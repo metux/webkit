@@ -51,6 +51,7 @@ public:
         void restoreTo(Settings*);
 
         bool m_originalCSSExclusionsEnabled;
+        bool m_originalCSSShapesEnabled;
         bool m_originalCSSVariablesEnabled;
 #if ENABLE(SHADOW_DOM)
         bool m_originalShadowDOMEnabled;
@@ -60,13 +61,11 @@ public:
         bool m_originalStyleScoped;
 #endif
         EditingBehaviorType m_originalEditingBehavior;
-        bool m_originalUnifiedSpellCheckerEnabled;
 #if ENABLE(TEXT_AUTOSIZING)
         bool m_originalTextAutosizingEnabled;
         IntSize m_originalTextAutosizingWindowSizeOverride;
         float m_originalTextAutosizingFontScaleFactor;
 #endif
-        IntSize m_originalResolutionOverride;
         String m_originalMediaTypeOverride;
 #if ENABLE(DIALOG_ELEMENT)
         bool m_originalDialogElementEnabled;
@@ -82,6 +81,9 @@ public:
         bool m_shouldDisplayCaptions;
         bool m_shouldDisplayTextDescriptions;
 #endif
+        String m_defaultVideoPosterURL;
+        bool m_originalTimeWithoutMouseMovementBeforeHidingControls;
+        bool m_useLegacyBackgroundSizeShorthandBehavior;
     };
 
     static PassRefPtr<InternalSettings> create(Page* page)
@@ -110,11 +112,9 @@ public:
     void setTextAutosizingEnabled(bool enabled, ExceptionCode&);
     void setTextAutosizingWindowSizeOverride(int width, int height, ExceptionCode&);
     void setTextAutosizingFontScaleFactor(float fontScaleFactor, ExceptionCode&);
-    void setResolutionOverride(int dotsPerCSSInchHorizontally, int dotsPerCSSInchVertically, ExceptionCode&);
     void setMediaTypeOverride(const String& mediaType, ExceptionCode&);
-    void setEnableScrollAnimator(bool enabled, ExceptionCode&);
-    bool scrollAnimatorEnabled(ExceptionCode&);
     void setCSSExclusionsEnabled(bool enabled, ExceptionCode&);
+    void setCSSShapesEnabled(bool enabled, ExceptionCode&);
     void setCSSVariablesEnabled(bool enabled, ExceptionCode&);
     bool cssVariablesEnabled(ExceptionCode&);
     void setCanStartMedia(bool, ExceptionCode&);
@@ -126,6 +126,9 @@ public:
     void setLangAttributeAwareFormControlUIEnabled(bool);
     void setImagesEnabled(bool enabled, ExceptionCode&);
     void setMinimumTimerInterval(double intervalInSeconds, ExceptionCode&);
+    void setDefaultVideoPosterURL(const String& url, ExceptionCode&);
+    void setTimeWithoutMouseMovementBeforeHidingControls(double time, ExceptionCode&);
+    void setUseLegacyBackgroundSizeShorthandBehavior(bool enabled, ExceptionCode&);
 
 private:
     explicit InternalSettings(Page*);

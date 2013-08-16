@@ -32,19 +32,24 @@
 #include "WebURLRequest.h"
 #include <wtf/PassRefPtr.h>
 #include <wtf/RefPtr.h>
-#include <wtf/UnusedParam.h>
 #include <wtf/text/WTFString.h>
 
 // Supplements
 #include "WebApplicationCacheManagerProxy.h"
 #include "WebCookieManagerProxy.h"
 #include "WebGeolocationManagerProxy.h"
-#include "WebKeyValueStorageManagerProxy.h"
+#include "WebKeyValueStorageManager.h"
 #include "WebMediaCacheManagerProxy.h"
 #include "WebNotificationManagerProxy.h"
 #include "WebResourceCacheManagerProxy.h"
 #if ENABLE(SQL_DATABASE)
 #include "WebDatabaseManagerProxy.h"
+#endif
+#if ENABLE(BATTERY_STATUS)
+#include "WebBatteryManagerProxy.h"
+#endif
+#if ENABLE(NETWORK_INFO)
+#include "WebNetworkInfoManagerProxy.h"
 #endif
 
 using namespace WebKit;
@@ -206,7 +211,7 @@ WKApplicationCacheManagerRef WKContextGetApplicationCacheManager(WKContextRef co
 WKBatteryManagerRef WKContextGetBatteryManager(WKContextRef contextRef)
 {
 #if ENABLE(BATTERY_STATUS)
-    return toAPI(toImpl(contextRef)->batteryManagerProxy());
+    return toAPI(toImpl(contextRef)->supplement<WebBatteryManagerProxy>());
 #else
     return 0;
 #endif
@@ -229,7 +234,7 @@ WKGeolocationManagerRef WKContextGetGeolocationManager(WKContextRef contextRef)
 WKNetworkInfoManagerRef WKContextGetNetworkInfoManager(WKContextRef contextRef)
 {
 #if ENABLE(NETWORK_INFO)
-    return toAPI(toImpl(contextRef)->networkInfoManagerProxy());
+    return toAPI(toImpl(contextRef)->supplement<WebNetworkInfoManagerProxy>());
 #else
     return 0;
 #endif
@@ -242,7 +247,7 @@ WKIconDatabaseRef WKContextGetIconDatabase(WKContextRef contextRef)
 
 WKKeyValueStorageManagerRef WKContextGetKeyValueStorageManager(WKContextRef contextRef)
 {
-    return toAPI(toImpl(contextRef)->supplement<WebKeyValueStorageManagerProxy>());
+    return toAPI(toImpl(contextRef)->supplement<WebKeyValueStorageManager>());
 }
 
 WKMediaCacheManagerRef WKContextGetMediaCacheManager(WKContextRef contextRef)
@@ -287,6 +292,11 @@ void WKContextSetIconDatabasePath(WKContextRef contextRef, WKStringRef iconDatab
 void WKContextAllowSpecificHTTPSCertificateForHost(WKContextRef contextRef, WKCertificateInfoRef certificateRef, WKStringRef hostRef)
 {
     toImpl(contextRef)->allowSpecificHTTPSCertificateForHost(toImpl(certificateRef), toImpl(hostRef)->string());
+}
+
+WK_EXPORT void WKContextSetApplicationCacheDirectory(WKContextRef contextRef, WKStringRef applicationCacheDirectory)
+{
+    toImpl(contextRef)->setApplicationCacheDirectory(toImpl(applicationCacheDirectory)->string());
 }
 
 void WKContextSetDatabaseDirectory(WKContextRef contextRef, WKStringRef databaseDirectory)
@@ -364,6 +374,18 @@ void WKContextSetPlugInAutoStartOriginHashes(WKContextRef contextRef, WKDictiona
     if (!dictionaryRef)
         return;
     toImpl(contextRef)->setPlugInAutoStartOriginHashes(*toImpl(dictionaryRef));
+}
+
+void WKContextSetPlugInAutoStartOrigins(WKContextRef contextRef, WKArrayRef arrayRef)
+{
+    if (!arrayRef)
+        return;
+    toImpl(contextRef)->setPlugInAutoStartOrigins(*toImpl(arrayRef));
+}
+
+void WKContextSetInvalidMessageFunction(WKContextInvalidMessageFunction invalidMessageFunction)
+{
+    WebContext::setInvalidMessageCallback(invalidMessageFunction);
 }
 
 // Deprecated functions.

@@ -36,7 +36,6 @@
 #include "PropertySetCSSStyleDeclaration.h"
 #include "StylePropertySet.h"
 #include "StyleRule.h"
-#include "WebCoreMemoryInstrumentation.h"
 #include <wtf/text/StringBuilder.h>
 
 namespace WebCore {
@@ -53,10 +52,10 @@ WebKitCSSViewportRule::~WebKitCSSViewportRule()
         m_propertiesCSSOMWrapper->clearParentRule();
 }
 
-CSSStyleDeclaration* WebKitCSSViewportRule::style() const
+CSSStyleDeclaration* WebKitCSSViewportRule::style()
 {
     if (!m_propertiesCSSOMWrapper)
-        m_propertiesCSSOMWrapper = StyleRuleCSSStyleDeclaration::create(m_viewportRule->mutableProperties(), const_cast<WebKitCSSViewportRule*>(this));
+        m_propertiesCSSOMWrapper = StyleRuleCSSStyleDeclaration::create(m_viewportRule->mutableProperties(), this);
 
     return m_propertiesCSSOMWrapper.get();
 }
@@ -66,7 +65,7 @@ String WebKitCSSViewportRule::cssText() const
     StringBuilder result;
     result.appendLiteral("@-webkit-viewport { ");
 
-    String decls = m_viewportRule->properties()->asText();
+    String decls = m_viewportRule->properties().asText();
     result.append(decls);
     if (!decls.isEmpty())
         result.append(' ');
@@ -84,14 +83,6 @@ void WebKitCSSViewportRule::reattach(StyleRuleBase* rule)
 
     if (m_propertiesCSSOMWrapper)
         m_propertiesCSSOMWrapper->reattach(m_viewportRule->mutableProperties());
-}
-
-void WebKitCSSViewportRule::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
-{
-    MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::CSS);
-    CSSRule::reportMemoryUsage(memoryObjectInfo);
-    info.addMember(m_viewportRule, "viewportRule");
-    info.addMember(m_propertiesCSSOMWrapper, "propertiesCSSOMWrapper");
 }
 
 } // namespace WebCore

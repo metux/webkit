@@ -9,13 +9,15 @@ Build configuration:
  Enable GCC build optimization                            : $enable_optimizations
  Code coverage support                                    : $enable_coverage
  Optimized memory allocator                               : $enable_fast_malloc
- Accelerated rendering backend                            : $acceleration_backend_description
+ Accelerated rendering backend                            : $acceleration_description
 
 Features:
 =======
  WebKit1 support                                          : $enable_webkit1
  WebKit2 support                                          : $enable_webkit2
  Accelerated Compositing                                  : $enable_accelerated_compositing
+ Accelerated 2D canvas                                    : $enable_accelerated_canvas
+ Battery API support                                      : $enable_battery_status
  Gamepad support                                          : $enable_gamepad
  Geolocation support                                      : $enable_geolocation
  HTML5 video element support                              : $enable_video
@@ -27,7 +29,6 @@ Features:
  Credential storage support                               : $enable_credential_storage
  Web Audio support                                        : $enable_web_audio
  WebGL                                                    : $enable_webgl
- XSLT support                                             : $enable_xslt
 
 
 GTK+ configuration:

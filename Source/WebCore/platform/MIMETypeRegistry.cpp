@@ -39,6 +39,7 @@
 #include <ApplicationServices/ApplicationServices.h>
 #include <wtf/RetainPtr.h>
 #endif
+
 #if PLATFORM(QT)
 #include <QImageReader>
 #include <QImageWriter>
@@ -187,6 +188,7 @@ static HashSet<String>* supportedImageMIMETypesForEncoding;
 static HashSet<String>* supportedJavaScriptMIMETypes;
 static HashSet<String>* supportedNonImageMIMETypes;
 static HashSet<String>* supportedMediaMIMETypes;
+static HashSet<String>* pdfAndPostScriptMIMETypes;
 static HashSet<String>* unsupportedTextMIMETypes;
 
 typedef HashMap<String, Vector<String>*, CaseFoldingHash> MediaMIMETypeMap;
@@ -194,11 +196,11 @@ typedef HashMap<String, Vector<String>*, CaseFoldingHash> MediaMIMETypeMap;
 static void initializeSupportedImageMIMETypes()
 {
 #if USE(CG)
-    RetainPtr<CFArrayRef> supportedTypes(AdoptCF, CGImageSourceCopyTypeIdentifiers());
+    RetainPtr<CFArrayRef> supportedTypes = adoptCF(CGImageSourceCopyTypeIdentifiers());
     CFIndex count = CFArrayGetCount(supportedTypes.get());
     for (CFIndex i = 0; i < count; i++) {
-        RetainPtr<CFStringRef> supportedType(AdoptCF, reinterpret_cast<CFStringRef>(CFArrayGetValueAtIndex(supportedTypes.get(), i)));
-        String mimeType = MIMETypeForImageSourceType(supportedType.get());
+        CFStringRef supportedType = reinterpret_cast<CFStringRef>(CFArrayGetValueAtIndex(supportedTypes.get(), i));
+        String mimeType = MIMETypeForImageSourceType(supportedType);
         if (!mimeType.isEmpty()) {
             supportedImageMIMETypes->add(mimeType);
             supportedImageResourceMIMETypes->add(mimeType);
@@ -244,22 +246,35 @@ static void initializeSupportedImageMIMETypes()
         supportedImageResourceMIMETypes->add(types[i]);
     }
 
+#if USE(WEBP)
+    supportedImageMIMETypes->add("image/webp");
+    supportedImageResourceMIMETypes->add("image/webp");
+#endif
+
 #if PLATFORM(QT)
+#if QT_VERSION >= QT_VERSION_CHECK(5, 1, 0)
+    QList<QByteArray> mimeTypes = QImageReader::supportedMimeTypes();
+    Q_FOREACH(const QByteArray& mimeType, mimeTypes) {
+        supportedImageMIMETypes->add(mimeType.constData());
+        supportedImageResourceMIMETypes->add(mimeType.constData());
+    }
+#else
     QList<QByteArray> formats = QImageReader::supportedImageFormats();
-    for (size_t i = 0; i < static_cast<size_t>(formats.size()); ++i) {
-#if ENABLE(SVG)
-        // Qt has support for SVG, but we want to use KSVG2
-        if (formats.at(i).toLower().startsWith("svg"))
-            continue;
-#endif // ENABLE(SVG)
+    for (int i = 0; i < formats.size(); ++i) {
         String mimeType = MIMETypeRegistry::getMIMETypeForExtension(formats.at(i).constData());
         if (!mimeType.isEmpty()) {
             supportedImageMIMETypes->add(mimeType);
             supportedImageResourceMIMETypes->add(mimeType);
         }
-     }
-#endif // PLATFORM(QT)
+    }
+#endif // QT_VERSION
+#if ENABLE(SVG)
+    // Do not treat SVG as images directly if WebKit can handle them.
+    supportedImageMIMETypes->remove("image/svg+xml");
+    supportedImageResourceMIMETypes->remove("image/svg+xml");
 #endif
+#endif // PLATFORM(QT)
+#endif // USE(CG)
 }
 
 static void initializeSupportedImageMIMETypesForEncoding()
@@ -268,11 +283,11 @@ static void initializeSupportedImageMIMETypesForEncoding()
 
 #if USE(CG)
 #if PLATFORM(MAC)
-    RetainPtr<CFArrayRef> supportedTypes(AdoptCF, CGImageDestinationCopyTypeIdentifiers());
+    RetainPtr<CFArrayRef> supportedTypes = adoptCF(CGImageDestinationCopyTypeIdentifiers());
     CFIndex count = CFArrayGetCount(supportedTypes.get());
     for (CFIndex i = 0; i < count; i++) {
-        RetainPtr<CFStringRef> supportedType(AdoptCF, reinterpret_cast<CFStringRef>(CFArrayGetValueAtIndex(supportedTypes.get(), i)));
-        String mimeType = MIMETypeForImageSourceType(supportedType.get());
+        CFStringRef supportedType = reinterpret_cast<CFStringRef>(CFArrayGetValueAtIndex(supportedTypes.get(), i));
+        String mimeType = MIMETypeForImageSourceType(supportedType);
         if (!mimeType.isEmpty())
             supportedImageMIMETypesForEncoding->add(mimeType);
     }
@@ -284,12 +299,19 @@ static void initializeSupportedImageMIMETypesForEncoding()
     supportedImageMIMETypesForEncoding->add("image/gif");
 #endif
 #elif PLATFORM(QT)
+#if QT_VERSION >= QT_VERSION_CHECK(5, 1, 0)
+    QList<QByteArray> mimeTypes = QImageWriter::supportedMimeTypes();
+    Q_FOREACH(const QByteArray& mimeType, mimeTypes) {
+        supportedImageMIMETypesForEncoding->add(mimeType.constData());
+    }
+#else
     QList<QByteArray> formats = QImageWriter::supportedImageFormats();
     for (int i = 0; i < formats.size(); ++i) {
         String mimeType = MIMETypeRegistry::getMIMETypeForExtension(formats.at(i).constData());
         if (!mimeType.isEmpty())
             supportedImageMIMETypesForEncoding->add(mimeType);
     }
+#endif // QT_VERSION
 #elif PLATFORM(GTK)
     supportedImageMIMETypesForEncoding->add("image/png");
     supportedImageMIMETypesForEncoding->add("image/jpeg");
@@ -328,6 +350,17 @@ static void initializeSupportedJavaScriptMIMETypes()
     };
     for (size_t i = 0; i < WTF_ARRAY_LENGTH(types); ++i)
       supportedJavaScriptMIMETypes->add(types[i]);
+}
+
+static void initializePDFAndPostScriptMIMETypes()
+{
+    const char* const types[] = {
+        "application/pdf",
+        "text/pdf",
+        "application/postscript",
+    };
+    for (size_t i = 0; i < WTF_ARRAY_LENGTH(types); ++i)
+        pdfAndPostScriptMIMETypes->add(types[i]);
 }
 
 static void initializeSupportedNonImageMimeTypes()
@@ -467,6 +500,9 @@ static void initializeMIMETypeRegistry()
     supportedImageMIMETypes = new HashSet<String>;
     initializeSupportedImageMIMETypes();
 
+    pdfAndPostScriptMIMETypes = new HashSet<String>;
+    initializePDFAndPostScriptMIMETypes();
+
     unsupportedTextMIMETypes = new HashSet<String>;
     initializeUnsupportedTextMIMETypes();
 }
@@ -581,6 +617,15 @@ bool MIMETypeRegistry::isJavaAppletMIMEType(const String& mimeType)
         || mimeType.startsWith("application/x-java-vm", false);
 }
 
+bool MIMETypeRegistry::isPDFOrPostScriptMIMEType(const String& mimeType)
+{
+    if (mimeType.isEmpty())
+        return false;
+    if (!pdfAndPostScriptMIMETypes)
+        initializeMIMETypeRegistry();
+    return pdfAndPostScriptMIMETypes->contains(mimeType);
+}
+
 bool MIMETypeRegistry::canShowMIMEType(const String& mimeType)
 {
     if (isSupportedImageMIMEType(mimeType) || isSupportedNonImageMIMEType(mimeType) || isSupportedMediaMIMEType(mimeType))
@@ -627,6 +672,13 @@ HashSet<String>& MIMETypeRegistry::getSupportedMediaMIMETypes()
     return *supportedMediaMIMETypes;
 }
 
+HashSet<String>& MIMETypeRegistry::getPDFAndPostScriptMIMETypes()
+{
+    if (!pdfAndPostScriptMIMETypes)
+        initializeMIMETypeRegistry();
+    return *pdfAndPostScriptMIMETypes;
+}
+
 HashSet<String>& MIMETypeRegistry::getUnsupportedTextMIMETypes()
 {
     if (!unsupportedTextMIMETypes)
@@ -640,14 +692,14 @@ const String& defaultMIMEType()
     return defaultMIMEType;
 }
 
-#if !PLATFORM(QT) && !PLATFORM(BLACKBERRY)
+#if !PLATFORM(QT) && !PLATFORM(BLACKBERRY) && !USE(CURL)
 String MIMETypeRegistry::getNormalizedMIMEType(const String& mimeType)
 {
     return mimeType;
 }
 #endif
 
-#if PLATFORM(BLACKBERRY)
+#if PLATFORM(BLACKBERRY) || USE(CURL)
 typedef HashMap<String, String> MIMETypeAssociationMap;
 
 static const MIMETypeAssociationMap& mimeTypeAssociationMap()

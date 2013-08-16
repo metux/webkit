@@ -35,7 +35,6 @@
 #include "GraphicsContext.h"
 #include "GtkVersioning.h"
 #include "HTMLMediaElement.h"
-#include "HTMLNames.h"
 #include "LocalizedStrings.h"
 #include "MediaControlElements.h"
 #include "PaintInfo.h"
@@ -62,8 +61,6 @@ namespace WebCore {
 extern GRefPtr<GdkPixbuf> getStockIconForWidgetType(GType, const char* iconName, gint direction, gint state, gint iconSize);
 extern GRefPtr<GdkPixbuf> getStockSymbolicIconForWidgetType(GType widgetType, const char* symbolicIconName, const char *fallbackStockIconName, gint direction, gint state, gint iconSize);
 
-using namespace HTMLNames;
-
 #if ENABLE(VIDEO)
 static HTMLMediaElement* getMediaElementFromRenderObject(RenderObject* o)
 {
@@ -71,10 +68,10 @@ static HTMLMediaElement* getMediaElementFromRenderObject(RenderObject* o)
     Node* mediaNode = node ? node->shadowHost() : 0;
     if (!mediaNode)
         mediaNode = node;
-    if (!mediaNode || !mediaNode->isElementNode() || !static_cast<Element*>(mediaNode)->isMediaElement())
+    if (!mediaNode || !mediaNode->isElementNode() || !toElement(mediaNode)->isMediaElement())
         return 0;
 
-    return static_cast<HTMLMediaElement*>(mediaNode);
+    return toHTMLMediaElement(mediaNode);
 }
 
 void RenderThemeGtk::initMediaButtons()
@@ -440,7 +437,7 @@ double RenderThemeGtk::getScreenDPI()
     return dpi;
 }
 
-void RenderThemeGtk::systemFont(int, FontDescription& fontDescription) const
+void RenderThemeGtk::systemFont(CSSValueID, FontDescription& fontDescription) const
 {
     GtkSettings* settings = gtk_settings_get_default();
     if (!settings)
@@ -454,7 +451,7 @@ void RenderThemeGtk::systemFont(int, FontDescription& fontDescription) const
     if (!pangoDescription)
         return;
 
-    fontDescription.firstFamily().setFamily(pango_font_description_get_family(pangoDescription));
+    fontDescription.setOneFamily(pango_font_description_get_family(pangoDescription));
 
     int size = pango_font_description_get_size(pangoDescription) / PANGO_SCALE;
     // If the size of the font is in points, we need to convert it to pixels.

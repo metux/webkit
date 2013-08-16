@@ -246,7 +246,7 @@ static PassRefPtr<ImmutableArray> toImmutableArray(const char* const* list)
  * @base_uri: (allow-none): the base URI to use when processing the style_sheet contents or %NULL for about:blank
  * @whitelist: (array zero-terminated=1) (allow-none): a whitelist of URI patterns or %NULL
  * @blacklist: (array zero-terminated=1) (allow-none): a blacklist of URI patterns or %NULL
- * @injected_frames: a #WebKitInjectedFrames describing to which frames the style_sheet should apply
+ * @injected_frames: a #WebKitInjectedContentFrames describing to which frames the style_sheet should apply
  *
  * Inject an external style sheet into pages. It is possible to only apply the style sheet
  * to some URIs by passing non-null values for @whitelist or @blacklist. Passing a %NULL
@@ -277,7 +277,7 @@ void webkit_web_view_group_add_user_style_sheet(WebKitWebViewGroup* group, const
  * webkit_web_view_group_remove_all_user_style_sheets:
  * @group: a #WebKitWebViewGroup
  *
- * Remove all style sheets previously injected into this #WebKitWebViewGroup
+ * Remove all style sheets previously injected into this #WebKitWebViewGroup 
  * via webkit_web_view_group_add_user_style_sheet().
  */
 void webkit_web_view_group_remove_all_user_style_sheets(WebKitWebViewGroup* group)

@@ -77,7 +77,8 @@ WebInspector.CSSStyleModel.Events = {
     MediaQueryResultChanged: "MediaQueryResultChanged",
     NamedFlowCreated: "NamedFlowCreated",
     NamedFlowRemoved: "NamedFlowRemoved",
-    RegionLayoutUpdated: "RegionLayoutUpdated"
+    RegionLayoutUpdated: "RegionLayoutUpdated",
+    RegionOversetChanged: "RegionOversetChanged"
 }
 
 WebInspector.CSSStyleModel.MediaTypes = ["all", "braille", "embossed", "handheld", "print", "projection", "screen", "speech", "tty", "tv"];
@@ -428,6 +429,21 @@ WebInspector.CSSStyleModel.prototype = {
         namedFlowCollection._appendNamedFlow(namedFlow);
         this.dispatchEventToListeners(WebInspector.CSSStyleModel.Events.RegionLayoutUpdated, namedFlow);
     },
+    
+    /**
+     * @param {CSSAgent.NamedFlow} namedFlowPayload
+     */
+    _regionOversetChanged: function(namedFlowPayload)
+    {
+        var namedFlow = WebInspector.NamedFlow.parsePayload(namedFlowPayload);
+        var namedFlowCollection = this._namedFlowCollections[namedFlow.documentNodeId];
+        
+        if (!namedFlowCollection)
+            return;
+        
+        namedFlowCollection._appendNamedFlow(namedFlow);
+        this.dispatchEventToListeners(WebInspector.CSSStyleModel.Events.RegionOversetChanged, namedFlow);
+    },
 
     /**
      * @param {CSSAgent.StyleSheetId} styleSheetId
@@ -552,29 +568,6 @@ WebInspector.CSSStyleModel.prototype = {
         if (!uiSourceCode)
             return null;
         return new WebInspector.UILocation(uiSourceCode, rawLocation.lineNumber, rawLocation.columnNumber);
-    },
-
-    /**
-     * @param {DOMAgent.NodeId} nodeId
-     */
-    toggleInlineVisibility: function(nodeId)
-    {
-        /**
-         * @param {WebInspector.CSSStyleDeclaration} inlineStyles
-         */
-        function callback(inlineStyles)
-        {
-            var visibility = inlineStyles.getLiveProperty("visibility");
-            if (visibility) {
-                if (visibility.value === "hidden")
-                    visibility.setText("", false, true);
-                else
-                    visibility.setValue("hidden", false, true);
-            } else
-                inlineStyles.appendProperty("visibility", "hidden");
-        }
-
-        this.getInlineStylesAsync(nodeId, callback.bind(this));
     },
 
     __proto__: WebInspector.Object.prototype
@@ -854,13 +847,12 @@ WebInspector.CSSRule = function(payload, matchingSelectors)
     this.selectorRange = payload.selectorList.range;
     this.sourceLine = payload.sourceLine;
     this.sourceURL = payload.sourceURL;
-    if (payload.sourceURL)
-        this._rawLocation = new WebInspector.CSSLocation(payload.sourceURL, payload.sourceLine);
     this.origin = payload.origin;
     this.style = WebInspector.CSSStyleDeclaration.parsePayload(payload.style);
     this.style.parentRule = this;
     if (payload.media)
         this.media = WebInspector.CSSMedia.parseMediaArrayPayload(payload.media);
+    this._setRawLocation(payload);
 }
 
 /**
@@ -874,6 +866,20 @@ WebInspector.CSSRule.parsePayload = function(payload, matchingIndices)
 }
 
 WebInspector.CSSRule.prototype = {
+    _setRawLocation: function(payload)
+    {
+        if (!payload.sourceURL)
+            return;
+        if (this.selectorRange) {
+            var resource = WebInspector.resourceTreeModel.resourceForURL(payload.sourceURL);
+            if (resource && resource.type === WebInspector.resourceTypes.Stylesheet) {
+                this._rawLocation = new WebInspector.CSSLocation(payload.sourceURL, this.selectorRange.startLine, this.selectorRange.startColumn);
+                return;
+            }
+        }
+        this._rawLocation = new WebInspector.CSSLocation(payload.sourceURL, payload.sourceLine);
+    },
+
     get isUserAgent()
     {
         return this.origin === "user-agent";
@@ -892,6 +898,17 @@ WebInspector.CSSRule.prototype = {
     get isRegular()
     {
         return this.origin === "regular";
+    },
+
+    /**
+     * @return {boolean}
+     */
+    isSourceNavigable: function()
+    {
+        if (!this.sourceURL)
+            return false;
+        var resource = WebInspector.resourceTreeModel.resourceForURL(this.sourceURL);
+        return !!resource && resource.contentType() === WebInspector.resourceTypes.Stylesheet;
     }
 }
 
@@ -1080,6 +1097,23 @@ WebInspector.CSSProperty.prototype = {
 
         WebInspector.cssModel._pendingCommandsMajorState.push(false);
         CSSAgent.toggleProperty(this.ownerStyle.id, this.index, disabled, callback.bind(this));
+    },
+
+    /**
+     * @param {boolean} forName
+     * @return {WebInspector.UILocation}
+     */
+    uiLocation: function(forName)
+    {
+        if (!this.range || !this.ownerStyle || !this.ownerStyle.parentRule || !this.ownerStyle.parentRule.sourceURL)
+            return null;
+
+        var range = this.range;
+        var line = forName ? range.startLine : range.endLine;
+        // End of range is exclusive, so subtract 1 from the end offset.
+        var column = forName ? range.startColumn : range.endColumn - 1;
+        var rawLocation = new WebInspector.CSSLocation(this.ownerStyle.parentRule.sourceURL, line, column);
+        return WebInspector.cssModel.rawLocationToUILocation(rawLocation);
     }
 }
 
@@ -1421,6 +1455,14 @@ WebInspector.CSSDispatcher.prototype = {
     regionLayoutUpdated: function(namedFlowPayload)
     {
         this._cssModel._regionLayoutUpdated(namedFlowPayload);
+    },
+    
+    /**
+     * @param {CSSAgent.NamedFlow} namedFlowPayload
+     */
+    regionOversetChanged: function(namedFlowPayload)
+    {
+        this._cssModel._regionOversetChanged(namedFlowPayload);
     }
 }
 

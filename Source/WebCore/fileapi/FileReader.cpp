@@ -40,7 +40,7 @@
 #include "Logging.h"
 #include "ProgressEvent.h"
 #include "ScriptExecutionContext.h"
-#include <wtf/ArrayBuffer.h>
+#include <runtime/ArrayBuffer.h>
 #include <wtf/CurrentTime.h>
 #include <wtf/text/CString.h>
 
@@ -56,7 +56,7 @@ PassRefPtr<FileReader> FileReader::create(ScriptExecutionContext* context)
 }
 
 FileReader::FileReader(ScriptExecutionContext* context)
-    : ActiveDOMObject(context, this)
+    : ActiveDOMObject(context)
     , m_state(EMPTY)
     , m_aborting(false)
     , m_readType(FileReaderLoader::ReadAsBinaryString)

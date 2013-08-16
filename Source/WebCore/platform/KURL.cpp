@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2004, 2007, 2008, 2011, 2012 Apple Inc. All rights reserved.
+ * Copyright (C) 2004, 2007, 2008, 2011, 2012, 2013 Apple Inc. All rights reserved.
  * Copyright (C) 2012 Research In Motion Limited. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -29,14 +29,10 @@
 
 #include "DecodeEscapeSequences.h"
 #include "MIMETypeRegistry.h"
-#include "PlatformMemoryInstrumentation.h"
 #include "TextEncoding.h"
 #include <stdio.h>
 #include <wtf/HashMap.h>
-#if !USE(WTFURL)
 #include <wtf/HexNumber.h>
-#endif
-#include <wtf/MemoryInstrumentationString.h>
 #include <wtf/StdLibExtras.h>
 #include <wtf/text/CString.h>
 #include <wtf/text/StringBuilder.h>
@@ -66,8 +62,6 @@ static inline bool isLetterMatchIgnoringCase(UChar character, char lowercaseLett
     ASSERT(isASCIILower(lowercaseLetter));
     return (character | 0x20) == lowercaseLetter;
 }
-
-#if !USE(GOOGLEURL) && !USE(WTFURL)
 
 static const char wsScheme[] = {'w', 's'};
 static const char ftpScheme[] = {'f', 't', 'p'};
@@ -706,7 +700,7 @@ bool KURL::setProtocol(const String& s)
         return false;
 
     if (!m_isValid) {
-        parse(newProtocol + ":" + m_string);
+        parse(newProtocol + ':' + m_string);
         return true;
     }
 
@@ -1034,9 +1028,9 @@ static inline bool isDefaultPortForScheme(const char* port, size_t portLength, c
     return false;
 }
 
-static inline bool hostPortIsEmptyButCredentialsArePresent(int hostStart, int portEnd, char userEndChar)
+static inline bool hostPortIsEmptyButCredentialsArePresent(int hostStart, int portEnd, char userinfoEndChar)
 {
-    return userEndChar == '@' && hostStart == portEnd;
+    return userinfoEndChar == '@' && hostStart == portEnd;
 }
 
 static bool isNonFileHierarchicalScheme(const char* scheme, size_t schemeLength)
@@ -1213,10 +1207,10 @@ void KURL::parse(const char* url, const String* originalString)
             return;
         }
 
-        if (hostPortIsEmptyButCredentialsArePresent(hostStart, portEnd, url[userEnd])) {
-            // in this circumstance, act as if there is an erroneous hostname containing an '@'
-            userEnd = userStart;
-            hostStart = userEnd;
+        if (hostPortIsEmptyButCredentialsArePresent(hostStart, portEnd, url[passwordEnd])) {
+            m_string = originalString ? *originalString : url;
+            invalidate();
+            return;
         }
 
         if (userStart == portEnd && !m_protocolIsInHTTPFamily && !isFile) {
@@ -1287,7 +1281,9 @@ void KURL::parse(const char* url, const String* originalString)
     // File URLs need a host part unless it is just file:// or file://localhost
     bool degenerateFilePath = pathStart == pathEnd && (hostStart == hostEnd || hostIsLocalHost);
 
-    bool haveNonHostAuthorityPart = userStart != userEnd || passwordStart != passwordEnd || portStart != portEnd;
+    // We drop empty credentials, but keep a colon in an empty host/port pair.
+    // Removing hostname completely would change the structure of the URL on re-parsing.
+    bool haveNonHostAuthorityPart = userStart != userEnd || passwordStart != passwordEnd || hostEnd != portEnd;
 
     // add ":" after scheme
     *p++ = ':';
@@ -1302,8 +1298,11 @@ void KURL::parse(const char* url, const String* originalString)
         // copy in the user
         strPtr = url + userStart;
         const char* userEndPtr = url + userEnd;
-        while (strPtr < userEndPtr)
-            *p++ = *strPtr++;
+        while (strPtr < userEndPtr) {
+            char c = *strPtr++;
+            ASSERT(isUserInfoChar(c));
+            *p++ = c;
+        }
         m_userEnd = p - buffer.data();
 
         // copy in the password
@@ -1311,8 +1310,11 @@ void KURL::parse(const char* url, const String* originalString)
             *p++ = ':';
             strPtr = url + passwordStart;
             const char* passwordEndPtr = url + passwordEnd;
-            while (strPtr < passwordEndPtr)
-                *p++ = *strPtr++;
+            while (strPtr < passwordEndPtr) {
+                char c = *strPtr++;
+                ASSERT(isUserInfoChar(c));
+                *p++ = c;
+            }
         }
         m_passwordEnd = p - buffer.data();
 
@@ -1325,20 +1327,27 @@ void KURL::parse(const char* url, const String* originalString)
             strPtr = url + hostStart;
             const char* hostEndPtr = url + hostEnd;
             if (isCanonicalHostnameLowercaseForScheme(buffer.data(), m_schemeEnd)) {
-                while (strPtr < hostEndPtr)
-                    *p++ = toASCIILower(*strPtr++);
+                while (strPtr < hostEndPtr) {
+                    char c = toASCIILower(*strPtr++);
+                    ASSERT(isHostnameChar(c) || c == '[' || c == ']' || c == ':');
+                    *p++ = c;
+                }
             } else {
-                while (strPtr < hostEndPtr)
-                    *p++ = *strPtr++;
+                while (strPtr < hostEndPtr) {
+                    char c = *strPtr++;
+                    ASSERT(isHostnameChar(c) || c == '[' || c == ']' || c == ':');
+                    *p++ = c;
+                }
             }
         }
         m_hostEnd = p - buffer.data();
 
-        // Copy in the port if the URL has one (and it's not default).
+        // Copy in the port if the URL has one (and it's not default). Also, copy it if there was no hostname, so that there is still something in authority component.
         if (hostEnd != portStart) {
             const char* portStr = url + portStart;
             size_t portLength = portEnd - portStart;
-            if (portLength && !isDefaultPortForScheme(portStr, portLength, buffer.data(), m_schemeEnd)) {
+            if ((portLength && !isDefaultPortForScheme(portStr, portLength, buffer.data(), m_schemeEnd))
+                || (hostStart == hostEnd && hostEnd != portStart)) {
                 *p++ = ':';
                 const char* portEndPtr = url + portEnd;
                 while (portStr < portEndPtr)
@@ -1398,7 +1407,7 @@ void KURL::parse(const char* url, const String* originalString)
 
     // If we didn't end up actually changing the original string and
     // it was already in a String, reuse it to avoid extra allocation.
-    if (originalString && *originalString == buffer)
+    if (originalString && equal(originalString->impl(), buffer.data(), m_fragmentEnd))
         m_string = *originalString;
     else
         m_string = String(buffer.data(), m_fragmentEnd);
@@ -1686,7 +1695,7 @@ bool KURL::isHierarchical() const
     return m_string[m_schemeEnd + 1] == '/';
 }
 
-void KURL::copyToBuffer(CharBuffer& buffer) const
+void KURL::copyToBuffer(Vector<char, 512>& buffer) const
 {
     // FIXME: This throws away the high bytes of all the characters in the string!
     // That's fine for a valid URL, which is all ASCII, but not for invalid URLs.
@@ -1727,8 +1736,6 @@ void KURL::print() const
     printf("%s\n", m_string.utf8().data());
 }
 #endif
-
-#endif // !USE(GOOGLEURL) && !USE(WTFURL)
 
 String KURL::strippedForUseAsReferrer() const
 {
@@ -1897,7 +1904,7 @@ String mimeTypeFromDataURL(const String& url)
         index = url.find(',');
     if (index != notFound) {
         if (index > 5)
-            return url.substring(5, index - 5);
+            return url.substring(5, index - 5).lower();
         return "text/plain"; // Data URLs with no MIME type are considered text/plain.
     }
     return "";
@@ -1912,27 +1919,17 @@ String mimeTypeFromURL(const KURL& url)
     return MIMETypeRegistry::getMIMETypeForExtension(extension);
 }
 
-void KURL::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
-{
-    MemoryClassInfo info(memoryObjectInfo, this);
-#if USE(GOOGLEURL)
-    info.addMember(m_url, "url");
-#elif USE(WTFURL)
-    info.addMember(m_urlImpl, "urlImpl");
-#else // !USE(GOOGLEURL)
-    info.addMember(m_string, "string");
-#endif
-}
-
 bool KURL::isSafeToSendToAnotherThread() const
 {
-#if USE(GOOGLEURL)
-    return m_url.isSafeToSendToAnotherThread();
-#elif USE(WTFURL)
-    return m_urlImpl->isSafeToSendToAnotherThread();
-#else // !USE(GOOGLEURL)
     return m_string.isSafeToSendToAnotherThread();
-#endif
+}
+
+String KURL::stringCenterEllipsizedToLength(unsigned length) const
+{
+    if (string().length() <= length)
+        return string();
+
+    return string().left(length / 2 - 1) + "..." + string().right(length / 2 - 2);
 }
 
 }

@@ -50,6 +50,7 @@
 #include <WebCore/UserStyleSheet.h>
 #include <WebCore/ViewportArguments.h>
 #include <WebCore/WindowFeatures.h>
+#include <wtf/text/CString.h>
 #include <wtf/text/StringHash.h>
 
 using namespace WebCore;
@@ -165,7 +166,7 @@ bool ArgumentCoder<MimeClassInfo>::decode(ArgumentDecoder& decoder, MimeClassInf
 
 void ArgumentCoder<PluginInfo>::encode(ArgumentEncoder& encoder, const PluginInfo& pluginInfo)
 {
-    encoder << pluginInfo.name << pluginInfo.file << pluginInfo.desc << pluginInfo.mimes;
+    encoder << pluginInfo.name << pluginInfo.file << pluginInfo.desc << pluginInfo.mimes << pluginInfo.isApplicationPlugin;
 }
     
 bool ArgumentCoder<PluginInfo>::decode(ArgumentDecoder& decoder, PluginInfo& pluginInfo)
@@ -177,6 +178,8 @@ bool ArgumentCoder<PluginInfo>::decode(ArgumentDecoder& decoder, PluginInfo& plu
     if (!decoder.decode(pluginInfo.desc))
         return false;
     if (!decoder.decode(pluginInfo.mimes))
+        return false;
+    if (!decoder.decode(pluginInfo.isApplicationPlugin))
         return false;
 
     return true;
@@ -387,6 +390,10 @@ void ArgumentCoder<ResourceRequest>::encode(ArgumentEncoder& encoder, const Reso
         encoder << resourceRequest.firstPartyForCookies().string();
     }
 
+#if ENABLE(CACHE_PARTITIONING)
+    encoder << resourceRequest.cachePartition();
+#endif
+
     encodePlatformData(encoder, resourceRequest);
 }
 
@@ -428,12 +435,28 @@ bool ArgumentCoder<ResourceRequest>::decode(ArgumentDecoder& decoder, ResourceRe
         resourceRequest = request;
     }
 
+#if ENABLE(CACHE_PARTITIONING)
+    String cachePartition;
+    if (!decoder.decode(cachePartition))
+        return false;
+    resourceRequest.setCachePartition(cachePartition);
+#endif
+
     return decodePlatformData(decoder, resourceRequest);
 }
 
 void ArgumentCoder<ResourceResponse>::encode(ArgumentEncoder& encoder, const ResourceResponse& resourceResponse)
 {
-    if (kShouldSerializeWebCoreData) {
+#if PLATFORM(MAC)
+    bool shouldSerializeWebCoreData = !resourceResponse.platformResponseIsUpToDate();
+    encoder << shouldSerializeWebCoreData;
+#else
+    bool shouldSerializeWebCoreData = true;
+#endif
+
+    encodePlatformData(encoder, resourceResponse);
+
+    if (shouldSerializeWebCoreData) {
         bool responseIsNull = resourceResponse.isNull();
         encoder << responseIsNull;
         if (responseIsNull)
@@ -449,13 +472,24 @@ void ArgumentCoder<ResourceResponse>::encode(ArgumentEncoder& encoder, const Res
         encoder << resourceResponse.httpStatusText();
         encoder << resourceResponse.suggestedFilename();
     }
-
-    encodePlatformData(encoder, resourceResponse);
 }
 
 bool ArgumentCoder<ResourceResponse>::decode(ArgumentDecoder& decoder, ResourceResponse& resourceResponse)
 {
-    if (kShouldSerializeWebCoreData) {
+#if PLATFORM(MAC)
+    bool hasSerializedWebCoreData;
+    if (!decoder.decode(hasSerializedWebCoreData))
+        return false;
+#else
+    bool hasSerializedWebCoreData = true;
+#endif
+
+    ResourceResponse response;
+
+    if (!decodePlatformData(decoder, response))
+        return false;
+
+    if (hasSerializedWebCoreData) {
         bool responseIsNull;
         if (!decoder.decode(responseIsNull))
             return false;
@@ -463,8 +497,6 @@ bool ArgumentCoder<ResourceResponse>::decode(ArgumentDecoder& decoder, ResourceR
             resourceResponse = ResourceResponse();
             return true;
         }
-
-        ResourceResponse response;
 
         String url;
         if (!decoder.decode(url))
@@ -506,11 +538,11 @@ bool ArgumentCoder<ResourceResponse>::decode(ArgumentDecoder& decoder, ResourceR
         if (!decoder.decode(suggestedFilename))
             return false;
         response.setSuggestedFilename(suggestedFilename);
-
-        resourceResponse = response;
     }
 
-    return decodePlatformData(decoder, resourceResponse);
+    resourceResponse = response;
+
+    return true;
 }
 
 void ArgumentCoder<ResourceError>::encode(ArgumentEncoder& encoder, const ResourceError& resourceError)
@@ -829,6 +861,35 @@ bool ArgumentCoder<GrammarDetail>::decode(ArgumentDecoder& decoder, GrammarDetai
     return true;
 }
 
+void ArgumentCoder<TextCheckingRequestData>::encode(ArgumentEncoder& encoder, const TextCheckingRequestData& request)
+{
+    encoder << request.sequence();
+    encoder << request.text();
+    encoder << request.mask();
+    encoder.encodeEnum(request.processType());
+}
+
+bool ArgumentCoder<TextCheckingRequestData>::decode(ArgumentDecoder& decoder, TextCheckingRequestData& request)
+{
+    int sequence;
+    if (!decoder.decode(sequence))
+        return false;
+
+    String text;
+    if (!decoder.decode(text))
+        return false;
+
+    TextCheckingTypeMask mask;
+    if (!decoder.decode(mask))
+        return false;
+
+    TextCheckingProcessType processType;
+    if (!decoder.decodeEnum(processType))
+        return false;
+
+    request = TextCheckingRequestData(sequence, text, mask, processType);
+    return true;
+}
 
 void ArgumentCoder<TextCheckingResult>::encode(ArgumentEncoder& encoder, const TextCheckingResult& result)
 {

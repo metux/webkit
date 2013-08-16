@@ -3,7 +3,7 @@
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 <title>WebKitContextMenuItem</title>
-<meta name="generator" content="DocBook XSL Stylesheets V1.76.1">
+<meta name="generator" content="DocBook XSL Stylesheets V1.78.1">
 <link rel="home" href="index.html" title="WebKit2GTK+ Reference Manual">
 <link rel="up" href="ch01.html" title="Class Overview">
 <link rel="prev" href="WebKitContextMenu.html" title="WebKitContextMenu">
@@ -144,8 +144,11 @@ for the items. You can also create separators and submenus.
 Enum values used to denote the stock actions for
 <a class="link" href="WebKitContextMenuItem.html" title="WebKitContextMenuItem"><span class="type">WebKitContextMenuItem</span></a>s
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><a name="WEBKIT-CONTEXT-MENU-ACTION-NO-ACTION:CAPS"></a><span class="term"><code class="literal">WEBKIT_CONTEXT_MENU_ACTION_NO_ACTION</code></span></p></td>
@@ -372,8 +375,11 @@ Enum values used to denote the stock actions for
 <p>
 Creates a new <a class="link" href="WebKitContextMenuItem.html" title="WebKitContextMenuItem"><span class="type">WebKitContextMenuItem</span></a> for the given <em class="parameter"><code>action</code></em>.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>action</code></em> :</span></p></td>
@@ -403,8 +409,11 @@ load operation will be stopped. You can get the <a href="../gtk2/GtkAction.html"
 to be notified when the item is activated. But you can't prevent the asociated
 action from being performed.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>action</code></em> :</span></p></td>
@@ -428,8 +437,11 @@ Creates a new <a class="link" href="WebKitContextMenuItem.html" title="WebKitCon
 Stock actions have a predefined label, this method can be used to create a
 <a class="link" href="WebKitContextMenuItem.html" title="WebKitContextMenuItem"><span class="type">WebKitContextMenuItem</span></a> for a <a class="link" href="WebKitContextMenuItem.html#WebKitContextMenuAction" title="enum WebKitContextMenuAction"><span class="type">WebKitContextMenuAction</span></a> but using a custom label.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>action</code></em> :</span></p></td>
@@ -455,8 +467,11 @@ Stock actions have a predefined label, this method can be used to create a
 <p>
 Creates a new <a class="link" href="WebKitContextMenuItem.html" title="WebKitContextMenuItem"><span class="type">WebKitContextMenuItem</span></a> using the given <em class="parameter"><code>label</code></em> with a submenu.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>label</code></em> :</span></p></td>
@@ -481,8 +496,11 @@ Creates a new <a class="link" href="WebKitContextMenuItem.html" title="WebKitCon
 <p>
 Creates a new <a class="link" href="WebKitContextMenuItem.html" title="WebKitContextMenuItem"><span class="type">WebKitContextMenuItem</span></a> representing a separator.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody><tr>
 <td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
 <td>the newly created <a class="link" href="WebKitContextMenuItem.html" title="WebKitContextMenuItem"><span class="type">WebKitContextMenuItem</span></a> object.</td>
@@ -496,8 +514,11 @@ Creates a new <a class="link" href="WebKitContextMenuItem.html" title="WebKitCon
 <p>
 Gets the action associated to <em class="parameter"><code>item</code></em>.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>item</code></em> :</span></p></td>
@@ -524,8 +545,11 @@ created for a stock action <a class="link" href="WebKitContextMenuItem.html#WEBK
 returned. If the <a class="link" href="WebKitContextMenuItem.html" title="WebKitContextMenuItem"><span class="type">WebKitContextMenuItem</span></a> is a separator <a class="link" href="WebKitContextMenuItem.html#WEBKIT-CONTEXT-MENU-ACTION-NO-ACTION:CAPS"><code class="literal">WEBKIT_CONTEXT_MENU_ACTION_NO_ACTION</code></a>
 will be returned.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>item</code></em> :</span></p></td>
@@ -548,8 +572,11 @@ will be returned.
 <p>
 Checks whether <em class="parameter"><code>item</code></em> is a separator.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>item</code></em> :</span></p></td>
@@ -574,8 +601,11 @@ Checks whether <em class="parameter"><code>item</code></em> is a separator.
 Sets or replaces the <em class="parameter"><code>item</code></em> submenu. If <em class="parameter"><code>submenu</code></em> is <a href="../glib/glib-Standard-Macros.html#NULL:CAPS"><code class="literal">NULL</code></a> the current
 submenu of <em class="parameter"><code>item</code></em> is removed.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>item</code></em> :</span></p></td>
@@ -598,8 +628,11 @@ submenu of <em class="parameter"><code>item</code></em> is removed.
 <p>
 Gets the submenu of <em class="parameter"><code>item</code></em>.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>item</code></em> :</span></p></td>

@@ -143,7 +143,7 @@ PassRefPtr<SimpleFontData> CSSFontFaceSource::getFontData(const FontDescription&
                 // Select first <font-face> child
                 for (Node* fontChild = m_externalSVGFontElement->firstChild(); fontChild; fontChild = fontChild->nextSibling()) {
                     if (fontChild->hasTagName(SVGNames::font_faceTag)) {
-                        fontFaceElement = static_cast<SVGFontFaceElement*>(fontChild);
+                        fontFaceElement = toSVGFontFaceElement(fontChild);
                         break;
                     }
                 }
@@ -202,6 +202,26 @@ void CSSFontFaceSource::setSVGFontFaceElement(PassRefPtr<SVGFontFaceElement> ele
 bool CSSFontFaceSource::isSVGFontFaceSource() const
 {
     return m_svgFontFaceElement || m_hasExternalSVGFont;
+}
+#endif
+
+#if ENABLE(FONT_LOAD_EVENTS)
+bool CSSFontFaceSource::isDecodeError() const
+{
+    if (m_font)
+        return m_font->status() == CachedResource::DecodeError;
+    return false;
+}
+
+bool CSSFontFaceSource::ensureFontData()
+{
+    if (!m_font)
+        return false;
+#if ENABLE(SVG_FONTS)
+    if (m_hasExternalSVGFont)
+        return m_font->ensureSVGFontData();
+#endif
+    return m_font->ensureCustomFontData();
 }
 #endif
 

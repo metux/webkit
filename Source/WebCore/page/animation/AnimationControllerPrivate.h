@@ -65,7 +65,7 @@ public:
     double updateAnimations(SetChanged callSetChanged = DoNotCallSetChanged);
     void updateAnimationTimer(SetChanged callSetChanged = DoNotCallSetChanged);
 
-    PassRefPtr<CompositeAnimation> accessCompositeAnimation(RenderObject*);
+    CompositeAnimation* ensureCompositeAnimation(RenderObject*);
     bool clear(RenderObject*);
 
     void updateStyleIfNeededDispatcherFired(Timer<AnimationControllerPrivate>*);
@@ -75,6 +75,7 @@ public:
 
     bool hasAnimations() const { return !m_compositeAnimations.isEmpty(); }
 
+    bool isSuspended() const { return m_isSuspended; }
     void suspendAnimations();
     void resumeAnimations();
 #if ENABLE(REQUEST_ANIMATION_FRAME)
@@ -83,6 +84,7 @@ public:
 
     void suspendAnimationsForDocument(Document*);
     void resumeAnimationsForDocument(Document*);
+    void startAnimationsIfNotSuspended(Document*);
 
     bool isRunningAnimationOnRenderer(RenderObject*, CSSPropertyID, bool isRunningNow) const;
     bool isRunningAcceleratedAnimationOnRenderer(RenderObject*, CSSPropertyID, bool isRunningNow) const;
@@ -107,7 +109,10 @@ public:
     void animationWillBeRemoved(AnimationBase*);
 
     void updateAnimationTimerForRenderer(RenderObject*);
-    
+
+    bool allowsNewAnimationsWhileSuspended() const { return m_allowsNewAnimationsWhileSuspended; }
+    void setAllowsNewAnimationsWhileSuspended(bool);
+
 private:
     void animationTimerFired(Timer<AnimationControllerPrivate>*);
 
@@ -139,7 +144,12 @@ private:
     WaitingAnimationsSet m_animationsWaitingForStyle;
     WaitingAnimationsSet m_animationsWaitingForStartTimeResponse;
     bool m_waitingForAsyncStartNotification;
-    double m_previousTimeToNextService;
+    bool m_isSuspended;
+
+    // Used to flag whether we should revert to previous buggy
+    // behavior of allowing new transitions and animations to
+    // run even when this object is suspended.
+    bool m_allowsNewAnimationsWhileSuspended;
 };
 
 } // namespace WebCore

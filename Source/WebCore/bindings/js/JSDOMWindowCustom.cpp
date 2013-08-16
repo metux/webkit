@@ -25,39 +25,17 @@
 #include "Frame.h"
 #include "HTMLCollection.h"
 #include "HTMLDocument.h"
-#include "History.h"
-#include "JSArrayBuffer.h"
-#include "JSDataView.h"
 #include "JSEvent.h"
 #include "JSEventListener.h"
-#include "JSEventSource.h"
-#include "JSFloat32Array.h"
-#include "JSFloat64Array.h"
 #include "JSHTMLAudioElement.h"
 #include "JSHTMLCollection.h"
 #include "JSHTMLOptionElement.h"
-#include "JSHistory.h"
 #include "JSImageConstructor.h"
-#include "JSInt16Array.h"
-#include "JSInt32Array.h"
-#include "JSInt8Array.h"
-#include "JSLocation.h"
-#include "JSMessageChannel.h"
 #include "JSMessagePortCustom.h"
-#include "JSUint16Array.h"
-#include "JSUint32Array.h"
-#include "JSUint8Array.h"
-#include "JSUint8ClampedArray.h"
-#include "JSWebKitCSSMatrix.h"
-#include "JSWebKitPoint.h"
-#include "JSXMLHttpRequest.h"
-#include "JSXSLTProcessor.h"
 #include "Location.h"
-#include "MediaPlayer.h"
 #include "ScheduledAction.h"
 #include "Settings.h"
 #include "SharedWorkerRepository.h"
-#include <runtime/JSFunction.h>
 
 #if ENABLE(WORKERS)
 #include "JSWorker.h"
@@ -117,15 +95,24 @@ static JSValue namedItemGetter(ExecState* exec, JSValue slotBase, PropertyName p
     ASSERT(document);
     ASSERT(document->isHTMLDocument());
 
-    RefPtr<HTMLCollection> collection = document->windowNamedItems(propertyNameToAtomicString(propertyName));
-    if (collection->hasExactlyOneItem())
-        return toJS(exec, thisObj, collection->item(0));
-    return toJS(exec, thisObj, WTF::getPtr(collection));
+    AtomicStringImpl* atomicPropertyName = findAtomicString(propertyName);
+    if (!atomicPropertyName || !toHTMLDocument(document)->windowNamedItemMap().contains(atomicPropertyName))
+        return jsUndefined();
+
+    if (UNLIKELY(!toHTMLDocument(document)->windowNamedItemMap().containsSingle(atomicPropertyName))) {
+        RefPtr<HTMLCollection> collection = document->windowNamedItems(atomicPropertyName);
+        ASSERT(!collection->isEmpty());
+        ASSERT(!collection->hasExactlyOneItem());
+        return toJS(exec, thisObj->globalObject(), WTF::getPtr(collection));
+    }
+
+    Node* node = toHTMLDocument(document)->windowNamedItemMap().getElementByWindowNamedItem(atomicPropertyName, document);
+    return toJS(exec, thisObj->globalObject(), node);
 }
 
-bool JSDOMWindow::getOwnPropertySlot(JSCell* cell, ExecState* exec, PropertyName propertyName, PropertySlot& slot)
+bool JSDOMWindow::getOwnPropertySlot(JSObject* object, ExecState* exec, PropertyName propertyName, PropertySlot& slot)
 {
-    JSDOMWindow* thisObject = jsCast<JSDOMWindow*>(cell);
+    JSDOMWindow* thisObject = jsCast<JSDOMWindow*>(object);
     // When accessing a Window cross-domain, functions are always the native built-in ones, and they
     // are not affected by properties changed on the Window or anything in its prototype chain.
     // This is consistent with the behavior of Firefox.
@@ -260,7 +247,7 @@ bool JSDOMWindow::getOwnPropertySlot(JSCell* cell, ExecState* exec, PropertyName
     Document* document = thisObject->impl()->frame()->document();
     if (document->isHTMLDocument()) {
         AtomicStringImpl* atomicPropertyName = findAtomicString(propertyName);
-        if (atomicPropertyName && (static_cast<HTMLDocument*>(document)->hasNamedItem(atomicPropertyName) || document->hasElementWithId(atomicPropertyName))) {
+        if (atomicPropertyName && toHTMLDocument(document)->windowNamedItemMap().contains(atomicPropertyName)) {
             slot.setCustom(thisObject, namedItemGetter);
             return true;
         }
@@ -269,9 +256,9 @@ bool JSDOMWindow::getOwnPropertySlot(JSCell* cell, ExecState* exec, PropertyName
     return Base::getOwnPropertySlot(thisObject, exec, propertyName, slot);
 }
 
-bool JSDOMWindow::getOwnPropertySlotByIndex(JSCell* cell, ExecState* exec, unsigned index, PropertySlot& slot)
+bool JSDOMWindow::getOwnPropertySlotByIndex(JSObject* object, ExecState* exec, unsigned index, PropertySlot& slot)
 {
-    JSDOMWindow* thisObject = jsCast<JSDOMWindow*>(cell);
+    JSDOMWindow* thisObject = jsCast<JSDOMWindow*>(object);
     
     if (!thisObject->impl()->frame()) {
         // FIXME: We should have a message here that explains why the property access/function call was
@@ -336,7 +323,7 @@ bool JSDOMWindow::getOwnPropertySlotByIndex(JSCell* cell, ExecState* exec, unsig
     Document* document = thisObject->impl()->frame()->document();
     if (document->isHTMLDocument()) {
         AtomicStringImpl* atomicPropertyName = findAtomicString(propertyName);
-        if (atomicPropertyName && (static_cast<HTMLDocument*>(document)->hasNamedItem(atomicPropertyName) || document->hasElementWithId(atomicPropertyName))) {
+        if (atomicPropertyName && toHTMLDocument(document)->windowNamedItemMap().contains(atomicPropertyName)) {
             slot.setCustom(thisObject, namedItemGetter);
             return true;
         }
@@ -365,7 +352,7 @@ bool JSDOMWindow::getOwnPropertyDescriptor(JSObject* object, ExecState* exec, Pr
         }
         entry = JSDOMWindowPrototype::s_info.propHashTable(exec)->entry(exec, propertyName);
         if (entry && (entry->attributes() & JSC::Function) && entry->function() == jsDOMWindowPrototypeFunctionClose) {
-            PropertySlot slot;
+            PropertySlot slot(thisObject);
             slot.setCustom(thisObject, nonCachingStaticFunctionGetter<jsDOMWindowPrototypeFunctionClose, 0>);
             descriptor.setDescriptor(slot.getValue(exec, propertyName), ReadOnly | DontDelete | DontEnum);
             return true;
@@ -376,7 +363,7 @@ bool JSDOMWindow::getOwnPropertyDescriptor(JSObject* object, ExecState* exec, Pr
 
     entry = JSDOMWindow::s_info.propHashTable(exec)->entry(exec, propertyName);
     if (entry) {
-        PropertySlot slot;
+        PropertySlot slot(thisObject);
         slot.setCustom(thisObject, entry->propertyGetter());
         descriptor.setDescriptor(slot.getValue(exec, propertyName), entry->attributes());
         return true;
@@ -388,7 +375,7 @@ bool JSDOMWindow::getOwnPropertyDescriptor(JSObject* object, ExecState* exec, Pr
     // are in Moz but not IE. Since we have some of these, we have to do
     // it the Moz way.
     if (thisObject->impl()->frame()->tree()->scopedChild(propertyNameToAtomicString(propertyName))) {
-        PropertySlot slot;
+        PropertySlot slot(thisObject);
         slot.setCustom(thisObject, childFrameGetter);
         descriptor.setDescriptor(slot.getValue(exec, propertyName), ReadOnly | DontDelete | DontEnum);
         return true;
@@ -397,7 +384,7 @@ bool JSDOMWindow::getOwnPropertyDescriptor(JSObject* object, ExecState* exec, Pr
     unsigned i = propertyName.asIndex();
     if (i < thisObject->impl()->frame()->tree()->scopedChildCount()) {
         ASSERT(i != PropertyName::NotAnIndex);
-        PropertySlot slot;
+        PropertySlot slot(thisObject);
         slot.setCustomIndex(thisObject, i, indexGetter);
         descriptor.setDescriptor(slot.getValue(exec, propertyName), ReadOnly | DontDelete | DontEnum);
         return true;
@@ -407,8 +394,8 @@ bool JSDOMWindow::getOwnPropertyDescriptor(JSObject* object, ExecState* exec, Pr
     Document* document = thisObject->impl()->frame()->document();
     if (document->isHTMLDocument()) {
         AtomicStringImpl* atomicPropertyName = findAtomicString(propertyName);
-        if (atomicPropertyName && (static_cast<HTMLDocument*>(document)->hasNamedItem(atomicPropertyName) || document->hasElementWithId(atomicPropertyName))) {
-            PropertySlot slot;
+        if (atomicPropertyName && toHTMLDocument(document)->windowNamedItemMap().contains(atomicPropertyName)) {
+            PropertySlot slot(thisObject);
             slot.setCustom(thisObject, namedItemGetter);
             descriptor.setDescriptor(slot.getValue(exec, propertyName), ReadOnly | DontDelete | DontEnum);
             return true;
@@ -518,7 +505,7 @@ void JSDOMWindow::setLocation(ExecState* exec, JSValue value)
         if (Settings* settings = activeFrame->settings()) {
             if (settings->usesDashboardBackwardCompatibilityMode() && !activeFrame->tree()->parent()) {
                 if (BindingSecurity::shouldAllowAccessToDOMWindow(exec, impl()))
-                    putDirect(exec->globalData(), Identifier(exec, "location"), value);
+                    putDirect(exec->vm(), Identifier(exec, "location"), value);
                 return;
             }
         }
@@ -545,29 +532,6 @@ JSValue JSDOMWindow::image(ExecState* exec) const
 {
     return getDOMConstructor<JSImageConstructor>(exec, this);
 }
-
-JSValue JSDOMWindow::option(ExecState* exec) const
-{
-    return getDOMConstructor<JSHTMLOptionElementNamedConstructor>(exec, this);
-}
-
-#if ENABLE(VIDEO)
-JSValue JSDOMWindow::audio(ExecState* exec) const
-{
-    if (!MediaPlayer::isAvailable())
-        return jsUndefined();
-    return getDOMConstructor<JSHTMLAudioElementNamedConstructor>(exec, this);
-}
-#endif
-
-#if ENABLE(SHARED_WORKERS)
-JSValue JSDOMWindow::sharedWorker(ExecState* exec) const
-{
-    if (SharedWorkerRepository::isAvailable())
-        return getDOMConstructor<JSSharedWorkerConstructor>(exec, this);
-    return jsUndefined();
-}
-#endif
 
 // Custom functions
 
@@ -609,18 +573,18 @@ inline void DialogHandler::dialogCreated(DOMWindow* dialog)
     m_frame = dialog->frame();
     // FIXME: This looks like a leak between the normal world and an isolated
     //        world if dialogArguments comes from an isolated world.
-    JSDOMWindow* globalObject = toJSDOMWindow(m_frame.get(), normalWorld(m_exec->globalData()));
+    JSDOMWindow* globalObject = toJSDOMWindow(m_frame.get(), normalWorld(m_exec->vm()));
     if (JSValue dialogArguments = m_exec->argument(1))
-        globalObject->putDirect(m_exec->globalData(), Identifier(m_exec, "dialogArguments"), dialogArguments);
+        globalObject->putDirect(m_exec->vm(), Identifier(m_exec, "dialogArguments"), dialogArguments);
 }
 
 inline JSValue DialogHandler::returnValue() const
 {
-    JSDOMWindow* globalObject = toJSDOMWindow(m_frame.get(), normalWorld(m_exec->globalData()));
+    JSDOMWindow* globalObject = toJSDOMWindow(m_frame.get(), normalWorld(m_exec->vm()));
     if (!globalObject)
         return jsUndefined();
     Identifier identifier(m_exec, "returnValue");
-    PropertySlot slot;
+    PropertySlot slot(globalObject);
     if (!JSGlobalObject::getOwnPropertySlot(globalObject, m_exec, identifier, slot))
         return jsUndefined();
     return slot.getValue(m_exec, identifier);

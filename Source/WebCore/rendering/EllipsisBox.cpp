@@ -36,13 +36,13 @@ void EllipsisBox::paint(PaintInfo& paintInfo, const LayoutPoint& paintOffset, La
 {
     GraphicsContext* context = paintInfo.context;
     RenderStyle* style = m_renderer->style(isFirstLineStyle());
-    Color textColor = style->visitedDependentColor(CSSPropertyColor);
+    Color textColor = style->visitedDependentColor(CSSPropertyWebkitTextFillColor);
     if (textColor != context->fillColor())
         context->setFillColor(textColor, style->colorSpace());
     bool setShadow = false;
     if (style->textShadow()) {
         context->setShadow(LayoutSize(style->textShadow()->x(), style->textShadow()->y()),
-                           style->textShadow()->blur(), style->textShadow()->color(), style->colorSpace());
+                           style->textShadow()->radius(), style->textShadow()->color(), style->colorSpace());
         setShadow = true;
     }
 

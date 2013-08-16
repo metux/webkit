@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2007, 2008, 2009 Apple Inc. All rights reserved.
+ * Copyright (C) 2007, 2008, 2009, 2013 Apple Inc. All rights reserved.
  * Copyright (C) 2012 Adobe Systems Incorporated. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -36,6 +36,7 @@
 #include "CSSImageValue.h"
 #include "CSSPrimitiveValue.h"
 #include "CSSPropertyNames.h"
+#include "CachedImage.h"
 #include "ClipPathOperation.h"
 #include "FloatConversion.h"
 #include "IdentityTransformOperation.h"
@@ -48,6 +49,7 @@
 #include "StylePropertyShorthand.h"
 #include "StyleResolver.h"
 #include <algorithm>
+#include <wtf/MathExtras.h>
 #include <wtf/Noncopyable.h>
 #include <wtf/RefCounted.h>
 
@@ -113,7 +115,7 @@ static inline PassOwnPtr<ShadowData> blendFunc(const AnimationBase* anim, const 
         return adoptPtr(new ShadowData(*to));
 
     return adoptPtr(new ShadowData(blend(from->location(), to->location(), progress),
-                                   blend(from->blur(), to->blur(), progress),
+                                   blend(from->radius(), to->radius(), progress),
                                    blend(from->spread(), to->spread(), progress),
                                    blendFunc(anim, from->style(), to->style(), progress),
                                    from->isWebkitBoxShadow(),
@@ -142,11 +144,11 @@ static inline PassRefPtr<ClipPathOperation> blendFunc(const AnimationBase*, Clip
     return ShapeClipPathOperation::create(toShape->blend(fromShape, progress));
 }
 
-#if ENABLE(CSS_EXCLUSIONS)
-static inline PassRefPtr<ExclusionShapeValue> blendFunc(const AnimationBase*, ExclusionShapeValue* from, ExclusionShapeValue* to, double progress)
+#if ENABLE(CSS_SHAPES)
+static inline PassRefPtr<ShapeValue> blendFunc(const AnimationBase*, ShapeValue* from, ShapeValue* to, double progress)
 {
     // FIXME Bug 102723: Shape-inside should be able to animate a value of 'outside-shape' when shape-outside is set to a BasicShape
-    if (from->type() != ExclusionShapeValue::SHAPE || to->type() != ExclusionShapeValue::SHAPE)
+    if (from->type() != ShapeValue::Shape || to->type() != ShapeValue::Shape)
         return to;
 
     const BasicShape* fromShape = from->shape();
@@ -155,7 +157,7 @@ static inline PassRefPtr<ExclusionShapeValue> blendFunc(const AnimationBase*, Ex
     if (!fromShape->canBlend(toShape))
         return to;
 
-    return ExclusionShapeValue::createShapeValue(toShape->blend(fromShape, progress));
+    return ShapeValue::createShapeValue(toShape->blend(fromShape, progress));
 }
 #endif
 
@@ -217,13 +219,6 @@ static inline EVisibility blendFunc(const AnimationBase* anim, EVisibility from,
 
 static inline LengthBox blendFunc(const AnimationBase* anim, const LengthBox& from, const LengthBox& to, double progress)
 {
-    // Length types have to match to animate
-    if (from.top().type() != to.top().type()
-        || from.right().type() != to.right().type()
-        || from.bottom().type() != to.bottom().type()
-        || from.left().type() != to.left().type())
-        return to;
-
     LengthBox result(blendFunc(anim, from.top(), to.top(), progress),
                      blendFunc(anim, from.right(), to.right(), progress),
                      blendFunc(anim, from.bottom(), to.bottom(), progress),
@@ -235,6 +230,26 @@ static inline LengthBox blendFunc(const AnimationBase* anim, const LengthBox& fr
 static inline SVGLength blendFunc(const AnimationBase*, const SVGLength& from, const SVGLength& to, double progress)
 {
     return to.blend(from, narrowPrecisionToFloat(progress));
+}
+static inline Vector<SVGLength> blendFunc(const AnimationBase*, const Vector<SVGLength>& from, const Vector<SVGLength>& to, double progress)
+{
+    size_t fromLength = from.size();
+    size_t toLength = to.size();
+    if (!fromLength)
+        return !progress ? from : to;
+    if (!toLength)
+        return progress == 1 ? from : to;
+    size_t resultLength = fromLength;
+    if (fromLength != toLength) {
+        if (!remainder(std::max(fromLength, toLength), std::min(fromLength, toLength)))
+            resultLength = std::max(fromLength, toLength);
+        else
+            resultLength = fromLength * toLength;
+    }
+    Vector<SVGLength> result(resultLength);
+    for (size_t i = 0; i < resultLength; ++i)
+        result[i] = to[i % toLength].blend(from[i % fromLength], narrowPrecisionToFloat(progress));
+    return result;
 }
 #endif
 
@@ -410,11 +425,11 @@ public:
     }
 };
 
-#if ENABLE(CSS_EXCLUSIONS)
-class PropertyWrapperExclusionShape : public RefCountedPropertyWrapper<ExclusionShapeValue> {
+#if ENABLE(CSS_SHAPES)
+class PropertyWrapperShape : public RefCountedPropertyWrapper<ShapeValue> {
 public:
-    PropertyWrapperExclusionShape(CSSPropertyID prop, ExclusionShapeValue* (RenderStyle::*getter)() const, void (RenderStyle::*setter)(PassRefPtr<ExclusionShapeValue>))
-        : RefCountedPropertyWrapper<ExclusionShapeValue>(prop, getter, setter)
+    PropertyWrapperShape(CSSPropertyID prop, ShapeValue* (RenderStyle::*getter)() const, void (RenderStyle::*setter)(PassRefPtr<ShapeValue>))
+        : RefCountedPropertyWrapper<ShapeValue>(prop, getter, setter)
     {
     }
 };
@@ -1170,8 +1185,8 @@ void CSSPropertyAnimation::ensurePropertyMap()
 
     gPropertyWrappers->append(new PropertyWrapperClipPath(CSSPropertyWebkitClipPath, &RenderStyle::clipPath, &RenderStyle::setClipPath));
 
-#if ENABLE(CSS_EXCLUSIONS)
-    gPropertyWrappers->append(new PropertyWrapperExclusionShape(CSSPropertyWebkitShapeInside, &RenderStyle::shapeInside, &RenderStyle::setShapeInside));
+#if ENABLE(CSS_SHAPES)
+    gPropertyWrappers->append(new PropertyWrapperShape(CSSPropertyWebkitShapeInside, &RenderStyle::shapeInside, &RenderStyle::setShapeInside));
 #endif
 
     gPropertyWrappers->append(new PropertyWrapperVisitedAffectedColor(CSSPropertyWebkitColumnRuleColor, MaybeInvalidColor, &RenderStyle::columnRuleColor, &RenderStyle::setColumnRuleColor, &RenderStyle::visitedLinkColumnRuleColor, &RenderStyle::setVisitedLinkColumnRuleColor));
@@ -1194,6 +1209,7 @@ void CSSPropertyAnimation::ensurePropertyMap()
     gPropertyWrappers->append(new PropertyWrapperSVGPaint(CSSPropertyStroke, &RenderStyle::strokePaintType, &RenderStyle::strokePaintColor, &RenderStyle::setStrokePaintColor));
     gPropertyWrappers->append(new PropertyWrapper<float>(CSSPropertyStrokeOpacity, &RenderStyle::strokeOpacity, &RenderStyle::setStrokeOpacity));
     gPropertyWrappers->append(new PropertyWrapper<SVGLength>(CSSPropertyStrokeWidth, &RenderStyle::strokeWidth, &RenderStyle::setStrokeWidth));
+    gPropertyWrappers->append(new PropertyWrapper< Vector<SVGLength> >(CSSPropertyStrokeDasharray, &RenderStyle::strokeDashArray, &RenderStyle::setStrokeDashArray));
     gPropertyWrappers->append(new PropertyWrapper<SVGLength>(CSSPropertyStrokeDashoffset, &RenderStyle::strokeDashOffset, &RenderStyle::setStrokeDashOffset));
     gPropertyWrappers->append(new PropertyWrapper<float>(CSSPropertyStrokeMiterlimit, &RenderStyle::strokeMiterLimit, &RenderStyle::setStrokeMiterLimit));
 

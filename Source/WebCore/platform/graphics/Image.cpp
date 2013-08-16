@@ -34,11 +34,9 @@
 #include "IntRect.h"
 #include "Length.h"
 #include "MIMETypeRegistry.h"
-#include "PlatformMemoryInstrumentation.h"
 #include "SharedBuffer.h"
 #include <math.h>
 #include <wtf/MainThread.h>
-#include <wtf/MemoryObjectInfo.h>
 #include <wtf/StdLibExtras.h>
 
 #if USE(CG)
@@ -104,10 +102,7 @@ void Image::drawTiled(GraphicsContext* ctxt, const FloatRect& destRect, const Fl
         return;
     }
 
-    // See <https://webkit.org/b/59043>.
-#if !PLATFORM(WX)
     ASSERT(!isBitmapImage() || notSolidColor());
-#endif
 
     FloatSize intrinsicTileSize = size();
     if (hasRelativeWidth())
@@ -143,12 +138,32 @@ void Image::drawTiled(GraphicsContext* ctxt, const FloatRect& destRect, const Fl
 
 // FIXME: Merge with the other drawTiled eventually, since we need a combination of both for some things.
 void Image::drawTiled(GraphicsContext* ctxt, const FloatRect& dstRect, const FloatRect& srcRect,
-    const FloatPoint& patternPhase, const AffineTransform &patternTransform, ColorSpace styleColorSpace, CompositeOperator op)
+    const FloatSize& tileScaleFactor, TileRule hRule, TileRule vRule, ColorSpace styleColorSpace, CompositeOperator op)
 {    
     if (mayFillWithSolidColor()) {
         fillWithSolidColor(ctxt, dstRect, solidColor(), styleColorSpace, op);
         return;
     }
+    
+    // FIXME: We do not support 'round' or 'space' yet. For now just map them to 'repeat'.
+    if (hRule == RoundTile || hRule == SpaceTile)
+        hRule = RepeatTile;
+    if (vRule == RoundTile || vRule == SpaceTile)
+        vRule = RepeatTile;
+
+    AffineTransform patternTransform = AffineTransform().scaleNonUniform(tileScaleFactor.width(), tileScaleFactor.height());
+
+    // We want to construct the phase such that the pattern is centered (when stretch is not
+    // set for a particular rule).
+    float hPhase = tileScaleFactor.width() * srcRect.x();
+    float vPhase = tileScaleFactor.height() * srcRect.y();
+    float scaledTileWidth = tileScaleFactor.width() * srcRect.width();
+    float scaledTileHeight = tileScaleFactor.height() * srcRect.height();
+    if (hRule == Image::RepeatTile)
+        hPhase -= (dstRect.width() - scaledTileWidth) / 2;
+    if (vRule == Image::RepeatTile)
+        vPhase -= (dstRect.height() - scaledTileHeight) / 2; 
+    FloatPoint patternPhase(dstRect.x() - hPhase, dstRect.y() - vPhase);
     
     drawPattern(ctxt, srcRect, patternTransform, patternPhase, styleColorSpace, op, dstRect);
 
@@ -177,14 +192,6 @@ void Image::computeIntrinsicDimensions(Length& intrinsicWidth, Length& intrinsic
     intrinsicRatio = size();
     intrinsicWidth = Length(intrinsicRatio.width(), Fixed);
     intrinsicHeight = Length(intrinsicRatio.height(), Fixed);
-}
-
-void Image::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
-{
-    MemoryClassInfo info(memoryObjectInfo, this, PlatformMemoryTypes::Image);
-    memoryObjectInfo->setClassName("Image");
-    info.addMember(m_encodedImageData, "encodedImageData");
-    info.addWeakPointer(m_imageObserver);
 }
 
 }

@@ -110,6 +110,9 @@ typedef void (*WKBundlePageDidReconnectDOMWindowExtensionToGlobalObjectCallback)
 typedef void (*WKBundlePageWillDestroyGlobalObjectForDOMWindowExtensionCallback)(WKBundlePageRef page, WKBundleDOMWindowExtensionRef, const void* clientInfo);
 typedef bool (*WKBundlePageShouldForceUniversalAccessFromLocalURLCallback)(WKBundlePageRef, WKStringRef url, const void* clientInfo);
 typedef void (*WKBundlePageDidLayoutCallback)(WKBundlePageRef page, WKLayoutMilestones milestones, WKTypeRef* userData, const void *clientInfo);
+typedef void (*WKBundlePageFeaturesUsedInPageCallback)(WKBundlePageRef page, WKArrayRef featureStrings, const void *clientInfo);
+typedef void (*WKBundlePageWillLoadURLRequestCallback)(WKBundlePageRef page, WKURLRequestRef request, WKTypeRef userData, const void *clientInfo);
+typedef void (*WKBundlePageWillLoadDataRequestCallback)(WKBundlePageRef page, WKURLRequestRef request, WKDataRef data, WKStringRef MIMEType, WKStringRef encodingName, WKURLRef unreachableURL, WKTypeRef userData, const void *clientInfo);
 
 struct WKBundlePageLoaderClient {
     int                                                                     version;
@@ -155,10 +158,17 @@ struct WKBundlePageLoaderClient {
 
     // Version 4
     WKBundlePageDidLayoutCallback                                           didLayout;
+
+    // Version 5
+    WKBundlePageFeaturesUsedInPageCallback                                  featuresUsedInPage;
+    
+    // Version 6
+    WKBundlePageWillLoadURLRequestCallback                                  willLoadURLRequest;
+    WKBundlePageWillLoadDataRequestCallback                                 willLoadDataRequest;
 };
 typedef struct WKBundlePageLoaderClient WKBundlePageLoaderClient;
 
-enum { kWKBundlePageLoaderClientCurrentVersion = 4 };
+enum { kWKBundlePageLoaderClientCurrentVersion = 6 };
 
 enum {
     WKBundlePagePolicyActionPassThrough,
@@ -246,9 +256,10 @@ typedef WKBundlePageUIElementVisibility (*WKBundlePageMenuBarIsVisibleCallback)(
 typedef WKBundlePageUIElementVisibility (*WKBundlePageToolbarsAreVisibleCallback)(WKBundlePageRef page, const void *clientInfo);
 typedef void (*WKBundlePageReachedAppCacheOriginQuotaCallback)(WKBundlePageRef page, WKSecurityOriginRef origin, int64_t totalBytesNeeded, const void *clientInfo);
 typedef uint64_t (*WKBundlePageExceededDatabaseQuotaCallback)(WKBundlePageRef page, WKSecurityOriginRef origin, WKStringRef databaseName, WKStringRef databaseDisplayName, uint64_t currentQuotaBytes, uint64_t currentOriginUsageBytes, uint64_t currentDatabaseUsageBytes, uint64_t expectedUsageBytes, const void *clientInfo);
-typedef WKStringRef (*WKBundlePagePlugInCreateStartLabelTitleCallback)(const void *clientInfo);
-typedef WKStringRef (*WKBundlePagePlugInCreateStartLabelSubtitleCallback)(const void *clientInfo);
+typedef WKStringRef (*WKBundlePagePlugInCreateStartLabelTitleCallback)(WKStringRef mimeType, const void *clientInfo);
+typedef WKStringRef (*WKBundlePagePlugInCreateStartLabelSubtitleCallback)(WKStringRef mimeType, const void *clientInfo);
 typedef WKStringRef (*WKBundlePagePlugInCreateExtraStyleSheetCallback)(const void *clientInfo);
+typedef WKStringRef (*WKBundlePagePlugInCreateExtraScriptCallback)(const void *clientInfo);
 
 struct WKBundlePageUIClient {
     int                                                                 version;
@@ -276,6 +287,7 @@ struct WKBundlePageUIClient {
     WKBundlePagePlugInCreateStartLabelTitleCallback                     createPlugInStartLabelTitle;
     WKBundlePagePlugInCreateStartLabelSubtitleCallback                  createPlugInStartLabelSubtitle;
     WKBundlePagePlugInCreateExtraStyleSheetCallback                     createPlugInExtraStyleSheet;
+    WKBundlePagePlugInCreateExtraScriptCallback                         createPlugInExtraScript;
 };
 typedef struct WKBundlePageUIClient WKBundlePageUIClient;
 
@@ -325,6 +337,9 @@ typedef void (*WKBundlePageTextDidChangeInTextAreaCallback)(WKBundlePageRef page
 typedef bool (*WKBundlePageShouldPerformActionInTextFieldCallback)(WKBundlePageRef page, WKBundleNodeHandleRef htmlInputElementHandle, WKInputFieldActionType actionType, WKBundleFrameRef frame, const void* clientInfo);
 typedef void (*WKBundlePageWillSubmitFormCallback)(WKBundlePageRef page, WKBundleNodeHandleRef htmlFormElementHandle, WKBundleFrameRef frame, WKBundleFrameRef sourceFrame, WKDictionaryRef values, WKTypeRef* userData, const void* clientInfo);
 typedef void (*WKBundlePageWillSendSubmitEventCallback)(WKBundlePageRef page, WKBundleNodeHandleRef htmlFormElementHandle, WKBundleFrameRef frame, WKBundleFrameRef sourceFrame, WKDictionaryRef values, const void* clientInfo);
+typedef void (*WKBundlePageDidFocusTextFieldCallback)(WKBundlePageRef page, WKBundleNodeHandleRef htmlInputElementHandle, WKBundleFrameRef frame, const void* clientInfo);
+typedef bool (*WKBundlePageShouldNotifyOnFormChangesCallback)(WKBundlePageRef page, const void* clientInfo);
+typedef void (*WKBundlePageDidAssociateFormControlsCallback)(WKBundlePageRef page, WKArrayRef elementHandles, const void* clientInfo);
 
 struct WKBundlePageFormClient {
     int                                                                 version;
@@ -340,10 +355,15 @@ struct WKBundlePageFormClient {
     
     // Version 1.
     WKBundlePageWillSendSubmitEventCallback                             willSendSubmitEvent;
+
+    // version 2.
+    WKBundlePageDidFocusTextFieldCallback                               didFocusTextField;
+    WKBundlePageShouldNotifyOnFormChangesCallback                       shouldNotifyOnFormChanges;
+    WKBundlePageDidAssociateFormControlsCallback                        didAssociateFormControls;
 };
 typedef struct WKBundlePageFormClient WKBundlePageFormClient;
 
-enum { kWKBundlePageFormClientCurrentVersion = 1 };
+enum { kWKBundlePageFormClientCurrentVersion = 2 };
 
 // ContextMenu client
 typedef void (*WKBundlePageGetContextMenuFromDefaultContextMenuCallback)(WKBundlePageRef page, WKBundleHitTestResultRef hitTestResult, WKArrayRef defaultMenu, WKArrayRef* newMenu, WKTypeRef* userData, const void* clientInfo);
@@ -417,13 +437,17 @@ WK_EXPORT WKBundleFrameRef WKBundlePageGetMainFrame(WKBundlePageRef page);
 
 WK_EXPORT WKBundleBackForwardListRef WKBundlePageGetBackForwardList(WKBundlePageRef page);
 
-WK_EXPORT void WKBundlePageSetUnderlayPage(WKBundlePageRef page, WKBundlePageRef pageUnderlay);
-
 WK_EXPORT void WKBundlePageInstallPageOverlay(WKBundlePageRef page, WKBundlePageOverlayRef pageOverlay);
 WK_EXPORT void WKBundlePageUninstallPageOverlay(WKBundlePageRef page, WKBundlePageOverlayRef pageOverlay);
 
 WK_EXPORT void WKBundlePageInstallPageOverlayWithAnimation(WKBundlePageRef page, WKBundlePageOverlayRef pageOverlay);
 WK_EXPORT void WKBundlePageUninstallPageOverlayWithAnimation(WKBundlePageRef page, WKBundlePageOverlayRef pageOverlay);
+
+WK_EXPORT void WKBundlePageSetTopOverhangImage(WKBundlePageRef page, WKImageRef image);
+WK_EXPORT void WKBundlePageSetBottomOverhangImage(WKBundlePageRef page, WKImageRef image);
+
+WK_EXPORT void WKBundlePageSetHeaderBanner(WKBundlePageRef page, WKBundlePageBannerRef banner);
+WK_EXPORT void WKBundlePageSetFooterBanner(WKBundlePageRef page, WKBundlePageBannerRef banner);
 
 WK_EXPORT bool WKBundlePageHasLocalDataForURL(WKBundlePageRef page, WKURLRef url);
 WK_EXPORT bool WKBundlePageCanHandleRequest(WKURLRequestRef request);

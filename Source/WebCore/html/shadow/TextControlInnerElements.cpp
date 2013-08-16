@@ -27,28 +27,40 @@
 #include "config.h"
 #include "TextControlInnerElements.h"
 
-#include "BeforeTextInsertedEvent.h"
 #include "Document.h"
 #include "EventHandler.h"
 #include "EventNames.h"
 #include "Frame.h"
 #include "HTMLInputElement.h"
 #include "HTMLNames.h"
-#include "HTMLTextAreaElement.h"
 #include "MouseEvent.h"
-#include "Page.h"
 #include "RenderSearchField.h"
+#include "RenderTextControl.h"
 #include "RenderView.h"
 #include "ScriptController.h"
 #include "SpeechInput.h"
 #include "SpeechInputEvent.h"
-#include "StyleInheritedData.h"
 #include "TextEvent.h"
 #include "TextEventInputType.h"
 
 namespace WebCore {
 
 using namespace HTMLNames;
+
+TextControlInnerContainer::TextControlInnerContainer(Document* document)
+    : HTMLDivElement(divTag, document)
+{
+}
+
+PassRefPtr<TextControlInnerContainer> TextControlInnerContainer::create(Document* document)
+{
+    return adoptRef(new TextControlInnerContainer(document));
+}
+    
+RenderObject* TextControlInnerContainer::createRenderer(RenderArena* arena, RenderStyle*)
+{
+    return new (arena) RenderTextControlInnerContainer(this);
+}
 
 TextControlInnerElement::TextControlInnerElement(Document* document)
     : HTMLDivElement(divTag, document)
@@ -143,7 +155,7 @@ const AtomicString& SearchFieldResultsButtonElement::shadowPseudoId() const
 void SearchFieldResultsButtonElement::defaultEventHandler(Event* event)
 {
     // On mousedown, bring up a menu, if needed
-    HTMLInputElement* input = static_cast<HTMLInputElement*>(shadowHost());
+    HTMLInputElement* input = toHTMLInputElement(shadowHost());
     if (input && event->type() == eventNames().mousedownEvent && event->isMouseEvent() && static_cast<MouseEvent*>(event)->button() == LeftButton) {
         input->focus();
         input->select();
@@ -183,20 +195,20 @@ const AtomicString& SearchFieldCancelButtonElement::shadowPseudoId() const
     return pseudoId;
 }
 
-void SearchFieldCancelButtonElement::detach()
+void SearchFieldCancelButtonElement::detach(const AttachContext& context)
 {
     if (m_capturing) {
         if (Frame* frame = document()->frame())
             frame->eventHandler()->setCapturingMouseEventsNode(0);
     }
-    HTMLDivElement::detach();
+    HTMLDivElement::detach(context);
 }
 
 
 void SearchFieldCancelButtonElement::defaultEventHandler(Event* event)
 {
     // If the element is visible, on mouseup, clear the value, and set selection
-    RefPtr<HTMLInputElement> input(static_cast<HTMLInputElement*>(shadowHost()));
+    RefPtr<HTMLInputElement> input(toHTMLInputElement(shadowHost()));
     if (!input || input->isDisabledOrReadOnly()) {
         if (!event->defaultHandled())
             HTMLDivElement::defaultEventHandler(event);
@@ -235,7 +247,7 @@ void SearchFieldCancelButtonElement::defaultEventHandler(Event* event)
 
 bool SearchFieldCancelButtonElement::willRespondToMouseClickEvents()
 {
-    const HTMLInputElement* input = static_cast<HTMLInputElement*>(shadowHost());
+    const HTMLInputElement* input = toHTMLInputElement(shadowHost());
     if (input && !input->isDisabledOrReadOnly())
         return true;
 
@@ -280,7 +292,7 @@ void InputFieldSpeechButtonElement::defaultEventHandler(Event* event)
     // The call to focus() below dispatches a focus event, and an event handler in the page might
     // remove the input element from DOM. To make sure it remains valid until we finish our work
     // here, we take a temporary reference.
-    RefPtr<HTMLInputElement> input(static_cast<HTMLInputElement*>(shadowHost()));
+    RefPtr<HTMLInputElement> input(toHTMLInputElement(shadowHost()));
 
     if (!input || input->isDisabledOrReadOnly()) {
         if (!event->defaultHandled())
@@ -332,8 +344,8 @@ void InputFieldSpeechButtonElement::defaultEventHandler(Event* event)
 
 bool InputFieldSpeechButtonElement::willRespondToMouseClickEvents()
 {
-    const HTMLInputElement* input = static_cast<HTMLInputElement*>(shadowHost());
-    if (input && !input->disabled() && !input->readOnly())
+    const HTMLInputElement* input = toHTMLInputElement(shadowHost());
+    if (input && !input->isDisabledOrReadOnly())
         return true;
 
     return HTMLDivElement::willRespondToMouseClickEvents();
@@ -369,8 +381,8 @@ void InputFieldSpeechButtonElement::setRecognitionResult(int, const SpeechInputR
     // The call to setValue() below dispatches an event, and an event handler in the page might
     // remove the input element from DOM. To make sure it remains valid until we finish our work
     // here, we take a temporary reference.
-    RefPtr<HTMLInputElement> input(static_cast<HTMLInputElement*>(shadowHost()));
-    if (!input || input->disabled() || input->readOnly())
+    RefPtr<HTMLInputElement> input(toHTMLInputElement(shadowHost()));
+    if (!input || input->isDisabledOrReadOnly())
         return;
 
     RefPtr<InputFieldSpeechButtonElement> holdRefButton(this);
@@ -392,15 +404,15 @@ void InputFieldSpeechButtonElement::setRecognitionResult(int, const SpeechInputR
         renderer()->repaint();
 }
 
-void InputFieldSpeechButtonElement::attach()
+void InputFieldSpeechButtonElement::attach(const AttachContext& context)
 {
     ASSERT(!m_listenerId);
     if (SpeechInput* input = SpeechInput::from(document()->page()))
         m_listenerId = input->registerListener(this);
-    HTMLDivElement::attach();
+    HTMLDivElement::attach(context);
 }
 
-void InputFieldSpeechButtonElement::detach()
+void InputFieldSpeechButtonElement::detach(const AttachContext& context)
 {
     if (m_capturing) {
         if (Frame* frame = document()->frame())
@@ -414,7 +426,7 @@ void InputFieldSpeechButtonElement::detach()
         m_listenerId = 0;
     }
 
-    HTMLDivElement::detach();
+    HTMLDivElement::detach(context);
 }
 
 void InputFieldSpeechButtonElement::startSpeechInput()
@@ -422,7 +434,7 @@ void InputFieldSpeechButtonElement::startSpeechInput()
     if (m_state != Idle)
         return;
 
-    RefPtr<HTMLInputElement> input = static_cast<HTMLInputElement*>(shadowHost());
+    RefPtr<HTMLInputElement> input = toHTMLInputElement(shadowHost());
     AtomicString language = input->computeInheritedLanguage();
     String grammar = input->getAttribute(webkitgrammarAttr);
     IntRect rect = document()->view()->contentsToRootView(pixelSnappedBoundingBox());

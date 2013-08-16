@@ -39,9 +39,10 @@ struct BidiRun : BidiCharacterRun {
         , m_object(object)
         , m_box(0)
     {
+        ASSERT(!object->isText() || static_cast<unsigned>(stop) <= toRenderText(object)->textLength());
         // Stored in base class to save space.
         m_hasHyphen = false;
-#if ENABLE(CSS_EXCLUSIONS)
+#if ENABLE(CSS_SHAPES)
         m_startsSegment = false;
 #endif
     }

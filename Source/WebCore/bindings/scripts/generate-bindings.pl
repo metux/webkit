@@ -100,7 +100,7 @@ if ($supplementalDependencyFile) {
         my ($idlFile, @followingIdlFiles) = split(/\s+/, $line);
         if ($idlFile and basename($idlFile) eq basename($targetIdlFile)) {
             $idlFound = 1;
-            @supplementedIdlFiles = @followingIdlFiles;
+            @supplementedIdlFiles = sort @followingIdlFiles;
         }
     }
     close FH;
@@ -139,7 +139,7 @@ foreach my $idlFile (@supplementedIdlFiles) {
     my $document = $parser->Parse($idlFile, $defines, $preprocessor);
 
     foreach my $interface (@{$document->interfaces}) {
-        if ($interface->extendedAttributes->{"Supplemental"} and $interface->extendedAttributes->{"Supplemental"} eq $targetInterfaceName) {
+        if (!$interface->isPartial || $interface->name eq $targetInterfaceName) {
             my $targetDataNode;
             foreach my $interface (@{$targetDocument->interfaces}) {
                 if ($interface->name eq $targetInterfaceName) {
@@ -149,40 +149,37 @@ foreach my $idlFile (@supplementedIdlFiles) {
             }
             die "Not found an interface ${targetInterfaceName} in ${targetInterfaceName}.idl." unless defined $targetDataNode;
 
-            # Support [Supplemental] for attributes.
+            # Support for attributes of partial interfaces.
             foreach my $attribute (@{$interface->attributes}) {
                 # Record that this attribute is implemented by $interfaceName.
-                $attribute->signature->extendedAttributes->{"ImplementedBy"} = $interfaceName;
+                $attribute->signature->extendedAttributes->{"ImplementedBy"} = $interfaceName if $interface->isPartial;
 
                 # Add interface-wide extended attributes to each attribute.
                 foreach my $extendedAttributeName (keys %{$interface->extendedAttributes}) {
-                    next if ($extendedAttributeName eq "Supplemental");
                     $attribute->signature->extendedAttributes->{$extendedAttributeName} = $interface->extendedAttributes->{$extendedAttributeName};
                 }
                 push(@{$targetDataNode->attributes}, $attribute);
             }
 
-            # Support [Supplemental] for methods.
+            # Support for methods of partial interfaces.
             foreach my $function (@{$interface->functions}) {
                 # Record that this method is implemented by $interfaceName.
-                $function->signature->extendedAttributes->{"ImplementedBy"} = $interfaceName;
+                $function->signature->extendedAttributes->{"ImplementedBy"} = $interfaceName if $interface->isPartial;
 
                 # Add interface-wide extended attributes to each method.
                 foreach my $extendedAttributeName (keys %{$interface->extendedAttributes}) {
-                    next if ($extendedAttributeName eq "Supplemental");
                     $function->signature->extendedAttributes->{$extendedAttributeName} = $interface->extendedAttributes->{$extendedAttributeName};
                 }
                 push(@{$targetDataNode->functions}, $function);
             }
 
-            # Support [Supplemental] for constants.
+            # Support for constants of partial interfaces.
             foreach my $constant (@{$interface->constants}) {
                 # Record that this constant is implemented by $interfaceName.
-                $constant->extendedAttributes->{"ImplementedBy"} = $interfaceName;
+                $constant->extendedAttributes->{"ImplementedBy"} = $interfaceName if $interface->isPartial;
 
                 # Add interface-wide extended attributes to each constant.
                 foreach my $extendedAttributeName (keys %{$interface->extendedAttributes}) {
-                    next if ($extendedAttributeName eq "Supplemental");
                     $constant->extendedAttributes->{$extendedAttributeName} = $interface->extendedAttributes->{$extendedAttributeName};
                 }
                 push(@{$targetDataNode->constants}, $constant);
@@ -288,7 +285,7 @@ sub checkIfIDLAttributesExists
         if ($idlAttributes->{$name}{"*"}) {
             next;
         }
-        for my $rightValue (split /\s*\|\s*/, $extendedAttributes->{$name}) {
+        for my $rightValue (split /\s*[|&]\s*/, $extendedAttributes->{$name}) {
             if (!exists $idlAttributes->{$name}{$rightValue}) {
                 $error = "Unknown IDL attribute [$name=" . $extendedAttributes->{$name} . "] is found at $idlFile.";
                 last OUTER;

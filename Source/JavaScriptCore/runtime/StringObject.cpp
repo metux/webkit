@@ -32,19 +32,19 @@ ASSERT_HAS_TRIVIAL_DESTRUCTOR(StringObject);
 
 const ClassInfo StringObject::s_info = { "String", &JSWrapperObject::s_info, 0, 0, CREATE_METHOD_TABLE(StringObject) };
 
-StringObject::StringObject(JSGlobalData& globalData, Structure* structure)
-    : JSWrapperObject(globalData, structure)
+StringObject::StringObject(VM& vm, Structure* structure)
+    : JSWrapperObject(vm, structure)
 {
 }
 
-void StringObject::finishCreation(JSGlobalData& globalData, JSString* string)
+void StringObject::finishCreation(VM& vm, JSString* string)
 {
-    Base::finishCreation(globalData);
+    Base::finishCreation(vm);
     ASSERT(inherits(&s_info));
-    setInternalValue(globalData, string);
+    setInternalValue(vm, string);
 }
 
-bool StringObject::getOwnPropertySlot(JSCell* cell, ExecState* exec, PropertyName propertyName, PropertySlot& slot)
+bool StringObject::getOwnPropertySlot(JSObject* cell, ExecState* exec, PropertyName propertyName, PropertySlot& slot)
 {
     StringObject* thisObject = jsCast<StringObject*>(cell);
     if (thisObject->internalValue()->getStringPropertySlot(exec, propertyName, slot))
@@ -52,9 +52,9 @@ bool StringObject::getOwnPropertySlot(JSCell* cell, ExecState* exec, PropertyNam
     return JSObject::getOwnPropertySlot(thisObject, exec, propertyName, slot);
 }
     
-bool StringObject::getOwnPropertySlotByIndex(JSCell* cell, ExecState* exec, unsigned propertyName, PropertySlot& slot)
+bool StringObject::getOwnPropertySlotByIndex(JSObject* object, ExecState* exec, unsigned propertyName, PropertySlot& slot)
 {
-    StringObject* thisObject = jsCast<StringObject*>(cell);
+    StringObject* thisObject = jsCast<StringObject*>(object);
     if (thisObject->internalValue()->getStringPropertySlot(exec, propertyName, slot))
         return true;    
     return JSObject::getOwnPropertySlot(thisObject, exec, Identifier::from(exec, propertyName), slot);
@@ -166,7 +166,7 @@ void StringObject::getOwnPropertyNames(JSObject* object, ExecState* exec, Proper
 StringObject* constructString(ExecState* exec, JSGlobalObject* globalObject, JSValue string)
 {
     StringObject* object = StringObject::create(exec, globalObject->stringObjectStructure());
-    object->setInternalValue(exec->globalData(), string);
+    object->setInternalValue(exec->vm(), string);
     return object;
 }
 

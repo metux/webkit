@@ -1,11 +1,4 @@
 # Configuration flags that are used throughout WebKitGTK+.
-AC_DEFINE([WTF_USE_GLIB], [1], [ ])
-AC_DEFINE([WTF_USE_FREETYPE], [1], [ ])
-AC_DEFINE([WTF_USE_HARFBUZZ], [1], [ ])
-AC_DEFINE([WTF_USE_SOUP], [1], [ ])
-AC_DEFINE([WTF_USE_WEBP], [1], [ ])
-AC_DEFINE([WTF_USE_ICU_UNICODE], [1], [ ])
-AC_DEFINE([GST_API_VERSION_1], [1], [Using GStreamer 1.0])
 AC_DEFINE_UNQUOTED(GETTEXT_PACKAGE,"$GETTEXT_PACKAGE", [The gettext catalog name])
 
 if test "$enable_debug" = "yes"; then
@@ -60,10 +53,6 @@ if test "$enable_opcode_stats" = "yes"; then
     AC_DEFINE([ENABLE_OPCODE_STATS], [1], [Define to enable Opcode statistics])
 fi
 
-if test "$enable_introspection" = "yes"; then
-    AC_DEFINE([ENABLE_INTROSPECTION], [1], [Define to enable GObject introspection support])
-fi
-
 if test "$enable_video" = "yes" || test "$enable_web_audio" = "yes"; then
     AC_DEFINE([WTF_USE_GSTREAMER], [1], [ ])
     if test "$enable_debug" = "yes"; then
@@ -77,23 +66,11 @@ fi
 
 if test "$enable_accelerated_compositing" = "yes"; then
     AC_DEFINE([WTF_USE_ACCELERATED_COMPOSITING], [1], [ ])
-
-    if test "$with_acceleration_backend" = "none"; then
-        AC_DEFINE([WTF_USE_TEXTURE_MAPPER], [1], [ ])
-        AC_DEFINE([WTF_USE_TEXTURE_MAPPER_CAIRO], [1], [ ])
-    fi
-
-    if test "$with_acceleration_backend" = "opengl"; then
-        AC_DEFINE([WTF_USE_TEXTURE_MAPPER], [1], [ ])
-        AC_DEFINE([WTF_USE_TEXTURE_MAPPER_GL], [1], [ ])
-    fi
-
-    if test "$with_acceleration_backend" = "clutter"; then
-        AC_DEFINE([WTF_USE_CLUTTER], [1], [ ])
-    fi
+    AC_DEFINE([WTF_USE_TEXTURE_MAPPER], [1], [ ])
+    AC_DEFINE([WTF_USE_TEXTURE_MAPPER_GL], [1], [ ])
 fi
 
-if test "$with_acceleration_backend" = "opengl"; then
+if test "$found_opengl" = "yes"; then
     AC_DEFINE([WTF_USE_OPENGL], [1], [ ])
 fi
 
@@ -117,3 +94,8 @@ if test "$enable_credential_storage" = "yes"; then
     AC_DEFINE([ENABLE_CREDENTIAL_STORAGE], [1], [ ])
 fi
 
+if test "$enable_jit" = "yes"; then
+    AC_DEFINE([ENABLE_JIT], [1], [ ])
+elif test "$enable_jit" = "no"; then
+    AC_DEFINE([ENABLE_JIT], [0], [ ])
+fi

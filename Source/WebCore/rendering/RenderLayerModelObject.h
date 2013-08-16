@@ -46,7 +46,9 @@ public:
 
     virtual bool requiresLayer() const = 0;
 
-    virtual void reportMemoryUsage(MemoryObjectInfo*) const OVERRIDE;
+    // Returns true if the background is painted opaque in the given rect.
+    // The query rect is given in local coordinate system.
+    virtual bool backgroundIsKnownToBeOpaqueInRect(const LayoutRect&) const { return false; }
 
     // This is null for anonymous renderers.
     ContainerNode* node() const { return toContainerNode(RenderObject::node()); }
@@ -57,7 +59,7 @@ protected:
     virtual void willBeDestroyed() OVERRIDE;
 
 private:
-    virtual bool isLayerModelObject() const OVERRIDE { return true; }
+    virtual bool isLayerModelObject() const OVERRIDE FINAL { return true; }
 
     RenderLayer* m_layer;
 

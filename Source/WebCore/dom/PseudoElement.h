@@ -34,16 +34,23 @@
 
 namespace WebCore {
 
-class PseudoElement : public Element {
+class PseudoElement FINAL : public Element {
 public:
     static PassRefPtr<PseudoElement> create(Element* parent, PseudoId pseudoId)
     {
         return adoptRef(new PseudoElement(parent, pseudoId));
     }
+    ~PseudoElement();
 
     virtual PassRefPtr<RenderStyle> customStyleForRenderer() OVERRIDE;
-    virtual void attach() OVERRIDE;
+    virtual void attach(const AttachContext& = AttachContext()) OVERRIDE;
     virtual bool rendererIsNeeded(const NodeRenderingContext&) OVERRIDE;
+
+    // As per http://dev.w3.org/csswg/css3-regions/#flow-into, pseudo-elements such as ::first-line, ::first-letter, ::before or ::after
+    // cannot be directly collected into a named flow.
+#if ENABLE(CSS_REGIONS)
+    virtual bool shouldMoveToFlowThread(RenderStyle*) const OVERRIDE { return false; }
+#endif
 
     virtual bool canStartSelection() const OVERRIDE { return false; }
     virtual bool canContainRangeEndPoint() const OVERRIDE { return false; }
@@ -53,7 +60,7 @@ public:
 private:
     PseudoElement(Element*, PseudoId);
 
-    virtual void didRecalcStyle(StyleChange) OVERRIDE;
+    virtual void didRecalcStyle(Style::Change) OVERRIDE;
     virtual PseudoId customPseudoId() const OVERRIDE { return m_pseudoId; }
 
     PseudoId m_pseudoId;

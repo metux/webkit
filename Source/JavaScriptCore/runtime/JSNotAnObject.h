@@ -39,7 +39,7 @@ namespace JSC {
     class JSNotAnObject : public JSNonFinalObject {
     private:
         JSNotAnObject(ExecState* exec)
-            : JSNonFinalObject(exec->globalData(), exec->globalData().notAnObjectStructure.get())
+            : JSNonFinalObject(exec->vm(), exec->vm().notAnObjectStructure.get())
         {
         }
         
@@ -49,13 +49,13 @@ namespace JSC {
         static JSNotAnObject* create(ExecState* exec)
         {
             JSNotAnObject* object = new (NotNull, allocateCell<JSNotAnObject>(*exec->heap())) JSNotAnObject(exec);
-            object->finishCreation(exec->globalData());
+            object->finishCreation(exec->vm());
             return object;
         }
 
-        static Structure* createStructure(JSGlobalData& globalData, JSGlobalObject* globalObject, JSValue prototype)
+        static Structure* createStructure(VM& vm, JSGlobalObject* globalObject, JSValue prototype)
         {
-            return Structure::create(globalData, globalObject, prototype, TypeInfo(ObjectType, StructureFlags), &s_info);
+            return Structure::create(vm, globalObject, prototype, TypeInfo(ObjectType, StructureFlags), &s_info);
         }
 
         static const ClassInfo s_info;
@@ -68,8 +68,8 @@ namespace JSC {
         static JSValue defaultValue(const JSObject*, ExecState*, PreferredPrimitiveType);
 
         // JSObject methods
-        static bool getOwnPropertySlot(JSCell*, ExecState*, PropertyName, PropertySlot&);
-        static bool getOwnPropertySlotByIndex(JSCell*, ExecState*, unsigned propertyName, PropertySlot&);
+        static bool getOwnPropertySlot(JSObject*, ExecState*, PropertyName, PropertySlot&);
+        static bool getOwnPropertySlotByIndex(JSObject*, ExecState*, unsigned propertyName, PropertySlot&);
         static bool getOwnPropertyDescriptor(JSObject*, ExecState*, PropertyName, PropertyDescriptor&);
 
         static void put(JSCell*, ExecState*, PropertyName, JSValue, PutPropertySlot&);

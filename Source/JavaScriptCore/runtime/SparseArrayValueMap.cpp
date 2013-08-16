@@ -39,8 +39,8 @@ namespace JSC {
 
 const ClassInfo SparseArrayValueMap::s_info = { "SparseArrayValueMap", 0, 0, 0, CREATE_METHOD_TABLE(SparseArrayValueMap) };
 
-SparseArrayValueMap::SparseArrayValueMap(JSGlobalData& globalData)
-    : Base(globalData, globalData.sparseArrayValueMapStructure.get())
+SparseArrayValueMap::SparseArrayValueMap(VM& vm)
+    : Base(vm, vm.sparseArrayValueMapStructure.get())
     , m_flags(Normal)
     , m_reportedCapacity(0)
 {
@@ -50,15 +50,15 @@ SparseArrayValueMap::~SparseArrayValueMap()
 {
 }
 
-void SparseArrayValueMap::finishCreation(JSGlobalData& globalData)
+void SparseArrayValueMap::finishCreation(VM& vm)
 {
-    Base::finishCreation(globalData);
+    Base::finishCreation(vm);
 }
 
-SparseArrayValueMap* SparseArrayValueMap::create(JSGlobalData& globalData)
+SparseArrayValueMap* SparseArrayValueMap::create(VM& vm)
 {
-    SparseArrayValueMap* result = new (NotNull, allocateCell<SparseArrayValueMap>(globalData.heap)) SparseArrayValueMap(globalData);
-    result->finishCreation(globalData);
+    SparseArrayValueMap* result = new (NotNull, allocateCell<SparseArrayValueMap>(vm.heap)) SparseArrayValueMap(vm);
+    result->finishCreation(vm);
     return result;
 }
 
@@ -67,9 +67,9 @@ void SparseArrayValueMap::destroy(JSCell* cell)
     static_cast<SparseArrayValueMap*>(cell)->SparseArrayValueMap::~SparseArrayValueMap();
 }
 
-Structure* SparseArrayValueMap::createStructure(JSGlobalData& globalData, JSGlobalObject* globalObject, JSValue prototype)
+Structure* SparseArrayValueMap::createStructure(VM& vm, JSGlobalObject* globalObject, JSValue prototype)
 {
-    return Structure::create(globalData, globalObject, prototype, TypeInfo(CompoundType, StructureFlags), &s_info);
+    return Structure::create(vm, globalObject, prototype, TypeInfo(CompoundType, StructureFlags), &s_info);
 }
 
 SparseArrayValueMap::AddResult SparseArrayValueMap::add(JSObject* array, unsigned i)
@@ -118,11 +118,11 @@ bool SparseArrayValueMap::putDirect(ExecState* exec, JSObject* array, unsigned i
     }
 
     entry.attributes = attributes;
-    entry.set(exec->globalData(), this, value);
+    entry.set(exec->vm(), this, value);
     return true;
 }
 
-void SparseArrayEntry::get(PropertySlot& slot) const
+void SparseArrayEntry::get(JSObject* thisObject, PropertySlot& slot) const
 {
     JSValue value = Base::get();
     ASSERT(value);
@@ -132,13 +132,7 @@ void SparseArrayEntry::get(PropertySlot& slot) const
         return;
     }
 
-    JSObject* getter = asGetterSetter(value)->getter();
-    if (!getter) {
-        slot.setUndefined();
-        return;
-    }
-
-    slot.setGetterSlot(getter);
+    slot.setGetterSlot(thisObject, jsCast<GetterSetter*>(value));
 }
 
 void SparseArrayEntry::get(PropertyDescriptor& descriptor) const
@@ -148,19 +142,13 @@ void SparseArrayEntry::get(PropertyDescriptor& descriptor) const
 
 JSValue SparseArrayEntry::get(ExecState* exec, JSObject* array) const
 {
-    JSValue result = Base::get();
-    ASSERT(result);
+    JSValue value = Base::get();
+    ASSERT(value);
 
-    if (LIKELY(!result.isGetterSetter()))
-        return result;
+    if (LIKELY(!value.isGetterSetter()))
+        return value;
 
-    JSObject* getter = asGetterSetter(result)->getter();
-    if (!getter)
-        return jsUndefined();
-
-    CallData callData;
-    CallType callType = getter->methodTable()->getCallData(getter, callData);
-    return call(exec, getter, callType, callData, array->methodTable()->toThisObject(array, exec), exec->emptyList());
+    return callGetter(exec, array, jsCast<GetterSetter*>(value));
 }
 
 void SparseArrayEntry::put(ExecState* exec, JSValue thisValue, SparseArrayValueMap* map, JSValue value, bool shouldThrow)
@@ -172,27 +160,11 @@ void SparseArrayEntry::put(ExecState* exec, JSValue thisValue, SparseArrayValueM
             return;
         }
 
-        set(exec->globalData(), map, value);
+        set(exec->vm(), map, value);
         return;
     }
 
-    JSValue accessor = Base::get();
-    ASSERT(accessor.isGetterSetter());
-    JSObject* setter = asGetterSetter(accessor)->setter();
-    
-    if (!setter) {
-        if (shouldThrow)
-            throwTypeError(exec, StrictModeReadonlyPropertyWriteError);
-        return;
-    }
-
-    CallData callData;
-    CallType callType = setter->methodTable()->getCallData(setter, callData);
-    MarkedArgumentBuffer args;
-    args.append(value);
-    if (thisValue.isObject())
-        thisValue = asObject(thisValue)->methodTable()->toThisObject(asObject(thisValue), exec);
-    call(exec, setter, callType, callData, thisValue, args);
+    callSetter(exec, thisValue, Base::get(), value, shouldThrow ? StrictMode : NotStrictMode);
 }
 
 JSValue SparseArrayEntry::getNonSparseMode() const

@@ -32,6 +32,7 @@
 #include "ExceptionCode.h"
 #include "HTMLDataListElement.h"
 #include "HTMLNames.h"
+#include "HTMLOptGroupElement.h"
 #include "HTMLParserIdioms.h"
 #include "HTMLSelectElement.h"
 #include "NodeRenderStyle.h"
@@ -42,7 +43,6 @@
 #include "ScriptElement.h"
 #include "StyleResolver.h"
 #include "Text.h"
-#include <wtf/StdLibExtras.h>
 #include <wtf/Vector.h>
 #include <wtf/text/StringBuilder.h>
 
@@ -90,9 +90,9 @@ PassRefPtr<HTMLOptionElement> HTMLOptionElement::createForJSConstructor(Document
     return element.release();
 }
 
-void HTMLOptionElement::attach()
+void HTMLOptionElement::attach(const AttachContext& context)
 {
-    HTMLElement::attach();
+    HTMLElement::attach(context);
     // If after attaching nothing called styleForRenderer() on this node we
     // manually cache the value. This happens if our parent doesn't have a
     // renderer like <optgroup> or if it doesn't allow children like <select>.
@@ -100,15 +100,10 @@ void HTMLOptionElement::attach()
         updateNonRenderStyle();
 }
 
-void HTMLOptionElement::detach()
+void HTMLOptionElement::detach(const AttachContext& context)
 {
     m_style.clear();
-    HTMLElement::detach();
-}
-
-bool HTMLOptionElement::supportsFocus() const
-{
-    return HTMLElement::supportsFocus();
+    HTMLElement::detach(context);
 }
 
 bool HTMLOptionElement::isFocusable() const
@@ -181,7 +176,7 @@ int HTMLOptionElement::index() const
     const Vector<HTMLElement*>& items = selectElement->listItems();
     size_t length = items.size();
     for (size_t i = 0; i < length; ++i) {
-        if (!items[i]->hasTagName(optionTag))
+        if (!isHTMLOptionElement(items[i]))
             continue;
         if (items[i] == this)
             return optionIndex;
@@ -312,7 +307,7 @@ void HTMLOptionElement::setLabel(const String& label)
 
 void HTMLOptionElement::updateNonRenderStyle()
 {
-    m_style = document()->styleResolver()->styleForElement(this);
+    m_style = document()->ensureStyleResolver()->styleForElement(this);
 }
 
 RenderStyle* HTMLOptionElement::nonRendererStyle() const
@@ -328,7 +323,7 @@ PassRefPtr<RenderStyle> HTMLOptionElement::customStyleForRenderer()
     return m_style;
 }
 
-void HTMLOptionElement::didRecalcStyle(StyleChange)
+void HTMLOptionElement::didRecalcStyle(Style::Change)
 {
     // FIXME: This is nasty, we ask our owner select to repaint even if the new
     // style is exactly the same.
@@ -341,12 +336,12 @@ void HTMLOptionElement::didRecalcStyle(StyleChange)
 String HTMLOptionElement::textIndentedToRespectGroupLabel() const
 {
     ContainerNode* parent = parentNode();
-    if (parent && parent->hasTagName(optgroupTag))
+    if (parent && isHTMLOptGroupElement(parent))
         return "    " + text();
     return text();
 }
 
-bool HTMLOptionElement::disabled() const
+bool HTMLOptionElement::isDisabledFormControl() const
 {
     if (ownElementDisabled())
         return true;
@@ -355,7 +350,7 @@ bool HTMLOptionElement::disabled() const
         return false;
 
     HTMLElement* parentElement = static_cast<HTMLElement*>(parentNode());
-    return parentElement->hasTagName(optgroupTag) && parentElement->disabled();
+    return isHTMLOptGroupElement(parentElement) && parentElement->isDisabledFormControl();
 }
 
 Node::InsertionNotificationRequest HTMLOptionElement::insertedInto(ContainerNode* insertionPoint)
@@ -381,28 +376,12 @@ String HTMLOptionElement::collectOptionInnerText() const
         if (node->isTextNode())
             text.append(node->nodeValue());
         // Text nodes inside script elements are not part of the option text.
-        if (node->isElementNode() && toScriptElement(toElement(node)))
+        if (node->isElementNode() && toScriptElementIfPossible(toElement(node)))
             node = NodeTraversal::nextSkippingChildren(node, this);
         else
             node = NodeTraversal::next(node, this);
     }
     return text.toString();
 }
-
-#ifndef NDEBUG
-
-HTMLOptionElement* toHTMLOptionElement(Node* node)
-{
-    ASSERT(!node || node->hasTagName(optionTag));
-    return static_cast<HTMLOptionElement*>(node);
-}
-
-const HTMLOptionElement* toHTMLOptionElement(const Node* node)
-{
-    ASSERT(!node || node->hasTagName(optionTag));
-    return static_cast<const HTMLOptionElement*>(node);
-}
-
-#endif
 
 } // namespace

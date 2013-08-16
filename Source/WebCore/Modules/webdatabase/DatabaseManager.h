@@ -89,7 +89,6 @@ public:
 
     String fullPathForDatabase(SecurityOrigin*, const String& name, bool createIfDoesNotExist = true);
 
-#if !PLATFORM(CHROMIUM)
     bool hasEntryForOrigin(SecurityOrigin*);
     void origins(Vector<RefPtr<SecurityOrigin> >& result);
     bool databaseNamesForOrigin(SecurityOrigin*, Vector<String>& result);
@@ -104,13 +103,7 @@ public:
     bool deleteOrigin(SecurityOrigin*);
     bool deleteDatabase(SecurityOrigin*, const String& name);
 
-#else // PLATFORM(CHROMIUM)
-    void closeDatabasesImmediately(const String& originIdentifier, const String& name);
-#endif // PLATFORM(CHROMIUM)
-
     void interruptAllDatabasesForContext(ScriptExecutionContext*);
-
-    unsigned long long getMaxSizeForDatabase(const DatabaseBackendBase*);
 
 private:
     DatabaseManager();

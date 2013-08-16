@@ -38,6 +38,7 @@
 #include "InlineTextBox.h"
 #include "NodeTraversal.h"
 #include "Range.h"
+#include "RenderImage.h"
 #include "RenderTableCell.h"
 #include "RenderTableRow.h"
 #include "RenderTextControl.h"
@@ -46,7 +47,7 @@
 #include "TextBoundaries.h"
 #include "TextBreakIterator.h"
 #include "VisiblePosition.h"
-#include "visible_units.h"
+#include "VisibleUnits.h"
 #include <wtf/text/CString.h>
 #include <wtf/unicode/CharacterNames.h>
 
@@ -243,32 +244,29 @@ static void setUpFullyClippedStack(BitStack& stack, Node* node)
 
     ASSERT(stack.size() == 1 + depthCrossingShadowBoundaries(node));
 }
+    
+static bool isRendererReplacedElement(RenderObject* renderer)
+{
+    if (!renderer)
+        return false;
+    
+    if (renderer->isImage() || renderer->isWidget())
+        return true;
+    
+    if (renderer->node() && renderer->node()->isElementNode()) {
+        Element* element = toElement(renderer->node());
+        if (element->isFormControlElement() || element->hasTagName(legendTag)
+            || element->hasTagName(meterTag) || element->hasTagName(progressTag))
+            return true;
+        
+        if (equalIgnoringCase(element->getAttribute(roleAttr), "img"))
+            return true;
+    }
+    
+    return false;
+}
 
 // --------
-
-TextIterator::TextIterator()
-    : m_startContainer(0)
-    , m_startOffset(0)
-    , m_endContainer(0)
-    , m_endOffset(0)
-    , m_positionNode(0)
-    , m_textCharacters(0)
-    , m_textLength(0)
-    , m_remainingTextBox(0)
-    , m_firstLetterText(0)
-    , m_lastCharacter(0)
-    , m_sortedTextBoxesPosition(0)
-    , m_emitsCharactersBetweenAllVisiblePositions(false)
-    , m_entersTextControls(false)
-    , m_emitsTextWithoutTranscoding(false)
-    , m_emitsOriginalText(false)
-    , m_handledFirstLetter(false)
-    , m_ignoresStyleVisibility(false)
-    , m_emitsObjectReplacementCharacters(false)
-    , m_stopsOnFormControls(false)
-    , m_shouldStop(false)
-{
-}
 
 TextIterator::TextIterator(const Range* r, TextIteratorBehavior behavior)
     : m_startContainer(0)
@@ -290,6 +288,7 @@ TextIterator::TextIterator(const Range* r, TextIteratorBehavior behavior)
     , m_emitsObjectReplacementCharacters(behavior & TextIteratorEmitsObjectReplacementCharacters)
     , m_stopsOnFormControls(behavior & TextIteratorStopsOnFormControls)
     , m_shouldStop(false)
+    , m_emitsImageAltText(behavior & TextIteratorEmitsImageAltText)
 {
     if (!r)
         return;
@@ -406,12 +405,7 @@ void TextIterator::advance()
             if (!m_handledNode) {
                 if (renderer->isText() && m_node->nodeType() == Node::TEXT_NODE) // FIXME: What about CDATA_SECTION_NODE?
                     m_handledNode = handleTextNode();
-                else if (renderer && (renderer->isImage() || renderer->isWidget() ||
-                         (renderer->node() && renderer->node()->isElementNode() &&
-                          (static_cast<Element*>(renderer->node())->isFormControlElement()
-                          || static_cast<Element*>(renderer->node())->hasTagName(legendTag)
-                          || static_cast<Element*>(renderer->node())->hasTagName(meterTag)
-                          || static_cast<Element*>(renderer->node())->hasTagName(progressTag)))))
+                else if (isRendererReplacedElement(renderer))
                     m_handledNode = handleReplacedElement();
                 else
                     m_handledNode = handleNonTextNode();
@@ -712,10 +706,18 @@ bool TextIterator::handleReplacedElement()
     m_positionOffsetBaseNode = m_node;
     m_positionStartOffset = 0;
     m_positionEndOffset = 1;
-
     m_textCharacters = 0;
-    m_textLength = 0;
 
+    if (m_emitsImageAltText && renderer->isImage() && renderer->isRenderImage()) {
+        m_text = toRenderImage(renderer)->altText();
+        if (!m_text.isEmpty()) {
+            m_textLength = m_text.length();
+            m_lastCharacter = m_text[m_textLength - 1];
+            return true;
+        }
+    }
+
+    m_textLength = 0;
     m_lastCharacter = 0;
 
     return true;
@@ -747,14 +749,13 @@ static bool shouldEmitTabBeforeNode(Node* node)
     return t && (t->cellBefore(rc) || t->cellAbove(rc));
 }
 
-static bool shouldEmitNewlineForNode(Node* node)
+static bool shouldEmitNewlineForNode(Node* node, bool emitsOriginalText)
 {
-    // br elements are represented by a single newline.
-    RenderObject* r = node->renderer();
-    if (!r)
-        return node->hasTagName(brTag);
-        
-    return r->isBR();
+    RenderObject* renderer = node->renderer();
+
+    if (renderer ? !renderer->isBR() : !node->hasTagName(brTag))
+        return false;
+    return emitsOriginalText || !(node->isInShadowTree() && node->shadowHost()->toInputElement());
 }
 
 static bool shouldEmitNewlinesBeforeAndAfterNode(Node* node)
@@ -956,7 +957,7 @@ void TextIterator::representNodeOffsetZero()
 
 bool TextIterator::handleNonTextNode()
 {
-    if (shouldEmitNewlineForNode(m_node))
+    if (shouldEmitNewlineForNode(m_node, m_emitsOriginalText))
         emitCharacter('\n', m_node->parentNode(), m_node, 0, 1);
     else if (m_emitsCharactersBetweenAllVisiblePositions && m_node->renderer() && m_node->renderer()->isHR())
         emitCharacter(' ', m_node->parentNode(), m_node, 0, 1);
@@ -1089,30 +1090,6 @@ Node* TextIterator::node() const
 
 // --------
 
-SimplifiedBackwardsTextIterator::SimplifiedBackwardsTextIterator()
-    : m_node(0)
-    , m_offset(0)
-    , m_handledNode(false)
-    , m_handledChildren(false)
-    , m_startNode(0)
-    , m_startOffset(0)
-    , m_endNode(0)
-    , m_endOffset(0)
-    , m_positionNode(0)
-    , m_positionStartOffset(0)
-    , m_positionEndOffset(0)
-    , m_textCharacters(0)
-    , m_textLength(0)
-    , m_lastTextNode(0)
-    , m_lastCharacter(0)
-    , m_singleCharacterBuffer(0)
-    , m_havePassedStartNode(false)
-    , m_shouldHandleFirstLetter(false)
-    , m_stopsOnFormControls(false)
-    , m_shouldStop(false)
-{
-}
-
 SimplifiedBackwardsTextIterator::SimplifiedBackwardsTextIterator(const Range* r, TextIteratorBehavior behavior)
     : m_node(0)
     , m_offset(0)
@@ -1134,6 +1111,7 @@ SimplifiedBackwardsTextIterator::SimplifiedBackwardsTextIterator(const Range* r,
     , m_shouldHandleFirstLetter(false)
     , m_stopsOnFormControls(behavior & TextIteratorStopsOnFormControls)
     , m_shouldStop(false)
+    , m_emitsOriginalText(false)
 {
     ASSERT(behavior == TextIteratorDefaultBehavior || behavior == TextIteratorStopsOnFormControls);
 
@@ -1342,7 +1320,7 @@ bool SimplifiedBackwardsTextIterator::handleNonTextNode()
 {    
     // We can use a linefeed in place of a tab because this simple iterator is only used to
     // find boundaries, not actual content.  A linefeed breaks words, sentences, and paragraphs.
-    if (shouldEmitNewlineForNode(m_node) || shouldEmitNewlineAfterNode(m_node) || shouldEmitTabBeforeNode(m_node)) {
+    if (shouldEmitNewlineForNode(m_node, m_emitsOriginalText) || shouldEmitNewlineAfterNode(m_node) || shouldEmitTabBeforeNode(m_node)) {
         unsigned index = m_node->nodeIndex();
         // The start of this emitted range is wrong. Ensuring correctness would require
         // VisiblePositions and so would be slow. previousBoundary expects this.
@@ -1353,7 +1331,7 @@ bool SimplifiedBackwardsTextIterator::handleNonTextNode()
 
 void SimplifiedBackwardsTextIterator::exitNode()
 {
-    if (shouldEmitNewlineForNode(m_node) || shouldEmitNewlineBeforeNode(m_node) || shouldEmitTabBeforeNode(m_node)) {
+    if (shouldEmitNewlineForNode(m_node, m_emitsOriginalText) || shouldEmitNewlineBeforeNode(m_node) || shouldEmitTabBeforeNode(m_node)) {
         // The start of this emitted range is wrong. Ensuring correctness would require
         // VisiblePositions and so would be slow. previousBoundary expects this.
         emitCharacter('\n', m_node, 0, 0);
@@ -1391,13 +1369,6 @@ PassRefPtr<Range> SimplifiedBackwardsTextIterator::range() const
 }
 
 // --------
-
-CharacterIterator::CharacterIterator()
-    : m_offset(0)
-    , m_runOffset(0)
-    , m_atBreak(true)
-{
-}
 
 CharacterIterator::CharacterIterator(const Range* r, TextIteratorBehavior behavior)
     : m_offset(0)
@@ -1498,13 +1469,6 @@ static PassRefPtr<Range> characterSubrange(CharacterIterator& it, int offset, in
         end->endContainer(), end->endOffset());
 }
 
-BackwardsCharacterIterator::BackwardsCharacterIterator()
-    : m_offset(0)
-    , m_runOffset(0)
-    , m_atBreak(true)
-{
-}
-
 BackwardsCharacterIterator::BackwardsCharacterIterator(const Range* range, TextIteratorBehavior behavior)
     : m_offset(0)
     , m_runOffset(0)
@@ -1572,12 +1536,6 @@ void BackwardsCharacterIterator::advance(int count)
 }
 
 // --------
-
-WordAwareIterator::WordAwareIterator()
-    : m_previousText(0)
-    , m_didLookAhead(false)
-{
-}
 
 WordAwareIterator::WordAwareIterator(const Range* r)
     : m_previousText(0)
@@ -2024,13 +1982,26 @@ inline SearchBuffer::SearchBuffer(const String& target, FindOptions options)
     UStringSearch* searcher = WebCore::searcher();
     UCollator* collator = usearch_getCollator(searcher);
 
-    UCollationStrength strength = m_options & CaseInsensitive ? UCOL_PRIMARY : UCOL_TERTIARY;
+    UCollationStrength strength;
+    USearchAttributeValue comparator;
+    if (m_options & CaseInsensitive) {
+        // Without loss of generality, have 'e' match {'e', 'E', 'é', 'É'} and 'é' match {'é', 'É'}.
+        strength = UCOL_SECONDARY;
+        comparator = USEARCH_PATTERN_BASE_WEIGHT_IS_WILDCARD;
+    } else {
+        // Without loss of generality, have 'e' match {'e'} and 'é' match {'é'}.
+        strength = UCOL_TERTIARY;
+        comparator = USEARCH_STANDARD_ELEMENT_COMPARISON;
+    }
     if (ucol_getStrength(collator) != strength) {
         ucol_setStrength(collator, strength);
         usearch_reset(searcher);
     }
 
     UErrorCode status = U_ZERO_ERROR;
+    usearch_setAttribute(searcher, USEARCH_ELEMENT_COMPARISON, comparator, &status);
+    ASSERT(status == U_ZERO_ERROR);
+
     usearch_setPattern(searcher, m_target.characters(), targetLength, &status);
     ASSERT(status == U_ZERO_ERROR);
 
@@ -2093,7 +2064,7 @@ inline void SearchBuffer::prependContext(const UChar* characters, size_t length)
     }
 
     size_t usableLength = min(m_buffer.capacity() - m_prefixLength, length - wordBoundaryContextStart);
-    m_buffer.prepend(characters + length - usableLength, usableLength);
+    m_buffer.insert(0, characters + length - usableLength, usableLength);
     m_prefixLength += usableLength;
 
     if (wordBoundaryContextStart || m_prefixLength == m_buffer.capacity())
@@ -2545,19 +2516,16 @@ bool TextIterator::getLocationAndLengthFromRange(Node* scope, const Range* range
 String plainText(const Range* r, TextIteratorBehavior defaultBehavior, bool isDisplayString)
 {
     // The initial buffer size can be critical for performance: https://bugs.webkit.org/show_bug.cgi?id=81192
-    static const unsigned cMaxSegmentSize = 1 << 15;
+    static const unsigned initialCapacity = 1 << 15;
 
     unsigned bufferLength = 0;
     StringBuilder builder;
-    builder.reserveCapacity(cMaxSegmentSize);
+    builder.reserveCapacity(initialCapacity);
     TextIteratorBehavior behavior = defaultBehavior;
     if (!isDisplayString)
         behavior = static_cast<TextIteratorBehavior>(behavior | TextIteratorEmitsTextsWithoutTranscoding);
     
     for (TextIterator it(r, behavior); !it.atEnd(); it.advance()) {
-        if (builder.capacity() < builder.length() + it.length())
-            builder.reserveCapacity(builder.capacity() + cMaxSegmentSize);
-
         it.appendTextToStringBuilder(builder);
         bufferLength += it.length();
     }
@@ -2571,17 +2539,6 @@ String plainText(const Range* r, TextIteratorBehavior defaultBehavior, bool isDi
         r->ownerDocument()->displayStringModifiedByEncoding(result);
 
     return result;
-}
-
-static inline bool isAllCollapsibleWhitespace(const String& string)
-{
-    const UChar* characters = string.characters();
-    unsigned length = string.length();
-    for (unsigned i = 0; i < length; ++i) {
-        if (!isCollapsibleWhitespace(characters[i]))
-            return false;
-    }
-    return true;
 }
 
 static PassRefPtr<Range> collapsedToBoundary(const Range* range, bool forward)

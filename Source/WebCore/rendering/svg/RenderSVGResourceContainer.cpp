@@ -25,9 +25,10 @@
 #include "RenderLayer.h"
 #include "RenderSVGRoot.h"
 #include "RenderView.h"
+#include "SVGGraphicsElement.h"
 #include "SVGRenderingContext.h"
 #include "SVGResourcesCache.h"
-#include "SVGStyledTransformableElement.h"
+#include <wtf/StackStats.h>
 
 namespace WebCore {
 
@@ -86,7 +87,7 @@ void RenderSVGResourceContainer::idChanged()
     // Remove old id, that is guaranteed to be present in cache.
     SVGDocumentExtensions* extensions = svgExtensionsFromNode(node());
     extensions->removeResource(m_id);
-    m_id = static_cast<Element*>(node())->getIdAttribute();
+    m_id = toElement(node())->getIdAttribute();
 
     registerResource();
 }
@@ -225,7 +226,7 @@ AffineTransform RenderSVGResourceContainer::transformOnNonScalingStroke(RenderOb
     if (!object->isSVGShape())
         return resourceTransform;
 
-    SVGStyledTransformableElement* element = static_cast<SVGStyledTransformableElement*>(object->node());
+    SVGGraphicsElement* element = toSVGGraphicsElement(object->node());
     AffineTransform transform = element->getScreenCTM(SVGLocatable::DisallowStyleUpdate);
     transform *= resourceTransform;
     return transform;

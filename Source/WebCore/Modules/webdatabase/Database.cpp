@@ -41,6 +41,7 @@
 #include "DatabaseThread.h"
 #include "DatabaseTracker.h"
 #include "Document.h"
+#include "JSDOMWindow.h"
 #include "Logging.h"
 #include "NotImplemented.h"
 #include "Page.h"
@@ -58,10 +59,6 @@
 #include <wtf/RefPtr.h>
 #include <wtf/StdLibExtras.h>
 #include <wtf/text/CString.h>
-
-#if USE(JSC)
-#include "JSDOMWindow.h"
-#endif
 
 namespace WebCore {
 
@@ -167,11 +164,6 @@ void Database::closeImmediately()
         logErrorMessage("forcibly closing database");
         databaseThread->scheduleImmediateTask(DatabaseCloseTask::create(this, 0));
     }
-}
-
-unsigned long long Database::maximumSize() const
-{
-    return DatabaseManager::manager().getMaxSizeForDatabase(this);
 }
 
 void Database::changeVersion(const String& oldVersion, const String& newVersion,
@@ -290,19 +282,6 @@ SecurityOrigin* Database::securityOrigin() const
         return m_databaseThreadSecurityOrigin.get();
     return 0;
 }
-
-#if PLATFORM(CHROMIUM)
-void Database::reportStartTransactionResult(int errorSite, int webSqlErrorCode, int sqliteErrorCode)
-{
-    backend()->reportStartTransactionResult(errorSite, webSqlErrorCode, sqliteErrorCode);
-}
-
-void Database::reportCommitTransactionResult(int errorSite, int webSqlErrorCode, int sqliteErrorCode)
-{
-    backend()->reportCommitTransactionResult(errorSite, webSqlErrorCode, sqliteErrorCode);
-}
-
-#endif
 
 } // namespace WebCore
 

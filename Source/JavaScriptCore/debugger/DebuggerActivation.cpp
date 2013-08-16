@@ -35,17 +35,17 @@ ASSERT_HAS_TRIVIAL_DESTRUCTOR(DebuggerActivation);
 
 const ClassInfo DebuggerActivation::s_info = { "DebuggerActivation", &Base::s_info, 0, 0, CREATE_METHOD_TABLE(DebuggerActivation) };
 
-DebuggerActivation::DebuggerActivation(JSGlobalData& globalData)
-    : JSNonFinalObject(globalData, globalData.debuggerActivationStructure.get())
+DebuggerActivation::DebuggerActivation(VM& vm)
+    : JSNonFinalObject(vm, vm.debuggerActivationStructure.get())
 {
 }
 
-void DebuggerActivation::finishCreation(JSGlobalData& globalData, JSObject* activation)
+void DebuggerActivation::finishCreation(VM& vm, JSObject* activation)
 {
-    Base::finishCreation(globalData);
+    Base::finishCreation(vm);
     ASSERT(activation);
     ASSERT(activation->isActivationObject());
-    m_activation.set(globalData, this, jsCast<JSActivation*>(activation));
+    m_activation.set(vm, this, jsCast<JSActivation*>(activation));
 }
 
 void DebuggerActivation::visitChildren(JSCell* cell, SlotVisitor& visitor)
@@ -65,9 +65,9 @@ String DebuggerActivation::className(const JSObject* object)
     return thisObject->m_activation->methodTable()->className(thisObject->m_activation.get());
 }
 
-bool DebuggerActivation::getOwnPropertySlot(JSCell* cell, ExecState* exec, PropertyName propertyName, PropertySlot& slot)
+bool DebuggerActivation::getOwnPropertySlot(JSObject* object, ExecState* exec, PropertyName propertyName, PropertySlot& slot)
 {
-    DebuggerActivation* thisObject = jsCast<DebuggerActivation*>(cell);
+    DebuggerActivation* thisObject = jsCast<DebuggerActivation*>(object);
     return thisObject->m_activation->methodTable()->getOwnPropertySlot(thisObject->m_activation.get(), exec, propertyName, slot);
 }
 

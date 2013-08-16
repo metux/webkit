@@ -86,7 +86,8 @@ class PresentationAttributeCacheCleaner {
     WTF_MAKE_NONCOPYABLE(PresentationAttributeCacheCleaner); WTF_MAKE_FAST_ALLOCATED;
 public:
     PresentationAttributeCacheCleaner()
-        : m_cleanTimer(this, &PresentationAttributeCacheCleaner::cleanCache)
+        : m_hitCount(0)
+        , m_cleanTimer(this, &PresentationAttributeCacheCleaner::cleanCache)
     {
     }
 
@@ -146,33 +147,34 @@ CSSStyleDeclaration* StyledElement::style()
     return ensureMutableInlineStyle()->ensureInlineCSSStyleDeclaration(this);
 }
 
-StylePropertySet* StyledElement::ensureMutableInlineStyle()
+MutableStylePropertySet* StyledElement::ensureMutableInlineStyle()
 {
     RefPtr<StylePropertySet>& inlineStyle = ensureUniqueElementData()->m_inlineStyle;
     if (!inlineStyle)
-        inlineStyle = StylePropertySet::create(strictToCSSParserMode(isHTMLElement() && !document()->inQuirksMode()));
+        inlineStyle = MutableStylePropertySet::create(strictToCSSParserMode(isHTMLElement() && !document()->inQuirksMode()));
     else if (!inlineStyle->isMutable())
-        inlineStyle = inlineStyle->copy();
-    return inlineStyle.get();
+        inlineStyle = inlineStyle->mutableCopy();
+    ASSERT(inlineStyle->isMutable());
+    return static_cast<MutableStylePropertySet*>(inlineStyle.get());
 }
 
-void StyledElement::attributeChanged(const QualifiedName& name, const AtomicString& newValue)
+void StyledElement::attributeChanged(const QualifiedName& name, const AtomicString& newValue, AttributeModificationReason reason)
 {
     if (name == styleAttr)
-        styleAttributeChanged(newValue);
+        styleAttributeChanged(newValue, reason);
     else if (isPresentationAttribute(name)) {
         elementData()->m_presentationAttributeStyleIsDirty = true;
         setNeedsStyleRecalc(InlineStyleChange);
     }
 
-    Element::attributeChanged(name, newValue);
+    Element::attributeChanged(name, newValue, reason);
 }
 
 PropertySetCSSStyleDeclaration* StyledElement::inlineStyleCSSOMWrapper()
 {
     if (!inlineStyle() || !inlineStyle()->hasCSSOMWrapper())
         return 0;
-    PropertySetCSSStyleDeclaration* cssomWrapper = ensureUniqueElementData()->m_inlineStyle->cssStyleDeclaration();
+    PropertySetCSSStyleDeclaration* cssomWrapper = ensureMutableInlineStyle()->cssStyleDeclaration();
     ASSERT(cssomWrapper && cssomWrapper->parentElement() == this);
     return cssomWrapper;
 }
@@ -192,11 +194,13 @@ inline void StyledElement::setInlineStyleFromString(const AtomicString& newStyle
 
     if (!inlineStyle)
         inlineStyle = CSSParser::parseInlineStyleDeclaration(newStyleString, this);
-    else
-        inlineStyle->parseDeclaration(newStyleString, document()->elementSheet()->contents());
+    else {
+        ASSERT(inlineStyle->isMutable());
+        static_pointer_cast<MutableStylePropertySet>(inlineStyle)->parseDeclaration(newStyleString, document()->elementSheet()->contents());
+    }
 }
 
-void StyledElement::styleAttributeChanged(const AtomicString& newStyleString)
+void StyledElement::styleAttributeChanged(const AtomicString& newStyleString, AttributeModificationReason reason)
 {
     WTF::OrdinalNumber startLineNumber = WTF::OrdinalNumber::beforeFirst();
     if (document() && document()->scriptableDocumentParser() && !document()->isInDocumentWrite())
@@ -206,7 +210,7 @@ void StyledElement::styleAttributeChanged(const AtomicString& newStyleString)
         if (PropertySetCSSStyleDeclaration* cssomWrapper = inlineStyleCSSOMWrapper())
             cssomWrapper->clearParentElement();
         ensureUniqueElementData()->m_inlineStyle.clear();
-    } else if (document()->contentSecurityPolicy()->allowInlineStyle(document()->url(), startLineNumber))
+    } else if (reason == ModifiedByCloning || document()->contentSecurityPolicy()->allowInlineStyle(document()->url(), startLineNumber))
         setInlineStyleFromString(newStyleString);
 
     elementData()->m_styleAttributeIsDirty = false;
@@ -223,7 +227,14 @@ void StyledElement::inlineStyleChanged()
     InspectorInstrumentation::didInvalidateStyleAttr(document(), this);
 }
     
-bool StyledElement::setInlineStyleProperty(CSSPropertyID propertyID, int identifier, bool important)
+bool StyledElement::setInlineStyleProperty(CSSPropertyID propertyID, CSSValueID identifier, bool important)
+{
+    ensureMutableInlineStyle()->setProperty(propertyID, cssValuePool().createIdentifierValue(identifier), important);
+    inlineStyleChanged();
+    return true;
+}
+
+bool StyledElement::setInlineStyleProperty(CSSPropertyID propertyID, CSSPropertyID identifier, bool important)
 {
     ensureMutableInlineStyle()->setProperty(propertyID, cssValuePool().createIdentifierValue(identifier), important);
     inlineStyleChanged();
@@ -285,15 +296,15 @@ void StyledElement::makePresentationAttributeCacheKey(PresentationAttributeCache
         return;
     unsigned size = attributeCount();
     for (unsigned i = 0; i < size; ++i) {
-        const Attribute* attribute = attributeItem(i);
-        if (!isPresentationAttribute(attribute->name()))
+        const Attribute& attribute = attributeAt(i);
+        if (!isPresentationAttribute(attribute.name()))
             continue;
-        if (!attribute->namespaceURI().isNull())
+        if (!attribute.namespaceURI().isNull())
             return;
         // FIXME: Background URL may depend on the base URL and can't be shared. Disallow caching.
-        if (attribute->name() == backgroundAttr)
+        if (attribute.name() == backgroundAttr)
             return;
-        result.attributesAndValues.append(make_pair(attribute->localName().impl(), attribute->value()));
+        result.attributesAndValues.append(make_pair(attribute.localName().impl(), attribute.value()));
     }
     if (result.attributesAndValues.isEmpty())
         return;
@@ -332,11 +343,11 @@ void StyledElement::rebuildPresentationAttributeStyle()
         style = cacheIterator->value->value;
         presentationAttributeCacheCleaner().didHitPresentationAttributeCache();
     } else {
-        style = StylePropertySet::create(isSVGElement() ? SVGAttributeMode : CSSQuirksMode);
+        style = MutableStylePropertySet::create(isSVGElement() ? SVGAttributeMode : CSSQuirksMode);
         unsigned size = attributeCount();
         for (unsigned i = 0; i < size; ++i) {
-            const Attribute* attribute = attributeItem(i);
-            collectStyleForPresentationAttribute(*attribute, style.get());
+            const Attribute& attribute = attributeAt(i);
+            collectStyleForPresentationAttribute(attribute.name(), attribute.value(), static_cast<MutableStylePropertySet*>(style.get()));
         }
     }
 
@@ -362,17 +373,17 @@ void StyledElement::rebuildPresentationAttributeStyle()
         cacheIterator->value = newEntry.release();
 }
 
-void StyledElement::addPropertyToPresentationAttributeStyle(StylePropertySet* style, CSSPropertyID propertyID, int identifier)
+void StyledElement::addPropertyToPresentationAttributeStyle(MutableStylePropertySet* style, CSSPropertyID propertyID, CSSValueID identifier)
 {
     style->setProperty(propertyID, cssValuePool().createIdentifierValue(identifier));
 }
 
-void StyledElement::addPropertyToPresentationAttributeStyle(StylePropertySet* style, CSSPropertyID propertyID, double value, CSSPrimitiveValue::UnitTypes unit)
+void StyledElement::addPropertyToPresentationAttributeStyle(MutableStylePropertySet* style, CSSPropertyID propertyID, double value, CSSPrimitiveValue::UnitTypes unit)
 {
     style->setProperty(propertyID, cssValuePool().createValue(value, unit));
 }
     
-void StyledElement::addPropertyToPresentationAttributeStyle(StylePropertySet* style, CSSPropertyID propertyID, const String& value)
+void StyledElement::addPropertyToPresentationAttributeStyle(MutableStylePropertySet* style, CSSPropertyID propertyID, const String& value)
 {
     style->setProperty(propertyID, value, false, document()->elementSheet()->contents());
 }

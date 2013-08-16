@@ -41,6 +41,13 @@
 class TestRunner : public RefCounted<TestRunner> {
 public:
     static PassRefPtr<TestRunner> create(const std::string& testPathOrURL, const std::string& expectedPixelHash);
+
+    static const unsigned viewWidth;
+    static const unsigned viewHeight;
+
+    static const unsigned w3cSVGViewWidth;
+    static const unsigned w3cSVGViewHeight;
+
     ~TestRunner();
 
     void makeWindowObject(JSContextRef, JSObjectRef windowObject, JSValueRef* exception);
@@ -66,7 +73,6 @@ public:
     long long applicationCacheDiskUsageForOrigin(JSStringRef name);
     bool isCommandEnabled(JSStringRef name);
     void keepWebHistory();
-    JSValueRef computedStyleIncludingVisitedInfo(JSContextRef, JSValueRef);
     void notifyDone();
     int numberOfPendingGeolocationPermissionRequests();
     void overridePreference(JSStringRef key, JSStringRef value);
@@ -86,7 +92,6 @@ public:
     void setAppCacheMaximumSize(unsigned long long quota);
     void setApplicationCacheOriginQuota(unsigned long long);
     void setAuthorAndUserStylesEnabled(bool);
-    void setAutofilled(JSContextRef, JSValueRef nodeObject, bool autofilled);
     void setCacheModel(int);
     void setCustomPolicyDelegate(bool setDelegate, bool permissive);
     void setDatabaseQuota(unsigned long long quota);
@@ -105,8 +110,6 @@ public:
     void setPluginsEnabled(bool);
     void setPopupBlockingEnabled(bool);
     void setPrivateBrowsingEnabled(bool);
-    void setSelectTrailingWhitespaceEnabled(bool);
-    void setSmartInsertDeleteEnabled(bool);
     void setTabKeyCyclesThroughElements(bool);
     void setUseDashboardCompatibilityMode(bool flag);
     void setUserStyleSheetEnabled(bool flag);
@@ -124,7 +127,7 @@ public:
     size_t webHistoryItemCount();
     int windowCount();
     
-#if PLATFORM(MAC) || PLATFORM(GTK) || PLATFORM(WIN)
+#if PLATFORM(MAC) || PLATFORM(GTK) || PLATFORM(WIN) || PLATFORM(EFL)
     JSRetainPtr<JSStringRef> platformName() const;
 #endif
 
@@ -136,8 +139,6 @@ public:
     void denyWebNotificationPermission(JSStringRef origin);
     void removeAllWebNotificationPermissions();
     void simulateWebNotificationClick(JSValueRef notification);
-
-    bool elementDoesAutoCompleteForElementWithId(JSStringRef id);
 
     bool dumpAsAudio() const { return m_dumpAsAudio; }
     void setDumpAsAudio(bool dumpAsAudio) { m_dumpAsAudio = dumpAsAudio; }
@@ -295,7 +296,6 @@ public:
     bool geolocationPermission() const { return m_geolocationPermission; }
 
     void setDeveloperExtrasEnabled(bool);
-    void setAsynchronousSpellCheckingEnabled(bool);
     void showWebInspector();
     void closeWebInspector();
     void evaluateInWebInspector(long callId, JSStringRef script);
@@ -327,8 +327,6 @@ public:
     // Simulate a request an embedding application could make, populating per-session credential storage.
     void authenticateSession(JSStringRef url, JSStringRef username, JSStringRef password);
 
-    JSRetainPtr<JSStringRef> markerTextForListItem(JSContextRef, JSValueRef nodeObject) const;
-
     JSValueRef originsWithLocalStorage(JSContextRef);
     void deleteAllLocalStorage();
     void deleteLocalStorageForOrigin(JSStringRef originIdentifier);
@@ -338,9 +336,6 @@ public:
 
     void setShouldPaintBrokenImage(bool);
     bool shouldPaintBrokenImage() const { return m_shouldPaintBrokenImage; }
-
-    static const unsigned maxViewWidth;
-    static const unsigned maxViewHeight;
 
     void setTextDirection(JSStringRef);
     const std::string& titleTextDirection() const { return m_titleTextDirection; }

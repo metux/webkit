@@ -31,11 +31,8 @@
 #include "ImageObserver.h"
 #include "IntRect.h"
 #include "MIMETypeRegistry.h"
-#include "PlatformMemoryInstrumentation.h"
 #include "Timer.h"
 #include <wtf/CurrentTime.h>
-#include <wtf/MemoryInstrumentationVector.h>
-#include <wtf/MemoryObjectInfo.h>
 #include <wtf/Vector.h>
 #include <wtf/text/WTFString.h>
 
@@ -299,7 +296,7 @@ bool BitmapImage::ensureFrameIsCached(size_t index)
     return true;
 }
 
-NativeImagePtr BitmapImage::frameAtIndex(size_t index)
+PassNativeImagePtr BitmapImage::frameAtIndex(size_t index)
 {
     if (!ensureFrameIsCached(index))
         return 0;
@@ -320,7 +317,7 @@ float BitmapImage::frameDurationAtIndex(size_t index)
     return m_frames[index].m_duration;
 }
 
-NativeImagePtr BitmapImage::nativeImageForCurrentFrame()
+PassNativeImagePtr BitmapImage::nativeImageForCurrentFrame()
 {
     return frameAtIndex(currentFrame());
 }
@@ -341,14 +338,9 @@ bool BitmapImage::currentFrameKnownToBeOpaque()
     return !frameHasAlphaAtIndex(currentFrame());
 }
 
-ImageOrientation BitmapImage::currentFrameOrientation()
-{
-    return frameOrientationAtIndex(currentFrame());
-}
-
 ImageOrientation BitmapImage::frameOrientationAtIndex(size_t index)
 {
-    if (m_frames.size() <= index)
+    if (!ensureFrameIsCached(index))
         return DefaultImageOrientation;
 
     if (m_frames[index].m_haveMetadata)
@@ -573,28 +565,10 @@ Color BitmapImage::solidColor() const
 {
     return m_solidColor;
 }
-
-void BitmapImage::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
+    
+bool BitmapImage::canAnimate()
 {
-    MemoryClassInfo info(memoryObjectInfo, this, PlatformMemoryTypes::Image);
-    memoryObjectInfo->setClassName("BitmapImage");
-    Image::reportMemoryUsage(memoryObjectInfo);
-    info.addMember(m_source, "source");
-    info.addMember(m_frameTimer, "frameTimer");
-    info.addMember(m_frames, "frames");
-}
-
-void FrameData::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
-{
-    MemoryClassInfo info(memoryObjectInfo, this, PlatformMemoryTypes::Image);
-    memoryObjectInfo->setClassName("FrameData");
-#if OS(WINCE) && !PLATFORM(QT)
-    info.addRawBuffer(m_frame.get(), m_frameBytes, "NativeImage", "frame");
-#elif USE(SKIA)
-    info.addMember(m_frame, "frame");
-#else
-    info.addRawBuffer(m_frame, m_frameBytes, "NativeImage", "frame");
-#endif
+    return shouldAnimate() && frameCount() > 1;
 }
 
 }

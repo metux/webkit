@@ -26,6 +26,7 @@
 
 #include "Attribute.h"
 #include "CSSValueKeywords.h"
+#include "CachedImage.h"
 #include "Chrome.h"
 #include "ChromeClient.h"
 #include "EventNames.h"
@@ -87,12 +88,12 @@ bool HTMLObjectElement::isPresentationAttribute(const QualifiedName& name) const
     return HTMLPlugInImageElement::isPresentationAttribute(name);
 }
 
-void HTMLObjectElement::collectStyleForPresentationAttribute(const Attribute& attribute, StylePropertySet* style)
+void HTMLObjectElement::collectStyleForPresentationAttribute(const QualifiedName& name, const AtomicString& value, MutableStylePropertySet* style)
 {
-    if (attribute.name() == borderAttr)
-        applyBorderAttributeToStyle(attribute, style);
+    if (name == borderAttr)
+        applyBorderAttributeToStyle(value, style);
     else
-        HTMLPlugInImageElement::collectStyleForPresentationAttribute(attribute, style);
+        HTMLPlugInImageElement::collectStyleForPresentationAttribute(name, value, style);
 }
 
 void HTMLObjectElement::parseAttribute(const QualifiedName& name, const AtomicString& value)
@@ -120,9 +121,7 @@ void HTMLObjectElement::parseAttribute(const QualifiedName& name, const AtomicSt
         m_classId = value;
         if (renderer())
             setNeedsWidgetUpdate(true);
-    } else if (name == onloadAttr)
-        setAttributeEventListener(eventNames().loadEvent, createAttributeEventListener(this, name, value));
-    else if (name == onbeforeloadAttr)
+    } else if (name == onbeforeloadAttr)
         setAttributeEventListener(eventNames().beforeloadEvent, createAttributeEventListener(this, name, value));
     else
         HTMLPlugInImageElement::parseAttribute(name, value);
@@ -193,11 +192,11 @@ void HTMLObjectElement::parametersForPlugin(Vector<String>& paramNames, Vector<S
     // Turn the attributes of the <object> element into arrays, but don't override <param> values.
     if (hasAttributes()) {
         for (unsigned i = 0; i < attributeCount(); ++i) {
-            const Attribute* attribute = attributeItem(i);
-            const AtomicString& name = attribute->name().localName();
+            const Attribute& attribute = attributeAt(i);
+            const AtomicString& name = attribute.name().localName();
             if (!uniqueParamNames.contains(name.impl())) {
                 paramNames.append(name.string());
-                paramValues.append(attribute->value().string());
+                paramValues.append(attribute.value().string());
             }
         }
     }
@@ -277,7 +276,7 @@ bool HTMLObjectElement::hasValidClassId()
 // moved down into HTMLPluginImageElement.cpp
 void HTMLObjectElement::updateWidget(PluginCreationOption pluginCreationOption)
 {
-    ASSERT(!renderEmbeddedObject()->showsUnavailablePluginIndicator());
+    ASSERT(!renderEmbeddedObject()->isPluginUnavailable());
     ASSERT(needsWidgetUpdate());
     setNeedsWidgetUpdate(false);
     // FIXME: This should ASSERT isFinishedParsingChildren() instead.
@@ -363,9 +362,9 @@ bool HTMLObjectElement::isURLAttribute(const Attribute& attribute) const
     return attribute.name() == dataAttr || (attribute.name() == usemapAttr && attribute.value().string()[0] != '#') || HTMLPlugInImageElement::isURLAttribute(attribute);
 }
 
-const QualifiedName& HTMLObjectElement::imageSourceAttributeName() const
+const AtomicString& HTMLObjectElement::imageSourceURL() const
 {
-    return dataAttr;
+    return getAttribute(dataAttr);
 }
 
 void HTMLObjectElement::renderFallbackContent()
@@ -429,7 +428,7 @@ void HTMLObjectElement::updateDocNamedItem()
     Node* child = firstChild();
     while (child && isNamedItem) {
         if (child->isElementNode()) {
-            Element* element = static_cast<Element*>(child);
+            Element* element = toElement(child);
             // FIXME: Use of isRecognizedTagName is almost certainly wrong here.
             if (isRecognizedTagName(element->tagQName()) && !element->hasTagName(paramTag))
                 isNamedItem = false;
@@ -440,14 +439,23 @@ void HTMLObjectElement::updateDocNamedItem()
             isNamedItem = false;
         child = child->nextSibling();
     }
-    if (isNamedItem != wasNamedItem && document()->isHTMLDocument()) {
-        HTMLDocument* document = static_cast<HTMLDocument*>(this->document());
-        if (isNamedItem) {
-            document->addNamedItem(getNameAttribute());
-            document->addExtraNamedItem(getIdAttribute());
-        } else {
-            document->removeNamedItem(getNameAttribute());
-            document->removeExtraNamedItem(getIdAttribute());
+    if (isNamedItem != wasNamedItem && inDocument() && document()->isHTMLDocument()) {
+        HTMLDocument* document = toHTMLDocument(this->document());
+
+        const AtomicString& id = getIdAttribute();
+        if (!id.isEmpty()) {
+            if (isNamedItem)
+                document->documentNamedItemMap().add(id.impl(), this);
+            else
+                document->documentNamedItemMap().remove(id.impl(), this);
+        }
+
+        const AtomicString& name = getNameAttribute();
+        if (!name.isEmpty() && id != name) {
+            if (isNamedItem)
+                document->documentNamedItemMap().add(name.impl(), this);
+            else
+                document->documentNamedItemMap().remove(name.impl(), this);
         }
     }
     m_docNamedItem = isNamedItem;
@@ -501,7 +509,7 @@ bool HTMLObjectElement::appendFormData(FormDataList& encoding, bool)
     if (!widget || !widget->isPluginViewBase())
         return false;
     String value;
-    if (!static_cast<PluginViewBase*>(widget)->getFormValue(value))
+    if (!toPluginViewBase(widget)->getFormValue(value))
         return false;
     encoding.appendData(name(), value);
     return true;
@@ -511,17 +519,5 @@ HTMLFormElement* HTMLObjectElement::virtualForm() const
 {
     return FormAssociatedElement::form();
 }
-
-#if ENABLE(MICRODATA)
-String HTMLObjectElement::itemValueText() const
-{
-    return getURLAttribute(dataAttr);
-}
-
-void HTMLObjectElement::setItemValueText(const String& value, ExceptionCode&)
-{
-    setAttribute(dataAttr, value);
-}
-#endif
 
 }

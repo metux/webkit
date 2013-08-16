@@ -614,9 +614,9 @@ inline bool JSValue::inherits(const ClassInfo* classInfo) const
     return isCell() && asCell()->inherits(classInfo);
 }
 
-inline JSObject* JSValue::toThisObject(ExecState* exec) const
+inline JSValue JSValue::toThis(ExecState* exec, ECMAMode ecmaMode) const
 {
-    return isCell() ? asCell()->methodTable()->toThisObject(asCell(), exec) : toThisObjectSlowCase(exec);
+    return isCell() ? asCell()->methodTable()->toThis(asCell(), exec, ecmaMode) : toThisSlowCase(exec, ecmaMode);
 }
 
 inline JSValue JSValue::get(ExecState* exec, PropertyName propertyName) const
@@ -627,21 +627,19 @@ inline JSValue JSValue::get(ExecState* exec, PropertyName propertyName) const
 
 inline JSValue JSValue::get(ExecState* exec, PropertyName propertyName, PropertySlot& slot) const
 {
-    if (UNLIKELY(!isCell())) {
-        JSObject* prototype = synthesizePrototype(exec);
-        if (!prototype->getPropertySlot(exec, propertyName, slot))
-            return jsUndefined();
-        return slot.getValue(exec, propertyName);
-    }
-    JSCell* cell = asCell();
-    while (true) {
-        if (cell->fastGetOwnPropertySlot(exec, propertyName, slot))
+    // If this is a primitive, we'll need to synthesize the prototype -
+    // and if it's a string there are special properties to check first.
+    JSObject* object;
+    if (UNLIKELY(!isObject())) {
+        if (isCell() && asString(*this)->getStringPropertySlot(exec, propertyName, slot))
             return slot.getValue(exec, propertyName);
-        JSValue prototype = asObject(cell)->prototype();
-        if (!prototype.isObject())
-            return jsUndefined();
-        cell = asObject(prototype);
-    }
+        object = synthesizePrototype(exec);
+    } else
+        object = asObject(asCell());
+    
+    if (object->getPropertySlot(exec, propertyName, slot))
+        return slot.getValue(exec, propertyName);
+    return jsUndefined();
 }
 
 inline JSValue JSValue::get(ExecState* exec, unsigned propertyName) const
@@ -652,21 +650,19 @@ inline JSValue JSValue::get(ExecState* exec, unsigned propertyName) const
 
 inline JSValue JSValue::get(ExecState* exec, unsigned propertyName, PropertySlot& slot) const
 {
-    if (UNLIKELY(!isCell())) {
-        JSObject* prototype = synthesizePrototype(exec);
-        if (!prototype->getPropertySlot(exec, propertyName, slot))
-            return jsUndefined();
-        return slot.getValue(exec, propertyName);
-    }
-    JSCell* cell = const_cast<JSCell*>(asCell());
-    while (true) {
-        if (cell->methodTable()->getOwnPropertySlotByIndex(cell, exec, propertyName, slot))
+    // If this is a primitive, we'll need to synthesize the prototype -
+    // and if it's a string there are special properties to check first.
+    JSObject* object;
+    if (UNLIKELY(!isObject())) {
+        if (isCell() && asString(*this)->getStringPropertySlot(exec, propertyName, slot))
             return slot.getValue(exec, propertyName);
-        JSValue prototype = asObject(cell)->prototype();
-        if (!prototype.isObject())
-            return jsUndefined();
-        cell = prototype.asCell();
-    }
+        object = synthesizePrototype(exec);
+    } else
+        object = asObject(asCell());
+    
+    if (object->getPropertySlot(exec, propertyName, slot))
+        return slot.getValue(exec, propertyName);
+    return jsUndefined();
 }
 
 inline void JSValue::put(ExecState* exec, PropertyName propertyName, JSValue value, PutPropertySlot& slot)
@@ -793,14 +789,36 @@ inline bool JSValue::strictEqual(ExecState* exec, JSValue v1, JSValue v2)
     return strictEqualSlowCaseInline(exec, v1, v2);
 }
 
+inline TriState JSValue::pureStrictEqual(JSValue v1, JSValue v2)
+{
+    if (v1.isInt32() && v2.isInt32())
+        return triState(v1 == v2);
+
+    if (v1.isNumber() && v2.isNumber())
+        return triState(v1.asNumber() == v2.asNumber());
+
+    if (!v1.isCell() || !v2.isCell())
+        return triState(v1 == v2);
+    
+    if (v1.asCell()->isString() && v2.asCell()->isString()) {
+        const StringImpl* v1String = asString(v1)->tryGetValueImpl();
+        const StringImpl* v2String = asString(v2)->tryGetValueImpl();
+        if (!v1String || !v2String)
+            return MixedTriState;
+        return triState(WTF::equal(v1String, v2String));
+    }
+    
+    return triState(v1 == v2);
+}
+
 inline TriState JSValue::pureToBoolean() const
 {
     if (isInt32())
         return asInt32() ? TrueTriState : FalseTriState;
     if (isDouble())
-        return (asDouble() > 0.0 || asDouble() < 0.0) ? TrueTriState : FalseTriState; // false for NaN
+        return isNotZeroAndOrdered(asDouble()) ? TrueTriState : FalseTriState; // false for NaN
     if (isCell())
-        return MixedTriState;
+        return asCell()->pureToBoolean();
     return isTrue() ? TrueTriState : FalseTriState;
 }
 

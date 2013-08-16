@@ -183,7 +183,10 @@ StyleDifference SVGRenderStyle::diff(const SVGRenderStyle* other) const
             || stroke->paintUri != other->stroke->paintUri
             || stroke->miterLimit != other->stroke->miterLimit
             || stroke->dashArray != other->stroke->dashArray
-            || stroke->dashOffset != other->stroke->dashOffset)
+            || stroke->dashOffset != other->stroke->dashOffset
+            || stroke->visitedLinkPaintColor != other->stroke->visitedLinkPaintColor
+            || stroke->visitedLinkPaintUri != other->stroke->visitedLinkPaintUri
+            || stroke->visitedLinkPaintType != other->stroke->visitedLinkPaintType)
             return StyleDifferenceLayout;
 
         // Only the stroke-opacity case remains, where we only need a repaint.
@@ -221,6 +224,9 @@ StyleDifference SVGRenderStyle::diff(const SVGRenderStyle* other) const
 
     // FIXME: vector-effect is not taken into account in the layout-phase. Once this is fixed, we should relayout here.
     if (svg_noninherited_flags.f._vectorEffect != other->svg_noninherited_flags.f._vectorEffect)
+        return StyleDifferenceRepaint;
+
+    if (svg_noninherited_flags.f.bufferedRendering != other->svg_noninherited_flags.f.bufferedRendering)
         return StyleDifferenceRepaint;
 
     if (svg_noninherited_flags.f.maskType != other->svg_noninherited_flags.f.maskType)

@@ -57,11 +57,10 @@ static void pasteClipboardCallback(GtkWidget* widget, KeyBindingTranslator* tran
     translator->addPendingEditorCommand("Paste");
 }
 
-static void toggleOverwriteCallback(GtkWidget* widget, KeyBindingTranslator*)
+static void toggleOverwriteCallback(GtkWidget* widget, KeyBindingTranslator* translator)
 {
-    // We don't support toggling the overwrite mode, but the default callback expects
-    // the GtkTextView to have a layout, so we handle this signal just to stop it.
     g_signal_stop_emission_by_name(widget, "toggle-overwrite");
+    translator->addPendingEditorCommand("OverWrite");
 }
 
 // GTK+ will still send these signals to the web view. So we can safely stop signal
@@ -210,7 +209,7 @@ void KeyBindingTranslator::getEditorCommandsForKeyEvent(GdkEventKey* event, Even
 #endif
 
     if (!m_pendingEditorCommands.isEmpty()) {
-        commandList.append(m_pendingEditorCommands);
+        commandList.appendVector(m_pendingEditorCommands);
         return;
     }
 

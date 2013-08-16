@@ -5,6 +5,7 @@
     <sub name="Class Overview" link="ch01.html">
       <sub name="WebKitWebContext" link="WebKitWebContext.html"/>
       <sub name="WebKitWebView" link="WebKitWebView.html"/>
+      <sub name="WebKitAuthenticationRequest" link="WebKitAuthenticationRequest.html"/>
       <sub name="WebKitBackForwardList" link="WebKitBackForwardList.html"/>
       <sub name="WebKitBackForwardListItem" link="WebKitBackForwardListItem.html"/>
       <sub name="WebKitSettings" link="WebKitSettings.html"/>
@@ -40,6 +41,7 @@
       <sub name="WebKitWebPage" link="WebKitWebPage.html"/>
     </sub>
     <sub name="Index" link="index-all.html"/>
+    <sub name="Index of new symbols in 2.2" link="api-index-2-2.html"/>
     <sub name="Annotation Glossary" link="annotation-glossary.html"/>
   </chapters>
   <functions>
@@ -161,6 +163,7 @@
     <keyword type="property" name="The &quot;view-mode&quot; property" link="WebKitWebView.html#WebKitWebView--view-mode"/>
     <keyword type="property" name="The &quot;web-context&quot; property" link="WebKitWebView.html#WebKitWebView--web-context"/>
     <keyword type="property" name="The &quot;zoom-level&quot; property" link="WebKitWebView.html#WebKitWebView--zoom-level"/>
+    <keyword type="signal" name="The &quot;authenticate&quot; signal" link="WebKitWebView.html#WebKitWebView-authenticate"/>
     <keyword type="signal" name="The &quot;close&quot; signal" link="WebKitWebView.html#WebKitWebView-close"/>
     <keyword type="signal" name="The &quot;context-menu&quot; signal" link="WebKitWebView.html#WebKitWebView-context-menu"/>
     <keyword type="signal" name="The &quot;context-menu-dismissed&quot; signal" link="WebKitWebView.html#WebKitWebView-context-menu-dismissed"/>
@@ -181,6 +184,27 @@
     <keyword type="signal" name="The &quot;script-dialog&quot; signal" link="WebKitWebView.html#WebKitWebView-script-dialog"/>
     <keyword type="signal" name="The &quot;submit-form&quot; signal" link="WebKitWebView.html#WebKitWebView-submit-form"/>
     <keyword type="signal" name="The &quot;web-process-crashed&quot; signal" link="WebKitWebView.html#WebKitWebView-web-process-crashed"/>
+    <keyword type="struct" name="struct WebKitAuthenticationRequest" link="WebKitAuthenticationRequest.html#WebKitAuthenticationRequest-struct"/>
+    <keyword type="enum" name="enum WebKitAuthenticationScheme" link="WebKitAuthenticationRequest.html#WebKitAuthenticationScheme" since="2.2"/>
+    <keyword type="function" name="webkit_authentication_request_authenticate ()" link="WebKitAuthenticationRequest.html#webkit-authentication-request-authenticate" since="2.2"/>
+    <keyword type="function" name="webkit_authentication_request_cancel ()" link="WebKitAuthenticationRequest.html#webkit-authentication-request-cancel" since="2.2"/>
+    <keyword type="function" name="webkit_authentication_request_can_save_credentials ()" link="WebKitAuthenticationRequest.html#webkit-authentication-request-can-save-credentials" since="2.2"/>
+    <keyword type="function" name="webkit_authentication_request_get_host ()" link="WebKitAuthenticationRequest.html#webkit-authentication-request-get-host" since="2.2"/>
+    <keyword type="function" name="webkit_authentication_request_get_port ()" link="WebKitAuthenticationRequest.html#webkit-authentication-request-get-port" since="2.2"/>
+    <keyword type="function" name="webkit_authentication_request_is_retry ()" link="WebKitAuthenticationRequest.html#webkit-authentication-request-is-retry" since="2.2"/>
+    <keyword type="function" name="webkit_authentication_request_get_proposed_credential ()" link="WebKitAuthenticationRequest.html#webkit-authentication-request-get-proposed-credential" since="2.2"/>
+    <keyword type="function" name="webkit_authentication_request_get_realm ()" link="WebKitAuthenticationRequest.html#webkit-authentication-request-get-realm" since="2.2"/>
+    <keyword type="function" name="webkit_authentication_request_get_scheme ()" link="WebKitAuthenticationRequest.html#webkit-authentication-request-get-scheme" since="2.2"/>
+    <keyword type="function" name="webkit_authentication_request_is_for_proxy ()" link="WebKitAuthenticationRequest.html#webkit-authentication-request-is-for-proxy" since="2.2"/>
+    <keyword type="struct" name="WebKitCredential" link="WebKitAuthenticationRequest.html#WebKitCredential-struct"/>
+    <keyword type="enum" name="enum WebKitCredentialPersistence" link="WebKitAuthenticationRequest.html#WebKitCredentialPersistence" since="2.2"/>
+    <keyword type="function" name="webkit_credential_new ()" link="WebKitAuthenticationRequest.html#webkit-credential-new" since="2.2"/>
+    <keyword type="function" name="webkit_credential_copy ()" link="WebKitAuthenticationRequest.html#webkit-credential-copy" since="2.2"/>
+    <keyword type="function" name="webkit_credential_free ()" link="WebKitAuthenticationRequest.html#webkit-credential-free" since="2.2"/>
+    <keyword type="function" name="webkit_credential_get_password ()" link="WebKitAuthenticationRequest.html#webkit-credential-get-password" since="2.2"/>
+    <keyword type="function" name="webkit_credential_get_persistence ()" link="WebKitAuthenticationRequest.html#webkit-credential-get-persistence" since="2.2"/>
+    <keyword type="function" name="webkit_credential_get_username ()" link="WebKitAuthenticationRequest.html#webkit-credential-get-username" since="2.2"/>
+    <keyword type="function" name="webkit_credential_has_password ()" link="WebKitAuthenticationRequest.html#webkit-credential-has-password" since="2.2"/>
     <keyword type="struct" name="struct WebKitBackForwardList" link="WebKitBackForwardList.html#WebKitBackForwardList-struct"/>
     <keyword type="function" name="webkit_back_forward_list_get_length ()" link="WebKitBackForwardList.html#webkit-back-forward-list-get-length"/>
     <keyword type="function" name="webkit_back_forward_list_get_current_item ()" link="WebKitBackForwardList.html#webkit-back-forward-list-get-current-item"/>
@@ -286,6 +310,10 @@
     <keyword type="function" name="webkit_settings_set_user_agent_with_application_details ()" link="WebKitSettings.html#webkit-settings-set-user-agent-with-application-details"/>
     <keyword type="function" name="webkit_settings_get_enable_smooth_scrolling ()" link="WebKitSettings.html#webkit-settings-get-enable-smooth-scrolling"/>
     <keyword type="function" name="webkit_settings_set_enable_smooth_scrolling ()" link="WebKitSettings.html#webkit-settings-set-enable-smooth-scrolling"/>
+    <keyword type="function" name="webkit_settings_get_enable_accelerated_2d_canvas ()" link="WebKitSettings.html#webkit-settings-get-enable-accelerated-2d-canvas" since="2.2"/>
+    <keyword type="function" name="webkit_settings_set_enable_accelerated_2d_canvas ()" link="WebKitSettings.html#webkit-settings-set-enable-accelerated-2d-canvas" since="2.2"/>
+    <keyword type="function" name="webkit_settings_get_enable_write_console_messages_to_stdout ()" link="WebKitSettings.html#webkit-settings-get-enable-write-console-messages-to-stdout" since="2.2"/>
+    <keyword type="function" name="webkit_settings_set_enable_write_console_messages_to_stdout ()" link="WebKitSettings.html#webkit-settings-set-enable-write-console-messages-to-stdout" since="2.2"/>
     <keyword type="property" name="The &quot;allow-modal-dialogs&quot; property" link="WebKitSettings.html#WebKitSettings--allow-modal-dialogs"/>
     <keyword type="property" name="The &quot;auto-load-images&quot; property" link="WebKitSettings.html#WebKitSettings--auto-load-images"/>
     <keyword type="property" name="The &quot;cursive-font-family&quot; property" link="WebKitSettings.html#WebKitSettings--cursive-font-family"/>
@@ -294,6 +322,7 @@
     <keyword type="property" name="The &quot;default-font-size&quot; property" link="WebKitSettings.html#WebKitSettings--default-font-size"/>
     <keyword type="property" name="The &quot;default-monospace-font-size&quot; property" link="WebKitSettings.html#WebKitSettings--default-monospace-font-size"/>
     <keyword type="property" name="The &quot;draw-compositing-indicators&quot; property" link="WebKitSettings.html#WebKitSettings--draw-compositing-indicators"/>
+    <keyword type="property" name="The &quot;enable-accelerated-2d-canvas&quot; property" link="WebKitSettings.html#WebKitSettings--enable-accelerated-2d-canvas"/>
     <keyword type="property" name="The &quot;enable-caret-browsing&quot; property" link="WebKitSettings.html#WebKitSettings--enable-caret-browsing"/>
     <keyword type="property" name="The &quot;enable-developer-extras&quot; property" link="WebKitSettings.html#WebKitSettings--enable-developer-extras"/>
     <keyword type="property" name="The &quot;enable-dns-prefetching&quot; property" link="WebKitSettings.html#WebKitSettings--enable-dns-prefetching"/>
@@ -314,6 +343,7 @@
     <keyword type="property" name="The &quot;enable-tabs-to-links&quot; property" link="WebKitSettings.html#WebKitSettings--enable-tabs-to-links"/>
     <keyword type="property" name="The &quot;enable-webaudio&quot; property" link="WebKitSettings.html#WebKitSettings--enable-webaudio"/>
     <keyword type="property" name="The &quot;enable-webgl&quot; property" link="WebKitSettings.html#WebKitSettings--enable-webgl"/>
+    <keyword type="property" name="The &quot;enable-write-console-messages-to-stdout&quot; property" link="WebKitSettings.html#WebKitSettings--enable-write-console-messages-to-stdout"/>
     <keyword type="property" name="The &quot;enable-xss-auditor&quot; property" link="WebKitSettings.html#WebKitSettings--enable-xss-auditor"/>
     <keyword type="property" name="The &quot;fantasy-font-family&quot; property" link="WebKitSettings.html#WebKitSettings--fantasy-font-family"/>
     <keyword type="property" name="The &quot;javascript-can-access-clipboard&quot; property" link="WebKitSettings.html#WebKitSettings--javascript-can-access-clipboard"/>
@@ -553,6 +583,7 @@
     <keyword type="function" name="webkit_uri_scheme_request_get_path ()" link="WebKitURISchemeRequest.html#webkit-uri-scheme-request-get-path"/>
     <keyword type="function" name="webkit_uri_scheme_request_get_web_view ()" link="WebKitURISchemeRequest.html#webkit-uri-scheme-request-get-web-view"/>
     <keyword type="function" name="webkit_uri_scheme_request_finish ()" link="WebKitURISchemeRequest.html#webkit-uri-scheme-request-finish"/>
+    <keyword type="function" name="webkit_uri_scheme_request_finish_error ()" link="WebKitURISchemeRequest.html#webkit-uri-scheme-request-finish-error" since="2.2"/>
     <keyword type="function" name="webkit_get_major_version ()" link="webkit2gtk-WebKitVersion.html#webkit-get-major-version"/>
     <keyword type="function" name="webkit_get_minor_version ()" link="webkit2gtk-WebKitVersion.html#webkit-get-minor-version"/>
     <keyword type="function" name="webkit_get_micro_version ()" link="webkit2gtk-WebKitVersion.html#webkit-get-micro-version"/>
@@ -617,8 +648,8 @@
     <keyword type="signal" name="The &quot;page-created&quot; signal" link="WebKitWebExtension.html#WebKitWebExtension-page-created"/>
     <keyword type="struct" name="struct WebKitWebPage" link="WebKitWebPage.html#WebKitWebPage-struct"/>
     <keyword type="function" name="webkit_web_page_get_dom_document ()" link="WebKitWebPage.html#webkit-web-page-get-dom-document"/>
-    <keyword type="function" name="webkit_web_page_get_uri ()" link="WebKitWebPage.html#webkit-web-page-get-uri"/>
     <keyword type="function" name="webkit_web_page_get_id ()" link="WebKitWebPage.html#webkit-web-page-get-id"/>
+    <keyword type="function" name="webkit_web_page_get_uri ()" link="WebKitWebPage.html#webkit-web-page-get-uri"/>
     <keyword type="property" name="The &quot;uri&quot; property" link="WebKitWebPage.html#WebKitWebPage--uri"/>
     <keyword type="signal" name="The &quot;document-loaded&quot; signal" link="WebKitWebPage.html#WebKitWebPage-document-loaded"/>
     <keyword type="signal" name="The &quot;send-request&quot; signal" link="WebKitWebPage.html#WebKitWebPage-send-request"/>
@@ -646,6 +677,18 @@
     <keyword type="constant" name="WEBKIT_SCRIPT_DIALOG_ALERT" link="WebKitWebView.html#WEBKIT-SCRIPT-DIALOG-ALERT:CAPS"/>
     <keyword type="constant" name="WEBKIT_SCRIPT_DIALOG_CONFIRM" link="WebKitWebView.html#WEBKIT-SCRIPT-DIALOG-CONFIRM:CAPS"/>
     <keyword type="constant" name="WEBKIT_SCRIPT_DIALOG_PROMPT" link="WebKitWebView.html#WEBKIT-SCRIPT-DIALOG-PROMPT:CAPS"/>
+    <keyword type="constant" name="WEBKIT_AUTHENTICATION_SCHEME_DEFAULT" link="WebKitAuthenticationRequest.html#WEBKIT-AUTHENTICATION-SCHEME-DEFAULT:CAPS"/>
+    <keyword type="constant" name="WEBKIT_AUTHENTICATION_SCHEME_HTTP_BASIC" link="WebKitAuthenticationRequest.html#WEBKIT-AUTHENTICATION-SCHEME-HTTP-BASIC:CAPS"/>
+    <keyword type="constant" name="WEBKIT_AUTHENTICATION_SCHEME_HTTP_DIGEST" link="WebKitAuthenticationRequest.html#WEBKIT-AUTHENTICATION-SCHEME-HTTP-DIGEST:CAPS"/>
+    <keyword type="constant" name="WEBKIT_AUTHENTICATION_SCHEME_HTML_FORM" link="WebKitAuthenticationRequest.html#WEBKIT-AUTHENTICATION-SCHEME-HTML-FORM:CAPS"/>
+    <keyword type="constant" name="WEBKIT_AUTHENTICATION_SCHEME_NTLM" link="WebKitAuthenticationRequest.html#WEBKIT-AUTHENTICATION-SCHEME-NTLM:CAPS"/>
+    <keyword type="constant" name="WEBKIT_AUTHENTICATION_SCHEME_NEGOTIATE" link="WebKitAuthenticationRequest.html#WEBKIT-AUTHENTICATION-SCHEME-NEGOTIATE:CAPS"/>
+    <keyword type="constant" name="WEBKIT_AUTHENTICATION_SCHEME_CLIENT_CERTIFICATE_REQUESTED" link="WebKitAuthenticationRequest.html#WEBKIT-AUTHENTICATION-SCHEME-CLIENT-CERTIFICATE-REQUESTED:CAPS"/>
+    <keyword type="constant" name="WEBKIT_AUTHENTICATION_SCHEME_SERVER_TRUST_EVALUATION_REQUESTED" link="WebKitAuthenticationRequest.html#WEBKIT-AUTHENTICATION-SCHEME-SERVER-TRUST-EVALUATION-REQUESTED:CAPS"/>
+    <keyword type="constant" name="WEBKIT_AUTHENTICATION_SCHEME_UNKNOWN" link="WebKitAuthenticationRequest.html#WEBKIT-AUTHENTICATION-SCHEME-UNKNOWN:CAPS"/>
+    <keyword type="constant" name="WEBKIT_CREDENTIAL_PERSISTENCE_NONE" link="WebKitAuthenticationRequest.html#WEBKIT-CREDENTIAL-PERSISTENCE-NONE:CAPS"/>
+    <keyword type="constant" name="WEBKIT_CREDENTIAL_PERSISTENCE_FOR_SESSION" link="WebKitAuthenticationRequest.html#WEBKIT-CREDENTIAL-PERSISTENCE-FOR-SESSION:CAPS"/>
+    <keyword type="constant" name="WEBKIT_CREDENTIAL_PERSISTENCE_PERMANENT" link="WebKitAuthenticationRequest.html#WEBKIT-CREDENTIAL-PERSISTENCE-PERMANENT:CAPS"/>
     <keyword type="constant" name="WEBKIT_NAVIGATION_TYPE_LINK_CLICKED" link="WebKitNavigationPolicyDecision.html#WEBKIT-NAVIGATION-TYPE-LINK-CLICKED:CAPS"/>
     <keyword type="constant" name="WEBKIT_NAVIGATION_TYPE_FORM_SUBMITTED" link="WebKitNavigationPolicyDecision.html#WEBKIT-NAVIGATION-TYPE-FORM-SUBMITTED:CAPS"/>
     <keyword type="constant" name="WEBKIT_NAVIGATION_TYPE_BACK_FORWARD" link="WebKitNavigationPolicyDecision.html#WEBKIT-NAVIGATION-TYPE-BACK-FORWARD:CAPS"/>

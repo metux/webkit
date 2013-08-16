@@ -52,7 +52,7 @@ class InstrumentingAgents;
 class Page;
 class ScriptHeapSnapshot;
 class ScriptProfile;
-class WorkerContext;
+class WorkerGlobalScope;
 
 typedef String ErrorString;
 
@@ -61,13 +61,13 @@ class InspectorProfilerAgent : public InspectorBaseAgent<InspectorProfilerAgent>
 public:
     static PassOwnPtr<InspectorProfilerAgent> create(InstrumentingAgents*, InspectorConsoleAgent*, Page*, InspectorCompositeState*, InjectedScriptManager*);
 #if ENABLE(WORKERS)
-    static PassOwnPtr<InspectorProfilerAgent> create(InstrumentingAgents*, InspectorConsoleAgent*, WorkerContext*, InspectorCompositeState*, InjectedScriptManager*);
+    static PassOwnPtr<InspectorProfilerAgent> create(InstrumentingAgents*, InspectorConsoleAgent*, WorkerGlobalScope*, InspectorCompositeState*, InjectedScriptManager*);
 #endif
     virtual ~InspectorProfilerAgent();
 
-    void addProfile(PassRefPtr<ScriptProfile> prpProfile, unsigned lineNumber, const String& sourceURL);
-    void addProfileFinishedMessageToConsole(PassRefPtr<ScriptProfile>, unsigned lineNumber, const String& sourceURL);
-    void addStartProfilingMessageToConsole(const String& title, unsigned lineNumber, const String& sourceURL);
+    void addProfile(PassRefPtr<ScriptProfile> prpProfile, unsigned lineNumber, unsigned columnNumber, const String& sourceURL);
+    void addProfileFinishedMessageToConsole(PassRefPtr<ScriptProfile>, unsigned lineNumber, unsigned columnNumber, const String& sourceURL);
+    void addStartProfilingMessageToConsole(const String& title, unsigned lineNumber, unsigned columnNumber, const String& sourceURL);
     virtual void collectGarbage(ErrorString*);
     virtual void clearProfiles(ErrorString*) { resetState(); }
     void resetState();
@@ -100,8 +100,6 @@ public:
 
     virtual void getObjectByHeapObjectId(ErrorString*, const String& heapSnapshotObjectId, const String* objectGroup, RefPtr<TypeBuilder::Runtime::RemoteObject>& result);
     virtual void getHeapObjectId(ErrorString*, const String& objectId, String* heapSnapshotObjectId);
-
-    virtual void reportMemoryUsage(MemoryObjectInfo*) const OVERRIDE;
 
     void willProcessTask();
     void didProcessTask();

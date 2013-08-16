@@ -109,6 +109,7 @@ public:
         TypePreferences,
         TypeTextChecker,
         TypeVibration,
+        TypeViewportAttributes,
 
         // Bundle types
         TypeBundle,
@@ -121,6 +122,7 @@ public:
         TypeBundleNavigationAction,
         TypeBundleNodeHandle,
         TypeBundlePage,
+        TypeBundlePageBanner,
         TypeBundlePageGroup,
         TypeBundlePageOverlay,
         TypeBundleRangeHandle,
@@ -135,6 +137,10 @@ public:
 #endif
 #if PLATFORM(EFL)
         TypePopupMenuItem,
+#if ENABLE(TOUCH_EVENTS)
+        TypeTouchPoint,
+        TypeTouchEvent,
+#endif
 #endif
     };
 
@@ -146,6 +152,23 @@ public:
 
 protected:
     APIObject();
+};
+
+template <APIObject::Type ArgumentType>
+class TypedAPIObject : public APIObject {
+public:
+    static const Type APIType = ArgumentType;
+
+    virtual ~TypedAPIObject()
+    {
+    }
+
+protected:
+    TypedAPIObject()
+    {
+    }
+
+    virtual Type type() const OVERRIDE { return APIType; }
 };
 
 } // namespace WebKit

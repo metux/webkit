@@ -25,6 +25,8 @@
 
 #include "config.h"
 #include "SourceProvider.h"
+#include <wtf/StdLibExtras.h>
+#include <wtf/TCSpinLock.h>
 
 namespace JSC {
 
@@ -32,11 +34,28 @@ SourceProvider::SourceProvider(const String& url, const TextPosition& startPosit
     : m_url(url)
     , m_startPosition(startPosition)
     , m_validated(false)
+    , m_id(0)
 {
 }
 
 SourceProvider::~SourceProvider()
 {
+}
+
+static inline size_t charPositionExtractor(const size_t* value)
+{
+    return *value;
+}
+
+static TCMalloc_SpinLock providerIdLock = SPINLOCK_INITIALIZER;
+
+void SourceProvider::getID()
+{
+    SpinLockHolder lock(&providerIdLock);
+    if (!m_id) {
+        static intptr_t nextProviderID = 0;
+        m_id = ++nextProviderID;
+    }
 }
 
 } // namespace JSC

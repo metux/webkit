@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 1999 Lars Knoll (knoll@kde.org)
- * Copyright (C) 2005, 2006, 2007, 2008, 2009, 2010 Apple Inc. All rights reserved.
+ * Copyright (C) 2005, 2006, 2007, 2008, 2009, 2010, 2013 Apple Inc. All rights reserved.
  * Copyright (C) 2009 Google Inc. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
@@ -25,10 +25,13 @@
 
 #include <limits.h>
 #include <wtf/ASCIICType.h>
+#include <wtf/CompilationThread.h>
 #include <wtf/Forward.h>
+#include <wtf/MathExtras.h>
 #include <wtf/StdLibExtras.h>
 #include <wtf/StringHasher.h>
 #include <wtf/Vector.h>
+#include <wtf/text/ConversionMode.h>
 #include <wtf/unicode/Unicode.h>
 
 #if PLATFORM(QT)
@@ -64,12 +67,14 @@ template<typename CharacterType> struct HashAndCharactersTranslator;
 struct HashAndUTF8CharactersTranslator;
 struct LCharBufferTranslator;
 struct CharBufferFromLiteralDataTranslator;
-class MemoryObjectInfo;
 struct SubstringTranslator;
 struct UCharBufferTranslator;
 template<typename> class RetainPtr;
 
-enum TextCaseSensitivity { TextCaseSensitive, TextCaseInsensitive };
+enum TextCaseSensitivity {
+    TextCaseSensitive,
+    TextCaseInsensitive
+};
 
 typedef bool (*CharacterMatchFunctionPtr)(UChar);
 typedef bool (*IsWhiteSpaceFunctionPtr)(UChar);
@@ -240,17 +245,29 @@ private:
         STRING_STATS_ADD_8BIT_STRING(m_length);
     }
 
-    enum ConstructFromLiteralTag { ConstructFromLiteral };
-    StringImpl(const char* characters, unsigned length, ConstructFromLiteralTag)
+    enum ConstructWithoutCopyingTag { ConstructWithoutCopying };
+    StringImpl(const UChar* characters, unsigned length, ConstructWithoutCopyingTag)
         : m_refCount(s_refCountIncrement)
         , m_length(length)
-        , m_data8(reinterpret_cast<const LChar*>(characters))
+        , m_data16(characters)
         , m_buffer(0)
-        , m_hashAndFlags(s_hashFlag8BitBuffer | BufferInternal | s_hashFlagHasTerminatingNullCharacter)
+        , m_hashAndFlags(BufferInternal)
+    {
+        ASSERT(m_data16);
+        ASSERT(m_length);
+
+        STRING_STATS_ADD_16BIT_STRING(0);
+    }
+
+    StringImpl(const LChar* characters, unsigned length, ConstructWithoutCopyingTag)
+        : m_refCount(s_refCountIncrement)
+        , m_length(length)
+        , m_data8(characters)
+        , m_buffer(0)
+        , m_hashAndFlags(s_hashFlag8BitBuffer | BufferInternal)
     {
         ASSERT(m_data8);
         ASSERT(m_length);
-        ASSERT(!characters[length]);
 
         STRING_STATS_ADD_8BIT_STRING(0);
     }
@@ -314,7 +331,7 @@ private:
         // keys means that we don't need them to match any other string (in fact,
         // that's exactly the oposite of what we want!), and teh normal hash would
         // lead to lots of conflicts.
-        unsigned hash = reinterpret_cast<uintptr_t>(this);
+        unsigned hash = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(this));
         hash <<= s_flagCount;
         if (!hash)
             hash = 1 << s_flagCount;
@@ -347,9 +364,10 @@ private:
         STRING_STATS_ADD_16BIT_STRING(m_length);
     }
 #endif
+    ~StringImpl();
 
 public:
-    WTF_EXPORT_STRING_API ~StringImpl();
+    WTF_EXPORT_STRING_API static void destroy(StringImpl*);
 
     WTF_EXPORT_STRING_API static PassRefPtr<StringImpl> create(const UChar*, unsigned length);
     WTF_EXPORT_STRING_API static PassRefPtr<StringImpl> create(const LChar*, unsigned length);
@@ -359,6 +377,7 @@ public:
     {
         return create8BitIfPossible(vector.data(), vector.size());
     }
+    WTF_EXPORT_STRING_API static PassRefPtr<StringImpl> create8BitIfPossible(const UChar*);
 
     ALWAYS_INLINE static PassRefPtr<StringImpl> create(const char* s, unsigned length) { return create(reinterpret_cast<const LChar*>(s), length); }
     WTF_EXPORT_STRING_API static PassRefPtr<StringImpl> create(const LChar*);
@@ -391,16 +410,21 @@ public:
         return adoptRef(new StringImpl(rep->m_data16 + offset, length, ownerRep));
     }
 
-    WTF_EXPORT_STRING_API static PassRefPtr<StringImpl> createFromLiteral(const char* characters, unsigned length);
     template<unsigned charactersCount>
     ALWAYS_INLINE static PassRefPtr<StringImpl> createFromLiteral(const char (&characters)[charactersCount])
     {
         COMPILE_ASSERT(charactersCount > 1, StringImplFromLiteralNotEmpty);
         COMPILE_ASSERT((charactersCount - 1 <= ((unsigned(~0) - sizeof(StringImpl)) / sizeof(LChar))), StringImplFromLiteralCannotOverflow);
 
-        return createFromLiteral(characters, charactersCount - 1);
+        return createWithoutCopying(reinterpret_cast<const LChar*>(characters), charactersCount - 1);
     }
+
+    // FIXME: Transition off of these functions to createWithoutCopying instead.
+    WTF_EXPORT_STRING_API static PassRefPtr<StringImpl> createFromLiteral(const char* characters, unsigned length);
     WTF_EXPORT_STRING_API static PassRefPtr<StringImpl> createFromLiteral(const char* characters);
+
+    WTF_EXPORT_STRING_API static PassRefPtr<StringImpl> createWithoutCopying(const UChar* characters, unsigned length);
+    WTF_EXPORT_STRING_API static PassRefPtr<StringImpl> createWithoutCopying(const LChar* characters, unsigned length);
 
     WTF_EXPORT_STRING_API static PassRefPtr<StringImpl> createUninitialized(unsigned length, LChar*& data);
     WTF_EXPORT_STRING_API static PassRefPtr<StringImpl> createUninitialized(unsigned length, UChar*& data);
@@ -422,10 +446,7 @@ public:
         }
         output = reinterpret_cast<T*>(resultImpl + 1);
 
-        if (sizeof(T) == sizeof(char))
-            return adoptRef(new (NotNull, resultImpl) StringImpl(length, Force8BitConstructor));
-
-        return adoptRef(new (NotNull, resultImpl) StringImpl(length));
+        return constructInternal<T>(resultImpl, length);
     }
 
     static PassRefPtr<StringImpl> createEmptyUnique()
@@ -441,11 +462,11 @@ public:
 
     static unsigned flagsOffset() { return OBJECT_OFFSETOF(StringImpl, m_hashAndFlags); }
     static unsigned flagIs8Bit() { return s_hashFlag8BitBuffer; }
+    static unsigned flagIsIdentifier() { return s_hashFlagIsIdentifier; }
     static unsigned dataOffset() { return OBJECT_OFFSETOF(StringImpl, m_data8); }
-    static PassRefPtr<StringImpl> createWithTerminatingNullCharacter(const StringImpl&);
 
-    template<typename CharType, size_t inlineCapacity>
-    static PassRefPtr<StringImpl> adopt(Vector<CharType, inlineCapacity>& vector)
+    template<typename CharType, size_t inlineCapacity, typename OverflowHandler>
+    static PassRefPtr<StringImpl> adopt(Vector<CharType, inlineCapacity, OverflowHandler>& vector)
     {
         if (size_t size = vector.size()) {
             ASSERT(vector.data());
@@ -465,9 +486,6 @@ public:
 
     unsigned length() const { return m_length; }
     bool is8Bit() const { return m_hashAndFlags & s_hashFlag8BitBuffer; }
-    bool hasInternalBuffer() const { return bufferOwnership() == BufferInternal; }
-    bool hasOwnedBuffer() const { return bufferOwnership() == BufferOwned; }
-    StringImpl* baseString() const { return bufferOwnership() == BufferSubstring ? m_substringBuffer : 0; }
 
     // FIXME: Remove all unnecessary usages of characters()
     ALWAYS_INLINE const LChar* characters8() const { ASSERT(is8Bit()); return m_data8; }
@@ -483,7 +501,7 @@ public:
     template <typename CharType>
     ALWAYS_INLINE const CharType * getCharacters() const;
 
-    size_t cost()
+    size_t cost() const
     {
         // For substrings, return the cost of the base string.
         if (bufferOwnership() == BufferSubstring)
@@ -493,7 +511,21 @@ public:
             return 0;
 
         m_hashAndFlags |= s_hashFlagDidReportCost;
-        return m_length;
+        size_t result = m_length;
+        if (!is8Bit())
+            result <<= 1;
+        return result;
+    }
+    
+    size_t costDuringGC()
+    {
+        if (bufferOwnership() == BufferSubstring)
+            return divideRoundedUp(m_substringBuffer->costDuringGC(), refCount());
+        
+        size_t result = m_length;
+        if (!is8Bit())
+            result <<= 1;
+        return divideRoundedUp(result, refCount());
     }
 
     WTF_EXPORT_STRING_API size_t sizeInBytes() const;
@@ -515,13 +547,11 @@ public:
         return !length() && !isStatic();
     }
 
-    bool hasTerminatingNullCharacter() const { return m_hashAndFlags & s_hashFlagHasTerminatingNullCharacter; }
-
     bool isAtomic() const { return m_hashAndFlags & s_hashFlagIsAtomic; }
-    void setIsAtomic(bool isIdentifier)
+    void setIsAtomic(bool isAtomic)
     {
         ASSERT(!isStatic());
-        if (isIdentifier)
+        if (isAtomic)
             m_hashAndFlags |= s_hashFlagIsAtomic;
         else
             m_hashAndFlags &= ~s_hashFlagIsAtomic;
@@ -534,8 +564,14 @@ public:
 #if PLATFORM(QT)
     QStringData* qStringData() { return bufferOwnership() == BufferAdoptedQString ? m_qStringData : 0; }
 #endif
+    
+    static WTF_EXPORT_STRING_API CString utf8ForCharacters(const UChar* characters, unsigned length, ConversionMode = LenientConversion);
+    WTF_EXPORT_STRING_API CString utf8ForRange(unsigned offset, unsigned length, ConversionMode = LenientConversion) const;
+    WTF_EXPORT_STRING_API CString utf8(ConversionMode = LenientConversion) const;
 
 private:
+    static WTF_EXPORT_STRING_API bool utf8Impl(const UChar* characters, unsigned length, char*& buffer, size_t bufferSize, ConversionMode);
+    
     // The high bits of 'hash' are always empty, but we prefer to store our flags
     // in the low bits because it makes them slightly more efficient to access.
     // So, we shift left and right when setting and getting our hash code.
@@ -576,25 +612,38 @@ public:
             return existingHash();
         return hashSlowCase();
     }
-
+    
+    inline size_t refCount() const
+    {
+        return m_refCount / s_refCountIncrement;
+    }
+    
     inline bool hasOneRef() const
     {
         return m_refCount == s_refCountIncrement;
     }
+    
+    // This method is useful for assertions.
+    inline bool hasAtLeastOneRef() const
+    {
+        return !!m_refCount;
+    }
 
     inline void ref()
     {
+        ASSERT(!isCompilationThread());
         m_refCount += s_refCountIncrement;
     }
 
     inline void deref()
     {
-        if (m_refCount == s_refCountIncrement) {
-            delete this;
+        ASSERT(!isCompilationThread());        
+        unsigned tempRefCount = m_refCount - s_refCountIncrement;
+        if (!tempRefCount) {
+            StringImpl::destroy(this);
             return;
         }
-
-        m_refCount -= s_refCountIncrement;
+        m_refCount = tempRefCount;
     }
 
     WTF_EXPORT_PRIVATE static StringImpl* empty();
@@ -640,13 +689,14 @@ public:
 
     WTF_EXPORT_STRING_API PassRefPtr<StringImpl> substring(unsigned pos, unsigned len = UINT_MAX);
 
-    UChar operator[](unsigned i) const
+    UChar at(unsigned i) const
     {
         ASSERT_WITH_SECURITY_IMPLICATION(i < m_length);
         if (is8Bit())
             return m_data8[i];
         return m_data16[i];
     }
+    UChar operator[](unsigned i) const { return at(i); }
     WTF_EXPORT_STRING_API UChar32 characterStartingAt(unsigned);
 
     WTF_EXPORT_STRING_API bool containsOnlyWhitespace();
@@ -690,22 +740,25 @@ public:
     size_t find(UChar character, unsigned start = 0);
     WTF_EXPORT_STRING_API size_t find(CharacterMatchFunctionPtr, unsigned index = 0);
     size_t find(const LChar*, unsigned index = 0);
-    ALWAYS_INLINE size_t find(const char* s, unsigned index = 0) { return find(reinterpret_cast<const LChar*>(s), index); };
+    ALWAYS_INLINE size_t find(const char* s, unsigned index = 0) { return find(reinterpret_cast<const LChar*>(s), index); }
     WTF_EXPORT_STRING_API size_t find(StringImpl*);
     WTF_EXPORT_STRING_API size_t find(StringImpl*, unsigned index);
     size_t findIgnoringCase(const LChar*, unsigned index = 0);
-    ALWAYS_INLINE size_t findIgnoringCase(const char* s, unsigned index = 0) { return findIgnoringCase(reinterpret_cast<const LChar*>(s), index); };
+    ALWAYS_INLINE size_t findIgnoringCase(const char* s, unsigned index = 0) { return findIgnoringCase(reinterpret_cast<const LChar*>(s), index); }
     WTF_EXPORT_STRING_API size_t findIgnoringCase(StringImpl*, unsigned index = 0);
+
+    WTF_EXPORT_STRING_API size_t findNextLineStart(unsigned index = UINT_MAX);
 
     WTF_EXPORT_STRING_API size_t reverseFind(UChar, unsigned index = UINT_MAX);
     WTF_EXPORT_STRING_API size_t reverseFind(StringImpl*, unsigned index = UINT_MAX);
     WTF_EXPORT_STRING_API size_t reverseFindIgnoringCase(StringImpl*, unsigned index = UINT_MAX);
 
-    bool startsWith(StringImpl* str, bool caseSensitive = true) { return (caseSensitive ? reverseFind(str, 0) : reverseFindIgnoringCase(str, 0)) == 0; }
+    WTF_EXPORT_STRING_API bool startsWith(const StringImpl*) const;
+    bool startsWith(StringImpl* str, bool caseSensitive) { return caseSensitive ? startsWith(str) : (reverseFindIgnoringCase(str, 0) == 0); }
     WTF_EXPORT_STRING_API bool startsWith(UChar) const;
     WTF_EXPORT_STRING_API bool startsWith(const char*, unsigned matchLength, bool caseSensitive) const;
     template<unsigned matchLength>
-    bool startsWith(const char (&prefix)[matchLength], bool caseSensitive = true) const { return startsWith(prefix, matchLength - 1, caseSensitive); };
+    bool startsWith(const char (&prefix)[matchLength], bool caseSensitive = true) const { return startsWith(prefix, matchLength - 1, caseSensitive); }
 
     WTF_EXPORT_STRING_API bool endsWith(StringImpl*, bool caseSensitive = true);
     WTF_EXPORT_STRING_API bool endsWith(UChar) const;
@@ -735,10 +788,14 @@ public:
 #endif
 
 private:
-
-    bool isASCIILiteral() const
+    bool requiresCopy() const
     {
-        return is8Bit() && hasInternalBuffer() && reinterpret_cast<const void*>(m_data8) != reinterpret_cast<const void*>(this + 1);
+        if (bufferOwnership() != BufferInternal)
+            return true;
+
+        if (is8Bit())
+            return reinterpret_cast<const void*>(m_data8) == reinterpret_cast<const void*>(this + 1);
+        return reinterpret_cast<const void*>(m_data16) == reinterpret_cast<const void*>(this + 1);
     }
 
     // This number must be at least 2 to avoid sharing empty, null as well as 1 character strings from SmallStrings.
@@ -748,6 +805,11 @@ private:
     bool isStatic() const { return m_refCount & s_refCountFlagIsStaticString; }
     template <class UCharPredicate> PassRefPtr<StringImpl> stripMatchedCharacters(UCharPredicate);
     template <typename CharType, class UCharPredicate> PassRefPtr<StringImpl> simplifyMatchedCharactersToSpace(UCharPredicate);
+    template <typename CharType> static PassRefPtr<StringImpl> constructInternal(StringImpl*, unsigned);
+    template <typename CharType> static PassRefPtr<StringImpl> createUninitializedInternal(unsigned, CharType*&);
+    template <typename CharType> static PassRefPtr<StringImpl> createUninitializedInternalNonEmpty(unsigned, CharType*&);
+    template <typename CharType> static PassRefPtr<StringImpl> reallocateInternal(PassRefPtr<StringImpl>, unsigned, CharType*&);
+    template <typename CharType> static PassRefPtr<StringImpl> createInternal(const CharType*, unsigned);
     WTF_EXPORT_STRING_API NEVER_INLINE const UChar* getData16SlowCase() const;
     WTF_EXPORT_PRIVATE NEVER_INLINE unsigned hashSlowCase() const;
 
@@ -755,14 +817,13 @@ private:
     static const unsigned s_refCountFlagIsStaticString = 0x1;
     static const unsigned s_refCountIncrement = 0x2; // This allows us to ref / deref without disturbing the static string flag.
 
-    // The bottom 8 bits in the hash are flags.
-    static const unsigned s_flagCount = 8;
+    // The bottom 7 bits in the hash are flags.
+    static const unsigned s_flagCount = 7;
     static const unsigned s_flagMask = (1u << s_flagCount) - 1;
-    COMPILE_ASSERT(s_flagCount == StringHasher::flagCount, StringHasher_reserves_enough_bits_for_StringImpl_flags);
+    COMPILE_ASSERT(s_flagCount <= StringHasher::flagCount, StringHasher_reserves_enough_bits_for_StringImpl_flags);
 
-    static const unsigned s_hashFlagHas16BitShadow = 1u << 7;
-    static const unsigned s_hashFlag8BitBuffer = 1u << 6;
-    static const unsigned s_hashFlagHasTerminatingNullCharacter = 1u << 5;
+    static const unsigned s_hashFlagHas16BitShadow = 1u << 6;
+    static const unsigned s_hashFlag8BitBuffer = 1u << 5;
     static const unsigned s_hashFlagIsAtomic = 1u << 4;
     static const unsigned s_hashFlagDidReportCost = 1u << 3;
     static const unsigned s_hashFlagIsIdentifier = 1u << 2;
@@ -771,6 +832,32 @@ private:
 #ifdef STRING_STATS
     WTF_EXPORTDATA static StringStats m_stringStats;
 #endif
+
+public:
+    struct StaticASCIILiteral {
+        // These member variables must match the layout of StringImpl.
+        unsigned m_refCount;
+        unsigned m_length;
+        const LChar* m_data8;
+        void* m_buffer;
+        unsigned m_hashAndFlags;
+
+        // These values mimic ConstructFromLiteral.
+        static const unsigned s_initialRefCount = s_refCountIncrement;
+        static const unsigned s_initialFlags = s_hashFlag8BitBuffer | BufferInternal;
+        static const unsigned s_hashShift = s_flagCount;
+    };
+
+#ifndef NDEBUG
+    void assertHashIsCorrect()
+    {
+        ASSERT(hasHash());
+        ASSERT(existingHash() == StringHasher::computeHashAndMaskTop8Bits(characters8(), length()));
+    }
+#endif
+
+private:
+    // These member variables must match the layout of StaticASCIILiteral.
     unsigned m_refCount;
     unsigned m_length;
     union {
@@ -788,6 +875,25 @@ private:
     mutable unsigned m_hashAndFlags;
 };
 
+COMPILE_ASSERT(sizeof(StringImpl) == sizeof(StringImpl::StaticASCIILiteral), StringImpl_should_match_its_StaticASCIILiteral);
+
+#if !ASSERT_DISABLED
+// StringImpls created from StaticASCIILiteral will ASSERT
+// in the generic ValueCheck<T>::checkConsistency
+// as they are not allocated by fastMalloc.
+// We don't currently have any way to detect that case
+// so we ignore the consistency check for all StringImpl*.
+template<> struct
+ValueCheck<StringImpl*> {
+    static void checkConsistency(const StringImpl*) { }
+};
+#endif
+
+template <>
+ALWAYS_INLINE PassRefPtr<StringImpl> StringImpl::constructInternal<LChar>(StringImpl* impl, unsigned length) { return adoptRef(new (NotNull, impl) StringImpl(length, Force8BitConstructor)); }
+template <>
+ALWAYS_INLINE PassRefPtr<StringImpl> StringImpl::constructInternal<UChar>(StringImpl* impl, unsigned length) { return adoptRef(new (NotNull, impl) StringImpl(length)); }
+
 template <>
 ALWAYS_INLINE const LChar* StringImpl::getCharacters<LChar>() const { return characters8(); }
 
@@ -798,10 +904,11 @@ WTF_EXPORT_STRING_API bool equal(const StringImpl*, const StringImpl*);
 WTF_EXPORT_STRING_API bool equal(const StringImpl*, const LChar*);
 inline bool equal(const StringImpl* a, const char* b) { return equal(a, reinterpret_cast<const LChar*>(b)); }
 WTF_EXPORT_STRING_API bool equal(const StringImpl*, const LChar*, unsigned);
+WTF_EXPORT_STRING_API bool equal(const StringImpl*, const UChar*, unsigned);
 inline bool equal(const StringImpl* a, const char* b, unsigned length) { return equal(a, reinterpret_cast<const LChar*>(b), length); }
 inline bool equal(const LChar* a, StringImpl* b) { return equal(b, a); }
 inline bool equal(const char* a, StringImpl* b) { return equal(b, reinterpret_cast<const LChar*>(a)); }
-WTF_EXPORT_STRING_API bool equal(const StringImpl*, const UChar*, unsigned);
+WTF_EXPORT_STRING_API bool equalNonNull(const StringImpl* a, const StringImpl* b);
 
 // Do comparisons 8 or 4 bytes-at-a-time on architectures where it's safe.
 #if CPU(X86_64)
@@ -917,51 +1024,113 @@ ALWAYS_INLINE bool equal(const UChar* a, const UChar* b, unsigned length)
     
     return true;
 }
-#else
+#elif PLATFORM(IOS) && WTF_ARM_ARCH_AT_LEAST(7)
 ALWAYS_INLINE bool equal(const LChar* a, const LChar* b, unsigned length)
 {
-    for (unsigned i = 0; i != length; ++i) {
-        if (a[i] != b[i])
-            return false;
-    }
+    bool isEqual = false;
+    uint32_t aValue;
+    uint32_t bValue;
+    asm("subs   %[length], #4\n"
+        "blo    2f\n"
 
-    return true;
+        "0:\n" // Label 0 = Start of loop over 32 bits.
+        "ldr    %[aValue], [%[a]], #4\n"
+        "ldr    %[bValue], [%[b]], #4\n"
+        "cmp    %[aValue], %[bValue]\n"
+        "bne    66f\n"
+        "subs   %[length], #4\n"
+        "bhs    0b\n"
+
+        // At this point, length can be:
+        // -0: 00000000000000000000000000000000 (0 bytes left)
+        // -1: 11111111111111111111111111111111 (3 bytes left)
+        // -2: 11111111111111111111111111111110 (2 bytes left)
+        // -3: 11111111111111111111111111111101 (1 byte left)
+        // -4: 11111111111111111111111111111100 (length was 0)
+        // The pointers are at the correct position.
+        "2:\n" // Label 2 = End of loop over 32 bits, check for pair of characters.
+        "tst    %[length], #2\n"
+        "beq    1f\n"
+        "ldrh   %[aValue], [%[a]], #2\n"
+        "ldrh   %[bValue], [%[b]], #2\n"
+        "cmp    %[aValue], %[bValue]\n"
+        "bne    66f\n"
+
+        "1:\n" // Label 1 = Check for a single character left.
+        "tst    %[length], #1\n"
+        "beq    42f\n"
+        "ldrb   %[aValue], [%[a]]\n"
+        "ldrb   %[bValue], [%[b]]\n"
+        "cmp    %[aValue], %[bValue]\n"
+        "bne    66f\n"
+
+        "42:\n" // Label 42 = Success.
+        "mov    %[isEqual], #1\n"
+        "66:\n" // Label 66 = End without changing isEqual to 1.
+        : [length]"+r"(length), [isEqual]"+r"(isEqual), [a]"+r"(a), [b]"+r"(b), [aValue]"+r"(aValue), [bValue]"+r"(bValue)
+        :
+        :
+        );
+    return isEqual;
 }
 
 ALWAYS_INLINE bool equal(const UChar* a, const UChar* b, unsigned length)
 {
-    for (unsigned i = 0; i != length; ++i) {
-        if (a[i] != b[i])
-            return false;
-    }
+    bool isEqual = false;
+    uint32_t aValue;
+    uint32_t bValue;
+    asm("subs   %[length], #2\n"
+        "blo    1f\n"
 
-    return true;
+        "0:\n" // Label 0 = Start of loop over 32 bits.
+        "ldr    %[aValue], [%[a]], #4\n"
+        "ldr    %[bValue], [%[b]], #4\n"
+        "cmp    %[aValue], %[bValue]\n"
+        "bne    66f\n"
+        "subs   %[length], #2\n"
+        "bhs    0b\n"
+
+        // At this point, length can be:
+        // -0: 00000000000000000000000000000000 (0 bytes left)
+        // -1: 11111111111111111111111111111111 (1 character left, 2 bytes)
+        // -2: 11111111111111111111111111111110 (length was zero)
+        // The pointers are at the correct position.
+        "1:\n" // Label 1 = Check for a single character left.
+        "tst    %[length], #1\n"
+        "beq    42f\n"
+        "ldrh   %[aValue], [%[a]]\n"
+        "ldrh   %[bValue], [%[b]]\n"
+        "cmp    %[aValue], %[bValue]\n"
+        "bne    66f\n"
+
+        "42:\n" // Label 42 = Success.
+        "mov    %[isEqual], #1\n"
+        "66:\n" // Label 66 = End without changing isEqual to 1.
+        : [length]"+r"(length), [isEqual]"+r"(isEqual), [a]"+r"(a), [b]"+r"(b), [aValue]"+r"(aValue), [bValue]"+r"(bValue)
+        :
+        :
+        );
+    return isEqual;
 }
+#else
+ALWAYS_INLINE bool equal(const LChar* a, const LChar* b, unsigned length) { return !memcmp(a, b, length); }
+ALWAYS_INLINE bool equal(const UChar* a, const UChar* b, unsigned length) { return !memcmp(a, b, length * sizeof(UChar)); }
 #endif
 
 ALWAYS_INLINE bool equal(const LChar* a, const UChar* b, unsigned length)
 {
-    for (unsigned i = 0; i != length; ++i) {
+    for (unsigned i = 0; i < length; ++i) {
         if (a[i] != b[i])
             return false;
     }
-
     return true;
 }
 
-ALWAYS_INLINE bool equal(const UChar* a, const LChar* b, unsigned length)
-{
-    for (unsigned i = 0; i != length; ++i) {
-        if (a[i] != b[i])
-            return false;
-    }
+ALWAYS_INLINE bool equal(const UChar* a, const LChar* b, unsigned length) { return equal(b, a, length); }
 
-    return true;
-}
-
-WTF_EXPORT_STRING_API bool equalIgnoringCase(StringImpl*, StringImpl*);
-WTF_EXPORT_STRING_API bool equalIgnoringCase(StringImpl*, const LChar*);
-inline bool equalIgnoringCase(const LChar* a, StringImpl* b) { return equalIgnoringCase(b, a); }
+WTF_EXPORT_STRING_API bool equalIgnoringCase(const StringImpl*, const StringImpl*);
+WTF_EXPORT_STRING_API bool equalIgnoringCase(const StringImpl*, const LChar*);
+inline bool equalIgnoringCase(const LChar* a, const StringImpl* b) { return equalIgnoringCase(b, a); }
 WTF_EXPORT_STRING_API bool equalIgnoringCase(const LChar*, const LChar*, unsigned);
 WTF_EXPORT_STRING_API bool equalIgnoringCase(const UChar*, const LChar*, unsigned);
 inline bool equalIgnoringCase(const UChar* a, const char* b, unsigned length) { return equalIgnoringCase(a, reinterpret_cast<const LChar*>(b), length); }
@@ -973,6 +1142,7 @@ inline bool equalIgnoringCase(const UChar* a, const UChar* b, int length)
     ASSERT(length >= 0);
     return !Unicode::umemcasecmp(a, b, length);
 }
+WTF_EXPORT_STRING_API bool equalIgnoringCaseNonNull(const StringImpl*, const StringImpl*);
 
 WTF_EXPORT_STRING_API bool equalIgnoringNullity(StringImpl*, StringImpl*);
 
@@ -1019,7 +1189,54 @@ inline size_t find(const UChar* characters, unsigned length, CharacterMatchFunct
     return notFound;
 }
 
-template <typename CharacterType>
+template<typename CharacterType>
+inline size_t findNextLineStart(const CharacterType* characters, unsigned length, unsigned index = 0)
+{
+    while (index < length) {
+        CharacterType c = characters[index++];
+        if ((c != '\n') && (c != '\r'))
+            continue;
+
+        // There can only be a start of a new line if there are more characters
+        // beyond the current character.
+        if (index < length) {
+            // The 3 common types of line terminators are 1. \r\n (Windows), 
+            // 2. \r (old MacOS) and 3. \n (Unix'es).
+
+            if (c == '\n')
+                return index; // Case 3: just \n.
+
+            CharacterType c2 = characters[index];
+            if (c2 != '\n')
+                return index; // Case 2: just \r.
+
+            // Case 1: \r\n.
+            // But, there's only a start of a new line if there are more
+            // characters beyond the \r\n.
+            if (++index < length)
+                return index; 
+        }
+    }
+    return notFound;
+}
+
+template<typename CharacterType>
+inline size_t reverseFindLineTerminator(const CharacterType* characters, unsigned length, unsigned index = UINT_MAX)
+{
+    if (!length)
+        return notFound;
+    if (index >= length)
+        index = length - 1;
+    CharacterType c = characters[index];
+    while ((c != '\n') && (c != '\r')) {
+        if (!index--)
+            return notFound;
+        c = characters[index];
+    }
+    return index;
+}
+
+template<typename CharacterType>
 inline size_t reverseFind(const CharacterType* characters, unsigned length, CharacterType matchCharacter, unsigned index = UINT_MAX)
 {
     if (!length)
@@ -1136,10 +1353,26 @@ static inline bool isSpaceOrNewline(UChar c)
     return c <= 0x7F ? WTF::isASCIISpace(c) : WTF::Unicode::direction(c) == WTF::Unicode::WhiteSpaceNeutral;
 }
 
+template<typename CharacterType>
+inline unsigned lengthOfNullTerminatedString(const CharacterType* string)
+{
+    ASSERT(string);
+    size_t length = 0;
+    while (string[length])
+        ++length;
+
+    RELEASE_ASSERT(length < std::numeric_limits<unsigned>::max());
+    return static_cast<unsigned>(length);
+}
+
 inline PassRefPtr<StringImpl> StringImpl::isolatedCopy() const
 {
-    if (isASCIILiteral())
-        return StringImpl::createFromLiteral(reinterpret_cast<const char*>(m_data8), m_length);
+    if (!requiresCopy()) {
+        if (is8Bit())
+            return StringImpl::createWithoutCopying(m_data8, m_length);
+        return StringImpl::createWithoutCopying(m_data16, m_length);
+    }
+
     if (is8Bit())
         return create(m_data8, m_length);
     return create(m_data16, m_length);
@@ -1156,10 +1389,11 @@ template<> struct DefaultHash<RefPtr<StringImpl> > {
     typedef StringHash Hash;
 };
 
-}
+} // namespace WTF
 
 using WTF::StringImpl;
 using WTF::equal;
+using WTF::equalNonNull;
 using WTF::TextCaseSensitivity;
 using WTF::TextCaseSensitive;
 using WTF::TextCaseInsensitive;

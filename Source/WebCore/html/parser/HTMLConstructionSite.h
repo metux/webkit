@@ -30,7 +30,6 @@
 #include "FragmentScriptingPermission.h"
 #include "HTMLElementStack.h"
 #include "HTMLFormattingElementList.h"
-#include "NotImplemented.h"
 #include <wtf/Noncopyable.h>
 #include <wtf/PassRefPtr.h>
 #include <wtf/RefPtr.h>
@@ -72,8 +71,8 @@ class HTMLFormElement;
 class HTMLConstructionSite {
     WTF_MAKE_NONCOPYABLE(HTMLConstructionSite);
 public:
-    HTMLConstructionSite(Document*, unsigned maximumDOMTreeDepth);
-    HTMLConstructionSite(DocumentFragment*, FragmentScriptingPermission, unsigned maximumDOMTreeDepth);
+    HTMLConstructionSite(Document*, ParserContentPolicy, unsigned maximumDOMTreeDepth);
+    HTMLConstructionSite(DocumentFragment*, ParserContentPolicy, unsigned maximumDOMTreeDepth);
     ~HTMLConstructionSite();
 
     void detach();
@@ -131,6 +130,8 @@ public:
     HTMLFormElement* form() const { return m_form.get(); }
     PassRefPtr<HTMLFormElement> takeForm();
 
+    ParserContentPolicy parserContentPolicy() { return m_parserContentPolicy; }
+
     class RedirectToFosterParentGuard {
         WTF_MAKE_NONCOPYABLE(RedirectToFosterParentGuard);
     public:
@@ -183,7 +184,7 @@ private:
 
     AttachmentQueue m_attachmentQueue;
 
-    FragmentScriptingPermission m_fragmentScriptingPermission;
+    ParserContentPolicy m_parserContentPolicy;
     bool m_isParsingFragment;
 
     // http://www.whatwg.org/specs/web-apps/current-work/multipage/tokenization.html#parsing-main-intable

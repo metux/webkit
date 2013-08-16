@@ -35,11 +35,8 @@
 #include "NodeTraversal.h"
 #include "Page.h"
 #include "PageGroup.h"
-
-#if USE(PLATFORM_STRATEGIES)
 #include "PlatformStrategies.h"
 #include "VisitedLinkStrategy.h"
-#endif
 
 namespace WebCore {
 
@@ -78,8 +75,8 @@ void VisitedLinkState::invalidateStyleForAllLinks()
 
 inline static LinkHash linkHashForElement(Document* document, Element* element)
 {
-    if (element->hasTagName(aTag))
-        return static_cast<HTMLAnchorElement*>(element)->visitedLinkHash();
+    if (isHTMLAnchorElement(element))
+        return toHTMLAnchorElement(element)->visitedLinkHash();
     if (const AtomicString* attribute = linkAttribute(element))
         return WebCore::visitedLinkHash(document->baseURL(), *attribute);
     return 0;
@@ -109,8 +106,8 @@ EInsideLink VisitedLinkState::determineLinkStateSlowCase(Element* element)
         return InsideVisitedLink;
 
     LinkHash hash;
-    if (element->hasTagName(aTag))
-        hash = static_cast<HTMLAnchorElement*>(element)->visitedLinkHash();
+    if (isHTMLAnchorElement(element))
+        hash = toHTMLAnchorElement(element)->visitedLinkHash();
     else
         hash = WebCore::visitedLinkHash(element->document()->baseURL(), *attribute);
 
@@ -127,11 +124,7 @@ EInsideLink VisitedLinkState::determineLinkStateSlowCase(Element* element)
 
     m_linksCheckedForVisitedState.add(hash);
 
-#if USE(PLATFORM_STRATEGIES)
     return platformStrategies()->visitedLinkStrategy()->isLinkVisited(page, hash, element->document()->baseURL(), *attribute) ? InsideVisitedLink : InsideUnvisitedLink;
-#else
-    return page->group().isLinkVisited(hash) ? InsideVisitedLink : InsideUnvisitedLink;
-#endif
 }
 
 

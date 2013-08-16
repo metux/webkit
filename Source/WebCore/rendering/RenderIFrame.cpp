@@ -33,6 +33,7 @@
 #include "Page.h"
 #include "RenderView.h"
 #include "Settings.h"
+#include <wtf/StackStats.h>
 
 namespace WebCore {
 
@@ -80,7 +81,7 @@ LayoutUnit RenderIFrame::maxPreferredLogicalWidth() const
 
 bool RenderIFrame::isSeamless() const
 {
-    return node() && node()->hasTagName(iframeTag) && static_cast<HTMLIFrameElement*>(node())->shouldDisplaySeamlessly();
+    return node() && node()->hasTagName(iframeTag) && toHTMLIFrameElement(node())->shouldDisplaySeamlessly();
 }
 
 bool RenderIFrame::requiresLayer() const
@@ -92,8 +93,8 @@ RenderView* RenderIFrame::contentRootRenderer() const
 {
     // FIXME: Is this always a valid cast? What about plugins?
     ASSERT(!widget() || widget()->isFrameView());
-    FrameView* childFrameView = static_cast<FrameView*>(widget());
-    return childFrameView ? static_cast<RenderView*>(childFrameView->frame()->contentRenderer()) : 0;
+    FrameView* childFrameView = toFrameView(widget());
+    return childFrameView ? childFrameView->frame()->contentRenderer() : 0;
 }
 
 bool RenderIFrame::flattenFrame() const
@@ -101,7 +102,7 @@ bool RenderIFrame::flattenFrame() const
     if (!node() || !node()->hasTagName(iframeTag))
         return false;
 
-    HTMLIFrameElement* element = static_cast<HTMLIFrameElement*>(node());
+    HTMLIFrameElement* element = toHTMLIFrameElement(node());
     Frame* frame = element->document()->frame();
 
     if (isSeamless())
@@ -137,7 +138,7 @@ void RenderIFrame::layoutSeamlessly()
     // Laying out our kids is normally responsible for adjusting our height, so we set it here.
     // Replaced elements normally do not respect padding, but seamless elements should: we'll add
     // both padding and border to the child's logical height here.
-    FrameView* childFrameView = static_cast<FrameView*>(widget());
+    FrameView* childFrameView = toFrameView(widget());
     if (childFrameView) // Widget should never be null during layout(), but just in case.
         setLogicalHeight(childFrameView->contentsHeight() + borderTop() + borderBottom() + paddingTop() + paddingBottom());
     updateLogicalHeight();
@@ -145,7 +146,7 @@ void RenderIFrame::layoutSeamlessly()
     updateWidgetPosition(); // Notify the Widget of our final height.
 
     // Assert that the child document did a complete layout.
-    RenderView* childRoot = childFrameView ? static_cast<RenderView*>(childFrameView->frame()->contentRenderer()) : 0;
+    RenderView* childRoot = childFrameView ? childFrameView->frame()->contentRenderer() : 0;
     ASSERT(!childFrameView || !childFrameView->layoutPending());
     ASSERT_UNUSED(childRoot, !childRoot || !childRoot->needsLayout());
 }

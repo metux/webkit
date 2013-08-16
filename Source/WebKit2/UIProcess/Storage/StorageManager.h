@@ -27,15 +27,21 @@
 #define StorageManager_h
 
 #include "Connection.h"
+#include <wtf/Forward.h>
 #include <wtf/PassRefPtr.h>
 #include <wtf/ThreadSafeRefCounted.h>
 #include <wtf/text/StringHash.h>
 
 class WorkQueue;
 
+namespace WebCore {
+class SecurityOrigin;
+}
+
 namespace WebKit {
 
 struct SecurityOriginData;
+class LocalStorageDatabaseTracker;
 class WebProcessProxy;
 
 class StorageManager : public CoreIPC::Connection::WorkQueueMessageReceiver {
@@ -43,12 +49,21 @@ public:
     static PassRefPtr<StorageManager> create();
     ~StorageManager();
 
-    void createSessionStorageNamespace(uint64_t storageNamespaceID);
+    void setLocalStorageDirectory(const String&);
+
+    void createSessionStorageNamespace(uint64_t storageNamespaceID, CoreIPC::Connection* allowedConnection, unsigned quotaInBytes);
     void destroySessionStorageNamespace(uint64_t storageNamespaceID);
+    void setAllowedSessionStorageNamespaceConnection(uint64_t storageNamespaceID, CoreIPC::Connection* allowedConnection);
     void cloneSessionStorageNamespace(uint64_t storageNamespaceID, uint64_t newStorageNamespaceID);
 
     void processWillOpenConnection(WebProcessProxy*);
     void processWillCloseConnection(WebProcessProxy*);
+
+    // FIXME: Instead of a context + C function, this should take a WTF::Function, but we currently don't
+    // support arguments in functions.
+    void getOrigins(FunctionDispatcher* callbackDispatcher, void* context, void (*callback)(const Vector<RefPtr<WebCore::SecurityOrigin>>& securityOrigins, void* context));
+    void deleteEntriesForOrigin(WebCore::SecurityOrigin*);
+    void deleteAllEntries();
 
 private:
     StorageManager();
@@ -58,20 +73,41 @@ private:
     virtual void didReceiveSyncMessage(CoreIPC::Connection*, CoreIPC::MessageDecoder&, OwnPtr<CoreIPC::MessageEncoder>& replyEncoder) OVERRIDE;
 
     // Message handlers.
-    void createStorageArea(CoreIPC::Connection*, uint64_t storageAreaID, uint64_t storageNamespaceID, const SecurityOriginData&);
-    void destroyStorageArea(CoreIPC::Connection*, uint64_t storageAreaID);
-    void getValues(CoreIPC::Connection*, uint64_t storageAreaID, HashMap<String, String>& values);
+    void createLocalStorageMap(CoreIPC::Connection*, uint64_t storageMapID, uint64_t storageNamespaceID, const SecurityOriginData&);
+    void createSessionStorageMap(CoreIPC::Connection*, uint64_t storageMapID, uint64_t storageNamespaceID, const SecurityOriginData&);
+    void destroyStorageMap(CoreIPC::Connection*, uint64_t storageMapID);
 
-    void createSessionStorageNamespaceInternal(uint64_t storageNamespaceID);
+    void getValues(CoreIPC::Connection*, uint64_t storageMapID, uint64_t storageMapSeed, HashMap<String, String>& values);
+    void setItem(CoreIPC::Connection*, uint64_t storageAreaID, uint64_t sourceStorageAreaID, uint64_t storageMapSeed, const String& key, const String& value, const String& urlString);
+    void removeItem(CoreIPC::Connection*, uint64_t storageMapID, uint64_t sourceStorageAreaID, uint64_t storageMapSeed, const String& key, const String& urlString);
+    void clear(CoreIPC::Connection*, uint64_t storageMapID, uint64_t sourceStorageAreaID, uint64_t storageMapSeed, const String& urlString);
+
+    void createSessionStorageNamespaceInternal(uint64_t storageNamespaceID, CoreIPC::Connection* allowedConnection, unsigned quotaInBytes);
     void destroySessionStorageNamespaceInternal(uint64_t storageNamespaceID);
+    void setAllowedSessionStorageNamespaceConnectionInternal(uint64_t storageNamespaceID, CoreIPC::Connection* allowedConnection);
     void cloneSessionStorageNamespaceInternal(uint64_t storageNamespaceID, uint64_t newStorageNamespaceID);
+
+    void invalidateConnectionInternal(CoreIPC::Connection*);
+
+    class StorageArea;
+    StorageArea* findStorageArea(CoreIPC::Connection*, uint64_t) const;
+
+    class LocalStorageNamespace;
+    LocalStorageNamespace* getOrCreateLocalStorageNamespace(uint64_t storageNamespaceID);
+
+    void getOriginsInternal(FunctionDispatcher* callbackDispatcher, void* context, void (*callback)(const Vector<RefPtr<WebCore::SecurityOrigin>>& securityOrigins, void* context));
+    void deleteEntriesForOriginInternal(WebCore::SecurityOrigin*);
+    void deleteAllEntriesInternal();
 
     RefPtr<WorkQueue> m_queue;
 
-    class SessionStorageNamespace;
-    HashMap<uint64_t, RefPtr<SessionStorageNamespace> > m_sessionStorageNamespaces;
+    RefPtr<LocalStorageDatabaseTracker> m_localStorageDatabaseTracker;
+    HashMap<uint64_t, RefPtr<LocalStorageNamespace>> m_localStorageNamespaces;
 
-    class StorageArea;
+    class SessionStorageNamespace;
+    HashMap<uint64_t, RefPtr<SessionStorageNamespace>> m_sessionStorageNamespaces;
+
+    HashMap<std::pair<RefPtr<CoreIPC::Connection>, uint64_t>, RefPtr<StorageArea>> m_storageAreasByConnection;
 };
 
 } // namespace WebKit

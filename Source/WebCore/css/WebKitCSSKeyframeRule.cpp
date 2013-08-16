@@ -27,21 +27,26 @@
 #include "WebKitCSSKeyframeRule.h"
 
 #include "PropertySetCSSStyleDeclaration.h"
+#include "StylePropertySet.h"
 #include "WebKitCSSKeyframesRule.h"
 #include <wtf/text/StringBuilder.h>
 
 namespace WebCore {
 
-StylePropertySet* StyleKeyframe::mutableProperties()
+StyleKeyframe::StyleKeyframe(PassRefPtr<StylePropertySet> properties)
+    : m_properties(properties)
+{
+}
+
+StyleKeyframe::~StyleKeyframe()
+{
+}
+
+MutableStylePropertySet* StyleKeyframe::mutableProperties()
 {
     if (!m_properties->isMutable())
-        m_properties = m_properties->copy();
-    return m_properties.get();
-}
-    
-void StyleKeyframe::setProperties(PassRefPtr<StylePropertySet> properties)
-{
-    m_properties = properties;
+        m_properties = m_properties->mutableCopy();
+    return static_cast<MutableStylePropertySet*>(m_properties.get());
 }
 
 /* static */
@@ -87,13 +92,6 @@ String StyleKeyframe::cssText() const
     return result.toString();
 }
 
-void StyleKeyframe::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
-{
-    MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::CSS);
-    info.addMember(m_properties, "properties");
-    info.addMember(m_key, "key");
-}
-
 WebKitCSSKeyframeRule::WebKitCSSKeyframeRule(StyleKeyframe* keyframe, WebKitCSSKeyframesRule* parent)
     : CSSRule(0)
     , m_keyframe(keyframe)
@@ -107,19 +105,11 @@ WebKitCSSKeyframeRule::~WebKitCSSKeyframeRule()
         m_propertiesCSSOMWrapper->clearParentRule();
 }
 
-CSSStyleDeclaration* WebKitCSSKeyframeRule::style() const
+CSSStyleDeclaration* WebKitCSSKeyframeRule::style()
 {
     if (!m_propertiesCSSOMWrapper)
-        m_propertiesCSSOMWrapper = StyleRuleCSSStyleDeclaration::create(m_keyframe->mutableProperties(), const_cast<WebKitCSSKeyframeRule*>(this));
+        m_propertiesCSSOMWrapper = StyleRuleCSSStyleDeclaration::create(m_keyframe->mutableProperties(), this);
     return m_propertiesCSSOMWrapper.get();
-}
-
-void WebKitCSSKeyframeRule::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
-{
-    MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::CSS);
-    CSSRule::reportMemoryUsage(memoryObjectInfo);
-    info.addMember(m_keyframe, "keyframe");
-    info.addMember(m_propertiesCSSOMWrapper, "propertiesCSSOMWrapper");
 }
 
 void WebKitCSSKeyframeRule::reattach(StyleRuleBase*)

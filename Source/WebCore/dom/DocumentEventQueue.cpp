@@ -34,28 +34,27 @@
 #include "RuntimeApplicationChecks.h"
 #include "ScriptExecutionContext.h"
 #include "SuspendableTimer.h"
-#include "WebCoreMemoryInstrumentation.h"
-#include <wtf/MemoryInstrumentationHashSet.h>
-#include <wtf/MemoryInstrumentationListHashSet.h>
 
 namespace WebCore {
     
-class DocumentEventQueueTimer : public SuspendableTimer {
-    WTF_MAKE_NONCOPYABLE(DocumentEventQueueTimer);
+class DocumentEventQueueTimer FINAL : public SuspendableTimer {
 public:
+    static PassOwnPtr<DocumentEventQueueTimer> create(DocumentEventQueue* eventQueue, ScriptExecutionContext* context)
+    {
+        return adoptPtr(new DocumentEventQueueTimer(eventQueue, context));
+    }
+
+private:
     DocumentEventQueueTimer(DocumentEventQueue* eventQueue, ScriptExecutionContext* context)
         : SuspendableTimer(context)
         , m_eventQueue(eventQueue) { }
 
-    virtual void reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const OVERRIDE
+    virtual void fired() OVERRIDE
     {
-        MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::DOM);
-        SuspendableTimer::reportMemoryUsage(memoryObjectInfo);
-        info.addWeakPointer(m_eventQueue);
+        ASSERT(!isSuspended());
+        m_eventQueue->pendingEventTimerFired();
     }
 
-private:
-    virtual void fired() { m_eventQueue->pendingEventTimerFired(); }
     DocumentEventQueue* m_eventQueue;
 };
 
@@ -65,7 +64,7 @@ PassRefPtr<DocumentEventQueue> DocumentEventQueue::create(ScriptExecutionContext
 }
 
 DocumentEventQueue::DocumentEventQueue(ScriptExecutionContext* context)
-    : m_pendingEventTimer(adoptPtr(new DocumentEventQueueTimer(this, context)))
+    : m_pendingEventTimer(DocumentEventQueueTimer::create(this, context))
     , m_isClosed(false)
 {
     m_pendingEventTimer->suspendIfNeeded();
@@ -106,27 +105,21 @@ void DocumentEventQueue::enqueueOrDispatchScrollEvent(PassRefPtr<Node> target, S
     enqueueEvent(scrollEvent.release());
 }
 
-void DocumentEventQueue::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
-{
-    MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::DOM);
-    info.addMember(m_pendingEventTimer, "pendingEventTimer");
-    info.addMember(m_queuedEvents, "queuedEvents");
-    info.addMember(m_nodesWithQueuedScrollEvents, "nodesWithQueuedScrollEvents");
-}
-
 bool DocumentEventQueue::cancelEvent(Event* event)
 {
-    bool found = m_queuedEvents.contains(event);
-    m_queuedEvents.remove(event);
+    ListHashSet<RefPtr<Event>, 16>::iterator it = m_queuedEvents.find(event);
+    bool found = it != m_queuedEvents.end();
+    if (found)
+        m_queuedEvents.remove(it);
     if (m_queuedEvents.isEmpty())
-        m_pendingEventTimer->stop();
+        m_pendingEventTimer->cancel();
     return found;
 }
 
 void DocumentEventQueue::close()
 {
     m_isClosed = true;
-    m_pendingEventTimer->stop();
+    m_pendingEventTimer->cancel();
     m_queuedEvents.clear();
 }
 

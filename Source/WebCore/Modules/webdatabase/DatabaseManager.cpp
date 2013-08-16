@@ -36,21 +36,16 @@
 #include "DatabaseBackendSync.h"
 #include "DatabaseCallback.h"
 #include "DatabaseContext.h"
+#include "DatabaseStrategy.h"
 #include "DatabaseSync.h"
 #include "DatabaseTask.h"
 #include "ExceptionCode.h"
 #include "InspectorDatabaseInstrumentation.h"
 #include "Logging.h"
+#include "PlatformStrategies.h"
 #include "ScriptController.h"
 #include "ScriptExecutionContext.h"
 #include "SecurityOrigin.h"
-
-#if USE(PLATFORM_STRATEGIES)
-#include "DatabaseStrategy.h"
-#include "PlatformStrategies.h"
-#else
-#include "DatabaseServer.h"
-#endif
 
 namespace WebCore {
 
@@ -66,18 +61,14 @@ DatabaseManager& DatabaseManager::manager()
 }
 
 DatabaseManager::DatabaseManager()
-    : m_client(0)
+    : m_server(platformStrategies()->databaseStrategy()->getDatabaseServer())
+    , m_client(0)
     , m_databaseIsAvailable(true)
 #if !ASSERT_DISABLED
     , m_databaseContextRegisteredCount(0)
     , m_databaseContextInstanceCount(0)
 #endif
 {
-#if USE(PLATFORM_STRATEGIES)
-    m_server = platformStrategies()->databaseStrategy()->getDatabaseServer();
-#else
-    m_server = new DatabaseServer;
-#endif
     ASSERT(m_server); // We should always have a server to work with.
 }
 
@@ -363,7 +354,6 @@ String DatabaseManager::fullPathForDatabase(SecurityOrigin* origin, const String
     return m_server->fullPathForDatabase(origin, name, createIfDoesNotExist);
 }
 
-#if !PLATFORM(CHROMIUM)
 bool DatabaseManager::hasEntryForOrigin(SecurityOrigin* origin)
 {
     return m_server->hasEntryForOrigin(origin);
@@ -414,13 +404,6 @@ bool DatabaseManager::deleteDatabase(SecurityOrigin* origin, const String& name)
     return m_server->deleteDatabase(origin, name);
 }
 
-#else // PLATFORM(CHROMIUM)
-void DatabaseManager::closeDatabasesImmediately(const String& originIdentifier, const String& name)
-{
-    m_server->closeDatabasesImmediately(originIdentifier, name);
-}
-#endif // PLATFORM(CHROMIUM)
-
 void DatabaseManager::interruptAllDatabasesForContext(ScriptExecutionContext* context)
 {
     RefPtr<DatabaseContext> databaseContext = existingDatabaseContextFor(context);
@@ -428,14 +411,9 @@ void DatabaseManager::interruptAllDatabasesForContext(ScriptExecutionContext* co
         m_server->interruptAllDatabasesForContext(databaseContext->backend().get());
 }
 
-unsigned long long DatabaseManager::getMaxSizeForDatabase(const DatabaseBackendBase* database)
-{
-    return m_server->getMaxSizeForDatabase(database);
-}
-
 void DatabaseManager::logErrorMessage(ScriptExecutionContext* context, const String& message)
 {
-    context->addConsoleMessage(OtherMessageSource, ErrorMessageLevel, message);
+    context->addConsoleMessage(StorageMessageSource, ErrorMessageLevel, message);
 }
 
 } // namespace WebCore

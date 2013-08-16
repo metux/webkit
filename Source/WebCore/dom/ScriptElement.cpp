@@ -29,8 +29,10 @@
 #include "CachedResourceRequest.h"
 #include "ContentSecurityPolicy.h"
 #include "CrossOriginAccessControl.h"
+#include "CurrentScriptIncrementer.h"
 #include "Document.h"
 #include "DocumentParser.h"
+#include "Event.h"
 #include "Frame.h"
 #include "FrameLoader.h"
 #include "HTMLNames.h"
@@ -40,6 +42,7 @@
 #include "MIMETypeRegistry.h"
 #include "Page.h"
 #include "ScriptCallStack.h"
+#include "ScriptController.h"
 #include "ScriptRunner.h"
 #include "ScriptSourceCode.h"
 #include "ScriptValue.h"
@@ -295,7 +298,7 @@ void ScriptElement::executeScript(const ScriptSourceCode& sourceCode)
 
 #if ENABLE(NOSNIFF)
     if (m_isExternalScript && m_cachedScript && !m_cachedScript->mimeTypeAllowedByNosniff()) {
-        m_element->document()->addConsoleMessage(JSMessageSource, ErrorMessageLevel, "Refused to execute script from '" + m_cachedScript->url().string() + "' because its MIME type ('" + m_cachedScript->mimeType() + "') is not executable, and strict MIME type checking is enabled.");
+        m_element->document()->addConsoleMessage(SecurityMessageSource, ErrorMessageLevel, "Refused to execute script from '" + m_cachedScript->url().stringCenterEllipsizedToLength() + "' because its MIME type ('" + m_cachedScript->mimeType() + "') is not executable, and strict MIME type checking is enabled.");
         return;
     }
 #endif
@@ -305,6 +308,8 @@ void ScriptElement::executeScript(const ScriptSourceCode& sourceCode)
     if (Frame* frame = document->frame()) {
         {
             IgnoreDestructiveWriteCountIncrementer ignoreDesctructiveWriteCountIncrementer(m_isExternalScript ? document.get() : 0);
+            CurrentScriptIncrementer currentScriptIncrementer(document.get(), m_element);
+
             // Create a script from the script element node, using the script
             // block's source and the script block's type.
             // Note: This is where the script is compiled and actually executed.
@@ -413,14 +418,14 @@ String ScriptElement::scriptContent() const
     return content.toString();
 }
 
-ScriptElement* toScriptElement(Element* element)
+ScriptElement* toScriptElementIfPossible(Element* element)
 {
-    if (element->isHTMLElement() && element->hasTagName(HTMLNames::scriptTag))
-        return static_cast<HTMLScriptElement*>(element);
+    if (isHTMLScriptElement(element))
+        return toHTMLScriptElement(element);
 
 #if ENABLE(SVG)
-    if (element->isSVGElement() && element->hasTagName(SVGNames::scriptTag))
-        return static_cast<SVGScriptElement*>(element);
+    if (isSVGScriptElement(element))
+        return toSVGScriptElement(element);
 #endif
 
     return 0;

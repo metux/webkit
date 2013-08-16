@@ -60,7 +60,7 @@ private:
 class RenderTableCell;
 class RenderTableRow;
 
-class RenderTableSection : public RenderBox {
+class RenderTableSection FINAL : public RenderBox {
 public:
     RenderTableSection(Element*);
     virtual ~RenderTableSection();
@@ -79,6 +79,7 @@ public:
 
     int calcRowLogicalHeight();
     void layoutRows();
+    void computeOverflowFromCells();
 
     RenderTable* table() const { return toRenderTable(parent()); }
 
@@ -102,8 +103,6 @@ public:
         }
 
         bool hasCells() const { return cells.size() > 0; }
-
-        void reportMemoryUsage(MemoryObjectInfo*) const;
     };
 
     typedef Vector<CellStruct> Row;
@@ -114,8 +113,6 @@ public:
             , baseline()
         {
         }
-
-        void reportMemoryUsage(MemoryObjectInfo*) const;
 
         Row row;
         RenderTableRow* rowRenderer;
@@ -152,6 +149,8 @@ public:
         CellStruct& c = m_grid[row].row[col];
         return c.primaryCell();
     }
+
+    RenderTableRow* rowRendererAt(unsigned row) const { return m_grid[row].rowRenderer; }
 
     void appendColumn(unsigned pos);
     void splitColumn(unsigned pos, unsigned first);
@@ -199,8 +198,6 @@ public:
     
     virtual void paint(PaintInfo&, const LayoutPoint&) OVERRIDE;
 
-    virtual void reportMemoryUsage(MemoryObjectInfo*) const OVERRIDE;
-
 protected:
     virtual void styleDidChange(StyleDifference, const RenderStyle* oldStyle);
 
@@ -230,6 +227,7 @@ private:
     void distributeRemainingExtraLogicalHeight(int& extraLogicalHeight);
 
     bool hasOverflowingCell() const { return m_overflowingCells.size() || m_forceSlowPaintPathWithOverflowingCell; }
+    void computeOverflowFromCells(unsigned totalRows, unsigned nEffCols);
 
     CellSpan fullTableRowSpan() const { return CellSpan(0, m_grid.size()); }
     CellSpan fullTableColumnSpan() const { return CellSpan(0, table()->columns().size()); }

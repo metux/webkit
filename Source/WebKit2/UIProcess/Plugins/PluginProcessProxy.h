@@ -32,6 +32,7 @@
 #include "Connection.h"
 #include "PluginModuleInfo.h"
 #include "PluginProcess.h"
+#include "PluginProcessAttributes.h"
 #include "ProcessLauncher.h"
 #include "WebProcessProxyMessages.h"
 #include <wtf/Deque.h>
@@ -64,12 +65,13 @@ struct RawPluginMetaData {
 
 class PluginProcessProxy : public ChildProcessProxy {
 public:
-    static PassRefPtr<PluginProcessProxy> create(PluginProcessManager*, const PluginModuleInfo&, PluginProcess::Type);
+    static PassRefPtr<PluginProcessProxy> create(PluginProcessManager*, const PluginProcessAttributes&, uint64_t pluginProcessToken);
     ~PluginProcessProxy();
 
-    const PluginModuleInfo& pluginInfo() const { return m_pluginInfo; }
+    const PluginProcessAttributes& pluginProcessAttributes() const { return m_pluginProcessAttributes; }
+    uint64_t pluginProcessToken() const { return m_pluginProcessToken; }
 
-    // Asks the plug-in process to create a new connection to a web process. The connection identifier will be 
+    // Asks the plug-in process to create a new connection to a web process. The connection identifier will be
     // encoded in the given argument encoder and sent back to the connection of the given web process.
     void getPluginProcessConnection(PassRefPtr<Messages::WebProcessProxy::GetPluginProcessConnection::DelayedReply>);
     
@@ -80,8 +82,6 @@ public:
     void clearSiteData(WebPluginSiteDataManager*, const Vector<String>& sites, uint64_t flags, uint64_t maxAgeInSeconds, uint64_t callbackID);
 
     bool isValid() const { return m_connection; }
-
-    PluginProcess::Type processType() const { return m_processType; }
 
 #if PLATFORM(MAC)
     void setProcessSuppressionEnabled(bool);
@@ -98,15 +98,17 @@ public:
 #endif
 
 private:
-    PluginProcessProxy(PluginProcessManager*, const PluginModuleInfo&, PluginProcess::Type);
+    PluginProcessProxy(PluginProcessManager*, const PluginProcessAttributes&, uint64_t pluginProcessToken);
 
     virtual void getLaunchOptions(ProcessLauncher::LaunchOptions&) OVERRIDE;
-    void platformGetLaunchOptions(ProcessLauncher::LaunchOptions&, const PluginModuleInfo&);
+    void platformGetLaunchOptions(ProcessLauncher::LaunchOptions&, const PluginProcessAttributes&);
 
     void pluginProcessCrashedOrFailedToLaunch();
 
     // CoreIPC::Connection::Client
     virtual void didReceiveMessage(CoreIPC::Connection*, CoreIPC::MessageDecoder&) OVERRIDE;
+    virtual void didReceiveSyncMessage(CoreIPC::Connection*, CoreIPC::MessageDecoder&, OwnPtr<CoreIPC::MessageEncoder>&) OVERRIDE;
+
     virtual void didClose(CoreIPC::Connection*) OVERRIDE;
     virtual void didReceiveInvalidMessage(CoreIPC::Connection*, CoreIPC::StringReference messageReceiverName, CoreIPC::StringReference messageName) OVERRIDE;
 
@@ -114,7 +116,6 @@ private:
     virtual void didFinishLaunching(ProcessLauncher*, CoreIPC::Connection::Identifier);
 
     // Message handlers
-    void didReceivePluginProcessProxyMessage(CoreIPC::Connection*, CoreIPC::MessageDecoder&);
     void didCreateWebProcessConnection(const CoreIPC::Attachment&, bool supportsAsynchronousPluginInitialization);
     void didGetSitesWithData(const Vector<String>& sites, uint64_t callbackID);
     void didClearSiteData(uint64_t callbackID);
@@ -133,23 +134,27 @@ private:
     void endModal();
 
     void applicationDidBecomeActive();
+    void openPluginPreferencePane();
+    void launchProcess(const String& launchPath, const Vector<String>& arguments, bool& result);
+    void launchApplicationAtURL(const String& urlString, const Vector<String>& arguments, bool& result);
+    void openURL(const String& url, bool& result, int32_t& status, String& launchedURLString);
 #endif
 
     void platformInitializePluginProcess(PluginProcessCreationParameters& parameters);
 
     // The plug-in host process manager.
     PluginProcessManager* m_pluginProcessManager;
-    
-    // Information about the plug-in.
-    PluginModuleInfo m_pluginInfo;
+
+    PluginProcessAttributes m_pluginProcessAttributes;
+    uint64_t m_pluginProcessToken;
 
     // The connection to the plug-in host process.
     RefPtr<CoreIPC::Connection> m_connection;
 
-    Deque<RefPtr<Messages::WebProcessProxy::GetPluginProcessConnection::DelayedReply> > m_pendingConnectionReplies;
+    Deque<RefPtr<Messages::WebProcessProxy::GetPluginProcessConnection::DelayedReply>> m_pendingConnectionReplies;
 
     Vector<uint64_t> m_pendingGetSitesRequests;
-    HashMap<uint64_t, RefPtr<WebPluginSiteDataManager> > m_pendingGetSitesReplies;
+    HashMap<uint64_t, RefPtr<WebPluginSiteDataManager>> m_pendingGetSitesReplies;
 
     struct ClearSiteDataRequest {
         Vector<String> sites;
@@ -158,7 +163,7 @@ private:
         uint64_t callbackID;
     };
     Vector<ClearSiteDataRequest> m_pendingClearSiteDataRequests;
-    HashMap<uint64_t, RefPtr<WebPluginSiteDataManager> > m_pendingClearSiteDataReplies;
+    HashMap<uint64_t, RefPtr<WebPluginSiteDataManager>> m_pendingClearSiteDataReplies;
 
     // If createPluginConnection is called while the process is still launching we'll keep count of it and send a bunch of requests
     // when the process finishes launching.
@@ -171,8 +176,6 @@ private:
     bool m_fullscreenWindowIsShowing;
     unsigned m_preFullscreenAppPresentationOptions;
 #endif
-
-    PluginProcess::Type m_processType;
 };
 
 } // namespace WebKit

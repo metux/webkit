@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011 Apple Inc. All rights reserved.
+ * Copyright (C) 2011, 2013 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -29,7 +29,6 @@
 #if ENABLE(CSS_FILTERS)
 
 #include "CSSValueList.h"
-#include "WebCoreMemoryInstrumentation.h"
 #include <wtf/PassRefPtr.h>
 #include <wtf/text/WTFString.h>
 
@@ -53,8 +52,11 @@ bool WebKitCSSFilterValue::typeUsesSpaceSeparator(FilterOperationType operationT
 
 String WebKitCSSFilterValue::customCssText() const
 {
-    String result;
+    const char* result = "";
     switch (m_type) {
+    case UnknownFilterOperation:
+        result = "";
+        break;
     case ReferenceFilterOperation:
         result = "url(";
         break;
@@ -93,11 +95,9 @@ String WebKitCSSFilterValue::customCssText() const
         result = "custom(";
         break;
 #endif
-    default:
-        break;
     }
 
-    return result + CSSValueList::customCssText() + ")";
+    return result + CSSValueList::customCssText() + ')';
 }
 
 WebKitCSSFilterValue::WebKitCSSFilterValue(const WebKitCSSFilterValue& cloneFrom)
@@ -114,12 +114,6 @@ PassRefPtr<WebKitCSSFilterValue> WebKitCSSFilterValue::cloneForCSSOM() const
 bool WebKitCSSFilterValue::equals(const WebKitCSSFilterValue& other) const
 {
     return m_type == other.m_type && CSSValueList::equals(other);
-}
-
-void WebKitCSSFilterValue::reportDescendantMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
-{
-    MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::CSS);
-    CSSValueList::reportDescendantMemoryUsage(memoryObjectInfo);
 }
 
 }

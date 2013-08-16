@@ -9,12 +9,10 @@ WebKitWebPage
 
 </para>
 
-
 <!-- ##### SECTION See_Also ##### -->
 <para>
 
 </para>
-
 
 <!-- ##### SECTION Stability_Level ##### -->
 
@@ -59,7 +57,7 @@ WebKitWebPage
 @Returns: 
 
 
-<!-- ##### FUNCTION webkit_web_page_get_uri ##### -->
+<!-- ##### FUNCTION webkit_web_page_get_id ##### -->
 <para>
 
 </para>
@@ -68,7 +66,7 @@ WebKitWebPage
 @Returns: 
 
 
-<!-- ##### FUNCTION webkit_web_page_get_id ##### -->
+<!-- ##### FUNCTION webkit_web_page_get_uri ##### -->
 <para>
 
 </para>

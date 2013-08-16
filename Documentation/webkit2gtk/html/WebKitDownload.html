@@ -3,7 +3,7 @@
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 <title>WebKitDownload</title>
-<meta name="generator" content="DocBook XSL Stylesheets V1.76.1">
+<meta name="generator" content="DocBook XSL Stylesheets V1.78.1">
 <link rel="home" href="index.html" title="WebKit2GTK+ Reference Manual">
 <link rel="up" href="ch01.html" title="Class Overview">
 <link rel="prev" href="WebKitWindowProperties.html" title="WebKitWindowProperties">
@@ -109,8 +109,11 @@ and handle the download process itself.
 Retrieves the <a class="link" href="WebKitURIRequest.html" title="WebKitURIRequest"><span class="type">WebKitURIRequest</span></a> object that backs the download
 process.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>download</code></em> :</span></p></td>
@@ -134,8 +137,11 @@ Obtains the URI to which the downloaded file will be written. You
 can connect to <a class="link" href="WebKitDownload.html#WebKitDownload-created-destination" title='The "created-destination" signal'><span class="type">"created-destination"</span></a> to make
 sure this method returns a valid destination.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>download</code></em> :</span></p></td>
@@ -170,8 +176,11 @@ and destination URI is not set when the download tranfer starts,
 the file will be saved with the filename suggested by the server in
 <a href="../glib/glib-Miscellaneous-Utility-Functions.html#G-USER-DIRECTORY-DOWNLOAD:CAPS"><code class="literal">G_USER_DIRECTORY_DOWNLOAD</code></a> directory.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>download</code></em> :</span></p></td>
@@ -195,8 +204,11 @@ process. This method returns <a href="../glib/glib-Standard-Macros.html#NULL:CAP
 is received from the server. You can connect to notify::response
 signal to be notified when the response is received.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>download</code></em> :</span></p></td>
@@ -222,8 +234,11 @@ operation is effectively cancelled the signal
 <a class="link" href="WebKitDownload.html#WebKitDownload-failed" title='The "failed" signal'><span class="type">"failed"</span></a> is emitted with
 <a class="link" href="webkit2gtk-WebKitError.html#WEBKIT-DOWNLOAD-ERROR-CANCELLED-BY-USER:CAPS"><code class="literal">WEBKIT_DOWNLOAD_ERROR_CANCELLED_BY_USER</code></a> error.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody><tr>
 <td><p><span class="term"><em class="parameter"><code>download</code></em> :</span></p></td>
 <td>a <a class="link" href="WebKitDownload.html" title="WebKitDownload"><span class="type">WebKitDownload</span></a>
@@ -241,8 +256,11 @@ Gets the value of the <a class="link" href="WebKitDownload.html#WebKitDownload--
 You can monitor the estimated progress of the download operation by
 connecting to the notify::estimated-progress signal of <em class="parameter"><code>download</code></em>.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>download</code></em> :</span></p></td>
@@ -266,8 +284,11 @@ Gets the elapsed time in seconds, including any fractional part.
 If the download finished, had an error or was cancelled this is
 the time between its start and the event.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>download</code></em> :</span></p></td>
@@ -290,8 +311,11 @@ the time between its start and the event.
 Gets the length of the data already downloaded for <em class="parameter"><code>download</code></em>
 in bytes.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>download</code></em> :</span></p></td>
@@ -312,8 +336,11 @@ in bytes.
 <p>
 Get the <a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> that initiated the download.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>download</code></em> :</span></p></td>
@@ -376,8 +403,11 @@ This signal is emitted after <a class="link" href="WebKitDownload.html#WebKitDow
 <a class="link" href="WebKitDownload.html#WebKitDownload-received-data" title='The "received-data" signal'><span class="type">"received-data"</span></a> to notify that destination file has been
 created successfully at <em class="parameter"><code>destination</code></em>.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>download</code></em> :</span></p></td>
@@ -407,8 +437,11 @@ decide a destination URI for the download. If this signal is not
 handled the file will be downloaded to <a href="../glib/glib-Miscellaneous-Utility-Functions.html#G-USER-DIRECTORY-DOWNLOAD:CAPS"><code class="literal">G_USER_DIRECTORY_DOWNLOAD</code></a>
 directory using <em class="parameter"><code>suggested_filename</code></em>.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>download</code></em> :</span></p></td>
@@ -446,8 +479,11 @@ with <a class="link" href="WebKitDownload.html#webkit-download-cancel" title="we
 <a class="link" href="webkit2gtk-WebKitError.html#WEBKIT-DOWNLOAD-ERROR-CANCELLED-BY-USER:CAPS"><code class="literal">WEBKIT_DOWNLOAD_ERROR_CANCELLED_BY_USER</code></a>. The download operation finishes
 after an error and <a class="link" href="WebKitDownload.html#WebKitDownload-finished" title='The "finished" signal'><span class="type">"finished"</span></a> signal is emitted after this one.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>download</code></em> :</span></p></td>
@@ -474,8 +510,11 @@ after an error and <a class="link" href="WebKitDownload.html#WebKitDownload-fini
 This signal is emitted when download finishes successfully or due to an error.
 In case of errors <a class="link" href="WebKitDownload.html#WebKitDownload-failed" title='The "failed" signal'><span class="type">"failed"</span></a> signal is emitted before this one.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>download</code></em> :</span></p></td>
@@ -500,8 +539,11 @@ This signal is emitted after response is received,
 every time new data has been written to the destination. It's
 useful to know the progress of the download operation.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>download</code></em> :</span></p></td>

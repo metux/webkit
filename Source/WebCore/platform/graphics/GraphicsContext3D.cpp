@@ -30,16 +30,17 @@
 #if USE(3D_GRAPHICS)
 
 #include "GraphicsContext3D.h"
-#include "GraphicsContext3DNEON.h"
 
-#include "CheckedInt.h"
-#include "DrawingBuffer.h"
 #include "Extensions3D.h"
 #include "Image.h"
 #include "ImageData.h"
 #include "ImageObserver.h"
 
-#include <wtf/ArrayBufferView.h>
+#if HAVE(ARM_NEON_INTRINSICS)
+#include "GraphicsContext3DNEON.h"
+#endif
+
+#include <runtime/ArrayBufferView.h>
 #include <wtf/OwnArrayPtr.h>
 #include <wtf/PassOwnArrayPtr.h>
 
@@ -176,6 +177,9 @@ bool GraphicsContext3D::computeFormatAndTypeParameters(GC3Denum format,
     case GraphicsContext3D::FLOAT: // OES_texture_float
         *bytesPerComponent = sizeof(GC3Dfloat);
         break;
+    case GraphicsContext3D::HALF_FLOAT_OES: // OES_texture_half_float
+        *bytesPerComponent = sizeof(GC3Dhalffloat);
+        break;
     default:
         return false;
     }
@@ -198,11 +202,11 @@ GC3Denum GraphicsContext3D::computeImageSizeInBytes(GC3Denum format, GC3Denum ty
             *paddingInBytes = 0;
         return GraphicsContext3D::NO_ERROR;
     }
-    CheckedInt<uint32_t> checkedValue(bytesPerComponent * componentsPerPixel);
+    Checked<uint32_t, RecordOverflow> checkedValue = bytesPerComponent * componentsPerPixel;
     checkedValue *=  width;
-    if (!checkedValue.isValid())
+    if (checkedValue.hasOverflowed())
         return GraphicsContext3D::INVALID_VALUE;
-    unsigned int validRowSize = checkedValue.value();
+    unsigned int validRowSize = checkedValue.unsafeGet();
     unsigned int padding = 0;
     unsigned int residual = validRowSize % alignment;
     if (residual) {
@@ -212,9 +216,9 @@ GC3Denum GraphicsContext3D::computeImageSizeInBytes(GC3Denum format, GC3Denum ty
     // Last row needs no padding.
     checkedValue *= (height - 1);
     checkedValue += validRowSize;
-    if (!checkedValue.isValid())
+    if (checkedValue.hasOverflowed())
         return GraphicsContext3D::INVALID_VALUE;
-    *imageSizeInBytes = checkedValue.value();
+    *imageSizeInBytes = checkedValue.unsafeGet();
     if (paddingInBytes)
         *paddingInBytes = padding;
     return GraphicsContext3D::NO_ERROR;
@@ -1332,8 +1336,8 @@ ALWAYS_INLINE void FormatConverter::convert()
         }
     } else if (!trivialUnpack && !trivialPack) {
         for (size_t i = 0; i < m_height; ++i) {
-            unpack<SrcFormat>(srcRowStart, reinterpret_cast<IntermediateSrcType*>(m_unpackedIntermediateSrcData.get()), m_width);
-            pack<DstFormat, alphaOp>(reinterpret_cast<IntermediateSrcType*>(m_unpackedIntermediateSrcData.get()), dstRowStart, m_width);
+            unpack<SrcFormat>(srcRowStart, reinterpret_cast_ptr<IntermediateSrcType*>(m_unpackedIntermediateSrcData.get()), m_width);
+            pack<DstFormat, alphaOp>(reinterpret_cast_ptr<IntermediateSrcType*>(m_unpackedIntermediateSrcData.get()), dstRowStart, m_width);
             srcRowStart += srcStrideInElements;
             dstRowStart += dstStrideInElements;
         }
@@ -1389,6 +1393,21 @@ unsigned GraphicsContext3D::getClearBitsByAttachmentType(GC3Denum attachment)
 {
     switch (attachment) {
     case GraphicsContext3D::COLOR_ATTACHMENT0:
+    case Extensions3D::COLOR_ATTACHMENT1_EXT:
+    case Extensions3D::COLOR_ATTACHMENT2_EXT:
+    case Extensions3D::COLOR_ATTACHMENT3_EXT:
+    case Extensions3D::COLOR_ATTACHMENT4_EXT:
+    case Extensions3D::COLOR_ATTACHMENT5_EXT:
+    case Extensions3D::COLOR_ATTACHMENT6_EXT:
+    case Extensions3D::COLOR_ATTACHMENT7_EXT:
+    case Extensions3D::COLOR_ATTACHMENT8_EXT:
+    case Extensions3D::COLOR_ATTACHMENT9_EXT:
+    case Extensions3D::COLOR_ATTACHMENT10_EXT:
+    case Extensions3D::COLOR_ATTACHMENT11_EXT:
+    case Extensions3D::COLOR_ATTACHMENT12_EXT:
+    case Extensions3D::COLOR_ATTACHMENT13_EXT:
+    case Extensions3D::COLOR_ATTACHMENT14_EXT:
+    case Extensions3D::COLOR_ATTACHMENT15_EXT:
         return GraphicsContext3D::COLOR_BUFFER_BIT;
     case GraphicsContext3D::DEPTH_ATTACHMENT:
         return GraphicsContext3D::DEPTH_BUFFER_BIT;
@@ -1452,6 +1471,25 @@ unsigned GraphicsContext3D::getChannelBitsByFormat(GC3Denum format)
         return 0;
     }
 }
+
+#if !PLATFORM(BLACKBERRY) && !PLATFORM(QT) && !PLATFORM(GTK) && !PLATFORM(EFL) && !PLATFORM(MAC) && !PLATFORM(WIN)
+PlatformGraphicsContext3D GraphicsContext3D::platformGraphicsContext3D() const
+{
+    return NullPlatformGraphicsContext3D;
+}
+
+Platform3DObject GraphicsContext3D::platformTexture() const
+{
+    return NullPlatform3DObject;
+}
+
+#if USE(ACCELERATED_COMPOSITING)
+PlatformLayer* GraphicsContext3D::platformLayer() const
+{
+    return 0;
+}
+#endif
+#endif
 
 } // namespace WebCore
 

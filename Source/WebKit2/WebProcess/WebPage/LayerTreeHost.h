@@ -47,6 +47,7 @@ class GraphicsLayerFactory;
 
 namespace WebKit {
 
+class PageOverlay;
 class UpdateInfo;
 class WebPage;
 
@@ -71,12 +72,12 @@ public:
     virtual bool forceRepaintAsync(uint64_t /*callbackID*/) { return false; }
     virtual void sizeDidChange(const WebCore::IntSize& newSize) = 0;
     virtual void deviceOrPageScaleFactorChanged() = 0;
+    virtual void pageBackgroundTransparencyChanged() = 0;
 
-    virtual void didInstallPageOverlay() = 0;
-    virtual void didUninstallPageOverlay() = 0;
-    virtual void setPageOverlayNeedsDisplay(const WebCore::IntRect&) = 0;
-    virtual void setPageOverlayOpacity(float) { }
-    virtual bool pageOverlayShouldApplyFadeWhenPainting() const { return true; }
+    virtual void didInstallPageOverlay(PageOverlay*) = 0;
+    virtual void didUninstallPageOverlay(PageOverlay*) = 0;
+    virtual void setPageOverlayNeedsDisplay(PageOverlay*, const WebCore::IntRect&) = 0;
+    virtual void setPageOverlayOpacity(PageOverlay*, float) { }
 
     virtual void pauseRendering() { }
     virtual void resumeRendering() { }
@@ -85,9 +86,6 @@ public:
     virtual void setBackgroundColor(const WebCore::Color&) { }
 
 #if USE(COORDINATED_GRAPHICS)
-    virtual void setVisibleContentsRect(const WebCore::FloatRect&, float /* scale */, const WebCore::FloatPoint&) { }
-    virtual void renderNextFrame() { }
-    virtual void purgeBackingStores() { }
     virtual void didReceiveCoordinatedLayerTreeHostMessage(CoreIPC::Connection*, CoreIPC::MessageDecoder&) = 0;
 #endif
 
@@ -109,12 +107,10 @@ protected:
 #endif
 };
 
-#if !USE(COORDINATED_GRAPHICS)
 inline bool LayerTreeHost::supportsAcceleratedCompositing()
 {
     return true;
 }
-#endif
 
 } // namespace WebKit
 

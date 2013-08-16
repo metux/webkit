@@ -42,7 +42,6 @@
 #include "WebKitWebViewBasePrivate.h"
 #include "WebPageProxy.h"
 #include "WebViewBaseInputMethodFilter.h"
-#include <WebCore/ClipboardGtk.h>
 #include <WebCore/ClipboardUtilitiesGtk.h>
 #include <WebCore/DataObjectGtk.h>
 #include <WebCore/DragData.h>
@@ -245,9 +244,7 @@ static void webkitWebViewBaseRealize(GtkWidget* widget)
         | GDK_BUTTON_PRESS_MASK
         | GDK_BUTTON_RELEASE_MASK
         | GDK_SCROLL_MASK
-#if GTK_CHECK_VERSION(3, 3, 18)
         | GDK_SMOOTH_SCROLL_MASK
-#endif
         | GDK_POINTER_MOTION_MASK
         | GDK_KEY_PRESS_MASK
         | GDK_KEY_RELEASE_MASK
@@ -497,7 +494,7 @@ static void resizeWebKitWebViewBaseFromAllocation(WebKitWebViewBase* webViewBase
 #endif
 
     if (priv->pageProxy->drawingArea())
-        priv->pageProxy->drawingArea()->setSize(viewRect.size(), IntSize());
+        priv->pageProxy->drawingArea()->setSize(viewRect.size(), IntSize(), IntSize());
 
     webkitWebViewBaseNotifyResizerSize(webViewBase);
 }

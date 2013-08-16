@@ -44,10 +44,8 @@ class WebSecurityOrigin;
 
 typedef GenericCallback<WKArrayRef> ArrayCallback;
 
-class WebResourceCacheManagerProxy : public APIObject, public WebContextSupplement, private CoreIPC::MessageReceiver {
+class WebResourceCacheManagerProxy : public TypedAPIObject<APIObject::TypeCacheManager>, public WebContextSupplement, private CoreIPC::MessageReceiver {
 public:
-    static const Type APIType = TypeCacheManager;
-
     static const char* supplementName();
 
     static PassRefPtr<WebResourceCacheManagerProxy> create(WebContext*);
@@ -63,8 +61,6 @@ public:
 private:
     explicit WebResourceCacheManagerProxy(WebContext*);
 
-    virtual Type type() const { return APIType; }
-
     // WebContextSupplement
     virtual void contextDestroyed() OVERRIDE;
     virtual void processDidClose(WebProcessProxy*) OVERRIDE;
@@ -78,7 +74,7 @@ private:
     // Message handlers.
     void didGetCacheOrigins(const Vector<SecurityOriginData>& originIdentifiers, uint64_t callbackID);
 
-    HashMap<uint64_t, RefPtr<ArrayCallback> > m_arrayCallbacks;
+    HashMap<uint64_t, RefPtr<ArrayCallback>> m_arrayCallbacks;
 };
 
 } // namespace WebKit

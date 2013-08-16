@@ -21,7 +21,7 @@
  */
 
 #include "config.h"
-#include "JSLocationCustom.h"
+#include "JSLocation.h"
 
 #include "Location.h"
 #include <runtime/JSFunction.h>
@@ -100,7 +100,7 @@ bool JSLocation::getOwnPropertyDescriptorDelegate(ExecState* exec, PropertyName 
     
     // Check for the few functions that we allow, even when called cross-domain.
     const HashEntry* entry = JSLocationPrototype::s_info.propHashTable(exec)->entry(exec, propertyName);
-    PropertySlot slot;
+    PropertySlot slot(this);
     if (entry && (entry->attributes() & JSC::Function)) {
         if (entry->function() == jsLocationPrototypeFunctionReplace) {
             slot.setCustom(this, nonCachingStaticReplaceFunctionGetter);

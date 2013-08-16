@@ -34,19 +34,33 @@
 namespace JSC {
 
 class ExecState;
-class JSGlobalData;
+class VM;
 
 // This header gives other parts of the system access to the JIT's prototocol
 // for the throwing and handling exceptions.
 
 struct ExceptionHandler {
-    void* catchRoutine;
     ExecState* callFrame;
+    void* catchRoutine;
 };
 
-ExceptionHandler genericThrow(JSGlobalData*, ExecState*, JSValue exceptionValue, unsigned vPCIndex);
+#if USE(JSVALUE32_64)
+// EncodedExceptionHandler is used to convince the compiler to return an ExceptionHander
+// struct in two registers for 32 bit builds.
+typedef int64_t EncodedExceptionHandler;
 
-ExceptionHandler jitThrow(JSGlobalData*, ExecState*, JSValue exceptionValue, ReturnAddressPtr faultLocation);
+union ExceptionHandlerUnion {
+    ExceptionHandler handler;
+    EncodedExceptionHandler encodedHandler;
+};
+
+EncodedExceptionHandler encode(ExceptionHandler);
+#endif
+
+ExceptionHandler genericThrow(VM*, ExecState*, JSValue exceptionValue, unsigned vPCIndex);
+
+ExceptionHandler jitThrowNew(VM*, ExecState*, JSValue exceptionValue);
+ExceptionHandler jitThrow(VM*, ExecState*, JSValue exceptionValue, ReturnAddressPtr faultLocation);
 
 } // namespace JSC
 

@@ -55,14 +55,14 @@ StringConstructor::StringConstructor(JSGlobalObject* globalObject, Structure* st
 
 void StringConstructor::finishCreation(ExecState* exec, StringPrototype* stringPrototype)
 {
-    Base::finishCreation(exec->globalData(), stringPrototype->classInfo()->className);
-    putDirectWithoutTransition(exec->globalData(), exec->propertyNames().prototype, stringPrototype, ReadOnly | DontEnum | DontDelete);
-    putDirectWithoutTransition(exec->globalData(), exec->propertyNames().length, jsNumber(1), ReadOnly | DontEnum | DontDelete);
+    Base::finishCreation(exec->vm(), stringPrototype->classInfo()->className);
+    putDirectWithoutTransition(exec->vm(), exec->propertyNames().prototype, stringPrototype, ReadOnly | DontEnum | DontDelete);
+    putDirectWithoutTransition(exec->vm(), exec->propertyNames().length, jsNumber(1), ReadOnly | DontEnum | DontDelete);
 }
 
-bool StringConstructor::getOwnPropertySlot(JSCell* cell, ExecState* exec, PropertyName propertyName, PropertySlot &slot)
+bool StringConstructor::getOwnPropertySlot(JSObject* object, ExecState* exec, PropertyName propertyName, PropertySlot &slot)
 {
-    return getStaticFunctionSlot<InternalFunction>(exec, ExecState::stringConstructorTable(exec), jsCast<StringConstructor*>(cell), propertyName, slot);
+    return getStaticFunctionSlot<InternalFunction>(exec, ExecState::stringConstructorTable(exec), jsCast<StringConstructor*>(object), propertyName, slot);
 }
 
 bool StringConstructor::getOwnPropertyDescriptor(JSObject* object, ExecState* exec, PropertyName propertyName, PropertyDescriptor& descriptor)
@@ -87,6 +87,11 @@ static EncodedJSValue JSC_HOST_CALL stringFromCharCode(ExecState* exec)
     if (LIKELY(exec->argumentCount() == 1))
         return JSValue::encode(jsSingleCharacterString(exec, exec->argument(0).toUInt32(exec)));
     return JSValue::encode(stringFromCharCodeSlowCase(exec));
+}
+
+JSCell* JSC_HOST_CALL stringFromCharCode(ExecState* exec, int32_t arg)
+{
+    return jsSingleCharacterString(exec, arg);
 }
 
 static EncodedJSValue JSC_HOST_CALL constructWithStringConstructor(ExecState* exec)

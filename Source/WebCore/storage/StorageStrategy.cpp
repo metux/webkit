@@ -28,20 +28,21 @@
 
 #include "StorageNamespaceImpl.h"
 
-#if USE(PLATFORM_STRATEGIES)
-
 namespace WebCore {
 
-PassRefPtr<StorageNamespace> StorageStrategy::localStorageNamespace(const String& path, unsigned quota)
+PassRefPtr<StorageNamespace> StorageStrategy::localStorageNamespace(PageGroup* pageGroup)
 {
-    return StorageNamespaceImpl::localStorageNamespace(path, quota);
+    return StorageNamespaceImpl::localStorageNamespace(pageGroup);
 }
 
-PassRefPtr<StorageNamespace> StorageStrategy::sessionStorageNamespace(Page*, unsigned quota)
+PassRefPtr<StorageNamespace> StorageStrategy::sessionStorageNamespace(Page* page)
 {
-    return StorageNamespaceImpl::sessionStorageNamespace(quota);
+    return StorageNamespaceImpl::sessionStorageNamespace(page);
+}
+
+PassRefPtr<StorageNamespace> StorageStrategy::transientLocalStorageNamespace(PageGroup* pageGroup, SecurityOrigin* securityOrigin)
+{
+    return StorageNamespaceImpl::transientLocalStorageNamespace(pageGroup, securityOrigin);
 }
 
 } // namespace WebCore
-
-#endif // USE(STORAGE_STRATEGIES)

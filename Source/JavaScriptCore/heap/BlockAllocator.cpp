@@ -35,9 +35,10 @@
 namespace JSC {
 
 BlockAllocator::BlockAllocator()
-    : m_copiedRegionSet(CopiedBlock::blockSize)
+    : m_superRegion()
+    , m_copiedRegionSet(CopiedBlock::blockSize)
     , m_markedRegionSet(MarkedBlock::blockSize)
-    , m_weakAndMarkStackRegionSet(WeakBlock::blockSize)
+    , m_fourKBBlockRegionSet(WeakBlock::blockSize)
     , m_workListRegionSet(CopyWorkListSegment::blockSize)
     , m_numberOfEmptyRegions(0)
     , m_isCurrentlyAllocating(false)
@@ -57,6 +58,16 @@ BlockAllocator::~BlockAllocator()
         m_emptyRegionCondition.broadcast();
     }
     waitForThreadCompletion(m_blockFreeingThread);
+    ASSERT(allRegionSetsAreEmpty());
+    ASSERT(m_emptyRegions.isEmpty());
+}
+
+bool BlockAllocator::allRegionSetsAreEmpty() const
+{
+    return m_copiedRegionSet.isEmpty()
+        && m_markedRegionSet.isEmpty()
+        && m_fourKBBlockRegionSet.isEmpty()
+        && m_workListRegionSet.isEmpty();
 }
 
 void BlockAllocator::releaseFreeRegions()
@@ -77,7 +88,7 @@ void BlockAllocator::releaseFreeRegions()
         if (!region)
             break;
 
-        delete region;
+        region->destroy();
     }
 }
 
@@ -149,7 +160,7 @@ void BlockAllocator::blockFreeingThreadMain()
             if (!region)
                 break;
             
-            delete region;
+            region->destroy();
         }
     }
 }

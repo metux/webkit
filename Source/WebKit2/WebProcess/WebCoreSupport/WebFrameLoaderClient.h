@@ -40,12 +40,10 @@ public:
 
     WebFrame* webFrame() const { return m_frame; }
 
-    bool frameHasCustomRepresentation() const { return m_frameHasCustomRepresentation; }
-
 private:
     virtual void frameLoaderDestroyed() OVERRIDE;
 
-    virtual bool hasHTMLView() const OVERRIDE;
+    virtual bool hasHTMLView() const OVERRIDE { return true; }
     virtual bool hasWebView() const OVERRIDE;
     
     virtual void makeRepresentation(WebCore::DocumentLoader*) OVERRIDE;
@@ -175,8 +173,8 @@ private:
 
     virtual void dispatchDidBecomeFrameset(bool) OVERRIDE;
 
-    virtual bool canCachePage() const OVERRIDE;
-    virtual void convertMainResourceLoadToDownload(WebCore::MainResourceLoader*, const WebCore::ResourceRequest&, const WebCore::ResourceResponse&) OVERRIDE;
+    virtual bool canCachePage() const OVERRIDE { return true; }
+    virtual void convertMainResourceLoadToDownload(WebCore::DocumentLoader*, const WebCore::ResourceRequest&, const WebCore::ResourceResponse&) OVERRIDE;
     
     virtual PassRefPtr<WebCore::Frame> createFrame(const WebCore::KURL& url, const String& name, WebCore::HTMLFrameOwnerElement* ownerElement,
                                           const String& referrer, bool allowsScrolling, int marginWidth, int marginHeight) OVERRIDE;
@@ -214,7 +212,7 @@ private:
     virtual NSCachedURLResponse* willCacheResponse(WebCore::DocumentLoader*, unsigned long identifier, NSCachedURLResponse*) const OVERRIDE;
 #endif
 
-    virtual bool shouldUsePluginDocument(const String& /*mimeType*/) const OVERRIDE;
+    virtual bool shouldAlwaysUsePluginDocument(const String& /*mimeType*/) const OVERRIDE;
 
     virtual void didChangeScrollOffset() OVERRIDE;
 
@@ -224,13 +222,20 @@ private:
 
     virtual PassRefPtr<WebCore::FrameNetworkingContext> createNetworkingContext() OVERRIDE;
 
+    virtual void forcePageTransitionIfNeeded() OVERRIDE;
+
     WebFrame* m_frame;
     RefPtr<PluginView> m_pluginView;
     bool m_hasSentResponseToPluginView;
     bool m_didCompletePageTransitionAlready;
-    bool m_frameHasCustomRepresentation;
     bool m_frameCameFromPageCache;
 };
+
+// As long as EmptyFrameLoaderClient exists in WebCore, this can return 0.
+inline WebFrameLoaderClient* toWebFrameLoaderClient(WebCore::FrameLoaderClient* client)
+{
+    return client->isEmptyFrameLoaderClient() ? 0 : static_cast<WebFrameLoaderClient*>(client);
+}
 
 } // namespace WebKit
 

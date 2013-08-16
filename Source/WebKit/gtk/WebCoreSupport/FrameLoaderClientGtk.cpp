@@ -52,7 +52,6 @@
 #include "JSDOMWindow.h"
 #include "Language.h"
 #include "MIMETypeRegistry.h"
-#include "MainResourceLoader.h"
 #include "MouseEvent.h"
 #include "NotImplemented.h"
 #include "Page.h"
@@ -551,7 +550,7 @@ PassRefPtr<Frame> FrameLoaderClient::createFrame(const KURL& url, const String& 
 
 void FrameLoaderClient::redirectDataToPlugin(Widget* pluginWidget)
 {
-    m_pluginView = static_cast<PluginView*>(pluginWidget);
+    m_pluginView = toPluginView(pluginWidget);
     if (pluginWidget)
         m_hasSentResponseToPlugin = false;
 }
@@ -1066,58 +1065,41 @@ void FrameLoaderClient::dispatchDidFailLoad(const ResourceError& error)
     notifyStatus(m_frame, WEBKIT_LOAD_FAILED);
 
     WebKitWebView* webView = getViewFromFrame(m_frame);
-    GError* webError = g_error_new_literal(g_quark_from_string(error.domain().utf8().data()),
-                                           error.errorCode(),
-                                           error.localizedDescription().utf8().data());
+    GOwnPtr<GError> webError(g_error_new_literal(
+        g_quark_from_string(error.domain().utf8().data()),
+        error.errorCode(),
+        error.localizedDescription().utf8().data()));
     gboolean isHandled = false;
-    g_signal_emit_by_name(webView, "load-error", m_frame, error.failingURL().utf8().data(), webError, &isHandled);
+    g_signal_emit_by_name(webView, "load-error", m_frame, error.failingURL().utf8().data(), webError.get(), &isHandled);
 
-    if (isHandled) {
-        g_error_free(webError);
+    if (isHandled || !shouldFallBack(error))
         return;
-    }
-
-    if (!shouldFallBack(error)) {
-        g_error_free(webError);
-        return;
-    }
 
     m_loadingErrorPage = true;
 
     String content;
-    gchar* fileContent = 0;
     GOwnPtr<gchar> errorPath(g_build_filename(sharedResourcesPath().data(), "resources", "error.html", NULL));
-    gchar* errorURI = g_filename_to_uri(errorPath.get(), 0, 0);
-
-    GFile* errorFile = g_file_new_for_uri(errorURI);
-    g_free(errorURI);
+    GRefPtr<GFile> errorFile = adoptGRef(g_file_new_for_path(errorPath.get()));
 
     if (!errorFile)
         content = makeString("<html><body>", webError->message, "</body></html>");
     else {
-        gboolean loaded = g_file_load_contents(errorFile, 0, &fileContent, 0, 0, 0);
-        if (!loaded)
+        GOwnPtr<gchar> fileContent;
+        if (!g_file_load_contents(errorFile.get(), 0, &fileContent.outPtr(), 0, 0, 0))
             content = makeString("<html><body>", webError->message, "</body></html>");
         else
-            content = String::format(fileContent, error.failingURL().utf8().data(), webError->message);
+            content = String::format(fileContent.get(), error.failingURL().utf8().data(), webError->message);
     }
 
     webkit_web_frame_load_alternate_string(m_frame, content.utf8().data(), 0, error.failingURL().utf8().data());
-
-    g_free(fileContent);
-
-    if (errorFile)
-        g_object_unref(errorFile);
-
-    g_error_free(webError);
 }
 
-void FrameLoaderClient::convertMainResourceLoadToDownload(MainResourceLoader* mainResourceLoader, const ResourceRequest& request, const ResourceResponse& response)
+void FrameLoaderClient::convertMainResourceLoadToDownload(WebCore::DocumentLoader* documentLoader, const ResourceRequest& request, const ResourceResponse& response)
 {
     GRefPtr<WebKitNetworkRequest> networkRequest(adoptGRef(kitNew(request)));
     WebKitWebView* view = getViewFromFrame(m_frame);
 
-    webkit_web_view_request_download(view, networkRequest.get(), response, mainResourceLoader->loader()->handle());
+    webkit_web_view_request_download(view, networkRequest.get(), response, documentLoader->mainResourceLoader()->handle());
 }
 
 ResourceError FrameLoaderClient::cancelledError(const ResourceRequest& request)
@@ -1251,11 +1233,7 @@ void FrameLoaderClient::transitionToCommittedForNewPage()
 {
     WebKitWebView* containingWindow = getViewFromFrame(m_frame);
     GtkAllocation allocation;
-#if GTK_CHECK_VERSION(2, 18, 0)
     gtk_widget_get_allocation(GTK_WIDGET(containingWindow), &allocation);
-#else
-    allocation = GTK_WIDGET(containingWindow)->allocation;
-#endif
     IntSize size = IntSize(allocation.width, allocation.height);
     bool transparent = webkit_web_view_get_transparent(containingWindow);
     Color backgroundColor = transparent ? WebCore::Color::transparent : WebCore::Color::white;

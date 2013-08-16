@@ -31,13 +31,11 @@
 /**
  * @constructor
  * @param {WebInspector.IsolatedFileSystemManager} manager
- * @param {string} id
  * @param {string} path
  */
-WebInspector.IsolatedFileSystem = function(manager, id, path, name, rootURL)
+WebInspector.IsolatedFileSystem = function(manager, path, name, rootURL)
 {
     this._manager = manager;
-    this._id = id;
     this._path = path;
     this._name = name;
     this._rootURL = rootURL;
@@ -74,14 +72,6 @@ WebInspector.IsolatedFileSystem.prototype = {
     /**
      * @return {string}
      */
-    id: function()
-    {
-        return this._id;
-    },
-
-    /**
-     * @return {string}
-     */
     path: function()
     {
         return this._path;
@@ -113,7 +103,7 @@ WebInspector.IsolatedFileSystem.prototype = {
 
     /**
      * @param {string} path
-     * @param {function(Array.<string>)} callback
+     * @param {function(string)} callback
      */
     requestFilesRecursive: function(path, callback)
     {
@@ -129,8 +119,6 @@ WebInspector.IsolatedFileSystem.prototype = {
             this._requestEntries(domFileSystem, path, innerCallback.bind(this));
         }
 
-        var result = [];
-        var callbacksLeft = 1;
         /**
          * @param {Array.<FileEntry>} entries
          */
@@ -139,14 +127,10 @@ WebInspector.IsolatedFileSystem.prototype = {
             for (var i = 0; i < entries.length; ++i) {
                 var entry = entries[i];
                 if (!entry.isDirectory)
-                    result.push(entry.fullPath);
-                else {
-                    callbacksLeft++;
+                    callback(entry.fullPath);
+                else
                     this._requestEntries(domFileSystem, entry.fullPath, innerCallback.bind(this));
-                }
             }
-            if (!--callbacksLeft)
-                callback(result);
         }
     },
 
@@ -194,6 +178,11 @@ WebInspector.IsolatedFileSystem.prototype = {
 
         function errorHandler(error)
         {
+            if (error.code === FileError.NOT_FOUND_ERR) {
+                callback(null);
+                return;
+            }
+
             var errorMessage = WebInspector.IsolatedFileSystem.errorMessage(error);
             console.error(errorMessage + " when getting content for file '" + (this._path + "/" + path) + "'");
             callback(null);
@@ -214,7 +203,7 @@ WebInspector.IsolatedFileSystem.prototype = {
          */
         function fileSystemLoaded(domFileSystem)
         {
-            domFileSystem.root.getFile(path, null, fileEntryLoaded, errorHandler);
+            domFileSystem.root.getFile(path, { create: true }, fileEntryLoaded, errorHandler);
         }
 
         /**

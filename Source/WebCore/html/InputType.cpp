@@ -49,7 +49,6 @@
 #include "HTMLInputElement.h"
 #include "HTMLNames.h"
 #include "HTMLParserIdioms.h"
-#include "HTMLShadowElement.h"
 #include "HiddenInputType.h"
 #include "ImageInputType.h"
 #include "InputTypeNames.h"
@@ -101,7 +100,7 @@ static PassOwnPtr<InputTypeFactoryMap> createInputTypeFactoryMap()
     if (RuntimeEnabledFeatures::inputTypeDateEnabled())
         map->add(InputTypeNames::date(), DateInputType::create);
 #endif
-#if ENABLE(INPUT_TYPE_DATETIME)
+#if ENABLE(INPUT_TYPE_DATETIME_INCOMPLETE)
     if (RuntimeEnabledFeatures::inputTypeDateTimeEnabled())
         map->add(InputTypeNames::datetime(), DateTimeInputType::create);
 #endif
@@ -315,6 +314,11 @@ bool InputType::sizeShouldIncludeDecoration(int, int& preferredSize) const
     return false;
 }
 
+float InputType::decorationWidth() const
+{
+    return 0;
+}
+
 bool InputType::isInRange(const String& value) const
 {
     if (!isSteppable())
@@ -374,15 +378,15 @@ String InputType::validationMessage() const
     const String value = element()->value();
 
     // The order of the following checks is meaningful. e.g. We'd like to show the
-    // valueMissing message even if the control has other validation errors.
+    // badInput message even if the control has other validation errors.
+    if (hasBadInput())
+        return badInputText();
+
     if (valueMissing(value))
         return valueMissingText();
 
     if (typeMismatch())
         return typeMismatchText();
-
-    if (hasBadInput())
-        return badInputText();
 
     if (patternMismatch(value))
         return validationMessagePatternMismatchText();
@@ -482,18 +486,6 @@ void InputType::destroyShadowSubtree()
         return;
 
     root->removeChildren();
-
-    // It's ok to clear contents of all other ShadowRoots because they must have
-    // been created by TextFieldDecorationElement, and we don't allow adding
-    // AuthorShadowRoot to HTMLInputElement.
-    while ((root = root->youngerShadowRoot())) {
-#if ENABLE(SHADOW_DOM)
-        root->removeChildren();
-        root->appendChild(HTMLShadowElement::create(shadowTag, element()->document()));
-#else
-        ASSERT_NOT_REACHED();
-#endif
-    }
 }
 
 Decimal InputType::parseToNumber(const String&, const Decimal& defaultValue) const
@@ -529,7 +521,7 @@ void InputType::dispatchSimulatedClickIfActive(KeyboardEvent* event) const
 Chrome* InputType::chrome() const
 {
     if (Page* page = element()->document()->page())
-        return page->chrome();
+        return &page->chrome();
     return 0;
 }
 
@@ -588,10 +580,6 @@ void InputType::altAttributeChanged()
 }
 
 void InputType::srcAttributeChanged()
-{
-}
-
-void InputType::willMoveToNewOwnerDocument()
 {
 }
 
@@ -733,11 +721,6 @@ Icon* InputType::icon() const
 {
     ASSERT_NOT_REACHED();
     return 0;
-}
-
-bool InputType::shouldApplyLocaleDirection() const
-{
-    return false;
 }
 
 bool InputType::shouldResetOnDocumentActivation()
@@ -900,6 +883,10 @@ void InputType::updatePlaceholderText()
 {
 }
 
+void InputType::attributeChanged()
+{
+}
+
 void InputType::multipleAttributeChanged()
 {
 }
@@ -909,6 +896,14 @@ void InputType::disabledAttributeChanged()
 }
 
 void InputType::readonlyAttributeChanged()
+{
+}
+
+void InputType::requiredAttributeChanged()
+{
+}
+
+void InputType::valueAttributeChanged()
 {
 }
 
@@ -940,6 +935,10 @@ Decimal InputType::findClosestTickMarkValue(const Decimal&)
     return Decimal::nan();
 }
 #endif
+
+void InputType::updateClearButtonVisibility()
+{
+}
 
 bool InputType::supportsIndeterminateAppearance() const
 {
@@ -1001,8 +1000,8 @@ void InputType::applyStep(int count, AnyStepHandling anyStepHandling, TextFieldE
 
     setValueAsDecimal(newValue, eventBehavior, ec);
 
-    if (AXObjectCache::accessibilityEnabled())
-         element()->document()->axObjectCache()->postNotification(element(), AXObjectCache::AXValueChanged, true);
+    if (AXObjectCache* cache = element()->document()->existingAXObjectCache())
+        cache->postNotification(element(), AXObjectCache::AXValueChanged, true);
 }
 
 bool InputType::getAllowedValueStep(Decimal* step) const

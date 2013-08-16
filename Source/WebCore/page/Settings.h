@@ -41,6 +41,7 @@
 
 namespace WebCore {
 
+    class FontGenericFamilies;
     class Page;
 
     enum EditableLinkBehavior {
@@ -57,21 +58,12 @@ namespace WebCore {
         TextDirectionSubmenuAlwaysIncluded
     };
 
-    // UScriptCode uses -1 and 0 for UScriptInvalidCode and UScriptCommon.
-    // We need to use -2 and -3 for empty value and deleted value.
-    struct UScriptCodeHashTraits : WTF::GenericHashTraits<int> {
-        static const bool emptyValueIsZero = false;
-        static int emptyValue() { return -2; }
-        static void constructDeletedValue(int& slot) { slot = -3; }
-        static bool isDeletedValue(int value) { return value == -3; }
-    };
-
-    typedef HashMap<int, AtomicString, DefaultHash<int>::Hash, UScriptCodeHashTraits> ScriptFontFamilyMap;
-
     class Settings {
         WTF_MAKE_NONCOPYABLE(Settings); WTF_MAKE_FAST_ALLOCATED;
     public:
         static PassOwnPtr<Settings> create(Page*);
+
+        ~Settings();
 
         void setStandardFontFamily(const AtomicString&, UScriptCode = USCRIPT_COMMON);
         const AtomicString& standardFontFamily(UScriptCode = USCRIPT_COMMON) const;
@@ -94,21 +86,6 @@ namespace WebCore {
         void setPictographFontFamily(const AtomicString&, UScriptCode = USCRIPT_COMMON);
         const AtomicString& pictographFontFamily(UScriptCode = USCRIPT_COMMON) const;
 
-        void setMinimumFontSize(int);
-        int minimumFontSize() const { return m_minimumFontSize; }
-
-        void setMinimumLogicalFontSize(int);
-        int minimumLogicalFontSize() const { return m_minimumLogicalFontSize; }
-
-        void setDefaultFontSize(int);
-        int defaultFontSize() const { return m_defaultFontSize; }
-
-        void setDefaultFixedFontSize(int);
-        int defaultFixedFontSize() const { return m_defaultFixedFontSize; }
-
-        void setScreenFontSubstitutionEnabled(bool);
-        bool screenFontSubstitutionEnabled() const { return m_screenFontSubstitutionEnabled; }
-
 #if ENABLE(TEXT_AUTOSIZING)
         void setTextAutosizingEnabled(bool);
         bool textAutosizingEnabled() const { return m_textAutosizingEnabled; }
@@ -122,10 +99,6 @@ namespace WebCore {
 #endif
 
         // Only set by Layout Tests.
-        void setResolutionOverride(const IntSize&);
-        const IntSize& resolutionOverride() const { return m_resolutionDensityPerInchOverride; }
-
-        // Only set by Layout Tests.
         void setMediaTypeOverride(const String&);
         const String& mediaTypeOverride() const { return m_mediaTypeOverride; }
 
@@ -134,13 +107,16 @@ namespace WebCore {
         void setLoadsImagesAutomatically(bool);
         bool loadsImagesAutomatically() const { return m_loadsImagesAutomatically; }
 
-        void setScriptEnabled(bool);
-        // Instead of calling isScriptEnabled directly, please consider calling
-        // ScriptController::canExecuteScripts, which takes things like the
-        // HTML sandbox attribute into account.
+        // Clients that execute script should call ScriptController::canExecuteScripts()
+        // instead of this function. ScriptController::canExecuteScripts() checks the
+        // HTML sandbox, plug-in sandboxing, and other important details.
         bool isScriptEnabled() const { return m_isScriptEnabled; }
+        void setScriptEnabled(bool);
 
         SETTINGS_GETTERS_AND_SETTERS
+
+        void setScreenFontSubstitutionEnabled(bool);
+        bool screenFontSubstitutionEnabled() const { return m_screenFontSubstitutionEnabled; }
 
         void setJavaEnabled(bool);
         bool isJavaEnabled() const { return m_isJavaEnabled; }
@@ -177,9 +153,6 @@ namespace WebCore {
         void setUserStyleSheetLocation(const KURL&);
         const KURL& userStyleSheetLocation() const { return m_userStyleSheetLocation; }
 
-        void setTextAreasAreResizable(bool);
-        bool textAreasAreResizable() const { return m_textAreasAreResizable; }
-
         void setNeedsAdobeFrameReloadingQuirk(bool);
         bool needsAcrobatFrameReloadingQuirk() const { return m_needsAdobeFrameReloadingQuirk; }
 
@@ -198,11 +171,13 @@ namespace WebCore {
         void setDOMTimerAlignmentInterval(double);
         double domTimerAlignmentInterval() const;
 
+#if ENABLE(HIDDEN_PAGE_DOM_TIMER_THROTTLING)
+        bool hiddenPageDOMTimerThrottlingEnabled() const { return m_hiddenPageDOMTimerThrottlingEnabled; }
+        void setHiddenPageDOMTimerThrottlingEnabled(bool);
+#endif
+
         void setUsesPageCache(bool);
         bool usesPageCache() const { return m_usesPageCache; }
-        
-        void setAuthorAndUserStylesEnabled(bool);
-        bool authorAndUserStylesEnabled() const { return m_authorAndUserStylesEnabled; }
         
         void setFontRenderingMode(FontRenderingMode mode);
         FontRenderingMode fontRenderingMode() const;
@@ -226,19 +201,10 @@ namespace WebCore {
         bool cssVariablesEnabled() const { return false; }
 #endif
 
-        void setAcceleratedCompositingEnabled(bool);
-        bool acceleratedCompositingEnabled() const { return m_acceleratedCompositingEnabled; }
-
-        void setShowDebugBorders(bool);
-        bool showDebugBorders() const { return m_showDebugBorders; }
-
-        void setShowRepaintCounter(bool);
-        bool showRepaintCounter() const { return m_showRepaintCounter; }
-
         void setShowTiledScrollingIndicator(bool);
         bool showTiledScrollingIndicator() const { return m_showTiledScrollingIndicator; }
 
-#if PLATFORM(WIN) || (OS(WINDOWS) && PLATFORM(WX))
+#if PLATFORM(WIN)
         static void setShouldUseHighResolutionTimers(bool);
         static bool shouldUseHighResolutionTimers() { return gShouldUseHighResolutionTimers; }
 #endif
@@ -251,16 +217,17 @@ namespace WebCore {
         static bool isAVFoundationEnabled() { return gAVFoundationEnabled; }
 #endif
 
-#if PLATFORM(MAC) || (PLATFORM(QT) && USE(QTKIT))
+#if PLATFORM(MAC)
         static void setQTKitEnabled(bool flag);
         static bool isQTKitEnabled() { return gQTKitEnabled; }
 #endif
 
         static const unsigned defaultMaximumHTMLParserDOMTreeDepth = 512;
 
-#if ENABLE(SMOOTH_SCROLLING)
-        void setEnableScrollAnimator(bool flag) { m_scrollAnimatorEnabled = flag; }
-        bool scrollAnimatorEnabled() const { return m_scrollAnimatorEnabled; }
+#if USE(SAFARI_THEME)
+        // Windows debugging pref (global) for switching between the Aqua look and a native windows look.
+        static void setShouldPaintNativeControls(bool);
+        static bool shouldPaintNativeControls() { return gShouldPaintNativeControls; }
 #endif
 
         static void setMockScrollbarsEnabled(bool flag);
@@ -283,42 +250,41 @@ namespace WebCore {
         void setAggressiveTileRetentionEnabled(bool);
         bool aggressiveTileRetentionEnabled() { return m_aggressiveTileRetentionEnabled; }
 
-#if USE(JSC)
         static void setShouldRespectPriorityInCSSAttributeSetters(bool);
         static bool shouldRespectPriorityInCSSAttributeSetters();
+
+        void setTimeWithoutMouseMovementBeforeHidingControls(double time) { m_timeWithoutMouseMovementBeforeHidingControls = time; }
+        double timeWithoutMouseMovementBeforeHidingControls() const { return m_timeWithoutMouseMovementBeforeHidingControls; }
+
+#if ENABLE(PAGE_VISIBILITY_API)
+        bool hiddenPageCSSAnimationSuspensionEnabled() const { return m_hiddenPageCSSAnimationSuspensionEnabled; }
+        void setHiddenPageCSSAnimationSuspensionEnabled(bool);
 #endif
+
+        static bool lowPowerVideoAudioBufferSizeEnabled() { return gLowPowerVideoAudioBufferSizeEnabled; }
+        static void setLowPowerVideoAudioBufferSizeEnabled(bool);
 
     private:
         explicit Settings(Page*);
 
         void initializeDefaultFontFamilies();
+        static bool shouldEnableScreenFontSubstitutionByDefault();
 
         Page* m_page;
 
         String m_mediaTypeOverride;
         KURL m_userStyleSheetLocation;
-        ScriptFontFamilyMap m_standardFontFamilyMap;
-        ScriptFontFamilyMap m_serifFontFamilyMap;
-        ScriptFontFamilyMap m_fixedFontFamilyMap;
-        ScriptFontFamilyMap m_sansSerifFontFamilyMap;
-        ScriptFontFamilyMap m_cursiveFontFamilyMap;
-        ScriptFontFamilyMap m_fantasyFontFamilyMap;
-        ScriptFontFamilyMap m_pictographFontFamilyMap;
-        int m_minimumFontSize;
-        int m_minimumLogicalFontSize;
-        int m_defaultFontSize;
-        int m_defaultFixedFontSize;
-        bool m_screenFontSubstitutionEnabled;
+        RefPtr<FontGenericFamilies> m_fontGenericFamilies;
         SecurityOrigin::StorageBlockingPolicy m_storageBlockingPolicy;
 #if ENABLE(TEXT_AUTOSIZING)
         float m_textAutosizingFontScaleFactor;
         IntSize m_textAutosizingWindowSizeOverride;
         bool m_textAutosizingEnabled : 1;
 #endif
-        IntSize m_resolutionDensityPerInchOverride;
 
         SETTINGS_MEMBER_VARIABLES
 
+        bool m_screenFontSubstitutionEnabled : 1;
         bool m_isJavaEnabled : 1;
         bool m_isJavaEnabledForLocalFiles : 1;
         bool m_loadsImagesAutomatically : 1;
@@ -326,10 +292,8 @@ namespace WebCore {
         bool m_areImagesEnabled : 1;
         bool m_arePluginsEnabled : 1;
         bool m_isScriptEnabled : 1;
-        bool m_textAreasAreResizable : 1;
         bool m_needsAdobeFrameReloadingQuirk : 1;
         bool m_usesPageCache : 1;
-        bool m_authorAndUserStylesEnabled : 1;
         unsigned m_fontRenderingMode : 1;
         bool m_isCSSCustomFilterEnabled : 1;
 #if ENABLE(CSS_STICKY_POSITION)
@@ -338,15 +302,9 @@ namespace WebCore {
 #if ENABLE(CSS_VARIABLES)
         bool m_cssVariablesEnabled : 1;
 #endif
-        bool m_acceleratedCompositingEnabled : 1;
-        bool m_showDebugBorders : 1;
-        bool m_showRepaintCounter : 1;
         bool m_showTiledScrollingIndicator : 1;
         bool m_tiledBackingStoreEnabled : 1;
         bool m_dnsPrefetchingEnabled : 1;
-#if ENABLE(SMOOTH_SCROLLING)
-        bool m_scrollAnimatorEnabled : 1;
-#endif
 
 #if ENABLE(TOUCH_EVENTS)
         bool m_touchEventEmulationEnabled : 1;
@@ -354,9 +312,17 @@ namespace WebCore {
         bool m_scrollingPerformanceLoggingEnabled : 1;
         bool m_aggressiveTileRetentionEnabled : 1;
 
+        double m_timeWithoutMouseMovementBeforeHidingControls;
+
         Timer<Settings> m_setImageLoadingSettingsTimer;
         void imageLoadingSettingsTimerFired(Timer<Settings>*);
 
+#if ENABLE(HIDDEN_PAGE_DOM_TIMER_THROTTLING)
+        bool m_hiddenPageDOMTimerThrottlingEnabled : 1;
+#endif
+#if ENABLE(PAGE_VISIBILITY_API)
+        bool m_hiddenPageCSSAnimationSuspensionEnabled : 1;
+#endif
         static double gDefaultMinDOMTimerInterval;
         static double gDefaultDOMTimerAlignmentInterval;
 
@@ -364,21 +330,24 @@ namespace WebCore {
         static bool gAVFoundationEnabled;
 #endif
 
-#if PLATFORM(MAC) || (PLATFORM(QT) && USE(QTKIT))
+#if PLATFORM(MAC)
         static bool gQTKitEnabled;
 #endif
         
         static bool gMockScrollbarsEnabled;
         static bool gUsesOverlayScrollbars;
 
-#if PLATFORM(WIN) || (OS(WINDOWS) && PLATFORM(WX))
+#if USE(SAFARI_THEME)
+        static bool gShouldPaintNativeControls;
+#endif
+#if PLATFORM(WIN)
         static bool gShouldUseHighResolutionTimers;
 #endif
-#if USE(JSC)
         static bool gShouldRespectPriorityInCSSAttributeSetters;
-#endif
 
         static double gHiddenPageDOMTimerAlignmentInterval;
+
+        static bool gLowPowerVideoAudioBufferSizeEnabled;
     };
 
 } // namespace WebCore

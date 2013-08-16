@@ -46,6 +46,11 @@ SecurityOriginData SecurityOriginData::fromSecurityOrigin(SecurityOrigin* securi
     return securityOriginData;
 }
 
+PassRefPtr<SecurityOrigin> SecurityOriginData::securityOrigin() const
+{
+    return SecurityOrigin::create(protocol, host, port);
+}
+
 void SecurityOriginData::encode(CoreIPC::ArgumentEncoder& encoder) const
 {
     encoder << protocol;
@@ -73,7 +78,7 @@ void performAPICallbackWithSecurityOriginDataVector(const Vector<SecurityOriginD
     }
     
     size_t originDataCount = originDatas.size();
-    Vector<RefPtr<APIObject> > securityOrigins;
+    Vector<RefPtr<APIObject>> securityOrigins;
     securityOrigins.reserveCapacity(originDataCount);
 
     for (size_t i = 0; i < originDataCount; ++i) {

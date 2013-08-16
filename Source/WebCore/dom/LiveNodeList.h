@@ -77,8 +77,6 @@ public:
             document()->unregisterNodeList(this);
     }
 
-    virtual void reportMemoryUsage(MemoryObjectInfo*) const;
-
     // DOM API
     virtual unsigned length() const OVERRIDE;
     virtual Node* item(unsigned offset) const OVERRIDE;
@@ -179,11 +177,6 @@ ALWAYS_INLINE bool LiveNodeListBase::shouldInvalidateTypeOnAttributeChange(NodeL
             || attrName == HTMLNames::formAttr || attrName == HTMLNames::typeAttr;
     case InvalidateOnHRefAttrChange:
         return attrName == HTMLNames::hrefAttr;
-    case InvalidateOnItemAttrChange:
-#if ENABLE(MICRODATA)
-        return attrName == HTMLNames::itemscopeAttr || attrName == HTMLNames::itempropAttr
-            || attrName == HTMLNames::itemtypeAttr || attrName == HTMLNames::itemrefAttr || attrName == HTMLNames::idAttr;
-#endif // Intentionally fall through
     case DoNotInvalidateOnAttributeChanges:
         return false;
     case InvalidateOnAnyAttrChange:

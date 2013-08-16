@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2008 Apple Inc. All Rights Reserved.
+ * Copyright (C) 2013 Patrick Gansterer <paroga@paroga.com>
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -187,7 +188,7 @@ inline ArrayElementType* binarySearchImpl(ArrayType& array, size_t size, KeyType
 {
     size_t offset = 0;
     while (size > 1) {
-        int pos = (size - 1) >> 1;
+        size_t pos = (size - 1) >> 1;
         KeyType val = extractKey(&array[offset + pos]);
         
         if (val == key)
@@ -259,7 +260,40 @@ inline ArrayElementType* approximateBinarySearch(const ArrayType& array, size_t 
     return binarySearchImpl<ArrayElementType, KeyType, ArrayType, ExtractKey, ReturnAdjacentElementIfKeyIsNotPresent>(const_cast<ArrayType&>(array), size, key, extractKey);
 }
 
+template<typename VectorType, typename ElementType>
+inline void insertIntoBoundedVector(VectorType& vector, size_t size, const ElementType& element, size_t index)
+{
+    for (unsigned i = size; i-- > index + 1;)
+        vector[i] = vector[i - 1];
+    vector[index] = element;
+}
+
 } // namespace WTF
+
+#if OS(WINCE)
+// Windows CE CRT has does not implement bsearch().
+inline void* wtf_bsearch(const void* key, const void* base, size_t count, size_t size, int (*compare)(const void *, const void *))
+{
+    const char* first = static_cast<const char*>(base);
+
+    while (count) {
+        size_t pos = (count - 1) >> 1;
+        const char* item = first + pos * size;
+        int compareResult = compare(item, key);
+        if (!compareResult)
+            return const_cast<char*>(item);
+        if (compareResult < 0) {
+            count -= (pos + 1);
+            first += (pos + 1) * size;
+        } else
+            count = pos;
+    }
+
+    return 0;
+}
+
+#define bsearch(key, base, count, size, compare) wtf_bsearch(key, base, count, size, compare)
+#endif
 
 // This version of placement new omits a 0 check.
 enum NotNullTag { NotNull };
@@ -271,6 +305,7 @@ inline void* operator new(size_t, NotNullTag, void* location)
 
 using WTF::KB;
 using WTF::MB;
+using WTF::insertIntoBoundedVector;
 using WTF::isPointerAligned;
 using WTF::is8ByteAligned;
 using WTF::binarySearch;

@@ -33,7 +33,7 @@ String listMarkerText(EListStyleType, int value);
 
 // Used to render the list item's marker.
 // The RenderListMarker always has to be a child of a RenderListItem.
-class RenderListMarker : public RenderBox {
+class RenderListMarker FINAL : public RenderBox {
 public:
     static RenderListMarker* createAnonymous(RenderListItem*);
 
@@ -43,8 +43,6 @@ public:
     String suffix() const;
 
     bool isInside() const;
-
-    virtual void reportMemoryUsage(MemoryObjectInfo*) const OVERRIDE;
 
     void updateMarginsAndContent();
 

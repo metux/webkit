@@ -161,7 +161,7 @@ WebInspector.SASSSourceMapping.prototype = {
         if (!lines.length)
             return;
 
-        const sourceMapRegex = /^\/\*@ sourceMappingURL=([^\s]+)\s*\*\/$/;
+        const sourceMapRegex = /^\/\*[#@] sourceMappingURL=([^\s]+)\s*\*\/$/;
         var lastLine = lines[lines.length - 1];
         var match = lastLine.match(sourceMapRegex);
         if (!match)
@@ -226,6 +226,7 @@ WebInspector.SASSSourceMapping.prototype = {
      */
     _bindUISourceCode: function(rawURL, sourceMap)
     {
+        this._cssModel.setSourceMapping(rawURL, this);
         var sources = sourceMap.sources();
         for (var i = 0; i < sources.length; ++i) {
             var url = sources[i];
@@ -233,12 +234,10 @@ WebInspector.SASSSourceMapping.prototype = {
                 var content = InspectorFrontendHost.loadResourceSynchronously(url);
                 var contentProvider = new WebInspector.StaticContentProvider(WebInspector.resourceTypes.Stylesheet, content, "text/x-scss");
                 var uiSourceCode = this._networkWorkspaceProvider.addFileForURL(url, contentProvider, true);
-                uiSourceCode.setSourceMapping(this);
                 this._addCSSURLforSASSURL(rawURL, url);
+                uiSourceCode.setSourceMapping(this);
             }
         }
-
-        this._cssModel.setSourceMapping(rawURL, this);
     },
 
     /**
@@ -271,6 +270,14 @@ WebInspector.SASSSourceMapping.prototype = {
     {
         // FIXME: Implement this when ui -> raw mapping has clients.
         return new WebInspector.CSSLocation(uiSourceCode.url || "", lineNumber, columnNumber);
+    },
+
+    /**
+     * @return {boolean}
+     */
+    isIdentity: function()
+    {
+        return false;
     },
 
     _reset: function()

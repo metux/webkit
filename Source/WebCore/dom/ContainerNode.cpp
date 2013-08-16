@@ -2,7 +2,7 @@
  * Copyright (C) 1999 Lars Knoll (knoll@kde.org)
  *           (C) 1999 Antti Koivisto (koivisto@kde.org)
  *           (C) 2001 Dirk Mueller (mueller@kde.org)
- * Copyright (C) 2004, 2005, 2006, 2007, 2008, 2009 Apple Inc. All rights reserved.
+ * Copyright (C) 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011, 2012, 2013 Apple Inc. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -25,10 +25,10 @@
 
 #include "AXObjectCache.h"
 #include "ChildListMutationScope.h"
+#include "Chrome.h"
+#include "ChromeClient.h"
 #include "ContainerNodeAlgorithms.h"
-#if ENABLE(DELETION_UI)
-#include "DeleteButtonController.h"
-#endif
+#include "Editor.h"
 #include "EventNames.h"
 #include "ExceptionCode.h"
 #include "FloatRect.h"
@@ -38,24 +38,25 @@
 #include "InlineTextBox.h"
 #include "InsertionPoint.h"
 #include "InspectorInstrumentation.h"
+#include "JSNode.h"
 #include "LoaderStrategy.h"
 #include "MemoryCache.h"
 #include "MutationEvent.h"
 #include "NodeRenderStyle.h"
 #include "NodeTraversal.h"
-#include "ResourceLoadScheduler.h"
 #include "Page.h"
 #include "PlatformStrategies.h"
 #include "RenderBox.h"
 #include "RenderTheme.h"
 #include "RenderWidget.h"
+#include "ResourceLoadScheduler.h"
 #include "RootInlineBox.h"
 #include "TemplateContentDocumentFragment.h"
 #include <wtf/CurrentTime.h>
 #include <wtf/Vector.h>
 
-#if USE(JSC)
-#include "JSNode.h"
+#if ENABLE(DELETION_UI)
+#include "DeleteButtonController.h"
 #endif
 
 using namespace std;
@@ -64,7 +65,7 @@ namespace WebCore {
 
 static void dispatchChildInsertionEvents(Node*);
 static void dispatchChildRemovalEvents(Node*);
-static void updateTreeAfterInsertion(ContainerNode*, Node*, bool shouldLazyAttach);
+static void updateTreeAfterInsertion(ContainerNode*, Node*, AttachBehavior);
 
 typedef pair<RefPtr<Node>, unsigned> CallbackParameters;
 typedef pair<NodeCallback, CallbackParameters> CallbackInfo;
@@ -136,9 +137,8 @@ void ContainerNode::takeAllChildrenFrom(ContainerNode* oldParent)
 
 ContainerNode::~ContainerNode()
 {
-    if (AXObjectCache::accessibilityEnabled() && documentInternal() && documentInternal()->axObjectCacheExists())
-        documentInternal()->axObjectCache()->remove(this);
-
+    if (Document* document = documentInternal())
+        willBeDeletedFrom(document);
     removeDetachedChildren();
 }
 
@@ -201,7 +201,7 @@ static inline ExceptionCode checkAcceptChild(ContainerNode* newParent, Node* new
         return HIERARCHY_REQUEST_ERR;
 
     if (oldChild && newParent->isDocumentNode()) {
-        if (!static_cast<Document*>(newParent)->canReplaceChild(newChild, oldChild))
+        if (!toDocument(newParent)->canReplaceChild(newChild, oldChild))
             return HIERARCHY_REQUEST_ERR;
     } else if (!isChildTypeAllowed(newParent, newChild))
         return HIERARCHY_REQUEST_ERR;
@@ -240,7 +240,7 @@ static inline bool checkReplaceChild(ContainerNode* newParent, Node* newChild, N
     return true;
 }
 
-bool ContainerNode::insertBefore(PassRefPtr<Node> newChild, Node* refChild, ExceptionCode& ec, bool shouldLazyAttach)
+bool ContainerNode::insertBefore(PassRefPtr<Node> newChild, Node* refChild, ExceptionCode& ec, AttachBehavior attachBehavior)
 {
     // Check that this node is not "floating".
     // If it is, it can be deleted as a side effect of sending mutation events.
@@ -252,7 +252,7 @@ bool ContainerNode::insertBefore(PassRefPtr<Node> newChild, Node* refChild, Exce
 
     // insertBefore(node, 0) is equivalent to appendChild(node)
     if (!refChild)
-        return appendChild(newChild, ec, shouldLazyAttach);
+        return appendChild(newChild, ec, attachBehavior);
 
     // Make sure adding the new child is OK.
     if (!checkAddChild(this, newChild.get(), ec))
@@ -299,7 +299,7 @@ bool ContainerNode::insertBefore(PassRefPtr<Node> newChild, Node* refChild, Exce
 
         insertBeforeCommon(next.get(), child);
 
-        updateTreeAfterInsertion(this, child, shouldLazyAttach);
+        updateTreeAfterInsertion(this, child, attachBehavior);
     }
 
     dispatchSubtreeModifiedEvent();
@@ -358,7 +358,7 @@ void ContainerNode::parserInsertBefore(PassRefPtr<Node> newChild, Node* nextChil
     ChildNodeInsertionNotifier(this).notify(newChild.get());
 }
 
-bool ContainerNode::replaceChild(PassRefPtr<Node> newChild, Node* oldChild, ExceptionCode& ec, bool shouldLazyAttach)
+bool ContainerNode::replaceChild(PassRefPtr<Node> newChild, Node* oldChild, ExceptionCode& ec, AttachBehavior attachBehavior)
 {
     // Check that this node is not "floating".
     // If it is, it can be deleted as a side effect of sending mutation events.
@@ -438,7 +438,7 @@ bool ContainerNode::replaceChild(PassRefPtr<Node> newChild, Node* oldChild, Exce
                 appendChildToContainer(child, this);
         }
 
-        updateTreeAfterInsertion(this, child, shouldLazyAttach);
+        updateTreeAfterInsertion(this, child, attachBehavior);
     }
 
     dispatchSubtreeModifiedEvent();
@@ -463,7 +463,7 @@ static void willRemoveChildren(ContainerNode* container)
     container->document()->nodeChildrenWillBeRemoved(container);
 
     ChildListMutationScope mutation(container);
-    for (NodeVector::const_iterator it = children.begin(); it != children.end(); it++) {
+    for (NodeVector::const_iterator it = children.begin(); it != children.end(); ++it) {
         Node* child = it->get();
         mutation.willRemoveChild(child);
         child->notifyMutationObserversNodeWillDetach();
@@ -607,39 +607,15 @@ void ContainerNode::removeChildren()
     // and remove... e.g. stop loading frames, fire unload events.
     willRemoveChildren(protect.get());
 
-    Vector<RefPtr<Node>, 10> removedChildren;
+    NodeVector removedChildren;
     {
         WidgetHierarchyUpdatesSuspensionScope suspendWidgetHierarchyUpdates;
         {
             NoEventDispatchAssertion assertNoEventDispatch;
             removedChildren.reserveInitialCapacity(childNodeCount());
             while (RefPtr<Node> n = m_firstChild) {
-                Node* next = n->nextSibling();
-
-                // Remove the node from the tree before calling detach or removedFromDocument (4427024, 4129744).
-                // removeChild() does this after calling detach(). There is no explanation for
-                // this discrepancy between removeChild() and its optimized version removeChildren().
-                n->setPreviousSibling(0);
-                n->setNextSibling(0);
-                n->setParentOrShadowHostNode(0);
-                document()->adoptIfNeeded(n.get());
-
-                m_firstChild = next;
-                if (n == m_lastChild)
-                    m_lastChild = 0;
-                removedChildren.append(n.release());
-            }
-
-            // Detach the nodes only after properly removed from the tree because
-            // a. detaching requires a proper DOM tree (for counters and quotes for
-            // example) and during the previous loop the next sibling still points to
-            // the node being removed while the node being removed does not point back
-            // and does not point to the same parent as its next sibling.
-            // b. destroying Renderers of standalone nodes is sometimes faster.
-            for (size_t i = 0; i < removedChildren.size(); ++i) {
-                Node* removedChild = removedChildren[i].get();
-                if (removedChild->attached())
-                    removedChild->detach();
+                removedChildren.append(m_firstChild);
+                removeBetween(0, m_firstChild->nextSibling(), m_firstChild);
             }
         }
 
@@ -652,7 +628,7 @@ void ContainerNode::removeChildren()
     dispatchSubtreeModifiedEvent();
 }
 
-bool ContainerNode::appendChild(PassRefPtr<Node> newChild, ExceptionCode& ec, bool shouldLazyAttach)
+bool ContainerNode::appendChild(PassRefPtr<Node> newChild, ExceptionCode& ec, AttachBehavior attachBehavior)
 {
     RefPtr<ContainerNode> protect(this);
 
@@ -702,7 +678,7 @@ bool ContainerNode::appendChild(PassRefPtr<Node> newChild, ExceptionCode& ec, bo
             appendChildToContainer(child, this);
         }
 
-        updateTreeAfterInsertion(this, child, shouldLazyAttach);
+        updateTreeAfterInsertion(this, child, attachBehavior);
     }
 
     dispatchSubtreeModifiedEvent();
@@ -749,11 +725,7 @@ void ContainerNode::suspendPostAttachCallbacks()
                 s_shouldReEnableMemoryCacheCallsAfterAttach = true;
             }
         }
-#if USE(PLATFORM_STRATEGIES)
         platformStrategies()->loaderStrategy()->resourceLoadScheduler()->suspendPendingRequests();
-#else
-        resourceLoadScheduler()->suspendPendingRequests();
-#endif
     }
     ++s_attachDepth;
 }
@@ -770,11 +742,7 @@ void ContainerNode::resumePostAttachCallbacks()
             if (Page* page = document()->page())
                 page->setMemoryCacheClientCallsEnabled(true);
         }
-#if USE(PLATFORM_STRATEGIES)
         platformStrategies()->loaderStrategy()->resourceLoadScheduler()->resumePendingRequests();
-#else
-        resourceLoadScheduler()->resumePendingRequests();
-#endif
     }
     --s_attachDepth;
 }
@@ -819,17 +787,17 @@ void ContainerNode::scheduleSetNeedsStyleRecalc(StyleChangeType changeType)
         setNeedsStyleRecalc(changeType);
 }
 
-void ContainerNode::attach()
+void ContainerNode::attach(const AttachContext& context)
 {
-    attachChildren();
-    Node::attach();
+    attachChildren(context);
+    Node::attach(context);
 }
 
-void ContainerNode::detach()
+void ContainerNode::detach(const AttachContext& context)
 {
-    detachChildren();
+    detachChildren(context);
     clearChildNeedsStyleRecalc();
-    Node::detach();
+    Node::detach(context);
 }
 
 void ContainerNode::childrenChanged(bool changedByParser, Node*, Node*, int childCountDelta)
@@ -840,21 +808,36 @@ void ContainerNode::childrenChanged(bool changedByParser, Node*, Node*, int chil
     invalidateNodeListCachesInAncestors();
 }
 
+inline static void cloneChildNodesAvoidingDeleteButton(ContainerNode* parent, ContainerNode* clonedParent, HTMLElement* deleteButtonContainerElement)
+{
+    ExceptionCode ec = 0;
+    for (Node* child = parent->firstChild(); child && !ec; child = child->nextSibling()) {
+
+#if ENABLE(DELETION_UI)
+        if (child == deleteButtonContainerElement)
+            continue;
+#else
+        UNUSED_PARAM(deleteButtonContainerElement);
+#endif
+
+        RefPtr<Node> clonedChild = child->cloneNode(false);
+        clonedParent->appendChild(clonedChild, ec);
+
+        if (!ec && child->isContainerNode())
+            cloneChildNodesAvoidingDeleteButton(toContainerNode(child), toContainerNode(clonedChild.get()), deleteButtonContainerElement);
+    }
+}
+
 void ContainerNode::cloneChildNodes(ContainerNode *clone)
 {
 #if ENABLE(DELETION_UI)
     HTMLElement* deleteButtonContainerElement = 0;
     if (Frame* frame = document()->frame())
-        deleteButtonContainerElement = frame->editor()->deleteButtonController()->containerElement();
+        deleteButtonContainerElement = frame->editor().deleteButtonController()->containerElement();
+    cloneChildNodesAvoidingDeleteButton(this, clone, deleteButtonContainerElement);
+#else
+    cloneChildNodesAvoidingDeleteButton(this, clone, 0);
 #endif
-    ExceptionCode ec = 0;
-    for (Node* n = firstChild(); n && !ec; n = n->nextSibling()) {
-#if ENABLE(DELETION_UI)
-        if (n == deleteButtonContainerElement)
-            continue;
-#endif
-        clone->appendChild(n->cloneNode(true), ec);
-    }
 }
 
 bool ContainerNode::getUpperLeftCorner(FloatPoint& point) const
@@ -985,76 +968,6 @@ LayoutRect ContainerNode::boundingBox() const
     return enclosingLayoutRect(FloatRect(upperLeft, lowerRight.expandedTo(upperLeft) - upperLeft));
 }
 
-void ContainerNode::setFocus(bool received)
-{
-    if (focused() == received)
-        return;
-
-    Node::setFocus(received);
-
-    // note that we need to recalc the style
-    setNeedsStyleRecalc();
-}
-
-void ContainerNode::setActive(bool down, bool pause)
-{
-    if (down == active()) return;
-
-    Node::setActive(down);
-
-    // note that we need to recalc the style
-    // FIXME: Move to Element
-    if (renderer()) {
-        bool reactsToPress = renderStyle()->affectedByActive() || (isElementNode() && toElement(this)->childrenAffectedByActive());
-        if (reactsToPress)
-            setNeedsStyleRecalc();
-        if (renderStyle()->hasAppearance()) {
-            if (renderer()->theme()->stateChanged(renderer(), PressedState))
-                reactsToPress = true;
-        }
-        if (reactsToPress && pause) {
-            // The delay here is subtle.  It relies on an assumption, namely that the amount of time it takes
-            // to repaint the "down" state of the control is about the same time as it would take to repaint the
-            // "up" state.  Once you assume this, you can just delay for 100ms - that time (assuming that after you
-            // leave this method, it will be about that long before the flush of the up state happens again).
-#ifdef HAVE_FUNC_USLEEP
-            double startTime = currentTime();
-#endif
-
-            // Ensure there are no pending changes
-            Document::updateStyleForAllDocuments();
-            // Do an immediate repaint.
-            if (renderer())
-                renderer()->repaint(true);
-
-            // FIXME: Find a substitute for usleep for Win32.
-            // Better yet, come up with a way of doing this that doesn't use this sort of thing at all.
-#ifdef HAVE_FUNC_USLEEP
-            // Now pause for a small amount of time (1/10th of a second from before we repainted in the pressed state)
-            double remainingTime = 0.1 - (currentTime() - startTime);
-            if (remainingTime > 0)
-                usleep(static_cast<useconds_t>(remainingTime * 1000000.0));
-#endif
-        }
-    }
-}
-
-void ContainerNode::setHovered(bool over)
-{
-    if (over == hovered()) return;
-
-    Node::setHovered(over);
-
-    // note that we need to recalc the style
-    // FIXME: Move to Element
-    if (renderer()) {
-        if (renderStyle()->affectedByHover() || (isElementNode() && toElement(this)->childrenAffectedByHover()))
-            setNeedsStyleRecalc();
-        if (renderer() && renderer()->style()->hasAppearance())
-            renderer()->theme()->stateChanged(renderer(), HoverState);
-    }
-}
-
 unsigned ContainerNode::childNodeCount() const
 {
     unsigned count = 0;
@@ -1071,20 +984,6 @@ Node *ContainerNode::childNode(unsigned index) const
     for (i = 0; n != 0 && i < index; i++)
         n = n->nextSibling();
     return n;
-}
-
-void ContainerNode::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
-{
-    MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::DOM);
-    Node::reportMemoryUsage(memoryObjectInfo);
-    info.ignoreMember(m_firstChild);
-    info.ignoreMember(m_lastChild);
-
-    // Report child nodes as direct members to make them look like a tree in the snapshot.
-    NodeVector children;
-    getChildNodes(const_cast<ContainerNode*>(this), children);
-    for (size_t i = 0; i < children.size(); ++i)
-        info.addMember(children[i], "child");
 }
 
 static void dispatchChildInsertionEvents(Node* child)
@@ -1116,9 +1015,7 @@ static void dispatchChildRemovalEvents(Node* child)
 
     ASSERT(!NoEventDispatchAssertion::isEventDispatchForbidden());
 
-#if USE(JSC)
     willCreatePossiblyOrphanedTreeByRemoval(child);
-#endif
     InspectorInstrumentation::willRemoveDOMNode(child->document(), child);
 
     RefPtr<Node> c = child;
@@ -1135,7 +1032,7 @@ static void dispatchChildRemovalEvents(Node* child)
     }
 }
 
-static void updateTreeAfterInsertion(ContainerNode* parent, Node* child, bool shouldLazyAttach)
+static void updateTreeAfterInsertion(ContainerNode* parent, Node* child, AttachBehavior attachBehavior)
 {
     ASSERT(parent->refCount());
     ASSERT(child->refCount());
@@ -1149,7 +1046,7 @@ static void updateTreeAfterInsertion(ContainerNode* parent, Node* child, bool sh
     // FIXME: Attachment should be the first operation in this function, but some code
     // (for example, HTMLFormControlElement's autofocus support) requires this ordering.
     if (parent->attached() && !child->attached() && child->parentNode() == parent) {
-        if (shouldLazyAttach)
+        if (attachBehavior == AttachLazily)
             child->lazyAttach();
         else
             child->attach();

@@ -31,7 +31,6 @@
 #include "DOMStringList.h"
 #include "IDBAny.h"
 #include "IDBBindingUtilities.h"
-#include "IDBCursorBackendInterface.h"
 #include "IDBCursorWithValue.h"
 #include "IDBDatabase.h"
 #include "IDBDatabaseException.h"
@@ -44,11 +43,10 @@
 #include "ScriptExecutionContext.h"
 #include "SerializedScriptValue.h"
 #include "SharedBuffer.h"
-#include <wtf/UnusedParam.h>
 
 namespace WebCore {
 
-static const unsigned short defaultDirection = IDBCursor::NEXT;
+static const unsigned short defaultDirection = IndexedDB::CursorNext;
 
 IDBObjectStore::IDBObjectStore(const IDBObjectStoreMetadata& metadata, IDBTransaction* transaction)
     : m_metadata(metadata)
@@ -169,9 +167,11 @@ PassRefPtr<IDBRequest> IDBObjectStore::put(IDBDatabaseBackendInterface::PutMode 
         return 0;
     }
 
-    RefPtr<SerializedScriptValue> serializedValue = value.serialize(state);
-    if (state->hadException()) {
-        ec = IDBDatabaseException::DataCloneError;
+    // FIXME: Expose the JS engine exception state through ScriptState.
+    bool didThrow = false;
+    RefPtr<SerializedScriptValue> serializedValue = value.serialize(state, 0, 0, didThrow);
+    if (didThrow) {
+        // Setting an explicit ExceptionCode here would defer handling the already thrown exception.
         return 0;
     }
 
@@ -321,7 +321,7 @@ private:
     {
     }
 
-    virtual void handleEvent(ScriptExecutionContext* context, Event* event)
+    virtual void handleEvent(ScriptExecutionContext*, Event* event)
     {
         ASSERT(event->type() == eventNames().successEvent);
         EventTarget* target = event->target();
@@ -469,6 +469,7 @@ PassRefPtr<IDBIndex> IDBObjectStore::index(const String& name, ExceptionCode& ec
 
 void IDBObjectStore::deleteIndex(const String& name, ExceptionCode& ec)
 {
+    IDB_TRACE("IDBObjectStore::deleteIndex");
     if (!m_transaction->isVersionChange() || m_deleted) {
         ec = IDBDatabaseException::InvalidStateError;
         return;
@@ -485,9 +486,9 @@ void IDBObjectStore::deleteIndex(const String& name, ExceptionCode& ec)
 
     backendDB()->deleteIndex(m_transaction->id(), id(), indexId);
 
+    m_metadata.indexes.remove(indexId);
     IDBIndexMap::iterator it = m_indexMap.find(name);
     if (it != m_indexMap.end()) {
-        m_metadata.indexes.remove(it->value->id());
         it->value->markDeleted();
         m_indexMap.remove(name);
     }
@@ -504,12 +505,12 @@ PassRefPtr<IDBRequest> IDBObjectStore::openCursor(ScriptExecutionContext* contex
         ec = IDBDatabaseException::TransactionInactiveError;
         return 0;
     }
-    IDBCursor::Direction direction = IDBCursor::stringToDirection(directionString, context, ec);
+    IndexedDB::CursorDirection direction = IDBCursor::stringToDirection(directionString, ec);
     if (ec)
         return 0;
 
     RefPtr<IDBRequest> request = IDBRequest::create(context, IDBAny::create(this), m_transaction.get());
-    request->setCursorDetails(IDBCursorBackendInterface::KeyAndValue, direction);
+    request->setCursorDetails(IndexedDB::CursorKeyAndValue, direction);
 
     backendDB()->openCursor(m_transaction->id(), id(), IDBIndexMetadata::InvalidId, range, direction, false, static_cast<IDBDatabaseBackendInterface::TaskType>(taskType), request);
     return request.release();

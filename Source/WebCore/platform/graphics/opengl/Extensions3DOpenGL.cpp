@@ -35,7 +35,7 @@
 #if PLATFORM(MAC)
 #include "ANGLE/ShaderLang.h"
 #include <OpenGL/gl.h>
-#elif PLATFORM(GTK) || PLATFORM(EFL) || PLATFORM(QT)
+#elif PLATFORM(GTK) || PLATFORM(EFL) || PLATFORM(QT) || PLATFORM(WIN)
 #include "OpenGLShims.h"
 #endif
 
@@ -65,7 +65,7 @@ Platform3DObject Extensions3DOpenGL::createVertexArrayOES()
 {
     m_context->makeContextCurrent();
     GLuint array = 0;
-#if (PLATFORM(GTK) || PLATFORM(QT) || PLATFORM(EFL))
+#if (PLATFORM(GTK) || PLATFORM(QT) || PLATFORM(EFL)) || PLATFORM(WIN)
     if (isVertexArrayObjectSupported())
         glGenVertexArrays(1, &array);
 #elif defined(GL_APPLE_vertex_array_object) && GL_APPLE_vertex_array_object
@@ -80,7 +80,7 @@ void Extensions3DOpenGL::deleteVertexArrayOES(Platform3DObject array)
         return;
 
     m_context->makeContextCurrent();
-#if (PLATFORM(GTK) || PLATFORM(QT) || PLATFORM(EFL))
+#if (PLATFORM(GTK) || PLATFORM(QT) || PLATFORM(EFL) || PLATFORM(WIN))
     if (isVertexArrayObjectSupported())
         glDeleteVertexArrays(1, &array);
 #elif defined(GL_APPLE_vertex_array_object) && GL_APPLE_vertex_array_object
@@ -94,7 +94,7 @@ GC3Dboolean Extensions3DOpenGL::isVertexArrayOES(Platform3DObject array)
         return GL_FALSE;
 
     m_context->makeContextCurrent();
-#if (PLATFORM(GTK) || PLATFORM(QT) || PLATFORM(EFL))
+#if (PLATFORM(GTK) || PLATFORM(QT) || PLATFORM(EFL) || PLATFORM(WIN))
     if (isVertexArrayObjectSupported())
         return glIsVertexArray(array);
 #elif defined(GL_APPLE_vertex_array_object) && GL_APPLE_vertex_array_object
@@ -106,7 +106,7 @@ GC3Dboolean Extensions3DOpenGL::isVertexArrayOES(Platform3DObject array)
 void Extensions3DOpenGL::bindVertexArrayOES(Platform3DObject array)
 {
     m_context->makeContextCurrent();
-#if (PLATFORM(GTK) || PLATFORM(QT) || PLATFORM(EFL))
+#if (PLATFORM(GTK) || PLATFORM(QT) || PLATFORM(EFL) || PLATFORM(WIN))
     if (isVertexArrayObjectSupported())
         glBindVertexArray(array);
 #elif defined(GL_APPLE_vertex_array_object) && GL_APPLE_vertex_array_object
@@ -178,7 +178,26 @@ bool Extensions3DOpenGL::supportsExtension(const String& name)
     if (name == "GL_EXT_texture_filter_anisotropic")
         return m_availableExtensions.contains("GL_EXT_texture_filter_anisotropic");
 
+    if (name == "GL_EXT_draw_buffers") {
+#if PLATFORM(MAC)
+        return m_availableExtensions.contains("GL_ARB_draw_buffers");
+#else
+        // FIXME: implement support for other platforms.
+        return false;
+#endif
+    }
     return m_availableExtensions.contains(name);
+}
+
+void Extensions3DOpenGL::drawBuffersEXT(GC3Dsizei n, const GC3Denum* bufs)
+{
+    //  FIXME: implement support for other platforms.
+#if PLATFORM(MAC)
+    ::glDrawBuffersARB(n, bufs);
+#else
+    UNUSED_PARAM(n);
+    UNUSED_PARAM(bufs);
+#endif
 }
 
 String Extensions3DOpenGL::getExtensions()
@@ -186,7 +205,7 @@ String Extensions3DOpenGL::getExtensions()
     return String(reinterpret_cast<const char*>(::glGetString(GL_EXTENSIONS)));
 }
 
-#if (PLATFORM(GTK) || PLATFORM(QT) || PLATFORM(EFL))
+#if (PLATFORM(GTK) || PLATFORM(QT) || PLATFORM(EFL) || PLATFORM(WIN))
 bool Extensions3DOpenGL::isVertexArrayObjectSupported()
 {
     static const bool supportsVertexArrayObject = supports("GL_OES_vertex_array_object");

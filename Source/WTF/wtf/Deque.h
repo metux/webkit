@@ -79,10 +79,12 @@ namespace WTF {
 
         T& last() { ASSERT(m_start != m_end); return *(--end()); }
         const T& last() const { ASSERT(m_start != m_end); return *(--end()); }
+        PassType takeLast();
 
         template<typename U> void append(const U&);
         template<typename U> void prepend(const U&);
         void removeFirst();
+        void removeLast();
         void remove(iterator&);
         void remove(const_iterator&);
 
@@ -348,6 +350,7 @@ namespace WTF {
         destroyAll();
         m_start = 0;
         m_end = 0;
+        m_buffer.deallocateBuffer(m_buffer.buffer());
         checkValidity();
     }
 
@@ -405,6 +408,14 @@ namespace WTF {
         return Pass::transfer(oldFirst);
     }
 
+    template<typename T, size_t inlineCapacity>
+    inline typename Deque<T, inlineCapacity>::PassType Deque<T, inlineCapacity>::takeLast()
+    {
+        T oldLast = Pass::transfer(last());
+        removeLast();
+        return Pass::transfer(oldLast);
+    }
+
     template<typename T, size_t inlineCapacity> template<typename U>
     inline void Deque<T, inlineCapacity>::append(const U& value)
     {
@@ -442,6 +453,20 @@ namespace WTF {
             m_start = 0;
         else
             ++m_start;
+        checkValidity();
+    }
+
+    template<typename T, size_t inlineCapacity>
+    inline void Deque<T, inlineCapacity>::removeLast()
+    {
+        checkValidity();
+        invalidateIterators();
+        ASSERT(!isEmpty());
+        if (!m_end)
+            m_end = m_buffer.capacity() - 1;
+        else
+            --m_end;
+        TypeOperations::destruct(&m_buffer.buffer()[m_end], &m_buffer.buffer()[m_end + 1]);
         checkValidity();
     }
 

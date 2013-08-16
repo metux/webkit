@@ -24,13 +24,14 @@
 
 #if ENABLE(SVG_FONTS)
 #include "SVGElement.h"
+#include "SVGNames.h"
 
 namespace WebCore {
 
 class SVGFontElement;
 class StyleRuleFontFace;
 
-class SVGFontFaceElement : public SVGElement {
+class SVGFontFaceElement FINAL : public SVGElement {
 public:
     static PassRefPtr<SVGFontFaceElement> create(const QualifiedName&, Document*);
 
@@ -63,6 +64,12 @@ private:
     RefPtr<StyleRuleFontFace> m_fontFaceRule;
     SVGFontElement* m_fontElement;
 };
+
+inline SVGFontFaceElement* toSVGFontFaceElement(Node* node)
+{
+    ASSERT_WITH_SECURITY_IMPLICATION(!node || node->hasTagName(SVGNames::font_faceTag));
+    return static_cast<SVGFontFaceElement*>(node);
+}
 
 } // namespace WebCore
 

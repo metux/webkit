@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2006, 2007, 2008 Apple Inc. All rights reserved.
+ * Copyright (C) 2006, 2007, 2008, 2013 Apple Inc. All rights reserved.
  * Copyright (C) 2006 Samuel Weinig <sam.weinig@gmail.com>
  *
  * This library is free software; you can redistribute it and/or
@@ -29,12 +29,8 @@
 
 #include <wtf/Platform.h>
 #include <wtf/ExportMacros.h>
-// WTF cannot depend on JSC even if USE(JSC).
-#if USE(JSC) && !defined(BUILDING_WTF)
+#if !defined(BUILDING_WTF)
 #include "JSExportMacros.h"
-#elif PLATFORM(CHROMIUM)
-// Chromium doesn't have runtime/ in its include paths.
-#include "runtime/JSExportMacros.h"
 #endif
 
 #if OS(WINDOWS)
@@ -76,3 +72,8 @@
 #else
 #define SKIP_STATIC_CONSTRUCTORS_ON_GCC 1
 #endif
+
+// Enable the following if you want to use the MacroAssembler::probe() facility
+// to do JIT debugging.
+#define WTF_USE_MASM_PROBE 0
+

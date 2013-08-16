@@ -33,6 +33,7 @@
 #include "FrameLoaderTypes.h"
 #include "IconURL.h"
 #include "LayoutMilestones.h"
+#include "ResourceLoadPriority.h"
 #include <wtf/Forward.h>
 #include <wtf/Vector.h>
 
@@ -50,13 +51,6 @@ typedef class _jobject* jobject;
 #if PLATFORM(MAC) && !defined(__OBJC__)
 class NSCachedURLResponse;
 class NSView;
-#endif
-
-#if USE(V8)
-namespace v8 {
-class Context;
-template<class T> class Handle;
-}
 #endif
 
 namespace WebCore {
@@ -83,7 +77,6 @@ namespace WebCore {
     class HTMLPlugInElement;
     class IntSize;
     class KURL;
-    class MainResourceLoader;
     class MessageEvent;
     class NavigationAction;
     class Page;
@@ -92,7 +85,6 @@ namespace WebCore {
     class PolicyChecker;
     class ResourceError;
     class ResourceHandle;
-    class ResourceLoader;
     class ResourceRequest;
     class ResourceResponse;
 #if ENABLE(MEDIA_STREAM)
@@ -264,7 +256,7 @@ namespace WebCore {
         virtual void dispatchDidBecomeFrameset(bool) = 0; // Can change due to navigation or DOM modification.
 
         virtual bool canCachePage() const = 0;
-        virtual void convertMainResourceLoadToDownload(MainResourceLoader*, const ResourceRequest&, const ResourceResponse&) = 0;
+        virtual void convertMainResourceLoadToDownload(DocumentLoader*, const ResourceRequest&, const ResourceResponse&) = 0;
 
         virtual PassRefPtr<Frame> createFrame(const KURL& url, const String& name, HTMLFrameOwnerElement* ownerElement, const String& referrer, bool allowsScrolling, int marginWidth, int marginHeight) = 0;
         virtual PassRefPtr<Widget> createPlugin(const IntSize&, HTMLPlugInElement*, const KURL&, const Vector<String>&, const Vector<String>&, const String&, bool loadManually) = 0;
@@ -289,12 +281,6 @@ namespace WebCore {
 
         virtual void didExhaustMemoryAvailableForScript() { };
 
-#if USE(V8)
-        virtual void didCreateScriptContext(v8::Handle<v8::Context>, int extensionGroup, int worldId) = 0;
-        virtual void willReleaseScriptContext(v8::Handle<v8::Context>, int worldId) = 0;
-        virtual bool allowScriptExtension(const String& extensionName, int extensionGroup, int worldId) = 0;
-#endif
-
         virtual void registerForIconNotification(bool listen = true) = 0;
         
 #if PLATFORM(MAC)
@@ -307,7 +293,7 @@ namespace WebCore {
         virtual bool shouldCacheResponse(DocumentLoader*, unsigned long identifier, const ResourceResponse&, const unsigned char* data, unsigned long long length) = 0;
 #endif
 
-        virtual bool shouldUsePluginDocument(const String& /*mimeType*/) const { return false; }
+        virtual bool shouldAlwaysUsePluginDocument(const String& /*mimeType*/) const { return false; }
         virtual bool shouldLoadMediaElementURL(const KURL&) const { return true; }
 
         virtual void didChangeScrollOffset() { }
@@ -351,10 +337,6 @@ namespace WebCore {
         virtual void dispatchWillStartUsingPeerConnectionHandler(RTCPeerConnectionHandler*) { }
 #endif
 
-#if ENABLE(REQUEST_AUTOCOMPLETE)
-        virtual void didRequestAutocomplete(PassRefPtr<FormState>) = 0;
-#endif
-
 #if ENABLE(WEBGL)
         virtual bool allowWebGL(bool enabledPerSettings) { return enabledPerSettings; }
         // Informs the embedder that a WebGL canvas inside this frame received a lost context
@@ -364,6 +346,13 @@ namespace WebCore {
 
         // If an HTML document is being loaded, informs the embedder that the document will have its <body> attached soon.
         virtual void dispatchWillInsertBody() { }
+
+        virtual void dispatchDidChangeResourcePriority(unsigned long /*identifier*/, ResourceLoadPriority) { }
+
+        virtual void forcePageTransitionIfNeeded() { }
+
+        // FIXME (bug 116233): We need to get rid of EmptyFrameLoaderClient completely, then this will no longer be needed.
+        virtual bool isEmptyFrameLoaderClient() { return false; }
     };
 
 } // namespace WebCore

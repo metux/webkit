@@ -28,13 +28,12 @@
 #include "ActiveDOMObject.h"
 
 #include "ScriptExecutionContext.h"
-#include "WebCoreMemoryInstrumentation.h"
-#include "WorkerContext.h"
+#include "WorkerGlobalScope.h"
 #include "WorkerThread.h"
 
 namespace WebCore {
 
-ActiveDOMObject::ActiveDOMObject(ScriptExecutionContext* scriptExecutionContext, void* upcastPointer)
+ActiveDOMObject::ActiveDOMObject(ScriptExecutionContext* scriptExecutionContext)
     : ContextDestructionObserver(scriptExecutionContext)
     , m_pendingActivityCount(0)
 #if !ASSERT_DISABLED
@@ -45,7 +44,7 @@ ActiveDOMObject::ActiveDOMObject(ScriptExecutionContext* scriptExecutionContext,
         return;
 
     ASSERT(m_scriptExecutionContext->isContextThread());
-    m_scriptExecutionContext->didCreateActiveDOMObject(this, upcastPointer);
+    m_scriptExecutionContext->didCreateActiveDOMObject(this);
 }
 
 ActiveDOMObject::~ActiveDOMObject()
@@ -100,11 +99,5 @@ void ActiveDOMObject::resume()
 void ActiveDOMObject::stop()
 {
 }
-
-void ActiveDOMObject::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
-{
-    MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::DOM);
-}
-
 
 } // namespace WebCore

@@ -42,12 +42,16 @@ typedef uint32_t WKCacheModel;
 // Context Client
 typedef void (*WKContextPlugInAutoStartOriginHashesChangedCallback)(WKContextRef context, const void *clientInfo);
 typedef void (*WKContextNetworkProcessDidCrashCallback)(WKContextRef context, const void *clientInfo);
+typedef void (*WKContextPlugInInformationBecameAvailableCallback)(WKContextRef context, WKArrayRef plugIn, const void *clientInfo);
 
 struct WKContextClient {
     int                                                                 version;
     const void *                                                        clientInfo;
+
+    // Version 0.
     WKContextPlugInAutoStartOriginHashesChangedCallback                 plugInAutoStartOriginHashesChanged;
     WKContextNetworkProcessDidCrashCallback                             networkProcessDidCrash;
+    WKContextPlugInInformationBecameAvailableCallback                   plugInInformationBecameAvailable;
 };
 typedef struct WKContextClient WKContextClient;
 
@@ -201,6 +205,7 @@ WK_EXPORT void WKContextSetJavaScriptGarbageCollectorTimerEnabled(WKContextRef c
 
 WK_EXPORT WKDictionaryRef WKContextCopyPlugInAutoStartOriginHashes(WKContextRef context);
 WK_EXPORT void WKContextSetPlugInAutoStartOriginHashes(WKContextRef context, WKDictionaryRef dictionary);
+WK_EXPORT void WKContextSetPlugInAutoStartOrigins(WKContextRef contextRef, WKArrayRef arrayRef);
 
 #ifdef __cplusplus
 }

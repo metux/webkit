@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011 Apple Inc. All rights reserved.
+ * Copyright (C) 2011, 2013 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -35,7 +35,7 @@
 namespace JSC {
 
 class JSCell;
-class JSGlobalData;
+class VM;
 class JSGlobalObject;
 
 template<class T> class WriteBarrierBase;
@@ -68,11 +68,11 @@ template<class T> inline void validateCell(T)
 // We have a separate base class with no constructors for use in Unions.
 template <typename T> class WriteBarrierBase {
 public:
-    void set(JSGlobalData& globalData, const JSCell* owner, T* value)
+    void set(VM& vm, const JSCell* owner, T* value)
     {
         ASSERT(value);
         validateCell(value);
-        setEarlyValue(globalData, owner, value);
+        setEarlyValue(vm, owner, value);
     }
     
     // This is meant to be used like operator=, but is called copyFrom instead, in
@@ -82,16 +82,16 @@ public:
         m_cell = other.m_cell;
     }
 
-    void setMayBeNull(JSGlobalData& globalData, const JSCell* owner, T* value)
+    void setMayBeNull(VM& vm, const JSCell* owner, T* value)
     {
         if (value)
             validateCell(value);
-        setEarlyValue(globalData, owner, value);
+        setEarlyValue(vm, owner, value);
     }
 
     // Should only be used by JSCell during early initialisation
     // when some basic types aren't yet completely instantiated
-    void setEarlyValue(JSGlobalData&, const JSCell* owner, T* value)
+    void setEarlyValue(VM&, const JSCell* owner, T* value)
     {
         this->m_cell = reinterpret_cast<JSCell*>(value);
         Heap::writeBarrier(owner, this->m_cell);
@@ -99,9 +99,11 @@ public:
     
     T* get() const
     {
-        if (m_cell)
-            validateCell(m_cell);
-        return reinterpret_cast<T*>(static_cast<void*>(m_cell));
+        // Copy m_cell to a local to avoid multiple-read issues. (See <http://webkit.org/b/110854>)
+        JSCell* cell = m_cell;
+        if (cell)
+            validateCell(cell);
+        return reinterpret_cast<T*>(static_cast<void*>(cell));
     }
 
     T* operator*() const
@@ -120,7 +122,7 @@ public:
 
     void clear() { m_cell = 0; }
     
-    JSCell** slot() { return &m_cell; }
+    T** slot() { return reinterpret_cast<T**>(&m_cell); }
     
     typedef T* (WriteBarrierBase::*UnspecifiedBoolType);
     operator UnspecifiedBoolType*() const { return m_cell ? reinterpret_cast<UnspecifiedBoolType*>(1) : 0; }
@@ -145,7 +147,7 @@ private:
 
 template <> class WriteBarrierBase<Unknown> {
 public:
-    void set(JSGlobalData&, const JSCell* owner, JSValue value)
+    void set(VM&, const JSCell* owner, JSValue value)
     {
         m_value = JSValue::encode(value);
         Heap::writeBarrier(owner, value);
@@ -195,15 +197,15 @@ public:
         this->setWithoutWriteBarrier(0);
     }
 
-    WriteBarrier(JSGlobalData& globalData, const JSCell* owner, T* value)
+    WriteBarrier(VM& vm, const JSCell* owner, T* value)
     {
-        this->set(globalData, owner, value);
+        this->set(vm, owner, value);
     }
 
     enum MayBeNullTag { MayBeNull };
-    WriteBarrier(JSGlobalData& globalData, const JSCell* owner, T* value, MayBeNullTag)
+    WriteBarrier(VM& vm, const JSCell* owner, T* value, MayBeNullTag)
     {
-        this->setMayBeNull(globalData, owner, value);
+        this->setMayBeNull(vm, owner, value);
     }
 };
 
@@ -214,27 +216,15 @@ public:
         this->setWithoutWriteBarrier(JSValue());
     }
 
-    WriteBarrier(JSGlobalData& globalData, const JSCell* owner, JSValue value)
+    WriteBarrier(VM& vm, const JSCell* owner, JSValue value)
     {
-        this->set(globalData, owner, value);
+        this->set(vm, owner, value);
     }
 };
 
 template <typename U, typename V> inline bool operator==(const WriteBarrierBase<U>& lhs, const WriteBarrierBase<V>& rhs)
 {
     return lhs.get() == rhs.get();
-}
-
-// SlotVisitor functions
-
-template<typename T> inline void SlotVisitor::append(WriteBarrierBase<T>* slot)
-{
-    internalAppend(*slot->slot());
-}
-
-ALWAYS_INLINE void SlotVisitor::appendValues(WriteBarrierBase<Unknown>* barriers, size_t count)
-{
-    append(barriers->slot(), count);
 }
 
 } // namespace JSC

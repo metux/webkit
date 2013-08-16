@@ -544,7 +544,7 @@
     <keyword type="struct" name="WebKitWebPluginDatabase" link="WebKitWebPluginDatabase.html#WebKitWebPluginDatabase-struct"/>
     <keyword type="function" name="webkit_web_plugin_database_get_plugin_for_mimetype ()" link="WebKitWebPluginDatabase.html#webkit-web-plugin-database-get-plugin-for-mimetype" since="1.3.8"/>
     <keyword type="function" name="webkit_web_plugin_database_get_plugins ()" link="WebKitWebPluginDatabase.html#webkit-web-plugin-database-get-plugins" since="1.3.8"/>
-    <keyword type="function" name="webkit_web_plugin_database_plugins_list_free ()" link="WebKitWebPluginDatabase.html#webkit-web-plugin-database-plugins-list-free"/>
+    <keyword type="function" name="webkit_web_plugin_database_plugins_list_free ()" link="WebKitWebPluginDatabase.html#webkit-web-plugin-database-plugins-list-free" since="1.3.8"/>
     <keyword type="function" name="webkit_web_plugin_database_refresh ()" link="WebKitWebPluginDatabase.html#webkit-web-plugin-database-refresh" since="1.3.8"/>
     <keyword type="struct" name="WebKitSoupAuthDialog" link="WebKitSoupAuthDialog.html#WebKitSoupAuthDialog-struct"/>
     <keyword type="signal" name="The &quot;current-toplevel&quot; signal" link="WebKitSoupAuthDialog.html#WebKitSoupAuthDialog-current-toplevel"/>
@@ -612,7 +612,7 @@
     <keyword type="property" name="The &quot;mime-types&quot; property" link="WebKitFileChooserRequest.html#WebKitFileChooserRequest--mime-types"/>
     <keyword type="property" name="The &quot;select-multiple&quot; property" link="WebKitFileChooserRequest.html#WebKitFileChooserRequest--select-multiple"/>
     <keyword type="property" name="The &quot;selected-files&quot; property" link="WebKitFileChooserRequest.html#WebKitFileChooserRequest--selected-files"/>
-    <keyword type="" name="Logging" link="webkit-environment.html#idp3818528"/>
+    <keyword type="" name="Logging" link="webkit-environment.html#idp9557664"/>
     <keyword type="constant" name="WEBKIT_CACHE_MODEL_DEFAULT" link="webkitgtk-Global-functions.html#WEBKIT-CACHE-MODEL-DEFAULT:CAPS"/>
     <keyword type="constant" name="WEBKIT_CACHE_MODEL_DOCUMENT_VIEWER" link="webkitgtk-Global-functions.html#WEBKIT-CACHE-MODEL-DOCUMENT-VIEWER:CAPS"/>
     <keyword type="constant" name="WEBKIT_CACHE_MODEL_WEB_BROWSER" link="webkitgtk-Global-functions.html#WEBKIT-CACHE-MODEL-WEB-BROWSER:CAPS"/>

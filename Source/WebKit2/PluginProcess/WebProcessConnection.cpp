@@ -28,6 +28,7 @@
 
 #if ENABLE(PLUGIN_PROCESS)
 
+#include "ActivityAssertion.h"
 #include "ArgumentCoders.h"
 #include "ConnectionStack.h"
 #include "NPObjectMessageReceiverMessages.h"
@@ -71,7 +72,7 @@ void WebProcessConnection::addPluginControllerProxy(PassOwnPtr<PluginControllerP
     uint64_t pluginInstanceID = pluginController->pluginInstanceID();
 
     ASSERT(!m_pluginControllers.contains(pluginInstanceID));
-    m_pluginControllers.set(pluginInstanceID, pluginController.leakPtr());
+    m_pluginControllers.set(pluginInstanceID, pluginController);
 }
 
 void WebProcessConnection::destroyPluginControllerProxy(PluginControllerProxy* pluginController)
@@ -86,7 +87,7 @@ void WebProcessConnection::removePluginControllerProxy(PluginControllerProxy* pl
     {
         ASSERT(m_pluginControllers.contains(pluginController->pluginInstanceID()));
 
-        OwnPtr<PluginControllerProxy> pluginControllerOwnPtr = adoptPtr(m_pluginControllers.take(pluginController->pluginInstanceID()));
+        OwnPtr<PluginControllerProxy> pluginControllerOwnPtr = m_pluginControllers.take(pluginController->pluginInstanceID());
         ASSERT(pluginControllerOwnPtr == pluginController);
     }
 
@@ -140,6 +141,9 @@ void WebProcessConnection::didReceiveMessage(CoreIPC::Connection* connection, Co
 
 void WebProcessConnection::didReceiveSyncMessage(CoreIPC::Connection* connection, CoreIPC::MessageDecoder& decoder, OwnPtr<CoreIPC::MessageEncoder>& replyEncoder)
 {
+    // Force all timers to run at full speed when processing a synchronous message
+    ActivityAssertion activityAssertion(PluginProcess::shared());
+
     ConnectionStack::CurrentConnectionPusher currentConnection(ConnectionStack::shared(), connection);
 
     uint64_t destinationID = decoder.destinationID();
@@ -167,7 +171,8 @@ void WebProcessConnection::didClose(CoreIPC::Connection*)
     // The web process crashed. Destroy all the plug-in controllers. Destroying the last plug-in controller
     // will cause the web process connection itself to be destroyed.
     Vector<PluginControllerProxy*> pluginControllers;
-    copyValuesToVector(m_pluginControllers, pluginControllers);
+    for (auto it = m_pluginControllers.values().begin(), end = m_pluginControllers.values().end(); it != end; ++it)
+        pluginControllers.append(it->get());
 
     for (size_t i = 0; i < pluginControllers.size(); ++i)
         destroyPluginControllerProxy(pluginControllers[i]);
@@ -175,6 +180,9 @@ void WebProcessConnection::didClose(CoreIPC::Connection*)
 
 void WebProcessConnection::destroyPlugin(uint64_t pluginInstanceID, bool asynchronousCreationIncomplete)
 {
+    // Ensure we don't clamp any timers during destruction
+    ActivityAssertion activityAssertion(PluginProcess::shared());
+
     PluginControllerProxy* pluginControllerProxy = m_pluginControllers.get(pluginInstanceID);
     
     // If there is no PluginControllerProxy then this plug-in doesn't exist yet and we probably have nothing to do.
@@ -221,6 +229,9 @@ void WebProcessConnection::createPluginInternal(const PluginCreationParameters& 
 
 void WebProcessConnection::createPlugin(const PluginCreationParameters& creationParameters, PassRefPtr<Messages::WebProcessConnection::CreatePlugin::DelayedReply> reply)
 {
+    // Ensure we don't clamp any timers during initialization
+    ActivityAssertion activityAssertion(PluginProcess::shared());
+
     PluginControllerProxy* pluginControllerProxy = m_pluginControllers.get(creationParameters.pluginInstanceID);
 
     // The controller proxy for the plug-in we're being asked to create synchronously might already exist if it was requested asynchronously before.
@@ -278,7 +289,17 @@ void WebProcessConnection::createPluginAsynchronously(const PluginCreationParame
     // Normally the plug-in process doesn't give its synchronous messages the special flag to allow for that.
     // We can force it to do so by incrementing the "DispatchMessageMarkedDispatchWhenWaitingForSyncReply" count.
     m_connection->incrementDispatchMessageMarkedDispatchWhenWaitingForSyncReplyCount();
+
+    // The call to createPluginInternal can potentially cause the plug-in to be destroyed and
+    // thus free the WebProcessConnection object. Protect it.
+    RefPtr<WebProcessConnection> protect(this);
     createPluginInternal(creationParameters, result, wantsWheelEvents, remoteLayerClientID);
+
+    if (!m_connection) {
+        // createPluginInternal caused the connection to go away.
+        return;
+    }
+
     m_connection->decrementDispatchMessageMarkedDispatchWhenWaitingForSyncReplyCount();
 
     // If someone asked for this plug-in synchronously while it was in the middle of being created then we need perform the

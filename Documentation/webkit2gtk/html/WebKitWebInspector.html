@@ -3,7 +3,7 @@
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 <title>WebKitWebInspector</title>
-<meta name="generator" content="DocBook XSL Stylesheets V1.76.1">
+<meta name="generator" content="DocBook XSL Stylesheets V1.78.1">
 <link rel="home" href="index.html" title="WebKit2GTK+ Reference Manual">
 <link rel="up" href="ch01.html" title="Class Overview">
 <link rel="prev" href="WebKitPlugin.html" title="WebKitPlugin">
@@ -108,8 +108,46 @@ to true, otherwise no inspector is available.
 7
 8
 9
-10</pre></td>
-        <td class="listing_code"><pre class="programlisting"><span class="comment">/*</span><span class="comment"> Enable the developer extras </span><span class="comment">*/</span>
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29</pre></td>
+        <td class="listing_code"><pre class="programlisting"><?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta name="syntax" content="cpp" />
+<meta name="settings" content="use_xhtml,use_css,pre_wrap,no_foldcolumn,prevent_copy=" />
+<meta name="colorscheme" content="none" />
+<style type="text/css">
+
+pre { white-space: pre-wrap; font-family: monospace; color: #000000; background-color: #ffffff; }
+body { font-family: monospace; color: #000000; background-color: #ffffff; }
+* { font-size: 1em; }
+.Comment { color: #c00000; font-weight: bold; }
+.Constant { color: #0000c0; text-decoration: underline; }
+
+</style>
+</head>
+<body>
+<pre id='vimCodeElement'>
+<span class="comment">/*</span><span class="comment"> Enable the developer extras </span><span class="comment">*/</span>
 WebKitSettings *setting = webkit_web_view_get_settings (WEBKIT_WEB_VIEW(my_webview));
 g_object_set (G_OBJECT(settings), <span class="number">&quot;enable-developer-extras&quot;</span>, TRUE, <span class="number">NULL</span>);
 
@@ -144,8 +182,11 @@ Get the <span class="type">WebKitWebViewBase</span> used to display the inspecto
 This might be <a href="../glib/glib-Standard-Macros.html#NULL:CAPS"><code class="literal">NULL</code></a> if the inspector hasn't been loaded yet,
 or it has been closed.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>inspector</code></em> :</span></p></td>
@@ -171,8 +212,11 @@ nothing has been loaded yet in the inspected view, if the inspector
 has been closed or when inspected view was loaded from a HTML string
 instead of a URI.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>inspector</code></em> :</span></p></td>
@@ -195,8 +239,11 @@ instead of a URI.
 Whether the <em class="parameter"><code>inspector</code></em> view is currently attached to the same window that contains
 the inspected view.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>inspector</code></em> :</span></p></td>
@@ -219,8 +266,11 @@ the inspected view.
 Request <em class="parameter"><code>inspector</code></em> to be attached. The signal <a class="link" href="WebKitWebInspector.html#WebKitWebInspector-attach" title='The "attach" signal'><span class="type">"attach"</span></a>
 will be emitted. If the inspector is already attached it does nothing.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody><tr>
 <td><p><span class="term"><em class="parameter"><code>inspector</code></em> :</span></p></td>
 <td>a <a class="link" href="WebKitWebInspector.html" title="WebKitWebInspector"><span class="type">WebKitWebInspector</span></a>
@@ -236,8 +286,11 @@ will be emitted. If the inspector is already attached it does nothing.
 Request <em class="parameter"><code>inspector</code></em> to be detached. The signal <a class="link" href="WebKitWebInspector.html#WebKitWebInspector-detach" title='The "detach" signal'><span class="type">"detach"</span></a>
 will be emitted. If the inspector is already detached it does nothing.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody><tr>
 <td><p><span class="term"><em class="parameter"><code>inspector</code></em> :</span></p></td>
 <td>a <a class="link" href="WebKitWebInspector.html" title="WebKitWebInspector"><span class="type">WebKitWebInspector</span></a>
@@ -252,8 +305,11 @@ will be emitted. If the inspector is already detached it does nothing.
 <p>
 Request <em class="parameter"><code>inspector</code></em> to be shown.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody><tr>
 <td><p><span class="term"><em class="parameter"><code>inspector</code></em> :</span></p></td>
 <td>a <a class="link" href="WebKitWebInspector.html" title="WebKitWebInspector"><span class="type">WebKitWebInspector</span></a>
@@ -268,8 +324,11 @@ Request <em class="parameter"><code>inspector</code></em> to be shown.
 <p>
 Request <em class="parameter"><code>inspector</code></em> to be closed.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody><tr>
 <td><p><span class="term"><em class="parameter"><code>inspector</code></em> :</span></p></td>
 <td>a <a class="link" href="WebKitWebInspector.html" title="WebKitWebInspector"><span class="type">WebKitWebInspector</span></a>
@@ -287,8 +346,11 @@ Get the height that the inspector view should have when
 it's attached. If the inspector view is not attached this
 returns 0.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>inspector</code></em> :</span></p></td>
@@ -341,8 +403,11 @@ the inspector view to a browser tab).
 To prevent the inspector vew from being attached you can connect to this
 signal and simply return <a href="../glib/glib-Standard-Macros.html#TRUE:CAPS"><code class="literal">TRUE</code></a>.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>inspector</code></em> :</span></p></td>
@@ -380,8 +445,11 @@ In both cases, if this signal is not handled, the default implementation
 calls <a href="../gtk2/GtkWindow.html#gtk-window-present"><code class="function">gtk_window_present()</code></a> on the current toplevel <a href="../gtk2/GtkWindow.html"><span class="type">GtkWindow</span></a> of the
 inspector view.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>inspector</code></em> :</span></p></td>
@@ -410,8 +478,11 @@ Emitted when the inspector page is closed. If you are using your own
 inspector window, you should connect to this signal and destroy your
 window.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>inspector</code></em> :</span></p></td>
@@ -441,8 +512,11 @@ the signal <a class="link" href="WebKitWebInspector.html#WebKitWebInspector-open
 To prevent the inspector vew from being detached you can connect to this
 signal and simply return <a href="../glib/glib-Standard-Macros.html#TRUE:CAPS"><code class="literal">TRUE</code></a>.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>inspector</code></em> :</span></p></td>
@@ -478,8 +552,11 @@ the inspector in a separate window after being detached.
 To prevent the inspector from being shown you can connect to this
 signal and simply return <a href="../glib/glib-Standard-Macros.html#TRUE:CAPS"><code class="literal">TRUE</code></a>
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>inspector</code></em> :</span></p></td>

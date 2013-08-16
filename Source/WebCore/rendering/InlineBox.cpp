@@ -29,7 +29,6 @@
 #include "RenderArena.h"
 #include "RenderBlock.h"
 #include "RootInlineBox.h"
-#include "WebCoreMemoryInstrumentation.h"
 
 #ifndef NDEBUG
 #include <stdio.h>
@@ -45,25 +44,23 @@ struct SameSizeAsInlineBox {
     FloatPoint b;
     float c;
     uint32_t d : 32;
-#ifndef NDEBUG
+#if !ASSERT_DISABLED
     bool f;
 #endif
 };
 
 COMPILE_ASSERT(sizeof(InlineBox) == sizeof(SameSizeAsInlineBox), InlineBox_size_guard);
 
-#ifndef NDEBUG
+#if !ASSERT_DISABLED
 static bool inInlineBoxDetach;
 #endif
 
-#ifndef NDEBUG
-
+#if !ASSERT_DISABLED
 InlineBox::~InlineBox()
 {
     if (!m_hasBadParent && m_parent)
         m_parent->setHasBadChildList();
 }
-
 #endif
 
 void InlineBox::remove()
@@ -74,11 +71,11 @@ void InlineBox::remove()
 
 void InlineBox::destroy(RenderArena* renderArena)
 {
-#ifndef NDEBUG
+#if !ASSERT_DISABLED
     inInlineBoxDetach = true;
 #endif
     delete this;
-#ifndef NDEBUG
+#if !ASSERT_DISABLED
     inInlineBoxDetach = false;
 #endif
 
@@ -94,7 +91,6 @@ void* InlineBox::operator new(size_t sz, RenderArena* renderArena)
 void InlineBox::operator delete(void* ptr, size_t sz)
 {
     ASSERT(inInlineBoxDetach);
-
     // Stash size where destroy can find it.
     *(size_t *)ptr = sz;
 }
@@ -390,17 +386,6 @@ LayoutPoint InlineBox::flipForWritingMode(const LayoutPoint& point)
     if (!renderer()->style()->isFlippedBlocksWritingMode())
         return point;
     return root()->block()->flipForWritingMode(point);
-}
-
-void InlineBox::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
-{
-    MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::Rendering);
-    info.addMember(m_next, "next");
-    info.addMember(m_prev, "prev");
-    info.addMember(m_parent, "parent");
-    info.addMember(m_renderer, "renderer");
-
-    info.setCustomAllocation(true);
 }
 
 } // namespace WebCore

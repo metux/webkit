@@ -32,6 +32,8 @@
 #include "DOMTimer.h"
 #include "Database.h"
 #include "Document.h"
+#include "Font.h"
+#include "FontGenericFamilies.h"
 #include "Frame.h"
 #include "FrameTree.h"
 #include "FrameView.h"
@@ -40,7 +42,6 @@
 #include "InspectorInstrumentation.h"
 #include "Page.h"
 #include "PageCache.h"
-#include "ResourceHandle.h"
 #include "StorageMap.h"
 #include "TextAutosizer.h"
 #include <limits>
@@ -57,62 +58,44 @@ static void setImageLoadingSettings(Page* page)
     }
 }
 
-// Sets the entry in the font map for the given script. If family is the empty string, removes the entry instead.
-static inline void setGenericFontFamilyMap(ScriptFontFamilyMap& fontMap, const AtomicString& family, UScriptCode script, Page* page)
+static void invalidateAfterGenericFamilyChange(Page* page)
 {
-    ScriptFontFamilyMap::iterator it = fontMap.find(static_cast<int>(script));
-    if (family.isEmpty()) {
-        if (it == fontMap.end())
-            return;
-        fontMap.remove(it);
-    } else if (it != fontMap.end() && it->value == family)
-        return;
-    else
-        fontMap.set(static_cast<int>(script), family);
-
+    invalidateFontGlyphsCache();
     if (page)
         page->setNeedsRecalcStyleInAllFrames();
-}
-
-static inline const AtomicString& getGenericFontFamilyForScript(const ScriptFontFamilyMap& fontMap, UScriptCode script)
-{
-    ScriptFontFamilyMap::const_iterator it = fontMap.find(static_cast<int>(script));
-    if (it != fontMap.end())
-        return it->value;
-    if (script != USCRIPT_COMMON)
-        return getGenericFontFamilyForScript(fontMap, USCRIPT_COMMON);
-    return emptyAtom;
 }
 
 double Settings::gDefaultMinDOMTimerInterval = 0.010; // 10 milliseconds
 double Settings::gDefaultDOMTimerAlignmentInterval = 0;
 double Settings::gHiddenPageDOMTimerAlignmentInterval = 1.0;
 
+#if USE(SAFARI_THEME)
+bool Settings::gShouldPaintNativeControls = true;
+#endif
+
 #if USE(AVFOUNDATION)
 bool Settings::gAVFoundationEnabled = false;
 #endif
 
-#if PLATFORM(MAC) || (PLATFORM(QT) && USE(QTKIT))
+#if PLATFORM(MAC)
 bool Settings::gQTKitEnabled = true;
 #endif
 
 bool Settings::gMockScrollbarsEnabled = false;
 bool Settings::gUsesOverlayScrollbars = false;
 
-#if PLATFORM(WIN) || (OS(WINDOWS) && PLATFORM(WX))
+#if PLATFORM(WIN)
 bool Settings::gShouldUseHighResolutionTimers = true;
 #endif
     
-#if USE(JSC)
 bool Settings::gShouldRespectPriorityInCSSAttributeSetters = false;
-#endif
+bool Settings::gLowPowerVideoAudioBufferSizeEnabled = false;
 
 // NOTEs
-//  1) EditingMacBehavior comprises Tiger, Leopard, SnowLeopard and iOS builds, as well QtWebKit and Chromium when built on Mac;
+//  1) EditingMacBehavior comprises Tiger, Leopard, SnowLeopard and iOS builds, as well as QtWebKit when built on Mac;
 //  2) EditingWindowsBehavior comprises Win32 and WinCE builds, as well as QtWebKit and Chromium when built on Windows;
-//  3) EditingUnixBehavior comprises all unix-based systems, but Darwin/MacOS/Android (and then abusing the terminology);
-//  4) EditingAndroidBehavior comprises Android builds.
-// 99) MacEditingBehavior is used a fallback.
+//  3) EditingUnixBehavior comprises all unix-based systems, but Darwin/MacOS (and then abusing the terminology);
+// 99) MacEditingBehavior is used as a fallback.
 static EditingBehaviorType editingBehaviorTypeForPlatform()
 {
     return
@@ -120,8 +103,6 @@ static EditingBehaviorType editingBehaviorTypeForPlatform()
     EditingMacBehavior
 #elif OS(WINDOWS)
     EditingWindowsBehavior
-#elif OS(ANDROID)
-    EditingAndroidBehavior
 #elif OS(UNIX)
     EditingUnixBehavior
 #else
@@ -133,19 +114,17 @@ static EditingBehaviorType editingBehaviorTypeForPlatform()
 
 static const double defaultIncrementalRenderingSuppressionTimeoutInSeconds = 5;
 #if USE(UNIFIED_TEXT_CHECKING)
-static const double defaultUnifiedTextCheckerEnabled = true;
+static const bool defaultUnifiedTextCheckerEnabled = true;
 #else
-static const double defaultUnifiedTextCheckerEnabled = false;
+static const bool defaultUnifiedTextCheckerEnabled = false;
 #endif
+static const bool defaultSmartInsertDeleteEnabled = true;
+static const bool defaultSelectTrailingWhitespaceEnabled = false;
 
 Settings::Settings(Page* page)
     : m_page(0)
     , m_mediaTypeOverride("screen")
-    , m_minimumFontSize(0)
-    , m_minimumLogicalFontSize(0)
-    , m_defaultFontSize(0)
-    , m_defaultFixedFontSize(0)
-    , m_screenFontSubstitutionEnabled(true)
+    , m_fontGenericFamilies(FontGenericFamilies::create())
     , m_storageBlockingPolicy(SecurityOrigin::AllowAllStorage)
 #if ENABLE(TEXT_AUTOSIZING)
     , m_textAutosizingFontScaleFactor(1)
@@ -157,6 +136,7 @@ Settings::Settings(Page* page)
 #endif
 #endif
     SETTINGS_INITIALIZER_LIST
+    , m_screenFontSubstitutionEnabled(shouldEnableScreenFontSubstitutionByDefault())
     , m_isJavaEnabled(false)
     , m_isJavaEnabledForLocalFiles(true)
     , m_loadsImagesAutomatically(false)
@@ -164,10 +144,8 @@ Settings::Settings(Page* page)
     , m_areImagesEnabled(true)
     , m_arePluginsEnabled(false)
     , m_isScriptEnabled(false)
-    , m_textAreasAreResizable(false)
     , m_needsAdobeFrameReloadingQuirk(false)
     , m_usesPageCache(false)
-    , m_authorAndUserStylesEnabled(true)
     , m_fontRenderingMode(0)
     , m_isCSSCustomFilterEnabled(false)
 #if ENABLE(CSS_STICKY_POSITION)
@@ -176,21 +154,22 @@ Settings::Settings(Page* page)
 #if ENABLE(CSS_VARIABLES)
     , m_cssVariablesEnabled(false)
 #endif
-    , m_acceleratedCompositingEnabled(true)
-    , m_showDebugBorders(false)
-    , m_showRepaintCounter(false)
     , m_showTiledScrollingIndicator(false)
     , m_tiledBackingStoreEnabled(false)
     , m_dnsPrefetchingEnabled(false)
-#if ENABLE(SMOOTH_SCROLLING)
-    , m_scrollAnimatorEnabled(true)
-#endif
 #if ENABLE(TOUCH_EVENTS)
     , m_touchEventEmulationEnabled(false)
 #endif
     , m_scrollingPerformanceLoggingEnabled(false)
     , m_aggressiveTileRetentionEnabled(false)
+    , m_timeWithoutMouseMovementBeforeHidingControls(3)
     , m_setImageLoadingSettingsTimer(this, &Settings::imageLoadingSettingsTimerFired)
+#if ENABLE(HIDDEN_PAGE_DOM_TIMER_THROTTLING)
+    , m_hiddenPageDOMTimerThrottlingEnabled(false)
+#endif
+#if ENABLE(PAGE_VISIBILITY_API)
+    , m_hiddenPageCSSAnimationSuspensionEnabled(false)
+#endif
 {
     // A Frame may not have been created yet, so we initialize the AtomicString
     // hash before trying to use it.
@@ -199,10 +178,16 @@ Settings::Settings(Page* page)
     m_page = page; // Page is not yet fully initialized wen constructing Settings, so keeping m_page null over initializeDefaultFontFamilies() call.
 }
 
+Settings::~Settings()
+{
+}
+
 PassOwnPtr<Settings> Settings::create(Page* page)
 {
     return adoptPtr(new Settings(page));
-} 
+}
+
+SETTINGS_SETTER_BODIES
 
 void Settings::setHiddenPageDOMTimerAlignmentInterval(double hiddenPageDOMTimerAlignmentinterval)
 {
@@ -214,6 +199,13 @@ double Settings::hiddenPageDOMTimerAlignmentInterval()
     return gHiddenPageDOMTimerAlignmentInterval;
 }
 
+#if !PLATFORM(MAC)
+bool Settings::shouldEnableScreenFontSubstitutionByDefault()
+{
+    return true;
+}
+#endif
+
 #if !PLATFORM(MAC) && !PLATFORM(BLACKBERRY)
 void Settings::initializeDefaultFontFamilies()
 {
@@ -223,117 +215,86 @@ void Settings::initializeDefaultFontFamilies()
 
 const AtomicString& Settings::standardFontFamily(UScriptCode script) const
 {
-    return getGenericFontFamilyForScript(m_standardFontFamilyMap, script);
+    return m_fontGenericFamilies->standardFontFamily(script);
 }
 
 void Settings::setStandardFontFamily(const AtomicString& family, UScriptCode script)
 {
-    setGenericFontFamilyMap(m_standardFontFamilyMap, family, script, m_page);
+    bool changes = m_fontGenericFamilies->setStandardFontFamily(family, script);
+    if (changes)
+        invalidateAfterGenericFamilyChange(m_page);
 }
 
 const AtomicString& Settings::fixedFontFamily(UScriptCode script) const
 {
-    return getGenericFontFamilyForScript(m_fixedFontFamilyMap, script);
+    return m_fontGenericFamilies->fixedFontFamily(script);
 }
 
 void Settings::setFixedFontFamily(const AtomicString& family, UScriptCode script)
 {
-    setGenericFontFamilyMap(m_fixedFontFamilyMap, family, script, m_page);
+    bool changes = m_fontGenericFamilies->setFixedFontFamily(family, script);
+    if (changes)
+        invalidateAfterGenericFamilyChange(m_page);
 }
 
 const AtomicString& Settings::serifFontFamily(UScriptCode script) const
 {
-    return getGenericFontFamilyForScript(m_serifFontFamilyMap, script);
+    return m_fontGenericFamilies->serifFontFamily(script);
 }
 
 void Settings::setSerifFontFamily(const AtomicString& family, UScriptCode script)
 {
-     setGenericFontFamilyMap(m_serifFontFamilyMap, family, script, m_page);
+    bool changes = m_fontGenericFamilies->setSerifFontFamily(family, script);
+    if (changes)
+        invalidateAfterGenericFamilyChange(m_page);
 }
 
 const AtomicString& Settings::sansSerifFontFamily(UScriptCode script) const
 {
-    return getGenericFontFamilyForScript(m_sansSerifFontFamilyMap, script);
+    return m_fontGenericFamilies->sansSerifFontFamily(script);
 }
 
 void Settings::setSansSerifFontFamily(const AtomicString& family, UScriptCode script)
 {
-    setGenericFontFamilyMap(m_sansSerifFontFamilyMap, family, script, m_page);
+    bool changes = m_fontGenericFamilies->setSansSerifFontFamily(family, script);
+    if (changes)
+        invalidateAfterGenericFamilyChange(m_page);
 }
 
 const AtomicString& Settings::cursiveFontFamily(UScriptCode script) const
 {
-    return getGenericFontFamilyForScript(m_cursiveFontFamilyMap, script);
+    return m_fontGenericFamilies->cursiveFontFamily(script);
 }
 
 void Settings::setCursiveFontFamily(const AtomicString& family, UScriptCode script)
 {
-    setGenericFontFamilyMap(m_cursiveFontFamilyMap, family, script, m_page);
+    bool changes = m_fontGenericFamilies->setCursiveFontFamily(family, script);
+    if (changes)
+        invalidateAfterGenericFamilyChange(m_page);
 }
 
 const AtomicString& Settings::fantasyFontFamily(UScriptCode script) const
 {
-    return getGenericFontFamilyForScript(m_fantasyFontFamilyMap, script);
+    return m_fontGenericFamilies->fantasyFontFamily(script);
 }
 
 void Settings::setFantasyFontFamily(const AtomicString& family, UScriptCode script)
 {
-    setGenericFontFamilyMap(m_fantasyFontFamilyMap, family, script, m_page);
+    bool changes = m_fontGenericFamilies->setFantasyFontFamily(family, script);
+    if (changes)
+        invalidateAfterGenericFamilyChange(m_page);
 }
 
 const AtomicString& Settings::pictographFontFamily(UScriptCode script) const
 {
-    return getGenericFontFamilyForScript(m_pictographFontFamilyMap, script);
+    return m_fontGenericFamilies->pictographFontFamily(script);
 }
 
 void Settings::setPictographFontFamily(const AtomicString& family, UScriptCode script)
 {
-    setGenericFontFamilyMap(m_pictographFontFamilyMap, family, script, m_page);
-}
-
-void Settings::setMinimumFontSize(int minimumFontSize)
-{
-    if (m_minimumFontSize == minimumFontSize)
-        return;
-
-    m_minimumFontSize = minimumFontSize;
-    m_page->setNeedsRecalcStyleInAllFrames();
-}
-
-void Settings::setMinimumLogicalFontSize(int minimumLogicalFontSize)
-{
-    if (m_minimumLogicalFontSize == minimumLogicalFontSize)
-        return;
-
-    m_minimumLogicalFontSize = minimumLogicalFontSize;
-    m_page->setNeedsRecalcStyleInAllFrames();
-}
-
-void Settings::setDefaultFontSize(int defaultFontSize)
-{
-    if (m_defaultFontSize == defaultFontSize)
-        return;
-
-    m_defaultFontSize = defaultFontSize;
-    m_page->setNeedsRecalcStyleInAllFrames();
-}
-
-void Settings::setDefaultFixedFontSize(int defaultFontSize)
-{
-    if (m_defaultFixedFontSize == defaultFontSize)
-        return;
-
-    m_defaultFixedFontSize = defaultFontSize;
-    m_page->setNeedsRecalcStyleInAllFrames();
-}
-
-void Settings::setScreenFontSubstitutionEnabled(bool screenFontSubstitutionEnabled)
-{
-    if (m_screenFontSubstitutionEnabled == screenFontSubstitutionEnabled)
-        return;
-
-    m_screenFontSubstitutionEnabled = screenFontSubstitutionEnabled;
-    m_page->setNeedsRecalcStyleInAllFrames();
+    bool changes = m_fontGenericFamilies->setPictographFontFamily(family, script);
+    if (changes)
+        invalidateAfterGenericFamilyChange(m_page);
 }
 
 #if ENABLE(TEXT_AUTOSIZING)
@@ -367,15 +328,6 @@ void Settings::setTextAutosizingFontScaleFactor(float fontScaleFactor)
 }
 
 #endif
-
-void Settings::setResolutionOverride(const IntSize& densityPerInchOverride)
-{
-    if (m_resolutionDensityPerInchOverride == densityPerInchOverride)
-        return;
-
-    m_resolutionDensityPerInchOverride = densityPerInchOverride;
-    m_page->setNeedsRecalcStyleInAllFrames();
-}
 
 void Settings::setMediaTypeOverride(const String& mediaTypeOverride)
 {
@@ -438,7 +390,11 @@ void Settings::setImagesEnabled(bool areImagesEnabled)
 
 void Settings::setPluginsEnabled(bool arePluginsEnabled)
 {
+    if (m_arePluginsEnabled == arePluginsEnabled)
+        return;
+
     m_arePluginsEnabled = arePluginsEnabled;
+    Page::refreshPlugins(false);
 }
 
 void Settings::setPrivateBrowsingEnabled(bool privateBrowsingEnabled)
@@ -458,15 +414,6 @@ void Settings::setUserStyleSheetLocation(const KURL& userStyleSheetLocation)
     m_userStyleSheetLocation = userStyleSheetLocation;
 
     m_page->userStyleSheetLocationChanged();
-}
-
-void Settings::setTextAreasAreResizable(bool textAreasAreResizable)
-{
-    if (m_textAreasAreResizable == textAreasAreResizable)
-        return;
-
-    m_textAreasAreResizable = textAreasAreResizable;
-    m_page->setNeedsRecalcStyleInAllFrames();
 }
 
 // FIXME: This quirk is needed because of Radar 4674537 and 5211271. We need to phase it out once Adobe
@@ -527,16 +474,14 @@ void Settings::setUsesPageCache(bool usesPageCache)
         int last = m_page->backForward()->forwardCount();
         for (int i = first; i <= last; i++)
             pageCache()->remove(m_page->backForward()->itemAtIndex(i));
-        pageCache()->releaseAutoreleasedPagesNow();
     }
 }
 
-void Settings::setAuthorAndUserStylesEnabled(bool authorAndUserStylesEnabled)
+void Settings::setScreenFontSubstitutionEnabled(bool enabled)
 {
-    if (m_authorAndUserStylesEnabled == authorAndUserStylesEnabled)
+    if (m_screenFontSubstitutionEnabled == enabled)
         return;
-
-    m_authorAndUserStylesEnabled = authorAndUserStylesEnabled;
+    m_screenFontSubstitutionEnabled = enabled;
     m_page->setNeedsRecalcStyleInAllFrames();
 }
 
@@ -553,6 +498,13 @@ FontRenderingMode Settings::fontRenderingMode() const
     return static_cast<FontRenderingMode>(m_fontRenderingMode);
 }
 
+#if USE(SAFARI_THEME)
+void Settings::setShouldPaintNativeControls(bool shouldPaintNativeControls)
+{
+    gShouldPaintNativeControls = shouldPaintNativeControls;
+}
+#endif
+
 void Settings::setDNSPrefetchingEnabled(bool dnsPrefetchingEnabled)
 {
     if (m_dnsPrefetchingEnabled == dnsPrefetchingEnabled)
@@ -560,33 +512,6 @@ void Settings::setDNSPrefetchingEnabled(bool dnsPrefetchingEnabled)
 
     m_dnsPrefetchingEnabled = dnsPrefetchingEnabled;
     m_page->dnsPrefetchingStateChanged();
-}
-
-void Settings::setAcceleratedCompositingEnabled(bool enabled)
-{
-    if (m_acceleratedCompositingEnabled == enabled)
-        return;
-        
-    m_acceleratedCompositingEnabled = enabled;
-    m_page->setNeedsRecalcStyleInAllFrames();
-}
-
-void Settings::setShowDebugBorders(bool enabled)
-{
-    if (m_showDebugBorders == enabled)
-        return;
-        
-    m_showDebugBorders = enabled;
-    m_page->setNeedsRecalcStyleInAllFrames();
-}
-
-void Settings::setShowRepaintCounter(bool enabled)
-{
-    if (m_showRepaintCounter == enabled)
-        return;
-        
-    m_showRepaintCounter = enabled;
-    m_page->setNeedsRecalcStyleInAllFrames();
 }
 
 void Settings::setShowTiledScrollingIndicator(bool enabled)
@@ -597,7 +522,7 @@ void Settings::setShowTiledScrollingIndicator(bool enabled)
     m_showTiledScrollingIndicator = enabled;
 }
 
-#if PLATFORM(WIN) || (OS(WINDOWS) && PLATFORM(WX))
+#if PLATFORM(WIN)
 void Settings::setShouldUseHighResolutionTimers(bool shouldUseHighResolutionTimers)
 {
     gShouldUseHighResolutionTimers = shouldUseHighResolutionTimers;
@@ -629,18 +554,18 @@ void Settings::setAVFoundationEnabled(bool enabled)
         return;
 
     gAVFoundationEnabled = enabled;
-    HTMLMediaElement::requeryMediaEngines();
+    HTMLMediaElement::resetMediaEngines();
 }
 #endif
 
-#if PLATFORM(MAC) || (PLATFORM(QT) && USE(QTKIT))
+#if PLATFORM(MAC)
 void Settings::setQTKitEnabled(bool enabled)
 {
     if (gQTKitEnabled == enabled)
         return;
 
     gQTKitEnabled = enabled;
-    HTMLMediaElement::requeryMediaEngines();
+    HTMLMediaElement::resetMediaEngines();
 }
 #endif
 
@@ -677,7 +602,6 @@ bool Settings::usesOverlayScrollbars()
     return gUsesOverlayScrollbars;
 }
 
-#if USE(JSC)
 void Settings::setShouldRespectPriorityInCSSAttributeSetters(bool flag)
 {
     gShouldRespectPriorityInCSSAttributeSetters = flag;
@@ -687,6 +611,30 @@ bool Settings::shouldRespectPriorityInCSSAttributeSetters()
 {
     return gShouldRespectPriorityInCSSAttributeSetters;
 }
+
+#if ENABLE(HIDDEN_PAGE_DOM_TIMER_THROTTLING)
+void Settings::setHiddenPageDOMTimerThrottlingEnabled(bool flag)
+{
+    if (m_hiddenPageDOMTimerThrottlingEnabled == flag)
+        return;
+    m_hiddenPageDOMTimerThrottlingEnabled = flag;
+    m_page->hiddenPageDOMTimerThrottlingStateChanged();
+}
 #endif
+
+#if ENABLE(PAGE_VISIBILITY_API)
+void Settings::setHiddenPageCSSAnimationSuspensionEnabled(bool flag)
+{
+    if (m_hiddenPageCSSAnimationSuspensionEnabled == flag)
+        return;
+    m_hiddenPageCSSAnimationSuspensionEnabled = flag;
+    m_page->hiddenPageCSSAnimationSuspensionStateChanged();
+}
+#endif
+
+void Settings::setLowPowerVideoAudioBufferSizeEnabled(bool flag)
+{
+    gLowPowerVideoAudioBufferSizeEnabled = flag;
+}
 
 } // namespace WebCore

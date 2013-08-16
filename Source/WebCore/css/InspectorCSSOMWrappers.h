@@ -23,10 +23,11 @@
 #ifndef InspectorCSSOMWrappers_h
 #define InspectorCSSOMWrappers_h
 
+#include <wtf/Forward.h>
 #include <wtf/HashMap.h>
 #include <wtf/HashSet.h>
-#include <wtf/MemoryObjectInfo.h>
 #include <wtf/RefPtr.h>
+#include <wtf/Vector.h>
 
 namespace WebCore {
 
@@ -42,8 +43,6 @@ public:
     // It is here to support inspector. Don't use for any regular engine functions.
     CSSStyleRule* getWrapperForRuleInSheets(StyleRule*, DocumentStyleSheetCollection*);
     void collectFromStyleSheetIfNeeded(CSSStyleSheet*);
-
-    void reportMemoryUsage(MemoryObjectInfo*) const;
 
 private:
     template <class ListType>

@@ -24,8 +24,6 @@
 #include "config.h"
 #include "CachedResource.h"
 
-#include "MemoryCache.h"
-#include "CachedMetadata.h"
 #include "CachedResourceClient.h"
 #include "CachedResourceClientWalker.h"
 #include "CachedResourceHandle.h"
@@ -33,37 +31,28 @@
 #include "CrossOriginAccessControl.h"
 #include "Document.h"
 #include "DocumentLoader.h"
+#include "FrameLoader.h"
 #include "FrameLoaderClient.h"
 #include "InspectorInstrumentation.h"
 #include "KURL.h"
 #include "LoaderStrategy.h"
 #include "Logging.h"
+#include "MemoryCache.h"
 #include "PlatformStrategies.h"
 #include "PurgeableBuffer.h"
 #include "ResourceBuffer.h"
 #include "ResourceHandle.h"
 #include "ResourceLoadScheduler.h"
+#include "SchemeRegistry.h"
 #include "SecurityOrigin.h"
 #include "SecurityPolicy.h"
 #include "SubresourceLoader.h"
-#include "WebCoreMemoryInstrumentation.h"
 #include <wtf/CurrentTime.h>
 #include <wtf/MathExtras.h>
-#include <wtf/MemoryInstrumentationHashCountedSet.h>
-#include <wtf/MemoryInstrumentationHashSet.h>
-#include <wtf/MemoryObjectInfo.h>
 #include <wtf/RefCountedLeakCounter.h>
 #include <wtf/StdLibExtras.h>
 #include <wtf/text/CString.h>
 #include <wtf/Vector.h>
-
-namespace WTF {
-
-template<> struct SequenceMemoryInstrumentationTraits<WebCore::CachedResourceClient*> {
-    template <typename I> static void reportMemoryUsage(I, I, MemoryClassInfo&) { }
-};
-
-}
 
 using namespace WTF;
 
@@ -151,7 +140,7 @@ static ResourceLoadPriority defaultPriorityForResourceType(CachedResource::Type 
     return ResourceLoadPriorityLow;
 }
 
-#if PLATFORM(CHROMIUM) || PLATFORM(BLACKBERRY)
+#if PLATFORM(BLACKBERRY)
 static ResourceRequest::TargetType cachedResourceTypeToTargetType(CachedResource::Type type)
 {
     switch (type) {
@@ -193,13 +182,20 @@ static ResourceRequest::TargetType cachedResourceTypeToTargetType(CachedResource
 }
 #endif
 
+static double deadDecodedDataDeletionIntervalForResourceType(CachedResource::Type type)
+{
+    if (type == CachedResource::Script)
+        return 0;
+    return memoryCache()->deadDecodedDataDeletionInterval();
+}
+
 DEFINE_DEBUG_ONLY_GLOBAL(RefCountedLeakCounter, cachedResourceLeakCounter, ("CachedResource"));
 
 CachedResource::CachedResource(const ResourceRequest& request, Type type)
     : m_resourceRequest(request)
     , m_loadPriority(defaultPriorityForResourceType(type))
     , m_responseTimestamp(currentTime())
-    , m_decodedDataDeletionTimer(this, &CachedResource::decodedDataDeletionTimerFired)
+    , m_decodedDataDeletionTimer(this, &CachedResource::decodedDataDeletionTimerFired, deadDecodedDataDeletionIntervalForResourceType(type))
     , m_lastDecodedAccessTime(0)
     , m_loadFinishTime(0)
     , m_encodedSize(0)
@@ -247,7 +243,7 @@ CachedResource::~CachedResource()
     ASSERT(canDelete());
     ASSERT(!inCache());
     ASSERT(!m_deleted);
-    ASSERT(url().isNull() || memoryCache()->resourceForURL(KURL(ParsedURLString, url())) != this);
+    ASSERT(url().isNull() || memoryCache()->resourceForRequest(resourceRequest()) != this);
 
 #ifndef NDEBUG
     m_deleted = true;
@@ -310,7 +306,7 @@ void CachedResource::load(CachedResourceLoader* cachedResourceLoader, const Reso
     m_options = options;
     m_loading = true;
 
-#if PLATFORM(CHROMIUM) || PLATFORM(BLACKBERRY)
+#if PLATFORM(BLACKBERRY)
     if (m_resourceRequest.targetType() == ResourceRequest::TargetIsUnspecified)
         m_resourceRequest.setTargetType(cachedResourceTypeToTargetType(type()));
 #endif
@@ -354,12 +350,7 @@ void CachedResource::load(CachedResourceLoader* cachedResourceLoader, const Reso
         m_fragmentIdentifierForRequest = String();
     }
 
-#if USE(PLATFORM_STRATEGIES)
     m_loader = platformStrategies()->loaderStrategy()->resourceLoadScheduler()->scheduleSubresourceLoad(cachedResourceLoader->frame(), this, request, request.priority(), options);
-#else
-    m_loader = resourceLoadScheduler()->scheduleSubresourceLoad(cachedResourceLoader->frame(), this, request, request.priority(), options);
-#endif
-
     if (!m_loader) {
         failBeforeStarting();
         return;
@@ -378,11 +369,18 @@ void CachedResource::checkNotify()
         c->notifyFinished(this);
 }
 
-void CachedResource::data(PassRefPtr<ResourceBuffer>, bool allDataReceived)
+void CachedResource::addDataBuffer(ResourceBuffer*)
 {
-    if (!allDataReceived)
-        return;
-    
+    ASSERT(m_options.dataBufferingPolicy == BufferData);
+}
+
+void CachedResource::addData(const char*, unsigned)
+{
+    ASSERT(m_options.dataBufferingPolicy == DoNotBufferData);
+}
+
+void CachedResource::finishLoading(ResourceBuffer*)
+{
     setLoading(false);
     checkNotify();
 }
@@ -393,6 +391,16 @@ void CachedResource::error(CachedResource::Status status)
     ASSERT(errorOccurred());
     m_data.clear();
 
+    setLoading(false);
+    checkNotify();
+}
+    
+void CachedResource::cancelLoad()
+{
+    if (!isLoading())
+        return;
+
+    setStatus(LoadError);
     setLoading(false);
     checkNotify();
 }
@@ -416,7 +424,7 @@ bool CachedResource::isExpired() const
 
     return currentAge() > freshnessLifetime();
 }
-    
+
 double CachedResource::currentAge() const
 {
     // RFC2616 13.2.3
@@ -428,12 +436,18 @@ double CachedResource::currentAge() const
     double residentTime = currentTime() - m_responseTimestamp;
     return correctedReceivedAge + residentTime;
 }
-    
+
 double CachedResource::freshnessLifetime() const
 {
-    // Cache non-http resources liberally
-    if (!m_response.url().protocolIsInHTTPFamily())
+    if (!m_response.url().protocolIsInHTTPFamily()) {
+        // Don't cache non-HTTP main resources since we can't check for freshness.
+        // FIXME: We should not cache subresources either, but when we tried this
+        // it caused performance and flakiness issues in our test infrastructure.
+        if (m_type == MainResource && !SchemeRegistry::shouldCacheResponsesFromURLSchemeIndefinitely(m_response.url().protocol()))
+            return 0;
+
         return std::numeric_limits<double>::max();
+    }
 
     // RFC2616 13.2.4
     double maxAgeValue = m_response.cacheControlMaxAge();
@@ -460,49 +474,10 @@ void CachedResource::responseReceived(const ResourceResponse& response)
         setEncoding(encoding);
 }
 
-void CachedResource::setSerializedCachedMetadata(const char* data, size_t size)
+void CachedResource::clearLoader()
 {
-    // We only expect to receive cached metadata from the platform once.
-    // If this triggers, it indicates an efficiency problem which is most
-    // likely unexpected in code designed to improve performance.
-    ASSERT(!m_cachedMetadata);
-
-    m_cachedMetadata = CachedMetadata::deserialize(data, size);
-}
-
-void CachedResource::setCachedMetadata(unsigned dataTypeID, const char* data, size_t size)
-{
-    // Currently, only one type of cached metadata per resource is supported.
-    // If the need arises for multiple types of metadata per resource this could
-    // be enhanced to store types of metadata in a map.
-    ASSERT(!m_cachedMetadata);
-
-    m_cachedMetadata = CachedMetadata::create(dataTypeID, data, size);
-    ResourceHandle::cacheMetadata(m_response, m_cachedMetadata->serialize());
-}
-
-CachedMetadata* CachedResource::cachedMetadata(unsigned dataTypeID) const
-{
-    if (!m_cachedMetadata || m_cachedMetadata->dataTypeID() != dataTypeID)
-        return 0;
-    return m_cachedMetadata.get();
-}
-
-void CachedResource::stopLoading()
-{
-    ASSERT(m_loader);            
+    ASSERT(m_loader);
     m_loader = 0;
-
-    CachedResourceHandle<CachedResource> protect(this);
-
-    // All loads finish with data(allDataReceived = true) or error(), except for
-    // canceled loads, which silently set our request to 0. Be sure to notify our
-    // client in that case, so we don't seem to continue loading forever.
-    if (isLoading()) {
-        setLoading(false);
-        setStatus(LoadError);
-        checkNotify();
-    }
 }
 
 void CachedResource::addClient(CachedResourceClient* client)
@@ -592,12 +567,12 @@ void CachedResource::destroyDecodedDataIfNeeded()
 {
     if (!m_decodedSize)
         return;
-
-    if (double interval = memoryCache()->deadDecodedDataDeletionInterval())
-        m_decodedDataDeletionTimer.startOneShot(interval);
+    if (!memoryCache()->deadDecodedDataDeletionInterval())
+        return;
+    m_decodedDataDeletionTimer.restart();
 }
 
-void CachedResource::decodedDataDeletionTimerFired(Timer<CachedResource>*)
+void CachedResource::decodedDataDeletionTimerFired(DeferrableOneShotTimer<CachedResource>*)
 {
     destroyDecodedData();
 }
@@ -916,10 +891,9 @@ void CachedResource::setLoadPriority(ResourceLoadPriority loadPriority)
     if (loadPriority == m_loadPriority)
         return;
     m_loadPriority = loadPriority;
-    if (m_loader && m_loader->handle())
-        m_loader->handle()->didChangePriority(loadPriority);
+    if (m_loader)
+        m_loader->didChangePriority(loadPriority);
 }
-
 
 CachedResource::CachedResourceCallback::CachedResourceCallback(CachedResource* resource, CachedResourceClient* client)
     : m_resource(resource)
@@ -940,32 +914,22 @@ void CachedResource::CachedResourceCallback::timerFired(Timer<CachedResourceCall
     m_resource->didAddClient(m_client);
 }
 
-void CachedResource::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
+#if PLATFORM(MAC)
+void CachedResource::tryReplaceEncodedData(PassRefPtr<SharedBuffer> newBuffer)
 {
-    MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::CachedResource);
-    memoryObjectInfo->setName(url().string());
-    info.addMember(m_resourceRequest, "resourceRequest");
-    info.addMember(m_fragmentIdentifierForRequest, "fragmentIdentifierForRequest");
-    info.addMember(m_clients, "clients");
-    info.addMember(m_accept, "accept");
-    info.addMember(m_loader, "loader");
-    info.addMember(m_response, "response");
-    info.addMember(m_data, "data");
-    info.addMember(m_cachedMetadata, "cachedMetadata");
-    info.addMember(m_nextInAllResourcesList, "nextInAllResourcesList");
-    info.addMember(m_prevInAllResourcesList, "prevInAllResourcesList");
-    info.addMember(m_nextInLiveResourcesList, "nextInLiveResourcesList");
-    info.addMember(m_prevInLiveResourcesList, "prevInLiveResourcesList");
-    info.addMember(m_owningCachedResourceLoader, "owningCachedResourceLoader");
-    info.addMember(m_resourceToRevalidate, "resourceToRevalidate");
-    info.addMember(m_proxyResource, "proxyResource");
-    info.addMember(m_handlesToRevalidate, "handlesToRevalidate");
-    info.addMember(m_options, "options");
-    info.addMember(m_decodedDataDeletionTimer, "decodedDataDeletionTimer");
-    info.ignoreMember(m_clientsAwaitingCallback);
+    if (!m_data)
+        return;
+    
+    if (!mayTryReplaceEncodedData())
+        return;
+    
+    // Because the disk cache is asynchronous and racey with regards to the data we might be asked to replace,
+    // we need to verify that the new buffer has the same contents as our old buffer.
+    if (m_data->size() != newBuffer->size() || memcmp(m_data->data(), newBuffer->data(), m_data->size()))
+        return;
 
-    if (m_purgeableData && !m_purgeableData->wasPurged())
-        info.addRawBuffer(m_purgeableData.get(), m_purgeableData->size(), "PurgeableData", "purgeableData");
+    m_data->tryReplaceSharedBufferContents(newBuffer.get());
 }
+#endif
 
 }

@@ -21,6 +21,8 @@
 #ifndef RetainPtr_h
 #define RetainPtr_h
 
+#if USE(CF) || defined(__OBJC__)
+
 #include <wtf/HashTraits.h>
 #include <wtf/NullPtr.h>
 #include <wtf/TypeTraits.h>
@@ -49,8 +51,33 @@ namespace WTF {
 
     enum AdoptCFTag { AdoptCF };
     enum AdoptNSTag { AdoptNS };
-    
+
+#if USE(CF)
+    inline void retain(CFTypeRef ptr) { CFRetain(ptr); }
+    inline void release(CFTypeRef ptr) { CFRelease(ptr); }
+#endif
+
 #ifdef __OBJC__
+#if __has_feature(objc_arc)
+    inline void adoptNSReference(id) { }
+    inline void retain(id ptr) { }
+    inline void release(id ptr) { }
+#else
+    inline void retain(id ptr)
+    {
+        CFRetain(ptr);
+    }
+
+    inline void release(id ptr)
+    {
+        CFRelease(ptr);
+    }
+
+#ifdef OBJC_NO_GC
+    inline void adoptNSReference(id)
+    {
+    }
+#else
     inline void adoptNSReference(id ptr)
     {
         if (ptr) {
@@ -59,6 +86,9 @@ namespace WTF {
         }
     }
 #endif
+#endif // __has_feature(objc_arc)
+#endif // __OBJC__
+
 
     template<typename T> class RetainPtr {
     public:
@@ -66,12 +96,23 @@ namespace WTF {
         typedef ValueType* PtrType;
 
         RetainPtr() : m_ptr(0) {}
-        RetainPtr(PtrType ptr) : m_ptr(ptr) { if (ptr) CFRetain(ptr); }
+        RetainPtr(PtrType ptr) : m_ptr(ptr) { if (ptr) retain(ptr); }
 
-        RetainPtr(AdoptCFTag, PtrType ptr) : m_ptr(ptr) { }
-        RetainPtr(AdoptNSTag, PtrType ptr) : m_ptr(ptr) { adoptNSReference(ptr); }
+        RetainPtr(AdoptCFTag, PtrType ptr)
+            : m_ptr(ptr)
+        {
+#ifdef __OBJC__
+            static_assert((!std::is_convertible<T, id>::value), "Don't use adoptCF with Objective-C pointer types, use adoptNS.");
+#endif
+        }
+
+        RetainPtr(AdoptNSTag, PtrType ptr)
+            : m_ptr(ptr)
+        {
+            adoptNSReference(ptr);
+        }
         
-        RetainPtr(const RetainPtr& o) : m_ptr(o.m_ptr) { if (PtrType ptr = m_ptr) CFRetain(ptr); }
+        RetainPtr(const RetainPtr& o) : m_ptr(o.m_ptr) { if (PtrType ptr = m_ptr) retain(ptr); }
 
 #if COMPILER_SUPPORTS(CXX_RVALUE_REFERENCES)
         RetainPtr(RetainPtr&& o) : m_ptr(o.leakRef()) { }
@@ -81,7 +122,7 @@ namespace WTF {
         RetainPtr(HashTableDeletedValueType) : m_ptr(hashTableDeletedValue()) { }
         bool isHashTableDeletedValue() const { return m_ptr == hashTableDeletedValue(); }
         
-        ~RetainPtr() { if (PtrType ptr = m_ptr) CFRelease(ptr); }
+        ~RetainPtr() { if (PtrType ptr = m_ptr) release(ptr); }
         
         template<typename U> RetainPtr(const RetainPtr<U>&);
 
@@ -97,8 +138,9 @@ namespace WTF {
         bool operator!() const { return !m_ptr; }
     
         // This conversion operator allows implicit conversion to bool but not to other integer types.
-        typedef PtrType RetainPtr::*UnspecifiedBoolType;
-        operator UnspecifiedBoolType() const { return m_ptr ? &RetainPtr::m_ptr : 0; }
+        typedef void (RetainPtr::*UnspecifiedBoolType)() const;
+        void ImplicitConversionToBoolIsNotAllowed() const { }
+        operator UnspecifiedBoolType() const { return m_ptr ? &RetainPtr::ImplicitConversionToBoolIsNotAllowed : 0; }
         
         RetainPtr& operator=(const RetainPtr&);
         template<typename U> RetainPtr& operator=(const RetainPtr<U>&);
@@ -114,9 +156,6 @@ namespace WTF {
         RetainPtr& operator=(std::nullptr_t) { clear(); return *this; }
 #endif
 
-        void adoptCF(PtrType);
-        void adoptNS(PtrType);
-        
         void swap(RetainPtr&);
 
     private:
@@ -124,19 +163,19 @@ namespace WTF {
 
         PtrType m_ptr;
     };
-    
+
     template<typename T> template<typename U> inline RetainPtr<T>::RetainPtr(const RetainPtr<U>& o)
         : m_ptr(o.get())
     {
         if (PtrType ptr = m_ptr)
-            CFRetain(ptr);
+            retain(ptr);
     }
 
     template<typename T> inline void RetainPtr<T>::clear()
     {
         if (PtrType ptr = m_ptr) {
             m_ptr = 0;
-            CFRelease(ptr);
+            release(ptr);
         }
     }
 
@@ -151,79 +190,68 @@ namespace WTF {
     {
         PtrType optr = o.get();
         if (optr)
-            CFRetain(optr);
+            retain(optr);
         PtrType ptr = m_ptr;
         m_ptr = optr;
         if (ptr)
-            CFRelease(ptr);
+            release(ptr);
         return *this;
     }
-    
+
     template<typename T> template<typename U> inline RetainPtr<T>& RetainPtr<T>::operator=(const RetainPtr<U>& o)
     {
         PtrType optr = o.get();
         if (optr)
-            CFRetain(optr);
+            retain(optr);
         PtrType ptr = m_ptr;
         m_ptr = optr;
         if (ptr)
-            CFRelease(ptr);
+            release(ptr);
         return *this;
     }
 
     template<typename T> inline RetainPtr<T>& RetainPtr<T>::operator=(PtrType optr)
     {
         if (optr)
-            CFRetain(optr);
+            retain(optr);
         PtrType ptr = m_ptr;
         m_ptr = optr;
         if (ptr)
-            CFRelease(ptr);
+            release(ptr);
         return *this;
     }
 
     template<typename T> template<typename U> inline RetainPtr<T>& RetainPtr<T>::operator=(U* optr)
     {
         if (optr)
-            CFRetain(optr);
+            retain(optr);
         PtrType ptr = m_ptr;
         m_ptr = optr;
         if (ptr)
-            CFRelease(ptr);
+            release(ptr);
         return *this;
     }
 
 #if COMPILER_SUPPORTS(CXX_RVALUE_REFERENCES)
     template<typename T> inline RetainPtr<T>& RetainPtr<T>::operator=(RetainPtr<T>&& o)
     {
-        adoptCF(o.leakRef());
+        PtrType ptr = m_ptr;
+        m_ptr = o.leakRef();
+        if (ptr)
+            release(ptr);
+
         return *this;
     }
-    
+
     template<typename T> template<typename U> inline RetainPtr<T>& RetainPtr<T>::operator=(RetainPtr<U>&& o)
     {
-        adoptCF(o.leakRef());
+        PtrType ptr = m_ptr;
+        m_ptr = o.leakRef();
+        if (ptr)
+            release(ptr);
         return *this;
     }
 #endif
-
-    template<typename T> inline void RetainPtr<T>::adoptCF(PtrType optr)
-    {
-        PtrType ptr = m_ptr;
-        m_ptr = optr;
-        if (ptr)
-            CFRelease(ptr);
-    }
-
-    template<typename T> inline void RetainPtr<T>::adoptNS(PtrType optr)
-    {
-        adoptNSReference(optr);
-        
-        PtrType ptr = m_ptr;
-        m_ptr = optr;
-        if (ptr)
-            CFRelease(ptr);
-    }
 
     template<typename T> inline void RetainPtr<T>::swap(RetainPtr<T>& o)
     {
@@ -266,13 +294,13 @@ namespace WTF {
     }
 
     template<typename T> inline RetainPtr<T> adoptCF(T CF_RELEASES_ARGUMENT) WARN_UNUSED_RETURN;
-    template<typename T> inline RetainPtr<T> adoptCF(T o)
+    template<typename T> inline RetainPtr<T> adoptCF(T CF_RELEASES_ARGUMENT o)
     {
         return RetainPtr<T>(AdoptCF, o);
     }
 
     template<typename T> inline RetainPtr<T> adoptNS(T NS_RELEASES_ARGUMENT) WARN_UNUSED_RETURN;
-    template<typename T> inline RetainPtr<T> adoptNS(T o)
+    template<typename T> inline RetainPtr<T> adoptNS(T NS_RELEASES_ARGUMENT o)
     {
         return RetainPtr<T>(AdoptNS, o);
     }
@@ -298,16 +326,12 @@ namespace WTF {
     template<typename P> struct DefaultHash<RetainPtr<P> > { typedef PtrHash<RetainPtr<P> > Hash; };
 
     template <typename P>
-    struct RetainPtrObjectHashTraits : GenericHashTraits<RetainPtr<P> > {
-        static const bool emptyValueIsZero = true;
+    struct RetainPtrObjectHashTraits : SimpleClassHashTraits<RetainPtr<P> > {
         static const RetainPtr<P>& emptyValue()
         {
             static RetainPtr<P>& null = *(new RetainPtr<P>);
             return null;
         }
-        static const bool needsDestruction = true;
-        static void constructDeletedValue(RetainPtr<P>& slot) { new (&slot) RetainPtr<P>(HashTableDeletedValue); }
-        static bool isDeletedValue(const RetainPtr<P>& value) { return value.isHashTableDeletedValue(); }
     };
 
     template <typename P>
@@ -315,7 +339,7 @@ namespace WTF {
         static unsigned hash(const RetainPtr<P>& o)
         {
             ASSERT_WITH_MESSAGE(o.get(), "attempt to use null RetainPtr in HashTable");
-            return CFHash(o.get());
+            return static_cast<unsigned>(CFHash(o.get()));
         }
         static bool equal(const RetainPtr<P>& a, const RetainPtr<P>& b)
         {
@@ -331,5 +355,7 @@ using WTF::adoptCF;
 using WTF::adoptNS;
 using WTF::RetainPtr;
 using WTF::retainPtr;
+
+#endif // USE(CF) || defined(__OBJC__)
 
 #endif // WTF_RetainPtr_h

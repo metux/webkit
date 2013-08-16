@@ -41,10 +41,6 @@
 #include <wtf/ThreadSafeRefCounted.h>
 #include <wtf/text/WTFString.h>
 
-#if !LOG_DISABLED || !ERROR_DISABLED
-#include "SecurityOrigin.h"
-#endif
-
 namespace WebCore {
 
 class DatabaseAuthorizer;
@@ -114,23 +110,11 @@ protected:
     void setCachedVersion(const String&);
     bool getActualVersionForTransaction(String& version);
 
-#if PLATFORM(CHROMIUM)
-    void reportOpenDatabaseResult(int errorSite, int webSqlErrorCode, int sqliteErrorCode);
-    void reportChangeVersionResult(int errorSite, int webSqlErrorCode, int sqliteErrorCode);
-    void reportStartTransactionResult(int errorSite, int webSqlErrorCode, int sqliteErrorCode);
-    void reportCommitTransactionResult(int errorSite, int webSqlErrorCode, int sqliteErrorCode);
-    void reportExecuteStatementResult(int errorSite, int webSqlErrorCode, int sqliteErrorCode);
-    void reportVacuumDatabaseResult(int sqliteErrorCode);
-#else
-    void reportOpenDatabaseResult(int, int, int) { }
-    void reportChangeVersionResult(int, int, int) { }
-    void reportStartTransactionResult(int, int, int) { }
-    void reportCommitTransactionResult(int, int, int) { }
-    void reportExecuteStatementResult(int, int, int) { }
-    void reportVacuumDatabaseResult(int) { }
-#endif
-
     static const char* databaseInfoTableName();
+
+#if !LOG_DISABLED || !ERROR_DISABLED
+    String databaseDebugName() const;
+#endif
 
     RefPtr<SecurityOrigin> m_contextThreadSecurityOrigin;
     RefPtr<DatabaseBackendContext> m_databaseContext; // Associated with m_scriptExecutionContext.
@@ -142,10 +126,6 @@ protected:
     String m_filename;
 
     DatabaseBase* m_frontend;
-
-#if !LOG_DISABLED || !ERROR_DISABLED
-    String databaseDebugName() const { return m_contextThreadSecurityOrigin->toString() + "::" + m_name; }
-#endif
 
 private:
     DatabaseGuid m_guid;

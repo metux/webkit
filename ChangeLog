@@ -1,15 +1,169 @@
-2013-06-18  Xabier Rodriguez Calvar  <calvaris@igalia.com>
+2013-08-09  Zan Dobersek  <zdobersek@igalia.com>
 
-        [GTK][GStreamer] Fullscreen option in video element context menu not working
-        https://bugs.webkit.org/show_bug.cgi?id=105191
+        [Automake] Clean up OpenGL graphics configuration sections
+        https://bugs.webkit.org/show_bug.cgi?id=119554
 
-        Fullscreen with native controls is outdated and even broken in
-        [GTK][WK2], so they are deactivated for now.
+        Reviewed by Martin Robinson.
 
-        Reviewed by Philippe Normand.
+        Clean up sections in the Automake configuration process that are configuring the OpenGL graphics
+        features and dependencies. Remove unnecessary variable assignments, merge similar code paths,
+        clarify a couple of comments and error messages and fix a few whitespace problems.
 
-        * Source/autotools/SetupAutoconfHeader.m4: Removed the use of
-        fullscreen native media controls.
+        * Source/autotools/FindDependencies.m4:
+        * Source/autotools/ReadCommandLineArguments.m4:
+        * Source/autotools/SetupAutomake.m4:
+
+2013-08-04  Sam Weinig  <sam@webkit.org>
+
+        Remove support for HTML5 MicroData
+        https://bugs.webkit.org/show_bug.cgi?id=119480
+
+        Reviewed by Anders Carlsson.
+
+        * Source/autotools/SetupWebKitFeatures.m4:
+        * Source/cmake/OptionsBlackBerry.cmake:
+        * Source/cmake/OptionsEfl.cmake:
+        * Source/cmake/OptionsGTK.cmake:
+        * Source/cmake/WebKitFeatures.cmake:
+        * Source/cmakeconfig.h.cmake:
+
+2013-08-06  Simon Pena  <simon.pena@samsung.com>
+
+        Build fix for GTK 32-bit after r153736
+
+        * Source/autotools/symbols.filter: expose WebCore::SerializedScriptValue::create.
+
+2013-08-06  Simon Pena  <simon.pena@samsung.com>
+
+        Build fix for GTK after r153736
+
+        * Source/autotools/symbols.filter: expose missing symbols
+        WebCore::SerializedScriptValue::create and WebCore::toJS to Internals.
+
+2013-08-05  Zan Dobersek  <zdobersek@igalia.com>
+
+        [Automake] Define ENABLE_JIT through the Autoconf header
+        https://bugs.webkit.org/show_bug.cgi?id=119445
+
+        Reviewed by Martin Robinson.
+
+        Instead of defining the ENABLE_JIT value through JSC_CPPFLAGS, the feature define is
+        set to be either enabled or disabled through the Autoconf header, based on the value
+        passed through the configuration flag. The 'auto' value is used as default, meaning
+        that the feature is enabled or disabled in the Platform.h header based on the platform
+        configuration (OS, architecture etc.).
+
+        * Source/autotools/FindDependencies.m4: Remove the JSC_CPPFLAGS definition.
+        * Source/autotools/ReadCommandLineArguments.m4: Change the default value to 'auto' instead
+        of 'autodetect', as used by other configuration options that take a similar approach to enabling
+        a specific feature.
+        * Source/autotools/SetupAutoconfHeader.m4: Set a strict value for the ENABLE_JIT define through
+        the Autoconf header if the feature was specifically enabled or disabled.
+
+2013-08-04  Zalan Bujtas  <zalan@apple.com>
+
+        Background doesn't fully repaint when body has margins.
+        https://bugs.webkit.org/show_bug.cgi?id=119033
+
+        Reviewed by Simon Fraser.
+
+        Ensure that background-color changes do not leave unpainted areas when
+        body has margins.
+
+        Both <body> and <html> background-color get propagated up to the viewport.
+        If <body> has background-color attribute set, while <html> doesn't, the color is
+        applied not only on the <body> but on both the <html> and the viewport. However,
+        it's not enough to mark the RenderView dirty because with tiles backing on,
+        there could be areas outside of the viewport that need repaint. By marking
+        the RenderView's graphics layer dirty instead, we ensure that all the related
+        tiles get marked dirty too and the new background color covers all areas.
+
+        Manual test added. When forcing top-level composition on (even with embedded iframe to
+        make sure we don't do paintsIntoWindow rendering), the test case execution changes so much,
+        that the repaint rects don't reflect the functionality difference anymore.
+
+        Reviewed by Simon Fraser.
+
+        * ManualTests/compositing/background-color-change-on-body-with-margin.html: Added.
+
+2013-07-30  Ádám Kallai  <kadam@inf.u-szeged.hu>
+
+        [Qt] Workaround to make syncqt run and generate forwarding headers in SVN repositories too.
+        https://bugs.webkit.org/show_bug.cgi?id=118725.
+
+        Reviewed by Tor Arne Vestbø.
+
+        * .qmake.conf:
+
+2013-07-30  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        Unreviewed. Update NEWS and Versions.m4 for 2.1.4 release.
+
+        * Source/autotools/Versions.m4: Bump version numbers.
+
+2013-07-27  Ryuan Choi  <ryuan.choi@samsung.com>
+
+        [EFL] Bump required version of EFL to 1.7
+        https://bugs.webkit.org/show_bug.cgi?id=119144
+
+        Reviewed by Christophe Dumez.
+
+        We have supported 1.6 for Tizen build since r137203.
+        But Tizen now supports 1.7+ after Tizen released 2.0.
+
+        * Source/cmake/OptionsEfl.cmake:
+        Bumped EFL to 1.7 and removed promotion.
+
+2013-07-25  Christophe Dumez  <ch.dumez@sisa.samsung.com>
+
+        Unreviewed EFL build fix after r153315.
+
+        Use -std=gnu++0x instead of -std=c++0x as we rely on GNU extensions such as
+        typeof().
+
+        * Source/cmake/WebKitHelpers.cmake:
+
+2013-07-25  Ryuan Choi  <ryuan.choi@samsung.com>
+
+        [CMAKE] Enforce c++0x for cmake based ports
+        https://bugs.webkit.org/show_bug.cgi?id=119081
+
+        Reviewed by Gyuyoung Kim.
+
+        * Source/cmake/WebKitHelpers.cmake:
+        Enforce c++0x for all cmake based ports to fix build break.
+
+2013-07-24  Ryuan Choi  <ryuan.choi@samsung.com>
+
+        [EFL][CMAKE] Fix wrong syntax about option commands
+        https://bugs.webkit.org/show_bug.cgi?id=119035
+
+        Reviewed by Christophe Dumez.
+
+        second argument of cmake option command should be description.
+
+        * Source/cmake/OptionsEfl.cmake: Added description instead of wrong initial value.
+
+2013-07-23  Tim Horton  <timothy_horton@apple.com>
+
+        Add a test for plug-in unavailability indicator obscurity detection
+        https://bugs.webkit.org/show_bug.cgi?id=119007
+
+        Reviewed by Anders Carlsson.
+
+        * Source/autotools/symbols.filter:
+        Expose RenderEmbeddedObject::isReplacementObscured to internals.
+
+2013-07-16  Balazs Kelemen  <kbalazs@webkit.org>
+
+        [CMake] Undefined references should be detected at build time
+        https://bugs.webkit.org/show_bug.cgi?id=110236
+
+        Reviewed by Christophe Dumez.
+
+        Pass the --no-undefined argument to the linker on platforms where it is available.
+
+        * Source/cmake/OptionsCommon.cmake:
 
 2013-07-16  Carlos Garcia Campos  <cgarcia@igalia.com>
 
@@ -24,6 +178,123 @@
         * Source/autotools/SetupAutoconfHeader.m4: Define
         GDK_VERSION_MIN_REQUIRED in config.h.
 
+2013-07-09  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        Unreviewed. Update NEWS and Versions.m4 for 2.1.3 release.
+
+        * Source/autotools/Versions.m4: Bump version numbers.
+
+2013-07-08  Andy Estes  <aestes@apple.com>
+
+        Add WebInspectorUI to WebKit.xcworkspace
+        https://bugs.webkit.org/show_bug.cgi?id=118491
+
+        Reviewed by Sam Weinig.
+
+        * WebKit.xcworkspace/contents.xcworkspacedata:
+
+2013-07-08  ChangSeok Oh  <changseok.oh@collabora.com>
+
+        [GTK] Acceleration description isn't displayed in configured options.
+        https://bugs.webkit.org/show_bug.cgi?id=118441
+
+        Reviewed by Gustavo Noronha Silva.
+
+        The acceleration_backend_description has been changed to acceleration_description from r152275.
+
+        * Source/autotools/PrintBuildConfiguration.m4:
+
+2013-07-08  Zan Dobersek  <zdobersek@igalia.com>
+
+        [Autoconf] Define WTF_USE_OPENGL when OpenGL was found
+        https://bugs.webkit.org/show_bug.cgi?id=118341
+
+        Reviewed by Gustavo Noronha Silva.
+
+        After r152275, WTF_USE_OPENGL is only defined if the accelerated compositing is enabled.
+        This breaks the build if disabling the accelerated compositing feature as the OpenGL-specific
+        code is not compiled anymore even if it's still required.
+
+        To avoid that, WTF_USE_OPENGL should be defined if OpenGL was found. The accelerated compositing
+        feature also relies on this condition, exiting the configuration process with an error otherwise.
+
+        * Source/autotools/SetupAutoconfHeader.m4:
+
+2013-07-01  Gustavo Noronha Silva  <gustavo.noronha@collabora.com>
+
+        [GTK] Remove unsupported AC backends
+        https://bugs.webkit.org/show_bug.cgi?id=117362
+
+        Reviewed by Martin Robinson.
+
+        * Source/autotools/FindDependencies.m4: remove checks related to acceleration backend,
+        turn them into a check for OpenGL being available, simply.
+        * Source/autotools/ReadCommandLineArguments.m4: remove command line option to select
+        accelerated backend, it's now auto-detected.
+        * Source/autotools/SetupAutoconfHeader.m4: no longer defines USE_CLUTTER and
+        USE_TEXTURE_MAPPER_CAIRO.
+        * Source/autotools/SetupAutomake.m4: remove checks related to acceleration backend,
+        turn them into a check for OpenGL being available, simply.
+        * Source/autotools/Versions.m4: no longer check for clutter/clutter-gtk.
+
+2013-07-01  Timothy Hatcher  <timothy@apple.com>
+
+        Link to WebInspectorUI.framework at build time instead of soft linking.
+
+        https://bugs.webkit.org/show_bug.cgi?id=118261
+
+        Reviewed by Joseph Pecoraro.
+
+        * Source/Makefile: Build WebInspectorUI before WebKit and WebKit2.
+
+2013-06-28  Sean Bright  <sean@malleable.com>
+
+        [Autotools] Properly quote harfbuzz-icu pkg-config check
+        https://bugs.webkit.org/show_bug.cgi?id=118186
+
+        Reviewed by Carlos Garcia Campos.
+
+        A secondary test was added in r150963 to check for harfbuzz-icu
+        when it was split into two packages, but the test is not properly
+        quoted.  If the test fails you get an error about missing
+        version "./configure.9.8" instead of the expected "0.9.8."
+
+        * Source/autotools/FindDependencies.m4:
+
+2013-06-27  Christophe Dumez  <ch.dumez@sisa.samsung.com>
+
+        Remove [NoInterfaceObject] from WorkerGlobalScope
+        https://bugs.webkit.org/show_bug.cgi?id=118071
+
+        Reviewed by Kentaro Hara.
+
+        Update GENERATE_BINDINGS CMake macro to take 2 additional parameters
+        now needed by the preprocess-idls.pl script.
+
+        * Source/cmake/WebKitMacros.cmake:
+
+2013-06-24  Ryuan Choi  <ryuan.choi@samsung.com>
+
+        [CMAKE] Clear unused cmakedefines
+        https://bugs.webkit.org/show_bug.cgi?id=117931
+
+        Reviewed by Christophe Dumez.
+
+        * Source/cmakeconfig.h.cmake:
+        Removed ENABLE_AS_IMAGE, ENABLE_LEGACY_WEBKIT_BLOB_BUILDER and
+        ENABLE_CLIENT_BASED_GEOLOCATION cmakedefines which already removed.
+
+2013-06-20  Ryuan Choi  <ryuan.choi@samsung.com>
+
+        [CMAKE][EFL] Enable DOM4 Events Constructor
+        https://bugs.webkit.org/show_bug.cgi?id=117858
+
+        Reviewed by Laszlo Gombos.
+
+        * Source/cmake/OptionsEfl.cmake: Enabled ENABLE_DOM4_EVENTS_CONSTRUCTOR.
+        * Source/cmake/WebKitFeatures.cmake: Added ENABLE_DOM4_EVENTS_CONSTRUCTOR.
+        * Source/cmakeconfig.h.cmake: Ditto.
+
 2013-06-20  Zan Dobersek  <zdobersek@igalia.com>
 
         [GTK] remove bashism from configure
@@ -35,13 +306,49 @@
         of the base string followed by the string that's being appended. This replaces the use of the '+=' operator
         that works under bash but is not supported by other shells.
 
-2013-06-11  Carlos Garcia Campos  <cgarcia@igalia.com>
+2013-06-18  Ryosuke Niwa  <rniwa@webkit.org>
 
-        Unreviewed. Update NEWS and Versions.m4 for 2.0.3 release.
+        REGRESSION(r147602): Search text field doesn't render selection when it has some :focus rules
+        https://bugs.webkit.org/show_bug.cgi?id=117747
+
+        Reviewed by Kent Tamura.
+
+        * ManualTests/search-select-all-with-focus-style.html: Added.
+
+2013-06-18  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        Unreviewed. Update NEWS and Versions.m4 for 2.1.2 release.
 
         * Source/autotools/Versions.m4: Bump version numbers.
 
-2013-06-11  Carlos Garcia Campos  <cgarcia@igalia.com>
+2013-06-18  Xabier Rodriguez Calvar  <calvaris@igalia.com>
+
+        [GTK][GStreamer] Fullscreen option in video element context menu not working
+        https://bugs.webkit.org/show_bug.cgi?id=105191
+
+        Fullscreen with native controls is outdated and even broken in
+        [GTK][WK2], so they are deactivated for now.
+
+        Reviewed by Philippe Normand.
+
+        * Source/autotools/SetupAutoconfHeader.m4: Removed the use of
+        fullscreen native media controls.
+
+2013-06-17  Michael Brüning  <michael.bruning@digia.com>
+
+        [Qt] Remove Qt specific QTKIT flagged code.
+        https://bugs.webkit.org/show_bug.cgi?id=117635
+
+        Reviewed by Simon Hausmann.
+
+        Due to disabling QTKIT for Qt in r151546, the
+        code the flags that are not taken into account
+        anymore and the code that has been rendered
+        unreachable by this are removed.
+
+        * Source/widgetsapi.pri:
+
+2013-06-17  Carlos Garcia Campos  <cgarcia@igalia.com>
 
         Unreviewed. Rename gobject_introspection_required variable.
 
@@ -50,6 +357,136 @@
 
         * Source/autotools/FindDependencies.m4:
         * Source/autotools/Versions.m4:
+
+2013-06-14  Patrick Gansterer  <paroga@webkit.org>
+
+        Introduce USE(WINGDI) for the Windows port
+        https://bugs.webkit.org/show_bug.cgi?id=116138
+
+        Reviewed by Ryosuke Niwa.
+
+        Using USE(WINGDI) instead of OS(WINCE) will allow us to
+        compile the GDI based Windows port on WinNT too.
+
+        * Source/cmake/OptionsWinCE.cmake:
+
+2013-06-14  Manuel Rego Casasnovas  <rego@igalia.com>
+
+        [GTK][WK1] Missing symbols
+        https://bugs.webkit.org/show_bug.cgi?id=117629
+
+        Unreviewed GTK+ build fix.
+
+        * Source/autotools/symbols.filter: Added missing symbols needed when
+        compiling WK1.
+
+2013-06-13  Max Vujovic  <mvujovic@adobe.com>
+
+        [CSS Regions] Selection dragged from a region paints its background
+        https://bugs.webkit.org/show_bug.cgi?id=117607
+
+        Reviewed by Alexandru Chiculita.
+
+        Add a manual test for the painting of a dragged selection from a region. We don't have an
+        automated way to test this yet. This test is similar to the other manual selection dragging
+        tests (e.g. ManualTests/drag-image.html).
+
+        * ManualTests/regions/drag-selection-painting.html: Added.
+
+2013-06-13  Xabier Rodriguez Calvar  <calvaris@igalia.com>
+
+        [GTK] [WK2] Found missing symbol when running some tests
+        https://bugs.webkit.org/show_bug.cgi?id=117598
+
+        Reviewed by Martin Robinson.
+
+        * Source/autotools/symbols.filter: Added missing
+        _ZN7WebCore28notImplementedLoggingChannelEv.
+
+2013-06-12  Alberto Garcia  <agarcia@igalia.com>
+
+        [BlackBerry] Remove dead WebDOM code
+        https://bugs.webkit.org/show_bug.cgi?id=113370
+
+        Reviewed by Anders Carlsson.
+
+        BlackBerry PR 347565
+        Internally reviewed by Charles Wei.
+
+        * Source/cmake/OptionsBlackBerry.cmake:
+
+2013-06-06  Timothy Hatcher  <timothy@apple.com>
+
+        Add WebInspectorUI to the Makefile.
+
+        Reviewed by Mark Rowe.
+
+        * Source/Makefile:
+
+2013-06-11  Seokju Kwon  <seokju.kwon@gmail.com>
+
+        Remove leftover wxWebkit code
+        https://bugs.webkit.org/show_bug.cgi?id=117471
+
+        Reviewed by Andreas Kling.
+
+        * Source/cmake/WebKitPackaging.cmake:
+
+2013-06-07  Zan Dobersek  <zdobersek@igalia.com>
+
+        [regression] build failure WebKitFontFamilyNames.h missing
+        https://bugs.webkit.org/show_bug.cgi?id=117178
+
+        Reviewed by Sam Weinig.
+
+        * GNUmakefile.am: List platform_sources under the BUILT_SOURCES list.
+
+2013-06-05  Bear Travis  <betravis@adobe.com>
+
+        [CSS Exclusions][CSS Shapes] Split CSS Exclusions & Shapes compile & runtime flags
+        https://bugs.webkit.org/show_bug.cgi?id=117172
+
+        Reviewed by Alexandru Chiculita.
+
+        Adding the CSS_SHAPES compile flag.
+
+        * Source/autotools/SetupWebKitFeatures.m4:
+        * Source/autotools/symbols.filter:
+        * Source/cmake/WebKitFeatures.cmake:
+        * Source/cmakeconfig.h.cmake:
+
+2013-06-05  Zan Dobersek  <zdobersek@igalia.com>
+
+        Move MemoryInfo under window.internals
+        https://bugs.webkit.org/show_bug.cgi?id=117197
+
+        Reviewed by Ryosuke Niwa.
+
+        * Source/autotools/symbols.filter: Export the required symbol.
+
+2013-06-04  Christophe Dumez  <ch.dumez@sisa.samsung.com>
+
+        Automatically generate WorkerContext constructor attributes
+        https://bugs.webkit.org/show_bug.cgi?id=117183
+
+        Reviewed by Kentaro Hara.
+
+        Update GENERATE_BINDINGS macro to take an additional _workercontext_constructors_file
+        optional argument.
+
+        * Source/cmake/WebKitMacros.cmake:
+
+2013-06-03  Eduardo Lima Mitev  <elima@igalia.com>
+
+        [EFL] Add ATK version 2.8.0 to efl jhbuild moduleset
+        https://bugs.webkit.org/show_bug.cgi?id=116726
+
+        Reviewed by Gyuyoung Kim.
+
+        Bump required version of ATK to 2.8.0 in EFL CMake's build.
+
+        * Source/cmake/FindATK.cmake: Adds macro to check required version
+        * Source/cmake/OptionsEfl.cmake: Specifies required version of ATK to be 2.8.0
 
 2013-05-30  Alberto Garcia  <agarcia@igalia.com>
 
@@ -67,6 +504,157 @@
 
         * Source/autotools/FindDependencies.m4:
 
+2013-05-29  Kent Tamura  <tkent@chromium.org>
+
+        Remove leftover files for ENABLE_PAGE_POPUP and ENABLE_CALENDAR_PICKER
+        https://bugs.webkit.org/show_bug.cgi?id=116999
+
+        Reviewed by Anders Carlsson.
+
+        * ManualTests/forms/calendar-picker-crash-by-type-change.html: Removed.
+        * ManualTests/forms/calendar-picker.html: Removed.
+        * ManualTests/forms/color-suggestion-picker.html: Removed.
+        * ManualTests/forms/date-suggestion-picker.html: Removed.
+
+2013-05-29  Martin Robinson  <mrobinson@igalia.com>
+
+        Fix more CMake GTK+ build issues after r150336
+
+        * Source/cmake/OptionsGTK.cmake: Actually set the new output name variable
+        and be sure to set WTF_USE_EGL when EGL is enabled.
+
+2013-05-29  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        Unreviewed. Update NEWS and Versions.m4 for 2.1.1 release.
+
+        * Source/autotools/Versions.m4: Bump version numbers.
+
+2013-05-29  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        Unreviewed. Fix make distcheck.
+
+        * GNUmakefile.am: Add WebKitFeatures.h and WebKitFeatures.txt to
+        DISTCLEANFILES.
+
+2013-05-26  Jon Lee  <jonlee@apple.com>
+
+        [WK2] Notifications clobber each other with multiple processes
+        https://bugs.webkit.org/show_bug.cgi?id=116428
+        <rdar://problem/13935191>
+
+        Reviewed by Darin Adler.
+
+        * ManualTests/notification-in-multiple-windows.html: Added.
+
+2013-05-27  Patrick Gansterer  <paroga@webkit.org>
+
+        Use ICU_INCLUDE_DIRS in BlackBerry CMake files
+        https://bugs.webkit.org/show_bug.cgi?id=116210
+
+        Reviewed by Rob Buis.
+
+        Set and use the ICU_INCLUDE_DIRS variable to avoid
+        duplicated adding of the ICU include directory.
+
+        * Source/cmake/OptionsBlackBerry.cmake:
+
+2013-05-24  Anders Carlsson  <andersca@apple.com>
+
+        Remove PagePopup code
+        https://bugs.webkit.org/show_bug.cgi?id=116732
+
+        Reviewed by Andreas Kling.
+
+        * Source/cmakeconfig.h.cmake:
+        Remove ENABLE_PAGE_POPUP.
+
+2013-05-21  Martin Robinson  <mrobinson@igalia.com>
+
+        [GTK] [CMake] Add support for building WebKit2
+        https://bugs.webkit.org/show_bug.cgi?id=116372
+
+        Reviewed by Gustavo Noronha Silva.
+
+        * Source/cmake/FindWebP.cmake: Added.
+        * Source/cmake/OptionsGTK.cmake: Turn on WebKit2 and the plugin process and also look
+        for WebP. These missing symbols were hidden up until now. ENABLE_TEXTURE_MAPPER was
+        also incorrect specified.
+
+2013-05-21  Zan Dobersek  <zdobersek@igalia.com>
+
+        [GTK] Compile everything in C++11 mode
+        https://bugs.webkit.org/show_bug.cgi?id=116452
+
+        Reviewed by Anders Carlsson.
+
+        * Source/autotools/SetupCompilerFlags.m4: Use the C++11 standard by default when compiling C++ source code.
+        Perform some minor cleanup around the comments and the order of specifying additional CXXFLAGS entries.
+
+2013-05-21  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        [BlackBerry] Make PagePopup implementation independent from WebCore
+        https://bugs.webkit.org/show_bug.cgi?id=116448
+
+        Reviewed by Anders Carlsson.
+
+        * Source/cmake/OptionsBlackBerry.cmake: Do not enable PAGE_POPUP
+        feature.
+
+2013-05-20  Christophe Dumez  <ch.dumez@sisa.samsung.com>
+
+        [EFL] Reenabled INDEXED_DATABASE after r150344
+        https://bugs.webkit.org/show_bug.cgi?id=116430
+
+        Reviewed by Gyuyoung Kim.
+
+        Reenable INDEXED_DATABASE flag for EFL port now that WebKit2
+        build was fixed in r150344.
+
+        * Source/cmake/OptionsEfl.cmake:
+
+2013-05-19  Anders Carlsson  <andersca@apple.com>
+
+        Remove link prerendering code
+        https://bugs.webkit.org/show_bug.cgi?id=116415
+
+        Reviewed by Darin Adler.
+
+        This code was only used by Chromium and is dead now.
+
+        * Source/autotools/SetupWebKitFeatures.m4:
+        * Source/cmake/WebKitFeatures.cmake:
+        * Source/cmakeconfig.h.cmake:
+
+2013-05-18  Patrick Gansterer  <paroga@webkit.org>
+
+        [CMake] Replace *_LIBRARY_NAME with *_OUTPUT_NAME
+        https://bugs.webkit.org/show_bug.cgi?id=114554
+
+        Reviewed by Gyuyoung Kim.
+
+        Using variables as target names is very uncommon in CMake.
+        The usual way to specify the name of the resulting binary
+        is to set the OUTPUT_NAME target property.
+
+        * CMakeLists.txt:
+        * Source/CMakeLists.txt:
+        * Source/PlatformEfl.cmake:
+        * Source/PlatformGTK.cmake:
+        * Source/cmake/OptionsBlackBerry.cmake:
+        * Source/cmake/OptionsEfl.cmake:
+        * Source/cmake/OptionsGTK.cmake:
+        * Source/cmake/WebKitHelpers.cmake:
+        * Source/cmake/gtest/CMakeLists.txt:
+
+2013-05-18  Christophe Dumez  <ch.dumez@sisa.samsung.com>
+
+        Unreviewed EFL build fix.
+
+        Temporarily disabled INDEXED_DATABASE at compile-time as it breaks
+        WK2 build after r150305.
+
+        * Source/cmake/OptionsEfl.cmake:
+
 2013-05-18  Alberto Garcia  <agarcia@igalia.com>
 
         [GTK] Parallel build fails if gtk-doc is enabled
@@ -78,55 +666,350 @@
         Define an empty noinst_DATA variable where other automake files
         can add additional objects to be built.
 
-2013-05-16  Alberto Garcia  <agarcia@igalia.com>
+2013-05-16  Martin Robinson  <mrobinson@igalia.com>
 
-        [GTK] WebAudio doesn't build in WebKitGTK+ 2.0.2
-        https://bugs.webkit.org/show_bug.cgi?id=116154
+        [GTK] [CMake] Disable the shadow DOM
+        https://bugs.webkit.org/show_bug.cgi?id=116237
 
         Reviewed by Gustavo Noronha Silva.
 
-        Don't override the value of ENABLE_WEB_AUDIO selected in the
-        configure script.
+        * Source/cmake/OptionsGTK.cmake: Disable shadow DOM by default.
+
+2013-05-14  Martin Robinson  <mrobinson@igalia.com>
+
+        [GTK] Add support for building WebCore to the cmake build
+        https://bugs.webkit.org/show_bug.cgi?id=116128
+
+        Reviewed by Gustavo Noronha Silva.
+
+        * Source/PlatformGTK.cmake: Added.
+        * Source/cmake/OptionsGTK.cmake: Added more logic and variables to support WebCore and properly
+        defined some existing variables.
+
+2013-05-15  Alexey Proskuryakov  <ap@apple.com>
+
+        More fixing after WebProcessShim renaming in r149074.
+
+        * WebKit.xcworkspace/xcshareddata/xcschemes/All Source (target WebProcess).xcscheme:
+        Updated to insert the right shim.
+
+2013-05-15  Patrick Gansterer  <paroga@webkit.org>
+
+        Consolidate lists in WTF CMake files
+        https://bugs.webkit.org/show_bug.cgi?id=116142
+
+        Reviewed by Martin Robinson.
+
+        Move common files into the CMakeLists.txt to avoid duplicating the list of files.
+        Also rebase the recently added GTK files to match the other CMake ports, since
+        the submitted patch was based on an older version of the source tree.
+
+        * Source/cmake/OptionsGTK.cmake:
+
+2013-05-14  Zan Dobersek  <zdobersek@igalia.com>
+
+        [GTK] Move generated ColorData.cpp, WebKitFontFamilyNames.(cpp|h) build targets into libPlatform
+        https://bugs.webkit.org/show_bug.cgi?id=115921
+
+        Reviewed by Gustavo Noronha Silva.
+
+        * GNUmakefile.am: Add GENSOURCES_PLATFORM, platform_built_sources variables.
+
+2013-05-11  Martin Robinson  <mrobinson@igalia.com>
+
+        [GTK] Add a basic cmake build for WTF and JavaScriptCore
+        https://bugs.webkit.org/show_bug.cgi?id=115967
+
+        Reviewed by Laszlo Gombos.
+
+        * CMakeLists.txt: Add GTK+ to the list of ports.
+        * Source/CMakeLists.txt: We do not try to build WebCoreTestSupport when WebCore is disabled.
+        * Source/cmake/FindGAIL3.cmake: Added.
+        * Source/cmake/FindGDK3.cmake: Added.
+        * Source/cmake/FindGStreamer.cmake: Use the passed in minimum version.
+        * Source/cmake/FindGTK3.cmake: Added.
+        * Source/cmake/FindXt.cmake: Added.
+        * Source/cmake/OptionsEfl.cmake: Pass in the minimum version.
+        * Source/cmake/OptionsGTK.cmake: Added.
+
+2013-05-11  Martin Robinson  <mrobinson@igalia.com>
+
+        Move defines to platform
+
+        [GTK] Move defines that will never be configured to Platform.h
+        https://bugs.webkit.org/show_bug.cgi?id=115965
+
+        Reviewed by Andreas Kling.
+
+        * Source/autotools/SetupAutoconfHeader.m4: Move some unchanging defines to Platform.h.
+
+2013-05-09  Christophe Dumez  <ch.dumez@sisa.samsung.com>
+
+        Add support for [NoInterfaceObject] Web IDL extended attribute
+        https://bugs.webkit.org/show_bug.cgi?id=115714
+
+        Reviewed by Kentaro Hara.
+
+        Update GENERATE_BINDINGS macro to take an additional _window_constructors_file
+        optional argument.
+
+        * Source/cmake/WebKitMacros.cmake:
+
+2013-05-08  José Dapena Paz  <jdapena@igalia.com> and Zan Dobersek  <zdobersek@igalia.com>
+
+        [GTK] Plumb the Automake build system for the Battery Status API feature
+        https://bugs.webkit.org/show_bug.cgi?id=115718
+
+        Reviewed by Martin Robinson.
+
+        * Source/autotools/FindDependencies.m4: Check for the upower-glib dependency if the feature is enabled.
+        * Source/autotools/PrintBuildConfiguration.m4: Print out the feature status.
+        * Source/autotools/ReadCommandLineArguments.m4: Check for the --enable-battery-status option. The deafult,
+        when the option is not given, is to disable the feature.
+        * Source/autotools/SetupWebKitFeatures.m4: Treat the ENABLE_BATTERY_STATUS define as configurable.
+        * Source/autotools/symbols.filter: Export a couple of symbols that are used in the WebCore internals library.
+
+2013-05-08  Zan Dobersek  <zdobersek@igalia.com>
+
+        [Automake] Pass --no-demangle to the linker by default to get the mangled symbols
+        https://bugs.webkit.org/show_bug.cgi?id=115732
+
+        Reviewed by Gustavo Noronha Silva.
+
+        * GNUmakefile.am: Pass the --no-demangle option to the linker by default. This is done by appending
+        the flag to the LDFLAGS variable. While the AM_LDFLAGS variable would be more appropriate, it's not
+        at all used when linking installable libraries like libwebkitgtk and libwebkit2gtk, so the LDFLAGS
+        variable is used instead.
+
+2013-05-07  Gyuyoung Kim  <gyuyoung.kim@samsung.com>
+
+        [CMAKE] Remove SHADOW_DOM from cmakeconfig.h.cmake
+        https://bugs.webkit.org/show_bug.cgi?id=115712
+
+        Reviewed by Andreas Kling.
+
+        Nobody uses SHADOW_DOM in cmake.
+
+        * Source/cmake/WebKitFeatures.cmake:
+        * Source/cmakeconfig.h.cmake:
+
+2013-05-06  Mike Lattanzio  <mlattanzio@blackberry.com>
+
+        [BlackBerry] Enable and Expose Text Autosizing through BlackBerry::WebKit::WebSettings
+        https://bugs.webkit.org/show_bug.cgi?id=113808
+
+        Reviewed by Rob Buis.
+
+        Set the ENABLE_TEXT_AUTOSIZING default to ON for BlackBerry.
+
+        * Source/cmake/OptionsBlackBerry.cmake:
+
+2013-05-06  Christophe Dumez  <ch.dumez@sisa.samsung.com>
+
+        [EFL] Shadow DOM should be disabled at compile time
+        https://bugs.webkit.org/show_bug.cgi?id=115635
+
+        Reviewed by Andreas Kling.
+
+        Disable Shadow DOM at compile time for EFL port. Shadow DOM code
+        is being removed from the tree.
+
+        * Source/cmake/OptionsEfl.cmake:
+
+2013-05-04  Dean Jackson  <dino@apple.com>
+
+        Animations and Transitions should not start when globally suspended
+        https://bugs.webkit.org/show_bug.cgi?id=114915
+
+        Reviewed by Sam Weinig.
+
+        Export AnimationController::isSuspended().
+
+        * Source/autotools/symbols.filter:
+
+2013-05-01  Benjamin Poulain  <benjamin@webkit.org>
+
+        Remove the remaining wscript
+        https://bugs.webkit.org/show_bug.cgi?id=115459
+
+        Reviewed by Andreas Kling.
+
+        * wscript: Removed.
+
+2013-05-01  Sergio Villar Senin  <svillar@igalia.com>
+
+        Show a block cursor in overtype mode
+        https://bugs.webkit.org/show_bug.cgi?id=114819
+
+        Reviewed by Ryosuke Niwa.
+
+        * Source/autotools/symbols.filter: export some extra symbols for
+        testing purposes.
+
+2013-04-30  Christophe Dumez  <ch.dumez@sisa.samsung.com>
+
+        [EFL] Enable scaled cursors
+        https://bugs.webkit.org/show_bug.cgi?id=106242
+
+        Reviewed by Gyuyoung Kim.
+
+        Enable MOUSE_CURSOR_SCALE flag for EFL port.
+
+        * Source/cmake/OptionsEfl.cmake:
+        * Source/cmake/WebKitFeatures.cmake:
+
+2013-04-29  Zan Dobersek  <zdobersek@igalia.com>
+
+        [GTK] Disable Shadow DOM feature
+        https://bugs.webkit.org/show_bug.cgi?id=115374
+
+        Reviewed by Martin Robinson.
+
+        Disable the Shadow DOM feature on the GTK port, the feature is planned for removal.
 
         * Source/autotools/SetupWebKitFeatures.m4:
 
-2013-05-13  Carlos Garcia Campos  <cgarcia@igalia.com>
+2013-04-28  Ryuan Choi  <ryuan.choi@samsung.com>
 
-        Unreviewed. Update NEWS and Versions.m4 for 2.0.2 release.
+        [EFL][CMAKE] Build break after r149259
+        https://bugs.webkit.org/show_bug.cgi?id=115339
 
-        * Source/autotools/Versions.m4: Bump version numbers.
+        Reviewed by Gyuyoung Kim.
 
-2013-04-16  Carlos Garcia Campos  <cgarcia@igalia.com>
+        r149259 used c++11 features(Right angle bracket, Range-based for-loop).
+        This patch enforces c++0x when cmake based ports build WebKit2 using gcc.
 
-        Unreviewed. Update NEWS and Versions.m4 for 2.0.1 release.
+        * Source/cmake/WebKitHelpers.cmake:
 
-        * Source/autotools/Versions.m4: Bump version numbers.
+2013-04-22  Benjamin Poulain  <benjamin@webkit.org>
 
-2013-03-31  Martin Robinson  <mrobinson@igalia.com>
+        Remove the memory instrumentation code
+        https://bugs.webkit.org/show_bug.cgi?id=114931
 
-        Bug 110293 uses read -d which is a non-portable bashism
-        https://bugs.webkit.org/show_bug.cgi?id=113349
+        Reviewed by Andreas Kling.
+
+        * Source/autotools/symbols.filter:
+
+2013-04-22  Martin Robinson  <mrobinson@igalia.com>
+
+        [GTK] Enable introspection always for developer builds
+        https://bugs.webkit.org/show_bug.cgi?id=114983
 
         Reviewed by Gustavo Noronha Silva.
 
-        * Source/autotools/SetupWebKitFeatures.m4: Pass the default feature set to the
-        feature script in a more portable way.
+        * Source/autotools/SetupAutoconfHeader.m4: No longer expose the ENABLE_INTROSPECTION
+        autoconf header variable. It isn't used and it means that when introspection is enabled
+        or disabled, there is an unnecessary full rebuild.
 
-2013-04-02  Martin Robinson  <mrobinson@igalia.com>
+2013-04-22  Zan Dobersek  <zdobersek@igalia.com>
 
-        [GTK] Make libsecret optional
-        https://bugs.webkit.org/show_bug.cgi?id=113821
+        [GTK] Set up libPlatform.la
+        https://bugs.webkit.org/show_bug.cgi?id=114168
 
-        Reviewed by Gustavo Noronha Silva.
+        Reviewed by Martin Robinson.
 
-        Add a configuration option to disable credential storage and thus remove
-        the libsecret dependency. This should make it possible to build WebKit 2.x
-        on Windows again.
+        * GNUmakefile.am: Define the platform_cppflags and platform_sources variables.
 
-        * Source/autotools/FindDependencies.m4: Only look for libsecret if credential storage is active.
-        * Source/autotools/PrintBuildConfiguration.m4: Print whether or not credential storage is active.
-        * Source/autotools/ReadCommandLineArguments.m4: Added an option to control credential storage.
-        * Source/autotools/SetupAutoconfHeader.m4: Expose credential storage setting to code.
+2013-04-20  Zan Dobersek  <zdobersek@igalia.com>
+
+        Enable sub-pixel layout for the GTK port
+        https://bugs.webkit.org/show_bug.cgi?id=94792
+
+        Reviewed by Martin Robinson.
+
+        * Source/autotools/SetupWebKitFeatures.m4: Enable the subpixel layout.
+
+2013-04-20  Andras Becsi  <andras.becsi@digia.com>
+
+        [Qt][Mac] Remove obsolete workaround for debug builds
+        https://bugs.webkit.org/show_bug.cgi?id=114750
+
+        Reviewed by Jocelyn Turcotte.
+
+        This workaround made default builds fail with recent Qt5 because
+        it removed the major version number from the library name, producing
+        QtWebKitWidgets, whereas the linking command line tried to link
+        against Qt5WebKitWidgets.
+        Debug builds are possible with and without framework-enabled builds
+        of Qt, but the debug versions of the Qt libraries have to be present.
+        Debug builds with a release version of Qt are not possible on Mac
+        since for debug builds qmake produces a linker command line where
+        all the Qt libraries have the "_debug" suffix, therefore if the debug
+        libraries are missing the build fails.
+
+        * Source/widgetsapi.pri:
+
+2013-04-19  Martin Robinson  <mrobinson@igalia.com>
+
+        [GTK] JSCore.gir.in has a few problems
+        https://bugs.webkit.org/show_bug.cgi?id=114710
+
+        Reviewed by Philippe Normand.
+
+        * GNUmakefile.am: Move common GIR initialization here from WebKit1.
+        * configure.ac: Updated to reflect new JSC gir file location.
+
+2013-04-18  Ryuan Choi  <ryuan.choi@gmail.com>
+
+        [EFL] Build break when using cmake without CMAKE_BUILD_TYPE
+        https://bugs.webkit.org/show_bug.cgi?id=114835
+
+        Unreviewed build fix.
+
+        * Source/cmake/OptionsEfl.cmake:
+
+2013-04-16  Patrick Gansterer  <paroga@webkit.org>
+
+        [CMake] Do not use JAVASCRIPTCORE_DIR in add_custom_command() of JavaScriptcore project
+        https://bugs.webkit.org/show_bug.cgi?id=114265
+
+        Reviewed by Brent Fulgham.
+
+        * Source/cmake/WebKitMacros.cmake: Removed macro GENERATE_HASH_LUT.
+
+2013-04-16  Andy Estes  <aestes@apple.com>
+
+        Changed the default debugger from GDB to LLDB for the 'All Source' scheme in WebKit.xcworkspace.
+
+        Rubber-stamped by Dan Bernstein.
+
+        * WebKit.xcworkspace/xcshareddata/xcschemes/All Source.xcscheme:
+
+2013-04-16  Manuel Rego Casasnovas  <rego@igalia.com>
+
+        [EFL] Bump libsoup dependency to 2.42.0
+        https://bugs.webkit.org/show_bug.cgi?id=113927
+
+        Reviewed by Gyuyoung Kim.
+
+        Update libsoup required version to v2.42.0 and GLib to v2.36.0 as
+        required by libsoup for EFL port.
+
+        * Source/cmake/OptionsEfl.cmake:
+
+2013-04-15  Patrick Gansterer  <paroga@webkit.org>
+
+        [CMake] Add WTF_USE_*_UNICODE variables
+        https://bugs.webkit.org/show_bug.cgi?id=114556
+
+        Reviewed by Brent Fulgham.
+
+        WTF_USE_ICU_UNICODE and WTF_USE_WCHAR_UNICODE are used to
+        reduce duplication in the platform specific CMake files.
+
+        * Source/cmake/OptionsBlackBerry.cmake:
+        * Source/cmake/OptionsEfl.cmake:
+        * Source/cmake/OptionsWinCE.cmake:
+
+2013-04-15  Martin Robinson  <mrobinson@igalia.com>
+
+        [GTK] REGRESSION(r147499): HTTP auth dialog doesn't remember passwords anymore
+        https://bugs.webkit.org/show_bug.cgi?id=114613
+
+        Reviewed by Carlos Garcia Campos.
+
+        * Source/autotools/SetupAutoconfHeader.m4: Correct definition of ENABLE_CREDENTIAL_STORAGE
+        so that the ENABLE(CREDENTIAL_STORAGE) macro work properly.
 
 2013-04-12  Martin Robinson  <mrobinson@igalia.com>
 
@@ -139,13 +1022,322 @@
         Pango 1.32.0. 1.32.0 isn't strictly necessary and the version of GTK+ that
         we depend on (3.6.0) depends on 1.30.0.
 
-2013-03-27  Carlos Garcia Campos  <cgarcia@igalia.com>
+2013-04-12  Jer Noble  <jer.noble@apple.com>
 
-        Unreviewed. Update NEWS and Versions.m4 for 2.0.0 release.
+        TimeRanges::nearest() returns incorrect results.
+        https://bugs.webkit.org/show_bug.cgi?id=114483
 
-        * Source/autotools/Versions.m4: Bump version numbers.
+        Reviewed by Eric Carlson.
 
-2013-03-26  Carlos Garcia Campos  <cgarcia@igalia.com>
+        Add symbols needed by WebCoreTestSupport to exports list.
+
+        * Source/autotools/symbols.filter:
+
+2013-04-12  Commit Queue  <rniwa@webkit.org>
+
+        Unreviewed, rolling out r148262.
+        http://trac.webkit.org/changeset/148262
+        https://bugs.webkit.org/show_bug.cgi?id=114493
+
+        Cairo dep should now build, rolling r148247 back in (Requested
+        by zdobersek on #webkit).
+
+        * Source/autotools/FindDependencies.m4:
+        * Source/autotools/PrintBuildConfiguration.m4:
+        * Source/autotools/SetupWebKitFeatures.m4:
+
+2013-04-11  Commit Queue  <rniwa@webkit.org>
+
+        Unreviewed, rolling out r148247.
+        http://trac.webkit.org/changeset/148247
+        https://bugs.webkit.org/show_bug.cgi?id=114490
+
+        Cairo dep fails to build on builders due to missing EGL
+        headers (Requested by zdobersek on #webkit).
+
+        * Source/autotools/FindDependencies.m4:
+        * Source/autotools/PrintBuildConfiguration.m4:
+        * Source/autotools/SetupWebKitFeatures.m4:
+
+2013-04-11  Paweł Forysiuk  <tuxator@o2.pl>
+
+        [GTK] Webkit fails to build with MinGW compiler after changeset 146468
+        https://bugs.webkit.org/show_bug.cgi?id=114473
+
+        Reviewed by Martin Robinson.
+
+        * Source/autotools/CheckSystemAndBasicDependencies.m4: Fix typo.
+
+2013-04-11  Martin Robinson  <mrobinson@igalia.com>
+
+        [GTK] Add accelerated 2D canvas support using cairo-gl
+        https://bugs.webkit.org/show_bug.cgi?id=104672
+
+        Reviewed by Alejandro G. Castro.
+
+        Detect that we can activate accelerated canvas when CairoGL is present and
+        TextureMapperGL is enabled.
+
+        * Source/autotools/FindDependencies.m4: Look for CairoGL.
+        * Source/autotools/PrintBuildConfiguration.m4: Print the status of accelerated canvas activation.
+        * Source/autotools/SetupWebKitFeatures.m4: Set the feature.
+
+2013-04-11  Zan Dobersek  <zdobersek@igalia.com>
+
+        Unreviewed.
+
+        * Source/autotools/symbols.filter: Stop exporting redundant symbols.
+
+2013-04-11  Rune Lillesveen  <rune@opera.com>
+
+        Incorrect evaluation of resolution media queries
+        https://bugs.webkit.org/show_bug.cgi?id=114029
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        Removed setResolutionOverride from exports.
+
+        * Source/autotools/symbols.filter:
+
+2013-04-10  Anton Obzhirov  <a.obzhirov@samsung.com>
+
+        [GTK] Add support for Page Visibility
+        https://bugs.webkit.org/show_bug.cgi?id=97324
+
+        Reviewed by Sam Weinig.
+
+        Page Visibility has been enabled for GTK port.
+        New GTK unittest has been added.
+
+        * Source/autotools/SetupWebKitFeatures.m4:
+
+2013-04-09  Raphael Kubo da Costa  <raphael.kubo.da.costa@intel.com>
+
+        [EFL] Declare TEST_THEME_DIR in a single place.
+        https://bugs.webkit.org/show_bug.cgi?id=114285
+
+        Reviewed by Anders Carlsson.
+
+        Instead of adding the `THEME_DIR' preprocessor variable in many
+        different CMakeList.txt files in the tree, declare it in
+        OptionsEfl.cmake so that we avoid needlessly duplicating code around.
+
+        While here, rename it to `TEST_THEME_DIR', which is the name used our
+        WebKit2 infrastructure, to better reflect the purpose of this value.
+
+        * Source/cmake/OptionsEfl.cmake: Add the TEST_THEME_DIR preprocessor
+        definition.
+
+2013-04-09  ChangSeok Oh  <changseok.oh@collabora.com>
+
+        [GTK][AC] upversion of clutter and its dependecy
+        https://bugs.webkit.org/show_bug.cgi?id=114016
+
+        Reviewed by Gustavo Noronha Silva.
+
+        Upversion of clutter to 1.14, cogl to 1.14 and clutter-gtk to 1.4.4.
+
+        * Source/autotools/Versions.m4:
+
+2013-04-09  Thiago Marcos P. Santos  <thiago.santos@intel.com>
+
+        [WK2] Drop WebProcess capabilities on Linux using seccomp filters
+        https://bugs.webkit.org/show_bug.cgi?id=89875
+
+        Reviewed by Maciej Stachowiak.
+
+        Added the bits to EFL/CMake buildsystem to find the libseccomp
+        library.
+
+        * Source/cmake/FindLibSeccomp.cmake: Added.
+        * Source/cmake/OptionsEfl.cmake:
+        * Source/cmake/WebKitFeatures.cmake:
+        * Source/cmakeconfig.h.cmake:
+
+2013-04-09  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        Unreviewed. Fix GTK+ 32 bit build.
+
+        * Source/autotools/symbols.filter: Add some symbols that are
+        mangled differently in 32 bits due to size_t.
+
+2013-04-09  Patrick Gansterer  <paroga@webkit.org>
+
+        Do not set CMAKE_BUILD_TYPE if it is not defined
+        https://bugs.webkit.org/show_bug.cgi?id=114243
+
+        Reviewed by Geoffrey Garen.
+
+        Setting the CMAKE_BUILD_TYPE causes some problem with Visual Studio.
+        Adopt the current usage of the variable to better CMake style.
+
+        * CMakeLists.txt:
+        * Source/cmake/OptionsCommon.cmake:
+        * Source/cmake/OptionsEfl.cmake:
+
+2013-03-31  Martin Robinson  <mrobinson@igalia.com>
+
+        Bug 110293 uses read -d which is a non-portable bashism
+        https://bugs.webkit.org/show_bug.cgi?id=113349
+
+        Reviewed by Gustavo Noronha Silva.
+
+        * Source/autotools/SetupWebKitFeatures.m4: Pass the default feature set to the
+        feature script in a more portable way.
+
+2013-04-08  Jeff Rogers  <jrogers@rim.com>
+
+        [BlackBerry] Update BlackBerry JavaScript API
+        https://bugs.webkit.org/show_bug.cgi?id=114065
+
+        Reviewed by Rob Buis.
+
+        Internal PR 317350
+        Export JSC symbols in BlackBerry build.
+
+        * Source/cmake/OptionsBlackBerry.cmake:
+
+2013-04-08  Martin Robinson  <mrobinson@igalia.com>
+
+        [GTK] Configure should verify ICU is installed on mingw
+        https://bugs.webkit.org/show_bug.cgi?id=113645
+
+        Reviewed by Gustavo Noronha Silva.
+
+        * Source/autotools/FindDependencies.m4: When falling back to hard-coded compiler flags
+        for ICU and mingw, check that headers do exist on the system and error out otherwise.
+
+2013-04-08  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        [GTK] Build Platform as a separate static library
+        https://bugs.webkit.org/show_bug.cgi?id=114164
+
+        Reviewed by Martin Robinson.
+
+        * GNUmakefile.am: Add webkit2platform_sources definition.
+
+2013-04-08  Zan Dobersek  <zdobersek@igalia.com>
+
+        Unreviewed GTK build fix.
+
+        * Source/autotools/symbols.filter: Exporting a bunch of symbols.
+
+2013-04-07  Vivek Galatage  <vivek.vg@samsung.com>
+
+        Modify .gitignore file to remove entries for chromium generated files
+        https://bugs.webkit.org/show_bug.cgi?id=114141
+
+        Reviewed by Gyuyoung Kim.
+
+        * .gitignore:
+
+2013-04-07  Patrick Gansterer  <paroga@webkit.org>
+
+        Remove references to Skia and V8 from CMake files
+        https://bugs.webkit.org/show_bug.cgi?id=114130
+
+        Reviewed by Geoffrey Garen.
+
+        * Source/cmake/OptionsBlackBerry.cmake:
+        * Source/cmake/WebKitPackaging.cmake:
+
+2013-04-07  David Kilzer  <ddkilzer@apple.com>
+
+        Remove the rest of SVG_DOM_OBJC_BINDINGS
+        <http://webkit.org/b/114112>
+
+        Reviewed by Geoffrey Garen.
+
+        * Source/autotools/SetupWebKitFeatures.m4:
+        * Source/cmake/WebKitFeatures.cmake:
+        * Source/cmakeconfig.h.cmake:
+        - Remove references to ENABLE_SVG_DOM_OBJC_BINDINGS.
+
+2013-04-05  Ed Bartosh  <bartosh@gmail.com>
+
+        [EFL] --no-tiled-backing-store build fails because of not used #if USE(ACCELERATED_COMPOSITING)
+        https://bugs.webkit.org/show_bug.cgi?id=113627
+
+        Reviewed by Simon Fraser.
+
+        * Source/cmake/OptionsEfl.cmake: Disabled 3D_GRAPHICS and WEB_GL when accelerated compositing is on
+
+2013-04-05  Rijubrata Bhaumik  <rijubrata.bhaumik@intel.com>
+
+        [EFL] Enable indexed database
+        https://bugs.webkit.org/show_bug.cgi?id=107248
+
+        Reviewed by Alexis Menard.
+
+        * Source/cmake/OptionsEfl.cmake:
+
+2013-04-05  Benjamin Poulain  <benjamin@webkit.org>
+
+        Fix GTK+ for real after r147712
+
+        Reviewed by Ryosuke Niwa.
+
+        * GNUmakefile.am:
+        * Source/Platform: Added.
+        * Source/Platform/GNUmakefile.am: Added.
+
+2013-04-05  Benjamin Poulain  <benjamin@webkit.org>
+
+        Fix GTK+ build after r147712
+
+        Unreviewed.
+
+        * GNUmakefile.am: remove the reference to
+        Source/Platform/GNUmakefile.am. The file has been removed.
+
+2013-04-05  Benjamin Poulain  <bpoulain@apple.com>
+
+        Remove WTFURL from WebKit
+        https://bugs.webkit.org/show_bug.cgi?id=113994
+
+        Reviewed by Ryosuke Niwa.
+
+        * Source/cmake/WebKitFeatures.cmake:
+        * Source/cmakeconfig.h.cmake:
+
+2013-04-04  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Remove the top level gyp directory and Platform/chromium
+        https://bugs.webkit.org/show_bug.cgi?id=113999
+
+        Reviewed by Benjamin Poulain.
+
+        * Source/Platform: Removed.
+        * Source/gyp: Removed.
+
+2013-04-04  Geoffrey Garen  <ggaren@apple.com>
+
+        Nixed the defunct chromium folder from ManualTests
+        https://bugs.webkit.org/show_bug.cgi?id=113995
+
+        Reviewed by Benjamin Poulain.
+
+        * ManualTests/chromium: Removed.
+        * ManualTests/chromium/autofill-popup-shiftupdown.hml: Removed.
+        * ManualTests/chromium/drag-image-accounts-for-device-scale.html: Removed.
+        * ManualTests/chromium/modifiers-during-drag-and-drop.html: Removed.
+        * ManualTests/chromium/no-autofill-on-readonly.html: Removed.
+        * ManualTests/chromium/onchange-reload-popup.html: Removed.
+        * ManualTests/chromium/popup-menu-crash.html: Removed.
+        * ManualTests/chromium/select-close-popup-value-change.html: Removed.
+        * ManualTests/chromium/suggestions-popup-font-change.html: Removed.
+
+2013-04-04  Xabier Rodriguez Calvar  <calvaris@igalia.com>
+
+        [GStreamer] Virtual modifier for MediaPlayer::simulateAudioInterruption must go
+        https://bugs.webkit.org/show_bug.cgi?id=113851
+
+        Reviewed by Eric Carlson.
+
+        * Source/autotools/symbols.filter: Added
+        _ZN7WebCore11MediaPlayer25simulateAudioInterruptionEv symbol.
+
+2013-04-03  Carlos Garcia Campos  <cgarcia@igalia.com>
 
         [GTK] Bump required versions of some dependencies
         https://bugs.webkit.org/show_bug.cgi?id=113282
@@ -178,18 +1370,288 @@
 
         * Source/autotools/Versions.m4:
 
-2013-03-20  Carlos Garcia Campos  <cgarcia@igalia.com>
+2013-04-02  Martin Robinson  <mrobinson@igalia.com>
 
-        Unreviewed. Update NEWS and Versions.m4 for 1.11.92 release.
+        [GTK] Make libsecret optional
+        https://bugs.webkit.org/show_bug.cgi?id=113821
 
-        * Source/autotools/Versions.m4: Bump version numbers.
+        Reviewed by Gustavo Noronha Silva.
 
-2013-03-20  Carlos Garcia Campos  <cgarcia@igalia.com>
+        Add a configuration option to disable credential storage and thus remove
+        the libsecret dependency. This should make it possible to build WebKit 2.x
+        on Windows again.
 
-        Unreviewed. Fix make distcheck.
+        * Source/autotools/FindDependencies.m4: Only look for libsecret if credential storage is active.
+        * Source/autotools/PrintBuildConfiguration.m4: Print whether or not credential storage is active.
+        * Source/autotools/ReadCommandLineArguments.m4: Added an option to control credential storage.
+        * Source/autotools/SetupAutoconfHeader.m4: Expose credential storage setting to code.
 
-        * GNUmakefile.am: Add WebKitFeatures.txt and WebKitFeatures.h to
-        DISTCLEANFILES.
+2013-04-02  Sheriff Bot  <webkit.review.bot@gmail.com>
+
+        Unreviewed, rolling out r147401.
+        http://trac.webkit.org/changeset/147401
+        https://bugs.webkit.org/show_bug.cgi?id=113767
+
+        The patch makes it extremely hard to set up the dependencies
+        properly on the GTK builders (Requested by zdobersek on
+        #webkit).
+
+        * Source/autotools/Versions.m4:
+
+2013-04-02  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        [GTK] Bump required versions of some dependencies
+        https://bugs.webkit.org/show_bug.cgi?id=113282
+
+        Reviewed by Martin Robinson.
+
+        This patch updates the following dependencies:
+
+         - libsoup 2.42.0: is the current stable release.
+
+         - glib 2.36.0: libsoup 2.42 requires 2.35.0, but we don't want to
+           depend on unstable versions and 2.36 is the next stable version
+           after 2.35.
+
+         - gtk+ 3.6.0: this is the previous stable release. We don't
+           currently have any code using newer API, so we will be able to
+           remove all the #ifdefed code.
+
+         - at-spi2 2.5.3: is the version required by gtk+ 3.6.
+
+         - GObject introspection 1.32.0: is the version required by gtk+ 3.6.
+
+         - Pango 1.32.0: it's the current stable version and the first one
+           depending on Harfbuzz.
+
+         - Fontconfig 2.5: required by pango 1.32.0 when using Harfbuzz.
+
+         - gtk+ 2.24.10: it allows us to remove a lot of deprecated code
+           and #ifdefs.
+
+        * Source/autotools/Versions.m4:
+
+2013-04-02  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        [EFL][CMAKE] Move MOZ_X11 definition from OptionsCommon to OptionsEfl
+        https://bugs.webkit.org/show_bug.cgi?id=113685
+
+        Reviewed by Martin Robinson.
+
+        MOZ_X11 is added unconditionally in OptionsCommon for UNIX
+        platforms, but not all UNIX platforms use X11 for plugins,
+        BlackBerry doesn't. The only port using cmake that uses X11 is EFL
+        and it already has checks for X11, so we can just move the
+        definition to OptionsEfl.
+
+        * Source/cmake/OptionsCommon.cmake:
+        * Source/cmake/OptionsEfl.cmake:
+
+2013-04-01  Jinwoo Song  <jinwoo7.song@samsung.com>
+
+        [EFL] Enable user-select:all for EFL port
+        https://bugs.webkit.org/show_bug.cgi?id=113494
+
+        Reviewed by Gyuyoung Kim.
+        
+        Add a feature flag for user-select:all and enable it for EFL port.
+
+        * Source/cmake/OptionsEfl.cmake:
+        * Source/cmake/WebKitFeatures.cmake:
+        * Source/cmakeconfig.h.cmake:
+
+2013-03-29  Charles Wei  <charles.wei@torchmobile.com.cn>
+
+        [BlackBerry] Cleanup the CONTEXT_MENUS in BlackBerry porting
+        https://bugs.webkit.org/show_bug.cgi?id=113562
+
+        Reviewed by George Staikos.
+        Internally reviewed by Mike Fenton and Gen Mak.
+
+        * Source/cmake/OptionsBlackBerry.cmake:
+        * Source/cmake/WebKitFeatures.cmake:
+        * Source/cmakeconfig.h.cmake:
+
+2013-03-28  Zan Dobersek  <zdobersek@igalia.com>
+
+        [GTK] Build GTK-specific, non-layer-violating source code into WebCore-independent libPlatformGtk.la
+        https://bugs.webkit.org/show_bug.cgi?id=112546
+
+        Reviewed by Martin Robinson.
+
+        * GNUmakefile.am: Define the new platform_webcore_cppflags.
+
+2013-03-28  Zan Dobersek  <zdobersek@igalia.com>
+
+        Unreviewed GTK build fix after r147039.
+
+        * Source/autotools/symbols.filter: Export the missing symbols.
+
+2013-03-27  Patrick Gansterer  <paroga@webkit.org>
+
+        Set WTF_ARM_ARCH_VERSION to correct value when used with MSVC
+        https://bugs.webkit.org/show_bug.cgi?id=113436
+
+        Reviewed by Benjamin Poulain.
+
+        * Source/cmake/OptionsWinCE.cmake: CPU(ARM_TRADITIONAL) is now set correctly by Platform.h.
+
+2013-03-27  Timothy Hatcher  <timothy@apple.com>
+
+        Add support for dock-to-right of the Web Inspector in the Mac port.
+
+        Unfortunately this requires Safari changes, so it is disabled in the nightly builds.
+
+        https://webkit.org/b/113341
+        rdar://problem/10368152
+
+        Reviewed by Joseph Pecoraro.
+
+        * Source/autotools/symbols.filter:
+
+2013-03-27  Sheriff Bot  <webkit.review.bot@gmail.com>
+
+        Unreviewed, rolling out r146864.
+        http://trac.webkit.org/changeset/146864
+        https://bugs.webkit.org/show_bug.cgi?id=113391
+
+        causes crashes on Wk2 EFL release bot (Requested by drott on
+        #webkit).
+
+        * Source/cmake/OptionsEfl.cmake:
+
+2013-03-26  Rijubrata Bhaumik  <rijubrata.bhaumik@intel.com>
+
+        [EFL] Enable IndexedDB by default
+        https://bugs.webkit.org/show_bug.cgi?id=107248
+
+        Reviewed by Laszlo Gombos.
+
+        * Source/cmake/OptionsEfl.cmake:
+        Enable IndexedDB by default on EFL.
+
+2013-03-25  Kent Tamura  <tkent@chromium.org>
+
+        Rename ENABLE_INPUT_TYPE_DATETIME
+        https://bugs.webkit.org/show_bug.cgi?id=113254
+
+        Reviewed by Kentaro Hara.
+
+        Rename ENABLE_INPUT_TYPE_DATETIME to ENABLE_INPUT_TYPE_DATETIME_INCOMPLETE.
+        Actually I'd like to remove the code, but we shouldn't remove it yet
+        because we shipped products with it on some platforms.
+
+        * Source/autotools/SetupWebKitFeatures.m4:
+        * Source/cmake/WebKitFeatures.cmake:
+        * Source/cmakeconfig.h.cmake:
+
+2013-03-25  Daniel Cheng  <dcheng@chromium.org>
+
+        Don't allow drags to start after a mouse press that creates a context menu
+        https://bugs.webkit.org/show_bug.cgi?id=112079
+
+        Reviewed by Tony Chang.
+
+        * ManualTests/context-menu-during-drag-selection.html: Added.
+
+2013-03-22  Yuki Sekiguchi  <yuki.sekiguchi@access-company.com>
+
+        Cannot run All Source (target WebProcess) on Xcode.
+        https://bugs.webkit.org/show_bug.cgi?id=111042
+
+        Reviewed by Alexey Proskuryakov.
+
+        WebProcessShim is renamed by r139066.
+        However, WebProcessShim is not renamed to SecItemShim in WebKit.xcworkspace.
+        This make WebProcess.app load WebProcessShim.dylib, and it cause dyld loading error.
+
+        * WebKit.xcworkspace/xcshareddata/xcschemes/All Source (target WebProcess).xcscheme: Renamed WebProcessShim to SecItemShim.
+
+2013-03-21  Zan Dobersek  <zdobersek@igalia.com>
+
+        [GTK] Move libLevelDB.la setup into a separate GNUmakefile.am
+        https://bugs.webkit.org/show_bug.cgi?id=112947
+
+        Reviewed by Martin Robinson.
+
+        * GNUmakefile.am: Include the new GNUmakefile.am, located under Source/ThirdParty/leveldb.
+
+2013-03-21  Martin Robinson  <mrobinson@igalia.com>
+
+        Source/ThirdParty/leveldb/db/builder.cc does not build on systems without <endian.h>
+        https://bugs.webkit.org/show_bug.cgi?id=111817
+
+        Reviewed by Gustavo Noronha Silva.
+
+        Improve processing of the autoconf host variable.  Setup up the wiring to detect
+        whether or not we are compiling for Darwin.
+
+        * Source/autotools/CheckSystemAndBasicDependencies.m4: Improve host detection.
+        * Source/autotools/SetupAutomake.m4: Tell automake if we are compiling for Darwin or not.
+
+2013-03-20  Michael Pruett  <michael@68k.org>
+
+        [JSC] Implement EnforceRange IDL attribute for integer conversions
+        https://bugs.webkit.org/show_bug.cgi?id=112506
+
+        Reviewed by Kentaro Hara.
+
+        * Source/autotools/symbols.filter:
+
+2013-03-20  Zan Dobersek  <zdobersek@igalia.com>
+
+        [GTK] Build ANGLE sources into a separate library from libWebCore.la
+        https://bugs.webkit.org/show_bug.cgi?id=112778
+
+        Reviewed by Martin Robinson.
+
+        * GNUmakefile.am: Include the GNUmakefile.am covering the libANGLE.la library.
+
+2013-03-20  Jocelyn Turcotte  <jocelyn.turcotte@digia.com>
+
+        [Qt] Define MODULE_VERSION
+        https://bugs.webkit.org/show_bug.cgi?id=112808
+
+        Reviewed by Allan Sandfeld Jensen.
+
+        Upstream http://codereview.qt-project.org/49052
+        Use 5.2.0 as this is the next release that will be branched from trunk.
+
+        * .qmake.conf:
+
+2013-03-20  Rouslan Solomakhin  <rouslan@chromium.org>
+
+        Copy-paste should not spellcheck when continuous spellcheck is turned off
+        https://bugs.webkit.org/show_bug.cgi?id=112464
+
+        Reviewed by Ryosuke Niwa.
+
+        * Source/autotools/symbols.filter: Export WebCore::Editor::isContinuousSpellCheckingEnabled() and WebCore::Editor::toggleContinuousSpellChecking() for use by internals.
+
+2013-03-20  JungJik Lee  <jungjik.lee@samsung.com>
+
+        [EFL] Disable REQUEST_ANIMATION_FRAME_TIMER to render a new animation frame.
+        https://bugs.webkit.org/show_bug.cgi?id=112114
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        Add a manual test to check the running of scripted transition animation.
+
+        * ManualTests/animation/transition-on-and-offscreen-animation.html: Added.
+
+2013-03-19  David Rosca  <nowrep@gmail.com>
+
+        [Qt] QStyle: Set State_Enabled by default when painting style widgets.
+        https://bugs.webkit.org/show_bug.cgi?id=112688
+
+        Reviewed by Jocelyn Turcotte.
+
+        All Qt style widgets were painted with a disabled state, even when
+        they actually were enabled.
+        This change fixes it by setting State_Enabled as a default state,
+        which is then correctly removed when element is disabled.
+
+        * Source/WebCore/platform/qt/RenderThemeQStyle.cpp:
 
 2013-03-17  Gustavo Noronha Silva  <gns@gnome.org>
 
@@ -200,35 +1662,99 @@
 
         * Source/autotools/symbols.filter: make leveldb symbols local.
 
-2013-03-06  Gustavo Noronha Silva  <gns@gnome.org>
+2013-03-15  Jae Hyun Park  <jae.park@company100.net>
 
-        Build fix. Fixes problems building code that uses deprecated functions from GTK+ 2,
-        such as RenderThemeGtk2.cpp, in debug mode. RenderThemeGtk2.cpp tries to allow usage
-        of deprecated functions by undefining GTK_DISABLE_DEPRECATED, but it ended up being
-        redefined because autotoolsconfig.h was included again by headers that came after
-        config.h.
+        [GTK] acceleration_backend_description does not concatenate "(gles2"
+        https://bugs.webkit.org/show_bug.cgi?id=112405
 
         Reviewed by Martin Robinson.
 
-        * Source/autotools/SetupWebKitFeatures.m4: add checks to ensure the
-        autotoolsconfig.h header is only included once.
+        In FindDependencies.m4, acceleration_backend_description string does not
+        concatenate if there is a space between the operator and the operand.
 
-2013-03-14  Carlos Garcia Campos  <cgarcia@igalia.com>
+        * Source/autotools/FindDependencies.m4:
 
-        Unreviewed. Pre-release version bump.
+2013-03-15  Allan Sandfeld Jensen  <allan.jensen@digia.com>
 
-        * Source/autotools/Versions.m4: Bump version to 1.11.92 for people
-        already using the webkit-2.0 branch.
+        [Qt] Build error with building with Qt 5.1
+        https://bugs.webkit.org/show_bug.cgi?id=112435
 
-2013-03-13  Carlos Garcia Campos  <cgarcia@igalia.com>
+        Reviewed by Noam Rosenthal.
 
-        [GTK] Split GtkAuthenticationDialog in two widgets
-        https://bugs.webkit.org/show_bug.cgi?id=103644
+        QAccessibleWidget has moved to private.
 
-        Reviewed by Xan Lopez.
+        * Source/widgetsapi.pri:
 
-        * Source/autotools/Versions.m4: Bump GTK+ 2 requirements to 2.16
-        for GtkOrientable.
+2013-03-14  Tobias Mueller  <tobiasmue@gnome.org>
+
+        Build: Remove XSLT option and depend hard on XSLT.
+        You will now not be able to give --disable-xslt or --enable-xslt
+        because it is not optional anymore.
+        https://bugs.webkit.org/show_bug.cgi?id=112368
+
+        Reviewed by Martin Robinson.
+
+        * Source/autotools/FindDependencies.m4:
+            Always check for libxslt
+        
+        * Source/autotools/PrintBuildConfiguration.m4:
+            Removed printing out the value of XSLT
+
+        * Source/autotools/ReadCommandLineArguments.m4:
+            Removed reading XSLT options
+
+2013-03-14  Jesus Sanchez-Palencia  <jesus.palencia@openbossa.org>
+
+        [EFL] Use CROSS_PLATFORM_CONTEXT_MENU
+        https://bugs.webkit.org/show_bug.cgi?id=111877
+
+        Reviewed by Caio Marcelo de Oliveira Filho.
+
+        * Source/cmake/OptionsEfl.cmake: add -DWTF_USE_CROSS_PLATFORM_CONTEXT_MENUS=1
+
+2013-03-14  Simon Hausmann  <simon.hausmann@digia.com>
+
+        [Qt] Improve the handling of mock geolocation, device orientation and motion clients
+
+        Reviewed by Tor Arne Vestbø.
+
+        The mock versions of these web facing features should be instantiated when
+        running in DumpRenderTree only. In order for them to work, no extra Qt modules
+        such as QtLocation are actually needed.
+
+        This patch decouples enabling device orientation/motion and geolocation from
+        the underlying Qt modules and makes them available in developer builds
+        (!production_build) and backed by mock backends when running in drt.
+
+        So if the Qt 5 modules are available, they'll be used (unless drtRun). For
+        developers the web facing features are always enabled (although requests will
+        time out) and the mock backends are enabled inside DRT, allowing for the layout
+        tests to run with less dependencies.
+
+        In addition this also enables the mock device motion client, which was
+        previously never instantiated.
+
+        * Source/widgetsapi.pri:
+
+2013-03-13  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Threaded HTML Parser is missing feature define flags in all but Chromium port's build files
+        https://bugs.webkit.org/show_bug.cgi?id=112277
+
+        Reviewed by Adam Barth.
+
+        * Source/autotools/SetupWebKitFeatures.m4:
+        * Source/cmake/WebKitFeatures.cmake:
+        * Source/cmakeconfig.h.cmake:
+
+2013-03-13  Nate Chapin  <japhet@chromium.org>
+
+        Expose symbols for internals
+        https://bugs.webkit.org/show_bug.cgi?id=112194
+
+        Reviewed by Alexey Proskuryakov.
+
+        * Source/autotools/symbols.filter:
 
 2013-03-12  Zan Dobersek  <zdobersek@igalia.com>
 
@@ -240,6 +1766,16 @@
         * Source/autotools/SetupCompilerFlags.m4: Only use the -Wno-c++11-extensions warning when building
         with Clang as GCC does not support the warning just yet. Also enhance the comment about using libstdc++
         as the standard C++ library when compiling with Clang.
+
+2013-03-12  Zan Dobersek  <zdobersek@igalia.com>
+
+        [GTK] Set up the libPlatformGtk.la library
+        https://bugs.webkit.org/show_bug.cgi?id=111738
+
+        Reviewed by Martin Robinson.
+
+        * GNUmakefile.am: Define the two variables that will hold sources list and cppflags as required for the new library.
+        Include the new GNUmakefile.am that's now available under Source/Platform.
 
 2013-03-11  Tobias Mueller  <tobiasmue@gnome.org>
 
@@ -253,11 +1789,23 @@
 
         * Source/autotools/FindDependencies.m4:
 
-2013-03-05  Gustavo Noronha Silva  <gns@gnome.org>
+2013-03-11  Claudio Saavedra  <csaavedra@igalia.com>
 
-        Unreviewed build fix.
+        [GTK] Bump version
+        https://bugs.webkit.org/show_bug.cgi?id=112055
 
-        * GNUmakefile.am: remove bad path for generate-feature-defines-files from EXTRA_DIST.
+        Reviewed by Martin Robinson.
+
+        * Source/autotools/Versions.m4: Bump to 2.1.0
+
+2013-03-11  Jeff Rogers  <jrogers@rim.com>
+
+        [BlackBerry] Disable MathML support
+        https://bugs.webkit.org/show_bug.cgi?id=111929
+
+        Reviewed by Rob Buis.
+
+        * Source/cmake/OptionsBlackBerry.cmake:
 
 2013-03-09  Martin Robinson  <mrobinson@igalia.com>
 
@@ -268,6 +1816,45 @@
 
         * Source/autotools/Versions.m4: Add missing required version
         definitions.
+
+2013-03-08  Dean Jackson  <dino@apple.com>
+
+        Don't snapshot Java plugins
+        https://bugs.webkit.org/show_bug.cgi?id=111899
+
+        Reviewed by Tim Horton.
+
+        Export MIMETypeRegistry::isJavaAppletMIMEType symbol.
+
+        * Source/autotools/symbols.filter:
+
+2013-03-08  Chandra Shekar Vallala  <brk376@motorola.com>
+
+        [chromium] Keydown event for 'shift+alt' returns win keycode instead of 'alt'
+        https://bugs.webkit.org/show_bug.cgi?id=111112
+
+        Reviewed by Tony Chang.
+
+        Return windows keycode of Alt incase of GDK_META_L, GDK_META_R.
+
+        Try press Shift then alt key. The test passes if the shiftKey, altKey values
+        of JSKeyEvent are true and keycode/which is 18.
+
+        * ManualTests/shift-alt-key-event.html: Added.
+
+2013-03-08  Zan Dobersek  <zdobersek@igalia.com>
+
+        [Autotools] Remove definitions of unnecessary Automake conditionals
+        https://bugs.webkit.org/show_bug.cgi?id=111830
+
+        Reviewed by Philippe Normand.
+
+        The following Automake conditionals are not used anywhere and should have their
+        definitions in SetupAutomake.m4 removed:
+        ENABLE_GAMEPAD, ENABLE_XSLT, ENABLE_GEOLOCATION, ENABLE_SVG_FONTS,
+        ENABLE_OPCODE_STATS, ENABLE_CSS_FILTERS, ENABLE_CSS_SHADERS.
+
+        * Source/autotools/SetupAutomake.m4:
 
 2013-03-08  Zan Dobersek  <zdobersek@igalia.com>
 
@@ -284,6 +1871,27 @@
         * Source/autotools/SetupAutomake.m4:
         * Source/autotools/SetupWebKitFeatures.m4:
 
+2013-03-07  Keishi Hattori  <keishi@webkit.org>
+
+        Update calendar picker UI
+        https://bugs.webkit.org/show_bug.cgi?id=109439
+
+        Reviewed by Kent Tamura.
+
+        * ManualTests/forms/calendar-picker.html: New test file with more options.
+        * ManualTests/forms/date-suggestion-picker.html: Copied from ManualTests/forms/calendar-picker.html. Old one kept for dat/time suggestion picker testing.
+
+2013-03-07  Christophe Dumez  <ch.dumez@sisa.samsung.com>
+
+        [EFL] Bump libsoup dependency to 2.40.3 to fix regressions
+        https://bugs.webkit.org/show_bug.cgi?id=111756
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        Update libsoup required version to v2.40.3 for EFL port.
+
+        * Source/cmake/OptionsEfl.cmake:
+
 2013-03-07  Zan Dobersek  <zdobersek@igalia.com>
 
         [GTK] Limit the supported compilers to GCC >= 4.7 and Clang >= 3.0
@@ -295,6 +1903,120 @@
         * Source/autotools/SetupCompilerFlags.m4: Set up C++11-specific compiler flags. Force the C99 standard for the C code.
         Use the -Qunused-arguments flag when using Clang, it reduces irrelevant errors when using ccache.
 
+2013-03-05  Gustavo Noronha Silva  <gns@gnome.org>
+
+        [GTK] Enable translations for WebKit2
+        https://bugs.webkit.org/show_bug.cgi?id=111398
+
+        Reviewed by Martin Robinson.
+
+        * GNUmakefile.am: adjust path for i18n GNUmakefile.am.
+        * configure.ac: generate the i18n makefile unconditionally, the translations are
+        used by both WebKitGTK+ and WebKit2GTK+.
+
+2013-03-06  Adam Klein  <adamk@chromium.org>
+
+        [V8] Use implicit references instead of object groups to keep registered MutationObservers alive
+        https://bugs.webkit.org/show_bug.cgi?id=111382
+
+        Reviewed by Adam Barth.
+
+        * ManualTests/mutation-observer-leaks-nodes.html: Added.
+
+2013-03-06  Gustavo Noronha Silva  <gns@gnome.org>
+
+        Build fix. Fixes problems building code that uses deprecated functions from GTK+ 2,
+        such as RenderThemeGtk2.cpp, in debug mode. RenderThemeGtk2.cpp tries to allow usage
+        of deprecated functions by undefining GTK_DISABLE_DEPRECATED, but it ended up being
+        redefined because autotoolsconfig.h was included again by headers that came after
+        config.h.
+
+        Reviewed by Martin Robinson.
+
+        * Source/autotools/SetupWebKitFeatures.m4: add checks to ensure the
+        autotoolsconfig.h header is only included once.
+
+2013-03-05  Ryuan Choi  <ryuan.choi@samsung.com>
+
+        [EFL] Build break with latest EFL libraries
+        https://bugs.webkit.org/show_bug.cgi?id=111028
+
+        Reviewed by Dirk Pranke.
+
+        In latest EFL trunk, include path of ecore sub modules are changed from
+        ecore-1 to ecore-XXX-1.
+        So, this patch adds missing ECORE_XXX_INCLUDE_DIRS.
+
+        * Source/cmake/FindEcore.cmake: Added additional path suffixes to find include directories of ecore-XXX
+        * Source/cmake/FindElementary.cmake: Checked Ecore_Con dependency which Elementary requires.
+        * Source/cmake/OptionsEfl.cmake: Made Imf and Imf_Evas mandatory.
+
+2013-03-05  Shawn Singh  <shawnsingh@chromium.org>
+
+        Fix default background of a dragged image.
+        https://bugs.webkit.org/show_bug.cgi?id=110512
+
+        Reviewed by Tony Chang.
+
+        * ManualTests/drag-background-with-padding.html: Added.
+
+2013-03-05  Gustavo Noronha Silva  <gns@gnome.org>
+
+        Unreviewed build fix.
+
+        * GNUmakefile.am: remove bad path for generate-feature-defines-files from EXTRA_DIST.
+
+2013-03-04  Ruslan Abdikeev  <aruslan@chromium.org>
+
+        <link rel="apple-touch-icon"> tag is not honored on CNN.com, workflowy.com etc
+        https://bugs.webkit.org/show_bug.cgi?id=109061
+
+        Reviewed by Adam Barth.
+
+        * Source/autotools/symbols.filter:
+
+2013-03-04  Kunihiko Sakamoto  <ksakamoto@chromium.org>
+
+        Add build flag for FontLoader
+        https://bugs.webkit.org/show_bug.cgi?id=111289
+
+        Reviewed by Benjamin Poulain.
+
+        Add ENABLE_FONT_LOAD_EVENTS build flag (disabled by default).
+
+        * Source/autotools/SetupWebKitFeatures.m4:
+        * Source/cmake/WebKitFeatures.cmake:
+        * Source/cmakeconfig.h.cmake:
+
+2013-03-03  Sheriff Bot  <webkit.review.bot@gmail.com>
+
+        Unreviewed, rolling out r144567.
+        http://trac.webkit.org/changeset/144567
+        https://bugs.webkit.org/show_bug.cgi?id=111266
+
+        Does not compile on apple-win (Requested by abarth on
+        #webkit).
+
+        * Source/autotools/symbols.filter:
+
+2013-03-03  Ruslan Abdikeev  <aruslan@chromium.org>
+
+        <link rel="apple-touch-icon"> tag is not honored on CNN.com, workflowy.com etc
+        https://bugs.webkit.org/show_bug.cgi?id=109061
+
+        Reviewed by Adam Barth.
+
+        * Source/autotools/symbols.filter:
+
+2013-03-01  Elliott Sprehn  <esprehn@gmail.com>
+
+        Don't leak Documents when using MutationObserver from extensions
+        https://bugs.webkit.org/show_bug.cgi?id=111234
+
+        Reviewed by Adam Barth.
+
+        * ManualTests/leak-observer-nonmain-world.html: Added.
+
 2013-02-27  Zan Dobersek  <zdobersek@igalia.com>
 
         [GTK] Disable MathML support in release builds
@@ -304,6 +2026,52 @@
 
         * Source/autotools/SetupWebKitFeatures.m4: Disable the MathML support in release builds
         as the code is not yet deemed production-ready.
+
+2013-02-27  Glenn Adams  <glenn@skynav.com>
+
+        Add ENABLE_CSS3_TEXT_LINE_BREAK flag.
+        https://bugs.webkit.org/show_bug.cgi?id=110944
+
+        Reviewed by Dean Jackson.
+
+        * Source/cmake/WebKitFeatures.cmake:
+        * Source/cmakeconfig.h.cmake:
+
+2013-02-24  Laszlo Gombos  <l.gombos@samsung.com>
+
+        [EFL] Rename ENABLE_REGIONS to ENABLE_CSS_REGIONS
+        https://bugs.webkit.org/show_bug.cgi?id=110699
+
+        Reviewed by Andreas Kling.
+
+        Fix a typo. ENABLE_REGIONS is called ENABLE_CSS_REGIONS
+        throughout the project.
+
+        * Source/cmake/OptionsEfl.cmake:
+
+2013-02-24  Zan Dobersek  <zdobersek@igalia.com>
+
+        [GTK] Stop generating UserAgentGtk.h
+        https://bugs.webkit.org/show_bug.cgi?id=110582
+
+        Reviewed by Martin Robinson.
+
+        * configure.ac: Provide the USER_AGENT_GTK_(MAJOR|MINOR)_VERSION defines in the autotoolsconfig.h
+        header, containing the user agent versions that are to be used in the user agent string. The
+        WEBKIT_USER_AGENT_(MAJOR|MINOR)_VERSION name is avoided as the same defines are specified in the
+        webkitversion.h API header (but are not accessible from the WebCore layer). The UserAgentGtk.h
+        header is also not generated anymore from the input file.
+
+2013-02-21  Tony Chang  <tony@chromium.org>
+
+        Autogenerate Settings that call setNeedsRecalcStyleInAllFrames when set
+        https://bugs.webkit.org/show_bug.cgi?id=109989
+
+        Reviewed by Ryosuke Niwa.
+
+        Add setters to export symbols.
+
+        * Source/autotools/symbols.filter:
 
 2013-02-21  Martin Robinson  <mrobinson@igalia.com>
 
@@ -331,29 +2099,6 @@
         to SetupWebKitFeatures.m4.
         * autogen.sh: Remove the call to override-feature-defines.
         * configure.ac: Now include SetupWebKitFeatures.
-
-2013-03-05  Gustavo Noronha Silva  <gns@gnome.org>
-
-        [GTK] Enable translations for WebKit2
-        https://bugs.webkit.org/show_bug.cgi?id=111398
-
-        Reviewed by Martin Robinson.
-
-        * GNUmakefile.am: adjust path for i18n GNUmakefile.am.
-        * configure.ac: generate the i18n makefile unconditionally, the translations are
-        used by both WebKitGTK+ and WebKit2GTK+.
-
-2013-03-07  Carlos Garcia Campos  <cgarcia@igalia.com>
-
-        Unreviewed. Update NEWS and Versions.m4 for 1.11.91 release.
-
-        * Source/autotools/Versions.m4: Bump version numbers.
-
-2013-02-22  Carlos Garcia Campos  <cgarcia@igalia.com>
-
-        Unreviewed. Update NEWS and Versions.m4 for 1.11.90 release.
-
-        * Source/autotools/Versions.m4: Bump version numbers.
 
 2013-02-20  Dirk Schulze  <krit@webkit.org>
 

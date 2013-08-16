@@ -33,6 +33,7 @@
 
 #if ENABLE(LLINT_C_LOOP)
 #include "CodeBlock.h"
+#include "CommonSlowPaths.h"
 #include "LLIntCLoop.h"
 #include "LLIntSlowPaths.h"
 #include "Operations.h"
@@ -116,6 +117,17 @@ static double Ints2Double(uint32_t lo, uint32_t hi)
     } u;
     u.ival64 = (static_cast<uint64_t>(hi) << 32) | lo;
     return u.dval;
+}
+
+static void Double2Ints(double val, uint32_t& lo, uint32_t& hi)
+{
+    union {
+        double dval;
+        uint64_t ival64;
+    } u;
+    u.dval = val;
+    hi = static_cast<uint32_t>(u.ival64 >> 32);
+    lo = static_cast<uint32_t>(u.ival64);
 }
 #endif // USE(JSVALUE32_64)
 
@@ -254,7 +266,7 @@ JSValue CLoop::execute(CallFrame* callFrame, OpcodeID bootstrapOpcodeId,
         return JSValue();
     }
 
-    ASSERT(callFrame->globalData().topCallFrame == callFrame);
+    ASSERT(callFrame->vm().topCallFrame == callFrame);
 
     // Define the pseudo registers used by the LLINT C Loop backend:
     ASSERT(sizeof(CLoopRegister) == sizeof(intptr_t));
@@ -297,12 +309,10 @@ JSValue CLoop::execute(CallFrame* callFrame, OpcodeID bootstrapOpcodeId,
     CLoopRegister rRetVPC;
     CLoopDoubleRegister d0, d1;
 
-#if COMPILER(MSVC)
     // Keep the compiler happy. We don't really need this, but the compiler
     // will complain. This makes the warning go away.
     t0.i = 0;
     t1.i = 0;
-#endif
 
     // Instantiate the pseudo JIT stack frame used by the LLINT C Loop backend:
     JITStackFrame jitStackFrame;
@@ -310,10 +320,10 @@ JSValue CLoop::execute(CallFrame* callFrame, OpcodeID bootstrapOpcodeId,
     // The llint expects the native stack pointer, sp, to be pointing to the
     // jitStackFrame (which is the simulation of the native stack frame):
     JITStackFrame* const sp = &jitStackFrame;
-    sp->globalData = &callFrame->globalData();
+    sp->vm = &callFrame->vm();
 
-    // Set up an alias for the globalData ptr in the JITStackFrame:
-    JSGlobalData* &globalData = sp->globalData;
+    // Set up an alias for the vm ptr in the JITStackFrame:
+    VM* &vm = sp->vm;
 
     CodeBlock* codeBlock = callFrame->codeBlock();
     Instruction* vPC;
@@ -414,7 +424,7 @@ JSValue CLoop::execute(CallFrame* callFrame, OpcodeID bootstrapOpcodeId,
             callFrame = callFrame->callerFrame();
 
             // The part in getHostCallReturnValueWithExecState():
-            JSValue result = globalData->hostCallReturnValue;
+            JSValue result = vm->hostCallReturnValue;
 #if USE(JSVALUE32_64)
             t1.i = result.tag();
             t0.i = result.payload();
@@ -426,7 +436,7 @@ JSValue CLoop::execute(CallFrame* callFrame, OpcodeID bootstrapOpcodeId,
 
         OFFLINE_ASM_GLUE_LABEL(ctiOpThrowNotCaught)
         {
-            return globalData->exception;
+            return vm->exception;
         }
 
 #if !ENABLE(COMPUTED_GOTO_OPCODES)
@@ -454,9 +464,8 @@ JSValue CLoop::execute(CallFrame* callFrame, OpcodeID bootstrapOpcodeId,
         // from ArgumentCount.tag() (see the dispatchAfterCall() macro used in
         // the callTargetFunction() macro in the llint asm files).
         //
-        // For the C loop, we don't have the JIT stub to this work for us.
-        // So, we need to implement the equivalent of dispatchAfterCall() here
-        // before dispatching to the PC.
+        // For the C loop, we don't have the JIT stub to do this work for us. So,
+        // we jump to llint_generic_return_point.
 
         vPC = callFrame->currentVPC();
 
@@ -481,11 +490,12 @@ JSValue CLoop::execute(CallFrame* callFrame, OpcodeID bootstrapOpcodeId,
         rBasePC.vp = codeBlock->instructions().begin();
 #endif // USE(JSVALUE64)
 
-        NEXT_INSTRUCTION();
+        goto llint_generic_return_point;
 
     } // END doReturnHelper.
 
 
+#if ENABLE(COMPUTED_GOTO_OPCODES)
     // Keep the compiler happy so that it doesn't complain about unused
     // labels for the LLInt trampoline glue. The labels are automatically
     // emitted by label macros above, and some of them are referenced by
@@ -496,7 +506,7 @@ JSValue CLoop::execute(CallFrame* callFrame, OpcodeID bootstrapOpcodeId,
         UNUSED_LABEL(__opcode);
         FOR_EACH_OPCODE_ID(LLINT_OPCODE_ENTRY);
     #undef LLINT_OPCODE_ENTRY
-
+#endif
 
     #undef NEXT_INSTRUCTION
     #undef DEFINE_OPCODE

@@ -30,17 +30,25 @@
 #if ENABLE(VIDEO_TRACK)
 
 #include "ExceptionCode.h"
+#include "TextTrackCue.h"
 #include "TrackBase.h"
 #include <wtf/PassOwnPtr.h>
 #include <wtf/RefCounted.h>
 #include <wtf/text/WTFString.h>
 
+#if USE(PLATFORM_TEXT_TRACK_MENU)
+#include "PlatformTextTrack.h"
+#endif
+
 namespace WebCore {
 
-class HTMLMediaElement;
+class ScriptExecutionContext;
 class TextTrack;
-class TextTrackCue;
 class TextTrackCueList;
+#if ENABLE(WEBVTT_REGIONS)
+class TextTrackRegion;
+class TextTrackRegionList;
+#endif
 
 class TextTrackClient {
 public:
@@ -53,7 +61,11 @@ public:
     virtual void textTrackRemoveCue(TextTrack*, PassRefPtr<TextTrackCue>) = 0;
 };
 
-class TextTrack : public TrackBase {
+class TextTrack : public TrackBase, public EventTarget
+#if USE(PLATFORM_TEXT_TRACK_MENU)
+    , public PlatformTextTrackClient
+#endif
+    {
 public:
     static PassRefPtr<TextTrack> create(ScriptExecutionContext* context, TextTrackClient* client, const AtomicString& kind, const AtomicString& label, const AtomicString& language)
     {
@@ -61,28 +73,26 @@ public:
     }
     virtual ~TextTrack();
 
-    void setMediaElement(HTMLMediaElement* element) { m_mediaElement = element; }
-    HTMLMediaElement* mediaElement() { return m_mediaElement; }
+    virtual const AtomicString& interfaceName() const;
+    virtual ScriptExecutionContext* scriptExecutionContext() const;
 
-    AtomicString kind() const { return m_kind; }
-    void setKind(const AtomicString&);
+    static TextTrack* captionMenuOffItem();
+    static TextTrack* captionMenuAutomaticItem();
 
     static const AtomicString& subtitlesKeyword();
     static const AtomicString& captionsKeyword();
     static const AtomicString& descriptionsKeyword();
     static const AtomicString& chaptersKeyword();
     static const AtomicString& metadataKeyword();
+    static const AtomicString& forcedKeyword();
+    virtual const AtomicString& defaultKindKeyword() const OVERRIDE { return subtitlesKeyword(); }
     static bool isValidKindKeyword(const AtomicString&);
-
-    AtomicString label() const { return m_label; }
-    void setLabel(const AtomicString& label) { m_label = label; }
-
-    AtomicString language() const { return m_language; }
-    void setLanguage(const AtomicString& language) { m_language = language; }
 
     static const AtomicString& disabledKeyword();
     static const AtomicString& hiddenKeyword();
     static const AtomicString& showingKeyword();
+
+    virtual void setKind(const AtomicString&) OVERRIDE;
 
     AtomicString mode() const { return m_mode; }
     virtual void setMode(const AtomicString&);
@@ -94,12 +104,19 @@ public:
     TextTrackCueList* cues();
     TextTrackCueList* activeCues() const;
 
-    void clearClient() { m_client = 0; }
+    virtual void clearClient() OVERRIDE { m_client = 0; }
     TextTrackClient* client() { return m_client; }
 
     void addCue(PassRefPtr<TextTrackCue>);
-    void removeCue(TextTrackCue*, ExceptionCode&);
-    bool hasCue(TextTrackCue*);
+    virtual void removeCue(TextTrackCue*, ExceptionCode&);
+
+    bool hasCue(TextTrackCue*, TextTrackCue::CueMatchRules = TextTrackCue::MatchAllFields);
+
+#if ENABLE(VIDEO_TRACK) && ENABLE(WEBVTT_REGIONS)
+    TextTrackRegionList* regions();
+    void addRegion(PassRefPtr<TextTrackRegion>);
+    void removeRegion(TextTrackRegion*, ExceptionCode&);
+#endif
 
     void cueWillChange(TextTrackCue*);
     void cueDidChange(TextTrackCue*);
@@ -110,6 +127,10 @@ public:
     TextTrackType trackType() const { return m_trackType; }
 
     virtual bool isClosedCaptions() const { return false; }
+    virtual bool isSDH() const { return false; }
+    virtual bool containsOnlyForcedSubtitles() const { return false; }
+    virtual bool isMainProgramContent() const;
+    virtual bool isEasyToRead() const { return false; }
 
     int trackIndex();
     void invalidateTrackIndex();
@@ -125,17 +146,45 @@ public:
 
     void removeAllCues();
 
+#if USE(PLATFORM_TEXT_TRACK_MENU)
+    PassRefPtr<PlatformTextTrack> platformTextTrack();
+#endif
+
+    using RefCounted<TrackBase>::ref;
+    using RefCounted<TrackBase>::deref;
+
 protected:
     TextTrack(ScriptExecutionContext*, TextTrackClient*, const AtomicString& kind, const AtomicString& label, const AtomicString& language, TextTrackType);
+#if ENABLE(VIDEO_TRACK) && ENABLE(WEBVTT_REGIONS)
+    TextTrackRegionList* regionList();
+#endif
+
+    virtual EventTargetData* eventTargetData() OVERRIDE;
+    virtual EventTargetData* ensureEventTargetData() OVERRIDE;
 
     RefPtr<TextTrackCueList> m_cues;
 
 private:
+    virtual bool isValidKind(const AtomicString&) const OVERRIDE;
+
+    virtual void refEventTarget() OVERRIDE { ref(); }
+    virtual void derefEventTarget() OVERRIDE { deref(); }
+
+#if ENABLE(VIDEO_TRACK) && ENABLE(WEBVTT_REGIONS)
+    TextTrackRegionList* ensureTextTrackRegionList();
+    RefPtr<TextTrackRegionList> m_regions;
+#endif
+
+#if USE(PLATFORM_TEXT_TRACK_MENU)
+    virtual TextTrack* publicTrack() OVERRIDE { return this; }
+
+    RefPtr<PlatformTextTrack> m_platformTextTrack;
+#endif
+
     TextTrackCueList* ensureTextTrackCueList();
-    HTMLMediaElement* m_mediaElement;
-    AtomicString m_kind;
-    AtomicString m_label;
-    AtomicString m_language;
+
+    ScriptExecutionContext* m_scriptExecutionContext;
+    EventTargetData m_eventTargetData;
     AtomicString m_mode;
     TextTrackClient* m_client;
     TextTrackType m_trackType;
@@ -144,6 +193,12 @@ private:
     int m_renderedTrackIndex;
     bool m_hasBeenConfigured;
 };
+
+inline TextTrack* toTextTrack(TrackBase* track)
+{
+    ASSERT(track->type() == TrackBase::TextTrack);
+    return static_cast<TextTrack*>(track);
+}
 
 } // namespace WebCore
 

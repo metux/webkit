@@ -32,7 +32,6 @@
 #include "ProgressShadowElement.h"
 #include "RenderProgress.h"
 #include "ShadowRoot.h"
-#include <wtf/StdLibExtras.h>
 
 namespace WebCore {
 
@@ -78,13 +77,8 @@ RenderProgress* HTMLProgressElement::renderProgress() const
         return static_cast<RenderProgress*>(renderer());
 
     RenderObject* renderObject = userAgentShadowRoot()->firstChild()->renderer();
-    ASSERT(!renderObject || renderObject->isProgress());
+    ASSERT_WITH_SECURITY_IMPLICATION(!renderObject || renderObject->isProgress());
     return static_cast<RenderProgress*>(renderObject);
-}
-
-bool HTMLProgressElement::supportsFocus() const
-{
-    return HTMLElement::supportsFocus() && !disabled();
 }
 
 void HTMLProgressElement::parseAttribute(const QualifiedName& name, const AtomicString& value)
@@ -97,9 +91,9 @@ void HTMLProgressElement::parseAttribute(const QualifiedName& name, const Atomic
         LabelableElement::parseAttribute(name, value);
 }
 
-void HTMLProgressElement::attach()
+void HTMLProgressElement::attach(const AttachContext& context)
 {
-    LabelableElement::attach();
+    LabelableElement::attach(context);
     if (RenderProgress* render = renderProgress())
         render->updateFromElement();
 }
@@ -171,6 +165,11 @@ void HTMLProgressElement::didAddUserAgentShadowRoot(ShadowRoot* root)
     bar->appendChild(m_value, ASSERT_NO_EXCEPTION);
 
     inner->appendChild(bar, ASSERT_NO_EXCEPTION);
+}
+
+bool HTMLProgressElement::shouldAppearIndeterminate() const
+{
+    return !isDeterminate();
 }
 
 } // namespace

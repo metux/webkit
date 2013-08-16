@@ -42,6 +42,7 @@ public:
 
     void adopt(CSSSelectorList& list);
     void adoptSelectorVector(Vector<OwnPtr<CSSParserSelector> >& selectorVector);
+    void adoptSelectorArray(CSSSelector* selectors) { ASSERT(!m_selectorArray); m_selectorArray = selectors; }
 
     bool isValid() const { return !!m_selectorArray; }
     const CSSSelector* first() const { return m_selectorArray; }
@@ -61,16 +62,11 @@ public:
     bool selectorsNeedNamespaceResolution();
     bool hasInvalidSelector() const;
 
-#if ENABLE(SHADOW_DOM)
-    bool hasShadowDistributedAt(size_t index) const;
-#endif
-
     String selectorsText() const;
 
-    void reportMemoryUsage(MemoryObjectInfo*) const;
+    unsigned componentCount() const;
 
 private:
-    unsigned length() const;
     void deleteSelectors();
 
     // End of a multipart selector is indicated by m_isLastInTagHistory bit in the last item.

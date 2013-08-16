@@ -41,20 +41,18 @@
 #include "WebProcessMessages.h"
 #include "WebProcessProxyMessages.h"
 #include <WebCore/KURL.h>
+#include <WebCore/SuddenTermination.h>
 #include <stdio.h>
 #include <wtf/MainThread.h>
 #include <wtf/text/CString.h>
 #include <wtf/text/WTFString.h>
 
-#if PLATFORM(MAC)
-#include "SimplePDFPlugin.h"
-#if ENABLE(PDFKIT_PLUGIN)
-#include "PDFPlugin.h"
-#endif
-#endif
-
 #if ENABLE(CUSTOM_PROTOCOLS)
 #include "CustomProtocolManagerProxyMessages.h"
+#endif
+
+#if PLATFORM(MAC)
+#include "PDFPlugin.h"
 #endif
 
 #if USE(SECURITY_FRAMEWORK)
@@ -62,7 +60,6 @@
 #endif
 
 using namespace WebCore;
-using namespace std;
 
 #define MESSAGE_CHECK(assertion) MESSAGE_CHECK_BASE(assertion, connection())
 #define MESSAGE_CHECK_URL(url) MESSAGE_CHECK_BASE(checkURLReceivedFromWebProcess(url), connection())
@@ -121,12 +118,18 @@ void WebProcessProxy::connectionWillOpen(CoreIPC::Connection* connection)
     SecItemShimProxy::shared().initializeConnection(connection);
 #endif
 
+    for (WebPageProxyMap::iterator it = m_pageMap.begin(), end = m_pageMap.end(); it != end; ++it)
+        it->value->connectionWillOpen(connection);
+
     m_context->processWillOpenConnection(this);
 }
 
 void WebProcessProxy::connectionWillClose(CoreIPC::Connection* connection)
 {
     ASSERT(this->connection() == connection);
+
+    for (WebPageProxyMap::iterator it = m_pageMap.begin(), end = m_pageMap.end(); it != end; ++it)
+        it->value->connectionWillClose(connection);
 
     m_context->processWillCloseConnection(this);
 }
@@ -140,9 +143,9 @@ void WebProcessProxy::disconnect()
         m_webConnection = nullptr;
     }
 
-    m_responsivenessTimer.stop();
+    m_responsivenessTimer.invalidate();
 
-    Vector<RefPtr<WebFrameProxy> > frames;
+    Vector<RefPtr<WebFrameProxy>> frames;
     copyValuesToVector(m_frameMap, frames);
 
     for (size_t i = 0, size = frames.size(); i < size; ++i)
@@ -194,12 +197,12 @@ void WebProcessProxy::removeWebPage(uint64_t pageID)
     updateProcessSuppressionState();
 #endif
 
-#if ENABLE(NETWORK_PROCESS)
-    // Terminate the web process immediately if we have enough information to confidently do so.
-    // This only works if we're using a network process. Otherwise we have to wait for the web process to clean up.
-    if (canTerminateChildProcess() && m_context->usesNetworkProcess())
-        requestTermination();
-#endif
+    // If this was the last WebPage open in that web process, and we have no other reason to keep it alive, let it go.
+    // We only allow this when using a network process, as otherwise the WebProcess needs to preserve its session state.
+    if (m_context->usesNetworkProcess() && canTerminateChildProcess()) {
+        abortProcessLaunchIfNeeded();
+        disconnect();
+    }
 }
 
 Vector<WebPageProxy*> WebProcessProxy::pages() const
@@ -211,7 +214,7 @@ Vector<WebPageProxy*> WebProcessProxy::pages() const
 
 WebBackForwardListItem* WebProcessProxy::webBackForwardItem(uint64_t itemID) const
 {
-    return m_backForwardListItemMap.get(itemID).get();
+    return m_backForwardListItemMap.get(itemID);
 }
 
 void WebProcessProxy::registerNewWebBackForwardListItem(WebBackForwardListItem* item)
@@ -303,7 +306,7 @@ void WebProcessProxy::addBackForwardItem(uint64_t itemID, const String& original
 }
 
 #if ENABLE(NETSCAPE_PLUGIN_API)
-void WebProcessProxy::getPlugins(bool refresh, Vector<PluginInfo>& plugins)
+void WebProcessProxy::getPlugins(bool refresh, Vector<PluginInfo>& plugins, Vector<PluginInfo>& applicationPlugins)
 {
     if (refresh)
         m_context->pluginInfoStore().refresh();
@@ -312,22 +315,20 @@ void WebProcessProxy::getPlugins(bool refresh, Vector<PluginInfo>& plugins)
     for (size_t i = 0; i < pluginModules.size(); ++i)
         plugins.append(pluginModules[i].info);
 
-#if PLATFORM(MAC)
+#if ENABLE(PDFKIT_PLUGIN)
     // Add built-in PDF last, so that it's not used when a real plug-in is installed.
     if (!m_context->omitPDFSupport()) {
-#if ENABLE(PDFKIT_PLUGIN)
         plugins.append(PDFPlugin::pluginInfo());
-#endif
-        plugins.append(SimplePDFPlugin::pluginInfo());
+        applicationPlugins.append(PDFPlugin::pluginInfo());
     }
 #endif
 }
 #endif // ENABLE(NETSCAPE_PLUGIN_API)
 
 #if ENABLE(PLUGIN_PROCESS)
-void WebProcessProxy::getPluginProcessConnection(const String& pluginPath, uint32_t processType, PassRefPtr<Messages::WebProcessProxy::GetPluginProcessConnection::DelayedReply> reply)
+void WebProcessProxy::getPluginProcessConnection(uint64_t pluginProcessToken, PassRefPtr<Messages::WebProcessProxy::GetPluginProcessConnection::DelayedReply> reply)
 {
-    PluginProcessManager::shared().getPluginProcessConnection(m_context->pluginInfoStore(), pluginPath, static_cast<PluginProcess::Type>(processType), reply);
+    PluginProcessManager::shared().getPluginProcessConnection(pluginProcessToken, reply);
 }
 
 #elif ENABLE(NETSCAPE_PLUGIN_API)
@@ -398,7 +399,7 @@ void WebProcessProxy::didClose(CoreIPC::Connection*)
 
     webConnection()->didClose();
 
-    Vector<RefPtr<WebPageProxy> > pages;
+    Vector<RefPtr<WebPageProxy>> pages;
     copyValuesToVector(m_pageMap, pages);
 
     disconnect();
@@ -412,7 +413,9 @@ void WebProcessProxy::didReceiveInvalidMessage(CoreIPC::Connection* connection, 
 {
     WTFLogAlways("Received an invalid message \"%s.%s\" from the web process.\n", messageReceiverName.toString().data(), messageName.toString().data());
 
-    // Terminate the WebProcesses.
+    WebContext::didReceiveInvalidMessage(messageReceiverName, messageName);
+
+    // Terminate the WebProcess.
     terminate();
 
     // Since we've invalidated the connection we'll never get a CoreIPC::Connection::Client::didClose
@@ -422,7 +425,7 @@ void WebProcessProxy::didReceiveInvalidMessage(CoreIPC::Connection* connection, 
 
 void WebProcessProxy::didBecomeUnresponsive(ResponsivenessTimer*)
 {
-    Vector<RefPtr<WebPageProxy> > pages;
+    Vector<RefPtr<WebPageProxy>> pages;
     copyValuesToVector(m_pageMap, pages);
     for (size_t i = 0, size = pages.size(); i < size; ++i)
         pages[i]->processDidBecomeUnresponsive();
@@ -430,7 +433,7 @@ void WebProcessProxy::didBecomeUnresponsive(ResponsivenessTimer*)
 
 void WebProcessProxy::interactionOccurredWhileUnresponsive(ResponsivenessTimer*)
 {
-    Vector<RefPtr<WebPageProxy> > pages;
+    Vector<RefPtr<WebPageProxy>> pages;
     copyValuesToVector(m_pageMap, pages);
     for (size_t i = 0, size = pages.size(); i < size; ++i)
         pages[i]->interactionOccurredWhileProcessUnresponsive();
@@ -438,7 +441,7 @@ void WebProcessProxy::interactionOccurredWhileUnresponsive(ResponsivenessTimer*)
 
 void WebProcessProxy::didBecomeResponsive(ResponsivenessTimer*)
 {
-    Vector<RefPtr<WebPageProxy> > pages;
+    Vector<RefPtr<WebPageProxy>> pages;
     copyValuesToVector(m_pageMap, pages);
     for (size_t i = 0, size = pages.size(); i < size; ++i)
         pages[i]->processDidBecomeResponsive();
@@ -462,7 +465,7 @@ WebFrameProxy* WebProcessProxy::webFrame(uint64_t frameID) const
     if (!WebFrameProxyMap::isValidKey(frameID))
         return 0;
 
-    return m_frameMap.get(frameID).get();
+    return m_frameMap.get(frameID);
 }
 
 bool WebProcessProxy::canCreateFrame(uint64_t frameID) const
@@ -487,7 +490,7 @@ void WebProcessProxy::didDestroyFrame(uint64_t frameID)
 
 void WebProcessProxy::disconnectFramesFromPage(WebPageProxy* page)
 {
-    Vector<RefPtr<WebFrameProxy> > frames;
+    Vector<RefPtr<WebFrameProxy>> frames;
     copyValuesToVector(m_frameMap, frames);
     for (size_t i = 0, size = frames.size(); i < size; ++i) {
         if (frames[i]->page() == page)
@@ -498,7 +501,7 @@ void WebProcessProxy::disconnectFramesFromPage(WebPageProxy* page)
 size_t WebProcessProxy::frameCountInPage(WebPageProxy* page) const
 {
     size_t result = 0;
-    for (HashMap<uint64_t, RefPtr<WebFrameProxy> >::const_iterator iter = m_frameMap.begin(); iter != m_frameMap.end(); ++iter) {
+    for (HashMap<uint64_t, RefPtr<WebFrameProxy>>::const_iterator iter = m_frameMap.begin(); iter != m_frameMap.end(); ++iter) {
         if (iter->value->page() == page)
             ++result;
     }
@@ -635,6 +638,18 @@ void WebProcessProxy::pagePreferencesChanged(WebKit::WebPageProxy *page)
 #endif
 }
 
+void WebProcessProxy::didSaveToPageCache()
+{
+    m_context->processDidCachePage(this);
+}
+
+void WebProcessProxy::releasePageCache()
+{
+    if (canSendMessage())
+        send(Messages::WebProcess::ReleasePageCache(), 0);
+}
+
+
 void WebProcessProxy::requestTermination()
 {
     if (!isValid())
@@ -646,6 +661,23 @@ void WebProcessProxy::requestTermination()
         webConnection()->didClose();
 
     disconnect();
+}
+
+
+void WebProcessProxy::enableSuddenTermination()
+{
+    if (!isValid())
+        return;
+
+    WebCore::enableSuddenTermination();
+}
+
+void WebProcessProxy::disableSuddenTermination()
+{
+    if (!isValid())
+        return;
+
+    WebCore::disableSuddenTermination();
 }
 
 } // namespace WebKit

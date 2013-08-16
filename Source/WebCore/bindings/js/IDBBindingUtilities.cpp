@@ -33,6 +33,7 @@
 #include "IDBKey.h"
 #include "IDBKeyPath.h"
 #include "IDBTracing.h"
+#include "SharedBuffer.h"
 
 #include <runtime/DateInstance.h>
 #include <runtime/ObjectConstructor.h>
@@ -49,7 +50,7 @@ static bool get(ExecState* exec, JSValue object, const String& keyPathElement, J
     }
     if (!object.isObject())
         return false;
-    Identifier identifier(&exec->globalData(), keyPathElement.utf8().data());
+    Identifier identifier(&exec->vm(), keyPathElement.utf8().data());
     if (!asObject(object)->hasProperty(exec, identifier))
         return false;
     result = asObject(object)->get(exec, identifier);
@@ -58,6 +59,7 @@ static bool get(ExecState* exec, JSValue object, const String& keyPathElement, J
 
 static bool canSet(JSValue object, const String& keyPathElement)
 {
+    UNUSED_PARAM(keyPathElement);
     return object.isObject();
 }
 
@@ -65,8 +67,8 @@ static bool set(ExecState* exec, JSValue& object, const String& keyPathElement, 
 {
     if (!canSet(object, keyPathElement))
         return false;
-    Identifier identifier(&exec->globalData(), keyPathElement.utf8().data());
-    asObject(object)->putDirect(exec->globalData(), identifier, jsValue);
+    Identifier identifier(&exec->vm(), keyPathElement.utf8().data());
+    asObject(object)->putDirect(exec->vm(), identifier, jsValue);
     return true;
 }
 
@@ -298,13 +300,27 @@ ScriptValue deserializeIDBValue(DOMRequestState* requestState, PassRefPtr<Serial
     RefPtr<SerializedScriptValue> serializedValue = prpValue;
     if (serializedValue)
         return ScriptValue::deserialize(exec, serializedValue.get(), NonThrowing);
-    return ScriptValue(exec->globalData(), jsNull());
+    return ScriptValue(exec->vm(), jsNull());
+}
+
+ScriptValue deserializeIDBValueBuffer(DOMRequestState* requestState, PassRefPtr<SharedBuffer> prpBuffer)
+{
+    ExecState* exec = requestState->exec();
+    RefPtr<SharedBuffer> buffer = prpBuffer;
+    if (buffer) {
+        // FIXME: The extra copy here can be eliminated by allowing SerializedScriptValue to take a raw const char* or const uint8_t*.
+        Vector<uint8_t> value;
+        value.append(buffer->data(), buffer->size());
+        RefPtr<SerializedScriptValue> serializedValue = SerializedScriptValue::createFromWireBytes(value);
+        return ScriptValue::deserialize(exec, serializedValue.get(), NonThrowing);
+    }
+    return ScriptValue(exec->vm(), jsNull());
 }
 
 ScriptValue idbKeyToScriptValue(DOMRequestState* requestState, PassRefPtr<IDBKey> key)
 {
     ExecState* exec = requestState->exec();
-    return ScriptValue(exec->globalData(), idbKeyToJSValue(exec, jsCast<JSDOMGlobalObject*>(exec->lexicalGlobalObject()), key.get()));
+    return ScriptValue(exec->vm(), idbKeyToJSValue(exec, jsCast<JSDOMGlobalObject*>(exec->lexicalGlobalObject()), key.get()));
 }
 
 PassRefPtr<IDBKey> scriptValueToIDBKey(DOMRequestState* requestState, const ScriptValue& scriptValue)

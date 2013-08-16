@@ -68,6 +68,7 @@ public:
 
 protected:
     void clearConnection();
+    void abortProcessLaunchIfNeeded();
 
     // ProcessLauncher::Client
     virtual void didFinishLaunching(ProcessLauncher*, CoreIPC::Connection::Identifier) OVERRIDE;
@@ -82,7 +83,7 @@ private:
 
     bool sendMessage(PassOwnPtr<CoreIPC::MessageEncoder>, unsigned messageSendFlags);
 
-    Vector<std::pair<OwnPtr<CoreIPC::MessageEncoder>, unsigned> > m_pendingMessages;
+    Vector<std::pair<OwnPtr<CoreIPC::MessageEncoder>, unsigned>> m_pendingMessages;
     RefPtr<ProcessLauncher> m_processLauncher;
     RefPtr<CoreIPC::Connection> m_connection;
     CoreIPC::MessageReceiverMap m_messageReceiverMap;

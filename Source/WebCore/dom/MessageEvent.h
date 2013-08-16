@@ -34,7 +34,7 @@
 #include "MessagePort.h"
 #include "ScriptValue.h"
 #include "SerializedScriptValue.h"
-#include <wtf/ArrayBuffer.h>
+#include <runtime/ArrayBuffer.h>
 
 namespace WebCore {
 
@@ -88,13 +88,13 @@ public:
     const String& origin() const { return m_origin; }
     const String& lastEventId() const { return m_lastEventId; }
     DOMWindow* source() const { return m_source.get(); }
-    MessagePortArray* ports() const { return m_ports.get(); }
+    MessagePortArray ports() const { return m_ports ? *m_ports : MessagePortArray(); }
 
     // FIXME: Remove this when we have custom ObjC binding support.
     SerializedScriptValue* data() const;
-    // FIXME: remove this when we update the ObjC bindings (bug #28774).
+
+    // Needed for Objective-C bindings (see bug 28774).
     MessagePort* messagePort();
-    // FIXME: remove this when we update the ObjC bindings (bug #28774).
     void initMessageEvent(const AtomicString& type, bool canBubble, bool cancelable, PassRefPtr<SerializedScriptValue> data, const String& origin, const String& lastEventId, DOMWindow* source, MessagePort*);
 
     virtual const AtomicString& interfaceName() const;

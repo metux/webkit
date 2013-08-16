@@ -3,7 +3,7 @@
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 <title>WebKitFindController</title>
-<meta name="generator" content="DocBook XSL Stylesheets V1.76.1">
+<meta name="generator" content="DocBook XSL Stylesheets V1.78.1">
 <link rel="home" href="index.html" title="WebKit2GTK+ Reference Manual">
 <link rel="up" href="ch01.html" title="Class Overview">
 <link rel="prev" href="WebKitFileChooserRequest.html" title="WebKitFileChooserRequest">
@@ -129,8 +129,11 @@ operations are asynchronous and trigger signals when ready, such as
 <p>
 Enum values used to specify search options.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><a name="WEBKIT-FIND-OPTIONS-NONE:CAPS"></a><span class="term"><code class="literal">WEBKIT_FIND_OPTIONS_NONE</code></span></p></td>
@@ -200,8 +203,11 @@ instead of the actual number.
 Callers should call <a class="link" href="WebKitFindController.html#webkit-find-controller-search-finish" title="webkit_find_controller_search_finish ()"><code class="function">webkit_find_controller_search_finish()</code></a> to
 finish the current search operation.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>find_controller</code></em> :</span></p></td>
@@ -237,8 +243,11 @@ every text match found.
 This method will be typically called when the search UI is
 closed/hidden by the client application.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody><tr>
 <td><p><span class="term"><em class="parameter"><code>find_controller</code></em> :</span></p></td>
 <td>a <a class="link" href="WebKitFindController.html" title="WebKitFindController"><span class="type">WebKitFindController</span></a>
@@ -257,8 +266,11 @@ Looks for the next occurrence of the search text.
 Calling this method before <a class="link" href="WebKitFindController.html#webkit-find-controller-search" title="webkit_find_controller_search ()"><code class="function">webkit_find_controller_search()</code></a> or
 <a class="link" href="WebKitFindController.html#webkit-find-controller-count-matches" title="webkit_find_controller_count_matches ()"><code class="function">webkit_find_controller_count_matches()</code></a> is a programming error.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody><tr>
 <td><p><span class="term"><em class="parameter"><code>find_controller</code></em> :</span></p></td>
 <td>the <a class="link" href="WebKitFindController.html" title="WebKitFindController"><span class="type">WebKitFindController</span></a>
@@ -278,8 +290,11 @@ Looks for the previous occurrence of the search text.
 Calling this method before <a class="link" href="WebKitFindController.html#webkit-find-controller-search" title="webkit_find_controller_search ()"><code class="function">webkit_find_controller_search()</code></a> or
 <a class="link" href="WebKitFindController.html#webkit-find-controller-count-matches" title="webkit_find_controller_count_matches ()"><code class="function">webkit_find_controller_count_matches()</code></a> is a programming error.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody><tr>
 <td><p><span class="term"><em class="parameter"><code>find_controller</code></em> :</span></p></td>
 <td>the <a class="link" href="WebKitFindController.html" title="WebKitFindController"><span class="type">WebKitFindController</span></a>
@@ -298,8 +313,11 @@ for. This text is passed to either
 <a class="link" href="WebKitFindController.html#webkit-find-controller-search" title="webkit_find_controller_search ()"><code class="function">webkit_find_controller_search()</code></a> or
 <a class="link" href="WebKitFindController.html#webkit-find-controller-count-matches" title="webkit_find_controller_count_matches ()"><code class="function">webkit_find_controller_count_matches()</code></a>.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>find_controller</code></em> :</span></p></td>
@@ -327,8 +345,11 @@ Counts the number of matches for <em class="parameter"><code>search_text</code><
 matches will be provided by the
 <a class="link" href="WebKitFindController.html#WebKitFindController-counted-matches" title='The "counted-matches" signal'><span class="type">"counted-matches"</span></a> signal.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>find_controller</code></em> :</span></p></td>
@@ -358,8 +379,11 @@ matches will be provided by the
 Gets a bitmask containing the <a class="link" href="WebKitFindController.html#WebKitFindOptions" title="enum WebKitFindOptions"><span class="type">WebKitFindOptions</span></a> associated with
 the current search.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>find_controller</code></em> :</span></p></td>
@@ -385,8 +409,11 @@ lookup. This number is passed as the last argument of
 <a class="link" href="WebKitFindController.html#webkit-find-controller-search" title="webkit_find_controller_search ()"><code class="function">webkit_find_controller_search()</code></a> or
 <a class="link" href="WebKitFindController.html#webkit-find-controller-count-matches" title="webkit_find_controller_count_matches ()"><code class="function">webkit_find_controller_count_matches()</code></a>.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>find_controller</code></em> :</span></p></td>
@@ -409,8 +436,11 @@ Gets the <a class="link" href="WebKitWebView.html" title="WebKitWebView"><span c
 not unref the returned instance as it belongs to the
 <a class="link" href="WebKitFindController.html" title="WebKitFindController"><span class="type">WebKitFindController</span></a>.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>find_controller</code></em> :</span></p></td>
@@ -474,8 +504,11 @@ This signal is emitted when the <a class="link" href="WebKitFindController.html"
 counted the number of matches for a given text after a call
 to <a class="link" href="WebKitFindController.html#webkit-find-controller-count-matches" title="webkit_find_controller_count_matches ()"><code class="function">webkit_find_controller_count_matches()</code></a>.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>find_controller</code></em> :</span></p></td>
@@ -505,8 +538,11 @@ is not found asynchronously after a call to
 <a class="link" href="WebKitFindController.html#webkit-find-controller-search" title="webkit_find_controller_search ()"><code class="function">webkit_find_controller_search()</code></a>, <a class="link" href="WebKitFindController.html#webkit-find-controller-search-next" title="webkit_find_controller_search_next ()"><code class="function">webkit_find_controller_search_next()</code></a>
 or <a class="link" href="WebKitFindController.html#webkit-find-controller-search-previous" title="webkit_find_controller_search_previous ()"><code class="function">webkit_find_controller_search_previous()</code></a>.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>find_controller</code></em> :</span></p></td>
@@ -533,8 +569,11 @@ asynchronously after a call to <a class="link" href="WebKitFindController.html#w
 <a class="link" href="WebKitFindController.html#webkit-find-controller-search-next" title="webkit_find_controller_search_next ()"><code class="function">webkit_find_controller_search_next()</code></a> or
 <a class="link" href="WebKitFindController.html#webkit-find-controller-search-previous" title="webkit_find_controller_search_previous ()"><code class="function">webkit_find_controller_search_previous()</code></a>.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>find_controller</code></em> :</span></p></td>

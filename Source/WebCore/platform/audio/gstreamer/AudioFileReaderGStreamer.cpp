@@ -62,7 +62,7 @@ public:
     AudioFileReader(const void* data, size_t dataSize);
     ~AudioFileReader();
 
-    PassOwnPtr<AudioBus> createBus(float sampleRate, bool mixToMono);
+    PassRefPtr<AudioBus> createBus(float sampleRate, bool mixToMono);
 
 #ifdef GST_API_VERSION_1
     GstFlowReturn handleSample(GstAppSink*);
@@ -100,16 +100,14 @@ private:
 static void copyGstreamerBuffersToAudioChannel(GstBufferList* buffers, AudioChannel* audioChannel)
 {
 #ifdef GST_API_VERSION_1
-    gsize offset = 0;
-    for (unsigned i = 0; i < gst_buffer_list_length(buffers); i++) {
+    float* destination = audioChannel->mutableData();
+    unsigned bufferCount = gst_buffer_list_length(buffers);
+    for (unsigned i = 0; i < bufferCount; ++i) {
         GstBuffer* buffer = gst_buffer_list_get(buffers, i);
-        if (!buffer)
-            continue;
-        GstMapInfo info;
-        gst_buffer_map(buffer, &info, GST_MAP_READ);
-        memcpy(audioChannel->mutableData() + offset, reinterpret_cast<float*>(info.data), info.size);
-        offset += info.size / sizeof(float);
-        gst_buffer_unmap(buffer, &info);
+        ASSERT(buffer);
+        gsize bufferSize = gst_buffer_get_size(buffer);
+        gst_buffer_extract(buffer, 0, destination, bufferSize);
+        destination += bufferSize / sizeof(float);
     }
 #else
     GstBufferListIterator* iter = gst_buffer_list_iterate(buffers);
@@ -438,7 +436,7 @@ void AudioFileReader::decodeAudioForBusCreation()
     gst_element_set_state(m_pipeline, GST_STATE_PAUSED);
 }
 
-PassOwnPtr<AudioBus> AudioFileReader::createBus(float sampleRate, bool mixToMono)
+PassRefPtr<AudioBus> AudioFileReader::createBus(float sampleRate, bool mixToMono)
 {
     m_sampleRate = sampleRate;
 
@@ -453,38 +451,38 @@ PassOwnPtr<AudioBus> AudioFileReader::createBus(float sampleRate, bool mixToMono
     gst_buffer_list_iterator_add_group(m_frontRightBuffersIterator);
 #endif
 
-    GRefPtr<GMainContext> context = g_main_context_new();
+    GRefPtr<GMainContext> context = adoptGRef(g_main_context_new());
     g_main_context_push_thread_default(context.get());
     m_loop = adoptGRef(g_main_loop_new(context.get(), FALSE));
 
     // Start the pipeline processing just after the loop is started.
-    GSource* timeoutSource = g_timeout_source_new(0);
-    g_source_attach(timeoutSource, context.get());
-    g_source_set_callback(timeoutSource, reinterpret_cast<GSourceFunc>(enteredMainLoopCallback), this, 0);
+    GRefPtr<GSource> timeoutSource = adoptGRef(g_timeout_source_new(0));
+    g_source_attach(timeoutSource.get(), context.get());
+    g_source_set_callback(timeoutSource.get(), reinterpret_cast<GSourceFunc>(enteredMainLoopCallback), this, 0);
 
     g_main_loop_run(m_loop.get());
     g_main_context_pop_thread_default(context.get());
 
     if (m_errorOccurred)
-        return nullptr;
+        return 0;
 
     unsigned channels = mixToMono ? 1 : 2;
-    OwnPtr<AudioBus> audioBus = adoptPtr(new AudioBus(channels, m_channelSize, true));
+    RefPtr<AudioBus> audioBus = AudioBus::create(channels, m_channelSize, true);
     audioBus->setSampleRate(m_sampleRate);
 
     copyGstreamerBuffersToAudioChannel(m_frontLeftBuffers, audioBus->channel(0));
     if (!mixToMono)
         copyGstreamerBuffersToAudioChannel(m_frontRightBuffers, audioBus->channel(1));
 
-    return audioBus.release();
+    return audioBus;
 }
 
-PassOwnPtr<AudioBus> createBusFromAudioFile(const char* filePath, bool mixToMono, float sampleRate)
+PassRefPtr<AudioBus> createBusFromAudioFile(const char* filePath, bool mixToMono, float sampleRate)
 {
     return AudioFileReader(filePath).createBus(sampleRate, mixToMono);
 }
 
-PassOwnPtr<AudioBus> createBusFromInMemoryAudioFile(const void* data, size_t dataSize, bool mixToMono, float sampleRate)
+PassRefPtr<AudioBus> createBusFromInMemoryAudioFile(const void* data, size_t dataSize, bool mixToMono, float sampleRate)
 {
     return AudioFileReader(data, dataSize).createBus(sampleRate, mixToMono);
 }

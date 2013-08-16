@@ -24,10 +24,9 @@
  */
  
 #include "config.h"
-
-#if ENABLE(THREADED_SCROLLING)
-
 #include "ScrollingStateTree.h"
+
+#if ENABLE(THREADED_SCROLLING) || USE(COORDINATED_GRAPHICS)
 
 #include "ScrollingStateFixedNode.h"
 #include "ScrollingStateScrollingNode.h"
@@ -42,6 +41,7 @@ PassOwnPtr<ScrollingStateTree> ScrollingStateTree::create()
 
 ScrollingStateTree::ScrollingStateTree()
     : m_hasChangedProperties(false)
+    , m_hasNewRootStateNode(false)
 {
 }
 
@@ -64,13 +64,14 @@ ScrollingNodeID ScrollingStateTree::attachNode(ScrollingNodeType nodeType, Scrol
         removeNode(node);
     }
 
-    ScrollingStateNode* newNode;
+    ScrollingStateNode* newNode = 0;
     if (!parentID) {
         // If we're resetting the root node, we should clear the HashMap and destroy the current children.
         clear();
 
         setRootStateNode(ScrollingStateScrollingNode::create(this, newNodeID));
         newNode = rootStateNode();
+        m_hasNewRootStateNode = true;
     } else {
         ScrollingStateNode* parent = stateNodeForID(parentID);
         if (!parent)
@@ -137,6 +138,9 @@ PassOwnPtr<ScrollingStateTree> ScrollingStateTree::commit()
     treeStateClone->m_hasChangedProperties = true;
     m_hasChangedProperties = false;
 
+    treeStateClone->m_hasNewRootStateNode = m_hasNewRootStateNode;
+    m_hasNewRootStateNode = false;
+
     return treeStateClone.release();
 }
 
@@ -182,4 +186,4 @@ ScrollingStateNode* ScrollingStateTree::stateNodeForID(ScrollingNodeID scrollLay
 
 } // namespace WebCore
 
-#endif // ENABLE(THREADED_SCROLLING)
+#endif // ENABLE(THREADED_SCROLLING) || USE(COORDINATED_GRAPHICS)

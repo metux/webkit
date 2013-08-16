@@ -35,7 +35,7 @@ namespace WebCore {
 class IntRect;
 
 enum ScrollingModeIndication {
-    MainThreadScrollingBecauseOfStyleIndictaion,
+    MainThreadScrollingBecauseOfStyleIndication,
     MainThreadScrollingBecauseOfEventHandlersIndication,
     ThreadedScrollingIndication
 };
@@ -46,9 +46,11 @@ public:
 
     virtual void setVisibleRect(const FloatRect&) = 0;
     virtual FloatRect visibleRect() const = 0;
+    virtual bool tilesWouldChangeForVisibleRect(const FloatRect&) const = 0;
 
     virtual void setExposedRect(const FloatRect&) = 0;
     virtual void setClipsToExposedRect(bool) = 0;
+    virtual bool clipsToExposedRect() = 0;
 
     virtual void prepopulateRect(const FloatRect&) = 0;
 
@@ -78,6 +80,8 @@ public:
     
     virtual void setUnparentsOffscreenTiles(bool) = 0;
     virtual bool unparentsOffscreenTiles() const = 0;
+    
+    virtual double retainedTileBackingStoreMemory() const = 0;
 
     // Exposed for testing
     virtual IntRect tileCoverageRect() const = 0;

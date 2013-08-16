@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012 Apple Inc. All rights reserved.
+ * Copyright (C) 2012, 2013 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -37,6 +37,9 @@ namespace JSC { namespace Profiler {
 Compilation::Compilation(Bytecodes* bytecodes, CompilationKind kind)
     : m_bytecodes(bytecodes)
     , m_kind(kind)
+    , m_numInlinedGetByIds(0)
+    , m_numInlinedPutByIds(0)
+    , m_numInlinedCalls(0)
 {
 }
 
@@ -91,38 +94,42 @@ JSValue Compilation::toJS(ExecState* exec) const
 {
     JSObject* result = constructEmptyObject(exec);
     
-    result->putDirect(exec->globalData(), exec->propertyNames().bytecodesID, jsNumber(m_bytecodes->id()));
-    result->putDirect(exec->globalData(), exec->propertyNames().compilationKind, jsString(exec, String::fromUTF8(toCString(m_kind))));
+    result->putDirect(exec->vm(), exec->propertyNames().bytecodesID, jsNumber(m_bytecodes->id()));
+    result->putDirect(exec->vm(), exec->propertyNames().compilationKind, jsString(exec, String::fromUTF8(toCString(m_kind))));
     
     JSArray* profiledBytecodes = constructEmptyArray(exec, 0);
     for (unsigned i = 0; i < m_profiledBytecodes.size(); ++i)
         profiledBytecodes->putDirectIndex(exec, i, m_profiledBytecodes[i].toJS(exec));
-    result->putDirect(exec->globalData(), exec->propertyNames().profiledBytecodes, profiledBytecodes);
+    result->putDirect(exec->vm(), exec->propertyNames().profiledBytecodes, profiledBytecodes);
     
     JSArray* descriptions = constructEmptyArray(exec, 0);
     for (unsigned i = 0; i < m_descriptions.size(); ++i)
         descriptions->putDirectIndex(exec, i, m_descriptions[i].toJS(exec));
-    result->putDirect(exec->globalData(), exec->propertyNames().descriptions, descriptions);
+    result->putDirect(exec->vm(), exec->propertyNames().descriptions, descriptions);
     
     JSArray* counters = constructEmptyArray(exec, 0);
     HashMap<OriginStack, OwnPtr<ExecutionCounter> >::const_iterator end = m_counters.end();
     for (HashMap<OriginStack, OwnPtr<ExecutionCounter> >::const_iterator iter = m_counters.begin(); iter != end; ++iter) {
         JSObject* counterEntry = constructEmptyObject(exec);
-        counterEntry->putDirect(exec->globalData(), exec->propertyNames().origin, iter->key.toJS(exec));
-        counterEntry->putDirect(exec->globalData(), exec->propertyNames().executionCount, jsNumber(iter->value->count()));
+        counterEntry->putDirect(exec->vm(), exec->propertyNames().origin, iter->key.toJS(exec));
+        counterEntry->putDirect(exec->vm(), exec->propertyNames().executionCount, jsNumber(iter->value->count()));
         counters->push(exec, counterEntry);
     }
-    result->putDirect(exec->globalData(), exec->propertyNames().counters, counters);
+    result->putDirect(exec->vm(), exec->propertyNames().counters, counters);
     
     JSArray* exitSites = constructEmptyArray(exec, 0);
     for (unsigned i = 0; i < m_osrExitSites.size(); ++i)
         exitSites->putDirectIndex(exec, i, m_osrExitSites[i].toJS(exec));
-    result->putDirect(exec->globalData(), exec->propertyNames().osrExitSites, exitSites);
+    result->putDirect(exec->vm(), exec->propertyNames().osrExitSites, exitSites);
     
     JSArray* exits = constructEmptyArray(exec, 0);
     for (unsigned i = 0; i < m_osrExits.size(); ++i)
         exits->putDirectIndex(exec, i, m_osrExits[i].toJS(exec));
-    result->putDirect(exec->globalData(), exec->propertyNames().osrExits, exits);
+    result->putDirect(exec->vm(), exec->propertyNames().osrExits, exits);
+    
+    result->putDirect(exec->vm(), exec->propertyNames().numInlinedGetByIds, jsNumber(m_numInlinedGetByIds));
+    result->putDirect(exec->vm(), exec->propertyNames().numInlinedPutByIds, jsNumber(m_numInlinedPutByIds));
+    result->putDirect(exec->vm(), exec->propertyNames().numInlinedCalls, jsNumber(m_numInlinedCalls));
     
     return result;
 }

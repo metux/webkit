@@ -28,7 +28,6 @@
 
 #include "CSSImageGeneratorValue.h"
 #include "CSSPrimitiveValue.h"
-#include "StyleResolver.h"
 #include <wtf/RefPtr.h>
 #include <wtf/Vector.h>
 
@@ -53,7 +52,6 @@ struct CSSGradientColorStop {
     RefPtr<CSSPrimitiveValue> m_color;
     Color m_resolvedColor;
     bool m_colorIsDerivedFromElement;
-    void reportMemoryUsage(MemoryObjectInfo*) const;
     bool operator==(const CSSGradientColorStop& other) const
     {
         return compareCSSValuePtr(m_color, other.m_color)
@@ -90,7 +88,7 @@ public:
     bool knownToBeOpaque(const RenderObject*) const;
 
     void loadSubimages(CachedResourceLoader*) { }
-    PassRefPtr<CSSGradientValue> gradientWithStylesResolved(StyleResolver::State&);
+    PassRefPtr<CSSGradientValue> gradientWithStylesResolved(StyleResolver*);
 
 protected:
     CSSGradientValue(ClassType classType, CSSGradientRepeat repeat, CSSGradientType gradientType)
@@ -120,8 +118,6 @@ protected:
     FloatPoint computeEndPoint(CSSPrimitiveValue*, CSSPrimitiveValue*, RenderStyle*, RenderStyle* rootStyle, const IntSize&);
 
     bool isCacheable() const;
-
-    void reportBaseClassMemoryUsage(MemoryObjectInfo*) const;
 
     // Points. Some of these may be null.
     RefPtr<CSSPrimitiveValue> m_firstX;
@@ -159,8 +155,6 @@ public:
     }
 
     bool equals(const CSSLinearGradientValue&) const;
-
-    void reportDescendantMemoryUsage(MemoryObjectInfo*) const;
 
 private:
     CSSLinearGradientValue(CSSGradientRepeat repeat, CSSGradientType gradientType = CSSLinearGradient)
@@ -204,8 +198,6 @@ public:
     PassRefPtr<Gradient> createGradient(RenderObject*, const IntSize&);
 
     bool equals(const CSSRadialGradientValue&) const;
-
-    void reportDescendantMemoryUsage(MemoryObjectInfo*) const;
 
 private:
     CSSRadialGradientValue(CSSGradientRepeat repeat, CSSGradientType gradientType = CSSRadialGradient)

@@ -39,6 +39,7 @@
 
 namespace JSC {
 
+class CodeBlock;
 struct StructureStubInfo;
 
 class PutByIdAccess {
@@ -55,7 +56,7 @@ public:
     }
     
     static PutByIdAccess transition(
-        JSGlobalData& globalData,
+        VM& vm,
         JSCell* owner,
         Structure* oldStructure,
         Structure* newStructure,
@@ -64,22 +65,22 @@ public:
     {
         PutByIdAccess result;
         result.m_type = Transition;
-        result.m_oldStructure.set(globalData, owner, oldStructure);
-        result.m_newStructure.set(globalData, owner, newStructure);
-        result.m_chain.set(globalData, owner, chain);
+        result.m_oldStructure.set(vm, owner, oldStructure);
+        result.m_newStructure.set(vm, owner, newStructure);
+        result.m_chain.set(vm, owner, chain);
         result.m_stubRoutine = stubRoutine;
         return result;
     }
     
     static PutByIdAccess replace(
-        JSGlobalData& globalData,
+        VM& vm,
         JSCell* owner,
         Structure* structure,
         PassRefPtr<JITStubRoutine> stubRoutine)
     {
         PutByIdAccess result;
         result.m_type = Replace;
-        result.m_oldStructure.set(globalData, owner, structure);
+        result.m_oldStructure.set(vm, owner, structure);
         result.m_stubRoutine = stubRoutine;
         return result;
     }
@@ -132,6 +133,8 @@ public:
     bool visitWeak() const;
     
 private:
+    friend class CodeBlock;
+    
     AccessType m_type;
     WriteBarrier<Structure> m_oldStructure;
     WriteBarrier<Structure> m_newStructure;
@@ -178,6 +181,8 @@ public:
     bool visitWeak() const;
     
 private:
+    friend class CodeBlock;
+    
     Vector<PutByIdAccess, 2> m_list;
     PutKind m_kind;
 };

@@ -142,7 +142,8 @@ public:
 
     enum TileRule { StretchTile, RoundTile, SpaceTile, RepeatTile };
 
-    virtual NativeImagePtr nativeImageForCurrentFrame() { return 0; }
+    virtual PassNativeImagePtr nativeImageForCurrentFrame() { return 0; }
+    virtual ImageOrientation orientationForCurrentFrame() { return ImageOrientation(); }
     
 #if PLATFORM(MAC)
     // Accessors for native image formats.
@@ -186,8 +187,6 @@ public:
     virtual bool notSolidColor() { return true; }
 #endif
 
-    virtual void reportMemoryUsage(MemoryObjectInfo*) const;
-
 protected:
     Image(ImageObserver* = 0);
 
@@ -201,7 +200,7 @@ protected:
     virtual void draw(GraphicsContext*, const FloatRect& dstRect, const FloatRect& srcRect, ColorSpace styleColorSpace, CompositeOperator, BlendMode, RespectImageOrientationEnum);
     void drawTiled(GraphicsContext*, const FloatRect& dstRect, const FloatPoint& srcPoint, const FloatSize& tileSize, ColorSpace styleColorSpace,
         CompositeOperator , BlendMode);
-    void drawTiled(GraphicsContext*, const FloatRect& dstRect, const FloatRect& srcRect, const FloatPoint& patternPhase, const AffineTransform& patternTransform, ColorSpace styleColorSpace, CompositeOperator);
+    void drawTiled(GraphicsContext*, const FloatRect& dstRect, const FloatRect& srcRect, const FloatSize& tileScaleFactor, TileRule hRule, TileRule vRule, ColorSpace styleColorSpace, CompositeOperator);
 
     // Supporting tiled drawing
     virtual bool mayFillWithSolidColor() { return false; }

@@ -115,13 +115,10 @@ WebInspector.ResourcesPanel = function(database)
 
     WebInspector.databaseModel.databases().forEach(this._addDatabase.bind(this));
     WebInspector.databaseModel.addEventListener(WebInspector.DatabaseModel.Events.DatabaseAdded, this._databaseAdded, this);
-
-    WebInspector.domStorageModel.storages().forEach(this._addDOMStorage.bind(this));
-    WebInspector.domStorageModel.addEventListener(WebInspector.DOMStorageModel.Events.DOMStorageAdded, this._domStorageAdded, this);
 }
 
 WebInspector.ResourcesPanel.prototype = {
-    get statusBarItems()
+    statusBarItems: function()
     {
         return [this.storageViewStatusBarItemsContainer];
     },
@@ -136,6 +133,7 @@ WebInspector.ResourcesPanel.prototype = {
     {
         if (!this._initialized && this.isShowing() && this._cachedResourcesWereLoaded) {
             this._populateResourceTree();
+            this._populateDOMStorageTree();
             this._populateApplicationCacheTree();
             this._initDefaultSelection();
             this._initialized = true;
@@ -331,7 +329,7 @@ WebInspector.ResourcesPanel.prototype = {
      */
     _domStorageAdded: function(event)
     {
-        var domStorage = /** @type {WebInspector.DOMStorage}*/ (event.data);
+        var domStorage = /** @type {WebInspector.DOMStorage} */ (event.data);
         this._addDOMStorage(domStorage);
     },
 
@@ -340,12 +338,40 @@ WebInspector.ResourcesPanel.prototype = {
      */
     _addDOMStorage: function(domStorage)
     {
+        console.assert(!this._domStorageTreeElements.get(domStorage));
+
         var domStorageTreeElement = new WebInspector.DOMStorageTreeElement(this, domStorage, (domStorage.isLocalStorage ? "local-storage" : "session-storage"));
         this._domStorageTreeElements.put(domStorage, domStorageTreeElement);
         if (domStorage.isLocalStorage)
             this.localStorageListTreeElement.appendChild(domStorageTreeElement);
         else
             this.sessionStorageListTreeElement.appendChild(domStorageTreeElement);
+    },
+
+    /**
+     * @param {WebInspector.Event} event
+     */
+    _domStorageRemoved: function(event)
+    {
+        var domStorage = /** @type {WebInspector.DOMStorage} */ (event.data);
+        this._removeDOMStorage(domStorage);
+    },
+
+    /**
+     * @param {WebInspector.DOMStorage} domStorage
+     */
+    _removeDOMStorage: function(domStorage)
+    {
+        var treeElement = this._domStorageTreeElements.get(domStorage);
+        if (!treeElement)
+            return;
+        var wasSelected = treeElement.selected;
+        var parentListTreeElement = treeElement.parent;
+        parentListTreeElement.removeChild(treeElement);
+        if (wasSelected)
+            parentListTreeElement.select();
+        this._domStorageTreeElements.remove(treeElement);
+        this._domStorageViews.remove(domStorage);
     },
 
     /**
@@ -487,6 +513,14 @@ WebInspector.ResourcesPanel.prototype = {
         this._innerShowView(view);
     },
 
+    /**
+     * @param {string} cookieDomain
+     */
+    clearCookies: function(cookieDomain)
+    {
+        this._cookieViews[cookieDomain].clear();
+    },
+
     showApplicationCache: function(frameId)
     {
         if (!this._applicationCacheViews[frameId])
@@ -523,7 +557,7 @@ WebInspector.ResourcesPanel.prototype = {
         this.visibleView = view;
 
         this.storageViewStatusBarItemsContainer.removeChildren();
-        var statusBarItems = view.statusBarItems || [];
+        var statusBarItems = view.statusBarItems() || [];
         for (var i = 0; i < statusBarItems.length; ++i)
             this.storageViewStatusBarItemsContainer.appendChild(statusBarItems[i]);
     },
@@ -570,6 +604,13 @@ WebInspector.ResourcesPanel.prototype = {
             }
         }
         database.getTableNames(tableNamesCallback);
+    },
+
+    _populateDOMStorageTree: function()
+    {
+        WebInspector.domStorageModel.storages().forEach(this._addDOMStorage.bind(this));
+        WebInspector.domStorageModel.addEventListener(WebInspector.DOMStorageModel.Events.DOMStorageAdded, this._domStorageAdded, this);
+        WebInspector.domStorageModel.addEventListener(WebInspector.DOMStorageModel.Events.DOMStorageRemoved, this._domStorageRemoved, this);
     },
 
     _populateApplicationCacheTree: function()
@@ -1523,7 +1564,7 @@ WebInspector.FileSystemListTreeElement.prototype = {
     _handleContextMenuEvent: function(event)
     {
         var contextMenu = new WebInspector.ContextMenu(event);
-        contextMenu.appendItem(WebInspector.UIString("Refresh FileSystem List"), this._refreshFileSystem.bind(this));
+        contextMenu.appendItem(WebInspector.UIString(WebInspector.useLowerCaseMenuTitles() ? "Refresh FileSystem list" : "Refresh FileSystem List"), this._refreshFileSystem.bind(this));
         contextMenu.show();
     },
 
@@ -1696,6 +1737,27 @@ WebInspector.IDBObjectStoreTreeElement.prototype = {
         return "indexedDB://" + this._databaseId.securityOrigin + "/" + this._databaseId.name + "/" + this._objectStore.name;
     },
 
+    onattach: function()
+    {
+        WebInspector.BaseStorageTreeElement.prototype.onattach.call(this);
+        this.listItemElement.addEventListener("contextmenu", this._handleContextMenuEvent.bind(this), true);
+    },
+
+    _handleContextMenuEvent: function(event)
+    {
+        var contextMenu = new WebInspector.ContextMenu(event);
+        contextMenu.appendItem(WebInspector.UIString("Clear"), this._clearObjectStore.bind(this));
+        contextMenu.show();
+    },
+
+    _clearObjectStore: function()
+    {
+        function callback() {
+            this.update(this._objectStore);
+        }
+        this._model.clearObjectStore(this._databaseId, this._objectStore.name, callback.bind(this));
+    },
+
    /**
      * @param {WebInspector.IndexedDBModel.ObjectStore} objectStore
      */
@@ -1850,14 +1912,14 @@ WebInspector.IDBIndexTreeElement.prototype = {
  */
 WebInspector.DOMStorageTreeElement = function(storagePanel, domStorage, className)
 {
-    WebInspector.BaseStorageTreeElement.call(this, storagePanel, null, domStorage.domain ? domStorage.domain : WebInspector.UIString("Local Files"), ["domstorage-storage-tree-item", className]);
+    WebInspector.BaseStorageTreeElement.call(this, storagePanel, null, domStorage.securityOrigin ? domStorage.securityOrigin : WebInspector.UIString("Local Files"), ["domstorage-storage-tree-item", className]);
     this._domStorage = domStorage;
 }
 
 WebInspector.DOMStorageTreeElement.prototype = {
     get itemURL()
     {
-        return "storage://" + this._domStorage.domain + "/" + (this._domStorage.isLocalStorage ? "local" : "session");
+        return "storage://" + this._domStorage.securityOrigin + "/" + (this._domStorage.isLocalStorage ? "local" : "session");
     },
 
     onselect: function(selectedByUser)
@@ -1883,6 +1945,30 @@ WebInspector.CookieTreeElement.prototype = {
     get itemURL()
     {
         return "cookies://" + this._cookieDomain;
+    },
+
+    onattach: function()
+    {
+        WebInspector.BaseStorageTreeElement.prototype.onattach.call(this);
+        this.listItemElement.addEventListener("contextmenu", this._handleContextMenuEvent.bind(this), true);
+    },
+
+    /**
+     * @param {Event} event
+     */
+    _handleContextMenuEvent: function(event)
+    {
+        var contextMenu = new WebInspector.ContextMenu(event);
+        contextMenu.appendItem(WebInspector.UIString("Clear"), this._clearCookies.bind(this));
+        contextMenu.show();
+    },
+
+    /**
+     * @param {string} domain
+     */
+    _clearCookies: function(domain)
+    {
+        this._storagePanel.clearCookies(this._cookieDomain);
     },
 
     onselect: function(selectedByUser)

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012 Apple Inc. All rights reserved.
+ * Copyright (C) 2012, 2013 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -38,8 +38,7 @@
 #include "Page.h"
 #include "StyleCachedImageSet.h"
 #include "StylePendingImage.h"
-#include "WebCoreMemoryInstrumentation.h"
-#include <wtf/MemoryInstrumentationVector.h>
+#include <wtf/text/StringBuilder.h>
 
 namespace WebCore {
 
@@ -145,13 +144,13 @@ StyleImage* CSSImageSetValue::cachedOrPendingImageSet(Document* document)
 String CSSImageSetValue::customCssText() const
 {
     StringBuilder result;
-    result.append("-webkit-image-set(");
+    result.appendLiteral("-webkit-image-set(");
 
     size_t length = this->length();
     size_t i = 0;
     while (i < length) {
         if (i > 0)
-            result.append(", ");
+            result.appendLiteral(", ");
 
         const CSSValue* imageValue = item(i);
         result.append(imageValue->cssText());
@@ -168,7 +167,7 @@ String CSSImageSetValue::customCssText() const
         ++i;
     }
 
-    result.append(")");
+    result.append(')');
     return result.toString();
 }
 
@@ -193,19 +192,6 @@ CSSImageSetValue::CSSImageSetValue(const CSSImageSetValue& cloneFrom)
 PassRefPtr<CSSImageSetValue> CSSImageSetValue::cloneForCSSOM() const
 {
     return adoptRef(new CSSImageSetValue(*this));
-}
-
-void CSSImageSetValue::reportDescendantMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
-{
-    MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::CSS);
-    CSSValueList::reportDescendantMemoryUsage(memoryObjectInfo);
-    info.addMember(m_imagesInSet, "imagesInSet");
-}
-
-void CSSImageSetValue::ImageWithScale::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
-{
-    MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::CSS);
-    info.addMember(imageURL, "imageURL");
 }
 
 } // namespace WebCore

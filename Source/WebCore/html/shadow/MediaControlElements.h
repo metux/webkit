@@ -38,7 +38,7 @@ namespace WebCore {
 
 // ----------------------------
 
-class MediaControlPanelElement : public MediaControlDivElement {
+class MediaControlPanelElement FINAL : public MediaControlDivElement {
 public:
     static PassRefPtr<MediaControlPanelElement> create(Document*);
 
@@ -80,7 +80,7 @@ private:
 
 // ----------------------------
 
-class MediaControlPanelEnclosureElement : public MediaControlDivElement {
+class MediaControlPanelEnclosureElement FINAL : public MediaControlDivElement {
 public:
     static PassRefPtr<MediaControlPanelEnclosureElement> create(Document*);
 
@@ -91,7 +91,7 @@ private:
 
 // ----------------------------
 
-class MediaControlOverlayEnclosureElement : public MediaControlDivElement {
+class MediaControlOverlayEnclosureElement FINAL : public MediaControlDivElement {
 public:
     static PassRefPtr<MediaControlOverlayEnclosureElement> create(Document*);
 
@@ -106,9 +106,13 @@ class MediaControlTimelineContainerElement : public MediaControlDivElement {
 public:
     static PassRefPtr<MediaControlTimelineContainerElement> create(Document*);
 
+    void setTimeDisplaysHidden(bool);
+
 private:
     explicit MediaControlTimelineContainerElement(Document*);
     virtual const AtomicString& shadowPseudoId() const OVERRIDE;
+
+    virtual RenderObject* createRenderer(RenderArena*, RenderStyle*) OVERRIDE;
 };
 
 // ----------------------------
@@ -146,7 +150,7 @@ private:
 
 // ----------------------------
 
-class MediaControlPanelMuteButtonElement : public MediaControlMuteButtonElement {
+class MediaControlPanelMuteButtonElement FINAL : public MediaControlMuteButtonElement {
 public:
     static PassRefPtr<MediaControlPanelMuteButtonElement> create(Document*, MediaControls*);
 
@@ -163,7 +167,7 @@ private:
 
 // ----------------------------
 
-class MediaControlVolumeSliderMuteButtonElement : public MediaControlMuteButtonElement {
+class MediaControlVolumeSliderMuteButtonElement FINAL : public MediaControlMuteButtonElement {
 public:
     static PassRefPtr<MediaControlVolumeSliderMuteButtonElement> create(Document*);
 
@@ -175,7 +179,7 @@ private:
 
 // ----------------------------
 
-class MediaControlPlayButtonElement : public MediaControlInputElement {
+class MediaControlPlayButtonElement FINAL : public MediaControlInputElement {
 public:
     static PassRefPtr<MediaControlPlayButtonElement> create(Document*);
 
@@ -191,7 +195,7 @@ private:
 
 // ----------------------------
 
-class MediaControlOverlayPlayButtonElement : public MediaControlInputElement {
+class MediaControlOverlayPlayButtonElement FINAL : public MediaControlInputElement {
 public:
     static PassRefPtr<MediaControlOverlayPlayButtonElement> create(Document*);
 
@@ -262,7 +266,7 @@ private:
 
 // ----------------------------
 
-class MediaControlToggleClosedCaptionsButtonElement : public MediaControlInputElement {
+class MediaControlToggleClosedCaptionsButtonElement FINAL : public MediaControlInputElement {
 public:
     static PassRefPtr<MediaControlToggleClosedCaptionsButtonElement> create(Document*, MediaControls*);
 
@@ -283,7 +287,7 @@ private:
 
 // ----------------------------
 
-class MediaControlClosedCaptionsContainerElement : public MediaControlDivElement {
+class MediaControlClosedCaptionsContainerElement FINAL : public MediaControlDivElement {
 public:
     static PassRefPtr<MediaControlClosedCaptionsContainerElement> create(Document*);
 
@@ -296,14 +300,13 @@ private:
 
 // ----------------------------
 
-class MediaControlClosedCaptionsTrackListElement : public MediaControlDivElement {
+class MediaControlClosedCaptionsTrackListElement FINAL : public MediaControlDivElement {
 public:
     static PassRefPtr<MediaControlClosedCaptionsTrackListElement> create(Document*, MediaControls*);
 
     virtual bool willRespondToMouseClickEvents() OVERRIDE { return true; }
 
     void updateDisplay();
-    void resetTrackListMenu() { m_trackListHasChanged = true; }
 
 private:
     MediaControlClosedCaptionsTrackListElement(Document*, MediaControls*);
@@ -315,20 +318,23 @@ private:
 
     typedef Vector<RefPtr<Element> > TrackMenuItems;
     TrackMenuItems m_menuItems;
+#if ENABLE(VIDEO_TRACK)
+    typedef HashMap<RefPtr<Element>, RefPtr<TextTrack> > MenuItemToTrackMap;
+    MenuItemToTrackMap m_menuToTrackMap;
+#endif
     MediaControls* m_controls;
-    bool m_trackListHasChanged;
 };
 
 // ----------------------------
 
-class MediaControlTimelineElement : public MediaControlInputElement {
+class MediaControlTimelineElement FINAL : public MediaControlInputElement {
 public:
     static PassRefPtr<MediaControlTimelineElement> create(Document*, MediaControls*);
 
     virtual bool willRespondToMouseClickEvents() OVERRIDE;
 
-    void setPosition(float);
-    void setDuration(float);
+    void setPosition(double);
+    void setDuration(double);
 
 private:
     explicit MediaControlTimelineElement(Document*, MediaControls*);
@@ -341,7 +347,7 @@ private:
 
 // ----------------------------
 
-class MediaControlFullscreenButtonElement : public MediaControlInputElement {
+class MediaControlFullscreenButtonElement FINAL : public MediaControlInputElement {
 public:
     static PassRefPtr<MediaControlFullscreenButtonElement> create(Document*);
 
@@ -358,7 +364,7 @@ private:
 
 // ----------------------------
 
-class MediaControlPanelVolumeSliderElement : public MediaControlVolumeSliderElement {
+class MediaControlPanelVolumeSliderElement FINAL : public MediaControlVolumeSliderElement {
 public:
     static PassRefPtr<MediaControlPanelVolumeSliderElement> create(Document*);
 
@@ -409,7 +415,7 @@ private:
 
 // ----------------------------
 
-class MediaControlTimeRemainingDisplayElement : public MediaControlTimeDisplayElement {
+class MediaControlTimeRemainingDisplayElement FINAL : public MediaControlTimeDisplayElement {
 public:
     static PassRefPtr<MediaControlTimeRemainingDisplayElement> create(Document*);
 
@@ -420,7 +426,7 @@ private:
 
 // ----------------------------
 
-class MediaControlCurrentTimeDisplayElement : public MediaControlTimeDisplayElement {
+class MediaControlCurrentTimeDisplayElement FINAL : public MediaControlTimeDisplayElement {
 public:
     static PassRefPtr<MediaControlCurrentTimeDisplayElement> create(Document*);
 
@@ -433,27 +439,33 @@ private:
 
 #if ENABLE(VIDEO_TRACK)
 
-class MediaControlTextTrackContainerElement : public MediaControlDivElement, public TextTrackRepresentationClient {
+class MediaControlTextTrackContainerElement FINAL : public MediaControlDivElement, public TextTrackRepresentationClient {
 public:
     static PassRefPtr<MediaControlTextTrackContainerElement> create(Document*);
 
     void updateDisplay();
     void updateSizes(bool forceUpdate = false);
-    void createSubtrees(Document*);
+    void enteredFullscreen();
+    void exitedFullscreen();
+    static const AtomicString& textTrackContainerElementShadowPseudoId();
 
 private:
+    void updateTimerFired(Timer<MediaControlTextTrackContainerElement>*);
+
     explicit MediaControlTextTrackContainerElement(Document*);
     virtual const AtomicString& shadowPseudoId() const OVERRIDE;
 
     virtual RenderObject* createRenderer(RenderArena*, RenderStyle*);
 
-    virtual void paintTextTrackRepresentation(GraphicsContext*, const IntRect&) OVERRIDE;
+    virtual PassRefPtr<Image> createTextTrackRepresentationImage() OVERRIDE;
     virtual void textTrackRepresentationBoundsChanged(const IntRect&) OVERRIDE;
+    void clearTextTrackRepresentation();
     OwnPtr<TextTrackRepresentation> m_textTrackRepresentation;
 
+    Timer<MediaControlTextTrackContainerElement> m_updateTimer;
     IntRect m_videoDisplaySize;
-    float m_fontSize;
-    RefPtr<HTMLElement> m_cueContainer;
+    int m_fontSize;
+    bool m_fontSizeIsImportant;
 };
 
 #endif

@@ -29,6 +29,7 @@
 #include "APIObject.h"
 #include "DownloadProxyMap.h"
 #include "GenericCallback.h"
+#include "ImmutableArray.h"
 #include "ImmutableDictionary.h"
 #include "MessageReceiver.h"
 #include "MessageReceiverMap.h"
@@ -57,6 +58,11 @@
 #include "NetworkProcessProxy.h"
 #endif
 
+#if PLATFORM(MAC)
+OBJC_CLASS NSObject;
+OBJC_CLASS NSString;
+#endif
+
 namespace WebKit {
 
 class DownloadProxy;
@@ -69,9 +75,6 @@ struct WebProcessCreationParameters;
     
 typedef GenericCallback<WKDictionaryRef> DictionaryCallback;
 
-#if ENABLE(BATTERY_STATUS)
-class WebBatteryManagerProxy;
-#endif
 #if ENABLE(NETWORK_INFO)
 class WebNetworkInfoManagerProxy;
 #endif
@@ -84,10 +87,12 @@ extern NSString *SchemeForCustomProtocolRegisteredNotificationName;
 extern NSString *SchemeForCustomProtocolUnregisteredNotificationName;
 #endif
 
-class WebContext : public APIObject, private CoreIPC::MessageReceiver {
+class WebContext : public TypedAPIObject<APIObject::TypeContext>, private CoreIPC::MessageReceiver
+#if ENABLE(NETSCAPE_PLUGIN_API)
+    , private PluginInfoStoreClient
+#endif
+    {
 public:
-    static const Type APIType = TypeContext;
-
     static PassRefPtr<WebContext> create(const String& injectedBundlePath);
     virtual ~WebContext();
 
@@ -96,7 +101,7 @@ public:
     template <typename T>
     T* supplement()
     {
-        return static_cast<T*>(m_supplements.get(T::supplementName()).get());
+        return static_cast<T*>(m_supplements.get(T::supplementName()));
     }
 
     template <typename T>
@@ -129,6 +134,7 @@ public:
 
     template<typename U> void sendToAllProcesses(const U& message);
     template<typename U> void sendToAllProcessesRelaunchingThemIfNecessary(const U& message);
+    template<typename U> void sendToOneProcess(const U& message);
 
     // Sends the message to WebProcess or NetworkProcess as approporiate for current process model.
     template<typename U> void sendToNetworkingProcess(const U& message);
@@ -164,7 +170,6 @@ public:
 
     PluginInfoStore& pluginInfoStore() { return m_pluginInfoStore; }
 #endif
-    String applicationCacheDirectory();
 
     void setAlwaysUsesComplexTextCodePath(bool);
     void setShouldUseFontSmoothing(bool);
@@ -204,15 +209,7 @@ public:
     WebHistoryClient& historyClient() { return m_historyClient; }
     WebContextClient& client() { return m_client; }
 
-    static HashSet<String, CaseFoldingHash> pdfAndPostScriptMIMETypes();
-
-#if ENABLE(BATTERY_STATUS)
-    WebBatteryManagerProxy* batteryManagerProxy() const { return m_batteryManagerProxy.get(); }
-#endif
     WebIconDatabase* iconDatabase() const { return m_iconDatabase.get(); }
-#if ENABLE(NETWORK_INFO)
-    WebNetworkInfoManagerProxy* networkInfoManagerProxy() const { return m_networkInfoManagerProxy.get(); }
-#endif
 #if ENABLE(NETSCAPE_PLUGIN_API)
     WebPluginSiteDataManager* pluginSiteDataManager() const { return m_pluginSiteDataManager.get(); }
 #endif
@@ -224,10 +221,11 @@ public:
     };
     static Statistics& statistics();    
 
+    void setApplicationCacheDirectory(const String& dir) { m_overrideApplicationCacheDirectory = dir; }
     void setDatabaseDirectory(const String& dir) { m_overrideDatabaseDirectory = dir; }
     void setIconDatabasePath(const String&);
     String iconDatabasePath() const;
-    void setLocalStorageDirectory(const String& dir) { m_overrideLocalStorageDirectory = dir; }
+    void setLocalStorageDirectory(const String&);
     void setDiskCacheDirectory(const String& dir) { m_overrideDiskCacheDirectory = dir; }
     void setCookieStorageDirectory(const String& dir) { m_overrideCookieStorageDirectory = dir; }
 
@@ -261,6 +259,7 @@ public:
 
     PassRefPtr<ImmutableDictionary> plugInAutoStartOriginHashes() const;
     void setPlugInAutoStartOriginHashes(ImmutableDictionary&);
+    void setPlugInAutoStartOrigins(ImmutableArray&);
 
     // Network Process Management
 
@@ -293,11 +292,17 @@ public:
     bool ignoreTLSErrors() const { return m_ignoreTLSErrors; }
 #endif
 
+    static void setInvalidMessageCallback(void (*)(WKStringRef));
+    static void didReceiveInvalidMessage(const CoreIPC::StringReference& messageReceiverName, const CoreIPC::StringReference& messageName);
+
+    void processDidCachePage(WebProcessProxy*);
+
+    bool isURLKnownHSTSHost(const String& urlString, bool privateBrowsingEnabled) const;
+    void resetHSTSHosts();
+
 private:
     WebContext(ProcessModel, const String& injectedBundlePath);
     void platformInitialize();
-
-    virtual Type type() const { return APIType; }
 
     void platformInitializeWebProcess(WebProcessCreationParameters&);
     void platformInvalidateContext();
@@ -343,6 +348,9 @@ private:
     static void languageChanged(void* context);
     void languageChanged();
 
+    String applicationCacheDirectory() const;
+    String platformDefaultApplicationCacheDirectory() const;
+
     String databaseDirectory() const;
     String platformDefaultDatabaseDirectory() const;
 
@@ -371,13 +379,20 @@ private:
     void addPlugInAutoStartOriginHash(const String& pageOrigin, unsigned plugInOriginHash);
     void plugInDidReceiveUserInteraction(unsigned plugInOriginHash);
 
+#if ENABLE(NETSCAPE_PLUGIN_API)
+    // PluginInfoStoreClient:
+    virtual void pluginInfoStoreDidLoadPlugins(PluginInfoStore*) OVERRIDE;
+#endif
+
     CoreIPC::MessageReceiverMap m_messageReceiverMap;
 
     ProcessModel m_processModel;
     unsigned m_webProcessCountLimit; // The limit has no effect when process model is ProcessModelSharedSecondaryProcess.
     
-    Vector<RefPtr<WebProcessProxy> > m_processes;
+    Vector<RefPtr<WebProcessProxy>> m_processes;
     bool m_haveInitialEmptyProcess;
+
+    WebProcessProxy* m_processWithPageCache;
 
     RefPtr<WebPageGroup> m_defaultPageGroup;
 
@@ -407,33 +422,23 @@ private:
     bool m_alwaysUsesComplexTextCodePath;
     bool m_shouldUseFontSmoothing;
 
-    // How many times an API call was used to enable the preference.
-    // The variable can be 0 when private browsing is used if it's enabled due to a persistent preference.
-    static unsigned m_privateBrowsingEnterCount;
-
     // Messages that were posted before any pages were created.
     // The client should use initialization messages instead, so that a restarted process would get the same state.
-    Vector<pair<String, RefPtr<APIObject> > > m_messagesToInjectedBundlePostedToEmptyContext;
+    Vector<pair<String, RefPtr<APIObject>>> m_messagesToInjectedBundlePostedToEmptyContext;
 
     CacheModel m_cacheModel;
 
     bool m_memorySamplerEnabled;
     double m_memorySamplerInterval;
 
-#if ENABLE(BATTERY_STATUS)
-    RefPtr<WebBatteryManagerProxy> m_batteryManagerProxy;
-#endif
     RefPtr<WebIconDatabase> m_iconDatabase;
-#if ENABLE(NETWORK_INFO)
-    RefPtr<WebNetworkInfoManagerProxy> m_networkInfoManagerProxy;
-#endif
 #if ENABLE(NETSCAPE_PLUGIN_API)
     RefPtr<WebPluginSiteDataManager> m_pluginSiteDataManager;
 #endif
 
     RefPtr<StorageManager> m_storageManager;
 
-    typedef HashMap<const char*, RefPtr<WebContextSupplement>, PtrHash<const char*> > WebContextSupplementMap;
+    typedef HashMap<const char*, RefPtr<WebContextSupplement>, PtrHash<const char*>> WebContextSupplementMap;
     WebContextSupplementMap m_supplements;
 
 #if USE(SOUP)
@@ -441,11 +446,19 @@ private:
 #endif
 
 #if PLATFORM(MAC)
-    RetainPtr<CFTypeRef> m_enhancedAccessibilityObserver;
-    RetainPtr<CFTypeRef> m_customSchemeRegisteredObserver;
-    RetainPtr<CFTypeRef> m_customSchemeUnregisteredObserver;
+    RetainPtr<NSObject> m_enhancedAccessibilityObserver;
+    RetainPtr<NSObject> m_customSchemeRegisteredObserver;
+    RetainPtr<NSObject> m_customSchemeUnregisteredObserver;
+
+    RetainPtr<NSObject> m_automaticTextReplacementNotificationObserver;
+    RetainPtr<NSObject> m_automaticSpellingCorrectionNotificationObserver;
+#if __MAC_OS_X_VERSION_MIN_REQUIRED >= 1090
+    RetainPtr<NSObject> m_automaticQuoteSubstitutionNotificationObserver;
+    RetainPtr<NSObject> m_automaticDashSubstitutionNotificationObserver;
+#endif
 #endif
 
+    String m_overrideApplicationCacheDirectory;
     String m_overrideDatabaseDirectory;
     String m_overrideIconDatabasePath;
     String m_overrideLocalStorageDirectory;
@@ -459,8 +472,8 @@ private:
     RefPtr<NetworkProcessProxy> m_networkProcess;
 #endif
     
-    HashMap<uint64_t, RefPtr<DictionaryCallback> > m_dictionaryCallbacks;
-    HashMap<uint64_t, RefPtr<StatisticsRequest> > m_statisticsRequests;
+    HashMap<uint64_t, RefPtr<DictionaryCallback>> m_dictionaryCallbacks;
+    HashMap<uint64_t, RefPtr<StatisticsRequest>> m_statisticsRequests;
 
 #if PLATFORM(MAC)
     bool m_processSuppressionEnabled;
@@ -525,6 +538,30 @@ template<typename U> void WebContext::sendToAllProcessesRelaunchingThemIfNecessa
     if (m_processModel == ProcessModelSharedSecondaryProcess)
         ensureSharedWebProcess();
     sendToAllProcesses(message);
+}
+
+template<typename U> inline void WebContext::sendToOneProcess(const U& message)
+{
+    if (m_processModel == ProcessModelSharedSecondaryProcess)
+        ensureSharedWebProcess();
+
+    bool messageSent = false;
+    size_t processCount = m_processes.size();
+    for (size_t i = 0; i < processCount; ++i) {
+        WebProcessProxy* process = m_processes[i].get();
+        if (process->canSendMessage()) {
+            process->send(message, 0);
+            messageSent = true;
+            break;
+        }
+    }
+
+    if (!messageSent && m_processModel == ProcessModelMultipleSecondaryProcesses) {
+        warmInitialProcess();
+        RefPtr<WebProcessProxy> process = m_processes.last();
+        if (process->canSendMessage())
+            process->send(message, 0);
+    }
 }
 
 } // namespace WebKit

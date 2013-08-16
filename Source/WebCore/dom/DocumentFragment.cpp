@@ -34,11 +34,11 @@ namespace WebCore {
 DocumentFragment::DocumentFragment(Document* document, ConstructionType constructionType)
     : ContainerNode(document, constructionType)
 {
-    ASSERT(document);
 }
 
 PassRefPtr<DocumentFragment> DocumentFragment::create(Document* document)
 {
+    ASSERT(document);
     return adoptRef(new DocumentFragment(document, Node::CreateDocumentFragment));
 }
 
@@ -75,14 +75,14 @@ PassRefPtr<Node> DocumentFragment::cloneNode(bool deep)
     return clone.release();
 }
 
-void DocumentFragment::parseHTML(const String& source, Element* contextElement, FragmentScriptingPermission scriptingPermission)
+void DocumentFragment::parseHTML(const String& source, Element* contextElement, ParserContentPolicy parserContentPolicy)
 {
-    HTMLDocumentParser::parseDocumentFragment(source, this, contextElement, scriptingPermission);
+    HTMLDocumentParser::parseDocumentFragment(source, this, contextElement, parserContentPolicy);
 }
 
-bool DocumentFragment::parseXML(const String& source, Element* contextElement, FragmentScriptingPermission scriptingPermission)
+bool DocumentFragment::parseXML(const String& source, Element* contextElement, ParserContentPolicy parserContentPolicy)
 {
-    return XMLDocumentParser::parseDocumentFragment(source, this, contextElement, scriptingPermission);
+    return XMLDocumentParser::parseDocumentFragment(source, this, contextElement, parserContentPolicy);
 }
 
 }

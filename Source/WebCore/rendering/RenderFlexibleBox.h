@@ -40,24 +40,28 @@ public:
     RenderFlexibleBox(Element*);
     virtual ~RenderFlexibleBox();
 
+    static RenderFlexibleBox* createAnonymous(Document*);
+
     virtual const char* renderName() const OVERRIDE;
 
-    virtual bool isFlexibleBox() const OVERRIDE { return true; }
-    virtual bool avoidsFloats() const OVERRIDE { return true; }
-    virtual bool canCollapseAnonymousBlockChild() const OVERRIDE { return false; }
-    virtual void layoutBlock(bool relayoutChildren, LayoutUnit pageLogicalHeight = 0) OVERRIDE;
+    virtual bool isFlexibleBox() const OVERRIDE FINAL { return true; }
+    virtual bool avoidsFloats() const OVERRIDE FINAL { return true; }
+    virtual bool canCollapseAnonymousBlockChild() const OVERRIDE FINAL { return false; }
+    virtual void layoutBlock(bool relayoutChildren, LayoutUnit pageLogicalHeight = 0) OVERRIDE FINAL;
 
     virtual int baselinePosition(FontBaseline, bool firstLine, LineDirectionMode, LinePositionMode = PositionOnContainingLine) const OVERRIDE;
     virtual int firstLineBoxBaseline() const OVERRIDE;
     virtual int inlineBlockBaseline(LineDirectionMode) const OVERRIDE;
 
-    virtual void paintChildren(PaintInfo& forSelf, const LayoutPoint&, PaintInfo& forChild, bool usePrintRect) OVERRIDE;
+    virtual void paintChildren(PaintInfo& forSelf, const LayoutPoint&, PaintInfo& forChild, bool usePrintRect) OVERRIDE FINAL;
 
     bool isHorizontalFlow() const;
 
 protected:
     virtual void computeIntrinsicLogicalWidths(LayoutUnit& minLogicalWidth, LayoutUnit& maxLogicalWidth) const OVERRIDE;
     virtual void computePreferredLogicalWidths() OVERRIDE;
+
+    virtual void styleDidChange(StyleDifference, const RenderStyle* oldStyle);
 
 private:
     enum FlexSign {
@@ -134,14 +138,15 @@ private:
     EAlignItems alignmentForChild(RenderBox* child) const;
     LayoutUnit mainAxisBorderAndPaddingExtentForChild(RenderBox* child) const;
     LayoutUnit mainAxisScrollbarExtentForChild(RenderBox* child) const;
-    LayoutUnit preferredMainAxisContentExtentForChild(RenderBox* child);
+    LayoutUnit preferredMainAxisContentExtentForChild(RenderBox* child, bool hasInfiniteLineLength);
 
     void layoutFlexItems(bool relayoutChildren, Vector<LineContext>&);
     LayoutUnit autoMarginOffsetInMainAxis(const OrderedFlexItemList&, LayoutUnit& availableFreeSpace);
     void updateAutoMarginsInMainAxis(RenderBox* child, LayoutUnit autoMarginOffset);
     bool hasAutoMarginsInCrossAxis(RenderBox* child) const;
     bool updateAutoMarginsInCrossAxis(RenderBox* child, LayoutUnit availableAlignmentSpace);
-    void repositionLogicalHeightDependentFlexItems(Vector<LineContext>&, LayoutUnit& oldClientAfterEdge);
+    void repositionLogicalHeightDependentFlexItems(Vector<LineContext>&);
+    LayoutUnit clientLogicalBottomAfterRepositioning();
     void appendChildFrameRects(ChildFrameRects&);
     void repaintChildrenDuringLayoutIfMoved(const ChildFrameRects&);
 
@@ -151,10 +156,10 @@ private:
     LayoutUnit computeChildMarginValue(Length margin, RenderView*);
     void computeMainAxisPreferredSizes(OrderHashSet&);
     LayoutUnit adjustChildSizeForMinAndMax(RenderBox*, LayoutUnit childSize);
-    bool computeNextFlexLine(OrderedFlexItemList& orderedChildren, LayoutUnit& preferredMainAxisExtent, double& totalFlexGrow, double& totalWeightedFlexShrink, LayoutUnit& minMaxAppliedMainAxisExtent);
+    bool computeNextFlexLine(OrderedFlexItemList& orderedChildren, LayoutUnit& preferredMainAxisExtent, double& totalFlexGrow, double& totalWeightedFlexShrink, LayoutUnit& minMaxAppliedMainAxisExtent, bool& hasInfiniteLineLength);
 
-    bool resolveFlexibleLengths(FlexSign, const OrderedFlexItemList&, LayoutUnit& availableFreeSpace, double& totalFlexGrow, double& totalWeightedFlexShrink, InflexibleFlexItemSize&, Vector<LayoutUnit>& childSizes);
-    void freezeViolations(const Vector<Violation>&, LayoutUnit& availableFreeSpace, double& totalFlexGrow, double& totalWeightedFlexShrink, InflexibleFlexItemSize&);
+    bool resolveFlexibleLengths(FlexSign, const OrderedFlexItemList&, LayoutUnit& availableFreeSpace, double& totalFlexGrow, double& totalWeightedFlexShrink, InflexibleFlexItemSize&, Vector<LayoutUnit>& childSizes, bool hasInfiniteLineLength);
+    void freezeViolations(const Vector<Violation>&, LayoutUnit& availableFreeSpace, double& totalFlexGrow, double& totalWeightedFlexShrink, InflexibleFlexItemSize&, bool hasInfiniteLineLength);
 
     void resetAutoMarginsAndLogicalTopInCrossAxis(RenderBox*);
     bool needToStretchChild(RenderBox*);
@@ -172,6 +177,21 @@ private:
     mutable OrderIterator m_orderIterator;
     int m_numberOfInFlowChildrenOnFirstLine;
 };
+
+inline RenderFlexibleBox* toRenderFlexibleBox(RenderObject* object)
+{
+    ASSERT_WITH_SECURITY_IMPLICATION(!object || object->isFlexibleBox());
+    return static_cast<RenderFlexibleBox*>(object);
+}
+
+inline const RenderFlexibleBox* toRenderFlexibleBox(const RenderObject* object)
+{
+    ASSERT_WITH_SECURITY_IMPLICATION(!object || object->isFlexibleBox());
+    return static_cast<const RenderFlexibleBox*>(object);
+}
+
+// This will catch anyone doing an unnecessary cast.
+void toRenderFlexibleBox(const RenderFlexibleBox*);
 
 } // namespace WebCore
 

@@ -32,6 +32,7 @@
 #include "EventNames.h"
 #include "ExceptionCodePlaceholder.h"
 #include "Frame.h"
+#include "FrameLoader.h"
 #include "FrameLoaderClient.h"
 #include "HTMLEmbedElement.h"
 #include "HTMLHtmlElement.h"
@@ -39,7 +40,6 @@
 #include "HTMLSourceElement.h"
 #include "HTMLVideoElement.h"
 #include "KeyboardEvent.h"
-#include "MainResourceLoader.h"
 #include "NodeList.h"
 #include "RawDataDocumentParser.h"
 #include "ScriptController.h"
@@ -85,7 +85,7 @@ void MediaDocumentParser::createDocumentStructure()
 
     RefPtr<Element> mediaElement = document()->createElement(videoTag, false);
 
-    m_mediaElement = static_cast<HTMLVideoElement*>(mediaElement.get());
+    m_mediaElement = toHTMLVideoElement(mediaElement.get());
     m_mediaElement->setAttribute(controlsAttr, "");
     m_mediaElement->setAttribute(autoplayAttr, "");
 
@@ -105,7 +105,7 @@ void MediaDocumentParser::createDocumentStructure()
     if (!frame)
         return;
 
-    frame->loader()->activeDocumentLoader()->mainResourceLoader()->setDataBufferingPolicy(DoNotBufferData);
+    frame->loader()->activeDocumentLoader()->setMainResourceDataBufferingPolicy(DoNotBufferData);
 }
 
 void MediaDocumentParser::appendBytes(DocumentWriter*, const char*, size_t)
@@ -118,7 +118,7 @@ void MediaDocumentParser::appendBytes(DocumentWriter*, const char*, size_t)
 }
     
 MediaDocument::MediaDocument(Frame* frame, const KURL& url)
-    : HTMLDocument(frame, url)
+    : HTMLDocument(frame, url, MediaDocumentClass)
     , m_replaceMediaElementTimer(this, &MediaDocument::replaceMediaElementTimerFired)
 {
     setCompatibilityMode(QuirksMode);
@@ -140,12 +140,12 @@ static inline HTMLVideoElement* descendentVideoElement(Node* node)
     ASSERT(node);
 
     if (node->hasTagName(videoTag))
-        return static_cast<HTMLVideoElement*>(node);
+        return toHTMLVideoElement(node);
 
     RefPtr<NodeList> nodeList = node->getElementsByTagNameNS(videoTag.namespaceURI(), videoTag.localName());
    
     if (nodeList.get()->length() > 0)
-        return static_cast<HTMLVideoElement*>(nodeList.get()->item(0));
+        return toHTMLVideoElement(nodeList.get()->item(0));
 
     return 0;
 }
@@ -155,7 +155,7 @@ static inline HTMLVideoElement* ancestorVideoElement(Node* node)
     while (node && !node->hasTagName(videoTag))
         node = node->parentOrShadowHostNode();
 
-    return static_cast<HTMLVideoElement*>(node);
+    return toHTMLVideoElement(node);
 }
 
 void MediaDocument::defaultEventHandler(Event* event)
@@ -166,7 +166,6 @@ void MediaDocument::defaultEventHandler(Event* event)
     if (!targetNode)
         return;
 
-#if !PLATFORM(CHROMIUM)
     if (HTMLVideoElement* video = ancestorVideoElement(targetNode)) {
         if (event->type() == eventNames().clickEvent) {
             if (!video->canPlay()) {
@@ -180,7 +179,6 @@ void MediaDocument::defaultEventHandler(Event* event)
             }
         }
     }
-#endif
 
     if (event->type() == eventNames().keydownEvent && event->isKeyboardEvent()) {
         HTMLVideoElement* video = descendentVideoElement(targetNode);

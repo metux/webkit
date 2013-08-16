@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011 Apple Inc. All rights reserved.
+ * Copyright (C) 2011, 2013 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -28,10 +28,13 @@
 
 #include "CodeBlock.h"
 #include "CodeBlockWithJITType.h"
+#include "DFGClobberSet.h"
 #include "DFGVariableAccessDataDump.h"
 #include "FunctionExecutableDump.h"
+#include "OperandsInlines.h"
 #include "Operations.h"
 #include <wtf/CommaPrinter.h>
+#include <wtf/ListDump.h>
 
 #if ENABLE(DFG_JIT)
 
@@ -44,18 +47,17 @@ static const char* dfgOpNames[] = {
 #undef STRINGIZE_DFG_OP_ENUM
 };
 
-Graph::Graph(JSGlobalData& globalData, CodeBlock* codeBlock, unsigned osrEntryBytecodeIndex, const Operands<JSValue>& mustHandleValues)
-    : m_globalData(globalData)
-    , m_codeBlock(codeBlock)
-    , m_compilation(globalData.m_perBytecodeProfiler ? globalData.m_perBytecodeProfiler->newCompilation(codeBlock, Profiler::DFG) : 0)
-    , m_profiledBlock(codeBlock->alternative())
-    , m_allocator(globalData.m_dfgState->m_allocator)
+Graph::Graph(VM& vm, Plan& plan, LongLivedState& longLivedState)
+    : m_vm(vm)
+    , m_plan(plan)
+    , m_codeBlock(m_plan.codeBlock.get())
+    , m_profiledBlock(m_codeBlock->alternative())
+    , m_allocator(longLivedState.m_allocator)
     , m_hasArguments(false)
-    , m_osrEntryBytecodeIndex(osrEntryBytecodeIndex)
-    , m_mustHandleValues(mustHandleValues)
     , m_fixpointState(BeforeFixpoint)
     , m_form(LoadStore)
     , m_unificationState(LocallyUnified)
+    , m_refCountState(EverythingIsLive)
 {
     ASSERT(m_profiledBlock);
 }
@@ -76,7 +78,7 @@ static void printWhiteSpace(PrintStream& out, unsigned amount)
         out.print(" ");
 }
 
-bool Graph::dumpCodeOrigin(PrintStream& out, const char* prefix, Node* previousNode, Node* currentNode)
+bool Graph::dumpCodeOrigin(PrintStream& out, const char* prefix, Node* previousNode, Node* currentNode, DumpContext* context)
 {
     if (!previousNode)
         return false;
@@ -101,7 +103,7 @@ bool Graph::dumpCodeOrigin(PrintStream& out, const char* prefix, Node* previousN
     for (unsigned i = previousInlineStack.size(); i-- > indexOfDivergence;) {
         out.print(prefix);
         printWhiteSpace(out, i * 2);
-        out.print("<-- ", *previousInlineStack[i].inlineCallFrame, "\n");
+        out.print("<-- ", inContext(*previousInlineStack[i].inlineCallFrame, context), "\n");
         hasPrinted = true;
     }
     
@@ -109,7 +111,7 @@ bool Graph::dumpCodeOrigin(PrintStream& out, const char* prefix, Node* previousN
     for (unsigned i = indexOfDivergence; i < currentInlineStack.size(); ++i) {
         out.print(prefix);
         printWhiteSpace(out, i * 2);
-        out.print("--> ", *currentInlineStack[i].inlineCallFrame, "\n");
+        out.print("--> ", inContext(*currentInlineStack[i].inlineCallFrame, context), "\n");
         hasPrinted = true;
     }
     
@@ -126,7 +128,7 @@ void Graph::printNodeWhiteSpace(PrintStream& out, Node* node)
     printWhiteSpace(out, amountOfNodeWhiteSpace(node));
 }
 
-void Graph::dump(PrintStream& out, const char* prefix, Node* node)
+void Graph::dump(PrintStream& out, const char* prefix, Node* node, DumpContext* context)
 {
     NodeType op = node->op();
 
@@ -178,8 +180,8 @@ void Graph::dump(PrintStream& out, const char* prefix, Node* node)
             out.print(comma, node->child3());
     }
 
-    if (strlen(nodeFlagsAsString(node->flags())))
-        out.print(comma, nodeFlagsAsString(node->flags()));
+    if (toCString(NodeFlagsDump(node->flags())) != "<empty>")
+        out.print(comma, NodeFlagsDump(node->flags()));
     if (node->hasArrayMode())
         out.print(comma, node->arrayMode());
     if (node->hasVarNumber())
@@ -187,15 +189,13 @@ void Graph::dump(PrintStream& out, const char* prefix, Node* node)
     if (node->hasRegisterPointer())
         out.print(comma, "global", globalObjectFor(node->codeOrigin)->findRegisterIndex(node->registerPointer()), "(", RawPointer(node->registerPointer()), ")");
     if (node->hasIdentifier())
-        out.print(comma, "id", node->identifierNumber(), "{", m_codeBlock->identifier(node->identifierNumber()).string(), "}");
-    if (node->hasStructureSet()) {
-        for (size_t i = 0; i < node->structureSet().size(); ++i)
-            out.print(comma, "struct(", RawPointer(node->structureSet()[i]), ": ", IndexingTypeDump(node->structureSet()[i]->indexingType()), ")");
-    }
+        out.print(comma, "id", node->identifierNumber(), "{", identifiers()[node->identifierNumber()], "}");
+    if (node->hasStructureSet())
+        out.print(comma, inContext(node->structureSet(), context));
     if (node->hasStructure())
-        out.print(comma, "struct(", RawPointer(node->structure()), ": ", IndexingTypeDump(node->structure()->indexingType()), ")");
+        out.print(comma, inContext(*node->structure(), context));
     if (node->hasStructureTransitionData())
-        out.print(comma, "struct(", RawPointer(node->structureTransitionData().previousStructure), " -> ", RawPointer(node->structureTransitionData().newStructure), ")");
+        out.print(comma, inContext(*node->structureTransitionData().previousStructure, context), " -> ", inContext(*node->structureTransitionData().newStructure, context));
     if (node->hasFunction()) {
         out.print(comma, "function(", RawPointer(node->function()), ", ");
         if (node->function()->inherits(&JSFunction::s_info)) {
@@ -214,13 +214,21 @@ void Graph::dump(PrintStream& out, const char* prefix, Node* node)
         else
             out.print(comma, "executable(not function: ", RawPointer(node->executable()), ")");
     }
+    if (node->hasFunctionDeclIndex()) {
+        FunctionExecutable* executable = m_codeBlock->functionDecl(node->functionDeclIndex());
+        out.print(comma, FunctionExecutableDump(executable));
+    }
+    if (node->hasFunctionExprIndex()) {
+        FunctionExecutable* executable = m_codeBlock->functionExpr(node->functionExprIndex());
+        out.print(comma, FunctionExecutableDump(executable));
+    }
     if (node->hasStorageAccessData()) {
         StorageAccessData& storageAccessData = m_storageAccessData[node->storageAccessDataIndex()];
-        out.print(comma, "id", storageAccessData.identifierNumber, "{", m_codeBlock->identifier(storageAccessData.identifierNumber).string(), "}");
+        out.print(comma, "id", storageAccessData.identifierNumber, "{", identifiers()[storageAccessData.identifierNumber], "}");
         out.print(", ", static_cast<ptrdiff_t>(storageAccessData.offset));
     }
-    ASSERT(node->hasVariableAccessData() == node->hasLocal());
-    if (node->hasVariableAccessData()) {
+    ASSERT(node->hasVariableAccessData(*this) == node->hasLocal(*this));
+    if (node->hasVariableAccessData(*this)) {
         VariableAccessData* variableAccessData = node->variableAccessData();
         int operand = variableAccessData->operand();
         if (operandIsArgument(operand))
@@ -233,30 +241,46 @@ void Graph::dump(PrintStream& out, const char* prefix, Node* node)
         out.print(node->startConstant(), ":[");
         CommaPrinter anotherComma;
         for (unsigned i = 0; i < node->numConstants(); ++i)
-            out.print(anotherComma, m_codeBlock->constantBuffer(node->startConstant())[i]);
+            out.print(anotherComma, inContext(m_codeBlock->constantBuffer(node->startConstant())[i], context));
         out.print("]");
     }
     if (node->hasIndexingType())
         out.print(comma, IndexingTypeDump(node->indexingType()));
+    if (node->hasPhi())
+        out.print(comma, "^", node->phi()->index());
     if (node->hasExecutionCounter())
         out.print(comma, RawPointer(node->executionCounter()));
     if (op == JSConstant) {
         out.print(comma, "$", node->constantNumber());
         JSValue value = valueOfJSConstant(node);
-        out.print(" = ", value);
+        out.print(" = ", inContext(value, context));
     }
     if (op == WeakJSConstant)
-        out.print(comma, RawPointer(node->weakConstant()));
+        out.print(comma, RawPointer(node->weakConstant()), " (", inContext(*node->weakConstant()->structure(), context), ")");
     if (node->isBranch() || node->isJump())
-        out.print(comma, "T:#", node->takenBlockIndex());
+        out.print(comma, "T:", *node->takenBlock());
     if (node->isBranch())
-        out.print(comma, "F:#", node->notTakenBlockIndex());
+        out.print(comma, "F:", *node->notTakenBlock());
+    if (node->isSwitch()) {
+        SwitchData* data = node->switchData();
+        out.print(comma, data->kind);
+        for (unsigned i = 0; i < data->cases.size(); ++i)
+            out.print(comma, inContext(data->cases[i].value, context), ":", *data->cases[i].target);
+        out.print(comma, "default:", *data->fallThrough);
+    }
+    ClobberSet reads;
+    ClobberSet writes;
+    addReadsAndWrites(*this, node, reads, writes);
+    if (!reads.isEmpty())
+        out.print(comma, "R:", sortedListDump(reads.direct(), ","));
+    if (!writes.isEmpty())
+        out.print(comma, "W:", sortedListDump(writes.direct(), ","));
     out.print(comma, "bc#", node->codeOrigin.bytecodeIndex);
     
     out.print(")");
 
     if (!skipped) {
-        if (node->hasVariableAccessData())
+        if (node->hasVariableAccessData(*this))
             out.print("  predicting ", SpeculationDump(node->variableAccessData()->prediction()), node->variableAccessData()->shouldUseDoubleFormat() ? ", forcing double" : "");
         else if (node->hasHeapPrediction())
             out.print("  predicting ", SpeculationDump(node->getHeapPrediction()));
@@ -265,131 +289,147 @@ void Graph::dump(PrintStream& out, const char* prefix, Node* node)
     out.print("\n");
 }
 
-void Graph::dumpBlockHeader(PrintStream& out, const char* prefix, BlockIndex blockIndex, PhiNodeDumpMode phiNodeDumpMode)
+void Graph::dumpBlockHeader(PrintStream& out, const char* prefix, BasicBlock* block, PhiNodeDumpMode phiNodeDumpMode, DumpContext* context)
 {
-    BasicBlock* block = m_blocks[blockIndex].get();
-
-    out.print(prefix, "Block #", blockIndex, " (", block->at(0)->codeOrigin, "): ", block->isReachable ? "" : "(skipped)", block->isOSRTarget ? " (OSR target)" : "", "\n");
+    out.print(prefix, "Block ", *block, " (", inContext(block->at(0)->codeOrigin, context), "): ", block->isReachable ? "" : "(skipped)", block->isOSRTarget ? " (OSR target)" : "", "\n");
     out.print(prefix, "  Predecessors:");
-    for (size_t i = 0; i < block->m_predecessors.size(); ++i)
-        out.print(" #", block->m_predecessors[i]);
+    for (size_t i = 0; i < block->predecessors.size(); ++i)
+        out.print(" ", *block->predecessors[i]);
     out.print("\n");
     if (m_dominators.isValid()) {
         out.print(prefix, "  Dominated by:");
         for (size_t i = 0; i < m_blocks.size(); ++i) {
-            if (!m_dominators.dominates(i, blockIndex))
+            if (!m_dominators.dominates(i, block->index))
                 continue;
             out.print(" #", i);
         }
         out.print("\n");
         out.print(prefix, "  Dominates:");
         for (size_t i = 0; i < m_blocks.size(); ++i) {
-            if (!m_dominators.dominates(blockIndex, i))
+            if (!m_dominators.dominates(block->index, i))
                 continue;
             out.print(" #", i);
         }
         out.print("\n");
     }
-    out.print(prefix, "  Phi Nodes:");
-    for (size_t i = 0; i < block->phis.size(); ++i) {
-        Node* phiNode = block->phis[i];
-        if (!phiNode->shouldGenerate() && phiNodeDumpMode == DumpLivePhisOnly)
-            continue;
-        out.print(" @", phiNode->index(), "<", phiNode->refCount(), ">->(");
-        if (phiNode->child1()) {
-            out.print("@", phiNode->child1()->index());
-            if (phiNode->child2()) {
-                out.print(", @", phiNode->child2()->index());
-                if (phiNode->child3())
-                    out.print(", @", phiNode->child3()->index());
-            }
+    if (m_naturalLoops.isValid()) {
+        if (const NaturalLoop* loop = m_naturalLoops.headerOf(block)) {
+            out.print(prefix, "  Loop header, contains:");
+            Vector<BlockIndex> sortedBlockList;
+            for (unsigned i = 0; i < loop->size(); ++i)
+                sortedBlockList.append(loop->at(i)->index);
+            std::sort(sortedBlockList.begin(), sortedBlockList.end());
+            for (unsigned i = 0; i < sortedBlockList.size(); ++i)
+                out.print(" #", sortedBlockList[i]);
+            out.print("\n");
         }
-        out.print(")", i + 1 < block->phis.size() ? "," : "");
+        
+        Vector<const NaturalLoop*> containingLoops =
+            m_naturalLoops.loopsOf(block);
+        if (!containingLoops.isEmpty()) {
+            out.print(prefix, "  Containing loop headers:");
+            for (unsigned i = 0; i < containingLoops.size(); ++i)
+                out.print(" ", *containingLoops[i]->header());
+            out.print("\n");
+        }
     }
-    out.print("\n");
+    if (!block->phis.isEmpty()) {
+        out.print(prefix, "  Phi Nodes:");
+        for (size_t i = 0; i < block->phis.size(); ++i) {
+            Node* phiNode = block->phis[i];
+            if (!phiNode->shouldGenerate() && phiNodeDumpMode == DumpLivePhisOnly)
+                continue;
+            out.print(" @", phiNode->index(), "<", phiNode->refCount(), ">->(");
+            if (phiNode->child1()) {
+                out.print("@", phiNode->child1()->index());
+                if (phiNode->child2()) {
+                    out.print(", @", phiNode->child2()->index());
+                    if (phiNode->child3())
+                        out.print(", @", phiNode->child3()->index());
+                }
+            }
+            out.print(")", i + 1 < block->phis.size() ? "," : "");
+        }
+        out.print("\n");
+    }
 }
 
-void Graph::dump(PrintStream& out)
+void Graph::dump(PrintStream& out, DumpContext* context)
 {
+    DumpContext myContext;
+    if (!context)
+        context = &myContext;
+    
+    dataLog("\n");
     dataLog("DFG for ", CodeBlockWithJITType(m_codeBlock, JITCode::DFGJIT), ":\n");
-    dataLog("  Fixpoint state: ", m_fixpointState, "; Form: ", m_form, "; Unification state: ", m_unificationState, "\n");
+    dataLog("  Fixpoint state: ", m_fixpointState, "; Form: ", m_form, "; Unification state: ", m_unificationState, "; Ref count state: ", m_refCountState, "\n");
+    dataLog("\n");
     
     Node* lastNode = 0;
     for (size_t b = 0; b < m_blocks.size(); ++b) {
         BasicBlock* block = m_blocks[b].get();
         if (!block)
             continue;
-        dumpBlockHeader(out, "", b, DumpAllPhis);
-        out.print("  vars before: ");
-        if (block->cfaHasVisited)
-            dumpOperands(block->valuesAtHead, out);
-        else
-            out.print("<empty>");
-        out.print("\n");
-        out.print("  var links: ");
-        dumpOperands(block->variablesAtHead, out);
-        out.print("\n");
+        dumpBlockHeader(out, "", block, DumpAllPhis, context);
+        switch (m_form) {
+        case LoadStore:
+        case ThreadedCPS: {
+            out.print("  vars before: ");
+            if (block->cfaHasVisited)
+                out.print(inContext(block->valuesAtHead, context));
+            else
+                out.print("<empty>");
+            out.print("\n");
+            out.print("  var links: ", block->variablesAtHead, "\n");
+            break;
+        }
+            
+        case SSA: {
+            RELEASE_ASSERT(block->ssa);
+            out.print("  Flush format: ", block->ssa->flushFormatAtHead, "\n");
+            out.print("  Availability: ", block->ssa->availabilityAtHead, "\n");
+            out.print("  Live: ", nodeListDump(block->ssa->liveAtHead), "\n");
+            out.print("  Values: ", nodeMapDump(block->ssa->valuesAtHead, context), "\n");
+            break;
+        } }
         for (size_t i = 0; i < block->size(); ++i) {
-            dumpCodeOrigin(out, "", lastNode, block->at(i));
-            dump(out, "", block->at(i));
+            dumpCodeOrigin(out, "", lastNode, block->at(i), context);
+            dump(out, "", block->at(i), context);
             lastNode = block->at(i);
         }
-        out.print("  vars after: ");
-        if (block->cfaHasVisited)
-            dumpOperands(block->valuesAtTail, out);
-        else
-            out.print("<empty>");
-        out.print("\n");
-        out.print("  var links: ");
-        dumpOperands(block->variablesAtTail, out);
-        out.print("\n");
+        switch (m_form) {
+        case LoadStore:
+        case ThreadedCPS: {
+            out.print("  vars after: ");
+            if (block->cfaHasVisited)
+                out.print(inContext(block->valuesAtTail, context));
+            else
+                out.print("<empty>");
+            out.print("\n");
+            out.print("  var links: ", block->variablesAtTail, "\n");
+            break;
+        }
+            
+        case SSA: {
+            RELEASE_ASSERT(block->ssa);
+            out.print("  Flush format: ", block->ssa->flushFormatAtTail, "\n");
+            out.print("  Availability: ", block->ssa->availabilityAtTail, "\n");
+            out.print("  Live: ", nodeListDump(block->ssa->liveAtTail), "\n");
+            out.print("  Values: ", nodeMapDump(block->ssa->valuesAtTail, context), "\n");
+            break;
+        } }
+        dataLog("\n");
     }
-}
-
-// FIXME: Convert this to be iterative, not recursive.
-#define DO_TO_CHILDREN(node, thingToDo) do {                            \
-        Node* _node = (node);                                           \
-        if (_node->flags() & NodeHasVarArgs) {                          \
-            for (unsigned _childIdx = _node->firstChild();              \
-                _childIdx < _node->firstChild() + _node->numChildren(); \
-                _childIdx++) {                                          \
-                if (!!m_varArgChildren[_childIdx])                      \
-                    thingToDo(m_varArgChildren[_childIdx]);             \
-            }                                                           \
-        } else {                                                        \
-            if (!_node->child1()) {                                     \
-                ASSERT(                                                 \
-                    !_node->child2()                                    \
-                    && !_node->child3());                               \
-                break;                                                  \
-            }                                                           \
-            thingToDo(_node->child1());                                 \
-                                                                        \
-            if (!_node->child2()) {                                     \
-                ASSERT(!_node->child3());                               \
-                break;                                                  \
-            }                                                           \
-            thingToDo(_node->child2());                                 \
-                                                                        \
-            if (!_node->child3())                                       \
-                break;                                                  \
-            thingToDo(_node->child3());                                 \
-        }                                                               \
-    } while (false)
-
-void Graph::refChildren(Node* op)
-{
-    DO_TO_CHILDREN(op, ref);
-}
-
-void Graph::derefChildren(Node* op)
-{
-    DO_TO_CHILDREN(op, deref);
+    
+    if (!myContext.isEmpty()) {
+        myContext.dump(WTF::dataFile());
+        dataLog("\n");
+    }
 }
 
 void Graph::dethread()
 {
-    if (m_form == LoadStore)
+    if (m_form == LoadStore || m_form == SSA)
         return;
     
     if (logCompilationChanges())
@@ -410,99 +450,25 @@ void Graph::dethread()
     m_form = LoadStore;
 }
 
-void Graph::handleSuccessor(Vector<BlockIndex, 16>& worklist, BlockIndex blockIndex, BlockIndex successorIndex)
+void Graph::handleSuccessor(Vector<BasicBlock*, 16>& worklist, BasicBlock* block, BasicBlock* successor)
 {
-    BasicBlock* successor = m_blocks[successorIndex].get();
     if (!successor->isReachable) {
         successor->isReachable = true;
-        worklist.append(successorIndex);
+        worklist.append(successor);
     }
     
-    successor->m_predecessors.append(blockIndex);
-}
-
-void Graph::collectGarbage()
-{
-    SamplingRegion samplingRegion("DFG Garbage Collection");
-    
-    // First reset the counts to 0 for all nodes.
-    for (BlockIndex blockIndex = 0; blockIndex < m_blocks.size(); ++blockIndex) {
-        BasicBlock* block = m_blocks[blockIndex].get();
-        if (!block)
-            continue;
-        for (unsigned indexInBlock = block->size(); indexInBlock--;)
-            block->at(indexInBlock)->setRefCount(0);
-        for (unsigned phiIndex = block->phis.size(); phiIndex--;)
-            block->phis[phiIndex]->setRefCount(0);
-    }
-    
-    // Now find the roots: the nodes that are must-generate. Set their ref counts to
-    // 1 and put them on the worklist.
-    Vector<Node*, 128> worklist;
-    for (BlockIndex blockIndex = 0; blockIndex < m_blocks.size(); ++blockIndex) {
-        BasicBlock* block = m_blocks[blockIndex].get();
-        if (!block)
-            continue;
-        for (unsigned indexInBlock = block->size(); indexInBlock--;) {
-            Node* node = block->at(indexInBlock);
-            if (!(node->flags() & NodeMustGenerate))
-                continue;
-            node->setRefCount(1);
-            worklist.append(node);
-        }
-    }
-    
-    while (!worklist.isEmpty()) {
-        Node* node = worklist.last();
-        worklist.removeLast();
-        ASSERT(node->shouldGenerate()); // It should not be on the worklist unless it's ref'ed.
-        if (node->flags() & NodeHasVarArgs) {
-            for (unsigned childIdx = node->firstChild();
-                childIdx < node->firstChild() + node->numChildren();
-                ++childIdx) {
-                if (!m_varArgChildren[childIdx])
-                    continue;
-                Node* childNode = m_varArgChildren[childIdx].node();
-                if (childNode->postfixRef())
-                    continue;
-                worklist.append(childNode);
-            }
-        } else if (node->child1()) {
-            if (!node->child1()->postfixRef())
-                worklist.append(node->child1().node());
-            if (node->child2()) {
-                if (!node->child2()->postfixRef())
-                    worklist.append(node->child2().node());
-                if (node->child3()) {
-                    if (!node->child3()->postfixRef())
-                        worklist.append(node->child3().node());
-                }
-            }
-        }
-    }
+    successor->predecessors.append(block);
 }
 
 void Graph::determineReachability()
 {
-    Vector<BlockIndex, 16> worklist;
-    worklist.append(0);
-    m_blocks[0]->isReachable = true;
+    Vector<BasicBlock*, 16> worklist;
+    worklist.append(block(0));
+    block(0)->isReachable = true;
     while (!worklist.isEmpty()) {
-        BlockIndex index = worklist.last();
-        worklist.removeLast();
-        
-        BasicBlock* block = m_blocks[index].get();
-        ASSERT(block->isLinked);
-        
-        Node* node = block->last();
-        ASSERT(node->isTerminal());
-        
-        if (node->isJump())
-            handleSuccessor(worklist, index, node->takenBlockIndex());
-        else if (node->isBranch()) {
-            handleSuccessor(worklist, index, node->takenBlockIndex());
-            handleSuccessor(worklist, index, node->notTakenBlockIndex());
-        }
+        BasicBlock* block = worklist.takeLast();
+        for (unsigned i = block->numSuccessors(); i--;)
+            handleSuccessor(worklist, block, block->successor(i));
     }
 }
 
@@ -513,7 +479,7 @@ void Graph::resetReachability()
         if (!block)
             continue;
         block->isReachable = false;
-        block->m_predecessors.clear();
+        block->predecessors.clear();
     }
     
     determineReachability();
@@ -530,6 +496,95 @@ void Graph::resetExitStates()
     }
 }
 
+void Graph::invalidateCFG()
+{
+    m_dominators.invalidate();
+    m_naturalLoops.invalidate();
+}
+
+void Graph::substituteGetLocal(BasicBlock& block, unsigned startIndexInBlock, VariableAccessData* variableAccessData, Node* newGetLocal)
+{
+    if (variableAccessData->isCaptured()) {
+        // Let CSE worry about this one.
+        return;
+    }
+    for (unsigned indexInBlock = startIndexInBlock; indexInBlock < block.size(); ++indexInBlock) {
+        Node* node = block[indexInBlock];
+        bool shouldContinue = true;
+        switch (node->op()) {
+        case SetLocal: {
+            if (node->local() == variableAccessData->local())
+                shouldContinue = false;
+            break;
+        }
+                
+        case GetLocal: {
+            if (node->variableAccessData() != variableAccessData)
+                continue;
+            substitute(block, indexInBlock, node, newGetLocal);
+            Node* oldTailNode = block.variablesAtTail.operand(variableAccessData->local());
+            if (oldTailNode == node)
+                block.variablesAtTail.operand(variableAccessData->local()) = newGetLocal;
+            shouldContinue = false;
+            break;
+        }
+                
+        default:
+            break;
+        }
+        if (!shouldContinue)
+            break;
+    }
+}
+
+void Graph::addForDepthFirstSort(Vector<BasicBlock*>& result, Vector<BasicBlock*, 16>& worklist, HashSet<BasicBlock*>& seen, BasicBlock* block)
+{
+    if (seen.contains(block))
+        return;
+    
+    result.append(block);
+    worklist.append(block);
+    seen.add(block);
+}
+
+void Graph::getBlocksInDepthFirstOrder(Vector<BasicBlock*>& result)
+{
+    Vector<BasicBlock*, 16> worklist;
+    HashSet<BasicBlock*> seen;
+    addForDepthFirstSort(result, worklist, seen, block(0));
+    while (!worklist.isEmpty()) {
+        BasicBlock* block = worklist.takeLast();
+        for (unsigned i = block->numSuccessors(); i--;)
+            addForDepthFirstSort(result, worklist, seen, block->successor(i));
+    }
+}
+
+void Graph::clearReplacements()
+{
+    for (BlockIndex blockIndex = numBlocks(); blockIndex--;) {
+        BasicBlock* block = m_blocks[blockIndex].get();
+        if (!block)
+            continue;
+        for (unsigned phiIndex = block->phis.size(); phiIndex--;)
+            block->phis[phiIndex]->misc.replacement = 0;
+        for (unsigned nodeIndex = block->size(); nodeIndex--;)
+            block->at(nodeIndex)->misc.replacement = 0;
+    }
+}
+
+void Graph::initializeNodeOwners()
+{
+    for (BlockIndex blockIndex = numBlocks(); blockIndex--;) {
+        BasicBlock* block = m_blocks[blockIndex].get();
+        if (!block)
+            continue;
+        for (unsigned phiIndex = block->phis.size(); phiIndex--;)
+            block->phis[phiIndex]->misc.owner = block;
+        for (unsigned nodeIndex = block->size(); nodeIndex--;)
+            block->at(nodeIndex)->misc.owner = block;
+    }
+}
+    
 } } // namespace JSC::DFG
 
 #endif

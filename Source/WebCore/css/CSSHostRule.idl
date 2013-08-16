@@ -21,14 +21,11 @@
 // Introduced in Shadow DOM spec:
 [
     Conditional=SHADOW_DOM,
-    V8EnabledAtRuntime=shadowDOM
 ] interface CSSHostRule : CSSRule {
     readonly attribute CSSRuleList cssRules;
     
-    unsigned long      insertRule(in [Optional=DefaultIsUndefined] DOMString rule, 
-                                  in [Optional=DefaultIsUndefined] unsigned long index)
-        raises(DOMException);
-    void               deleteRule(in [Optional=DefaultIsUndefined] unsigned long index)
-        raises(DOMException);
+    [RaisesException] unsigned long      insertRule([Default=Undefined] optional DOMString rule, 
+                                  [Default=Undefined] optional unsigned long index);
+    [RaisesException] void               deleteRule([Default=Undefined] optional unsigned long index);
 };
 

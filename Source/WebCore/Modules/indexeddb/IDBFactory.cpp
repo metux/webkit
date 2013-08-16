@@ -45,10 +45,11 @@
 #include "IDBKey.h"
 #include "IDBKeyRange.h"
 #include "IDBOpenDBRequest.h"
+#include "IDBTracing.h"
 #include "Page.h"
 #include "PageGroup.h"
 #include "SecurityOrigin.h"
-#include "WorkerContext.h"
+#include "WorkerGlobalScope.h"
 #include "WorkerLoaderProxy.h"
 #include "WorkerThread.h"
 
@@ -68,13 +69,13 @@ IDBFactory::~IDBFactory()
 namespace {
 static bool isContextValid(ScriptExecutionContext* context)
 {
-    ASSERT(context->isDocument() || context->isWorkerContext());
+    ASSERT(context->isDocument() || context->isWorkerGlobalScope());
     if (context->isDocument()) {
-        Document* document = static_cast<Document*>(context);
+        Document* document = toDocument(context);
         return document->frame() && document->page();
     }
 #if !ENABLE(WORKERS)
-    if (context->isWorkerContext())
+    if (context->isWorkerGlobalScope())
         return false;
 #endif
     return true;
@@ -84,12 +85,12 @@ static String getIndexedDBDatabasePath(ScriptExecutionContext* context)
 {
     ASSERT(isContextValid(context));
     if (context->isDocument()) {
-        Document* document = static_cast<Document*>(context);
+        Document* document = toDocument(context);
         return document->page()->group().groupSettings()->indexedDBDatabasePath();
     }
 #if ENABLE(WORKERS)
-    WorkerContext* workerContext = static_cast<WorkerContext*>(context);
-    const GroupSettings* groupSettings = workerContext->groupSettings();
+    WorkerGlobalScope* workerGlobalScope = static_cast<WorkerGlobalScope*>(context);
+    const GroupSettings* groupSettings = workerGlobalScope->groupSettings();
     if (groupSettings)
         return groupSettings->indexedDBDatabasePath();
 #endif
@@ -99,6 +100,7 @@ static String getIndexedDBDatabasePath(ScriptExecutionContext* context)
 
 PassRefPtr<IDBRequest> IDBFactory::getDatabaseNames(ScriptExecutionContext* context, ExceptionCode& ec)
 {
+    IDB_TRACE("IDBFactory::getDatabaseNames");
     if (!isContextValid(context))
         return 0;
     if (!context->securityOrigin()->canAccessDatabase(context->topOrigin())) {
@@ -111,11 +113,10 @@ PassRefPtr<IDBRequest> IDBFactory::getDatabaseNames(ScriptExecutionContext* cont
     return request;
 }
 
-PassRefPtr<IDBOpenDBRequest> IDBFactory::open(ScriptExecutionContext* context, const String& name, int64_t version, ExceptionCode& ec)
+PassRefPtr<IDBOpenDBRequest> IDBFactory::open(ScriptExecutionContext* context, const String& name, unsigned long long version, ExceptionCode& ec)
 {
-    // FIXME: This should only need to check for 0 once webkit.org/b/96798 lands.
-    const int64_t maxECMAScriptInteger = 0x20000000000000LL - 1;
-    if (version < 1 || version > maxECMAScriptInteger) {
+    IDB_TRACE("IDBFactory::open");
+    if (!version) {
         ec = TypeError;
         return 0;
     }
@@ -146,11 +147,13 @@ PassRefPtr<IDBOpenDBRequest> IDBFactory::openInternal(ScriptExecutionContext* co
 
 PassRefPtr<IDBOpenDBRequest> IDBFactory::open(ScriptExecutionContext* context, const String& name, ExceptionCode& ec)
 {
+    IDB_TRACE("IDBFactory::open");
     return openInternal(context, name, IDBDatabaseMetadata::NoIntVersion, ec);
 }
 
 PassRefPtr<IDBOpenDBRequest> IDBFactory::deleteDatabase(ScriptExecutionContext* context, const String& name, ExceptionCode& ec)
 {
+    IDB_TRACE("IDBFactory::deleteDatabase");
     HistogramSupport::histogramEnumeration("WebCore.IndexedDB.FrontEndAPICalls", IDBDeleteDatabaseCall, IDBMethodsMax);
     if (name.isNull()) {
         ec = TypeError;

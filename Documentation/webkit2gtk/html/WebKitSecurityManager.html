@@ -3,7 +3,7 @@
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 <title>WebKitSecurityManager</title>
-<meta name="generator" content="DocBook XSL Stylesheets V1.76.1">
+<meta name="generator" content="DocBook XSL Stylesheets V1.78.1">
 <link rel="home" href="index.html" title="WebKit2GTK+ Reference Manual">
 <link rel="up" href="ch01.html" title="Class Overview">
 <link rel="prev" href="WebKitFormSubmissionRequest.html" title="WebKitFormSubmissionRequest">
@@ -113,8 +113,11 @@ has it.
 Register <em class="parameter"><code>scheme</code></em> as a local scheme. This means that other non-local pages
 cannot link to or access URIs of this scheme.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>security_manager</code></em> :</span></p></td>
@@ -138,8 +141,11 @@ cannot link to or access URIs of this scheme.
 Whether <em class="parameter"><code>scheme</code></em> is considered as a local scheme.
 See also <a class="link" href="WebKitSecurityManager.html#webkit-security-manager-register-uri-scheme-as-local" title="webkit_security_manager_register_uri_scheme_as_local ()"><code class="function">webkit_security_manager_register_uri_scheme_as_local()</code></a>.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>security_manager</code></em> :</span></p></td>
@@ -168,8 +174,11 @@ See also <a class="link" href="WebKitSecurityManager.html#webkit-security-manage
 Register <em class="parameter"><code>scheme</code></em> as a no-access scheme. This means that pages loaded
 with this URI scheme cannot access pages loaded with any other URI scheme.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>security_manager</code></em> :</span></p></td>
@@ -193,8 +202,11 @@ with this URI scheme cannot access pages loaded with any other URI scheme.
 Whether <em class="parameter"><code>scheme</code></em> is considered as a no-access scheme.
 See also <a class="link" href="WebKitSecurityManager.html#webkit-security-manager-register-uri-scheme-as-no-access" title="webkit_security_manager_register_uri_scheme_as_no_access ()"><code class="function">webkit_security_manager_register_uri_scheme_as_no_access()</code></a>.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>security_manager</code></em> :</span></p></td>
@@ -223,8 +235,11 @@ See also <a class="link" href="WebKitSecurityManager.html#webkit-security-manage
 Register <em class="parameter"><code>scheme</code></em> as a display isolated scheme. This means that pages cannot
 display these URIs unless they are from the same scheme.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>security_manager</code></em> :</span></p></td>
@@ -248,8 +263,11 @@ display these URIs unless they are from the same scheme.
 Whether <em class="parameter"><code>scheme</code></em> is considered as a display isolated scheme.
 See also <a class="link" href="WebKitSecurityManager.html#webkit-security-manager-register-uri-scheme-as-display-isolated" title="webkit_security_manager_register_uri_scheme_as_display_isolated ()"><code class="function">webkit_security_manager_register_uri_scheme_as_display_isolated()</code></a>.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>security_manager</code></em> :</span></p></td>
@@ -279,8 +297,11 @@ Register <em class="parameter"><code>scheme</code></em> as a secure scheme. This
 content warnings won't be generated for this scheme when
 included by an HTTPS page.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>security_manager</code></em> :</span></p></td>
@@ -304,8 +325,11 @@ included by an HTTPS page.
 Whether <em class="parameter"><code>scheme</code></em> is considered as a secure scheme.
 See also <a class="link" href="WebKitSecurityManager.html#webkit-security-manager-register-uri-scheme-as-secure" title="webkit_security_manager_register_uri_scheme_as_secure ()"><code class="function">webkit_security_manager_register_uri_scheme_as_secure()</code></a>.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>security_manager</code></em> :</span></p></td>
@@ -335,8 +359,11 @@ Register <em class="parameter"><code>scheme</code></em> as a CORS (Cross-origin 
 This means that CORS requests are allowed. See W3C CORS specification
 http://www.w3.org/TR/cors/.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>security_manager</code></em> :</span></p></td>
@@ -360,8 +387,11 @@ http://www.w3.org/TR/cors/.
 Whether <em class="parameter"><code>scheme</code></em> is considered as a CORS enabled scheme.
 See also <a class="link" href="WebKitSecurityManager.html#webkit-security-manager-register-uri-scheme-as-cors-enabled" title="webkit_security_manager_register_uri_scheme_as_cors_enabled ()"><code class="function">webkit_security_manager_register_uri_scheme_as_cors_enabled()</code></a>.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>security_manager</code></em> :</span></p></td>
@@ -390,8 +420,11 @@ See also <a class="link" href="WebKitSecurityManager.html#webkit-security-manage
 Register <em class="parameter"><code>scheme</code></em> as an empty document scheme. This means that
 they are allowd to commit synchronously.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>security_manager</code></em> :</span></p></td>
@@ -415,8 +448,11 @@ they are allowd to commit synchronously.
 Whether <em class="parameter"><code>scheme</code></em> is considered as an empty document scheme.
 See also <a class="link" href="WebKitSecurityManager.html#webkit-security-manager-register-uri-scheme-as-empty-document" title="webkit_security_manager_register_uri_scheme_as_empty_document ()"><code class="function">webkit_security_manager_register_uri_scheme_as_empty_document()</code></a>.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>security_manager</code></em> :</span></p></td>

@@ -27,6 +27,7 @@
 #include "NodeRenderingContext.h"
 #include "RenderCombineText.h"
 #include "RenderText.h"
+#include "ScopedEventQueue.h"
 #include "ShadowRoot.h"
 
 #if ENABLE(SVG)
@@ -36,6 +37,7 @@
 
 #include "StyleInheritedData.h"
 #include "StyleResolver.h"
+#include <wtf/CheckedArithmetic.h>
 #include <wtf/text/CString.h>
 #include <wtf/text/StringBuilder.h>
 
@@ -64,6 +66,7 @@ PassRefPtr<Text> Text::splitText(unsigned offset, ExceptionCode& ec)
         return 0;
     }
 
+    EventQueueScope scope;
     String oldStr = data();
     RefPtr<Text> newText = virtualCreate(oldStr.substring(offset));
     setDataWithoutUpdate(oldStr.substring(0, offset));
@@ -124,25 +127,23 @@ String Text::wholeText() const
     const Text* endText = latestLogicallyAdjacentTextNode(this);
 
     Node* onePastEndText = endText->nextSibling();
-    unsigned resultLength = 0;
+    Checked<unsigned> resultLength = 0;
     for (const Node* n = startText; n != onePastEndText; n = n->nextSibling()) {
         if (!n->isTextNode())
             continue;
         const Text* t = static_cast<const Text*>(n);
         const String& data = t->data();
-        if (std::numeric_limits<unsigned>::max() - data.length() < resultLength)
-            CRASH();
         resultLength += data.length();
     }
     StringBuilder result;
-    result.reserveCapacity(resultLength);
+    result.reserveCapacity(resultLength.unsafeGet());
     for (const Node* n = startText; n != onePastEndText; n = n->nextSibling()) {
         if (!n->isTextNode())
             continue;
         const Text* t = static_cast<const Text*>(n);
         result.append(t->data());
     }
-    ASSERT(result.length() == resultLength);
+    ASSERT(result.length() == resultLength.unsafeGet());
 
     return result.toString();
 }
@@ -234,11 +235,11 @@ bool Text::textRendererIsNeeded(const NodeRenderingContext& context)
         RenderObject* first = parent->firstChild();
         while (first && first->isFloatingOrOutOfFlowPositioned())
             first = first->nextSibling();
-        RenderObject* next = context.nextRenderer();
-        if (!first || next == first)
+        if (!first || context.nextRenderer() == first) {
             // Whitespace at the start of a block just goes away.  Don't even
             // make a render object for this text.
             return false;
+        }
     }
     
     return true;
@@ -275,26 +276,10 @@ RenderText* Text::createTextRenderer(RenderArena* arena, RenderStyle* style)
     return new (arena) RenderText(this, dataImpl());
 }
 
-void Text::attach()
+void Text::attach(const AttachContext& context)
 {
     createTextRendererIfNeeded();
-    CharacterData::attach();
-}
-
-void Text::recalcTextStyle(StyleChange change)
-{
-    RenderText* renderer = toRenderText(this->renderer());
-
-    if (change != NoChange && renderer)
-        renderer->setStyle(document()->styleResolver()->styleForText(this));
-
-    if (needsStyleRecalc()) {
-        if (renderer)
-            renderer->setText(dataImpl());
-        else
-            reattach();
-    }
-    clearNeedsStyleRecalc();
+    CharacterData::attach(context);
 }
 
 void Text::updateTextRenderer(unsigned offsetOfReplacedData, unsigned lengthOfReplacedData)
@@ -302,7 +287,12 @@ void Text::updateTextRenderer(unsigned offsetOfReplacedData, unsigned lengthOfRe
     if (!attached())
         return;
     RenderText* textRenderer = toRenderText(renderer());
-    if (!textRenderer || !textRendererIsNeeded(NodeRenderingContext(this, textRenderer->style()))) {
+    if (!textRenderer) {
+        reattach();
+        return;
+    }
+    NodeRenderingContext renderingContext(this, textRenderer->style());
+    if (!textRendererIsNeeded(renderingContext)) {
         reattach();
         return;
     }
@@ -319,15 +309,15 @@ PassRefPtr<Text> Text::virtualCreate(const String& data)
     return create(document(), data);
 }
 
-PassRefPtr<Text> Text::createWithLengthLimit(Document* document, const String& data, unsigned start, unsigned maxChars)
+PassRefPtr<Text> Text::createWithLengthLimit(Document* document, const String& data, unsigned start, unsigned lengthLimit)
 {
     unsigned dataLength = data.length();
 
-    if (!start && dataLength <= maxChars)
+    if (!start && dataLength <= lengthLimit)
         return create(document, data);
 
     RefPtr<Text> result = Text::create(document, String());
-    result->parserAppendData(data, start, maxChars);
+    result->parserAppendData(data, start, lengthLimit);
 
     return result;
 }

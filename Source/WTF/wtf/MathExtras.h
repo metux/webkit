@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2006, 2007, 2008, 2009, 2010 Apple Inc. All rights reserved.
+ * Copyright (C) 2006, 2007, 2008, 2009, 2010, 2013 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -48,6 +48,11 @@
 // namespace. For now, we include math.h since the QNX cmath header only imports its functions
 // into the standard namespace.
 #include <math.h>
+// These macros from math.h conflict with the real functions in the std namespace.
+#undef signbit
+#undef isnan
+#undef isinf
+#undef isfinite
 #endif
 
 #ifndef M_PI
@@ -139,6 +144,20 @@ inline long lround(double num) { return static_cast<long>(round(num)); }
 inline long lroundf(float num) { return static_cast<long>(roundf(num)); }
 inline double trunc(double num) { return num > 0 ? floor(num) : ceil(num); }
 
+#if defined(_MSC_VER) && (_MSC_VER <= 1600)
+
+inline double remainder(double numerator, double denominator)
+{
+    double result = fmod(numerator, denominator);
+    if (result > 0.5 * denominator)
+        return result - denominator;
+
+    return result;
+}
+
+#endif
+
+
 #endif
 
 #if COMPILER(GCC) && OS(QNX)
@@ -146,17 +165,17 @@ inline double trunc(double num) { return num > 0 ? floor(num) : ceil(num); }
 inline long long abs(long num) { return labs(num); }
 #endif
 
-#if OS(ANDROID) || COMPILER(MSVC)
-// ANDROID and MSVC's math.h does not currently supply log2 or log2f.
+#if COMPILER(MSVC)
+// MSVC's math.h does not currently supply log2 or log2f.
 inline double log2(double num)
 {
-    // This constant is roughly M_LN2, which is not provided by default on Windows and Android.
+    // This constant is roughly M_LN2, which is not provided by default on Windows.
     return log(num) / 0.693147180559945309417232121458176568;
 }
 
 inline float log2f(float num)
 {
-    // This constant is roughly M_LN2, which is not provided by default on Windows and Android.
+    // This constant is roughly M_LN2, which is not provided by default on Windows.
     return logf(num) / 0.693147180559945309417232121458176568f;
 }
 #endif
@@ -182,7 +201,7 @@ inline float nextafterf(float x, float y) { return x > y ? x - FLT_EPSILON : x +
 inline double copysign(double x, double y) { return _copysign(x, y); }
 
 // Work around a bug in Win, where atan2(+-infinity, +-infinity) yields NaN instead of specific values.
-inline double wtf_atan2(double x, double y)
+extern "C" inline double wtf_atan2(double x, double y)
 {
     double posInf = std::numeric_limits<double>::infinity();
     double negInf = -std::numeric_limits<double>::infinity();
@@ -205,10 +224,10 @@ inline double wtf_atan2(double x, double y)
 }
 
 // Work around a bug in the Microsoft CRT, where fmod(x, +-infinity) yields NaN instead of x.
-inline double wtf_fmod(double x, double y) { return (!std::isinf(x) && std::isinf(y)) ? x : fmod(x, y); }
+extern "C" inline double wtf_fmod(double x, double y) { return (!std::isinf(x) && std::isinf(y)) ? x : fmod(x, y); }
 
 // Work around a bug in the Microsoft CRT, where pow(NaN, 0) yields NaN instead of 1.
-inline double wtf_pow(double x, double y) { return y == 0 ? 1 : pow(x, y); }
+extern "C" inline double wtf_pow(double x, double y) { return y == 0 ? 1 : pow(x, y); }
 
 #define atan2(x, y) wtf_atan2(x, y)
 #define fmod(x, y) wtf_fmod(x, y)
@@ -331,6 +350,11 @@ template <typename T> inline unsigned getLSBSet(T value)
     return result;
 }
 
+template<typename T> inline T divideRoundedUp(T a, T b)
+{
+    return (a + b - 1) / b;
+}
+
 template<typename T> inline T timesThreePlusOneDividedByTwo(T value)
 {
     // Mathematically equivalent to:
@@ -339,6 +363,23 @@ template<typename T> inline T timesThreePlusOneDividedByTwo(T value)
     //   (unsigned)ceil(value * 1.5));
     // This form is not prone to internal overflow.
     return value + (value >> 1) + (value & 1);
+}
+
+template<typename T> inline bool isNotZeroAndOrdered(T value)
+{
+    return value > 0.0 || value < 0.0;
+}
+
+template<typename T> inline bool isZeroOrUnordered(T value)
+{
+    return !isNotZeroAndOrdered(value);
+}
+
+template<typename T> inline bool isGreaterThanNonZeroPowerOfTwo(T value, unsigned power)
+{
+    // The crazy way of testing of index >= 2 ** power
+    // (where I use ** to denote pow()).
+    return !!((value >> 1) >> (power - 1));
 }
 
 #ifndef UINT64_C
@@ -429,6 +470,24 @@ inline uint32_t roundUpToPowerOfTwo(uint32_t v)
     v |= v >> 16;
     v++;
     return v;
+}
+
+inline unsigned fastLog2(unsigned i)
+{
+    unsigned log2 = 0;
+    if (i & (i - 1))
+        log2 += 1;
+    if (i >> 16)
+        log2 += 16, i >>= 16;
+    if (i >> 8)
+        log2 += 8, i >>= 8;
+    if (i >> 4)
+        log2 += 4, i >>= 4;
+    if (i >> 2)
+        log2 += 2, i >>= 2;
+    if (i >> 1)
+        log2 += 1;
+    return log2;
 }
 
 } // namespace WTF

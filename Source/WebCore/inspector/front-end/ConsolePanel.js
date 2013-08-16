@@ -40,9 +40,9 @@ WebInspector.ConsolePanel = function()
 }
 
 WebInspector.ConsolePanel.prototype = {
-    get statusBarItems()
+    statusBarItems: function()
     {
-        return this._view.statusBarItems;
+        return this._view.statusBarItems();
     },
 
     wasShown: function()
@@ -109,7 +109,6 @@ WebInspector.ConsolePanel.prototype = {
         if (index === -1)
             index = this._searchResults.length - 1;
         this._jumpToSearchResult(index);
-        return true;
     },
 
     _clearCurrentSearchResultHighlight: function()

@@ -66,7 +66,7 @@ hr interfaceName=HTMLHRElement
 html
 i interfaceName=HTMLElement
 iframe interfaceName=HTMLIFrameElement
-image mapToTagName=img
+image interfaceName=HTMLElement
 img interfaceName=HTMLImageElement, constructorNeedsFormElement
 input constructorNeedsFormElement, constructorNeedsCreatedByParser
 ins interfaceName=HTMLModElement
@@ -96,7 +96,6 @@ ol interfaceName=HTMLOListElement
 optgroup interfaceName=HTMLOptGroupElement
 option
 output constructorNeedsFormElement
-shadow interfaceName=HTMLShadowElement, conditional=SHADOW_DOM, runtimeConditional=shadowDOM
 p interfaceName=HTMLParagraphElement
 param
 plaintext interfaceName=HTMLElement

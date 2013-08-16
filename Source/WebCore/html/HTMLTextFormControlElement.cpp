@@ -33,6 +33,7 @@
 #include "EventNames.h"
 #include "FeatureObserver.h"
 #include "Frame.h"
+#include "FrameSelection.h"
 #include "HTMLBRElement.h"
 #include "HTMLFormElement.h"
 #include "HTMLInputElement.h"
@@ -76,7 +77,7 @@ bool HTMLTextFormControlElement::childShouldCreateRenderer(const NodeRenderingCo
 
 Node::InsertionNotificationRequest HTMLTextFormControlElement::insertedInto(ContainerNode* insertionPoint)
 {
-    HTMLFormControlElement::insertedInto(insertionPoint);
+    HTMLFormControlElementWithState::insertedInto(insertionPoint);
     if (!insertionPoint->inDocument())
         return InsertionDone;
     String initialValue = value();
@@ -84,20 +85,20 @@ Node::InsertionNotificationRequest HTMLTextFormControlElement::insertedInto(Cont
     return InsertionDone;
 }
 
-void HTMLTextFormControlElement::dispatchFocusEvent(PassRefPtr<Node> oldFocusedNode, FocusDirection direction)
+void HTMLTextFormControlElement::dispatchFocusEvent(PassRefPtr<Element> oldFocusedElement, FocusDirection direction)
 {
     if (supportsPlaceholder())
         updatePlaceholderVisibility(false);
-    handleFocusEvent(oldFocusedNode.get(), direction);
-    HTMLFormControlElementWithState::dispatchFocusEvent(oldFocusedNode, direction);
+    handleFocusEvent(oldFocusedElement.get(), direction);
+    HTMLFormControlElementWithState::dispatchFocusEvent(oldFocusedElement, direction);
 }
 
-void HTMLTextFormControlElement::dispatchBlurEvent(PassRefPtr<Node> newFocusedNode)
+void HTMLTextFormControlElement::dispatchBlurEvent(PassRefPtr<Element> newFocusedElement)
 {
     if (supportsPlaceholder())
         updatePlaceholderVisibility(false);
     handleBlurEvent();
-    HTMLFormControlElementWithState::dispatchBlurEvent(newFocusedNode);
+    HTMLFormControlElementWithState::dispatchBlurEvent(newFocusedElement);
 }
 
 void HTMLTextFormControlElement::defaultEventHandler(Event* event)
@@ -152,7 +153,7 @@ bool HTMLTextFormControlElement::placeholderShouldBeVisible() const
         && isEmptyValue()
         && isEmptySuggestedValue()
         && !isPlaceholderEmpty()
-        && (document()->focusedNode() != this || (renderer() && renderer()->theme()->shouldShowPlaceholderWhenFocused()))
+        && (document()->focusedElement() != this || (renderer() && renderer()->theme()->shouldShowPlaceholderWhenFocused()))
         && (!renderer() || renderer()->style()->visibility() == VISIBLE);
 }
 
@@ -165,7 +166,7 @@ void HTMLTextFormControlElement::updatePlaceholderVisibility(bool placeholderVal
     HTMLElement* placeholder = placeholderElement();
     if (!placeholder)
         return;
-    placeholder->setInlineStyleProperty(CSSPropertyVisibility, placeholderShouldBeVisible() ? "visible" : "hidden");
+    placeholder->setInlineStyleProperty(CSSPropertyVisibility, placeholderShouldBeVisible() ? CSSValueVisible : CSSValueHidden);
 }
 
 void HTMLTextFormControlElement::fixPlaceholderRenderer(HTMLElement* placeholder, HTMLElement* siblingElement)
@@ -176,21 +177,14 @@ void HTMLTextFormControlElement::fixPlaceholderRenderer(HTMLElement* placeholder
         return;
     RenderObject* placeholderRenderer = placeholder->renderer();
     RenderObject* siblingRenderer = siblingElement->renderer();
-    ASSERT(siblingRenderer);
+    if (!siblingRenderer)
+        return;
     if (placeholderRenderer->nextSibling() == siblingRenderer)
         return;
     RenderObject* parentRenderer = placeholderRenderer->parent();
-    ASSERT(parentRenderer == siblingRenderer->parent());
+    ASSERT(siblingRenderer->parent() == parentRenderer);
     parentRenderer->removeChild(placeholderRenderer);
     parentRenderer->addChild(placeholderRenderer, siblingRenderer);
-}
-
-RenderTextControl* HTMLTextFormControlElement::textRendererAfterUpdateLayout()
-{
-    if (!isTextFormControl())
-        return 0;
-    document()->updateLayoutIgnorePendingStylesheets();
-    return toRenderTextControl(renderer());
 }
 
 void HTMLTextFormControlElement::setSelectionStart(int start)
@@ -223,7 +217,7 @@ String HTMLTextFormControlElement::selectedText() const
 void HTMLTextFormControlElement::dispatchFormControlChangeEvent()
 {
     if (m_textAsOfLastFormControlChangeEvent != value()) {
-        HTMLElement::dispatchChangeEvent();
+        dispatchChangeEvent();
         setTextAsOfLastFormControlChangeEvent(value());
     }
     setChangedSinceLastFormControlChangeEvent(false);
@@ -360,7 +354,7 @@ int HTMLTextFormControlElement::selectionStart() const
 {
     if (!isTextFormControl())
         return 0;
-    if (document()->focusedNode() != this && hasCachedSelection())
+    if (document()->focusedElement() != this && hasCachedSelection())
         return m_cachedSelectionStart;
 
     return computeSelectionStart();
@@ -380,7 +374,7 @@ int HTMLTextFormControlElement::selectionEnd() const
 {
     if (!isTextFormControl())
         return 0;
-    if (document()->focusedNode() != this && hasCachedSelection())
+    if (document()->focusedElement() != this && hasCachedSelection())
         return m_cachedSelectionEnd;
     return computeSelectionEnd();
 }
@@ -418,7 +412,7 @@ const AtomicString& HTMLTextFormControlElement::selectionDirection() const
 {
     if (!isTextFormControl())
         return directionString(SelectionHasNoDirection);
-    if (document()->focusedNode() != this && hasCachedSelection())
+    if (document()->focusedElement() != this && hasCachedSelection())
         return directionString(m_cachedSelectionDirection);
 
     return directionString(computeSelectionDirection());
@@ -511,11 +505,7 @@ void HTMLTextFormControlElement::parseAttribute(const QualifiedName& name, const
     if (name == placeholderAttr) {
         updatePlaceholderVisibility(true);
         FeatureObserver::observe(document(), FeatureObserver::PlaceholderAttribute);
-    } else if (name == onselectAttr)
-        setAttributeEventListener(eventNames().selectEvent, createAttributeEventListener(this, name, value));
-    else if (name == onchangeAttr)
-        setAttributeEventListener(eventNames().changeEvent, createAttributeEventListener(this, name, value));
-    else
+    } else
         HTMLFormControlElementWithState::parseAttribute(name, value);
 }
 
@@ -533,9 +523,10 @@ void HTMLTextFormControlElement::setInnerTextValue(const String& value)
 
     bool textIsChanged = value != innerTextValue();
     if (textIsChanged || !innerTextElement()->hasChildNodes()) {
-        if (textIsChanged && document() && renderer() && AXObjectCache::accessibilityEnabled())
-            document()->axObjectCache()->postNotification(this, AXObjectCache::AXValueChanged, false);
-
+        if (textIsChanged && document() && renderer()) {
+            if (AXObjectCache* cache = document()->existingAXObjectCache())
+                cache->postNotification(this, AXObjectCache::AXValueChanged, false);
+        }
         innerTextElement()->setInnerText(value, ASSERT_NO_EXCEPTION);
 
         if (value.endsWith('\n') || value.endsWith('\r'))
@@ -617,13 +608,13 @@ String HTMLTextFormControlElement::valueWithHardLineBreaks() const
             unsigned position = 0;
             while (breakNode == node && breakOffset <= length) {
                 if (breakOffset > position) {
-                    result.append(data.characters() + position, breakOffset - position);
+                    result.append(data, position, breakOffset - position);
                     position = breakOffset;
                     result.append(newlineCharacter);
                 }
                 getNextSoftBreak(line, breakNode, breakOffset);
             }
-            result.append(data.characters() + position, length - position);
+            result.append(data, position, length - position);
         }
         while (breakNode == node)
             getNextSoftBreak(line, breakNode, breakOffset);
@@ -672,13 +663,6 @@ String HTMLTextFormControlElement::directionForFormData() const
     }
 
     return "ltr";
-}
-
-void HTMLTextFormControlElement::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
-{
-    MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::DOM);
-    HTMLFormControlElementWithState::reportMemoryUsage(memoryObjectInfo);
-    info.addMember(m_textAsOfLastFormControlChangeEvent, "textAsOfLastFormControlChangeEvent");
 }
 
 } // namespace Webcore

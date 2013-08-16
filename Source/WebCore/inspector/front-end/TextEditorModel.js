@@ -192,13 +192,6 @@ WebInspector.TextEditorModel = function()
     this._lineBreak = "\n";
 }
 
-WebInspector.TextEditorModel.Indent = {
-    TwoSpaces: "  ",
-    FourSpaces: "    ",
-    EightSpaces: "        ",
-    TabCharacter: "\t"
-}
-
 WebInspector.TextEditorModel.Events = {
     TextChanged: "TextChanged"
 }
@@ -206,6 +199,17 @@ WebInspector.TextEditorModel.Events = {
 WebInspector.TextEditorModel.endsWithBracketRegex = /[{(\[]\s*$/;
 
 WebInspector.TextEditorModel.prototype = {
+    /**
+     * @return {boolean}
+     */
+    isClean: function() {
+        return !this._undoStack.length;
+    },
+
+    markClean: function() {
+        this._resetUndoStack();
+    },
+
     /**
      * @return {number}
      */
@@ -651,7 +655,7 @@ WebInspector.TextEditorModel.prototype = {
         this._markUndoableState();
 
         var indent = WebInspector.settings.textEditorIndent.get();
-        var indentLength = indent === WebInspector.TextEditorModel.Indent.TabCharacter ? 4 : indent.length;
+        var indentLength = indent === WebInspector.TextUtils.Indent.TabCharacter ? 4 : indent.length;
         var lineIndentRegex = new RegExp("^ {1," + indentLength + "}");
         var newRange = range.clone();
 

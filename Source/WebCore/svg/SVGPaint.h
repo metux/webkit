@@ -97,10 +97,8 @@ public:
 
     bool equals(const SVGPaint&) const;
 
-    void reportDescendantMemoryUsage(MemoryObjectInfo*) const;
-
 private:
-    friend class CSSComputedStyleDeclaration;
+    friend class ComputedStyleExtractor;
 
     static PassRefPtr<SVGPaint> create(const SVGPaintType& type, const String& uri, const Color& color)
     {

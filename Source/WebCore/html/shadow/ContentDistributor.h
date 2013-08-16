@@ -31,7 +31,6 @@
 #ifndef ContentDistributor_h
 #define ContentDistributor_h
 
-#include "SelectRuleFeatureSet.h"
 #include <wtf/Forward.h>
 #include <wtf/HashMap.h>
 #include <wtf/RefCounted.h>
@@ -44,70 +43,6 @@ class Element;
 class InsertionPoint;
 class Node;
 class ShadowRoot;
-
-class ContentDistribution {
-public:
-    PassRefPtr<Node> first() const { return m_nodes.first(); }
-    PassRefPtr<Node> last() const { return m_nodes.last(); }
-    PassRefPtr<Node> at(size_t index) const { return m_nodes.at(index); }
-
-    size_t size() const { return m_nodes.size(); }
-    bool isEmpty() const { return m_nodes.isEmpty(); }
-
-    void append(PassRefPtr<Node>);
-    void clear() { m_nodes.clear(); m_indices.clear(); }
-
-    bool contains(const Node* node) const { return m_indices.contains(node); }
-    size_t find(const Node*) const;
-    Node* nextTo(const Node*) const;
-    Node* previousTo(const Node*) const;
-
-    void swap(ContentDistribution& other);
-
-    const Vector<RefPtr<Node> >& nodes() const { return m_nodes; }
-
-private:
-    Vector<RefPtr<Node> > m_nodes;
-    HashMap<const Node*, size_t> m_indices;
-};
-
-class ScopeContentDistribution {
-public:
-    ScopeContentDistribution();
-
-    InsertionPoint* insertionPointAssignedTo() const { return m_insertionPointAssignedTo; }
-    void setInsertionPointAssignedTo(InsertionPoint* insertionPoint) { m_insertionPointAssignedTo = insertionPoint; }
-
-    void registerInsertionPoint(InsertionPoint*);
-    void unregisterInsertionPoint(InsertionPoint*);
-    bool hasShadowElementChildren() const { return m_numberOfShadowElementChildren > 0; }
-    bool hasContentElementChildren() const { return m_numberOfContentElementChildren > 0; }
-
-    void registerElementShadow() { ++m_numberOfElementShadowChildren; }
-    void unregisterElementShadow() { ASSERT(m_numberOfElementShadowChildren > 0); --m_numberOfElementShadowChildren; }
-    unsigned numberOfElementShadowChildren() const { return m_numberOfElementShadowChildren; }
-    bool hasElementShadowChildren() const { return m_numberOfElementShadowChildren > 0; }
-
-    void invalidateInsertionPointList();
-    const Vector<RefPtr<InsertionPoint> >& ensureInsertionPointList(ShadowRoot*);
-
-    bool isUsedForRendering() const;
-
-    static bool hasShadowElement(const ShadowRoot*);
-    static bool hasContentElement(const ShadowRoot*);
-    static bool hasInsertionPoint(const ShadowRoot*);
-    static bool hasElementShadow(const ShadowRoot* holder) { return countElementShadow(holder); }
-    static unsigned countElementShadow(const ShadowRoot*);
-    static InsertionPoint* assignedTo(const ShadowRoot*);
-
-private:
-    InsertionPoint* m_insertionPointAssignedTo;
-    unsigned m_numberOfShadowElementChildren;
-    unsigned m_numberOfContentElementChildren;
-    unsigned m_numberOfElementShadowChildren;
-    bool m_insertionPointListIsValid;
-    Vector<RefPtr<InsertionPoint> > m_insertionPointList;
-};
 
 class ContentDistributor {
     WTF_MAKE_NONCOPYABLE(ContentDistributor);
@@ -122,36 +57,31 @@ public:
     ContentDistributor();
     ~ContentDistributor();
 
+    void invalidateInsertionPointList();
+    
     InsertionPoint* findInsertionPointFor(const Node* key) const;
-    const SelectRuleFeatureSet& ensureSelectFeatureSet(ElementShadow*);
 
-    void distributeSelectionsTo(InsertionPoint*, const ContentDistribution& pool, Vector<bool>& distributed);
-    void distributeNodeChildrenTo(InsertionPoint*, ContainerNode*);
+    void distributeSelectionsTo(InsertionPoint*, Element* host);
 
     void invalidateDistribution(Element* host);
     void didShadowBoundaryChange(Element* host);
-    void didAffectSelector(Element* host, AffectedSelectorMask);
-    void willAffectSelector(Element* host);
 
     static void ensureDistribution(ShadowRoot*);
 
 private:
+    const Vector<RefPtr<InsertionPoint> >& ensureInsertionPointList(ShadowRoot*);
+
     void distribute(Element* host);
     bool invalidate(Element* host);
-    void populate(Node*, ContentDistribution&);
-
-    void collectSelectFeatureSetFrom(ShadowRoot*);
-    bool needsSelectFeatureSet() const { return m_needsSelectFeatureSet; }
-    void setNeedsSelectFeatureSet() { m_needsSelectFeatureSet = true; }
 
     void setValidity(Validity validity) { m_validity = validity; }
     bool isValid() const { return m_validity == Valid; }
     bool needsDistribution() const;
     bool needsInvalidation() const { return m_validity != Invalidated; }
 
+    Vector<RefPtr<InsertionPoint> > m_insertionPointList;
     HashMap<const Node*, RefPtr<InsertionPoint> > m_nodeToInsertionPoint;
-    SelectRuleFeatureSet m_selectFeatures;
-    bool m_needsSelectFeatureSet : 1;
+    bool m_insertionPointListIsValid;
     unsigned m_validity : 2;
 };
 

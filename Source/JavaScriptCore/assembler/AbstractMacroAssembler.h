@@ -31,7 +31,6 @@
 #include "MacroAssemblerCodeRef.h"
 #include <wtf/CryptographicallyRandomNumber.h>
 #include <wtf/Noncopyable.h>
-#include <wtf/UnusedParam.h>
 
 #if ENABLE(ASSEMBLER)
 
@@ -45,6 +44,24 @@
 #endif
 
 namespace JSC {
+
+inline bool isARMv7s()
+{
+#if CPU(APPLE_ARMV7S)
+    return true;
+#else
+    return false;
+#endif
+}
+
+inline bool isX86()
+{
+#if CPU(X86_64) || CPU(X86)
+    return true;
+#else
+    return false;
+#endif
+}
 
 class JumpReplacementWatchpoint;
 class LinkBuffer;
@@ -78,6 +95,13 @@ public:
         TimesFour,
         TimesEight,
     };
+    
+    static Scale timesPtr()
+    {
+        if (sizeof(void*) == 4)
+            return TimesFour;
+        return TimesEight;
+    }
 
     // Address:
     //
@@ -87,6 +111,11 @@ public:
             : base(base)
             , offset(offset)
         {
+        }
+        
+        Address withOffset(int32_t additionalOffset)
+        {
+            return Address(base, offset + additionalOffset);
         }
 
         RegisterID base;
@@ -538,6 +567,10 @@ public:
 
         void link(AbstractMacroAssembler<AssemblerType>* masm) const
         {
+#if ENABLE(DFG_REGISTER_ALLOCATION_VALIDATION)
+            masm->checkRegisterAllocationAgainstBranchRange(m_label.m_offset, masm->debugOffset());
+#endif
+
 #if CPU(ARM_THUMB2)
             masm->m_assembler.linkJump(m_label, masm->m_assembler.label(), m_type, m_condition);
 #elif CPU(SH4)
@@ -549,6 +582,10 @@ public:
         
         void linkTo(Label label, AbstractMacroAssembler<AssemblerType>* masm) const
         {
+#if ENABLE(DFG_REGISTER_ALLOCATION_VALIDATION)
+            masm->checkRegisterAllocationAgainstBranchRange(label.m_label.m_offset, m_label.m_offset);
+#endif
+
 #if CPU(ARM_THUMB2)
             masm->m_assembler.linkJump(m_label, label.m_label, m_type, m_condition);
 #else
@@ -683,6 +720,44 @@ public:
         return Label(this);
     }
 
+#if ENABLE(DFG_REGISTER_ALLOCATION_VALIDATION)
+    class RegisterAllocationOffset {
+    public:
+        RegisterAllocationOffset(unsigned offset)
+            : m_offset(offset)
+        {
+        }
+
+        void check(unsigned low, unsigned high)
+        {
+            RELEASE_ASSERT_WITH_MESSAGE(!(low <= m_offset && m_offset <= high), "Unsafe branch over register allocation at instruction offset %u in jump offset range %u..%u", m_offset, low, high);
+        }
+
+    private:
+        unsigned m_offset;
+    };
+
+    void addRegisterAllocationAtOffset(unsigned offset)
+    {
+        m_registerAllocationForOffsets.append(RegisterAllocationOffset(offset));
+    }
+
+    void clearRegisterAllocationOffsets()
+    {
+        m_registerAllocationForOffsets.clear();
+    }
+
+    void checkRegisterAllocationAgainstBranchRange(unsigned offset1, unsigned offset2)
+    {
+        if (offset1 > offset2)
+            std::swap(offset1, offset2);
+
+        size_t size = m_registerAllocationForOffsets.size();
+        for (size_t i = 0; i < size; ++i)
+            m_registerAllocationForOffsets[i].check(offset1, offset2);
+    }
+#endif
+
     template<typename T, typename U>
     static ptrdiff_t differenceBetween(T from, U to)
     {
@@ -714,6 +789,10 @@ protected:
     }
 
     WeakRandom m_randomSource;
+
+#if ENABLE(DFG_REGISTER_ALLOCATION_VALIDATION)
+    Vector<RegisterAllocationOffset, 10> m_registerAllocationForOffsets;
+#endif
 
 #if ENABLE(JIT_CONSTANT_BLINDING)
     static bool scratchRegisterForBlinding() { return false; }

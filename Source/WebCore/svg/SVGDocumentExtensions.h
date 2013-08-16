@@ -27,7 +27,6 @@
 #include <wtf/HashSet.h>
 #include <wtf/PassOwnPtr.h>
 #include <wtf/text/AtomicStringHash.h>
-#include <wtf/text/StringImpl.h>
 
 namespace WebCore {
 
@@ -85,8 +84,8 @@ private:
     HashSet<SVGFontFaceElement*> m_svgFontFaceElements;
 #endif
     HashMap<AtomicString, RenderSVGResourceContainer*> m_resources;
-    HashMap<AtomicString, SVGPendingElements*> m_pendingResources; // Resources that are pending.
-    HashMap<AtomicString, SVGPendingElements*> m_pendingResourcesForRemoval; // Resources that are pending and scheduled for removal.
+    HashMap<AtomicString, OwnPtr<SVGPendingElements> > m_pendingResources; // Resources that are pending.
+    HashMap<AtomicString, OwnPtr<SVGPendingElements> > m_pendingResourcesForRemoval; // Resources that are pending and scheduled for removal.
     HashMap<SVGElement*, OwnPtr<HashSet<SVGElement*> > > m_elementDependencies;
     OwnPtr<SVGResourcesCache> m_resourcesCache;
 

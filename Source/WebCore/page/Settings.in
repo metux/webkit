@@ -33,6 +33,11 @@ deviceHeight type=int, initial=0
 # since the memory used won't be released until the Page is destroyed.
 sessionStorageQuota type=unsigned, initial=StorageMap::noQuota
 
+minimumFontSize type=int, initial=0, setNeedsStyleRecalcInAllFrames=1
+minimumLogicalFontSize type=int, initial=0, setNeedsStyleRecalcInAllFrames=1
+defaultFontSize type=int, initial=0, setNeedsStyleRecalcInAllFrames=1
+defaultFixedFontSize type=int, initial=0, setNeedsStyleRecalcInAllFrames=1
+
 editingBehaviorType type=EditingBehaviorType, initial=editingBehaviorTypeForPlatform()
 maximumHTMLParserDOMTreeDepth type=unsigned, initial=defaultMaximumHTMLParserDOMTreeDepth
 
@@ -50,13 +55,18 @@ javaScriptCanAccessClipboard initial=false
 shouldPrintBackgrounds initial=false
 usesDashboardBackwardCompatibilityMode initial=false, conditional=DASHBOARD_SUPPORT
 
+textAreasAreResizable initial=false, setNeedsStyleRecalcInAllFrames=1
+authorAndUserStylesEnabled initial=true, setNeedsStyleRecalcInAllFrames=1
+acceleratedCompositingEnabled initial=true, setNeedsStyleRecalcInAllFrames=1
+showDebugBorders initial=false, setNeedsStyleRecalcInAllFrames=1
+showRepaintCounter initial=false, setNeedsStyleRecalcInAllFrames=1
+
 # This is a quirk we are pro-actively applying to old applications. It changes keyboard event dispatching,
 # making keyIdentifier available on keypress events, making charCode available on keydown/keyup events,
 # and getting keypress dispatched in more cases.
 needsKeyboardEventDisambiguationQuirks initial=false
 
 treatsAnyTextCSSLinkAsStylesheet initial=false
-needsLeopardMailQuirks initial=false
 shrinksStandaloneImagesToFit initial=true
 pageCacheSupportsPlugins initial=false
 showsURLsInToolTips initial=false
@@ -64,6 +74,7 @@ showsToolTipOverTruncatedText initial=false
 forceFTPDirectoryListings initial=false
 developerExtrasEnabled initial=false
 javaScriptExperimentsEnabled initial=false
+scriptMarkupEnabled initial=true
 needsSiteSpecificQuirks initial=false
 webArchiveDebugModeEnabled initial=false, conditional=WEB_ARCHIVE
 localFileContentSniffingEnabled initial=false
@@ -83,11 +94,6 @@ downloadableBinaryFontsEnabled initial=true
 
 xssAuditorEnabled initial=false
 unsafePluginPastingEnabled initial=true
-acceleratedCompositingFor3DTransformsEnabled initial=true
-acceleratedCompositingForVideoEnabled initial=true
-acceleratedCompositingForPluginsEnabled initial=true
-acceleratedCompositingForCanvasEnabled initial=true
-acceleratedCompositingForAnimationEnabled initial=true
 acceleratedCompositingForFixedPositionEnabled initial=false
 acceleratedCompositingForOverflowScrollEnabled initial=false
 
@@ -101,15 +107,12 @@ webGLErrorsToConsoleEnabled initial=true
 openGLMultisamplingEnabled initial=true
 privilegedWebGLExtensionsEnabled initial=false
 accelerated2dCanvasEnabled initial=false
-deferred2dCanvasEnabled initial=false
 antialiased2dCanvasEnabled initial=true
 loadDeferringEnabled initial=true
 webAudioEnabled initial=false
 paginateDuringLayoutEnabled initial=false
 fullScreenEnabled initial=false, conditional=FULLSCREEN_API
 asynchronousSpellCheckingEnabled initial=false
-memoryInfoEnabled initial=false
-quantizedMemoryInfoEnabled initial=false
 
 # This feature requires an implementation of ValidationMessageClient.
 interactiveFormValidationEnabled initial=false
@@ -133,6 +136,7 @@ shouldDisplaySubtitles initial=false, conditional=VIDEO_TRACK
 shouldDisplayCaptions initial=false, conditional=VIDEO_TRACK
 shouldDisplayTextDescriptions initial=false, conditional=VIDEO_TRACK
 scrollingCoordinatorEnabled initial=false
+scrollAnimatorEnabled initial=true, conditional=SMOOTH_SCROLLING
 notificationsEnabled initial=true
 
 # Some apps needs isLoadingInAPISense to account for active subresource loaders.
@@ -149,7 +153,6 @@ deviceSupportsMouse initial=true
 # support for touch adjustment.
 touchAdjustmentEnabled initial=true
 
-needsDidFinishLoadOrderQuirk initial=false
 fixedPositionCreatesStackingContext initial=false
 syncXHRInDocumentsEnabled initial=true
 cookieEnabled initial=true
@@ -158,6 +161,7 @@ applicationChromeMode initial=false
 DOMPasteAllowed initial=false
 
 threadedHTMLParser initial=false, conditional=THREADED_HTML_PARSER
+useThreadedHTMLParserForDataURLs initial=false, conditional=THREADED_HTML_PARSER
 
 # When enabled, window.blur() does not change focus, and
 # window.focus() only changes focus when invoked from the context that
@@ -168,6 +172,10 @@ diagnosticLoggingEnabled initial=false
 applyDeviceScaleFactorInCompositor initial=true
 applyPageScaleFactorInCompositor initial=false
 plugInSnapshottingEnabled initial=false
+snapshotAllPlugIns initial=false
+autostartOriginPlugInSnapshottingEnabled initial=true
+primaryPlugInSnapshotDetectionEnabled initial=true
+maximumPlugInSnapshotAttempts type=unsigned, initial=20
 frameFlatteningEnabled initial=false
 
 allowCustomScrollbarInMainFrame initial=true
@@ -181,3 +189,14 @@ touchDragDropEnabled initial=false
 unifiedTextCheckerEnabled initial=defaultUnifiedTextCheckerEnabled
 
 logsPageMessagesToSystemConsoleEnabled initial=false
+
+backForwardCacheExpirationInterval type=double, initial=1800
+
+# Some apps could have a default video poster if it is not set.
+defaultVideoPosterURL type=String
+
+smartInsertDeleteEnabled initial=defaultSmartInsertDeleteEnabled
+selectTrailingWhitespaceEnabled initial=defaultSelectTrailingWhitespaceEnabled
+
+selectionIncludesAltImageText initial=true
+useLegacyBackgroundSizeShorthandBehavior initial=false

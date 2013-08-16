@@ -45,10 +45,6 @@
 
 namespace WebCore {
 class GraphicsContext3D;
-class ImageData;
-#if PLATFORM(CHROMIUM)
-class DrawingBufferPrivate;
-#endif
 
 // Manages a rendering target (framebuffer + attachment) for a canvas.  Can publish its rendering
 // results to a PlatformLayer for compositing.
@@ -115,8 +111,6 @@ public:
 
     Platform3DObject framebuffer() const;
 
-    PassRefPtr<ImageData> paintRenderingResultsToImageData();
-
     // Immediately releases ownership of all resources. Call upon loss of the
     // graphics context to prevent freeing invalid resources.
     void discardResources();
@@ -125,11 +119,8 @@ public:
 
 #if USE(ACCELERATED_COMPOSITING)
     PlatformLayer* platformLayer();
-    void prepareBackBuffer();
-    bool requiresCopyFromBackToFrontBuffer() const;
     unsigned frontColorBuffer() const;
     void paintCompositedResultsToCanvas(ImageBuffer*);
-    void clearPlatformLayer();
 #endif
 
     GraphicsContext3D* graphicsContext3D() const { return m_context.get(); }
@@ -139,6 +130,8 @@ private:
                   bool packedDepthStencilExtensionSupported, PreserveDrawingBuffer, AlphaRequirement);
 
     void initialize(const IntSize&);
+
+    bool checkBufferIntegrity();
 
     PreserveDrawingBuffer m_preserveDrawingBuffer;
     AlphaRequirement m_alpha;
@@ -169,10 +162,6 @@ private:
 
     // True if our contents have been modified since the last presentation of this buffer.
     bool m_contentsChanged;
-
-#if PLATFORM(CHROMIUM)
-    OwnPtr<DrawingBufferPrivate> m_private;
-#endif
 
 #if PLATFORM(MAC)
     RetainPtr<WebGLLayer> m_platformLayer;

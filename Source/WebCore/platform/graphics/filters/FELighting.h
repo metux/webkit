@@ -34,7 +34,7 @@
 #include "LightSource.h"
 #include "PointLightSource.h"
 #include "SpotLightSource.h"
-#include <wtf/Uint8ClampedArray.h>
+#include <runtime/Uint8ClampedArray.h>
 
 // Common base class for FEDiffuseLighting and FESpecularLighting
 
@@ -45,10 +45,6 @@ struct FELightingPaintingDataForNeon;
 class FELighting : public FilterEffect {
 public:
     virtual void platformApplySoftware();
-#if USE(SKIA)
-    virtual SkImageFilter* createImageFilter(SkiaImageFilterBuilder*);
-    virtual bool platformApplySkia();
-#endif
 
     virtual void determineAbsolutePaintRect() { setAbsolutePaintRect(enclosingIntRect(maxEffectRect())); }
 

@@ -3,7 +3,7 @@
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 <title>WebKitPrintOperation</title>
-<meta name="generator" content="DocBook XSL Stylesheets V1.76.1">
+<meta name="generator" content="DocBook XSL Stylesheets V1.78.1">
 <link rel="home" href="index.html" title="WebKit2GTK+ Reference Manual">
 <link rel="up" href="ch01.html" title="Class Overview">
 <link rel="prev" href="WebKitHitTestResult.html" title="WebKitHitTestResult">
@@ -113,8 +113,11 @@ display the print dialog with <a class="link" href="WebKitPrintOperation.html#we
 Enum values representing the response of the print dialog shown with
 <a class="link" href="WebKitPrintOperation.html#webkit-print-operation-run-dialog" title="webkit_print_operation_run_dialog ()"><code class="function">webkit_print_operation_run_dialog()</code></a>.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><a name="WEBKIT-PRINT-OPERATION-RESPONSE-PRINT:CAPS"></a><span class="term"><code class="literal">WEBKIT_PRINT_OPERATION_RESPONSE_PRINT</code></span></p></td>
@@ -136,8 +139,11 @@ Enum values representing the response of the print dialog shown with
 <p>
 Create a new <a class="link" href="WebKitPrintOperation.html" title="WebKitPrintOperation"><span class="type">WebKitPrintOperation</span></a> to print <em class="parameter"><code>web_view</code></em> contents.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>web_view</code></em> :</span></p></td>
@@ -162,8 +168,11 @@ Return the current print settings of <em class="parameter"><code>print_operation
 either <a class="link" href="WebKitPrintOperation.html#webkit-print-operation-set-print-settings" title="webkit_print_operation_set_print_settings ()"><code class="function">webkit_print_operation_set_print_settings()</code></a> or <a class="link" href="WebKitPrintOperation.html#webkit-print-operation-run-dialog" title="webkit_print_operation_run_dialog ()"><code class="function">webkit_print_operation_run_dialog()</code></a>
 have been called.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>print_operation</code></em> :</span></p></td>
@@ -188,8 +197,11 @@ have been called.
 Set the current print settings of <em class="parameter"><code>print_operation</code></em>. Current print settings are used for
 the initial values of the print dialog when <a class="link" href="WebKitPrintOperation.html#webkit-print-operation-run-dialog" title="webkit_print_operation_run_dialog ()"><code class="function">webkit_print_operation_run_dialog()</code></a> is called.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>print_operation</code></em> :</span></p></td>
@@ -213,8 +225,11 @@ Return the current page setup of <em class="parameter"><code>print_operation</co
 either <a class="link" href="WebKitPrintOperation.html#webkit-print-operation-set-print-settings" title="webkit_print_operation_set_print_settings ()"><code class="function">webkit_print_operation_set_print_settings()</code></a> or <a class="link" href="WebKitPrintOperation.html#webkit-print-operation-run-dialog" title="webkit_print_operation_run_dialog ()"><code class="function">webkit_print_operation_run_dialog()</code></a>
 have been called.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>print_operation</code></em> :</span></p></td>
@@ -239,8 +254,11 @@ have been called.
 Set the current page setup of <em class="parameter"><code>print_operation</code></em>. Current page setup is used for the
 initial values of the print dialog when <a class="link" href="WebKitPrintOperation.html#webkit-print-operation-run-dialog" title="webkit_print_operation_run_dialog ()"><code class="function">webkit_print_operation_run_dialog()</code></a> is called.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>print_operation</code></em> :</span></p></td>
@@ -274,8 +292,11 @@ You can get the updated print settings and page setup by calling
 <a class="link" href="WebKitPrintOperation.html#webkit-print-operation-get-print-settings" title="webkit_print_operation_get_print_settings ()"><code class="function">webkit_print_operation_get_print_settings()</code></a> and <a class="link" href="WebKitPrintOperation.html#webkit-print-operation-get-page-setup" title="webkit_print_operation_get_page_setup ()"><code class="function">webkit_print_operation_get_page_setup()</code></a>
 after this method.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>print_operation</code></em> :</span></p></td>
@@ -308,8 +329,11 @@ The <a class="link" href="WebKitPrintOperation.html#WebKitPrintOperation-finishe
 operation finishes. If an error occurs while printing the signal
 <a class="link" href="WebKitPrintOperation.html#WebKitPrintOperation-failed" title='The "failed" signal'><span class="type">"failed"</span></a> is emitted before <a class="link" href="WebKitPrintOperation.html#WebKitPrintOperation-finished" title='The "finished" signal'><span class="type">"finished"</span></a>.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody><tr>
 <td><p><span class="term"><em class="parameter"><code>print_operation</code></em> :</span></p></td>
 <td>a <a class="link" href="WebKitPrintOperation.html" title="WebKitPrintOperation"><span class="type">WebKitPrintOperation</span></a>
@@ -356,8 +380,11 @@ Emitted when an error occurs while printing. The given <em class="parameter"><co
 <a class="link" href="webkit2gtk-WebKitError.html#WEBKIT-PRINT-ERROR:CAPS" title="WEBKIT_PRINT_ERROR"><code class="literal">WEBKIT_PRINT_ERROR</code></a>, contains further details of the failure.
 The <a class="link" href="WebKitPrintOperation.html#WebKitPrintOperation-finished" title='The "finished" signal'><span class="type">"finished"</span></a> signal is emitted after this one.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>print_operation</code></em> :</span></p></td>
@@ -383,8 +410,11 @@ The <a class="link" href="WebKitPrintOperation.html#WebKitPrintOperation-finishe
 Emitted when the print operation has finished doing everything
 required for printing.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>print_operation</code></em> :</span></p></td>

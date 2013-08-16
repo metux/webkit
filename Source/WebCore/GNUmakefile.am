@@ -9,10 +9,12 @@ webcore_cppflags += \
 	-I$(srcdir)/Source/ThirdParty/ANGLE/include/GLSLANG \
 	-I$(srcdir)/Source/ThirdParty/ANGLE/include/KHR \
 	-I$(srcdir)/Source/WebCore \
+	-I$(srcdir)/Source/WebCore/Modules/battery \
 	-I$(srcdir)/Source/WebCore/Modules/filesystem \
 	-I$(srcdir)/Source/WebCore/Modules/gamepad \
 	-I$(srcdir)/Source/WebCore/Modules/geolocation \
 	-I$(srcdir)/Source/WebCore/Modules/indexeddb \
+	-I$(srcdir)/Source/WebCore/Modules/indieui \
 	-I$(srcdir)/Source/WebCore/Modules/mediasource \
 	-I$(srcdir)/Source/WebCore/Modules/mediastream \
 	-I$(srcdir)/Source/WebCore/Modules/navigatorcontentutils \
@@ -37,6 +39,7 @@ webcore_cppflags += \
 	-I$(srcdir)/Source/WebCore/history \
 	-I$(srcdir)/Source/WebCore/html \
 	-I$(srcdir)/Source/WebCore/html/canvas \
+	-I$(srcdir)/Source/WebCore/html/forms \
 	-I$(srcdir)/Source/WebCore/html/parser \
 	-I$(srcdir)/Source/WebCore/html/shadow \
 	-I$(srcdir)/Source/WebCore/html/track \
@@ -88,9 +91,11 @@ webcore_cppflags += \
 	-I$(srcdir)/Source/WebCore/plugins/win \
 	-I$(srcdir)/Source/WebCore/rendering \
 	-I$(srcdir)/Source/WebCore/rendering/mathml \
+	-I$(srcdir)/Source/WebCore/rendering/shapes \
 	-I$(srcdir)/Source/WebCore/rendering/style \
 	-I$(srcdir)/Source/WebCore/rendering/svg \
 	-I$(srcdir)/Source/WebCore/storage \
+	-I$(srcdir)/Source/WebCore/style \
 	-I$(srcdir)/Source/WebCore/svg \
 	-I$(srcdir)/Source/WebCore/svg/animation \
 	-I$(srcdir)/Source/WebCore/svg/graphics \
@@ -105,8 +110,7 @@ webcore_cppflags += \
 	-I$(top_builddir)/WebCore/bindings/js \
 	-I$(top_builddir)/DerivedSources/WebCore \
 	-I$(top_builddir)/DerivedSources \
-	-I$(top_builddir)/DerivedSources/JavaScriptCore \
-	-DDATA_DIR=\"${datadir}\"
+	-I$(top_builddir)/DerivedSources/JavaScriptCore
 
 webcoregtk_cppflags += \
 	-DWEBKITGTK_API_VERSION_STRING=\"@WEBKITGTK_API_VERSION@\" \
@@ -115,7 +119,6 @@ webcoregtk_cppflags += \
 	-I$(srcdir)/Source/WebCore/page/gtk \
 	-I$(srcdir)/Source/WebCore/platform/cairo \
 	-I$(srcdir)/Source/WebCore/platform/audio/gstreamer \
-	-I$(srcdir)/Source/WebCore/platform/geoclue \
 	-I$(srcdir)/Source/WebCore/platform/graphics/cairo \
 	-I$(srcdir)/Source/WebCore/platform/graphics/freetype \
 	-I$(srcdir)/Source/WebCore/platform/graphics/glx \
@@ -145,7 +148,7 @@ $(GENSOURCES_WEBCORE)/XPathGrammar.cpp: $(WebCore)/xml/XPathGrammar.y
 # MathML tag and attribute names, and element factory
 DerivedSources/WebCore/MathMLElementFactory.h: DerivedSources/WebCore/MathMLElementFactory.cpp
 DerivedSources/WebCore/MathMLNames.h: DerivedSources/WebCore/MathMLNames.cpp
-DerivedSources/WebCore/MathMLElementFactory.cpp DerivedSources/WebCore/MathMLNames.cpp: $(WebCore)/dom/make_names.pl $(WebCore)/mathml/mathtags.in $(WebCore)/mathml/mathattrs.in
+DerivedSources/WebCore/MathMLElementFactory.cpp DerivedSources/WebCore/MathMLNames.cpp: $(WebCore)/dom/make_names.pl $(WebCore)/bindings/scripts/Hasher.pm $(WebCore)/bindings/scripts/StaticString.pm $(WebCore)/mathml/mathtags.in $(WebCore)/mathml/mathattrs.in
 	$(AM_V_GEN)$(PERL) -I$(WebCore)/bindings/scripts $< --tags $(WebCore)/mathml/mathtags.in --attrs $(WebCore)/mathml/mathattrs.in --factory --wrapperFactory --outputDir "$(GENSOURCES_WEBCORE)"
 
 # ----
@@ -172,6 +175,8 @@ libWebCoreSVG_la_CPPFLAGS = \
 	-DBUILDING_WebCore \
 	-DBUILDING_WEBKIT \
 	$(global_cppflags) \
+	$(platform_cppflags) \
+	$(platformgtk_cppflags) \
 	$(webcore_cppflags) \
 	$(webcoregtk_cppflags) \
 	$(javascriptcore_cppflags) \
@@ -189,33 +194,26 @@ endif # END_ENABLE_SVG
 # SVG tag and attribute names (need to pass an extra flag if svg experimental features are enabled)
 DerivedSources/WebCore/SVGNames.cpp: DerivedSources/WebCore/SVGElementFactory.cpp
 DerivedSources/WebCore/JSSVGElementWrapperFactory.cpp: DerivedSources/WebCore/SVGElementFactory.cpp
-DerivedSources/WebCore/SVGElementFactory.cpp: $(WebCore)/dom/make_names.pl $(WebCore)/svg/svgtags.in $(WebCore)/svg/svgattrs.in
+DerivedSources/WebCore/SVGElementFactory.cpp: $(WebCore)/dom/make_names.pl $(WebCore)/bindings/scripts/Hasher.pm $(WebCore)/bindings/scripts/StaticString.pm $(WebCore)/svg/svgtags.in $(WebCore)/svg/svgattrs.in
 	$(AM_V_GEN)$(PERL) -I$(WebCore)/bindings/scripts $< --tags $(WebCore)/svg/svgtags.in --attrs $(WebCore)/svg/svgattrs.in --extraDefines "$(feature_defines)" --factory --wrapperFactory --outputDir "$(GENSOURCES_WEBCORE)"
 
 # end SVG Features
 
 DerivedSources/WebCore/XLinkNames.h: DerivedSources/WebCore/XLinkNames.cpp
-DerivedSources/WebCore/XLinkNames.cpp : $(WebCore)/dom/make_names.pl $(WebCore)/svg/xlinkattrs.in
+DerivedSources/WebCore/XLinkNames.cpp : $(WebCore)/dom/make_names.pl $(WebCore)/bindings/scripts/Hasher.pm $(WebCore)/bindings/scripts/StaticString.pm $(WebCore)/svg/xlinkattrs.in
 	$(AM_V_GEN)$(PERL) -I$(WebCore)/bindings/scripts $< --attrs $(WebCore)/svg/xlinkattrs.in --outputDir "$(GENSOURCES_WEBCORE)"
-
-if USE_TEXTURE_MAPPER_CAIRO
-webcore_cppflags += \
-	-I$(srcdir)/Source/WebCore/platform/graphics/texmap
-endif  # END USE_TEXTURE_MAPPER_CAIRO
 
 if USE_TEXTURE_MAPPER_GL
 webcore_cppflags += \
 	-I$(srcdir)/Source/WebCore/platform/graphics/texmap
 endif  # END USETEXTURE_MAPPER_GL
 
-if USE_CLUTTER
-webcore_cppflags += \
-	-I$(srcdir)/Source/WebCore/platform/clutter \
-	-I$(srcdir)/Source/WebCore/platform/graphics/clutter
-endif  # END USE_CLUTTER
-
 if ENABLE_INDEXED_DATABASE
 webcore_cppflags += \
+	-DWTF_USE_LEVELDB=1 \
+	-I$(srcdir)/Source/ThirdParty/leveldb \
+	-I$(srcdir)/Source/ThirdParty/leveldb/include
+platform_cppflags += \
 	-DWTF_USE_LEVELDB=1 \
 	-I$(srcdir)/Source/ThirdParty/leveldb \
 	-I$(srcdir)/Source/ThirdParty/leveldb/include
@@ -252,10 +250,6 @@ DerivedSources/WebCore/XMLViewerJS.h: $(WebCore)/xml/XMLViewer.js
 DerivedSources/WebCore/HTMLEntityTable.cpp: $(WebCore)/html/parser/HTMLEntityNames.in $(WebCore)/html/parser/create-html-entity-table
 	$(AM_V_GEN)$(PYTHON) $(WebCore)/html/parser/create-html-entity-table -o $(GENSOURCES_WEBCORE)/HTMLEntityTable.cpp $(WebCore)/html/parser/HTMLEntityNames.in
 
-# color names
-DerivedSources/WebCore/ColorData.cpp: $(WebCore)/platform/ColorData.gperf $(WebCore)/make-hash-tools.pl
-	$(AM_V_GEN)$(PERL) $(WebCore)/make-hash-tools.pl $(GENSOURCES_WEBCORE) $(WebCore)/platform/ColorData.gperf
-
 # CSS grammar
 
 DerivedSources/WebCore/CSSGrammar.h: $(GENSOURCES_WEBCORE)/CSSGrammar.cpp
@@ -275,6 +269,10 @@ USER_AGENT_STYLE_SHEETS = \
 	$(WebCore)/css/fullscreen.css \
 	$(WebCore)/css/plugIns.css
 
+# plug-in resources
+PLUG_INS_RESOURCES = \
+	$(WebCore)/Resources/plugIns.js
+
 # new-style JavaScript bindings
 SCRIPTS_FOR_GENERATE_BINDINGS = \
 	$(WebCore)/bindings/scripts/CodeGenerator.pm \
@@ -291,9 +289,9 @@ DerivedSources/WebCore/UserAgentStyleSheetsData.cpp: DerivedSources/WebCore/User
 DerivedSources/WebCore/UserAgentStyleSheets.h: $(WebCore)/css/make-css-file-arrays.pl $(WebCore)/bindings/scripts/preprocessor.pm $(USER_AGENT_STYLE_SHEETS)
 	$(AM_V_GEN)$(PERL) -I$(WebCore)/bindings/scripts $<  --defines "$(feature_defines)" $@ DerivedSources/WebCore/UserAgentStyleSheetsData.cpp $(USER_AGENT_STYLE_SHEETS)
 
-DerivedSources/WebCore/WebKitFontFamilyNames.cpp: DerivedSources/WebCore/WebKitFontFamilyNames.h
-DerivedSources/WebCore/WebKitFontFamilyNames.h: $(WebCore)/dom/make_names.pl $(WebCore)/css/WebKitFontFamilyNames.in
-	$(AM_V_GEN)$(PERL) -I$(WebCore)/bindings/scripts $< --fonts $(WebCore)/css/WebKitFontFamilyNames.in --outputDir "$(GENSOURCES_WEBCORE)"
+DerivedSources/WebCore/PlugInsResourcesData.cpp: DerivedSources/WebCore/PlugInsResources.h
+DerivedSources/WebCore/PlugInsResources.h: $(WebCore)/css/make-css-file-arrays.pl $(WebCore)/bindings/scripts/preprocessor.pm $(PLUG_INS_RESOURCES)
+	$(AM_V_GEN)$(PERL) -I$(WebCore)/bindings/scripts $<  --defines "$(feature_defines)" $@ DerivedSources/WebCore/PlugInsResourcesData.cpp $(PLUG_INS_RESOURCES)
 
 
 # HTML tag and attribute names
@@ -301,14 +299,14 @@ DerivedSources/WebCore/JSHTMLElementWrapperFactory.cpp: DerivedSources/WebCore/H
 DerivedSources/WebCore/HTMLElementFactory.cpp: DerivedSources/WebCore/HTMLElementFactory.h
 DerivedSources/WebCore/HTMLElementFactory.h: DerivedSources/WebCore/HTMLNames.cpp
 DerivedSources/WebCore/HTMLNames.cpp: DerivedSources/WebCore/HTMLNames.h
-DerivedSources/WebCore/HTMLNames.h: $(WebCore)/dom/make_names.pl $(WebCore)/html/HTMLTagNames.in $(WebCore)/html/HTMLAttributeNames.in
+DerivedSources/WebCore/HTMLNames.h: $(WebCore)/dom/make_names.pl $(WebCore)/bindings/scripts/Hasher.pm $(WebCore)/bindings/scripts/StaticString.pm $(WebCore)/html/HTMLTagNames.in $(WebCore)/html/HTMLAttributeNames.in
 	$(AM_V_GEN)$(PERL) -I$(WebCore)/bindings/scripts $< --tags $(WebCore)/html/HTMLTagNames.in --attrs $(WebCore)/html/HTMLAttributeNames.in --extraDefines "$(feature_defines)" --factory --wrapperFactory --outputDir "$(GENSOURCES_WEBCORE)"
 
 
-DerivedSources/WebCore/XMLNSNames.cpp DerivedSources/WebCore/XMLNSNames.h: $(WebCore)/dom/make_names.pl $(WebCore)/xml/xmlnsattrs.in
+DerivedSources/WebCore/XMLNSNames.cpp DerivedSources/WebCore/XMLNSNames.h: $(WebCore)/dom/make_names.pl $(WebCore)/bindings/scripts/Hasher.pm $(WebCore)/bindings/scripts/StaticString.pm $(WebCore)/xml/xmlnsattrs.in
 	$(AM_V_GEN)$(PERL) -I$(WebCore)/bindings/scripts $< --attrs $(WebCore)/xml/xmlnsattrs.in --outputDir "$(GENSOURCES_WEBCORE)"
 
-DerivedSources/WebCore/XMLNames.cpp DerivedSources/WebCore/XMLNames.h: $(WebCore)/dom/make_names.pl $(WebCore)/xml/xmlattrs.in
+DerivedSources/WebCore/XMLNames.cpp DerivedSources/WebCore/XMLNames.h: $(WebCore)/dom/make_names.pl $(WebCore)/bindings/scripts/Hasher.pm $(WebCore)/bindings/scripts/StaticString.pm $(WebCore)/xml/xmlattrs.in
 	$(AM_V_GEN)$(PERL) -I$(WebCore)/bindings/scripts $< --attrs $(WebCore)/xml/xmlattrs.in --outputDir "$(GENSOURCES_WEBCORE)"
 
 DerivedSources/WebCore/EventFactory.cpp DerivedSources/WebCore/EventHeaders.h DerivedSources/WebCore/EventInterfaces.h: $(WebCore)/dom/make_event_factory.pl $(WebCore)/dom/EventNames.in
@@ -352,15 +350,8 @@ audio_DATA = $(WebCore)/platform/audio/resources/Composite.wav
 dist_audio_DATA = $(audio_DATA)
 endif  # END ENABLE_WEB_AUDIO
 
-# ANGLE tokenizer & parser
-DerivedSources/ANGLE/glslang.cpp: Source/ThirdParty/ANGLE/src/compiler/glslang.l
-	$(AM_V_GEN)$(FLEX) --noline --nounistd --outfile="$@" "$<"
-
-DerivedSources/ANGLE/glslang_tab.cpp: Source/ThirdParty/ANGLE/src/compiler/glslang.y
-	$(AM_V_GEN)$(BISON) --no-lines --defines="DerivedSources/ANGLE/glslang_tab.h" --skeleton=yacc.c --output="$@" $<
-DerivedSources/ANGLE/glslang_tab.h: DerivedSources/ANGLE/glslang_tab.cpp
-
 IDL_PATH := \
+    $(WebCore)/Modules/battery \
     $(WebCore)/Modules/filesystem \
     $(WebCore)/Modules/gamepad \
     $(WebCore)/Modules/geolocation \
@@ -394,6 +385,10 @@ IDL_PATH := \
 vpath %.idl $(IDL_PATH)
 
 supplemental_dependency_file = $(top_builddir)/DerivedSources/WebCore/idl_supplemental_dependencies
+window_constructors_file = $(top_builddir)/DerivedSources/WebCore/DOMWindowConstructors.idl
+workerglobalscope_constructors_file = $(top_builddir)/DerivedSources/WebCore/WorkerGlobalScopeConstructors.idl
+sharedworkerglobalscope_constructors_file = $(top_builddir)/DerivedSources/WebCore/SharedWorkerGlobalScopeConstructors.idl
+dedicatedworkerglobalscope_constructors_file = $(top_builddir)/DerivedSources/WebCore/DedicatedWorkerGlobalScopeConstructors.idl
 idl_files_list = $(top_builddir)/DerivedSources/WebCore/idl_files_list
 idl_attributes_file = $(WebCore)/bindings/scripts/IDLAttributes.txt
 
@@ -402,7 +397,9 @@ $(supplemental_dependency_file): $(SCRIPTS_FOR_PREPROCESS_IDLS) $(dom_binding_id
 	$(AM_V_GEN)
 	$(AM_V_at)echo -n > $(idl_files_list)
 	$(AM_V_at)($(foreach idl, $(dom_binding_idls), echo $(idl) &&) echo -n) >> $(idl_files_list)
-	$(AM_V_at)$(PERL) -I$(WebCore)/bindings/scripts $(WebCore)/bindings/scripts/preprocess-idls.pl --defines "LANGUAGE_JAVASCRIPT=1 $(feature_defines)" --idlFilesList $(idl_files_list) --supplementalDependencyFile $@
+	$(AM_V_at)$(PERL) -I$(WebCore)/bindings/scripts $(WebCore)/bindings/scripts/preprocess-idls.pl --defines "LANGUAGE_JAVASCRIPT=1 $(feature_defines)" --idlFilesList $(idl_files_list) --windowConstructorsFile $(window_constructors_file) --workerGlobalScopeConstructorsFile $(workerglobalscope_constructors_file) --sharedWorkerGlobalScopeConstructorsFile $(sharedworkerglobalscope_constructors_file) --dedicatedWorkerGlobalScopeConstructorsFile $(dedicatedworkerglobalscope_constructors_file) --supplementalDependencyFile $@
+
+.PHONY: $(window_constructors_file) $(workerglobalscope_constructors_file) $(sharedworkerglobalscope_constructors_file) $(dedicatedworkerglobalscope_constructors_file)
 
 # This does not appear to work correctly with gnumake unless
 # it includes an empty command list (the semicolon).
@@ -422,32 +419,26 @@ DerivedSources/WebCore/JSInternalSettingsGenerated.h: DerivedSources/WebCore/Int
 # IDL generation takes a long time. The pipe represents an order-only dependency,
 # which means that GNUmake will only try to build the dependencies first, but
 # not rebuild all the targets if the dependencies change.
-$(webkitgtk_sources) $(webkit2_sources) $(webkit2_plugin_process_sources) $(webcore_sources) $(webcoregtk_sources) : | $(supplemental_dependency_file) $(webcore_built_sources)
+$(webkitgtk_sources) $(webkit2_sources) $(webkit2_plugin_process_sources) $(webcore_sources) $(webcoregtk_sources) $(platform_sources) $(platformgtk_sources) : | $(supplemental_dependency_file) $(window_constructors_file) $(workerglobalscope_constructors_file) $(sharedworkerglobalscope_constructors_file) $(dedictedworkerglobalscope_constructors_file) $(webcore_built_sources) $(platform_built_sources)
 
 noinst_LTLIBRARIES += \
 	libWebCorePlatform.la \
 	libWebCoreModules.la \
 	libWebCore.la
 
-if ENABLE_INDEXED_DATABASE
-noinst_LTLIBRARIES += \
-	libLevelDB.la
-endif
-
 if ENABLE_SVG
 noinst_LTLIBRARIES += \
 	libWebCoreSVG.la
 endif
 
-# Artificial dependency to try to force a relink of the WebCore libraries
-# When their makefiles change.
+# Artificial dependencies to try to force a relink of the WebCore libraries when their makefiles change.
 webcore_lib_for_dep = libWebCore.la
 $(webcore_lib_for_dep): $(srcdir)/Source/WebCore/GNUmakefile.am $(srcdir)/Source/WebCore/GNUmakefile.list.am $(srcdir)/Source/autotools/symbols.filter
 
-webcoremodules_lib_for_dep = libWebcoreModules.la
+webcoremodules_lib_for_dep = libWebCoreModules.la
 $(webcoremodules_lib_for_dep): $(srcdir)/Source/WebCore/GNUmakefile.am $(srcdir)/Source/WebCore/GNUmakefile.list.am
 
-webcoreplatform_lib_for_dep = libWebcorePlatform.la
+webcoreplatform_lib_for_dep = libWebCorePlatform.la
 $(webcoreplatform_lib_for_dep): $(srcdir)/Source/WebCore/GNUmakefile.am $(srcdir)/Source/WebCore/GNUmakefile.list.am
 
 webcoresvg_lib_for_dep = libWebCoreSVG.la
@@ -474,12 +465,13 @@ libWebCore_la_CPPFLAGS = \
 	-DBUILDING_WebCore \
 	-DBUILDING_WEBKIT \
 	$(global_cppflags) \
+	$(platform_cppflags) \
+	$(platformgtk_cppflags) \
 	$(webcore_cppflags) \
 	$(webcoregtk_cppflags) \
 	$(javascriptcore_cppflags) \
 	-fno-strict-aliasing \
 	$(CAIRO_CFLAGS) \
-	$(CLUTTER_CFLAGS) \
 	$(COVERAGE_CFLAGS) \
 	$(ENCHANT_CFLAGS) \
 	$(FREETYPE_CFLAGS) \
@@ -508,24 +500,6 @@ libWebCoreModules_la_CXXFLAGS = $(libWebCore_la_CXXFLAGS)
 libWebCoreModules_la_CFLAGS = $(libWebCore_la_CFLAGS)
 libWebCoreModules_la_CPPFLAGS = $(libWebCore_la_CPPFLAGS)
 
-libLevelDB_la_CXXFLAGS = $(global_cxxflags)
-libLevelDB_la_CFLAGS = $(global_cxflags)
-libLevelDB_la_CPPFLAGS = \
-	$(global_cppflags) \
-	-fno-builtin-memcmp \
-	-I$(srcdir)/Source/ThirdParty/leveldb \
-	-I$(srcdir)/Source/ThirdParty/leveldb/include
-
-if TARGET_WIN32
-libLevelDB_la_CPPFLAGS += \
-	-DOS_WIN
-else
-libLevelDB_la_CPPFLAGS += \
-	-pthread \
-	-DOS_LINUX \
-	-DLEVELDB_PLATFORM_POSIX
-endif
-
 libWebCorePlatform_la_SOURCES = \
 	$(webcore_platform_sources)
 libWebCorePlatform_la_CXXFLAGS = \
@@ -537,12 +511,13 @@ libWebCorePlatform_la_CFLAGS = \
 libWebCorePlatform_la_CPPFLAGS = \
 	-DBUILDING_WEBKIT \
 	$(global_cppflags) \
+	$(platform_cppflags) \
+	$(platformgtk_cppflags) \
 	$(webcore_cppflags) \
 	$(webcoregtk_cppflags) \
 	$(javascriptcore_cppflags) \
 	-fno-strict-aliasing \
 	$(CAIRO_CFLAGS) \
-	$(CLUTTER_CFLAGS) \
 	$(COVERAGE_CFLAGS) \
 	$(ENCHANT_CFLAGS) \
 	$(FREETYPE_CFLAGS) \
@@ -583,12 +558,13 @@ libWebCoreGtk_la_CPPFLAGS = \
 	-DBUILDING_WebCore \
 	-DBUILDING_WEBKIT \
 	$(global_cppflags) \
+	$(platform_cppflags) \
+	$(platformgtk_cppflags) \
 	$(webcore_cppflags) \
 	$(webcoregtk_cppflags) \
 	$(javascriptcore_cppflags) \
 	-fno-strict-aliasing \
 	$(CAIRO_CFLAGS) \
-	$(CLUTTER_CFLAGS) \
 	$(COVERAGE_CFLAGS) \
 	$(ENCHANT_CFLAGS) \
 	$(FREETYPE_CFLAGS) \
@@ -610,6 +586,7 @@ libWebCoreGtk_la_CPPFLAGS = \
 	$(XT_CFLAGS)
 
 EXTRA_DIST += \
+	$(wildcard $(srcdir)/Source/WebCore/Modules/battery/*.idl) \
 	$(wildcard $(srcdir)/Source/WebCore/Modules/filesystem/*.idl) \
 	$(wildcard $(srcdir)/Source/WebCore/Modules/gamepad/*.idl) \
 	$(wildcard $(srcdir)/Source/WebCore/Modules/geolocation/*.idl) \
@@ -644,10 +621,12 @@ EXTRA_DIST += \
 	Source/WebCore/bindings/scripts/CodeGeneratorGObject.pm \
 	Source/WebCore/bindings/scripts/CodeGeneratorJS.pm \
 	Source/WebCore/bindings/scripts/CodeGenerator.pm \
+	Source/WebCore/bindings/scripts/Hasher.pm \
 	Source/WebCore/bindings/scripts/IDLAttributes.txt \
 	Source/WebCore/bindings/scripts/IDLParser.pm \
 	Source/WebCore/bindings/scripts/InFilesCompiler.pm \
 	Source/WebCore/bindings/scripts/InFilesParser.pm \
+	Source/WebCore/bindings/scripts/StaticString.pm \
 	Source/WebCore/bindings/scripts/generate-bindings.pl \
 	Source/WebCore/bindings/scripts/gobject-generate-headers.pl \
 	Source/WebCore/bindings/scripts/preprocessor.pm \
@@ -705,6 +684,7 @@ EXTRA_DIST += \
 	Source/WebCore/page/Settings.in \
 	Source/WebCore/platform/ColorData.gperf \
 	Source/WebCore/platform/text/mac/make-charset-table.pl \
+	Source/WebCore/Resources/plugIns.js \
 	Source/WebCore/svg/svgattrs.in \
 	Source/WebCore/svg/svgtags.in \
 	Source/WebCore/svg/xlinkattrs.in \

@@ -3,7 +3,7 @@
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 <title>WebKitResponsePolicyDecision</title>
-<meta name="generator" content="DocBook XSL Stylesheets V1.76.1">
+<meta name="generator" content="DocBook XSL Stylesheets V1.78.1">
 <link rel="home" href="index.html" title="WebKit2GTK+ Reference Manual">
 <link rel="up" href="ch01.html" title="Class Overview">
 <link rel="prev" href="WebKitNavigationPolicyDecision.html" title="WebKitNavigationPolicyDecision">
@@ -60,7 +60,7 @@
 <a name="WebKitResponsePolicyDecision.properties"></a><h2>Properties</h2>
 <pre class="synopsis">
   "<a class="link" href="WebKitResponsePolicyDecision.html#WebKitResponsePolicyDecision--request" title='The "request" property'>request</a>"                  <a class="link" href="WebKitURIRequest.html" title="WebKitURIRequest"><span class="type">WebKitURIRequest</span></a>*     : Read
-  "<a class="link" href="WebKitResponsePolicyDecision.html#WebKitResponsePolicyDecision--response" title='The "response" property'>response</a>"                 <a class="link" href="WebKitURIRequest.html" title="WebKitURIRequest"><span class="type">WebKitURIRequest</span></a>*     : Read
+  "<a class="link" href="WebKitResponsePolicyDecision.html#WebKitResponsePolicyDecision--response" title='The "response" property'>response</a>"                 <a class="link" href="WebKitURIResponse.html" title="WebKitURIResponse"><span class="type">WebKitURIResponse</span></a>*    : Read
 </pre>
 </div>
 <div class="refsect1">
@@ -89,8 +89,11 @@ normally.
 <p>
 Gets the value of the <a class="link" href="WebKitResponsePolicyDecision.html#WebKitResponsePolicyDecision--request" title='The "request" property'><span class="type">"request"</span></a> property.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>decision</code></em> :</span></p></td>
@@ -113,8 +116,11 @@ Gets the value of the <a class="link" href="WebKitResponsePolicyDecision.html#We
 <p>
 Gets the value of the <a class="link" href="WebKitResponsePolicyDecision.html#WebKitResponsePolicyDecision--response" title='The "response" property'><span class="type">"response"</span></a> property.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>decision</code></em> :</span></p></td>
@@ -143,7 +149,7 @@ policy decision.
 <hr>
 <div class="refsect2">
 <a name="WebKitResponsePolicyDecision--response"></a><h3>The <code class="literal">"response"</code> property</h3>
-<pre class="programlisting">  "response"                 <a class="link" href="WebKitURIRequest.html" title="WebKitURIRequest"><span class="type">WebKitURIRequest</span></a>*     : Read</pre>
+<pre class="programlisting">  "response"                 <a class="link" href="WebKitURIResponse.html" title="WebKitURIResponse"><span class="type">WebKitURIResponse</span></a>*    : Read</pre>
 <p>
 This property contains the <a class="link" href="WebKitURIResponse.html" title="WebKitURIResponse"><span class="type">WebKitURIResponse</span></a> associated with this
 policy decision.

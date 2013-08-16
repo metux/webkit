@@ -33,7 +33,6 @@
 #include "HTMLNames.h"
 #include "Logging.h"
 #include "RuntimeEnabledFeatures.h"
-#include "ScriptCallStack.h"
 #include "ScriptEventListener.h"
 
 using namespace std;
@@ -79,15 +78,17 @@ Node::InsertionNotificationRequest HTMLTrackElement::insertedInto(ContainerNode*
 
     HTMLElement::insertedInto(insertionPoint);
     HTMLMediaElement* parent = mediaElement();
-    if (insertionPoint == parent)
-        parent->didAddTrack(this);
+    if (insertionPoint == parent) {
+        ensureTrack();
+        parent->didAddTextTrack(this);
+    }
     return InsertionDone;
 }
 
 void HTMLTrackElement::removedFrom(ContainerNode* insertionPoint)
 {
     if (!parentNode() && WebCore::isMediaElement(insertionPoint))
-        toMediaElement(insertionPoint)->didRemoveTrack(this);
+        toHTMLMediaElement(insertionPoint)->didRemoveTextTrack(this);
     HTMLElement::removedFrom(insertionPoint);
 }
 
@@ -112,12 +113,7 @@ void HTMLTrackElement::parseAttribute(const QualifiedName& name, const AtomicStr
             track()->setIsDefault(!value.isNull());
     }
 
-    if (name == onloadAttr)
-        setAttributeEventListener(eventNames().loadEvent, createAttributeEventListener(this, name, value));
-    else if (name == onerrorAttr)
-        setAttributeEventListener(eventNames().errorEvent, createAttributeEventListener(this, name, value));
-    else
-        HTMLElement::parseAttribute(name, value);
+    HTMLElement::parseAttribute(name, value);
 }
 
 KURL HTMLTrackElement::src() const
@@ -178,7 +174,9 @@ LoadableTextTrack* HTMLTrackElement::ensureTrack()
         if (!TextTrack::isValidKindKeyword(kind))
             kind = TextTrack::subtitlesKeyword();
         m_track = LoadableTextTrack::create(this, kind, label(), srclang());
-    }
+    } else
+        m_track->setTrackElement(this);
+
     return m_track.get();
 }
 
@@ -358,22 +356,10 @@ HTMLMediaElement* HTMLTrackElement::mediaElement() const
 {
     Element* parent = parentElement();
     if (parent && parent->isMediaElement())
-        return static_cast<HTMLMediaElement*>(parentNode());
+        return toHTMLMediaElement(parentNode());
 
     return 0;
 }
-
-#if ENABLE(MICRODATA)
-String HTMLTrackElement::itemValueText() const
-{
-    return getURLAttribute(srcAttr);
-}
-
-void HTMLTrackElement::setItemValueText(const String& value, ExceptionCode&)
-{
-    setAttribute(srcAttr, value);
-}
-#endif
 
 }
 

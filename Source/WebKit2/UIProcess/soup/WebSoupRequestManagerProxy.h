@@ -34,10 +34,8 @@ namespace WebKit {
 class WebContext;
 class WebData;
 
-class WebSoupRequestManagerProxy : public APIObject, public WebContextSupplement, private CoreIPC::MessageReceiver {
+class WebSoupRequestManagerProxy : public TypedAPIObject<APIObject::TypeSoupRequestManager>, public WebContextSupplement, private CoreIPC::MessageReceiver {
 public:
-    static const Type APIType = TypeSoupRequestManager;
-
     static const char* supplementName();
 
     static PassRefPtr<WebSoupRequestManagerProxy> create(WebContext*);
@@ -49,6 +47,7 @@ public:
     void didHandleURIRequest(const WebData*, uint64_t contentLength, const String& mimeType, uint64_t requestID);
     void didReceiveURIRequestData(const WebData*, uint64_t requestID);
     void didReceiveURIRequest(const String& uriString, WebPageProxy*, uint64_t requestID);
+    void didFailURIRequest(const WebCore::ResourceError&, uint64_t requestID);
 
     const Vector<String>& registeredURISchemes() const { return m_registeredURISchemes; }
 
@@ -57,8 +56,6 @@ public:
 
 private:
     WebSoupRequestManagerProxy(WebContext*);
-
-    virtual Type type() const { return APIType; }
 
     // WebContextSupplement
     virtual void contextDestroyed() OVERRIDE;

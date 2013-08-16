@@ -38,7 +38,6 @@
 #include <WebCore/Settings.h>
 
 using namespace WebCore;
-using namespace std;
 
 namespace WebKit {
 
@@ -73,7 +72,6 @@ DrawingAreaImpl::DrawingAreaImpl(WebPage* webPage, const WebPageCreationParamete
 
 #if USE(COORDINATED_GRAPHICS)
     m_alwaysUseCompositing = true;
-    webPage->corePage()->settings()->setScrollingCoordinatorEnabled(true);
 #endif
 
     if (m_alwaysUseCompositing)
@@ -111,9 +109,6 @@ void DrawingAreaImpl::setNeedsDisplayInRect(const IntRect& rect)
     if (dirtyRect.isEmpty())
         return;
 
-    if (m_webPage->mainFrameHasCustomRepresentation())
-        return;
-
     m_dirtyRegion.unite(dirtyRect);
     scheduleDisplay();
 }
@@ -131,9 +126,6 @@ void DrawingAreaImpl::scroll(const IntRect& scrollRect, const IntSize& scrollDel
         m_layerTreeHost->scrollNonCompositedContents(scrollRect);
         return;
     }
-
-    if (m_webPage->mainFrameHasCustomRepresentation())
-        return;
 
     if (scrollRect.isEmpty())
         return;
@@ -177,6 +169,12 @@ void DrawingAreaImpl::scroll(const IntRect& scrollRect, const IntSize& scrollDel
 
     m_scrollRect = scrollRect;
     m_scrollOffset += scrollDelta;
+}
+
+void DrawingAreaImpl::pageBackgroundTransparencyChanged()
+{
+    if (m_layerTreeHost)
+        m_layerTreeHost->pageBackgroundTransparencyChanged();
 }
 
 void DrawingAreaImpl::setLayerTreeStateIsFrozen(bool isFrozen)
@@ -225,54 +223,34 @@ bool DrawingAreaImpl::forceRepaintAsync(uint64_t callbackID)
     return m_layerTreeHost && m_layerTreeHost->forceRepaintAsync(callbackID);
 }
 
-void DrawingAreaImpl::didInstallPageOverlay()
+void DrawingAreaImpl::didInstallPageOverlay(PageOverlay* pageOverlay)
 {
     if (m_layerTreeHost)
-        m_layerTreeHost->didInstallPageOverlay();
+        m_layerTreeHost->didInstallPageOverlay(pageOverlay);
 }
 
-void DrawingAreaImpl::didUninstallPageOverlay()
+void DrawingAreaImpl::didUninstallPageOverlay(PageOverlay* pageOverlay)
 {
     if (m_layerTreeHost)
-        m_layerTreeHost->didUninstallPageOverlay();
+        m_layerTreeHost->didUninstallPageOverlay(pageOverlay);
 
     setNeedsDisplay();
 }
 
-void DrawingAreaImpl::setPageOverlayNeedsDisplay(const IntRect& rect)
+void DrawingAreaImpl::setPageOverlayNeedsDisplay(PageOverlay* pageOverlay, const IntRect& rect)
 {
     if (m_layerTreeHost) {
-        m_layerTreeHost->setPageOverlayNeedsDisplay(rect);
+        m_layerTreeHost->setPageOverlayNeedsDisplay(pageOverlay, rect);
         return;
     }
 
     setNeedsDisplayInRect(rect);
 }
 
-void DrawingAreaImpl::setPageOverlayOpacity(float value)
+void DrawingAreaImpl::setPageOverlayOpacity(PageOverlay* pageOverlay, float value)
 {
     if (m_layerTreeHost)
-        m_layerTreeHost->setPageOverlayOpacity(value);
-}
-
-bool DrawingAreaImpl::pageOverlayShouldApplyFadeWhenPainting() const
-{
-    if (m_layerTreeHost && !m_layerTreeHost->pageOverlayShouldApplyFadeWhenPainting())
-        return false;
-
-    return true;
-}
-
-void DrawingAreaImpl::pageCustomRepresentationChanged()
-{
-    if (!m_alwaysUseCompositing)
-        return;
-
-    if (m_webPage->mainFrameHasCustomRepresentation()) {
-        if (m_layerTreeHost)
-            exitAcceleratedCompositingMode();
-    } else if (!m_layerTreeHost)
-        enterAcceleratedCompositingMode(0);
+        m_layerTreeHost->setPageOverlayOpacity(pageOverlay, value);
 }
 
 void DrawingAreaImpl::setPaintingEnabled(bool paintingEnabled)
@@ -536,7 +514,7 @@ void DrawingAreaImpl::enterAcceleratedCompositingMode(GraphicsLayer* graphicsLay
 
 void DrawingAreaImpl::exitAcceleratedCompositingMode()
 {
-    if (m_alwaysUseCompositing && !m_webPage->mainFrameHasCustomRepresentation())
+    if (m_alwaysUseCompositing)
         return;
 
     ASSERT(!m_layerTreeStateIsFrozen);
@@ -673,13 +651,6 @@ void DrawingAreaImpl::display(UpdateInfo& updateInfo)
     ASSERT(!m_layerTreeHost);
     ASSERT(!m_webPage->size().isEmpty());
 
-    // FIXME: It would be better if we could avoid painting altogether when there is a custom representation.
-    if (m_webPage->mainFrameHasCustomRepresentation()) {
-        // ASSUMPTION: the custom representation will be painting the dirty region for us.
-        m_dirtyRegion = Region();
-        return;
-    }
-
     m_webPage->layoutIfNeeded();
 
     // The layout may have put the page into accelerated compositing mode. If the LayerTreeHost is
@@ -726,8 +697,14 @@ void DrawingAreaImpl::display(UpdateInfo& updateInfo)
 
     for (size_t i = 0; i < rects.size(); ++i) {
         m_webPage->drawRect(*graphicsContext, rects[i]);
-        if (m_webPage->hasPageOverlay())
-            m_webPage->drawPageOverlay(*graphicsContext, rects[i]);
+
+        if (m_webPage->hasPageOverlay()) {
+            PageOverlayList& pageOverlays = m_webPage->pageOverlays();
+            PageOverlayList::iterator end = pageOverlays.end();
+            for (PageOverlayList::iterator it = pageOverlays.begin(); it != end; ++it)
+                m_webPage->drawPageOverlay(it->get(), *graphicsContext, rects[i]);
+        }
+
         updateInfo.updateRects.append(rects[i]);
     }
 

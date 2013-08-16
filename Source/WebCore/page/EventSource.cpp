@@ -47,6 +47,7 @@
 #include "ResourceRequest.h"
 #include "ResourceResponse.h"
 #include "ScriptCallStack.h"
+#include "ScriptController.h"
 #include "ScriptExecutionContext.h"
 #include "SecurityOrigin.h"
 #include "SerializedScriptValue.h"
@@ -59,12 +60,12 @@ namespace WebCore {
 const unsigned long long EventSource::defaultReconnectDelay = 3000;
 
 inline EventSource::EventSource(ScriptExecutionContext* context, const KURL& url, const Dictionary& eventSourceInit)
-    : ActiveDOMObject(context, this)
+    : ActiveDOMObject(context)
     , m_url(url)
     , m_withCredentials(false)
     , m_state(CONNECTING)
     , m_decoder(TextResourceDecoder::create("text/plain", "UTF-8"))
-    , m_reconnectTimer(this, &EventSource::reconnectTimerFired)
+    , m_connectTimer(this, &EventSource::connectTimerFired)
     , m_discardTrailingNewline(false)
     , m_requestInFlight(false)
     , m_reconnectDelay(defaultReconnectDelay)
@@ -88,7 +89,7 @@ PassRefPtr<EventSource> EventSource::create(ScriptExecutionContext* context, con
     // FIXME: Convert this to check the isolated world's Content Security Policy once webkit.org/b/104520 is solved.
     bool shouldBypassMainWorldContentSecurityPolicy = false;
     if (context->isDocument()) {
-        Document* document = static_cast<Document*>(context);
+        Document* document = toDocument(context);
         shouldBypassMainWorldContentSecurityPolicy = document->frame()->script()->shouldBypassMainWorldContentSecurityPolicy();
     }
     if (!shouldBypassMainWorldContentSecurityPolicy && !context->contentSecurityPolicy()->allowConnectToSource(fullURL)) {
@@ -100,7 +101,7 @@ PassRefPtr<EventSource> EventSource::create(ScriptExecutionContext* context, con
     RefPtr<EventSource> source = adoptRef(new EventSource(context, fullURL, eventSourceInit));
 
     source->setPendingActivity(source.get());
-    source->connect();
+    source->scheduleInitialConnect();
     source->suspendIfNeeded();
 
     return source.release();
@@ -154,14 +155,22 @@ void EventSource::networkRequestEnded()
         unsetPendingActivity(this);
 }
 
+void EventSource::scheduleInitialConnect()
+{
+    ASSERT(m_state == CONNECTING);
+    ASSERT(!m_requestInFlight);
+
+    m_connectTimer.startOneShot(0);
+}
+
 void EventSource::scheduleReconnect()
 {
     m_state = CONNECTING;
-    m_reconnectTimer.startOneShot(m_reconnectDelay / 1000);
+    m_connectTimer.startOneShot(m_reconnectDelay / 1000.0);
     dispatchEvent(Event::create(eventNames().errorEvent, false, false));
 }
 
-void EventSource::reconnectTimerFired(Timer<EventSource>*)
+void EventSource::connectTimerFired(Timer<EventSource>*)
 {
     connect();
 }
@@ -188,16 +197,16 @@ void EventSource::close()
         return;
     }
 
-    // Stop trying to reconnect if EventSource was explicitly closed or if ActiveDOMObject::stop() was called.
-    if (m_reconnectTimer.isActive()) {
-        m_reconnectTimer.stop();
-        unsetPendingActivity(this);
-    }
+    // Stop trying to connect/reconnect if EventSource was explicitly closed or if ActiveDOMObject::stop() was called.
+    if (m_connectTimer.isActive())
+        m_connectTimer.stop();
 
     if (m_requestInFlight)
         m_loader->cancel();
-
-    m_state = CLOSED;
+    else {
+        m_state = CLOSED;
+        unsetPendingActivity(this);
+    }
 }
 
 const AtomicString& EventSource::interfaceName() const
@@ -304,9 +313,13 @@ void EventSource::didFailRedirectCheck()
 void EventSource::abortConnectionAttempt()
 {
     ASSERT(m_state == CONNECTING);
-    ASSERT(m_requestInFlight);
 
-    m_loader->cancel();
+    if (m_requestInFlight)
+        m_loader->cancel();
+    else {
+        m_state = CLOSED;
+        unsetPendingActivity(this);
+    }
 
     ASSERT(m_state == CLOSED);
     dispatchEvent(Event::create(eventNames().errorEvent, false, false));

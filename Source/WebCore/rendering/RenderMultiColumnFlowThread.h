@@ -31,16 +31,21 @@
 
 namespace WebCore {
 
-class RenderMultiColumnFlowThread : public RenderFlowThread {
+class RenderMultiColumnFlowThread FINAL : public RenderFlowThread {
 public:
-    RenderMultiColumnFlowThread(Document*);
     ~RenderMultiColumnFlowThread();
 
+    static RenderMultiColumnFlowThread* createAnonymous(Document*);
+
 private:
+    RenderMultiColumnFlowThread();
+
     virtual const char* renderName() const OVERRIDE;
     virtual void computeLogicalHeight(LayoutUnit logicalHeight, LayoutUnit logicalTop, LogicalExtentComputedValues&) const OVERRIDE;
-    
-    virtual void layout() OVERRIDE;
+    virtual void autoGenerateRegionsToBlockOffset(LayoutUnit) OVERRIDE;
+    virtual LayoutUnit initialLogicalWidth() const OVERRIDE;
+    virtual void setPageBreak(LayoutUnit offset, LayoutUnit spaceShortage) OVERRIDE;
+    virtual void updateMinimumPageHeight(LayoutUnit offset, LayoutUnit minHeight) OVERRIDE;
 };
 
 } // namespace WebCore

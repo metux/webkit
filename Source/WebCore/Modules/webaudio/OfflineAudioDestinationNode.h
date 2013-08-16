@@ -50,7 +50,7 @@ public:
     virtual void uninitialize() OVERRIDE;
 
     // AudioDestinationNode
-    virtual void enableInput() OVERRIDE { };
+    virtual void enableInput(const String&) OVERRIDE { }
     virtual void startRendering() OVERRIDE;
 
     virtual float sampleRate()  const { return m_renderTarget->sampleRate(); }
@@ -62,7 +62,7 @@ private:
     RefPtr<AudioBuffer> m_renderTarget;
     
     // Temporary AudioBus for each render quantum.
-    OwnPtr<AudioBus> m_renderBus;
+    RefPtr<AudioBus> m_renderBus;
     
     // Rendering thread.
     volatile ThreadIdentifier m_renderThread;

@@ -3,7 +3,7 @@
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 <title>Global functions</title>
-<meta name="generator" content="DocBook XSL Stylesheets V1.76.1">
+<meta name="generator" content="DocBook XSL Stylesheets V1.78.1">
 <link rel="home" href="index.html" title="WebKitGTK+ Reference Manual">
 <link rel="up" href="ch01.html" title="Global functions">
 <link rel="prev" href="ch01.html" title="Global functions">
@@ -96,8 +96,11 @@ Note that the session features are added by WebKit on demand,
 so if you insert your own <a href="../libsoup-2.4/SoupCookieJar.html"><span class="type">SoupCookieJar</span></a> before any network
 traffic occurs, WebKit will use it instead of the default.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody><tr>
 <td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
 <td>the default <a href="../libsoup-2.4/SoupSession.html"><span class="type">SoupSession</span></a>. <span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
@@ -115,8 +118,11 @@ traffic occurs, WebKit will use it instead of the default.
 Returns the default quota for Web Database databases. By default
 this value is 5MB.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody><tr>
 <td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
 <td>the current default database quota in bytes</td>
@@ -130,12 +136,15 @@ this value is 5MB.
 <pre class="programlisting">const <a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gchar</span></a> *       webkit_get_web_database_directory_path
                                                         (<em class="parameter"><code><span class="type">void</span></code></em>);</pre>
 <p>
-Returns the current path to the directory WebKit will write Web 
+Returns the current path to the directory WebKit will write Web
 Database and Indexed Database databases. By default this path will
 be in the user data directory.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody><tr>
 <td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
 <td>the current database directory path in the filesystem encoding</td>
@@ -152,8 +161,11 @@ be in the user data directory.
 Returns the current <a class="link" href="WebKitWebPluginDatabase.html" title="WebKitWebPluginDatabase"><span class="type">WebKitWebPluginDatabase</span></a> with information about
 all the plugins WebKit knows about in this instance.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody><tr>
 <td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
 <td>the current <a class="link" href="WebKitWebPluginDatabase.html" title="WebKitWebPluginDatabase"><span class="type">WebKitWebPluginDatabase</span></a>. <span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
@@ -179,8 +191,11 @@ Removes all web databases from the current database directory path.
 <p>
 Sets the default quota for Web Database databases.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody><tr>
 <td><p><span class="term"><em class="parameter"><code>defaultQuota</code></em> :</span></p></td>
 <td>the new default database quota</td>
@@ -194,11 +209,14 @@ Sets the default quota for Web Database databases.
 <pre class="programlisting"><span class="returnvalue">void</span>                webkit_set_web_database_directory_path
                                                         (<em class="parameter"><code>const <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a> *path</code></em>);</pre>
 <p>
-Sets the current path to the directory WebKit will write Web 
+Sets the current path to the directory WebKit will write Web
 Database and Indexed Database databases.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody><tr>
 <td><p><span class="term"><em class="parameter"><code>path</code></em> :</span></p></td>
 <td>the new database directory path in the filesystem encoding</td>
@@ -214,8 +232,11 @@ Database and Indexed Database databases.
 Returns the <a class="link" href="WebKitFaviconDatabase.html" title="WebKitFaviconDatabase"><span class="type">WebKitFaviconDatabase</span></a> providing access to website
 icons.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody><tr>
 <td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
 <td>the current <a class="link" href="WebKitFaviconDatabase.html" title="WebKitFaviconDatabase"><span class="type">WebKitFaviconDatabase</span></a>. <span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
@@ -235,8 +256,11 @@ icons.
 <p>
 Returns the <a class="link" href="WebKitIconDatabase.html" title="WebKitIconDatabase"><span class="type">WebKitIconDatabase</span></a> providing access to website icons.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody><tr>
 <td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
 <td>the current <a class="link" href="WebKitIconDatabase.html" title="WebKitIconDatabase"><span class="type">WebKitIconDatabase</span></a>. <span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
@@ -249,12 +273,16 @@ Returns the <a class="link" href="WebKitIconDatabase.html" title="WebKitIconData
 <div class="refsect2">
 <a name="webkit-get-text-checker"></a><h3>webkit_get_text_checker ()</h3>
 <pre class="programlisting"><a href="../gobject/gobject-The-Base-Object-Type.html#GObject"><span class="returnvalue">GObject</span></a> *           webkit_get_text_checker             (<em class="parameter"><code><span class="type">void</span></code></em>);</pre>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody><tr>
 <td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
 <td>the <a class="link" href="WebKitSpellChecker.html" title="WebKitSpellChecker"><span class="type">WebKitSpellChecker</span></a> used by WebKit, or <a href="../glib/glib-Standard-Macros.html#NULL:CAPS"><code class="literal">NULL</code></a> if spell
-checking is not enabled</td>
+checking is not enabled. <span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
+</td>
 </tr></tbody>
 </table></div>
 <p class="since">Since 1.5.1</p>
@@ -269,8 +297,11 @@ accepts GObject since in the future we might accept objects
 implementing multiple interfaces (for example, spell checking and
 grammar checking).
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody><tr>
 <td><p><span class="term"><em class="parameter"><code>checker</code></em> :</span></p></td>
 <td>a <a class="link" href="WebKitSpellChecker.html" title="WebKitSpellChecker"><span class="type">WebKitSpellChecker</span></a> or <a href="../glib/glib-Standard-Macros.html#NULL:CAPS"><code class="literal">NULL</code></a>
@@ -289,8 +320,11 @@ Returns the path to the directory WebKit will write web application
 cache databases to. By default this path is set to
 $XDG_CACHE_HOME/webkitgtk/applications and cannot be modified.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody><tr>
 <td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
 <td>the application cache database directory path</td>
@@ -307,8 +341,11 @@ $XDG_CACHE_HOME/webkitgtk/applications and cannot be modified.
 Returns the maximum size of the cache storage.
 By default it is set to UINT_MAX i.e. no quota.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody><tr>
 <td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
 <td>the current application cache maximum storage size</td>
@@ -326,8 +363,11 @@ Sets new application cache maximum storage size.
 Changing the application cache storage size will clear the cache
 and rebuild cache storage.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody><tr>
 <td><p><span class="term"><em class="parameter"><code>size</code></em> :</span></p></td>
 <td>the new web application cache maximum storage size</td>
@@ -348,8 +388,11 @@ and rebuild cache storage.
 <p>
 Enum values used for determining the webview cache model.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><a name="WEBKIT-CACHE-MODEL-DEFAULT:CAPS"></a><span class="term"><code class="literal">WEBKIT_CACHE_MODEL_DEFAULT</code></span></p></td>
@@ -390,8 +433,11 @@ Returns the current cache model. For more information about this
 value check the documentation of the function
 <a class="link" href="webkitgtk-Global-functions.html#webkit-set-cache-model" title="webkit_set_cache_model ()"><code class="function">webkit_set_cache_model()</code></a>.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody><tr>
 <td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
 <td>the current <a class="link" href="webkitgtk-Global-functions.html#WebKitCacheModel" title="enum WebKitCacheModel"><span class="type">WebKitCacheModel</span></a>
@@ -426,8 +472,11 @@ browsing interface can reduce memory usage substantially by
 specifying WEBKIT_CACHE_MODEL_DOCUMENT_VIEWER. Default value is
 WEBKIT_CACHE_MODEL_WEB_BROWSER.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody><tr>
 <td><p><span class="term"><em class="parameter"><code>cache_model</code></em> :</span></p></td>
 <td>a <a class="link" href="webkitgtk-Global-functions.html#WebKitCacheModel" title="enum WebKitCacheModel"><span class="type">WebKitCacheModel</span></a>
@@ -484,8 +533,11 @@ WEBKIT_CACHE_MODEL_WEB_BROWSER.
 <p>
 Enum values used to denote actions of items in the default context menu.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><a name="WEBKIT-CONTEXT-MENU-ACTION-NO-ACTION:CAPS"></a><span class="term"><code class="literal">WEBKIT_CONTEXT_MENU_ACTION_NO_ACTION</code></span></p></td>
@@ -700,7 +752,7 @@ In order to inspect the default context menu, you should connect to
 <p>
 </p>
 <div class="example">
-<a name="idp5586800"></a><p class="title"><b>Example 1. Inspecting the default context menu</b></p>
+<a name="idp9938544"></a><p class="title"><b>Example 1. Inspecting the default context menu</b></p>
 <div class="example-contents">
   <table class="listing_frame" border="0" cellpadding="0" cellspacing="0">
     <tbody>
@@ -754,8 +806,50 @@ In order to inspect the default context menu, you should connect to
 47
 48
 49
-50</pre></td>
-        <td class="listing_code"><pre class="programlisting"><span class="type">static</span> gboolean context_menu_cb (WebKitWebView       *webView,
+50
+51
+52
+53
+54
+55
+56
+57
+58
+59
+60
+61
+62
+63
+64
+65
+66
+67
+68
+69
+70
+71</pre></td>
+        <td class="listing_code"><pre class="programlisting"><?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta name="syntax" content="cpp" />
+<meta name="settings" content="use_xhtml,use_css,pre_wrap,no_foldcolumn,prevent_copy=" />
+<meta name="colorscheme" content="none" />
+<style type="text/css">
+
+pre { white-space: pre-wrap; font-family: monospace; color: #000000; background-color: #ffffff; }
+body { font-family: monospace; color: #000000; background-color: #ffffff; }
+* { font-size: 1em; }
+.Comment { color: #c00000; font-weight: bold; }
+.Constant { color: #0000c0; text-decoration: underline; }
+.Statement { color: #008080; font-weight: bold; }
+.Type { color: #008000; text-decoration: underline; }
+
+</style>
+</head>
+<body>
+<pre id='vimCodeElement'>
+<span class="type">static</span> gboolean context_menu_cb (WebKitWebView       *webView,
                                  GtkWidget           *default_menu,
                                  WebKitHitTestResult *hit_test_result,
                                  gboolean             triggered_with_keyboard,
@@ -817,8 +911,11 @@ In order to inspect the default context menu, you should connect to
 Note that you can get the <a href="../gtk2/GtkAction.html"><span class="type">GtkAction</span></a> of any item in the default context menu with
 <a href="../gtk2/GtkActivatable.html#gtk-activatable-get-related-action"><code class="function">gtk_activatable_get_related_action()</code></a>.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>item</code></em> :</span></p></td>
@@ -848,8 +945,11 @@ Note that you can get the <a href="../gtk2/GtkAction.html"><span class="type">Gt
 <p>
 Flags used to represent the security policy of a URI scheme.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><a name="WEBKIT-SECURITY-POLICY-LOCAL:CAPS"></a><span class="term"><code class="literal">WEBKIT_SECURITY_POLICY_LOCAL</code></span></p></td>
@@ -901,8 +1001,11 @@ Flags used to represent the security policy of a URI scheme.
 <p>
 Set the security policy for the given URI scheme.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>scheme</code></em> :</span></p></td>
@@ -925,8 +1028,11 @@ Set the security policy for the given URI scheme.
 <p>
 Get the security policy for the given URI scheme.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>scheme</code></em> :</span></p></td>

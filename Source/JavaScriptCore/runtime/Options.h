@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011, 2012 Apple Inc. All rights reserved.
+ * Copyright (C) 2011, 2012, 2013 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -60,6 +60,33 @@ namespace JSC {
 // values after the sanity checks (for your own testing), then you're liable to
 // ensure that the new values set are sane and reasonable for your own run.
 
+class OptionRange {
+private:
+    enum RangeState { Uninitialized, InitError, Normal, Inverted };
+public:
+    OptionRange& operator= (const int& rhs)
+    { // Only needed for initialization
+        if (!rhs) {
+            m_state = Uninitialized;
+            m_rangeString = 0;
+            m_lowLimit = 0;
+            m_highLimit = 0;
+        }
+        return *this;
+    }
+
+    bool init(const char*);
+    bool isInRange(unsigned);
+    const char* rangeString() { return (m_state > InitError) ? m_rangeString : "<null>"; }
+
+private:
+    RangeState m_state;
+    const char* m_rangeString;
+    unsigned m_lowLimit;
+    unsigned m_highLimit;
+};
+
+typedef OptionRange optionRange;
 
 #define JSC_OPTIONS(v) \
     v(bool, useJIT,    true) \
@@ -74,6 +101,7 @@ namespace JSC {
     v(bool, showDisassembly, false) \
     v(bool, showDFGDisassembly, false) \
     v(bool, showAllDFGNodes, false) \
+    v(optionRange, bytecodeRangeToDFGCompile, 0) \
     v(bool, dumpBytecodeAtDFGTime, false) \
     v(bool, dumpGraphAtEachPhase, false) \
     v(bool, verboseCompilation, false) \
@@ -81,8 +109,34 @@ namespace JSC {
     v(bool, printEachOSRExit, false) \
     v(bool, validateGraph, false) \
     v(bool, validateGraphAtEachPhase, false) \
+    v(bool, verboseOSR, false) \
+    v(bool, verboseCallLink, false) \
+    v(bool, verboseCompilationQueue, false) \
+    v(bool, reportCompileTimes, false) \
+    v(bool, verboseCFA, false) \
+    \
+    v(bool, enableOSREntryInLoops, true) \
+    \
+    v(bool, useExperimentalFTL, false) \
+    v(bool, useFTLTBAA, true) \
+    v(bool, enableLLVMFastISel, false) \
+    v(bool, useLLVMSmallCodeModel, false) \
+    v(bool, ftlTrapsOnOSRExit, false) \
+    v(bool, ftlOSRExitOmitsMarshalling, false) \
+    v(bool, useLLVMOSRExitIntrinsic, false) \
+    v(bool, dumpLLVMIR, false) \
+    v(bool, llvmAlwaysFails, false) \
+    v(unsigned, llvmBackendOptimizationLevel, 2) \
+    v(unsigned, llvmOptimizationLevel, 2) \
+    v(unsigned, llvmSizeLevel, 0) \
+    \
+    v(bool, enableConcurrentJIT, true) \
+    v(unsigned, numberOfCompilerThreads, computeNumberOfWorkerThreads(2) - 1) \
     \
     v(bool, enableProfiler, false) \
+    \
+    v(bool, forceUDis86Disassembler, false) \
+    v(bool, forceLLVMDisassembler, false) \
     \
     v(unsigned, maximumOptimizationCandidateInstructionCount, 10000) \
     \
@@ -92,6 +146,9 @@ namespace JSC {
     \
     /* Depth of inline stack, so 1 = no inlining, 2 = one level, etc. */ \
     v(unsigned, maximumInliningDepth, 5) \
+    \
+    v(unsigned, maximumBinaryStringSwitchCaseLength, 50) \
+    v(unsigned, maximumBinaryStringSwitchTotalLength, 2000) \
     \
     v(int32, thresholdForJITAfterWarmUp, 100) \
     v(int32, thresholdForJITSoon, 100) \
@@ -111,7 +168,6 @@ namespace JSC {
     v(unsigned, likelyToTakeSlowCaseMinimumCount, 100) \
     v(unsigned, couldTakeSlowCaseMinimumCount, 10) \
     \
-    v(double, osrExitProminenceForFrequentExitSite, 0.3) \
     v(unsigned, osrExitCountForReoptimization, 100) \
     v(unsigned, osrExitCountForReoptimizationFromLoop, 5) \
     \
@@ -125,6 +181,7 @@ namespace JSC {
     \
     v(double, doubleVoteRatioForDoubleFormat, 2) \
     v(double, structureCheckVoteRatioForHoisting, 1) \
+    v(double, checkArrayVoteRatioForHoisting, 1) \
     \
     v(unsigned, minimumNumberOfScansBetweenRebalance, 100) \
     v(unsigned, numberOfGCMarkers, computeNumberOfGCMarkers(7)) \
@@ -180,6 +237,7 @@ private:
         unsignedType,
         doubleType,
         int32Type,
+        optionRangeType,
     };
 
     // For storing for an option value:
@@ -189,6 +247,7 @@ private:
             unsigned unsignedVal;
             double doubleVal;
             int32 int32Val;
+            OptionRange optionRangeVal;
         } u;
     };
 

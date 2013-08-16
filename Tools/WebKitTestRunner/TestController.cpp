@@ -33,6 +33,7 @@
 #include <WebKit2/WKAuthenticationDecisionListener.h>
 #include <WebKit2/WKContextPrivate.h>
 #include <WebKit2/WKCredential.h>
+#include <WebKit2/WKIconDatabase.h>
 #include <WebKit2/WKNotification.h>
 #include <WebKit2/WKNotificationManager.h>
 #include <WebKit2/WKNotificationPermissionRequest.h>
@@ -62,6 +63,12 @@
 #endif
 
 namespace WTR {
+
+const unsigned TestController::viewWidth = 800;
+const unsigned TestController::viewHeight = 600;
+
+const unsigned TestController::w3cSVGViewWidth = 480;
+const unsigned TestController::w3cSVGViewHeight = 360;
 
 // defaultLongTimeout + defaultShortTimeout should be less than 80,
 // the default timeout value of the test harness so we can detect an
@@ -105,6 +112,8 @@ TestController::TestController(int argc, const char* argv[])
     , m_isGeolocationPermissionAllowed(false)
     , m_policyDelegateEnabled(false)
     , m_policyDelegatePermissive(false)
+    , m_handlesAuthenticationChallenges(false)
+    , m_shouldBlockAllPlugins(false)
 {
     initialize(argc, argv);
     controller = this;
@@ -114,6 +123,8 @@ TestController::TestController(int argc, const char* argv[])
 
 TestController::~TestController()
 {
+    WKIconDatabaseClose(WKContextGetIconDatabase(m_context.get()));
+
     platformDestroy();
 }
 
@@ -184,7 +195,7 @@ WKPageRef TestController::createOtherPage(WKPageRef oldPage, WKURLRequestRef, WK
 {
     PlatformWebView* parentView = static_cast<PlatformWebView*>(const_cast<void*>(clientInfo));
 
-    PlatformWebView* view = new PlatformWebView(WKPageGetContext(oldPage), WKPageGetPageGroup(oldPage), parentView->options());
+    PlatformWebView* view = new PlatformWebView(WKPageGetContext(oldPage), WKPageGetPageGroup(oldPage), oldPage, parentView->options());
     WKPageRef newPage = view->page();
 
     view->resizeTo(800, 600);
@@ -234,12 +245,14 @@ WKPageRef TestController::createOtherPage(WKPageRef oldPage, WKURLRequestRef, WK
         createOtherPage,
         0, // mouseDidMoveOverElement
         0, // decidePolicyForNotificationPermissionRequest
-        0, // unavailablePluginButtonClicked
+        0, // unavailablePluginButtonClicked_deprecatedForUseWithV1
         0, // showColorPicker
         0, // hideColorPicker
-        0, // shouldInstantiatePlugin
+        0, // unavailablePluginButtonClicked
     };
     WKPageSetPageUIClient(newPage, &otherPageUIClient);
+
+    view->didInitializeClients();
 
     WKRetain(newPage);
     return newPage;
@@ -338,12 +351,13 @@ void TestController::initialize(int argc, const char* argv[])
     m_context.adopt(WKContextCreateWithInjectedBundlePath(injectedBundlePath()));
     m_geolocationProvider = adoptPtr(new GeolocationProviderMock(m_context.get()));
 
+#if PLATFORM(MAC) && __MAC_OS_X_VERSION_MIN_REQUIRED > 1080
+    WKContextSetUsesNetworkProcess(m_context.get(), true);
+    WKContextSetProcessModel(m_context.get(), kWKProcessModelMultipleSecondaryProcesses);
+#endif
+
     if (const char* dumpRenderTreeTemp = libraryPathForTesting()) {
-        WKRetainPtr<WKStringRef> dumpRenderTreeTempWK(AdoptWK, WKStringCreateWithUTF8CString(dumpRenderTreeTemp));
-        WKContextSetDatabaseDirectory(m_context.get(), dumpRenderTreeTempWK.get());
-        WKContextSetLocalStorageDirectory(m_context.get(), dumpRenderTreeTempWK.get());
-        WKContextSetDiskCacheDirectory(m_context.get(), dumpRenderTreeTempWK.get());
-        WKContextSetCookieStorageDirectory(m_context.get(), dumpRenderTreeTempWK.get());
+        String temporaryFolder = String::fromUTF8(dumpRenderTreeTemp);
 
         // WebCore::pathByAppendingComponent is not used here because of the namespace,
         // which leads us to this ugly #ifdef and file path concatenation.
@@ -352,8 +366,13 @@ void TestController::initialize(int argc, const char* argv[])
 #else
         const char separator = '/';
 #endif
-        String iconDatabaseFileTemp = String::fromUTF8(dumpRenderTreeTemp) + separator + String(ASCIILiteral("WebpageIcons.db"));
-        WKContextSetIconDatabasePath(m_context.get(), toWK(iconDatabaseFileTemp).get());
+
+        WKContextSetApplicationCacheDirectory(m_context.get(), toWK(temporaryFolder + separator + "ApplicationCache").get());
+        WKContextSetDatabaseDirectory(m_context.get(), toWK(temporaryFolder + separator + "Databases").get());
+        WKContextSetLocalStorageDirectory(m_context.get(), toWK(temporaryFolder + separator + "LocalStorage").get());
+        WKContextSetDiskCacheDirectory(m_context.get(), toWK(temporaryFolder + separator + "Cache").get());
+        WKContextSetCookieStorageDirectory(m_context.get(), toWK(temporaryFolder + separator + "Cookies").get());
+        WKContextSetIconDatabasePath(m_context.get(), toWK(temporaryFolder + separator + "IconDatabase" + separator + "WebpageIcons.db").get());
     }
 
     platformInitializeContext();
@@ -379,7 +398,7 @@ void TestController::initialize(int argc, const char* argv[])
 
 void TestController::createWebViewWithOptions(WKDictionaryRef options)
 {
-    m_mainWebView = adoptPtr(new PlatformWebView(m_context.get(), m_pageGroup.get(), options));
+    m_mainWebView = adoptPtr(new PlatformWebView(m_context.get(), m_pageGroup.get(), 0, options));
     WKPageUIClient pageUIClient = {
         kWKPageUIClientCurrentVersion,
         m_mainWebView.get(),
@@ -425,10 +444,10 @@ void TestController::createWebViewWithOptions(WKDictionaryRef options)
         createOtherPage,
         0, // mouseDidMoveOverElement
         decidePolicyForNotificationPermissionRequest, // decidePolicyForNotificationPermissionRequest
-        unavailablePluginButtonClicked,
+        0, // unavailablePluginButtonClicked_deprecatedForUseWithV1
         0, // showColorPicker
         0, // hideColorPicker
-        0, // shouldInstantiatePlugin
+        unavailablePluginButtonClicked,
     };
     WKPageSetPageUIClient(m_mainWebView->page(), &pageUIClient);
 
@@ -464,10 +483,13 @@ void TestController::createWebViewWithOptions(WKDictionaryRef options)
         0, // didNewFirstVisuallyNonEmptyLayout
         0, // willGoToBackForwardListItem
         0, // interactionOccurredWhileProcessUnresponsive
-        0, // pluginDidFail
+        0, // pluginDidFail_deprecatedForUseWithV1
         0, // didReceiveIntentForFrame
         0, // registerIntentServiceForFrame
         0, // didLayout
+        0, // pluginLoadPolicy_deprecatedForUseWithV2
+        0, // pluginDidFail
+        pluginLoadPolicy, // pluginLoadPolicy
     };
     WKPageSetPageLoaderClient(m_mainWebView->page(), &pageLoaderClient);
 
@@ -480,6 +502,8 @@ void TestController::createWebViewWithOptions(WKDictionaryRef options)
         0, // unableToImplementPolicy
     };
     WKPageSetPagePolicyClient(m_mainWebView->page(), &pagePolicyClient);
+
+    m_mainWebView->didInitializeClients();
 }
 
 void TestController::ensureViewSupportsOptions(WKDictionaryRef options)
@@ -567,6 +591,7 @@ bool TestController::resetStateToConsistentValues()
 #endif
     WKPreferencesSetScreenFontSubstitutionEnabled(preferences, true);
     WKPreferencesSetInspectorUsesWebKitUserInterface(preferences, true);
+    WKPreferencesSetAsynchronousSpellCheckingEnabled(preferences, false);
 #if !PLATFORM(MAC)
     WKTextCheckerContinuousSpellCheckingEnabledStateChanged(true);
 #endif
@@ -582,7 +607,7 @@ bool TestController::resetStateToConsistentValues()
     // EFL use a real window while other ports such as Qt don't.
     // In EFL, we need to resize the window to the original size after calls to window.resizeTo.
     WKRect rect = m_mainWebView->windowFrame();
-    m_mainWebView->setWindowFrame(WKRectMake(rect.origin.x, rect.origin.y, 800, 600));
+    m_mainWebView->setWindowFrame(WKRectMake(rect.origin.x, rect.origin.y, TestController::viewWidth, TestController::viewHeight));
 #endif
 
     // Reset notification permissions
@@ -601,6 +626,8 @@ bool TestController::resetStateToConsistentValues()
     m_handlesAuthenticationChallenges = false;
     m_authenticationUsername = String();
     m_authenticationPassword = String();
+
+    m_shouldBlockAllPlugins = false;
 
     // Reset main page back to about:blank
     m_doneResetting = false;
@@ -732,7 +759,7 @@ void TestController::runTestingServerLoop()
 void TestController::run()
 {
     if (!resetStateToConsistentValues()) {
-        m_currentInvocation->dumpWebProcessUnresponsiveness();
+        TestInvocation::dumpWebProcessUnresponsiveness("<unknown> - TestController::run - Failed to reset state to consistent values\n");
         return;
     }
 
@@ -1054,6 +1081,18 @@ void TestController::processDidCrash(WKPageRef page, const void* clientInfo)
     static_cast<TestController*>(const_cast<void*>(clientInfo))->processDidCrash();
 }
 
+WKPluginLoadPolicy TestController::pluginLoadPolicy(WKPageRef page, WKPluginLoadPolicy currentPluginLoadPolicy, WKDictionaryRef pluginInformation, WKStringRef* unavailabilityDescription, const void* clientInfo)
+{
+    return static_cast<TestController*>(const_cast<void*>(clientInfo))->pluginLoadPolicy(page, currentPluginLoadPolicy, pluginInformation, unavailabilityDescription);
+}
+
+WKPluginLoadPolicy TestController::pluginLoadPolicy(WKPageRef, WKPluginLoadPolicy currentPluginLoadPolicy, WKDictionaryRef pluginInformation, WKStringRef* unavailabilityDescription)
+{
+    if (m_shouldBlockAllPlugins)
+        return kWKPluginLoadPolicyBlocked;
+    return currentPluginLoadPolicy;
+}
+
 void TestController::didCommitLoadForFrame(WKPageRef page, WKFrameRef frame)
 {
     if (!WKFrameIsMainFrame(frame))
@@ -1181,7 +1220,7 @@ void TestController::decidePolicyForNotificationPermissionRequest(WKPageRef, WKS
     WKNotificationPermissionRequestAllow(request);
 }
 
-void TestController::unavailablePluginButtonClicked(WKPageRef, WKPluginUnavailabilityReason, WKStringRef, WKStringRef, WKStringRef, const void*)
+void TestController::unavailablePluginButtonClicked(WKPageRef, WKPluginUnavailabilityReason, WKDictionaryRef, const void*)
 {
     printf("MISSING PLUGIN BUTTON PRESSED\n");
 }

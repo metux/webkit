@@ -156,7 +156,7 @@ bool SVGAnimationElement::isSupportedAttribute(const QualifiedName& attrName)
         supportedAttributes.add(SVGNames::toAttr);
         supportedAttributes.add(SVGNames::byAttr);
     }
-    return supportedAttributes.contains<QualifiedName, SVGAttributeHashTranslator>(attrName);
+    return supportedAttributes.contains<SVGAttributeHashTranslator>(attrName);
 }
 
 void SVGAnimationElement::parseAttribute(const QualifiedName& name, const AtomicString& value)
@@ -354,7 +354,7 @@ bool SVGAnimationElement::isAccumulated() const
 bool SVGAnimationElement::isTargetAttributeCSSProperty(SVGElement* targetElement, const QualifiedName& attributeName)
 {
     ASSERT(targetElement);
-    if (!targetElement->isStyled())
+    if (!targetElement->isSVGStyledElement())
         return false;
 
     return SVGStyledElement::isAnimatableCSSProperty(attributeName);
@@ -632,14 +632,15 @@ void SVGAnimationElement::updateAnimation(float percent, unsigned repeatCount, S
     calculateAnimatedValue(effectivePercent, repeatCount, resultElement);
 }
 
-void SVGAnimationElement::computeCSSPropertyValue(SVGElement* element, CSSPropertyID id, String& value)
+void SVGAnimationElement::computeCSSPropertyValue(SVGElement* element, CSSPropertyID id, String& valueString)
 {
     ASSERT(element);
-    ASSERT(element->isStyled());
+    ASSERT(element->isSVGStyledElement());
 
     // Don't include any properties resulting from CSS Transitions/Animations or SMIL animations, as we want to retrieve the "base value".
     element->setUseOverrideComputedStyle(true);
-    value = CSSComputedStyleDeclaration::create(element)->getPropertyValue(id);
+    RefPtr<CSSValue> value = ComputedStyleExtractor(element).propertyValue(id);
+    valueString = value ? value->cssText() : String();
     element->setUseOverrideComputedStyle(false);
 }
 
@@ -653,8 +654,8 @@ void SVGAnimationElement::adjustForInheritance(SVGElement* targetElement, const 
     if (!parent || !parent->isSVGElement())
         return;
 
-    SVGElement* svgParent = static_cast<SVGElement*>(parent);
-    if (!svgParent->isStyled())
+    SVGElement* svgParent = toSVGElement(parent);
+    if (!svgParent->isSVGStyledElement())
         return;
     computeCSSPropertyValue(svgParent, cssPropertyID(attributeName.localName()), value);
 }
@@ -664,7 +665,7 @@ static bool inheritsFromProperty(SVGElement* targetElement, const QualifiedName&
     ASSERT(targetElement);
     DEFINE_STATIC_LOCAL(const AtomicString, inherit, ("inherit", AtomicString::ConstructFromLiteral));
     
-    if (value.isEmpty() || value != inherit || !targetElement->isStyled())
+    if (value.isEmpty() || value != inherit || !targetElement->isSVGStyledElement())
         return false;
     return SVGStyledElement::isAnimatableCSSProperty(attributeName);
 }

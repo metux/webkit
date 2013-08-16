@@ -33,7 +33,7 @@
 #include "RenderTheme.h"
 #include "RenderView.h"
 #include "VisiblePosition.h"
-#include "WebCoreMemoryInstrumentation.h"
+#include <wtf/StackStats.h>
 
 using namespace std;
 
@@ -93,11 +93,12 @@ void RenderReplaced::layout()
     m_overflow.clear();
     addVisualEffectOverflow();
     updateLayerTransform();
-    
+    invalidateBackgroundObscurationStatus();
+
     repainter.repaintAfterLayout();
     setNeedsLayout(false);
 }
- 
+
 void RenderReplaced::intrinsicSizeChanged()
 {
     int scaledWidth = static_cast<int>(cDefaultWidth * style()->effectiveZoom());
@@ -123,7 +124,7 @@ void RenderReplaced::paint(PaintInfo& paintInfo, const LayoutPoint& paintOffset)
 
     LayoutRect paintRect = LayoutRect(adjustedPaintOffset, size());
     if ((paintInfo.phase == PaintPhaseOutline || paintInfo.phase == PaintPhaseSelfOutline) && style()->outlineWidth())
-        paintOutline(paintInfo.context, paintRect);
+        paintOutline(paintInfo, paintRect);
     
     if (paintInfo.phase != PaintPhaseForeground && paintInfo.phase != PaintPhaseSelection && !canHaveChildren())
         return;
@@ -247,12 +248,6 @@ bool RenderReplaced::hasReplacedLogicalHeight() const
     return false;
 }
 
-static inline bool rendererHasAspectRatio(const RenderObject* renderer)
-{
-    ASSERT(renderer);
-    return renderer->isImage() || renderer->isCanvas() || renderer->isVideo();
-}
-
 void RenderReplaced::computeAspectRatioInformationForRenderBox(RenderBox* contentRenderer, FloatSize& constrainedSize, double& intrinsicRatio, bool& isPercentageIntrinsicSize) const
 {
     FloatSize intrinsicSize;
@@ -265,7 +260,7 @@ void RenderReplaced::computeAspectRatioInformationForRenderBox(RenderBox* conten
         if (!isPercentageIntrinsicSize)
             intrinsicSize.scale(style()->effectiveZoom());
 
-        if (rendererHasAspectRatio(this) && isPercentageIntrinsicSize)
+        if (hasAspectRatio() && isPercentageIntrinsicSize)
             intrinsicRatio = 1;
             
         // Update our intrinsic size to match what the content renderer has computed, so that when we
@@ -311,7 +306,7 @@ void RenderReplaced::computeIntrinsicRatioInformation(FloatSize& intrinsicSize, 
     intrinsicSize = FloatSize(intrinsicLogicalWidth(), intrinsicLogicalHeight());
 
     // Figure out if we need to compute an intrinsic ratio.
-    if (intrinsicSize.isEmpty() || !rendererHasAspectRatio(this))
+    if (intrinsicSize.isEmpty() || !hasAspectRatio())
         return;
 
     intrinsicRatio = intrinsicSize.width() / intrinsicSize.height();
@@ -320,7 +315,7 @@ void RenderReplaced::computeIntrinsicRatioInformation(FloatSize& intrinsicSize, 
 LayoutUnit RenderReplaced::computeReplacedLogicalWidth(ShouldComputePreferred shouldComputePreferred) const
 {
     if (style()->logicalWidth().isSpecified() || style()->logicalWidth().isIntrinsic())
-        return computeReplacedLogicalWidthRespectingMinMaxWidth(computeReplacedLogicalWidthUsing(MainOrPreferredSize, style()->logicalWidth()), shouldComputePreferred);
+        return computeReplacedLogicalWidthRespectingMinMaxWidth(computeReplacedLogicalWidthUsing(style()->logicalWidth()), shouldComputePreferred);
 
     RenderBox* contentRenderer = embeddedContentBox();
 
@@ -356,7 +351,7 @@ LayoutUnit RenderReplaced::computeReplacedLogicalWidth(ShouldComputePreferred sh
                 // 'margin-left' + 'border-left-width' + 'padding-left' + 'width' + 'padding-right' + 'border-right-width' + 'margin-right' = width of containing block
                 LayoutUnit logicalWidth;
                 if (RenderBlock* blockWithWidth = firstContainingBlockWithLogicalWidth(this))
-                    logicalWidth = blockWithWidth->computeReplacedLogicalWidthRespectingMinMaxWidth(blockWithWidth->computeReplacedLogicalWidthUsing(MainOrPreferredSize, blockWithWidth->style()->logicalWidth()), shouldComputePreferred);
+                    logicalWidth = blockWithWidth->computeReplacedLogicalWidthRespectingMinMaxWidth(blockWithWidth->computeReplacedLogicalWidthUsing(blockWithWidth->style()->logicalWidth()), shouldComputePreferred);
                 else
                     logicalWidth = containingBlock()->availableLogicalWidth();
 
@@ -388,7 +383,7 @@ LayoutUnit RenderReplaced::computeReplacedLogicalHeight() const
 {
     // 10.5 Content height: the 'height' property: http://www.w3.org/TR/CSS21/visudet.html#propdef-height
     if (hasReplacedLogicalHeight())
-        return computeReplacedLogicalHeightRespectingMinMaxHeight(computeReplacedLogicalHeightUsing(MainOrPreferredSize, style()->logicalHeight()));
+        return computeReplacedLogicalHeightRespectingMinMaxHeight(computeReplacedLogicalHeightUsing(style()->logicalHeight()));
 
     RenderBox* contentRenderer = embeddedContentBox();
 
@@ -570,12 +565,6 @@ LayoutRect RenderReplaced::clippedOverflowRectForRepaint(const RenderLayerModelO
     }
     computeRectForRepaint(repaintContainer, r);
     return r;
-}
-
-void RenderReplaced::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
-{
-    MemoryClassInfo info(memoryObjectInfo, this, PlatformMemoryTypes::Rendering);
-    RenderBox::reportMemoryUsage(memoryObjectInfo);
 }
 
 }

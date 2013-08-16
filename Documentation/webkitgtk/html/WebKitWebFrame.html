@@ -3,7 +3,7 @@
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 <title>WebKitWebFrame</title>
-<meta name="generator" content="DocBook XSL Stylesheets V1.76.1">
+<meta name="generator" content="DocBook XSL Stylesheets V1.78.1">
 <link rel="home" href="index.html" title="WebKitGTK+ Reference Manual">
 <link rel="up" href="ch02.html" title="Class Overview">
 <link rel="prev" href="webkitgtk-webkitwebview.html" title="WebKitWebView">
@@ -142,8 +142,48 @@ be found by using <a class="link" href="WebKitWebFrame.html#webkit-web-frame-fin
       <tr>
         <td class="listing_lines" align="right"><pre>1
 2
-3</pre></td>
-        <td class="listing_code"><pre class="programlisting"><span class="comment">/*</span><span class="comment"> Get the frame from the &lt;a class=&quot;link&quot; href=&quot;webkitgtk-webkitwebview.html#WebKitWebView&quot;&gt;WebKitWebView&lt;/a&gt; </span><span class="comment">*/</span>
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23</pre></td>
+        <td class="listing_code"><pre class="programlisting"><?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta name="syntax" content="cpp" />
+<meta name="settings" content="use_xhtml,use_css,pre_wrap,no_foldcolumn,prevent_copy=" />
+<meta name="colorscheme" content="none" />
+<style type="text/css">
+
+pre { white-space: pre-wrap; font-family: monospace; color: #000000; background-color: #ffffff; }
+body { font-family: monospace; color: #000000; background-color: #ffffff; }
+* { font-size: 1em; }
+.Comment { color: #c00000; font-weight: bold; }
+.Constant { color: #0000c0; text-decoration: underline; }
+.Special { color: #c000c0; font-weight: bold; }
+
+</style>
+</head>
+<body>
+<pre id='vimCodeElement'>
+<span class="comment">/*</span><span class="comment"> Get the frame from the &lt;a class=&quot;link&quot; href=&quot;webkitgtk-webkitwebview.html#WebKitWebView&quot;&gt;WebKitWebView&lt;/a&gt; </span><span class="comment">*/</span>
 WebKitWebFrame *frame = webkit_web_view_get_main_frame (WEBKIT_WEB_VIEW(my_view));
 g_print (<span class="number">&quot;The URI of this frame is '</span><span class="symbol">%s</span><span class="number">'&quot;</span>, webkit_web_frame_get_uri (frame));</pre></td>
       </tr>
@@ -166,8 +206,11 @@ g_print (<span class="number">&quot;The URI of this frame is '</span><span class
     WEBKIT_LOAD_FAILED
 } WebKitLoadStatus;
 </pre>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><a name="WEBKIT-LOAD-PROVISIONAL:CAPS"></a><span class="term"><code class="literal">WEBKIT_LOAD_PROVISIONAL</code></span></p></td>
@@ -232,8 +275,11 @@ hierarchy until a match is found. If no match is found in <em class="parameter">
 hierarchy, this function will search for a matching frame in other main
 frame hierarchies. Returns <a href="../glib/glib-Standard-Macros.html#NULL:CAPS"><code class="literal">NULL</code></a> if no match is found.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>frame</code></em> :</span></p></td>
@@ -259,8 +305,11 @@ frame hierarchies. Returns <a href="../glib/glib-Standard-Macros.html#NULL:CAPS"
 <p>
 Returns the committed data source.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>frame</code></em> :</span></p></td>
@@ -280,8 +329,11 @@ Returns the committed data source.
 <div class="refsect2">
 <a name="webkit-web-frame-get-dom-document"></a><h3>webkit_web_frame_get_dom_document ()</h3>
 <pre class="programlisting"><span class="returnvalue">WebKitDOMDocument</span> * webkit_web_frame_get_dom_document   (<em class="parameter"><code><a class="link" href="WebKitWebFrame.html" title="WebKitWebFrame"><span class="type">WebKitWebFrame</span></a> *frame</code></em>);</pre>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>frame</code></em> :</span></p></td>
@@ -306,8 +358,11 @@ in the <em class="parameter"><code>frame</code></em> or <a href="../glib/glib-St
 Gets the global JavaScript execution context. Use this function to bridge
 between the WebKit and JavaScriptCore APIs.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>frame</code></em> :</span></p></td>
@@ -316,7 +371,7 @@ between the WebKit and JavaScriptCore APIs.
 </tr>
 <tr>
 <td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
-<td>the global JavaScript context. <span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
+<td>the global JavaScript context <span class="type">JSGlobalContextRef</span>. <span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
 </td>
 </tr>
 </tbody>
@@ -337,8 +392,11 @@ between the WebKit and JavaScriptCore APIs.
 <p>
 Determines the current status of the load.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>frame</code></em> :</span></p></td>
@@ -360,8 +418,11 @@ Determines the current status of the load.
 <p>
 Returns the <em class="parameter"><code>frame</code></em>'s name
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>frame</code></em> :</span></p></td>
@@ -388,8 +449,11 @@ that was given to the request for the given frame, or NULL if the
 frame was not created by a load. You must unref the object when you
 are done with it.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>frame</code></em> :</span></p></td>
@@ -412,8 +476,11 @@ are done with it.
 <p>
 Returns the <em class="parameter"><code>frame</code></em>'s parent frame, or <a href="../glib/glib-Standard-Macros.html#NULL:CAPS"><code class="literal">NULL</code></a> if it has none.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>frame</code></em> :</span></p></td>
@@ -439,8 +506,11 @@ creates a provisional data source. The provisional data source will
 transition to a committed data source once any data has been received. Use
 webkit_web_frame_get_data_source to get the committed data source.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>frame</code></em> :</span></p></td>
@@ -465,8 +535,11 @@ request is not in progress. <span class="annotation">[<acronym title="Don't free
 <p>
 Returns the <em class="parameter"><code>frame</code></em>'s security origin.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>frame</code></em> :</span></p></td>
@@ -489,8 +562,11 @@ Returns the <em class="parameter"><code>frame</code></em>'s security origin.
 <p>
 Returns the <em class="parameter"><code>frame</code></em>'s document title
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>frame</code></em> :</span></p></td>
@@ -512,8 +588,11 @@ Returns the <em class="parameter"><code>frame</code></em>'s document title
 <p>
 Returns the current URI of the contents displayed by the <em class="parameter"><code>frame</code></em>
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>frame</code></em> :</span></p></td>
@@ -547,8 +626,11 @@ Returns the <a class="link" href="webkitgtk-webkitwebview.html#WebKitWebView"><s
 The <a class="link" href="webkitgtk-webkitwebview.html#WebKitWebView"><span class="type">WebKitWebView</span></a> returned manages the entire hierarchy of <a class="link" href="WebKitWebFrame.html" title="WebKitWebFrame"><span class="type">WebKitWebFrame</span></a>
 objects that contains <em class="parameter"><code>frame</code></em>.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>frame</code></em> :</span></p></td>
@@ -576,8 +658,11 @@ Request loading of an alternate content for a URL that is unreachable.
 Using this method will preserve the back-forward list. The URI passed in
 <em class="parameter"><code>base_url</code></em> has to be an absolute URI.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>frame</code></em> :</span></p></td>
@@ -614,8 +699,11 @@ Creates a provisional data source that will transition to a committed data
 source once any data has been received. Use <a class="link" href="WebKitWebFrame.html#webkit-web-frame-stop-loading" title="webkit_web_frame_stop_loading ()"><code class="function">webkit_web_frame_stop_loading()</code></a> to
 stop the load. This function is typically invoked on the main frame.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>frame</code></em> :</span></p></td>
@@ -648,8 +736,11 @@ If <em class="parameter"><code>mime_type</code></em> is <a href="../glib/glib-St
 <p>
 If <em class="parameter"><code>encoding</code></em> is <a href="../glib/glib-Standard-Macros.html#NULL:CAPS"><code class="literal">NULL</code></a>, "UTF-8" is assumed.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>frame</code></em> :</span></p></td>
@@ -686,8 +777,11 @@ If <em class="parameter"><code>encoding</code></em> is <a href="../glib/glib-Sta
 <p>
 Requests loading of the specified URI string.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>frame</code></em> :</span></p></td>
@@ -714,8 +808,11 @@ frames.</p>
 <p>
 Creates a new <a class="link" href="WebKitWebFrame.html" title="WebKitWebFrame"><span class="type">WebKitWebFrame</span></a> initialized with a controlling <a class="link" href="webkitgtk-webkitwebview.html#WebKitWebView"><span class="type">WebKitWebView</span></a>.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>web_view</code></em> :</span></p></td>
@@ -739,8 +836,11 @@ Prints the given <a class="link" href="WebKitWebFrame.html" title="WebKitWebFram
 user. If you need more control over the printing process, see
 <a class="link" href="WebKitWebFrame.html#webkit-web-frame-print-full" title="webkit_web_frame_print_full ()"><code class="function">webkit_web_frame_print_full()</code></a>.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody><tr>
 <td><p><span class="term"><em class="parameter"><code>frame</code></em> :</span></p></td>
 <td>a <a class="link" href="WebKitWebFrame.html" title="WebKitWebFrame"><span class="type">WebKitWebFrame</span></a>
@@ -762,8 +862,11 @@ and <a href="../gtk2/gtk2-High-level-Printing-API.html#GtkPrintOperationAction">
 <a href="../gtk2/gtk2-High-level-Printing-API.html#gtk-print-operation-run"><code class="function">gtk_print_operation_run()</code></a> for printing the contents of the
 <a class="link" href="WebKitWebFrame.html" title="WebKitWebFrame"><span class="type">WebKitWebFrame</span></a>.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>frame</code></em> :</span></p></td>
@@ -797,8 +900,11 @@ and <a href="../gtk2/gtk2-High-level-Printing-API.html#GtkPrintOperationAction">
 <p>
 Reloads the initial request.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody><tr>
 <td><p><span class="term"><em class="parameter"><code>frame</code></em> :</span></p></td>
 <td>a <a class="link" href="WebKitWebFrame.html" title="WebKitWebFrame"><span class="type">WebKitWebFrame</span></a>
@@ -813,8 +919,11 @@ Reloads the initial request.
 <p>
 Stops any pending loads on <em class="parameter"><code>frame</code></em>'s data source, and those of its children.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody><tr>
 <td><p><span class="term"><em class="parameter"><code>frame</code></em> :</span></p></td>
 <td>a <a class="link" href="WebKitWebFrame.html" title="WebKitWebFrame"><span class="type">WebKitWebFrame</span></a>
@@ -890,8 +999,11 @@ you know what you are doing.
                                                         <a href="../glib/glib-Basic-Types.html#gpointer"><span class="type">gpointer</span></a>        user_data)           : <a href="../gobject/gobject-Signals.html#G-SIGNAL-RUN-LAST:CAPS"><code class="literal">Run Last</code></a></pre>
 <p>
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>webkitwebframe</code></em> :</span></p></td>
@@ -913,8 +1025,11 @@ you know what you are doing.
                                                         <a href="../glib/glib-Basic-Types.html#gpointer"><span class="type">gpointer</span></a>        user_data)           : <a href="../gobject/gobject-Signals.html#G-SIGNAL-RUN-LAST:CAPS"><code class="literal">Run Last</code></a></pre>
 <p>
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>webkitwebframe</code></em> :</span></p></td>
@@ -939,8 +1054,11 @@ Invoked when insecure content is run from a secure page. This happens
 when a page loaded via HTTPS loads a stylesheet, script, image or
 iframe from an unencrypted HTTP URL.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>web_frame</code></em> :</span></p></td>
@@ -974,8 +1092,11 @@ iframe from an unencrypted HTTP URL.
 <p>
 Emitted when frame loading is done.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>web_frame</code></em> :</span></p></td>
@@ -1001,8 +1122,11 @@ Emitted when new resource data has been received. The
 since the last time this signal was emitted. This is useful to
 provide progress information about the resource load operation.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>web_frame</code></em> :</span></p></td>
@@ -1034,8 +1158,11 @@ provide progress information about the resource load operation.
 <p>
 Invoked when a resource failed to load.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>web_frame</code></em> :</span></p></td>
@@ -1066,8 +1193,11 @@ Invoked when a resource failed to load.
 <p>
 Emitted when all the data for the resource was loaded.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>web_frame</code></em> :</span></p></td>
@@ -1114,8 +1244,11 @@ The <a class="link" href="WebKitWebResource.html" title="WebKitWebResource"><spa
 the lifetime of the resource, but the contents may change
 between signal emissions.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>web_frame</code></em> :</span></p></td>
@@ -1152,8 +1285,11 @@ response, if any</td>
 <p>
 Emitted when the response is received from the server.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>web_frame</code></em> :</span></p></td>
@@ -1199,8 +1335,11 @@ You can obtain the new policies from the
 WebKitWebFrame:horizontal-scrollbar-policy and
 WebKitWebFrame:vertical-scrollbar-policy properties.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>web_view</code></em> :</span></p></td>
@@ -1233,8 +1372,11 @@ event. <a href="../glib/glib-Standard-Macros.html#FALSE:CAPS"><code class="liter
 <p>
 When a <a class="link" href="WebKitWebFrame.html" title="WebKitWebFrame"><span class="type">WebKitWebFrame</span></a> changes the document title this signal is emitted.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>frame</code></em> :</span></p></td>

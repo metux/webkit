@@ -147,6 +147,14 @@ WebInspector.ResourceTreeModel.prototype = {
     },
 
     /**
+     * @return {Array.<string>}
+     */
+    securityOrigins: function()
+    {
+        return Object.keys(this._securityOriginFrameCount);
+    },
+
+    /**
      * @param {WebInspector.ResourceTreeFrame} mainFrame
      */
     _handleMainFrameDetached: function(mainFrame)
@@ -293,6 +301,14 @@ WebInspector.ResourceTreeModel.prototype = {
     },
 
     /**
+     * @return {Array.<WebInspector.ResourceTreeFrame>}
+     */
+    frames: function() 
+    {
+        return Object.values(this._frames);
+    },
+
+    /**
      * @param {WebInspector.Event} event
      */
     _consoleMessageAdded: function(event)
@@ -423,7 +439,7 @@ WebInspector.ResourceTreeFrame = function(model, parentFrame, payload)
     this._loaderId = payload.loaderId;
     this._name = payload.name;
     this._url = payload.url;
-    this._securityOrigin = payload.securityOrigin || "";
+    this._securityOrigin = payload.securityOrigin;
     this._mimeType = payload.mimeType;
 
     /**
@@ -513,7 +529,7 @@ WebInspector.ResourceTreeFrame.prototype = {
         this._loaderId = framePayload.loaderId;
         this._name = framePayload.name;
         this._url = framePayload.url;
-        this._securityOrigin = framePayload.securityOrigin || "";
+        this._securityOrigin = framePayload.securityOrigin;
         this._mimeType = framePayload.mimeType;
 
         var mainResource = this._resourcesMap[this._url];

@@ -3,7 +3,7 @@
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 <title>WebKitWebDataSource</title>
-<meta name="generator" content="DocBook XSL Stylesheets V1.76.1">
+<meta name="generator" content="DocBook XSL Stylesheets V1.78.1">
 <link rel="home" href="index.html" title="WebKitGTK+ Reference Manual">
 <link rel="up" href="ch02.html" title="Class Overview">
 <link rel="prev" href="WebKitWebDatabase.html" title="WebKitWebDatabase">
@@ -101,8 +101,11 @@ be incomplete until the data has finished loading. Returns <a href="../glib/glib
 frame hasn't loaded any data. Use webkit_web_data_source_is_loading to test
 if data source is in the process of loading.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>data_source</code></em> :</span></p></td>
@@ -128,8 +131,11 @@ hasn't loaded any data. <span class="annotation">[<acronym title="Don't free dat
 Returns the text encoding name as set in the <a class="link" href="webkitgtk-webkitwebview.html#WebKitWebView"><span class="type">WebKitWebView</span></a>, or if not, the
 text encoding of the response.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>data_source</code></em> :</span></p></td>
@@ -155,8 +161,11 @@ content. The <a class="link" href="WebKitNetworkRequest.html" title="WebKitNetwo
 prior to the "committed" load state. See webkit_web_data_source_get_request
 for getting the "committed" request.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>data_source</code></em> :</span></p></td>
@@ -180,8 +189,11 @@ for getting the "committed" request.
 <p>
 Returns the main resource of the <em class="parameter"><code>data_source</code></em>
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>data_source</code></em> :</span></p></td>
@@ -209,8 +221,11 @@ Returns a <a class="link" href="WebKitNetworkRequest.html" title="WebKitNetworkR
 the request that was "committed", and hence, different from the request you
 get from the webkit_web_data_source_get_initial_request method.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>data_source</code></em> :</span></p></td>
@@ -237,8 +252,11 @@ attached to the frame or the frame hasn't been loaded. <span class="annotation">
 Gives you a <a href="../glib/glib-Doubly-Linked-Lists.html#GList"><span class="type">GList</span></a> of <a class="link" href="WebKitWebResource.html" title="WebKitWebResource"><span class="type">WebKitWebResource</span></a> objects that compose the
 <a class="link" href="webkitgtk-webkitwebview.html#WebKitWebView"><span class="type">WebKitWebView</span></a> to which this <a class="link" href="WebKitWebDataSource.html" title="WebKitWebDataSource"><span class="type">WebKitWebDataSource</span></a> is attached.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>data_source</code></em> :</span></p></td>
@@ -265,8 +283,11 @@ Return the unreachable URI of <em class="parameter"><code>data_source</code></em
 unreachable URL if it was created using <a class="link" href="WebKitWebFrame.html" title="WebKitWebFrame"><span class="type">WebKitWebFrame</span></a>'s
 webkit_web_frame_load_alternate_html_string method.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>data_source</code></em> :</span></p></td>
@@ -289,8 +310,11 @@ webkit_web_frame_load_alternate_html_string method.
 <p>
 Returns the <a class="link" href="WebKitWebFrame.html" title="WebKitWebFrame"><span class="type">WebKitWebFrame</span></a> that represents this data source
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>data_source</code></em> :</span></p></td>
@@ -316,8 +340,11 @@ not be freed or destroyed.  This will return <a href="../glib/glib-Standard-Macr
 <p>
 Determines whether the data source is in the process of loading its content.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>data_source</code></em> :</span></p></td>
@@ -341,8 +368,11 @@ Determines whether the data source is in the process of loading its content.
 Creates a new <a class="link" href="WebKitWebDataSource.html" title="WebKitWebDataSource"><span class="type">WebKitWebDataSource</span></a> instance. The URL of the
 <a class="link" href="WebKitWebDataSource.html" title="WebKitWebDataSource"><span class="type">WebKitWebDataSource</span></a> will be set to "about:blank".
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody><tr>
 <td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
 <td>a new <a class="link" href="WebKitWebDataSource.html" title="WebKitWebDataSource"><span class="type">WebKitWebDataSource</span></a>.</td>

@@ -22,7 +22,7 @@
 #define DISABLE_SHIMS
 #include "OpenGLShims.h"
 
-#if !PLATFORM(QT)
+#if !PLATFORM(QT) && !PLATFORM(WIN)
 #include <dlfcn.h>
 #endif
 
@@ -40,7 +40,14 @@ OpenGLFunctionTable* openGLFunctionTable()
 #if PLATFORM(QT)
 static void* getProcAddress(const char* procName)
 {
-    return reinterpret_cast<void*>(QOpenGLContext::currentContext()->getProcAddress(procName));
+    if (QOpenGLContext* context = QOpenGLContext::currentContext())
+        return reinterpret_cast<void*>(context->getProcAddress(procName));
+    return 0;
+}
+#elif PLATFORM(WIN)
+static void* getProcAddress(const char* procName)
+{
+    return GetProcAddress(GetModuleHandleA("libGLESv2"), procName);
 }
 #else
 typedef void* (*glGetProcAddressType) (const char* procName);
@@ -84,6 +91,8 @@ static void* lookupOpenGLFunctionAddress(const char* functionName, bool* success
     fullFunctionName = functionName;
     fullFunctionName.append("ANGLE");
     target = getProcAddress(fullFunctionName.utf8().data());
+    if (target)
+        return target;
 
     fullFunctionName = functionName;
     fullFunctionName.append("APPLE");
@@ -142,6 +151,8 @@ bool initializeOpenGLShims()
     ASSIGN_FUNCTION_TABLE_ENTRY(glBufferSubData, success);
     ASSIGN_FUNCTION_TABLE_ENTRY(glCheckFramebufferStatus, success);
     ASSIGN_FUNCTION_TABLE_ENTRY(glCompileShader, success);
+    ASSIGN_FUNCTION_TABLE_ENTRY(glCompressedTexImage2D, success);
+    ASSIGN_FUNCTION_TABLE_ENTRY(glCompressedTexSubImage2D, success);
     ASSIGN_FUNCTION_TABLE_ENTRY(glCreateProgram, success);
     ASSIGN_FUNCTION_TABLE_ENTRY(glCreateShader, success);
     ASSIGN_FUNCTION_TABLE_ENTRY(glDeleteBuffers, success);

@@ -29,7 +29,6 @@
 #include "GraphicsTypes3D.h"
 #include "Image.h"
 #include "IntRect.h"
-#include "KURL.h"
 #include "PlatformLayer.h"
 #include <wtf/HashMap.h>
 #include <wtf/ListHashSet.h>
@@ -39,20 +38,23 @@
 #include <wtf/RefCounted.h>
 #include <wtf/text/WTFString.h>
 
+#if USE(CA)
+#include "PlatformCALayer.h"
+#endif
+
 // FIXME: Find a better way to avoid the name confliction for NO_ERROR.
-#if ((PLATFORM(CHROMIUM) && OS(WINDOWS)) || PLATFORM(WIN) || (PLATFORM(QT) && OS(WINDOWS)))
+#if PLATFORM(WIN) || (PLATFORM(QT) && OS(WINDOWS))
 #undef NO_ERROR
 #elif PLATFORM(GTK)
 // This define is from the X11 headers, but it's used below, so we must undefine it.
 #undef VERSION
 #endif
 
-#if PLATFORM(MAC) || PLATFORM(GTK) || PLATFORM(QT) || PLATFORM(EFL) || PLATFORM(BLACKBERRY)
+#if PLATFORM(MAC) || PLATFORM(GTK) || PLATFORM(QT) || PLATFORM(EFL) || PLATFORM(BLACKBERRY) || PLATFORM(WIN)
 #include "ANGLEWebKitBridge.h"
 #endif
 
 #if PLATFORM(MAC)
-#include <OpenGL/OpenGL.h>
 #include <wtf/RetainPtr.h>
 OBJC_CLASS CALayer;
 OBJC_CLASS WebGLLayer;
@@ -60,8 +62,6 @@ OBJC_CLASS WebGLLayer;
 QT_BEGIN_NAMESPACE
 class QPainter;
 class QRect;
-class QGLWidget;
-class QGLContext;
 class QOpenGLContext;
 class QSurface;
 QT_END_NAMESPACE
@@ -70,6 +70,8 @@ typedef unsigned int GLuint;
 #endif
 
 #if PLATFORM(MAC)
+typedef struct _CGLContextObject *CGLContextObj;
+
 typedef CGLContextObj PlatformGraphicsContext3D;
 #elif PLATFORM(QT)
 typedef QOpenGLContext* PlatformGraphicsContext3D;
@@ -79,17 +81,9 @@ typedef void* PlatformGraphicsContext3D;
 typedef void* PlatformGraphicsSurface3D;
 #endif
 
-#if (PLATFORM(CHROMIUM) || PLATFORM(BLACKBERRY)) && USE(SKIA)
-class GrContext;
-#endif
-
 // These are currently the same among all implementations.
 const PlatformGraphicsContext3D NullPlatformGraphicsContext3D = 0;
 const Platform3DObject NullPlatform3DObject = 0;
-
-#if USE(CG)
-#include <CoreGraphics/CGContext.h>
-#endif
 
 namespace WebCore {
 class DrawingBuffer;
@@ -251,6 +245,7 @@ public:
         INT = 0x1404,
         UNSIGNED_INT = 0x1405,
         FLOAT = 0x1406,
+        HALF_FLOAT_OES = 0x8D61,
         FIXED = 0x140C,
         DEPTH_COMPONENT = 0x1902,
         ALPHA = 0x1906,
@@ -462,7 +457,6 @@ public:
         bool noExtensions;
         bool shareResources;
         bool preferDiscreteGPU;
-        KURL topDocumentURL;
     };
 
     enum RenderStyle {
@@ -494,43 +488,17 @@ public:
     PlatformGraphicsContext3D platformGraphicsContext3D() const { return m_contextObj; }
     Platform3DObject platformTexture() const { return m_compositorTexture; }
     CALayer* platformLayer() const { return reinterpret_cast<CALayer*>(m_webGLLayer.get()); }
-#elif PLATFORM(CHROMIUM) || PLATFORM(BLACKBERRY)
-    PlatformGraphicsContext3D platformGraphicsContext3D() const;
-    Platform3DObject platformTexture() const;
-#if USE(SKIA)
-    GrContext* grContext();
-#endif
-#if USE(ACCELERATED_COMPOSITING)
-    PlatformLayer* platformLayer() const;
-#endif
-#elif PLATFORM(QT)
-    PlatformGraphicsContext3D platformGraphicsContext3D();
-    Platform3DObject platformTexture() const;
-#if USE(ACCELERATED_COMPOSITING)
-    PlatformLayer* platformLayer() const;
-#endif
-#elif PLATFORM(GTK)
-    PlatformGraphicsContext3D platformGraphicsContext3D();
-    Platform3DObject platformTexture() const { return m_texture; }
-#if USE(ACCELERATED_COMPOSITING)
-    PlatformLayer* platformLayer() const;
-#endif
-#elif PLATFORM(EFL)
-    PlatformGraphicsContext3D platformGraphicsContext3D();
-    Platform3DObject platformTexture() const { return m_texture; }
-#if USE(ACCELERATED_COMPOSITING)
-    PlatformLayer* platformLayer() const;
-#endif
 #else
-    PlatformGraphicsContext3D platformGraphicsContext3D() const { return NullPlatformGraphicsContext3D; }
-    Platform3DObject platformTexture() const { return NullPlatform3DObject; }
-#if USE(ACCELERATED_COMPOSITING)
-    PlatformLayer* platformLayer() const { return 0; }
+    PlatformGraphicsContext3D platformGraphicsContext3D();
+    Platform3DObject platformTexture() const;
+#if USE(ACCELERATED_COMPOSITING) 
+    PlatformLayer* platformLayer() const;
 #endif
 #endif
+
     bool makeContextCurrent();
 
-#if PLATFORM(MAC) || PLATFORM(CHROMIUM) || PLATFORM(GTK) || PLATFORM(QT) || PLATFORM(EFL) || PLATFORM(BLACKBERRY)
+#if PLATFORM(MAC) || PLATFORM(GTK) || PLATFORM(QT) || PLATFORM(EFL) || PLATFORM(BLACKBERRY) || PLATFORM(WIN)
     // With multisampling on, blit from multisampleFBO to regular FBO.
     void prepareTexture();
 #endif
@@ -806,7 +774,7 @@ public:
 
     void reshape(int width, int height);
 
-#if PLATFORM(GTK) || PLATFORM(EFL)
+#if PLATFORM(GTK) || PLATFORM(EFL) || USE(CAIRO)
     void paintToCanvas(const unsigned char* imagePixels, int imageWidth, int imageHeight,
                        int canvasWidth, int canvasHeight, PlatformContextCairo* context);
 #elif PLATFORM(QT)
@@ -921,10 +889,7 @@ public:
         // needs to lock the resources or relevant data if needed and returns true upon success
         bool extractImage(bool premultiplyAlpha, bool ignoreGammaAndColorProfile);
 
-#if USE(SKIA)
-        OwnPtr<NativeImageSkia> m_nativeImage;
-        NativeImageSkia* m_skiaImage;
-#elif USE(CAIRO)
+#if USE(CAIRO)
         ImageSource* m_decoder;
         RefPtr<cairo_surface_t> m_imageSurface;
 #elif USE(CG)
@@ -934,6 +899,8 @@ public:
         OwnArrayPtr<uint8_t> m_formalizedRGBA8Data;
 #elif PLATFORM(QT)
         QImage m_qtImage;
+#elif PLATFORM(BLACKBERRY)
+        Vector<unsigned> m_imageData;
 #endif
         Image* m_image;
         ImageHtmlDomSource m_imageHtmlDomSource;
@@ -956,7 +923,7 @@ private:
     // Destination data will have no gaps between rows.
     static bool packPixels(const uint8_t* sourceData, DataFormat sourceDataFormat, unsigned width, unsigned height, unsigned sourceUnpackAlignment, unsigned destinationFormat, unsigned destinationType, AlphaOp, void* destinationData, bool flipY);
 
-#if PLATFORM(MAC) || PLATFORM(GTK) || PLATFORM(QT) || PLATFORM(EFL) || PLATFORM(BLACKBERRY)
+#if PLATFORM(MAC) || PLATFORM(GTK) || PLATFORM(QT) || PLATFORM(EFL) || PLATFORM(BLACKBERRY) || PLATFORM(WIN)
     // Take into account the user's requested context creation attributes,
     // in particular stencil and antialias, and determine which could or
     // could not be honored based on the capabilities of the OpenGL
@@ -987,6 +954,8 @@ private:
 #if PLATFORM(MAC)
     CGLContextObj m_contextObj;
     RetainPtr<WebGLLayer> m_webGLLayer;
+#elif PLATFORM(WIN) && USE(CA)
+    RefPtr<PlatformCALayer> m_webGLLayer;
 #elif PLATFORM(BLACKBERRY)
 #if USE(ACCELERATED_COMPOSITING)
     RefPtr<PlatformLayer> m_compositingLayer;
@@ -994,7 +963,7 @@ private:
     void* m_context;
 #endif
 
-#if PLATFORM(MAC) || PLATFORM(GTK) || PLATFORM(QT) || PLATFORM(EFL) || PLATFORM(BLACKBERRY)
+#if PLATFORM(MAC) || PLATFORM(GTK) || PLATFORM(QT) || PLATFORM(EFL) || PLATFORM(BLACKBERRY) || PLATFORM(WIN)
     struct SymbolInfo {
         SymbolInfo()
             : type(0)
@@ -1035,7 +1004,7 @@ private:
         {
         }
         
-        ShaderSymbolMap& symbolMap(ANGLEShaderSymbolType symbolType)
+        ShaderSymbolMap& symbolMap(enum ANGLEShaderSymbolType symbolType)
         {
             ASSERT(symbolType == SHADER_SYMBOL_TYPE_ATTRIBUTE || symbolType == SHADER_SYMBOL_TYPE_UNIFORM);
             if (symbolType == SHADER_SYMBOL_TYPE_ATTRIBUTE)
@@ -1053,10 +1022,10 @@ private:
     ANGLEWebKitBridge m_compiler;
 #endif
 
-#if PLATFORM(BLACKBERRY) || (PLATFORM(QT) && defined(QT_OPENGL_ES_2)) || ((PLATFORM(GTK) || PLATFORM(EFL)) && USE(OPENGL_ES_2))
+#if PLATFORM(BLACKBERRY) || (PLATFORM(QT) && defined(QT_OPENGL_ES_2)) || ((PLATFORM(GTK) || PLATFORM(EFL) || PLATFORM(WIN)) && USE(OPENGL_ES_2))
     friend class Extensions3DOpenGLES;
     OwnPtr<Extensions3DOpenGLES> m_extensions;
-#elif !PLATFORM(CHROMIUM)
+#else
     friend class Extensions3DOpenGL;
     OwnPtr<Extensions3DOpenGL> m_extensions;
 #endif
@@ -1081,10 +1050,19 @@ private:
     bool m_layerComposited;
     GC3Duint m_internalColorFormat;
 
-    // For tracking which FBO/texture is bound
-    GC3Duint m_boundFBO;
-    GC3Denum m_activeTexture;
-    GC3Duint m_boundTexture0;
+    struct GraphicsContext3DState {
+        GraphicsContext3DState()
+            : boundFBO(0)
+            , activeTexture(GraphicsContext3D::TEXTURE0)
+            , boundTexture0(0)
+        { }
+
+        GC3Duint boundFBO;
+        GC3Denum activeTexture;
+        GC3Duint boundTexture0;
+    };
+
+    GraphicsContext3DState m_state;
 
     // For multisampling
     GC3Duint m_multisampleFBO;

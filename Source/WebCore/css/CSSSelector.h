@@ -44,7 +44,7 @@ namespace WebCore {
         /**
          * Re-create selector text from selector's data
          */
-        String selectorText() const;
+        String selectorText(const String& = "") const;
 
         // checks if the 2 selectors (including sub selectors) agree.
         bool operator==(const CSSSelector&) const;
@@ -78,9 +78,6 @@ namespace WebCore {
             IndirectAdjacent,
             SubSelector,
             ShadowDescendant,
-#if ENABLE(SHADOW_DOM)
-            ShadowDistributed
-#endif
         };
 
         enum PseudoType {
@@ -127,6 +124,7 @@ namespace WebCore {
             PseudoNot,
             PseudoResizer,
             PseudoRoot,
+            PseudoScope,
             PseudoScrollbar,
             PseudoScrollbarBack,
             PseudoScrollbarButton,
@@ -168,9 +166,6 @@ namespace WebCore {
 #if ENABLE(IFRAME_SEAMLESS)
             PseudoSeamlessDocument,
 #endif
-#if ENABLE(SHADOW_DOM)
-            PseudoDistributed
-#endif
         };
 
         enum MarginBoxType {
@@ -200,7 +195,6 @@ namespace WebCore {
         }
 
         static PseudoType parsePseudoType(const AtomicString&);
-        static bool isCustomPseudoType(const AtomicString&);        
         static PseudoId pseudoId(PseudoType);
 
         // Selectors are kept in an array by CSSSelectorList. The next component of the selector is
@@ -210,11 +204,12 @@ namespace WebCore {
         const QualifiedName& tagQName() const;
         const AtomicString& value() const;
         const QualifiedName& attribute() const;
+        const AtomicString& attributeCanonicalLocalName() const;
         const AtomicString& argument() const { return m_hasRareData ? m_data.m_rareData->m_argument : nullAtom; }
         const CSSSelectorList* selectorList() const { return m_hasRareData ? m_data.m_rareData->m_selectorList.get() : 0; }
 
         void setValue(const AtomicString&);
-        void setAttribute(const QualifiedName&);
+        void setAttribute(const QualifiedName&, bool isCaseInsensitive);
         void setArgument(const AtomicString&);
         void setSelectorList(PassOwnPtr<CSSSelectorList>);
 
@@ -226,10 +221,6 @@ namespace WebCore {
         bool isCustomPseudoElement() const;
         bool isSiblingSelector() const;
         bool isAttributeSelector() const;
-#if ENABLE(SHADOW_DOM)
-        bool isDistributedPseudoElement() const;
-        bool isShadowDistributed() const;
-#endif
 
         Relation relation() const { return static_cast<Relation>(m_relation); }
 
@@ -273,6 +264,7 @@ namespace WebCore {
             int m_a; // Used for :nth-*
             int m_b; // Used for :nth-*
             QualifiedName m_attribute; // used for attribute selector
+            AtomicString m_attributeCanonicalLocalName;
             AtomicString m_argument; // Used for :contains, :lang and :nth-*
             OwnPtr<CSSSelectorList> m_selectorList; // Used for :-webkit-any and :not
         
@@ -294,6 +286,13 @@ inline const QualifiedName& CSSSelector::attribute() const
     ASSERT(isAttributeSelector());
     ASSERT(m_hasRareData);
     return m_data.m_rareData->m_attribute;
+}
+
+inline const AtomicString& CSSSelector::attributeCanonicalLocalName() const
+{
+    ASSERT(isAttributeSelector());
+    ASSERT(m_hasRareData);
+    return m_data.m_rareData->m_attributeCanonicalLocalName;
 }
 
 inline bool CSSSelector::matchesPseudoElement() const
@@ -342,21 +341,10 @@ inline bool CSSSelector::isAttributeSelector() const
         || m_match == CSSSelector::End;
 }
 
-#if ENABLE(SHADOW_DOM)
-inline bool CSSSelector::isDistributedPseudoElement() const
-{
-    return m_match == PseudoElement && pseudoType() == PseudoDistributed;
-}
-
-inline bool CSSSelector::isShadowDistributed() const
-{
-    return m_relation == CSSSelector::ShadowDistributed;
-}
-#endif
-
 inline void CSSSelector::setValue(const AtomicString& value)
 {
     ASSERT(m_match != Tag);
+    ASSERT(m_pseudoType == PseudoNotParsed);
     // Need to do ref counting manually for the union.
     if (m_hasRareData) {
         if (m_data.m_rareData->m_value)
@@ -369,14 +357,6 @@ inline void CSSSelector::setValue(const AtomicString& value)
         m_data.m_value->deref();
     m_data.m_value = value.impl();
     m_data.m_value->ref();
-}
-
-inline void move(PassOwnPtr<CSSSelector> from, CSSSelector* to)
-{
-    memcpy(to, from.get(), sizeof(CSSSelector));
-    // We want to free the memory (which was allocated with fastNew), but we
-    // don't want the destructor to run since it will affect the copy we've just made.
-    fastDeleteSkippingDestructor(from.leakPtr());
 }
 
 inline CSSSelector::CSSSelector()

@@ -57,14 +57,13 @@
 #include "RenderView.h"
 #include "RenderWidget.h"
 #include "RenderedPosition.h"
-#include "SecureTextInput.h"
 #include "Settings.h"
 #include "SpatialNavigation.h"
+#include "StylePropertySet.h"
 #include "TextIterator.h"
 #include "TypingCommand.h"
+#include "VisibleUnits.h"
 #include "htmlediting.h"
-#include "visible_units.h"
-#include <limits.h>
 #include <stdio.h>
 #include <wtf/text/CString.h>
 
@@ -102,7 +101,7 @@ bool DragCaretController::isContentRichlyEditable() const
 
 static inline bool shouldAlwaysUseDirectionalSelection(Frame* frame)
 {
-    return !frame || frame->editor()->behavior().shouldConsiderSelectionAsDirectional();
+    return !frame || frame->editor().behavior().shouldConsiderSelectionAsDirectional();
 }
 
 FrameSelection::FrameSelection(Frame* frame)
@@ -114,6 +113,7 @@ FrameSelection::FrameSelection(Frame* frame)
     , m_caretPaint(true)
     , m_isCaretBlinkingSuspended(false)
     , m_focused(frame && frame->page() && frame->page()->focusController()->focusedFrame() == frame)
+    , m_shouldShowBlockCursor(false)
 {
     if (shouldAlwaysUseDirectionalSelection(m_frame))
         m_selection.setIsDirectional(true);
@@ -279,7 +279,13 @@ void FrameSelection::setSelection(const VisibleSelection& newSelection, SetSelec
     if (s.base().anchorNode()) {
         Document* document = s.base().anchorNode()->document();
         if (document && document->frame() && document->frame() != m_frame && document != m_frame->document()) {
+            RefPtr<Frame> guard = document->frame();
             document->frame()->selection()->setSelection(s, options, align, granularity);
+            // It's possible that during the above set selection, this FrameSelection has been modified by
+            // selectFrameElementInParentIfFullySelected, but that the selection is no longer valid since
+            // the frame is about to be destroyed. If this is the case, clear our selection.
+            if (guard->hasOneRef() && !m_selection.isNonOrphanedCaretOrRange())
+                clear();
             return;
         }
     }
@@ -304,7 +310,7 @@ void FrameSelection::setSelection(const VisibleSelection& newSelection, SetSelec
     setCaretRectNeedsUpdate();
     
     if (!s.isNone() && !(options & DoNotSetFocus))
-        setFocusedNodeIfNeeded();
+        setFocusedElementIfNeeded();
 
     if (!(options & DoNotUpdateAppearance)) {
 #if ENABLE(TEXT_CARET)
@@ -320,19 +326,20 @@ void FrameSelection::setSelection(const VisibleSelection& newSelection, SetSelec
     m_xPosForVerticalArrowNavigation = NoXPosForVerticalArrowNavigation();
     selectFrameElementInParentIfFullySelected();
     notifyRendererOfSelectionChange(userTriggered);
-    m_frame->editor()->respondToChangedSelection(oldSelection, options);
+    m_frame->editor().respondToChangedSelection(oldSelection, options);
     if (userTriggered == UserTriggered) {
         ScrollAlignment alignment;
 
-        if (m_frame->editor()->behavior().shouldCenterAlignWhenSelectionIsRevealed())
+        if (m_frame->editor().behavior().shouldCenterAlignWhenSelectionIsRevealed())
             alignment = (align == AlignCursorOnScrollAlways) ? ScrollAlignment::alignCenterAlways : ScrollAlignment::alignCenterIfNeeded;
         else
             alignment = (align == AlignCursorOnScrollAlways) ? ScrollAlignment::alignTopAlways : ScrollAlignment::alignToEdgeIfNeeded;
 
         revealSelection(alignment, RevealExtent);
     }
-
+#if HAVE(ACCESSIBILITY)
     notifyAccessibilityForSelectionChange();
+#endif
     m_frame->document()->enqueueDocumentEvent(Event::create(eventNames().selectionchangeEvent, false, false));
 }
 
@@ -347,7 +354,7 @@ static bool removingNodeRemovesPosition(Node* node, const Position& position)
     if (!node->isElementNode())
         return false;
 
-    Element* element = static_cast<Element*>(node);
+    Element* element = toElement(node);
     return element->containsIncludingShadowDOM(position.anchorNode());
 }
 
@@ -574,6 +581,26 @@ VisiblePosition FrameSelection::endForPlatform() const
     return positionForPlatform(false);
 }
 
+VisiblePosition FrameSelection::nextWordPositionForPlatform(const VisiblePosition &originalPosition)
+{
+    VisiblePosition positionAfterCurrentWord = nextWordPosition(originalPosition);
+
+    if (m_frame && m_frame->editor().behavior().shouldSkipSpaceWhenMovingRight()) {
+        // In order to skip spaces when moving right, we advance one
+        // word further and then move one word back. Given the
+        // semantics of previousWordPosition() this will put us at the
+        // beginning of the word following.
+        VisiblePosition positionAfterSpacingAndFollowingWord = nextWordPosition(positionAfterCurrentWord);
+        if (positionAfterSpacingAndFollowingWord != positionAfterCurrentWord)
+            positionAfterCurrentWord = previousWordPosition(positionAfterSpacingAndFollowingWord);
+
+        bool movingBackwardsMovedPositionToStartOfCurrentWord = positionAfterCurrentWord == previousWordPosition(nextWordPosition(originalPosition));
+        if (movingBackwardsMovedPositionToStartOfCurrentWord)
+            positionAfterCurrentWord = positionAfterSpacingAndFollowingWord;
+    }
+    return positionAfterCurrentWord;
+}
+
 #if ENABLE(USERSELECT_ALL)
 static void adjustPositionForUserSelectAll(VisiblePosition& pos, bool isForward)
 {
@@ -600,7 +627,7 @@ VisiblePosition FrameSelection::modifyExtendingRight(TextGranularity granularity
         break;
     case WordGranularity:
         if (directionOfEnclosingBlock() == LTR)
-            pos = nextWordPosition(pos);
+            pos = nextWordPositionForPlatform(pos);
         else
             pos = previousWordPosition(pos);
         break;
@@ -634,7 +661,7 @@ VisiblePosition FrameSelection::modifyExtendingForward(TextGranularity granulari
         pos = pos.next(CannotCrossEditingBoundary);
         break;
     case WordGranularity:
-        pos = nextWordPosition(pos);
+        pos = nextWordPositionForPlatform(pos);
         break;
     case SentenceGranularity:
         pos = nextSentencePosition(pos);
@@ -685,7 +712,7 @@ VisiblePosition FrameSelection::modifyMovingRight(TextGranularity granularity)
 #if USE(ICU_UNICODE)
         // Visual word movement relies on isWordTextBreak which is not implemented in WinCE and QT.
         // https://bugs.webkit.org/show_bug.cgi?id=81136.
-        bool skipsSpaceWhenMovingRight = m_frame && m_frame->editor()->behavior().shouldSkipSpaceWhenMovingRight();
+        bool skipsSpaceWhenMovingRight = m_frame && m_frame->editor().behavior().shouldSkipSpaceWhenMovingRight();
         pos = rightWordPosition(VisiblePosition(m_selection.extent(), m_selection.affinity()), skipsSpaceWhenMovingRight);
         break;
 #endif
@@ -718,7 +745,7 @@ VisiblePosition FrameSelection::modifyMovingForward(TextGranularity granularity)
             pos = VisiblePosition(m_selection.extent(), m_selection.affinity()).next(CannotCrossEditingBoundary);
         break;
     case WordGranularity:
-        pos = nextWordPosition(VisiblePosition(m_selection.extent(), m_selection.affinity()));
+        pos = nextWordPositionForPlatform(VisiblePosition(m_selection.extent(), m_selection.affinity()));
         break;
     case SentenceGranularity:
         pos = nextSentencePosition(VisiblePosition(m_selection.extent(), m_selection.affinity()));
@@ -774,7 +801,7 @@ VisiblePosition FrameSelection::modifyExtendingLeft(TextGranularity granularity)
         if (directionOfEnclosingBlock() == LTR)
             pos = previousWordPosition(pos);
         else
-            pos = nextWordPosition(pos);
+            pos = nextWordPositionForPlatform(pos);
         break;
     case LineBoundary:
         if (directionOfEnclosingBlock() == LTR)
@@ -859,7 +886,7 @@ VisiblePosition FrameSelection::modifyMovingLeft(TextGranularity granularity)
         break;
     case WordGranularity: {
 #if USE(ICU_UNICODE)
-        bool skipsSpaceWhenMovingRight = m_frame && m_frame->editor()->behavior().shouldSkipSpaceWhenMovingRight();
+        bool skipsSpaceWhenMovingRight = m_frame && m_frame->editor().behavior().shouldSkipSpaceWhenMovingRight();
         pos = leftWordPosition(VisiblePosition(m_selection.extent(), m_selection.affinity()), skipsSpaceWhenMovingRight);
         break;
 #endif
@@ -996,7 +1023,7 @@ bool FrameSelection::modify(EAlteration alter, SelectionDirection direction, Tex
 
         if (!m_selection.isCaret()
             && (granularity == WordGranularity || granularity == ParagraphGranularity || granularity == LineGranularity)
-            && m_frame && !m_frame->editor()->behavior().shouldExtendSelectionByWordOrLineAcrossCaret()) {
+            && m_frame && !m_frame->editor().behavior().shouldExtendSelectionByWordOrLineAcrossCaret()) {
             // Don't let the selection go across the base position directly. Needed to match mac
             // behavior when, for instance, word-selecting backwards starting with the caret in
             // the middle of a word and then word-selecting forward, leaving the caret in the
@@ -1009,7 +1036,7 @@ bool FrameSelection::modify(EAlteration alter, SelectionDirection direction, Tex
 
         // Standard Mac behavior when extending to a boundary is grow the selection rather than leaving the
         // base in place and moving the extent. Matches NSTextView.
-        if (!m_frame || !m_frame->editor()->behavior().shouldAlwaysGrowSelectionWhenExtendingToBoundary() || m_selection.isCaret() || !isBoundary(granularity))
+        if (!m_frame || !m_frame->editor().behavior().shouldAlwaysGrowSelectionWhenExtendingToBoundary() || m_selection.isCaret() || !isBoundary(granularity))
             setExtent(position, userTriggered);
         else {
             TextDirection textDirection = directionOfEnclosingBlock();
@@ -1182,6 +1209,7 @@ void FrameSelection::prepareForDestruction()
         view->clearSelection();
 
     setSelection(VisibleSelection(), CloseTyping | ClearTypingStyle | DoNotUpdateAppearance);
+    m_previousCaretNode.clear();
 }
 
 void FrameSelection::setStart(const VisiblePosition &pos, EUserTriggered trigger)
@@ -1337,12 +1365,7 @@ static void repaintCaretForLocalRect(Node* node, const LayoutRect& rect)
     if (!caretPainter)
         return;
 
-    // FIXME: Need to over-paint 1 pixel to workaround some rounding problems.
-    // https://bugs.webkit.org/show_bug.cgi?id=108283
-    LayoutRect inflatedRect = rect;
-    inflatedRect.inflate(1);
-
-    caretPainter->repaintRectangle(inflatedRect);
+    caretPainter->repaintRectangle(rect);
 }
 
 bool FrameSelection::recomputeCaretRect()
@@ -1357,26 +1380,30 @@ bool FrameSelection::recomputeCaretRect()
     if (!v)
         return false;
 
+    Node* caretNode = m_selection.start().deprecatedNode();
+
     LayoutRect oldRect = localCaretRectWithoutUpdate();
     LayoutRect newRect = localCaretRect();
-    if (oldRect == newRect && !m_absCaretBoundsDirty)
+
+    if (caretNode == m_previousCaretNode && oldRect == newRect && !m_absCaretBoundsDirty)
         return false;
 
     IntRect oldAbsCaretBounds = m_absCaretBounds;
-    m_absCaretBounds = absoluteBoundsForLocalRect(m_selection.start().deprecatedNode(), localCaretRectWithoutUpdate());
+    m_absCaretBounds = absoluteBoundsForLocalRect(caretNode, localCaretRectWithoutUpdate());
     m_absCaretBoundsDirty = false;
-    
-    if (oldAbsCaretBounds == m_absCaretBounds)
+
+    if (caretNode == m_previousCaretNode && oldAbsCaretBounds == m_absCaretBounds)
         return false;
 
 #if ENABLE(TEXT_CARET)
     if (RenderView* view = m_frame->document()->renderView()) {
-        Node* node = m_selection.start().deprecatedNode();
-        if (m_previousCaretNode)
-            repaintCaretForLocalRect(m_previousCaretNode.get(), oldRect);
-        m_previousCaretNode = node;
-        if (shouldRepaintCaret(view, isContentEditable()))
-            repaintCaretForLocalRect(node, newRect);
+        bool previousOrNewCaretNodeIsContentEditable = isContentEditable() || (m_previousCaretNode && m_previousCaretNode->isContentEditable());
+        if (shouldRepaintCaret(view, previousOrNewCaretNodeIsContentEditable)) {
+            if (m_previousCaretNode)
+                repaintCaretForLocalRect(m_previousCaretNode.get(), oldRect);
+            m_previousCaretNode = caretNode;
+            repaintCaretForLocalRect(caretNode, newRect);
+        }
     }
 #endif
     return true;
@@ -1445,7 +1472,8 @@ void CaretBase::paintCaret(Node* node, GraphicsContext* context, const LayoutPoi
 
     Color caretColor = Color::black;
     ColorSpace colorSpace = ColorSpaceDeviceRGB;
-    Element* element = node->rootEditableElement();
+    Element* element = node->isElementNode() ? toElement(node) : node->parentElement();
+
     if (element && element->renderer()) {
         caretColor = element->renderer()->style()->visitedDependentColor(CSSPropertyColor);
         colorSpace = element->renderer()->style()->colorSpace();
@@ -1535,8 +1563,7 @@ bool FrameSelection::contains(const LayoutPoint& point)
     if (!document->renderer()) 
         return false;
     
-    HitTestRequest request(HitTestRequest::ReadOnly |
-                           HitTestRequest::Active);
+    HitTestRequest request(HitTestRequest::ReadOnly | HitTestRequest::Active | HitTestRequest::DisallowShadowContent);
     HitTestResult result(point);
     document->renderView()->hitTest(request, result);
     Node* innerNode = result.innerNode();
@@ -1609,8 +1636,8 @@ void FrameSelection::selectAll()
 {
     Document* document = m_frame->document();
 
-    if (document->focusedNode() && document->focusedNode()->hasTagName(selectTag)) {
-        HTMLSelectElement* selectElement = toHTMLSelectElement(document->focusedNode());
+    if (document->focusedElement() && document->focusedElement()->hasTagName(selectTag)) {
+        HTMLSelectElement* selectElement = toHTMLSelectElement(document->focusedElement());
         if (selectElement->canSelectAll()) {
             selectElement->selectAll();
             return;
@@ -1674,7 +1701,7 @@ bool FrameSelection::setSelectedRange(Range* range, EAffinity affinity, bool clo
 bool FrameSelection::isInPasswordField() const
 {
     HTMLTextFormControlElement* textControl = enclosingTextFormControl(start());
-    return textControl && textControl->hasTagName(inputTag) && static_cast<HTMLInputElement*>(textControl)->isPasswordField();
+    return textControl && isHTMLInputElement(textControl) && toHTMLInputElement(textControl)->isPasswordField();
 }
 
 void FrameSelection::focusedOrActiveStateChanged()
@@ -1698,35 +1725,17 @@ void FrameSelection::focusedOrActiveStateChanged()
     // Because StyleResolver::checkOneSelector() and
     // RenderTheme::isFocused() check if the frame is active, we have to
     // update style and theme state that depended on those.
-    if (Node* node = m_frame->document()->focusedNode()) {
-        node->setNeedsStyleRecalc();
-        if (RenderObject* renderer = node->renderer())
+    if (Element* element = m_frame->document()->focusedElement()) {
+        element->setNeedsStyleRecalc();
+        if (RenderObject* renderer = element->renderer())
             if (renderer && renderer->style()->hasAppearance())
                 renderer->theme()->stateChanged(renderer, FocusState);
     }
-
-    // Secure keyboard entry is set by the active frame.
-    if (m_frame->document()->useSecureKeyboardEntryWhenActive())
-        setUseSecureKeyboardEntry(activeAndFocused);
 }
 
 void FrameSelection::pageActivationChanged()
 {
     focusedOrActiveStateChanged();
-}
-
-void FrameSelection::updateSecureKeyboardEntryIfActive()
-{
-    if (m_frame->document() && isFocusedAndActive())
-        setUseSecureKeyboardEntry(m_frame->document()->useSecureKeyboardEntryWhenActive());
-}
-
-void FrameSelection::setUseSecureKeyboardEntry(bool enable)
-{
-    if (enable)
-        enableSecureTextInput();
-    else
-        disableSecureTextInput();
 }
 
 void FrameSelection::setFocused(bool flag)
@@ -1745,16 +1754,24 @@ bool FrameSelection::isFocusedAndActive() const
 
 inline static bool shouldStopBlinkingDueToTypingCommand(Frame* frame)
 {
-    return frame->editor()->lastEditCommand() && frame->editor()->lastEditCommand()->shouldStopCaretBlinking();
+    return frame->editor().lastEditCommand() && frame->editor().lastEditCommand()->shouldStopCaretBlinking();
 }
 
 void FrameSelection::updateAppearance()
 {
+    // Paint a block cursor instead of a caret in overtype mode unless the caret is at the end of a line (in this case
+    // the FrameSelection will paint a blinking caret as usual).
+    VisiblePosition forwardPosition;
+    if (m_shouldShowBlockCursor && m_selection.isCaret()) {
+        forwardPosition = modifyExtendingForward(CharacterGranularity);
+        m_caretPaint = forwardPosition.isNull();
+    }
+
 #if ENABLE(TEXT_CARET)
     bool caretRectChangedOrCleared = recomputeCaretRect();
 
     bool caretBrowsing = m_frame->settings() && m_frame->settings()->caretBrowsingEnabled();
-    bool shouldBlink = caretIsVisible() && isCaret() && (isContentEditable() || caretBrowsing);
+    bool shouldBlink = caretIsVisible() && isCaret() && (isContentEditable() || caretBrowsing) && forwardPosition.isNull();
 
     // If the caret moved, stop the blink timer so we can restart with a
     // black caret in the new location.
@@ -1780,7 +1797,7 @@ void FrameSelection::updateAppearance()
 
     // Construct a new VisibleSolution, since m_selection is not necessarily valid, and the following steps
     // assume a valid selection. See <https://bugs.webkit.org/show_bug.cgi?id=69563> and <rdar://problem/10232866>.
-    VisibleSelection selection(m_selection.visibleStart(), m_selection.visibleEnd());
+    VisibleSelection selection(m_selection.visibleStart(), forwardPosition.isNotNull() ? forwardPosition : m_selection.visibleEnd());
 
     if (!selection.isRange()) {
         view->clearSelection();
@@ -1862,36 +1879,36 @@ static bool isFrameElement(const Node* n)
     return widget && widget->isFrameView();
 }
 
-void FrameSelection::setFocusedNodeIfNeeded()
+void FrameSelection::setFocusedElementIfNeeded()
 {
     if (isNone() || !isFocused())
         return;
 
     bool caretBrowsing = m_frame->settings() && m_frame->settings()->caretBrowsingEnabled();
     if (caretBrowsing) {
-        if (Node* anchor = enclosingAnchorElement(base())) {
-            m_frame->page()->focusController()->setFocusedNode(anchor, m_frame);
+        if (Element* anchor = enclosingAnchorElement(base())) {
+            m_frame->page()->focusController()->setFocusedElement(anchor, m_frame);
             return;
         }
     }
 
-    if (Node* target = rootEditableElement()) {
-        // Walk up the DOM tree to search for a node to focus. 
+    if (Element* target = rootEditableElement()) {
+        // Walk up the DOM tree to search for an element to focus.
         while (target) {
             // We don't want to set focus on a subframe when selecting in a parent frame,
             // so add the !isFrameElement check here. There's probably a better way to make this
             // work in the long term, but this is the safest fix at this time.
-            if (target && target->isMouseFocusable() && !isFrameElement(target)) {
-                m_frame->page()->focusController()->setFocusedNode(target, m_frame);
+            if (target->isMouseFocusable() && !isFrameElement(target)) {
+                m_frame->page()->focusController()->setFocusedElement(target, m_frame);
                 return;
             }
-            target = target->parentOrShadowHostNode();
+            target = target->parentOrShadowHostElement();
         }
-        m_frame->document()->setFocusedNode(0);
+        m_frame->document()->setFocusedElement(0);
     }
 
     if (caretBrowsing)
-        m_frame->page()->focusController()->setFocusedNode(0, m_frame);
+        m_frame->page()->focusController()->setFocusedElement(0, m_frame);
 }
 
 void DragCaretController::paintDragCaret(Frame* frame, GraphicsContext* p, const LayoutPoint& paintOffset, const LayoutRect& clipRect) const
@@ -1907,16 +1924,16 @@ void DragCaretController::paintDragCaret(Frame* frame, GraphicsContext* p, const
 #endif
 }
 
-PassRefPtr<StylePropertySet> FrameSelection::copyTypingStyle() const
+PassRefPtr<MutableStylePropertySet> FrameSelection::copyTypingStyle() const
 {
     if (!m_typingStyle || !m_typingStyle->style())
         return 0;
-    return m_typingStyle->style()->copy();
+    return m_typingStyle->style()->mutableCopy();
 }
 
 bool FrameSelection::shouldDeleteSelection(const VisibleSelection& selection) const
 {
-    return m_frame->editor()->client()->shouldDeleteRange(selection.toNormalizedRange().get());
+    return m_frame->editor().client()->shouldDeleteRange(selection.toNormalizedRange().get());
 }
 
 FloatRect FrameSelection::bounds(bool clipToVisibleContent) const
@@ -1956,15 +1973,13 @@ static HTMLFormElement* scanForForm(Node* start)
         return 0;
     Element* element = start->isElementNode() ? toElement(start) : ElementTraversal::next(start);
     for (; element; element = ElementTraversal::next(element)) {
-        if (element->hasTagName(formTag))
-            return static_cast<HTMLFormElement*>(element);
+        if (isHTMLFormElement(element))
+            return toHTMLFormElement(element);
         if (element->isHTMLElement() && toHTMLElement(element)->isFormControlElement())
             return static_cast<HTMLFormControlElement*>(element)->form();
-        if (element->hasTagName(frameTag) || element->hasTagName(iframeTag)) {
-            Node* childDocument = static_cast<HTMLFrameElementBase*>(element)->contentDocument();
-            if (HTMLFormElement* frameResult = scanForForm(childDocument))
+        if (element->hasTagName(frameTag) || element->hasTagName(iframeTag))
+            if (HTMLFormElement* frameResult = scanForForm(toHTMLFrameElementBase(element)->contentDocument()))
                 return frameResult;
-        }
     }
     return 0;
 }
@@ -1973,15 +1988,15 @@ static HTMLFormElement* scanForForm(Node* start)
 HTMLFormElement* FrameSelection::currentForm() const
 {
     // Start looking either at the active (first responder) node, or where the selection is.
-    Node* start = m_frame->document()->focusedNode();
+    Node* start = m_frame->document()->focusedElement();
     if (!start)
         start = this->start().deprecatedNode();
 
     // Try walking up the node tree to find a form element.
     Node* node;
     for (node = start; node; node = node->parentNode()) {
-        if (node->hasTagName(formTag))
-            return static_cast<HTMLFormElement*>(node);
+        if (isHTMLFormElement(node))
+            return toHTMLFormElement(node);
         if (node->isHTMLElement() && toHTMLElement(node)->isFormControlElement())
             return static_cast<HTMLFormControlElement*>(node)->form();
     }
@@ -2035,7 +2050,7 @@ void FrameSelection::setSelectionFromNone()
 
 bool FrameSelection::shouldChangeSelection(const VisibleSelection& newSelection) const
 {
-    return m_frame->editor()->shouldChangeSelection(selection(), newSelection, newSelection.affinity(), false);
+    return m_frame->editor().shouldChangeSelection(selection(), newSelection, newSelection.affinity(), false);
 }
 
 bool FrameSelection::dispatchSelectStart()
@@ -2051,6 +2066,15 @@ inline bool FrameSelection::visualWordMovementEnabled() const
 {
     Settings* settings = m_frame ? m_frame->settings() : 0;
     return settings && settings->visualWordMovementEnabled();
+}
+
+void FrameSelection::setShouldShowBlockCursor(bool shouldShowBlockCursor)
+{
+    m_shouldShowBlockCursor = shouldShowBlockCursor;
+
+    m_frame->document()->updateLayoutIgnorePendingStylesheets();
+
+    updateAppearance();
 }
 
 #ifndef NDEBUG

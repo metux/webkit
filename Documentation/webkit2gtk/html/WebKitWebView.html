@@ -3,11 +3,11 @@
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 <title>WebKitWebView</title>
-<meta name="generator" content="DocBook XSL Stylesheets V1.76.1">
+<meta name="generator" content="DocBook XSL Stylesheets V1.78.1">
 <link rel="home" href="index.html" title="WebKit2GTK+ Reference Manual">
 <link rel="up" href="ch01.html" title="Class Overview">
 <link rel="prev" href="WebKitWebContext.html" title="WebKitWebContext">
-<link rel="next" href="WebKitBackForwardList.html" title="WebKitBackForwardList">
+<link rel="next" href="WebKitAuthenticationRequest.html" title="WebKitAuthenticationRequest">
 <meta name="generator" content="GTK-Doc V1.18.1 (XML mode)">
 <link rel="stylesheet" href="style.css" type="text/css">
 </head>
@@ -18,7 +18,7 @@
 <td><a accesskey="u" href="ch01.html"><img src="up.png" width="24" height="24" border="0" alt="Up"></a></td>
 <td><a accesskey="h" href="index.html"><img src="home.png" width="24" height="24" border="0" alt="Home"></a></td>
 <th width="100%" align="center">WebKit2GTK+ Reference Manual</th>
-<td><a accesskey="n" href="WebKitBackForwardList.html"><img src="right.png" width="24" height="24" border="0" alt="Next"></a></td>
+<td><a accesskey="n" href="WebKitAuthenticationRequest.html"><img src="right.png" width="24" height="24" border="0" alt="Next"></a></td>
 </tr>
 <tr><td colspan="5" class="shortcuts">
 <a href="#WebKitWebView.synopsis" class="shortcut">Top</a>
@@ -248,6 +248,7 @@ WebKitWebView implements
 <div class="refsect1">
 <a name="WebKitWebView.signals"></a><h2>Signals</h2>
 <pre class="synopsis">
+  "<a class="link" href="WebKitWebView.html#WebKitWebView-authenticate" title='The "authenticate" signal'>authenticate</a>"                                   : <a href="../gobject/gobject-Signals.html#G-SIGNAL-RUN-LAST:CAPS"><code class="literal">Run Last</code></a>
   "<a class="link" href="WebKitWebView.html#WebKitWebView-close" title='The "close" signal'>close</a>"                                          : <a href="../gobject/gobject-Signals.html#G-SIGNAL-RUN-LAST:CAPS"><code class="literal">Run Last</code></a>
   "<a class="link" href="WebKitWebView.html#WebKitWebView-context-menu" title='The "context-menu" signal'>context-menu</a>"                                   : <a href="../gobject/gobject-Signals.html#G-SIGNAL-RUN-LAST:CAPS"><code class="literal">Run Last</code></a>
   "<a class="link" href="WebKitWebView.html#WebKitWebView-context-menu-dismissed" title='The "context-menu-dismissed" signal'>context-menu-dismissed</a>"                         : <a href="../gobject/gobject-Signals.html#G-SIGNAL-RUN-LAST:CAPS"><code class="literal">Run Last</code></a>
@@ -306,8 +307,11 @@ to embed it in a <a href="../gtk2/GtkScrolledWindow.html"><span class="type">Gtk
 Enum values used to denote the different events that happen during a
 <a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> load operation.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><a name="WEBKIT-LOAD-STARTED:CAPS"></a><span class="term"><code class="literal">WEBKIT_LOAD_STARTED</code></span></p></td>
@@ -353,8 +357,11 @@ or there was an error during the load operation.
 Enum values used for determining the type of a policy decision during
 <a class="link" href="WebKitWebView.html#WebKitWebView-decide-policy" title='The "decide-policy" signal'><span class="type">"decide-policy"</span></a>.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><a name="WEBKIT-POLICY-DECISION-TYPE-NAVIGATION-ACTION:CAPS"></a><span class="term"><code class="literal">WEBKIT_POLICY_DECISION_TYPE_NAVIGATION_ACTION</code></span></p></td>
@@ -404,8 +411,11 @@ Enum values used for determining the type of a policy decision during
 Enum values to specify the different ways in which a <a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a>
 can save its current web page into a self-contained file.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody><tr>
 <td><p><a name="WEBKIT-SAVE-MODE-MHTML:CAPS"></a><span class="term"><code class="literal">WEBKIT_SAVE_MODE_MHTML</code></span></p></td>
 <td>Save the current page using the MHTML format.
@@ -425,8 +435,11 @@ can save its current web page into a self-contained file.
 Enum values to specify the different ways in which a <a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a>
 can display a web page.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><a name="WEBKIT-VIEW-MODE-WEB:CAPS"></a><span class="term"><code class="literal">WEBKIT_VIEW_MODE_WEB</code></span></p></td>
@@ -453,8 +466,11 @@ can display a web page.
 Enum values used to denote the different events which can trigger
 the detection of insecure content.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><a name="WEBKIT-INSECURE-CONTENT-RUN:CAPS"></a><span class="term"><code class="literal">WEBKIT_INSECURE_CONTENT_RUN</code></span></p></td>
@@ -485,8 +501,11 @@ from an untrusted source.
 Enum values used to specify options when taking a snapshot
 from a <a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a>.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><a name="WEBKIT-SNAPSHOT-OPTIONS-NONE:CAPS"></a><span class="term"><code class="literal">WEBKIT_SNAPSHOT_OPTIONS_NONE</code></span></p></td>
@@ -514,8 +533,11 @@ snapshot the highlight of the selected content.
 Enum values used to specify the region from which to get a <a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a>
 snapshot
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><a name="WEBKIT-SNAPSHOT-REGION-VISIBLE:CAPS"></a><span class="term"><code class="literal">WEBKIT_SNAPSHOT_REGION_VISIBLE</code></span></p></td>
@@ -620,8 +642,11 @@ Creates a new <a class="link" href="WebKitWebView.html" title="WebKitWebView"><s
 default <a class="link" href="WebKitWebViewGroup.html" title="WebKitWebViewGroup"><span class="type">WebKitWebViewGroup</span></a>.
 See also <a class="link" href="WebKitWebView.html#webkit-web-view-new-with-context" title="webkit_web_view_new_with_context ()"><code class="function">webkit_web_view_new_with_context()</code></a> and <a class="link" href="WebKitWebView.html#webkit-web-view-new-with-group" title="webkit_web_view_new_with_group ()"><code class="function">webkit_web_view_new_with_group()</code></a>.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody><tr>
 <td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
 <td>The newly created <a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> widget</td>
@@ -637,8 +662,11 @@ Creates a new <a class="link" href="WebKitWebView.html" title="WebKitWebView"><s
 default <a class="link" href="WebKitWebViewGroup.html" title="WebKitWebViewGroup"><span class="type">WebKitWebViewGroup</span></a>.
 See also <a class="link" href="WebKitWebView.html#webkit-web-view-new-with-group" title="webkit_web_view_new_with_group ()"><code class="function">webkit_web_view_new_with_group()</code></a>.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>context</code></em> :</span></p></td>
@@ -661,8 +689,11 @@ Creates a new <a class="link" href="WebKitWebView.html" title="WebKitWebView"><s
 The view will be part of <em class="parameter"><code>group</code></em> and it will be affected by the
 group properties like the settings.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>group</code></em> :</span></p></td>
@@ -683,8 +714,11 @@ group properties like the settings.
 <p>
 Gets the web context of <em class="parameter"><code>web_view</code></em>.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>web_view</code></em> :</span></p></td>
@@ -706,8 +740,11 @@ Gets the web context of <em class="parameter"><code>web_view</code></em>.
 <p>
 Gets the group <em class="parameter"><code>web_view</code></em> belongs to.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>web_view</code></em> :</span></p></td>
@@ -732,8 +769,11 @@ Requests loading of the specified URI string.
 You can monitor the load operation by connecting to
 <a class="link" href="WebKitWebView.html#WebKitWebView-load-changed" title='The "load-changed" signal'><span class="type">"load-changed"</span></a> signal.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>web_view</code></em> :</span></p></td>
@@ -764,8 +804,11 @@ directory than <em class="parameter"><code>base_uri</code></em> you can build a 
 it defaults to "about:blank". The mime type of the document will be "text/html".
 You can monitor the load operation by connecting to <a class="link" href="WebKitWebView.html#WebKitWebView-load-changed" title='The "load-changed" signal'><span class="type">"load-changed"</span></a> signal.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>web_view</code></em> :</span></p></td>
@@ -798,8 +841,11 @@ When this method is called from <a class="link" href="WebKitWebView.html#WebKitW
 error page, the the back-forward list is maintained appropriately.
 For everything else this method works the same way as <a class="link" href="WebKitWebView.html#webkit-web-view-load-html" title="webkit_web_view_load_html ()"><code class="function">webkit_web_view_load_html()</code></a>.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>web_view</code></em> :</span></p></td>
@@ -833,8 +879,11 @@ Load the specified <em class="parameter"><code>plain_text</code></em> string int
 document will be "text/plain". You can monitor the load
 operation by connecting to <a class="link" href="WebKitWebView.html#WebKitWebView-load-changed" title='The "load-changed" signal'><span class="type">"load-changed"</span></a> signal.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>web_view</code></em> :</span></p></td>
@@ -858,8 +907,11 @@ Requests loading of the specified <a class="link" href="WebKitURIRequest.html" t
 You can monitor the load operation by connecting to
 <a class="link" href="WebKitWebView.html#WebKitWebView-load-changed" title='The "load-changed" signal'><span class="type">"load-changed"</span></a> signal.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>web_view</code></em> :</span></p></td>
@@ -880,8 +932,11 @@ You can monitor the load operation by connecting to
 <p>
 Determines whether <em class="parameter"><code>web_view</code></em> has a previous history item.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>web_view</code></em> :</span></p></td>
@@ -905,8 +960,11 @@ Loads the previous history item.
 You can monitor the load operation by connecting to
 <a class="link" href="WebKitWebView.html#WebKitWebView-load-changed" title='The "load-changed" signal'><span class="type">"load-changed"</span></a> signal.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody><tr>
 <td><p><span class="term"><em class="parameter"><code>web_view</code></em> :</span></p></td>
 <td>a <a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a>
@@ -921,8 +979,11 @@ You can monitor the load operation by connecting to
 <p>
 Determines whether <em class="parameter"><code>web_view</code></em> has a next history item.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>web_view</code></em> :</span></p></td>
@@ -946,8 +1007,11 @@ Loads the next history item.
 You can monitor the load operation by connecting to
 <a class="link" href="WebKitWebView.html#WebKitWebView-load-changed" title='The "load-changed" signal'><span class="type">"load-changed"</span></a> signal.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody><tr>
 <td><p><span class="term"><em class="parameter"><code>web_view</code></em> :</span></p></td>
 <td>a <a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a>
@@ -964,8 +1028,11 @@ Gets the value of the <a class="link" href="WebKitWebView.html#WebKitWebView--ti
 You can connect to notify::title signal of <em class="parameter"><code>web_view</code></em> to
 be notified when the title has been received.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>web_view</code></em> :</span></p></td>
@@ -987,8 +1054,11 @@ be notified when the title has been received.
 Get the identifier of the <a class="link" href="WebKitWebPage.html" title="WebKitWebPage"><span class="type">WebKitWebPage</span></a> corresponding to
 the <a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a>
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>web_view</code></em> :</span></p></td>
@@ -1010,8 +1080,11 @@ the <a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class=
 Reloads the current contents of <em class="parameter"><code>web_view</code></em>.
 See also <a class="link" href="WebKitWebView.html#webkit-web-view-reload-bypass-cache" title="webkit_web_view_reload_bypass_cache ()"><code class="function">webkit_web_view_reload_bypass_cache()</code></a>.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody><tr>
 <td><p><span class="term"><em class="parameter"><code>web_view</code></em> :</span></p></td>
 <td>a <a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a>
@@ -1027,8 +1100,11 @@ See also <a class="link" href="WebKitWebView.html#webkit-web-view-reload-bypass-
 Reloads the current contents of <em class="parameter"><code>web_view</code></em> without
 using any cached data.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody><tr>
 <td><p><span class="term"><em class="parameter"><code>web_view</code></em> :</span></p></td>
 <td>a <a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a>
@@ -1047,8 +1123,11 @@ If there is a loading operation in progress, it will be cancelled and
 <a class="link" href="WebKitWebView.html#WebKitWebView-load-failed" title='The "load-failed" signal'><span class="type">"load-failed"</span></a> signal will be emitted with
 <a class="link" href="webkit2gtk-WebKitError.html#WEBKIT-NETWORK-ERROR-CANCELLED:CAPS"><code class="literal">WEBKIT_NETWORK_ERROR_CANCELLED</code></a> error.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody><tr>
 <td><p><span class="term"><em class="parameter"><code>web_view</code></em> :</span></p></td>
 <td>a <a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a>
@@ -1068,8 +1147,11 @@ interesting in knowing when the view is loding something but not in the
 details about the status of the load operation, for example to start a spinner
 when the view is loading a page and stop it when it finishes.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>web_view</code></em> :</span></p></td>
@@ -1094,8 +1176,11 @@ Gets the value of the <a class="link" href="WebKitWebView.html#WebKitWebView--es
 You can monitor the estimated progress of a load operation by
 connecting to the notify::estimated-load-progress signal of <em class="parameter"><code>web_view</code></em>.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>web_view</code></em> :</span></p></td>
@@ -1117,8 +1202,11 @@ load as a range from 0.0 to 1.0.</td>
 <p>
 Returns the current custom character encoding name of <em class="parameter"><code>web_view</code></em>.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>web_view</code></em> :</span></p></td>
@@ -1145,8 +1233,11 @@ META tags. Calling this method will stop any current load operation and reload t
 current page. Setting the custom character encoding to <a href="../glib/glib-Standard-Macros.html#NULL:CAPS"><code class="literal">NULL</code></a> removes the character
 encoding override.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>web_view</code></em> :</span></p></td>
@@ -1170,8 +1261,11 @@ encoding override.
 Obtains the <a class="link" href="WebKitBackForwardList.html" title="WebKitBackForwardList"><span class="type">WebKitBackForwardList</span></a> associated with the given <a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a>. The
 <a class="link" href="WebKitBackForwardList.html" title="WebKitBackForwardList"><span class="type">WebKitBackForwardList</span></a> is owned by the <a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a>.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>web_view</code></em> :</span></p></td>
@@ -1197,8 +1291,11 @@ Loads the specific history item <em class="parameter"><code>list_item</code></em
 You can monitor the load operation by connecting to
 <a class="link" href="WebKitWebView.html#WebKitWebView-load-changed" title='The "load-changed" signal'><span class="type">"load-changed"</span></a> signal.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>web_view</code></em> :</span></p></td>
@@ -1231,7 +1328,7 @@ a load operation:
 <p>
   When a new load operation starts the active URI is the requested URI:
   </p>
-<div class="itemizedlist"><ul class="itemizedlist" type="disc">
+<div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; ">
 <li class="listitem"><p>
     If the load operation was started by <a class="link" href="WebKitWebView.html#webkit-web-view-load-uri" title="webkit_web_view_load_uri ()"><code class="function">webkit_web_view_load_uri()</code></a>,
     the requested URI is the given one.
@@ -1277,8 +1374,11 @@ a load operation:
 You can monitor the active URI by connecting to the notify::uri
 signal of <em class="parameter"><code>web_view</code></em>.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>web_view</code></em> :</span></p></td>
@@ -1302,8 +1402,11 @@ Returns favicon currently associated to <em class="parameter"><code>web_view</co
 connect to notify::favicon signal of <em class="parameter"><code>web_view</code></em> to be notified when
 the favicon is available.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>web_view</code></em> :</span></p></td>
@@ -1332,8 +1435,11 @@ New settings are applied immediately on all <a class="link" href="WebKitWebView.
 in the <em class="parameter"><code>web_view</code></em> group.
 See also <a class="link" href="WebKitWebViewGroup.html#webkit-web-view-group-set-settings" title="webkit_web_view_group_set_settings ()"><code class="function">webkit_web_view_group_set_settings()</code></a>.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>web_view</code></em> :</span></p></td>
@@ -1362,8 +1468,11 @@ the settings of a <a class="link" href="WebKitWebView.html" title="WebKitWebView
 <a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a>s of the same group.
 See also <a class="link" href="WebKitWebViewGroup.html#webkit-web-view-group-get-settings" title="webkit_web_view_group_get_settings ()"><code class="function">webkit_web_view_group_get_settings()</code></a>.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>web_view</code></em> :</span></p></td>
@@ -1387,8 +1496,11 @@ See also <a class="link" href="WebKitWebViewGroup.html#webkit-web-view-group-get
 Get the <a class="link" href="WebKitWindowProperties.html" title="WebKitWindowProperties"><span class="type">WebKitWindowProperties</span></a> object containing the properties
 that the window containing <em class="parameter"><code>web_view</code></em> should have.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>web_view</code></em> :</span></p></td>
@@ -1412,8 +1524,11 @@ that the window containing <em class="parameter"><code>web_view</code></em> shou
 Set the zoom level of <em class="parameter"><code>web_view</code></em>, i.e. the factor by which the
 view contents are scaled with respect to their original size.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>web_view</code></em> :</span></p></td>
@@ -1435,8 +1550,11 @@ view contents are scaled with respect to their original size.
 Get the zoom level of <em class="parameter"><code>web_view</code></em>, i.e. the factor by which the
 view contents are scaled with respect to their original size.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>web_view</code></em> :</span></p></td>
@@ -1467,8 +1585,11 @@ Asynchronously execute the given editing command.
 When the operation is finished, <em class="parameter"><code>callback</code></em> will be called. You can then call
 <a class="link" href="WebKitWebView.html#webkit-web-view-can-execute-editing-command-finish" title="webkit_web_view_can_execute_editing_command_finish ()"><code class="function">webkit_web_view_can_execute_editing_command_finish()</code></a> to get the result of the operation.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>web_view</code></em> :</span></p></td>
@@ -1507,8 +1628,11 @@ When the operation is finished, <em class="parameter"><code>callback</code></em>
 <p>
 Finish an asynchronous operation started with <a class="link" href="WebKitWebView.html#webkit-web-view-can-execute-editing-command" title="webkit_web_view_can_execute_editing_command ()"><code class="function">webkit_web_view_can_execute_editing_command()</code></a>.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>web_view</code></em> :</span></p></td>
@@ -1543,8 +1667,11 @@ Request to execute the given <em class="parameter"><code>command</code></em> for
 <a class="link" href="WebKitWebView.html#webkit-web-view-can-execute-editing-command" title="webkit_web_view_can_execute_editing_command ()"><code class="function">webkit_web_view_can_execute_editing_command()</code></a> to check whether
 it's possible to execute the command.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>web_view</code></em> :</span></p></td>
@@ -1567,8 +1694,11 @@ it's possible to execute the command.
 Gets the <a class="link" href="WebKitFindController.html" title="WebKitFindController"><span class="type">WebKitFindController</span></a> that will allow the caller to query
 the <a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> for the text to look for.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>web_view</code></em> :</span></p></td>
@@ -1591,8 +1721,11 @@ this particular <a class="link" href="WebKitWebView.html" title="WebKitWebView">
 <p>
 Get the <a class="link" href="WebKitWebInspector.html" title="WebKitWebInspector"><span class="type">WebKitWebInspector</span></a> associated to <em class="parameter"><code>web_view</code></em>
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>web_view</code></em> :</span></p></td>
@@ -1616,8 +1749,11 @@ Get the <a class="link" href="WebKitWebInspector.html" title="WebKitWebInspector
 Get the global JavaScript context used by <em class="parameter"><code>web_view</code></em> to deserialize the
 result values of scripts executed with <a class="link" href="WebKitWebView.html#webkit-web-view-run-javascript" title="webkit_web_view_run_javascript ()"><code class="function">webkit_web_view_run_javascript()</code></a>.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>web_view</code></em> :</span></p></td>
@@ -1641,14 +1777,18 @@ the result values of scripts.</td>
                                                          <em class="parameter"><code><a href="../gio/GAsyncResult.html#GAsyncReadyCallback"><span class="type">GAsyncReadyCallback</span></a> callback</code></em>,
                                                          <em class="parameter"><code><a href="../glib/glib-Basic-Types.html#gpointer"><span class="type">gpointer</span></a> user_data</code></em>);</pre>
 <p>
-Asynchronously run <em class="parameter"><code>script</code></em> in the context of the current page in <em class="parameter"><code>web_view</code></em>.
+Asynchronously run <em class="parameter"><code>script</code></em> in the context of the current page in <em class="parameter"><code>web_view</code></em>. If
+WebKitWebSettings:enable-javascript is FALSE, this method will do nothing.
 </p>
 <p>
 When the operation is finished, <em class="parameter"><code>callback</code></em> will be called. You can then call
 <a class="link" href="WebKitWebView.html#webkit-web-view-run-javascript-finish" title="webkit_web_view_run_javascript_finish ()"><code class="function">webkit_web_view_run_javascript_finish()</code></a> to get the result of the operation.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>web_view</code></em> :</span></p></td>
@@ -1743,8 +1883,50 @@ a string:
 44
 45
 46
-47</pre></td>
-        <td class="listing_code"><pre class="programlisting"><span class="type">static</span> <span class="type">void</span>
+47
+48
+49
+50
+51
+52
+53
+54
+55
+56
+57
+58
+59
+60
+61
+62
+63
+64
+65
+66
+67
+68</pre></td>
+        <td class="listing_code"><pre class="programlisting"><?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta name="syntax" content="cpp" />
+<meta name="settings" content="use_xhtml,use_css,pre_wrap,no_foldcolumn,prevent_copy=" />
+<meta name="colorscheme" content="none" />
+<style type="text/css">
+
+pre { white-space: pre-wrap; font-family: monospace; color: #000000; background-color: #ffffff; }
+body { font-family: monospace; color: #000000; background-color: #ffffff; }
+* { font-size: 1em; }
+.Constant { color: #0000c0; text-decoration: underline; }
+.Special { color: #c000c0; font-weight: bold; }
+.Statement { color: #008080; font-weight: bold; }
+.Type { color: #008000; text-decoration: underline; }
+
+</style>
+</head>
+<body>
+<pre id='vimCodeElement'>
+<span class="type">static</span> <span class="type">void</span>
 web_view_javascript_finished (GObject      *object,
                               GAsyncResult *result,
                               gpointer      user_data)
@@ -1798,8 +1980,11 @@ web_view_get_link_url (WebKitWebView *web_view,
 
 <p>
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>web_view</code></em> :</span></p></td>
@@ -1842,8 +2027,11 @@ When the operation is finished, <em class="parameter"><code>callback</code></em>
 then call <a class="link" href="WebKitWebView.html#webkit-web-view-run-javascript-from-gresource-finish" title="webkit_web_view_run_javascript_from_gresource_finish ()"><code class="function">webkit_web_view_run_javascript_from_gresource_finish()</code></a> to get the result
 of the operation.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>web_view</code></em> :</span></p></td>
@@ -1885,8 +2073,11 @@ Finish an asynchronous operation started with <a class="link" href="WebKitWebVie
 <p>
 Check <a class="link" href="WebKitWebView.html#webkit-web-view-run-javascript-finish" title="webkit_web_view_run_javascript_finish ()"><code class="function">webkit_web_view_run_javascript_finish()</code></a> for a usage example.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>web_view</code></em> :</span></p></td>
@@ -1919,8 +2110,11 @@ or <a href="../glib/glib-Standard-Macros.html#NULL:CAPS"><code class="literal">N
 <p>
 Whether or not a MIME type can be displayed in <em class="parameter"><code>web_view</code></em>.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>web_view</code></em> :</span></p></td>
@@ -1957,8 +2151,11 @@ When the operation is finished, <em class="parameter"><code>callback</code></em>
 then call <a class="link" href="WebKitWebView.html#webkit-web-view-save-finish" title="webkit_web_view_save_finish ()"><code class="function">webkit_web_view_save_finish()</code></a> to get the result of the
 operation.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>web_view</code></em> :</span></p></td>
@@ -1996,8 +2193,11 @@ operation.
 <p>
 Finish an asynchronous operation started with <a class="link" href="WebKitWebView.html#webkit-web-view-save" title="webkit_web_view_save ()"><code class="function">webkit_web_view_save()</code></a>.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>web_view</code></em> :</span></p></td>
@@ -2041,8 +2241,11 @@ When the operation is finished, <em class="parameter"><code>callback</code></em>
 then call <a class="link" href="WebKitWebView.html#webkit-web-view-save-to-file-finish" title="webkit_web_view_save_to_file_finish ()"><code class="function">webkit_web_view_save_to_file_finish()</code></a> to get the result of the
 operation.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>web_view</code></em> :</span></p></td>
@@ -2084,8 +2287,11 @@ operation.
 <p>
 Finish an asynchronous operation started with <a class="link" href="WebKitWebView.html#webkit-web-view-save-to-file" title="webkit_web_view_save_to_file ()"><code class="function">webkit_web_view_save_to_file()</code></a>.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>web_view</code></em> :</span></p></td>
@@ -2117,8 +2323,11 @@ Finish an asynchronous operation started with <a class="link" href="WebKitWebVie
 <p>
 Requests downloading of the specified URI string for <em class="parameter"><code>web_view</code></em>.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>web_view</code></em> :</span></p></td>
@@ -2148,8 +2357,11 @@ Set the view mode of <em class="parameter"><code>web_view</code></em> to <em cla
 before loading new contents on <em class="parameter"><code>web_view</code></em> so that the new <a class="link" href="WebKitWebView.html#WebKitViewMode" title="enum WebKitViewMode"><span class="type">WebKitViewMode</span></a> will
 be applied to the new contents.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>web_view</code></em> :</span></p></td>
@@ -2171,8 +2383,11 @@ be applied to the new contents.
 <p>
 Get the view mode of <em class="parameter"><code>web_view</code></em>.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>web_view</code></em> :</span></p></td>
@@ -2201,8 +2416,11 @@ This function should be called after a response has been received from the
 server, so you can connect to <a class="link" href="WebKitWebView.html#WebKitWebView-load-changed" title='The "load-changed" signal'><span class="type">"load-changed"</span></a> and call this function
 when it's emitted with <a class="link" href="WebKitWebView.html#WEBKIT-LOAD-COMMITTED:CAPS"><code class="literal">WEBKIT_LOAD_COMMITTED</code></a> event.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>web_view</code></em> :</span></p></td>
@@ -2246,8 +2464,11 @@ When the operation is finished, <em class="parameter"><code>callback</code></em>
 call <a class="link" href="WebKitWebView.html#webkit-web-view-get-snapshot-finish" title="webkit_web_view_get_snapshot_finish ()"><code class="function">webkit_web_view_get_snapshot_finish()</code></a> to get the result of the
 operation.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>web_view</code></em> :</span></p></td>
@@ -2290,8 +2511,11 @@ operation.
 <p>
 Finishes an asynchronous operation started with <a class="link" href="WebKitWebView.html#webkit-web-view-get-snapshot" title="webkit_web_view_get_snapshot ()"><code class="function">webkit_web_view_get_snapshot()</code></a>.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>web_view</code></em> :</span></p></td>
@@ -2330,8 +2554,11 @@ Finishes an asynchronous operation started with <a class="link" href="WebKitWebV
 Atomically increments the reference count of <em class="parameter"><code>js_result</code></em> by one. This
 function is MT-safe and may be called from any thread.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>js_result</code></em> :</span></p></td>
@@ -2356,8 +2583,11 @@ reference count drops to 0, all memory allocated by the <a class="link" href="We
 released. This function is MT-safe and may be called from any
 thread.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody><tr>
 <td><p><span class="term"><em class="parameter"><code>js_result</code></em> :</span></p></td>
 <td>a <a class="link" href="WebKitWebView.html#WebKitJavascriptResult"><span class="type">WebKitJavascriptResult</span></a>
@@ -2374,8 +2604,11 @@ thread.
 Get the global Javascript context that should be used with the
 <code class="function">JSValueRef</code> returned by <a class="link" href="WebKitWebView.html#webkit-javascript-result-get-value" title="webkit_javascript_result_get_value ()"><code class="function">webkit_javascript_result_get_value()</code></a>.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>js_result</code></em> :</span></p></td>
@@ -2398,8 +2631,11 @@ Get the global Javascript context that should be used with the
 Get the value of <em class="parameter"><code>js_result</code></em>. You should use the <code class="function">JSGlobalContextRef</code>
 returned by <a class="link" href="WebKitWebView.html#webkit-javascript-result-get-global-context" title="webkit_javascript_result_get_global_context ()"><code class="function">webkit_javascript_result_get_global_context()</code></a> to use the <code class="function">JSValueRef</code>.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>js_result</code></em> :</span></p></td>
@@ -2433,8 +2669,11 @@ returned by <a class="link" href="WebKitWebView.html#webkit-javascript-result-ge
 <p>
 Enum values used for determining the type of <a class="link" href="WebKitWebView.html#WebKitScriptDialog"><span class="type">WebKitScriptDialog</span></a>
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><a name="WEBKIT-SCRIPT-DIALOG-ALERT:CAPS"></a><span class="term"><code class="literal">WEBKIT_SCRIPT_DIALOG_ALERT</code></span></p></td>
@@ -2465,8 +2704,11 @@ information to the user.
 <p>
 Get the dialog type of a <a class="link" href="WebKitWebView.html#WebKitScriptDialog"><span class="type">WebKitScriptDialog</span></a>.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>dialog</code></em> :</span></p></td>
@@ -2488,8 +2730,11 @@ Get the dialog type of a <a class="link" href="WebKitWebView.html#WebKitScriptDi
 <p>
 Get the message of a <a class="link" href="WebKitWebView.html#WebKitScriptDialog"><span class="type">WebKitScriptDialog</span></a>.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>dialog</code></em> :</span></p></td>
@@ -2517,8 +2762,11 @@ signal sets <a href="../glib/glib-Standard-Macros.html#TRUE:CAPS"><code class="l
 It's an error to use this method with a <a class="link" href="WebKitWebView.html#WebKitScriptDialog"><span class="type">WebKitScriptDialog</span></a> that is not of type
 <a class="link" href="WebKitWebView.html#WEBKIT-SCRIPT-DIALOG-CONFIRM:CAPS"><code class="literal">WEBKIT_SCRIPT_DIALOG_CONFIRM</code></a>.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>dialog</code></em> :</span></p></td>
@@ -2542,8 +2790,11 @@ Get the default text of a <a class="link" href="WebKitWebView.html#WebKitScriptD
 It's an error to use this method with a <a class="link" href="WebKitWebView.html#WebKitScriptDialog"><span class="type">WebKitScriptDialog</span></a> that is not of type
 <a class="link" href="WebKitWebView.html#WEBKIT-SCRIPT-DIALOG-PROMPT:CAPS"><code class="literal">WEBKIT_SCRIPT_DIALOG_PROMPT</code></a>.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>dialog</code></em> :</span></p></td>
@@ -2572,8 +2823,11 @@ signal sets the text of the entry form when OK button is clicked, otherwise <a h
 It's an error to use this method with a <a class="link" href="WebKitWebView.html#WebKitScriptDialog"><span class="type">WebKitScriptDialog</span></a> that is not of type
 <a class="link" href="WebKitWebView.html#WEBKIT-SCRIPT-DIALOG-PROMPT:CAPS"><code class="literal">WEBKIT_SCRIPT_DIALOG_PROMPT</code></a>.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>dialog</code></em> :</span></p></td>
@@ -2594,8 +2848,11 @@ It's an error to use this method with a <a class="link" href="WebKitWebView.html
 <p>
 Return the main resource of <em class="parameter"><code>web_view</code></em>.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>web_view</code></em> :</span></p></td>
@@ -2713,6 +2970,56 @@ See <a class="link" href="WebKitWebView.html#webkit-web-view-set-zoom-level" tit
 <div class="refsect1">
 <a name="WebKitWebView.signal-details"></a><h2>Signal Details</h2>
 <div class="refsect2">
+<a name="WebKitWebView-authenticate"></a><h3>The <code class="literal">"authenticate"</code> signal</h3>
+<pre class="programlisting"><a href="../glib/glib-Basic-Types.html#gboolean"><span class="returnvalue">gboolean</span></a>            user_function                      (<a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a>               *web_view,
+                                                        <a class="link" href="WebKitAuthenticationRequest.html" title="WebKitAuthenticationRequest"><span class="type">WebKitAuthenticationRequest</span></a> *request,
+                                                        <a href="../glib/glib-Basic-Types.html#gpointer"><span class="type">gpointer</span></a>                     user_data)      : <a href="../gobject/gobject-Signals.html#G-SIGNAL-RUN-LAST:CAPS"><code class="literal">Run Last</code></a></pre>
+<p>
+This signal is emitted when the user is challenged with HTTP
+authentication. To let the  application access or supply
+the credentials as well as to allow the client application
+to either cancel the request or perform the authentication,
+the signal will pass an instance of the
+<a class="link" href="WebKitAuthenticationRequest.html" title="WebKitAuthenticationRequest"><span class="type">WebKitAuthenticationRequest</span></a> in the <em class="parameter"><code>request</code></em> argument.
+To handle this signal asynchronously you should keep a ref
+of the request and return <a href="../glib/glib-Standard-Macros.html#TRUE:CAPS"><code class="literal">TRUE</code></a>. To disable HTTP authentication
+entirely, connect to this signal and simply return <a href="../glib/glib-Standard-Macros.html#TRUE:CAPS"><code class="literal">TRUE</code></a>.
+</p>
+<p>
+The default signal handler will run a default authentication
+dialog asynchronously for the user to interact with.
+</p>
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
+<col align="left" valign="top">
+<col>
+</colgroup>
+<tbody>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>web_view</code></em> :</span></p></td>
+<td>the <a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> on which the signal is emitted</td>
+</tr>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>request</code></em> :</span></p></td>
+<td>a <a class="link" href="WebKitAuthenticationRequest.html" title="WebKitAuthenticationRequest"><span class="type">WebKitAuthenticationRequest</span></a>
+</td>
+</tr>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>user_data</code></em> :</span></p></td>
+<td>user data set when the signal handler was connected.</td>
+</tr>
+<tr>
+<td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
+<td>
+<a href="../glib/glib-Standard-Macros.html#TRUE:CAPS"><code class="literal">TRUE</code></a> to stop other handlers from being invoked for the event.
+<a href="../glib/glib-Standard-Macros.html#FALSE:CAPS"><code class="literal">FALSE</code></a> to propagate the event further.</td>
+</tr>
+</tbody>
+</table></div>
+<p class="since">Since 2.2</p>
+</div>
+<hr>
+<div class="refsect2">
 <a name="WebKitWebView-close"></a><h3>The <code class="literal">"close"</code> signal</h3>
 <pre class="programlisting"><span class="returnvalue">void</span>                user_function                      (<a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> *webView,
                                                         <a href="../glib/glib-Basic-Types.html#gpointer"><span class="type">gpointer</span></a>       user_data)      : <a href="../gobject/gobject-Signals.html#G-SIGNAL-RUN-LAST:CAPS"><code class="literal">Run Last</code></a></pre>
@@ -2722,8 +3029,11 @@ call is made from JavaScript's <code class="function">window.close</code> functi
 It is the owner's responsibility to handle this signal to hide or
 destroy the <a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a>, if necessary.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>webView</code></em> :</span></p></td>
@@ -2741,7 +3051,7 @@ destroy the <a class="link" href="WebKitWebView.html" title="WebKitWebView"><spa
 <a name="WebKitWebView-context-menu"></a><h3>The <code class="literal">"context-menu"</code> signal</h3>
 <pre class="programlisting"><a href="../glib/glib-Basic-Types.html#gboolean"><span class="returnvalue">gboolean</span></a>            user_function                      (<a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a>       *web_view,
                                                         <a class="link" href="WebKitContextMenu.html" title="WebKitContextMenu"><span class="type">WebKitContextMenu</span></a>   *context_menu,
-                                                        <a href="../gdk2/gdk2-Event-Structures.html#GdkEvent"><span class="type">GdkEvent</span></a>            *event,
+                                                        <a href="../gdk3/gdk3-Event-Structures.html#GdkEvent"><span class="type">GdkEvent</span></a>            *event,
                                                         <a class="link" href="WebKitHitTestResult.html" title="WebKitHitTestResult"><span class="type">WebKitHitTestResult</span></a> *hit_test_result,
                                                         <a href="../glib/glib-Basic-Types.html#gpointer"><span class="type">gpointer</span></a>             user_data)            : <a href="../gobject/gobject-Signals.html#G-SIGNAL-RUN-LAST:CAPS"><code class="literal">Run Last</code></a></pre>
 <p>
@@ -2749,7 +3059,7 @@ Emmited when a context menu is about to be displayed to give the application
 a chance to customize the proposed menu, prevent the menu from being displayed
 or build its own context menu.
 </p>
-<div class="itemizedlist"><ul class="itemizedlist" type="disc">
+<div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; ">
 <li class="listitem"><p>
  To customize the proposed menu you can use <a class="link" href="WebKitContextMenu.html#webkit-context-menu-prepend" title="webkit_context_menu_prepend ()"><code class="function">webkit_context_menu_prepend()</code></a>,
  <a class="link" href="WebKitContextMenu.html#webkit-context-menu-append" title="webkit_context_menu_append ()"><code class="function">webkit_context_menu_append()</code></a> or <a class="link" href="WebKitContextMenu.html#webkit-context-menu-insert" title="webkit_context_menu_insert ()"><code class="function">webkit_context_menu_insert()</code></a> to add new
@@ -2783,8 +3093,11 @@ will be shown, if it return <a href="../glib/glib-Standard-Macros.html#TRUE:CAPS
 The proposed <a class="link" href="WebKitContextMenu.html" title="WebKitContextMenu"><span class="type">WebKitContextMenu</span></a> passed in <em class="parameter"><code>context_menu</code></em> argument is only valid
 during the signal emission.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>web_view</code></em> :</span></p></td>
@@ -2797,7 +3110,7 @@ during the signal emission.
 </tr>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>event</code></em> :</span></p></td>
-<td>the <a href="../gdk2/gdk2-Event-Structures.html#GdkEvent"><span class="type">GdkEvent</span></a> that triggered the context menu</td>
+<td>the <a href="../gdk3/gdk3-Event-Structures.html#GdkEvent"><span class="type">GdkEvent</span></a> that triggered the context menu</td>
 </tr>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>hit_test_result</code></em> :</span></p></td>
@@ -2826,8 +3139,11 @@ during the signal emission.
 Emitted after <a class="link" href="WebKitWebView.html#WebKitWebView-context-menu" title='The "context-menu" signal'><span class="type">"context-menu"</span></a> signal, if the context menu is shown,
 to notify that the context menu is dismissed.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>web_view</code></em> :</span></p></td>
@@ -2854,8 +3170,11 @@ newly created <a class="link" href="WebKitWebView.html" title="WebKitWebView"><s
 The new <a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> should not be displayed to the user
 until the <a class="link" href="WebKitWebView.html#WebKitWebView-ready-to-show" title='The "ready-to-show" signal'><span class="type">"ready-to-show"</span></a> signal is emitted.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>web_view</code></em> :</span></p></td>
@@ -2917,8 +3236,48 @@ specific type when making the decision. For example:
 21
 22
 23
-24</pre></td>
-        <td class="listing_code"><pre class="programlisting"><span class="type">static</span> gboolean
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+39
+40
+41
+42
+43
+44</pre></td>
+        <td class="listing_code"><pre class="programlisting"><?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta name="syntax" content="cpp" />
+<meta name="settings" content="use_xhtml,use_css,pre_wrap,no_foldcolumn,prevent_copy=" />
+<meta name="colorscheme" content="none" />
+<style type="text/css">
+
+pre { white-space: pre-wrap; font-family: monospace; color: #000000; background-color: #ffffff; }
+body { font-family: monospace; color: #000000; background-color: #ffffff; }
+* { font-size: 1em; }
+.Comment { color: #c00000; font-weight: bold; }
+.Statement { color: #008080; font-weight: bold; }
+.Type { color: #008000; text-decoration: underline; }
+
+</style>
+</head>
+<body>
+<pre id='vimCodeElement'>
+<span class="type">static</span> gboolean
 decide_policy_cb (WebKitWebView *web_view,
                   WebKitPolicyDecision *decision,
                   WebKitPolicyDecisionType type)
@@ -2957,8 +3316,11 @@ made explicitly, <a class="link" href="WebKitPolicyDecision.html#webkit-policy-d
 default signal handler will simply call <a class="link" href="WebKitPolicyDecision.html#webkit-policy-decision-use" title="webkit_policy_decision_use ()"><code class="function">webkit_policy_decision_use()</code></a>. Only the first
 policy decision chosen for a given <a class="link" href="WebKitPolicyDecision.html" title="WebKitPolicyDecision"><span class="type">WebKitPolicyDecision</span></a> will have any affect.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>web_view</code></em> :</span></p></td>
@@ -3002,8 +3364,11 @@ transition and eventually prepare the top-level window
 (e.g. hide some widgets that would otherwise be part of the
 full screen window).
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>web_view</code></em> :</span></p></td>
@@ -3039,8 +3404,11 @@ non-HTTPS content.
 You can check the <em class="parameter"><code>event</code></em> parameter to know exactly which kind
 of event has been detected (see <a class="link" href="WebKitWebView.html#WebKitInsecureContentEvent" title="enum WebKitInsecureContentEvent"><span class="type">WebKitInsecureContentEvent</span></a>).
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>web_view</code></em> :</span></p></td>
@@ -3069,8 +3437,11 @@ window out of its full screen state. This signal can be used by
 client code to restore widgets hidden during the
 <a class="link" href="WebKitWebView.html#WebKitWebView-enter-fullscreen" title='The "enter-fullscreen" signal'><span class="type">"enter-fullscreen"</span></a> stage for instance.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>web_view</code></em> :</span></p></td>
@@ -3144,8 +3515,48 @@ load operation.
 23
 24
 25
-26</pre></td>
-        <td class="listing_code"><pre class="programlisting"><span class="type">static</span> <span class="type">void</span> web_view_load_changed (WebKitWebView  *web_view,
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+39
+40
+41
+42
+43
+44
+45
+46</pre></td>
+        <td class="listing_code"><pre class="programlisting"><?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta name="syntax" content="cpp" />
+<meta name="settings" content="use_xhtml,use_css,pre_wrap,no_foldcolumn,prevent_copy=" />
+<meta name="colorscheme" content="none" />
+<style type="text/css">
+
+pre { white-space: pre-wrap; font-family: monospace; color: #000000; background-color: #ffffff; }
+body { font-family: monospace; color: #000000; background-color: #ffffff; }
+* { font-size: 1em; }
+.Comment { color: #c00000; font-weight: bold; }
+.Statement { color: #008080; font-weight: bold; }
+.Type { color: #008000; text-decoration: underline; }
+
+</style>
+</head>
+<body>
+<pre id='vimCodeElement'>
+<span class="type">static</span> <span class="type">void</span> web_view_load_changed (WebKitWebView  *web_view,
                                    WebKitLoadEvent load_event,
                                    gpointer        user_data)
 {
@@ -3178,8 +3589,11 @@ load operation.
 
 <p>
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>web_view</code></em> :</span></p></td>
@@ -3218,8 +3632,11 @@ WebKitWebView::load-changed will always be emitted with
 By default, if the signal is not handled, a stock error page will be displayed.
 You need to handle the signal if you want to provide your own error page.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>web_view</code></em> :</span></p></td>
@@ -3263,12 +3680,15 @@ element such as a link, image or a media element. To determine
 what type of element the mouse cursor is over, a Hit Test is performed
 on the current mouse coordinates and the result is passed in the
 <em class="parameter"><code>hit_test_result</code></em> argument. The <em class="parameter"><code>modifiers</code></em> argument is a bitmask of
-<a href="../gdk2/gdk2-Windows.html#GdkModifierType"><span class="type">GdkModifierType</span></a> flags indicating the state of modifier keys.
+<a href="../gdk3/gdk3-Windows.html#GdkModifierType"><span class="type">GdkModifierType</span></a> flags indicating the state of modifier keys.
 The signal is emitted again when the mouse is moved out of the
 current element with a new <em class="parameter"><code>hit_test_result</code></em>.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>web_view</code></em> :</span></p></td>
@@ -3281,7 +3701,7 @@ current element with a new <em class="parameter"><code>hit_test_result</code></e
 </tr>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>modifiers</code></em> :</span></p></td>
-<td>a bitmask of <a href="../gdk2/gdk2-Windows.html#GdkModifierType"><span class="type">GdkModifierType</span></a>
+<td>a bitmask of <a href="../gdk3/gdk3-Windows.html#GdkModifierType"><span class="type">GdkModifierType</span></a>
 </td>
 </tr>
 <tr>
@@ -3335,8 +3755,48 @@ allowing the user decide what to do with the request:
 20
 21
 22
-23</pre></td>
-        <td class="listing_code"><pre class="programlisting"><span class="type">static</span> gboolean permission_request_cb (WebKitWebView *web_view,
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+39
+40
+41
+42
+43</pre></td>
+        <td class="listing_code"><pre class="programlisting"><?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta name="syntax" content="cpp" />
+<meta name="settings" content="use_xhtml,use_css,pre_wrap,no_foldcolumn,prevent_copy=" />
+<meta name="colorscheme" content="none" />
+<style type="text/css">
+
+pre { white-space: pre-wrap; font-family: monospace; color: #000000; background-color: #ffffff; }
+body { font-family: monospace; color: #000000; background-color: #ffffff; }
+* { font-size: 1em; }
+.Constant { color: #0000c0; text-decoration: underline; }
+.Statement { color: #008080; font-weight: bold; }
+.Type { color: #008000; text-decoration: underline; }
+
+</style>
+</head>
+<body>
+<pre id='vimCodeElement'>
+<span class="type">static</span> gboolean permission_request_cb (WebKitWebView *web_view,
                                        WebKitPermissionRequest *request,
                                        GtkWindow *parent_window)
 {
@@ -3379,8 +3839,11 @@ By default, if the signal is not handled,
 <a class="link" href="WebKitPermissionRequest.html#webkit-permission-request-deny" title="webkit_permission_request_deny ()"><code class="function">webkit_permission_request_deny()</code></a> will be called over the
 <a class="link" href="WebKitPermissionRequest.html" title="WebKitPermissionRequest"><span class="type">WebKitPermissionRequest</span></a>.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>web_view</code></em> :</span></p></td>
@@ -3422,8 +3885,11 @@ event so that the print dialog is shown.
 You can connect to this signal and return <a href="../glib/glib-Standard-Macros.html#TRUE:CAPS"><code class="literal">TRUE</code></a> to cancel the print operation
 or implement your own print dialog.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>web_view</code></em> :</span></p></td>
@@ -3459,8 +3925,11 @@ size, position, whether the location, status and scrollbars
 should be displayed, is already set on the <a class="link" href="WebKitWindowProperties.html" title="WebKitWindowProperties"><span class="type">WebKitWindowProperties</span></a>
 of <em class="parameter"><code>web_view</code></em>. See also <a class="link" href="WebKitWebView.html#webkit-web-view-get-window-properties" title="webkit_web_view_get_window_properties ()"><code class="function">webkit_web_view_get_window_properties()</code></a>.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>web_view</code></em> :</span></p></td>
@@ -3486,8 +3955,11 @@ contains the <a class="link" href="WebKitURIRequest.html" title="WebKitURIReques
 You can monitor the load operation by connecting to the different signals
 of <em class="parameter"><code>resource</code></em>.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>web_view</code></em> :</span></p></td>
@@ -3524,8 +3996,11 @@ new view to behave as modal. Once the signal is emitted a new
 mainloop will be run to block user interaction in the parent
 <a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> until the new dialog is closed.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>web_view</code></em> :</span></p></td>
@@ -3558,8 +4033,11 @@ argument.
 The default signal handler will asynchronously run a regular
 <a href="../gtk2/GtkFileChooserDialog.html"><span class="type">GtkFileChooserDialog</span></a> for the user to interact with.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>web_view</code></em> :</span></p></td>
@@ -3596,7 +4074,7 @@ The <em class="parameter"><code>dialog</code></em> parameter should be used to b
 If the signal is not handled a different dialog will be built and shown depending
 on the dialog type:
 </p>
-<div class="itemizedlist"><ul class="itemizedlist" type="disc">
+<div class="itemizedlist"><ul class="itemizedlist" style="list-style-type: disc; ">
 <li class="listitem"><p>
  <a class="link" href="WebKitWebView.html#WEBKIT-SCRIPT-DIALOG-ALERT:CAPS"><code class="literal">WEBKIT_SCRIPT_DIALOG_ALERT</code></a>: message dialog with a single Close button.
 </p></li>
@@ -3610,8 +4088,11 @@ on the dialog type:
 </ul></div>
 <p>
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>web_view</code></em> :</span></p></td>
@@ -3654,8 +4135,11 @@ simply calling <a href="../gobject/gobject-The-Base-Object-Type.html#g-object-re
 If the last reference is removed on a <a class="link" href="WebKitFormSubmissionRequest.html" title="WebKitFormSubmissionRequest"><span class="type">WebKitFormSubmissionRequest</span></a> and the
 form has not been submitted, <a class="link" href="WebKitFormSubmissionRequest.html#webkit-form-submission-request-submit" title="webkit_form_submission_request_submit ()"><code class="function">webkit_form_submission_request_submit()</code></a> will be called.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>web_view</code></em> :</span></p></td>
@@ -3681,8 +4165,11 @@ form has not been submitted, <a class="link" href="WebKitFormSubmissionRequest.h
 <p>
 This signal is emitted when the web process crashes.
 </p>
-<div class="variablelist"><table border="0">
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
 <col align="left" valign="top">
+<col>
+</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>web_view</code></em> :</span></p></td>

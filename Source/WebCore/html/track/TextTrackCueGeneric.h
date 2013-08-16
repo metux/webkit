@@ -30,7 +30,6 @@
 
 #include "Color.h"
 #include "TextTrackCue.h"
-#include <wtf/RefCounted.h>
 
 namespace WebCore {
 
@@ -67,20 +66,24 @@ public:
     
     Color backgroundColor() const { return m_backgroundColor; }
     void setBackgroundColor(RGBA32 color) { m_backgroundColor.setRGB(color); }
+    
+    Color highlightColor() const { return m_highlightColor; }
+    void setHighlightColor(RGBA32 color) { m_highlightColor.setRGB(color); }
+    
+    virtual void setFontSize(int, const IntSize&, bool important) OVERRIDE;
 
-    virtual bool operator==(const TextTrackCue&) const OVERRIDE;
-    virtual bool operator!=(const TextTrackCue& cue) const OVERRIDE
-    {
-        return !(*this == cue);
-    }
+    virtual bool isEqual(const TextTrackCue&, CueMatchRules) const OVERRIDE;
 
     virtual TextTrackCue::CueType cueType() const OVERRIDE { return TextTrackCue::Generic; }
 
 private:
+    virtual bool isOrderedBefore(const TextTrackCue*) const OVERRIDE;
+
     TextTrackCueGeneric(ScriptExecutionContext*, double start, double end, const String&);
     
     Color m_foregroundColor;
     Color m_backgroundColor;
+    Color m_highlightColor;
     double m_baseFontSizeRelativeToVideoHeight;
     double m_fontSizeMultiplier;
     String m_fontName;

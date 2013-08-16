@@ -27,6 +27,7 @@
 #include "FloatQuad.h"
 #include "FlowThreadController.h"
 #include "Frame.h"
+#include "FrameSelection.h"
 #include "FrameView.h"
 #include "GraphicsContext.h"
 #include "HTMLFrameOwnerElement.h"
@@ -42,7 +43,7 @@
 #include "RenderWidgetProtector.h"
 #include "StyleInheritedData.h"
 #include "TransformState.h"
-#include "WebCoreMemoryInstrumentation.h"
+#include <wtf/StackStats.h>
 
 #if USE(ACCELERATED_COMPOSITING)
 #include "RenderLayerCompositor.h"
@@ -68,7 +69,7 @@ RenderView::RenderView(Document* document)
     , m_layoutStateDisableCount(0)
     , m_renderQuoteHead(0)
     , m_renderCounterCount(0)
-    , m_layoutPhase(RenderViewNormalLayout)
+    , m_selectionWasCaret(false)
 {
     // init RenderObject attributes
     setInline(false);
@@ -92,12 +93,21 @@ bool RenderView::hitTest(const HitTestRequest& request, HitTestResult& result)
 
 bool RenderView::hitTest(const HitTestRequest& request, const HitTestLocation& location, HitTestResult& result)
 {
-    bool inside = layer()->hitTest(request, location, result);
+    if (layer()->hitTest(request, location, result))
+        return true;
 
-    // Next set up the correct :hover/:active state along the new chain.
-    document()->updateHoverActiveState(request, result);
+    // FIXME: Consider if this test should be done unconditionally.
+    if (request.allowsFrameScrollbars() && m_frameView) {
+        // ScrollView scrollbars are not the same as RenderLayer scrollbars tested by RenderLayer::hitTestOverflowControls,
+        // so we need to test ScrollView scrollbars separately here.
+        Scrollbar* frameScrollbar = m_frameView->scrollbarAtPoint(location.roundedPoint());
+        if (frameScrollbar) {
+            result.setScrollbar(frameScrollbar);
+            return true;
+        }
+    }
 
-    return inside;
+    return false;
 }
 
 void RenderView::computeLogicalHeight(LayoutUnit logicalHeight, LayoutUnit, LogicalExtentComputedValues& computedValues) const
@@ -162,8 +172,8 @@ void RenderView::addChild(RenderObject* newChild, RenderObject* beforeChild)
     // up regions in the parent document during layout.
     if (newChild && !newChild->isRenderFlowThread()) {
         RenderBox* seamlessBox = enclosingSeamlessRenderer(document());
-        if (seamlessBox && seamlessBox->inRenderFlowThread())
-            newChild->setInRenderFlowThread();
+        if (seamlessBox && seamlessBox->flowThreadContainingBlock())
+            newChild->setFlowThreadState(seamlessBox->flowThreadState());
     }
     RenderBlock::addChild(newChild, beforeChild);
 }
@@ -200,7 +210,7 @@ bool RenderView::initializeLayoutState(LayoutState& state)
         
         // Set the current render flow thread to point to our ancestor. This will allow the seamless document to locate the correct
         // regions when doing a layout.
-        if (seamlessAncestor->inRenderFlowThread()) {
+        if (seamlessAncestor->flowThreadContainingBlock()) {
             flowThreadController()->setCurrentRenderFlowThread(seamlessAncestor->view()->flowThreadController()->currentRenderFlowThread());
             isSeamlessAncestorInFlowThread = true;
         }
@@ -211,32 +221,65 @@ bool RenderView::initializeLayoutState(LayoutState& state)
     return isSeamlessAncestorInFlowThread;
 }
 
-// The algorithm to layout the flow thread content in auto height regions has to make sure
-// that when a two-pass layout is needed, the auto height regions always start the first
-// pass without a computed override logical content height (from previous layouts).
-// This way, the layout algorithm gives the same result in all situations.
-// If the flow thread content does not need layout, the decision of whether we need a full
-// two pass layout cannot be made up-front. Therefore, we do a first layout, and if an auto
-// height region needs layout or a non-auto height region changes its box dimensions,
-// we need to perform a full two pass layout.
+// The algorithm below assumes this is a full layout. In case there are previously computed values for regions, supplemental steps are taken
+// to ensure the results are the same as those obtained from a full layout (i.e. the auto-height regions from all the flows are marked as needing
+// layout).
+// 1. The flows are laid out from the outer flow to the inner flow. This successfully computes the outer non-auto-height regions size so the 
+// inner flows have the necessary information to correctly fragment the content.
+// 2. The flows are laid out from the inner flow to the outer flow. After an inner flow is laid out it goes into the constrained layout phase
+// and marks the auto-height regions they need layout. This means the outer flows will relayout if they depend on regions with auto-height regions
+// belonging to inner flows. This step will correctly set the computedAutoHeight for the auto-height regions. It's possible for non-auto-height
+// regions to relayout if they depend on auto-height regions. This will invalidate the inner flow threads and mark them as needing layout.
+// 3. The last step is to do one last layout if there are pathological dependencies between non-auto-height regions and auto-height regions
+// as detected in the previous step.
 void RenderView::layoutContentInAutoLogicalHeightRegions(const LayoutState& state)
 {
-    ASSERT(!flowThreadController()->needsTwoPassLayoutForAutoHeightRegions());
-
-    if (!flowThreadController()->hasRenderNamedFlowThreadsNeedingLayout()) {
+    // We need to invalidate all the flows with auto-height regions if one such flow needs layout.
+    // If none is found we do a layout a check back again afterwards.
+    if (!flowThreadController()->updateFlowThreadsNeedingLayout()) {
+        // Do a first layout of the content. In some cases more layouts are not needed (e.g. only flows with non-auto-height regions have changed).
         layoutContent(state);
-        if (!flowThreadController()->needsTwoPassLayoutForAutoHeightRegions())
+
+        // If we find no named flow needing a two step layout after the first layout, exit early.
+        // Otherwise, initiate the two step layout algorithm and recompute all the flows.
+        if (!flowThreadController()->updateFlowThreadsNeedingTwoStepLayout())
             return;
     }
 
-    // Start a full two phase layout for regions with auto logical height.
-    flowThreadController()->resetRegionsOverrideLogicalContentHeight();
+    // Layout to recompute all the named flows with auto-height regions.
     layoutContent(state);
 
-    m_layoutPhase = ConstrainedFlowThreadsLayoutInAutoLogicalHeightRegions;
-    flowThreadController()->markAutoLogicalHeightRegionsForLayout();
-    layoutContent(state);
-    flowThreadController()->setNeedsTwoPassLayoutForAutoHeightRegions(false);
+    // Propagate the computed auto-height values upwards.
+    // Non-auto-height regions may invalidate the flow thread because they depended on auto-height regions, but that's ok.
+    flowThreadController()->updateFlowThreadsIntoConstrainedPhase();
+
+    // Do one last layout that should update the auto-height regions found in the main flow
+    // and solve pathological dependencies between regions (e.g. a non-auto-height region depending
+    // on an auto-height one).
+    if (needsLayout())
+        layoutContent(state);
+}
+
+void RenderView::layoutContentToComputeOverflowInRegions(const LayoutState& state)
+{
+    if (!hasRenderNamedFlowThreads())
+        return;
+
+    // First pass through the flow threads and mark the regions as needing a simple layout.
+    // The regions extract the overflow from the flow thread and pass it to their containg
+    // block chain.
+    flowThreadController()->updateFlowThreadsIntoOverflowPhase();
+    if (needsLayout())
+        layoutContent(state);
+
+    // In case scrollbars resized the regions a new pass is necessary to update the flow threads
+    // and recompute the overflow on regions. This is the final state of the flow threads.
+    flowThreadController()->updateFlowThreadsIntoFinalPhase();
+    if (needsLayout())
+        layoutContent(state);
+
+    // Finally reset the layout state of the flow threads.
+    flowThreadController()->updateFlowThreadsIntoMeasureContentPhase();
 }
 
 void RenderView::layout()
@@ -259,7 +302,11 @@ void RenderView::layout()
                     || child->style()->logicalMaxHeight().isPercent()
                     || child->style()->logicalHeight().isViewportPercentage()
                     || child->style()->logicalMinHeight().isViewportPercentage()
-                    || child->style()->logicalMaxHeight().isViewportPercentage())
+                    || child->style()->logicalMaxHeight().isViewportPercentage()
+#if ENABLE(SVG)
+                    || child->isSVGRoot()
+#endif
+                )
                 child->setChildNeedsLayout(true, MarkOnlyThis);
         }
     }
@@ -274,11 +321,12 @@ void RenderView::layout()
     m_pageLogicalHeightChanged = false;
     m_layoutState = &state;
 
-    m_layoutPhase = RenderViewNormalLayout;
     if (checkTwoPassLayoutForAutoHeightRegions())
         layoutContentInAutoLogicalHeightRegions(state);
     else
         layoutContent(state);
+
+    layoutContentToComputeOverflowInRegions(state);
 
 #ifndef NDEBUG
     checkLayoutState(state);
@@ -288,6 +336,19 @@ void RenderView::layout()
     
     if (isSeamlessAncestorInFlowThread)
         flowThreadController()->setCurrentRenderFlowThread(0);
+}
+
+LayoutUnit RenderView::pageOrViewLogicalHeight() const
+{
+    if (document()->printing())
+        return pageLogicalHeight();
+    
+    if (hasColumns() && !style()->hasInlineColumnAxis()) {
+        if (int pageLength = frameView()->pagination().pageLength)
+            return pageLength;
+    }
+
+    return viewLogicalHeight();
 }
 
 void RenderView::mapLocalToContainer(const RenderLayerModelObject* repaintContainer, TransformState& transformState, MapCoordinatesFlags mode, bool* wasFixed) const
@@ -374,7 +435,7 @@ void RenderView::paint(PaintInfo& paintInfo, const LayoutPoint& paintOffset)
     ASSERT(LayoutPoint(IntPoint(paintOffset.x(), paintOffset.y())) == paintOffset);
 
     // This avoids painting garbage between columns if there is a column gap.
-    if (m_frameView && m_frameView->pagination().mode != Pagination::Unpaginated)
+    if (m_frameView && m_frameView->pagination().mode != Pagination::Unpaginated && paintInfo.shouldPaintWithinRoot(this))
         paintInfo.context->fillRect(paintInfo.rect, m_frameView->baseBackgroundColor(), ColorSpaceDeviceRGB);
 
     paintObject(paintInfo, paintOffset);
@@ -408,6 +469,9 @@ static inline bool rendererObscuresBackground(RenderObject* rootObject)
 
 void RenderView::paintBoxDecorations(PaintInfo& paintInfo, const LayoutPoint&)
 {
+    if (!paintInfo.shouldPaintWithinRoot(this))
+        return;
+
     // Check to see if we are enclosed by a layer that requires complex painting rules.  If so, we cannot blit
     // when scrolling, and we need to use slow repaints.  Examples of layers that require this are transparent layers,
     // layers with reflections, or transformed layers.
@@ -486,6 +550,17 @@ bool RenderView::shouldRepaint(const LayoutRect& r) const
     return true;
 }
 
+void RenderView::repaintRootContents()
+{
+#if USE(ACCELERATED_COMPOSITING)
+    if (layer()->isComposited()) {
+        layer()->setBackingNeedsRepaint();
+        return;
+    }
+#endif
+    repaint();
+}
+
 void RenderView::repaintViewRectangle(const LayoutRect& ur, bool immediate) const
 {
     if (!shouldRepaint(ur))
@@ -527,12 +602,19 @@ void RenderView::repaintRectangleInViewAndCompositedLayers(const LayoutRect& ur,
 
 void RenderView::repaintViewAndCompositedLayers()
 {
-    repaint();
-    
+    repaintRootContents();
 #if USE(ACCELERATED_COMPOSITING)
     if (compositor()->inCompositingMode())
         compositor()->repaintCompositedLayers();
 #endif
+}
+
+LayoutRect RenderView::visualOverflowRect() const
+{
+    if (m_frameView->paintsEntireContents())
+        return layoutOverflowRect();
+
+    return RenderBlock::visualOverflowRect();
 }
 
 void RenderView::computeRectForRepaint(const RenderLayerModelObject* repaintContainer, LayoutRect& rect, bool fixed) const
@@ -641,9 +723,8 @@ void RenderView::repaintSelection() const
 
         // Blocks are responsible for painting line gaps and margin gaps. They must be examined as well.
         for (RenderBlock* block = o->containingBlock(); block && !block->isRenderView(); block = block->containingBlock()) {
-            if (processedBlocks.contains(block))
+            if (!processedBlocks.add(block).isNewEntry)
                 break;
-            processedBlocks.add(block);
             RenderSelectionInfo(block, true).repaint();
         }
     }
@@ -671,12 +752,14 @@ void RenderView::setSelection(RenderObject* start, int startPos, RenderObject* e
     if ((start && !end) || (end && !start))
         return;
 
+    bool caretChanged = m_selectionWasCaret != view()->frame()->selection()->isCaret();
+    m_selectionWasCaret = view()->frame()->selection()->isCaret();
     // Just return if the selection hasn't changed.
     if (m_selectionStart == start && m_selectionStartPos == startPos &&
-        m_selectionEnd == end && m_selectionEndPos == endPos)
+        m_selectionEnd == end && m_selectionEndPos == endPos && !caretChanged)
         return;
 
-    if ((start && end) && (start->enclosingRenderFlowThread() != end->enclosingRenderFlowThread()))
+    if ((start && end) && (start->flowThreadContainingBlock() != end->flowThreadContainingBlock()))
         return;
 
     // Record the old selected objects.  These will be used later
@@ -985,12 +1068,6 @@ int RenderView::viewWidth() const
 int RenderView::viewLogicalHeight() const
 {
     int height = style()->isHorizontalWritingMode() ? viewHeight() : viewWidth();
-
-    if (hasColumns() && !style()->hasInlineColumnAxis()) {
-        if (int pageLength = m_frameView->pagination().pageLength)
-            height = pageLength;
-    }
-
     return height;
 }
 
@@ -1005,6 +1082,7 @@ void RenderView::pushLayoutState(RenderObject* root)
     ASSERT(m_layoutStateDisableCount == 0);
     ASSERT(m_layoutState == 0);
 
+    pushLayoutStateForCurrentFlowThread(root);
     m_layoutState = new (renderArena()) LayoutState(root);
 }
 
@@ -1119,6 +1197,30 @@ FlowThreadController* RenderView::flowThreadController()
     return m_flowThreadController.get();
 }
 
+void RenderView::pushLayoutStateForCurrentFlowThread(const RenderObject* object)
+{
+    if (!m_flowThreadController)
+        return;
+
+    RenderFlowThread* currentFlowThread = m_flowThreadController->currentRenderFlowThread();
+    if (!currentFlowThread)
+        return;
+
+    currentFlowThread->pushFlowThreadLayoutState(object);
+}
+
+void RenderView::popLayoutStateForCurrentFlowThread()
+{
+    if (!m_flowThreadController)
+        return;
+
+    RenderFlowThread* currentFlowThread = m_flowThreadController->currentRenderFlowThread();
+    if (!currentFlowThread)
+        return;
+
+    currentFlowThread->popFlowThreadLayoutState();
+}
+
 RenderBlock::IntervalArena* RenderView::intervalArena()
 {
     if (!m_intervalArena)
@@ -1126,25 +1228,42 @@ RenderBlock::IntervalArena* RenderView::intervalArena()
     return m_intervalArena.get();
 }
 
-void RenderView::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
+FragmentationDisabler::FragmentationDisabler(RenderObject* root)
 {
-    MemoryClassInfo info(memoryObjectInfo, this, PlatformMemoryTypes::Rendering);
-    RenderBlock::reportMemoryUsage(memoryObjectInfo);
-    info.addWeakPointer(m_frameView);
-    info.addWeakPointer(m_selectionStart);
-    info.addWeakPointer(m_selectionEnd);
-    info.addMember(m_widgets, "widgets");
-    info.addMember(m_layoutState, "layoutState");
-#if USE(ACCELERATED_COMPOSITING)
-    info.addMember(m_compositor, "compositor");
+    RenderView* renderView = root->view();
+    ASSERT(renderView);
+
+    LayoutState* layoutState = renderView->layoutState();
+
+    m_root = root;
+    m_fragmenting = layoutState && layoutState->isPaginated();
+    m_flowThreadState = m_root->flowThreadState();
+#ifndef NDEBUG
+    m_layoutState = layoutState;
 #endif
-#if ENABLE(CSS_SHADERS) && USE(3D_GRAPHICS)
-    info.addMember(m_customFilterGlobalContext, "customFilterGlobalContext");
+
+    if (layoutState)
+        layoutState->m_isPaginated = false;
+        
+    if (m_flowThreadState != RenderObject::NotInsideFlowThread)
+        m_root->setFlowThreadStateIncludingDescendants(RenderObject::NotInsideFlowThread);
+}
+
+FragmentationDisabler::~FragmentationDisabler()
+{
+    RenderView* renderView = m_root->view();
+    ASSERT(renderView);
+
+    LayoutState* layoutState = renderView->layoutState();
+#ifndef NDEBUG
+    ASSERT(m_layoutState == layoutState);
 #endif
-    info.addMember(m_flowThreadController, "flowThreadController");
-    info.addMember(m_intervalArena, "intervalArena");
-    info.addWeakPointer(m_renderQuoteHead);
-    info.addMember(m_legacyPrinting, "legacyPrinting");
+
+    if (layoutState)
+        layoutState->m_isPaginated = m_fragmenting;
+        
+    if (m_flowThreadState != RenderObject::NotInsideFlowThread)
+        m_root->setFlowThreadStateIncludingDescendants(m_flowThreadState);
 }
 
 } // namespace WebCore

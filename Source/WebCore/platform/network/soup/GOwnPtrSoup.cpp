@@ -20,13 +20,7 @@
 #include "config.h"
 #include "GOwnPtrSoup.h"
 
-#include <libsoup/soup-cookie.h>
-// FIXME: soup-message-headers.h doesn't currently has the G_BEGIN_DECLS/G_END_DECLS guards.
-// Remove this extern C when we bump libsoup requirements.
-extern "C" {
-#include <libsoup/soup-message-headers.h>
-}
-#include <libsoup/soup-uri.h>
+#include <libsoup/soup.h>
 
 namespace WTF {
 

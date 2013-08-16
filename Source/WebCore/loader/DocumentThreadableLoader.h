@@ -31,7 +31,7 @@
 #ifndef DocumentThreadableLoader_h
 #define DocumentThreadableLoader_h
 
-#include "CachedRawResource.h"
+#include "CachedRawResourceClient.h"
 #include "CachedResourceHandle.h"
 #include "FrameLoaderTypes.h"
 #include "ThreadableLoader.h"
@@ -43,6 +43,7 @@
 #include <wtf/text/WTFString.h>
 
 namespace WebCore {
+    class CachedRawResource;
     class Document;
     class KURL;
     class ResourceRequest;
@@ -82,9 +83,6 @@ namespace WebCore {
         virtual void dataReceived(CachedResource*, const char* data, int dataLength);
         virtual void redirectReceived(CachedResource*, ResourceRequest&, const ResourceResponse&);
         virtual void notifyFinished(CachedResource*);
-#if PLATFORM(CHROMIUM)
-        virtual void dataDownloaded(CachedResource*, int);
-#endif
 
         void didReceiveResponse(unsigned long identifier, const ResourceResponse&);
         void didReceiveData(unsigned long identifier, const char* data, int dataLength);

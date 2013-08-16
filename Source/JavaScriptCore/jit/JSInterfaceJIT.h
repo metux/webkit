@@ -33,7 +33,6 @@
 #include "JSStack.h"
 #include "JSString.h"
 #include "MacroAssembler.h"
-#include <wtf/AlwaysInline.h>
 #include <wtf/Vector.h>
 
 #if ENABLE(JIT)
@@ -57,22 +56,24 @@ namespace JSC {
 #if CPU(X86_64)
         static const RegisterID returnValueRegister = X86Registers::eax;
         static const RegisterID cachedResultRegister = X86Registers::eax;
+#if !OS(WINDOWS)
         static const RegisterID firstArgumentRegister = X86Registers::edi;
-        
-#if ENABLE(VALUE_PROFILER)
-        static const RegisterID bucketCounterRegister = X86Registers::r10;
+        static const RegisterID secondArgumentRegister = X86Registers::esi;
+#else
+        static const RegisterID firstArgumentRegister = X86Registers::ecx;
+        static const RegisterID secondArgumentRegister = X86Registers::edx;
 #endif
-        
-        static const RegisterID timeoutCheckRegister = X86Registers::r12;
+
         static const RegisterID callFrameRegister = X86Registers::r13;
         static const RegisterID tagTypeNumberRegister = X86Registers::r14;
         static const RegisterID tagMaskRegister = X86Registers::r15;
-        
+
         static const RegisterID regT0 = X86Registers::eax;
         static const RegisterID regT1 = X86Registers::edx;
         static const RegisterID regT2 = X86Registers::ecx;
         static const RegisterID regT3 = X86Registers::ebx;
-        
+        static const RegisterID regT4 = X86Registers::r10;
+
         static const FPRegisterID fpRegT0 = X86Registers::xmm0;
         static const FPRegisterID fpRegT1 = X86Registers::xmm1;
         static const FPRegisterID fpRegT2 = X86Registers::xmm2;
@@ -85,14 +86,15 @@ namespace JSC {
         // On x86 we always use fastcall conventions = but on
         // OS X if might make more sense to just use regparm.
         static const RegisterID firstArgumentRegister = X86Registers::ecx;
+        static const RegisterID secondArgumentRegister = X86Registers::edx;
         
-        static const RegisterID bucketCounterRegister = X86Registers::esi;
         static const RegisterID callFrameRegister = X86Registers::edi;
         
         static const RegisterID regT0 = X86Registers::eax;
         static const RegisterID regT1 = X86Registers::edx;
         static const RegisterID regT2 = X86Registers::ecx;
         static const RegisterID regT3 = X86Registers::ebx;
+        static const RegisterID regT4 = X86Registers::esi;
         
         static const FPRegisterID fpRegT0 = X86Registers::xmm0;
         static const FPRegisterID fpRegT1 = X86Registers::xmm1;
@@ -102,19 +104,19 @@ namespace JSC {
         static const RegisterID returnValueRegister = ARMRegisters::r0;
         static const RegisterID cachedResultRegister = ARMRegisters::r0;
         static const RegisterID firstArgumentRegister = ARMRegisters::r0;
+        static const RegisterID secondArgumentRegister = ARMRegisters::r1;
 
 #if ENABLE(VALUE_PROFILER)
-        static const RegisterID bucketCounterRegister = ARMRegisters::r7;
 #endif
 
         static const RegisterID regT0 = ARMRegisters::r0;
         static const RegisterID regT1 = ARMRegisters::r1;
         static const RegisterID regT2 = ARMRegisters::r2;
         static const RegisterID regT3 = ARMRegisters::r4;
+        static const RegisterID regT4 = ARMRegisters::r7;
 
         // Update ctiTrampoline in JITStubs.cpp if these values are changed!
         static const RegisterID callFrameRegister = ARMRegisters::r5;
-        static const RegisterID timeoutCheckRegister = ARMRegisters::r6;
 
         static const FPRegisterID fpRegT0 = ARMRegisters::d0;
         static const FPRegisterID fpRegT1 = ARMRegisters::d1;
@@ -124,11 +126,8 @@ namespace JSC {
         static const RegisterID returnValueRegister = MIPSRegisters::v0;
         static const RegisterID cachedResultRegister = MIPSRegisters::v0;
         static const RegisterID firstArgumentRegister = MIPSRegisters::a0;
+        static const RegisterID secondArgumentRegister = MIPSRegisters::a1;
         
-#if ENABLE(VALUE_PROFILER)
-        static const RegisterID bucketCounterRegister = MIPSRegisters::s3;
-#endif
-
         // regT0 must be v0 for returning a 32-bit value.
         static const RegisterID regT0 = MIPSRegisters::v0;
         
@@ -140,15 +139,15 @@ namespace JSC {
         // regT3 must be saved in the callee, so use an S register.
         static const RegisterID regT3 = MIPSRegisters::s2;
         
+        static const RegisterID regT4 = MIPSRegisters::s3;
+
         static const RegisterID callFrameRegister = MIPSRegisters::s0;
-        static const RegisterID timeoutCheckRegister = MIPSRegisters::s1;
         
         static const FPRegisterID fpRegT0 = MIPSRegisters::f4;
         static const FPRegisterID fpRegT1 = MIPSRegisters::f6;
         static const FPRegisterID fpRegT2 = MIPSRegisters::f8;
         static const FPRegisterID fpRegT3 = MIPSRegisters::f10;
 #elif CPU(SH4)
-        static const RegisterID timeoutCheckRegister = SH4Registers::r8;
         static const RegisterID callFrameRegister = SH4Registers::fp;
 
         static const RegisterID regT0 = SH4Registers::r0;
@@ -159,7 +158,8 @@ namespace JSC {
         static const RegisterID regT5 = SH4Registers::r5;
         static const RegisterID regT6 = SH4Registers::r6;
         static const RegisterID regT7 = SH4Registers::r7;
-        static const RegisterID firstArgumentRegister =regT4;
+        static const RegisterID firstArgumentRegister = regT4;
+        static const RegisterID secondArgumentRegister = regT5;
 
         static const RegisterID returnValueRegister = SH4Registers::r0;
         static const RegisterID cachedResultRegister = SH4Registers::r0;
@@ -219,9 +219,6 @@ namespace JSC {
     };
 
     struct ThunkHelpers {
-        static unsigned stringImplFlagsOffset() { return StringImpl::flagsOffset(); }
-        static unsigned stringImpl8BitFlag() { return StringImpl::flagIs8Bit(); }
-        static unsigned stringImplDataOffset() { return StringImpl::dataOffset(); }
         static unsigned jsStringLengthOffset() { return OBJECT_OFFSETOF(JSString, m_length); }
         static unsigned jsStringValueOffset() { return OBJECT_OFFSETOF(JSString, m_value); }
     };

@@ -26,12 +26,13 @@
 #include "HTMLParserIdioms.h"
 
 #include "Decimal.h"
+#include "HTMLIdentifier.h"
+#include "KURL.h"
 #include "QualifiedName.h"
 #include <limits>
 #include <wtf/MathExtras.h>
 #include <wtf/text/AtomicString.h>
 #include <wtf/text/StringBuilder.h>
-#include <wtf/text/StringHash.h>
 
 namespace WebCore {
 
@@ -207,12 +208,12 @@ bool parseHTMLInteger(const String& input, int& value)
     // Step 1
     // Step 2
     unsigned length = input.length();
-    if (length && input.is8Bit()) {
+    if (!length || input.is8Bit()) {
         const LChar* start = input.characters8();
         return parseHTMLIntegerInternal(start, start + length, value);
     }
 
-    const UChar* start = input.characters();
+    const UChar* start = input.characters16();
     return parseHTMLIntegerInternal(start, start + length, value);
 }
 
@@ -277,11 +278,13 @@ bool parseHTMLNonNegativeInteger(const String& input, unsigned& value)
     return parseHTMLNonNegativeIntegerInternal(start, start + length, value);
 }
 
-static bool threadSafeEqual(StringImpl* a, StringImpl* b)
+static bool threadSafeEqual(const StringImpl* a, const StringImpl* b)
 {
+    if (a == b)
+        return true;
     if (a->hash() != b->hash())
         return false;
-    return StringHash::equal(a, b);
+    return equalNonNull(a, b);
 }
 
 bool threadSafeMatch(const QualifiedName& a, const QualifiedName& b)
@@ -289,9 +292,78 @@ bool threadSafeMatch(const QualifiedName& a, const QualifiedName& b)
     return threadSafeEqual(a.localName().impl(), b.localName().impl());
 }
 
-bool threadSafeMatch(const String& localName, const QualifiedName& qName)
+#if ENABLE(THREADED_HTML_PARSER)
+bool threadSafeMatch(const HTMLIdentifier& localName, const QualifiedName& qName)
 {
-    return threadSafeEqual(localName.impl(), qName.localName().impl());
+    return threadSafeEqual(localName.asStringImpl(), qName.localName().impl());
+}
+#endif
+
+struct ImageWithScale {
+    String imageURL;
+    float scaleFactor;
+    bool operator==(const ImageWithScale& image) const
+    {
+        return scaleFactor == image.scaleFactor && imageURL == image.imageURL;
+    }
+};
+typedef Vector<ImageWithScale> ImageCandidates;
+
+static inline bool compareByScaleFactor(const ImageWithScale& first, const ImageWithScale& second)
+{
+    return first.scaleFactor < second.scaleFactor;
+}
+
+String bestFitSourceForImageAttributes(float deviceScaleFactor, const String& srcAttribute, const String& srcSetAttribute)
+{
+    ImageCandidates imageCandidates;
+
+    const String srcSetAttributeValue = srcSetAttribute.simplifyWhiteSpace(isHTMLSpace);
+    Vector<String> srcSetTokens;
+
+    srcSetAttributeValue.split(',', srcSetTokens);
+    for (size_t i = 0; i < srcSetTokens.size(); ++i) {
+        Vector<String> data;
+        float imgScaleFactor = 1.0;
+        bool validScaleFactor = false;
+
+        srcSetTokens[i].stripWhiteSpace().split(' ', data);
+        // There must be at least one candidate descriptor, and the last one must
+        // be a scale factor. Since we don't support descriptors other than scale,
+        // it's better to discard any rule with such descriptors rather than accept
+        // only the scale data.
+        if (data.size() != 2)
+            continue;
+        if (!data.last().endsWith('x'))
+            continue;
+
+        imgScaleFactor = data.last().substring(0, data.last().length() - 1).toFloat(&validScaleFactor);
+        if (!validScaleFactor)
+            continue;
+
+        ImageWithScale image;
+        image.imageURL = decodeURLEscapeSequences(data[0]);
+        image.scaleFactor = imgScaleFactor;
+
+        imageCandidates.append(image);
+    }
+
+    const String src =  srcAttribute.simplifyWhiteSpace(isHTMLSpace);
+    if (!src.isEmpty()) {
+        ImageWithScale image;
+        image.imageURL = decodeURLEscapeSequences(src);
+        image.scaleFactor = 1.0;
+
+        imageCandidates.append(image);
+    }
+
+    std::stable_sort(imageCandidates.begin(), imageCandidates.end(), compareByScaleFactor);
+
+    for (size_t i = 0; i < imageCandidates.size(); ++i) {
+        if (imageCandidates[i].scaleFactor >= deviceScaleFactor)
+            return imageCandidates[i].imageURL;
+    }
+    return String();
 }
 
 }

@@ -36,7 +36,6 @@
 #include "ScrollTypes.h"
 #include <wtf/FastAllocBase.h>
 #include <wtf/Forward.h>
-#include <wtf/UnusedParam.h>
 
 namespace WebCore {
 
@@ -65,7 +64,7 @@ public:
 
     virtual bool handleWheelEvent(const PlatformWheelEvent&);
 
-#if PLATFORM(MAC) || (PLATFORM(CHROMIUM) && OS(DARWIN))
+#if PLATFORM(MAC)
     virtual void handleWheelEventPhase(PlatformWheelEventPhase) { }
 #endif
 

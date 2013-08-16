@@ -49,14 +49,13 @@ public:
     
     virtual void addChildren();
     
-    virtual AccessibilityTableCell* cellForColumnAndRow(unsigned column, unsigned row);
-
 private:
     // ARIA treegrids and grids support selected rows.
     virtual bool supportsSelectedRows() { return true; }    
     virtual bool isMultiSelectable() const { return true; }
     virtual bool isTableExposableThroughAccessibility() const { return true; }
     
+    void addRowDescendant(AccessibilityObject*, HashSet<AccessibilityObject*>& appendedRows, unsigned& columnCount);
     bool addTableCellChild(AccessibilityObject*, HashSet<AccessibilityObject*>& appendedRows, unsigned& columnCount);
 };
 

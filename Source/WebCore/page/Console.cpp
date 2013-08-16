@@ -39,8 +39,8 @@
 #include "FrameTree.h"
 #include "InspectorConsoleInstrumentation.h"
 #include "InspectorController.h"
-#include "MemoryInfo.h"
 #include "Page.h"
+#include "PageConsole.h"
 #include "PageGroup.h"
 #include "ScriptArguments.h"
 #include "ScriptCallStack.h"
@@ -51,19 +51,10 @@
 #include "ScriptableDocumentParser.h"
 #include "Settings.h"
 #include <stdio.h>
-#include <wtf/UnusedParam.h>
 #include <wtf/text/CString.h>
 #include <wtf/text/WTFString.h>
 
-#if PLATFORM(CHROMIUM)
-#include "TraceEvent.h"
-#endif
-
 namespace WebCore {
-
-namespace {
-    int muteCount = 0;
-}
 
 Console::Console(Frame* frame)
     : DOMWindowProperty(frame)
@@ -72,117 +63,6 @@ Console::Console(Frame* frame)
 
 Console::~Console()
 {
-}
-
-static void printSourceURLAndLine(const String& sourceURL, unsigned lineNumber)
-{
-    if (!sourceURL.isEmpty()) {
-        if (lineNumber > 0)
-            printf("%s:%d: ", sourceURL.utf8().data(), lineNumber);
-        else
-            printf("%s: ", sourceURL.utf8().data());
-    }
-}
-
-static void printMessageSourceAndLevelPrefix(MessageSource source, MessageLevel level)
-{
-    const char* sourceString;
-    switch (source) {
-    case HTMLMessageSource:
-        sourceString = "HTML";
-        break;
-    case XMLMessageSource:
-        sourceString = "XML";
-        break;
-    case JSMessageSource:
-        sourceString = "JS";
-        break;
-    case NetworkMessageSource:
-        sourceString = "NETWORK";
-        break;
-    case ConsoleAPIMessageSource:
-        sourceString = "CONSOLEAPI";
-        break;
-    case OtherMessageSource:
-        sourceString = "OTHER";
-        break;
-    default:
-        ASSERT_NOT_REACHED();
-        sourceString = "UNKNOWN";
-        break;
-    }
-
-    const char* levelString;
-    switch (level) {
-    case TipMessageLevel:
-        levelString = "TIP";
-        break;
-    case LogMessageLevel:
-        levelString = "LOG";
-        break;
-    case WarningMessageLevel:
-        levelString = "WARN";
-        break;
-    case ErrorMessageLevel:
-        levelString = "ERROR";
-        break;
-    case DebugMessageLevel:
-        levelString = "DEBUG";
-        break;
-    default:
-        ASSERT_NOT_REACHED();
-        levelString = "UNKNOWN";
-        break;
-    }
-
-    printf("%s %s:", sourceString, levelString);
-}
-
-void Console::addMessage(MessageSource source, MessageLevel level, const String& message, unsigned long requestIdentifier, Document* document)
-{
-    String url;
-    if (document)
-        url = document->url().string();
-    unsigned line = 0;
-    if (document && document->parsing() && !document->isInDocumentWrite() && document->scriptableDocumentParser()) {
-        ScriptableDocumentParser* parser = document->scriptableDocumentParser();
-        if (!parser->isWaitingForScripts() && !parser->isExecutingScript())
-            line = parser->lineNumber().oneBasedInt();
-    }
-    addMessage(source, level, message, url, line, 0, 0, requestIdentifier);
-}
-
-void Console::addMessage(MessageSource source, MessageLevel level, const String& message, PassRefPtr<ScriptCallStack> callStack)
-{
-    addMessage(source, level, message, String(), 0, callStack, 0);
-}
-
-void Console::addMessage(MessageSource source, MessageLevel level, const String& message, const String& url, unsigned lineNumber, PassRefPtr<ScriptCallStack> callStack, ScriptState* state, unsigned long requestIdentifier)
-{
-    if (muteCount && source != ConsoleAPIMessageSource)
-        return;
-
-    Page* page = this->page();
-    if (!page)
-        return;
-
-    if (callStack)
-        InspectorInstrumentation::addMessageToConsole(page, source, LogMessageType, level, message, callStack, requestIdentifier);
-    else
-        InspectorInstrumentation::addMessageToConsole(page, source, LogMessageType, level, message, url, lineNumber, state, requestIdentifier);
-
-    if (!m_frame->settings() || m_frame->settings()->privateBrowsingEnabled())
-        return;
-
-    page->chrome()->client()->addMessageToConsole(source, level, message, lineNumber, url);
-
-    if (!m_frame->settings()->logsPageMessagesToSystemConsoleEnabled() && !shouldPrintExceptions())
-        return;
-
-    printSourceURLAndLine(url, lineNumber);
-    printMessageSourceAndLevelPrefix(source, level);
-
-    printf(" %s\n", message.utf8().data());
 }
 
 static void internalAddMessage(Page* page, MessageType type, MessageLevel level, ScriptState* state, PassRefPtr<ScriptArguments> prpArguments, bool acceptNoArguments = false, bool printTrace = false)
@@ -203,17 +83,17 @@ static void internalAddMessage(Page* page, MessageType type, MessageLevel level,
     bool gotMessage = arguments->getFirstArgumentAsString(message);
     InspectorInstrumentation::addMessageToConsole(page, ConsoleAPIMessageSource, type, level, message, state, arguments);
 
-    if (!page->settings() || page->settings()->privateBrowsingEnabled())
+    if (page->settings()->privateBrowsingEnabled())
         return;
 
     if (gotMessage)
-        page->chrome()->client()->addMessageToConsole(ConsoleAPIMessageSource, type, level, message, lastCaller.lineNumber(), lastCaller.sourceURL());
+        page->chrome().client()->addMessageToConsole(ConsoleAPIMessageSource, type, level, message, lastCaller.lineNumber(), lastCaller.columnNumber(), lastCaller.sourceURL());
 
-    if (!page->settings()->logsPageMessagesToSystemConsoleEnabled() && !Console::shouldPrintExceptions())
+    if (!page->settings()->logsPageMessagesToSystemConsoleEnabled() && !PageConsole::shouldPrintExceptions())
         return;
 
-    printSourceURLAndLine(lastCaller.sourceURL(), lastCaller.lineNumber());
-    printMessageSourceAndLevelPrefix(ConsoleAPIMessageSource, level);
+    PageConsole::printSourceURLAndLine(lastCaller.sourceURL(), lastCaller.lineNumber());
+    PageConsole::printMessageSourceAndLevelPrefix(ConsoleAPIMessageSource, level);
 
     for (size_t i = 0; i < arguments->argumentCount(); ++i) {
         String argAsString = arguments->argumentAt(i).toString(arguments->globalState());
@@ -294,11 +174,6 @@ void Console::count(ScriptState* state, PassRefPtr<ScriptArguments> arguments)
     InspectorInstrumentation::consoleCount(page(), state, arguments);
 }
 
-void Console::markTimeline(PassRefPtr<ScriptArguments> arguments)
-{
-    InspectorInstrumentation::consoleTimeStamp(m_frame, arguments);
-}
-
 #if ENABLE(JAVASCRIPT_DEBUGGER)
 
 void Console::profile(const String& title, ScriptState* state)
@@ -319,7 +194,7 @@ void Console::profile(const String& title, ScriptState* state)
 
     RefPtr<ScriptCallStack> callStack(createScriptCallStack(state, 1));
     const ScriptCallFrame& lastCaller = callStack->at(0);
-    InspectorInstrumentation::addStartProfilingMessageToConsole(page, resolvedTitle, lastCaller.lineNumber(), lastCaller.sourceURL());
+    InspectorInstrumentation::addStartProfilingMessageToConsole(page, resolvedTitle, lastCaller.lineNumber(), lastCaller.columnNumber(), lastCaller.sourceURL());
 }
 
 void Console::profileEnd(const String& title, ScriptState* state)
@@ -345,16 +220,10 @@ void Console::profileEnd(const String& title, ScriptState* state)
 void Console::time(const String& title)
 {
     InspectorInstrumentation::startConsoleTiming(m_frame, title);
-#if PLATFORM(CHROMIUM)
-    TRACE_EVENT_COPY_ASYNC_BEGIN0("webkit", title.utf8().data(), this);
-#endif
 }
 
 void Console::timeEnd(ScriptState* state, const String& title)
 {
-#if PLATFORM(CHROMIUM)
-    TRACE_EVENT_COPY_ASYNC_END0("webkit", title.utf8().data(), this);
-#endif
     RefPtr<ScriptCallStack> callStack(createScriptCallStackForConsole(state));
     InspectorInstrumentation::stopConsoleTiming(m_frame, title, callStack.release());
 }
@@ -376,39 +245,7 @@ void Console::groupCollapsed(ScriptState* state, PassRefPtr<ScriptArguments> arg
 
 void Console::groupEnd()
 {
-    InspectorInstrumentation::addMessageToConsole(page(), ConsoleAPIMessageSource, EndGroupMessageType, LogMessageLevel, String(), String(), 0);
-}
-
-// static
-void Console::mute()
-{
-    muteCount++;
-}
-
-// static
-void Console::unmute()
-{
-    ASSERT(muteCount > 0);
-    muteCount--;
-}
-
-PassRefPtr<MemoryInfo> Console::memory() const
-{
-    // FIXME: Because we create a new object here each time,
-    // console.memory !== console.memory, which seems wrong.
-    return MemoryInfo::create(m_frame);
-}
-
-static bool printExceptions = false;
-
-bool Console::shouldPrintExceptions()
-{
-    return printExceptions;
-}
-
-void Console::setShouldPrintExceptions(bool print)
-{
-    printExceptions = print;
+    InspectorInstrumentation::addMessageToConsole(page(), ConsoleAPIMessageSource, EndGroupMessageType, LogMessageLevel, String(), String(), 0, 0);
 }
 
 Page* Console::page() const

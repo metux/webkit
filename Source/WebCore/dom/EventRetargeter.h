@@ -39,6 +39,9 @@ class EventTarget;
 class FocusEvent;
 class MouseEvent;
 class Node;
+#if ENABLE(TOUCH_EVENTS)
+class TouchEvent;
+#endif
 class TreeScope;
 
 enum EventDispatchBehavior {
@@ -51,16 +54,26 @@ public:
     static void calculateEventPath(Node*, Event*, EventPath&);
     static void adjustForMouseEvent(Node*, const MouseEvent&, EventPath&);
     static void adjustForFocusEvent(Node*, const FocusEvent&, EventPath&);
+#if ENABLE(TOUCH_EVENTS)
+    typedef Vector<RefPtr<TouchList> > EventPathTouchLists;
+    static void adjustForTouchEvent(Node*, const TouchEvent&, EventPath&);
+#endif
     static EventTarget* eventTargetRespectingTargetRules(Node* referenceNode);
 
 private:
     typedef Vector<RefPtr<Node> > AdjustedNodes;
     typedef HashMap<TreeScope*, Node*> RelatedNodeMap;
-
-    static void adjustForRelatedTarget(Node*, EventTarget* relatedTarget, EventPath&);
-    static void calculateAdjustedNodes(Node*, Node* relatedNode, EventPath&, AdjustedNodes&);
-    static void buildRelatedNodeMap(Node*, RelatedNodeMap&);
+    enum EventWithRelatedTargetDispatchBehavior {
+        StopAtBoundaryIfNeeded,
+        DoesNotStopAtBoundary
+    };
+    static void adjustForRelatedTarget(const Node*, EventTarget* relatedTarget, EventPath&);
+    static void calculateAdjustedNodes(const Node*, const Node* relatedNode, EventWithRelatedTargetDispatchBehavior, EventPath&, AdjustedNodes&);
+    static void buildRelatedNodeMap(const Node*, RelatedNodeMap&);
     static Node* findRelatedNode(TreeScope*, RelatedNodeMap&);
+#if ENABLE(TOUCH_EVENTS)
+    static void adjustTouchList(const Node*, const TouchList*, const EventPath&, EventPathTouchLists&);
+#endif
 };
 
 inline EventTarget* EventRetargeter::eventTargetRespectingTargetRules(Node* referenceNode)
@@ -80,7 +93,7 @@ inline EventTarget* EventRetargeter::eventTargetRespectingTargetRules(Node* refe
     // At this time, SVG nodes are not supported in non-<use> shadow trees.
     if (!shadowHostElement || !shadowHostElement->hasTagName(SVGNames::useTag))
         return referenceNode;
-    SVGUseElement* useElement = static_cast<SVGUseElement*>(shadowHostElement);
+    SVGUseElement* useElement = toSVGUseElement(shadowHostElement);
     if (SVGElementInstance* instance = useElement->instanceForShadowTreeElement(referenceNode))
         return instance;
 #endif

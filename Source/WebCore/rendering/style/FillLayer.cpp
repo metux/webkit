@@ -52,7 +52,7 @@ FillLayer::FillLayer(EFillLayerType type)
     , m_repeatX(FillLayer::initialFillRepeatX(type))
     , m_repeatY(FillLayer::initialFillRepeatY(type))
     , m_composite(FillLayer::initialFillComposite(type))
-    , m_sizeType(SizeNone)
+    , m_sizeType(FillLayer::initialFillSizeType(type))
     , m_blendMode(FillLayer::initialFillBlendMode(type))
     , m_imageSet(false)
     , m_attachmentSet(false)
@@ -153,7 +153,7 @@ bool FillLayer::operator==(const FillLayer& o) const
     return StyleImage::imagesEquivalent(m_image.get(), o.m_image.get()) && m_xPosition == o.m_xPosition && m_yPosition == o.m_yPosition
             && m_backgroundXOrigin == o.m_backgroundXOrigin && m_backgroundYOrigin == o.m_backgroundYOrigin
             && m_attachment == o.m_attachment && m_clip == o.m_clip && m_composite == o.m_composite
-            && m_blendModeSet == o.m_blendModeSet && m_origin == o.m_origin && m_repeatX == o.m_repeatX
+            && m_blendMode == o.m_blendMode && m_origin == o.m_origin && m_repeatX == o.m_repeatX
             && m_repeatY == o.m_repeatY && m_sizeType == o.m_sizeType && m_sizeLength == o.m_sizeLength
             && m_type == o.m_type && ((m_next && o.m_next) ? *m_next == *o.m_next : m_next == o.m_next);
 }
@@ -350,6 +350,9 @@ bool FillLayer::hasOpaqueImage(const RenderObject* renderer) const
 
     if (m_composite == CompositeClear || m_composite == CompositeCopy)
         return true;
+
+    if (m_blendMode != BlendModeNormal)
+        return false;
 
     if (m_composite == CompositeSourceOver)
         return m_image->knownToBeOpaque(renderer);

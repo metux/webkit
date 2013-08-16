@@ -56,19 +56,21 @@ ConsoleMessage::ConsoleMessage(bool canGenerateCallStack, MessageSource source, 
     , m_message(message)
     , m_url()
     , m_line(0)
+    , m_column(0)
     , m_repeatCount(1)
     , m_requestId(IdentifiersFactory::requestId(requestIdentifier))
 {
     autogenerateMetadata(canGenerateCallStack);
 }
 
-ConsoleMessage::ConsoleMessage(bool canGenerateCallStack, MessageSource source, MessageType type, MessageLevel level, const String& message, const String& url, unsigned line, ScriptState* state, unsigned long requestIdentifier)
+ConsoleMessage::ConsoleMessage(bool canGenerateCallStack, MessageSource source, MessageType type, MessageLevel level, const String& message, const String& url, unsigned line, unsigned column, ScriptState* state, unsigned long requestIdentifier)
     : m_source(source)
     , m_type(type)
     , m_level(level)
     , m_message(message)
     , m_url(url)
     , m_line(line)
+    , m_column(column)
     , m_repeatCount(1)
     , m_requestId(IdentifiersFactory::requestId(requestIdentifier))
 {
@@ -82,6 +84,7 @@ ConsoleMessage::ConsoleMessage(bool, MessageSource source, MessageType type, Mes
     , m_message(message)
     , m_arguments(0)
     , m_line(0)
+    , m_column(0)
     , m_repeatCount(1)
     , m_requestId(IdentifiersFactory::requestId(requestIdentifier))
 {
@@ -89,6 +92,7 @@ ConsoleMessage::ConsoleMessage(bool, MessageSource source, MessageType type, Mes
         const ScriptCallFrame& frame = callStack->at(0);
         m_url = frame.sourceURL();
         m_line = frame.lineNumber();
+        m_column = frame.columnNumber();
     }
     m_callStack = callStack;
 }
@@ -101,6 +105,7 @@ ConsoleMessage::ConsoleMessage(bool canGenerateCallStack, MessageSource source, 
     , m_arguments(arguments)
     , m_url()
     , m_line(0)
+    , m_column(0)
     , m_repeatCount(1)
     , m_requestId(IdentifiersFactory::requestId(requestIdentifier))
 {
@@ -127,6 +132,7 @@ void ConsoleMessage::autogenerateMetadata(bool canGenerateCallStack, ScriptState
         const ScriptCallFrame& frame = m_callStack->at(0);
         m_url = frame.sourceURL();
         m_line = frame.lineNumber();
+        m_column = frame.columnNumber();
         return;
     }
 
@@ -137,11 +143,15 @@ void ConsoleMessage::autogenerateMetadata(bool canGenerateCallStack, ScriptState
 static TypeBuilder::Console::ConsoleMessage::Source::Enum messageSourceValue(MessageSource source)
 {
     switch (source) {
-    case HTMLMessageSource: return TypeBuilder::Console::ConsoleMessage::Source::Html;
     case XMLMessageSource: return TypeBuilder::Console::ConsoleMessage::Source::Xml;
     case JSMessageSource: return TypeBuilder::Console::ConsoleMessage::Source::Javascript;
     case NetworkMessageSource: return TypeBuilder::Console::ConsoleMessage::Source::Network;
     case ConsoleAPIMessageSource: return TypeBuilder::Console::ConsoleMessage::Source::Console_api;
+    case StorageMessageSource: return TypeBuilder::Console::ConsoleMessage::Source::Storage;
+    case AppCacheMessageSource: return TypeBuilder::Console::ConsoleMessage::Source::Appcache;
+    case RenderingMessageSource: return TypeBuilder::Console::ConsoleMessage::Source::Rendering;
+    case CSSMessageSource: return TypeBuilder::Console::ConsoleMessage::Source::Css;
+    case SecurityMessageSource: return TypeBuilder::Console::ConsoleMessage::Source::Security;
     case OtherMessageSource: return TypeBuilder::Console::ConsoleMessage::Source::Other;
     }
     return TypeBuilder::Console::ConsoleMessage::Source::Other;
@@ -170,11 +180,10 @@ static TypeBuilder::Console::ConsoleMessage::Type::Enum messageTypeValue(Message
 static TypeBuilder::Console::ConsoleMessage::Level::Enum messageLevelValue(MessageLevel level)
 {
     switch (level) {
-    case TipMessageLevel: return TypeBuilder::Console::ConsoleMessage::Level::Tip;
+    case DebugMessageLevel: return TypeBuilder::Console::ConsoleMessage::Level::Debug;
     case LogMessageLevel: return TypeBuilder::Console::ConsoleMessage::Level::Log;
     case WarningMessageLevel: return TypeBuilder::Console::ConsoleMessage::Level::Warning;
     case ErrorMessageLevel: return TypeBuilder::Console::ConsoleMessage::Level::Error;
-    case DebugMessageLevel: return TypeBuilder::Console::ConsoleMessage::Level::Debug;
     }
     return TypeBuilder::Console::ConsoleMessage::Level::Log;
 }
@@ -188,6 +197,7 @@ void ConsoleMessage::addToFrontend(InspectorFrontend::Console* frontend, Injecte
     // FIXME: only send out type for ConsoleAPI source messages.
     jsonObj->setType(messageTypeValue(m_type));
     jsonObj->setLine(static_cast<int>(m_line));
+    jsonObj->setColumn(static_cast<int>(m_column));
     jsonObj->setUrl(m_url);
     jsonObj->setRepeatCount(static_cast<int>(m_repeatCount));
     if (m_source == NetworkMessageSource && !m_requestId.isEmpty())
@@ -252,6 +262,7 @@ bool ConsoleMessage::isEqual(ConsoleMessage* msg) const
         && msg->m_level == m_level
         && msg->m_message == m_message
         && msg->m_line == m_line
+        && msg->m_column == m_column
         && msg->m_url == m_url
         && msg->m_requestId == m_requestId;
 }

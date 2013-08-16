@@ -35,6 +35,7 @@ namespace JSC {
 
 MarkedBlock* MarkedBlock::create(DeadBlock* block, MarkedAllocator* allocator, size_t cellSize, DestructorType destructorType)
 {
+    ASSERT(reinterpret_cast<size_t>(block) == (reinterpret_cast<size_t>(block) & blockMask));
     Region* region = block->region();
     return new (NotNull, block) MarkedBlock(region, allocator, cellSize, destructorType);
 }
@@ -46,7 +47,7 @@ MarkedBlock::MarkedBlock(Region* region, MarkedAllocator* allocator, size_t cell
     , m_destructorType(destructorType)
     , m_allocator(allocator)
     , m_state(New) // All cells start out unmarked.
-    , m_weakSet(allocator->heap()->globalData())
+    , m_weakSet(allocator->heap()->vm())
 {
     ASSERT(allocator);
     HEAP_LOG_BLOCK_STATE_TRANSITION(this);

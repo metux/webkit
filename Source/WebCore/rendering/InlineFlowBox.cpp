@@ -20,7 +20,6 @@
 #include "config.h"
 #include "InlineFlowBox.h"
 
-#include "CachedImage.h"
 #include "CSSPropertyNames.h"
 #include "Document.h"
 #include "EllipsisBox.h"
@@ -39,7 +38,6 @@
 #include "RenderView.h"
 #include "RootInlineBox.h"
 #include "Text.h"
-#include "WebCoreMemoryInstrumentation.h"
 
 #include <math.h>
 
@@ -482,6 +480,13 @@ bool InlineFlowBox::requiresIdeographicBaseline(const GlyphOverflowAndFallbackFo
     return false;
 }
 
+static bool verticalAlignApplies(RenderObject* curr)
+{
+    // http://www.w3.org/TR/CSS2/visudet.html#propdef-vertical-align - vertical-align
+    // only applies to inline level and table-cell elements
+    return !curr->isText() || curr->parent()->isInline() || curr->parent()->isTableCell();
+}
+
 void InlineFlowBox::adjustMaxAscentAndDescent(int& maxAscent, int& maxDescent, int maxPositionTop, int maxPositionBottom)
 {
     for (InlineBox* curr = firstChild(); curr; curr = curr->nextOnLine()) {
@@ -489,7 +494,8 @@ void InlineFlowBox::adjustMaxAscentAndDescent(int& maxAscent, int& maxDescent, i
         // positioned elements
         if (curr->renderer()->isOutOfFlowPositioned())
             continue; // Positioned placeholders don't affect calculations.
-        if (curr->verticalAlign() == TOP || curr->verticalAlign() == BOTTOM) {
+
+        if ((curr->verticalAlign() == TOP || curr->verticalAlign() == BOTTOM) && verticalAlignApplies(curr->renderer())) {
             int lineHeight = curr->lineHeight();
             if (curr->verticalAlign() == TOP) {
                 if (maxAscent + maxDescent < lineHeight)
@@ -572,10 +578,10 @@ void InlineFlowBox::computeLogicalBoxHeights(RootInlineBox* rootBox, LayoutUnit&
         rootBox->ascentAndDescentForBox(curr, textBoxDataMap, ascent, descent, affectsAscent, affectsDescent);
 
         LayoutUnit boxHeight = ascent + descent;
-        if (curr->verticalAlign() == TOP) {
+        if (curr->verticalAlign() == TOP && verticalAlignApplies(curr->renderer())) {
             if (maxPositionTop < boxHeight)
                 maxPositionTop = boxHeight;
-        } else if (curr->verticalAlign() == BOTTOM) {
+        } else if (curr->verticalAlign() == BOTTOM && verticalAlignApplies(curr->renderer())) {
             if (maxPositionBottom < boxHeight)
                 maxPositionBottom = boxHeight;
         } else if (!inlineFlowBox || strictMode || inlineFlowBox->hasTextChildren() || (inlineFlowBox->descendantsHaveSameLineHeightAndBaseline() && inlineFlowBox->hasTextDescendants())
@@ -621,7 +627,7 @@ void InlineFlowBox::placeBoxesInBlockDirection(LayoutUnit top, LayoutUnit maxHei
     if (descendantsHaveSameLineHeightAndBaseline()) {
         adjustmentForChildrenWithSameLineHeightAndBaseline = logicalTop();
         if (parent())
-            adjustmentForChildrenWithSameLineHeightAndBaseline += (boxModelObject()->borderBefore() + boxModelObject()->paddingBefore());
+            adjustmentForChildrenWithSameLineHeightAndBaseline += (boxModelObject()->borderAndPaddingBefore());
     }
 
     for (InlineBox* curr = firstChild(); curr; curr = curr->nextOnLine()) {
@@ -635,9 +641,10 @@ void InlineFlowBox::placeBoxesInBlockDirection(LayoutUnit top, LayoutUnit maxHei
 
         InlineFlowBox* inlineFlowBox = curr->isInlineFlowBox() ? toInlineFlowBox(curr) : 0;
         bool childAffectsTopBottomPos = true;
-        if (curr->verticalAlign() == TOP)
+
+        if (curr->verticalAlign() == TOP && verticalAlignApplies(curr->renderer()))
             curr->setLogicalTop(top);
-        else if (curr->verticalAlign() == BOTTOM)
+        else if (curr->verticalAlign() == BOTTOM && verticalAlignApplies(curr->renderer()))
             curr->setLogicalTop(top + maxHeight - curr->lineHeight());
         else {
             if (!strictMode && inlineFlowBox && !inlineFlowBox->hasTextChildren() && !curr->boxModelObject()->hasInlineDirectionBordersOrPadding()
@@ -738,6 +745,25 @@ void InlineFlowBox::placeBoxesInBlockDirection(LayoutUnit top, LayoutUnit maxHei
             flipLinesInBlockDirection(lineTopIncludingMargins, lineBottomIncludingMargins);
     }
 }
+
+#if ENABLE(CSS3_TEXT)
+void InlineFlowBox::computeMaxLogicalTop(float& maxLogicalTop) const
+{
+    for (InlineBox* curr = firstChild(); curr; curr = curr->nextOnLine()) {
+        if (curr->renderer()->isOutOfFlowPositioned())
+            continue; // Positioned placeholders don't affect calculations.
+
+        if (descendantsHaveSameLineHeightAndBaseline())
+            continue;
+
+        maxLogicalTop = max<float>(maxLogicalTop, curr->y());
+        float localMaxLogicalTop = 0;
+        if (curr->isInlineFlowBox())
+            toInlineFlowBox(curr)->computeMaxLogicalTop(localMaxLogicalTop);
+        maxLogicalTop = max<float>(maxLogicalTop, localMaxLogicalTop);
+    }
+}
+#endif // CSS3_TEXT
 
 void InlineFlowBox::flipLinesInBlockDirection(LayoutUnit lineTop, LayoutUnit lineBottom)
 {
@@ -1025,6 +1051,26 @@ bool InlineFlowBox::nodeAtPoint(const HitTestRequest& request, HitTestResult& re
     }
 
     // Now check ourselves. Pixel snap hit testing.
+    if (!visibleToHitTesting())
+        return false;
+
+    // Do not hittest content beyond the ellipsis box.
+    if (isRootInlineBox() && hasEllipsisBox()) {
+        const EllipsisBox* ellipsisBox = root()->ellipsisBox();
+        LayoutRect boundsRect(roundedFrameRect());
+
+        if (isHorizontal())
+            renderer()->style()->isLeftToRightDirection() ? boundsRect.shiftXEdgeTo(ellipsisBox->right()) : boundsRect.setWidth(ellipsisBox->left() - left());
+        else
+            boundsRect.shiftYEdgeTo(ellipsisBox->right());
+
+        flipForWritingMode(boundsRect);
+        boundsRect.moveBy(accumulatedOffset);
+        // We are beyond the ellipsis box.
+        if (locationInContainer.intersects(boundsRect))
+            return false;
+    }
+
     LayoutRect frameRect = roundedFrameRect();
     LayoutUnit minX = frameRect.x();
     LayoutUnit minY = frameRect.y();
@@ -1047,7 +1093,7 @@ bool InlineFlowBox::nodeAtPoint(const HitTestRequest& request, HitTestResult& re
     flipForWritingMode(rect);
     rect.moveBy(accumulatedOffset);
 
-    if (visibleToHitTesting() && locationInContainer.intersects(rect)) {
+    if (locationInContainer.intersects(rect)) {
         renderer()->updateHitTestResult(result, flipForWritingMode(locationInContainer.point() - toLayoutSize(accumulatedOffset))); // Don't add in m_x or m_y here, we want coords in the containing block's space.
         if (!result.addNodeToRectBasedTestResult(renderer()->node(), request, locationInContainer, rect))
             return true;
@@ -1115,7 +1161,7 @@ void InlineFlowBox::paint(PaintInfo& paintInfo, const LayoutPoint& paintOffset, 
     PaintPhase paintPhase = paintInfo.phase == PaintPhaseChildOutlines ? PaintPhaseOutline : paintInfo.phase;
     PaintInfo childInfo(paintInfo);
     childInfo.phase = paintPhase;
-    childInfo.updatePaintingRootForChildren(renderer());
+    childInfo.updateSubtreePaintRootForChildren(renderer());
     
     // Paint our children.
     if (paintPhase != PaintPhaseSelfOutline) {
@@ -1635,16 +1681,5 @@ void InlineFlowBox::checkConsistency() const
 }
 
 #endif
-
-void InlineFlowBox::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
-{
-    MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::Rendering);
-    InlineBox::reportMemoryUsage(memoryObjectInfo);
-    info.addMember(m_overflow, "overflow");
-    info.addMember(m_firstChild, "firstChild");
-    info.addMember(m_lastChild, "lastChild");
-    info.addMember(m_prevLineBox, "prevLineBox");
-    info.addMember(m_nextLineBox, "nextLineBox");
-}
 
 } // namespace WebCore

@@ -20,16 +20,12 @@
 #include "config.h"
 #include "WebKitWebExtension.h"
 
-#include "FrameView.h"
-#include "ImageOptions.h"
 #include "ImmutableDictionary.h"
 #include "WKBundleAPICast.h"
 #include "WKBundlePage.h"
-#include "WebImage.h"
 #include "WebKitPrivate.h"
 #include "WebKitWebExtensionPrivate.h"
 #include "WebKitWebPagePrivate.h"
-#include "WebProcess.h"
 #include <WebCore/DNS.h>
 #include <wtf/HashMap.h>
 #include <wtf/gobject/GRefPtr.h>
@@ -93,40 +89,6 @@ static void webkitWebExtensionDidReceiveMessage(WebKitWebExtension* extension, c
         ASSERT_NOT_REACHED();
 }
 
-static void webkitWebExtensionDidReceiveMessageToPage(WebKitWebExtension* extension, WebPage* page, const String& messageName, ImmutableDictionary& message)
-{
-    if (messageName == String("GetSnapshot")) {
-        SnapshotOptions snapshotOptions = static_cast<SnapshotOptions>(static_cast<WebUInt64*>(message.get(String::fromUTF8("SnapshotOptions")))->value());
-        uint64_t callbackID = static_cast<WebUInt64*>(message.get("CallbackID"))->value();
-        SnapshotRegion region = static_cast<SnapshotRegion>(static_cast<WebUInt64*>(message.get("SnapshotRegion"))->value());
-
-        RefPtr<WebImage> snapshotImage;
-
-        if (WebCore::FrameView* frameView = page->mainFrameView()) {
-            WebCore::IntRect snapshotRect;
-            switch (region) {
-            case SnapshotRegionVisible:
-                snapshotRect = frameView->visibleContentRect(WebCore::ScrollableArea::ExcludeScrollbars);
-                break;
-            case SnapshotRegionFullDocument:
-                snapshotRect = WebCore::IntRect(WebCore::IntPoint(0, 0), frameView->contentsSize());
-                break;
-            default:
-                ASSERT_NOT_REACHED();
-            }
-            if (!snapshotRect.isEmpty())
-                snapshotImage = page->scaledSnapshotWithOptions(snapshotRect, 1, snapshotOptions | SnapshotOptionsShareable);
-        }
-
-        ImmutableDictionary::MapType messageReply;
-        messageReply.set("Page", page);
-        messageReply.set("CallbackID", WebUInt64::create(callbackID));
-        messageReply.set("Snapshot", snapshotImage);
-        WebProcess::shared().injectedBundle()->postMessage("WebPage.DidGetSnapshot", ImmutableDictionary::adopt(messageReply).get());
-    } else
-        ASSERT_NOT_REACHED();
-}
-
 static void didCreatePage(WKBundleRef bundle, WKBundlePageRef page, const void* clientInfo)
 {
     webkitWebExtensionPageCreated(WEBKIT_WEB_EXTENSION(clientInfo), toImpl(page));
@@ -146,7 +108,8 @@ static void didReceiveMessage(WKBundleRef bundle, WKStringRef name, WKTypeRef me
 static void didReceiveMessageToPage(WKBundleRef bundle, WKBundlePageRef page, WKStringRef name, WKTypeRef messageBody, const void* clientInfo)
 {
     ASSERT(WKGetTypeID(messageBody) == WKDictionaryGetTypeID());
-    webkitWebExtensionDidReceiveMessageToPage(WEBKIT_WEB_EXTENSION(clientInfo), toImpl(page), toImpl(name)->string(), *toImpl(static_cast<WKDictionaryRef>(messageBody)));
+    if (WebKitWebPage* webPage = WEBKIT_WEB_EXTENSION(clientInfo)->priv->pages.get(toImpl(page)).get())
+        webkitWebPageDidReceiveMessage(webPage, toImpl(name)->string(), *toImpl(static_cast<WKDictionaryRef>(messageBody)));
 }
 
 WebKitWebExtension* webkitWebExtensionCreate(InjectedBundle* bundle)

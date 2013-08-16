@@ -39,6 +39,7 @@
 #include "RenderView.h"
 #include "ScrollAnimator.h"
 #include <wtf/MainThread.h>
+#include <wtf/text/StringBuilder.h>
 
 #if USE(ACCELERATED_COMPOSITING)
 #include "RenderLayerCompositor.h"
@@ -48,12 +49,12 @@
 #include "ScrollingCoordinatorMac.h"
 #endif
 
-#if PLATFORM(CHROMIUM)
-#include "ScrollingCoordinatorChromium.h"
-#endif
-
 #if USE(COORDINATED_GRAPHICS)
 #include "ScrollingCoordinatorCoordinatedGraphics.h"
+#endif
+
+#if PLATFORM(BLACKBERRY)
+#include "ScrollingCoordinatorBlackBerry.h"
 #endif
 
 namespace WebCore {
@@ -64,12 +65,12 @@ PassRefPtr<ScrollingCoordinator> ScrollingCoordinator::create(Page* page)
     return adoptRef(new ScrollingCoordinatorMac(page));
 #endif
 
-#if PLATFORM(CHROMIUM)
-    return adoptRef(new ScrollingCoordinatorChromium(page));
-#endif
-
 #if USE(COORDINATED_GRAPHICS)
     return adoptRef(new ScrollingCoordinatorCoordinatedGraphics(page));
+#endif
+
+#if PLATFORM(BLACKBERRY)
+    return adoptRef(new ScrollingCoordinatorBlackBerry(page));
 #endif
 
     return adoptRef(new ScrollingCoordinator(page));
@@ -144,7 +145,7 @@ Region ScrollingCoordinator::computeNonFastScrollableRegion(const Frame* frame, 
             if (!(*it)->isPluginViewBase())
                 continue;
 
-            PluginViewBase* pluginViewBase = static_cast<PluginViewBase*>((*it).get());
+            PluginViewBase* pluginViewBase = toPluginViewBase((*it).get());
             if (pluginViewBase->wantsWheelEvents())
                 nonFastScrollableRegion.unite(pluginViewBase->frameRect());
         }
@@ -210,7 +211,7 @@ static void accumulateDocumentEventTargetRects(Vector<IntRect>& rects, const Doc
         }
 
         if (touchTarget->isDocumentNode() && touchTarget != document) {
-            accumulateDocumentEventTargetRects(rects, static_cast<const Document*>(touchTarget));
+            accumulateDocumentEventTargetRects(rects, toDocument(touchTarget));
             continue;
         }
 
@@ -272,6 +273,23 @@ void ScrollingCoordinator::frameViewFixedObjectsDidChange(FrameView* frameView)
     updateShouldUpdateScrollLayerPositionOnMainThread();
 }
 
+#if USE(ACCELERATED_COMPOSITING)
+GraphicsLayer* ScrollingCoordinator::scrollLayerForScrollableArea(ScrollableArea* scrollableArea)
+{
+    return scrollableArea->layerForScrolling();
+}
+
+GraphicsLayer* ScrollingCoordinator::horizontalScrollbarLayerForScrollableArea(ScrollableArea* scrollableArea)
+{
+    return scrollableArea->layerForHorizontalScrollbar();
+}
+
+GraphicsLayer* ScrollingCoordinator::verticalScrollbarLayerForScrollableArea(ScrollableArea* scrollableArea)
+{
+    return scrollableArea->layerForVerticalScrollbar();
+}
+#endif
+
 GraphicsLayer* ScrollingCoordinator::scrollLayerForFrameView(FrameView* frameView)
 {
 #if USE(ACCELERATED_COMPOSITING)
@@ -283,6 +301,41 @@ GraphicsLayer* ScrollingCoordinator::scrollLayerForFrameView(FrameView* frameVie
     if (!renderView)
         return 0;
     return renderView->compositor()->scrollLayer();
+#else
+    UNUSED_PARAM(frameView);
+    return 0;
+#endif
+}
+
+GraphicsLayer* ScrollingCoordinator::headerLayerForFrameView(FrameView* frameView)
+{
+#if USE(ACCELERATED_COMPOSITING) && ENABLE(RUBBER_BANDING)
+    Frame* frame = frameView->frame();
+    if (!frame)
+        return 0;
+
+    RenderView* renderView = frame->contentRenderer();
+    if (!renderView)
+        return 0;
+
+    return renderView->compositor()->headerLayer();
+#else
+    UNUSED_PARAM(frameView);
+    return 0;
+#endif
+}
+
+GraphicsLayer* ScrollingCoordinator::footerLayerForFrameView(FrameView* frameView)
+{
+#if USE(ACCELERATED_COMPOSITING) && ENABLE(RUBBER_BANDING)
+    Frame* frame = frameView->frame();
+    if (!frame)
+        return 0;
+
+    RenderView* renderView = frame->contentRenderer();
+    if (!renderView)
+        return 0;
+    return renderView->compositor()->footerLayer();
 #else
     UNUSED_PARAM(frameView);
     return 0;
@@ -369,14 +422,26 @@ void ScrollingCoordinator::updateMainFrameScrollPosition(const IntPoint& scrollP
 #if USE(ACCELERATED_COMPOSITING)
     if (GraphicsLayer* scrollLayer = scrollLayerForFrameView(frameView)) {
         GraphicsLayer* counterScrollingLayer = counterScrollingLayerForFrameView(frameView);
+        GraphicsLayer* headerLayer = headerLayerForFrameView(frameView);
+        GraphicsLayer* footerLayer = footerLayerForFrameView(frameView);
+        IntSize scrollOffsetForFixed = frameView->scrollOffsetForFixedPosition();
+
         if (programmaticScroll || scrollingLayerPositionAction == SetScrollingLayerPosition) {
             scrollLayer->setPosition(-frameView->scrollPosition());
             if (counterScrollingLayer)
-                counterScrollingLayer->setPosition(IntPoint(frameView->scrollOffsetForFixedPosition()));
+                counterScrollingLayer->setPosition(IntPoint(scrollOffsetForFixed));
+            if (headerLayer)
+                headerLayer->setPosition(FloatPoint(scrollOffsetForFixed.width(), 0));
+            if (footerLayer)
+                footerLayer->setPosition(FloatPoint(scrollOffsetForFixed.width(), frameView->totalContentsSize().height() - frameView->footerHeight()));
         } else {
             scrollLayer->syncPosition(-frameView->scrollPosition());
             if (counterScrollingLayer)
-                counterScrollingLayer->syncPosition(IntPoint(frameView->scrollOffsetForFixedPosition()));
+                counterScrollingLayer->syncPosition(IntPoint(scrollOffsetForFixed));
+            if (headerLayer)
+                headerLayer->syncPosition(FloatPoint(scrollOffsetForFixed.width(), 0));
+            if (footerLayer)
+                footerLayer->syncPosition(FloatPoint(scrollOffsetForFixed.width(), frameView->totalContentsSize().height() - frameView->footerHeight()));
 
             LayoutRect viewportRect = frameView->viewportConstrainedVisibleContentRect();
             syncChildPositions(viewportRect);
@@ -387,7 +452,7 @@ void ScrollingCoordinator::updateMainFrameScrollPosition(const IntPoint& scrollP
 #endif
 }
 
-#if PLATFORM(MAC) || (PLATFORM(CHROMIUM) && OS(DARWIN))
+#if PLATFORM(MAC)
 void ScrollingCoordinator::handleWheelEventPhase(PlatformWheelEventPhase phase)
 {
     ASSERT(isMainThread());
@@ -441,7 +506,7 @@ MainThreadScrollingReasons ScrollingCoordinator::mainThreadScrollingReasons() co
         mainThreadScrollingReasons |= HasViewportConstrainedObjectsWithoutSupportingFixedLayers;
     if (supportsFixedPositionLayers() && hasVisibleSlowRepaintViewportConstrainedObjects(frameView))
         mainThreadScrollingReasons |= HasNonLayerViewportConstrainedObjects;
-    if (m_page->mainFrame()->document()->isImageDocument())
+    if (m_page->mainFrame()->document() && m_page->mainFrame()->document()->isImageDocument())
         mainThreadScrollingReasons |= IsImageDocument;
 
     return mainThreadScrollingReasons;

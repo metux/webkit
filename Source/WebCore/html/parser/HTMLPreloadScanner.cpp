@@ -34,9 +34,6 @@
 #include "HTMLTokenizer.h"
 #include "InputTypeNames.h"
 #include "LinkRelAttribute.h"
-#include "MediaList.h"
-#include "MediaQueryEvaluator.h"
-#include <wtf/Functional.h>
 #include <wtf/MainThread.h>
 
 namespace WebCore {
@@ -63,24 +60,26 @@ TokenPreloadScanner::TagId TokenPreloadScanner::tagIdFor(const HTMLToken::DataVe
     return UnknownTagId;
 }
 
-TokenPreloadScanner::TagId TokenPreloadScanner::tagIdFor(const String& tagName)
+#if ENABLE(THREADED_HTML_PARSER)
+TokenPreloadScanner::TagId TokenPreloadScanner::tagIdFor(const HTMLIdentifier& tagName)
 {
-    if (threadSafeMatch(tagName, imgTag))
+    if (threadSafeHTMLNamesMatch(tagName, imgTag))
         return ImgTagId;
-    if (threadSafeMatch(tagName, inputTag))
+    if (threadSafeHTMLNamesMatch(tagName, inputTag))
         return InputTagId;
-    if (threadSafeMatch(tagName, linkTag))
+    if (threadSafeHTMLNamesMatch(tagName, linkTag))
         return LinkTagId;
-    if (threadSafeMatch(tagName, scriptTag))
+    if (threadSafeHTMLNamesMatch(tagName, scriptTag))
         return ScriptTagId;
-    if (threadSafeMatch(tagName, styleTag))
+    if (threadSafeHTMLNamesMatch(tagName, styleTag))
         return StyleTagId;
-    if (threadSafeMatch(tagName, baseTag))
+    if (threadSafeHTMLNamesMatch(tagName, baseTag))
         return BaseTagId;
-    if (threadSafeMatch(tagName, templateTag))
+    if (threadSafeHTMLNamesMatch(tagName, templateTag))
         return TemplateTagId;
     return UnknownTagId;
 }
+#endif
 
 String TokenPreloadScanner::initiatorFor(TagId tagId)
 {
@@ -106,11 +105,11 @@ String TokenPreloadScanner::initiatorFor(TagId tagId)
 
 class TokenPreloadScanner::StartTagScanner {
 public:
-    explicit StartTagScanner(TagId tagId)
+    explicit StartTagScanner(TagId tagId, float deviceScaleFactor = 1.0)
         : m_tagId(tagId)
         , m_linkIsStyleSheet(false)
-        , m_linkMediaAttributeIsScreen(true)
         , m_inputIsImage(false)
+        , m_deviceScaleFactor(deviceScaleFactor)
     {
     }
 
@@ -124,6 +123,13 @@ public:
             String attributeValue = StringImpl::create8BitIfPossible(iter->value);
             processAttribute(attributeName, attributeValue);
         }
+
+        // Resolve between src and srcSet if we have them.
+        if (!m_srcSetAttribute.isEmpty()) {
+            String srcMatchingScale = bestFitSourceForImageAttributes(m_deviceScaleFactor, m_urlToLoad, m_srcSetAttribute);
+            setUrlToLoad(srcMatchingScale, true);
+        }
+
     }
 
 #if ENABLE(THREADED_HTML_PARSER)
@@ -141,34 +147,50 @@ public:
         if (!shouldPreload())
             return nullptr;
 
-        OwnPtr<PreloadRequest> request = PreloadRequest::create(initiatorFor(m_tagId), m_urlToLoad, predictedBaseURL, resourceType());
+        OwnPtr<PreloadRequest> request = PreloadRequest::create(initiatorFor(m_tagId), m_urlToLoad, predictedBaseURL, resourceType(), m_mediaAttribute);
         request->setCrossOriginModeAllowsCookies(crossOriginModeAllowsCookies());
         request->setCharset(charset());
         return request.release();
     }
 
+static bool match(const AtomicString& name, const QualifiedName& qName)
+{
+    ASSERT(isMainThread());
+    return qName.localName() == name;
+}
+
+#if ENABLE(THREADED_HTML_PARSER)
+static bool match(const HTMLIdentifier& name, const QualifiedName& qName)
+{
+    return threadSafeHTMLNamesMatch(name, qName);
+}
+#endif
+
 private:
-    void processAttribute(const String& attributeName, const String& attributeValue)
+    template<typename NameType>
+    void processAttribute(const NameType& attributeName, const String& attributeValue)
     {
-        if (threadSafeMatch(attributeName, charsetAttr))
+        if (match(attributeName, charsetAttr))
             m_charset = attributeValue;
 
         if (m_tagId == ScriptTagId || m_tagId == ImgTagId) {
-            if (threadSafeMatch(attributeName, srcAttr))
+            if (match(attributeName, srcAttr))
                 setUrlToLoad(attributeValue);
-            else if (threadSafeMatch(attributeName, crossoriginAttr) && !attributeValue.isNull())
+            else if (match(attributeName, srcsetAttr))
+                m_srcSetAttribute = attributeValue;
+            else if (match(attributeName, crossoriginAttr) && !attributeValue.isNull())
                 m_crossOriginMode = stripLeadingAndTrailingHTMLSpaces(attributeValue);
         } else if (m_tagId == LinkTagId) {
-            if (threadSafeMatch(attributeName, hrefAttr))
+            if (match(attributeName, hrefAttr))
                 setUrlToLoad(attributeValue);
-            else if (threadSafeMatch(attributeName, relAttr))
+            else if (match(attributeName, relAttr))
                 m_linkIsStyleSheet = relAttributeIsStyleSheet(attributeValue);
-            else if (threadSafeMatch(attributeName, mediaAttr))
-                m_linkMediaAttributeIsScreen = linkMediaAttributeIsScreen(attributeValue);
+            else if (match(attributeName, mediaAttr))
+                m_mediaAttribute = attributeValue;
         } else if (m_tagId == InputTagId) {
-            if (threadSafeMatch(attributeName, srcAttr))
+            if (match(attributeName, srcAttr))
                 setUrlToLoad(attributeValue);
-            else if (threadSafeMatch(attributeName, typeAttr))
+            else if (match(attributeName, typeAttr))
                 m_inputIsImage = equalIgnoringCase(attributeValue, InputTypeNames::image());
         }
     }
@@ -179,26 +201,16 @@ private:
         return rel.m_isStyleSheet && !rel.m_isAlternate && rel.m_iconType == InvalidIcon && !rel.m_isDNSPrefetch;
     }
 
-    static bool linkMediaAttributeIsScreen(const String& attributeValue)
-    {
-        if (attributeValue.isEmpty())
-            return true;
-        RefPtr<MediaQuerySet> mediaQueries = MediaQuerySet::createAllowingDescriptionSyntax(attributeValue);
-    
-        // Only preload screen media stylesheets. Used this way, the evaluator evaluates to true for any 
-        // rules containing complex queries (full evaluation is possible but it requires a frame and a style selector which
-        // may be problematic here).
-        MediaQueryEvaluator mediaQueryEvaluator("screen");
-        return mediaQueryEvaluator.eval(mediaQueries.get());
-    }
-
-    void setUrlToLoad(const String& attributeValue)
+    void setUrlToLoad(const String& value, bool allowReplacement = false)
     {
         // We only respect the first src/href, per HTML5:
         // http://www.whatwg.org/specs/web-apps/current-work/multipage/tokenization.html#attribute-name-state
-        if (!m_urlToLoad.isEmpty())
+        if (!allowReplacement && !m_urlToLoad.isEmpty())
             return;
-        m_urlToLoad = stripLeadingAndTrailingHTMLSpaces(attributeValue);
+        String url = stripLeadingAndTrailingHTMLSpaces(value);
+        if (url.isEmpty())
+            return;
+        m_urlToLoad = url;
     }
 
     const String& charset() const
@@ -215,7 +227,7 @@ private:
             return CachedResource::Script;
         if (m_tagId == ImgTagId || (m_tagId == InputTagId && m_inputIsImage))
             return CachedResource::ImageResource;
-        if (m_tagId == LinkTagId && m_linkIsStyleSheet && m_linkMediaAttributeIsScreen)
+        if (m_tagId == LinkTagId && m_linkIsStyleSheet)
             return CachedResource::CSSStyleSheet;
         ASSERT_NOT_REACHED();
         return CachedResource::RawResource;
@@ -226,7 +238,7 @@ private:
         if (m_urlToLoad.isEmpty())
             return false;
 
-        if (m_tagId == LinkTagId && (!m_linkIsStyleSheet || !m_linkMediaAttributeIsScreen))
+        if (m_tagId == LinkTagId && !m_linkIsStyleSheet)
             return false;
 
         if (m_tagId == InputTagId && !m_inputIsImage)
@@ -242,16 +254,19 @@ private:
 
     TagId m_tagId;
     String m_urlToLoad;
+    String m_srcSetAttribute;
     String m_charset;
     String m_crossOriginMode;
     bool m_linkIsStyleSheet;
-    bool m_linkMediaAttributeIsScreen;
+    String m_mediaAttribute;
     bool m_inputIsImage;
+    float m_deviceScaleFactor;
 };
 
-TokenPreloadScanner::TokenPreloadScanner(const KURL& documentURL)
+TokenPreloadScanner::TokenPreloadScanner(const KURL& documentURL, float deviceScaleFactor)
     : m_documentURL(documentURL)
     , m_inStyle(false)
+    , m_deviceScaleFactor(deviceScaleFactor)
 #if ENABLE(TEMPLATE_ELEMENT)
     , m_templateCount(0)
 #endif
@@ -260,6 +275,30 @@ TokenPreloadScanner::TokenPreloadScanner(const KURL& documentURL)
 
 TokenPreloadScanner::~TokenPreloadScanner()
 {
+}
+
+TokenPreloadScannerCheckpoint TokenPreloadScanner::createCheckpoint()
+{
+    TokenPreloadScannerCheckpoint checkpoint = m_checkpoints.size();
+    m_checkpoints.append(Checkpoint(m_predictedBaseElementURL, m_inStyle
+#if ENABLE(TEMPLATE_ELEMENT)
+                                    , m_templateCount
+#endif
+                                    ));
+    return checkpoint;
+}
+
+void TokenPreloadScanner::rewindTo(TokenPreloadScannerCheckpoint checkpointIndex)
+{
+    ASSERT(checkpointIndex < m_checkpoints.size()); // If this ASSERT fires, checkpointIndex is invalid.
+    const Checkpoint& checkpoint = m_checkpoints[checkpointIndex];
+    m_predictedBaseElementURL = checkpoint.predictedBaseElementURL;
+    m_inStyle = checkpoint.inStyle;
+#if ENABLE(TEMPLATE_ELEMENT)
+    m_templateCount = checkpoint.templateCount;
+#endif
+    m_cssScanner.reset();
+    m_checkpoints.clear();
 }
 
 void TokenPreloadScanner::scan(const HTMLToken& token, Vector<OwnPtr<PreloadRequest> >& requests)
@@ -324,7 +363,7 @@ void TokenPreloadScanner::scanCommon(const Token& token, Vector<OwnPtr<PreloadRe
             return;
         }
 
-        StartTagScanner scanner(tagId);
+        StartTagScanner scanner(tagId, m_deviceScaleFactor);
         scanner.processAttributes(token.attributes());
         OwnPtr<PreloadRequest> request = scanner.createPreloadRequest(m_predictedBaseElementURL);
         if (request)
@@ -345,8 +384,8 @@ void TokenPreloadScanner::updatePredictedBaseURL(const Token& token)
         m_predictedBaseElementURL = KURL(m_documentURL, stripLeadingAndTrailingHTMLSpaces(hrefAttribute->value)).copy();
 }
 
-HTMLPreloadScanner::HTMLPreloadScanner(const HTMLParserOptions& options, const KURL& documentURL)
-    : m_scanner(documentURL)
+HTMLPreloadScanner::HTMLPreloadScanner(const HTMLParserOptions& options, const KURL& documentURL, float deviceScaleFactor)
+    : m_scanner(documentURL, deviceScaleFactor)
     , m_tokenizer(HTMLTokenizer::create(options))
 {
 }

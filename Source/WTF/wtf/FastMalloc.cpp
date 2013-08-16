@@ -87,8 +87,12 @@
 #include <pthread.h>
 #endif
 #include <string.h>
+#include <wtf/DataLog.h>
 #include <wtf/StdLibExtras.h>
-#include <wtf/UnusedParam.h>
+
+#if OS(DARWIN)
+#include <malloc/malloc.h>
+#endif
 
 #ifndef NO_TCMALLOC_SAMPLES
 #ifdef WTF_CHANGES
@@ -103,7 +107,7 @@
 #endif
 
 // Harden the pointers stored in the TCMalloc linked lists
-#if COMPILER(GCC)
+#if COMPILER(GCC) && !PLATFORM(QT)
 #define ENABLE_TCMALLOC_HARDENING 1
 #endif
 
@@ -231,9 +235,7 @@ TryMallocReturnValue tryFastZeroedMalloc(size_t n)
 
 #if FORCE_SYSTEM_MALLOC
 
-#if OS(DARWIN)
-#include <malloc/malloc.h>
-#elif OS(WINDOWS)
+#if OS(WINDOWS)
 #include <malloc.h>
 #endif
 
@@ -423,13 +425,15 @@ extern "C" WTF_EXPORT_PRIVATE const int jscore_fastmalloc_introspection = 0;
 
 #else // FORCE_SYSTEM_MALLOC
 
-#include "AlwaysInline.h"
 #include "TCPackedCache.h"
 #include "TCPageMap.h"
 #include "TCSpinLock.h"
 #include "TCSystemAlloc.h"
+#include "ThreadSpecific.h"
 #include <algorithm>
+#if USE(PTHREADS)
 #include <pthread.h>
+#endif
 #include <stdarg.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -450,7 +454,6 @@ extern "C" WTF_EXPORT_PRIVATE const int jscore_fastmalloc_introspection = 0;
 #ifdef WTF_CHANGES
 
 #if OS(DARWIN)
-#include "MallocZoneSupport.h"
 #include <wtf/HashSet.h>
 #include <wtf/Vector.h>
 #endif
@@ -512,19 +515,7 @@ namespace WTF {
 #define MESSAGE LOG_ERROR
 #define CHECK_CONDITION ASSERT
 
-#if ENABLE(TCMALLOC_HARDENING)
-/*
- * To make it harder to exploit use-after free style exploits
- * we mask the addresses we put into our linked lists with the
- * address of kLLHardeningMask.  Due to ASLR the address of
- * kLLHardeningMask should be sufficiently randomized to make direct
- * freelist manipulation much more difficult.
- */
 static const char kLLHardeningMask = 0;
-enum {
-    MaskKeyShift = 13
-};
-
 template <unsigned> struct EntropySource;
 template <> struct EntropySource<4> {
     static uint32_t value()
@@ -544,16 +535,28 @@ template <> struct EntropySource<8> {
     }
 };
 
+#if ENABLE(TCMALLOC_HARDENING)
+/*
+ * To make it harder to exploit use-after free style exploits
+ * we mask the addresses we put into our linked lists with the
+ * address of kLLHardeningMask.  Due to ASLR the address of
+ * kLLHardeningMask should be sufficiently randomized to make direct
+ * freelist manipulation much more difficult.
+ */
+enum {
+    MaskKeyShift = 13
+};
+
 static ALWAYS_INLINE uintptr_t internalEntropyValue() 
 {
-    static uintptr_t value = EntropySource<sizeof(uintptr_t)>::value();
+    static uintptr_t value = EntropySource<sizeof(uintptr_t)>::value() | 1;
     ASSERT(value);
     return value;
 }
 
 #define HARDENING_ENTROPY internalEntropyValue()
 #define ROTATE_VALUE(value, amount) (((value) >> (amount)) | ((value) << (sizeof(value) * 8 - (amount))))
-#define XOR_MASK_PTR_WITH_KEY(ptr, key, entropy) (reinterpret_cast<typeof(ptr)>(reinterpret_cast<uintptr_t>(ptr)^(ROTATE_VALUE(reinterpret_cast<uintptr_t>(key), MaskKeyShift)^entropy)))
+#define XOR_MASK_PTR_WITH_KEY(ptr, key, entropy) (reinterpret_cast<__typeof__(ptr)>(reinterpret_cast<uintptr_t>(ptr)^(ROTATE_VALUE(reinterpret_cast<uintptr_t>(key), MaskKeyShift)^entropy)))
 
 
 static ALWAYS_INLINE uint32_t freedObjectStartPoison()
@@ -573,23 +576,27 @@ static ALWAYS_INLINE uint32_t freedObjectEndPoison()
 #define PTR_TO_UINT32(ptr) static_cast<uint32_t>(reinterpret_cast<uintptr_t>(ptr))
 #define END_POISON_INDEX(allocationSize) (((allocationSize) - sizeof(uint32_t)) / sizeof(uint32_t))
 #define POISON_ALLOCATION(allocation, allocationSize) do { \
-    reinterpret_cast<uint32_t*>(allocation)[0] = 1; \
-    reinterpret_cast<uint32_t*>(allocation)[1] = 1; \
-    if (allocationSize < 4 * sizeof(uint32_t)) \
+    ASSERT((allocationSize) >= 2 * sizeof(uint32_t)); \
+    reinterpret_cast<uint32_t*>(allocation)[0] = 0xbadbeef1; \
+    reinterpret_cast<uint32_t*>(allocation)[1] = 0xbadbeef3; \
+    if ((allocationSize) < 4 * sizeof(uint32_t)) \
         break; \
-    reinterpret_cast<uint32_t*>(allocation)[2] = 1; \
-    reinterpret_cast<uint32_t*>(allocation)[END_POISON_INDEX(allocationSize)] = 1; \
+    reinterpret_cast<uint32_t*>(allocation)[2] = 0xbadbeef5; \
+    reinterpret_cast<uint32_t*>(allocation)[END_POISON_INDEX(allocationSize)] = 0xbadbeef7; \
 } while (false);
 
 #define POISON_DEALLOCATION_EXPLICIT(allocation, allocationSize, startPoison, endPoison) do { \
-    if (allocationSize < 4 * sizeof(uint32_t)) \
+    ASSERT((allocationSize) >= 2 * sizeof(uint32_t)); \
+    reinterpret_cast_ptr<uint32_t*>(allocation)[0] = 0xbadbeef9; \
+    reinterpret_cast_ptr<uint32_t*>(allocation)[1] = 0xbadbeefb; \
+    if ((allocationSize) < 4 * sizeof(uint32_t)) \
         break; \
-    reinterpret_cast<uint32_t*>(allocation)[2] = (startPoison) ^ PTR_TO_UINT32(allocation); \
-    reinterpret_cast<uint32_t*>(allocation)[END_POISON_INDEX(allocationSize)] = (endPoison) ^ PTR_TO_UINT32(allocation); \
+    reinterpret_cast_ptr<uint32_t*>(allocation)[2] = (startPoison) ^ PTR_TO_UINT32(allocation); \
+    reinterpret_cast_ptr<uint32_t*>(allocation)[END_POISON_INDEX(allocationSize)] = (endPoison) ^ PTR_TO_UINT32(allocation); \
 } while (false)
 
 #define POISON_DEALLOCATION(allocation, allocationSize) \
-    POISON_DEALLOCATION_EXPLICIT(allocation, allocationSize, freedObjectStartPoison(), freedObjectEndPoison())
+    POISON_DEALLOCATION_EXPLICIT(allocation, (allocationSize), freedObjectStartPoison(), freedObjectEndPoison())
 
 #define MAY_BE_POISONED(allocation, allocationSize) (((allocationSize) >= 4 * sizeof(uint32_t)) && ( \
     (reinterpret_cast<uint32_t*>(allocation)[2] == (freedObjectStartPoison() ^ PTR_TO_UINT32(allocation))) || \
@@ -621,12 +628,25 @@ static ALWAYS_INLINE uint32_t freedObjectEndPoison()
 // Not all possible combinations of the following parameters make
 // sense.  In particular, if kMaxSize increases, you may have to
 // increase kNumClasses as well.
-static const size_t kPageShift  = 12;
+#if OS(DARWIN)
+#    define K_PAGE_SHIFT PAGE_SHIFT
+#    if (K_PAGE_SHIFT == 12)
+#        define K_NUM_CLASSES 68
+#    elif (K_PAGE_SHIFT == 14)
+#        define K_NUM_CLASSES 77
+#    else
+#        error "Unsupported PAGE_SHIFT amount"
+#    endif
+#else
+#    define K_PAGE_SHIFT 12
+#    define K_NUM_CLASSES 68
+#endif
+static const size_t kPageShift  = K_PAGE_SHIFT;
 static const size_t kPageSize   = 1 << kPageShift;
-static const size_t kMaxSize    = 8u * kPageSize;
+static const size_t kMaxSize    = 32u * 1024;
 static const size_t kAlignShift = 3;
 static const size_t kAlignment  = 1 << kAlignShift;
-static const size_t kNumClasses = 68;
+static const size_t kNumClasses = K_NUM_CLASSES;
 
 // Allocates a big block of memory for the pagemap once we reach more than
 // 128MB
@@ -769,6 +789,9 @@ public:
     ALWAYS_INLINE bool operator!() const { return !m_value; }
     typedef void* (HardenedSLL::*UnspecifiedBoolType);
     ALWAYS_INLINE operator UnspecifiedBoolType() const { return m_value ? &HardenedSLL::m_value : 0; }
+
+    bool operator!=(const HardenedSLL& other) const { return m_value != other.m_value; }
+    bool operator==(const HardenedSLL& other) const { return m_value == other.m_value; }
 
 private:
     void* m_value;
@@ -1037,6 +1060,10 @@ static void* MetaDataAlloc(size_t bytes) {
   return result;
 }
 
+#if defined(WTF_CHANGES) && OS(DARWIN)
+class RemoteMemoryReader;
+#endif
+
 template <class T>
 class PageHeapAllocator {
  private:
@@ -1109,12 +1136,8 @@ class PageHeapAllocator {
   int inuse() const { return inuse_; }
 
 #if defined(WTF_CHANGES) && OS(DARWIN)
-  template <class Recorder>
-  void recordAdministrativeRegions(Recorder& recorder, const RemoteMemoryReader& reader)
-  {
-      for (HardenedSLL adminAllocation = allocated_regions_; adminAllocation; adminAllocation.setValue(reader.nextEntryInHardenedLinkedList(reinterpret_cast<void**>(adminAllocation.value()), entropy_)))
-          recorder.recordRegion(reinterpret_cast<vm_address_t>(adminAllocation.value()), kAllocIncrement);
-  }
+  template <typename Recorder>
+  void recordAdministrativeRegions(Recorder&, const RemoteMemoryReader&);
 #endif
 };
 
@@ -1150,6 +1173,20 @@ static size_t AllocationSize(size_t bytes) {
   }
 }
 
+enum {
+    kSpanCookieBits = 10,
+    kSpanCookieMask = (1 << 10) - 1,
+    kSpanThisShift = 7
+};
+
+static uint32_t spanValidationCookie;
+static uint32_t spanInitializerCookie()
+{
+    static uint32_t value = EntropySource<sizeof(uint32_t)>::value() & kSpanCookieMask;
+    spanValidationCookie = value;
+    return value;
+}
+
 // Information kept for a span (a contiguous run of pages).
 struct Span {
   PageID        start;          // Starting page number
@@ -1172,6 +1209,17 @@ public:
   unsigned int  sizeclass : 8;  // Size-class for small objects (or 0)
   unsigned int  refcount : 11;  // Number of non-free objects
   bool decommitted : 1;
+  void initCookie()
+  {
+      m_cookie = ((reinterpret_cast<uintptr_t>(this) >> kSpanThisShift) & kSpanCookieMask) ^ spanInitializerCookie();
+  }
+  void clearCookie() { m_cookie = 0; }
+  bool isValid() const
+  {
+      return (((reinterpret_cast<uintptr_t>(this) >> kSpanThisShift) & kSpanCookieMask) ^ m_cookie) == spanValidationCookie;
+  }
+private:
+  uint32_t m_cookie : kSpanCookieBits;
 
 #undef SPAN_HISTORY
 #ifdef SPAN_HISTORY
@@ -1202,6 +1250,7 @@ static Span* NewSpan(PageID p, Length len) {
   memset(result, 0, sizeof(*result));
   result->start = p;
   result->length = len;
+  result->initCookie();
 #ifdef SPAN_HISTORY
   result->nexthistory = 0;
 #endif
@@ -1209,10 +1258,12 @@ static Span* NewSpan(PageID p, Length len) {
 }
 
 static inline void DeleteSpan(Span* span) {
+  RELEASE_ASSERT(span->isValid());
 #ifndef NDEBUG
   // In debug mode, trash the contents of deleted Spans
   memset(span, 0x3f, sizeof(*span));
 #endif
+  span->clearCookie();
   span_allocator.Delete(span);
 }
 
@@ -1312,6 +1363,11 @@ class TCMalloc_Central_FreeList {
       for (HardenedSLL nextObject = span->objects; nextObject; nextObject.setValue(reader.nextEntryInHardenedLinkedList(reinterpret_cast<void**>(nextObject.value()), entropy_))) {
         finder.visit(nextObject.value());
       }
+    }
+
+    for (int slot = 0; slot < used_slots_; ++slot) {
+      for (HardenedSLL entry = tc_slots_[slot].head; entry; entry.setValue(reader.nextEntryInHardenedLinkedList(reinterpret_cast<void**>(entry.value()), entropy_)))
+        finder.visit(entry.value());
     }
   }
 #endif
@@ -1453,7 +1509,69 @@ private:
     PageHeapAllocator<TCMalloc_ThreadCache>* m_pageHeapAllocator;
 };
 
+// This method declaration, and the constants below, are taken from Libc/gen/malloc.c.
+extern "C" void (*malloc_logger)(uint32_t typeFlags, uintptr_t zone, uintptr_t size, uintptr_t pointer, uintptr_t returnValue, uint32_t numberOfFramesToSkip);
+
 #endif
+
+class MallocHook {
+    static bool stackLoggingEnabled;
+
+#if OS(DARWIN)
+    
+    enum StackLoggingType {
+        StackLoggingTypeAlloc = 2,
+        StackLoggingTypeDealloc = 4,
+    };
+
+    static void record(uint32_t typeFlags, uintptr_t zone, uintptr_t size, void* pointer, void* returnValue, uint32_t numberOfFramesToSkip)
+    {
+        malloc_logger(typeFlags, zone, size, reinterpret_cast<uintptr_t>(pointer), reinterpret_cast<uintptr_t>(returnValue), numberOfFramesToSkip);
+    }
+
+    static NEVER_INLINE void recordAllocation(void* pointer, size_t size)
+    {
+        // StackLoggingTypeAlloc takes the newly-allocated address in the returnValue argument, the size of the allocation
+        // in the size argument and ignores all other arguments.
+        record(StackLoggingTypeAlloc, 0, size, 0, pointer, 0);
+    }
+
+    static NEVER_INLINE void recordDeallocation(void* pointer)
+    {
+        // StackLoggingTypeDealloc takes the pointer in the size argument and ignores all other arguments.
+        record(StackLoggingTypeDealloc, 0, reinterpret_cast<uintptr_t>(pointer), 0, 0, 0);
+    }
+
+#endif
+
+public:
+    static void init()
+    {
+#if OS(DARWIN)
+        // If the system allocator's malloc_logger has been set up then stack logging is enabled.
+        stackLoggingEnabled = malloc_logger;
+#endif
+    }
+
+#if OS(DARWIN)
+    static ALWAYS_INLINE void InvokeNewHook(void* pointer, size_t size)
+    {
+        if (UNLIKELY(stackLoggingEnabled))
+            recordAllocation(pointer, size);
+    }
+
+    static ALWAYS_INLINE void InvokeDeleteHook(void* pointer)
+    {
+
+        if (UNLIKELY(stackLoggingEnabled))
+            recordDeallocation(pointer);
+    }
+#else
+    static ALWAYS_INLINE void InvokeNewHook(void*, size_t) { }
+    static ALWAYS_INLINE void InvokeDeleteHook(void*) { }
+#endif
+};
+bool MallocHook::stackLoggingEnabled = false;
 
 #endif
 
@@ -1833,8 +1951,9 @@ void TCMalloc_PageHeap::initializeScavenger()
 {
     m_scavengeQueue = dispatch_queue_create("com.apple.JavaScriptCore.FastMallocSavenger", NULL);
     m_scavengeTimer = dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, m_scavengeQueue);
-    dispatch_time_t startTime = dispatch_time(DISPATCH_TIME_NOW, kScavengeDelayInSeconds * NSEC_PER_SEC);
-    dispatch_source_set_timer(m_scavengeTimer, startTime, kScavengeDelayInSeconds * NSEC_PER_SEC, 1000 * NSEC_PER_USEC);
+    uint64_t scavengeDelayInNanoseconds = kScavengeDelayInSeconds * NSEC_PER_SEC;
+    dispatch_time_t startTime = dispatch_time(DISPATCH_TIME_NOW, scavengeDelayInNanoseconds);
+    dispatch_source_set_timer(m_scavengeTimer, startTime, scavengeDelayInNanoseconds, scavengeDelayInNanoseconds / 10);
     dispatch_source_set_event_handler(m_scavengeTimer, ^{ periodicScavenge(); });
     m_scavengingSuspended = true;
 }
@@ -2587,10 +2706,12 @@ class TCMalloc_ThreadCache_FreeList {
     // Runs through the linked list to ensure that
     // we can do that, and ensures that 'missing'
     // is not present
-    NEVER_INLINE void Validate(HardenedSLL missing) {
+    NEVER_INLINE void Validate(HardenedSLL missing, size_t size) {
         HardenedSLL node = list_;
+        UNUSED_PARAM(size);
         while (node) {
             RELEASE_ASSERT(node != missing);
+            RELEASE_ASSERT(IS_DEFINITELY_POISONED(node.value(), size));
             node = SLL_Next(node, entropy_);
         }
     }
@@ -2803,10 +2924,7 @@ static bool tsd_inited = false;
 #if USE(PTHREAD_GETSPECIFIC_DIRECT)
 static const pthread_key_t heap_key = __PTK_FRAMEWORK_JAVASCRIPTCORE_KEY0;
 #else
-static pthread_key_t heap_key;
-#endif
-#if OS(WINDOWS)
-DWORD tlsIndex = TLS_OUT_OF_INDEXES;
+static ThreadSpecificKey heap_key;
 #endif
 
 static ALWAYS_INLINE void setThreadHeap(TCMalloc_ThreadCache* heap)
@@ -2818,12 +2936,12 @@ static ALWAYS_INLINE void setThreadHeap(TCMalloc_ThreadCache* heap)
         CRASH();
 #endif
 
+#if OS(DARWIN)
     // Still do pthread_setspecific even if there's an alternate form
     // of thread-local storage in use, to benefit from the delete callback.
     pthread_setspecific(heap_key, heap);
-
-#if OS(WINDOWS)
-    TlsSetValue(tlsIndex, heap);
+#else
+    threadSpecificSet(heap_key, heap);
 #endif
 }
 
@@ -3001,7 +3119,7 @@ void TCMalloc_Central_FreeList::InsertRange(HardenedSLL start, HardenedSLL end, 
   ReleaseListToSpans(start);
 }
 
-void TCMalloc_Central_FreeList::RemoveRange(HardenedSLL* start, HardenedSLL* end, int *N) {
+ALWAYS_INLINE void TCMalloc_Central_FreeList::RemoveRange(HardenedSLL* start, HardenedSLL* end, int *N) {
   int num = *N;
   ASSERT(num > 0);
 
@@ -3039,7 +3157,7 @@ void TCMalloc_Central_FreeList::RemoveRange(HardenedSLL* start, HardenedSLL* end
 }
 
 
-HardenedSLL TCMalloc_Central_FreeList::FetchFromSpansSafe() {
+ALWAYS_INLINE HardenedSLL TCMalloc_Central_FreeList::FetchFromSpansSafe() {
   HardenedSLL t = FetchFromSpans();
   if (!t) {
     Populate();
@@ -3121,7 +3239,15 @@ ALWAYS_INLINE void TCMalloc_Central_FreeList::Populate() {
   }
   ASSERT(ptr == start);
   ASSERT(ptr == head.value());
-  POISON_DEALLOCATION_EXPLICIT(ptr, size, startPoison, endPoison);
+#ifndef NDEBUG
+    {
+        HardenedSLL node = head;
+        while (node) {
+            ASSERT(IS_DEFINITELY_POISONED(node.value(), size));
+            node = SLL_Next(node, entropy_);
+        }
+    }
+#endif
   span->objects = head;
   ASSERT(span->objects.value() == head.value());
   span->refcount = 0; // No sub-object in use yet
@@ -3200,7 +3326,7 @@ inline void TCMalloc_ThreadCache::Deallocate(HardenedSLL ptr, size_t cl) {
   size_ += allocationSize;
   FreeList* list = &list_[cl];
   if (MAY_BE_POISONED(ptr.value(), allocationSize))
-      list->Validate(ptr);
+      list->Validate(ptr, allocationSize);
 
   POISON_DEALLOCATION(ptr.value(), allocationSize);
   list->Push(ptr);
@@ -3338,6 +3464,7 @@ void TCMalloc_ThreadCache::InitModule() {
     pageheap->init();
     phinited = 1;
 #if defined(WTF_CHANGES) && OS(DARWIN)
+    MallocHook::init();
     FastMallocZone::init();
 #endif
   }
@@ -3361,10 +3488,10 @@ inline TCMalloc_ThreadCache* TCMalloc_ThreadCache::GetThreadHeap() {
     // __thread is faster, but only when the kernel supports it
   if (KernelSupportsTLS())
     return threadlocal_heap;
-#elif OS(WINDOWS)
-    return static_cast<TCMalloc_ThreadCache*>(TlsGetValue(tlsIndex));
-#else
+#elif OS(DARWIN)
     return static_cast<TCMalloc_ThreadCache*>(pthread_getspecific(heap_key));
+#else
+    return static_cast<TCMalloc_ThreadCache*>(threadSpecificGet(heap_key));
 #endif
 }
 
@@ -3393,10 +3520,7 @@ void TCMalloc_ThreadCache::InitTSD() {
 #if USE(PTHREAD_GETSPECIFIC_DIRECT)
   pthread_key_init_np(heap_key, DestroyThreadCache);
 #else
-  pthread_key_create(&heap_key, DestroyThreadCache);
-#endif
-#if OS(WINDOWS)
-  tlsIndex = TlsAlloc();
+  threadSpecificKeyCreate(&heap_key, DestroyThreadCache);
 #endif
   tsd_inited = true;
     
@@ -3949,15 +4073,15 @@ static ALWAYS_INLINE void do_free(void* ptr) {
   if (ptr == NULL) return;
   ASSERT(pageheap != NULL);  // Should not call free() before malloc()
   const PageID p = reinterpret_cast<uintptr_t>(ptr) >> kPageShift;
-  Span* span = NULL;
-  size_t cl = pageheap->GetSizeClassIfCached(p);
+  Span* span = pageheap->GetDescriptor(p);
+  RELEASE_ASSERT(span->isValid());
+  size_t cl = span->sizeclass;
 
-  if (cl == 0) {
-    span = pageheap->GetDescriptor(p);
-    cl = span->sizeclass;
+  if (cl) {
+    size_t byteSizeForClass = ByteSizeForClass(cl);
+    RELEASE_ASSERT(!((reinterpret_cast<char*>(ptr) - reinterpret_cast<char*>(span->start << kPageShift)) % byteSizeForClass));
     pageheap->CacheSizeClass(p, cl);
-  }
-  if (cl != 0) {
+
 #ifndef NO_TCMALLOC_SAMPLES
     ASSERT(!pageheap->GetDescriptor(p)->sample);
 #endif
@@ -3966,8 +4090,7 @@ static ALWAYS_INLINE void do_free(void* ptr) {
       heap->Deallocate(HardenedSLL::create(ptr), cl);
     } else {
       // Delete directly into central cache
-      size_t allocationSize = ByteSizeForClass(cl);
-      POISON_DEALLOCATION(ptr, allocationSize);
+      POISON_DEALLOCATION(ptr, byteSizeForClass);
       SLL_SetNext(HardenedSLL::create(ptr), HardenedSLL::null(), central_cache[cl].entropy());
       central_cache[cl].InsertRange(HardenedSLL::create(ptr), HardenedSLL::create(ptr), 1);
     }
@@ -3982,7 +4105,7 @@ static ALWAYS_INLINE void do_free(void* ptr) {
       span->objects = NULL;
     }
 #endif
-
+    RELEASE_ASSERT(reinterpret_cast<void*>(span->start << kPageShift) == ptr);
     POISON_DEALLOCATION(ptr, span->length << kPageShift);
     pageheap->Delete(span);
   }
@@ -4117,12 +4240,22 @@ ALWAYS_INLINE void* malloc(size_t);
 
 void* fastMalloc(size_t size)
 {
-    return malloc<true>(size);
+    void* result = malloc<true>(size);
+#if ENABLE(ALLOCATION_LOGGING)
+    dataLogF("fastMalloc allocating %lu bytes (fastMalloc): %p.\n", size, result);
+#endif
+    return result;
 }
 
 TryMallocReturnValue tryFastMalloc(size_t size)
 {
-    return malloc<false>(size);
+    TryMallocReturnValue result = malloc<false>(size);
+#if ENABLE(ALLOCATION_LOGGING)
+    void* pointer;
+    (void)result.getValue(pointer);
+    dataLogF("fastMalloc allocating %lu bytes (tryFastMalloc): %p.\n", size, pointer);
+#endif
+    return result;
 }
 
 template <bool crashOnFailure>
@@ -4147,9 +4280,7 @@ void* malloc(size_t size) {
     void* result = do_malloc(size);
 #endif
 
-#ifndef WTF_CHANGES
   MallocHook::InvokeNewHook(result, size);
-#endif
   return result;
 }
 
@@ -4157,9 +4288,11 @@ void* malloc(size_t size) {
 extern "C" 
 #endif
 void free(void* ptr) {
-#ifndef WTF_CHANGES
-  MallocHook::InvokeDeleteHook(ptr);
+#if ENABLE(ALLOCATION_LOGGING)
+    dataLogF("fastFree freeing %p.\n", ptr);
 #endif
+    
+  MallocHook::InvokeDeleteHook(ptr);
 
 #if ENABLE(WTF_MALLOC_VALIDATION)
     if (!ptr)
@@ -4186,6 +4319,9 @@ void* fastCalloc(size_t n, size_t elem_size)
 #if ENABLE(WTF_MALLOC_VALIDATION)
     fastMallocValidate(result);
 #endif
+#if ENABLE(ALLOCATION_LOGGING)
+    dataLogF("fastMalloc contiguously allocating %lu * %lu bytes (fastCalloc): %p.\n", n, elem_size, result);
+#endif
     return result;
 }
 
@@ -4194,6 +4330,9 @@ TryMallocReturnValue tryFastCalloc(size_t n, size_t elem_size)
     void* result = calloc<false>(n, elem_size);
 #if ENABLE(WTF_MALLOC_VALIDATION)
     fastMallocValidate(result);
+#endif
+#if ENABLE(ALLOCATION_LOGGING)
+    dataLogF("fastMalloc contiguously allocating %lu * %lu bytes (tryFastCalloc): %p.\n", n, elem_size, result);
 #endif
     return result;
 }
@@ -4222,9 +4361,7 @@ void* calloc(size_t n, size_t elem_size) {
     }
 #endif
 
-#ifndef WTF_CHANGES
   MallocHook::InvokeNewHook(result, totalBytes);
-#endif
   return result;
 }
 
@@ -4256,6 +4393,9 @@ void* fastRealloc(void* old_ptr, size_t new_size)
 #if ENABLE(WTF_MALLOC_VALIDATION)
     fastMallocValidate(result);
 #endif
+#if ENABLE(ALLOCATION_LOGGING)
+    dataLogF("fastMalloc reallocating %lu bytes (fastRealloc): %p -> %p.\n", new_size, old_ptr, result);
+#endif
     return result;
 }
 
@@ -4267,6 +4407,9 @@ TryMallocReturnValue tryFastRealloc(void* old_ptr, size_t new_size)
     void* result = realloc<false>(old_ptr, new_size);
 #if ENABLE(WTF_MALLOC_VALIDATION)
     fastMallocValidate(result);
+#endif
+#if ENABLE(ALLOCATION_LOGGING)
+    dataLogF("fastMalloc reallocating %lu bytes (tryFastRealloc): %p -> %p.\n", new_size, old_ptr, result);
 #endif
     return result;
 }
@@ -4280,16 +4423,12 @@ void* realloc(void* old_ptr, size_t new_size) {
     void* result = malloc<crashOnFailure>(new_size);
 #else
     void* result = do_malloc(new_size);
-#ifndef WTF_CHANGES
     MallocHook::InvokeNewHook(result, new_size);
-#endif
 #endif
     return result;
   }
   if (new_size == 0) {
-#ifndef WTF_CHANGES
     MallocHook::InvokeDeleteHook(old_ptr);
-#endif
     free(old_ptr);
     return NULL;
   }
@@ -4329,13 +4468,9 @@ void* realloc(void* old_ptr, size_t new_size) {
     if (new_ptr == NULL) {
       return NULL;
     }
-#ifndef WTF_CHANGES
     MallocHook::InvokeNewHook(new_ptr, new_size);
-#endif
     memcpy(new_ptr, old_ptr, ((old_size < new_size) ? old_size : new_size));
-#ifndef WTF_CHANGES
     MallocHook::InvokeDeleteHook(old_ptr);
-#endif
     // We could use a variant of do_free() that leverages the fact
     // that we already know the sizeclass of old_ptr.  The benefit
     // would be small, so don't bother.
@@ -4627,17 +4762,50 @@ size_t fastMallocSize(const void* ptr)
 }
 
 #if OS(DARWIN)
+class RemoteMemoryReader {
+    task_t m_task;
+    memory_reader_t* m_reader;
+
+public:
+    RemoteMemoryReader(task_t task, memory_reader_t* reader)
+        : m_task(task)
+        , m_reader(reader)
+    { }
+
+    void* operator()(vm_address_t address, size_t size) const
+    {
+        void* output;
+        kern_return_t err = (*m_reader)(m_task, address, size, static_cast<void**>(&output));
+        if (err)
+            output = 0;
+        return output;
+    }
+
+    template <typename T>
+    T* operator()(T* address, size_t size = sizeof(T)) const
+    {
+        return static_cast<T*>((*this)(reinterpret_cast<vm_address_t>(address), size));
+    }
+
+    template <typename T>
+    T* nextEntryInHardenedLinkedList(T** remoteAddress, uintptr_t entropy) const
+    {
+        T** localAddress = (*this)(remoteAddress);
+        if (!localAddress)
+            return 0;
+        T* hardenedNext = *localAddress;
+        if (!hardenedNext || hardenedNext == (void*)entropy)
+            return 0;
+        return XOR_MASK_PTR_WITH_KEY(hardenedNext, remoteAddress, entropy);
+    }
+};
 
 template <typename T>
-T* RemoteMemoryReader::nextEntryInHardenedLinkedList(T** remoteAddress, uintptr_t entropy) const
+template <typename Recorder>
+void PageHeapAllocator<T>::recordAdministrativeRegions(Recorder& recorder, const RemoteMemoryReader& reader)
 {
-    T** localAddress = (*this)(remoteAddress);
-    if (!localAddress)
-        return 0;
-    T* hardenedNext = *localAddress;
-    if (!hardenedNext || hardenedNext == (void*)entropy)
-        return 0;
-    return XOR_MASK_PTR_WITH_KEY(hardenedNext, remoteAddress, entropy);
+    for (HardenedSLL adminAllocation = allocated_regions_; adminAllocation; adminAllocation.setValue(reader.nextEntryInHardenedLinkedList(reinterpret_cast<void**>(adminAllocation.value()), entropy_)))
+        recorder.recordRegion(reinterpret_cast<vm_address_t>(adminAllocation.value()), kAllocIncrement);
 }
 
 class FreeObjectFinder {
@@ -4730,19 +4898,26 @@ public:
 
     void recordPendingRegions()
     {
-        if (!(m_typeMask & (MALLOC_PTR_IN_USE_RANGE_TYPE | MALLOC_PTR_REGION_RANGE_TYPE))) {
+        bool recordRegionsContainingPointers = m_typeMask & MALLOC_PTR_REGION_RANGE_TYPE;
+        bool recordAllocations = m_typeMask & MALLOC_PTR_IN_USE_RANGE_TYPE;
+
+        if (!recordRegionsContainingPointers && !recordAllocations) {
             m_coalescedSpans.clear();
             return;
         }
 
+        Vector<vm_range_t, 256> pointerRegions;
         Vector<vm_range_t, 1024> allocatedPointers;
         for (size_t i = 0; i < m_coalescedSpans.size(); ++i) {
             Span *theSpan = m_coalescedSpans[i];
-            if (theSpan->free)
-                continue;
-
             vm_address_t spanStartAddress = theSpan->start << kPageShift;
             vm_size_t spanSizeInBytes = theSpan->length * kPageSize;
+
+            if (recordRegionsContainingPointers)
+                pointerRegions.append((vm_range_t){spanStartAddress, spanSizeInBytes});
+
+            if (theSpan->free || !recordAllocations)
+                continue;
 
             if (!theSpan->sizeclass) {
                 // If it's an allocated large object span, mark it as in use
@@ -4760,7 +4935,11 @@ public:
             }
         }
 
-        (*m_recorder)(m_task, m_context, m_typeMask & (MALLOC_PTR_IN_USE_RANGE_TYPE | MALLOC_PTR_REGION_RANGE_TYPE), allocatedPointers.data(), allocatedPointers.size());
+        if (recordRegionsContainingPointers)
+            (*m_recorder)(m_task, m_context, MALLOC_PTR_REGION_RANGE_TYPE, pointerRegions.data(), pointerRegions.size());
+
+        if (recordAllocations)
+            (*m_recorder)(m_task, m_context, MALLOC_PTR_IN_USE_RANGE_TYPE, allocatedPointers.data(), allocatedPointers.size());
 
         m_coalescedSpans.clear();
     }
@@ -4774,9 +4953,8 @@ public:
         if (!span || !span->start)
             return 1;
 
-        if (m_seenPointers.contains(ptr))
+        if (!m_seenPointers.add(ptr).isNewEntry)
             return span->length;
-        m_seenPointers.add(ptr);
 
         if (!m_coalescedSpans.size()) {
             m_coalescedSpans.append(span);
@@ -4919,10 +5097,7 @@ void* FastMallocZone::zoneRealloc(malloc_zone_t*, void*, size_t)
 extern "C" {
 malloc_introspection_t jscore_fastmalloc_introspection = { &FastMallocZone::enumerate, &FastMallocZone::goodSize, &FastMallocZone::check, &FastMallocZone::print,
     &FastMallocZone::log, &FastMallocZone::forceLock, &FastMallocZone::forceUnlock, &FastMallocZone::statistics
-
-#if OS(IOS) || __MAC_OS_X_VERSION_MAX_ALLOWED >= 1060
     , 0 // zone_locked will not be called on the zone unless it advertises itself as version five or higher.
-#endif
 #if OS(IOS) || __MAC_OS_X_VERSION_MAX_ALLOWED >= 1070
     , 0, 0, 0, 0 // These members will not be used unless the zone advertises itself as version seven or higher.
 #endif

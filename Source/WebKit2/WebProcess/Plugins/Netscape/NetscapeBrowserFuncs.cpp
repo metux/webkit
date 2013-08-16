@@ -40,7 +40,6 @@
 #include <wtf/text/StringBuilder.h>
 
 using namespace WebCore;
-using namespace std;
 
 namespace WebKit {
 
@@ -248,7 +247,7 @@ static NPError parsePostBuffer(bool isFile, const char *buffer, uint32_t length,
                 String contentLength = headerFields.get("Content-Length");
                 
                 if (!contentLength.isNull())
-                    dataLength = min(contentLength.toInt(), (int)dataLength);
+                    dataLength = std::min(contentLength.toInt(), (int)dataLength);
                 headerFields.remove("Content-Length");
                 
                 postBuffer += location;
@@ -410,6 +409,8 @@ static const unsigned WKNVExpectsNonretainedLayer = 74657;
 
 // 74658 and 74659 are no longer implemented.
 
+static const unsigned WKNVPlugInContainer = 74660;
+
 #endif
 
 static NPError NPN_GetValue(NPP npp, NPNVariable variable, void *value)
@@ -491,6 +492,12 @@ static NPError NPN_GetValue(NPP npp, NPNVariable variable, void *value)
             // Asking for this will make us expect a non-retained layer from the plug-in.
             plugin->setPluginReturnsNonretainedLayer(true);
             *(NPBool*)value = true;
+            break;
+        }
+
+        case WKNVPlugInContainer: {
+            RefPtr<NetscapePlugin> plugin = NetscapePlugin::fromNPP(npp);
+            *reinterpret_cast<void**>(value) = plugin->plugInContainer();
             break;
         }
 

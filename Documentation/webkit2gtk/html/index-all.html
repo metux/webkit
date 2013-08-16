@@ -3,11 +3,11 @@
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
 <title>Index</title>
-<meta name="generator" content="DocBook XSL Stylesheets V1.76.1">
+<meta name="generator" content="DocBook XSL Stylesheets V1.78.1">
 <link rel="home" href="index.html" title="WebKit2GTK+ Reference Manual">
 <link rel="up" href="index.html" title="WebKit2GTK+ Reference Manual">
 <link rel="prev" href="WebKitWebPage.html" title="WebKitWebPage">
-<link rel="next" href="annotation-glossary.html" title="Annotation Glossary">
+<link rel="next" href="api-index-2-2.html" title="Index of new symbols in 2.2">
 <meta name="generator" content="GTK-Doc V1.18.1 (XML mode)">
 <link rel="stylesheet" href="style.css" type="text/css">
 </head>
@@ -17,14 +17,18 @@
 <td> </td>
 <td><a accesskey="h" href="index.html"><img src="home.png" width="24" height="24" border="0" alt="Home"></a></td>
 <th width="100%" align="center">WebKit2GTK+ Reference Manual</th>
-<td><a accesskey="n" href="annotation-glossary.html"><img src="right.png" width="24" height="24" border="0" alt="Next"></a></td>
+<td><a accesskey="n" href="api-index-2-2.html"><img src="right.png" width="24" height="24" border="0" alt="Next"></a></td>
 </tr></table>
 <div class="index">
-<div class="titlepage"><div><div><h2 class="title">
-<a name="index-all"></a>Index</h2></div></div></div>
+<div class="titlepage"><div><div><h1 class="title">
+<a name="index-all"></a>Index</h1></div></div></div>
 <div class="index"><div class="indexdiv">
 <h3>W</h3>
 <dl>
+<dt>WebKitAuthenticationRequest, <a class="indexterm" href="WebKitAuthenticationRequest.html#WebKitAuthenticationRequest-struct">struct WebKitAuthenticationRequest</a>
+</dt>
+<dt>WebKitAuthenticationScheme, <a class="indexterm" href="WebKitAuthenticationRequest.html#WebKitAuthenticationScheme">enum WebKitAuthenticationScheme</a>
+</dt>
 <dt>WebKitBackForwardList, <a class="indexterm" href="WebKitBackForwardList.html#WebKitBackForwardList-struct">struct WebKitBackForwardList</a>
 </dt>
 <dt>WebKitBackForwardList::changed, <a class="indexterm" href="WebKitBackForwardList.html#WebKitBackForwardList-changed">The "changed" signal</a>
@@ -46,6 +50,10 @@
 <dt>WebKitCookieManager::changed, <a class="indexterm" href="WebKitCookieManager.html#WebKitCookieManager-changed">The "changed" signal</a>
 </dt>
 <dt>WebKitCookiePersistentStorage, <a class="indexterm" href="WebKitCookieManager.html#WebKitCookiePersistentStorage">enum WebKitCookiePersistentStorage</a>
+</dt>
+<dt>WebKitCredential, <a class="indexterm" href="WebKitAuthenticationRequest.html#WebKitCredential-struct">WebKitCredential</a>
+</dt>
+<dt>WebKitCredentialPersistence, <a class="indexterm" href="WebKitAuthenticationRequest.html#WebKitCredentialPersistence">enum WebKitCredentialPersistence</a>
 </dt>
 <dt>WebKitDownload, <a class="indexterm" href="WebKitDownload.html#WebKitDownload-struct">struct WebKitDownload</a>
 </dt>
@@ -209,6 +217,8 @@
 </dt>
 <dt>WebKitSettings:draw-compositing-indicators, <a class="indexterm" href="WebKitSettings.html#WebKitSettings--draw-compositing-indicators">The "draw-compositing-indicators" property</a>
 </dt>
+<dt>WebKitSettings:enable-accelerated-2d-canvas, <a class="indexterm" href="WebKitSettings.html#WebKitSettings--enable-accelerated-2d-canvas">The "enable-accelerated-2d-canvas" property</a>
+</dt>
 <dt>WebKitSettings:enable-caret-browsing, <a class="indexterm" href="WebKitSettings.html#WebKitSettings--enable-caret-browsing">The "enable-caret-browsing" property</a>
 </dt>
 <dt>WebKitSettings:enable-developer-extras, <a class="indexterm" href="WebKitSettings.html#WebKitSettings--enable-developer-extras">The "enable-developer-extras" property</a>
@@ -248,6 +258,8 @@
 <dt>WebKitSettings:enable-webaudio, <a class="indexterm" href="WebKitSettings.html#WebKitSettings--enable-webaudio">The "enable-webaudio" property</a>
 </dt>
 <dt>WebKitSettings:enable-webgl, <a class="indexterm" href="WebKitSettings.html#WebKitSettings--enable-webgl">The "enable-webgl" property</a>
+</dt>
+<dt>WebKitSettings:enable-write-console-messages-to-stdout, <a class="indexterm" href="WebKitSettings.html#WebKitSettings--enable-write-console-messages-to-stdout">The "enable-write-console-messages-to-stdout" property</a>
 </dt>
 <dt>WebKitSettings:enable-xss-auditor, <a class="indexterm" href="WebKitSettings.html#WebKitSettings--enable-xss-auditor">The "enable-xss-auditor" property</a>
 </dt>
@@ -359,6 +371,8 @@
 </dt>
 <dt>WebKitWebView, <a class="indexterm" href="WebKitWebView.html#WebKitWebView-struct">WebKitWebView</a>
 </dt>
+<dt>WebKitWebView::authenticate, <a class="indexterm" href="WebKitWebView.html#WebKitWebView-authenticate">The "authenticate" signal</a>
+</dt>
 <dt>WebKitWebView::close, <a class="indexterm" href="WebKitWebView.html#WebKitWebView-close">The "close" signal</a>
 </dt>
 <dt>WebKitWebView::context-menu, <a class="indexterm" href="WebKitWebView.html#WebKitWebView-context-menu">The "context-menu" signal</a>
@@ -438,6 +452,26 @@
 <dt>WebKitWindowProperties:statusbar-visible, <a class="indexterm" href="WebKitWindowProperties.html#WebKitWindowProperties--statusbar-visible">The "statusbar-visible" property</a>
 </dt>
 <dt>WebKitWindowProperties:toolbar-visible, <a class="indexterm" href="WebKitWindowProperties.html#WebKitWindowProperties--toolbar-visible">The "toolbar-visible" property</a>
+</dt>
+<dt>webkit_authentication_request_authenticate, <a class="indexterm" href="WebKitAuthenticationRequest.html#webkit-authentication-request-authenticate">webkit_authentication_request_authenticate ()</a>
+</dt>
+<dt>webkit_authentication_request_cancel, <a class="indexterm" href="WebKitAuthenticationRequest.html#webkit-authentication-request-cancel">webkit_authentication_request_cancel ()</a>
+</dt>
+<dt>webkit_authentication_request_can_save_credentials, <a class="indexterm" href="WebKitAuthenticationRequest.html#webkit-authentication-request-can-save-credentials">webkit_authentication_request_can_save_credentials ()</a>
+</dt>
+<dt>webkit_authentication_request_get_host, <a class="indexterm" href="WebKitAuthenticationRequest.html#webkit-authentication-request-get-host">webkit_authentication_request_get_host ()</a>
+</dt>
+<dt>webkit_authentication_request_get_port, <a class="indexterm" href="WebKitAuthenticationRequest.html#webkit-authentication-request-get-port">webkit_authentication_request_get_port ()</a>
+</dt>
+<dt>webkit_authentication_request_get_proposed_credential, <a class="indexterm" href="WebKitAuthenticationRequest.html#webkit-authentication-request-get-proposed-credential">webkit_authentication_request_get_proposed_credential ()</a>
+</dt>
+<dt>webkit_authentication_request_get_realm, <a class="indexterm" href="WebKitAuthenticationRequest.html#webkit-authentication-request-get-realm">webkit_authentication_request_get_realm ()</a>
+</dt>
+<dt>webkit_authentication_request_get_scheme, <a class="indexterm" href="WebKitAuthenticationRequest.html#webkit-authentication-request-get-scheme">webkit_authentication_request_get_scheme ()</a>
+</dt>
+<dt>webkit_authentication_request_is_for_proxy, <a class="indexterm" href="WebKitAuthenticationRequest.html#webkit-authentication-request-is-for-proxy">webkit_authentication_request_is_for_proxy ()</a>
+</dt>
+<dt>webkit_authentication_request_is_retry, <a class="indexterm" href="WebKitAuthenticationRequest.html#webkit-authentication-request-is-retry">webkit_authentication_request_is_retry ()</a>
 </dt>
 <dt>webkit_back_forward_list_get_back_item, <a class="indexterm" href="WebKitBackForwardList.html#webkit-back-forward-list-get-back-item">webkit_back_forward_list_get_back_item ()</a>
 </dt>
@@ -526,6 +560,20 @@
 <dt>webkit_cookie_manager_set_accept_policy, <a class="indexterm" href="WebKitCookieManager.html#webkit-cookie-manager-set-accept-policy">webkit_cookie_manager_set_accept_policy ()</a>
 </dt>
 <dt>webkit_cookie_manager_set_persistent_storage, <a class="indexterm" href="WebKitCookieManager.html#webkit-cookie-manager-set-persistent-storage">webkit_cookie_manager_set_persistent_storage ()</a>
+</dt>
+<dt>webkit_credential_copy, <a class="indexterm" href="WebKitAuthenticationRequest.html#webkit-credential-copy">webkit_credential_copy ()</a>
+</dt>
+<dt>webkit_credential_free, <a class="indexterm" href="WebKitAuthenticationRequest.html#webkit-credential-free">webkit_credential_free ()</a>
+</dt>
+<dt>webkit_credential_get_password, <a class="indexterm" href="WebKitAuthenticationRequest.html#webkit-credential-get-password">webkit_credential_get_password ()</a>
+</dt>
+<dt>webkit_credential_get_persistence, <a class="indexterm" href="WebKitAuthenticationRequest.html#webkit-credential-get-persistence">webkit_credential_get_persistence ()</a>
+</dt>
+<dt>webkit_credential_get_username, <a class="indexterm" href="WebKitAuthenticationRequest.html#webkit-credential-get-username">webkit_credential_get_username ()</a>
+</dt>
+<dt>webkit_credential_has_password, <a class="indexterm" href="WebKitAuthenticationRequest.html#webkit-credential-has-password">webkit_credential_has_password ()</a>
+</dt>
+<dt>webkit_credential_new, <a class="indexterm" href="WebKitAuthenticationRequest.html#webkit-credential-new">webkit_credential_new ()</a>
 </dt>
 <dt>webkit_download_cancel, <a class="indexterm" href="WebKitDownload.html#webkit-download-cancel">webkit_download_cancel ()</a>
 </dt>
@@ -773,6 +821,8 @@
 </dt>
 <dt>webkit_settings_get_draw_compositing_indicators, <a class="indexterm" href="WebKitSettings.html#webkit-settings-get-draw-compositing-indicators">webkit_settings_get_draw_compositing_indicators ()</a>
 </dt>
+<dt>webkit_settings_get_enable_accelerated_2d_canvas, <a class="indexterm" href="WebKitSettings.html#webkit-settings-get-enable-accelerated-2d-canvas">webkit_settings_get_enable_accelerated_2d_canvas ()</a>
+</dt>
 <dt>webkit_settings_get_enable_caret_browsing, <a class="indexterm" href="WebKitSettings.html#webkit-settings-get-enable-caret-browsing">webkit_settings_get_enable_caret_browsing ()</a>
 </dt>
 <dt>webkit_settings_get_enable_developer_extras, <a class="indexterm" href="WebKitSettings.html#webkit-settings-get-enable-developer-extras">webkit_settings_get_enable_developer_extras ()</a>
@@ -812,6 +862,8 @@
 <dt>webkit_settings_get_enable_webaudio, <a class="indexterm" href="WebKitSettings.html#webkit-settings-get-enable-webaudio">webkit_settings_get_enable_webaudio ()</a>
 </dt>
 <dt>webkit_settings_get_enable_webgl, <a class="indexterm" href="WebKitSettings.html#webkit-settings-get-enable-webgl">webkit_settings_get_enable_webgl ()</a>
+</dt>
+<dt>webkit_settings_get_enable_write_console_messages_to_stdout, <a class="indexterm" href="WebKitSettings.html#webkit-settings-get-enable-write-console-messages-to-stdout">webkit_settings_get_enable_write_console_messages_to_stdout ()</a>
 </dt>
 <dt>webkit_settings_get_enable_xss_auditor, <a class="indexterm" href="WebKitSettings.html#webkit-settings-get-enable-xss-auditor">webkit_settings_get_enable_xss_auditor ()</a>
 </dt>
@@ -863,6 +915,8 @@
 </dt>
 <dt>webkit_settings_set_draw_compositing_indicators, <a class="indexterm" href="WebKitSettings.html#webkit-settings-set-draw-compositing-indicators">webkit_settings_set_draw_compositing_indicators ()</a>
 </dt>
+<dt>webkit_settings_set_enable_accelerated_2d_canvas, <a class="indexterm" href="WebKitSettings.html#webkit-settings-set-enable-accelerated-2d-canvas">webkit_settings_set_enable_accelerated_2d_canvas ()</a>
+</dt>
 <dt>webkit_settings_set_enable_caret_browsing, <a class="indexterm" href="WebKitSettings.html#webkit-settings-set-enable-caret-browsing">webkit_settings_set_enable_caret_browsing ()</a>
 </dt>
 <dt>webkit_settings_set_enable_developer_extras, <a class="indexterm" href="WebKitSettings.html#webkit-settings-set-enable-developer-extras">webkit_settings_set_enable_developer_extras ()</a>
@@ -902,6 +956,8 @@
 <dt>webkit_settings_set_enable_webaudio, <a class="indexterm" href="WebKitSettings.html#webkit-settings-set-enable-webaudio">webkit_settings_set_enable_webaudio ()</a>
 </dt>
 <dt>webkit_settings_set_enable_webgl, <a class="indexterm" href="WebKitSettings.html#webkit-settings-set-enable-webgl">webkit_settings_set_enable_webgl ()</a>
+</dt>
+<dt>webkit_settings_set_enable_write_console_messages_to_stdout, <a class="indexterm" href="WebKitSettings.html#webkit-settings-set-enable-write-console-messages-to-stdout">webkit_settings_set_enable_write_console_messages_to_stdout ()</a>
 </dt>
 <dt>webkit_settings_set_enable_xss_auditor, <a class="indexterm" href="WebKitSettings.html#webkit-settings-set-enable-xss-auditor">webkit_settings_set_enable_xss_auditor ()</a>
 </dt>
@@ -958,6 +1014,8 @@
 <dt>webkit_uri_response_get_uri, <a class="indexterm" href="WebKitURIResponse.html#webkit-uri-response-get-uri">webkit_uri_response_get_uri ()</a>
 </dt>
 <dt>webkit_uri_scheme_request_finish, <a class="indexterm" href="WebKitURISchemeRequest.html#webkit-uri-scheme-request-finish">webkit_uri_scheme_request_finish ()</a>
+</dt>
+<dt>webkit_uri_scheme_request_finish_error, <a class="indexterm" href="WebKitURISchemeRequest.html#webkit-uri-scheme-request-finish-error">webkit_uri_scheme_request_finish_error ()</a>
 </dt>
 <dt>webkit_uri_scheme_request_get_path, <a class="indexterm" href="WebKitURISchemeRequest.html#webkit-uri-scheme-request-get-path">webkit_uri_scheme_request_get_path ()</a>
 </dt>

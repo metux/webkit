@@ -33,9 +33,9 @@
 #include "RenderTreeAsText.h"
 #include "TextStream.h"
 
+#include <runtime/Uint8ClampedArray.h>
 #include <wtf/MathExtras.h>
 #include <wtf/ParallelJobs.h>
-#include <wtf/Uint8ClampedArray.h>
 
 using namespace std;
 
@@ -230,6 +230,8 @@ inline void FEGaussianBlur::platformApply(Uint8ClampedArray* srcPixelArray, Uint
 
 void FEGaussianBlur::calculateUnscaledKernelSize(unsigned& kernelSizeX, unsigned& kernelSizeY, float stdX, float stdY)
 {
+    ASSERT(stdX >= 0 && stdY >= 0);
+
     kernelSizeX = 0;
     if (stdX)
         kernelSizeX = max<unsigned>(2, static_cast<unsigned>(floorf(stdX * gaussianKernelFactor() + 0.5f)));

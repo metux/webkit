@@ -29,7 +29,6 @@
 #include "config.h"
 #include "GlyphPageTreeNode.h"
 
-#include "OpenTypeVerticalData.h"
 #include "SegmentedFontData.h"
 #include "SimpleFontData.h"
 #include <stdio.h>
@@ -37,6 +36,10 @@
 #include <wtf/text/WTFString.h>
 #include <wtf/unicode/CharacterNames.h>
 #include <wtf/unicode/Unicode.h>
+
+#if ENABLE(OPENTYPE_VERTICAL)
+#include "OpenTypeVerticalData.h"
+#endif
 
 namespace WebCore {
 
@@ -201,15 +204,20 @@ void GlyphPageTreeNode::initializePage(const FontData* fontData, unsigned pageNu
                 }
             }
 
-            m_page = GlyphPage::createUninitialized(this);
-
             // Now that we have a buffer full of characters, we want to get back an array
             // of glyph indices.  This part involves calling into the platform-specific 
             // routine of our glyph map for actually filling in the page with the glyphs.
             // Success is not guaranteed. For example, Times fails to fill page 260, giving glyph data
             // for only 128 out of 256 characters.
             bool haveGlyphs;
-            if (fontData->isSegmented()) {
+            if (!fontData->isSegmented()) {
+                if (GlyphPage::mayUseMixedFontDataWhenFilling(buffer, bufferLength, static_cast<const SimpleFontData*>(fontData)))
+                    m_page = GlyphPage::createForMixedFontData(this);
+                else
+                    m_page = GlyphPage::createForSingleFontData(this, static_cast<const SimpleFontData*>(fontData));
+                haveGlyphs = fill(m_page.get(), 0, GlyphPage::size, buffer, bufferLength, static_cast<const SimpleFontData*>(fontData));
+            } else {
+                m_page = GlyphPage::createForMixedFontData(this);
                 haveGlyphs = false;
 
                 const SegmentedFontData* segmentedFontData = static_cast<const SegmentedFontData*>(fontData);
@@ -225,7 +233,7 @@ void GlyphPageTreeNode::initializePage(const FontData* fontData, unsigned pageNu
                     int to = 1 + min(static_cast<int>(range.to()) - static_cast<int>(start), static_cast<int>(GlyphPage::size) - 1);
                     if (from < static_cast<int>(GlyphPage::size) && to > 0) {
                         if (haveGlyphs && !scratchPage) {
-                            scratchPage = GlyphPage::createUninitialized(this);
+                            scratchPage = GlyphPage::createForMixedFontData(this);
                             pageToFill = scratchPage.get();
                         }
 
@@ -246,8 +254,7 @@ void GlyphPageTreeNode::initializePage(const FontData* fontData, unsigned pageNu
                         }
                     }
                 }
-            } else
-                haveGlyphs = fill(m_page.get(), 0, GlyphPage::size, buffer, bufferLength, static_cast<const SimpleFontData*>(fontData));
+            }
 
             if (!haveGlyphs)
                 m_page = 0;
@@ -279,7 +286,7 @@ void GlyphPageTreeNode::initializePage(const FontData* fontData, unsigned pageNu
                 m_page = parentPage;
             } else {
                 // Combine the parent's glyphs and ours to form a new more complete page.
-                m_page = GlyphPage::createUninitialized(this);
+                m_page = GlyphPage::createForMixedFontData(this);
 
                 // Overlay the parent page on the fallback page. Check if the fallback font
                 // has added anything.
@@ -307,7 +314,7 @@ void GlyphPageTreeNode::initializePage(const FontData* fontData, unsigned pageNu
         if (parentPage)
             m_page = parentPage->createCopiedSystemFallbackPage(this);
         else
-            m_page = GlyphPage::createZeroedSystemFallbackPage(this);
+            m_page = GlyphPage::createForMixedFontData(this);
     }
 }
 
@@ -369,7 +376,7 @@ void GlyphPageTreeNode::pruneFontData(const SimpleFontData* fontData, unsigned l
 
     // Prune fall back child (if any) of this font.
     if (m_systemFallbackChild && m_systemFallbackChild->m_page)
-        m_systemFallbackChild->m_page->clearForFontData(fontData);
+        m_systemFallbackChild->m_page->removeFontDataFromSystemFallbackPage(fontData);
 
     // Prune any branch that contains this FontData.
     if (OwnPtr<GlyphPageTreeNode> node = m_children.take(fontData)) {

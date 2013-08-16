@@ -37,9 +37,10 @@
 #include "CachedResourceRequest.h"
 #include "CachedResourceRequestInitiators.h"
 #include "Document.h"
+#include "KURL.h"
 #include "StyleCachedShader.h"
 #include "StylePendingShader.h"
-#include "WebCoreMemoryInstrumentation.h"
+#include <wtf/text/StringBuilder.h>
 
 namespace WebCore {
 
@@ -54,6 +55,11 @@ WebKitCSSShaderValue::~WebKitCSSShaderValue()
 {
 }
 
+KURL WebKitCSSShaderValue::completeURL(CachedResourceLoader* loader) const
+{
+    return loader->document()->completeURL(m_url);
+}
+
 StyleCachedShader* WebKitCSSShaderValue::cachedShader(CachedResourceLoader* loader)
 {
     ASSERT(loader);
@@ -61,7 +67,7 @@ StyleCachedShader* WebKitCSSShaderValue::cachedShader(CachedResourceLoader* load
     if (!m_accessedShader) {
         m_accessedShader = true;
 
-        CachedResourceRequest request(ResourceRequest(loader->document()->completeURL(m_url)));
+        CachedResourceRequest request(ResourceRequest(completeURL(loader)));
         request.setInitiator(cachedResourceRequestInitiators().css);
         if (CachedResourceHandle<CachedShader> cachedShader = loader->requestShader(request))
             m_shader = StyleCachedShader::create(cachedShader.get());
@@ -95,13 +101,6 @@ String WebKitCSSShaderValue::customCssText() const
 bool WebKitCSSShaderValue::equals(const WebKitCSSShaderValue& other) const
 {
     return m_url == other.m_url;
-}
-
-void WebKitCSSShaderValue::reportDescendantMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
-{
-    MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::CSS);
-    info.addMember(m_url, "url");
-    info.addMember(m_format, "format");
 }
     
 } // namespace WebCore

@@ -26,6 +26,8 @@
 #include "ImageBuffer.h"
 #include <wtf/CurrentTime.h>
 
+#if USE(TEXTURE_MAPPER)
+
 namespace WebCore {
 
 TextureMapperLayer* toTextureMapperLayer(GraphicsLayer* layer)
@@ -41,22 +43,17 @@ PassOwnPtr<GraphicsLayer> GraphicsLayer::create(GraphicsLayerFactory* factory, G
     return factory->createGraphicsLayer(client);
 }
 
-PassOwnPtr<GraphicsLayer> GraphicsLayer::create(GraphicsLayerClient* client)
-{
-    return adoptPtr(new GraphicsLayerTextureMapper(client));
-}
-
 GraphicsLayerTextureMapper::GraphicsLayerTextureMapper(GraphicsLayerClient* client)
     : GraphicsLayer(client)
     , m_layer(adoptPtr(new TextureMapperLayer()))
     , m_compositedNativeImagePtr(0)
     , m_changeMask(NoChanges)
     , m_needsDisplay(false)
-    , m_hasOwnBackingStore(true)
     , m_fixedToViewport(false)
     , m_debugBorderWidth(0)
     , m_contentsLayer(0)
-    , m_animationStartedTimer(this, &GraphicsLayerTextureMapper::animationStartedTimerFired)
+    , m_animationStartTime(0)
+    , m_isScrollable(false)
 {
 }
 
@@ -75,6 +72,9 @@ void GraphicsLayerTextureMapper::setName(const String& name)
 
 GraphicsLayerTextureMapper::~GraphicsLayerTextureMapper()
 {
+    if (m_contentsLayer)
+        m_contentsLayer->setClient(0);
+
     willBeDestroyed();
 }
 
@@ -87,7 +87,7 @@ void GraphicsLayerTextureMapper::willBeDestroyed()
 */
 void GraphicsLayerTextureMapper::setNeedsDisplay()
 {
-    if (!m_hasOwnBackingStore)
+    if (!drawsContent())
         return;
 
     m_needsDisplay = true;
@@ -107,7 +107,7 @@ void GraphicsLayerTextureMapper::setContentsNeedsDisplay()
 */
 void GraphicsLayerTextureMapper::setNeedsDisplayInRect(const FloatRect& rect)
 {
-    if (!m_hasOwnBackingStore)
+    if (!drawsContent())
         return;
 
     if (m_needsDisplay)
@@ -277,10 +277,10 @@ void GraphicsLayerTextureMapper::setDrawsContent(bool value)
 {
     if (value == drawsContent())
         return;
-    notifyChange(DrawsContentChange);
     GraphicsLayer::setDrawsContent(value);
+    notifyChange(DrawsContentChange);
 
-    if (value && m_hasOwnBackingStore)
+    if (value)
         setNeedsDisplay();
 }
 
@@ -382,7 +382,14 @@ void GraphicsLayerTextureMapper::setContentsToMedia(TextureMapperPlatformLayer* 
 
     GraphicsLayer::setContentsToMedia(media);
     notifyChange(ContentChange);
+
+    if (m_contentsLayer)
+        m_contentsLayer->setClient(0);
+
     m_contentsLayer = media;
+
+    if (m_contentsLayer)
+        m_contentsLayer->setClient(this);
 }
 
 void GraphicsLayerTextureMapper::setShowDebugBorder(bool show)
@@ -403,6 +410,24 @@ void GraphicsLayerTextureMapper::setShowRepaintCounter(bool show)
     notifyChange(DebugVisualsChange);
 }
 
+void GraphicsLayerTextureMapper::didCommitScrollOffset(const IntSize& offset)
+{
+    if (offset.isZero())
+        return;
+
+    m_committedScrollOffset = offset;
+    notifyChange(CommittedScrollOffsetChange);
+}
+
+void GraphicsLayerTextureMapper::setIsScrollable(bool isScrollable)
+{
+    if (m_isScrollable == isScrollable)
+        return;
+
+    m_isScrollable = isScrollable;
+    notifyChange(IsScrollableChange);
+}
+
 /* \reimp (GraphicsLayer.h)
 */
 void GraphicsLayerTextureMapper::flushCompositingStateForThisLayerOnly()
@@ -415,8 +440,6 @@ void GraphicsLayerTextureMapper::flushCompositingStateForThisLayerOnly()
 
 void GraphicsLayerTextureMapper::prepareBackingStoreIfNeeded()
 {
-    if (!m_hasOwnBackingStore)
-        return;
     if (!shouldHaveBackingStore()) {
         m_backingStore.clear();
         m_changeMask |= BackingStoreChange;
@@ -432,7 +455,6 @@ void GraphicsLayerTextureMapper::prepareBackingStoreIfNeeded()
 
 void GraphicsLayerTextureMapper::updateDebugBorderAndRepaintCount()
 {
-    ASSERT(m_hasOwnBackingStore);
     if (isShowingDebugBorder())
         updateDebugIndicators();
 
@@ -537,8 +559,17 @@ void GraphicsLayerTextureMapper::commitLayerChanges()
     if (m_changeMask & AnimationChange)
         m_layer->setAnimations(m_animations);
 
+    if (m_changeMask & AnimationStarted)
+        client()->notifyAnimationStarted(this, m_animationStartTime);
+
     if (m_changeMask & FixedToViewporChange)
         m_layer->setFixedToViewport(fixedToViewport());
+
+    if (m_changeMask & IsScrollableChange)
+        m_layer->setIsScrollable(isScrollable());
+
+    if (m_changeMask & CommittedScrollOffsetChange)
+        m_layer->didCommitScrollOffset(m_committedScrollOffset);
 
     m_changeMask = NoChanges;
 }
@@ -562,9 +593,6 @@ void GraphicsLayerTextureMapper::flushCompositingState(const FloatRect& rect)
 
 void GraphicsLayerTextureMapper::updateBackingStoreIfNeeded()
 {
-    if (!m_hasOwnBackingStore)
-        return;
-
     TextureMapper* textureMapper = m_layer->textureMapper();
     if (!textureMapper)
         return;
@@ -610,9 +638,15 @@ bool GraphicsLayerTextureMapper::addAnimation(const KeyframeValueList& valueList
     if (valueList.property() == AnimatedPropertyWebkitTransform)
         listsMatch = validateTransformOperations(valueList, hasBigRotation) >= 0;
 
-    m_animations.add(GraphicsLayerAnimation(keyframesName, valueList, boxSize, anim, WTF::currentTime() - timeOffset, listsMatch));
+    const double currentTime = WTF::currentTime();
+    m_animations.add(GraphicsLayerAnimation(keyframesName, valueList, boxSize, anim, currentTime - timeOffset, listsMatch));
+    // m_animationStartTime is the time of the first real frame of animation, now or delayed by a negative offset.
+    if (timeOffset > 0)
+        m_animationStartTime = currentTime;
+    else
+        m_animationStartTime = currentTime - timeOffset;
     notifyChange(AnimationChange);
-    m_animationStartedTimer.startOneShot(0);
+    notifyChange(AnimationStarted);
     return true;
 }
 
@@ -633,11 +667,6 @@ void GraphicsLayerTextureMapper::removeAnimation(const String& animationName)
     m_animations.remove(animationName);
 }
 
-void GraphicsLayerTextureMapper::animationStartedTimerFired(Timer<GraphicsLayerTextureMapper>*)
-{
-    client()->notifyAnimationStarted(this, /* DOM time */ WTF::currentTime());
-}
-
 #if ENABLE(CSS_FILTERS)
 bool GraphicsLayerTextureMapper::setFilters(const FilterOperations& filters)
 {
@@ -645,16 +674,6 @@ bool GraphicsLayerTextureMapper::setFilters(const FilterOperations& filters)
     return GraphicsLayer::setFilters(filters);
 }
 #endif
-
-void GraphicsLayerTextureMapper::setBackingStore(PassRefPtr<TextureMapperBackingStore> backingStore)
-{
-    ASSERT(!m_hasOwnBackingStore);
-    if (m_backingStore == backingStore)
-        return;
-
-    m_backingStore = backingStore;
-    notifyChange(BackingStoreChange);
-}
 
 void GraphicsLayerTextureMapper::setFixedToViewport(bool fixed)
 {
@@ -672,3 +691,4 @@ void GraphicsLayerTextureMapper::setRepaintCount(int repaintCount)
 }
 
 }
+#endif

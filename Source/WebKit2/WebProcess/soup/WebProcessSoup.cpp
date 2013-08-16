@@ -27,16 +27,19 @@
 #include "config.h"
 #include "WebProcess.h"
 
-#define LIBSOUP_USE_UNSTABLE_REQUEST_API
+#if PLATFORM(EFL)
+#include "SeccompFiltersWebProcessEfl.h"
+#endif
 
 #include "WebCookieManager.h"
 #include "WebProcessCreationParameters.h"
+#include "WebSoupRequestManager.h"
 #include <WebCore/FileSystem.h>
 #include <WebCore/Language.h>
 #include <WebCore/MemoryCache.h>
 #include <WebCore/PageCache.h>
 #include <WebCore/ResourceHandle.h>
-#include <libsoup/soup-cache.h>
+#include <libsoup/soup.h>
 #include <wtf/gobject/GOwnPtr.h>
 #include <wtf/gobject/GRefPtr.h>
 #include <wtf/text/CString.h>
@@ -164,6 +167,15 @@ static void languageChanged(void*)
 
 void WebProcess::platformInitializeWebProcess(const WebProcessCreationParameters& parameters, CoreIPC::MessageDecoder&)
 {
+#if ENABLE(SECCOMP_FILTERS)
+    {
+#if PLATFORM(EFL)
+        SeccompFiltersWebProcessEfl seccompFilters(parameters);
+#endif
+        seccompFilters.initialize();
+    }
+#endif
+
     ASSERT(!parameters.diskCacheDirectory.isEmpty());
     GRefPtr<SoupCache> soupCache = adoptGRef(soup_cache_new(parameters.diskCacheDirectory.utf8().data(), SOUP_CACHE_SINGLE_USER));
     soup_session_add_feature(WebCore::ResourceHandle::defaultSession(), SOUP_SESSION_FEATURE(soupCache.get()));
@@ -173,7 +185,7 @@ void WebProcess::platformInitializeWebProcess(const WebProcessCreationParameters
         setSoupSessionAcceptLanguage(parameters.languages);
 
     for (size_t i = 0; i < parameters.urlSchemesRegistered.size(); i++)
-        m_soupRequestManager.registerURIScheme(parameters.urlSchemesRegistered[i]);
+        supplement<WebSoupRequestManager>()->registerURIScheme(parameters.urlSchemesRegistered[i]);
 
     if (!parameters.cookiePersistentStoragePath.isEmpty()) {
         supplement<WebCookieManager>()->setCookiePersistentStorage(parameters.cookiePersistentStoragePath,

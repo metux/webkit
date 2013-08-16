@@ -90,7 +90,7 @@ String SVGStyledElement::title() const
         // that do enable SVG in a shadow tree.
         ASSERT(!shadowHostElement || shadowHostElement->hasTagName(SVGNames::useTag));
         if (shadowHostElement && shadowHostElement->hasTagName(SVGNames::useTag)) {
-            SVGUseElement* useElement = static_cast<SVGUseElement*>(shadowHostElement);
+            SVGUseElement* useElement = toSVGUseElement(shadowHostElement);
  
             // If the <use> title is not empty we found the title to use.
             String useTitle(useElement->title());
@@ -139,6 +139,7 @@ CSSPropertyID SVGStyledElement::cssPropertyIdForSVGAttributeName(const Qualified
         // This is a list of all base CSS and SVG CSS properties which are exposed as SVG XML attributes
         mapAttributeToCSSProperty(propertyNameToIdMap, alignment_baselineAttr);
         mapAttributeToCSSProperty(propertyNameToIdMap, baseline_shiftAttr);
+        mapAttributeToCSSProperty(propertyNameToIdMap, buffered_renderingAttr);
         mapAttributeToCSSProperty(propertyNameToIdMap, clipAttr);
         mapAttributeToCSSProperty(propertyNameToIdMap, clip_pathAttr);
         mapAttributeToCSSProperty(propertyNameToIdMap, clip_ruleAttr);
@@ -214,6 +215,7 @@ static inline AttributeToPropertyTypeMap& cssPropertyToTypeMap()
     // Fill the map for the first use.
     s_cssPropertyMap.set(alignment_baselineAttr, AnimatedString);
     s_cssPropertyMap.set(baseline_shiftAttr, AnimatedString);
+    s_cssPropertyMap.set(buffered_renderingAttr, AnimatedString);
     s_cssPropertyMap.set(clipAttr, AnimatedRect);
     s_cssPropertyMap.set(clip_pathAttr, AnimatedString);
     s_cssPropertyMap.set(clip_ruleAttr, AnimatedString);
@@ -292,11 +294,11 @@ bool SVGStyledElement::isPresentationAttribute(const QualifiedName& name) const
     return SVGElement::isPresentationAttribute(name);
 }
 
-void SVGStyledElement::collectStyleForPresentationAttribute(const Attribute& attribute, StylePropertySet* style)
+void SVGStyledElement::collectStyleForPresentationAttribute(const QualifiedName& name, const AtomicString& value, MutableStylePropertySet* style)
 {
-    CSSPropertyID propertyID = SVGStyledElement::cssPropertyIdForSVGAttributeName(attribute.name());
+    CSSPropertyID propertyID = SVGStyledElement::cssPropertyIdForSVGAttributeName(name);
     if (propertyID > 0)
-        addPropertyToPresentationAttributeStyle(style, propertyID, attribute.value());
+        addPropertyToPresentationAttributeStyle(style, propertyID, value);
 }
 
 void SVGStyledElement::parseAttribute(const QualifiedName& name, const AtomicString& value)
@@ -400,13 +402,13 @@ PassRefPtr<CSSValue> SVGStyledElement::getPresentationAttribute(const String& na
         return 0;
 
     QualifiedName attributeName(nullAtom, name, nullAtom);
-    const Attribute* attr = getAttributeItem(attributeName);
-    if (!attr)
+    const Attribute* attribute = findAttributeByName(attributeName);
+    if (!attribute)
         return 0;
 
-    RefPtr<StylePropertySet> style = StylePropertySet::create(SVGAttributeMode);
-    CSSPropertyID propertyID = SVGStyledElement::cssPropertyIdForSVGAttributeName(attr->name());
-    style->setProperty(propertyID, attr->value());
+    RefPtr<MutableStylePropertySet> style = MutableStylePropertySet::create(SVGAttributeMode);
+    CSSPropertyID propertyID = SVGStyledElement::cssPropertyIdForSVGAttributeName(attribute->name());
+    style->setProperty(propertyID, attribute->value());
     RefPtr<CSSValue> cssValue = style->getPropertyCSSValue(propertyID);
     return cssValue ? cssValue->cloneForCSSOM() : 0;
 }
@@ -424,7 +426,7 @@ void SVGStyledElement::setInstanceUpdatesBlocked(bool value)
 
 AffineTransform SVGStyledElement::localCoordinateSpaceTransform(SVGLocatable::CTMScope) const
 {
-    // To be overriden by SVGStyledLocatableElement/SVGStyledTransformableElement (or as special case SVGTextElement and SVGPatternElement)
+    // To be overriden by SVGGraphicsElement (or as special case SVGTextElement and SVGPatternElement)
     return AffineTransform();
 }
 
@@ -455,14 +457,14 @@ void SVGStyledElement::updateRelativeLengthsInformation(bool hasRelativeLengths,
         if (!node->isSVGElement())
             break;
 
-        SVGElement* element = static_cast<SVGElement*>(node);
-        if (!element->isStyled()) {
+        SVGElement* element = toSVGElement(node);
+        if (!element->isSVGStyledElement()) {
             node = node->parentNode();
             continue;
         }
 
         // Register us in the parent element map.
-        static_cast<SVGStyledElement*>(element)->updateRelativeLengthsInformation(hasRelativeLengths, this);
+        toSVGStyledElement(element)->updateRelativeLengthsInformation(hasRelativeLengths, this);
         break;
     }
 }

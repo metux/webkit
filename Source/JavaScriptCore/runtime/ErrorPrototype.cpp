@@ -50,20 +50,20 @@ const ClassInfo ErrorPrototype::s_info = { "Error", &ErrorInstance::s_info, 0, E
 */
 
 ErrorPrototype::ErrorPrototype(ExecState* exec, Structure* structure)
-    : ErrorInstance(exec->globalData(), structure)
+    : ErrorInstance(exec->vm(), structure)
 {
 }
 
 void ErrorPrototype::finishCreation(ExecState* exec, JSGlobalObject*)
 {
-    Base::finishCreation(exec->globalData(), "");
+    Base::finishCreation(exec->vm(), "");
     ASSERT(inherits(&s_info));
-    putDirect(exec->globalData(), exec->propertyNames().name, jsNontrivialString(exec, String(ASCIILiteral("Error"))), DontEnum);
+    putDirect(exec->vm(), exec->propertyNames().name, jsNontrivialString(exec, String(ASCIILiteral("Error"))), DontEnum);
 }
 
-bool ErrorPrototype::getOwnPropertySlot(JSCell* cell, ExecState* exec, PropertyName propertyName, PropertySlot &slot)
+bool ErrorPrototype::getOwnPropertySlot(JSObject* object, ExecState* exec, PropertyName propertyName, PropertySlot &slot)
 {
-    return getStaticFunctionSlot<ErrorInstance>(exec, ExecState::errorPrototypeTable(exec), jsCast<ErrorPrototype*>(cell), propertyName, slot);
+    return getStaticFunctionSlot<ErrorInstance>(exec, ExecState::errorPrototypeTable(exec), jsCast<ErrorPrototype*>(object), propertyName, slot);
 }
 
 bool ErrorPrototype::getOwnPropertyDescriptor(JSObject* object, ExecState* exec, PropertyName propertyName, PropertyDescriptor& descriptor)

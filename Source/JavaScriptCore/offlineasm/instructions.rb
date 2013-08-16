@@ -254,10 +254,11 @@ MACRO_INSTRUCTIONS =
 X86_INSTRUCTIONS =
     [
      "cdqi",
-     "idivi"
+     "idivi",
+     "resetX87Stack"
     ]
 
-ARMv7_INSTRUCTIONS =
+ARM_INSTRUCTIONS =
     [
      "smulli",
      "addis",
@@ -273,6 +274,21 @@ MIPS_INSTRUCTIONS =
     "sltu",
     "pichdr",
     "pichdrra"
+    ]
+
+SH4_INSTRUCTIONS =
+    [
+    "shllx",
+    "shlrx",
+    "shld",
+    "shad",
+    "bdnan",
+    "loaddReversedAndIncrementAddress",
+    "storedReversedAndDecrementAddress",
+    "ldspr",
+    "stspr",
+    "callf",
+    "jmpf"
     ]
 
 CXX_INSTRUCTIONS =
@@ -291,7 +307,7 @@ CXX_INSTRUCTIONS =
      "cloopDo",              # no operands
     ]
 
-INSTRUCTIONS = MACRO_INSTRUCTIONS + X86_INSTRUCTIONS + ARMv7_INSTRUCTIONS + MIPS_INSTRUCTIONS + CXX_INSTRUCTIONS
+INSTRUCTIONS = MACRO_INSTRUCTIONS + X86_INSTRUCTIONS + ARM_INSTRUCTIONS + MIPS_INSTRUCTIONS + SH4_INSTRUCTIONS + CXX_INSTRUCTIONS
 
 INSTRUCTION_PATTERN = Regexp.new('\\A((' + INSTRUCTIONS.join(')|(') + '))\\Z')
 

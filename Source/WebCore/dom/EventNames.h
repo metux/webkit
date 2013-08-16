@@ -84,9 +84,13 @@ namespace WebCore {
     macro(keyup) \
     macro(levelchange) \
     macro(load) \
+    macro(loading) \
+    macro(loadingdone) \
     macro(loadstart) \
     macro(message) \
     macro(mousedown) \
+    macro(mouseenter) \
+    macro(mouseleave) \
     macro(mousemove) \
     macro(mouseout) \
     macro(mouseover) \
@@ -117,7 +121,7 @@ namespace WebCore {
     macro(updateready) \
     macro(upgradeneeded) \
     macro(versionchange) \
-    macro(webkitvisibilitychange) \
+    macro(visibilitychange) \
     macro(write) \
     macro(writeend) \
     macro(writestart) \
@@ -225,15 +229,14 @@ namespace WebCore {
     macro(connecting) \
     macro(addstream) \
     macro(removestream) \
-    macro(statechange) \
+    macro(signalingstatechange) \
     macro(removetrack) \
     macro(mute) \
     macro(unmute) \
-    macro(icechange) \
+    macro(iceconnectionstatechange) \
     macro(icecandidate) \
     macro(negotiationneeded) \
     macro(datachannel) \
-    macro(gatheringchange) \
     macro(tonechange) \
     \
     macro(show) \
@@ -243,19 +246,15 @@ namespace WebCore {
     \
     macro(webkitregionlayoutupdate) \
     \
+    macro(webkitregionoversetchange) \
+    \
     macro(webkitnetworkinfochange) \
     \
     macro(webkitresourcetimingbufferfull) \
     \
     macro(webkitdeviceproximity) \
     \
-    macro(autocomplete) \
-    macro(autocompleteerror) \
-    \
-    macro(webkitprerenderstart) \
-    macro(webkitprerenderstop) \
-    macro(webkitprerenderload) \
-    macro(webkitprerenderdomcontentloaded) \
+    macro(securitypolicyviolation) \
     \
 
 // end of DOM_EVENT_NAMES_FOR_EACH

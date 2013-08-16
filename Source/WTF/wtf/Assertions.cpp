@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2003, 2006, 2007 Apple Inc.  All rights reserved.
+ * Copyright (C) 2003, 2006, 2007, 2013 Apple Inc.  All rights reserved.
  * Copyright (C) 2007-2009 Torch Mobile, Inc.
  * Copyright (C) 2011 University of Szeged. All rights reserved.
  *
@@ -36,6 +36,9 @@
 
 #include "Compiler.h"
 #include "OwnArrayPtr.h"
+#include <wtf/StringExtras.h>
+#include <wtf/text/CString.h>
+#include <wtf/text/WTFString.h>
 
 #include <stdio.h>
 #include <stdarg.h>
@@ -61,14 +64,10 @@
 #include <windows.h>
 #endif
 
-#if (OS(DARWIN) || (OS(LINUX) && !defined(__UCLIBC__))) && !OS(ANDROID)
+#if OS(DARWIN) || (OS(LINUX) && !defined(__UCLIBC__))
 #include <cxxabi.h>
 #include <dlfcn.h>
 #include <execinfo.h>
-#endif
-
-#if OS(ANDROID)
-#include "android/log.h"
 #endif
 
 #if PLATFORM(BLACKBERRY)
@@ -119,8 +118,6 @@ static void vprintf_stderr_common(const char* format, va_list args)
 
 #elif PLATFORM(BLACKBERRY)
     BBLOGV(BlackBerry::Platform::LogLevelCritical, format, args);
-#elif OS(ANDROID)
-    __android_log_vprint(ANDROID_LOG_WARN, "WebKit", format, args);
 #elif HAVE(ISDEBUGGERPRESENT)
     if (IsDebuggerPresent()) {
         size_t size = 1024;
@@ -245,7 +242,7 @@ void WTFReportArgumentAssertionFailure(const char* file, int line, const char* f
 
 void WTFGetBacktrace(void** stack, int* size)
 {
-#if (OS(DARWIN) || (OS(LINUX) && !defined(__UCLIBC__))) && !OS(ANDROID)
+#if OS(DARWIN) || (OS(LINUX) && !defined(__UCLIBC__))
     *size = backtrace(stack, *size);
 #elif OS(WINDOWS) && !OS(WINCE)
     // The CaptureStackBackTrace function is available in XP, but it is not defined
@@ -284,7 +281,7 @@ void WTFReportBacktrace()
 #    if defined(__GLIBC__) && !defined(__UCLIBC__)
 #      define WTF_USE_BACKTRACE_SYMBOLS 1
 #    endif
-#  elif !OS(ANDROID)
+#  else
 #    define WTF_USE_DLADDR 1
 #  endif
 #endif
@@ -334,8 +331,21 @@ void WTFSetCrashHook(WTFCrashHookFunction function)
 
 void WTFInvokeCrashHook()
 {
+}
+
+void WTFCrash()
+{
     if (globalHook)
         globalHook();
+
+    WTFReportBacktrace();
+    *(int *)(uintptr_t)0xbbadbeef = 0;
+    // More reliable, but doesn't say BBADBEEF.
+#if COMPILER(CLANG)
+    __builtin_trap();
+#else
+    ((void(*)())0)();
+#endif
 }
 
 #if HAVE(SIGNAL_H)
@@ -424,6 +434,50 @@ void WTFLogAlways(const char* format, ...)
     va_start(args, format);
     vprintf_stderr_with_trailing_newline(format, args);
     va_end(args);
+}
+
+WTFLogChannel* WTFLogChannelByName(WTFLogChannel* channels[], size_t count, const char* name)
+{
+    for (size_t i = 0; i < count; ++i) {
+        WTFLogChannel* channel = channels[i];
+        if (!strcasecmp(name, channel->name))
+            return channel;
+    }
+
+    return 0;
+}
+
+static void setStateOfAllChannels(WTFLogChannel* channels[], size_t channelCount, WTFLogChannelState state)
+{
+    for (size_t i = 0; i < channelCount; ++i)
+        channels[i]->state = state;
+}
+
+void WTFInitializeLogChannelStatesFromString(WTFLogChannel* channels[], size_t count, const char* logLevel)
+{
+    String logLevelString = logLevel;
+    Vector<String> components;
+    logLevelString.split(',', components);
+
+    for (size_t i = 0; i < components.size(); ++i) {
+        String component = components[i];
+
+        WTFLogChannelState logChannelState = WTFLogChannelOn;
+        if (component.startsWith('-')) {
+            logChannelState = WTFLogChannelOff;
+            component = component.substring(1);
+        }
+
+        if (equalIgnoringCase(component, "all")) {
+            setStateOfAllChannels(channels, count, logChannelState);
+            continue;
+        }
+
+        if (WTFLogChannel* channel = WTFLogChannelByName(channels, count, component.utf8().data()))
+            channel->state = logChannelState;
+        else
+            WTFLogAlways("Unknown logging channel: %s", component.utf8().data());
+    }
 }
 
 } // extern "C"

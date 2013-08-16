@@ -32,7 +32,6 @@
 #include "MacroAssembler.h"
 #include "Opcode.h"
 #include "PropertySlot.h"
-#include "ResolveOperation.h"
 #include "SpecialPointer.h"
 #include "Structure.h"
 #include "StructureChain.h"
@@ -70,20 +69,20 @@ struct Instruction {
         u.operand = operand;
     }
 
-    Instruction(JSGlobalData& globalData, JSCell* owner, Structure* structure)
+    Instruction(VM& vm, JSCell* owner, Structure* structure)
     {
         u.structure.clear();
-        u.structure.set(globalData, owner, structure);
+        u.structure.set(vm, owner, structure);
     }
-    Instruction(JSGlobalData& globalData, JSCell* owner, StructureChain* structureChain)
+    Instruction(VM& vm, JSCell* owner, StructureChain* structureChain)
     {
         u.structureChain.clear();
-        u.structureChain.set(globalData, owner, structureChain);
+        u.structureChain.set(vm, owner, structureChain);
     }
-    Instruction(JSGlobalData& globalData, JSCell* owner, JSCell* jsCell)
+    Instruction(VM& vm, JSCell* owner, JSCell* jsCell)
     {
         u.jsCell.clear();
-        u.jsCell.set(globalData, owner, jsCell);
+        u.jsCell.set(vm, owner, jsCell);
     }
 
     Instruction(PropertySlot::GetValueFunc getterFunc) { u.getterFunc = getterFunc; }
@@ -117,8 +116,6 @@ struct Instruction {
         ObjectAllocationProfile* objectAllocationProfile;
         void* pointer;
         bool* predicatePointer;
-        ResolveOperations* resolveOperations;
-        PutToBaseOperation* putToBaseOperation;
     } u;
         
 private:

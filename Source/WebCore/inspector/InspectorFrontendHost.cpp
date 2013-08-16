@@ -38,6 +38,7 @@
 #include "ContextMenuController.h"
 #include "ContextMenuProvider.h"
 #include "DOMFileSystem.h"
+#include "DOMWrapperWorld.h"
 #include "Element.h"
 #include "Frame.h"
 #include "FrameLoader.h"
@@ -48,13 +49,12 @@
 #include "InspectorFrontendClient.h"
 #include "Page.h"
 #include "Pasteboard.h"
+#include "ResourceError.h"
+#include "ResourceRequest.h"
+#include "ResourceResponse.h"
 #include "ScriptFunctionCall.h"
 #include "UserGestureIndicator.h"
-
-#include <wtf/RefPtr.h>
 #include <wtf/StdLibExtras.h>
-
-using namespace std;
 
 namespace WebCore {
 
@@ -193,6 +193,18 @@ void InspectorFrontendHost::setAttachedWindowHeight(unsigned height)
         m_client->changeAttachedWindowHeight(height);
 }
 
+void InspectorFrontendHost::setAttachedWindowWidth(unsigned width)
+{
+    if (m_client)
+        m_client->changeAttachedWindowWidth(width);
+}
+
+void InspectorFrontendHost::setToolbarHeight(unsigned height)
+{
+    if (m_client)
+        m_client->setToolbarHeight(height);
+}
+
 void InspectorFrontendHost::moveWindowBy(float x, float y) const
 {
     if (m_client)
@@ -208,11 +220,6 @@ void InspectorFrontendHost::setInjectedScriptForOrigin(const String& origin, con
 String InspectorFrontendHost::localizedStringsURL()
 {
     return m_client ? m_client->localizedStringsURL() : "";
-}
-
-String InspectorFrontendHost::hiddenPanels()
-{
-    return m_client ? m_client->hiddenPanels() : "";
 }
 
 void InspectorFrontendHost::copyText(const String& text)
@@ -249,17 +256,6 @@ void InspectorFrontendHost::close(const String&)
 {
 }
 
-bool InspectorFrontendHost::canInspectWorkers()
-{
-#if ENABLE(WORKERS)
-    if (m_client)
-        return m_client->canInspectWorkers();
-    return false;
-#else
-    return false;
-#endif
-}
-
 void InspectorFrontendHost::sendMessageToBackend(const String& message)
 {
     if (m_client)
@@ -294,8 +290,8 @@ String InspectorFrontendHost::loadResourceSynchronously(const String& url)
     Vector<char> data;
     ResourceError error;
     ResourceResponse response;
-    m_frontendPage->mainFrame()->loader()->loadResourceSynchronously(request, DoNotAllowStoredCredentials, error, response, data);
-    return String(data.data(), data.size());
+    m_frontendPage->mainFrame()->loader()->loadResourceSynchronously(request, DoNotAllowStoredCredentials, DoNotAskClientForCrossOriginCredentials, error, response, data);
+    return String::fromUTF8(data.data(), data.size());
 }
 
 bool InspectorFrontendHost::supportsFileSystems()
@@ -334,6 +330,16 @@ PassRefPtr<DOMFileSystem> InspectorFrontendHost::isolatedFileSystem(const String
 bool InspectorFrontendHost::isUnderTest()
 {
     return m_client && m_client->isUnderTest();
+}
+
+bool InspectorFrontendHost::canSaveAs()
+{
+    return false;
+}
+
+bool InspectorFrontendHost::canInspectWorkers()
+{
+    return false;
 }
 
 } // namespace WebCore

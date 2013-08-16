@@ -53,6 +53,10 @@ WK_EXPORT void WKPreferencesSetJavaScriptEnabled(WKPreferencesRef preferences, b
 WK_EXPORT bool WKPreferencesGetJavaScriptEnabled(WKPreferencesRef preferences);
 
 // Defaults to true.
+WK_EXPORT void WKPreferencesSetJavaScriptMarkupEnabled(WKPreferencesRef preferences, bool javaScriptEnabled);
+WK_EXPORT bool WKPreferencesGetJavaScriptMarkupEnabled(WKPreferencesRef preferences);
+
+// Defaults to true.
 WK_EXPORT void WKPreferencesSetLoadsImagesAutomatically(WKPreferencesRef preferences, bool loadsImagesAutomatically);
 WK_EXPORT bool WKPreferencesGetLoadsImagesAutomatically(WKPreferencesRef preferences);
 
@@ -231,6 +235,10 @@ WK_EXPORT bool WKPreferencesGetTextAutosizingEnabled(WKPreferencesRef preference
 // Defaults to true.
 WK_EXPORT void WKPreferencesSetQTKitEnabled(WKPreferencesRef preferencesRef, bool enabled);
 WK_EXPORT bool WKPreferencesGetQTKitEnabled(WKPreferencesRef preferencesRef);
+
+// Defaults to false
+WK_EXPORT void WKPreferencesSetAsynchronousSpellCheckingEnabled(WKPreferencesRef preferencesRef, bool enabled);
+WK_EXPORT bool WKPreferencesGetAsynchronousSpellCheckingEnabled(WKPreferencesRef preferencesRef);
 
 #ifdef __cplusplus
 }

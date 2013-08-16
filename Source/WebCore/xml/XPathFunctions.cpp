@@ -299,7 +299,7 @@ void Function::setArguments(const Vector<Expression*>& args)
         setIsContextNodeSensitive(false);
 
     Vector<Expression*>::const_iterator end = args.end();
-    for (Vector<Expression*>::const_iterator it = args.begin(); it != end; it++)
+    for (Vector<Expression*>::const_iterator it = args.begin(); it != end; ++it)
         addSubExpression(*it);
 }
 
@@ -590,7 +590,7 @@ Value FunLang::evaluate() const
         if (node->isElementNode()) {
             Element* element = toElement(node);
             if (element->hasAttributes())
-                languageAttribute = element->getAttributeItem(XMLNames::langAttr);
+                languageAttribute = element->findAttributeByName(XMLNames::langAttr);
         }
         if (languageAttribute)
             break;

@@ -28,6 +28,7 @@
 #include "Chrome.h"
 #include "Console.h"
 #include "DumpRenderTreeSupportGtk.h"
+#include "Editor.h"
 #include "Element.h"
 #include "FileChooser.h"
 #include "FileIconLoader.h"
@@ -35,6 +36,7 @@
 #include "FloatRect.h"
 #include "FocusController.h"
 #include "FrameLoadRequest.h"
+#include "FrameSelection.h"
 #include "FrameView.h"
 #include "GtkUtilities.h"
 #include "GtkVersioning.h"
@@ -68,9 +70,22 @@
 #include <glib.h>
 #include <glib/gi18n-lib.h>
 #include <gtk/gtk.h>
+#include <wtf/CurrentTime.h>
 #include <wtf/MathExtras.h>
 #include <wtf/text/CString.h>
 #include <wtf/text/WTFString.h>
+
+#ifdef GDK_WINDOWING_X11
+#define Font XFont
+#define Cursor XCursor
+#define Region XRegion
+#include <gdk/gdkx.h>
+#undef Font
+#undef Cursor
+#undef Region
+#undef None
+#undef Status
+#endif
 
 #if ENABLE(SQL_DATABASE)
 #include "DatabaseManager.h"
@@ -80,9 +95,24 @@
 #include "HTMLMediaElement.h"
 #endif
 
+#ifdef GDK_WINDOWING_X11
+#include "WidgetBackingStoreGtkX11.h"
+#endif
+#include "WidgetBackingStoreCairo.h"
+
 using namespace WebCore;
 
 namespace WebKit {
+
+static PassOwnPtr<WidgetBackingStore> createBackingStore(GtkWidget* widget, const IntSize& size)
+{
+#ifdef GDK_WINDOWING_X11
+    GdkDisplay* display = gdk_display_manager_get_default_display(gdk_display_manager_get());
+    if (GDK_IS_X11_DISPLAY(display))
+        return WebCore::WidgetBackingStoreGtkX11::create(widget, size);
+#endif
+    return WebCore::WidgetBackingStoreCairo::create(widget, size);
+}
 
 ChromeClient::ChromeClient(WebKitWebView* webView)
     : m_webView(webView)
@@ -141,8 +171,7 @@ void ChromeClient::setWindowRect(const FloatRect& rect)
     GtkWidget* window = gtk_widget_get_toplevel(GTK_WIDGET(m_webView));
     if (widgetIsOnscreenToplevelWindow(window)) {
         gtk_window_move(GTK_WINDOW(window), intrect.x(), intrect.y());
-        if (!intrect.isEmpty())
-            gtk_window_resize(GTK_WINDOW(window), intrect.width(), intrect.height());
+        gtk_window_resize(GTK_WINDOW(window), intrect.width(), intrect.height());
     }
 }
 
@@ -313,7 +342,7 @@ void ChromeClient::takeFocus(FocusDirection)
     unfocus();
 }
 
-void ChromeClient::focusedNodeChanged(Node*)
+void ChromeClient::focusedElementChanged(Element*)
 {
 }
 
@@ -331,7 +360,7 @@ bool ChromeClient::runBeforeUnloadConfirmPanel(const WTF::String& message, WebCo
     return runJavaScriptConfirm(frame, message);
 }
 
-void ChromeClient::addMessageToConsole(WebCore::MessageSource source, WebCore::MessageLevel level, const WTF::String& message, unsigned lineNumber, const WTF::String& sourceId)
+void ChromeClient::addMessageToConsole(WebCore::MessageSource source, WebCore::MessageLevel level, const WTF::String& message, unsigned lineNumber, unsigned columnNumber, const WTF::String& sourceId)
 {
     gboolean retval;
     g_signal_emit_by_name(m_webView, "console-message", message.utf8().data(), lineNumber, sourceId.utf8().data(), &retval);
@@ -452,8 +481,7 @@ void ChromeClient::widgetSizeChanged(const IntSize& oldWidgetSize, IntSize newSi
         || newSize.width() > backingStore->size().width()
         || newSize.height() > backingStore->size().height()) {
 
-        OwnPtr<WidgetBackingStore> newBackingStore =
-            WebCore::WidgetBackingStore::create(GTK_WIDGET(m_webView), newSize);
+        OwnPtr<WidgetBackingStore> newBackingStore = createBackingStore(GTK_WIDGET(m_webView), newSize);
         RefPtr<cairo_t> cr = adoptRef(cairo_create(newBackingStore->cairoSurface()));
 
         clearEverywhereInBackingStore(m_webView, cr.get());
@@ -513,7 +541,7 @@ static void coalesceRectsIfPossible(const IntRect& clipRect, Vector<IntRect>& re
     rects.append(clipRect);
 }
 
-static void paintWebView(WebKitWebView* webView, Frame* frame, Region dirtyRegion)
+static void paintWebView(WebKitWebView* webView, Frame* frame, const Region& dirtyRegion)
 {
     if (!webView->priv->backingStore)
         return;
@@ -596,7 +624,7 @@ void ChromeClient::paint(WebCore::Timer<ChromeClient>*)
     // synced with cursor movement. For instance, a text field can move without
     // the selection changing.
     Frame* focusedFrame = core(m_webView)->focusController()->focusedOrMainFrame();
-    if (focusedFrame && focusedFrame->editor()->canEdit())
+    if (focusedFrame && focusedFrame->editor().canEdit())
         m_webView->priv->imFilter.setCursorRect(frame->selection()->absoluteCaretBounds());
 }
 
@@ -717,11 +745,7 @@ void ChromeClient::contentsSizeChanged(Frame* frame, const IntSize& size) const
     // otherwise we get into an infinite loop!
     GtkWidget* widget = GTK_WIDGET(m_webView);
     GtkRequisition requisition;
-#if GTK_CHECK_VERSION(2, 20, 0)
-    gtk_widget_get_requisition(widget, &requisition);
-#else
-    requisition = widget->requisition;
-#endif
+    gtk_widget_get_preferred_size(widget, &requisition, 0);
     if (gtk_widget_get_realized(widget)
         && (requisition.height != size.height()
         || requisition.width != size.width()))
@@ -913,7 +937,7 @@ void ChromeClient::enterFullscreenForNode(Node* node)
 
     HTMLElement* element = static_cast<HTMLElement*>(node);
     if (element && element->isMediaElement()) {
-        HTMLMediaElement* mediaElement = static_cast<HTMLMediaElement*>(element);
+        HTMLMediaElement* mediaElement = toHTMLMediaElement(element);
         if (mediaElement->player() && mediaElement->player()->canEnterFullscreen())
             mediaElement->player()->enterFullscreen();
     }
@@ -926,7 +950,7 @@ void ChromeClient::exitFullscreenForNode(Node* node)
 
     HTMLElement* element = static_cast<HTMLElement*>(node);
     if (element && element->isMediaElement()) {
-        HTMLMediaElement* mediaElement = static_cast<HTMLMediaElement*>(element);
+        HTMLMediaElement* mediaElement = toHTMLMediaElement(element);
         if (mediaElement->player())
             mediaElement->player()->exitFullscreen();
     }
@@ -970,7 +994,7 @@ void ChromeClient::enterFullScreenForElement(WebCore::Element* element)
 
 #if ENABLE(VIDEO) && USE(NATIVE_FULLSCREEN_VIDEO)
     if (element && element->isMediaElement()) {
-        HTMLMediaElement* mediaElement = static_cast<HTMLMediaElement*>(element);
+        HTMLMediaElement* mediaElement = toHTMLMediaElement(element);
         if (mediaElement->player() && mediaElement->player()->canEnterFullscreen()) {
             element->document()->webkitWillEnterFullScreenForElement(element);
             mediaElement->player()->enterFullscreen();
@@ -1011,7 +1035,7 @@ void ChromeClient::exitFullScreenForElement(WebCore::Element*)
 #if ENABLE(VIDEO) && USE(NATIVE_FULLSCREEN_VIDEO)
     if (m_fullScreenElement && m_fullScreenElement->isMediaElement()) {
         m_fullScreenElement->document()->webkitWillExitFullScreenForElement(m_fullScreenElement.get());
-        HTMLMediaElement* mediaElement = static_cast<HTMLMediaElement*>(m_fullScreenElement.get());
+        HTMLMediaElement* mediaElement = toHTMLMediaElement(m_fullScreenElement.get());
         if (mediaElement->player()) {
             mediaElement->player()->exitFullscreen();
             m_fullScreenElement->document()->webkitDidExitFullScreenForElement(m_fullScreenElement.get());
@@ -1044,11 +1068,11 @@ void ChromeClient::attachRootGraphicsLayer(Frame* frame, GraphicsLayer* rootLaye
 
     if (turningOnCompositing) {
         m_displayTimer.stop();
-        m_webView->priv->backingStore = WebCore::WidgetBackingStore::create(GTK_WIDGET(m_webView), IntSize(1, 1));
+        m_webView->priv->backingStore = createBackingStore(GTK_WIDGET(m_webView), IntSize(1, 1));
     }
 
     if (turningOffCompositing) {
-        m_webView->priv->backingStore = WebCore::WidgetBackingStore::create(GTK_WIDGET(m_webView), getWebViewRect(m_webView).size());
+        m_webView->priv->backingStore = createBackingStore(GTK_WIDGET(m_webView), getWebViewRect(m_webView).size());
         RefPtr<cairo_t> cr = adoptRef(cairo_create(m_webView->priv->backingStore->cairoSurface()));
         clearEverywhereInBackingStore(m_webView, cr.get());
     }

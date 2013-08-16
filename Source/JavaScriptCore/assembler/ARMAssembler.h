@@ -50,7 +50,7 @@ namespace JSC {
             r9,
             r10,
             r11,
-            r12, S1 = r12,
+            r12, ip = r12, S1 = r12,
             r13, sp = r13,
             r14, lr = r14,
             r15, pc = r15
@@ -91,6 +91,52 @@ namespace JSC {
             d31
         } FPRegisterID;
 
+#if USE(MASM_PROBE)
+    #define FOR_EACH_CPU_REGISTER(V) \
+        FOR_EACH_CPU_GPREGISTER(V) \
+        FOR_EACH_CPU_SPECIAL_REGISTER(V) \
+        FOR_EACH_CPU_FPREGISTER(V)
+
+    #define FOR_EACH_CPU_GPREGISTER(V) \
+        V(void*, r0) \
+        V(void*, r1) \
+        V(void*, r2) \
+        V(void*, r3) \
+        V(void*, r4) \
+        V(void*, r5) \
+        V(void*, r6) \
+        V(void*, r7) \
+        V(void*, r8) \
+        V(void*, r9) \
+        V(void*, r10) \
+        V(void*, r11) \
+        V(void*, ip) \
+        V(void*, sp) \
+        V(void*, lr) \
+        V(void*, pc)
+
+    #define FOR_EACH_CPU_SPECIAL_REGISTER(V) \
+        V(void*, apsr) \
+        V(void*, fpscr) \
+
+    #define FOR_EACH_CPU_FPREGISTER(V) \
+        V(double, d0) \
+        V(double, d1) \
+        V(double, d2) \
+        V(double, d3) \
+        V(double, d4) \
+        V(double, d5) \
+        V(double, d6) \
+        V(double, d7) \
+        V(double, d8) \
+        V(double, d9) \
+        V(double, d10) \
+        V(double, d11) \
+        V(double, d12) \
+        V(double, d13) \
+        V(double, d14) \
+        V(double, d15)
+#endif // USE(MASM_PROBE)
     } // namespace ARMRegisters
 
     class ARMAssembler {
@@ -107,21 +153,21 @@ namespace JSC {
 
         // ARM conditional constants
         typedef enum {
-            EQ = 0x00000000, // Zero
-            NE = 0x10000000, // Non-zero
-            CS = 0x20000000,
-            CC = 0x30000000,
-            MI = 0x40000000,
-            PL = 0x50000000,
-            VS = 0x60000000,
-            VC = 0x70000000,
-            HI = 0x80000000,
-            LS = 0x90000000,
-            GE = 0xa0000000,
-            LT = 0xb0000000,
-            GT = 0xc0000000,
-            LE = 0xd0000000,
-            AL = 0xe0000000
+            EQ = 0x00000000, // Zero / Equal.
+            NE = 0x10000000, // Non-zero / Not equal.
+            CS = 0x20000000, // Unsigned higher or same.
+            CC = 0x30000000, // Unsigned lower.
+            MI = 0x40000000, // Negative.
+            PL = 0x50000000, // Positive or zero.
+            VS = 0x60000000, // Overflowed.
+            VC = 0x70000000, // Not overflowed.
+            HI = 0x80000000, // Unsigned higher.
+            LS = 0x90000000, // Unsigned lower or same.
+            GE = 0xa0000000, // Signed greater than or equal.
+            LT = 0xb0000000, // Signed less than.
+            GT = 0xc0000000, // Signed greater than.
+            LE = 0xd0000000, // Signed less than or equal.
+            AL = 0xe0000000  // Unconditional / Always execute.
         } Condition;
 
         // ARM instruction constants
@@ -163,8 +209,8 @@ namespace JSC {
             VMOV_VFP32 = 0x0e000a10,
             VMOV_ARM32 = 0x0e100a10,
             VCVT_F64_S32 = 0x0eb80bc0,
-            VCVT_S32_F64 = 0x0ebd0b40,
-            VCVT_U32_F64 = 0x0ebc0b40,
+            VCVT_S32_F64 = 0x0ebd0bc0,
+            VCVT_U32_F64 = 0x0ebc0bc0,
             VCVT_F32_F64 = 0x0eb70bc0,
             VCVT_F64_F32 = 0x0eb70ac0,
             VMRS_APSR = 0x0ef1fa10,
@@ -400,13 +446,6 @@ namespace JSC {
         void movs(int rd, ARMWord op2, Condition cc = AL)
         {
             emitInstruction(toARMWord(cc) | MOV | SetConditionalCodes, rd, ARMRegisters::r0, op2);
-        }
-
-        static void revertJump(void* instructionStart, RegisterID rd, ARMWord imm)
-        {
-            ARMWord* insn = reinterpret_cast<ARMWord*>(instructionStart);
-            ARMWord* address = getLdrImmAddress(insn);
-            *address = imm;
         }
 
         void bic(int rd, int rn, ARMWord op2, Condition cc = AL)
@@ -767,7 +806,7 @@ namespace JSC {
             return loadBranchTarget(ARMRegisters::pc, cc, useConstantPool);
         }
 
-        PassRefPtr<ExecutableMemoryHandle> executableCopy(JSGlobalData&, void* ownerUID, JITCompilationEffort);
+        PassRefPtr<ExecutableMemoryHandle> executableCopy(VM&, void* ownerUID, JITCompilationEffort);
 
         unsigned debugOffset() { return m_buffer.debugOffset(); }
 
@@ -1029,29 +1068,46 @@ namespace JSC {
             return AL | B | (offset & BranchOffsetMask);
         }
 
+#if OS(LINUX) && COMPILER(GCC)
+        static inline void linuxPageFlush(uintptr_t begin, uintptr_t end)
+        {
+            asm volatile(
+                "push    {r7}\n"
+                "mov     r0, %0\n"
+                "mov     r1, %1\n"
+                "mov     r7, #0xf0000\n"
+                "add     r7, r7, #0x2\n"
+                "mov     r2, #0x0\n"
+                "svc     0x0\n"
+                "pop     {r7}\n"
+                :
+                : "r" (begin), "r" (end)
+                : "r0", "r1", "r2");
+        }
+#endif
+
 #if OS(LINUX) && COMPILER(RVCT)
         static __asm void cacheFlush(void* code, size_t);
 #else
         static void cacheFlush(void* code, size_t size)
         {
 #if OS(LINUX) && COMPILER(GCC)
-            uintptr_t currentPage = reinterpret_cast<uintptr_t>(code) & ~(pageSize() - 1);
-            uintptr_t lastPage = (reinterpret_cast<uintptr_t>(code) + size) & ~(pageSize() - 1);
-            do {
-                asm volatile(
-                    "push    {r7}\n"
-                    "mov     r0, %0\n"
-                    "mov     r1, %1\n"
-                    "mov     r7, #0xf0000\n"
-                    "add     r7, r7, #0x2\n"
-                    "mov     r2, #0x0\n"
-                    "svc     0x0\n"
-                    "pop     {r7}\n"
-                    :
-                    : "r" (currentPage), "r" (currentPage + pageSize())
-                    : "r0", "r1", "r2");
-                currentPage += pageSize();
-            } while (lastPage >= currentPage);
+            size_t page = pageSize();
+            uintptr_t current = reinterpret_cast<uintptr_t>(code);
+            uintptr_t end = current + size;
+            uintptr_t firstPageEnd = (current & ~(page - 1)) + page;
+
+            if (end <= firstPageEnd) {
+                linuxPageFlush(current, end);
+                return;
+            }
+
+            linuxPageFlush(current, firstPageEnd);
+
+            for (current = firstPageEnd; current + page < end; current += page)
+                linuxPageFlush(current, current + page);
+
+            linuxPageFlush(current, end);
 #elif OS(WINCE)
             CacheRangeFlush(code, size, CACHE_SYNC_ALL);
 #elif OS(QNX) && ENABLE(ASSEMBLER_WX_EXCLUSIVE)

@@ -36,8 +36,6 @@
 #include "SVGRenderingContext.h"
 #include "SVGStyledElement.h"
 #include "SVGUnitTypes.h"
-
-#include <wtf/UnusedParam.h>
 #include <wtf/Vector.h>
 
 namespace WebCore {
@@ -92,12 +90,12 @@ bool RenderSVGResourceMasker::applyResource(RenderObject* object, RenderStyle*, 
     MaskerData* maskerData = m_masker.get(object);
 
     AffineTransform absoluteTransform;
-    SVGRenderingContext::calculateTransformationToOutermostSVGCoordinateSystem(object, absoluteTransform);
+    SVGRenderingContext::calculateTransformationToOutermostCoordinateSystem(object, absoluteTransform);
 
     FloatRect repaintRect = object->repaintRectInLocalCoordinates();
 
     if (!maskerData->maskImage && !repaintRect.isEmpty()) {
-        SVGMaskElement* maskElement = static_cast<SVGMaskElement*>(node());
+        SVGMaskElement* maskElement = toSVGMaskElement(node());
         if (!maskElement)
             return false;
 
@@ -137,7 +135,7 @@ bool RenderSVGResourceMasker::drawContentIntoMaskImage(MaskerData* maskerData, C
     // Draw the content into the ImageBuffer.
     for (Node* node = maskElement->firstChild(); node; node = node->nextSibling()) {
         RenderObject* renderer = node->renderer();
-        if (!node->isSVGElement() || !static_cast<SVGElement*>(node)->isStyled() || !renderer)
+        if (!node->isSVGElement() || !toSVGElement(node)->isSVGStyledElement() || !renderer)
             continue;
         if (renderer->needsLayout())
             return false;
@@ -166,7 +164,7 @@ void RenderSVGResourceMasker::calculateMaskContentRepaintRect()
 {
     for (Node* childNode = node()->firstChild(); childNode; childNode = childNode->nextSibling()) {
         RenderObject* renderer = childNode->renderer();
-        if (!childNode->isSVGElement() || !static_cast<SVGElement*>(childNode)->isStyled() || !renderer)
+        if (!childNode->isSVGElement() || !toSVGElement(childNode)->isSVGStyledElement() || !renderer)
             continue;
         RenderStyle* style = renderer->style();
         if (!style || style->display() == NONE || style->visibility() != VISIBLE)
@@ -177,7 +175,7 @@ void RenderSVGResourceMasker::calculateMaskContentRepaintRect()
 
 FloatRect RenderSVGResourceMasker::resourceBoundingBox(RenderObject* object)
 {
-    SVGMaskElement* maskElement = static_cast<SVGMaskElement*>(node());
+    SVGMaskElement* maskElement = toSVGMaskElement(node());
     ASSERT(maskElement);
 
     FloatRect objectBoundingBox = object->objectBoundingBox();
