@@ -7,8 +7,10 @@ webkitgtk (2.1.4-1) experimental; urgency=low
     debian/libjavascriptcore*dev.links, gir1.2-*.links:
   - Install the GObject Introspection support files, and compatibility
     links that cover the old names
+  * debian/patches/03_dom_bindings_compat.patch:
+  - Add symbols that went missing since the last stable release
 
- -- Gustavo Noronha Silva <kov@debian.org>  Mon, 19 Aug 2013 08:18:03 -0300
+ -- Gustavo Noronha Silva <kov@debian.org>  Mon, 19 Aug 2013 08:23:38 -0300
 
 webkitgtk (2.0.4-2) unstable; urgency=low
 
