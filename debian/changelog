@@ -3,8 +3,12 @@ webkitgtk (2.1.4-1) experimental; urgency=low
   * New development release
   * debian/patches/01_do-not-build-testing-tools.patch:
   - refreshed
+  * debian/libjavascriptcore*dev.install, gir1.2-*.install,
+    debian/libjavascriptcore*dev.links, gir1.2-*.links:
+  - Install the GObject Introspection support files, and compatibility
+    links that cover the old names
 
- -- Gustavo Noronha Silva <kov@debian.org>  Thu, 15 Aug 2013 22:10:04 -0300
+ -- Gustavo Noronha Silva <kov@debian.org>  Mon, 19 Aug 2013 08:18:03 -0300
 
 webkitgtk (2.0.4-2) unstable; urgency=low
 
