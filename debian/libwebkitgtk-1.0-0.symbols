@@ -13,8 +13,28 @@ libwebkitgtk-1.0.so.0 libwebkitgtk-1.0-0 #MINVER#
  webkit_dom_attr_get_type@Base 1.3.10
  webkit_dom_attr_get_value@Base 1.3.10
  webkit_dom_attr_set_value@Base 1.3.10
+ webkit_dom_audio_track_get_enabled@Base 2.1.4
+ webkit_dom_audio_track_get_id@Base 2.1.4
+ webkit_dom_audio_track_get_kind@Base 2.1.4
+ webkit_dom_audio_track_get_label@Base 2.1.4
+ webkit_dom_audio_track_get_language@Base 2.1.4
+ webkit_dom_audio_track_get_type@Base 2.1.4
+ webkit_dom_audio_track_list_dispatch_event@Base 2.1.4
+ webkit_dom_audio_track_list_get_length@Base 2.1.4
+ webkit_dom_audio_track_list_get_track_by_id@Base 2.1.4
+ webkit_dom_audio_track_list_get_type@Base 2.1.4
+ webkit_dom_audio_track_list_item@Base 2.1.4
+ webkit_dom_audio_track_set_enabled@Base 2.1.4
  webkit_dom_bar_info_get_type@Base 1.3.10
  webkit_dom_bar_info_get_visible@Base 1.3.10
+ webkit_dom_bar_prop_get_type@Base 2.1.4
+ webkit_dom_bar_prop_get_visible@Base 2.1.4
+ webkit_dom_battery_manager_dispatch_event@Base 2.1.4
+ webkit_dom_battery_manager_get_charging@Base 2.1.4
+ webkit_dom_battery_manager_get_charging_time@Base 2.1.4
+ webkit_dom_battery_manager_get_discharging_time@Base 2.1.4
+ webkit_dom_battery_manager_get_level@Base 2.1.4
+ webkit_dom_battery_manager_get_type@Base 2.1.4
  webkit_dom_blob_get_size@Base 1.3.10
  webkit_dom_blob_get_type@Base 1.3.10
  webkit_dom_blob_slice@Base 1.6.1
@@ -102,6 +122,7 @@ libwebkitgtk-1.0.so.0 libwebkitgtk-1.0-0 #MINVER#
  webkit_dom_document_get_charset@Base 1.3.10
  webkit_dom_document_get_compat_mode@Base 1.3.10
  webkit_dom_document_get_cookie@Base 1.3.10
+ webkit_dom_document_get_current_script@Base 2.1.4
  webkit_dom_document_get_default_charset@Base 1.3.10
  webkit_dom_document_get_default_view@Base 1.3.10
  webkit_dom_document_get_doctype@Base 1.3.10
@@ -115,6 +136,7 @@ libwebkitgtk-1.0.so.0 libwebkitgtk-1.0-0 #MINVER#
  webkit_dom_document_get_elements_by_tag_name_ns@Base 1.3.10
  webkit_dom_document_get_forms@Base 1.3.10
  webkit_dom_document_get_head@Base 1.3.10
+ webkit_dom_document_get_hidden@Base 2.1.4
  webkit_dom_document_get_images@Base 1.3.10
  webkit_dom_document_get_implementation@Base 1.3.10
  webkit_dom_document_get_input_encoding@Base 1.3.10
@@ -129,6 +151,7 @@ libwebkitgtk-1.0.so.0 libwebkitgtk-1.0-0 #MINVER#
  webkit_dom_document_get_style_sheets@Base 1.3.10
  webkit_dom_document_get_title@Base 1.3.10
  webkit_dom_document_get_type@Base 1.3.10
+ webkit_dom_document_get_visibility_state@Base 2.1.4
  webkit_dom_document_get_webkit_current_full_screen_element@Base 1.3.10
  webkit_dom_document_get_webkit_full_screen_keyboard_input_allowed@Base 1.3.10
  webkit_dom_document_get_webkit_fullscreen_element@Base 1.9.2
@@ -348,6 +371,7 @@ libwebkitgtk-1.0.so.0 libwebkitgtk-1.0-0 #MINVER#
  webkit_dom_element_get_attribute_node@Base 1.3.10
  webkit_dom_element_get_attribute_node_ns@Base 1.3.10
  webkit_dom_element_get_attribute_ns@Base 1.3.10
+ webkit_dom_element_get_attributes@Base 2.1.4
  webkit_dom_element_get_child_element_count@Base 1.3.10
  webkit_dom_element_get_class_list@Base 1.10.1
  webkit_dom_element_get_class_name@Base 1.10.1
@@ -378,6 +402,7 @@ libwebkitgtk-1.0.so.0 libwebkitgtk-1.0-0 #MINVER#
  webkit_dom_element_get_webkit_region_overset@Base 1.10.1
  webkit_dom_element_has_attribute@Base 1.3.10
  webkit_dom_element_has_attribute_ns@Base 1.3.10
+ webkit_dom_element_has_attributes@Base 2.1.4
  webkit_dom_element_query_selector@Base 1.3.10
  webkit_dom_element_query_selector_all@Base 1.3.10
  webkit_dom_element_remove@Base 1.11.90
@@ -423,6 +448,7 @@ libwebkitgtk-1.0.so.0 libwebkitgtk-1.0-0 #MINVER#
  webkit_dom_event_target_remove_event_listener@Base 1.3.13
  webkit_dom_file_get_name@Base 1.3.10
  webkit_dom_file_get_type@Base 1.3.10
+ webkit_dom_file_get_webkit_relative_path@Base 2.1.4
  webkit_dom_file_list_get_length@Base 1.3.10
  webkit_dom_file_list_get_type@Base 1.3.10
  webkit_dom_file_list_item@Base 1.3.10
@@ -807,6 +833,7 @@ libwebkitgtk-1.0.so.0 libwebkitgtk-1.0-0 #MINVER#
  webkit_dom_html_image_element_get_natural_height@Base 1.3.10
  webkit_dom_html_image_element_get_natural_width@Base 1.3.10
  webkit_dom_html_image_element_get_src@Base 1.3.10
+ webkit_dom_html_image_element_get_srcset@Base 2.1.4
  webkit_dom_html_image_element_get_type@Base 1.3.10
  webkit_dom_html_image_element_get_use_map@Base 1.3.10
  webkit_dom_html_image_element_get_vspace@Base 1.3.10
@@ -824,6 +851,7 @@ libwebkitgtk-1.0.so.0 libwebkitgtk-1.0-0 #MINVER#
  webkit_dom_html_image_element_set_lowsrc@Base 1.3.10
  webkit_dom_html_image_element_set_name@Base 1.3.10
  webkit_dom_html_image_element_set_src@Base 1.3.10
+ webkit_dom_html_image_element_set_srcset@Base 2.1.4
  webkit_dom_html_image_element_set_use_map@Base 1.3.10
  webkit_dom_html_image_element_set_vspace@Base 1.3.10
  webkit_dom_html_image_element_set_width@Base 1.3.10
@@ -1119,6 +1147,7 @@ libwebkitgtk-1.0.so.0 libwebkitgtk-1.0-0 #MINVER#
  webkit_dom_html_option_element_set_value@Base 1.3.10
  webkit_dom_html_options_collection_get_selected_index@Base 1.3.10
  webkit_dom_html_options_collection_get_type@Base 1.3.10
+ webkit_dom_html_options_collection_named_item@Base 2.1.4
  webkit_dom_html_options_collection_set_selected_index@Base 1.3.10
  webkit_dom_html_paragraph_element_get_align@Base 1.3.10
  webkit_dom_html_paragraph_element_get_type@Base 1.3.10
@@ -1405,6 +1434,16 @@ libwebkitgtk-1.0.so.0 libwebkitgtk-1.0-0 #MINVER#
  webkit_dom_htmlu_list_element_get_compact@Base 1.3.10
  webkit_dom_htmlu_list_element_get_type@Base 1.3.10
  webkit_dom_htmlu_list_element_set_compact@Base 1.3.10
+ webkit_dom_keyboard_event_get_alt_graph_key@Base 2.1.4
+ webkit_dom_keyboard_event_get_alt_key@Base 2.1.4
+ webkit_dom_keyboard_event_get_ctrl_key@Base 2.1.4
+ webkit_dom_keyboard_event_get_key_identifier@Base 2.1.4
+ webkit_dom_keyboard_event_get_key_location@Base 2.1.4
+ webkit_dom_keyboard_event_get_meta_key@Base 2.1.4
+ webkit_dom_keyboard_event_get_modifier_state@Base 2.1.4
+ webkit_dom_keyboard_event_get_shift_key@Base 2.1.4
+ webkit_dom_keyboard_event_get_type@Base 2.1.4
+ webkit_dom_keyboard_event_init_keyboard_event@Base 2.1.4
  webkit_dom_location_get_ancestor_origins@Base 1.9.2
  webkit_dom_location_get_origin@Base 1.3.10
  webkit_dom_location_get_type@Base 1.3.10
@@ -1472,6 +1511,9 @@ libwebkitgtk-1.0.so.0 libwebkitgtk-1.0-0 #MINVER#
  webkit_dom_navigator_get_user_agent@Base 1.3.10
  webkit_dom_navigator_get_vendor@Base 1.3.10
  webkit_dom_navigator_get_vendor_sub@Base 1.3.10
+ webkit_dom_navigator_get_webkit_battery@Base 2.1.4
+ webkit_dom_navigator_get_webkit_persistent_storage@Base 2.1.4
+ webkit_dom_navigator_get_webkit_temporary_storage@Base 2.1.4
  webkit_dom_navigator_is_protocol_handler_registered@Base 1.10.1
  webkit_dom_navigator_java_enabled@Base 1.3.10
  webkit_dom_navigator_register_protocol_handler@Base 1.10.1
@@ -1637,6 +1679,7 @@ libwebkitgtk-1.0.so.0 libwebkitgtk-1.0-0 #MINVER#
  webkit_dom_storage_get_type@Base 1.3.10
  webkit_dom_storage_info_get_type@Base 1.10.1
  webkit_dom_storage_key@Base 1.3.10
+ webkit_dom_storage_quota_get_type@Base 2.1.4
  webkit_dom_storage_remove_item@Base 1.3.10
  webkit_dom_storage_set_item@Base 1.3.10
  webkit_dom_style_media_get_type@Base 1.3.10
@@ -1742,6 +1785,18 @@ libwebkitgtk-1.0.so.0 libwebkitgtk-1.0-0 #MINVER#
  webkit_dom_validity_state_get_type_mismatch@Base 1.3.10
  webkit_dom_validity_state_get_valid@Base 1.3.10
  webkit_dom_validity_state_get_value_missing@Base 1.3.10
+ webkit_dom_video_track_get_id@Base 2.1.4
+ webkit_dom_video_track_get_kind@Base 2.1.4
+ webkit_dom_video_track_get_label@Base 2.1.4
+ webkit_dom_video_track_get_language@Base 2.1.4
+ webkit_dom_video_track_get_selected@Base 2.1.4
+ webkit_dom_video_track_get_type@Base 2.1.4
+ webkit_dom_video_track_list_dispatch_event@Base 2.1.4
+ webkit_dom_video_track_list_get_length@Base 2.1.4
+ webkit_dom_video_track_list_get_track_by_id@Base 2.1.4
+ webkit_dom_video_track_list_get_type@Base 2.1.4
+ webkit_dom_video_track_list_item@Base 2.1.4
+ webkit_dom_video_track_set_selected@Base 2.1.4
  webkit_dom_webkit_named_flow_dispatch_event@Base 1.10.1
  webkit_dom_webkit_named_flow_get_content@Base 1.10.1
  webkit_dom_webkit_named_flow_get_content_nodes@Base 1.9.2

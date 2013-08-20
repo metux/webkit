@@ -9,8 +9,10 @@ webkitgtk (2.1.4-1) experimental; urgency=low
     links that cover the old names
   * debian/patches/03_dom_bindings_compat.patch:
   - Add symbols that went missing since the last stable release
+  * debian/*.symbols:
+  - updated symbols files to contain the newly added APIs
 
- -- Gustavo Noronha Silva <kov@debian.org>  Mon, 19 Aug 2013 08:23:38 -0300
+ -- Gustavo Noronha Silva <kov@debian.org>  Mon, 19 Aug 2013 21:11:33 -0300
 
 webkitgtk (2.0.4-2) unstable; urgency=low
 

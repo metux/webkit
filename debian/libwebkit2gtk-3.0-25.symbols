@@ -3,6 +3,18 @@ libwebkit2gtk-3.0.so.25 libwebkit2gtk-3.0-25 #MINVER#
  (c++)"WebKit::WebGtkExtensionManager::initialize(OpaqueWKBundle const*, void const*)@Base" 2.0.2
  (c++)"WebKit::WebGtkExtensionManager::shared()@Base" 2.0.2
  webkit_authentication_dialog_get_type@Base 2.0.2
+ webkit_authentication_request_authenticate@Base 2.1.4
+ webkit_authentication_request_can_save_credentials@Base 2.1.4
+ webkit_authentication_request_cancel@Base 2.1.4
+ webkit_authentication_request_get_host@Base 2.1.4
+ webkit_authentication_request_get_port@Base 2.1.4
+ webkit_authentication_request_get_proposed_credential@Base 2.1.4
+ webkit_authentication_request_get_realm@Base 2.1.4
+ webkit_authentication_request_get_scheme@Base 2.1.4
+ webkit_authentication_request_get_type@Base 2.1.4
+ webkit_authentication_request_is_for_proxy@Base 2.1.4
+ webkit_authentication_request_is_retry@Base 2.1.4
+ webkit_authentication_scheme_get_type@Base 2.1.4
  webkit_authentication_widget_get_type@Base 2.0.2
  webkit_back_forward_list_get_back_item@Base 2.0.2
  webkit_back_forward_list_get_back_list@Base 2.0.2
@@ -56,6 +68,15 @@ libwebkit2gtk-3.0.so.25 libwebkit2gtk-3.0-25 #MINVER#
  webkit_cookie_manager_set_accept_policy@Base 2.0.2
  webkit_cookie_manager_set_persistent_storage@Base 2.0.2
  webkit_cookie_persistent_storage_get_type@Base 2.0.2
+ webkit_credential_copy@Base 2.1.4
+ webkit_credential_free@Base 2.1.4
+ webkit_credential_get_password@Base 2.1.4
+ webkit_credential_get_persistence@Base 2.1.4
+ webkit_credential_get_type@Base 2.1.4
+ webkit_credential_get_username@Base 2.1.4
+ webkit_credential_has_password@Base 2.1.4
+ webkit_credential_new@Base 2.1.4
+ webkit_credential_persistence_get_type@Base 2.1.4
  webkit_dom_attr_get_is_id@Base 2.0.2
  webkit_dom_attr_get_name@Base 2.0.2
  webkit_dom_attr_get_owner_element@Base 2.0.2
@@ -63,8 +84,28 @@ libwebkit2gtk-3.0.so.25 libwebkit2gtk-3.0-25 #MINVER#
  webkit_dom_attr_get_type@Base 2.0.2
  webkit_dom_attr_get_value@Base 2.0.2
  webkit_dom_attr_set_value@Base 2.0.2
+ webkit_dom_audio_track_get_enabled@Base 2.1.4
+ webkit_dom_audio_track_get_id@Base 2.1.4
+ webkit_dom_audio_track_get_kind@Base 2.1.4
+ webkit_dom_audio_track_get_label@Base 2.1.4
+ webkit_dom_audio_track_get_language@Base 2.1.4
+ webkit_dom_audio_track_get_type@Base 2.1.4
+ webkit_dom_audio_track_list_dispatch_event@Base 2.1.4
+ webkit_dom_audio_track_list_get_length@Base 2.1.4
+ webkit_dom_audio_track_list_get_track_by_id@Base 2.1.4
+ webkit_dom_audio_track_list_get_type@Base 2.1.4
+ webkit_dom_audio_track_list_item@Base 2.1.4
+ webkit_dom_audio_track_set_enabled@Base 2.1.4
  webkit_dom_bar_info_get_type@Base 2.0.2
  webkit_dom_bar_info_get_visible@Base 2.0.2
+ webkit_dom_bar_prop_get_type@Base 2.1.4
+ webkit_dom_bar_prop_get_visible@Base 2.1.4
+ webkit_dom_battery_manager_dispatch_event@Base 2.1.4
+ webkit_dom_battery_manager_get_charging@Base 2.1.4
+ webkit_dom_battery_manager_get_charging_time@Base 2.1.4
+ webkit_dom_battery_manager_get_discharging_time@Base 2.1.4
+ webkit_dom_battery_manager_get_level@Base 2.1.4
+ webkit_dom_battery_manager_get_type@Base 2.1.4
  webkit_dom_blob_get_size@Base 2.0.2
  webkit_dom_blob_get_type@Base 2.0.2
  webkit_dom_blob_slice@Base 2.0.2
@@ -152,6 +193,7 @@ libwebkit2gtk-3.0.so.25 libwebkit2gtk-3.0-25 #MINVER#
  webkit_dom_document_get_charset@Base 2.0.2
  webkit_dom_document_get_compat_mode@Base 2.0.2
  webkit_dom_document_get_cookie@Base 2.0.2
+ webkit_dom_document_get_current_script@Base 2.1.4
  webkit_dom_document_get_default_charset@Base 2.0.2
  webkit_dom_document_get_default_view@Base 2.0.2
  webkit_dom_document_get_doctype@Base 2.0.2
@@ -165,6 +207,7 @@ libwebkit2gtk-3.0.so.25 libwebkit2gtk-3.0-25 #MINVER#
  webkit_dom_document_get_elements_by_tag_name_ns@Base 2.0.2
  webkit_dom_document_get_forms@Base 2.0.2
  webkit_dom_document_get_head@Base 2.0.2
+ webkit_dom_document_get_hidden@Base 2.1.4
  webkit_dom_document_get_images@Base 2.0.2
  webkit_dom_document_get_implementation@Base 2.0.2
  webkit_dom_document_get_input_encoding@Base 2.0.2
@@ -179,6 +222,7 @@ libwebkit2gtk-3.0.so.25 libwebkit2gtk-3.0-25 #MINVER#
  webkit_dom_document_get_style_sheets@Base 2.0.2
  webkit_dom_document_get_title@Base 2.0.2
  webkit_dom_document_get_type@Base 2.0.2
+ webkit_dom_document_get_visibility_state@Base 2.1.4
  webkit_dom_document_get_webkit_current_full_screen_element@Base 2.0.2
  webkit_dom_document_get_webkit_full_screen_keyboard_input_allowed@Base 2.0.2
  webkit_dom_document_get_webkit_fullscreen_element@Base 2.0.2
@@ -398,6 +442,7 @@ libwebkit2gtk-3.0.so.25 libwebkit2gtk-3.0-25 #MINVER#
  webkit_dom_element_get_attribute_node@Base 2.0.2
  webkit_dom_element_get_attribute_node_ns@Base 2.0.2
  webkit_dom_element_get_attribute_ns@Base 2.0.2
+ webkit_dom_element_get_attributes@Base 2.1.4
  webkit_dom_element_get_child_element_count@Base 2.0.2
  webkit_dom_element_get_class_list@Base 2.0.2
  webkit_dom_element_get_class_name@Base 2.0.2
@@ -428,6 +473,7 @@ libwebkit2gtk-3.0.so.25 libwebkit2gtk-3.0-25 #MINVER#
  webkit_dom_element_get_webkit_region_overset@Base 2.0.2
  webkit_dom_element_has_attribute@Base 2.0.2
  webkit_dom_element_has_attribute_ns@Base 2.0.2
+ webkit_dom_element_has_attributes@Base 2.1.4
  webkit_dom_element_query_selector@Base 2.0.2
  webkit_dom_element_query_selector_all@Base 2.0.2
  webkit_dom_element_remove@Base 2.0.2
@@ -473,6 +519,7 @@ libwebkit2gtk-3.0.so.25 libwebkit2gtk-3.0-25 #MINVER#
  webkit_dom_event_target_remove_event_listener@Base 2.0.2
  webkit_dom_file_get_name@Base 2.0.2
  webkit_dom_file_get_type@Base 2.0.2
+ webkit_dom_file_get_webkit_relative_path@Base 2.1.4
  webkit_dom_file_list_get_length@Base 2.0.2
  webkit_dom_file_list_get_type@Base 2.0.2
  webkit_dom_file_list_item@Base 2.0.2
@@ -857,6 +904,7 @@ libwebkit2gtk-3.0.so.25 libwebkit2gtk-3.0-25 #MINVER#
  webkit_dom_html_image_element_get_natural_height@Base 2.0.2
  webkit_dom_html_image_element_get_natural_width@Base 2.0.2
  webkit_dom_html_image_element_get_src@Base 2.0.2
+ webkit_dom_html_image_element_get_srcset@Base 2.1.4
  webkit_dom_html_image_element_get_type@Base 2.0.2
  webkit_dom_html_image_element_get_use_map@Base 2.0.2
  webkit_dom_html_image_element_get_vspace@Base 2.0.2
@@ -874,6 +922,7 @@ libwebkit2gtk-3.0.so.25 libwebkit2gtk-3.0-25 #MINVER#
  webkit_dom_html_image_element_set_lowsrc@Base 2.0.2
  webkit_dom_html_image_element_set_name@Base 2.0.2
  webkit_dom_html_image_element_set_src@Base 2.0.2
+ webkit_dom_html_image_element_set_srcset@Base 2.1.4
  webkit_dom_html_image_element_set_use_map@Base 2.0.2
  webkit_dom_html_image_element_set_vspace@Base 2.0.2
  webkit_dom_html_image_element_set_width@Base 2.0.2
@@ -1169,6 +1218,7 @@ libwebkit2gtk-3.0.so.25 libwebkit2gtk-3.0-25 #MINVER#
  webkit_dom_html_option_element_set_value@Base 2.0.2
  webkit_dom_html_options_collection_get_selected_index@Base 2.0.2
  webkit_dom_html_options_collection_get_type@Base 2.0.2
+ webkit_dom_html_options_collection_named_item@Base 2.1.4
  webkit_dom_html_options_collection_set_selected_index@Base 2.0.2
  webkit_dom_html_paragraph_element_get_align@Base 2.0.2
  webkit_dom_html_paragraph_element_get_type@Base 2.0.2
@@ -1455,6 +1505,16 @@ libwebkit2gtk-3.0.so.25 libwebkit2gtk-3.0-25 #MINVER#
  webkit_dom_htmlu_list_element_get_compact@Base 2.0.2
  webkit_dom_htmlu_list_element_get_type@Base 2.0.2
  webkit_dom_htmlu_list_element_set_compact@Base 2.0.2
+ webkit_dom_keyboard_event_get_alt_graph_key@Base 2.1.4
+ webkit_dom_keyboard_event_get_alt_key@Base 2.1.4
+ webkit_dom_keyboard_event_get_ctrl_key@Base 2.1.4
+ webkit_dom_keyboard_event_get_key_identifier@Base 2.1.4
+ webkit_dom_keyboard_event_get_key_location@Base 2.1.4
+ webkit_dom_keyboard_event_get_meta_key@Base 2.1.4
+ webkit_dom_keyboard_event_get_modifier_state@Base 2.1.4
+ webkit_dom_keyboard_event_get_shift_key@Base 2.1.4
+ webkit_dom_keyboard_event_get_type@Base 2.1.4
+ webkit_dom_keyboard_event_init_keyboard_event@Base 2.1.4
  webkit_dom_location_get_ancestor_origins@Base 2.0.2
  webkit_dom_location_get_origin@Base 2.0.2
  webkit_dom_location_get_type@Base 2.0.2
@@ -1522,6 +1582,9 @@ libwebkit2gtk-3.0.so.25 libwebkit2gtk-3.0-25 #MINVER#
  webkit_dom_navigator_get_user_agent@Base 2.0.2
  webkit_dom_navigator_get_vendor@Base 2.0.2
  webkit_dom_navigator_get_vendor_sub@Base 2.0.2
+ webkit_dom_navigator_get_webkit_battery@Base 2.1.4
+ webkit_dom_navigator_get_webkit_persistent_storage@Base 2.1.4
+ webkit_dom_navigator_get_webkit_temporary_storage@Base 2.1.4
  webkit_dom_navigator_is_protocol_handler_registered@Base 2.0.2
  webkit_dom_navigator_java_enabled@Base 2.0.2
  webkit_dom_navigator_register_protocol_handler@Base 2.0.2
@@ -1687,6 +1750,7 @@ libwebkit2gtk-3.0.so.25 libwebkit2gtk-3.0-25 #MINVER#
  webkit_dom_storage_get_type@Base 2.0.2
  webkit_dom_storage_info_get_type@Base 2.0.2
  webkit_dom_storage_key@Base 2.0.2
+ webkit_dom_storage_quota_get_type@Base 2.1.4
  webkit_dom_storage_remove_item@Base 2.0.2
  webkit_dom_storage_set_item@Base 2.0.2
  webkit_dom_style_media_get_type@Base 2.0.2
@@ -1792,6 +1856,18 @@ libwebkit2gtk-3.0.so.25 libwebkit2gtk-3.0-25 #MINVER#
  webkit_dom_validity_state_get_type_mismatch@Base 2.0.2
  webkit_dom_validity_state_get_valid@Base 2.0.2
  webkit_dom_validity_state_get_value_missing@Base 2.0.2
+ webkit_dom_video_track_get_id@Base 2.1.4
+ webkit_dom_video_track_get_kind@Base 2.1.4
+ webkit_dom_video_track_get_label@Base 2.1.4
+ webkit_dom_video_track_get_language@Base 2.1.4
+ webkit_dom_video_track_get_selected@Base 2.1.4
+ webkit_dom_video_track_get_type@Base 2.1.4
+ webkit_dom_video_track_list_dispatch_event@Base 2.1.4
+ webkit_dom_video_track_list_get_length@Base 2.1.4
+ webkit_dom_video_track_list_get_track_by_id@Base 2.1.4
+ webkit_dom_video_track_list_get_type@Base 2.1.4
+ webkit_dom_video_track_list_item@Base 2.1.4
+ webkit_dom_video_track_set_selected@Base 2.1.4
  webkit_dom_webkit_named_flow_dispatch_event@Base 2.0.2
  webkit_dom_webkit_named_flow_get_content@Base 2.0.2
  webkit_dom_webkit_named_flow_get_content_nodes@Base 2.0.2
@@ -1978,6 +2054,7 @@ libwebkit2gtk-3.0.so.25 libwebkit2gtk-3.0-25 #MINVER#
  webkit_settings_get_default_font_size@Base 2.0.2
  webkit_settings_get_default_monospace_font_size@Base 2.0.2
  webkit_settings_get_draw_compositing_indicators@Base 2.0.2
+ webkit_settings_get_enable_accelerated_2d_canvas@Base 2.1.4
  webkit_settings_get_enable_caret_browsing@Base 2.0.2
  webkit_settings_get_enable_developer_extras@Base 2.0.2
  webkit_settings_get_enable_dns_prefetching@Base 2.0.2
@@ -1998,6 +2075,7 @@ libwebkit2gtk-3.0.so.25 libwebkit2gtk-3.0-25 #MINVER#
  webkit_settings_get_enable_tabs_to_links@Base 2.0.2
  webkit_settings_get_enable_webaudio@Base 2.0.2
  webkit_settings_get_enable_webgl@Base 2.0.2
+ webkit_settings_get_enable_write_console_messages_to_stdout@Base 2.1.4
  webkit_settings_get_enable_xss_auditor@Base 2.0.2
  webkit_settings_get_fantasy_font_family@Base 2.0.2
  webkit_settings_get_javascript_can_access_clipboard@Base 2.0.2
@@ -2024,6 +2102,7 @@ libwebkit2gtk-3.0.so.25 libwebkit2gtk-3.0-25 #MINVER#
  webkit_settings_set_default_font_size@Base 2.0.2
  webkit_settings_set_default_monospace_font_size@Base 2.0.2
  webkit_settings_set_draw_compositing_indicators@Base 2.0.2
+ webkit_settings_set_enable_accelerated_2d_canvas@Base 2.1.4
  webkit_settings_set_enable_caret_browsing@Base 2.0.2
  webkit_settings_set_enable_developer_extras@Base 2.0.2
  webkit_settings_set_enable_dns_prefetching@Base 2.0.2
@@ -2044,6 +2123,7 @@ libwebkit2gtk-3.0.so.25 libwebkit2gtk-3.0-25 #MINVER#
  webkit_settings_set_enable_tabs_to_links@Base 2.0.2
  webkit_settings_set_enable_webaudio@Base 2.0.2
  webkit_settings_set_enable_webgl@Base 2.0.2
+ webkit_settings_set_enable_write_console_messages_to_stdout@Base 2.1.4
  webkit_settings_set_enable_xss_auditor@Base 2.0.2
  webkit_settings_set_fantasy_font_family@Base 2.0.2
  webkit_settings_set_javascript_can_access_clipboard@Base 2.0.2
@@ -2080,6 +2160,7 @@ libwebkit2gtk-3.0.so.25 libwebkit2gtk-3.0-25 #MINVER#
  webkit_uri_response_get_type@Base 2.0.2
  webkit_uri_response_get_uri@Base 2.0.2
  webkit_uri_scheme_request_finish@Base 2.0.2
+ webkit_uri_scheme_request_finish_error@Base 2.1.4
  webkit_uri_scheme_request_get_path@Base 2.0.2
  webkit_uri_scheme_request_get_scheme@Base 2.0.2
  webkit_uri_scheme_request_get_type@Base 2.0.2
