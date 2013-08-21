@@ -5,8 +5,12 @@ webkitgtk (2.1.4-2) experimental; urgency=low
     each flavor, and save space by cleaning up the build
   - clean *.pyc files in the clean target, to allow multiple builds in the
     same source tree again
+  * debian/rules:
+  - disable debug symbols sparc, and use stabs for armel, like we already
+    do for armhf; their buildds are too constrained in terms of hardware
+    resources
 
- -- Gustavo Noronha Silva <kov@debian.org>  Wed, 21 Aug 2013 16:05:25 -0300
+ -- Gustavo Noronha Silva <kov@debian.org>  Wed, 21 Aug 2013 23:13:58 -0300
 
 webkitgtk (2.1.4-1) experimental; urgency=low
 
