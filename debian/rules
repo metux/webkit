@@ -83,6 +83,7 @@ clean:
 	rm -rf build-*
 	rm -rf debian/tmp-*
 	rm -f Source/WebKit/gtk/docs/version.xml
+	find . -name \*.pyc -delete
 
 	dh_autoreconf_clean
 

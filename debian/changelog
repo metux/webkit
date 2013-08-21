@@ -3,8 +3,10 @@ webkitgtk (2.1.4-2) experimental; urgency=low
   * debian/rules:
   - merge build and install rules so we can install right after building
     each flavor, and save space by cleaning up the build
+  - clean *.pyc files in the clean target, to allow multiple builds in the
+    same source tree again
 
- -- Gustavo Noronha Silva <kov@debian.org>  Wed, 21 Aug 2013 09:12:23 -0300
+ -- Gustavo Noronha Silva <kov@debian.org>  Wed, 21 Aug 2013 16:05:25 -0300
 
 webkitgtk (2.1.4-1) experimental; urgency=low
 
