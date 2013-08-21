@@ -3,8 +3,10 @@ webkitgtk (2.0.4-3) unstable; urgency=low
   * debian/rules:
   - merge build and install rules so we can install right after building
     each flavor, and save space by cleaning up the build
+  - clean *.pyc files in the clean target, to allow multiple builds in the
+    same source tree again
 
- -- Gustavo Noronha Silva <kov@debian.org>  Sun, 25 Aug 2013 18:26:29 -0300
+ -- Gustavo Noronha Silva <kov@debian.org>  Sun, 25 Aug 2013 18:26:50 -0300
 
 webkitgtk (2.0.4-2) unstable; urgency=low
 
