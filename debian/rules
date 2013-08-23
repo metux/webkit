@@ -215,6 +215,7 @@ ifeq (3.0,$(filter 3.0,$(GTK_VERSIONS)))
 	dh_install -plibwebkitgtk-3.0-dev --sourcedir=debian/tmp-3.0
 	dh_install -plibwebkitgtk-3.0-0-dbg --sourcedir=debian/tmp-3.0
 	dh_install -pgir1.2-webkit-3.0 --sourcedir=debian/tmp-3.0
+	dh_install -plibwebkitgtk-common-dev --sourcedir=debian/tmp-3.0
 ifeq ($(ENABLE_WEBKIT2),yes)
 	dh_install -plibwebkit2gtk-3.0-25 --sourcedir=debian/tmp-3.0
 	dh_install -plibwebkit2gtk-3.0-dev --sourcedir=debian/tmp-3.0

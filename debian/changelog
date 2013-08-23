@@ -1,3 +1,11 @@
+webkitgtk (2.1.4-3) experimental; urgency=low
+
+  * debian/control, debian/libwebkitgtk-common-dev.install:
+  - install the webkitdom headers in a separate dev package that can be
+    depended on by both libwebkitgtk-3.0-dev and libwebkit2gtk-3.0-dev
+
+ -- Gustavo Noronha Silva <kov@debian.org>  Fri, 23 Aug 2013 15:03:44 -0300
+
 webkitgtk (2.1.4-2) experimental; urgency=low
 
   * debian/rules:
