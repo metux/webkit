@@ -405,7 +405,7 @@ static void appendAccessibilityObject(AccessibilityObject* object, Accessibility
         if (!widget || !widget->isFrameView())
             return;
         
-        Document* doc = toFrameView(widget)->frame()->document();
+        Document* doc = toFrameView(widget)->frame().document();
         if (!doc || !doc->renderer())
             return;
         
@@ -578,7 +578,7 @@ bool AccessibilityObject::press() const
     if (!actionElem)
         return false;
     if (Frame* f = actionElem->document()->frame())
-        f->loader()->resetMultipleFormSubmissionProtection();
+        f->loader().resetMultipleFormSubmissionProtection();
     
     UserGestureIndicator gestureIndicator(DefinitelyProcessingUserGesture);
     actionElem->accessKeyAction(true);
@@ -821,7 +821,7 @@ static bool replacedNodeNeedsCharacter(Node* replacedNode)
         return false;
 
     // create an AX object, but skip it if it is not supposed to be seen
-    AccessibilityObject* object = replacedNode->renderer()->document()->axObjectCache()->getOrCreate(replacedNode);
+    AccessibilityObject* object = replacedNode->renderer()->document().axObjectCache()->getOrCreate(replacedNode);
     if (object->accessibilityIsIgnored())
         return false;
 
@@ -1071,7 +1071,7 @@ AccessibilityObject* AccessibilityObject::accessibilityObjectForPosition(const V
     if (!obj)
         return 0;
 
-    return obj->document()->axObjectCache()->getOrCreate(obj);
+    return obj->document().axObjectCache()->getOrCreate(obj);
 }
 
 #if HAVE(ACCESSIBILITY)
@@ -1159,7 +1159,7 @@ Document* AccessibilityObject::document() const
     if (!frameView)
         return 0;
     
-    return frameView->frame()->document();
+    return frameView->frame().document();
 }
     
 Page* AccessibilityObject::page() const
@@ -1214,7 +1214,7 @@ AccessibilityObject* AccessibilityObject::anchorElementForNode(Node* node)
     if (!obj)
         return 0;
     
-    RefPtr<AccessibilityObject> axObj = obj->document()->axObjectCache()->getOrCreate(obj);
+    RefPtr<AccessibilityObject> axObj = obj->document().axObjectCache()->getOrCreate(obj);
     Element* anchor = axObj->anchorElement();
     if (!anchor)
         return 0;
@@ -1223,9 +1223,24 @@ AccessibilityObject* AccessibilityObject::anchorElementForNode(Node* node)
     if (!anchorRenderer)
         return 0;
     
-    return anchorRenderer->document()->axObjectCache()->getOrCreate(anchorRenderer);
+    return anchorRenderer->document().axObjectCache()->getOrCreate(anchorRenderer);
 }
+
+AccessibilityObject* AccessibilityObject::headingElementForNode(Node* node)
+{
+    if (!node)
+        return 0;
     
+    RenderObject* renderObject = node->renderer();
+    if (!renderObject)
+        return 0;
+    
+    AccessibilityObject* axObject = renderObject->document().axObjectCache()->getOrCreate(renderObject);
+    for (; axObject && axObject->roleValue() != HeadingRole; axObject = axObject->parentObject()) { }
+    
+    return axObject;
+}
+
 void AccessibilityObject::ariaTreeRows(AccessibilityChildrenVector& result)
 {
     AccessibilityChildrenVector axChildren = children();
@@ -1276,6 +1291,7 @@ void AccessibilityObject::ariaTreeItemDisclosedRows(AccessibilityChildrenVector&
 #if HAVE(ACCESSIBILITY)
 const String& AccessibilityObject::actionVerb() const
 {
+#if !PLATFORM(IOS)
     // FIXME: Need to add verbs for select elements.
     DEFINE_STATIC_LOCAL(const String, buttonAction, (AXButtonActionVerb()));
     DEFINE_STATIC_LOCAL(const String, textFieldAction, (AXTextFieldActionVerb()));
@@ -1286,7 +1302,6 @@ const String& AccessibilityObject::actionVerb() const
     DEFINE_STATIC_LOCAL(const String, menuListAction, (AXMenuListActionVerb()));
     DEFINE_STATIC_LOCAL(const String, menuListPopupAction, (AXMenuListPopupActionVerb()));
     DEFINE_STATIC_LOCAL(const String, listItemAction, (AXListItemActionVerb()));
-    DEFINE_STATIC_LOCAL(const String, noAction, ());
 
     switch (roleValue()) {
     case ButtonRole:
@@ -1309,8 +1324,11 @@ const String& AccessibilityObject::actionVerb() const
     case ListItemRole:
         return listItemAction;
     default:
-        return noAction;
+        return nullAtom;
     }
+#else
+    return nullAtom;
+#endif
 }
 #endif
 
@@ -1630,7 +1648,9 @@ int AccessibilityObject::ariaPosInSet() const
     
 bool AccessibilityObject::supportsARIAExpanded() const
 {
-    return !getAttribute(aria_expandedAttr).isEmpty();
+    // Undefined values should not result in this attribute being exposed to ATs according to ARIA.
+    const AtomicString& expanded = getAttribute(aria_expandedAttr);
+    return equalIgnoringCase(expanded, "true") || equalIgnoringCase(expanded, "false");
 }
     
 bool AccessibilityObject::isExpanded() const

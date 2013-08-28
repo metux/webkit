@@ -32,14 +32,15 @@
 
 #include "Chrome.h"
 #include "DocumentLoader.h"
+#include "ElementTraversal.h"
 #include "FrameView.h"
 #include "ImageBuffer.h"
 #include "ImageObserver.h"
 #include "IntRect.h"
-#include "NodeTraversal.h"
 #include "RenderSVGRoot.h"
 #include "RenderStyle.h"
 #include "SVGDocument.h"
+#include "SVGForeignObjectElement.h"
 #include "SVGImageChromeClient.h"
 #include "SVGSVGElement.h"
 #include "Settings.h"
@@ -56,7 +57,7 @@ SVGImage::~SVGImage()
     if (m_page) {
         // Store m_page in a local variable, clearing m_page, so that SVGImageChromeClient knows we're destructed.
         OwnPtr<Page> currentPage = m_page.release();
-        currentPage->mainFrame()->loader()->frameDetached(); // Break both the loader and view references to the frame
+        currentPage->mainFrame().loader().frameDetached(); // Break both the loader and view references to the frame
     }
 
     // Verify that page teardown destroyed the Chrome
@@ -68,16 +69,13 @@ bool SVGImage::hasSingleSecurityOrigin() const
     if (!m_page)
         return true;
 
-    Frame* frame = m_page->mainFrame();
-    SVGSVGElement* rootElement = toSVGDocument(frame->document())->rootElement();
+    SVGSVGElement* rootElement = toSVGDocument(m_page->mainFrame().document())->rootElement();
     if (!rootElement)
         return true;
 
     // Don't allow foreignObject elements since they can leak information with arbitrary HTML (like spellcheck or control theme).
-    for (Element* current = ElementTraversal::firstWithin(rootElement); current; current = ElementTraversal::next(current, rootElement)) {
-        if (current->hasTagName(SVGNames::foreignObjectTag))
-            return false;
-    }
+    if (Traversal<SVGForeignObjectElement>::firstWithin(rootElement))
+        return false;
 
     // Because SVG image rendering disallows external resources and links,
     // these images effectively are restricted to a single security origin.
@@ -89,8 +87,7 @@ void SVGImage::setContainerSize(const IntSize& size)
     if (!m_page || !usesContainerSize())
         return;
 
-    Frame* frame = m_page->mainFrame();
-    SVGSVGElement* rootElement = toSVGDocument(frame->document())->rootElement();
+    SVGSVGElement* rootElement = toSVGDocument(m_page->mainFrame().document())->rootElement();
     if (!rootElement)
         return;
     RenderSVGRoot* renderer = toRenderSVGRoot(rootElement->renderer());
@@ -107,8 +104,7 @@ IntSize SVGImage::containerSize() const
 {
     if (!m_page)
         return IntSize();
-    Frame* frame = m_page->mainFrame();
-    SVGSVGElement* rootElement = toSVGDocument(frame->document())->rootElement();
+    SVGSVGElement* rootElement = toSVGDocument(m_page->mainFrame().document())->rootElement();
     if (!rootElement)
         return IntSize();
 
@@ -257,8 +253,7 @@ RenderBox* SVGImage::embeddedContentBox() const
 {
     if (!m_page)
         return 0;
-    Frame* frame = m_page->mainFrame();
-    SVGSVGElement* rootElement = toSVGDocument(frame->document())->rootElement();
+    SVGSVGElement* rootElement = toSVGDocument(m_page->mainFrame().document())->rootElement();
     if (!rootElement)
         return 0;
     return toRenderBox(rootElement->renderer());
@@ -268,16 +263,14 @@ FrameView* SVGImage::frameView() const
 {
     if (!m_page)
         return 0;
-
-    return m_page->mainFrame()->view();
+    return m_page->mainFrame().view();
 }
 
 bool SVGImage::hasRelativeWidth() const
 {
     if (!m_page)
         return false;
-    Frame* frame = m_page->mainFrame();
-    SVGSVGElement* rootElement = toSVGDocument(frame->document())->rootElement();
+    SVGSVGElement* rootElement = toSVGDocument(m_page->mainFrame().document())->rootElement();
     if (!rootElement)
         return false;
     return rootElement->intrinsicWidth().isPercent();
@@ -287,8 +280,7 @@ bool SVGImage::hasRelativeHeight() const
 {
     if (!m_page)
         return false;
-    Frame* frame = m_page->mainFrame();
-    SVGSVGElement* rootElement = toSVGDocument(frame->document())->rootElement();
+    SVGSVGElement* rootElement = toSVGDocument(m_page->mainFrame().document())->rootElement();
     if (!rootElement)
         return false;
     return rootElement->intrinsicHeight().isPercent();
@@ -298,8 +290,7 @@ void SVGImage::computeIntrinsicDimensions(Length& intrinsicWidth, Length& intrin
 {
     if (!m_page)
         return;
-    Frame* frame = m_page->mainFrame();
-    SVGSVGElement* rootElement = toSVGDocument(frame->document())->rootElement();
+    SVGSVGElement* rootElement = toSVGDocument(m_page->mainFrame().document())->rootElement();
     if (!rootElement)
         return;
 
@@ -318,8 +309,7 @@ void SVGImage::startAnimation(bool /* catchUpIfNecessary */)
 {
     if (!m_page)
         return;
-    Frame* frame = m_page->mainFrame();
-    SVGSVGElement* rootElement = toSVGDocument(frame->document())->rootElement();
+    SVGSVGElement* rootElement = toSVGDocument(m_page->mainFrame().document())->rootElement();
     if (!rootElement)
         return;
     rootElement->unpauseAnimations();
@@ -330,8 +320,7 @@ void SVGImage::stopAnimation()
 {
     if (!m_page)
         return;
-    Frame* frame = m_page->mainFrame();
-    SVGSVGElement* rootElement = toSVGDocument(frame->document())->rootElement();
+    SVGSVGElement* rootElement = toSVGDocument(m_page->mainFrame().document())->rootElement();
     if (!rootElement)
         return;
     rootElement->pauseAnimations();
@@ -349,8 +338,6 @@ bool SVGImage::dataChanged(bool allDataReceived)
         return true;
 
     if (allDataReceived) {
-        static FrameLoaderClient* dummyFrameLoaderClient =  new EmptyFrameLoaderClient;
-
         Page::PageClients pageClients;
         fillWithEmptyClients(pageClients);
         m_chromeClient = adoptPtr(new SVGImageChromeClient(this));
@@ -363,24 +350,24 @@ bool SVGImage::dataChanged(bool allDataReceived)
         // SVGImage objects, but we're safe now, because SVGImage can only be
         // loaded by a top-level document.
         m_page = adoptPtr(new Page(pageClients));
-        m_page->settings()->setMediaEnabled(false);
-        m_page->settings()->setScriptEnabled(false);
-        m_page->settings()->setPluginsEnabled(false);
+        m_page->settings().setMediaEnabled(false);
+        m_page->settings().setScriptEnabled(false);
+        m_page->settings().setPluginsEnabled(false);
 
-        RefPtr<Frame> frame = Frame::create(m_page.get(), 0, dummyFrameLoaderClient);
-        frame->setView(FrameView::create(frame.get()));
-        frame->init();
-        FrameLoader* loader = frame->loader();
-        loader->forceSandboxFlags(SandboxAll);
+        Frame& frame = m_page->mainFrame();
+        frame.setView(FrameView::create(&frame));
+        frame.init();
+        FrameLoader& loader = frame.loader();
+        loader.forceSandboxFlags(SandboxAll);
 
-        frame->view()->setCanHaveScrollbars(false); // SVG Images will always synthesize a viewBox, if it's not available, and thus never see scrollbars.
-        frame->view()->setTransparent(true); // SVG Images are transparent.
+        frame.view()->setCanHaveScrollbars(false); // SVG Images will always synthesize a viewBox, if it's not available, and thus never see scrollbars.
+        frame.view()->setTransparent(true); // SVG Images are transparent.
 
-        ASSERT(loader->activeDocumentLoader()); // DocumentLoader should have been created by frame->init().
-        loader->activeDocumentLoader()->writer()->setMIMEType("image/svg+xml");
-        loader->activeDocumentLoader()->writer()->begin(KURL()); // create the empty document
-        loader->activeDocumentLoader()->writer()->addData(data()->data(), data()->size());
-        loader->activeDocumentLoader()->writer()->end();
+        ASSERT(loader.activeDocumentLoader()); // DocumentLoader should have been created by frame->init().
+        loader.activeDocumentLoader()->writer()->setMIMEType("image/svg+xml");
+        loader.activeDocumentLoader()->writer()->begin(KURL()); // create the empty document
+        loader.activeDocumentLoader()->writer()->addData(data()->data(), data()->size());
+        loader.activeDocumentLoader()->writer()->end();
 
         // Set the intrinsic size before a container size is available.
         m_intrinsicSize = containerSize();
@@ -402,8 +389,7 @@ bool isInSVGImage(const Element* element)
     if (!page)
         return false;
 
-    ChromeClient* chromeClient = page->chrome().client();
-    return chromeClient && chromeClient->isSVGImageChromeClient();
+    return page->chrome().client().isSVGImageChromeClient();
 }
 
 }

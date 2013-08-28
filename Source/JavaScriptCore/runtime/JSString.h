@@ -156,14 +156,14 @@ namespace JSC {
 
         static Structure* createStructure(VM& vm, JSGlobalObject* globalObject, JSValue proto)
         {
-            return Structure::create(vm, globalObject, proto, TypeInfo(StringType, OverridesGetOwnPropertySlot | InterceptsGetOwnPropertySlotByIndexEvenWhenLengthIsNotZero), &s_info);
+            return Structure::create(vm, globalObject, proto, TypeInfo(StringType, OverridesGetOwnPropertySlot | InterceptsGetOwnPropertySlotByIndexEvenWhenLengthIsNotZero), info());
         }
 
         static size_t offsetOfLength() { return OBJECT_OFFSETOF(JSString, m_length); }
         static size_t offsetOfFlags() { return OBJECT_OFFSETOF(JSString, m_flags); }
         static size_t offsetOfValue() { return OBJECT_OFFSETOF(JSString, m_value); }
 
-        static JS_EXPORTDATA const ClassInfo s_info;
+        DECLARE_EXPORT_INFO;
 
         static void visitChildren(JSCell*, SlotVisitor&);
 
@@ -473,14 +473,14 @@ namespace JSC {
     ALWAYS_INLINE bool JSString::getStringPropertySlot(ExecState* exec, PropertyName propertyName, PropertySlot& slot)
     {
         if (propertyName == exec->propertyNames().length) {
-            slot.setValue(jsNumber(m_length));
+            slot.setValue(this, DontEnum | DontDelete | ReadOnly, jsNumber(m_length));
             return true;
         }
 
         unsigned i = propertyName.asIndex();
         if (i < m_length) {
             ASSERT(i != PropertyName::NotAnIndex); // No need for an explicit check, the above test would always fail!
-            slot.setValue(getIndex(exec, i));
+            slot.setValue(this, DontDelete | ReadOnly, getIndex(exec, i));
             return true;
         }
 
@@ -490,14 +490,14 @@ namespace JSC {
     ALWAYS_INLINE bool JSString::getStringPropertySlot(ExecState* exec, unsigned propertyName, PropertySlot& slot)
     {
         if (propertyName < m_length) {
-            slot.setValue(getIndex(exec, propertyName));
+            slot.setValue(this, DontDelete | ReadOnly, getIndex(exec, propertyName));
             return true;
         }
 
         return false;
     }
 
-    inline bool isJSString(JSValue v) { return v.isCell() && v.asCell()->classInfo() == &JSString::s_info; }
+    inline bool isJSString(JSValue v) { return v.isCell() && v.asCell()->classInfo() == JSString::info(); }
 
     // --- JSValue inlines ----------------------------
         

@@ -95,15 +95,14 @@ RenderWidget::RenderWidget(Element* element)
     // able to handle that.
     , m_refCount(1)
 {
-    view()->addWidget(this);
+    view().addWidget(this);
 }
 
 void RenderWidget::willBeDestroyed()
 {
-    if (RenderView* v = view())
-        v->removeWidget(this);
+    view().removeWidget(this);
     
-    if (AXObjectCache* cache = document()->existingAXObjectCache()) {
+    if (AXObjectCache* cache = document().existingAXObjectCache()) {
         cache->childrenChanged(this->parent());
         cache->remove(this);
     }
@@ -318,7 +317,7 @@ void RenderWidget::paint(PaintInfo& paintInfo, const LayoutPoint& paintOffset)
         paintInfo.context->restore();
 
     // Paint a partially transparent wash over selected widgets.
-    if (isSelected() && !document()->printing()) {
+    if (isSelected() && !document().printing()) {
         // FIXME: selectionRect() is in absolute, not painting coordinates.
         paintInfo.context->fillRect(pixelSnappedIntRect(selectionRect()), selectionBackgroundColor(), style()->colorSpace());
     }
@@ -352,7 +351,7 @@ void RenderWidget::updateWidgetPosition()
     if (m_widget && m_widget->isFrameView()) {
         FrameView* frameView = toFrameView(m_widget.get());
         // Check the frame's page to make sure that the frame isn't in the process of being destroyed.
-        if ((boundsChanged || frameView->needsLayout()) && frameView->frame()->page())
+        if ((boundsChanged || frameView->needsLayout()) && frameView->frame().page())
             frameView->layout();
     }
 }

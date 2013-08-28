@@ -97,7 +97,7 @@ void JIT::emit_op_jmp(Instruction* currentInstruction)
 void JIT::emit_op_new_object(Instruction* currentInstruction)
 {
     Structure* structure = currentInstruction[3].u.objectAllocationProfile->structure();
-    size_t allocationSize = JSObject::allocationSize(structure->inlineCapacity());
+    size_t allocationSize = JSFinalObject::allocationSize(structure->inlineCapacity());
     MarkedAllocator* allocator = &m_vm->heap.allocatorForObjectWithoutDestructor(allocationSize);
 
     RegisterID resultReg = regT0;
@@ -1093,7 +1093,7 @@ void JIT::emitSlow_op_get_arguments_length(Instruction* currentInstruction, Vect
     linkSlowCase(iter);
     unsigned dst = currentInstruction[1].u.operand;
     unsigned base = currentInstruction[2].u.operand;
-    Identifier* ident = &(m_codeBlock->identifier(currentInstruction[3].u.operand));
+    const Identifier* ident = &(m_codeBlock->identifier(currentInstruction[3].u.operand));
     
     emitGetVirtualRegister(base, regT0);
     JITStubCall stubCall(this, cti_op_get_by_id_generic);

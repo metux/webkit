@@ -22,6 +22,7 @@
 #include "ObjectPrototype.h"
 
 #include "Error.h"
+#include "GetterSetter.h"
 #include "JSFunction.h"
 #include "JSString.h"
 #include "JSStringBuilder.h"
@@ -54,7 +55,7 @@ void ObjectPrototype::finishCreation(ExecState* exec, JSGlobalObject* globalObje
     VM& vm = exec->vm();
     
     Base::finishCreation(vm);
-    ASSERT(inherits(&s_info));
+    ASSERT(inherits(info()));
     vm.prototypeMap.addPrototype(this);
     
     JSC_NATIVE_FUNCTION(vm.propertyNames->toString, objectProtoFuncToString, DontEnum, 0);
@@ -155,10 +156,10 @@ EncodedJSValue JSC_HOST_CALL objectProtoFuncLookupGetter(ExecState* exec)
     if (exec->hadException())
         return JSValue::encode(jsUndefined());
 
-    PropertyDescriptor descriptor;
-    if (thisObject->getPropertyDescriptor(exec, Identifier(exec, exec->argument(0).toString(exec)->value(exec)), descriptor)
-        && descriptor.getterPresent())
-        return JSValue::encode(descriptor.getter());
+    PropertySlot slot(thisObject);
+    if (thisObject->getPropertySlot(exec, Identifier(exec, exec->argument(0).toString(exec)->value(exec)), slot)
+        && slot.isAccessor())
+        return JSValue::encode(slot.getterSetter()->getter());
 
     return JSValue::encode(jsUndefined());
 }
@@ -169,18 +170,22 @@ EncodedJSValue JSC_HOST_CALL objectProtoFuncLookupSetter(ExecState* exec)
     if (exec->hadException())
         return JSValue::encode(jsUndefined());
 
-    PropertyDescriptor descriptor;
-    if (thisObject->getPropertyDescriptor(exec, Identifier(exec, exec->argument(0).toString(exec)->value(exec)), descriptor)
-        && descriptor.setterPresent())
-        return JSValue::encode(descriptor.setter());
+    PropertySlot slot(thisObject);
+    if (thisObject->getPropertySlot(exec, Identifier(exec, exec->argument(0).toString(exec)->value(exec)), slot)
+        && slot.isAccessor())
+        return JSValue::encode(slot.getterSetter()->setter());
 
     return JSValue::encode(jsUndefined());
 }
 
 EncodedJSValue JSC_HOST_CALL objectProtoFuncPropertyIsEnumerable(ExecState* exec)
 {
-    JSValue thisValue = exec->hostThisValue().toThis(exec, StrictMode);
-    return JSValue::encode(jsBoolean(thisValue.toObject(exec)->propertyIsEnumerable(exec, Identifier(exec, exec->argument(0).toString(exec)->value(exec)))));
+    JSObject* thisObject = exec->hostThisValue().toThis(exec, StrictMode).toObject(exec);
+    Identifier propertyName(exec, exec->argument(0).toString(exec)->value(exec));
+
+    PropertyDescriptor descriptor;
+    bool enumerable = thisObject->getOwnPropertyDescriptor(exec, propertyName, descriptor) && descriptor.enumerable();
+    return JSValue::encode(jsBoolean(enumerable));
 }
 
 // 15.2.4.3 Object.prototype.toLocaleString()

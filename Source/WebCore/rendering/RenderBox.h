@@ -368,6 +368,7 @@ public:
 
     enum RenderBoxRegionInfoFlags { CacheRenderBoxRegionInfo, DoNotCacheRenderBoxRegionInfo };
     LayoutRect borderBoxRectInRegion(RenderRegion*, RenderBoxRegionInfoFlags = CacheRenderBoxRegionInfo) const;
+    RenderRegion* clampToStartAndEndRegions(RenderRegion*) const;
     void clearRenderBoxRegionInfo();
     virtual LayoutUnit offsetFromLogicalTopOfFirstPage() const;
     
@@ -404,7 +405,7 @@ public:
 
     bool stretchesToViewport() const
     {
-        return document()->inQuirksMode() && style()->logicalHeight().isAuto() && !isFloatingOrOutOfFlowPositioned() && (isRoot() || isBody()) && !document()->shouldDisplaySeamlesslyWithParent() && !isInline();
+        return document().inQuirksMode() && style()->logicalHeight().isAuto() && !isFloatingOrOutOfFlowPositioned() && (isRoot() || isBody()) && !document().shouldDisplaySeamlesslyWithParent() && !isInline();
     }
 
     virtual LayoutSize intrinsicSize() const { return LayoutSize(); }
@@ -462,6 +463,9 @@ public:
     bool scrollsOverflow() const { return scrollsOverflowX() || scrollsOverflowY(); }
     bool scrollsOverflowX() const { return hasOverflowClip() && (style()->overflowX() == OSCROLL || hasAutoHorizontalScrollbar()); }
     bool scrollsOverflowY() const { return hasOverflowClip() && (style()->overflowY() == OSCROLL || hasAutoVerticalScrollbar()); }
+    bool hasScrollableOverflowX() const { return scrollsOverflowX() && scrollWidth() != clientWidth(); }
+    bool hasScrollableOverflowY() const { return scrollsOverflowY() && scrollHeight() != clientHeight(); }
+
     bool usesCompositedScrolling() const;
     
     bool hasUnsplittableScrollingOverflow() const;
@@ -498,6 +502,10 @@ public:
     LayoutRect maskClipRect();
 
     virtual VisiblePosition positionForPoint(const LayoutPoint&);
+
+    RenderBlock* outermostBlockContainingFloatingObject();
+    void updatePaintingContainerForFloatingObject();
+    virtual bool updateLayerIfNeeded();
 
     void removeFloatingOrPositionedChildFromBlockLists();
     
@@ -634,7 +642,7 @@ private:
     void updateShapeOutsideInfoAfterStyleChange(const ShapeValue* shapeOutside, const ShapeValue* oldShapeOutside);
 #endif
 
-    bool fixedElementLaysOutRelativeToFrame(Frame*, FrameView*) const;
+    bool fixedElementLaysOutRelativeToFrame(const FrameView&) const;
 
     bool includeVerticalScrollbarSize() const;
     bool includeHorizontalScrollbarSize() const;

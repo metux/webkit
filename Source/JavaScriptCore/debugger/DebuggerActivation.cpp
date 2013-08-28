@@ -51,7 +51,7 @@ void DebuggerActivation::finishCreation(VM& vm, JSObject* activation)
 void DebuggerActivation::visitChildren(JSCell* cell, SlotVisitor& visitor)
 {
     DebuggerActivation* thisObject = jsCast<DebuggerActivation*>(cell);
-    ASSERT_GC_OBJECT_INHERITS(thisObject, &s_info);
+    ASSERT_GC_OBJECT_INHERITS(thisObject, info());
     COMPILE_ASSERT(StructureFlags & OverridesVisitChildren, OverridesVisitChildrenWithoutSettingFlag);
     ASSERT(thisObject->structure()->typeInfo().overridesVisitChildren());
 
@@ -77,12 +77,6 @@ void DebuggerActivation::put(JSCell* cell, ExecState* exec, PropertyName propert
     thisObject->m_activation->methodTable()->put(thisObject->m_activation.get(), exec, propertyName, value, slot);
 }
 
-void DebuggerActivation::putDirectVirtual(JSObject* object, ExecState* exec, PropertyName propertyName, JSValue value, unsigned attributes)
-{
-    DebuggerActivation* thisObject = jsCast<DebuggerActivation*>(object);
-    thisObject->m_activation->methodTable()->putDirectVirtual(thisObject->m_activation.get(), exec, propertyName, value, attributes);
-}
-
 bool DebuggerActivation::deleteProperty(JSCell* cell, ExecState* exec, PropertyName propertyName)
 {
     DebuggerActivation* thisObject = jsCast<DebuggerActivation*>(cell);
@@ -95,13 +89,7 @@ void DebuggerActivation::getOwnPropertyNames(JSObject* object, ExecState* exec, 
     thisObject->m_activation->methodTable()->getPropertyNames(thisObject->m_activation.get(), exec, propertyNames, mode);
 }
 
-bool DebuggerActivation::getOwnPropertyDescriptor(JSObject* object, ExecState* exec, PropertyName propertyName, PropertyDescriptor& descriptor)
-{
-    DebuggerActivation* thisObject = jsCast<DebuggerActivation*>(object);
-    return thisObject->m_activation->methodTable()->getOwnPropertyDescriptor(thisObject->m_activation.get(), exec, propertyName, descriptor);
-}
-
-bool DebuggerActivation::defineOwnProperty(JSObject* object, ExecState* exec, PropertyName propertyName, PropertyDescriptor& descriptor, bool shouldThrow)
+bool DebuggerActivation::defineOwnProperty(JSObject* object, ExecState* exec, PropertyName propertyName, const PropertyDescriptor& descriptor, bool shouldThrow)
 {
     DebuggerActivation* thisObject = jsCast<DebuggerActivation*>(object);
     return thisObject->m_activation->methodTable()->defineOwnProperty(thisObject->m_activation.get(), exec, propertyName, descriptor, shouldThrow);

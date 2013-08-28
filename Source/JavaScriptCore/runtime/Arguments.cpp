@@ -40,7 +40,7 @@ const ClassInfo Arguments::s_info = { "Arguments", &Base::s_info, 0, 0, CREATE_M
 void Arguments::visitChildren(JSCell* cell, SlotVisitor& visitor)
 {
     Arguments* thisObject = jsCast<Arguments*>(cell);
-    ASSERT_GC_OBJECT_INHERITS(thisObject, &s_info);
+    ASSERT_GC_OBJECT_INHERITS(thisObject, info());
     COMPILE_ASSERT(StructureFlags & OverridesVisitChildren, OverridesVisitChildrenWithoutSettingFlag);
     ASSERT(thisObject->structure()->typeInfo().overridesVisitChildren());
     JSObject::visitChildren(thisObject, visitor);
@@ -94,7 +94,7 @@ bool Arguments::getOwnPropertySlotByIndex(JSObject* object, ExecState* exec, uns
 {
     Arguments* thisObject = jsCast<Arguments*>(object);
     if (JSValue value = thisObject->tryGetArgument(i)) {
-        slot.setValue(value);
+        slot.setValue(thisObject, None, value);
         return true;
     }
 
@@ -129,18 +129,18 @@ bool Arguments::getOwnPropertySlot(JSObject* object, ExecState* exec, PropertyNa
     unsigned i = propertyName.asIndex();
     if (JSValue value = thisObject->tryGetArgument(i)) {
         RELEASE_ASSERT(i < PropertyName::NotAnIndex);
-        slot.setValue(value);
+        slot.setValue(thisObject, None, value);
         return true;
     }
 
     if (propertyName == exec->propertyNames().length && LIKELY(!thisObject->m_overrodeLength)) {
-        slot.setValue(jsNumber(thisObject->m_numArguments));
+        slot.setValue(thisObject, DontEnum, jsNumber(thisObject->m_numArguments));
         return true;
     }
 
     if (propertyName == exec->propertyNames().callee && LIKELY(!thisObject->m_overrodeCallee)) {
         if (!thisObject->m_isStrictMode) {
-            slot.setValue(thisObject->m_callee.get());
+            slot.setValue(thisObject, DontEnum, thisObject->m_callee.get());
             return true;
         }
         thisObject->createStrictModeCalleeIfNecessary(exec);
@@ -150,35 +150,6 @@ bool Arguments::getOwnPropertySlot(JSObject* object, ExecState* exec, PropertyNa
         thisObject->createStrictModeCallerIfNecessary(exec);
 
     return JSObject::getOwnPropertySlot(thisObject, exec, propertyName, slot);
-}
-
-bool Arguments::getOwnPropertyDescriptor(JSObject* object, ExecState* exec, PropertyName propertyName, PropertyDescriptor& descriptor)
-{
-    Arguments* thisObject = jsCast<Arguments*>(object);
-    unsigned i = propertyName.asIndex();
-    if (JSValue value = thisObject->tryGetArgument(i)) {
-        RELEASE_ASSERT(i < PropertyName::NotAnIndex);
-        descriptor.setDescriptor(value, None);
-        return true;
-    }
-    
-    if (propertyName == exec->propertyNames().length && LIKELY(!thisObject->m_overrodeLength)) {
-        descriptor.setDescriptor(jsNumber(thisObject->m_numArguments), DontEnum);
-        return true;
-    }
-    
-    if (propertyName == exec->propertyNames().callee && LIKELY(!thisObject->m_overrodeCallee)) {
-        if (!thisObject->m_isStrictMode) {
-            descriptor.setDescriptor(thisObject->m_callee.get(), DontEnum);
-            return true;
-        }
-        thisObject->createStrictModeCalleeIfNecessary(exec);
-    }
-
-    if (propertyName == exec->propertyNames().caller && thisObject->m_isStrictMode)
-        thisObject->createStrictModeCallerIfNecessary(exec);
-    
-    return JSObject::getOwnPropertyDescriptor(thisObject, exec, propertyName, descriptor);
 }
 
 void Arguments::getOwnPropertyNames(JSObject* object, ExecState* exec, PropertyNameArray& propertyNames, EnumerationMode mode)
@@ -280,7 +251,7 @@ bool Arguments::deleteProperty(JSCell* cell, ExecState* exec, PropertyName prope
     return JSObject::deleteProperty(thisObject, exec, propertyName);
 }
 
-bool Arguments::defineOwnProperty(JSObject* object, ExecState* exec, PropertyName propertyName, PropertyDescriptor& descriptor, bool shouldThrow)
+bool Arguments::defineOwnProperty(JSObject* object, ExecState* exec, PropertyName propertyName, const PropertyDescriptor& descriptor, bool shouldThrow)
 {
     Arguments* thisObject = jsCast<Arguments*>(object);
     unsigned i = propertyName.asIndex();

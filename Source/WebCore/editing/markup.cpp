@@ -36,10 +36,9 @@
 #include "CSSValueKeywords.h"
 #include "ChildListMutationScope.h"
 #include "ContextFeatures.h"
-#if ENABLE(DELETION_UI)
-#include "DeleteButtonController.h"
-#endif
+#include "DescendantIterator.h"
 #include "DocumentFragment.h"
+#include "DocumentType.h"
 #include "Editor.h"
 #include "ExceptionCode.h"
 #include "ExceptionCodePlaceholder.h"
@@ -52,7 +51,6 @@
 #include "HTMLTextFormControlElement.h"
 #include "KURL.h"
 #include "MarkupAccumulator.h"
-#include "NodeTraversal.h"
 #include "Range.h"
 #include "RenderBlock.h"
 #include "RenderObject.h"
@@ -63,6 +61,10 @@
 #include "htmlediting.h"
 #include <wtf/StdLibExtras.h>
 #include <wtf/text/StringBuilder.h>
+
+#if ENABLE(DELETION_UI)
+#include "DeleteButtonController.h"
+#endif
 
 using namespace std;
 
@@ -101,14 +103,14 @@ static void completeURLs(DocumentFragment* fragment, const String& baseURL)
 
     KURL parsedBaseURL(ParsedURLString, baseURL);
 
-    for (Element* element = ElementTraversal::firstWithin(fragment); element; element = ElementTraversal::next(element, fragment)) {
+    for (auto element = elementDescendants(fragment).begin(), end = elementDescendants(fragment).end(); element != end; ++element) {
         if (!element->hasAttributes())
             continue;
         unsigned length = element->attributeCount();
         for (unsigned i = 0; i < length; i++) {
             const Attribute& attribute = element->attributeAt(i);
             if (element->isURLAttribute(attribute) && !attribute.value().isEmpty())
-                changes.append(AttributeChange(element, attribute.name(), KURL(parsedBaseURL, attribute.value()).string()));
+                changes.append(AttributeChange(&*element, attribute.name(), KURL(parsedBaseURL, attribute.value()).string()));
         }
     }
 
@@ -823,19 +825,22 @@ bool isPlainTextMarkup(Node *node)
     return (node->childNodeCount() == 2 && isTabSpanTextNode(node->firstChild()->firstChild()) && node->firstChild()->nextSibling()->isTextNode());
 }
 
+static bool contextPreservesNewline(const Range& context)
+{
+    VisiblePosition position(context.startPosition());
+    Node* container = position.deepEquivalent().containerNode();
+    if (!container || !container->renderer())
+        return false;
+
+    return container->renderer()->style()->preserveNewline();
+}
+
 PassRefPtr<DocumentFragment> createFragmentFromText(Range* context, const String& text)
 {
     if (!context)
         return 0;
 
-    Node* styleNode = context->firstNode();
-    if (!styleNode) {
-        styleNode = context->startPosition().deprecatedNode();
-        if (!styleNode)
-            return 0;
-    }
-
-    Document* document = styleNode->document();
+    Document* document = context->ownerDocument();
     RefPtr<DocumentFragment> fragment = document->createDocumentFragment();
     
     if (text.isEmpty())
@@ -845,8 +850,7 @@ PassRefPtr<DocumentFragment> createFragmentFromText(Range* context, const String
     string.replace("\r\n", "\n");
     string.replace('\r', '\n');
 
-    RenderObject* renderer = styleNode->renderer();
-    if (renderer && renderer->style()->preserveNewline()) {
+    if (contextPreservesNewline(*context)) {
         fragment->appendChild(document->createTextNode(string), ASSERT_NO_EXCEPTION);
         if (string.endsWith('\n')) {
             RefPtr<Element> element = createBreakElement(document);
@@ -920,24 +924,30 @@ PassRefPtr<DocumentFragment> createFragmentFromNodes(Document *document, const V
     return fragment.release();
 }
 
+String documentTypeString(const Document& document)
+{
+    DocumentType* documentType = document.doctype();
+    if (!documentType)
+        return String();
+
+    return createMarkup(documentType);
+}
+
 String createFullMarkup(const Node* node)
 {
     if (!node)
         return String();
-        
+
     Document* document = node->document();
     if (!document)
         return String();
-        
-    Frame* frame = document->frame();
-    if (!frame)
-        return String();
 
-    // FIXME: This is never "for interchange". Is that right?    
+    // FIXME: This is never "for interchange". Is that right?
     String markupString = createMarkup(node, IncludeNode, 0);
+
     Node::NodeType nodeType = node->nodeType();
     if (nodeType != Node::DOCUMENT_NODE && nodeType != Node::DOCUMENT_TYPE_NODE)
-        markupString = frame->documentTypeString() + markupString;
+        markupString = documentTypeString(*document) + markupString;
 
     return markupString;
 }
@@ -950,17 +960,13 @@ String createFullMarkup(const Range* range)
     Node* node = range->startContainer();
     if (!node)
         return String();
-        
+
     Document* document = node->document();
     if (!document)
         return String();
-        
-    Frame* frame = document->frame();
-    if (!frame)
-        return String();
 
-    // FIXME: This is always "for interchange". Is that right? See the previous method.
-    return frame->documentTypeString() + createMarkup(range, 0, AnnotateForInterchange);        
+    // FIXME: This is always "for interchange". Is that right?
+    return documentTypeString(*document) + createMarkup(range, 0, AnnotateForInterchange);
 }
 
 String urlToMarkup(const KURL& url, const String& title)
@@ -1053,14 +1059,13 @@ PassRefPtr<DocumentFragment> createContextualFragment(const String& markup, HTML
     // accommodate folks passing complete HTML documents to make the
     // child of an element.
 
-    RefPtr<Node> nextNode;
-    for (RefPtr<Node> node = fragment->firstChild(); node; node = nextNode) {
-        nextNode = node->nextSibling();
-        if (node->hasTagName(htmlTag) || node->hasTagName(headTag) || node->hasTagName(bodyTag)) {
-            HTMLElement* element = toHTMLElement(node.get());
-            if (Node* firstChild = element->firstChild())
-                nextNode = firstChild;
-            removeElementPreservingChildren(fragment, element);
+    RefPtr<HTMLElement> nextElement;
+    for (RefPtr<HTMLElement> element = Traversal<HTMLElement>::firstWithin(fragment.get()); element; element = nextElement) {
+        nextElement = Traversal<HTMLElement>::nextSibling(element.get());
+        if (element->hasTagName(htmlTag) || element->hasTagName(headTag) || element->hasTagName(bodyTag)) {
+            if (HTMLElement* firstChild = Traversal<HTMLElement>::firstChild(element.get()))
+                nextElement = firstChild;
+            removeElementPreservingChildren(fragment, element.get());
         }
     }
     return fragment.release();

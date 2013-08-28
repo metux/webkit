@@ -98,7 +98,7 @@ IntSize RenderImage::imageSizeForError(CachedImage* newImage) const
 
     IntSize imageSize;
     if (newImage->willPaintBrokenImage()) {
-        float deviceScaleFactor = WebCore::deviceScaleFactor(frame());
+        float deviceScaleFactor = WebCore::deviceScaleFactor(&frame());
         pair<Image*, float> brokenImageAndImageScaleFactor = newImage->brokenImage(deviceScaleFactor);
         imageSize = brokenImageAndImageScaleFactor.first->size();
         imageSize.scale(1 / brokenImageAndImageScaleFactor.second);
@@ -160,7 +160,7 @@ void RenderImage::imageChanged(WrappedImagePtr newImage, const IntRect* rect)
     // FIXME (86669): Instead of the RenderImage determining whether its document is in the page
     // cache, the RenderImage should remove itself as a client when its document is put into the
     // page cache.
-    if (documentBeingDestroyed() || document()->inPageCache())
+    if (documentBeingDestroyed() || document().inPageCache())
         return;
 
     if (hasBoxDecorations() || hasMask())
@@ -174,7 +174,7 @@ void RenderImage::imageChanged(WrappedImagePtr newImage, const IntRect* rect)
     
     if (!m_didIncrementVisuallyNonEmptyPixelCount) {
         // At a zoom level of 1 the image is guaranteed to have an integer size.
-        view()->frameView()->incrementVisuallyNonEmptyPixelCount(flooredIntSize(m_imageResource->imageSize(1.0f)));
+        view().frameView().incrementVisuallyNonEmptyPixelCount(flooredIntSize(m_imageResource->imageSize(1.0f)));
         m_didIncrementVisuallyNonEmptyPixelCount = true;
     }
 
@@ -182,7 +182,7 @@ void RenderImage::imageChanged(WrappedImagePtr newImage, const IntRect* rect)
 
     // Set image dimensions, taking into account the size of the alt text.
     if (m_imageResource->errorOccurred()) {
-        if (!m_altText.isEmpty() && document()->hasPendingStyleRecalc()) {
+        if (!m_altText.isEmpty() && document().hasPendingStyleRecalc()) {
             ASSERT(node());
             if (node()) {
                 m_needsToSetSizeForAltText = true;
@@ -309,9 +309,7 @@ void RenderImage::paintReplaced(PaintInfo& paintInfo, const LayoutPoint& paintOf
 
     GraphicsContext* context = paintInfo.context;
 
-    Page* page = 0;
-    if (Frame* frame = this->frame())
-        page = frame->page();
+    Page* page = frame().page();
 
     if (!m_imageResource->hasImage() || m_imageResource->errorOccurred()) {
         if (paintInfo.phase == PaintPhaseSelection)
@@ -339,7 +337,7 @@ void RenderImage::paintReplaced(PaintInfo& paintInfo, const LayoutPoint& paintOf
             RefPtr<Image> image = m_imageResource->image();
 
             if (m_imageResource->errorOccurred() && !image->isNull() && usableWidth >= image->width() && usableHeight >= image->height()) {
-                float deviceScaleFactor = WebCore::deviceScaleFactor(frame());
+                float deviceScaleFactor = WebCore::deviceScaleFactor(&frame());
                 // Call brokenImage() explicitly to ensure we get the broken image icon at the appropriate resolution.
                 pair<Image*, float> brokenImageAndImageScaleFactor = m_imageResource->cachedImage()->brokenImage(deviceScaleFactor);
                 image = brokenImageAndImageScaleFactor.first;
@@ -353,12 +351,18 @@ void RenderImage::paintReplaced(PaintInfo& paintInfo, const LayoutPoint& paintOf
                 if (centerY < 0)
                     centerY = 0;
                 imageOffset = LayoutSize(leftBorder + leftPad + centerX + borderWidth, topBorder + topPad + centerY + borderWidth);
-                context->drawImage(image.get(), style()->colorSpace(), pixelSnappedIntRect(LayoutRect(paintOffset + imageOffset, imageSize)), CompositeSourceOver, shouldRespectImageOrientation());
+
+                ImageOrientationDescription orientationDescription;
+#if ENABLE(CSS_IMAGE_ORIENTATION)
+                orientationDescription.setImageOrientationEnum(style()->imageOrientation());
+                orientationDescription.setRespectImageOrientation(shouldRespectImageOrientation());
+#endif
+                context->drawImage(image.get(), style()->colorSpace(), pixelSnappedIntRect(LayoutRect(paintOffset + imageOffset, imageSize)), CompositeSourceOver, orientationDescription);
                 errorPictureDrawn = true;
             }
 
             if (!m_altText.isEmpty()) {
-                String text = document()->displayStringModifiedByEncoding(m_altText);
+                String text = document().displayStringModifiedByEncoding(m_altText);
                 context->setFillColor(style()->visitedDependentColor(CSSPropertyColor), style()->colorSpace());
                 const Font& font = style()->font();
                 const FontMetrics& fontMetrics = font.fontMetrics();
@@ -416,15 +420,13 @@ void RenderImage::paint(PaintInfo& paintInfo, const LayoutPoint& paintOffset)
     
 void RenderImage::paintAreaElementFocusRing(PaintInfo& paintInfo)
 {
-    Document* document = this->document();
-    
-    if (document->printing() || !document->frame()->selection()->isFocusedAndActive())
+    if (document().printing() || !frame().selection().isFocusedAndActive())
         return;
     
     if (paintInfo.context->paintingDisabled() && !paintInfo.context->updatingControlTints())
         return;
 
-    Element* focusedElement = document->focusedElement();
+    Element* focusedElement = document().focusedElement();
     if (!focusedElement || !isHTMLAreaElement(focusedElement))
         return;
 
@@ -475,7 +477,12 @@ void RenderImage::paintIntoRect(GraphicsContext* context, const LayoutRect& rect
     CompositeOperator compositeOperator = imageElt ? imageElt->compositeOperator() : CompositeSourceOver;
     Image* image = m_imageResource->image().get();
     bool useLowQualityScaling = shouldPaintAtLowQuality(context, image, image, alignedRect.size());
-    context->drawImage(m_imageResource->image(alignedRect.width(), alignedRect.height()).get(), style()->colorSpace(), alignedRect, compositeOperator, shouldRespectImageOrientation(), useLowQualityScaling);
+    ImageOrientationDescription orientationDescription;
+#if ENABLE(CSS_IMAGE_ORIENTATION)
+    orientationDescription.setImageOrientationEnum(style()->imageOrientation());
+    orientationDescription.setRespectImageOrientation(shouldRespectImageOrientation());
+#endif
+    context->drawImage(m_imageResource->image(alignedRect.width(), alignedRect.height()).get(), style()->colorSpace(), alignedRect, compositeOperator, orientationDescription, useLowQualityScaling);
 }
 
 bool RenderImage::boxShadowShouldBeAppliedToBackground(BackgroundBleedAvoidance bleedAvoidance, InlineFlowBox*) const

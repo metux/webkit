@@ -57,7 +57,7 @@ FlowThreadController::~FlowThreadController()
 {
 }
 
-RenderNamedFlowThread* FlowThreadController::ensureRenderFlowThreadWithName(const AtomicString& name)
+RenderNamedFlowThread& FlowThreadController::ensureRenderFlowThreadWithName(const AtomicString& name)
 {
     if (!m_renderNamedFlowThreadList)
         m_renderNamedFlowThreadList = adoptPtr(new RenderNamedFlowThreadList());
@@ -65,16 +65,16 @@ RenderNamedFlowThread* FlowThreadController::ensureRenderFlowThreadWithName(cons
         for (RenderNamedFlowThreadList::iterator iter = m_renderNamedFlowThreadList->begin(); iter != m_renderNamedFlowThreadList->end(); ++iter) {
             RenderNamedFlowThread* flowRenderer = *iter;
             if (flowRenderer->flowThreadName() == name)
-                return flowRenderer;
+                return *flowRenderer;
         }
     }
 
-    NamedFlowCollection* namedFlows = m_view->document()->namedFlows();
+    NamedFlowCollection* namedFlows = m_view->document().namedFlows();
 
     // Sanity check for the absence of a named flow in the "CREATED" state with the same name.
     ASSERT(!namedFlows->flowByName(name));
 
-    RenderNamedFlowThread* flowRenderer = RenderNamedFlowThread::createAnonymous(m_view->document(), namedFlows->ensureFlowWithName(name));
+    RenderNamedFlowThread* flowRenderer = RenderNamedFlowThread::createAnonymous(&m_view->document(), namedFlows->ensureFlowWithName(name));
     flowRenderer->setStyle(RenderFlowThread::createFlowThreadStyle(m_view->style()));
     m_renderNamedFlowThreadList->add(flowRenderer);
 
@@ -83,7 +83,7 @@ RenderNamedFlowThread* FlowThreadController::ensureRenderFlowThreadWithName(cons
 
     setIsRenderNamedFlowThreadOrderDirty(true);
 
-    return flowRenderer;
+    return *flowRenderer;
 }
 
 void FlowThreadController::styleDidChange()
@@ -265,6 +265,17 @@ void FlowThreadController::updateFlowThreadsIntoFinalPhase()
         flowRenderer->setLayoutPhase(RenderFlowThread::LayoutPhaseFinal);
     }
 }
+
+#if USE(ACCELERATED_COMPOSITING)
+void FlowThreadController::updateRenderFlowThreadLayersIfNeeded()
+{
+    // Walk the flow chain in reverse order because RenderRegions might become RenderLayers for the following flow threads.
+    for (RenderNamedFlowThreadList::reverse_iterator iter = m_renderNamedFlowThreadList->rbegin(); iter != m_renderNamedFlowThreadList->rend(); ++iter) {
+        RenderNamedFlowThread* flowRenderer = *iter;
+        flowRenderer->updateLayerToRegionMappingsIfNeeded();
+    }
+}
+#endif
 
 bool FlowThreadController::isContentNodeRegisteredWithAnyNamedFlow(const Node* contentNode) const
 {

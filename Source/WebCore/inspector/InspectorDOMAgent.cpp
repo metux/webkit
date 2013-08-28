@@ -53,7 +53,6 @@
 #include "DocumentFragment.h"
 #include "DocumentType.h"
 #include "Element.h"
-#include "ElementShadow.h"
 #include "Event.h"
 #include "EventContext.h"
 #include "EventListener.h"
@@ -280,7 +279,7 @@ void InspectorDOMAgent::restore()
 Vector<Document*> InspectorDOMAgent::documents()
 {
     Vector<Document*> result;
-    for (Frame* frame = m_document->frame(); frame; frame = frame->tree()->traverseNext()) {
+    for (Frame* frame = m_document->frame(); frame; frame = frame->tree().traverseNext()) {
         Document* document = frame->document();
         if (!document)
             continue;
@@ -357,10 +356,8 @@ void InspectorDOMAgent::unbind(Node* node, NodeToIdMap* nodesMap)
     }
 
     if (node->isElementNode()) {
-        if (ElementShadow* shadow = toElement(node)->shadow()) {
-            if (ShadowRoot* root = shadow->shadowRoot())
-                unbind(root, nodesMap);
-        }
+        if (ShadowRoot* root = toElement(node)->shadowRoot())
+            unbind(root, nodesMap);
     }
 
     nodesMap->remove(node);
@@ -787,7 +784,7 @@ void InspectorDOMAgent::setOuterHTML(ErrorString* errorString, int nodeId, const
     if (!node)
         return;
 
-    Document* document = node->isDocumentNode() ? toDocument(node) : node->ownerDocument();
+    Document* document = node->document();
     if (!document || (!document->isHTMLDocument() && !document->isXHTMLDocument()
 #if ENABLE(SVG)
         && !document->isSVGDocument()
@@ -1089,7 +1086,7 @@ void InspectorDOMAgent::focusNode()
     RefPtr<Node> node = m_nodeToFocus.get();
     m_nodeToFocus = 0;
 
-    Document* document = node->ownerDocument();
+    Document* document = node->document();
     if (!document)
         return;
     Frame* frame = document->frame();
@@ -1415,11 +1412,9 @@ PassRefPtr<TypeBuilder::DOM::Node> InspectorDOMAgent::buildObjectForNode(Node* n
                 value->setContentDocument(buildObjectForNode(doc, 0, nodesMap));
         }
 
-        ElementShadow* shadow = element->shadow();
-        if (shadow) {
+        if (ShadowRoot* root = element->shadowRoot()) {
             RefPtr<TypeBuilder::Array<TypeBuilder::DOM::Node> > shadowRoots = TypeBuilder::Array<TypeBuilder::DOM::Node>::create();
-            if (ShadowRoot* root = shadow->shadowRoot())
-                shadowRoots->addItem(buildObjectForNode(root, 0, nodesMap));
+            shadowRoots->addItem(buildObjectForNode(root, 0, nodesMap));
             value->setShadowRoots(shadowRoots);
         }
 
@@ -1755,7 +1750,7 @@ void InspectorDOMAgent::frameDocumentUpdated(Frame* frame)
 
     Page* page = frame->page();
     ASSERT(page);
-    if (frame != page->mainFrame())
+    if (frame != &page->mainFrame())
         return;
 
     // Only update the main frame document, nested frame document updates are not required
@@ -1821,7 +1816,7 @@ void InspectorDOMAgent::pushNodeByBackendIdToFrontend(ErrorString* errorString, 
 
 PassRefPtr<TypeBuilder::Runtime::RemoteObject> InspectorDOMAgent::resolveNode(Node* node, const String& objectGroup)
 {
-    Document* document = node->isDocumentNode() ? node->document() : node->ownerDocument();
+    Document* document = node->document();
     Frame* frame = document ? document->frame() : 0;
     if (!frame)
         return 0;

@@ -35,6 +35,7 @@
 #include "HTMLNames.h"
 #include "InlineTextBox.h"
 #include "PrintContext.h"
+#include "PseudoElement.h"
 #include "RenderBR.h"
 #include "RenderDetailsMarker.h"
 #include "RenderFileUploadControl.h"
@@ -48,6 +49,7 @@
 #include "RenderTableCell.h"
 #include "RenderView.h"
 #include "RenderWidget.h"
+#include "ShadowRoot.h"
 #include "StylePropertySet.h"
 #include <wtf/HexNumber.h>
 #include <wtf/Vector.h>
@@ -88,9 +90,15 @@ TextStream& operator<<(TextStream& ts, const IntPoint& p)
     return ts << "(" << p.x() << "," << p.y() << ")";
 }
 
+TextStream& operator<<(TextStream& ts, const LayoutRect& r)
+{
+    // FIXME: These should be printed as floats. Keeping them ints for consistency with previous test expectations.
+    return ts << pixelSnappedIntRect(r);
+}
+
 TextStream& operator<<(TextStream& ts, const LayoutPoint& p)
 {
-    // FIXME: These should be printed as floats. Keeping them ints for consistency with pervious test expectations.
+    // FIXME: These should be printed as floats. Keeping them ints for consistency with previous test expectations.
     return ts << "(" << p.x().toInt() << "," << p.y().toInt() << ")";
 }
 
@@ -581,8 +589,7 @@ void write(TextStream& ts, const RenderObject& o, int indent, RenderAsTextBehavi
         Widget* widget = toRenderWidget(&o)->widget();
         if (widget && widget->isFrameView()) {
             FrameView* view = toFrameView(widget);
-            RenderView* root = view->frame()->contentRenderer();
-            if (root) {
+            if (RenderView* root = view->frame().contentRenderer()) {
                 view->layout();
                 RenderLayer* l = root->layer();
                 if (l)
@@ -625,7 +632,7 @@ static void write(TextStream& ts, RenderLayer& l,
             ts << " outlineClip " << adjustedOutlineClipRect;
     }
 
-    if (l.renderer()->hasOverflowClip()) {
+    if (l.renderer().hasOverflowClip()) {
         if (l.scrollXOffset())
             ts << " scrollX " << l.scrollXOffset();
         if (l.scrollYOffset())
@@ -653,7 +660,7 @@ static void write(TextStream& ts, RenderLayer& l,
     ts << "\n";
 
     if (paintPhase != LayerPaintPhaseBackground)
-        write(ts, *l.renderer(), indent + 1, behavior);
+        write(ts, l.renderer(), indent + 1, behavior);
 }
 
 static void writeRenderRegionList(const RenderRegionList& flowThreadRegionList, TextStream& ts, int indent)
@@ -670,6 +677,8 @@ static void writeRenderRegionList(const RenderRegionList& flowThreadRegionList, 
                 Element* element = toElement(renderRegion->generatingNode());
                 ts << " #" << element->idForStyleResolution();
             }
+            if (renderRegion->hasLayer())
+                ts << " hasLayer";
             if (renderRegion->hasCustomRegionStyle())
                 ts << " region style: 1";
             if (renderRegion->hasAutoLogicalHeight())
@@ -790,8 +799,8 @@ static void writeLayers(TextStream& ts, const RenderLayer* rootLayer, RenderLaye
     
     // Altough the RenderFlowThread requires a layer, it is not collected by its parent,
     // so we have to treat it as a special case.
-    if (l->renderer()->isRenderView()) {
-        RenderView* renderView = toRenderView(l->renderer());
+    if (l->renderer().isRenderView()) {
+        RenderView* renderView = toRenderView(&l->renderer());
         writeRenderNamedFlowThreads(ts, renderView, rootLayer, paintDirtyRect, indent, behavior);
     }
 }
@@ -841,7 +850,7 @@ static void writeSelection(TextStream& ts, const RenderObject* o)
     if (!frame)
         return;
 
-    VisibleSelection selection = frame->selection()->selection();
+    VisibleSelection selection = frame->selection().selection();
     if (selection.isCaret()) {
         ts << "caret: position " << selection.start().deprecatedEditingOffset() << " of " << nodePosition(selection.start().deprecatedNode());
         if (selection.affinity() == UPSTREAM)
@@ -894,6 +903,8 @@ String externalRepresentation(Element* element, RenderAsTextBehavior behavior)
 
 static void writeCounterValuesFromChildren(TextStream& stream, RenderObject* parent, bool& isFirstCounter)
 {
+    if (!parent)
+        return;
     for (RenderObject* child = parent->firstChild(); child; child = child->nextSibling()) {
         if (child->isCounter()) {
             if (!isFirstCounter)
@@ -913,10 +924,10 @@ String counterValueForElement(Element* element)
     TextStream stream;
     bool isFirstCounter = true;
     // The counter renderers should be children of :before or :after pseudo-elements.
-    if (RenderObject* before = element->pseudoElementRenderer(BEFORE))
-        writeCounterValuesFromChildren(stream, before, isFirstCounter);
-    if (RenderObject* after = element->pseudoElementRenderer(AFTER))
-        writeCounterValuesFromChildren(stream, after, isFirstCounter);
+    if (PseudoElement* before = element->beforePseudoElement())
+        writeCounterValuesFromChildren(stream, before->renderer(), isFirstCounter);
+    if (PseudoElement* after = element->afterPseudoElement())
+        writeCounterValuesFromChildren(stream, after->renderer(), isFirstCounter);
     return stream.release();
 }
 

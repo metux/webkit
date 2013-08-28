@@ -1241,6 +1241,12 @@ public:
         return appendCallSetResult(operation, result);
     }
 
+    JITCompiler::Call callOperation(P_DFGOperation_EStJ operation, GPRReg result, Structure* structure, GPRReg arg2)
+    {
+        m_jit.setupArgumentsWithExecState(TrustedImmPtr(structure), arg2);
+        return appendCallWithExceptionCheckSetResult(operation, result);
+    }
+
     JITCompiler::Call callOperation(C_DFGOperation_EJ operation, GPRReg result, GPRReg arg1)
     {
         m_jit.setupArgumentsWithExecState(arg1);
@@ -1349,6 +1355,14 @@ public:
 #define EABI_32BIT_DUMMY_ARG      TrustedImm32(0),
 #else
 #define EABI_32BIT_DUMMY_ARG
+#endif
+
+// JSVALUE32_64 is a 64-bit integer that cannot be put half in an argument register and half on stack when using SH4 architecture.
+// To avoid this, let's occupy the 4th argument register (r7) with a dummy argument when necessary.
+#if CPU(SH4)
+#define SH4_32BIT_DUMMY_ARG      TrustedImm32(0),
+#else
+#define SH4_32BIT_DUMMY_ARG
 #endif
 
     JITCompiler::Call callOperation(Z_DFGOperation_D operation, GPRReg result, FPRReg arg1)
@@ -1483,8 +1497,14 @@ public:
 
     JITCompiler::Call callOperation(P_DFGOperation_EJS operation, GPRReg result, JSValueRegs value, size_t index)
     {
-        m_jit.setupArgumentsWithExecState(value.payloadGPR(), value.tagGPR(), TrustedImmPtr(index));
+        m_jit.setupArgumentsWithExecState(EABI_32BIT_DUMMY_ARG value.payloadGPR(), value.tagGPR(), TrustedImmPtr(index));
         return appendCallSetResult(operation, result);
+    }
+
+    JITCompiler::Call callOperation(P_DFGOperation_EStJ operation, GPRReg result, Structure* structure, GPRReg arg2Tag, GPRReg arg2Payload)
+    {
+        m_jit.setupArgumentsWithExecState(TrustedImmPtr(structure), arg2Payload, arg2Tag);
+        return appendCallWithExceptionCheckSetResult(operation, result);
     }
 
     JITCompiler::Call callOperation(C_DFGOperation_EJ operation, GPRReg result, GPRReg arg1Tag, GPRReg arg1Payload)
@@ -1505,22 +1525,22 @@ public:
 
     JITCompiler::Call callOperation(S_DFGOperation_EJJ operation, GPRReg result, GPRReg arg1Tag, GPRReg arg1Payload, GPRReg arg2Tag, GPRReg arg2Payload)
     {
-        m_jit.setupArgumentsWithExecState(EABI_32BIT_DUMMY_ARG arg1Payload, arg1Tag, arg2Payload, arg2Tag);
+        m_jit.setupArgumentsWithExecState(EABI_32BIT_DUMMY_ARG arg1Payload, arg1Tag, SH4_32BIT_DUMMY_ARG arg2Payload, arg2Tag);
         return appendCallWithExceptionCheckSetResult(operation, result);
     }
     JITCompiler::Call callOperation(J_DFGOperation_EJJ operation, GPRReg resultTag, GPRReg resultPayload, GPRReg arg1Tag, GPRReg arg1Payload, GPRReg arg2Tag, GPRReg arg2Payload)
     {
-        m_jit.setupArgumentsWithExecState(EABI_32BIT_DUMMY_ARG arg1Payload, arg1Tag, arg2Payload, arg2Tag);
+        m_jit.setupArgumentsWithExecState(EABI_32BIT_DUMMY_ARG arg1Payload, arg1Tag, SH4_32BIT_DUMMY_ARG arg2Payload, arg2Tag);
         return appendCallWithExceptionCheckSetResult(operation, resultPayload, resultTag);
     }
     JITCompiler::Call callOperation(J_DFGOperation_EJJ operation, GPRReg resultTag, GPRReg resultPayload, GPRReg arg1Tag, GPRReg arg1Payload, MacroAssembler::TrustedImm32 imm)
     {
-        m_jit.setupArgumentsWithExecState(EABI_32BIT_DUMMY_ARG arg1Payload, arg1Tag, imm, TrustedImm32(JSValue::Int32Tag));
+        m_jit.setupArgumentsWithExecState(EABI_32BIT_DUMMY_ARG arg1Payload, arg1Tag, SH4_32BIT_DUMMY_ARG imm, TrustedImm32(JSValue::Int32Tag));
         return appendCallWithExceptionCheckSetResult(operation, resultPayload, resultTag);
     }
     JITCompiler::Call callOperation(J_DFGOperation_EJJ operation, GPRReg resultTag, GPRReg resultPayload, MacroAssembler::TrustedImm32 imm, GPRReg arg2Tag, GPRReg arg2Payload)
     {
-        m_jit.setupArgumentsWithExecState(EABI_32BIT_DUMMY_ARG imm, TrustedImm32(JSValue::Int32Tag), arg2Payload, arg2Tag);
+        m_jit.setupArgumentsWithExecState(EABI_32BIT_DUMMY_ARG imm, TrustedImm32(JSValue::Int32Tag), SH4_32BIT_DUMMY_ARG arg2Payload, arg2Tag);
         return appendCallWithExceptionCheckSetResult(operation, resultPayload, resultTag);
     }
 
@@ -1558,18 +1578,18 @@ public:
 
     JITCompiler::Call callOperation(V_DFGOperation_EPZJ operation, GPRReg arg1, GPRReg arg2, GPRReg arg3Tag, GPRReg arg3Payload)
     {
-        m_jit.setupArgumentsWithExecState(arg1, arg2, EABI_32BIT_DUMMY_ARG arg3Payload, arg3Tag);
+        m_jit.setupArgumentsWithExecState(arg1, arg2, EABI_32BIT_DUMMY_ARG SH4_32BIT_DUMMY_ARG arg3Payload, arg3Tag);
         return appendCallWithExceptionCheck(operation);
     }
 
     JITCompiler::Call callOperation(V_DFGOperation_EOZJ operation, GPRReg arg1, GPRReg arg2, GPRReg arg3Tag, GPRReg arg3Payload)
     {
-        m_jit.setupArgumentsWithExecState(arg1, arg2, EABI_32BIT_DUMMY_ARG arg3Payload, arg3Tag);
+        m_jit.setupArgumentsWithExecState(arg1, arg2, EABI_32BIT_DUMMY_ARG SH4_32BIT_DUMMY_ARG arg3Payload, arg3Tag);
         return appendCallWithExceptionCheck(operation);
     }
     JITCompiler::Call callOperation(V_DFGOperation_EOZJ operation, GPRReg arg1, GPRReg arg2, TrustedImm32 arg3Tag, GPRReg arg3Payload)
     {
-        m_jit.setupArgumentsWithExecState(arg1, arg2, EABI_32BIT_DUMMY_ARG arg3Payload, arg3Tag);
+        m_jit.setupArgumentsWithExecState(arg1, arg2, EABI_32BIT_DUMMY_ARG SH4_32BIT_DUMMY_ARG arg3Payload, arg3Tag);
         return appendCallWithExceptionCheck(operation);
     }
 
@@ -1580,6 +1600,7 @@ public:
     }
 
 #undef EABI_32BIT_DUMMY_ARG
+#undef SH4_32BIT_DUMMY_ARG
     
     template<typename FunctionType>
     JITCompiler::Call callOperation(
@@ -1629,7 +1650,7 @@ public:
     }
 #endif // USE(JSVALUE32_64)
     
-#if !defined(NDEBUG) && !CPU(ARM) && !CPU(MIPS)
+#if !defined(NDEBUG) && !CPU(ARM) && !CPU(MIPS) && !CPU(SH4)
     void prepareForExternalCall()
     {
         // We're about to call out to a "native" helper function. The helper
@@ -1916,6 +1937,8 @@ public:
     void compileToStringOnCell(Node*);
     void compileNewStringObject(Node*);
     
+    void compileNewTypedArray(Node*);
+    
     void compileIntegerCompare(Node*, MacroAssembler::RelationalCondition);
     void compileBooleanCompare(Node*, MacroAssembler::RelationalCondition);
     void compileDoubleCompare(Node*, MacroAssembler::DoubleCondition);
@@ -1964,10 +1987,11 @@ public:
     void compileArithDiv(Node*);
     void compileArithMod(Node*);
     void compileGetIndexedPropertyStorage(Node*);
-    void compileGetByValOnIntTypedArray(const TypedArrayDescriptor&, Node*, size_t elementSize, TypedArraySignedness);
-    void compilePutByValForIntTypedArray(const TypedArrayDescriptor&, GPRReg base, GPRReg property, Node*, size_t elementSize, TypedArraySignedness, TypedArrayRounding = TruncateRounding);
-    void compileGetByValOnFloatTypedArray(const TypedArrayDescriptor&, Node*, size_t elementSize);
-    void compilePutByValForFloatTypedArray(const TypedArrayDescriptor&, GPRReg base, GPRReg property, Node*, size_t elementSize);
+    void compileGetTypedArrayByteOffset(Node*);
+    void compileGetByValOnIntTypedArray(Node*, TypedArrayType);
+    void compilePutByValForIntTypedArray(GPRReg base, GPRReg property, Node*, TypedArrayType);
+    void compileGetByValOnFloatTypedArray(Node*, TypedArrayType);
+    void compilePutByValForFloatTypedArray(GPRReg base, GPRReg property, Node*, TypedArrayType);
     void compileNewFunctionNoCheck(Node*);
     void compileNewFunctionExpression(Node*);
     bool compileRegExpExec(Node*);
@@ -2108,8 +2132,6 @@ public:
     void speculateNotCell(Edge);
     void speculateOther(Edge);
     void speculate(Node*, Edge);
-    
-    const TypedArrayDescriptor* typedArrayDescriptor(ArrayMode);
     
     JITCompiler::Jump jumpSlowForUnwantedArrayMode(GPRReg tempWithIndexingTypeReg, ArrayMode, IndexingType);
     JITCompiler::JumpList jumpSlowForUnwantedArrayMode(GPRReg tempWithIndexingTypeReg, ArrayMode);

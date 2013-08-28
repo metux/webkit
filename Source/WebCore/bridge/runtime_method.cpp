@@ -51,7 +51,7 @@ RuntimeMethod::RuntimeMethod(JSGlobalObject* globalObject, Structure* structure,
 void RuntimeMethod::finishCreation(VM& vm, const String& ident)
 {
     Base::finishCreation(vm, ident);
-    ASSERT(inherits(&s_info));
+    ASSERT(inherits(info()));
 }
 
 JSValue RuntimeMethod::lengthGetter(ExecState*, JSValue slotBase, PropertyName)
@@ -65,24 +65,11 @@ bool RuntimeMethod::getOwnPropertySlot(JSObject* object, ExecState* exec, Proper
 {
     RuntimeMethod* thisObject = jsCast<RuntimeMethod*>(object);
     if (propertyName == exec->propertyNames().length) {
-        slot.setCacheableCustom(thisObject, thisObject->lengthGetter);
+        slot.setCacheableCustom(thisObject, DontDelete | ReadOnly | DontEnum, thisObject->lengthGetter);
         return true;
     }
     
     return InternalFunction::getOwnPropertySlot(thisObject, exec, propertyName, slot);
-}
-
-bool RuntimeMethod::getOwnPropertyDescriptor(JSObject* object, ExecState* exec, PropertyName propertyName, PropertyDescriptor &descriptor)
-{
-    RuntimeMethod* thisObject = jsCast<RuntimeMethod*>(object);
-    if (propertyName == exec->propertyNames().length) {
-        PropertySlot slot(thisObject);
-        slot.setCustom(thisObject, lengthGetter);
-        descriptor.setDescriptor(slot.getValue(exec, propertyName), ReadOnly | DontDelete | DontEnum);
-        return true;
-    }
-    
-    return InternalFunction::getOwnPropertyDescriptor(thisObject, exec, propertyName, descriptor);
 }
 
 static EncodedJSValue JSC_HOST_CALL callRuntimeMethod(ExecState* exec)
@@ -95,14 +82,14 @@ static EncodedJSValue JSC_HOST_CALL callRuntimeMethod(ExecState* exec)
     RefPtr<Instance> instance;
 
     JSValue thisValue = exec->hostThisValue();
-    if (thisValue.inherits(&RuntimeObject::s_info)) {
+    if (thisValue.inherits(RuntimeObject::info())) {
         RuntimeObject* runtimeObject = static_cast<RuntimeObject*>(asObject(thisValue));
         instance = runtimeObject->getInternalInstance();
         if (!instance) 
             return JSValue::encode(RuntimeObject::throwInvalidAccessError(exec));
     } else {
         // Calling a runtime object of a plugin element?
-        if (thisValue.inherits(&JSHTMLElement::s_info)) {
+        if (thisValue.inherits(JSHTMLElement::info())) {
             HTMLElement* element = jsCast<JSHTMLElement*>(asObject(thisValue))->impl();
             instance = pluginInstance(element);
         }

@@ -49,7 +49,7 @@
 #include "DocumentType.h"
 #include "Element.h"
 #include "ElementRareData.h"
-#include "ElementShadow.h"
+#include "ElementTraversal.h"
 #include "Event.h"
 #include "EventContext.h"
 #include "EventDispatchMediator.h"
@@ -348,21 +348,18 @@ Node::~Node()
     liveNodeSet.remove(this);
 #endif
 
+    ASSERT(!renderer());
+    ASSERT(!parentNode());
+    ASSERT(!m_previous);
+    ASSERT(!m_next);
+
     if (hasRareData())
         clearRareData();
-
-    if (renderer())
-        detach();
 
     if (!isContainerNode()) {
         if (Document* document = documentInternal())
             willBeDeletedFrom(document);
     }
-
-    if (m_previous)
-        m_previous->setNextSibling(0);
-    if (m_next)
-        m_next->setPreviousSibling(0);
 
     m_treeScope->guardDeref();
 
@@ -391,10 +388,10 @@ NodeRareData* Node::rareData() const
     return static_cast<NodeRareData*>(m_data.m_rareData);
 }
 
-NodeRareData* Node::ensureRareData()
+NodeRareData& Node::ensureRareData()
 {
     if (hasRareData())
-        return rareData();
+        return *rareData();
 
     NodeRareData* data;
     if (isElementNode())
@@ -405,7 +402,7 @@ NodeRareData* Node::ensureRareData()
 
     m_data.m_rareData = data;
     setFlag(HasRareDataFlag);
-    return data;
+    return *data;
 }
 
 void Node::clearRareData()
@@ -454,7 +451,7 @@ void Node::setNodeValue(const String& /*nodeValue*/, ExceptionCode& ec)
 
 PassRefPtr<NodeList> Node::childNodes()
 {
-    return ensureRareData()->ensureNodeLists()->ensureChildNodeList(this);
+    return ensureRareData().ensureNodeLists().ensureChildNodeList(this);
 }
 
 Node *Node::lastDescendant() const
@@ -630,7 +627,7 @@ bool Node::rendererIsEditable(EditableLevel editableLevel, UserSelectAllTreatmen
 #if ENABLE(USERSELECT_ALL)
             // Elements with user-select: all style are considered atomic
             // therefore non editable.
-            if (node->renderer()->style()->userSelect() == SELECT_ALL && treatment == UserSelectAllIsAlwaysNonEditable)
+            if (treatment == UserSelectAllIsAlwaysNonEditable && node->renderer()->style()->userSelect() == SELECT_ALL)
                 return false;
 #else
             UNUSED_PARAM(treatment);
@@ -706,15 +703,11 @@ LayoutRect Node::renderRect(bool* isReplaced)
     return LayoutRect();    
 }
 
-inline void Node::setStyleChange(StyleChangeType changeType)
+void Node::markAncestorsWithChildNeedsStyleRecalc()
 {
-    m_nodeFlags = (m_nodeFlags & ~StyleChangeMask) | changeType;
-}
-
-inline void Node::markAncestorsWithChildNeedsStyleRecalc()
-{
-    for (ContainerNode* p = parentOrShadowHostNode(); p && !p->childNeedsStyleRecalc(); p = p->parentOrShadowHostNode())
-        p->setChildNeedsStyleRecalc();
+    ContainerNode* ancestor = isPseudoElement() ? toPseudoElement(this)->hostElement() : parentOrShadowHostNode();
+    for (; ancestor && !ancestor->childNeedsStyleRecalc(); ancestor = ancestor->parentOrShadowHostNode())
+        ancestor->setChildNeedsStyleRecalc();
 
     if (document()->childNeedsStyleRecalc())
         document()->scheduleStyleRecalc();
@@ -742,18 +735,6 @@ void Node::setNeedsStyleRecalc(StyleChangeType changeType)
 
     if (existingChangeType == NoStyleChange)
         markAncestorsWithChildNeedsStyleRecalc();
-}
-
-void Node::lazyAttach(ShouldSetAttached shouldSetAttached)
-{
-    for (Node* n = this; n; n = NodeTraversal::next(n, this)) {
-        if (n->hasChildNodes())
-            n->setChildNeedsStyleRecalc();
-        n->setStyleChange(FullStyleChange);
-        if (shouldSetAttached == SetAttached)
-            n->setAttached();
-    }
-    markAncestorsWithChildNeedsStyleRecalc();
 }
 
 unsigned Node::nodeIndex() const
@@ -907,87 +888,26 @@ bool Node::containsIncludingHostElements(const Node* node) const
 #endif
 }
 
-void Node::attach(const AttachContext&)
-{
-    ASSERT(!attached());
-    ASSERT(!renderer() || (renderer()->style() && renderer()->parent()));
-
-    // If this node got a renderer it may be the previousRenderer() of sibling text nodes and thus affect the
-    // result of Text::textRendererIsNeeded() for those nodes.
-    if (renderer()) {
-        for (Node* next = nextSibling(); next; next = next->nextSibling()) {
-            if (next->renderer())
-                break;
-            if (!next->attached())
-                break; // Assume this means none of the following siblings are attached.
-            if (!next->isTextNode())
-                continue;
-            ASSERT(!next->renderer());
-            toText(next)->createTextRendererIfNeeded();
-            // If we again decided not to create a renderer for next, we can bail out the loop,
-            // because it won't affect the result of Text::textRendererIsNeeded() for the rest
-            // of sibling nodes.
-            if (!next->renderer())
-                break;
-        }
-    }
-
-    setAttached();
-    clearNeedsStyleRecalc();
-
-    if (Document* doc = documentInternal()) {
-        if (AXObjectCache* cache = doc->axObjectCache())
-            cache->updateCacheAfterNodeIsAttached(this);
-    }
-}
-
-#ifndef NDEBUG
-static Node* detachingNode;
-
-bool Node::inDetach() const
-{
-    return detachingNode == this;
-}
-#endif
-
-void Node::detach(const AttachContext&)
-{
-#ifndef NDEBUG
-    ASSERT(!detachingNode);
-    detachingNode = this;
-#endif
-
-    if (renderer())
-        renderer()->destroyAndCleanupAnonymousWrappers();
-    setRenderer(0);
-
-    clearFlag(IsAttachedFlag);
-
-#ifndef NDEBUG
-    detachingNode = 0;
-#endif
-}
-
 Node* Node::pseudoAwarePreviousSibling() const
 {
-    if (parentElement() && !previousSibling()) {
-        Element* parent = parentElement();
-        if (isAfterPseudoElement() && parent->lastChild())
-            return parent->lastChild();
+    Element* parentOrHost = isPseudoElement() ? toPseudoElement(this)->hostElement() : parentElement();
+    if (parentOrHost && !previousSibling()) {
+        if (isAfterPseudoElement() && parentOrHost->lastChild())
+            return parentOrHost->lastChild();
         if (!isBeforePseudoElement())
-            return parent->pseudoElement(BEFORE);
+            return parentOrHost->beforePseudoElement();
     }
     return previousSibling();
 }
 
 Node* Node::pseudoAwareNextSibling() const
 {
-    if (parentElement() && !nextSibling()) {
-        Element* parent = parentElement();
-        if (isBeforePseudoElement() && parent->firstChild())
-            return parent->firstChild();
+    Element* parentOrHost = isPseudoElement() ? toPseudoElement(this)->hostElement() : parentElement();
+    if (parentOrHost && !nextSibling()) {
+        if (isBeforePseudoElement() && parentOrHost->firstChild())
+            return parentOrHost->firstChild();
         if (!isAfterPseudoElement())
-            return parent->pseudoElement(AFTER);
+            return parentOrHost->afterPseudoElement();
     }
     return nextSibling();
 }
@@ -996,15 +916,14 @@ Node* Node::pseudoAwareFirstChild() const
 {
     if (isElementNode()) {
         const Element* currentElement = toElement(this);
-        Node* first = currentElement->pseudoElement(BEFORE);
+        Node* first = currentElement->beforePseudoElement();
         if (first)
             return first;
         first = currentElement->firstChild();
         if (!first)
-            first = currentElement->pseudoElement(AFTER);
+            first = currentElement->afterPseudoElement();
         return first;
     }
-
     return firstChild();
 }
 
@@ -1012,15 +931,14 @@ Node* Node::pseudoAwareLastChild() const
 {
     if (isElementNode()) {
         const Element* currentElement = toElement(this);
-        Node* last = currentElement->pseudoElement(AFTER);
+        Node* last = currentElement->afterPseudoElement();
         if (last)
             return last;
         last = currentElement->lastChild();
         if (!last)
-            last = currentElement->pseudoElement(BEFORE);
+            last = currentElement->beforePseudoElement();
         return last;
     }
-
     return lastChild();
 }
 
@@ -1065,14 +983,14 @@ bool Node::isRegisteredWithNamedFlow() const
 Element* Node::shadowHost() const
 {
     if (ShadowRoot* root = containingShadowRoot())
-        return root->host();
+        return root->hostElement();
     return 0;
 }
 
 Node* Node::deprecatedShadowAncestorNode() const
 {
     if (ShadowRoot* root = containingShadowRoot())
-        return root->host();
+        return root->hostElement();
 
     return const_cast<Node*>(this);
 }
@@ -1111,7 +1029,7 @@ Element* Node::parentOrShadowHostElement() const
         return 0;
 
     if (parent->isShadowRoot())
-        return toShadowRoot(parent)->host();
+        return toShadowRoot(parent)->hostElement();
 
     if (!parent->isElementNode())
         return 0;
@@ -1121,12 +1039,38 @@ Element* Node::parentOrShadowHostElement() const
 
 Node* Node::insertionParentForBinding() const
 {
-    return resolveReprojection(this);
+    return findInsertionPointOf(this);
+}
+
+Node::InsertionNotificationRequest Node::insertedInto(ContainerNode* insertionPoint)
+{
+    ASSERT(insertionPoint->inDocument() || isContainerNode());
+    if (insertionPoint->inDocument())
+        setFlag(InDocumentFlag);
+    if (parentOrShadowHostNode()->isInShadowTree())
+        setFlag(IsInShadowTreeFlag);
+    return InsertionDone;
+}
+
+void Node::removedFrom(ContainerNode* insertionPoint)
+{
+    ASSERT(insertionPoint->inDocument() || isContainerNode());
+    if (insertionPoint->inDocument())
+        clearFlag(InDocumentFlag);
+    if (isInShadowTree() && !treeScope()->rootNode()->isShadowRoot())
+        clearFlag(IsInShadowTreeFlag);
 }
 
 bool Node::needsShadowTreeWalkerSlow() const
 {
-    return (isShadowRoot() || (isElementNode() && (isInsertionPoint() || isPseudoElement() || toElement(this)->hasPseudoElements() || toElement(this)->shadow())));
+    if (isShadowRoot())
+        return true;
+    if (!isElementNode())
+        return false;
+    const Element* asElement = toElement(this);
+    if (asElement->isPseudoElement() || asElement->beforePseudoElement() || asElement->afterPseudoElement())
+        return true;
+    return asElement->isInsertionPoint() || asElement->shadowRoot();
 }
 
 bool Node::isRootEditableElement() const
@@ -1165,8 +1109,8 @@ PassRefPtr<NodeList> Node::getElementsByTagName(const AtomicString& localName)
         return 0;
 
     if (document()->isHTMLDocument())
-        return ensureRareData()->ensureNodeLists()->addCacheWithAtomicName<HTMLTagNodeList>(this, HTMLTagNodeListType, localName);
-    return ensureRareData()->ensureNodeLists()->addCacheWithAtomicName<TagNodeList>(this, TagNodeListType, localName);
+        return ensureRareData().ensureNodeLists().addCacheWithAtomicName<HTMLTagNodeList>(this, HTMLTagNodeListType, localName);
+    return ensureRareData().ensureNodeLists().addCacheWithAtomicName<TagNodeList>(this, TagNodeListType, localName);
 }
 
 PassRefPtr<NodeList> Node::getElementsByTagNameNS(const AtomicString& namespaceURI, const AtomicString& localName)
@@ -1177,23 +1121,23 @@ PassRefPtr<NodeList> Node::getElementsByTagNameNS(const AtomicString& namespaceU
     if (namespaceURI == starAtom)
         return getElementsByTagName(localName);
 
-    return ensureRareData()->ensureNodeLists()->addCacheWithQualifiedName(this, namespaceURI.isEmpty() ? nullAtom : namespaceURI, localName);
+    return ensureRareData().ensureNodeLists().addCacheWithQualifiedName(this, namespaceURI.isEmpty() ? nullAtom : namespaceURI, localName);
 }
 
 PassRefPtr<NodeList> Node::getElementsByName(const String& elementName)
 {
-    return ensureRareData()->ensureNodeLists()->addCacheWithAtomicName<NameNodeList>(this, NameNodeListType, elementName);
+    return ensureRareData().ensureNodeLists().addCacheWithAtomicName<NameNodeList>(this, NameNodeListType, elementName);
 }
 
 PassRefPtr<NodeList> Node::getElementsByClassName(const String& classNames)
 {
-    return ensureRareData()->ensureNodeLists()->addCacheWithName<ClassNodeList>(this, ClassNodeListType, classNames);
+    return ensureRareData().ensureNodeLists().addCacheWithName<ClassNodeList>(this, ClassNodeListType, classNames);
 }
 
 PassRefPtr<RadioNodeList> Node::radioNodeList(const AtomicString& name)
 {
     ASSERT(hasTagName(formTag) || hasTagName(fieldsetTag));
-    return ensureRareData()->ensureNodeLists()->addCacheWithAtomicName<RadioNodeList>(this, RadioNodeListType, name);
+    return ensureRareData().ensureNodeLists().addCacheWithAtomicName<RadioNodeList>(this, RadioNodeListType, name);
 }
 
 PassRefPtr<Element> Node::querySelector(const AtomicString& selectors, ExceptionCode& ec)
@@ -1203,7 +1147,7 @@ PassRefPtr<Element> Node::querySelector(const AtomicString& selectors, Exception
         return 0;
     }
 
-    SelectorQuery* selectorQuery = document()->selectorQueryCache()->add(selectors, document(), ec);
+    SelectorQuery* selectorQuery = document()->selectorQueryCache().add(selectors, document(), ec);
     if (!selectorQuery)
         return 0;
     return selectorQuery->queryFirst(this);
@@ -1216,7 +1160,7 @@ PassRefPtr<NodeList> Node::querySelectorAll(const AtomicString& selectors, Excep
         return 0;
     }
 
-    SelectorQuery* selectorQuery = document()->selectorQueryCache()->add(selectors, document(), ec);
+    SelectorQuery* selectorQuery = document()->selectorQueryCache().add(selectors, document(), ec);
     if (!selectorQuery)
         return 0;
     return selectorQuery->queryAll(this);
@@ -2018,14 +1962,14 @@ EventTargetData* Node::eventTargetData()
     return hasEventTargetData() ? eventTargetDataMap().get(this) : 0;
 }
 
-EventTargetData* Node::ensureEventTargetData()
+EventTargetData& Node::ensureEventTargetData()
 {
     if (hasEventTargetData())
-        return eventTargetDataMap().get(this);
+        return *eventTargetDataMap().get(this);
     setHasEventTargetData(true);
     EventTargetData* data = new EventTargetData;
     eventTargetDataMap().set(this, adoptPtr(data));
-    return data;
+    return *data;
 }
 
 void Node::clearEventTargetData()
@@ -2083,7 +2027,7 @@ void Node::getRegisteredMutationObserversOfType(HashMap<MutationObserver*, Mutat
 void Node::registerMutationObserver(MutationObserver* observer, MutationObserverOptions options, const HashSet<AtomicString>& attributeFilter)
 {
     MutationObserverRegistration* registration = 0;
-    Vector<OwnPtr<MutationObserverRegistration> >& registry = ensureRareData()->ensureMutationObserverData()->registry;
+    Vector<OwnPtr<MutationObserverRegistration> >& registry = ensureRareData().ensureMutationObserverData().registry;
     for (size_t i = 0; i < registry.size(); ++i) {
         if (registry[i]->observer() == observer) {
             registration = registry[i].get();
@@ -2116,7 +2060,7 @@ void Node::unregisterMutationObserver(MutationObserverRegistration* registration
 
 void Node::registerTransientMutationObserver(MutationObserverRegistration* registration)
 {
-    ensureRareData()->ensureMutationObserverData()->transientRegistry.add(registration);
+    ensureRareData().ensureMutationObserverData().transientRegistry.add(registration);
 }
 
 void Node::unregisterTransientMutationObserver(MutationObserverRegistration* registration)
@@ -2267,7 +2211,7 @@ void Node::defaultEventHandler(Event* event)
     if (eventType == eventNames().keydownEvent || eventType == eventNames().keypressEvent) {
         if (event->isKeyboardEvent())
             if (Frame* frame = document()->frame())
-                frame->eventHandler()->defaultKeyboardEventHandler(static_cast<KeyboardEvent*>(event));
+                frame->eventHandler().defaultKeyboardEventHandler(static_cast<KeyboardEvent*>(event));
     } else if (eventType == eventNames().clickEvent) {
         int detail = event->isUIEvent() ? static_cast<UIEvent*>(event)->detail() : 0;
         if (dispatchDOMActivateEvent(detail, event))
@@ -2276,12 +2220,12 @@ void Node::defaultEventHandler(Event* event)
     } else if (eventType == eventNames().contextmenuEvent) {
         if (Frame* frame = document()->frame())
             if (Page* page = frame->page())
-                page->contextMenuController()->handleContextMenuEvent(event);
+                page->contextMenuController().handleContextMenuEvent(event);
 #endif
     } else if (eventType == eventNames().textInputEvent) {
         if (event->hasInterface(eventNames().interfaceForTextEvent))
             if (Frame* frame = document()->frame())
-                frame->eventHandler()->defaultTextInputEventHandler(static_cast<TextEvent*>(event));
+                frame->eventHandler().defaultTextInputEventHandler(static_cast<TextEvent*>(event));
 #if ENABLE(PAN_SCROLLING)
     } else if (eventType == eventNames().mousedownEvent && event->isMouseEvent()) {
         MouseEvent* mouseEvent = static_cast<MouseEvent*>(event);
@@ -2295,7 +2239,7 @@ void Node::defaultEventHandler(Event* event)
 
             if (renderer) {
                 if (Frame* frame = document()->frame())
-                    frame->eventHandler()->startPanScrolling(renderer);
+                    frame->eventHandler().startPanScrolling(renderer);
             }
         }
 #endif
@@ -2310,7 +2254,7 @@ void Node::defaultEventHandler(Event* event)
         
         if (startNode && startNode->renderer())
             if (Frame* frame = document()->frame())
-                frame->eventHandler()->defaultWheelEventHandler(startNode, wheelEvent);
+                frame->eventHandler().defaultWheelEventHandler(startNode, wheelEvent);
     } else if (event->type() == eventNames().webkitEditableContentChangedEvent) {
         dispatchInputEvent();
     }
@@ -2399,7 +2343,7 @@ unsigned Node::connectedSubframeCount() const
 void Node::incrementConnectedSubframeCount(unsigned amount)
 {
     ASSERT(isContainerNode());
-    ensureRareData()->incrementConnectedSubframeCount(amount);
+    ensureRareData().incrementConnectedSubframeCount(amount);
 }
 
 void Node::decrementConnectedSubframeCount(unsigned amount)
@@ -2443,9 +2387,10 @@ void Node::unregisterScopedHTMLStyleChild()
 size_t Node::numberOfScopedHTMLStyleChildren() const
 {
     size_t count = 0;
-    for (Element* element = ElementTraversal::firstWithin(this); element; element = ElementTraversal::next(element, this))
-        if (isHTMLStyleElement(element) && toHTMLStyleElement(element)->isRegisteredAsScoped())
+    for (HTMLStyleElement* style = Traversal<HTMLStyleElement>::firstWithin(this); style; style = Traversal<HTMLStyleElement>::next(style, this)) {
+        if (style->isRegisteredAsScoped())
             count++;
+    }
 
     return count;
 }

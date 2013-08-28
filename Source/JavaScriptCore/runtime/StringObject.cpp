@@ -40,7 +40,7 @@ StringObject::StringObject(VM& vm, Structure* structure)
 void StringObject::finishCreation(VM& vm, JSString* string)
 {
     Base::finishCreation(vm);
-    ASSERT(inherits(&s_info));
+    ASSERT(inherits(info()));
     setInternalValue(vm, string);
 }
 
@@ -58,14 +58,6 @@ bool StringObject::getOwnPropertySlotByIndex(JSObject* object, ExecState* exec, 
     if (thisObject->internalValue()->getStringPropertySlot(exec, propertyName, slot))
         return true;    
     return JSObject::getOwnPropertySlot(thisObject, exec, Identifier::from(exec, propertyName), slot);
-}
-
-bool StringObject::getOwnPropertyDescriptor(JSObject* object, ExecState* exec, PropertyName propertyName, PropertyDescriptor& descriptor)
-{
-    StringObject* thisObject = jsCast<StringObject*>(object);
-    if (thisObject->internalValue()->getStringPropertyDescriptor(exec, propertyName, descriptor))
-        return true;    
-    return JSObject::getOwnPropertyDescriptor(thisObject, exec, propertyName, descriptor);
 }
 
 void StringObject::put(JSCell* cell, ExecState* exec, PropertyName propertyName, JSValue value, PutPropertySlot& slot)
@@ -89,7 +81,7 @@ void StringObject::putByIndex(JSCell* cell, ExecState* exec, unsigned propertyNa
     JSObject::putByIndex(cell, exec, propertyName, value, shouldThrow);
 }
 
-bool StringObject::defineOwnProperty(JSObject* object, ExecState* exec, PropertyName propertyName, PropertyDescriptor& descriptor, bool throwException)
+bool StringObject::defineOwnProperty(JSObject* object, ExecState* exec, PropertyName propertyName, const PropertyDescriptor& descriptor, bool throwException)
 {
     StringObject* thisObject = jsCast<StringObject*>(object);
 

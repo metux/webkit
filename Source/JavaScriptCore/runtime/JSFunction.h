@@ -103,12 +103,12 @@ namespace JSC {
 
         JS_EXPORT_PRIVATE const SourceCode* sourceCode() const;
 
-        static JS_EXPORTDATA const ClassInfo s_info;
+        DECLARE_EXPORT_INFO;
 
         static Structure* createStructure(VM& vm, JSGlobalObject* globalObject, JSValue prototype) 
         {
             ASSERT(globalObject);
-            return Structure::create(vm, globalObject, prototype, TypeInfo(JSFunctionType, StructureFlags), &s_info); 
+            return Structure::create(vm, globalObject, prototype, TypeInfo(JSFunctionType, StructureFlags), info()); 
         }
 
         NativeFunction nativeFunction();
@@ -171,9 +171,8 @@ namespace JSC {
         ObjectAllocationProfile* createAllocationProfile(ExecState*, size_t inlineCapacity);
 
         static bool getOwnPropertySlot(JSObject*, ExecState*, PropertyName, PropertySlot&);
-        static bool getOwnPropertyDescriptor(JSObject*, ExecState*, PropertyName, PropertyDescriptor&);
         static void getOwnNonIndexPropertyNames(JSObject*, ExecState*, PropertyNameArray&, EnumerationMode = ExcludeDontEnumProperties);
-        static bool defineOwnProperty(JSObject*, ExecState*, PropertyName, PropertyDescriptor&, bool shouldThrow);
+        static bool defineOwnProperty(JSObject*, ExecState*, PropertyName, const PropertyDescriptor&, bool shouldThrow);
 
         static void put(JSCell*, ExecState*, PropertyName, JSValue, PutPropertySlot&);
 

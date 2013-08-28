@@ -286,7 +286,7 @@ public:
     void invalidateMatchedPropertiesCache();
 
 #if ENABLE(CSS_FILTERS)
-    bool createFilterOperations(CSSValue* inValue, RenderStyle* inStyle, RenderStyle* rootStyle, FilterOperations& outOperations);
+    bool createFilterOperations(CSSValue* inValue, FilterOperations& outOperations);
 #if ENABLE(CSS_SHADERS)
     StyleShader* styleShader(CSSValue*);
     StyleShader* cachedOrPendingStyleShaderFromValue(WebKitCSSShaderValue*);
@@ -415,7 +415,6 @@ public:
         , m_rootElementStyle(0)
         , m_regionForStyling(0)
         , m_elementLinkState(NotInsideLink)
-        , m_distributedToInsertionPoint(false)
         , m_elementAffectedByClassRules(false)
         , m_applyPropertyToRegularStyle(true)
         , m_applyPropertyToVisitedLinkStyle(false)
@@ -446,7 +445,6 @@ public:
 
         const RenderRegion* regionForStyling() const { return m_regionForStyling; }
         EInsideLink elementLinkState() const { return m_elementLinkState; }
-        bool distributedToInsertionPoint() const { return m_distributedToInsertionPoint; }
         void setElementAffectedByClassRules(bool isAffected) { m_elementAffectedByClassRules = isAffected; }
         bool elementAffectedByClassRules() const { return m_elementAffectedByClassRules; }
 
@@ -499,8 +497,6 @@ public:
         RenderRegion* m_regionForStyling;
         
         EInsideLink m_elementLinkState;
-
-        bool m_distributedToInsertionPoint;
 
         bool m_elementAffectedByClassRules;
 
@@ -670,7 +666,7 @@ public:
     {
         if (m_pushedStyleResolver)
             return;
-        m_pushedStyleResolver = m_parent->document()->ensureStyleResolver();
+        m_pushedStyleResolver = &m_parent->document()->ensureStyleResolver();
         m_pushedStyleResolver->pushParentElement(m_parent);
     }
     ~StyleResolverParentPusher()
@@ -679,8 +675,8 @@ public:
             return;
         // This tells us that our pushed style selector is in a bad state,
         // so we should just bail out in that scenario.
-        ASSERT(m_pushedStyleResolver == m_parent->document()->ensureStyleResolver());
-        if (m_pushedStyleResolver != m_parent->document()->ensureStyleResolver())
+        ASSERT(m_pushedStyleResolver == &m_parent->document()->ensureStyleResolver());
+        if (m_pushedStyleResolver != &m_parent->document()->ensureStyleResolver())
             return;
         m_pushedStyleResolver->popParentElement(m_parent);
     }

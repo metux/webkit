@@ -23,6 +23,7 @@
 #include "config.h"
 #include "JSCell.h"
 
+#include "ArrayBufferView.h"
 #include "JSFunction.h"
 #include "JSString.h"
 #include "JSObject.h"
@@ -206,21 +207,22 @@ bool JSCell::customHasInstance(JSObject*, ExecState*, JSValue)
     return false;
 }
 
-void JSCell::putDirectVirtual(JSObject*, ExecState*, PropertyName, JSValue, unsigned)
-{
-    RELEASE_ASSERT_NOT_REACHED();
-}
-
-bool JSCell::defineOwnProperty(JSObject*, ExecState*, PropertyName, PropertyDescriptor&, bool)
+bool JSCell::defineOwnProperty(JSObject*, ExecState*, PropertyName, const PropertyDescriptor&, bool)
 {
     RELEASE_ASSERT_NOT_REACHED();
     return false;
 }
 
-bool JSCell::getOwnPropertyDescriptor(JSObject*, ExecState*, PropertyName, PropertyDescriptor&)
+ArrayBuffer* JSCell::slowDownAndWasteMemory(JSArrayBufferView*)
 {
     RELEASE_ASSERT_NOT_REACHED();
-    return false;
+    return 0;
+}
+
+PassRefPtr<ArrayBufferView> JSCell::getTypedArrayImpl(JSArrayBufferView*)
+{
+    RELEASE_ASSERT_NOT_REACHED();
+    return 0;
 }
 
 } // namespace JSC

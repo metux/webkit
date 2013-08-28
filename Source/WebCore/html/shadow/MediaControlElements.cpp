@@ -54,6 +54,7 @@
 #include "RenderVideo.h"
 #include "RenderView.h"
 #include "Settings.h"
+#include "ShadowRoot.h"
 #if ENABLE(VIDEO_TRACK)
 #include "TextTrack.h"
 #include "TextTrackList.h"
@@ -109,7 +110,7 @@ void MediaControlPanelElement::startDrag(const LayoutPoint& eventLocation)
 
     m_lastDragEventLocation = eventLocation;
 
-    frame->eventHandler()->setCapturingMouseEventsNode(this);
+    frame->eventHandler().setCapturingMouseEventsNode(this);
 
     m_isBeingDragged = true;
 }
@@ -136,7 +137,7 @@ void MediaControlPanelElement::endDrag()
     if (!frame)
         return;
 
-    frame->eventHandler()->setCapturingMouseEventsNode(0);
+    frame->eventHandler().setCapturingMouseEventsNode(0);
 }
 
 void MediaControlPanelElement::startTimer()

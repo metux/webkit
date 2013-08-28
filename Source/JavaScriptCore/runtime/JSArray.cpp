@@ -76,7 +76,7 @@ void JSArray::setLengthWritable(ExecState* exec, bool writable)
 }
 
 // Defined in ES5.1 15.4.5.1
-bool JSArray::defineOwnProperty(JSObject* object, ExecState* exec, PropertyName propertyName, PropertyDescriptor& descriptor, bool throwException)
+bool JSArray::defineOwnProperty(JSObject* object, ExecState* exec, PropertyName propertyName, const PropertyDescriptor& descriptor, bool throwException)
 {
     JSArray* array = jsCast<JSArray*>(object);
 
@@ -181,22 +181,12 @@ bool JSArray::getOwnPropertySlot(JSObject* object, ExecState* exec, PropertyName
 {
     JSArray* thisObject = jsCast<JSArray*>(object);
     if (propertyName == exec->propertyNames().length) {
-        slot.setValue(jsNumber(thisObject->length()));
+        unsigned attributes = thisObject->isLengthWritable() ? DontDelete | DontEnum : DontDelete | DontEnum | ReadOnly;
+        slot.setValue(thisObject, attributes, jsNumber(thisObject->length()));
         return true;
     }
 
     return JSObject::getOwnPropertySlot(thisObject, exec, propertyName, slot);
-}
-
-bool JSArray::getOwnPropertyDescriptor(JSObject* object, ExecState* exec, PropertyName propertyName, PropertyDescriptor& descriptor)
-{
-    JSArray* thisObject = jsCast<JSArray*>(object);
-    if (propertyName == exec->propertyNames().length) {
-        descriptor.setDescriptor(jsNumber(thisObject->length()), thisObject->isLengthWritable() ? DontDelete | DontEnum : DontDelete | DontEnum | ReadOnly);
-        return true;
-    }
-
-    return JSObject::getOwnPropertyDescriptor(thisObject, exec, propertyName, descriptor);
 }
 
 // ECMA 15.4.5.1
@@ -279,6 +269,7 @@ bool JSArray::unshiftCountSlowCase(VM& vm, bool addToFront, unsigned count)
     // Step 2:
     // We're either going to choose to allocate a new ArrayStorage, or we're going to reuse the existing one.
 
+    DeferGC deferGC(vm.heap);
     void* newAllocBase = 0;
     unsigned newStorageCapacity;
     // If the current storage array is sufficiently large (but not too large!) then just keep using it.

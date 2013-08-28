@@ -2581,37 +2581,13 @@ void SpeculativeJIT::compile(Node* node)
         case Array::Arguments:
             compileGetByValOnArguments(node);
             break;
-        case Array::Int8Array:
-            compileGetByValOnIntTypedArray(m_jit.vm()->int8ArrayDescriptor(), node, sizeof(int8_t), SignedTypedArray);
-            break;
-        case Array::Int16Array:
-            compileGetByValOnIntTypedArray(m_jit.vm()->int16ArrayDescriptor(), node, sizeof(int16_t), SignedTypedArray);
-            break;
-        case Array::Int32Array:
-            compileGetByValOnIntTypedArray(m_jit.vm()->int32ArrayDescriptor(), node, sizeof(int32_t), SignedTypedArray);
-            break;
-        case Array::Uint8Array:
-            compileGetByValOnIntTypedArray(m_jit.vm()->uint8ArrayDescriptor(), node, sizeof(uint8_t), UnsignedTypedArray);
-            break;
-        case Array::Uint8ClampedArray:
-            compileGetByValOnIntTypedArray(m_jit.vm()->uint8ClampedArrayDescriptor(), node, sizeof(uint8_t), UnsignedTypedArray);
-            break;
-        case Array::Uint16Array:
-            compileGetByValOnIntTypedArray(m_jit.vm()->uint16ArrayDescriptor(), node, sizeof(uint16_t), UnsignedTypedArray);
-            break;
-        case Array::Uint32Array:
-            compileGetByValOnIntTypedArray(m_jit.vm()->uint32ArrayDescriptor(), node, sizeof(uint32_t), UnsignedTypedArray);
-            break;
-        case Array::Float32Array:
-            compileGetByValOnFloatTypedArray(m_jit.vm()->float32ArrayDescriptor(), node, sizeof(float));
-            break;
-        case Array::Float64Array:
-            compileGetByValOnFloatTypedArray(m_jit.vm()->float64ArrayDescriptor(), node, sizeof(double));
-            break;
-        default:
-            RELEASE_ASSERT_NOT_REACHED();
-            break;
-        }
+        default: {
+            TypedArrayType type = node->arrayMode().typedArrayType();
+            if (isInt(type))
+                compileGetByValOnIntTypedArray(node, type);
+            else
+                compileGetByValOnFloatTypedArray(node, type);
+        } }
         break;
     }
 
@@ -2872,46 +2848,13 @@ void SpeculativeJIT::compile(Node* node)
             break;
         }
             
-        case Array::Int8Array:
-            compilePutByValForIntTypedArray(m_jit.vm()->int8ArrayDescriptor(), base.gpr(), property.gpr(), node, sizeof(int8_t), SignedTypedArray);
-            break;
-            
-        case Array::Int16Array:
-            compilePutByValForIntTypedArray(m_jit.vm()->int16ArrayDescriptor(), base.gpr(), property.gpr(), node, sizeof(int16_t), SignedTypedArray);
-            break;
-            
-        case Array::Int32Array:
-            compilePutByValForIntTypedArray(m_jit.vm()->int32ArrayDescriptor(), base.gpr(), property.gpr(), node, sizeof(int32_t), SignedTypedArray);
-            break;
-            
-        case Array::Uint8Array:
-            compilePutByValForIntTypedArray(m_jit.vm()->uint8ArrayDescriptor(), base.gpr(), property.gpr(), node, sizeof(uint8_t), UnsignedTypedArray);
-            break;
-            
-        case Array::Uint8ClampedArray:
-            compilePutByValForIntTypedArray(m_jit.vm()->uint8ClampedArrayDescriptor(), base.gpr(), property.gpr(), node, sizeof(uint8_t), UnsignedTypedArray, ClampRounding);
-            break;
-            
-        case Array::Uint16Array:
-            compilePutByValForIntTypedArray(m_jit.vm()->uint16ArrayDescriptor(), base.gpr(), property.gpr(), node, sizeof(uint16_t), UnsignedTypedArray);
-            break;
-            
-        case Array::Uint32Array:
-            compilePutByValForIntTypedArray(m_jit.vm()->uint32ArrayDescriptor(), base.gpr(), property.gpr(), node, sizeof(uint32_t), UnsignedTypedArray);
-            break;
-            
-        case Array::Float32Array:
-            compilePutByValForFloatTypedArray(m_jit.vm()->float32ArrayDescriptor(), base.gpr(), property.gpr(), node, sizeof(float));
-            break;
-            
-        case Array::Float64Array:
-            compilePutByValForFloatTypedArray(m_jit.vm()->float64ArrayDescriptor(), base.gpr(), property.gpr(), node, sizeof(double));
-            break;
-            
-        default:
-            RELEASE_ASSERT_NOT_REACHED();
-            break;
-        }
+        default: {
+            TypedArrayType type = arrayMode.typedArrayType();
+            if (isInt(type))
+                compilePutByValForIntTypedArray(base.gpr(), property.gpr(), node, type);
+            else
+                compilePutByValForFloatTypedArray(base.gpr(), property.gpr(), node, type);
+        } }
 
         break;
     }
@@ -3584,6 +3527,36 @@ void SpeculativeJIT::compile(Node* node)
         break;
     }
         
+    case NewTypedArray: {
+        switch (node->child1().useKind()) {
+        case Int32Use:
+            compileNewTypedArray(node);
+            break;
+        case UntypedUse: {
+            JSValueOperand argument(this, node->child1());
+            GPRReg argumentGPR = argument.gpr();
+            
+            flushRegisters();
+            
+            GPRResult result(this);
+            GPRReg resultGPR = result.gpr();
+            
+            JSGlobalObject* globalObject = m_jit.graph().globalObjectFor(node->codeOrigin);
+            callOperation(
+                operationNewTypedArrayWithOneArgumentForType(node->typedArrayType()),
+                resultGPR, globalObject->typedArrayStructure(node->typedArrayType()),
+                argumentGPR);
+            
+            cellResult(resultGPR, node);
+            break;
+        }
+        default:
+            RELEASE_ASSERT_NOT_REACHED();
+            break;
+        }
+        break;
+    }
+        
     case NewRegexp: {
         flushRegisters();
         GPRResult result(this);
@@ -3660,7 +3633,7 @@ void SpeculativeJIT::compile(Node* node)
         MacroAssembler::JumpList slowPath;
 
         Structure* structure = node->structure();
-        size_t allocationSize = JSObject::allocationSize(structure->inlineCapacity());
+        size_t allocationSize = JSFinalObject::allocationSize(structure->inlineCapacity());
         MarkedAllocator* allocatorPtr = &m_jit.vm()->heap.allocatorForObjectWithoutDestructor(allocationSize);
 
         m_jit.move(TrustedImmPtr(allocatorPtr), allocatorGPR);
@@ -3953,13 +3926,13 @@ void SpeculativeJIT::compile(Node* node)
         
     case PhantomPutStructure: {
         ASSERT(isKnownCell(node->child1().node()));
-        m_jit.jitCode()->common.notifyCompilingStructureTransition(m_jit.codeBlock(), node);
+        m_jit.jitCode()->common.notifyCompilingStructureTransition(m_jit.graph().m_plan, m_jit.codeBlock(), node);
         noResult(node);
         break;
     }
         
     case PutStructure: {
-        m_jit.jitCode()->common.notifyCompilingStructureTransition(m_jit.codeBlock(), node);
+        m_jit.jitCode()->common.notifyCompilingStructureTransition(m_jit.graph().m_plan, m_jit.codeBlock(), node);
 
         SpeculateCellOperand base(this, node->child1());
         GPRReg baseGPR = base.gpr();
@@ -3999,6 +3972,11 @@ void SpeculativeJIT::compile(Node* node)
 
     case GetIndexedPropertyStorage: {
         compileGetIndexedPropertyStorage(node);
+        break;
+    }
+        
+    case GetTypedArrayByteOffset: {
+        compileGetTypedArrayByteOffset(node);
         break;
     }
         
@@ -4697,6 +4675,10 @@ void SpeculativeJIT::compile(Node* node)
     case PhantomLocal:
         // This is a no-op.
         noResult(node);
+        break;
+
+    case Unreachable:
+        RELEASE_ASSERT_NOT_REACHED();
         break;
         
     case LastNodeType:

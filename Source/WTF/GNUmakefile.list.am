@@ -25,6 +25,8 @@ wtf_sources += \
     Source/WTF/wtf/Compiler.h \
     Source/WTF/wtf/CompilationThread.cpp \
     Source/WTF/wtf/CompilationThread.h \
+    Source/WTF/wtf/Compression.h \
+    Source/WTF/wtf/Compression.cpp \
     Source/WTF/wtf/CryptographicallyRandomNumber.cpp \
     Source/WTF/wtf/CryptographicallyRandomNumber.h \
     Source/WTF/wtf/CurrentTime.cpp \
@@ -36,6 +38,7 @@ wtf_sources += \
     Source/WTF/wtf/DecimalNumber.cpp \
     Source/WTF/wtf/DecimalNumber.h \
     Source/WTF/wtf/Decoder.h \
+    Source/WTF/wtf/DeferrableRefCounted.h \
     Source/WTF/wtf/Deque.h \
     Source/WTF/wtf/DisallowCType.h \
     Source/WTF/wtf/DoublyLinkedList.h \
@@ -52,6 +55,7 @@ wtf_sources += \
     Source/WTF/wtf/FilePrintStream.cpp \
     Source/WTF/wtf/FilePrintStream.h \
     Source/WTF/wtf/FixedArray.h \
+    Source/WTF/wtf/FlipBytes.h \
     Source/WTF/wtf/Forward.h \
     Source/WTF/wtf/FunctionDispatcher.cpp \
     Source/WTF/wtf/FunctionDispatcher.h \

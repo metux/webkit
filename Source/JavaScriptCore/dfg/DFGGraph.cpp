@@ -198,7 +198,7 @@ void Graph::dump(PrintStream& out, const char* prefix, Node* node, DumpContext* 
         out.print(comma, inContext(*node->structureTransitionData().previousStructure, context), " -> ", inContext(*node->structureTransitionData().newStructure, context));
     if (node->hasFunction()) {
         out.print(comma, "function(", RawPointer(node->function()), ", ");
-        if (node->function()->inherits(&JSFunction::s_info)) {
+        if (node->function()->inherits(JSFunction::info())) {
             JSFunction* function = jsCast<JSFunction*>(node->function());
             if (function->isHostFunction())
                 out.print("<host function>");
@@ -209,7 +209,7 @@ void Graph::dump(PrintStream& out, const char* prefix, Node* node, DumpContext* 
         out.print(")");
     }
     if (node->hasExecutable()) {
-        if (node->executable()->inherits(&FunctionExecutable::s_info))
+        if (node->executable()->inherits(FunctionExecutable::info()))
             out.print(comma, "executable(", FunctionExecutableDump(jsCast<FunctionExecutable*>(node->executable())), ")");
         else
             out.print(comma, "executable(not function: ", RawPointer(node->executable()), ")");
@@ -246,6 +246,8 @@ void Graph::dump(PrintStream& out, const char* prefix, Node* node, DumpContext* 
     }
     if (node->hasIndexingType())
         out.print(comma, IndexingTypeDump(node->indexingType()));
+    if (node->hasTypedArrayType())
+        out.print(comma, node->typedArrayType());
     if (node->hasPhi())
         out.print(comma, "^", node->phi()->index());
     if (node->hasExecutionCounter())

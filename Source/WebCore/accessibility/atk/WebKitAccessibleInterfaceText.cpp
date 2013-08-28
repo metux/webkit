@@ -253,7 +253,7 @@ static AtkAttributeSet* getAttributeSetForAccessibilityObject(const Accessibilit
     }
 
     if (!style->textIndent().isUndefined()) {
-        int indentation = valueForLength(style->textIndent(), object->size().width(), renderer->view());
+        int indentation = valueForLength(style->textIndent(), object->size().width(), &renderer->view());
         buffer.set(g_strdup_printf("%i", indentation));
         result = addToAtkAttributeSet(result, atk_text_attribute_get_name(ATK_TEXT_ATTR_INDENT), buffer.get());
     }
@@ -592,7 +592,7 @@ static gchar* webkitAccessibleTextGetText(AtkText* text, gint startOffset, gint 
     if (endOffset == -1) {
         end = coreObject->stringValue().length();
         if (!end)
-            end = coreObject->textUnderElement(TextUnderElementModeIncludeAllChildren).length();
+            end = coreObject->textUnderElement(AccessibilityTextUnderElementMode(AccessibilityTextUnderElementMode::TextUnderElementModeIncludeAllChildren)).length();
     }
 
     String ret;
@@ -601,7 +601,7 @@ static gchar* webkitAccessibleTextGetText(AtkText* text, gint startOffset, gint 
     else {
         ret = coreObject->stringValue();
         if (!ret)
-            ret = coreObject->textUnderElement(TextUnderElementModeIncludeAllChildren);
+            ret = coreObject->textUnderElement(AccessibilityTextUnderElementMode(AccessibilityTextUnderElementMode::TextUnderElementModeIncludeAllChildren));
     }
 
     if (!ret.length()) {

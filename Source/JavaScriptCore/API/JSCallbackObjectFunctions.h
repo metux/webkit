@@ -45,7 +45,7 @@ namespace JSC {
 template <class Parent>
 inline JSCallbackObject<Parent>* JSCallbackObject<Parent>::asCallbackObject(JSValue value)
 {
-    ASSERT(asObject(value)->inherits(&s_info));
+    ASSERT(asObject(value)->inherits(info()));
     return jsCast<JSCallbackObject*>(asObject(value));
 }
 
@@ -69,7 +69,7 @@ template <class Parent>
 void JSCallbackObject<Parent>::finishCreation(ExecState* exec)
 {
     Base::finishCreation(exec->vm());
-    ASSERT(Parent::inherits(&s_info));
+    ASSERT(Parent::inherits(info()));
     init(exec);
 }
 
@@ -77,7 +77,7 @@ void JSCallbackObject<Parent>::finishCreation(ExecState* exec)
 template <class Parent>
 void JSCallbackObject<Parent>::finishCreation(VM& vm)
 {
-    ASSERT(Parent::inherits(&s_info));
+    ASSERT(Parent::inherits(info()));
     ASSERT(Parent::isGlobalObject());
     Base::finishCreation(vm);
     init(jsCast<JSGlobalObject*>(this)->globalExec());
@@ -137,7 +137,7 @@ bool JSCallbackObject<Parent>::getOwnPropertySlot(JSObject* object, ExecState* e
                     propertyNameRef = OpaqueJSString::create(name);
                 APICallbackShim callbackShim(exec);
                 if (hasProperty(ctx, thisRef, propertyNameRef.get())) {
-                    slot.setCustom(thisObject, callbackGetter);
+                    slot.setCustom(thisObject, ReadOnly | DontEnum, callbackGetter);
                     return true;
                 }
             } else if (JSObjectGetPropertyCallback getProperty = jsClass->getProperty) {
@@ -151,11 +151,11 @@ bool JSCallbackObject<Parent>::getOwnPropertySlot(JSObject* object, ExecState* e
                 }
                 if (exception) {
                     throwError(exec, toJS(exec, exception));
-                    slot.setValue(jsUndefined());
+                    slot.setValue(thisObject, ReadOnly | DontEnum, jsUndefined());
                     return true;
                 }
                 if (value) {
-                    slot.setValue(toJS(exec, value));
+                    slot.setValue(thisObject, ReadOnly | DontEnum, toJS(exec, value));
                     return true;
                 }
             }
@@ -164,7 +164,7 @@ bool JSCallbackObject<Parent>::getOwnPropertySlot(JSObject* object, ExecState* e
                 if (staticValues->contains(name)) {
                     JSValue value = thisObject->getStaticValue(exec, propertyName);
                     if (value) {
-                        slot.setValue(value);
+                        slot.setValue(thisObject, ReadOnly | DontEnum, value);
                         return true;
                     }
                 }
@@ -172,7 +172,7 @@ bool JSCallbackObject<Parent>::getOwnPropertySlot(JSObject* object, ExecState* e
             
             if (OpaqueJSClassStaticFunctionsTable* staticFunctions = jsClass->staticFunctions(exec)) {
                 if (staticFunctions->contains(name)) {
-                    slot.setCustom(thisObject, staticFunctionGetter);
+                    slot.setCustom(thisObject, ReadOnly | DontEnum, staticFunctionGetter);
                     return true;
                 }
             }
@@ -210,26 +210,6 @@ JSValue JSCallbackObject<Parent>::defaultValue(const JSObject* object, ExecState
     }
     
     return Parent::defaultValue(object, exec, hint);
-}
-
-template <class Parent>
-bool JSCallbackObject<Parent>::getOwnPropertyDescriptor(JSObject* object, ExecState* exec, PropertyName propertyName, PropertyDescriptor& descriptor)
-{
-    JSCallbackObject* thisObject = jsCast<JSCallbackObject*>(object);
-    PropertySlot slot(thisObject);
-    if (thisObject->methodTable()->getOwnPropertySlot(thisObject, exec, propertyName, slot)) {
-        // Ideally we should return an access descriptor, but returning a value descriptor is better than nothing.
-        JSValue value = slot.getValue(exec, propertyName);
-        if (!exec->hadException())
-            descriptor.setValue(value);
-        // We don't know whether the property is configurable, but assume it is.
-        descriptor.setConfigurable(true);
-        // We don't know whether the property is enumerable (we could call getOwnPropertyNames() to find out), but assume it isn't.
-        descriptor.setEnumerable(false);
-        return true;
-    }
-
-    return Parent::getOwnPropertyDescriptor(thisObject, exec, propertyName, descriptor);
 }
 
 template <class Parent>

@@ -55,7 +55,6 @@ public:
     static void getOwnPropertyNames(JSObject*, ExecState*, PropertyNameArray&, EnumerationMode);
     static bool getOwnPropertySlot(JSObject*, ExecState*, PropertyName, PropertySlot&);
     static bool getOwnPropertySlotByIndex(JSObject*, ExecState*, unsigned, PropertySlot&);
-    static bool getOwnPropertyDescriptor(JSObject*, ExecState*, PropertyName, PropertyDescriptor&);
     static void put(JSCell*, ExecState*, PropertyName, JSValue, PutPropertySlot&);
     static void putByIndex(JSCell*, ExecState*, unsigned propertyName, JSValue, bool shouldThrow);
     
@@ -66,7 +65,7 @@ public:
     
     Bindings::Array* getConcreteArray() const { return m_array; }
 
-    static const ClassInfo s_info;
+    DECLARE_INFO;
 
     static ArrayPrototype* createPrototype(ExecState*, JSGlobalObject* globalObject)
     {
@@ -75,7 +74,7 @@ public:
 
     static Structure* createStructure(VM& vm, JSGlobalObject* globalObject, JSValue prototype)
     {
-        return Structure::create(vm, globalObject, prototype, TypeInfo(ObjectType, StructureFlags), &s_info, ArrayClass);
+        return Structure::create(vm, globalObject, prototype, TypeInfo(ObjectType, StructureFlags), info(), ArrayClass);
     }
 
 protected:

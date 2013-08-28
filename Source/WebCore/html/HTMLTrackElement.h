@@ -90,12 +90,25 @@ private:
     virtual void textTrackAddCue(TextTrack*, PassRefPtr<TextTrackCue>);
     virtual void textTrackRemoveCue(TextTrack*, PassRefPtr<TextTrackCue>);
 
-    LoadableTextTrack* ensureTrack();
+    LoadableTextTrack& ensureTrack();
     virtual bool canLoadUrl(const KURL&);
 
     RefPtr<LoadableTextTrack> m_track;
     Timer<HTMLTrackElement> m_loadTimer;
 };
+
+inline bool isHTMLTrackElement(const Node* node)
+{
+    return node->hasTagName(HTMLNames::trackTag);
+}
+
+inline bool isHTMLTrackElement(const Element* element)
+{
+    return element->hasTagName(HTMLNames::trackTag);
+}
+
+template <> inline bool isElementOfType<HTMLTrackElement>(const Element* element) { return isHTMLTrackElement(element); }
+
 
 }
 

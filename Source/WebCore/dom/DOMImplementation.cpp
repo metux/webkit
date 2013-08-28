@@ -64,10 +64,12 @@ namespace WebCore {
 
 typedef HashSet<String, CaseFoldingHash> FeatureSet;
 
+#if ENABLE(SVG)
 static void addString(FeatureSet& set, const char* string)
 {
     set.add(string);
 }
+#endif
 
 #if ENABLE(VIDEO)
 class DOMImplementationSupportsTypeClient : public MediaPlayerSupportsTypeClient {
@@ -349,7 +351,7 @@ PassRefPtr<Document> DOMImplementation::createDocument(const String& type, Frame
     PluginData* pluginData = 0;
     PluginData::AllowedPluginTypes allowedPluginTypes = PluginData::OnlyApplicationPlugins;
     if (frame && frame->page()) {
-        if (frame->loader()->subframeLoader()->allowPlugins(NotAboutToInstantiatePlugin))
+        if (frame->loader().subframeLoader()->allowPlugins(NotAboutToInstantiatePlugin))
             allowedPluginTypes = PluginData::AllPlugins;
 
         pluginData = frame->page()->pluginData();
@@ -365,7 +367,7 @@ PassRefPtr<Document> DOMImplementation::createDocument(const String& type, Frame
 #if ENABLE(VIDEO)
      // Check to see if the type can be played by our MediaPlayer, if so create a MediaDocument
     // Key system is not applicable here.
-    DOMImplementationSupportsTypeClient client(frame && frame->settings() && frame->settings()->needsSiteSpecificQuirks(), url.host());
+    DOMImplementationSupportsTypeClient client(frame && frame->settings().needsSiteSpecificQuirks(), url.host());
     if (MediaPlayer::supportsType(ContentType(type), String(), url, &client))
          return MediaDocument::create(frame, url);
 #endif
@@ -373,7 +375,7 @@ PassRefPtr<Document> DOMImplementation::createDocument(const String& type, Frame
     // Everything else except text/plain can be overridden by plugins. In particular, Adobe SVG Viewer should be used for SVG, if installed.
     // Disallowing plug-ins to use text/plain prevents plug-ins from hijacking a fundamental type that the browser is expected to handle,
     // and also serves as an optimization to prevent loading the plug-in database in the common case.
-    if (type != "text/plain" && ((pluginData && pluginData->supportsMimeType(type, allowedPluginTypes)) || (frame && frame->loader()->client()->shouldAlwaysUsePluginDocument(type))))
+    if (type != "text/plain" && ((pluginData && pluginData->supportsMimeType(type, allowedPluginTypes)) || (frame && frame->loader().client().shouldAlwaysUsePluginDocument(type))))
         return PluginDocument::create(frame, url);
     if (isTextMIMEType(type))
         return TextDocument::create(frame, url);

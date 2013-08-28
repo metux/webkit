@@ -41,11 +41,11 @@ public:
         return prototype;
     }
     
-    static const ClassInfo s_info;
+    DECLARE_INFO;
 
     static Structure* createStructure(VM& vm, JSGlobalObject* globalObject, JSValue prototype)
     {
-        return Structure::create(vm, globalObject, prototype, TypeInfo(NameInstanceType, StructureFlags), &s_info);
+        return Structure::create(vm, globalObject, prototype, TypeInfo(NameInstanceType, StructureFlags), info());
     }
 
 protected:
@@ -56,7 +56,6 @@ protected:
 
 private:
     static bool getOwnPropertySlot(JSObject*, ExecState*, PropertyName, PropertySlot&);
-    static bool getOwnPropertyDescriptor(JSObject*, ExecState*, PropertyName, PropertyDescriptor&);
 };
 
 } // namespace JSC

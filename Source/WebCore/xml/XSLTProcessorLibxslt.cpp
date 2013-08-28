@@ -129,7 +129,7 @@ static xmlDocPtr docLoaderFunc(const xmlChar* uri,
 
         bool requestAllowed = globalCachedResourceLoader->frame() && globalCachedResourceLoader->document()->securityOrigin()->canRequest(url);
         if (requestAllowed) {
-            globalCachedResourceLoader->frame()->loader()->loadResourceSynchronously(url, AllowStoredCredentials, DoNotAskClientForCrossOriginCredentials, error, response, data);
+            globalCachedResourceLoader->frame()->loader().loadResourceSynchronously(url, AllowStoredCredentials, DoNotAskClientForCrossOriginCredentials, error, response, data);
             requestAllowed = globalCachedResourceLoader->document()->securityOrigin()->canRequest(response.url());
         }
         if (!requestAllowed) {
@@ -140,7 +140,7 @@ static xmlDocPtr docLoaderFunc(const xmlChar* uri,
         PageConsole* console = 0;
         Frame* frame = globalProcessor->xslStylesheet()->ownerDocument()->frame();
         if (frame && frame->page())
-            console = frame->page()->console();
+            console = &frame->page()->console();
         xmlSetStructuredErrorFunc(console, XSLTProcessor::parseErrorFunc);
         xmlSetGenericErrorFunc(console, XSLTProcessor::genericErrorFunc);
 

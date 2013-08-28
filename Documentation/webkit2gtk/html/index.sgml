@@ -979,11 +979,22 @@
 <ANCHOR id="webkit-web-page-get-dom-document" href="webkit2gtk/WebKitWebPage.html#webkit-web-page-get-dom-document">
 <ANCHOR id="webkit-web-page-get-id" href="webkit2gtk/WebKitWebPage.html#webkit-web-page-get-id">
 <ANCHOR id="webkit-web-page-get-uri" href="webkit2gtk/WebKitWebPage.html#webkit-web-page-get-uri">
+<ANCHOR id="webkit-web-page-get-main-frame" href="webkit2gtk/WebKitWebPage.html#webkit-web-page-get-main-frame">
 <ANCHOR id="WebKitWebPage.property-details" href="webkit2gtk/WebKitWebPage.html#WebKitWebPage.property-details">
 <ANCHOR id="WebKitWebPage--uri" href="webkit2gtk/WebKitWebPage.html#WebKitWebPage--uri">
 <ANCHOR id="WebKitWebPage.signal-details" href="webkit2gtk/WebKitWebPage.html#WebKitWebPage.signal-details">
 <ANCHOR id="WebKitWebPage-document-loaded" href="webkit2gtk/WebKitWebPage.html#WebKitWebPage-document-loaded">
 <ANCHOR id="WebKitWebPage-send-request" href="webkit2gtk/WebKitWebPage.html#WebKitWebPage-send-request">
+<ANCHOR id="WebKitFrame" href="webkit2gtk/WebKitFrame.html">
+<ANCHOR id="WebKitFrame.synopsis" href="webkit2gtk/WebKitFrame.html#WebKitFrame.synopsis">
+<ANCHOR id="WebKitFrame.object-hierarchy" href="webkit2gtk/WebKitFrame.html#WebKitFrame.object-hierarchy">
+<ANCHOR id="WebKitFrame.description" href="webkit2gtk/WebKitFrame.html#WebKitFrame.description">
+<ANCHOR id="WebKitFrame.details" href="webkit2gtk/WebKitFrame.html#WebKitFrame.details">
+<ANCHOR id="WebKitFrame-struct" href="webkit2gtk/WebKitFrame.html#WebKitFrame-struct">
+<ANCHOR id="webkit-frame-is-main-frame" href="webkit2gtk/WebKitFrame.html#webkit-frame-is-main-frame">
+<ANCHOR id="webkit-frame-get-uri" href="webkit2gtk/WebKitFrame.html#webkit-frame-get-uri">
+<ANCHOR id="webkit-frame-get-javascript-global-context" href="webkit2gtk/WebKitFrame.html#webkit-frame-get-javascript-global-context">
+<ANCHOR id="webkit-frame-get-javascript-context-for-script-world" href="webkit2gtk/WebKitFrame.html#webkit-frame-get-javascript-context-for-script-world">
 <ANCHOR id="annotation-glossterm-out" href="webkit2gtk/annotation-glossary.html#annotation-glossterm-out">
 <ANCHOR id="annotation-glossterm-scope async" href="webkit2gtk/annotation-glossary.html#annotation-glossterm-scope async">
 <ANCHOR id="annotation-glossterm-allow-none" href="webkit2gtk/annotation-glossary.html#annotation-glossterm-allow-none">

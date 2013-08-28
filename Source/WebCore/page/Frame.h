@@ -71,13 +71,11 @@ namespace WebCore {
     class ScriptController;
     class Settings;
     class TiledBackingStore;
-    class TreeScope;
     class VisiblePosition;
 
 #if !USE(TILED_BACKING_STORE)
     class TiledBackingStoreClient { };
 #endif
-
 
     enum {
         LayerTreeFlagsIncludeDebugInfo = 1 << 0,
@@ -115,24 +113,18 @@ namespace WebCore {
         FrameView* view() const;
 
         Editor& editor() const;
-        EventHandler* eventHandler() const;
-        FrameLoader* loader() const;
-        NavigationScheduler* navigationScheduler() const;
-        FrameSelection* selection() const;
-        FrameTree* tree() const;
-        AnimationController* animation() const;
-        ScriptController* script();
+        EventHandler& eventHandler() const;
+        FrameLoader& loader() const;
+        NavigationScheduler& navigationScheduler() const;
+        FrameSelection& selection() const;
+        FrameTree& tree() const;
+        AnimationController& animation() const;
+        ScriptController& script();
         
         RenderView* contentRenderer() const; // Root of the render tree for the document contained in this frame.
         RenderPart* ownerRenderer() const; // Renderer for the element that contains this frame.
 
-#if ENABLE(PAGE_VISIBILITY_API)
-        void dispatchVisibilityStateChangeEvent();
-#endif
-
     // ======== All public functions below this point are candidates to move out of Frame into another class. ========
-
-        bool inScope(TreeScope*) const;
 
         void injectUserScripts(UserScriptInjectionTime);
         
@@ -141,7 +133,7 @@ namespace WebCore {
 
         static Frame* frameForWidget(const Widget*);
 
-        Settings* settings() const; // can be NULL
+        Settings& settings() const { return *m_settings; }
 
         void setPrinting(bool printing, const FloatSize& pageSize, const FloatSize& originalPageSize, float maximumShrinkRatio, AdjustViewSizeOrNot);
         bool shouldUsePrintingLayout() const;
@@ -176,8 +168,6 @@ namespace WebCore {
         void clearTimers();
         static void clearTimers(FrameView*, Document*);
 
-        String documentTypeString() const;
-
         String displayStringModifiedByEncoding(const String&) const;
 
         DragImageRef nodeImage(Node*);
@@ -195,9 +185,6 @@ namespace WebCore {
         void resumeActiveDOMObjectsAndAnimations();
         bool activeDOMObjectsAndAnimationsSuspended() const { return m_activeDOMObjectsAndAnimationsSuspendedCount > 0; }
 
-        // Should only be called on the main frame of a page.
-        void notifyChromeClientWheelEventHandlerCountChanged() const;
-
         bool isURLAllowed(const KURL&) const;
 
     // ========
@@ -210,6 +197,7 @@ namespace WebCore {
         HashSet<FrameDestructionObserver*> m_destructionObservers;
 
         Page* m_page;
+        const RefPtr<Settings> m_settings;
         mutable FrameTree m_treeNode;
         mutable FrameLoader m_loader;
         mutable NavigationScheduler m_navigationScheduler;
@@ -218,11 +206,11 @@ namespace WebCore {
         RefPtr<FrameView> m_view;
         RefPtr<Document> m_doc;
 
-        OwnPtr<ScriptController> m_script;
+        const OwnPtr<ScriptController> m_script;
         const OwnPtr<Editor> m_editor;
-        OwnPtr<FrameSelection> m_selection;
-        OwnPtr<EventHandler> m_eventHandler;
-        OwnPtr<AnimationController> m_animationController;
+        const OwnPtr<FrameSelection> m_selection;
+        const OwnPtr<EventHandler> m_eventHandler;
+        const OwnPtr<AnimationController> m_animationController;
 
         float m_pageZoomFactor;
         float m_textZoomFactor;
@@ -260,14 +248,14 @@ namespace WebCore {
         m_loader.init();
     }
 
-    inline FrameLoader* Frame::loader() const
+    inline FrameLoader& Frame::loader() const
     {
-        return &m_loader;
+        return m_loader;
     }
 
-    inline NavigationScheduler* Frame::navigationScheduler() const
+    inline NavigationScheduler& Frame::navigationScheduler() const
     {
-        return &m_navigationScheduler;
+        return m_navigationScheduler;
     }
 
     inline FrameView* Frame::view() const
@@ -275,9 +263,9 @@ namespace WebCore {
         return m_view.get();
     }
 
-    inline ScriptController* Frame::script()
+    inline ScriptController& Frame::script()
     {
-        return m_script.get();
+        return *m_script;
     }
 
     inline Document* Frame::document() const
@@ -285,9 +273,9 @@ namespace WebCore {
         return m_doc.get();
     }
 
-    inline FrameSelection* Frame::selection() const
+    inline FrameSelection& Frame::selection() const
     {
-        return m_selection.get();
+        return *m_selection;
     }
 
     inline Editor& Frame::editor() const
@@ -295,9 +283,9 @@ namespace WebCore {
         return *m_editor;
     }
 
-    inline AnimationController* Frame::animation() const
+    inline AnimationController& Frame::animation() const
     {
-        return m_animationController.get();
+        return *m_animationController;
     }
 
     inline HTMLFrameOwnerElement* Frame::ownerElement() const
@@ -315,9 +303,9 @@ namespace WebCore {
         m_inViewSourceMode = mode;
     }
 
-    inline FrameTree* Frame::tree() const
+    inline FrameTree& Frame::tree() const
     {
-        return &m_treeNode;
+        return m_treeNode;
     }
 
     inline Page* Frame::page() const
@@ -330,9 +318,9 @@ namespace WebCore {
         m_page = 0;
     }
 
-    inline EventHandler* Frame::eventHandler() const
+    inline EventHandler& Frame::eventHandler() const
     {
-        return m_eventHandler.get();
+        return *m_eventHandler;
     }
 
 } // namespace WebCore

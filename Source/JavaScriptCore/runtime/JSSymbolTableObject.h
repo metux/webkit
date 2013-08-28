@@ -41,8 +41,6 @@ public:
     
     SharedSymbolTable* symbolTable() const { return m_symbolTable.get(); }
     
-    static NO_RETURN_DUE_TO_CRASH void putDirectVirtual(JSObject*, ExecState*, PropertyName, JSValue, unsigned attributes);
-    
     JS_EXPORT_PRIVATE static bool deleteProperty(JSCell*, ExecState*, PropertyName);
     JS_EXPORT_PRIVATE static void getOwnNonIndexPropertyNames(JSObject*, ExecState*, PropertyNameArray&, EnumerationMode);
     
@@ -79,7 +77,7 @@ inline bool symbolTableGet(
         return false;
     SymbolTableEntry::Fast entry = iter->value;
     ASSERT(!entry.isNull());
-    slot.setValue(object->registerAt(entry.getIndex()).get());
+    slot.setValue(object, entry.getAttributes() | DontDelete, object->registerAt(entry.getIndex()).get());
     return true;
 }
 
@@ -111,7 +109,7 @@ inline bool symbolTableGet(
         return false;
     SymbolTableEntry::Fast entry = iter->value;
     ASSERT(!entry.isNull());
-    slot.setValue(object->registerAt(entry.getIndex()).get());
+    slot.setValue(object, entry.getAttributes() | DontDelete, object->registerAt(entry.getIndex()).get());
     slotIsWriteable = !entry.isReadOnly();
     return true;
 }

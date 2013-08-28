@@ -54,7 +54,7 @@ static IntRect screenRectOfContents(Element* element)
     if (element->renderer() && element->renderer()->hasLayer() && element->renderer()->enclosingLayer()->isComposited()) {
         FloatQuad contentsBox = static_cast<FloatRect>(element->renderer()->enclosingLayer()->backing()->contentsBox());
         contentsBox = element->renderer()->localToAbsoluteQuad(contentsBox);
-        return element->renderer()->view()->frameView()->contentsToScreen(contentsBox.enclosingBoundingBox());
+        return element->renderer()->view().frameView().contentsToScreen(contentsBox.enclosingBoundingBox());
     }
 #endif
     return element->screenRect();
@@ -86,7 +86,7 @@ void WebFullScreenManager::didReceiveMessage(CoreIPC::Connection* connection, Co
 
 bool WebFullScreenManager::supportsFullScreen(bool withKeyboard)
 {
-    if (!m_page->corePage()->settings()->fullScreenEnabled())
+    if (!m_page->corePage()->settings().fullScreenEnabled())
         return false;
 
     return m_page->injectedBundleFullScreenClient().supportsFullScreen(m_page.get(), withKeyboard);
@@ -156,12 +156,12 @@ void WebFullScreenManager::close()
 
 void WebFullScreenManager::saveScrollPosition()
 {
-    m_scrollPosition = m_page->corePage()->mainFrame()->view()->scrollPosition();
+    m_scrollPosition = m_page->corePage()->mainFrame().view()->scrollPosition();
 }
 
 void WebFullScreenManager::restoreScrollPosition()
 {
-    m_page->corePage()->mainFrame()->view()->setScrollPosition(m_scrollPosition);
+    m_page->corePage()->mainFrame().view()->setScrollPosition(m_scrollPosition);
 }
 
 } // namespace WebKit

@@ -54,7 +54,7 @@ namespace WebCore {
 
 ResourceLoader::ResourceLoader(Frame* frame, ResourceLoaderOptions options)
     : m_frame(frame)
-    , m_documentLoader(frame->loader()->activeDocumentLoader())
+    , m_documentLoader(frame->loader().activeDocumentLoader())
     , m_identifier(0)
     , m_reachedTerminalState(false)
     , m_notifiedLoadComplete(false)
@@ -157,7 +157,7 @@ void ResourceLoader::start()
     }
 
     if (!m_reachedTerminalState)
-        m_handle = ResourceHandle::create(m_frame->loader()->networkingContext(), m_request, this, m_defersLoading, m_options.sniffContent == SniffContent);
+        m_handle = ResourceHandle::create(m_frame->loader().networkingContext(), m_request, this, m_defersLoading, m_options.sniffContent == SniffContent);
 }
 
 void ResourceLoader::setDefersLoading(bool defers)
@@ -176,7 +176,7 @@ FrameLoader* ResourceLoader::frameLoader() const
 {
     if (!m_frame)
         return 0;
-    return m_frame->loader();
+    return &m_frame->loader();
 }
 
 void ResourceLoader::setDataBufferingPolicy(DataBufferingPolicy dataBufferingPolicy)
@@ -231,7 +231,7 @@ void ResourceLoader::willSendRequest(ResourceRequest& request, const ResourceRes
     // We need a resource identifier for all requests, even if FrameLoader is never going to see it (such as with CORS preflight requests).
     bool createdResourceIdentifier = false;
     if (!m_identifier) {
-        m_identifier = m_frame->page()->progress()->createUniqueIdentifier();
+        m_identifier = m_frame->page()->progress().createUniqueIdentifier();
         createdResourceIdentifier = true;
     }
 
@@ -243,7 +243,7 @@ void ResourceLoader::willSendRequest(ResourceRequest& request, const ResourceRes
     }
 #if ENABLE(INSPECTOR)
     else
-        InspectorInstrumentation::willSendRequest(m_frame.get(), m_identifier, m_frame->loader()->documentLoader(), request, redirectResponse);
+        InspectorInstrumentation::willSendRequest(m_frame.get(), m_identifier, m_frame->loader().documentLoader(), request, redirectResponse);
 #endif
 
     if (!redirectResponse.isNull())
@@ -252,7 +252,7 @@ void ResourceLoader::willSendRequest(ResourceRequest& request, const ResourceRes
     m_request = request;
 
     if (!redirectResponse.isNull() && !m_documentLoader->isCommitted())
-        frameLoader()->client()->dispatchDidReceiveServerRedirectForProvisionalLoad();
+        frameLoader()->client().dispatchDidReceiveServerRedirectForProvisionalLoad();
 }
 
 void ResourceLoader::didSendData(unsigned long long, unsigned long long)
@@ -375,7 +375,7 @@ void ResourceLoader::cleanupForError(const ResourceError& error)
 void ResourceLoader::didChangePriority(ResourceLoadPriority loadPriority)
 {
     if (handle()) {
-        frameLoader()->client()->dispatchDidChangeResourcePriority(identifier(), loadPriority);
+        frameLoader()->client().dispatchDidChangeResourcePriority(identifier(), loadPriority);
         handle()->didChangePriority(loadPriority);
     }
 }
@@ -442,12 +442,12 @@ ResourceError ResourceLoader::cancelledError()
 
 ResourceError ResourceLoader::blockedError()
 {
-    return frameLoader()->client()->blockedError(m_request);
+    return frameLoader()->client().blockedError(m_request);
 }
 
 ResourceError ResourceLoader::cannotShowURLError()
 {
-    return frameLoader()->client()->cannotShowURLError(m_request);
+    return frameLoader()->client().cannotShowURLError(m_request);
 }
 
 void ResourceLoader::willSendRequest(ResourceHandle*, ResourceRequest& request, const ResourceResponse& redirectResponse)
@@ -511,7 +511,7 @@ bool ResourceLoader::shouldUseCredentialStorage()
         return false;
     
     RefPtr<ResourceLoader> protector(this);
-    return frameLoader()->client()->shouldUseCredentialStorage(documentLoader(), identifier());
+    return frameLoader()->client().shouldUseCredentialStorage(documentLoader(), identifier());
 }
 
 void ResourceLoader::didReceiveAuthenticationChallenge(const AuthenticationChallenge& challenge)
@@ -550,7 +550,7 @@ void ResourceLoader::didCancelAuthenticationChallenge(const AuthenticationChalle
 bool ResourceLoader::canAuthenticateAgainstProtectionSpace(const ProtectionSpace& protectionSpace)
 {
     RefPtr<ResourceLoader> protector(this);
-    return frameLoader()->client()->canAuthenticateAgainstProtectionSpace(documentLoader(), identifier(), protectionSpace);
+    return frameLoader()->client().canAuthenticateAgainstProtectionSpace(documentLoader(), identifier(), protectionSpace);
 }
 #endif
 

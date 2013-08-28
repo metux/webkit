@@ -329,7 +329,7 @@ DerivedSources/WebCore/InspectorProtocolVersion.h : $(WebCore)/inspector/Inspect
 	$(AM_V_GEN)$(PYTHON) $(WebCore)/inspector/generate-inspector-protocol-version -o $(GENSOURCES_WEBCORE)/InspectorProtocolVersion.h $(WebCore)/inspector/Inspector.json
 
 DerivedSources/WebCore/InspectorBackendDispatcher.cpp: $(WebCore)/inspector/Inspector.json $(WebCore)/inspector/CodeGeneratorInspector.py
-	$(AM_V_GEN)$(PYTHON) $(WebCore)/inspector/CodeGeneratorInspector.py $< --output_h_dir $(GENSOURCES_WEBCORE) --output_cpp_dir $(GENSOURCES_WEBCORE)
+	$(AM_V_GEN)$(PYTHON) $(WebCore)/inspector/CodeGeneratorInspector.py $< --output_h_dir $(GENSOURCES_WEBCORE) --output_cpp_dir $(GENSOURCES_WEBCORE) --output_js_dir $(GENSOURCES_WEBCORE)
 DerivedSources/WebCore/InspectorTypeBuilder.h: DerivedSources/WebCore/InspectorTypeBuilder.cpp
 DerivedSources/WebCore/InspectorTypeBuilder.cpp: DerivedSources/WebCore/InspectorFrontend.h
 DerivedSources/WebCore/InspectorFrontend.h: DerivedSources/WebCore/InspectorFrontend.cpp
@@ -349,6 +349,14 @@ audiodir = ${datadir}/webkitgtk-@WEBKITGTK_API_VERSION@/resources/audio/
 audio_DATA = $(WebCore)/platform/audio/resources/Composite.wav
 dist_audio_DATA = $(audio_DATA)
 endif  # END ENABLE_WEB_AUDIO
+
+# ANGLE tokenizer & parser
+DerivedSources/ANGLE/glslang.cpp: Source/ThirdParty/ANGLE/src/compiler/glslang.l DerivedSources/ANGLE/glslang_tab.cpp
+	$(AM_V_GEN)$(FLEX) --noline --nounistd --outfile="$@" "$<"
+
+DerivedSources/ANGLE/glslang_tab.cpp: Source/ThirdParty/ANGLE/src/compiler/glslang.y
+	$(AM_V_GEN)$(BISON) --no-lines --defines="DerivedSources/ANGLE/glslang_tab.h" --skeleton=yacc.c --output="$@" $<
+DerivedSources/ANGLE/glslang_tab.h: DerivedSources/ANGLE/glslang_tab.cpp
 
 IDL_PATH := \
     $(WebCore)/Modules/battery \

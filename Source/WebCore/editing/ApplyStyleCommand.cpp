@@ -31,6 +31,7 @@
 #include "CSSPropertyNames.h"
 #include "CSSValueKeywords.h"
 #include "CSSValuePool.h"
+#include "ChildIterator.h"
 #include "Document.h"
 #include "EditingStyle.h"
 #include "Editor.h"
@@ -47,6 +48,7 @@
 #include "StyleResolver.h"
 #include "Text.h"
 #include "TextIterator.h"
+#include "TextNodeTraversal.h"
 #include "VisibleUnits.h"
 #include "htmlediting.h"
 #include <wtf/StdLibExtras.h>
@@ -99,11 +101,11 @@ bool isStyleSpanOrSpanWithOnlyStyleAttribute(const Element* element)
     return hasNoAttributeOrOnlyStyleAttribute(toHTMLElement(element), AllowNonEmptyStyleAttribute);
 }
 
-static inline bool isSpanWithoutAttributesOrUnstyledStyleSpan(const Node* node)
+static inline bool isSpanWithoutAttributesOrUnstyledStyleSpan(const Element* element)
 {
-    if (!node || !node->isHTMLElement() || !node->hasTagName(spanTag))
+    if (!element || !element->isHTMLElement() || !element->hasTagName(spanTag))
         return false;
-    return hasNoAttributeOrOnlyStyleAttribute(toHTMLElement(node), StyleAttributeShouldBeEmpty);
+    return hasNoAttributeOrOnlyStyleAttribute(toHTMLElement(element), StyleAttributeShouldBeEmpty);
 }
 
 bool isEmptyFontTag(const Element* element, ShouldStyleAttributeBeEmpty shouldStyleAttributeBeEmpty)
@@ -440,13 +442,14 @@ void ApplyStyleCommand::cleanupUnstyledAppleStyleSpans(Node* dummySpanAncestor)
     // can be propagated, which can result in more splitting. If a dummy span gets
     // cloned/split, the new node is always a sibling of it. Therefore, we scan
     // all the children of the dummy's parent
-    Node* next;
-    for (Node* node = dummySpanAncestor->firstChild(); node; node = next) {
-        next = node->nextSibling();
-        if (isSpanWithoutAttributesOrUnstyledStyleSpan(node))
-            removeNodePreservingChildren(node);
-        node = next;
+
+    Vector<Element*> toRemove;
+    for (auto child = elementChildren(dummySpanAncestor).begin(), end = elementChildren(dummySpanAncestor).end(); child != end; ++child) {
+        if (isSpanWithoutAttributesOrUnstyledStyleSpan(&*child))
+            toRemove.append(&*child);
     }
+    for (unsigned i = 0; i < toRemove.size(); ++i)
+        removeNodePreservingChildren(toRemove[i]);
 }
 
 HTMLElement* ApplyStyleCommand::splitAncestorsWithUnicodeBidi(Node* node, bool before, WritingDirection allowedDirection)
@@ -886,8 +889,8 @@ bool ApplyStyleCommand::removeInlineStyleFromElement(EditingStyle* style, PassRe
     if (isStyledInlineElementToRemove(element.get())) {
         if (mode == RemoveNone)
             return true;
-        ASSERT(extractedStyle);
-        extractedStyle->mergeInlineStyleOfElement(element.get(), EditingStyle::OverrideValues);
+        if (extractedStyle)
+            extractedStyle->mergeInlineStyleOfElement(element.get(), EditingStyle::OverrideValues);
         removeNodePreservingChildren(element);
         return true;
     }
@@ -1521,13 +1524,9 @@ void ApplyStyleCommand::joinChildTextNodes(Node* node, const Position& start, co
     Position newStart = start;
     Position newEnd = end;
 
-    Vector<RefPtr<Text> > textNodes;
-    for (Node* curr = node->firstChild(); curr; curr = curr->nextSibling()) {
-        if (!curr->isTextNode())
-            continue;
-        
-        textNodes.append(toText(curr));
-    }
+    Vector<RefPtr<Text>> textNodes;
+    for (Text* textNode = TextNodeTraversal::firstChild(node); textNode; textNode = TextNodeTraversal::nextSibling(textNode))
+        textNodes.append(textNode);
 
     for (size_t i = 0; i < textNodes.size(); ++i) {
         Text* childText = textNodes[i].get();

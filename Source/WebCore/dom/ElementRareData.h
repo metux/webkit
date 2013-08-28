@@ -24,10 +24,10 @@
 
 #include "ClassList.h"
 #include "DatasetDOMStringMap.h"
-#include "ElementShadow.h"
 #include "NamedNodeMap.h"
 #include "NodeRareData.h"
 #include "PseudoElement.h"
+#include "ShadowRoot.h"
 #include "StyleInheritedData.h"
 #include <wtf/OwnPtr.h>
 
@@ -39,9 +39,11 @@ public:
 
     ~ElementRareData();
 
-    void setPseudoElement(PseudoId, PassRefPtr<PseudoElement>);
-    PseudoElement* pseudoElement(PseudoId) const;
-    bool hasPseudoElements() const { return m_generatedBefore || m_generatedAfter; }
+    void setBeforePseudoElement(PassRefPtr<PseudoElement>);
+    void setAfterPseudoElement(PassRefPtr<PseudoElement>);
+
+    PseudoElement* beforePseudoElement() const { return m_beforePseudoElement.get(); }
+    PseudoElement* afterPseudoElement() const { return m_afterPseudoElement.get(); }
 
     void resetComputedStyle();
     void resetDynamicRestyleObservations();
@@ -96,14 +98,9 @@ public:
     unsigned childIndex() const { return m_childIndex; }
     void setChildIndex(unsigned index) { m_childIndex = index; }
 
-    void clearShadow() { m_shadow = nullptr; }
-    ElementShadow* shadow() const { return m_shadow.get(); }
-    ElementShadow* ensureShadow()
-    {
-        if (!m_shadow)
-            m_shadow = ElementShadow::create();
-        return m_shadow.get();
-    }
+    void clearShadowRoot() { m_shadowRoot = nullptr; }
+    ShadowRoot* shadowRoot() const { return m_shadowRoot.get(); }
+    void setShadowRoot(PassRefPtr<ShadowRoot> shadowRoot) { m_shadowRoot = shadowRoot; }
 
     NamedNodeMap* attributeMap() const { return m_attributeMap.get(); }
     void setAttributeMap(PassOwnPtr<NamedNodeMap> attributeMap) { m_attributeMap = attributeMap; }
@@ -171,11 +168,11 @@ private:
 
     OwnPtr<DatasetDOMStringMap> m_dataset;
     OwnPtr<ClassList> m_classList;
-    OwnPtr<ElementShadow> m_shadow;
+    RefPtr<ShadowRoot> m_shadowRoot;
     OwnPtr<NamedNodeMap> m_attributeMap;
 
-    RefPtr<PseudoElement> m_generatedBefore;
-    RefPtr<PseudoElement> m_generatedAfter;
+    RefPtr<PseudoElement> m_beforePseudoElement;
+    RefPtr<PseudoElement> m_afterPseudoElement;
 
     ElementRareData(RenderObject*);
     void releasePseudoElement(PseudoElement*);
@@ -219,51 +216,21 @@ inline ElementRareData::ElementRareData(RenderObject* renderer)
 
 inline ElementRareData::~ElementRareData()
 {
-    ASSERT(!m_shadow);
-    ASSERT(!m_generatedBefore);
-    ASSERT(!m_generatedAfter);
+    ASSERT(!m_shadowRoot);
+    ASSERT(!m_beforePseudoElement);
+    ASSERT(!m_afterPseudoElement);
 }
 
-inline void ElementRareData::setPseudoElement(PseudoId pseudoId, PassRefPtr<PseudoElement> element)
+inline void ElementRareData::setBeforePseudoElement(PassRefPtr<PseudoElement> pseudoElement)
 {
-    switch (pseudoId) {
-    case BEFORE:
-        releasePseudoElement(m_generatedBefore.get());
-        m_generatedBefore = element;
-        break;
-    case AFTER:
-        releasePseudoElement(m_generatedAfter.get());
-        m_generatedAfter = element;
-        break;
-    default:
-        ASSERT_NOT_REACHED();
-    }
+    ASSERT(!m_beforePseudoElement || !pseudoElement);
+    m_beforePseudoElement = pseudoElement;
 }
 
-inline PseudoElement* ElementRareData::pseudoElement(PseudoId pseudoId) const
+inline void ElementRareData::setAfterPseudoElement(PassRefPtr<PseudoElement> pseudoElement)
 {
-    switch (pseudoId) {
-    case BEFORE:
-        return m_generatedBefore.get();
-    case AFTER:
-        return m_generatedAfter.get();
-    default:
-        return 0;
-    }
-}
-
-inline void ElementRareData::releasePseudoElement(PseudoElement* element)
-{
-    if (!element)
-        return;
-
-    if (element->attached())
-        element->detach();
-
-    ASSERT(!element->nextSibling());
-    ASSERT(!element->previousSibling());
-
-    element->setParentOrShadowHostNode(0);
+    ASSERT(!m_afterPseudoElement || !pseudoElement);
+    m_afterPseudoElement = pseudoElement;
 }
 
 inline void ElementRareData::resetComputedStyle()

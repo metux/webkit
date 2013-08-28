@@ -207,7 +207,7 @@ bool ApplicationCacheHost::maybeLoadSynchronously(ResourceRequest& request, Reso
             response = resource->response();
             data.append(resource->data()->data(), resource->data()->size());
         } else {
-            error = documentLoader()->frameLoader()->client()->cannotShowURLError(request);
+            error = documentLoader()->frameLoader()->client().cannotShowURLError(request);
         }
         return true;
     }
@@ -474,8 +474,7 @@ void ApplicationCacheHost::abort()
 
 bool ApplicationCacheHost::isApplicationCacheEnabled()
 {
-    return m_documentLoader->frame() && m_documentLoader->frame()->settings()
-           && m_documentLoader->frame()->settings()->offlineWebApplicationCacheEnabled();
+    return m_documentLoader->frame() && m_documentLoader->frame()->settings().offlineWebApplicationCacheEnabled();
 }
 
 }  // namespace WebCore
