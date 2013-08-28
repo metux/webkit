@@ -25,7 +25,7 @@
 #include "ArrayAllocationProfile.h"
 #include "JSArray.h"
 #include "JSClassRef.h"
-#include "VM.h"
+#include "JSArrayBufferPrototype.h"
 #include "JSSegmentedVariableObject.h"
 #include "JSWeakObjectMapRefInternal.h"
 #include "NumberPrototype.h"
@@ -33,6 +33,7 @@
 #include "StringPrototype.h"
 #include "StructureChain.h"
 #include "StructureRareDataInlines.h"
+#include "VM.h"
 #include "Watchpoint.h"
 #include <JavaScriptCore/JSBase.h>
 #include <wtf/HashSet.h>
@@ -166,6 +167,16 @@ protected:
     WriteBarrier<Structure> m_regExpStructure;
     WriteBarrier<Structure> m_stringObjectStructure;
     WriteBarrier<Structure> m_internalFunctionStructure;
+    
+    WriteBarrier<JSArrayBufferPrototype> m_arrayBufferPrototype;
+    WriteBarrier<Structure> m_arrayBufferStructure;
+    
+    struct TypedArrayData {
+        WriteBarrier<JSObject> prototype;
+        WriteBarrier<Structure> structure;
+    };
+    
+    FixedArray<TypedArrayData, NUMBER_OF_TYPED_ARRAY_TYPES> m_typedArrays;
         
     void* m_specialPointers[Special::TableSize]; // Special pointers used by the LLInt and JIT.
 
@@ -204,7 +215,7 @@ public:
         return globalObject;
     }
 
-    static JS_EXPORTDATA const ClassInfo s_info;
+    DECLARE_EXPORT_INFO;
 
     bool hasDebugger() const { return m_debugger; }
     bool hasProfiler() const { return globalObjectMethodTable()->supportsProfiling(this); }
@@ -228,6 +239,10 @@ protected:
         init(thisValue);
     }
 
+    enum ConstantMode { IsConstant, IsVariable };
+    enum FunctionMode { IsFunctionToSpecialize, NotFunctionOrNotSpecializable };
+    int addGlobalVar(const Identifier&, ConstantMode, FunctionMode);
+
 public:
     JS_EXPORT_PRIVATE ~JSGlobalObject();
     JS_EXPORT_PRIVATE static void destroy(JSCell*);
@@ -237,19 +252,33 @@ public:
     JS_EXPORT_PRIVATE static void visitChildren(JSCell*, SlotVisitor&);
 
     JS_EXPORT_PRIVATE static bool getOwnPropertySlot(JSObject*, ExecState*, PropertyName, PropertySlot&);
-    JS_EXPORT_PRIVATE static bool getOwnPropertyDescriptor(JSObject*, ExecState*, PropertyName, PropertyDescriptor&);
     bool hasOwnPropertyForWrite(ExecState*, PropertyName);
     JS_EXPORT_PRIVATE static void put(JSCell*, ExecState*, PropertyName, JSValue, PutPropertySlot&);
 
-    JS_EXPORT_PRIVATE static void putDirectVirtual(JSObject*, ExecState*, PropertyName, JSValue, unsigned attributes);
-
     JS_EXPORT_PRIVATE static void defineGetter(JSObject*, ExecState*, PropertyName, JSObject* getterFunc, unsigned attributes);
     JS_EXPORT_PRIVATE static void defineSetter(JSObject*, ExecState*, PropertyName, JSObject* setterFunc, unsigned attributes);
-    JS_EXPORT_PRIVATE static bool defineOwnProperty(JSObject*, ExecState*, PropertyName, PropertyDescriptor&, bool shouldThrow);
+    JS_EXPORT_PRIVATE static bool defineOwnProperty(JSObject*, ExecState*, PropertyName, const PropertyDescriptor&, bool shouldThrow);
 
     // We use this in the code generator as we perform symbol table
     // lookups prior to initializing the properties
     bool symbolTableHasProperty(PropertyName);
+
+    void addVar(ExecState* exec, const Identifier& propertyName)
+    {
+        if (!hasProperty(exec, propertyName))
+            addGlobalVar(propertyName, IsVariable, NotFunctionOrNotSpecializable);
+    }
+    void addConst(ExecState* exec, const Identifier& propertyName)
+    {
+        if (!hasProperty(exec, propertyName))
+            addGlobalVar(propertyName, IsConstant, NotFunctionOrNotSpecializable);
+    }
+    void addFunction(ExecState* exec, const Identifier& propertyName, JSValue value)
+    {
+        bool propertyDidExist = removeDirect(exec->vm(), propertyName); // Newly declared functions overwrite existing properties.
+        int index = addGlobalVar(propertyName, IsVariable, !propertyDidExist ? IsFunctionToSpecialize : NotFunctionOrNotSpecializable);
+        registerAt(index).set(exec->vm(), this, value);
+    }
 
     // The following accessors return pristine values, even if a script 
     // replaces the global object's associated property.
@@ -330,6 +359,14 @@ public:
     Structure* regExpMatchesArrayStructure() const { return m_regExpMatchesArrayStructure.get(); }
     Structure* regExpStructure() const { return m_regExpStructure.get(); }
     Structure* stringObjectStructure() const { return m_stringObjectStructure.get(); }
+    
+    JSArrayBufferPrototype* arrayBufferPrototype() const { return m_arrayBufferPrototype.get(); }
+    Structure* arrayBufferStructure() const { return m_arrayBufferStructure.get(); }
+    
+    Structure* typedArrayStructure(TypedArrayType type) const
+    {
+        return m_typedArrays[toIndex(type)].structure.get();
+    }
 
     void* actualPointerFor(Special::Pointer pointer)
     {
@@ -390,7 +427,7 @@ public:
 
     static Structure* createStructure(VM& vm, JSValue prototype)
     {
-        return Structure::create(vm, 0, prototype, TypeInfo(GlobalObjectType, StructureFlags), &s_info);
+        return Structure::create(vm, 0, prototype, TypeInfo(GlobalObjectType, StructureFlags), info());
     }
 
     void registerWeakMap(OpaqueJSWeakObjectMap* map)

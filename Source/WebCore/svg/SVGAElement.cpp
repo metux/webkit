@@ -37,7 +37,6 @@
 #include "HTMLParserIdioms.h"
 #include "KeyboardEvent.h"
 #include "MouseEvent.h"
-#include "NodeRenderingContext.h"
 #include "PlatformMouseEvent.h"
 #include "RenderSVGInline.h"
 #include "RenderSVGText.h"
@@ -84,7 +83,7 @@ String SVGAElement::title() const
         return title;
 
     // Otherwise, use the title of this element.
-    return SVGStyledElement::title();
+    return SVGElement::title();
 }
 
 bool SVGAElement::isSupportedAttribute(const QualifiedName& attrName)
@@ -180,7 +179,7 @@ void SVGAElement::defaultEventHandler(Event* event)
             Frame* frame = document()->frame();
             if (!frame)
                 return;
-            frame->loader()->urlSelected(document()->completeURL(url), target, event, false, false, MaybeSendReferrer);
+            frame->loader().urlSelected(document()->completeURL(url), target, event, false, false, MaybeSendReferrer);
             return;
         }
     }
@@ -221,19 +220,19 @@ bool SVGAElement::isKeyboardFocusable(KeyboardEvent* event) const
     if (!document()->frame())
         return false;
     
-    return document()->frame()->eventHandler()->tabsToLinks(event);
+    return document()->frame()->eventHandler().tabsToLinks(event);
 }
 
-bool SVGAElement::childShouldCreateRenderer(const NodeRenderingContext& childContext) const
+bool SVGAElement::childShouldCreateRenderer(const Node* child) const
 {
     // http://www.w3.org/2003/01/REC-SVG11-20030114-errata#linking-text-environment
     // The 'a' element may contain any element that its parent may contain, except itself.
-    if (childContext.node()->hasTagName(SVGNames::aTag))
+    if (child->hasTagName(SVGNames::aTag))
         return false;
     if (parentNode() && parentNode()->isSVGElement())
-        return parentNode()->childShouldCreateRenderer(childContext);
+        return parentNode()->childShouldCreateRenderer(child);
 
-    return SVGElement::childShouldCreateRenderer(childContext);
+    return SVGElement::childShouldCreateRenderer(child);
 }
 
 } // namespace WebCore

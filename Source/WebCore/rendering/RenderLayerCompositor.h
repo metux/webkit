@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 Apple Inc. All rights reserved.
+ * Copyright (C) 2009, 2013 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -96,7 +96,7 @@ typedef unsigned CompositingReasons;
 class RenderLayerCompositor : public GraphicsLayerClient, public GraphicsLayerUpdaterClient {
     WTF_MAKE_FAST_ALLOCATED;
 public:
-    explicit RenderLayerCompositor(RenderView*);
+    explicit RenderLayerCompositor(RenderView&);
     ~RenderLayerCompositor();
 
     // Return true if this RenderView is in "compositing mode" (i.e. has one or more
@@ -141,6 +141,9 @@ public:
     // This is only used when state changes and we do not exepect a style update or layout to happen soon (e.g. when
     // we discover that an iframe is overlapped during painting).
     void scheduleCompositingLayerUpdate();
+
+    // Update the maps that we use to distribute layers to coresponding RenderRegions.
+    void updateRenderFlowThreadLayersIfNeeded();
     
     // Update the compositing state of the given layer. Returns true if that state changed.
     enum CompositingChangeRepaint { CompositingChangeRepaintNow, CompositingChangeWillRepaintLater };
@@ -163,7 +166,7 @@ public:
     
     // Return the bounding box required for compositing layer and its childern, relative to ancestorLayer.
     // If layerBoundingBox is not 0, on return it contains the bounding box of this layer only.
-    IntRect calculateCompositedBounds(const RenderLayer*, const RenderLayer* ancestorLayer) const;
+    LayoutRect calculateCompositedBounds(const RenderLayer*, const RenderLayer* ancestorLayer) const;
 
     // Repaint the appropriate layers when the given RenderLayer starts or stops being composited.
     void repaintOnCompositingChange(RenderLayer*);
@@ -402,7 +405,7 @@ private:
 #endif
 
 private:
-    RenderView* m_renderView;
+    RenderView& m_renderView;
     OwnPtr<GraphicsLayer> m_rootContentLayer;
     Timer<RenderLayerCompositor> m_updateCompositingLayersTimer;
 

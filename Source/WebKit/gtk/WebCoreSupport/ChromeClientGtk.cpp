@@ -588,7 +588,7 @@ void ChromeClient::performAllPendingScrolls()
 void ChromeClient::paint(WebCore::Timer<ChromeClient>*)
 {
     static const double minimumFrameInterval = 1.0 / 60.0; // No more than 60 frames a second.
-    double timeSinceLastDisplay = currentTime() - m_lastDisplayTime;
+    double timeSinceLastDisplay = monotonicallyIncreasingTime() - m_lastDisplayTime;
     double timeUntilNextDisplay = minimumFrameInterval - timeSinceLastDisplay;
 
     if (timeUntilNextDisplay > 0 && !m_forcePaint) {
@@ -596,13 +596,13 @@ void ChromeClient::paint(WebCore::Timer<ChromeClient>*)
         return;
     }
 
-    Frame* frame = core(m_webView)->mainFrame();
-    if (!frame || !frame->contentRenderer() || !frame->view())
+    Frame& frame = core(m_webView)->mainFrame();
+    if (!frame.contentRenderer() || !frame.view())
         return;
 
-    frame->view()->updateLayoutAndStyleIfNeededRecursive();
+    frame.view()->updateLayoutAndStyleIfNeededRecursive();
     performAllPendingScrolls();
-    paintWebView(m_webView, frame, m_dirtyRegion);
+    paintWebView(m_webView, &frame, m_dirtyRegion);
 
     HashSet<GtkWidget*> children = m_webView->priv->children;
     HashSet<GtkWidget*>::const_iterator end = children.end();
@@ -617,15 +617,15 @@ void ChromeClient::paint(WebCore::Timer<ChromeClient>*)
     gtk_widget_queue_draw_area(GTK_WIDGET(m_webView), rect.x(), rect.y(), rect.width(), rect.height());
 
     m_dirtyRegion = Region();
-    m_lastDisplayTime = currentTime();
+    m_lastDisplayTime = monotonicallyIncreasingTime();
     m_repaintSoonSourceId = 0;
 
     // We update the IM context window location here, because we want it to be
     // synced with cursor movement. For instance, a text field can move without
     // the selection changing.
-    Frame* focusedFrame = core(m_webView)->focusController()->focusedOrMainFrame();
+    Frame* focusedFrame = core(m_webView)->focusController().focusedOrMainFrame();
     if (focusedFrame && focusedFrame->editor().canEdit())
-        m_webView->priv->imFilter.setCursorRect(frame->selection()->absoluteCaretBounds());
+        m_webView->priv->imFilter.setCursorRect(frame.selection().absoluteCaretBounds());
 }
 
 void ChromeClient::forcePaint()
@@ -752,7 +752,7 @@ void ChromeClient::contentsSizeChanged(Frame* frame, const IntSize& size) const
         gtk_widget_queue_resize_no_redraw(widget);
 
     // If this was a main frame size change, update the scrollbars.
-    if (frame != frame->page()->mainFrame())
+    if (frame != &frame->page()->mainFrame())
         return;
     m_adjustmentWatcher.updateAdjustmentsFromScrollbarsLater();
 }

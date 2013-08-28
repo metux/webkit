@@ -39,12 +39,12 @@ ErrorInstance::ErrorInstance(VM& vm, Structure* structure)
 void ErrorInstance::finishCreation(VM& vm, const String& message, Vector<StackFrame> stackTrace)
 {
     Base::finishCreation(vm);
-    ASSERT(inherits(&s_info));
+    ASSERT(inherits(info()));
     if (!message.isNull())
         putDirect(vm, vm.propertyNames->message, jsString(&vm, message), DontEnum);
     
     if (!stackTrace.isEmpty())
-        putDirect(vm, vm.propertyNames->stack, vm.interpreter->stackTraceAsString(vm.topCallFrame, stackTrace), None);
+        putDirect(vm, vm.propertyNames->stack, vm.interpreter->stackTraceAsString(vm.topCallFrame, stackTrace), DontEnum);
 }
     
 } // namespace JSC

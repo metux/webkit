@@ -749,18 +749,18 @@ PassRefPtr<HTMLCollection> HTMLElement::children()
     return ensureCachedHTMLCollection(NodeChildren);
 }
 
-bool HTMLElement::rendererIsNeeded(const NodeRenderingContext& context)
+bool HTMLElement::rendererIsNeeded(const RenderStyle& style)
 {
     if (hasLocalName(noscriptTag)) {
         Frame* frame = document()->frame();
-        if (frame && frame->script()->canExecuteScripts(NotAboutToExecuteScript))
+        if (frame && frame->script().canExecuteScripts(NotAboutToExecuteScript))
             return false;
     } else if (hasLocalName(noembedTag)) {
         Frame* frame = document()->frame();
-        if (frame && frame->loader()->subframeLoader()->allowPlugins(NotAboutToInstantiatePlugin))
+        if (frame && frame->loader().subframeLoader()->allowPlugins(NotAboutToInstantiatePlugin))
             return false;
     }
-    return StyledElement::rendererIsNeeded(context);
+    return StyledElement::rendererIsNeeded(style);
 }
 
 RenderObject* HTMLElement::createRenderer(RenderArena* arena, RenderStyle* style)

@@ -23,6 +23,7 @@
 #include "HTMLMapElement.h"
 
 #include "Attribute.h"
+#include "DescendantIterator.h"
 #include "Document.h"
 #include "HTMLAreaElement.h"
 #include "HTMLCollection.h"
@@ -30,7 +31,6 @@
 #include "HTMLNames.h"
 #include "HitTestResult.h"
 #include "IntSize.h"
-#include "NodeTraversal.h"
 #include "RenderObject.h"
 
 using namespace std;
@@ -62,16 +62,13 @@ HTMLMapElement::~HTMLMapElement()
 bool HTMLMapElement::mapMouseEvent(LayoutPoint location, const LayoutSize& size, HitTestResult& result)
 {
     HTMLAreaElement* defaultArea = 0;
-    Element* element = this;
-    while ((element = ElementTraversal::next(element, this))) {
-        if (isHTMLAreaElement(element)) {
-            HTMLAreaElement* areaElt = toHTMLAreaElement(element);
-            if (areaElt->isDefault()) {
-                if (!defaultArea)
-                    defaultArea = areaElt;
-            } else if (areaElt->mapMouseEvent(location, size, result))
-                return true;
-        }
+
+    for (auto area = descendantsOfType<HTMLAreaElement>(this).begin(), end = descendantsOfType<HTMLAreaElement>(this).end(); area != end; ++area) {
+        if (area->isDefault()) {
+            if (!defaultArea)
+                defaultArea = &*area;
+        } else if (area->mapMouseEvent(location, size, result))
+            return true;
     }
     
     if (defaultArea) {

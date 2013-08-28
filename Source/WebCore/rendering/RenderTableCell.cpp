@@ -363,11 +363,10 @@ LayoutRect RenderTableCell::clippedOverflowRectForRepaint(const RenderLayerModel
     LayoutPoint location(max<LayoutUnit>(left, -visualOverflowRect().x()), max<LayoutUnit>(top, -visualOverflowRect().y()));
     LayoutRect r(-location.x(), -location.y(), location.x() + max(width() + right, visualOverflowRect().maxX()), location.y() + max(height() + bottom, visualOverflowRect().maxY()));
 
-    if (RenderView* v = view()) {
-        // FIXME: layoutDelta needs to be applied in parts before/after transforms and
-        // repaint containers. https://bugs.webkit.org/show_bug.cgi?id=23308
-        r.move(v->layoutDelta());
-    }
+    // FIXME: layoutDelta needs to be applied in parts before/after transforms and
+    // repaint containers. https://bugs.webkit.org/show_bug.cgi?id=23308
+    r.move(view().layoutDelta());
+
     computeRectForRepaint(repaintContainer, r);
     return r;
 }
@@ -377,8 +376,7 @@ void RenderTableCell::computeRectForRepaint(const RenderLayerModelObject* repain
     if (repaintContainer == this)
         return;
     r.setY(r.y());
-    RenderView* v = view();
-    if ((!v || !v->layoutStateEnabled() || repaintContainer) && parent())
+    if ((!view().layoutStateEnabled() || repaintContainer) && parent())
         r.moveBy(-parentBox()->location()); // Rows are in the same coordinate space, so don't add their offset in.
     RenderBlock::computeRectForRepaint(repaintContainer, r, fixed);
 }
@@ -484,7 +482,7 @@ bool RenderTableCell::hasStartBorderAdjoiningTable() const
 {
     bool isStartColumn = !col();
     bool isEndColumn = table()->colToEffCol(col() + colSpan() - 1) == table()->numEffCols() - 1;
-    bool hasSameDirectionAsTable = hasSameDirectionAs(table());
+    bool hasSameDirectionAsTable = hasSameDirectionAs(section());
 
     // The table direction determines the row direction. In mixed directionality, we cannot guarantee that
     // we have a common border with the table (think a ltr table with rtl start cell).
@@ -495,7 +493,7 @@ bool RenderTableCell::hasEndBorderAdjoiningTable() const
 {
     bool isStartColumn = !col();
     bool isEndColumn = table()->colToEffCol(col() + colSpan() - 1) == table()->numEffCols() - 1;
-    bool hasSameDirectionAsTable = hasSameDirectionAs(table());
+    bool hasSameDirectionAsTable = hasSameDirectionAs(section());
 
     // The table direction determines the row direction. In mixed directionality, we cannot guarantee that
     // we have a common border with the table (think a ltr table with ltr end cell).
@@ -895,6 +893,34 @@ inline CollapsedBorderValue RenderTableCell::cachedCollapsedBottomBorder(const R
     return styleForCellFlow->isLeftToRightDirection() ? section()->cachedCollapsedBorder(this, CBSEnd) : section()->cachedCollapsedBorder(this, CBSStart);
 }
 
+inline RenderTableCell* RenderTableCell::cellAtLeft(const RenderStyle* styleForCellFlow) const
+{
+    if (styleForCellFlow->isHorizontalWritingMode())
+        return styleForCellFlow->isLeftToRightDirection() ? table()->cellBefore(this) : table()->cellAfter(this);
+    return styleForCellFlow->isFlippedBlocksWritingMode() ? table()->cellBelow(this) : table()->cellAbove(this);
+}
+
+inline RenderTableCell* RenderTableCell::cellAtRight(const RenderStyle* styleForCellFlow) const
+{
+    if (styleForCellFlow->isHorizontalWritingMode())
+        return styleForCellFlow->isLeftToRightDirection() ? table()->cellAfter(this) : table()->cellBefore(this);
+    return styleForCellFlow->isFlippedBlocksWritingMode() ? table()->cellAbove(this) : table()->cellBelow(this);
+}
+
+inline RenderTableCell* RenderTableCell::cellAtTop(const RenderStyle* styleForCellFlow) const
+{
+    if (styleForCellFlow->isHorizontalWritingMode())
+        return styleForCellFlow->isFlippedBlocksWritingMode() ? table()->cellBelow(this) : table()->cellAbove(this);
+    return styleForCellFlow->isLeftToRightDirection() ? table()->cellBefore(this) : table()->cellAfter(this);
+}
+
+inline RenderTableCell* RenderTableCell::cellAtBottom(const RenderStyle* styleForCellFlow) const
+{
+    if (styleForCellFlow->isHorizontalWritingMode())
+        return styleForCellFlow->isFlippedBlocksWritingMode() ? table()->cellAbove(this) : table()->cellBelow(this);
+    return styleForCellFlow->isLeftToRightDirection() ? table()->cellAfter(this) : table()->cellBefore(this);
+}
+
 int RenderTableCell::borderLeft() const
 {
     return table()->collapseBorders() ? borderHalfLeft(false) : RenderBlock::borderLeft();
@@ -1168,23 +1194,25 @@ void RenderTableCell::paintCollapsedBorders(PaintInfo& paintInfo, const LayoutPo
     int bottomYOffsetLeft = bottomWidth;
     int bottomYOffsetRight = bottomWidth;
 
-    bool shouldDrawTopBorder = true;
-    bool shouldDrawLeftBorder = true;
+    // We use the direction/writing-mode given by the section here because we want to know if we're
+    // at the section's edge.
+    bool shouldDrawTopBorder = !cellAtTop(section()->style());
+    bool shouldDrawLeftBorder = !cellAtLeft(section()->style());
     bool shouldDrawRightBorder = true;
 
-    if (RenderTableCell* top = table()->cellAbove(this)) {
-        shouldDrawTopBorder = top->alignLeftRightBorderPaintRect(leftXOffsetTop, rightXOffsetTop);
+    if (RenderTableCell* top = cellAtTop(styleForCellFlow)) {
+        shouldDrawTopBorder = shouldDrawTopBorder && top->alignLeftRightBorderPaintRect(leftXOffsetTop, rightXOffsetTop);
         if (this->colSpan() > 1)
             shouldDrawTopBorder = false;
     }
 
-    if (RenderTableCell* bottom = table()->cellBelow(this))
+    if (RenderTableCell* bottom = cellAtBottom(styleForCellFlow))
         bottom->alignLeftRightBorderPaintRect(leftXOffsetBottom, rightXOffsetBottom);
 
-    if (RenderTableCell* left = table()->cellBefore(this))
-        shouldDrawLeftBorder = left->alignTopBottomBorderPaintRect(topYOffsetLeft, bottomYOffsetLeft);
+    if (RenderTableCell* left = cellAtLeft(styleForCellFlow))
+        shouldDrawLeftBorder = shouldDrawLeftBorder && left->alignTopBottomBorderPaintRect(topYOffsetLeft, bottomYOffsetLeft);
 
-    if (RenderTableCell* right = table()->cellAfter(this))
+    if (RenderTableCell* right = cellAtRight(styleForCellFlow))
         shouldDrawRightBorder = right->alignTopBottomBorderPaintRect(topYOffsetRight, bottomYOffsetRight);
 
     IntRect cellRect = pixelSnappedIntRect(paintRect.x(), paintRect.y(), paintRect.width(), paintRect.height());
@@ -1345,7 +1373,7 @@ RenderTableCell* RenderTableCell::createAnonymous(Document* document)
 
 RenderTableCell* RenderTableCell::createAnonymousWithParentRenderer(const RenderObject* parent)
 {
-    RenderTableCell* newCell = RenderTableCell::createAnonymous(parent->document());
+    RenderTableCell* newCell = RenderTableCell::createAnonymous(&parent->document());
     RefPtr<RenderStyle> newStyle = RenderStyle::createAnonymousStyleWithDisplay(parent->style(), TABLE_CELL);
     newCell->setStyle(newStyle.release());
     return newCell;

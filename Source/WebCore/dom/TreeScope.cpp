@@ -32,6 +32,7 @@
 #include "DOMWindow.h"
 #include "Document.h"
 #include "Element.h"
+#include "ElementTraversal.h"
 #include "FocusController.h"
 #include "Frame.h"
 #include "FrameView.h"
@@ -42,7 +43,6 @@
 #include "HTMLNames.h"
 #include "HitTestResult.h"
 #include "IdTargetObserverRegistry.h"
-#include "NodeTraversal.h"
 #include "Page.h"
 #include "RenderView.h"
 #include "RuntimeEnabledFeatures.h"
@@ -298,13 +298,10 @@ HTMLLabelElement* TreeScope::labelElementForId(const AtomicString& forAttributeV
     if (!m_labelsByForAttribute) {
         // Populate the map on first access.
         m_labelsByForAttribute = adoptPtr(new DocumentOrderedMap);
-        for (Element* element = ElementTraversal::firstWithin(rootNode()); element; element = ElementTraversal::next(element)) {
-            if (isHTMLLabelElement(element)) {
-                HTMLLabelElement* label = toHTMLLabelElement(element);
-                const AtomicString& forValue = label->fastGetAttribute(forAttr);
-                if (!forValue.isEmpty())
-                    addLabel(forValue, label);
-            }
+        for (HTMLLabelElement* label = Traversal<HTMLLabelElement>::firstWithin(rootNode()); label; label = Traversal<HTMLLabelElement>::next(label)) {
+            const AtomicString& forValue = label->fastGetAttribute(forAttr);
+            if (!forValue.isEmpty())
+                addLabel(forValue, label);
         }
     }
 
@@ -342,18 +339,15 @@ Element* TreeScope::findAnchor(const String& name)
         return 0;
     if (Element* element = getElementById(name))
         return element;
-    for (Element* element = ElementTraversal::firstWithin(rootNode()); element; element = ElementTraversal::next(element)) {
-        if (isHTMLAnchorElement(element)) {
-            HTMLAnchorElement* anchor = toHTMLAnchorElement(element);
-            if (rootNode()->document()->inQuirksMode()) {
-                // Quirks mode, case insensitive comparison of names.
-                if (equalIgnoringCase(anchor->name(), name))
-                    return anchor;
-            } else {
-                // Strict mode, names need to match exactly.
-                if (anchor->name() == name)
-                    return anchor;
-            }
+    for (HTMLAnchorElement* anchor = Traversal<HTMLAnchorElement>::firstWithin(rootNode()); anchor; anchor = Traversal<HTMLAnchorElement>::next(anchor)) {
+        if (rootNode()->document()->inQuirksMode()) {
+            // Quirks mode, case insensitive comparison of names.
+            if (equalIgnoringCase(anchor->name(), name))
+                return anchor;
+        } else {
+            // Strict mode, names need to match exactly.
+            if (anchor->name() == name)
+                return anchor;
         }
     }
     return 0;
@@ -382,8 +376,8 @@ void TreeScope::adoptIfNeeded(Node* node)
 
 static Element* focusedFrameOwnerElement(Frame* focusedFrame, Frame* currentFrame)
 {
-    for (; focusedFrame; focusedFrame = focusedFrame->tree()->parent()) {
-        if (focusedFrame->tree()->parent() == currentFrame)
+    for (; focusedFrame; focusedFrame = focusedFrame->tree().parent()) {
+        if (focusedFrame->tree().parent() == currentFrame)
             return focusedFrame->ownerElement();
     }
     return 0;
@@ -395,12 +389,12 @@ Element* TreeScope::focusedElement()
     Element* element = document->focusedElement();
 
     if (!element && document->page())
-        element = focusedFrameOwnerElement(document->page()->focusController()->focusedFrame(), document->frame());
+        element = focusedFrameOwnerElement(document->page()->focusController().focusedFrame(), document->frame());
     if (!element)
         return 0;
     TreeScope* treeScope = element->treeScope();
     while (treeScope != this && treeScope != document) {
-        element = toShadowRoot(treeScope->rootNode())->host();
+        element = toShadowRoot(treeScope->rootNode())->hostElement();
         treeScope = element->treeScope();
     }
     if (this != treeScope)

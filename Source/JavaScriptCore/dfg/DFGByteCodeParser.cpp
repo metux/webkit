@@ -168,6 +168,7 @@ private:
     bool handleInlining(Node* callTargetNode, int resultOperand, const CallLinkStatus&, int registerOffset, int argumentCountIncludingThis, unsigned nextOffset, CodeSpecializationKind);
     // Handle intrinsic functions. Return true if it succeeded, false if we need to plant a call.
     bool handleIntrinsic(int resultOperand, Intrinsic, int registerOffset, int argumentCountIncludingThis, SpeculatedType prediction);
+    bool handleTypedArrayConstructor(int resultOperand, InternalFunction*, int registerOffset, int argumentCountIncludingThis, TypedArrayType);
     bool handleConstantInternalFunction(int resultOperand, InternalFunction*, int registerOffset, int argumentCountIncludingThis, SpeculatedType prediction, CodeSpecializationKind);
     Node* handlePutByOffset(Node* base, unsigned identifier, PropertyOffset, Node* value);
     Node* handleGetByOffset(SpeculatedType, Node* base, unsigned identifierNumber, PropertyOffset);
@@ -400,6 +401,18 @@ private:
             return findArgumentPositionForArgument(operandToArgument(operand));
         return findArgumentPositionForLocal(operand);
     }
+
+    void addConstant(JSValue value)
+    {
+        unsigned constantIndex = m_codeBlock->addConstantLazily();
+        initializeLazyWriteBarrierForConstant(
+            m_graph.m_plan.writeBarriers,
+            m_codeBlock->constants()[constantIndex],
+            m_codeBlock,
+            constantIndex,
+            m_codeBlock->ownerExecutable(), 
+            value);
+    }
     
     void flush(int operand)
     {
@@ -496,9 +509,11 @@ private:
     // doesn't handle liveness preservation.
     Node* getJSConstantForValue(JSValue constantValue)
     {
-        unsigned constantIndex = m_codeBlock->addOrFindConstant(constantValue);
-        if (constantIndex >= m_constants.size())
+        unsigned constantIndex;
+        if (!m_codeBlock->findConstant(constantValue, constantIndex)) {
+            addConstant(constantValue);
             m_constants.append(ConstantRecord());
+        }
         
         ASSERT(m_constants.size() == m_codeBlock->numberOfConstantRegisters());
         
@@ -567,7 +582,7 @@ private:
 
             // Add undefined to the CodeBlock's constants, and add a corresponding slot in m_constants.
             ASSERT(m_constants.size() == numberOfConstants);
-            m_codeBlock->addConstant(jsUndefined());
+            addConstant(jsUndefined());
             m_constants.append(ConstantRecord());
             ASSERT(m_constants.size() == m_codeBlock->numberOfConstantRegisters());
         }
@@ -592,7 +607,7 @@ private:
 
             // Add null to the CodeBlock's constants, and add a corresponding slot in m_constants.
             ASSERT(m_constants.size() == numberOfConstants);
-            m_codeBlock->addConstant(jsNull());
+            addConstant(jsNull());
             m_constants.append(ConstantRecord());
             ASSERT(m_constants.size() == m_codeBlock->numberOfConstantRegisters());
         }
@@ -617,7 +632,7 @@ private:
 
             // Add the value 1 to the CodeBlock's constants, and add a corresponding slot in m_constants.
             ASSERT(m_constants.size() == numberOfConstants);
-            m_codeBlock->addConstant(jsNumber(1));
+            addConstant(jsNumber(1));
             m_constants.append(ConstantRecord());
             ASSERT(m_constants.size() == m_codeBlock->numberOfConstantRegisters());
         }
@@ -645,7 +660,7 @@ private:
 
             // Add the value nan to the CodeBlock's constants, and add a corresponding slot in m_constants.
             ASSERT(m_constants.size() == numberOfConstants);
-            m_codeBlock->addConstant(nan);
+            addConstant(nan);
             m_constants.append(ConstantRecord());
             ASSERT(m_constants.size() == m_codeBlock->numberOfConstantRegisters());
         }
@@ -1574,6 +1589,58 @@ bool ByteCodeParser::handleIntrinsic(int resultOperand, Intrinsic intrinsic, int
     }
 }
 
+bool ByteCodeParser::handleTypedArrayConstructor(
+    int resultOperand, InternalFunction* function, int registerOffset,
+    int argumentCountIncludingThis, TypedArrayType type)
+{
+    if (!isTypedView(type))
+        return false;
+    
+    if (function->classInfo() != constructorClassInfoForType(type))
+        return false;
+    
+    if (function->globalObject() != m_inlineStackTop->m_codeBlock->globalObject())
+        return false;
+    
+    // We only have an intrinsic for the case where you say:
+    //
+    // new FooArray(blah);
+    //
+    // Of course, 'blah' could be any of the following:
+    //
+    // - Integer, indicating that you want to allocate an array of that length.
+    //   This is the thing we're hoping for, and what we can actually do meaningful
+    //   optimizations for.
+    //
+    // - Array buffer, indicating that you want to create a view onto that _entire_
+    //   buffer.
+    //
+    // - Non-buffer object, indicating that you want to create a copy of that
+    //   object by pretending that it quacks like an array.
+    //
+    // - Anything else, indicating that you want to have an exception thrown at
+    //   you.
+    //
+    // The intrinsic, NewTypedArray, will behave as if it could do any of these
+    // things up until we do Fixup. Thereafter, if child1 (i.e. 'blah') is
+    // predicted Int32, then we lock it in as a normal typed array allocation.
+    // Otherwise, NewTypedArray turns into a totally opaque function call that
+    // may clobber the world - by virtue of it accessing properties on what could
+    // be an object.
+    //
+    // Note that although the generic form of NewTypedArray sounds sort of awful,
+    // it is actually quite likely to be more efficient than a fully generic
+    // Construct. So, we might want to think about making NewTypedArray variadic,
+    // or else making Construct not super slow.
+    
+    if (argumentCountIncludingThis != 2)
+        return false;
+    
+    set(resultOperand,
+        addToGraph(NewTypedArray, OpInfo(type), get(registerOffset + argumentToOperand(1))));
+    return true;
+}
+
 bool ByteCodeParser::handleConstantInternalFunction(
     int resultOperand, InternalFunction* function, int registerOffset,
     int argumentCountIncludingThis, SpeculatedType prediction, CodeSpecializationKind kind)
@@ -1587,7 +1654,10 @@ bool ByteCodeParser::handleConstantInternalFunction(
     
     UNUSED_PARAM(prediction); // Remove this once we do more things.
     
-    if (function->classInfo() == &ArrayConstructor::s_info) {
+    if (function->classInfo() == ArrayConstructor::info()) {
+        if (function->globalObject() != m_inlineStackTop->m_codeBlock->globalObject())
+            return false;
+        
         if (argumentCountIncludingThis == 2) {
             set(resultOperand,
                 addToGraph(NewArrayWithSize, OpInfo(ArrayWithUndecided), get(registerOffset + argumentToOperand(1))));
@@ -1599,7 +1669,9 @@ bool ByteCodeParser::handleConstantInternalFunction(
         set(resultOperand,
             addToGraph(Node::VarArg, NewArray, OpInfo(ArrayWithUndecided), OpInfo(0)));
         return true;
-    } else if (function->classInfo() == &StringConstructor::s_info) {
+    }
+    
+    if (function->classInfo() == StringConstructor::info()) {
         Node* result;
         
         if (argumentCountIncludingThis <= 1)
@@ -1612,6 +1684,14 @@ bool ByteCodeParser::handleConstantInternalFunction(
         
         set(resultOperand, result);
         return true;
+    }
+    
+    for (unsigned typeIndex = 0; typeIndex < NUMBER_OF_TYPED_ARRAY_TYPES; ++typeIndex) {
+        bool result = handleTypedArrayConstructor(
+            resultOperand, function, registerOffset, argumentCountIncludingThis,
+            indexToTypedArrayType(typeIndex));
+        if (result)
+            return true;
     }
     
     return false;
@@ -1822,7 +1902,7 @@ bool ByteCodeParser::parseBlock(unsigned limit)
                 if (profile->m_singletonValueIsTop
                     || !profile->m_singletonValue
                     || !profile->m_singletonValue.isCell()
-                    || profile->m_singletonValue.asCell()->classInfo() != &Structure::s_info)
+                    || profile->m_singletonValue.asCell()->classInfo() != Structure::info())
                     setThis(addToGraph(ToThis, op1));
                 else {
                     addToGraph(
@@ -1840,7 +1920,7 @@ bool ByteCodeParser::parseBlock(unsigned limit)
             bool alreadyEmitted = false;
             if (callee->op() == WeakJSConstant) {
                 JSCell* cell = callee->weakConstant();
-                ASSERT(cell->inherits(&JSFunction::s_info));
+                ASSERT(cell->inherits(JSFunction::info()));
                 
                 JSFunction* function = jsCast<JSFunction*>(cell);
                 ObjectAllocationProfile* allocationProfile = function->tryGetAllocationProfile();
@@ -1919,7 +1999,7 @@ bool ByteCodeParser::parseBlock(unsigned limit)
                 || !profile->m_singletonValue.isCell())
                 set(currentInstruction[1].u.operand, get(JSStack::Callee));
             else {
-                ASSERT(profile->m_singletonValue.asCell()->inherits(&JSFunction::s_info));
+                ASSERT(profile->m_singletonValue.asCell()->inherits(JSFunction::info()));
                 Node* actualCallee = get(JSStack::Callee);
                 addToGraph(CheckFunction, OpInfo(profile->m_singletonValue.asCell()), actualCallee);
                 set(currentInstruction[1].u.operand, addToGraph(WeakJSConstant, OpInfo(profile->m_singletonValue.asCell())));
@@ -2771,7 +2851,7 @@ bool ByteCodeParser::parseBlock(unsigned limit)
                 unsigned target = m_currentIndex + table.branchOffsets[i];
                 if (target == data.fallThroughBytecodeIndex())
                     continue;
-                data.cases.append(SwitchCase::withBytecodeIndex(jsNumber(table.min + i), target));
+                data.cases.append(SwitchCase::withBytecodeIndex(jsNumber(static_cast<int32_t>(table.min + i)), target));
             }
             m_graph.m_switchData.append(data);
             addToGraph(Switch, OpInfo(&m_graph.m_switchData.last()), get(currentInstruction[3].u.operand));
@@ -2853,13 +2933,15 @@ bool ByteCodeParser::parseBlock(unsigned limit)
             LAST_OPCODE(op_end);
 
         case op_throw:
-            flushAllArgumentsAndCapturedVariablesInInlineStack();
             addToGraph(Throw, get(currentInstruction[1].u.operand));
+            flushAllArgumentsAndCapturedVariablesInInlineStack();
+            addToGraph(Unreachable);
             LAST_OPCODE(op_throw);
             
         case op_throw_static_error:
-            flushAllArgumentsAndCapturedVariablesInInlineStack();
             addToGraph(ThrowReferenceError);
+            flushAllArgumentsAndCapturedVariablesInInlineStack();
+            addToGraph(Unreachable);
             LAST_OPCODE(op_throw_static_error);
             
         case op_call:
@@ -3274,10 +3356,23 @@ ByteCodeParser::InlineStackEntry::InlineStackEntry(
         ASSERT(callsiteBlockHead);
         
         InlineCallFrame inlineCallFrame;
-        inlineCallFrame.executable.set(*byteCodeParser->m_vm, byteCodeParser->m_codeBlock->ownerExecutable(), codeBlock->ownerExecutable());
+        initializeLazyWriteBarrierForInlineCallFrameExecutable(
+            byteCodeParser->m_graph.m_plan.writeBarriers,
+            inlineCallFrame.executable,
+            byteCodeParser->m_codeBlock,
+            byteCodeParser->m_codeBlock->inlineCallFrames().size(),
+            byteCodeParser->m_codeBlock->ownerExecutable(), 
+            codeBlock->ownerExecutable());
         inlineCallFrame.stackOffset = inlineCallFrameStart + JSStack::CallFrameHeaderSize;
-        if (callee)
-            inlineCallFrame.callee.set(*byteCodeParser->m_vm, byteCodeParser->m_codeBlock->ownerExecutable(), callee);
+        if (callee) {
+            initializeLazyWriteBarrierForInlineCallFrameCallee(
+                byteCodeParser->m_graph.m_plan.writeBarriers,
+                inlineCallFrame.callee,
+                byteCodeParser->m_codeBlock,
+                byteCodeParser->m_codeBlock->inlineCallFrames().size(),
+                byteCodeParser->m_codeBlock->ownerExecutable(), 
+                callee);
+        }
         inlineCallFrame.caller = byteCodeParser->currentCodeOrigin();
         inlineCallFrame.arguments.resize(argumentCountIncludingThis); // Set the number of arguments including this, but don't configure the value recoveries, yet.
         inlineCallFrame.isCall = isCall(kind);
@@ -3328,7 +3423,7 @@ ByteCodeParser::InlineStackEntry::InlineStackEntry(
             if (!value) {
                 if (byteCodeParser->m_emptyJSValueIndex == UINT_MAX) {
                     byteCodeParser->m_emptyJSValueIndex = byteCodeParser->m_codeBlock->numberOfConstantRegisters() + FirstConstantRegisterIndex;
-                    byteCodeParser->m_codeBlock->addConstant(JSValue());
+                    byteCodeParser->addConstant(JSValue());
                     byteCodeParser->m_constants.append(ConstantRecord());
                 }
                 m_constantRemap[i] = byteCodeParser->m_emptyJSValueIndex;
@@ -3336,7 +3431,7 @@ ByteCodeParser::InlineStackEntry::InlineStackEntry(
             }
             JSValueMap::AddResult result = byteCodeParser->m_jsValueMap.add(JSValue::encode(value), byteCodeParser->m_codeBlock->numberOfConstantRegisters() + FirstConstantRegisterIndex);
             if (result.isNewEntry) {
-                byteCodeParser->m_codeBlock->addConstant(value);
+                byteCodeParser->addConstant(value);
                 byteCodeParser->m_constants.append(ConstantRecord());
             }
             m_constantRemap[i] = result.iterator->value;

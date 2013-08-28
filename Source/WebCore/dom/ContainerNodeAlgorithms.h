@@ -23,10 +23,12 @@
 #define ContainerNodeAlgorithms_h
 
 #include "Document.h"
+#include "ElementTraversal.h"
 #include "Frame.h"
 #include "HTMLFrameOwnerElement.h"
 #include "InspectorInstrumentation.h"
 #include "NodeTraversal.h"
+#include "ShadowRoot.h"
 #include <wtf/Assertions.h>
 
 namespace WebCore {
@@ -108,7 +110,7 @@ inline void removeDetachedChildrenInContainer(GenericNodeContainer* container)
 template<class GenericNode, class GenericNodeContainer>
 inline void appendChildToContainer(GenericNode* child, GenericNodeContainer* container)
 {
-    child->setParentOrShadowHostNode(container);
+    child->setParentNode(container);
 
     GenericNode* lastChild = container->lastChild();
     if (lastChild) {
@@ -163,7 +165,7 @@ namespace Private {
 
             next = n->nextSibling();
             n->setNextSibling(0);
-            n->setParentOrShadowHostNode(0);
+            n->setParentNode(0);
             container->setFirstChild(next);
             if (next)
                 next->setPreviousSibling(0);
@@ -266,7 +268,7 @@ public:
         DescendantsOnly
     };
 
-    explicit ChildFrameDisconnector(Node* root)
+    explicit ChildFrameDisconnector(ContainerNode* root)
         : m_root(root)
     {
     }
@@ -274,19 +276,18 @@ public:
     void disconnect(DisconnectPolicy = RootAndDescendants);
 
 private:
-    void collectFrameOwners(Node* root);
-    void collectFrameOwners(ElementShadow*);
+    void collectFrameOwners(ContainerNode* root);
     void disconnectCollectedFrameOwners();
 
     Vector<RefPtr<HTMLFrameOwnerElement>, 10> m_frameOwners;
-    Node* m_root;
+    ContainerNode* m_root;
 };
 
 #ifndef NDEBUG
 unsigned assertConnectedSubrameCountIsConsistent(Node*);
 #endif
 
-inline void ChildFrameDisconnector::collectFrameOwners(Node* root)
+inline void ChildFrameDisconnector::collectFrameOwners(ContainerNode* root)
 {
     if (!root->connectedSubframeCount())
         return;
@@ -294,10 +295,10 @@ inline void ChildFrameDisconnector::collectFrameOwners(Node* root)
     if (root->isHTMLElement() && root->isFrameOwnerElement())
         m_frameOwners.append(toFrameOwnerElement(root));
 
-    for (Node* child = root->firstChild(); child; child = child->nextSibling())
+    for (Element* child = ElementTraversal::firstChild(root); child; child = ElementTraversal::nextSibling(child))
         collectFrameOwners(child);
 
-    ElementShadow* shadow = root->isElementNode() ? toElement(root)->shadow() : 0;
+    ShadowRoot* shadow = root->isElementNode() ? toElement(root)->shadowRoot() : 0;
     if (shadow)
         collectFrameOwners(shadow);
 }
@@ -329,7 +330,7 @@ inline void ChildFrameDisconnector::disconnect(DisconnectPolicy policy)
     if (policy == RootAndDescendants)
         collectFrameOwners(m_root);
     else {
-        for (Node* child = m_root->firstChild(); child; child = child->nextSibling())
+        for (Element* child = ElementTraversal::firstChild(m_root); child; child = ElementTraversal::nextSibling(child))
             collectFrameOwners(child);
     }
 

@@ -67,12 +67,12 @@ AnimationControllerPrivate::~AnimationControllerPrivate()
 {
 }
 
-CompositeAnimation* AnimationControllerPrivate::ensureCompositeAnimation(RenderObject* renderer)
+CompositeAnimation& AnimationControllerPrivate::ensureCompositeAnimation(RenderObject* renderer)
 {
     RenderObjectAnimationMap::AddResult result = m_compositeAnimations.add(renderer, 0);
     if (result.isNewEntry)
         result.iterator->value = CompositeAnimation::create(this);
-    return result.iterator->value.get();
+    return *result.iterator->value;
 }
 
 bool AnimationControllerPrivate::clear(RenderObject* renderer)
@@ -269,8 +269,8 @@ void AnimationControllerPrivate::suspendAnimations()
     suspendAnimationsForDocument(m_frame->document());
 
     // Traverse subframes
-    for (Frame* child = m_frame->tree()->firstChild(); child; child = child->tree()->nextSibling())
-        child->animation()->suspendAnimations();
+    for (Frame* child = m_frame->tree().firstChild(); child; child = child->tree().nextSibling())
+        child->animation().suspendAnimations();
 
     m_isSuspended = true;
 }
@@ -283,8 +283,8 @@ void AnimationControllerPrivate::resumeAnimations()
     resumeAnimationsForDocument(m_frame->document());
 
     // Traverse subframes
-    for (Frame* child = m_frame->tree()->firstChild(); child; child = child->tree()->nextSibling())
-        child->animation()->resumeAnimations();
+    for (Frame* child = m_frame->tree().firstChild(); child; child = child->tree().nextSibling())
+        child->animation().resumeAnimations();
 
     m_isSuspended = false;
 }
@@ -296,7 +296,7 @@ void AnimationControllerPrivate::suspendAnimationsForDocument(Document* document
     RenderObjectAnimationMap::const_iterator animationsEnd = m_compositeAnimations.end();
     for (RenderObjectAnimationMap::const_iterator it = m_compositeAnimations.begin(); it != animationsEnd; ++it) {
         RenderObject* renderer = it->key;
-        if (renderer->document() == document) {
+        if (&renderer->document() == document) {
             CompositeAnimation* compAnim = it->value.get();
             compAnim->suspendAnimations();
         }
@@ -312,7 +312,7 @@ void AnimationControllerPrivate::resumeAnimationsForDocument(Document* document)
     RenderObjectAnimationMap::const_iterator animationsEnd = m_compositeAnimations.end();
     for (RenderObjectAnimationMap::const_iterator it = m_compositeAnimations.begin(); it != animationsEnd; ++it) {
         RenderObject* renderer = it->key;
-        if (renderer->document() == document) {
+        if (&renderer->document() == document) {
             CompositeAnimation* compAnim = it->value.get();
             compAnim->resumeAnimations();
         }
@@ -337,8 +337,8 @@ bool AnimationControllerPrivate::pauseAnimationAtTime(RenderObject* renderer, co
     if (!renderer)
         return false;
 
-    CompositeAnimation* compositeAnimation = ensureCompositeAnimation(renderer);
-    if (compositeAnimation->pauseAnimationAtTime(name, t)) {
+    CompositeAnimation& compositeAnimation = ensureCompositeAnimation(renderer);
+    if (compositeAnimation.pauseAnimationAtTime(name, t)) {
         renderer->node()->setNeedsStyleRecalc(SyntheticStyleChange);
         startUpdateStyleIfNeededDispatcher();
         return true;
@@ -352,8 +352,8 @@ bool AnimationControllerPrivate::pauseTransitionAtTime(RenderObject* renderer, c
     if (!renderer)
         return false;
 
-    CompositeAnimation* compositeAnimation = ensureCompositeAnimation(renderer);
-    if (compositeAnimation->pauseTransitionAtTime(cssPropertyID(property), t)) {
+    CompositeAnimation& compositeAnimation = ensureCompositeAnimation(renderer);
+    if (compositeAnimation.pauseTransitionAtTime(cssPropertyID(property), t)) {
         renderer->node()->setNeedsStyleRecalc(SyntheticStyleChange);
         startUpdateStyleIfNeededDispatcher();
         return true;
@@ -406,7 +406,7 @@ unsigned AnimationControllerPrivate::numberOfActiveAnimations(Document* document
     for (RenderObjectAnimationMap::const_iterator it = m_compositeAnimations.begin(); it != animationsEnd; ++it) {
         RenderObject* renderer = it->key;
         CompositeAnimation* compAnim = it->value.get();
-        if (renderer->document() == document)
+        if (&renderer->document() == document)
             count += compAnim->numberOfActiveAnimations();
     }
     
@@ -516,7 +516,7 @@ void AnimationController::cancelAnimations(RenderObject* renderer)
 PassRefPtr<RenderStyle> AnimationController::updateAnimations(RenderObject* renderer, RenderStyle* newStyle)
 {
     // Don't do anything if we're in the cache
-    if (!renderer->document() || renderer->document()->inPageCache())
+    if (renderer->document().inPageCache())
         return newStyle;
 
     RenderStyle* oldStyle = renderer->style();
@@ -525,7 +525,7 @@ PassRefPtr<RenderStyle> AnimationController::updateAnimations(RenderObject* rend
         return newStyle;
 
     // Don't run transitions when printing.
-    if (renderer->view()->printing())
+    if (renderer->view().printing())
         return newStyle;
 
     // Fetch our current set of implicit animations from a hashtable.  We then compare them
@@ -536,14 +536,13 @@ PassRefPtr<RenderStyle> AnimationController::updateAnimations(RenderObject* rend
     // We don't support anonymous pseudo elements like :first-line or :first-letter.
     ASSERT(renderer->node());
 
-    CompositeAnimation* rendererAnimations = m_data->ensureCompositeAnimation(renderer);
-    RefPtr<RenderStyle> blendedStyle = rendererAnimations->animate(renderer, oldStyle, newStyle);
+    CompositeAnimation& rendererAnimations = m_data->ensureCompositeAnimation(renderer);
+    RefPtr<RenderStyle> blendedStyle = rendererAnimations.animate(renderer, oldStyle, newStyle);
 
     if (renderer->parent() || newStyle->animations() || (oldStyle && oldStyle->animations())) {
         m_data->updateAnimationTimerForRenderer(renderer);
 #if ENABLE(REQUEST_ANIMATION_FRAME)
-        if (FrameView* view = renderer->document()->view())
-            view->scheduleAnimation();
+        renderer->view().frameView().scheduleAnimation();
 #endif
     }
 

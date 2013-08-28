@@ -234,7 +234,7 @@ public:
     }
     virtual ~Document();
 
-    MediaQueryMatcher* mediaQueryMatcher();
+    MediaQueryMatcher& mediaQueryMatcher();
 
     using ContainerNode::ref;
     using ContainerNode::deref;
@@ -246,7 +246,7 @@ public:
     Element* getElementByAccessKey(const String& key);
     void invalidateAccessKeyMap();
 
-    SelectorQueryCache* selectorQueryCache();
+    SelectorQueryCache& selectorQueryCache();
 
     // DOM methods & attributes for Document
 
@@ -406,7 +406,6 @@ public:
 #if ENABLE(PAGE_VISIBILITY_API)
     String visibilityState() const;
     bool hidden() const;
-    void dispatchVisibilityStateChangeEvent();
 #endif
 
 #if ENABLE(CSP_NEXT)
@@ -451,11 +450,11 @@ public:
 
     bool sawElementsInKnownNamespaces() const { return m_sawElementsInKnownNamespaces; }
 
-    StyleResolver* ensureStyleResolver()
+    StyleResolver& ensureStyleResolver()
     { 
         if (!m_styleResolver)
             createStyleResolver();
-        return m_styleResolver.get();
+        return *m_styleResolver;
     }
 
     void notifyRemovePendingSheetIfNeeded();
@@ -509,12 +508,10 @@ public:
     PassRefPtr<Text> createEditingTextNode(const String&);
 
     void recalcStyle(Style::Change = Style::NoChange);
-    bool childNeedsAndNotInStyleRecalc();
     void updateStyleIfNeeded();
     void updateLayout();
     void updateLayoutIgnorePendingStylesheets();
     PassRefPtr<RenderStyle> styleForElementIgnoringPendingStylesheets(Element*);
-    PassRefPtr<RenderStyle> styleForPage(int pageIndex);
 
     // Returns true if page box (margin boxes and page borders) is visible.
     bool isPageBoxVisible(int pageIndex);
@@ -527,8 +524,8 @@ public:
 
     CachedResourceLoader* cachedResourceLoader() { return m_cachedResourceLoader.get(); }
 
-    virtual void attach(const AttachContext& = AttachContext()) OVERRIDE;
-    virtual void detach(const AttachContext& = AttachContext()) OVERRIDE;
+    void didBecomeCurrentDocumentInFrame();
+    virtual void detach();
     void prepareForDestruction();
 
     // Override ScriptExecutionContext methods to do additional work
@@ -548,6 +545,8 @@ public:
         m_renderer = renderer;
         Node::setRenderer(renderer);
     }
+
+    bool renderTreeBeingDestroyed() const { return m_renderTreeBeingDestroyed; }
 
     AXObjectCache* existingAXObjectCache() const;
     AXObjectCache* axObjectCache() const;
@@ -653,7 +652,7 @@ public:
     void resetLinkColor();
     void resetVisitedLinkColor();
     void resetActiveLinkColor();
-    VisitedLinkState* visitedLinkState() const { return m_visitedLinkState.get(); }
+    VisitedLinkState& visitedLinkState() const { return *m_visitedLinkState; }
 
     MouseEventWithHitTestResults prepareMouseEvent(const HitTestRequest&, const LayoutPoint&, const PlatformMouseEvent&);
 
@@ -846,7 +845,7 @@ public:
 
     HTMLHeadElement* head();
 
-    DocumentMarkerController* markers() const { return m_markers.get(); }
+    DocumentMarkerController& markers() const { return *m_markers; }
 
     bool directionSetOnDocumentElement() const { return m_directionSetOnDocumentElement; }
     bool writingModeSetOnDocumentElement() const { return m_writingModeSetOnDocumentElement; }
@@ -1075,7 +1074,9 @@ public:
     PassRefPtr<Touch> createTouch(DOMWindow*, EventTarget*, int identifier, int pageX, int pageY, int screenX, int screenY, int radiusX, int radiusY, float rotationAngle, float force, ExceptionCode&) const;
 #endif
 
+#if ENABLE(WEB_TIMING)
     const DocumentTiming* timing() const { return &m_documentTiming; }
+#endif
 
 #if ENABLE(REQUEST_ANIMATION_FRAME)
     int requestAnimationFrame(PassRefPtr<RequestAnimationFrameCallback>);
@@ -1120,8 +1121,6 @@ public:
 
     void suspendScheduledTasks(ActiveDOMObject::ReasonForSuspension);
     void resumeScheduledTasks(ActiveDOMObject::ReasonForSuspension);
-
-    IntSize viewportSize() const;
 
 #if ENABLE(CSS_DEVICE_ADAPTATION)
     IntSize initialViewportSize() const;
@@ -1199,6 +1198,7 @@ private:
     friend class Node;
     friend class IgnoreDestructiveWriteCountIncrementer;
 
+    virtual void createRenderTree();
     virtual void dispose() OVERRIDE;
 
     void detachParser();
@@ -1352,7 +1352,7 @@ private:
     Color m_linkColor;
     Color m_visitedLinkColor;
     Color m_activeLinkColor;
-    OwnPtr<VisitedLinkState> m_visitedLinkState;
+    const OwnPtr<VisitedLinkState> m_visitedLinkState;
 
     bool m_visuallyOrdered;
     ReadyState m_readyState;
@@ -1382,7 +1382,7 @@ private:
     RefPtr<RenderArena> m_renderArena;
 
     OwnPtr<AXObjectCache> m_axObjectCache;
-    OwnPtr<DocumentMarkerController> m_markers;
+    const OwnPtr<DocumentMarkerController> m_markers;
     
     Timer<Document> m_updateFocusAppearanceTimer;
 
@@ -1496,7 +1496,10 @@ private:
     bool m_directionSetOnDocumentElement;
     bool m_writingModeSetOnDocumentElement;
 
+#if ENABLE(WEB_TIMING)
     DocumentTiming m_documentTiming;
+#endif
+
     RefPtr<MediaQueryMatcher> m_mediaQueryMatcher;
     bool m_writeRecursionIsTooDeep;
     unsigned m_writeRecursionDepth;
@@ -1560,6 +1563,7 @@ private:
     HashSet<RefPtr<Element> > m_associatedFormControls;
 
     bool m_hasInjectedPlugInsScript;
+    bool m_renderTreeBeingDestroyed;
 };
 
 inline void Document::notifyRemovePendingSheetIfNeeded()
@@ -1615,7 +1619,7 @@ inline bool Node::isDocumentNode() const
 
 inline Node::Node(Document* document, ConstructionType type)
     : m_nodeFlags(type)
-    , m_parentOrShadowHostNode(0)
+    , m_parentNode(0)
     , m_treeScope(document)
     , m_previous(0)
     , m_next(0)

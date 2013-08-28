@@ -35,6 +35,7 @@
 #include "MediaPlayer.h"
 
 #if ENABLE(PLUGIN_PROXY_FOR_VIDEO)
+#include "HTMLPlugInImageElement.h"
 #include "MediaPlayerProxy.h"
 #endif
 
@@ -386,7 +387,8 @@ protected:
     virtual void parseAttribute(const QualifiedName&, const AtomicString&) OVERRIDE;
     virtual void finishParsingChildren();
     virtual bool isURLAttribute(const Attribute&) const OVERRIDE;
-    virtual void attach(const AttachContext& = AttachContext()) OVERRIDE;
+    virtual void willAttachRenderers() OVERRIDE;
+    virtual void didAttachRenderers() OVERRIDE;
 
     virtual void didMoveToNewDocument(Document* oldDocument) OVERRIDE;
 
@@ -431,9 +433,9 @@ private:
     virtual bool hasCustomFocusLogic() const OVERRIDE;
     virtual bool supportsFocus() const OVERRIDE;
     virtual bool isMouseFocusable() const OVERRIDE;
-    virtual bool rendererIsNeeded(const NodeRenderingContext&);
+    virtual bool rendererIsNeeded(const RenderStyle&);
     virtual RenderObject* createRenderer(RenderArena*, RenderStyle*);
-    virtual bool childShouldCreateRenderer(const NodeRenderingContext&) const OVERRIDE;
+    virtual bool childShouldCreateRenderer(const Node*) const OVERRIDE;
     virtual InsertionNotificationRequest insertedInto(ContainerNode*) OVERRIDE;
     virtual void removedFrom(ContainerNode*) OVERRIDE;
     virtual void didRecalcStyle(Style::Change);
@@ -641,8 +643,8 @@ private:
     unsigned m_previousProgress;
     double m_previousProgressTime;
 
-    // The last time a timeupdate event was sent (wall clock).
-    double m_lastTimeUpdateEventWallTime;
+    // The last time a timeupdate event was sent (based on monotonic clock).
+    double m_clockTimeAtLastUpdateEvent;
 
     // The last time a timeupdate event was sent in movie time.
     double m_lastTimeUpdateEventMovieTime;
@@ -673,8 +675,8 @@ private:
 #endif
 
     mutable double m_cachedTime;
-    mutable double m_cachedTimeWallClockUpdateTime;
-    mutable double m_minimumWallClockTimeToCacheMediaTime;
+    mutable double m_clockTimeAtLastCachedTimeUpdate;
+    mutable double m_minimumClockTimeToUpdateCachedTime;
 
     double m_fragmentStartTime;
     double m_fragmentEndTime;
@@ -723,7 +725,7 @@ private:
     bool m_haveVisibleTextTrack : 1;
     bool m_processingPreferenceChange : 1;
 
-    String m_forcedOrAutomaticSubtitleTrackLanguage;
+    String m_subtitleTrackLanguage;
     float m_lastTextTrackUpdateTime;
 
     CaptionUserPreferences::CaptionDisplayMode m_captionDisplayMode;

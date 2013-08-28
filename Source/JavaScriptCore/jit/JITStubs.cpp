@@ -114,6 +114,8 @@ void performPlatformSpecificJITAssertions(VM* vm)
     performARMJITAssertions();
 #elif CPU(MIPS)
     performMIPSJITAssertions();
+#elif CPU(SH4)
+    performSH4JITAssertions();
 #endif
 }
 
@@ -415,7 +417,7 @@ private:
 // our caller, so exception processing can proceed from a valid state.
 template<typename T> static T throwExceptionFromOpCall(JITStackFrame& jitStackFrame, CallFrame* newCallFrame, ReturnAddressPtr& returnAddressSlot, ErrorFunctor& createError )
 {
-    CallFrame* callFrame = newCallFrame->callerFrame();
+    CallFrame* callFrame = newCallFrame->callerFrame()->removeHostCallFrameFlag();
     jitStackFrame.callFrame = callFrame;
     callFrame->vm().topCallFrame = callFrame;
     callFrame->vm().exception = createError(callFrame);
@@ -473,7 +475,9 @@ DEFINE_STUB_FUNCTION(void, op_put_by_id_generic)
 {
     STUB_INIT_STACK_FRAME(stackFrame);
 
-    PutPropertySlot slot(stackFrame.callFrame->codeBlock()->isStrictMode());
+    PutPropertySlot slot(
+        stackFrame.callFrame->codeBlock()->isStrictMode(),
+        stackFrame.callFrame->codeBlock()->putByIdContext());
     stackFrame.args[0].jsValue().put(stackFrame.callFrame, stackFrame.args[1].identifier(), stackFrame.args[2].jsValue(), slot);
     CHECK_FOR_EXCEPTION_AT_END();
 }
@@ -482,7 +486,9 @@ DEFINE_STUB_FUNCTION(void, op_put_by_id_direct_generic)
 {
     STUB_INIT_STACK_FRAME(stackFrame);
     
-    PutPropertySlot slot(stackFrame.callFrame->codeBlock()->isStrictMode());
+    PutPropertySlot slot(
+        stackFrame.callFrame->codeBlock()->isStrictMode(),
+        stackFrame.callFrame->codeBlock()->putByIdContext());
     JSValue baseValue = stackFrame.args[0].jsValue();
     ASSERT(baseValue.isObject());
     asObject(baseValue)->putDirect(stackFrame.callFrame->vm(), stackFrame.args[1].identifier(), stackFrame.args[2].jsValue(), slot);
@@ -514,7 +520,9 @@ DEFINE_STUB_FUNCTION(void, op_put_by_id)
     StructureStubInfo* stubInfo = &codeBlock->getStubInfo(STUB_RETURN_ADDRESS);
     AccessType accessType = static_cast<AccessType>(stubInfo->accessType);
 
-    PutPropertySlot slot(callFrame->codeBlock()->isStrictMode());
+    PutPropertySlot slot(
+        callFrame->codeBlock()->isStrictMode(),
+        callFrame->codeBlock()->putByIdContext());
     stackFrame.args[0].jsValue().put(callFrame, ident, stackFrame.args[2].jsValue(), slot);
     
     if (accessType == static_cast<AccessType>(stubInfo->accessType)) {
@@ -535,7 +543,9 @@ DEFINE_STUB_FUNCTION(void, op_put_by_id_direct)
     StructureStubInfo* stubInfo = &codeBlock->getStubInfo(STUB_RETURN_ADDRESS);
     AccessType accessType = static_cast<AccessType>(stubInfo->accessType);
 
-    PutPropertySlot slot(callFrame->codeBlock()->isStrictMode());
+    PutPropertySlot slot(
+        callFrame->codeBlock()->isStrictMode(),
+        callFrame->codeBlock()->putByIdContext());
     JSValue baseValue = stackFrame.args[0].jsValue();
     ASSERT(baseValue.isObject());
     
@@ -556,7 +566,9 @@ DEFINE_STUB_FUNCTION(void, op_put_by_id_fail)
     CallFrame* callFrame = stackFrame.callFrame;
     Identifier& ident = stackFrame.args[1].identifier();
     
-    PutPropertySlot slot(callFrame->codeBlock()->isStrictMode());
+    PutPropertySlot slot(
+        callFrame->codeBlock()->isStrictMode(),
+        callFrame->codeBlock()->putByIdContext());
     stackFrame.args[0].jsValue().put(callFrame, ident, stackFrame.args[2].jsValue(), slot);
 
     CHECK_FOR_EXCEPTION_AT_END();
@@ -569,7 +581,9 @@ DEFINE_STUB_FUNCTION(void, op_put_by_id_direct_fail)
     CallFrame* callFrame = stackFrame.callFrame;
     Identifier& ident = stackFrame.args[1].identifier();
     
-    PutPropertySlot slot(callFrame->codeBlock()->isStrictMode());
+    PutPropertySlot slot(
+        callFrame->codeBlock()->isStrictMode(),
+        callFrame->codeBlock()->putByIdContext());
     JSValue baseValue = stackFrame.args[0].jsValue();
     ASSERT(baseValue.isObject());
     asObject(baseValue)->putDirect(callFrame->vm(), ident, stackFrame.args[2].jsValue(), slot);
@@ -593,7 +607,7 @@ DEFINE_STUB_FUNCTION(JSObject*, op_put_by_id_transition_realloc)
     JSObject* base = asObject(baseValue);
     VM& vm = *stackFrame.vm;
     Butterfly* butterfly = base->growOutOfLineStorage(vm, oldSize, newSize);
-    base->setButterfly(vm, butterfly, newStructure);
+    base->setStructureAndButterfly(vm, newStructure, butterfly);
 
     return base;
 }
@@ -1406,7 +1420,7 @@ DEFINE_STUB_FUNCTION(EncodedJSValue, op_call_NotJSFunction)
     ASSERT(callType != CallTypeJS);
     if (callType != CallTypeHost) {
         ASSERT(callType == CallTypeNone);
-        ErrorWithExecAndCalleeFunctor functor = ErrorWithExecAndCalleeFunctor(createNotAConstructorError, callee);
+        ErrorWithExecAndCalleeFunctor functor = ErrorWithExecAndCalleeFunctor(createNotAFunctionError, callee);
         return throwExceptionFromOpCall<EncodedJSValue>(stackFrame, callFrame, STUB_RETURN_ADDRESS, functor);
     }
 
@@ -2157,15 +2171,27 @@ DEFINE_STUB_FUNCTION(void*, vm_throw)
 }
 
 #if USE(JSVALUE32_64)
-EncodedExceptionHandler JIT_STUB cti_vm_throw_slowpath(CallFrame* callFrame)
+EncodedExceptionHandler JIT_STUB cti_vm_handle_exception(CallFrame* callFrame)
 {
+    ASSERT(!callFrame->hasHostCallFrameFlag());
+    if (!callFrame) {
+        // The entire stack has already been unwound. Nothing more to handle.
+        return encode(uncaughtExceptionHandler());
+    }
+
     VM* vm = callFrame->codeBlock()->vm();
     vm->topCallFrame = callFrame;
     return encode(jitThrowNew(vm, callFrame, vm->exception));
 }
 #else
-ExceptionHandler JIT_STUB cti_vm_throw_slowpath(CallFrame* callFrame)
+ExceptionHandler JIT_STUB cti_vm_handle_exception(CallFrame* callFrame)
 {
+    ASSERT(!callFrame->hasHostCallFrameFlag());
+    if (!callFrame) {
+        // The entire stack has already been unwound. Nothing more to handle.
+        return uncaughtExceptionHandler();
+    }
+
     VM* vm = callFrame->codeBlock()->vm();
     vm->topCallFrame = callFrame;
     return jitThrowNew(vm, callFrame, vm->exception);
@@ -2186,7 +2212,7 @@ DEFINE_STUB_FUNCTION(EncodedJSValue, op_resolve_scope)
     ExecState* exec = stackFrame.callFrame;
     Instruction* pc = stackFrame.args[0].pc();
 
-    Identifier& ident = exec->codeBlock()->identifier(pc[2].u.operand);
+    const Identifier& ident = exec->codeBlock()->identifier(pc[2].u.operand);
     return JSValue::encode(JSScope::resolve(exec, exec->scope(), ident));
 }
 
@@ -2196,7 +2222,7 @@ DEFINE_STUB_FUNCTION(EncodedJSValue, op_get_from_scope)
     ExecState* exec = stackFrame.callFrame;
     Instruction* pc = stackFrame.args[0].pc();
 
-    Identifier& ident = exec->codeBlock()->identifier(pc[3].u.operand);
+    const Identifier& ident = exec->codeBlock()->identifier(pc[3].u.operand);
     JSObject* scope = jsCast<JSObject*>(exec->uncheckedR(pc[2].u.operand).jsValue());
     ResolveModeAndType modeAndType(pc[4].u.operand);
 
@@ -2229,7 +2255,7 @@ DEFINE_STUB_FUNCTION(void, op_put_to_scope)
     Instruction* pc = stackFrame.args[0].pc();
 
     CodeBlock* codeBlock = exec->codeBlock();
-    Identifier& ident = codeBlock->identifier(pc[2].u.operand);
+    const Identifier& ident = codeBlock->identifier(pc[2].u.operand);
     JSObject* scope = jsCast<JSObject*>(exec->uncheckedR(pc[1].u.operand).jsValue());
     JSValue value = exec->r(pc[3].u.operand).jsValue();
     ResolveModeAndType modeAndType = ResolveModeAndType(pc[4].u.operand);
@@ -2242,6 +2268,11 @@ DEFINE_STUB_FUNCTION(void, op_put_to_scope)
 
     PutPropertySlot slot(codeBlock->isStrictMode());
     scope->methodTable()->put(scope, exec, ident, value, slot);
+    
+    if (exec->vm().exception) {
+        VM_THROW_EXCEPTION_AT_END();
+        return;
+    }
 
     // Covers implicit globals. Since they don't exist until they first execute, we didn't know how to cache them at compile time.
     if (modeAndType.type() == GlobalProperty || modeAndType.type() == GlobalPropertyWithVarInjectionChecks) {

@@ -24,6 +24,7 @@
 #include "HTMLCollection.h"
 
 #include "ClassNodeList.h"
+#include "ElementTraversal.h"
 #include "HTMLDocument.h"
 #include "HTMLElement.h"
 #include "HTMLNameCollection.h"
@@ -32,7 +33,6 @@
 #include "HTMLOptionElement.h"
 #include "NodeList.h"
 #include "NodeRareData.h"
-#include "NodeTraversal.h"
 
 namespace WebCore {
 
@@ -182,7 +182,7 @@ inline bool isMatchingElement(const NodeListType*, Element*);
 template <> inline bool isMatchingElement(const HTMLCollection* htmlCollection, Element* element)
 {
     CollectionType type = htmlCollection->type();
-    if (!element->isHTMLElement() && !(type == DocAll || type == NodeChildren))
+    if (!element->isHTMLElement() && !(type == DocAll || type == NodeChildren || type == WindowNamedItems))
         return false;
 
     switch (type) {
@@ -514,14 +514,14 @@ inline Element* firstMatchingChildElement(const HTMLCollection* nodeList, Contai
 {
     Element* element = ElementTraversal::firstWithin(root);
     while (element && !isMatchingElement(nodeList, element))
-        element = ElementTraversal::nextSkippingChildren(element, root);
+        element = ElementTraversal::nextSibling(element);
     return element;
 }
 
-inline Element* nextMatchingChildElement(const HTMLCollection* nodeList, Element* current, ContainerNode* root)
+inline Element* nextMatchingSiblingElement(const HTMLCollection* nodeList, Element* current)
 {
     do {
-        current = ElementTraversal::nextSkippingChildren(current, root);
+        current = ElementTraversal::nextSibling(current);
     } while (current && !isMatchingElement(nodeList, current));
     return current;
 }
@@ -542,7 +542,7 @@ inline Element* HTMLCollection::traverseNextElement(unsigned& offsetInArray, Ele
         return virtualItemAfter(offsetInArray, previous);
     ASSERT(!offsetInArray);
     if (shouldOnlyIncludeDirectChildren())
-        return nextMatchingChildElement(this, previous, root);
+        return nextMatchingSiblingElement(this, previous);
     return nextMatchingElement(this, previous, root);
 }
 
@@ -558,7 +558,7 @@ inline Element* HTMLCollection::traverseForwardToOffset(unsigned offset, Element
         return 0;
     }
     if (shouldOnlyIncludeDirectChildren()) {
-        while ((currentElement = nextMatchingChildElement(this, currentElement, root))) {
+        while ((currentElement = nextMatchingSiblingElement(this, currentElement))) {
             if (++currentOffset == offset)
                 return currentElement;
         }
@@ -627,15 +627,14 @@ void HTMLCollection::updateNameCache() const
 
     unsigned arrayOffset = 0;
     for (Element* element = traverseFirstElement(arrayOffset, root); element; element = traverseNextElement(arrayOffset, element, root)) {
+        const AtomicString& idAttrVal = element->getIdAttribute();
+        if (!idAttrVal.isEmpty())
+            appendIdCache(idAttrVal, element);
         if (!element->isHTMLElement())
             continue;
-        HTMLElement* htmlElement = toHTMLElement(element);
-        const AtomicString& idAttrVal = htmlElement->getIdAttribute();
-        const AtomicString& nameAttrVal = htmlElement->getNameAttribute();
-        if (!idAttrVal.isEmpty())
-            appendIdCache(idAttrVal, htmlElement);
-        if (!nameAttrVal.isEmpty() && idAttrVal != nameAttrVal && (type() != DocAll || nameShouldBeVisibleInDocumentAll(htmlElement)))
-            appendNameCache(nameAttrVal, htmlElement);
+        const AtomicString& nameAttrVal = element->getNameAttribute();
+        if (!nameAttrVal.isEmpty() && idAttrVal != nameAttrVal && (type() != DocAll || nameShouldBeVisibleInDocumentAll(toHTMLElement(element))))
+            appendNameCache(nameAttrVal, element);
     }
 
     setHasNameCache();

@@ -195,7 +195,7 @@ bool PageGroup::isLinkVisited(LinkHash visitedLinkHash)
     if (!m_visitedLinksPopulated) {
         m_visitedLinksPopulated = true;
         ASSERT(!m_pages.isEmpty());
-        (*m_pages.begin())->chrome().client()->populateVisitedLinks();
+        (*m_pages.begin())->chrome().client().populateVisitedLinks();
     }
     return m_visitedLinkHashes.contains(visitedLinkHash);
 }
@@ -403,7 +403,7 @@ void PageGroup::invalidateInjectedStyleSheetCacheInAllFrames()
     // Clear our cached sheets and have them just reparse.
     HashSet<Page*>::const_iterator end = m_pages.end();
     for (HashSet<Page*>::const_iterator it = m_pages.begin(); it != end; ++it) {
-        for (Frame* frame = (*it)->mainFrame(); frame; frame = frame->tree()->traverseNext()) {
+        for (Frame* frame = &(*it)->mainFrame(); frame; frame = frame->tree().traverseNext()) {
             frame->document()->styleSheetCollection()->invalidateInjectedStyleSheetCache();
             frame->document()->styleResolverChanged(DeferRecalcStyle);
         }

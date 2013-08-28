@@ -260,7 +260,7 @@ void EvalExecutable::jettisonOptimizedCode(VM& vm)
 void EvalExecutable::visitChildren(JSCell* cell, SlotVisitor& visitor)
 {
     EvalExecutable* thisObject = jsCast<EvalExecutable*>(cell);
-    ASSERT_GC_OBJECT_INHERITS(thisObject, &s_info);
+    ASSERT_GC_OBJECT_INHERITS(thisObject, info());
     COMPILE_ASSERT(StructureFlags & OverridesVisitChildren, OverridesVisitChildrenWithoutSettingFlag);
     ASSERT(thisObject->structure()->typeInfo().overridesVisitChildren());
     ScriptExecutable::visitChildren(thisObject, visitor);
@@ -371,24 +371,6 @@ void ProgramExecutable::unlinkCalls()
 #endif
 }
 
-int ProgramExecutable::addGlobalVar(JSGlobalObject* globalObject, const Identifier& ident, ConstantMode constantMode, FunctionMode functionMode)
-{
-    // Try to share the symbolTable if possible
-    SharedSymbolTable* symbolTable = globalObject->symbolTable();
-    UNUSED_PARAM(functionMode);
-    ConcurrentJITLocker locker(symbolTable->m_lock);
-    int index = symbolTable->size(locker);
-    SymbolTableEntry newEntry(index, (constantMode == IsConstant) ? ReadOnly : 0);
-    if (functionMode == IsFunctionToSpecialize)
-        newEntry.attemptToWatch();
-    SymbolTable::Map::AddResult result = symbolTable->add(locker, ident.impl(), newEntry);
-    if (!result.isNewEntry) {
-        result.iterator->value.notifyWrite();
-        index = result.iterator->value.getIndex();
-    }
-    return index;
-}
-
 JSObject* ProgramExecutable::initializeGlobalProperties(VM& vm, CallFrame* callFrame, JSScope* scope)
 {
     RELEASE_ASSERT(scope);
@@ -408,27 +390,19 @@ JSObject* ProgramExecutable::initializeGlobalProperties(VM& vm, CallFrame* callF
     const UnlinkedProgramCodeBlock::VariableDeclations& variableDeclarations = unlinkedCode->variableDeclarations();
     const UnlinkedProgramCodeBlock::FunctionDeclations& functionDeclarations = unlinkedCode->functionDeclarations();
 
-    size_t newGlobals = variableDeclarations.size() + functionDeclarations.size();
-    if (!newGlobals)
-        return 0;
-    globalObject->addRegisters(newGlobals);
     CallFrame* globalExec = globalObject->globalExec();
 
     for (size_t i = 0; i < functionDeclarations.size(); ++i) {
-        bool propertyDidExist = globalObject->removeDirect(vm, functionDeclarations[i].first); // Newly declared functions overwrite existing properties.
         UnlinkedFunctionExecutable* unlinkedFunctionExecutable = functionDeclarations[i].second.get();
         JSValue value = JSFunction::create(globalExec, unlinkedFunctionExecutable->link(vm, m_source, lineNo(), 0), scope);
-        int index = addGlobalVar(globalObject, functionDeclarations[i].first, IsVariable,
-            !propertyDidExist ? IsFunctionToSpecialize : NotFunctionOrNotSpecializable);
-        globalObject->registerAt(index).set(vm, globalObject, value);
+        globalObject->addFunction(callFrame, functionDeclarations[i].first, value);
     }
 
     for (size_t i = 0; i < variableDeclarations.size(); ++i) {
-        if (globalObject->hasProperty(globalExec, variableDeclarations[i].first))
-            continue;
-        addGlobalVar(globalObject, variableDeclarations[i].first,
-            (variableDeclarations[i].second & DeclarationStacks::IsConstant) ? IsConstant : IsVariable,
-            NotFunctionOrNotSpecializable);
+        if (variableDeclarations[i].second & DeclarationStacks::IsConstant)
+            globalObject->addConst(callFrame, variableDeclarations[i].first);
+        else
+            globalObject->addVar(callFrame, variableDeclarations[i].first);
     }
     return 0;
 }
@@ -436,7 +410,7 @@ JSObject* ProgramExecutable::initializeGlobalProperties(VM& vm, CallFrame* callF
 void ProgramExecutable::visitChildren(JSCell* cell, SlotVisitor& visitor)
 {
     ProgramExecutable* thisObject = jsCast<ProgramExecutable*>(cell);
-    ASSERT_GC_OBJECT_INHERITS(thisObject, &s_info);
+    ASSERT_GC_OBJECT_INHERITS(thisObject, info());
     COMPILE_ASSERT(StructureFlags & OverridesVisitChildren, OverridesVisitChildrenWithoutSettingFlag);
     ASSERT(thisObject->structure()->typeInfo().overridesVisitChildren());
     ScriptExecutable::visitChildren(thisObject, visitor);
@@ -624,7 +598,7 @@ void FunctionExecutable::jettisonOptimizedCodeForConstruct(VM& vm)
 void FunctionExecutable::visitChildren(JSCell* cell, SlotVisitor& visitor)
 {
     FunctionExecutable* thisObject = jsCast<FunctionExecutable*>(cell);
-    ASSERT_GC_OBJECT_INHERITS(thisObject, &s_info);
+    ASSERT_GC_OBJECT_INHERITS(thisObject, info());
     COMPILE_ASSERT(StructureFlags & OverridesVisitChildren, OverridesVisitChildrenWithoutSettingFlag);
     ASSERT(thisObject->structure()->typeInfo().overridesVisitChildren());
     ScriptExecutable::visitChildren(thisObject, visitor);
@@ -690,7 +664,7 @@ String FunctionExecutable::paramString() const
 
 CodeBlockHash ExecutableBase::hashFor(CodeSpecializationKind kind) const
 {
-    if (this->classInfo() == &NativeExecutable::s_info)
+    if (this->classInfo() == NativeExecutable::info())
         return jsCast<const NativeExecutable*>(this)->hashFor(kind);
     
     return jsCast<const ScriptExecutable*>(this)->hashFor(kind);

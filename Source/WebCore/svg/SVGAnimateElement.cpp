@@ -30,8 +30,8 @@
 #include "QualifiedName.h"
 #include "RenderObject.h"
 #include "SVGAnimatorFactory.h"
+#include "SVGElement.h"
 #include "SVGNames.h"
-#include "SVGStyledElement.h"
 #include "StylePropertySet.h"
 
 namespace WebCore {
@@ -111,12 +111,7 @@ void SVGAnimateElement::calculateAnimatedValue(float percentage, unsigned repeat
     ASSERT(m_fromType->type() == m_animatedPropertyType);
     ASSERT(m_toType);
 
-    ASSERT(resultElement->hasTagName(SVGNames::animateTag)
-        || resultElement->hasTagName(SVGNames::animateColorTag)
-        || resultElement->hasTagName(SVGNames::animateTransformTag)
-        || resultElement->hasTagName(SVGNames::setTag));
-
-    SVGAnimateElement* resultAnimationElement = static_cast<SVGAnimateElement*>(resultElement);
+    SVGAnimateElement* resultAnimationElement = toSVGAnimateElement(resultElement);
     ASSERT(resultAnimationElement->m_animatedType);
     ASSERT(resultAnimationElement->m_animatedPropertyType == m_animatedPropertyType);
 
@@ -247,8 +242,7 @@ static inline void applyCSSPropertyToTarget(SVGElement* targetElement, CSSProper
 {
     ASSERT(!targetElement->m_deletionHasBegun);
 
-    MutableStylePropertySet* propertySet = targetElement->ensureAnimatedSMILStyleProperties();
-    if (!propertySet->setProperty(id, value, false, 0))
+    if (!targetElement->ensureAnimatedSMILStyleProperties().setProperty(id, value, false, 0))
         return;
 
     targetElement->setNeedsStyleRecalc(SyntheticStyleChange);
@@ -257,7 +251,7 @@ static inline void applyCSSPropertyToTarget(SVGElement* targetElement, CSSProper
 static inline void removeCSSPropertyFromTarget(SVGElement* targetElement, CSSPropertyID id)
 {
     ASSERT(!targetElement->m_deletionHasBegun);
-    targetElement->ensureAnimatedSMILStyleProperties()->removeProperty(id);
+    targetElement->ensureAnimatedSMILStyleProperties().removeProperty(id);
     targetElement->setNeedsStyleRecalc(SyntheticStyleChange);
 }
 

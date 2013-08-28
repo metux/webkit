@@ -80,7 +80,7 @@ public:
 
     bool ieForbidsInsertHTML() const;
 
-    virtual bool rendererIsNeeded(const NodeRenderingContext&);
+    virtual bool rendererIsNeeded(const RenderStyle&);
     virtual RenderObject* createRenderer(RenderArena*, RenderStyle*);
 
     HTMLFormElement* form() const { return virtualForm(); }
@@ -153,6 +153,8 @@ inline HTMLElement::HTMLElement(const QualifiedName& tagName, Document* document
 {
     ASSERT(tagName.localName().impl());
 }
+
+template <> inline bool isElementOfType<HTMLElement>(const Element* element) { return element->isHTMLElement(); }
 
 } // namespace WebCore
 

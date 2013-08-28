@@ -181,7 +181,7 @@ CallFrame* loadVarargs(CallFrame* callFrame, JSStack* stack, JSValue thisValue, 
         return 0;
     }
 
-    if (asObject(arguments)->classInfo() == &Arguments::s_info) {
+    if (asObject(arguments)->classInfo() == Arguments::info()) {
         Arguments* argsObject = asArguments(arguments);
         unsigned argCount = argsObject->length(callFrame);
         CallFrame* newCallFrame = CallFrame::create(callFrame->registers() + firstFreeRegister + CallFrame::offsetFor(argCount + 1));
@@ -398,7 +398,7 @@ NEVER_INLINE bool Interpreter::unwindCallFrame(StackIterator& iter, JSValue exce
     }
 
     CallFrame* callerFrame = callFrame->callerFrame();
-    callFrame->vm().topCallFrame = callerFrame;
+    callFrame->vm().topCallFrame = callerFrame->removeHostCallFrameFlag();
     return !callerFrame->hasHostCallFrameFlag();
 }
 
@@ -531,7 +531,8 @@ String StackFrame::toString(CallFrame* callFrame)
 void Interpreter::getStackTrace(Vector<StackFrame>& results, size_t maxStackSize)
 {
     VM& vm = m_vm;
-    CallFrame* callFrame = vm.topCallFrame->removeHostCallFrameFlag();
+    ASSERT(!vm.topCallFrame->hasHostCallFrameFlag());
+    CallFrame* callFrame = vm.topCallFrame;
     if (!callFrame)
         return;
     StackIterator iter = callFrame->begin();
@@ -734,12 +735,9 @@ JSValue Interpreter::execute(ProgramExecutable* program, CallFrame* callFrame, J
             JSONPPath.swap(JSONPData[entry].m_path);
             JSValue JSONPValue = JSONPData[entry].m_value.get();
             if (JSONPPath.size() == 1 && JSONPPath[0].m_type == JSONPPathEntryTypeDeclare) {
-                if (globalObject->hasProperty(callFrame, JSONPPath[0].m_pathEntryName)) {
-                    PutPropertySlot slot;
-                    globalObject->methodTable()->put(globalObject, callFrame, JSONPPath[0].m_pathEntryName, JSONPValue, slot);
-                } else
-                    globalObject->methodTable()->putDirectVirtual(globalObject, callFrame, JSONPPath[0].m_pathEntryName, JSONPValue, DontEnum | DontDelete);
-                // var declarations return undefined
+                globalObject->addVar(callFrame, JSONPPath[0].m_pathEntryName);
+                PutPropertySlot slot;
+                globalObject->methodTable()->put(globalObject, callFrame, JSONPPath[0].m_pathEntryName, JSONPValue, slot);
                 result = jsUndefined();
                 continue;
             }
@@ -1004,8 +1002,14 @@ JSObject* Interpreter::executeConstruct(CallFrame* callFrame, JSObject* construc
 #elif ENABLE(JIT)
             result = constructData.js.functionExecutable->generatedJITCodeForConstruct()->execute(&m_stack, newCallFrame, &vm);
 #endif // ENABLE(JIT)
-        } else
+        } else {
             result = JSValue::decode(constructData.native.function(newCallFrame));
+            if (!callFrame->hadException()) {
+                ASSERT_WITH_MESSAGE(result.isObject(), "Host constructor returned non object.");
+                if (!result.isObject())
+                    throwTypeError(newCallFrame);
+            }
+        }
     }
 
     if (LegacyProfiler* profiler = vm.enabledProfiler())

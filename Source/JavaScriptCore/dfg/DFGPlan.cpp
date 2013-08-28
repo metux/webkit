@@ -90,6 +90,7 @@ Plan::Plan(
     , mustHandleValues(codeBlock->numParameters(), numVarsWithValues)
     , compilation(codeBlock->vm()->m_perBytecodeProfiler ? adoptRef(new Profiler::Compilation(codeBlock->vm()->m_perBytecodeProfiler->ensureBytecodesFor(codeBlock.get()), Profiler::DFG)) : 0)
     , identifiers(codeBlock.get())
+    , weakReferences(codeBlock.get())
     , isCompiled(false)
 {
 }
@@ -244,6 +245,8 @@ Plan::CompilationPath Plan::compileInThreadImpl(LongLivedState& longLivedState)
         FTL::link(state);
         return FTLPath;
     }
+#else
+    RELEASE_ASSERT(!Options::useExperimentalFTL());
 #endif // ENABLE(FTL_JIT)
     
     performCPSRethreading(dfg);
@@ -271,10 +274,13 @@ bool Plan::isStillValid()
         && chains.areStillValid();
 }
 
-void Plan::reallyAdd()
+void Plan::reallyAdd(CommonData* commonData)
 {
     watchpoints.reallyAdd();
-    identifiers.reallyAdd(vm);
+    identifiers.reallyAdd(vm, commonData);
+    weakReferences.reallyAdd(vm, commonData);
+    transitions.reallyAdd(vm, commonData);
+    writeBarriers.trigger(vm);
 }
 
 CompilationResult Plan::finalize(RefPtr<JSC::JITCode>& jitCode, MacroAssemblerCodePtr* jitCodeWithArityCheck)
@@ -291,7 +297,7 @@ CompilationResult Plan::finalize(RefPtr<JSC::JITCode>& jitCode, MacroAssemblerCo
     if (!result)
         return CompilationFailed;
     
-    reallyAdd();
+    reallyAdd(jitCode->dfgCommon());
     
     return CompilationSuccessful;
 }

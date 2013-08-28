@@ -87,10 +87,10 @@ static inline bool hasNoStyleInformation(Document* document)
     if (!document->frame() || !document->frame()->page())
         return false;
 
-    if (!document->frame()->page()->settings()->developerExtrasEnabled())
+    if (!document->frame()->page()->settings().developerExtrasEnabled())
         return false;
 
-    if (document->frame()->tree()->parent())
+    if (document->frame()->tree().parent())
         return false; // This document is not in a top frame
 
     return true;
@@ -466,7 +466,7 @@ static void* openFunc(const char* uri)
         // FIXME: We should restore the original global error handler as well.
 
         if (cachedResourceLoader->frame())
-            cachedResourceLoader->frame()->loader()->loadResourceSynchronously(url, AllowStoredCredentials, DoNotAskClientForCrossOriginCredentials, error, response, data);
+            cachedResourceLoader->frame()->loader().loadResourceSynchronously(url, AllowStoredCredentials, DoNotAskClientForCrossOriginCredentials, error, response, data);
     }
 
     // We have to check the URL again after the load to catch redirects.
@@ -862,13 +862,13 @@ void XMLDocumentParser::startElementNs(const xmlChar* xmlLocalName, const xmlCha
 #endif
 
     if (m_view && currentNode->attached() && !newElement->attached())
-        newElement->attach();
+        Style::attachRenderTree(newElement.get());
 
     if (newElement->hasTagName(HTMLNames::htmlTag))
         static_cast<HTMLHtmlElement*>(newElement.get())->insertedByParser();
 
     if (!m_parsingFragment && isFirstElement && document()->frame())
-        document()->frame()->loader()->dispatchDocumentElementAvailable();
+        document()->frame()->loader().dispatchDocumentElementAvailable();
 }
 
 void XMLDocumentParser::endElementNs()
@@ -1010,8 +1010,6 @@ void XMLDocumentParser::processingInstruction(const xmlChar* target, const xmlCh
     pi->setCreatedByParser(true);
 
     m_currentNode->parserAppendChild(pi.get());
-    if (m_view && !pi->attached())
-        pi->attach();
 
     pi->finishParsingChildren();
 
@@ -1039,7 +1037,7 @@ void XMLDocumentParser::cdataBlock(const xmlChar* s, int len)
     RefPtr<CDATASection> newNode = CDATASection::create(m_currentNode->document(), toString(s, len));
     m_currentNode->parserAppendChild(newNode.get());
     if (m_view && !newNode->attached())
-        newNode->attach();
+        newNode->attachText();
 }
 
 void XMLDocumentParser::comment(const xmlChar* s)
@@ -1056,8 +1054,6 @@ void XMLDocumentParser::comment(const xmlChar* s)
 
     RefPtr<Comment> newNode = Comment::create(m_currentNode->document(), toString(s));
     m_currentNode->parserAppendChild(newNode.get());
-    if (m_view && !newNode->attached())
-        newNode->attach();
 }
 
 enum StandaloneInfo {

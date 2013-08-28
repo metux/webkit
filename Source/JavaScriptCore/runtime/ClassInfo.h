@@ -31,6 +31,7 @@
 namespace JSC {
 
 class HashEntry;
+class JSArrayBufferView;
 struct HashTable;
 
 struct MethodTable {
@@ -88,14 +89,14 @@ struct MethodTable {
     typedef bool (*CustomHasInstanceFunctionPtr)(JSObject*, ExecState*, JSValue);
     CustomHasInstanceFunctionPtr customHasInstance;
 
-    typedef void (*PutWithAttributesFunctionPtr)(JSObject*, ExecState*, PropertyName propertyName, JSValue, unsigned attributes);
-    PutWithAttributesFunctionPtr putDirectVirtual;
-
-    typedef bool (*DefineOwnPropertyFunctionPtr)(JSObject*, ExecState*, PropertyName, PropertyDescriptor&, bool);
+    typedef bool (*DefineOwnPropertyFunctionPtr)(JSObject*, ExecState*, PropertyName, const PropertyDescriptor&, bool);
     DefineOwnPropertyFunctionPtr defineOwnProperty;
 
-    typedef bool (*GetOwnPropertyDescriptorFunctionPtr)(JSObject*, ExecState*, PropertyName, PropertyDescriptor&);
-    GetOwnPropertyDescriptorFunctionPtr getOwnPropertyDescriptor;
+    typedef ArrayBuffer* (*SlowDownAndWasteMemory)(JSArrayBufferView*);
+    SlowDownAndWasteMemory slowDownAndWasteMemory;
+    
+    typedef PassRefPtr<ArrayBufferView> (*GetTypedArrayImpl)(JSArrayBufferView*);
+    GetTypedArrayImpl getTypedArrayImpl;
 };
 
 #define CREATE_MEMBER_CHECKER(member) \
@@ -136,9 +137,9 @@ struct MethodTable {
         &ClassName::getPropertyNames, \
         &ClassName::className, \
         &ClassName::customHasInstance, \
-        &ClassName::putDirectVirtual, \
         &ClassName::defineOwnProperty, \
-        &ClassName::getOwnPropertyDescriptor, \
+        &ClassName::slowDownAndWasteMemory, \
+        &ClassName::getTypedArrayImpl \
     }, \
     ClassName::TypedArrayStorageType
 

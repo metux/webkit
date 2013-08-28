@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011 Apple Inc. All rights reserved.
+ * Copyright (C) 2011, 2013 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -46,6 +46,7 @@
 #include "ObjectConstructor.h"
 #include "Operations.h"
 #include "StringConstructor.h"
+#include "TypedArrayInlines.h"
 #include <wtf/InlineASM.h>
 
 #if ENABLE(JIT)
@@ -262,6 +263,53 @@
         "b " LOCAL_REFERENCE(function) "WithReturnAddress" "\n" \
     );
 
+#elif COMPILER(GCC) && CPU(SH4)
+
+#define SH4_SCRATCH_REGISTER "r11"
+
+#define FUNCTION_WRAPPER_WITH_RETURN_ADDRESS_E(function) \
+    asm( \
+    ".text" "\n" \
+    ".globl " SYMBOL_STRING(function) "\n" \
+    HIDE_SYMBOL(function) "\n" \
+    SYMBOL_STRING(function) ":" "\n" \
+        "sts pr, r5" "\n" \
+        "bra " LOCAL_REFERENCE(function) "WithReturnAddress" "\n" \
+        "nop" "\n" \
+    );
+
+#define FUNCTION_WRAPPER_WITH_RETURN_ADDRESS_ECI(function) \
+    asm( \
+    ".text" "\n" \
+    ".globl " SYMBOL_STRING(function) "\n" \
+    HIDE_SYMBOL(function) "\n" \
+    SYMBOL_STRING(function) ":" "\n" \
+        "sts pr, r7" "\n" \
+        "mov.l 2f, " SH4_SCRATCH_REGISTER "\n" \
+        "braf " SH4_SCRATCH_REGISTER "\n" \
+        "nop" "\n" \
+        "1: .balign 4" "\n" \
+        "2: .long " LOCAL_REFERENCE(function) "WithReturnAddress-1b" "\n" \
+    );
+
+#define FUNCTION_WRAPPER_WITH_RETURN_ADDRESS(function, offset, scratch) \
+    asm( \
+    ".text" "\n" \
+    ".globl " SYMBOL_STRING(function) "\n" \
+    HIDE_SYMBOL(function) "\n" \
+    SYMBOL_STRING(function) ":" "\n" \
+        "sts pr, " scratch "\n" \
+        "mov.l " scratch ", @(" STRINGIZE(offset) ", r15)" "\n" \
+        "mov.l 2f, " scratch "\n" \
+        "braf " scratch "\n" \
+        "nop" "\n" \
+        "1: .balign 4" "\n" \
+        "2: .long " LOCAL_REFERENCE(function) "WithReturnAddress-1b" "\n" \
+    );
+
+#define FUNCTION_WRAPPER_WITH_RETURN_ADDRESS_EJI(function)  FUNCTION_WRAPPER_WITH_RETURN_ADDRESS(function, 0, SH4_SCRATCH_REGISTER)
+#define FUNCTION_WRAPPER_WITH_RETURN_ADDRESS_EJCI(function) FUNCTION_WRAPPER_WITH_RETURN_ADDRESS(function, 4, SH4_SCRATCH_REGISTER)
+
 #endif
 
 #define P_FUNCTION_WRAPPER_WITH_RETURN_ADDRESS_E(function) \
@@ -338,6 +386,76 @@ ALWAYS_INLINE static void DFG_OPERATION operationPutByValInternal(ExecState* exe
         PutPropertySlot slot(strict);
         baseValue.put(exec, ident, value, slot);
     }
+}
+
+template<typename ViewClass>
+char* newTypedArrayWithSize(ExecState* exec, Structure* structure, int32_t size)
+{
+    VM& vm = exec->vm();
+    NativeCallFrameTracer tracer(&vm, exec);
+    if (size < 0) {
+        throwError(exec, createRangeError(exec, "Requested length is negative"));
+        return 0;
+    }
+    return bitwise_cast<char*>(ViewClass::create(exec, structure, size));
+}
+
+template<typename ViewClass>
+char* newTypedArrayWithOneArgument(
+    ExecState* exec, Structure* structure, EncodedJSValue encodedValue)
+{
+    VM& vm = exec->vm();
+    NativeCallFrameTracer tracer(&vm, exec);
+    
+    JSValue value = JSValue::decode(encodedValue);
+    
+    if (JSArrayBuffer* jsBuffer = jsDynamicCast<JSArrayBuffer*>(value)) {
+        RefPtr<ArrayBuffer> buffer = jsBuffer->impl();
+        
+        if (buffer->byteLength() % ViewClass::elementSize) {
+            throwError(exec, createRangeError(exec, "ArrayBuffer length minus the byteOffset is not a multiple of the element size"));
+            return 0;
+        }
+        return bitwise_cast<char*>(
+            ViewClass::create(
+                exec, structure, buffer, 0, buffer->byteLength() / ViewClass::elementSize));
+    }
+    
+    if (JSObject* object = jsDynamicCast<JSObject*>(value)) {
+        unsigned length = object->get(exec, vm.propertyNames->length).toUInt32(exec);
+        if (exec->hadException())
+            return 0;
+        
+        ViewClass* result = ViewClass::createUninitialized(exec, structure, length);
+        if (!result)
+            return 0;
+        
+        if (!result->set(exec, object, 0, length))
+            return 0;
+        
+        return bitwise_cast<char*>(result);
+    }
+    
+    int length;
+    if (value.isInt32())
+        length = value.asInt32();
+    else if (!value.isNumber()) {
+        throwError(exec, createTypeError(exec, "Invalid array length argument"));
+        return 0;
+    } else {
+        length = static_cast<int>(value.asNumber());
+        if (length != value.asNumber()) {
+            throwError(exec, createTypeError(exec, "Invalid array length argument (fractional lengths not allowed)"));
+            return 0;
+        }
+    }
+    
+    if (length < 0) {
+        throwError(exec, createRangeError(exec, "Requested length is negative"));
+        return 0;
+    }
+    
+    return bitwise_cast<char*>(ViewClass::create(exec, structure, length));
 }
 
 extern "C" {
@@ -756,7 +874,7 @@ EncodedJSValue DFG_OPERATION operationRegExpExec(ExecState* exec, JSCell* base, 
     VM& vm = exec->vm();
     NativeCallFrameTracer tracer(&vm, exec);
     
-    if (!base->inherits(&RegExpObject::s_info))
+    if (!base->inherits(RegExpObject::info()))
         return throwVMTypeError(exec);
 
     ASSERT(argument->isString() || argument->isObject());
@@ -769,7 +887,7 @@ size_t DFG_OPERATION operationRegExpTest(ExecState* exec, JSCell* base, JSCell* 
     VM& vm = exec->vm();
     NativeCallFrameTracer tracer(&vm, exec);
 
-    if (!base->inherits(&RegExpObject::s_info)) {
+    if (!base->inherits(RegExpObject::info())) {
         throwTypeError(exec);
         return false;
     }
@@ -785,7 +903,7 @@ void DFG_OPERATION operationPutByIdStrict(ExecState* exec, EncodedJSValue encode
     NativeCallFrameTracer tracer(vm, exec);
     
     Identifier ident(vm, uid);
-    PutPropertySlot slot(true);
+    PutPropertySlot slot(true, exec->codeBlock()->putByIdContext());
     base->methodTable()->put(base, exec, ident, JSValue::decode(encodedValue), slot);
 }
 
@@ -795,7 +913,7 @@ void DFG_OPERATION operationPutByIdNonStrict(ExecState* exec, EncodedJSValue enc
     NativeCallFrameTracer tracer(vm, exec);
     
     Identifier ident(vm, uid);
-    PutPropertySlot slot(false);
+    PutPropertySlot slot(false, exec->codeBlock()->putByIdContext());
     base->methodTable()->put(base, exec, ident, JSValue::decode(encodedValue), slot);
 }
 
@@ -805,7 +923,7 @@ void DFG_OPERATION operationPutByIdDirectStrict(ExecState* exec, EncodedJSValue 
     NativeCallFrameTracer tracer(vm, exec);
     
     Identifier ident(vm, uid);
-    PutPropertySlot slot(true);
+    PutPropertySlot slot(true, exec->codeBlock()->putByIdContext());
     ASSERT(base->isObject());
     asObject(base)->putDirect(exec->vm(), ident, JSValue::decode(encodedValue), slot);
 }
@@ -816,7 +934,7 @@ void DFG_OPERATION operationPutByIdDirectNonStrict(ExecState* exec, EncodedJSVal
     NativeCallFrameTracer tracer(vm, exec);
     
     Identifier ident(vm, uid);
-    PutPropertySlot slot(false);
+    PutPropertySlot slot(false, exec->codeBlock()->putByIdContext());
     ASSERT(base->isObject());
     asObject(base)->putDirect(exec->vm(), ident, JSValue::decode(encodedValue), slot);
 }
@@ -833,7 +951,7 @@ void DFG_OPERATION operationPutByIdStrictOptimizeWithReturnAddress(ExecState* ex
 
     JSValue value = JSValue::decode(encodedValue);
     JSValue baseValue(base);
-    PutPropertySlot slot(true);
+    PutPropertySlot slot(true, exec->codeBlock()->putByIdContext());
     
     baseValue.put(exec, ident, value, slot);
     
@@ -858,7 +976,7 @@ void DFG_OPERATION operationPutByIdNonStrictOptimizeWithReturnAddress(ExecState*
 
     JSValue value = JSValue::decode(encodedValue);
     JSValue baseValue(base);
-    PutPropertySlot slot(false);
+    PutPropertySlot slot(false, exec->codeBlock()->putByIdContext());
     
     baseValue.put(exec, ident, value, slot);
     
@@ -882,7 +1000,7 @@ void DFG_OPERATION operationPutByIdDirectStrictOptimizeWithReturnAddress(ExecSta
     AccessType accessType = static_cast<AccessType>(stubInfo.accessType);
 
     JSValue value = JSValue::decode(encodedValue);
-    PutPropertySlot slot(true);
+    PutPropertySlot slot(true, exec->codeBlock()->putByIdContext());
     
     ASSERT(base->isObject());
     asObject(base)->putDirect(exec->vm(), ident, value, slot);
@@ -907,7 +1025,7 @@ void DFG_OPERATION operationPutByIdDirectNonStrictOptimizeWithReturnAddress(Exec
     AccessType accessType = static_cast<AccessType>(stubInfo.accessType);
 
     JSValue value = JSValue::decode(encodedValue);
-    PutPropertySlot slot(false);
+    PutPropertySlot slot(false, exec->codeBlock()->putByIdContext());
     
     ASSERT(base->isObject());
     asObject(base)->putDirect(exec->vm(), ident, value, slot);
@@ -933,7 +1051,7 @@ void DFG_OPERATION operationPutByIdStrictBuildListWithReturnAddress(ExecState* e
 
     JSValue value = JSValue::decode(encodedValue);
     JSValue baseValue(base);
-    PutPropertySlot slot(true);
+    PutPropertySlot slot(true, exec->codeBlock()->putByIdContext());
     
     baseValue.put(exec, ident, value, slot);
     
@@ -955,7 +1073,7 @@ void DFG_OPERATION operationPutByIdNonStrictBuildListWithReturnAddress(ExecState
 
     JSValue value = JSValue::decode(encodedValue);
     JSValue baseValue(base);
-    PutPropertySlot slot(false);
+    PutPropertySlot slot(false, exec->codeBlock()->putByIdContext());
     
     baseValue.put(exec, ident, value, slot);
     
@@ -976,7 +1094,7 @@ void DFG_OPERATION operationPutByIdDirectStrictBuildListWithReturnAddress(ExecSt
     AccessType accessType = static_cast<AccessType>(stubInfo.accessType);
     
     JSValue value = JSValue::decode(encodedValue);
-    PutPropertySlot slot(true);
+    PutPropertySlot slot(true, exec->codeBlock()->putByIdContext());
     
     ASSERT(base->isObject());
     asObject(base)->putDirect(exec->vm(), ident, value, slot);
@@ -998,7 +1116,7 @@ void DFG_OPERATION operationPutByIdDirectNonStrictBuildListWithReturnAddress(Exe
     AccessType accessType = static_cast<AccessType>(stubInfo.accessType);
 
     JSValue value = JSValue::decode(encodedValue);
-    PutPropertySlot slot(false);
+    PutPropertySlot slot(false, exec->codeBlock()->putByIdContext());
     
     ASSERT(base->isObject());
     asObject(base)->putDirect(exec->vm(), ident, value, slot);
@@ -1319,6 +1437,114 @@ char* DFG_OPERATION operationNewArrayBuffer(ExecState* exec, Structure* arrayStr
     return bitwise_cast<char*>(constructArray(exec, arrayStructure, exec->codeBlock()->constantBuffer(start), size));
 }
 
+char* DFG_OPERATION operationNewInt8ArrayWithSize(
+    ExecState* exec, Structure* structure, int32_t length)
+{
+    return newTypedArrayWithSize<JSInt8Array>(exec, structure, length);
+}
+
+char* DFG_OPERATION operationNewInt8ArrayWithOneArgument(
+    ExecState* exec, Structure* structure, EncodedJSValue encodedValue)
+{
+    return newTypedArrayWithOneArgument<JSInt8Array>(exec, structure, encodedValue);
+}
+
+char* DFG_OPERATION operationNewInt16ArrayWithSize(
+    ExecState* exec, Structure* structure, int32_t length)
+{
+    return newTypedArrayWithSize<JSInt16Array>(exec, structure, length);
+}
+
+char* DFG_OPERATION operationNewInt16ArrayWithOneArgument(
+    ExecState* exec, Structure* structure, EncodedJSValue encodedValue)
+{
+    return newTypedArrayWithOneArgument<JSInt16Array>(exec, structure, encodedValue);
+}
+
+char* DFG_OPERATION operationNewInt32ArrayWithSize(
+    ExecState* exec, Structure* structure, int32_t length)
+{
+    return newTypedArrayWithSize<JSInt32Array>(exec, structure, length);
+}
+
+char* DFG_OPERATION operationNewInt32ArrayWithOneArgument(
+    ExecState* exec, Structure* structure, EncodedJSValue encodedValue)
+{
+    return newTypedArrayWithOneArgument<JSInt32Array>(exec, structure, encodedValue);
+}
+
+char* DFG_OPERATION operationNewUint8ArrayWithSize(
+    ExecState* exec, Structure* structure, int32_t length)
+{
+    return newTypedArrayWithSize<JSUint8Array>(exec, structure, length);
+}
+
+char* DFG_OPERATION operationNewUint8ArrayWithOneArgument(
+    ExecState* exec, Structure* structure, EncodedJSValue encodedValue)
+{
+    return newTypedArrayWithOneArgument<JSUint8Array>(exec, structure, encodedValue);
+}
+
+char* DFG_OPERATION operationNewUint8ClampedArrayWithSize(
+    ExecState* exec, Structure* structure, int32_t length)
+{
+    return newTypedArrayWithSize<JSUint8ClampedArray>(exec, structure, length);
+}
+
+char* DFG_OPERATION operationNewUint8ClampedArrayWithOneArgument(
+    ExecState* exec, Structure* structure, EncodedJSValue encodedValue)
+{
+    return newTypedArrayWithOneArgument<JSUint8ClampedArray>(exec, structure, encodedValue);
+}
+
+char* DFG_OPERATION operationNewUint16ArrayWithSize(
+    ExecState* exec, Structure* structure, int32_t length)
+{
+    return newTypedArrayWithSize<JSUint16Array>(exec, structure, length);
+}
+
+char* DFG_OPERATION operationNewUint16ArrayWithOneArgument(
+    ExecState* exec, Structure* structure, EncodedJSValue encodedValue)
+{
+    return newTypedArrayWithOneArgument<JSUint16Array>(exec, structure, encodedValue);
+}
+
+char* DFG_OPERATION operationNewUint32ArrayWithSize(
+    ExecState* exec, Structure* structure, int32_t length)
+{
+    return newTypedArrayWithSize<JSUint32Array>(exec, structure, length);
+}
+
+char* DFG_OPERATION operationNewUint32ArrayWithOneArgument(
+    ExecState* exec, Structure* structure, EncodedJSValue encodedValue)
+{
+    return newTypedArrayWithOneArgument<JSUint32Array>(exec, structure, encodedValue);
+}
+
+char* DFG_OPERATION operationNewFloat32ArrayWithSize(
+    ExecState* exec, Structure* structure, int32_t length)
+{
+    return newTypedArrayWithSize<JSFloat32Array>(exec, structure, length);
+}
+
+char* DFG_OPERATION operationNewFloat32ArrayWithOneArgument(
+    ExecState* exec, Structure* structure, EncodedJSValue encodedValue)
+{
+    return newTypedArrayWithOneArgument<JSFloat32Array>(exec, structure, encodedValue);
+}
+
+char* DFG_OPERATION operationNewFloat64ArrayWithSize(
+    ExecState* exec, Structure* structure, int32_t length)
+{
+    return newTypedArrayWithSize<JSFloat64Array>(exec, structure, length);
+}
+
+char* DFG_OPERATION operationNewFloat64ArrayWithOneArgument(
+    ExecState* exec, Structure* structure, EncodedJSValue encodedValue)
+{
+    return newTypedArrayWithOneArgument<JSFloat64Array>(exec, structure, encodedValue);
+}
+
 EncodedJSValue DFG_OPERATION operationNewRegexp(ExecState* exec, void* regexpPtr)
 {
     VM& vm = exec->vm();
@@ -1428,7 +1654,7 @@ EncodedJSValue DFG_OPERATION operationGetInlinedArgumentByVal(
 
 JSCell* DFG_OPERATION operationNewFunctionNoCheck(ExecState* exec, JSCell* functionExecutable)
 {
-    ASSERT(functionExecutable->inherits(&FunctionExecutable::s_info));
+    ASSERT(functionExecutable->inherits(FunctionExecutable::info()));
     VM& vm = exec->vm();
     NativeCallFrameTracer tracer(&vm, exec);
     return JSFunction::create(exec, static_cast<FunctionExecutable*>(functionExecutable), exec->scope());
@@ -1436,7 +1662,7 @@ JSCell* DFG_OPERATION operationNewFunctionNoCheck(ExecState* exec, JSCell* funct
 
 EncodedJSValue DFG_OPERATION operationNewFunction(ExecState* exec, JSCell* functionExecutable)
 {
-    ASSERT(functionExecutable->inherits(&FunctionExecutable::s_info));
+    ASSERT(functionExecutable->inherits(FunctionExecutable::info()));
     VM& vm = exec->vm();
     NativeCallFrameTracer tracer(&vm, exec);
     return JSValue::encode(JSFunction::create(exec, static_cast<FunctionExecutable*>(functionExecutable), exec->scope()));
@@ -1444,7 +1670,7 @@ EncodedJSValue DFG_OPERATION operationNewFunction(ExecState* exec, JSCell* funct
 
 JSCell* DFG_OPERATION operationNewFunctionExpression(ExecState* exec, JSCell* functionExecutableAsCell)
 {
-    ASSERT(functionExecutableAsCell->inherits(&FunctionExecutable::s_info));
+    ASSERT(functionExecutableAsCell->inherits(FunctionExecutable::info()));
 
     VM& vm = exec->vm();
     NativeCallFrameTracer tracer(&vm, exec);
@@ -1859,8 +2085,11 @@ SYMBOL_STRING(getHostCallReturnValue) ":" "\n"
     "add #-40, r14" "\n"
     "mov.l @r14, r14" "\n"
     "mov r14, r4" "\n"
-    "bra " LOCAL_REFERENCE(getHostCallReturnValueWithExecState) "\n"
+    "mov.l 2f, " SH4_SCRATCH_REGISTER "\n"
+    "braf " SH4_SCRATCH_REGISTER "\n"
     "nop" "\n"
+    "1: .balign 4" "\n"
+    "2: .long " LOCAL_REFERENCE(getHostCallReturnValueWithExecState) "-1b\n"
 );
 #endif
 

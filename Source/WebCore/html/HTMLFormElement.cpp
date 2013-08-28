@@ -27,6 +27,7 @@
 
 #include "Attribute.h"
 #include "Document.h"
+#include "ElementTraversal.h"
 #include "Event.h"
 #include "EventNames.h"
 #include "FormController.h"
@@ -40,8 +41,6 @@
 #include "HTMLInputElement.h"
 #include "HTMLNames.h"
 #include "HTMLTableElement.h"
-#include "NodeRenderingContext.h"
-#include "NodeTraversal.h"
 #include "Page.h"
 #include "RenderTextControl.h"
 #include "ScriptController.h"
@@ -95,13 +94,17 @@ bool HTMLFormElement::formWouldHaveSecureSubmission(const String& url)
     return document()->completeURL(url).protocolIs("https");
 }
 
-bool HTMLFormElement::rendererIsNeeded(const NodeRenderingContext& context)
+bool HTMLFormElement::rendererIsNeeded(const RenderStyle& style)
 {
     if (!m_wasDemoted)
-        return HTMLElement::rendererIsNeeded(context);
+        return HTMLElement::rendererIsNeeded(style);
 
     ContainerNode* node = parentNode();
     RenderObject* parentRenderer = node->renderer();
+
+    if (!parentRenderer)
+        return false;
+
     // FIXME: Shouldn't we also check for table caption (see |formIsTablePart| below).
     bool parentIsTableElementPart = (parentRenderer->isTable() && isHTMLTableElement(node))
         || (parentRenderer->isTableRow() && node->hasTagName(trTag))
@@ -112,7 +115,7 @@ bool HTMLFormElement::rendererIsNeeded(const NodeRenderingContext& context)
     if (!parentIsTableElementPart)
         return true;
 
-    EDisplay display = context.style()->display();
+    EDisplay display = style.display();
     bool formIsTablePart = display == TABLE || display == INLINE_TABLE || display == TABLE_ROW_GROUP
         || display == TABLE_HEADER_GROUP || display == TABLE_FOOTER_GROUP || display == TABLE_ROW
         || display == TABLE_COLUMN_GROUP || display == TABLE_COLUMN || display == TABLE_CELL
@@ -202,7 +205,7 @@ static inline HTMLFormControlElement* submitElementFromEvent(const Event* event)
 bool HTMLFormElement::validateInteractively(Event* event)
 {
     ASSERT(event);
-    if (!document()->page() || !document()->page()->settings()->interactiveFormValidationEnabled() || noValidate())
+    if (!document()->page() || !document()->page()->settings().interactiveFormValidationEnabled() || noValidate())
         return true;
 
     HTMLFormControlElement* submitElement = submitElementFromEvent(event);
@@ -270,7 +273,7 @@ bool HTMLFormElement::prepareForSubmission(Event* event)
     StringPairVector controlNamesAndValues;
     getTextFieldValues(controlNamesAndValues);
     RefPtr<FormState> formState = FormState::create(this, controlNamesAndValues, document(), NotSubmittedByJavaScript);
-    frame->loader()->client()->dispatchWillSendSubmitEvent(formState.release());
+    frame->loader().client().dispatchWillSendSubmitEvent(formState.release());
 
     if (dispatchEvent(Event::create(eventNames().submitEvent, true, true)))
         m_shouldSubmit = true;
@@ -347,7 +350,7 @@ void HTMLFormElement::submit(Event* event, bool activateSubmitButton, bool proce
         firstSuccessfulSubmitButton->setActivatedSubmit(true);
 
     bool lockHistory = !processingUserGesture;
-    frame->loader()->submitForm(FormSubmission::create(this, m_attributes, event, lockHistory, formSubmissionTrigger));
+    frame->loader().submitForm(FormSubmission::create(this, m_attributes, event, lockHistory, formSubmissionTrigger));
 
     if (needButtonActivation && firstSuccessfulSubmitButton)
         firstSuccessfulSubmitButton->setActivatedSubmit(false);
@@ -608,36 +611,38 @@ bool HTMLFormElement::checkInvalidControlsAndCollectUnhandled(Vector<RefPtr<Form
     return hasInvalidControls;
 }
 
-HTMLFormControlElement* HTMLFormElement::elementForAlias(const AtomicString& alias)
+HTMLFormControlElement* HTMLFormElement::elementFromPastNamesMap(const AtomicString& pastName) const
 {
-    if (alias.isEmpty() || !m_elementAliases)
+    if (pastName.isEmpty() || !m_pastNamesMap)
         return 0;
-    return m_elementAliases->get(alias.impl());
+    return m_pastNamesMap->get(pastName.impl());
 }
 
-void HTMLFormElement::addElementAlias(HTMLFormControlElement* element, const AtomicString& alias)
+void HTMLFormElement::addElementToPastNamesMap(HTMLFormControlElement* element, const AtomicString& pastName)
 {
-    if (alias.isEmpty())
+    if (pastName.isEmpty())
         return;
-    if (!m_elementAliases)
-        m_elementAliases = adoptPtr(new AliasMap);
-    m_elementAliases->set(alias.impl(), element);
+    if (!m_pastNamesMap)
+        m_pastNamesMap = adoptPtr(new PastNamesMap);
+    m_pastNamesMap->set(pastName.impl(), element);
+}
+
+bool HTMLFormElement::hasNamedElement(const AtomicString& name)
+{
+    return elements()->hasNamedItem(name) || elementFromPastNamesMap(name);
 }
 
 void HTMLFormElement::getNamedElements(const AtomicString& name, Vector<RefPtr<Node> >& namedItems)
 {
+    // http://www.whatwg.org/specs/web-apps/current-work/multipage/forms.html#dom-form-nameditem
     elements()->namedItems(name, namedItems);
 
-    HTMLFormControlElement* aliasElement = elementForAlias(name);
-    if (aliasElement) {
-        if (namedItems.find(aliasElement) == notFound) {
-            // We have seen it before but it is gone now. Still, we need to return it.
-            // FIXME: The above comment is not clear enough; it does not say why we need to do this.
-            namedItems.append(aliasElement);
-        }
-    }
-    if (namedItems.size() && namedItems.first() != aliasElement)
-        addElementAlias(static_cast<HTMLFormControlElement*>(namedItems.first().get()), name);
+    // FIXME: The specification says we should not add the element from the past when names map when namedItems is not empty.
+    HTMLFormControlElement* elementFromPast = elementFromPastNamesMap(name);
+    if (namedItems.size() == 1 && namedItems.first() != elementFromPast)
+        addElementToPastNamesMap(static_cast<HTMLFormControlElement*>(namedItems.first().get()), name);
+    else if (elementFromPast && namedItems.find(elementFromPast) == notFound)
+        namedItems.append(elementFromPast);
 }
 
 void HTMLFormElement::documentDidResumeFromPageCache()

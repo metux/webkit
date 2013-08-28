@@ -295,7 +295,7 @@ void CachedImage::checkShouldPaintBrokenImage()
     if (!m_loader || m_loader->reachedTerminalState())
         return;
 
-    m_shouldPaintBrokenImage = m_loader->frameLoader()->client()->shouldPaintBrokenImage(m_resourceRequest.url());
+    m_shouldPaintBrokenImage = m_loader->frameLoader()->client().shouldPaintBrokenImage(m_resourceRequest.url());
 }
 
 void CachedImage::clear()
@@ -352,12 +352,8 @@ bool CachedImage::canBeDrawn() const
     if (!m_loader || m_loader->reachedTerminalState())
         return true;
 
-    Settings* settings = m_loader->frameLoader()->frame()->settings();
-    if (!settings)
-        return true;
-
     size_t estimatedDecodedImageSize = m_image->width() * m_image->height() * 4; // no overflow check
-    return estimatedDecodedImageSize <= settings->maximumDecodedImageSize();
+    return estimatedDecodedImageSize <= m_loader->frameLoader()->frame().settings().maximumDecodedImageSize();
 }
 
 void CachedImage::addIncrementalDataBuffer(ResourceBuffer* data)

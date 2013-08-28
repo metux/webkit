@@ -421,8 +421,6 @@ void WebPageProxy::initializeLoaderClient(const WKPageLoaderClient* loadClient)
         milestones |= WebCore::DidFirstLayout;
     if (loadClient->didFirstVisuallyNonEmptyLayoutForFrame)
         milestones |= WebCore::DidFirstVisuallyNonEmptyLayout;
-    if (loadClient->didNewFirstVisuallyNonEmptyLayout)
-        milestones |= WebCore::DidHitRelevantRepaintedObjectsAreaThreshold;
 
     if (milestones)
         m_process->send(Messages::WebPage::ListenForLayoutMilestones(milestones), m_pageID);
@@ -1445,6 +1443,7 @@ void WebPageProxy::findPlugin(const String& mimeType, uint32_t processType, cons
 #else
     UNUSED_PARAM(frameURLString);
     UNUSED_PARAM(pageURLString);
+    UNUSED_PARAM(unavailabilityDescription);
 #endif
 
     PluginProcessSandboxPolicy pluginProcessSandboxPolicy = PluginProcessSandboxPolicyNormal;
@@ -2395,16 +2394,6 @@ void WebPageProxy::didFirstVisuallyNonEmptyLayoutForFrame(uint64_t frameID, Core
     MESSAGE_CHECK(frame);
 
     m_loaderClient.didFirstVisuallyNonEmptyLayoutForFrame(this, frame, userData.get());
-}
-
-void WebPageProxy::didNewFirstVisuallyNonEmptyLayout(CoreIPC::MessageDecoder& decoder)
-{
-    RefPtr<APIObject> userData;
-    WebContextUserMessageDecoder messageDecoder(userData, m_process.get());
-    if (!decoder.decode(messageDecoder))
-        return;
-
-    m_loaderClient.didNewFirstVisuallyNonEmptyLayout(this, userData.get());
 }
 
 void WebPageProxy::didLayout(uint32_t layoutMilestones, CoreIPC::MessageDecoder& decoder)
@@ -4171,7 +4160,11 @@ void WebPageProxy::didBlockInsecurePluginVersion(const String& mimeType, const S
     PluginModuleInfo plugin = m_process->context()->pluginInfoStore().findPlugin(newMimeType, KURL(KURL(), pluginURLString));
     pluginInformation = createPluginInformationDictionary(plugin, frameURLString, mimeType, pageURLString, String(), String(), replacementObscured);
 #else
+    UNUSED_PARAM(mimeType);
     UNUSED_PARAM(pluginURLString);
+    UNUSED_PARAM(frameURLString);
+    UNUSED_PARAM(pageURLString);
+    UNUSED_PARAM(replacementObscured);
 #endif
 
     m_loaderClient.didBlockInsecurePluginVersion(this, pluginInformation.get());

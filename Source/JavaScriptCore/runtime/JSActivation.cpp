@@ -43,7 +43,7 @@ const ClassInfo JSActivation::s_info = { "JSActivation", &Base::s_info, 0, 0, CR
 void JSActivation::visitChildren(JSCell* cell, SlotVisitor& visitor)
 {
     JSActivation* thisObject = jsCast<JSActivation*>(cell);
-    ASSERT_GC_OBJECT_INHERITS(thisObject, &s_info);
+    ASSERT_GC_OBJECT_INHERITS(thisObject, info());
     COMPILE_ASSERT(StructureFlags & OverridesVisitChildren, OverridesVisitChildrenWithoutSettingFlag);
     ASSERT(thisObject->structure()->typeInfo().overridesVisitChildren());
     Base::visitChildren(thisObject, visitor);
@@ -66,7 +66,7 @@ inline bool JSActivation::symbolTableGet(PropertyName propertyName, PropertySlot
     if (isTornOff() && !isValid(entry))
         return false;
 
-    slot.setValue(registerAt(entry.getIndex()).get());
+    slot.setValue(this, DontEnum, registerAt(entry.getIndex()).get());
     return true;
 }
 
@@ -157,7 +157,7 @@ bool JSActivation::getOwnPropertySlot(JSObject* object, ExecState* exec, Propert
     if (propertyName == exec->propertyNames().arguments) {
         // Defend against the inspector asking for the arguments object after it has been optimized out.
         if (!thisObject->isTornOff()) {
-            slot.setCustom(thisObject, thisObject->getArgumentsGetter());
+            slot.setCustom(thisObject, DontEnum, thisObject->getArgumentsGetter());
             return true;
         }
     }
@@ -165,8 +165,9 @@ bool JSActivation::getOwnPropertySlot(JSObject* object, ExecState* exec, Propert
     if (thisObject->symbolTableGet(propertyName, slot))
         return true;
 
-    if (JSValue value = thisObject->getDirect(exec->vm(), propertyName)) {
-        slot.setValue(value);
+    unsigned attributes;
+    if (JSValue value = thisObject->getDirect(exec->vm(), propertyName, attributes)) {
+        slot.setValue(thisObject, attributes, value);
         return true;
     }
 
@@ -175,26 +176,6 @@ bool JSActivation::getOwnPropertySlot(JSObject* object, ExecState* exec, Propert
     ASSERT(!thisObject->hasGetterSetterProperties());
     ASSERT(thisObject->prototype().isNull());
     return false;
-}
-
-bool JSActivation::getOwnPropertyDescriptor(JSObject* object, ExecState* exec, PropertyName propertyName, PropertyDescriptor& descriptor)
-{
-    JSActivation* thisObject = jsCast<JSActivation*>(object);
-
-    if (propertyName == exec->propertyNames().arguments) {
-        // Defend against the inspector asking for the arguments object after it has been optimized out.
-        if (!thisObject->isTornOff()) {
-            PropertySlot slot(thisObject);
-            JSActivation::getOwnPropertySlot(thisObject, exec, propertyName, slot);
-            descriptor.setDescriptor(slot.getValue(exec, propertyName), DontEnum);
-            return true;
-        }
-    }
-
-    if (thisObject->symbolTableGet(propertyName, descriptor))
-        return true;
-
-    return Base::getOwnPropertyDescriptor(object, exec, propertyName, descriptor);
 }
 
 void JSActivation::put(JSCell* cell, ExecState* exec, PropertyName propertyName, JSValue value, PutPropertySlot& slot)
@@ -210,22 +191,6 @@ void JSActivation::put(JSCell* cell, ExecState* exec, PropertyName propertyName,
     // expose in the activation object.
     ASSERT(!thisObject->hasGetterSetterProperties());
     thisObject->putOwnDataProperty(exec->vm(), propertyName, value, slot);
-}
-
-// FIXME: Make this function honor ReadOnly (const) and DontEnum
-void JSActivation::putDirectVirtual(JSObject* object, ExecState* exec, PropertyName propertyName, JSValue value, unsigned attributes)
-{
-    JSActivation* thisObject = jsCast<JSActivation*>(object);
-    ASSERT(!Heap::heap(value) || Heap::heap(value) == Heap::heap(thisObject));
-
-    if (thisObject->symbolTablePutWithAttributes(exec->vm(), propertyName, value, attributes))
-        return;
-
-    // We don't call through to JSObject because __proto__ and getter/setter 
-    // properties are non-standard extensions that other implementations do not
-    // expose in the activation object.
-    ASSERT(!thisObject->hasGetterSetterProperties());
-    JSObject::putDirectVirtual(thisObject, exec, propertyName, value, attributes);
 }
 
 bool JSActivation::deleteProperty(JSCell* cell, ExecState* exec, PropertyName propertyName)
@@ -259,7 +224,7 @@ JSValue JSActivation::argumentsGetter(ExecState*, JSValue slotBase, PropertyName
     callFrame->uncheckedR(argumentsRegister) = arguments;
     callFrame->uncheckedR(realArgumentsRegister) = arguments;
     
-    ASSERT(callFrame->uncheckedR(realArgumentsRegister).jsValue().inherits(&Arguments::s_info));
+    ASSERT(callFrame->uncheckedR(realArgumentsRegister).jsValue().inherits(Arguments::info()));
     return callFrame->uncheckedR(realArgumentsRegister).jsValue();
 }
 

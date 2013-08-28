@@ -60,7 +60,7 @@ void RegExpMatchesArray::finishCreation(VM& vm)
 void RegExpMatchesArray::visitChildren(JSCell* cell, SlotVisitor& visitor)
 {
     RegExpMatchesArray* thisObject = jsCast<RegExpMatchesArray*>(cell);
-    ASSERT_GC_OBJECT_INHERITS(thisObject, &s_info);
+    ASSERT_GC_OBJECT_INHERITS(thisObject, info());
     COMPILE_ASSERT(StructureFlags & OverridesVisitChildren, OverridesVisitChildrenWithoutSettingFlag);
     ASSERT(thisObject->structure()->typeInfo().overridesVisitChildren());
 
@@ -92,9 +92,8 @@ void RegExpMatchesArray::reifyAllProperties(ExecState* exec)
         }
     }
 
-    PutPropertySlot slot;
-    JSArray::put(this, exec, exec->propertyNames().index, jsNumber(m_result.start), slot);
-    JSArray::put(this, exec, exec->propertyNames().input, m_input.get(), slot);
+    putDirect(exec->vm(), exec->propertyNames().index, jsNumber(m_result.start));
+    putDirect(exec->vm(), exec->propertyNames().input, m_input.get());
 
     m_state = ReifiedAll;
 }

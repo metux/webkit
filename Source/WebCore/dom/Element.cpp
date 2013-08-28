@@ -35,6 +35,7 @@
 #include "ClassList.h"
 #include "ClientRect.h"
 #include "ClientRectList.h"
+#include "ContainerNodeAlgorithms.h"
 #include "CustomElementRegistry.h"
 #include "DOMTokenList.h"
 #include "DatasetDOMStringMap.h"
@@ -42,6 +43,7 @@
 #include "DocumentFragment.h"
 #include "DocumentSharedObjectPool.h"
 #include "ElementRareData.h"
+#include "ElementTraversal.h"
 #include "EventDispatcher.h"
 #include "ExceptionCode.h"
 #include "FlowThreadController.h"
@@ -68,8 +70,6 @@
 #include "NamedNodeMap.h"
 #include "NodeList.h"
 #include "NodeRenderStyle.h"
-#include "NodeRenderingContext.h"
-#include "NodeTraversal.h"
 #include "Page.h"
 #include "PointerLockController.h"
 #include "PseudoElement.h"
@@ -125,16 +125,16 @@ static AttrNodeList* attrNodeListForElement(Element* element)
     return attrNodeListMap().get(element);
 }
 
-static AttrNodeList* ensureAttrNodeListForElement(Element* element)
+static AttrNodeList& ensureAttrNodeListForElement(Element* element)
 {
     if (element->hasSyntheticAttrChildNodes()) {
         ASSERT(attrNodeListMap().contains(element));
-        return attrNodeListMap().get(element);
+        return *attrNodeListMap().get(element);
     }
     ASSERT(!attrNodeListMap().contains(element));
     element->setHasSyntheticAttrChildNodes(true);
     AttrNodeListMap::AddResult result = attrNodeListMap().add(element, adoptPtr(new AttrNodeList));
-    return result.iterator->value.get();
+    return *result.iterator->value;
 }
 
 static void removeAttrNodeListForElement(Element* element)
@@ -145,11 +145,11 @@ static void removeAttrNodeListForElement(Element* element)
     element->setHasSyntheticAttrChildNodes(false);
 }
 
-static Attr* findAttrNodeInList(AttrNodeList* attrNodeList, const QualifiedName& name)
+static Attr* findAttrNodeInList(AttrNodeList& attrNodeList, const QualifiedName& name)
 {
-    for (unsigned i = 0; i < attrNodeList->size(); ++i) {
-        if (attrNodeList->at(i)->qualifiedName() == name)
-            return attrNodeList->at(i).get();
+    for (unsigned i = 0; i < attrNodeList.size(); ++i) {
+        if (attrNodeList.at(i)->qualifiedName() == name)
+            return attrNodeList.at(i).get();
     }
     return 0;
 }
@@ -170,12 +170,10 @@ Element::~Element()
     }
 #endif
 
-    if (hasRareData()) {
-        ElementRareData* data = elementRareData();
-        data->setPseudoElement(BEFORE, 0);
-        data->setPseudoElement(AFTER, 0);
-        data->clearShadow();
-    }
+    ASSERT(!beforePseudoElement());
+    ASSERT(!afterPseudoElement());
+
+    removeShadowRoot();
 
     if (hasSyntheticAttrChildNodes())
         detachAllAttrNodesFromElement();
@@ -194,9 +192,9 @@ inline ElementRareData* Element::elementRareData() const
     return static_cast<ElementRareData*>(rareData());
 }
 
-inline ElementRareData* Element::ensureElementRareData()
+inline ElementRareData& Element::ensureElementRareData()
 {
-    return static_cast<ElementRareData*>(ensureRareData());
+    return static_cast<ElementRareData&>(ensureRareData());
 }
 
 void Element::clearTabIndexExplicitlyIfNeeded()
@@ -207,7 +205,7 @@ void Element::clearTabIndexExplicitlyIfNeeded()
 
 void Element::setTabIndexExplicitly(short tabIndex)
 {
-    ensureElementRareData()->setTabIndexExplicitly(tabIndex);
+    ensureElementRareData().setTabIndexExplicitly(tabIndex);
 }
 
 bool Element::supportsFocus() const
@@ -316,12 +314,12 @@ void Element::setBooleanAttribute(const QualifiedName& name, bool value)
 
 NamedNodeMap* Element::attributes() const
 {
-    ElementRareData* rareData = const_cast<Element*>(this)->ensureElementRareData();
-    if (NamedNodeMap* attributeMap = rareData->attributeMap())
+    ElementRareData& rareData = const_cast<Element*>(this)->ensureElementRareData();
+    if (NamedNodeMap* attributeMap = rareData.attributeMap())
         return attributeMap;
 
-    rareData->setAttributeMap(NamedNodeMap::create(const_cast<Element*>(this)));
-    return rareData->attributeMap();
+    rareData.setAttributeMap(NamedNodeMap::create(const_cast<Element*>(this)));
+    return rareData.attributeMap();
 }
 
 Node::NodeType Element::nodeType() const
@@ -473,7 +471,7 @@ void Element::setActive(bool flag, bool pause)
     // The rest of this function implements a feature that only works if the
     // platform supports immediate invalidations on the ChromeClient, so bail if
     // that isn't supported.
-    if (!document()->page()->chrome().client()->supportsImmediateInvalidation())
+    if (!document()->page()->chrome().client().supportsImmediateInvalidation())
         return;
 
     if (reactsToPress && pause) {
@@ -482,7 +480,7 @@ void Element::setActive(bool flag, bool pause)
         // "up" state. Once you assume this, you can just delay for 100ms - that time (assuming that after you
         // leave this method, it will be about that long before the flush of the up state happens again).
 #ifdef HAVE_FUNC_USLEEP
-        double startTime = currentTime();
+        double startTime = monotonicallyIncreasingTime();
 #endif
 
         document()->updateStyleIfNeeded();
@@ -494,7 +492,7 @@ void Element::setActive(bool flag, bool pause)
         // FIXME: Come up with a less ridiculous way of doing this.
 #ifdef HAVE_FUNC_USLEEP
         // Now pause for a small amount of time (1/10th of a second from before we repainted in the pressed state)
-        double remainingTime = 0.1 - (currentTime() - startTime);
+        double remainingTime = 0.1 - (monotonicallyIncreasingTime() - startTime);
         if (remainingTime > 0)
             usleep(static_cast<useconds_t>(remainingTime * 1000000.0));
 #endif
@@ -762,7 +760,16 @@ int Element::clientHeight()
 
 int Element::scrollLeft()
 {
+    if (document()->documentElement() == this && document()->inQuirksMode())
+        return 0;
+
     document()->updateLayoutIgnorePendingStylesheets();
+    if (document()->documentElement() == this) {
+        if (RenderView* renderView = document()->renderView()) {
+            if (FrameView* view = &renderView->frameView())
+                return adjustForAbsoluteZoom(view->scrollX(), renderView);
+        }
+    }
     if (RenderBox* rend = renderBox())
         return adjustForAbsoluteZoom(rend->scrollLeft(), rend);
     return 0;
@@ -770,7 +777,16 @@ int Element::scrollLeft()
 
 int Element::scrollTop()
 {
+    if (document()->documentElement() == this && document()->inQuirksMode())
+        return 0;
+
     document()->updateLayoutIgnorePendingStylesheets();
+    if (document()->documentElement() == this) {
+        if (RenderView* renderView = document()->renderView()) {
+            if (FrameView* view = &renderView->frameView())
+                return adjustForAbsoluteZoom(view->scrollY(), renderView);
+        }
+    }
     if (RenderBox* rend = renderBox())
         return adjustForAbsoluteZoom(rend->scrollTop(), rend);
     return 0;
@@ -963,7 +979,7 @@ inline void Element::setAttributeInternal(unsigned index, const QualifiedName& n
         if (RefPtr<Attr> attrNode = inSynchronizationOfLazyAttribute ? 0 : attrIfExists(name))
             attrNode->setValue(newValue);
         else
-            ensureUniqueElementData()->attributeAt(index).setValue(newValue);
+            ensureUniqueElementData().attributeAt(index).setValue(newValue);
     }
 
     if (!inSynchronizationOfLazyAttribute)
@@ -1111,7 +1127,7 @@ void Element::classAttributeChanged(const AtomicString& newClassString)
 
     if (classStringHasClassName(newClassString)) {
         const bool shouldFoldCase = document()->inQuirksMode();
-        const SpaceSplitString oldClasses = ensureUniqueElementData()->classNames();
+        const SpaceSplitString oldClasses = ensureUniqueElementData().classNames();
         elementData()->setClass(newClassString, shouldFoldCase);
         const SpaceSplitString& newClasses = elementData()->classNames();
         shouldInvalidateStyle = testShouldInvalidateStyle && checkSelectorForClassChange(oldClasses, newClasses, *styleResolver);
@@ -1241,9 +1257,9 @@ const AtomicString& Element::imageSourceURL() const
     return getAttribute(srcAttr);
 }
 
-bool Element::rendererIsNeeded(const NodeRenderingContext& context)
+bool Element::rendererIsNeeded(const RenderStyle& style)
 {
-    return context.style()->display() != NONE;
+    return style.display() != NONE;
 }
 
 RenderObject* Element::createRenderer(RenderArena*, RenderStyle* style)
@@ -1282,12 +1298,6 @@ Node::InsertionNotificationRequest Element::insertedInto(ContainerNode* insertio
     if (containsFullScreenElement() && parentElement() && !parentElement()->containsFullScreenElement())
         setContainsFullScreenElementOnAncestorsCrossingFrameBoundaries(true);
 #endif
-
-    if (Element* before = pseudoElement(BEFORE))
-        before->insertedInto(insertionPoint);
-
-    if (Element* after = pseudoElement(AFTER))
-        after->insertedInto(insertionPoint);
 
     if (!insertionPoint->isInTreeScope())
         return InsertionDone;
@@ -1329,12 +1339,6 @@ void Element::removedFrom(ContainerNode* insertionPoint)
 #if ENABLE(SVG)
     bool wasInDocument = insertionPoint->document();
 #endif
-
-    if (Element* before = pseudoElement(BEFORE))
-        before->removedFrom(insertionPoint);
-
-    if (Element* after = pseudoElement(AFTER))
-        after->removedFrom(insertionPoint);
 
 #if ENABLE(DIALOG_ELEMENT)
     document()->removeFromTopLayer(this);
@@ -1385,107 +1389,100 @@ void Element::removedFrom(ContainerNode* insertionPoint)
 #endif
 }
 
-void Element::createRendererIfNeeded(const AttachContext& context)
-{
-    NodeRenderingContext(this, context).createRendererForElementIfNeeded();
-}
-
-void Element::attach(const AttachContext& context)
-{
-    PostAttachCallbackDisabler callbackDisabler(this);
-    StyleResolverParentPusher parentPusher(this);
-    WidgetHierarchyUpdatesSuspensionScope suspendWidgetHierarchyUpdates;
-
-    createRendererIfNeeded(context);
-
-    if (parentElement() && parentElement()->isInCanvasSubtree())
-        setIsInCanvasSubtree(true);
-
-    updatePseudoElement(BEFORE);
-
-    // When a shadow root exists, it does the work of attaching the children.
-    if (ElementShadow* shadow = this->shadow()) {
-        parentPusher.push();
-        shadow->attach(context);
-    } else if (firstChild())
-        parentPusher.push();
-
-    ContainerNode::attach(context);
-
-    updatePseudoElement(AFTER);
-
-    if (hasRareData()) {   
-        ElementRareData* data = elementRareData();
-        if (data->needsFocusAppearanceUpdateSoonAfterAttach()) {
-            if (isFocusable() && document()->focusedElement() == this)
-                document()->updateFocusAppearanceSoon(false /* don't restore selection */);
-            data->setNeedsFocusAppearanceUpdateSoonAfterAttach(false);
-        }
-    }
-}
-
 void Element::unregisterNamedFlowContentNode()
 {
     if (document()->cssRegionsEnabled() && inNamedFlow() && document()->renderView())
         document()->renderView()->flowThreadController()->unregisterNamedFlowContentNode(this);
 }
 
-void Element::detach(const AttachContext& context)
+void Element::lazyReattach(ShouldSetAttached shouldSetAttached)
 {
-    WidgetHierarchyUpdatesSuspensionScope suspendWidgetHierarchyUpdates;
-    unregisterNamedFlowContentNode();
-    cancelFocusAppearanceUpdate();
-    if (hasRareData()) {
-        ElementRareData* data = elementRareData();
-        data->setPseudoElement(BEFORE, 0);
-        data->setPseudoElement(AFTER, 0);
-        data->setIsInCanvasSubtree(false);
-        data->resetComputedStyle();
-        data->resetDynamicRestyleObservations();
-        data->setIsInsideRegion(false);
+    Style::AttachContext context;
+    context.performingReattach = true;
+
+    if (attached())
+        Style::detachRenderTree(this, context);
+    lazyAttach(shouldSetAttached);
+}
+
+void Element::lazyAttach(ShouldSetAttached shouldSetAttached)
+{
+    for (Node* node = this; node; node = NodeTraversal::next(node, this)) {
+        if (!node->isTextNode() && !node->isElementNode())
+            continue;
+        if (node->hasChildNodes())
+            node->setChildNeedsStyleRecalc();
+        if (node->isElementNode())
+            toElement(node)->setStyleChange(FullStyleChange);
+        if (shouldSetAttached == SetAttached)
+            node->setAttached(true);
     }
-
-    if (ElementShadow* shadow = this->shadow())
-        shadow->detach(context);
-
-    // Do not remove the element's hovered and active status
-    // if performing a reattach.
-    if (!context.performingReattach) {
-        if (isUserActionElement()) {
-            if (hovered())
-                document()->hoveredElementDidDetach(this);
-            if (inActiveChain())
-                document()->elementInActiveChainDidDetach(this);
-            document()->userActionElements().didDetach(this);
-        }
-    }
-
-    ContainerNode::detach(context);
+    markAncestorsWithChildNeedsStyleRecalc();
 }
 
 PassRefPtr<RenderStyle> Element::styleForRenderer()
 {
-    if (hasCustomStyleCallbacks()) {
+    if (hasCustomStyleResolveCallbacks()) {
         if (RefPtr<RenderStyle> style = customStyleForRenderer())
             return style.release();
     }
 
-    return document()->ensureStyleResolver()->styleForElement(this);
+    return document()->ensureStyleResolver().styleForElement(this);
 }
 
-ElementShadow* Element::shadow() const
+ShadowRoot* Element::shadowRoot() const
 {
-    return hasRareData() ? elementRareData()->shadow() : 0;
-}
-
-ElementShadow* Element::ensureShadow()
-{
-    return ensureElementRareData()->ensureShadow();
+    return hasRareData() ? elementRareData()->shadowRoot() : 0;
 }
 
 void Element::didAffectSelector(AffectedSelectorMask)
 {
     setNeedsStyleRecalc();
+}
+
+void Element::addShadowRoot(PassRefPtr<ShadowRoot> newShadowRoot)
+{
+    ASSERT(!shadowRoot());
+
+    ShadowRoot* shadowRoot = newShadowRoot.get();
+    ensureElementRareData().setShadowRoot(newShadowRoot);
+
+    shadowRoot->setHostElement(this);
+    shadowRoot->setParentTreeScope(treeScope());
+    shadowRoot->distributor().didShadowBoundaryChange(this);
+
+    ChildNodeInsertionNotifier(this).notify(shadowRoot);
+
+    // Existence of shadow roots requires the host and its children to do traversal using ComposedShadowTreeWalker.
+    setNeedsShadowTreeWalker();
+
+    // FIXME(94905): ShadowHost should be reattached during recalcStyle.
+    // Set some flag here and recreate shadow hosts' renderer in
+    // Element::recalcStyle.
+    if (attached())
+        lazyReattach();
+
+    InspectorInstrumentation::didPushShadowRoot(this, shadowRoot);
+}
+
+void Element::removeShadowRoot()
+{
+    RefPtr<ShadowRoot> oldRoot = shadowRoot();
+    if (!oldRoot)
+        return;
+    InspectorInstrumentation::willPopShadowRoot(this, oldRoot.get());
+    document()->removeFocusedNodeOfSubtree(oldRoot.get());
+
+    ASSERT(!oldRoot->attached());
+
+    elementRareData()->clearShadowRoot();
+
+    oldRoot->setHostElement(0);
+    oldRoot->setParentTreeScope(document());
+
+    ChildNodeRemovalNotifier(this).notify(oldRoot.get());
+
+    oldRoot->distributor().invalidateDistribution(this);
 }
 
 PassRefPtr<ShadowRoot> Element::createShadowRoot(ExceptionCode& ec)
@@ -1494,8 +1491,10 @@ PassRefPtr<ShadowRoot> Element::createShadowRoot(ExceptionCode& ec)
         ensureUserAgentShadowRoot();
 
 #if ENABLE(SHADOW_DOM)
-    if (RuntimeEnabledFeatures::authorShadowDOMForAnyElementEnabled())
-        return ensureShadow()->addShadowRoot(this, ShadowRoot::AuthorShadowRoot);
+    if (RuntimeEnabledFeatures::authorShadowDOMForAnyElementEnabled()) {
+        addShadowRoot(ShadowRoot::create(document(), ShadowRoot::AuthorShadowRoot));
+        return shadowRoot();
+    }
 #endif
 
     // Since some elements recreates shadow root dynamically, multiple shadow
@@ -1505,15 +1504,14 @@ PassRefPtr<ShadowRoot> Element::createShadowRoot(ExceptionCode& ec)
         ec = HIERARCHY_REQUEST_ERR;
         return 0;
     }
-    return ensureShadow()->addShadowRoot(this, ShadowRoot::AuthorShadowRoot);
+    addShadowRoot(ShadowRoot::create(document(), ShadowRoot::AuthorShadowRoot));
+
+    return shadowRoot();
 }
 
 ShadowRoot* Element::authorShadowRoot() const
 {
-    ElementShadow* elementShadow = shadow();
-    if (!elementShadow)
-        return 0;
-    ShadowRoot* shadowRoot = elementShadow->shadowRoot();
+    ShadowRoot* shadowRoot = this->shadowRoot();
     if (shadowRoot->type() == ShadowRoot::AuthorShadowRoot)
         return shadowRoot;
     return 0;
@@ -1521,24 +1519,22 @@ ShadowRoot* Element::authorShadowRoot() const
 
 ShadowRoot* Element::userAgentShadowRoot() const
 {
-    if (ElementShadow* elementShadow = shadow()) {
-        if (ShadowRoot* shadowRoot = elementShadow->shadowRoot()) {
-            ASSERT(shadowRoot->type() == ShadowRoot::UserAgentShadowRoot);
-            return shadowRoot;
-        }
+    if (ShadowRoot* shadowRoot = this->shadowRoot()) {
+        ASSERT(shadowRoot->type() == ShadowRoot::UserAgentShadowRoot);
+        return shadowRoot;
     }
-
     return 0;
 }
 
-ShadowRoot* Element::ensureUserAgentShadowRoot()
+ShadowRoot& Element::ensureUserAgentShadowRoot()
 {
     ShadowRoot* shadowRoot = userAgentShadowRoot();
     if (!shadowRoot) {
-        shadowRoot = ensureShadow()->addShadowRoot(this, ShadowRoot::UserAgentShadowRoot);
+        addShadowRoot(ShadowRoot::create(document(), ShadowRoot::UserAgentShadowRoot));
+        shadowRoot = userAgentShadowRoot();
         didAddUserAgentShadowRoot(shadowRoot);
     }
-    return shadowRoot;
+    return *shadowRoot;
 }
 
 const AtomicString& Element::shadowPseudoId() const
@@ -1658,15 +1654,15 @@ void Element::childrenChanged(bool changedByParser, Node* beforeChange, Node* af
     else
         checkForSiblingStyleChanges(this, renderStyle(), false, beforeChange, afterChange, childCountDelta);
 
-    if (ElementShadow * shadow = this->shadow())
-        shadow->invalidateDistribution();
+    if (ShadowRoot* shadowRoot = this->shadowRoot())
+        shadowRoot->invalidateDistribution();
 }
 
 void Element::removeAllEventListeners()
 {
     ContainerNode::removeAllEventListeners();
-    if (ElementShadow* shadow = this->shadow())
-        shadow->removeAllEventListeners();
+    if (ShadowRoot* shadowRoot = this->shadowRoot())
+        shadowRoot->removeAllEventListeners();
 }
 
 void Element::beginParsingChildren()
@@ -1739,21 +1735,21 @@ PassRefPtr<Attr> Element::setAttributeNode(Attr* attrNode, ExceptionCode& ec)
     }
 
     synchronizeAllAttributes();
-    UniqueElementData* elementData = ensureUniqueElementData();
+    UniqueElementData& elementData = ensureUniqueElementData();
 
-    unsigned index = elementData->findAttributeIndexByNameForAttributeNode(attrNode);
+    unsigned index = elementData.findAttributeIndexByNameForAttributeNode(attrNode, shouldIgnoreAttributeCase(this));
     if (index != ElementData::attributeNotFound) {
         if (oldAttrNode)
-            detachAttrNodeFromElementWithValue(oldAttrNode.get(), elementData->attributeAt(index).value());
+            detachAttrNodeFromElementWithValue(oldAttrNode.get(), elementData.attributeAt(index).value());
         else
-            oldAttrNode = Attr::create(document(), attrNode->qualifiedName(), elementData->attributeAt(index).value());
+            oldAttrNode = Attr::create(document(), attrNode->qualifiedName(), elementData.attributeAt(index).value());
     }
 
     setAttributeInternal(index, attrNode->qualifiedName(), attrNode->value(), NotInSynchronizationOfLazyAttribute);
 
     attrNode->attachToElement(this);
     treeScope()->adoptIfNeeded(attrNode);
-    ensureAttrNodeListForElement(this)->append(attrNode);
+    ensureAttrNodeListForElement(this).append(attrNode);
 
     return oldAttrNode.release();
 }
@@ -1820,10 +1816,10 @@ void Element::removeAttributeInternal(unsigned index, SynchronizationOfLazyAttri
 {
     ASSERT_WITH_SECURITY_IMPLICATION(index < attributeCount());
 
-    UniqueElementData* elementData = ensureUniqueElementData();
+    UniqueElementData& elementData = ensureUniqueElementData();
 
-    QualifiedName name = elementData->attributeAt(index).name();
-    AtomicString valueBeingRemoved = elementData->attributeAt(index).value();
+    QualifiedName name = elementData.attributeAt(index).name();
+    AtomicString valueBeingRemoved = elementData.attributeAt(index).value();
 
     if (!inSynchronizationOfLazyAttribute) {
         if (!valueBeingRemoved.isNull())
@@ -1831,9 +1827,9 @@ void Element::removeAttributeInternal(unsigned index, SynchronizationOfLazyAttri
     }
 
     if (RefPtr<Attr> attrNode = attrIfExists(name))
-        detachAttrNodeFromElementWithValue(attrNode.get(), elementData->attributeAt(index).value());
+        detachAttrNodeFromElementWithValue(attrNode.get(), elementData.attributeAt(index).value());
 
-    elementData->removeAttribute(index);
+    elementData.removeAttribute(index);
 
     if (!inSynchronizationOfLazyAttribute)
         didRemoveAttribute(name);
@@ -1843,7 +1839,7 @@ void Element::addAttributeInternal(const QualifiedName& name, const AtomicString
 {
     if (!inSynchronizationOfLazyAttribute)
         willModifyAttribute(name, nullAtom, value);
-    ensureUniqueElementData()->addAttribute(name, value);
+    ensureUniqueElementData().addAttribute(name, value);
     if (!inSynchronizationOfLazyAttribute)
         didAddAttribute(name, value);
 }
@@ -1941,7 +1937,7 @@ void Element::focus(bool restorePreviousSelection, FocusDirection direction)
         // If a focus event handler changes the focus to a different node it
         // does not make sense to continue and update appearence.
         protect = this;
-        if (!page->focusController()->setFocusedElement(this, doc->frame(), direction))
+        if (!page->focusController().setFocusedElement(this, doc->frame(), direction))
             return;
     }
 
@@ -1949,12 +1945,24 @@ void Element::focus(bool restorePreviousSelection, FocusDirection direction)
     doc->updateLayoutIgnorePendingStylesheets();
 
     if (!isFocusable()) {
-        ensureElementRareData()->setNeedsFocusAppearanceUpdateSoonAfterAttach(true);
+        ensureElementRareData().setNeedsFocusAppearanceUpdateSoonAfterAttach(true);
         return;
     }
         
     cancelFocusAppearanceUpdate();
     updateFocusAppearance(restorePreviousSelection);
+}
+
+void Element::updateFocusAppearanceAfterAttachIfNeeded()
+{
+    if (!hasRareData())
+        return;
+    ElementRareData* data = elementRareData();
+    if (!data->needsFocusAppearanceUpdateSoonAfterAttach())
+        return;
+    if (isFocusable() && document()->focusedElement() == this)
+        document()->updateFocusAppearanceSoon(false /* don't restore selection */);
+    data->setNeedsFocusAppearanceUpdateSoonAfterAttach(false);
 }
 
 void Element::updateFocusAppearance(bool /*restorePreviousSelection*/)
@@ -1965,15 +1973,15 @@ void Element::updateFocusAppearance(bool /*restorePreviousSelection*/)
             return;
         
         // When focusing an editable element in an iframe, don't reset the selection if it already contains a selection.
-        if (this == frame->selection()->rootEditableElement())
+        if (this == frame->selection().rootEditableElement())
             return;
 
         // FIXME: We should restore the previous selection if there is one.
         VisibleSelection newSelection = VisibleSelection(firstPositionInOrBeforeNode(this), DOWNSTREAM);
         
-        if (frame->selection()->shouldChangeSelection(newSelection)) {
-            frame->selection()->setSelection(newSelection);
-            frame->selection()->revealSelection();
+        if (frame->selection().shouldChangeSelection(newSelection)) {
+            frame->selection().setSelection(newSelection);
+            frame->selection().revealSelection();
         }
     } else if (renderer() && !renderer()->isWidget())
         renderer()->scrollRectToVisible(boundingBox());
@@ -1985,7 +1993,7 @@ void Element::blur()
     Document* doc = document();
     if (treeScope()->focusedElement() == this) {
         if (doc->frame())
-            doc->frame()->page()->focusController()->setFocusedElement(0, doc->frame());
+            doc->frame()->page()->focusController().setFocusedElement(0, doc->frame());
         else
             doc->setFocusedElement(0);
     }
@@ -2008,7 +2016,7 @@ void Element::dispatchFocusOutEvent(const AtomicString& eventType, PassRefPtr<El
 void Element::dispatchFocusEvent(PassRefPtr<Element> oldFocusedElement, FocusDirection)
 {
     if (document()->page())
-        document()->page()->chrome().client()->elementDidFocus(this);
+        document()->page()->chrome().client().elementDidFocus(this);
 
     RefPtr<FocusEvent> event = FocusEvent::create(eventNames().focusEvent, false, false, document()->defaultView(), 0, oldFocusedElement);
     EventDispatcher::dispatchEvent(this, FocusEventDispatchMediator::create(event.release()));
@@ -2017,7 +2025,7 @@ void Element::dispatchFocusEvent(PassRefPtr<Element> oldFocusedElement, FocusDir
 void Element::dispatchBlurEvent(PassRefPtr<Element> newFocusedElement)
 {
     if (document()->page())
-        document()->page()->chrome().client()->elementDidBlur(this);
+        document()->page()->chrome().client().elementDidBlur(this);
 
     RefPtr<FocusEvent> event = FocusEvent::create(eventNames().blurEvent, false, false, document()->defaultView(), 0, newFocusedElement);
     EventDispatcher::dispatchEvent(this, BlurEventDispatchMediator::create(event.release()));
@@ -2069,13 +2077,25 @@ void Element::setMinimumSizeForResizing(const LayoutSize& size)
 {
     if (!hasRareData() && size == defaultMinimumSizeForResizing())
         return;
-    ensureElementRareData()->setMinimumSizeForResizing(size);
+    ensureElementRareData().setMinimumSizeForResizing(size);
+}
+
+static PseudoElement* beforeOrAfterPseudoElement(Element* host, PseudoId pseudoElementSpecifier)
+{
+    switch (pseudoElementSpecifier) {
+    case BEFORE:
+        return host->beforePseudoElement();
+    case AFTER:
+        return host->afterPseudoElement();
+    default:
+        return 0;
+    }
 }
 
 RenderStyle* Element::computedStyle(PseudoId pseudoElementSpecifier)
 {
-    if (PseudoElement* element = pseudoElement(pseudoElementSpecifier))
-        return element->computedStyle();
+    if (PseudoElement* pseudoElement = beforeOrAfterPseudoElement(this, pseudoElementSpecifier))
+        return pseudoElement->computedStyle();
 
     // FIXME: Find and use the renderer from the pseudo element instead of the actual element so that the 'length'
     // properties, which are only known by the renderer because it did the layout, will be correct and so that the
@@ -2093,66 +2113,66 @@ RenderStyle* Element::computedStyle(PseudoId pseudoElementSpecifier)
         // document tree and figure out when to destroy the computed style for such elements.
         return 0;
 
-    ElementRareData* data = ensureElementRareData();
-    if (!data->computedStyle())
-        data->setComputedStyle(document()->styleForElementIgnoringPendingStylesheets(this));
-    return pseudoElementSpecifier ? data->computedStyle()->getCachedPseudoStyle(pseudoElementSpecifier) : data->computedStyle();
+    ElementRareData& data = ensureElementRareData();
+    if (!data.computedStyle())
+        data.setComputedStyle(document()->styleForElementIgnoringPendingStylesheets(this));
+    return pseudoElementSpecifier ? data.computedStyle()->getCachedPseudoStyle(pseudoElementSpecifier) : data.computedStyle();
 }
 
 void Element::setStyleAffectedByEmpty()
 {
-    ensureElementRareData()->setStyleAffectedByEmpty(true);
+    ensureElementRareData().setStyleAffectedByEmpty(true);
 }
 
 void Element::setChildrenAffectedByHover(bool value)
 {
     if (value || hasRareData())
-        ensureElementRareData()->setChildrenAffectedByHover(value);
+        ensureElementRareData().setChildrenAffectedByHover(value);
 }
 
 void Element::setChildrenAffectedByActive(bool value)
 {
     if (value || hasRareData())
-        ensureElementRareData()->setChildrenAffectedByActive(value);
+        ensureElementRareData().setChildrenAffectedByActive(value);
 }
 
 void Element::setChildrenAffectedByDrag(bool value)
 {
     if (value || hasRareData())
-        ensureElementRareData()->setChildrenAffectedByDrag(value);
+        ensureElementRareData().setChildrenAffectedByDrag(value);
 }
 
 void Element::setChildrenAffectedByFirstChildRules()
 {
-    ensureElementRareData()->setChildrenAffectedByFirstChildRules(true);
+    ensureElementRareData().setChildrenAffectedByFirstChildRules(true);
 }
 
 void Element::setChildrenAffectedByLastChildRules()
 {
-    ensureElementRareData()->setChildrenAffectedByLastChildRules(true);
+    ensureElementRareData().setChildrenAffectedByLastChildRules(true);
 }
 
 void Element::setChildrenAffectedByDirectAdjacentRules()
 {
-    ensureElementRareData()->setChildrenAffectedByDirectAdjacentRules(true);
+    ensureElementRareData().setChildrenAffectedByDirectAdjacentRules(true);
 }
 
 void Element::setChildrenAffectedByForwardPositionalRules()
 {
-    ensureElementRareData()->setChildrenAffectedByForwardPositionalRules(true);
+    ensureElementRareData().setChildrenAffectedByForwardPositionalRules(true);
 }
 
 void Element::setChildrenAffectedByBackwardPositionalRules()
 {
-    ensureElementRareData()->setChildrenAffectedByBackwardPositionalRules(true);
+    ensureElementRareData().setChildrenAffectedByBackwardPositionalRules(true);
 }
 
 void Element::setChildIndex(unsigned index)
 {
-    ElementRareData* rareData = ensureElementRareData();
+    ElementRareData& rareData = ensureElementRareData();
     if (RenderStyle* style = renderStyle())
         style->setUnique();
-    rareData->setChildIndex(index);
+    rareData.setChildIndex(index);
 }
 
 bool Element::hasFlagsSetDuringStylingOfChildren() const
@@ -2231,7 +2251,7 @@ unsigned Element::rareDataChildIndex() const
 
 void Element::setIsInCanvasSubtree(bool isInCanvasSubtree)
 {
-    ensureElementRareData()->setIsInCanvasSubtree(isInCanvasSubtree);
+    ensureElementRareData().setIsInCanvasSubtree(isInCanvasSubtree);
 }
 
 bool Element::isInCanvasSubtree() const
@@ -2244,7 +2264,7 @@ void Element::setIsInsideRegion(bool value)
     if (value == isInsideRegion())
         return;
 
-    ensureElementRareData()->setIsInsideRegion(value);
+    ensureElementRareData().setIsInsideRegion(value);
 }
 
 bool Element::isInsideRegion() const
@@ -2254,7 +2274,7 @@ bool Element::isInsideRegion() const
 
 void Element::setRegionOversetState(RegionOversetState state)
 {
-    ensureElementRareData()->setRegionOversetState(state);
+    ensureElementRareData().setRegionOversetState(state);
 }
 
 RegionOversetState Element::regionOversetState() const
@@ -2310,64 +2330,103 @@ void Element::normalizeAttributes()
     }
 }
 
-void Element::updatePseudoElement(PseudoId pseudoId, Style::Change change)
+bool Element::updateExistingPseudoElement(PseudoElement* existingPseudoElement, Style::Change change)
 {
-    PseudoElement* existing = pseudoElement(pseudoId);
-    if (existing) {
-        // PseudoElement styles hang off their parent element's style so if we needed
-        // a style recalc we should Force one on the pseudo.
-        Style::resolveTree(existing, needsStyleRecalc() ? Style::Force : change);
+    // PseudoElement styles hang off their parent element's style so if we needed
+    // a style recalc we should Force one on the pseudo.
+    Style::resolveTree(existingPseudoElement, needsStyleRecalc() ? Style::Force : change);
 
-        // Wait until our parent is not displayed or pseudoElementRendererIsNeeded
-        // is false, otherwise we could continously create and destroy PseudoElements
-        // when RenderObject::isChildAllowed on our parent returns false for the
-        // PseudoElement's renderer for each style recalc.
-        if (!renderer() || !pseudoElementRendererIsNeeded(renderer()->getCachedPseudoStyle(pseudoId)))
-            setPseudoElement(pseudoId, 0);
-    } else if (RefPtr<PseudoElement> element = createPseudoElementIfNeeded(pseudoId)) {
-        element->attach();
-        setPseudoElement(pseudoId, element.release());
-    }
+    // FIXME: This is silly.
+    // Wait until our parent is not displayed or pseudoElementRendererIsNeeded
+    // is false, otherwise we could continously create and destroy PseudoElements
+    // when RenderObject::isChildAllowed on our parent returns false for the
+    // PseudoElement's renderer for each style recalc.
+    return renderer() && pseudoElementRendererIsNeeded(existingPseudoElement->renderStyle());
 }
 
 PassRefPtr<PseudoElement> Element::createPseudoElementIfNeeded(PseudoId pseudoId)
 {
     if (!document()->styleSheetCollection()->usesBeforeAfterRules())
         return 0;
-
     if (!renderer() || !renderer()->canHaveGeneratedChildren())
         return 0;
-
     if (isPseudoElement())
         return 0;
-
     if (!pseudoElementRendererIsNeeded(renderer()->getCachedPseudoStyle(pseudoId)))
         return 0;
-
-    return PseudoElement::create(this, pseudoId);
+    RefPtr<PseudoElement> pseudoElement = PseudoElement::create(this, pseudoId);
+    Style::attachRenderTree(pseudoElement.get());
+    return pseudoElement.release();
 }
 
-bool Element::hasPseudoElements() const
+void Element::updateBeforePseudoElement(Style::Change change)
 {
-    return hasRareData() && elementRareData()->hasPseudoElements();
+    if (PseudoElement* existingPseudoElement = beforePseudoElement()) {
+        if (!updateExistingPseudoElement(existingPseudoElement, change))
+            clearBeforePseudoElement();
+        return;
+    }
+    if (RefPtr<PseudoElement> pseudo = createPseudoElementIfNeeded(BEFORE))
+        setBeforePseudoElement(pseudo.release());
 }
 
-PseudoElement* Element::pseudoElement(PseudoId pseudoId) const
+void Element::updateAfterPseudoElement(Style::Change change)
 {
-    return hasRareData() ? elementRareData()->pseudoElement(pseudoId) : 0;
+    if (PseudoElement* existingPseudoElement = afterPseudoElement()) {
+        if (!updateExistingPseudoElement(existingPseudoElement, change))
+            clearAfterPseudoElement();
+        return;
+    }
+    if (RefPtr<PseudoElement> pseudo = createPseudoElementIfNeeded(AFTER))
+        setAfterPseudoElement(pseudo.release());
 }
 
-void Element::setPseudoElement(PseudoId pseudoId, PassRefPtr<PseudoElement> element)
+PseudoElement* Element::beforePseudoElement() const
 {
-    ensureElementRareData()->setPseudoElement(pseudoId, element);
+    return hasRareData() ? elementRareData()->beforePseudoElement() : 0;
+}
+
+PseudoElement* Element::afterPseudoElement() const
+{
+    return hasRareData() ? elementRareData()->afterPseudoElement() : 0;
+}
+
+void Element::setBeforePseudoElement(PassRefPtr<PseudoElement> element)
+{
+    ensureElementRareData().setBeforePseudoElement(element);
     resetNeedsShadowTreeWalker();
 }
 
-RenderObject* Element::pseudoElementRenderer(PseudoId pseudoId) const
+void Element::setAfterPseudoElement(PassRefPtr<PseudoElement> element)
 {
-    if (PseudoElement* element = pseudoElement(pseudoId))
-        return element->renderer();
-    return 0;
+    ensureElementRareData().setAfterPseudoElement(element);
+    resetNeedsShadowTreeWalker();
+}
+
+static void disconnectPseudoElement(PseudoElement* pseudoElement)
+{
+    if (!pseudoElement)
+        return;
+    if (pseudoElement->attached())
+        Style::detachRenderTree(pseudoElement);
+    ASSERT(pseudoElement->hostElement());
+    pseudoElement->clearHostElement();
+}
+
+void Element::clearBeforePseudoElement()
+{
+    if (!hasRareData())
+        return;
+    disconnectPseudoElement(elementRareData()->beforePseudoElement());
+    elementRareData()->setBeforePseudoElement(nullptr);
+}
+
+void Element::clearAfterPseudoElement()
+{
+    if (!hasRareData())
+        return;
+    disconnectPseudoElement(elementRareData()->afterPseudoElement());
+    elementRareData()->setAfterPseudoElement(nullptr);
 }
 
 // ElementTraversal API
@@ -2378,10 +2437,17 @@ Element* Element::firstElementChild() const
 
 Element* Element::lastElementChild() const
 {
-    Node* n = lastChild();
-    while (n && !n->isElementNode())
-        n = n->previousSibling();
-    return toElement(n);
+    return ElementTraversal::lastWithin(this);
+}
+
+Element* Element::previousElementSibling() const
+{
+    return ElementTraversal::previousSibling(this);
+}
+
+Element* Element::nextElementSibling() const
+{
+    return ElementTraversal::nextSibling(this);
 }
 
 unsigned Element::childElementCount() const
@@ -2412,7 +2478,7 @@ bool Element::webkitMatchesSelector(const String& selector, ExceptionCode& ec)
         return false;
     }
 
-    SelectorQuery* selectorQuery = document()->selectorQueryCache()->add(selector, document(), ec);
+    SelectorQuery* selectorQuery = document()->selectorQueryCache().add(selector, document(), ec);
     if (!selectorQuery)
         return false;
     return selectorQuery->matches(this);
@@ -2425,18 +2491,18 @@ bool Element::shouldAppearIndeterminate() const
 
 DOMTokenList* Element::classList()
 {
-    ElementRareData* data = ensureElementRareData();
-    if (!data->classList())
-        data->setClassList(ClassList::create(this));
-    return data->classList();
+    ElementRareData& data = ensureElementRareData();
+    if (!data.classList())
+        data.setClassList(ClassList::create(this));
+    return data.classList();
 }
 
 DOMStringMap* Element::dataset()
 {
-    ElementRareData* data = ensureElementRareData();
-    if (!data->dataset())
-        data->setDataset(DatasetDOMStringMap::create(this));
-    return data->dataset();
+    ElementRareData& data = ensureElementRareData();
+    if (!data.dataset())
+        data.setDataset(DatasetDOMStringMap::create(this));
+    return data.dataset();
 }
 
 KURL Element::getURLAttribute(const QualifiedName& name) const
@@ -2500,13 +2566,13 @@ const AtomicString& Element::UIActions() const
 
     
 #if ENABLE(SVG)
-bool Element::childShouldCreateRenderer(const NodeRenderingContext& childContext) const
+bool Element::childShouldCreateRenderer(const Node* child) const
 {
     // Only create renderers for SVG elements whose parents are SVG elements, or for proper <svg xmlns="svgNS"> subdocuments.
-    if (childContext.node()->isSVGElement())
-        return childContext.node()->hasTagName(SVGNames::svgTag) || isSVGElement();
+    if (child->isSVGElement())
+        return child->hasTagName(SVGNames::svgTag) || isSVGElement();
 
-    return ContainerNode::childShouldCreateRenderer(childContext);
+    return ContainerNode::childShouldCreateRenderer(child);
 }
 #endif
 
@@ -2528,7 +2594,7 @@ bool Element::containsFullScreenElement() const
 
 void Element::setContainsFullScreenElement(bool flag)
 {
-    ensureElementRareData()->setContainsFullScreenElement(flag);
+    ensureElementRareData().setContainsFullScreenElement(flag);
     setNeedsStyleRecalc(SyntheticStyleChange);
 }
 
@@ -2556,7 +2622,7 @@ void Element::setIsInTopLayer(bool inTopLayer)
 {
     if (isInTopLayer() == inTopLayer)
         return;
-    ensureElementRareData()->setIsInTopLayer(inTopLayer);
+    ensureElementRareData().setIsInTopLayer(inTopLayer);
 
     // We must ensure a reattach occurs so the renderer is inserted in the correct sibling order under RenderView according to its
     // top layer position, or in its usual place if not in the top layer.
@@ -2733,17 +2799,17 @@ void Element::updateNameForDocument(HTMLDocument* document, const AtomicString& 
     if (WindowNameCollection::nodeMatchesIfNameAttributeMatch(this)) {
         const AtomicString& id = WindowNameCollection::nodeMatchesIfIdAttributeMatch(this) ? getIdAttribute() : nullAtom;
         if (!oldName.isEmpty() && oldName != id)
-            document->windowNamedItemMap().remove(oldName.impl(), this);
+            document->removeWindowNamedItem(oldName, this);
         if (!newName.isEmpty() && newName != id)
-            document->windowNamedItemMap().add(newName.impl(), this);
+            document->addWindowNamedItem(newName, this);
     }
 
     if (DocumentNameCollection::nodeMatchesIfNameAttributeMatch(this)) {
         const AtomicString& id = DocumentNameCollection::nodeMatchesIfIdAttributeMatch(this) ? getIdAttribute() : nullAtom;
         if (!oldName.isEmpty() && oldName != id)
-            document->documentNamedItemMap().remove(oldName.impl(), this);
+            document->removeDocumentNamedItem(oldName, this);
         if (!newName.isEmpty() && newName != id)
-            document->documentNamedItemMap().add(newName.impl(), this);
+            document->addDocumentNamedItem(newName, this);
     }
 }
 
@@ -2784,17 +2850,17 @@ void Element::updateIdForDocument(HTMLDocument* document, const AtomicString& ol
     if (WindowNameCollection::nodeMatchesIfIdAttributeMatch(this)) {
         const AtomicString& name = condition == UpdateHTMLDocumentNamedItemMapsOnlyIfDiffersFromNameAttribute && WindowNameCollection::nodeMatchesIfNameAttributeMatch(this) ? getNameAttribute() : nullAtom;
         if (!oldId.isEmpty() && oldId != name)
-            document->windowNamedItemMap().remove(oldId.impl(), this);
+            document->removeWindowNamedItem(oldId, this);
         if (!newId.isEmpty() && newId != name)
-            document->windowNamedItemMap().add(newId.impl(), this);
+            document->addWindowNamedItem(newId, this);
     }
 
     if (DocumentNameCollection::nodeMatchesIfIdAttributeMatch(this)) {
         const AtomicString& name = condition == UpdateHTMLDocumentNamedItemMapsOnlyIfDiffersFromNameAttribute && DocumentNameCollection::nodeMatchesIfNameAttributeMatch(this) ? getNameAttribute() : nullAtom;
         if (!oldId.isEmpty() && oldId != name)
-            document->documentNamedItemMap().remove(oldId.impl(), this);
+            document->removeDocumentNamedItem(oldId, this);
         if (!newId.isEmpty() && newId != name)
-            document->documentNamedItemMap().add(newId.impl(), this);
+            document->addDocumentNamedItem(newId, this);
     }
 }
 
@@ -2868,15 +2934,15 @@ PassRefPtr<HTMLCollection> Element::ensureCachedHTMLCollection(CollectionType ty
     RefPtr<HTMLCollection> collection;
     if (type == TableRows) {
         ASSERT(hasTagName(tableTag));
-        return ensureRareData()->ensureNodeLists()->addCacheWithAtomicName<HTMLTableRowsCollection>(this, type);
+        return ensureRareData().ensureNodeLists().addCacheWithAtomicName<HTMLTableRowsCollection>(this, type);
     } else if (type == SelectOptions) {
         ASSERT(hasTagName(selectTag));
-        return ensureRareData()->ensureNodeLists()->addCacheWithAtomicName<HTMLOptionsCollection>(this, type);
+        return ensureRareData().ensureNodeLists().addCacheWithAtomicName<HTMLOptionsCollection>(this, type);
     } else if (type == FormControls) {
         ASSERT(hasTagName(formTag) || hasTagName(fieldsetTag));
-        return ensureRareData()->ensureNodeLists()->addCacheWithAtomicName<HTMLFormControlsCollection>(this, type);
+        return ensureRareData().ensureNodeLists().addCacheWithAtomicName<HTMLFormControlsCollection>(this, type);
     }
-    return ensureRareData()->ensureNodeLists()->addCacheWithAtomicName<HTMLCollection>(this, type);
+    return ensureRareData().ensureNodeLists().addCacheWithAtomicName<HTMLCollection>(this, type);
 }
 
 HTMLCollection* Element::cachedHTMLCollection(CollectionType type)
@@ -2893,24 +2959,24 @@ void Element::setSavedLayerScrollOffset(const IntSize& size)
 {
     if (size.isZero() && !hasRareData())
         return;
-    ensureElementRareData()->setSavedLayerScrollOffset(size);
+    ensureElementRareData().setSavedLayerScrollOffset(size);
 }
 
 PassRefPtr<Attr> Element::attrIfExists(const QualifiedName& name)
 {
     if (AttrNodeList* attrNodeList = attrNodeListForElement(this))
-        return findAttrNodeInList(attrNodeList, name);
+        return findAttrNodeInList(*attrNodeList, name);
     return 0;
 }
 
 PassRefPtr<Attr> Element::ensureAttr(const QualifiedName& name)
 {
-    AttrNodeList* attrNodeList = ensureAttrNodeListForElement(this);
+    AttrNodeList& attrNodeList = ensureAttrNodeListForElement(this);
     RefPtr<Attr> attrNode = findAttrNodeInList(attrNodeList, name);
     if (!attrNode) {
         attrNode = Attr::create(this, name);
         treeScope()->adoptIfNeeded(attrNode.get());
-        attrNodeList->append(attrNode);
+        attrNodeList.append(attrNode);
     }
     return attrNode.release();
 }
@@ -2939,7 +3005,7 @@ void Element::detachAllAttrNodesFromElement()
 
     for (unsigned i = 0; i < attributeCount(); ++i) {
         const Attribute& attribute = attributeAt(i);
-        if (RefPtr<Attr> attrNode = findAttrNodeInList(attrNodeList, attribute.name()))
+        if (RefPtr<Attr> attrNode = findAttrNodeInList(*attrNodeList, attribute.name()))
             attrNode->detachFromElementWithValue(attribute.value());
     }
 
@@ -2953,20 +3019,66 @@ void Element::resetComputedStyle()
     elementRareData()->resetComputedStyle();
 }
 
+void Element::clearStyleDerivedDataBeforeDetachingRenderer()
+{
+    unregisterNamedFlowContentNode();
+    cancelFocusAppearanceUpdate();
+    clearBeforePseudoElement();
+    clearAfterPseudoElement();
+    if (!hasRareData())
+        return;
+    ElementRareData* data = elementRareData();
+    data->setIsInCanvasSubtree(false);
+    data->resetComputedStyle();
+    data->resetDynamicRestyleObservations();
+    data->setIsInsideRegion(false);
+}
+
+void Element::clearHoverAndActiveStatusBeforeDetachingRenderer()
+{
+    if (!isUserActionElement())
+        return;
+    if (hovered())
+        document()->hoveredElementDidDetach(this);
+    if (inActiveChain())
+        document()->elementInActiveChainDidDetach(this);
+    document()->userActionElements().didDetach(this);
+}
+
 bool Element::willRecalcStyle(Style::Change)
 {
-    ASSERT(hasCustomStyleCallbacks());
+    ASSERT(hasCustomStyleResolveCallbacks());
     return true;
 }
 
 void Element::didRecalcStyle(Style::Change)
 {
-    ASSERT(hasCustomStyleCallbacks());
+    ASSERT(hasCustomStyleResolveCallbacks());
+}
+
+void Element::willAttachRenderers()
+{
+    ASSERT(hasCustomStyleResolveCallbacks());
+}
+
+void Element::didAttachRenderers()
+{
+    ASSERT(hasCustomStyleResolveCallbacks());
+}
+
+void Element::willDetachRenderers()
+{
+    ASSERT(hasCustomStyleResolveCallbacks());
+}
+
+void Element::didDetachRenderers()
+{
+    ASSERT(hasCustomStyleResolveCallbacks());
 }
 
 PassRefPtr<RenderStyle> Element::customStyleForRenderer()
 {
-    ASSERT(hasCustomStyleCallbacks());
+    ASSERT(hasCustomStyleResolveCallbacks());
     return 0;
 }
 
@@ -3039,227 +3151,13 @@ bool Element::hasPendingResources() const
 
 void Element::setHasPendingResources()
 {
-    ensureElementRareData()->setHasPendingResources(true);
+    ensureElementRareData().setHasPendingResources(true);
 }
 
 void Element::clearHasPendingResources()
 {
-    ensureElementRareData()->setHasPendingResources(false);
+    ensureElementRareData().setHasPendingResources(false);
 }
 #endif
-
-void ElementData::deref()
-{
-    if (!derefBase())
-        return;
-
-    if (m_isUnique)
-        delete static_cast<UniqueElementData*>(this);
-    else
-        delete static_cast<ShareableElementData*>(this);
-}
-
-ElementData::ElementData()
-    : m_isUnique(true)
-    , m_arraySize(0)
-    , m_hasNameAttribute(false)
-    , m_presentationAttributeStyleIsDirty(false)
-    , m_styleAttributeIsDirty(false)
-#if ENABLE(SVG)
-    , m_animatedSVGAttributesAreDirty(false)
-#endif
-{
-}
-
-ElementData::ElementData(unsigned arraySize)
-    : m_isUnique(false)
-    , m_arraySize(arraySize)
-    , m_hasNameAttribute(false)
-    , m_presentationAttributeStyleIsDirty(false)
-    , m_styleAttributeIsDirty(false)
-#if ENABLE(SVG)
-    , m_animatedSVGAttributesAreDirty(false)
-#endif
-{
-}
-
-struct SameSizeAsElementData : public RefCounted<SameSizeAsElementData> {
-    unsigned bitfield;
-    void* refPtrs[3];
-};
-
-COMPILE_ASSERT(sizeof(ElementData) == sizeof(SameSizeAsElementData), element_attribute_data_should_stay_small);
-
-static size_t sizeForShareableElementDataWithAttributeCount(unsigned count)
-{
-    return sizeof(ShareableElementData) + sizeof(Attribute) * count;
-}
-
-PassRefPtr<ShareableElementData> ShareableElementData::createWithAttributes(const Vector<Attribute>& attributes)
-{
-    void* slot = WTF::fastMalloc(sizeForShareableElementDataWithAttributeCount(attributes.size()));
-    return adoptRef(new (NotNull, slot) ShareableElementData(attributes));
-}
-
-PassRefPtr<UniqueElementData> UniqueElementData::create()
-{
-    return adoptRef(new UniqueElementData);
-}
-
-ShareableElementData::ShareableElementData(const Vector<Attribute>& attributes)
-    : ElementData(attributes.size())
-{
-    for (unsigned i = 0; i < m_arraySize; ++i)
-        new (NotNull, &m_attributeArray[i]) Attribute(attributes[i]);
-}
-
-ShareableElementData::~ShareableElementData()
-{
-    for (unsigned i = 0; i < m_arraySize; ++i)
-        m_attributeArray[i].~Attribute();
-}
-
-ShareableElementData::ShareableElementData(const UniqueElementData& other)
-    : ElementData(other, false)
-{
-    ASSERT(!other.m_presentationAttributeStyle);
-
-    if (other.m_inlineStyle) {
-        ASSERT(!other.m_inlineStyle->hasCSSOMWrapper());
-        m_inlineStyle = other.m_inlineStyle->immutableCopyIfNeeded();
-    }
-
-    for (unsigned i = 0; i < m_arraySize; ++i)
-        new (NotNull, &m_attributeArray[i]) Attribute(other.m_attributeVector.at(i));
-}
-
-ElementData::ElementData(const ElementData& other, bool isUnique)
-    : m_isUnique(isUnique)
-    , m_arraySize(isUnique ? 0 : other.length())
-    , m_hasNameAttribute(other.m_hasNameAttribute)
-    , m_presentationAttributeStyleIsDirty(other.m_presentationAttributeStyleIsDirty)
-    , m_styleAttributeIsDirty(other.m_styleAttributeIsDirty)
-#if ENABLE(SVG)
-    , m_animatedSVGAttributesAreDirty(other.m_animatedSVGAttributesAreDirty)
-#endif
-    , m_classNames(other.m_classNames)
-    , m_idForStyleResolution(other.m_idForStyleResolution)
-{
-    // NOTE: The inline style is copied by the subclass copy constructor since we don't know what to do with it here.
-}
-
-UniqueElementData::UniqueElementData()
-{
-}
-
-UniqueElementData::UniqueElementData(const UniqueElementData& other)
-    : ElementData(other, true)
-    , m_presentationAttributeStyle(other.m_presentationAttributeStyle)
-    , m_attributeVector(other.m_attributeVector)
-{
-    m_inlineStyle = other.m_inlineStyle ? other.m_inlineStyle->mutableCopy() : 0;
-}
-
-UniqueElementData::UniqueElementData(const ShareableElementData& other)
-    : ElementData(other, true)
-{
-    // An ShareableElementData should never have a mutable inline StylePropertySet attached.
-    ASSERT(!other.m_inlineStyle || !other.m_inlineStyle->isMutable());
-    m_inlineStyle = other.m_inlineStyle;
-
-    m_attributeVector.reserveCapacity(other.length());
-    for (unsigned i = 0; i < other.length(); ++i)
-        m_attributeVector.uncheckedAppend(other.m_attributeArray[i]);
-}
-
-PassRefPtr<UniqueElementData> ElementData::makeUniqueCopy() const
-{
-    if (isUnique())
-        return adoptRef(new UniqueElementData(static_cast<const UniqueElementData&>(*this)));
-    return adoptRef(new UniqueElementData(static_cast<const ShareableElementData&>(*this)));
-}
-
-PassRefPtr<ShareableElementData> UniqueElementData::makeShareableCopy() const
-{
-    void* slot = WTF::fastMalloc(sizeForShareableElementDataWithAttributeCount(m_attributeVector.size()));
-    return adoptRef(new (NotNull, slot) ShareableElementData(*this));
-}
-
-void UniqueElementData::addAttribute(const QualifiedName& attributeName, const AtomicString& value)
-{
-    m_attributeVector.append(Attribute(attributeName, value));
-}
-
-void UniqueElementData::removeAttribute(unsigned index)
-{
-    ASSERT_WITH_SECURITY_IMPLICATION(index < length());
-    m_attributeVector.remove(index);
-}
-
-bool ElementData::isEquivalent(const ElementData* other) const
-{
-    if (!other)
-        return isEmpty();
-
-    unsigned len = length();
-    if (len != other->length())
-        return false;
-
-    for (unsigned i = 0; i < len; i++) {
-        const Attribute& attribute = attributeAt(i);
-        const Attribute* otherAttr = other->findAttributeByName(attribute.name());
-        if (!otherAttr || attribute.value() != otherAttr->value())
-            return false;
-    }
-
-    return true;
-}
-
-unsigned ElementData::findAttributeIndexByNameSlowCase(const AtomicString& name, bool shouldIgnoreAttributeCase) const
-{
-    // Continue to checking case-insensitively and/or full namespaced names if necessary:
-    for (unsigned i = 0; i < length(); ++i) {
-        const Attribute& attribute = attributeAt(i);
-        if (!attribute.name().hasPrefix()) {
-            if (shouldIgnoreAttributeCase && equalIgnoringCase(name, attribute.localName()))
-                return i;
-        } else {
-            // FIXME: Would be faster to do this comparison without calling toString, which
-            // generates a temporary string by concatenation. But this branch is only reached
-            // if the attribute name has a prefix, which is rare in HTML.
-            if (equalPossiblyIgnoringCase(name, attribute.name().toString(), shouldIgnoreAttributeCase))
-                return i;
-        }
-    }
-    return attributeNotFound;
-}
-
-unsigned ElementData::findAttributeIndexByNameForAttributeNode(const Attr* attr) const
-{
-    ASSERT(attr);
-    const Attribute* attributes = attributeBase();
-    unsigned count = length();
-    for (unsigned i = 0; i < count; ++i) {
-        if (attributes[i].name() == attr->qualifiedName())
-            return i;
-    }
-    return attributeNotFound;
-}
-
-Attribute* UniqueElementData::findAttributeByName(const QualifiedName& name)
-{
-    unsigned count = length();
-    for (unsigned i = 0; i < count; ++i) {
-        if (m_attributeVector.at(i).name().matches(name))
-            return &m_attributeVector.at(i);
-    }
-    return 0;
-}
-
-Attribute& UniqueElementData::attributeAt(unsigned index)
-{
-    ASSERT_WITH_SECURITY_IMPLICATION(index < length());
-    return m_attributeVector.at(index);
-}
 
 } // namespace WebCore

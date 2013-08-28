@@ -58,7 +58,7 @@ public:
             m_view->setNeedsLayout(true);
     }
 
-    RenderNamedFlowThread* ensureRenderFlowThreadWithName(const AtomicString&);
+    RenderNamedFlowThread& ensureRenderFlowThreadWithName(const AtomicString&);
     const RenderNamedFlowThreadList* renderNamedFlowThreadList() const { return m_renderNamedFlowThreadList.get(); }
     bool hasRenderNamedFlowThreads() const { return m_renderNamedFlowThreadList && !m_renderNamedFlowThreadList->isEmpty(); }
     void layoutRenderNamedFlowThreads();
@@ -78,6 +78,10 @@ public:
     void updateFlowThreadsIntoOverflowPhase();
     void updateFlowThreadsIntoMeasureContentPhase();
     void updateFlowThreadsIntoFinalPhase();
+
+#if USE(ACCELERATED_COMPOSITING)
+    void updateRenderFlowThreadLayersIfNeeded();
+#endif
 
 #ifndef NDEBUG
     bool isAutoLogicalHeightRegionsCountConsistent() const;

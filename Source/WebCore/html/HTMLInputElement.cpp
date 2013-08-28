@@ -35,7 +35,6 @@
 #include "DateTimeChooser.h"
 #include "Document.h"
 #include "Editor.h"
-#include "ElementShadow.h"
 #include "EventNames.h"
 #include "ExceptionCode.h"
 #include "FeatureObserver.h"
@@ -136,6 +135,7 @@ HTMLInputElement::HTMLInputElement(const QualifiedName& tagName, Document* docum
     , m_inputType(InputType::createText(this))
 {
     ASSERT(hasTagName(inputTag) || hasTagName(isindexTag));
+    setHasCustomStyleResolveCallbacks();
 }
 
 PassRefPtr<HTMLInputElement> HTMLInputElement::create(const QualifiedName& tagName, Document* document, HTMLFormElement* form, bool createdByParser)
@@ -413,7 +413,7 @@ void HTMLInputElement::updateFocusAppearance(bool restorePreviousSelection)
         else
             restoreCachedSelection();
         if (document()->frame())
-            document()->frame()->selection()->revealSelection();
+            document()->frame()->selection().revealSelection();
     } else
         HTMLTextFormControlElement::updateFocusAppearance(restorePreviousSelection);
 }
@@ -479,7 +479,7 @@ void HTMLInputElement::updateType()
 
     bool wasAttached = attached();
     if (wasAttached)
-        detach();
+        Style::detachRenderTree(this);
 
     m_inputType = newType.release();
     m_inputType->createShadowSubtree();
@@ -530,13 +530,13 @@ void HTMLInputElement::updateType()
     }
 
     if (wasAttached) {
-        attach();
+        Style::attachRenderTree(this);
         if (document()->focusedElement() == this)
             updateFocusAppearance(true);
     }
 
-    if (ElementShadow* elementShadow = shadowOfParentForDistribution(this))
-        elementShadow->invalidateDistribution();
+    if (ShadowRoot* shadowRoot = shadowRootOfParentForDistribution(this))
+        shadowRoot->invalidateDistribution();
 
     setChangedSinceLastFormControlChangeEvent(false);
 
@@ -694,8 +694,8 @@ void HTMLInputElement::parseAttribute(const QualifiedName& name, const AtomicStr
         m_maxResults = !value.isNull() ? std::min(value.toInt(), maxSavedResults) : -1;
         // FIXME: Detaching just for maxResults change is not ideal.  We should figure out the right
         // time to relayout for this change.
-        if (m_maxResults != oldResults && (m_maxResults <= 0 || oldResults <= 0))
-            reattachIfAttached();
+        if (m_maxResults != oldResults && (m_maxResults <= 0 || oldResults <= 0) && attached())
+            Style::reattachRenderTree(this);
         setNeedsStyleRecalc();
         FeatureObserver::observe(document(), FeatureObserver::ResultsAttribute);
     } else if (name == autosaveAttr) {
@@ -786,9 +786,9 @@ void HTMLInputElement::finishParsingChildren()
     }
 }
 
-bool HTMLInputElement::rendererIsNeeded(const NodeRenderingContext& context)
+bool HTMLInputElement::rendererIsNeeded(const RenderStyle& style)
 {
-    return m_inputType->rendererIsNeeded() && HTMLTextFormControlElement::rendererIsNeeded(context);
+    return m_inputType->rendererIsNeeded() && HTMLTextFormControlElement::rendererIsNeeded(style);
 }
 
 RenderObject* HTMLInputElement::createRenderer(RenderArena* arena, RenderStyle* style)
@@ -796,14 +796,15 @@ RenderObject* HTMLInputElement::createRenderer(RenderArena* arena, RenderStyle* 
     return m_inputType->createRenderer(arena, style);
 }
 
-void HTMLInputElement::attach(const AttachContext& context)
+void HTMLInputElement::willAttachRenderers()
 {
-    PostAttachCallbackDisabler disabler(this);
-
     if (!m_hasType)
         updateType();
+}
 
-    HTMLTextFormControlElement::attach(context);
+void HTMLInputElement::didAttachRenderers()
+{
+    HTMLTextFormControlElement::didAttachRenderers();
 
     m_inputType->attach();
 
@@ -811,9 +812,8 @@ void HTMLInputElement::attach(const AttachContext& context)
         document()->updateFocusAppearanceSoon(true /* restore selection */);
 }
 
-void HTMLInputElement::detach(const AttachContext& context)
+void HTMLInputElement::didDetachRenderers()
 {
-    HTMLTextFormControlElement::detach(context);
     setFormControlValueMatchesRenderer(false);
     m_inputType->detach();
 }
@@ -895,7 +895,7 @@ void HTMLInputElement::setChecked(bool nowChecked, TextFieldEventBehavior eventB
     // RenderTextView), but it's not possible to do it at the moment
     // because of the way the code is structured.
     if (renderer()) {
-        if (AXObjectCache* cache = renderer()->document()->existingAXObjectCache())
+        if (AXObjectCache* cache = renderer()->document().existingAXObjectCache())
             cache->checkedStateChanged(this);
     }
 
