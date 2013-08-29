@@ -50,7 +50,7 @@ ifneq (,$(findstring $(DEB_BUILD_ARCH),sparc ia64 mips mipsel s390 s390x hurd-i3
 endif
 
 # Let's try to keep debugging symbols on these arches.
-ifneq (,$(findstring $(DEB_BUILD_ARCH),armel armhf kfreebsd-amd64 kfreebsd-i386))
+ifneq (,$(findstring $(DEB_BUILD_ARCH),armel armhf kfreebsd-amd64 kfreebsd-i386 powerpc))
 	CFLAGS += -gstabs
 endif
 
