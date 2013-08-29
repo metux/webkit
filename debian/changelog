@@ -3,6 +3,8 @@ webkitgtk (2.0.4-4) UNRELEASED; urgency=low
   * debian/rules:
     + Switch powerpc to stabs as it's currently taking too much space in
       the buildds.
+  * debian/control:
+    + Add myself to Uploaders.
 
  -- Emilio Pozuelo Monfort <pochu@debian.org>  Thu, 29 Aug 2013 18:14:20 +0200
 
