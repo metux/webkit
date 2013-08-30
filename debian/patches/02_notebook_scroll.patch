@@ -1,7 +1,9 @@
---- a/Source/WebKit/gtk/webkit/webkitwebview.cpp
-+++ b/Source/WebKit/gtk/webkit/webkitwebview.cpp
+Index: webkitgtk-2.1.90/Source/WebKit/gtk/webkit/webkitwebview.cpp
+===================================================================
+--- webkitgtk-2.1.90.orig/Source/WebKit/gtk/webkit/webkitwebview.cpp	2013-08-28 12:44:13.217369398 -0300
++++ webkitgtk-2.1.90/Source/WebKit/gtk/webkit/webkitwebview.cpp	2013-08-28 12:44:13.213369387 -0300
 @@ -789,6 +789,12 @@
-     if (!frame->view())
+     if (!frame.view())
          return FALSE;
  
 +#ifndef GTK_API_VERSION_2
@@ -11,5 +13,5 @@
 +#endif
 +
      PlatformWheelEvent wheelEvent(event);
-     return frame->eventHandler()->handleWheelEvent(wheelEvent);
+     return frame.eventHandler().handleWheelEvent(wheelEvent);
  }

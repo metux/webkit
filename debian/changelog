@@ -4,6 +4,8 @@ webkitgtk (2.1.90-1) experimental; urgency=low
   * New development release
   * debian/patches/series, debian/patches/03_dom_bindings_compat.patch:
   - removed patch; applied upstream
+  * debian/patches/02_notebook_scroll.patch:
+  - refreshed
 
   [ Emilio Pozuelo Monfort ]
   * debian/rules:
