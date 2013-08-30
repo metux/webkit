@@ -2,7 +2,7 @@ AC_PREREQ(2.60)
 
 m4_include([Source/autotools/Versions.m4])
 
-AC_INIT([WebKitGTK],[webkit_major_version.webkit_minor_version.webkit_micro_version],[http://bugs.webkit.org/])
+AC_INIT([WebKitGTK],[webkit_major_version.webkit_minor_version.webkit_micro_version.webkit_patch_version],[http://bugs.webkit.org/])
 AC_CONFIG_MACRO_DIR([Source/autotools])
 AC_CONFIG_AUX_DIR([Source/autotools])
 AC_SUBST(ACLOCAL_AMFLAGS, "-I Source/autotools")
@@ -32,6 +32,7 @@ m4_include([Source/autotools/SetupWebKitFeatures.m4])
 
 # We would put AM_INIT_AUTOMAKE into SetupAutomake.m4, but seems to cause autoconf errors.
 AM_INIT_AUTOMAKE([foreign subdir-objects dist-xz no-dist-gzip tar-ustar])
+AM_MAINTAINER_MODE([enable])
 m4_include([Source/autotools/SetupAutomake.m4])
 
 ######################################################################################

@@ -8,7 +8,7 @@
 <link rel="up" href="ch01.html" title="Class Overview">
 <link rel="prev" href="WebKitContextMenu.html" title="WebKitContextMenu">
 <link rel="next" href="WebKitFormSubmissionRequest.html" title="WebKitFormSubmissionRequest">
-<meta name="generator" content="GTK-Doc V1.18.1 (XML mode)">
+<meta name="generator" content="GTK-Doc V1.19 (XML mode)">
 <link rel="stylesheet" href="style.css" type="text/css">
 </head>
 <body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF">
@@ -41,7 +41,7 @@
 <a name="WebKitContextMenuItem.synopsis"></a><h2>Synopsis</h2>
 <pre class="synopsis">                    <a class="link" href="WebKitContextMenuItem.html#WebKitContextMenuItem-struct" title="WebKitContextMenuItem">WebKitContextMenuItem</a>;
 enum                <a class="link" href="WebKitContextMenuItem.html#WebKitContextMenuAction" title="enum WebKitContextMenuAction">WebKitContextMenuAction</a>;
-<a class="link" href="WebKitContextMenuItem.html" title="WebKitContextMenuItem"><span class="returnvalue">WebKitContextMenuItem</span></a> * <a class="link" href="WebKitContextMenuItem.html#webkit-context-menu-item-new" title="webkit_context_menu_item_new ()">webkit_context_menu_item_new</a>    (<em class="parameter"><code><a href="../gtk2/GtkAction.html"><span class="type">GtkAction</span></a> *action</code></em>);
+<a class="link" href="WebKitContextMenuItem.html" title="WebKitContextMenuItem"><span class="returnvalue">WebKitContextMenuItem</span></a> * <a class="link" href="WebKitContextMenuItem.html#webkit-context-menu-item-new" title="webkit_context_menu_item_new ()">webkit_context_menu_item_new</a>    (<em class="parameter"><code><a href="../gtk3/GtkAction.html"><span class="type">GtkAction</span></a> *action</code></em>);
 <a class="link" href="WebKitContextMenuItem.html" title="WebKitContextMenuItem"><span class="returnvalue">WebKitContextMenuItem</span></a> * <a class="link" href="WebKitContextMenuItem.html#webkit-context-menu-item-new-from-stock-action" title="webkit_context_menu_item_new_from_stock_action ()">webkit_context_menu_item_new_from_stock_action</a>
                                                         (<em class="parameter"><code><a class="link" href="WebKitContextMenuItem.html#WebKitContextMenuAction" title="enum WebKitContextMenuAction"><span class="type">WebKitContextMenuAction</span></a> action</code></em>);
 <a class="link" href="WebKitContextMenuItem.html" title="WebKitContextMenuItem"><span class="returnvalue">WebKitContextMenuItem</span></a> * <a class="link" href="WebKitContextMenuItem.html#webkit-context-menu-item-new-from-stock-action-with-label" title="webkit_context_menu_item_new_from_stock_action_with_label ()">webkit_context_menu_item_new_from_stock_action_with_label</a>
@@ -52,7 +52,7 @@ enum                <a class="link" href="WebKitContextMenuItem.html#WebKitConte
                                                          <em class="parameter"><code><a class="link" href="WebKitContextMenu.html" title="WebKitContextMenu"><span class="type">WebKitContextMenu</span></a> *submenu</code></em>);
 <a class="link" href="WebKitContextMenuItem.html" title="WebKitContextMenuItem"><span class="returnvalue">WebKitContextMenuItem</span></a> * <a class="link" href="WebKitContextMenuItem.html#webkit-context-menu-item-new-separator" title="webkit_context_menu_item_new_separator ()">webkit_context_menu_item_new_separator</a>
                                                         (<em class="parameter"><code><span class="type">void</span></code></em>);
-<a href="../gtk2/GtkAction.html"><span class="returnvalue">GtkAction</span></a> *         <a class="link" href="WebKitContextMenuItem.html#webkit-context-menu-item-get-action" title="webkit_context_menu_item_get_action ()">webkit_context_menu_item_get_action</a> (<em class="parameter"><code><a class="link" href="WebKitContextMenuItem.html" title="WebKitContextMenuItem"><span class="type">WebKitContextMenuItem</span></a> *item</code></em>);
+<a href="../gtk3/GtkAction.html"><span class="returnvalue">GtkAction</span></a> *         <a class="link" href="WebKitContextMenuItem.html#webkit-context-menu-item-get-action" title="webkit_context_menu_item_get_action ()">webkit_context_menu_item_get_action</a> (<em class="parameter"><code><a class="link" href="WebKitContextMenuItem.html" title="WebKitContextMenuItem"><span class="type">WebKitContextMenuItem</span></a> *item</code></em>);
 <a class="link" href="WebKitContextMenuItem.html#WebKitContextMenuAction" title="enum WebKitContextMenuAction"><span class="returnvalue">WebKitContextMenuAction</span></a> <a class="link" href="WebKitContextMenuItem.html#webkit-context-menu-item-get-stock-action" title="webkit_context_menu_item_get_stock_action ()">webkit_context_menu_item_get_stock_action</a>
                                                         (<em class="parameter"><code><a class="link" href="WebKitContextMenuItem.html" title="WebKitContextMenuItem"><span class="type">WebKitContextMenuItem</span></a> *item</code></em>);
 <a href="../glib/glib-Basic-Types.html#gboolean"><span class="returnvalue">gboolean</span></a>            <a class="link" href="WebKitContextMenuItem.html#webkit-context-menu-item-is-separator" title="webkit_context_menu_item_is_separator ()">webkit_context_menu_item_is_separator</a>
@@ -75,7 +75,7 @@ enum                <a class="link" href="WebKitContextMenuItem.html#WebKitConte
 <div class="refsect1">
 <a name="WebKitContextMenuItem.description"></a><h2>Description</h2>
 <p>
-The <a class="link" href="WebKitContextMenu.html" title="WebKitContextMenu"><span class="type">WebKitContextMenu</span></a> is composed of <a class="link" href="WebKitContextMenuItem.html" title="WebKitContextMenuItem"><span class="type">WebKitContextMenuItem</span></a>s. These items can be created from a <a href="../gtk2/GtkAction.html"><span class="type">GtkAction</span></a>, from a
+The <a class="link" href="WebKitContextMenu.html" title="WebKitContextMenu"><span class="type">WebKitContextMenu</span></a> is composed of <a class="link" href="WebKitContextMenuItem.html" title="WebKitContextMenuItem"><span class="type">WebKitContextMenuItem</span></a>s. These items can be created from a <a href="../gtk3/GtkAction.html"><span class="type">GtkAction</span></a>, from a
 <a class="link" href="WebKitContextMenuItem.html#WebKitContextMenuAction" title="enum WebKitContextMenuAction"><span class="type">WebKitContextMenuAction</span></a> or from a <a class="link" href="WebKitContextMenuItem.html#WebKitContextMenuAction" title="enum WebKitContextMenuAction"><span class="type">WebKitContextMenuAction</span></a> and a
 label. These <a class="link" href="WebKitContextMenuItem.html#WebKitContextMenuAction" title="enum WebKitContextMenuAction"><span class="type">WebKitContextMenuAction</span></a>s denote stock actions
 for the items. You can also create separators and submenus.
@@ -371,7 +371,7 @@ Enum values used to denote the stock actions for
 <hr>
 <div class="refsect2">
 <a name="webkit-context-menu-item-new"></a><h3>webkit_context_menu_item_new ()</h3>
-<pre class="programlisting"><a class="link" href="WebKitContextMenuItem.html" title="WebKitContextMenuItem"><span class="returnvalue">WebKitContextMenuItem</span></a> * webkit_context_menu_item_new    (<em class="parameter"><code><a href="../gtk2/GtkAction.html"><span class="type">GtkAction</span></a> *action</code></em>);</pre>
+<pre class="programlisting"><a class="link" href="WebKitContextMenuItem.html" title="WebKitContextMenuItem"><span class="returnvalue">WebKitContextMenuItem</span></a> * webkit_context_menu_item_new    (<em class="parameter"><code><a href="../gtk3/GtkAction.html"><span class="type">GtkAction</span></a> *action</code></em>);</pre>
 <p>
 Creates a new <a class="link" href="WebKitContextMenuItem.html" title="WebKitContextMenuItem"><span class="type">WebKitContextMenuItem</span></a> for the given <em class="parameter"><code>action</code></em>.
 </p>
@@ -383,7 +383,7 @@ Creates a new <a class="link" href="WebKitContextMenuItem.html" title="WebKitCon
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>action</code></em> :</span></p></td>
-<td>a <a href="../gtk2/GtkAction.html"><span class="type">GtkAction</span></a>
+<td>a <a href="../gtk3/GtkAction.html"><span class="type">GtkAction</span></a>
 </td>
 </tr>
 <tr>
@@ -403,9 +403,9 @@ Creates a new <a class="link" href="WebKitContextMenuItem.html" title="WebKitCon
 Stock actions are handled automatically by WebKit so that, for example,
 when a menu item created with a <a class="link" href="WebKitContextMenuItem.html#WEBKIT-CONTEXT-MENU-ACTION-STOP:CAPS"><code class="literal">WEBKIT_CONTEXT_MENU_ACTION_STOP</code></a> is
 activated the action associated will be handled by WebKit and the current
-load operation will be stopped. You can get the <a href="../gtk2/GtkAction.html"><span class="type">GtkAction</span></a> of a
+load operation will be stopped. You can get the <a href="../gtk3/GtkAction.html"><span class="type">GtkAction</span></a> of a
 <a class="link" href="WebKitContextMenuItem.html" title="WebKitContextMenuItem"><span class="type">WebKitContextMenuItem</span></a> created with a <a class="link" href="WebKitContextMenuItem.html#WebKitContextMenuAction" title="enum WebKitContextMenuAction"><span class="type">WebKitContextMenuAction</span></a> with
-<a class="link" href="WebKitContextMenuItem.html#webkit-context-menu-item-get-action" title="webkit_context_menu_item_get_action ()"><code class="function">webkit_context_menu_item_get_action()</code></a> and connect to <a href="../gtk2/GtkAction.html#GtkAction-activate"><span class="type">"activate"</span></a> signal
+<a class="link" href="WebKitContextMenuItem.html#webkit-context-menu-item-get-action" title="webkit_context_menu_item_get_action ()"><code class="function">webkit_context_menu_item_get_action()</code></a> and connect to <a href="../gtk3/GtkAction.html#GtkAction-activate"><span class="type">"activate"</span></a> signal
 to be notified when the item is activated. But you can't prevent the asociated
 action from being performed.
 </p>
@@ -510,7 +510,7 @@ Creates a new <a class="link" href="WebKitContextMenuItem.html" title="WebKitCon
 <hr>
 <div class="refsect2">
 <a name="webkit-context-menu-item-get-action"></a><h3>webkit_context_menu_item_get_action ()</h3>
-<pre class="programlisting"><a href="../gtk2/GtkAction.html"><span class="returnvalue">GtkAction</span></a> *         webkit_context_menu_item_get_action (<em class="parameter"><code><a class="link" href="WebKitContextMenuItem.html" title="WebKitContextMenuItem"><span class="type">WebKitContextMenuItem</span></a> *item</code></em>);</pre>
+<pre class="programlisting"><a href="../gtk3/GtkAction.html"><span class="returnvalue">GtkAction</span></a> *         webkit_context_menu_item_get_action (<em class="parameter"><code><a class="link" href="WebKitContextMenuItem.html" title="WebKitContextMenuItem"><span class="type">WebKitContextMenuItem</span></a> *item</code></em>);</pre>
 <p>
 Gets the action associated to <em class="parameter"><code>item</code></em>.
 </p>
@@ -527,7 +527,7 @@ Gets the action associated to <em class="parameter"><code>item</code></em>.
 </tr>
 <tr>
 <td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
-<td>the <a href="../gtk2/GtkAction.html"><span class="type">GtkAction</span></a> associated to the <a class="link" href="WebKitContextMenuItem.html" title="WebKitContextMenuItem"><span class="type">WebKitContextMenuItem</span></a>,
+<td>the <a href="../gtk3/GtkAction.html"><span class="type">GtkAction</span></a> associated to the <a class="link" href="WebKitContextMenuItem.html" title="WebKitContextMenuItem"><span class="type">WebKitContextMenuItem</span></a>,
 or <a href="../glib/glib-Standard-Macros.html#NULL:CAPS"><code class="literal">NULL</code></a> if <em class="parameter"><code>item</code></em> is a separator. <span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
 </td>
 </tr>
@@ -652,6 +652,6 @@ Gets the submenu of <em class="parameter"><code>item</code></em>.
 </div>
 <div class="footer">
 <hr>
-          Generated by GTK-Doc V1.18.1</div>
+          Generated by GTK-Doc V1.19</div>
 </body>
 </html>

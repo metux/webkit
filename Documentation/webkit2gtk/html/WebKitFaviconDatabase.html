@@ -8,7 +8,7 @@
 <link rel="up" href="ch01.html" title="Class Overview">
 <link rel="prev" href="webkit2gtk-WebKitError.html" title="WebKitError">
 <link rel="next" href="WebKitFileChooserRequest.html" title="WebKitFileChooserRequest">
-<meta name="generator" content="GTK-Doc V1.18.1 (XML mode)">
+<meta name="generator" content="GTK-Doc V1.19 (XML mode)">
 <link rel="stylesheet" href="style.css" type="text/css">
 </head>
 <body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF">
@@ -49,7 +49,7 @@ enum                <a class="link" href="WebKitFaviconDatabase.html#WebKitFavic
                                                          <em class="parameter"><code><a href="../gio/GCancellable.html"><span class="type">GCancellable</span></a> *cancellable</code></em>,
                                                          <em class="parameter"><code><a href="../gio/GAsyncResult.html#GAsyncReadyCallback"><span class="type">GAsyncReadyCallback</span></a> callback</code></em>,
                                                          <em class="parameter"><code><a href="../glib/glib-Basic-Types.html#gpointer"><span class="type">gpointer</span></a> user_data</code></em>);
-<span class="returnvalue">cairo_surface_t</span> *   <a class="link" href="WebKitFaviconDatabase.html#webkit-favicon-database-get-favicon-finish" title="webkit_favicon_database_get_favicon_finish ()">webkit_favicon_database_get_favicon_finish</a>
+<a href="../cairo/cairo-cairo-surface-t.html#cairo-surface-t"><span class="returnvalue">cairo_surface_t</span></a> *   <a class="link" href="WebKitFaviconDatabase.html#webkit-favicon-database-get-favicon-finish" title="webkit_favicon_database_get_favicon_finish ()">webkit_favicon_database_get_favicon_finish</a>
                                                         (<em class="parameter"><code><a class="link" href="WebKitFaviconDatabase.html" title="WebKitFaviconDatabase"><span class="type">WebKitFaviconDatabase</span></a> *database</code></em>,
                                                          <em class="parameter"><code><a href="../gio/GAsyncResult.html"><span class="type">GAsyncResult</span></a> *result</code></em>,
                                                          <em class="parameter"><code><a href="../glib/glib-Error-Reporting.html#GError"><span class="type">GError</span></a> **error</code></em>);
@@ -152,7 +152,7 @@ Enum values used to denote the various errors related to the <a class="link" hre
                                                          <em class="parameter"><code><a href="../gio/GAsyncResult.html#GAsyncReadyCallback"><span class="type">GAsyncReadyCallback</span></a> callback</code></em>,
                                                          <em class="parameter"><code><a href="../glib/glib-Basic-Types.html#gpointer"><span class="type">gpointer</span></a> user_data</code></em>);</pre>
 <p>
-Asynchronously obtains a <span class="type">cairo_surface_t</span> of the favicon for the
+Asynchronously obtains a <a href="../cairo/cairo-cairo-surface-t.html#cairo-surface-t"><span class="type">cairo_surface_t</span></a> of the favicon for the
 given page URI. It returns the cached icon if it's in the database
 asynchronously waiting for the icon to be read from the database.
 </p>
@@ -198,7 +198,7 @@ satisfied or <a href="../glib/glib-Standard-Macros.html#NULL:CAPS"><code class="
 <hr>
 <div class="refsect2">
 <a name="webkit-favicon-database-get-favicon-finish"></a><h3>webkit_favicon_database_get_favicon_finish ()</h3>
-<pre class="programlisting"><span class="returnvalue">cairo_surface_t</span> *   webkit_favicon_database_get_favicon_finish
+<pre class="programlisting"><a href="../cairo/cairo-cairo-surface-t.html#cairo-surface-t"><span class="returnvalue">cairo_surface_t</span></a> *   webkit_favicon_database_get_favicon_finish
                                                         (<em class="parameter"><code><a class="link" href="WebKitFaviconDatabase.html" title="WebKitFaviconDatabase"><span class="type">WebKitFaviconDatabase</span></a> *database</code></em>,
                                                          <em class="parameter"><code><a href="../gio/GAsyncResult.html"><span class="type">GAsyncResult</span></a> *result</code></em>,
                                                          <em class="parameter"><code><a href="../glib/glib-Error-Reporting.html#GError"><span class="type">GError</span></a> **error</code></em>);</pre>
@@ -228,7 +228,7 @@ Finishes an operation started with <a class="link" href="WebKitFaviconDatabase.h
 </tr>
 <tr>
 <td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
-<td>a new reference to a <span class="type">cairo_surface_t</span>, or
+<td>a new reference to a <a href="../cairo/cairo-cairo-surface-t.html#cairo-surface-t"><span class="type">cairo_surface_t</span></a>, or
 <a href="../glib/glib-Standard-Macros.html#NULL:CAPS"><code class="literal">NULL</code></a> in case of error. <span class="annotation">[<acronym title="Free data after the code is done."><span class="acronym">transfer full</span></acronym>]</span>
 </td>
 </tr>
@@ -332,6 +332,6 @@ property. See <a class="link" href="WebKitWebView.html#webkit-web-view-get-favic
 </div>
 <div class="footer">
 <hr>
-          Generated by GTK-Doc V1.18.1</div>
+          Generated by GTK-Doc V1.19</div>
 </body>
 </html>
