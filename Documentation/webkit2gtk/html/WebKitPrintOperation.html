@@ -8,7 +8,7 @@
 <link rel="up" href="ch01.html" title="Class Overview">
 <link rel="prev" href="WebKitHitTestResult.html" title="WebKitHitTestResult">
 <link rel="next" href="WebKitWebResource.html" title="WebKitWebResource">
-<meta name="generator" content="GTK-Doc V1.18.1 (XML mode)">
+<meta name="generator" content="GTK-Doc V1.19 (XML mode)">
 <link rel="stylesheet" href="style.css" type="text/css">
 </head>
 <body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF">
@@ -46,19 +46,19 @@
 <pre class="synopsis">                    <a class="link" href="WebKitPrintOperation.html#WebKitPrintOperation-struct" title="WebKitPrintOperation">WebKitPrintOperation</a>;
 enum                <a class="link" href="WebKitPrintOperation.html#WebKitPrintOperationResponse" title="enum WebKitPrintOperationResponse">WebKitPrintOperationResponse</a>;
 <a class="link" href="WebKitPrintOperation.html" title="WebKitPrintOperation"><span class="returnvalue">WebKitPrintOperation</span></a> * <a class="link" href="WebKitPrintOperation.html#webkit-print-operation-new" title="webkit_print_operation_new ()">webkit_print_operation_new</a>       (<em class="parameter"><code><a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> *web_view</code></em>);
-<a href="../gtk2/GtkPrintSettings.html"><span class="returnvalue">GtkPrintSettings</span></a> *  <a class="link" href="WebKitPrintOperation.html#webkit-print-operation-get-print-settings" title="webkit_print_operation_get_print_settings ()">webkit_print_operation_get_print_settings</a>
+<a href="../gtk3/GtkPrintSettings.html"><span class="returnvalue">GtkPrintSettings</span></a> *  <a class="link" href="WebKitPrintOperation.html#webkit-print-operation-get-print-settings" title="webkit_print_operation_get_print_settings ()">webkit_print_operation_get_print_settings</a>
                                                         (<em class="parameter"><code><a class="link" href="WebKitPrintOperation.html" title="WebKitPrintOperation"><span class="type">WebKitPrintOperation</span></a> *print_operation</code></em>);
 <span class="returnvalue">void</span>                <a class="link" href="WebKitPrintOperation.html#webkit-print-operation-set-print-settings" title="webkit_print_operation_set_print_settings ()">webkit_print_operation_set_print_settings</a>
                                                         (<em class="parameter"><code><a class="link" href="WebKitPrintOperation.html" title="WebKitPrintOperation"><span class="type">WebKitPrintOperation</span></a> *print_operation</code></em>,
-                                                         <em class="parameter"><code><a href="../gtk2/GtkPrintSettings.html"><span class="type">GtkPrintSettings</span></a> *print_settings</code></em>);
-<a href="../gtk2/GtkPageSetup.html"><span class="returnvalue">GtkPageSetup</span></a> *      <a class="link" href="WebKitPrintOperation.html#webkit-print-operation-get-page-setup" title="webkit_print_operation_get_page_setup ()">webkit_print_operation_get_page_setup</a>
+                                                         <em class="parameter"><code><a href="../gtk3/GtkPrintSettings.html"><span class="type">GtkPrintSettings</span></a> *print_settings</code></em>);
+<a href="../gtk3/GtkPageSetup.html"><span class="returnvalue">GtkPageSetup</span></a> *      <a class="link" href="WebKitPrintOperation.html#webkit-print-operation-get-page-setup" title="webkit_print_operation_get_page_setup ()">webkit_print_operation_get_page_setup</a>
                                                         (<em class="parameter"><code><a class="link" href="WebKitPrintOperation.html" title="WebKitPrintOperation"><span class="type">WebKitPrintOperation</span></a> *print_operation</code></em>);
 <span class="returnvalue">void</span>                <a class="link" href="WebKitPrintOperation.html#webkit-print-operation-set-page-setup" title="webkit_print_operation_set_page_setup ()">webkit_print_operation_set_page_setup</a>
                                                         (<em class="parameter"><code><a class="link" href="WebKitPrintOperation.html" title="WebKitPrintOperation"><span class="type">WebKitPrintOperation</span></a> *print_operation</code></em>,
-                                                         <em class="parameter"><code><a href="../gtk2/GtkPageSetup.html"><span class="type">GtkPageSetup</span></a> *page_setup</code></em>);
+                                                         <em class="parameter"><code><a href="../gtk3/GtkPageSetup.html"><span class="type">GtkPageSetup</span></a> *page_setup</code></em>);
 <a class="link" href="WebKitPrintOperation.html#WebKitPrintOperationResponse" title="enum WebKitPrintOperationResponse"><span class="returnvalue">WebKitPrintOperationResponse</span></a> <a class="link" href="WebKitPrintOperation.html#webkit-print-operation-run-dialog" title="webkit_print_operation_run_dialog ()">webkit_print_operation_run_dialog</a>
                                                         (<em class="parameter"><code><a class="link" href="WebKitPrintOperation.html" title="WebKitPrintOperation"><span class="type">WebKitPrintOperation</span></a> *print_operation</code></em>,
-                                                         <em class="parameter"><code><a href="../gtk2/GtkWindow.html"><span class="type">GtkWindow</span></a> *parent</code></em>);
+                                                         <em class="parameter"><code><a href="../gtk3/GtkWindow.html"><span class="type">GtkWindow</span></a> *parent</code></em>);
 <span class="returnvalue">void</span>                <a class="link" href="WebKitPrintOperation.html#webkit-print-operation-print" title="webkit_print_operation_print ()">webkit_print_operation_print</a>        (<em class="parameter"><code><a class="link" href="WebKitPrintOperation.html" title="WebKitPrintOperation"><span class="type">WebKitPrintOperation</span></a> *print_operation</code></em>);
 </pre>
 </div>
@@ -72,8 +72,8 @@ enum                <a class="link" href="WebKitPrintOperation.html#WebKitPrintO
 <div class="refsect1">
 <a name="WebKitPrintOperation.properties"></a><h2>Properties</h2>
 <pre class="synopsis">
-  "<a class="link" href="WebKitPrintOperation.html#WebKitPrintOperation--page-setup" title='The "page-setup" property'>page-setup</a>"               <a href="../gtk2/GtkPageSetup.html"><span class="type">GtkPageSetup</span></a>*         : Read / Write
-  "<a class="link" href="WebKitPrintOperation.html#WebKitPrintOperation--print-settings" title='The "print-settings" property'>print-settings</a>"           <a href="../gtk2/GtkPrintSettings.html"><span class="type">GtkPrintSettings</span></a>*     : Read / Write
+  "<a class="link" href="WebKitPrintOperation.html#WebKitPrintOperation--page-setup" title='The "page-setup" property'>page-setup</a>"               <a href="../gtk3/GtkPageSetup.html"><span class="type">GtkPageSetup</span></a>*         : Read / Write
+  "<a class="link" href="WebKitPrintOperation.html#WebKitPrintOperation--print-settings" title='The "print-settings" property'>print-settings</a>"           <a href="../gtk3/GtkPrintSettings.html"><span class="type">GtkPrintSettings</span></a>*     : Read / Write
   "<a class="link" href="WebKitPrintOperation.html#WebKitPrintOperation--web-view" title='The "web-view" property'>web-view</a>"                 <a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a>*        : Read / Write / Construct Only
 </pre>
 </div>
@@ -88,7 +88,7 @@ enum                <a class="link" href="WebKitPrintOperation.html#WebKitPrintO
 <a name="WebKitPrintOperation.description"></a><h2>Description</h2>
 <p>
 A <a class="link" href="WebKitPrintOperation.html" title="WebKitPrintOperation"><span class="type">WebKitPrintOperation</span></a> controls a print operation in WebKit. With
-a similar API to <a href="../gtk2/gtk2-High-level-Printing-API.html#GtkPrintOperation"><span class="type">GtkPrintOperation</span></a>, it lets you set the print
+a similar API to <a href="../gtk3/gtk3-High-level-Printing-API.html#GtkPrintOperation"><span class="type">GtkPrintOperation</span></a>, it lets you set the print
 settings with <a class="link" href="WebKitPrintOperation.html#webkit-print-operation-set-print-settings" title="webkit_print_operation_set_print_settings ()"><code class="function">webkit_print_operation_set_print_settings()</code></a> or
 display the print dialog with <a class="link" href="WebKitPrintOperation.html#webkit-print-operation-run-dialog" title="webkit_print_operation_run_dialog ()"><code class="function">webkit_print_operation_run_dialog()</code></a>.
 </p>
@@ -161,7 +161,7 @@ Create a new <a class="link" href="WebKitPrintOperation.html" title="WebKitPrint
 <hr>
 <div class="refsect2">
 <a name="webkit-print-operation-get-print-settings"></a><h3>webkit_print_operation_get_print_settings ()</h3>
-<pre class="programlisting"><a href="../gtk2/GtkPrintSettings.html"><span class="returnvalue">GtkPrintSettings</span></a> *  webkit_print_operation_get_print_settings
+<pre class="programlisting"><a href="../gtk3/GtkPrintSettings.html"><span class="returnvalue">GtkPrintSettings</span></a> *  webkit_print_operation_get_print_settings
                                                         (<em class="parameter"><code><a class="link" href="WebKitPrintOperation.html" title="WebKitPrintOperation"><span class="type">WebKitPrintOperation</span></a> *print_operation</code></em>);</pre>
 <p>
 Return the current print settings of <em class="parameter"><code>print_operation</code></em>. It returns <a href="../glib/glib-Standard-Macros.html#NULL:CAPS"><code class="literal">NULL</code></a> until
@@ -181,7 +181,7 @@ have been called.
 </tr>
 <tr>
 <td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
-<td>the current <a href="../gtk2/GtkPrintSettings.html"><span class="type">GtkPrintSettings</span></a> of <em class="parameter"><code>print_operation</code></em>. <span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
+<td>the current <a href="../gtk3/GtkPrintSettings.html"><span class="type">GtkPrintSettings</span></a> of <em class="parameter"><code>print_operation</code></em>. <span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
 </td>
 </tr>
 </tbody>
@@ -192,7 +192,7 @@ have been called.
 <a name="webkit-print-operation-set-print-settings"></a><h3>webkit_print_operation_set_print_settings ()</h3>
 <pre class="programlisting"><span class="returnvalue">void</span>                webkit_print_operation_set_print_settings
                                                         (<em class="parameter"><code><a class="link" href="WebKitPrintOperation.html" title="WebKitPrintOperation"><span class="type">WebKitPrintOperation</span></a> *print_operation</code></em>,
-                                                         <em class="parameter"><code><a href="../gtk2/GtkPrintSettings.html"><span class="type">GtkPrintSettings</span></a> *print_settings</code></em>);</pre>
+                                                         <em class="parameter"><code><a href="../gtk3/GtkPrintSettings.html"><span class="type">GtkPrintSettings</span></a> *print_settings</code></em>);</pre>
 <p>
 Set the current print settings of <em class="parameter"><code>print_operation</code></em>. Current print settings are used for
 the initial values of the print dialog when <a class="link" href="WebKitPrintOperation.html#webkit-print-operation-run-dialog" title="webkit_print_operation_run_dialog ()"><code class="function">webkit_print_operation_run_dialog()</code></a> is called.
@@ -210,7 +210,7 @@ the initial values of the print dialog when <a class="link" href="WebKitPrintOpe
 </tr>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>print_settings</code></em> :</span></p></td>
-<td>a <a href="../gtk2/GtkPrintSettings.html"><span class="type">GtkPrintSettings</span></a> to set</td>
+<td>a <a href="../gtk3/GtkPrintSettings.html"><span class="type">GtkPrintSettings</span></a> to set</td>
 </tr>
 </tbody>
 </table></div>
@@ -218,7 +218,7 @@ the initial values of the print dialog when <a class="link" href="WebKitPrintOpe
 <hr>
 <div class="refsect2">
 <a name="webkit-print-operation-get-page-setup"></a><h3>webkit_print_operation_get_page_setup ()</h3>
-<pre class="programlisting"><a href="../gtk2/GtkPageSetup.html"><span class="returnvalue">GtkPageSetup</span></a> *      webkit_print_operation_get_page_setup
+<pre class="programlisting"><a href="../gtk3/GtkPageSetup.html"><span class="returnvalue">GtkPageSetup</span></a> *      webkit_print_operation_get_page_setup
                                                         (<em class="parameter"><code><a class="link" href="WebKitPrintOperation.html" title="WebKitPrintOperation"><span class="type">WebKitPrintOperation</span></a> *print_operation</code></em>);</pre>
 <p>
 Return the current page setup of <em class="parameter"><code>print_operation</code></em>. It returns <a href="../glib/glib-Standard-Macros.html#NULL:CAPS"><code class="literal">NULL</code></a> until
@@ -238,7 +238,7 @@ have been called.
 </tr>
 <tr>
 <td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
-<td>the current <a href="../gtk2/GtkPageSetup.html"><span class="type">GtkPageSetup</span></a> of <em class="parameter"><code>print_operation</code></em>. <span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
+<td>the current <a href="../gtk3/GtkPageSetup.html"><span class="type">GtkPageSetup</span></a> of <em class="parameter"><code>print_operation</code></em>. <span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
 </td>
 </tr>
 </tbody>
@@ -249,7 +249,7 @@ have been called.
 <a name="webkit-print-operation-set-page-setup"></a><h3>webkit_print_operation_set_page_setup ()</h3>
 <pre class="programlisting"><span class="returnvalue">void</span>                webkit_print_operation_set_page_setup
                                                         (<em class="parameter"><code><a class="link" href="WebKitPrintOperation.html" title="WebKitPrintOperation"><span class="type">WebKitPrintOperation</span></a> *print_operation</code></em>,
-                                                         <em class="parameter"><code><a href="../gtk2/GtkPageSetup.html"><span class="type">GtkPageSetup</span></a> *page_setup</code></em>);</pre>
+                                                         <em class="parameter"><code><a href="../gtk3/GtkPageSetup.html"><span class="type">GtkPageSetup</span></a> *page_setup</code></em>);</pre>
 <p>
 Set the current page setup of <em class="parameter"><code>print_operation</code></em>. Current page setup is used for the
 initial values of the print dialog when <a class="link" href="WebKitPrintOperation.html#webkit-print-operation-run-dialog" title="webkit_print_operation_run_dialog ()"><code class="function">webkit_print_operation_run_dialog()</code></a> is called.
@@ -267,7 +267,7 @@ initial values of the print dialog when <a class="link" href="WebKitPrintOperati
 </tr>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>page_setup</code></em> :</span></p></td>
-<td>a <a href="../gtk2/GtkPageSetup.html"><span class="type">GtkPageSetup</span></a> to set</td>
+<td>a <a href="../gtk3/GtkPageSetup.html"><span class="type">GtkPageSetup</span></a> to set</td>
 </tr>
 </tbody>
 </table></div>
@@ -277,7 +277,7 @@ initial values of the print dialog when <a class="link" href="WebKitPrintOperati
 <a name="webkit-print-operation-run-dialog"></a><h3>webkit_print_operation_run_dialog ()</h3>
 <pre class="programlisting"><a class="link" href="WebKitPrintOperation.html#WebKitPrintOperationResponse" title="enum WebKitPrintOperationResponse"><span class="returnvalue">WebKitPrintOperationResponse</span></a> webkit_print_operation_run_dialog
                                                         (<em class="parameter"><code><a class="link" href="WebKitPrintOperation.html" title="WebKitPrintOperation"><span class="type">WebKitPrintOperation</span></a> *print_operation</code></em>,
-                                                         <em class="parameter"><code><a href="../gtk2/GtkWindow.html"><span class="type">GtkWindow</span></a> *parent</code></em>);</pre>
+                                                         <em class="parameter"><code><a href="../gtk3/GtkWindow.html"><span class="type">GtkWindow</span></a> *parent</code></em>);</pre>
 <p>
 Run the print dialog and start printing using the options selected by
 the user. This method returns when the print dialog is closed.
@@ -346,17 +346,17 @@ operation finishes. If an error occurs while printing the signal
 <a name="WebKitPrintOperation.property-details"></a><h2>Property Details</h2>
 <div class="refsect2">
 <a name="WebKitPrintOperation--page-setup"></a><h3>The <code class="literal">"page-setup"</code> property</h3>
-<pre class="programlisting">  "page-setup"               <a href="../gtk2/GtkPageSetup.html"><span class="type">GtkPageSetup</span></a>*         : Read / Write</pre>
+<pre class="programlisting">  "page-setup"               <a href="../gtk3/GtkPageSetup.html"><span class="type">GtkPageSetup</span></a>*         : Read / Write</pre>
 <p>
-The initial <a href="../gtk2/GtkPageSetup.html"><span class="type">GtkPageSetup</span></a> for the print operation.
+The initial <a href="../gtk3/GtkPageSetup.html"><span class="type">GtkPageSetup</span></a> for the print operation.
 </p>
 </div>
 <hr>
 <div class="refsect2">
 <a name="WebKitPrintOperation--print-settings"></a><h3>The <code class="literal">"print-settings"</code> property</h3>
-<pre class="programlisting">  "print-settings"           <a href="../gtk2/GtkPrintSettings.html"><span class="type">GtkPrintSettings</span></a>*     : Read / Write</pre>
+<pre class="programlisting">  "print-settings"           <a href="../gtk3/GtkPrintSettings.html"><span class="type">GtkPrintSettings</span></a>*     : Read / Write</pre>
 <p>
-The initial <a href="../gtk2/GtkPrintSettings.html"><span class="type">GtkPrintSettings</span></a> for the print operation.
+The initial <a href="../gtk3/GtkPrintSettings.html"><span class="type">GtkPrintSettings</span></a> for the print operation.
 </p>
 </div>
 <hr>
@@ -431,6 +431,6 @@ required for printing.
 </div>
 <div class="footer">
 <hr>
-          Generated by GTK-Doc V1.18.1</div>
+          Generated by GTK-Doc V1.19</div>
 </body>
 </html>
