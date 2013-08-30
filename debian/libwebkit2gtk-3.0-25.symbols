@@ -1940,6 +1940,11 @@ libwebkit2gtk-3.0.so.25 libwebkit2gtk-3.0-25 #MINVER#
  webkit_form_submission_request_get_text_fields@Base 2.0.2
  webkit_form_submission_request_get_type@Base 2.0.2
  webkit_form_submission_request_submit@Base 2.0.2
+ webkit_frame_get_javascript_context_for_script_world@Base 2.1.90.1
+ webkit_frame_get_javascript_global_context@Base 2.1.90.1
+ webkit_frame_get_type@Base 2.1.90.1
+ webkit_frame_get_uri@Base 2.1.90.1
+ webkit_frame_is_main_frame@Base 2.1.90.1
  webkit_geolocation_permission_request_get_type@Base 2.0.2
  webkit_get_major_version@Base 2.0.2
  webkit_get_micro_version@Base 2.0.2
@@ -2035,6 +2040,9 @@ libwebkit2gtk-3.0.so.25 libwebkit2gtk-3.0-25 #MINVER#
  webkit_script_dialog_prompt_get_default_text@Base 2.0.2
  webkit_script_dialog_prompt_set_text@Base 2.0.2
  webkit_script_dialog_type_get_type@Base 2.0.2
+ webkit_script_world_get_default@Base 2.1.90.1
+ webkit_script_world_get_type@Base 2.1.90.1
+ webkit_script_world_new@Base 2.1.90.1
  webkit_security_manager_get_type@Base 2.0.2
  webkit_security_manager_register_uri_scheme_as_cors_enabled@Base 2.0.2
  webkit_security_manager_register_uri_scheme_as_display_isolated@Base 2.0.2
@@ -2207,6 +2215,7 @@ libwebkit2gtk-3.0.so.25 libwebkit2gtk-3.0-25 #MINVER#
  webkit_web_inspector_show@Base 2.0.2
  webkit_web_page_get_dom_document@Base 2.0.2
  webkit_web_page_get_id@Base 2.0.2
+ webkit_web_page_get_main_frame@Base 2.1.90.1
  webkit_web_page_get_type@Base 2.0.2
  webkit_web_page_get_uri@Base 2.0.2
  webkit_web_resource_get_data@Base 2.0.2
