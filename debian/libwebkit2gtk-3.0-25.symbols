@@ -454,6 +454,7 @@ libwebkit2gtk-3.0.so.25 libwebkit2gtk-3.0-25 #MINVER#
  webkit_dom_element_get_elements_by_tag_name@Base 2.0.2
  webkit_dom_element_get_elements_by_tag_name_ns@Base 2.0.2
  webkit_dom_element_get_first_element_child@Base 2.0.2
+ webkit_dom_element_get_id@Base 2.1.90
  webkit_dom_element_get_last_element_child@Base 2.0.2
  webkit_dom_element_get_next_element_sibling@Base 2.0.2
  webkit_dom_element_get_offset_height@Base 2.0.2
@@ -489,6 +490,7 @@ libwebkit2gtk-3.0.so.25 libwebkit2gtk-3.0-25 #MINVER#
  webkit_dom_element_set_attribute_node_ns@Base 2.0.2
  webkit_dom_element_set_attribute_ns@Base 2.0.2
  webkit_dom_element_set_class_name@Base 2.0.2
+ webkit_dom_element_set_id@Base 2.1.90
  webkit_dom_element_set_scroll_left@Base 2.0.2
  webkit_dom_element_set_scroll_top@Base 2.0.2
  webkit_dom_element_webkit_matches_selector@Base 2.0.2

@@ -383,6 +383,7 @@ libwebkitgtk-1.0.so.0 libwebkitgtk-1.0-0 #MINVER#
  webkit_dom_element_get_elements_by_tag_name@Base 1.3.10
  webkit_dom_element_get_elements_by_tag_name_ns@Base 1.3.10
  webkit_dom_element_get_first_element_child@Base 1.3.10
+ webkit_dom_element_get_id@Base 2.1.90
  webkit_dom_element_get_last_element_child@Base 1.3.10
  webkit_dom_element_get_next_element_sibling@Base 1.3.10
  webkit_dom_element_get_offset_height@Base 1.3.10
@@ -418,6 +419,7 @@ libwebkitgtk-1.0.so.0 libwebkitgtk-1.0-0 #MINVER#
  webkit_dom_element_set_attribute_node_ns@Base 1.3.10
  webkit_dom_element_set_attribute_ns@Base 1.3.10
  webkit_dom_element_set_class_name@Base 1.10.1
+ webkit_dom_element_set_id@Base 2.1.90
  webkit_dom_element_set_scroll_left@Base 1.3.10
  webkit_dom_element_set_scroll_top@Base 1.3.10
  webkit_dom_element_webkit_matches_selector@Base 1.3.10

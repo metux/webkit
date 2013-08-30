@@ -6,6 +6,8 @@ webkitgtk (2.1.90-1) experimental; urgency=low
   - removed patch; applied upstream
   * debian/patches/02_notebook_scroll.patch:
   - refreshed
+  * debian/*.symbols:
+  - updated with ABI additions
 
   [ Emilio Pozuelo Monfort ]
   * debian/rules:
@@ -14,7 +16,7 @@ webkitgtk (2.1.90-1) experimental; urgency=low
   * debian/control:
     + Add myself to Uploaders.
 
- -- Gustavo Noronha Silva <kov@debian.org>  Thu, 29 Aug 2013 21:24:36 -0300
+ -- Gustavo Noronha Silva <kov@debian.org>  Thu, 29 Aug 2013 21:32:48 -0300
 
 webkitgtk (2.1.4-3) experimental; urgency=low
 
