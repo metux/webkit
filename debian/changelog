@@ -2,6 +2,8 @@ webkitgtk (2.1.90-1) experimental; urgency=low
 
   [ Gustavo Noronha Silva ]
   * New development release
+  * debian/patches/series, debian/patches/03_dom_bindings_compat.patch:
+  - removed patch; applied upstream
 
   [ Emilio Pozuelo Monfort ]
   * debian/rules:
@@ -10,7 +12,7 @@ webkitgtk (2.1.90-1) experimental; urgency=low
   * debian/control:
     + Add myself to Uploaders.
 
- -- Gustavo Noronha Silva <kov@debian.org>  Wed, 28 Aug 2013 12:43:23 -0300
+ -- Gustavo Noronha Silva <kov@debian.org>  Thu, 29 Aug 2013 21:24:36 -0300
 
 webkitgtk (2.1.4-3) experimental; urgency=low
 
