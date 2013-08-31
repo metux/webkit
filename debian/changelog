@@ -1,4 +1,6 @@
-webkitgtk (2.0.4-4) UNRELEASED; urgency=low
+webkitgtk (2.0.4-4) unstable; urgency=low
+
+  * Team upload.
 
   [ Emilio Pozuelo Monfort ]
   * debian/rules:
@@ -13,7 +15,7 @@ webkitgtk (2.0.4-4) UNRELEASED; urgency=low
       findstring also matches substrings so we accidentally used stabs debug
       symbols for i386 and amd64 and disabled jit for mips.
 
- -- Emilio Pozuelo Monfort <pochu@debian.org>  Thu, 29 Aug 2013 18:14:20 +0200
+ -- Michael Biebl <biebl@debian.org>  Sat, 31 Aug 2013 12:24:39 +0200
 
 webkitgtk (2.0.4-3) unstable; urgency=low
 
