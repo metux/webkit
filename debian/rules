@@ -45,22 +45,22 @@ ifeq ($(DEB_BUILD_ARCH),alpha)
         LDFLAGS += -Wl,--no-relax
 endif
 
-ifneq (,$(findstring $(DEB_BUILD_ARCH),sparc ia64 mips mipsel s390 s390x hurd-i386))
+ifneq (,$(filter $(DEB_BUILD_ARCH),sparc ia64 mips mipsel s390 s390x hurd-i386))
 	CFLAGS := $(CFLAGS:-g=)
 endif
 
 # Let's try to keep debugging symbols on these arches.
-ifneq (,$(findstring $(DEB_BUILD_ARCH),armel armhf kfreebsd-amd64 kfreebsd-i386 powerpc))
+ifneq (,$(filter $(DEB_BUILD_ARCH),armel armhf kfreebsd-amd64 kfreebsd-i386 powerpc))
 	CFLAGS += -gstabs
 endif
 
 # disable jit on some architectures (bug #651636)
-ifneq (,$(findstring $(DEB_BUILD_ARCH),armel mipsel))
+ifneq (,$(filter $(DEB_BUILD_ARCH),armel mipsel))
 	COMMON_CONFIGURE_ARGUMENTS += --disable-jit
 endif
 
 # See https://bugs.webkit.org/show_bug.cgi?id=113638
-ifneq (,$(findstring $(DEB_BUILD_ARCH),ia64 powerpc sparc s390 s390x))
+ifneq (,$(filter $(DEB_BUILD_ARCH),ia64 powerpc sparc s390 s390x))
 JSC_CPPFLAGS = -DENABLE_JIT=0 -DENABLE_YARR_JIT=0 -DENABLE_ASSEMBLER=0
 endif
 

@@ -1,3 +1,13 @@
+webkitgtk (2.1.90.1-2) UNRELEASED; urgency=low
+
+  [ Michael Biebl ]
+  * debian/rules:
+    + Use filter instead of findstring to match the current architecture as
+      findstring also matches substrings so we accidentally used stabs debug
+      symbols for i386 and amd64 and disabled jit for mips.
+
+ -- Emilio Pozuelo Monfort <pochu@debian.org>  Sun, 01 Sep 2013 15:44:34 +0200
+
 webkitgtk (2.1.90.1-1) experimental; urgency=low
 
   [ Gustavo Noronha Silva ]
