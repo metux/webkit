@@ -1,10 +1,17 @@
 webkitgtk (2.0.4-4) UNRELEASED; urgency=low
 
+  [ Emilio Pozuelo Monfort ]
   * debian/rules:
     + Switch powerpc to stabs as it's currently taking too much space in
       the buildds.
   * debian/control:
     + Add myself to Uploaders.
+
+  [ Michael Biebl ]
+  * debian/rules:
+    + Use filter instead of findstring to match the current architecture as
+      findstring also matches substrings so we accidentally used stabs debug
+      symbols for i386 and amd64 and disabled jit for mips.
 
  -- Emilio Pozuelo Monfort <pochu@debian.org>  Thu, 29 Aug 2013 18:14:20 +0200
 
