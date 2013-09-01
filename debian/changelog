@@ -11,6 +11,11 @@ webkitgtk (2.1.90.1-2) UNRELEASED; urgency=low
     + Use CPPFLAGS instead of JSC_CPPFLAGS to disable JIT and MacroAssembler
       as JSC_CPPFLAGS is no longer honored by the build system. This fixes
       the build (again) on ia64 powerpc sparc s390 and s390x.
+  * debian/patches/40_hppa_platform_h.patch,
+    debian/patches/41_hppa_build_fix.patch,
+    debian/rules:
+    + Add support for HPPA. Thanks to John David Anglin for the patches.
+      Closes: #721206.
 
  -- Emilio Pozuelo Monfort <pochu@debian.org>  Sun, 01 Sep 2013 15:44:34 +0200
 
