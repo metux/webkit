@@ -6,6 +6,12 @@ webkitgtk (2.1.90.1-2) UNRELEASED; urgency=low
       findstring also matches substrings so we accidentally used stabs debug
       symbols for i386 and amd64 and disabled jit for mips.
 
+  [ Emilio Pozuelo Monfort ]
+  * debian/rules:
+    + Use CPPFLAGS instead of JSC_CPPFLAGS to disable JIT and MacroAssembler
+      as JSC_CPPFLAGS is no longer honored by the build system. This fixes
+      the build (again) on ia64 powerpc sparc s390 and s390x.
+
  -- Emilio Pozuelo Monfort <pochu@debian.org>  Sun, 01 Sep 2013 15:44:34 +0200
 
 webkitgtk (2.1.90.1-1) experimental; urgency=low

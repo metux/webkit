@@ -61,7 +61,7 @@ endif
 
 # See https://bugs.webkit.org/show_bug.cgi?id=113638
 ifneq (,$(filter $(DEB_BUILD_ARCH),ia64 powerpc sparc s390 s390x))
-JSC_CPPFLAGS = -DENABLE_JIT=0 -DENABLE_YARR_JIT=0 -DENABLE_ASSEMBLER=0
+	CPPFLAGS += -DENABLE_JIT=0 -DENABLE_YARR_JIT=0 -DENABLE_ASSEMBLER=0
 endif
 
 ifneq (,$(filter parallel=%,$(DEB_BUILD_OPTIONS)))
@@ -112,7 +112,6 @@ ifeq (2.0,$(filter 2.0,$(GTK_VERSIONS)))
 	CXXFLAGS="$(CFLAGS)" \
 	CPPFLAGS="$(CPPFLAGS)" \
 	LDFLAGS="$(LDFLAGS)" \
-	JSC_CPPFLAGS="$(JSC_CPPFLAGS)" \
 	CC="gcc-4.7" \
 	CXX="g++-4.7" \
 	../configure --prefix=/usr \
@@ -140,7 +139,6 @@ ifeq (3.0,$(filter 3.0,$(GTK_VERSIONS)))
 	CXXFLAGS="$(CFLAGS)" \
 	CPPFLAGS="$(CPPFLAGS)" \
 	LDFLAGS="$(LDFLAGS)" \
-	JSC_CPPFLAGS="$(JSC_CPPFLAGS)" \
 	CC="gcc-4.7" \
 	CXX="g++-4.7" \
 	../configure --prefix=/usr \
