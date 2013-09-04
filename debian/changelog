@@ -1,3 +1,11 @@
+webkitgtk (2.0.4-5) UNRELEASED; urgency=low
+
+  * debian/rules:
+    + Disable JIT and MacroAssembler on alpha. Closes: #721863.
+    + Likewise for ppc64 and sparc64.
+
+ -- Emilio Pozuelo Monfort <pochu@debian.org>  Thu, 05 Sep 2013 00:42:45 +0200
+
 webkitgtk (2.0.4-4) unstable; urgency=low
 
   * Team upload.
