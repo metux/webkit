@@ -1,4 +1,6 @@
-webkitgtk (2.0.4-5) UNRELEASED; urgency=low
+webkitgtk (2.0.4-5) unstable; urgency=low
+
+  * Team upload.
 
   [ Emilio Pozuelo Monfort ]
   * debian/rules:
@@ -9,7 +11,7 @@ webkitgtk (2.0.4-5) UNRELEASED; urgency=low
   * debian/rules
     - Use --disable-jit for mips to fix FTBFS on that architecture.
 
- -- Michael Biebl <biebl@debian.org>  Sun, 08 Sep 2013 20:17:42 +0200
+ -- Michael Biebl <biebl@debian.org>  Sun, 08 Sep 2013 21:37:00 +0200
 
 webkitgtk (2.0.4-4) unstable; urgency=low
 
