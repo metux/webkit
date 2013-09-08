@@ -55,7 +55,7 @@ ifneq (,$(filter $(DEB_BUILD_ARCH),armel armhf kfreebsd-amd64 kfreebsd-i386 powe
 endif
 
 # disable jit on some architectures (bug #651636)
-ifneq (,$(filter $(DEB_BUILD_ARCH),armel mipsel))
+ifneq (,$(filter $(DEB_BUILD_ARCH),armel mips mipsel))
 	COMMON_CONFIGURE_ARGUMENTS += --disable-jit
 endif
 
