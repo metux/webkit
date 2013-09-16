@@ -184,6 +184,7 @@
 <ANCHOR id="WebKitAuthenticationRequest.synopsis" href="webkit2gtk/WebKitAuthenticationRequest.html#WebKitAuthenticationRequest.synopsis">
 <ANCHOR id="WebKitCredential" href="webkit2gtk/WebKitAuthenticationRequest.html#WebKitCredential">
 <ANCHOR id="WebKitAuthenticationRequest.object-hierarchy" href="webkit2gtk/WebKitAuthenticationRequest.html#WebKitAuthenticationRequest.object-hierarchy">
+<ANCHOR id="WebKitAuthenticationRequest.signals" href="webkit2gtk/WebKitAuthenticationRequest.html#WebKitAuthenticationRequest.signals">
 <ANCHOR id="WebKitAuthenticationRequest.description" href="webkit2gtk/WebKitAuthenticationRequest.html#WebKitAuthenticationRequest.description">
 <ANCHOR id="WebKitAuthenticationRequest.details" href="webkit2gtk/WebKitAuthenticationRequest.html#WebKitAuthenticationRequest.details">
 <ANCHOR id="WebKitAuthenticationRequest-struct" href="webkit2gtk/WebKitAuthenticationRequest.html#WebKitAuthenticationRequest-struct">
@@ -219,6 +220,8 @@
 <ANCHOR id="webkit-credential-get-persistence" href="webkit2gtk/WebKitAuthenticationRequest.html#webkit-credential-get-persistence">
 <ANCHOR id="webkit-credential-get-username" href="webkit2gtk/WebKitAuthenticationRequest.html#webkit-credential-get-username">
 <ANCHOR id="webkit-credential-has-password" href="webkit2gtk/WebKitAuthenticationRequest.html#webkit-credential-has-password">
+<ANCHOR id="WebKitAuthenticationRequest.signal-details" href="webkit2gtk/WebKitAuthenticationRequest.html#WebKitAuthenticationRequest.signal-details">
+<ANCHOR id="WebKitAuthenticationRequest-cancelled" href="webkit2gtk/WebKitAuthenticationRequest.html#WebKitAuthenticationRequest-cancelled">
 <ANCHOR id="WebKitAuthenticationRequest.see-also" href="webkit2gtk/WebKitAuthenticationRequest.html#WebKitAuthenticationRequest.see-also">
 <ANCHOR id="WebKitBackForwardList" href="webkit2gtk/WebKitBackForwardList.html">
 <ANCHOR id="WebKitBackForwardList.synopsis" href="webkit2gtk/WebKitBackForwardList.html#WebKitBackForwardList.synopsis">
@@ -901,6 +904,8 @@
 <ANCHOR id="WEBKIT-CONTEXT-MENU-ACTION-MEDIA-PLAY:CAPS" href="webkit2gtk/WebKitContextMenuItem.html#WEBKIT-CONTEXT-MENU-ACTION-MEDIA-PLAY:CAPS">
 <ANCHOR id="WEBKIT-CONTEXT-MENU-ACTION-MEDIA-PAUSE:CAPS" href="webkit2gtk/WebKitContextMenuItem.html#WEBKIT-CONTEXT-MENU-ACTION-MEDIA-PAUSE:CAPS">
 <ANCHOR id="WEBKIT-CONTEXT-MENU-ACTION-MEDIA-MUTE:CAPS" href="webkit2gtk/WebKitContextMenuItem.html#WEBKIT-CONTEXT-MENU-ACTION-MEDIA-MUTE:CAPS">
+<ANCHOR id="WEBKIT-CONTEXT-MENU-ACTION-DOWNLOAD-VIDEO-TO-DISK:CAPS" href="webkit2gtk/WebKitContextMenuItem.html#WEBKIT-CONTEXT-MENU-ACTION-DOWNLOAD-VIDEO-TO-DISK:CAPS">
+<ANCHOR id="WEBKIT-CONTEXT-MENU-ACTION-DOWNLOAD-AUDIO-TO-DISK:CAPS" href="webkit2gtk/WebKitContextMenuItem.html#WEBKIT-CONTEXT-MENU-ACTION-DOWNLOAD-AUDIO-TO-DISK:CAPS">
 <ANCHOR id="WEBKIT-CONTEXT-MENU-ACTION-CUSTOM:CAPS" href="webkit2gtk/WebKitContextMenuItem.html#WEBKIT-CONTEXT-MENU-ACTION-CUSTOM:CAPS">
 <ANCHOR id="webkit-context-menu-item-new" href="webkit2gtk/WebKitContextMenuItem.html#webkit-context-menu-item-new">
 <ANCHOR id="webkit-context-menu-item-new-from-stock-action" href="webkit2gtk/WebKitContextMenuItem.html#webkit-context-menu-item-new-from-stock-action">

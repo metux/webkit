@@ -206,6 +206,7 @@
     <keyword type="function" name="webkit_credential_get_persistence ()" link="WebKitAuthenticationRequest.html#webkit-credential-get-persistence" since="2.2"/>
     <keyword type="function" name="webkit_credential_get_username ()" link="WebKitAuthenticationRequest.html#webkit-credential-get-username" since="2.2"/>
     <keyword type="function" name="webkit_credential_has_password ()" link="WebKitAuthenticationRequest.html#webkit-credential-has-password" since="2.2"/>
+    <keyword type="signal" name="The &quot;cancelled&quot; signal" link="WebKitAuthenticationRequest.html#WebKitAuthenticationRequest-cancelled"/>
     <keyword type="struct" name="struct WebKitBackForwardList" link="WebKitBackForwardList.html#WebKitBackForwardList-struct"/>
     <keyword type="function" name="webkit_back_forward_list_get_length ()" link="WebKitBackForwardList.html#webkit-back-forward-list-get-length"/>
     <keyword type="function" name="webkit_back_forward_list_get_current_item ()" link="WebKitBackForwardList.html#webkit-back-forward-list-get-current-item"/>
@@ -790,6 +791,8 @@
     <keyword type="constant" name="WEBKIT_CONTEXT_MENU_ACTION_MEDIA_PLAY" link="WebKitContextMenuItem.html#WEBKIT-CONTEXT-MENU-ACTION-MEDIA-PLAY:CAPS"/>
     <keyword type="constant" name="WEBKIT_CONTEXT_MENU_ACTION_MEDIA_PAUSE" link="WebKitContextMenuItem.html#WEBKIT-CONTEXT-MENU-ACTION-MEDIA-PAUSE:CAPS"/>
     <keyword type="constant" name="WEBKIT_CONTEXT_MENU_ACTION_MEDIA_MUTE" link="WebKitContextMenuItem.html#WEBKIT-CONTEXT-MENU-ACTION-MEDIA-MUTE:CAPS"/>
+    <keyword type="constant" name="WEBKIT_CONTEXT_MENU_ACTION_DOWNLOAD_VIDEO_TO_DISK" link="WebKitContextMenuItem.html#WEBKIT-CONTEXT-MENU-ACTION-DOWNLOAD-VIDEO-TO-DISK:CAPS"/>
+    <keyword type="constant" name="WEBKIT_CONTEXT_MENU_ACTION_DOWNLOAD_AUDIO_TO_DISK" link="WebKitContextMenuItem.html#WEBKIT-CONTEXT-MENU-ACTION-DOWNLOAD-AUDIO-TO-DISK:CAPS"/>
     <keyword type="constant" name="WEBKIT_CONTEXT_MENU_ACTION_CUSTOM" link="WebKitContextMenuItem.html#WEBKIT-CONTEXT-MENU-ACTION-CUSTOM:CAPS"/>
     <keyword type="constant" name="WEBKIT_INJECTED_CONTENT_FRAMES_ALL" link="WebKitWebViewGroup.html#WEBKIT-INJECTED-CONTENT-FRAMES-ALL:CAPS"/>
     <keyword type="constant" name="WEBKIT_INJECTED_CONTENT_FRAMES_TOP_ONLY" link="WebKitWebViewGroup.html#WEBKIT-INJECTED-CONTENT-FRAMES-TOP-ONLY:CAPS"/>
