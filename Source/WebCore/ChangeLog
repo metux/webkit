@@ -1,3 +1,312 @@
+2013-09-06  Anders Carlsson  <andersca@apple.com>
+
+        Stop using fastNew/fastDelete in WebCore
+        https://bugs.webkit.org/show_bug.cgi?id=120867
+
+        Reviewed by Geoffrey Garen.
+
+        Using fastNew/fastDelete can be dangerous, especially when put into a smart pointer
+        such as OwnPtr which uses regular delete. Because of this I'd like to remove fastNew/fastDelete.
+        Turns out it's only used in a couple of places in WebCore, so just use new/delete here instead.
+
+        * platform/audio/FFTFrame.h:
+        * platform/audio/gstreamer/FFTFrameGStreamer.cpp:
+        (WebCore::FFTFrame::FFTFrame):
+        (WebCore::FFTFrame::~FFTFrame):
+        (WebCore::FFTFrame::doFFT):
+        (WebCore::FFTFrame::doInverseFFT):
+        * platform/graphics/gstreamer/MediaPlayerPrivateGStreamerBase.cpp:
+        (WebCore::MediaPlayerPrivateGStreamerBase::MediaPlayerPrivateGStreamerBase):
+        (WebCore::MediaPlayerPrivateGStreamerBase::~MediaPlayerPrivateGStreamerBase):
+        * platform/graphics/gstreamer/VideoSinkGStreamer.cpp:
+        (webkitVideoSinkDispose):
+
+2013-09-09  Claudio Saavedra  <csaavedra@igalia.com>
+
+        [GTK]  ghost cursor when mouse hovers over an image file in a tab
+        https://bugs.webkit.org/show_bug.cgi?id=120675
+
+        Reviewed by Carlos Garcia Campos.
+
+        No new tests, covered by existing.
+
+        * platform/gtk/CursorGtk.cpp:
+        (WebCore::createNamedCursor): Use new gdk_cursor_new_from_surface()
+        when compiling against GTK+ 3.9.12 or newer.
+
+2013-09-04  Zan Dobersek  <zdobersek@igalia.com>
+
+        [GTK] Add support for the Wayland build target
+        https://bugs.webkit.org/show_bug.cgi?id=120627
+
+        Reviewed by Gustavo Noronha Silva.
+
+        * GNUmakefile.list.am: Reorder the Source/WebCore/plugins/np* source files.
+        The X11-specific source files should only be included if the X11 target is being built. PluginPackageNone and
+        PluginViewNone source files must be included in non-X11-target builds. Other source files that were previously
+        guarded with the TARGET_X11 conditional should also be built for the Wayland target, so the new TARGET_X11_OR_WAYLAND
+        conditional is used. If neither of those two targets is being built we fall back to adding source files to the build
+        as necessary by the actual build target.
+        * platform/gtk/GtkVersioning.c:
+        (gdk_screen_get_monitor_workarea): Additionally guard bits of code that depend on the GDK_WINDOWING_X11 macro being
+        defined - these should only be built when building the X11 target, checked for with PLATFORM(X11).
+
+2013-09-04  Claudio Saavedra  <csaavedra@igalia.com>
+
+        [GTK] Color of input button's text broken with recent gnome-themes-standard
+        https://bugs.webkit.org/show_bug.cgi?id=120581
+
+        Reviewed by Carlos Garcia Campos.
+
+        * platform/gtk/RenderThemeGtk3.cpp:
+        (WebCore::getStyleContext): add the "text-button" class.
+        (WebCore::RenderThemeGtk::systemColor): Use the ACTIVE state flag,
+        as this is the one actually used for button labels.
+
+2013-09-04  Andre Moreira Magalhaes   <andre.magalhaes@collabora.co.uk>
+
+        [GStreamer] cannot play live streams
+        https://bugs.webkit.org/show_bug.cgi?id=116831
+
+        Reviewed by Philippe Normand.
+
+        Fix issues with rtsp streams embedded on <video> not loading.
+
+        * platform/graphics/gstreamer/MediaPlayerPrivateGStreamer.cpp:
+        Do not reset pipeline to READY state on STATE_CHANGE_ASYNC when entering PAUSED state for
+        live streams, otherwise we enter an endless loop of READY->PAUSED->READY->PAUSED when
+        starting playback.
+
+2013-09-05  Andre Moreira Magalhaes   <andre.magalhaes@collabora.co.uk>
+
+        [Qt][WK1] REGRESSION(r154988): compositing/video/video-with-invalid-source.html
+        https://bugs.webkit.org/show_bug.cgi?id=120683
+
+        Reviewed by Philippe Normand.
+
+        Do not set pipeline state to NULL on MediaPlayerPrivateGStreamer::loadingFailed()
+        otherwise the bus is flushed and we never get a GST_MESSAGE_ERROR when failing to
+        load uris.
+        Also restore previous behaviour (before r154988) of not invoking loadingFailed() for
+        all failed manual state change attempts.
+
+        * platform/graphics/gstreamer/MediaPlayerPrivateGStreamer.cpp:
+        (WebCore::MediaPlayerPrivateGStreamer::changePipelineState):
+        Do not call loadingFailed() if state change fails as all manual state changes are
+        now done with changePipelineState().
+        (WebCore::MediaPlayerPrivateGStreamer::play):
+        (WebCore::MediaPlayerPrivateGStreamer::pause):
+        (WebCore::MediaPlayerPrivateGStreamer::seek):
+        (WebCore::MediaPlayerPrivateGStreamer::handleMessage):
+        Restore previous behaviour (before changeset r154988) when calling changePipelineState().
+        (WebCore::MediaPlayerPrivateGStreamer::updateStates):
+        Do nothing if changing to READY on EOS (same behaviour as setting to NULL as it was before
+        changeset r154988).
+        (WebCore::MediaPlayerPrivateGStreamer::loadingFailed):
+        Do not set pipeline state to NULL so we properly get GST_MESSAGE_ERROR on loading failures.
+
+2013-09-03  Andre Moreira Magalhaes   <andre.magalhaes@collabora.co.uk>
+
+        [GStreamer] Don't set state to NULL until element is destroyed
+        https://bugs.webkit.org/show_bug.cgi?id=117354
+
+        Reviewed by Philippe Normand.
+
+        Don't set playbin to NULL until it is going to be destroyed or if we stay
+        for too long on the READY state. Instead only set the state to READY as this
+        allows much faster state changes to PAUSED/PLAYING again. playbin internally
+        caches some state that is destroyed when setting it to NULL.
+        This state is independent of the URI and it is even possible to change the
+        URI in READY state.
+
+        To avoid having resources (e.g. audio devices) open indefinitely,
+        when setting the state to READY we create a timeout and if the timeout
+        is reached we reset the pipeline state to NULL to free resources.
+
+        Also now all state changes use the changePipelineState method instead of setting
+        the playbin state directly with gst_element_set_state, so we have a better control
+        of when we are requesting state changes.
+
+        * platform/graphics/gstreamer/MediaPlayerPrivateGStreamer.cpp:
+        (WebCore::mediaPlayerPrivateReadyStateTimeoutCallback):
+        (WebCore::MediaPlayerPrivateGStreamer::MediaPlayerPrivateGStreamer):
+        (WebCore::MediaPlayerPrivateGStreamer::~MediaPlayerPrivateGStreamer):
+        (WebCore::MediaPlayerPrivateGStreamer::commitLoad):
+        (WebCore::MediaPlayerPrivateGStreamer::changePipelineState):
+        (WebCore::MediaPlayerPrivateGStreamer::setRate):
+        (WebCore::MediaPlayerPrivateGStreamer::handlePluginInstallerResult):
+        * platform/graphics/gstreamer/MediaPlayerPrivateGStreamer.h:
+
+2013-09-04  Andre Moreira Magalhaes   <andre.magalhaes@collabora.co.uk>
+
+        REGRESSION(r154977): Do not urlencode soup message on ResourceRequest::toSoupMessage()
+        https://bugs.webkit.org/show_bug.cgi?id=120681
+
+        Reviewed by Martin Robinson.
+
+        Do not call soup_message_set_uri with soupURI() (url encoded uri) on
+        ResourceRequest::toSoupMessage().
+
+        * platform/network/soup/ResourceRequest.h:
+        * platform/network/soup/ResourceRequestSoup.cpp:
+        (WebCore::ResourceRequest::updateSoupMessageMembers):
+        (WebCore::ResourceRequest::updateSoupMessage):
+        (WebCore::ResourceRequest::toSoupMessage):
+        Split common code from updateSoupMessage/toSoupMessage into updateSoupMessageMembers.
+
+2013-09-03  Andre Moreira Magalhaes   <andre.magalhaes@collabora.co.uk>
+
+        [gstreamer] Disable HTTP request "Accept-Encoding:" header field on gstreamer source element to avoid receiving the wrong size when retrieving data
+        https://bugs.webkit.org/show_bug.cgi?id=115354
+
+        Reviewed by Philippe Normand.
+
+        Also disable Accept-Encoding on ResourceRequest::toSoupMessage accordingly.
+
+        * platform/network/soup/ResourceRequestSoup.cpp:
+        (WebCore::ResourceRequest::toSoupMessage):
+        Call ResourceRequest::updateSoupMessage from ResourceRequest::toSoupMessage so that the
+        Accept-Encoding header is also respected.
+
+2013-09-03  Xabier Rodriguez Calvar  <calvaris@igalia.com>
+
+        [GStreamer] Video player sets system volume to 100%
+        https://bugs.webkit.org/show_bug.cgi?id=118974
+
+        Reviewed by Philippe Normand.
+
+        In order to preserve the system volume we need to keep track of
+        the volume being initialized in the HTMLMediaElement and then just
+        setting the volume to the sink when initializing the pipeline if
+        that volume was changed before.
+
+        * html/HTMLMediaElement.cpp:
+        (WebCore::HTMLMediaElement::HTMLMediaElement): Initialized
+        attribute to false.
+        (WebCore::HTMLMediaElement::setVolume): Set the attribute to true
+        when volume is changed.
+        (WebCore::HTMLMediaElement::updateVolume): Set the volume only if
+        volume was initialized.
+        (WebCore::HTMLMediaElement::mediaPlayerPlatformVolumeConfigurationRequired):
+        Platform volume configuration is required only if volume was not
+        initialized before.
+        * html/HTMLMediaElement.h: Added attribute and interface method.
+        * platform/graphics/MediaPlayer.h:
+        (WebCore::MediaPlayerClient::mediaPlayerPlatformVolumeConfigurationRequired):
+        Declared and added default implementation for the interface method.
+        (WebCore::MediaPlayer::platformVolumeConfigurationRequired):
+        Asked the client, meaning the HTMLMediaElement if the platform
+        volume configuration is required.
+        * platform/graphics/gstreamer/MediaPlayerPrivateGStreamerBase.cpp:
+        (WebCore::mediaPlayerPrivateVolumeChangedCallback): Added log.
+        (WebCore::MediaPlayerPrivateGStreamerBase::setVolume): Added log.
+        (WebCore::MediaPlayerPrivateGStreamerBase::setStreamVolumeElement):
+        Set the volume only if not platform volume is required and added log.
+
+2013-09-01  Xabier Rodriguez Calvar  <calvaris@igalia.com>
+
+        Volume slider value should be 0 when audio is muted
+        https://bugs.webkit.org/show_bug.cgi?id=120553
+
+        Reviewed by Eric Carlson.
+
+        Fixed the problem of showing a non empty slider when audio is
+        muted.
+
+        Test: media/volume-bar-empty-when-muted.html.
+
+        * html/shadow/MediaControls.cpp:
+        (WebCore::MediaControls::reset): Use setSliderVolume.
+        (WebCore::MediaControls::changedVolume): Use setSliderVolume.
+        (WebCore::MediaControls::setSliderVolume): Added to set the volume
+        to 0 when muted and to its value otherwise.
+        * html/shadow/MediaControls.h: Added setSliderVolume.
+        * html/shadow/MediaControlsApple.cpp:
+        (WebCore::MediaControlsApple::reset): Used setSliderVolume and
+        setFullscreenSliderVolume.
+        (WebCore::MediaControlsApple::changedVolume): Used
+        setFullscreenSliderVolume.
+        (WebCore::MediaControlsApple::setFullscreenSliderVolume): Added to
+        set the volume to 0 when muted and to its value otherwise.
+        * html/shadow/MediaControlsApple.h: Added setFullscreenSliderVolume
+        * html/shadow/MediaControlsBlackBerry.cpp:
+        (WebCore::MediaControlsBlackBerry::reset): Used setSliderVolume.
+
+2013-08-27  Andre Moreira Magalhaes   <andre.magalhaes@collabora.co.uk>
+
+        [gstreamer] Make sure gstreamer source element is thread-safe
+        https://bugs.webkit.org/show_bug.cgi?id=115352
+
+        Reviewed by Philippe Normand.
+
+        GStreamer source element may be created by any gstreamer element on any thread by calling
+        gst_element_make_from_uri with the URIs handled by the source element.
+        This patch makes sure the gstreamer source element is thread-safe to avoid issues with it
+        being created outside the main thread.
+
+        * platform/graphics/gstreamer/WebKitWebSourceGStreamer.cpp:
+        (webkit_web_src_init):
+        (webKitWebSrcDispose):
+        (webKitWebSrcFinalize):
+        (webKitWebSrcSetProperty):
+        (webKitWebSrcGetProperty):
+        (removeTimeoutSources):
+        (webKitWebSrcStop):
+        (webKitWebSrcStart):
+        (webKitWebSrcChangeState):
+        (webKitWebSrcQueryWithParent):
+        (webKitWebSrcGetUri):
+        (webKitWebSrcSetUri):
+        (webKitWebSrcNeedDataMainCb):
+        (webKitWebSrcNeedDataCb):
+        (webKitWebSrcEnoughDataMainCb):
+        (webKitWebSrcEnoughDataCb):
+        (webKitWebSrcSeekMainCb):
+        (webKitWebSrcSeekDataCb):
+        (webKitWebSrcSetMediaPlayer):
+        (StreamingClient::StreamingClient):
+        (StreamingClient::~StreamingClient):
+        (StreamingClient::createReadBuffer):
+        (StreamingClient::handleResponseReceived):
+        (StreamingClient::handleDataReceived):
+        (StreamingClient::handleNotifyFinished):
+        (CachedResourceStreamingClient::CachedResourceStreamingClient):
+        (CachedResourceStreamingClient::~CachedResourceStreamingClient):
+        (CachedResourceStreamingClient::loadFailed):
+        (CachedResourceStreamingClient::setDefersLoading):
+        (CachedResourceStreamingClient::getOrCreateReadBuffer):
+        (CachedResourceStreamingClient::responseReceived):
+        (CachedResourceStreamingClient::dataReceived):
+        (CachedResourceStreamingClient::notifyFinished):
+        (ResourceHandleStreamingClient::ResourceHandleStreamingClient):
+        (ResourceHandleStreamingClient::~ResourceHandleStreamingClient):
+        (ResourceHandleStreamingClient::loadFailed):
+        (ResourceHandleStreamingClient::setDefersLoading):
+        (ResourceHandleStreamingClient::getOrCreateReadBuffer):
+        (ResourceHandleStreamingClient::willSendRequest):
+        (ResourceHandleStreamingClient::didReceiveResponse):
+        (ResourceHandleStreamingClient::didReceiveData):
+        (ResourceHandleStreamingClient::didFinishLoading):
+        (ResourceHandleStreamingClient::didFail):
+        (ResourceHandleStreamingClient::wasBlocked):
+        (ResourceHandleStreamingClient::cannotShowURL):
+        Make element thread-safe, add support to use the element without a player associated (e.g.
+        the DASH plugin using the webkitsrc to download fragments), use GMutexLocker to simplify
+        locks and other general improvements.
+
+2013-06-19  Andre Moreira Magalhaes   <andre.magalhaes@collabora.co.uk>
+
+        Adjust internal size on gstreamer source element when receiving data if necessary
+        https://bugs.webkit.org/show_bug.cgi?id=116534
+
+        Reviewed by Philippe Normand.
+
+        If the size received in didReceiveResponse is smaller than the actual size of the received data
+        update the internal size and the appsrc size to the proper value.
+
+        * platform/graphics/gstreamer/WebKitWebSourceGStreamer.cpp:
+        (StreamingClient::didReceiveData):
+
 2013-08-28  Gustavo Noronha Silva  <gns@gnome.org>
 
         Unreviewed build fix - copy/paste failure, copied too much.

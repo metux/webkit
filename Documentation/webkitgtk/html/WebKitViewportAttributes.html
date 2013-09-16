@@ -8,7 +8,7 @@
 <link rel="up" href="ch02.html" title="Class Overview">
 <link rel="prev" href="webkitgtk-webkitdownload.html" title="WebKitDownload">
 <link rel="next" href="WebKitHitTestResult.html" title="WebKitHitTestResult">
-<meta name="generator" content="GTK-Doc V1.19 (XML mode)">
+<meta name="generator" content="GTK-Doc V1.18.1 (XML mode)">
 <link rel="stylesheet" href="style.css" type="text/css">
 </head>
 <body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF">
@@ -132,39 +132,81 @@ http://developer.apple.com/safari/library/documentation/appleapplications/refere
 29
 30
 31
-32</pre></td>
-        <td class="listing_code"><pre class="programlisting"><span class="comment">/* Connect to the viewport-attributes-changes signal */</span>
-<span class="normal"><a href="../webkitgtk/WebKitViewportAttributes.html">WebKitViewportAttributes</a></span><span class="symbol">*</span><span class="normal"> attributes </span><span class="symbol">=</span><span class="normal"> </span><span class="function"><a href="../webkitgtk/webkitgtk-webkitwebview.html#webkit-web-view-get-viewport-attributes">webkit_web_view_get_viewport_attributes</a></span><span class="normal"> </span><span class="symbol">(</span><span class="normal">web_view</span><span class="symbol">);</span>
-<span class="function"><a href="../gobject/gobject-Signals.html#g-signal-connect">g_signal_connect</a></span><span class="normal"> </span><span class="symbol">(</span><span class="normal">web_view</span><span class="symbol">,</span><span class="normal"> </span><span class="string">"viewport-attributes-recompute-requested"</span><span class="symbol">,</span><span class="normal"> </span><span class="function"><a href="../gobject/gobject-Closures.html#G-CALLBACK:CAPS">G_CALLBACK</a></span><span class="normal"> </span><span class="symbol">(</span><span class="normal">viewport_recompute_cb</span><span class="symbol">),</span><span class="normal"> window</span><span class="symbol">);</span>
-<span class="function"><a href="../gobject/gobject-Signals.html#g-signal-connect">g_signal_connect</a></span><span class="normal"> </span><span class="symbol">(</span><span class="normal">web_view</span><span class="symbol">,</span><span class="normal"> </span><span class="string">"viewport-attributes-changed"</span><span class="symbol">,</span><span class="normal"> </span><span class="function"><a href="../gobject/gobject-Closures.html#G-CALLBACK:CAPS">G_CALLBACK</a></span><span class="normal"> </span><span class="symbol">(</span><span class="normal">viewport_changed_cb</span><span class="symbol">),</span><span class="normal"> window</span><span class="symbol">);</span>
-<span class="function"><a href="../gobject/gobject-Signals.html#g-signal-connect">g_signal_connect</a></span><span class="normal"> </span><span class="symbol">(</span><span class="normal">attributes</span><span class="symbol">,</span><span class="normal"> </span><span class="string">"notify::valid"</span><span class="symbol">,</span><span class="normal"> </span><span class="function"><a href="../gobject/gobject-Closures.html#G-CALLBACK:CAPS">G_CALLBACK</a></span><span class="normal"> </span><span class="symbol">(</span><span class="normal">viewport_valid_changed_cb</span><span class="symbol">),</span><span class="normal"> web_view</span><span class="symbol">);</span>
+32
+33
+34
+35
+36
+37
+38
+39
+40
+41
+42
+43
+44
+45
+46
+47
+48
+49
+50
+51
+52
+53</pre></td>
+        <td class="listing_code"><pre class="programlisting"><?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<meta name="syntax" content="cpp" />
+<meta name="settings" content="use_xhtml,use_css,pre_wrap,no_foldcolumn,prevent_copy=" />
+<meta name="colorscheme" content="none" />
+<style type="text/css">
 
-<span class="comment">/* Handle the viewport-attributes-recompute-requested signal to override the device width */</span>
-<span class="keyword">static</span><span class="normal"> </span><span class="type">void</span>
-<span class="function">viewport_recompute_cb</span><span class="normal"> </span><span class="symbol">(</span><span class="normal"><a href="../webkitgtk/webkitgtk-webkitwebview.html#WebKitWebView">WebKitWebView</a></span><span class="symbol">*</span><span class="normal"> web_view</span><span class="symbol">,</span><span class="normal"> <a href="../webkitgtk/WebKitViewportAttributes.html">WebKitViewportAttributes</a></span><span class="symbol">*</span><span class="normal"> attributes</span><span class="symbol">,</span><span class="normal"> <a href="../gtk3/GtkWidget.html">GtkWidget</a></span><span class="symbol">*</span><span class="normal"> window</span><span class="symbol">)</span>
-<span class="cbracket">{</span>
-<span class="normal">    </span><span class="type">int</span><span class="normal"> override_available_width </span><span class="symbol">=</span><span class="normal"> </span><span class="number">480</span><span class="symbol">;</span>
-<span class="normal">    </span><span class="function"><a href="../gobject/gobject-The-Base-Object-Type.html#g-object-set">g_object_set</a></span><span class="normal"> </span><span class="symbol">(</span><span class="function"><a href="../gobject/gobject-The-Base-Object-Type.html#G-OBJECT:CAPS">G_OBJECT</a></span><span class="symbol">(</span><span class="normal">attributes</span><span class="symbol">),</span><span class="normal"> </span><span class="string">"available-width"</span><span class="symbol">,</span><span class="normal"> override_available_width</span><span class="symbol">,</span><span class="normal"> <a href="../glib/glib-Standard-Macros.html#NULL:CAPS">NULL</a></span><span class="symbol">);</span>
-<span class="cbracket">}</span>
+pre { white-space: pre-wrap; font-family: monospace; color: #000000; background-color: #ffffff; }
+body { font-family: monospace; color: #000000; background-color: #ffffff; }
+* { font-size: 1em; }
+.Comment { color: #c00000; font-weight: bold; }
+.Constant { color: #0000c0; text-decoration: underline; }
+.Statement { color: #008080; font-weight: bold; }
+.Type { color: #008000; text-decoration: underline; }
 
-<span class="comment">/* Handle the viewport-attributes-changed signal to recompute the initial scale factor */</span>
-<span class="keyword">static</span><span class="normal"> </span><span class="type">void</span>
-<span class="function">viewport_changed_cb</span><span class="normal"> </span><span class="symbol">(</span><span class="normal"><a href="../webkitgtk/webkitgtk-webkitwebview.html#WebKitWebView">WebKitWebView</a></span><span class="symbol">*</span><span class="normal"> web_view</span><span class="symbol">,</span><span class="normal"> <a href="../webkitgtk/WebKitViewportAttributes.html">WebKitViewportAttributes</a></span><span class="symbol">*</span><span class="normal"> attributes</span><span class="symbol">,</span><span class="normal"> </span><span class="usertype">gpointer</span><span class="normal"> data</span><span class="symbol">)</span>
-<span class="cbracket">{</span>
-<span class="normal">    </span><span class="usertype">gfloat</span><span class="normal"> initialScale</span><span class="symbol">;</span>
-<span class="normal">    </span><span class="function"><a href="../gobject/gobject-The-Base-Object-Type.html#g-object-get">g_object_get</a></span><span class="normal"> </span><span class="symbol">(</span><span class="function"><a href="../gobject/gobject-The-Base-Object-Type.html#G-OBJECT:CAPS">G_OBJECT</a></span><span class="normal"> </span><span class="symbol">(</span><span class="normal">atributes</span><span class="symbol">),</span><span class="normal"> </span><span class="string">"initial-scale-factor"</span><span class="symbol">,</span><span class="normal"> </span><span class="symbol">&amp;</span><span class="normal">initialScale</span><span class="symbol">,</span><span class="normal"> <a href="../glib/glib-Standard-Macros.html#NULL:CAPS">NULL</a></span><span class="symbol">);</span>
-<span class="normal">    </span><span class="function"><a href="../webkitgtk/webkitgtk-webkitwebview.html#webkit-web-view-set-zoom-level">webkit_web_view_set_zoom_level</a></span><span class="normal"> </span><span class="symbol">(</span><span class="normal">web_view</span><span class="symbol">,</span><span class="normal"> initialScale</span><span class="symbol">);</span>
-<span class="cbracket">}</span>
+</style>
+</head>
+<body>
+<pre id='vimCodeElement'>
+<span class="comment">/*</span><span class="comment"> Connect to the viewport-attributes-changes signal </span><span class="comment">*/</span>
+WebKitViewportAttributes* attributes = webkit_web_view_get_viewport_attributes (web_view);
+g_signal_connect (web_view, <span class="number">&quot;viewport-attributes-recompute-requested&quot;</span>, G_CALLBACK (viewport_recompute_cb), window);
+g_signal_connect (web_view, <span class="number">&quot;viewport-attributes-changed&quot;</span>, G_CALLBACK (viewport_changed_cb), window);
+g_signal_connect (attributes, <span class="number">&quot;notify::valid&quot;</span>, G_CALLBACK (viewport_valid_changed_cb), web_view);
 
-<span class="comment">/* Handle the notify::valid signal to initialize the zoom level */</span>
-<span class="keyword">static</span><span class="normal"> </span><span class="type">void</span>
-<span class="function">viewport_valid_changed_cb</span><span class="normal"> </span><span class="symbol">(</span><span class="normal"><a href="../webkitgtk/WebKitViewportAttributes.html">WebKitViewportAttributes</a></span><span class="symbol">*</span><span class="normal"> attributes</span><span class="symbol">,</span><span class="normal"> <a href="../gobject/gobject-GParamSpec.html#GParamSpec">GParamSpec</a></span><span class="symbol">*</span><span class="normal"> pspec</span><span class="symbol">,</span><span class="normal"> <a href="../webkitgtk/webkitgtk-webkitwebview.html#WebKitWebView">WebKitWebView</a></span><span class="symbol">*</span><span class="normal"> web_view</span><span class="symbol">)</span>
-<span class="cbracket">{</span>
-<span class="normal">    </span><span class="usertype">gboolean</span><span class="normal"> is_valid</span><span class="symbol">;</span>
-<span class="normal">    </span><span class="function"><a href="../gobject/gobject-The-Base-Object-Type.html#g-object-get">g_object_get</a></span><span class="normal"> </span><span class="symbol">(</span><span class="normal">attributes</span><span class="symbol">,</span><span class="normal"> </span><span class="string">"valid"</span><span class="symbol">,</span><span class="normal"> </span><span class="symbol">&amp;</span><span class="normal">is_valid</span><span class="symbol">,</span><span class="normal"> <a href="../glib/glib-Standard-Macros.html#NULL:CAPS">NULL</a></span><span class="symbol">);</span>
-<span class="normal">    </span><span class="keyword">if</span><span class="normal"> </span><span class="symbol">(!</span><span class="normal">is_valid</span><span class="symbol">)</span>
-<span class="normal">        </span><span class="function"><a href="../webkitgtk/webkitgtk-webkitwebview.html#webkit-web-view-set-zoom-level">webkit_web_view_set_zoom_level</a></span><span class="normal"> </span><span class="symbol">(</span><span class="normal">web_view</span><span class="symbol">,</span><span class="normal"> </span><span class="number">1.0</span><span class="symbol">);</span>
-<span class="cbracket">}</span></pre></td>
+<span class="comment">/*</span><span class="comment"> Handle the viewport-attributes-recompute-requested signal to override the device width </span><span class="comment">*/</span>
+<span class="type">static</span> <span class="type">void</span>
+viewport_recompute_cb (WebKitWebView* web_view, WebKitViewportAttributes* attributes, GtkWidget* window)
+{
+    <span class="type">int</span> override_available_width = <span class="number">480</span>;
+    g_object_set (G_OBJECT(attributes), <span class="number">&quot;available-width&quot;</span>, override_available_width, <span class="number">NULL</span>);
+}
+
+<span class="comment">/*</span><span class="comment"> Handle the viewport-attributes-changed signal to recompute the initial scale factor </span><span class="comment">*/</span>
+<span class="type">static</span> <span class="type">void</span>
+viewport_changed_cb (WebKitWebView* web_view, WebKitViewportAttributes* attributes, gpointer data)
+{
+    gfloat initialScale;
+    g_object_get (G_OBJECT (atributes), <span class="number">&quot;initial-scale-factor&quot;</span>, &amp;initialScale, <span class="number">NULL</span>);
+    webkit_web_view_set_zoom_level (web_view, initialScale);
+}
+
+<span class="comment">/*</span><span class="comment"> Handle the notify::valid signal to initialize the zoom level </span><span class="comment">*/</span>
+<span class="type">static</span> <span class="type">void</span>
+viewport_valid_changed_cb (WebKitViewportAttributes* attributes, GParamSpec* pspec, WebKitWebView* web_view)
+{
+    gboolean is_valid;
+    g_object_get (attributes, <span class="number">&quot;valid&quot;</span>, &amp;is_valid, <span class="number">NULL</span>);
+    <span class="keyword">if</span> (!is_valid)
+        webkit_web_view_set_zoom_level (web_view, <span class="number">1.0</span>);
+}</pre></td>
       </tr>
     </tbody>
   </table>
@@ -324,6 +366,6 @@ the device size, available size, desktop width, or device DPI.
 </div>
 <div class="footer">
 <hr>
-          Generated by GTK-Doc V1.19</div>
+          Generated by GTK-Doc V1.18.1</div>
 </body>
 </html>

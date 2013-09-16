@@ -9,10 +9,12 @@ WebKitAuthenticationRequest
 
 </para>
 
+
 <!-- ##### SECTION See_Also ##### -->
 <para>
 
 </para>
+
 
 <!-- ##### SECTION Stability_Level ##### -->
 
@@ -25,6 +27,13 @@ WebKitAuthenticationRequest
 
 </para>
 
+
+<!-- ##### SIGNAL WebKitAuthenticationRequest::cancelled ##### -->
+<para>
+
+</para>
+
+@webkitauthenticationrequest: the object which received the signal.
 
 <!-- ##### ENUM WebKitAuthenticationScheme ##### -->
 <para>

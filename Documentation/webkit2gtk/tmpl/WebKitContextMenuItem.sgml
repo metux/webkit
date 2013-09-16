@@ -9,10 +9,12 @@ WebKitContextMenuItem
 
 </para>
 
+
 <!-- ##### SECTION See_Also ##### -->
 <para>
 
 </para>
+
 
 <!-- ##### SECTION Stability_Level ##### -->
 
@@ -73,6 +75,8 @@ WebKitContextMenuItem
 @WEBKIT_CONTEXT_MENU_ACTION_MEDIA_PLAY: 
 @WEBKIT_CONTEXT_MENU_ACTION_MEDIA_PAUSE: 
 @WEBKIT_CONTEXT_MENU_ACTION_MEDIA_MUTE: 
+@WEBKIT_CONTEXT_MENU_ACTION_DOWNLOAD_VIDEO_TO_DISK: 
+@WEBKIT_CONTEXT_MENU_ACTION_DOWNLOAD_AUDIO_TO_DISK: 
 @WEBKIT_CONTEXT_MENU_ACTION_CUSTOM: 
 
 <!-- ##### FUNCTION webkit_context_menu_item_new ##### -->

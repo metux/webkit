@@ -156,6 +156,9 @@
 /* Version number of package */
 #undef VERSION
 
+/* Define if target is Wayland */
+#undef WTF_PLATFORM_WAYLAND
+
 /* Define if target is X11 */
 #undef WTF_PLATFORM_X11
 

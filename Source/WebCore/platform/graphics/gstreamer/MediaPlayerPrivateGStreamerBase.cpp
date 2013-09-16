@@ -76,6 +76,7 @@ static int greatestCommonDivisor(int a, int b)
 static void mediaPlayerPrivateVolumeChangedCallback(GObject*, GParamSpec*, MediaPlayerPrivateGStreamerBase* player)
 {
     // This is called when m_volumeElement receives the notify::volume signal.
+    LOG_MEDIA_MESSAGE("Volume changed to: %f", player->volume());
     player->volumeChanged();
 }
 
@@ -117,7 +118,7 @@ MediaPlayerPrivateGStreamerBase::MediaPlayerPrivateGStreamerBase(MediaPlayer* pl
     , m_muteSignalHandler(0)
 {
 #if GLIB_CHECK_VERSION(2, 31, 0)
-    m_bufferMutex = WTF::fastNew<GMutex>();
+    m_bufferMutex = new GMutex;
     g_mutex_init(m_bufferMutex);
 #else
     m_bufferMutex = g_mutex_new();
@@ -130,7 +131,7 @@ MediaPlayerPrivateGStreamerBase::~MediaPlayerPrivateGStreamerBase()
 
 #if GLIB_CHECK_VERSION(2, 31, 0)
     g_mutex_clear(m_bufferMutex);
-    WTF::fastDelete(m_bufferMutex);
+    delete m_bufferMutex;
 #else
     g_mutex_free(m_bufferMutex);
 #endif
@@ -234,6 +235,7 @@ void MediaPlayerPrivateGStreamerBase::setVolume(float volume)
     if (!m_volumeElement)
         return;
 
+    LOG_MEDIA_MESSAGE("Setting volume: %f", volume);
     gst_stream_volume_set_volume(m_volumeElement.get(), GST_STREAM_VOLUME_FORMAT_CUBIC, static_cast<double>(volume));
 }
 
@@ -618,7 +620,16 @@ void MediaPlayerPrivateGStreamerBase::setStreamVolumeElement(GstStreamVolume* vo
     ASSERT(!m_volumeElement);
     m_volumeElement = volume;
 
-    g_object_set(m_volumeElement.get(), "mute", m_player->muted(), "volume", m_player->volume(), NULL);
+    // We don't set the initial volume because we trust the sink to keep it for us. See
+    // https://bugs.webkit.org/show_bug.cgi?id=118974 for more information.
+    if (!m_player->platformVolumeConfigurationRequired()) {
+        LOG_MEDIA_MESSAGE("Setting stream volume to %f", m_player->volume());
+        g_object_set(m_volumeElement.get(), "volume", m_player->volume(), NULL);
+    } else
+        LOG_MEDIA_MESSAGE("Not setting stream volume, trusting system one");
+
+    LOG_MEDIA_MESSAGE("Setting stream muted %d",  m_player->muted());
+    g_object_set(m_volumeElement.get(), "mute", m_player->muted(), NULL);
 
     m_volumeSignalHandler = g_signal_connect(m_volumeElement.get(), "notify::volume", G_CALLBACK(mediaPlayerPrivateVolumeChangedCallback), this);
     m_muteSignalHandler = g_signal_connect(m_volumeElement.get(), "notify::mute", G_CALLBACK(mediaPlayerPrivateMuteChangedCallback), this);
