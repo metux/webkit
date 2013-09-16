@@ -1,7 +1,9 @@
---- ./Source/WTF/wtf/Platform.h.save	2013-08-20 20:48:15.000000000 -0400
-+++ ./Source/WTF/wtf/Platform.h	2013-08-24 22:06:38.931786315 -0400
-@@ -65,6 +65,15 @@
- #define WTF_CPU_ALPHA 1
+Index: webkitgtk/Source/WTF/wtf/Platform.h
+===================================================================
+--- webkitgtk.orig/Source/WTF/wtf/Platform.h	2013-09-16 15:23:20.798989912 -0300
++++ webkitgtk/Source/WTF/wtf/Platform.h	2013-09-16 15:23:20.794989892 -0300
+@@ -71,6 +71,15 @@
+ #define WTF_CPU_HPPA 1
  #endif
  
 +/* CPU(HPPA) - HP PARISC */

@@ -1,5 +1,7 @@
---- ./Source/WTF/wtf/dtoa/utils.h.save	2013-08-28 21:31:19.172162840 -0400
-+++ ./Source/WTF/wtf/dtoa/utils.h	2013-08-28 21:32:30.642518129 -0400
+Index: webkitgtk/Source/WTF/wtf/dtoa/utils.h
+===================================================================
+--- webkitgtk.orig/Source/WTF/wtf/dtoa/utils.h	2013-09-16 15:23:23.891005245 -0300
++++ webkitgtk/Source/WTF/wtf/dtoa/utils.h	2013-09-16 15:23:23.887005225 -0300
 @@ -49,7 +49,7 @@
  defined(__ARMEL__) || \
  defined(_MIPS_ARCH_MIPS32R2)
