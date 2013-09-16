@@ -64,6 +64,11 @@ ifneq (,$(filter $(DEB_BUILD_ARCH),alpha hppa ia64 powerpc ppc64 sparc sparc64 s
 	CPPFLAGS += -DENABLE_JIT=0 -DENABLE_YARR_JIT=0 -DENABLE_ASSEMBLER=0
 endif
 
+# Disabling GLX on ARM will make it use EGL, which works better.
+ifneq (,$(findstring $(DEB_BUILD_ARCH),armel armhf))
+       COMMON_CONFIGURE_ARGUMENTS += --enable-glx=no
+endif
+
 ifneq (,$(filter parallel=%,$(DEB_BUILD_OPTIONS)))
 	NUMJOBS = $(patsubst parallel=%,%,$(filter parallel=%,$(DEB_BUILD_OPTIONS)))
 	MAKEARGUMENTS += -j$(NUMJOBS)
