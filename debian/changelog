@@ -27,6 +27,9 @@ webkitgtk (2.1.91-1) experimental; urgency=low
   [ Gustavo Noronha Silva ]
   * debian/rules:
     + Disable GLX on ARM, thanks to Sjoerd Simons.
+  * debian/patches/10_hurd_getCurrentExecutablePath.patch,
+    debian/patches/20_bsd-hurd-gtest-port.patch:
+    + removed, applied upstream
 
  -- Gustavo Noronha Silva <kov@debian.org>  Mon, 16 Sep 2013 15:02:08 -0300
 
