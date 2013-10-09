@@ -1,3 +1,107 @@
+2013-09-13  Gustavo Noronha Silva  <gustavo.noronha@collabora.com>
+
+        [GTK] Move to the new web inspector
+        https://bugs.webkit.org/show_bug.cgi?id=120647
+
+        Reviewed by Carlos Garcia Campos.
+
+        No tests for the new inspector UI as of yet.
+
+        * GNUmakefile.am: no longer install the deprecated inspector UI files.
+        * WebCore.exp.in: add SchemeRegistry symbol that is now used.
+
+2013-09-11  Mario Sanchez Prada  <mario.prada@samsung.com>
+
+        [GTK] Remove Gail dependency from build system for GTK3
+        https://bugs.webkit.org/show_bug.cgi?id=119673
+
+        Reviewed by Gustavo Noronha Silva.
+
+        * GNUmakefile.am: Removed GAIL_CFLAGS.
+        * PlatformGTK.cmake: Removed GAIL3_INCLUDE_DIRS and GAIL3_LIBRARIES.
+
+2013-09-11  Mario Sanchez Prada  <mario.prada@samsung.com>
+
+        [GTK] Get rid of Pango/Gail dependencies in accessibility for ATK
+        https://bugs.webkit.org/show_bug.cgi?id=114867
+
+        Reviewed by Martin Robinson.
+
+        Removed all trace of Gail and Pango specific code from the AtkText
+        implementation, now everything has been reimplemented.
+
+        * accessibility/atk/WebKitAccessibleInterfaceText.cpp:
+        (webkitAccessibleTextGetTextForOffset): Removed fallback code
+        relying in Gail/Pango, now all the related code has been
+        removed. Also, replaced the collection of if statements with a
+        switch, for better readability of the code.
+
+2013-09-10  Mario Sanchez Prada  <mario.prada@samsung.com>
+
+        [GTK] Reimplement atk_text_get_text_*_offset for LINE boundaries
+        https://bugs.webkit.org/show_bug.cgi?id=114872
+
+        Reviewed by Gustavo Noronha Silva.
+
+        Re-implement these functions without using GailTextUtil nor Pango.
+
+        * accessibility/atk/WebKitAccessibleInterfaceText.cpp:
+        (lineAtPositionForAtkBoundary): New helper function to find the
+        line at a given position considering values of AtkTextBoundary.
+        (webkitAccessibleTextLineForBoundary): New function,
+        implementing atk_text_get_text_*_offset for LINE.
+        (webkitAccessibleTextGetTextForOffset): Replace usage of Gail for
+        LINE boundaries with webkitAccessibleTextLineForBoundary().
+
+2013-09-04  Mario Sanchez Prada  <mario.prada@samsung.com>
+
+        [GTK] Reimplement atk_text_get_text_*_offset for SENTENCE boundaries
+        https://bugs.webkit.org/show_bug.cgi?id=114873
+
+        Reviewed by Chris Fleizach.
+
+        Re-implement these functions without using GailTextUtil nor Pango.
+
+        * accessibility/atk/WebKitAccessibleInterfaceText.cpp:
+        (webkitAccessibleTextWordForBoundary): Renamed from webkitAccessibleTextGetWordForBoundary,
+        to keep it consistent with names for new functions.
+        (isSentenceBoundary): Helper function to know when we are either
+        at the beginning or the end of a sentence.
+        (isWhiteSpaceBetweenSentences): It returns true if we are in the
+        middle of a white space between sentences. Useful for implementing
+        the SENTENCE_END boundary type.
+        (sentenceAtPositionForAtkBoundary): New helper function to find the
+        sentence at a given position considering values of AtkTextBoundary.
+        (webkitAccessibleTextSentenceForBoundary): New function,
+        implementing atk_text_get_text_*_offset for SENTENCE.
+        (webkitAccessibleTextGetTextForOffset): Replace usage of Gail for
+        SENTENCE boundaries with webkitAccessibleTextSentenceForBoundary().
+
+2013-09-14  Alberto Garcia  <berto@igalia.com>
+
+        Missing  allow-none introspection annotation for DomDocument.evaluate method
+        https://bugs.webkit.org/show_bug.cgi?id=118310
+
+        Reviewed by Martin Robinson.
+
+        Add (allow-none) introspection annotation to parameters that can
+        be NULL.
+
+        * bindings/scripts/CodeGeneratorGObject.pm:
+        (GenerateFunction):
+
+2013-09-14  Alberto Garcia  <berto@igalia.com>
+
+        [GTK] WebKitGTK+ is linking against libxslt in too many places
+        https://bugs.webkit.org/show_bug.cgi?id=121356
+
+        Reviewed by Martin Robinson.
+
+        Don't use LIBXSLT_CFLAGS when compiling libWebCorePlatform and
+        libWebCoreGtk, no source files use libxslt there.
+
+        * GNUmakefile.am:
+
 2013-09-06  Anders Carlsson  <andersca@apple.com>
 
         Stop using fastNew/fastDelete in WebCore

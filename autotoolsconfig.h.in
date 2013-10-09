@@ -20,12 +20,6 @@
 /* */
 #undef ENABLE_SPELLCHECK
 
-/* */
-#undef GDK_DISABLE_DEPRECATED
-
-/* */
-#undef GDK_PIXBUF_DISABLE_DEPRECATED
-
 /* Minimum GTK/GDK version required */
 #undef GDK_VERSION_MIN_REQUIRED
 
@@ -33,13 +27,7 @@
 #undef GETTEXT_PACKAGE
 
 /* */
-#undef GST_DISABLE_DEPRECATED
-
-/* */
 #undef GTK_API_VERSION_2
-
-/* */
-#undef GTK_DISABLE_DEPRECATED
 
 /* Define to 1 if you have the <dlfcn.h> header file. */
 #undef HAVE_DLFCN_H
@@ -114,9 +102,6 @@
 /* Define to disable debugging */
 #undef NDEBUG
 
-/* Define to 1 if your C compiler doesn't accept -c and -o together. */
-#undef NO_MINUS_C_MINUS_O
-
 /* Name of package */
 #undef PACKAGE
 
@@ -137,9 +122,6 @@
 
 /* Define to the version of this package. */
 #undef PACKAGE_VERSION
-
-/* */
-#undef PANGO_DISABLE_DEPRECATED
 
 /* Define to 1 if you have the ANSI C header files. */
 #undef STDC_HEADERS

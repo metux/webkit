@@ -74,8 +74,6 @@ case "$with_gtk" in
         WEBKITGTK_API_MINOR_VERSION=0
         WEBKITGTK_API_VERSION=1.0
         WEBKITGTK_PC_NAME=webkit
-        GAIL_PC_NAME=gail
-        GAIL_REQUIRED_VERSION=gail2_required_version
         ;;
     3.0) GTK_REQUIRED_VERSION=gtk3_required_version
         GTK_API_VERSION=3.0
@@ -83,8 +81,6 @@ case "$with_gtk" in
         WEBKITGTK_API_MINOR_VERSION=0
         WEBKITGTK_API_VERSION=3.0
         WEBKITGTK_PC_NAME=webkitgtk
-        GAIL_PC_NAME=gail-3.0
-        GAIL_REQUIRED_VERSION=gail3_required_version
         ;;
 esac
 AC_SUBST([WEBKITGTK_API_MAJOR_VERSION])
@@ -154,10 +150,6 @@ if test "$enable_spellcheck" = "yes"; then
     AC_SUBST(ENCHANT_LIBS)
 fi
 
-PKG_CHECK_MODULES(GAIL, $GAIL_PC_NAME >= $GAIL_REQUIRED_VERSION)
-AC_SUBST(GAIL_CFLAGS)
-AC_SUBST(GAIL_LIBS)
-
 # Check for target-specific dependencies.
 if test "$with_target" = "directfb"; then
     PKG_CHECK_MODULES(CAIRO, cairo-directfb >= cairo_required_version)
@@ -204,9 +196,19 @@ elif test "enable_glx" != "no"; then
     enable_glx=no
 fi
 
-if test "$with_wayland_target" = "yes"; then
+if test "$with_wayland_target" != "no"; then
     # The GTK+ Wayland target dependency should match the version of the master GTK+ dependency.
-    PKG_CHECK_MODULES(GTK_WAYLAND, gtk+-wayland-$GTK_API_VERSION = $GTK_ACTUAL_VERSION)
+    PKG_CHECK_MODULES([GTK_WAYLAND], [
+        gtk+-wayland-$GTK_API_VERSION = $GTK_ACTUAL_VERSION
+        gtk+-wayland-$GTK_API_VERSION >= gtk3_wayland_required_version
+    ], [with_wayland_target=yes], [
+        if test "$with_wayland_target" = "yes"; then
+            AC_MSG_ERROR([GTK+ Wayland dependency (gtk+-wayland-$GTK_API_VERSION >= gtk3_wayland_required_version) not found.])
+        else
+            AC_MSG_WARN([GTK+ Wayland dependency (gtk+-wayland-$GTK_API_VERSION >= gtk3_wayland_required_version) not found, disabling the Wayland target.])
+            with_wayland_target=no
+        fi
+    ])
 fi
 
 AC_CHECK_HEADERS([GL/glx.h], [have_glx="yes"], [have_glx="no"])
@@ -497,7 +499,7 @@ if test "$enable_webkit2" = "yes"; then
     fi
 
     # Make sure we have GTK+ 2.x to build the plugin process.
-    PKG_CHECK_MODULES(GTK2, gtk+-2.0 >= gtk2_required_version gail >= gail2_required_version)
+    PKG_CHECK_MODULES(GTK2, gtk+-2.0 >= gtk2_required_version)
     AC_SUBST(GTK2_CFLAGS)
     AC_SUBST(GTK2_LIBS)
 

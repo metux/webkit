@@ -40,6 +40,7 @@
       <sub name="WebKitWebExtension" link="WebKitWebExtension.html"/>
       <sub name="WebKitWebPage" link="WebKitWebPage.html"/>
       <sub name="WebKitFrame" link="WebKitFrame.html"/>
+      <sub name="WebKitScriptWorld" link="WebKitScriptWorld.html"/>
     </sub>
     <sub name="Index" link="index-all.html"/>
     <sub name="Index of new symbols in 2.2" link="api-index-2-2.html"/>
@@ -661,6 +662,10 @@
     <keyword type="function" name="webkit_frame_get_uri ()" link="WebKitFrame.html#webkit-frame-get-uri" since="2.2"/>
     <keyword type="function" name="webkit_frame_get_javascript_global_context ()" link="WebKitFrame.html#webkit-frame-get-javascript-global-context" since="2.2"/>
     <keyword type="function" name="webkit_frame_get_javascript_context_for_script_world ()" link="WebKitFrame.html#webkit-frame-get-javascript-context-for-script-world" since="2.2"/>
+    <keyword type="struct" name="struct WebKitScriptWorld" link="WebKitScriptWorld.html#WebKitScriptWorld-struct"/>
+    <keyword type="function" name="webkit_script_world_get_default ()" link="WebKitScriptWorld.html#webkit-script-world-get-default" since="2.2"/>
+    <keyword type="function" name="webkit_script_world_new ()" link="WebKitScriptWorld.html#webkit-script-world-new" since="2.2"/>
+    <keyword type="signal" name="The &quot;window-object-cleared&quot; signal" link="WebKitScriptWorld.html#WebKitScriptWorld-window-object-cleared"/>
     <keyword type="constant" name="WEBKIT_CACHE_MODEL_DOCUMENT_VIEWER" link="WebKitWebContext.html#WEBKIT-CACHE-MODEL-DOCUMENT-VIEWER:CAPS"/>
     <keyword type="constant" name="WEBKIT_CACHE_MODEL_WEB_BROWSER" link="WebKitWebContext.html#WEBKIT-CACHE-MODEL-WEB-BROWSER:CAPS"/>
     <keyword type="constant" name="WEBKIT_CACHE_MODEL_DOCUMENT_BROWSER" link="WebKitWebContext.html#WEBKIT-CACHE-MODEL-DOCUMENT-BROWSER:CAPS"/>
