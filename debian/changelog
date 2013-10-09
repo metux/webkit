@@ -1,6 +1,8 @@
 webkitgtk (2.2.0-1) UNRELEASED; urgency=low
 
   * New upstream stable release.
+  * debian/control:
+    + Remove gail build dependencies, no longer needed.
 
  -- Emilio Pozuelo Monfort <pochu@debian.org>  Wed, 09 Oct 2013 12:16:33 +0200
 
