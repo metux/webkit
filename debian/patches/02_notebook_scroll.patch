@@ -1,8 +1,6 @@
-Index: webkitgtk/Source/WebKit/gtk/webkit/webkitwebview.cpp
-===================================================================
---- webkitgtk.orig/Source/WebKit/gtk/webkit/webkitwebview.cpp	2013-09-16 15:23:19.214982057 -0300
-+++ webkitgtk/Source/WebKit/gtk/webkit/webkitwebview.cpp	2013-09-16 15:23:19.210982038 -0300
-@@ -789,6 +789,12 @@
+--- a/Source/WebKit/gtk/webkit/webkitwebview.cpp
++++ b/Source/WebKit/gtk/webkit/webkitwebview.cpp
+@@ -793,6 +793,12 @@
      if (!frame.view())
          return FALSE;
  
