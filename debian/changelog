@@ -1,4 +1,4 @@
-webkitgtk (2.2.0-1) UNRELEASED; urgency=low
+webkitgtk (2.2.0-1) experimental; urgency=low
 
   * New upstream stable release.
   * debian/control:
@@ -6,7 +6,7 @@ webkitgtk (2.2.0-1) UNRELEASED; urgency=low
   * debian/patches:
     + Refreshed.
 
- -- Emilio Pozuelo Monfort <pochu@debian.org>  Wed, 09 Oct 2013 12:16:33 +0200
+ -- Emilio Pozuelo Monfort <pochu@debian.org>  Wed, 09 Oct 2013 16:01:05 +0200
 
 webkitgtk (2.1.91-1) experimental; urgency=low
 
