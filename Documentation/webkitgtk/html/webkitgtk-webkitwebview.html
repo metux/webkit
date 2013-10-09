@@ -3067,9 +3067,9 @@ given frame.
 <hr>
 <div class="refsect2">
 <a name="WebKitWebView-download-requested"></a><h3>The <code class="literal">"download-requested"</code> signal</h3>
-<pre class="programlisting"><a href="../glib/glib-Basic-Types.html#gboolean"><span class="returnvalue">gboolean</span></a>            user_function                      (<a class="link" href="webkitgtk-webkitwebview.html#WebKitWebView"><span class="type">WebKitWebView</span></a> *web_view,
-                                                        <a href="../gobject/gobject-The-Base-Object-Type.html#GObject"><span class="type">GObject</span></a>       *download,
-                                                        <a href="../glib/glib-Basic-Types.html#gpointer"><span class="type">gpointer</span></a>       user_data)      : <a href="../gobject/gobject-Signals.html#G-SIGNAL-RUN-LAST:CAPS"><code class="literal">Run Last</code></a></pre>
+<pre class="programlisting"><a href="../glib/glib-Basic-Types.html#gboolean"><span class="returnvalue">gboolean</span></a>            user_function                      (<a class="link" href="webkitgtk-webkitwebview.html#WebKitWebView"><span class="type">WebKitWebView</span></a>  *web_view,
+                                                        <a class="link" href="webkitgtk-webkitdownload.html#WebKitDownload"><span class="type">WebKitDownload</span></a> *download,
+                                                        <a href="../glib/glib-Basic-Types.html#gpointer"><span class="type">gpointer</span></a>        user_data)      : <a href="../gobject/gobject-Signals.html#G-SIGNAL-RUN-LAST:CAPS"><code class="literal">Run Last</code></a></pre>
 <p>
 A new Download is being requested. By default, if the signal is
 not handled, the download is cancelled. If you handle the download

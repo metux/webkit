@@ -7,7 +7,7 @@
 <link rel="home" href="index.html" title="WebKit2GTK+ Reference Manual">
 <link rel="up" href="ch02.html" title="Web Extensions">
 <link rel="prev" href="WebKitWebPage.html" title="WebKitWebPage">
-<link rel="next" href="index-all.html" title="Index">
+<link rel="next" href="WebKitScriptWorld.html" title="WebKitScriptWorld">
 <meta name="generator" content="GTK-Doc V1.18.1 (XML mode)">
 <link rel="stylesheet" href="style.css" type="text/css">
 </head>
@@ -18,7 +18,7 @@
 <td><a accesskey="u" href="ch02.html"><img src="up.png" width="24" height="24" border="0" alt="Up"></a></td>
 <td><a accesskey="h" href="index.html"><img src="home.png" width="24" height="24" border="0" alt="Home"></a></td>
 <th width="100%" align="center">WebKit2GTK+ Reference Manual</th>
-<td><a accesskey="n" href="index-all.html"><img src="right.png" width="24" height="24" border="0" alt="Next"></a></td>
+<td><a accesskey="n" href="WebKitScriptWorld.html"><img src="right.png" width="24" height="24" border="0" alt="Next"></a></td>
 </tr>
 <tr><td colspan="5" class="shortcuts">
 <a href="#WebKitFrame.synopsis" class="shortcut">Top</a>
@@ -46,7 +46,7 @@ const <a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gc
                                                         (<em class="parameter"><code><a class="link" href="WebKitFrame.html" title="WebKitFrame"><span class="type">WebKitFrame</span></a> *frame</code></em>);
 <span class="returnvalue">JSGlobalContextRef</span>  <a class="link" href="WebKitFrame.html#webkit-frame-get-javascript-context-for-script-world" title="webkit_frame_get_javascript_context_for_script_world ()">webkit_frame_get_javascript_context_for_script_world</a>
                                                         (<em class="parameter"><code><a class="link" href="WebKitFrame.html" title="WebKitFrame"><span class="type">WebKitFrame</span></a> *frame</code></em>,
-                                                         <em class="parameter"><code><span class="type">WebKitScriptWorld</span> *world</code></em>);
+                                                         <em class="parameter"><code><a class="link" href="WebKitScriptWorld.html" title="WebKitScriptWorld"><span class="type">WebKitScriptWorld</span></a> *world</code></em>);
 </pre>
 </div>
 <div class="refsect1">
@@ -157,9 +157,9 @@ between the WebKit and JavaScriptCore APIs.
 <a name="webkit-frame-get-javascript-context-for-script-world"></a><h3>webkit_frame_get_javascript_context_for_script_world ()</h3>
 <pre class="programlisting"><span class="returnvalue">JSGlobalContextRef</span>  webkit_frame_get_javascript_context_for_script_world
                                                         (<em class="parameter"><code><a class="link" href="WebKitFrame.html" title="WebKitFrame"><span class="type">WebKitFrame</span></a> *frame</code></em>,
-                                                         <em class="parameter"><code><span class="type">WebKitScriptWorld</span> *world</code></em>);</pre>
+                                                         <em class="parameter"><code><a class="link" href="WebKitScriptWorld.html" title="WebKitScriptWorld"><span class="type">WebKitScriptWorld</span></a> *world</code></em>);</pre>
 <p>
-Gets the JavaScript execution context of <em class="parameter"><code>frame</code></em> for the given <span class="type">WebKitScriptWorld</span>.
+Gets the JavaScript execution context of <em class="parameter"><code>frame</code></em> for the given <a class="link" href="WebKitScriptWorld.html" title="WebKitScriptWorld"><span class="type">WebKitScriptWorld</span></a>.
 </p>
 <div class="variablelist"><table border="0" class="variablelist">
 <colgroup>
@@ -174,7 +174,7 @@ Gets the JavaScript execution context of <em class="parameter"><code>frame</code
 </tr>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>world</code></em> :</span></p></td>
-<td>a <span class="type">WebKitScriptWorld</span>
+<td>a <a class="link" href="WebKitScriptWorld.html" title="WebKitScriptWorld"><span class="type">WebKitScriptWorld</span></a>
 </td>
 </tr>
 <tr>

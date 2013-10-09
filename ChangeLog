@@ -1,3 +1,97 @@
+2013-09-18  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        Unreviewed. Update NEWS and Versions.m4 for 2.1.92 release.
+
+        * Source/autotools/Versions.m4: Bump version numbers.
+
+2013-09-13  Gustavo Noronha Silva  <gustavo.noronha@collabora.com>
+
+        [GTK] Move to the new web inspector
+        https://bugs.webkit.org/show_bug.cgi?id=120647
+
+        Reviewed by Carlos Garcia Campos.
+
+        * GNUmakefile.am: include the new WebInspectorUI GNUmakefile.am.
+
+2013-09-16  Zan Dobersek  <zdobersek@igalia.com>
+
+        [GTK][2.2] Enable the Wayland target by default if the GTK+ Wayland dependency is available
+        https://bugs.webkit.org/show_bug.cgi?id=121414
+
+        Reviewed by Martin Robinson.
+
+        * Source/autotools/FindDependencies.m4: If the Wayland target is not strictly disabled, also check that the GTK+ Wayland
+        package (gtk+-wayland-3.0) has a recent-enough version. If the dependency could not be satisfied, either a warning or an
+        error is printed out, depending if the Wayland target was required or just optional.
+        * Source/autotools/PrintBuildConfiguration.m4: Add a new macro, AM_APPEND_TO_DESRIPTION, that's helpful when producing
+        a description string that can contain multiple items that should be nicely formatted when listed in that string. This is
+        then used when creating the description for all the enabled targets, so for instance 'x11, wayland' string would be displayed
+        if both the X11 and Wayland targets are enabled.
+        * Source/autotools/ReadCommandLineArguments.m4: The --with-target configuration options should default to 'x11,wayland' if
+        not given, with the Wayland target in that case not being a hard requirement (i.e. it should be disabled if the dependencies
+        for the Wayland target could not be found).
+        * Source/autotools/Versions.m4: The GTK+ Wayland dependency should be of version 3.9.14 or greater (the 3.10 release series).
+
+2013-09-11  Mario Sanchez Prada  <mario.prada@samsung.com>
+
+        [GTK] Remove Gail dependency from build system for GTK3
+        https://bugs.webkit.org/show_bug.cgi?id=119673
+
+        Reviewed by Gustavo Noronha Silva.
+
+        * Source/autotools/FindDependencies.m4: Don't look for GAIL at all.
+        * Source/autotools/Versions.m4: Removed any reference to GAIL.
+        * Source/cmake/FindGAIL3.cmake: Removed.
+        * Source/cmake/OptionsGTK.cmake: Don't look for the GAIL package.
+
+2013-09-11  Alberto Garcia  <berto@igalia.com>
+
+        autogen.sh: fix removal of autom4te.cache
+        https://bugs.webkit.org/show_bug.cgi?id=121150
+
+        Reviewed by Carlos Garcia Campos.
+
+        The removal of autom4te.cache is wrong, it uses 'rm -f' instead of
+        'rm -rf' and it relies on an undefined variable.
+
+        In addition to that, it should be done after running autoreconf,
+        which is when it's no longer needed.
+
+        * autogen.sh:
+
+2013-09-11  Alberto Garcia  <berto@igalia.com>
+
+        Unquoted $ORIGDIR in autogen.sh
+        https://bugs.webkit.org/show_bug.cgi?id=19512
+
+        Reviewed by Carlos Garcia Campos.
+
+        Quote all directory names. This doesn't mean that all possible
+        directory names are safe for building webkit, but the configure
+        script already runs a sanity check.
+
+        * autogen.sh:
+
+2013-09-11  Zan Dobersek  <zdobersek@igalia.com>
+
+        [GTK] Stop disabling deprecated symbols in debug builds
+        https://bugs.webkit.org/show_bug.cgi?id=121145
+
+        Reviewed by Carlos Garcia Campos.
+
+        Disabling the dependencies' deprecated symbols in debug builds is only causing unnecessary
+        build failures. Compiler warnings are being thrown whenever a deprecated symbol is being
+        used, so a build failure is an overreach in this case.
+
+        * Source/autotools/SetupAutoconfHeader.m4:
+
+2013-09-11  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        Unreviewed. Update NEWS and Versions.m4 for 2.1.91 release.
+
+        * Source/autotools/Versions.m4: Bump version numbers.
+        * configure.ac: Remove webkit_patch_version from AC_INIT call.
+
 2013-09-06  Zan Dobersek  <zdobersek@igalia.com>
 
         [GTK] Bump the required Clang version to 3.2

@@ -1000,12 +1000,23 @@
 <ANCHOR id="webkit-frame-get-uri" href="webkit2gtk/WebKitFrame.html#webkit-frame-get-uri">
 <ANCHOR id="webkit-frame-get-javascript-global-context" href="webkit2gtk/WebKitFrame.html#webkit-frame-get-javascript-global-context">
 <ANCHOR id="webkit-frame-get-javascript-context-for-script-world" href="webkit2gtk/WebKitFrame.html#webkit-frame-get-javascript-context-for-script-world">
-<ANCHOR id="annotation-glossterm-out" href="webkit2gtk/annotation-glossary.html#annotation-glossterm-out">
-<ANCHOR id="annotation-glossterm-scope async" href="webkit2gtk/annotation-glossary.html#annotation-glossterm-scope async">
-<ANCHOR id="annotation-glossterm-allow-none" href="webkit2gtk/annotation-glossary.html#annotation-glossterm-allow-none">
-<ANCHOR id="annotation-glossterm-closure" href="webkit2gtk/annotation-glossary.html#annotation-glossterm-closure">
-<ANCHOR id="annotation-glossterm-transfer none" href="webkit2gtk/annotation-glossary.html#annotation-glossterm-transfer none">
-<ANCHOR id="annotation-glossterm-array" href="webkit2gtk/annotation-glossary.html#annotation-glossterm-array">
-<ANCHOR id="annotation-glossterm-element-type" href="webkit2gtk/annotation-glossary.html#annotation-glossterm-element-type">
-<ANCHOR id="annotation-glossterm-transfer container" href="webkit2gtk/annotation-glossary.html#annotation-glossterm-transfer container">
+<ANCHOR id="WebKitScriptWorld" href="webkit2gtk/WebKitScriptWorld.html">
+<ANCHOR id="WebKitScriptWorld.synopsis" href="webkit2gtk/WebKitScriptWorld.html#WebKitScriptWorld.synopsis">
+<ANCHOR id="WebKitScriptWorld.object-hierarchy" href="webkit2gtk/WebKitScriptWorld.html#WebKitScriptWorld.object-hierarchy">
+<ANCHOR id="WebKitScriptWorld.signals" href="webkit2gtk/WebKitScriptWorld.html#WebKitScriptWorld.signals">
+<ANCHOR id="WebKitScriptWorld.description" href="webkit2gtk/WebKitScriptWorld.html#WebKitScriptWorld.description">
+<ANCHOR id="WebKitScriptWorld.details" href="webkit2gtk/WebKitScriptWorld.html#WebKitScriptWorld.details">
+<ANCHOR id="WebKitScriptWorld-struct" href="webkit2gtk/WebKitScriptWorld.html#WebKitScriptWorld-struct">
+<ANCHOR id="webkit-script-world-get-default" href="webkit2gtk/WebKitScriptWorld.html#webkit-script-world-get-default">
+<ANCHOR id="webkit-script-world-new" href="webkit2gtk/WebKitScriptWorld.html#webkit-script-world-new">
+<ANCHOR id="WebKitScriptWorld.signal-details" href="webkit2gtk/WebKitScriptWorld.html#WebKitScriptWorld.signal-details">
+<ANCHOR id="WebKitScriptWorld-window-object-cleared" href="webkit2gtk/WebKitScriptWorld.html#WebKitScriptWorld-window-object-cleared">
 <ANCHOR id="annotation-glossterm-transfer full" href="webkit2gtk/annotation-glossary.html#annotation-glossterm-transfer full">
+<ANCHOR id="annotation-glossterm-array" href="webkit2gtk/annotation-glossary.html#annotation-glossterm-array">
+<ANCHOR id="annotation-glossterm-scope async" href="webkit2gtk/annotation-glossary.html#annotation-glossterm-scope async">
+<ANCHOR id="annotation-glossterm-element-type" href="webkit2gtk/annotation-glossary.html#annotation-glossterm-element-type">
+<ANCHOR id="annotation-glossterm-allow-none" href="webkit2gtk/annotation-glossary.html#annotation-glossterm-allow-none">
+<ANCHOR id="annotation-glossterm-transfer container" href="webkit2gtk/annotation-glossary.html#annotation-glossterm-transfer container">
+<ANCHOR id="annotation-glossterm-closure" href="webkit2gtk/annotation-glossary.html#annotation-glossterm-closure">
+<ANCHOR id="annotation-glossterm-out" href="webkit2gtk/annotation-glossary.html#annotation-glossterm-out">
+<ANCHOR id="annotation-glossterm-transfer none" href="webkit2gtk/annotation-glossary.html#annotation-glossterm-transfer none">
