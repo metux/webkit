@@ -345,7 +345,6 @@ webkit (1.9.2-1) experimental; urgency=low
   - updated with symbols of the new version
 
  -- Gustavo Noronha Silva <kov@debian.org>  Tue, 08 May 2012 12:01:33 -0300
->>>>>>> experimental
 
 webkit (1.8.1-3.4) unstable; urgency=medium
 
