@@ -1,3 +1,10 @@
+webkitgtk (2.2.0-2) UNRELEASED; urgency=low
+
+  * debian/rules:
+    + Disable JIT on mips, should fix the FTBFS.
+
+ -- Emilio Pozuelo Monfort <pochu@debian.org>  Mon, 14 Oct 2013 18:44:01 +0200
+
 webkitgtk (2.2.0-1) experimental; urgency=low
 
   * New upstream stable release.
