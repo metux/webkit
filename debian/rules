@@ -65,7 +65,7 @@ ifneq (,$(filter $(DEB_BUILD_ARCH),alpha hppa ia64 powerpc ppc64 sparc sparc64 s
 endif
 
 # Disabling GLX on ARM will make it use EGL, which works better.
-ifneq (,$(findstring $(DEB_BUILD_ARCH),armel armhf))
+ifneq (,$(filter $(DEB_BUILD_ARCH),armel armhf))
        COMMON_CONFIGURE_ARGUMENTS += --enable-glx=no
 endif
 

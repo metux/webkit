@@ -1,3 +1,11 @@
+webkitgtk (2.2.1-2) UNRELEASED; urgency=low
+
+  [ Michael Biebl ]
+  * debian/rules:
+    + Replace another occurence of findstring with filter.
+
+ -- Emilio Pozuelo Monfort <pochu@debian.org>  Wed, 30 Oct 2013 00:49:46 +0100
+
 webkitgtk (2.2.1-1) unstable; urgency=low
 
   * debian/gbp.conf:
