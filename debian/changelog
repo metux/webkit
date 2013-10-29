@@ -1,3 +1,10 @@
+webkitgtk (2.2.0-3) UNRELEASED; urgency=low
+
+  * debian/gbp.conf:
+    + Added.
+
+ -- Emilio Pozuelo Monfort <pochu@debian.org>  Tue, 29 Oct 2013 20:16:18 +0100
+
 webkitgtk (2.2.0-2) unstable; urgency=low
 
   * debian/rules:
