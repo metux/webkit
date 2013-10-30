@@ -12,6 +12,9 @@ webkitgtk (2.3.1-1) UNRELEASED; urgency=low
   * debian/control,
     debian/rules:
     + Enable wayland support on linux.
+  * debian/rules:
+    + Use gcc / g++ 4.8 instead of 4.7. We should just be using the
+      default here but some architectures are still defaulting to 4.6.
 
  -- Emilio Pozuelo Monfort <pochu@debian.org>  Wed, 30 Oct 2013 00:49:46 +0100
 
