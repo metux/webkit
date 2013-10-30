@@ -1,0 +1,713 @@
+<!-- ##### SECTION Title ##### -->
+WebKitDOMElement
+
+<!-- ##### SECTION Short_Description ##### -->
+
+
+<!-- ##### SECTION Long_Description ##### -->
+<para>
+
+</para>
+
+
+<!-- ##### SECTION See_Also ##### -->
+<para>
+
+</para>
+
+
+<!-- ##### SECTION Stability_Level ##### -->
+
+
+<!-- ##### SECTION Image ##### -->
+
+
+<!-- ##### STRUCT WebKitDOMElement ##### -->
+<para>
+
+</para>
+
+
+<!-- ##### ARG WebKitDOMElement:attributes ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMElement:child-element-count ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMElement:class-list ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMElement:class-name ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMElement:client-height ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMElement:client-left ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMElement:client-top ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMElement:client-width ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMElement:first-element-child ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMElement:id ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMElement:last-element-child ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMElement:next-element-sibling ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMElement:offset-height ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMElement:offset-left ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMElement:offset-parent ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMElement:offset-top ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMElement:offset-width ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMElement:previous-element-sibling ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMElement:scroll-height ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMElement:scroll-left ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMElement:scroll-top ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMElement:scroll-width ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMElement:style ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMElement:tag-name ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMElement:webkit-region-overset ##### -->
+<para>
+
+</para>
+
+<!-- ##### FUNCTION webkit_dom_element_get_attribute ##### -->
+<para>
+
+</para>
+
+@self: 
+@name: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_element_set_attribute ##### -->
+<para>
+
+</para>
+
+@self: 
+@name: 
+@value: 
+@error: 
+
+
+<!-- ##### FUNCTION webkit_dom_element_remove_attribute ##### -->
+<para>
+
+</para>
+
+@self: 
+@name: 
+
+
+<!-- ##### FUNCTION webkit_dom_element_get_attribute_node ##### -->
+<para>
+
+</para>
+
+@self: 
+@name: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_element_set_attribute_node ##### -->
+<para>
+
+</para>
+
+@self: 
+@newAttr: 
+@error: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_element_remove_attribute_node ##### -->
+<para>
+
+</para>
+
+@self: 
+@oldAttr: 
+@error: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_element_get_elements_by_tag_name ##### -->
+<para>
+
+</para>
+
+@self: 
+@name: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_element_has_attributes ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_element_get_attribute_ns ##### -->
+<para>
+
+</para>
+
+@self: 
+@namespaceURI: 
+@localName: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_element_set_attribute_ns ##### -->
+<para>
+
+</para>
+
+@self: 
+@namespaceURI: 
+@qualifiedName: 
+@value: 
+@error: 
+
+
+<!-- ##### FUNCTION webkit_dom_element_remove_attribute_ns ##### -->
+<para>
+
+</para>
+
+@self: 
+@namespaceURI: 
+@localName: 
+
+
+<!-- ##### FUNCTION webkit_dom_element_get_elements_by_tag_name_ns ##### -->
+<para>
+
+</para>
+
+@self: 
+@namespaceURI: 
+@localName: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_element_get_attribute_node_ns ##### -->
+<para>
+
+</para>
+
+@self: 
+@namespaceURI: 
+@localName: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_element_set_attribute_node_ns ##### -->
+<para>
+
+</para>
+
+@self: 
+@newAttr: 
+@error: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_element_has_attribute ##### -->
+<para>
+
+</para>
+
+@self: 
+@name: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_element_has_attribute_ns ##### -->
+<para>
+
+</para>
+
+@self: 
+@namespaceURI: 
+@localName: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_element_focus ##### -->
+<para>
+
+</para>
+
+@self: 
+
+
+<!-- ##### FUNCTION webkit_dom_element_blur ##### -->
+<para>
+
+</para>
+
+@self: 
+
+
+<!-- ##### FUNCTION webkit_dom_element_scroll_into_view ##### -->
+<para>
+
+</para>
+
+@self: 
+@alignWithTop: 
+
+
+<!-- ##### FUNCTION webkit_dom_element_scroll_into_view_if_needed ##### -->
+<para>
+
+</para>
+
+@self: 
+@centerIfNeeded: 
+
+
+<!-- ##### FUNCTION webkit_dom_element_scroll_by_lines ##### -->
+<para>
+
+</para>
+
+@self: 
+@lines: 
+
+
+<!-- ##### FUNCTION webkit_dom_element_scroll_by_pages ##### -->
+<para>
+
+</para>
+
+@self: 
+@pages: 
+
+
+<!-- ##### FUNCTION webkit_dom_element_get_elements_by_class_name ##### -->
+<para>
+
+</para>
+
+@self: 
+@name: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_element_query_selector ##### -->
+<para>
+
+</para>
+
+@self: 
+@selectors: 
+@error: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_element_query_selector_all ##### -->
+<para>
+
+</para>
+
+@self: 
+@selectors: 
+@error: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_element_webkit_matches_selector ##### -->
+<para>
+
+</para>
+
+@self: 
+@selectors: 
+@error: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_element_webkit_request_full_screen ##### -->
+<para>
+
+</para>
+
+@self: 
+@flags: 
+
+
+<!-- ##### FUNCTION webkit_dom_element_webkit_request_fullscreen ##### -->
+<para>
+
+</para>
+
+@self: 
+
+
+<!-- ##### FUNCTION webkit_dom_element_webkit_request_pointer_lock ##### -->
+<para>
+
+</para>
+
+@self: 
+
+
+<!-- ##### FUNCTION webkit_dom_element_remove ##### -->
+<para>
+
+</para>
+
+@self: 
+@error: 
+
+
+<!-- ##### FUNCTION webkit_dom_element_get_tag_name ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_element_get_attributes ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_element_get_style ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_element_get_id ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_element_set_id ##### -->
+<para>
+
+</para>
+
+@self: 
+@value: 
+
+
+<!-- ##### FUNCTION webkit_dom_element_get_offset_left ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_element_get_offset_top ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_element_get_offset_width ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_element_get_offset_height ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_element_get_offset_parent ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_element_get_client_left ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_element_get_client_top ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_element_get_client_width ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_element_get_client_height ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_element_get_scroll_left ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_element_set_scroll_left ##### -->
+<para>
+
+</para>
+
+@self: 
+@value: 
+
+
+<!-- ##### FUNCTION webkit_dom_element_get_scroll_top ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_element_set_scroll_top ##### -->
+<para>
+
+</para>
+
+@self: 
+@value: 
+
+
+<!-- ##### FUNCTION webkit_dom_element_get_scroll_width ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_element_get_scroll_height ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_element_get_class_name ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_element_set_class_name ##### -->
+<para>
+
+</para>
+
+@self: 
+@value: 
+
+
+<!-- ##### FUNCTION webkit_dom_element_get_class_list ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_element_get_first_element_child ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_element_get_last_element_child ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_element_get_previous_element_sibling ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_element_get_next_element_sibling ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_element_get_child_element_count ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_element_get_webkit_region_overset ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+

@@ -445,14 +445,9 @@ public:
 
     static void destroy(JSCell*);
 
-#if ENABLE(JIT)
-    void jettisonOptimizedCode(VM&);
-#endif
-
-    EvalCodeBlock& generatedBytecode()
+    EvalCodeBlock* codeBlock()
     {
-        ASSERT(m_evalCodeBlock);
-        return *m_evalCodeBlock;
+        return m_evalCodeBlock.get();
     }
 
     static EvalExecutable* create(ExecState*, const SourceCode&, bool isInStrictContext);
@@ -507,14 +502,9 @@ public:
 
     static void destroy(JSCell*);
 
-#if ENABLE(JIT)
-    void jettisonOptimizedCode(VM&);
-#endif
-
-    ProgramCodeBlock& generatedBytecode()
+    ProgramCodeBlock* codeBlock()
     {
-        ASSERT(m_programCodeBlock);
-        return *m_programCodeBlock;
+        return m_programCodeBlock.get();
     }
 
     JSObject* checkSyntax(ExecState*);
@@ -576,55 +566,32 @@ public:
     // Returns either call or construct bytecode. This can be appropriate
     // for answering questions that that don't vary between call and construct --
     // for example, argumentsRegister().
-    FunctionCodeBlock& generatedBytecode()
+    FunctionCodeBlock* eitherCodeBlock()
     {
         if (m_codeBlockForCall)
-            return *m_codeBlockForCall;
-        ASSERT(m_codeBlockForConstruct);
-        return *m_codeBlockForConstruct;
+            return m_codeBlockForCall.get();
+        return m_codeBlockForConstruct.get();
     }
         
-#if ENABLE(JIT)
-    void jettisonOptimizedCodeForCall(VM&);
-#endif
-
     bool isGeneratedForCall() const
     {
         return m_codeBlockForCall;
     }
 
-    FunctionCodeBlock& generatedBytecodeForCall()
+    FunctionCodeBlock* codeBlockForCall()
     {
-        ASSERT(m_codeBlockForCall);
-        return *m_codeBlockForCall;
+        return m_codeBlockForCall.get();
     }
-
-#if ENABLE(JIT)
-    void jettisonOptimizedCodeForConstruct(VM&);
-#endif
 
     bool isGeneratedForConstruct() const
     {
         return m_codeBlockForConstruct;
     }
 
-    FunctionCodeBlock& generatedBytecodeForConstruct()
+    FunctionCodeBlock* codeBlockForConstruct()
     {
-        ASSERT(m_codeBlockForConstruct);
-        return *m_codeBlockForConstruct;
+        return m_codeBlockForConstruct.get();
     }
-        
-#if ENABLE(JIT)
-    void jettisonOptimizedCodeFor(VM& vm, CodeSpecializationKind kind)
-    {
-        if (kind == CodeForCall) 
-            jettisonOptimizedCodeForCall(vm);
-        else {
-            ASSERT(kind == CodeForConstruct);
-            jettisonOptimizedCodeForConstruct(vm);
-        }
-    }
-#endif
         
     bool isGeneratedFor(CodeSpecializationKind kind)
     {
@@ -634,12 +601,12 @@ public:
         return isGeneratedForConstruct();
     }
         
-    FunctionCodeBlock& generatedBytecodeFor(CodeSpecializationKind kind)
+    FunctionCodeBlock* codeBlockFor(CodeSpecializationKind kind)
     {
         if (kind == CodeForCall)
-            return generatedBytecodeForCall();
+            return codeBlockForCall();
         ASSERT(kind == CodeForConstruct);
-        return generatedBytecodeForConstruct();
+        return codeBlockForConstruct();
     }
 
     FunctionCodeBlock* baselineCodeBlockFor(CodeSpecializationKind);
@@ -673,14 +640,6 @@ public:
 private:
     FunctionExecutable(VM&, const SourceCode&, UnlinkedFunctionExecutable*, unsigned firstLine, unsigned lastLine, unsigned startColumn);
 
-    RefPtr<FunctionCodeBlock>& codeBlockFor(CodeSpecializationKind kind)
-    {
-        if (kind == CodeForCall)
-            return m_codeBlockForCall;
-        ASSERT(kind == CodeForConstruct);
-        return m_codeBlockForConstruct;
-    }
- 
     bool isCompiling()
     {
 #if ENABLE(JIT)

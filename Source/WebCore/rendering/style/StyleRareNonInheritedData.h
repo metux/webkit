@@ -77,8 +77,8 @@ enum PageSizeType {
 // actually uses one of these properties.
 class StyleRareNonInheritedData : public RefCounted<StyleRareNonInheritedData> {
 public:
-    static PassRefPtr<StyleRareNonInheritedData> create() { return adoptRef(new StyleRareNonInheritedData); }
-    PassRefPtr<StyleRareNonInheritedData> copy() const { return adoptRef(new StyleRareNonInheritedData(*this)); }
+    static PassRef<StyleRareNonInheritedData> create() { return adoptRef(*new StyleRareNonInheritedData); }
+    PassRef<StyleRareNonInheritedData> copy() const { return adoptRef(*new StyleRareNonInheritedData(*this)); }
     ~StyleRareNonInheritedData();
     
     bool operator==(const StyleRareNonInheritedData&) const;
@@ -123,7 +123,7 @@ public:
     DataRef<StyleGridData> m_grid;
     DataRef<StyleGridItemData> m_gridItem;
 
-    OwnPtr<ContentData> m_content;
+    std::unique_ptr<ContentData> m_content;
     OwnPtr<CounterDirectiveMap> m_counterDirectives;
 
     OwnPtr<ShadowData> m_boxShadow;  // For box-shadow decorations.
@@ -143,6 +143,7 @@ public:
     RefPtr<ShapeValue> m_shapeOutside;
     Length m_shapeMargin;
     Length m_shapePadding;
+    float m_shapeImageThreshold;
 #endif
 
     RefPtr<ClipPathOperation> m_clipPath;
@@ -200,6 +201,8 @@ public:
 #if ENABLE(CSS_COMPOSITING)
     unsigned m_effectiveBlendMode: 5; // EBlendMode
 #endif
+
+    unsigned m_objectFit : 3; // ObjectFit
 
 private:
     StyleRareNonInheritedData();

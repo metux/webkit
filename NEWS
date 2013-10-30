@@ -1,102 +1,25 @@
 =================
-WebKitGTK+  2.2.1
+WebKitGTK+  2.3.1
 =================
 
-What's new in WebKitGTK+ 2.2.1?
+What's new in WebKitGTK+ 2.3.1?
 
-  - Fix a crash in JavaScriptCore when visiting google groups.
-  - Fix a crash in JavaScriptCore when trying to send a message via
-    'today's birthdays' dialogue box on Facebook.
-  - Make sure the GtkWidget used for windowed plugins is destroyed
-    when the plugin instance is destroyed.
-  - Fix the build with drag and drop support disabled.
-
-=================
-WebKitGTK+  2.2.0
-=================
-
-What's new in WebKitGTK+ 2.2.0?
-
-  - Bump the GTK+ Wayland dependency to 3.10
-  - Fix the build with GTK+ 2.0.
-
-=================
-WebKitGTK+ 2.1.92
-=================
-
-What's new in WebKitGTK+ 2.1.92?
-
-  - Switch to the new Web Inspector.
-  - Reimplement several accessibility methods to not require Gail and
-    Pango.
-  - Allow to run in a Wayland environment even when WebKitGTK+ has
-    been built with accelerated compositing support enabled, falling
-    back to software rendering in such case since accelerated
-    compositing is not supported yet under Wayland.
-  - Enable the Wayland target by default if the GTK+ Wayland
-    dependency is available.
-  - Fix web inspector rendering when docked in a page that uses
-    accelerated compositing.
-  - Do not try to parse incomplete HTTP requests in the web inspector.
-  - Use WEBKIT_TYPE_DOWNLOAD instead of G_TYPE_OBJECT for the argument
-    of the WebKitWebView::download-requested signal in WebKit1.
-  - Add allow-none introspection annotation to parameters that can
-    be NULL in GObject DOM bindings.
-  - Honor the --disable-gtk-doc configure option.
-  - Fix the build on directories containing spaces.
-  - Allow to build when the build directory is in a different
-    partition.
-  - Translation updates: Polish, Brazilian Portuguese, Spanish, Galician
-
-=================
-WebKitGTK+ 2.1.91
-=================
-
-What's new in WebKitGTK+ 2.1.91?
-
-  - Add a cancelled signal to WebKitAuthenticationRequest in WebKit2
-    GTK+ API.
-  - Add support for building with Wayland as the target.
-  - Fix issues with rtsp streams embedded on <video> not loading.
-  - Fix the media player to not set the system volume to 100%.
-  - Ensure volume slider value is 0 when audio is muted.
-  - Make GStreamer source element thread-safe.
-  - Adjust internal size on GStreamer source element when receiving
-    data if necessary.
-  - Disable accelerated compositing if the system doesn't support it.
-  - Fix rendering of input buttons text with recent
-    gnome-themes-standard.
-  - Fix the cursor rendering when the mouse is over an image document
-    with recent versions of GTK+.
-  - Fix a crash in some cases when context menu is shown.
-  - Fix the build on GNU/Hurd.
-  - Translation updates: Brazilian Portuguese, Spanish.
-
-===================
-WebKitGTK+ 2.1.90.1
-===================
-
-What's new in WebKitGTK+ 2.1.90.1?
-
-  - Adds support for maintainer mode, so that the GNOME continuous
-    integration will be able to forbid autotools regeneration
-  - Added DOM bindings symbols that got removed from the IDL back for
-    ABI compatibility
-
-=================
-WebKitGTK+ 2.1.90
-=================
-
-What's new in WebKitGTK+ 2.1.90?
-
-  - Add API to inject custom JavaScript to WebKit2 Web Extensions API.
-  - Add support for running JavaScript code in isolated worlds to
-    WebKit2 Web Extensions API.
-  - Expose WebKitFrame in WebKit2GTK+ Web Extensions API.
-  - Fix the volume slider track shown when muted.
-  - Cancel authentication dialog when the load fails.
-  - Fix a crash in WebKit1 when inspector window is closed.
-  - Translation updates: Brazilian Portuguese.
+  - Add WebKit2 API for TLS errors.
+  - Make EventTarget interface introspectable in GObject DOM bindings.
+  - Expose WheelEvent in the GObject DOM bindings API.
+  - Generate API documentation for GObject DOM bindings.
+  - Respect image orientation by default.
+  - Enable text edition undo/redo operations support in WebKit2.
+  - Add suppport for blob URLs to GStreamer media backend.
+  - Add support for subtitles.
+  - Allow running the web process with an arbitrary prefix command in
+    debug builds.
+  - Expose image links properly to accessibility.
+  - Expose title and alternative text for links in image maps to
+    accessibility.
+  - Cancel the current active WebKitAuthenticationRequest on load
+    fail.
+  - Fix several memory leaks.
 
 =================
 WebKitGTK+  2.1.4
@@ -444,7 +367,7 @@ What's new in WebKitGTK+ 1.9.3?
   - Fix cursor used for ne-resize.
   - Fix contractions recognition by the spell checker.
   - Fix a crash rendering scrollbars on GTK wxWebkit.
-  - Fix KURL::fileSystemPath() implementation to strip the query part
+  - Fix URL::fileSystemPath() implementation to strip the query part
     of the uri.
   - Check for GTK2/GTK3 symbol mismatch earlier to fix plugins run
     with nspluginwrapper.

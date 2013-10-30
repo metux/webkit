@@ -29,6 +29,7 @@ G_BEGIN_DECLS
  * webkit_dom_html_text_area_element_is_edited:
  * @input: A #WebKitDOMHTMLTextAreaElement
  *
+ * Returns:
  */
 WEBKIT_API gboolean webkit_dom_html_text_area_element_is_edited(WebKitDOMHTMLTextAreaElement* input);
 
@@ -36,6 +37,7 @@ WEBKIT_API gboolean webkit_dom_html_text_area_element_is_edited(WebKitDOMHTMLTex
  * webkit_dom_html_input_element_is_edited:
  * @input: A #WebKitDOMHTMLInputElement
  *
+ * Returns:
  */
 WEBKIT_API gboolean webkit_dom_html_input_element_is_edited(WebKitDOMHTMLInputElement* input);
 
@@ -212,8 +214,6 @@ WEBKIT_API gchar* webkit_dom_document_get_webkit_visibility_state(WebKitDOMDocum
  * webkit_dom_html_document_open:
  * @self: A #WebKitDOMHTMLDocument
  *
- * Returns:
- *
 **/
 WEBKIT_API void webkit_dom_html_document_open(WebKitDOMHTMLDocument* self);
 
@@ -223,8 +223,6 @@ WEBKIT_API void webkit_dom_html_document_open(WebKitDOMHTMLDocument* self);
  * @value: A #gchar
  *
  * This functionality has been removed from WebKit, this function does nothing.
- *
- * Returns:
  *
 **/
 WEBKIT_API void webkit_dom_html_element_set_item_id(WebKitDOMHTMLElement* self, const gchar* value);
@@ -269,8 +267,6 @@ WEBKIT_API WebKitDOMDOMSettableTokenList* webkit_dom_html_element_get_item_prop(
  *
  * This functionality has been removed from WebKit, this function does nothing.
  *
- * Returns:
- *
 **/
 WEBKIT_API void webkit_dom_html_element_set_item_scope(WebKitDOMHTMLElement* self, gboolean value);
 
@@ -295,6 +291,29 @@ WEBKIT_API gboolean webkit_dom_html_element_get_item_scope(WebKitDOMHTMLElement*
  *
 **/
 WEBKIT_API void* webkit_dom_html_element_get_item_type(WebKitDOMHTMLElement* self);
+
+
+/**
+ * webkit_dom_html_style_element_set_scoped:
+ * @self: A #WebKitDOMHTMLStyleElement
+ * @value: A #gboolean
+ *
+ * This functionality has been removed from WebKit, this function does nothing.
+ *
+**/
+WEBKIT_API void webkit_dom_html_style_element_set_scoped(WebKitDOMHTMLStyleElement* self, gboolean value);
+
+/**
+ * webkit_dom_html_style_element_get_scoped:
+ * @self: A #WebKitDOMHTMLStyleElement
+ *
+ * This functionality has been removed from WebKit, this function does nothing.
+ *
+ * Returns:
+ *
+**/
+WEBKIT_API gboolean webkit_dom_html_style_element_get_scoped(WebKitDOMHTMLStyleElement* self);
+
 
 WEBKIT_API GType webkit_dom_html_properties_collection_get_type(void);
 
@@ -438,6 +457,17 @@ WEBKIT_API WebKitDOMNode* webkit_dom_property_node_list_item(void* self, gulong 
  *
 **/
 WEBKIT_API gulong webkit_dom_property_node_list_get_length(void* self);
+
+/**
+ * webkit_dom_html_media_element_get_start_time:
+ * @self: A #HTMLMediaElement
+ *
+ * The HTMLMediaElement:start-time property has been removed from WebKit, this function does nothing.
+ *
+ * Returns:
+ *
+**/
+WEBKIT_API gdouble webkit_dom_html_media_element_get_start_time(WebKitDOMHTMLMediaElement*);
 
 G_END_DECLS
 

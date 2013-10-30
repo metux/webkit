@@ -34,8 +34,6 @@
 
 namespace JSC {
 
-struct JITStackFrame;
-
 class MacroAssemblerARMv7 : public AbstractMacroAssembler<ARMv7Assembler> {
     // FIXME: switch dataTempRegister & addressTempRegister, or possibly use r7?
     //        - dTR is likely used more than aTR, and we'll get better instruction
@@ -55,6 +53,10 @@ public:
     typedef ARMv7Assembler::LinkRecord LinkRecord;
     typedef ARMv7Assembler::JumpType JumpType;
     typedef ARMv7Assembler::JumpLinkType JumpLinkType;
+    typedef ARMv7Assembler::Condition Condition;
+
+    static const ARMv7Assembler::Condition DefaultCondition = ARMv7Assembler::ConditionInvalid;
+    static const ARMv7Assembler::JumpType DefaultJump = ARMv7Assembler::JumpNoConditionFixedSize;
 
     static bool isCompactPtrAlignedAddressOffset(ptrdiff_t value)
     {
@@ -101,8 +103,6 @@ public:
     };
     
 public:
-    typedef ARMRegisters::FPDoubleRegisterID FPRegisterID;
-
     static const Scale ScalePtr = TimesFour;
 
     enum RelationalCondition {
@@ -144,6 +144,7 @@ public:
     };
 
     static const RegisterID stackPointerRegister = ARMRegisters::sp;
+    static const RegisterID framePointerRegister = ARMRegisters::fp;
     static const RegisterID linkRegister = ARMRegisters::lr;
 
     // Integer arithmetic operations:
@@ -775,7 +776,6 @@ public:
         m_assembler.vmov(dest, src1, src2);
     }
 
-#if ENABLE(JIT_CONSTANT_BLINDING)
     static bool shouldBlindForSpecificArch(uint32_t value)
     {
         ARMThumbImmediate immediate = ARMThumbImmediate::makeEncodedImm(value);
@@ -793,7 +793,6 @@ public:
         // be controlled by an attacker.
         return !immediate.isUInt12();
     }
-#endif
 
     // Floating-point operations:
 
@@ -1813,7 +1812,6 @@ public:
         ProbeFunction probeFunction;
         void* arg1;
         void* arg2;
-        JITStackFrame* jitStackFrame;
         CPUState cpu;
 
         void dump(const char* indentation = 0);

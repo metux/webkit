@@ -316,9 +316,9 @@ bool WebInspectorProxy::isInspectorPage(WebPageProxy* page)
 
 static bool isMainInspectorPage(const WebInspectorProxy* webInspectorProxy, WKURLRequestRef requestRef)
 {
-    // Use KURL so we can compare just the paths.
-    KURL inspectorURL(KURL(), webInspectorProxy->inspectorPageURL());
-    KURL requestURL(KURL(), toImpl(requestRef)->url());
+    // Use URL so we can compare just the paths.
+    URL inspectorURL(URL(), webInspectorProxy->inspectorPageURL());
+    URL requestURL(URL(), toImpl(requestRef)->url());
 
     ASSERT(WebCore::SchemeRegistry::shouldTreatURLSchemeAsLocal(inspectorURL.protocol()));
 
@@ -480,9 +480,9 @@ void WebInspectorProxy::inspectedURLChanged(const String& urlString)
     platformInspectedURLChanged(urlString);
 }
 
-void WebInspectorProxy::save(const String& filename, const String& content, bool forceSaveAs)
+void WebInspectorProxy::save(const String& filename, const String& content, bool base64Encoded, bool forceSaveAs)
 {
-    platformSave(filename, content, forceSaveAs);
+    platformSave(filename, content, base64Encoded, forceSaveAs);
 }
 
 void WebInspectorProxy::append(const String& filename, const String& content)

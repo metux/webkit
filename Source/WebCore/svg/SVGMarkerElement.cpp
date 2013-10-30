@@ -73,7 +73,7 @@ BEGIN_REGISTER_ANIMATED_PROPERTIES(SVGMarkerElement)
     REGISTER_PARENT_ANIMATED_PROPERTIES(SVGElement)
 END_REGISTER_ANIMATED_PROPERTIES
 
-inline SVGMarkerElement::SVGMarkerElement(const QualifiedName& tagName, Document* document)
+inline SVGMarkerElement::SVGMarkerElement(const QualifiedName& tagName, Document& document)
     : SVGElement(tagName, document)
     , m_refX(LengthModeWidth)
     , m_refY(LengthModeHeight)
@@ -87,7 +87,7 @@ inline SVGMarkerElement::SVGMarkerElement(const QualifiedName& tagName, Document
     registerAnimatedPropertiesForSVGMarkerElement();
 }
 
-PassRefPtr<SVGMarkerElement> SVGMarkerElement::create(const QualifiedName& tagName, Document* document)
+PassRefPtr<SVGMarkerElement> SVGMarkerElement::create(const QualifiedName& tagName, Document& document)
 {
     return adoptRef(new SVGMarkerElement(tagName, document));
 }
@@ -176,18 +176,18 @@ void SVGMarkerElement::svgAttributeChanged(const QualifiedName& attrName)
         updateRelativeLengthsInformation();
 
     if (RenderObject* object = renderer())
-        object->setNeedsLayout(true);
+        object->setNeedsLayout();
 }
 
-void SVGMarkerElement::childrenChanged(bool changedByParser, Node* beforeChange, Node* afterChange, int childCountDelta)
+void SVGMarkerElement::childrenChanged(const ChildChange& change)
 {
-    SVGElement::childrenChanged(changedByParser, beforeChange, afterChange, childCountDelta);
+    SVGElement::childrenChanged(change);
 
-    if (changedByParser)
+    if (change.source == ChildChangeSourceParser)
         return;
 
     if (RenderObject* object = renderer())
-        object->setNeedsLayout(true);
+        object->setNeedsLayout();
 }
 
 void SVGMarkerElement::setOrientToAuto()
@@ -214,9 +214,9 @@ void SVGMarkerElement::setOrientToAngle(const SVGAngle& angle)
     svgAttributeChanged(orientAnglePropertyInfo()->attributeName);
 }
 
-RenderObject* SVGMarkerElement::createRenderer(RenderArena* arena, RenderStyle*)
+RenderElement* SVGMarkerElement::createRenderer(PassRef<RenderStyle> style)
 {
-    return new (arena) RenderSVGResourceMarker(this);
+    return new RenderSVGResourceMarker(*this, std::move(style));
 }
 
 bool SVGMarkerElement::selfHasRelativeLengths() const
@@ -250,10 +250,10 @@ PassRefPtr<SVGAnimatedProperty> SVGMarkerElement::lookupOrCreateOrientTypeWrappe
            (ownerType, orientTypePropertyInfo(), ownerType->m_orientType.value);
 }
   
-PassRefPtr<SVGAnimatedEnumerationPropertyTearOff<SVGMarkerOrientType> > SVGMarkerElement::orientTypeAnimated()
+PassRefPtr<SVGAnimatedEnumerationPropertyTearOff<SVGMarkerOrientType>> SVGMarkerElement::orientTypeAnimated()
 {
     m_orientType.shouldSynchronize = true;
-    return static_pointer_cast<SVGAnimatedEnumerationPropertyTearOff<SVGMarkerOrientType> >(lookupOrCreateOrientTypeWrapper(this));
+    return static_pointer_cast<SVGAnimatedEnumerationPropertyTearOff<SVGMarkerOrientType>>(lookupOrCreateOrientTypeWrapper(this));
 }
 
 }

@@ -9,6 +9,9 @@
 #undef ENABLE_CREDENTIAL_STORAGE
 
 /* */
+#undef ENABLE_FTL_JIT
+
+/* */
 #undef ENABLE_JIT
 
 /* Define to enable Opcode statistics */
@@ -49,6 +52,9 @@
 
 /* Define to 1 if you have the <inttypes.h> header file. */
 #undef HAVE_INTTYPES_H
+
+/* */
+#undef HAVE_LLVM
 
 /* Define to 1 if you have the <memory.h> header file. */
 #undef HAVE_MEMORY_H

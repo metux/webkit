@@ -636,6 +636,11 @@ void GraphicsContext::drawLineForText(const FloatPoint& origin, float width, boo
     cairo_restore(cairoContext);
 }
 
+void GraphicsContext::updateDocumentMarkerResources()
+{
+    // Unnecessary, since our document markers don't use resources.
+}
+
 void GraphicsContext::drawLineForDocumentMarker(const FloatPoint& origin, float width, DocumentMarkerLineStyle style)
 {
     if (paintingDisabled())
@@ -757,7 +762,7 @@ void GraphicsContext::setPlatformStrokeStyle(StrokeStyle strokeStyle)
     }
 }
 
-void GraphicsContext::setURLForRect(const KURL&, const IntRect&)
+void GraphicsContext::setURLForRect(const URL&, const IntRect&)
 {
     notImplemented();
 }
@@ -1040,7 +1045,7 @@ void GraphicsContext::fillRoundedRect(const IntRect& r, const IntSize& topLeft, 
     cairo_restore(cr);
 }
 
-void GraphicsContext::fillRectWithRoundedHole(const IntRect& rect, const RoundedRect& roundedHoleRect, const Color& color, ColorSpace colorSpace)
+void GraphicsContext::fillRectWithRoundedHole(const IntRect& rect, const RoundedRect& roundedHoleRect, const Color& color, ColorSpace)
 {
     if (paintingDisabled() || !color.isValid())
         return;

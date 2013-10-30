@@ -36,6 +36,7 @@
 #include <wtf/HashMap.h>
 #include <wtf/HashSet.h>
 #include <wtf/Noncopyable.h>
+#include <wtf/Ref.h>
 #include <wtf/RefCounted.h>
 #include <wtf/text/WTFString.h>
 
@@ -55,7 +56,7 @@ namespace WebCore {
 
 class AlternativeTextClient;
 class BackForwardController;
-class BackForwardList;
+class BackForwardClient;
 class Chrome;
 class ChromeClient;
 class ClientRectList;
@@ -74,6 +75,7 @@ class HaltablePlugin;
 class HistoryItem;
 class InspectorClient;
 class InspectorController;
+class MainFrame;
 class MediaCanStartListener;
 class Node;
 class PageActivityAssertionToken;
@@ -135,7 +137,7 @@ public:
         DragClient* dragClient;
         InspectorClient* inspectorClient;
         PlugInClient* plugInClient;
-        RefPtr<BackForwardList> backForwardClient;
+        RefPtr<BackForwardClient> backForwardClient;
         ValidationMessageClient* validationMessageClient;
         FrameLoaderClient* loaderClientForMainFrame;
     };
@@ -152,7 +154,7 @@ public:
     ViewportArguments viewportArguments() const;
 
     static void refreshPlugins(bool reload);
-    PluginData* pluginData() const;
+    PluginData& pluginData() const;
 
     void setCanStartMedia(bool);
     bool canStartMedia() const { return m_canStartMedia; }
@@ -160,13 +162,14 @@ public:
     EditorClient* editorClient() const { return m_editorClient; }
     PlugInClient* plugInClient() const { return m_plugInClient; }
 
-    Frame& mainFrame() const { return *m_mainFrame; }
+    MainFrame& mainFrame() { ASSERT(m_mainFrame); return *m_mainFrame; }
+    const MainFrame& mainFrame() const { ASSERT(m_mainFrame); return *m_mainFrame; }
 
     bool openedByDOM() const;
     void setOpenedByDOM();
 
     // DEPRECATED. Use backForward() instead of the following 6 functions.
-    BackForwardList* backForwardList() const;
+    BackForwardClient* backForwardClient() const;
     bool goBack();
     bool goForward();
     bool canGoBackOrForward(int distance) const;
@@ -210,7 +213,7 @@ public:
 
     Settings& settings() const { return *m_settings; }
     ProgressTracker& progress() const { return *m_progress; }
-    BackForwardController* backForward() const { return m_backForwardController.get(); }
+    BackForwardController& backForward() const { return *m_backForwardController; }
 
     FeatureObserver* featureObserver() { return &m_featureObserver; }
 
@@ -233,8 +236,6 @@ public:
     bool tabKeyCyclesThroughElements() const { return m_tabKeyCyclesThroughElements; }
 
     bool findString(const String&, FindOptions);
-    // FIXME: Switch callers over to the FindOptions version and retire this one.
-    bool findString(const String&, TextCaseSensitivity, FindDirection, bool shouldWrap);
 
     PassRefPtr<Range> rangeOfString(const String&, Range*, FindOptions);
 
@@ -249,7 +250,7 @@ public:
     // the index of the first range after the user selection
     // NoMatchAfterUserSelection if there is no matching text after the user selection.
     enum { NoMatchAfterUserSelection = -1 };
-    void findStringMatchingRanges(const String&, FindOptions, int maxCount, Vector<RefPtr<Range> >*, int& indexForSelection);
+    void findStringMatchingRanges(const String&, FindOptions, int maxCount, Vector<RefPtr<Range>>*, int& indexForSelection);
 #if PLATFORM(MAC)
     void addSchedulePair(PassRefPtr<SchedulePair>);
     void removeSchedulePair(PassRefPtr<SchedulePair>);
@@ -279,11 +280,7 @@ public:
 
     bool shouldSuppressScrollbarAnimations() const { return m_suppressScrollbarAnimations; }
     void setShouldSuppressScrollbarAnimations(bool suppressAnimations);
-
-    bool rubberBandsAtBottom();
-    void setRubberBandsAtBottom(bool);
-    bool rubberBandsAtTop();
-    void setRubberBandsAtTop(bool);
+    void lockAllOverlayScrollbarsToHidden(bool lockOverlayScrollbars);
 
     // Page and FrameView both store a Pagination value. Page::pagination() is set only by API,
     // and FrameView::pagination() is set only by CSS. Page::pagination() will affect all
@@ -353,6 +350,7 @@ public:
 #if ENABLE(PAGE_VISIBILITY_API) || ENABLE(HIDDEN_PAGE_DOM_TIMER_THROTTLING)
     void setVisibilityState(PageVisibilityState, bool);
 #endif
+    void resumeAnimatingImages();
 
     void addLayoutMilestones(LayoutMilestones);
     void removeLayoutMilestones(LayoutMilestones);
@@ -391,8 +389,8 @@ public:
     void sawMediaEngine(const String& engineName);
     void resetSeenMediaEngines();
 
-    PageThrottler* pageThrottler() { return m_pageThrottler.get(); }
-    PassOwnPtr<PageActivityAssertionToken> createActivityToken();
+    PageThrottler& pageThrottler() { return *m_pageThrottler; }
+    std::unique_ptr<PageActivityAssertionToken> createActivityToken();
 
     PageConsole& console() { return *m_console; }
 
@@ -435,20 +433,20 @@ private:
     void setTimerAlignmentInterval(double);
     double timerAlignmentInterval() const;
 
-    void collectPluginViews(Vector<RefPtr<PluginViewBase>, 32>& pluginViewBases);
+    Vector<Ref<PluginViewBase>> pluginViews();
 
     void throttleTimers();
     void unthrottleTimers();
 
-    const OwnPtr<Chrome> m_chrome;
-    const OwnPtr<DragCaretController> m_dragCaretController;
+    const std::unique_ptr<Chrome> m_chrome;
+    const std::unique_ptr<DragCaretController> m_dragCaretController;
 
 #if ENABLE(DRAG_SUPPORT)
-    const OwnPtr<DragController> m_dragController;
+    const std::unique_ptr<DragController> m_dragController;
 #endif
-    const OwnPtr<FocusController> m_focusController;
+    const std::unique_ptr<FocusController> m_focusController;
 #if ENABLE(CONTEXT_MENUS)
-    const OwnPtr<ContextMenuController> m_contextMenuController;
+    const std::unique_ptr<ContextMenuController> m_contextMenuController;
 #endif
 #if ENABLE(INSPECTOR)
     OwnPtr<InspectorController> m_inspectorController;
@@ -459,10 +457,10 @@ private:
     RefPtr<ScrollingCoordinator> m_scrollingCoordinator;
 
     const RefPtr<Settings> m_settings;
-    const OwnPtr<ProgressTracker> m_progress;
+    const std::unique_ptr<ProgressTracker> m_progress;
 
-    OwnPtr<BackForwardController> m_backForwardController;
-    const RefPtr<Frame> m_mainFrame;
+    const std::unique_ptr<BackForwardController> m_backForwardController;
+    const RefPtr<MainFrame> m_mainFrame;
 
     mutable RefPtr<PluginData> m_pluginData;
 
@@ -483,7 +481,6 @@ private:
     unsigned m_defersLoadingCallCount;
 
     bool m_inLowQualityInterpolationMode;
-    bool m_cookieEnabled;
     bool m_areMemoryCacheClientCallsEnabled;
     float m_mediaVolume;
 
@@ -499,7 +496,7 @@ private:
     mutable bool m_didLoadUserStyleSheet;
     mutable time_t m_userStyleSheetModificationTime;
 
-    OwnPtr<PageGroup> m_singlePageGroup;
+    std::unique_ptr<PageGroup> m_singlePageGroup;
     PageGroup* m_group;
 
     JSC::Debugger* m_debugger;
@@ -543,9 +540,8 @@ private:
     AlternativeTextClient* m_alternativeTextClient;
 
     bool m_scriptedAnimationsSuspended;
-    OwnPtr<PageThrottler> m_pageThrottler;
-
-    const OwnPtr<PageConsole> m_console;
+    const std::unique_ptr<PageThrottler> m_pageThrottler;
+    const std::unique_ptr<PageConsole> m_console;
 
     HashSet<String> m_seenPlugins;
     HashSet<String> m_seenMediaEngines;

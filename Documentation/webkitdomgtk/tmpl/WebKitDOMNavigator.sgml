@@ -1,0 +1,343 @@
+<!-- ##### SECTION Title ##### -->
+WebKitDOMNavigator
+
+<!-- ##### SECTION Short_Description ##### -->
+
+
+<!-- ##### SECTION Long_Description ##### -->
+<para>
+
+</para>
+
+
+<!-- ##### SECTION See_Also ##### -->
+<para>
+
+</para>
+
+
+<!-- ##### SECTION Stability_Level ##### -->
+
+
+<!-- ##### SECTION Image ##### -->
+
+
+<!-- ##### STRUCT WebKitDOMNavigator ##### -->
+<para>
+
+</para>
+
+
+<!-- ##### ARG WebKitDOMNavigator:app-code-name ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMNavigator:app-name ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMNavigator:app-version ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMNavigator:cookie-enabled ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMNavigator:geolocation ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMNavigator:language ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMNavigator:mime-types ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMNavigator:on-line ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMNavigator:platform ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMNavigator:plugins ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMNavigator:product ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMNavigator:product-sub ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMNavigator:user-agent ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMNavigator:vendor ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMNavigator:vendor-sub ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMNavigator:webkit-battery ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMNavigator:webkit-persistent-storage ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMNavigator:webkit-temporary-storage ##### -->
+<para>
+
+</para>
+
+<!-- ##### FUNCTION webkit_dom_navigator_java_enabled ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_navigator_get_storage_updates ##### -->
+<para>
+
+</para>
+
+@self: 
+
+
+<!-- ##### FUNCTION webkit_dom_navigator_webkit_get_gamepads ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_navigator_register_protocol_handler ##### -->
+<para>
+
+</para>
+
+@self: 
+@scheme: 
+@url: 
+@title: 
+@error: 
+
+
+<!-- ##### FUNCTION webkit_dom_navigator_is_protocol_handler_registered ##### -->
+<para>
+
+</para>
+
+@self: 
+@scheme: 
+@url: 
+@error: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_navigator_unregister_protocol_handler ##### -->
+<para>
+
+</para>
+
+@self: 
+@scheme: 
+@url: 
+@error: 
+
+
+<!-- ##### FUNCTION webkit_dom_navigator_get_app_code_name ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_navigator_get_app_name ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_navigator_get_app_version ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_navigator_get_language ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_navigator_get_user_agent ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_navigator_get_platform ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_navigator_get_plugins ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_navigator_get_mime_types ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_navigator_get_product ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_navigator_get_product_sub ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_navigator_get_vendor ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_navigator_get_vendor_sub ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_navigator_get_cookie_enabled ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_navigator_get_on_line ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_navigator_get_webkit_battery ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_navigator_get_geolocation ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_navigator_get_webkit_temporary_storage ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_navigator_get_webkit_persistent_storage ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+

@@ -1,0 +1,86 @@
+<!-- ##### SECTION Title ##### -->
+WebKitDOMBatteryManager
+
+<!-- ##### SECTION Short_Description ##### -->
+
+
+<!-- ##### SECTION Long_Description ##### -->
+<para>
+
+</para>
+
+
+<!-- ##### SECTION See_Also ##### -->
+<para>
+
+</para>
+
+
+<!-- ##### SECTION Stability_Level ##### -->
+
+
+<!-- ##### SECTION Image ##### -->
+
+
+<!-- ##### STRUCT WebKitDOMBatteryManager ##### -->
+<para>
+
+</para>
+
+
+<!-- ##### ARG WebKitDOMBatteryManager:charging ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMBatteryManager:charging-time ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMBatteryManager:discharging-time ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMBatteryManager:level ##### -->
+<para>
+
+</para>
+
+<!-- ##### FUNCTION webkit_dom_battery_manager_get_charging ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_battery_manager_get_charging_time ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_battery_manager_get_discharging_time ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_battery_manager_get_level ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+

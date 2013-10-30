@@ -1,0 +1,67 @@
+<!-- ##### SECTION Title ##### -->
+WebKitDOMPerformance
+
+<!-- ##### SECTION Short_Description ##### -->
+
+
+<!-- ##### SECTION Long_Description ##### -->
+<para>
+
+</para>
+
+
+<!-- ##### SECTION See_Also ##### -->
+<para>
+
+</para>
+
+
+<!-- ##### SECTION Stability_Level ##### -->
+
+
+<!-- ##### SECTION Image ##### -->
+
+
+<!-- ##### STRUCT WebKitDOMPerformance ##### -->
+<para>
+
+</para>
+
+
+<!-- ##### ARG WebKitDOMPerformance:navigation ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMPerformance:timing ##### -->
+<para>
+
+</para>
+
+<!-- ##### FUNCTION webkit_dom_performance_now ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_performance_get_navigation ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_performance_get_timing ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+

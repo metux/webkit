@@ -34,7 +34,7 @@
 
 namespace WebCore {
 
-MediaControls::MediaControls(Document* document)
+MediaControls::MediaControls(Document& document)
     : HTMLDivElement(HTMLNames::divTag, document)
     , m_mediaController(0)
     , m_panel(0)
@@ -84,7 +84,7 @@ void MediaControls::setMediaController(MediaControllerInterface* controller)
 
 void MediaControls::reset()
 {
-    Page* page = document()->page();
+    Page* page = document().page();
     if (!page)
         return;
 
@@ -126,7 +126,7 @@ void MediaControls::reset()
 
 void MediaControls::reportedError()
 {
-    Page* page = document()->page();
+    Page* page = document().page();
     if (!page)
         return;
 
@@ -216,7 +216,7 @@ void MediaControls::updateCurrentTimeDisplay()
 {
     double now = m_mediaController->currentTime();
 
-    Page* page = document()->page();
+    Page* page = document().page();
     if (!page)
         return;
 
@@ -272,7 +272,7 @@ void MediaControls::enteredFullscreen()
     m_isFullscreen = true;
     m_fullScreenButton->setIsFullscreen(true);
 
-    if (Page* page = document()->page())
+    if (Page* page = document().page())
         page->chrome().setCursorHiddenUntilMouseMoves(true);
 
     startHideFullscreenControlsTimer();
@@ -340,7 +340,7 @@ void MediaControls::hideFullscreenControlsTimerFired(Timer<MediaControls>*)
     if (!shouldHideControls())
         return;
 
-    if (Page* page = document()->page())
+    if (Page* page = document().page())
         page->chrome().setCursorHiddenUntilMouseMoves(true);
 
     makeTransparent();
@@ -351,7 +351,7 @@ void MediaControls::startHideFullscreenControlsTimer()
     if (!m_isFullscreen)
         return;
 
-    Page* page = document()->page();
+    Page* page = document().page();
     if (!page)
         return;
 

@@ -30,7 +30,6 @@
 #include "MediaQuery.h"
 
 #include "MediaQueryExp.h"
-#include <wtf/NonCopyingSort.h>
 #include <wtf/text/StringBuilder.h>
 
 namespace WebCore {
@@ -73,12 +72,6 @@ String MediaQuery::serialize() const
     return result.toString();
 }
 
-static bool expressionCompare(const OwnPtr<MediaQueryExp>& a, const OwnPtr<MediaQueryExp>& b)
-{
-    return codePointCompare(a->serialize(), b->serialize()) < 0;
-}
-
-
 MediaQuery::MediaQuery(Restrictor r, const String& mediaType, PassOwnPtr<ExpressionVector> exprs)
     : m_restrictor(r)
     , m_mediaType(mediaType.lower())
@@ -90,7 +83,9 @@ MediaQuery::MediaQuery(Restrictor r, const String& mediaType, PassOwnPtr<Express
         return;
     }
 
-    nonCopyingSort(m_expressions->begin(), m_expressions->end(), expressionCompare);
+    std::sort(m_expressions->begin(), m_expressions->end(), [](const OwnPtr<MediaQueryExp>& a, const OwnPtr<MediaQueryExp>& b) {
+        return codePointCompare(a->serialize(), b->serialize()) < 0;
+    });
 
     // remove all duplicated expressions
     String key;

@@ -36,7 +36,6 @@
 #include "DeviceOrientationController.h"
 #include "Document.h"
 #include "DocumentLoader.h"
-#include "Frame.h"
 #include "FrameLoader.h"
 #include "FrameLoaderClient.h"
 #include "FrameLoaderStateMachine.h"
@@ -45,9 +44,11 @@
 #include "HistoryController.h"
 #include "HistoryItem.h"
 #include "Logging.h"
+#include "MainFrame.h"
 #include "Page.h"
 #include "Settings.h"
 #include "SharedWorkerRepository.h"
+#include "SubframeLoader.h"
 #include <wtf/CurrentTime.h>
 #include <wtf/text/CString.h>
 #include <wtf/text/StringConcatenate.h>
@@ -55,8 +56,6 @@
 #if ENABLE(PROXIMITY_EVENTS)
 #include "DeviceProximityController.h"
 #endif
-
-using namespace std;
 
 namespace WebCore {
 
@@ -94,8 +93,8 @@ static unsigned logCanCacheFrameDecision(Frame* frame, int indentLevel)
         return 1 << NoDocumentLoader;
     }
 
-    KURL currentURL = frame->loader().documentLoader()->url();
-    KURL newURL = frame->loader().provisionalDocumentLoader() ? frame->loader().provisionalDocumentLoader()->url() : KURL();
+    URL currentURL = frame->loader().documentLoader()->url();
+    URL newURL = frame->loader().provisionalDocumentLoader() ? frame->loader().provisionalDocumentLoader()->url() : URL();
     if (!newURL.isEmpty())
         PCLOG(" Determining if frame can be cached navigating from (", currentURL.string(), ") to (", newURL.string(), "):");
     else
@@ -110,7 +109,7 @@ static unsigned logCanCacheFrameDecision(Frame* frame, int indentLevel)
         PCLOG("   -Frame is an error page");
         rejectReasons |= 1 << IsErrorPage;
     }
-    if (frame->loader().subframeLoader()->containsPlugins() && !frame->page()->settings().pageCacheSupportsPlugins()) {
+    if (frame->loader().subframeLoader().containsPlugins() && !frame->page()->settings().pageCacheSupportsPlugins()) {
         PCLOG("   -Frame contains plugins");
         rejectReasons |= 1 << HasPlugins;
     }
@@ -204,7 +203,7 @@ static void logCanCachePageDecision(Page* page)
     // Only bother logging for main frames that have actually loaded and have content.
     if (page->mainFrame().loader().stateMachine()->creatingInitialEmptyDocument())
         return;
-    KURL currentURL = page->mainFrame().loader().documentLoader() ? page->mainFrame().loader().documentLoader()->url() : KURL();
+    URL currentURL = page->mainFrame().loader().documentLoader() ? page->mainFrame().loader().documentLoader()->url() : URL();
     if (currentURL.isEmpty())
         return;
     
@@ -216,7 +215,7 @@ static void logCanCachePageDecision(Page* page)
     if (frameRejectReasons)
         rejectReasons |= 1 << FrameCannotBeInPageCache;
     
-    if (!page->backForward()->isActive()) {
+    if (!page->backForward().isActive()) {
         PCLOG("   -The back/forward list is disabled or has 0 capacity");
         rejectReasons |= 1 << DisabledBackForwardList;
     }
@@ -316,7 +315,7 @@ bool PageCache::canCachePageContainingThisFrame(Frame* frame)
         && documentLoader->mainDocumentError().isNull()
         // Do not cache error pages (these can be recognized as pages with substitute data or unreachable URLs).
         && !(documentLoader->substituteData().isValid() && !documentLoader->substituteData().failingURL().isEmpty())
-        && (!frameLoader.subframeLoader()->containsPlugins() || frame->page()->settings().pageCacheSupportsPlugins())
+        && (!frameLoader.subframeLoader().containsPlugins() || frame->page()->settings().pageCacheSupportsPlugins())
         && (!document->url().protocolIs("https") || (!documentLoader->response().cacheControlContainsNoCache() && !documentLoader->response().cacheControlContainsNoStore()))
         && (!document->domWindow() || !document->domWindow()->hasEventListeners(eventNames().unloadEvent))
 #if ENABLE(SQL_DATABASE)
@@ -354,7 +353,7 @@ bool PageCache::canCache(Page* page) const
     
     return m_capacity > 0
         && canCachePageContainingThisFrame(&page->mainFrame())
-        && page->backForward()->isActive()
+        && page->backForward().isActive()
         && page->settings().usesPageCache()
 #if ENABLE(DEVICE_ORIENTATION)
         && !DeviceMotionController::isActiveAt(page)
@@ -372,7 +371,7 @@ bool PageCache::canCache(Page* page) const
 void PageCache::setCapacity(int capacity)
 {
     ASSERT(capacity >= 0);
-    m_capacity = max(capacity, 0);
+    m_capacity = std::max(capacity, 0);
 
     prune();
 }
@@ -399,7 +398,7 @@ void PageCache::markPagesForFullStyleRecalc(Page* page)
 {
     for (HistoryItem* current = m_head; current; current = current->m_next) {
         CachedPage* cachedPage = current->m_cachedPage.get();
-        if (&cachedPage->cachedMainFrame()->view()->frame() == &page->mainFrame())
+        if (&page->mainFrame() == &cachedPage->cachedMainFrame()->view()->frame())
             cachedPage->markForFullStyleRecalc();
     }
 }
@@ -410,7 +409,7 @@ void PageCache::markPagesForDeviceScaleChanged(Page* page)
 {
     for (HistoryItem* current = m_head; current; current = current->m_next) {
         CachedPage* cachedPage = current->m_cachedPage.get();
-        if (&cachedPage->cachedMainFrame()->view()->frame() == &page->mainFrame())
+        if (&page->mainFrame() == &cachedPage->cachedMainFrame()->view()->frame())
             cachedPage->markForDeviceScaleChanged();
     }
 }
@@ -424,11 +423,10 @@ void PageCache::markPagesForCaptionPreferencesChanged()
 }
 #endif
 
-void PageCache::add(PassRefPtr<HistoryItem> prpItem, Page* page)
+void PageCache::add(PassRefPtr<HistoryItem> prpItem, Page& page)
 {
     ASSERT(prpItem);
-    ASSERT(page);
-    ASSERT(canCache(page));
+    ASSERT(canCache(&page));
     
     HistoryItem* item = prpItem.leakRef(); // Balanced in remove().
 
@@ -441,6 +439,29 @@ void PageCache::add(PassRefPtr<HistoryItem> prpItem, Page* page)
     ++m_size;
     
     prune();
+}
+
+PassOwnPtr<CachedPage> PageCache::take(HistoryItem* item)
+{
+    if (!item)
+        return nullptr;
+
+    OwnPtr<CachedPage> cachedPage = item->m_cachedPage.release();
+
+    removeFromLRUList(item);
+    --m_size;
+
+    item->deref(); // Balanced in add().
+
+    if (!cachedPage)
+        return nullptr;
+
+    if (cachedPage->hasExpired()) {
+        LOG(PageCache, "Not restoring page for %s from back/forward cache because cache entry has expired", item->url().string().ascii().data());
+        return nullptr;
+    }
+
+    return cachedPage.release();
 }
 
 CachedPage* PageCache::get(HistoryItem* item)

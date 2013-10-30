@@ -1,0 +1,73 @@
+<!-- ##### SECTION Title ##### -->
+WebKitDOMDOMPluginArray
+
+<!-- ##### SECTION Short_Description ##### -->
+
+
+<!-- ##### SECTION Long_Description ##### -->
+<para>
+
+</para>
+
+
+<!-- ##### SECTION See_Also ##### -->
+<para>
+
+</para>
+
+
+<!-- ##### SECTION Stability_Level ##### -->
+
+
+<!-- ##### SECTION Image ##### -->
+
+
+<!-- ##### STRUCT WebKitDOMDOMPluginArray ##### -->
+<para>
+
+</para>
+
+
+<!-- ##### ARG WebKitDOMDOMPluginArray:length ##### -->
+<para>
+
+</para>
+
+<!-- ##### FUNCTION webkit_dom_dom_plugin_array_item ##### -->
+<para>
+
+</para>
+
+@self: 
+@index: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_dom_plugin_array_named_item ##### -->
+<para>
+
+</para>
+
+@self: 
+@name: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_dom_plugin_array_refresh ##### -->
+<para>
+
+</para>
+
+@self: 
+@reload: 
+
+
+<!-- ##### FUNCTION webkit_dom_dom_plugin_array_get_length ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+

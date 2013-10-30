@@ -1,0 +1,67 @@
+<!-- ##### SECTION Title ##### -->
+WebKitDOMHTMLLegendElement
+
+<!-- ##### SECTION Short_Description ##### -->
+
+
+<!-- ##### SECTION Long_Description ##### -->
+<para>
+
+</para>
+
+
+<!-- ##### SECTION See_Also ##### -->
+<para>
+
+</para>
+
+
+<!-- ##### SECTION Stability_Level ##### -->
+
+
+<!-- ##### SECTION Image ##### -->
+
+
+<!-- ##### STRUCT WebKitDOMHTMLLegendElement ##### -->
+<para>
+
+</para>
+
+
+<!-- ##### ARG WebKitDOMHTMLLegendElement:align ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMHTMLLegendElement:form ##### -->
+<para>
+
+</para>
+
+<!-- ##### FUNCTION webkit_dom_html_legend_element_get_form ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_legend_element_get_align ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_legend_element_set_align ##### -->
+<para>
+
+</para>
+
+@self: 
+@value: 
+
+

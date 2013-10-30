@@ -31,6 +31,7 @@
 #include "CodeBlock.h"
 #include "DFGDriver.h"
 #include "JIT.h"
+#include "LLIntEntrypoint.h"
 #include "Operations.h"
 #include "Parser.h"
 #include <wtf/Vector.h>
@@ -89,20 +90,6 @@ Intrinsic NativeExecutable::intrinsic() const
 }
 #endif
 
-#if ENABLE(JIT)
-// Utility method used for jettisoning code blocks.
-template<typename T>
-static void jettisonCodeBlock(VM& vm, RefPtr<T>& codeBlock)
-{
-    ASSERT(JITCode::isOptimizingJIT(codeBlock->jitType()));
-    ASSERT(codeBlock->alternative());
-    RefPtr<T> codeBlockToJettison = codeBlock.release();
-    codeBlock = static_pointer_cast<T>(codeBlockToJettison->releaseAlternative());
-    codeBlockToJettison->unlinkIncomingCalls();
-    vm.heap.jettisonDFGCodeBlock(static_pointer_cast<CodeBlock>(codeBlockToJettison.release()));
-}
-#endif
-
 const ClassInfo ScriptExecutable::s_info = { "ScriptExecutable", &ExecutableBase::s_info, 0, 0, CREATE_METHOD_TABLE(ScriptExecutable) };
 
 #if ENABLE(JIT)
@@ -115,6 +102,7 @@ void ScriptExecutable::destroy(JSCell* cell)
 void ScriptExecutable::installCode(CodeBlock* genericCodeBlock)
 {
     RELEASE_ASSERT(genericCodeBlock->ownerExecutable() == this);
+    RELEASE_ASSERT(JITCode::isExecutableScript(genericCodeBlock->jitType()));
     
     VM& vm = *genericCodeBlock->vm();
     
@@ -122,12 +110,6 @@ void ScriptExecutable::installCode(CodeBlock* genericCodeBlock)
         vm.m_perBytecodeProfiler->ensureBytecodesFor(genericCodeBlock);
     
     ASSERT(vm.heap.isDeferred());
-    
-    if (JITCode::isJIT(genericCodeBlock->jitType())) {
-        vm.heap.reportExtraMemoryCost(
-            sizeof(CodeBlock) + genericCodeBlock->jitCode()->size());
-    } else
-        vm.heap.reportExtraMemoryCost(sizeof(CodeBlock));
     
     CodeSpecializationKind kind = genericCodeBlock->specializationKind();
     
@@ -227,6 +209,7 @@ PassRefPtr<CodeBlock> ScriptExecutable::newCodeBlockFor(
     UnlinkedFunctionCodeBlock* unlinkedCodeBlock =
         executable->m_unlinkedExecutable->codeBlockFor(
             *vm, executable->m_source, kind, debuggerMode, profilerMode, error);
+    recordParse(executable->m_unlinkedExecutable->features(), executable->m_unlinkedExecutable->hasCapturedVariables(), lineNo(), lastLine(), startColumn()); 
     if (!unlinkedCodeBlock) {
         exception = vm->throwException(
             globalObject->globalExec(),
@@ -248,27 +231,56 @@ PassRefPtr<CodeBlock> ScriptExecutable::newReplacementCodeBlockFor(
     if (classInfo() == EvalExecutable::info()) {
         RELEASE_ASSERT(kind == CodeForCall);
         EvalExecutable* executable = jsCast<EvalExecutable*>(this);
+        EvalCodeBlock* baseline = static_cast<EvalCodeBlock*>(
+            executable->m_evalCodeBlock->baselineVersion());
         RefPtr<EvalCodeBlock> result = adoptRef(new EvalCodeBlock(
-            CodeBlock::CopyParsedBlock, *executable->m_evalCodeBlock));
-        result->setAlternative(executable->m_evalCodeBlock);
+            CodeBlock::CopyParsedBlock, *baseline));
+        result->setAlternative(baseline);
         return result;
     }
     
     if (classInfo() == ProgramExecutable::info()) {
         RELEASE_ASSERT(kind == CodeForCall);
         ProgramExecutable* executable = jsCast<ProgramExecutable*>(this);
+        ProgramCodeBlock* baseline = static_cast<ProgramCodeBlock*>(
+            executable->m_programCodeBlock->baselineVersion());
         RefPtr<ProgramCodeBlock> result = adoptRef(new ProgramCodeBlock(
-            CodeBlock::CopyParsedBlock, *executable->m_programCodeBlock));
-        result->setAlternative(executable->m_programCodeBlock);
+            CodeBlock::CopyParsedBlock, *baseline));
+        result->setAlternative(baseline);
         return result;
     }
 
     RELEASE_ASSERT(classInfo() == FunctionExecutable::info());
     FunctionExecutable* executable = jsCast<FunctionExecutable*>(this);
+    FunctionCodeBlock* baseline = static_cast<FunctionCodeBlock*>(
+        executable->codeBlockFor(kind)->baselineVersion());
     RefPtr<FunctionCodeBlock> result = adoptRef(new FunctionCodeBlock(
-        CodeBlock::CopyParsedBlock, *executable->codeBlockFor(kind)));
-    result->setAlternative(executable->codeBlockFor(kind));
+        CodeBlock::CopyParsedBlock, *baseline));
+    result->setAlternative(baseline);
     return result;
+}
+
+static void setupLLInt(VM& vm, CodeBlock* codeBlock)
+{
+#if ENABLE(LLINT)
+    LLInt::setEntrypoint(vm, codeBlock);
+#else
+    UNUSED_PARAM(vm);
+    UNUSED_PARAM(codeBlock);
+    UNREACHABLE_FOR_PLATFORM();
+#endif
+}
+
+static void setupJIT(VM& vm, CodeBlock* codeBlock)
+{
+#if ENABLE(JIT)
+    CompilationResult result = JIT::compile(&vm, codeBlock, JITCompilationMustSucceed);
+    RELEASE_ASSERT(result == CompilationSuccessful);
+#else
+    UNUSED_PARAM(vm);
+    UNUSED_PARAM(codeBlock);
+    UNREACHABLE_FOR_PLATFORM();
+#endif
 }
 
 JSObject* ScriptExecutable::prepareForExecutionImpl(
@@ -284,15 +296,22 @@ JSObject* ScriptExecutable::prepareForExecutionImpl(
         return exception;
     }
     
-    JITCode::JITType jitType;
-#if ENABLE(LLINT)
-    jitType = JITCode::InterpreterThunk;
+    bool shouldUseLLInt;
+#if !ENABLE(JIT)
+    // No JIT implies use of the C Loop LLINT. Override the options to reflect this. 
+    Options::useLLInt() = true;
+    shouldUseLLInt = true;
+#elif ENABLE(LLINT)
+    shouldUseLLInt = Options::useLLInt();
 #else
-    jitType = JITCode::BaselineJIT;
+    shouldUseLLInt = false;
 #endif
-    CompilationResult result = codeBlock->prepareForExecution(exec, jitType);
-    RELEASE_ASSERT(result == CompilationSuccessful);
-
+    
+    if (shouldUseLLInt)
+        setupLLInt(vm, codeBlock.get());
+    else
+        setupJIT(vm, codeBlock.get());
+    
     installCode(codeBlock.get());
     return 0;
 }
@@ -376,15 +395,6 @@ inline const char* samplingDescription(JITCode::JITType jitType)
     }
 }
 
-#if ENABLE(JIT)
-void EvalExecutable::jettisonOptimizedCode(VM& vm)
-{
-    jettisonCodeBlock(vm, m_evalCodeBlock);
-    m_jitCodeForCall = m_evalCodeBlock->jitCode();
-    ASSERT(!m_jitCodeForCallWithArityCheck);
-}
-#endif // ENABLE(JIT)
-
 void EvalExecutable::visitChildren(JSCell* cell, SlotVisitor& visitor)
 {
     EvalExecutable* thisObject = jsCast<EvalExecutable*>(cell);
@@ -426,15 +436,6 @@ JSObject* ProgramExecutable::checkSyntax(ExecState* exec)
     return error.toErrorObject(lexicalGlobalObject, m_source);
 }
 
-#if ENABLE(JIT)
-void ProgramExecutable::jettisonOptimizedCode(VM& vm)
-{
-    jettisonCodeBlock(vm, m_programCodeBlock);
-    m_jitCodeForCall = m_programCodeBlock->jitCode();
-    ASSERT(!m_jitCodeForCallWithArityCheck);
-}
-#endif
-
 void ProgramExecutable::unlinkCalls()
 {
 #if ENABLE(JIT)
@@ -464,11 +465,9 @@ JSObject* ProgramExecutable::initializeGlobalProperties(VM& vm, CallFrame* callF
     const UnlinkedProgramCodeBlock::VariableDeclations& variableDeclarations = unlinkedCode->variableDeclarations();
     const UnlinkedProgramCodeBlock::FunctionDeclations& functionDeclarations = unlinkedCode->functionDeclarations();
 
-    CallFrame* globalExec = globalObject->globalExec();
-
     for (size_t i = 0; i < functionDeclarations.size(); ++i) {
         UnlinkedFunctionExecutable* unlinkedFunctionExecutable = functionDeclarations[i].second.get();
-        JSValue value = JSFunction::create(globalExec, unlinkedFunctionExecutable->link(vm, m_source, lineNo(), 0), scope);
+        JSValue value = JSFunction::create(vm, unlinkedFunctionExecutable->link(vm, m_source, lineNo(), 0), scope);
         globalObject->addFunction(callFrame, functionDeclarations[i].first, value);
     }
 
@@ -517,22 +516,6 @@ FunctionCodeBlock* FunctionExecutable::baselineCodeBlockFor(CodeSpecializationKi
     ASSERT(JITCode::isBaselineCode(result->jitType()));
     return result;
 }
-
-#if ENABLE(JIT)
-void FunctionExecutable::jettisonOptimizedCodeForCall(VM& vm)
-{
-    jettisonCodeBlock(vm, m_codeBlockForCall);
-    m_jitCodeForCall = m_codeBlockForCall->jitCode();
-    m_jitCodeForCallWithArityCheck = m_codeBlockForCall->jitCodeWithArityCheck();
-}
-
-void FunctionExecutable::jettisonOptimizedCodeForConstruct(VM& vm)
-{
-    jettisonCodeBlock(vm, m_codeBlockForConstruct);
-    m_jitCodeForConstruct = m_codeBlockForConstruct->jitCode();
-    m_jitCodeForConstructWithArityCheck = m_codeBlockForConstruct->jitCodeWithArityCheck();
-}
-#endif
 
 void FunctionExecutable::visitChildren(JSCell* cell, SlotVisitor& visitor)
 {

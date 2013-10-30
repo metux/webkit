@@ -1,0 +1,477 @@
+<!-- ##### SECTION Title ##### -->
+WebKitDOMHTMLAnchorElement
+
+<!-- ##### SECTION Short_Description ##### -->
+
+
+<!-- ##### SECTION Long_Description ##### -->
+<para>
+
+</para>
+
+
+<!-- ##### SECTION See_Also ##### -->
+<para>
+
+</para>
+
+
+<!-- ##### SECTION Stability_Level ##### -->
+
+
+<!-- ##### SECTION Image ##### -->
+
+
+<!-- ##### STRUCT WebKitDOMHTMLAnchorElement ##### -->
+<para>
+
+</para>
+
+
+<!-- ##### ARG WebKitDOMHTMLAnchorElement:charset ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMHTMLAnchorElement:coords ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMHTMLAnchorElement:download ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMHTMLAnchorElement:hash ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMHTMLAnchorElement:host ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMHTMLAnchorElement:hostname ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMHTMLAnchorElement:href ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMHTMLAnchorElement:hreflang ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMHTMLAnchorElement:name ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMHTMLAnchorElement:origin ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMHTMLAnchorElement:pathname ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMHTMLAnchorElement:ping ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMHTMLAnchorElement:port ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMHTMLAnchorElement:protocol ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMHTMLAnchorElement:rel ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMHTMLAnchorElement:rev ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMHTMLAnchorElement:search ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMHTMLAnchorElement:shape ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMHTMLAnchorElement:target ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMHTMLAnchorElement:text ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMHTMLAnchorElement:type ##### -->
+<para>
+
+</para>
+
+<!-- ##### FUNCTION webkit_dom_html_anchor_element_get_charset ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_anchor_element_set_charset ##### -->
+<para>
+
+</para>
+
+@self: 
+@value: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_anchor_element_get_coords ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_anchor_element_set_coords ##### -->
+<para>
+
+</para>
+
+@self: 
+@value: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_anchor_element_get_download ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_anchor_element_set_download ##### -->
+<para>
+
+</para>
+
+@self: 
+@value: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_anchor_element_get_href ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_anchor_element_set_href ##### -->
+<para>
+
+</para>
+
+@self: 
+@value: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_anchor_element_get_hreflang ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_anchor_element_set_hreflang ##### -->
+<para>
+
+</para>
+
+@self: 
+@value: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_anchor_element_get_name ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_anchor_element_set_name ##### -->
+<para>
+
+</para>
+
+@self: 
+@value: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_anchor_element_get_ping ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_anchor_element_set_ping ##### -->
+<para>
+
+</para>
+
+@self: 
+@value: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_anchor_element_get_rel ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_anchor_element_set_rel ##### -->
+<para>
+
+</para>
+
+@self: 
+@value: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_anchor_element_get_rev ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_anchor_element_set_rev ##### -->
+<para>
+
+</para>
+
+@self: 
+@value: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_anchor_element_get_shape ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_anchor_element_set_shape ##### -->
+<para>
+
+</para>
+
+@self: 
+@value: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_anchor_element_get_target ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_anchor_element_set_target ##### -->
+<para>
+
+</para>
+
+@self: 
+@value: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_anchor_element_get_hash ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_anchor_element_set_hash ##### -->
+<para>
+
+</para>
+
+@self: 
+@value: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_anchor_element_get_host ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_anchor_element_set_host ##### -->
+<para>
+
+</para>
+
+@self: 
+@value: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_anchor_element_get_hostname ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_anchor_element_set_hostname ##### -->
+<para>
+
+</para>
+
+@self: 
+@value: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_anchor_element_get_pathname ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_anchor_element_set_pathname ##### -->
+<para>
+
+</para>
+
+@self: 
+@value: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_anchor_element_get_port ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_anchor_element_set_port ##### -->
+<para>
+
+</para>
+
+@self: 
+@value: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_anchor_element_get_protocol ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_anchor_element_set_protocol ##### -->
+<para>
+
+</para>
+
+@self: 
+@value: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_anchor_element_get_search ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_anchor_element_set_search ##### -->
+<para>
+
+</para>
+
+@self: 
+@value: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_anchor_element_get_origin ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_anchor_element_get_text ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+

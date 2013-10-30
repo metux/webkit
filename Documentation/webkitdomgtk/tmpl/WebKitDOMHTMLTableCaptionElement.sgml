@@ -1,0 +1,53 @@
+<!-- ##### SECTION Title ##### -->
+WebKitDOMHTMLTableCaptionElement
+
+<!-- ##### SECTION Short_Description ##### -->
+
+
+<!-- ##### SECTION Long_Description ##### -->
+<para>
+
+</para>
+
+
+<!-- ##### SECTION See_Also ##### -->
+<para>
+
+</para>
+
+
+<!-- ##### SECTION Stability_Level ##### -->
+
+
+<!-- ##### SECTION Image ##### -->
+
+
+<!-- ##### STRUCT WebKitDOMHTMLTableCaptionElement ##### -->
+<para>
+
+</para>
+
+
+<!-- ##### ARG WebKitDOMHTMLTableCaptionElement:align ##### -->
+<para>
+
+</para>
+
+<!-- ##### FUNCTION webkit_dom_html_table_caption_element_get_align ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_table_caption_element_set_align ##### -->
+<para>
+
+</para>
+
+@self: 
+@value: 
+
+

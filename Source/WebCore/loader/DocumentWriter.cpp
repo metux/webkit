@@ -46,6 +46,7 @@
 #include "Settings.h"
 #include "SinkDocument.h"
 #include "TextResourceDecoder.h"
+#include <wtf/Ref.h>
 
 namespace WebCore {
 
@@ -99,10 +100,10 @@ void DocumentWriter::clear()
 
 void DocumentWriter::begin()
 {
-    begin(KURL());
+    begin(URL());
 }
 
-PassRefPtr<Document> DocumentWriter::createDocument(const KURL& url)
+PassRefPtr<Document> DocumentWriter::createDocument(const URL& url)
 {
     if (!m_frame->loader().stateMachine()->isDisplayingInitialEmptyDocument() && m_frame->loader().client().shouldAlwaysUsePluginDocument(m_mimeType))
         return PluginDocument::create(m_frame, url);
@@ -111,12 +112,12 @@ PassRefPtr<Document> DocumentWriter::createDocument(const KURL& url)
     return DOMImplementation::createDocument(m_mimeType, m_frame, url, m_frame->inViewSourceMode());
 }
 
-void DocumentWriter::begin(const KURL& urlReference, bool dispatch, Document* ownerDocument)
+void DocumentWriter::begin(const URL& urlReference, bool dispatch, Document* ownerDocument)
 {
     // We grab a local copy of the URL because it's easy for callers to supply
     // a URL that will be deallocated during the execution of this function.
     // For example, see <https://bugs.webkit.org/show_bug.cgi?id=66360>.
-    KURL url = urlReference;
+    URL url = urlReference;
 
     // Create a new document before clearing the frame, because it may need to
     // inherit an aliased security context.
@@ -218,7 +219,7 @@ void DocumentWriter::addData(const char* bytes, size_t length)
         CRASH();
 
     ASSERT(m_parser);
-    m_parser->appendBytes(this, bytes, length);
+    m_parser->appendBytes(*this, bytes, length);
 }
 
 void DocumentWriter::end()
@@ -233,12 +234,12 @@ void DocumentWriter::end()
     // http://bugs.webkit.org/show_bug.cgi?id=10854
     // The frame's last ref may be removed and it can be deleted by checkCompleted(), 
     // so we'll add a protective refcount
-    RefPtr<Frame> protector(m_frame);
+    Ref<Frame> protect(*m_frame);
 
     if (!m_parser)
         return;
     // FIXME: m_parser->finish() should imply m_parser->flush().
-    m_parser->flush(this);
+    m_parser->flush(*this);
     if (!m_parser)
         return;
     m_parser->finish();

@@ -1,3 +1,21 @@
+2013-10-10  Shantha kumar  <shkumar@redhat.com>
+
+        Webkit - Updated Tamil translation
+        https://bugs.webkit.org/show_bug.cgi?id=120520
+
+        Reviewed by Gustavo Noronha Silva.
+
+        * ta.po: updated.
+
+2013-09-16  Daniel Mustieles  <daniel.mustieles@gmail.com>
+
+        Updated spanish Translation
+        https://bugs.webkit.org/show_bug.cgi?id=100677
+
+        Reviewed by Gustavo Noronha Silva.
+
+        * es.po: updated.
+
 2013-09-16  Fran Dieguez  <frandieguez@gnome.org>
 
         Add new Galician translations
@@ -16,15 +34,6 @@
 
         * en_GB.po: updated.
 
-2013-09-16  Daniel Mustieles  <daniel.mustieles@gmail.com>
-
-        Updated spanish Translation
-        https://bugs.webkit.org/show_bug.cgi?id=100677
-
-        Reviewed by Gustavo Noronha Silva.
-
-        * es.po: updated.
-
 2013-09-16  Enrico Nicoletto  <liverig@gmail.com>
 
         [l10n] [pt_BR] Updated Brazilian Portuguese translation of WebKitGTK+ - 12/09/2013
@@ -38,15 +47,6 @@
 
         [l10n] Updated Polish translation of WebKitGTK+
         https://bugs.webkit.org/show_bug.cgi?id=121392
-
-        Reviewed by Gustavo Noronha Silva.
-
-        * pl.po: updated.
-
-2013-08-27  Piotr Drąg  <piotrdrag@gmail.com>
-
-        [l10n] Updated Polish translation of WebKitGTK+
-        https://bugs.webkit.org/show_bug.cgi?id=119986
 
         Reviewed by Gustavo Noronha Silva.
 
@@ -78,6 +78,15 @@
         Reviewed by Gustavo Noronha.
 
         * de.po: updated.
+
+2013-08-27  Piotr Drąg  <piotrdrag@gmail.com>
+
+        [l10n] Updated Polish translation of WebKitGTK+
+        https://bugs.webkit.org/show_bug.cgi?id=119986
+
+        Reviewed by Gustavo Noronha Silva.
+
+        * pl.po: updated.
 
 2013-08-26  Enrico Nicoletto  <liverig@gmail.com>
 

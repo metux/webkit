@@ -29,6 +29,8 @@
 #include <wtf/Platform.h>
 
 #include "CompilationResult.h"
+#include "DFGCompilationKey.h"
+#include "DFGCompilationMode.h"
 #include "DFGDesiredIdentifiers.h"
 #include "DFGDesiredStructureChains.h"
 #include "DFGDesiredTransitions.h"
@@ -53,7 +55,8 @@ class LongLivedState;
 
 struct Plan : public ThreadSafeRefCounted<Plan> {
     Plan(
-        PassRefPtr<CodeBlock>, unsigned osrEntryBytecodeIndex, unsigned numVarsWithValues);
+        PassRefPtr<CodeBlock>, CompilationMode, unsigned osrEntryBytecodeIndex,
+        const Operands<JSValue>& mustHandleValues);
     ~Plan();
     
     void compileInThread(LongLivedState&);
@@ -63,12 +66,12 @@ struct Plan : public ThreadSafeRefCounted<Plan> {
     
     void notifyReady();
     
-    CodeBlock* key();
+    CompilationKey key();
     
     VM& vm;
     RefPtr<CodeBlock> codeBlock;
+    CompilationMode mode;
     const unsigned osrEntryBytecodeIndex;
-    const unsigned numVarsWithValues;
     Operands<JSValue> mustHandleValues;
 
     RefPtr<Profiler::Compilation> compilation;

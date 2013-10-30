@@ -112,7 +112,7 @@ if (!window.InspectorFrontendHost) {
             window.open(url, "_blank");
         },
 
-        save: function(url, content, forceSaveAs)
+        save: function(url, content, base64Encoded, forceSaveAs)
         {
         },
 
@@ -139,6 +139,15 @@ if (!window.InspectorFrontendHost) {
             if (xhr.status === 200)
                 return xhr.responseText;
             return null;
+        },
+
+        platform: function()
+        {
+            return (navigator.platform.match(/mac|win|linux/i) || ["other"])[0].toLowerCase();
+        },
+
+        beep: function()
+        {
         },
 
         // Private

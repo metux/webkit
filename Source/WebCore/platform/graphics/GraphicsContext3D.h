@@ -30,11 +30,10 @@
 #include "Image.h"
 #include "IntRect.h"
 #include "PlatformLayer.h"
+#include <memory>
 #include <wtf/HashMap.h>
 #include <wtf/ListHashSet.h>
 #include <wtf/Noncopyable.h>
-#include <wtf/OwnArrayPtr.h>
-#include <wtf/PassOwnArrayPtr.h>
 #include <wtf/RefCounted.h>
 #include <wtf/text/WTFString.h>
 
@@ -43,14 +42,14 @@
 #endif
 
 // FIXME: Find a better way to avoid the name confliction for NO_ERROR.
-#if PLATFORM(WIN) || (PLATFORM(QT) && OS(WINDOWS))
+#if PLATFORM(WIN)
 #undef NO_ERROR
 #elif PLATFORM(GTK)
 // This define is from the X11 headers, but it's used below, so we must undefine it.
 #undef VERSION
 #endif
 
-#if PLATFORM(MAC) || PLATFORM(GTK) || PLATFORM(QT) || PLATFORM(EFL) || PLATFORM(BLACKBERRY) || PLATFORM(WIN)
+#if PLATFORM(MAC) || PLATFORM(GTK) || PLATFORM(EFL) || PLATFORM(BLACKBERRY) || PLATFORM(WIN) || PLATFORM(NIX)
 #include "ANGLEWebKitBridge.h"
 #endif
 
@@ -58,14 +57,7 @@
 #include <wtf/RetainPtr.h>
 OBJC_CLASS CALayer;
 OBJC_CLASS WebGLLayer;
-#elif PLATFORM(QT)
-QT_BEGIN_NAMESPACE
-class QPainter;
-class QRect;
-class QOpenGLContext;
-class QSurface;
-QT_END_NAMESPACE
-#elif PLATFORM(GTK) || PLATFORM(EFL)
+#elif PLATFORM(GTK) || PLATFORM(EFL) || PLATFORM(NIX)
 typedef unsigned int GLuint;
 #endif
 
@@ -73,9 +65,6 @@ typedef unsigned int GLuint;
 typedef struct _CGLContextObject *CGLContextObj;
 
 typedef CGLContextObj PlatformGraphicsContext3D;
-#elif PLATFORM(QT)
-typedef QOpenGLContext* PlatformGraphicsContext3D;
-typedef QSurface* PlatformGraphicsSurface3D;
 #else
 typedef void* PlatformGraphicsContext3D;
 typedef void* PlatformGraphicsSurface3D;
@@ -93,9 +82,6 @@ class Extensions3DOpenGLES;
 #else
 class Extensions3DOpenGL;
 #endif
-#if PLATFORM(QT)
-class Extensions3DQt;
-#endif
 class HostWindow;
 class Image;
 class ImageBuffer;
@@ -108,6 +94,8 @@ class PlatformContextCairo;
 #elif PLATFORM(BLACKBERRY)
 class GraphicsContext;
 #endif
+
+typedef WTF::HashMap<CString, uint64_t> ShaderNameHash;
 
 struct ActiveInfo {
     String name;
@@ -445,6 +433,8 @@ public:
             , noExtensions(false)
             , shareResources(true)
             , preferDiscreteGPU(false)
+            , multithreaded(false)
+            , forceSoftwareRenderer(false)
         {
         }
 
@@ -457,6 +447,8 @@ public:
         bool noExtensions;
         bool shareResources;
         bool preferDiscreteGPU;
+        bool multithreaded;
+        bool forceSoftwareRenderer;
     };
 
     enum RenderStyle {
@@ -498,7 +490,7 @@ public:
 
     bool makeContextCurrent();
 
-#if PLATFORM(MAC) || PLATFORM(GTK) || PLATFORM(QT) || PLATFORM(EFL) || PLATFORM(BLACKBERRY) || PLATFORM(WIN)
+#if PLATFORM(MAC) || PLATFORM(GTK) || PLATFORM(EFL) || PLATFORM(BLACKBERRY) || PLATFORM(WIN) || PLATFORM(NIX)
     // With multisampling on, blit from multisampleFBO to regular FBO.
     void prepareTexture();
 #endif
@@ -607,16 +599,19 @@ public:
     // Check if the format is one of the formats from the ImageData or DOM elements.
     // The formats from ImageData is always RGBA8.
     // The formats from DOM elements vary with Graphics ports. It can only be RGBA8 or BGRA8 for non-CG port while a little more for CG port.
-    static ALWAYS_INLINE bool srcFormatComeFromDOMElementOrImageData(DataFormat SrcFormat)
+    static ALWAYS_INLINE bool srcFormatComesFromDOMElementOrImageData(DataFormat SrcFormat)
     {
 #if USE(CG)
 #if CPU(BIG_ENDIAN)
-    return SrcFormat == DataFormatRGBA8 || SrcFormat == DataFormatARGB8 || SrcFormat == DataFormatRGB8;
+    return SrcFormat == DataFormatRGBA8 || SrcFormat == DataFormatARGB8 || SrcFormat == DataFormatRGB8
+        || SrcFormat == DataFormatRA8 || SrcFormat == DataFormatAR8 || SrcFormat == DataFormatR8 || SrcFormat == DataFormatA8;
 #else
     // That LITTLE_ENDIAN case has more possible formats than BIG_ENDIAN case is because some decoded image data is actually big endian
     // even on little endian architectures.
     return SrcFormat == DataFormatBGRA8 || SrcFormat == DataFormatABGR8 || SrcFormat == DataFormatBGR8
-        || SrcFormat == DataFormatRGBA8 || SrcFormat == DataFormatARGB8 || SrcFormat == DataFormatRGB8;
+        || SrcFormat == DataFormatRGBA8 || SrcFormat == DataFormatARGB8 || SrcFormat == DataFormatRGB8
+        || SrcFormat == DataFormatR8 || SrcFormat == DataFormatA8
+        || SrcFormat == DataFormatRA8 || SrcFormat == DataFormatAR8;
 #endif
 #else
     return SrcFormat == DataFormatBGRA8 || SrcFormat == DataFormatRGBA8;
@@ -777,9 +772,6 @@ public:
 #if PLATFORM(GTK) || PLATFORM(EFL) || USE(CAIRO)
     void paintToCanvas(const unsigned char* imagePixels, int imageWidth, int imageHeight,
                        int canvasWidth, int canvasHeight, PlatformContextCairo* context);
-#elif PLATFORM(QT)
-    void paintToCanvas(const unsigned char* imagePixels, int imageWidth, int imageHeight,
-                       int canvasWidth, int canvasHeight, QPainter* context);
 #elif PLATFORM(BLACKBERRY) || USE(CG)
     void paintToCanvas(const unsigned char* imagePixels, int imageWidth, int imageHeight,
                        int canvasWidth, int canvasHeight, GraphicsContext*);
@@ -896,9 +888,7 @@ public:
         CGImageRef m_cgImage;
         RetainPtr<CGImageRef> m_decodedImage;
         RetainPtr<CFDataRef> m_pixelData;
-        OwnArrayPtr<uint8_t> m_formalizedRGBA8Data;
-#elif PLATFORM(QT)
-        QImage m_qtImage;
+        std::unique_ptr<uint8_t[]> m_formalizedRGBA8Data;
 #elif PLATFORM(BLACKBERRY)
         Vector<unsigned> m_imageData;
 #endif
@@ -923,7 +913,7 @@ private:
     // Destination data will have no gaps between rows.
     static bool packPixels(const uint8_t* sourceData, DataFormat sourceDataFormat, unsigned width, unsigned height, unsigned sourceUnpackAlignment, unsigned destinationFormat, unsigned destinationType, AlphaOp, void* destinationData, bool flipY);
 
-#if PLATFORM(MAC) || PLATFORM(GTK) || PLATFORM(QT) || PLATFORM(EFL) || PLATFORM(BLACKBERRY) || PLATFORM(WIN)
+#if PLATFORM(MAC) || PLATFORM(GTK) || PLATFORM(EFL) || PLATFORM(BLACKBERRY) || PLATFORM(WIN) || PLATFORM(NIX)
     // Take into account the user's requested context creation attributes,
     // in particular stencil and antialias, and determine which could or
     // could not be honored based on the capabilities of the OpenGL
@@ -944,7 +934,7 @@ private:
 
     bool reshapeFBOs(const IntSize&);
     void resolveMultisamplingIfNecessary(const IntRect& = IntRect());
-#if (PLATFORM(QT) || PLATFORM(EFL)) && USE(GRAPHICS_SURFACE)
+#if (PLATFORM(EFL) || PLATFORM(NIX)) && USE(GRAPHICS_SURFACE)
     void createGraphicsSurfaces(const IntSize&);
 #endif
 
@@ -963,7 +953,7 @@ private:
     void* m_context;
 #endif
 
-#if PLATFORM(MAC) || PLATFORM(GTK) || PLATFORM(QT) || PLATFORM(EFL) || PLATFORM(BLACKBERRY) || PLATFORM(WIN)
+#if PLATFORM(MAC) || PLATFORM(GTK) || PLATFORM(EFL) || PLATFORM(BLACKBERRY) || PLATFORM(WIN) || PLATFORM(NIX)
     struct SymbolInfo {
         SymbolInfo()
             : type(0)
@@ -1020,9 +1010,11 @@ private:
     String originalSymbolName(Platform3DObject program, ANGLEShaderSymbolType, const String& name);
 
     ANGLEWebKitBridge m_compiler;
+
+    OwnPtr<ShaderNameHash> nameHashMapForShaders;
 #endif
 
-#if PLATFORM(BLACKBERRY) || (PLATFORM(QT) && defined(QT_OPENGL_ES_2)) || ((PLATFORM(GTK) || PLATFORM(EFL) || PLATFORM(WIN)) && USE(OPENGL_ES_2))
+#if PLATFORM(BLACKBERRY) || ((PLATFORM(GTK) || PLATFORM(EFL) || PLATFORM(WIN) || PLATFORM(NIX)) && USE(OPENGL_ES_2))
     friend class Extensions3DOpenGLES;
     OwnPtr<Extensions3DOpenGLES> m_extensions;
 #else
@@ -1033,7 +1025,7 @@ private:
 
     Attributes m_attrs;
     RenderStyle m_renderStyle;
-    Vector<Vector<float> > m_vertexArray;
+    Vector<Vector<float>> m_vertexArray;
 
     GC3Duint m_texture;
 #if !PLATFORM(BLACKBERRY)

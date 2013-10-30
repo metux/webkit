@@ -31,14 +31,16 @@
 
 #include "ColorSpace.h"
 #include "Document.h"
-#include "ElementTraversal.h"
+#include "ElementIterator.h"
 #include "FEColorMatrix.h"
 #include "FEComponentTransfer.h"
 #include "FEDropShadow.h"
 #include "FEGaussianBlur.h"
 #include "FEMerge.h"
 #include "FloatConversion.h"
+#include "Frame.h"
 #include "RenderLayer.h"
+#include "Settings.h"
 
 #include <algorithm>
 #include <wtf/MathExtras.h>
@@ -94,7 +96,7 @@ static PassRefPtr<FECustomFilter> createCustomFilterEffect(Filter* filter, Docum
         return 0;
 
     CustomFilterGlobalContext* globalContext = document->renderView()->customFilterGlobalContext();
-    globalContext->prepareContextIfNeeded(document->view()->hostWindow());
+    globalContext->prepareContextIfNeeded(document->view()->hostWindow(), document->frame()->settings().forceSoftwareWebGLRendering());
     if (!globalContext->context())
         return 0;
 
@@ -123,7 +125,7 @@ GraphicsContext* FilterEffectRenderer::inputContext()
     return sourceImage() ? sourceImage()->context() : 0;
 }
 
-PassRefPtr<FilterEffect> FilterEffectRenderer::buildReferenceFilter(RenderObject* renderer, PassRefPtr<FilterEffect> previousEffect, ReferenceFilterOperation* filterOperation)
+PassRefPtr<FilterEffect> FilterEffectRenderer::buildReferenceFilter(RenderElement* renderer, PassRefPtr<FilterEffect> previousEffect, ReferenceFilterOperation* filterOperation)
 {
 #if ENABLE(SVG)
     if (!renderer)
@@ -146,7 +148,7 @@ PassRefPtr<FilterEffect> FilterEffectRenderer::buildReferenceFilter(RenderObject
     if (!filter) {
         // Although we did not find the referenced filter, it might exist later
         // in the document
-        document->accessSVGExtensions()->addPendingResource(filterOperation->fragment(), toElement(renderer->node()));
+        document->accessSVGExtensions()->addPendingResource(filterOperation->fragment(), renderer->element());
         return 0;
     }
 
@@ -157,13 +159,11 @@ PassRefPtr<FilterEffect> FilterEffectRenderer::buildReferenceFilter(RenderObject
     // wrong. We should probably be extracting the alpha from the 
     // previousEffect, but this requires some more processing.  
     // This may need a spec clarification.
-    RefPtr<SVGFilterBuilder> builder = SVGFilterBuilder::create(previousEffect, SourceAlpha::create(this));
+    auto builder = std::make_unique<SVGFilterBuilder>(previousEffect, SourceAlpha::create(this));
 
-    for (SVGElement* svgElement = Traversal<SVGElement>::firstChild(filter); svgElement; svgElement = Traversal<SVGElement>::nextSibling(svgElement)) {
-        if (!svgElement->isFilterEffect())
-            continue;
-        SVGFilterPrimitiveStandardAttributes* effectElement = static_cast<SVGFilterPrimitiveStandardAttributes*>(svgElement);
-
+    auto attributesChildren = childrenOfType<SVGFilterPrimitiveStandardAttributes>(*filter);
+    for (auto it = attributesChildren.begin(), end = attributesChildren.end(); it != end; ++it) {
+        SVGFilterPrimitiveStandardAttributes* effectElement = &*it;
         effect = effectElement->build(builder.get(), this);
         if (!effect)
             continue;
@@ -181,7 +181,7 @@ PassRefPtr<FilterEffect> FilterEffectRenderer::buildReferenceFilter(RenderObject
 #endif
 }
 
-bool FilterEffectRenderer::build(RenderObject* renderer, const FilterOperations& operations, bool clipsToBounds)
+bool FilterEffectRenderer::build(RenderElement* renderer, const FilterOperations& operations, FilterConsumer consumer)
 {
 #if ENABLE(CSS_SHADERS)
     m_hasCustomShaderFilter = false;
@@ -199,7 +199,7 @@ bool FilterEffectRenderer::build(RenderObject* renderer, const FilterOperations&
     for (size_t i = 0; i < operations.operations().size(); ++i) {
         RefPtr<FilterEffect> effect;
         FilterOperation* filterOperation = operations.operations().at(i).get();
-        switch (filterOperation->getOperationType()) {
+        switch (filterOperation->type()) {
         case FilterOperation::REFERENCE: {
             ReferenceFilterOperation* referenceOperation = static_cast<ReferenceFilterOperation*>(filterOperation);
             effect = buildReferenceFilter(renderer, previousEffect, referenceOperation);
@@ -328,7 +328,7 @@ bool FilterEffectRenderer::build(RenderObject* renderer, const FilterOperations&
         case FilterOperation::BLUR: {
             BlurFilterOperation* blurOperation = static_cast<BlurFilterOperation*>(filterOperation);
             float stdDeviation = floatValueForLength(blurOperation->stdDeviation(), 0);
-            effect = FEGaussianBlur::create(this, stdDeviation, stdDeviation);
+            effect = FEGaussianBlur::create(this, stdDeviation, stdDeviation, consumer == FilterProperty ? EDGEMODE_NONE : EDGEMODE_DUPLICATE);
             break;
         }
         case FilterOperation::DROP_SHADOW: {
@@ -359,10 +359,10 @@ bool FilterEffectRenderer::build(RenderObject* renderer, const FilterOperations&
         if (effect) {
             // Unlike SVG Filters and CSSFilterImages, filter functions on the filter
             // property applied here should not clip to their primitive subregions.
-            effect->setClipsToBounds(clipsToBounds);
+            effect->setClipsToBounds(consumer == FilterFunction);
             effect->setOperatingColorSpace(ColorSpaceDeviceRGB);
             
-            if (filterOperation->getOperationType() != FilterOperation::REFERENCE) {
+            if (filterOperation->type() != FilterOperation::REFERENCE) {
                 effect->inputEffects().append(previousEffect);
                 m_effects.append(effect);
             }
@@ -512,7 +512,7 @@ void FilterEffectRendererHelper::applyFilterEffect(GraphicsContext* destinationC
     LayoutRect destRect = filter->outputRect();
     destRect.move(m_paintOffset.x(), m_paintOffset.y());
     
-    destinationContext->drawImageBuffer(filter->output(), m_renderLayer->renderer().style()->colorSpace(), pixelSnappedIntRect(destRect), CompositeSourceOver);
+    destinationContext->drawImageBuffer(filter->output(), m_renderLayer->renderer().style().colorSpace(), pixelSnappedIntRect(destRect), CompositeSourceOver);
     
     filter->clearIntermediateResults();
 }

@@ -1,0 +1,40 @@
+<!-- ##### SECTION Title ##### -->
+WebKitDOMNodeFilter
+
+<!-- ##### SECTION Short_Description ##### -->
+
+
+<!-- ##### SECTION Long_Description ##### -->
+<para>
+
+</para>
+
+
+<!-- ##### SECTION See_Also ##### -->
+<para>
+
+</para>
+
+
+<!-- ##### SECTION Stability_Level ##### -->
+
+
+<!-- ##### SECTION Image ##### -->
+
+
+<!-- ##### STRUCT WebKitDOMNodeFilter ##### -->
+<para>
+
+</para>
+
+
+<!-- ##### FUNCTION webkit_dom_node_filter_accept_node ##### -->
+<para>
+
+</para>
+
+@self: 
+@n: 
+@Returns: 
+
+

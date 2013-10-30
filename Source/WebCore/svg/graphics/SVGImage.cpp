@@ -32,11 +32,12 @@
 
 #include "Chrome.h"
 #include "DocumentLoader.h"
-#include "ElementTraversal.h"
+#include "ElementIterator.h"
 #include "FrameView.h"
 #include "ImageBuffer.h"
 #include "ImageObserver.h"
 #include "IntRect.h"
+#include "MainFrame.h"
 #include "RenderSVGRoot.h"
 #include "RenderStyle.h"
 #include "SVGDocument.h"
@@ -74,7 +75,7 @@ bool SVGImage::hasSingleSecurityOrigin() const
         return true;
 
     // Don't allow foreignObject elements since they can leak information with arbitrary HTML (like spellcheck or control theme).
-    if (Traversal<SVGForeignObjectElement>::firstWithin(rootElement))
+    if (descendantsOfType<SVGForeignObjectElement>(*rootElement).first())
         return false;
 
     // Because SVG image rendering disallows external resources and links,
@@ -118,7 +119,7 @@ IntSize SVGImage::containerSize() const
         return containerSize;
 
     // Assure that a container size is always given for a non-identity zoom level.
-    ASSERT(renderer->style()->effectiveZoom() == 1);
+    ASSERT(renderer->style().effectiveZoom() == 1);
 
     FloatSize currentSize;
     if (rootElement->intrinsicWidth().isFixed() && rootElement->intrinsicHeight().isFixed())
@@ -156,7 +157,7 @@ void SVGImage::drawForContainer(GraphicsContext* context, const FloatSize contai
     adjustedSrcSize.scale(roundedContainerSize.width() / containerSize.width(), roundedContainerSize.height() / containerSize.height());
     scaledSrc.setSize(adjustedSrcSize);
 
-    draw(context, dstRect, scaledSrc, colorSpace, compositeOp, blendMode);
+    draw(context, dstRect, scaledSrc, colorSpace, compositeOp, blendMode, ImageOrientationDescription());
 
     setImageObserver(observer);
 }
@@ -173,7 +174,7 @@ PassNativeImagePtr SVGImage::nativeImageForCurrentFrame()
     if (!buffer) // failed to allocate image
         return 0;
 
-    draw(buffer->context(), rect(), rect(), ColorSpaceDeviceRGB, CompositeSourceOver, BlendModeNormal);
+    draw(buffer->context(), rect(), rect(), ColorSpaceDeviceRGB, CompositeSourceOver, BlendModeNormal, ImageOrientationDescription());
 
     // FIXME: WK(Bug 113657): We should use DontCopyBackingStore here.
     return buffer->copyImage(CopyBackingStore)->nativeImageForCurrentFrame();
@@ -199,7 +200,11 @@ void SVGImage::drawPatternForContainer(GraphicsContext* context, const FloatSize
     if (!buffer) // Failed to allocate buffer.
         return;
     drawForContainer(buffer->context(), containerSize, zoom, imageBufferSize, zoomedContainerRect, ColorSpaceDeviceRGB, CompositeSourceOver, BlendModeNormal);
+    if (context->drawLuminanceMask())
+        buffer->convertToLuminanceMask();
+
     RefPtr<Image> image = buffer->copyImage(DontCopyBackingStore, Unscaled);
+    image->setSpaceSize(spaceSize());
 
     // Adjust the source rect and transform due to the image buffer's scaling.
     FloatRect scaledSrcRect = srcRect;
@@ -207,10 +212,11 @@ void SVGImage::drawPatternForContainer(GraphicsContext* context, const FloatSize
     AffineTransform unscaledPatternTransform(patternTransform);
     unscaledPatternTransform.scale(1 / imageBufferScale.width(), 1 / imageBufferScale.height());
 
+    context->setDrawLuminanceMask(false);
     image->drawPattern(context, scaledSrcRect, unscaledPatternTransform, phase, colorSpace, compositeOp, dstRect);
 }
 
-void SVGImage::draw(GraphicsContext* context, const FloatRect& dstRect, const FloatRect& srcRect, ColorSpace, CompositeOperator compositeOp, BlendMode blendMode)
+void SVGImage::draw(GraphicsContext* context, const FloatRect& dstRect, const FloatRect& srcRect, ColorSpace, CompositeOperator compositeOp, BlendMode blendMode, ImageOrientationDescription)
 {
     if (!m_page)
         return;
@@ -355,7 +361,7 @@ bool SVGImage::dataChanged(bool allDataReceived)
         m_page->settings().setPluginsEnabled(false);
 
         Frame& frame = m_page->mainFrame();
-        frame.setView(FrameView::create(&frame));
+        frame.setView(FrameView::create(frame));
         frame.init();
         FrameLoader& loader = frame.loader();
         loader.forceSandboxFlags(SandboxAll);
@@ -364,10 +370,10 @@ bool SVGImage::dataChanged(bool allDataReceived)
         frame.view()->setTransparent(true); // SVG Images are transparent.
 
         ASSERT(loader.activeDocumentLoader()); // DocumentLoader should have been created by frame->init().
-        loader.activeDocumentLoader()->writer()->setMIMEType("image/svg+xml");
-        loader.activeDocumentLoader()->writer()->begin(KURL()); // create the empty document
-        loader.activeDocumentLoader()->writer()->addData(data()->data(), data()->size());
-        loader.activeDocumentLoader()->writer()->end();
+        loader.activeDocumentLoader()->writer().setMIMEType("image/svg+xml");
+        loader.activeDocumentLoader()->writer().begin(URL()); // create the empty document
+        loader.activeDocumentLoader()->writer().addData(data()->data(), data()->size());
+        loader.activeDocumentLoader()->writer().end();
 
         // Set the intrinsic size before a container size is available.
         m_intrinsicSize = containerSize();
@@ -385,7 +391,7 @@ bool isInSVGImage(const Element* element)
 {
     ASSERT(element);
 
-    Page* page = element->document()->page();
+    Page* page = element->document().page();
     if (!page)
         return false;
 

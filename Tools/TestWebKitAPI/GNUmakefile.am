@@ -64,7 +64,11 @@ Programs_TestWebKitAPI_TestWTF_SOURCES = \
 	Tools/TestWebKitAPI/Tests/WTF/MathExtras.cpp \
 	Tools/TestWebKitAPI/Tests/WTF/MediaTime.cpp \
 	Tools/TestWebKitAPI/Tests/WTF/MetaAllocator.cpp \
+	Tools/TestWebKitAPI/Tests/WTF/MoveOnly.h \
 	Tools/TestWebKitAPI/Tests/WTF/RedBlackTree.cpp \
+	Tools/TestWebKitAPI/Tests/WTF/Ref.cpp \
+	Tools/TestWebKitAPI/Tests/WTF/RefLogger.h \
+	Tools/TestWebKitAPI/Tests/WTF/RefPtr.cpp \
 	Tools/TestWebKitAPI/Tests/WTF/SHA1.cpp \
 	Tools/TestWebKitAPI/Tests/WTF/SaturatedArithmeticOperations.cpp \
 	Tools/TestWebKitAPI/Tests/WTF/StringBuilder.cpp \
@@ -73,8 +77,6 @@ Programs_TestWebKitAPI_TestWTF_SOURCES = \
 	Tools/TestWebKitAPI/Tests/WTF/StringOperators.cpp \
 	Tools/TestWebKitAPI/Tests/WTF/TemporaryChange.cpp \
 	Tools/TestWebKitAPI/Tests/WTF/Vector.cpp \
-	Tools/TestWebKitAPI/Tests/WTF/VectorBasic.cpp \
-	Tools/TestWebKitAPI/Tests/WTF/VectorReverse.cpp \
 	Tools/TestWebKitAPI/WTFStringUtilities.h
 
 Programs_TestWebKitAPI_TestJavaScriptCore_CPPFLAGS = \
@@ -167,7 +169,7 @@ Programs_TestWebKitAPI_TestWebCore_LDFLAGS = \
 	-no-fast-install
 
 Programs_TestWebKitAPI_TestWebCore_SOURCES = \
-	Tools/TestWebKitAPI/Tests/WebCore/KURL.cpp \
+	Tools/TestWebKitAPI/Tests/WebCore/URL.cpp \
 	Tools/TestWebKitAPI/Tests/WebCore/LayoutUnit.cpp
 
 Programs_TestWebKitAPI_TestGtk_CPPFLAGS = \

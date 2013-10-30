@@ -1,6 +1,7 @@
 /*
  * Copyright (C) 2011 Google Inc. All rights reserved.
  * Copyright (C) 2011 Ericsson AB. All rights reserved.
+ * Copyright (C) 2013 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -30,8 +31,9 @@
 
 #include "ActiveDOMObject.h"
 #include "EventTarget.h"
-#include "MediaStreamDescriptor.h"
 #include "MediaStreamSource.h"
+#include "MediaStreamTrackPrivate.h"
+#include "ScriptWrappable.h"
 #include <wtf/RefCounted.h>
 #include <wtf/RefPtr.h>
 #include <wtf/Vector.h>
@@ -39,57 +41,107 @@
 
 namespace WebCore {
 
-class MediaStreamComponent;
+class Dictionary;
+class MediaConstraintsImpl;
+class MediaSourceStates;
+class MediaStreamTrackSourcesCallback;
+class MediaStreamCapabilities;
+class MediaTrackConstraints;
 
-class MediaStreamTrack : public RefCounted<MediaStreamTrack>, public ActiveDOMObject, public EventTarget, public MediaStreamSource::Observer {
+class MediaStreamTrack : public RefCounted<MediaStreamTrack>, public ScriptWrappable, public ActiveDOMObject, public EventTargetWithInlineData, public MediaStreamSource::Observer, public MediaStreamTrackPrivateClient {
 public:
-    static PassRefPtr<MediaStreamTrack> create(ScriptExecutionContext*, MediaStreamComponent*);
+    class Observer {
+    public:
+        virtual void trackDidEnd() = 0;
+    };
+
     virtual ~MediaStreamTrack();
 
-    String kind() const;
-    String id() const;
-    String label() const;
+    virtual const AtomicString& kind() const = 0;
+    const String& id() const;
+    const String& label() const;
 
     bool enabled() const;
     void setEnabled(bool);
 
-    String readyState() const;
+    bool muted() const;
+    bool readonly() const;
+    bool remote() const;
+
+    const AtomicString& readyState() const;
+
+    static void getSources(ScriptExecutionContext*, PassRefPtr<MediaStreamTrackSourcesCallback>, ExceptionCode&);
+
+    RefPtr<MediaTrackConstraints> constraints() const;
+    RefPtr<MediaSourceStates> states() const;
+    RefPtr<MediaStreamCapabilities> capabilities() const;
+    void applyConstraints(const Dictionary&);
+
+    RefPtr<MediaStreamTrack> clone();
+    void stopProducingData();
 
     DEFINE_ATTRIBUTE_EVENT_LISTENER(mute);
     DEFINE_ATTRIBUTE_EVENT_LISTENER(unmute);
+    DEFINE_ATTRIBUTE_EVENT_LISTENER(started);
     DEFINE_ATTRIBUTE_EVENT_LISTENER(ended);
+    DEFINE_ATTRIBUTE_EVENT_LISTENER(overconstrained);
 
-    MediaStreamComponent* component();
+    MediaStreamSource* source() const { return m_privateTrack->source(); }
+    void setSource(MediaStreamSource*);
+
     bool ended() const;
 
-    // EventTarget
-    virtual const AtomicString& interfaceName() const OVERRIDE;
-    virtual ScriptExecutionContext* scriptExecutionContext() const OVERRIDE;
+    void addObserver(Observer*);
+    void removeObserver(Observer*);
+    MediaStreamTrackPrivate* privateTrack() const { return m_privateTrack.get(); }
 
-    // ActiveDOMObject
-    virtual void stop() OVERRIDE;
+    // MediaStreamTrackPrivateClient
+    void trackReadyStateChanged();
+    void trackMutedChanged();
+
+    // EventTarget
+    virtual EventTargetInterface eventTargetInterface() const OVERRIDE FINAL { return MediaStreamTrackEventTargetInterfaceType; }
+    virtual ScriptExecutionContext* scriptExecutionContext() const OVERRIDE FINAL { return ActiveDOMObject::scriptExecutionContext(); }
 
     using RefCounted<MediaStreamTrack>::ref;
     using RefCounted<MediaStreamTrack>::deref;
 
+protected:
+    explicit MediaStreamTrack(MediaStreamTrack*);
+    MediaStreamTrack(ScriptExecutionContext*, PassRefPtr<MediaStreamTrackPrivate>, const Dictionary*);
+
 private:
-    MediaStreamTrack(ScriptExecutionContext*, MediaStreamComponent*);
+
+    void configureTrackRendering();
+    void trackDidEnd();
+    void scheduleEventDispatch(PassRefPtr<Event>);
+    void dispatchQueuedEvents();
+
+    // ActiveDOMObject
+    virtual void stop() OVERRIDE FINAL;
 
     // EventTarget
-    virtual EventTargetData* eventTargetData() OVERRIDE;
-    virtual EventTargetData& ensureEventTargetData() OVERRIDE;
-    virtual void refEventTarget() OVERRIDE { ref(); }
-    virtual void derefEventTarget() OVERRIDE { deref(); }
-    EventTargetData m_eventTargetData;
+    virtual void refEventTarget() OVERRIDE FINAL { ref(); }
+    virtual void derefEventTarget() OVERRIDE FINAL { deref(); }
 
     // MediaStreamSourceObserver
-    virtual void sourceChangedState() OVERRIDE;
+    virtual void sourceStateChanged() OVERRIDE FINAL;
+    virtual void sourceMutedChanged() OVERRIDE FINAL;
+    virtual void sourceEnabledChanged() OVERRIDE FINAL;
+    virtual bool stopped() OVERRIDE FINAL;
 
-    bool m_stopped;
-    RefPtr<MediaStreamComponent> m_component;
+    Vector<RefPtr<Event>> m_scheduledEvents;
+
+    RefPtr<MediaConstraintsImpl> m_constraints;
+    Mutex m_mutex;
+
+    Vector<Observer*> m_observers;
+
+    RefPtr<MediaStreamTrackPrivate> m_privateTrack;
+    bool m_eventDispatchScheduled;
 };
 
-typedef Vector<RefPtr<MediaStreamTrack> > MediaStreamTrackVector;
+typedef Vector<RefPtr<MediaStreamTrack>> MediaStreamTrackVector;
 
 } // namespace WebCore
 

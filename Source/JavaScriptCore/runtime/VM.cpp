@@ -38,16 +38,18 @@
 #include "DFGWorklist.h"
 #include "DebuggerActivation.h"
 #include "ErrorInstance.h"
+#include "FTLThunks.h"
 #include "FunctionConstructor.h"
 #include "GCActivityCallback.h"
 #include "GetterSetter.h"
 #include "Heap.h"
+#include "HeapIterationScope.h"
 #include "HostCallReturnValue.h"
 #include "Identifier.h"
 #include "IncrementalSweeper.h"
 #include "Interpreter.h"
-#include "JSActivation.h"
 #include "JSAPIValueWrapper.h"
+#include "JSActivation.h"
 #include "JSArray.h"
 #include "JSFunction.h"
 #include "JSGlobalObjectFunctions.h"
@@ -58,6 +60,7 @@
 #include "JSWithScope.h"
 #include "Lexer.h"
 #include "Lookup.h"
+#include "MapData.h"
 #include "Nodes.h"
 #include "ParserArena.h"
 #include "RegExpCache.h"
@@ -67,6 +70,7 @@
 #include "StrictEvalActivation.h"
 #include "StrongInlines.h"
 #include "UnlinkedCodeBlock.h"
+#include "WeakMapData.h"
 #include <wtf/ProcessID.h>
 #include <wtf/RetainPtr.h>
 #include <wtf/StringPrintStream.h>
@@ -106,6 +110,11 @@ extern const HashTable regExpTable;
 extern const HashTable regExpConstructorTable;
 extern const HashTable regExpPrototypeTable;
 extern const HashTable stringConstructorTable;
+#if ENABLE(PROMISES)
+extern const HashTable promisePrototypeTable;
+extern const HashTable promiseConstructorTable;
+extern const HashTable promiseResolverPrototypeTable;
+#endif
 
 // Note: Platform.h will enforce that ENABLE(ASSEMBLER) is true if either
 // ENABLE(JIT) or ENABLE(YARR_JIT) or both are enabled. The code below
@@ -114,8 +123,14 @@ extern const HashTable stringConstructorTable;
 #if ENABLE(ASSEMBLER)
 static bool enableAssembler(ExecutableAllocator& executableAllocator)
 {
-    if (!executableAllocator.isValid() || (!Options::useJIT() && !Options::useRegExpJIT()))
+    if (!Options::useJIT() && !Options::useRegExpJIT())
         return false;
+
+    if (!executableAllocator.isValid()) {
+        if (Options::crashIfCantAllocateJITMemory())
+            CRASH();
+        return false;
+    }
 
 #if USE(CF)
 #if COMPILER(GCC) && !COMPILER(CLANG)
@@ -149,34 +164,37 @@ VM::VM(VMType vmType, HeapType heapType)
     , vmType(vmType)
     , clientData(0)
     , topCallFrame(CallFrame::noCaller()->removeHostCallFrameFlag())
-    , arrayConstructorTable(fastNew<HashTable>(JSC::arrayConstructorTable))
-    , arrayPrototypeTable(fastNew<HashTable>(JSC::arrayPrototypeTable))
-    , booleanPrototypeTable(fastNew<HashTable>(JSC::booleanPrototypeTable))
-    , dataViewTable(fastNew<HashTable>(JSC::dataViewTable))
-    , dateTable(fastNew<HashTable>(JSC::dateTable))
-    , dateConstructorTable(fastNew<HashTable>(JSC::dateConstructorTable))
-    , errorPrototypeTable(fastNew<HashTable>(JSC::errorPrototypeTable))
-    , globalObjectTable(fastNew<HashTable>(JSC::globalObjectTable))
-    , jsonTable(fastNew<HashTable>(JSC::jsonTable))
-    , numberConstructorTable(fastNew<HashTable>(JSC::numberConstructorTable))
-    , numberPrototypeTable(fastNew<HashTable>(JSC::numberPrototypeTable))
-    , objectConstructorTable(fastNew<HashTable>(JSC::objectConstructorTable))
-    , privateNamePrototypeTable(fastNew<HashTable>(JSC::privateNamePrototypeTable))
-    , regExpTable(fastNew<HashTable>(JSC::regExpTable))
-    , regExpConstructorTable(fastNew<HashTable>(JSC::regExpConstructorTable))
-    , regExpPrototypeTable(fastNew<HashTable>(JSC::regExpPrototypeTable))
-    , stringConstructorTable(fastNew<HashTable>(JSC::stringConstructorTable))
+    , arrayConstructorTable(adoptPtr(new HashTable(JSC::arrayConstructorTable)))
+    , arrayPrototypeTable(adoptPtr(new HashTable(JSC::arrayPrototypeTable)))
+    , booleanPrototypeTable(adoptPtr(new HashTable(JSC::booleanPrototypeTable)))
+    , dataViewTable(adoptPtr(new HashTable(JSC::dataViewTable)))
+    , dateTable(adoptPtr(new HashTable(JSC::dateTable)))
+    , dateConstructorTable(adoptPtr(new HashTable(JSC::dateConstructorTable)))
+    , errorPrototypeTable(adoptPtr(new HashTable(JSC::errorPrototypeTable)))
+    , globalObjectTable(adoptPtr(new HashTable(JSC::globalObjectTable)))
+    , jsonTable(adoptPtr(new HashTable(JSC::jsonTable)))
+    , numberConstructorTable(adoptPtr(new HashTable(JSC::numberConstructorTable)))
+    , numberPrototypeTable(adoptPtr(new HashTable(JSC::numberPrototypeTable)))
+    , objectConstructorTable(adoptPtr(new HashTable(JSC::objectConstructorTable)))
+    , privateNamePrototypeTable(adoptPtr(new HashTable(JSC::privateNamePrototypeTable)))
+    , regExpTable(adoptPtr(new HashTable(JSC::regExpTable)))
+    , regExpConstructorTable(adoptPtr(new HashTable(JSC::regExpConstructorTable)))
+    , regExpPrototypeTable(adoptPtr(new HashTable(JSC::regExpPrototypeTable)))
+    , stringConstructorTable(adoptPtr(new HashTable(JSC::stringConstructorTable)))
+#if ENABLE(PROMISES)
+    , promisePrototypeTable(adoptPtr(new HashTable(JSC::promisePrototypeTable)))
+    , promiseConstructorTable(adoptPtr(new HashTable(JSC::promiseConstructorTable)))
+    , promiseResolverPrototypeTable(adoptPtr(new HashTable(JSC::promiseResolverPrototypeTable)))
+#endif
     , identifierTable(vmType == Default ? wtfThreadData().currentIdentifierTable() : createIdentifierTable())
     , propertyNames(new CommonIdentifiers(this))
     , emptyList(new MarkedArgumentBuffer)
     , parserArena(adoptPtr(new ParserArena))
-    , keywords(adoptPtr(new Keywords(this)))
+    , keywords(adoptPtr(new Keywords(*this)))
     , interpreter(0)
     , jsArrayClassInfo(JSArray::info())
     , jsFinalObjectClassInfo(JSFinalObject::info())
-#if ENABLE(DFG_JIT)
     , sizeOfLastScratchBuffer(0)
-#endif
     , dynamicGlobalObject(0)
     , m_enabledProfiler(0)
     , m_regExpCache(new RegExpCache(this))
@@ -230,14 +248,20 @@ VM::VM(VMType vmType, HeapType heapType)
     unlinkedEvalCodeBlockStructure.set(*this, UnlinkedEvalCodeBlock::createStructure(*this, 0, jsNull()));
     unlinkedFunctionCodeBlockStructure.set(*this, UnlinkedFunctionCodeBlock::createStructure(*this, 0, jsNull()));
     propertyTableStructure.set(*this, PropertyTable::createStructure(*this, 0, jsNull()));
+    mapDataStructure.set(*this, MapData::createStructure(*this, 0, jsNull()));
+    weakMapDataStructure.set(*this, WeakMapData::createStructure(*this, 0, jsNull()));
+    iterationTerminator.set(*this, JSFinalObject::create(*this, JSFinalObject::createStructure(*this, 0, jsNull(), 1)));
     smallStrings.initializeCommonStrings(*this);
 
     wtfThreadData().setCurrentIdentifierTable(existingEntryIdentifierTable);
 
 #if ENABLE(JIT)
     jitStubs = adoptPtr(new JITThunks());
-    performPlatformSpecificJITAssertions(this);
 #endif
+
+#if ENABLE(FTL_JIT)
+    ftlThunks = std::make_unique<FTL::Thunks>();
+#endif // ENABLE(FTL_JIT)
     
     interpreter->initialize(this->canUseJIT());
     
@@ -315,24 +339,11 @@ VM::~VM()
     regExpConstructorTable->deleteTable();
     regExpPrototypeTable->deleteTable();
     stringConstructorTable->deleteTable();
-
-    fastDelete(const_cast<HashTable*>(arrayConstructorTable));
-    fastDelete(const_cast<HashTable*>(arrayPrototypeTable));
-    fastDelete(const_cast<HashTable*>(booleanPrototypeTable));
-    fastDelete(const_cast<HashTable*>(dataViewTable));
-    fastDelete(const_cast<HashTable*>(dateTable));
-    fastDelete(const_cast<HashTable*>(dateConstructorTable));
-    fastDelete(const_cast<HashTable*>(errorPrototypeTable));
-    fastDelete(const_cast<HashTable*>(globalObjectTable));
-    fastDelete(const_cast<HashTable*>(jsonTable));
-    fastDelete(const_cast<HashTable*>(numberConstructorTable));
-    fastDelete(const_cast<HashTable*>(numberPrototypeTable));
-    fastDelete(const_cast<HashTable*>(objectConstructorTable));
-    fastDelete(const_cast<HashTable*>(privateNamePrototypeTable));
-    fastDelete(const_cast<HashTable*>(regExpTable));
-    fastDelete(const_cast<HashTable*>(regExpConstructorTable));
-    fastDelete(const_cast<HashTable*>(regExpPrototypeTable));
-    fastDelete(const_cast<HashTable*>(stringConstructorTable));
+#if ENABLE(PROMISES)
+    promisePrototypeTable->deleteTable();
+    promiseConstructorTable->deleteTable();
+    promiseResolverPrototypeTable->deleteTable();
+#endif
 
     delete emptyList;
 
@@ -417,6 +428,10 @@ static ThunkGenerator thunkGeneratorForIntrinsic(Intrinsic intrinsic)
         return logThunkGenerator;
     case IMulIntrinsic:
         return imulThunkGenerator;
+    case ArrayIteratorNextKeyIntrinsic:
+        return arrayIteratorNextKeyThunkGenerator;
+    case ArrayIteratorNextValueIntrinsic:
+        return arrayIteratorNextValueThunkGenerator;
     default:
         return 0;
     }
@@ -489,7 +504,7 @@ void VM::dumpSampleData(ExecState* exec)
 
 SourceProviderCache* VM::addSourceProviderCache(SourceProvider* sourceProvider)
 {
-    SourceProviderCacheMap::AddResult addResult = sourceProviderCacheMap.add(sourceProvider, 0);
+    auto addResult = sourceProviderCacheMap.add(sourceProvider, nullptr);
     if (addResult.isNewEntry)
         addResult.iterator->value = adoptRef(new SourceProviderCache);
     return addResult.iterator->value.get();
@@ -519,8 +534,8 @@ void VM::releaseExecutableMemory()
     
     if (dynamicGlobalObject) {
         StackPreservingRecompiler recompiler;
+        HeapIterationScope iterationScope(heap);
         HashSet<JSCell*> roots;
-        heap.canonicalizeCellLivenessData();
         heap.getConservativeRegisterRoots(roots);
         HashSet<JSCell*>::iterator end = roots.end();
         for (HashSet<JSCell*>::iterator ptr = roots.begin(); ptr != end; ++ptr) {
@@ -541,7 +556,7 @@ void VM::releaseExecutableMemory()
                 recompiler.currentlyExecutingFunctions.add(static_cast<FunctionExecutable*>(executable));
                 
         }
-        heap.objectSpace().forEachLiveCell<StackPreservingRecompiler>(recompiler);
+        heap.objectSpace().forEachLiveCell<StackPreservingRecompiler>(iterationScope, recompiler);
     }
     m_regExpCache->invalidateCode();
     heap.collectAllGarbage();
@@ -690,6 +705,15 @@ void VM::gatherConservativeRoots(ConservativeRoots& conservativeRoots)
             conservativeRoots.add(bufferStart, static_cast<void*>(static_cast<char*>(bufferStart) + scratchBuffer->activeLength()));
         }
     }
+}
+
+DFG::Worklist* VM::ensureWorklist()
+{
+    if (!DFG::enableConcurrentJIT())
+        return 0;
+    if (!worklist)
+        worklist = DFG::globalWorklist();
+    return worklist.get();
 }
 #endif
 

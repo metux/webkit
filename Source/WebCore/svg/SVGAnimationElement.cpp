@@ -51,7 +51,7 @@ BEGIN_REGISTER_ANIMATED_PROPERTIES(SVGAnimationElement)
     REGISTER_PARENT_ANIMATED_PROPERTIES(SVGTests)
 END_REGISTER_ANIMATED_PROPERTIES
 
-SVGAnimationElement::SVGAnimationElement(const QualifiedName& tagName, Document* document)
+SVGAnimationElement::SVGAnimationElement(const QualifiedName& tagName, Document& document)
     : SVGSMILElement(tagName, document)
     , m_fromPropertyValueType(RegularPropertyValue)
     , m_toPropertyValueType(RegularPropertyValue)
@@ -537,7 +537,7 @@ void SVGAnimationElement::currentValuesForValuesAnimation(float percent, float& 
         --index;
     from = m_values[index];
     to = m_values[index + 1];
-    ASSERT(toPercent > fromPercent);
+    ASSERT_WITH_SECURITY_IMPLICATION(toPercent > fromPercent);
     effectivePercent = (percent - fromPercent) / (toPercent - fromPercent);
 
     if (calcMode == CalcModeSpline) {

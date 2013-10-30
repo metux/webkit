@@ -1,0 +1,980 @@
+<!-- ##### SECTION Title ##### -->
+WebKitDOMDOMWindow
+
+<!-- ##### SECTION Short_Description ##### -->
+
+
+<!-- ##### SECTION Long_Description ##### -->
+<para>
+
+</para>
+
+
+<!-- ##### SECTION See_Also ##### -->
+<para>
+
+</para>
+
+
+<!-- ##### SECTION Stability_Level ##### -->
+
+
+<!-- ##### SECTION Image ##### -->
+
+
+<!-- ##### STRUCT WebKitDOMDOMWindow ##### -->
+<para>
+
+</para>
+
+
+<!-- ##### ARG WebKitDOMDOMWindow:application-cache ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMDOMWindow:client-information ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMDOMWindow:closed ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMDOMWindow:console ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMDOMWindow:css ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMDOMWindow:default-status ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMDOMWindow:device-pixel-ratio ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMDOMWindow:document ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMDOMWindow:frame-element ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMDOMWindow:frames ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMDOMWindow:history ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMDOMWindow:inner-height ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMDOMWindow:inner-width ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMDOMWindow:length ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMDOMWindow:local-storage ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMDOMWindow:locationbar ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMDOMWindow:menubar ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMDOMWindow:name ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMDOMWindow:navigator ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMDOMWindow:offscreen-buffering ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMDOMWindow:opener ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMDOMWindow:outer-height ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMDOMWindow:outer-width ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMDOMWindow:page-x-offset ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMDOMWindow:page-y-offset ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMDOMWindow:parent ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMDOMWindow:performance ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMDOMWindow:personalbar ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMDOMWindow:screen ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMDOMWindow:screen-left ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMDOMWindow:screen-top ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMDOMWindow:screen-x ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMDOMWindow:screen-y ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMDOMWindow:scroll-x ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMDOMWindow:scroll-y ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMDOMWindow:scrollbars ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMDOMWindow:self ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMDOMWindow:session-storage ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMDOMWindow:status ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMDOMWindow:statusbar ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMDOMWindow:style-media ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMDOMWindow:toolbar ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMDOMWindow:top ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMDOMWindow:webkit-storage-info ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMDOMWindow:window ##### -->
+<para>
+
+</para>
+
+<!-- ##### FUNCTION webkit_dom_dom_window_get_selection ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_dom_window_focus ##### -->
+<para>
+
+</para>
+
+@self: 
+
+
+<!-- ##### FUNCTION webkit_dom_dom_window_blur ##### -->
+<para>
+
+</para>
+
+@self: 
+
+
+<!-- ##### FUNCTION webkit_dom_dom_window_close ##### -->
+<para>
+
+</para>
+
+@self: 
+
+
+<!-- ##### FUNCTION webkit_dom_dom_window_print ##### -->
+<para>
+
+</para>
+
+@self: 
+
+
+<!-- ##### FUNCTION webkit_dom_dom_window_stop ##### -->
+<para>
+
+</para>
+
+@self: 
+
+
+<!-- ##### FUNCTION webkit_dom_dom_window_alert ##### -->
+<para>
+
+</para>
+
+@self: 
+@message: 
+
+
+<!-- ##### FUNCTION webkit_dom_dom_window_confirm ##### -->
+<para>
+
+</para>
+
+@self: 
+@message: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_dom_window_prompt ##### -->
+<para>
+
+</para>
+
+@self: 
+@message: 
+@defaultValue: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_dom_window_find ##### -->
+<para>
+
+</para>
+
+@self: 
+@string: 
+@caseSensitive: 
+@backwards: 
+@wrap: 
+@wholeWord: 
+@searchInFrames: 
+@showDialog: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_dom_window_scroll_by ##### -->
+<para>
+
+</para>
+
+@self: 
+@x: 
+@y: 
+
+
+<!-- ##### FUNCTION webkit_dom_dom_window_scroll_to ##### -->
+<para>
+
+</para>
+
+@self: 
+@x: 
+@y: 
+
+
+<!-- ##### FUNCTION webkit_dom_dom_window_scroll ##### -->
+<para>
+
+</para>
+
+@self: 
+@x: 
+@y: 
+
+
+<!-- ##### FUNCTION webkit_dom_dom_window_move_by ##### -->
+<para>
+
+</para>
+
+@self: 
+@x: 
+@y: 
+
+
+<!-- ##### FUNCTION webkit_dom_dom_window_move_to ##### -->
+<para>
+
+</para>
+
+@self: 
+@x: 
+@y: 
+
+
+<!-- ##### FUNCTION webkit_dom_dom_window_resize_by ##### -->
+<para>
+
+</para>
+
+@self: 
+@x: 
+@y: 
+
+
+<!-- ##### FUNCTION webkit_dom_dom_window_resize_to ##### -->
+<para>
+
+</para>
+
+@self: 
+@width: 
+@height: 
+
+
+<!-- ##### FUNCTION webkit_dom_dom_window_match_media ##### -->
+<para>
+
+</para>
+
+@self: 
+@query: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_dom_window_get_computed_style ##### -->
+<para>
+
+</para>
+
+@self: 
+@element: 
+@pseudoElement: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_dom_window_webkit_convert_point_from_page_to_node ##### -->
+<para>
+
+</para>
+
+@self: 
+@node: 
+@p: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_dom_window_webkit_convert_point_from_node_to_page ##### -->
+<para>
+
+</para>
+
+@self: 
+@node: 
+@p: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_dom_window_cancel_animation_frame ##### -->
+<para>
+
+</para>
+
+@self: 
+@id: 
+
+
+<!-- ##### FUNCTION webkit_dom_dom_window_webkit_cancel_animation_frame ##### -->
+<para>
+
+</para>
+
+@self: 
+@id: 
+
+
+<!-- ##### FUNCTION webkit_dom_dom_window_webkit_cancel_request_animation_frame ##### -->
+<para>
+
+</para>
+
+@self: 
+@id: 
+
+
+<!-- ##### FUNCTION webkit_dom_dom_window_capture_events ##### -->
+<para>
+
+</para>
+
+@self: 
+
+
+<!-- ##### FUNCTION webkit_dom_dom_window_release_events ##### -->
+<para>
+
+</para>
+
+@self: 
+
+
+<!-- ##### FUNCTION webkit_dom_dom_window_atob ##### -->
+<para>
+
+</para>
+
+@self: 
+@string: 
+@error: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_dom_window_btoa ##### -->
+<para>
+
+</para>
+
+@self: 
+@string: 
+@error: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_dom_window_clear_timeout ##### -->
+<para>
+
+</para>
+
+@self: 
+@handle: 
+
+
+<!-- ##### FUNCTION webkit_dom_dom_window_clear_interval ##### -->
+<para>
+
+</para>
+
+@self: 
+@handle: 
+
+
+<!-- ##### FUNCTION webkit_dom_dom_window_get_screen ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_dom_window_get_history ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_dom_window_get_locationbar ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_dom_window_get_menubar ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_dom_window_get_personalbar ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_dom_window_get_scrollbars ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_dom_window_get_statusbar ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_dom_window_get_toolbar ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_dom_window_get_navigator ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_dom_window_get_client_information ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_dom_window_get_frame_element ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_dom_window_get_offscreen_buffering ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_dom_window_get_outer_height ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_dom_window_get_outer_width ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_dom_window_get_inner_height ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_dom_window_get_inner_width ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_dom_window_get_screen_x ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_dom_window_get_screen_y ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_dom_window_get_screen_left ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_dom_window_get_screen_top ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_dom_window_get_scroll_x ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_dom_window_get_scroll_y ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_dom_window_get_page_x_offset ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_dom_window_get_page_y_offset ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_dom_window_get_closed ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_dom_window_get_length ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_dom_window_get_name ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_dom_window_set_name ##### -->
+<para>
+
+</para>
+
+@self: 
+@value: 
+
+
+<!-- ##### FUNCTION webkit_dom_dom_window_get_status ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_dom_window_set_status ##### -->
+<para>
+
+</para>
+
+@self: 
+@value: 
+
+
+<!-- ##### FUNCTION webkit_dom_dom_window_get_default_status ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_dom_window_set_default_status ##### -->
+<para>
+
+</para>
+
+@self: 
+@value: 
+
+
+<!-- ##### FUNCTION webkit_dom_dom_window_get_self ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_dom_window_get_window ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_dom_window_get_frames ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_dom_window_get_opener ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_dom_window_get_parent ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_dom_window_get_top ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_dom_window_get_document ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_dom_window_get_style_media ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_dom_window_get_device_pixel_ratio ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_dom_window_get_application_cache ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_dom_window_get_session_storage ##### -->
+<para>
+
+</para>
+
+@self: 
+@error: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_dom_window_get_local_storage ##### -->
+<para>
+
+</para>
+
+@self: 
+@error: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_dom_window_get_console ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_dom_window_get_performance ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_dom_window_get_css ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_dom_window_get_webkit_storage_info ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+

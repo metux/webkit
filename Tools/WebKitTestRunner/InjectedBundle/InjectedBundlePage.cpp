@@ -48,12 +48,8 @@
 #include <wtf/text/CString.h>
 #include <wtf/text/StringBuilder.h>
 
-#if USE(CF) && !PLATFORM(QT)
+#if USE(CF)
 #include "WebArchiveDumpSupport.h"
-#endif
-
-#if PLATFORM(QT)
-#include "DumpRenderTreeSupportQt.h"
 #endif
 
 using namespace std;
@@ -428,11 +424,7 @@ void InjectedBundlePage::resetAfterTest()
 {
     WKBundleFrameRef frame = WKBundlePageGetMainFrame(m_page);
     JSGlobalContextRef context = WKBundleFrameGetJavaScriptContext(frame);
-#if PLATFORM(QT)
-    DumpRenderTreeSupportQt::resetInternalsObject(context);
-#else
     WebCoreTestSupport::resetInternalsObject(context);
-#endif
     assignedUrlsCache.clear();
 }
 
@@ -827,14 +819,11 @@ void InjectedBundlePage::dumpAllFramesText(StringBuilder& stringBuilder)
 
 void InjectedBundlePage::dumpDOMAsWebArchive(WKBundleFrameRef frame, StringBuilder& stringBuilder)
 {
-#if USE(CF) && !PLATFORM(QT)
+#if USE(CF)
     WKRetainPtr<WKDataRef> wkData = adoptWK(WKBundleFrameCopyWebArchive(frame));
     RetainPtr<CFDataRef> cfData = adoptCF(CFDataCreate(0, WKDataGetBytes(wkData.get()), WKDataGetSize(wkData.get())));
     RetainPtr<CFStringRef> cfString = adoptCF(createXMLStringFromWebArchiveData(cfData.get()));
     stringBuilder.append(cfString.get());
-#else
-    UNUSED_PARAM(frame);
-    UNUSED_PARAM(stringBuilder);
 #endif
 }
 
@@ -964,11 +953,7 @@ void InjectedBundlePage::didClearWindowForFrame(WKBundleFrameRef frame, WKBundle
     InjectedBundle::shared().textInputController()->makeWindowObject(context, window, &exception);
     InjectedBundle::shared().accessibilityController()->makeWindowObject(context, window, &exception);
 
-#if PLATFORM(QT)
-    DumpRenderTreeSupportQt::injectInternalsObject(context);
-#else
     WebCoreTestSupport::injectInternalsObject(context);
-#endif
 }
 
 void InjectedBundlePage::didCancelClientRedirectForFrame(WKBundleFrameRef frame)
@@ -1464,7 +1449,18 @@ uint64_t InjectedBundlePage::didExceedDatabaseQuota(WKSecurityOriginRef origin, 
     }
 
     static const uint64_t defaultQuota = 5 * 1024 * 1024;
-    return defaultQuota;
+    static const uint64_t maxQuota = 10 * 1024 * 1024;
+    uint64_t newQuota = defaultQuota;
+    if (defaultQuota < expectedUsageBytes && expectedUsageBytes <= maxQuota) {
+        newQuota = expectedUsageBytes;
+
+        StringBuilder stringBuilder;
+        stringBuilder.appendLiteral("UI DELEGATE DATABASE CALLBACK: increased quota to ");
+        stringBuilder.appendNumber(newQuota);
+        stringBuilder.append('\n');
+        InjectedBundle::shared().outputText(stringBuilder.toString());
+    }
+    return newQuota;
 }
 
 // Editor Client Callbacks

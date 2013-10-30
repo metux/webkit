@@ -10,10 +10,10 @@ webcore_cppflags += \
 	-I$(srcdir)/Source/ThirdParty/ANGLE/include/KHR \
 	-I$(srcdir)/Source/WebCore \
 	-I$(srcdir)/Source/WebCore/Modules/battery \
-	-I$(srcdir)/Source/WebCore/Modules/filesystem \
 	-I$(srcdir)/Source/WebCore/Modules/gamepad \
 	-I$(srcdir)/Source/WebCore/Modules/geolocation \
 	-I$(srcdir)/Source/WebCore/Modules/indexeddb \
+	-I$(srcdir)/Source/WebCore/Modules/indexeddb/leveldb \
 	-I$(srcdir)/Source/WebCore/Modules/indieui \
 	-I$(srcdir)/Source/WebCore/Modules/mediasource \
 	-I$(srcdir)/Source/WebCore/Modules/mediastream \
@@ -31,6 +31,7 @@ webcore_cppflags += \
 	-I$(srcdir)/Source/WebCore/bridge \
 	-I$(srcdir)/Source/WebCore/bridge/c \
 	-I$(srcdir)/Source/WebCore/bridge/jsc \
+	-I$(srcdir)/Source/WebCore/crypto \
 	-I$(srcdir)/Source/WebCore/css \
 	-I$(srcdir)/Source/WebCore/dom \
 	-I$(srcdir)/Source/WebCore/dom/default \
@@ -85,7 +86,6 @@ webcore_cppflags += \
 	-I$(srcdir)/Source/WebCore/platform/network/gtk \
 	-I$(srcdir)/Source/WebCore/platform/sql \
 	-I$(srcdir)/Source/WebCore/platform/text \
-	-I$(srcdir)/Source/WebCore/platform/text/transcoder \
 	-I$(srcdir)/Source/WebCore/platform/win \
 	-I$(srcdir)/Source/WebCore/plugins \
 	-I$(srcdir)/Source/WebCore/plugins/win \
@@ -128,6 +128,7 @@ webcoregtk_cppflags += \
 	-I$(srcdir)/Source/WebCore/platform/graphics/gstreamer \
 	-I$(srcdir)/Source/WebCore/platform/graphics/gtk \
 	-I$(srcdir)/Source/WebCore/platform/gtk \
+	-I$(srcdir)/Source/WebCore/platform/mediastream/gstreamer \
 	-I$(srcdir)/Source/WebCore/platform/network/soup \
 	-I$(srcdir)/Source/WebCore/platform/text/enchant
 
@@ -240,11 +241,13 @@ DerivedSources/WebCore/CSSValueKeywords.h: $(WEBCORE_CSS_VALUE_KEYWORDS) $(WebCo
 
 # XML Viewer CSS
 DerivedSources/WebCore/XMLViewerCSS.h: $(WebCore)/xml/XMLViewer.css
-	$(AM_V_GEN)$(PERL) $(WebCore)/inspector/xxd.pl XMLViewer_css $(WebCore)/xml/XMLViewer.css $(GENSOURCES_WEBCORE)/XMLViewerCSS.h
+	$(AM_V_GEN)$(PYTHON) $(WebCore)/inspector/Scripts/cssmin.py <$(WebCore)/xml/XMLViewer.css > $(GENSOURCES_WEBCORE)/XMLViewer.min.css
+	$(AM_V_GEN)$(PERL) $(WebCore)/inspector/xxd.pl XMLViewer_css $(GENSOURCES_WEBCORE)/XMLViewer.min.css $(GENSOURCES_WEBCORE)/XMLViewerCSS.h
 
 # XML Viewer JS
 DerivedSources/WebCore/XMLViewerJS.h: $(WebCore)/xml/XMLViewer.js
-	$(AM_V_GEN)$(PERL) $(WebCore)/inspector/xxd.pl XMLViewer_js $(WebCore)/xml/XMLViewer.js $(GENSOURCES_WEBCORE)/XMLViewerJS.h
+	$(AM_V_GEN)$(PYTHON) $(WebCore)/inspector/Scripts/jsmin.py <$(WebCore)/xml/XMLViewer.js > $(GENSOURCES_WEBCORE)/XMLViewer.min.js
+	$(AM_V_GEN)$(PERL) $(WebCore)/inspector/xxd.pl XMLViewer_js $(GENSOURCES_WEBCORE)/XMLViewer.min.js $(GENSOURCES_WEBCORE)/XMLViewerJS.h
 
 # HTML entity names
 DerivedSources/WebCore/HTMLEntityTable.cpp: $(WebCore)/html/parser/HTMLEntityNames.in $(WebCore)/html/parser/create-html-entity-table
@@ -298,6 +301,7 @@ DerivedSources/WebCore/PlugInsResources.h: $(WebCore)/css/make-css-file-arrays.p
 DerivedSources/WebCore/JSHTMLElementWrapperFactory.cpp: DerivedSources/WebCore/HTMLElementFactory.cpp
 DerivedSources/WebCore/HTMLElementFactory.cpp: DerivedSources/WebCore/HTMLElementFactory.h
 DerivedSources/WebCore/HTMLElementFactory.h: DerivedSources/WebCore/HTMLNames.cpp
+DerivedSources/WebCore/HTMLElementTypeHelpers.h: DerivedSources/WebCore/HTMLNames.h
 DerivedSources/WebCore/HTMLNames.cpp: DerivedSources/WebCore/HTMLNames.h
 DerivedSources/WebCore/HTMLNames.h: $(WebCore)/dom/make_names.pl $(WebCore)/bindings/scripts/Hasher.pm $(WebCore)/bindings/scripts/StaticString.pm $(WebCore)/html/HTMLTagNames.in $(WebCore)/html/HTMLAttributeNames.in
 	$(AM_V_GEN)$(PERL) -I$(WebCore)/bindings/scripts $< --tags $(WebCore)/html/HTMLTagNames.in --attrs $(WebCore)/html/HTMLAttributeNames.in --extraDefines "$(feature_defines)" --factory --wrapperFactory --outputDir "$(GENSOURCES_WEBCORE)"
@@ -336,12 +340,18 @@ DerivedSources/WebCore/InspectorFrontend.h: DerivedSources/WebCore/InspectorFron
 DerivedSources/WebCore/InspectorFrontend.cpp: DerivedSources/WebCore/InspectorBackendCommands.js
 DerivedSources/WebCore/InspectorBackendCommands.js: DerivedSources/WebCore/InspectorBackendDispatcher.h
 DerivedSources/WebCore/InspectorBackendDispatcher.h: DerivedSources/WebCore/InspectorBackendDispatcher.cpp
-DerivedSources/WebCore/InspectorOverlayPage.h: $(WebCore)/inspector/InspectorOverlayPage.html
-	$(AM_V_GEN)$(PERL) $(WebCore)/inspector/xxd.pl InspectorOverlayPage_html $(WebCore)/inspector/InspectorOverlayPage.html $(GENSOURCES_WEBCORE)/InspectorOverlayPage.h
+
+DerivedSources/WebCore/InspectorOverlayPage.h: $(WebCore)/inspector/InspectorOverlayPage.html $(WebCore)/inspector/InspectorOverlayPage.css $(WebCore)/inspector/InspectorOverlayPage.js
+	$(AM_V_GEN)$(PYTHON) $(WebCore)/inspector/Scripts/inline-and-minify-stylesheets-and-scripts.py $(WebCore)/inspector/InspectorOverlayPage.html $(GENSOURCES_WEBCORE)/InspectorOverlayPage.combined.html
+	$(AM_V_GEN)$(PERL) $(WebCore)/inspector/xxd.pl InspectorOverlayPage_html $(GENSOURCES_WEBCORE)/InspectorOverlayPage.combined.html $(GENSOURCES_WEBCORE)/InspectorOverlayPage.h
+
 DerivedSources/WebCore/InjectedScriptCanvasModuleSource.h: $(WebCore)/inspector/InjectedScriptCanvasModuleSource.js
-	$(AM_V_GEN)$(PERL) $(WebCore)/inspector/xxd.pl InjectedScriptCanvasModuleSource_js $(WebCore)/inspector/InjectedScriptCanvasModuleSource.js $(GENSOURCES_WEBCORE)/InjectedScriptCanvasModuleSource.h
+	$(AM_V_GEN)$(PYTHON) $(WebCore)/inspector/Scripts/jsmin.py <$(WebCore)/inspector/InjectedScriptCanvasModuleSource.js > $(GENSOURCES_WEBCORE)/InjectedScriptCanvasModuleSource.min.js
+	$(AM_V_GEN)$(PERL) $(WebCore)/inspector/xxd.pl InjectedScriptCanvasModuleSource_js $(GENSOURCES_WEBCORE)/InjectedScriptCanvasModuleSource.min.js $(GENSOURCES_WEBCORE)/InjectedScriptCanvasModuleSource.h
+
 DerivedSources/WebCore/InjectedScriptSource.h: $(WebCore)/inspector/InjectedScriptSource.js
-	$(AM_V_GEN)$(PERL) $(WebCore)/inspector/xxd.pl InjectedScriptSource_js $(WebCore)/inspector/InjectedScriptSource.js $(GENSOURCES_WEBCORE)/InjectedScriptSource.h
+	$(AM_V_GEN)$(PYTHON) $(WebCore)/inspector/Scripts/jsmin.py <$(WebCore)/inspector/InjectedScriptSource.js > $(GENSOURCES_WEBCORE)/InjectedScriptSource.min.js
+	$(AM_V_GEN)$(PERL) $(WebCore)/inspector/xxd.pl InjectedScriptSource_js $(GENSOURCES_WEBCORE)/InjectedScriptSource.min.js $(GENSOURCES_WEBCORE)/InjectedScriptSource.h
 
 if ENABLE_WEB_AUDIO
 # Installing HRTF database wav files
@@ -360,7 +370,6 @@ DerivedSources/ANGLE/glslang_tab.h: DerivedSources/ANGLE/glslang_tab.cpp
 
 IDL_PATH := \
     $(WebCore)/Modules/battery \
-    $(WebCore)/Modules/filesystem \
     $(WebCore)/Modules/gamepad \
     $(WebCore)/Modules/geolocation \
     $(WebCore)/Modules/indexeddb \
@@ -373,6 +382,7 @@ IDL_PATH := \
     $(WebCore)/Modules/webdatabase \
     $(WebCore)/Modules/websockets \
     $(WebCore)/bindings/js \
+    $(WebCore)/crypto \
     $(WebCore)/css \
     $(WebCore)/dom \
     $(WebCore)/fileapi \
@@ -592,7 +602,6 @@ libWebCoreGtk_la_CPPFLAGS = \
 
 EXTRA_DIST += \
 	$(wildcard $(srcdir)/Source/WebCore/Modules/battery/*.idl) \
-	$(wildcard $(srcdir)/Source/WebCore/Modules/filesystem/*.idl) \
 	$(wildcard $(srcdir)/Source/WebCore/Modules/gamepad/*.idl) \
 	$(wildcard $(srcdir)/Source/WebCore/Modules/geolocation/*.idl) \
 	$(wildcard $(srcdir)/Source/WebCore/Modules/indexeddb/*.idl) \
@@ -605,6 +614,7 @@ EXTRA_DIST += \
 	$(wildcard $(srcdir)/Source/WebCore/Modules/webaudio/*.idl) \
 	$(wildcard $(srcdir)/Source/WebCore/Modules/webdatabase/*.idl) \
 	$(wildcard $(srcdir)/Source/WebCore/Modules/websockets/*.idl) \
+	$(wildcard $(srcdir)/Source/WebCore/crypto/*.idl) \
 	$(wildcard $(srcdir)/Source/WebCore/css/*.idl) \
 	$(wildcard $(srcdir)/Source/WebCore/dom/*.idl) \
 	$(wildcard $(srcdir)/Source/WebCore/fileapi/*.idl) \
@@ -613,6 +623,9 @@ EXTRA_DIST += \
 	$(wildcard $(srcdir)/Source/WebCore/html/track/*.idl) \
 	$(wildcard $(srcdir)/Source/WebCore/html/*.idl) \
 	$(wildcard $(srcdir)/Source/WebCore/inspector/*.idl) \
+	$(wildcard $(srcdir)/Source/WebCore/inspector/*.css) \
+	$(wildcard $(srcdir)/Source/WebCore/inspector/*.js) \
+	$(wildcard $(srcdir)/Source/WebCore/inspector/Scripts/*.py) \
 	$(wildcard $(srcdir)/Source/WebCore/loader/appcache/*.idl) \
 	$(wildcard $(srcdir)/Source/WebCore/page/*.idl) \
 	$(wildcard $(srcdir)/Source/WebCore/plugins/*.idl) \
@@ -634,6 +647,7 @@ EXTRA_DIST += \
 	Source/WebCore/bindings/scripts/StaticString.pm \
 	Source/WebCore/bindings/scripts/generate-bindings.pl \
 	Source/WebCore/bindings/scripts/gobject-generate-headers.pl \
+	Source/WebCore/bindings/scripts/gobject-run-api-break-test \
 	Source/WebCore/bindings/scripts/preprocessor.pm \
 	Source/WebCore/bindings/scripts/preprocess-idls.pl \
 	Source/WebCore/ChangeLog \
@@ -643,7 +657,6 @@ EXTRA_DIST += \
 	Source/WebCore/css/CSSValueKeywords.in \
 	Source/WebCore/dom/DOMExceptions.in \
 	Source/WebCore/css/fullscreen.css \
-	Source/WebCore/css/fullscreenQuickTime.css \
 	Source/WebCore/css/html.css \
 	Source/WebCore/css/make-css-file-arrays.pl \
 	Source/WebCore/css/makegrammar.pl \

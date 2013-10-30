@@ -52,16 +52,12 @@ namespace WebCore {
 
 using namespace HTMLNames;
 
-// ----------------------------
-
-RenderSearchField::RenderSearchField(Element* element)
-    : RenderTextControlSingleLine(element)
+RenderSearchField::RenderSearchField(HTMLInputElement& element, PassRef<RenderStyle> style)
+    : RenderTextControlSingleLine(element, std::move(style))
     , m_searchPopupIsVisible(false)
     , m_searchPopup(0)
 {
-    ASSERT(element->isHTMLElement());
-    ASSERT(element->toInputElement());
-    ASSERT(element->toInputElement()->isSearchField());
+    ASSERT(element.isSearchField());
 }
 
 RenderSearchField::~RenderSearchField()
@@ -74,21 +70,20 @@ RenderSearchField::~RenderSearchField()
 
 inline HTMLElement* RenderSearchField::resultsButtonElement() const
 {
-    return inputElement()->resultsButtonElement();
+    return inputElement().resultsButtonElement();
 }
 
 inline HTMLElement* RenderSearchField::cancelButtonElement() const
 {
-    return inputElement()->cancelButtonElement();
+    return inputElement().cancelButtonElement();
 }
 
 void RenderSearchField::addSearchResult()
 {
-    HTMLInputElement* input = inputElement();
-    if (input->maxResults() <= 0)
+    if (inputElement().maxResults() <= 0)
         return;
 
-    String value = input->value();
+    String value = inputElement().value();
     if (value.isEmpty())
         return;
 
@@ -102,7 +97,7 @@ void RenderSearchField::addSearchResult()
     }
 
     m_recentSearches.insert(0, value);
-    while (static_cast<int>(m_recentSearches.size()) > input->maxResults())
+    while (static_cast<int>(m_recentSearches.size()) > inputElement().maxResults())
         m_recentSearches.removeLast();
 
     const AtomicString& name = autosaveName();
@@ -129,11 +124,10 @@ void RenderSearchField::showPopup()
     m_searchPopup->loadRecentSearches(name, m_recentSearches);
 
     // Trim the recent searches list if the maximum size has changed since we last saved.
-    HTMLInputElement* input = inputElement();
-    if (static_cast<int>(m_recentSearches.size()) > input->maxResults()) {
+    if (static_cast<int>(m_recentSearches.size()) > inputElement().maxResults()) {
         do {
             m_recentSearches.removeLast();
-        } while (static_cast<int>(m_recentSearches.size()) > input->maxResults());
+        } while (static_cast<int>(m_recentSearches.size()) > inputElement().maxResults());
 
         m_searchPopup->saveRecentSearches(name, m_recentSearches);
     }
@@ -178,35 +172,34 @@ void RenderSearchField::updateFromElement()
 
 void RenderSearchField::updateCancelButtonVisibility() const
 {
-    RenderObject* cancelButtonRenderer = cancelButtonElement()->renderer();
+    RenderElement* cancelButtonRenderer = cancelButtonElement()->renderer();
     if (!cancelButtonRenderer)
         return;
 
-    const RenderStyle* curStyle = cancelButtonRenderer->style();
+    const RenderStyle& curStyle = cancelButtonRenderer->style();
     EVisibility buttonVisibility = visibilityForCancelButton();
-    if (curStyle->visibility() == buttonVisibility)
+    if (curStyle.visibility() == buttonVisibility)
         return;
 
-    RefPtr<RenderStyle> cancelButtonStyle = RenderStyle::clone(curStyle);
-    cancelButtonStyle->setVisibility(buttonVisibility);
-    cancelButtonRenderer->setStyle(cancelButtonStyle);
+    auto cancelButtonStyle = RenderStyle::clone(&curStyle);
+    cancelButtonStyle.get().setVisibility(buttonVisibility);
+    cancelButtonRenderer->setStyle(std::move(cancelButtonStyle));
 }
 
 EVisibility RenderSearchField::visibilityForCancelButton() const
 {
-    return (style()->visibility() == HIDDEN || inputElement()->value().isEmpty()) ? HIDDEN : VISIBLE;
+    return (style().visibility() == HIDDEN || inputElement().value().isEmpty()) ? HIDDEN : VISIBLE;
 }
 
 const AtomicString& RenderSearchField::autosaveName() const
 {
-    return toElement(node())->getAttribute(autosaveAttr);
+    return inputElement().getAttribute(autosaveAttr);
 }
 
 // PopupMenuClient methods
 void RenderSearchField::valueChanged(unsigned listIndex, bool fireEvents)
 {
     ASSERT(static_cast<int>(listIndex) < listSize());
-    HTMLInputElement* input = inputElement();
     if (static_cast<int>(listIndex) == (listSize() - 1)) {
         if (fireEvents) {
             m_recentSearches.clear();
@@ -218,10 +211,10 @@ void RenderSearchField::valueChanged(unsigned listIndex, bool fireEvents)
             }
         }
     } else {
-        input->setValue(itemText(listIndex));
+        inputElement().setValue(itemText(listIndex));
         if (fireEvents)
-            input->onSearch();
-        input->select();
+            inputElement().onSearch();
+        inputElement().select();
     }
 }
 
@@ -265,8 +258,8 @@ PopupMenuStyle RenderSearchField::itemStyle(unsigned) const
 
 PopupMenuStyle RenderSearchField::menuStyle() const
 {
-    return PopupMenuStyle(style()->visitedDependentColor(CSSPropertyColor), style()->visitedDependentColor(CSSPropertyBackgroundColor), style()->font(), style()->visibility() == VISIBLE,
-        style()->display() == NONE, style()->textIndent(), style()->direction(), isOverride(style()->unicodeBidi()), PopupMenuStyle::CustomBackgroundColor);
+    return PopupMenuStyle(style().visitedDependentColor(CSSPropertyColor), style().visitedDependentColor(CSSPropertyBackgroundColor), style().font(), style().visibility() == VISIBLE,
+        style().display() == NONE, style().textIndent(), style().direction(), isOverride(style().unicodeBidi()), PopupMenuStyle::CustomBackgroundColor);
 }
 
 int RenderSearchField::clientInsetLeft() const
@@ -339,7 +332,7 @@ bool RenderSearchField::itemIsSelected(unsigned) const
 
 void RenderSearchField::setTextFromItem(unsigned listIndex)
 {
-    inputElement()->setValue(itemText(listIndex));
+    inputElement().setValue(itemText(listIndex));
 }
 
 FontSelector* RenderSearchField::fontSelector() const
@@ -355,9 +348,9 @@ HostWindow* RenderSearchField::hostWindow() const
 PassRefPtr<Scrollbar> RenderSearchField::createScrollbar(ScrollableArea* scrollableArea, ScrollbarOrientation orientation, ScrollbarControlSize controlSize)
 {
     RefPtr<Scrollbar> widget;
-    bool hasCustomScrollbarStyle = style()->hasPseudoStyle(SCROLLBAR);
+    bool hasCustomScrollbarStyle = style().hasPseudoStyle(SCROLLBAR);
     if (hasCustomScrollbarStyle)
-        widget = RenderScrollbar::createCustomScrollbar(scrollableArea, orientation, this->node());
+        widget = RenderScrollbar::createCustomScrollbar(scrollableArea, orientation, &inputElement());
     else
         widget = Scrollbar::createNativeScrollbar(scrollableArea, orientation, controlSize);
     return widget.release();

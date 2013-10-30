@@ -1,0 +1,40 @@
+<!-- ##### SECTION Title ##### -->
+WebKitDOMXPathNSResolver
+
+<!-- ##### SECTION Short_Description ##### -->
+
+
+<!-- ##### SECTION Long_Description ##### -->
+<para>
+
+</para>
+
+
+<!-- ##### SECTION See_Also ##### -->
+<para>
+
+</para>
+
+
+<!-- ##### SECTION Stability_Level ##### -->
+
+
+<!-- ##### SECTION Image ##### -->
+
+
+<!-- ##### STRUCT WebKitDOMXPathNSResolver ##### -->
+<para>
+
+</para>
+
+
+<!-- ##### FUNCTION webkit_dom_xpath_ns_resolver_lookup_namespace_uri ##### -->
+<para>
+
+</para>
+
+@self: 
+@prefix: 
+@Returns: 
+
+

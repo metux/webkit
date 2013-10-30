@@ -99,6 +99,10 @@ const <a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gc
 <span class="returnvalue">void</span>                <a class="link" href="WebKitWebContext.html#webkit-web-context-set-disk-cache-directory" title="webkit_web_context_set_disk_cache_directory ()">webkit_web_context_set_disk_cache_directory</a>
                                                         (<em class="parameter"><code><a class="link" href="WebKitWebContext.html" title="WebKitWebContext"><span class="type">WebKitWebContext</span></a> *context</code></em>,
                                                          <em class="parameter"><code>const <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a> *directory</code></em>);
+<span class="returnvalue">void</span>                <a class="link" href="WebKitWebContext.html#webkit-web-context-allow-tls-certificate-for-host" title="webkit_web_context_allow_tls_certificate_for_host ()">webkit_web_context_allow_tls_certificate_for_host</a>
+                                                        (<em class="parameter"><code><a class="link" href="WebKitWebContext.html" title="WebKitWebContext"><span class="type">WebKitWebContext</span></a> *context</code></em>,
+                                                         <em class="parameter"><code><a class="link" href="WebKitCertificateInfo.html" title="WebKitCertificateInfo"><span class="type">WebKitCertificateInfo</span></a> *info</code></em>,
+                                                         <em class="parameter"><code>const <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a> *host</code></em>);
 
 <span class="returnvalue">void</span>                (<a class="link" href="WebKitWebContext.html#WebKitURISchemeRequestCallback" title="WebKitURISchemeRequestCallback ()">*WebKitURISchemeRequestCallback</a>)   (<em class="parameter"><code><a class="link" href="WebKitURISchemeRequest.html" title="WebKitURISchemeRequest"><span class="type">WebKitURISchemeRequest</span></a> *request</code></em>,
                                                          <em class="parameter"><code><a href="../glib/glib-Basic-Types.html#gpointer"><span class="type">gpointer</span></a> user_data</code></em>);
@@ -223,7 +227,10 @@ Enum values used to denote the TLS errors policy.
 </tr>
 <tr>
 <td><p><a name="WEBKIT-TLS-ERRORS-POLICY-FAIL:CAPS"></a><span class="term"><code class="literal">WEBKIT_TLS_ERRORS_POLICY_FAIL</code></span></p></td>
-<td>TLS errors make the load to finish with an error.
+<td>TLS errors will emit
+  <a class="link" href="WebKitWebView.html#WebKitWebView-load-failed-with-tls-errors" title='The "load-failed-with-tls-errors" signal'><span class="type">"load-failed-with-tls-errors"</span></a> and, if the signal is handled,
+  finish the load. In case the signal is not handled,
+  <a class="link" href="WebKitWebView.html#WebKitWebView-load-failed" title='The "load-failed" signal'><span class="type">"load-failed"</span></a> is emitted before the load finishes.
 </td>
 </tr>
 </tbody>
@@ -938,6 +945,39 @@ it will not have any effect.
 <tr>
 <td><p><span class="term"><em class="parameter"><code>directory</code></em> :</span></p></td>
 <td>the directory to set</td>
+</tr>
+</tbody>
+</table></div>
+</div>
+<hr>
+<div class="refsect2">
+<a name="webkit-web-context-allow-tls-certificate-for-host"></a><h3>webkit_web_context_allow_tls_certificate_for_host ()</h3>
+<pre class="programlisting"><span class="returnvalue">void</span>                webkit_web_context_allow_tls_certificate_for_host
+                                                        (<em class="parameter"><code><a class="link" href="WebKitWebContext.html" title="WebKitWebContext"><span class="type">WebKitWebContext</span></a> *context</code></em>,
+                                                         <em class="parameter"><code><a class="link" href="WebKitCertificateInfo.html" title="WebKitCertificateInfo"><span class="type">WebKitCertificateInfo</span></a> *info</code></em>,
+                                                         <em class="parameter"><code>const <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a> *host</code></em>);</pre>
+<p>
+Ignore further TLS errors on the <em class="parameter"><code>host</code></em> for the certificate present in <em class="parameter"><code>info</code></em>.
+</p>
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
+<col align="left" valign="top">
+<col>
+</colgroup>
+<tbody>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>context</code></em> :</span></p></td>
+<td>a <a class="link" href="WebKitWebContext.html" title="WebKitWebContext"><span class="type">WebKitWebContext</span></a>
+</td>
+</tr>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>info</code></em> :</span></p></td>
+<td>a <a class="link" href="WebKitCertificateInfo.html" title="WebKitCertificateInfo"><span class="type">WebKitCertificateInfo</span></a>
+</td>
+</tr>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>host</code></em> :</span></p></td>
+<td>the host for which a certificate is to be allowed</td>
 </tr>
 </tbody>
 </table></div>

@@ -41,7 +41,7 @@ BEGIN_REGISTER_ANIMATED_PROPERTIES(SVGStopElement)
     REGISTER_PARENT_ANIMATED_PROPERTIES(SVGElement)
 END_REGISTER_ANIMATED_PROPERTIES
 
-inline SVGStopElement::SVGStopElement(const QualifiedName& tagName, Document* document)
+inline SVGStopElement::SVGStopElement(const QualifiedName& tagName, Document& document)
     : SVGElement(tagName, document)
     , m_offset(0)
 {
@@ -49,7 +49,7 @@ inline SVGStopElement::SVGStopElement(const QualifiedName& tagName, Document* do
     registerAnimatedPropertiesForSVGStopElement();
 }
 
-PassRefPtr<SVGStopElement> SVGStopElement::create(const QualifiedName& tagName, Document* document)
+PassRefPtr<SVGStopElement> SVGStopElement::create(const QualifiedName& tagName, Document& document)
 {
     return adoptRef(new SVGStopElement(tagName, document));
 }
@@ -100,9 +100,9 @@ void SVGStopElement::svgAttributeChanged(const QualifiedName& attrName)
     ASSERT_NOT_REACHED();
 }
 
-RenderObject* SVGStopElement::createRenderer(RenderArena* arena, RenderStyle*)
+RenderElement* SVGStopElement::createRenderer(PassRef<RenderStyle> style)
 {
-    return new (arena) RenderSVGGradientStop(this);
+    return new RenderSVGGradientStop(*this, std::move(style));
 }
 
 bool SVGStopElement::rendererIsNeeded(const RenderStyle&)
@@ -112,7 +112,7 @@ bool SVGStopElement::rendererIsNeeded(const RenderStyle&)
 
 Color SVGStopElement::stopColorIncludingOpacity() const
 {
-    RenderStyle* style = renderer() ? renderer()->style() : 0;
+    RenderStyle* style = renderer() ? &renderer()->style() : nullptr;
     // FIXME: This check for null style exists to address Bug WK 90814, a rare crash condition in
     // which the renderer or style is null. This entire class is scheduled for removal (Bug WK 86941)
     // and we will tolerate this null check until then.

@@ -1,0 +1,168 @@
+<!-- ##### SECTION Title ##### -->
+WebKitDOMHTMLTableColElement
+
+<!-- ##### SECTION Short_Description ##### -->
+
+
+<!-- ##### SECTION Long_Description ##### -->
+<para>
+
+</para>
+
+
+<!-- ##### SECTION See_Also ##### -->
+<para>
+
+</para>
+
+
+<!-- ##### SECTION Stability_Level ##### -->
+
+
+<!-- ##### SECTION Image ##### -->
+
+
+<!-- ##### STRUCT WebKitDOMHTMLTableColElement ##### -->
+<para>
+
+</para>
+
+
+<!-- ##### ARG WebKitDOMHTMLTableColElement:align ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMHTMLTableColElement:ch ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMHTMLTableColElement:ch-off ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMHTMLTableColElement:span ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMHTMLTableColElement:v-align ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMHTMLTableColElement:width ##### -->
+<para>
+
+</para>
+
+<!-- ##### FUNCTION webkit_dom_html_table_col_element_get_align ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_table_col_element_set_align ##### -->
+<para>
+
+</para>
+
+@self: 
+@value: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_table_col_element_get_ch ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_table_col_element_set_ch ##### -->
+<para>
+
+</para>
+
+@self: 
+@value: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_table_col_element_get_ch_off ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_table_col_element_set_ch_off ##### -->
+<para>
+
+</para>
+
+@self: 
+@value: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_table_col_element_get_span ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_table_col_element_set_span ##### -->
+<para>
+
+</para>
+
+@self: 
+@value: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_table_col_element_get_v_align ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_table_col_element_set_v_align ##### -->
+<para>
+
+</para>
+
+@self: 
+@value: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_table_col_element_get_width ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_table_col_element_set_width ##### -->
+<para>
+
+</para>
+
+@self: 
+@value: 
+
+

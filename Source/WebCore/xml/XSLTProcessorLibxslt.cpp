@@ -120,7 +120,7 @@ static xmlDocPtr docLoaderFunc(const xmlChar* uri,
     case XSLT_LOAD_DOCUMENT: {
         xsltTransformContextPtr context = (xsltTransformContextPtr)ctxt;
         xmlChar* base = xmlNodeGetBase(context->document->doc, context->node);
-        KURL url(KURL(ParsedURLString, reinterpret_cast<const char*>(base)), reinterpret_cast<const char*>(uri));
+        URL url(URL(ParsedURLString, reinterpret_cast<const char*>(base)), reinterpret_cast<const char*>(uri));
         xmlFree(base);
         ResourceError error;
         ResourceResponse response;
@@ -251,12 +251,12 @@ static xsltStylesheetPtr xsltStylesheetPointer(RefPtr<XSLStyleSheet>& cachedStyl
 {
     if (!cachedStylesheet && stylesheetRootNode) {
         cachedStylesheet = XSLStyleSheet::createForXSLTProcessor(stylesheetRootNode->parentNode() ? stylesheetRootNode->parentNode() : stylesheetRootNode,
-            stylesheetRootNode->document()->url().string(),
-            stylesheetRootNode->document()->url()); // FIXME: Should we use baseURL here?
+            stylesheetRootNode->document().url().string(),
+            stylesheetRootNode->document().url()); // FIXME: Should we use baseURL here?
 
         // According to Mozilla documentation, the node must be a Document node, an xsl:stylesheet or xsl:transform element.
         // But we just use text content regardless of node type.
-        cachedStylesheet->parseString(createMarkup(stylesheetRootNode));
+        cachedStylesheet->parseString(createMarkup(*stylesheetRootNode));
     }
 
     if (!cachedStylesheet || !cachedStylesheet->document())
@@ -265,10 +265,10 @@ static xsltStylesheetPtr xsltStylesheetPointer(RefPtr<XSLStyleSheet>& cachedStyl
     return cachedStylesheet->compileStyleSheet();
 }
 
-static inline xmlDocPtr xmlDocPtrFromNode(Node* sourceNode, bool& shouldDelete)
+static inline xmlDocPtr xmlDocPtrFromNode(Node& sourceNode, bool& shouldDelete)
 {
-    RefPtr<Document> ownerDocument = sourceNode->document();
-    bool sourceIsDocument = (sourceNode == ownerDocument.get());
+    Ref<Document> ownerDocument(sourceNode.document());
+    bool sourceIsDocument = (&sourceNode == &ownerDocument.get());
 
     xmlDocPtr sourceDoc = 0;
     if (sourceIsDocument && ownerDocument->transformSource())
@@ -300,9 +300,9 @@ static inline String resultMIMEType(xmlDocPtr resultDoc, xsltStylesheetPtr sheet
     return "application/xml";
 }
 
-bool XSLTProcessor::transformToString(Node* sourceNode, String& mimeType, String& resultString, String& resultEncoding)
+bool XSLTProcessor::transformToString(Node& sourceNode, String& mimeType, String& resultString, String& resultEncoding)
 {
-    RefPtr<Document> ownerDocument = sourceNode->document();
+    Ref<Document> ownerDocument(sourceNode.document());
 
     setXSLTLoadCallBack(docLoaderFunc, this, ownerDocument->cachedResourceLoader());
     xsltStylesheetPtr sheet = xsltStylesheetPointer(m_stylesheet, m_stylesheetRootNode.get());

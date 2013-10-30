@@ -52,7 +52,7 @@ BEGIN_REGISTER_ANIMATED_PROPERTIES(SVGFilterPrimitiveStandardAttributes)
     REGISTER_PARENT_ANIMATED_PROPERTIES(SVGElement)
 END_REGISTER_ANIMATED_PROPERTIES
 
-SVGFilterPrimitiveStandardAttributes::SVGFilterPrimitiveStandardAttributes(const QualifiedName& tagName, Document* document)
+SVGFilterPrimitiveStandardAttributes::SVGFilterPrimitiveStandardAttributes(const QualifiedName& tagName, Document& document)
     : SVGElement(tagName, document)
     , m_x(LengthModeWidth, "0%")
     , m_y(LengthModeHeight, "0%")
@@ -117,12 +117,13 @@ void SVGFilterPrimitiveStandardAttributes::svgAttributeChanged(const QualifiedNa
     invalidate();
 }
 
-void SVGFilterPrimitiveStandardAttributes::childrenChanged(bool changedByParser, Node* beforeChange, Node* afterChange, int childCountDelta)
+void SVGFilterPrimitiveStandardAttributes::childrenChanged(const ChildChange& change)
 {
-    SVGElement::childrenChanged(changedByParser, beforeChange, afterChange, childCountDelta);
+    SVGElement::childrenChanged(change);
 
-    if (!changedByParser)
-        invalidate();
+    if (change.source == ChildChangeSourceParser)
+        return;
+    invalidate();
 }
 
 void SVGFilterPrimitiveStandardAttributes::setStandardAttributes(FilterEffect* filterEffect) const
@@ -141,9 +142,9 @@ void SVGFilterPrimitiveStandardAttributes::setStandardAttributes(FilterEffect* f
         filterEffect->setHasHeight(true);
 }
 
-RenderObject* SVGFilterPrimitiveStandardAttributes::createRenderer(RenderArena* arena, RenderStyle*)
+RenderElement* SVGFilterPrimitiveStandardAttributes::createRenderer(PassRef<RenderStyle> style)
 {
-    return new (arena) RenderSVGResourceFilterPrimitive(this);
+    return new RenderSVGResourceFilterPrimitive(*this, std::move(style));
 }
 
 bool SVGFilterPrimitiveStandardAttributes::rendererIsNeeded(const RenderStyle& style)

@@ -1,34 +1,9 @@
-dnl AM_APPEND_TO_DESCRIPTION
-dnl Appends the given string to the description variable,
-dnl using a separator if the description variable is not empty.
-dnl
-dnl Usage:
-dnl AM_APPEND_TO_DESCRIPTION([DESCRIPTION], [STRING])
-AC_DEFUN([AM_APPEND_TO_DESCRIPTION], [
-  if test "$$1" != ""; then
-    $1="${$1}, "
-  fi
-
-  $1="${$1}$2"
-]) dnl AM_APPEND_TO_DESCRIPTION
-
-
 target_description=""
-if test "$with_x11_target" = "yes"; then
-    AM_APPEND_TO_DESCRIPTION(target_description, "x11")
-fi
-if test "$with_wayland_target" = "yes"; then
-    AM_APPEND_TO_DESCRIPTION(target_description, "wayland")
-fi
-if test "$with_target" = "win32"; then
-    AM_APPEND_TO_DESCRIPTION(target_description, "win32")
-fi
-if test "$with_target" = "quartz"; then
-    AM_APPEND_TO_DESCRIPTION(target_description, "quartz")
-fi
-if test "$with_target" = "directfb"; then
-    AM_APPEND_TO_DESCRIPTION(target_description, "directfb")
-fi
+AS_IF([test "$enable_x11_target" = "yes"], [AM_APPEND_TO_DESCRIPTION(target_description, "x11")], [])
+AS_IF([test "$enable_wayland_target" = "yes"], [AM_APPEND_TO_DESCRIPTION(target_description, "wayland")], [])
+AS_IF([test "$enable_win32_target" = "yes"], [AM_APPEND_TO_DESCRIPTION(target_description, "win32")], [])
+AS_IF([test "$enable_quartz_target" = "yes"], [AM_APPEND_TO_DESCRIPTION(target_description, "quartz")], [])
+AS_IF([test "$enable_directfb_target" = "yes"], [AM_APPEND_TO_DESCRIPTION(target_description, "directfb")], [])
 
 AC_OUTPUT
 
@@ -54,6 +29,7 @@ Features:
  Geolocation support                                      : $enable_geolocation
  HTML5 video element support                              : $enable_video
  JIT compilation                                          : $enable_jit
+ FTL JIT compilation                                      : $enable_ftl_jit
  Opcode stats                                             : $enable_opcode_stats
  SVG fonts support                                        : $enable_svg_fonts
  SVG support                                              : $enable_svg

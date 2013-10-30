@@ -37,9 +37,8 @@
 #include <WebKit2/WKDictionary.h>
 #include <WebKit2/WKInspector.h>
 #include <WebKit2/WKRetainPtr.h>
-#include <wtf/OwnArrayPtr.h>
-#include <wtf/PassOwnArrayPtr.h>
 #include <wtf/PassOwnPtr.h>
+#include <wtf/StdLibExtras.h>
 #include <wtf/text/CString.h>
 
 #if PLATFORM(MAC)
@@ -82,13 +81,13 @@ static WKURLRef createWKURL(const char* pathOrURL)
 #endif
     static const size_t prefixLength = strlen(filePrefix);
 
-    OwnArrayPtr<char> buffer;
+    std::unique_ptr<char[]> buffer;
     if (isAbsolutePath) {
-        buffer = adoptArrayPtr(new char[prefixLength + length + 1]);
+        buffer = std::make_unique<char[]>(prefixLength + length + 1);
         strcpy(buffer.get(), filePrefix);
         strcpy(buffer.get() + prefixLength, pathOrURL);
     } else {
-        buffer = adoptArrayPtr(new char[prefixLength + PATH_MAX + length + 2]); // 1 for the separator
+        buffer = std::make_unique<char[]>(prefixLength + PATH_MAX + length + 2); // 1 for the separator
         strcpy(buffer.get(), filePrefix);
         if (!getcwd(buffer.get() + prefixLength, PATH_MAX))
             return 0;
@@ -151,19 +150,19 @@ static bool shouldOpenWebInspector(const char* pathOrURL)
 #endif
 
 #if PLATFORM(MAC)
-static bool shouldUseTiledDrawing(const char* pathOrURL)
+static bool shouldUseThreadedScrolling(const char* pathOrURL)
 {
     return strstr(pathOrURL, "tiled-drawing/") || strstr(pathOrURL, "tiled-drawing\\");
 }
 #endif
 
-static void updateTiledDrawingForCurrentTest(const char* pathOrURL)
+static void updateThreadedScrollingForCurrentTest(const char* pathOrURL)
 {
 #if PLATFORM(MAC)
     WKRetainPtr<WKMutableDictionaryRef> viewOptions = adoptWK(WKMutableDictionaryCreate());
-    WKRetainPtr<WKStringRef> useTiledDrawingKey = adoptWK(WKStringCreateWithUTF8CString("TiledDrawing"));
-    WKRetainPtr<WKBooleanRef> useTiledDrawingValue = adoptWK(WKBooleanCreate(shouldUseTiledDrawing(pathOrURL)));
-    WKDictionaryAddItem(viewOptions.get(), useTiledDrawingKey.get(), useTiledDrawingValue.get());
+    WKRetainPtr<WKStringRef> useThreadedScrollingKey = adoptWK(WKStringCreateWithUTF8CString("ThreadedScrolling"));
+    WKRetainPtr<WKBooleanRef> useThreadedScrollingValue = adoptWK(WKBooleanCreate(shouldUseThreadedScrolling(pathOrURL)));
+    WKDictionaryAddItem(viewOptions.get(), useThreadedScrollingKey.get(), useThreadedScrollingValue.get());
 
     TestController::shared().ensureViewSupportsOptions(viewOptions.get());
 #else
@@ -202,7 +201,7 @@ void TestInvocation::invoke()
     TestController::TimeoutDuration timeoutToUse = TestController::LongTimeout;
     sizeWebViewForCurrentTest(m_pathOrURL.c_str());
     updateLayoutType(m_pathOrURL.c_str());
-    updateTiledDrawingForCurrentTest(m_pathOrURL.c_str());
+    updateThreadedScrollingForCurrentTest(m_pathOrURL.c_str());
 
     m_textOutput.clear();
 
@@ -310,6 +309,13 @@ void TestInvocation::dump(const char* textToStdout, const char* textToStderr, bo
     fflush(stderr);
 }
 
+void TestInvocation::forceRepaintDoneCallback(WKErrorRef, void* context)
+{
+    TestInvocation* testInvocation = static_cast<TestInvocation*>(context);
+    testInvocation->m_gotRepaint = true;
+    TestController::shared().notifyDone();
+}
+
 void TestInvocation::dumpResults()
 {
     if (m_textOutput.length() || !m_audioResult)
@@ -317,8 +323,19 @@ void TestInvocation::dumpResults()
     else
         dumpAudio(m_audioResult.get());
 
-    if (m_dumpPixels && m_pixelResult)
+    if (m_dumpPixels && m_pixelResult) {
+        if (PlatformWebView::windowSnapshotEnabled()) {
+            m_gotRepaint = false;
+            WKPageForceRepaint(TestController::shared().mainWebView()->page(), this, TestInvocation::forceRepaintDoneCallback);
+            TestController::shared().runUntil(m_gotRepaint, TestController::ShortTimeout);
+            if (!m_gotRepaint) {
+                m_errorMessage = "Timed out waiting for pre-pixel dump repaint\n";
+                m_webProcessIsUnresponsive = true;
+                return;
+            }
+        }
         dumpPixelsAndCompareWithExpected(m_pixelResult.get(), m_repaintRects.get());
+    }
 
     fputs("#EOF\n", stdout);
     fflush(stdout);
@@ -336,16 +353,7 @@ void TestInvocation::dumpAudio(WKDataRef audioData)
     printf("Content-Type: audio/wav\n");
     printf("Content-Length: %lu\n", static_cast<unsigned long>(length));
 
-    const size_t bytesToWriteInOneChunk = 1 << 15;
-    size_t dataRemainingToWrite = length;
-    while (dataRemainingToWrite) {
-        size_t bytesToWriteInThisChunk = std::min(dataRemainingToWrite, bytesToWriteInOneChunk);
-        size_t bytesWritten = fwrite(data, 1, bytesToWriteInThisChunk, stdout);
-        if (bytesWritten != bytesToWriteInThisChunk)
-            break;
-        dataRemainingToWrite -= bytesWritten;
-        data += bytesWritten;
-    }
+    fwrite(data, 1, length, stdout);
     printf("#EOF\n");
     fprintf(stderr, "#EOF\n");
 }

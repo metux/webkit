@@ -1,0 +1,76 @@
+<!-- ##### SECTION Title ##### -->
+WebKitDOMHTMLFrameSetElement
+
+<!-- ##### SECTION Short_Description ##### -->
+
+
+<!-- ##### SECTION Long_Description ##### -->
+<para>
+
+</para>
+
+
+<!-- ##### SECTION See_Also ##### -->
+<para>
+
+</para>
+
+
+<!-- ##### SECTION Stability_Level ##### -->
+
+
+<!-- ##### SECTION Image ##### -->
+
+
+<!-- ##### STRUCT WebKitDOMHTMLFrameSetElement ##### -->
+<para>
+
+</para>
+
+
+<!-- ##### ARG WebKitDOMHTMLFrameSetElement:cols ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMHTMLFrameSetElement:rows ##### -->
+<para>
+
+</para>
+
+<!-- ##### FUNCTION webkit_dom_html_frame_set_element_get_cols ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_frame_set_element_set_cols ##### -->
+<para>
+
+</para>
+
+@self: 
+@value: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_frame_set_element_get_rows ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_frame_set_element_set_rows ##### -->
+<para>
+
+</para>
+
+@self: 
+@value: 
+
+

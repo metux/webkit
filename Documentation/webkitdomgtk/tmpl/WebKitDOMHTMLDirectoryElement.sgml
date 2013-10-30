@@ -1,0 +1,53 @@
+<!-- ##### SECTION Title ##### -->
+WebKitDOMHTMLDirectoryElement
+
+<!-- ##### SECTION Short_Description ##### -->
+
+
+<!-- ##### SECTION Long_Description ##### -->
+<para>
+
+</para>
+
+
+<!-- ##### SECTION See_Also ##### -->
+<para>
+
+</para>
+
+
+<!-- ##### SECTION Stability_Level ##### -->
+
+
+<!-- ##### SECTION Image ##### -->
+
+
+<!-- ##### STRUCT WebKitDOMHTMLDirectoryElement ##### -->
+<para>
+
+</para>
+
+
+<!-- ##### ARG WebKitDOMHTMLDirectoryElement:compact ##### -->
+<para>
+
+</para>
+
+<!-- ##### FUNCTION webkit_dom_html_directory_element_get_compact ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_directory_element_set_compact ##### -->
+<para>
+
+</para>
+
+@self: 
+@value: 
+
+
