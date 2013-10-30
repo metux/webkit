@@ -29,10 +29,14 @@ EXTRA_CONFIGURE_ARGUMENTS =
 EXTRA_DH_ARGUMENTS =
 
 ifeq ($(ENABLE_WEBKIT2),yes)
-	EXTRA_CONFIGURE_ARGUMENTS = --enable-webkit2 --libexecdir=/usr/lib/webkit2gtk-3.0/libexec
+	EXTRA_CONFIGURE_ARGUMENTS += --enable-webkit2 --libexecdir=/usr/lib/webkit2gtk-3.0/libexec
 else
-	EXTRA_CONFIGURE_ARGUMENTS = --disable-webkit2
-	EXTRA_DH_ARGUMENTS = -Nlibwebkit2gtk-3.0-25 -Nlibwebkit2gtk-3.0-dev -Nlibwebkit2gtk-3.0-25-dbg -Ngir1.2-webkit2-3.0
+	EXTRA_CONFIGURE_ARGUMENTS += --disable-webkit2
+	EXTRA_DH_ARGUMENTS += -Nlibwebkit2gtk-3.0-25 -Nlibwebkit2gtk-3.0-dev -Nlibwebkit2gtk-3.0-25-dbg -Ngir1.2-webkit2-3.0
+endif
+
+ifeq ($(DEB_HOST_ARCH_OS),linux)
+	EXTRA_CONFIGURE_ARGUMENTS += --enable-wayland-target
 endif
 
 # Sacrifice speed in order to make it more likely resource limits

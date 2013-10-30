@@ -9,6 +9,9 @@ webkitgtk (2.3.1-1) UNRELEASED; urgency=low
     debian/gbp.conf:
     + Update for 2.3 packages in experimental.
   * New upstream development release.
+  * debian/control,
+    debian/rules:
+    + Enable wayland support on linux.
 
  -- Emilio Pozuelo Monfort <pochu@debian.org>  Wed, 30 Oct 2013 00:49:46 +0100
 
