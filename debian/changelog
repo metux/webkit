@@ -9,6 +9,7 @@ webkitgtk (2.3.1-1) UNRELEASED; urgency=low
     debian/gbp.conf:
     + Update for 2.3 packages in experimental.
   * New upstream development release.
+    + Re-enables MathML support. Closes: #649067.
   * debian/control,
     debian/rules:
     + Enable wayland support on linux.
