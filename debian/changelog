@@ -1,4 +1,4 @@
-webkitgtk (2.2.1-2) UNRELEASED; urgency=low
+webkitgtk (2.3.1-1) UNRELEASED; urgency=low
 
   [ Michael Biebl ]
   * debian/rules:
@@ -8,6 +8,7 @@ webkitgtk (2.2.1-2) UNRELEASED; urgency=low
   * debian/watch,
     debian/gbp.conf:
     + Update for 2.3 packages in experimental.
+  * New upstream development release.
 
  -- Emilio Pozuelo Monfort <pochu@debian.org>  Wed, 30 Oct 2013 00:49:46 +0100
 
