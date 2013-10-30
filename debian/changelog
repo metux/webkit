@@ -18,6 +18,8 @@ webkitgtk (2.3.1-1) UNRELEASED; urgency=low
       default here but some architectures are still defaulting to 4.6.
   * debian/patches/01_do-not-build-testing-tools.patch:
     + Removed, no longer needed.
+  * debian/patches:
+    + Refreshed.
 
  -- Emilio Pozuelo Monfort <pochu@debian.org>  Wed, 30 Oct 2013 00:49:46 +0100
 
