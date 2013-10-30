@@ -1,0 +1,58 @@
+<!-- ##### SECTION Title ##### -->
+WebKitDOMLocation
+
+<!-- ##### SECTION Short_Description ##### -->
+
+
+<!-- ##### SECTION Long_Description ##### -->
+<para>
+
+</para>
+
+
+<!-- ##### SECTION See_Also ##### -->
+<para>
+
+</para>
+
+
+<!-- ##### SECTION Stability_Level ##### -->
+
+
+<!-- ##### SECTION Image ##### -->
+
+
+<!-- ##### STRUCT WebKitDOMLocation ##### -->
+<para>
+
+</para>
+
+
+<!-- ##### ARG WebKitDOMLocation:ancestor-origins ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMLocation:origin ##### -->
+<para>
+
+</para>
+
+<!-- ##### FUNCTION webkit_dom_location_get_origin ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_location_get_ancestor_origins ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+

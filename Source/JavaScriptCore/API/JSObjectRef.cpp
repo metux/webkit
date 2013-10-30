@@ -105,7 +105,7 @@ JSObjectRef JSObjectMakeFunctionWithCallback(JSContextRef ctx, JSStringRef name,
     }
     ExecState* exec = toJS(ctx);
     APIEntryShim entryShim(exec);
-    return toRef(JSCallbackFunction::create(exec, exec->lexicalGlobalObject(), callAsFunction, name ? name->string() : ASCIILiteral("anonymous")));
+    return toRef(JSCallbackFunction::create(exec->vm(), exec->lexicalGlobalObject(), callAsFunction, name ? name->string() : ASCIILiteral("anonymous")));
 }
 
 JSObjectRef JSObjectMakeConstructor(JSContextRef ctx, JSClassRef jsClass, JSObjectCallAsConstructorCallback callAsConstructor)
@@ -596,7 +596,7 @@ public:
     
     unsigned refCount;
     VM* vm;
-    Vector<JSRetainPtr<JSStringRef> > array;
+    Vector<JSRetainPtr<JSStringRef>> array;
 };
 
 JSPropertyNameArrayRef JSObjectCopyPropertyNames(JSContextRef ctx, JSObjectRef object)

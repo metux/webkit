@@ -34,7 +34,7 @@ namespace WebCore {
 
 class HTMLSourceElement FINAL : public HTMLElement {
 public:
-    static PassRefPtr<HTMLSourceElement> create(const QualifiedName&, Document*);
+    static PassRefPtr<HTMLSourceElement> create(const QualifiedName&, Document&);
 
     String media() const;
     String type() const;
@@ -46,10 +46,10 @@ public:
     void cancelPendingErrorEvent();
 
 private:
-    HTMLSourceElement(const QualifiedName&, Document*);
+    HTMLSourceElement(const QualifiedName&, Document&);
     
-    virtual InsertionNotificationRequest insertedInto(ContainerNode*) OVERRIDE;
-    virtual void removedFrom(ContainerNode*) OVERRIDE;
+    virtual InsertionNotificationRequest insertedInto(ContainerNode&) OVERRIDE;
+    virtual void removedFrom(ContainerNode&) OVERRIDE;
     virtual bool isURLAttribute(const Attribute&) const OVERRIDE;
 
     void errorEventTimerFired(Timer<HTMLSourceElement>*);
@@ -57,18 +57,7 @@ private:
     Timer<HTMLSourceElement> m_errorEventTimer;
 };
 
-inline bool isHTMLSourceElement(const Node* node)
-{
-    return node->hasTagName(HTMLNames::sourceTag);
-}
-
-inline bool isHTMLSourceElement(const Element* element)
-{
-    return element->hasTagName(HTMLNames::sourceTag);
-}
-
-template <> inline bool isElementOfType<HTMLSourceElement>(const Element* element) { return isHTMLSourceElement(element); }
-
+NODE_TYPE_CASTS(HTMLSourceElement)
 
 } //namespace
 

@@ -1,0 +1,68 @@
+<!-- ##### SECTION Title ##### -->
+WebKitDOMCSSValue
+
+<!-- ##### SECTION Short_Description ##### -->
+
+
+<!-- ##### SECTION Long_Description ##### -->
+<para>
+
+</para>
+
+
+<!-- ##### SECTION See_Also ##### -->
+<para>
+
+</para>
+
+
+<!-- ##### SECTION Stability_Level ##### -->
+
+
+<!-- ##### SECTION Image ##### -->
+
+
+<!-- ##### STRUCT WebKitDOMCSSValue ##### -->
+<para>
+
+</para>
+
+
+<!-- ##### ARG WebKitDOMCSSValue:css-text ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMCSSValue:css-value-type ##### -->
+<para>
+
+</para>
+
+<!-- ##### FUNCTION webkit_dom_css_value_get_css_text ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_css_value_set_css_text ##### -->
+<para>
+
+</para>
+
+@self: 
+@value: 
+@error: 
+
+
+<!-- ##### FUNCTION webkit_dom_css_value_get_css_value_type ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+

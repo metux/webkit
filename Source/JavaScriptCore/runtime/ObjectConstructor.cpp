@@ -34,7 +34,7 @@
 #include "Operations.h"
 #include "PropertyDescriptor.h"
 #include "PropertyNameArray.h"
-#include "StackIterator.h"
+#include "StackVisitor.h"
 
 namespace JSC {
 
@@ -58,7 +58,7 @@ static EncodedJSValue JSC_HOST_CALL objectConstructorIsExtensible(ExecState*);
 
 namespace JSC {
 
-ASSERT_HAS_TRIVIAL_DESTRUCTOR(ObjectConstructor);
+STATIC_ASSERT_IS_TRIVIALLY_DESTRUCTIBLE(ObjectConstructor);
 
 const ClassInfo ObjectConstructor::s_info = { "Function", &InternalFunction::s_info, 0, ExecState::objectConstructorTable, CREATE_METHOD_TABLE(ObjectConstructor) };
 
@@ -80,18 +80,18 @@ const ClassInfo ObjectConstructor::s_info = { "Function", &InternalFunction::s_i
 @end
 */
 
-ObjectConstructor::ObjectConstructor(JSGlobalObject* globalObject, Structure* structure)
-    : InternalFunction(globalObject, structure)
+ObjectConstructor::ObjectConstructor(VM& vm, Structure* structure)
+    : InternalFunction(vm, structure)
 {
 }
 
-void ObjectConstructor::finishCreation(ExecState* exec, ObjectPrototype* objectPrototype)
+void ObjectConstructor::finishCreation(VM& vm, ObjectPrototype* objectPrototype)
 {
-    Base::finishCreation(exec->vm(), Identifier(exec, "Object").string());
+    Base::finishCreation(vm, Identifier(&vm, "Object").string());
     // ECMA 15.2.3.1
-    putDirectWithoutTransition(exec->vm(), exec->propertyNames().prototype, objectPrototype, DontEnum | DontDelete | ReadOnly);
+    putDirectWithoutTransition(vm, vm.propertyNames->prototype, objectPrototype, DontEnum | DontDelete | ReadOnly);
     // no. of arguments for constructor
-    putDirectWithoutTransition(exec->vm(), exec->propertyNames().length, jsNumber(1), ReadOnly | DontEnum | DontDelete);
+    putDirectWithoutTransition(vm, vm.propertyNames->length, jsNumber(1), ReadOnly | DontEnum | DontDelete);
 }
 
 bool ObjectConstructor::getOwnPropertySlot(JSObject* object, ExecState* exec, PropertyName propertyName, PropertySlot &slot)
@@ -131,16 +131,43 @@ CallType ObjectConstructor::getCallData(JSCell*, CallData& callData)
     return CallTypeHost;
 }
 
+class ObjectConstructorGetPrototypeOfFunctor {
+public:
+    ObjectConstructorGetPrototypeOfFunctor(JSObject* object)
+        : m_hasSkippedFirstFrame(false)
+        , m_object(object)
+        , m_result(JSValue::encode(jsUndefined()))
+    {
+    }
+
+    EncodedJSValue result() const { return m_result; }
+
+    StackVisitor::Status operator()(StackVisitor& visitor)
+    {
+        if (!m_hasSkippedFirstFrame) {
+            m_hasSkippedFirstFrame = true;
+            return StackVisitor::Continue;
+        }
+
+    if (m_object->allowsAccessFrom(visitor->callFrame()))
+        m_result = JSValue::encode(m_object->prototype());
+    return StackVisitor::Done;
+}
+
+private:
+    bool m_hasSkippedFirstFrame;
+    JSObject* m_object;
+    EncodedJSValue m_result;
+};
+
 EncodedJSValue JSC_HOST_CALL objectConstructorGetPrototypeOf(ExecState* exec)
 {
     if (!exec->argument(0).isObject())
         return throwVMError(exec, createTypeError(exec, ASCIILiteral("Requested prototype of a value that is not an object.")));
     JSObject* object = asObject(exec->argument(0));
-    StackIterator iter = exec->begin();
-    ++iter;
-    if ((iter == exec->end()) || !object->allowsAccessFrom(iter->callFrame()))
-        return JSValue::encode(jsUndefined());
-    return JSValue::encode(object->prototype());
+    ObjectConstructorGetPrototypeOfFunctor functor(object);
+    exec->iterate(functor);
+    return functor.result();
 }
 
 EncodedJSValue JSC_HOST_CALL objectConstructorGetOwnPropertyDescriptor(ExecState* exec)
@@ -344,9 +371,9 @@ EncodedJSValue JSC_HOST_CALL objectConstructorDefineProperties(ExecState* exec)
 
 EncodedJSValue JSC_HOST_CALL objectConstructorCreate(ExecState* exec)
 {
-    if (!exec->argument(0).isObject() && !exec->argument(0).isNull())
-        return throwVMError(exec, createTypeError(exec, ASCIILiteral("Object prototype may only be an Object or null.")));
     JSValue proto = exec->argument(0);
+    if (!proto.isObject() && !proto.isNull())
+        return throwVMError(exec, createTypeError(exec, ASCIILiteral("Object prototype may only be an Object or null.")));
     JSObject* newObject = proto.isObject()
         ? constructEmptyObject(exec, asObject(proto))
         : constructEmptyObject(exec, exec->lexicalGlobalObject()->nullPrototypeObjectStructure());

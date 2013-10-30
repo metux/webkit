@@ -1,0 +1,133 @@
+<!-- ##### SECTION Title ##### -->
+WebKitDOMCharacterData
+
+<!-- ##### SECTION Short_Description ##### -->
+
+
+<!-- ##### SECTION Long_Description ##### -->
+<para>
+
+</para>
+
+
+<!-- ##### SECTION See_Also ##### -->
+<para>
+
+</para>
+
+
+<!-- ##### SECTION Stability_Level ##### -->
+
+
+<!-- ##### SECTION Image ##### -->
+
+
+<!-- ##### STRUCT WebKitDOMCharacterData ##### -->
+<para>
+
+</para>
+
+
+<!-- ##### ARG WebKitDOMCharacterData:data ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMCharacterData:length ##### -->
+<para>
+
+</para>
+
+<!-- ##### FUNCTION webkit_dom_character_data_substring_data ##### -->
+<para>
+
+</para>
+
+@self: 
+@offset: 
+@length: 
+@error: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_character_data_append_data ##### -->
+<para>
+
+</para>
+
+@self: 
+@data: 
+@error: 
+
+
+<!-- ##### FUNCTION webkit_dom_character_data_insert_data ##### -->
+<para>
+
+</para>
+
+@self: 
+@offset: 
+@data: 
+@error: 
+
+
+<!-- ##### FUNCTION webkit_dom_character_data_delete_data ##### -->
+<para>
+
+</para>
+
+@self: 
+@offset: 
+@length: 
+@error: 
+
+
+<!-- ##### FUNCTION webkit_dom_character_data_replace_data ##### -->
+<para>
+
+</para>
+
+@self: 
+@offset: 
+@length: 
+@data: 
+@error: 
+
+
+<!-- ##### FUNCTION webkit_dom_character_data_remove ##### -->
+<para>
+
+</para>
+
+@self: 
+@error: 
+
+
+<!-- ##### FUNCTION webkit_dom_character_data_get_data ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_character_data_set_data ##### -->
+<para>
+
+</para>
+
+@self: 
+@value: 
+@error: 
+
+
+<!-- ##### FUNCTION webkit_dom_character_data_get_length ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+

@@ -1,0 +1,155 @@
+<!-- ##### SECTION Title ##### -->
+WebKitDOMCSSStyleDeclaration
+
+<!-- ##### SECTION Short_Description ##### -->
+
+
+<!-- ##### SECTION Long_Description ##### -->
+<para>
+
+</para>
+
+
+<!-- ##### SECTION See_Also ##### -->
+<para>
+
+</para>
+
+
+<!-- ##### SECTION Stability_Level ##### -->
+
+
+<!-- ##### SECTION Image ##### -->
+
+
+<!-- ##### STRUCT WebKitDOMCSSStyleDeclaration ##### -->
+<para>
+
+</para>
+
+
+<!-- ##### ARG WebKitDOMCSSStyleDeclaration:css-text ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMCSSStyleDeclaration:length ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMCSSStyleDeclaration:parent-rule ##### -->
+<para>
+
+</para>
+
+<!-- ##### FUNCTION webkit_dom_css_style_declaration_get_property_value ##### -->
+<para>
+
+</para>
+
+@self: 
+@propertyName: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_css_style_declaration_remove_property ##### -->
+<para>
+
+</para>
+
+@self: 
+@propertyName: 
+@error: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_css_style_declaration_get_property_priority ##### -->
+<para>
+
+</para>
+
+@self: 
+@propertyName: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_css_style_declaration_set_property ##### -->
+<para>
+
+</para>
+
+@self: 
+@propertyName: 
+@value: 
+@priority: 
+@error: 
+
+
+<!-- ##### FUNCTION webkit_dom_css_style_declaration_item ##### -->
+<para>
+
+</para>
+
+@self: 
+@index: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_css_style_declaration_get_property_shorthand ##### -->
+<para>
+
+</para>
+
+@self: 
+@propertyName: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_css_style_declaration_is_property_implicit ##### -->
+<para>
+
+</para>
+
+@self: 
+@propertyName: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_css_style_declaration_get_css_text ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_css_style_declaration_set_css_text ##### -->
+<para>
+
+</para>
+
+@self: 
+@value: 
+@error: 
+
+
+<!-- ##### FUNCTION webkit_dom_css_style_declaration_get_length ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_css_style_declaration_get_parent_rule ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+

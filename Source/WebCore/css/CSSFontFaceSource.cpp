@@ -26,12 +26,12 @@
 #include "config.h"
 #include "CSSFontFaceSource.h"
 
-#include "CachedFont.h"
 #include "CSSFontFace.h"
 #include "CSSFontSelector.h"
+#include "CachedFont.h"
 #include "CachedResourceLoader.h"
 #include "Document.h"
-#include "ElementTraversal.h"
+#include "ElementIterator.h"
 #include "FontCache.h"
 #include "FontDescription.h"
 #include "SimpleFontData.h"
@@ -115,9 +115,9 @@ PassRefPtr<SimpleFontData> CSSFontFaceSource::getFontData(const FontDescription&
     unsigned hashKey = (fontDescription.computedPixelSize() + 1) << 5 | fontDescription.widthVariant() << 3
                        | (fontDescription.orientation() == Vertical ? 4 : 0) | (syntheticBold ? 2 : 0) | (syntheticItalic ? 1 : 0);
 
-    RefPtr<SimpleFontData>& fontData = m_fontDataTable.add(hashKey, 0).iterator->value;
+    RefPtr<SimpleFontData> fontData = m_fontDataTable.add(hashKey, nullptr).iterator->value;
     if (fontData)
-        return fontData; // No release, because fontData is a reference to a RefPtr that is held in the m_fontDataTable.
+        return fontData.release();
 
     // If we are still loading, then we let the system pick a font.
     if (isLoaded()) {
@@ -139,14 +139,14 @@ PassRefPtr<SimpleFontData> CSSFontFaceSource::getFontData(const FontDescription&
                 if (!m_externalSVGFontElement)
                     return 0;
 
-                if (auto fontFaceElement = Traversal<SVGFontFaceElement>::firstChild(m_externalSVGFontElement.get())) {
+                if (auto firstFontFace = childrenOfType<SVGFontFaceElement>(*m_externalSVGFontElement).first()) {
                     if (!m_svgFontFaceElement) {
                         // We're created using a CSS @font-face rule, that means we're not associated with a SVGFontFaceElement.
                         // Use the imported <font-face> tag as referencing font-face element for these cases.
-                        m_svgFontFaceElement = fontFaceElement;
+                        m_svgFontFaceElement = firstFontFace;
                     }
 
-                    fontData = SimpleFontData::create(SVGFontData::create(fontFaceElement), fontDescription.computedPixelSize(), syntheticBold, syntheticItalic);
+                    fontData = SimpleFontData::create(SVGFontData::create(firstFontFace), fontDescription.computedPixelSize(), syntheticBold, syntheticItalic);
                 }
             } else
 #endif
@@ -176,7 +176,7 @@ PassRefPtr<SimpleFontData> CSSFontFaceSource::getFontData(const FontDescription&
         fontData = SimpleFontData::create(temporaryFont->platformData(), true, true);
     }
 
-    return fontData; // No release, because fontData is a reference to a RefPtr that is held in the m_fontDataTable.
+    return fontData.release();
 }
 
 #if ENABLE(SVG_FONTS)

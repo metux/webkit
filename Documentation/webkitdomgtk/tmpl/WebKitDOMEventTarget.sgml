@@ -1,0 +1,66 @@
+<!-- ##### SECTION Title ##### -->
+WebKitDOMEventTarget
+
+<!-- ##### SECTION Short_Description ##### -->
+
+
+<!-- ##### SECTION Long_Description ##### -->
+<para>
+
+</para>
+
+
+<!-- ##### SECTION See_Also ##### -->
+<para>
+
+</para>
+
+
+<!-- ##### SECTION Stability_Level ##### -->
+
+
+<!-- ##### SECTION Image ##### -->
+
+
+<!-- ##### STRUCT WebKitDOMEventTarget ##### -->
+<para>
+
+</para>
+
+
+<!-- ##### FUNCTION webkit_dom_event_target_dispatch_event ##### -->
+<para>
+
+</para>
+
+@target: 
+@event: 
+@error: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_event_target_add_event_listener ##### -->
+<para>
+
+</para>
+
+@target: 
+@event_name: 
+@handler: 
+@use_capture: 
+@user_data: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_event_target_remove_event_listener ##### -->
+<para>
+
+</para>
+
+@target: 
+@event_name: 
+@handler: 
+@use_capture: 
+@Returns: 
+
+

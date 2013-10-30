@@ -24,9 +24,8 @@
 #if USE(CF) || defined(__OBJC__)
 
 #include <wtf/HashTraits.h>
-#include <wtf/NullPtr.h>
-#include <wtf/TypeTraits.h>
 #include <algorithm>
+#include <cstddef>
 
 #if USE(CF)
 #include <CoreFoundation/CoreFoundation.h>
@@ -49,6 +48,11 @@ namespace WTF {
     // Unlike most most of our smart pointers, RetainPtr can take either the pointer type or the pointed-to type,
     // so both RetainPtr<NSDictionary> and RetainPtr<CFDictionaryRef> will work.
 
+#if !PLATFORM(IOS)
+    #define AdoptCF DeprecatedAdoptCF
+    #define AdoptNS DeprecatedAdoptNS
+#endif
+
     enum AdoptCFTag { AdoptCF };
     enum AdoptNSTag { AdoptNS };
     
@@ -70,7 +74,7 @@ namespace WTF {
 
     template<typename T> class RetainPtr {
     public:
-        typedef typename RemovePointer<T>::Type ValueType;
+        typedef typename std::remove_pointer<T>::type ValueType;
         typedef ValueType* PtrType;
         typedef CFTypeRef StorageType;
 
@@ -97,10 +101,8 @@ namespace WTF {
         
         RetainPtr(const RetainPtr& o) : m_ptr(o.m_ptr) { if (StorageType ptr = m_ptr) CFRetain(ptr); }
 
-#if COMPILER_SUPPORTS(CXX_RVALUE_REFERENCES)
         RetainPtr(RetainPtr&& o) : m_ptr(toStorageType(o.leakRef())) { }
         template<typename U> RetainPtr(RetainPtr<U>&& o) : m_ptr(toStorageType(o.leakRef())) { }
-#endif
 
         // Hash table deleted values, which are only constructed and never copied or destroyed.
         RetainPtr(HashTableDeletedValueType) : m_ptr(hashTableDeletedValue()) { }
@@ -130,10 +132,8 @@ namespace WTF {
         RetainPtr& operator=(PtrType);
         template<typename U> RetainPtr& operator=(U*);
 
-#if COMPILER_SUPPORTS(CXX_RVALUE_REFERENCES)
         RetainPtr& operator=(RetainPtr&&);
         template<typename U> RetainPtr& operator=(RetainPtr<U>&&);
-#endif
 
 #if !COMPILER_SUPPORTS(CXX_NULLPTR)
         RetainPtr& operator=(std::nullptr_t) { clear(); return *this; }
@@ -220,8 +220,6 @@ namespace WTF {
         return *this;
     }
 
-#if COMPILER_SUPPORTS(CXX_RVALUE_REFERENCES)
-
     template<typename T> inline RetainPtr<T>& RetainPtr<T>::operator=(RetainPtr&& o)
     {
         RetainPtr ptr = std::move(o);
@@ -235,8 +233,6 @@ namespace WTF {
         swap(ptr);
         return *this;
     }
-
-#endif
 
     template<typename T> inline void RetainPtr<T>::swap(RetainPtr& o)
     {
@@ -294,12 +290,12 @@ namespace WTF {
     template<typename T> inline RetainPtr<T> retainPtr(T) WARN_UNUSED_RETURN;
     template<typename T> inline RetainPtr<T> retainPtr(T o)
     {
-        return RetainPtr<T>(o);
+        return o;
     }
 
-    template<typename P> struct HashTraits<RetainPtr<P> > : SimpleClassHashTraits<RetainPtr<P> > { };
+    template<typename P> struct HashTraits<RetainPtr<P>> : SimpleClassHashTraits<RetainPtr<P>> { };
     
-    template<typename P> struct PtrHash<RetainPtr<P> > : PtrHash<typename RetainPtr<P>::PtrType> {
+    template<typename P> struct PtrHash<RetainPtr<P>> : PtrHash<typename RetainPtr<P>::PtrType> {
         using PtrHash<typename RetainPtr<P>::PtrType>::hash;
         static unsigned hash(const RetainPtr<P>& key) { return hash(key.get()); }
         using PtrHash<typename RetainPtr<P>::PtrType>::equal;
@@ -308,10 +304,10 @@ namespace WTF {
         static bool equal(const RetainPtr<P>& a, typename RetainPtr<P>::PtrType b) { return a == b; }
     };
     
-    template<typename P> struct DefaultHash<RetainPtr<P> > { typedef PtrHash<RetainPtr<P> > Hash; };
+    template<typename P> struct DefaultHash<RetainPtr<P>> { typedef PtrHash<RetainPtr<P>> Hash; };
 
     template <typename P>
-    struct RetainPtrObjectHashTraits : SimpleClassHashTraits<RetainPtr<P> > {
+    struct RetainPtrObjectHashTraits : SimpleClassHashTraits<RetainPtr<P>> {
         static const RetainPtr<P>& emptyValue()
         {
             static RetainPtr<P>& null = *(new RetainPtr<P>);
@@ -332,14 +328,23 @@ namespace WTF {
         }
         static const bool safeToCompareToEmptyOrDeleted = false;
     };
+
+#if !PLATFORM(IOS)
+    #undef AdoptCF
+    #undef AdoptNS
+#endif
+
 } // namespace WTF
 
-using WTF::AdoptCF;
-using WTF::AdoptNS;
+using WTF::RetainPtr;
 using WTF::adoptCF;
 using WTF::adoptNS;
-using WTF::RetainPtr;
 using WTF::retainPtr;
+
+#if PLATFORM(IOS)
+using WTF::AdoptCF;
+using WTF::AdoptNS;
+#endif
 
 #endif // USE(CF) || defined(__OBJC__)
 

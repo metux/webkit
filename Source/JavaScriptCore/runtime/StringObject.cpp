@@ -28,7 +28,7 @@
 
 namespace JSC {
 
-ASSERT_HAS_TRIVIAL_DESTRUCTOR(StringObject);
+STATIC_ASSERT_IS_TRIVIALLY_DESTRUCTIBLE(StringObject);
 
 const ClassInfo StringObject::s_info = { "String", &JSWrapperObject::s_info, 0, 0, CREATE_METHOD_TABLE(StringObject) };
 
@@ -149,16 +149,16 @@ void StringObject::getOwnPropertyNames(JSObject* object, ExecState* exec, Proper
     StringObject* thisObject = jsCast<StringObject*>(object);
     int size = thisObject->internalValue()->length();
     for (int i = 0; i < size; ++i)
-        propertyNames.add(Identifier(exec, String::number(i)));
+        propertyNames.add(Identifier::from(exec, i));
     if (mode == IncludeDontEnumProperties)
         propertyNames.add(exec->propertyNames().length);
     return JSObject::getOwnPropertyNames(thisObject, exec, propertyNames, mode);
 }
 
-StringObject* constructString(ExecState* exec, JSGlobalObject* globalObject, JSValue string)
+StringObject* constructString(VM& vm, JSGlobalObject* globalObject, JSValue string)
 {
-    StringObject* object = StringObject::create(exec, globalObject->stringObjectStructure());
-    object->setInternalValue(exec->vm(), string);
+    StringObject* object = StringObject::create(vm, globalObject->stringObjectStructure());
+    object->setInternalValue(vm, string);
     return object;
 }
 

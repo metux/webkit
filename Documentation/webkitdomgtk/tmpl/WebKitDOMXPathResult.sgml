@@ -1,0 +1,154 @@
+<!-- ##### SECTION Title ##### -->
+WebKitDOMXPathResult
+
+<!-- ##### SECTION Short_Description ##### -->
+
+
+<!-- ##### SECTION Long_Description ##### -->
+<para>
+
+</para>
+
+
+<!-- ##### SECTION See_Also ##### -->
+<para>
+
+</para>
+
+
+<!-- ##### SECTION Stability_Level ##### -->
+
+
+<!-- ##### SECTION Image ##### -->
+
+
+<!-- ##### STRUCT WebKitDOMXPathResult ##### -->
+<para>
+
+</para>
+
+
+<!-- ##### ARG WebKitDOMXPathResult:boolean-value ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMXPathResult:invalid-iterator-state ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMXPathResult:number-value ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMXPathResult:result-type ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMXPathResult:single-node-value ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMXPathResult:snapshot-length ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMXPathResult:string-value ##### -->
+<para>
+
+</para>
+
+<!-- ##### FUNCTION webkit_dom_xpath_result_iterate_next ##### -->
+<para>
+
+</para>
+
+@self: 
+@error: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_xpath_result_snapshot_item ##### -->
+<para>
+
+</para>
+
+@self: 
+@index: 
+@error: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_xpath_result_get_result_type ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_xpath_result_get_number_value ##### -->
+<para>
+
+</para>
+
+@self: 
+@error: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_xpath_result_get_string_value ##### -->
+<para>
+
+</para>
+
+@self: 
+@error: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_xpath_result_get_boolean_value ##### -->
+<para>
+
+</para>
+
+@self: 
+@error: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_xpath_result_get_single_node_value ##### -->
+<para>
+
+</para>
+
+@self: 
+@error: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_xpath_result_get_invalid_iterator_state ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_xpath_result_get_snapshot_length ##### -->
+<para>
+
+</para>
+
+@self: 
+@error: 
+@Returns: 
+
+

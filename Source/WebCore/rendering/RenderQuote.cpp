@@ -24,13 +24,14 @@
 #include "RenderQuote.h"
 
 #include "QuotesData.h"
+#include "RenderView.h"
 
 using namespace WTF::Unicode;
 
 namespace WebCore {
 
-RenderQuote::RenderQuote(Document* node, QuoteType quote)
-    : RenderText(node, StringImpl::empty())
+RenderQuote::RenderQuote(Document& document, QuoteType quote)
+    : RenderText(document, emptyString())
     , m_type(quote)
     , m_depth(-1)
     , m_next(0)
@@ -315,7 +316,7 @@ static StringImpl* stringForQuoteCharacter(UChar character)
             return strings[i].string;
         if (!strings[i].character) {
             strings[i].character = character;
-            strings[i].string = StringImpl::create8BitIfPossible(&character, 1).leakRef();
+            strings[i].string = &StringImpl::create8BitIfPossible(&character, 1).leakRef();
             return strings[i].string;
         }
     }
@@ -335,28 +336,28 @@ static inline StringImpl* apostropheString()
     return apostropheString;
 }
 
-PassRefPtr<StringImpl> RenderQuote::originalText() const
+String RenderQuote::originalText() const
 {
     if (m_depth < 0)
-        return StringImpl::empty();
+        return emptyString();
     bool isOpenQuote = false;
     switch (m_type) {
     case NO_OPEN_QUOTE:
     case NO_CLOSE_QUOTE:
-        return StringImpl::empty();
+        return emptyString();
     case OPEN_QUOTE:
         isOpenQuote = true;
         // fall through
     case CLOSE_QUOTE:
-        if (const QuotesData* quotes = style()->quotes())
+        if (const QuotesData* quotes = style().quotes())
             return isOpenQuote ? quotes->openQuote(m_depth).impl() : quotes->closeQuote(m_depth).impl();
-        if (const QuotesForLanguage* quotes = quotesForLanguage(style()->locale()))
+        if (const QuotesForLanguage* quotes = quotesForLanguage(style().locale()))
             return stringForQuoteCharacter(isOpenQuote ? (m_depth ? quotes->open2 : quotes->open1) : (m_depth ? quotes->close2 : quotes->close1));
         // FIXME: Should the default be the quotes for "en" rather than straight quotes?
         return m_depth ? apostropheString() : quotationMarkString();
     }
     ASSERT_NOT_REACHED();
-    return StringImpl::empty();
+    return emptyString();
 }
 
 void RenderQuote::attachQuote()

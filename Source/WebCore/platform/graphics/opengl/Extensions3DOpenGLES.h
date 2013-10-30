@@ -29,15 +29,10 @@
 
 #include "Extensions3DOpenGLCommon.h"
 
-#if PLATFORM(QT)
-// Takes care of declaring the GLES extensions.
-#include <qopengl.h>
-#else
 #include <GLES2/gl2.h>
 #include <GLES2/gl2ext.h>
-#endif
 
-#if OS(QNX) || PLATFORM(QT)
+#if OS(QNX)
 // See https://bugs.webkit.org/show_bug.cgi?id=91030.
 // Newer Khorons headers do define these with a PROC suffix, but older headers don't.
 #define PFNGLFRAMEBUFFERTEXTURE2DMULTISAMPLEIMG PFNGLFRAMEBUFFERTEXTURE2DMULTISAMPLEIMGPROC
@@ -67,6 +62,11 @@ typedef GC3Denum (GL_APIENTRYP PFNGLGETGRAPHICSRESETSTATUSEXTPROC) (void);
 typedef void (GL_APIENTRYP PFNGLREADNPIXELSEXTPROC) (GLint x, GLint y, GC3Dsizei width, GC3Dsizei height, GC3Denum format, GC3Denum type, GC3Dsizei bufSize, void *data);
 typedef void (GL_APIENTRYP PFNGLGETNUNIFORMFVEXTPROC) (GLuint program, GLint location, GC3Dsizei bufSize, float *params);
 typedef void (GL_APIENTRYP PFNGLGETNUNIFORMIVEXTPROC) (GLuint program, GLint location, GC3Dsizei bufSize, GLint *params);
+#endif
+
+#if PLATFORM(NIX) && USE(OPENGL_ES_2) && !GL_IMG_multisampled_render_to_texture
+// on rPi, PFNGLFRAMEBUFFERTEXTURE2DMULTISAMPLEIMG is called PFNGLCLIPPLANEXIMG.
+typedef PFNGLCLIPPLANEXIMG PFNGLFRAMEBUFFERTEXTURE2DMULTISAMPLEIMG;
 #endif
 
 namespace WebCore {

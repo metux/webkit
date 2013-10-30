@@ -34,7 +34,6 @@
 #include "ChromeClient.h"
 #include "ClientRect.h"
 #include "ClientRectList.h"
-#include "ComposedShadowTreeWalker.h"
 #include "ContentDistributor.h"
 #include "Cursor.h"
 #include "DOMStringList.h"
@@ -47,10 +46,8 @@
 #include "EventHandler.h"
 #include "ExceptionCode.h"
 #include "FormController.h"
-#include "Frame.h"
 #include "FrameLoader.h"
 #include "FrameView.h"
-#include "HTMLContentElement.h"
 #include "HTMLInputElement.h"
 #include "HTMLNames.h"
 #include "HTMLSelectElement.h"
@@ -65,10 +62,12 @@
 #include "InspectorFrontendClientLocal.h"
 #include "InspectorInstrumentation.h"
 #include "InspectorOverlay.h"
+#include "InspectorValues.h"
 #include "InstrumentingAgents.h"
 #include "InternalSettings.h"
 #include "IntRect.h"
 #include "Language.h"
+#include "MainFrame.h"
 #include "MallocStatistics.h"
 #include "MemoryCache.h"
 #include "MemoryInfo.h"
@@ -78,7 +77,6 @@
 #include "Range.h"
 #include "RenderEmbeddedObject.h"
 #include "RenderMenuList.h"
-#include "RenderObject.h"
 #include "RenderTreeAsText.h"
 #include "RenderView.h"
 #include "RuntimeEnabledFeatures.h"
@@ -146,6 +144,12 @@
 
 #if ENABLE(VIBRATION)
 #include "Vibration.h"
+#endif
+
+#if ENABLE(MEDIA_STREAM)
+#include "MockMediaStreamCenter.h"
+#include "RTCPeerConnection.h"
+#include "RTCPeerConnectionHandlerMock.h"
 #endif
 
 namespace WebCore {
@@ -278,6 +282,11 @@ Internals::Internals(Document* document)
     if (document && document->page())
         document->page()->group().captionPreferences()->setTestingMode(true);
 #endif
+
+#if ENABLE(MEDIA_STREAM)
+    MockMediaStreamCenter::registerMockMediaStreamCenter();
+    enableMockRTCPeerConnectionHandler();
+#endif
 }
 
 Document* Internals::contextDocument() const
@@ -334,34 +343,6 @@ bool Internals::isLoadingFromMemoryCache(const String& url)
     return resource && resource->status() == CachedResource::Cached;
 }
 
-PassRefPtr<Element> Internals::createContentElement(ExceptionCode& ec)
-{
-    Document* document = contextDocument();
-    if (!document) {
-        ec = INVALID_ACCESS_ERR;
-        return 0;
-    }
-
-#if ENABLE(SHADOW_DOM)
-    return HTMLContentElement::create(document);
-#else
-    return 0;
-#endif
-}
-
-bool Internals::isValidContentSelect(Element* insertionPoint, ExceptionCode& ec)
-{
-    if (!insertionPoint || !insertionPoint->isInsertionPoint()) {
-        ec = INVALID_ACCESS_ERR;
-        return false;
-    }
-
-#if ENABLE(SHADOW_DOM)
-    return isHTMLContentElement(insertionPoint) && toHTMLContentElement(insertionPoint)->isSelectValid();
-#else
-    return false;
-#endif
-}
 
 Node* Internals::treeScopeRootNode(Node* node, ExceptionCode& ec)
 {
@@ -370,7 +351,7 @@ Node* Internals::treeScopeRootNode(Node* node, ExceptionCode& ec)
         return 0;
     }
 
-    return node->treeScope()->rootNode();
+    return node->treeScope().rootNode();
 }
 
 Node* Internals::parentTreeScope(Node* node, ExceptionCode& ec)
@@ -379,7 +360,7 @@ Node* Internals::parentTreeScope(Node* node, ExceptionCode& ec)
         ec = INVALID_ACCESS_ERR;
         return 0;
     }
-    const TreeScope* parentTreeScope = node->treeScope()->parentTreeScope();
+    const TreeScope* parentTreeScope = node->treeScope().parentTreeScope();
     return parentTreeScope ? parentTreeScope->rootNode() : 0;
 }
 
@@ -398,8 +379,9 @@ unsigned Internals::numberOfActiveAnimations() const
     return frame()->animation().numberOfActiveAnimations(frame()->document());
 }
 
-bool Internals::animationsAreSuspended(Document* document, ExceptionCode& ec) const
+bool Internals::animationsAreSuspended(ExceptionCode& ec) const
 {
+    Document* document = contextDocument();
     if (!document || !document->frame()) {
         ec = INVALID_ACCESS_ERR;
         return false;
@@ -408,8 +390,9 @@ bool Internals::animationsAreSuspended(Document* document, ExceptionCode& ec) co
     return document->frame()->animation().isSuspended();
 }
 
-void Internals::suspendAnimations(Document* document, ExceptionCode& ec) const
+void Internals::suspendAnimations(ExceptionCode& ec) const
 {
+    Document* document = contextDocument();
     if (!document || !document->frame()) {
         ec = INVALID_ACCESS_ERR;
         return;
@@ -418,8 +401,9 @@ void Internals::suspendAnimations(Document* document, ExceptionCode& ec) const
     document->frame()->animation().suspendAnimations();
 }
 
-void Internals::resumeAnimations(Document* document, ExceptionCode& ec) const
+void Internals::resumeAnimations(ExceptionCode& ec) const
 {
+    Document* document = contextDocument();
     if (!document || !document->frame()) {
         ec = INVALID_ACCESS_ERR;
         return;
@@ -498,61 +482,6 @@ bool Internals::attached(Node* node, ExceptionCode& ec)
     return node->attached();
 }
 
-Node* Internals::nextSiblingByWalker(Node* node, ExceptionCode& ec)
-{
-    if (!node) {
-        ec = INVALID_ACCESS_ERR;
-        return 0;
-    }
-    ComposedShadowTreeWalker walker(node);
-    walker.nextSibling();
-    return walker.get();
-}
-
-Node* Internals::firstChildByWalker(Node* node, ExceptionCode& ec)
-{
-    if (!node) {
-        ec = INVALID_ACCESS_ERR;
-        return 0;
-    }
-    ComposedShadowTreeWalker walker(node);
-    walker.firstChild();
-    return walker.get();
-}
-
-Node* Internals::lastChildByWalker(Node* node, ExceptionCode& ec)
-{
-    if (!node) {
-        ec = INVALID_ACCESS_ERR;
-        return 0;
-    }
-    ComposedShadowTreeWalker walker(node);
-    walker.lastChild();
-    return walker.get();
-}
-
-Node* Internals::nextNodeByWalker(Node* node, ExceptionCode& ec)
-{
-    if (!node) {
-        ec = INVALID_ACCESS_ERR;
-        return 0;
-    }
-    ComposedShadowTreeWalker walker(node);
-    walker.next();
-    return walker.get();
-}
-
-Node* Internals::previousNodeByWalker(Node* node, ExceptionCode& ec)
-{
-    if (!node) {
-        ec = INVALID_ACCESS_ERR;
-        return 0;
-    }
-    ComposedShadowTreeWalker walker(node);
-    walker.previous();
-    return walker.get();
-}
-
 String Internals::elementRenderTreeAsText(Element* element, ExceptionCode& ec)
 {
     if (!element) {
@@ -567,19 +496,6 @@ String Internals::elementRenderTreeAsText(Element* element, ExceptionCode& ec)
     }
 
     return representation;
-}
-
-size_t Internals::numberOfScopedHTMLStyleChildren(const Node* scope, ExceptionCode& ec) const
-{
-    if (scope && (scope->isElementNode() || scope->isShadowRoot()))
-#if ENABLE(STYLE_SCOPED)
-        return scope->numberOfScopedHTMLStyleChildren();
-#else
-        return 0;
-#endif
-
-    ec = INVALID_ACCESS_ERR;
-    return 0;
 }
 
 PassRefPtr<CSSComputedStyleDeclaration> Internals::computedStyleIncludingVisitedInfo(Node* node, ExceptionCode& ec) const
@@ -670,9 +586,9 @@ void Internals::setShadowPseudoId(Element* element, const String& id, ExceptionC
 
 String Internals::visiblePlaceholder(Element* element)
 {
-    if (element && isHTMLTextFormControlElement(element)) {
-        if (toHTMLTextFormControlElement(element)->placeholderShouldBeVisible())
-            return toHTMLTextFormControlElement(element)->placeholderElement()->textContent();
+    if (element && isHTMLTextFormControlElement(*element)) {
+        if (toHTMLTextFormControlElement(*element).placeholderShouldBeVisible())
+            return toHTMLTextFormControlElement(*element).placeholderElement()->textContent();
     }
 
     return String();
@@ -734,7 +650,14 @@ void Internals::enableMockSpeechSynthesizer()
     synthesis->setPlatformSynthesizer(PlatformSpeechSynthesizerMock::create(synthesis));
 }
 #endif
-    
+
+#if ENABLE(MEDIA_STREAM)
+void Internals::enableMockRTCPeerConnectionHandler()
+{
+    RTCPeerConnectionHandler::create = RTCPeerConnectionHandlerMock::create;
+}
+#endif
+
 PassRefPtr<ClientRect> Internals::absoluteCaretBounds(ExceptionCode& ec)
 {
     Document* document = contextDocument();
@@ -753,16 +676,17 @@ PassRefPtr<ClientRect> Internals::boundingBox(Element* element, ExceptionCode& e
         return ClientRect::create();
     }
 
-    element->document()->updateLayoutIgnorePendingStylesheets();
-    RenderObject* renderer = element->renderer();
+    element->document().updateLayoutIgnorePendingStylesheets();
+    auto renderer = element->renderer();
     if (!renderer)
         return ClientRect::create();
     return ClientRect::create(renderer->absoluteBoundingBoxRectIgnoringTransforms());
 }
 
-PassRefPtr<ClientRectList> Internals::inspectorHighlightRects(Document* document, ExceptionCode& ec)
+PassRefPtr<ClientRectList> Internals::inspectorHighlightRects(ExceptionCode& ec)
 {
 #if ENABLE(INSPECTOR)
+    Document* document = contextDocument();
     if (!document || !document->page() || !document->page()->inspectorController()) {
         ec = INVALID_ACCESS_ERR;
         return ClientRectList::create();
@@ -772,9 +696,24 @@ PassRefPtr<ClientRectList> Internals::inspectorHighlightRects(Document* document
     document->page()->inspectorController()->getHighlight(&highlight);
     return ClientRectList::create(highlight.quads);
 #else
-    UNUSED_PARAM(document);
     UNUSED_PARAM(ec);
     return ClientRectList::create();
+#endif
+}
+
+String Internals::inspectorHighlightObject(ExceptionCode& ec)
+{
+#if ENABLE(INSPECTOR)
+    Document* document = contextDocument();
+    if (!document || !document->page() || !document->page()->inspectorController()) {
+        ec = INVALID_ACCESS_ERR;
+        return String();
+    }
+    RefPtr<InspectorObject> object = document->page()->inspectorController()->buildObjectForHighlightedNode();
+    return object ? object->toJSONString() : String();
+#else
+    UNUSED_PARAM(ec);
+    return String();
 #endif
 }
 
@@ -791,7 +730,7 @@ unsigned Internals::markerCountForNode(Node* node, const String& markerType, Exc
         return 0;
     }
 
-    return node->document()->markers().markersFor(node, markerTypes).size();
+    return node->document().markers().markersFor(node, markerTypes).size();
 }
 
 DocumentMarker* Internals::markerAt(Node* node, const String& markerType, unsigned index, ExceptionCode& ec)
@@ -807,7 +746,7 @@ DocumentMarker* Internals::markerAt(Node* node, const String& markerType, unsign
         return 0;
     }
 
-    Vector<DocumentMarker*> markers = node->document()->markers().markersFor(node, markerTypes);
+    Vector<DocumentMarker*> markers = node->document().markers().markersFor(node, markerTypes);
     if (markers.size() <= index)
         return 0;
     return markers[index];
@@ -831,12 +770,13 @@ String Internals::markerDescriptionForNode(Node* node, const String& markerType,
 
 void Internals::addTextMatchMarker(const Range* range, bool isActive)
 {
-    range->ownerDocument()->updateLayoutIgnorePendingStylesheets();
-    range->ownerDocument()->markers().addTextMatchMarker(range, isActive);
+    range->ownerDocument().updateLayoutIgnorePendingStylesheets();
+    range->ownerDocument().markers().addTextMatchMarker(range, isActive);
 }
 
-void Internals::setScrollViewPosition(Document* document, long x, long y, ExceptionCode& ec)
+void Internals::setScrollViewPosition(long x, long y, ExceptionCode& ec)
 {
+    Document* document = contextDocument();
     if (!document || !document->view()) {
         ec = INVALID_ACCESS_ERR;
         return;
@@ -853,8 +793,9 @@ void Internals::setScrollViewPosition(Document* document, long x, long y, Except
     frameView->setConstrainsScrollingToContentEdge(constrainsScrollingToContentEdgeOldValue);
 }
 
-void Internals::setPagination(Document* document, const String& mode, int gap, int pageLength, ExceptionCode& ec)
+void Internals::setPagination(const String& mode, int gap, int pageLength, ExceptionCode& ec)
 {
+    Document* document = contextDocument();
     if (!document || !document->page()) {
         ec = INVALID_ACCESS_ERR;
         return;
@@ -882,8 +823,9 @@ void Internals::setPagination(Document* document, const String& mode, int gap, i
     page->setPagination(pagination);
 }
 
-String Internals::configurationForViewport(Document* document, float devicePixelRatio, int deviceWidth, int deviceHeight, int availableWidth, int availableHeight, ExceptionCode& ec)
+String Internals::configurationForViewport(float devicePixelRatio, int deviceWidth, int deviceHeight, int availableWidth, int availableHeight, ExceptionCode& ec)
 {
+    Document* document = contextDocument();
     if (!document || !document->page()) {
         ec = INVALID_ACCESS_ERR;
         return String();
@@ -992,16 +934,17 @@ void Internals::setAutofilled(Element* element, bool enabled, ExceptionCode& ec)
 
 void Internals::scrollElementToRect(Element* element, long x, long y, long w, long h, ExceptionCode& ec)
 {
-    if (!element || !element->document() || !element->document()->view()) {
+    if (!element || !element->document().view()) {
         ec = INVALID_ACCESS_ERR;
         return;
     }
-    FrameView* frameView = element->document()->view();
+    FrameView* frameView = element->document().view();
     frameView->scrollElementToRect(element, IntRect(x, y, w, h));
 }
 
-void Internals::paintControlTints(Document* document, ExceptionCode& ec)
+void Internals::paintControlTints(ExceptionCode& ec)
 {
+    Document* document = contextDocument();
     if (!document || !document->view()) {
         ec = INVALID_ACCESS_ERR;
         return;
@@ -1057,8 +1000,9 @@ String Internals::rangeAsText(const Range* range, ExceptionCode& ec)
     return range->text();
 }
 
-void Internals::setDelegatesScrolling(bool enabled, Document* document, ExceptionCode& ec)
+void Internals::setDelegatesScrolling(bool enabled, ExceptionCode& ec)
 {
+    Document* document = contextDocument();
     // Delegate scrolling is valid only on mainframe's view.
     if (!document || !document->view() || !document->page() || &document->page()->mainFrame() != document->frame()) {
         ec = INVALID_ACCESS_ERR;
@@ -1069,8 +1013,9 @@ void Internals::setDelegatesScrolling(bool enabled, Document* document, Exceptio
 }
 
 #if ENABLE(TOUCH_ADJUSTMENT)
-PassRefPtr<WebKitPoint> Internals::touchPositionAdjustedToBestClickableNode(long x, long y, long width, long height, Document* document, ExceptionCode& ec)
+PassRefPtr<WebKitPoint> Internals::touchPositionAdjustedToBestClickableNode(long x, long y, long width, long height, ExceptionCode& ec)
 {
+    Document* document = contextDocument();
     if (!document || !document->frame()) {
         ec = INVALID_ACCESS_ERR;
         return 0;
@@ -1089,8 +1034,9 @@ PassRefPtr<WebKitPoint> Internals::touchPositionAdjustedToBestClickableNode(long
     return 0;
 }
 
-Node* Internals::touchNodeAdjustedToBestClickableNode(long x, long y, long width, long height, Document* document, ExceptionCode& ec)
+Node* Internals::touchNodeAdjustedToBestClickableNode(long x, long y, long width, long height, ExceptionCode& ec)
 {
+    Document* document = contextDocument();
     if (!document || !document->frame()) {
         ec = INVALID_ACCESS_ERR;
         return 0;
@@ -1105,8 +1051,9 @@ Node* Internals::touchNodeAdjustedToBestClickableNode(long x, long y, long width
     return targetNode;
 }
 
-PassRefPtr<WebKitPoint> Internals::touchPositionAdjustedToBestContextMenuNode(long x, long y, long width, long height, Document* document, ExceptionCode& ec)
+PassRefPtr<WebKitPoint> Internals::touchPositionAdjustedToBestContextMenuNode(long x, long y, long width, long height, ExceptionCode& ec)
 {
+    Document* document = contextDocument();
     if (!document || !document->frame()) {
         ec = INVALID_ACCESS_ERR;
         return 0;
@@ -1125,8 +1072,9 @@ PassRefPtr<WebKitPoint> Internals::touchPositionAdjustedToBestContextMenuNode(lo
     return WebKitPoint::create(x, y);
 }
 
-Node* Internals::touchNodeAdjustedToBestContextMenuNode(long x, long y, long width, long height, Document* document, ExceptionCode& ec)
+Node* Internals::touchNodeAdjustedToBestContextMenuNode(long x, long y, long width, long height, ExceptionCode& ec)
 {
+    Document* document = contextDocument();
     if (!document || !document->frame()) {
         ec = INVALID_ACCESS_ERR;
         return 0;
@@ -1141,8 +1089,9 @@ Node* Internals::touchNodeAdjustedToBestContextMenuNode(long x, long y, long wid
     return targetNode;
 }
 
-PassRefPtr<ClientRect> Internals::bestZoomableAreaForTouchPoint(long x, long y, long width, long height, Document* document, ExceptionCode& ec)
+PassRefPtr<ClientRect> Internals::bestZoomableAreaForTouchPoint(long x, long y, long width, long height, ExceptionCode& ec)
 {
+    Document* document = contextDocument();
     if (!document || !document->frame()) {
         ec = INVALID_ACCESS_ERR;
         return 0;
@@ -1162,8 +1111,9 @@ PassRefPtr<ClientRect> Internals::bestZoomableAreaForTouchPoint(long x, long y, 
 #endif
 
 
-int Internals::lastSpellCheckRequestSequence(Document* document, ExceptionCode& ec)
+int Internals::lastSpellCheckRequestSequence(ExceptionCode& ec)
 {
+    Document* document = contextDocument();
     if (!document || !document->frame()) {
         ec = INVALID_ACCESS_ERR;
         return -1;
@@ -1172,8 +1122,9 @@ int Internals::lastSpellCheckRequestSequence(Document* document, ExceptionCode& 
     return document->frame()->editor().spellChecker().lastRequestSequence();
 }
 
-int Internals::lastSpellCheckProcessedSequence(Document* document, ExceptionCode& ec)
+int Internals::lastSpellCheckProcessedSequence(ExceptionCode& ec)
 {
+    Document* document = contextDocument();
     if (!document || !document->frame()) {
         ec = INVALID_ACCESS_ERR;
         return -1;
@@ -1192,8 +1143,9 @@ void Internals::setUserPreferredLanguages(const Vector<String>& languages)
     WebCore::overrideUserPreferredLanguages(languages);
 }
 
-unsigned Internals::wheelEventHandlerCount(Document* document, ExceptionCode& ec)
+unsigned Internals::wheelEventHandlerCount(ExceptionCode& ec)
 {
+    Document* document = contextDocument();
     if (!document) {
         ec = INVALID_ACCESS_ERR;
         return 0;
@@ -1202,8 +1154,9 @@ unsigned Internals::wheelEventHandlerCount(Document* document, ExceptionCode& ec
     return document->wheelEventHandlerCount();
 }
 
-unsigned Internals::touchEventHandlerCount(Document* document, ExceptionCode& ec)
+unsigned Internals::touchEventHandlerCount(ExceptionCode& ec)
 {
+    Document* document = contextDocument();
     if (!document) {
         ec = INVALID_ACCESS_ERR;
         return 0;
@@ -1219,29 +1172,10 @@ unsigned Internals::touchEventHandlerCount(Document* document, ExceptionCode& ec
     return count;
 }
 
-#if ENABLE(TOUCH_EVENT_TRACKING)
-PassRefPtr<ClientRectList> Internals::touchEventTargetClientRects(Document* document, ExceptionCode& ec)
-{
-    if (!document || !document->view() || !document->page()) {
-        ec = INVALID_ACCESS_ERR;
-        return 0;
-    }
-    if (!document->page()->scrollingCoordinator())
-        return ClientRectList::create();
-
-    document->updateLayoutIgnorePendingStylesheets();
-
-    Vector<IntRect> absoluteRects;
-    document->page()->scrollingCoordinator()->computeAbsoluteTouchEventTargetRects(document, absoluteRects);
-    Vector<FloatQuad> absoluteQuads(absoluteRects.size());
-
-    for (size_t i = 0; i < absoluteRects.size(); ++i)
-        absoluteQuads[i] = FloatQuad(absoluteRects[i]);
-
-    return ClientRectList::create(absoluteQuads);
-}
-#endif
-
+// FIXME: Remove the document argument. It is almost always the same as
+// contextDocument(), with the exception of a few tests that pass a
+// different document, and could just make the call through another Internals
+// instance instead.
 PassRefPtr<NodeList> Internals::nodesFromRect(Document* document, int centerX, int centerY, unsigned topPadding, unsigned rightPadding,
     unsigned bottomPadding, unsigned leftPadding, bool ignoreClipping, bool allowShadowContent, bool allowChildFrameContent, ExceptionCode& ec) const
 {
@@ -1273,7 +1207,7 @@ PassRefPtr<NodeList> Internals::nodesFromRect(Document* document, int centerX, i
     if (!request.ignoreClipping() && !frameView->visibleContentRect().intersects(HitTestLocation::rectForPoint(point, topPadding, rightPadding, bottomPadding, leftPadding)))
         return 0;
 
-    Vector<RefPtr<Node> > matches;
+    Vector<Ref<Node>> matches;
 
     // Need padding to trigger a rect based hit test, but we want to return a NodeList
     // so we special case this.
@@ -1281,11 +1215,15 @@ PassRefPtr<NodeList> Internals::nodesFromRect(Document* document, int centerX, i
         HitTestResult result(point);
         renderView->hitTest(request, result);
         if (result.innerNode())
-            matches.append(result.innerNode()->deprecatedShadowAncestorNode());
+            matches.append(*result.innerNode()->deprecatedShadowAncestorNode());
     } else {
         HitTestResult result(point, topPadding, rightPadding, bottomPadding, leftPadding);
         renderView->hitTest(request, result);
-        copyToVector(result.rectBasedTestResult(), matches);
+        
+        const HitTestResult::NodeSet& nodeSet = result.rectBasedTestResult();
+        matches.reserveInitialCapacity(nodeSet.size());
+        for (auto it = nodeSet.begin(), end = nodeSet.end(); it != end; ++it)
+            matches.uncheckedAppend(*it->get());
     }
 
     return StaticNodeList::adopt(matches);
@@ -1307,8 +1245,9 @@ void Internals::emitInspectorDidCancelFrame()
 #endif
 }
 
-void Internals::setBatteryStatus(Document* document, const String& eventType, bool charging, double chargingTime, double dischargingTime, double level, ExceptionCode& ec)
+void Internals::setBatteryStatus(const String& eventType, bool charging, double chargingTime, double dischargingTime, double level, ExceptionCode& ec)
 {
+    Document* document = contextDocument();
     if (!document || !document->page()) {
         ec = INVALID_ACCESS_ERR;
         return;
@@ -1325,8 +1264,9 @@ void Internals::setBatteryStatus(Document* document, const String& eventType, bo
 #endif
 }
 
-void Internals::setNetworkInformation(Document* document, const String& eventType, double bandwidth, bool metered, ExceptionCode& ec)
+void Internals::setNetworkInformation(const String& eventType, double bandwidth, bool metered, ExceptionCode& ec)
 {
+    Document* document = contextDocument();
     if (!document || !document->page()) {
         ec = INVALID_ACCESS_ERR;
         return;
@@ -1341,8 +1281,9 @@ void Internals::setNetworkInformation(Document* document, const String& eventTyp
 #endif
 }
 
-void Internals::setDeviceProximity(Document* document, const String& eventType, double value, double min, double max, ExceptionCode& ec)
+void Internals::setDeviceProximity(const String& eventType, double value, double min, double max, ExceptionCode& ec)
 {
+    Document* document = contextDocument();
     if (!document || !document->page()) {
         ec = INVALID_ACCESS_ERR;
         return;
@@ -1358,16 +1299,18 @@ void Internals::setDeviceProximity(Document* document, const String& eventType, 
 #endif
 }
 
-bool Internals::hasSpellingMarker(Document* document, int from, int length, ExceptionCode&)
+bool Internals::hasSpellingMarker(int from, int length, ExceptionCode&)
 {
+    Document* document = contextDocument();
     if (!document || !document->frame())
         return 0;
 
     return document->frame()->editor().selectionStartHasMarkerFor(DocumentMarker::Spelling, from, length);
 }
     
-bool Internals::hasAutocorrectedMarker(Document* document, int from, int length, ExceptionCode&)
+bool Internals::hasAutocorrectedMarker(int from, int length, ExceptionCode&)
 {
+    Document* document = contextDocument();
     if (!document || !document->frame())
         return 0;
     
@@ -1448,16 +1391,18 @@ void Internals::setAutomaticSpellingCorrectionEnabled(bool enabled, ExceptionCod
 #endif
 }
 
-bool Internals::isOverwriteModeEnabled(Document* document, ExceptionCode&)
+bool Internals::isOverwriteModeEnabled(ExceptionCode&)
 {
+    Document* document = contextDocument();
     if (!document || !document->frame())
         return 0;
 
     return document->frame()->editor().isOverwriteModeEnabled();
 }
 
-void Internals::toggleOverwriteModeEnabled(Document* document, ExceptionCode&)
+void Internals::toggleOverwriteModeEnabled(ExceptionCode&)
 {
+    Document* document = contextDocument();
     if (!document || !document->frame())
         return;
 
@@ -1475,8 +1420,12 @@ unsigned Internals::numberOfLiveDocuments() const
     return InspectorCounters::counterValue(InspectorCounters::DocumentCounter);
 }
 
-Vector<String> Internals::consoleMessageArgumentCounts(Document* document) const
+Vector<String> Internals::consoleMessageArgumentCounts() const
 {
+    Document* document = contextDocument();
+    if (!document || !document->page())
+        return Vector<String>();
+
     InstrumentingAgents* instrumentingAgents = instrumentationForPage(document->page());
     if (!instrumentingAgents)
         return Vector<String>();
@@ -1498,7 +1447,11 @@ PassRefPtr<DOMWindow> Internals::openDummyInspectorFrontend(const String& url)
     DOMWindow* window = page->mainFrame().document()->domWindow();
     ASSERT(window);
 
-    m_frontendWindow = window->open(url, "", "", window, window);
+#if defined(_MSC_VER) && _MSC_VER <= 1700
+    m_frontendWindow = window->open(url, "", "", window, window); // Work around bug in VS2010 and earlier
+#else
+    m_frontendWindow = window->open(url, "", "", *window, *window);
+#endif
     ASSERT(m_frontendWindow);
 
     Page* frontendPage = m_frontendWindow->document()->page();
@@ -1551,16 +1504,21 @@ void Internals::setJavaScriptProfilingEnabled(bool enabled, ExceptionCode& ec)
 }
 #endif // ENABLE(INSPECTOR)
 
-bool Internals::hasGrammarMarker(Document* document, int from, int length, ExceptionCode&)
+bool Internals::hasGrammarMarker(int from, int length, ExceptionCode&)
 {
+    Document* document = contextDocument();
     if (!document || !document->frame())
         return 0;
 
     return document->frame()->editor().selectionStartHasMarkerFor(DocumentMarker::Grammar, from, length);
 }
 
-unsigned Internals::numberOfScrollableAreas(Document* document, ExceptionCode&)
+unsigned Internals::numberOfScrollableAreas(ExceptionCode&)
 {
+    Document* document = contextDocument();
+    if (!document || !document->frame())
+        return 0;
+
     unsigned count = 0;
     Frame* frame = document->frame();
     if (frame->view()->scrollableAreas())
@@ -1574,8 +1532,9 @@ unsigned Internals::numberOfScrollableAreas(Document* document, ExceptionCode&)
     return count;
 }
     
-bool Internals::isPageBoxVisible(Document* document, int pageNumber, ExceptionCode& ec)
+bool Internals::isPageBoxVisible(int pageNumber, ExceptionCode& ec)
 {
+    Document* document = contextDocument();
     if (!document) {
         ec = INVALID_ACCESS_ERR;
         return false;
@@ -1584,6 +1543,10 @@ bool Internals::isPageBoxVisible(Document* document, int pageNumber, ExceptionCo
     return document->isPageBoxVisible(pageNumber);
 }
 
+// FIXME: Remove the document argument. It is almost always the same as
+// contextDocument(), with the exception of a few tests that pass a
+// different document, and could just make the call through another Internals
+// instance instead.
 String Internals::layerTreeAsText(Document* document, ExceptionCode& ec) const
 {
     return layerTreeAsText(document, 0, ec);
@@ -1605,12 +1568,15 @@ String Internals::layerTreeAsText(Document* document, unsigned flags, ExceptionC
         layerTreeFlags |= LayerTreeFlagsIncludeRepaintRects;
     if (flags & LAYER_TREE_INCLUDES_PAINTING_PHASES)
         layerTreeFlags |= LayerTreeFlagsIncludePaintingPhases;
+    if (flags & LAYER_TREE_INCLUDES_CONTENT_LAYERS)
+        layerTreeFlags |= LayerTreeFlagsIncludeContentLayers;
 
     return document->frame()->layerTreeAsText(layerTreeFlags);
 }
 
-String Internals::repaintRectsAsText(Document* document, ExceptionCode& ec) const
+String Internals::repaintRectsAsText(ExceptionCode& ec) const
 {
+    Document* document = contextDocument();
     if (!document || !document->frame()) {
         ec = INVALID_ACCESS_ERR;
         return String();
@@ -1619,8 +1585,9 @@ String Internals::repaintRectsAsText(Document* document, ExceptionCode& ec) cons
     return document->frame()->trackedRepaintRectsAsText();
 }
 
-String Internals::scrollingStateTreeAsText(Document* document, ExceptionCode& ec) const
+String Internals::scrollingStateTreeAsText(ExceptionCode& ec) const
 {
+    Document* document = contextDocument();
     if (!document || !document->frame()) {
         ec = INVALID_ACCESS_ERR;
         return String();
@@ -1633,8 +1600,9 @@ String Internals::scrollingStateTreeAsText(Document* document, ExceptionCode& ec
     return page->scrollingStateTreeAsText();
 }
 
-String Internals::mainThreadScrollingReasons(Document* document, ExceptionCode& ec) const
+String Internals::mainThreadScrollingReasons(ExceptionCode& ec) const
 {
+    Document* document = contextDocument();
     if (!document || !document->frame()) {
         ec = INVALID_ACCESS_ERR;
         return String();
@@ -1647,8 +1615,9 @@ String Internals::mainThreadScrollingReasons(Document* document, ExceptionCode& 
     return page->mainThreadScrollingReasonsAsText();
 }
 
-PassRefPtr<ClientRectList> Internals::nonFastScrollableRects(Document* document, ExceptionCode& ec) const
+PassRefPtr<ClientRectList> Internals::nonFastScrollableRects(ExceptionCode& ec) const
 {
+    Document* document = contextDocument();
     if (!document || !document->frame()) {
         ec = INVALID_ACCESS_ERR;
         return 0;
@@ -1661,8 +1630,9 @@ PassRefPtr<ClientRectList> Internals::nonFastScrollableRects(Document* document,
     return page->nonFastScrollableRects(document->frame());
 }
 
-void Internals::garbageCollectDocumentResources(Document* document, ExceptionCode& ec) const
+void Internals::garbageCollectDocumentResources(ExceptionCode& ec) const
 {
+    Document* document = contextDocument();
     if (!document) {
         ec = INVALID_ACCESS_ERR;
         return;
@@ -1679,20 +1649,32 @@ void Internals::allowRoundingHacks() const
     TextRun::setAllowsRoundingHacks(true);
 }
 
-void Internals::insertAuthorCSS(Document* document, const String& css) const
+void Internals::insertAuthorCSS(const String& css, ExceptionCode& ec) const
 {
-    RefPtr<StyleSheetContents> parsedSheet = StyleSheetContents::create(document);
-    parsedSheet->setIsUserStyleSheet(false);
-    parsedSheet->parseString(css);
-    document->styleSheetCollection()->addAuthorSheet(parsedSheet);
+    Document* document = contextDocument();
+    if (!document) {
+        ec = INVALID_ACCESS_ERR;
+        return;
+    }
+
+    auto parsedSheet = StyleSheetContents::create(*document);
+    parsedSheet.get().setIsUserStyleSheet(false);
+    parsedSheet.get().parseString(css);
+    document->styleSheetCollection().addAuthorSheet(std::move(parsedSheet));
 }
 
-void Internals::insertUserCSS(Document* document, const String& css) const
+void Internals::insertUserCSS(const String& css, ExceptionCode& ec) const
 {
-    RefPtr<StyleSheetContents> parsedSheet = StyleSheetContents::create(document);
-    parsedSheet->setIsUserStyleSheet(true);
-    parsedSheet->parseString(css);
-    document->styleSheetCollection()->addUserSheet(parsedSheet);
+    Document* document = contextDocument();
+    if (!document) {
+        ec = INVALID_ACCESS_ERR;
+        return;
+    }
+
+    auto parsedSheet = StyleSheetContents::create(*document);
+    parsedSheet.get().setIsUserStyleSheet(true);
+    parsedSheet.get().parseString(css);
+    document->styleSheetCollection().addUserSheet(std::move(parsedSheet));
 }
 
 String Internals::counterValue(Element* element)
@@ -1723,14 +1705,14 @@ Vector<String> Internals::iconURLs(Document* document, int iconTypesMask) const
     return array;
 }
 
-Vector<String> Internals::shortcutIconURLs(Document* document) const
+Vector<String> Internals::shortcutIconURLs() const
 {
-    return iconURLs(document, Favicon);
+    return iconURLs(contextDocument(), Favicon);
 }
 
-Vector<String> Internals::allIconURLs(Document* document) const
+Vector<String> Internals::allIconURLs() const
 {
-    return iconURLs(document, Favicon | TouchIcon | TouchPrecomposedIcon);
+    return iconURLs(contextDocument(), Favicon | TouchIcon | TouchPrecomposedIcon);
 }
 
 int Internals::numberOfPages(float pageWidth, float pageHeight)
@@ -1772,8 +1754,9 @@ void Internals::setPageScaleFactor(float scaleFactor, int x, int y, ExceptionCod
     page->setPageScaleFactor(scaleFactor, IntPoint(x, y));
 }
 
-void Internals::setHeaderHeight(Document* document, float height)
+void Internals::setHeaderHeight(float height)
 {
+    Document* document = contextDocument();
     if (!document || !document->view())
         return;
 #if USE(ACCELERATED_COMPOSITING)
@@ -1782,8 +1765,9 @@ void Internals::setHeaderHeight(Document* document, float height)
 #endif
 }
 
-void Internals::setFooterHeight(Document* document, float height)
+void Internals::setFooterHeight(float height)
 {
+    Document* document = contextDocument();
     if (!document || !document->view())
         return;
 #if USE(ACCELERATED_COMPOSITING)
@@ -1793,29 +1777,33 @@ void Internals::setFooterHeight(Document* document, float height)
 }
 
 #if ENABLE(FULLSCREEN_API)
-void Internals::webkitWillEnterFullScreenForElement(Document* document, Element* element)
+void Internals::webkitWillEnterFullScreenForElement(Element* element)
 {
+    Document* document = contextDocument();
     if (!document)
         return;
     document->webkitWillEnterFullScreenForElement(element);
 }
 
-void Internals::webkitDidEnterFullScreenForElement(Document* document, Element* element)
+void Internals::webkitDidEnterFullScreenForElement(Element* element)
 {
+    Document* document = contextDocument();
     if (!document)
         return;
     document->webkitDidEnterFullScreenForElement(element);
 }
 
-void Internals::webkitWillExitFullScreenForElement(Document* document, Element* element)
+void Internals::webkitWillExitFullScreenForElement(Element* element)
 {
+    Document* document = contextDocument();
     if (!document)
         return;
     document->webkitWillExitFullScreenForElement(element);
 }
 
-void Internals::webkitDidExitFullScreenForElement(Document* document, Element* element)
+void Internals::webkitDidExitFullScreenForElement(Element* element)
 {
+    Document* document = contextDocument();
     if (!document)
         return;
     document->webkitDidExitFullScreenForElement(element);
@@ -1853,8 +1841,9 @@ Vector<String> Internals::getReferencedFilePaths() const
     return FormController::getReferencedFilePaths(frame()->loader().history().currentItem()->documentState());
 }
 
-void Internals::startTrackingRepaints(Document* document, ExceptionCode& ec)
+void Internals::startTrackingRepaints(ExceptionCode& ec)
 {
+    Document* document = contextDocument();
     if (!document || !document->view()) {
         ec = INVALID_ACCESS_ERR;
         return;
@@ -1864,8 +1853,9 @@ void Internals::startTrackingRepaints(Document* document, ExceptionCode& ec)
     frameView->setTracksRepaints(true);
 }
 
-void Internals::stopTrackingRepaints(Document* document, ExceptionCode& ec)
+void Internals::stopTrackingRepaints(ExceptionCode& ec)
 {
+    Document* document = contextDocument();
     if (!document || !document->view()) {
         ec = INVALID_ACCESS_ERR;
         return;
@@ -1930,8 +1920,9 @@ static const char* cursorTypeToString(Cursor::Type cursorType)
 }
 #endif
 
-String Internals::getCurrentCursorInfo(Document* document, ExceptionCode& ec)
+String Internals::getCurrentCursorInfo(ExceptionCode& ec)
 {
+    Document* document = contextDocument();
     if (!document || !document->frame()) {
         ec = INVALID_ACCESS_ERR;
         return String();
@@ -2029,12 +2020,12 @@ void Internals::simulateAudioInterruption(Node* node)
 
 bool Internals::isSelectPopupVisible(Node* node)
 {
-    if (!node->hasTagName(HTMLNames::selectTag))
+    if (!isHTMLSelectElement(node))
         return false;
 
     HTMLSelectElement* select = toHTMLSelectElement(node);
 
-    RenderObject* renderer = select->renderer();
+    auto renderer = select->renderer();
     if (!renderer->isMenuList())
         return false;
 
@@ -2156,7 +2147,7 @@ bool Internals::isPluginUnavailabilityIndicatorObscured(Element* element, Except
         return false;
     }
 
-    RenderObject* renderer = element->renderer();
+    auto renderer = element->renderer();
     if (!renderer || !renderer->isEmbeddedObject()) {
         ec = INVALID_ACCESS_ERR;
         return false;

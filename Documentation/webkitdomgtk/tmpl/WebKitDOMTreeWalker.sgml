@@ -1,0 +1,168 @@
+<!-- ##### SECTION Title ##### -->
+WebKitDOMTreeWalker
+
+<!-- ##### SECTION Short_Description ##### -->
+
+
+<!-- ##### SECTION Long_Description ##### -->
+<para>
+
+</para>
+
+
+<!-- ##### SECTION See_Also ##### -->
+<para>
+
+</para>
+
+
+<!-- ##### SECTION Stability_Level ##### -->
+
+
+<!-- ##### SECTION Image ##### -->
+
+
+<!-- ##### STRUCT WebKitDOMTreeWalker ##### -->
+<para>
+
+</para>
+
+
+<!-- ##### ARG WebKitDOMTreeWalker:expand-entity-references ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMTreeWalker:filter ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMTreeWalker:root ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMTreeWalker:what-to-show ##### -->
+<para>
+
+</para>
+
+<!-- ##### FUNCTION webkit_dom_tree_walker_parent_node ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_tree_walker_first_child ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_tree_walker_last_child ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_tree_walker_previous_sibling ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_tree_walker_next_sibling ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_tree_walker_previous_node ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_tree_walker_next_node ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_tree_walker_get_root ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_tree_walker_get_what_to_show ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_tree_walker_get_filter ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_tree_walker_get_expand_entity_references ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_tree_walker_get_current_node ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_tree_walker_set_current_node ##### -->
+<para>
+
+</para>
+
+@self: 
+@value: 
+@error: 
+
+

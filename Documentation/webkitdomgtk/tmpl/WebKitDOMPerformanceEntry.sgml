@@ -1,0 +1,86 @@
+<!-- ##### SECTION Title ##### -->
+WebKitDOMPerformanceEntry
+
+<!-- ##### SECTION Short_Description ##### -->
+
+
+<!-- ##### SECTION Long_Description ##### -->
+<para>
+
+</para>
+
+
+<!-- ##### SECTION See_Also ##### -->
+<para>
+
+</para>
+
+
+<!-- ##### SECTION Stability_Level ##### -->
+
+
+<!-- ##### SECTION Image ##### -->
+
+
+<!-- ##### STRUCT WebKitDOMPerformanceEntry ##### -->
+<para>
+
+</para>
+
+
+<!-- ##### ARG WebKitDOMPerformanceEntry:duration ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMPerformanceEntry:entry-type ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMPerformanceEntry:name ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMPerformanceEntry:start-time ##### -->
+<para>
+
+</para>
+
+<!-- ##### FUNCTION webkit_dom_performance_entry_get_name ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_performance_entry_get_entry_type ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_performance_entry_get_start_time ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_performance_entry_get_duration ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+

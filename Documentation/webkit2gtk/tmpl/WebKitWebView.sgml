@@ -123,6 +123,16 @@ WebKitWebView
 @arg3: 
 @Returns: 
 
+<!-- ##### SIGNAL WebKitWebView::load-failed-with-tls-errors ##### -->
+<para>
+
+</para>
+
+@webkitwebview: the object which received the signal.
+@arg1: 
+@arg2: 
+@Returns: 
+
 <!-- ##### SIGNAL WebKitWebView::mouse-target-changed ##### -->
 <para>
 

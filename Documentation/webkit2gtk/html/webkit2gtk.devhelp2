@@ -35,6 +35,7 @@
       <sub name="WebKitFormSubmissionRequest" link="WebKitFormSubmissionRequest.html"/>
       <sub name="WebKitSecurityManager" link="WebKitSecurityManager.html"/>
       <sub name="WebKitWebViewGroup" link="WebKitWebViewGroup.html"/>
+      <sub name="WebKitCertificateInfo" link="WebKitCertificateInfo.html"/>
     </sub>
     <sub name="Web Extensions" link="ch02.html">
       <sub name="WebKitWebExtension" link="WebKitWebExtension.html"/>
@@ -44,6 +45,7 @@
     </sub>
     <sub name="Index" link="index-all.html"/>
     <sub name="Index of new symbols in 2.2" link="api-index-2-2.html"/>
+    <sub name="Index of new symbols in 2.4" link="api-index-2-4.html"/>
     <sub name="Annotation Glossary" link="annotation-glossary.html"/>
   </chapters>
   <functions>
@@ -73,6 +75,7 @@
     <keyword type="function" name="webkit_web_context_set_web_extensions_directory ()" link="WebKitWebContext.html#webkit-web-context-set-web-extensions-directory"/>
     <keyword type="function" name="webkit_web_context_prefetch_dns ()" link="WebKitWebContext.html#webkit-web-context-prefetch-dns"/>
     <keyword type="function" name="webkit_web_context_set_disk_cache_directory ()" link="WebKitWebContext.html#webkit-web-context-set-disk-cache-directory"/>
+    <keyword type="function" name="webkit_web_context_allow_tls_certificate_for_host ()" link="WebKitWebContext.html#webkit-web-context-allow-tls-certificate-for-host"/>
     <keyword type="function" name="WebKitURISchemeRequestCallback ()" link="WebKitWebContext.html#WebKitURISchemeRequestCallback"/>
     <keyword type="function" name="webkit_web_context_register_uri_scheme ()" link="WebKitWebContext.html#webkit-web-context-register-uri-scheme"/>
     <keyword type="signal" name="The &quot;download-started&quot; signal" link="WebKitWebContext.html#WebKitWebContext-download-started"/>
@@ -176,6 +179,7 @@
     <keyword type="signal" name="The &quot;leave-fullscreen&quot; signal" link="WebKitWebView.html#WebKitWebView-leave-fullscreen"/>
     <keyword type="signal" name="The &quot;load-changed&quot; signal" link="WebKitWebView.html#WebKitWebView-load-changed"/>
     <keyword type="signal" name="The &quot;load-failed&quot; signal" link="WebKitWebView.html#WebKitWebView-load-failed"/>
+    <keyword type="signal" name="The &quot;load-failed-with-tls-errors&quot; signal" link="WebKitWebView.html#WebKitWebView-load-failed-with-tls-errors"/>
     <keyword type="signal" name="The &quot;mouse-target-changed&quot; signal" link="WebKitWebView.html#WebKitWebView-mouse-target-changed"/>
     <keyword type="signal" name="The &quot;permission-request&quot; signal" link="WebKitWebView.html#WebKitWebView-permission-request"/>
     <keyword type="signal" name="The &quot;print&quot; signal" link="WebKitWebView.html#WebKitWebView-print"/>
@@ -645,6 +649,11 @@
     <keyword type="function" name="webkit_web_view_group_add_user_style_sheet ()" link="WebKitWebViewGroup.html#webkit-web-view-group-add-user-style-sheet"/>
     <keyword type="function" name="webkit_web_view_group_remove_all_user_style_sheets ()" link="WebKitWebViewGroup.html#webkit-web-view-group-remove-all-user-style-sheets"/>
     <keyword type="property" name="The &quot;settings&quot; property" link="WebKitWebViewGroup.html#WebKitWebViewGroup--settings"/>
+    <keyword type="struct" name="WebKitCertificateInfo" link="WebKitCertificateInfo.html#WebKitCertificateInfo-struct"/>
+    <keyword type="function" name="webkit_certificate_info_copy ()" link="WebKitCertificateInfo.html#webkit-certificate-info-copy" since="2.4"/>
+    <keyword type="function" name="webkit_certificate_info_free ()" link="WebKitCertificateInfo.html#webkit-certificate-info-free" since="2.4"/>
+    <keyword type="function" name="webkit_certificate_info_get_tls_certificate ()" link="WebKitCertificateInfo.html#webkit-certificate-info-get-tls-certificate" since="2.4"/>
+    <keyword type="function" name="webkit_certificate_info_get_tls_errors ()" link="WebKitCertificateInfo.html#webkit-certificate-info-get-tls-errors" since="2.4"/>
     <keyword type="struct" name="struct WebKitWebExtension" link="WebKitWebExtension.html#WebKitWebExtension-struct"/>
     <keyword type="function" name="WebKitWebExtensionInitializeFunction ()" link="WebKitWebExtension.html#WebKitWebExtensionInitializeFunction"/>
     <keyword type="function" name="webkit_web_extension_get_page ()" link="WebKitWebExtension.html#webkit-web-extension-get-page"/>

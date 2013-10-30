@@ -1,0 +1,200 @@
+<!-- ##### SECTION Title ##### -->
+WebKitDOMDOMSecurityPolicy
+
+<!-- ##### SECTION Short_Description ##### -->
+
+
+<!-- ##### SECTION Long_Description ##### -->
+<para>
+
+</para>
+
+
+<!-- ##### SECTION See_Also ##### -->
+<para>
+
+</para>
+
+
+<!-- ##### SECTION Stability_Level ##### -->
+
+
+<!-- ##### SECTION Image ##### -->
+
+
+<!-- ##### STRUCT WebKitDOMDOMSecurityPolicy ##### -->
+<para>
+
+</para>
+
+
+<!-- ##### ARG WebKitDOMDOMSecurityPolicy:allows-eval ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMDOMSecurityPolicy:allows-inline-script ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMDOMSecurityPolicy:allows-inline-style ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMDOMSecurityPolicy:is-active ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMDOMSecurityPolicy:report-ur-is ##### -->
+<para>
+
+</para>
+
+<!-- ##### FUNCTION webkit_dom_dom_security_policy_allows_connection_to ##### -->
+<para>
+
+</para>
+
+@self: 
+@url: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_dom_security_policy_allows_font_from ##### -->
+<para>
+
+</para>
+
+@self: 
+@url: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_dom_security_policy_allows_form_action ##### -->
+<para>
+
+</para>
+
+@self: 
+@url: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_dom_security_policy_allows_frame_from ##### -->
+<para>
+
+</para>
+
+@self: 
+@url: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_dom_security_policy_allows_image_from ##### -->
+<para>
+
+</para>
+
+@self: 
+@url: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_dom_security_policy_allows_media_from ##### -->
+<para>
+
+</para>
+
+@self: 
+@url: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_dom_security_policy_allows_object_from ##### -->
+<para>
+
+</para>
+
+@self: 
+@url: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_dom_security_policy_allows_plugin_type ##### -->
+<para>
+
+</para>
+
+@self: 
+@type: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_dom_security_policy_allows_script_from ##### -->
+<para>
+
+</para>
+
+@self: 
+@url: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_dom_security_policy_allows_style_from ##### -->
+<para>
+
+</para>
+
+@self: 
+@url: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_dom_security_policy_get_allows_eval ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_dom_security_policy_get_allows_inline_script ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_dom_security_policy_get_allows_inline_style ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_dom_security_policy_get_is_active ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_dom_security_policy_get_report_ur_is ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+

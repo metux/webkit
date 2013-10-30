@@ -27,6 +27,7 @@
 #include "NamedNodeMap.h"
 #include "NodeRareData.h"
 #include "PseudoElement.h"
+#include "RenderElement.h"
 #include "ShadowRoot.h"
 #include "StyleInheritedData.h"
 #include <wtf/OwnPtr.h>
@@ -35,7 +36,7 @@ namespace WebCore {
 
 class ElementRareData : public NodeRareData {
 public:
-    static PassOwnPtr<ElementRareData> create(RenderObject* renderer) { return adoptPtr(new ElementRareData(renderer)); }
+    static PassOwnPtr<ElementRareData> create(RenderElement* renderer) { return adoptPtr(new ElementRareData(renderer)); }
 
     ~ElementRareData();
 
@@ -73,11 +74,6 @@ public:
     void setContainsFullScreenElement(bool value) { m_containsFullScreenElement = value; }
 #endif
 
-#if ENABLE(DIALOG_ELEMENT)
-    bool isInTopLayer() const { return m_isInTopLayer; }
-    void setIsInTopLayer(bool value) { m_isInTopLayer = value; }
-#endif
-
     bool childrenAffectedByHover() const { return m_childrenAffectedByHover; }
     void setChildrenAffectedByHover(bool value) { m_childrenAffectedByHover = value; }
     bool childrenAffectedByActive() const { return m_childrenAffectedByActive; }
@@ -106,10 +102,10 @@ public:
     void setAttributeMap(PassOwnPtr<NamedNodeMap> attributeMap) { m_attributeMap = attributeMap; }
 
     RenderStyle* computedStyle() const { return m_computedStyle.get(); }
-    void setComputedStyle(PassRefPtr<RenderStyle> computedStyle) { m_computedStyle = computedStyle; }
+    void setComputedStyle(PassRef<RenderStyle> computedStyle) { m_computedStyle = std::move(computedStyle); }
 
     ClassList* classList() const { return m_classList.get(); }
-    void setClassList(PassOwnPtr<ClassList> classList) { m_classList = classList; }
+    void setClassList(OwnPtr<ClassList> classList) { m_classList = std::move(classList); }
     void clearClassListValueForQuirksMode()
     {
         if (!m_classList)
@@ -141,9 +137,6 @@ private:
 #if ENABLE(FULLSCREEN_API)
     unsigned m_containsFullScreenElement : 1;
 #endif
-#if ENABLE(DIALOG_ELEMENT)
-    unsigned m_isInTopLayer : 1;
-#endif
 #if ENABLE(SVG)
     unsigned m_hasPendingResources : 1;
 #endif
@@ -174,7 +167,7 @@ private:
     RefPtr<PseudoElement> m_beforePseudoElement;
     RefPtr<PseudoElement> m_afterPseudoElement;
 
-    ElementRareData(RenderObject*);
+    explicit ElementRareData(RenderElement*);
     void releasePseudoElement(PseudoElement*);
 };
 
@@ -183,7 +176,7 @@ inline IntSize defaultMinimumSizeForResizing()
     return IntSize(LayoutUnit::max(), LayoutUnit::max());
 }
 
-inline ElementRareData::ElementRareData(RenderObject* renderer)
+inline ElementRareData::ElementRareData(RenderElement* renderer)
     : NodeRareData(renderer)
     , m_tabIndex(0)
     , m_childIndex(0)
@@ -193,9 +186,6 @@ inline ElementRareData::ElementRareData(RenderObject* renderer)
     , m_isInCanvasSubtree(false)
 #if ENABLE(FULLSCREEN_API)
     , m_containsFullScreenElement(false)
-#endif
-#if ENABLE(DIALOG_ELEMENT)
-    , m_isInTopLayer(false)
 #endif
 #if ENABLE(SVG)
     , m_hasPendingResources(false)
@@ -235,7 +225,7 @@ inline void ElementRareData::setAfterPseudoElement(PassRefPtr<PseudoElement> pse
 
 inline void ElementRareData::resetComputedStyle()
 {
-    setComputedStyle(0);
+    m_computedStyle = nullptr;
     setStyleAffectedByEmpty(false);
     setChildIndex(0);
 }

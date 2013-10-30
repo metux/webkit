@@ -22,8 +22,12 @@
 #define DISABLE_SHIMS
 #include "OpenGLShims.h"
 
-#if !PLATFORM(QT) && !PLATFORM(WIN)
+#if !PLATFORM(WIN)
 #include <dlfcn.h>
+#endif
+
+#if PLATFORM(NIX) && USE(EGL)
+#include <EGL/egl.h>
 #endif
 
 #include <wtf/text/CString.h>
@@ -37,17 +41,15 @@ OpenGLFunctionTable* openGLFunctionTable()
     return &table;
 }
 
-#if PLATFORM(QT)
-static void* getProcAddress(const char* procName)
-{
-    if (QOpenGLContext* context = QOpenGLContext::currentContext())
-        return reinterpret_cast<void*>(context->getProcAddress(procName));
-    return 0;
-}
-#elif PLATFORM(WIN)
+#if PLATFORM(WIN)
 static void* getProcAddress(const char* procName)
 {
     return GetProcAddress(GetModuleHandleA("libGLESv2"), procName);
+}
+#elif PLATFORM(NIX) && USE(EGL)
+static void* getProcAddress(const char* procName)
+{
+    return reinterpret_cast<void*>(eglGetProcAddress(procName));
 }
 #else
 typedef void* (*glGetProcAddressType) (const char* procName);
@@ -106,7 +108,7 @@ static void* lookupOpenGLFunctionAddress(const char* functionName, bool* success
     return target;
 }
 
-#if PLATFORM(QT) && defined(QT_OPENGL_ES_2)
+#if PLATFORM(NIX) && USE(OPENGL_ES_2)
 
 // With Angle only EGL/GLES2 extensions are available through eglGetProcAddress, not the regular standardized functions.
 #define ASSIGN_FUNCTION_TABLE_ENTRY(FunctionName, success) \

@@ -32,10 +32,8 @@ WebInspector.TextEditor = function(element, mimeType, delegate)
     this._element.classList.add(WebInspector.TextEditor.StyleClassName);
     this._element.classList.add(WebInspector.SyntaxHighlightedStyleClassName);
 
-    this._readOnly = true;
-
     this._codeMirror = CodeMirror(this.element, {
-        readOnly: this._readOnly,
+        readOnly: true,
         indentWithTabs: true,
         indentUnit: 4,
         lineNumbers: true,
@@ -64,7 +62,7 @@ WebInspector.TextEditor = function(element, mimeType, delegate)
     this._searchResults = [];
     this._currentSearchResultIndex = -1;
 
-    this._formatted = false
+    this._formatted = false;
     this._formatterSourceMap = null;
 
     this._delegate = delegate || null;
@@ -148,8 +146,7 @@ WebInspector.TextEditor.prototype = {
 
     set readOnly(readOnly)
     {
-        this._readOnly = readOnly;
-        this._updateCodeMirrorReadOnly();
+        this._codeMirror.setOption("readOnly", readOnly);
     },
 
     get formatted()
@@ -171,7 +168,6 @@ WebInspector.TextEditor.prototype = {
         delete this._ignoreCodeMirrorContentDidChangeEvent;
 
         this._formatted = formatted;
-        this._updateCodeMirrorReadOnly();
 
         this.dispatchEventToListeners(WebInspector.TextEditor.Event.FormattingDidChange);
     },
@@ -185,7 +181,7 @@ WebInspector.TextEditor.prototype = {
     {
         const supportedModes = {
             "javascript": true,
-            "css-base": true,
+            "css": true,
         };
 
         var mode = this._codeMirror.getMode();
@@ -218,6 +214,8 @@ WebInspector.TextEditor.prototype = {
 
     set mimeType(newMIMEType)
     {
+        newMIMEType = parseMIMEType(newMIMEType).type;
+
         this._mimeType = newMIMEType;
         this._codeMirror.setOption("mode", newMIMEType);
     },
@@ -442,7 +440,7 @@ WebInspector.TextEditor.prototype = {
         return this._codeMirror.getLine(lineNumber);
     },
 
-    revealPosition: function(position, textRangeToSelect, forceUnformatted)
+    revealPosition: function(position, textRangeToSelect, forceUnformatted, noHighlight)
     {
         console.assert(position === undefined || position instanceof WebInspector.SourceCodePosition, "revealPosition called without a SourceCodePosition");
         if (!(position instanceof WebInspector.SourceCodePosition))
@@ -486,6 +484,9 @@ WebInspector.TextEditor.prototype = {
                 this._scrollIntoViewCentered(position.start);
 
             this.selectedTextRange = textRangeToSelect;
+
+            if (noHighlight)
+                return;
 
             this._codeMirror.addLineClass(lineHandle, "wrap", WebInspector.TextEditor.HighlightedStyleClassName);
 
@@ -577,17 +578,33 @@ WebInspector.TextEditor.prototype = {
         return this._codeMirror.toggleLineClass(lineHandle, "wrap", styleClassName);
     },
 
-    // Private
-
-    _updateCodeMirrorReadOnly: function()
+    get lineCount()
     {
-        this._codeMirror.setOption("readOnly", this._readOnly || this._formatted);
+        return this._codeMirror.lineCount();
     },
+
+    focus: function()
+    {
+        this._codeMirror.focus();
+    },
+
+    // Private
 
     _contentChanged: function(codeMirror, change)
     {
         if (this._ignoreCodeMirrorContentDidChangeEvent)
             return;
+
+        if (this._formatted) {
+            this._formatterSourceMap = null;
+            this._formatted = false;
+
+            if (this._delegate && typeof this._delegate.textEditorUpdatedFormatting === "function")
+                this._delegate.textEditorUpdatedFormatting(this);
+
+            this.dispatchEventToListeners(WebInspector.TextEditor.Event.FormattingDidChange);
+        }
+
         this.dispatchEventToListeners(WebInspector.TextEditor.Event.ContentDidChange);
     },
 
@@ -1023,7 +1040,7 @@ WebInspector.TextEditor.prototype = {
         if (lineNumber !== undefined) {
             // We have a new line that will now show the dragged breakpoint.
             var newColumnBreakpoints = {};
-            var columnNumber = (lineNumber === this._lineNumberWithMousedDownBreakpoint ? this._columnNumberWithDraggedBreakpoint : 0)
+            var columnNumber = (lineNumber === this._lineNumberWithMousedDownBreakpoint ? this._columnNumberWithDraggedBreakpoint : 0);
             newColumnBreakpoints[columnNumber] = this._draggingBreakpointInfo;
             this._previousColumnBreakpointInfo = this._allColumnBreakpointInfoForLine(lineNumber);
             this._setColumnBreakpointInfoForLine(lineNumber, newColumnBreakpoints);
@@ -1180,7 +1197,6 @@ WebInspector.TextEditor.prototype = {
                 }
 
                 if (!isNaN(this._executionLineNumber)) {
-                    console.assert(this._executionLineHandle);
                     console.assert(!isNaN(this._executionColumnNumber));
                     newExecutionLocation = this._formatterSourceMap.originalToFormatted(this._executionLineNumber, this._executionColumnNumber);
                 }
@@ -1204,7 +1220,6 @@ WebInspector.TextEditor.prototype = {
                 }
 
                 if (!isNaN(this._executionLineNumber)) {
-                    console.assert(this._executionLineHandle);
                     console.assert(!isNaN(this._executionColumnNumber));
                     newExecutionLocation = this._formatterSourceMap.formattedToOriginal(this._executionLineNumber, this._executionColumnNumber);
                 }

@@ -41,8 +41,6 @@
 #include "RenderListBox.h"
 #include "RenderObject.h"
 
-using namespace std;
-
 namespace WebCore {
 
 using namespace HTMLNames;
@@ -178,7 +176,7 @@ AccessibilityObject* AccessibilityListBoxOption::parentObject() const
     if (!parentNode)
         return 0;
     
-    return m_optionElement->document()->axObjectCache()->getOrCreate(parentNode);
+    return m_optionElement->document().axObjectCache()->getOrCreate(parentNode);
 }
 
 void AccessibilityListBoxOption::setSelected(bool selected)

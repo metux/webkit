@@ -1,0 +1,58 @@
+<!-- ##### SECTION Title ##### -->
+WebKitDOMHTMLLIElement
+
+<!-- ##### SECTION Short_Description ##### -->
+
+
+<!-- ##### SECTION Long_Description ##### -->
+<para>
+
+</para>
+
+
+<!-- ##### SECTION See_Also ##### -->
+<para>
+
+</para>
+
+
+<!-- ##### SECTION Stability_Level ##### -->
+
+
+<!-- ##### SECTION Image ##### -->
+
+
+<!-- ##### STRUCT WebKitDOMHTMLLIElement ##### -->
+<para>
+
+</para>
+
+
+<!-- ##### ARG WebKitDOMHTMLLIElement:type ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMHTMLLIElement:value ##### -->
+<para>
+
+</para>
+
+<!-- ##### FUNCTION webkit_dom_htmlli_element_get_value ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_htmlli_element_set_value ##### -->
+<para>
+
+</para>
+
+@self: 
+@value: 
+
+

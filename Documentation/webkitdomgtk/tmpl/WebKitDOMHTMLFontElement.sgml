@@ -1,0 +1,99 @@
+<!-- ##### SECTION Title ##### -->
+WebKitDOMHTMLFontElement
+
+<!-- ##### SECTION Short_Description ##### -->
+
+
+<!-- ##### SECTION Long_Description ##### -->
+<para>
+
+</para>
+
+
+<!-- ##### SECTION See_Also ##### -->
+<para>
+
+</para>
+
+
+<!-- ##### SECTION Stability_Level ##### -->
+
+
+<!-- ##### SECTION Image ##### -->
+
+
+<!-- ##### STRUCT WebKitDOMHTMLFontElement ##### -->
+<para>
+
+</para>
+
+
+<!-- ##### ARG WebKitDOMHTMLFontElement:color ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMHTMLFontElement:face ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMHTMLFontElement:size ##### -->
+<para>
+
+</para>
+
+<!-- ##### FUNCTION webkit_dom_html_font_element_get_color ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_font_element_set_color ##### -->
+<para>
+
+</para>
+
+@self: 
+@value: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_font_element_get_face ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_font_element_set_face ##### -->
+<para>
+
+</para>
+
+@self: 
+@value: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_font_element_get_size ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_font_element_set_size ##### -->
+<para>
+
+</para>
+
+@self: 
+@value: 
+
+

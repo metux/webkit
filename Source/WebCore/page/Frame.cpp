@@ -66,6 +66,7 @@
 #include "InspectorInstrumentation.h"
 #include "JSDOMWindowShell.h"
 #include "Logging.h"
+#include "MainFrame.h"
 #include "MathMLNames.h"
 #include "MediaFeatureNames.h"
 #include "Navigator.h"
@@ -75,11 +76,12 @@
 #include "PageCache.h"
 #include "PageGroup.h"
 #include "RegularExpression.h"
-#include "RenderPart.h"
 #include "RenderTableCell.h"
+#include "RenderText.h"
 #include "RenderTextControl.h"
 #include "RenderTheme.h"
 #include "RenderView.h"
+#include "RenderWidget.h"
 #include "RuntimeEnabledFeatures.h"
 #include "SVGNames.h"
 #include "ScriptController.h"
@@ -131,7 +133,7 @@ static inline Frame* parentFromOwnerElement(HTMLFrameOwnerElement* ownerElement)
 {
     if (!ownerElement)
         return 0;
-    return ownerElement->document()->frame();
+    return ownerElement->document().frame();
 }
 
 static inline float parentPageZoomFactor(Frame* frame)
@@ -150,18 +152,19 @@ static inline float parentTextZoomFactor(Frame* frame)
     return parent->textZoomFactor();
 }
 
-inline Frame::Frame(Page* page, HTMLFrameOwnerElement* ownerElement, FrameLoaderClient* frameLoaderClient)
-    : m_page(page)
-    , m_settings(&page->settings())
+Frame::Frame(Page& page, HTMLFrameOwnerElement* ownerElement, FrameLoaderClient& frameLoaderClient)
+    : m_mainFrame(ownerElement ? page.mainFrame() : static_cast<MainFrame&>(*this))
+    , m_page(&page)
+    , m_settings(&page.settings())
     , m_treeNode(this, parentFromOwnerElement(ownerElement))
-    , m_loader(*this, *frameLoaderClient)
+    , m_loader(*this, frameLoaderClient)
     , m_navigationScheduler(this)
     , m_ownerElement(ownerElement)
-    , m_script(adoptPtr(new ScriptController(this)))
+    , m_script(std::make_unique<ScriptController>(*this))
     , m_editor(Editor::create(*this))
     , m_selection(adoptPtr(new FrameSelection(this)))
-    , m_eventHandler(adoptPtr(new EventHandler(this)))
-    , m_animationController(adoptPtr(new AnimationController(this)))
+    , m_eventHandler(adoptPtr(new EventHandler(*this)))
+    , m_animationController(std::make_unique<AnimationController>(*this))
     , m_pageZoomFactor(parentPageZoomFactor(this))
     , m_textZoomFactor(parentTextZoomFactor(this))
 #if ENABLE(ORIENTATION_EVENTS)
@@ -170,7 +173,6 @@ inline Frame::Frame(Page* page, HTMLFrameOwnerElement* ownerElement, FrameLoader
     , m_inViewSourceMode(false)
     , m_activeDOMObjectsAndAnimationsSuspendedCount(0)
 {
-    ASSERT(page);
     AtomicString::init();
     HTMLNames::init();
     QualifiedName::init();
@@ -188,7 +190,8 @@ inline Frame::Frame(Page* page, HTMLFrameOwnerElement* ownerElement, FrameLoader
         setTiledBackingStoreEnabled(settings().tiledBackingStoreEnabled());
 #endif
     } else {
-        page->incrementSubframeCount();
+        m_mainFrame.selfOnlyRef();
+        page.incrementSubframeCount();
         ownerElement->setContentFrame(this);
     }
 
@@ -204,7 +207,9 @@ inline Frame::Frame(Page* page, HTMLFrameOwnerElement* ownerElement, FrameLoader
 
 PassRefPtr<Frame> Frame::create(Page* page, HTMLFrameOwnerElement* ownerElement, FrameLoaderClient* client)
 {
-    return adoptRef(new Frame(page, ownerElement, client));
+    ASSERT(page);
+    ASSERT(client);
+    return adoptRef(new Frame(*page, ownerElement, *client));
 }
 
 Frame::~Frame()
@@ -223,6 +228,9 @@ Frame::~Frame()
     HashSet<FrameDestructionObserver*>::iterator stop = m_destructionObservers.end();
     for (HashSet<FrameDestructionObserver*>::iterator it = m_destructionObservers.begin(); it != stop; ++it)
         (*it)->frameDestroyed();
+
+    if (!isMainFrame())
+        m_mainFrame.selfOnlyDeref();
 }
 
 void Frame::addDestructionObserver(FrameDestructionObserver* observer)
@@ -246,10 +254,8 @@ void Frame::setView(PassRefPtr<FrameView> view)
     // Prepare for destruction now, so any unload event handlers get run and the DOMWindow is
     // notified. If we wait until the view is destroyed, then things won't be hooked up enough for
     // these calls to work.
-    if (!view && m_doc && m_doc->attached() && !m_doc->inPageCache()) {
-        // FIXME: We don't call willRemove here. Why is that OK?
+    if (!view && m_doc && m_doc->attached() && !m_doc->inPageCache())
         m_doc->prepareForDestruction();
-    }
     
     if (m_view)
         m_view->unscheduleRelayout();
@@ -273,10 +279,8 @@ void Frame::setDocument(PassRefPtr<Document> newDocument)
 {
     ASSERT(!newDocument || newDocument->frame() == this);
 
-    if (m_doc && m_doc->attached() && !m_doc->inPageCache()) {
-        // FIXME: We don't call willRemove here. Why is that OK?
-        m_doc->detach();
-    }
+    if (m_doc && m_doc->attached() && !m_doc->inPageCache())
+        m_doc->prepareForDestruction();
 
     m_doc = newDocument.get();
     ASSERT(!m_doc || m_doc->domWindow());
@@ -338,7 +342,7 @@ String Frame::searchForLabelsAboveCell(RegularExpression* regExp, HTMLTableCellE
         // search within the above cell we found for a match
         size_t lengthSearched = 0;    
         for (Text* textNode = TextNodeTraversal::firstWithin(aboveCell); textNode; textNode = TextNodeTraversal::next(textNode, aboveCell)) {
-            if (!textNode->renderer() || textNode->renderer()->style()->visibility() != VISIBLE)
+            if (!textNode->renderer() || textNode->renderer()->style().visibility() != VISIBLE)
                 continue;
             // For each text chunk, run the regexp
             String nodeString = textNode->data();
@@ -393,7 +397,7 @@ String Frame::searchForLabelsBeforeElement(const Vector<String>& labels, Element
                 return result;
             }
             searchedCellAbove = true;
-        } else if (n->isTextNode() && n->renderer() && n->renderer()->style()->visibility() == VISIBLE) {
+        } else if (n->isTextNode() && n->renderer() && n->renderer()->style().visibility() == VISIBLE) {
             // For each text chunk, run the regexp
             String nodeString = n->nodeValue();
             // add 100 for slop, to make it more likely that we'll search whole nodes
@@ -506,7 +510,7 @@ FloatSize Frame::resizePageRectsKeepingRatio(const FloatSize& originalSize, cons
     if (!contentRenderer())
         return FloatSize();
 
-    if (contentRenderer()->style()->isHorizontalWritingMode()) {
+    if (contentRenderer()->style().isHorizontalWritingMode()) {
         ASSERT(fabs(originalSize.width()) > numeric_limits<float>::epsilon());
         float ratio = originalSize.height() / originalSize.width();
         resultSize.setWidth(floorf(expectedSize.width()));
@@ -532,12 +536,12 @@ void Frame::injectUserScripts(UserScriptInjectionTime injectionTime)
     const UserScriptMap* userScripts = m_page->group().userScripts();
     if (!userScripts)
         return;
-    UserScriptMap::const_iterator end = userScripts->end();
-    for (UserScriptMap::const_iterator it = userScripts->begin(); it != end; ++it)
-        injectUserScriptsForWorld(it->key.get(), *it->value, injectionTime);
+
+    for (auto it = userScripts->begin(), end = userScripts->end(); it != end; ++it)
+        injectUserScriptsForWorld(*it->key.get(), *it->value, injectionTime);
 }
 
-void Frame::injectUserScriptsForWorld(DOMWrapperWorld* world, const UserScriptVector& userScripts, UserScriptInjectionTime injectionTime)
+void Frame::injectUserScriptsForWorld(DOMWrapperWorld& world, const UserScriptVector& userScripts, UserScriptInjectionTime injectionTime)
 {
     if (userScripts.isEmpty())
         return;
@@ -563,21 +567,21 @@ RenderView* Frame::contentRenderer() const
     return document() ? document()->renderView() : 0;
 }
 
-RenderPart* Frame::ownerRenderer() const
+RenderWidget* Frame::ownerRenderer() const
 {
     HTMLFrameOwnerElement* ownerElement = m_ownerElement;
     if (!ownerElement)
         return 0;
-    RenderObject* object = ownerElement->renderer();
+    auto object = ownerElement->renderer();
     if (!object)
         return 0;
     // FIXME: If <object> is ever fixed to disassociate itself from frames
     // that it has started but canceled, then this can turn into an ASSERT
     // since m_ownerElement would be 0 when the load is canceled.
     // https://bugs.webkit.org/show_bug.cgi?id=18585
-    if (!object->isRenderPart())
+    if (!object->isWidget())
         return 0;
-    return toRenderPart(object);
+    return toRenderWidget(object);
 }
 
 Frame* Frame::frameForWidget(const Widget* widget)
@@ -585,8 +589,7 @@ Frame* Frame::frameForWidget(const Widget* widget)
     ASSERT_ARG(widget, widget);
 
     if (RenderWidget* renderer = RenderWidget::find(widget))
-        if (Node* node = renderer->node())
-            return node->document()->frame();
+        return renderer->frameOwnerElement().document().frame();
 
     // Assume all widgets are either a FrameView or owned by a RenderWidget.
     // FIXME: That assumption is not right for scroll bars!
@@ -632,13 +635,23 @@ void Frame::willDetachPage()
 void Frame::disconnectOwnerElement()
 {
     if (m_ownerElement) {
-        if (Document* doc = document())
-            doc->topDocument()->clearAXObjectCache();
+        // We use the ownerElement's document to retrieve the cache, because the contentDocument for this
+        // frame is already detached (and can't access the top level AX cache).
+        // However, we pass in the current document to clearTextMarkerNodesInUse so we can identify the
+        // nodes inside this document that need to be removed from the cache.
+        
+        // We don't clear the AXObjectCache here because we don't want to clear the top level cache
+        // when a sub-frame is removed.
+#if HAVE(ACCESSIBILITY)
+        if (AXObjectCache* cache = m_ownerElement->document().existingAXObjectCache())
+            cache->clearTextMarkerNodesInUse(document());
+#endif
+        
         m_ownerElement->clearContentFrame();
         if (m_page)
             m_page->decrementSubframeCount();
     }
-    m_ownerElement = 0;
+    m_ownerElement = nullptr;
 }
 
 String Frame::displayStringModifiedByEncoding(const String& str) const
@@ -652,7 +665,7 @@ VisiblePosition Frame::visiblePositionForPoint(const IntPoint& framePoint)
     Node* node = result.innerNonSharedNode();
     if (!node)
         return VisiblePosition();
-    RenderObject* renderer = node->renderer();
+    auto renderer = node->renderer();
     if (!renderer)
         return VisiblePosition();
     VisiblePosition visiblePos = renderer->positionForPoint(result.localPoint());
@@ -671,7 +684,7 @@ Document* Frame::documentAtPoint(const IntPoint& point)
 
     if (contentRenderer())
         result = eventHandler().hitTestResultAtPoint(pt);
-    return result.innerNode() ? result.innerNode()->document() : 0;
+    return result.innerNode() ? &result.innerNode()->document() : 0;
 }
 
 PassRefPtr<Range> Frame::rangeForPoint(const IntPoint& framePoint)
@@ -706,7 +719,7 @@ void Frame::createView(const IntSize& viewportSize, const Color& backgroundColor
     ASSERT(this);
     ASSERT(m_page);
 
-    bool isMainFrame = this == &m_page->mainFrame();
+    bool isMainFrame = this->isMainFrame();
 
     if (isMainFrame && view())
         view()->setParentVisible(false);
@@ -715,12 +728,12 @@ void Frame::createView(const IntSize& viewportSize, const Color& backgroundColor
 
     RefPtr<FrameView> frameView;
     if (isMainFrame) {
-        frameView = FrameView::create(this, viewportSize);
+        frameView = FrameView::create(*this, viewportSize);
         frameView->setFixedLayoutSize(fixedLayoutSize);
         frameView->setFixedVisibleContentRect(fixedVisibleContentRect);
         frameView->setUseFixedLayout(useFixedLayout);
     } else
-        frameView = FrameView::create(this);
+        frameView = FrameView::create(*this);
 
     frameView->setScrollbarModes(horizontalScrollbarMode, verticalScrollbarMode, horizontalLock, verticalLock);
 
@@ -875,11 +888,11 @@ void Frame::setPageAndTextZoomFactors(float pageZoomFactor, float textZoomFactor
         child->setPageAndTextZoomFactors(m_pageZoomFactor, m_textZoomFactor);
 
     if (FrameView* view = this->view()) {
-        if (document->renderer() && document->renderer()->needsLayout() && view->didFirstLayout())
+        if (document->renderView() && document->renderView()->needsLayout() && view->didFirstLayout())
             view->layout();
     }
 
-    if (&page->mainFrame() == this)
+    if (isMainFrame())
         pageCache()->markPagesForFullStyleRecalc(page);
 }
 
@@ -888,7 +901,7 @@ float Frame::frameScaleFactor() const
     Page* page = this->page();
 
     // Main frame is scaled with respect to he container but inner frames are not scaled with respect to the main frame.
-    if (!page || &page->mainFrame() != this || settings().applyPageScaleFactorInCompositor())
+    if (!page || &page->mainFrame() != this || settings().delegatesPageScaling())
         return 1;
 
     return page->pageScaleFactor();
@@ -925,9 +938,6 @@ void Frame::resumeActiveDOMObjectsAndAnimations()
         animation().resumeAnimationsForDocument(document());
         document()->resumeScriptedAnimationControllerCallbacks();
     }
-
-    if (m_view)
-        m_view->resumeAnimatingImages();
 }
 
 #if USE(ACCELERATED_COMPOSITING)
@@ -941,7 +951,7 @@ void Frame::deviceOrPageScaleFactorChanged()
 }
 #endif
 
-bool Frame::isURLAllowed(const KURL& url) const
+bool Frame::isURLAllowed(const URL& url) const
 {
     // We allow one level of self-reference because some sites depend on that,
     // but we don't allow more than one.
@@ -989,7 +999,7 @@ struct ScopedFramePaintingState {
 DragImageRef Frame::nodeImage(Node* node)
 {
     if (!node->renderer())
-        return 0;
+        return nullptr;
 
     const ScopedFramePaintingState state(this, node);
 
@@ -1000,10 +1010,10 @@ DragImageRef Frame::nodeImage(Node* node)
     m_doc->updateLayout();
     m_view->setNodeToDraw(node); // Enable special sub-tree drawing mode.
 
-    // Document::updateLayout may have blown away the original RenderObject.
-    RenderObject* renderer = node->renderer();
+    // Document::updateLayout may have blown away the original renderer.
+    auto renderer = node->renderer();
     if (!renderer)
-      return 0;
+        return nullptr;
 
     LayoutRect topLevelRect;
     IntRect paintingRect = pixelSnappedIntRect(renderer->paintingRootRect(topLevelRect));
@@ -1016,14 +1026,19 @@ DragImageRef Frame::nodeImage(Node* node)
 
     OwnPtr<ImageBuffer> buffer(ImageBuffer::create(paintingRect.size(), deviceScaleFactor, ColorSpaceDeviceRGB));
     if (!buffer)
-        return 0;
+        return nullptr;
     buffer->context()->translate(-paintingRect.x(), -paintingRect.y());
     buffer->context()->clip(FloatRect(0, 0, paintingRect.maxX(), paintingRect.maxY()));
 
     m_view->paintContents(buffer->context(), paintingRect);
 
     RefPtr<Image> image = buffer->copyImage();
-    return createDragImageFromImage(image.get(), ImageOrientationDescription(renderer->shouldRespectImageOrientation()));
+
+    ImageOrientationDescription orientationDescription(renderer->shouldRespectImageOrientation());
+#if ENABLE(CSS_IMAGE_ORIENTATION)
+    orientationDescription.setImageOrientationEnum(renderer->style().imageOrientation());
+#endif
+    return createDragImageFromImage(image.get(), orientationDescription);
 }
 
 DragImageRef Frame::dragImageForSelection()

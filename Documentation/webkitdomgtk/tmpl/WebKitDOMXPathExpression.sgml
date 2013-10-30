@@ -1,0 +1,43 @@
+<!-- ##### SECTION Title ##### -->
+WebKitDOMXPathExpression
+
+<!-- ##### SECTION Short_Description ##### -->
+
+
+<!-- ##### SECTION Long_Description ##### -->
+<para>
+
+</para>
+
+
+<!-- ##### SECTION See_Also ##### -->
+<para>
+
+</para>
+
+
+<!-- ##### SECTION Stability_Level ##### -->
+
+
+<!-- ##### SECTION Image ##### -->
+
+
+<!-- ##### STRUCT WebKitDOMXPathExpression ##### -->
+<para>
+
+</para>
+
+
+<!-- ##### FUNCTION webkit_dom_xpath_expression_evaluate ##### -->
+<para>
+
+</para>
+
+@self: 
+@contextNode: 
+@type: 
+@inResult: 
+@error: 
+@Returns: 
+
+

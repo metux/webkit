@@ -37,9 +37,9 @@ class HTMLMediaElement;
 
 class HTMLTrackElement FINAL : public HTMLElement, public TextTrackClient {
 public:
-    static PassRefPtr<HTMLTrackElement> create(const QualifiedName&, Document*);
+    static PassRefPtr<HTMLTrackElement> create(const QualifiedName&, Document&);
 
-    KURL src() const;
+    URL src() const;
     void setSrc(const String&);
 
     String kind();
@@ -68,14 +68,14 @@ public:
     const AtomicString& mediaElementCrossOriginAttribute() const;
 
 private:
-    HTMLTrackElement(const QualifiedName&, Document*);
+    HTMLTrackElement(const QualifiedName&, Document&);
     virtual ~HTMLTrackElement();
 
     virtual void parseAttribute(const QualifiedName&, const AtomicString&) OVERRIDE;
 
-    virtual InsertionNotificationRequest insertedInto(ContainerNode*) OVERRIDE;
+    virtual InsertionNotificationRequest insertedInto(ContainerNode&) OVERRIDE;
+    virtual void removedFrom(ContainerNode&) OVERRIDE;
 
-    virtual void removedFrom(ContainerNode*) OVERRIDE;
     virtual bool isURLAttribute(const Attribute&) const OVERRIDE;
 
     void loadTimerFired(Timer<HTMLTrackElement>*);
@@ -91,24 +91,13 @@ private:
     virtual void textTrackRemoveCue(TextTrack*, PassRefPtr<TextTrackCue>);
 
     LoadableTextTrack& ensureTrack();
-    virtual bool canLoadUrl(const KURL&);
+    virtual bool canLoadUrl(const URL&);
 
     RefPtr<LoadableTextTrack> m_track;
     Timer<HTMLTrackElement> m_loadTimer;
 };
 
-inline bool isHTMLTrackElement(const Node* node)
-{
-    return node->hasTagName(HTMLNames::trackTag);
-}
-
-inline bool isHTMLTrackElement(const Element* element)
-{
-    return element->hasTagName(HTMLNames::trackTag);
-}
-
-template <> inline bool isElementOfType<HTMLTrackElement>(const Element* element) { return isHTMLTrackElement(element); }
-
+NODE_TYPE_CASTS(HTMLTrackElement)
 
 }
 

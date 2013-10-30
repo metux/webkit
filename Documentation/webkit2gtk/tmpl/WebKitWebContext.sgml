@@ -264,6 +264,16 @@ WebKitWebContext
 @directory: 
 
 
+<!-- ##### FUNCTION webkit_web_context_allow_tls_certificate_for_host ##### -->
+<para>
+
+</para>
+
+@context: 
+@info: 
+@host: 
+
+
 <!-- ##### USER_FUNCTION WebKitURISchemeRequestCallback ##### -->
 <para>
 

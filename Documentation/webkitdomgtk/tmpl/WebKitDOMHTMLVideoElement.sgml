@@ -1,0 +1,217 @@
+<!-- ##### SECTION Title ##### -->
+WebKitDOMHTMLVideoElement
+
+<!-- ##### SECTION Short_Description ##### -->
+
+
+<!-- ##### SECTION Long_Description ##### -->
+<para>
+
+</para>
+
+
+<!-- ##### SECTION See_Also ##### -->
+<para>
+
+</para>
+
+
+<!-- ##### SECTION Stability_Level ##### -->
+
+
+<!-- ##### SECTION Image ##### -->
+
+
+<!-- ##### STRUCT WebKitDOMHTMLVideoElement ##### -->
+<para>
+
+</para>
+
+
+<!-- ##### ARG WebKitDOMHTMLVideoElement:height ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMHTMLVideoElement:poster ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMHTMLVideoElement:video-height ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMHTMLVideoElement:video-width ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMHTMLVideoElement:webkit-decoded-frame-count ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMHTMLVideoElement:webkit-displaying-fullscreen ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMHTMLVideoElement:webkit-dropped-frame-count ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMHTMLVideoElement:webkit-supports-fullscreen ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMHTMLVideoElement:width ##### -->
+<para>
+
+</para>
+
+<!-- ##### FUNCTION webkit_dom_html_video_element_webkit_enter_fullscreen ##### -->
+<para>
+
+</para>
+
+@self: 
+@error: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_video_element_webkit_exit_fullscreen ##### -->
+<para>
+
+</para>
+
+@self: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_video_element_webkit_enter_full_screen ##### -->
+<para>
+
+</para>
+
+@self: 
+@error: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_video_element_webkit_exit_full_screen ##### -->
+<para>
+
+</para>
+
+@self: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_video_element_get_width ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_video_element_set_width ##### -->
+<para>
+
+</para>
+
+@self: 
+@value: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_video_element_get_height ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_video_element_set_height ##### -->
+<para>
+
+</para>
+
+@self: 
+@value: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_video_element_get_video_width ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_video_element_get_video_height ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_video_element_get_poster ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_video_element_set_poster ##### -->
+<para>
+
+</para>
+
+@self: 
+@value: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_video_element_get_webkit_supports_fullscreen ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_video_element_get_webkit_displaying_fullscreen ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_video_element_get_webkit_decoded_frame_count ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_video_element_get_webkit_dropped_frame_count ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+

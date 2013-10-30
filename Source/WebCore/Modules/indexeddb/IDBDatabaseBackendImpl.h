@@ -27,6 +27,7 @@
 #define IDBDatabaseBackendImpl_h
 
 #include "IDBCallbacks.h"
+#include "IDBDatabaseCallbacks.h"
 #include "IDBMetadata.h"
 #include <stdint.h>
 #include <wtf/Deque.h>
@@ -37,18 +38,18 @@
 
 namespace WebCore {
 
-class IDBBackingStore;
+class IDBBackingStoreInterface;
 class IDBDatabase;
-class IDBFactoryBackendImpl;
-class IDBTransactionBackendImpl;
+class IDBFactoryBackendInterface;
+class IDBTransactionBackendInterface;
 class IDBTransactionCoordinator;
 
-class IDBDatabaseBackendImpl : public IDBDatabaseBackendInterface {
+class IDBDatabaseBackendImpl FINAL : public IDBDatabaseBackendInterface {
 public:
-    static PassRefPtr<IDBDatabaseBackendImpl> create(const String& name, IDBBackingStore* database, IDBFactoryBackendImpl*, const String& uniqueIdentifier);
+    static PassRefPtr<IDBDatabaseBackendImpl> create(const String& name, IDBBackingStoreInterface*, IDBFactoryBackendInterface*, const String& uniqueIdentifier);
     virtual ~IDBDatabaseBackendImpl();
 
-    PassRefPtr<IDBBackingStore> backingStore() const;
+    IDBBackingStoreInterface* backingStore() const;
 
     static const int64_t InvalidId = 0;
     int64_t id() const { return m_metadata.id; }
@@ -75,10 +76,10 @@ public:
     virtual void deleteIndex(int64_t transactionId, int64_t objectStoreId, int64_t indexId);
 
     IDBTransactionCoordinator* transactionCoordinator() const { return m_transactionCoordinator.get(); }
-    void transactionStarted(PassRefPtr<IDBTransactionBackendImpl>);
-    void transactionFinished(PassRefPtr<IDBTransactionBackendImpl>);
-    void transactionFinishedAndCompleteFired(PassRefPtr<IDBTransactionBackendImpl>);
-    void transactionFinishedAndAbortFired(PassRefPtr<IDBTransactionBackendImpl>);
+    void transactionStarted(IDBTransactionBackendInterface*);
+    void transactionFinished(IDBTransactionBackendInterface*);
+    void transactionFinishedAndCompleteFired(IDBTransactionBackendInterface*);
+    void transactionFinishedAndAbortFired(IDBTransactionBackendInterface*);
 
     virtual void get(int64_t transactionId, int64_t objectStoreId, int64_t indexId, PassRefPtr<IDBKeyRange>, bool keyOnly, PassRefPtr<IDBCallbacks>) OVERRIDE;
     virtual void put(int64_t transactionId, int64_t objectStoreId, PassRefPtr<SharedBuffer> value, PassRefPtr<IDBKey>, PutMode, PassRefPtr<IDBCallbacks>, const Vector<int64_t>& indexIds, const Vector<IndexKeys>&) OVERRIDE;
@@ -89,8 +90,13 @@ public:
     virtual void deleteRange(int64_t transactionId, int64_t objectStoreId, PassRefPtr<IDBKeyRange>, PassRefPtr<IDBCallbacks>) OVERRIDE;
     virtual void clear(int64_t transactionId, int64_t objectStoreId, PassRefPtr<IDBCallbacks>) OVERRIDE;
 
+    virtual bool isIDBDatabaseBackendImpl() OVERRIDE { return true; }
+
+    class VersionChangeOperation;
+    class VersionChangeAbortOperation;
+
 private:
-    IDBDatabaseBackendImpl(const String& name, IDBBackingStore* database, IDBFactoryBackendImpl*, const String& uniqueIdentifier);
+    IDBDatabaseBackendImpl(const String& name, IDBBackingStoreInterface*, IDBFactoryBackendInterface*, const String& uniqueIdentifier);
 
     bool openInternal();
     void runIntVersionChangeTransaction(PassRefPtr<IDBCallbacks>, PassRefPtr<IDBDatabaseCallbacks>, int64_t transactionId, int64_t requestedVersion);
@@ -100,32 +106,66 @@ private:
     bool isDeleteDatabaseBlocked();
     void deleteDatabaseFinal(PassRefPtr<IDBCallbacks>);
 
-    class VersionChangeOperation;
-
-    // When a "versionchange" transaction aborts, these restore the back-end object hierarchy.
-    class VersionChangeAbortOperation;
-
-    RefPtr<IDBBackingStore> m_backingStore;
+    RefPtr<IDBBackingStoreInterface> m_backingStore;
     IDBDatabaseMetadata m_metadata;
 
     String m_identifier;
     // This might not need to be a RefPtr since the factory's lifetime is that of the page group, but it's better to be conservitive than sorry.
-    RefPtr<IDBFactoryBackendImpl> m_factory;
+    RefPtr<IDBFactoryBackendInterface> m_factory;
 
     OwnPtr<IDBTransactionCoordinator> m_transactionCoordinator;
-    RefPtr<IDBTransactionBackendImpl> m_runningVersionChangeTransaction;
+    RefPtr<IDBTransactionBackendInterface> m_runningVersionChangeTransaction;
 
-    typedef HashMap<int64_t, IDBTransactionBackendImpl*> TransactionMap;
+    typedef HashMap<int64_t, IDBTransactionBackendInterface*> TransactionMap;
     TransactionMap m_transactions;
 
-    class PendingOpenCall;
-    Deque<OwnPtr<PendingOpenCall> > m_pendingOpenCalls;
+    class PendingOpenCall {
+    public:
+        static PassOwnPtr<PendingOpenCall> create(PassRefPtr<IDBCallbacks> callbacks, PassRefPtr<IDBDatabaseCallbacks> databaseCallbacks, int64_t transactionId, int64_t version)
+        {
+            return adoptPtr(new PendingOpenCall(callbacks, databaseCallbacks, transactionId, version));
+        }
+        IDBCallbacks* callbacks() { return m_callbacks.get(); }
+        IDBDatabaseCallbacks* databaseCallbacks() { return m_databaseCallbacks.get(); }
+        int64_t version() { return m_version; }
+        int64_t transactionId() const { return m_transactionId; }
+
+    private:
+        PendingOpenCall(PassRefPtr<IDBCallbacks> callbacks, PassRefPtr<IDBDatabaseCallbacks> databaseCallbacks, int64_t transactionId, int64_t version)
+            : m_callbacks(callbacks)
+            , m_databaseCallbacks(databaseCallbacks)
+            , m_version(version)
+            , m_transactionId(transactionId)
+        {
+        }
+        RefPtr<IDBCallbacks> m_callbacks;
+        RefPtr<IDBDatabaseCallbacks> m_databaseCallbacks;
+        int64_t m_version;
+        const int64_t m_transactionId;
+    };
+
+    Deque<OwnPtr<PendingOpenCall>> m_pendingOpenCalls;
     OwnPtr<PendingOpenCall> m_pendingSecondHalfOpen;
 
-    class PendingDeleteCall;
-    Deque<OwnPtr<PendingDeleteCall> > m_pendingDeleteCalls;
+    class PendingDeleteCall {
+    public:
+        static PassOwnPtr<PendingDeleteCall> create(PassRefPtr<IDBCallbacks> callbacks)
+        {
+            return adoptPtr(new PendingDeleteCall(callbacks));
+        }
+        IDBCallbacks* callbacks() { return m_callbacks.get(); }
 
-    typedef ListHashSet<RefPtr<IDBDatabaseCallbacks> > DatabaseCallbacksSet;
+    private:
+        PendingDeleteCall(PassRefPtr<IDBCallbacks> callbacks)
+            : m_callbacks(callbacks)
+        {
+        }
+        RefPtr<IDBCallbacks> m_callbacks;
+    };
+
+    Deque<OwnPtr<PendingDeleteCall>> m_pendingDeleteCalls;
+
+    typedef ListHashSet<RefPtr<IDBDatabaseCallbacks>> DatabaseCallbacksSet;
     DatabaseCallbacksSet m_databaseCallbacksSet;
 
     bool m_closingConnection;
@@ -133,6 +173,6 @@ private:
 
 } // namespace WebCore
 
-#endif
+#endif // ENABLE(INDEXED_DATABASE)
 
 #endif // IDBDatabaseBackendImpl_h

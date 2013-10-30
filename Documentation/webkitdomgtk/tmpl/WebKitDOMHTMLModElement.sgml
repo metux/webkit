@@ -1,0 +1,76 @@
+<!-- ##### SECTION Title ##### -->
+WebKitDOMHTMLModElement
+
+<!-- ##### SECTION Short_Description ##### -->
+
+
+<!-- ##### SECTION Long_Description ##### -->
+<para>
+
+</para>
+
+
+<!-- ##### SECTION See_Also ##### -->
+<para>
+
+</para>
+
+
+<!-- ##### SECTION Stability_Level ##### -->
+
+
+<!-- ##### SECTION Image ##### -->
+
+
+<!-- ##### STRUCT WebKitDOMHTMLModElement ##### -->
+<para>
+
+</para>
+
+
+<!-- ##### ARG WebKitDOMHTMLModElement:cite ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMHTMLModElement:date-time ##### -->
+<para>
+
+</para>
+
+<!-- ##### FUNCTION webkit_dom_html_mod_element_get_cite ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_mod_element_set_cite ##### -->
+<para>
+
+</para>
+
+@self: 
+@value: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_mod_element_get_date_time ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_mod_element_set_date_time ##### -->
+<para>
+
+</para>
+
+@self: 
+@value: 
+
+

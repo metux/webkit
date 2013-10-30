@@ -24,7 +24,7 @@
 #if ENABLE(SVG)
 #include "SVGGradientElement.h"
 
-#include "Attribute.h"
+#include "ElementIterator.h"
 #include "RenderSVGHiddenContainer.h"
 #include "RenderSVGPath.h"
 #include "RenderSVGResourceLinearGradient.h"
@@ -55,7 +55,7 @@ BEGIN_REGISTER_ANIMATED_PROPERTIES(SVGGradientElement)
     REGISTER_PARENT_ANIMATED_PROPERTIES(SVGElement)
 END_REGISTER_ANIMATED_PROPERTIES
  
-SVGGradientElement::SVGGradientElement(const QualifiedName& tagName, Document* document)
+SVGGradientElement::SVGGradientElement(const QualifiedName& tagName, Document& document)
     : SVGElement(tagName, document)
     , m_spreadMethod(SVGSpreadMethodPad)
     , m_gradientUnits(SVGUnitTypes::SVG_UNIT_TYPE_OBJECTBOUNDINGBOX)
@@ -123,31 +123,28 @@ void SVGGradientElement::svgAttributeChanged(const QualifiedName& attrName)
     SVGElementInstance::InvalidationGuard invalidationGuard(this);
     
     if (RenderObject* object = renderer())
-        object->setNeedsLayout(true);
+        object->setNeedsLayout();
 }
     
-void SVGGradientElement::childrenChanged(bool changedByParser, Node* beforeChange, Node* afterChange, int childCountDelta)
+void SVGGradientElement::childrenChanged(const ChildChange& change)
 {
-    SVGElement::childrenChanged(changedByParser, beforeChange, afterChange, childCountDelta);
+    SVGElement::childrenChanged(change);
 
-    if (changedByParser)
+    if (change.source == ChildChangeSourceParser)
         return;
 
     if (RenderObject* object = renderer())
-        object->setNeedsLayout(true);
+        object->setNeedsLayout();
 }
 
 Vector<Gradient::ColorStop> SVGGradientElement::buildStops()
 {
     Vector<Gradient::ColorStop> stops;
 
+    auto stopChildren = childrenOfType<SVGStopElement>(*this);
     float previousOffset = 0.0f;
-    for (Node* n = firstChild(); n; n = n->nextSibling()) {
-        SVGElement* element = n->isSVGElement() ? toSVGElement(n) : 0;
-        if (!element || !element->isGradientStop())
-            continue;
 
-        SVGStopElement* stop = toSVGStopElement(element);
+    for (auto stop = stopChildren.begin(), end = stopChildren.end(); stop != end; ++stop) {
         Color color = stop->stopColorIncludingOpacity();
 
         // Figure out right monotonic offset
@@ -164,6 +161,11 @@ Vector<Gradient::ColorStop> SVGGradientElement::buildStops()
     }
 
     return stops;
+}
+
+bool isSVGGradientElement(const Node& node)
+{
+    return node.hasTagName(SVGNames::radialGradientTag) || node.hasTagName(SVGNames::linearGradientTag);
 }
 
 }

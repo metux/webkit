@@ -1,0 +1,142 @@
+<!-- ##### SECTION Title ##### -->
+WebKitDOMScreen
+
+<!-- ##### SECTION Short_Description ##### -->
+
+
+<!-- ##### SECTION Long_Description ##### -->
+<para>
+
+</para>
+
+
+<!-- ##### SECTION See_Also ##### -->
+<para>
+
+</para>
+
+
+<!-- ##### SECTION Stability_Level ##### -->
+
+
+<!-- ##### SECTION Image ##### -->
+
+
+<!-- ##### STRUCT WebKitDOMScreen ##### -->
+<para>
+
+</para>
+
+
+<!-- ##### ARG WebKitDOMScreen:avail-height ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMScreen:avail-left ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMScreen:avail-top ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMScreen:avail-width ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMScreen:color-depth ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMScreen:height ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMScreen:pixel-depth ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMScreen:width ##### -->
+<para>
+
+</para>
+
+<!-- ##### FUNCTION webkit_dom_screen_get_height ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_screen_get_width ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_screen_get_color_depth ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_screen_get_pixel_depth ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_screen_get_avail_left ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_screen_get_avail_top ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_screen_get_avail_height ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_screen_get_avail_width ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+

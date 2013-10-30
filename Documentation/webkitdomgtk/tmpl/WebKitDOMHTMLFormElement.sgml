@@ -1,0 +1,290 @@
+<!-- ##### SECTION Title ##### -->
+WebKitDOMHTMLFormElement
+
+<!-- ##### SECTION Short_Description ##### -->
+
+
+<!-- ##### SECTION Long_Description ##### -->
+<para>
+
+</para>
+
+
+<!-- ##### SECTION See_Also ##### -->
+<para>
+
+</para>
+
+
+<!-- ##### SECTION Stability_Level ##### -->
+
+
+<!-- ##### SECTION Image ##### -->
+
+
+<!-- ##### STRUCT WebKitDOMHTMLFormElement ##### -->
+<para>
+
+</para>
+
+
+<!-- ##### ARG WebKitDOMHTMLFormElement:accept-charset ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMHTMLFormElement:action ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMHTMLFormElement:autocomplete ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMHTMLFormElement:elements ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMHTMLFormElement:encoding ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMHTMLFormElement:enctype ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMHTMLFormElement:length ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMHTMLFormElement:method ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMHTMLFormElement:name ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMHTMLFormElement:no-validate ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMHTMLFormElement:target ##### -->
+<para>
+
+</para>
+
+<!-- ##### FUNCTION webkit_dom_html_form_element_submit ##### -->
+<para>
+
+</para>
+
+@self: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_form_element_reset ##### -->
+<para>
+
+</para>
+
+@self: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_form_element_check_validity ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_form_element_get_accept_charset ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_form_element_set_accept_charset ##### -->
+<para>
+
+</para>
+
+@self: 
+@value: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_form_element_get_action ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_form_element_set_action ##### -->
+<para>
+
+</para>
+
+@self: 
+@value: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_form_element_get_autocomplete ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_form_element_set_autocomplete ##### -->
+<para>
+
+</para>
+
+@self: 
+@value: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_form_element_get_enctype ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_form_element_set_enctype ##### -->
+<para>
+
+</para>
+
+@self: 
+@value: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_form_element_get_encoding ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_form_element_set_encoding ##### -->
+<para>
+
+</para>
+
+@self: 
+@value: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_form_element_get_method ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_form_element_set_method ##### -->
+<para>
+
+</para>
+
+@self: 
+@value: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_form_element_get_name ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_form_element_set_name ##### -->
+<para>
+
+</para>
+
+@self: 
+@value: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_form_element_get_no_validate ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_form_element_set_no_validate ##### -->
+<para>
+
+</para>
+
+@self: 
+@value: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_form_element_get_target ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_form_element_set_target ##### -->
+<para>
+
+</para>
+
+@self: 
+@value: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_form_element_get_elements ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_form_element_get_length ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+

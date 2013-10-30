@@ -30,6 +30,7 @@
 
 #include "Executable.h"
 #include "JSInterfaceJIT.h"
+#include "JSStack.h"
 #include "LinkBuffer.h"
 
 namespace JSC {
@@ -37,10 +38,16 @@ namespace JSC {
     class SpecializedThunkJIT : public JSInterfaceJIT {
     public:
         static const int ThisArgument = -1;
-        SpecializedThunkJIT(int expectedArgCount)
+        SpecializedThunkJIT(VM* vm, int expectedArgCount)
+            : JSInterfaceJIT(vm)
         {
             // Check that we have the expected number of arguments
             m_failures.append(branch32(NotEqual, payloadFor(JSStack::ArgumentCount), TrustedImm32(expectedArgCount + 1)));
+        }
+        
+        explicit SpecializedThunkJIT(VM* vm)
+            : JSInterfaceJIT(vm)
+        {
         }
         
         void loadDoubleArgument(int argument, FPRegisterID dst, RegisterID scratch)
@@ -61,6 +68,13 @@ namespace JSC {
             m_failures.append(branchPtr(NotEqual, Address(dst, JSCell::structureOffset()), TrustedImmPtr(vm.stringStructure.get())));
         }
         
+        void loadArgumentWithSpecificClass(const ClassInfo* classInfo, int argument, RegisterID dst, RegisterID scratch)
+        {
+            loadCellArgument(argument, dst);
+            loadPtr(Address(dst, JSCell::structureOffset()), scratch);
+            appendFailure(branchPtr(NotEqual, Address(scratch, Structure::classInfoOffset()), TrustedImmPtr(classInfo)));
+        }
+        
         void loadInt32Argument(int argument, RegisterID dst, Jump& failTarget)
         {
             unsigned src = CallFrame::argumentOffset(argument);
@@ -78,7 +92,7 @@ namespace JSC {
         {
             m_failures.append(failure);
         }
-
+#if USE(JSVALUE64)
         void returnJSValue(RegisterID src)
         {
             if (src != regT0)
@@ -86,6 +100,15 @@ namespace JSC {
             loadPtr(payloadFor(JSStack::CallerFrame, callFrameRegister), callFrameRegister);
             ret();
         }
+#else
+        void returnJSValue(RegisterID payload, RegisterID tag)
+        {
+            ASSERT_UNUSED(payload, payload == regT0);
+            ASSERT_UNUSED(tag, tag == regT1);
+            loadPtr(payloadFor(JSStack::CallerFrame, callFrameRegister), callFrameRegister);
+            ret();
+        }
+#endif
         
         void returnDouble(FPRegisterID src)
         {
@@ -130,9 +153,9 @@ namespace JSC {
             ret();
         }
         
-        MacroAssemblerCodeRef finalize(VM& vm, MacroAssemblerCodePtr fallback, const char* thunkKind)
+        MacroAssemblerCodeRef finalize(MacroAssemblerCodePtr fallback, const char* thunkKind)
         {
-            LinkBuffer patchBuffer(vm, this, GLOBAL_THUNK_ID);
+            LinkBuffer patchBuffer(*m_vm, this, GLOBAL_THUNK_ID);
             patchBuffer.link(m_failures, CodeLocationLabel(fallback));
             for (unsigned i = 0; i < m_calls.size(); i++)
                 patchBuffer.link(m_calls[i].first, m_calls[i].second);
@@ -174,7 +197,7 @@ namespace JSC {
         }
         
         MacroAssembler::JumpList m_failures;
-        Vector<std::pair<Call, FunctionPtr> > m_calls;
+        Vector<std::pair<Call, FunctionPtr>> m_calls;
     };
 
 }

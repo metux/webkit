@@ -259,6 +259,7 @@ WebKitWebView implements
   "<a class="link" href="WebKitWebView.html#WebKitWebView-leave-fullscreen" title='The "leave-fullscreen" signal'>leave-fullscreen</a>"                               : <a href="../gobject/gobject-Signals.html#G-SIGNAL-RUN-LAST:CAPS"><code class="literal">Run Last</code></a>
   "<a class="link" href="WebKitWebView.html#WebKitWebView-load-changed" title='The "load-changed" signal'>load-changed</a>"                                   : <a href="../gobject/gobject-Signals.html#G-SIGNAL-RUN-LAST:CAPS"><code class="literal">Run Last</code></a>
   "<a class="link" href="WebKitWebView.html#WebKitWebView-load-failed" title='The "load-failed" signal'>load-failed</a>"                                    : <a href="../gobject/gobject-Signals.html#G-SIGNAL-RUN-LAST:CAPS"><code class="literal">Run Last</code></a>
+  "<a class="link" href="WebKitWebView.html#WebKitWebView-load-failed-with-tls-errors" title='The "load-failed-with-tls-errors" signal'>load-failed-with-tls-errors</a>"                    : <a href="../gobject/gobject-Signals.html#G-SIGNAL-RUN-LAST:CAPS"><code class="literal">Run Last</code></a>
   "<a class="link" href="WebKitWebView.html#WebKitWebView-mouse-target-changed" title='The "mouse-target-changed" signal'>mouse-target-changed</a>"                           : <a href="../gobject/gobject-Signals.html#G-SIGNAL-RUN-LAST:CAPS"><code class="literal">Run Last</code></a>
   "<a class="link" href="WebKitWebView.html#WebKitWebView-permission-request" title='The "permission-request" signal'>permission-request</a>"                             : <a href="../gobject/gobject-Signals.html#G-SIGNAL-RUN-LAST:CAPS"><code class="literal">Run Last</code></a>
   "<a class="link" href="WebKitWebView.html#WebKitWebView-print" title='The "print" signal'>print</a>"                                          : <a href="../gobject/gobject-Signals.html#G-SIGNAL-RUN-LAST:CAPS"><code class="literal">Run Last</code></a>
@@ -3702,6 +3703,60 @@ You need to handle the signal if you want to provide your own error page.
 </tr>
 </tbody>
 </table></div>
+</div>
+<hr>
+<div class="refsect2">
+<a name="WebKitWebView-load-failed-with-tls-errors"></a><h3>The <code class="literal">"load-failed-with-tls-errors"</code> signal</h3>
+<pre class="programlisting"><a href="../glib/glib-Basic-Types.html#gboolean"><span class="returnvalue">gboolean</span></a>            user_function                      (<a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a>         *web_view,
+                                                        <a class="link" href="WebKitCertificateInfo.html" title="WebKitCertificateInfo"><span class="type">WebKitCertificateInfo</span></a> *info,
+                                                        <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a>                 *host,
+                                                        <a href="../glib/glib-Basic-Types.html#gpointer"><span class="type">gpointer</span></a>               user_data)      : <a href="../gobject/gobject-Signals.html#G-SIGNAL-RUN-LAST:CAPS"><code class="literal">Run Last</code></a></pre>
+<p>
+Emitted when a TLS error occurs during a load operation. The <em class="parameter"><code>info</code></em>
+object contains information about the error such as the <a href="../gio/GTlsCertificate.html"><span class="type">GTlsCertificate</span></a>
+and the <a href="../gio/gio-TLS-Overview.html#GTlsCertificateFlags"><span class="type">GTlsCertificateFlags</span></a>. To allow an exception for this certificate
+and this host use <a class="link" href="WebKitWebContext.html#webkit-web-context-allow-tls-certificate-for-host" title="webkit_web_context_allow_tls_certificate_for_host ()"><code class="function">webkit_web_context_allow_tls_certificate_for_host()</code></a>.
+</p>
+<p>
+To handle this signal asynchronously you should copy the <a class="link" href="WebKitCertificateInfo.html" title="WebKitCertificateInfo"><span class="type">WebKitCertificateInfo</span></a>
+with <a class="link" href="WebKitCertificateInfo.html#webkit-certificate-info-copy" title="webkit_certificate_info_copy ()"><code class="function">webkit_certificate_info_copy()</code></a> and return <a href="../glib/glib-Standard-Macros.html#TRUE:CAPS"><code class="literal">TRUE</code></a>.
+</p>
+<p>
+If <a href="../glib/glib-Standard-Macros.html#FALSE:CAPS"><code class="literal">FALSE</code></a> is returned, <a class="link" href="WebKitWebView.html#WebKitWebView-load-failed" title='The "load-failed" signal'><span class="type">"load-failed"</span></a> will be emitted. The load
+will finish regardless of the returned value.
+</p>
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
+<col align="left" valign="top">
+<col>
+</colgroup>
+<tbody>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>web_view</code></em> :</span></p></td>
+<td>the <a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> on which the signal is emitted</td>
+</tr>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>info</code></em> :</span></p></td>
+<td>a <a class="link" href="WebKitCertificateInfo.html" title="WebKitCertificateInfo"><span class="type">WebKitCertificateInfo</span></a>
+</td>
+</tr>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>host</code></em> :</span></p></td>
+<td>the host on which the error occurred</td>
+</tr>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>user_data</code></em> :</span></p></td>
+<td>user data set when the signal handler was connected.</td>
+</tr>
+<tr>
+<td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
+<td>
+<a href="../glib/glib-Standard-Macros.html#TRUE:CAPS"><code class="literal">TRUE</code></a> to stop other handlers from being invoked for the event.
+<a href="../glib/glib-Standard-Macros.html#FALSE:CAPS"><code class="literal">FALSE</code></a> to propagate the event further.</td>
+</tr>
+</tbody>
+</table></div>
+<p class="since">Since 2.4</p>
 </div>
 <hr>
 <div class="refsect2">

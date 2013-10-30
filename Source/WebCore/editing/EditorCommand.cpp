@@ -97,7 +97,7 @@ static Frame* targetFrame(Frame& frame, Event* event)
     Node* node = event->target()->toNode();
     if (!node)
         return &frame;
-    return node->document()->frame();
+    return node->document().frame();
 }
 
 static bool applyCommandToFrame(Frame& frame, EditorCommandSource source, EditAction action, StylePropertySet* style)
@@ -142,7 +142,7 @@ static bool executeToggleStyleInList(Frame& frame, EditorCommandSource source, E
     RefPtr<CSSValue> selectedCSSValue = selectionStyle->style()->getPropertyCSSValue(propertyID);
     String newStyle = ASCIILiteral("none");
     if (selectedCSSValue->isValueList()) {
-        RefPtr<CSSValueList> selectedCSSValueList = static_cast<CSSValueList*>(selectedCSSValue.get());
+        RefPtr<CSSValueList> selectedCSSValueList = toCSSValueList(selectedCSSValue.get());
         if (!selectedCSSValueList->removeAll(value))
             selectedCSSValueList->append(value);
         if (selectedCSSValueList->length())
@@ -193,13 +193,14 @@ static bool executeApplyParagraphStyle(Frame& frame, EditorCommandSource source,
 
 static bool executeInsertFragment(Frame& frame, PassRefPtr<DocumentFragment> fragment)
 {
-    applyCommand(ReplaceSelectionCommand::create(frame.document(), fragment, ReplaceSelectionCommand::PreventNesting, EditActionUnspecified));
+    ASSERT(frame.document());
+    applyCommand(ReplaceSelectionCommand::create(*frame.document(), fragment, ReplaceSelectionCommand::PreventNesting, EditActionUnspecified));
     return true;
 }
 
 static bool executeInsertNode(Frame& frame, PassRefPtr<Node> content)
 {
-    RefPtr<DocumentFragment> fragment = DocumentFragment::create(frame.document());
+    RefPtr<DocumentFragment> fragment = DocumentFragment::create(*frame.document());
     ExceptionCode ec = 0;
     fragment->appendChild(content, ec);
     if (ec)
@@ -252,16 +253,14 @@ static unsigned verticalScrollDistance(Frame& frame)
     Element* focusedElement = frame.document()->focusedElement();
     if (!focusedElement)
         return 0;
-    RenderObject* renderer = focusedElement->renderer();
+    auto renderer = focusedElement->renderer();
     if (!renderer || !renderer->isBox())
         return 0;
-    RenderStyle* style = renderer->style();
-    if (!style)
-        return 0;
-    if (!(style->overflowY() == OSCROLL || style->overflowY() == OAUTO || focusedElement->rendererIsEditable()))
+    const RenderStyle& style = renderer->style();
+    if (!(style.overflowY() == OSCROLL || style.overflowY() == OAUTO || focusedElement->rendererIsEditable()))
         return 0;
     int height = std::min<int>(toRenderBox(renderer)->clientHeight(), frame.view()->visibleHeight());
-    return static_cast<unsigned>(max(max<int>(height * Scrollbar::minFractionToStepWhenPaging(), height - Scrollbar::maxOverlapBetweenPages()), 1));
+    return static_cast<unsigned>(std::max(std::max<int>(height * Scrollbar::minFractionToStepWhenPaging(), height - Scrollbar::maxOverlapBetweenPages()), 1));
 }
 
 static RefPtr<Range> unionDOMRanges(Range* a, Range* b)
@@ -290,7 +289,8 @@ static bool executeCreateLink(Frame& frame, Event*, EditorCommandSource, const S
     // FIXME: If userInterface is true, we should display a dialog box to let the user enter a URL.
     if (value.isEmpty())
         return false;
-    applyCommand(CreateLinkCommand::create(frame.document(), value));
+    ASSERT(frame.document());
+    applyCommand(CreateLinkCommand::create(*frame.document(), value));
     return true;
 }
 
@@ -327,7 +327,7 @@ static bool executeDelete(Frame& frame, Event*, EditorCommandSource source, cons
     case CommandFromDOMWithUserInterface:
         // If the current selection is a caret, delete the preceding character. IE performs forwardDelete, but we currently side with Firefox.
         // Doesn't scroll to make the selection visible, or modify the kill ring (this time, siding with IE, not Firefox).
-        TypingCommand::deleteKeyPressed(frame.document(), frame.selection().granularity() == WordGranularity ? TypingCommand::SmartDelete : 0);
+        TypingCommand::deleteKeyPressed(*frame.document(), frame.selection().granularity() == WordGranularity ? TypingCommand::SmartDelete : 0);
         return true;
     }
     ASSERT_NOT_REACHED();
@@ -410,7 +410,7 @@ static bool executeDeleteWordForward(Frame& frame, Event*, EditorCommandSource, 
 
 static bool executeFindString(Frame& frame, Event*, EditorCommandSource, const String& value)
 {
-    return frame.editor().findString(value, true, false, true, false);
+    return frame.editor().findString(value, CaseInsensitive | WrapAround);
 }
 
 static bool executeFontName(Frame& frame, Event*, EditorCommandSource source, const String& value)
@@ -447,7 +447,8 @@ static bool executeFormatBlock(Frame& frame, Event*, EditorCommandSource, const 
         return false;
     QualifiedName qualifiedTagName(prefix, localName, xhtmlNamespaceURI);
 
-    RefPtr<FormatBlockCommand> command = FormatBlockCommand::create(frame.document(), qualifiedTagName);
+    ASSERT(frame.document());
+    RefPtr<FormatBlockCommand> command = FormatBlockCommand::create(*frame.document(), qualifiedTagName);
     applyCommand(command);
     return command->didApply();
 }
@@ -463,7 +464,7 @@ static bool executeForwardDelete(Frame& frame, Event*, EditorCommandSource sourc
         // Doesn't scroll to make the selection visible, or modify the kill ring.
         // ForwardDelete is not implemented in IE or Firefox, so this behavior is only needed for
         // backward compatibility with ourselves, and for consistency with Delete.
-        TypingCommand::forwardDeleteKeyPressed(frame.document());
+        TypingCommand::forwardDeleteKeyPressed(*frame.document());
         return true;
     }
     ASSERT_NOT_REACHED();
@@ -478,7 +479,8 @@ static bool executeIgnoreSpelling(Frame& frame, Event*, EditorCommandSource, con
 
 static bool executeIndent(Frame& frame, Event*, EditorCommandSource, const String&)
 {
-    applyCommand(IndentOutdentCommand::create(frame.document(), IndentOutdentCommand::Indent));
+    ASSERT(frame.document());
+    applyCommand(IndentOutdentCommand::create(*frame.document(), IndentOutdentCommand::Indent));
     return true;
 }
 
@@ -489,7 +491,7 @@ static bool executeInsertBacktab(Frame& frame, Event* event, EditorCommandSource
 
 static bool executeInsertHorizontalRule(Frame& frame, Event*, EditorCommandSource, const String& value)
 {
-    RefPtr<HTMLHRElement> rule = HTMLHRElement::create(frame.document());
+    RefPtr<HTMLHRElement> rule = HTMLHRElement::create(*frame.document());
     if (!value.isEmpty())
         rule->setIdAttribute(value);
     return executeInsertNode(frame, rule.release());
@@ -497,13 +499,13 @@ static bool executeInsertHorizontalRule(Frame& frame, Event*, EditorCommandSourc
 
 static bool executeInsertHTML(Frame& frame, Event*, EditorCommandSource, const String& value)
 {
-    return executeInsertFragment(frame, createFragmentFromMarkup(frame.document(), value, ""));
+    return executeInsertFragment(frame, createFragmentFromMarkup(*frame.document(), value, ""));
 }
 
 static bool executeInsertImage(Frame& frame, Event*, EditorCommandSource, const String& value)
 {
     // FIXME: If userInterface is true, we should display a dialog box and let the user choose a local image.
-    RefPtr<HTMLImageElement> image = HTMLImageElement::create(frame.document());
+    RefPtr<HTMLImageElement> image = HTMLImageElement::create(*frame.document());
     image->setSrc(value);
     return executeInsertNode(frame, image.release());
 }
@@ -518,7 +520,7 @@ static bool executeInsertLineBreak(Frame& frame, Event* event, EditorCommandSour
         // Doesn't scroll to make the selection visible, or modify the kill ring.
         // InsertLineBreak is not implemented in IE or Firefox, so this behavior is only needed for
         // backward compatibility with ourselves, and for consistency with other commands.
-        TypingCommand::insertLineBreak(frame.document(), 0);
+        TypingCommand::insertLineBreak(*frame.document(), 0);
         return true;
     }
     ASSERT_NOT_REACHED();
@@ -533,19 +535,20 @@ static bool executeInsertNewline(Frame& frame, Event* event, EditorCommandSource
 
 static bool executeInsertNewlineInQuotedContent(Frame& frame, Event*, EditorCommandSource, const String&)
 {
-    TypingCommand::insertParagraphSeparatorInQuotedContent(frame.document());
+    TypingCommand::insertParagraphSeparatorInQuotedContent(*frame.document());
     return true;
 }
 
 static bool executeInsertOrderedList(Frame& frame, Event*, EditorCommandSource, const String&)
 {
-    applyCommand(InsertListCommand::create(frame.document(), InsertListCommand::OrderedList));
+    ASSERT(frame.document());
+    applyCommand(InsertListCommand::create(*frame.document(), InsertListCommand::OrderedList));
     return true;
 }
 
 static bool executeInsertParagraph(Frame& frame, Event*, EditorCommandSource, const String&)
 {
-    TypingCommand::insertParagraphSeparator(frame.document(), 0);
+    TypingCommand::insertParagraphSeparator(*frame.document(), 0);
     return true;
 }
 
@@ -556,13 +559,14 @@ static bool executeInsertTab(Frame& frame, Event* event, EditorCommandSource, co
 
 static bool executeInsertText(Frame& frame, Event*, EditorCommandSource, const String& value)
 {
-    TypingCommand::insertText(frame.document(), value, 0);
+    TypingCommand::insertText(*frame.document(), value, 0);
     return true;
 }
 
 static bool executeInsertUnorderedList(Frame& frame, Event*, EditorCommandSource, const String&)
 {
-    applyCommand(InsertListCommand::create(frame.document(), InsertListCommand::UnorderedList));
+    ASSERT(frame.document());
+    applyCommand(InsertListCommand::create(*frame.document(), InsertListCommand::UnorderedList));
     return true;
 }
 
@@ -898,7 +902,8 @@ static bool executeMoveToRightEndOfLineAndModifySelection(Frame& frame, Event*, 
 
 static bool executeOutdent(Frame& frame, Event*, EditorCommandSource, const String&)
 {
-    applyCommand(IndentOutdentCommand::create(frame.document(), IndentOutdentCommand::Outdent));
+    ASSERT(frame.document());
+    applyCommand(IndentOutdentCommand::create(*frame.document(), IndentOutdentCommand::Outdent));
     return true;
 }
 
@@ -918,19 +923,21 @@ static bool executePaste(Frame& frame, Event*, EditorCommandSource source, const
     return true;
 }
 
+#if PLATFORM(GTK)
+
 static bool executePasteGlobalSelection(Frame& frame, Event*, EditorCommandSource source, const String&)
 {
+    // FIXME: This check should be in an enable function, not here.
     if (!frame.editor().client()->supportsGlobalSelection())
         return false;
+
     ASSERT_UNUSED(source, source == CommandFromMenuOrKeyBinding);
     UserTypingGestureIndicator typingGestureIndicator(frame);
-
-    bool oldSelectionMode = Pasteboard::generalPasteboard()->isSelectionMode();
-    Pasteboard::generalPasteboard()->setSelectionMode(true);
-    frame.editor().paste();
-    Pasteboard::generalPasteboard()->setSelectionMode(oldSelectionMode);
+    frame.editor().paste(*Pasteboard::createForGlobalSelection());
     return true;
 }
+
+#endif
 
 static bool executePasteAndMatchStyle(Frame& frame, Event*, EditorCommandSource source, const String&)
 {
@@ -1126,7 +1133,8 @@ static bool executeUndo(Frame& frame, Event*, EditorCommandSource, const String&
 
 static bool executeUnlink(Frame& frame, Event*, EditorCommandSource, const String&)
 {
-    applyCommand(UnlinkCommand::create(frame.document()));
+    ASSERT(frame.document());
+    applyCommand(UnlinkCommand::create(*frame.document()));
     return true;
 }
 
@@ -1559,7 +1567,6 @@ static const CommandMap& createCommandMap()
         { "Paste", { executePaste, supportedPaste, enabledPaste, stateNone, valueNull, notTextInsertion, allowExecutionWhenDisabled } },
         { "PasteAndMatchStyle", { executePasteAndMatchStyle, supportedPaste, enabledPaste, stateNone, valueNull, notTextInsertion, allowExecutionWhenDisabled } },
         { "PasteAsPlainText", { executePasteAsPlainText, supportedPaste, enabledPaste, stateNone, valueNull, notTextInsertion, allowExecutionWhenDisabled } },
-        { "PasteGlobalSelection", { executePasteGlobalSelection, supportedFromMenuOrKeyBinding, enabledPaste, stateNone, valueNull, notTextInsertion, allowExecutionWhenDisabled } },
         { "Print", { executePrint, supported, enabled, stateNone, valueNull, notTextInsertion, doNotAllowExecutionWhenDisabled } },
         { "Redo", { executeRedo, supported, enabledRedo, stateNone, valueNull, notTextInsertion, doNotAllowExecutionWhenDisabled } },
         { "RemoveFormat", { executeRemoveFormat, supported, enabledRangeInEditableText, stateNone, valueNull, notTextInsertion, doNotAllowExecutionWhenDisabled } },
@@ -1593,6 +1600,10 @@ static const CommandMap& createCommandMap()
         { "UseCSS", { executeUseCSS, supported, enabled, stateNone, valueNull, notTextInsertion, doNotAllowExecutionWhenDisabled } },
         { "Yank", { executeYank, supportedFromMenuOrKeyBinding, enabledInEditableText, stateNone, valueNull, notTextInsertion, doNotAllowExecutionWhenDisabled } },
         { "YankAndSelect", { executeYankAndSelect, supportedFromMenuOrKeyBinding, enabledInEditableText, stateNone, valueNull, notTextInsertion, doNotAllowExecutionWhenDisabled } },
+
+#if PLATFORM(GTK)
+        { "PasteGlobalSelection", { executePasteGlobalSelection, supportedFromMenuOrKeyBinding, enabledPaste, stateNone, valueNull, notTextInsertion, allowExecutionWhenDisabled } },
+#endif
 
 #if PLATFORM(MAC)
         { "TakeFindStringFromSelection", { executeTakeFindStringFromSelection, supportedFromMenuOrKeyBinding, enabledTakeFindStringFromSelection, stateNone, valueNull, notTextInsertion, doNotAllowExecutionWhenDisabled } },

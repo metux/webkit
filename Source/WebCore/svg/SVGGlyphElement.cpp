@@ -33,13 +33,13 @@
 
 namespace WebCore {
 
-inline SVGGlyphElement::SVGGlyphElement(const QualifiedName& tagName, Document* document)
+inline SVGGlyphElement::SVGGlyphElement(const QualifiedName& tagName, Document& document)
     : SVGElement(tagName, document)
 {
     ASSERT(hasTagName(SVGNames::glyphTag));
 }
 
-PassRefPtr<SVGGlyphElement> SVGGlyphElement::create(const QualifiedName& tagName, Document* document)
+PassRefPtr<SVGGlyphElement> SVGGlyphElement::create(const QualifiedName& tagName, Document& document)
 {
     return adoptRef(new SVGGlyphElement(tagName, document));
 }
@@ -59,15 +59,15 @@ void SVGGlyphElement::parseAttribute(const QualifiedName& name, const AtomicStri
         SVGElement::parseAttribute(name, value);
 }
 
-Node::InsertionNotificationRequest SVGGlyphElement::insertedInto(ContainerNode* rootParent)
+Node::InsertionNotificationRequest SVGGlyphElement::insertedInto(ContainerNode& rootParent)
 {
     invalidateGlyphCache();
     return SVGElement::insertedInto(rootParent);
 }
 
-void SVGGlyphElement::removedFrom(ContainerNode* rootParent)
+void SVGGlyphElement::removedFrom(ContainerNode& rootParent)
 {
-    if (rootParent->inDocument())
+    if (rootParent.inDocument())
         invalidateGlyphCache();
     SVGElement::removedFrom(rootParent);
 }

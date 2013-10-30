@@ -1,0 +1,175 @@
+<!-- ##### SECTION Title ##### -->
+WebKitDOMShadowRoot
+
+<!-- ##### SECTION Short_Description ##### -->
+
+
+<!-- ##### SECTION Long_Description ##### -->
+<para>
+
+</para>
+
+
+<!-- ##### SECTION See_Also ##### -->
+<para>
+
+</para>
+
+
+<!-- ##### SECTION Stability_Level ##### -->
+
+
+<!-- ##### SECTION Image ##### -->
+
+
+<!-- ##### STRUCT WebKitDOMShadowRoot ##### -->
+<para>
+
+</para>
+
+
+<!-- ##### ARG WebKitDOMShadowRoot:active-element ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMShadowRoot:apply-author-styles ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMShadowRoot:inner-html ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMShadowRoot:reset-style-inheritance ##### -->
+<para>
+
+</para>
+
+<!-- ##### FUNCTION webkit_dom_shadow_root_get_selection ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_shadow_root_get_element_by_id ##### -->
+<para>
+
+</para>
+
+@self: 
+@elementId: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_shadow_root_get_elements_by_class_name ##### -->
+<para>
+
+</para>
+
+@self: 
+@className: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_shadow_root_get_elements_by_tag_name ##### -->
+<para>
+
+</para>
+
+@self: 
+@tagName: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_shadow_root_get_elements_by_tag_name_ns ##### -->
+<para>
+
+</para>
+
+@self: 
+@namespaceURI: 
+@localName: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_shadow_root_element_from_point ##### -->
+<para>
+
+</para>
+
+@self: 
+@x: 
+@y: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_shadow_root_get_active_element ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_shadow_root_get_apply_author_styles ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_shadow_root_set_apply_author_styles ##### -->
+<para>
+
+</para>
+
+@self: 
+@value: 
+
+
+<!-- ##### FUNCTION webkit_dom_shadow_root_get_reset_style_inheritance ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_shadow_root_set_reset_style_inheritance ##### -->
+<para>
+
+</para>
+
+@self: 
+@value: 
+
+
+<!-- ##### FUNCTION webkit_dom_shadow_root_get_inner_html ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_shadow_root_set_inner_html ##### -->
+<para>
+
+</para>
+
+@self: 
+@value: 
+@error: 
+
+

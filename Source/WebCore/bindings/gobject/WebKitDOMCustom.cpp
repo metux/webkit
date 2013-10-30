@@ -247,6 +247,19 @@ void* webkit_dom_html_element_get_item_type(WebKitDOMHTMLElement*)
     return 0;
 }
 
+// WebKitDOMHTMLStyleElement
+
+void webkit_dom_html_style_element_set_scoped(WebKitDOMHTMLStyleElement*, gboolean)
+{
+    g_warning("%s: this functionality has been removed from WebKit, this function does nothing.", __func__);
+}
+
+gboolean webkit_dom_html_style_element_get_scoped(WebKitDOMHTMLStyleElement*)
+{
+    g_warning("%s: this functionality has been removed from WebKit, this function does nothing.", __func__);
+    return FALSE;
+}
+
 // WebKitDOMHTMLPropertiesCollection
 
 typedef struct _WebKitDOMHTMLPropertiesCollection {
@@ -536,5 +549,11 @@ WebKitDOMNode* webkit_dom_property_node_list_item(void*, gulong)
 gulong webkit_dom_property_node_list_get_length(void*)
 {
     g_warning("%s: the PropertyNodeList object has been removed from WebKit, this function does nothing.", __func__);
+    return 0;
+}
+
+gdouble webkit_dom_html_media_element_get_start_time(WebKitDOMHTMLMediaElement*)
+{
+    g_warning("%s: the HTMLMediaElement:start-time property has been removed from WebKit, this function does nothing.", __func__);
     return 0;
 }

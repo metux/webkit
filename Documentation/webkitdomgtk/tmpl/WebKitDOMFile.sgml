@@ -1,0 +1,58 @@
+<!-- ##### SECTION Title ##### -->
+WebKitDOMFile
+
+<!-- ##### SECTION Short_Description ##### -->
+
+
+<!-- ##### SECTION Long_Description ##### -->
+<para>
+
+</para>
+
+
+<!-- ##### SECTION See_Also ##### -->
+<para>
+
+</para>
+
+
+<!-- ##### SECTION Stability_Level ##### -->
+
+
+<!-- ##### SECTION Image ##### -->
+
+
+<!-- ##### STRUCT WebKitDOMFile ##### -->
+<para>
+
+</para>
+
+
+<!-- ##### ARG WebKitDOMFile:name ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMFile:webkit-relative-path ##### -->
+<para>
+
+</para>
+
+<!-- ##### FUNCTION webkit_dom_file_get_name ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_file_get_webkit_relative_path ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+

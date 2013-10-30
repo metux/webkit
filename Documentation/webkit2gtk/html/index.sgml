@@ -35,6 +35,7 @@
 <ANCHOR id="webkit-web-context-set-web-extensions-directory" href="webkit2gtk/WebKitWebContext.html#webkit-web-context-set-web-extensions-directory">
 <ANCHOR id="webkit-web-context-prefetch-dns" href="webkit2gtk/WebKitWebContext.html#webkit-web-context-prefetch-dns">
 <ANCHOR id="webkit-web-context-set-disk-cache-directory" href="webkit2gtk/WebKitWebContext.html#webkit-web-context-set-disk-cache-directory">
+<ANCHOR id="webkit-web-context-allow-tls-certificate-for-host" href="webkit2gtk/WebKitWebContext.html#webkit-web-context-allow-tls-certificate-for-host">
 <ANCHOR id="WebKitURISchemeRequestCallback" href="webkit2gtk/WebKitWebContext.html#WebKitURISchemeRequestCallback">
 <ANCHOR id="webkit-web-context-register-uri-scheme" href="webkit2gtk/WebKitWebContext.html#webkit-web-context-register-uri-scheme">
 <ANCHOR id="WebKitWebContext.signal-details" href="webkit2gtk/WebKitWebContext.html#WebKitWebContext.signal-details">
@@ -170,6 +171,7 @@
 <ANCHOR id="WebKitWebView-leave-fullscreen" href="webkit2gtk/WebKitWebView.html#WebKitWebView-leave-fullscreen">
 <ANCHOR id="WebKitWebView-load-changed" href="webkit2gtk/WebKitWebView.html#WebKitWebView-load-changed">
 <ANCHOR id="WebKitWebView-load-failed" href="webkit2gtk/WebKitWebView.html#WebKitWebView-load-failed">
+<ANCHOR id="WebKitWebView-load-failed-with-tls-errors" href="webkit2gtk/WebKitWebView.html#WebKitWebView-load-failed-with-tls-errors">
 <ANCHOR id="WebKitWebView-mouse-target-changed" href="webkit2gtk/WebKitWebView.html#WebKitWebView-mouse-target-changed">
 <ANCHOR id="WebKitWebView-permission-request" href="webkit2gtk/WebKitWebView.html#WebKitWebView-permission-request">
 <ANCHOR id="WebKitWebView-print" href="webkit2gtk/WebKitWebView.html#WebKitWebView-print">
@@ -962,6 +964,17 @@
 <ANCHOR id="WebKitWebViewGroup.property-details" href="webkit2gtk/WebKitWebViewGroup.html#WebKitWebViewGroup.property-details">
 <ANCHOR id="WebKitWebViewGroup--settings" href="webkit2gtk/WebKitWebViewGroup.html#WebKitWebViewGroup--settings">
 <ANCHOR id="WebKitWebViewGroup.see-also" href="webkit2gtk/WebKitWebViewGroup.html#WebKitWebViewGroup.see-also">
+<ANCHOR id="WebKitCertificateInfo" href="webkit2gtk/WebKitCertificateInfo.html">
+<ANCHOR id="WebKitCertificateInfo.synopsis" href="webkit2gtk/WebKitCertificateInfo.html#WebKitCertificateInfo.synopsis">
+<ANCHOR id="WebKitCertificateInfo.object-hierarchy" href="webkit2gtk/WebKitCertificateInfo.html#WebKitCertificateInfo.object-hierarchy">
+<ANCHOR id="WebKitCertificateInfo.description" href="webkit2gtk/WebKitCertificateInfo.html#WebKitCertificateInfo.description">
+<ANCHOR id="WebKitCertificateInfo.details" href="webkit2gtk/WebKitCertificateInfo.html#WebKitCertificateInfo.details">
+<ANCHOR id="WebKitCertificateInfo-struct" href="webkit2gtk/WebKitCertificateInfo.html#WebKitCertificateInfo-struct">
+<ANCHOR id="webkit-certificate-info-copy" href="webkit2gtk/WebKitCertificateInfo.html#webkit-certificate-info-copy">
+<ANCHOR id="webkit-certificate-info-free" href="webkit2gtk/WebKitCertificateInfo.html#webkit-certificate-info-free">
+<ANCHOR id="webkit-certificate-info-get-tls-certificate" href="webkit2gtk/WebKitCertificateInfo.html#webkit-certificate-info-get-tls-certificate">
+<ANCHOR id="webkit-certificate-info-get-tls-errors" href="webkit2gtk/WebKitCertificateInfo.html#webkit-certificate-info-get-tls-errors">
+<ANCHOR id="WebKitCertificateInfo.see-also" href="webkit2gtk/WebKitCertificateInfo.html#WebKitCertificateInfo.see-also">
 <ANCHOR id="WebKitWebExtension" href="webkit2gtk/WebKitWebExtension.html">
 <ANCHOR id="WebKitWebExtension.synopsis" href="webkit2gtk/WebKitWebExtension.html#WebKitWebExtension.synopsis">
 <ANCHOR id="WebKitWebExtension.object-hierarchy" href="webkit2gtk/WebKitWebExtension.html#WebKitWebExtension.object-hierarchy">
@@ -1011,12 +1024,12 @@
 <ANCHOR id="webkit-script-world-new" href="webkit2gtk/WebKitScriptWorld.html#webkit-script-world-new">
 <ANCHOR id="WebKitScriptWorld.signal-details" href="webkit2gtk/WebKitScriptWorld.html#WebKitScriptWorld.signal-details">
 <ANCHOR id="WebKitScriptWorld-window-object-cleared" href="webkit2gtk/WebKitScriptWorld.html#WebKitScriptWorld-window-object-cleared">
-<ANCHOR id="annotation-glossterm-transfer full" href="webkit2gtk/annotation-glossary.html#annotation-glossterm-transfer full">
 <ANCHOR id="annotation-glossterm-out" href="webkit2gtk/annotation-glossary.html#annotation-glossterm-out">
+<ANCHOR id="annotation-glossterm-allow-none" href="webkit2gtk/annotation-glossary.html#annotation-glossterm-allow-none">
+<ANCHOR id="annotation-glossterm-scope async" href="webkit2gtk/annotation-glossary.html#annotation-glossterm-scope async">
 <ANCHOR id="annotation-glossterm-transfer container" href="webkit2gtk/annotation-glossary.html#annotation-glossterm-transfer container">
 <ANCHOR id="annotation-glossterm-transfer none" href="webkit2gtk/annotation-glossary.html#annotation-glossterm-transfer none">
-<ANCHOR id="annotation-glossterm-element-type" href="webkit2gtk/annotation-glossary.html#annotation-glossterm-element-type">
-<ANCHOR id="annotation-glossterm-scope async" href="webkit2gtk/annotation-glossary.html#annotation-glossterm-scope async">
 <ANCHOR id="annotation-glossterm-array" href="webkit2gtk/annotation-glossary.html#annotation-glossterm-array">
-<ANCHOR id="annotation-glossterm-allow-none" href="webkit2gtk/annotation-glossary.html#annotation-glossterm-allow-none">
+<ANCHOR id="annotation-glossterm-transfer full" href="webkit2gtk/annotation-glossary.html#annotation-glossterm-transfer full">
 <ANCHOR id="annotation-glossterm-closure" href="webkit2gtk/annotation-glossary.html#annotation-glossterm-closure">
+<ANCHOR id="annotation-glossterm-element-type" href="webkit2gtk/annotation-glossary.html#annotation-glossterm-element-type">

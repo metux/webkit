@@ -40,21 +40,21 @@ class SVGFilterElement FINAL : public SVGElement,
                                public SVGURIReference,
                                public SVGExternalResourcesRequired {
 public:
-    static PassRefPtr<SVGFilterElement> create(const QualifiedName&, Document*);
+    static PassRefPtr<SVGFilterElement> create(const QualifiedName&, Document&);
 
     void setFilterRes(unsigned filterResX, unsigned filterResY);
 
 private:
-    SVGFilterElement(const QualifiedName&, Document*);
+    SVGFilterElement(const QualifiedName&, Document&);
 
     virtual bool needsPendingResourceHandling() const { return false; }
 
     bool isSupportedAttribute(const QualifiedName&);
     virtual void parseAttribute(const QualifiedName&, const AtomicString&) OVERRIDE;
     virtual void svgAttributeChanged(const QualifiedName&);
-    virtual void childrenChanged(bool changedByParser = false, Node* beforeChange = 0, Node* afterChange = 0, int childCountDelta = 0);
+    virtual void childrenChanged(const ChildChange&) OVERRIDE;
 
-    virtual RenderObject* createRenderer(RenderArena*, RenderStyle*) OVERRIDE;
+    virtual RenderElement* createRenderer(PassRef<RenderStyle>) OVERRIDE;
     virtual bool childShouldCreateRenderer(const Node*) const OVERRIDE;
 
     virtual bool selfHasRelativeLengths() const;
@@ -76,11 +76,7 @@ private:
     END_DECLARE_ANIMATED_PROPERTIES
 };
 
-inline SVGFilterElement* toSVGFilterElement(Node* node)
-{
-    ASSERT_WITH_SECURITY_IMPLICATION(!node || node->hasTagName(SVGNames::filterTag));
-    return static_cast<SVGFilterElement*>(node);
-}
+NODE_TYPE_CASTS(SVGFilterElement)
 
 }
 

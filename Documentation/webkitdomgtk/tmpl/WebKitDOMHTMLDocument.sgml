@@ -1,0 +1,330 @@
+<!-- ##### SECTION Title ##### -->
+WebKitDOMHTMLDocument
+
+<!-- ##### SECTION Short_Description ##### -->
+
+
+<!-- ##### SECTION Long_Description ##### -->
+<para>
+
+</para>
+
+
+<!-- ##### SECTION See_Also ##### -->
+<para>
+
+</para>
+
+
+<!-- ##### SECTION Stability_Level ##### -->
+
+
+<!-- ##### SECTION Image ##### -->
+
+
+<!-- ##### STRUCT WebKitDOMHTMLDocument ##### -->
+<para>
+
+</para>
+
+
+<!-- ##### ARG WebKitDOMHTMLDocument:active-element ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMHTMLDocument:alink-color ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMHTMLDocument:bg-color ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMHTMLDocument:compat-mode ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMHTMLDocument:design-mode ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMHTMLDocument:dir ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMHTMLDocument:embeds ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMHTMLDocument:fg-color ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMHTMLDocument:height ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMHTMLDocument:link-color ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMHTMLDocument:plugins ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMHTMLDocument:scripts ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMHTMLDocument:vlink-color ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMHTMLDocument:width ##### -->
+<para>
+
+</para>
+
+<!-- ##### FUNCTION webkit_dom_html_document_close ##### -->
+<para>
+
+</para>
+
+@self: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_document_clear ##### -->
+<para>
+
+</para>
+
+@self: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_document_capture_events ##### -->
+<para>
+
+</para>
+
+@self: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_document_release_events ##### -->
+<para>
+
+</para>
+
+@self: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_document_has_focus ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_document_get_embeds ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_document_get_plugins ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_document_get_scripts ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_document_get_width ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_document_get_height ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_document_get_dir ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_document_set_dir ##### -->
+<para>
+
+</para>
+
+@self: 
+@value: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_document_get_design_mode ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_document_set_design_mode ##### -->
+<para>
+
+</para>
+
+@self: 
+@value: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_document_get_compat_mode ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_document_get_active_element ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_document_get_bg_color ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_document_set_bg_color ##### -->
+<para>
+
+</para>
+
+@self: 
+@value: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_document_get_fg_color ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_document_set_fg_color ##### -->
+<para>
+
+</para>
+
+@self: 
+@value: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_document_get_alink_color ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_document_set_alink_color ##### -->
+<para>
+
+</para>
+
+@self: 
+@value: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_document_get_link_color ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_document_set_link_color ##### -->
+<para>
+
+</para>
+
+@self: 
+@value: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_document_get_vlink_color ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_document_set_vlink_color ##### -->
+<para>
+
+</para>
+
+@self: 
+@value: 
+
+
