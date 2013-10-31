@@ -20,6 +20,8 @@ webkitgtk (2.3.1-1) UNRELEASED; urgency=low
     + Removed, no longer needed.
   * debian/patches:
     + Refreshed.
+  * debian/patches/50_bsd-hurd-build-fix.patch:
+    + Fix the build on !linux.
 
  -- Emilio Pozuelo Monfort <pochu@debian.org>  Wed, 30 Oct 2013 00:49:46 +0100
 
