@@ -4,3 +4,4 @@
 41_hppa_build_fix.patch
 50_bsd-hurd-build-fix.patch
 60_add-missing-include.patch
+61_add-another-missing-include.patch
