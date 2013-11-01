@@ -26,6 +26,9 @@ webkitgtk (2.3.1-1) UNRELEASED; urgency=low
     + Patch from upstream bugzilla, fix another build issue.
   * debian/patches/61_add-another-missing-include.patch:
     + Another missing include, patch from upstream bugzilla.
+  * debian/patches/40_hppa_platform_h.patch:
+    + WTF_CPU_HPPA was already being defined, so only define the missing
+      remaining bits.
 
  -- Emilio Pozuelo Monfort <pochu@debian.org>  Wed, 30 Oct 2013 00:49:46 +0100
 
