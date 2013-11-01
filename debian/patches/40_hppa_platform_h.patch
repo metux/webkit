@@ -1,13 +1,10 @@
 --- a/Source/WTF/wtf/Platform.h
 +++ b/Source/WTF/wtf/Platform.h
-@@ -69,6 +69,10 @@
+@@ -69,6 +69,7 @@
  /* CPU(HPPA) - HP PA-RISC */
  #if defined(__hppa__) || defined(__hppa64__)
  #define WTF_CPU_HPPA 1
 +#define WTF_CPU_BIG_ENDIAN 1
-+#define ENABLE_JIT 0
-+#define ENABLE_YARR_JIT 0
-+#define ENABLE_ASSEMBLER 0
  #endif
  
  /* CPU(IA64) - Itanium / IA-64 */
