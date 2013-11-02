@@ -31,6 +31,11 @@ libwebkit2gtk-3.0.so.25 libwebkit2gtk-3.0-25 #MINVER#
  webkit_back_forward_list_item_get_type@Base 2.0.2
  webkit_back_forward_list_item_get_uri@Base 2.0.2
  webkit_cache_model_get_type@Base 2.0.2
+ webkit_certificate_info_copy@Base 2.3.1
+ webkit_certificate_info_free@Base 2.3.1
+ webkit_certificate_info_get_tls_certificate@Base 2.3.1
+ webkit_certificate_info_get_tls_errors@Base 2.3.1
+ webkit_certificate_info_get_type@Base 2.3.1
  webkit_context_menu_action_get_type@Base 2.0.2
  webkit_context_menu_append@Base 2.0.2
  webkit_context_menu_first@Base 2.0.2
@@ -516,9 +521,11 @@ libwebkit2gtk-3.0.so.25 libwebkit2gtk-3.0-25 #MINVER#
  webkit_dom_event_stop_immediate_propagation@Base 2.0.2
  webkit_dom_event_stop_propagation@Base 2.0.2
  webkit_dom_event_target_add_event_listener@Base 2.0.2
+ webkit_dom_event_target_add_event_listener_with_closure@Base 2.3.1
  webkit_dom_event_target_dispatch_event@Base 2.0.2
  webkit_dom_event_target_get_type@Base 2.0.2
  webkit_dom_event_target_remove_event_listener@Base 2.0.2
+ webkit_dom_event_target_remove_event_listener_with_closure@Base 2.3.1
  webkit_dom_file_get_name@Base 2.0.2
  webkit_dom_file_get_type@Base 2.0.2
  webkit_dom_file_get_webkit_relative_path@Base 2.1.4
@@ -852,9 +859,7 @@ libwebkit2gtk-3.0.so.25 libwebkit2gtk-3.0-25 #MINVER#
  webkit_dom_html_frame_set_element_get_type@Base 2.0.2
  webkit_dom_html_frame_set_element_set_cols@Base 2.0.2
  webkit_dom_html_frame_set_element_set_rows@Base 2.0.2
- webkit_dom_html_head_element_get_profile@Base 2.0.2
  webkit_dom_html_head_element_get_type@Base 2.0.2
- webkit_dom_html_head_element_set_profile@Base 2.0.2
  webkit_dom_html_heading_element_get_align@Base 2.0.2
  webkit_dom_html_heading_element_get_type@Base 2.0.2
  webkit_dom_html_heading_element_set_align@Base 2.0.2
@@ -1683,11 +1688,9 @@ libwebkit2gtk-3.0.so.25 libwebkit2gtk-3.0-25 #MINVER#
  webkit_dom_performance_timing_get_type@Base 2.0.2
  webkit_dom_performance_timing_get_unload_event_end@Base 2.0.2
  webkit_dom_performance_timing_get_unload_event_start@Base 2.0.2
- webkit_dom_processing_instruction_get_data@Base 2.0.2
  webkit_dom_processing_instruction_get_sheet@Base 2.0.2
  webkit_dom_processing_instruction_get_target@Base 2.0.2
  webkit_dom_processing_instruction_get_type@Base 2.0.2
- webkit_dom_processing_instruction_set_data@Base 2.0.2
  webkit_dom_property_node_list_get_length@Base 2.0.2
  webkit_dom_property_node_list_get_type@Base 2.0.2
  webkit_dom_property_node_list_item@Base 2.0.2
@@ -1886,6 +1889,16 @@ libwebkit2gtk-3.0.so.25 libwebkit2gtk-3.0-25 #MINVER#
  webkit_dom_webkit_point_get_y@Base 2.0.2
  webkit_dom_webkit_point_set_x@Base 2.0.2
  webkit_dom_webkit_point_set_y@Base 2.0.2
+ webkit_dom_wheel_event_get_delta_mode@Base 2.3.1
+ webkit_dom_wheel_event_get_delta_x@Base 2.3.1
+ webkit_dom_wheel_event_get_delta_y@Base 2.3.1
+ webkit_dom_wheel_event_get_delta_z@Base 2.3.1
+ webkit_dom_wheel_event_get_type@Base 2.3.1
+ webkit_dom_wheel_event_get_webkit_direction_inverted_from_device@Base 2.3.1
+ webkit_dom_wheel_event_get_wheel_delta@Base 2.3.1
+ webkit_dom_wheel_event_get_wheel_delta_x@Base 2.3.1
+ webkit_dom_wheel_event_get_wheel_delta_y@Base 2.3.1
+ webkit_dom_wheel_event_init_wheel_event@Base 2.3.1
  webkit_dom_xpath_expression_evaluate@Base 2.0.2
  webkit_dom_xpath_expression_get_type@Base 2.0.2
  webkit_dom_xpath_ns_resolver_get_type@Base 2.0.2
@@ -1973,6 +1986,7 @@ libwebkit2gtk-3.0.so.25 libwebkit2gtk-3.0-25 #MINVER#
  webkit_javascript_result_unref@Base 2.0.2
  webkit_load_event_get_type@Base 2.0.2
  webkit_marshal_BOOLEAN__BOXED@Base 2.0.2
+ webkit_marshal_BOOLEAN__BOXED_STRING@Base 2.3.1
  webkit_marshal_BOOLEAN__ENUM_STRING_POINTER@Base 2.0.2
  webkit_marshal_BOOLEAN__OBJECT@Base 2.0.2
  webkit_marshal_BOOLEAN__OBJECT_BOXED_OBJECT@Base 2.0.2
@@ -2177,6 +2191,7 @@ libwebkit2gtk-3.0.so.25 libwebkit2gtk-3.0-25 #MINVER#
  webkit_uri_scheme_request_get_uri@Base 2.0.2
  webkit_uri_scheme_request_get_web_view@Base 2.0.2
  webkit_view_mode_get_type@Base 2.0.2
+ webkit_web_context_allow_tls_certificate_for_host@Base 2.3.1
  webkit_web_context_clear_cache@Base 2.0.2
  webkit_web_context_download_uri@Base 2.0.2
  webkit_web_context_get_cache_model@Base 2.0.2
