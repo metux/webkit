@@ -5,3 +5,4 @@
 50_bsd-hurd-build-fix.patch
 60_add-missing-include.patch
 61_add-another-missing-include.patch
+70_Add-stubs-for-missing-symbols-in-dom-bindings.patch

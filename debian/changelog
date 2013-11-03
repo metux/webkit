@@ -32,6 +32,9 @@ webkitgtk (2.3.1-1) UNRELEASED; urgency=low
     + Don't disable YARR, JIT and MacroAssembler here, this is a more general
       problem as explained in https://bugs.webkit.org/show_bug.cgi?id=113638
       and we already disable those in debian/rules.
+  * debian/patches/70_Add-stubs-for-missing-symbols-in-dom-bindings.patch:
+    + New patch, add stubs for a few missing symbols in the DOM bindings
+      which are gone because the underlying objects have been removed.
   * debian/libwebkitgtk-1.0-0.symbols,
     debian/libwebkitgtk-3.0-0.symbols,
     debian/libwebkit2gtk-3.0-25.symbols:

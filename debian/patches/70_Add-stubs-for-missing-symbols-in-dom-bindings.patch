@@ -1,0 +1,123 @@
+From 6d95cd68c41e6f4e1569bffe0a54cdeda69c491b Mon Sep 17 00:00:00 2001
+From: Emilio Pozuelo Monfort <pochu27@gmail.com>
+Date: Sun, 3 Nov 2013 16:04:18 +0100
+Subject: [PATCH] Add stubs for missing symbols in dom bindings
+
+https://bugs.webkit.org/show_bug.cgi?id=123663
+---
+ .../WebCore/bindings/gobject/WebKitDOMCustom.cpp   | 28 +++++++++++++
+ Source/WebCore/bindings/gobject/WebKitDOMCustom.h  | 47 ++++++++++++++++++++++
+ .../bindings/gobject/WebKitDOMCustom.symbols       |  4 ++
+ 3 files changed, 79 insertions(+)
+
+--- a/Source/WebCore/bindings/gobject/WebKitDOMCustom.cpp
++++ b/Source/WebCore/bindings/gobject/WebKitDOMCustom.cpp
+@@ -23,10 +23,12 @@
+ #include "WebKitDOMDOMStringList.h"
+ #include "WebKitDOMHTMLCollection.h"
+ #include "WebKitDOMHTMLFormElement.h"
++#include "WebKitDOMHTMLHeadElement.h"
+ #include "WebKitDOMHTMLInputElement.h"
+ #include "WebKitDOMHTMLInputElementPrivate.h"
+ #include "WebKitDOMHTMLTextAreaElement.h"
+ #include "WebKitDOMHTMLTextAreaElementPrivate.h"
++#include "WebKitDOMProcessingInstruction.h"
+ #include "WebKitDOMNodeList.h"
+ #include "WebKitDOMObject.h"
+ #include "WebKitDOMPrivate.h"
+@@ -557,3 +559,29 @@
+     g_warning("%s: the HTMLMediaElement:start-time property has been removed from WebKit, this function does nothing.", __func__);
+     return 0;
+ }
++
++// WebKitDOMHTMLElement
++
++gchar* webkit_dom_html_head_element_get_profile(WebKitDOMHTMLHeadElement* self)
++{
++    g_warning("%s: the HeadElement object has been removed from WebKit, this function does nothing.", __func__);
++    return g_strdup("");
++}
++
++void webkit_dom_html_head_element_set_profile(WebKitDOMHTMLHeadElement* self, const gchar* value)
++{
++    g_warning("%s: the HeadElement object has been removed from WebKit, this function does nothing.", __func__);
++}
++
++// WebKitDOMProcessingInstruction
++
++gchar* webkit_dom_processing_instruction_get_data(WebKitDOMProcessingInstruction* self)
++{
++    g_warning("%s: this functionality has been removed from WebKit, this function does nothing.", __func__);
++    return g_strdup("");
++}
++
++void webkit_dom_processing_instruction_set_data(WebKitDOMProcessingInstruction* self, const gchar* value, GError** error)
++{
++    g_warning("%s: this functionality has been removed from WebKit, this function does nothing.", __func__);
++}
+--- a/Source/WebCore/bindings/gobject/WebKitDOMCustom.h
++++ b/Source/WebCore/bindings/gobject/WebKitDOMCustom.h
+@@ -469,6 +469,53 @@
+ **/
+ WEBKIT_API gdouble webkit_dom_html_media_element_get_start_time(WebKitDOMHTMLMediaElement*);
+ 
++/**
++ * webkit_dom_html_head_element_get_profile:
++ * @self: A #WebKitDOMHTMLHeadElement
++ *
++ * This functionality has been removed from WebKit, this function does nothing.
++ *
++ * Returns:
++ *
++**/
++WEBKIT_API gchar* webkit_dom_html_head_element_get_profile(WebKitDOMHTMLHeadElement* self);
++
++/**
++ * webkit_dom_html_head_element_set_profile:
++ * @self: A #WebKitDOMHTMLHeadElement
++ * @value: A #gchar
++ *
++ * This functionality has been removed from WebKit, this function does nothing.
++ *
++ * Returns:
++ *
++**/
++WEBKIT_API void webkit_dom_html_head_element_set_profile(WebKitDOMHTMLHeadElement* self, const gchar* value);
++
++/**
++ * webkit_dom_processing_instruction_get_data:
++ * @self: A #WebKitDOMProcessingInstruction
++ *
++ * This functionality has been removed from WebKit, this function does nothing.
++ *
++ * Returns:
++ *
++**/
++WEBKIT_API gchar* webkit_dom_processing_instruction_get_data(WebKitDOMProcessingInstruction* self);
++
++/**
++ * webkit_dom_processing_instruction_set_data:
++ * @self: A #WebKitDOMProcessingInstruction
++ * @value: A #gchar
++ * @error: #GError
++ *
++ * This functionality has been removed from WebKit, this function does nothing.
++ *
++ * Returns:
++ *
++**/
++WEBKIT_API void webkit_dom_processing_instruction_set_data(WebKitDOMProcessingInstruction* self, const gchar* value, GError** error);
++
+ G_END_DECLS
+ 
+ #endif
+--- a/Source/WebCore/bindings/gobject/WebKitDOMCustom.symbols
++++ b/Source/WebCore/bindings/gobject/WebKitDOMCustom.symbols
+@@ -43,3 +43,7 @@
+ WebKitDOMNode* webkit_dom_property_node_list_item(void*, gulong)
+ gulong webkit_dom_property_node_list_get_length(void*)
+ gdouble webkit_dom_html_media_element_get_start_time(WebKitDOMHTMLMediaElement*)
++gchar* webkit_dom_html_head_element_get_profile(WebKitDOMHTMLHeadElement*)
++void webkit_dom_html_head_element_set_profile(WebKitDOMHTMLHeadElement*, const gchar*)
++gchar* webkit_dom_processing_instruction_get_data(WebKitDOMProcessingInstruction*)
++void webkit_dom_processing_instruction_set_data(WebKitDOMProcessingInstruction*, const gchar*, GError**)
