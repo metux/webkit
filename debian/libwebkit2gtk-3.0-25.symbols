@@ -859,7 +859,9 @@ libwebkit2gtk-3.0.so.25 libwebkit2gtk-3.0-25 #MINVER#
  webkit_dom_html_frame_set_element_get_type@Base 2.0.2
  webkit_dom_html_frame_set_element_set_cols@Base 2.0.2
  webkit_dom_html_frame_set_element_set_rows@Base 2.0.2
+ webkit_dom_html_head_element_get_profile@Base 2.0.2
  webkit_dom_html_head_element_get_type@Base 2.0.2
+ webkit_dom_html_head_element_set_profile@Base 2.0.2
  webkit_dom_html_heading_element_get_align@Base 2.0.2
  webkit_dom_html_heading_element_get_type@Base 2.0.2
  webkit_dom_html_heading_element_set_align@Base 2.0.2
@@ -1688,9 +1690,11 @@ libwebkit2gtk-3.0.so.25 libwebkit2gtk-3.0-25 #MINVER#
  webkit_dom_performance_timing_get_type@Base 2.0.2
  webkit_dom_performance_timing_get_unload_event_end@Base 2.0.2
  webkit_dom_performance_timing_get_unload_event_start@Base 2.0.2
+ webkit_dom_processing_instruction_get_data@Base 2.0.2
  webkit_dom_processing_instruction_get_sheet@Base 2.0.2
  webkit_dom_processing_instruction_get_target@Base 2.0.2
  webkit_dom_processing_instruction_get_type@Base 2.0.2
+ webkit_dom_processing_instruction_set_data@Base 2.0.2
  webkit_dom_property_node_list_get_length@Base 2.0.2
  webkit_dom_property_node_list_get_type@Base 2.0.2
  webkit_dom_property_node_list_item@Base 2.0.2

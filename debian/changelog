@@ -38,9 +38,7 @@ webkitgtk (2.3.1-1) UNRELEASED; urgency=low
   * debian/libwebkitgtk-1.0-0.symbols,
     debian/libwebkitgtk-3.0-0.symbols,
     debian/libwebkit2gtk-3.0-25.symbols:
-    + Updated for the new symbols. Additionally there are four webkit_dom_*
-      symbols gone from all libs:
-      https://bugs.webkit.org/show_bug.cgi?id=123663
+    + Updated for the new symbols.
 
  -- Emilio Pozuelo Monfort <pochu@debian.org>  Wed, 30 Oct 2013 00:49:46 +0100
 
