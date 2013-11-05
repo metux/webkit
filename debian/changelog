@@ -1,4 +1,4 @@
-webkitgtk (2.3.1-1) UNRELEASED; urgency=low
+webkitgtk (2.3.1-1) experimental; urgency=low
 
   [ Michael Biebl ]
   * debian/rules:
@@ -44,7 +44,7 @@ webkitgtk (2.3.1-1) UNRELEASED; urgency=low
       implementation's license but doesn't actually have that license.
     + Drop an old override.
 
- -- Emilio Pozuelo Monfort <pochu@debian.org>  Wed, 30 Oct 2013 00:49:46 +0100
+ -- Emilio Pozuelo Monfort <pochu@debian.org>  Tue, 05 Nov 2013 14:24:07 +0100
 
 webkitgtk (2.2.1-1) unstable; urgency=low
 
