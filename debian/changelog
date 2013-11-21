@@ -1,4 +1,4 @@
-webkitgtk (2.3.2-1) UNRELEASED; urgency=low
+webkitgtk (2.3.2-1) experimental; urgency=low
 
   * New upstream release.
   * debian/patches/40_hppa_platform_h.patch,
@@ -32,7 +32,7 @@ webkitgtk (2.3.2-1) UNRELEASED; urgency=low
     debian/libwebkit2gtk-3.0-25.symbols:
     + Updated for the new symbols.
 
- -- Emilio Pozuelo Monfort <pochu@debian.org>  Thu, 21 Nov 2013 21:20:48 +0100
+ -- Emilio Pozuelo Monfort <pochu@debian.org>  Thu, 21 Nov 2013 22:15:28 +0100
 
 webkitgtk (2.3.1-1) experimental; urgency=low
 
