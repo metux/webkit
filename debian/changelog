@@ -8,6 +8,8 @@ webkitgtk (2.3.2-1) UNRELEASED; urgency=low
     debian/patches/61_add-another-missing-include.patch,
     debian/patches/70_Add-stubs-for-missing-symbols-in-dom-bindings.patch:
     + Removed, merged upstream.
+  * debian/patches/30_gtkdoc_fixxref_warnings.patch:
+    + Drop unapplied patch that we don't need anymore.
 
  -- Emilio Pozuelo Monfort <pochu@debian.org>  Thu, 21 Nov 2013 21:20:48 +0100
 
