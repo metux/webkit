@@ -12,6 +12,11 @@ webkitgtk (2.3.2-1) UNRELEASED; urgency=low
     + Drop unapplied patch that we don't need anymore.
   * debian/patches/13_thread-safe-icon-db.patch:
     + Drop unapplied patch that was fixed upstream a long time ago.
+  * debian/patches/12_large-mem-page.patch:
+    + Drop unapplied patch, it hasn't been applied in quite some time
+      and we haven't heard of any complains. Besides, the patch no
+      longer applies as the code it touched has been largely reworked
+      or removed.
 
  -- Emilio Pozuelo Monfort <pochu@debian.org>  Thu, 21 Nov 2013 21:20:48 +0100
 
