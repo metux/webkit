@@ -46,7 +46,7 @@ namespace WebCore {
 using namespace MathMLNames;
 
 // FIXME: The OpenType MATH table contains information that should override this table (http://wkbug/122297).
-static RenderMathMLOperator::StretchyCharacter stretchyCharacters[13] = {
+static RenderMathMLOperator::StretchyCharacter stretchyCharacters[14] = {
     { 0x28  , 0x239b, 0x239c, 0x239d, 0x0    }, // left parenthesis
     { 0x29  , 0x239e, 0x239f, 0x23a0, 0x0    }, // right parenthesis
     { 0x5b  , 0x23a1, 0x23a2, 0x23a3, 0x0    }, // left square bracket
@@ -56,8 +56,9 @@ static RenderMathMLOperator::StretchyCharacter stretchyCharacters[13] = {
     { 0x2309, 0x23a4, 0x23a5, 0x23a5, 0x0    }, // right ceiling
     { 0x230b, 0x23a5, 0x23a5, 0x23a6, 0x0    }, // right floor
     { 0x7b  , 0x23a7, 0x23aa, 0x23a9, 0x23a8 }, // left curly bracket
-    { 0x7c  , 0x23aa, 0x23aa, 0x23aa, 0x0    }, // vertical bar
+    { 0x7c  , 0x7c,   0x7c,   0x7c,   0x0    }, // vertical bar
     { 0x2016, 0x2016, 0x2016, 0x2016, 0x0    }, // double vertical line
+    { 0x2225, 0x2225, 0x2225, 0x2225, 0x0    }, // parallel to
     { 0x7d  , 0x23ab, 0x23aa, 0x23ad, 0x23ac }, // right curly bracket
     { 0x222b, 0x2320, 0x23ae, 0x2321, 0x0    } // integral sign
 };
@@ -322,7 +323,11 @@ void RenderMathMLOperator::fillWithExtensionGlyph(PaintInfo& info, const LayoutP
 {
     ASSERT(m_stretchyCharacter);
     ASSERT(m_stretchyCharacter->extensionGlyph);
-    ASSERT(from.y() < to.y());
+    ASSERT(from.y() <= to.y());
+
+    // If there is no space for the extension glyph, we don't need to do anything.
+    if (from.y() == to.y())
+        return;
 
     GraphicsContextStateSaver stateSaver(*info.context);
 
@@ -382,7 +387,7 @@ void RenderMathMLOperator::paint(PaintInfo& info, const LayoutPoint& paintOffset
     if (m_stretchyCharacter->middleGlyph) {
         // Center the glyph origin between the start and end glyph paint extents. Then shift it half the paint height toward the bottom glyph.
         FloatRect middleGlyphBounds = glyphBoundsForCharacter(m_stretchyCharacter->middleGlyph);
-        LayoutPoint middleGlyphOrigin(operatorTopLeft.x(), topGlyphOrigin.y() + y());
+        LayoutPoint middleGlyphOrigin(operatorTopLeft.x(), topGlyphOrigin.y());
         middleGlyphOrigin.moveBy(LayoutPoint(0, (bottomGlyphPaintRect.y() - topGlyphPaintRect.maxY()) / 2.0));
         middleGlyphOrigin.moveBy(LayoutPoint(0, middleGlyphBounds.height() / 2.0));
 

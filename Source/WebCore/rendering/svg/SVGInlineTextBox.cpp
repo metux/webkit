@@ -41,8 +41,6 @@
 #include "SVGRootInlineBox.h"
 #include "SVGTextRunRenderingContext.h"
 
-using namespace std;
-
 namespace WebCore {
 
 struct ExpectedSVGInlineTextBoxSize : public InlineTextBox {
@@ -132,8 +130,8 @@ FloatRect SVGInlineTextBox::selectionRectForTextFragment(const SVGTextFragment& 
 LayoutRect SVGInlineTextBox::localSelectionRect(int startPosition, int endPosition) const
 {
     int boxStart = start();
-    startPosition = max(startPosition - boxStart, 0);
-    endPosition = min(endPosition - boxStart, static_cast<int>(len()));
+    startPosition = std::max(startPosition - boxStart, 0);
+    endPosition = std::min(endPosition - boxStart, static_cast<int>(len()));
     if (startPosition >= endPosition)
         return LayoutRect();
 
@@ -259,23 +257,21 @@ void SVGInlineTextBox::paint(PaintInfo& paintInfo, const LayoutPoint&, LayoutUni
 
     RenderStyle& style = parentRenderer.style();
 
-    const SVGRenderStyle* svgStyle = style.svgStyle();
-    ASSERT(svgStyle);
+    const SVGRenderStyle& svgStyle = style.svgStyle();
 
-    bool hasFill = svgStyle->hasFill();
-    bool hasVisibleStroke = svgStyle->hasVisibleStroke();
+    bool hasFill = svgStyle.hasFill();
+    bool hasVisibleStroke = svgStyle.hasVisibleStroke();
 
     RenderStyle* selectionStyle = &style;
     if (hasSelection) {
         selectionStyle = parentRenderer.getCachedPseudoStyle(SELECTION);
         if (selectionStyle) {
-            const SVGRenderStyle* svgSelectionStyle = selectionStyle->svgStyle();
-            ASSERT(svgSelectionStyle);
+            const SVGRenderStyle& svgSelectionStyle = selectionStyle->svgStyle();
 
             if (!hasFill)
-                hasFill = svgSelectionStyle->hasFill();
+                hasFill = svgSelectionStyle.hasFill();
             if (!hasVisibleStroke)
-                hasVisibleStroke = svgSelectionStyle->hasVisibleStroke();
+                hasVisibleStroke = svgSelectionStyle.hasVisibleStroke();
         } else
             selectionStyle = &style;
     }
@@ -333,9 +329,9 @@ bool SVGInlineTextBox::acquirePaintingResource(GraphicsContext*& context, float 
 
     Color fallbackColor;
     if (m_paintingResourceMode & ApplyToFillMode)
-        m_paintingResource = RenderSVGResource::fillPaintingResource(renderer, style, fallbackColor);
+        m_paintingResource = RenderSVGResource::fillPaintingResource(renderer, *style, fallbackColor);
     else if (m_paintingResourceMode & ApplyToStrokeMode)
-        m_paintingResource = RenderSVGResource::strokePaintingResource(renderer, style, fallbackColor);
+        m_paintingResource = RenderSVGResource::strokePaintingResource(renderer, *style, fallbackColor);
     else {
         // We're either called for stroking or filling.
         ASSERT_NOT_REACHED();
@@ -409,7 +405,7 @@ TextRun SVGInlineTextBox::constructTextRun(RenderStyle* style, const SVGTextFrag
                 , direction()
                 , dirOverride() || style->rtlOrdering() == VisualOrder /* directionalOverride */);
 
-    if (textRunNeedsRenderingContext(style->font()))
+    if (style->font().isSVGFont())
         run.setRenderingContext(SVGTextRunRenderingContext::create(renderer()));
 
     run.disableRoundingHacks();
@@ -501,11 +497,10 @@ void SVGInlineTextBox::paintDecoration(GraphicsContext* context, TextDecoration 
     if (decorationStyle.visibility() == HIDDEN)
         return;
 
-    const SVGRenderStyle* svgDecorationStyle = decorationStyle.svgStyle();
-    ASSERT(svgDecorationStyle);
+    const SVGRenderStyle& svgDecorationStyle = decorationStyle.svgStyle();
 
-    bool hasDecorationFill = svgDecorationStyle->hasFill();
-    bool hasVisibleDecorationStroke = svgDecorationStyle->hasVisibleStroke();
+    bool hasDecorationFill = svgDecorationStyle.hasFill();
+    bool hasVisibleDecorationStroke = svgDecorationStyle.hasVisibleStroke();
 
     if (hasDecorationFill) {
         m_paintingResourceMode = ApplyToFillMode;
@@ -673,8 +668,8 @@ bool SVGInlineTextBox::nodeAtPoint(const HitTestRequest& request, HitTestResult&
     PointerEventsHitRules hitRules(PointerEventsHitRules::SVG_TEXT_HITTESTING, request, renderer().style().pointerEvents());
     bool isVisible = renderer().style().visibility() == VISIBLE;
     if (isVisible || !hitRules.requireVisible) {
-        if ((hitRules.canHitStroke && (renderer().style().svgStyle()->hasStroke() || !hitRules.requireStroke))
-            || (hitRules.canHitFill && (renderer().style().svgStyle()->hasFill() || !hitRules.requireFill))) {
+        if ((hitRules.canHitStroke && (renderer().style().svgStyle().hasStroke() || !hitRules.requireStroke))
+            || (hitRules.canHitFill && (renderer().style().svgStyle().hasFill() || !hitRules.requireFill))) {
             FloatPoint boxOrigin(x(), y());
             boxOrigin.moveBy(accumulatedOffset);
             FloatRect rect(boxOrigin, size());

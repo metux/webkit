@@ -29,6 +29,7 @@
 #include "CSSComputedStyleDeclaration.h"
 #include "HTMLNames.h"
 #include "HTMLTableElement.h"
+#include "InlineElementBox.h"
 #include "InlineIterator.h"
 #include "InlineTextBox.h"
 #include "Logging.h"
@@ -65,10 +66,8 @@ static bool hasInlineBoxWrapper(RenderObject& renderer)
 static Node* nextRenderedEditable(Node* node)
 {
     while ((node = nextLeafNode(node))) {
-        if (!node->rendererIsEditable())
-            continue;
         RenderObject* renderer = node->renderer();
-        if (!renderer)
+        if (!renderer || !node->rendererIsEditable())
             continue;
         if (hasInlineBoxWrapper(*renderer))
             return node;
@@ -79,10 +78,8 @@ static Node* nextRenderedEditable(Node* node)
 static Node* previousRenderedEditable(Node* node)
 {
     while ((node = previousLeafNode(node))) {
-        if (!node->rendererIsEditable())
-            continue;
         RenderObject* renderer = node->renderer();
-        if (!renderer)
+        if (!renderer || !node->rendererIsEditable())
             continue;
         if (hasInlineBoxWrapper(*renderer))
             return node;
@@ -680,7 +677,7 @@ Position Position::upstream(EditingBoundaryCrossingRule rule) const
                     otherBox = otherBox->nextLeafChild();
                     if (!otherBox)
                         break;
-                    if (otherBox == lastTextBox || (&otherBox->renderer() == &textRenderer && static_cast<InlineTextBox*>(otherBox)->start() > textOffset))
+                    if (otherBox == lastTextBox || (&otherBox->renderer() == &textRenderer && toInlineTextBox(otherBox)->start() > textOffset))
                         continuesOnNextLine = false;
                 }
 
@@ -689,7 +686,7 @@ Position Position::upstream(EditingBoundaryCrossingRule rule) const
                     otherBox = otherBox->prevLeafChild();
                     if (!otherBox)
                         break;
-                    if (otherBox == lastTextBox || (&otherBox->renderer() == &textRenderer && static_cast<InlineTextBox*>(otherBox)->start() > textOffset))
+                    if (otherBox == lastTextBox || (&otherBox->renderer() == &textRenderer && toInlineTextBox(otherBox)->start() > textOffset))
                         continuesOnNextLine = false;
                 }
 
@@ -808,7 +805,7 @@ Position Position::downstream(EditingBoundaryCrossingRule rule) const
                     otherBox = otherBox->nextLeafChild();
                     if (!otherBox)
                         break;
-                    if (otherBox == lastTextBox || (&otherBox->renderer() == &textRenderer && static_cast<InlineTextBox*>(otherBox)->start() >= textOffset))
+                    if (otherBox == lastTextBox || (&otherBox->renderer() == &textRenderer && toInlineTextBox(otherBox)->start() >= textOffset))
                         continuesOnNextLine = false;
                 }
 
@@ -817,7 +814,7 @@ Position Position::downstream(EditingBoundaryCrossingRule rule) const
                     otherBox = otherBox->prevLeafChild();
                     if (!otherBox)
                         break;
-                    if (otherBox == lastTextBox || (&otherBox->renderer() == &textRenderer && static_cast<InlineTextBox*>(otherBox)->start() >= textOffset))
+                    if (otherBox == lastTextBox || (&otherBox->renderer() == &textRenderer && toInlineTextBox(otherBox)->start() >= textOffset))
                         continuesOnNextLine = false;
                 }
 
@@ -937,6 +934,9 @@ bool Position::isCandidate() const
     if (m_anchorNode->hasTagName(htmlTag))
         return false;
         
+    if (isRendererReplacedElement(renderer))
+        return !nodeIsUserSelectNone(deprecatedNode()) && atFirstEditingPositionForNode();
+
     if (renderer->isRenderBlockFlow()) {
         RenderBlock& block = toRenderBlock(*renderer);
         if (block.logicalHeight() || m_anchorNode->hasTagName(bodyTag)) {

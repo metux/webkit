@@ -97,17 +97,16 @@ macro dispatchAfterCall()
 end
 
 macro cCall2(function, arg1, arg2)
-    if ARM or ARMv7 or ARMv7_TRADITIONAL
-        move arg1, t0
-        move arg2, t1
+    if ARM or ARMv7 or ARMv7_TRADITIONAL or MIPS
+        move arg1, a0
+        move arg2, a1
         call function
     elsif X86
         poke arg1, 0
         poke arg2, 1
         call function
-    elsif MIPS or SH4
-        move arg1, a0
-        move arg2, a1
+    elsif SH4
+        setargs arg1, arg2
         call function
     elsif C_LOOP
         cloopCallSlowPath function, arg1, arg2
@@ -118,11 +117,11 @@ end
 
 # This barely works. arg3 and arg4 should probably be immediates.
 macro cCall4(function, arg1, arg2, arg3, arg4)
-    if ARM or ARMv7 or ARMv7_TRADITIONAL
-        move arg1, t0
-        move arg2, t1
-        move arg3, t2
-        move arg4, t3
+    if ARM or ARMv7 or ARMv7_TRADITIONAL or MIPS
+        move arg1, a0
+        move arg2, a1
+        move arg3, a2
+        move arg4, a3
         call function
     elsif X86
         poke arg1, 0
@@ -130,11 +129,8 @@ macro cCall4(function, arg1, arg2, arg3, arg4)
         poke arg3, 2
         poke arg4, 3
         call function
-    elsif MIPS or SH4
-        move arg1, a0
-        move arg2, a1
-        move arg3, a2
-        move arg4, a3
+    elsif SH4
+        setargs arg1, arg2, arg3, arg4
         call function
     elsif C_LOOP
         error
@@ -147,6 +143,87 @@ macro callSlowPath(slowPath)
     cCall2(slowPath, cfr, PC)
     move t0, PC
     move t1, cfr
+end
+
+macro functionPrologue(extraStackSpace)
+    if X86
+        push cfr
+        move sp, cfr
+    end
+    pushCalleeSaves
+    if ARM or ARMv7 or ARMv7_TRADITIONAL or MIPS
+        push cfr
+        push lr
+    end
+    subp extraStackSpace, sp
+end
+
+macro functionEpilogue(extraStackSpace)
+    addp extraStackSpace, sp
+    if ARM or ARMv7 or ARMv7_TRADITIONAL or MIPS
+        pop lr
+        pop cfr
+    end
+    popCalleeSaves
+    if X86
+        pop cfr
+    end
+end
+
+macro doCallToJavaScript()
+    if X86
+        const extraStackSpace = 28
+        const previousCFR = t0
+        const previousPC = t1
+        const entry = t5
+        const newCallFrame = t4
+    elsif ARM or ARMv7_TRADITIONAL
+        const extraStackSpace = 16
+        const previousCFR = t3  
+        const previousPC = lr
+        const entry = a0
+        const newCallFrame = a1
+    elsif ARMv7
+        const extraStackSpace = 28
+        const previousCFR = t3  
+        const previousPC = lr
+        const entry = a0
+        const newCallFrame = a1
+    elsif MIPS
+        const extraStackSpace = 20
+        const previousCFR = t2  
+        const previousPC = lr
+        const entry = a0
+        const newCallFrame = a1
+    elsif SH4
+        const extraStackSpace = 20
+        const previousCFR = t3  
+        const previousPC = lr
+        const entry = a0
+        const newCallFrame = a1
+    end
+
+    if X86
+        loadp [sp], previousPC
+        move cfr, previousCFR
+    end
+    functionPrologue(extraStackSpace)
+    if X86
+        loadp extraStackSpace+20[sp], entry
+        loadp extraStackSpace+24[sp], newCallFrame
+    else
+        move cfr, previousCFR
+    end
+
+    move newCallFrame, cfr
+    loadp [cfr], newCallFrame
+    storep previousCFR, [newCallFrame]
+    storep previousPC, 4[newCallFrame]
+    call entry
+
+_returnFromJavaScript:
+    functionEpilogue(extraStackSpace)
+    ret
 end
 
 # Debugging operation if you'd like to print an operand in the instruction stream. fromWhere
@@ -316,7 +393,6 @@ macro functionArityCheck(doneLabel, slow_path)
     // Move frame up "t1" slots
     negi t1
     move cfr, t3
-    addp 8, t3
     loadi PayloadOffset + ArgumentCount[cfr], t2
     addi CallFrameHeaderSlots, t2
 .copyLoop:
@@ -358,9 +434,9 @@ _llint_op_enter:
     move 0, t1
     negi t2
 .opEnterLoop:
-    addi 1, t2
     storei t0, TagOffset[cfr, t2, 8]
     storei t1, PayloadOffset[cfr, t2, 8]
+    addi 1, t2
     btinz t2, .opEnterLoop
 .opEnterDone:
     dispatch(1)
@@ -1911,7 +1987,7 @@ macro varInjectionCheck(slowPath)
     loadp CodeBlock[cfr], t0
     loadp CodeBlock::m_globalObject[t0], t0
     loadp JSGlobalObject::m_varInjectionWatchpoint[t0], t0
-    btbnz WatchpointSet::m_isInvalidated[t0], slowPath
+    bbeq WatchpointSet::m_state[t0], IsInvalidated, slowPath
 end
 
 macro resolveScope()

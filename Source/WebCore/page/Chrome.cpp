@@ -60,7 +60,6 @@
 namespace WebCore {
 
 using namespace HTMLNames;
-using namespace std;
 
 Chrome::Chrome(Page& page, ChromeClient& client)
     : m_page(page)
@@ -569,11 +568,6 @@ String ChromeClient::generateReplacementFile(const String&)
 {
     ASSERT_NOT_REACHED();
     return String();
-}
-
-bool ChromeClient::paintCustomOverhangArea(GraphicsContext*, const IntRect&, const IntRect&, const IntRect&)
-{
-    return false;
 }
 
 bool Chrome::selectItemWritingDirectionIsNatural()

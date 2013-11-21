@@ -50,7 +50,7 @@ class Document;
 class DocumentStyleSheetCollection;
 class Element;
 class InspectorCSSOMWrappers;
-class InspectorFrontend;
+class InspectorCSSFrontendDispatcher;
 class InstrumentingAgents;
 class NameNodeMap;
 class Node;
@@ -64,9 +64,9 @@ class ChangeRegionOversetTask;
 #if ENABLE(INSPECTOR)
 
 class InspectorCSSAgent
-    : public InspectorBaseAgent<InspectorCSSAgent>
+    : public InspectorBaseAgent
     , public InspectorDOMAgent::DOMListener
-    , public InspectorBackendDispatcher::CSSCommandHandler
+    , public InspectorCSSBackendDispatcherHandler
     , public InspectorStyleSheet::Listener {
     WTF_MAKE_NONCOPYABLE(InspectorCSSAgent);
 public:
@@ -89,17 +89,16 @@ public:
 
     static CSSStyleRule* asCSSStyleRule(CSSRule*);
 
-    static PassOwnPtr<InspectorCSSAgent> create(InstrumentingAgents* instrumentingAgents, InspectorCompositeState* state, InspectorDOMAgent* domAgent)
+    static PassOwnPtr<InspectorCSSAgent> create(InstrumentingAgents* instrumentingAgents, InspectorDOMAgent* domAgent)
     {
-        return adoptPtr(new InspectorCSSAgent(instrumentingAgents, state, domAgent));
+        return adoptPtr(new InspectorCSSAgent(instrumentingAgents, domAgent));
     }
     ~InspectorCSSAgent();
 
     bool forcePseudoState(Element*, CSSSelector::PseudoType);
-    virtual void setFrontend(InspectorFrontend*);
-    virtual void clearFrontend();
+    virtual void didCreateFrontendAndBackend(InspectorFrontendChannel*, InspectorBackendDispatcher*) OVERRIDE;
+    virtual void willDestroyFrontendAndBackend() OVERRIDE;
     virtual void discardAgent();
-    virtual void restore();
     virtual void enable(ErrorString*);
     virtual void disable(ErrorString*);
     void reset();
@@ -147,7 +146,7 @@ private:
     class SetRuleSelectorAction;
     class AddRuleAction;
 
-    InspectorCSSAgent(InstrumentingAgents*, InspectorCompositeState*, InspectorDOMAgent*);
+    InspectorCSSAgent(InstrumentingAgents*, InspectorDOMAgent*);
 
     typedef HashMap<String, RefPtr<InspectorStyleSheet>> IdToInspectorStyleSheet;
     typedef HashMap<CSSStyleSheet*, RefPtr<InspectorStyleSheet>> CSSStyleSheetToInspectorStyleSheet;
@@ -184,7 +183,8 @@ private:
 
     void resetPseudoStates();
 
-    InspectorFrontend::CSS* m_frontend;
+    std::unique_ptr<InspectorCSSFrontendDispatcher> m_frontendDispatcher;
+    RefPtr<InspectorCSSBackendDispatcher> m_backendDispatcher;
     InspectorDOMAgent* m_domAgent;
 
     IdToInspectorStyleSheet m_idToInspectorStyleSheet;

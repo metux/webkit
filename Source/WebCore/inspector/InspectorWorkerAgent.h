@@ -38,26 +38,24 @@
 #include <wtf/HashMap.h>
 
 namespace WebCore {
-class InspectorFrontend;
 class InspectorObject;
-class InspectorState;
+class InspectorWorkerFrontendDispatcher;
 class InstrumentingAgents;
 class URL;
 class WorkerGlobalScopeProxy;
 
 typedef String ErrorString;
 
-class InspectorWorkerAgent : public InspectorBaseAgent<InspectorWorkerAgent>, public InspectorBackendDispatcher::WorkerCommandHandler {
+class InspectorWorkerAgent : public InspectorBaseAgent, public InspectorWorkerBackendDispatcherHandler {
 public:
-    static PassOwnPtr<InspectorWorkerAgent> create(InstrumentingAgents*, InspectorCompositeState*);
+    static PassOwnPtr<InspectorWorkerAgent> create(InstrumentingAgents*);
     ~InspectorWorkerAgent();
 
-    virtual void setFrontend(InspectorFrontend*);
-    virtual void restore();
-    virtual void clearFrontend();
+    virtual void didCreateFrontendAndBackend(InspectorFrontendChannel*, InspectorBackendDispatcher*) OVERRIDE;
+    virtual void willDestroyFrontendAndBackend() OVERRIDE;
 
     // Called from InspectorInstrumentation
-    bool shouldPauseDedicatedWorkerOnStart();
+    bool shouldPauseDedicatedWorkerOnStart() const;
     void didStartWorkerGlobalScope(WorkerGlobalScopeProxy*, const URL&);
     void workerGlobalScopeTerminated(WorkerGlobalScopeProxy*);
 
@@ -71,12 +69,15 @@ public:
     virtual void setAutoconnectToWorkers(ErrorString*, bool value);
 
 private:
-    InspectorWorkerAgent(InstrumentingAgents*, InspectorCompositeState*);
+    InspectorWorkerAgent(InstrumentingAgents*);
     void createWorkerFrontendChannelsForExistingWorkers();
     void createWorkerFrontendChannel(WorkerGlobalScopeProxy*, const String& url);
     void destroyWorkerFrontendChannels();
 
-    InspectorFrontend* m_inspectorFrontend;
+    std::unique_ptr<InspectorWorkerFrontendDispatcher> m_frontendDispatcher;
+    RefPtr<InspectorWorkerBackendDispatcher> m_backendDispatcher;
+    bool m_enabled;
+    bool m_shouldPauseDedicatedWorkerOnStart;
 
     class WorkerFrontendChannel;
     typedef HashMap<int, WorkerFrontendChannel*> WorkerChannels;

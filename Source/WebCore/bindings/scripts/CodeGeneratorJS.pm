@@ -1563,7 +1563,8 @@ sub GenerateImplementation
             push(@hashValue2, $functionLength);
 
             my @specials = ();
-            push(@specials, "DontDelete") unless $function->signature->extendedAttributes->{"Deletable"};
+            push(@specials, "DontDelete") if $interface->extendedAttributes->{"OperationsNotDeletable"}
+                || $function->signature->extendedAttributes->{"NotDeletable"};
             push(@specials, "DontEnum") if $function->signature->extendedAttributes->{"NotEnumerable"};
             push(@specials, "JSC::Function");
             my $special = (@specials > 0) ? join(" | ", @specials) : "0";
@@ -1627,7 +1628,8 @@ sub GenerateImplementation
         push(@hashValue2, $functionLength);
 
         my @specials = ();
-        push(@specials, "DontDelete") unless $function->signature->extendedAttributes->{"Deletable"};
+        push(@specials, "DontDelete") if $interface->extendedAttributes->{"OperationsNotDeletable"}
+            || $function->signature->extendedAttributes->{"NotDeletable"};
         push(@specials, "DontEnum") if $function->signature->extendedAttributes->{"NotEnumerable"};
         push(@specials, "JSC::Function");
         my $special = (@specials > 0) ? join(" | ", @specials) : "0";
@@ -1908,7 +1910,6 @@ sub GenerateImplementation
                 if ($interface->extendedAttributes->{"CheckSecurity"} &&
                     !$attribute->signature->extendedAttributes->{"DoNotCheckSecurity"} &&
                     !$attribute->signature->extendedAttributes->{"DoNotCheckSecurityOnGetter"}) {
-                    $implIncludes{"BindingSecurity.h"} = 1;
                     push(@implContent, "    if (!BindingSecurity::shouldAllowAccessToDOMWindow(exec, castedThis->impl()))\n");
                     push(@implContent, "        return jsUndefined();\n");
                 }
@@ -2047,7 +2048,6 @@ sub GenerateImplementation
                 push(@implContent, "    ${className}* domObject = jsCast<$className*>(asObject(slotBase));\n");
 
                 if ($interface->extendedAttributes->{"CheckSecurity"}) {
-                    $implIncludes{"BindingSecurity.h"} = 1;
                     push(@implContent, "    if (!BindingSecurity::shouldAllowAccessToDOMWindow(exec, domObject->impl()))\n");
                     push(@implContent, "        return jsUndefined();\n");
                 }
@@ -2138,7 +2138,6 @@ sub GenerateImplementation
 
                             if ($interface->extendedAttributes->{"CheckSecurity"} && !$attribute->signature->extendedAttributes->{"DoNotCheckSecurity"}) {
                                 if ($interfaceName eq "DOMWindow") {
-                                    $implIncludes{"BindingSecurity.h"} = 1;
                                     push(@implContent, "    if (!BindingSecurity::shouldAllowAccessToDOMWindow(exec, jsCast<$className*>(thisObject)->impl()))\n");
                                 } else {
                                     push(@implContent, "    if (!shouldAllowAccessToFrame(exec, jsCast<$className*>(thisObject)->impl().frame()))\n");
@@ -2285,7 +2284,6 @@ sub GenerateImplementation
                 push(@implContent, "{\n");
                 if ($interface->extendedAttributes->{"CheckSecurity"}) {
                     if ($interfaceName eq "DOMWindow") {
-                        $implIncludes{"BindingSecurity.h"} = 1;
                         push(@implContent, "    if (!BindingSecurity::shouldAllowAccessToDOMWindow(exec, jsCast<$className*>(thisObject)->impl()))\n");
                     } else {
                         push(@implContent, "    if (!shouldAllowAccessToFrame(exec, jsCast<$className*>(thisObject)->impl().frame()))\n");
@@ -2395,7 +2393,6 @@ sub GenerateImplementation
 
                 if ($interface->extendedAttributes->{"CheckSecurity"} and
                     !$function->signature->extendedAttributes->{"DoNotCheckSecurity"}) {
-                    $implIncludes{"BindingSecurity.h"} = 1;
                     push(@implContent, "    if (!BindingSecurity::shouldAllowAccessToDOMWindow(exec, castedThis->impl()))\n");
                     push(@implContent, "        return JSValue::encode(jsUndefined());\n");
                 }
@@ -3239,10 +3236,10 @@ my %nativeType = (
     "boolean" => "bool",
     "double" => "double",
     "float" => "float",
-    "short" => "short",
+    "short" => "int16_t",
     "long" => "int",
     "unsigned long" => "unsigned",
-    "unsigned short" => "unsigned short",
+    "unsigned short" => "uint16_t",
     "long long" => "long long",
     "unsigned long long" => "unsigned long long",
     "byte" => "int8_t",
@@ -3353,8 +3350,10 @@ sub JSValueToNative
     my $intConversion = $signature->extendedAttributes->{"EnforceRange"} ? "EnforceRange" : "NormalConversion";
     return "toInt8(exec, $value, $intConversion)" if $type eq "byte";
     return "toUInt8(exec, $value, $intConversion)" if $type eq "octet";
-    return "toInt32(exec, $value, $intConversion)" if $type eq "long" or $type eq "short";
-    return "toUInt32(exec, $value, $intConversion)" if $type eq "unsigned long" or $type eq "unsigned short";
+    return "toInt16(exec, $value, $intConversion)" if $type eq "short";
+    return "toUInt16(exec, $value, $intConversion)" if $type eq "unsigned short";
+    return "toInt32(exec, $value, $intConversion)" if $type eq "long";
+    return "toUInt32(exec, $value, $intConversion)" if $type eq "unsigned long";
     return "toInt64(exec, $value, $intConversion)" if $type eq "long long";
     return "toUInt64(exec, $value, $intConversion)" if $type eq "unsigned long long";
 
@@ -4024,8 +4023,8 @@ END
             my $numParameters = @{$function->parameters};
             my ($dummy, $paramIndex) = GenerateParametersCheck($outputArray, $function, $interface, $numParameters, $interfaceName, "constructorCallback", undef, undef, undef);
 
-            if ($codeGenerator->ExtendedAttributeContains($interface->extendedAttributes->{"ConstructorCallWith"}, "ScriptExecutionContext")) {
-                push(@constructorArgList, "context");
+            if ($codeGenerator->ExtendedAttributeContains($interface->extendedAttributes->{"ConstructorCallWith"}, "ScriptExecutionContext") ) {
+                push(@constructorArgList, "*context");
                 push(@$outputArray, "    ScriptExecutionContext* context = castedThis->scriptExecutionContext();\n");
                 push(@$outputArray, "    if (!context)\n");
                 push(@$outputArray, "        return throwVMError(exec, createReferenceError(exec, \"${interfaceName} constructor associated document is unavailable\"));\n");

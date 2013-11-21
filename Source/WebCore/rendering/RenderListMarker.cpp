@@ -28,6 +28,7 @@
 #include "Document.h"
 #include "Font.h"
 #include "GraphicsContext.h"
+#include "InlineElementBox.h"
 #include "RenderLayer.h"
 #include "RenderListItem.h"
 #include "RenderView.h"
@@ -35,7 +36,6 @@
 #include <wtf/text/StringBuilder.h>
 #include <wtf/unicode/CharacterNames.h>
 
-using namespace std;
 using namespace WTF;
 using namespace Unicode;
 
@@ -1148,11 +1148,11 @@ void RenderListMarker::styleDidChange(StyleDifference diff, const RenderStyle* o
     }
 }
 
-InlineBox* RenderListMarker::createInlineBox()
+std::unique_ptr<InlineElementBox> RenderListMarker::createInlineBox()
 {
-    InlineBox* result = RenderBox::createInlineBox();
-    result->setBehavesLikeText(isText());
-    return result;
+    auto box = RenderBox::createInlineBox();
+    box->setBehavesLikeText(isText());
+    return box;
 }
 
 bool RenderListMarker::isImage() const

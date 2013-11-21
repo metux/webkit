@@ -37,7 +37,7 @@
 #include "ExceptionCodePlaceholder.h"
 #include "InspectorDatabaseResource.h"
 #include "InspectorFrontend.h"
-#include "InspectorState.h"
+
 #include "InspectorValues.h"
 #include "InstrumentingAgents.h"
 #include "SQLError.h"
@@ -53,13 +53,9 @@
 
 #include <wtf/Vector.h>
 
-typedef WebCore::InspectorBackendDispatcher::DatabaseCommandHandler::ExecuteSQLCallback ExecuteSQLCallback;
+typedef WebCore::InspectorDatabaseBackendDispatcherHandler::ExecuteSQLCallback ExecuteSQLCallback;
 
 namespace WebCore {
-
-namespace DatabaseAgentState {
-static const char databaseAgentEnabled[] = "databaseAgentEnabled";
-};
 
 namespace {
 
@@ -205,8 +201,8 @@ void InspectorDatabaseAgent::didOpenDatabase(PassRefPtr<Database> database, cons
     RefPtr<InspectorDatabaseResource> resource = InspectorDatabaseResource::create(database, domain, name, version);
     m_resources.set(resource->id(), resource);
     // Resources are only bound while visible.
-    if (m_frontend && m_enabled)
-        resource->bind(m_frontend);
+    if (m_frontendDispatcher && m_enabled)
+        resource->bind(m_frontendDispatcher.get());
 }
 
 void InspectorDatabaseAgent::clearResources()
@@ -214,8 +210,8 @@ void InspectorDatabaseAgent::clearResources()
     m_resources.clear();
 }
 
-InspectorDatabaseAgent::InspectorDatabaseAgent(InstrumentingAgents* instrumentingAgents, InspectorCompositeState* state)
-    : InspectorBaseAgent<InspectorDatabaseAgent>("Database", instrumentingAgents, state)
+InspectorDatabaseAgent::InspectorDatabaseAgent(InstrumentingAgents* instrumentingAgents)
+    : InspectorBaseAgent(ASCIILiteral("Database"), instrumentingAgents)
     , m_enabled(false)
 {
     m_instrumentingAgents->setInspectorDatabaseAgent(this);
@@ -226,15 +222,18 @@ InspectorDatabaseAgent::~InspectorDatabaseAgent()
     m_instrumentingAgents->setInspectorDatabaseAgent(0);
 }
 
-void InspectorDatabaseAgent::setFrontend(InspectorFrontend* frontend)
+void InspectorDatabaseAgent::didCreateFrontendAndBackend(InspectorFrontendChannel* frontendChannel, InspectorBackendDispatcher* backendDispatcher)
 {
-    m_frontend = frontend->database();
+    m_frontendDispatcher = std::make_unique<InspectorDatabaseFrontendDispatcher>(frontendChannel);
+    m_backendDispatcher = InspectorDatabaseBackendDispatcher::create(backendDispatcher, this);
 }
 
-void InspectorDatabaseAgent::clearFrontend()
+void InspectorDatabaseAgent::willDestroyFrontendAndBackend()
 {
-    m_frontend = 0;
-    disable(0);
+    m_frontendDispatcher = nullptr;
+    m_backendDispatcher.clear();
+
+    disable(nullptr);
 }
 
 void InspectorDatabaseAgent::enable(ErrorString*)
@@ -242,11 +241,10 @@ void InspectorDatabaseAgent::enable(ErrorString*)
     if (m_enabled)
         return;
     m_enabled = true;
-    m_state->setBoolean(DatabaseAgentState::databaseAgentEnabled, m_enabled);
 
     DatabaseResourcesMap::iterator databasesEnd = m_resources.end();
     for (DatabaseResourcesMap::iterator it = m_resources.begin(); it != databasesEnd; ++it)
-        it->value->bind(m_frontend);
+        it->value->bind(m_frontendDispatcher.get());
 }
 
 void InspectorDatabaseAgent::disable(ErrorString*)
@@ -254,12 +252,6 @@ void InspectorDatabaseAgent::disable(ErrorString*)
     if (!m_enabled)
         return;
     m_enabled = false;
-    m_state->setBoolean(DatabaseAgentState::databaseAgentEnabled, m_enabled);
-}
-
-void InspectorDatabaseAgent::restore()
-{
-    m_enabled = m_state->getBoolean(DatabaseAgentState::databaseAgentEnabled);
 }
 
 void InspectorDatabaseAgent::getDatabaseTableNames(ErrorString* error, const String& databaseId, RefPtr<TypeBuilder::Array<String>>& names)

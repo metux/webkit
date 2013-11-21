@@ -44,7 +44,6 @@
 #include "RenderSlider.h"
 #include "RenderTheme.h"
 #include "ShadowRoot.h"
-#include "StepRange.h"
 
 namespace WebCore {
 
@@ -233,6 +232,7 @@ Element* SliderThumbElement::focusDelegate()
 
 void SliderThumbElement::dragFrom(const LayoutPoint& point)
 {
+    Ref<SliderThumbElement> protect(*this);
     setPositionFromPoint(point);
     startDragging();
 }

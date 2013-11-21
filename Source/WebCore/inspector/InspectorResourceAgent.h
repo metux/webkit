@@ -55,10 +55,8 @@ class Frame;
 class HTTPHeaderMap;
 class InspectorArray;
 class InspectorClient;
-class InspectorFrontend;
 class InspectorObject;
 class InspectorPageAgent;
-class InspectorState;
 class InstrumentingAgents;
 class URL;
 class NetworkResourcesData;
@@ -78,20 +76,17 @@ struct WebSocketFrame;
 
 typedef String ErrorString;
 
-class InspectorResourceAgent : public InspectorBaseAgent<InspectorResourceAgent>, public InspectorBackendDispatcher::NetworkCommandHandler {
+class InspectorResourceAgent : public InspectorBaseAgent, public InspectorNetworkBackendDispatcherHandler {
 public:
-    static PassOwnPtr<InspectorResourceAgent> create(InstrumentingAgents* instrumentingAgents, InspectorPageAgent* pageAgent, InspectorClient* client, InspectorCompositeState* state)
+    static PassOwnPtr<InspectorResourceAgent> create(InstrumentingAgents* instrumentingAgents, InspectorPageAgent* pageAgent, InspectorClient* client)
     {
-        return adoptPtr(new InspectorResourceAgent(instrumentingAgents, pageAgent, client, state));
+        return adoptPtr(new InspectorResourceAgent(instrumentingAgents, pageAgent, client));
     }
 
-    virtual void setFrontend(InspectorFrontend*);
-    virtual void clearFrontend();
-    virtual void restore();
-
-    static PassRefPtr<InspectorResourceAgent> restore(Page*, InspectorCompositeState*, InspectorFrontend*);
-
     ~InspectorResourceAgent();
+
+    virtual void didCreateFrontendAndBackend(InspectorFrontendChannel*, InspectorBackendDispatcher*) OVERRIDE;
+    virtual void willDestroyFrontendAndBackend() OVERRIDE;
 
     void willSendRequest(unsigned long identifier, DocumentLoader*, ResourceRequest&, const ResourceResponse& redirectResponse);
     void markResourceAsCached(unsigned long identifier);
@@ -152,16 +147,20 @@ public:
     virtual void setCacheDisabled(ErrorString*, bool cacheDisabled);
 
 private:
-    InspectorResourceAgent(InstrumentingAgents*, InspectorPageAgent*, InspectorClient*, InspectorCompositeState*);
+    InspectorResourceAgent(InstrumentingAgents*, InspectorPageAgent*, InspectorClient*);
 
     void enable();
 
     InspectorPageAgent* m_pageAgent;
     InspectorClient* m_client;
-    InspectorFrontend::Network* m_frontend;
+    std::unique_ptr<InspectorNetworkFrontendDispatcher> m_frontendDispatcher;
+    RefPtr<InspectorNetworkBackendDispatcher> m_backendDispatcher;
     String m_userAgentOverride;
     OwnPtr<NetworkResourcesData> m_resourcesData;
+    bool m_enabled;
+    bool m_cacheDisabled;
     bool m_loadingXHRSynchronously;
+    RefPtr<InspectorObject> m_extraRequestHeaders;
 
     typedef HashMap<ThreadableLoaderClient*, RefPtr<XHRReplayData>> PendingXHRReplayDataMap;
     PendingXHRReplayDataMap m_pendingXHRReplayData;

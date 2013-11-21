@@ -2,26 +2,19 @@
 <html>
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
-<title>WebKitDOMDOMWindow</title>
+<title>WebKitDOMGTK+ Reference Manual: WebKitDOMDOMWindow</title>
 <meta name="generator" content="DocBook XSL Stylesheets V1.78.1">
 <link rel="home" href="index.html" title="WebKitDOMGTK+ Reference Manual">
 <link rel="up" href="ch01.html" title="Class Overview">
 <link rel="prev" href="WebKitDOMDOMWindowCSS.html" title="WebKitDOMDOMWindowCSS">
 <link rel="next" href="WebKitDOMDOMSelection.html" title="WebKitDOMDOMSelection">
-<meta name="generator" content="GTK-Doc V1.18.1 (XML mode)">
+<meta name="generator" content="GTK-Doc V1.19.1 (XML mode)">
 <link rel="stylesheet" href="style.css" type="text/css">
 </head>
 <body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF">
-<table class="navigation" id="top" width="100%" summary="Navigation header" cellpadding="2" cellspacing="2">
-<tr valign="middle">
-<td><a accesskey="p" href="WebKitDOMDOMWindowCSS.html"><img src="left.png" width="24" height="24" border="0" alt="Prev"></a></td>
-<td><a accesskey="u" href="ch01.html"><img src="up.png" width="24" height="24" border="0" alt="Up"></a></td>
-<td><a accesskey="h" href="index.html"><img src="home.png" width="24" height="24" border="0" alt="Home"></a></td>
-<th width="100%" align="center">WebKitDOMGTK+ Reference Manual</th>
-<td><a accesskey="n" href="WebKitDOMDOMSelection.html"><img src="right.png" width="24" height="24" border="0" alt="Next"></a></td>
-</tr>
-<tr><td colspan="5" class="shortcuts">
-<a href="#WebKitDOMDOMWindow.synopsis" class="shortcut">Top</a>
+<table class="navigation" id="top" width="100%" summary="Navigation header" cellpadding="2" cellspacing="10"><tr valign="middle">
+<td width="100%" align="left">
+<a href="#" class="shortcut">Top</a>
                    | 
                   <a href="#WebKitDOMDOMWindow.description" class="shortcut">Description</a>
                    | 
@@ -30,8 +23,12 @@
                   <a href="#WebKitDOMDOMWindow.implemented-interfaces" class="shortcut">Implemented Interfaces</a>
                    | 
                   <a href="#WebKitDOMDOMWindow.properties" class="shortcut">Properties</a>
-</td></tr>
-</table>
+</td>
+<td><a accesskey="h" href="index.html"><img src="home.png" width="16" height="16" border="0" alt="Home"></a></td>
+<td><a accesskey="u" href="ch01.html"><img src="up.png" width="16" height="16" border="0" alt="Up"></a></td>
+<td><a accesskey="p" href="WebKitDOMDOMWindowCSS.html"><img src="left.png" width="16" height="16" border="0" alt="Prev"></a></td>
+<td><a accesskey="n" href="WebKitDOMDOMSelection.html"><img src="right.png" width="16" height="16" border="0" alt="Next"></a></td>
+</tr></table>
 <div class="refentry">
 <a name="WebKitDOMDOMWindow"></a><div class="titlepage"></div>
 <div class="refnamediv"><table width="100%"><tr>
@@ -111,6 +108,10 @@
 <span class="returnvalue">void</span>                <a class="link" href="WebKitDOMDOMWindow.html#webkit-dom-dom-window-webkit-cancel-request-animation-frame" title="webkit_dom_dom_window_webkit_cancel_request_animation_frame ()">webkit_dom_dom_window_webkit_cancel_request_animation_frame</a>
                                                         (<em class="parameter"><code><a class="link" href="WebKitDOMDOMWindow.html" title="WebKitDOMDOMWindow"><span class="type">WebKitDOMDOMWindow</span></a> *self</code></em>,
                                                          <em class="parameter"><code><a href="../glib/glib-Basic-Types.html#glong"><span class="type">glong</span></a> id</code></em>);
+<a href="../glib/glib-Basic-Types.html#gboolean"><span class="returnvalue">gboolean</span></a>            <a class="link" href="WebKitDOMDOMWindow.html#webkit-dom-dom-window-dispatch-event" title="webkit_dom_dom_window_dispatch_event ()">webkit_dom_dom_window_dispatch_event</a>
+                                                        (<em class="parameter"><code><a class="link" href="WebKitDOMDOMWindow.html" title="WebKitDOMDOMWindow"><span class="type">WebKitDOMDOMWindow</span></a> *self</code></em>,
+                                                         <em class="parameter"><code><a class="link" href="WebKitDOMEvent.html" title="WebKitDOMEvent"><span class="type">WebKitDOMEvent</span></a> *evt</code></em>,
+                                                         <em class="parameter"><code><a href="../glib/glib-Error-Reporting.html#GError"><span class="type">GError</span></a> **error</code></em>);
 <span class="returnvalue">void</span>                <a class="link" href="WebKitDOMDOMWindow.html#webkit-dom-dom-window-capture-events" title="webkit_dom_dom_window_capture_events ()">webkit_dom_dom_window_capture_events</a>
                                                         (<em class="parameter"><code><a class="link" href="WebKitDOMDOMWindow.html" title="WebKitDOMDOMWindow"><span class="type">WebKitDOMDOMWindow</span></a> *self</code></em>);
 <span class="returnvalue">void</span>                <a class="link" href="WebKitDOMDOMWindow.html#webkit-dom-dom-window-release-events" title="webkit_dom_dom_window_release_events ()">webkit_dom_dom_window_release_events</a>
@@ -300,7 +301,7 @@ WebKitDOMDOMWindow implements
 </tr>
 <tr>
 <td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
-<td>. <span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
+<td>A <a class="link" href="WebKitDOMDOMSelection.html" title="WebKitDOMDOMSelection"><span class="type">WebKitDOMDOMSelection</span></a>. <span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
 </td>
 </tr>
 </tbody>
@@ -431,6 +432,11 @@ WebKitDOMDOMWindow implements
 <td>A <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a>
 </td>
 </tr>
+<tr>
+<td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
+<td>A <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>
+</td>
+</tr>
 </tbody>
 </table></div>
 </div>
@@ -458,6 +464,11 @@ WebKitDOMDOMWindow implements
 </tr>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>defaultValue</code></em> :</span></p></td>
+<td>A <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a>
+</td>
+</tr>
+<tr>
+<td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
 <td>A <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a>
 </td>
 </tr>
@@ -518,6 +529,11 @@ WebKitDOMDOMWindow implements
 </tr>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>showDialog</code></em> :</span></p></td>
+<td>A <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>
+</td>
+</tr>
+<tr>
+<td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
 <td>A <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>
 </td>
 </tr>
@@ -758,7 +774,7 @@ WebKitDOMDOMWindow implements
 </tr>
 <tr>
 <td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
-<td>. <span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
+<td>A <a class="link" href="WebKitDOMMediaQueryList.html" title="WebKitDOMMediaQueryList"><span class="type">WebKitDOMMediaQueryList</span></a>. <span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
 </td>
 </tr>
 </tbody>
@@ -794,7 +810,7 @@ WebKitDOMDOMWindow implements
 </tr>
 <tr>
 <td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
-<td>. <span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
+<td>A <a class="link" href="WebKitDOMCSSStyleDeclaration.html" title="WebKitDOMCSSStyleDeclaration"><span class="type">WebKitDOMCSSStyleDeclaration</span></a>. <span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
 </td>
 </tr>
 </tbody>
@@ -830,7 +846,7 @@ WebKitDOMDOMWindow implements
 </tr>
 <tr>
 <td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
-<td>. <span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
+<td>A <a class="link" href="WebKitDOMWebKitPoint.html" title="WebKitDOMWebKitPoint"><span class="type">WebKitDOMWebKitPoint</span></a>. <span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
 </td>
 </tr>
 </tbody>
@@ -866,7 +882,7 @@ WebKitDOMDOMWindow implements
 </tr>
 <tr>
 <td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
-<td>. <span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
+<td>A <a class="link" href="WebKitDOMWebKitPoint.html" title="WebKitDOMWebKitPoint"><span class="type">WebKitDOMWebKitPoint</span></a>. <span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
 </td>
 </tr>
 </tbody>
@@ -949,6 +965,45 @@ WebKitDOMDOMWindow implements
 </div>
 <hr>
 <div class="refsect2">
+<a name="webkit-dom-dom-window-dispatch-event"></a><h3>webkit_dom_dom_window_dispatch_event ()</h3>
+<pre class="programlisting"><a href="../glib/glib-Basic-Types.html#gboolean"><span class="returnvalue">gboolean</span></a>            webkit_dom_dom_window_dispatch_event
+                                                        (<em class="parameter"><code><a class="link" href="WebKitDOMDOMWindow.html" title="WebKitDOMDOMWindow"><span class="type">WebKitDOMDOMWindow</span></a> *self</code></em>,
+                                                         <em class="parameter"><code><a class="link" href="WebKitDOMEvent.html" title="WebKitDOMEvent"><span class="type">WebKitDOMEvent</span></a> *evt</code></em>,
+                                                         <em class="parameter"><code><a href="../glib/glib-Error-Reporting.html#GError"><span class="type">GError</span></a> **error</code></em>);</pre>
+<div class="warning">
+<h3 class="title">Warning</h3>
+<p><code class="literal">webkit_dom_dom_window_dispatch_event</code> has been deprecated since version 2.4 and should not be used in newly-written code. Use <a class="link" href="WebKitDOMEventTarget.html#webkit-dom-event-target-dispatch-event" title="webkit_dom_event_target_dispatch_event ()"><code class="function">webkit_dom_event_target_dispatch_event()</code></a> instead.</p>
+</div>
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
+<col align="left" valign="top">
+<col>
+</colgroup>
+<tbody>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>self</code></em> :</span></p></td>
+<td>A <a class="link" href="WebKitDOMDOMWindow.html" title="WebKitDOMDOMWindow"><span class="type">WebKitDOMDOMWindow</span></a>
+</td>
+</tr>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>evt</code></em> :</span></p></td>
+<td>A <a class="link" href="WebKitDOMEvent.html" title="WebKitDOMEvent"><span class="type">WebKitDOMEvent</span></a>
+</td>
+</tr>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>error</code></em> :</span></p></td>
+<td><a href="../glib/glib-Error-Reporting.html#GError"><span class="type">GError</span></a></td>
+</tr>
+<tr>
+<td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
+<td>A <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>
+</td>
+</tr>
+</tbody>
+</table></div>
+</div>
+<hr>
+<div class="refsect2">
 <a name="webkit-dom-dom-window-capture-events"></a><h3>webkit_dom_dom_window_capture_events ()</h3>
 <pre class="programlisting"><span class="returnvalue">void</span>                webkit_dom_dom_window_capture_events
                                                         (<em class="parameter"><code><a class="link" href="WebKitDOMDOMWindow.html" title="WebKitDOMDOMWindow"><span class="type">WebKitDOMDOMWindow</span></a> *self</code></em>);</pre>
@@ -1007,6 +1062,11 @@ WebKitDOMDOMWindow implements
 <td><p><span class="term"><em class="parameter"><code>error</code></em> :</span></p></td>
 <td><a href="../glib/glib-Error-Reporting.html#GError"><span class="type">GError</span></a></td>
 </tr>
+<tr>
+<td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
+<td>A <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a>
+</td>
+</tr>
 </tbody>
 </table></div>
 </div>
@@ -1035,6 +1095,11 @@ WebKitDOMDOMWindow implements
 <tr>
 <td><p><span class="term"><em class="parameter"><code>error</code></em> :</span></p></td>
 <td><a href="../glib/glib-Error-Reporting.html#GError"><span class="type">GError</span></a></td>
+</tr>
+<tr>
+<td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
+<td>A <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a>
+</td>
 </tr>
 </tbody>
 </table></div>
@@ -1105,7 +1170,7 @@ WebKitDOMDOMWindow implements
 </tr>
 <tr>
 <td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
-<td>. <span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
+<td>A <a class="link" href="WebKitDOMScreen.html" title="WebKitDOMScreen"><span class="type">WebKitDOMScreen</span></a>. <span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
 </td>
 </tr>
 </tbody>
@@ -1128,7 +1193,7 @@ WebKitDOMDOMWindow implements
 </tr>
 <tr>
 <td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
-<td>. <span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
+<td>A <a class="link" href="WebKitDOMHistory.html" title="WebKitDOMHistory"><span class="type">WebKitDOMHistory</span></a>. <span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
 </td>
 </tr>
 </tbody>
@@ -1152,7 +1217,7 @@ WebKitDOMDOMWindow implements
 </tr>
 <tr>
 <td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
-<td>. <span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
+<td>A <a class="link" href="WebKitDOMBarProp.html" title="WebKitDOMBarProp"><span class="type">WebKitDOMBarProp</span></a>. <span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
 </td>
 </tr>
 </tbody>
@@ -1175,7 +1240,7 @@ WebKitDOMDOMWindow implements
 </tr>
 <tr>
 <td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
-<td>. <span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
+<td>A <a class="link" href="WebKitDOMBarProp.html" title="WebKitDOMBarProp"><span class="type">WebKitDOMBarProp</span></a>. <span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
 </td>
 </tr>
 </tbody>
@@ -1199,7 +1264,7 @@ WebKitDOMDOMWindow implements
 </tr>
 <tr>
 <td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
-<td>. <span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
+<td>A <a class="link" href="WebKitDOMBarProp.html" title="WebKitDOMBarProp"><span class="type">WebKitDOMBarProp</span></a>. <span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
 </td>
 </tr>
 </tbody>
@@ -1223,7 +1288,7 @@ WebKitDOMDOMWindow implements
 </tr>
 <tr>
 <td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
-<td>. <span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
+<td>A <a class="link" href="WebKitDOMBarProp.html" title="WebKitDOMBarProp"><span class="type">WebKitDOMBarProp</span></a>. <span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
 </td>
 </tr>
 </tbody>
@@ -1246,7 +1311,7 @@ WebKitDOMDOMWindow implements
 </tr>
 <tr>
 <td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
-<td>. <span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
+<td>A <a class="link" href="WebKitDOMBarProp.html" title="WebKitDOMBarProp"><span class="type">WebKitDOMBarProp</span></a>. <span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
 </td>
 </tr>
 </tbody>
@@ -1269,7 +1334,7 @@ WebKitDOMDOMWindow implements
 </tr>
 <tr>
 <td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
-<td>. <span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
+<td>A <a class="link" href="WebKitDOMBarProp.html" title="WebKitDOMBarProp"><span class="type">WebKitDOMBarProp</span></a>. <span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
 </td>
 </tr>
 </tbody>
@@ -1293,7 +1358,7 @@ WebKitDOMDOMWindow implements
 </tr>
 <tr>
 <td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
-<td>. <span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
+<td>A <a class="link" href="WebKitDOMNavigator.html" title="WebKitDOMNavigator"><span class="type">WebKitDOMNavigator</span></a>. <span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
 </td>
 </tr>
 </tbody>
@@ -1317,7 +1382,7 @@ WebKitDOMDOMWindow implements
 </tr>
 <tr>
 <td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
-<td>. <span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
+<td>A <a class="link" href="WebKitDOMNavigator.html" title="WebKitDOMNavigator"><span class="type">WebKitDOMNavigator</span></a>. <span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
 </td>
 </tr>
 </tbody>
@@ -1341,7 +1406,7 @@ WebKitDOMDOMWindow implements
 </tr>
 <tr>
 <td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
-<td>. <span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
+<td>A <a class="link" href="WebKitDOMElement.html" title="WebKitDOMElement"><span class="type">WebKitDOMElement</span></a>. <span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
 </td>
 </tr>
 </tbody>
@@ -1357,11 +1422,18 @@ WebKitDOMDOMWindow implements
 <col align="left" valign="top">
 <col>
 </colgroup>
-<tbody><tr>
+<tbody>
+<tr>
 <td><p><span class="term"><em class="parameter"><code>self</code></em> :</span></p></td>
 <td>A <a class="link" href="WebKitDOMDOMWindow.html" title="WebKitDOMDOMWindow"><span class="type">WebKitDOMDOMWindow</span></a>
 </td>
-</tr></tbody>
+</tr>
+<tr>
+<td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
+<td>A <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>
+</td>
+</tr>
+</tbody>
 </table></div>
 </div>
 <hr>
@@ -1374,11 +1446,18 @@ WebKitDOMDOMWindow implements
 <col align="left" valign="top">
 <col>
 </colgroup>
-<tbody><tr>
+<tbody>
+<tr>
 <td><p><span class="term"><em class="parameter"><code>self</code></em> :</span></p></td>
 <td>A <a class="link" href="WebKitDOMDOMWindow.html" title="WebKitDOMDOMWindow"><span class="type">WebKitDOMDOMWindow</span></a>
 </td>
-</tr></tbody>
+</tr>
+<tr>
+<td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
+<td>A <a href="../glib/glib-Basic-Types.html#glong"><span class="type">glong</span></a>
+</td>
+</tr>
+</tbody>
 </table></div>
 </div>
 <hr>
@@ -1391,11 +1470,18 @@ WebKitDOMDOMWindow implements
 <col align="left" valign="top">
 <col>
 </colgroup>
-<tbody><tr>
+<tbody>
+<tr>
 <td><p><span class="term"><em class="parameter"><code>self</code></em> :</span></p></td>
 <td>A <a class="link" href="WebKitDOMDOMWindow.html" title="WebKitDOMDOMWindow"><span class="type">WebKitDOMDOMWindow</span></a>
 </td>
-</tr></tbody>
+</tr>
+<tr>
+<td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
+<td>A <a href="../glib/glib-Basic-Types.html#glong"><span class="type">glong</span></a>
+</td>
+</tr>
+</tbody>
 </table></div>
 </div>
 <hr>
@@ -1408,11 +1494,18 @@ WebKitDOMDOMWindow implements
 <col align="left" valign="top">
 <col>
 </colgroup>
-<tbody><tr>
+<tbody>
+<tr>
 <td><p><span class="term"><em class="parameter"><code>self</code></em> :</span></p></td>
 <td>A <a class="link" href="WebKitDOMDOMWindow.html" title="WebKitDOMDOMWindow"><span class="type">WebKitDOMDOMWindow</span></a>
 </td>
-</tr></tbody>
+</tr>
+<tr>
+<td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
+<td>A <a href="../glib/glib-Basic-Types.html#glong"><span class="type">glong</span></a>
+</td>
+</tr>
+</tbody>
 </table></div>
 </div>
 <hr>
@@ -1425,11 +1518,18 @@ WebKitDOMDOMWindow implements
 <col align="left" valign="top">
 <col>
 </colgroup>
-<tbody><tr>
+<tbody>
+<tr>
 <td><p><span class="term"><em class="parameter"><code>self</code></em> :</span></p></td>
 <td>A <a class="link" href="WebKitDOMDOMWindow.html" title="WebKitDOMDOMWindow"><span class="type">WebKitDOMDOMWindow</span></a>
 </td>
-</tr></tbody>
+</tr>
+<tr>
+<td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
+<td>A <a href="../glib/glib-Basic-Types.html#glong"><span class="type">glong</span></a>
+</td>
+</tr>
+</tbody>
 </table></div>
 </div>
 <hr>
@@ -1441,11 +1541,18 @@ WebKitDOMDOMWindow implements
 <col align="left" valign="top">
 <col>
 </colgroup>
-<tbody><tr>
+<tbody>
+<tr>
 <td><p><span class="term"><em class="parameter"><code>self</code></em> :</span></p></td>
 <td>A <a class="link" href="WebKitDOMDOMWindow.html" title="WebKitDOMDOMWindow"><span class="type">WebKitDOMDOMWindow</span></a>
 </td>
-</tr></tbody>
+</tr>
+<tr>
+<td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
+<td>A <a href="../glib/glib-Basic-Types.html#glong"><span class="type">glong</span></a>
+</td>
+</tr>
+</tbody>
 </table></div>
 </div>
 <hr>
@@ -1457,11 +1564,18 @@ WebKitDOMDOMWindow implements
 <col align="left" valign="top">
 <col>
 </colgroup>
-<tbody><tr>
+<tbody>
+<tr>
 <td><p><span class="term"><em class="parameter"><code>self</code></em> :</span></p></td>
 <td>A <a class="link" href="WebKitDOMDOMWindow.html" title="WebKitDOMDOMWindow"><span class="type">WebKitDOMDOMWindow</span></a>
 </td>
-</tr></tbody>
+</tr>
+<tr>
+<td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
+<td>A <a href="../glib/glib-Basic-Types.html#glong"><span class="type">glong</span></a>
+</td>
+</tr>
+</tbody>
 </table></div>
 </div>
 <hr>
@@ -1474,11 +1588,18 @@ WebKitDOMDOMWindow implements
 <col align="left" valign="top">
 <col>
 </colgroup>
-<tbody><tr>
+<tbody>
+<tr>
 <td><p><span class="term"><em class="parameter"><code>self</code></em> :</span></p></td>
 <td>A <a class="link" href="WebKitDOMDOMWindow.html" title="WebKitDOMDOMWindow"><span class="type">WebKitDOMDOMWindow</span></a>
 </td>
-</tr></tbody>
+</tr>
+<tr>
+<td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
+<td>A <a href="../glib/glib-Basic-Types.html#glong"><span class="type">glong</span></a>
+</td>
+</tr>
+</tbody>
 </table></div>
 </div>
 <hr>
@@ -1491,11 +1612,18 @@ WebKitDOMDOMWindow implements
 <col align="left" valign="top">
 <col>
 </colgroup>
-<tbody><tr>
+<tbody>
+<tr>
 <td><p><span class="term"><em class="parameter"><code>self</code></em> :</span></p></td>
 <td>A <a class="link" href="WebKitDOMDOMWindow.html" title="WebKitDOMDOMWindow"><span class="type">WebKitDOMDOMWindow</span></a>
 </td>
-</tr></tbody>
+</tr>
+<tr>
+<td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
+<td>A <a href="../glib/glib-Basic-Types.html#glong"><span class="type">glong</span></a>
+</td>
+</tr>
+</tbody>
 </table></div>
 </div>
 <hr>
@@ -1507,11 +1635,18 @@ WebKitDOMDOMWindow implements
 <col align="left" valign="top">
 <col>
 </colgroup>
-<tbody><tr>
+<tbody>
+<tr>
 <td><p><span class="term"><em class="parameter"><code>self</code></em> :</span></p></td>
 <td>A <a class="link" href="WebKitDOMDOMWindow.html" title="WebKitDOMDOMWindow"><span class="type">WebKitDOMDOMWindow</span></a>
 </td>
-</tr></tbody>
+</tr>
+<tr>
+<td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
+<td>A <a href="../glib/glib-Basic-Types.html#glong"><span class="type">glong</span></a>
+</td>
+</tr>
+</tbody>
 </table></div>
 </div>
 <hr>
@@ -1523,11 +1658,18 @@ WebKitDOMDOMWindow implements
 <col align="left" valign="top">
 <col>
 </colgroup>
-<tbody><tr>
+<tbody>
+<tr>
 <td><p><span class="term"><em class="parameter"><code>self</code></em> :</span></p></td>
 <td>A <a class="link" href="WebKitDOMDOMWindow.html" title="WebKitDOMDOMWindow"><span class="type">WebKitDOMDOMWindow</span></a>
 </td>
-</tr></tbody>
+</tr>
+<tr>
+<td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
+<td>A <a href="../glib/glib-Basic-Types.html#glong"><span class="type">glong</span></a>
+</td>
+</tr>
+</tbody>
 </table></div>
 </div>
 <hr>
@@ -1540,11 +1682,18 @@ WebKitDOMDOMWindow implements
 <col align="left" valign="top">
 <col>
 </colgroup>
-<tbody><tr>
+<tbody>
+<tr>
 <td><p><span class="term"><em class="parameter"><code>self</code></em> :</span></p></td>
 <td>A <a class="link" href="WebKitDOMDOMWindow.html" title="WebKitDOMDOMWindow"><span class="type">WebKitDOMDOMWindow</span></a>
 </td>
-</tr></tbody>
+</tr>
+<tr>
+<td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
+<td>A <a href="../glib/glib-Basic-Types.html#glong"><span class="type">glong</span></a>
+</td>
+</tr>
+</tbody>
 </table></div>
 </div>
 <hr>
@@ -1557,11 +1706,18 @@ WebKitDOMDOMWindow implements
 <col align="left" valign="top">
 <col>
 </colgroup>
-<tbody><tr>
+<tbody>
+<tr>
 <td><p><span class="term"><em class="parameter"><code>self</code></em> :</span></p></td>
 <td>A <a class="link" href="WebKitDOMDOMWindow.html" title="WebKitDOMDOMWindow"><span class="type">WebKitDOMDOMWindow</span></a>
 </td>
-</tr></tbody>
+</tr>
+<tr>
+<td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
+<td>A <a href="../glib/glib-Basic-Types.html#glong"><span class="type">glong</span></a>
+</td>
+</tr>
+</tbody>
 </table></div>
 </div>
 <hr>
@@ -1573,11 +1729,18 @@ WebKitDOMDOMWindow implements
 <col align="left" valign="top">
 <col>
 </colgroup>
-<tbody><tr>
+<tbody>
+<tr>
 <td><p><span class="term"><em class="parameter"><code>self</code></em> :</span></p></td>
 <td>A <a class="link" href="WebKitDOMDOMWindow.html" title="WebKitDOMDOMWindow"><span class="type">WebKitDOMDOMWindow</span></a>
 </td>
-</tr></tbody>
+</tr>
+<tr>
+<td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
+<td>A <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>
+</td>
+</tr>
+</tbody>
 </table></div>
 </div>
 <hr>
@@ -1589,11 +1752,18 @@ WebKitDOMDOMWindow implements
 <col align="left" valign="top">
 <col>
 </colgroup>
-<tbody><tr>
+<tbody>
+<tr>
 <td><p><span class="term"><em class="parameter"><code>self</code></em> :</span></p></td>
 <td>A <a class="link" href="WebKitDOMDOMWindow.html" title="WebKitDOMDOMWindow"><span class="type">WebKitDOMDOMWindow</span></a>
 </td>
-</tr></tbody>
+</tr>
+<tr>
+<td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
+<td>A <a href="../glib/glib-Basic-Types.html#gulong"><span class="type">gulong</span></a>
+</td>
+</tr>
+</tbody>
 </table></div>
 </div>
 <hr>
@@ -1605,11 +1775,18 @@ WebKitDOMDOMWindow implements
 <col align="left" valign="top">
 <col>
 </colgroup>
-<tbody><tr>
+<tbody>
+<tr>
 <td><p><span class="term"><em class="parameter"><code>self</code></em> :</span></p></td>
 <td>A <a class="link" href="WebKitDOMDOMWindow.html" title="WebKitDOMDOMWindow"><span class="type">WebKitDOMDOMWindow</span></a>
 </td>
-</tr></tbody>
+</tr>
+<tr>
+<td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
+<td>A <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a>
+</td>
+</tr>
+</tbody>
 </table></div>
 </div>
 <hr>
@@ -1645,11 +1822,18 @@ WebKitDOMDOMWindow implements
 <col align="left" valign="top">
 <col>
 </colgroup>
-<tbody><tr>
+<tbody>
+<tr>
 <td><p><span class="term"><em class="parameter"><code>self</code></em> :</span></p></td>
 <td>A <a class="link" href="WebKitDOMDOMWindow.html" title="WebKitDOMDOMWindow"><span class="type">WebKitDOMDOMWindow</span></a>
 </td>
-</tr></tbody>
+</tr>
+<tr>
+<td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
+<td>A <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a>
+</td>
+</tr>
+</tbody>
 </table></div>
 </div>
 <hr>
@@ -1686,11 +1870,18 @@ WebKitDOMDOMWindow implements
 <col align="left" valign="top">
 <col>
 </colgroup>
-<tbody><tr>
+<tbody>
+<tr>
 <td><p><span class="term"><em class="parameter"><code>self</code></em> :</span></p></td>
 <td>A <a class="link" href="WebKitDOMDOMWindow.html" title="WebKitDOMDOMWindow"><span class="type">WebKitDOMDOMWindow</span></a>
 </td>
-</tr></tbody>
+</tr>
+<tr>
+<td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
+<td>A <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a>
+</td>
+</tr>
+</tbody>
 </table></div>
 </div>
 <hr>
@@ -1735,7 +1926,7 @@ WebKitDOMDOMWindow implements
 </tr>
 <tr>
 <td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
-<td>. <span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
+<td>A <a class="link" href="WebKitDOMDOMWindow.html" title="WebKitDOMDOMWindow"><span class="type">WebKitDOMDOMWindow</span></a>. <span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
 </td>
 </tr>
 </tbody>
@@ -1758,7 +1949,7 @@ WebKitDOMDOMWindow implements
 </tr>
 <tr>
 <td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
-<td>. <span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
+<td>A <a class="link" href="WebKitDOMDOMWindow.html" title="WebKitDOMDOMWindow"><span class="type">WebKitDOMDOMWindow</span></a>. <span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
 </td>
 </tr>
 </tbody>
@@ -1781,7 +1972,7 @@ WebKitDOMDOMWindow implements
 </tr>
 <tr>
 <td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
-<td>. <span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
+<td>A <a class="link" href="WebKitDOMDOMWindow.html" title="WebKitDOMDOMWindow"><span class="type">WebKitDOMDOMWindow</span></a>. <span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
 </td>
 </tr>
 </tbody>
@@ -1804,7 +1995,7 @@ WebKitDOMDOMWindow implements
 </tr>
 <tr>
 <td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
-<td>. <span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
+<td>A <a class="link" href="WebKitDOMDOMWindow.html" title="WebKitDOMDOMWindow"><span class="type">WebKitDOMDOMWindow</span></a>. <span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
 </td>
 </tr>
 </tbody>
@@ -1827,7 +2018,7 @@ WebKitDOMDOMWindow implements
 </tr>
 <tr>
 <td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
-<td>. <span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
+<td>A <a class="link" href="WebKitDOMDOMWindow.html" title="WebKitDOMDOMWindow"><span class="type">WebKitDOMDOMWindow</span></a>. <span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
 </td>
 </tr>
 </tbody>
@@ -1850,7 +2041,7 @@ WebKitDOMDOMWindow implements
 </tr>
 <tr>
 <td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
-<td>. <span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
+<td>A <a class="link" href="WebKitDOMDOMWindow.html" title="WebKitDOMDOMWindow"><span class="type">WebKitDOMDOMWindow</span></a>. <span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
 </td>
 </tr>
 </tbody>
@@ -1873,7 +2064,7 @@ WebKitDOMDOMWindow implements
 </tr>
 <tr>
 <td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
-<td>. <span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
+<td>A <a class="link" href="WebKitDOMDocument.html" title="WebKitDOMDocument"><span class="type">WebKitDOMDocument</span></a>. <span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
 </td>
 </tr>
 </tbody>
@@ -1897,7 +2088,7 @@ WebKitDOMDOMWindow implements
 </tr>
 <tr>
 <td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
-<td>. <span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
+<td>A <a class="link" href="WebKitDOMStyleMedia.html" title="WebKitDOMStyleMedia"><span class="type">WebKitDOMStyleMedia</span></a>. <span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
 </td>
 </tr>
 </tbody>
@@ -1913,11 +2104,18 @@ WebKitDOMDOMWindow implements
 <col align="left" valign="top">
 <col>
 </colgroup>
-<tbody><tr>
+<tbody>
+<tr>
 <td><p><span class="term"><em class="parameter"><code>self</code></em> :</span></p></td>
 <td>A <a class="link" href="WebKitDOMDOMWindow.html" title="WebKitDOMDOMWindow"><span class="type">WebKitDOMDOMWindow</span></a>
 </td>
-</tr></tbody>
+</tr>
+<tr>
+<td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
+<td>A <a href="../glib/glib-Basic-Types.html#gdouble"><span class="type">gdouble</span></a>
+</td>
+</tr>
+</tbody>
 </table></div>
 </div>
 <hr>
@@ -1938,7 +2136,7 @@ WebKitDOMDOMWindow implements
 </tr>
 <tr>
 <td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
-<td>. <span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
+<td>A <a class="link" href="WebKitDOMDOMApplicationCache.html" title="WebKitDOMDOMApplicationCache"><span class="type">WebKitDOMDOMApplicationCache</span></a>. <span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
 </td>
 </tr>
 </tbody>
@@ -1967,7 +2165,7 @@ WebKitDOMDOMWindow implements
 </tr>
 <tr>
 <td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
-<td>. <span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
+<td>A <a class="link" href="WebKitDOMStorage.html" title="WebKitDOMStorage"><span class="type">WebKitDOMStorage</span></a>. <span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
 </td>
 </tr>
 </tbody>
@@ -1996,7 +2194,7 @@ WebKitDOMDOMWindow implements
 </tr>
 <tr>
 <td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
-<td>. <span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
+<td>A <a class="link" href="WebKitDOMStorage.html" title="WebKitDOMStorage"><span class="type">WebKitDOMStorage</span></a>. <span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
 </td>
 </tr>
 </tbody>
@@ -2019,7 +2217,7 @@ WebKitDOMDOMWindow implements
 </tr>
 <tr>
 <td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
-<td>. <span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
+<td>A <a class="link" href="WebKitDOMConsole.html" title="WebKitDOMConsole"><span class="type">WebKitDOMConsole</span></a>. <span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
 </td>
 </tr>
 </tbody>
@@ -2043,7 +2241,7 @@ WebKitDOMDOMWindow implements
 </tr>
 <tr>
 <td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
-<td>. <span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
+<td>A <a class="link" href="WebKitDOMPerformance.html" title="WebKitDOMPerformance"><span class="type">WebKitDOMPerformance</span></a>. <span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
 </td>
 </tr>
 </tbody>
@@ -2066,7 +2264,7 @@ WebKitDOMDOMWindow implements
 </tr>
 <tr>
 <td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
-<td>. <span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
+<td>A <a class="link" href="WebKitDOMDOMWindowCSS.html" title="WebKitDOMDOMWindowCSS"><span class="type">WebKitDOMDOMWindowCSS</span></a>. <span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
 </td>
 </tr>
 </tbody>
@@ -2090,7 +2288,7 @@ WebKitDOMDOMWindow implements
 </tr>
 <tr>
 <td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
-<td>. <span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
+<td>A <a class="link" href="WebKitDOMStorageInfo.html" title="WebKitDOMStorageInfo"><span class="type">WebKitDOMStorageInfo</span></a>. <span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
 </td>
 </tr>
 </tbody>
@@ -2390,6 +2588,6 @@ WebKitDOMDOMWindow implements
 </div>
 <div class="footer">
 <hr>
-          Generated by GTK-Doc V1.18.1</div>
+          Generated by GTK-Doc V1.19.1</div>
 </body>
 </html>

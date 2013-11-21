@@ -61,7 +61,6 @@
 #include "InjectedScript.h"
 #include "InspectorFrontend.h"
 #include "InspectorPageAgent.h"
-#include "InspectorState.h"
 #include "InspectorValues.h"
 #include "InstrumentingAgents.h"
 #include "SecurityOrigin.h"
@@ -77,17 +76,13 @@ using WebCore::TypeBuilder::IndexedDB::KeyRange;
 using WebCore::TypeBuilder::IndexedDB::ObjectStore;
 using WebCore::TypeBuilder::IndexedDB::ObjectStoreIndex;
 
-typedef WebCore::InspectorBackendDispatcher::IndexedDBCommandHandler::RequestDatabaseNamesCallback RequestDatabaseNamesCallback;
-typedef WebCore::InspectorBackendDispatcher::IndexedDBCommandHandler::RequestDatabaseCallback RequestDatabaseCallback;
-typedef WebCore::InspectorBackendDispatcher::IndexedDBCommandHandler::RequestDataCallback RequestDataCallback;
+typedef WebCore::InspectorIndexedDBBackendDispatcherHandler::RequestDatabaseNamesCallback RequestDatabaseNamesCallback;
+typedef WebCore::InspectorIndexedDBBackendDispatcherHandler::RequestDatabaseCallback RequestDatabaseCallback;
+typedef WebCore::InspectorIndexedDBBackendDispatcherHandler::RequestDataCallback RequestDataCallback;
 typedef WebCore::InspectorBackendDispatcher::CallbackBase RequestCallback;
-typedef WebCore::InspectorBackendDispatcher::IndexedDBCommandHandler::ClearObjectStoreCallback ClearObjectStoreCallback;
+typedef WebCore::InspectorIndexedDBBackendDispatcherHandler::ClearObjectStoreCallback ClearObjectStoreCallback;
 
 namespace WebCore {
-
-namespace IndexedDBAgentState {
-static const char indexedDBAgentEnabled[] = "indexedDBAgentEnabled";
-};
 
 namespace {
 
@@ -561,8 +556,8 @@ public:
 
 } // namespace
 
-InspectorIndexedDBAgent::InspectorIndexedDBAgent(InstrumentingAgents* instrumentingAgents, InspectorCompositeState* state, InjectedScriptManager* injectedScriptManager, InspectorPageAgent* pageAgent)
-    : InspectorBaseAgent<InspectorIndexedDBAgent>("IndexedDB", instrumentingAgents, state)
+InspectorIndexedDBAgent::InspectorIndexedDBAgent(InstrumentingAgents* instrumentingAgents, InjectedScriptManager* injectedScriptManager, InspectorPageAgent* pageAgent)
+    : InspectorBaseAgent(ASCIILiteral("IndexedDB"), instrumentingAgents)
     , m_injectedScriptManager(injectedScriptManager)
     , m_pageAgent(pageAgent)
 {
@@ -572,27 +567,24 @@ InspectorIndexedDBAgent::~InspectorIndexedDBAgent()
 {
 }
 
-void InspectorIndexedDBAgent::clearFrontend()
+void InspectorIndexedDBAgent::didCreateFrontendAndBackend(InspectorFrontendChannel*, InspectorBackendDispatcher* backendDispatcher)
 {
-    disable(0);
+    m_backendDispatcher = InspectorIndexedDBBackendDispatcher::create(backendDispatcher, this);
 }
 
-void InspectorIndexedDBAgent::restore()
+void InspectorIndexedDBAgent::willDestroyFrontendAndBackend()
 {
-    if (m_state->getBoolean(IndexedDBAgentState::indexedDBAgentEnabled)) {
-        ErrorString error;
-        enable(&error);
-    }
+    m_backendDispatcher.clear();
+
+    disable(nullptr);
 }
 
 void InspectorIndexedDBAgent::enable(ErrorString*)
 {
-    m_state->setBoolean(IndexedDBAgentState::indexedDBAgentEnabled, true);
 }
 
 void InspectorIndexedDBAgent::disable(ErrorString*)
 {
-    m_state->setBoolean(IndexedDBAgentState::indexedDBAgentEnabled, false);
 }
 
 static Document* assertDocument(ErrorString* errorString, Frame* frame)

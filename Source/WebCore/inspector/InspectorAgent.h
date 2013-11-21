@@ -43,7 +43,7 @@ class DOMWrapperWorld;
 class DocumentLoader;
 class Frame;
 class InjectedScriptManager;
-class InspectorFrontend;
+class InspectorInspectorFrontendDispatcher;
 class InspectorObject;
 class InstrumentingAgents;
 class URL;
@@ -51,12 +51,12 @@ class Page;
 
 typedef String ErrorString;
 
-class InspectorAgent : public InspectorBaseAgent<InspectorAgent>, public InspectorBackendDispatcher::InspectorCommandHandler {
+class InspectorAgent : public InspectorBaseAgent, public InspectorInspectorBackendDispatcherHandler {
     WTF_MAKE_NONCOPYABLE(InspectorAgent);
 public:
-    static PassOwnPtr<InspectorAgent> create(Page* page, InjectedScriptManager* injectedScriptManager, InstrumentingAgents* instrumentingAgents, InspectorCompositeState* state)
+    static PassOwnPtr<InspectorAgent> create(Page* page, InjectedScriptManager* injectedScriptManager, InstrumentingAgents* instrumentingAgents)
     {
-        return adoptPtr(new InspectorAgent(page, injectedScriptManager, instrumentingAgents, state));
+        return adoptPtr(new InspectorAgent(page, injectedScriptManager, instrumentingAgents));
     }
 
     virtual ~InspectorAgent();
@@ -70,17 +70,15 @@ public:
     URL inspectedURL() const;
     URL inspectedURLWithoutFragment() const;
 
-    InspectorFrontend* frontend() const { return m_frontend; }
-
-    virtual void setFrontend(InspectorFrontend*);
-    virtual void clearFrontend();
+    virtual void didCreateFrontendAndBackend(InspectorFrontendChannel*, InspectorBackendDispatcher*) OVERRIDE;
+    virtual void willDestroyFrontendAndBackend() OVERRIDE;
 
     void didClearWindowObjectInWorld(Frame*, DOMWrapperWorld&);
 
     void didCommitLoad();
     void domContentLoadedEventFired();
 
-    bool hasFrontend() const { return m_frontend; }
+    bool hasFrontend() const { return !!m_frontendDispatcher; }
 
     // Generic code called from custom implementations.
     void evaluateForTestInFrontend(long testCallId, const String& script);
@@ -90,15 +88,18 @@ public:
     void inspect(PassRefPtr<TypeBuilder::Runtime::RemoteObject> objectToInspect, PassRefPtr<InspectorObject> hints);
 
 private:
-    InspectorAgent(Page*, InjectedScriptManager*, InstrumentingAgents*, InspectorCompositeState*);
+    InspectorAgent(Page*, InjectedScriptManager*, InstrumentingAgents*);
 
     Page* m_inspectedPage;
-    InspectorFrontend* m_frontend;
+    std::unique_ptr<InspectorInspectorFrontendDispatcher> m_frontendDispatcher;
+    RefPtr<InspectorInspectorBackendDispatcher> m_backendDispatcher;
     InjectedScriptManager* m_injectedScriptManager;
 
     Vector<pair<long, String>> m_pendingEvaluateTestCommands;
     pair<RefPtr<TypeBuilder::Runtime::RemoteObject>, RefPtr<InspectorObject>> m_pendingInspectData;
     HashMap<String, String> m_injectedScriptForOrigin;
+
+    bool m_enabled;
 };
 
 } // namespace WebCore

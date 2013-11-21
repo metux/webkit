@@ -33,6 +33,7 @@
 #include "ArrayProfile.h"
 #include "ByValInfo.h"
 #include "BytecodeConventions.h"
+#include "BytecodeLivenessAnalysis.h"
 #include "CallLinkInfo.h"
 #include "CallReturnOffsetToBytecodeOffset.h"
 #include "CodeBlockHash.h"
@@ -61,7 +62,6 @@
 #include "JITCode.h"
 #include "JITWriteBarrier.h"
 #include "JSGlobalObject.h"
-#include "JumpReplacementWatchpoint.h"
 #include "JumpTable.h"
 #include "LLIntCallLinkInfo.h"
 #include "LazyOperandValueProfile.h"
@@ -92,8 +92,11 @@ inline VirtualRegister unmodifiedArgumentsRegister(VirtualRegister argumentsRegi
 
 static ALWAYS_INLINE int missingThisObjectMarker() { return std::numeric_limits<int>::max(); }
 
+enum ReoptimizationMode { DontCountReoptimization, CountReoptimization };
+
 class CodeBlock : public ThreadSafeRefCounted<CodeBlock>, public UnconditionalFinalizer, public WeakReferenceHarvester {
     WTF_MAKE_FAST_ALLOCATED;
+    friend class BytecodeLivenessAnalysis;
     friend class JIT;
     friend class LLIntOffsetsExtractor;
 public:
@@ -135,6 +138,10 @@ public:
         return specializationFromIsConstruct(m_isConstructor);
     }
     
+    CodeBlock* baselineAlternative();
+    
+    // FIXME: Get rid of this.
+    // https://bugs.webkit.org/show_bug.cgi?id=123677
     CodeBlock* baselineVersion();
 
     void visitAggregate(SlotVisitor&);
@@ -277,7 +284,6 @@ public:
     {
         return jitType() == JITCode::BaselineJIT;
     }
-    void jettison();
     
     virtual CodeBlock* replacement() = 0;
 
@@ -294,6 +300,8 @@ public:
     bool hasOptimizedReplacement(); // the typeToReplace is my JITType
 #endif
 
+    void jettison(ReoptimizationMode = DontCountReoptimization);
+    
     ScriptExecutable* ownerExecutable() const { return m_ownerExecutable.get(); }
 
     void setVM(VM* vm) { m_vm = vm; }
@@ -345,6 +353,27 @@ public:
     bool needsActivation() const
     {
         return m_needsActivation;
+    }
+    
+    unsigned captureCount() const
+    {
+        if (!symbolTable())
+            return 0;
+        return symbolTable()->captureCount();
+    }
+    
+    int captureStart() const
+    {
+        if (!symbolTable())
+            return 0;
+        return symbolTable()->captureStart();
+    }
+    
+    int captureEnd() const
+    {
+        if (!symbolTable())
+            return 0;
+        return symbolTable()->captureEnd();
     }
 
     bool isCaptured(VirtualRegister operand, InlineCallFrame* = 0) const;
@@ -583,7 +612,12 @@ public:
     {
         return m_lazyOperandValueProfiles;
     }
-#endif
+#else // ENABLE(DFG_JIT)
+    bool addFrequentExitSite(const DFG::FrequentExitSite&)
+    {
+        return false;
+    }
+#endif // ENABLE(DFG_JIT)
 
     // Constant Pool
 #if ENABLE(DFG_JIT)
@@ -665,6 +699,13 @@ public:
     JSGlobalObject* globalObject() { return m_globalObject.get(); }
 
     JSGlobalObject* globalObjectFor(CodeOrigin);
+
+    BytecodeLivenessAnalysis& livenessAnalysis()
+    {
+        if (!m_livenessAnalysis)
+            m_livenessAnalysis = std::make_unique<BytecodeLivenessAnalysis>(this);
+        return *m_livenessAnalysis;
+    }
 
     // Jump Tables
 
@@ -855,10 +896,6 @@ public:
     void updateAllPredictions() { }
 #endif
 
-#if ENABLE(JIT)
-    void reoptimize();
-#endif
-
 #if ENABLE(VERBOSE_VALUE_PROFILE)
     void dumpValueProfiles();
 #endif
@@ -1037,13 +1074,13 @@ private:
 #endif
 #if ENABLE(VALUE_PROFILER)
     Vector<ValueProfile> m_argumentValueProfiles;
-    SegmentedVector<ValueProfile, 8> m_valueProfiles;
+    Vector<ValueProfile> m_valueProfiles;
     SegmentedVector<RareCaseProfile, 8> m_rareCaseProfiles;
     SegmentedVector<RareCaseProfile, 8> m_specialFastCaseProfiles;
-    SegmentedVector<ArrayAllocationProfile, 8> m_arrayAllocationProfiles;
+    Vector<ArrayAllocationProfile> m_arrayAllocationProfiles;
     ArrayProfileVector m_arrayProfiles;
 #endif
-    SegmentedVector<ObjectAllocationProfile, 8> m_objectAllocationProfiles;
+    Vector<ObjectAllocationProfile> m_objectAllocationProfiles;
 
     // Constant Pool
     Vector<Identifier> m_additionalIdentifiers;
@@ -1065,6 +1102,8 @@ private:
     uint16_t m_reoptimizationRetryCounter;
     
     mutable CodeBlockHash m_hash;
+
+    std::unique_ptr<BytecodeLivenessAnalysis> m_livenessAnalysis;
 
     struct RareData {
         WTF_MAKE_FAST_ALLOCATED;

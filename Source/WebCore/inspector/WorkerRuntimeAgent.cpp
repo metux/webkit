@@ -44,8 +44,8 @@
 
 namespace WebCore {
 
-WorkerRuntimeAgent::WorkerRuntimeAgent(InstrumentingAgents* instrumentingAgents, InspectorCompositeState* state, InjectedScriptManager* injectedScriptManager, WorkerGlobalScope* workerGlobalScope)
-    : InspectorRuntimeAgent(instrumentingAgents, state, injectedScriptManager)
+WorkerRuntimeAgent::WorkerRuntimeAgent(InstrumentingAgents* instrumentingAgents, InjectedScriptManager* injectedScriptManager, WorkerGlobalScope* workerGlobalScope)
+    : InspectorRuntimeAgent(instrumentingAgents, injectedScriptManager)
     , m_workerGlobalScope(workerGlobalScope)
     , m_paused(false)
 {
@@ -55,6 +55,16 @@ WorkerRuntimeAgent::WorkerRuntimeAgent(InstrumentingAgents* instrumentingAgents,
 WorkerRuntimeAgent::~WorkerRuntimeAgent()
 {
     m_instrumentingAgents->setWorkerRuntimeAgent(0);
+}
+
+void WorkerRuntimeAgent::didCreateFrontendAndBackend(InspectorFrontendChannel*, InspectorBackendDispatcher* backendDispatcher)
+{
+    m_backendDispatcher = InspectorRuntimeBackendDispatcher::create(backendDispatcher, this);
+}
+
+void WorkerRuntimeAgent::willDestroyFrontendAndBackend()
+{
+    m_backendDispatcher.clear();
 }
 
 InjectedScript WorkerRuntimeAgent::injectedScriptForEval(ErrorString* error, const int* executionContextId)

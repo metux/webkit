@@ -703,14 +703,18 @@ public:
         if (!value->isValueList())
             return;
 
+        auto& valueList = toCSSValueList(*value);
+
         FontDescription fontDescription = styleResolver->style()->fontDescription();
         // Before mapping in a new font-family property, we should reset the generic family.
         bool oldFamilyUsedFixedDefaultSize = fontDescription.useFixedDefaultSize();
         fontDescription.setGenericFamily(FontDescription::NoFamily);
 
-        Vector<AtomicString, 1> families;
-        for (CSSValueListIterator i = value; i.hasMore(); i.advance()) {
-            CSSValue* item = i.value();
+        Vector<AtomicString> families;
+        families.reserveInitialCapacity(valueList.length());
+
+        for (unsigned i = 0; i < valueList.length(); ++i) {
+            CSSValue* item = valueList.item(i);
             if (!item->isPrimitiveValue())
                 continue;
             CSSPrimitiveValue* contentValue = toCSSPrimitiveValue(item);
@@ -755,12 +759,12 @@ public:
                 continue;
             if (families.isEmpty())
                 fontDescription.setIsSpecifiedFont(fontDescription.genericFamily() == FontDescription::NoFamily);
-            families.append(face);
+            families.uncheckedAppend(face);
         }
 
         if (families.isEmpty())
             return;
-        fontDescription.adoptFamilies(families);
+        fontDescription.setFamilies(families);
 
         if (fontDescription.keywordSize() && fontDescription.useFixedDefaultSize() != oldFamilyUsedFixedDefaultSize)
             styleResolver->setFontSize(fontDescription, Style::fontSizeForKeyword(CSSValueXxSmall + fontDescription.keywordSize() - 1, !oldFamilyUsedFixedDefaultSize, styleResolver->document()));
@@ -1396,7 +1400,7 @@ public:
     }
 };
 
-#if ENABLE(CSS3_TEXT)
+#if ENABLE(CSS3_TEXT_DECORATION)
 class ApplyPropertyTextUnderlinePosition {
 public:
     static void applyValue(CSSPropertyID, StyleResolver* styleResolver, CSSValue* value)
@@ -1423,7 +1427,7 @@ public:
         return PropertyHandler(handler.inheritFunction(), handler.initialFunction(), &applyValue);
     }
 };
-#endif // CSS3_TEXT
+#endif // CSS3_TEXT_DECORATION
 
 class ApplyPropertyLineHeight {
 public:
@@ -1444,7 +1448,7 @@ public:
             lineHeight = primitiveValue->computeLength<Length>(styleResolver->style(), styleResolver->rootElementStyle(), multiplier);
         } else if (primitiveValue->isPercentage()) {
             // FIXME: percentage should not be restricted to an integer here.
-            lineHeight = Length((styleResolver->style()->fontSize() * primitiveValue->getIntValue()) / 100, Fixed);
+            lineHeight = Length((styleResolver->style()->computedFontSize() * primitiveValue->getIntValue()) / 100, Fixed);
         } else if (primitiveValue->isNumber()) {
             // FIXME: number and percentage values should produce the same type of Length (ie. Fixed or Percent).
             lineHeight = Length(primitiveValue->getDoubleValue() * 100.0, Percent);
@@ -1522,8 +1526,16 @@ public:
 
 class ApplyPropertyPageSize {
 private:
-    static Length mmLength(double mm) { return CSSPrimitiveValue::create(mm, CSSPrimitiveValue::CSS_MM)->computeLength<Length>(0, 0); }
-    static Length inchLength(double inch) { return CSSPrimitiveValue::create(inch, CSSPrimitiveValue::CSS_IN)->computeLength<Length>(0, 0); }
+    static Length mmLength(double mm)
+    {
+        Ref<CSSPrimitiveValue> value(CSSPrimitiveValue::create(mm, CSSPrimitiveValue::CSS_MM));
+        return value.get().computeLength<Length>(0, 0);
+    }
+    static Length inchLength(double inch)
+    {
+        Ref<CSSPrimitiveValue> value(CSSPrimitiveValue::create(inch, CSSPrimitiveValue::CSS_IN));
+        return value.get().computeLength<Length>(0, 0);
+    }
     static bool getPageSizeFromName(CSSPrimitiveValue* pageSizeName, CSSPrimitiveValue* pageOrientation, Length& width, Length& height)
     {
         DEFINE_STATIC_LOCAL(Length, a5Width, (mmLength(148)));
@@ -2059,7 +2071,11 @@ public:
             CSSPrimitiveValue* primitiveValue = toCSSPrimitiveValue(value);
             if (primitiveValue->getValueID() == CSSValueAuto)
                 setValue(styleResolver->style(), 0);
-            // FIXME Bug 102571: Layout for the value 'outside-shape' is not yet implemented
+            else if (primitiveValue->getValueID() == CSSValueContentBox
+                || primitiveValue->getValueID() == CSSValueBorderBox
+                || primitiveValue->getValueID() == CSSValuePaddingBox
+                || primitiveValue->getValueID() == CSSValueMarginBox)
+                setValue(styleResolver->style(), ShapeValue::createBoxValue(primitiveValue->getValueID()));
             else if (primitiveValue->getValueID() == CSSValueOutsideShape)
                 setValue(styleResolver->style(), ShapeValue::createOutsideValue());
             else if (primitiveValue->isShape()) {
@@ -2306,15 +2322,15 @@ DeprecatedStyleBuilder::DeprecatedStyleBuilder()
     setPropertyHandler(CSSPropertyTextAlign, ApplyPropertyTextAlign::createHandler());
     setPropertyHandler(CSSPropertyTextDecoration, ApplyPropertyTextDecoration::createHandler());
 #if ENABLE(CSS3_TEXT)
+    setPropertyHandler(CSSPropertyWebkitTextAlignLast, ApplyPropertyDefault<TextAlignLast, &RenderStyle::textAlignLast, TextAlignLast, &RenderStyle::setTextAlignLast, TextAlignLast, &RenderStyle::initialTextAlignLast>::createHandler());
+    setPropertyHandler(CSSPropertyWebkitTextJustify, ApplyPropertyDefault<TextJustify, &RenderStyle::textJustify, TextJustify, &RenderStyle::setTextJustify, TextJustify, &RenderStyle::initialTextJustify>::createHandler());
+#endif // CSS3_TEXT
+#if ENABLE(CSS3_TEXT_DECORATION)
     setPropertyHandler(CSSPropertyWebkitTextDecorationLine, ApplyPropertyTextDecoration::createHandler());
     setPropertyHandler(CSSPropertyWebkitTextDecorationStyle, ApplyPropertyDefault<TextDecorationStyle, &RenderStyle::textDecorationStyle, TextDecorationStyle, &RenderStyle::setTextDecorationStyle, TextDecorationStyle, &RenderStyle::initialTextDecorationStyle>::createHandler());
     setPropertyHandler(CSSPropertyWebkitTextDecorationColor, ApplyPropertyColor<NoInheritFromParent, &RenderStyle::textDecorationColor, &RenderStyle::setTextDecorationColor, &RenderStyle::setVisitedLinkTextDecorationColor, &RenderStyle::color>::createHandler());
-    setPropertyHandler(CSSPropertyWebkitTextAlignLast, ApplyPropertyDefault<TextAlignLast, &RenderStyle::textAlignLast, TextAlignLast, &RenderStyle::setTextAlignLast, TextAlignLast, &RenderStyle::initialTextAlignLast>::createHandler());
-    setPropertyHandler(CSSPropertyWebkitTextJustify, ApplyPropertyDefault<TextJustify, &RenderStyle::textJustify, TextJustify, &RenderStyle::setTextJustify, TextJustify, &RenderStyle::initialTextJustify>::createHandler());
-    setPropertyHandler(CSSPropertyWebkitTextUnderlinePosition, ApplyPropertyTextUnderlinePosition::createHandler());
-#endif // CSS3_TEXT
-#if ENABLE(CSS3_TEXT_DECORATION)
     setPropertyHandler(CSSPropertyWebkitTextDecorationSkip, ApplyPropertyTextDecorationSkip::createHandler());
+    setPropertyHandler(CSSPropertyWebkitTextUnderlinePosition, ApplyPropertyTextUnderlinePosition::createHandler());
 #endif
     setPropertyHandler(CSSPropertyTextIndent, ApplyPropertyTextIndent::createHandler());
     setPropertyHandler(CSSPropertyTextOverflow, ApplyPropertyDefault<TextOverflow, &RenderStyle::textOverflow, TextOverflow, &RenderStyle::setTextOverflow, TextOverflow, &RenderStyle::initialTextOverflow>::createHandler());

@@ -128,6 +128,10 @@
 #define ENABLE_TEXT_CARET 0
 #endif
 
+#if !defined(ENABLE_TEXT_SELECTION)
+#define ENABLE_TEXT_SELECTION 0
+#endif
+
 #if !defined(ENABLE_TOUCH_EVENTS)
 #define ENABLE_TOUCH_EVENTS 1
 #endif
@@ -224,6 +228,10 @@
 #define ENABLE_INPUT_TYPE_COLOR_POPOVER 1
 #endif
 
+#if !defined(ENABLE_MEDIA_SOURCE)
+#define ENABLE_MEDIA_SOURCE 1
+#endif
+
 #endif /* PLATFORM(MAC) && !PLATFORM(IOS) */
 
 /* --------- Apple Windows port --------- */
@@ -286,6 +294,10 @@
 
 #if !defined(ENABLE_SUBPIXEL_LAYOUT)
 #define ENABLE_SUBPIXEL_LAYOUT 1
+#endif
+
+#if !defined(ENABLE_8BIT_TEXTRUN)
+#define ENABLE_8BIT_TEXTRUN 1
 #endif
 
 #endif /* PLATFORM(EFL) */
@@ -591,6 +603,10 @@
 #define ENABLE_LEGACY_VIEWPORT_ADAPTION 0
 #endif
 
+#if !defined(ENABLE_LETTERPRESS)
+#define ENABLE_LETTERPRESS 0
+#endif
+
 #if !defined(ENABLE_LINK_PREFETCH)
 #define ENABLE_LINK_PREFETCH 0
 #endif
@@ -777,6 +793,10 @@
 
 #if !defined(ENABLE_TEXT_CARET)
 #define ENABLE_TEXT_CARET 1
+#endif
+
+#if !defined(ENABLE_TEXT_SELECTION)
+#define ENABLE_TEXT_SELECTION 1
 #endif
 
 #if !defined(ENABLE_THREADED_HTML_PARSER)

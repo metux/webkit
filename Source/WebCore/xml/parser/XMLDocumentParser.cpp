@@ -60,8 +60,6 @@
 #include "SVGStyleElement.h"
 #endif
 
-using namespace std;
-
 namespace WebCore {
 
 using namespace HTMLNames;
@@ -135,7 +133,7 @@ void XMLDocumentParser::append(PassRefPtr<StringImpl> inputSource)
 void XMLDocumentParser::handleError(XMLErrors::ErrorType type, const char* m, TextPosition position)
 {
     if (!m_xmlErrors)
-        m_xmlErrors = adoptPtr(new XMLErrors(document()));
+        m_xmlErrors = std::make_unique<XMLErrors>(document());
     m_xmlErrors->handleError(type, m, position);
     if (type != XMLErrors::warning)
         m_sawError = true;

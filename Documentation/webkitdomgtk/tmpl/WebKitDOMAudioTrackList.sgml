@@ -9,12 +9,10 @@ WebKitDOMAudioTrackList
 
 </para>
 
-
 <!-- ##### SECTION See_Also ##### -->
 <para>
 
 </para>
-
 
 <!-- ##### SECTION Stability_Level ##### -->
 
@@ -50,6 +48,17 @@ WebKitDOMAudioTrackList
 
 @self: 
 @id: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_audio_track_list_dispatch_event ##### -->
+<para>
+
+</para>
+
+@self: 
+@evt: 
+@error: 
 @Returns: 
 
 

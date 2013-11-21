@@ -37,6 +37,7 @@
 #include "ImageQualityController.h"
 #include "Page.h"
 #include "RenderGeometryMap.h"
+#include "RenderIterator.h"
 #include "RenderLayer.h"
 #include "RenderLayerBacking.h"
 #include "RenderNamedFlowThread.h"
@@ -63,6 +64,7 @@ RenderView::RenderView(Document& document, PassRef<RenderStyle> style)
     , m_selectionEnd(0)
     , m_selectionStartPos(-1)
     , m_selectionEndPos(-1)
+    , m_rendererCount(0)
     , m_maximalOutlineSize(0)
     , m_pageLogicalHeight(0)
     , m_pageLogicalHeightChanged(false)
@@ -302,10 +304,10 @@ void RenderView::layout()
     bool relayoutChildren = !shouldUsePrintingLayout() && (width() != viewWidth() || height() != viewHeight());
     if (relayoutChildren) {
         setChildNeedsLayout(MarkOnlyThis);
-        for (RenderObject* child = firstChild(); child; child = child->nextSibling()) {
-            if (!child->isBox())
-                continue;
-            RenderBox& box = toRenderBox(*child);
+
+        auto boxChildren = childrenOfType<RenderBox>(*this);
+        for (auto child = boxChildren.begin(), end = boxChildren.end(); child != end; ++child) {
+            RenderBox& box = *child;
             if (box.hasRelativeLogicalHeight()
                 || box.hasViewportPercentageLogicalHeight()
                 || box.style().logicalHeight().isPercent()
@@ -1026,7 +1028,7 @@ float RenderView::zoomFactor() const
     return frameView().frame().pageZoomFactor();
 }
 
-void RenderView::pushLayoutState(RenderObject* root)
+void RenderView::pushLayoutState(RenderObject& root)
 {
     ASSERT(m_layoutStateDisableCount == 0);
     ASSERT(m_layoutState == 0);
@@ -1114,6 +1116,8 @@ void RenderView::setIsInWindow(bool isInWindow)
 #if USE(ACCELERATED_COMPOSITING)
     if (m_compositor)
         m_compositor->setIsInWindow(isInWindow);
+#else
+    UNUSED_PARAM(isInWindow);
 #endif
 }
 
@@ -1151,7 +1155,7 @@ FlowThreadController& RenderView::flowThreadController()
     return *m_flowThreadController;
 }
 
-void RenderView::pushLayoutStateForCurrentFlowThread(const RenderObject* object)
+void RenderView::pushLayoutStateForCurrentFlowThread(const RenderObject& object)
 {
     if (!m_flowThreadController)
         return;
@@ -1187,38 +1191,6 @@ ImageQualityController& RenderView::imageQualityController()
     if (!m_imageQualityController)
         m_imageQualityController = ImageQualityController::create(*this);
     return *m_imageQualityController;
-}
-
-FragmentationDisabler::FragmentationDisabler(RenderObject* root)
-{
-    LayoutState* layoutState = root->view().layoutState();
-
-    m_root = root;
-    m_fragmenting = layoutState && layoutState->isPaginated();
-    m_flowThreadState = m_root->flowThreadState();
-#ifndef NDEBUG
-    m_layoutState = layoutState;
-#endif
-
-    if (layoutState)
-        layoutState->m_isPaginated = false;
-        
-    if (m_flowThreadState != RenderObject::NotInsideFlowThread)
-        m_root->setFlowThreadStateIncludingDescendants(RenderObject::NotInsideFlowThread);
-}
-
-FragmentationDisabler::~FragmentationDisabler()
-{
-    LayoutState* layoutState = m_root->view().layoutState();
-#ifndef NDEBUG
-    ASSERT(m_layoutState == layoutState);
-#endif
-
-    if (layoutState)
-        layoutState->m_isPaginated = m_fragmenting;
-        
-    if (m_flowThreadState != RenderObject::NotInsideFlowThread)
-        m_root->setFlowThreadStateIncludingDescendants(m_flowThreadState);
 }
 
 } // namespace WebCore

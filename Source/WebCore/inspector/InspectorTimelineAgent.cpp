@@ -44,7 +44,6 @@
 #include "InspectorInstrumentation.h"
 #include "InspectorMemoryAgent.h"
 #include "InspectorPageAgent.h"
-#include "InspectorState.h"
 #include "InstrumentingAgents.h"
 #include "IntRect.h"
 #include "JSDOMWindow.h"
@@ -57,13 +56,6 @@
 
 namespace WebCore {
 
-namespace TimelineAgentState {
-static const char timelineAgentEnabled[] = "timelineAgentEnabled";
-static const char timelineMaxCallStackDepth[] = "timelineMaxCallStackDepth";
-static const char includeDomCounters[] = "includeDomCounters";
-static const char includeNativeMemoryStatistics[] = "includeNativeMemoryStatistics";
-}
-
 void TimelineTimeConverter::reset()
 {
     m_startOffset = monotonicallyIncreasingTime() - currentTime();
@@ -71,53 +63,45 @@ void TimelineTimeConverter::reset()
 
 InspectorTimelineAgent::~InspectorTimelineAgent()
 {
-    clearFrontend();
 }
 
-void InspectorTimelineAgent::setFrontend(InspectorFrontend* frontend)
+void InspectorTimelineAgent::didCreateFrontendAndBackend(InspectorFrontendChannel* frontendChannel, InspectorBackendDispatcher* backendDispatcher)
 {
-    m_frontend = frontend->timeline();
+    m_frontendDispatcher = std::make_unique<InspectorTimelineFrontendDispatcher>(frontendChannel);
+    m_backendDispatcher = InspectorTimelineBackendDispatcher::create(backendDispatcher, this);
 }
 
-void InspectorTimelineAgent::clearFrontend()
+void InspectorTimelineAgent::willDestroyFrontendAndBackend()
 {
+    m_frontendDispatcher = nullptr;
+    m_backendDispatcher.clear();
+
     ErrorString error;
     stop(&error);
-    m_frontend = 0;
 }
 
-void InspectorTimelineAgent::restore()
+void InspectorTimelineAgent::start(ErrorString*, const int* maxCallStackDepth, const bool* includeDomCounters)
 {
-    if (m_state->getBoolean(TimelineAgentState::timelineAgentEnabled)) {
-        m_maxCallStackDepth = m_state->getLong(TimelineAgentState::timelineMaxCallStackDepth);
-        ErrorString error;
-        bool includeDomCounters = m_state->getBoolean(TimelineAgentState::includeDomCounters);
-        bool includeNativeMemoryStatistics = m_state->getBoolean(TimelineAgentState::includeNativeMemoryStatistics);
-        start(&error, &m_maxCallStackDepth, &includeDomCounters, &includeNativeMemoryStatistics);
-    }
-}
-
-void InspectorTimelineAgent::start(ErrorString*, const int* maxCallStackDepth, const bool* includeDomCounters, const bool* includeNativeMemoryStatistics)
-{
-    if (!m_frontend)
+    if (!m_frontendDispatcher)
         return;
 
     if (maxCallStackDepth && *maxCallStackDepth > 0)
         m_maxCallStackDepth = *maxCallStackDepth;
     else
         m_maxCallStackDepth = 5;
-    m_state->setLong(TimelineAgentState::timelineMaxCallStackDepth, m_maxCallStackDepth);
-    m_state->setBoolean(TimelineAgentState::includeDomCounters, includeDomCounters && *includeDomCounters);
-    m_state->setBoolean(TimelineAgentState::includeNativeMemoryStatistics, includeNativeMemoryStatistics && *includeNativeMemoryStatistics);
+
+    if (includeDomCounters)
+        m_includeDOMCounters = *includeDomCounters;
+
     m_timeConverter.reset();
 
     m_instrumentingAgents->setInspectorTimelineAgent(this);
-    m_state->setBoolean(TimelineAgentState::timelineAgentEnabled, true);
+    m_enabled = true;
 }
 
 void InspectorTimelineAgent::stop(ErrorString*)
 {
-    if (!m_state->getBoolean(TimelineAgentState::timelineAgentEnabled))
+    if (!m_enabled)
         return;
 
     m_weakFactory.revokeAll();
@@ -125,7 +109,7 @@ void InspectorTimelineAgent::stop(ErrorString*)
 
     clearRecordStack();
 
-    m_state->setBoolean(TimelineAgentState::timelineAgentEnabled, false);
+    m_enabled = false;
 }
 
 void InspectorTimelineAgent::canMonitorMainThread(ErrorString*, bool* result)
@@ -551,7 +535,7 @@ void InspectorTimelineAgent::setDOMCounters(TypeBuilder::Timeline::TimelineEvent
 {
     record->setUsedHeapSize(usedHeapSize());
 
-    if (m_state->getBoolean(TimelineAgentState::includeDomCounters)) {
+    if (m_includeDOMCounters) {
         int documentCount = 0;
         int nodeCount = 0;
         if (m_inspectorType == PageInspector) {
@@ -595,16 +579,17 @@ void InspectorTimelineAgent::didCompleteCurrentRecord(TimelineRecordType type)
     }
 }
 
-InspectorTimelineAgent::InspectorTimelineAgent(InstrumentingAgents* instrumentingAgents, InspectorPageAgent* pageAgent, InspectorMemoryAgent* memoryAgent, InspectorCompositeState* state, InspectorType type, InspectorClient* client)
-    : InspectorBaseAgent<InspectorTimelineAgent>("Timeline", instrumentingAgents, state)
+InspectorTimelineAgent::InspectorTimelineAgent(InstrumentingAgents* instrumentingAgents, InspectorPageAgent* pageAgent, InspectorMemoryAgent* memoryAgent, InspectorType type, InspectorClient* client)
+    : InspectorBaseAgent(ASCIILiteral("Timeline"), instrumentingAgents)
     , m_pageAgent(pageAgent)
     , m_memoryAgent(memoryAgent)
-    , m_frontend(0)
     , m_id(1)
     , m_maxCallStackDepth(5)
     , m_inspectorType(type)
     , m_client(client)
     , m_weakFactory(this)
+    , m_enabled(false)
+    , m_includeDOMCounters(false)
 {
 }
 
@@ -620,7 +605,7 @@ void InspectorTimelineAgent::sendEvent(PassRefPtr<InspectorObject> event)
 {
     // FIXME: runtimeCast is a hack. We do it because we can't build TimelineEvent directly now.
     RefPtr<TypeBuilder::Timeline::TimelineEvent> recordChecked = TypeBuilder::Timeline::TimelineEvent::runtimeCast(event);
-    m_frontend->eventRecorded(recordChecked.release());
+    m_frontendDispatcher->eventRecorded(recordChecked.release());
 }
 
 void InspectorTimelineAgent::pushCurrentRecord(PassRefPtr<InspectorObject> data, TimelineRecordType type, bool captureCallStack, Frame* frame)

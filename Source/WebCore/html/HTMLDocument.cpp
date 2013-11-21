@@ -71,7 +71,6 @@
 #include "HTMLFrameSetElement.h"
 #include "HTMLNames.h"
 #include "InspectorInstrumentation.h"
-#include "URL.h"
 #include "Page.h"
 #include "ScriptController.h"
 #include "Settings.h"
@@ -162,7 +161,7 @@ bool HTMLDocument::hasFocus()
 String HTMLDocument::bgColor()
 {
     HTMLElement* b = body();
-    HTMLBodyElement* bodyElement = (b && b->hasTagName(bodyTag)) ? static_cast<HTMLBodyElement*>(b) : 0;
+    HTMLBodyElement* bodyElement = (b && b->hasTagName(bodyTag)) ? toHTMLBodyElement(b) : 0;
 
     if (!bodyElement)
         return String();
@@ -172,7 +171,7 @@ String HTMLDocument::bgColor()
 void HTMLDocument::setBgColor(const String& value)
 {
     HTMLElement* b = body();
-    HTMLBodyElement* bodyElement = (b && b->hasTagName(bodyTag)) ? static_cast<HTMLBodyElement*>(b) : 0;
+    HTMLBodyElement* bodyElement = (b && b->hasTagName(bodyTag)) ? toHTMLBodyElement(b) : 0;
 
     if (bodyElement)
         bodyElement->setBgColor(value);
@@ -181,7 +180,7 @@ void HTMLDocument::setBgColor(const String& value)
 String HTMLDocument::fgColor()
 {
     HTMLElement* b = body();
-    HTMLBodyElement* bodyElement = (b && b->hasTagName(bodyTag)) ? static_cast<HTMLBodyElement*>(b) : 0;
+    HTMLBodyElement* bodyElement = (b && b->hasTagName(bodyTag)) ? toHTMLBodyElement(b) : 0;
 
     if (!bodyElement)
         return String();
@@ -191,7 +190,7 @@ String HTMLDocument::fgColor()
 void HTMLDocument::setFgColor(const String& value)
 {
     HTMLElement* b = body();
-    HTMLBodyElement* bodyElement = (b && b->hasTagName(bodyTag)) ? static_cast<HTMLBodyElement*>(b) : 0;
+    HTMLBodyElement* bodyElement = (b && b->hasTagName(bodyTag)) ? toHTMLBodyElement(b) : 0;
 
     if (bodyElement)
         bodyElement->setText(value);
@@ -200,7 +199,7 @@ void HTMLDocument::setFgColor(const String& value)
 String HTMLDocument::alinkColor()
 {
     HTMLElement* b = body();
-    HTMLBodyElement* bodyElement = (b && b->hasTagName(bodyTag)) ? static_cast<HTMLBodyElement*>(b) : 0;
+    HTMLBodyElement* bodyElement = (b && b->hasTagName(bodyTag)) ? toHTMLBodyElement(b) : 0;
 
     if (!bodyElement)
         return String();
@@ -210,7 +209,7 @@ String HTMLDocument::alinkColor()
 void HTMLDocument::setAlinkColor(const String& value)
 {
     HTMLElement* b = body();
-    HTMLBodyElement* bodyElement = (b && b->hasTagName(bodyTag)) ? static_cast<HTMLBodyElement*>(b) : 0;
+    HTMLBodyElement* bodyElement = (b && b->hasTagName(bodyTag)) ? toHTMLBodyElement(b) : 0;
 
     if (bodyElement) {
         // This check is a bit silly, but some benchmarks like to set the
@@ -224,7 +223,7 @@ void HTMLDocument::setAlinkColor(const String& value)
 String HTMLDocument::linkColor()
 {
     HTMLElement* b = body();
-    HTMLBodyElement* bodyElement = (b && b->hasTagName(bodyTag)) ? static_cast<HTMLBodyElement*>(b) : 0;
+    HTMLBodyElement* bodyElement = (b && b->hasTagName(bodyTag)) ? toHTMLBodyElement(b) : 0;
 
     if (!bodyElement)
         return String();
@@ -234,7 +233,7 @@ String HTMLDocument::linkColor()
 void HTMLDocument::setLinkColor(const String& value)
 {
     HTMLElement* b = body();
-    HTMLBodyElement* bodyElement = (b && b->hasTagName(bodyTag)) ? static_cast<HTMLBodyElement*>(b) : 0;
+    HTMLBodyElement* bodyElement = (b && b->hasTagName(bodyTag)) ? toHTMLBodyElement(b) : 0;
 
     if (bodyElement) {
         // This check is a bit silly, but some benchmarks like to set the
@@ -248,7 +247,7 @@ void HTMLDocument::setLinkColor(const String& value)
 String HTMLDocument::vlinkColor()
 {
     HTMLElement* b = body();
-    HTMLBodyElement* bodyElement = (b && b->hasTagName(bodyTag)) ? static_cast<HTMLBodyElement*>(b) : 0;
+    HTMLBodyElement* bodyElement = (b && b->hasTagName(bodyTag)) ? toHTMLBodyElement(b) : 0;
 
     if (!bodyElement)
         return String();
@@ -258,7 +257,7 @@ String HTMLDocument::vlinkColor()
 void HTMLDocument::setVlinkColor(const String& value)
 {
     HTMLElement* b = body();
-    HTMLBodyElement* bodyElement = (b && b->hasTagName(bodyTag)) ? static_cast<HTMLBodyElement*>(b) : 0;
+    HTMLBodyElement* bodyElement = (b && b->hasTagName(bodyTag)) ? toHTMLBodyElement(b) : 0;
 
     if (bodyElement) {
         // This check is a bit silly, but some benchmarks like to set the

@@ -2,26 +2,19 @@
 <html>
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
-<title>WebKitDOMAudioTrackList</title>
+<title>WebKitDOMGTK+ Reference Manual: WebKitDOMAudioTrackList</title>
 <meta name="generator" content="DocBook XSL Stylesheets V1.78.1">
 <link rel="home" href="index.html" title="WebKitDOMGTK+ Reference Manual">
 <link rel="up" href="ch01.html" title="Class Overview">
 <link rel="prev" href="WebKitDOMAudioTrack.html" title="WebKitDOMAudioTrack">
 <link rel="next" href="WebKitDOMHTMLAudioElement.html" title="WebKitDOMHTMLAudioElement">
-<meta name="generator" content="GTK-Doc V1.18.1 (XML mode)">
+<meta name="generator" content="GTK-Doc V1.19.1 (XML mode)">
 <link rel="stylesheet" href="style.css" type="text/css">
 </head>
 <body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF">
-<table class="navigation" id="top" width="100%" summary="Navigation header" cellpadding="2" cellspacing="2">
-<tr valign="middle">
-<td><a accesskey="p" href="WebKitDOMAudioTrack.html"><img src="left.png" width="24" height="24" border="0" alt="Prev"></a></td>
-<td><a accesskey="u" href="ch01.html"><img src="up.png" width="24" height="24" border="0" alt="Up"></a></td>
-<td><a accesskey="h" href="index.html"><img src="home.png" width="24" height="24" border="0" alt="Home"></a></td>
-<th width="100%" align="center">WebKitDOMGTK+ Reference Manual</th>
-<td><a accesskey="n" href="WebKitDOMHTMLAudioElement.html"><img src="right.png" width="24" height="24" border="0" alt="Next"></a></td>
-</tr>
-<tr><td colspan="5" class="shortcuts">
-<a href="#WebKitDOMAudioTrackList.synopsis" class="shortcut">Top</a>
+<table class="navigation" id="top" width="100%" summary="Navigation header" cellpadding="2" cellspacing="10"><tr valign="middle">
+<td width="100%" align="left">
+<a href="#" class="shortcut">Top</a>
                    | 
                   <a href="#WebKitDOMAudioTrackList.description" class="shortcut">Description</a>
                    | 
@@ -30,8 +23,12 @@
                   <a href="#WebKitDOMAudioTrackList.implemented-interfaces" class="shortcut">Implemented Interfaces</a>
                    | 
                   <a href="#WebKitDOMAudioTrackList.properties" class="shortcut">Properties</a>
-</td></tr>
-</table>
+</td>
+<td><a accesskey="h" href="index.html"><img src="home.png" width="16" height="16" border="0" alt="Home"></a></td>
+<td><a accesskey="u" href="ch01.html"><img src="up.png" width="16" height="16" border="0" alt="Up"></a></td>
+<td><a accesskey="p" href="WebKitDOMAudioTrack.html"><img src="left.png" width="16" height="16" border="0" alt="Prev"></a></td>
+<td><a accesskey="n" href="WebKitDOMHTMLAudioElement.html"><img src="right.png" width="16" height="16" border="0" alt="Next"></a></td>
+</tr></table>
 <div class="refentry">
 <a name="WebKitDOMAudioTrackList"></a><div class="titlepage"></div>
 <div class="refnamediv"><table width="100%"><tr>
@@ -49,6 +46,10 @@
 <a class="link" href="WebKitDOMAudioTrack.html" title="WebKitDOMAudioTrack"><span class="returnvalue">WebKitDOMAudioTrack</span></a> * <a class="link" href="WebKitDOMAudioTrackList.html#webkit-dom-audio-track-list-get-track-by-id" title="webkit_dom_audio_track_list_get_track_by_id ()">webkit_dom_audio_track_list_get_track_by_id</a>
                                                         (<em class="parameter"><code><a class="link" href="WebKitDOMAudioTrackList.html" title="WebKitDOMAudioTrackList"><span class="type">WebKitDOMAudioTrackList</span></a> *self</code></em>,
                                                          <em class="parameter"><code>const <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a> *id</code></em>);
+<a href="../glib/glib-Basic-Types.html#gboolean"><span class="returnvalue">gboolean</span></a>            <a class="link" href="WebKitDOMAudioTrackList.html#webkit-dom-audio-track-list-dispatch-event" title="webkit_dom_audio_track_list_dispatch_event ()">webkit_dom_audio_track_list_dispatch_event</a>
+                                                        (<em class="parameter"><code><a class="link" href="WebKitDOMAudioTrackList.html" title="WebKitDOMAudioTrackList"><span class="type">WebKitDOMAudioTrackList</span></a> *self</code></em>,
+                                                         <em class="parameter"><code><a class="link" href="WebKitDOMEvent.html" title="WebKitDOMEvent"><span class="type">WebKitDOMEvent</span></a> *evt</code></em>,
+                                                         <em class="parameter"><code><a href="../glib/glib-Error-Reporting.html#GError"><span class="type">GError</span></a> **error</code></em>);
 <a href="../glib/glib-Basic-Types.html#gulong"><span class="returnvalue">gulong</span></a>              <a class="link" href="WebKitDOMAudioTrackList.html#webkit-dom-audio-track-list-get-length" title="webkit_dom_audio_track_list_get_length ()">webkit_dom_audio_track_list_get_length</a>
                                                         (<em class="parameter"><code><a class="link" href="WebKitDOMAudioTrackList.html" title="WebKitDOMAudioTrackList"><span class="type">WebKitDOMAudioTrackList</span></a> *self</code></em>);
 </pre>
@@ -109,7 +110,7 @@ WebKitDOMAudioTrackList implements
 </tr>
 <tr>
 <td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
-<td>. <span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
+<td>A <a class="link" href="WebKitDOMAudioTrack.html" title="WebKitDOMAudioTrack"><span class="type">WebKitDOMAudioTrack</span></a>. <span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
 </td>
 </tr>
 </tbody>
@@ -139,7 +140,46 @@ WebKitDOMAudioTrackList implements
 </tr>
 <tr>
 <td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
-<td>. <span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
+<td>A <a class="link" href="WebKitDOMAudioTrack.html" title="WebKitDOMAudioTrack"><span class="type">WebKitDOMAudioTrack</span></a>. <span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
+</td>
+</tr>
+</tbody>
+</table></div>
+</div>
+<hr>
+<div class="refsect2">
+<a name="webkit-dom-audio-track-list-dispatch-event"></a><h3>webkit_dom_audio_track_list_dispatch_event ()</h3>
+<pre class="programlisting"><a href="../glib/glib-Basic-Types.html#gboolean"><span class="returnvalue">gboolean</span></a>            webkit_dom_audio_track_list_dispatch_event
+                                                        (<em class="parameter"><code><a class="link" href="WebKitDOMAudioTrackList.html" title="WebKitDOMAudioTrackList"><span class="type">WebKitDOMAudioTrackList</span></a> *self</code></em>,
+                                                         <em class="parameter"><code><a class="link" href="WebKitDOMEvent.html" title="WebKitDOMEvent"><span class="type">WebKitDOMEvent</span></a> *evt</code></em>,
+                                                         <em class="parameter"><code><a href="../glib/glib-Error-Reporting.html#GError"><span class="type">GError</span></a> **error</code></em>);</pre>
+<div class="warning">
+<h3 class="title">Warning</h3>
+<p><code class="literal">webkit_dom_audio_track_list_dispatch_event</code> has been deprecated since version 2.4 and should not be used in newly-written code. Use <a class="link" href="WebKitDOMEventTarget.html#webkit-dom-event-target-dispatch-event" title="webkit_dom_event_target_dispatch_event ()"><code class="function">webkit_dom_event_target_dispatch_event()</code></a> instead.</p>
+</div>
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
+<col align="left" valign="top">
+<col>
+</colgroup>
+<tbody>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>self</code></em> :</span></p></td>
+<td>A <a class="link" href="WebKitDOMAudioTrackList.html" title="WebKitDOMAudioTrackList"><span class="type">WebKitDOMAudioTrackList</span></a>
+</td>
+</tr>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>evt</code></em> :</span></p></td>
+<td>A <a class="link" href="WebKitDOMEvent.html" title="WebKitDOMEvent"><span class="type">WebKitDOMEvent</span></a>
+</td>
+</tr>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>error</code></em> :</span></p></td>
+<td><a href="../glib/glib-Error-Reporting.html#GError"><span class="type">GError</span></a></td>
+</tr>
+<tr>
+<td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
+<td>A <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>
 </td>
 </tr>
 </tbody>
@@ -155,11 +195,18 @@ WebKitDOMAudioTrackList implements
 <col align="left" valign="top">
 <col>
 </colgroup>
-<tbody><tr>
+<tbody>
+<tr>
 <td><p><span class="term"><em class="parameter"><code>self</code></em> :</span></p></td>
 <td>A <a class="link" href="WebKitDOMAudioTrackList.html" title="WebKitDOMAudioTrackList"><span class="type">WebKitDOMAudioTrackList</span></a>
 </td>
-</tr></tbody>
+</tr>
+<tr>
+<td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
+<td>A <a href="../glib/glib-Basic-Types.html#gulong"><span class="type">gulong</span></a>
+</td>
+</tr>
+</tbody>
 </table></div>
 </div>
 </div>
@@ -174,6 +221,6 @@ WebKitDOMAudioTrackList implements
 </div>
 <div class="footer">
 <hr>
-          Generated by GTK-Doc V1.18.1</div>
+          Generated by GTK-Doc V1.19.1</div>
 </body>
 </html>

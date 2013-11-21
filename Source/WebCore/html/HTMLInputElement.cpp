@@ -37,22 +37,18 @@
 #include "Editor.h"
 #include "EventNames.h"
 #include "ExceptionCode.h"
-#include "FeatureObserver.h"
 #include "FileInputType.h"
 #include "FileList.h"
 #include "FormController.h"
 #include "Frame.h"
 #include "FrameSelection.h"
 #include "FrameView.h"
-#include "HTMLCollection.h"
 #include "HTMLDataListElement.h"
 #include "HTMLFormElement.h"
 #include "HTMLImageLoader.h"
-#include "HTMLNames.h"
 #include "HTMLOptionElement.h"
 #include "HTMLParserIdioms.h"
 #include "IdTargetObserver.h"
-#include "InputType.h"
 #include "InsertionPoint.h"
 #include "KeyboardEvent.h"
 #include "Language.h"
@@ -64,7 +60,6 @@
 #include "RuntimeEnabledFeatures.h"
 #include "ScopedEventQueue.h"
 #include "SearchInputType.h"
-#include "ShadowRoot.h"
 #include "StyleResolver.h"
 #include <wtf/MathExtras.h>
 #include <wtf/Ref.h>
@@ -598,7 +593,7 @@ bool HTMLInputElement::isPresentationAttribute(const QualifiedName& name) const
     return HTMLTextFormControlElement::isPresentationAttribute(name);
 }
 
-void HTMLInputElement::collectStyleForPresentationAttribute(const QualifiedName& name, const AtomicString& value, MutableStylePropertySet* style)
+void HTMLInputElement::collectStyleForPresentationAttribute(const QualifiedName& name, const AtomicString& value, MutableStylePropertySet& style)
 {
     if (name == vspaceAttr) {
         addHTMLLengthToStyle(style, CSSPropertyMarginTop, value);
@@ -1603,7 +1598,7 @@ HTMLDataListElement* HTMLInputElement::dataList() const
     if (!element->hasTagName(datalistTag))
         return 0;
 
-    return static_cast<HTMLDataListElement*>(element);
+    return toHTMLDataListElement(element);
 }
 
 void HTMLInputElement::resetListAttributeTargetObserver()

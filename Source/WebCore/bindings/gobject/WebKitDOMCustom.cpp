@@ -19,18 +19,26 @@
 #include "config.h"
 #include "WebKitDOMCustom.h"
 
+#include "JSMainThreadExecState.h"
+#include "WebKitDOMAudioTrackPrivate.h"
 #include "WebKitDOMBlob.h"
 #include "WebKitDOMDOMStringList.h"
 #include "WebKitDOMHTMLCollection.h"
 #include "WebKitDOMHTMLFormElement.h"
+#include "WebKitDOMHTMLHeadElement.h"
 #include "WebKitDOMHTMLInputElement.h"
 #include "WebKitDOMHTMLInputElementPrivate.h"
+#include "WebKitDOMHTMLMediaElementPrivate.h"
 #include "WebKitDOMHTMLTextAreaElement.h"
 #include "WebKitDOMHTMLTextAreaElementPrivate.h"
 #include "WebKitDOMNodeList.h"
 #include "WebKitDOMObject.h"
 #include "WebKitDOMPrivate.h"
+#include "WebKitDOMProcessingInstruction.h"
+#include "WebKitDOMTextTrackPrivate.h"
+#include "WebKitDOMVideoTrackPrivate.h"
 #include "WebKitDOMWebKitNamedFlow.h"
+#include "gobject/ConvertToUTF8String.h"
 
 using namespace WebKit;
 
@@ -46,6 +54,102 @@ gboolean webkit_dom_html_input_element_is_edited(WebKitDOMHTMLInputElement* inpu
     g_return_val_if_fail(WEBKIT_DOM_IS_HTML_INPUT_ELEMENT(input), FALSE);
 
     return core(input)->lastChangeWasUserEdit();
+}
+
+void webkit_dom_html_media_element_set_current_time(WebKitDOMHTMLMediaElement* self, gdouble value, GError**)
+{
+#if ENABLE(VIDEO)
+    WebCore::JSMainThreadNullState state;
+    g_return_if_fail(WEBKIT_DOM_IS_HTML_MEDIA_ELEMENT(self));
+    WebCore::HTMLMediaElement* item = WebKit::core(self);
+    item->setCurrentTime(value);
+#else
+    WEBKIT_WARN_FEATURE_NOT_PRESENT("Video")
+#endif /* ENABLE(VIDEO) */
+}
+
+gchar* webkit_dom_audio_track_get_kind(WebKitDOMAudioTrack* self)
+{
+#if ENABLE(VIDEO_TRACK)
+    WebCore::JSMainThreadNullState state;
+    g_return_val_if_fail(WEBKIT_DOM_IS_AUDIO_TRACK(self), 0);
+    WebCore::AudioTrack* item = WebKit::core(self);
+    gchar* result = convertToUTF8String(item->kind());
+    return result;
+#else
+    WEBKIT_WARN_FEATURE_NOT_PRESENT("Video Track")
+    return 0;
+#endif /* ENABLE(VIDEO_TRACK) */
+}
+
+gchar* webkit_dom_audio_track_get_language(WebKitDOMAudioTrack* self)
+{
+#if ENABLE(VIDEO_TRACK)
+    WebCore::JSMainThreadNullState state;
+    g_return_val_if_fail(WEBKIT_DOM_IS_AUDIO_TRACK(self), 0);
+    WebCore::AudioTrack* item = WebKit::core(self);
+    gchar* result = convertToUTF8String(item->language());
+    return result;
+#else
+    WEBKIT_WARN_FEATURE_NOT_PRESENT("Video Track")
+    return 0;
+#endif /* ENABLE(VIDEO_TRACK) */
+}
+
+gchar* webkit_dom_text_track_get_kind(WebKitDOMTextTrack* self)
+{
+#if ENABLE(VIDEO_TRACK)
+    WebCore::JSMainThreadNullState state;
+    g_return_val_if_fail(WEBKIT_DOM_IS_TEXT_TRACK(self), 0);
+    WebCore::TextTrack* item = WebKit::core(self);
+    gchar* result = convertToUTF8String(item->kind());
+    return result;
+#else
+    WEBKIT_WARN_FEATURE_NOT_PRESENT("Video Track")
+    return 0;
+#endif /* ENABLE(VIDEO_TRACK) */
+}
+
+gchar* webkit_dom_text_track_get_language(WebKitDOMTextTrack* self)
+{
+#if ENABLE(VIDEO_TRACK)
+    WebCore::JSMainThreadNullState state;
+    g_return_val_if_fail(WEBKIT_DOM_IS_TEXT_TRACK(self), 0);
+    WebCore::TextTrack* item = WebKit::core(self);
+    gchar* result = convertToUTF8String(item->language());
+    return result;
+#else
+    WEBKIT_WARN_FEATURE_NOT_PRESENT("Video Track")
+    return 0;
+#endif /* ENABLE(VIDEO_TRACK) */
+}
+
+gchar* webkit_dom_video_track_get_kind(WebKitDOMVideoTrack* self)
+{
+#if ENABLE(VIDEO_TRACK)
+    WebCore::JSMainThreadNullState state;
+    g_return_val_if_fail(WEBKIT_DOM_IS_VIDEO_TRACK(self), 0);
+    WebCore::VideoTrack* item = WebKit::core(self);
+    gchar* result = convertToUTF8String(item->kind());
+    return result;
+#else
+    WEBKIT_WARN_FEATURE_NOT_PRESENT("Video Track")
+    return 0;
+#endif /* ENABLE(VIDEO_TRACK) */
+}
+
+gchar* webkit_dom_video_track_get_language(WebKitDOMVideoTrack* self)
+{
+#if ENABLE(VIDEO_TRACK)
+    WebCore::JSMainThreadNullState state;
+    g_return_val_if_fail(WEBKIT_DOM_IS_VIDEO_TRACK(self), 0);
+    WebCore::VideoTrack* item = WebKit::core(self);
+    gchar* result = convertToUTF8String(item->language());
+    return result;
+#else
+    WEBKIT_WARN_FEATURE_NOT_PRESENT("Video Track")
+    return 0;
+#endif /* ENABLE(VIDEO_TRACK) */
 }
 
 /* Compatibility */
@@ -556,4 +660,36 @@ gdouble webkit_dom_html_media_element_get_start_time(WebKitDOMHTMLMediaElement*)
 {
     g_warning("%s: the HTMLMediaElement:start-time property has been removed from WebKit, this function does nothing.", __func__);
     return 0;
+}
+
+gdouble webkit_dom_html_media_element_get_initial_time(WebKitDOMHTMLMediaElement*)
+{
+    g_warning("%s: the HTMLMediaElement:initial-time property has been removed from WebKit, this function does nothing.", __func__);
+    return 0;
+}
+
+// WebKitDOMHTMLHeadElement
+
+gchar* webkit_dom_html_head_element_get_profile(WebKitDOMHTMLHeadElement* self)
+{
+    g_warning("%s: the HeadElement object has been removed from WebKit, this function does nothing.", __func__);
+    return g_strdup("");
+}
+
+void webkit_dom_html_head_element_set_profile(WebKitDOMHTMLHeadElement* self, const gchar* value)
+{
+    g_warning("%s: the HeadElement object has been removed from WebKit, this function does nothing.", __func__);
+}
+
+// WebKitDOMProcessingInstruction
+
+gchar* webkit_dom_processing_instruction_get_data(WebKitDOMProcessingInstruction* self)
+{
+    g_warning("%s: this functionality has been removed from WebKit, this function does nothing.", __func__);
+    return g_strdup("");
+}
+
+void webkit_dom_processing_instruction_set_data(WebKitDOMProcessingInstruction* self, const gchar* value, GError** error)
+{
+    g_warning("%s: this functionality has been removed from WebKit, this function does nothing.", __func__);
 }

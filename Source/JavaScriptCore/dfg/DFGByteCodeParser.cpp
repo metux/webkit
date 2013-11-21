@@ -391,11 +391,11 @@ private:
             InlineCallFrame* inlineCallFrame = stack->m_inlineCallFrame;
             if (!inlineCallFrame)
                 break;
-            if (operand.offset() <= static_cast<int>(inlineCallFrame->stackOffset + JSStack::CallFrameHeaderSize))
+            if (operand.offset() < static_cast<int>(inlineCallFrame->stackOffset + JSStack::CallFrameHeaderSize))
                 continue;
             if (operand.offset() == inlineCallFrame->stackOffset + CallFrame::thisArgumentOffset())
                 continue;
-            if (operand.offset() > static_cast<int>(inlineCallFrame->stackOffset + JSStack::CallFrameHeaderSize + inlineCallFrame->arguments.size()))
+            if (operand.offset() >= static_cast<int>(inlineCallFrame->stackOffset + CallFrame::thisArgumentOffset() + inlineCallFrame->arguments.size()))
                 continue;
             int argument = VirtualRegister(operand.offset() - inlineCallFrame->stackOffset).toArgument();
             return stack->m_argumentPositions[argument];
@@ -697,6 +697,15 @@ private:
     
     bool canFold(Node* node)
     {
+        if (Options::validateFTLOSRExitLiveness()) {
+            // The static folding that the bytecode parser does results in the DFG
+            // being able to do some DCE that the bytecode liveness analysis would
+            // miss. Hence, we disable the static folding if we're validating FTL OSR
+            // exit liveness. This may be brutish, but this validator is powerful
+            // enough that it's worth it.
+            return false;
+        }
+        
         return node->isStronglyProvedConstantIn(inlineCallFrame());
     }
 
@@ -769,8 +778,8 @@ private:
         
         addVarArgChild(get(VirtualRegister(currentInstruction[2].u.operand)));
         int argCount = currentInstruction[3].u.operand;
-        if (JSStack::CallFrameHeaderSize + (unsigned)argCount > m_parameterSlots)
-            m_parameterSlots = JSStack::CallFrameHeaderSize + argCount;
+        if (JSStack::ThisArgument + (unsigned)argCount > m_parameterSlots)
+            m_parameterSlots = JSStack::ThisArgument + argCount;
 
         int registerOffset = -currentInstruction[4].u.operand;
         int dummyThisArgument = op == Call ? 0 : 1;
@@ -1290,7 +1299,7 @@ bool ByteCodeParser::handleInlining(Node* callTargetNode, int resultOperand, con
     int inlineCallFrameStart = m_inlineStackTop->remapOperand(VirtualRegister(registerOffset)).offset() + JSStack::CallFrameHeaderSize;
     
     // Make sure that we have enough locals.
-    unsigned newNumLocals = VirtualRegister(inlineCallFrameStart).toLocal() + JSStack::CallFrameHeaderSize + codeBlock->m_numCalleeRegisters;
+    unsigned newNumLocals = VirtualRegister(inlineCallFrameStart).toLocal() + 1 + JSStack::CallFrameHeaderSize + codeBlock->m_numCalleeRegisters;
     if (newNumLocals > m_numLocals) {
         m_numLocals = newNumLocals;
         for (size_t i = 0; i < m_graph.numBlocks(); ++i)
@@ -1454,8 +1463,6 @@ bool ByteCodeParser::handleMinMax(int resultOperand, NodeType op, int registerOf
     return false;
 }
 
-// FIXME: We dead-code-eliminate unused Math intrinsics, but that's invalid because
-// they need to perform the ToNumber conversion, which can have side-effects.
 bool ByteCodeParser::handleIntrinsic(int resultOperand, Intrinsic intrinsic, int registerOffset, int argumentCountIncludingThis, SpeculatedType prediction)
 {
     switch (intrinsic) {
@@ -1481,17 +1488,34 @@ bool ByteCodeParser::handleIntrinsic(int resultOperand, Intrinsic intrinsic, int
     case MaxIntrinsic:
         return handleMinMax(resultOperand, ArithMax, registerOffset, argumentCountIncludingThis);
         
-    case SqrtIntrinsic: {
-        if (argumentCountIncludingThis == 1) { // Math.sqrt()
+    case SqrtIntrinsic:
+    case CosIntrinsic:
+    case SinIntrinsic: {
+        if (argumentCountIncludingThis == 1) {
             set(VirtualRegister(resultOperand), constantNaN());
             return true;
         }
         
-        if (!MacroAssembler::supportsFloatingPointSqrt())
+        switch (intrinsic) {
+        case SqrtIntrinsic:
+            if (!MacroAssembler::supportsFloatingPointSqrt())
+                return false;
+            
+            set(VirtualRegister(resultOperand), addToGraph(ArithSqrt, get(virtualRegisterForArgument(1, registerOffset))));
+            return true;
+            
+        case CosIntrinsic:
+            set(VirtualRegister(resultOperand), addToGraph(ArithCos, get(virtualRegisterForArgument(1, registerOffset))));
+            return true;
+            
+        case SinIntrinsic:
+            set(VirtualRegister(resultOperand), addToGraph(ArithSin, get(virtualRegisterForArgument(1, registerOffset))));
+            return true;
+            
+        default:
+            RELEASE_ASSERT_NOT_REACHED();
             return false;
-
-        set(VirtualRegister(resultOperand), addToGraph(ArithSqrt, get(virtualRegisterForArgument(1, registerOffset))));
-        return true;
+        }
     }
         
     case ArrayPushIntrinsic: {
@@ -2978,8 +3002,8 @@ bool ByteCodeParser::parseBlock(unsigned limit)
             addToGraph(CheckArgumentsNotCreated);
             
             unsigned argCount = inlineCallFrame()->arguments.size();
-            if (JSStack::CallFrameHeaderSize + argCount > m_parameterSlots)
-                m_parameterSlots = JSStack::CallFrameHeaderSize + argCount;
+            if (JSStack::ThisArgument + argCount > m_parameterSlots)
+                m_parameterSlots = JSStack::ThisArgument + argCount;
             
             addVarArgChild(get(VirtualRegister(currentInstruction[2].u.operand))); // callee
             addVarArgChild(get(VirtualRegister(currentInstruction[3].u.operand))); // this
@@ -3058,6 +3082,7 @@ bool ByteCodeParser::parseBlock(unsigned limit)
                     break;
                 }
                 Node* base = cellConstantWithStructureCheck(globalObject, status.structureSet().singletonStructure());
+                addToGraph(Phantom, get(VirtualRegister(scope)));
                 if (JSValue specificValue = status.specificValue())
                     set(VirtualRegister(dst), cellConstant(specificValue.asCell()));
                 else
@@ -3066,6 +3091,7 @@ bool ByteCodeParser::parseBlock(unsigned limit)
             }
             case GlobalVar:
             case GlobalVarWithVarInjectionChecks: {
+                addToGraph(Phantom, get(VirtualRegister(scope)));
                 SymbolTableEntry entry = globalObject->symbolTable()->get(uid);
                 if (!entry.couldBeWatched() || !m_graph.watchpoints().isStillValid(entry.watchpointSet())) {
                     set(VirtualRegister(dst), addToGraph(GetGlobalVar, OpInfo(operand), OpInfo(prediction)));
@@ -3116,6 +3142,7 @@ bool ByteCodeParser::parseBlock(unsigned limit)
                     break;
                 }
                 Node* base = cellConstantWithStructureCheck(globalObject, status.oldStructure());
+                addToGraph(Phantom, get(VirtualRegister(scope)));
                 handlePutByOffset(base, identifierNumber, static_cast<PropertyOffset>(operand), get(VirtualRegister(value)));
                 // Keep scope alive until after put.
                 addToGraph(Phantom, get(VirtualRegister(scope)));
@@ -3123,6 +3150,7 @@ bool ByteCodeParser::parseBlock(unsigned limit)
             }
             case GlobalVar:
             case GlobalVarWithVarInjectionChecks: {
+                addToGraph(Phantom, get(VirtualRegister(scope)));
                 SymbolTableEntry entry = globalObject->symbolTable()->get(uid);
                 ASSERT(!entry.couldBeWatched() || !m_graph.watchpoints().isStillValid(entry.watchpointSet()));
                 addToGraph(PutGlobalVar, OpInfo(operand), get(VirtualRegister(value)));

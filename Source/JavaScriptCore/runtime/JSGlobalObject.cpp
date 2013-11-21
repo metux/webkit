@@ -31,6 +31,8 @@
 #include "JSGlobalObject.h"
 
 #include "Arguments.h"
+#include "ArgumentsIteratorConstructor.h"
+#include "ArgumentsIteratorPrototype.h"
 #include "ArrayConstructor.h"
 #include "ArrayIteratorConstructor.h"
 #include "ArrayIteratorPrototype.h"
@@ -52,6 +54,7 @@
 #include "Interpreter.h"
 #include "JSAPIWrapperObject.h"
 #include "JSActivation.h"
+#include "JSArgumentsIterator.h"
 #include "JSArrayBuffer.h"
 #include "JSArrayBufferConstructor.h"
 #include "JSArrayBufferPrototype.h"
@@ -69,9 +72,11 @@
 #include "JSGlobalObjectFunctions.h"
 #include "JSLock.h"
 #include "JSMap.h"
+#include "JSMapIterator.h"
 #include "JSNameScope.h"
 #include "JSONObject.h"
 #include "JSSet.h"
+#include "JSSetIterator.h"
 #include "JSTypedArrayConstructors.h"
 #include "JSTypedArrayPrototypes.h"
 #include "JSTypedArrays.h"
@@ -80,6 +85,8 @@
 #include "LegacyProfiler.h"
 #include "Lookup.h"
 #include "MapConstructor.h"
+#include "MapIteratorConstructor.h"
+#include "MapIteratorPrototype.h"
 #include "MapPrototype.h"
 #include "MathObject.h"
 #include "NameConstructor.h"
@@ -99,6 +106,8 @@
 #include "RegExpObject.h"
 #include "RegExpPrototype.h"
 #include "SetConstructor.h"
+#include "SetIteratorConstructor.h"
+#include "SetIteratorPrototype.h"
 #include "SetPrototype.h"
 #include "StrictEvalActivation.h"
 #include "StringConstructor.h"
@@ -141,9 +150,9 @@ const GlobalObjectMethodTable JSGlobalObject::s_globalObjectMethodTable = { &all
 
 JSGlobalObject::JSGlobalObject(VM& vm, Structure* structure, const GlobalObjectMethodTable* globalObjectMethodTable)
     : Base(vm, structure, 0)
-    , m_masqueradesAsUndefinedWatchpoint(adoptRef(new WatchpointSet(InitializedWatching)))
-    , m_havingABadTimeWatchpoint(adoptRef(new WatchpointSet(InitializedWatching)))
-    , m_varInjectionWatchpoint(adoptRef(new WatchpointSet(InitializedWatching)))
+    , m_masqueradesAsUndefinedWatchpoint(adoptRef(new WatchpointSet(IsWatched)))
+    , m_havingABadTimeWatchpoint(adoptRef(new WatchpointSet(IsWatched)))
+    , m_varInjectionWatchpoint(adoptRef(new WatchpointSet(IsWatched)))
     , m_weakRandom(Options::forceWeakRandomSeed() ? Options::forcedWeakRandomSeed() : static_cast<unsigned>(randomNumber() * (std::numeric_limits<unsigned>::max() + 1.0)))
     , m_evalEnabled(true)
     , m_globalObjectMethodTable(globalObjectMethodTable ? globalObjectMethodTable : &s_globalObjectMethodTable)

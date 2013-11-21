@@ -2,26 +2,19 @@
 <html>
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
-<title>WebKitDOMTextTrackCue</title>
+<title>WebKitDOMGTK+ Reference Manual: WebKitDOMTextTrackCue</title>
 <meta name="generator" content="DocBook XSL Stylesheets V1.78.1">
 <link rel="home" href="index.html" title="WebKitDOMGTK+ Reference Manual">
 <link rel="up" href="ch01.html" title="Class Overview">
 <link rel="prev" href="WebKitDOMTextTrackList.html" title="WebKitDOMTextTrackList">
 <link rel="next" href="WebKitDOMTextTrackCueList.html" title="WebKitDOMTextTrackCueList">
-<meta name="generator" content="GTK-Doc V1.18.1 (XML mode)">
+<meta name="generator" content="GTK-Doc V1.19.1 (XML mode)">
 <link rel="stylesheet" href="style.css" type="text/css">
 </head>
 <body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF">
-<table class="navigation" id="top" width="100%" summary="Navigation header" cellpadding="2" cellspacing="2">
-<tr valign="middle">
-<td><a accesskey="p" href="WebKitDOMTextTrackList.html"><img src="left.png" width="24" height="24" border="0" alt="Prev"></a></td>
-<td><a accesskey="u" href="ch01.html"><img src="up.png" width="24" height="24" border="0" alt="Up"></a></td>
-<td><a accesskey="h" href="index.html"><img src="home.png" width="24" height="24" border="0" alt="Home"></a></td>
-<th width="100%" align="center">WebKitDOMGTK+ Reference Manual</th>
-<td><a accesskey="n" href="WebKitDOMTextTrackCueList.html"><img src="right.png" width="24" height="24" border="0" alt="Next"></a></td>
-</tr>
-<tr><td colspan="5" class="shortcuts">
-<a href="#WebKitDOMTextTrackCue.synopsis" class="shortcut">Top</a>
+<table class="navigation" id="top" width="100%" summary="Navigation header" cellpadding="2" cellspacing="10"><tr valign="middle">
+<td width="100%" align="left">
+<a href="#" class="shortcut">Top</a>
                    | 
                   <a href="#WebKitDOMTextTrackCue.description" class="shortcut">Description</a>
                    | 
@@ -30,8 +23,12 @@
                   <a href="#WebKitDOMTextTrackCue.implemented-interfaces" class="shortcut">Implemented Interfaces</a>
                    | 
                   <a href="#WebKitDOMTextTrackCue.properties" class="shortcut">Properties</a>
-</td></tr>
-</table>
+</td>
+<td><a accesskey="h" href="index.html"><img src="home.png" width="16" height="16" border="0" alt="Home"></a></td>
+<td><a accesskey="u" href="ch01.html"><img src="up.png" width="16" height="16" border="0" alt="Up"></a></td>
+<td><a accesskey="p" href="WebKitDOMTextTrackList.html"><img src="left.png" width="16" height="16" border="0" alt="Prev"></a></td>
+<td><a accesskey="n" href="WebKitDOMTextTrackCueList.html"><img src="right.png" width="16" height="16" border="0" alt="Next"></a></td>
+</tr></table>
 <div class="refentry">
 <a name="WebKitDOMTextTrackCue"></a><div class="titlepage"></div>
 <div class="refnamediv"><table width="100%"><tr>
@@ -46,6 +43,10 @@
 <pre class="synopsis">                    <a class="link" href="WebKitDOMTextTrackCue.html#WebKitDOMTextTrackCue-struct" title="WebKitDOMTextTrackCue">WebKitDOMTextTrackCue</a>;
 <a class="link" href="WebKitDOMDocumentFragment.html" title="WebKitDOMDocumentFragment"><span class="returnvalue">WebKitDOMDocumentFragment</span></a> * <a class="link" href="WebKitDOMTextTrackCue.html#webkit-dom-text-track-cue-get-cue-as-html" title="webkit_dom_text_track_cue_get_cue_as_html ()">webkit_dom_text_track_cue_get_cue_as_html</a>
                                                         (<em class="parameter"><code><a class="link" href="WebKitDOMTextTrackCue.html" title="WebKitDOMTextTrackCue"><span class="type">WebKitDOMTextTrackCue</span></a> *self</code></em>);
+<a href="../glib/glib-Basic-Types.html#gboolean"><span class="returnvalue">gboolean</span></a>            <a class="link" href="WebKitDOMTextTrackCue.html#webkit-dom-text-track-cue-dispatch-event" title="webkit_dom_text_track_cue_dispatch_event ()">webkit_dom_text_track_cue_dispatch_event</a>
+                                                        (<em class="parameter"><code><a class="link" href="WebKitDOMTextTrackCue.html" title="WebKitDOMTextTrackCue"><span class="type">WebKitDOMTextTrackCue</span></a> *self</code></em>,
+                                                         <em class="parameter"><code><a class="link" href="WebKitDOMEvent.html" title="WebKitDOMEvent"><span class="type">WebKitDOMEvent</span></a> *evt</code></em>,
+                                                         <em class="parameter"><code><a href="../glib/glib-Error-Reporting.html#GError"><span class="type">GError</span></a> **error</code></em>);
 <a class="link" href="WebKitDOMTextTrack.html" title="WebKitDOMTextTrack"><span class="returnvalue">WebKitDOMTextTrack</span></a> * <a class="link" href="WebKitDOMTextTrackCue.html#webkit-dom-text-track-cue-get-track" title="webkit_dom_text_track_cue_get_track ()">webkit_dom_text_track_cue_get_track</a>
                                                         (<em class="parameter"><code><a class="link" href="WebKitDOMTextTrackCue.html" title="WebKitDOMTextTrackCue"><span class="type">WebKitDOMTextTrackCue</span></a> *self</code></em>);
 <a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gchar</span></a> *             <a class="link" href="WebKitDOMTextTrackCue.html#webkit-dom-text-track-cue-get-id" title="webkit_dom_text_track_cue_get_id ()">webkit_dom_text_track_cue_get_id</a>    (<em class="parameter"><code><a class="link" href="WebKitDOMTextTrackCue.html" title="WebKitDOMTextTrackCue"><span class="type">WebKitDOMTextTrackCue</span></a> *self</code></em>);
@@ -164,7 +165,46 @@ WebKitDOMTextTrackCue implements
 </tr>
 <tr>
 <td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
-<td>. <span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
+<td>A <a class="link" href="WebKitDOMDocumentFragment.html" title="WebKitDOMDocumentFragment"><span class="type">WebKitDOMDocumentFragment</span></a>. <span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
+</td>
+</tr>
+</tbody>
+</table></div>
+</div>
+<hr>
+<div class="refsect2">
+<a name="webkit-dom-text-track-cue-dispatch-event"></a><h3>webkit_dom_text_track_cue_dispatch_event ()</h3>
+<pre class="programlisting"><a href="../glib/glib-Basic-Types.html#gboolean"><span class="returnvalue">gboolean</span></a>            webkit_dom_text_track_cue_dispatch_event
+                                                        (<em class="parameter"><code><a class="link" href="WebKitDOMTextTrackCue.html" title="WebKitDOMTextTrackCue"><span class="type">WebKitDOMTextTrackCue</span></a> *self</code></em>,
+                                                         <em class="parameter"><code><a class="link" href="WebKitDOMEvent.html" title="WebKitDOMEvent"><span class="type">WebKitDOMEvent</span></a> *evt</code></em>,
+                                                         <em class="parameter"><code><a href="../glib/glib-Error-Reporting.html#GError"><span class="type">GError</span></a> **error</code></em>);</pre>
+<div class="warning">
+<h3 class="title">Warning</h3>
+<p><code class="literal">webkit_dom_text_track_cue_dispatch_event</code> has been deprecated since version 2.4 and should not be used in newly-written code. Use <a class="link" href="WebKitDOMEventTarget.html#webkit-dom-event-target-dispatch-event" title="webkit_dom_event_target_dispatch_event ()"><code class="function">webkit_dom_event_target_dispatch_event()</code></a> instead.</p>
+</div>
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
+<col align="left" valign="top">
+<col>
+</colgroup>
+<tbody>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>self</code></em> :</span></p></td>
+<td>A <a class="link" href="WebKitDOMTextTrackCue.html" title="WebKitDOMTextTrackCue"><span class="type">WebKitDOMTextTrackCue</span></a>
+</td>
+</tr>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>evt</code></em> :</span></p></td>
+<td>A <a class="link" href="WebKitDOMEvent.html" title="WebKitDOMEvent"><span class="type">WebKitDOMEvent</span></a>
+</td>
+</tr>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>error</code></em> :</span></p></td>
+<td><a href="../glib/glib-Error-Reporting.html#GError"><span class="type">GError</span></a></td>
+</tr>
+<tr>
+<td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
+<td>A <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>
 </td>
 </tr>
 </tbody>
@@ -188,7 +228,7 @@ WebKitDOMTextTrackCue implements
 </tr>
 <tr>
 <td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
-<td>. <span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
+<td>A <a class="link" href="WebKitDOMTextTrack.html" title="WebKitDOMTextTrack"><span class="type">WebKitDOMTextTrack</span></a>. <span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
 </td>
 </tr>
 </tbody>
@@ -203,11 +243,18 @@ WebKitDOMTextTrackCue implements
 <col align="left" valign="top">
 <col>
 </colgroup>
-<tbody><tr>
+<tbody>
+<tr>
 <td><p><span class="term"><em class="parameter"><code>self</code></em> :</span></p></td>
 <td>A <a class="link" href="WebKitDOMTextTrackCue.html" title="WebKitDOMTextTrackCue"><span class="type">WebKitDOMTextTrackCue</span></a>
 </td>
-</tr></tbody>
+</tr>
+<tr>
+<td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
+<td>A <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a>
+</td>
+</tr>
+</tbody>
 </table></div>
 </div>
 <hr>
@@ -244,11 +291,18 @@ WebKitDOMTextTrackCue implements
 <col align="left" valign="top">
 <col>
 </colgroup>
-<tbody><tr>
+<tbody>
+<tr>
 <td><p><span class="term"><em class="parameter"><code>self</code></em> :</span></p></td>
 <td>A <a class="link" href="WebKitDOMTextTrackCue.html" title="WebKitDOMTextTrackCue"><span class="type">WebKitDOMTextTrackCue</span></a>
 </td>
-</tr></tbody>
+</tr>
+<tr>
+<td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
+<td>A <a href="../glib/glib-Basic-Types.html#gdouble"><span class="type">gdouble</span></a>
+</td>
+</tr>
+</tbody>
 </table></div>
 </div>
 <hr>
@@ -291,11 +345,18 @@ WebKitDOMTextTrackCue implements
 <col align="left" valign="top">
 <col>
 </colgroup>
-<tbody><tr>
+<tbody>
+<tr>
 <td><p><span class="term"><em class="parameter"><code>self</code></em> :</span></p></td>
 <td>A <a class="link" href="WebKitDOMTextTrackCue.html" title="WebKitDOMTextTrackCue"><span class="type">WebKitDOMTextTrackCue</span></a>
 </td>
-</tr></tbody>
+</tr>
+<tr>
+<td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
+<td>A <a href="../glib/glib-Basic-Types.html#gdouble"><span class="type">gdouble</span></a>
+</td>
+</tr>
+</tbody>
 </table></div>
 </div>
 <hr>
@@ -338,11 +399,18 @@ WebKitDOMTextTrackCue implements
 <col align="left" valign="top">
 <col>
 </colgroup>
-<tbody><tr>
+<tbody>
+<tr>
 <td><p><span class="term"><em class="parameter"><code>self</code></em> :</span></p></td>
 <td>A <a class="link" href="WebKitDOMTextTrackCue.html" title="WebKitDOMTextTrackCue"><span class="type">WebKitDOMTextTrackCue</span></a>
 </td>
-</tr></tbody>
+</tr>
+<tr>
+<td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
+<td>A <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>
+</td>
+</tr>
+</tbody>
 </table></div>
 </div>
 <hr>
@@ -380,11 +448,18 @@ WebKitDOMTextTrackCue implements
 <col align="left" valign="top">
 <col>
 </colgroup>
-<tbody><tr>
+<tbody>
+<tr>
 <td><p><span class="term"><em class="parameter"><code>self</code></em> :</span></p></td>
 <td>A <a class="link" href="WebKitDOMTextTrackCue.html" title="WebKitDOMTextTrackCue"><span class="type">WebKitDOMTextTrackCue</span></a>
 </td>
-</tr></tbody>
+</tr>
+<tr>
+<td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
+<td>A <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a>
+</td>
+</tr>
+</tbody>
 </table></div>
 </div>
 <hr>
@@ -427,11 +502,18 @@ WebKitDOMTextTrackCue implements
 <col align="left" valign="top">
 <col>
 </colgroup>
-<tbody><tr>
+<tbody>
+<tr>
 <td><p><span class="term"><em class="parameter"><code>self</code></em> :</span></p></td>
 <td>A <a class="link" href="WebKitDOMTextTrackCue.html" title="WebKitDOMTextTrackCue"><span class="type">WebKitDOMTextTrackCue</span></a>
 </td>
-</tr></tbody>
+</tr>
+<tr>
+<td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
+<td>A <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>
+</td>
+</tr>
+</tbody>
 </table></div>
 </div>
 <hr>
@@ -468,11 +550,18 @@ WebKitDOMTextTrackCue implements
 <col align="left" valign="top">
 <col>
 </colgroup>
-<tbody><tr>
+<tbody>
+<tr>
 <td><p><span class="term"><em class="parameter"><code>self</code></em> :</span></p></td>
 <td>A <a class="link" href="WebKitDOMTextTrackCue.html" title="WebKitDOMTextTrackCue"><span class="type">WebKitDOMTextTrackCue</span></a>
 </td>
-</tr></tbody>
+</tr>
+<tr>
+<td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
+<td>A <a href="../glib/glib-Basic-Types.html#glong"><span class="type">glong</span></a>
+</td>
+</tr>
+</tbody>
 </table></div>
 </div>
 <hr>
@@ -514,11 +603,18 @@ WebKitDOMTextTrackCue implements
 <col align="left" valign="top">
 <col>
 </colgroup>
-<tbody><tr>
+<tbody>
+<tr>
 <td><p><span class="term"><em class="parameter"><code>self</code></em> :</span></p></td>
 <td>A <a class="link" href="WebKitDOMTextTrackCue.html" title="WebKitDOMTextTrackCue"><span class="type">WebKitDOMTextTrackCue</span></a>
 </td>
-</tr></tbody>
+</tr>
+<tr>
+<td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
+<td>A <a href="../glib/glib-Basic-Types.html#glong"><span class="type">glong</span></a>
+</td>
+</tr>
+</tbody>
 </table></div>
 </div>
 <hr>
@@ -560,11 +656,18 @@ WebKitDOMTextTrackCue implements
 <col align="left" valign="top">
 <col>
 </colgroup>
-<tbody><tr>
+<tbody>
+<tr>
 <td><p><span class="term"><em class="parameter"><code>self</code></em> :</span></p></td>
 <td>A <a class="link" href="WebKitDOMTextTrackCue.html" title="WebKitDOMTextTrackCue"><span class="type">WebKitDOMTextTrackCue</span></a>
 </td>
-</tr></tbody>
+</tr>
+<tr>
+<td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
+<td>A <a href="../glib/glib-Basic-Types.html#glong"><span class="type">glong</span></a>
+</td>
+</tr>
+</tbody>
 </table></div>
 </div>
 <hr>
@@ -605,11 +708,18 @@ WebKitDOMTextTrackCue implements
 <col align="left" valign="top">
 <col>
 </colgroup>
-<tbody><tr>
+<tbody>
+<tr>
 <td><p><span class="term"><em class="parameter"><code>self</code></em> :</span></p></td>
 <td>A <a class="link" href="WebKitDOMTextTrackCue.html" title="WebKitDOMTextTrackCue"><span class="type">WebKitDOMTextTrackCue</span></a>
 </td>
-</tr></tbody>
+</tr>
+<tr>
+<td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
+<td>A <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a>
+</td>
+</tr>
+</tbody>
 </table></div>
 </div>
 <hr>
@@ -650,11 +760,18 @@ WebKitDOMTextTrackCue implements
 <col align="left" valign="top">
 <col>
 </colgroup>
-<tbody><tr>
+<tbody>
+<tr>
 <td><p><span class="term"><em class="parameter"><code>self</code></em> :</span></p></td>
 <td>A <a class="link" href="WebKitDOMTextTrackCue.html" title="WebKitDOMTextTrackCue"><span class="type">WebKitDOMTextTrackCue</span></a>
 </td>
-</tr></tbody>
+</tr>
+<tr>
+<td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
+<td>A <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a>
+</td>
+</tr>
+</tbody>
 </table></div>
 </div>
 <hr>
@@ -770,6 +887,6 @@ WebKitDOMTextTrackCue implements
 </div>
 <div class="footer">
 <hr>
-          Generated by GTK-Doc V1.18.1</div>
+          Generated by GTK-Doc V1.19.1</div>
 </body>
 </html>

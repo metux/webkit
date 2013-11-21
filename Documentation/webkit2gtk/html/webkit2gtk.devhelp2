@@ -75,7 +75,7 @@
     <keyword type="function" name="webkit_web_context_set_web_extensions_directory ()" link="WebKitWebContext.html#webkit-web-context-set-web-extensions-directory"/>
     <keyword type="function" name="webkit_web_context_prefetch_dns ()" link="WebKitWebContext.html#webkit-web-context-prefetch-dns"/>
     <keyword type="function" name="webkit_web_context_set_disk_cache_directory ()" link="WebKitWebContext.html#webkit-web-context-set-disk-cache-directory"/>
-    <keyword type="function" name="webkit_web_context_allow_tls_certificate_for_host ()" link="WebKitWebContext.html#webkit-web-context-allow-tls-certificate-for-host"/>
+    <keyword type="function" name="webkit_web_context_allow_tls_certificate_for_host ()" link="WebKitWebContext.html#webkit-web-context-allow-tls-certificate-for-host" since="2.4"/>
     <keyword type="function" name="WebKitURISchemeRequestCallback ()" link="WebKitWebContext.html#WebKitURISchemeRequestCallback"/>
     <keyword type="function" name="webkit_web_context_register_uri_scheme ()" link="WebKitWebContext.html#webkit-web-context-register-uri-scheme"/>
     <keyword type="signal" name="The &quot;download-started&quot; signal" link="WebKitWebContext.html#WebKitWebContext-download-started"/>
@@ -321,6 +321,8 @@
     <keyword type="function" name="webkit_settings_set_enable_accelerated_2d_canvas ()" link="WebKitSettings.html#webkit-settings-set-enable-accelerated-2d-canvas" since="2.2"/>
     <keyword type="function" name="webkit_settings_get_enable_write_console_messages_to_stdout ()" link="WebKitSettings.html#webkit-settings-get-enable-write-console-messages-to-stdout" since="2.2"/>
     <keyword type="function" name="webkit_settings_set_enable_write_console_messages_to_stdout ()" link="WebKitSettings.html#webkit-settings-set-enable-write-console-messages-to-stdout" since="2.2"/>
+    <keyword type="function" name="webkit_settings_get_enable_media_stream ()" link="WebKitSettings.html#webkit-settings-get-enable-media-stream" since="2.4"/>
+    <keyword type="function" name="webkit_settings_set_enable_media_stream ()" link="WebKitSettings.html#webkit-settings-set-enable-media-stream" since="2.4"/>
     <keyword type="property" name="The &quot;allow-modal-dialogs&quot; property" link="WebKitSettings.html#WebKitSettings--allow-modal-dialogs"/>
     <keyword type="property" name="The &quot;auto-load-images&quot; property" link="WebKitSettings.html#WebKitSettings--auto-load-images"/>
     <keyword type="property" name="The &quot;cursive-font-family&quot; property" link="WebKitSettings.html#WebKitSettings--cursive-font-family"/>
@@ -340,6 +342,7 @@
     <keyword type="property" name="The &quot;enable-hyperlink-auditing&quot; property" link="WebKitSettings.html#WebKitSettings--enable-hyperlink-auditing"/>
     <keyword type="property" name="The &quot;enable-java&quot; property" link="WebKitSettings.html#WebKitSettings--enable-java"/>
     <keyword type="property" name="The &quot;enable-javascript&quot; property" link="WebKitSettings.html#WebKitSettings--enable-javascript"/>
+    <keyword type="property" name="The &quot;enable-media-stream&quot; property" link="WebKitSettings.html#WebKitSettings--enable-media-stream"/>
     <keyword type="property" name="The &quot;enable-offline-web-application-cache&quot; property" link="WebKitSettings.html#WebKitSettings--enable-offline-web-application-cache"/>
     <keyword type="property" name="The &quot;enable-page-cache&quot; property" link="WebKitSettings.html#WebKitSettings--enable-page-cache"/>
     <keyword type="property" name="The &quot;enable-plugins&quot; property" link="WebKitSettings.html#WebKitSettings--enable-plugins"/>

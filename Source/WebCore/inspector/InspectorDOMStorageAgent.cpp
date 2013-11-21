@@ -41,7 +41,6 @@
 #include "Frame.h"
 #include "InspectorFrontend.h"
 #include "InspectorPageAgent.h"
-#include "InspectorState.h"
 #include "InspectorValues.h"
 #include "InstrumentingAgents.h"
 #include "Page.h"
@@ -56,14 +55,10 @@
 
 namespace WebCore {
 
-namespace DOMStorageAgentState {
-static const char domStorageAgentEnabled[] = "domStorageAgentEnabled";
-};
-
-InspectorDOMStorageAgent::InspectorDOMStorageAgent(InstrumentingAgents* instrumentingAgents, InspectorPageAgent* pageAgent, InspectorCompositeState* state)
-    : InspectorBaseAgent<InspectorDOMStorageAgent>("DOMStorage", instrumentingAgents, state)
+InspectorDOMStorageAgent::InspectorDOMStorageAgent(InstrumentingAgents* instrumentingAgents, InspectorPageAgent* pageAgent)
+    : InspectorBaseAgent(ASCIILiteral("DOMStorage"), instrumentingAgents)
     , m_pageAgent(pageAgent)
-    , m_frontend(0)
+    , m_enabled(false)
 {
     m_instrumentingAgents->setInspectorDOMStorageAgent(this);
 }
@@ -74,30 +69,28 @@ InspectorDOMStorageAgent::~InspectorDOMStorageAgent()
     m_instrumentingAgents = 0;
 }
 
-void InspectorDOMStorageAgent::setFrontend(InspectorFrontend* frontend)
+void InspectorDOMStorageAgent::didCreateFrontendAndBackend(InspectorFrontendChannel* frontendChannel, InspectorBackendDispatcher* backendDispatcher)
 {
-    m_frontend = frontend;
+    m_frontendDispatcher = std::make_unique<InspectorDOMStorageFrontendDispatcher>(frontendChannel);
+    m_backendDispatcher = InspectorDOMStorageBackendDispatcher::create(backendDispatcher, this);
 }
 
-void InspectorDOMStorageAgent::clearFrontend()
+void InspectorDOMStorageAgent::willDestroyFrontendAndBackend()
 {
-    m_frontend = 0;
-    disable(0);
-}
+    m_frontendDispatcher = nullptr;
+    m_backendDispatcher.clear();
 
-bool InspectorDOMStorageAgent::isEnabled() const
-{
-    return m_state->getBoolean(DOMStorageAgentState::domStorageAgentEnabled);
+    disable(nullptr);
 }
 
 void InspectorDOMStorageAgent::enable(ErrorString*)
 {
-    m_state->setBoolean(DOMStorageAgentState::domStorageAgentEnabled, true);
+    m_enabled = true;
 }
 
 void InspectorDOMStorageAgent::disable(ErrorString*)
 {
-    m_state->setBoolean(DOMStorageAgentState::domStorageAgentEnabled, false);
+    m_enabled = false;
 }
 
 void InspectorDOMStorageAgent::getDOMStorageItems(ErrorString* errorString, const RefPtr<InspectorObject>& storageId, RefPtr<TypeBuilder::Array<TypeBuilder::Array<String>>>& items)
@@ -173,19 +166,19 @@ PassRefPtr<TypeBuilder::DOMStorage::StorageId> InspectorDOMStorageAgent::storage
 
 void InspectorDOMStorageAgent::didDispatchDOMStorageEvent(const String& key, const String& oldValue, const String& newValue, StorageType storageType, SecurityOrigin* securityOrigin, Page*)
 {
-    if (!m_frontend || !isEnabled())
+    if (!m_frontendDispatcher || !m_enabled)
         return;
 
     RefPtr<TypeBuilder::DOMStorage::StorageId> id = storageId(securityOrigin, storageType == LocalStorage);
 
     if (key.isNull())
-        m_frontend->domstorage()->domStorageItemsCleared(id);
+        m_frontendDispatcher->domStorageItemsCleared(id);
     else if (newValue.isNull())
-        m_frontend->domstorage()->domStorageItemRemoved(id, key);
+        m_frontendDispatcher->domStorageItemRemoved(id, key);
     else if (oldValue.isNull())
-        m_frontend->domstorage()->domStorageItemAdded(id, key, newValue);
+        m_frontendDispatcher->domStorageItemAdded(id, key, newValue);
     else
-        m_frontend->domstorage()->domStorageItemUpdated(id, key, oldValue, newValue);
+        m_frontendDispatcher->domStorageItemUpdated(id, key, oldValue, newValue);
 }
 
 PassRefPtr<StorageArea> InspectorDOMStorageAgent::findStorageArea(ErrorString* errorString, const RefPtr<InspectorObject>& storageId, Frame*& targetFrame)

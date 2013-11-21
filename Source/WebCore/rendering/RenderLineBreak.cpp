@@ -24,6 +24,7 @@
 
 #include "Document.h"
 #include "HTMLElement.h"
+#include "InlineElementBox.h"
 #include "RenderBlock.h"
 #include "RootInlineBox.h"
 #include "VisiblePosition.h"
@@ -43,8 +44,7 @@ RenderLineBreak::RenderLineBreak(HTMLElement& element, PassRef<RenderStyle> styl
 
 RenderLineBreak::~RenderLineBreak()
 {
-    if (m_inlineBoxWrapper)
-        m_inlineBoxWrapper->destroy(renderArena());
+    delete m_inlineBoxWrapper;
 }
 
 LayoutUnit RenderLineBreak::lineHeight(bool firstLine, LineDirectionMode /*direction*/, LinePositionMode /*linePositionMode*/) const
@@ -68,21 +68,21 @@ int RenderLineBreak::baselinePosition(FontBaseline baselineType, bool firstLine,
     return fontMetrics.ascent(baselineType) + (lineHeight(firstLine, direction, linePositionMode) - fontMetrics.height()) / 2;
 }
 
-InlineBox* RenderLineBreak::createInlineBox()
+std::unique_ptr<InlineElementBox> RenderLineBreak::createInlineBox()
 {
-    return new (renderArena()) InlineBox(*this);
+    return std::make_unique<InlineElementBox>(*this);
 }
 
-void RenderLineBreak::setInlineBoxWrapper(InlineBox* inlineBox)
+void RenderLineBreak::setInlineBoxWrapper(InlineElementBox* inlineBox)
 {
     ASSERT(!inlineBox || !m_inlineBoxWrapper);
     m_inlineBoxWrapper = inlineBox;
 }
 
-void RenderLineBreak::replaceInlineBoxWrapper(InlineBox* inlineBox)
+void RenderLineBreak::replaceInlineBoxWrapper(InlineElementBox& inlineBox)
 {
     deleteInlineBoxWrapper();
-    setInlineBoxWrapper(inlineBox);
+    setInlineBoxWrapper(&inlineBox);
 }
 
 void RenderLineBreak::deleteInlineBoxWrapper()
@@ -91,7 +91,7 @@ void RenderLineBreak::deleteInlineBoxWrapper()
         return;
     if (!documentBeingDestroyed())
         m_inlineBoxWrapper->removeFromParent();
-    m_inlineBoxWrapper->destroy(renderArena());
+    delete m_inlineBoxWrapper;
     m_inlineBoxWrapper = nullptr;
 }
 
@@ -100,7 +100,7 @@ void RenderLineBreak::dirtyLineBoxes(bool fullLayout)
     if (!m_inlineBoxWrapper)
         return;
     if (fullLayout) {
-        m_inlineBoxWrapper->destroy(renderArena());
+        delete m_inlineBoxWrapper;
         m_inlineBoxWrapper = nullptr;
         return;
     }

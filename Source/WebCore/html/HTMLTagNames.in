@@ -32,7 +32,7 @@ col interfaceName=HTMLTableColElement
 colgroup interfaceName=HTMLTableColElement
 command interfaceName=HTMLElement
 webkitShadowContent interfaceName=HTMLElement, noConstructor
-datalist interfaceName=HTMLDataListElement, conditional=DATALIST_ELEMENT
+datalist interfaceName=HTMLDataListElement, conditional=DATALIST_ELEMENT, generateTypeHelpers
 dd interfaceName=HTMLElement
 del interfaceName=HTMLModElement
 details conditional=DETAILS_ELEMENT
@@ -61,7 +61,7 @@ head generateTypeHelpers
 header interfaceName=HTMLElement
 hgroup interfaceName=HTMLElement
 hr interfaceName=HTMLHRElement
-html
+html generateTypeHelpers
 i interfaceName=HTMLElement
 iframe interfaceName=HTMLIFrameElement, generateTypeHelpers
 image interfaceName=HTMLElement

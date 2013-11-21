@@ -47,8 +47,6 @@
 #include "SVGImage.h"
 #include <wtf/StackStats.h>
 
-using namespace std;
-
 namespace WebCore {
 
 using namespace HTMLNames;
@@ -141,7 +139,7 @@ bool RenderImage::setImageSizeForAltText(CachedImage* newImage /* = 0 */)
         FontCachePurgePreventer fontCachePurgePreventer;
 
         const Font& font = style().font();
-        IntSize paddedTextSize(paddingWidth + min(ceilf(font.width(RenderBlock::constructTextRun(this, font, m_altText, style()))), maxAltTextWidth), paddingHeight + min(font.fontMetrics().height(), maxAltTextHeight));
+        IntSize paddedTextSize(paddingWidth + std::min(ceilf(font.width(RenderBlock::constructTextRun(this, font, m_altText, style()))), maxAltTextWidth), paddingHeight + std::min(font.fontMetrics().height(), maxAltTextHeight));
         imageSize = imageSize.expandedTo(paddedTextSize);
     }
 
@@ -391,10 +389,9 @@ void RenderImage::paintReplaced(PaintInfo& paintInfo, const LayoutPoint& paintOf
                     centerY = 0;
                 imageOffset = LayoutSize(leftBorder + leftPad + centerX + borderWidth, topBorder + topPad + centerY + borderWidth);
 
-                ImageOrientationDescription orientationDescription;
+                ImageOrientationDescription orientationDescription(shouldRespectImageOrientation());
 #if ENABLE(CSS_IMAGE_ORIENTATION)
                 orientationDescription.setImageOrientationEnum(style().imageOrientation());
-                orientationDescription.setRespectImageOrientation(shouldRespectImageOrientation());
 #endif
                 context->drawImage(image.get(), style().colorSpace(), pixelSnappedIntRect(LayoutRect(paintOffset + imageOffset, imageSize)), CompositeSourceOver, orientationDescription);
                 errorPictureDrawn = true;
@@ -523,10 +520,9 @@ void RenderImage::paintIntoRect(GraphicsContext* context, const LayoutRect& rect
     CompositeOperator compositeOperator = imageElt ? imageElt->compositeOperator() : CompositeSourceOver;
     Image* image = m_imageResource->image().get();
     bool useLowQualityScaling = shouldPaintAtLowQuality(context, image, image, alignedRect.size());
-    ImageOrientationDescription orientationDescription;
+    ImageOrientationDescription orientationDescription(shouldRespectImageOrientation());
 #if ENABLE(CSS_IMAGE_ORIENTATION)
     orientationDescription.setImageOrientationEnum(style().imageOrientation());
-    orientationDescription.setRespectImageOrientation(shouldRespectImageOrientation());
 #endif
     context->drawImage(m_imageResource->image(alignedRect.width(), alignedRect.height()).get(), style().colorSpace(), alignedRect, compositeOperator, orientationDescription, useLowQualityScaling);
 }

@@ -46,14 +46,13 @@ class SecurityOrigin;
 
 class PageRuntimeAgent : public InspectorRuntimeAgent {
 public:
-    static PassOwnPtr<PageRuntimeAgent> create(InstrumentingAgents* instrumentingAgents, InspectorCompositeState* state, InjectedScriptManager* injectedScriptManager, Page* page, InspectorPageAgent* pageAgent)
+    static PassOwnPtr<PageRuntimeAgent> create(InstrumentingAgents* instrumentingAgents, InjectedScriptManager* injectedScriptManager, Page* page, InspectorPageAgent* pageAgent)
     {
-        return adoptPtr(new PageRuntimeAgent(instrumentingAgents, state, injectedScriptManager, page, pageAgent));
+        return adoptPtr(new PageRuntimeAgent(instrumentingAgents, injectedScriptManager, page, pageAgent));
     }
     virtual ~PageRuntimeAgent();
-    virtual void setFrontend(InspectorFrontend*);
-    virtual void clearFrontend();
-    virtual void restore();
+    virtual void didCreateFrontendAndBackend(InspectorFrontendChannel*, InspectorBackendDispatcher*) OVERRIDE;
+    virtual void willDestroyFrontendAndBackend() OVERRIDE;
     virtual void enable(ErrorString*);
     virtual void disable(ErrorString*);
 
@@ -61,7 +60,7 @@ public:
     void didCreateIsolatedContext(Frame*, JSC::ExecState*, SecurityOrigin*);
 
 private:
-    PageRuntimeAgent(InstrumentingAgents*, InspectorCompositeState*, InjectedScriptManager*, Page*, InspectorPageAgent*);
+    PageRuntimeAgent(InstrumentingAgents*, InjectedScriptManager*, Page*, InspectorPageAgent*);
 
     virtual InjectedScript injectedScriptForEval(ErrorString*, const int* executionContextId);
     virtual void muteConsole();
@@ -71,7 +70,8 @@ private:
 
     Page* m_inspectedPage;
     InspectorPageAgent* m_pageAgent;
-    InspectorFrontend::Runtime* m_frontend;
+    std::unique_ptr<InspectorRuntimeFrontendDispatcher> m_frontendDispatcher;
+    RefPtr<InspectorRuntimeBackendDispatcher> m_backendDispatcher;
     bool m_mainWorldContextCreated;
 };
 

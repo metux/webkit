@@ -2,26 +2,19 @@
 <html>
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
-<title>WebKitDOMHTMLMediaElement</title>
+<title>WebKitDOMGTK+ Reference Manual: WebKitDOMHTMLMediaElement</title>
 <meta name="generator" content="DocBook XSL Stylesheets V1.78.1">
 <link rel="home" href="index.html" title="WebKitDOMGTK+ Reference Manual">
 <link rel="up" href="ch01.html" title="Class Overview">
 <link rel="prev" href="WebKitDOMHTMLMarqueeElement.html" title="WebKitDOMHTMLMarqueeElement">
 <link rel="next" href="WebKitDOMHTMLMenuElement.html" title="WebKitDOMHTMLMenuElement">
-<meta name="generator" content="GTK-Doc V1.18.1 (XML mode)">
+<meta name="generator" content="GTK-Doc V1.19.1 (XML mode)">
 <link rel="stylesheet" href="style.css" type="text/css">
 </head>
 <body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF">
-<table class="navigation" id="top" width="100%" summary="Navigation header" cellpadding="2" cellspacing="2">
-<tr valign="middle">
-<td><a accesskey="p" href="WebKitDOMHTMLMarqueeElement.html"><img src="left.png" width="24" height="24" border="0" alt="Prev"></a></td>
-<td><a accesskey="u" href="ch01.html"><img src="up.png" width="24" height="24" border="0" alt="Up"></a></td>
-<td><a accesskey="h" href="index.html"><img src="home.png" width="24" height="24" border="0" alt="Home"></a></td>
-<th width="100%" align="center">WebKitDOMGTK+ Reference Manual</th>
-<td><a accesskey="n" href="WebKitDOMHTMLMenuElement.html"><img src="right.png" width="24" height="24" border="0" alt="Next"></a></td>
-</tr>
-<tr><td colspan="5" class="shortcuts">
-<a href="#WebKitDOMHTMLMediaElement.synopsis" class="shortcut">Top</a>
+<table class="navigation" id="top" width="100%" summary="Navigation header" cellpadding="2" cellspacing="10"><tr valign="middle">
+<td width="100%" align="left">
+<a href="#" class="shortcut">Top</a>
                    | 
                   <a href="#WebKitDOMHTMLMediaElement.description" class="shortcut">Description</a>
                    | 
@@ -30,8 +23,12 @@
                   <a href="#WebKitDOMHTMLMediaElement.implemented-interfaces" class="shortcut">Implemented Interfaces</a>
                    | 
                   <a href="#WebKitDOMHTMLMediaElement.properties" class="shortcut">Properties</a>
-</td></tr>
-</table>
+</td>
+<td><a accesskey="h" href="index.html"><img src="home.png" width="16" height="16" border="0" alt="Home"></a></td>
+<td><a accesskey="u" href="ch01.html"><img src="up.png" width="16" height="16" border="0" alt="Up"></a></td>
+<td><a accesskey="p" href="WebKitDOMHTMLMarqueeElement.html"><img src="left.png" width="16" height="16" border="0" alt="Prev"></a></td>
+<td><a accesskey="n" href="WebKitDOMHTMLMenuElement.html"><img src="right.png" width="16" height="16" border="0" alt="Next"></a></td>
+</tr></table>
 <div class="refentry">
 <a name="WebKitDOMHTMLMediaElement"></a><div class="titlepage"></div>
 <div class="refnamediv"><table width="100%"><tr>
@@ -50,6 +47,9 @@
                                                          <em class="parameter"><code>const <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a> *type</code></em>);
 <span class="returnvalue">void</span>                <a class="link" href="WebKitDOMHTMLMediaElement.html#webkit-dom-html-media-element-play" title="webkit_dom_html_media_element_play ()">webkit_dom_html_media_element_play</a>  (<em class="parameter"><code><a class="link" href="WebKitDOMHTMLMediaElement.html" title="WebKitDOMHTMLMediaElement"><span class="type">WebKitDOMHTMLMediaElement</span></a> *self</code></em>);
 <span class="returnvalue">void</span>                <a class="link" href="WebKitDOMHTMLMediaElement.html#webkit-dom-html-media-element-pause" title="webkit_dom_html_media_element_pause ()">webkit_dom_html_media_element_pause</a> (<em class="parameter"><code><a class="link" href="WebKitDOMHTMLMediaElement.html" title="WebKitDOMHTMLMediaElement"><span class="type">WebKitDOMHTMLMediaElement</span></a> *self</code></em>);
+<span class="returnvalue">void</span>                <a class="link" href="WebKitDOMHTMLMediaElement.html#webkit-dom-html-media-element-fast-seek" title="webkit_dom_html_media_element_fast_seek ()">webkit_dom_html_media_element_fast_seek</a>
+                                                        (<em class="parameter"><code><a class="link" href="WebKitDOMHTMLMediaElement.html" title="WebKitDOMHTMLMediaElement"><span class="type">WebKitDOMHTMLMediaElement</span></a> *self</code></em>,
+                                                         <em class="parameter"><code><a href="../glib/glib-Basic-Types.html#gdouble"><span class="type">gdouble</span></a> time</code></em>);
 <a class="link" href="WebKitDOMMediaError.html" title="WebKitDOMMediaError"><span class="returnvalue">WebKitDOMMediaError</span></a> * <a class="link" href="WebKitDOMHTMLMediaElement.html#webkit-dom-html-media-element-get-error" title="webkit_dom_html_media_element_get_error ()">webkit_dom_html_media_element_get_error</a>
                                                         (<em class="parameter"><code><a class="link" href="WebKitDOMHTMLMediaElement.html" title="WebKitDOMHTMLMediaElement"><span class="type">WebKitDOMHTMLMediaElement</span></a> *self</code></em>);
 <a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gchar</span></a> *             <a class="link" href="WebKitDOMHTMLMediaElement.html#webkit-dom-html-media-element-get-src" title="webkit_dom_html_media_element_get_src ()">webkit_dom_html_media_element_get_src</a>
@@ -73,12 +73,6 @@
 <a href="../glib/glib-Basic-Types.html#gboolean"><span class="returnvalue">gboolean</span></a>            <a class="link" href="WebKitDOMHTMLMediaElement.html#webkit-dom-html-media-element-get-seeking" title="webkit_dom_html_media_element_get_seeking ()">webkit_dom_html_media_element_get_seeking</a>
                                                         (<em class="parameter"><code><a class="link" href="WebKitDOMHTMLMediaElement.html" title="WebKitDOMHTMLMediaElement"><span class="type">WebKitDOMHTMLMediaElement</span></a> *self</code></em>);
 <a href="../glib/glib-Basic-Types.html#gdouble"><span class="returnvalue">gdouble</span></a>             <a class="link" href="WebKitDOMHTMLMediaElement.html#webkit-dom-html-media-element-get-current-time" title="webkit_dom_html_media_element_get_current_time ()">webkit_dom_html_media_element_get_current_time</a>
-                                                        (<em class="parameter"><code><a class="link" href="WebKitDOMHTMLMediaElement.html" title="WebKitDOMHTMLMediaElement"><span class="type">WebKitDOMHTMLMediaElement</span></a> *self</code></em>);
-<span class="returnvalue">void</span>                <a class="link" href="WebKitDOMHTMLMediaElement.html#webkit-dom-html-media-element-set-current-time" title="webkit_dom_html_media_element_set_current_time ()">webkit_dom_html_media_element_set_current_time</a>
-                                                        (<em class="parameter"><code><a class="link" href="WebKitDOMHTMLMediaElement.html" title="WebKitDOMHTMLMediaElement"><span class="type">WebKitDOMHTMLMediaElement</span></a> *self</code></em>,
-                                                         <em class="parameter"><code><a href="../glib/glib-Basic-Types.html#gdouble"><span class="type">gdouble</span></a> value</code></em>,
-                                                         <em class="parameter"><code><a href="../glib/glib-Error-Reporting.html#GError"><span class="type">GError</span></a> **error</code></em>);
-<a href="../glib/glib-Basic-Types.html#gdouble"><span class="returnvalue">gdouble</span></a>             <a class="link" href="WebKitDOMHTMLMediaElement.html#webkit-dom-html-media-element-get-initial-time" title="webkit_dom_html_media_element_get_initial_time ()">webkit_dom_html_media_element_get_initial_time</a>
                                                         (<em class="parameter"><code><a class="link" href="WebKitDOMHTMLMediaElement.html" title="WebKitDOMHTMLMediaElement"><span class="type">WebKitDOMHTMLMediaElement</span></a> *self</code></em>);
 <a href="../glib/glib-Basic-Types.html#gdouble"><span class="returnvalue">gdouble</span></a>             <a class="link" href="WebKitDOMHTMLMediaElement.html#webkit-dom-html-media-element-get-duration" title="webkit_dom_html_media_element_get_duration ()">webkit_dom_html_media_element_get_duration</a>
                                                         (<em class="parameter"><code><a class="link" href="WebKitDOMHTMLMediaElement.html" title="WebKitDOMHTMLMediaElement"><span class="type">WebKitDOMHTMLMediaElement</span></a> *self</code></em>);
@@ -186,7 +180,6 @@ WebKitDOMHTMLMediaElement implements
   "<a class="link" href="WebKitDOMHTMLMediaElement.html#WebKitDOMHTMLMediaElement--duration" title='The "duration" property'>duration</a>"                 <a href="../glib/glib-Basic-Types.html#gdouble"><span class="type">gdouble</span></a>               : Read
   "<a class="link" href="WebKitDOMHTMLMediaElement.html#WebKitDOMHTMLMediaElement--ended" title='The "ended" property'>ended</a>"                    <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read
   "<a class="link" href="WebKitDOMHTMLMediaElement.html#WebKitDOMHTMLMediaElement--error" title='The "error" property'>error</a>"                    <a class="link" href="WebKitDOMMediaError.html" title="WebKitDOMMediaError"><span class="type">WebKitDOMMediaError</span></a>*  : Read
-  "<a class="link" href="WebKitDOMHTMLMediaElement.html#WebKitDOMHTMLMediaElement--initial-time" title='The "initial-time" property'>initial-time</a>"             <a href="../glib/glib-Basic-Types.html#gdouble"><span class="type">gdouble</span></a>               : Read
   "<a class="link" href="WebKitDOMHTMLMediaElement.html#WebKitDOMHTMLMediaElement--loop" title='The "loop" property'>loop</a>"                     <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read / Write
   "<a class="link" href="WebKitDOMHTMLMediaElement.html#WebKitDOMHTMLMediaElement--media-group" title='The "media-group" property'>media-group</a>"              <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a>*                : Read / Write
   "<a class="link" href="WebKitDOMHTMLMediaElement.html#WebKitDOMHTMLMediaElement--muted" title='The "muted" property'>muted</a>"                    <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read / Write
@@ -258,6 +251,11 @@ WebKitDOMHTMLMediaElement implements
 <td>A <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a>
 </td>
 </tr>
+<tr>
+<td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
+<td>A <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a>
+</td>
+</tr>
 </tbody>
 </table></div>
 </div>
@@ -295,6 +293,31 @@ WebKitDOMHTMLMediaElement implements
 </div>
 <hr>
 <div class="refsect2">
+<a name="webkit-dom-html-media-element-fast-seek"></a><h3>webkit_dom_html_media_element_fast_seek ()</h3>
+<pre class="programlisting"><span class="returnvalue">void</span>                webkit_dom_html_media_element_fast_seek
+                                                        (<em class="parameter"><code><a class="link" href="WebKitDOMHTMLMediaElement.html" title="WebKitDOMHTMLMediaElement"><span class="type">WebKitDOMHTMLMediaElement</span></a> *self</code></em>,
+                                                         <em class="parameter"><code><a href="../glib/glib-Basic-Types.html#gdouble"><span class="type">gdouble</span></a> time</code></em>);</pre>
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
+<col align="left" valign="top">
+<col>
+</colgroup>
+<tbody>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>self</code></em> :</span></p></td>
+<td>A <a class="link" href="WebKitDOMHTMLMediaElement.html" title="WebKitDOMHTMLMediaElement"><span class="type">WebKitDOMHTMLMediaElement</span></a>
+</td>
+</tr>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>time</code></em> :</span></p></td>
+<td>A <a href="../glib/glib-Basic-Types.html#gdouble"><span class="type">gdouble</span></a>
+</td>
+</tr>
+</tbody>
+</table></div>
+</div>
+<hr>
+<div class="refsect2">
 <a name="webkit-dom-html-media-element-get-error"></a><h3>webkit_dom_html_media_element_get_error ()</h3>
 <pre class="programlisting"><a class="link" href="WebKitDOMMediaError.html" title="WebKitDOMMediaError"><span class="returnvalue">WebKitDOMMediaError</span></a> * webkit_dom_html_media_element_get_error
                                                         (<em class="parameter"><code><a class="link" href="WebKitDOMHTMLMediaElement.html" title="WebKitDOMHTMLMediaElement"><span class="type">WebKitDOMHTMLMediaElement</span></a> *self</code></em>);</pre>
@@ -311,7 +334,7 @@ WebKitDOMHTMLMediaElement implements
 </tr>
 <tr>
 <td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
-<td>. <span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
+<td>A <a class="link" href="WebKitDOMMediaError.html" title="WebKitDOMMediaError"><span class="type">WebKitDOMMediaError</span></a>. <span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
 </td>
 </tr>
 </tbody>
@@ -327,11 +350,18 @@ WebKitDOMHTMLMediaElement implements
 <col align="left" valign="top">
 <col>
 </colgroup>
-<tbody><tr>
+<tbody>
+<tr>
 <td><p><span class="term"><em class="parameter"><code>self</code></em> :</span></p></td>
 <td>A <a class="link" href="WebKitDOMHTMLMediaElement.html" title="WebKitDOMHTMLMediaElement"><span class="type">WebKitDOMHTMLMediaElement</span></a>
 </td>
-</tr></tbody>
+</tr>
+<tr>
+<td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
+<td>A <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a>
+</td>
+</tr>
+</tbody>
 </table></div>
 </div>
 <hr>
@@ -369,11 +399,18 @@ WebKitDOMHTMLMediaElement implements
 <col align="left" valign="top">
 <col>
 </colgroup>
-<tbody><tr>
+<tbody>
+<tr>
 <td><p><span class="term"><em class="parameter"><code>self</code></em> :</span></p></td>
 <td>A <a class="link" href="WebKitDOMHTMLMediaElement.html" title="WebKitDOMHTMLMediaElement"><span class="type">WebKitDOMHTMLMediaElement</span></a>
 </td>
-</tr></tbody>
+</tr>
+<tr>
+<td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
+<td>A <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a>
+</td>
+</tr>
+</tbody>
 </table></div>
 </div>
 <hr>
@@ -386,11 +423,18 @@ WebKitDOMHTMLMediaElement implements
 <col align="left" valign="top">
 <col>
 </colgroup>
-<tbody><tr>
+<tbody>
+<tr>
 <td><p><span class="term"><em class="parameter"><code>self</code></em> :</span></p></td>
 <td>A <a class="link" href="WebKitDOMHTMLMediaElement.html" title="WebKitDOMHTMLMediaElement"><span class="type">WebKitDOMHTMLMediaElement</span></a>
 </td>
-</tr></tbody>
+</tr>
+<tr>
+<td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
+<td>A <a href="../glib/glib-Basic-Types.html#gushort"><span class="type">gushort</span></a>
+</td>
+</tr>
+</tbody>
 </table></div>
 </div>
 <hr>
@@ -403,11 +447,18 @@ WebKitDOMHTMLMediaElement implements
 <col align="left" valign="top">
 <col>
 </colgroup>
-<tbody><tr>
+<tbody>
+<tr>
 <td><p><span class="term"><em class="parameter"><code>self</code></em> :</span></p></td>
 <td>A <a class="link" href="WebKitDOMHTMLMediaElement.html" title="WebKitDOMHTMLMediaElement"><span class="type">WebKitDOMHTMLMediaElement</span></a>
 </td>
-</tr></tbody>
+</tr>
+<tr>
+<td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
+<td>A <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a>
+</td>
+</tr>
+</tbody>
 </table></div>
 </div>
 <hr>
@@ -453,7 +504,7 @@ WebKitDOMHTMLMediaElement implements
 </tr>
 <tr>
 <td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
-<td>. <span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
+<td>A <a class="link" href="WebKitDOMTimeRanges.html" title="WebKitDOMTimeRanges"><span class="type">WebKitDOMTimeRanges</span></a>. <span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
 </td>
 </tr>
 </tbody>
@@ -469,11 +520,18 @@ WebKitDOMHTMLMediaElement implements
 <col align="left" valign="top">
 <col>
 </colgroup>
-<tbody><tr>
+<tbody>
+<tr>
 <td><p><span class="term"><em class="parameter"><code>self</code></em> :</span></p></td>
 <td>A <a class="link" href="WebKitDOMHTMLMediaElement.html" title="WebKitDOMHTMLMediaElement"><span class="type">WebKitDOMHTMLMediaElement</span></a>
 </td>
-</tr></tbody>
+</tr>
+<tr>
+<td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
+<td>A <a href="../glib/glib-Basic-Types.html#gushort"><span class="type">gushort</span></a>
+</td>
+</tr>
+</tbody>
 </table></div>
 </div>
 <hr>
@@ -486,11 +544,18 @@ WebKitDOMHTMLMediaElement implements
 <col align="left" valign="top">
 <col>
 </colgroup>
-<tbody><tr>
+<tbody>
+<tr>
 <td><p><span class="term"><em class="parameter"><code>self</code></em> :</span></p></td>
 <td>A <a class="link" href="WebKitDOMHTMLMediaElement.html" title="WebKitDOMHTMLMediaElement"><span class="type">WebKitDOMHTMLMediaElement</span></a>
 </td>
-</tr></tbody>
+</tr>
+<tr>
+<td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
+<td>A <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>
+</td>
+</tr>
+</tbody>
 </table></div>
 </div>
 <hr>
@@ -503,25 +568,6 @@ WebKitDOMHTMLMediaElement implements
 <col align="left" valign="top">
 <col>
 </colgroup>
-<tbody><tr>
-<td><p><span class="term"><em class="parameter"><code>self</code></em> :</span></p></td>
-<td>A <a class="link" href="WebKitDOMHTMLMediaElement.html" title="WebKitDOMHTMLMediaElement"><span class="type">WebKitDOMHTMLMediaElement</span></a>
-</td>
-</tr></tbody>
-</table></div>
-</div>
-<hr>
-<div class="refsect2">
-<a name="webkit-dom-html-media-element-set-current-time"></a><h3>webkit_dom_html_media_element_set_current_time ()</h3>
-<pre class="programlisting"><span class="returnvalue">void</span>                webkit_dom_html_media_element_set_current_time
-                                                        (<em class="parameter"><code><a class="link" href="WebKitDOMHTMLMediaElement.html" title="WebKitDOMHTMLMediaElement"><span class="type">WebKitDOMHTMLMediaElement</span></a> *self</code></em>,
-                                                         <em class="parameter"><code><a href="../glib/glib-Basic-Types.html#gdouble"><span class="type">gdouble</span></a> value</code></em>,
-                                                         <em class="parameter"><code><a href="../glib/glib-Error-Reporting.html#GError"><span class="type">GError</span></a> **error</code></em>);</pre>
-<div class="variablelist"><table border="0" class="variablelist">
-<colgroup>
-<col align="left" valign="top">
-<col>
-</colgroup>
 <tbody>
 <tr>
 <td><p><span class="term"><em class="parameter"><code>self</code></em> :</span></p></td>
@@ -529,32 +575,11 @@ WebKitDOMHTMLMediaElement implements
 </td>
 </tr>
 <tr>
-<td><p><span class="term"><em class="parameter"><code>value</code></em> :</span></p></td>
+<td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
 <td>A <a href="../glib/glib-Basic-Types.html#gdouble"><span class="type">gdouble</span></a>
 </td>
 </tr>
-<tr>
-<td><p><span class="term"><em class="parameter"><code>error</code></em> :</span></p></td>
-<td><a href="../glib/glib-Error-Reporting.html#GError"><span class="type">GError</span></a></td>
-</tr>
 </tbody>
-</table></div>
-</div>
-<hr>
-<div class="refsect2">
-<a name="webkit-dom-html-media-element-get-initial-time"></a><h3>webkit_dom_html_media_element_get_initial_time ()</h3>
-<pre class="programlisting"><a href="../glib/glib-Basic-Types.html#gdouble"><span class="returnvalue">gdouble</span></a>             webkit_dom_html_media_element_get_initial_time
-                                                        (<em class="parameter"><code><a class="link" href="WebKitDOMHTMLMediaElement.html" title="WebKitDOMHTMLMediaElement"><span class="type">WebKitDOMHTMLMediaElement</span></a> *self</code></em>);</pre>
-<div class="variablelist"><table border="0" class="variablelist">
-<colgroup>
-<col align="left" valign="top">
-<col>
-</colgroup>
-<tbody><tr>
-<td><p><span class="term"><em class="parameter"><code>self</code></em> :</span></p></td>
-<td>A <a class="link" href="WebKitDOMHTMLMediaElement.html" title="WebKitDOMHTMLMediaElement"><span class="type">WebKitDOMHTMLMediaElement</span></a>
-</td>
-</tr></tbody>
 </table></div>
 </div>
 <hr>
@@ -567,11 +592,18 @@ WebKitDOMHTMLMediaElement implements
 <col align="left" valign="top">
 <col>
 </colgroup>
-<tbody><tr>
+<tbody>
+<tr>
 <td><p><span class="term"><em class="parameter"><code>self</code></em> :</span></p></td>
 <td>A <a class="link" href="WebKitDOMHTMLMediaElement.html" title="WebKitDOMHTMLMediaElement"><span class="type">WebKitDOMHTMLMediaElement</span></a>
 </td>
-</tr></tbody>
+</tr>
+<tr>
+<td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
+<td>A <a href="../glib/glib-Basic-Types.html#gdouble"><span class="type">gdouble</span></a>
+</td>
+</tr>
+</tbody>
 </table></div>
 </div>
 <hr>
@@ -584,11 +616,18 @@ WebKitDOMHTMLMediaElement implements
 <col align="left" valign="top">
 <col>
 </colgroup>
-<tbody><tr>
+<tbody>
+<tr>
 <td><p><span class="term"><em class="parameter"><code>self</code></em> :</span></p></td>
 <td>A <a class="link" href="WebKitDOMHTMLMediaElement.html" title="WebKitDOMHTMLMediaElement"><span class="type">WebKitDOMHTMLMediaElement</span></a>
 </td>
-</tr></tbody>
+</tr>
+<tr>
+<td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
+<td>A <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>
+</td>
+</tr>
+</tbody>
 </table></div>
 </div>
 <hr>
@@ -601,11 +640,18 @@ WebKitDOMHTMLMediaElement implements
 <col align="left" valign="top">
 <col>
 </colgroup>
-<tbody><tr>
+<tbody>
+<tr>
 <td><p><span class="term"><em class="parameter"><code>self</code></em> :</span></p></td>
 <td>A <a class="link" href="WebKitDOMHTMLMediaElement.html" title="WebKitDOMHTMLMediaElement"><span class="type">WebKitDOMHTMLMediaElement</span></a>
 </td>
-</tr></tbody>
+</tr>
+<tr>
+<td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
+<td>A <a href="../glib/glib-Basic-Types.html#gdouble"><span class="type">gdouble</span></a>
+</td>
+</tr>
+</tbody>
 </table></div>
 </div>
 <hr>
@@ -643,11 +689,18 @@ WebKitDOMHTMLMediaElement implements
 <col align="left" valign="top">
 <col>
 </colgroup>
-<tbody><tr>
+<tbody>
+<tr>
 <td><p><span class="term"><em class="parameter"><code>self</code></em> :</span></p></td>
 <td>A <a class="link" href="WebKitDOMHTMLMediaElement.html" title="WebKitDOMHTMLMediaElement"><span class="type">WebKitDOMHTMLMediaElement</span></a>
 </td>
-</tr></tbody>
+</tr>
+<tr>
+<td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
+<td>A <a href="../glib/glib-Basic-Types.html#gdouble"><span class="type">gdouble</span></a>
+</td>
+</tr>
+</tbody>
 </table></div>
 </div>
 <hr>
@@ -693,7 +746,7 @@ WebKitDOMHTMLMediaElement implements
 </tr>
 <tr>
 <td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
-<td>. <span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
+<td>A <a class="link" href="WebKitDOMTimeRanges.html" title="WebKitDOMTimeRanges"><span class="type">WebKitDOMTimeRanges</span></a>. <span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
 </td>
 </tr>
 </tbody>
@@ -717,7 +770,7 @@ WebKitDOMHTMLMediaElement implements
 </tr>
 <tr>
 <td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
-<td>. <span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
+<td>A <a class="link" href="WebKitDOMTimeRanges.html" title="WebKitDOMTimeRanges"><span class="type">WebKitDOMTimeRanges</span></a>. <span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
 </td>
 </tr>
 </tbody>
@@ -733,11 +786,18 @@ WebKitDOMHTMLMediaElement implements
 <col align="left" valign="top">
 <col>
 </colgroup>
-<tbody><tr>
+<tbody>
+<tr>
 <td><p><span class="term"><em class="parameter"><code>self</code></em> :</span></p></td>
 <td>A <a class="link" href="WebKitDOMHTMLMediaElement.html" title="WebKitDOMHTMLMediaElement"><span class="type">WebKitDOMHTMLMediaElement</span></a>
 </td>
-</tr></tbody>
+</tr>
+<tr>
+<td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
+<td>A <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>
+</td>
+</tr>
+</tbody>
 </table></div>
 </div>
 <hr>
@@ -750,11 +810,18 @@ WebKitDOMHTMLMediaElement implements
 <col align="left" valign="top">
 <col>
 </colgroup>
-<tbody><tr>
+<tbody>
+<tr>
 <td><p><span class="term"><em class="parameter"><code>self</code></em> :</span></p></td>
 <td>A <a class="link" href="WebKitDOMHTMLMediaElement.html" title="WebKitDOMHTMLMediaElement"><span class="type">WebKitDOMHTMLMediaElement</span></a>
 </td>
-</tr></tbody>
+</tr>
+<tr>
+<td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
+<td>A <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>
+</td>
+</tr>
+</tbody>
 </table></div>
 </div>
 <hr>
@@ -792,11 +859,18 @@ WebKitDOMHTMLMediaElement implements
 <col align="left" valign="top">
 <col>
 </colgroup>
-<tbody><tr>
+<tbody>
+<tr>
 <td><p><span class="term"><em class="parameter"><code>self</code></em> :</span></p></td>
 <td>A <a class="link" href="WebKitDOMHTMLMediaElement.html" title="WebKitDOMHTMLMediaElement"><span class="type">WebKitDOMHTMLMediaElement</span></a>
 </td>
-</tr></tbody>
+</tr>
+<tr>
+<td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
+<td>A <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>
+</td>
+</tr>
+</tbody>
 </table></div>
 </div>
 <hr>
@@ -834,11 +908,18 @@ WebKitDOMHTMLMediaElement implements
 <col align="left" valign="top">
 <col>
 </colgroup>
-<tbody><tr>
+<tbody>
+<tr>
 <td><p><span class="term"><em class="parameter"><code>self</code></em> :</span></p></td>
 <td>A <a class="link" href="WebKitDOMHTMLMediaElement.html" title="WebKitDOMHTMLMediaElement"><span class="type">WebKitDOMHTMLMediaElement</span></a>
 </td>
-</tr></tbody>
+</tr>
+<tr>
+<td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
+<td>A <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>
+</td>
+</tr>
+</tbody>
 </table></div>
 </div>
 <hr>
@@ -876,11 +957,18 @@ WebKitDOMHTMLMediaElement implements
 <col align="left" valign="top">
 <col>
 </colgroup>
-<tbody><tr>
+<tbody>
+<tr>
 <td><p><span class="term"><em class="parameter"><code>self</code></em> :</span></p></td>
 <td>A <a class="link" href="WebKitDOMHTMLMediaElement.html" title="WebKitDOMHTMLMediaElement"><span class="type">WebKitDOMHTMLMediaElement</span></a>
 </td>
-</tr></tbody>
+</tr>
+<tr>
+<td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
+<td>A <a href="../glib/glib-Basic-Types.html#gdouble"><span class="type">gdouble</span></a>
+</td>
+</tr>
+</tbody>
 </table></div>
 </div>
 <hr>
@@ -923,11 +1011,18 @@ WebKitDOMHTMLMediaElement implements
 <col align="left" valign="top">
 <col>
 </colgroup>
-<tbody><tr>
+<tbody>
+<tr>
 <td><p><span class="term"><em class="parameter"><code>self</code></em> :</span></p></td>
 <td>A <a class="link" href="WebKitDOMHTMLMediaElement.html" title="WebKitDOMHTMLMediaElement"><span class="type">WebKitDOMHTMLMediaElement</span></a>
 </td>
-</tr></tbody>
+</tr>
+<tr>
+<td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
+<td>A <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>
+</td>
+</tr>
+</tbody>
 </table></div>
 </div>
 <hr>
@@ -965,11 +1060,18 @@ WebKitDOMHTMLMediaElement implements
 <col align="left" valign="top">
 <col>
 </colgroup>
-<tbody><tr>
+<tbody>
+<tr>
 <td><p><span class="term"><em class="parameter"><code>self</code></em> :</span></p></td>
 <td>A <a class="link" href="WebKitDOMHTMLMediaElement.html" title="WebKitDOMHTMLMediaElement"><span class="type">WebKitDOMHTMLMediaElement</span></a>
 </td>
-</tr></tbody>
+</tr>
+<tr>
+<td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
+<td>A <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>
+</td>
+</tr>
+</tbody>
 </table></div>
 </div>
 <hr>
@@ -1007,11 +1109,18 @@ WebKitDOMHTMLMediaElement implements
 <col align="left" valign="top">
 <col>
 </colgroup>
-<tbody><tr>
+<tbody>
+<tr>
 <td><p><span class="term"><em class="parameter"><code>self</code></em> :</span></p></td>
 <td>A <a class="link" href="WebKitDOMHTMLMediaElement.html" title="WebKitDOMHTMLMediaElement"><span class="type">WebKitDOMHTMLMediaElement</span></a>
 </td>
-</tr></tbody>
+</tr>
+<tr>
+<td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
+<td>A <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>
+</td>
+</tr>
+</tbody>
 </table></div>
 </div>
 <hr>
@@ -1049,11 +1158,18 @@ WebKitDOMHTMLMediaElement implements
 <col align="left" valign="top">
 <col>
 </colgroup>
-<tbody><tr>
+<tbody>
+<tr>
 <td><p><span class="term"><em class="parameter"><code>self</code></em> :</span></p></td>
 <td>A <a class="link" href="WebKitDOMHTMLMediaElement.html" title="WebKitDOMHTMLMediaElement"><span class="type">WebKitDOMHTMLMediaElement</span></a>
 </td>
-</tr></tbody>
+</tr>
+<tr>
+<td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
+<td>A <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>
+</td>
+</tr>
+</tbody>
 </table></div>
 </div>
 <hr>
@@ -1066,11 +1182,18 @@ WebKitDOMHTMLMediaElement implements
 <col align="left" valign="top">
 <col>
 </colgroup>
-<tbody><tr>
+<tbody>
+<tr>
 <td><p><span class="term"><em class="parameter"><code>self</code></em> :</span></p></td>
 <td>A <a class="link" href="WebKitDOMHTMLMediaElement.html" title="WebKitDOMHTMLMediaElement"><span class="type">WebKitDOMHTMLMediaElement</span></a>
 </td>
-</tr></tbody>
+</tr>
+<tr>
+<td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
+<td>A <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>
+</td>
+</tr>
+</tbody>
 </table></div>
 </div>
 <hr>
@@ -1108,11 +1231,18 @@ WebKitDOMHTMLMediaElement implements
 <col align="left" valign="top">
 <col>
 </colgroup>
-<tbody><tr>
+<tbody>
+<tr>
 <td><p><span class="term"><em class="parameter"><code>self</code></em> :</span></p></td>
 <td>A <a class="link" href="WebKitDOMHTMLMediaElement.html" title="WebKitDOMHTMLMediaElement"><span class="type">WebKitDOMHTMLMediaElement</span></a>
 </td>
-</tr></tbody>
+</tr>
+<tr>
+<td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
+<td>A <a href="../glib/glib-Basic-Types.html#gulong"><span class="type">gulong</span></a>
+</td>
+</tr>
+</tbody>
 </table></div>
 </div>
 <hr>
@@ -1125,11 +1255,18 @@ WebKitDOMHTMLMediaElement implements
 <col align="left" valign="top">
 <col>
 </colgroup>
-<tbody><tr>
+<tbody>
+<tr>
 <td><p><span class="term"><em class="parameter"><code>self</code></em> :</span></p></td>
 <td>A <a class="link" href="WebKitDOMHTMLMediaElement.html" title="WebKitDOMHTMLMediaElement"><span class="type">WebKitDOMHTMLMediaElement</span></a>
 </td>
-</tr></tbody>
+</tr>
+<tr>
+<td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
+<td>A <a href="../glib/glib-Basic-Types.html#gulong"><span class="type">gulong</span></a>
+</td>
+</tr>
+</tbody>
 </table></div>
 </div>
 <hr>
@@ -1142,11 +1279,18 @@ WebKitDOMHTMLMediaElement implements
 <col align="left" valign="top">
 <col>
 </colgroup>
-<tbody><tr>
+<tbody>
+<tr>
 <td><p><span class="term"><em class="parameter"><code>self</code></em> :</span></p></td>
 <td>A <a class="link" href="WebKitDOMHTMLMediaElement.html" title="WebKitDOMHTMLMediaElement"><span class="type">WebKitDOMHTMLMediaElement</span></a>
 </td>
-</tr></tbody>
+</tr>
+<tr>
+<td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
+<td>A <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a>
+</td>
+</tr>
+</tbody>
 </table></div>
 </div>
 <hr>
@@ -1243,13 +1387,6 @@ WebKitDOMHTMLMediaElement implements
 <a name="WebKitDOMHTMLMediaElement--error"></a><h3>The <code class="literal">"error"</code> property</h3>
 <pre class="programlisting">  "error"                    <a class="link" href="WebKitDOMMediaError.html" title="WebKitDOMMediaError"><span class="type">WebKitDOMMediaError</span></a>*  : Read</pre>
 <p>read-only WebKitDOMMediaError* HTMLMediaElement:error.</p>
-</div>
-<hr>
-<div class="refsect2">
-<a name="WebKitDOMHTMLMediaElement--initial-time"></a><h3>The <code class="literal">"initial-time"</code> property</h3>
-<pre class="programlisting">  "initial-time"             <a href="../glib/glib-Basic-Types.html#gdouble"><span class="type">gdouble</span></a>               : Read</pre>
-<p>read-only gdouble HTMLMediaElement:initial-time.</p>
-<p>Default value: 0</p>
 </div>
 <hr>
 <div class="refsect2">
@@ -1377,6 +1514,6 @@ WebKitDOMHTMLMediaElement implements
 </div>
 <div class="footer">
 <hr>
-          Generated by GTK-Doc V1.18.1</div>
+          Generated by GTK-Doc V1.19.1</div>
 </body>
 </html>

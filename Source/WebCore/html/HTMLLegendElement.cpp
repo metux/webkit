@@ -27,7 +27,6 @@
 
 #include "ElementIterator.h"
 #include "HTMLFieldSetElement.h"
-#include "HTMLFormControlElement.h"
 #include "HTMLNames.h"
 
 namespace WebCore {
@@ -83,7 +82,7 @@ HTMLFormElement* HTMLLegendElement::virtualForm() const
     if (!fieldset || !fieldset->hasTagName(fieldsetTag))
         return 0;
 
-    return static_cast<HTMLFieldSetElement*>(fieldset)->form();
+    return toHTMLFieldSetElement(fieldset)->form();
 }
     
 } // namespace

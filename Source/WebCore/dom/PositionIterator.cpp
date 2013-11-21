@@ -27,9 +27,9 @@
 #include "PositionIterator.h"
 
 #include "HTMLNames.h"
-#include "Node.h"
 #include "RenderBlock.h"
 #include "RenderText.h"
+#include "TextIterator.h"
 #include "htmlediting.h"
 
 namespace WebCore {

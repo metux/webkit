@@ -44,14 +44,14 @@ InlineTextBox* RenderTextLineBoxes::createAndAppendLineBox(RenderText& renderTex
 {
     auto textBox = renderText.createTextBox();
     if (!m_first) {
-        m_first = textBox;
-        m_last = textBox;
+        m_first = textBox.get();
+        m_last = textBox.get();
     } else {
-        m_last->setNextTextBox(textBox);
+        m_last->setNextTextBox(textBox.get());
         textBox->setPreviousTextBox(m_last);
-        m_last = textBox;
+        m_last = textBox.get();
     }
-    return textBox;
+    return textBox.release();
 }
 
 void RenderTextLineBoxes::extract(InlineTextBox& box)
@@ -116,15 +116,14 @@ void RenderTextLineBoxes::removeAllFromParent(RenderText& renderer)
         box->removeFromParent();
 }
 
-void RenderTextLineBoxes::deleteAll(RenderText& renderer)
+void RenderTextLineBoxes::deleteAll()
 {
     if (!m_first)
         return;
-    auto& arena = renderer.renderArena();
     InlineTextBox* next;
     for (auto current = m_first; current; current = next) {
         next = current->nextTextBox();
-        current->destroy(arena);
+        delete current;
     }
     m_first = nullptr;
     m_last = nullptr;

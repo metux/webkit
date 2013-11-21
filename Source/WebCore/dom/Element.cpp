@@ -29,51 +29,37 @@
 #include "AXObjectCache.h"
 #include "Attr.h"
 #include "CSSParser.h"
-#include "CSSSelectorList.h"
 #include "Chrome.h"
 #include "ChromeClient.h"
-#include "ClassList.h"
 #include "ClientRect.h"
 #include "ClientRectList.h"
 #include "ContainerNodeAlgorithms.h"
 #include "DOMTokenList.h"
-#include "DatasetDOMStringMap.h"
-#include "Document.h"
-#include "DocumentFragment.h"
 #include "DocumentSharedObjectPool.h"
 #include "ElementRareData.h"
-#include "ElementTraversal.h"
 #include "EventDispatcher.h"
-#include "ExceptionCode.h"
 #include "FlowThreadController.h"
 #include "FocusController.h"
 #include "FocusEvent.h"
-#include "Frame.h"
 #include "FrameSelection.h"
 #include "FrameView.h"
 #include "HTMLCollection.h"
 #include "HTMLDocument.h"
 #include "HTMLElement.h"
 #include "HTMLFormControlsCollection.h"
-#include "HTMLFrameOwnerElement.h"
 #include "HTMLLabelElement.h"
 #include "HTMLNameCollection.h"
-#include "HTMLNames.h"
 #include "HTMLOptionsCollection.h"
 #include "HTMLParserIdioms.h"
+#include "HTMLSelectElement.h"
 #include "HTMLTableRowsCollection.h"
 #include "InsertionPoint.h"
-#include "InspectorInstrumentation.h"
 #include "KeyboardEvent.h"
 #include "MutationObserverInterestGroup.h"
 #include "MutationRecord.h"
-#include "NamedNodeMap.h"
-#include "NodeList.h"
 #include "NodeRenderStyle.h"
-#include "Page.h"
 #include "PlatformWheelEvent.h"
 #include "PointerLockController.h"
-#include "PseudoElement.h"
 #include "RenderNamedFlowFragment.h"
 #include "RenderRegion.h"
 #include "RenderTheme.h"
@@ -81,10 +67,8 @@
 #include "RenderWidget.h"
 #include "SelectorQuery.h"
 #include "Settings.h"
-#include "ShadowRoot.h"
 #include "StylePropertySet.h"
 #include "StyleResolver.h"
-#include "Text.h"
 #include "TextIterator.h"
 #include "VoidCallback.h"
 #include "WheelEvent.h"
@@ -1125,7 +1109,7 @@ void Element::attributeChanged(const QualifiedName& name, const AtomicString& ne
         shouldInvalidateStyle |= testShouldInvalidateStyle && isInShadowTree();
 
 
-    invalidateNodeListCachesInAncestors(&name, this);
+    invalidateNodeListAndCollectionCachesInAncestors(&name, this);
 
     // If there is currently no StyleResolver, we can't be sure that this attribute change won't affect style.
     shouldInvalidateStyle |= !styleResolver;
@@ -1213,7 +1197,10 @@ void Element::classAttributeChanged(const AtomicString& newClassString)
 
     if (classStringHasClassName(newClassString)) {
         const bool shouldFoldCase = document().inQuirksMode();
-        const SpaceSplitString oldClasses = ensureUniqueElementData().classNames();
+        // Note: We'll need ElementData, but it doesn't have to be UniqueElementData.
+        if (!elementData())
+            ensureUniqueElementData();
+        const SpaceSplitString oldClasses = elementData()->classNames();
         elementData()->setClass(newClassString, shouldFoldCase);
         const SpaceSplitString& newClasses = elementData()->classNames();
         shouldInvalidateStyle = testShouldInvalidateStyle && checkSelectorForClassChange(oldClasses, newClasses, *styleResolver);
@@ -2181,12 +2168,6 @@ void Element::setStyleAffectedByEmpty()
     ensureElementRareData().setStyleAffectedByEmpty(true);
 }
 
-void Element::setChildrenAffectedByHover(bool value)
-{
-    if (value || hasRareData())
-        ensureElementRareData().setChildrenAffectedByHover(value);
-}
-
 void Element::setChildrenAffectedByActive(bool value)
 {
     if (value || hasRareData())
@@ -2197,21 +2178,6 @@ void Element::setChildrenAffectedByDrag(bool value)
 {
     if (value || hasRareData())
         ensureElementRareData().setChildrenAffectedByDrag(value);
-}
-
-void Element::setChildrenAffectedByFirstChildRules()
-{
-    ensureElementRareData().setChildrenAffectedByFirstChildRules(true);
-}
-
-void Element::setChildrenAffectedByLastChildRules()
-{
-    ensureElementRareData().setChildrenAffectedByLastChildRules(true);
-}
-
-void Element::setChildrenAffectedByDirectAdjacentRules()
-{
-    ensureElementRareData().setChildrenAffectedByDirectAdjacentRules(true);
 }
 
 void Element::setChildrenAffectedByForwardPositionalRules()
@@ -2234,14 +2200,13 @@ void Element::setChildIndex(unsigned index)
 
 bool Element::hasFlagsSetDuringStylingOfChildren() const
 {
+    if (childrenAffectedByHover() || childrenAffectedByFirstChildRules() || childrenAffectedByLastChildRules() || childrenAffectedByDirectAdjacentRules())
+        return true;
+
     if (!hasRareData())
         return false;
-    return rareDataChildrenAffectedByHover()
-        || rareDataChildrenAffectedByActive()
+    return rareDataChildrenAffectedByActive()
         || rareDataChildrenAffectedByDrag()
-        || rareDataChildrenAffectedByFirstChildRules()
-        || rareDataChildrenAffectedByLastChildRules()
-        || rareDataChildrenAffectedByDirectAdjacentRules()
         || rareDataChildrenAffectedByForwardPositionalRules()
         || rareDataChildrenAffectedByBackwardPositionalRules();
 }
@@ -2250,12 +2215,6 @@ bool Element::rareDataStyleAffectedByEmpty() const
 {
     ASSERT(hasRareData());
     return elementRareData()->styleAffectedByEmpty();
-}
-
-bool Element::rareDataChildrenAffectedByHover() const
-{
-    ASSERT(hasRareData());
-    return elementRareData()->childrenAffectedByHover();
 }
 
 bool Element::rareDataChildrenAffectedByActive() const
@@ -2268,24 +2227,6 @@ bool Element::rareDataChildrenAffectedByDrag() const
 {
     ASSERT(hasRareData());
     return elementRareData()->childrenAffectedByDrag();
-}
-
-bool Element::rareDataChildrenAffectedByFirstChildRules() const
-{
-    ASSERT(hasRareData());
-    return elementRareData()->childrenAffectedByFirstChildRules();
-}
-
-bool Element::rareDataChildrenAffectedByLastChildRules() const
-{
-    ASSERT(hasRareData());
-    return elementRareData()->childrenAffectedByLastChildRules();
-}
-
-bool Element::rareDataChildrenAffectedByDirectAdjacentRules() const
-{
-    ASSERT(hasRareData());
-    return elementRareData()->childrenAffectedByDirectAdjacentRules();
 }
 
 bool Element::rareDataChildrenAffectedByForwardPositionalRules() const
@@ -2411,7 +2352,7 @@ PassRefPtr<PseudoElement> Element::createPseudoElementIfNeeded(PseudoId pseudoId
         return 0;
     if (!pseudoElementRendererIsNeeded(renderer()->getCachedPseudoStyle(pseudoId)))
         return 0;
-    RefPtr<PseudoElement> pseudoElement = PseudoElement::create(this, pseudoId);
+    RefPtr<PseudoElement> pseudoElement = PseudoElement::create(*this, pseudoId);
     Style::attachRenderTree(*pseudoElement);
     return pseudoElement.release();
 }
@@ -2491,12 +2432,12 @@ void Element::clearAfterPseudoElement()
 // ElementTraversal API
 Element* Element::firstElementChild() const
 {
-    return ElementTraversal::firstWithin(this);
+    return ElementTraversal::firstChild(this);
 }
 
 Element* Element::lastElementChild() const
 {
-    return ElementTraversal::lastWithin(this);
+    return ElementTraversal::lastChild(this);
 }
 
 Element* Element::previousElementSibling() const
@@ -2550,7 +2491,7 @@ DOMTokenList* Element::classList()
 {
     ElementRareData& data = ensureElementRareData();
     if (!data.classList())
-        data.setClassList(ClassList::create(this));
+        data.setClassList(std::make_unique<ClassList>(*this));
     return data.classList();
 }
 
@@ -2558,7 +2499,7 @@ DOMStringMap* Element::dataset()
 {
     ElementRareData& data = ensureElementRareData();
     if (!data.dataset())
-        data.setDataset(DatasetDOMStringMap::create(this));
+        data.setDataset(std::make_unique<DatasetDOMStringMap>(*this));
     return data.dataset();
 }
 
@@ -2619,17 +2560,15 @@ const AtomicString& Element::UIActions() const
 }
 #endif
 
-    
-#if ENABLE(SVG)
-bool Element::childShouldCreateRenderer(const Node* child) const
+bool Element::childShouldCreateRenderer(const Node& child) const
 {
+#if ENABLE(SVG)
     // Only create renderers for SVG elements whose parents are SVG elements, or for proper <svg xmlns="svgNS"> subdocuments.
-    if (child->isSVGElement())
-        return child->hasTagName(SVGNames::svgTag) || isSVGElement();
-
+    if (child.isSVGElement())
+        return child.hasTagName(SVGNames::svgTag) || isSVGElement();
+#endif
     return ContainerNode::childShouldCreateRenderer(child);
 }
-#endif
 
 #if ENABLE(FULLSCREEN_API)
 void Element::webkitRequestFullscreen()
@@ -2967,21 +2906,19 @@ PassRefPtr<HTMLCollection> Element::ensureCachedHTMLCollection(CollectionType ty
 
     RefPtr<HTMLCollection> collection;
     if (type == TableRows) {
-        ASSERT(hasTagName(tableTag));
-        return ensureRareData().ensureNodeLists().addCacheWithAtomicName<HTMLTableRowsCollection>(*this, type);
+        return ensureRareData().ensureNodeLists().addCachedCollection<HTMLTableRowsCollection>(toHTMLTableElement(*this), type);
     } else if (type == SelectOptions) {
-        ASSERT(hasTagName(selectTag));
-        return ensureRareData().ensureNodeLists().addCacheWithAtomicName<HTMLOptionsCollection>(*this, type);
+        return ensureRareData().ensureNodeLists().addCachedCollection<HTMLOptionsCollection>(toHTMLSelectElement(*this), type);
     } else if (type == FormControls) {
         ASSERT(hasTagName(formTag) || hasTagName(fieldsetTag));
-        return ensureRareData().ensureNodeLists().addCacheWithAtomicName<HTMLFormControlsCollection>(*this, type);
+        return ensureRareData().ensureNodeLists().addCachedCollection<HTMLFormControlsCollection>(*this, type);
     }
-    return ensureRareData().ensureNodeLists().addCacheWithAtomicName<HTMLCollection>(*this, type);
+    return ensureRareData().ensureNodeLists().addCachedCollection<HTMLCollection>(*this, type);
 }
 
 HTMLCollection* Element::cachedHTMLCollection(CollectionType type)
 {
-    return hasRareData() && rareData()->nodeLists() ? rareData()->nodeLists()->cacheWithAtomicName<HTMLCollection>(type) : 0;
+    return hasRareData() && rareData()->nodeLists() ? rareData()->nodeLists()->cachedCollection<HTMLCollection>(type) : 0;
 }
 
 IntSize Element::savedLayerScrollOffset() const

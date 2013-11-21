@@ -175,7 +175,6 @@ void JIT::emit_op_get_by_val(Instruction* currentInstruction)
 
     emitValueProfilingSite(regT4);
     emitStore(dst, regT1, regT0);
-    map(m_bytecodeOffset + OPCODE_LENGTH(op_get_by_val), dst, regT1, regT0);
     
     m_byValCompilationInfo.append(ByValCompilationInfo(m_bytecodeOffset, badType, mode, done));
 }
@@ -484,14 +483,13 @@ void JIT::emit_op_get_by_id(Instruction* currentInstruction)
 
     JITGetByIdGenerator gen(
         m_codeBlock, CodeOrigin(m_bytecodeOffset), RegisterSet::specialRegisters(),
-        JSValueRegs::payloadOnly(regT0), JSValueRegs(regT1, regT0), true);
+        callFrameRegister, JSValueRegs::payloadOnly(regT0), JSValueRegs(regT1, regT0), true);
     gen.generateFastPath(*this);
     addSlowCase(gen.slowPathJump());
     m_getByIds.append(gen);
 
     emitValueProfilingSite(regT4);
     emitStore(dst, regT1, regT0);
-    map(m_bytecodeOffset + OPCODE_LENGTH(op_get_by_id), dst, regT1, regT0);
 }
 
 void JIT::emitSlow_op_get_by_id(Instruction* currentInstruction, Vector<SlowCaseEntry>::iterator& iter)
@@ -530,8 +528,8 @@ void JIT::emit_op_put_by_id(Instruction* currentInstruction)
     
     JITPutByIdGenerator gen(
         m_codeBlock, CodeOrigin(m_bytecodeOffset), RegisterSet::specialRegisters(),
-        JSValueRegs::payloadOnly(regT0), JSValueRegs(regT3, regT2), regT1, true,
-        m_codeBlock->ecmaMode(), direct ? Direct : NotDirect);
+        callFrameRegister, JSValueRegs::payloadOnly(regT0), JSValueRegs(regT3, regT2),
+        regT1, true, m_codeBlock->ecmaMode(), direct ? Direct : NotDirect);
     
     gen.generateFastPath(*this);
     addSlowCase(gen.slowPathJump());
@@ -646,7 +644,6 @@ void JIT::emit_op_get_by_pname(Instruction* currentInstruction)
     compileGetDirectOffset(regT2, regT1, regT0, regT3);    
     
     emitStore(dst, regT1, regT0);
-    map(m_bytecodeOffset + OPCODE_LENGTH(op_get_by_pname), dst, regT1, regT0);
 }
 
 void JIT::emitSlow_op_get_by_pname(Instruction* currentInstruction, Vector<SlowCaseEntry>::iterator& iter)
@@ -670,7 +667,7 @@ void JIT::emitVarInjectionCheck(bool needsVarInjectionChecks)
 {
     if (!needsVarInjectionChecks)
         return;
-    addSlowCase(branchTest8(NonZero, AbsoluteAddress(m_codeBlock->globalObject()->varInjectionWatchpoint()->addressOfIsInvalidated())));
+    addSlowCase(branch8(Equal, AbsoluteAddress(m_codeBlock->globalObject()->varInjectionWatchpoint()->addressOfState()), TrustedImm32(IsInvalidated)));
 }
 
 void JIT::emitResolveClosure(int dst, bool needsVarInjectionChecks, unsigned depth)
@@ -687,7 +684,6 @@ void JIT::emitResolveClosure(int dst, bool needsVarInjectionChecks, unsigned dep
     for (unsigned i = 0; i < depth; ++i)
         loadPtr(Address(regT0, JSScope::offsetOfNext()), regT0);
     emitStore(dst, regT1, regT0);
-    map(m_bytecodeOffset + OPCODE_LENGTH(op_resolve_scope), dst, regT1, regT0);
 }
 
 void JIT::emit_op_resolve_scope(Instruction* currentInstruction)
@@ -705,7 +701,6 @@ void JIT::emit_op_resolve_scope(Instruction* currentInstruction)
         move(TrustedImm32(JSValue::CellTag), regT1);
         move(TrustedImmPtr(m_codeBlock->globalObject()), regT0);
         emitStore(dst, regT1, regT0);
-        map(m_bytecodeOffset + OPCODE_LENGTH(op_resolve_scope), dst, regT1, regT0);
         break;
     case ClosureVar:
     case ClosureVarWithVarInjectionChecks:
@@ -788,7 +783,6 @@ void JIT::emit_op_get_from_scope(Instruction* currentInstruction)
     }
     emitValueProfilingSite(regT4);
     emitStore(dst, regT1, regT0);
-    map(m_bytecodeOffset + OPCODE_LENGTH(op_get_from_scope), dst, regT1, regT0);
 }
 
 void JIT::emitSlow_op_get_from_scope(Instruction* currentInstruction, Vector<SlowCaseEntry>::iterator& iter)
@@ -887,7 +881,6 @@ void JIT::emit_op_init_global_const(Instruction* currentInstruction)
 
     store32(regT1, registerPointer->tagPointer());
     store32(regT0, registerPointer->payloadPointer());
-    map(m_bytecodeOffset + OPCODE_LENGTH(op_init_global_const), value, regT1, regT0);
 }
 
 } // namespace JSC

@@ -45,9 +45,7 @@ namespace WebCore {
 class InjectedScriptManager;
 class InspectorArray;
 class InspectorConsoleAgent;
-class InspectorFrontend;
 class InspectorObject;
-class InspectorState;
 class InstrumentingAgents;
 class Page;
 class ScriptHeapSnapshot;
@@ -56,12 +54,12 @@ class WorkerGlobalScope;
 
 typedef String ErrorString;
 
-class InspectorProfilerAgent : public InspectorBaseAgent<InspectorProfilerAgent>, public InspectorBackendDispatcher::ProfilerCommandHandler {
+class InspectorProfilerAgent : public InspectorBaseAgent, public InspectorProfilerBackendDispatcherHandler {
     WTF_MAKE_NONCOPYABLE(InspectorProfilerAgent); WTF_MAKE_FAST_ALLOCATED;
 public:
-    static PassOwnPtr<InspectorProfilerAgent> create(InstrumentingAgents*, InspectorConsoleAgent*, Page*, InspectorCompositeState*, InjectedScriptManager*);
+    static PassOwnPtr<InspectorProfilerAgent> create(InstrumentingAgents*, InspectorConsoleAgent*, Page*, InjectedScriptManager*);
 #if ENABLE(WORKERS)
-    static PassOwnPtr<InspectorProfilerAgent> create(InstrumentingAgents*, InspectorConsoleAgent*, WorkerGlobalScope*, InspectorCompositeState*, InjectedScriptManager*);
+    static PassOwnPtr<InspectorProfilerAgent> create(InstrumentingAgents*, InspectorConsoleAgent*, WorkerGlobalScope*, InjectedScriptManager*);
 #endif
     virtual ~InspectorProfilerAgent();
 
@@ -84,16 +82,15 @@ public:
 
     void disable();
     void enable(bool skipRecompile);
-    bool enabled() { return m_enabled; }
+    bool enabled() const { return m_enabled; }
     String getCurrentUserInitiatedProfileName(bool incrementProfileNumber = false);
     virtual void getProfileHeaders(ErrorString*, RefPtr<TypeBuilder::Array<TypeBuilder::Profiler::ProfileHeader>>&);
     virtual void getCPUProfile(ErrorString*, int uid, RefPtr<TypeBuilder::Profiler::CPUProfile>&);
     virtual void getHeapSnapshot(ErrorString*, int uid);
     virtual void removeProfile(ErrorString*, const String& type, int uid);
 
-    virtual void setFrontend(InspectorFrontend*);
-    virtual void clearFrontend();
-    virtual void restore();
+    virtual void didCreateFrontendAndBackend(InspectorFrontendChannel*, InspectorBackendDispatcher*) OVERRIDE;
+    virtual void willDestroyFrontendAndBackend() OVERRIDE;
 
     virtual void takeHeapSnapshot(ErrorString*, const bool* reportProgress);
     void toggleRecordButton(bool isProfiling);
@@ -102,7 +99,7 @@ public:
     virtual void getHeapObjectId(ErrorString*, const String& objectId, String* heapSnapshotObjectId);
 
 protected:
-    InspectorProfilerAgent(InstrumentingAgents*, InspectorConsoleAgent*, InspectorCompositeState*, InjectedScriptManager*);
+    InspectorProfilerAgent(InstrumentingAgents*, InspectorConsoleAgent*, InjectedScriptManager*);
     virtual void startProfiling(const String& title) = 0;
     virtual PassRefPtr<ScriptProfile> stopProfiling(const String& title) = 0;
 
@@ -118,8 +115,10 @@ private:
 
     InspectorConsoleAgent* m_consoleAgent;
     InjectedScriptManager* m_injectedScriptManager;
-    InspectorFrontend::Profiler* m_frontend;
+    std::unique_ptr<InspectorProfilerFrontendDispatcher> m_frontendDispatcher;
+    RefPtr<InspectorProfilerBackendDispatcher> m_backendDispatcher;
     bool m_enabled;
+    bool m_profileHeadersRequested;
     bool m_recordingCPUProfile;
     int m_currentUserInitiatedProfileNumber;
     unsigned m_nextUserInitiatedProfileNumber;

@@ -9,12 +9,10 @@ WebKitDOMWebKitNamedFlow
 
 </para>
 
-
 <!-- ##### SECTION See_Also ##### -->
 <para>
 
 </para>
-
 
 <!-- ##### SECTION Stability_Level ##### -->
 
@@ -68,6 +66,17 @@ WebKitDOMWebKitNamedFlow
 </para>
 
 @self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_webkit_named_flow_dispatch_event ##### -->
+<para>
+
+</para>
+
+@self: 
+@event: 
+@error: 
 @Returns: 
 
 

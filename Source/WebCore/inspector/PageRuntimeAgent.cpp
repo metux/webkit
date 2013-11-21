@@ -38,7 +38,6 @@
 #include "InjectedScript.h"
 #include "InjectedScriptManager.h"
 #include "InspectorPageAgent.h"
-#include "InspectorState.h"
 #include "InstrumentingAgents.h"
 #include "MainFrame.h"
 #include "Page.h"
@@ -50,15 +49,10 @@ using WebCore::TypeBuilder::Runtime::ExecutionContextDescription;
 
 namespace WebCore {
 
-namespace PageRuntimeAgentState {
-static const char runtimeEnabled[] = "runtimeEnabled";
-};
-
-PageRuntimeAgent::PageRuntimeAgent(InstrumentingAgents* instrumentingAgents, InspectorCompositeState* state, InjectedScriptManager* injectedScriptManager, Page* page, InspectorPageAgent* pageAgent)
-    : InspectorRuntimeAgent(instrumentingAgents, state, injectedScriptManager)
+PageRuntimeAgent::PageRuntimeAgent(InstrumentingAgents* instrumentingAgents, InjectedScriptManager* injectedScriptManager, Page* page, InspectorPageAgent* pageAgent)
+    : InspectorRuntimeAgent(instrumentingAgents, injectedScriptManager)
     , m_inspectedPage(page)
     , m_pageAgent(pageAgent)
-    , m_frontend(0)
     , m_mainWorldContextCreated(false)
 {
     m_instrumentingAgents->setPageRuntimeAgent(this);
@@ -69,24 +63,19 @@ PageRuntimeAgent::~PageRuntimeAgent()
     m_instrumentingAgents->setPageRuntimeAgent(0);
 }
 
-void PageRuntimeAgent::setFrontend(InspectorFrontend* frontend)
+void PageRuntimeAgent::didCreateFrontendAndBackend(InspectorFrontendChannel* frontendChannel, InspectorBackendDispatcher* backendDispatcher)
 {
-    m_frontend = frontend->runtime();
+    m_frontendDispatcher = std::make_unique<InspectorRuntimeFrontendDispatcher>(frontendChannel);
+    m_backendDispatcher = InspectorRuntimeBackendDispatcher::create(backendDispatcher, this);
 }
 
-void PageRuntimeAgent::clearFrontend()
+void PageRuntimeAgent::willDestroyFrontendAndBackend()
 {
-    m_frontend = 0;
+    m_frontendDispatcher = nullptr;
+    m_backendDispatcher.clear();
+
     String errorString;
     disable(&errorString);
-}
-
-void PageRuntimeAgent::restore()
-{
-    if (m_state->getBoolean(PageRuntimeAgentState::runtimeEnabled)) {
-        String error;
-        enable(&error);
-    }
 }
 
 void PageRuntimeAgent::enable(ErrorString* errorString)
@@ -95,7 +84,7 @@ void PageRuntimeAgent::enable(ErrorString* errorString)
         return;
 
     InspectorRuntimeAgent::enable(errorString);
-    m_state->setBoolean(PageRuntimeAgentState::runtimeEnabled, true);
+
     // Only report existing contexts if the page did commit load, otherwise we may
     // unintentionally initialize contexts in the frames which may trigger some listeners
     // that are expected to be triggered only after the load is committed, see http://crbug.com/131623
@@ -109,7 +98,6 @@ void PageRuntimeAgent::disable(ErrorString* errorString)
         return;
 
     InspectorRuntimeAgent::disable(errorString);
-    m_state->setBoolean(PageRuntimeAgentState::runtimeEnabled, false);
 }
 
 void PageRuntimeAgent::didCreateMainWorldContext(Frame* frame)
@@ -118,7 +106,7 @@ void PageRuntimeAgent::didCreateMainWorldContext(Frame* frame)
 
     if (!m_enabled)
         return;
-    ASSERT(m_frontend);
+    ASSERT(m_frontendDispatcher);
     String frameId = m_pageAgent->frameId(frame);
     JSC::ExecState* scriptState = mainWorldExecState(frame);
     notifyContextCreated(frameId, scriptState, 0, true);
@@ -128,7 +116,7 @@ void PageRuntimeAgent::didCreateIsolatedContext(Frame* frame, JSC::ExecState* sc
 {
     if (!m_enabled)
         return;
-    ASSERT(m_frontend);
+    ASSERT(m_frontendDispatcher);
     String frameId = m_pageAgent->frameId(frame);
     notifyContextCreated(frameId, scriptState, origin, false);
 }
@@ -182,7 +170,7 @@ void PageRuntimeAgent::notifyContextCreated(const String& frameId, JSC::ExecStat
     ASSERT(securityOrigin || isPageContext);
     int executionContextId = injectedScriptManager()->injectedScriptIdFor(scriptState);
     String name = securityOrigin ? securityOrigin->toRawString() : "";
-    m_frontend->executionContextCreated(ExecutionContextDescription::create()
+    m_frontendDispatcher->executionContextCreated(ExecutionContextDescription::create()
         .setId(executionContextId)
         .setIsPageContext(isPageContext)
         .setName(name)

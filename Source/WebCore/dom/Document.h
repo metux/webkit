@@ -110,7 +110,7 @@ class HitTestResult;
 class IntPoint;
 class LayoutPoint;
 class LayoutRect;
-class LiveNodeListBase;
+class LiveNodeList;
 class JSNode;
 class Locale;
 class MediaCanStartListener;
@@ -125,7 +125,6 @@ class PlatformMouseEvent;
 class ProcessingInstruction;
 class Range;
 class RegisteredEventListener;
-class RenderArena;
 class RenderView;
 class RenderFullScreen;
 class ScriptableDocumentParser;
@@ -549,7 +548,6 @@ public:
     virtual void suspendActiveDOMObjects(ActiveDOMObject::ReasonForSuspension) OVERRIDE;
     virtual void resumeActiveDOMObjects(ActiveDOMObject::ReasonForSuspension) OVERRIDE;
 
-    RenderArena* renderArena() { return m_renderArena.get(); }
     RenderView* renderView() const { return m_renderView; }
 
     bool renderTreeBeingDestroyed() const { return m_renderTreeBeingDestroyed; }
@@ -699,10 +697,12 @@ public:
     void styleRecalcTimerFired(Timer<Document>*);
     void optimizedStyleSheetUpdateTimerFired(Timer<Document>*);
 
-    void registerNodeList(LiveNodeListBase*);
-    void unregisterNodeList(LiveNodeListBase*);
-    bool shouldInvalidateNodeListCaches(const QualifiedName* attrName = 0) const;
-    void invalidateNodeListCaches(const QualifiedName* attrName);
+    void registerNodeList(LiveNodeList&);
+    void unregisterNodeList(LiveNodeList&);
+    void registerCollection(HTMLCollection&);
+    void unregisterCollection(HTMLCollection&);
+    bool shouldInvalidateNodeListAndCollectionCaches(const QualifiedName* attrName = nullptr) const;
+    void invalidateNodeListAndCollectionCaches(const QualifiedName* attrName);
 
     void attachNodeIterator(NodeIterator*);
     void detachNodeIterator(NodeIterator*);
@@ -1192,6 +1192,8 @@ private:
     friend class Node;
     friend class IgnoreDestructiveWriteCountIncrementer;
 
+    void commonTeardown();
+
     RenderObject* renderer() const WTF_DELETED_FUNCTION;
     void setRenderer(RenderObject*) WTF_DELETED_FUNCTION;
     void setRenderView(RenderView*);
@@ -1374,8 +1376,6 @@ private:
     bool m_titleSetExplicitly;
     RefPtr<Element> m_titleElement;
 
-    std::unique_ptr<RenderArena> m_renderArena;
-
     OwnPtr<AXObjectCache> m_axObjectCache;
     const OwnPtr<DocumentMarkerController> m_markers;
     
@@ -1411,14 +1411,14 @@ private:
 
     String m_contentLanguage;
 
-    RenderView* m_savedRenderView;
-    
     RefPtr<TextResourceDecoder> m_decoder;
 
     InheritedBool m_designMode;
 
-    HashSet<LiveNodeListBase*> m_listsInvalidatedAtDocument;
-    unsigned m_nodeListCounts[numNodeListInvalidationTypes];
+    HashSet<LiveNodeList*> m_listsInvalidatedAtDocument;
+    HashSet<HTMLCollection*> m_collectionsInvalidatedAtDocument;
+
+    unsigned m_nodeListAndCollectionCounts[numNodeListInvalidationTypes];
 
     RefPtr<XPathEvaluator> m_xpathEvaluator;
 
@@ -1617,6 +1617,18 @@ inline ScriptExecutionContext* Node::scriptExecutionContext() const
 }
 
 Element* eventTargetElementForDocument(Document*);
+
+inline Document& toDocument(ScriptExecutionContext& scriptExecutionContext)
+{
+    ASSERT_WITH_SECURITY_IMPLICATION(scriptExecutionContext.isDocument());
+    return static_cast<Document&>(scriptExecutionContext);
+}
+
+inline const Document& toDocument(const ScriptExecutionContext& scriptExecutionContext)
+{
+    ASSERT_WITH_SECURITY_IMPLICATION(scriptExecutionContext.isDocument());
+    return static_cast<const Document&>(scriptExecutionContext);
+}
 
 inline Document* toDocument(ScriptExecutionContext* scriptExecutionContext)
 {

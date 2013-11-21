@@ -611,6 +611,13 @@ public:
         return label;
     }
     
+    using MacroAssemblerX86Common::branch8;
+    Jump branch8(RelationalCondition cond, AbsoluteAddress left, TrustedImm32 right)
+    {
+        MacroAssemblerX86Common::move(TrustedImmPtr(left.m_ptr), scratchRegister);
+        return MacroAssemblerX86Common::branch8(cond, Address(scratchRegister), right);
+    }
+    
     using MacroAssemblerX86Common::branchTest8;
     Jump branchTest8(ResultCondition cond, ExtendedAddress address, TrustedImm32 mask = TrustedImm32(-1))
     {
@@ -641,6 +648,7 @@ public:
         return FunctionPtr(X86Assembler::readPointer(call.dataLabelPtrAtOffset(-REPTACH_OFFSET_CALL_R11).dataLocation()));
     }
 
+    static bool haveScratchRegisterForBlinding() { return true; }
     static RegisterID scratchRegisterForBlinding() { return scratchRegister; }
 
     static bool canJumpReplacePatchableBranchPtrWithPatch() { return true; }

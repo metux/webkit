@@ -27,13 +27,14 @@
 #include "FloatQuad.h"
 #include "GraphicsContext.h"
 #include "HitTestResult.h"
+#include "InlineElementBox.h"
 #include "InlineTextBox.h"
 #include "Page.h"
-#include "RenderArena.h"
 #include "RenderBlock.h"
 #include "RenderFlowThread.h"
 #include "RenderFullScreen.h"
 #include "RenderGeometryMap.h"
+#include "RenderIterator.h"
 #include "RenderLayer.h"
 #include "RenderLineBreak.h"
 #include "RenderTheme.h"
@@ -46,20 +47,16 @@
 #include "Frame.h"
 #endif
 
-using namespace std;
-
 namespace WebCore {
 
 RenderInline::RenderInline(Element& element, PassRef<RenderStyle> style)
     : RenderBoxModelObject(element, std::move(style), RenderInlineFlag)
-    , m_alwaysCreateLineBoxes(false)
 {
     setChildrenInline(true);
 }
 
 RenderInline::RenderInline(Document& document, PassRef<RenderStyle> style)
     : RenderBoxModelObject(document, std::move(style), RenderInlineFlag)
-    , m_alwaysCreateLineBoxes(false)
 {
     setChildrenInline(true);
 }
@@ -114,7 +111,7 @@ void RenderInline::willBeDestroyed()
             parent()->dirtyLinesFromChangedChild(this);
     }
 
-    m_lineBoxes.deleteLineBoxes(renderArena());
+    m_lineBoxes.deleteLineBoxes();
 
     RenderBoxModelObject::willBeDestroyed();
 }
@@ -193,13 +190,13 @@ void RenderInline::styleDidChange(StyleDifference diff, const RenderStyle* oldSt
         updateStyleOfAnonymousBlockContinuations(toRenderBlock(block), &newStyle, oldStyle);
     }
 
-    if (!m_alwaysCreateLineBoxes) {
+    if (!alwaysCreateLineBoxes()) {
         bool alwaysCreateLineBoxes = hasSelfPaintingLayer() || hasBoxDecorations() || newStyle.hasPadding() || newStyle.hasMargin() || hasOutline();
         if (oldStyle && alwaysCreateLineBoxes) {
             dirtyLineBoxes(false);
             setNeedsLayout();
         }
-        m_alwaysCreateLineBoxes = alwaysCreateLineBoxes;
+        setRenderInlineAlwaysCreatesLineBoxes(alwaysCreateLineBoxes);
     }
 }
 
@@ -207,7 +204,7 @@ void RenderInline::updateAlwaysCreateLineBoxes(bool fullLayout)
 {
     // Once we have been tainted once, just assume it will happen again. This way effects like hover highlighting that change the
     // background color will only cause a layout on the first rollover.
-    if (m_alwaysCreateLineBoxes)
+    if (alwaysCreateLineBoxes())
         return;
 
     RenderStyle* parentStyle = &parent()->style();
@@ -234,7 +231,7 @@ void RenderInline::updateAlwaysCreateLineBoxes(bool fullLayout)
     if (alwaysCreateLineBoxes) {
         if (!fullLayout)
             dirtyLineBoxes(false);
-        m_alwaysCreateLineBoxes = true;
+        setAlwaysCreateLineBoxes();
     }
 }
 
@@ -723,7 +720,7 @@ static LayoutUnit computeMargin(const RenderInline* renderer, const Length& marg
     if (margin.isFixed())
         return margin.value();
     if (margin.isPercent())
-        return minimumValueForLength(margin, max<LayoutUnit>(0, renderer->containingBlock()->availableLogicalWidth()));
+        return minimumValueForLength(margin, std::max<LayoutUnit>(0, renderer->containingBlock()->availableLogicalWidth()));
     if (margin.isViewportPercentage())
         return valueForLength(margin, 0, &renderer->view());
     return 0;
@@ -1018,8 +1015,8 @@ LayoutRect RenderInline::linesVisualOverflowBoundingBox() const
     LayoutUnit logicalLeftSide = LayoutUnit::max();
     LayoutUnit logicalRightSide = LayoutUnit::min();
     for (InlineFlowBox* curr = firstLineBox(); curr; curr = curr->nextLineBox()) {
-        logicalLeftSide = min(logicalLeftSide, curr->logicalLeftVisualOverflow());
-        logicalRightSide = max(logicalRightSide, curr->logicalRightVisualOverflow());
+        logicalLeftSide = std::min(logicalLeftSide, curr->logicalLeftVisualOverflow());
+        logicalRightSide = std::max(logicalRightSide, curr->logicalRightVisualOverflow());
     }
 
     const RootInlineBox& firstRootBox = firstLineBox()->root();
@@ -1074,10 +1071,9 @@ LayoutRect RenderInline::clippedOverflowRectForRepaint(const RenderLayerModelObj
     cb->computeRectForRepaint(repaintContainer, repaintRect);
 
     if (outlineSize) {
-        for (RenderObject* curr = firstChild(); curr; curr = curr->nextSibling()) {
-            if (!curr->isText())
-                repaintRect.unite(curr->rectWithOutlineForRepaint(repaintContainer, outlineSize));
-        }
+        auto children = childrenOfType<RenderElement>(*this);
+        for (auto child = children.begin(), end = children.end(); child != end; ++child)
+            repaintRect.unite(child->rectWithOutlineForRepaint(repaintContainer, outlineSize));
 
         if (RenderBoxModelObject* continuation = this->continuation()) {
             if (!continuation->isInline() && continuation->parent())
@@ -1091,10 +1087,9 @@ LayoutRect RenderInline::clippedOverflowRectForRepaint(const RenderLayerModelObj
 LayoutRect RenderInline::rectWithOutlineForRepaint(const RenderLayerModelObject* repaintContainer, LayoutUnit outlineWidth) const
 {
     LayoutRect r(RenderBoxModelObject::rectWithOutlineForRepaint(repaintContainer, outlineWidth));
-    for (RenderObject* curr = firstChild(); curr; curr = curr->nextSibling()) {
-        if (!curr->isText())
-            r.unite(curr->rectWithOutlineForRepaint(repaintContainer, outlineWidth));
-    }
+    auto children = childrenOfType<RenderElement>(*this);
+    for (auto child = children.begin(), end = children.end(); child != end; ++child)
+        r.unite(child->rectWithOutlineForRepaint(repaintContainer, outlineWidth));
     return r;
 }
 
@@ -1306,7 +1301,7 @@ void RenderInline::updateHitTestResult(HitTestResult& result, const LayoutPoint&
 void RenderInline::dirtyLineBoxes(bool fullLayout)
 {
     if (fullLayout) {
-        m_lineBoxes.deleteLineBoxes(renderArena());
+        m_lineBoxes.deleteLineBoxes();
         return;
     }
 
@@ -1341,19 +1336,20 @@ void RenderInline::dirtyLineBoxes(bool fullLayout)
 
 void RenderInline::deleteLines()
 {
-    m_lineBoxes.deleteLineBoxTree(renderArena());
+    m_lineBoxes.deleteLineBoxTree();
 }
 
-InlineFlowBox* RenderInline::createInlineFlowBox() 
+std::unique_ptr<InlineFlowBox> RenderInline::createInlineFlowBox()
 {
-    return new (renderArena()) InlineFlowBox(*this);
+    return std::make_unique<InlineFlowBox>(*this);
 }
 
 InlineFlowBox* RenderInline::createAndAppendInlineFlowBox()
 {
     setAlwaysCreateLineBoxes();
-    InlineFlowBox* flowBox = createInlineFlowBox();
-    m_lineBoxes.appendLineBox(flowBox);
+    auto newFlowBox = createInlineFlowBox();
+    auto flowBox = newFlowBox.get();
+    m_lineBoxes.appendLineBox(std::move(newFlowBox));
     return flowBox;
 }
 
@@ -1429,16 +1425,17 @@ void RenderInline::addFocusRingRects(Vector<IntRect>& rects, const LayoutPoint& 
     AbsoluteRectsGeneratorContext context(rects, additionalOffset);
     generateLineBoxRects(context);
 
-    for (RenderObject* curr = firstChild(); curr; curr = curr->nextSibling()) {
-        if (!curr->isText() && !curr->isListMarker()) {
-            FloatPoint pos(additionalOffset);
-            // FIXME: This doesn't work correctly with transforms.
-            if (curr->hasLayer()) 
-                pos = curr->localToContainerPoint(FloatPoint(), paintContainer);
-            else if (curr->isBox())
-                pos.move(toRenderBox(curr)->locationOffset());
-            curr->addFocusRingRects(rects, flooredIntPoint(pos), paintContainer);
-        }
+    auto children = childrenOfType<RenderElement>(*this);
+    for (auto child = children.begin(), end = children.end(); child != end; ++child) {
+        if (child->isListMarker())
+            continue;
+        FloatPoint pos(additionalOffset);
+        // FIXME: This doesn't work correctly with transforms.
+        if (child->hasLayer())
+            pos = child->localToContainerPoint(FloatPoint(), paintContainer);
+        else if (child->isBox())
+            pos.move(toRenderBox(*child).locationOffset());
+        child->addFocusRingRects(rects, flooredIntPoint(pos), paintContainer);
     }
 
     if (RenderBoxModelObject* continuation = this->continuation()) {
@@ -1474,8 +1471,8 @@ void RenderInline::paintOutline(PaintInfo& paintInfo, const LayoutPoint& paintOf
     rects.append(LayoutRect());
     for (InlineFlowBox* curr = firstLineBox(); curr; curr = curr->nextLineBox()) {
         const RootInlineBox& rootBox = curr->root();
-        LayoutUnit top = max<LayoutUnit>(rootBox.lineTop(), curr->logicalTop());
-        LayoutUnit bottom = min<LayoutUnit>(rootBox.lineBottom(), curr->logicalBottom());
+        LayoutUnit top = std::max<LayoutUnit>(rootBox.lineTop(), curr->logicalTop());
+        LayoutUnit bottom = std::min<LayoutUnit>(rootBox.lineBottom(), curr->logicalBottom());
         rects.append(LayoutRect(curr->x(), top, curr->logicalWidth(), bottom - top));
     }
     rects.append(LayoutRect());
@@ -1543,7 +1540,7 @@ void RenderInline::paintOutlineForLine(GraphicsContext* graphicsContext, const L
         drawLineForBoxSide(graphicsContext,
             pixelSnappedBox.x() - outlineWidth,
             pixelSnappedBox.y() - outlineWidth,
-            min(pixelSnappedBox.maxX() + outlineWidth, (lastline.isEmpty() ? 1000000 : pixelSnappedLastLine.x())),
+            std::min(pixelSnappedBox.maxX() + outlineWidth, (lastline.isEmpty() ? 1000000 : pixelSnappedLastLine.x())),
             pixelSnappedBox.y(),
             BSTop, outlineColor, outlineStyle,
             outlineWidth,
@@ -1552,7 +1549,7 @@ void RenderInline::paintOutlineForLine(GraphicsContext* graphicsContext, const L
     
     if (lastline.maxX() < thisline.maxX())
         drawLineForBoxSide(graphicsContext,
-            max(lastline.isEmpty() ? -1000000 : pixelSnappedLastLine.maxX(), pixelSnappedBox.x() - outlineWidth),
+            std::max(lastline.isEmpty() ? -1000000 : pixelSnappedLastLine.maxX(), pixelSnappedBox.x() - outlineWidth),
             pixelSnappedBox.y() - outlineWidth,
             pixelSnappedBox.maxX() + outlineWidth,
             pixelSnappedBox.y(),
@@ -1576,7 +1573,7 @@ void RenderInline::paintOutlineForLine(GraphicsContext* graphicsContext, const L
         drawLineForBoxSide(graphicsContext,
             pixelSnappedBox.x() - outlineWidth,
             pixelSnappedBox.maxY(),
-            min(pixelSnappedBox.maxX() + outlineWidth, !nextline.isEmpty() ? pixelSnappedNextLine.x() + 1 : 1000000),
+            std::min(pixelSnappedBox.maxX() + outlineWidth, !nextline.isEmpty() ? pixelSnappedNextLine.x() + 1 : 1000000),
             pixelSnappedBox.maxY() + outlineWidth,
             BSBottom, outlineColor, outlineStyle,
             outlineWidth,
@@ -1585,7 +1582,7 @@ void RenderInline::paintOutlineForLine(GraphicsContext* graphicsContext, const L
     
     if (nextline.maxX() < thisline.maxX())
         drawLineForBoxSide(graphicsContext,
-            max(!nextline.isEmpty() ? pixelSnappedNextLine.maxX() : -1000000, pixelSnappedBox.x() - outlineWidth),
+            std::max(!nextline.isEmpty() ? pixelSnappedNextLine.maxX() : -1000000, pixelSnappedBox.x() - outlineWidth),
             pixelSnappedBox.maxY(),
             pixelSnappedBox.maxX() + outlineWidth,
             pixelSnappedBox.maxY() + outlineWidth,

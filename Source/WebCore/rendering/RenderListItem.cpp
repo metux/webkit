@@ -27,6 +27,7 @@
 #include "ElementTraversal.h"
 #include "HTMLNames.h"
 #include "HTMLOListElement.h"
+#include "InlineElementBox.h"
 #include "PseudoElement.h"
 #include "RenderListMarker.h"
 #include "RenderView.h"
@@ -34,8 +35,6 @@
 #include <wtf/StackStats.h>
 #include <wtf/StdLibExtras.h>
 #include <wtf/text/StringBuilder.h>
-
-using namespace std;
 
 namespace WebCore {
 
@@ -370,7 +369,7 @@ void RenderListItem::positionListMarker()
                         adjustOverflow = true;
                 }
                 box->setOverflowFromLogicalRects(newLogicalLayoutOverflowRect, newLogicalVisualOverflowRect, lineTop, lineBottom);
-                if (box->boxModelObject()->hasSelfPaintingLayer())
+                if (box->renderer().hasSelfPaintingLayer())
                     hitSelfPaintingLayer = true;
             }
         } else {
@@ -392,7 +391,7 @@ void RenderListItem::positionListMarker()
                 }
                 box->setOverflowFromLogicalRects(newLogicalLayoutOverflowRect, newLogicalVisualOverflowRect, lineTop, lineBottom);
                 
-                if (box->boxModelObject()->hasSelfPaintingLayer())
+                if (box->renderer().hasSelfPaintingLayer())
                     hitSelfPaintingLayer = true;
             }
         }

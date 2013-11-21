@@ -32,9 +32,8 @@
 
 #include "GraphicsContext.h"
 #include "PaintInfo.h"
+#include "RenderIterator.h"
 #include "RenderMathMLRow.h"
-
-using namespace std;
 
 namespace WebCore {
     
@@ -185,11 +184,9 @@ RenderBox* RenderMathMLRoot::index() const
 
 void RenderMathMLRoot::layout()
 {
-    for (RenderObject* child = firstChild(); child; child = child->nextSibling()) {
-        if (!child->isBox())
-            continue;
-        toRenderBox(child)->layoutIfNeeded();
-    }
+    auto boxChildren = childrenOfType<RenderBox>(*this);
+    for (auto box = boxChildren.begin(), end = boxChildren.end(); box != end; ++box)
+        box->layoutIfNeeded();
 
     int baseHeight = firstChild() && firstChild()->isBox() ? roundToInt(toRenderBox(firstChild())->logicalHeight()) : style().fontSize();
     int frontWidth = lroundf(gFrontWidthEms * style().fontSize());
@@ -197,7 +194,7 @@ void RenderMathMLRoot::layout()
     // Base height above which the shape of the root changes
     float thresholdHeight = gThresholdBaseHeightEms * style().fontSize();
     if (baseHeight > thresholdHeight && thresholdHeight) {
-        float shift = min<float>((baseHeight - thresholdHeight) / thresholdHeight, 1.0f);
+        float shift = std::min<float>((baseHeight - thresholdHeight) / thresholdHeight, 1.0f);
         m_overbarLeftPointShift = static_cast<int>(shift * gRadicalBottomPointXFront * frontWidth);
         m_intrinsicPaddingAfter = lroundf(gBigRootBottomPaddingEms * style().fontSize());
     } else {

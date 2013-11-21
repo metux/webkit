@@ -42,22 +42,20 @@
 
 namespace WebCore {
 
-class InspectorState;
 class InstrumentingAgents;
 
 typedef String ErrorString;
 
-class InspectorLayerTreeAgent : public InspectorBaseAgent<InspectorLayerTreeAgent>, public InspectorBackendDispatcher::LayerTreeCommandHandler {
+class InspectorLayerTreeAgent : public InspectorBaseAgent, public InspectorLayerTreeBackendDispatcherHandler {
 public:
-    static PassOwnPtr<InspectorLayerTreeAgent> create(InstrumentingAgents* instrumentingAgents, InspectorCompositeState* state)
+    static PassOwnPtr<InspectorLayerTreeAgent> create(InstrumentingAgents* instrumentingAgents)
     {
-        return adoptPtr(new InspectorLayerTreeAgent(instrumentingAgents, state));
+        return adoptPtr(new InspectorLayerTreeAgent(instrumentingAgents));
     }
     ~InspectorLayerTreeAgent();
 
-    virtual void setFrontend(InspectorFrontend*);
-    virtual void clearFrontend();
-    virtual void restore();
+    virtual void didCreateFrontendAndBackend(InspectorFrontendChannel*, InspectorBackendDispatcher*) OVERRIDE;
+    virtual void willDestroyFrontendAndBackend() OVERRIDE;
     void reset();
 
     void layerTreeDidChange();
@@ -71,7 +69,7 @@ public:
     virtual void reasonsForCompositingLayer(ErrorString*, const String& layerId, RefPtr<TypeBuilder::LayerTree::CompositingReasons>&);
 
 private:
-    InspectorLayerTreeAgent(InstrumentingAgents*, InspectorCompositeState*);
+    InspectorLayerTreeAgent(InstrumentingAgents*);
 
     // RenderLayer-related methods.
     String bind(const RenderLayer*);
@@ -88,7 +86,8 @@ private:
     String bindPseudoElement(PseudoElement*);
     void unbindPseudoElement(PseudoElement*);
 
-    InspectorFrontend::LayerTree* m_frontend;
+    std::unique_ptr<InspectorLayerTreeFrontendDispatcher> m_frontendDispatcher;
+    RefPtr<InspectorLayerTreeBackendDispatcher> m_backendDispatcher;
 
     HashMap<const RenderLayer*, String> m_documentLayerToIdMap;
     HashMap<String, const RenderLayer*> m_idToLayer;

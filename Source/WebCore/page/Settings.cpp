@@ -46,8 +46,6 @@
 #include "TextAutosizer.h"
 #include <limits>
 
-using namespace std;
-
 namespace WebCore {
 
 static void setImageLoadingSettings(Page* page)
@@ -79,6 +77,10 @@ bool Settings::gAVFoundationEnabled = false;
 
 #if PLATFORM(MAC)
 bool Settings::gQTKitEnabled = true;
+#endif
+
+#if ENABLE(PLUGIN_PROXY_FOR_VIDEO)
+bool Settings::gVideoPluginProxyEnabled = true;
 #endif
 
 bool Settings::gMockScrollbarsEnabled = false;
@@ -579,6 +581,17 @@ void Settings::setQTKitEnabled(bool enabled)
 }
 #endif
 
+#if ENABLE(PLUGIN_PROXY_FOR_VIDEO)
+void Settings::setVideoPluginProxyEnabled(bool enabled)
+{
+    if (gVideoPluginProxyEnabled == enabled)
+        return;
+
+    gVideoPluginProxyEnabled = enabled;
+    HTMLMediaElement::resetMediaEngines();
+}
+#endif
+
 void Settings::setScrollingPerformanceLoggingEnabled(bool enabled)
 {
     m_scrollingPerformanceLoggingEnabled = enabled;
@@ -595,6 +608,7 @@ void Settings::setAggressiveTileRetentionEnabled(bool enabled)
 void Settings::setMockScrollbarsEnabled(bool flag)
 {
     gMockScrollbarsEnabled = flag;
+    // FIXME: This should update scroll bars in existing pages.
 }
 
 bool Settings::mockScrollbarsEnabled()
@@ -605,6 +619,7 @@ bool Settings::mockScrollbarsEnabled()
 void Settings::setUsesOverlayScrollbars(bool flag)
 {
     gUsesOverlayScrollbars = flag;
+    // FIXME: This should update scroll bars in existing pages.
 }
 
 bool Settings::usesOverlayScrollbars()

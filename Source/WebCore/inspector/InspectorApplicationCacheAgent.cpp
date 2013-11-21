@@ -36,7 +36,6 @@
 #include "InspectorAgent.h"
 #include "InspectorFrontend.h"
 #include "InspectorPageAgent.h"
-#include "InspectorState.h"
 #include "InspectorValues.h"
 #include "InstrumentingAgents.h"
 #include "NetworkStateNotifier.h"
@@ -45,39 +44,28 @@
 
 namespace WebCore {
 
-namespace ApplicationCacheAgentState {
-static const char applicationCacheAgentEnabled[] = "applicationCacheAgentEnabled";
-}
-
-InspectorApplicationCacheAgent::InspectorApplicationCacheAgent(InstrumentingAgents* instrumentingAgents, InspectorCompositeState* state, InspectorPageAgent* pageAgent)
-    : InspectorBaseAgent<InspectorApplicationCacheAgent>(ASCIILiteral("ApplicationCache"), instrumentingAgents, state)
+InspectorApplicationCacheAgent::InspectorApplicationCacheAgent(InstrumentingAgents* instrumentingAgents, InspectorPageAgent* pageAgent)
+    : InspectorBaseAgent(ASCIILiteral("ApplicationCache"), instrumentingAgents)
     , m_pageAgent(pageAgent)
-    , m_frontend(0)
 {
 }
 
-void InspectorApplicationCacheAgent::setFrontend(InspectorFrontend* frontend)
+void InspectorApplicationCacheAgent::didCreateFrontendAndBackend(InspectorFrontendChannel* frontendChannel, InspectorBackendDispatcher* backendDispatcher)
 {
-    m_frontend = frontend->applicationcache();
+    m_frontendDispatcher = std::make_unique<InspectorApplicationCacheFrontendDispatcher>(frontendChannel);
+    m_backendDispatcher = InspectorApplicationCacheBackendDispatcher::create(backendDispatcher, this);
 }
 
-void InspectorApplicationCacheAgent::clearFrontend()
+void InspectorApplicationCacheAgent::willDestroyFrontendAndBackend()
 {
+    m_frontendDispatcher = nullptr;
+    m_backendDispatcher.clear();
+
     m_instrumentingAgents->setInspectorApplicationCacheAgent(0);
-    m_frontend = 0;
-}
-
-void InspectorApplicationCacheAgent::restore()
-{
-    if (m_state->getBoolean(ApplicationCacheAgentState::applicationCacheAgentEnabled)) {
-        ErrorString error;
-        enable(&error);
-    }
 }
 
 void InspectorApplicationCacheAgent::enable(ErrorString*)
 {
-    m_state->setBoolean(ApplicationCacheAgentState::applicationCacheAgentEnabled, true);
     m_instrumentingAgents->setInspectorApplicationCacheAgent(this);
 
     // We need to pass initial navigator.onOnline.
@@ -95,13 +83,13 @@ void InspectorApplicationCacheAgent::updateApplicationCacheStatus(Frame* frame)
     ApplicationCacheHost::CacheInfo info = host->applicationCacheInfo();
 
     String manifestURL = info.m_manifest.string();
-    m_frontend->applicationCacheStatusUpdated(m_pageAgent->frameId(frame), manifestURL, static_cast<int>(status));
+    m_frontendDispatcher->applicationCacheStatusUpdated(m_pageAgent->frameId(frame), manifestURL, static_cast<int>(status));
 }
 
 void InspectorApplicationCacheAgent::networkStateChanged()
 {
     bool isNowOnline = networkStateNotifier().onLine();
-    m_frontend->networkStateUpdated(isNowOnline);
+    m_frontendDispatcher->networkStateUpdated(isNowOnline);
 }
 
 void InspectorApplicationCacheAgent::getFramesWithManifests(ErrorString*, RefPtr<TypeBuilder::Array<TypeBuilder::ApplicationCache::FrameWithManifest>>& result)
