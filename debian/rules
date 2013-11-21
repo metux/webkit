@@ -49,7 +49,8 @@ ifeq ($(DEB_BUILD_ARCH),alpha)
         LDFLAGS += -Wl,--no-relax
 endif
 
-ifneq (,$(filter $(DEB_BUILD_ARCH),sparc ia64 mips mipsel s390 s390x hurd-i386))
+# Disable debugging symbols on these arches.
+ifneq (,$(filter $(DEB_BUILD_ARCH),hurd-i386 ia64 mips mipsel powerpcspe s390 s390x sparc))
 	CFLAGS := $(CFLAGS:-g=)
 endif
 

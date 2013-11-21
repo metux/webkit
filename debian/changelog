@@ -25,6 +25,8 @@ webkitgtk (2.3.2-1) UNRELEASED; urgency=low
       the code that the patch tries to workaround may be fixed now.
       If these or any other patches are needed for IA64, they should be
       sent upstream so we don't run into problems like this again.
+  * debian/rules:
+    + Disable debugging symbols on powerpcspe. Closes: #696472.
 
  -- Emilio Pozuelo Monfort <pochu@debian.org>  Thu, 21 Nov 2013 21:20:48 +0100
 
