@@ -1,6 +1,13 @@
 webkitgtk (2.3.2-1) UNRELEASED; urgency=low
 
   * New upstream release.
+  * debian/patches/40_hppa_platform_h.patch,
+    debian/patches/41_hppa_build_fix.patch,
+    debian/patches/50_bsd-hurd-build-fix.patch,
+    debian/patches/60_add-missing-include.patch,
+    debian/patches/61_add-another-missing-include.patch,
+    debian/patches/70_Add-stubs-for-missing-symbols-in-dom-bindings.patch:
+    + Removed, merged upstream.
 
  -- Emilio Pozuelo Monfort <pochu@debian.org>  Thu, 21 Nov 2013 21:20:48 +0100
 
