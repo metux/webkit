@@ -33,6 +33,7 @@
 #include "HitTestResult.h"
 #include "LayoutRepainter.h"
 #include "Page.h"
+#include "RenderIterator.h"
 #include "RenderSVGContainer.h"
 #include "RenderSVGResource.h"
 #include "RenderSVGResourceContainer.h"
@@ -51,8 +52,6 @@
 #if ENABLE(FILTERS)
 #include "RenderSVGResourceFilter.h"
 #endif
-
-using namespace std;
 
 namespace WebCore {
 
@@ -213,7 +212,7 @@ void RenderSVGRoot::layout()
     buildLocalToBorderBoxTransform();
 
     m_isLayoutSizeChanged = needsLayout || (svgSVGElement().hasRelativeLengths() && oldSize != size());
-    SVGRenderSupport::layoutChildren(this, needsLayout || SVGRenderSupport::filtersForceContainerLayout(this));
+    SVGRenderSupport::layoutChildren(*this, needsLayout || SVGRenderSupport::filtersForceContainerLayout(*this));
 
     if (!m_resourcesNeedingToInvalidateClients.isEmpty()) {
         // Invalidate resource clients, which may mark some nodes for layout.
@@ -222,7 +221,7 @@ void RenderSVGRoot::layout()
             (*it)->removeAllClientsFromCache();
 
         m_isLayoutSizeChanged = false;
-        SVGRenderSupport::layoutChildren(this, false);
+        SVGRenderSupport::layoutChildren(*this, false);
     }
 
     // At this point LayoutRepainter already grabbed the old bounds,
@@ -293,12 +292,9 @@ void RenderSVGRoot::paintReplaced(PaintInfo& paintInfo, const LayoutPoint& paint
 
         if (continueRendering) {
             childPaintInfo.updateSubtreePaintRootForChildren(this);
-            for (RenderObject* child = firstChild(); child; child = child->nextSibling()) {
-                // FIXME: Can this ever have RenderText children?
-                if (!child->isRenderElement())
-                    continue;
-                toRenderElement(child)->paint(childPaintInfo, location());
-            }
+            auto children = childrenOfType<RenderElement>(*this);
+            for (auto child = children.begin(), end = children.end(); child != end; ++child)
+                child->paint(childPaintInfo, location());
         }
     }
 
@@ -324,12 +320,12 @@ void RenderSVGRoot::styleDidChange(StyleDifference diff, const RenderStyle* oldS
 void RenderSVGRoot::addChild(RenderObject* child, RenderObject* beforeChild)
 {
     RenderReplaced::addChild(child, beforeChild);
-    SVGResourcesCache::clientWasAddedToTree(child, &child->style());
+    SVGResourcesCache::clientWasAddedToTree(*child);
 }
 
 void RenderSVGRoot::removeChild(RenderObject& child)
 {
-    SVGResourcesCache::clientWillBeRemovedFromTree(&child);
+    SVGResourcesCache::clientWillBeRemovedFromTree(child);
     RenderReplaced::removeChild(child);
 }
 
@@ -359,7 +355,7 @@ const AffineTransform& RenderSVGRoot::localToParentTransform() const
 
 LayoutRect RenderSVGRoot::clippedOverflowRectForRepaint(const RenderLayerModelObject* repaintContainer) const
 {
-    return SVGRenderSupport::clippedOverflowRectForRepaint(this, repaintContainer);
+    return SVGRenderSupport::clippedOverflowRectForRepaint(*this, repaintContainer);
 }
 
 void RenderSVGRoot::computeFloatRectForRepaint(const RenderLayerModelObject* repaintContainer, FloatRect& repaintRect, bool fixed) const
@@ -368,8 +364,8 @@ void RenderSVGRoot::computeFloatRectForRepaint(const RenderLayerModelObject* rep
     // and then call RenderBox's method to handle all the normal CSS Box model bits
     repaintRect = m_localToBorderBoxTransform.mapRect(repaintRect);
 
-    const SVGRenderStyle* svgStyle = style().svgStyle();
-    if (const ShadowData* shadow = svgStyle->shadow())
+    const SVGRenderStyle& svgStyle = style().svgStyle();
+    if (const ShadowData* shadow = svgStyle.shadow())
         shadow->adjustRectForShadow(repaintRect);
 
     // Apply initial viewport clip - not affected by overflow settings
@@ -398,12 +394,12 @@ const RenderObject* RenderSVGRoot::pushMappingToContainer(const RenderLayerModel
 
 void RenderSVGRoot::updateCachedBoundaries()
 {
-    SVGRenderSupport::computeContainerBoundingBoxes(this, m_objectBoundingBox, m_objectBoundingBoxValid, m_strokeBoundingBox, m_repaintBoundingBoxExcludingShadow);
+    SVGRenderSupport::computeContainerBoundingBoxes(*this, m_objectBoundingBox, m_objectBoundingBoxValid, m_strokeBoundingBox, m_repaintBoundingBoxExcludingShadow);
     SVGRenderSupport::intersectRepaintRectWithResources(*this, m_repaintBoundingBoxExcludingShadow);
     m_repaintBoundingBoxExcludingShadow.inflate(borderAndPaddingWidth());
 
     m_repaintBoundingBox = m_repaintBoundingBoxExcludingShadow;
-    SVGRenderSupport::intersectRepaintRectWithShadows(this, m_repaintBoundingBox);
+    SVGRenderSupport::intersectRepaintRectWithShadows(*this, m_repaintBoundingBox);
 }
 
 bool RenderSVGRoot::nodeAtPoint(const HitTestRequest& request, HitTestResult& result, const HitTestLocation& locationInContainer, const LayoutPoint& accumulatedOffset, HitTestAction hitTestAction)

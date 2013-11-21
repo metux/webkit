@@ -164,6 +164,7 @@
   </chapters>
   <functions>
     <keyword type="struct" name="WebKitDOMBatteryManager" link="WebKitDOMBatteryManager.html#WebKitDOMBatteryManager-struct"/>
+    <keyword type="function" name="webkit_dom_battery_manager_dispatch_event ()" link="WebKitDOMBatteryManager.html#webkit-dom-battery-manager-dispatch-event" deprecated="2.4: Use webkit_dom_event_target_dispatch_event() instead."/>
     <keyword type="function" name="webkit_dom_battery_manager_get_charging ()" link="WebKitDOMBatteryManager.html#webkit-dom-battery-manager-get-charging"/>
     <keyword type="function" name="webkit_dom_battery_manager_get_charging_time ()" link="WebKitDOMBatteryManager.html#webkit-dom-battery-manager-get-charging-time"/>
     <keyword type="function" name="webkit_dom_battery_manager_get_discharging_time ()" link="WebKitDOMBatteryManager.html#webkit-dom-battery-manager-get-discharging-time"/>
@@ -670,6 +671,7 @@
     <keyword type="function" name="webkit_dom_node_lookup_namespace_uri ()" link="WebKitDOMNode.html#webkit-dom-node-lookup-namespace-uri"/>
     <keyword type="function" name="webkit_dom_node_compare_document_position ()" link="WebKitDOMNode.html#webkit-dom-node-compare-document-position"/>
     <keyword type="function" name="webkit_dom_node_contains ()" link="WebKitDOMNode.html#webkit-dom-node-contains"/>
+    <keyword type="function" name="webkit_dom_node_dispatch_event ()" link="WebKitDOMNode.html#webkit-dom-node-dispatch-event" deprecated="2.4: Use webkit_dom_event_target_dispatch_event() instead."/>
     <keyword type="function" name="webkit_dom_node_get_node_name ()" link="WebKitDOMNode.html#webkit-dom-node-get-node-name"/>
     <keyword type="function" name="webkit_dom_node_get_node_value ()" link="WebKitDOMNode.html#webkit-dom-node-get-node-value"/>
     <keyword type="function" name="webkit_dom_node_set_node_value ()" link="WebKitDOMNode.html#webkit-dom-node-set-node-value"/>
@@ -1684,6 +1686,7 @@
     <keyword type="function" name="webkit_dom_html_media_element_can_play_type ()" link="WebKitDOMHTMLMediaElement.html#webkit-dom-html-media-element-can-play-type"/>
     <keyword type="function" name="webkit_dom_html_media_element_play ()" link="WebKitDOMHTMLMediaElement.html#webkit-dom-html-media-element-play"/>
     <keyword type="function" name="webkit_dom_html_media_element_pause ()" link="WebKitDOMHTMLMediaElement.html#webkit-dom-html-media-element-pause"/>
+    <keyword type="function" name="webkit_dom_html_media_element_fast_seek ()" link="WebKitDOMHTMLMediaElement.html#webkit-dom-html-media-element-fast-seek"/>
     <keyword type="function" name="webkit_dom_html_media_element_get_error ()" link="WebKitDOMHTMLMediaElement.html#webkit-dom-html-media-element-get-error"/>
     <keyword type="function" name="webkit_dom_html_media_element_get_src ()" link="WebKitDOMHTMLMediaElement.html#webkit-dom-html-media-element-get-src"/>
     <keyword type="function" name="webkit_dom_html_media_element_set_src ()" link="WebKitDOMHTMLMediaElement.html#webkit-dom-html-media-element-set-src"/>
@@ -1695,8 +1698,6 @@
     <keyword type="function" name="webkit_dom_html_media_element_get_ready_state ()" link="WebKitDOMHTMLMediaElement.html#webkit-dom-html-media-element-get-ready-state"/>
     <keyword type="function" name="webkit_dom_html_media_element_get_seeking ()" link="WebKitDOMHTMLMediaElement.html#webkit-dom-html-media-element-get-seeking"/>
     <keyword type="function" name="webkit_dom_html_media_element_get_current_time ()" link="WebKitDOMHTMLMediaElement.html#webkit-dom-html-media-element-get-current-time"/>
-    <keyword type="function" name="webkit_dom_html_media_element_set_current_time ()" link="WebKitDOMHTMLMediaElement.html#webkit-dom-html-media-element-set-current-time"/>
-    <keyword type="function" name="webkit_dom_html_media_element_get_initial_time ()" link="WebKitDOMHTMLMediaElement.html#webkit-dom-html-media-element-get-initial-time"/>
     <keyword type="function" name="webkit_dom_html_media_element_get_duration ()" link="WebKitDOMHTMLMediaElement.html#webkit-dom-html-media-element-get-duration"/>
     <keyword type="function" name="webkit_dom_html_media_element_get_paused ()" link="WebKitDOMHTMLMediaElement.html#webkit-dom-html-media-element-get-paused"/>
     <keyword type="function" name="webkit_dom_html_media_element_get_default_playback_rate ()" link="WebKitDOMHTMLMediaElement.html#webkit-dom-html-media-element-get-default-playback-rate"/>
@@ -1737,7 +1738,6 @@
     <keyword type="property" name="The &quot;duration&quot; property" link="WebKitDOMHTMLMediaElement.html#WebKitDOMHTMLMediaElement--duration"/>
     <keyword type="property" name="The &quot;ended&quot; property" link="WebKitDOMHTMLMediaElement.html#WebKitDOMHTMLMediaElement--ended"/>
     <keyword type="property" name="The &quot;error&quot; property" link="WebKitDOMHTMLMediaElement.html#WebKitDOMHTMLMediaElement--error"/>
-    <keyword type="property" name="The &quot;initial-time&quot; property" link="WebKitDOMHTMLMediaElement.html#WebKitDOMHTMLMediaElement--initial-time"/>
     <keyword type="property" name="The &quot;loop&quot; property" link="WebKitDOMHTMLMediaElement.html#WebKitDOMHTMLMediaElement--loop"/>
     <keyword type="property" name="The &quot;media-group&quot; property" link="WebKitDOMHTMLMediaElement.html#WebKitDOMHTMLMediaElement--media-group"/>
     <keyword type="property" name="The &quot;muted&quot; property" link="WebKitDOMHTMLMediaElement.html#WebKitDOMHTMLMediaElement--muted"/>
@@ -2266,6 +2266,7 @@
     <keyword type="function" name="webkit_dom_dom_application_cache_update ()" link="WebKitDOMDOMApplicationCache.html#webkit-dom-dom-application-cache-update"/>
     <keyword type="function" name="webkit_dom_dom_application_cache_swap_cache ()" link="WebKitDOMDOMApplicationCache.html#webkit-dom-dom-application-cache-swap-cache"/>
     <keyword type="function" name="webkit_dom_dom_application_cache_abort ()" link="WebKitDOMDOMApplicationCache.html#webkit-dom-dom-application-cache-abort"/>
+    <keyword type="function" name="webkit_dom_dom_application_cache_dispatch_event ()" link="WebKitDOMDOMApplicationCache.html#webkit-dom-dom-application-cache-dispatch-event" deprecated="2.4: Use webkit_dom_event_target_dispatch_event() instead."/>
     <keyword type="function" name="webkit_dom_dom_application_cache_get_status ()" link="WebKitDOMDOMApplicationCache.html#webkit-dom-dom-application-cache-get-status"/>
     <keyword type="property" name="The &quot;status&quot; property" link="WebKitDOMDOMApplicationCache.html#WebKitDOMDOMApplicationCache--status"/>
     <keyword type="struct" name="WebKitDOMBarProp" link="WebKitDOMBarProp.html#WebKitDOMBarProp-struct"/>
@@ -2276,6 +2277,13 @@
     <keyword type="function" name="webkit_dom_console_group_end ()" link="WebKitDOMConsole.html#webkit-dom-console-group-end"/>
     <keyword type="function" name="webkit_dom_html_text_area_element_is_edited ()" link="webkitdomgtk-WebKitDOMCustom.html#webkit-dom-html-text-area-element-is-edited"/>
     <keyword type="function" name="webkit_dom_html_input_element_is_edited ()" link="webkitdomgtk-WebKitDOMCustom.html#webkit-dom-html-input-element-is-edited"/>
+    <keyword type="function" name="webkit_dom_html_media_element_set_current_time ()" link="webkitdomgtk-WebKitDOMCustom.html#webkit-dom-html-media-element-set-current-time"/>
+    <keyword type="function" name="webkit_dom_audio_track_get_kind ()" link="webkitdomgtk-WebKitDOMCustom.html#webkit-dom-audio-track-get-kind"/>
+    <keyword type="function" name="webkit_dom_audio_track_get_language ()" link="webkitdomgtk-WebKitDOMCustom.html#webkit-dom-audio-track-get-language"/>
+    <keyword type="function" name="webkit_dom_text_track_get_kind ()" link="webkitdomgtk-WebKitDOMCustom.html#webkit-dom-text-track-get-kind"/>
+    <keyword type="function" name="webkit_dom_text_track_get_language ()" link="webkitdomgtk-WebKitDOMCustom.html#webkit-dom-text-track-get-language"/>
+    <keyword type="function" name="webkit_dom_video_track_get_kind ()" link="webkitdomgtk-WebKitDOMCustom.html#webkit-dom-video-track-get-kind"/>
+    <keyword type="function" name="webkit_dom_video_track_get_language ()" link="webkitdomgtk-WebKitDOMCustom.html#webkit-dom-video-track-get-language"/>
     <keyword type="function" name="webkit_dom_blob_webkit_slice ()" link="webkitdomgtk-WebKitDOMCustom.html#webkit-dom-blob-webkit-slice"/>
     <keyword type="function" name="webkit_dom_html_element_get_class_name ()" link="webkitdomgtk-WebKitDOMCustom.html#webkit-dom-html-element-get-class-name"/>
     <keyword type="function" name="webkit_dom_html_element_set_class_name ()" link="webkitdomgtk-WebKitDOMCustom.html#webkit-dom-html-element-set-class-name"/>
@@ -2314,6 +2322,11 @@
     <keyword type="function" name="webkit_dom_property_node_list_item ()" link="webkitdomgtk-WebKitDOMCustom.html#webkit-dom-property-node-list-item"/>
     <keyword type="function" name="webkit_dom_property_node_list_get_length ()" link="webkitdomgtk-WebKitDOMCustom.html#webkit-dom-property-node-list-get-length"/>
     <keyword type="function" name="webkit_dom_html_media_element_get_start_time ()" link="webkitdomgtk-WebKitDOMCustom.html#webkit-dom-html-media-element-get-start-time"/>
+    <keyword type="function" name="webkit_dom_html_media_element_get_initial_time ()" link="webkitdomgtk-WebKitDOMCustom.html#webkit-dom-html-media-element-get-initial-time"/>
+    <keyword type="function" name="webkit_dom_html_head_element_get_profile ()" link="webkitdomgtk-WebKitDOMCustom.html#webkit-dom-html-head-element-get-profile"/>
+    <keyword type="function" name="webkit_dom_html_head_element_set_profile ()" link="webkitdomgtk-WebKitDOMCustom.html#webkit-dom-html-head-element-set-profile"/>
+    <keyword type="function" name="webkit_dom_processing_instruction_get_data ()" link="webkitdomgtk-WebKitDOMCustom.html#webkit-dom-processing-instruction-get-data"/>
+    <keyword type="function" name="webkit_dom_processing_instruction_set_data ()" link="webkitdomgtk-WebKitDOMCustom.html#webkit-dom-processing-instruction-set-data"/>
     <keyword type="struct" name="WebKitDOMDOMWindowCSS" link="WebKitDOMDOMWindowCSS.html#WebKitDOMDOMWindowCSS-struct"/>
     <keyword type="function" name="webkit_dom_dom_window_css_supports ()" link="WebKitDOMDOMWindowCSS.html#webkit-dom-dom-window-css-supports"/>
     <keyword type="struct" name="WebKitDOMDOMWindow" link="WebKitDOMDOMWindow.html#WebKitDOMDOMWindow-struct"/>
@@ -2341,6 +2354,7 @@
     <keyword type="function" name="webkit_dom_dom_window_cancel_animation_frame ()" link="WebKitDOMDOMWindow.html#webkit-dom-dom-window-cancel-animation-frame"/>
     <keyword type="function" name="webkit_dom_dom_window_webkit_cancel_animation_frame ()" link="WebKitDOMDOMWindow.html#webkit-dom-dom-window-webkit-cancel-animation-frame"/>
     <keyword type="function" name="webkit_dom_dom_window_webkit_cancel_request_animation_frame ()" link="WebKitDOMDOMWindow.html#webkit-dom-dom-window-webkit-cancel-request-animation-frame"/>
+    <keyword type="function" name="webkit_dom_dom_window_dispatch_event ()" link="WebKitDOMDOMWindow.html#webkit-dom-dom-window-dispatch-event" deprecated="2.4: Use webkit_dom_event_target_dispatch_event() instead."/>
     <keyword type="function" name="webkit_dom_dom_window_capture_events ()" link="WebKitDOMDOMWindow.html#webkit-dom-dom-window-capture-events"/>
     <keyword type="function" name="webkit_dom_dom_window_release_events ()" link="WebKitDOMDOMWindow.html#webkit-dom-dom-window-release-events"/>
     <keyword type="function" name="webkit_dom_dom_window_atob ()" link="WebKitDOMDOMWindow.html#webkit-dom-dom-window-atob"/>
@@ -2480,6 +2494,8 @@
     <keyword type="function" name="webkit_dom_event_target_dispatch_event ()" link="WebKitDOMEventTarget.html#webkit-dom-event-target-dispatch-event"/>
     <keyword type="function" name="webkit_dom_event_target_add_event_listener ()" link="WebKitDOMEventTarget.html#webkit-dom-event-target-add-event-listener"/>
     <keyword type="function" name="webkit_dom_event_target_remove_event_listener ()" link="WebKitDOMEventTarget.html#webkit-dom-event-target-remove-event-listener"/>
+    <keyword type="function" name="webkit_dom_event_target_add_event_listener_with_closure ()" link="WebKitDOMEventTarget.html#webkit-dom-event-target-add-event-listener-with-closure"/>
+    <keyword type="function" name="webkit_dom_event_target_remove_event_listener_with_closure ()" link="WebKitDOMEventTarget.html#webkit-dom-event-target-remove-event-listener-with-closure"/>
     <keyword type="struct" name="WebKitDOMHistory" link="WebKitDOMHistory.html#WebKitDOMHistory-struct"/>
     <keyword type="function" name="webkit_dom_history_back ()" link="WebKitDOMHistory.html#webkit-dom-history-back"/>
     <keyword type="function" name="webkit_dom_history_forward ()" link="WebKitDOMHistory.html#webkit-dom-history-forward"/>
@@ -2582,6 +2598,7 @@
     <keyword type="function" name="webkit_dom_webkit_named_flow_get_regions_by_content ()" link="WebKitDOMWebKitNamedFlow.html#webkit-dom-webkit-named-flow-get-regions-by-content"/>
     <keyword type="function" name="webkit_dom_webkit_named_flow_get_regions ()" link="WebKitDOMWebKitNamedFlow.html#webkit-dom-webkit-named-flow-get-regions"/>
     <keyword type="function" name="webkit_dom_webkit_named_flow_get_content ()" link="WebKitDOMWebKitNamedFlow.html#webkit-dom-webkit-named-flow-get-content"/>
+    <keyword type="function" name="webkit_dom_webkit_named_flow_dispatch_event ()" link="WebKitDOMWebKitNamedFlow.html#webkit-dom-webkit-named-flow-dispatch-event" deprecated="2.4: Use webkit_dom_event_target_dispatch_event() instead."/>
     <keyword type="function" name="webkit_dom_webkit_named_flow_get_name ()" link="WebKitDOMWebKitNamedFlow.html#webkit-dom-webkit-named-flow-get-name"/>
     <keyword type="function" name="webkit_dom_webkit_named_flow_get_overset ()" link="WebKitDOMWebKitNamedFlow.html#webkit-dom-webkit-named-flow-get-overset"/>
     <keyword type="function" name="webkit_dom_webkit_named_flow_get_first_empty_region_index ()" link="WebKitDOMWebKitNamedFlow.html#webkit-dom-webkit-named-flow-get-first-empty-region-index"/>
@@ -2738,19 +2755,16 @@
     <keyword type="property" name="The &quot;wheel-delta-y&quot; property" link="WebKitDOMWheelEvent.html#WebKitDOMWheelEvent--wheel-delta-y"/>
     <keyword type="struct" name="WebKitDOMAudioTrack" link="WebKitDOMAudioTrack.html#WebKitDOMAudioTrack-struct"/>
     <keyword type="function" name="webkit_dom_audio_track_get_id ()" link="WebKitDOMAudioTrack.html#webkit-dom-audio-track-get-id"/>
-    <keyword type="function" name="webkit_dom_audio_track_get_kind ()" link="WebKitDOMAudioTrack.html#webkit-dom-audio-track-get-kind"/>
     <keyword type="function" name="webkit_dom_audio_track_get_label ()" link="WebKitDOMAudioTrack.html#webkit-dom-audio-track-get-label"/>
-    <keyword type="function" name="webkit_dom_audio_track_get_language ()" link="WebKitDOMAudioTrack.html#webkit-dom-audio-track-get-language"/>
     <keyword type="function" name="webkit_dom_audio_track_get_enabled ()" link="WebKitDOMAudioTrack.html#webkit-dom-audio-track-get-enabled"/>
     <keyword type="function" name="webkit_dom_audio_track_set_enabled ()" link="WebKitDOMAudioTrack.html#webkit-dom-audio-track-set-enabled"/>
     <keyword type="property" name="The &quot;enabled&quot; property" link="WebKitDOMAudioTrack.html#WebKitDOMAudioTrack--enabled"/>
     <keyword type="property" name="The &quot;id&quot; property" link="WebKitDOMAudioTrack.html#WebKitDOMAudioTrack--id"/>
-    <keyword type="property" name="The &quot;kind&quot; property" link="WebKitDOMAudioTrack.html#WebKitDOMAudioTrack--kind"/>
     <keyword type="property" name="The &quot;label&quot; property" link="WebKitDOMAudioTrack.html#WebKitDOMAudioTrack--label"/>
-    <keyword type="property" name="The &quot;language&quot; property" link="WebKitDOMAudioTrack.html#WebKitDOMAudioTrack--language"/>
     <keyword type="struct" name="WebKitDOMAudioTrackList" link="WebKitDOMAudioTrackList.html#WebKitDOMAudioTrackList-struct"/>
     <keyword type="function" name="webkit_dom_audio_track_list_item ()" link="WebKitDOMAudioTrackList.html#webkit-dom-audio-track-list-item"/>
     <keyword type="function" name="webkit_dom_audio_track_list_get_track_by_id ()" link="WebKitDOMAudioTrackList.html#webkit-dom-audio-track-list-get-track-by-id"/>
+    <keyword type="function" name="webkit_dom_audio_track_list_dispatch_event ()" link="WebKitDOMAudioTrackList.html#webkit-dom-audio-track-list-dispatch-event" deprecated="2.4: Use webkit_dom_event_target_dispatch_event() instead."/>
     <keyword type="function" name="webkit_dom_audio_track_list_get_length ()" link="WebKitDOMAudioTrackList.html#webkit-dom-audio-track-list-get-length"/>
     <keyword type="property" name="The &quot;length&quot; property" link="WebKitDOMAudioTrackList.html#WebKitDOMAudioTrackList--length"/>
     <keyword type="struct" name="WebKitDOMHTMLAudioElement" link="WebKitDOMHTMLAudioElement.html#WebKitDOMHTMLAudioElement-struct"/>
@@ -2783,25 +2797,26 @@
     <keyword type="struct" name="WebKitDOMTextTrack" link="WebKitDOMTextTrack.html#WebKitDOMTextTrack-struct"/>
     <keyword type="function" name="webkit_dom_text_track_add_cue ()" link="WebKitDOMTextTrack.html#webkit-dom-text-track-add-cue"/>
     <keyword type="function" name="webkit_dom_text_track_remove_cue ()" link="WebKitDOMTextTrack.html#webkit-dom-text-track-remove-cue"/>
-    <keyword type="function" name="webkit_dom_text_track_get_kind ()" link="WebKitDOMTextTrack.html#webkit-dom-text-track-get-kind"/>
+    <keyword type="function" name="webkit_dom_text_track_dispatch_event ()" link="WebKitDOMTextTrack.html#webkit-dom-text-track-dispatch-event" deprecated="2.4: Use webkit_dom_event_target_dispatch_event() instead."/>
+    <keyword type="function" name="webkit_dom_text_track_get_id ()" link="WebKitDOMTextTrack.html#webkit-dom-text-track-get-id"/>
     <keyword type="function" name="webkit_dom_text_track_get_label ()" link="WebKitDOMTextTrack.html#webkit-dom-text-track-get-label"/>
-    <keyword type="function" name="webkit_dom_text_track_get_language ()" link="WebKitDOMTextTrack.html#webkit-dom-text-track-get-language"/>
     <keyword type="function" name="webkit_dom_text_track_get_mode ()" link="WebKitDOMTextTrack.html#webkit-dom-text-track-get-mode"/>
     <keyword type="function" name="webkit_dom_text_track_set_mode ()" link="WebKitDOMTextTrack.html#webkit-dom-text-track-set-mode"/>
     <keyword type="function" name="webkit_dom_text_track_get_cues ()" link="WebKitDOMTextTrack.html#webkit-dom-text-track-get-cues"/>
     <keyword type="function" name="webkit_dom_text_track_get_active_cues ()" link="WebKitDOMTextTrack.html#webkit-dom-text-track-get-active-cues"/>
     <keyword type="property" name="The &quot;active-cues&quot; property" link="WebKitDOMTextTrack.html#WebKitDOMTextTrack--active-cues"/>
     <keyword type="property" name="The &quot;cues&quot; property" link="WebKitDOMTextTrack.html#WebKitDOMTextTrack--cues"/>
-    <keyword type="property" name="The &quot;kind&quot; property" link="WebKitDOMTextTrack.html#WebKitDOMTextTrack--kind"/>
+    <keyword type="property" name="The &quot;id&quot; property" link="WebKitDOMTextTrack.html#WebKitDOMTextTrack--id"/>
     <keyword type="property" name="The &quot;label&quot; property" link="WebKitDOMTextTrack.html#WebKitDOMTextTrack--label"/>
-    <keyword type="property" name="The &quot;language&quot; property" link="WebKitDOMTextTrack.html#WebKitDOMTextTrack--language"/>
     <keyword type="property" name="The &quot;mode&quot; property" link="WebKitDOMTextTrack.html#WebKitDOMTextTrack--mode"/>
     <keyword type="struct" name="WebKitDOMTextTrackList" link="WebKitDOMTextTrackList.html#WebKitDOMTextTrackList-struct"/>
     <keyword type="function" name="webkit_dom_text_track_list_item ()" link="WebKitDOMTextTrackList.html#webkit-dom-text-track-list-item"/>
+    <keyword type="function" name="webkit_dom_text_track_list_dispatch_event ()" link="WebKitDOMTextTrackList.html#webkit-dom-text-track-list-dispatch-event" deprecated="2.4: Use webkit_dom_event_target_dispatch_event() instead."/>
     <keyword type="function" name="webkit_dom_text_track_list_get_length ()" link="WebKitDOMTextTrackList.html#webkit-dom-text-track-list-get-length"/>
     <keyword type="property" name="The &quot;length&quot; property" link="WebKitDOMTextTrackList.html#WebKitDOMTextTrackList--length"/>
     <keyword type="struct" name="WebKitDOMTextTrackCue" link="WebKitDOMTextTrackCue.html#WebKitDOMTextTrackCue-struct"/>
     <keyword type="function" name="webkit_dom_text_track_cue_get_cue_as_html ()" link="WebKitDOMTextTrackCue.html#webkit-dom-text-track-cue-get-cue-as-html"/>
+    <keyword type="function" name="webkit_dom_text_track_cue_dispatch_event ()" link="WebKitDOMTextTrackCue.html#webkit-dom-text-track-cue-dispatch-event" deprecated="2.4: Use webkit_dom_event_target_dispatch_event() instead."/>
     <keyword type="function" name="webkit_dom_text_track_cue_get_track ()" link="WebKitDOMTextTrackCue.html#webkit-dom-text-track-cue-get-track"/>
     <keyword type="function" name="webkit_dom_text_track_cue_get_id ()" link="WebKitDOMTextTrackCue.html#webkit-dom-text-track-cue-get-id"/>
     <keyword type="function" name="webkit_dom_text_track_cue_set_id ()" link="WebKitDOMTextTrackCue.html#webkit-dom-text-track-cue-set-id"/>
@@ -2845,19 +2860,16 @@
     <keyword type="struct" name="WebKitDOMTrackEvent" link="WebKitDOMTrackEvent.html#WebKitDOMTrackEvent-struct"/>
     <keyword type="struct" name="WebKitDOMVideoTrack" link="WebKitDOMVideoTrack.html#WebKitDOMVideoTrack-struct"/>
     <keyword type="function" name="webkit_dom_video_track_get_id ()" link="WebKitDOMVideoTrack.html#webkit-dom-video-track-get-id"/>
-    <keyword type="function" name="webkit_dom_video_track_get_kind ()" link="WebKitDOMVideoTrack.html#webkit-dom-video-track-get-kind"/>
     <keyword type="function" name="webkit_dom_video_track_get_label ()" link="WebKitDOMVideoTrack.html#webkit-dom-video-track-get-label"/>
-    <keyword type="function" name="webkit_dom_video_track_get_language ()" link="WebKitDOMVideoTrack.html#webkit-dom-video-track-get-language"/>
     <keyword type="function" name="webkit_dom_video_track_get_selected ()" link="WebKitDOMVideoTrack.html#webkit-dom-video-track-get-selected"/>
     <keyword type="function" name="webkit_dom_video_track_set_selected ()" link="WebKitDOMVideoTrack.html#webkit-dom-video-track-set-selected"/>
     <keyword type="property" name="The &quot;id&quot; property" link="WebKitDOMVideoTrack.html#WebKitDOMVideoTrack--id"/>
-    <keyword type="property" name="The &quot;kind&quot; property" link="WebKitDOMVideoTrack.html#WebKitDOMVideoTrack--kind"/>
     <keyword type="property" name="The &quot;label&quot; property" link="WebKitDOMVideoTrack.html#WebKitDOMVideoTrack--label"/>
-    <keyword type="property" name="The &quot;language&quot; property" link="WebKitDOMVideoTrack.html#WebKitDOMVideoTrack--language"/>
     <keyword type="property" name="The &quot;selected&quot; property" link="WebKitDOMVideoTrack.html#WebKitDOMVideoTrack--selected"/>
     <keyword type="struct" name="WebKitDOMVideoTrackList" link="WebKitDOMVideoTrackList.html#WebKitDOMVideoTrackList-struct"/>
     <keyword type="function" name="webkit_dom_video_track_list_item ()" link="WebKitDOMVideoTrackList.html#webkit-dom-video-track-list-item"/>
     <keyword type="function" name="webkit_dom_video_track_list_get_track_by_id ()" link="WebKitDOMVideoTrackList.html#webkit-dom-video-track-list-get-track-by-id"/>
+    <keyword type="function" name="webkit_dom_video_track_list_dispatch_event ()" link="WebKitDOMVideoTrackList.html#webkit-dom-video-track-list-dispatch-event" deprecated="2.4: Use webkit_dom_event_target_dispatch_event() instead."/>
     <keyword type="function" name="webkit_dom_video_track_list_get_length ()" link="WebKitDOMVideoTrackList.html#webkit-dom-video-track-list-get-length"/>
     <keyword type="property" name="The &quot;length&quot; property" link="WebKitDOMVideoTrackList.html#WebKitDOMVideoTrackList--length"/>
   </functions>

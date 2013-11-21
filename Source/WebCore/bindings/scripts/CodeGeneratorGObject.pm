@@ -278,6 +278,11 @@ sub SkipFunction {
         }
     }
 
+    # Skip functions for which we have a custom implementation due to API breaks
+    if ($functionName eq "webkit_dom_html_media_element_set_current_time") {
+        return 1;
+    }
+
     # This is for DataTransferItemList.idl add(File) method
     if ($functionName eq "webkit_dom_data_transfer_item_list_add" && @{$function->parameters} == 1) {
         return 1;
@@ -958,6 +963,10 @@ sub GenerateFunction {
 
     push(@symbols, "$returnType $functionName($symbolSig)\n");
 
+    if ($deprecationVersion) {
+        push(@hBody, "#if !defined(WEBKIT_DISABLE_DEPRECATED)\n");
+    }
+
     # Insert introspection annotations
     push(@hBody, "/**\n");
     push(@hBody, " * ${functionName}:\n");
@@ -976,10 +985,12 @@ sub GenerateFunction {
     }
     push(@hBody, " * \@error: #GError\n") if $raisesException;
     push(@hBody, " *\n");
-    if (IsGDOMClassType($function->signature->type)) {
-        push(@hBody, " * Returns: (transfer none):\n");
+    my $returnTypeName = $returnType;
+    $returnTypeName =~ s/\*$//;
+    if ($returnValueIsGDOMType) {
+        push(@hBody, " * Returns: (transfer none): A #${returnTypeName}\n");
     } elsif ($returnType ne "void") {
-        push(@hBody, " * Returns:\n");
+        push(@hBody, " * Returns: A #${returnTypeName}\n");
     }
     if ($deprecationVersion) {
         push(@hBody, " *\n");
@@ -999,8 +1010,14 @@ sub GenerateFunction {
         push(@hBody, "WEBKIT_API ");
     }
     push(@hBody, "$returnType\n$functionName($functionSig);\n");
+    if ($deprecationVersion) {
+        push(@hBody, "#endif /* WEBKIT_DISABLE_DEPRECATED */\n");
+    }
     push(@hBody, "\n");
 
+    if ($deprecationVersion) {
+        push(@cBody, "#if !defined(WEBKIT_DISABLE_DEPRECATED)\n");
+    }
     push(@cBody, "$returnType $functionName($functionSig)\n{\n");
     push(@cBody, "#if ${parentConditionalString}\n") if $parentConditionalString;
     push(@cBody, "#if ${conditionalString}\n") if $conditionalString;
@@ -1216,7 +1233,13 @@ EOF
         push(@cBody, "#endif /* ${parentConditionalString} */\n");
     }
 
-    push(@cBody, "}\n\n");
+    push(@cBody, "}\n");
+
+    if ($deprecationVersion) {
+        push(@cBody, "#endif // WEBKIT_DISABLE_DEPRECATED\n");
+    }
+
+    push(@cBody, "\n");
 }
 
 sub ClassHasFunction {

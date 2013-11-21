@@ -30,7 +30,6 @@
 #include "ApplicationCacheHost.h"
 #include "ApplicationCacheResource.h"
 #include "Attribute.h"
-#include "Chrome.h"
 #include "ChromeClient.h"
 #include "ClientRect.h"
 #include "ClientRectList.h"
@@ -41,15 +40,11 @@
 #include "DiagnosticLoggingKeys.h"
 #include "DocumentLoader.h"
 #include "ElementIterator.h"
-#include "Event.h"
 #include "EventNames.h"
-#include "ExceptionCode.h"
 #include "ExceptionCodePlaceholder.h"
 #include "FrameLoader.h"
 #include "FrameLoaderClient.h"
 #include "FrameView.h"
-#include "HTMLDocument.h"
-#include "HTMLNames.h"
 #include "HTMLSourceElement.h"
 #include "HTMLVideoElement.h"
 #include "JSHTMLMediaElement.h"
@@ -61,17 +56,12 @@
 #include "MediaDocument.h"
 #include "MediaError.h"
 #include "MediaFragmentURIParser.h"
-#include "MediaKeyError.h"
 #include "MediaKeyEvent.h"
 #include "MediaList.h"
-#include "MediaPlayer.h"
 #include "MediaQueryEvaluator.h"
-#include "MouseEvent.h"
 #include "MIMETypeRegistry.h"
-#include "Page.h"
 #include "PageActivityAssertionToken.h"
 #include "PageGroup.h"
-#include "RenderTheme.h"
 #include "RenderVideo.h"
 #include "RenderView.h"
 #include "ScriptController.h"
@@ -98,18 +88,14 @@
 
 #if ENABLE(VIDEO_TRACK)
 #include "AudioTrackList.h"
-#include "AudioTrackPrivate.h"
-#include "CaptionUserPreferences.h"
 #include "HTMLTrackElement.h"
 #include "InbandGenericTextTrack.h"
-#include "InbandTextTrack.h"
 #include "InbandTextTrackPrivate.h"
 #include "InbandWebVTTTextTrack.h"
 #include "RuntimeEnabledFeatures.h"
 #include "TextTrackCueList.h"
 #include "TextTrackList.h"
 #include "VideoTrackList.h"
-#include "VideoTrackPrivate.h"
 #endif
 
 #if ENABLE(WEB_AUDIO)
@@ -309,7 +295,6 @@ HTMLMediaElement::HTMLMediaElement(const QualifiedName& tagName, Document& docum
 #if ENABLE(PLUGIN_PROXY_FOR_VIDEO)
     , m_needWidgetUpdate(false)
 #endif
-    , m_dispatchingCanPlayEvent(false)
     , m_loadInitiatedByUserGesture(false)
     , m_completelyLoaded(false)
     , m_havePreparedToPlay(false)
@@ -396,8 +381,10 @@ HTMLMediaElement::~HTMLMediaElement()
     }
 #endif
 
-    if (m_mediaController)
+    if (m_mediaController) {
         m_mediaController->removeMediaElement(this);
+        m_mediaController = 0;
+    }
 
 #if ENABLE(MEDIA_SOURCE)
     closeMediaSource();
@@ -547,8 +534,10 @@ void HTMLMediaElement::finishParsingChildren()
     m_parsingInProgress = false;
 
 #if ENABLE(PLUGIN_PROXY_FOR_VIDEO)
-    document().updateStyleIfNeeded();
-    createMediaPlayerProxy();
+    if (shouldUseVideoPluginProxy()) {
+        document().updateStyleIfNeeded();
+        createMediaPlayerProxy();
+    }
 #endif
     
 #if ENABLE(VIDEO_TRACK)
@@ -563,31 +552,31 @@ void HTMLMediaElement::finishParsingChildren()
 bool HTMLMediaElement::rendererIsNeeded(const RenderStyle& style)
 {
 #if ENABLE(PLUGIN_PROXY_FOR_VIDEO)
-    UNUSED_PARAM(style);
-    return true;
-#else
-    return controls() && HTMLElement::rendererIsNeeded(style);
+    if (shouldUseVideoPluginProxy())
+        return true;
 #endif
+    return controls() && HTMLElement::rendererIsNeeded(style);
 }
 
 RenderElement* HTMLMediaElement::createRenderer(PassRef<RenderStyle> style)
 {
 #if ENABLE(PLUGIN_PROXY_FOR_VIDEO)
-    // Setup the renderer if we already have a proxy widget.
-    RenderEmbeddedObject* mediaRenderer = new RenderEmbeddedObject(*this, std::move(style));
-    if (m_proxyWidget) {
-        mediaRenderer->setWidget(m_proxyWidget);
+    if (shouldUseVideoPluginProxy()) {
+        // Setup the renderer if we already have a proxy widget.
+        RenderEmbeddedObject* mediaRenderer = new RenderEmbeddedObject(*this, std::move(style));
+        if (m_proxyWidget) {
+            mediaRenderer->setWidget(m_proxyWidget);
 
-        if (Frame* frame = document().frame())
-            frame->loader().client().showMediaPlayerProxyPlugin(m_proxyWidget.get());
+            if (Frame* frame = document().frame())
+                frame->loader().client().showMediaPlayerProxyPlugin(m_proxyWidget.get());
+        }
+        return mediaRenderer;
     }
-    return mediaRenderer;
-#else
-    return new RenderMedia(*this, std::move(style));
 #endif
+    return new RenderMedia(*this, std::move(style));
 }
 
-bool HTMLMediaElement::childShouldCreateRenderer(const Node* child) const
+bool HTMLMediaElement::childShouldCreateRenderer(const Node& child) const
 {
 #if ENABLE(MEDIA_CONTROLS_SCRIPT)
     return hasShadowRootParent(child) && HTMLElement::childShouldCreateRenderer(child);
@@ -598,7 +587,7 @@ bool HTMLMediaElement::childShouldCreateRenderer(const Node* child) const
     // be rendered. So this should return false for most of the children.
     // One exception is a shadow tree built for rendering controls which should be visible.
     // So we let them go here by comparing its subtree root with one of the controls.
-    return &mediaControls()->treeScope() == &child->treeScope()
+    return &mediaControls()->treeScope() == &child.treeScope()
         && hasShadowRootParent(child)
         && HTMLElement::childShouldCreateRenderer(child);
 #endif
@@ -653,7 +642,8 @@ void HTMLMediaElement::willAttachRenderers()
     ASSERT(!attached());
 
 #if ENABLE(PLUGIN_PROXY_FOR_VIDEO)
-    m_needWidgetUpdate = true;
+    if (shouldUseVideoPluginProxy())
+        m_needWidgetUpdate = true;
 #endif
 }
 
@@ -681,9 +671,10 @@ void HTMLMediaElement::scheduleDelayedAction(DelayedActionType actionType)
 
     if ((actionType & LoadMediaResource) && !(m_pendingActionFlags & LoadMediaResource)) {
 #if ENABLE(PLUGIN_PROXY_FOR_VIDEO)
-        createMediaPlayerProxy();
+        if (shouldUseVideoPluginProxy())
+            createMediaPlayerProxy();
 #endif
-        
+
         prepareForLoad();
         setFlags(m_pendingActionFlags, LoadMediaResource);
     }
@@ -762,7 +753,17 @@ HTMLMediaElement::NetworkState HTMLMediaElement::networkState() const
 
 String HTMLMediaElement::canPlayType(const String& mimeType, const String& keySystem, const URL& url) const
 {
-    MediaPlayer::SupportsType support = MediaPlayer::supportsType(ContentType(mimeType), keySystem, url, this);
+    MediaEngineSupportParameters parameters;
+    ContentType contentType(mimeType);
+    parameters.type = contentType.type().lower();
+    parameters.codecs = contentType.parameter(ASCIILiteral("codecs"));
+    parameters.url = url;
+#if ENABLE(ENCRYPTED_MEDIA)
+    parameters.keySystem = keySystem;
+#else
+    UNUSED_PARAM(keySystem);
+#endif
+    MediaPlayer::SupportsType support = MediaPlayer::supportsType(parameters, this);
     String canPlay;
 
     // 4.8.10.3
@@ -832,14 +833,15 @@ void HTMLMediaElement::prepareForLoad()
     closeMediaSource();
 #endif
 
-#if !ENABLE(PLUGIN_PROXY_FOR_VIDEO)
-    createMediaPlayer();
-#else
-    if (m_player)
-        m_player->cancelLoad();
-    else
-        createMediaPlayerProxy();
+#if ENABLE(PLUGIN_PROXY_FOR_VIDEO)
+    if (shouldUseVideoPluginProxy())
+        if (m_player)
+            m_player->cancelLoad();
+        else
+            createMediaPlayerProxy();
+    } else
 #endif
+    createMediaPlayer();
 
     // 4 - If the media element's networkState is not set to NETWORK_EMPTY, then run these substeps
     if (m_networkState != NETWORK_EMPTY) {
@@ -1010,10 +1012,11 @@ void HTMLMediaElement::loadNextSourceChild()
         return;
     }
 
-#if !ENABLE(PLUGIN_PROXY_FOR_VIDEO)
-    // Recreate the media player for the new url
-    createMediaPlayer();
+#if ENABLE(PLUGIN_PROXY_FOR_VIDEO)
+    if (!shouldUseVideoPluginProxy())
 #endif
+        // Recreate the media player for the new url
+        createMediaPlayer();
 
     m_loadState = LoadingFromSourceElement;
     loadResource(mediaURL, contentType, keySystem);
@@ -1084,7 +1087,7 @@ void HTMLMediaElement::loadResource(const URL& initialURL, ContentType& contentT
     LOG(Media, "HTMLMediaElement::loadResource - m_currentSrc -> %s", urlForLoggingMedia(m_currentSrc).utf8().data());
 
 #if ENABLE(MEDIA_STREAM)
-    if (MediaStreamRegistry::registry().lookupMediaStreamDescriptor(url.string()))
+    if (MediaStreamRegistry::registry().lookupMediaStreamPrivate(url.string()))
         removeBehaviorRestriction(RequireUserGestureForRateChangeRestriction);
 #endif
 
@@ -1113,8 +1116,8 @@ void HTMLMediaElement::loadResource(const URL& initialURL, ContentType& contentT
         m_mediaSource = HTMLMediaSource::lookup(url.string());
 
     if (m_mediaSource) {
-        if (m_mediaSource->attachToElement())
-            m_player->load(url, m_mediaSource);
+        if (m_mediaSource->attachToElement(this))
+            m_player->load(url, contentType, m_mediaSource);
         else {
             // Forget our reference to the MediaSource, so we leave it alone
             // while processing remainder of load failure.
@@ -1431,9 +1434,12 @@ void HTMLMediaElement::textTrackReadyStateChanged(TextTrack* track)
     }
 }
 
-void HTMLMediaElement::audioTrackEnabledChanged(AudioTrack*)
+void HTMLMediaElement::audioTrackEnabledChanged(AudioTrack* track)
 {
-    // We will want to change the media controls here once they exist
+    if (!RuntimeEnabledFeatures::sharedFeatures().webkitVideoTrackEnabled())
+        return;
+    if (m_audioTracks && m_audioTracks->contains(track))
+        m_audioTracks->scheduleChangeEvent();
 }
 
 void HTMLMediaElement::textTrackModeChanged(TextTrack* track)
@@ -1469,9 +1475,12 @@ void HTMLMediaElement::textTrackModeChanged(TextTrack* track)
     configureTextTrackDisplay(AssumeTextTrackVisibilityChanged);
 }
 
-void HTMLMediaElement::videoTrackSelectedChanged(VideoTrack*)
+void HTMLMediaElement::videoTrackSelectedChanged(VideoTrack* track)
 {
-    // We will want to change the media controls here once they exist
+    if (!RuntimeEnabledFeatures::sharedFeatures().webkitVideoTrackEnabled())
+        return;
+    if (m_videoTracks && m_videoTracks->contains(track))
+        m_videoTracks->scheduleChangeEvent();
 }
 
 void HTMLMediaElement::textTrackKindChanged(TextTrack* track)
@@ -1881,6 +1890,7 @@ void HTMLMediaElement::setReadyState(MediaPlayer::ReadyState state)
     } else {
         if (wasPotentiallyPlaying && m_readyState < HAVE_FUTURE_DATA) {
             // 4.8.10.8
+            invalidateCachedTime();
             scheduleTimeupdateEvent(false);
             scheduleEvent(eventNames().waitingEvent);
         }
@@ -2100,13 +2110,13 @@ void HTMLMediaElement::progressEventTimerFired(Timer<HTMLMediaElement>*)
 void HTMLMediaElement::rewind(double timeDelta)
 {
     LOG(Media, "HTMLMediaElement::rewind(%f)", timeDelta);
-    setCurrentTime(std::max(currentTime() - timeDelta, minTimeSeekable()), IGNORE_EXCEPTION);
+    setCurrentTime(std::max(currentTime() - timeDelta, minTimeSeekable()));
 }
 
 void HTMLMediaElement::returnToRealtime()
 {
     LOG(Media, "HTMLMediaElement::returnToRealtime");
-    setCurrentTime(maxTimeSeekable(), IGNORE_EXCEPTION);
+    setCurrentTime(maxTimeSeekable());
 }
 
 void HTMLMediaElement::addPlayedRange(double start, double end)
@@ -2136,17 +2146,39 @@ void HTMLMediaElement::prepareToPlay()
     m_player->prepareToPlay();
 }
 
-void HTMLMediaElement::seek(double time, ExceptionCode& ec)
+void HTMLMediaElement::fastSeek(double time)
+{
+    LOG(Media, "HTMLMediaElement::fastSeek(%f)", time);
+    // 4.7.10.9 Seeking
+    // 9. If the approximate-for-speed flag is set, adjust the new playback position to a value that will
+    // allow for playback to resume promptly. If new playback position before this step is before current
+    // playback position, then the adjusted new playback position must also be before the current playback
+    // position. Similarly, if the new playback position before this step is after current playback position,
+    // then the adjusted new playback position must also be after the current playback position.
+    refreshCachedTime();
+    double delta = time - currentTime();
+    double negativeTolerance = delta >= 0 ? delta : std::numeric_limits<double>::infinity();
+    double positiveTolerance = delta < 0 ? -delta : std::numeric_limits<double>::infinity();
+
+    seekWithTolerance(time, negativeTolerance, positiveTolerance);
+}
+
+void HTMLMediaElement::seek(double time)
 {
     LOG(Media, "HTMLMediaElement::seek(%f)", time);
+    seekWithTolerance(time, 0, 0);
+}
 
-    // 4.8.9.9 Seeking
+void HTMLMediaElement::seekWithTolerance(double time, double negativeTolerance, double positiveTolerance)
+{
+    // 4.8.10.9 Seeking
 
-    // 1 - If the media element's readyState is HAVE_NOTHING, then raise an INVALID_STATE_ERR exception.
-    if (m_readyState == HAVE_NOTHING || !m_player) {
-        ec = INVALID_STATE_ERR;
+    // 1 - Set the media element's show poster flag to false.
+    setDisplayMode(Video);
+
+    // 2 - If the media element's readyState is HAVE_NOTHING, abort these steps.
+    if (m_readyState == HAVE_NOTHING || !m_player)
         return;
-    }
 
     // If the media engine has been told to postpone loading data, let it go ahead now.
     if (m_preload < MediaPlayer::Auto && m_readyState < HAVE_FUTURE_DATA)
@@ -2156,20 +2188,24 @@ void HTMLMediaElement::seek(double time, ExceptionCode& ec)
     refreshCachedTime();
     double now = currentTime();
 
-    // 2 - If the element's seeking IDL attribute is true, then another instance of this algorithm is
+    // 3 - If the element's seeking IDL attribute is true, then another instance of this algorithm is
     // already running. Abort that other instance of the algorithm without waiting for the step that
     // it is running to complete.
     // Nothing specific to be done here.
 
-    // 3 - Set the seeking IDL attribute to true.
+    // 4 - Set the seeking IDL attribute to true.
     // The flag will be cleared when the engine tells us the time has actually changed.
     m_seeking = true;
 
-    // 5 - If the new playback position is later than the end of the media resource, then let it be the end 
+    // 5 - If the seek was in response to a DOM method call or setting of an IDL attribute, then continue
+    // the script. The remainder of these steps must be run asynchronously.
+    // Nothing to be done here.
+
+    // 6 - If the new playback position is later than the end of the media resource, then let it be the end 
     // of the media resource instead.
     time = std::min(time, duration());
 
-    // 6 - If the new playback position is less than the earliest possible position, let it be that position instead.
+    // 7 - If the new playback position is less than the earliest possible position, let it be that position instead.
     double earliestTime = m_player->startTime();
     time = std::max(time, earliestTime);
 
@@ -2185,7 +2221,7 @@ void HTMLMediaElement::seek(double time, ExceptionCode& ec)
 #endif
     time = m_player->mediaTimeForTimeValue(time);
 
-    // 7 - If the (possibly now changed) new playback position is not in one of the ranges given in the 
+    // 8 - If the (possibly now changed) new playback position is not in one of the ranges given in the
     // seekable attribute, then let it be the position in one of the ranges given in the seekable attribute 
     // that is the nearest to the new playback position. ... If there are no ranges given in the seekable
     // attribute then set the seeking IDL attribute to false and abort these steps.
@@ -2221,29 +2257,33 @@ void HTMLMediaElement::seek(double time, ExceptionCode& ec)
     m_lastSeekTime = time;
     m_sentEndEvent = false;
 
-    // 8 - Set the current playback position to the given new playback position
-    m_player->seek(time);
-
-    // 9 - Queue a task to fire a simple event named seeking at the element.
+    // 10 - Queue a task to fire a simple event named seeking at the element.
     scheduleEvent(eventNames().seekingEvent);
 
-    // 10 - Queue a task to fire a simple event named timeupdate at the element.
-    scheduleTimeupdateEvent(false);
+    // 11 - Set the current playback position to the given new playback position
+    m_player->seekWithTolerance(time, negativeTolerance, positiveTolerance);
 
-    // 11-15 are handled, if necessary, when the engine signals a readystate change.
+    // 12 - Wait until the user agent has established whether or not the media data for the new playback
+    // position is available, and, if it is, until it has decoded enough data to play back that position.
+    // 13 - Await a stable state. The synchronous section consists of all the remaining steps of this algorithm.
 }
 
 void HTMLMediaElement::finishSeek()
 {
     LOG(Media, "HTMLMediaElement::finishSeek");
 
-    // 4.8.10.9 Seeking step 14
+    // 4.8.10.9 Seeking
+    // 14 - Set the seeking IDL attribute to false.
     m_seeking = false;
 
-    // 4.8.10.9 Seeking step 15
-    scheduleEvent(eventNames().seekedEvent);
+    // 15 - Run the time maches on steps.
+    // Handled by mediaPlayerTimeChanged().
 
-    setDisplayMode(Video);
+    // 16 - Queue a task to fire a simple event named timeupdate at the element.
+    scheduleEvent(eventNames().timeupdateEvent);
+
+    // 17 - Queue a task to fire a simple event named seeked at the element.
+    scheduleEvent(eventNames().seekedEvent);
 }
 
 HTMLMediaElement::ReadyState HTMLMediaElement::readyState() const
@@ -2342,24 +2382,12 @@ double HTMLMediaElement::currentTime() const
     return m_cachedTime;
 }
 
-void HTMLMediaElement::setCurrentTime(double time, ExceptionCode& ec)
+void HTMLMediaElement::setCurrentTime(double time)
 {
-    if (m_mediaController) {
-        ec = INVALID_STATE_ERR;
+    if (m_mediaController)
         return;
-    }
-    seek(time, ec);
-}
 
-double HTMLMediaElement::initialTime() const
-{
-    if (m_fragmentStartTime != MediaPlayer::invalidTime())
-        return m_fragmentStartTime;
-
-    if (!m_player)
-        return 0;
-
-    return m_player->initialTime();
+    seek(time);
 }
 
 double HTMLMediaElement::duration() const
@@ -2490,16 +2518,6 @@ void HTMLMediaElement::play()
     if (ScriptController::processingUserGesture())
         removeBehaviorsRestrictionsAfterFirstUserGesture();
 
-    Settings* settings = document().settings();
-    if (settings && settings->needsSiteSpecificQuirks() && m_dispatchingCanPlayEvent && !m_loadInitiatedByUserGesture) {
-        // It should be impossible to be processing the canplay event while handling a user gesture
-        // since it is dispatched asynchronously.
-        ASSERT(!ScriptController::processingUserGesture());
-        String host = document().baseURL().host();
-        if (host.endsWith(".npr.org", false) || equalIgnoringCase(host, "npr.org"))
-            return;
-    }
-
     playInternal();
 }
 
@@ -2512,7 +2530,7 @@ void HTMLMediaElement::playInternal()
         scheduleDelayedAction(LoadMediaResource);
 
     if (endedPlayback())
-        seek(0, IGNORE_EXCEPTION);
+        seek(0);
 
     if (m_mediaController)
         m_mediaController->bringElementUpToSpeed(this);
@@ -2895,6 +2913,7 @@ void HTMLMediaElement::mediaPlayerDidAddTextTrack(PassRefPtr<InbandTextTrackPriv
     // 4.8.10.12.2 Sourcing in-band text tracks
     // 1. Associate the relevant data with a new text track and its corresponding new TextTrack object.
     RefPtr<InbandTextTrack> textTrack = InbandTextTrack::create(ActiveDOMObject::scriptExecutionContext(), this, prpTrack);
+    textTrack->setMediaElement(this);
     
     // 2. Set the new text track's kind, label, and language based on the semantics of the relevant data,
     // as defined by the relevant specification. If there is no label in that data, then the label must
@@ -3123,7 +3142,7 @@ PassRefPtr<TextTrack> HTMLMediaElement::addTextTrack(const String& kind, const S
 
     // 5. Create a new text track corresponding to the new object, and set its text track kind to kind, its text 
     // track label to label, its text track language to language...
-    RefPtr<TextTrack> textTrack = TextTrack::create(ActiveDOMObject::scriptExecutionContext(), this, kind, label, language);
+    RefPtr<TextTrack> textTrack = TextTrack::create(ActiveDOMObject::scriptExecutionContext(), this, kind, emptyString(), label, language);
 
     // Note, due to side effects when changing track parameters, we have to
     // first append the track to the text track list.
@@ -3521,7 +3540,15 @@ URL HTMLMediaElement::selectNextSourceChild(ContentType* contentType, String* ke
             if (shouldLog)
                 LOG(Media, "HTMLMediaElement::selectNextSourceChild - 'type' is '%s' - key system is '%s'", type.utf8().data(), system.utf8().data());
 #endif
-            if (!MediaPlayer::supportsType(ContentType(type), system, mediaURL, this))
+            MediaEngineSupportParameters parameters;
+            ContentType contentType(type);
+            parameters.type = contentType.type().lower();
+            parameters.codecs = contentType.parameter(ASCIILiteral("codecs"));
+            parameters.url = mediaURL;
+#if ENABLE(ENCRYPTED_MEDIA)
+            parameters.keySystem = system;
+#endif
+            if (!MediaPlayer::supportsType(parameters, this))
                 goto check_again;
         }
 
@@ -3665,18 +3692,18 @@ void HTMLMediaElement::mediaPlayerTimeChanged(MediaPlayer*)
     double now = currentTime();
     double dur = duration();
     
-    // When the current playback position reaches the end of the media resource when the direction of
-    // playback is forwards, then the user agent must follow these steps:
-    if (!std::isnan(dur) && dur && now >= dur && m_playbackRate > 0) {
+    // When the current playback position reaches the end of the media resource then the user agent must follow these steps:
+    if (!std::isnan(dur) && dur) {
         // If the media element has a loop attribute specified and does not have a current media controller,
-        if (loop() && !m_mediaController) {
+        if (loop() && !m_mediaController && m_playbackRate > 0) {
             m_sentEndEvent = false;
-            //  then seek to the earliest possible position of the media resource and abort these steps.
-            seek(0, IGNORE_EXCEPTION);
-        } else {
+            // then seek to the earliest possible position of the media resource and abort these steps when the direction of
+            // playback is forwards,
+            if (now >= dur)
+                seek(0);
+        } else if ((now <= 0 && m_playbackRate < 0) || (now >= dur && m_playbackRate > 0)) {
             // If the media element does not have a current media controller, and the media element
-            // has still ended playback, and the direction of playback is still forwards, and paused
-            // is false,
+            // has still ended playback and paused is false,
             if (!m_mediaController && !m_paused) {
                 // changes paused to true and fires a simple event named pause at the media element.
                 m_paused = true;
@@ -3690,7 +3717,8 @@ void HTMLMediaElement::mediaPlayerTimeChanged(MediaPlayer*)
             // If the media element has a current media controller, then report the controller state
             // for the media element's current media controller.
             updateMediaController();
-        }
+        } else
+            m_sentEndEvent = false;
     }
     else
         m_sentEndEvent = false;
@@ -3737,7 +3765,7 @@ void HTMLMediaElement::mediaPlayerDurationChanged(MediaPlayer* player)
     double now = currentTime();
     double dur = duration();
     if (now > dur)
-        seek(dur, IGNORE_EXCEPTION);
+        seek(dur);
 
     endProcessingMediaPlayerCallback();
 }
@@ -4150,14 +4178,11 @@ void HTMLMediaElement::clearMediaPlayer(int flags)
     removeAllInbandTracks();
 #endif
 
-#if !ENABLE(PLUGIN_PROXY_FOR_VIDEO)
-
 #if ENABLE(MEDIA_SOURCE)
     closeMediaSource();
 #endif
 
     m_player.clear();
-#endif
     stopPeriodicTimers();
     m_loadTimer.stop();
 
@@ -4274,24 +4299,26 @@ void HTMLMediaElement::visibilityStateChanged()
 void HTMLMediaElement::defaultEventHandler(Event* event)
 {
 #if ENABLE(PLUGIN_PROXY_FOR_VIDEO)
-    auto renderer = this->renderer();
-    if (!renderer || !renderer->isWidget())
-        return;
+    if (shouldUseVideoPluginProxy()) {
+        auto renderer = this->renderer();
+        if (!renderer || !renderer->isWidget())
+            return;
 
-    if (Widget* widget = toRenderWidget(renderer)->widget())
-        widget->handleEvent(event);
-#else
-    HTMLElement::defaultEventHandler(event);
+        if (Widget* widget = toRenderWidget(renderer)->widget())
+            widget->handleEvent(event);
+        return;
+    }
 #endif
+    HTMLElement::defaultEventHandler(event);
 }
 
 bool HTMLMediaElement::willRespondToMouseClickEvents()
 {
 #if ENABLE(PLUGIN_PROXY_FOR_VIDEO)
-    return true;
-#else
-    return HTMLElement::willRespondToMouseClickEvents();
+    if (shouldUseVideoPluginProxy())
+        return true;
 #endif
+    return HTMLElement::willRespondToMouseClickEvents();
 }
 
 #if ENABLE(VIDEO_TRACK)
@@ -4384,7 +4411,7 @@ void HTMLMediaElement::createMediaPlayerProxy()
     
     // Hang onto the proxy widget so it won't be destroyed if the plug-in is set to
     // display:none
-    m_proxyWidget = frame->loader().subframeLoader().loadMediaPlayerProxyPlugin(this, url, paramNames, paramValues);
+    m_proxyWidget = frame->loader().subframeLoader().loadMediaPlayerProxyPlugin(*this, url, paramNames, paramValues);
     if (m_proxyWidget)
         m_needWidgetUpdate = false;
 }
@@ -4401,7 +4428,7 @@ void HTMLMediaElement::updateWidget(PluginCreationOption)
     mediaElement->getPluginProxyParams(kurl, paramNames, paramValues);
     // FIXME: What if document().frame() is 0?
     SubframeLoader& loader = document().frame()->loader().subframeLoader();
-    loader.loadMediaPlayerProxyPlugin(mediaElement, kurl, paramNames, paramValues);
+    loader.loadMediaPlayerProxyPlugin(*mediaElement, kurl, paramNames, paramValues);
 }
 
 #endif // ENABLE(PLUGIN_PROXY_FOR_VIDEO)
@@ -4711,13 +4738,25 @@ bool HTMLMediaElement::createMediaControls()
 
 void HTMLMediaElement::configureMediaControls()
 {
+#if ENABLE(PLUGIN_PROXY_FOR_VIDEO)
+    if (shouldUseVideoPluginProxy()) {
+        if (m_player)
+            m_player->setControls(controls());
+
+        if (!hasMediaControls() && inDocument())
+            createMediaControls();
+        return;
+    }
+#endif
+
 #if ENABLE(MEDIA_CONTROLS_SCRIPT)
     if (!controls() || !inDocument())
         return;
 
     ensureUserAgentShadowRoot();
     return;
-#elif !ENABLE(PLUGIN_PROXY_FOR_VIDEO)
+#endif
+
     if (!controls() || !inDocument()) {
         if (hasMediaControls())
             mediaControls()->hide();
@@ -4728,13 +4767,6 @@ void HTMLMediaElement::configureMediaControls()
         return;
 
     mediaControls()->show();
-#else 
-    if (m_player)
-        m_player->setControls(controls());
-
-    if (!hasMediaControls() && inDocument())
-        createMediaControls();
-#endif
 }
 
 #if ENABLE(VIDEO_TRACK)
@@ -4918,7 +4950,7 @@ void HTMLMediaElement::setMediaGroup(const String& group)
     }
 
     // Otherwise, let controller be a newly created MediaController.
-    setController(MediaController::create(Node::scriptExecutionContext()));
+    setController(MediaController::create(document()));
 }
 
 MediaController* HTMLMediaElement::controller() const
@@ -4944,24 +4976,6 @@ void HTMLMediaElement::updateMediaController()
 {
     if (m_mediaController)
         m_mediaController->reportControllerState();
-}
-
-bool HTMLMediaElement::dispatchEvent(PassRefPtr<Event> event)
-{
-    bool dispatchResult;
-    bool isCanPlayEvent;
-
-    isCanPlayEvent = (event->type() == eventNames().canplayEvent);
-
-    if (isCanPlayEvent)
-        m_dispatchingCanPlayEvent = true;
-
-    dispatchResult = HTMLElement::dispatchEvent(event);
-
-    if (isCanPlayEvent)
-        m_dispatchingCanPlayEvent = false;
-
-    return dispatchResult;
 }
 
 bool HTMLMediaElement::isBlocked() const
@@ -5024,7 +5038,7 @@ void HTMLMediaElement::applyMediaFragmentURI()
 {
     if (m_fragmentStartTime != MediaPlayer::invalidTime()) {
         m_sentEndEvent = false;
-        seek(m_fragmentStartTime, IGNORE_EXCEPTION);
+        seek(m_fragmentStartTime);
     }
 }
 
@@ -5171,6 +5185,13 @@ void HTMLMediaElement::removeBehaviorsRestrictionsAfterFirstUserGesture()
 {
     m_restrictions = NoRestrictions;
 }
+
+#if ENABLE(PLUGIN_PROXY_FOR_VIDEO)
+bool HTMLMediaElement::shouldUseVideoPluginProxy() const
+{
+    return document()->settings() && document()->settings()->isVideoPluginProxyEnabled();
+}
+#endif
 
 #if ENABLE(MEDIA_CONTROLS_SCRIPT)
 DOMWrapperWorld& HTMLMediaElement::ensureIsolatedWorld()

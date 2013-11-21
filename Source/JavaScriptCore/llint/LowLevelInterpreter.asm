@@ -31,16 +31,24 @@ if ARMv7s
 end
 
 # These declarations must match interpreter/JSStack.h.
-const CallFrameHeaderSize = 48
-const CallFrameHeaderSlots = 6
-const ArgumentCount = 48
-const CallerFrame = 40
-const Callee = 32
-const ScopeChain = 24
-const ReturnPC = 16
-const CodeBlock = 8
 
-const ThisArgumentOffset = CallFrameHeaderSize + 8
+if JSVALUE64
+const PtrSize = 8
+const CallFrameHeaderSlots = 6
+else
+const PtrSize = 4
+const CallFrameHeaderSlots = 5
+end
+const SlotSize = 8
+
+const CallerFrame = 0
+const ReturnPC = CallerFrame + PtrSize
+const CodeBlock = ReturnPC + PtrSize
+const ScopeChain = CodeBlock + SlotSize
+const Callee = ScopeChain + SlotSize
+const ArgumentCount = Callee + SlotSize
+const ThisArgumentOffset = ArgumentCount + SlotSize
+const CallFrameHeaderSize = ThisArgumentOffset
 
 # Some value representation constants.
 if JSVALUE64
@@ -62,6 +70,11 @@ const EmptyValueTag = -6
 const DeletedValueTag = -7
 const LowestTag = DeletedValueTag
 end
+
+# Watchpoint states
+const ClearWatchpoint = 0
+const IsWatched = 1
+const IsInvalidated = 2
 
 # Some register conventions.
 if JSVALUE64
@@ -372,6 +385,7 @@ macro functionInitialization(profileArgSkip)
         
     # Check stack height.
     loadi CodeBlock::m_numCalleeRegisters[t1], t0
+    addi 1, t0 # Account that local0 goes at slot -1
     loadp CodeBlock::m_vm[t1], t2
     loadp VM::interpreter[t2], t2
     lshiftp 3, t0
@@ -412,6 +426,12 @@ macro doReturn()
     ret
 end
 
+# stub to call into JavaScript
+# EncodedJSValue callToJavaScript(void* code, Register* topOfStack)
+# Note, if this stub or one of it's related macros is changed, make the
+# equivalent changes in jit/JITStubsX86.h and/or jit/JITStubsMSVC64.asm
+_callToJavaScript:
+    doCallToJavaScript()
 
 # Indicate the beginning of LLInt.
 _llint_begin:

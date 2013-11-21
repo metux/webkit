@@ -219,6 +219,8 @@
     void webkitDidExitFullScreenForElement(Element element);
 #endif
 
+    void setApplicationCacheOriginQuota(unsigned long long quota);
+
     void registerURLSchemeAsBypassingContentSecurityPolicy(DOMString scheme);
     void removeURLSchemeRegisteredAsBypassingContentSecurityPolicy(DOMString scheme);
 
@@ -271,4 +273,6 @@
     [RaisesException] boolean isPluginUnavailabilityIndicatorObscured(Element element);
 
     [RaisesException] ClientRect selectionBounds();
+    
+    [Conditional=MEDIA_SOURCE] void initializeMockMediaSource();
 };

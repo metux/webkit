@@ -2,34 +2,31 @@
 <html>
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
-<title>WebKitDOMVideoTrack</title>
+<title>WebKitDOMGTK+ Reference Manual: WebKitDOMVideoTrack</title>
 <meta name="generator" content="DocBook XSL Stylesheets V1.78.1">
 <link rel="home" href="index.html" title="WebKitDOMGTK+ Reference Manual">
 <link rel="up" href="ch01.html" title="Class Overview">
 <link rel="prev" href="WebKitDOMTrackEvent.html" title="WebKitDOMTrackEvent">
 <link rel="next" href="WebKitDOMVideoTrackList.html" title="WebKitDOMVideoTrackList">
-<meta name="generator" content="GTK-Doc V1.18.1 (XML mode)">
+<meta name="generator" content="GTK-Doc V1.19.1 (XML mode)">
 <link rel="stylesheet" href="style.css" type="text/css">
 </head>
 <body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF">
-<table class="navigation" id="top" width="100%" summary="Navigation header" cellpadding="2" cellspacing="2">
-<tr valign="middle">
-<td><a accesskey="p" href="WebKitDOMTrackEvent.html"><img src="left.png" width="24" height="24" border="0" alt="Prev"></a></td>
-<td><a accesskey="u" href="ch01.html"><img src="up.png" width="24" height="24" border="0" alt="Up"></a></td>
-<td><a accesskey="h" href="index.html"><img src="home.png" width="24" height="24" border="0" alt="Home"></a></td>
-<th width="100%" align="center">WebKitDOMGTK+ Reference Manual</th>
-<td><a accesskey="n" href="WebKitDOMVideoTrackList.html"><img src="right.png" width="24" height="24" border="0" alt="Next"></a></td>
-</tr>
-<tr><td colspan="5" class="shortcuts">
-<a href="#WebKitDOMVideoTrack.synopsis" class="shortcut">Top</a>
+<table class="navigation" id="top" width="100%" summary="Navigation header" cellpadding="2" cellspacing="10"><tr valign="middle">
+<td width="100%" align="left">
+<a href="#" class="shortcut">Top</a>
                    | 
                   <a href="#WebKitDOMVideoTrack.description" class="shortcut">Description</a>
                    | 
                   <a href="#WebKitDOMVideoTrack.object-hierarchy" class="shortcut">Object Hierarchy</a>
                    | 
                   <a href="#WebKitDOMVideoTrack.properties" class="shortcut">Properties</a>
-</td></tr>
-</table>
+</td>
+<td><a accesskey="h" href="index.html"><img src="home.png" width="16" height="16" border="0" alt="Home"></a></td>
+<td><a accesskey="u" href="ch01.html"><img src="up.png" width="16" height="16" border="0" alt="Up"></a></td>
+<td><a accesskey="p" href="WebKitDOMTrackEvent.html"><img src="left.png" width="16" height="16" border="0" alt="Prev"></a></td>
+<td><a accesskey="n" href="WebKitDOMVideoTrackList.html"><img src="right.png" width="16" height="16" border="0" alt="Next"></a></td>
+</tr></table>
 <div class="refentry">
 <a name="WebKitDOMVideoTrack"></a><div class="titlepage"></div>
 <div class="refnamediv"><table width="100%"><tr>
@@ -43,9 +40,7 @@
 <a name="WebKitDOMVideoTrack.synopsis"></a><h2>Synopsis</h2>
 <pre class="synopsis">                    <a class="link" href="WebKitDOMVideoTrack.html#WebKitDOMVideoTrack-struct" title="WebKitDOMVideoTrack">WebKitDOMVideoTrack</a>;
 <a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gchar</span></a> *             <a class="link" href="WebKitDOMVideoTrack.html#webkit-dom-video-track-get-id" title="webkit_dom_video_track_get_id ()">webkit_dom_video_track_get_id</a>       (<em class="parameter"><code><a class="link" href="WebKitDOMVideoTrack.html" title="WebKitDOMVideoTrack"><span class="type">WebKitDOMVideoTrack</span></a> *self</code></em>);
-<a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gchar</span></a> *             <a class="link" href="WebKitDOMVideoTrack.html#webkit-dom-video-track-get-kind" title="webkit_dom_video_track_get_kind ()">webkit_dom_video_track_get_kind</a>     (<em class="parameter"><code><a class="link" href="WebKitDOMVideoTrack.html" title="WebKitDOMVideoTrack"><span class="type">WebKitDOMVideoTrack</span></a> *self</code></em>);
 <a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gchar</span></a> *             <a class="link" href="WebKitDOMVideoTrack.html#webkit-dom-video-track-get-label" title="webkit_dom_video_track_get_label ()">webkit_dom_video_track_get_label</a>    (<em class="parameter"><code><a class="link" href="WebKitDOMVideoTrack.html" title="WebKitDOMVideoTrack"><span class="type">WebKitDOMVideoTrack</span></a> *self</code></em>);
-<a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gchar</span></a> *             <a class="link" href="WebKitDOMVideoTrack.html#webkit-dom-video-track-get-language" title="webkit_dom_video_track_get_language ()">webkit_dom_video_track_get_language</a> (<em class="parameter"><code><a class="link" href="WebKitDOMVideoTrack.html" title="WebKitDOMVideoTrack"><span class="type">WebKitDOMVideoTrack</span></a> *self</code></em>);
 <a href="../glib/glib-Basic-Types.html#gboolean"><span class="returnvalue">gboolean</span></a>            <a class="link" href="WebKitDOMVideoTrack.html#webkit-dom-video-track-get-selected" title="webkit_dom_video_track_get_selected ()">webkit_dom_video_track_get_selected</a> (<em class="parameter"><code><a class="link" href="WebKitDOMVideoTrack.html" title="WebKitDOMVideoTrack"><span class="type">WebKitDOMVideoTrack</span></a> *self</code></em>);
 <span class="returnvalue">void</span>                <a class="link" href="WebKitDOMVideoTrack.html#webkit-dom-video-track-set-selected" title="webkit_dom_video_track_set_selected ()">webkit_dom_video_track_set_selected</a> (<em class="parameter"><code><a class="link" href="WebKitDOMVideoTrack.html" title="WebKitDOMVideoTrack"><span class="type">WebKitDOMVideoTrack</span></a> *self</code></em>,
                                                          <em class="parameter"><code><a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a> value</code></em>);
@@ -63,9 +58,7 @@
 <a name="WebKitDOMVideoTrack.properties"></a><h2>Properties</h2>
 <pre class="synopsis">
   "<a class="link" href="WebKitDOMVideoTrack.html#WebKitDOMVideoTrack--id" title='The "id" property'>id</a>"                       <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a>*                : Read
-  "<a class="link" href="WebKitDOMVideoTrack.html#WebKitDOMVideoTrack--kind" title='The "kind" property'>kind</a>"                     <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a>*                : Read
   "<a class="link" href="WebKitDOMVideoTrack.html#WebKitDOMVideoTrack--label" title='The "label" property'>label</a>"                    <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a>*                : Read
-  "<a class="link" href="WebKitDOMVideoTrack.html#WebKitDOMVideoTrack--language" title='The "language" property'>language</a>"                 <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a>*                : Read
   "<a class="link" href="WebKitDOMVideoTrack.html#WebKitDOMVideoTrack--selected" title='The "selected" property'>selected</a>"                 <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read / Write
 </pre>
 </div>
@@ -91,27 +84,18 @@
 <col align="left" valign="top">
 <col>
 </colgroup>
-<tbody><tr>
+<tbody>
+<tr>
 <td><p><span class="term"><em class="parameter"><code>self</code></em> :</span></p></td>
 <td>A <a class="link" href="WebKitDOMVideoTrack.html" title="WebKitDOMVideoTrack"><span class="type">WebKitDOMVideoTrack</span></a>
 </td>
-</tr></tbody>
-</table></div>
-</div>
-<hr>
-<div class="refsect2">
-<a name="webkit-dom-video-track-get-kind"></a><h3>webkit_dom_video_track_get_kind ()</h3>
-<pre class="programlisting"><a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gchar</span></a> *             webkit_dom_video_track_get_kind     (<em class="parameter"><code><a class="link" href="WebKitDOMVideoTrack.html" title="WebKitDOMVideoTrack"><span class="type">WebKitDOMVideoTrack</span></a> *self</code></em>);</pre>
-<div class="variablelist"><table border="0" class="variablelist">
-<colgroup>
-<col align="left" valign="top">
-<col>
-</colgroup>
-<tbody><tr>
-<td><p><span class="term"><em class="parameter"><code>self</code></em> :</span></p></td>
-<td>A <a class="link" href="WebKitDOMVideoTrack.html" title="WebKitDOMVideoTrack"><span class="type">WebKitDOMVideoTrack</span></a>
+</tr>
+<tr>
+<td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
+<td>A <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a>
 </td>
-</tr></tbody>
+</tr>
+</tbody>
 </table></div>
 </div>
 <hr>
@@ -123,27 +107,18 @@
 <col align="left" valign="top">
 <col>
 </colgroup>
-<tbody><tr>
+<tbody>
+<tr>
 <td><p><span class="term"><em class="parameter"><code>self</code></em> :</span></p></td>
 <td>A <a class="link" href="WebKitDOMVideoTrack.html" title="WebKitDOMVideoTrack"><span class="type">WebKitDOMVideoTrack</span></a>
 </td>
-</tr></tbody>
-</table></div>
-</div>
-<hr>
-<div class="refsect2">
-<a name="webkit-dom-video-track-get-language"></a><h3>webkit_dom_video_track_get_language ()</h3>
-<pre class="programlisting"><a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gchar</span></a> *             webkit_dom_video_track_get_language (<em class="parameter"><code><a class="link" href="WebKitDOMVideoTrack.html" title="WebKitDOMVideoTrack"><span class="type">WebKitDOMVideoTrack</span></a> *self</code></em>);</pre>
-<div class="variablelist"><table border="0" class="variablelist">
-<colgroup>
-<col align="left" valign="top">
-<col>
-</colgroup>
-<tbody><tr>
-<td><p><span class="term"><em class="parameter"><code>self</code></em> :</span></p></td>
-<td>A <a class="link" href="WebKitDOMVideoTrack.html" title="WebKitDOMVideoTrack"><span class="type">WebKitDOMVideoTrack</span></a>
+</tr>
+<tr>
+<td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
+<td>A <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a>
 </td>
-</tr></tbody>
+</tr>
+</tbody>
 </table></div>
 </div>
 <hr>
@@ -155,11 +130,18 @@
 <col align="left" valign="top">
 <col>
 </colgroup>
-<tbody><tr>
+<tbody>
+<tr>
 <td><p><span class="term"><em class="parameter"><code>self</code></em> :</span></p></td>
 <td>A <a class="link" href="WebKitDOMVideoTrack.html" title="WebKitDOMVideoTrack"><span class="type">WebKitDOMVideoTrack</span></a>
 </td>
-</tr></tbody>
+</tr>
+<tr>
+<td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
+<td>A <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>
+</td>
+</tr>
+</tbody>
 </table></div>
 </div>
 <hr>
@@ -197,23 +179,9 @@
 </div>
 <hr>
 <div class="refsect2">
-<a name="WebKitDOMVideoTrack--kind"></a><h3>The <code class="literal">"kind"</code> property</h3>
-<pre class="programlisting">  "kind"                     <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a>*                : Read</pre>
-<p>read-only gchar* VideoTrack:kind.</p>
-<p>Default value: ""</p>
-</div>
-<hr>
-<div class="refsect2">
 <a name="WebKitDOMVideoTrack--label"></a><h3>The <code class="literal">"label"</code> property</h3>
 <pre class="programlisting">  "label"                    <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a>*                : Read</pre>
 <p>read-only gchar* VideoTrack:label.</p>
-<p>Default value: ""</p>
-</div>
-<hr>
-<div class="refsect2">
-<a name="WebKitDOMVideoTrack--language"></a><h3>The <code class="literal">"language"</code> property</h3>
-<pre class="programlisting">  "language"                 <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a>*                : Read</pre>
-<p>read-only gchar* VideoTrack:language.</p>
 <p>Default value: ""</p>
 </div>
 <hr>
@@ -227,6 +195,6 @@
 </div>
 <div class="footer">
 <hr>
-          Generated by GTK-Doc V1.18.1</div>
+          Generated by GTK-Doc V1.19.1</div>
 </body>
 </html>

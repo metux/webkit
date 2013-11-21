@@ -38,7 +38,6 @@
 #include "IdentifiersFactory.h"
 #include "InspectorDOMAgent.h"
 #include "InspectorFrontend.h"
-#include "InspectorState.h"
 #include "InstrumentingAgents.h"
 #include "IntRect.h"
 #include "PseudoElement.h"
@@ -49,13 +48,8 @@
 
 namespace WebCore {
 
-namespace LayerTreeAgentState {
-static const char layerTreeAgentEnabled[] = "layerTreeAgentEnabled";
-};
-
-InspectorLayerTreeAgent::InspectorLayerTreeAgent(InstrumentingAgents* instrumentingAgents, InspectorCompositeState* state)
-    : InspectorBaseAgent<InspectorLayerTreeAgent>("LayerTree", instrumentingAgents, state)
-    , m_frontend(0)
+InspectorLayerTreeAgent::InspectorLayerTreeAgent(InstrumentingAgents* instrumentingAgents)
+    : InspectorBaseAgent(ASCIILiteral("LayerTree"), instrumentingAgents)
 {
 }
 
@@ -64,21 +58,18 @@ InspectorLayerTreeAgent::~InspectorLayerTreeAgent()
     reset();
 }
 
-void InspectorLayerTreeAgent::setFrontend(InspectorFrontend* frontend)
+void InspectorLayerTreeAgent::didCreateFrontendAndBackend(InspectorFrontendChannel* frontendChannel, InspectorBackendDispatcher* backendDispatcher)
 {
-    m_frontend = frontend->layertree();
+    m_frontendDispatcher = std::make_unique<InspectorLayerTreeFrontendDispatcher>(frontendChannel);
+    m_backendDispatcher = InspectorLayerTreeBackendDispatcher::create(backendDispatcher, this);
 }
 
-void InspectorLayerTreeAgent::clearFrontend()
+void InspectorLayerTreeAgent::willDestroyFrontendAndBackend()
 {
-    m_frontend = 0;
-    disable(0);
-}
+    m_frontendDispatcher = nullptr;
+    m_backendDispatcher.clear();
 
-void InspectorLayerTreeAgent::restore()
-{
-    if (m_state->getBoolean(LayerTreeAgentState::layerTreeAgentEnabled))
-        enable(0);
+    disable(nullptr);
 }
 
 void InspectorLayerTreeAgent::reset()
@@ -91,21 +82,17 @@ void InspectorLayerTreeAgent::reset()
 
 void InspectorLayerTreeAgent::enable(ErrorString*)
 {
-    m_state->setBoolean(LayerTreeAgentState::layerTreeAgentEnabled, true);
     m_instrumentingAgents->setInspectorLayerTreeAgent(this);
 }
 
 void InspectorLayerTreeAgent::disable(ErrorString*)
 {
-    if (!m_state->getBoolean(LayerTreeAgentState::layerTreeAgentEnabled))
-        return;
-    m_state->setBoolean(LayerTreeAgentState::layerTreeAgentEnabled, false);
     m_instrumentingAgents->setInspectorLayerTreeAgent(0);
 }
 
 void InspectorLayerTreeAgent::layerTreeDidChange()
 {
-    m_frontend->layerTreeDidChange();
+    m_frontendDispatcher->layerTreeDidChange();
 }
 
 void InspectorLayerTreeAgent::renderLayerDestroyed(const RenderLayer* renderLayer)

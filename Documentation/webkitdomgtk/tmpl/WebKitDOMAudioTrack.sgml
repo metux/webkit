@@ -9,12 +9,10 @@ WebKitDOMAudioTrack
 
 </para>
 
-
 <!-- ##### SECTION See_Also ##### -->
 <para>
 
 </para>
-
 
 <!-- ##### SECTION Stability_Level ##### -->
 
@@ -38,17 +36,7 @@ WebKitDOMAudioTrack
 
 </para>
 
-<!-- ##### ARG WebKitDOMAudioTrack:kind ##### -->
-<para>
-
-</para>
-
 <!-- ##### ARG WebKitDOMAudioTrack:label ##### -->
-<para>
-
-</para>
-
-<!-- ##### ARG WebKitDOMAudioTrack:language ##### -->
 <para>
 
 </para>
@@ -62,25 +50,7 @@ WebKitDOMAudioTrack
 @Returns: 
 
 
-<!-- ##### FUNCTION webkit_dom_audio_track_get_kind ##### -->
-<para>
-
-</para>
-
-@self: 
-@Returns: 
-
-
 <!-- ##### FUNCTION webkit_dom_audio_track_get_label ##### -->
-<para>
-
-</para>
-
-@self: 
-@Returns: 
-
-
-<!-- ##### FUNCTION webkit_dom_audio_track_get_language ##### -->
 <para>
 
 </para>

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011 Apple Inc. All rights reserved.
+ * Copyright (C) 2011, 2013 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -71,6 +71,11 @@ const size_t APIClientTraits<WKPageLoaderClient>::interfaceSizesByVersion[] = {
     sizeof(WKPageLoaderClient)
 };
 
+const size_t APIClientTraits<WKPagePolicyClient>::interfaceSizesByVersion[] = {
+    offsetof(WKPagePolicyClient, decidePolicyForNavigationAction),
+    sizeof(WKPagePolicyClient)
+};
+
 const size_t APIClientTraits<WKPageUIClient>::interfaceSizesByVersion[] = {
     offsetof(WKPageUIClient, createNewPage),
     offsetof(WKPageUIClient, showColorPicker),
@@ -101,6 +106,11 @@ const size_t APIClientTraits<WKContextInjectedBundleClient>::interfaceSizesByVer
 const size_t APIClientTraits<WKIconDatabaseClient>::interfaceSizesByVersion[] = {
     offsetof(WKIconDatabaseClient, iconDataReadyForPageURL),
     sizeof(WKIconDatabaseClient)
+};
+
+const size_t APIClientTraits<WKGeolocationProvider>::interfaceSizesByVersion[] = {
+    offsetof(WKGeolocationProvider, setEnableHighAccuracy),
+    sizeof(WKGeolocationProvider)
 };
 
 } // namespace WebKit

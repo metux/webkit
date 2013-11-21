@@ -39,9 +39,8 @@ namespace WebCore {
 
 class Frame;
 class InspectorArray;
-class InspectorFrontend;
+class InspectorDOMStorageFrontendDispatcher;
 class InspectorPageAgent;
-class InspectorState;
 class InstrumentingAgents;
 class Page;
 class SecurityOrigin;
@@ -50,16 +49,16 @@ class StorageArea;
 
 typedef String ErrorString;
 
-class InspectorDOMStorageAgent : public InspectorBaseAgent<InspectorDOMStorageAgent>, public InspectorBackendDispatcher::DOMStorageCommandHandler {
+class InspectorDOMStorageAgent : public InspectorBaseAgent, public InspectorDOMStorageBackendDispatcherHandler {
 public:
-    static PassOwnPtr<InspectorDOMStorageAgent> create(InstrumentingAgents* instrumentingAgents, InspectorPageAgent* pageAgent, InspectorCompositeState* state)
+    static PassOwnPtr<InspectorDOMStorageAgent> create(InstrumentingAgents* instrumentingAgents, InspectorPageAgent* pageAgent)
     {
-        return adoptPtr(new InspectorDOMStorageAgent(instrumentingAgents, pageAgent, state));
+        return adoptPtr(new InspectorDOMStorageAgent(instrumentingAgents, pageAgent));
     }
     ~InspectorDOMStorageAgent();
 
-    virtual void setFrontend(InspectorFrontend*);
-    virtual void clearFrontend();
+    virtual void didCreateFrontendAndBackend(InspectorFrontendChannel*, InspectorBackendDispatcher*) OVERRIDE;
+    virtual void willDestroyFrontendAndBackend() OVERRIDE;
 
     // Called from the front-end.
     virtual void enable(ErrorString*);
@@ -77,13 +76,14 @@ public:
 
 private:
 
-    InspectorDOMStorageAgent(InstrumentingAgents*, InspectorPageAgent*, InspectorCompositeState*);
+    InspectorDOMStorageAgent(InstrumentingAgents*, InspectorPageAgent*);
 
-    bool isEnabled() const;
     PassRefPtr<StorageArea> findStorageArea(ErrorString*, const RefPtr<InspectorObject>&, Frame*&);
 
     InspectorPageAgent* m_pageAgent;
-    InspectorFrontend* m_frontend;
+    std::unique_ptr<InspectorDOMStorageFrontendDispatcher> m_frontendDispatcher;
+    RefPtr<InspectorDOMStorageBackendDispatcher> m_backendDispatcher;
+    bool m_enabled;
 };
 
 } // namespace WebCore

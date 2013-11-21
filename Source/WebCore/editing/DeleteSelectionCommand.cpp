@@ -28,7 +28,6 @@
 
 #include "Document.h"
 #include "DocumentMarkerController.h"
-#include "EditingBoundary.h"
 #include "Editor.h"
 #include "EditorClient.h"
 #include "Element.h"
@@ -292,7 +291,7 @@ void DeleteSelectionCommand::saveTypingStyleState()
     }
 
     // Figure out the typing style in effect before the delete is done.
-    m_typingStyle = EditingStyle::create(m_selectionToDelete.start());
+    m_typingStyle = EditingStyle::create(m_selectionToDelete.start(), EditingStyle::EditingPropertiesInEffect);
     m_typingStyle->removeStyleAddedByNode(enclosingAnchorElement(m_selectionToDelete.start()));
 
     // If we're deleting into a Mail blockquote, save the style at end() instead of start()

@@ -45,7 +45,7 @@ namespace WebCore {
 class DOMStringList;
 
 class IDBBackingStoreLevelDB;
-class IDBDatabaseBackendImpl;
+class IDBDatabaseBackend;
 
 class IDBFactoryBackendLevelDB : public IDBFactoryBackendInterface {
 public:
@@ -59,11 +59,9 @@ public:
     virtual void removeIDBDatabaseBackend(const String& uniqueIdentifier) OVERRIDE FINAL;
 
     virtual void getDatabaseNames(PassRefPtr<IDBCallbacks>, PassRefPtr<SecurityOrigin>, ScriptExecutionContext*, const String& dataDir) OVERRIDE FINAL;
-    virtual void open(const String& name, int64_t version, int64_t transactionId, PassRefPtr<IDBCallbacks>, PassRefPtr<IDBDatabaseCallbacks>, const SecurityOrigin& openingOrigin, const SecurityOrigin& mainFrameOrigin) OVERRIDE FINAL;
+    virtual void open(const String& name, uint64_t version, int64_t transactionId, PassRefPtr<IDBCallbacks>, PassRefPtr<IDBDatabaseCallbacks>, const SecurityOrigin& openingOrigin, const SecurityOrigin& mainFrameOrigin) OVERRIDE FINAL;
 
     virtual void deleteDatabase(const String& name, PassRefPtr<IDBCallbacks>, PassRefPtr<SecurityOrigin>, ScriptExecutionContext*, const String& dataDir) OVERRIDE FINAL;
-
-    virtual PassRefPtr<IDBTransactionBackendInterface> maybeCreateTransactionBackend(IDBDatabaseBackendInterface*, int64_t transactionId, PassRefPtr<IDBDatabaseCallbacks>, const Vector<int64_t>&, IndexedDB::TransactionMode) OVERRIDE FINAL;
 
 protected:
     virtual PassRefPtr<IDBBackingStoreLevelDB> openBackingStore(const SecurityOrigin&, const String& dataDir);
@@ -71,7 +69,7 @@ protected:
 private:
     explicit IDBFactoryBackendLevelDB(const String& databaseDirectory);
 
-    typedef HashMap<String, RefPtr<IDBDatabaseBackendImpl> > IDBDatabaseBackendMap;
+    typedef HashMap<String, RefPtr<IDBDatabaseBackend> > IDBDatabaseBackendMap;
     IDBDatabaseBackendMap m_databaseBackendMap;
 
     typedef HashMap<String, WeakPtr<IDBBackingStoreLevelDB> > IDBBackingStoreLevelDBMap;

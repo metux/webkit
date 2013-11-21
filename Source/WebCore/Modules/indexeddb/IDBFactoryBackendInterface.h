@@ -28,6 +28,8 @@
 #ifndef IDBFactoryBackendInterface_h
 #define IDBFactoryBackendInterface_h
 
+#include "IDBBackingStoreCursorInterface.h"
+#include "IDBDatabaseBackend.h"
 #include "IndexedDB.h"
 
 #include <wtf/PassRefPtr.h>
@@ -38,12 +40,12 @@
 
 namespace WebCore {
 
-class IDBBackingStoreInterface;
 class IDBCallbacks;
+class IDBCursorBackend;
 class IDBDatabase;
-class IDBDatabaseBackendInterface;
+class IDBDatabaseBackend;
 class IDBDatabaseCallbacks;
-class IDBTransactionBackendInterface;
+class IDBTransactionBackend;
 class SecurityOrigin;
 class ScriptExecutionContext;
 
@@ -59,16 +61,15 @@ public:
     virtual ~IDBFactoryBackendInterface() { }
 
     virtual void getDatabaseNames(PassRefPtr<IDBCallbacks>, PassRefPtr<SecurityOrigin>, ScriptExecutionContext*, const String& dataDir) = 0;
-    virtual void open(const String& name, int64_t version, int64_t transactionId, PassRefPtr<IDBCallbacks>, PassRefPtr<IDBDatabaseCallbacks>, const SecurityOrigin& openingOrigin, const SecurityOrigin& mainFrameOrigin) = 0;
+    virtual void open(const String& name, uint64_t version, int64_t transactionId, PassRefPtr<IDBCallbacks>, PassRefPtr<IDBDatabaseCallbacks>, const SecurityOrigin& openingOrigin, const SecurityOrigin& mainFrameOrigin) = 0;
     virtual void deleteDatabase(const String& name, PassRefPtr<IDBCallbacks>, PassRefPtr<SecurityOrigin>, ScriptExecutionContext*, const String& dataDir) = 0;
 
     virtual void removeIDBDatabaseBackend(const String& uniqueIdentifier) = 0;
 
-    virtual PassRefPtr<IDBTransactionBackendInterface> maybeCreateTransactionBackend(IDBDatabaseBackendInterface*, int64_t transactionId, PassRefPtr<IDBDatabaseCallbacks>, const Vector<int64_t>& objectStoreIds, IndexedDB::TransactionMode) = 0;
 };
 
 } // namespace WebCore
 
-#endif
+#endif // IDBFactoryBackendInterface_h
 
 #endif // IDBFactoryBackendInterface_h

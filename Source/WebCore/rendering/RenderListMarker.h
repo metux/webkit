@@ -60,7 +60,7 @@ private:
 
     virtual void imageChanged(WrappedImagePtr, const IntRect* = 0) OVERRIDE;
 
-    virtual InlineBox* createInlineBox() OVERRIDE;
+    virtual std::unique_ptr<InlineElementBox> createInlineBox() OVERRIDE;
 
     virtual LayoutUnit lineHeight(bool firstLine, LineDirectionMode, LinePositionMode = PositionOnContainingLine) const OVERRIDE;
     virtual int baselinePosition(FontBaseline, bool firstLine, LineDirectionMode, LinePositionMode = PositionOnContainingLine) const OVERRIDE;
@@ -85,19 +85,7 @@ private:
     RenderListItem& m_listItem;
 };
 
-inline RenderListMarker& toRenderListMarker(RenderObject& object)
-{
-    ASSERT_WITH_SECURITY_IMPLICATION(object.isListMarker());
-    return static_cast<RenderListMarker&>(object);
-}
-
-inline const RenderListMarker& toRenderListMarker(const RenderObject& object)
-{
-    ASSERT_WITH_SECURITY_IMPLICATION(object.isListMarker());
-    return static_cast<const RenderListMarker&>(object);
-}
-
-void toRenderListMarker(const RenderListMarker&);
+RENDER_OBJECT_TYPE_CASTS(RenderListMarker, isListMarker());
 
 } // namespace WebCore
 

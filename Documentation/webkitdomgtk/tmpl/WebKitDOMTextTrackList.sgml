@@ -9,12 +9,10 @@ WebKitDOMTextTrackList
 
 </para>
 
-
 <!-- ##### SECTION See_Also ##### -->
 <para>
 
 </para>
-
 
 <!-- ##### SECTION Stability_Level ##### -->
 
@@ -40,6 +38,17 @@ WebKitDOMTextTrackList
 
 @self: 
 @index: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_text_track_list_dispatch_event ##### -->
+<para>
+
+</para>
+
+@self: 
+@evt: 
+@error: 
 @Returns: 
 
 

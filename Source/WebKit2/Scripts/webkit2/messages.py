@@ -22,6 +22,7 @@
 
 import collections
 import re
+import sys
 from webkit2 import parser
 
 WANTS_CONNECTION_ATTRIBUTE = 'WantsConnection'
@@ -355,19 +356,21 @@ def class_template_headers(template_string):
     template_string = template_string.strip()
 
     class_template_types = {
-        # FIXME: Remove the unprefixed versions.
         'Vector': {'headers': ['<wtf/Vector.h>'], 'argument_coder_headers': ['"ArgumentCoders.h"']},
         'HashMap': {'headers': ['<wtf/HashMap.h>'], 'argument_coder_headers': ['"ArgumentCoders.h"']},
-
-        'WTF::Vector': {'headers': ['<wtf/Vector.h>'], 'argument_coder_headers': ['"ArgumentCoders.h"']},
-        'WTF::HashMap': {'headers': ['<wtf/HashMap.h>'], 'argument_coder_headers': ['"ArgumentCoders.h"']},
         'std::pair': {'headers': ['<utility>'], 'argument_coder_headers': ['"ArgumentCoders.h"']},
     }
 
     match = re.match('(?P<template_name>.+?)<(?P<parameter_string>.+)>', template_string)
     if not match:
         return {'header_infos':[], 'types':[template_string]}
-    header_infos = [class_template_types[match.groupdict()['template_name']]]
+
+    template_name = match.groupdict()['template_name']
+    if template_name not in class_template_types:
+        sys.stderr.write("Error: no class template type is defined for '%s'\n" % (template_string))
+        sys.exit(1)
+
+    header_infos = [class_template_types[template_name]]
     types = []
 
     for parameter in parser.split_parameters_string(match.groupdict()['parameter_string']):

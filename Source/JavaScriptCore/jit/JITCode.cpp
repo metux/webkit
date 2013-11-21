@@ -26,6 +26,7 @@
 #include "config.h"
 #include "JITCode.h"
 
+#include "LLIntThunks.h"
 #include "Operations.h"
 #include <wtf/PrintStream.h>
 
@@ -43,7 +44,9 @@ JITCode::~JITCode()
 #if ENABLE(JIT)
 JSValue JITCode::execute(JSStack* stack, CallFrame* callFrame, VM* vm)
 {
-    JSValue result = JSValue::decode(ctiTrampoline(executableAddress(), stack, callFrame, 0, 0, vm));
+    UNUSED_PARAM(stack);
+
+    JSValue result = JSValue::decode(callToJavaScript(executableAddress(), callFrame));
     return vm->exception() ? jsNull() : result;
 }
 #endif

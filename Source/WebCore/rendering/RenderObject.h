@@ -287,8 +287,6 @@ public:
 #endif
 
 public:
-    RenderArena& renderArena() const { return *document().renderArena(); }
-
     bool isPseudoElement() const { return node() && node()->isPseudoElement(); }
 
     bool isRenderElement() const { return !isText(); }
@@ -409,11 +407,23 @@ public:
 
 #if ENABLE(MATHML)
     virtual bool isRenderMathMLBlock() const { return false; }
+    virtual bool isRenderMathMLOperator() const { return false; }
+    virtual bool isRenderMathMLRow() const { return false; }
+    virtual bool isRenderMathMLMath() const { return false; }
+    virtual bool isRenderMathMLFenced() const { return false; }
+    virtual bool isRenderMathMLFraction() const { return false; }
+    virtual bool isRenderMathMLRoot() const { return false; }
+    virtual bool isRenderMathMLSpace() const { return false; }
+    virtual bool isRenderMathMLSquareRoot() const { return false; }
+    virtual bool isRenderMathMLScripts() const { return false; }
+    virtual bool isRenderMathMLScriptsWrapper() const { return false; }
+    virtual bool isRenderMathMLUnderOver() const { return false; }
 #endif // ENABLE(MATHML)
 
 #if ENABLE(SVG)
     // FIXME: Until all SVG renders can be subclasses of RenderSVGModelObject we have
     // to add SVG renderer methods to RenderObject with an ASSERT_NOT_REACHED() default implementation.
+    virtual bool isRenderSVGModelObject() const { return false; }
     virtual bool isSVGRoot() const { return false; }
     virtual bool isSVGContainer() const { return false; }
     virtual bool isSVGTransformableContainer() const { return false; }
@@ -722,8 +732,7 @@ public:
 
     // Anonymous blocks that are part of of a continuation chain will return their inline continuation's outline style instead.
     // This is typically only relevant when repainting.
-    // FIXME: Return a reference.
-    virtual RenderStyle* outlineStyleForRepaint() const { return &const_cast<RenderStyle&>(style()); }
+    virtual const RenderStyle& outlineStyleForRepaint() const { return style(); }
     
     virtual CursorDirective getCursor(const LayoutPoint&, Cursor&) const;
 
@@ -1059,6 +1068,9 @@ private:
     void setIsDragging(bool b) { m_bitfields.setIsDragging(b); }
     void setEverHadLayout(bool b) { m_bitfields.setEverHadLayout(b); }
 };
+
+template <typename Type> bool isRendererOfType(const RenderObject&);
+template <> inline bool isRendererOfType<const RenderObject>(const RenderObject&) { return true; }
 
 inline bool RenderObject::documentBeingDestroyed() const
 {

@@ -31,7 +31,6 @@
 #include "ScriptWrappable.h"
 #include "ThreadableLoaderClient.h"
 #include "XMLHttpRequestProgressEventThrottle.h"
-#include <wtf/OwnPtr.h>
 #include <wtf/text/AtomicStringHash.h>
 #include <wtf/text/StringBuilder.h>
 
@@ -54,7 +53,7 @@ class ThreadableLoader;
 class XMLHttpRequest FINAL : public ScriptWrappable, public RefCounted<XMLHttpRequest>, public EventTargetWithInlineData, private ThreadableLoaderClient, public ActiveDOMObject {
     WTF_MAKE_FAST_ALLOCATED;
 public:
-    static PassRefPtr<XMLHttpRequest> create(ScriptExecutionContext*);
+    static PassRefPtr<XMLHttpRequest> create(ScriptExecutionContext&);
     ~XMLHttpRequest();
 
     // These exact numeric values are important because JS expects them.
@@ -137,7 +136,7 @@ public:
     JSC::ArrayBuffer* responseArrayBuffer();
     JSC::ArrayBuffer* optionalResponseArrayBuffer() const { return m_responseArrayBuffer.get(); }
 
-    void setLastSendLineNumber(unsigned lineNumber) { m_lastSendLineNumber = lineNumber; }
+    void setLastSendLineAndColumnNumber(unsigned lineNumber, unsigned columnNumber);
     void setLastSendURL(const String& url) { m_lastSendURL = url; }
 
     XMLHttpRequestUpload* upload();
@@ -158,7 +157,7 @@ public:
     using RefCounted<XMLHttpRequest>::deref;
 
 private:
-    explicit XMLHttpRequest(ScriptExecutionContext*);
+    explicit XMLHttpRequest(ScriptExecutionContext&);
 
     // ActiveDOMObject
     virtual void contextDestroyed() OVERRIDE;
@@ -209,7 +208,7 @@ private:
 
     bool shouldDecodeResponse() const { return m_responseTypeCode < FirstBinaryResponseType; }
 
-    OwnPtr<XMLHttpRequestUpload> m_upload;
+    std::unique_ptr<XMLHttpRequestUpload> m_upload;
 
     URL m_url;
     String m_method;
@@ -232,11 +231,11 @@ private:
     RefPtr<TextResourceDecoder> m_decoder;
 
     StringBuilder m_responseBuilder;
-    mutable bool m_createdDocument;
-    mutable RefPtr<Document> m_responseDocument;
+    bool m_createdDocument;
+    RefPtr<Document> m_responseDocument;
     
     RefPtr<SharedBuffer> m_binaryResponseBuilder;
-    mutable RefPtr<JSC::ArrayBuffer> m_responseArrayBuffer;
+    RefPtr<JSC::ArrayBuffer> m_responseArrayBuffer;
 
     bool m_error;
 
@@ -249,6 +248,7 @@ private:
     long long m_receivedLength;
 
     unsigned m_lastSendLineNumber;
+    unsigned m_lastSendColumnNumber;
     String m_lastSendURL;
     ExceptionCode m_exceptionCode;
 

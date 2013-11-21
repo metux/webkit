@@ -42,6 +42,7 @@
 #include "HTMLNames.h"
 #include "LocalizedStrings.h"
 #include "MainFrame.h"
+#include "MathMLNames.h"
 #include "NodeList.h"
 #include "NodeTraversal.h"
 #include "NotImplemented.h"
@@ -512,6 +513,23 @@ void AccessibilityObject::findMatchingObjects(AccessibilitySearchCriteria* crite
     }
 }
 
+bool AccessibilityObject::hasAttributesRequiredForInclusion() const
+{
+    // These checks are simplified in the interest of execution speed.
+    if (!getAttribute(aria_helpAttr).isEmpty()
+        || !getAttribute(aria_describedbyAttr).isEmpty()
+        || !getAttribute(altAttr).isEmpty()
+        || !getAttribute(titleAttr).isEmpty())
+        return true;
+
+#if ENABLE(MATHML)
+    if (!getAttribute(MathMLNames::alttextAttr).isEmpty())
+        return true;
+#endif
+
+    return false;
+}
+
 bool AccessibilityObject::isARIAInput(AccessibilityRole ariaRole)
 {
     return ariaRole == RadioButtonRole || ariaRole == CheckBoxRole || ariaRole == TextFieldRole;
@@ -839,7 +857,7 @@ static bool replacedNodeNeedsCharacter(Node* replacedNode)
 {
     // we should always be given a rendered node and a replaced node, but be safe
     // replaced nodes are either attachments (widgets) or images
-    if (!replacedNode || !replacedNode->renderer() || !replacedNode->renderer()->isReplaced() || replacedNode->isTextNode())
+    if (!replacedNode || !isRendererReplacedElement(replacedNode->renderer()) || replacedNode->isTextNode())
         return false;
 
     // create an AX object, but skip it if it is not supposed to be seen

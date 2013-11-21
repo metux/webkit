@@ -38,13 +38,12 @@
 #include "PaintInfo.h"
 #include "Range.h"
 #include "RenderBoxRegionInfo.h"
+#include "RenderIterator.h"
 #include "RenderLayer.h"
 #include "RenderNamedFlowThread.h"
 #include "RenderView.h"
 #include "StyleResolver.h"
 #include <wtf/StackStats.h>
-
-using namespace std;
 
 namespace WebCore {
 
@@ -70,6 +69,54 @@ RenderRegion::RenderRegion(Document& document, PassRef<RenderStyle> style, Rende
     , m_hasComputedAutoHeight(false)
     , m_computedAutoHeight(0)
 {
+}
+
+LayoutPoint RenderRegion::mapRegionPointIntoFlowThreadCoordinates(const LayoutPoint& point)
+{
+    // Assuming the point is relative to the region block, 3 cases will be considered:
+    // a) top margin, padding or border.
+    // b) bottom margin, padding or border.
+    // c) non-content region area.
+
+    LayoutUnit pointLogicalTop(isHorizontalWritingMode() ? point.y() : point.x());
+    LayoutUnit pointLogicalLeft(isHorizontalWritingMode() ? point.x() : point.y());
+    LayoutUnit flowThreadLogicalTop(isHorizontalWritingMode() ? m_flowThreadPortionRect.y() : m_flowThreadPortionRect.x());
+    LayoutUnit flowThreadLogicalLeft(isHorizontalWritingMode() ? m_flowThreadPortionRect.x() : m_flowThreadPortionRect.y());
+    LayoutUnit flowThreadPortionTopBound(isHorizontalWritingMode() ? m_flowThreadPortionRect.height() : m_flowThreadPortionRect.width());
+    LayoutUnit flowThreadPortionLeftBound(isHorizontalWritingMode() ? m_flowThreadPortionRect.width() : m_flowThreadPortionRect.height());
+    LayoutUnit flowThreadPortionTopMax(isHorizontalWritingMode() ? m_flowThreadPortionRect.maxY() : m_flowThreadPortionRect.maxX());
+    LayoutUnit flowThreadPortionLeftMax(isHorizontalWritingMode() ? m_flowThreadPortionRect.maxX() : m_flowThreadPortionRect.maxY());
+    LayoutUnit effectiveFixedPointDenominator;
+    effectiveFixedPointDenominator.setRawValue(1);
+
+    if (pointLogicalTop < 0) {
+        LayoutPoint pointInThread(0, flowThreadLogicalTop);
+        return isHorizontalWritingMode() ? pointInThread : pointInThread.transposedPoint();
+    }
+
+    if (pointLogicalTop >= flowThreadPortionTopBound) {
+        LayoutPoint pointInThread(flowThreadPortionLeftBound, flowThreadPortionTopMax - effectiveFixedPointDenominator);
+        return isHorizontalWritingMode() ? pointInThread : pointInThread.transposedPoint();
+    }
+
+    if (pointLogicalLeft < 0) {
+        LayoutPoint pointInThread(flowThreadLogicalLeft, pointLogicalTop + flowThreadLogicalTop);
+        return isHorizontalWritingMode() ? pointInThread : pointInThread.transposedPoint();
+    }
+    if (pointLogicalLeft >= flowThreadPortionLeftBound) {
+        LayoutPoint pointInThread(flowThreadPortionLeftMax - effectiveFixedPointDenominator, pointLogicalTop + flowThreadLogicalTop);
+        return isHorizontalWritingMode() ? pointInThread : pointInThread.transposedPoint();
+    }
+    LayoutPoint pointInThread(pointLogicalLeft + flowThreadLogicalLeft, pointLogicalTop + flowThreadLogicalTop);
+    return isHorizontalWritingMode() ? pointInThread : pointInThread.transposedPoint();
+}
+
+VisiblePosition RenderRegion::positionForPoint(const LayoutPoint& point)
+{
+    if (!m_flowThread->firstChild()) // checking for empty region blocks.
+        return RenderBlock::positionForPoint(point);
+
+    return toRenderBlock(m_flowThread->firstChild())->positionForPoint(mapRegionPointIntoFlowThreadCoordinates(point));
 }
 
 LayoutUnit RenderRegion::pageLogicalWidth() const
@@ -131,15 +178,15 @@ LayoutRect RenderRegion::overflowRectForFlowThreadPortion(const LayoutRect& flow
     LayoutRect clipRect;
     if (m_flowThread->isHorizontalWritingMode()) {
         LayoutUnit minY = isFirstPortion ? (flowThreadOverflow.y() - outlineSize) : flowThreadPortionRect.y();
-        LayoutUnit maxY = isLastPortion ? max(flowThreadPortionRect.maxY(), flowThreadOverflow.maxY()) + outlineSize : flowThreadPortionRect.maxY();
-        LayoutUnit minX = clipX ? flowThreadPortionRect.x() : min(flowThreadPortionRect.x(), flowThreadOverflow.x() - outlineSize);
-        LayoutUnit maxX = clipX ? flowThreadPortionRect.maxX() : max(flowThreadPortionRect.maxX(), (flowThreadOverflow.maxX() + outlineSize));
+        LayoutUnit maxY = isLastPortion ? std::max(flowThreadPortionRect.maxY(), flowThreadOverflow.maxY()) + outlineSize : flowThreadPortionRect.maxY();
+        LayoutUnit minX = clipX ? flowThreadPortionRect.x() : std::min(flowThreadPortionRect.x(), flowThreadOverflow.x() - outlineSize);
+        LayoutUnit maxX = clipX ? flowThreadPortionRect.maxX() : std::max(flowThreadPortionRect.maxX(), (flowThreadOverflow.maxX() + outlineSize));
         clipRect = LayoutRect(minX, minY, maxX - minX, maxY - minY);
     } else {
         LayoutUnit minX = isFirstPortion ? (flowThreadOverflow.x() - outlineSize) : flowThreadPortionRect.x();
-        LayoutUnit maxX = isLastPortion ? max(flowThreadPortionRect.maxX(), flowThreadOverflow.maxX()) + outlineSize : flowThreadPortionRect.maxX();
-        LayoutUnit minY = clipY ? flowThreadPortionRect.y() : min(flowThreadPortionRect.y(), (flowThreadOverflow.y() - outlineSize));
-        LayoutUnit maxY = clipY ? flowThreadPortionRect.maxY() : max(flowThreadPortionRect.y(), (flowThreadOverflow.maxY() + outlineSize));
+        LayoutUnit maxX = isLastPortion ? std::max(flowThreadPortionRect.maxX(), flowThreadOverflow.maxX()) + outlineSize : flowThreadPortionRect.maxX();
+        LayoutUnit minY = clipY ? flowThreadPortionRect.y() : std::min(flowThreadPortionRect.y(), (flowThreadOverflow.y() - outlineSize));
+        LayoutUnit maxY = clipY ? flowThreadPortionRect.maxY() : std::max(flowThreadPortionRect.y(), (flowThreadOverflow.maxY() + outlineSize));
         clipRect = LayoutRect(minX, minY, maxX - minX, maxY - minY);
     }
 
@@ -393,18 +440,19 @@ void RenderRegion::installFlowThread()
     // By now the flow thread should already be added to the rendering tree,
     // so we go up the rendering parents and check that this region is not part of the same
     // flow that it actually needs to display. It would create a circular reference.
-    RenderObject* parentObject = parent();
-    m_parentNamedFlowThread = 0;
-    for ( ; parentObject; parentObject = parentObject->parent()) {
-        if (parentObject->isRenderNamedFlowThread()) {
-            m_parentNamedFlowThread = toRenderNamedFlowThread(parentObject);
-            // Do not take into account a region that links a flow with itself. The dependency
-            // cannot change, so it is not worth adding it to the list.
-            if (m_flowThread == m_parentNamedFlowThread)
-                m_flowThread = 0;
-            break;
-        }
+
+    auto closestFlowThreadAncestor = ancestorsOfType<RenderNamedFlowThread>(*this).first();
+    if (!closestFlowThreadAncestor) {
+        m_parentNamedFlowThread = nullptr;
+        return;
     }
+
+    m_parentNamedFlowThread = &*closestFlowThreadAncestor;
+
+    // Do not take into account a region that links a flow with itself. The dependency
+    // cannot change, so it is not worth adding it to the list.
+    if (m_flowThread == m_parentNamedFlowThread)
+        m_flowThread = nullptr;
 }
 
 void RenderRegion::attachRegion()
@@ -513,7 +561,7 @@ void RenderRegion::setRegionObjectsRegionStyle()
             continue;
 
         // If the object has style in region, use that instead of computing a new one.
-        RenderObjectRegionStyleMap::iterator it = m_renderObjectRegionStyle.find(object);
+        auto it = m_renderObjectRegionStyle.find(object);
         RefPtr<RenderStyle> objectStyleInRegion;
         bool objectRegionStyleCached = false;
         if (it != m_renderObjectRegionStyle.end()) {
@@ -535,7 +583,7 @@ void RenderRegion::restoreRegionObjectsOriginalStyle()
         return;
 
     RenderObjectRegionStyleMap temp;
-    for (RenderObjectRegionStyleMap::iterator iter = m_renderObjectRegionStyle.begin(), end = m_renderObjectRegionStyle.end(); iter != end; ++iter) {
+    for (auto iter = m_renderObjectRegionStyle.begin(), end = m_renderObjectRegionStyle.end(); iter != end; ++iter) {
         RenderObject* object = const_cast<RenderObject*>(iter->key);
         RefPtr<RenderStyle> objectRegionStyle = &object->style();
         RefPtr<RenderStyle> objectOriginalStyle = iter->value.style;
@@ -592,7 +640,7 @@ void RenderRegion::computeChildrenStyleInRegion(const RenderElement* object)
 {
     for (RenderObject* child = object->firstChild(); child; child = child->nextSibling()) {
 
-        RenderObjectRegionStyleMap::iterator it = m_renderObjectRegionStyle.find(child);
+        auto it = m_renderObjectRegionStyle.find(child);
 
         RefPtr<RenderStyle> childStyleInRegion;
         bool objectRegionStyleCached = false;

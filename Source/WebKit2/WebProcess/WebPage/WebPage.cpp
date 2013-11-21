@@ -31,8 +31,10 @@
 #include "Arguments.h"
 #include "DataReference.h"
 #include "DecoderAdapter.h"
+#include "DragControllerAction.h"
 #include "DrawingArea.h"
 #include "DrawingAreaMessages.h"
+#include "EditorState.h"
 #include "EventDispatcher.h"
 #include "InjectedBundle.h"
 #include "InjectedBundleBackForwardList.h"
@@ -49,8 +51,8 @@
 #include "PrintInfo.h"
 #include "SessionState.h"
 #include "ShareableBitmap.h"
+#include "WKSharedAPICast.h"
 #include "WebAlternativeTextClient.h"
-#include "WebBackForwardList.h"
 #include "WebBackForwardListItem.h"
 #include "WebBackForwardListProxy.h"
 #include "WebChromeClient.h"
@@ -123,7 +125,6 @@
 #include <WebCore/ResourceBuffer.h>
 #include <WebCore/ResourceRequest.h>
 #include <WebCore/ResourceResponse.h>
-#include <WebCore/RunLoop.h>
 #include <WebCore/RuntimeEnabledFeatures.h>
 #include <WebCore/SchemeRegistry.h>
 #include <WebCore/ScriptController.h>
@@ -140,6 +141,7 @@
 #include <runtime/JSCJSValue.h>
 #include <runtime/JSLock.h>
 #include <runtime/Operations.h>
+#include <wtf/RunLoop.h>
 
 #if ENABLE(MHTML)
 #include <WebCore/MHTMLArchive.h>
@@ -247,7 +249,7 @@ WebPage::WebPage(uint64_t pageID, const WebPageCreationParameters& parameters)
     , m_accessibilityObject(0)
 #endif
     , m_setCanStartMediaTimer(RunLoop::main(), this, &WebPage::setCanStartMediaTimerFired)
-    , m_sendDidUpdateInWindowStateTimer(RunLoop::main(), this, &WebPage::didUpdateInWindowStateTimerFired)
+    , m_sendDidUpdateViewStateTimer(RunLoop::main(), this, &WebPage::didUpdateViewStateTimerFired)
     , m_findController(this)
 #if ENABLE(INPUT_TYPE_COLOR)
     , m_activeColorChooser(0)
@@ -279,6 +281,7 @@ WebPage::WebPage(uint64_t pageID, const WebPageCreationParameters& parameters)
     , m_maximumRenderingSuppressionToken(0)
     , m_scrollPinningBehavior(DoNotPin)
     , m_useThreadedScrolling(false)
+    , m_viewState(parameters.viewState)
 {
     ASSERT(m_pageID);
     // FIXME: This is a non-ideal location for this Setting and
@@ -362,16 +365,17 @@ WebPage::WebPage(uint64_t pageID, const WebPageCreationParameters& parameters)
 
     setMemoryCacheMessagesEnabled(parameters.areMemoryCacheClientCallsEnabled);
 
-    setActive(parameters.isActive);
-    setFocused(parameters.isFocused);
+    setActive(parameters.viewState & ViewState::WindowIsActive);
+    setFocused(parameters.viewState & ViewState::IsFocused);
 
     // Page defaults to in-window, but setIsInWindow depends on it being a valid indicator of actually having been put into a window.
-    if (!parameters.isInWindow)
+    bool isInWindow = parameters.viewState & ViewState::IsInWindow;
+    if (!isInWindow)
         m_page->setIsInWindow(false);
     else
         WebProcess::shared().pageDidEnterWindow(m_pageID);
 
-    setIsInWindow(parameters.isInWindow);
+    setIsInWindow(isInWindow);
 
     setMinimumLayoutSize(parameters.minimumLayoutSize);
     setAutoSizingShouldExpandToViewHeight(parameters.autoSizingShouldExpandToViewHeight);
@@ -629,7 +633,7 @@ uint64_t WebPage::renderTreeSize() const
 {
     if (!m_page)
         return 0;
-    return m_page->renderTreeSize().treeSize;
+    return m_page->renderTreeSize();
 }
 
 void WebPage::setTracksRepaints(bool trackRepaints)
@@ -652,24 +656,19 @@ void WebPage::resetTrackedRepaints()
         view->resetTrackedRepaints();
 }
 
-PassRefPtr<ImmutableArray> WebPage::trackedRepaintRects()
+PassRefPtr<API::Array> WebPage::trackedRepaintRects()
 {
     FrameView* view = mainFrameView();
     if (!view)
-        return ImmutableArray::create();
+        return API::Array::create();
 
-    const Vector<IntRect>& rects = view->trackedRepaintRects();
-    size_t size = rects.size();
-    if (!size)
-        return ImmutableArray::create();
+    Vector<RefPtr<API::Object>> repaintRects;
+    repaintRects.reserveInitialCapacity(view->trackedRepaintRects().size());
 
-    Vector<RefPtr<APIObject>> vector;
-    vector.reserveInitialCapacity(size);
+    for (const auto& repaintRect : view->trackedRepaintRects())
+        repaintRects.uncheckedAppend(WebRect::create(toAPI(repaintRect)));
 
-    for (size_t i = 0; i < size; ++i)
-        vector.uncheckedAppend(WebRect::create(toAPI(rects[i])));
-
-    return ImmutableArray::adopt(vector);
+    return API::Array::create(std::move(repaintRects));
 }
 
 PluginView* WebPage::focusedPluginViewForFrame(Frame& frame)
@@ -836,7 +835,7 @@ void WebPage::loadURLRequest(const ResourceRequest& request, const SandboxExtens
 {
     SendStopResponsivenessTimer stopper(this);
 
-    RefPtr<APIObject> userData;
+    RefPtr<API::Object> userData;
     InjectedBundleUserMessageDecoder userMessageDecoder(userData);
     if (!decoder.decode(userMessageDecoder))
         return;
@@ -855,7 +854,7 @@ void WebPage::loadDataImpl(PassRefPtr<SharedBuffer> sharedBuffer, const String& 
 {
     SendStopResponsivenessTimer stopper(this);
 
-    RefPtr<APIObject> userData;
+    RefPtr<API::Object> userData;
     InjectedBundleUserMessageDecoder userMessageDecoder(userData);
     if (!decoder.decode(userMessageDecoder))
         return;
@@ -1319,7 +1318,7 @@ void WebPage::postInjectedBundleMessage(const String& messageName, CoreIPC::Mess
     if (!injectedBundle)
         return;
 
-    RefPtr<APIObject> messageBody;
+    RefPtr<API::Object> messageBody;
     InjectedBundleUserMessageDecoder messageBodyDecoder(messageBody);
     if (!decoder.decode(messageBodyDecoder))
         return;
@@ -1966,9 +1965,9 @@ void WebPage::setCanStartMediaTimerFired()
 }
 
 #if !PLATFORM(MAC)
-void WebPage::didUpdateInWindowStateTimerFired()
+void WebPage::didUpdateViewStateTimerFired()
 {
-    send(Messages::WebPageProxy::DidUpdateInWindowState());
+    send(Messages::WebPageProxy::DidUpdateViewState());
 }
 #endif
 
@@ -1981,7 +1980,7 @@ inline bool WebPage::canHandleUserEvents() const
     return true;
 }
 
-void WebPage::setIsInWindow(bool isInWindow, bool wantsDidUpdateViewInWindowState)
+void WebPage::setIsInWindow(bool isInWindow)
 {
     bool pageWasInWindow = m_page->isInWindow();
     
@@ -2009,9 +2008,31 @@ void WebPage::setIsInWindow(bool isInWindow, bool wantsDidUpdateViewInWindowStat
 
     if (isInWindow)
         layoutIfNeeded();
+}
 
-    if (wantsDidUpdateViewInWindowState)
-        m_sendDidUpdateInWindowStateTimer.startOneShot(0);
+void WebPage::setViewState(ViewState::Flags viewState, bool wantsDidUpdateViewState)
+{
+    ViewState::Flags changed = m_viewState ^ viewState;
+
+    // We want to make sure to update the active state while hidden, so if the view is hidden then update the active state
+    // early (in case it becomes visible), and if the view was visible then update active state later (in case it hides).
+    if (changed & ViewState::WindowIsVisible)
+        setWindowIsVisible(viewState & ViewState::WindowIsVisible);
+    if (changed & ViewState::IsFocused)
+        setFocused(viewState & ViewState::IsFocused);
+    if (changed & ViewState::WindowIsActive && !(m_viewState & ViewState::IsVisible))
+        setActive(viewState & ViewState::WindowIsActive);
+    if (changed & ViewState::IsVisible)
+        setViewIsVisible(viewState & ViewState::IsVisible);
+    if (changed & ViewState::WindowIsActive && m_viewState & ViewState::IsVisible)
+        setActive(viewState & ViewState::WindowIsActive);
+    if (changed & ViewState::IsInWindow)
+        setIsInWindow(viewState & ViewState::IsInWindow);
+
+    m_viewState = viewState;
+
+    if (wantsDidUpdateViewState)
+        m_sendDidUpdateViewStateTimer.startOneShot(0);
 }
 
 void WebPage::didReceivePolicyDecision(uint64_t frameID, uint64_t listenerID, uint32_t policyAction, uint64_t downloadID)
@@ -2397,8 +2418,16 @@ void WebPage::updatePreferences(const WebPreferencesStore& store)
     settings.setQTKitEnabled(store.getBoolValueForKey(WebPreferencesKey::isQTKitEnabledKey()));
 #endif
 
+#if USE(PLUGIN_PROXY_FOR_VIDEO)
+    settings->setVideoPluginProxyEnabled(store.getBoolValueForKey(WebPreferencesKey::isVideoPluginProxyEnabledKey()));
+#endif
+
 #if ENABLE(WEB_AUDIO)
     settings.setWebAudioEnabled(store.getBoolValueForKey(WebPreferencesKey::webAudioEnabledKey()));
+#endif
+
+#if ENABLE(MEDIA_STREAM)
+    settings.setMediaStreamEnabled(store.getBoolValueForKey(WebPreferencesKey::mediaStreamEnabledKey()));
 #endif
 
     settings.setApplicationChromeMode(store.getBoolValueForKey(WebPreferencesKey::applicationChromeModeKey()));
@@ -2451,6 +2480,8 @@ void WebPage::updatePreferences(const WebPreferencesStore& store)
 #endif
 
     settings.setLowPowerVideoAudioBufferSizeEnabled(store.getBoolValueForKey(WebPreferencesKey::lowPowerVideoAudioBufferSizeEnabledKey()));
+    settings.setSimpleLineLayoutEnabled(store.getBoolValueForKey(WebPreferencesKey::simpleLineLayoutEnabledKey()));
+    settings.setSimpleLineLayoutDebugBordersEnabled(store.getBoolValueForKey(WebPreferencesKey::simpleLineLayoutDebugBordersEnabledKey()));
 
     platformPreferencesDidChange(store);
 

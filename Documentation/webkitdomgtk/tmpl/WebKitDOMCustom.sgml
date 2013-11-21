@@ -9,12 +9,10 @@ WebKitDOMCustom
 
 </para>
 
-
 <!-- ##### SECTION See_Also ##### -->
 <para>
 
 </para>
-
 
 <!-- ##### SECTION Stability_Level ##### -->
 
@@ -37,6 +35,70 @@ WebKitDOMCustom
 </para>
 
 @input: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_media_element_set_current_time ##### -->
+<para>
+
+</para>
+
+@self: 
+@value: 
+@error: 
+
+
+<!-- ##### FUNCTION webkit_dom_audio_track_get_kind ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_audio_track_get_language ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_text_track_get_kind ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_text_track_get_language ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_video_track_get_kind ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_video_track_get_language ##### -->
+<para>
+
+</para>
+
+@self: 
 @Returns: 
 
 
@@ -383,7 +445,53 @@ WebKitDOMCustom
 
 </para>
 
-@Param1: 
+@self: 
 @Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_media_element_get_initial_time ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_head_element_get_profile ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_head_element_set_profile ##### -->
+<para>
+
+</para>
+
+@self: 
+@value: 
+
+
+<!-- ##### FUNCTION webkit_dom_processing_instruction_get_data ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_processing_instruction_set_data ##### -->
+<para>
+
+</para>
+
+@self: 
+@value: 
+@error: 
 
 

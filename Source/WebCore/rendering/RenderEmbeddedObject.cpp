@@ -102,7 +102,6 @@ static const Color& unavailablePluginBorderColor()
 
 RenderEmbeddedObject::RenderEmbeddedObject(HTMLFrameOwnerElement& element, PassRef<RenderStyle> style)
     : RenderWidget(element, std::move(style))
-    , m_hasFallbackContent(false)
     , m_isPluginUnavailable(false)
     , m_isUnavailablePluginIndicatorHidden(false)
     , m_unavailablePluginIndicatorIsPressed(false)
@@ -514,7 +513,7 @@ void RenderEmbeddedObject::layout()
     // When calling layout() on a child node, a parent must either push a LayoutStateMaintainter, or
     // instantiate LayoutStateDisabler. Since using a LayoutStateMaintainer is slightly more efficient,
     // and this method will be called many times per second during playback, use a LayoutStateMaintainer:
-    LayoutStateMaintainer statePusher(&view(), this, locationOffset(), hasTransform() || hasReflection() || style().isFlippedBlocksWritingMode());
+    LayoutStateMaintainer statePusher(view(), *this, locationOffset(), hasTransform() || hasReflection() || style().isFlippedBlocksWritingMode());
     
     childBox->setLocation(LayoutPoint(borderLeft(), borderTop()) + LayoutSize(paddingLeft(), paddingTop()));
     childBox->style().setHeight(Length(newSize.height(), Fixed));
@@ -524,25 +523,6 @@ void RenderEmbeddedObject::layout()
     clearChildNeedsLayout();
     
     statePusher.pop();
-}
-
-void RenderEmbeddedObject::viewCleared()
-{
-    // This is required for <object> elements whose contents are rendered by WebCore (e.g. src="foo.html").
-    if (widget() && widget()->isFrameView()) {
-        FrameView* view = toFrameView(widget());
-        int marginWidth = -1;
-        int marginHeight = -1;
-        if (isHTMLIFrameElement(frameOwnerElement())) {
-            HTMLIFrameElement& iframe = toHTMLIFrameElement(frameOwnerElement());
-            marginWidth = iframe.marginWidth();
-            marginHeight = iframe.marginHeight();
-        }
-        if (marginWidth != -1)
-            view->setMarginWidth(marginWidth);
-        if (marginHeight != -1)
-            view->setMarginHeight(marginHeight);
-    }
 }
 
 bool RenderEmbeddedObject::nodeAtPoint(const HitTestRequest& request, HitTestResult& result, const HitTestLocation& locationInContainer, const LayoutPoint& accumulatedOffset, HitTestAction hitTestAction)
@@ -649,6 +629,10 @@ CursorDirective RenderEmbeddedObject::getCursor(const LayoutPoint& point, Cursor
     if (showsUnavailablePluginIndicator() && shouldUnavailablePluginMessageBeButton(document(), m_pluginUnavailabilityReason) && isInUnavailablePluginIndicator(point)) {
         cursor = handCursor();
         return SetCursor;
+    }
+    if (widget() && widget()->isPluginViewBase()) {
+        // A plug-in is responsible for setting the cursor when the pointer is over it.
+        return DoNotSetCursor;
     }
     return RenderWidget::getCursor(point, cursor);
 }

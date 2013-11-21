@@ -42,11 +42,14 @@ class WorkerGlobalScope;
 
 class WorkerRuntimeAgent : public InspectorRuntimeAgent {
 public:
-    static PassOwnPtr<WorkerRuntimeAgent> create(InstrumentingAgents* instrumentingAgents, InspectorCompositeState* state, InjectedScriptManager* injectedScriptManager, WorkerGlobalScope* context)
+    static PassOwnPtr<WorkerRuntimeAgent> create(InstrumentingAgents* instrumentingAgents, InjectedScriptManager* injectedScriptManager, WorkerGlobalScope* context)
     {
-        return adoptPtr(new WorkerRuntimeAgent(instrumentingAgents, state, injectedScriptManager, context));
+        return adoptPtr(new WorkerRuntimeAgent(instrumentingAgents, injectedScriptManager, context));
     }
     virtual ~WorkerRuntimeAgent();
+
+    virtual void didCreateFrontendAndBackend(InspectorFrontendChannel*, InspectorBackendDispatcher*) OVERRIDE;
+    virtual void willDestroyFrontendAndBackend() OVERRIDE;
 
     // Protocol commands.
     virtual void run(ErrorString*);
@@ -56,11 +59,12 @@ public:
 #endif // ENABLE(JAVASCRIPT_DEBUGGER)
 
 private:
-    WorkerRuntimeAgent(InstrumentingAgents*, InspectorCompositeState*, InjectedScriptManager*, WorkerGlobalScope*);
+    WorkerRuntimeAgent(InstrumentingAgents*, InjectedScriptManager*, WorkerGlobalScope*);
     virtual InjectedScript injectedScriptForEval(ErrorString*, const int* executionContextId);
     virtual void muteConsole();
     virtual void unmuteConsole();
     WorkerGlobalScope* m_workerGlobalScope;
+    RefPtr<InspectorRuntimeBackendDispatcher> m_backendDispatcher;
     bool m_paused;
 };
 

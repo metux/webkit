@@ -100,7 +100,8 @@ enum AccessibilityRole {
     ApplicationLogRole,
     ApplicationMarqueeRole,
     ApplicationStatusRole,
-    ApplicationTimerRole, 
+    ApplicationTimerRole,
+    AudioRole,
     BrowserRole,
     BusyIndicatorRole,
     ButtonRole,
@@ -202,7 +203,8 @@ enum AccessibilityRole {
     ToolbarRole,
     UnknownRole,
     UserInterfaceTooltipRole,
-    ValueIndicatorRole,            
+    ValueIndicatorRole,
+    VideoRole,
     WebAreaRole,
     WebCoreLinkRole,
     WindowRole,
@@ -426,6 +428,7 @@ public:
     virtual bool isCheckbox() const { return roleValue() == CheckBoxRole; }
     virtual bool isRadioButton() const { return roleValue() == RadioButtonRole; }
     virtual bool isListBox() const { return roleValue() == ListBoxRole; }
+    virtual bool isListBoxOption() const { return false; }
     virtual bool isMediaTimeline() const { return false; }
     virtual bool isMenuRelated() const { return false; }
     virtual bool isMenu() const { return false; }
@@ -436,6 +439,7 @@ public:
     virtual bool isInputImage() const { return false; }
     virtual bool isProgressIndicator() const { return false; }
     virtual bool isSlider() const { return false; }
+    virtual bool isSliderThumb() const { return false; }
     virtual bool isInputSlider() const { return false; }
     virtual bool isControl() const { return false; }
     virtual bool isList() const { return false; }
@@ -605,6 +609,7 @@ public:
 
     // A programmatic way to set a name on an AccessibleObject.
     virtual void setAccessibleName(const AtomicString&) { }
+    virtual bool hasAttributesRequiredForInclusion() const;
 
     // Accessibility Text - (To be deprecated).
     virtual String accessibilityDescription() const { return String(); }

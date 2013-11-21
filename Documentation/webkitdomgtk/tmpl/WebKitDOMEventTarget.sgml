@@ -9,12 +9,10 @@ WebKitDOMEventTarget
 
 </para>
 
-
 <!-- ##### SECTION See_Also ##### -->
 <para>
 
 </para>
-
 
 <!-- ##### SECTION Stability_Level ##### -->
 
@@ -53,6 +51,30 @@ WebKitDOMEventTarget
 
 
 <!-- ##### FUNCTION webkit_dom_event_target_remove_event_listener ##### -->
+<para>
+
+</para>
+
+@target: 
+@event_name: 
+@handler: 
+@use_capture: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_event_target_add_event_listener_with_closure ##### -->
+<para>
+
+</para>
+
+@target: 
+@event_name: 
+@handler: 
+@use_capture: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_event_target_remove_event_listener_with_closure ##### -->
 <para>
 
 </para>

@@ -149,7 +149,7 @@ public:
     void markAutoLogicalHeightRegionsForLayout();
     void markRegionsForOverflowLayoutIfNeeded();
 
-    bool addForcedRegionBreak(const RenderBlock*, LayoutUnit, RenderObject* breakChild, bool isBefore, LayoutUnit* offsetBreakAdjustment = 0);
+    bool addForcedRegionBreak(const RenderBlock*, LayoutUnit, RenderBox* breakChild, bool isBefore, LayoutUnit* offsetBreakAdjustment = 0);
     void applyBreakAfterContent(LayoutUnit);
 
     bool pageLogicalSizeChanged() const { return m_pageLogicalSizeChanged; }
@@ -200,7 +200,7 @@ public:
 #endif
     virtual bool collectsGraphicsLayersUnderRegions() const;
 
-    void pushFlowThreadLayoutState(const RenderObject*);
+    void pushFlowThreadLayoutState(const RenderObject&);
     void popFlowThreadLayoutState();
     LayoutUnit offsetFromLogicalTopOfFirstRegion(const RenderBlock*) const;
     void clearRenderBoxRegionInfoAndCustomStyle(const RenderBox*, const RenderRegion*, const RenderRegion*, const RenderRegion*, const RenderRegion*);
@@ -326,16 +326,18 @@ protected:
     OwnPtr<RegionToLayerListMap> m_regionToLayerListMap;
 #endif
 
-    // A maps from RenderBox
+    // Map a box to the list of regions in which the box is rendered.
     typedef HashMap<const RenderBox*, RenderRegionRange> RenderRegionRangeMap;
     RenderRegionRangeMap m_regionRangeMap;
 
-    typedef HashMap<RenderObject*, RenderRegion*> RenderObjectToRegionMap;
-    RenderObjectToRegionMap m_breakBeforeToRegionMap;
-    RenderObjectToRegionMap m_breakAfterToRegionMap;
+    // Map a box with a region break to the auto height region affected by that break. 
+    typedef HashMap<RenderBox*, RenderRegion*> RenderBoxToRegionMap;
+    RenderBoxToRegionMap m_breakBeforeToRegionMap;
+    RenderBoxToRegionMap m_breakAfterToRegionMap;
 
     typedef ListHashSet<const RenderObject*> RenderObjectStack;
     RenderObjectStack m_activeObjectsStack;
+
     typedef HashMap<const RenderBox*, LayoutUnit> RenderBoxToOffsetMap;
     RenderBoxToOffsetMap m_boxesToOffsetMap;
 
@@ -367,12 +369,8 @@ private:
     RenderFlowThread* m_previousRenderFlowThread;
 };
 
-// These structures are used by PODIntervalTree for debugging.
+// This structure is used by PODIntervalTree for debugging.
 #ifndef NDEBUG
-template <> struct ValueToString<LayoutUnit> {
-    static String string(const LayoutUnit value) { return String::number(value.toFloat()); }
-};
-
 template <> struct ValueToString<RenderRegion*> {
     static String string(const RenderRegion* value) { return String::format("%p", value); }
 };

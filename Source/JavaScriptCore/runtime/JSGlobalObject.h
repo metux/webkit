@@ -71,6 +71,8 @@ class SourceCode;
 struct ActivationStackNode;
 struct HashTable;
 
+#define DEFINE_STANDARD_BUILTIN(macro, upperName, lowerName) macro(upperName, lowerName, lowerName, JS ## upperName, upperName)
+    
 #define FOR_EACH_SIMPLE_BUILTIN_TYPE(macro) \
     macro(Set, set, set, JSSet, Set) \
     macro(Map, map, map, JSMap, Map) \
@@ -80,8 +82,12 @@ struct HashTable;
     macro(Number, number, numberObject, NumberObject, Number) \
     macro(Error, error, error, ErrorInstance, Error) \
     macro(JSArrayBuffer, arrayBuffer, arrayBuffer, JSArrayBuffer, ArrayBuffer) \
-    macro(WeakMap, weakMap, weakMap, JSWeakMap, WeakMap) \
-    macro(ArrayIterator, arrayIterator, arrayIterator, JSArrayIterator, ArrayIterator) \
+    DEFINE_STANDARD_BUILTIN(macro, WeakMap, weakMap) \
+    DEFINE_STANDARD_BUILTIN(macro, ArrayIterator, arrayIterator) \
+    DEFINE_STANDARD_BUILTIN(macro, ArgumentsIterator, argumentsIterator) \
+    DEFINE_STANDARD_BUILTIN(macro, MapIterator, mapIterator) \
+    DEFINE_STANDARD_BUILTIN(macro, SetIterator, setIterator) \
+
 
 #define DECLARE_SIMPLE_BUILTIN_TYPE(capitalName, lowerName, properName, instanceType, jsName) \
     class JS ## capitalName; \
@@ -144,9 +150,7 @@ private:
 
 protected:
 
-    // Add one so we don't need to index with -1 to get current frame pointer.
-    // An index of -1 is an error for some compilers.
-    Register m_globalCallFrame[JSStack::CallFrameHeaderSize + 1];
+    Register m_globalCallFrame[JSStack::CallFrameHeaderSize];
 
     WriteBarrier<JSObject> m_globalThis;
 

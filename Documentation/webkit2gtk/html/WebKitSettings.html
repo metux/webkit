@@ -2,34 +2,31 @@
 <html>
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
-<title>WebKitSettings</title>
+<title>WebKit2GTK+ Reference Manual: WebKitSettings</title>
 <meta name="generator" content="DocBook XSL Stylesheets V1.78.1">
 <link rel="home" href="index.html" title="WebKit2GTK+ Reference Manual">
 <link rel="up" href="ch01.html" title="Class Overview">
 <link rel="prev" href="WebKitBackForwardListItem.html" title="WebKitBackForwardListItem">
 <link rel="next" href="WebKitURIRequest.html" title="WebKitURIRequest">
-<meta name="generator" content="GTK-Doc V1.18.1 (XML mode)">
+<meta name="generator" content="GTK-Doc V1.19.1 (XML mode)">
 <link rel="stylesheet" href="style.css" type="text/css">
 </head>
 <body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF">
-<table class="navigation" id="top" width="100%" summary="Navigation header" cellpadding="2" cellspacing="2">
-<tr valign="middle">
-<td><a accesskey="p" href="WebKitBackForwardListItem.html"><img src="left.png" width="24" height="24" border="0" alt="Prev"></a></td>
-<td><a accesskey="u" href="ch01.html"><img src="up.png" width="24" height="24" border="0" alt="Up"></a></td>
-<td><a accesskey="h" href="index.html"><img src="home.png" width="24" height="24" border="0" alt="Home"></a></td>
-<th width="100%" align="center">WebKit2GTK+ Reference Manual</th>
-<td><a accesskey="n" href="WebKitURIRequest.html"><img src="right.png" width="24" height="24" border="0" alt="Next"></a></td>
-</tr>
-<tr><td colspan="5" class="shortcuts">
-<a href="#WebKitSettings.synopsis" class="shortcut">Top</a>
+<table class="navigation" id="top" width="100%" summary="Navigation header" cellpadding="2" cellspacing="10"><tr valign="middle">
+<td width="100%" align="left">
+<a href="#" class="shortcut">Top</a>
                    | 
                   <a href="#WebKitSettings.description" class="shortcut">Description</a>
                    | 
                   <a href="#WebKitSettings.object-hierarchy" class="shortcut">Object Hierarchy</a>
                    | 
                   <a href="#WebKitSettings.properties" class="shortcut">Properties</a>
-</td></tr>
-</table>
+</td>
+<td><a accesskey="h" href="index.html"><img src="home.png" width="16" height="16" border="0" alt="Home"></a></td>
+<td><a accesskey="u" href="ch01.html"><img src="up.png" width="16" height="16" border="0" alt="Up"></a></td>
+<td><a accesskey="p" href="WebKitBackForwardListItem.html"><img src="left.png" width="16" height="16" border="0" alt="Prev"></a></td>
+<td><a accesskey="n" href="WebKitURIRequest.html"><img src="right.png" width="16" height="16" border="0" alt="Next"></a></td>
+</tr></table>
 <div class="refentry">
 <a name="WebKitSettings"></a><div class="titlepage"></div>
 <div class="refnamediv"><table width="100%"><tr>
@@ -260,6 +257,11 @@ const <a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gc
 <span class="returnvalue">void</span>                <a class="link" href="WebKitSettings.html#webkit-settings-set-enable-write-console-messages-to-stdout" title="webkit_settings_set_enable_write_console_messages_to_stdout ()">webkit_settings_set_enable_write_console_messages_to_stdout</a>
                                                         (<em class="parameter"><code><a class="link" href="WebKitSettings.html" title="WebKitSettings"><span class="type">WebKitSettings</span></a> *settings</code></em>,
                                                          <em class="parameter"><code><a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a> enabled</code></em>);
+<a href="../glib/glib-Basic-Types.html#gboolean"><span class="returnvalue">gboolean</span></a>            <a class="link" href="WebKitSettings.html#webkit-settings-get-enable-media-stream" title="webkit_settings_get_enable_media_stream ()">webkit_settings_get_enable_media_stream</a>
+                                                        (<em class="parameter"><code><a class="link" href="WebKitSettings.html" title="WebKitSettings"><span class="type">WebKitSettings</span></a> *settings</code></em>);
+<span class="returnvalue">void</span>                <a class="link" href="WebKitSettings.html#webkit-settings-set-enable-media-stream" title="webkit_settings_set_enable_media_stream ()">webkit_settings_set_enable_media_stream</a>
+                                                        (<em class="parameter"><code><a class="link" href="WebKitSettings.html" title="WebKitSettings"><span class="type">WebKitSettings</span></a> *settings</code></em>,
+                                                         <em class="parameter"><code><a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a> enabled</code></em>);
 </pre>
 </div>
 <div class="refsect1">
@@ -291,6 +293,7 @@ const <a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gc
   "<a class="link" href="WebKitSettings.html#WebKitSettings--enable-hyperlink-auditing" title='The "enable-hyperlink-auditing" property'>enable-hyperlink-auditing</a>" <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read / Write / Construct
   "<a class="link" href="WebKitSettings.html#WebKitSettings--enable-java" title='The "enable-java" property'>enable-java</a>"              <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read / Write / Construct
   "<a class="link" href="WebKitSettings.html#WebKitSettings--enable-javascript" title='The "enable-javascript" property'>enable-javascript</a>"        <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read / Write / Construct
+  "<a class="link" href="WebKitSettings.html#WebKitSettings--enable-media-stream" title='The "enable-media-stream" property'>enable-media-stream</a>"      <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read / Write / Construct
   "<a class="link" href="WebKitSettings.html#WebKitSettings--enable-offline-web-application-cache" title='The "enable-offline-web-application-cache" property'>enable-offline-web-application-cache</a>" <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read / Write / Construct
   "<a class="link" href="WebKitSettings.html#WebKitSettings--enable-page-cache" title='The "enable-page-cache" property'>enable-page-cache</a>"        <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read / Write / Construct
   "<a class="link" href="WebKitSettings.html#WebKitSettings--enable-plugins" title='The "enable-plugins" property'>enable-plugins</a>"           <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read / Write / Construct
@@ -335,56 +338,8 @@ After creation, a <a class="link" href="WebKitSettings.html" title="WebKitSettin
       <tr>
         <td class="listing_lines" align="right"><pre>1
 2
-3
-4
-5
-6
-7
-8
-9
-10
-11
-12
-13
-14
-15
-16
-17
-18
-19
-20
-21
-22
-23
-24
-25
-26
-27</pre></td>
-        <td class="listing_code"><pre class="programlisting"><?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
-<html xmlns="http://www.w3.org/1999/xhtml">
-<head>
-<meta name="syntax" content="cpp" />
-<meta name="settings" content="use_xhtml,use_css,pre_wrap,no_foldcolumn,prevent_copy=" />
-<meta name="colorscheme" content="none" />
-<style type="text/css">
-
-pre { white-space: pre-wrap; font-family: monospace; color: #000000; background-color: #ffffff; }
-body { font-family: monospace; color: #000000; background-color: #ffffff; }
-* { font-size: 1em; }
-.Comment { color: #c00000; font-weight: bold; }
-
-</style>
-
-<script type='text/javascript'>
-//<![CDATA[
-
-//]]>
-</script>
-</head>
-<body>
-<pre id='vimCodeElement'>
-<span class="comment">/*</span><span class="comment"> Disable JavaScript. </span><span class="comment">*/</span>
+3</pre></td>
+        <td class="listing_code"><pre class="programlisting"><span class="comment">/*</span><span class="comment"> Disable JavaScript. </span><span class="comment">*/</span>
 WebKitSettings *settings = webkit_web_view_group_get_settings (my_view_group);
 webkit_settings_set_enable_javascript (settings, FALSE);</pre></td>
       </tr>
@@ -2867,6 +2822,62 @@ Set the <a class="link" href="WebKitSettings.html#WebKitSettings--enable-write-c
 </table></div>
 <p class="since">Since 2.2</p>
 </div>
+<hr>
+<div class="refsect2">
+<a name="webkit-settings-get-enable-media-stream"></a><h3>webkit_settings_get_enable_media_stream ()</h3>
+<pre class="programlisting"><a href="../glib/glib-Basic-Types.html#gboolean"><span class="returnvalue">gboolean</span></a>            webkit_settings_get_enable_media_stream
+                                                        (<em class="parameter"><code><a class="link" href="WebKitSettings.html" title="WebKitSettings"><span class="type">WebKitSettings</span></a> *settings</code></em>);</pre>
+<p>
+Get the <a class="link" href="WebKitSettings.html#WebKitSettings--enable-media-stream" title='The "enable-media-stream" property'><span class="type">"enable-media-stream"</span></a> property.
+</p>
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
+<col align="left" valign="top">
+<col>
+</colgroup>
+<tbody>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>settings</code></em> :</span></p></td>
+<td>a <a class="link" href="WebKitSettings.html" title="WebKitSettings"><span class="type">WebKitSettings</span></a>
+</td>
+</tr>
+<tr>
+<td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
+<td>
+<a href="../glib/glib-Standard-Macros.html#TRUE:CAPS"><code class="literal">TRUE</code></a> If mediastream support is enabled or <a href="../glib/glib-Standard-Macros.html#FALSE:CAPS"><code class="literal">FALSE</code></a> otherwise.</td>
+</tr>
+</tbody>
+</table></div>
+<p class="since">Since 2.4</p>
+</div>
+<hr>
+<div class="refsect2">
+<a name="webkit-settings-set-enable-media-stream"></a><h3>webkit_settings_set_enable_media_stream ()</h3>
+<pre class="programlisting"><span class="returnvalue">void</span>                webkit_settings_set_enable_media_stream
+                                                        (<em class="parameter"><code><a class="link" href="WebKitSettings.html" title="WebKitSettings"><span class="type">WebKitSettings</span></a> *settings</code></em>,
+                                                         <em class="parameter"><code><a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a> enabled</code></em>);</pre>
+<p>
+Set the <a class="link" href="WebKitSettings.html#WebKitSettings--enable-media-stream" title='The "enable-media-stream" property'><span class="type">"enable-media-stream"</span></a> property.
+</p>
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
+<col align="left" valign="top">
+<col>
+</colgroup>
+<tbody>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>settings</code></em> :</span></p></td>
+<td>a <a class="link" href="WebKitSettings.html" title="WebKitSettings"><span class="type">WebKitSettings</span></a>
+</td>
+</tr>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>enabled</code></em> :</span></p></td>
+<td>Value to be set</td>
+</tr>
+</tbody>
+</table></div>
+<p class="since">Since 2.4</p>
+</div>
 </div>
 <div class="refsect1">
 <a name="WebKitSettings.property-details"></a><h2>Property Details</h2>
@@ -3065,6 +3076,21 @@ Determines whether or not Java is enabled on the page.
 Determines whether or not JavaScript executes within a page.
 </p>
 <p>Default value: TRUE</p>
+</div>
+<hr>
+<div class="refsect2">
+<a name="WebKitSettings--enable-media-stream"></a><h3>The <code class="literal">"enable-media-stream"</code> property</h3>
+<pre class="programlisting">  "enable-media-stream"      <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read / Write / Construct</pre>
+<p>
+Enable or disable support for MediaStream on pages. MediaStream
+is an experimental proposal for allowing web pages to access
+audio and video devices for capture.
+</p>
+<p>
+See also http://dev.w3.org/2011/webrtc/editor/getusermedia.html
+</p>
+<p>Default value: FALSE</p>
+<p class="since">Since 2.4</p>
 </div>
 <hr>
 <div class="refsect2">
@@ -3350,6 +3376,6 @@ this property is enabled.
 </div>
 <div class="footer">
 <hr>
-          Generated by GTK-Doc V1.18.1</div>
+          Generated by GTK-Doc V1.19.1</div>
 </body>
 </html>

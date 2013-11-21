@@ -41,7 +41,6 @@
 #include "Frame.h"
 #include "InspectorDOMStorageAgent.h"
 #include "InspectorFrontend.h"
-#include "InspectorState.h"
 #include "InspectorValues.h"
 #include "InstrumentingAgents.h"
 #include "MemoryCache.h"
@@ -68,6 +67,16 @@ InspectorMemoryAgent::~InspectorMemoryAgent()
 {
 }
 
+void InspectorMemoryAgent::didCreateFrontendAndBackend(InspectorFrontendChannel*, InspectorBackendDispatcher* backendDispatcher)
+{
+    m_backendDispatcher = InspectorMemoryBackendDispatcher::create(backendDispatcher, this);
+}
+
+void InspectorMemoryAgent::willDestroyFrontendAndBackend()
+{
+    m_backendDispatcher.clear();
+}
+
 void InspectorMemoryAgent::getDOMCounters(ErrorString*, int* documents, int* nodes, int* jsEventListeners)
 {
     *documents = InspectorCounters::counterValue(InspectorCounters::DocumentCounter);
@@ -75,27 +84,14 @@ void InspectorMemoryAgent::getDOMCounters(ErrorString*, int* documents, int* nod
     *jsEventListeners = ThreadLocalInspectorCounters::current().counterValue(ThreadLocalInspectorCounters::JSEventListenerCounter);
 }
 
-InspectorMemoryAgent::InspectorMemoryAgent(InstrumentingAgents* instrumentingAgents, InspectorCompositeState* state)
-    : InspectorBaseAgent<InspectorMemoryAgent>("Memory", instrumentingAgents, state)
-    , m_frontend(0)
+InspectorMemoryAgent::InspectorMemoryAgent(InstrumentingAgents* instrumentingAgents)
+    : InspectorBaseAgent(ASCIILiteral("Memory"), instrumentingAgents)
 {
 }
 
-PassOwnPtr<InspectorMemoryAgent> InspectorMemoryAgent::create(InstrumentingAgents* instrumentingAgents, InspectorCompositeState* state)
+PassOwnPtr<InspectorMemoryAgent> InspectorMemoryAgent::create(InstrumentingAgents* instrumentingAgents)
 {
-    return adoptPtr(new InspectorMemoryAgent(instrumentingAgents, state));
-}
-
-
-void InspectorMemoryAgent::setFrontend(InspectorFrontend* frontend)
-{
-    ASSERT(!m_frontend);
-    m_frontend = frontend->memory();
-}
-
-void InspectorMemoryAgent::clearFrontend()
-{
-    m_frontend = 0;
+    return adoptPtr(new InspectorMemoryAgent(instrumentingAgents));
 }
 
 } // namespace WebCore

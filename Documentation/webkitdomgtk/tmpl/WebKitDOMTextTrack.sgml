@@ -9,12 +9,10 @@ WebKitDOMTextTrack
 
 </para>
 
-
 <!-- ##### SECTION See_Also ##### -->
 <para>
 
 </para>
-
 
 <!-- ##### SECTION Stability_Level ##### -->
 
@@ -38,17 +36,12 @@ WebKitDOMTextTrack
 
 </para>
 
-<!-- ##### ARG WebKitDOMTextTrack:kind ##### -->
+<!-- ##### ARG WebKitDOMTextTrack:id ##### -->
 <para>
 
 </para>
 
 <!-- ##### ARG WebKitDOMTextTrack:label ##### -->
-<para>
-
-</para>
-
-<!-- ##### ARG WebKitDOMTextTrack:language ##### -->
 <para>
 
 </para>
@@ -77,7 +70,18 @@ WebKitDOMTextTrack
 @error: 
 
 
-<!-- ##### FUNCTION webkit_dom_text_track_get_kind ##### -->
+<!-- ##### FUNCTION webkit_dom_text_track_dispatch_event ##### -->
+<para>
+
+</para>
+
+@self: 
+@evt: 
+@error: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_text_track_get_id ##### -->
 <para>
 
 </para>
@@ -87,15 +91,6 @@ WebKitDOMTextTrack
 
 
 <!-- ##### FUNCTION webkit_dom_text_track_get_label ##### -->
-<para>
-
-</para>
-
-@self: 
-@Returns: 
-
-
-<!-- ##### FUNCTION webkit_dom_text_track_get_language ##### -->
 <para>
 
 </para>

@@ -79,6 +79,7 @@ public:
 
     virtual void seek(float) { }
     virtual void seekDouble(double time) { seek(time); }
+    virtual void seekWithTolerance(double time, double, double) { seek(time); }
 
     virtual bool seeking() const = 0;
 
@@ -129,8 +130,8 @@ public:
     virtual void setPoster(const String&) { }
 
 #if ENABLE(PLUGIN_PROXY_FOR_VIDEO)
-    virtual void deliverNotification(MediaPlayerProxyNotificationType) = 0;
-    virtual void setMediaPlayerProxy(WebMediaPlayerProxy*) = 0;
+    virtual void deliverNotification(MediaPlayerProxyNotificationType) { }
+    virtual void setMediaPlayerProxy(WebMediaPlayerProxy*) { }
     virtual void setControls(bool) { }
 #endif
 

@@ -43,11 +43,10 @@
 #include <WebKit2/WKGeolocationManager.h>
 #include <WebKit2/WKGeolocationPermissionRequest.h>
 #include <WebKit2/WKGeolocationPosition.h>
-#include <WebKit2/WKGraphicsContext.h>
 #include <WebKit2/WKHitTestResult.h>
 #include <WebKit2/WKMutableArray.h>
 #include <WebKit2/WKMutableDictionary.h>
-#include <WebKit2/WKNavigationData.h>
+#include <WebKit2/WKNavigationDataRef.h>
 #include <WebKit2/WKNumber.h>
 #include <WebKit2/WKOpenPanelParameters.h>
 #include <WebKit2/WKOpenPanelResultListener.h>

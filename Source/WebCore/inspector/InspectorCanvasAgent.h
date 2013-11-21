@@ -48,23 +48,21 @@ class Frame;
 class InjectedScriptCanvasModule;
 class InjectedScriptManager;
 class InspectorPageAgent;
-class InspectorState;
 class InstrumentingAgents;
 class ScriptObject;
 
 typedef String ErrorString;
 
-class InspectorCanvasAgent : public InspectorBaseAgent<InspectorCanvasAgent>, public InspectorBackendDispatcher::CanvasCommandHandler {
+class InspectorCanvasAgent : public InspectorBaseAgent, public InspectorCanvasBackendDispatcherHandler {
 public:
-    static PassOwnPtr<InspectorCanvasAgent> create(InstrumentingAgents* instrumentingAgents, InspectorCompositeState* state, InspectorPageAgent* pageAgent, InjectedScriptManager* injectedScriptManager)
+    static PassOwnPtr<InspectorCanvasAgent> create(InstrumentingAgents* instrumentingAgents, InspectorPageAgent* pageAgent, InjectedScriptManager* injectedScriptManager)
     {
-        return adoptPtr(new InspectorCanvasAgent(instrumentingAgents, state, pageAgent, injectedScriptManager));
+        return adoptPtr(new InspectorCanvasAgent(instrumentingAgents, pageAgent, injectedScriptManager));
     }
     ~InspectorCanvasAgent();
 
-    virtual void setFrontend(InspectorFrontend*);
-    virtual void clearFrontend();
-    virtual void restore();
+    virtual void didCreateFrontendAndBackend(InspectorFrontendChannel*, InspectorBackendDispatcher*) OVERRIDE;
+    virtual void willDestroyFrontendAndBackend() OVERRIDE;
 
     void frameNavigated(Frame*);
     void frameDetached(Frame*);
@@ -90,7 +88,7 @@ public:
     virtual void getResourceState(ErrorString*, const TypeBuilder::Canvas::TraceLogId&, const TypeBuilder::Canvas::ResourceId&, RefPtr<TypeBuilder::Canvas::ResourceState>&);
 
 private:
-    InspectorCanvasAgent(InstrumentingAgents*, InspectorCompositeState*, InspectorPageAgent*, InjectedScriptManager*);
+    InspectorCanvasAgent(InstrumentingAgents*, InspectorPageAgent*, InjectedScriptManager*);
 
     InjectedScriptCanvasModule injectedScriptCanvasModule(ErrorString*, JSC::ExecState*);
     InjectedScriptCanvasModule injectedScriptCanvasModule(ErrorString*, const ScriptObject&);
@@ -102,7 +100,8 @@ private:
 
     InspectorPageAgent* m_pageAgent;
     InjectedScriptManager* m_injectedScriptManager;
-    InspectorFrontend::Canvas* m_frontend;
+    std::unique_ptr<InspectorCanvasFrontendDispatcher> m_frontendDispatcher;
+    RefPtr<InspectorCanvasBackendDispatcher> m_backendDispatcher;
     bool m_enabled;
     // Contains all frames with canvases, value is true only for frames that have an uninstrumented canvas.
     typedef HashMap<Frame*, bool> FramesWithUninstrumentedCanvases;

@@ -28,6 +28,7 @@
 #include "Internals.h"
 
 #include "AnimationController.h"
+#include "ApplicationCacheStorage.h"
 #include "BackForwardController.h"
 #include "CachedResourceLoader.h"
 #include "Chrome.h"
@@ -69,6 +70,7 @@
 #include "Language.h"
 #include "MainFrame.h"
 #include "MallocStatistics.h"
+#include "MediaPlayer.h"
 #include "MemoryCache.h"
 #include "MemoryInfo.h"
 #include "Page.h"
@@ -150,6 +152,10 @@
 #include "MockMediaStreamCenter.h"
 #include "RTCPeerConnection.h"
 #include "RTCPeerConnectionHandlerMock.h"
+#endif
+
+#if ENABLE(MEDIA_SOURCE)
+#include "MockMediaPlayerMediaSource.h"
 #endif
 
 namespace WebCore {
@@ -273,6 +279,7 @@ void Internals::resetToConsistentState(Page* page)
         page->mainFrame().editor().toggleContinuousSpellChecking();
     if (page->mainFrame().editor().isOverwriteModeEnabled())
         page->mainFrame().editor().toggleOverwriteModeEnabled();
+    cacheStorage().setDefaultOriginQuota(ApplicationCacheStorage::noQuota());
 }
 
 Internals::Internals(Document* document)
@@ -1762,6 +1769,8 @@ void Internals::setHeaderHeight(float height)
 #if USE(ACCELERATED_COMPOSITING)
     FrameView* frameView = document->view();
     frameView->setHeaderHeight(height);
+#else
+    UNUSED_PARAM(height);
 #endif
 }
 
@@ -1809,6 +1818,14 @@ void Internals::webkitDidExitFullScreenForElement(Element* element)
     document->webkitDidExitFullScreenForElement(element);
 }
 #endif
+
+void Internals::setApplicationCacheOriginQuota(unsigned long long quota)
+{
+    Document* document = contextDocument();
+    if (!document)
+        return;
+    cacheStorage().storeUpdatedQuotaForOrigin(document->securityOrigin(), quota);
+}
 
 void Internals::registerURLSchemeAsBypassingContentSecurityPolicy(const String& scheme)
 {
@@ -2058,6 +2075,8 @@ void Internals::setCaptionsStyleSheetOverride(const String& override, ExceptionC
 
 #if ENABLE(VIDEO_TRACK) && !PLATFORM(WIN)
     document->page()->group().captionPreferences()->setCaptionsStyleSheetOverride(override);
+#else
+    UNUSED_PARAM(override);
 #endif
 }
 
@@ -2156,5 +2175,12 @@ bool Internals::isPluginUnavailabilityIndicatorObscured(Element* element, Except
     RenderEmbeddedObject* embed = toRenderEmbeddedObject(renderer);
     return embed->isReplacementObscured();
 }
+
+#if ENABLE(MEDIA_SOURCE)
+void Internals::initializeMockMediaSource()
+{
+    MediaPlayerFactorySupport::callRegisterMediaEngine(MockMediaPlayerMediaSource::registerMediaEngine);
+}
+#endif
 
 }

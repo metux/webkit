@@ -2,26 +2,19 @@
 <html>
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
-<title>WebKitDOMTextTrack</title>
+<title>WebKitDOMGTK+ Reference Manual: WebKitDOMTextTrack</title>
 <meta name="generator" content="DocBook XSL Stylesheets V1.78.1">
 <link rel="home" href="index.html" title="WebKitDOMGTK+ Reference Manual">
 <link rel="up" href="ch01.html" title="Class Overview">
 <link rel="prev" href="WebKitDOMHTMLVideoElement.html" title="WebKitDOMHTMLVideoElement">
 <link rel="next" href="WebKitDOMTextTrackList.html" title="WebKitDOMTextTrackList">
-<meta name="generator" content="GTK-Doc V1.18.1 (XML mode)">
+<meta name="generator" content="GTK-Doc V1.19.1 (XML mode)">
 <link rel="stylesheet" href="style.css" type="text/css">
 </head>
 <body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF">
-<table class="navigation" id="top" width="100%" summary="Navigation header" cellpadding="2" cellspacing="2">
-<tr valign="middle">
-<td><a accesskey="p" href="WebKitDOMHTMLVideoElement.html"><img src="left.png" width="24" height="24" border="0" alt="Prev"></a></td>
-<td><a accesskey="u" href="ch01.html"><img src="up.png" width="24" height="24" border="0" alt="Up"></a></td>
-<td><a accesskey="h" href="index.html"><img src="home.png" width="24" height="24" border="0" alt="Home"></a></td>
-<th width="100%" align="center">WebKitDOMGTK+ Reference Manual</th>
-<td><a accesskey="n" href="WebKitDOMTextTrackList.html"><img src="right.png" width="24" height="24" border="0" alt="Next"></a></td>
-</tr>
-<tr><td colspan="5" class="shortcuts">
-<a href="#WebKitDOMTextTrack.synopsis" class="shortcut">Top</a>
+<table class="navigation" id="top" width="100%" summary="Navigation header" cellpadding="2" cellspacing="10"><tr valign="middle">
+<td width="100%" align="left">
+<a href="#" class="shortcut">Top</a>
                    | 
                   <a href="#WebKitDOMTextTrack.description" class="shortcut">Description</a>
                    | 
@@ -30,8 +23,12 @@
                   <a href="#WebKitDOMTextTrack.implemented-interfaces" class="shortcut">Implemented Interfaces</a>
                    | 
                   <a href="#WebKitDOMTextTrack.properties" class="shortcut">Properties</a>
-</td></tr>
-</table>
+</td>
+<td><a accesskey="h" href="index.html"><img src="home.png" width="16" height="16" border="0" alt="Home"></a></td>
+<td><a accesskey="u" href="ch01.html"><img src="up.png" width="16" height="16" border="0" alt="Up"></a></td>
+<td><a accesskey="p" href="WebKitDOMHTMLVideoElement.html"><img src="left.png" width="16" height="16" border="0" alt="Prev"></a></td>
+<td><a accesskey="n" href="WebKitDOMTextTrackList.html"><img src="right.png" width="16" height="16" border="0" alt="Next"></a></td>
+</tr></table>
 <div class="refentry">
 <a name="WebKitDOMTextTrack"></a><div class="titlepage"></div>
 <div class="refnamediv"><table width="100%"><tr>
@@ -49,9 +46,12 @@
 <span class="returnvalue">void</span>                <a class="link" href="WebKitDOMTextTrack.html#webkit-dom-text-track-remove-cue" title="webkit_dom_text_track_remove_cue ()">webkit_dom_text_track_remove_cue</a>    (<em class="parameter"><code><a class="link" href="WebKitDOMTextTrack.html" title="WebKitDOMTextTrack"><span class="type">WebKitDOMTextTrack</span></a> *self</code></em>,
                                                          <em class="parameter"><code><a class="link" href="WebKitDOMTextTrackCue.html" title="WebKitDOMTextTrackCue"><span class="type">WebKitDOMTextTrackCue</span></a> *cue</code></em>,
                                                          <em class="parameter"><code><a href="../glib/glib-Error-Reporting.html#GError"><span class="type">GError</span></a> **error</code></em>);
-<a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gchar</span></a> *             <a class="link" href="WebKitDOMTextTrack.html#webkit-dom-text-track-get-kind" title="webkit_dom_text_track_get_kind ()">webkit_dom_text_track_get_kind</a>      (<em class="parameter"><code><a class="link" href="WebKitDOMTextTrack.html" title="WebKitDOMTextTrack"><span class="type">WebKitDOMTextTrack</span></a> *self</code></em>);
+<a href="../glib/glib-Basic-Types.html#gboolean"><span class="returnvalue">gboolean</span></a>            <a class="link" href="WebKitDOMTextTrack.html#webkit-dom-text-track-dispatch-event" title="webkit_dom_text_track_dispatch_event ()">webkit_dom_text_track_dispatch_event</a>
+                                                        (<em class="parameter"><code><a class="link" href="WebKitDOMTextTrack.html" title="WebKitDOMTextTrack"><span class="type">WebKitDOMTextTrack</span></a> *self</code></em>,
+                                                         <em class="parameter"><code><a class="link" href="WebKitDOMEvent.html" title="WebKitDOMEvent"><span class="type">WebKitDOMEvent</span></a> *evt</code></em>,
+                                                         <em class="parameter"><code><a href="../glib/glib-Error-Reporting.html#GError"><span class="type">GError</span></a> **error</code></em>);
+<a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gchar</span></a> *             <a class="link" href="WebKitDOMTextTrack.html#webkit-dom-text-track-get-id" title="webkit_dom_text_track_get_id ()">webkit_dom_text_track_get_id</a>        (<em class="parameter"><code><a class="link" href="WebKitDOMTextTrack.html" title="WebKitDOMTextTrack"><span class="type">WebKitDOMTextTrack</span></a> *self</code></em>);
 <a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gchar</span></a> *             <a class="link" href="WebKitDOMTextTrack.html#webkit-dom-text-track-get-label" title="webkit_dom_text_track_get_label ()">webkit_dom_text_track_get_label</a>     (<em class="parameter"><code><a class="link" href="WebKitDOMTextTrack.html" title="WebKitDOMTextTrack"><span class="type">WebKitDOMTextTrack</span></a> *self</code></em>);
-<a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gchar</span></a> *             <a class="link" href="WebKitDOMTextTrack.html#webkit-dom-text-track-get-language" title="webkit_dom_text_track_get_language ()">webkit_dom_text_track_get_language</a>  (<em class="parameter"><code><a class="link" href="WebKitDOMTextTrack.html" title="WebKitDOMTextTrack"><span class="type">WebKitDOMTextTrack</span></a> *self</code></em>);
 <a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gchar</span></a> *             <a class="link" href="WebKitDOMTextTrack.html#webkit-dom-text-track-get-mode" title="webkit_dom_text_track_get_mode ()">webkit_dom_text_track_get_mode</a>      (<em class="parameter"><code><a class="link" href="WebKitDOMTextTrack.html" title="WebKitDOMTextTrack"><span class="type">WebKitDOMTextTrack</span></a> *self</code></em>);
 <span class="returnvalue">void</span>                <a class="link" href="WebKitDOMTextTrack.html#webkit-dom-text-track-set-mode" title="webkit_dom_text_track_set_mode ()">webkit_dom_text_track_set_mode</a>      (<em class="parameter"><code><a class="link" href="WebKitDOMTextTrack.html" title="WebKitDOMTextTrack"><span class="type">WebKitDOMTextTrack</span></a> *self</code></em>,
                                                          <em class="parameter"><code>const <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a> *value</code></em>);
@@ -80,9 +80,8 @@ WebKitDOMTextTrack implements
 <pre class="synopsis">
   "<a class="link" href="WebKitDOMTextTrack.html#WebKitDOMTextTrack--active-cues" title='The "active-cues" property'>active-cues</a>"              <a class="link" href="WebKitDOMTextTrackCueList.html" title="WebKitDOMTextTrackCueList"><span class="type">WebKitDOMTextTrackCueList</span></a>*  : Read
   "<a class="link" href="WebKitDOMTextTrack.html#WebKitDOMTextTrack--cues" title='The "cues" property'>cues</a>"                     <a class="link" href="WebKitDOMTextTrackCueList.html" title="WebKitDOMTextTrackCueList"><span class="type">WebKitDOMTextTrackCueList</span></a>*  : Read
-  "<a class="link" href="WebKitDOMTextTrack.html#WebKitDOMTextTrack--kind" title='The "kind" property'>kind</a>"                     <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a>*                : Read
+  "<a class="link" href="WebKitDOMTextTrack.html#WebKitDOMTextTrack--id" title='The "id" property'>id</a>"                       <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a>*                : Read
   "<a class="link" href="WebKitDOMTextTrack.html#WebKitDOMTextTrack--label" title='The "label" property'>label</a>"                    <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a>*                : Read
-  "<a class="link" href="WebKitDOMTextTrack.html#WebKitDOMTextTrack--language" title='The "language" property'>language</a>"                 <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a>*                : Read
   "<a class="link" href="WebKitDOMTextTrack.html#WebKitDOMTextTrack--mode" title='The "mode" property'>mode</a>"                     <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a>*                : Read / Write
 </pre>
 </div>
@@ -154,18 +153,64 @@ WebKitDOMTextTrack implements
 </div>
 <hr>
 <div class="refsect2">
-<a name="webkit-dom-text-track-get-kind"></a><h3>webkit_dom_text_track_get_kind ()</h3>
-<pre class="programlisting"><a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gchar</span></a> *             webkit_dom_text_track_get_kind      (<em class="parameter"><code><a class="link" href="WebKitDOMTextTrack.html" title="WebKitDOMTextTrack"><span class="type">WebKitDOMTextTrack</span></a> *self</code></em>);</pre>
+<a name="webkit-dom-text-track-dispatch-event"></a><h3>webkit_dom_text_track_dispatch_event ()</h3>
+<pre class="programlisting"><a href="../glib/glib-Basic-Types.html#gboolean"><span class="returnvalue">gboolean</span></a>            webkit_dom_text_track_dispatch_event
+                                                        (<em class="parameter"><code><a class="link" href="WebKitDOMTextTrack.html" title="WebKitDOMTextTrack"><span class="type">WebKitDOMTextTrack</span></a> *self</code></em>,
+                                                         <em class="parameter"><code><a class="link" href="WebKitDOMEvent.html" title="WebKitDOMEvent"><span class="type">WebKitDOMEvent</span></a> *evt</code></em>,
+                                                         <em class="parameter"><code><a href="../glib/glib-Error-Reporting.html#GError"><span class="type">GError</span></a> **error</code></em>);</pre>
+<div class="warning">
+<h3 class="title">Warning</h3>
+<p><code class="literal">webkit_dom_text_track_dispatch_event</code> has been deprecated since version 2.4 and should not be used in newly-written code. Use <a class="link" href="WebKitDOMEventTarget.html#webkit-dom-event-target-dispatch-event" title="webkit_dom_event_target_dispatch_event ()"><code class="function">webkit_dom_event_target_dispatch_event()</code></a> instead.</p>
+</div>
 <div class="variablelist"><table border="0" class="variablelist">
 <colgroup>
 <col align="left" valign="top">
 <col>
 </colgroup>
-<tbody><tr>
+<tbody>
+<tr>
 <td><p><span class="term"><em class="parameter"><code>self</code></em> :</span></p></td>
 <td>A <a class="link" href="WebKitDOMTextTrack.html" title="WebKitDOMTextTrack"><span class="type">WebKitDOMTextTrack</span></a>
 </td>
-</tr></tbody>
+</tr>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>evt</code></em> :</span></p></td>
+<td>A <a class="link" href="WebKitDOMEvent.html" title="WebKitDOMEvent"><span class="type">WebKitDOMEvent</span></a>
+</td>
+</tr>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>error</code></em> :</span></p></td>
+<td><a href="../glib/glib-Error-Reporting.html#GError"><span class="type">GError</span></a></td>
+</tr>
+<tr>
+<td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
+<td>A <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>
+</td>
+</tr>
+</tbody>
+</table></div>
+</div>
+<hr>
+<div class="refsect2">
+<a name="webkit-dom-text-track-get-id"></a><h3>webkit_dom_text_track_get_id ()</h3>
+<pre class="programlisting"><a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gchar</span></a> *             webkit_dom_text_track_get_id        (<em class="parameter"><code><a class="link" href="WebKitDOMTextTrack.html" title="WebKitDOMTextTrack"><span class="type">WebKitDOMTextTrack</span></a> *self</code></em>);</pre>
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
+<col align="left" valign="top">
+<col>
+</colgroup>
+<tbody>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>self</code></em> :</span></p></td>
+<td>A <a class="link" href="WebKitDOMTextTrack.html" title="WebKitDOMTextTrack"><span class="type">WebKitDOMTextTrack</span></a>
+</td>
+</tr>
+<tr>
+<td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
+<td>A <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a>
+</td>
+</tr>
+</tbody>
 </table></div>
 </div>
 <hr>
@@ -177,27 +222,18 @@ WebKitDOMTextTrack implements
 <col align="left" valign="top">
 <col>
 </colgroup>
-<tbody><tr>
+<tbody>
+<tr>
 <td><p><span class="term"><em class="parameter"><code>self</code></em> :</span></p></td>
 <td>A <a class="link" href="WebKitDOMTextTrack.html" title="WebKitDOMTextTrack"><span class="type">WebKitDOMTextTrack</span></a>
 </td>
-</tr></tbody>
-</table></div>
-</div>
-<hr>
-<div class="refsect2">
-<a name="webkit-dom-text-track-get-language"></a><h3>webkit_dom_text_track_get_language ()</h3>
-<pre class="programlisting"><a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gchar</span></a> *             webkit_dom_text_track_get_language  (<em class="parameter"><code><a class="link" href="WebKitDOMTextTrack.html" title="WebKitDOMTextTrack"><span class="type">WebKitDOMTextTrack</span></a> *self</code></em>);</pre>
-<div class="variablelist"><table border="0" class="variablelist">
-<colgroup>
-<col align="left" valign="top">
-<col>
-</colgroup>
-<tbody><tr>
-<td><p><span class="term"><em class="parameter"><code>self</code></em> :</span></p></td>
-<td>A <a class="link" href="WebKitDOMTextTrack.html" title="WebKitDOMTextTrack"><span class="type">WebKitDOMTextTrack</span></a>
+</tr>
+<tr>
+<td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
+<td>A <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a>
 </td>
-</tr></tbody>
+</tr>
+</tbody>
 </table></div>
 </div>
 <hr>
@@ -209,11 +245,18 @@ WebKitDOMTextTrack implements
 <col align="left" valign="top">
 <col>
 </colgroup>
-<tbody><tr>
+<tbody>
+<tr>
 <td><p><span class="term"><em class="parameter"><code>self</code></em> :</span></p></td>
 <td>A <a class="link" href="WebKitDOMTextTrack.html" title="WebKitDOMTextTrack"><span class="type">WebKitDOMTextTrack</span></a>
 </td>
-</tr></tbody>
+</tr>
+<tr>
+<td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
+<td>A <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a>
+</td>
+</tr>
+</tbody>
 </table></div>
 </div>
 <hr>
@@ -258,7 +301,7 @@ WebKitDOMTextTrack implements
 </tr>
 <tr>
 <td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
-<td>. <span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
+<td>A <a class="link" href="WebKitDOMTextTrackCueList.html" title="WebKitDOMTextTrackCueList"><span class="type">WebKitDOMTextTrackCueList</span></a>. <span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
 </td>
 </tr>
 </tbody>
@@ -282,7 +325,7 @@ WebKitDOMTextTrack implements
 </tr>
 <tr>
 <td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
-<td>. <span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
+<td>A <a class="link" href="WebKitDOMTextTrackCueList.html" title="WebKitDOMTextTrackCueList"><span class="type">WebKitDOMTextTrackCueList</span></a>. <span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
 </td>
 </tr>
 </tbody>
@@ -304,9 +347,9 @@ WebKitDOMTextTrack implements
 </div>
 <hr>
 <div class="refsect2">
-<a name="WebKitDOMTextTrack--kind"></a><h3>The <code class="literal">"kind"</code> property</h3>
-<pre class="programlisting">  "kind"                     <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a>*                : Read</pre>
-<p>read-only gchar* TextTrack:kind.</p>
+<a name="WebKitDOMTextTrack--id"></a><h3>The <code class="literal">"id"</code> property</h3>
+<pre class="programlisting">  "id"                       <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a>*                : Read</pre>
+<p>read-only gchar* TextTrack:id.</p>
 <p>Default value: ""</p>
 </div>
 <hr>
@@ -314,13 +357,6 @@ WebKitDOMTextTrack implements
 <a name="WebKitDOMTextTrack--label"></a><h3>The <code class="literal">"label"</code> property</h3>
 <pre class="programlisting">  "label"                    <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a>*                : Read</pre>
 <p>read-only gchar* TextTrack:label.</p>
-<p>Default value: ""</p>
-</div>
-<hr>
-<div class="refsect2">
-<a name="WebKitDOMTextTrack--language"></a><h3>The <code class="literal">"language"</code> property</h3>
-<pre class="programlisting">  "language"                 <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a>*                : Read</pre>
-<p>read-only gchar* TextTrack:language.</p>
 <p>Default value: ""</p>
 </div>
 <hr>
@@ -334,6 +370,6 @@ WebKitDOMTextTrack implements
 </div>
 <div class="footer">
 <hr>
-          Generated by GTK-Doc V1.18.1</div>
+          Generated by GTK-Doc V1.19.1</div>
 </body>
 </html>

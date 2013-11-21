@@ -51,14 +51,24 @@
 
 namespace WebCore {
 
-InspectorInputAgent::InspectorInputAgent(InstrumentingAgents* instrumentingAgents, InspectorCompositeState* inspectorState, Page* page)
-    : InspectorBaseAgent<InspectorInputAgent>("Input", instrumentingAgents, inspectorState)
+InspectorInputAgent::InspectorInputAgent(InstrumentingAgents* instrumentingAgents, Page* page)
+    : InspectorBaseAgent(ASCIILiteral("Input"), instrumentingAgents)
     , m_page(page)
 {
 }
 
 InspectorInputAgent::~InspectorInputAgent()
 {
+}
+
+void InspectorInputAgent::didCreateFrontendAndBackend(InspectorFrontendChannel*, InspectorBackendDispatcher* backendDispatcher)
+{
+    m_backendDispatcher = InspectorInputBackendDispatcher::create(backendDispatcher, this);
+}
+
+void InspectorInputAgent::willDestroyFrontendAndBackend()
+{
+    m_backendDispatcher.clear();
 }
 
 void InspectorInputAgent::dispatchKeyEvent(ErrorString* error, const String& type, const int* modifiers, const double* timestamp, const String* text, const String* unmodifiedText, const String* keyIdentifier, const int* windowsVirtualKeyCode, const int* nativeVirtualKeyCode, const int* macCharCode, const bool* autoRepeat, const bool* isKeypad, const bool* isSystemKey)

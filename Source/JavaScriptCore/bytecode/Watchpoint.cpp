@@ -38,36 +38,37 @@ Watchpoint::~Watchpoint()
         remove();
 }
 
-WatchpointSet::WatchpointSet(InitialWatchpointSetMode mode)
-    : m_isWatched(mode == InitializedWatching)
-    , m_isInvalidated(false)
+WatchpointSet::WatchpointSet(WatchpointState state)
+    : m_state(state)
 {
 }
 
 WatchpointSet::~WatchpointSet()
 {
-    // Fire all watchpoints. This is necessary because it is possible, say with
-    // structure watchpoints, for the watchpoint set owner to die while the
-    // watchpoint owners are still live.
-    fireAllWatchpoints();
+    // Remove all watchpoints, so that they don't try to remove themselves. Note that we
+    // don't fire watchpoints on deletion. We assume that any code that is interested in
+    // watchpoints already also separately has a mechanism to make sure that the code is
+    // either keeping the watchpoint set's owner alive, or does some weak reference thing.
+    while (!m_set.isEmpty())
+        m_set.begin()->remove();
 }
 
 void WatchpointSet::add(Watchpoint* watchpoint)
 {
     ASSERT(!isCompilationThread());
+    ASSERT(state() != IsInvalidated);
     if (!watchpoint)
         return;
     m_set.push(watchpoint);
-    m_isWatched = true;
+    m_state = IsWatched;
 }
 
 void WatchpointSet::notifyWriteSlow()
 {
-    ASSERT(m_isWatched);
+    ASSERT(state() == IsWatched);
     
     fireAllWatchpoints();
-    m_isWatched = false;
-    m_isInvalidated = true;
+    m_state = IsInvalidated;
     WTF::storeStoreFence();
 }
 
@@ -86,11 +87,7 @@ WatchpointSet* InlineWatchpointSet::inflateSlow()
 {
     ASSERT(isThin());
     ASSERT(!isCompilationThread());
-    WatchpointSet* fat = adoptRef(new WatchpointSet(InitializedBlind)).leakRef();
-    if (m_data & IsInvalidatedFlag)
-        fat->m_isInvalidated = true;
-    if (m_data & IsWatchedFlag)
-        fat->m_isWatched = true;
+    WatchpointSet* fat = adoptRef(new WatchpointSet(decodeState(m_data))).leakRef();
     WTF::storeStoreFence();
     m_data = bitwise_cast<uintptr_t>(fat);
     return fat;

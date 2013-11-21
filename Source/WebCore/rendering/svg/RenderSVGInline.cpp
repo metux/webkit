@@ -38,11 +38,11 @@ RenderSVGInline::RenderSVGInline(SVGGraphicsElement& element, PassRef<RenderStyl
     setAlwaysCreateLineBoxes();
 }
 
-InlineFlowBox* RenderSVGInline::createInlineFlowBox()
+std::unique_ptr<InlineFlowBox> RenderSVGInline::createInlineFlowBox()
 {
-    InlineFlowBox* box = new (renderArena()) SVGInlineFlowBox(*this);
+    auto box = std::make_unique<SVGInlineFlowBox>(*this);
     box->setHasVirtualLogicalHeight();
-    return box;
+    return std::move(box);
 }
 
 FloatRect RenderSVGInline::objectBoundingBox() const
@@ -71,22 +71,22 @@ FloatRect RenderSVGInline::repaintRectInLocalCoordinates() const
 
 LayoutRect RenderSVGInline::clippedOverflowRectForRepaint(const RenderLayerModelObject* repaintContainer) const
 {
-    return SVGRenderSupport::clippedOverflowRectForRepaint(this, repaintContainer);
+    return SVGRenderSupport::clippedOverflowRectForRepaint(*this, repaintContainer);
 }
 
 void RenderSVGInline::computeFloatRectForRepaint(const RenderLayerModelObject* repaintContainer, FloatRect& repaintRect, bool fixed) const
 {
-    SVGRenderSupport::computeFloatRectForRepaint(this, repaintContainer, repaintRect, fixed);
+    SVGRenderSupport::computeFloatRectForRepaint(*this, repaintContainer, repaintRect, fixed);
 }
 
 void RenderSVGInline::mapLocalToContainer(const RenderLayerModelObject* repaintContainer, TransformState& transformState, MapCoordinatesFlags, bool* wasFixed) const
 {
-    SVGRenderSupport::mapLocalToContainer(this, repaintContainer, transformState, wasFixed);
+    SVGRenderSupport::mapLocalToContainer(*this, repaintContainer, transformState, wasFixed);
 }
 
 const RenderObject* RenderSVGInline::pushMappingToContainer(const RenderLayerModelObject* ancestorToStopAt, RenderGeometryMap& geometryMap) const
 {
-    return SVGRenderSupport::pushMappingToContainer(this, ancestorToStopAt, geometryMap);
+    return SVGRenderSupport::pushMappingToContainer(*this, ancestorToStopAt, geometryMap);
 }
 
 void RenderSVGInline::absoluteQuads(Vector<FloatQuad>& quads, bool* wasFixed) const
@@ -117,7 +117,7 @@ void RenderSVGInline::styleDidChange(StyleDifference diff, const RenderStyle* ol
 void RenderSVGInline::addChild(RenderObject* child, RenderObject* beforeChild)
 {
     RenderInline::addChild(child, beforeChild);
-    SVGResourcesCache::clientWasAddedToTree(child, &child->style());
+    SVGResourcesCache::clientWasAddedToTree(*child);
 
     if (RenderSVGText* textRenderer = RenderSVGText::locateRenderSVGTextAncestor(this))
         textRenderer->subtreeChildWasAdded(child);
@@ -125,7 +125,7 @@ void RenderSVGInline::addChild(RenderObject* child, RenderObject* beforeChild)
 
 void RenderSVGInline::removeChild(RenderObject& child)
 {
-    SVGResourcesCache::clientWillBeRemovedFromTree(&child);
+    SVGResourcesCache::clientWillBeRemovedFromTree(child);
 
     RenderSVGText* textRenderer = RenderSVGText::locateRenderSVGTextAncestor(this);
     if (!textRenderer) {

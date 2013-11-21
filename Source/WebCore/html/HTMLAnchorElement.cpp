@@ -34,7 +34,6 @@
 #include "FrameLoaderTypes.h"
 #include "FrameSelection.h"
 #include "HTMLImageElement.h"
-#include "HTMLNames.h"
 #include "HTMLParserIdioms.h"
 #include "KeyboardEvent.h"
 #include "MouseEvent.h"
@@ -605,6 +604,7 @@ bool shouldProhibitLinks(Element* element)
 #if ENABLE(SVG)
     return isInSVGImage(element);
 #else
+    UNUSED_PARAM(element);
     return false;
 #endif
 }

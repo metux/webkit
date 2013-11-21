@@ -55,37 +55,17 @@ void JIT::emit_op_mov(Instruction* currentInstruction)
     int dst = currentInstruction[1].u.operand;
     int src = currentInstruction[2].u.operand;
 
-    if (canBeOptimizedOrInlined()) {
-        // Use simpler approach, since the DFG thinks that the last result register
-        // is always set to the destination on every operation.
-        emitGetVirtualRegister(src, regT0);
-        emitPutVirtualRegister(dst);
-    } else {
-        if (m_codeBlock->isConstantRegisterIndex(src)) {
-            if (!getConstantOperand(src).isNumber())
-                store64(TrustedImm64(JSValue::encode(getConstantOperand(src))), Address(callFrameRegister, dst * sizeof(Register)));
-            else
-                store64(Imm64(JSValue::encode(getConstantOperand(src))), Address(callFrameRegister, dst * sizeof(Register)));
-            if (dst == m_lastResultBytecodeRegister)
-                killLastResultRegister();
-        } else if ((src == m_lastResultBytecodeRegister) || (dst == m_lastResultBytecodeRegister)) {
-            // If either the src or dst is the cached register go though
-            // get/put registers to make sure we track this correctly.
-            emitGetVirtualRegister(src, regT0);
-            emitPutVirtualRegister(dst);
-        } else {
-            // Perform the copy via regT1; do not disturb any mapping in regT0.
-            load64(Address(callFrameRegister, src * sizeof(Register)), regT1);
-            store64(regT1, Address(callFrameRegister, dst * sizeof(Register)));
-        }
-    }
+    // Use simpler approach, since the DFG thinks that the last result register
+    // is always set to the destination on every operation.
+    emitGetVirtualRegister(src, regT0);
+    emitPutVirtualRegister(dst);
 }
 
 void JIT::emit_op_end(Instruction* currentInstruction)
 {
-    RELEASE_ASSERT(returnValueRegister != callFrameRegister);
-    emitGetVirtualRegister(currentInstruction[1].u.operand, returnValueRegister);
-    restoreReturnAddressBeforeReturn(Address(callFrameRegister, JSStack::ReturnPC * static_cast<int>(sizeof(Register))));
+    RELEASE_ASSERT(returnValueGPR != callFrameRegister);
+    emitGetVirtualRegister(currentInstruction[1].u.operand, returnValueGPR);
+    restoreReturnAddressBeforeReturn(Address(callFrameRegister, CallFrame::returnPCOffset()));
     ret();
 }
 
@@ -116,7 +96,7 @@ void JIT::emitSlow_op_new_object(Instruction* currentInstruction, Vector<SlowCas
     int dst = currentInstruction[1].u.operand;
     Structure* structure = currentInstruction[3].u.objectAllocationProfile->structure();
     callOperation(operationNewObject, structure);
-    emitStoreCell(dst, returnValueRegister);
+    emitStoreCell(dst, returnValueGPR);
 }
 
 void JIT::emit_op_check_has_instance(Instruction* currentInstruction)
@@ -268,17 +248,17 @@ void JIT::emit_op_tear_off_arguments(Instruction* currentInstruction)
 void JIT::emit_op_ret(Instruction* currentInstruction)
 {
     ASSERT(callFrameRegister != regT1);
-    ASSERT(regT1 != returnValueRegister);
-    ASSERT(returnValueRegister != callFrameRegister);
+    ASSERT(regT1 != returnValueGPR);
+    ASSERT(returnValueGPR != callFrameRegister);
 
     // Return the result in %eax.
-    emitGetVirtualRegister(currentInstruction[1].u.operand, returnValueRegister);
+    emitGetVirtualRegister(currentInstruction[1].u.operand, returnValueGPR);
 
     // Grab the return address.
-    emitGetFromCallFrameHeaderPtr(JSStack::ReturnPC, regT1);
+    emitGetReturnPCFromCallFrameHeaderPtr(regT1);
 
     // Restore our caller's "r".
-    emitGetFromCallFrameHeaderPtr(JSStack::CallerFrame, callFrameRegister);
+    emitGetCallerFrameFromCallFrameHeaderPtr(callFrameRegister);
 
     // Return.
     restoreReturnAddressBeforeReturn(regT1);
@@ -288,20 +268,20 @@ void JIT::emit_op_ret(Instruction* currentInstruction)
 void JIT::emit_op_ret_object_or_this(Instruction* currentInstruction)
 {
     ASSERT(callFrameRegister != regT1);
-    ASSERT(regT1 != returnValueRegister);
-    ASSERT(returnValueRegister != callFrameRegister);
+    ASSERT(regT1 != returnValueGPR);
+    ASSERT(returnValueGPR != callFrameRegister);
 
     // Return the result in %eax.
-    emitGetVirtualRegister(currentInstruction[1].u.operand, returnValueRegister);
-    Jump notJSCell = emitJumpIfNotJSCell(returnValueRegister);
-    loadPtr(Address(returnValueRegister, JSCell::structureOffset()), regT2);
+    emitGetVirtualRegister(currentInstruction[1].u.operand, returnValueGPR);
+    Jump notJSCell = emitJumpIfNotJSCell(returnValueGPR);
+    loadPtr(Address(returnValueGPR, JSCell::structureOffset()), regT2);
     Jump notObject = emitJumpIfNotObject(regT2);
 
     // Grab the return address.
-    emitGetFromCallFrameHeaderPtr(JSStack::ReturnPC, regT1);
+    emitGetReturnPCFromCallFrameHeaderPtr(regT1);
 
     // Restore our caller's "r".
-    emitGetFromCallFrameHeaderPtr(JSStack::CallerFrame, callFrameRegister);
+    emitGetCallerFrameFromCallFrameHeaderPtr(callFrameRegister);
 
     // Return.
     restoreReturnAddressBeforeReturn(regT1);
@@ -310,13 +290,13 @@ void JIT::emit_op_ret_object_or_this(Instruction* currentInstruction)
     // Return 'this' in %eax.
     notJSCell.link(this);
     notObject.link(this);
-    emitGetVirtualRegister(currentInstruction[2].u.operand, returnValueRegister);
+    emitGetVirtualRegister(currentInstruction[2].u.operand, returnValueGPR);
 
     // Grab the return address.
-    emitGetFromCallFrameHeaderPtr(JSStack::ReturnPC, regT1);
+    emitGetReturnPCFromCallFrameHeaderPtr(regT1);
 
     // Restore our caller's "r".
-    emitGetFromCallFrameHeaderPtr(JSStack::CallerFrame, callFrameRegister);
+    emitGetCallerFrameFromCallFrameHeaderPtr(callFrameRegister);
 
     // Return.
     restoreReturnAddressBeforeReturn(regT1);
@@ -483,7 +463,7 @@ void JIT::emit_op_bitor(Instruction* currentInstruction)
 
 void JIT::emit_op_throw(Instruction* currentInstruction)
 {
-    ASSERT(regT0 == returnValueRegister);
+    ASSERT(regT0 == returnValueGPR);
     emitGetVirtualRegister(currentInstruction[1].u.operand, regT0);
     callOperationNoExceptionCheck(operationThrow, regT0);
     jumpToExceptionHandler();
@@ -511,7 +491,7 @@ void JIT::emit_op_get_pnames(Instruction* currentInstruction)
     // this call doesn't seem to be hot.
     Label isObject(this);
     callOperation(operationGetPNames, regT0);
-    emitStoreCell(dst, returnValueRegister);
+    emitStoreCell(dst, returnValueGPR);
     load32(Address(regT0, OBJECT_OFFSETOF(JSPropertyNameIterator, m_jsStringsSize)), regT3);
     store64(tagTypeNumberRegister, addressFor(i));
     store32(TrustedImm32(Int32Tag), intTagFor(size));
@@ -661,7 +641,6 @@ void JIT::emit_op_push_name_scope(Instruction* currentInstruction)
 
 void JIT::emit_op_catch(Instruction* currentInstruction)
 {
-    killLastResultRegister(); // FIXME: Implicitly treat op_catch as a labeled statement, and remove this line of code.
     move(regT0, callFrameRegister);
     move(TrustedImmPtr(m_vm), regT3);
     load64(Address(regT3, VM::exceptionOffset()), regT0);
@@ -682,7 +661,7 @@ void JIT::emit_op_switch_imm(Instruction* currentInstruction)
 
     emitGetVirtualRegister(scrutinee, regT0);
     callOperation(operationSwitchImmWithUnknownKeyType, regT0, tableIndex);
-    jump(returnValueRegister);
+    jump(returnValueGPR);
 }
 
 void JIT::emit_op_switch_char(Instruction* currentInstruction)
@@ -698,7 +677,7 @@ void JIT::emit_op_switch_char(Instruction* currentInstruction)
 
     emitGetVirtualRegister(scrutinee, regT0);
     callOperation(operationSwitchCharWithUnknownKeyType, regT0, tableIndex);
-    jump(returnValueRegister);
+    jump(returnValueGPR);
 }
 
 void JIT::emit_op_switch_string(Instruction* currentInstruction)
@@ -713,7 +692,7 @@ void JIT::emit_op_switch_string(Instruction* currentInstruction)
 
     emitGetVirtualRegister(scrutinee, regT0);
     callOperation(operationSwitchStringWithUnknownKeyType, regT0, tableIndex);
-    jump(returnValueRegister);
+    jump(returnValueGPR);
 }
 
 void JIT::emit_op_throw_static_error(Instruction* currentInstruction)
@@ -821,7 +800,7 @@ void JIT::emit_op_create_activation(Instruction* currentInstruction)
     
     Jump activationCreated = branchTest64(NonZero, Address(callFrameRegister, sizeof(Register) * dst));
     callOperation(operationCreateActivation, 0);
-    emitStoreCell(dst, returnValueRegister);
+    emitStoreCell(dst, returnValueGPR);
     activationCreated.link(this);
 }
 
@@ -832,8 +811,8 @@ void JIT::emit_op_create_arguments(Instruction* currentInstruction)
     Jump argsCreated = branchTest64(NonZero, Address(callFrameRegister, sizeof(Register) * dst));
 
     callOperation(operationCreateArguments);
-    emitStoreCell(dst, returnValueRegister);
-    emitStoreCell(unmodifiedArgumentsRegister(VirtualRegister(dst)), returnValueRegister);
+    emitStoreCell(dst, returnValueGPR);
+    emitStoreCell(unmodifiedArgumentsRegister(VirtualRegister(dst)), returnValueGPR);
 
     argsCreated.link(this);
 }
@@ -955,14 +934,14 @@ void JIT::emitSlow_op_jfalse(Instruction* currentInstruction, Vector<SlowCaseEnt
 {
     linkSlowCase(iter);
     callOperation(operationConvertJSValueToBoolean, regT0);
-    emitJumpSlowToHot(branchTest32(Zero, returnValueRegister), currentInstruction[2].u.operand); // inverted!
+    emitJumpSlowToHot(branchTest32(Zero, returnValueGPR), currentInstruction[2].u.operand); // inverted!
 }
 
 void JIT::emitSlow_op_jtrue(Instruction* currentInstruction, Vector<SlowCaseEntry>::iterator& iter)
 {
     linkSlowCase(iter);
     callOperation(operationConvertJSValueToBoolean, regT0);
-    emitJumpSlowToHot(branchTest32(NonZero, returnValueRegister), currentInstruction[2].u.operand);
+    emitJumpSlowToHot(branchTest32(NonZero, returnValueGPR), currentInstruction[2].u.operand);
 }
 
 void JIT::emitSlow_op_bitxor(Instruction* currentInstruction, Vector<SlowCaseEntry>::iterator& iter)
@@ -985,8 +964,8 @@ void JIT::emitSlow_op_eq(Instruction* currentInstruction, Vector<SlowCaseEntry>:
 {
     linkSlowCase(iter);
     callOperation(operationCompareEq, regT0, regT1);
-    emitTagAsBoolImmediate(returnValueRegister);
-    emitPutVirtualRegister(currentInstruction[1].u.operand, returnValueRegister);
+    emitTagAsBoolImmediate(returnValueGPR);
+    emitPutVirtualRegister(currentInstruction[1].u.operand, returnValueGPR);
 }
 
 void JIT::emitSlow_op_neq(Instruction* currentInstruction, Vector<SlowCaseEntry>::iterator& iter)
@@ -994,8 +973,8 @@ void JIT::emitSlow_op_neq(Instruction* currentInstruction, Vector<SlowCaseEntry>
     linkSlowCase(iter);
     callOperation(operationCompareEq, regT0, regT1);
     xor32(TrustedImm32(0x1), regT0);
-    emitTagAsBoolImmediate(returnValueRegister);
-    emitPutVirtualRegister(currentInstruction[1].u.operand, returnValueRegister);
+    emitTagAsBoolImmediate(returnValueGPR);
+    emitPutVirtualRegister(currentInstruction[1].u.operand, returnValueGPR);
 }
 
 void JIT::emitSlow_op_stricteq(Instruction* currentInstruction, Vector<SlowCaseEntry>::iterator& iter)
@@ -1106,8 +1085,8 @@ void JIT::emitSlow_op_get_argument_by_val(Instruction* currentInstruction, Vecto
     linkSlowCase(iter);
     linkSlowCase(iter);
     callOperation(operationCreateArguments);
-    emitStoreCell(arguments, returnValueRegister);
-    emitStoreCell(unmodifiedArgumentsRegister(VirtualRegister(arguments)), returnValueRegister);
+    emitStoreCell(arguments, returnValueGPR);
+    emitStoreCell(unmodifiedArgumentsRegister(VirtualRegister(arguments)), returnValueGPR);
     
     skipArgumentsCreation.link(this);
     emitGetVirtualRegister(arguments, regT0);
@@ -1150,8 +1129,8 @@ void JIT::emitSlow_op_loop_hint(Instruction*, Vector<SlowCaseEntry>::iterator& i
         linkSlowCase(iter);
         
         callOperation(operationOptimize, m_bytecodeOffset);
-        Jump noOptimizedEntry = branchTestPtr(Zero, returnValueRegister);
-        jump(returnValueRegister);
+        Jump noOptimizedEntry = branchTestPtr(Zero, returnValueGPR);
+        jump(returnValueGPR);
         noOptimizedEntry.link(this);
 
         emitJumpSlowToHot(jump(), OPCODE_LENGTH(op_loop_hint));
@@ -1188,14 +1167,8 @@ void JIT::emit_op_new_func(Instruction* currentInstruction)
     FunctionExecutable* funcExec = m_codeBlock->functionDecl(currentInstruction[2].u.operand);
     callOperation(operationNewFunction, dst, funcExec);
 
-    if (currentInstruction[3].u.operand) {
-#if USE(JSVALUE32_64)        
-        unmap();
-#else
-        killLastResultRegister();
-#endif
+    if (currentInstruction[3].u.operand)
         lazyJump.link(this);
-    }
 }
 
 void JIT::emit_op_new_func_exp(Instruction* currentInstruction)

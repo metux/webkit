@@ -26,7 +26,6 @@
 #include "ElementTraversal.h"
 #include "EventNames.h"
 #include "ExceptionCode.h"
-#include "HTMLDivElement.h"
 #include "HTMLNames.h"
 #include "HTMLParserIdioms.h"
 #include "ProgressShadowElement.h"
@@ -67,7 +66,7 @@ RenderElement* HTMLProgressElement::createRenderer(PassRef<RenderStyle> style)
     return new RenderProgress(*this, std::move(style));
 }
 
-bool HTMLProgressElement::childShouldCreateRenderer(const Node* child) const
+bool HTMLProgressElement::childShouldCreateRenderer(const Node& child) const
 {
     return hasShadowRootParent(child) && HTMLElement::childShouldCreateRenderer(child);
 }

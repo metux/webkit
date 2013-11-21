@@ -31,6 +31,7 @@
 #include "InlineTextBox.h"
 #include "LayoutRepainter.h"
 #include "RenderFlowThread.h"
+#include "RenderIterator.h"
 #include "RenderLayer.h"
 #include "RenderNamedFlowFragment.h"
 #include "RenderText.h"
@@ -38,8 +39,6 @@
 #include "SimpleLineLayoutFunctions.h"
 #include "VerticalPositionCache.h"
 #include "VisiblePosition.h"
-
-using namespace std;
 
 namespace WebCore {
 
@@ -113,9 +112,6 @@ void RenderBlockFlow::willBeDestroyed()
     // Mark as being destroyed to avoid trouble with merges in removeChild().
     m_beingDestroyed = true;
 
-    if (lineGridBox())
-        lineGridBox()->destroy(renderArena());
-
     if (renderNamedFlowFragment())
         setRenderNamedFlowFragment(0);
 
@@ -138,7 +134,7 @@ void RenderBlockFlow::willBeDestroyed()
     }
 
     if (!documentBeingDestroyed()) {
-        if (firstLineBox()) {
+        if (firstRootBox()) {
             // We can't wait for RenderBox::destroy to clear the selection,
             // because by then we will have nuked the line boxes.
             // FIXME: The FrameSelection should be responsible for this when it
@@ -150,7 +146,7 @@ void RenderBlockFlow::willBeDestroyed()
             // that will outlast this block. In the non-anonymous block case those
             // children will be destroyed by the time we return from this function.
             if (isAnonymousBlock()) {
-                for (auto box = firstLineBox(); box; box = box->nextLineBox()) {
+                for (auto box = firstRootBox(); box; box = box->nextRootBox()) {
                     while (auto childBox = box->firstChild())
                         childBox->removeFromParent();
                 }
@@ -159,7 +155,7 @@ void RenderBlockFlow::willBeDestroyed()
             parent()->dirtyLinesFromChangedChild(this);
     }
 
-    m_lineBoxes.deleteLineBoxes(renderArena());
+    m_lineBoxes.deleteLineBoxes();
 
     removeFromDelayedUpdateScrollInfoSet();
 
@@ -251,17 +247,17 @@ void RenderBlockFlow::clearFloats()
                     LayoutUnit oldLogicalBottom = logicalBottomForFloat(oldFloatingObject.get());
                     if (logicalWidthForFloat(floatingObject) != logicalWidthForFloat(oldFloatingObject.get()) || logicalLeftForFloat(floatingObject) != logicalLeftForFloat(oldFloatingObject.get())) {
                         changeLogicalTop = 0;
-                        changeLogicalBottom = max(changeLogicalBottom, max(logicalBottom, oldLogicalBottom));
+                        changeLogicalBottom = std::max(changeLogicalBottom, std::max(logicalBottom, oldLogicalBottom));
                     } else {
                         if (logicalBottom != oldLogicalBottom) {
-                            changeLogicalTop = min(changeLogicalTop, min(logicalBottom, oldLogicalBottom));
-                            changeLogicalBottom = max(changeLogicalBottom, max(logicalBottom, oldLogicalBottom));
+                            changeLogicalTop = std::min(changeLogicalTop, std::min(logicalBottom, oldLogicalBottom));
+                            changeLogicalBottom = std::max(changeLogicalBottom, std::max(logicalBottom, oldLogicalBottom));
                         }
                         LayoutUnit logicalTop = logicalTopForFloat(floatingObject);
                         LayoutUnit oldLogicalTop = logicalTopForFloat(oldFloatingObject.get());
                         if (logicalTop != oldLogicalTop) {
-                            changeLogicalTop = min(changeLogicalTop, min(logicalTop, oldLogicalTop));
-                            changeLogicalBottom = max(changeLogicalBottom, max(logicalTop, oldLogicalTop));
+                            changeLogicalTop = std::min(changeLogicalTop, std::min(logicalTop, oldLogicalTop));
+                            changeLogicalBottom = std::max(changeLogicalBottom, std::max(logicalTop, oldLogicalTop));
                         }
                     }
 
@@ -271,7 +267,7 @@ void RenderBlockFlow::clearFloats()
                     }
                 } else {
                     changeLogicalTop = 0;
-                    changeLogicalBottom = max(changeLogicalBottom, logicalBottom);
+                    changeLogicalBottom = std::max(changeLogicalBottom, logicalBottom);
                 }
             }
         }
@@ -281,7 +277,7 @@ void RenderBlockFlow::clearFloats()
             FloatingObject* floatingObject = it->value.get();
             if (!floatingObject->isDescendant()) {
                 changeLogicalTop = 0;
-                changeLogicalBottom = max(changeLogicalBottom, logicalBottomForFloat(floatingObject));
+                changeLogicalBottom = std::max(changeLogicalBottom, logicalBottomForFloat(floatingObject));
             }
         }
 
@@ -326,7 +322,7 @@ void RenderBlockFlow::layoutBlock(bool relayoutChildren, LayoutUnit pageLogicalH
     checkForPaginationLogicalHeightChange(pageLogicalHeight, pageLogicalHeightChanged, hasSpecifiedPageLogicalHeight);
 
     const RenderStyle& styleToUse = style();
-    LayoutStateMaintainer statePusher(&view(), this, locationOffset(), hasColumns() || hasTransform() || hasReflection() || styleToUse.isFlippedBlocksWritingMode(), pageLogicalHeight, pageLogicalHeightChanged, columnInfo());
+    LayoutStateMaintainer statePusher(view(), *this, locationOffset(), hasColumns() || hasTransform() || hasReflection() || styleToUse.isFlippedBlocksWritingMode(), pageLogicalHeight, pageLogicalHeightChanged, columnInfo());
 
     prepareShapesAndPaginationBeforeBlockLayout(relayoutChildren);
     if (!relayoutChildren)
@@ -431,8 +427,8 @@ void RenderBlockFlow::layoutBlock(bool relayoutChildren, LayoutUnit pageLogicalH
             // If we have clipped overflow, we should use layout overflow as well, since visual overflow from lines didn't propagate to our block's overflow.
             // Note the old code did this as well but even for overflow:visible. The addition of hasOverflowClip() at least tightens up the hack a bit.
             // layoutInlineChildren should be patched to compute the entire repaint rect.
-            repaintLogicalLeft = min(repaintLogicalLeft, logicalLeftLayoutOverflow());
-            repaintLogicalRight = max(repaintLogicalRight, logicalRightLayoutOverflow());
+            repaintLogicalLeft = std::min(repaintLogicalLeft, logicalLeftLayoutOverflow());
+            repaintLogicalRight = std::max(repaintLogicalRight, logicalRightLayoutOverflow());
         }
         
         LayoutRect repaintRect;
@@ -575,7 +571,7 @@ void RenderBlockFlow::layoutBlockChild(RenderBox& child, MarginInfo& marginInfo,
     else if (!child.avoidsFloats() || child.shrinkToAvoidFloats()) {
         // If an element might be affected by the presence of floats, then always mark it for
         // layout.
-        LayoutUnit fb = max(previousFloatLogicalBottom, lowestFloatLogicalBottom());
+        LayoutUnit fb = std::max(previousFloatLogicalBottom, lowestFloatLogicalBottom());
         if (fb > logicalTopEstimate)
             markDescendantsWithFloats = true;
     }
@@ -584,7 +580,7 @@ void RenderBlockFlow::layoutBlockChild(RenderBox& child, MarginInfo& marginInfo,
         if (markDescendantsWithFloats)
             childBlockFlow->markAllDescendantsWithFloatsForLayout();
         if (!child.isWritingModeRoot())
-            previousFloatLogicalBottom = max(previousFloatLogicalBottom, oldLogicalTop + childBlockFlow->lowestFloatLogicalBottom());
+            previousFloatLogicalBottom = std::max(previousFloatLogicalBottom, oldLogicalTop + childBlockFlow->lowestFloatLogicalBottom());
     }
 
     if (!child.needsLayout())
@@ -661,7 +657,7 @@ void RenderBlockFlow::layoutBlockChild(RenderBox& child, MarginInfo& marginInfo,
     // If the child has overhanging floats that intrude into following siblings (or possibly out
     // of this block), then the parent gets notified of the floats now.
     if (childBlockFlow && childBlockFlow->containsFloats())
-        maxFloatLogicalBottom = max(maxFloatLogicalBottom, addOverhangingFloats(*childBlockFlow, !childNeededLayout));
+        maxFloatLogicalBottom = std::max(maxFloatLogicalBottom, addOverhangingFloats(*childBlockFlow, !childNeededLayout));
 
     if (childOffset.width() || childOffset.height()) {
         view().addLayoutDelta(childOffset);
@@ -829,8 +825,8 @@ LayoutUnit RenderBlockFlow::collapseMargins(RenderBox& child, MarginInfo& margin
     // For self-collapsing blocks, collapse our bottom margins into our
     // top to get new posTop and negTop values.
     if (childIsSelfCollapsing) {
-        posTop = max(posTop, childMargins.positiveMarginAfter());
-        negTop = max(negTop, childMargins.negativeMarginAfter());
+        posTop = std::max(posTop, childMargins.positiveMarginAfter());
+        negTop = std::max(negTop, childMargins.negativeMarginAfter());
     }
     
     // See if the top margin is quirky. We only care if this child has
@@ -843,7 +839,7 @@ LayoutUnit RenderBlockFlow::collapseMargins(RenderBox& child, MarginInfo& margin
             // block. If it has larger margin values, then we need to update
             // our own maximal values.
             if (!document().inQuirksMode() || !marginInfo.quirkContainer() || !topQuirk)
-                setMaxMarginBeforeValues(max(posTop, maxPositiveMarginBefore()), max(negTop, maxNegativeMarginBefore()));
+                setMaxMarginBeforeValues(std::max(posTop, maxPositiveMarginBefore()), std::max(negTop, maxNegativeMarginBefore()));
 
             // The minute any of the margins involved isn't a quirk, don't
             // collapse it away, even if the margin is smaller (www.webreference.com
@@ -884,8 +880,8 @@ LayoutUnit RenderBlockFlow::collapseMargins(RenderBox& child, MarginInfo& margin
             // This child has no height. We need to compute our
             // position before we collapse the child's margins together,
             // so that we can get an accurate position for the zero-height block.
-            LayoutUnit collapsedBeforePos = max(marginInfo.positiveMargin(), childMargins.positiveMarginBefore());
-            LayoutUnit collapsedBeforeNeg = max(marginInfo.negativeMargin(), childMargins.negativeMarginBefore());
+            LayoutUnit collapsedBeforePos = std::max(marginInfo.positiveMargin(), childMargins.positiveMarginBefore());
+            LayoutUnit collapsedBeforeNeg = std::max(marginInfo.negativeMargin(), childMargins.negativeMarginBefore());
             marginInfo.setMargin(collapsedBeforePos, collapsedBeforeNeg);
             
             // Now collapse the child's margins together, which means examining our
@@ -914,7 +910,7 @@ LayoutUnit RenderBlockFlow::collapseMargins(RenderBox& child, MarginInfo& margin
             && (!document().inQuirksMode() || !marginInfo.quirkContainer() || !marginInfo.hasMarginBeforeQuirk())))) {
             // We're collapsing with a previous sibling's margins and not
             // with the top of the block.
-            setLogicalHeight(logicalHeight() + max(marginInfo.positiveMargin(), posTop) - max(marginInfo.negativeMargin(), negTop));
+            setLogicalHeight(logicalHeight() + std::max(marginInfo.positiveMargin(), posTop) - std::max(marginInfo.negativeMargin(), negTop));
             logicalTop = logicalHeight();
         }
 
@@ -936,7 +932,7 @@ LayoutUnit RenderBlockFlow::collapseMargins(RenderBox& child, MarginInfo& margin
     if (layoutState->isPaginated() && layoutState->pageLogicalHeight() && logicalTop > beforeCollapseLogicalTop
         && hasNextPage(beforeCollapseLogicalTop)) {
         LayoutUnit oldLogicalTop = logicalTop;
-        logicalTop = min(logicalTop, nextPageLogicalTop(beforeCollapseLogicalTop));
+        logicalTop = std::min(logicalTop, nextPageLogicalTop(beforeCollapseLogicalTop));
         setLogicalHeight(logicalHeight() + (logicalTop - oldLogicalTop));
     }
 
@@ -971,8 +967,8 @@ LayoutUnit RenderBlockFlow::clearFloatsIfNeeded(RenderBox& child, MarginInfo& ma
         // If DISCARD is specified for -webkit-margin-collapse, reset the margin values.
         if (!childDiscardMargin) {
             MarginValues childMargins = marginValuesForChild(child);
-            marginInfo.setPositiveMargin(max(childMargins.positiveMarginBefore(), childMargins.positiveMarginAfter()));
-            marginInfo.setNegativeMargin(max(childMargins.negativeMarginBefore(), childMargins.negativeMarginAfter()));
+            marginInfo.setPositiveMargin(std::max(childMargins.positiveMarginBefore(), childMargins.positiveMarginAfter()));
+            marginInfo.setNegativeMargin(std::max(childMargins.negativeMarginBefore(), childMargins.negativeMarginAfter()));
         } else
             marginInfo.clearMargin();
         marginInfo.setDiscardMargin(childDiscardMargin);
@@ -995,7 +991,7 @@ LayoutUnit RenderBlockFlow::clearFloatsIfNeeded(RenderBox& child, MarginInfo& ma
         LayoutUnit collapsedMargin = collapsedMarginBeforeForChild(child);
         setLogicalHeight(child.logicalTop() - collapsedMargin);
         // A negative collapsed margin-top value cancels itself out as it has already been factored into |yPos| above.
-        heightIncrease -= max(LayoutUnit(), collapsedMargin);
+        heightIncrease -= std::max(LayoutUnit(), collapsedMargin);
     } else
         // Increase our height by the amount we had to clear.
         setLogicalHeight(logicalHeight() + heightIncrease);
@@ -1040,8 +1036,8 @@ void RenderBlockFlow::marginBeforeEstimateForChild(RenderBox& child, LayoutUnit&
     }
 
     LayoutUnit beforeChildMargin = marginBeforeForChild(child);
-    positiveMarginBefore = max(positiveMarginBefore, beforeChildMargin);
-    negativeMarginBefore = max(negativeMarginBefore, -beforeChildMargin);
+    positiveMarginBefore = std::max(positiveMarginBefore, beforeChildMargin);
+    negativeMarginBefore = std::max(negativeMarginBefore, -beforeChildMargin);
 
     if (!child.isRenderBlockFlow())
         return;
@@ -1094,14 +1090,14 @@ LayoutUnit RenderBlockFlow::estimateLogicalTopPosition(RenderBox& child, const M
             // Use the cached collapsed margin values from a previous layout. Most of the time they
             // will be right.
             MarginValues marginValues = marginValuesForChild(child);
-            positiveMarginBefore = max(positiveMarginBefore, marginValues.positiveMarginBefore());
-            negativeMarginBefore = max(negativeMarginBefore, marginValues.negativeMarginBefore());
+            positiveMarginBefore = std::max(positiveMarginBefore, marginValues.positiveMarginBefore());
+            negativeMarginBefore = std::max(negativeMarginBefore, marginValues.negativeMarginBefore());
             discardMarginBefore = mustDiscardMarginBeforeForChild(child);
         }
 
         // Collapse the result with our current margins.
         if (!discardMarginBefore)
-            logicalTopEstimate += max(marginInfo.positiveMargin(), positiveMarginBefore) - max(marginInfo.negativeMargin(), negativeMarginBefore);
+            logicalTopEstimate += std::max(marginInfo.positiveMargin(), positiveMarginBefore) - std::max(marginInfo.negativeMargin(), negativeMarginBefore);
     }
 
     // Adjust logicalTopEstimate down to the next page if the margins are so large that we don't fit on the current
@@ -1109,7 +1105,7 @@ LayoutUnit RenderBlockFlow::estimateLogicalTopPosition(RenderBox& child, const M
     LayoutState* layoutState = view().layoutState();
     if (layoutState->isPaginated() && layoutState->pageLogicalHeight() && logicalTopEstimate > logicalHeight()
         && hasNextPage(logicalHeight()))
-        logicalTopEstimate = min(logicalTopEstimate, nextPageLogicalTop(logicalHeight()));
+        logicalTopEstimate = std::min(logicalTopEstimate, nextPageLogicalTop(logicalHeight()));
 
     logicalTopEstimate += getClearDelta(child, logicalTopEstimate);
     
@@ -1141,7 +1137,7 @@ void RenderBlockFlow::setCollapsedBottomMargin(const MarginInfo& marginInfo)
 
         // Update our max pos/neg bottom margins, since we collapsed our bottom margins
         // with our children.
-        setMaxMarginAfterValues(max(maxPositiveMarginAfter(), marginInfo.positiveMargin()), max(maxNegativeMarginAfter(), marginInfo.negativeMargin()));
+        setMaxMarginAfterValues(std::max(maxPositiveMarginAfter(), marginInfo.positiveMargin()), std::max(maxNegativeMarginAfter(), marginInfo.negativeMargin()));
 
         if (!marginInfo.hasMarginAfterQuirk())
             setHasMarginAfterQuirk(false);
@@ -1168,7 +1164,7 @@ void RenderBlockFlow::handleAfterSideOfBlock(LayoutUnit beforeSide, LayoutUnit a
 
     // Negative margins can cause our height to shrink below our minimal height (border/padding).
     // If this happens, ensure that the computed height is increased to the minimal height.
-    setLogicalHeight(max(logicalHeight(), beforeSide + afterSide));
+    setLogicalHeight(std::max(logicalHeight(), beforeSide + afterSide));
 
     // Update our bottom collapsed margin info.
     setCollapsedBottomMargin(marginInfo);
@@ -1176,24 +1172,26 @@ void RenderBlockFlow::handleAfterSideOfBlock(LayoutUnit beforeSide, LayoutUnit a
 
 void RenderBlockFlow::setMaxMarginBeforeValues(LayoutUnit pos, LayoutUnit neg)
 {
-    if (!m_rareData) {
+    if (!hasRareBlockFlowData()) {
         if (pos == RenderBlockFlowRareData::positiveMarginBeforeDefault(*this) && neg == RenderBlockFlowRareData::negativeMarginBeforeDefault(*this))
             return;
-        m_rareData = adoptPtr(new RenderBlockFlowRareData(*this));
+        materializeRareBlockFlowData();
     }
-    m_rareData->m_margins.setPositiveMarginBefore(pos);
-    m_rareData->m_margins.setNegativeMarginBefore(neg);
+
+    rareBlockFlowData()->m_margins.setPositiveMarginBefore(pos);
+    rareBlockFlowData()->m_margins.setNegativeMarginBefore(neg);
 }
 
 void RenderBlockFlow::setMaxMarginAfterValues(LayoutUnit pos, LayoutUnit neg)
 {
-    if (!m_rareData) {
+    if (!hasRareBlockFlowData()) {
         if (pos == RenderBlockFlowRareData::positiveMarginAfterDefault(*this) && neg == RenderBlockFlowRareData::negativeMarginAfterDefault(*this))
             return;
-        m_rareData = adoptPtr(new RenderBlockFlowRareData(*this));
+        materializeRareBlockFlowData();
     }
-    m_rareData->m_margins.setPositiveMarginAfter(pos);
-    m_rareData->m_margins.setNegativeMarginAfter(neg);
+
+    rareBlockFlowData()->m_margins.setPositiveMarginAfter(pos);
+    rareBlockFlowData()->m_margins.setNegativeMarginAfter(neg);
 }
 
 void RenderBlockFlow::setMustDiscardMarginBefore(bool value)
@@ -1202,14 +1200,14 @@ void RenderBlockFlow::setMustDiscardMarginBefore(bool value)
         ASSERT(value);
         return;
     }
-    
-    if (!m_rareData && !value)
-        return;
 
-    if (!m_rareData)
-        m_rareData = adoptPtr(new RenderBlockFlowRareData(*this));
+    if (!hasRareBlockFlowData()) {
+        if (!value)
+            return;
+        materializeRareBlockFlowData();
+    }
 
-    m_rareData->m_discardMarginBefore = value;
+    rareBlockFlowData()->m_discardMarginBefore = value;
 }
 
 void RenderBlockFlow::setMustDiscardMarginAfter(bool value)
@@ -1219,23 +1217,23 @@ void RenderBlockFlow::setMustDiscardMarginAfter(bool value)
         return;
     }
 
-    if (!m_rareData && !value)
-        return;
+    if (!hasRareBlockFlowData()) {
+        if (!value)
+            return;
+        materializeRareBlockFlowData();
+    }
 
-    if (!m_rareData)
-        m_rareData = adoptPtr(new RenderBlockFlowRareData(*this));
-
-    m_rareData->m_discardMarginAfter = value;
+    rareBlockFlowData()->m_discardMarginAfter = value;
 }
 
 bool RenderBlockFlow::mustDiscardMarginBefore() const
 {
-    return style().marginBeforeCollapse() == MDISCARD || (m_rareData && m_rareData->m_discardMarginBefore);
+    return style().marginBeforeCollapse() == MDISCARD || (hasRareBlockFlowData() && rareBlockFlowData()->m_discardMarginBefore);
 }
 
 bool RenderBlockFlow::mustDiscardMarginAfter() const
 {
-    return style().marginAfterCollapse() == MDISCARD || (m_rareData && m_rareData->m_discardMarginAfter);
+    return style().marginAfterCollapse() == MDISCARD || (hasRareBlockFlowData() && rareBlockFlowData()->m_discardMarginAfter);
 }
 
 bool RenderBlockFlow::mustDiscardMarginBeforeForChild(const RenderBox& child) const
@@ -1436,7 +1434,7 @@ static inline LayoutUnit calculateMinimumPageHeight(RenderStyle* renderStyle, Ro
 {
     // We may require a certain minimum number of lines per page in order to satisfy
     // orphans and widows, and that may affect the minimum page height.
-    unsigned lineCount = max<unsigned>(renderStyle->hasAutoOrphans() ? 1 : renderStyle->orphans(), renderStyle->hasAutoWidows() ? 1 : renderStyle->widows());
+    unsigned lineCount = std::max<unsigned>(renderStyle->hasAutoOrphans() ? 1 : renderStyle->orphans(), renderStyle->hasAutoWidows() ? 1 : renderStyle->widows());
     if (lineCount > 1) {
         RootInlineBox* line = lastLine;
         for (unsigned i = 1; i < lineCount && line->prevRootBox(); i++)
@@ -1445,7 +1443,7 @@ static inline LayoutUnit calculateMinimumPageHeight(RenderStyle* renderStyle, Ro
         // FIXME: Paginating using line overflow isn't all fine. See FIXME in
         // adjustLinePositionForPagination() for more details.
         LayoutRect overflow = line->logicalVisualOverflowRect(line->lineTop(), line->lineBottom());
-        lineTop = min(line->lineTopWithLeading(), overflow.y());
+        lineTop = std::min(line->lineTopWithLeading(), overflow.y());
     }
     return lineBottom - lineTop;
 }
@@ -1472,8 +1470,8 @@ void RenderBlockFlow::adjustLinePositionForPagination(RootInlineBox* lineBox, La
     // Technically if the location we move the line to has a different line width than our old position, then we need to dirty the
     // line and all following lines.
     LayoutRect logicalVisualOverflow = lineBox->logicalVisualOverflowRect(lineBox->lineTop(), lineBox->lineBottom());
-    LayoutUnit logicalOffset = min(lineBox->lineTopWithLeading(), logicalVisualOverflow.y());
-    LayoutUnit logicalBottom = max(lineBox->lineBottomWithLeading(), logicalVisualOverflow.maxY());
+    LayoutUnit logicalOffset = std::min(lineBox->lineTopWithLeading(), logicalVisualOverflow.y());
+    LayoutUnit logicalBottom = std::max(lineBox->lineBottomWithLeading(), logicalVisualOverflow.maxY());
     LayoutUnit lineHeight = logicalBottom - logicalOffset;
     updateMinimumPageHeight(logicalOffset, calculateMinimumPageHeight(&style(), lineBox, logicalOffset, logicalBottom));
     logicalOffset += delta;
@@ -1501,14 +1499,14 @@ void RenderBlockFlow::adjustLinePositionForPagination(RootInlineBox* lineBox, La
             return;
         if (lineHeight > pageLogicalHeight) {
             // Split the top margin in order to avoid splitting the visible part of the line.
-            remainingLogicalHeight -= min(lineHeight - pageLogicalHeight, max<LayoutUnit>(0, logicalVisualOverflow.y() - lineBox->lineTopWithLeading()));
+            remainingLogicalHeight -= std::min(lineHeight - pageLogicalHeight, std::max<LayoutUnit>(0, logicalVisualOverflow.y() - lineBox->lineTopWithLeading()));
         }
-        LayoutUnit totalLogicalHeight = lineHeight + max<LayoutUnit>(0, logicalOffset);
+        LayoutUnit totalLogicalHeight = lineHeight + std::max<LayoutUnit>(0, logicalOffset);
         LayoutUnit pageLogicalHeightAtNewOffset = hasUniformPageLogicalHeight ? pageLogicalHeight : pageLogicalHeightForOffset(logicalOffset + remainingLogicalHeight);
         setPageBreak(logicalOffset, lineHeight - remainingLogicalHeight);
         if (((lineBox == firstRootBox() && totalLogicalHeight < pageLogicalHeightAtNewOffset) || (!style().hasAutoOrphans() && style().orphans() >= lineIndex))
             && !isOutOfFlowPositioned() && !isTableCell())
-            setPaginationStrut(remainingLogicalHeight + max<LayoutUnit>(0, logicalOffset));
+            setPaginationStrut(remainingLogicalHeight + std::max<LayoutUnit>(0, logicalOffset));
         else {
             delta += remainingLogicalHeight;
             lineBox->setPaginationStrut(remainingLogicalHeight);
@@ -1521,37 +1519,34 @@ void RenderBlockFlow::adjustLinePositionForPagination(RootInlineBox* lineBox, La
 void RenderBlockFlow::setBreakAtLineToAvoidWidow(int lineToBreak)
 {
     ASSERT(lineToBreak >= 0);
-    if (!m_rareData)
-        m_rareData = adoptPtr(new RenderBlockFlowRareData(*this));
-
-    ASSERT(!m_rareData->m_didBreakAtLineToAvoidWidow);
-    m_rareData->m_lineBreakToAvoidWidow = lineToBreak;
+    ASSERT(!ensureRareBlockFlowData().m_didBreakAtLineToAvoidWidow);
+    ensureRareBlockFlowData().m_lineBreakToAvoidWidow = lineToBreak;
 }
 
 void RenderBlockFlow::setDidBreakAtLineToAvoidWidow()
 {
     ASSERT(!shouldBreakAtLineToAvoidWidow());
-    if (!m_rareData)
+    if (!hasRareBlockFlowData())
         return;
 
-    m_rareData->m_didBreakAtLineToAvoidWidow = true;
+    rareBlockFlowData()->m_didBreakAtLineToAvoidWidow = true;
 }
 
 void RenderBlockFlow::clearDidBreakAtLineToAvoidWidow()
 {
-    if (!m_rareData)
+    if (!hasRareBlockFlowData())
         return;
 
-    m_rareData->m_didBreakAtLineToAvoidWidow = false;
+    rareBlockFlowData()->m_didBreakAtLineToAvoidWidow = false;
 }
 
 void RenderBlockFlow::clearShouldBreakAtLineToAvoidWidow() const
 {
     ASSERT(shouldBreakAtLineToAvoidWidow());
-    if (!m_rareData)
+    if (!hasRareBlockFlowData())
         return;
 
-    m_rareData->m_lineBreakToAvoidWidow = -1;
+    rareBlockFlowData()->m_lineBreakToAvoidWidow = -1;
 }
 
 bool RenderBlockFlow::relayoutToAvoidWidows(LayoutStateMaintainer& statePusher)
@@ -1706,15 +1701,15 @@ void RenderBlockFlow::layoutLineGridBox()
     
     setLineGridBox(0);
 
-    RootInlineBox* lineGridBox = new (renderArena()) RootInlineBox(*this);
+    auto lineGridBox = std::make_unique<RootInlineBox>(*this);
     lineGridBox->setHasTextChildren(); // Needed to make the line ascent/descent actually be honored in quirks mode.
     lineGridBox->setConstructed();
     GlyphOverflowAndFallbackFontsMap textBoxDataMap;
     VerticalPositionCache verticalPositionCache;
     lineGridBox->alignBoxesInBlockDirection(logicalHeight(), textBoxDataMap, verticalPositionCache);
     
-    setLineGridBox(lineGridBox);
-    
+    setLineGridBox(std::move(lineGridBox));
+
     // FIXME: If any of the characteristics of the box change compared to the old one, then we need to do a deep dirtying
     // (similar to what happens when the page height changes). Ideally, though, we only do this if someone is actually snapping
     // to this grid.
@@ -1737,19 +1732,17 @@ void RenderBlockFlow::styleDidChange(StyleDifference diff, const RenderStyle* ol
     if (diff == StyleDifferenceLayout && s_canPropagateFloatIntoSibling && !canPropagateFloatIntoSibling && hasOverhangingFloats()) {
         RenderBlockFlow* parentBlock = this;
         const FloatingObjectSet& floatingObjectSet = m_floatingObjects->set();
-        auto end = floatingObjectSet.end();
 
-        for (auto curr = parent(); curr && !curr->isRenderView(); curr = curr->parent()) {
-            if (curr->isRenderBlockFlow()) {
-                RenderBlockFlow* currBlock = toRenderBlockFlow(curr);
-
-                if (currBlock->hasOverhangingFloats()) {
-                    for (auto it = floatingObjectSet.begin(); it != end; ++it) {
-                        RenderBox& renderer = (*it)->renderer();
-                        if (currBlock->hasOverhangingFloat(renderer)) {
-                            parentBlock = currBlock;
-                            break;
-                        }
+        auto ancestors = ancestorsOfType<RenderBlockFlow>(*this);
+        for (auto ancestor = ancestors.begin(), end = ancestors.end(); ancestor != end; ++ancestor) {
+            if (ancestor->isRenderView())
+                break;
+            if (ancestor->hasOverhangingFloats()) {
+                for (auto it = floatingObjectSet.begin(), end = floatingObjectSet.end(); it != end; ++it) {
+                    RenderBox& renderer = (*it)->renderer();
+                    if (ancestor->hasOverhangingFloat(renderer)) {
+                        parentBlock = &*ancestor;
+                        break;
                     }
                 }
             }
@@ -1788,7 +1781,7 @@ void RenderBlockFlow::deleteLines()
         ASSERT(!m_lineBoxes.firstLineBox());
         m_simpleLineLayout = nullptr;
     } else
-        m_lineBoxes.deleteLineBoxTree(renderArena());
+        m_lineBoxes.deleteLineBoxTree();
 
     RenderBlock::deleteLines();
 }
@@ -1931,7 +1924,7 @@ void RenderBlockFlow::clipOutFloatingObjects(RenderBlock& rootBlock, const Paint
 
 void RenderBlockFlow::createFloatingObjects()
 {
-    m_floatingObjects = adoptPtr(new FloatingObjects(this, isHorizontalWritingMode()));
+    m_floatingObjects = adoptPtr(new FloatingObjects(*this));
 }
 
 void RenderBlockFlow::removeFloatingObjects()
@@ -1977,11 +1970,6 @@ FloatingObject* RenderBlockFlow::insertFloatingObject(RenderBox& floatBox)
 
     setLogicalWidthForFloat(floatingObject.get(), logicalWidthForChild(floatBox) + marginStartForChild(floatBox) + marginEndForChild(floatBox));
 
-#if ENABLE(CSS_SHAPES)
-    if (ShapeOutsideInfo* shapeOutside = floatBox.shapeOutsideInfo())
-        shapeOutside->setShapeSize(logicalWidthForChild(floatBox), logicalHeightForChild(floatBox));
-#endif
-
     return m_floatingObjects->add(std::move(floatingObject));
 }
 
@@ -2003,7 +1991,7 @@ void RenderBlockFlow::removeFloatingObject(RenderBox& floatBox)
                     // Special-case zero- and less-than-zero-height floats: those don't touch
                     // the line that they're on, but it still needs to be dirtied. This is
                     // accomplished by pretending they have a height of 1.
-                    logicalBottom = max(logicalBottom, logicalTop + 1);
+                    logicalBottom = std::max(logicalBottom, logicalTop + 1);
                 }
                 if (floatingObject->originatingLine()) {
                     if (!selfNeedsLayout()) {
@@ -2036,6 +2024,22 @@ void RenderBlockFlow::removeFloatingObjectsBelow(FloatingObject* lastFloat, int 
     }
 }
 
+LayoutUnit RenderBlockFlow::logicalLeftOffsetForPositioningFloat(LayoutUnit logicalTop, LayoutUnit fixedOffset, bool applyTextIndent, LayoutUnit* heightRemaining) const
+{
+    LayoutUnit offset = fixedOffset;
+    if (m_floatingObjects && m_floatingObjects->hasLeftObjects())
+        offset = m_floatingObjects->logicalLeftOffsetForPositioningFloat(fixedOffset, logicalTop, heightRemaining);
+    return adjustLogicalLeftOffsetForLine(offset, applyTextIndent);
+}
+
+LayoutUnit RenderBlockFlow::logicalRightOffsetForPositioningFloat(LayoutUnit logicalTop, LayoutUnit fixedOffset, bool applyTextIndent, LayoutUnit* heightRemaining) const
+{
+    LayoutUnit offset = fixedOffset;
+    if (m_floatingObjects && m_floatingObjects->hasRightObjects())
+        offset = m_floatingObjects->logicalRightOffsetForPositioningFloat(fixedOffset, logicalTop, heightRemaining);
+    return adjustLogicalRightOffsetForLine(offset, applyTextIndent);
+}
+
 LayoutPoint RenderBlockFlow::computeLogicalLocationForFloat(const FloatingObject* floatingObject, LayoutUnit logicalTopOffset) const
 {
     RenderBox& childBox = floatingObject->renderer();
@@ -2066,7 +2070,7 @@ LayoutPoint RenderBlockFlow::computeLogicalLocationForFloat(const FloatingObject
 #endif
         logicalRightOffset = logicalRightOffsetForContent(logicalTopOffset);
 
-    LayoutUnit floatLogicalWidth = min(logicalWidthForFloat(floatingObject), logicalRightOffset - logicalLeftOffset); // The width we look for.
+    LayoutUnit floatLogicalWidth = std::min(logicalWidthForFloat(floatingObject), logicalRightOffset - logicalLeftOffset); // The width we look for.
 
     LayoutUnit floatLogicalLeft;
 
@@ -2075,30 +2079,30 @@ LayoutPoint RenderBlockFlow::computeLogicalLocationForFloat(const FloatingObject
     if (childBox.style().floating() == LeftFloat) {
         LayoutUnit heightRemainingLeft = 1;
         LayoutUnit heightRemainingRight = 1;
-        floatLogicalLeft = logicalLeftOffsetForLineIgnoringShapeOutside(logicalTopOffset, logicalLeftOffset, false, &heightRemainingLeft);
-        while (logicalRightOffsetForLineIgnoringShapeOutside(logicalTopOffset, logicalRightOffset, false, &heightRemainingRight) - floatLogicalLeft < floatLogicalWidth) {
-            logicalTopOffset += min(heightRemainingLeft, heightRemainingRight);
-            floatLogicalLeft = logicalLeftOffsetForLineIgnoringShapeOutside(logicalTopOffset, logicalLeftOffset, false, &heightRemainingLeft);
+        floatLogicalLeft = logicalLeftOffsetForPositioningFloat(logicalTopOffset, logicalLeftOffset, false, &heightRemainingLeft);
+        while (logicalRightOffsetForPositioningFloat(logicalTopOffset, logicalRightOffset, false, &heightRemainingRight) - floatLogicalLeft < floatLogicalWidth) {
+            logicalTopOffset += std::min(heightRemainingLeft, heightRemainingRight);
+            floatLogicalLeft = logicalLeftOffsetForPositioningFloat(logicalTopOffset, logicalLeftOffset, false, &heightRemainingLeft);
             if (insideFlowThread) {
                 // Have to re-evaluate all of our offsets, since they may have changed.
                 logicalRightOffset = logicalRightOffsetForContent(logicalTopOffset); // Constant part of right offset.
                 logicalLeftOffset = logicalLeftOffsetForContent(logicalTopOffset); // Constant part of left offset.
-                floatLogicalWidth = min(logicalWidthForFloat(floatingObject), logicalRightOffset - logicalLeftOffset);
+                floatLogicalWidth = std::min(logicalWidthForFloat(floatingObject), logicalRightOffset - logicalLeftOffset);
             }
         }
-        floatLogicalLeft = max(logicalLeftOffset - borderAndPaddingLogicalLeft(), floatLogicalLeft);
+        floatLogicalLeft = std::max(logicalLeftOffset - borderAndPaddingLogicalLeft(), floatLogicalLeft);
     } else {
         LayoutUnit heightRemainingLeft = 1;
         LayoutUnit heightRemainingRight = 1;
-        floatLogicalLeft = logicalRightOffsetForLineIgnoringShapeOutside(logicalTopOffset, logicalRightOffset, false, &heightRemainingRight);
-        while (floatLogicalLeft - logicalLeftOffsetForLineIgnoringShapeOutside(logicalTopOffset, logicalLeftOffset, false, &heightRemainingLeft) < floatLogicalWidth) {
-            logicalTopOffset += min(heightRemainingLeft, heightRemainingRight);
-            floatLogicalLeft = logicalRightOffsetForLineIgnoringShapeOutside(logicalTopOffset, logicalRightOffset, false, &heightRemainingRight);
+        floatLogicalLeft = logicalRightOffsetForPositioningFloat(logicalTopOffset, logicalRightOffset, false, &heightRemainingRight);
+        while (floatLogicalLeft - logicalLeftOffsetForPositioningFloat(logicalTopOffset, logicalLeftOffset, false, &heightRemainingLeft) < floatLogicalWidth) {
+            logicalTopOffset += std::min(heightRemainingLeft, heightRemainingRight);
+            floatLogicalLeft = logicalRightOffsetForPositioningFloat(logicalTopOffset, logicalRightOffset, false, &heightRemainingRight);
             if (insideFlowThread) {
                 // Have to re-evaluate all of our offsets, since they may have changed.
                 logicalRightOffset = logicalRightOffsetForContent(logicalTopOffset); // Constant part of right offset.
                 logicalLeftOffset = logicalLeftOffsetForContent(logicalTopOffset); // Constant part of left offset.
-                floatLogicalWidth = min(logicalWidthForFloat(floatingObject), logicalRightOffset - logicalLeftOffset);
+                floatLogicalWidth = std::min(logicalWidthForFloat(floatingObject), logicalRightOffset - logicalLeftOffset);
             }
         }
         // Use the original width of the float here, since the local variable
@@ -2143,7 +2147,7 @@ bool RenderBlockFlow::positionNewFloats()
     
     // The float cannot start above the top position of the last positioned float.
     if (lastPlacedFloatingObject)
-        logicalTop = max(logicalTopForFloat(lastPlacedFloatingObject), logicalTop);
+        logicalTop = std::max(logicalTopForFloat(lastPlacedFloatingObject), logicalTop);
 
     auto end = floatingObjectSet.end();
     // Now walk through the set of unpositioned floats and place them.
@@ -2161,9 +2165,9 @@ bool RenderBlockFlow::positionNewFloats()
         LayoutRect oldRect = childBox.frameRect();
 
         if (childBox.style().clear() & CLEFT)
-            logicalTop = max(lowestFloatLogicalBottom(FloatingObject::FloatLeft), logicalTop);
+            logicalTop = std::max(lowestFloatLogicalBottom(FloatingObject::FloatLeft), logicalTop);
         if (childBox.style().clear() & CRIGHT)
-            logicalTop = max(lowestFloatLogicalBottom(FloatingObject::FloatRight), logicalTop);
+            logicalTop = std::max(lowestFloatLogicalBottom(FloatingObject::FloatRight), logicalTop);
 
         LayoutPoint floatLogicalLocation = computeLogicalLocationForFloat(floatingObject, logicalTop);
 
@@ -2221,6 +2225,10 @@ bool RenderBlockFlow::positionNewFloats()
 
         m_floatingObjects->addPlacedObject(floatingObject);
 
+#if ENABLE(CSS_SHAPES)
+        if (ShapeOutsideInfo* shapeOutside = childBox.shapeOutsideInfo())
+            shapeOutside->setShapeSize(logicalWidthForChild(childBox), logicalHeightForChild(childBox));
+#endif
         // If the child moved, we have to repaint it.
         if (childBox.checkForRepaintDuringLayout())
             childBox.repaintDuringLayoutIfMoved(oldRect);
@@ -2249,47 +2257,36 @@ void RenderBlockFlow::newLine(EClear clear)
         setLogicalHeight(newY);
 }
 
-LayoutUnit RenderBlockFlow::logicalLeftFloatOffsetForLine(LayoutUnit logicalTop, LayoutUnit fixedOffset, LayoutUnit* heightRemaining, LayoutUnit logicalHeight, ShapeOutsideFloatOffsetMode offsetMode) const
+LayoutUnit RenderBlockFlow::logicalLeftFloatOffsetForLine(LayoutUnit logicalTop, LayoutUnit fixedOffset, LayoutUnit logicalHeight) const
 {
     if (m_floatingObjects && m_floatingObjects->hasLeftObjects())
-        return m_floatingObjects->logicalLeftOffset(fixedOffset, logicalTop, logicalHeight, offsetMode, heightRemaining);
+        return m_floatingObjects->logicalLeftOffset(fixedOffset, logicalTop, logicalHeight);
 
     return fixedOffset;
 }
 
-LayoutUnit RenderBlockFlow::logicalRightFloatOffsetForLine(LayoutUnit logicalTop, LayoutUnit fixedOffset, LayoutUnit* heightRemaining, LayoutUnit logicalHeight, ShapeOutsideFloatOffsetMode offsetMode) const
+LayoutUnit RenderBlockFlow::logicalRightFloatOffsetForLine(LayoutUnit logicalTop, LayoutUnit fixedOffset, LayoutUnit logicalHeight) const
 {
     if (m_floatingObjects && m_floatingObjects->hasRightObjects())
-        return m_floatingObjects->logicalRightOffset(fixedOffset, logicalTop, logicalHeight, offsetMode, heightRemaining);
+        return m_floatingObjects->logicalRightOffset(fixedOffset, logicalTop, logicalHeight);
 
     return fixedOffset;
 }
 
-LayoutUnit RenderBlockFlow::nextFloatLogicalBottomBelow(LayoutUnit logicalHeight, ShapeOutsideFloatOffsetMode offsetMode) const
+LayoutUnit RenderBlockFlow::nextFloatLogicalBottomBelow(LayoutUnit logicalHeight) const
 {
     if (!m_floatingObjects)
         return logicalHeight;
 
-    LayoutUnit bottom = LayoutUnit::max();
-    const FloatingObjectSet& floatingObjectSet = m_floatingObjects->set();
-    auto end = floatingObjectSet.end();
-    for (auto it = floatingObjectSet.begin(); it != end; ++it) {
-        FloatingObject* floatingObject = it->get();
-        LayoutUnit floatBottom = logicalBottomForFloat(floatingObject);
-#if ENABLE(CSS_SHAPES)
-        ShapeOutsideInfo* shapeOutside = floatingObject->renderer().shapeOutsideInfo();
-        if (offsetMode == ShapeOutsideFloatShapeOffset && shapeOutside) {
-            LayoutUnit shapeBottom = logicalTopForFloat(floatingObject) + marginBeforeForChild(floatingObject->renderer()) + shapeOutside->shapeLogicalBottom();
-            // Use the shapeBottom unless it extends outside of the margin box, in which case it is clipped.
-            if (shapeBottom < floatBottom)
-                floatBottom = shapeBottom;
-        }
-#endif
-        if (floatBottom > logicalHeight)
-            bottom = min(floatBottom, bottom);
-    }
+    return m_floatingObjects->findNextFloatLogicalBottomBelow(logicalHeight);
+}
 
-    return bottom == LayoutUnit::max() ? LayoutUnit() : bottom;
+LayoutUnit RenderBlockFlow::nextFloatLogicalBottomBelowForBlock(LayoutUnit logicalHeight) const
+{
+    if (!m_floatingObjects)
+        return logicalHeight;
+
+    return m_floatingObjects->findNextFloatLogicalBottomBelowForBlock(logicalHeight);
 }
 
 LayoutUnit RenderBlockFlow::lowestFloatLogicalBottom(FloatingObject::Type floatType) const
@@ -2302,7 +2299,7 @@ LayoutUnit RenderBlockFlow::lowestFloatLogicalBottom(FloatingObject::Type floatT
     for (auto it = floatingObjectSet.begin(); it != end; ++it) {
         FloatingObject* floatingObject = it->get();
         if (floatingObject->isPlaced() && floatingObject->type() & floatType)
-            lowestFloatBottom = max(lowestFloatBottom, logicalBottomForFloat(floatingObject));
+            lowestFloatBottom = std::max(lowestFloatBottom, logicalBottomForFloat(floatingObject));
     }
     return lowestFloatBottom;
 }
@@ -2322,9 +2319,9 @@ LayoutUnit RenderBlockFlow::addOverhangingFloats(RenderBlockFlow& child, bool ma
     auto childEnd = child.m_floatingObjects->set().end();
     for (auto childIt = child.m_floatingObjects->set().begin(); childIt != childEnd; ++childIt) {
         FloatingObject* floatingObject = childIt->get();
-        LayoutUnit floatLogicalBottom = min(logicalBottomForFloat(floatingObject), LayoutUnit::max() - childLogicalTop);
+        LayoutUnit floatLogicalBottom = std::min(logicalBottomForFloat(floatingObject), LayoutUnit::max() - childLogicalTop);
         LayoutUnit logicalBottom = childLogicalTop + floatLogicalBottom;
-        lowestFloatLogicalBottom = max(lowestFloatLogicalBottom, logicalBottom);
+        lowestFloatLogicalBottom = std::max(lowestFloatLogicalBottom, logicalBottom);
 
         if (logicalBottom > logicalHeight()) {
             // If the object is not in the list, we add it now.
@@ -2503,7 +2500,7 @@ LayoutUnit RenderBlockFlow::getClearDelta(RenderBox& child, LayoutUnit logicalTo
     }
 
     // We also clear floats if we are too big to sit on the same line as a float (and wish to avoid floats by default).
-    LayoutUnit result = clearSet ? max<LayoutUnit>(0, logicalBottom - logicalTop) : LayoutUnit();
+    LayoutUnit result = clearSet ? std::max<LayoutUnit>(0, logicalBottom - logicalTop) : LayoutUnit();
     if (!result && child.avoidsFloats()) {
         LayoutUnit newLogicalTop = logicalTop;
         while (true) {
@@ -2541,7 +2538,7 @@ LayoutUnit RenderBlockFlow::getClearDelta(RenderBox& child, LayoutUnit logicalTo
                 return newLogicalTop - logicalTop;
             }
 
-            newLogicalTop = nextFloatLogicalBottomBelow(newLogicalTop);
+            newLogicalTop = nextFloatLogicalBottomBelowForBlock(newLogicalTop);
             ASSERT(newLogicalTop >= logicalTop);
             if (newLogicalTop < logicalTop)
                 break;
@@ -2601,9 +2598,9 @@ void RenderBlockFlow::adjustForBorderFit(LayoutUnit x, LayoutUnit& left, LayoutU
 
         for (auto box = firstRootBox(); box; box = box->nextRootBox()) {
             if (box->firstChild())
-                left = min(left, x + static_cast<LayoutUnit>(box->firstChild()->x()));
+                left = std::min(left, x + static_cast<LayoutUnit>(box->firstChild()->x()));
             if (box->lastChild())
-                right = max(right, x + static_cast<LayoutUnit>(ceilf(box->lastChild()->logicalRight())));
+                right = std::max(right, x + static_cast<LayoutUnit>(ceilf(box->lastChild()->logicalRight())));
         }
     } else {
         for (RenderBox* obj = firstChildBox(); obj; obj = obj->nextSiblingBox()) {
@@ -2612,8 +2609,8 @@ void RenderBlockFlow::adjustForBorderFit(LayoutUnit x, LayoutUnit& left, LayoutU
                     toRenderBlockFlow(obj)->adjustForBorderFit(x + obj->x(), left, right);
                 else if (obj->style().visibility() == VISIBLE) {
                     // We are a replaced element or some kind of non-block-flow object.
-                    left = min(left, x + obj->x());
-                    right = max(right, x + obj->x() + obj->width());
+                    left = std::min(left, x + obj->x());
+                    right = std::max(right, x + obj->x() + obj->width());
                 }
             }
         }
@@ -2628,8 +2625,8 @@ void RenderBlockFlow::adjustForBorderFit(LayoutUnit x, LayoutUnit& left, LayoutU
             if (r->shouldPaint()) {
                 LayoutUnit floatLeft = xPositionForFloatIncludingMargin(r) - r->renderer().x();
                 LayoutUnit floatRight = floatLeft + r->renderer().width();
-                left = min(left, floatLeft);
-                right = max(right, floatRight);
+                left = std::min(left, floatLeft);
+                right = std::max(right, floatRight);
             }
         }
     }
@@ -2649,8 +2646,8 @@ void RenderBlockFlow::fitBorderToLinesIfNeeded()
     // Clamp to our existing edges. We can never grow. We only shrink.
     LayoutUnit leftEdge = borderLeft() + paddingLeft();
     LayoutUnit rightEdge = leftEdge + oldWidth;
-    left = min(rightEdge, max(leftEdge, left));
-    right = max(leftEdge, min(rightEdge, right));
+    left = std::min(rightEdge, std::max(leftEdge, left));
+    right = std::max(leftEdge, std::min(rightEdge, right));
     
     LayoutUnit newContentWidth = right - left;
     if (newContentWidth == oldWidth)
@@ -2693,8 +2690,8 @@ int RenderBlockFlow::firstLineBaseline() const
     if (m_simpleLineLayout)
         return SimpleLineLayout::computeFlowFirstLineBaseline(*this, *m_simpleLineLayout);
 
-    ASSERT(firstLineBox());
-    return firstLineBox()->logicalTop() + firstLineStyle().fontMetrics().ascent(firstRootBox()->baselineType());
+    ASSERT(firstRootBox());
+    return firstRootBox()->logicalTop() + firstLineStyle().fontMetrics().ascent(firstRootBox()->baselineType());
 }
 
 int RenderBlockFlow::inlineBlockBaseline(LineDirectionMode lineDirection) const
@@ -2717,9 +2714,9 @@ int RenderBlockFlow::inlineBlockBaseline(LineDirectionMode lineDirection) const
     if (m_simpleLineLayout)
         return SimpleLineLayout::computeFlowLastLineBaseline(*this, *m_simpleLineLayout);
 
-    bool isFirstLine = lastLineBox() == firstLineBox();
+    bool isFirstLine = lastRootBox() == firstRootBox();
     const RenderStyle& style = isFirstLine ? firstLineStyle() : this->style();
-    return lastLineBox()->logicalTop() + style.fontMetrics().ascent(lastRootBox()->baselineType());
+    return lastRootBox()->logicalTop() + style.fontMetrics().ascent(lastRootBox()->baselineType());
 }
 
 GapRects RenderBlockFlow::inlineSelectionGaps(RenderBlock& rootBlock, const LayoutPoint& rootBlockPhysicalPosition, const LayoutSize& offsetFromRootBlock,
@@ -2814,25 +2811,15 @@ void RenderBlockFlow::updateLogicalHeight()
     RenderBlock::updateLogicalHeight();
 
     if (renderNamedFlowFragment())
-        renderNamedFlowFragment()->setLogicalHeight(max<LayoutUnit>(0, logicalHeight() - borderAndPaddingLogicalHeight()));
+        renderNamedFlowFragment()->setLogicalHeight(std::max<LayoutUnit>(0, logicalHeight() - borderAndPaddingLogicalHeight()));
 }
 
 void RenderBlockFlow::setRenderNamedFlowFragment(RenderNamedFlowFragment* flowFragment)
 {
-    RenderBlockFlowRareData& rareData = ensureRareData();
+    RenderBlockFlowRareData& rareData = ensureRareBlockFlowData();
     if (rareData.m_renderNamedFlowFragment)
         rareData.m_renderNamedFlowFragment->destroy();
     rareData.m_renderNamedFlowFragment = flowFragment;
-}
-
-// FIXME: Use this function in more places.
-RenderBlockFlow::RenderBlockFlowRareData& RenderBlockFlow::ensureRareData()
-{
-    if (m_rareData)
-        return *m_rareData;
-
-    m_rareData = adoptPtr(new RenderBlockFlowRareData(*this));
-    return *m_rareData;
 }
 
 static bool shouldCheckLines(RenderObject& obj)
@@ -3029,7 +3016,7 @@ VisiblePosition RenderBlockFlow::positionForPointWithInlineChildren(const Layout
 
     if (closestBox) {
         if (moveCaretToBoundary) {
-            LayoutUnit firstRootBoxWithChildrenTop = min<LayoutUnit>(firstRootBoxWithChildren->selectionTop(), firstRootBoxWithChildren->logicalTop());
+            LayoutUnit firstRootBoxWithChildrenTop = std::min<LayoutUnit>(firstRootBoxWithChildren->selectionTop(), firstRootBoxWithChildren->logicalTop());
             if (pointInLogicalContents.y() < firstRootBoxWithChildrenTop
                 || (blocksAreFlipped && pointInLogicalContents.y() == firstRootBoxWithChildrenTop)) {
                 InlineBox* box = firstRootBoxWithChildren->firstLeafChild();
@@ -3065,6 +3052,14 @@ VisiblePosition RenderBlockFlow::positionForPointWithInlineChildren(const Layout
     return createVisiblePosition(0, DOWNSTREAM);
 }
 
+VisiblePosition RenderBlockFlow::positionForPoint(const LayoutPoint& point)
+{
+    if (auto fragment = renderNamedFlowFragment())
+        return fragment->positionForPoint(point);
+    return RenderBlock::positionForPoint(point);
+}
+
+
 void RenderBlockFlow::addFocusRingRectsForInlineChildren(Vector<IntRect>& rects, const LayoutPoint& additionalOffset, const RenderLayerModelObject*)
 {
     ASSERT(childrenInline());
@@ -3072,8 +3067,8 @@ void RenderBlockFlow::addFocusRingRectsForInlineChildren(Vector<IntRect>& rects,
     ensureLineBoxes();
 
     for (RootInlineBox* curr = firstRootBox(); curr; curr = curr->nextRootBox()) {
-        LayoutUnit top = max<LayoutUnit>(curr->lineTop(), curr->top());
-        LayoutUnit bottom = min<LayoutUnit>(curr->lineBottom(), curr->top() + curr->height());
+        LayoutUnit top = std::max<LayoutUnit>(curr->lineTop(), curr->top());
+        LayoutUnit bottom = std::min<LayoutUnit>(curr->lineBottom(), curr->top() + curr->height());
         LayoutRect rect(additionalOffset.x() + curr->x(), additionalOffset.y() + top, curr->width(), bottom - top);
         if (!rect.isEmpty())
             rects.append(pixelSnappedIntRect(rect));
@@ -3114,13 +3109,13 @@ bool RenderBlockFlow::relayoutForPagination(bool hasSpecifiedPageLogicalHeight, 
             // The forced page breaks are in control of the balancing.  Just set the column height to the
             // maximum page break distance.
             if (!pageLogicalHeight) {
-                LayoutUnit distanceBetweenBreaks = max<LayoutUnit>(colInfo->maximumDistanceBetweenForcedBreaks(),
+                LayoutUnit distanceBetweenBreaks = std::max<LayoutUnit>(colInfo->maximumDistanceBetweenForcedBreaks(),
                     view().layoutState()->pageLogicalOffset(this, borderAndPaddingBefore() + layoutOverflowLogicalBottom) - colInfo->forcedBreakOffset());
-                columnHeight = max(colInfo->minimumColumnHeight(), distanceBetweenBreaks);
+                columnHeight = std::max(colInfo->minimumColumnHeight(), distanceBetweenBreaks);
             }
         } else if (layoutOverflowLogicalBottom > boundedMultiply(pageLogicalHeight, desiredColumnCount)) {
             // Now that we know the intrinsic height of the columns, we have to rebalance them.
-            columnHeight = max<LayoutUnit>(colInfo->minimumColumnHeight(), ceilf((float)layoutOverflowLogicalBottom / desiredColumnCount));
+            columnHeight = std::max<LayoutUnit>(colInfo->minimumColumnHeight(), ceilf((float)layoutOverflowLogicalBottom / desiredColumnCount));
         }
         
         if (columnHeight && columnHeight != pageLogicalHeight) {
@@ -3148,7 +3143,7 @@ bool RenderBlockFlow::hasLines() const
     ASSERT(childrenInline());
 
     if (m_simpleLineLayout)
-        return m_simpleLineLayout->lineCount;
+        return m_simpleLineLayout->lineCount();
 
     return lineBoxes().firstLineBox();
 }
@@ -3171,7 +3166,7 @@ void RenderBlockFlow::layoutSimpleLines(LayoutUnit& repaintLogicalTop, LayoutUni
 void RenderBlockFlow::deleteLineBoxesBeforeSimpleLineLayout()
 {
     ASSERT(m_lineLayoutPath == SimpleLinesPath);
-    lineBoxes().deleteLineBoxes(renderArena());
+    lineBoxes().deleteLineBoxes();
     toRenderText(firstChild())->deleteLineBoxesBeforeSimpleLineLayout();
 }
 
@@ -3209,4 +3204,19 @@ void RenderBlockFlow::showLineTreeAndMark(const InlineBox* markedBox1, const cha
 }
 #endif
 
-} // namespace WebCore
+RenderBlockFlow::RenderBlockFlowRareData& RenderBlockFlow::ensureRareBlockFlowData()
+{
+    if (hasRareBlockFlowData())
+        return *m_rareBlockFlowData;
+    materializeRareBlockFlowData();
+    return *m_rareBlockFlowData;
+}
+
+void RenderBlockFlow::materializeRareBlockFlowData()
+{
+    ASSERT(!hasRareBlockFlowData());
+    m_rareBlockFlowData = std::make_unique<RenderBlockFlow::RenderBlockFlowRareData>(*this);
+}
+
+}
+// namespace WebCore

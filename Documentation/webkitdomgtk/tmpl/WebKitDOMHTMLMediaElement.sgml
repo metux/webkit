@@ -9,12 +9,10 @@ WebKitDOMHTMLMediaElement
 
 </para>
 
-
 <!-- ##### SECTION See_Also ##### -->
 <para>
 
 </para>
-
 
 <!-- ##### SECTION Stability_Level ##### -->
 
@@ -74,11 +72,6 @@ WebKitDOMHTMLMediaElement
 </para>
 
 <!-- ##### ARG WebKitDOMHTMLMediaElement:error ##### -->
-<para>
-
-</para>
-
-<!-- ##### ARG WebKitDOMHTMLMediaElement:initial-time ##### -->
 <para>
 
 </para>
@@ -207,6 +200,15 @@ WebKitDOMHTMLMediaElement
 @self: 
 
 
+<!-- ##### FUNCTION webkit_dom_html_media_element_fast_seek ##### -->
+<para>
+
+</para>
+
+@self: 
+@time: 
+
+
 <!-- ##### FUNCTION webkit_dom_html_media_element_get_error ##### -->
 <para>
 
@@ -298,25 +300,6 @@ WebKitDOMHTMLMediaElement
 
 
 <!-- ##### FUNCTION webkit_dom_html_media_element_get_current_time ##### -->
-<para>
-
-</para>
-
-@self: 
-@Returns: 
-
-
-<!-- ##### FUNCTION webkit_dom_html_media_element_set_current_time ##### -->
-<para>
-
-</para>
-
-@self: 
-@value: 
-@error: 
-
-
-<!-- ##### FUNCTION webkit_dom_html_media_element_get_initial_time ##### -->
 <para>
 
 </para>

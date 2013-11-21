@@ -9,12 +9,10 @@ WebKitDOMDOMApplicationCache
 
 </para>
 
-
 <!-- ##### SECTION See_Also ##### -->
 <para>
 
 </para>
-
 
 <!-- ##### SECTION Stability_Level ##### -->
 
@@ -57,6 +55,17 @@ WebKitDOMDOMApplicationCache
 </para>
 
 @self: 
+
+
+<!-- ##### FUNCTION webkit_dom_dom_application_cache_dispatch_event ##### -->
+<para>
+
+</para>
+
+@self: 
+@evt: 
+@error: 
+@Returns: 
 
 
 <!-- ##### FUNCTION webkit_dom_dom_application_cache_get_status ##### -->

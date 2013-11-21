@@ -41,6 +41,8 @@ private:
     MathMLTextElement(const QualifiedName& tagName, Document&);
 
     virtual RenderElement* createRenderer(PassRef<RenderStyle>) OVERRIDE;
+    virtual bool childShouldCreateRenderer(const Node&) const OVERRIDE;
+
     virtual void childrenChanged(const ChildChange&) OVERRIDE;
 };
     

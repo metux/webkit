@@ -1314,14 +1314,14 @@ public:
     void load32WithUnalignedHalfWords(BaseIndex address, RegisterID dest)
     {
         RegisterID scr = claimScratch();
-        RegisterID scr1 = claimScratch();
         Jump m_jump;
         JumpList end;
 
+        loadEffectiveAddress(address, scr);
+
+        RegisterID scr1 = claimScratch();
         if (dest != SH4Registers::r0)
             move(SH4Registers::r0, scr1);
-
-        loadEffectiveAddress(address, scr);
 
         m_assembler.ensureSpace(m_assembler.maxInstructionSize + 58, sizeof(uint32_t));
         move(scr, SH4Registers::r0);
@@ -1454,10 +1454,9 @@ public:
             m_assembler.dcmppeq(right, right);
             takeBranch.append(Jump(m_assembler.jne(), SH4Assembler::JumpNear));
             m_assembler.dcmppeq(left, right);
-            Jump m_jump = Jump(m_assembler.je());
+            m_assembler.branch(BF_OPCODE, 2);
             takeBranch.link(this);
-            m_assembler.extraInstrForBranch(scratchReg3);
-            return m_jump;
+            return Jump(m_assembler.extraInstrForBranch(scratchReg3));
         }
 
         if (cond == DoubleGreaterThanOrUnordered) {
@@ -1468,10 +1467,9 @@ public:
             m_assembler.dcmppeq(right, right);
             takeBranch.append(Jump(m_assembler.jne(), SH4Assembler::JumpNear));
             m_assembler.dcmppgt(right, left);
-            Jump m_jump = Jump(m_assembler.je());
+            m_assembler.branch(BF_OPCODE, 2);
             takeBranch.link(this);
-            m_assembler.extraInstrForBranch(scratchReg3);
-            return m_jump;
+            return Jump(m_assembler.extraInstrForBranch(scratchReg3));
         }
 
         if (cond == DoubleGreaterThanOrEqualOrUnordered) {
@@ -1487,10 +1485,9 @@ public:
             m_assembler.dcmppeq(right, right);
             takeBranch.append(Jump(m_assembler.jne(), SH4Assembler::JumpNear));
             m_assembler.dcmppgt(left, right);
-            Jump m_jump = Jump(m_assembler.je());
+            m_assembler.branch(BF_OPCODE, 2);
             takeBranch.link(this);
-            m_assembler.extraInstrForBranch(scratchReg3);
-            return m_jump;
+            return Jump(m_assembler.extraInstrForBranch(scratchReg3));
         }
 
         if (cond == DoubleLessThanOrEqualOrUnordered) {
@@ -1506,17 +1503,15 @@ public:
     Jump branchTrue()
     {
         m_assembler.ensureSpace(m_assembler.maxInstructionSize + 6, sizeof(uint32_t));
-        Jump m_jump = Jump(m_assembler.je());
-        m_assembler.extraInstrForBranch(scratchReg3);
-        return m_jump;
+        m_assembler.branch(BF_OPCODE, 2);
+        return Jump(m_assembler.extraInstrForBranch(scratchReg3));
     }
 
     Jump branchFalse()
     {
         m_assembler.ensureSpace(m_assembler.maxInstructionSize + 6, sizeof(uint32_t));
-        Jump m_jump = Jump(m_assembler.jne());
-        m_assembler.extraInstrForBranch(scratchReg3);
-        return m_jump;
+        m_assembler.branch(BT_OPCODE, 2);
+        return Jump(m_assembler.extraInstrForBranch(scratchReg3));
     }
 
     Jump branch32(RelationalCondition cond, BaseIndex left, TrustedImm32 right)
@@ -2452,7 +2447,7 @@ public:
 
     static void revertJumpReplacementToBranchPtrWithPatch(CodeLocationLabel instructionStart, RegisterID rd, void* initialValue)
     {
-        SH4Assembler::revertJumpToMove(instructionStart.dataLocation(), rd, reinterpret_cast<int>(initialValue));
+        SH4Assembler::revertJumpReplacementToBranchPtrWithPatch(instructionStart.dataLocation(), rd, reinterpret_cast<int>(initialValue));
     }
 
     static CodeLocationLabel startOfPatchableBranchPtrWithPatchOnAddress(CodeLocationDataLabelPtr)

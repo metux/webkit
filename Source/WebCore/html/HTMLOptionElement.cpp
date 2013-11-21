@@ -43,8 +43,6 @@
 #include "StyleResolver.h"
 #include "Text.h"
 #include <wtf/Ref.h>
-#include <wtf/Vector.h>
-#include <wtf/text/StringBuilder.h>
 
 namespace WebCore {
 
@@ -271,7 +269,7 @@ HTMLDataListElement* HTMLOptionElement::ownerDataListElement() const
 {
     for (ContainerNode* parent = parentNode(); parent ; parent = parent->parentNode()) {
         if (parent->hasTagName(datalistTag))
-            return static_cast<HTMLDataListElement*>(parent);
+            return toHTMLDataListElement(parent);
     }
     return 0;
 }

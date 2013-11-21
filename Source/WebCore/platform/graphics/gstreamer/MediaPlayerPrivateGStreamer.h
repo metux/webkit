@@ -33,13 +33,19 @@
 #include <gst/pbutils/install-plugins.h>
 #include <wtf/Forward.h>
 
+#if ENABLE(MEDIA_SOURCE)
+#include "MediaSourceGStreamer.h"
+#endif
+
 typedef struct _GstBuffer GstBuffer;
 typedef struct _GstMessage GstMessage;
 typedef struct _GstElement GstElement;
 
 namespace WebCore {
 
+class AudioTrackPrivateGStreamer;
 class InbandTextTrackPrivateGStreamer;
+class VideoTrackPrivateGStreamer;
 
 class MediaPlayerPrivateGStreamer : public MediaPlayerPrivateGStreamerBase {
 public:
@@ -53,7 +59,7 @@ public:
 
     void load(const String &url);
 #if ENABLE(MEDIA_SOURCE)
-    void load(const String& url, PassRefPtr<MediaSource>);
+    void load(const String& url, PassRefPtr<HTMLMediaSource>);
 #endif
     void commitLoad();
     void cancelLoad();
@@ -88,8 +94,10 @@ public:
     void loadingFailed(MediaPlayer::NetworkState);
 
     void videoChanged();
+    void videoCapsChanged();
     void audioChanged();
     void notifyPlayerOfVideo();
+    void notifyPlayerOfVideoCaps();
     void notifyPlayerOfAudio();
 
 #if ENABLE(VIDEO_TRACK) && defined(GST_API_VERSION_1)
@@ -181,6 +189,7 @@ private:
     guint m_audioTimerHandler;
     guint m_textTimerHandler;
     guint m_videoTimerHandler;
+    guint m_videoCapsTimerHandler;
     guint m_readyTimerHandler;
     GRefPtr<GstElement> m_webkitAudioSink;
     mutable long m_totalBytes;
@@ -190,8 +199,13 @@ private:
     GRefPtr<GstElement> m_autoAudioSink;
     bool m_missingPlugins;
 #if ENABLE(VIDEO_TRACK) && defined(GST_API_VERSION_1)
-    Vector<RefPtr<InbandTextTrackPrivateGStreamer> > m_textTracks;
+    Vector<RefPtr<AudioTrackPrivateGStreamer>> m_audioTracks;
+    Vector<RefPtr<InbandTextTrackPrivateGStreamer>> m_textTracks;
+    Vector<RefPtr<VideoTrackPrivateGStreamer>> m_videoTracks;
     RefPtr<InbandTextTrackPrivate> m_chaptersTrack;
+#endif
+#if ENABLE(MEDIA_SOURCE)
+    RefPtr<HTMLMediaSource> m_mediaSource;
 #endif
 };
 }

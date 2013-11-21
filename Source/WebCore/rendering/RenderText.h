@@ -79,7 +79,7 @@ public:
     UChar characterAt(unsigned i) const { return is8Bit() ? characters8()[i] : characters16()[i]; }
     UChar operator[](unsigned i) const { return characterAt(i); }
     unsigned textLength() const { return m_text.impl()->length(); } // non virtual implementation of length()
-    void positionLineBox(InlineBox*);
+    void positionLineBox(InlineTextBox&);
 
     virtual float width(unsigned from, unsigned len, const Font&, float xPos, HashSet<const SimpleFontData*>* fallbackFonts = 0, GlyphOverflow* = 0) const;
     virtual float width(unsigned from, unsigned len, float xPos, bool firstLine = false, HashSet<const SimpleFontData*>* fallbackFonts = 0, GlyphOverflow* = 0) const;
@@ -145,7 +145,7 @@ public:
 
     virtual void styleDidChange(StyleDifference, const RenderStyle* oldStyle);
 
-    virtual InlineTextBox* createTextBox(); // Subclassed by RenderSVGInlineText.
+    virtual std::unique_ptr<InlineTextBox> createTextBox(); // Subclassed by RenderSVGInlineText.
 
 #if ENABLE(IOS_TEXT_AUTOSIZING)
     float candidateComputedTextSize() const { return m_candidateComputedTextSize; }
@@ -216,6 +216,7 @@ private:
     RenderTextLineBoxes m_lineBoxes;
 };
 
+template <> inline bool isRendererOfType<const RenderText>(const RenderObject& renderer) { return renderer.isText(); }
 RENDER_OBJECT_TYPE_CASTS(RenderText, isText())
 
 inline RenderStyle& RenderText::style() const

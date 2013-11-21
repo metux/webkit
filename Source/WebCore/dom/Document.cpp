@@ -31,7 +31,6 @@
 #include "AXObjectCache.h"
 #include "AnimationController.h"
 #include "Attr.h"
-#include "Attribute.h"
 #include "CDATASection.h"
 #include "CSSStyleDeclaration.h"
 #include "CSSStyleSheet.h"
@@ -47,22 +46,15 @@
 #include "DOMWindow.h"
 #include "DateComponents.h"
 #include "Dictionary.h"
-#include "DocumentEventQueue.h"
-#include "DocumentFragment.h"
 #include "DocumentLoader.h"
 #include "DocumentMarkerController.h"
 #include "DocumentSharedObjectPool.h"
 #include "DocumentType.h"
 #include "Editor.h"
-#include "Element.h"
 #include "ElementIterator.h"
 #include "EntityReference.h"
-#include "Event.h"
 #include "EventFactory.h"
 #include "EventHandler.h"
-#include "EventListener.h"
-#include "EventNames.h"
-#include "ExceptionCode.h"
 #include "FontLoader.h"
 #include "FormController.h"
 #include "FrameLoader.h"
@@ -88,18 +80,15 @@
 #include "HTMLLinkElement.h"
 #include "HTMLMediaElement.h"
 #include "HTMLNameCollection.h"
-#include "HTMLNames.h"
 #include "HTMLParserIdioms.h"
 #include "HTMLPlugInElement.h"
 #include "HTMLScriptElement.h"
 #include "HTMLStyleElement.h"
 #include "HTMLTitleElement.h"
 #include "HTTPParsers.h"
-#include "HitTestRequest.h"
 #include "HitTestResult.h"
 #include "IconController.h"
 #include "ImageLoader.h"
-#include "InspectorCounters.h"
 #include "InspectorInstrumentation.h"
 #include "JSLazyEventListener.h"
 #include "Language.h"
@@ -110,13 +99,10 @@
 #include "MediaQueryMatcher.h"
 #include "MouseEventWithHitTestResults.h"
 #include "NameNodeList.h"
-#include "NamedFlowCollection.h"
 #include "NestingLevelIncrementer.h"
-#include "NodeFilter.h"
 #include "NodeIterator.h"
 #include "NodeRareData.h"
 #include "NodeWithIndex.h"
-#include "Page.h"
 #include "PageConsole.h"
 #include "PageGroup.h"
 #include "PageTransitionEvent.h"
@@ -126,8 +112,6 @@
 #include "PointerLockController.h"
 #include "PopStateEvent.h"
 #include "ProcessingInstruction.h"
-#include "QualifiedName.h"
-#include "RenderArena.h"
 #include "RenderView.h"
 #include "RenderWidget.h"
 #include "ResourceLoader.h"
@@ -138,7 +122,6 @@
 #include "ScriptController.h"
 #include "ScriptRunner.h"
 #include "ScriptSourceCode.h"
-#include "ScriptValue.h"
 #include "ScrollingCoordinator.h"
 #include "SecurityOrigin.h"
 #include "SecurityPolicy.h"
@@ -151,7 +134,6 @@
 #include "StyleSheetContents.h"
 #include "StyleSheetList.h"
 #include "TextResourceDecoder.h"
-#include "Timer.h"
 #include "TransformSource.h"
 #include "TreeWalker.h"
 #include "VisitedLinkState.h"
@@ -164,9 +146,6 @@
 #include "XPathResult.h"
 #include "htmlediting.h"
 #include <wtf/CurrentTime.h>
-#include <wtf/MainThread.h>
-#include <wtf/PassRefPtr.h>
-#include <wtf/Ref.h>
 #include <wtf/TemporaryChange.h>
 #include <wtf/text/StringBuffer.h>
 
@@ -448,7 +427,6 @@ Document::Document(Frame* frame, const URL& url, unsigned documentClasses)
     , m_xmlVersion(ASCIILiteral("1.0"))
     , m_xmlStandalone(StandaloneUnspecified)
     , m_hasXMLDeclaration(false)
-    , m_savedRenderView(nullptr)
     , m_designMode(inherit)
 #if ENABLE(DASHBOARD_SUPPORT) || ENABLE(DRAGGABLE_REGION)
     , m_hasAnnotatedRegions(false)
@@ -520,8 +498,8 @@ Document::Document(Frame* frame, const URL& url, unsigned documentClasses)
     initSecurityContext();
     initDNSPrefetch();
 
-    for (unsigned i = 0; i < WTF_ARRAY_LENGTH(m_nodeListCounts); i++)
-        m_nodeListCounts[i] = 0;
+    for (unsigned i = 0; i < WTF_ARRAY_LENGTH(m_nodeListAndCollectionCounts); ++i)
+        m_nodeListAndCollectionCounts[i] = 0;
 
     InspectorCounters::incrementCounter(InspectorCounters::DocumentCounter);
 }
@@ -553,7 +531,6 @@ Document::~Document()
 {
     ASSERT(!renderView());
     ASSERT(!m_inPageCache);
-    ASSERT(!m_savedRenderView);
     ASSERT(m_ranges.isEmpty());
     ASSERT(!m_styleRecalcTimer.isActive());
     ASSERT(!m_parentTreeScope);
@@ -582,8 +559,6 @@ Document::~Document()
     ASSERT(!m_parser || m_parser->refCount() == 1);
     detachParser();
 
-    m_renderArena = nullptr;
-
     if (this == topDocument())
         clearAXObjectCache();
 
@@ -610,9 +585,10 @@ Document::~Document()
         clearRareData();
 
     ASSERT(!m_listsInvalidatedAtDocument.size());
+    ASSERT(!m_collectionsInvalidatedAtDocument.size());
 
-    for (unsigned i = 0; i < WTF_ARRAY_LENGTH(m_nodeListCounts); i++)
-        ASSERT(!m_nodeListCounts[i]);
+    for (unsigned i = 0; i < WTF_ARRAY_LENGTH(m_nodeListAndCollectionCounts); ++i)
+        ASSERT(!m_nodeListAndCollectionCounts[i]);
 
     clearDocumentScope();
 
@@ -649,6 +625,16 @@ void Document::dropChildren()
     m_markers->detach();
 
     m_cssCanvasElements.clear();
+
+    commonTeardown();
+}
+
+void Document::commonTeardown()
+{
+#if ENABLE(SVG)
+    if (svgExtensions())
+        accessSVGExtensions()->pauseAnimations();
+#endif
 
 #if ENABLE(REQUEST_ANIMATION_FRAME)
     clearScriptedAnimationController();
@@ -982,7 +968,6 @@ PassRefPtr<Node> Document::adoptNode(PassRefPtr<Node> source, ExceptionCode& ec)
         Attr& attr = toAttr(*source);
         if (attr.ownerElement())
             attr.ownerElement()->removeAttributeNode(&attr, ec);
-        attr.setSpecified(true);
         break;
     }       
     default:
@@ -1489,11 +1474,8 @@ void Document::setTitle(const String& title)
     // The DOM API has no method of specifying direction, so assume LTR.
     updateTitle(StringWithDirection(title, LTR));
 
-    if (m_titleElement) {
-        ASSERT(isHTMLTitleElement(m_titleElement.get()));
-        if (isHTMLTitleElement(m_titleElement.get()))
-            toHTMLTitleElement(m_titleElement.get())->setText(title);
-    }
+    if (m_titleElement && isHTMLTitleElement(m_titleElement.get()))
+        toHTMLTitleElement(m_titleElement.get())->setText(title);
 }
 
 void Document::setTitleElement(const StringWithDirection& title, Element* titleElement)
@@ -1724,7 +1706,7 @@ void Document::recalcStyle(Style::Change change)
 
     InspectorInstrumentationCookie cookie = InspectorInstrumentation::willRecalculateStyle(this);
 
-    if (m_elementSheet && m_elementSheet->contents()->usesRemUnits())
+    if (m_elementSheet && m_elementSheet->contents().usesRemUnits())
         m_styleSheetCollection.setUsesRemUnit(true);
 
     m_inStyleRecalc = true;
@@ -1943,9 +1925,6 @@ void Document::createRenderTree()
     ASSERT(!attached());
     ASSERT(!m_inPageCache);
     ASSERT(!m_axObjectCache || this != topDocument());
-    ASSERT(!m_renderArena);
-
-    m_renderArena = std::make_unique<RenderArena>();
 
     // FIXME: It would be better if we could pass the resolved document style directly here.
     setRenderView(new RenderView(*this, RenderStyle::create()));
@@ -2052,8 +2031,6 @@ void Document::destroyRenderTree()
     // Do this before the arena is cleared, which is needed to deref the RenderStyle on TextAutoSizingKey.
     m_textAutoSizedNodes.clear();
 #endif
-
-    m_renderArena = nullptr;
 }
 
 void Document::prepareForDestruction()
@@ -2079,9 +2056,7 @@ void Document::prepareForDestruction()
     m_fullScreenErrorEventTargetQueue.clear();
 #endif
 
-#if ENABLE(REQUEST_ANIMATION_FRAME)
-    clearScriptedAnimationController();
-#endif
+    commonTeardown();
 
 #if ENABLE(SHARED_WORKERS)
     SharedWorkerRepository::documentDetached(this);
@@ -2594,11 +2569,11 @@ void Document::updateBaseURL()
 
     if (m_elementSheet) {
         // Element sheet is silly. It never contains anything.
-        ASSERT(!m_elementSheet->contents()->ruleCount());
-        bool usesRemUnits = m_elementSheet->contents()->usesRemUnits();
+        ASSERT(!m_elementSheet->contents().ruleCount());
+        bool usesRemUnits = m_elementSheet->contents().usesRemUnits();
         m_elementSheet = CSSStyleSheet::createInline(*this, m_baseURL);
         // FIXME: So we are not really the parser. The right fix is to eliminate the element sheet completely.
-        m_elementSheet->contents()->parserSetUsesRemUnits(usesRemUnits);
+        m_elementSheet->contents().parserSetUsesRemUnits(usesRemUnits);
     }
 
     if (!equalIgnoringFragmentIdentifier(oldBaseURL, m_baseURL)) {
@@ -3377,23 +3352,37 @@ void Document::setCSSTarget(Element* n)
         n->didAffectSelector(AffectedSelectorTarget);
 }
 
-void Document::registerNodeList(LiveNodeListBase* list)
+void Document::registerNodeList(LiveNodeList& list)
 {
-    if (list->hasIdNameCache())
-        m_nodeListCounts[InvalidateOnIdNameAttrChange]++;
-    m_nodeListCounts[list->invalidationType()]++;
-    if (list->isRootedAtDocument())
-        m_listsInvalidatedAtDocument.add(list);
+    m_nodeListAndCollectionCounts[list.invalidationType()]++;
+    if (list.isRootedAtDocument())
+        m_listsInvalidatedAtDocument.add(&list);
 }
 
-void Document::unregisterNodeList(LiveNodeListBase* list)
+void Document::unregisterNodeList(LiveNodeList& list)
 {
-    if (list->hasIdNameCache())
-        m_nodeListCounts[InvalidateOnIdNameAttrChange]--;
-    m_nodeListCounts[list->invalidationType()]--;
-    if (list->isRootedAtDocument()) {
-        ASSERT(m_listsInvalidatedAtDocument.contains(list));
-        m_listsInvalidatedAtDocument.remove(list);
+    m_nodeListAndCollectionCounts[list.invalidationType()]--;
+    if (list.isRootedAtDocument()) {
+        ASSERT(m_listsInvalidatedAtDocument.contains(&list));
+        m_listsInvalidatedAtDocument.remove(&list);
+    }
+}
+
+void Document::registerCollection(HTMLCollection& collection)
+{
+    m_nodeListAndCollectionCounts[InvalidateOnIdNameAttrChange]++;
+    m_nodeListAndCollectionCounts[collection.invalidationType()]++;
+    if (collection.isRootedAtDocument())
+        m_collectionsInvalidatedAtDocument.add(&collection);
+}
+
+void Document::unregisterCollection(HTMLCollection& collection)
+{
+    m_nodeListAndCollectionCounts[InvalidateOnIdNameAttrChange]--;
+    m_nodeListAndCollectionCounts[collection.invalidationType()]--;
+    if (collection.isRootedAtDocument()) {
+        ASSERT(m_collectionsInvalidatedAtDocument.contains(&collection));
+        m_collectionsInvalidatedAtDocument.remove(&collection);
     }
 }
 
@@ -3936,8 +3925,6 @@ void Document::setInPageCache(bool flag)
         page->lockAllOverlayScrollbarsToHidden(flag);
 
     if (flag) {
-        ASSERT(!m_savedRenderView);
-        m_savedRenderView = renderView();
         if (v) {
             // FIXME: There is some scrolling related work that needs to happen whenever a page goes into the
             // page cache and similar work that needs to occur when it comes out. This is where we do the work
@@ -3956,11 +3943,6 @@ void Document::setInPageCache(bool flag)
         }
         m_styleRecalcTimer.stop();
     } else {
-        ASSERT(!renderView() || renderView() == m_savedRenderView);
-        ASSERT(m_renderArena);
-        setRenderView(m_savedRenderView);
-        m_savedRenderView = nullptr;
-
         if (childNeedsStyleRecalc())
             scheduleStyleRecalc();
     }
@@ -4155,7 +4137,7 @@ URL Document::openSearchDescriptionURL()
     for (unsigned i = 0; Node* child = children->item(i); i++) {
         if (!child->hasTagName(linkTag))
             continue;
-        HTMLLinkElement* linkElement = static_cast<HTMLLinkElement*>(child);
+        HTMLLinkElement* linkElement = toHTMLLinkElement(child);
         if (!equalIgnoringCase(linkElement->type(), openSearchMIMEType) || !equalIgnoringCase(linkElement->rel(), openSearchRelation))
             continue;
         if (linkElement->href().isEmpty())
@@ -4285,7 +4267,7 @@ bool Document::hasSVGRootNode() const
 
 PassRefPtr<HTMLCollection> Document::ensureCachedCollection(CollectionType type)
 {
-    return ensureRareData().ensureNodeLists().addCacheWithAtomicName<HTMLCollection>(*this, type);
+    return ensureRareData().ensureNodeLists().addCachedCollection<HTMLCollection>(*this, type);
 }
 
 PassRefPtr<HTMLCollection> Document::images()
@@ -4331,17 +4313,17 @@ PassRefPtr<HTMLCollection> Document::anchors()
 
 PassRefPtr<HTMLCollection> Document::all()
 {
-    return ensureRareData().ensureNodeLists().addCacheWithAtomicName<HTMLAllCollection>(*this, DocAll);
+    return ensureRareData().ensureNodeLists().addCachedCollection<HTMLAllCollection>(*this, DocAll);
 }
 
 PassRefPtr<HTMLCollection> Document::windowNamedItems(const AtomicString& name)
 {
-    return ensureRareData().ensureNodeLists().addCacheWithAtomicName<WindowNameCollection>(*this, WindowNamedItems, name);
+    return ensureRareData().ensureNodeLists().addCachedCollection<WindowNameCollection>(*this, WindowNamedItems, name);
 }
 
 PassRefPtr<HTMLCollection> Document::documentNamedItems(const AtomicString& name)
 {
-    return ensureRareData().ensureNodeLists().addCacheWithAtomicName<DocumentNameCollection>(*this, DocumentNamedItems, name);
+    return ensureRareData().ensureNodeLists().addCachedCollection<DocumentNameCollection>(*this, DocumentNamedItems, name);
 }
 
 void Document::finishedParsing()
@@ -4451,7 +4433,7 @@ const Vector<IconURL>& Document::iconURLs(int iconTypesMask)
         Node* child = children->item(i);
         if (!child->hasTagName(linkTag))
             continue;
-        HTMLLinkElement* linkElement = static_cast<HTMLLinkElement*>(child);
+        HTMLLinkElement* linkElement = toHTMLLinkElement(child);
         if (!(linkElement->iconType() & iconTypesMask))
             continue;
         if (linkElement->href().isEmpty())
@@ -4880,6 +4862,8 @@ void Document::scriptedAnimationControllerSetThrottled(bool isThrottled)
 #if ENABLE(REQUEST_ANIMATION_FRAME)
     if (m_scriptedAnimationController)
         m_scriptedAnimationController->setThrottled(isThrottled);
+#else
+    UNUSED_PARAM(isThrottled);
 #endif
 }
 

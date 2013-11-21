@@ -58,7 +58,6 @@ class InspectorArray;
 class InspectorClient;
 class InspectorObject;
 class InspectorOverlay;
-class InspectorState;
 class InstrumentingAgents;
 class URL;
 class Page;
@@ -68,7 +67,7 @@ class TextResourceDecoder;
 
 typedef String ErrorString;
 
-class InspectorPageAgent : public InspectorBaseAgent<InspectorPageAgent>, public InspectorBackendDispatcher::PageCommandHandler {
+class InspectorPageAgent : public InspectorBaseAgent, public InspectorPageBackendDispatcherHandler {
     WTF_MAKE_NONCOPYABLE(InspectorPageAgent);
 public:
     enum ResourceType {
@@ -82,7 +81,7 @@ public:
         OtherResource
     };
 
-    static PassOwnPtr<InspectorPageAgent> create(InstrumentingAgents*, Page*, InspectorAgent*, InspectorCompositeState*, InjectedScriptManager*, InspectorClient*, InspectorOverlay*);
+    static PassOwnPtr<InspectorPageAgent> create(InstrumentingAgents*, Page*, InspectorAgent*, InjectedScriptManager*, InspectorClient*, InspectorOverlay*);
 
     static bool cachedResourceContent(CachedResource*, String* result, bool* base64Encoded);
     static bool sharedBufferContent(PassRefPtr<SharedBuffer>, const String& textEncodingName, bool withBase64Encode, String* result);
@@ -118,7 +117,7 @@ public:
     virtual void setShowFPSCounter(ErrorString*, bool show);
     virtual void canContinuouslyPaint(ErrorString*, bool*);
     virtual void setContinuousPaintingEnabled(ErrorString*, bool enabled);
-    virtual void getScriptExecutionStatus(ErrorString*, PageCommandHandler::Result::Enum*);
+    virtual void getScriptExecutionStatus(ErrorString*, InspectorPageBackendDispatcherHandler::Result::Enum*);
     virtual void setScriptExecutionDisabled(ErrorString*, bool);
     virtual void setGeolocationOverride(ErrorString*, const double*, const double*, const double*);
     virtual void clearGeolocationOverride(ErrorString*);
@@ -163,9 +162,8 @@ public:
     void scriptsEnabled(bool isEnabled);
 
     // Inspector Controller API
-    virtual void setFrontend(InspectorFrontend*);
-    virtual void clearFrontend();
-    virtual void restore();
+    virtual void didCreateFrontendAndBackend(InspectorFrontendChannel*, InspectorBackendDispatcher*) OVERRIDE;
+    virtual void willDestroyFrontendAndBackend() OVERRIDE;
 
     void webViewResized(const IntSize&);
 
@@ -183,7 +181,7 @@ public:
     static DocumentLoader* assertDocumentLoader(ErrorString*, Frame*);
 
 private:
-    InspectorPageAgent(InstrumentingAgents*, Page*, InspectorAgent*, InspectorCompositeState*, InjectedScriptManager*, InspectorClient*, InspectorOverlay*);
+    InspectorPageAgent(InstrumentingAgents*, Page*, InspectorAgent*, InjectedScriptManager*, InspectorClient*, InspectorOverlay*);
     bool deviceMetricsChanged(int width, int height, double fontScaleFactor, bool fitWindow);
     void updateViewMetrics(int, int, double, bool);
 #if ENABLE(TOUCH_EVENTS)
@@ -199,7 +197,8 @@ private:
     InspectorAgent* m_inspectorAgent;
     InjectedScriptManager* m_injectedScriptManager;
     InspectorClient* m_client;
-    InspectorFrontend::Page* m_frontend;
+    std::unique_ptr<InspectorPageFrontendDispatcher> m_frontendDispatcher;
+    RefPtr<InspectorPageBackendDispatcher> m_backendDispatcher;
     InspectorOverlay* m_overlay;
     long m_lastScriptIdentifier;
     String m_pendingScriptToEvaluateOnLoadOnce;
@@ -209,11 +208,18 @@ private:
     HashMap<Frame*, String> m_frameToIdentifier;
     HashMap<String, Frame*> m_identifierToFrame;
     HashMap<DocumentLoader*, String> m_loaderToIdentifier;
+    int m_screenWidthOverride;
+    int m_screenHeightOverride;
+    double m_fontScaleFactorOverride;
+    bool m_fitWindowOverride;
     bool m_enabled;
     bool m_isFirstLayoutAfterOnLoad;
     bool m_originalScriptExecutionDisabled;
     bool m_geolocationOverridden;
     bool m_ignoreScriptsEnabledNotification;
+    bool m_showPaintRects;
+    String m_emulatedMedia;
+    RefPtr<InspectorObject> m_scriptsToEvaluateOnLoad;
     RefPtr<GeolocationPosition> m_geolocationPosition;
     RefPtr<GeolocationPosition> m_platformGeolocationPosition;
     RefPtr<DeviceOrientationData> m_deviceOrientation;

@@ -342,13 +342,13 @@ public:
 
     // Methods for indicating the style is affected by dynamic updates (e.g., children changing, our position changing in our sibling list, etc.)
     bool styleAffectedByEmpty() const { return hasRareData() && rareDataStyleAffectedByEmpty(); }
-    bool childrenAffectedByHover() const { return hasRareData() && rareDataChildrenAffectedByHover(); }
+    bool childrenAffectedByHover() const { return getFlag(ChildrenAffectedByHoverRulesFlag); }
     bool childrenAffectedByActive() const { return hasRareData() && rareDataChildrenAffectedByActive(); }
     bool childrenAffectedByDrag() const { return hasRareData() && rareDataChildrenAffectedByDrag(); }
     bool childrenAffectedByPositionalRules() const { return hasRareData() && (rareDataChildrenAffectedByForwardPositionalRules() || rareDataChildrenAffectedByBackwardPositionalRules()); }
-    bool childrenAffectedByFirstChildRules() const { return hasRareData() && rareDataChildrenAffectedByFirstChildRules(); }
-    bool childrenAffectedByLastChildRules() const { return hasRareData() && rareDataChildrenAffectedByLastChildRules(); }
-    bool childrenAffectedByDirectAdjacentRules() const { return hasRareData() && rareDataChildrenAffectedByDirectAdjacentRules(); }
+    bool childrenAffectedByFirstChildRules() const { return getFlag(ChildrenAffectedByFirstChildRulesFlag); }
+    bool childrenAffectedByLastChildRules() const { return getFlag(ChildrenAffectedByLastChildRulesFlag); }
+    bool childrenAffectedByDirectAdjacentRules() const { return getFlag(ChildrenAffectedByDirectAdjacentRulesFlag); }
     bool childrenAffectedByForwardPositionalRules() const { return hasRareData() && rareDataChildrenAffectedByForwardPositionalRules(); }
     bool childrenAffectedByBackwardPositionalRules() const { return hasRareData() && rareDataChildrenAffectedByBackwardPositionalRules(); }
     unsigned childIndex() const { return hasRareData() ? rareDataChildIndex() : 0; }
@@ -356,12 +356,12 @@ public:
     bool hasFlagsSetDuringStylingOfChildren() const;
 
     void setStyleAffectedByEmpty();
-    void setChildrenAffectedByHover(bool);
+    void setChildrenAffectedByHover(bool flag) { setFlag(flag, ChildrenAffectedByHoverRulesFlag); }
     void setChildrenAffectedByActive(bool);
     void setChildrenAffectedByDrag(bool);
-    void setChildrenAffectedByFirstChildRules();
-    void setChildrenAffectedByLastChildRules();
-    void setChildrenAffectedByDirectAdjacentRules();
+    void setChildrenAffectedByFirstChildRules() { setFlag(ChildrenAffectedByFirstChildRulesFlag); }
+    void setChildrenAffectedByLastChildRules() { setFlag(ChildrenAffectedByLastChildRulesFlag); }
+    void setChildrenAffectedByDirectAdjacentRules() { setFlag(ChildrenAffectedByDirectAdjacentRulesFlag); }
     void setChildrenAffectedByForwardPositionalRules();
     void setChildrenAffectedByBackwardPositionalRules();
     void setChildIndex(unsigned);
@@ -452,12 +452,6 @@ public:
 
     DOMStringMap* dataset();
 
-#if ENABLE(MATHML)
-    virtual bool isMathMLElement() const { return false; }
-#else
-    static bool isMathMLElement() { return false; }
-#endif
-
 #if ENABLE(VIDEO)
     virtual bool isMediaElement() const { return false; }
 #endif
@@ -485,9 +479,9 @@ public:
     // to event listeners, and prevents DOMActivate events from being sent at all.
     virtual bool isDisabledFormControl() const { return false; }
 
+    virtual bool childShouldCreateRenderer(const Node&) const OVERRIDE;
 
 #if ENABLE(SVG)
-    virtual bool childShouldCreateRenderer(const Node*) const OVERRIDE;
     bool hasPendingResources() const;
     void setHasPendingResources();
     void clearHasPendingResources();
@@ -659,9 +653,7 @@ private:
     bool rareDataChildrenAffectedByHover() const;
     bool rareDataChildrenAffectedByActive() const;
     bool rareDataChildrenAffectedByDrag() const;
-    bool rareDataChildrenAffectedByFirstChildRules() const;
     bool rareDataChildrenAffectedByLastChildRules() const;
-    bool rareDataChildrenAffectedByDirectAdjacentRules() const;
     bool rareDataChildrenAffectedByForwardPositionalRules() const;
     bool rareDataChildrenAffectedByBackwardPositionalRules() const;
     unsigned rareDataChildIndex() const;

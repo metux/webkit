@@ -36,7 +36,6 @@
 
 #include "InspectorFrontend.h"
 #include "InspectorFrontendChannel.h"
-#include "InspectorState.h"
 #include "InspectorValues.h"
 #include "InstrumentingAgents.h"
 #include "URL.h"
@@ -46,16 +45,11 @@
 
 namespace WebCore {
 
-namespace WorkerAgentState {
-static const char workerInspectionEnabled[] = "workerInspectionEnabled";
-static const char autoconnectToWorkers[] = "autoconnectToWorkers";
-};
-
 class InspectorWorkerAgent::WorkerFrontendChannel : public WorkerGlobalScopeProxy::PageInspector {
     WTF_MAKE_FAST_ALLOCATED;
 public:
-    explicit WorkerFrontendChannel(InspectorFrontend* frontend, WorkerGlobalScopeProxy* proxy)
-        : m_frontend(frontend)
+    explicit WorkerFrontendChannel(InspectorWorkerFrontendDispatcher* frontendDispatcher, WorkerGlobalScopeProxy* proxy)
+        : m_frontendDispatcher(frontendDispatcher)
         , m_proxy(proxy)
         , m_id(s_nextId++)
         , m_connected(false)
@@ -95,10 +89,10 @@ private:
         RefPtr<InspectorObject> messageObject = value->asObject();
         if (!messageObject)
             return;
-        m_frontend->worker()->dispatchMessageFromWorker(m_id, messageObject);
+        m_frontendDispatcher->dispatchMessageFromWorker(m_id, messageObject);
     }
 
-    InspectorFrontend* m_frontend;
+    InspectorWorkerFrontendDispatcher* m_frontendDispatcher;
     WorkerGlobalScopeProxy* m_proxy;
     int m_id;
     bool m_connected;
@@ -107,14 +101,15 @@ private:
 
 int InspectorWorkerAgent::WorkerFrontendChannel::s_nextId = 1;
 
-PassOwnPtr<InspectorWorkerAgent> InspectorWorkerAgent::create(InstrumentingAgents* instrumentingAgents, InspectorCompositeState* inspectorState)
+PassOwnPtr<InspectorWorkerAgent> InspectorWorkerAgent::create(InstrumentingAgents* instrumentingAgents)
 {
-    return adoptPtr(new InspectorWorkerAgent(instrumentingAgents, inspectorState));
+    return adoptPtr(new InspectorWorkerAgent(instrumentingAgents));
 }
 
-InspectorWorkerAgent::InspectorWorkerAgent(InstrumentingAgents* instrumentingAgents, InspectorCompositeState* inspectorState)
-    : InspectorBaseAgent<InspectorWorkerAgent>("Worker", instrumentingAgents, inspectorState)
-    , m_inspectorFrontend(0)
+InspectorWorkerAgent::InspectorWorkerAgent(InstrumentingAgents* instrumentingAgents)
+    : InspectorBaseAgent(ASCIILiteral("Worker"), instrumentingAgents)
+    , m_enabled(false)
+    , m_shouldPauseDedicatedWorkerOnStart(false)
 {
     m_instrumentingAgents->setInspectorWorkerAgent(this);
 }
@@ -124,37 +119,36 @@ InspectorWorkerAgent::~InspectorWorkerAgent()
     m_instrumentingAgents->setInspectorWorkerAgent(0);
 }
 
-void InspectorWorkerAgent::setFrontend(InspectorFrontend* frontend)
+void InspectorWorkerAgent::didCreateFrontendAndBackend(InspectorFrontendChannel* frontendChannel, InspectorBackendDispatcher* backendDispatcher)
 {
-    m_inspectorFrontend = frontend;
+    m_frontendDispatcher = std::make_unique<InspectorWorkerFrontendDispatcher>(frontendChannel);
+    m_backendDispatcher = InspectorWorkerBackendDispatcher::create(backendDispatcher, this);
 }
 
-void InspectorWorkerAgent::restore()
+void InspectorWorkerAgent::willDestroyFrontendAndBackend()
 {
-    if (m_state->getBoolean(WorkerAgentState::workerInspectionEnabled))
-        createWorkerFrontendChannelsForExistingWorkers();
-}
+    m_shouldPauseDedicatedWorkerOnStart = false;
+    disable(nullptr);
 
-void InspectorWorkerAgent::clearFrontend()
-{
-    m_state->setBoolean(WorkerAgentState::autoconnectToWorkers, false);
-    disable(0);
-    m_inspectorFrontend = 0;
+    m_frontendDispatcher = nullptr;
+    m_backendDispatcher.clear();
 }
 
 void InspectorWorkerAgent::enable(ErrorString*)
 {
-    m_state->setBoolean(WorkerAgentState::workerInspectionEnabled, true);
-    if (!m_inspectorFrontend)
+    m_enabled = true;
+    if (!m_frontendDispatcher)
         return;
+
     createWorkerFrontendChannelsForExistingWorkers();
 }
 
 void InspectorWorkerAgent::disable(ErrorString*)
 {
-    m_state->setBoolean(WorkerAgentState::workerInspectionEnabled, false);
-    if (!m_inspectorFrontend)
+    m_enabled = false;
+    if (!m_frontendDispatcher)
         return;
+
     destroyWorkerFrontendChannels();
 }
 
@@ -196,18 +190,18 @@ void InspectorWorkerAgent::sendMessageToWorker(ErrorString* error, int workerId,
 
 void InspectorWorkerAgent::setAutoconnectToWorkers(ErrorString*, bool value)
 {
-    m_state->setBoolean(WorkerAgentState::autoconnectToWorkers, value);
+    m_shouldPauseDedicatedWorkerOnStart = value;
 }
 
-bool InspectorWorkerAgent::shouldPauseDedicatedWorkerOnStart()
+bool InspectorWorkerAgent::shouldPauseDedicatedWorkerOnStart() const
 {
-    return m_state->getBoolean(WorkerAgentState::autoconnectToWorkers);
+    return m_shouldPauseDedicatedWorkerOnStart;
 }
 
 void InspectorWorkerAgent::didStartWorkerGlobalScope(WorkerGlobalScopeProxy* workerGlobalScopeProxy, const URL& url)
 {
     m_dedicatedWorkers.set(workerGlobalScopeProxy, url.string());
-    if (m_inspectorFrontend && m_state->getBoolean(WorkerAgentState::workerInspectionEnabled))
+    if (m_frontendDispatcher && m_enabled)
         createWorkerFrontendChannel(workerGlobalScopeProxy, url.string());
 }
 
@@ -216,7 +210,7 @@ void InspectorWorkerAgent::workerGlobalScopeTerminated(WorkerGlobalScopeProxy* p
     m_dedicatedWorkers.remove(proxy);
     for (WorkerChannels::iterator it = m_idToChannel.begin(); it != m_idToChannel.end(); ++it) {
         if (proxy == it->value->proxy()) {
-            m_inspectorFrontend->worker()->workerTerminated(it->key);
+            m_frontendDispatcher->workerTerminated(it->key);
             delete it->value;
             m_idToChannel.remove(it);
             return;
@@ -241,14 +235,13 @@ void InspectorWorkerAgent::destroyWorkerFrontendChannels()
 
 void InspectorWorkerAgent::createWorkerFrontendChannel(WorkerGlobalScopeProxy* workerGlobalScopeProxy, const String& url)
 {
-    WorkerFrontendChannel* channel = new WorkerFrontendChannel(m_inspectorFrontend, workerGlobalScopeProxy);
+    WorkerFrontendChannel* channel = new WorkerFrontendChannel(m_frontendDispatcher.get(), workerGlobalScopeProxy);
     m_idToChannel.set(channel->id(), channel);
 
-    ASSERT(m_inspectorFrontend);
-    bool autoconnectToWorkers = m_state->getBoolean(WorkerAgentState::autoconnectToWorkers);
-    if (autoconnectToWorkers)
+    ASSERT(m_frontendDispatcher);
+    if (m_shouldPauseDedicatedWorkerOnStart)
         channel->connectToWorkerGlobalScope();
-    m_inspectorFrontend->worker()->workerCreated(channel->id(), url, autoconnectToWorkers);
+    m_frontendDispatcher->workerCreated(channel->id(), url, m_shouldPauseDedicatedWorkerOnStart);
 }
 
 } // namespace WebCore

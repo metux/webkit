@@ -143,19 +143,6 @@ static bool runBeforeUnloadConfirmPanel(WKPageRef page, WKStringRef message, WKF
     return TestController::shared().beforeUnloadReturnValue();
 }
 
-static unsigned long long exceededDatabaseQuota(WKPageRef, WKFrameRef, WKSecurityOriginRef, WKStringRef, WKStringRef, unsigned long long, unsigned long long, unsigned long long, unsigned long long expectedUsage, const void*)
-{
-    static const unsigned long long defaultQuota = 5 * 1024 * 1024;
-    static const unsigned long long maxQuota = 10 * 1024 * 1024;
-    unsigned long long newQuota = defaultQuota;
-    if (defaultQuota < expectedUsage && expectedUsage <= maxQuota) {
-        newQuota = expectedUsage;
-        printf("UI DELEGATE DATABASE CALLBACK: increased quota to %llu\n", newQuota);
-    }
-    return newQuota;
-}
-
-
 void TestController::runModal(WKPageRef page, const void* clientInfo)
 {
     PlatformWebView* view = static_cast<PlatformWebView*>(const_cast<void*>(clientInfo));
@@ -233,7 +220,7 @@ WKPageRef TestController::createOtherPage(WKPageRef oldPage, WKURLRequestRef, WK
         runBeforeUnloadConfirmPanel,
         0, // didDraw
         0, // pageDidScroll
-        exceededDatabaseQuota,
+        0, // exceededDatabaseQuota
         0, // runOpenPanel
         decidePolicyForGeolocationPermissionRequest,
         0, // headerHeight
@@ -364,11 +351,7 @@ void TestController::initialize(int argc, const char* argv[])
 
         // WebCore::pathByAppendingComponent is not used here because of the namespace,
         // which leads us to this ugly #ifdef and file path concatenation.
-#if OS(WINDOWS)
-        const char separator = '\\';
-#else
         const char separator = '/';
-#endif
 
         WKContextSetApplicationCacheDirectory(m_context.get(), toWK(temporaryFolder + separator + "ApplicationCache").get());
         WKContextSetDatabaseDirectory(m_context.get(), toWK(temporaryFolder + separator + "Databases").get());
@@ -398,6 +381,9 @@ void TestController::initialize(int argc, const char* argv[])
 
     if (testPluginDirectory())
         WKContextSetAdditionalPluginsDirectory(m_context.get(), testPluginDirectory());
+
+    // Some preferences (notably mock scroll bars setting) currently cannot be re-applied to an existing view, so we need to set them now.
+    resetPreferencesToConsistentValues();
 
     createWebViewWithOptions(0);
 }
@@ -435,7 +421,7 @@ void TestController::createWebViewWithOptions(WKDictionaryRef options)
         runBeforeUnloadConfirmPanel,
         0, // didDraw
         0, // pageDidScroll
-        exceededDatabaseQuota,
+        0, // exceededDatabaseQuota,
         0, // runOpenPanel
         decidePolicyForGeolocationPermissionRequest,
         0, // headerHeight
@@ -502,10 +488,12 @@ void TestController::createWebViewWithOptions(WKDictionaryRef options)
     WKPagePolicyClient pagePolicyClient = {
         kWKPagePolicyClientCurrentVersion,
         this,
-        decidePolicyForNavigationAction,
+        0, // decidePolicyForNavigationAction_deprecatedForUseWithV0
         0, // decidePolicyForNewWindowAction
-        decidePolicyForResponse,
+        0, // decidePolicyForResponse_deprecatedForUseWithV0
         0, // unableToImplementPolicy
+        decidePolicyForNavigationAction,
+        decidePolicyForResponse,
     };
     WKPageSetPagePolicyClient(m_mainWebView->page(), &pagePolicyClient);
 
@@ -527,30 +515,8 @@ void TestController::ensureViewSupportsOptions(WKDictionaryRef options)
     }
 }
 
-bool TestController::resetStateToConsistentValues()
+void TestController::resetPreferencesToConsistentValues()
 {
-    m_state = Resetting;
-
-    m_beforeUnloadReturnValue = true;
-
-    WKRetainPtr<WKStringRef> messageName = adoptWK(WKStringCreateWithUTF8CString("Reset"));
-    WKRetainPtr<WKMutableDictionaryRef> resetMessageBody = adoptWK(WKMutableDictionaryCreate());
-
-    WKRetainPtr<WKStringRef> shouldGCKey = adoptWK(WKStringCreateWithUTF8CString("ShouldGC"));
-    WKRetainPtr<WKBooleanRef> shouldGCValue = adoptWK(WKBooleanCreate(m_gcBetweenTests));
-    WKDictionaryAddItem(resetMessageBody.get(), shouldGCKey.get(), shouldGCValue.get());
-
-    WKContextPostMessageToInjectedBundle(TestController::shared().context(), messageName.get(), resetMessageBody.get());
-
-    WKContextSetShouldUseFontSmoothing(TestController::shared().context(), false);
-
-    WKContextSetCacheModel(TestController::shared().context(), kWKCacheModelDocumentBrowser);
-
-    // FIXME: This function should also ensure that there is only one page open.
-
-    // Reset the EventSender for each test.
-    m_eventSenderProxy = adoptPtr(new EventSenderProxy(this));
-
     // Reset preferences
     WKPreferencesRef preferences = WKPageGroupGetPreferences(m_pageGroup.get());
     WKPreferencesResetTestRunnerOverrides(preferences);
@@ -593,6 +559,36 @@ bool TestController::resetStateToConsistentValues()
     WKPreferencesSetSerifFontFamily(preferences, serifFontFamily);
     WKPreferencesSetScreenFontSubstitutionEnabled(preferences, true);
     WKPreferencesSetAsynchronousSpellCheckingEnabled(preferences, false);
+}
+
+bool TestController::resetStateToConsistentValues()
+{
+    m_state = Resetting;
+
+    m_beforeUnloadReturnValue = true;
+
+    WKRetainPtr<WKStringRef> messageName = adoptWK(WKStringCreateWithUTF8CString("Reset"));
+    WKRetainPtr<WKMutableDictionaryRef> resetMessageBody = adoptWK(WKMutableDictionaryCreate());
+
+    WKRetainPtr<WKStringRef> shouldGCKey = adoptWK(WKStringCreateWithUTF8CString("ShouldGC"));
+    WKRetainPtr<WKBooleanRef> shouldGCValue = adoptWK(WKBooleanCreate(m_gcBetweenTests));
+    WKDictionaryAddItem(resetMessageBody.get(), shouldGCKey.get(), shouldGCValue.get());
+
+    WKContextPostMessageToInjectedBundle(TestController::shared().context(), messageName.get(), resetMessageBody.get());
+
+    WKContextSetShouldUseFontSmoothing(TestController::shared().context(), false);
+
+    WKContextSetCacheModel(TestController::shared().context(), kWKCacheModelDocumentBrowser);
+
+    // FIXME: This function should also ensure that there is only one page open.
+
+    // Reset the EventSender for each test.
+    m_eventSenderProxy = adoptPtr(new EventSenderProxy(this));
+
+    // FIXME: Is this needed? Nothing in TestController changes preferences during tests, and if there is
+    // some other code doing this, it should probably be responsible for cleanup too.
+    resetPreferencesToConsistentValues();
+
 #if !PLATFORM(MAC)
     WKTextCheckerContinuousSpellCheckingEnabledStateChanged(true);
 #endif
@@ -1222,7 +1218,7 @@ void TestController::unavailablePluginButtonClicked(WKPageRef, WKPluginUnavailab
     printf("MISSING PLUGIN BUTTON PRESSED\n");
 }
 
-void TestController::decidePolicyForNavigationAction(WKPageRef, WKFrameRef, WKFrameNavigationType, WKEventModifiers, WKEventMouseButton, WKURLRequestRef, WKFramePolicyListenerRef listener, WKTypeRef, const void* clientInfo)
+void TestController::decidePolicyForNavigationAction(WKPageRef, WKFrameRef, WKFrameNavigationType, WKEventModifiers, WKEventMouseButton, WKFrameRef, WKURLRequestRef, WKFramePolicyListenerRef listener, WKTypeRef, const void* clientInfo)
 {
     static_cast<TestController*>(const_cast<void*>(clientInfo))->decidePolicyForNavigationAction(listener);
 }
@@ -1237,7 +1233,7 @@ void TestController::decidePolicyForNavigationAction(WKFramePolicyListenerRef li
     WKFramePolicyListenerUse(listener);
 }
 
-void TestController::decidePolicyForResponse(WKPageRef, WKFrameRef frame, WKURLResponseRef response, WKURLRequestRef, WKFramePolicyListenerRef listener, WKTypeRef, const void* clientInfo)
+void TestController::decidePolicyForResponse(WKPageRef, WKFrameRef frame, WKURLResponseRef response, WKURLRequestRef, bool canShowMIMEType, WKFramePolicyListenerRef listener, WKTypeRef, const void* clientInfo)
 {
     static_cast<TestController*>(const_cast<void*>(clientInfo))->decidePolicyForResponse(frame, response, listener);
 }

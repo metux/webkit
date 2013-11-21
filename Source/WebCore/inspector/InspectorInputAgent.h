@@ -40,29 +40,32 @@
 #include <wtf/text/WTFString.h>
 
 namespace WebCore {
-class InspectorState;
 class Page;
 
 typedef String ErrorString;
 
-class InspectorInputAgent : public InspectorBaseAgent<InspectorInputAgent>, public InspectorBackendDispatcher::InputCommandHandler {
+class InspectorInputAgent : public InspectorBaseAgent, public InspectorInputBackendDispatcherHandler {
     WTF_MAKE_NONCOPYABLE(InspectorInputAgent);
 public:
-    static PassOwnPtr<InspectorInputAgent> create(InstrumentingAgents* instrumentingAgents, InspectorCompositeState* inspectorState, Page* page)
+    static PassOwnPtr<InspectorInputAgent> create(InstrumentingAgents* instrumentingAgents, Page* page)
     {
-        return adoptPtr(new InspectorInputAgent(instrumentingAgents, inspectorState, page));
+        return adoptPtr(new InspectorInputAgent(instrumentingAgents, page));
     }
 
     ~InspectorInputAgent();
+
+    virtual void didCreateFrontendAndBackend(InspectorFrontendChannel*, InspectorBackendDispatcher*) OVERRIDE;
+    virtual void willDestroyFrontendAndBackend() OVERRIDE;
 
     // Methods called from the frontend for simulating input.
     virtual void dispatchKeyEvent(ErrorString*, const String& type, const int* modifiers, const double* timestamp, const String* text, const String* unmodifiedText, const String* keyIdentifier, const int* windowsVirtualKeyCode, const int* nativeVirtualKeyCode, const int* macCharCode, const bool* autoRepeat, const bool* isKeypad, const bool* isSystemKey);
     virtual void dispatchMouseEvent(ErrorString*, const String& type, int x, int y, const int* modifiers, const double* timestamp, const String* button, const int* clickCount);
 
 private:
-    InspectorInputAgent(InstrumentingAgents*, InspectorCompositeState*, Page*);
+    InspectorInputAgent(InstrumentingAgents*, Page*);
 
     Page* m_page;
+    RefPtr<InspectorInputBackendDispatcher> m_backendDispatcher;
 };
 
 #endif // ENABLE(INSPECTOR)
