@@ -17,6 +17,14 @@ webkitgtk (2.3.2-1) UNRELEASED; urgency=low
       and we haven't heard of any complains. Besides, the patch no
       longer applies as the code it touched has been largely reworked
       or removed.
+  * debian/patches/14_ia64-wide-ptr.patch,
+    debian/patches/15_ia64-use-system-malloc.patch:
+    + Dropped. The former wasn't been applied and needs rebasing if still
+      needed. The second is probably useless given all the other patches
+      that were needed on IA64 are gone. It may not be needed anymore as
+      the code that the patch tries to workaround may be fixed now.
+      If these or any other patches are needed for IA64, they should be
+      sent upstream so we don't run into problems like this again.
 
  -- Emilio Pozuelo Monfort <pochu@debian.org>  Thu, 21 Nov 2013 21:20:48 +0100
 
