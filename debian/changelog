@@ -27,6 +27,10 @@ webkitgtk (2.3.2-1) UNRELEASED; urgency=low
       sent upstream so we don't run into problems like this again.
   * debian/rules:
     + Disable debugging symbols on powerpcspe. Closes: #696472.
+  * debian/libwebkitgtk-1.0-0.symbols,
+    debian/libwebkitgtk-3.0-0.symbols,
+    debian/libwebkit2gtk-3.0-25.symbols:
+    + Updated for the new symbols.
 
  -- Emilio Pozuelo Monfort <pochu@debian.org>  Thu, 21 Nov 2013 21:20:48 +0100
 

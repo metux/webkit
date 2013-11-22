@@ -1103,6 +1103,7 @@ libwebkit2gtk-3.0.so.25 libwebkit2gtk-3.0-25 #MINVER#
  webkit_dom_html_marquee_element_start@Base 2.0.2
  webkit_dom_html_marquee_element_stop@Base 2.0.2
  webkit_dom_html_media_element_can_play_type@Base 2.0.2
+ webkit_dom_html_media_element_fast_seek@Base 2.3.2
  webkit_dom_html_media_element_get_autoplay@Base 2.0.2
  webkit_dom_html_media_element_get_buffered@Base 2.0.2
  webkit_dom_html_media_element_get_controls@Base 2.0.2
@@ -1813,6 +1814,7 @@ libwebkit2gtk-3.0.so.25 libwebkit2gtk-3.0-25 #MINVER#
  webkit_dom_text_track_dispatch_event@Base 2.0.2
  webkit_dom_text_track_get_active_cues@Base 2.0.2
  webkit_dom_text_track_get_cues@Base 2.0.2
+ webkit_dom_text_track_get_id@Base 2.3.2
  webkit_dom_text_track_get_kind@Base 2.0.2
  webkit_dom_text_track_get_label@Base 2.0.2
  webkit_dom_text_track_get_language@Base 2.0.2
@@ -2093,6 +2095,7 @@ libwebkit2gtk-3.0.so.25 libwebkit2gtk-3.0-25 #MINVER#
  webkit_settings_get_enable_hyperlink_auditing@Base 2.0.2
  webkit_settings_get_enable_java@Base 2.0.2
  webkit_settings_get_enable_javascript@Base 2.0.2
+ webkit_settings_get_enable_media_stream@Base 2.3.2
  webkit_settings_get_enable_offline_web_application_cache@Base 2.0.2
  webkit_settings_get_enable_page_cache@Base 2.0.2
  webkit_settings_get_enable_plugins@Base 2.0.2
@@ -2141,6 +2144,7 @@ libwebkit2gtk-3.0.so.25 libwebkit2gtk-3.0-25 #MINVER#
  webkit_settings_set_enable_hyperlink_auditing@Base 2.0.2
  webkit_settings_set_enable_java@Base 2.0.2
  webkit_settings_set_enable_javascript@Base 2.0.2
+ webkit_settings_set_enable_media_stream@Base 2.3.2
  webkit_settings_set_enable_offline_web_application_cache@Base 2.0.2
  webkit_settings_set_enable_page_cache@Base 2.0.2
  webkit_settings_set_enable_plugins@Base 2.0.2

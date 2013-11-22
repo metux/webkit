@@ -1027,6 +1027,7 @@ libwebkitgtk-3.0.so.0 libwebkitgtk-3.0-0 #MINVER#
  webkit_dom_html_marquee_element_start@Base 1.3.10
  webkit_dom_html_marquee_element_stop@Base 1.3.10
  webkit_dom_html_media_element_can_play_type@Base 1.3.10
+ webkit_dom_html_media_element_fast_seek@Base 2.3.2
  webkit_dom_html_media_element_get_autoplay@Base 1.3.10
  webkit_dom_html_media_element_get_buffered@Base 1.3.10
  webkit_dom_html_media_element_get_controls@Base 1.3.10
@@ -1737,6 +1738,7 @@ libwebkitgtk-3.0.so.0 libwebkitgtk-3.0-0 #MINVER#
  webkit_dom_text_track_dispatch_event@Base 1.11.90
  webkit_dom_text_track_get_active_cues@Base 1.11.90
  webkit_dom_text_track_get_cues@Base 1.11.90
+ webkit_dom_text_track_get_id@Base 2.3.2
  webkit_dom_text_track_get_kind@Base 1.11.90
  webkit_dom_text_track_get_label@Base 1.11.90
  webkit_dom_text_track_get_language@Base 1.11.90
