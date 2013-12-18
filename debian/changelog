@@ -1,5 +1,8 @@
-webkitgtk (2.3.2-2) UNRELEASED; urgency=low
+webkitgtk (2.3.3-1) UNRELEASED; urgency=low
 
+  * New upstream release.
+  * debian/patches/02_notebook_scroll.patch:
+    + Refreshed.
   * Multi-arch support:
     + debian/control: Add Multi-Arch and Pre-Depends fields to all
       packages with shared libraries.

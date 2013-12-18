@@ -1,6 +1,6 @@
 --- a/Source/WebKit/gtk/webkit/webkitwebview.cpp
 +++ b/Source/WebKit/gtk/webkit/webkitwebview.cpp
-@@ -795,6 +795,12 @@
+@@ -807,6 +807,12 @@
      if (!frame.view())
          return FALSE;
  
