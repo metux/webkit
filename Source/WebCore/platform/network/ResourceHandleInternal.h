@@ -33,6 +33,7 @@
 #include "Timer.h"
 
 #if USE(CFNETWORK)
+#include "ResourceHandleCFURLConnectionDelegate.h"
 #include <CFNetwork/CFURLConnectionPriv.h>
 #endif
 
@@ -83,6 +84,7 @@ namespace WebCore {
             , m_shouldContentSniff(shouldContentSniff)
 #if USE(CFNETWORK)
             , m_connection(0)
+            , m_currentRequest(request)
 #endif
 #if USE(WININET)
             , m_fileLoadTimer(loader, &ResourceHandle::fileLoadTimer)
@@ -101,14 +103,14 @@ namespace WebCore {
             , m_cancelled(false)
             , m_authFailureCount(0)
             , m_formDataStream(loader)
+            , m_sslErrors(0)
 #endif
 #if USE(SOUP)
             , m_cancelled(false)
-            , m_readBufferPtr(0)
-            , m_readBufferSize(0)
             , m_bodySize(0)
             , m_bodyDataSent(0)
             , m_redirectCount(0)
+            , m_previousPosition(0)
 #endif
 #if PLATFORM(MAC)
             , m_startWhenScheduled(false)
@@ -145,6 +147,8 @@ namespace WebCore {
         bool m_shouldContentSniff;
 #if USE(CFNETWORK)
         RetainPtr<CFURLConnectionRef> m_connection;
+        ResourceRequest m_currentRequest;
+        RefPtr<ResourceHandleCFURLConnectionDelegate> m_connectionDelegate;
 #endif
 #if PLATFORM(MAC) && !USE(CFNETWORK)
         RetainPtr<NSURLConnection> m_connection;
@@ -178,6 +182,7 @@ namespace WebCore {
         unsigned short m_authFailureCount;
 
         FormDataStream m_formDataStream;
+        unsigned m_sslErrors;
         Vector<char> m_postBytes;
 
         OwnPtr<MultipartHandle> m_multipartHandle;
@@ -192,13 +197,12 @@ namespace WebCore {
         GRefPtr<GCancellable> m_cancellable;
         GRefPtr<GAsyncResult> m_deferredResult;
         GRefPtr<GSource> m_timeoutSource;
-        GOwnPtr<char> m_defaultReadBuffer;
-        char* m_readBufferPtr;
-        size_t m_readBufferSize;
+        GOwnPtr<SoupBuffer> m_soupBuffer;
         unsigned long m_bodySize;
         unsigned long m_bodyDataSent;
         SoupSession* soupSession();
         int m_redirectCount;
+        size_t m_previousPosition;
 #endif
 #if PLATFORM(GTK)
         struct {

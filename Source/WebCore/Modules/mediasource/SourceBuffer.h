@@ -75,6 +75,7 @@ public:
 
     void abortIfUpdating();
     void removedFromMediaSource();
+    const MediaTime& highestPresentationEndTimestamp() const { return m_highestPresentationEndTimestamp; }
 
 #if ENABLE(VIDEO_TRACK)
     VideoTrackList* videoTracks();
@@ -107,6 +108,10 @@ private:
     virtual void sourceBufferPrivateDidReceiveSample(SourceBufferPrivate*, PassRefPtr<MediaSample>) OVERRIDE;
     virtual bool sourceBufferPrivateHasAudio(const SourceBufferPrivate*) const OVERRIDE;
     virtual bool sourceBufferPrivateHasVideo(const SourceBufferPrivate*) const OVERRIDE;
+    virtual void sourceBufferPrivateDidBecomeReadyForMoreSamples(SourceBufferPrivate*, AtomicString trackID) OVERRIDE;
+    virtual void sourceBufferPrivateSeekToTime(SourceBufferPrivate*, const MediaTime&);
+    virtual MediaTime sourceBufferPrivateFastSeekTimeForMediaTime(SourceBufferPrivate*, const MediaTime&, const MediaTime& negativeThreshold, const MediaTime& positiveThreshold);
+
 
     // AudioTrackClient
     virtual void audioTrackEnabledChanged(AudioTrack*) OVERRIDE;
@@ -135,6 +140,10 @@ private:
 
     bool validateInitializationSegment(const InitializationSegment&);
 
+    struct TrackBuffer;
+    void provideMediaData(TrackBuffer&, AtomicString trackID);
+    void didDropSample();
+
     RefPtr<SourceBufferPrivate> m_private;
     MediaSource* m_source;
     GenericEventQueue m_asyncEventQueue;
@@ -155,7 +164,6 @@ private:
     MediaTime m_timestampOffset;
     MediaTime m_highestPresentationEndTimestamp;
 
-    struct TrackBuffer;
     HashMap<AtomicString, TrackBuffer> m_trackBufferMap;
     bool m_receivedFirstInitializationSegment;
     RefPtr<TimeRanges> m_buffered;

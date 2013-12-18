@@ -30,6 +30,7 @@
 #include "RenderMathMLRow.h"
 
 #include "MathMLNames.h"
+#include "RenderIterator.h"
 #include "RenderMathMLOperator.h"
 
 namespace WebCore {
@@ -70,12 +71,10 @@ void RenderMathMLRow::layout()
         stretchLogicalHeight = style().fontSize();
     
     // Set the sizes of (possibly embellished) stretchy operator children.
-    for (RenderObject* child = firstChild(); child; child = child->nextSibling()) {
-        if (child->isRenderMathMLBlock()) {
-            if (RenderMathMLOperator* renderMo = toRenderMathMLBlock(child)->unembellishedOperator()) {
-                if (renderMo->stretchHeight() != stretchLogicalHeight)
-                    renderMo->stretchToHeight(stretchLogicalHeight);
-            }
+    for (auto& child : childrenOfType<RenderMathMLBlock>(*this)) {
+        if (auto renderMo = child.unembellishedOperator()) {
+            if (renderMo->stretchHeight() != stretchLogicalHeight)
+                renderMo->stretchToHeight(stretchLogicalHeight);
         }
     }
 

@@ -54,6 +54,13 @@ bool AccessibilityUIElement::isValid() const
 }
 
 // Unsupported methods on various platforms. As they're implemented on other platforms this list should be modified.
+#if (!PLATFORM(GTK) && !PLATFORM(EFL)) || !HAVE(ACCESSIBILITY)
+JSRetainPtr<JSStringRef> AccessibilityUIElement::characterAtOffset(int) { return 0; }
+JSRetainPtr<JSStringRef> AccessibilityUIElement::wordAtOffset(int) { return 0; }
+JSRetainPtr<JSStringRef> AccessibilityUIElement::lineAtOffset(int) { return 0; }
+JSRetainPtr<JSStringRef> AccessibilityUIElement::sentenceAtOffset(int) { return 0; }
+#endif
+
 #if (!PLATFORM(MAC) && !PLATFORM(GTK) && !PLATFORM(EFL)) || !HAVE(ACCESSIBILITY)
 AccessibilityUIElement::AccessibilityUIElement(PlatformUIElement) { }
 AccessibilityUIElement::AccessibilityUIElement(const AccessibilityUIElement&) { }
@@ -80,6 +87,7 @@ void AccessibilityUIElement::decrement() { }
 void AccessibilityUIElement::showMenu() { }
 void AccessibilityUIElement::press() { }
 JSRetainPtr<JSStringRef> AccessibilityUIElement::stringAttributeValue(JSStringRef) { return 0; }
+JSValueRef AccessibilityUIElement::uiElementArrayAttributeValue(JSStringRef) const { return nullptr; }
 PassRefPtr<AccessibilityUIElement> AccessibilityUIElement::uiElementAttributeValue(JSStringRef) const { return 0; }
 double AccessibilityUIElement::numberAttributeValue(JSStringRef) { return 0; }
 bool AccessibilityUIElement::boolAttributeValue(JSStringRef) { return false; }
@@ -113,6 +121,7 @@ bool AccessibilityUIElement::isRequired() const { return false; }
 bool AccessibilityUIElement::isFocused() const { return false; }
 bool AccessibilityUIElement::isFocusable() const { return false; }
 bool AccessibilityUIElement::isSelected() const { return false; }
+bool AccessibilityUIElement::isSelectedOptionActive() const { return false; }
 bool AccessibilityUIElement::isSelectable() const { return false; }
 bool AccessibilityUIElement::isMultiSelectable() const { return false; }
 void AccessibilityUIElement::setSelectedChild(AccessibilityUIElement*) const { }
@@ -160,6 +169,7 @@ void AccessibilityUIElement::setSelectedTextRange(unsigned, unsigned) { }
 JSRetainPtr<JSStringRef> AccessibilityUIElement::stringForRange(unsigned, unsigned) { return 0; }
 JSRetainPtr<JSStringRef> AccessibilityUIElement::attributedStringForRange(unsigned, unsigned) { return 0; }
 bool AccessibilityUIElement::attributedStringRangeIsMisspelled(unsigned, unsigned) { return false; }
+unsigned AccessibilityUIElement::uiElementCountForSearchPredicate(JSContextRef, AccessibilityUIElement*, bool, JSValueRef, JSStringRef, bool) { return 0; }
 PassRefPtr<AccessibilityUIElement> AccessibilityUIElement::uiElementForSearchPredicate(JSContextRef, AccessibilityUIElement*, bool, JSValueRef, JSStringRef, bool) { return 0; }
 PassRefPtr<AccessibilityUIElement> AccessibilityUIElement::cellForColumnAndRow(unsigned, unsigned) { return 0; }
 PassRefPtr<AccessibilityUIElement> AccessibilityUIElement::horizontalScrollbar() const { return 0; }

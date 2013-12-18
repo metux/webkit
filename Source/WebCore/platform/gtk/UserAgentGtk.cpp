@@ -30,22 +30,18 @@
 
 #if OS(UNIX)
 #include <sys/utsname.h>
-#elif OS(WINDOWS)
-#include "SystemInfo.h"
 #endif
 
 namespace WebCore {
 
-static const char* platformForUAString()
+static const char* cpuDescriptionForUAString()
 {
-#if PLATFORM(X11)
-    return "X11";
-#elif OS(WINDOWS)
-    return "";
-#elif PLATFORM(MAC)
-    return "Macintosh";
-#elif defined(GDK_WINDOWING_DIRECTFB)
-    return "DirectFB";
+#if CPU(PPC) || CPU(PPC64)
+    return "PPC";
+#elif CPU(X86) || CPU(X86_64)
+    return "Intel";
+#elif CPU(ARM) || CPU(ARM64)
+    return "ARM";
 #else
     return "Unknown";
 #endif
@@ -57,41 +53,26 @@ static String platformVersionForUAString()
     if (!uaOSVersion.isEmpty())
         return uaOSVersion;
 
-#if OS(WINDOWS)
-    uaOSVersion = windowsVersionForUAString();
-#elif OS(DARWIN)
-#if CPU(X86) || CPU(X86_64)
-    uaOSVersion = "Intel Mac OS X";
-#else
-    uaOSVersion = "PPC Mac OS X";
-#endif
-#elif OS(UNIX)
-    struct utsname name;
-    if (uname(&name) != -1)
-        uaOSVersion = String::format("%s %s", name.sysname, name.machine);
-    else
-        uaOSVersion = String("Unknown");
-#else
-    uaOSVersion = String("Unknown");
-#endif
+    // We will always claim to be Safari in Mac OS X, since Safari in Linux triggers the iOS path on
+    // some websites.
+    uaOSVersion = String::format("%s Mac OS X", cpuDescriptionForUAString());
     return uaOSVersion;
 }
 
 String standardUserAgent(const String& applicationName, const String& applicationVersion)
 {
-    // Create a default user agent string with a liberal interpretation of 
+    // Create a default user agent string with a liberal interpretation of
     // https://developer.mozilla.org/en-US/docs/User_Agent_Strings_Reference
     //
     // Forming a functional user agent is really difficult. We must mention Safari, because some
     // sites check for that when detecting WebKit browsers. Additionally some sites assume that
-    // browsers that are "Safari" but not running on OS X are the Safari iOS browser, so we
-    // also claim to be  Chromium. Getting this wrong can cause sites to load the wrong JavaScript,
-    // CSS, or custom fonts. In some cases sites won't load resources at all.
+    // browsers that are "Safari" but not running on OS X are the Safari iOS browse. Getting this
+    // wrong can cause sites to load the wrong JavaScript, CSS, or custom fonts. In some cases
+    // sites won't load resources at all.
     DEFINE_STATIC_LOCAL(const CString, uaVersion, (String::format("%i.%i", USER_AGENT_GTK_MAJOR_VERSION, USER_AGENT_GTK_MINOR_VERSION).utf8()));
-    DEFINE_STATIC_LOCAL(const String, staticUA, (String::format("Mozilla/5.0 (%s; %s) AppleWebKit/%s (KHTML, like Gecko) "
-                                                                "Chromium/25.0.1349.2 Chrome/25.0.1349.2 Safari/%s",
-                                                                platformForUAString(), platformVersionForUAString().utf8().data(),
-                                                                uaVersion.data(), uaVersion.data())));
+    DEFINE_STATIC_LOCAL(const String, staticUA, (String::format("Mozilla/5.0 (Macintosh; %s) AppleWebKit/%s (KHTML, like Gecko) Safari/%s",
+        platformVersionForUAString().utf8().data(), uaVersion.data(), uaVersion.data())));
+
     if (applicationName.isEmpty())
         return staticUA;
 

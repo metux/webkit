@@ -491,6 +491,24 @@ void SVGElement::parseAttribute(const QualifiedName& name, const AtomicString& v
         setAttributeEventListener(eventNames().DOMActivateEvent, name, value);
     else if (name == HTMLNames::classAttr)
         setClassNameBaseValue(value);
+#if ENABLE(TOUCH_EVENTS)
+    else if (name == ontouchstartAttr)
+        setAttributeEventListener(eventNames().touchstartEvent, name, value);
+    else if (name == ontouchmoveAttr)
+        setAttributeEventListener(eventNames().touchmoveEvent, name, value);
+    else if (name == ontouchendAttr)
+        setAttributeEventListener(eventNames().touchendEvent, name, value);
+    else if (name == ontouchcancelAttr)
+        setAttributeEventListener(eventNames().touchcancelEvent, name, value);
+#endif
+#if ENABLE(IOS_GESTURE_EVENTS)
+    else if (name == ongesturestartAttr)
+        setAttributeEventListener(eventNames().gesturestartEvent, name, value);
+    else if (name == ongesturechangeAttr)
+        setAttributeEventListener(eventNames().gesturechangeEvent, name, value);
+    else if (name == ongestureendAttr)
+        setAttributeEventListener(eventNames().gestureendEvent, name, value);
+#endif
     else if (SVGLangSpace::parseAttribute(name, value)) {
     } else
         StyledElement::parseAttribute(name, value);
@@ -510,9 +528,8 @@ void SVGElement::animatedPropertyTypeForAttribute(const QualifiedName& attribute
 
 bool SVGElement::haveLoadedRequiredResources()
 {
-    auto svgChildren = childrenOfType<SVGElement>(*this);
-    for (auto child = svgChildren.begin(), end = svgChildren.end(); child != end; ++child) {
-        if (!child->haveLoadedRequiredResources())
+    for (auto& child : childrenOfType<SVGElement>(*this)) {
+        if (!child.haveLoadedRequiredResources())
             return false;
     }
     return true;
@@ -759,14 +776,14 @@ PassRefPtr<RenderStyle> SVGElement::customStyleForRenderer()
     return document().ensureStyleResolver().styleForElement(correspondingElement(), style, DisallowStyleSharing);
 }
 
-MutableStylePropertySet* SVGElement::animatedSMILStyleProperties() const
+MutableStyleProperties* SVGElement::animatedSMILStyleProperties() const
 {
     if (m_svgRareData)
         return m_svgRareData->animatedSMILStyleProperties();
     return 0;
 }
 
-MutableStylePropertySet& SVGElement::ensureAnimatedSMILStyleProperties()
+MutableStyleProperties& SVGElement::ensureAnimatedSMILStyleProperties()
 {
     return ensureSVGRareData().ensureAnimatedSMILStyleProperties();
 }
@@ -782,7 +799,7 @@ RenderStyle* SVGElement::computedStyle(PseudoId pseudoElementSpecifier)
     if (!m_svgRareData || !m_svgRareData->useOverrideComputedStyle())
         return Element::computedStyle(pseudoElementSpecifier);
 
-    RenderStyle* parentStyle = 0;
+    RenderStyle* parentStyle = nullptr;
     if (Element* parent = parentOrShadowHostElement()) {
         if (auto renderer = parent->renderer())
             parentStyle = &renderer->style();
@@ -966,7 +983,7 @@ bool SVGElement::isPresentationAttribute(const QualifiedName& name) const
     return StyledElement::isPresentationAttribute(name);
 }
 
-void SVGElement::collectStyleForPresentationAttribute(const QualifiedName& name, const AtomicString& value, MutableStylePropertySet& style)
+void SVGElement::collectStyleForPresentationAttribute(const QualifiedName& name, const AtomicString& value, MutableStyleProperties& style)
 {
     CSSPropertyID propertyID = cssPropertyIdForSVGAttributeName(name);
     if (propertyID > 0)
@@ -1054,7 +1071,7 @@ PassRefPtr<CSSValue> SVGElement::getPresentationAttribute(const String& name)
     if (!attribute)
         return 0;
 
-    RefPtr<MutableStylePropertySet> style = MutableStylePropertySet::create(SVGAttributeMode);
+    RefPtr<MutableStyleProperties> style = MutableStyleProperties::create(SVGAttributeMode);
     CSSPropertyID propertyID = cssPropertyIdForSVGAttributeName(attribute->name());
     style->setProperty(propertyID, attribute->value());
     RefPtr<CSSValue> cssValue = style->getPropertyCSSValue(propertyID);

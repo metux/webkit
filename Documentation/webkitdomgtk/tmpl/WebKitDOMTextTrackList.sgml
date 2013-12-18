@@ -41,6 +41,16 @@ WebKitDOMTextTrackList
 @Returns: 
 
 
+<!-- ##### FUNCTION webkit_dom_text_track_list_get_track_by_id ##### -->
+<para>
+
+</para>
+
+@self: 
+@id: 
+@Returns: 
+
+
 <!-- ##### FUNCTION webkit_dom_text_track_list_dispatch_event ##### -->
 <para>
 

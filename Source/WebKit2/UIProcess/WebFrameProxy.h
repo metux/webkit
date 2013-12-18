@@ -40,9 +40,11 @@ namespace CoreIPC {
     class Connection;
 }
 
-namespace WebKit {
+namespace WebCore {
+class CertificateInfo;
+}
 
-class PlatformCertificateInfo;
+namespace WebKit {
 class WebCertificateInfo;
 class WebFormSubmissionListenerProxy;
 class WebFramePolicyListenerProxy;
@@ -50,7 +52,7 @@ class WebPageProxy;
 
 typedef GenericCallback<WKDataRef> DataCallback;
 
-class WebFrameProxy : public API::TypedObject<API::Object::Type::Frame> {
+class WebFrameProxy : public API::ObjectImpl<API::Object::Type::Frame> {
 public:
     static PassRefPtr<WebFrameProxy> create(WebPageProxy* page, uint64_t frameID)
     {
@@ -71,8 +73,7 @@ public:
 
     FrameLoadState& frameLoadState() { return m_frameLoadState; }
 
-    FrameLoadState::LoadState loadState() const { return m_frameLoadState.m_loadState; }
-    
+    void loadURL(const String&);
     void stopLoading() const;
 
     const String& url() const { return m_frameLoadState.m_url; }
@@ -101,7 +102,7 @@ public:
     void didStartProvisionalLoad(const String& url);
     void didReceiveServerRedirectForProvisionalLoad(const String& url);
     void didFailProvisionalLoad();
-    void didCommitLoad(const String& contentType, const PlatformCertificateInfo&);
+    void didCommitLoad(const String& contentType, const WebCore::CertificateInfo&);
     void didFinishLoad();
     void didFailLoad();
     void didSameDocumentNavigation(const String&); // eg. anchor navigation, session state change.

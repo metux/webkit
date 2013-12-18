@@ -20,6 +20,7 @@
 #include "config.h"
 #include "WebKitWebExtension.h"
 
+#include "APIString.h"
 #include "ImmutableDictionary.h"
 #include "WKBundleAPICast.h"
 #include "WKBundlePage.h"
@@ -83,7 +84,7 @@ static void webkitWebExtensionPageDestroy(WebKitWebExtension* extension, WebPage
 static void webkitWebExtensionDidReceiveMessage(WebKitWebExtension* extension, const String& messageName, ImmutableDictionary& message)
 {
     if (messageName == String::fromUTF8("PrefetchDNS")) {
-        WebString* hostname = static_cast<WebString*>(message.get(String::fromUTF8("Hostname")));
+        API::String* hostname = static_cast<API::String*>(message.get(String::fromUTF8("Hostname")));
         WebCore::prefetchDNS(hostname->string());
     } else
         ASSERT_NOT_REACHED();
@@ -116,16 +117,18 @@ WebKitWebExtension* webkitWebExtensionCreate(InjectedBundle* bundle)
 {
     WebKitWebExtension* extension = WEBKIT_WEB_EXTENSION(g_object_new(WEBKIT_TYPE_WEB_EXTENSION, NULL));
 
-    WKBundleClient wkBundleClient = {
-        kWKBundleClientCurrentVersion,
-        extension, // clientInfo
+    WKBundleClientV1 wkBundleClient = {
+        {
+            1, // version
+            extension, // clientInfo
+        },
         didCreatePage,
         willDestroyPage,
         0, // didInitializePageGroup
         didReceiveMessage,
         didReceiveMessageToPage
     };
-    WKBundleSetClient(toAPI(bundle), &wkBundleClient);
+    WKBundleSetClient(toAPI(bundle), &wkBundleClient.base);
 
     return extension;
 }

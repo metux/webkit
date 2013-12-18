@@ -82,3 +82,12 @@ static const type& name() \
 #define ENABLE_INSPECTOR_SERVER 1
 #endif
 #endif
+
+#ifndef ENABLE_SEC_ITEM_SHIM
+#if PLATFORM(MAC) && !PLATFORM(IOS)
+#define ENABLE_SEC_ITEM_SHIM 1
+#endif
+#endif
+
+// FIXME: Remove this once everything has been moved over to the IPC namespace.
+#define CoreIPC IPC

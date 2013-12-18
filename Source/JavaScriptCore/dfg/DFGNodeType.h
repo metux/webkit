@@ -105,13 +105,13 @@ namespace JSC { namespace DFG {
     /* Bitwise operators call ToInt32 on their operands. */\
     macro(ValueToInt32, NodeResultInt32) \
     /* Used to box the result of URShift nodes (result has range 0..2^32-1). */\
-    macro(UInt32ToNumber, NodeResultNumber | NodeExitsForward) \
+    macro(UInt32ToNumber, NodeResultNumber) \
     \
     /* Used to cast known integers to doubles, so as to separate the double form */\
     /* of the value from the integer form. */\
     macro(Int32ToDouble, NodeResultNumber) \
     /* Used to speculate that a double value is actually an integer. */\
-    macro(DoubleAsInt32, NodeResultInt32 | NodeExitsForward) \
+    macro(DoubleAsInt32, NodeResultInt32) \
     /* Used to separate representation and register allocation of Int52's represented */\
     /* as values. */\
     macro(Int52ToValue, NodeResultJS) \
@@ -171,6 +171,8 @@ namespace JSC { namespace DFG {
     macro(Arrayify, NodeMustGenerate) \
     macro(ArrayifyToStructure, NodeMustGenerate) \
     macro(GetIndexedPropertyStorage, NodeResultStorage) \
+    macro(ConstantStoragePointer, NodeResultStorage) \
+    macro(TypedArrayWatchpoint, NodeMustGenerate) \
     macro(GetByOffset, NodeResultJS) \
     macro(PutByOffset, NodeMustGenerate) \
     macro(GetArrayLength, NodeResultInt32) \
@@ -184,10 +186,13 @@ namespace JSC { namespace DFG {
     macro(PutClosureVar, NodeMustGenerate) \
     macro(GetGlobalVar, NodeResultJS) \
     macro(PutGlobalVar, NodeMustGenerate) \
-    macro(GlobalVarWatchpoint, NodeMustGenerate) \
+    macro(NotifyWrite, NodeMustGenerate) \
+    macro(VariableWatchpoint, NodeMustGenerate) \
     macro(VarInjectionWatchpoint, NodeMustGenerate) \
+    macro(FunctionReentryWatchpoint, NodeMustGenerate) \
     macro(CheckFunction, NodeMustGenerate) \
     macro(AllocationProfileWatchpoint, NodeMustGenerate) \
+    macro(CheckInBounds, NodeMustGenerate) \
     \
     /* Optimizations for array mutation. */\
     macro(ArrayPush, NodeResultJS | NodeMustGenerate | NodeClobbersWorld) \

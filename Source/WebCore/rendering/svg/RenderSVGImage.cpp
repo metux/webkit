@@ -162,7 +162,7 @@ void RenderSVGImage::paintForeground(PaintInfo& paintInfo)
 
 void RenderSVGImage::invalidateBufferedForeground()
 {
-    m_bufferedForeground.clear();
+    m_bufferedForeground.reset();
 }
 
 bool RenderSVGImage::nodeAtFloatPoint(const HitTestRequest& request, HitTestResult& result, const FloatPoint& pointInParent, HitTestAction hitTestAction)
@@ -194,11 +194,11 @@ void RenderSVGImage::imageChanged(WrappedImagePtr, const IntRect*)
 {
     // The image resource defaults to nullImage until the resource arrives.
     // This empty image may be cached by SVG resources which must be invalidated.
-    if (SVGResources* resources = SVGResourcesCache::cachedResourcesForRenderObject(this))
-        resources->removeClientFromCache(this);
+    if (SVGResources* resources = SVGResourcesCache::cachedResourcesForRenderObject(*this))
+        resources->removeClientFromCache(*this);
 
     // Eventually notify parent resources, that we've changed.
-    RenderSVGResource::markForLayoutAndParentResourceInvalidation(this, false);
+    RenderSVGResource::markForLayoutAndParentResourceInvalidation(*this, false);
 
     // Update the SVGImageCache sizeAndScales entry in case image loading finished after layout.
     // (https://bugs.webkit.org/show_bug.cgi?id=99489)

@@ -46,6 +46,7 @@
 #include "WebGeolocationManagerProxy.h"
 #include "WebIconDatabase.h"
 #include "WebKeyValueStorageManager.h"
+#include "WebKit2Initialize.h"
 #include "WebMediaCacheManagerProxy.h"
 #include "WebNotificationManagerProxy.h"
 #include "WebPluginSiteDataManager.h"
@@ -60,7 +61,6 @@
 #include <WebCore/LinkHash.h>
 #include <WebCore/Logging.h>
 #include <WebCore/ResourceRequest.h>
-#include <runtime/InitializeThreading.h>
 #include <runtime/Operations.h>
 #include <wtf/CurrentTime.h>
 #include <wtf/MainThread.h>
@@ -72,6 +72,11 @@
 
 #if ENABLE(NETWORK_INFO)
 #include "WebNetworkInfoManagerProxy.h"
+#endif
+
+#if ENABLE(DATABASE_PROCESS)
+#include "DatabaseProcessCreationParameters.h"
+#include "DatabaseProcessMessages.h"
 #endif
 
 #if ENABLE(NETWORK_PROCESS)
@@ -102,10 +107,8 @@ DEFINE_DEBUG_ONLY_GLOBAL(WTF::RefCountedLeakCounter, webContextCounter, ("WebCon
 
 PassRefPtr<WebContext> WebContext::create(const String& injectedBundlePath)
 {
-    JSC::initializeThreading();
-    WTF::initializeMainThread();
-    RunLoop::initializeMainRunLoop();
-    return adoptRef(new WebContext(ProcessModelSharedSecondaryProcess, injectedBundlePath));
+    InitializeWebKit2();
+    return adoptRef(new WebContext(injectedBundlePath));
 }
 
 static Vector<WebContext*>& contexts()
@@ -120,12 +123,12 @@ const Vector<WebContext*>& WebContext::allContexts()
     return contexts();
 }
 
-WebContext::WebContext(ProcessModel processModel, const String& injectedBundlePath)
-    : m_processModel(processModel)
+WebContext::WebContext(const String& injectedBundlePath)
+    : m_processModel(ProcessModelSharedSecondaryProcess)
     , m_webProcessCountLimit(UINT_MAX)
     , m_haveInitialEmptyProcess(false)
     , m_processWithPageCache(0)
-    , m_defaultPageGroup(WebPageGroup::create())
+    , m_defaultPageGroup(WebPageGroup::createNonNull())
     , m_injectedBundlePath(injectedBundlePath)
     , m_visitedLinkProvider(this)
     , m_plugInAutoStartProvider(this)
@@ -152,8 +155,8 @@ WebContext::WebContext(ProcessModel processModel, const String& injectedBundlePa
 {
     platformInitialize();
 
-    addMessageReceiver(Messages::WebContext::messageReceiverName(), this);
-    addMessageReceiver(WebContextLegacyMessages::messageReceiverName(), this);
+    addMessageReceiver(Messages::WebContext::messageReceiverName(), *this);
+    addMessageReceiver(WebContextLegacyMessages::messageReceiverName(), *this);
 
     // NOTE: These sub-objects must be initialized after m_messageReceiverMap..
     m_iconDatabase = WebIconDatabase::create(this);
@@ -244,29 +247,29 @@ WebContext::~WebContext()
 #endif
 }
 
-void WebContext::initializeClient(const WKContextClient* client)
+void WebContext::initializeClient(const WKContextClientBase* client)
 {
     m_client.initialize(client);
 }
 
-void WebContext::initializeInjectedBundleClient(const WKContextInjectedBundleClient* client)
+void WebContext::initializeInjectedBundleClient(const WKContextInjectedBundleClientBase* client)
 {
     m_injectedBundleClient.initialize(client);
 }
 
-void WebContext::initializeConnectionClient(const WKContextConnectionClient* client)
+void WebContext::initializeConnectionClient(const WKContextConnectionClientBase* client)
 {
     m_connectionClient.initialize(client);
 }
 
-void WebContext::initializeHistoryClient(const WKContextHistoryClient* client)
+void WebContext::initializeHistoryClient(const WKContextHistoryClientBase* client)
 {
     m_historyClient.initialize(client);
 
     sendToAllProcesses(Messages::WebProcess::SetShouldTrackVisitedLinks(m_historyClient.shouldTrackVisitedLinks()));
 }
 
-void WebContext::initializeDownloadClient(const WKContextDownloadClient* client)
+void WebContext::initializeDownloadClient(const WKContextDownloadClientBase* client)
 {
     m_downloadClient.initialize(client);
 }
@@ -359,7 +362,7 @@ void WebContext::ensureNetworkProcess()
     if (m_networkProcess)
         return;
 
-    m_networkProcess = NetworkProcessProxy::create(this);
+    m_networkProcess = NetworkProcessProxy::create(*this);
 
     NetworkProcessCreationParameters parameters;
 
@@ -413,6 +416,16 @@ void WebContext::ensureDatabaseProcess()
         return;
 
     m_databaseProcess = DatabaseProcessProxy::create(this);
+
+    DatabaseProcessCreationParameters parameters;
+
+    // Indexed databases exist in a subdirectory of the "database directory path."
+    // Currently, the top level of that directory contains entities related to WebSQL databases.
+    // We should fix this, and move WebSQL into a subdirectory (https://bugs.webkit.org/show_bug.cgi?id=124807)
+    // In the meantime, an entity name prefixed with three underscores will not conflict with any WebSQL entities.
+    parameters.indexedDatabaseDirectory = pathByAppendingComponent(databaseDirectory(), "___IndexedDB");
+
+    m_databaseProcess->send(Messages::DatabaseProcess::InitializeDatabaseProcess(parameters), 0);
 }
 
 void WebContext::getDatabaseProcessConnection(PassRefPtr<Messages::WebProcessProxy::GetDatabaseProcessConnection::DelayedReply> reply)
@@ -475,7 +488,7 @@ void WebContext::didReceiveInvalidMessage(const CoreIPC::StringReference& messag
     messageNameStringBuilder.append(".");
     messageNameStringBuilder.append(messageName.data(), messageName.size());
 
-    s_invalidMessageCallback(toAPI(WebString::create(messageNameStringBuilder.toString()).get()));
+    s_invalidMessageCallback(toAPI(API::String::create(messageNameStringBuilder.toString()).get()));
 }
 
 void WebContext::processDidCachePage(WebProcessProxy* process)
@@ -485,22 +498,22 @@ void WebContext::processDidCachePage(WebProcessProxy* process)
     m_processWithPageCache = process;
 }
 
-WebProcessProxy* WebContext::ensureSharedWebProcess()
+WebProcessProxy& WebContext::ensureSharedWebProcess()
 {
     ASSERT(m_processModel == ProcessModelSharedSecondaryProcess);
     if (m_processes.isEmpty())
         createNewWebProcess();
-    return m_processes[0].get();
+    return *m_processes[0];
 }
 
-WebProcessProxy* WebContext::createNewWebProcess()
+WebProcessProxy& WebContext::createNewWebProcess()
 {
 #if ENABLE(NETWORK_PROCESS)
     if (m_usesNetworkProcess)
         ensureNetworkProcess();
 #endif
 
-    RefPtr<WebProcessProxy> process = WebProcessProxy::create(this);
+    RefPtr<WebProcessProxy> process = WebProcessProxy::create(*this);
 
     WebProcessCreationParameters parameters;
 
@@ -553,7 +566,7 @@ WebProcessProxy* WebContext::createNewWebProcess()
 
     parameters.fullKeyboardAccessEnabled = WebProcessProxy::fullKeyboardAccessEnabled();
 
-    parameters.defaultRequestTimeoutInterval = WebURLRequest::defaultTimeoutInterval();
+    parameters.defaultRequestTimeoutInterval = API::URLRequest::defaultTimeoutInterval();
 
 #if ENABLE(NOTIFICATIONS) || ENABLE(LEGACY_NOTIFICATIONS)
     // FIXME: There should be a generic way for supplements to add to the intialization parameters.
@@ -573,7 +586,7 @@ WebProcessProxy* WebContext::createNewWebProcess()
     RefPtr<API::Object> injectedBundleInitializationUserData = m_injectedBundleClient.getInjectedBundleInitializationUserData(this);
     if (!injectedBundleInitializationUserData)
         injectedBundleInitializationUserData = m_injectedBundleInitializationUserData;
-    process->send(Messages::WebProcess::InitializeWebProcess(parameters, WebContextUserMessageEncoder(injectedBundleInitializationUserData.get())), 0);
+    process->send(Messages::WebProcess::InitializeWebProcess(parameters, WebContextUserMessageEncoder(injectedBundleInitializationUserData.get(), *process)), 0);
 
     if (WebPreferences::anyPageGroupsAreUsingPrivateBrowsing())
         process->send(Messages::WebProcess::EnsurePrivateBrowsingSession(), 0);
@@ -587,14 +600,14 @@ WebProcessProxy* WebContext::createNewWebProcess()
             CoreIPC::ArgumentEncoder messageData;
 
             messageData.encode(message.first);
-            messageData.encode(WebContextUserMessageEncoder(message.second.get()));
+            messageData.encode(WebContextUserMessageEncoder(message.second.get(), *process));
             process->send(Messages::WebProcess::PostInjectedBundleMessage(CoreIPC::DataReference(messageData.buffer(), messageData.bufferSize())), 0);
         }
         m_messagesToInjectedBundlePostedToEmptyContext.clear();
     } else
         ASSERT(m_messagesToInjectedBundlePostedToEmptyContext.isEmpty());
 
-    return process.get();
+    return *process;
 }
 
 void WebContext::warmInitialProcess()  
@@ -702,13 +715,13 @@ void WebContext::disconnectProcess(WebProcessProxy* process)
     m_processes.remove(m_processes.find(process));
 }
 
-WebProcessProxy* WebContext::createNewWebProcessRespectingProcessCountLimit()
+WebProcessProxy& WebContext::createNewWebProcessRespectingProcessCountLimit()
 {
     if (m_processes.size() < m_webProcessCountLimit)
         return createNewWebProcess();
 
     // Choose a process with fewest pages, to achieve flat distribution.
-    WebProcessProxy* result = 0;
+    WebProcessProxy* result = nullptr;
     unsigned fewestPagesSeen = UINT_MAX;
     for (unsigned i = 0; i < m_processes.size(); ++i) {
         if (fewestPagesSeen > m_processes[i]->pages().size()) {
@@ -716,29 +729,26 @@ WebProcessProxy* WebContext::createNewWebProcessRespectingProcessCountLimit()
             fewestPagesSeen = m_processes[i]->pages().size();
         }
     }
-    return result;
+    return *result;
 }
 
-PassRefPtr<WebPageProxy> WebContext::createWebPage(PageClient* pageClient, WebPageGroup* pageGroup, WebPageProxy* relatedPage)
+PassRefPtr<WebPageProxy> WebContext::createWebPage(PageClient& pageClient, WebPageGroup* pageGroup, WebPageProxy* relatedPage)
 {
     RefPtr<WebProcessProxy> process;
     if (m_processModel == ProcessModelSharedSecondaryProcess) {
-        process = ensureSharedWebProcess();
+        process = &ensureSharedWebProcess();
     } else {
         if (m_haveInitialEmptyProcess) {
             process = m_processes.last();
             m_haveInitialEmptyProcess = false;
         } else if (relatedPage) {
             // Sharing processes, e.g. when creating the page via window.open().
-            process = relatedPage->process();
+            process = &relatedPage->process();
         } else
-            process = createNewWebProcessRespectingProcessCountLimit();
+            process = &createNewWebProcessRespectingProcessCountLimit();
     }
 
-    if (!pageGroup)
-        pageGroup = m_defaultPageGroup.get();
-
-    return process->createWebPage(pageClient, this, pageGroup);
+    return process->createWebPage(pageClient, pageGroup ? *pageGroup : m_defaultPageGroup.get());
 }
 
 DownloadProxy* WebContext::download(WebPageProxy* initiatingPage, const ResourceRequest& request)
@@ -766,14 +776,14 @@ void WebContext::postMessageToInjectedBundle(const String& messageName, API::Obj
         return;
     }
 
-    // FIXME: Return early if the message body contains any references to WKPageRefs/WKFrameRefs etc. since they're local to a process.
+    for (auto process : m_processes) {
+        // FIXME: Return early if the message body contains any references to WKPageRefs/WKFrameRefs etc. since they're local to a process.
+        CoreIPC::ArgumentEncoder messageData;
+        messageData.encode(messageName);
+        messageData.encode(WebContextUserMessageEncoder(messageBody, *process.get()));
 
-    CoreIPC::ArgumentEncoder messageData;
-    messageData.encode(messageName);
-    messageData.encode(WebContextUserMessageEncoder(messageBody));
-
-    for (size_t i = 0; i < m_processes.size(); ++i)
-        m_processes[i]->send(Messages::WebProcess::PostInjectedBundleMessage(CoreIPC::DataReference(messageData.buffer(), messageData.bufferSize())), 0);
+        process->send(Messages::WebProcess::PostInjectedBundleMessage(CoreIPC::DataReference(messageData.buffer(), messageData.bufferSize())), 0);
+    }
 }
 
 // InjectedBundle client
@@ -898,15 +908,15 @@ DownloadProxy* WebContext::createDownloadProxy()
         return m_networkProcess->createDownloadProxy();
 #endif
 
-    return ensureSharedWebProcess()->createDownloadProxy();
+    return ensureSharedWebProcess().createDownloadProxy();
 }
 
-void WebContext::addMessageReceiver(CoreIPC::StringReference messageReceiverName, CoreIPC::MessageReceiver* messageReceiver)
+void WebContext::addMessageReceiver(CoreIPC::StringReference messageReceiverName, CoreIPC::MessageReceiver& messageReceiver)
 {
     m_messageReceiverMap.addMessageReceiver(messageReceiverName, messageReceiver);
 }
 
-void WebContext::addMessageReceiver(CoreIPC::StringReference messageReceiverName, uint64_t destinationID, CoreIPC::MessageReceiver* messageReceiver)
+void WebContext::addMessageReceiver(CoreIPC::StringReference messageReceiverName, uint64_t destinationID, CoreIPC::MessageReceiver& messageReceiver)
 {
     m_messageReceiverMap.addMessageReceiver(messageReceiverName, destinationID, messageReceiver);
 }
@@ -937,7 +947,7 @@ void WebContext::didReceiveMessage(CoreIPC::Connection* connection, CoreIPC::Mes
         && decoder.messageName() == WebContextLegacyMessages::postMessageMessageName()) {
         String messageName;
         RefPtr<API::Object> messageBody;
-        WebContextUserMessageDecoder messageBodyDecoder(messageBody, WebProcessProxy::fromConnection(connection));
+        WebContextUserMessageDecoder messageBodyDecoder(messageBody, *WebProcessProxy::fromConnection(connection));
         if (!decoder.decode(messageName))
             return;
         if (!decoder.decode(messageBodyDecoder))
@@ -961,9 +971,11 @@ void WebContext::didReceiveSyncMessage(CoreIPC::Connection* connection, CoreIPC:
         && decoder.messageName() == WebContextLegacyMessages::postSynchronousMessageMessageName()) {
         // FIXME: We should probably encode something in the case that the arguments do not decode correctly.
 
+        WebProcessProxy* process = WebProcessProxy::fromConnection(connection);
+
         String messageName;
         RefPtr<API::Object> messageBody;
-        WebContextUserMessageDecoder messageBodyDecoder(messageBody, WebProcessProxy::fromConnection(connection));
+        WebContextUserMessageDecoder messageBodyDecoder(messageBody, *process);
         if (!decoder.decode(messageName))
             return;
         if (!decoder.decode(messageBodyDecoder))
@@ -971,7 +983,7 @@ void WebContext::didReceiveSyncMessage(CoreIPC::Connection* connection, CoreIPC:
 
         RefPtr<API::Object> returnData;
         didReceiveSynchronousMessageFromInjectedBundle(messageName, messageBody.get(), returnData);
-        replyEncoder->encode(WebContextUserMessageEncoder(returnData.get()));
+        replyEncoder->encode(WebContextUserMessageEncoder(returnData.get(), *process));
         return;
     }
 
@@ -1096,12 +1108,12 @@ void WebContext::allowSpecificHTTPSCertificateForHost(const WebCertificateInfo* 
 {
 #if ENABLE(NETWORK_PROCESS)
     if (m_usesNetworkProcess && m_networkProcess) {
-        m_networkProcess->send(Messages::NetworkProcess::AllowSpecificHTTPSCertificateForHost(certificate->platformCertificateInfo(), host), 0);
+        m_networkProcess->send(Messages::NetworkProcess::AllowSpecificHTTPSCertificateForHost(certificate->certificateInfo(), host), 0);
         return;
     }
 #else
 #if USE(SOUP)
-    m_processes[0]->send(Messages::WebProcess::AllowSpecificHTTPSCertificateForHost(certificate->platformCertificateInfo(), host), 0);
+    m_processes[0]->send(Messages::WebProcess::AllowSpecificHTTPSCertificateForHost(certificate->certificateInfo(), host), 0);
     return;
 #else
     UNUSED_PARAM(certificate);
@@ -1109,7 +1121,9 @@ void WebContext::allowSpecificHTTPSCertificateForHost(const WebCertificateInfo* 
 #endif
 #endif
 
+#if !PLATFORM(IOS)
     ASSERT_NOT_REACHED();
+#endif
 }
 
 void WebContext::setHTTPPipeliningEnabled(bool enabled)
@@ -1263,23 +1277,23 @@ void WebContext::pluginInfoStoreDidLoadPlugins(PluginInfoStore* store)
 
     for (const auto& pluginModule : pluginModules) {
         ImmutableDictionary::MapType map;
-        map.set(ASCIILiteral("path"), WebString::create(pluginModule.path));
-        map.set(ASCIILiteral("name"), WebString::create(pluginModule.info.name));
-        map.set(ASCIILiteral("file"), WebString::create(pluginModule.info.file));
-        map.set(ASCIILiteral("desc"), WebString::create(pluginModule.info.desc));
+        map.set(ASCIILiteral("path"), API::String::create(pluginModule.path));
+        map.set(ASCIILiteral("name"), API::String::create(pluginModule.info.name));
+        map.set(ASCIILiteral("file"), API::String::create(pluginModule.info.file));
+        map.set(ASCIILiteral("desc"), API::String::create(pluginModule.info.desc));
 
         Vector<RefPtr<API::Object>> mimeTypes;
         mimeTypes.reserveInitialCapacity(pluginModule.info.mimes.size());
         for (const auto& mimeClassInfo : pluginModule.info.mimes)
-            mimeTypes.uncheckedAppend(WebString::create(mimeClassInfo.type));
+            mimeTypes.uncheckedAppend(API::String::create(mimeClassInfo.type));
         map.set(ASCIILiteral("mimes"), API::Array::create(std::move(mimeTypes)));
 
 #if PLATFORM(MAC)
-        map.set(ASCIILiteral("bundleId"), WebString::create(pluginModule.bundleIdentifier));
-        map.set(ASCIILiteral("version"), WebString::create(pluginModule.versionString));
+        map.set(ASCIILiteral("bundleId"), API::String::create(pluginModule.bundleIdentifier));
+        map.set(ASCIILiteral("version"), API::String::create(pluginModule.versionString));
 #endif
 
-        plugins.uncheckedAppend(ImmutableDictionary::adopt(map));
+        plugins.uncheckedAppend(ImmutableDictionary::create(std::move(map)));
     }
 
     m_client.plugInInformationBecameAvailable(this, API::Array::create(std::move(plugins)).get());

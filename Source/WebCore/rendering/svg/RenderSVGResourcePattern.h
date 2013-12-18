@@ -49,7 +49,7 @@ public:
     SVGPatternElement& patternElement() const;
 
     virtual void removeAllClientsFromCache(bool markForInvalidation = true);
-    virtual void removeClientFromCache(RenderObject*, bool markForInvalidation = true);
+    virtual void removeClientFromCache(RenderObject&, bool markForInvalidation = true);
 
     virtual bool applyResource(RenderElement&, const RenderStyle&, GraphicsContext*&, unsigned short resourceMode) OVERRIDE;
     virtual void postApplyResource(RenderElement&, GraphicsContext*&, unsigned short resourceMode, const Path*, const RenderSVGShape*) OVERRIDE;
@@ -64,9 +64,7 @@ private:
 
     bool buildTileImageTransform(RenderObject*, const PatternAttributes&, const SVGPatternElement&, FloatRect& patternBoundaries, AffineTransform& tileImageTransform) const;
 
-    PassOwnPtr<ImageBuffer> createTileImage(const PatternAttributes&, const FloatRect& tileBoundaries,
-                                            const FloatRect& absoluteTileBoundaries, const AffineTransform& tileImageTransform,
-                                            FloatRect& clampedAbsoluteTileBoundaries) const;
+    std::unique_ptr<ImageBuffer> createTileImage(const PatternAttributes&, const FloatRect& tileBoundaries, const FloatRect& absoluteTileBoundaries, const AffineTransform& tileImageTransform, FloatRect& clampedAbsoluteTileBoundaries) const;
 
     PatternData* buildPattern(RenderObject*, unsigned short resourceMode);
 

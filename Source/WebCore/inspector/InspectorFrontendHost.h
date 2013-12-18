@@ -66,7 +66,6 @@ public:
     void setToolbarHeight(unsigned);
 
     void moveWindowBy(float x, float y) const;
-    void setInjectedScriptForOrigin(const String& origin, const String& script);
 
     String localizedStringsURL();
 
@@ -80,6 +79,7 @@ public:
     // Called from [Custom] implementations.
     void showContextMenu(Event*, const Vector<ContextMenuItem>& items);
     void sendMessageToBackend(const String& message);
+    void dispatchEventAsContextMenuEvent(Event*);
 
     String loadResourceSynchronously(const String& url);
 

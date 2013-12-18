@@ -29,6 +29,10 @@
 #include "Arguments.h"
 #include "WebCoreArgumentCoders.h"
 
+#if PLATFORM(IOS)
+#include <WebCore/SelectionRect.h>
+#endif
+
 namespace WebKit {
 
 void EditorState::encode(CoreIPC::ArgumentEncoder& encoder) const
@@ -41,6 +45,17 @@ void EditorState::encode(CoreIPC::ArgumentEncoder& encoder) const
     encoder << isInPasswordField;
     encoder << isInPlugin;
     encoder << hasComposition;
+
+#if PLATFORM(IOS)
+    encoder << caretRectAtStart;
+    encoder << caretRectAtEnd;
+    encoder << selectionRects;
+    encoder << selectedTextLength;
+    encoder << wordAtSelection;
+    encoder << firstMarkedRect;
+    encoder << lastMarkedRect;
+    encoder << markedText;
+#endif
 
 #if PLATFORM(GTK)
     encoder << cursorRect;
@@ -72,6 +87,25 @@ bool EditorState::decode(CoreIPC::ArgumentDecoder& decoder, EditorState& result)
 
     if (!decoder.decode(result.hasComposition))
         return false;
+
+#if PLATFORM(IOS)
+    if (!decoder.decode(result.caretRectAtStart))
+        return false;
+    if (!decoder.decode(result.caretRectAtEnd))
+        return false;
+    if (!decoder.decode(result.selectionRects))
+        return false;
+    if (!decoder.decode(result.selectedTextLength))
+        return false;
+    if (!decoder.decode(result.wordAtSelection))
+        return false;
+    if (!decoder.decode(result.firstMarkedRect))
+        return false;
+    if (!decoder.decode(result.lastMarkedRect))
+        return false;
+    if (!decoder.decode(result.markedText))
+        return false;
+#endif
 
 #if PLATFORM(GTK)
     if (!decoder.decode(result.cursorRect))

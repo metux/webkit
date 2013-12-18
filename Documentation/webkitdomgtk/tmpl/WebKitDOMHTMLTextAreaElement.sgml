@@ -26,6 +26,16 @@ WebKitDOMHTMLTextAreaElement
 </para>
 
 
+<!-- ##### ARG WebKitDOMHTMLTextAreaElement:autocapitalize ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMHTMLTextAreaElement:autocorrect ##### -->
+<para>
+
+</para>
+
 <!-- ##### ARG WebKitDOMHTMLTextAreaElement:autofocus ##### -->
 <para>
 
@@ -526,6 +536,42 @@ WebKitDOMHTMLTextAreaElement
 
 
 <!-- ##### FUNCTION webkit_dom_html_text_area_element_set_selection_direction ##### -->
+<para>
+
+</para>
+
+@self: 
+@value: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_text_area_element_get_autocorrect ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_text_area_element_set_autocorrect ##### -->
+<para>
+
+</para>
+
+@self: 
+@value: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_text_area_element_get_autocapitalize ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_text_area_element_set_autocapitalize ##### -->
 <para>
 
 </para>

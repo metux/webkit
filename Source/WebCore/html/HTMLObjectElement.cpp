@@ -54,6 +54,11 @@
 #include "Widget.h"
 #include <wtf/Ref.h>
 
+#if PLATFORM(IOS)
+#include "RuntimeApplicationChecksIOS.h"
+#include "WebCoreSystemInterface.h"
+#endif
+
 namespace WebCore {
 
 using namespace HTMLNames;
@@ -89,7 +94,7 @@ bool HTMLObjectElement::isPresentationAttribute(const QualifiedName& name) const
     return HTMLPlugInImageElement::isPresentationAttribute(name);
 }
 
-void HTMLObjectElement::collectStyleForPresentationAttribute(const QualifiedName& name, const AtomicString& value, MutableStylePropertySet& style)
+void HTMLObjectElement::collectStyleForPresentationAttribute(const QualifiedName& name, const AtomicString& value, MutableStyleProperties& style)
 {
     if (name == borderAttr)
         applyBorderAttributeToStyle(value, style);
@@ -146,6 +151,14 @@ static void mapDataParamToSrc(Vector<String>* paramNames, Vector<String>* paramV
     }
 }
 
+#if PLATFORM(IOS)
+static bool shouldNotPerformURLAdjustment()
+{
+    static bool shouldNotPerformURLAdjustment = applicationIsNASAHD() && !iosExecutableWasLinkedOnOrAfterVersion(wkIOSSystemVersion_5_0);
+    return shouldNotPerformURLAdjustment;
+}
+#endif
+
 // FIXME: This function should not deal with url or serviceType!
 void HTMLObjectElement::parametersForPlugin(Vector<String>& paramNames, Vector<String>& paramValues, String& url, String& serviceType)
 {
@@ -154,22 +167,21 @@ void HTMLObjectElement::parametersForPlugin(Vector<String>& paramNames, Vector<S
     
     // Scan the PARAM children and store their name/value pairs.
     // Get the URL and type from the params if we don't already have them.
-    auto paramChildren = childrenOfType<HTMLParamElement>(*this);
-    for (auto param = paramChildren.begin(), end = paramChildren.end(); param != end; ++param) {
-        String name = param->name();
+    for (auto& param : childrenOfType<HTMLParamElement>(*this)) {
+        String name = param.name();
         if (name.isEmpty())
             continue;
 
         uniqueParamNames.add(name.impl());
-        paramNames.append(param->name());
-        paramValues.append(param->value());
+        paramNames.append(param.name());
+        paramValues.append(param.value());
 
         // FIXME: url adjustment does not belong in this function.
         if (url.isEmpty() && urlParameter.isEmpty() && (equalIgnoringCase(name, "src") || equalIgnoringCase(name, "movie") || equalIgnoringCase(name, "code") || equalIgnoringCase(name, "url")))
-            urlParameter = stripLeadingAndTrailingHTMLSpaces(param->value());
+            urlParameter = stripLeadingAndTrailingHTMLSpaces(param.value());
         // FIXME: serviceType calculation does not belong in this function.
         if (serviceType.isEmpty() && equalIgnoringCase(name, "type")) {
-            serviceType = param->value();
+            serviceType = param.value();
             size_t pos = serviceType.find(";");
             if (pos != notFound)
                 serviceType = serviceType.left(pos);
@@ -205,6 +217,11 @@ void HTMLObjectElement::parametersForPlugin(Vector<String>& paramNames, Vector<S
     // attribute, not by a param element. However, for compatibility, allow the
     // resource's URL to be given by a param named "src", "movie", "code" or "url"
     // if we know that resource points to a plug-in.
+#if PLATFORM(IOS)
+    if (shouldNotPerformURLAdjustment())
+        return;
+#endif
+
     if (url.isEmpty() && !urlParameter.isEmpty()) {
         SubframeLoader& loader = document().frame()->loader().subframeLoader();
         if (loader.resourceWillUsePlugin(urlParameter, serviceType, shouldPreferPlugInsForImages()))
@@ -243,9 +260,8 @@ bool HTMLObjectElement::shouldAllowQuickTimeClassIdQuirk()
     RefPtr<NodeList> metaElements = document().getElementsByTagName(HTMLNames::metaTag.localName());
     unsigned length = metaElements->length();
     for (unsigned i = 0; i < length; ++i) {
-        ASSERT_WITH_SECURITY_IMPLICATION(metaElements->item(i)->isHTMLElement());
-        HTMLMetaElement* metaElement = static_cast<HTMLMetaElement*>(metaElements->item(i));
-        if (equalIgnoringCase(metaElement->name(), "generator") && metaElement->content().startsWith("Mac OS X Server Web Services Server", false))
+        HTMLMetaElement& metaElement = toHTMLMetaElement(*metaElements->item(i));
+        if (equalIgnoringCase(metaElement.name(), "generator") && metaElement.content().startsWith("Mac OS X Server Web Services Server", false))
             return true;
     }
     
@@ -308,8 +324,9 @@ void HTMLObjectElement::updateWidget(PluginCreationOption pluginCreationOption)
     if (!renderer()) // Do not load the plugin if beforeload removed this element or its renderer.
         return;
 
-    SubframeLoader& loader = document().frame()->loader().subframeLoader();
-    bool success = beforeLoadAllowedLoad && hasValidClassId() && loader.requestObject(*this, url, getNameAttribute(), serviceType, paramNames, paramValues);
+    bool success = beforeLoadAllowedLoad && hasValidClassId();
+    if (success)
+        success = requestObject(url, serviceType, paramNames, paramValues);
     if (!success && hasFallbackContent())
         renderFallbackContent();
 }
@@ -445,14 +462,13 @@ bool HTMLObjectElement::containsJavaApplet() const
     if (MIMETypeRegistry::isJavaAppletMIMEType(getAttribute(typeAttr)))
         return true;
 
-    auto children = elementChildren(*this);
-    for (auto child = children.begin(), end = children.end(); child != end; ++child) {
-        if (child->hasTagName(paramTag) && equalIgnoringCase(child->getNameAttribute(), "type")
-            && MIMETypeRegistry::isJavaAppletMIMEType(child->getAttribute(valueAttr).string()))
+    for (auto& child : elementChildren(*this)) {
+        if (child.hasTagName(paramTag) && equalIgnoringCase(child.getNameAttribute(), "type")
+            && MIMETypeRegistry::isJavaAppletMIMEType(child.getAttribute(valueAttr).string()))
             return true;
-        if (child->hasTagName(objectTag) && static_cast<const HTMLObjectElement&>(*child).containsJavaApplet())
+        if (child.hasTagName(objectTag) && toHTMLObjectElement(child).containsJavaApplet())
             return true;
-        if (child->hasTagName(appletTag))
+        if (child.hasTagName(appletTag))
             return true;
     }
     

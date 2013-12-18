@@ -108,6 +108,8 @@
                                                          <em class="parameter"><code>const <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a> *value</code></em>,
                                                          <em class="parameter"><code><a href="../glib/glib-Error-Reporting.html#GError"><span class="type">GError</span></a> **error</code></em>);
 <a class="link" href="WebKitDOMElement.html" title="WebKitDOMElement"><span class="returnvalue">WebKitDOMElement</span></a> *  <a class="link" href="WebKitDOMNode.html#webkit-dom-node-get-parent-element" title="webkit_dom_node_get_parent_element ()">webkit_dom_node_get_parent_element</a>  (<em class="parameter"><code><a class="link" href="WebKitDOMNode.html" title="WebKitDOMNode"><span class="type">WebKitDOMNode</span></a> *self</code></em>);
+<a class="link" href="WebKitDOMNamedNodeMap.html" title="WebKitDOMNamedNodeMap"><span class="returnvalue">WebKitDOMNamedNodeMap</span></a> * <a class="link" href="WebKitDOMNode.html#webkit-dom-node-get-attributes" title="webkit_dom_node_get_attributes ()">webkit_dom_node_get_attributes</a>  (<em class="parameter"><code><a class="link" href="WebKitDOMNode.html" title="WebKitDOMNode"><span class="type">WebKitDOMNode</span></a> *self</code></em>);
+<a href="../glib/glib-Basic-Types.html#gboolean"><span class="returnvalue">gboolean</span></a>            <a class="link" href="WebKitDOMNode.html#webkit-dom-node-has-attributes" title="webkit_dom_node_has_attributes ()">webkit_dom_node_has_attributes</a>      (<em class="parameter"><code><a class="link" href="WebKitDOMNode.html" title="WebKitDOMNode"><span class="type">WebKitDOMNode</span></a> *self</code></em>);
 </pre>
 </div>
 <div class="refsect1">
@@ -1111,6 +1113,66 @@ WebKitDOMNode implements
 <tr>
 <td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
 <td>A <a class="link" href="WebKitDOMElement.html" title="WebKitDOMElement"><span class="type">WebKitDOMElement</span></a>. <span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
+</td>
+</tr>
+</tbody>
+</table></div>
+</div>
+<hr>
+<div class="refsect2">
+<a name="webkit-dom-node-get-attributes"></a><h3>webkit_dom_node_get_attributes ()</h3>
+<pre class="programlisting"><a class="link" href="WebKitDOMNamedNodeMap.html" title="WebKitDOMNamedNodeMap"><span class="returnvalue">WebKitDOMNamedNodeMap</span></a> * webkit_dom_node_get_attributes  (<em class="parameter"><code><a class="link" href="WebKitDOMNode.html" title="WebKitDOMNode"><span class="type">WebKitDOMNode</span></a> *self</code></em>);</pre>
+<div class="warning">
+<h3 class="title">Warning</h3>
+<p><code class="literal">webkit_dom_node_get_attributes</code> is deprecated and should not be used in newly-written code. 2.2</p>
+</div>
+<p>
+This functionality has been removed from WebKit, this function does nothing.
+</p>
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
+<col align="left" valign="top">
+<col>
+</colgroup>
+<tbody>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>self</code></em> :</span></p></td>
+<td>A <a class="link" href="WebKitDOMNode.html" title="WebKitDOMNode"><span class="type">WebKitDOMNode</span></a>
+</td>
+</tr>
+<tr>
+<td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
+<td>a <a class="link" href="WebKitDOMNamedNodeMap.html" title="WebKitDOMNamedNodeMap"><span class="type">WebKitDOMNamedNodeMap</span></a>. <span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
+</td>
+</tr>
+</tbody>
+</table></div>
+</div>
+<hr>
+<div class="refsect2">
+<a name="webkit-dom-node-has-attributes"></a><h3>webkit_dom_node_has_attributes ()</h3>
+<pre class="programlisting"><a href="../glib/glib-Basic-Types.html#gboolean"><span class="returnvalue">gboolean</span></a>            webkit_dom_node_has_attributes      (<em class="parameter"><code><a class="link" href="WebKitDOMNode.html" title="WebKitDOMNode"><span class="type">WebKitDOMNode</span></a> *self</code></em>);</pre>
+<div class="warning">
+<h3 class="title">Warning</h3>
+<p><code class="literal">webkit_dom_node_has_attributes</code> is deprecated and should not be used in newly-written code. 2.2</p>
+</div>
+<p>
+This functionality has been removed from WebKit, this function does nothing.
+</p>
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
+<col align="left" valign="top">
+<col>
+</colgroup>
+<tbody>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>self</code></em> :</span></p></td>
+<td>A <a class="link" href="WebKitDOMNode.html" title="WebKitDOMNode"><span class="type">WebKitDOMNode</span></a>
+</td>
+</tr>
+<tr>
+<td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
+<td>A <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>
 </td>
 </tr>
 </tbody>

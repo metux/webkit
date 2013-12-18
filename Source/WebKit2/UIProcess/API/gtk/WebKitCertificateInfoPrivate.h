@@ -20,9 +20,9 @@
 #ifndef WebKitCertificateInfoPrivate_h
 #define WebKitCertificateInfoPrivate_h
 
-#include "PlatformCertificateInfo.h"
 #include "WebKitCertificateInfo.h"
 #include "WebKitPrivate.h"
+#include <WebCore/CertificateInfo.h>
 
 struct _WebKitCertificateInfo {
     _WebKitCertificateInfo(GTlsCertificate* certificate, GTlsCertificateFlags tlsErrors)
@@ -35,9 +35,9 @@ struct _WebKitCertificateInfo {
     {
     }
 
-    WebKit::PlatformCertificateInfo certificateInfo;
+    WebCore::CertificateInfo certificateInfo;
 };
 
-const WebKit::PlatformCertificateInfo& webkitCertificateInfoGetCertificateInfo(WebKitCertificateInfo*);
+const WebCore::CertificateInfo& webkitCertificateInfoGetCertificateInfo(WebKitCertificateInfo*);
 
 #endif // WebKitCertificateInfoPrivate_h

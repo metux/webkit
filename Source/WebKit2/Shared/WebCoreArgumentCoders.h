@@ -31,6 +31,7 @@
 namespace WebCore {
 class AffineTransform;
 class AuthenticationChallenge;
+class CertificateInfo;
 class Color;
 class Credential;
 class Cursor;
@@ -41,6 +42,7 @@ class FloatPoint3D;
 class FloatRect;
 class FloatSize;
 class HTTPHeaderMap;
+class IDBKeyPath;
 class IntPoint;
 class IntRect;
 class IntSize;
@@ -60,6 +62,9 @@ struct Cookie;
 struct DictationAlternative;
 struct DragSession;
 struct FileChooserSettings;
+struct IDBDatabaseMetadata;
+struct IDBIndexMetadata;
+struct IDBObjectStoreMetadata;
 struct Length;
 struct GrammarDetail;
 struct MimeClassInfo;
@@ -77,6 +82,16 @@ struct KeypressCommand;
 }
 #endif
 
+#if PLATFORM(IOS)
+namespace WebCore {
+class FloatQuad;
+class SelectionRect;
+struct PasteboardImage;
+struct PasteboardWebContent;
+struct ViewportArguments;
+}
+#endif
+
 namespace CoreIPC {
 
 template<> struct ArgumentCoder<WebCore::AffineTransform> {
@@ -87,6 +102,11 @@ template<> struct ArgumentCoder<WebCore::AffineTransform> {
 template<> struct ArgumentCoder<WebCore::TransformationMatrix> {
     static void encode(ArgumentEncoder&, const WebCore::TransformationMatrix&);
     static bool decode(ArgumentDecoder&, WebCore::TransformationMatrix&);
+};
+
+template<> struct ArgumentCoder<WebCore::CertificateInfo> {
+    static void encode(ArgumentEncoder&, const WebCore::CertificateInfo&);
+    static bool decode(ArgumentDecoder&, WebCore::CertificateInfo&);
 };
 
 template<> struct ArgumentCoder<WebCore::FloatPoint> {
@@ -108,6 +128,18 @@ template<> struct ArgumentCoder<WebCore::FloatSize> {
     static void encode(ArgumentEncoder&, const WebCore::FloatSize&);
     static bool decode(ArgumentDecoder&, WebCore::FloatSize&);
 };
+
+#if PLATFORM(IOS)
+template<> struct ArgumentCoder<WebCore::FloatQuad> {
+    static void encode(ArgumentEncoder&, const WebCore::FloatQuad&);
+    static bool decode(ArgumentDecoder&, WebCore::FloatQuad&);
+};
+
+template<> struct ArgumentCoder<WebCore::ViewportArguments> {
+    static void encode(ArgumentEncoder&, const WebCore::ViewportArguments&);
+    static bool decode(ArgumentDecoder&, WebCore::ViewportArguments&);
+};
+#endif // PLATFORM(IOS)
 
 template<> struct ArgumentCoder<WebCore::IntPoint> {
     static void encode(ArgumentEncoder&, const WebCore::IntPoint&);
@@ -220,6 +252,11 @@ template<> struct ArgumentCoder<WebCore::KeypressCommand> {
 #endif
 
 #if PLATFORM(IOS)
+template<> struct ArgumentCoder<WebCore::SelectionRect> {
+    static void encode(ArgumentEncoder&, const WebCore::SelectionRect&);
+    static bool decode(ArgumentDecoder&, WebCore::SelectionRect&);
+};
+
 template<> struct ArgumentCoder<WebCore::PasteboardWebContent> {
     static void encode(ArgumentEncoder&, const WebCore::PasteboardWebContent&);
     static bool decode(ArgumentDecoder&, WebCore::PasteboardWebContent&);
@@ -295,6 +332,28 @@ template<> struct ArgumentCoder<WebCore::UserScript> {
 template<> struct ArgumentCoder<WebCore::FilterOperations> {
     static void encode(ArgumentEncoder&, const WebCore::FilterOperations&);
     static bool decode(ArgumentDecoder&, WebCore::FilterOperations&);
+};
+#endif
+
+#if ENABLE(INDEXED_DATABASE)
+template<> struct ArgumentCoder<WebCore::IDBDatabaseMetadata> {
+    static void encode(ArgumentEncoder&, const WebCore::IDBDatabaseMetadata&);
+    static bool decode(ArgumentDecoder&, WebCore::IDBDatabaseMetadata&);
+};
+
+template<> struct ArgumentCoder<WebCore::IDBIndexMetadata> {
+    static void encode(ArgumentEncoder&, const WebCore::IDBIndexMetadata&);
+    static bool decode(ArgumentDecoder&, WebCore::IDBIndexMetadata&);
+};
+
+template<> struct ArgumentCoder<WebCore::IDBKeyPath> {
+    static void encode(ArgumentEncoder&, const WebCore::IDBKeyPath&);
+    static bool decode(ArgumentDecoder&, WebCore::IDBKeyPath&);
+};
+
+template<> struct ArgumentCoder<WebCore::IDBObjectStoreMetadata> {
+    static void encode(ArgumentEncoder&, const WebCore::IDBObjectStoreMetadata&);
+    static bool decode(ArgumentDecoder&, WebCore::IDBObjectStoreMetadata&);
 };
 #endif
 

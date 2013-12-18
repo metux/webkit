@@ -80,6 +80,7 @@ const <a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gc
   "<a class="link" href="WebKitWebSettings.html#WebKitWebSettings--enable-hyperlink-auditing" title='The "enable-hyperlink-auditing" property'>enable-hyperlink-auditing</a>" <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read / Write / Construct
   "<a class="link" href="WebKitWebSettings.html#WebKitWebSettings--enable-java-applet" title='The "enable-java-applet" property'>enable-java-applet</a>"       <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read / Write / Construct
   "<a class="link" href="WebKitWebSettings.html#WebKitWebSettings--enable-media-stream" title='The "enable-media-stream" property'>enable-media-stream</a>"      <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read / Write / Construct
+  "<a class="link" href="WebKitWebSettings.html#WebKitWebSettings--enable-mediasource" title='The "enable-mediasource" property'>enable-mediasource</a>"       <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read / Write / Construct
   "<a class="link" href="WebKitWebSettings.html#WebKitWebSettings--enable-offline-web-application-cache" title='The "enable-offline-web-application-cache" property'>enable-offline-web-application-cache</a>" <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read / Write / Construct
   "<a class="link" href="WebKitWebSettings.html#WebKitWebSettings--enable-page-cache" title='The "enable-page-cache" property'>enable-page-cache</a>"        <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read / Write / Construct
   "<a class="link" href="WebKitWebSettings.html#WebKitWebSettings--enable-plugins" title='The "enable-plugins" property'>enable-plugins</a>"           <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read / Write / Construct
@@ -547,6 +548,22 @@ See also http://www.w3.org/TR/mediacapture-streams/
 </p>
 <p>Default value: FALSE</p>
 <p class="since">Since 1.10.0</p>
+</div>
+<hr>
+<div class="refsect2">
+<a name="WebKitWebSettings--enable-mediasource"></a><h3>The <code class="literal">"enable-mediasource"</code> property</h3>
+<pre class="programlisting">  "enable-mediasource"       <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read / Write / Construct</pre>
+<p>
+Enable or disable support for MediaSource on pages. MediaSource is an
+experimental proposal which extends HTMLMediaElement to allow
+JavaScript to generate media streams for playback.  The standard is
+currently a work-in-progress by the W3C HTML Media Task Force.
+</p>
+<p>
+See also http://www.w3.org/TR/media-source/
+</p>
+<p>Default value: FALSE</p>
+<p class="since">Since 2.4</p>
 </div>
 <hr>
 <div class="refsect2">

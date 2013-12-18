@@ -700,6 +700,18 @@ public:
         releaseScratch(scr);
     }
 
+    void load8(AbsoluteAddress address, RegisterID dest)
+    {
+        move(TrustedImmPtr(address.m_ptr), dest);
+        m_assembler.movbMemReg(dest, dest);
+        m_assembler.extub(dest, dest);
+    }
+
+    void load8(const void* address, RegisterID dest)
+    {
+        load8(AbsoluteAddress(address), dest);
+    }
+
     void load8PostInc(RegisterID base, RegisterID dest)
     {
         m_assembler.movbMemRegIn(base, dest);
@@ -897,6 +909,14 @@ public:
         }
 
         releaseScratch(scr);
+    }
+
+    void store8(RegisterID src, void* address)
+    {
+        RegisterID destptr = claimScratch();
+        move(TrustedImmPtr(address), destptr);
+        m_assembler.movbRegMem(src, destptr);
+        releaseScratch(destptr);
     }
 
     void store8(TrustedImm32 imm, void* address)
@@ -1571,6 +1591,15 @@ public:
     }
 
     Jump branch8(RelationalCondition cond, Address left, TrustedImm32 right)
+    {
+        RegisterID addressTempRegister = claimScratch();
+        load8(left, addressTempRegister);
+        Jump jmp = branch32(cond, addressTempRegister, right);
+        releaseScratch(addressTempRegister);
+        return jmp;
+    }
+
+    Jump branch8(RelationalCondition cond, AbsoluteAddress left, TrustedImm32 right)
     {
         RegisterID addressTempRegister = claimScratch();
         load8(left, addressTempRegister);
@@ -2331,12 +2360,14 @@ public:
         return Call(m_assembler.call(target), Call::None);
     }
 
-    void call(Address address, RegisterID target)
+    void call(Address address)
     {
+        RegisterID target = claimScratch();
         load32(address.base, address.offset, target);
         m_assembler.ensureSpace(m_assembler.maxInstructionSize + 2);
         m_assembler.branch(JSR_OPCODE, target);
         m_assembler.nop();
+        releaseScratch(target);
     }
 
     void breakpoint()
@@ -2421,6 +2452,11 @@ public:
     void nop()
     {
         m_assembler.nop();
+    }
+
+    void memoryFence()
+    {
+        m_assembler.synco();
     }
 
     static FunctionPtr readCallTarget(CodeLocationCall call)

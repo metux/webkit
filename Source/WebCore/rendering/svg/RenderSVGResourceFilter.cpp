@@ -73,15 +73,13 @@ void RenderSVGResourceFilter::removeAllClientsFromCache(bool markForInvalidation
     markAllClientsForInvalidation(markForInvalidation ? LayoutAndBoundariesInvalidation : ParentOnlyInvalidation);
 }
 
-void RenderSVGResourceFilter::removeClientFromCache(RenderObject* client, bool markForInvalidation)
+void RenderSVGResourceFilter::removeClientFromCache(RenderObject& client, bool markForInvalidation)
 {
-    ASSERT(client);
-
-    if (FilterData* filterData = m_filter.get(client)) {
+    if (FilterData* filterData = m_filter.get(&client)) {
         if (filterData->savedContext)
             filterData->state = FilterData::MarkedForRemoval;
         else
-            m_filter.remove(client);
+            m_filter.remove(&client);
     }
 
     markClientForInvalidation(client, markForInvalidation ? BoundariesInvalidation : ParentOnlyInvalidation);
@@ -93,18 +91,17 @@ std::unique_ptr<SVGFilterBuilder> RenderSVGResourceFilter::buildPrimitives(SVGFi
 
     // Add effects to the builder
     auto builder = std::make_unique<SVGFilterBuilder>(SourceGraphic::create(filter), SourceAlpha::create(filter));
-    auto children = childrenOfType<SVGFilterPrimitiveStandardAttributes>(filterElement());
-    for (auto element = children.begin(), end = children.end(); element != end; ++element) {
-        RefPtr<FilterEffect> effect = element->build(builder.get(), filter);
+    for (auto& element : childrenOfType<SVGFilterPrimitiveStandardAttributes>(filterElement())) {
+        RefPtr<FilterEffect> effect = element.build(builder.get(), filter);
         if (!effect) {
             builder->clearEffects();
             return nullptr;
         }
-        builder->appendEffectToEffectReferences(effect, element->renderer());
-        element->setStandardAttributes(effect.get());
-        effect->setEffectBoundaries(SVGLengthContext::resolveRectangle<SVGFilterPrimitiveStandardAttributes>(&*element, filterElement().primitiveUnits(), targetBoundingBox));
-        effect->setOperatingColorSpace(element->renderer()->style().svgStyle().colorInterpolationFilters() == CI_LINEARRGB ? ColorSpaceLinearRGB : ColorSpaceDeviceRGB);
-        builder->add(element->result(), effect.release());
+        builder->appendEffectToEffectReferences(effect, element.renderer());
+        element.setStandardAttributes(effect.get());
+        effect->setEffectBoundaries(SVGLengthContext::resolveRectangle<SVGFilterPrimitiveStandardAttributes>(&element, filterElement().primitiveUnits(), targetBoundingBox));
+        effect->setOperatingColorSpace(element.renderer()->style().svgStyle().colorInterpolationFilters() == CI_LINEARRGB ? ColorSpaceLinearRGB : ColorSpaceDeviceRGB);
+        builder->add(element.result(), effect.release());
     }
     return builder;
 }
@@ -213,7 +210,7 @@ bool RenderSVGResourceFilter::applyResource(RenderElement& renderer, const Rende
     effectiveTransform.scale(scale.width(), scale.height());
     effectiveTransform.multiply(filterData->shearFreeAbsoluteTransform);
 
-    OwnPtr<ImageBuffer> sourceGraphic;
+    std::unique_ptr<ImageBuffer> sourceGraphic;
     RenderingMode renderingMode = renderer.frame().settings().acceleratedFiltersEnabled() ? Accelerated : Unaccelerated;
     if (!SVGRenderingContext::createImageBuffer(filterData->drawingRegion, effectiveTransform, sourceGraphic, ColorSpaceLinearRGB, renderingMode)) {
         ASSERT(!m_filter.contains(&renderer));
@@ -228,7 +225,7 @@ bool RenderSVGResourceFilter::applyResource(RenderElement& renderer, const Rende
     GraphicsContext* sourceGraphicContext = sourceGraphic->context();
     ASSERT(sourceGraphicContext);
   
-    filterData->sourceGraphicBuffer = sourceGraphic.release();
+    filterData->sourceGraphicBuffer = std::move(sourceGraphic);
     filterData->savedContext = context;
 
     context = sourceGraphicContext;
@@ -264,7 +261,7 @@ void RenderSVGResourceFilter::postApplyResource(RenderElement& renderer, Graphic
 
     case FilterData::PaintingSource:
         if (!filterData->savedContext) {
-            removeClientFromCache(&renderer);
+            removeClientFromCache(renderer);
             return;
         }
 
@@ -282,7 +279,7 @@ void RenderSVGResourceFilter::postApplyResource(RenderElement& renderer, Graphic
         // initial filtering process. We just take the stored filter result on a
         // second drawing.
         if (filterData->state != FilterData::Built)
-            filterData->filter->setSourceImage(filterData->sourceGraphicBuffer.release());
+            filterData->filter->setSourceImage(std::move(filterData->sourceGraphicBuffer));
 
         // Always true if filterData is just built (filterData->state == FilterData::Built).
         if (!lastEffect->hasResult()) {
@@ -304,7 +301,7 @@ void RenderSVGResourceFilter::postApplyResource(RenderElement& renderer, Graphic
             context->concatCTM(filterData->shearFreeAbsoluteTransform);
         }
     }
-    filterData->sourceGraphicBuffer.clear();
+    filterData->sourceGraphicBuffer.reset();
 }
 
 FloatRect RenderSVGResourceFilter::resourceBoundingBox(const RenderObject& object)
@@ -316,8 +313,8 @@ void RenderSVGResourceFilter::primitiveAttributeChanged(RenderObject* object, co
 {
     SVGFilterPrimitiveStandardAttributes* primitve = static_cast<SVGFilterPrimitiveStandardAttributes*>(object->node());
 
-    for (auto it = m_filter.begin(), end = m_filter.end(); it != end; ++it) {
-        const auto &filterData = it->value;
+    for (const auto& objectFilterDataPair : m_filter) {
+        const auto& filterData = objectFilterDataPair.value;
         if (filterData->state != FilterData::Built)
             continue;
 
@@ -332,7 +329,7 @@ void RenderSVGResourceFilter::primitiveAttributeChanged(RenderObject* object, co
         builder->clearResultsRecursive(effect);
 
         // Repaint the image on the screen.
-        markClientForInvalidation(it->key, RepaintInvalidation);
+        markClientForInvalidation(*objectFilterDataPair.key, RepaintInvalidation);
     }
     markAllClientLayersForInvalidation();
 }

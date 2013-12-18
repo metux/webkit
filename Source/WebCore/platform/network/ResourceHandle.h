@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2004, 2006, 2011 Apple Inc. All rights reserved.
+ * Copyright (C) 2004, 2006, 2011, 2013 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -33,6 +33,10 @@
 #include <wtf/OwnPtr.h>
 #include <wtf/RefCounted.h>
 
+#if USE(QUICK_LOOK)
+#include "QuickLook.h"
+#endif // USE(QUICK_LOOK)
+
 #if USE(SOUP)
 typedef struct _GTlsCertificate GTlsCertificate;
 typedef struct _SoupSession SoupSession;
@@ -65,6 +69,7 @@ typedef struct objc_object *id;
 #endif
 
 #if USE(CFNETWORK)
+typedef const struct _CFCachedURLResponse* CFCachedURLResponseRef;
 typedef struct _CFURLConnection* CFURLConnectionRef;
 typedef int CFHTTPCookieStorageAcceptPolicy;
 typedef struct OpaqueCFHTTPCookieStorage* CFHTTPCookieStorageRef;
@@ -134,11 +139,18 @@ public:
     CFURLStorageSessionRef storageSession() const;
     CFURLConnectionRef connection() const;
     CFURLConnectionRef releaseConnectionForDownload();
+    const ResourceRequest& currentRequest() const;
     static void setHostAllowsAnyHTTPSCertificate(const String&);
     static void setClientCertificate(const String& host, CFDataRef);
-#endif
 
-#if PLATFORM(WIN) && USE(CURL)
+#if USE(QUICK_LOOK)
+    QuickLookHandle* quickLookHandle() { return m_quickLook.get(); }
+    void setQuickLookHandle(PassOwnPtr<QuickLookHandle> handle) { m_quickLook = handle; }
+#endif // USE(QUICK_LOOK)
+
+#endif // USE(CFNETWORK)
+
+#if (PLATFORM(WIN) || PLATFORM(NIX)) && USE(CURL)
     static void setHostAllowsAnyHTTPSCertificate(const String&);
 #endif
 #if PLATFORM(WIN) && USE(CURL) && USE(CF)
@@ -167,6 +179,7 @@ public:
     void sendPendingRequest();
     bool cancelledOrClientless();
     void ensureReadBuffer();
+    size_t currentStreamPosition() const;
     static SoupSession* defaultSession();
     static SoupSession* createTestingSession();
     static SoupSession* createPrivateBrowsingSession();
@@ -201,8 +214,10 @@ public:
     void continueCanAuthenticateAgainstProtectionSpace(bool);
 #endif
 
-#if PLATFORM(MAC)
     // Called in response to ResourceHandleClient::willCacheResponseAsync().
+#if USE(CFNETWORK)
+    void continueWillCacheResponse(CFCachedURLResponseRef);
+#elif PLATFORM(MAC)
     void continueWillCacheResponse(NSCachedURLResponse *);
 #endif
 
@@ -226,6 +241,9 @@ public:
 
 #if PLATFORM(MAC) || USE(CFNETWORK)
     static CFStringRef synchronousLoadRunLoopMode();
+#endif
+#if PLATFORM(IOS) && USE(CFNETWORK)
+    static CFMutableDictionaryRef createSSLPropertiesFromNSURLRequest(const ResourceRequest&);
 #endif
 
 #if USE(NETWORK_CFDATA_ARRAY_CALLBACK)
@@ -261,11 +279,15 @@ private:
 #if PLATFORM(MAC) && !USE(CFNETWORK)
     void createNSURLConnection(id delegate, bool shouldUseCredentialStorage, bool shouldContentSniff);
 #elif USE(CFNETWORK)
-    void createCFURLConnection(bool shouldUseCredentialStorage, bool shouldContentSniff);
+    void createCFURLConnection(bool shouldUseCredentialStorage, bool shouldContentSniff, CFDictionaryRef clientProperties);
 #endif
 
     friend class ResourceHandleInternal;
     OwnPtr<ResourceHandleInternal> d;
+
+#if USE(QUICK_LOOK)
+    OwnPtr<QuickLookHandle> m_quickLook;
+#endif // USE(QUICK_LOOK)
 };
 
 }

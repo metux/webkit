@@ -31,12 +31,12 @@
 #include "InlineTextBox.h"
 #include "Page.h"
 #include "RenderBlock.h"
-#include "RenderFlowThread.h"
 #include "RenderFullScreen.h"
 #include "RenderGeometryMap.h"
 #include "RenderIterator.h"
 #include "RenderLayer.h"
 #include "RenderLineBreak.h"
+#include "RenderNamedFlowThread.h"
 #include "RenderTheme.h"
 #include "RenderView.h"
 #include "StyleInheritedData.h"
@@ -217,7 +217,7 @@ void RenderInline::updateAlwaysCreateLineBoxes(bool fullLayout)
         || style().textEmphasisMark() != TextEmphasisMarkNone
         || (checkFonts && (!parentStyle->font().fontMetrics().hasIdenticalAscentDescentAndLineGap(style().font().fontMetrics())
         || parentStyle->lineHeight() != style().lineHeight()))
-        || (flowThread && flowThread->hasRegionsWithStyling());
+        || (flowThread && flowThread->isRenderNamedFlowThread() && toRenderNamedFlowThread(flowThread)->hasRegionsWithStyling());
 
     if (!alwaysCreateLineBoxes && checkFonts && document().styleSheetCollection().usesFirstLineRules()) {
         // Have to check the first line style as well.
@@ -697,6 +697,14 @@ void RenderInline::absoluteQuads(Vector<FloatQuad>& quads, bool* wasFixed) const
         continuation->absoluteQuads(quads, wasFixed);
 }
 
+#if PLATFORM(IOS)
+void RenderInline::absoluteQuadsForSelection(Vector<FloatQuad>& quads) const
+{
+    AbsoluteQuadsGeneratorContext context(this, quads);
+    generateLineBoxRects(context);
+}
+#endif
+
 LayoutUnit RenderInline::offsetLeft() const
 {
     LayoutPoint topLeft;
@@ -1071,9 +1079,8 @@ LayoutRect RenderInline::clippedOverflowRectForRepaint(const RenderLayerModelObj
     cb->computeRectForRepaint(repaintContainer, repaintRect);
 
     if (outlineSize) {
-        auto children = childrenOfType<RenderElement>(*this);
-        for (auto child = children.begin(), end = children.end(); child != end; ++child)
-            repaintRect.unite(child->rectWithOutlineForRepaint(repaintContainer, outlineSize));
+        for (auto& child : childrenOfType<RenderElement>(*this))
+            repaintRect.unite(child.rectWithOutlineForRepaint(repaintContainer, outlineSize));
 
         if (RenderBoxModelObject* continuation = this->continuation()) {
             if (!continuation->isInline() && continuation->parent())
@@ -1087,9 +1094,8 @@ LayoutRect RenderInline::clippedOverflowRectForRepaint(const RenderLayerModelObj
 LayoutRect RenderInline::rectWithOutlineForRepaint(const RenderLayerModelObject* repaintContainer, LayoutUnit outlineWidth) const
 {
     LayoutRect r(RenderBoxModelObject::rectWithOutlineForRepaint(repaintContainer, outlineWidth));
-    auto children = childrenOfType<RenderElement>(*this);
-    for (auto child = children.begin(), end = children.end(); child != end; ++child)
-        r.unite(child->rectWithOutlineForRepaint(repaintContainer, outlineWidth));
+    for (auto& child : childrenOfType<RenderElement>(*this))
+        r.unite(child.rectWithOutlineForRepaint(repaintContainer, outlineWidth));
     return r;
 }
 
@@ -1425,17 +1431,16 @@ void RenderInline::addFocusRingRects(Vector<IntRect>& rects, const LayoutPoint& 
     AbsoluteRectsGeneratorContext context(rects, additionalOffset);
     generateLineBoxRects(context);
 
-    auto children = childrenOfType<RenderElement>(*this);
-    for (auto child = children.begin(), end = children.end(); child != end; ++child) {
-        if (child->isListMarker())
+    for (auto& child : childrenOfType<RenderElement>(*this)) {
+        if (child.isListMarker())
             continue;
         FloatPoint pos(additionalOffset);
         // FIXME: This doesn't work correctly with transforms.
-        if (child->hasLayer())
-            pos = child->localToContainerPoint(FloatPoint(), paintContainer);
-        else if (child->isBox())
-            pos.move(toRenderBox(*child).locationOffset());
-        child->addFocusRingRects(rects, flooredIntPoint(pos), paintContainer);
+        if (child.hasLayer())
+            pos = child.localToContainerPoint(FloatPoint(), paintContainer);
+        else if (child.isBox())
+            pos.move(toRenderBox(child).locationOffset());
+        child.addFocusRingRects(rects, flooredIntPoint(pos), paintContainer);
     }
 
     if (RenderBoxModelObject* continuation = this->continuation()) {
@@ -1453,7 +1458,7 @@ void RenderInline::paintOutline(PaintInfo& paintInfo, const LayoutPoint& paintOf
     
     RenderStyle& styleToUse = style();
     if (styleToUse.outlineStyleIsAuto() || hasOutlineAnnotation()) {
-        if (!theme()->supportsFocusRing(&styleToUse)) {
+        if (!theme().supportsFocusRing(&styleToUse)) {
             // Only paint the focus ring by hand if the theme isn't able to draw the focus ring.
             paintFocusRing(paintInfo, paintOffset, &styleToUse);
         }

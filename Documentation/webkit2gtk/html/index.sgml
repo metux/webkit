@@ -356,6 +356,10 @@
 <ANCHOR id="webkit-settings-set-enable-write-console-messages-to-stdout" href="webkit2gtk/WebKitSettings.html#webkit-settings-set-enable-write-console-messages-to-stdout">
 <ANCHOR id="webkit-settings-get-enable-media-stream" href="webkit2gtk/WebKitSettings.html#webkit-settings-get-enable-media-stream">
 <ANCHOR id="webkit-settings-set-enable-media-stream" href="webkit2gtk/WebKitSettings.html#webkit-settings-set-enable-media-stream">
+<ANCHOR id="webkit-settings-get-enable-spatial-navigation" href="webkit2gtk/WebKitSettings.html#webkit-settings-get-enable-spatial-navigation">
+<ANCHOR id="webkit-settings-set-enable-spatial-navigation" href="webkit2gtk/WebKitSettings.html#webkit-settings-set-enable-spatial-navigation">
+<ANCHOR id="webkit-settings-get-enable-mediasource" href="webkit2gtk/WebKitSettings.html#webkit-settings-get-enable-mediasource">
+<ANCHOR id="webkit-settings-set-enable-mediasource" href="webkit2gtk/WebKitSettings.html#webkit-settings-set-enable-mediasource">
 <ANCHOR id="WebKitSettings.property-details" href="webkit2gtk/WebKitSettings.html#WebKitSettings.property-details">
 <ANCHOR id="WebKitSettings--allow-modal-dialogs" href="webkit2gtk/WebKitSettings.html#WebKitSettings--allow-modal-dialogs">
 <ANCHOR id="WebKitSettings--auto-load-images" href="webkit2gtk/WebKitSettings.html#WebKitSettings--auto-load-images">
@@ -377,6 +381,7 @@
 <ANCHOR id="WebKitSettings--enable-java" href="webkit2gtk/WebKitSettings.html#WebKitSettings--enable-java">
 <ANCHOR id="WebKitSettings--enable-javascript" href="webkit2gtk/WebKitSettings.html#WebKitSettings--enable-javascript">
 <ANCHOR id="WebKitSettings--enable-media-stream" href="webkit2gtk/WebKitSettings.html#WebKitSettings--enable-media-stream">
+<ANCHOR id="WebKitSettings--enable-mediasource" href="webkit2gtk/WebKitSettings.html#WebKitSettings--enable-mediasource">
 <ANCHOR id="WebKitSettings--enable-offline-web-application-cache" href="webkit2gtk/WebKitSettings.html#WebKitSettings--enable-offline-web-application-cache">
 <ANCHOR id="WebKitSettings--enable-page-cache" href="webkit2gtk/WebKitSettings.html#WebKitSettings--enable-page-cache">
 <ANCHOR id="WebKitSettings--enable-plugins" href="webkit2gtk/WebKitSettings.html#WebKitSettings--enable-plugins">
@@ -384,6 +389,7 @@
 <ANCHOR id="WebKitSettings--enable-resizable-text-areas" href="webkit2gtk/WebKitSettings.html#WebKitSettings--enable-resizable-text-areas">
 <ANCHOR id="WebKitSettings--enable-site-specific-quirks" href="webkit2gtk/WebKitSettings.html#WebKitSettings--enable-site-specific-quirks">
 <ANCHOR id="WebKitSettings--enable-smooth-scrolling" href="webkit2gtk/WebKitSettings.html#WebKitSettings--enable-smooth-scrolling">
+<ANCHOR id="WebKitSettings--enable-spatial-navigation" href="webkit2gtk/WebKitSettings.html#WebKitSettings--enable-spatial-navigation">
 <ANCHOR id="WebKitSettings--enable-tabs-to-links" href="webkit2gtk/WebKitSettings.html#WebKitSettings--enable-tabs-to-links">
 <ANCHOR id="WebKitSettings--enable-webaudio" href="webkit2gtk/WebKitSettings.html#WebKitSettings--enable-webaudio">
 <ANCHOR id="WebKitSettings--enable-webgl" href="webkit2gtk/WebKitSettings.html#WebKitSettings--enable-webgl">

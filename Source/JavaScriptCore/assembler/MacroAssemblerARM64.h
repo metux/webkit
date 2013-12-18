@@ -351,6 +351,19 @@ public:
         signExtend32ToPtr(imm, getCachedDataTempRegisterIDAndInvalidate());
         m_assembler.and_<64>(dest, dest, dataTempRegister);
     }
+
+    void and64(TrustedImmPtr imm, RegisterID dest)
+    {
+        LogicalImmediate logicalImm = LogicalImmediate::create64(reinterpret_cast<uint64_t>(imm.m_value));
+
+        if (logicalImm.isValid()) {
+            m_assembler.and_<64>(dest, dest, logicalImm);
+            return;
+        }
+
+        move(imm, getCachedDataTempRegisterIDAndInvalidate());
+        m_assembler.and_<64>(dest, dest, dataTempRegister);
+    }
     
     void countLeadingZeros32(RegisterID src, RegisterID dest)
     {
@@ -898,6 +911,8 @@ public:
     {
         moveToCachedReg(TrustedImmPtr(address), m_cachedMemoryTempRegister);
         m_assembler.ldrb(dest, memoryTempRegister, ARM64Registers::zr);
+        if (dest == memoryTempRegister)
+            m_cachedMemoryTempRegister.invalidate();
     }
 
     void load8Signed(BaseIndex address, RegisterID dest)
@@ -1191,15 +1206,6 @@ public:
         zeroExtend32ToPtr(dataTempRegister, dest);
         // Check thlow 32-bits sign extend to be equal to the full value.
         m_assembler.cmp<64>(dataTempRegister, dataTempRegister, ARM64Assembler::SXTW, 0);
-        return Jump(makeBranch(branchType == BranchIfTruncateSuccessful ? Equal : NotEqual));
-    }
-
-    Jump branchTruncateDoubleToUint32(FPRegisterID src, RegisterID dest, BranchTruncateType branchType = BranchIfTruncateFailed)
-    {
-        // Truncate to a 64-bit integer in dataTempRegister, copy the low 32-bit to dest.
-        m_assembler.fcvtzs<64, 64>(dest, src);
-        // Check thlow 32-bits zero extend to be equal to the full value.
-        m_assembler.cmp<64>(dest, dest, ARM64Assembler::UXTW, 0);
         return Jump(makeBranch(branchType == BranchIfTruncateSuccessful ? Equal : NotEqual));
     }
 
@@ -1570,8 +1576,8 @@ public:
 
     Jump branch32(RelationalCondition cond, AbsoluteAddress left, RegisterID right)
     {
-        load32(left.m_ptr, getCachedMemoryTempRegisterIDAndInvalidate());
-        return branch32(cond, memoryTempRegister, right);
+        load32(left.m_ptr, getCachedDataTempRegisterIDAndInvalidate());
+        return branch32(cond, dataTempRegister, right);
     }
 
     Jump branch32(RelationalCondition cond, AbsoluteAddress left, TrustedImm32 right)
@@ -1608,8 +1614,8 @@ public:
 
     Jump branch64(RelationalCondition cond, AbsoluteAddress left, RegisterID right)
     {
-        load64(left.m_ptr, getCachedMemoryTempRegisterIDAndInvalidate());
-        return branch64(cond, memoryTempRegister, right);
+        load64(left.m_ptr, getCachedDataTempRegisterIDAndInvalidate());
+        return branch64(cond, dataTempRegister, right);
     }
 
     Jump branch64(RelationalCondition cond, Address left, RegisterID right)
@@ -1641,7 +1647,7 @@ public:
     Jump branch8(RelationalCondition cond, AbsoluteAddress left, TrustedImm32 right)
     {
         ASSERT(!(0xffffff00 & right.m_value));
-        load8(left, getCachedMemoryTempRegisterIDAndInvalidate());
+        load8(left.m_ptr, getCachedMemoryTempRegisterIDAndInvalidate());
         return branch32(cond, memoryTempRegister, right);
     }
     
@@ -1757,6 +1763,12 @@ public:
     {
         move(TrustedImmPtr(reinterpret_cast<void*>(address.offset)), getCachedDataTempRegisterIDAndInvalidate());
         m_assembler.ldrb(dataTempRegister, address.base, dataTempRegister);
+        return branchTest32(cond, dataTempRegister, mask);
+    }
+
+    Jump branchTest8(ResultCondition cond, BaseIndex address, TrustedImm32 mask = TrustedImm32(-1))
+    {
+        load8(address, getCachedDataTempRegisterIDAndInvalidate());
         return branchTest32(cond, dataTempRegister, mask);
     }
 
@@ -2255,6 +2267,11 @@ public:
     {
         m_assembler.nop();
     }
+    
+    void memoryFence()
+    {
+        m_assembler.dmbSY();
+    }
 
 
     // Misc helper functions.
@@ -2488,6 +2505,9 @@ private:
             intptr_t addressAsInt = reinterpret_cast<intptr_t>(address);
             intptr_t addressDelta = addressAsInt - currentRegisterContents;
 
+            if (dest == memoryTempRegister)
+                m_cachedMemoryTempRegister.invalidate();
+
             if (isInIntRange(addressDelta)) {
                 if (ARM64Assembler::canEncodeSImmOffset(addressDelta)) {
                     m_assembler.ldur<datasize>(dest,  memoryTempRegister, addressDelta);
@@ -2509,7 +2529,10 @@ private:
         }
 
         move(TrustedImmPtr(address), memoryTempRegister);
-        m_cachedMemoryTempRegister.setValue(reinterpret_cast<intptr_t>(address));
+        if (dest == memoryTempRegister)
+            m_cachedMemoryTempRegister.invalidate();
+        else
+            m_cachedMemoryTempRegister.setValue(reinterpret_cast<intptr_t>(address));
         m_assembler.ldr<datasize>(dest, memoryTempRegister, ARM64Registers::zr);
     }
 

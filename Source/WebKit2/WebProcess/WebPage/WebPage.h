@@ -75,7 +75,11 @@
 #endif
 
 #if ENABLE(TOUCH_EVENTS)
+#if PLATFORM(IOS)
+#include <WebCore/PlatformTouchEventIOS.h>
+#else
 #include <WebCore/PlatformTouchEvent.h>
+#endif
 #endif
 
 #if ENABLE(CONTEXT_MENUS)
@@ -108,6 +112,7 @@ namespace WebCore {
     class Frame;
     class FrameView;
     class HTMLPlugInElement;
+    class IntPoint;
     class KeyboardEvent;
     class Page;
     class PrintContext;
@@ -158,7 +163,7 @@ class WebTouchEvent;
 
 typedef Vector<RefPtr<PageOverlay>> PageOverlayList;
 
-class WebPage : public API::TypedObject<API::Object::Type::BundlePage>, public CoreIPC::MessageReceiver, public CoreIPC::MessageSender {
+class WebPage : public API::ObjectImpl<API::Object::Type::BundlePage>, public CoreIPC::MessageReceiver, public CoreIPC::MessageSender {
 public:
     static PassRefPtr<WebPage> create(uint64_t pageID, const WebPageCreationParameters&);
     virtual ~WebPage();
@@ -237,18 +242,18 @@ public:
 
     // -- InjectedBundle methods
 #if ENABLE(CONTEXT_MENUS)
-    void initializeInjectedBundleContextMenuClient(WKBundlePageContextMenuClient*);
+    void initializeInjectedBundleContextMenuClient(WKBundlePageContextMenuClientBase*);
 #endif
-    void initializeInjectedBundleEditorClient(WKBundlePageEditorClient*);
-    void initializeInjectedBundleFormClient(WKBundlePageFormClient*);
-    void initializeInjectedBundleLoaderClient(WKBundlePageLoaderClient*);
-    void initializeInjectedBundlePolicyClient(WKBundlePagePolicyClient*);
-    void initializeInjectedBundleResourceLoadClient(WKBundlePageResourceLoadClient*);
-    void initializeInjectedBundleUIClient(WKBundlePageUIClient*);
+    void initializeInjectedBundleEditorClient(WKBundlePageEditorClientBase*);
+    void initializeInjectedBundleFormClient(WKBundlePageFormClientBase*);
+    void initializeInjectedBundleLoaderClient(WKBundlePageLoaderClientBase*);
+    void initializeInjectedBundlePolicyClient(WKBundlePagePolicyClientBase*);
+    void initializeInjectedBundleResourceLoadClient(WKBundlePageResourceLoadClientBase*);
+    void initializeInjectedBundleUIClient(WKBundlePageUIClientBase*);
 #if ENABLE(FULLSCREEN_API)
-    void initializeInjectedBundleFullScreenClient(WKBundlePageFullScreenClient*);
+    void initializeInjectedBundleFullScreenClient(WKBundlePageFullScreenClientBase*);
 #endif
-    void initializeInjectedBundleDiagnosticLoggingClient(WKBundlePageDiagnosticLoggingClient*);
+    void initializeInjectedBundleDiagnosticLoggingClient(WKBundlePageDiagnosticLoggingClientBase*);
 
 #if ENABLE(CONTEXT_MENUS)
     InjectedBundlePageContextMenuClient& injectedBundleContextMenuClient() { return m_contextMenuClient; }
@@ -313,6 +318,8 @@ public:
 
     void setSuppressScrollbarAnimations(bool);
 
+    void setBackgroundExtendsBeyondPage(bool);
+
     void setPaginationMode(uint32_t /* WebCore::Pagination::Mode */);
     void setPaginationBehavesLikeColumns(bool);
     void setPageLength(double);
@@ -351,8 +358,10 @@ public:
 
     bool hasCachedWindowFrame() const { return m_hasCachedWindowFrame; }
 
+#if !PLATFORM(IOS)
     void setTopOverhangImage(PassRefPtr<WebImage>);
     void setBottomOverhangImage(PassRefPtr<WebImage>);
+#endif // !PLATFORM(IOS)
 
     void updateHeaderAndFooterLayersForDeviceScaleChange(float scaleFactor);
 #endif // PLATFORM(MAC)
@@ -364,6 +373,7 @@ public:
     bool hasPageOverlay() const { return m_pageOverlays.size(); }
     PageOverlayList& pageOverlays() { return m_pageOverlays; }
 
+#if !PLATFORM(IOS)
     void setHeaderPageBanner(PassRefPtr<PageBanner>);
     PageBanner* headerPageBanner();
     void setFooterPageBanner(PassRefPtr<PageBanner>);
@@ -371,6 +381,7 @@ public:
 
     void hidePageBanners();
     void showPageBanners();
+#endif // !PLATFORM(IOS)
 
     WebCore::IntPoint screenToWindow(const WebCore::IntPoint&);
     WebCore::IntRect windowToScreen(const WebCore::IntRect&);
@@ -383,6 +394,24 @@ public:
 
 #if ENABLE(GEOLOCATION)
     GeolocationPermissionRequestManager& geolocationPermissionRequestManager() { return m_geolocationPermissionRequestManager; }
+#endif
+
+#if PLATFORM(IOS)
+    void handleTap(const WebCore::IntPoint&);
+    void tapHighlightAtPosition(uint64_t requestID, const WebCore::FloatPoint&);
+
+    void blurAssistedNode();
+    void selectWithGesture(const WebCore::IntPoint&, uint32_t granularity, uint32_t gestureType, uint32_t gestureState, uint64_t callbackID);
+    void updateSelectionWithTouches(const WebCore::IntPoint& point, uint32_t touches, bool baseIsStart, uint64_t callbackID);
+    void selectWithTwoTouches(const WebCore::IntPoint& from, const WebCore::IntPoint& to, uint32_t gestureType, uint32_t gestureState, uint64_t callbackID);
+    void extendSelection(uint32_t granularity);
+    void elementDidFocus(WebCore::Node*);
+    void elementDidBlur(WebCore::Node*);
+    void requestAutocorrectionData(const String& textForAutocorrection, uint64_t callbackID);
+    void applyAutocorrection(const String& correction, const String& originalText, uint64_t callbackID);
+    void insertText(const String& text, uint64_t replacementRangeStart, uint64_t replacementRangeEnd);
+    void setComposition(const String& text, Vector<WebCore::CompositionUnderline> underlines, uint64_t selectionStart, uint64_t selectionEnd);
+    void confirmComposition();
 #endif
 
     NotificationPermissionRequestManager* notificationPermissionRequestManager();
@@ -452,10 +481,12 @@ public:
     
     void sendComplexTextInputToPlugin(uint64_t pluginComplexTextInputIdentifier, const String& textInput);
 
+    void cancelComposition(EditorState& newState);
+#if !PLATFORM(IOS)
+    void insertText(const String& text, uint64_t replacementRangeStart, uint64_t replacementRangeEnd, bool& handled, EditorState& newState);
     void setComposition(const String& text, Vector<WebCore::CompositionUnderline> underlines, uint64_t selectionStart, uint64_t selectionEnd, uint64_t replacementRangeStart, uint64_t replacementRangeEnd, EditorState& newState);
     void confirmComposition(EditorState& newState);
-    void cancelComposition(EditorState& newState);
-    void insertText(const String& text, uint64_t replacementRangeStart, uint64_t replacementRangeEnd, bool& handled, EditorState& newState);
+#endif
     void getMarkedRange(uint64_t& location, uint64_t& length);
     void getSelectedRange(uint64_t& location, uint64_t& length);
     void getAttributedSubstringFromRange(uint64_t location, uint64_t length, AttributedString&);
@@ -580,6 +611,11 @@ public:
 #endif
     void setThrottled(bool isThrottled);
 
+#if PLATFORM(IOS)
+    void didFinishScrolling(const WebCore::FloatPoint& contentOffset);
+    void didFinishZooming(float);
+#endif
+
 #if PLATFORM(GTK) && USE(TEXTURE_MAPPER_GL)
     uint64_t nativeWindowHandle() { return m_nativeWindowHandle; }
 #endif
@@ -664,6 +700,7 @@ private:
     String sourceForFrame(WebFrame*);
 
     void loadDataImpl(PassRefPtr<WebCore::SharedBuffer>, const String& MIMEType, const String& encodingName, const WebCore::URL& baseURL, const WebCore::URL& failingURL, CoreIPC::MessageDecoder&);
+    void loadString(const String&, const String& MIMEType, const WebCore::URL& baseURL, const WebCore::URL& failingURL, CoreIPC::MessageDecoder&);
 
     bool platformHasLocalDataForURL(const WebCore::URL&);
 
@@ -708,6 +745,8 @@ private:
 
     static bool scroll(WebCore::Page*, WebCore::ScrollDirection, WebCore::ScrollGranularity);
     static bool logicalScroll(WebCore::Page*, WebCore::ScrollLogicalDirection, WebCore::ScrollGranularity);
+
+    void loadURLInFrame(const String&, uint64_t frameID);
 
     uint64_t restoreSession(const SessionState&);
     void restoreSessionAndNavigateToCurrentItem(const SessionState&);
@@ -902,8 +941,10 @@ private:
 #endif
 #endif
 
+#if !PLATFORM(IOS)
     RefPtr<PageBanner> m_headerBanner;
     RefPtr<PageBanner> m_footerBanner;
+#endif // !PLATFORM(IOS)
 
     RunLoop::Timer<WebPage> m_setCanStartMediaTimer;
     RunLoop::Timer<WebPage> m_sendDidUpdateViewStateTimer;
@@ -983,7 +1024,13 @@ private:
 #endif
     
     bool m_willGoToBackForwardItemCallbackEnabled;
-    
+
+#if PLATFORM(IOS)
+    RefPtr<WebCore::Node> m_assistedNode;
+    RefPtr<WebCore::Range> m_currentWordRange;
+    bool m_shouldReturnWordAtSelection;
+#endif
+
 #if ENABLE(PAGE_VISIBILITY_API)
     WebCore::PageVisibilityState m_visibilityState;
 #endif

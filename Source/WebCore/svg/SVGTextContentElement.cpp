@@ -228,7 +228,7 @@ bool SVGTextContentElement::isPresentationAttribute(const QualifiedName& name) c
     return SVGGraphicsElement::isPresentationAttribute(name);
 }
 
-void SVGTextContentElement::collectStyleForPresentationAttribute(const QualifiedName& name, const AtomicString& value, MutableStylePropertySet& style)
+void SVGTextContentElement::collectStyleForPresentationAttribute(const QualifiedName& name, const AtomicString& value, MutableStyleProperties& style)
 {
     if (!isSupportedAttribute(name))
         SVGGraphicsElement::collectStyleForPresentationAttribute(name, value, style);
@@ -274,8 +274,8 @@ void SVGTextContentElement::svgAttributeChanged(const QualifiedName& attrName)
     if (attrName == SVGNames::textLengthAttr)
         m_specifiedTextLength = m_textLength.value;
 
-    if (RenderObject* renderer = this->renderer())
-        RenderSVGResource::markForLayoutAndParentResourceInvalidation(renderer);
+    if (auto renderer = this->renderer())
+        RenderSVGResource::markForLayoutAndParentResourceInvalidation(*renderer);
 }
 
 bool SVGTextContentElement::selfHasRelativeLengths() const

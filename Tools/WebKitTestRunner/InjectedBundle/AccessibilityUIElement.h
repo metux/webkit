@@ -102,6 +102,7 @@ public:
     // Attributes - platform-independent implementations
     JSRetainPtr<JSStringRef> stringAttributeValue(JSStringRef attribute);
     double numberAttributeValue(JSStringRef attribute);
+    JSValueRef uiElementArrayAttributeValue(JSStringRef attribute) const;
     PassRefPtr<AccessibilityUIElement> uiElementAttributeValue(JSStringRef attribute) const;
     bool boolAttributeValue(JSStringRef attribute);
     bool isAttributeSupported(JSStringRef attribute);
@@ -135,6 +136,7 @@ public:
     bool isFocused() const;
     bool isFocusable() const;
     bool isSelected() const;
+    bool isSelectedOptionActive() const;
     bool isSelectable() const;
     bool isMultiSelectable() const;
     void setSelectedChild(AccessibilityUIElement*) const;
@@ -197,7 +199,14 @@ public:
     JSRetainPtr<JSStringRef> stringForRange(unsigned location, unsigned length);
     JSRetainPtr<JSStringRef> attributedStringForRange(unsigned location, unsigned length);
     bool attributedStringRangeIsMisspelled(unsigned location, unsigned length);
+    unsigned uiElementCountForSearchPredicate(JSContextRef, AccessibilityUIElement* startElement, bool isDirectionNext, JSValueRef searchKey, JSStringRef searchText, bool visibleOnly);
     PassRefPtr<AccessibilityUIElement> uiElementForSearchPredicate(JSContextRef, AccessibilityUIElement* startElement, bool isDirectionNext, JSValueRef searchKey, JSStringRef searchText, bool visibleOnly);
+
+    // Text-specific
+    JSRetainPtr<JSStringRef> characterAtOffset(int offset);
+    JSRetainPtr<JSStringRef> wordAtOffset(int offset);
+    JSRetainPtr<JSStringRef> lineAtOffset(int offset);
+    JSRetainPtr<JSStringRef> sentenceAtOffset(int offset);
     
     // Table-specific
     PassRefPtr<AccessibilityUIElement> cellForColumnAndRow(unsigned column, unsigned row);
@@ -254,6 +263,8 @@ private:
 
     void getLinkedUIElements(Vector<RefPtr<AccessibilityUIElement> >&);
     void getDocumentLinks(Vector<RefPtr<AccessibilityUIElement> >&);
+    
+    void getUIElementsWithAttribute(JSStringRef, Vector<RefPtr<AccessibilityUIElement> >&) const;
 #endif
 
 #if PLATFORM(MAC) || PLATFORM(GTK) || PLATFORM(EFL)

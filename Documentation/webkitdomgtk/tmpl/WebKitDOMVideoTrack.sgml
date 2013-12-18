@@ -31,7 +31,17 @@ WebKitDOMVideoTrack
 
 </para>
 
+<!-- ##### ARG WebKitDOMVideoTrack:kind ##### -->
+<para>
+
+</para>
+
 <!-- ##### ARG WebKitDOMVideoTrack:label ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMVideoTrack:language ##### -->
 <para>
 
 </para>
@@ -50,7 +60,25 @@ WebKitDOMVideoTrack
 @Returns: 
 
 
+<!-- ##### FUNCTION webkit_dom_video_track_get_kind ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
 <!-- ##### FUNCTION webkit_dom_video_track_get_label ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_video_track_get_language ##### -->
 <para>
 
 </para>

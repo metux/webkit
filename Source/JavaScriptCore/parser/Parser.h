@@ -35,7 +35,6 @@
 #include "SourceProvider.h"
 #include "SourceProviderCache.h"
 #include "SourceProviderCacheItem.h"
-#include "VMStackBounds.h"
 #include <wtf/Forward.h>
 #include <wtf/Noncopyable.h>
 #include <wtf/OwnPtr.h>
@@ -414,6 +413,8 @@ public:
     template <class ParsedNode>
     PassRefPtr<ParsedNode> parse(ParserError&);
 
+    JSTextPosition positionBeforeLastNewline() const { return m_lexer->positionBeforeLastNewline(); }
+
 private:
     struct AllowInOverride {
         AllowInOverride(Parser* parser)
@@ -698,7 +699,7 @@ private:
         return result;
     }
     
-    template <SourceElementsMode mode, class TreeBuilder> TreeSourceElements parseSourceElements(TreeBuilder&);
+    template <class TreeBuilder> TreeSourceElements parseSourceElements(TreeBuilder&, SourceElementsMode);
     template <class TreeBuilder> TreeStatement parseStatement(TreeBuilder&, const Identifier*& directive, unsigned* directiveLiteralLength = 0);
     template <class TreeBuilder> TreeStatement parseFunctionDeclaration(TreeBuilder&);
     template <class TreeBuilder> TreeStatement parseVarDeclaration(TreeBuilder&);
@@ -719,7 +720,7 @@ private:
     template <class TreeBuilder> TreeStatement parseExpressionStatement(TreeBuilder&);
     template <class TreeBuilder> TreeStatement parseExpressionOrLabelStatement(TreeBuilder&);
     template <class TreeBuilder> TreeStatement parseIfStatement(TreeBuilder&);
-    template <class TreeBuilder> ALWAYS_INLINE TreeStatement parseBlockStatement(TreeBuilder&);
+    template <class TreeBuilder> TreeStatement parseBlockStatement(TreeBuilder&);
     template <class TreeBuilder> TreeExpression parseExpression(TreeBuilder&);
     template <class TreeBuilder> TreeExpression parseAssignmentExpression(TreeBuilder&);
     template <class TreeBuilder> ALWAYS_INLINE TreeExpression parseConditionalExpression(TreeBuilder&);
@@ -729,19 +730,19 @@ private:
     template <class TreeBuilder> ALWAYS_INLINE TreeExpression parsePrimaryExpression(TreeBuilder&);
     template <class TreeBuilder> ALWAYS_INLINE TreeExpression parseArrayLiteral(TreeBuilder&);
     template <class TreeBuilder> ALWAYS_INLINE TreeExpression parseObjectLiteral(TreeBuilder&);
-    template <class TreeBuilder> ALWAYS_INLINE TreeExpression parseStrictObjectLiteral(TreeBuilder&);
+    template <class TreeBuilder> NEVER_INLINE TreeExpression parseStrictObjectLiteral(TreeBuilder&);
     enum SpreadMode { AllowSpread, DontAllowSpread };
     template <class TreeBuilder> ALWAYS_INLINE TreeArguments parseArguments(TreeBuilder&, SpreadMode);
-    template <bool strict, class TreeBuilder> ALWAYS_INLINE TreeProperty parseProperty(TreeBuilder&);
+    template <class TreeBuilder> TreeProperty parseProperty(TreeBuilder&, bool strict);
     template <class TreeBuilder> ALWAYS_INLINE TreeFunctionBody parseFunctionBody(TreeBuilder&);
     template <class TreeBuilder> ALWAYS_INLINE TreeFormalParameterList parseFormalParameters(TreeBuilder&);
-    template <class TreeBuilder> ALWAYS_INLINE TreeExpression parseVarDeclarationList(TreeBuilder&, int& declarations, TreeDeconstructionPattern& lastPattern, TreeExpression& lastInitializer, JSTextPosition& identStart, JSTextPosition& initStart, JSTextPosition& initEnd);
-    template <class TreeBuilder> ALWAYS_INLINE TreeConstDeclList parseConstDeclarationList(TreeBuilder&);
+    template <class TreeBuilder> TreeExpression parseVarDeclarationList(TreeBuilder&, int& declarations, TreeDeconstructionPattern& lastPattern, TreeExpression& lastInitializer, JSTextPosition& identStart, JSTextPosition& initStart, JSTextPosition& initEnd);
+    template <class TreeBuilder> NEVER_INLINE TreeConstDeclList parseConstDeclarationList(TreeBuilder&);
 
-    template <DeconstructionKind, class TreeBuilder> ALWAYS_INLINE TreeDeconstructionPattern createBindingPattern(TreeBuilder&, const Identifier&, int depth);
-    template <DeconstructionKind, class TreeBuilder> TreeDeconstructionPattern parseDeconstructionPattern(TreeBuilder&, int depth = 0);
+    template <class TreeBuilder> NEVER_INLINE TreeDeconstructionPattern createBindingPattern(TreeBuilder&, DeconstructionKind, const Identifier&, int depth);
+    template <class TreeBuilder> NEVER_INLINE TreeDeconstructionPattern parseDeconstructionPattern(TreeBuilder&, DeconstructionKind, int depth = 0);
     template <class TreeBuilder> NEVER_INLINE TreeDeconstructionPattern tryParseDeconstructionPatternExpression(TreeBuilder&);
-    template <FunctionRequirements, FunctionParseMode, bool nameIsInContainingScope, class TreeBuilder> bool parseFunctionInfo(TreeBuilder&, const Identifier*&, TreeFormalParameterList&, TreeFunctionBody&, unsigned& openBraceOffset, unsigned& closeBraceOffset, int& bodyStartLine, unsigned& bodyStartColumn);
+    template <class TreeBuilder> NEVER_INLINE bool parseFunctionInfo(TreeBuilder&, FunctionRequirements, FunctionParseMode, bool nameIsInContainingScope, const Identifier*&, TreeFormalParameterList&, TreeFunctionBody&, unsigned& openBraceOffset, unsigned& closeBraceOffset, int& bodyStartLine, unsigned& bodyStartColumn);
     ALWAYS_INLINE int isBinaryOperator(JSTokenType);
     bool allowAutomaticSemicolon();
     
@@ -756,7 +757,7 @@ private:
     
     bool canRecurse()
     {
-        return m_stack.isSafeToRecurse();
+        return m_vm->isSafeToRecurse();
     }
     
     const JSTextPosition& lastTokenEndPosition() const
@@ -825,7 +826,6 @@ private:
     ParserArena* m_arena;
     OwnPtr<LexerType> m_lexer;
     
-    VMStackBounds m_stack;
     bool m_hasStackOverflow;
     String m_errorMessage;
     JSToken m_token;
@@ -881,7 +881,8 @@ PassRefPtr<ParsedNode> Parser<LexerType>::parse(ParserError& error)
     errMsg = String();
 
     JSTokenLocation startLocation(tokenLocation());
-    unsigned startColumn = m_source->startColumn();
+    ASSERT(m_source->startColumn() > 0);
+    unsigned startColumn = m_source->startColumn() - 1;
 
     String parseError = parseInner();
 
@@ -900,13 +901,15 @@ PassRefPtr<ParsedNode> Parser<LexerType>::parse(ParserError& error)
     RefPtr<ParsedNode> result;
     if (m_sourceElements) {
         JSTokenLocation endLocation;
-        endLocation.line = m_lexer->lastLineNumber();
+        endLocation.line = m_lexer->lineNumber();
         endLocation.lineStartOffset = m_lexer->currentLineStartOffset();
         endLocation.startOffset = m_lexer->currentOffset();
+        unsigned endColumn = endLocation.startOffset - endLocation.lineStartOffset;
         result = ParsedNode::create(m_vm,
                                     startLocation,
                                     endLocation,
                                     startColumn,
+                                    endColumn,
                                     m_sourceElements,
                                     m_varDeclarations ? &m_varDeclarations->data : 0,
                                     m_funcDeclarations ? &m_funcDeclarations->data : 0,
@@ -914,7 +917,7 @@ PassRefPtr<ParsedNode> Parser<LexerType>::parse(ParserError& error)
                                     *m_source,
                                     m_features,
                                     m_numConstants);
-        result->setLoc(m_source->firstLine(), m_lastTokenEndPosition.line, m_lexer->currentOffset(), m_lexer->currentLineStartOffset());
+        result->setLoc(m_source->firstLine(), m_lexer->lineNumber(), m_lexer->currentOffset(), m_lexer->currentLineStartOffset());
     } else {
         // We can never see a syntax error when reparsing a function, since we should have
         // reported the error when parsing the containing program or eval code. So if we're
@@ -944,17 +947,23 @@ PassRefPtr<ParsedNode> Parser<LexerType>::parse(ParserError& error)
 }
 
 template <class ParsedNode>
-PassRefPtr<ParsedNode> parse(VM* vm, const SourceCode& source, FunctionParameters* parameters, const Identifier& name, JSParserStrictness strictness, JSParserMode parserMode, ParserError& error)
+PassRefPtr<ParsedNode> parse(VM* vm, const SourceCode& source, FunctionParameters* parameters, const Identifier& name, JSParserStrictness strictness, JSParserMode parserMode, ParserError& error, JSTextPosition* positionBeforeLastNewline = 0)
 {
     SamplingRegion samplingRegion("Parsing");
 
     ASSERT(!source.provider()->source().isNull());
     if (source.provider()->source().is8Bit()) {
         Parser<Lexer<LChar>> parser(vm, source, parameters, name, strictness, parserMode);
-        return parser.parse<ParsedNode>(error);
+        RefPtr<ParsedNode> result = parser.parse<ParsedNode>(error);
+        if (positionBeforeLastNewline)
+            *positionBeforeLastNewline = parser.positionBeforeLastNewline();
+        return result.release();
     }
     Parser<Lexer<UChar>> parser(vm, source, parameters, name, strictness, parserMode);
-    return parser.parse<ParsedNode>(error);
+    RefPtr<ParsedNode> result = parser.parse<ParsedNode>(error);
+    if (positionBeforeLastNewline)
+        *positionBeforeLastNewline = parser.positionBeforeLastNewline();
+    return result.release();
 }
 
 } // namespace

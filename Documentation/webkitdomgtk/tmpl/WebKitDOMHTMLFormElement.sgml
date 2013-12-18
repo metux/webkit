@@ -36,7 +36,17 @@ WebKitDOMHTMLFormElement
 
 </para>
 
+<!-- ##### ARG WebKitDOMHTMLFormElement:autocapitalize ##### -->
+<para>
+
+</para>
+
 <!-- ##### ARG WebKitDOMHTMLFormElement:autocomplete ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMHTMLFormElement:autocorrect ##### -->
 <para>
 
 </para>
@@ -284,5 +294,57 @@ WebKitDOMHTMLFormElement
 
 @self: 
 @Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_form_element_get_autocorrect ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_form_element_set_autocorrect ##### -->
+<para>
+
+</para>
+
+@self: 
+@value: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_form_element_get_autocapitalize ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_form_element_set_autocapitalize ##### -->
+<para>
+
+</para>
+
+@self: 
+@value: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_form_element_dispatch_form_change ##### -->
+<para>
+
+</para>
+
+@self: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_form_element_dispatch_form_input ##### -->
+<para>
+
+</para>
+
+@self: 
 
 

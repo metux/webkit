@@ -709,3 +709,12 @@ WebKitDOMElement
 @Returns: 
 
 
+<!-- ##### FUNCTION webkit_dom_element_get_webkit_region_overflow ##### -->
+<para>
+
+</para>
+
+@element: 
+@Returns: 
+
+

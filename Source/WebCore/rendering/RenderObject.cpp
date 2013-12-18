@@ -67,6 +67,10 @@
 #include "SVGRenderSupport.h"
 #endif
 
+#if PLATFORM(IOS)
+#include "SelectionRect.h"
+#endif
+
 namespace WebCore {
 
 using namespace HTMLNames;
@@ -126,10 +130,9 @@ RenderObject::~RenderObject()
     view().didDestroyRenderer();
 }
 
-RenderTheme* RenderObject::theme() const
+RenderTheme& RenderObject::theme() const
 {
     ASSERT(document().page());
-
     return document().page()->theme();
 }
 
@@ -140,16 +143,6 @@ bool RenderObject::isDescendantOf(const RenderObject* obj) const
             return true;
     }
     return false;
-}
-
-bool RenderObject::isBody() const
-{
-    return node() && node()->hasTagName(bodyTag);
-}
-
-bool RenderObject::isHR() const
-{
-    return node() && node()->hasTagName(hrTag);
 }
 
 bool RenderObject::isLegend() const
@@ -760,65 +753,6 @@ RenderBlock* RenderObject::containingBlock() const
     return toRenderBlock(o);
 }
 
-static bool mustRepaintFillLayers(const RenderObject* renderer, const FillLayer* layer)
-{
-    // Nobody will use multiple layers without wanting fancy positioning.
-    if (layer->next())
-        return true;
-
-    // Make sure we have a valid image.
-    StyleImage* image = layer->image();
-    if (!image || !image->canRender(renderer, renderer->style().effectiveZoom()))
-        return false;
-
-    if (!layer->xPosition().isZero() || !layer->yPosition().isZero())
-        return true;
-
-    EFillSizeType sizeType = layer->sizeType();
-
-    if (sizeType == Contain || sizeType == Cover)
-        return true;
-    
-    if (sizeType == SizeLength) {
-        LengthSize size = layer->sizeLength();
-        if (size.width().isPercent() || size.height().isPercent())
-            return true;
-        // If the image has neither an intrinsic width nor an intrinsic height, its size is determined as for 'contain'.
-        if ((size.width().isAuto() || size.height().isAuto()) && image->isGeneratedImage())
-            return true;
-    } else if (image->usesImageContainerSize())
-        return true;
-
-    return false;
-}
-
-bool RenderObject::borderImageIsLoadedAndCanBeRendered() const
-{
-    ASSERT(style().hasBorder());
-
-    StyleImage* borderImage = style().borderImage().image();
-    return borderImage && borderImage->canRender(toRenderElement(this), style().effectiveZoom()) && borderImage->isLoaded();
-}
-
-bool RenderObject::mustRepaintBackgroundOrBorder() const
-{
-    if (hasMask() && mustRepaintFillLayers(this, style().maskLayers()))
-        return true;
-
-    // If we don't have a background/border/mask, then nothing to do.
-    if (!hasBoxDecorations())
-        return false;
-
-    if (mustRepaintFillLayers(this, style().backgroundLayers()))
-        return true;
-     
-    // Our fill layers are ok.  Let's check border.
-    if (style().hasBorder() && borderImageIsLoadedAndCanBeRendered())
-        return true;
-
-    return false;
-}
-
 void RenderObject::drawLineForBoxSide(GraphicsContext* graphicsContext, int x1, int y1, int x2, int y2,
     BoxSide side, Color color, EBorderStyle borderStyle, int adjacentWidth1, int adjacentWidth2, bool antialias)
 {
@@ -1081,7 +1015,7 @@ void RenderObject::paintOutline(PaintInfo& paintInfo, const LayoutRect& paintRec
     int outlineOffset = styleToUse.outlineOffset();
 
     if (styleToUse.outlineStyleIsAuto() || hasOutlineAnnotation()) {
-        if (!theme()->supportsFocusRing(&styleToUse)) {
+        if (!theme().supportsFocusRing(&styleToUse)) {
             // Only paint the focus ring by hand if the theme isn't able to draw the focus ring.
             paintFocusRing(paintInfo, paintRect.location(), &styleToUse);
         }
@@ -1136,6 +1070,57 @@ void RenderObject::paintOutline(PaintInfo& paintInfo, const LayoutRect& paintRec
     if (useTransparencyLayer)
         graphicsContext->endTransparencyLayer();
 }
+
+// FIXME: Make this return an unsigned integer?
+int RenderObject::columnNumberForOffset(int offset)
+{
+    int columnNumber = 0;
+    RenderBlock* containingBlock = this->containingBlock();
+    RenderView& view = containingBlock->view();
+    const Pagination& pagination = view.frameView().frame().page()->pagination();
+    if (pagination.mode == Pagination::Unpaginated)
+        return columnNumber;
+
+    ColumnInfo* columnInfo = view.columnInfo();
+    if (columnInfo && columnInfo->progressionAxis() == ColumnInfo::BlockAxis) {
+        if (!columnInfo->progressionIsReversed())
+            columnNumber = (pagination.pageLength + pagination.gap - offset) / (pagination.pageLength + pagination.gap);
+        else
+            columnNumber = offset / (pagination.pageLength + pagination.gap);
+    }
+    return columnNumber;
+}
+
+#if PLATFORM(IOS)
+// This function is similar in spirit to RenderText::absoluteRectsForRange, but returns rectangles
+// which are annotated with additional state which helps iOS draw selections in its unique way.
+// No annotations are added in this class.
+// FIXME: Move to RenderText with absoluteRectsForRange()?
+void RenderObject::collectSelectionRects(Vector<SelectionRect>& rects, unsigned start, unsigned end)
+{
+    Vector<FloatQuad> quads;
+
+    if (!firstChildSlow()) {
+        // FIXME: WebKit's position for an empty span after a BR is incorrect, so we can't trust 
+        // quads for them. We don't need selection rects for those anyway though, since they 
+        // are just empty containers. See <https://bugs.webkit.org/show_bug.cgi?id=49358>.
+        RenderObject* previous = previousSibling();
+        Node* node = this->node();
+        if (!previous || !previous->isBR() || !node || !node->isContainerNode() || !isInline()) {
+            // For inline elements we don't use absoluteQuads, since it takes into account continuations and leads to wrong results.
+            absoluteQuadsForSelection(quads);
+        }
+    } else {
+        unsigned offset = start;
+        for (RenderObject* child = childAt(start); child && offset < end; child = child->nextSibling(), ++offset)
+            child->absoluteQuads(quads);
+    }
+
+    unsigned numberOfQuads = quads.size();
+    for (unsigned i = 0; i < numberOfQuads; ++i)
+        rects.append(SelectionRect(quads[i].enclosingBoundingBox(), isHorizontalWritingMode(), columnNumberForOffset(quads[i].enclosingBoundingBox().x())));
+}
+#endif
 
 IntRect RenderObject::absoluteBoundingBoxRect(bool useTransforms) const
 {
@@ -1348,116 +1333,6 @@ IntRect RenderObject::pixelSnappedAbsoluteClippedOverflowRect() const
     return pixelSnappedIntRect(absoluteClippedOverflowRect());
 }
 
-bool RenderObject::repaintAfterLayoutIfNeeded(const RenderLayerModelObject* repaintContainer, const LayoutRect& oldBounds, const LayoutRect& oldOutlineBox, const LayoutRect* newBoundsPtr, const LayoutRect* newOutlineBoxRectPtr)
-{
-    if (view().printing())
-        return false; // Don't repaint if we're printing.
-
-    // This ASSERT fails due to animations.  See https://bugs.webkit.org/show_bug.cgi?id=37048
-    // ASSERT(!newBoundsPtr || *newBoundsPtr == clippedOverflowRectForRepaint(repaintContainer));
-    LayoutRect newBounds = newBoundsPtr ? *newBoundsPtr : clippedOverflowRectForRepaint(repaintContainer);
-    LayoutRect newOutlineBox;
-
-    bool fullRepaint = selfNeedsLayout();
-    // Presumably a background or a border exists if border-fit:lines was specified.
-    if (!fullRepaint && style().borderFit() == BorderFitLines)
-        fullRepaint = true;
-    if (!fullRepaint) {
-        // This ASSERT fails due to animations.  See https://bugs.webkit.org/show_bug.cgi?id=37048
-        // ASSERT(!newOutlineBoxRectPtr || *newOutlineBoxRectPtr == outlineBoundsForRepaint(repaintContainer));
-        newOutlineBox = newOutlineBoxRectPtr ? *newOutlineBoxRectPtr : outlineBoundsForRepaint(repaintContainer);
-        if (newOutlineBox.location() != oldOutlineBox.location() || (mustRepaintBackgroundOrBorder() && (newBounds != oldBounds || newOutlineBox != oldOutlineBox)))
-            fullRepaint = true;
-    }
-
-    if (!repaintContainer)
-        repaintContainer = &view();
-
-    if (fullRepaint) {
-        repaintUsingContainer(repaintContainer, pixelSnappedIntRect(oldBounds));
-        if (newBounds != oldBounds)
-            repaintUsingContainer(repaintContainer, pixelSnappedIntRect(newBounds));
-        return true;
-    }
-
-    if (newBounds == oldBounds && newOutlineBox == oldOutlineBox)
-        return false;
-
-    LayoutUnit deltaLeft = newBounds.x() - oldBounds.x();
-    if (deltaLeft > 0)
-        repaintUsingContainer(repaintContainer, pixelSnappedIntRect(oldBounds.x(), oldBounds.y(), deltaLeft, oldBounds.height()));
-    else if (deltaLeft < 0)
-        repaintUsingContainer(repaintContainer, pixelSnappedIntRect(newBounds.x(), newBounds.y(), -deltaLeft, newBounds.height()));
-
-    LayoutUnit deltaRight = newBounds.maxX() - oldBounds.maxX();
-    if (deltaRight > 0)
-        repaintUsingContainer(repaintContainer, pixelSnappedIntRect(oldBounds.maxX(), newBounds.y(), deltaRight, newBounds.height()));
-    else if (deltaRight < 0)
-        repaintUsingContainer(repaintContainer, pixelSnappedIntRect(newBounds.maxX(), oldBounds.y(), -deltaRight, oldBounds.height()));
-
-    LayoutUnit deltaTop = newBounds.y() - oldBounds.y();
-    if (deltaTop > 0)
-        repaintUsingContainer(repaintContainer, pixelSnappedIntRect(oldBounds.x(), oldBounds.y(), oldBounds.width(), deltaTop));
-    else if (deltaTop < 0)
-        repaintUsingContainer(repaintContainer, pixelSnappedIntRect(newBounds.x(), newBounds.y(), newBounds.width(), -deltaTop));
-
-    LayoutUnit deltaBottom = newBounds.maxY() - oldBounds.maxY();
-    if (deltaBottom > 0)
-        repaintUsingContainer(repaintContainer, pixelSnappedIntRect(newBounds.x(), oldBounds.maxY(), newBounds.width(), deltaBottom));
-    else if (deltaBottom < 0)
-        repaintUsingContainer(repaintContainer, pixelSnappedIntRect(oldBounds.x(), newBounds.maxY(), oldBounds.width(), -deltaBottom));
-
-    if (newOutlineBox == oldOutlineBox)
-        return false;
-
-    // We didn't move, but we did change size. Invalidate the delta, which will consist of possibly
-    // two rectangles (but typically only one).
-    const RenderStyle& outlineStyle = outlineStyleForRepaint();
-    LayoutUnit outlineWidth = outlineStyle.outlineSize();
-    LayoutBoxExtent insetShadowExtent = style().getBoxShadowInsetExtent();
-    LayoutUnit width = absoluteValue(newOutlineBox.width() - oldOutlineBox.width());
-    if (width) {
-        LayoutUnit shadowLeft;
-        LayoutUnit shadowRight;
-        style().getBoxShadowHorizontalExtent(shadowLeft, shadowRight);
-        int borderRight = isBox() ? toRenderBox(this)->borderRight() : 0;
-        LayoutUnit boxWidth = isBox() ? toRenderBox(this)->width() : LayoutUnit();
-        LayoutUnit minInsetRightShadowExtent = std::min<LayoutUnit>(-insetShadowExtent.right(), std::min<LayoutUnit>(newBounds.width(), oldBounds.width()));
-        LayoutUnit borderWidth = std::max<LayoutUnit>(borderRight, std::max<LayoutUnit>(valueForLength(style().borderTopRightRadius().width(), boxWidth, &view()), valueForLength(style().borderBottomRightRadius().width(), boxWidth)));
-        LayoutUnit decorationsWidth = std::max<LayoutUnit>(-outlineStyle.outlineOffset(), borderWidth + minInsetRightShadowExtent) + std::max<LayoutUnit>(outlineWidth, shadowRight);
-        LayoutRect rightRect(newOutlineBox.x() + std::min(newOutlineBox.width(), oldOutlineBox.width()) - decorationsWidth,
-            newOutlineBox.y(),
-            width + decorationsWidth,
-            std::max(newOutlineBox.height(), oldOutlineBox.height()));
-        LayoutUnit right = std::min<LayoutUnit>(newBounds.maxX(), oldBounds.maxX());
-        if (rightRect.x() < right) {
-            rightRect.setWidth(std::min(rightRect.width(), right - rightRect.x()));
-            repaintUsingContainer(repaintContainer, pixelSnappedIntRect(rightRect));
-        }
-    }
-    LayoutUnit height = absoluteValue(newOutlineBox.height() - oldOutlineBox.height());
-    if (height) {
-        LayoutUnit shadowTop;
-        LayoutUnit shadowBottom;
-        style().getBoxShadowVerticalExtent(shadowTop, shadowBottom);
-        int borderBottom = isBox() ? toRenderBox(this)->borderBottom() : 0;
-        LayoutUnit boxHeight = isBox() ? toRenderBox(this)->height() : LayoutUnit();
-        LayoutUnit minInsetBottomShadowExtent = std::min<LayoutUnit>(-insetShadowExtent.bottom(), std::min<LayoutUnit>(newBounds.height(), oldBounds.height()));
-        LayoutUnit borderHeight = std::max<LayoutUnit>(borderBottom, std::max<LayoutUnit>(valueForLength(style().borderBottomLeftRadius().height(), boxHeight), valueForLength(style().borderBottomRightRadius().height(), boxHeight, &view())));
-        LayoutUnit decorationsHeight = std::max<LayoutUnit>(-outlineStyle.outlineOffset(), borderHeight + minInsetBottomShadowExtent) + std::max<LayoutUnit>(outlineWidth, shadowBottom);
-        LayoutRect bottomRect(newOutlineBox.x(),
-            std::min(newOutlineBox.maxY(), oldOutlineBox.maxY()) - decorationsHeight,
-            std::max(newOutlineBox.width(), oldOutlineBox.width()),
-            height + decorationsHeight);
-        LayoutUnit bottom = std::min(newBounds.maxY(), oldBounds.maxY());
-        if (bottomRect.y() < bottom) {
-            bottomRect.setHeight(std::min(bottomRect.height(), bottom - bottomRect.y()));
-            repaintUsingContainer(repaintContainer, pixelSnappedIntRect(bottomRect));
-        }
-    }
-    return false;
-}
-
 bool RenderObject::checkForRepaintDuringLayout() const
 {
     return !document().view()->needsFullRepaint() && !hasLayer() && everHadLayout();
@@ -1580,7 +1455,7 @@ Color RenderObject::selectionBackgroundColor() const
             if (pseudoStyle && pseudoStyle->visitedDependentColor(CSSPropertyBackgroundColor).isValid())
                 color = pseudoStyle->visitedDependentColor(CSSPropertyBackgroundColor).blendWithWhite();
             else
-                color = frame().selection().isFocusedAndActive() ? theme()->activeSelectionBackgroundColor() : theme()->inactiveSelectionBackgroundColor();
+                color = frame().selection().isFocusedAndActive() ? theme().activeSelectionBackgroundColor() : theme().inactiveSelectionBackgroundColor();
         }
     }
 
@@ -1601,9 +1476,7 @@ Color RenderObject::selectionColor(int colorProperty) const
         if (!color.isValid())
             color = pseudoStyle->visitedDependentColor(CSSPropertyColor);
     } else
-        color = frame().selection().isFocusedAndActive() ?
-                theme()->activeSelectionForegroundColor() :
-                theme()->inactiveSelectionForegroundColor();
+        color = frame().selection().isFocusedAndActive() ? theme().activeSelectionForegroundColor() : theme().inactiveSelectionForegroundColor();
 
     return color;
 }
@@ -2103,6 +1976,11 @@ void RenderObject::destroyAndCleanupAnonymousWrappers()
 
 void RenderObject::destroy()
 {
+#if PLATFORM(IOS)
+    if (hasLayer())
+        toRenderBoxModelObject(this)->layer()->willBeDestroyed();
+#endif
+
     willBeDestroyed();
     delete this;
 }
@@ -2175,6 +2053,11 @@ void RenderObject::updateHitTestResult(HitTestResult& result, const LayoutPoint&
 bool RenderObject::nodeAtPoint(const HitTestRequest&, HitTestResult&, const HitTestLocation& /*locationInContainer*/, const LayoutPoint& /*accumulatedOffset*/, HitTestAction)
 {
     return false;
+}
+
+int RenderObject::innerLineHeight() const
+{
+    return style().computedLineHeight();
 }
 
 RenderStyle* RenderObject::getCachedPseudoStyle(PseudoId pseudo, RenderStyle* parentStyle) const
@@ -2353,9 +2236,14 @@ bool RenderObject::willRenderImage(CachedImage*)
     if (style().visibility() != VISIBLE)
         return false;
 
+#if PLATFORM(IOS)
+    if (document().frame()->timersPaused())
+        return false;
+#else
     // We will not render a new image when Active DOM is suspended
     if (document().activeDOMObjectsAreSuspended())
         return false;
+#endif
 
     // If we're not in a window (i.e., we're dormant from being put in the b/f cache or in a background tab)
     // then we don't want to render either.

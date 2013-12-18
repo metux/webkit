@@ -26,6 +26,7 @@
 #include "config.h"
 #include "WebProcess.h"
 
+#include "APIFrameHandle.h"
 #include "AuthenticationManager.h"
 #include "EventDispatcher.h"
 #include "InjectedBundle.h"
@@ -33,6 +34,7 @@
 #include "Logging.h"
 #include "PluginProcessConnectionManager.h"
 #include "StatisticsData.h"
+#include "UserData.h"
 #include "WebApplicationCacheManager.h"
 #include "WebConnectionToUIProcess.h"
 #include "WebContextMessages.h"
@@ -97,6 +99,9 @@
 #include "NetworkProcessConnection.h"
 #endif
 
+#if ENABLE(SEC_ITEM_SHIM)
+#include "SecItemShim.h"
+#endif
 
 #if ENABLE(CUSTOM_PROTOCOLS)
 #include "CustomProtocolManager.h"
@@ -120,10 +125,6 @@
 
 #if ENABLE(NETWORK_PROCESS)
 #include "WebResourceLoadScheduler.h"
-#endif
-
-#if USE(SECURITY_FRAMEWORK)
-#include "SecItemShim.h"
 #endif
 
 #if USE(SOUP)
@@ -221,7 +222,7 @@ void WebProcess::initializeConnection(CoreIPC::Connection* connection)
     m_pluginProcessConnectionManager->initializeConnection(connection);
 #endif
 
-#if USE(SECURITY_FRAMEWORK)
+#if ENABLE(SEC_ITEM_SHIM)
     SecItemShim::shared().initializeConnection(connection);
 #endif
     
@@ -373,11 +374,13 @@ void WebProcess::ensureNetworkProcessConnection()
 
 #if PLATFORM(MAC)
     CoreIPC::Connection::Identifier connectionIdentifier(encodedConnectionIdentifier.port());
-    if (CoreIPC::Connection::identifierIsNull(connectionIdentifier))
-        return;
+#elif USE(UNIX_DOMAIN_SOCKETS)
+    CoreIPC::Connection::Identifier connectionIdentifier = encodedConnectionIdentifier.releaseFileDescriptor();
 #else
     ASSERT_NOT_REACHED();
 #endif
+    if (CoreIPC::Connection::identifierIsNull(connectionIdentifier))
+        return;
     m_networkProcessConnection = NetworkProcessConnection::create(connectionIdentifier);
 }
 #endif // ENABLE(NETWORK_PROCESS)
@@ -721,7 +724,7 @@ WebPageGroupProxy* WebProcess::webPageGroup(uint64_t pageGroupID)
 
 WebPageGroupProxy* WebProcess::webPageGroup(const WebPageGroupData& pageGroupData)
 {
-    HashMap<uint64_t, RefPtr<WebPageGroupProxy>>::AddResult result = m_pageGroupMap.add(pageGroupData.pageGroupID, nullptr);
+    auto result = m_pageGroupMap.add(pageGroupData.pageGroupID, nullptr);
     if (result.isNewEntry) {
         ASSERT(!result.iterator->value);
         result.iterator->value = WebPageGroupProxy::create(pageGroupData);
@@ -1146,7 +1149,18 @@ void WebProcess::updateActivePages()
 }
 
 #endif
-    
+
+#if PLATFORM(IOS)
+void WebProcess::resetAllGeolocationPermissions()
+{
+    for (auto it = m_pageMap.begin(), end = m_pageMap.end(); it != end; ++it) {
+        WebPage* page = (*it).value.get();
+        if (Frame* mainFrame = page->mainFrame())
+            mainFrame->resetAllGeolocationPermission();
+    }
+}
+#endif // PLATFORM(IOS)
+
 void WebProcess::pageDidEnterWindow(uint64_t pageID)
 {
     m_pagesInWindows.add(pageID);
@@ -1170,6 +1184,22 @@ void WebProcess::nonVisibleProcessCleanupTimerFired(Timer<WebProcess>*)
 #if PLATFORM(MAC)
     wkDestroyRenderingResources();
 #endif
+}
+
+RefPtr<API::Object> WebProcess::apiObjectByConvertingFromHandles(API::Object* object)
+{
+    return UserData::transform(object, [this](const API::Object& object) -> RefPtr<API::Object> {
+        switch (object.type()) {
+        case API::Object::Type::FrameHandle: {
+            auto& frameHandle = static_cast<const API::FrameHandle&>(object);
+
+            return webFrame(frameHandle.frameID());
+        }
+
+        default:
+            return nullptr;
+        }
+    });
 }
 
 } // namespace WebKit

@@ -46,14 +46,14 @@ class WebContext;
 class WebPageProxy;
 class WebSecurityOrigin;
 
-class WebNotificationManagerProxy : public API::TypedObject<API::Object::Type::NotificationManager>, public WebContextSupplement {
+class WebNotificationManagerProxy : public API::ObjectImpl<API::Object::Type::NotificationManager>, public WebContextSupplement {
 public:
 
     static const char* supplementName();
 
     static PassRefPtr<WebNotificationManagerProxy> create(WebContext*);
 
-    void initializeProvider(const WKNotificationProvider*);
+    void initializeProvider(const WKNotificationProviderBase*);
     void populateCopyOfNotificationPermissions(HashMap<String, bool>&);
 
     void show(WebPageProxy*, const String& title, const String& body, const String& iconURL, const String& tag, const String& lang, const String& dir, const String& originString, uint64_t pageNotificationID);

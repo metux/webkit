@@ -45,9 +45,9 @@ PassRefPtr<WebOriginDataManagerProxy> WebOriginDataManagerProxy::create(WebConte
 }
 
 WebOriginDataManagerProxy::WebOriginDataManagerProxy(WebContext* context)
-: WebContextSupplement(context)
+    : WebContextSupplement(context)
 {
-    context->addMessageReceiver(Messages::WebOriginDataManagerProxy::messageReceiverName(), this);
+    context->addMessageReceiver(Messages::WebOriginDataManagerProxy::messageReceiverName(), *this);
 }
 
 WebOriginDataManagerProxy::~WebOriginDataManagerProxy()
@@ -139,7 +139,7 @@ void WebOriginDataManagerProxy::stopObservingChanges(WKOriginDataTypes types)
     context()->sendToAllProcessesRelaunchingThemIfNecessary(Messages::WebOriginDataManager::StartObservingChanges(types));
 }
 
-void WebOriginDataManagerProxy::setChangeClient(const WKOriginDataManagerChangeClient *client)
+void WebOriginDataManagerProxy::setChangeClient(const WKOriginDataManagerChangeClientBase *client)
 {
     m_client.initialize(client);
 }

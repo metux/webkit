@@ -56,7 +56,7 @@ WebIconDatabase::WebIconDatabase(WebContext* context)
     , m_urlImportCompleted(false)
     , m_databaseCleanupDisabled(false)
 {
-    m_webContext->addMessageReceiver(Messages::WebIconDatabase::messageReceiverName(), this);
+    m_webContext->addMessageReceiver(Messages::WebIconDatabase::messageReceiverName(), *this);
 }
 
 void WebIconDatabase::invalidate()
@@ -238,7 +238,7 @@ void WebIconDatabase::close()
         m_iconDatabaseImpl->close();
 }
 
-void WebIconDatabase::initializeIconDatabaseClient(const WKIconDatabaseClient* client)
+void WebIconDatabase::initializeIconDatabaseClient(const WKIconDatabaseClientBase* client)
 {
     m_iconDatabaseClient.initialize(client);
 }

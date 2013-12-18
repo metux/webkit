@@ -43,6 +43,10 @@
 // FIXME: This is a layering violation.
 #include "JSDOMWindow.h"
 
+#if PLATFORM(IOS)
+#include "Document.h"
+#endif
+
 #if ENABLE(SQL_DATABASE)
 #include "DatabaseContext.h"
 #endif
@@ -143,10 +147,8 @@ void ScriptExecutionContext::dispatchMessagePortEvents()
 void ScriptExecutionContext::createdMessagePort(MessagePort* port)
 {
     ASSERT(port);
-#if ENABLE(WORKERS)
     ASSERT((isDocument() && isMainThread())
         || (isWorkerGlobalScope() && currentThread() == static_cast<WorkerGlobalScope*>(this)->thread()->threadID()));
-#endif
 
     m_messagePorts.add(port);
 }
@@ -154,10 +156,8 @@ void ScriptExecutionContext::createdMessagePort(MessagePort* port)
 void ScriptExecutionContext::destroyedMessagePort(MessagePort* port)
 {
     ASSERT(port);
-#if ENABLE(WORKERS)
     ASSERT((isDocument() && isMainThread())
         || (isWorkerGlobalScope() && currentThread() == static_cast<WorkerGlobalScope*>(this)->thread()->threadID()));
-#endif
 
     m_messagePorts.remove(port);
 }
@@ -181,6 +181,13 @@ bool ScriptExecutionContext::canSuspendActiveDOMObjects()
 
 void ScriptExecutionContext::suspendActiveDOMObjects(ActiveDOMObject::ReasonForSuspension why)
 {
+#if PLATFORM(IOS)
+    if (m_activeDOMObjectsAreSuspended) {
+        ASSERT(m_reasonForSuspendingActiveDOMObjects == ActiveDOMObject::DocumentWillBePaused);
+        return;
+    }
+#endif
+
     // No protection against m_activeDOMObjects changing during iteration: suspend() shouldn't execute arbitrary JS.
     m_iteratingActiveDOMObjects = true;
     ActiveDOMObjectsSet::iterator activeObjectsEnd = m_activeDOMObjects.end();
@@ -324,6 +331,14 @@ bool ScriptExecutionContext::dispatchErrorEvent(const String& errorMessage, int 
     if (!target)
         return false;
 
+#if PLATFORM(IOS)
+    if (target == target->toDOMWindow() && isDocument()) {
+        Settings* settings = static_cast<Document*>(this)->settings();
+        if (settings && !settings->shouldDispatchJavaScriptWindowOnErrorEvents())
+            return false;
+    }
+#endif
+
     String message = errorMessage;
     int line = lineNumber;
     int column = columnNumber;
@@ -397,10 +412,8 @@ JSC::VM* ScriptExecutionContext::vm()
      if (isDocument())
         return JSDOMWindow::commonVM();
 
-#if ENABLE(WORKERS)
     if (isWorkerGlobalScope())
         return static_cast<WorkerGlobalScope*>(this)->script()->vm();
-#endif
 
     ASSERT_NOT_REACHED();
     return 0;

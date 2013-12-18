@@ -58,12 +58,6 @@ RenderTextFragment::~RenderTextFragment()
 {
 }
 
-String RenderTextFragment::originalText() const
-{
-    String result = textNode() ? textNode()->data() : contentString();
-    return result.substring(start(), end());
-}
-
 bool RenderTextFragment::canBeSelectionLeaf() const
 {
     return textNode() && textNode()->rendererIsEditable();
@@ -103,14 +97,6 @@ void RenderTextFragment::setText(const String& text, bool force)
     textNode()->setRenderer(this);
 }
 
-void RenderTextFragment::transformText()
-{
-    // Don't reset first-letter here because we are only transforming the truncated fragment.
-    String textToTransform = originalText();
-    if (!textToTransform.isNull())
-        RenderText::setText(textToTransform, true);
-}
-
 UChar RenderTextFragment::previousCharacter() const
 {
     if (start()) {
@@ -126,10 +112,9 @@ RenderBlock* RenderTextFragment::blockForAccompanyingFirstLetter()
 {
     if (!m_firstLetter)
         return nullptr;
-    auto ancestorBlocks = ancestorsOfType<RenderBlock>(*m_firstLetter);
-    for (auto block = ancestorBlocks.begin(), end = ancestorBlocks.end(); block != end; ++block) {
-        if (block->style().hasPseudoStyle(FIRST_LETTER) && block->canHaveChildren())
-            return &*block;
+    for (auto& block : ancestorsOfType<RenderBlock>(*m_firstLetter)) {
+        if (block.style().hasPseudoStyle(FIRST_LETTER) && block.canHaveChildren())
+            return &block;
     }
     return nullptr;
 }

@@ -323,6 +323,10 @@
     <keyword type="function" name="webkit_settings_set_enable_write_console_messages_to_stdout ()" link="WebKitSettings.html#webkit-settings-set-enable-write-console-messages-to-stdout" since="2.2"/>
     <keyword type="function" name="webkit_settings_get_enable_media_stream ()" link="WebKitSettings.html#webkit-settings-get-enable-media-stream" since="2.4"/>
     <keyword type="function" name="webkit_settings_set_enable_media_stream ()" link="WebKitSettings.html#webkit-settings-set-enable-media-stream" since="2.4"/>
+    <keyword type="function" name="webkit_settings_get_enable_spatial_navigation ()" link="WebKitSettings.html#webkit-settings-get-enable-spatial-navigation" since="2.2"/>
+    <keyword type="function" name="webkit_settings_set_enable_spatial_navigation ()" link="WebKitSettings.html#webkit-settings-set-enable-spatial-navigation" since="2.2"/>
+    <keyword type="function" name="webkit_settings_get_enable_mediasource ()" link="WebKitSettings.html#webkit-settings-get-enable-mediasource" since="2.4"/>
+    <keyword type="function" name="webkit_settings_set_enable_mediasource ()" link="WebKitSettings.html#webkit-settings-set-enable-mediasource" since="2.4"/>
     <keyword type="property" name="The &quot;allow-modal-dialogs&quot; property" link="WebKitSettings.html#WebKitSettings--allow-modal-dialogs"/>
     <keyword type="property" name="The &quot;auto-load-images&quot; property" link="WebKitSettings.html#WebKitSettings--auto-load-images"/>
     <keyword type="property" name="The &quot;cursive-font-family&quot; property" link="WebKitSettings.html#WebKitSettings--cursive-font-family"/>
@@ -343,6 +347,7 @@
     <keyword type="property" name="The &quot;enable-java&quot; property" link="WebKitSettings.html#WebKitSettings--enable-java"/>
     <keyword type="property" name="The &quot;enable-javascript&quot; property" link="WebKitSettings.html#WebKitSettings--enable-javascript"/>
     <keyword type="property" name="The &quot;enable-media-stream&quot; property" link="WebKitSettings.html#WebKitSettings--enable-media-stream"/>
+    <keyword type="property" name="The &quot;enable-mediasource&quot; property" link="WebKitSettings.html#WebKitSettings--enable-mediasource"/>
     <keyword type="property" name="The &quot;enable-offline-web-application-cache&quot; property" link="WebKitSettings.html#WebKitSettings--enable-offline-web-application-cache"/>
     <keyword type="property" name="The &quot;enable-page-cache&quot; property" link="WebKitSettings.html#WebKitSettings--enable-page-cache"/>
     <keyword type="property" name="The &quot;enable-plugins&quot; property" link="WebKitSettings.html#WebKitSettings--enable-plugins"/>
@@ -350,6 +355,7 @@
     <keyword type="property" name="The &quot;enable-resizable-text-areas&quot; property" link="WebKitSettings.html#WebKitSettings--enable-resizable-text-areas"/>
     <keyword type="property" name="The &quot;enable-site-specific-quirks&quot; property" link="WebKitSettings.html#WebKitSettings--enable-site-specific-quirks"/>
     <keyword type="property" name="The &quot;enable-smooth-scrolling&quot; property" link="WebKitSettings.html#WebKitSettings--enable-smooth-scrolling"/>
+    <keyword type="property" name="The &quot;enable-spatial-navigation&quot; property" link="WebKitSettings.html#WebKitSettings--enable-spatial-navigation"/>
     <keyword type="property" name="The &quot;enable-tabs-to-links&quot; property" link="WebKitSettings.html#WebKitSettings--enable-tabs-to-links"/>
     <keyword type="property" name="The &quot;enable-webaudio&quot; property" link="WebKitSettings.html#WebKitSettings--enable-webaudio"/>
     <keyword type="property" name="The &quot;enable-webgl&quot; property" link="WebKitSettings.html#WebKitSettings--enable-webgl"/>

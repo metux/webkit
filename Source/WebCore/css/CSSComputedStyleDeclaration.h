@@ -32,13 +32,13 @@ class CSSPrimitiveValue;
 class CSSValueList;
 class Color;
 class FilterOperations;
-class MutableStylePropertySet;
+class MutableStyleProperties;
 class Node;
 class RenderObject;
 class RenderStyle;
 class SVGPaint;
 class ShadowData;
-class StylePropertySet;
+class StyleProperties;
 class StylePropertyShorthand;
 
 #if ENABLE(CSS_SHADERS)
@@ -57,14 +57,14 @@ public:
     PassRefPtr<CSSValue> propertyValue(CSSPropertyID, EUpdateLayout = UpdateLayout) const;
 
     // Helper methods for HTML editing.
-    PassRef<MutableStylePropertySet> copyPropertiesInSet(const CSSPropertyID* set, unsigned length) const;
-    PassRef<MutableStylePropertySet> copyProperties() const;
+    PassRef<MutableStyleProperties> copyPropertiesInSet(const CSSPropertyID* set, unsigned length) const;
+    PassRef<MutableStyleProperties> copyProperties() const;
     PassRefPtr<CSSPrimitiveValue> getFontSizeCSSValuePreferringKeyword() const;
     bool useFixedFontDefaultSize() const;
     bool propertyMatches(CSSPropertyID, const CSSValue*) const;
 
 #if ENABLE(CSS_FILTERS)
-    static PassRefPtr<CSSValue> valueForFilter(const RenderObject*, const RenderStyle*, const FilterOperations&, AdjustPixelValuesForComputedStyle = AdjustPixelValues);
+    static PassRef<CSSValue> valueForFilter(const RenderObject*, const RenderStyle*, const FilterOperations&, AdjustPixelValuesForComputedStyle = AdjustPixelValues);
 #endif
 
 private:
@@ -124,7 +124,7 @@ private:
     virtual PassRefPtr<CSSValue> getPropertyCSSValueInternal(CSSPropertyID) OVERRIDE;
     virtual String getPropertyValueInternal(CSSPropertyID) OVERRIDE;
     virtual void setPropertyInternal(CSSPropertyID, const String& value, bool important, ExceptionCode&) OVERRIDE;
-    virtual PassRef<MutableStylePropertySet> copyProperties() const OVERRIDE;
+    virtual PassRef<MutableStyleProperties> copyProperties() const OVERRIDE;
 
     PassRefPtr<CSSValue> getPropertyCSSValue(CSSPropertyID, EUpdateLayout = UpdateLayout) const;
 

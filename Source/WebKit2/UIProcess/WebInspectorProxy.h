@@ -69,7 +69,7 @@ enum AttachmentSide {
     AttachmentSideRight
 };
 
-class WebInspectorProxy : public API::TypedObject<API::Object::Type::Inspector>, public CoreIPC::MessageReceiver {
+class WebInspectorProxy : public API::ObjectImpl<API::Object::Type::Inspector>, public CoreIPC::MessageReceiver {
 public:
     static PassRefPtr<WebInspectorProxy> create(WebPageProxy* page)
     {
@@ -106,7 +106,7 @@ public:
 
 #if PLATFORM(GTK)
     GtkWidget* inspectorView() const { return m_inspectorView; };
-    void initializeInspectorClientGtk(const WKInspectorClientGtk*);
+    void initializeInspectorClientGtk(const WKInspectorClientGtkBase*);
 #endif
 
     void showConsole();
@@ -132,7 +132,7 @@ public:
     bool isProfilingPage() const { return m_isProfilingPage; }
     void togglePageProfiling();
 
-    static bool isInspectorPage(WebPageProxy*);
+    static bool isInspectorPage(WebPageProxy&);
 
     // Implemented the platform WebInspectorProxy file
     String inspectorPageURL() const;

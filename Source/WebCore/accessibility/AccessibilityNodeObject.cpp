@@ -68,6 +68,7 @@
 #include "NodeTraversal.h"
 #include "Page.h"
 #include "ProgressTracker.h"
+#include "RenderImage.h"
 #include "RenderView.h"
 #include "SVGElement.h"
 #include "SVGNames.h"
@@ -1025,15 +1026,14 @@ Element* AccessibilityNodeObject::mouseButtonListener() const
 
     // check if our parent is a mouse button listener
     // FIXME: Do the continuation search like anchorElement does
-    auto lineage = elementLineage(node->isElementNode() ? toElement(node) : node->parentElement());
-    for (auto element = lineage.begin(), end = lineage.end(); element != end; ++element) {
+    for (auto& element : elementLineage(node->isElementNode() ? toElement(node) : node->parentElement())) {
         // If we've reached the body and this is not a control element, do not expose press action for this element.
         // It can cause false positives, where every piece of text is labeled as accepting press actions. 
-        if (element->hasTagName(bodyTag) && isStaticText())
+        if (element.hasTagName(bodyTag) && isStaticText())
             break;
         
-        if (element->hasEventListeners(eventNames().clickEvent) || element->hasEventListeners(eventNames().mousedownEvent) || element->hasEventListeners(eventNames().mouseupEvent))
-            return &*element;
+        if (element.hasEventListeners(eventNames().clickEvent) || element.hasEventListeners(eventNames().mousedownEvent) || element.hasEventListeners(eventNames().mouseupEvent))
+            return &element;
     }
 
     return 0;
@@ -1165,21 +1165,21 @@ static Element* siblingWithAriaRole(String role, Node* node)
 {
     ContainerNode* parent = node->parentNode();
     if (!parent)
-        return 0;
-    auto children = elementChildren(*parent);
-    for (auto sibling = children.begin(), end = children.end(); sibling != end; ++sibling) {
-        const AtomicString& siblingAriaRole = sibling->fastGetAttribute(roleAttr);
+        return nullptr;
+
+    for (auto& sibling : elementChildren(*parent)) {
+        const AtomicString& siblingAriaRole = sibling.fastGetAttribute(roleAttr);
         if (equalIgnoringCase(siblingAriaRole, role))
-            return &*sibling;
+            return &sibling;
     }
 
-    return 0;
+    return nullptr;
 }
 
 Element* AccessibilityNodeObject::menuElementForMenuButton() const
 {
     if (ariaRoleAttribute() != MenuButtonRole)
-        return 0;
+        return nullptr;
 
     return siblingWithAriaRole("menu", node());
 }
@@ -1210,6 +1210,11 @@ AccessibilityObject* AccessibilityNodeObject::menuButtonForMenu() const
     return 0;
 }
 
+bool AccessibilityNodeObject::usesAltTagForTextComputation() const
+{
+    return isImage() || isInputImage() || isNativeImage() || isCanvas() || (node() && node()->hasTagName(imgTag));
+}
+    
 void AccessibilityNodeObject::titleElementText(Vector<AccessibilityText>& textOrder) const
 {
     Node* node = this->node();
@@ -1249,11 +1254,20 @@ void AccessibilityNodeObject::alternativeText(Vector<AccessibilityText>& textOrd
     if (!ariaLabel.isEmpty())
         textOrder.append(AccessibilityText(ariaLabel, AlternativeText));
     
-    if (isImage() || isInputImage() || isNativeImage() || isCanvas()) {
+    if (usesAltTagForTextComputation()) {
+        if (renderer() && renderer()->isRenderImage()) {
+            String renderAltText = toRenderImage(renderer())->altText();
+
+            // RenderImage will return title as a fallback from altText, but we don't want title here because we consider that in helpText.
+            if (!renderAltText.isEmpty() && renderAltText != getAttribute(titleAttr)) {
+                textOrder.append(AccessibilityText(renderAltText, AlternativeText));
+                return;
+            }
+        }
         // Images should use alt as long as the attribute is present, even if empty.
         // Otherwise, it should fallback to other methods, like the title attribute.
         const AtomicString& alt = getAttribute(altAttr);
-        if (!alt.isNull())
+        if (!alt.isEmpty())
             textOrder.append(AccessibilityText(alt, AlternativeText));
     }
     
@@ -1469,7 +1483,7 @@ String AccessibilityNodeObject::accessibilityDescription() const
     if (!ariaDescription.isEmpty())
         return ariaDescription;
 
-    if (isImage() || isInputImage() || isNativeImage() || isCanvas()) {
+    if (usesAltTagForTextComputation()) {
         // Images should use alt as long as the attribute is present, even if empty.                    
         // Otherwise, it should fallback to other methods, like the title attribute.                    
         const AtomicString& alt = getAttribute(altAttr);
@@ -1729,8 +1743,12 @@ String AccessibilityNodeObject::title() const
 String AccessibilityNodeObject::text() const
 {
     // If this is a user defined static text, use the accessible name computation.                                      
-    if (ariaRoleAttribute() == StaticTextRole)
-        return ariaAccessibilityDescription();
+    if (ariaRoleAttribute() == StaticTextRole) {
+        Vector<AccessibilityText> textOrder;
+        alternativeText(textOrder);
+        if (textOrder.size() > 0 && textOrder[0].text.length())
+            return textOrder[0].text;
+    }
 
     if (!isTextControl())
         return String();
@@ -1900,9 +1918,9 @@ void AccessibilityNodeObject::elementsFromAttribute(Vector<Element*>& elements, 
 
 void AccessibilityNodeObject::ariaLabeledByElements(Vector<Element*>& elements) const
 {
-    elementsFromAttribute(elements, aria_labeledbyAttr);
+    elementsFromAttribute(elements, aria_labelledbyAttr);
     if (!elements.size())
-        elementsFromAttribute(elements, aria_labelledbyAttr);
+        elementsFromAttribute(elements, aria_labeledbyAttr);
 }
 
 

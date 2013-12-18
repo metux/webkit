@@ -94,6 +94,20 @@
                                                         (<em class="parameter"><code><a class="link" href="WebKitDOMHTMLFormElement.html" title="WebKitDOMHTMLFormElement"><span class="type">WebKitDOMHTMLFormElement</span></a> *self</code></em>);
 <a href="../glib/glib-Basic-Types.html#glong"><span class="returnvalue">glong</span></a>               <a class="link" href="WebKitDOMHTMLFormElement.html#webkit-dom-html-form-element-get-length" title="webkit_dom_html_form_element_get_length ()">webkit_dom_html_form_element_get_length</a>
                                                         (<em class="parameter"><code><a class="link" href="WebKitDOMHTMLFormElement.html" title="WebKitDOMHTMLFormElement"><span class="type">WebKitDOMHTMLFormElement</span></a> *self</code></em>);
+<a href="../glib/glib-Basic-Types.html#gboolean"><span class="returnvalue">gboolean</span></a>            <a class="link" href="WebKitDOMHTMLFormElement.html#webkit-dom-html-form-element-get-autocorrect" title="webkit_dom_html_form_element_get_autocorrect ()">webkit_dom_html_form_element_get_autocorrect</a>
+                                                        (<em class="parameter"><code><a class="link" href="WebKitDOMHTMLFormElement.html" title="WebKitDOMHTMLFormElement"><span class="type">WebKitDOMHTMLFormElement</span></a> *self</code></em>);
+<span class="returnvalue">void</span>                <a class="link" href="WebKitDOMHTMLFormElement.html#webkit-dom-html-form-element-set-autocorrect" title="webkit_dom_html_form_element_set_autocorrect ()">webkit_dom_html_form_element_set_autocorrect</a>
+                                                        (<em class="parameter"><code><a class="link" href="WebKitDOMHTMLFormElement.html" title="WebKitDOMHTMLFormElement"><span class="type">WebKitDOMHTMLFormElement</span></a> *self</code></em>,
+                                                         <em class="parameter"><code><a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a> value</code></em>);
+<a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gchar</span></a> *             <a class="link" href="WebKitDOMHTMLFormElement.html#webkit-dom-html-form-element-get-autocapitalize" title="webkit_dom_html_form_element_get_autocapitalize ()">webkit_dom_html_form_element_get_autocapitalize</a>
+                                                        (<em class="parameter"><code><a class="link" href="WebKitDOMHTMLFormElement.html" title="WebKitDOMHTMLFormElement"><span class="type">WebKitDOMHTMLFormElement</span></a> *self</code></em>);
+<span class="returnvalue">void</span>                <a class="link" href="WebKitDOMHTMLFormElement.html#webkit-dom-html-form-element-set-autocapitalize" title="webkit_dom_html_form_element_set_autocapitalize ()">webkit_dom_html_form_element_set_autocapitalize</a>
+                                                        (<em class="parameter"><code><a class="link" href="WebKitDOMHTMLFormElement.html" title="WebKitDOMHTMLFormElement"><span class="type">WebKitDOMHTMLFormElement</span></a> *self</code></em>,
+                                                         <em class="parameter"><code>const <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a> *value</code></em>);
+<span class="returnvalue">void</span>                <a class="link" href="WebKitDOMHTMLFormElement.html#webkit-dom-html-form-element-dispatch-form-change" title="webkit_dom_html_form_element_dispatch_form_change ()">webkit_dom_html_form_element_dispatch_form_change</a>
+                                                        (<em class="parameter"><code><a class="link" href="WebKitDOMHTMLFormElement.html" title="WebKitDOMHTMLFormElement"><span class="type">WebKitDOMHTMLFormElement</span></a> *self</code></em>);
+<span class="returnvalue">void</span>                <a class="link" href="WebKitDOMHTMLFormElement.html#webkit-dom-html-form-element-dispatch-form-input" title="webkit_dom_html_form_element_dispatch_form_input ()">webkit_dom_html_form_element_dispatch_form_input</a>
+                                                        (<em class="parameter"><code><a class="link" href="WebKitDOMHTMLFormElement.html" title="WebKitDOMHTMLFormElement"><span class="type">WebKitDOMHTMLFormElement</span></a> *self</code></em>);
 </pre>
 </div>
 <div class="refsect1">
@@ -118,7 +132,9 @@ WebKitDOMHTMLFormElement implements
 <pre class="synopsis">
   "<a class="link" href="WebKitDOMHTMLFormElement.html#WebKitDOMHTMLFormElement--accept-charset" title='The "accept-charset" property'>accept-charset</a>"           <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a>*                : Read / Write
   "<a class="link" href="WebKitDOMHTMLFormElement.html#WebKitDOMHTMLFormElement--action" title='The "action" property'>action</a>"                   <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a>*                : Read / Write
+  "<a class="link" href="WebKitDOMHTMLFormElement.html#WebKitDOMHTMLFormElement--autocapitalize" title='The "autocapitalize" property'>autocapitalize</a>"           <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a>*                : Read / Write
   "<a class="link" href="WebKitDOMHTMLFormElement.html#WebKitDOMHTMLFormElement--autocomplete" title='The "autocomplete" property'>autocomplete</a>"             <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a>*                : Read / Write
+  "<a class="link" href="WebKitDOMHTMLFormElement.html#WebKitDOMHTMLFormElement--autocorrect" title='The "autocorrect" property'>autocorrect</a>"              <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read / Write
   "<a class="link" href="WebKitDOMHTMLFormElement.html#WebKitDOMHTMLFormElement--elements" title='The "elements" property'>elements</a>"                 <a class="link" href="WebKitDOMHTMLCollection.html" title="WebKitDOMHTMLCollection"><span class="type">WebKitDOMHTMLCollection</span></a>*  : Read
   "<a class="link" href="WebKitDOMHTMLFormElement.html#WebKitDOMHTMLFormElement--encoding" title='The "encoding" property'>encoding</a>"                 <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a>*                : Read / Write
   "<a class="link" href="WebKitDOMHTMLFormElement.html#WebKitDOMHTMLFormElement--enctype" title='The "enctype" property'>enctype</a>"                  <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a>*                : Read / Write
@@ -687,6 +703,146 @@ WebKitDOMHTMLFormElement implements
 </tbody>
 </table></div>
 </div>
+<hr>
+<div class="refsect2">
+<a name="webkit-dom-html-form-element-get-autocorrect"></a><h3>webkit_dom_html_form_element_get_autocorrect ()</h3>
+<pre class="programlisting"><a href="../glib/glib-Basic-Types.html#gboolean"><span class="returnvalue">gboolean</span></a>            webkit_dom_html_form_element_get_autocorrect
+                                                        (<em class="parameter"><code><a class="link" href="WebKitDOMHTMLFormElement.html" title="WebKitDOMHTMLFormElement"><span class="type">WebKitDOMHTMLFormElement</span></a> *self</code></em>);</pre>
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
+<col align="left" valign="top">
+<col>
+</colgroup>
+<tbody>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>self</code></em> :</span></p></td>
+<td>A <a class="link" href="WebKitDOMHTMLFormElement.html" title="WebKitDOMHTMLFormElement"><span class="type">WebKitDOMHTMLFormElement</span></a>
+</td>
+</tr>
+<tr>
+<td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
+<td>A <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>
+</td>
+</tr>
+</tbody>
+</table></div>
+</div>
+<hr>
+<div class="refsect2">
+<a name="webkit-dom-html-form-element-set-autocorrect"></a><h3>webkit_dom_html_form_element_set_autocorrect ()</h3>
+<pre class="programlisting"><span class="returnvalue">void</span>                webkit_dom_html_form_element_set_autocorrect
+                                                        (<em class="parameter"><code><a class="link" href="WebKitDOMHTMLFormElement.html" title="WebKitDOMHTMLFormElement"><span class="type">WebKitDOMHTMLFormElement</span></a> *self</code></em>,
+                                                         <em class="parameter"><code><a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a> value</code></em>);</pre>
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
+<col align="left" valign="top">
+<col>
+</colgroup>
+<tbody>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>self</code></em> :</span></p></td>
+<td>A <a class="link" href="WebKitDOMHTMLFormElement.html" title="WebKitDOMHTMLFormElement"><span class="type">WebKitDOMHTMLFormElement</span></a>
+</td>
+</tr>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>value</code></em> :</span></p></td>
+<td>A <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>
+</td>
+</tr>
+</tbody>
+</table></div>
+</div>
+<hr>
+<div class="refsect2">
+<a name="webkit-dom-html-form-element-get-autocapitalize"></a><h3>webkit_dom_html_form_element_get_autocapitalize ()</h3>
+<pre class="programlisting"><a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gchar</span></a> *             webkit_dom_html_form_element_get_autocapitalize
+                                                        (<em class="parameter"><code><a class="link" href="WebKitDOMHTMLFormElement.html" title="WebKitDOMHTMLFormElement"><span class="type">WebKitDOMHTMLFormElement</span></a> *self</code></em>);</pre>
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
+<col align="left" valign="top">
+<col>
+</colgroup>
+<tbody>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>self</code></em> :</span></p></td>
+<td>A <a class="link" href="WebKitDOMHTMLFormElement.html" title="WebKitDOMHTMLFormElement"><span class="type">WebKitDOMHTMLFormElement</span></a>
+</td>
+</tr>
+<tr>
+<td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
+<td>A <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a>
+</td>
+</tr>
+</tbody>
+</table></div>
+</div>
+<hr>
+<div class="refsect2">
+<a name="webkit-dom-html-form-element-set-autocapitalize"></a><h3>webkit_dom_html_form_element_set_autocapitalize ()</h3>
+<pre class="programlisting"><span class="returnvalue">void</span>                webkit_dom_html_form_element_set_autocapitalize
+                                                        (<em class="parameter"><code><a class="link" href="WebKitDOMHTMLFormElement.html" title="WebKitDOMHTMLFormElement"><span class="type">WebKitDOMHTMLFormElement</span></a> *self</code></em>,
+                                                         <em class="parameter"><code>const <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a> *value</code></em>);</pre>
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
+<col align="left" valign="top">
+<col>
+</colgroup>
+<tbody>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>self</code></em> :</span></p></td>
+<td>A <a class="link" href="WebKitDOMHTMLFormElement.html" title="WebKitDOMHTMLFormElement"><span class="type">WebKitDOMHTMLFormElement</span></a>
+</td>
+</tr>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>value</code></em> :</span></p></td>
+<td>A <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a>
+</td>
+</tr>
+</tbody>
+</table></div>
+</div>
+<hr>
+<div class="refsect2">
+<a name="webkit-dom-html-form-element-dispatch-form-change"></a><h3>webkit_dom_html_form_element_dispatch_form_change ()</h3>
+<pre class="programlisting"><span class="returnvalue">void</span>                webkit_dom_html_form_element_dispatch_form_change
+                                                        (<em class="parameter"><code><a class="link" href="WebKitDOMHTMLFormElement.html" title="WebKitDOMHTMLFormElement"><span class="type">WebKitDOMHTMLFormElement</span></a> *self</code></em>);</pre>
+<div class="warning">
+<h3 class="title">Warning</h3>
+<p><code class="literal">webkit_dom_html_form_element_dispatch_form_change</code> is deprecated and should not be used in newly-written code. 1.6</p>
+</div>
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
+<col align="left" valign="top">
+<col>
+</colgroup>
+<tbody><tr>
+<td><p><span class="term"><em class="parameter"><code>self</code></em> :</span></p></td>
+<td>A <a class="link" href="WebKitDOMHTMLFormElement.html" title="WebKitDOMHTMLFormElement"><span class="type">WebKitDOMHTMLFormElement</span></a>
+</td>
+</tr></tbody>
+</table></div>
+</div>
+<hr>
+<div class="refsect2">
+<a name="webkit-dom-html-form-element-dispatch-form-input"></a><h3>webkit_dom_html_form_element_dispatch_form_input ()</h3>
+<pre class="programlisting"><span class="returnvalue">void</span>                webkit_dom_html_form_element_dispatch_form_input
+                                                        (<em class="parameter"><code><a class="link" href="WebKitDOMHTMLFormElement.html" title="WebKitDOMHTMLFormElement"><span class="type">WebKitDOMHTMLFormElement</span></a> *self</code></em>);</pre>
+<div class="warning">
+<h3 class="title">Warning</h3>
+<p><code class="literal">webkit_dom_html_form_element_dispatch_form_input</code> is deprecated and should not be used in newly-written code. 1.6</p>
+</div>
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
+<col align="left" valign="top">
+<col>
+</colgroup>
+<tbody><tr>
+<td><p><span class="term"><em class="parameter"><code>self</code></em> :</span></p></td>
+<td>A <a class="link" href="WebKitDOMHTMLFormElement.html" title="WebKitDOMHTMLFormElement"><span class="type">WebKitDOMHTMLFormElement</span></a>
+</td>
+</tr></tbody>
+</table></div>
+</div>
 </div>
 <div class="refsect1">
 <a name="WebKitDOMHTMLFormElement.property-details"></a><h2>Property Details</h2>
@@ -705,10 +861,24 @@ WebKitDOMHTMLFormElement implements
 </div>
 <hr>
 <div class="refsect2">
+<a name="WebKitDOMHTMLFormElement--autocapitalize"></a><h3>The <code class="literal">"autocapitalize"</code> property</h3>
+<pre class="programlisting">  "autocapitalize"           <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a>*                : Read / Write</pre>
+<p>read-only gchar* HTMLFormElement:autocapitalize.</p>
+<p>Default value: ""</p>
+</div>
+<hr>
+<div class="refsect2">
 <a name="WebKitDOMHTMLFormElement--autocomplete"></a><h3>The <code class="literal">"autocomplete"</code> property</h3>
 <pre class="programlisting">  "autocomplete"             <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a>*                : Read / Write</pre>
 <p>read-only gchar* HTMLFormElement:autocomplete.</p>
 <p>Default value: ""</p>
+</div>
+<hr>
+<div class="refsect2">
+<a name="WebKitDOMHTMLFormElement--autocorrect"></a><h3>The <code class="literal">"autocorrect"</code> property</h3>
+<pre class="programlisting">  "autocorrect"              <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read / Write</pre>
+<p>read-only gboolean HTMLFormElement:autocorrect.</p>
+<p>Default value: FALSE</p>
 </div>
 <hr>
 <div class="refsect2">

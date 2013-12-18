@@ -390,69 +390,23 @@ WebInspector.CSSStyleDeclarationTextEditor.prototype = {
     {
         function update()
         {
-            // Matches rgba(0, 0, 0, 0.5), rgb(0, 0, 0), hsl(), hsla(), #fff, #ffffff, white
-            const colorRegex = /((?:rgb|hsl)a?\([^)]+\)|#[0-9a-fA-F]{6}|#[0-9a-fA-F]{3}|\b\w+\b(?![-.]))/g;
-
-            var start = typeof lineNumber === "number" ? lineNumber : 0;
-            var end = typeof lineNumber === "number" ? lineNumber + 1 : this._codeMirror.lineCount();
-
             // Look for color strings and add swatches in front of them.
-            for (var i = start; i < end; ++i) {
-                var lineContent = this._codeMirror.getLine(i);
+            this._codeMirror.createColorMarkers(lineNumber, function(marker, color, colorString) {
+                var swatchElement = document.createElement("span");
+                swatchElement.title = WebInspector.UIString("Click to open a colorpicker. Shift-click to change color format.");
+                swatchElement.className = WebInspector.CSSStyleDeclarationTextEditor.ColorSwatchElementStyleClassName;
+                swatchElement.addEventListener("click", this._colorSwatchClicked.bind(this));
+                            
+                var swatchInnerElement = document.createElement("span");
+                swatchInnerElement.style.backgroundColor = colorString;
+                swatchElement.appendChild(swatchInnerElement);
 
-                var match = colorRegex.exec(lineContent);
-                while (match) {
+                var codeMirrorTextMarker = marker.codeMirrorTextMarker;
+                var swatchMarker = this._codeMirror.setUniqueBookmark(codeMirrorTextMarker.find().from, swatchElement);
 
-                    // Act as a negative look-behind and disallow the color from being prefixing with certain characters.
-                    if (match.index > 0 && /[-.]/.test(lineContent[match.index - 1])) {
-                        match = colorRegex.exec(lineContent);
-                        continue;
-                    }
-
-                    var from = {line: i, ch: match.index};
-                    var to = {line: i, ch: match.index + match[0].length};
-
-                    var foundColorMarker = false;
-                    var marks = this._codeMirror.findMarksAt(to);
-                    for (var j = 0; j < marks.length; ++j) {
-                        if (!marks[j].__markedColor)
-                            continue;
-                        foundColorMarker = true;
-                        break;
-                    }
-
-                    if (foundColorMarker) {
-                        match = colorRegex.exec(lineContent);
-                        continue;
-                    }
-
-                    try {
-                        var color = new WebInspector.Color(match[0]);
-                    } catch (e) {
-                        match = colorRegex.exec(lineContent);
-                        continue;
-                    }
-
-                    var swatchElement = document.createElement("span");
-                    swatchElement.title = WebInspector.UIString("Click to open a colorpicker. Shift-click to change color format.");
-                    swatchElement.className = WebInspector.CSSStyleDeclarationTextEditor.ColorSwatchElementStyleClassName;
-                    swatchElement.addEventListener("click", this._colorSwatchClicked.bind(this));
-
-                    var swatchInnerElement = document.createElement("span");
-                    swatchInnerElement.style.backgroundColor = match[0];
-                    swatchElement.appendChild(swatchInnerElement);
-
-                    var swatchMarker = this._codeMirror.setUniqueBookmark(from, swatchElement);
-
-                    var colorTextMarker = this._codeMirror.markText(from, to);
-                    colorTextMarker.__markedColor = true;
-
-                    swatchInnerElement.__colorTextMarker = colorTextMarker;
-                    swatchInnerElement.__color = color;
-
-                    match = colorRegex.exec(lineContent);
-                }
-            }
+                swatchInnerElement.__colorTextMarker = codeMirrorTextMarker;
+                swatchInnerElement.__color = color;
+            }.bind(this));
         }
 
         if (nonatomic)
@@ -750,14 +704,9 @@ WebInspector.CSSStyleDeclarationTextEditor.prototype = {
             }.bind(this));
 
             var bounds = WebInspector.Rect.rectFromClientRect(swatch.getBoundingClientRect());
-            const padding = 2;
-            bounds.origin.x -= padding;
-            bounds.origin.y -= padding;
-            bounds.size.width += padding * 2;
-            bounds.size.height += padding * 2;
 
             this._colorPickerPopover.content = colorPicker.element;
-            this._colorPickerPopover.present(bounds, [WebInspector.RectEdge.MIN_X]);
+            this._colorPickerPopover.present(bounds.pad(2), [WebInspector.RectEdge.MIN_X]);
 
             colorPicker.color = color;
         }

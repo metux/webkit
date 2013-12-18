@@ -48,7 +48,6 @@
     void setToolbarHeight(float height);
 
     void moveWindowBy(float x, float y);
-    void setInjectedScriptForOrigin(DOMString origin, DOMString script);
 
     DOMString localizedStringsURL();
 
@@ -62,6 +61,7 @@
     [Custom] DOMString platform();
     [Custom] DOMString port();
     [Custom] void showContextMenu(MouseEvent event, any items);
+    void dispatchEventAsContextMenuEvent(Event event);
     void sendMessageToBackend(DOMString message);
 
     [Custom] void recordActionTaken(unsigned long actionCode);

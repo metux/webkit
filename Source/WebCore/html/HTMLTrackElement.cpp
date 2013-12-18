@@ -33,6 +33,7 @@
 #include "HTMLNames.h"
 #include "Logging.h"
 #include "RuntimeEnabledFeatures.h"
+#include <wtf/text/CString.h>
 
 namespace WebCore {
 
@@ -111,16 +112,6 @@ void HTMLTrackElement::parseAttribute(const QualifiedName& name, const AtomicStr
     }
 
     HTMLElement::parseAttribute(name, value);
-}
-
-URL HTMLTrackElement::src() const
-{
-    return document().completeURL(getAttribute(srcAttr));
-}
-
-void HTMLTrackElement::setSrc(const String& url)
-{
-    setAttribute(srcAttr, url);
 }
 
 String HTMLTrackElement::kind()

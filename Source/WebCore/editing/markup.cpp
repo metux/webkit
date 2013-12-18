@@ -52,7 +52,7 @@
 #include "MarkupAccumulator.h"
 #include "Range.h"
 #include "RenderBlock.h"
-#include "StylePropertySet.h"
+#include "StyleProperties.h"
 #include "TextIterator.h"
 #include "VisibleSelection.h"
 #include "VisibleUnits.h"
@@ -68,7 +68,7 @@ namespace WebCore {
 
 using namespace HTMLNames;
 
-static bool propertyMissingOrEqualToNone(StylePropertySet*, CSSPropertyID);
+static bool propertyMissingOrEqualToNone(StyleProperties*, CSSPropertyID);
 
 class AttributeChange {
 public:
@@ -99,15 +99,14 @@ static void completeURLs(DocumentFragment* fragment, const String& baseURL)
 
     URL parsedBaseURL(ParsedURLString, baseURL);
 
-    auto descendants = elementDescendants(*fragment);
-    for (auto element = descendants.begin(), end = descendants.end(); element != end; ++element) {
-        if (!element->hasAttributes())
+    for (auto& element : elementDescendants(*fragment)) {
+        if (!element.hasAttributes())
             continue;
-        unsigned length = element->attributeCount();
+        unsigned length = element.attributeCount();
         for (unsigned i = 0; i < length; i++) {
-            const Attribute& attribute = element->attributeAt(i);
-            if (element->isURLAttribute(attribute) && !attribute.value().isEmpty())
-                changes.append(AttributeChange(&*element, attribute.name(), URL(parsedBaseURL, attribute.value()).string()));
+            const Attribute& attribute = element.attributeAt(i);
+            if (element.isURLAttribute(attribute) && !attribute.value().isEmpty())
+                changes.append(AttributeChange(&element, attribute.name(), URL(parsedBaseURL, attribute.value()).string()));
         }
     }
 
@@ -124,13 +123,13 @@ public:
 
     Node* serializeNodes(Node* startNode, Node* pastEnd);
     void wrapWithNode(Node&, bool convertBlocksToInlines = false, RangeFullySelectsNode = DoesFullySelectNode);
-    void wrapWithStyleNode(StylePropertySet*, Document&, bool isBlock = false);
+    void wrapWithStyleNode(StyleProperties*, Document&, bool isBlock = false);
     String takeResults();
 
     using MarkupAccumulator::appendString;
 
 private:
-    void appendStyleNodeOpenTag(StringBuilder&, StylePropertySet*, Document&, bool isBlock = false);
+    void appendStyleNodeOpenTag(StringBuilder&, StyleProperties*, Document&, bool isBlock = false);
     const String& styleNodeCloseTag(bool isBlock = false);
 
     String renderedText(const Node&, const Range*);
@@ -184,7 +183,7 @@ void StyledMarkupAccumulator::wrapWithNode(Node& node, bool convertBlocksToInlin
         m_nodes->append(&node);
 }
 
-void StyledMarkupAccumulator::wrapWithStyleNode(StylePropertySet* style, Document& document, bool isBlock)
+void StyledMarkupAccumulator::wrapWithStyleNode(StyleProperties* style, Document& document, bool isBlock)
 {
     StringBuilder openTag;
     appendStyleNodeOpenTag(openTag, style, document, isBlock);
@@ -192,7 +191,7 @@ void StyledMarkupAccumulator::wrapWithStyleNode(StylePropertySet* style, Documen
     appendString(styleNodeCloseTag(isBlock));
 }
 
-void StyledMarkupAccumulator::appendStyleNodeOpenTag(StringBuilder& out, StylePropertySet* style, Document& document, bool isBlock)
+void StyledMarkupAccumulator::appendStyleNodeOpenTag(StringBuilder& out, StyleProperties* style, Document& document, bool isBlock)
 {
     // wrappingStyleForSerialization should have removed -webkit-text-decorations-in-effect
     ASSERT(propertyMissingOrEqualToNone(style, CSSPropertyWebkitTextDecorationsInEffect));
@@ -430,13 +429,6 @@ Node* StyledMarkupAccumulator::traverseNodesForSerialization(Node* startNode, No
     return lastClosed;
 }
 
-static bool isHTMLBlockElement(const Node* node)
-{
-    return node->hasTagName(tdTag)
-        || node->hasTagName(thTag)
-        || isNonTableCellHTMLBlockElement(node);
-}
-
 static Node* ancestorToRetainStructureAndAppearanceForBlock(Node* commonAncestorBlock)
 {
     if (!commonAncestorBlock)
@@ -461,13 +453,7 @@ static inline Node* ancestorToRetainStructureAndAppearance(Node* commonAncestor)
     return ancestorToRetainStructureAndAppearanceForBlock(enclosingBlock(commonAncestor));
 }
 
-static inline Node* ancestorToRetainStructureAndAppearanceWithNoRenderer(Node* commonAncestor)
-{
-    Node* commonAncestorBlock = enclosingNodeOfType(firstPositionInOrBeforeNode(commonAncestor), isHTMLBlockElement);
-    return ancestorToRetainStructureAndAppearanceForBlock(commonAncestorBlock);
-}
-
-static bool propertyMissingOrEqualToNone(StylePropertySet* style, CSSPropertyID propertyID)
+static bool propertyMissingOrEqualToNone(StyleProperties* style, CSSPropertyID propertyID)
 {
     if (!style)
         return false;
@@ -905,9 +891,7 @@ PassRefPtr<DocumentFragment> createFragmentForTransformToFragment(const String& 
 static Vector<Ref<HTMLElement>> collectElementsToRemoveFromFragment(ContainerNode& container)
 {
     Vector<Ref<HTMLElement>> toRemove;
-    auto children = childrenOfType<HTMLElement>(container);
-    for (auto it = children.begin(), end = children.end(); it != end; ++it) {
-        HTMLElement& element = *it;
+    for (auto& element : childrenOfType<HTMLElement>(container)) {
         if (isHTMLHtmlElement(element)) {
             toRemove.append(element);
             collectElementsToRemoveFromFragment(element);

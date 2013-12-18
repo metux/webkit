@@ -40,7 +40,7 @@ PassRefPtr<WebConnectionToWebProcess> WebConnectionToWebProcess::create(WebProce
 WebConnectionToWebProcess::WebConnectionToWebProcess(WebProcessProxy* process)
     : m_process(process)
 {
-    m_process->addMessageReceiver(Messages::WebConnection::messageReceiverName(), this);
+    m_process->addMessageReceiver(Messages::WebConnection::messageReceiverName(), *this);
 }
 
 void WebConnectionToWebProcess::invalidate()
@@ -52,12 +52,12 @@ void WebConnectionToWebProcess::invalidate()
 
 void WebConnectionToWebProcess::encodeMessageBody(CoreIPC::ArgumentEncoder& encoder, API::Object* messageBody)
 {
-    encoder << WebContextUserMessageEncoder(messageBody);
+    encoder << WebContextUserMessageEncoder(messageBody, *m_process);
 }
 
 bool WebConnectionToWebProcess::decodeMessageBody(CoreIPC::ArgumentDecoder& decoder, RefPtr<API::Object>& messageBody)
 {
-    WebContextUserMessageDecoder messageBodyDecoder(messageBody, m_process);
+    WebContextUserMessageDecoder messageBodyDecoder(messageBody, *m_process);
     return decoder.decode(messageBodyDecoder);
 }
 

@@ -33,6 +33,7 @@
 #include "MessageEncoder.h"
 #include "MessageReceiver.h"
 #include "WorkQueue.h"
+#include <atomic>
 #include <wtf/Deque.h>
 #include <wtf/Forward.h>
 #include <wtf/PassRefPtr.h>
@@ -115,6 +116,13 @@ public:
 #elif USE(UNIX_DOMAIN_SOCKETS)
     typedef int Identifier;
     static bool identifierIsNull(Identifier identifier) { return !identifier; }
+
+    struct SocketPair {
+        int client;
+        int server;
+    };
+
+    static Connection::SocketPair createPlatformConnection();
 #endif
 
     static PassRefPtr<Connection> createServerConnection(Identifier, Client*, WTF::RunLoop* clientRunLoop);
@@ -205,7 +213,7 @@ private:
 
     Client* m_client;
     bool m_isServer;
-    uint64_t m_syncRequestID;
+    std::atomic<uint64_t> m_syncRequestID;
 
     bool m_onlySendMessagesAsDispatchWhenWaitingForSyncReplyWhenProcessingSuchAMessage;
     bool m_shouldExitOnSyncMessageSendFailure;

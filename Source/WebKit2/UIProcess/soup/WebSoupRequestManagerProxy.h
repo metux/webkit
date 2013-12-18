@@ -29,23 +29,26 @@
 #include <wtf/RefPtr.h>
 #include <wtf/text/WTFString.h>
 
+namespace API {
+class Data;
+}
+
 namespace WebKit {
 
 class WebContext;
-class WebData;
 
-class WebSoupRequestManagerProxy : public API::TypedObject<API::Object::Type::SoupRequestManager>, public WebContextSupplement, private CoreIPC::MessageReceiver {
+class WebSoupRequestManagerProxy : public API::ObjectImpl<API::Object::Type::SoupRequestManager>, public WebContextSupplement, private CoreIPC::MessageReceiver {
 public:
     static const char* supplementName();
 
     static PassRefPtr<WebSoupRequestManagerProxy> create(WebContext*);
     virtual ~WebSoupRequestManagerProxy();
 
-    void initializeClient(const WKSoupRequestManagerClient*);
+    void initializeClient(const WKSoupRequestManagerClientBase*);
 
     void registerURIScheme(const String& scheme);
-    void didHandleURIRequest(const WebData*, uint64_t contentLength, const String& mimeType, uint64_t requestID);
-    void didReceiveURIRequestData(const WebData*, uint64_t requestID);
+    void didHandleURIRequest(const API::Data*, uint64_t contentLength, const String& mimeType, uint64_t requestID);
+    void didReceiveURIRequestData(const API::Data*, uint64_t requestID);
     void didReceiveURIRequest(const String& uriString, WebPageProxy*, uint64_t requestID);
     void didFailURIRequest(const WebCore::ResourceError&, uint64_t requestID);
 

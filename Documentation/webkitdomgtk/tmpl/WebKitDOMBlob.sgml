@@ -57,3 +57,15 @@ WebKitDOMBlob
 @Returns: 
 
 
+<!-- ##### FUNCTION webkit_dom_blob_webkit_slice ##### -->
+<para>
+
+</para>
+
+@self: 
+@start: 
+@end: 
+@content_type: 
+@Returns: 
+
+

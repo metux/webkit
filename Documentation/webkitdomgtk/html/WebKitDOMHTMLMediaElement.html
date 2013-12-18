@@ -50,6 +50,8 @@
 <span class="returnvalue">void</span>                <a class="link" href="WebKitDOMHTMLMediaElement.html#webkit-dom-html-media-element-fast-seek" title="webkit_dom_html_media_element_fast_seek ()">webkit_dom_html_media_element_fast_seek</a>
                                                         (<em class="parameter"><code><a class="link" href="WebKitDOMHTMLMediaElement.html" title="WebKitDOMHTMLMediaElement"><span class="type">WebKitDOMHTMLMediaElement</span></a> *self</code></em>,
                                                          <em class="parameter"><code><a href="../glib/glib-Basic-Types.html#gdouble"><span class="type">gdouble</span></a> time</code></em>);
+<span class="returnvalue">void</span>                <a class="link" href="WebKitDOMHTMLMediaElement.html#webkit-dom-html-media-element-webkit-show-playback-target-picker" title="webkit_dom_html_media_element_webkit_show_playback_target_picker ()">webkit_dom_html_media_element_webkit_show_playback_target_picker</a>
+                                                        (<em class="parameter"><code><a class="link" href="WebKitDOMHTMLMediaElement.html" title="WebKitDOMHTMLMediaElement"><span class="type">WebKitDOMHTMLMediaElement</span></a> *self</code></em>);
 <a class="link" href="WebKitDOMMediaError.html" title="WebKitDOMMediaError"><span class="returnvalue">WebKitDOMMediaError</span></a> * <a class="link" href="WebKitDOMHTMLMediaElement.html#webkit-dom-html-media-element-get-error" title="webkit_dom_html_media_element_get_error ()">webkit_dom_html_media_element_get_error</a>
                                                         (<em class="parameter"><code><a class="link" href="WebKitDOMHTMLMediaElement.html" title="WebKitDOMHTMLMediaElement"><span class="type">WebKitDOMHTMLMediaElement</span></a> *self</code></em>);
 <a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gchar</span></a> *             <a class="link" href="WebKitDOMHTMLMediaElement.html#webkit-dom-html-media-element-get-src" title="webkit_dom_html_media_element_get_src ()">webkit_dom_html_media_element_get_src</a>
@@ -146,6 +148,14 @@
 <span class="returnvalue">void</span>                <a class="link" href="WebKitDOMHTMLMediaElement.html#webkit-dom-html-media-element-set-media-group" title="webkit_dom_html_media_element_set_media_group ()">webkit_dom_html_media_element_set_media_group</a>
                                                         (<em class="parameter"><code><a class="link" href="WebKitDOMHTMLMediaElement.html" title="WebKitDOMHTMLMediaElement"><span class="type">WebKitDOMHTMLMediaElement</span></a> *self</code></em>,
                                                          <em class="parameter"><code>const <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a> *value</code></em>);
+<a class="link" href="WebKitDOMMediaController.html" title="WebKitDOMMediaController"><span class="returnvalue">WebKitDOMMediaController</span></a> * <a class="link" href="WebKitDOMHTMLMediaElement.html#webkit-dom-html-media-element-get-controller" title="webkit_dom_html_media_element_get_controller ()">webkit_dom_html_media_element_get_controller</a>
+                                                        (<em class="parameter"><code><a class="link" href="WebKitDOMHTMLMediaElement.html" title="WebKitDOMHTMLMediaElement"><span class="type">WebKitDOMHTMLMediaElement</span></a> *self</code></em>);
+<a href="../glib/glib-Basic-Types.html#gboolean"><span class="returnvalue">gboolean</span></a>            <a class="link" href="WebKitDOMHTMLMediaElement.html#webkit-dom-html-media-element-get-webkit-current-playback-target-is-wireless" title="webkit_dom_html_media_element_get_webkit_current_playback_target_is_wireless ()">webkit_dom_html_media_element_get_webkit_current_playback_target_is_wireless</a>
+                                                        (<em class="parameter"><code><a class="link" href="WebKitDOMHTMLMediaElement.html" title="WebKitDOMHTMLMediaElement"><span class="type">WebKitDOMHTMLMediaElement</span></a> *self</code></em>);
+<a href="../glib/glib-Basic-Types.html#gdouble"><span class="returnvalue">gdouble</span></a>             <a class="link" href="WebKitDOMHTMLMediaElement.html#webkit-dom-html-media-element-get-start-time" title="webkit_dom_html_media_element_get_start_time ()">webkit_dom_html_media_element_get_start_time</a>
+                                                        (<em class="parameter"><code><a class="link" href="WebKitDOMHTMLMediaElement.html" title="WebKitDOMHTMLMediaElement"><span class="type">WebKitDOMHTMLMediaElement</span></a> *self</code></em>);
+<a href="../glib/glib-Basic-Types.html#gdouble"><span class="returnvalue">gdouble</span></a>             <a class="link" href="WebKitDOMHTMLMediaElement.html#webkit-dom-html-media-element-get-initial-time" title="webkit_dom_html_media_element_get_initial_time ()">webkit_dom_html_media_element_get_initial_time</a>
+                                                        (<em class="parameter"><code><a class="link" href="WebKitDOMHTMLMediaElement.html" title="WebKitDOMHTMLMediaElement"><span class="type">WebKitDOMHTMLMediaElement</span></a> *self</code></em>);
 </pre>
 </div>
 <div class="refsect1">
@@ -172,6 +182,7 @@ WebKitDOMHTMLMediaElement implements
 <pre class="synopsis">
   "<a class="link" href="WebKitDOMHTMLMediaElement.html#WebKitDOMHTMLMediaElement--autoplay" title='The "autoplay" property'>autoplay</a>"                 <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read / Write
   "<a class="link" href="WebKitDOMHTMLMediaElement.html#WebKitDOMHTMLMediaElement--buffered" title='The "buffered" property'>buffered</a>"                 <a class="link" href="WebKitDOMTimeRanges.html" title="WebKitDOMTimeRanges"><span class="type">WebKitDOMTimeRanges</span></a>*  : Read
+  "<a class="link" href="WebKitDOMHTMLMediaElement.html#WebKitDOMHTMLMediaElement--controller" title='The "controller" property'>controller</a>"               <a class="link" href="WebKitDOMMediaController.html" title="WebKitDOMMediaController"><span class="type">WebKitDOMMediaController</span></a>*  : Read
   "<a class="link" href="WebKitDOMHTMLMediaElement.html#WebKitDOMHTMLMediaElement--controls" title='The "controls" property'>controls</a>"                 <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read / Write
   "<a class="link" href="WebKitDOMHTMLMediaElement.html#WebKitDOMHTMLMediaElement--current-src" title='The "current-src" property'>current-src</a>"              <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a>*                : Read
   "<a class="link" href="WebKitDOMHTMLMediaElement.html#WebKitDOMHTMLMediaElement--current-time" title='The "current-time" property'>current-time</a>"             <a href="../glib/glib-Basic-Types.html#gdouble"><span class="type">gdouble</span></a>               : Read / Write
@@ -195,6 +206,7 @@ WebKitDOMHTMLMediaElement implements
   "<a class="link" href="WebKitDOMHTMLMediaElement.html#WebKitDOMHTMLMediaElement--volume" title='The "volume" property'>volume</a>"                   <a href="../glib/glib-Basic-Types.html#gdouble"><span class="type">gdouble</span></a>               : Read / Write
   "<a class="link" href="WebKitDOMHTMLMediaElement.html#WebKitDOMHTMLMediaElement--webkit-audio-decoded-byte-count" title='The "webkit-audio-decoded-byte-count" property'>webkit-audio-decoded-byte-count</a>" <a href="../glib/glib-Basic-Types.html#gulong"><span class="type">gulong</span></a>                : Read
   "<a class="link" href="WebKitDOMHTMLMediaElement.html#WebKitDOMHTMLMediaElement--webkit-closed-captions-visible" title='The "webkit-closed-captions-visible" property'>webkit-closed-captions-visible</a>" <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read / Write
+  "<a class="link" href="WebKitDOMHTMLMediaElement.html#WebKitDOMHTMLMediaElement--webkit-current-playback-target-is-wireless" title='The "webkit-current-playback-target-is-wireless" property'>webkit-current-playback-target-is-wireless</a>" <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read
   "<a class="link" href="WebKitDOMHTMLMediaElement.html#WebKitDOMHTMLMediaElement--webkit-has-closed-captions" title='The "webkit-has-closed-captions" property'>webkit-has-closed-captions</a>" <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read
   "<a class="link" href="WebKitDOMHTMLMediaElement.html#WebKitDOMHTMLMediaElement--webkit-preserves-pitch" title='The "webkit-preserves-pitch" property'>webkit-preserves-pitch</a>"   <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read / Write
   "<a class="link" href="WebKitDOMHTMLMediaElement.html#WebKitDOMHTMLMediaElement--webkit-video-decoded-byte-count" title='The "webkit-video-decoded-byte-count" property'>webkit-video-decoded-byte-count</a>" <a href="../glib/glib-Basic-Types.html#gulong"><span class="type">gulong</span></a>                : Read
@@ -314,6 +326,23 @@ WebKitDOMHTMLMediaElement implements
 </td>
 </tr>
 </tbody>
+</table></div>
+</div>
+<hr>
+<div class="refsect2">
+<a name="webkit-dom-html-media-element-webkit-show-playback-target-picker"></a><h3>webkit_dom_html_media_element_webkit_show_playback_target_picker ()</h3>
+<pre class="programlisting"><span class="returnvalue">void</span>                webkit_dom_html_media_element_webkit_show_playback_target_picker
+                                                        (<em class="parameter"><code><a class="link" href="WebKitDOMHTMLMediaElement.html" title="WebKitDOMHTMLMediaElement"><span class="type">WebKitDOMHTMLMediaElement</span></a> *self</code></em>);</pre>
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
+<col align="left" valign="top">
+<col>
+</colgroup>
+<tbody><tr>
+<td><p><span class="term"><em class="parameter"><code>self</code></em> :</span></p></td>
+<td>A <a class="link" href="WebKitDOMHTMLMediaElement.html" title="WebKitDOMHTMLMediaElement"><span class="type">WebKitDOMHTMLMediaElement</span></a>
+</td>
+</tr></tbody>
 </table></div>
 </div>
 <hr>
@@ -1318,6 +1347,116 @@ WebKitDOMHTMLMediaElement implements
 </tbody>
 </table></div>
 </div>
+<hr>
+<div class="refsect2">
+<a name="webkit-dom-html-media-element-get-controller"></a><h3>webkit_dom_html_media_element_get_controller ()</h3>
+<pre class="programlisting"><a class="link" href="WebKitDOMMediaController.html" title="WebKitDOMMediaController"><span class="returnvalue">WebKitDOMMediaController</span></a> * webkit_dom_html_media_element_get_controller
+                                                        (<em class="parameter"><code><a class="link" href="WebKitDOMHTMLMediaElement.html" title="WebKitDOMHTMLMediaElement"><span class="type">WebKitDOMHTMLMediaElement</span></a> *self</code></em>);</pre>
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
+<col align="left" valign="top">
+<col>
+</colgroup>
+<tbody>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>self</code></em> :</span></p></td>
+<td>A <a class="link" href="WebKitDOMHTMLMediaElement.html" title="WebKitDOMHTMLMediaElement"><span class="type">WebKitDOMHTMLMediaElement</span></a>
+</td>
+</tr>
+<tr>
+<td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
+<td>A <a class="link" href="WebKitDOMMediaController.html" title="WebKitDOMMediaController"><span class="type">WebKitDOMMediaController</span></a>. <span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
+</td>
+</tr>
+</tbody>
+</table></div>
+</div>
+<hr>
+<div class="refsect2">
+<a name="webkit-dom-html-media-element-get-webkit-current-playback-target-is-wireless"></a><h3>webkit_dom_html_media_element_get_webkit_current_playback_target_is_wireless ()</h3>
+<pre class="programlisting"><a href="../glib/glib-Basic-Types.html#gboolean"><span class="returnvalue">gboolean</span></a>            webkit_dom_html_media_element_get_webkit_current_playback_target_is_wireless
+                                                        (<em class="parameter"><code><a class="link" href="WebKitDOMHTMLMediaElement.html" title="WebKitDOMHTMLMediaElement"><span class="type">WebKitDOMHTMLMediaElement</span></a> *self</code></em>);</pre>
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
+<col align="left" valign="top">
+<col>
+</colgroup>
+<tbody>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>self</code></em> :</span></p></td>
+<td>A <a class="link" href="WebKitDOMHTMLMediaElement.html" title="WebKitDOMHTMLMediaElement"><span class="type">WebKitDOMHTMLMediaElement</span></a>
+</td>
+</tr>
+<tr>
+<td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
+<td>A <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>
+</td>
+</tr>
+</tbody>
+</table></div>
+</div>
+<hr>
+<div class="refsect2">
+<a name="webkit-dom-html-media-element-get-start-time"></a><h3>webkit_dom_html_media_element_get_start_time ()</h3>
+<pre class="programlisting"><a href="../glib/glib-Basic-Types.html#gdouble"><span class="returnvalue">gdouble</span></a>             webkit_dom_html_media_element_get_start_time
+                                                        (<em class="parameter"><code><a class="link" href="WebKitDOMHTMLMediaElement.html" title="WebKitDOMHTMLMediaElement"><span class="type">WebKitDOMHTMLMediaElement</span></a> *self</code></em>);</pre>
+<div class="warning">
+<h3 class="title">Warning</h3>
+<p><code class="literal">webkit_dom_html_media_element_get_start_time</code> is deprecated and should not be used in newly-written code. 2.2</p>
+</div>
+<p>
+The HTMLMediaElement:start-time property has been removed from WebKit, this function does nothing.
+</p>
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
+<col align="left" valign="top">
+<col>
+</colgroup>
+<tbody>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>self</code></em> :</span></p></td>
+<td>A <span class="type">HTMLMediaElement</span>
+</td>
+</tr>
+<tr>
+<td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
+<td>A <a href="../glib/glib-Basic-Types.html#gdouble"><span class="type">gdouble</span></a>
+</td>
+</tr>
+</tbody>
+</table></div>
+</div>
+<hr>
+<div class="refsect2">
+<a name="webkit-dom-html-media-element-get-initial-time"></a><h3>webkit_dom_html_media_element_get_initial_time ()</h3>
+<pre class="programlisting"><a href="../glib/glib-Basic-Types.html#gdouble"><span class="returnvalue">gdouble</span></a>             webkit_dom_html_media_element_get_initial_time
+                                                        (<em class="parameter"><code><a class="link" href="WebKitDOMHTMLMediaElement.html" title="WebKitDOMHTMLMediaElement"><span class="type">WebKitDOMHTMLMediaElement</span></a> *self</code></em>);</pre>
+<div class="warning">
+<h3 class="title">Warning</h3>
+<p><code class="literal">webkit_dom_html_media_element_get_initial_time</code> is deprecated and should not be used in newly-written code. 2.2</p>
+</div>
+<p>
+The HTMLMediaElement:initial-time property has been removed from WebKit, this function does nothing.
+</p>
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
+<col align="left" valign="top">
+<col>
+</colgroup>
+<tbody>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>self</code></em> :</span></p></td>
+<td>A <span class="type">HTMLMediaElement</span>
+</td>
+</tr>
+<tr>
+<td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
+<td>A <a href="../glib/glib-Basic-Types.html#gdouble"><span class="type">gdouble</span></a>
+</td>
+</tr>
+</tbody>
+</table></div>
+</div>
 </div>
 <div class="refsect1">
 <a name="WebKitDOMHTMLMediaElement.property-details"></a><h2>Property Details</h2>
@@ -1332,6 +1471,12 @@ WebKitDOMHTMLMediaElement implements
 <a name="WebKitDOMHTMLMediaElement--buffered"></a><h3>The <code class="literal">"buffered"</code> property</h3>
 <pre class="programlisting">  "buffered"                 <a class="link" href="WebKitDOMTimeRanges.html" title="WebKitDOMTimeRanges"><span class="type">WebKitDOMTimeRanges</span></a>*  : Read</pre>
 <p>read-only WebKitDOMTimeRanges* HTMLMediaElement:buffered.</p>
+</div>
+<hr>
+<div class="refsect2">
+<a name="WebKitDOMHTMLMediaElement--controller"></a><h3>The <code class="literal">"controller"</code> property</h3>
+<pre class="programlisting">  "controller"               <a class="link" href="WebKitDOMMediaController.html" title="WebKitDOMMediaController"><span class="type">WebKitDOMMediaController</span></a>*  : Read</pre>
+<p>read-only WebKitDOMMediaController* HTMLMediaElement:controller.</p>
 </div>
 <hr>
 <div class="refsect2">
@@ -1488,6 +1633,13 @@ WebKitDOMHTMLMediaElement implements
 <a name="WebKitDOMHTMLMediaElement--webkit-closed-captions-visible"></a><h3>The <code class="literal">"webkit-closed-captions-visible"</code> property</h3>
 <pre class="programlisting">  "webkit-closed-captions-visible" <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read / Write</pre>
 <p>read-only gboolean HTMLMediaElement:webkit-closed-captions-visible.</p>
+<p>Default value: FALSE</p>
+</div>
+<hr>
+<div class="refsect2">
+<a name="WebKitDOMHTMLMediaElement--webkit-current-playback-target-is-wireless"></a><h3>The <code class="literal">"webkit-current-playback-target-is-wireless"</code> property</h3>
+<pre class="programlisting">  "webkit-current-playback-target-is-wireless" <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read</pre>
+<p>read-only gboolean HTMLMediaElement:webkit-current-playback-target-is-wireless.</p>
 <p>Default value: FALSE</p>
 </div>
 <hr>

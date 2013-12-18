@@ -1,0 +1,49 @@
+<!-- ##### SECTION Title ##### -->
+WebKitDOMMemoryInfo
+
+<!-- ##### SECTION Short_Description ##### -->
+
+
+<!-- ##### SECTION Long_Description ##### -->
+<para>
+
+</para>
+
+<!-- ##### SECTION See_Also ##### -->
+<para>
+
+</para>
+
+<!-- ##### SECTION Stability_Level ##### -->
+
+
+<!-- ##### SECTION Image ##### -->
+
+
+<!-- ##### FUNCTION webkit_dom_memory_info_get_total_js_heap_size ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_memory_info_get_used_js_heap_size ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_memory_info_get_js_heap_size_limit ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+

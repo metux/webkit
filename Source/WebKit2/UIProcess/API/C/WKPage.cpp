@@ -28,11 +28,11 @@
 #include "WKPagePrivate.h"
 
 #include "APIArray.h"
+#include "APIData.h"
 #include "PrintInfo.h"
 #include "WKAPICast.h"
 #include "WKPluginInformation.h"
 #include "WebBackForwardList.h"
-#include "WebData.h"
 #include "WebPageProxy.h"
 #include "WebProcessProxy.h"
 #include <WebCore/Page.h>
@@ -55,12 +55,12 @@ WKTypeID WKPageGetTypeID()
 
 WKContextRef WKPageGetContext(WKPageRef pageRef)
 {
-    return toAPI(toImpl(pageRef)->process()->context());
+    return toAPI(&toImpl(pageRef)->process().context());
 }
 
 WKPageGroupRef WKPageGetPageGroup(WKPageRef pageRef)
 {
-    return toAPI(toImpl(pageRef)->pageGroup());
+    return toAPI(&toImpl(pageRef)->pageGroup());
 }
 
 void WKPageLoadURL(WKPageRef pageRef, WKURLRef URLRef)
@@ -205,7 +205,7 @@ void WKPageTryRestoreScrollPosition(WKPageRef pageRef)
 
 WKBackForwardListRef WKPageGetBackForwardList(WKPageRef pageRef)
 {
-    return toAPI(toImpl(pageRef)->backForwardList());
+    return toAPI(&toImpl(pageRef)->backForwardList());
 }
 
 bool WKPageWillHandleHorizontalScrollEvents(WKPageRef pageRef)
@@ -215,7 +215,7 @@ bool WKPageWillHandleHorizontalScrollEvents(WKPageRef pageRef)
 
 WKStringRef WKPageCopyTitle(WKPageRef pageRef)
 {
-    return toCopiedAPI(toImpl(pageRef)->pageTitle());
+    return toCopiedAPI(toImpl(pageRef)->pageLoadState().title());
 }
 
 WKFrameRef WKPageGetMainFrame(WKPageRef pageRef)
@@ -315,13 +315,13 @@ void WKPageTerminate(WKPageRef pageRef)
 
 WKStringRef WKPageGetSessionHistoryURLValueType()
 {
-    static WebString* sessionHistoryURLValueType = WebString::create("SessionHistoryURL").leakRef();
+    static API::String* sessionHistoryURLValueType = API::String::create("SessionHistoryURL").leakRef();
     return toAPI(sessionHistoryURLValueType);
 }
 
 WKStringRef WKPageGetSessionBackForwardListItemValueType()
 {
-    static WebString* sessionBackForwardListValueType = WebString::create("SessionBackForwardListItem").leakRef();
+    static API::String* sessionBackForwardListValueType = API::String::create("SessionBackForwardListItem").leakRef();
     return toAPI(sessionBackForwardListValueType);
 }
 
@@ -495,6 +495,16 @@ void WKPageSetRubberBandsAtBottom(WKPageRef pageRef, bool rubberBandsAtBottom)
     toImpl(pageRef)->setRubberBandsAtBottom(rubberBandsAtBottom);
 }
 
+void WKPageSetBackgroundExtendsBeyondPage(WKPageRef pageRef, bool backgroundExtendsBeyondPage)
+{
+    toImpl(pageRef)->setBackgroundExtendsBeyondPage(backgroundExtendsBeyondPage);
+}
+
+bool WKPageBackgroundExtendsBeyondPage(WKPageRef pageRef)
+{
+    return toImpl(pageRef)->backgroundExtendsBeyondPage();
+}
+
 void WKPageSetPaginationMode(WKPageRef pageRef, WKPaginationMode paginationMode)
 {
     Pagination::Mode mode;
@@ -629,39 +639,42 @@ void WKPageCountStringMatches(WKPageRef pageRef, WKStringRef string, WKFindOptio
     toImpl(pageRef)->countStringMatches(toImpl(string)->string(), toFindOptions(options), maxMatchCount);
 }
 
-void WKPageSetPageContextMenuClient(WKPageRef pageRef, const WKPageContextMenuClient* wkClient)
+void WKPageSetPageContextMenuClient(WKPageRef pageRef, const WKPageContextMenuClientBase* wkClient)
 {
 #if ENABLE(CONTEXT_MENUS)
     toImpl(pageRef)->initializeContextMenuClient(wkClient);
+#else
+    UNUSED_PARAM(pageRef);
+    UNUSED_PARAM(wkClient);
 #endif
 }
 
-void WKPageSetPageFindClient(WKPageRef pageRef, const WKPageFindClient* wkClient)
+void WKPageSetPageFindClient(WKPageRef pageRef, const WKPageFindClientBase* wkClient)
 {
     toImpl(pageRef)->initializeFindClient(wkClient);
 }
 
-void WKPageSetPageFindMatchesClient(WKPageRef pageRef, const WKPageFindMatchesClient* wkClient)
+void WKPageSetPageFindMatchesClient(WKPageRef pageRef, const WKPageFindMatchesClientBase* wkClient)
 {
     toImpl(pageRef)->initializeFindMatchesClient(wkClient);
 }
 
-void WKPageSetPageFormClient(WKPageRef pageRef, const WKPageFormClient* wkClient)
+void WKPageSetPageFormClient(WKPageRef pageRef, const WKPageFormClientBase* wkClient)
 {
     toImpl(pageRef)->initializeFormClient(wkClient);
 }
 
-void WKPageSetPageLoaderClient(WKPageRef pageRef, const WKPageLoaderClient* wkClient)
+void WKPageSetPageLoaderClient(WKPageRef pageRef, const WKPageLoaderClientBase* wkClient)
 {
     toImpl(pageRef)->initializeLoaderClient(wkClient);
 }
 
-void WKPageSetPagePolicyClient(WKPageRef pageRef, const WKPagePolicyClient* wkClient)
+void WKPageSetPagePolicyClient(WKPageRef pageRef, const WKPagePolicyClientBase* wkClient)
 {
     toImpl(pageRef)->initializePolicyClient(wkClient);
 }
 
-void WKPageSetPageUIClient(WKPageRef pageRef, const WKPageUIClient* wkClient)
+void WKPageSetPageUIClient(WKPageRef pageRef, const WKPageUIClientBase* wkClient)
 {
     toImpl(pageRef)->initializeUIClient(wkClient);
 }
@@ -724,24 +737,27 @@ void WKPageForceRepaint(WKPageRef pageRef, void* context, WKPageForceRepaintFunc
 
 WK_EXPORT WKURLRef WKPageCopyPendingAPIRequestURL(WKPageRef pageRef)
 {
-    if (toImpl(pageRef)->pendingAPIRequestURL().isNull())
-        return 0;
-    return toCopiedURLAPI(toImpl(pageRef)->pendingAPIRequestURL());
+    const String& pendingAPIRequestURL = toImpl(pageRef)->pageLoadState().pendingAPIRequestURL();
+
+    if (pendingAPIRequestURL.isNull())
+        return nullptr;
+
+    return toCopiedURLAPI(pendingAPIRequestURL);
 }
 
 WKURLRef WKPageCopyActiveURL(WKPageRef pageRef)
 {
-    return toCopiedURLAPI(toImpl(pageRef)->activeURL());
+    return toCopiedURLAPI(toImpl(pageRef)->pageLoadState().activeURL());
 }
 
 WKURLRef WKPageCopyProvisionalURL(WKPageRef pageRef)
 {
-    return toCopiedURLAPI(toImpl(pageRef)->provisionalURL());
+    return toCopiedURLAPI(toImpl(pageRef)->pageLoadState().provisionalURL());
 }
 
 WKURLRef WKPageCopyCommittedURL(WKPageRef pageRef)
 {
-    return toCopiedURLAPI(toImpl(pageRef)->committedURL());
+    return toCopiedURLAPI(toImpl(pageRef)->pageLoadState().url());
 }
 
 WKStringRef WKPageCopyStandardUserAgentWithApplicationName(WKStringRef applicationName)
@@ -844,6 +860,9 @@ void WKPageSelectContextMenuItem(WKPageRef page, WKContextMenuItemRef item)
 {
 #if ENABLE(CONTEXT_MENUS)
     toImpl(page)->contextMenuItemSelected(*(toImpl(item)->data()));
+#else
+    UNUSED_PARAM(page);
+    UNUSED_PARAM(item);
 #endif
 }
 
@@ -885,14 +904,14 @@ void WKPageSetScrollPinningBehavior(WKPageRef page, WKScrollPinningBehavior pinn
     toImpl(page)->setScrollPinningBehavior(corePinning);
 }
 
-
-
-// -- DEPRECATED --
-
 void WKPageSetInvalidMessageFunction(WKPageInvalidMessageFunction)
 {
     // FIXME: Remove this function when doing so won't break WebKit nightlies.
 }
+
+#if ENABLE(NETSCAPE_PLUGIN_API)
+
+// -- DEPRECATED --
 
 WKStringRef WKPageGetPluginInformationBundleIdentifierKey()
 {
@@ -936,3 +955,4 @@ WKStringRef WKPageGetPluginInformationPluginURLKey()
 
 // -- DEPRECATED --
 
+#endif // ENABLE(NETSCAPE_PLUGIN_API)

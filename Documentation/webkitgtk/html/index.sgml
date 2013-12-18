@@ -354,6 +354,7 @@
 <ANCHOR id="WebKitWebSettings--enable-hyperlink-auditing" href="webkitgtk/WebKitWebSettings.html#WebKitWebSettings--enable-hyperlink-auditing">
 <ANCHOR id="WebKitWebSettings--enable-java-applet" href="webkitgtk/WebKitWebSettings.html#WebKitWebSettings--enable-java-applet">
 <ANCHOR id="WebKitWebSettings--enable-media-stream" href="webkitgtk/WebKitWebSettings.html#WebKitWebSettings--enable-media-stream">
+<ANCHOR id="WebKitWebSettings--enable-mediasource" href="webkitgtk/WebKitWebSettings.html#WebKitWebSettings--enable-mediasource">
 <ANCHOR id="WebKitWebSettings--enable-offline-web-application-cache" href="webkitgtk/WebKitWebSettings.html#WebKitWebSettings--enable-offline-web-application-cache">
 <ANCHOR id="WebKitWebSettings--enable-page-cache" href="webkitgtk/WebKitWebSettings.html#WebKitWebSettings--enable-page-cache">
 <ANCHOR id="WebKitWebSettings--enable-plugins" href="webkitgtk/WebKitWebSettings.html#WebKitWebSettings--enable-plugins">
@@ -842,6 +843,7 @@
 <ANCHOR id="annotation-glossterm-allow-none" href="webkitgtk/annotation-glossary.html#annotation-glossterm-allow-none">
 <ANCHOR id="annotation-glossterm-array" href="webkitgtk/annotation-glossary.html#annotation-glossterm-array">
 <ANCHOR id="annotation-glossterm-element-type" href="webkitgtk/annotation-glossary.html#annotation-glossterm-element-type">
+<ANCHOR id="annotation-glossterm-out" href="webkitgtk/annotation-glossary.html#annotation-glossterm-out">
 <ANCHOR id="annotation-glossterm-transfer container" href="webkitgtk/annotation-glossary.html#annotation-glossterm-transfer container">
 <ANCHOR id="annotation-glossterm-transfer full" href="webkitgtk/annotation-glossary.html#annotation-glossterm-transfer full">
 <ANCHOR id="annotation-glossterm-transfer none" href="webkitgtk/annotation-glossary.html#annotation-glossterm-transfer none">

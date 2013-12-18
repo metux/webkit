@@ -55,6 +55,8 @@ public:
     bool firstIncludedIntervalY(int minY, const IntSize& minSize, LayoutUnit& result) const;
     PassOwnPtr<RasterShapeIntervals> computeShapeMarginIntervals(unsigned shapeMargin) const;
 
+    void buildBoundsPath(Path&) const;
+
 private:
     int size() const { return m_intervalLists.size(); }
 
@@ -101,7 +103,12 @@ public:
     virtual void getIncludedIntervals(LayoutUnit logicalTop, LayoutUnit logicalHeight, SegmentList&) const OVERRIDE;
     virtual bool firstIncludedIntervalLogicalTop(LayoutUnit minLogicalIntervalTop, const LayoutSize& minLogicalIntervalSize, LayoutUnit&) const OVERRIDE;
 
-    virtual ShapeType type() const OVERRIDE { return Shape::RasterType; }
+    virtual void buildDisplayPaths(DisplayPaths& paths) const OVERRIDE
+    {
+        m_intervals->buildBoundsPath(paths.shape);
+        if (shapeMargin())
+            marginIntervals().buildBoundsPath(paths.marginShape);
+    }
 
 private:
     const RasterShapeIntervals& marginIntervals() const;

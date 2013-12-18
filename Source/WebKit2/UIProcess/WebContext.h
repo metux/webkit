@@ -90,12 +90,14 @@ extern NSString *SchemeForCustomProtocolRegisteredNotificationName;
 extern NSString *SchemeForCustomProtocolUnregisteredNotificationName;
 #endif
 
-class WebContext : public API::TypedObject<API::Object::Type::Context>, private CoreIPC::MessageReceiver
+class WebContext : public API::ObjectImpl<API::Object::Type::Context>, private CoreIPC::MessageReceiver
 #if ENABLE(NETSCAPE_PLUGIN_API)
     , private PluginInfoStoreClient
 #endif
     {
 public:
+    WebContext(const String& injectedBundlePath);
+
     static PassRefPtr<WebContext> create(const String& injectedBundlePath);
     virtual ~WebContext();
 
@@ -113,18 +115,18 @@ public:
         m_supplements.add(T::supplementName(), T::create(this));
     }
 
-    void addMessageReceiver(CoreIPC::StringReference messageReceiverName, CoreIPC::MessageReceiver*);
-    void addMessageReceiver(CoreIPC::StringReference messageReceiverName, uint64_t destinationID, CoreIPC::MessageReceiver*);
+    void addMessageReceiver(CoreIPC::StringReference messageReceiverName, CoreIPC::MessageReceiver&);
+    void addMessageReceiver(CoreIPC::StringReference messageReceiverName, uint64_t destinationID, CoreIPC::MessageReceiver&);
     void removeMessageReceiver(CoreIPC::StringReference messageReceiverName, uint64_t destinationID);
 
     bool dispatchMessage(CoreIPC::Connection*, CoreIPC::MessageDecoder&);
     bool dispatchSyncMessage(CoreIPC::Connection*, CoreIPC::MessageDecoder&, std::unique_ptr<CoreIPC::MessageEncoder>&);
 
-    void initializeClient(const WKContextClient*);
-    void initializeInjectedBundleClient(const WKContextInjectedBundleClient*);
-    void initializeConnectionClient(const WKContextConnectionClient*);
-    void initializeHistoryClient(const WKContextHistoryClient*);
-    void initializeDownloadClient(const WKContextDownloadClient*);
+    void initializeClient(const WKContextClientBase*);
+    void initializeInjectedBundleClient(const WKContextInjectedBundleClientBase*);
+    void initializeConnectionClient(const WKContextConnectionClientBase*);
+    void initializeHistoryClient(const WKContextHistoryClientBase*);
+    void initializeDownloadClient(const WKContextDownloadClientBase*);
 
     void setProcessModel(ProcessModel); // Can only be called when there are no processes running.
     ProcessModel processModel() const { return m_processModel; }
@@ -152,7 +154,7 @@ public:
 
     StorageManager& storageManager() const { return *m_storageManager; }
 
-    PassRefPtr<WebPageProxy> createWebPage(PageClient*, WebPageGroup*, WebPageProxy* relatedPage = 0);
+    PassRefPtr<WebPageProxy> createWebPage(PageClient&, WebPageGroup*, WebPageProxy* relatedPage = 0);
 
     const String& injectedBundlePath() const { return m_injectedBundlePath; }
 
@@ -236,8 +238,8 @@ public:
 
     void allowSpecificHTTPSCertificateForHost(const WebCertificateInfo*, const String& host);
 
-    WebProcessProxy* ensureSharedWebProcess();
-    WebProcessProxy* createNewWebProcessRespectingProcessCountLimit(); // Will return an existing one if limit is met.
+    WebProcessProxy& ensureSharedWebProcess();
+    WebProcessProxy& createNewWebProcessRespectingProcessCountLimit(); // Will return an existing one if limit is met.
     void warmInitialProcess();
 
     bool shouldTerminate(WebProcessProxy*);
@@ -310,13 +312,12 @@ public:
     void resetHSTSHosts();
 
 private:
-    WebContext(ProcessModel, const String& injectedBundlePath);
     void platformInitialize();
 
     void platformInitializeWebProcess(WebProcessCreationParameters&);
     void platformInvalidateContext();
 
-    WebProcessProxy* createNewWebProcess();
+    WebProcessProxy& createNewWebProcess();
 
     void requestWebContentStatistics(StatisticsRequest*);
     void requestNetworkingStatistics(StatisticsRequest*);
@@ -414,7 +415,7 @@ private:
 
     WebProcessProxy* m_processWithPageCache;
 
-    RefPtr<WebPageGroup> m_defaultPageGroup;
+    Ref<WebPageGroup> m_defaultPageGroup;
 
     RefPtr<API::Object> m_injectedBundleInitializationUserData;
     String m_injectedBundlePath;
@@ -472,7 +473,7 @@ private:
 
     RetainPtr<NSObject> m_automaticTextReplacementNotificationObserver;
     RetainPtr<NSObject> m_automaticSpellingCorrectionNotificationObserver;
-#if __MAC_OS_X_VERSION_MIN_REQUIRED >= 1090
+#if !PLATFORM(IOS) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 1090
     RetainPtr<NSObject> m_automaticQuoteSubstitutionNotificationObserver;
     RetainPtr<NSObject> m_automaticDashSubstitutionNotificationObserver;
 #endif
@@ -515,6 +516,13 @@ void WebContext::sendToNetworkingProcess(T&& message)
 {
     switch (m_processModel) {
     case ProcessModelSharedSecondaryProcess:
+#if ENABLE(NETWORK_PROCESS)
+        if (m_usesNetworkProcess) {
+            if (m_networkProcess->canSendMessage())
+                m_networkProcess->send(std::forward<T>(message), 0);
+            return;
+        }
+#endif
         if (!m_processes.isEmpty() && m_processes[0]->canSendMessage())
             m_processes[0]->send(std::forward<T>(message), 0);
         return;
@@ -535,6 +543,13 @@ void WebContext::sendToNetworkingProcessRelaunchingIfNecessary(T&& message)
 {
     switch (m_processModel) {
     case ProcessModelSharedSecondaryProcess:
+#if ENABLE(NETWORK_PROCESS)
+        if (m_usesNetworkProcess) {
+            ensureNetworkProcess();
+            m_networkProcess->send(std::forward<T>(message), 0);
+            return;
+        }
+#endif
         ensureSharedWebProcess();
         m_processes[0]->send(std::forward<T>(message), 0);
         return;

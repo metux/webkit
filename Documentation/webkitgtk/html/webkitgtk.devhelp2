@@ -321,6 +321,7 @@
     <keyword type="property" name="The &quot;enable-hyperlink-auditing&quot; property" link="WebKitWebSettings.html#WebKitWebSettings--enable-hyperlink-auditing"/>
     <keyword type="property" name="The &quot;enable-java-applet&quot; property" link="WebKitWebSettings.html#WebKitWebSettings--enable-java-applet"/>
     <keyword type="property" name="The &quot;enable-media-stream&quot; property" link="WebKitWebSettings.html#WebKitWebSettings--enable-media-stream"/>
+    <keyword type="property" name="The &quot;enable-mediasource&quot; property" link="WebKitWebSettings.html#WebKitWebSettings--enable-mediasource"/>
     <keyword type="property" name="The &quot;enable-offline-web-application-cache&quot; property" link="WebKitWebSettings.html#WebKitWebSettings--enable-offline-web-application-cache"/>
     <keyword type="property" name="The &quot;enable-page-cache&quot; property" link="WebKitWebSettings.html#WebKitWebSettings--enable-page-cache"/>
     <keyword type="property" name="The &quot;enable-plugins&quot; property" link="WebKitWebSettings.html#WebKitWebSettings--enable-plugins"/>

@@ -261,7 +261,11 @@ class BaseIndex
         end
     end
     def pointerExpr
-        "#{base.clValue(:int8Ptr)} + (#{index.clValue} << #{scaleShift}) + #{offset.clValue}"
+        if offset.value == 0
+            "#{base.clValue(:int8Ptr)} + (#{index.clValue} << #{scaleShift})"
+        else
+            "#{base.clValue(:int8Ptr)} + (#{index.clValue} << #{scaleShift}) + #{offset.clValue}"
+        end
     end
     def int8MemRef
         "*CAST<int8_t*>(#{pointerExpr})"
@@ -554,7 +558,7 @@ def cloopEmitCallSlowPath(operands)
     $asm.putc "    ExecState* exec = CAST<ExecState*>(#{operands[1].clValue(:voidPtr)});"
     $asm.putc "    Instruction* pc = CAST<Instruction*>(#{operands[2].clValue(:voidPtr)});"
     $asm.putc "    SlowPathReturnType result = #{operands[0].cLabel}(exec, pc);"
-    $asm.putc "    decodeResult(result, t0.instruction, t1.execState);"
+    $asm.putc "    decodeResult(result, t0.instruction, t1.vp);"
     $asm.putc "}"
 end
 
@@ -1091,7 +1095,8 @@ class Instruction
             cloopEmitOpAndBranch(operands, "|", :int32, "== 0")
         when "borrinz"
             cloopEmitOpAndBranch(operands, "|", :int32, "!= 0")
-
+            
+        when "memfence"
         when "pushCalleeSaves"
         when "popCalleeSaves"
 

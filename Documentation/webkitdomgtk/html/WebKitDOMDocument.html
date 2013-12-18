@@ -215,6 +215,7 @@
                                                          <em class="parameter"><code>const <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a> *value</code></em>);
 <a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gchar</span></a> *             <a class="link" href="WebKitDOMDocument.html#webkit-dom-document-get-referrer" title="webkit_dom_document_get_referrer ()">webkit_dom_document_get_referrer</a>    (<em class="parameter"><code><a class="link" href="WebKitDOMDocument.html" title="WebKitDOMDocument"><span class="type">WebKitDOMDocument</span></a> *self</code></em>);
 <a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gchar</span></a> *             <a class="link" href="WebKitDOMDocument.html#webkit-dom-document-get-domain" title="webkit_dom_document_get_domain ()">webkit_dom_document_get_domain</a>      (<em class="parameter"><code><a class="link" href="WebKitDOMDocument.html" title="WebKitDOMDocument"><span class="type">WebKitDOMDocument</span></a> *self</code></em>);
+<a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gchar</span></a> *             <a class="link" href="WebKitDOMDocument.html#webkit-dom-document-get-url" title="webkit_dom_document_get_url ()">webkit_dom_document_get_url</a>         (<em class="parameter"><code><a class="link" href="WebKitDOMDocument.html" title="WebKitDOMDocument"><span class="type">WebKitDOMDocument</span></a> *self</code></em>);
 <a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gchar</span></a> *             <a class="link" href="WebKitDOMDocument.html#webkit-dom-document-get-cookie" title="webkit_dom_document_get_cookie ()">webkit_dom_document_get_cookie</a>      (<em class="parameter"><code><a class="link" href="WebKitDOMDocument.html" title="WebKitDOMDocument"><span class="type">WebKitDOMDocument</span></a> *self</code></em>,
                                                          <em class="parameter"><code><a href="../glib/glib-Error-Reporting.html#GError"><span class="type">GError</span></a> **error</code></em>);
 <span class="returnvalue">void</span>                <a class="link" href="WebKitDOMDocument.html#webkit-dom-document-set-cookie" title="webkit_dom_document_set_cookie ()">webkit_dom_document_set_cookie</a>      (<em class="parameter"><code><a class="link" href="WebKitDOMDocument.html" title="WebKitDOMDocument"><span class="type">WebKitDOMDocument</span></a> *self</code></em>,
@@ -269,6 +270,10 @@
 <a class="link" href="WebKitDOMDOMSecurityPolicy.html" title="WebKitDOMDOMSecurityPolicy"><span class="returnvalue">WebKitDOMDOMSecurityPolicy</span></a> * <a class="link" href="WebKitDOMDocument.html#webkit-dom-document-get-security-policy" title="webkit_dom_document_get_security_policy ()">webkit_dom_document_get_security_policy</a>
                                                         (<em class="parameter"><code><a class="link" href="WebKitDOMDocument.html" title="WebKitDOMDocument"><span class="type">WebKitDOMDocument</span></a> *self</code></em>);
 <a class="link" href="WebKitDOMHTMLScriptElement.html" title="WebKitDOMHTMLScriptElement"><span class="returnvalue">WebKitDOMHTMLScriptElement</span></a> * <a class="link" href="WebKitDOMDocument.html#webkit-dom-document-get-current-script" title="webkit_dom_document_get_current_script ()">webkit_dom_document_get_current_script</a>
+                                                        (<em class="parameter"><code><a class="link" href="WebKitDOMDocument.html" title="WebKitDOMDocument"><span class="type">WebKitDOMDocument</span></a> *self</code></em>);
+<a href="../glib/glib-Basic-Types.html#gboolean"><span class="returnvalue">gboolean</span></a>            <a class="link" href="WebKitDOMDocument.html#webkit-dom-document-get-webkit-hidden" title="webkit_dom_document_get_webkit_hidden ()">webkit_dom_document_get_webkit_hidden</a>
+                                                        (<em class="parameter"><code><a class="link" href="WebKitDOMDocument.html" title="WebKitDOMDocument"><span class="type">WebKitDOMDocument</span></a> *self</code></em>);
+<a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gchar</span></a> *             <a class="link" href="WebKitDOMDocument.html#webkit-dom-document-get-webkit-visibility-state" title="webkit_dom_document_get_webkit_visibility_state ()">webkit_dom_document_get_webkit_visibility_state</a>
                                                         (<em class="parameter"><code><a class="link" href="WebKitDOMDocument.html" title="WebKitDOMDocument"><span class="type">WebKitDOMDocument</span></a> *self</code></em>);
 </pre>
 </div>
@@ -2097,6 +2102,29 @@ WebKitDOMDocument implements
 </div>
 <hr>
 <div class="refsect2">
+<a name="webkit-dom-document-get-url"></a><h3>webkit_dom_document_get_url ()</h3>
+<pre class="programlisting"><a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gchar</span></a> *             webkit_dom_document_get_url         (<em class="parameter"><code><a class="link" href="WebKitDOMDocument.html" title="WebKitDOMDocument"><span class="type">WebKitDOMDocument</span></a> *self</code></em>);</pre>
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
+<col align="left" valign="top">
+<col>
+</colgroup>
+<tbody>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>self</code></em> :</span></p></td>
+<td>A <a class="link" href="WebKitDOMDocument.html" title="WebKitDOMDocument"><span class="type">WebKitDOMDocument</span></a>
+</td>
+</tr>
+<tr>
+<td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
+<td>A <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a>
+</td>
+</tr>
+</tbody>
+</table></div>
+</div>
+<hr>
+<div class="refsect2">
 <a name="webkit-dom-document-get-cookie"></a><h3>webkit_dom_document_get_cookie ()</h3>
 <pre class="programlisting"><a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gchar</span></a> *             webkit_dom_document_get_cookie      (<em class="parameter"><code><a class="link" href="WebKitDOMDocument.html" title="WebKitDOMDocument"><span class="type">WebKitDOMDocument</span></a> *self</code></em>,
                                                          <em class="parameter"><code><a href="../glib/glib-Error-Reporting.html#GError"><span class="type">GError</span></a> **error</code></em>);</pre>
@@ -2817,6 +2845,68 @@ WebKitDOMDocument implements
 <tr>
 <td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
 <td>A <a class="link" href="WebKitDOMHTMLScriptElement.html" title="WebKitDOMHTMLScriptElement"><span class="type">WebKitDOMHTMLScriptElement</span></a>. <span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
+</td>
+</tr>
+</tbody>
+</table></div>
+</div>
+<hr>
+<div class="refsect2">
+<a name="webkit-dom-document-get-webkit-hidden"></a><h3>webkit_dom_document_get_webkit_hidden ()</h3>
+<pre class="programlisting"><a href="../glib/glib-Basic-Types.html#gboolean"><span class="returnvalue">gboolean</span></a>            webkit_dom_document_get_webkit_hidden
+                                                        (<em class="parameter"><code><a class="link" href="WebKitDOMDocument.html" title="WebKitDOMDocument"><span class="type">WebKitDOMDocument</span></a> *self</code></em>);</pre>
+<div class="warning">
+<h3 class="title">Warning</h3>
+<p><code class="literal">webkit_dom_document_get_webkit_hidden</code> is deprecated and should not be used in newly-written code. 2.2</p>
+</div>
+<p>
+This functionality has been removed from WebKit, this function does nothing.
+</p>
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
+<col align="left" valign="top">
+<col>
+</colgroup>
+<tbody>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>self</code></em> :</span></p></td>
+<td>A <a class="link" href="WebKitDOMDocument.html" title="WebKitDOMDocument"><span class="type">WebKitDOMDocument</span></a>
+</td>
+</tr>
+<tr>
+<td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
+<td>A <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>
+</td>
+</tr>
+</tbody>
+</table></div>
+</div>
+<hr>
+<div class="refsect2">
+<a name="webkit-dom-document-get-webkit-visibility-state"></a><h3>webkit_dom_document_get_webkit_visibility_state ()</h3>
+<pre class="programlisting"><a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gchar</span></a> *             webkit_dom_document_get_webkit_visibility_state
+                                                        (<em class="parameter"><code><a class="link" href="WebKitDOMDocument.html" title="WebKitDOMDocument"><span class="type">WebKitDOMDocument</span></a> *self</code></em>);</pre>
+<div class="warning">
+<h3 class="title">Warning</h3>
+<p><code class="literal">webkit_dom_document_get_webkit_visibility_state</code> is deprecated and should not be used in newly-written code. 2.2</p>
+</div>
+<p>
+This functionality has been removed from WebKit, this function does nothing.
+</p>
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
+<col align="left" valign="top">
+<col>
+</colgroup>
+<tbody>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>self</code></em> :</span></p></td>
+<td>A <a class="link" href="WebKitDOMDocument.html" title="WebKitDOMDocument"><span class="type">WebKitDOMDocument</span></a>
+</td>
+</tr>
+<tr>
+<td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
+<td>A <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a>
 </td>
 </tr>
 </tbody>

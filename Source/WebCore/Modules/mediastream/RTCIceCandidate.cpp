@@ -37,7 +37,6 @@
 
 #include "Dictionary.h"
 #include "ExceptionCode.h"
-#include "InspectorValues.h"
 #include "RTCIceCandidateDescriptor.h"
 
 namespace WebCore {
@@ -48,14 +47,14 @@ PassRefPtr<RTCIceCandidate> RTCIceCandidate::create(const Dictionary& dictionary
     bool ok = dictionary.get("candidate", candidate);
     if (ok && candidate.isEmpty()) {
         ec = TYPE_MISMATCH_ERR;
-        return 0;
+        return nullptr;
     }
 
     String sdpMid;
     ok = dictionary.get("sdpMid", sdpMid);
     if (ok && sdpMid.isEmpty()) {
         ec = TYPE_MISMATCH_ERR;
-        return 0;
+        return nullptr;
     }
 
     String tempLineIndex;
@@ -68,7 +67,7 @@ PassRefPtr<RTCIceCandidate> RTCIceCandidate::create(const Dictionary& dictionary
         sdpMLineIndex = tempLineIndex.toUIntStrict(&intConversionOk);
         if (!intConversionOk) {
             ec = TYPE_MISMATCH_ERR;
-            return 0;
+            return nullptr;
         }
     }
 

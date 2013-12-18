@@ -808,6 +808,15 @@ WebKitDOMDocument
 @Returns: 
 
 
+<!-- ##### FUNCTION webkit_dom_document_get_url ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
 <!-- ##### FUNCTION webkit_dom_document_get_cookie ##### -->
 <para>
 
@@ -1073,6 +1082,24 @@ WebKitDOMDocument
 
 
 <!-- ##### FUNCTION webkit_dom_document_get_current_script ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_document_get_webkit_hidden ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_document_get_webkit_visibility_state ##### -->
 <para>
 
 </para>

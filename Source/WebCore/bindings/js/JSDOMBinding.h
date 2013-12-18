@@ -237,6 +237,8 @@ inline JSC::JSValue argumentOrNull(JSC::ExecState* exec, unsigned index)
     return index >= exec->argumentCount() ? JSC::JSValue() : exec->argument(index);
 }
 
+void addImpureProperty(const AtomicString&);
+
 const JSC::HashTable& getHashTableForGlobalData(JSC::VM&, const JSC::HashTable& staticTable);
 
 void reportException(JSC::ExecState*, JSC::JSValue exception, CachedScript* = 0);
@@ -371,7 +373,7 @@ inline JSC::JSValue toJS(JSC::ExecState* exec, JSDOMGlobalObject* globalObject, 
 }
 
 template <typename T>
-inline JSC::JSValue toJS(JSC::ExecState* exec, JSDOMGlobalObject* globalObject, Vector<T> vector)
+inline JSC::JSValue toJS(JSC::ExecState* exec, JSDOMGlobalObject* globalObject, const Vector<T>& vector)
 {
     JSC::JSArray* array = constructEmptyArray(exec, 0, vector.size());
 
@@ -382,7 +384,7 @@ inline JSC::JSValue toJS(JSC::ExecState* exec, JSDOMGlobalObject* globalObject, 
 }
 
 template <typename T>
-inline JSC::JSValue toJS(JSC::ExecState* exec, JSDOMGlobalObject* globalObject, Vector<RefPtr<T>> vector)
+inline JSC::JSValue toJS(JSC::ExecState* exec, JSDOMGlobalObject* globalObject, const Vector<RefPtr<T>>& vector)
 {
     JSC::JSArray* array = constructEmptyArray(exec, 0, vector.size());
 
@@ -390,6 +392,11 @@ inline JSC::JSValue toJS(JSC::ExecState* exec, JSDOMGlobalObject* globalObject, 
         array->putDirectIndex(exec, i, toJS(exec, globalObject, vector[i].get()));
 
     return array;
+}
+
+inline JSC::JSValue toJS(JSC::ExecState* exec, JSDOMGlobalObject*, const String& value)
+{
+    return jsStringOrNull(exec, value);
 }
 
 template <class T>
@@ -508,10 +515,12 @@ Vector<RefPtr<T>> toRefPtrNativeArray(JSC::ExecState* exec, JSC::JSValue value, 
 
     Vector<RefPtr<T>> result;
     JSC::JSArray* array = asArray(value);
-    for (size_t i = 0; i < array->length(); ++i) {
+    size_t size = array->length();
+    result.reserveInitialCapacity(size);
+    for (size_t i = 0; i < size; ++i) {
         JSC::JSValue element = array->getIndex(exec, i);
         if (element.inherits(JST::info()))
-            result.append((*toT)(element));
+            result.uncheckedAppend((*toT)(element));
         else {
             throwVMError(exec, createTypeError(exec, "Invalid Array element type"));
             return Vector<RefPtr<T>>();
@@ -532,13 +541,14 @@ Vector<T> toNativeArray(JSC::ExecState* exec, JSC::JSValue value)
 
     JSC::JSObject* object = value.getObject();
     Vector<T> result;
+    result.reserveInitialCapacity(length);
     typedef NativeValueTraits<T> TraitsType;
 
     for (unsigned i = 0; i < length; ++i) {
         T indexValue;
         if (!TraitsType::nativeValue(exec, object->get(exec, i), indexValue))
             return Vector<T>();
-        result.append(indexValue);
+        result.uncheckedAppend(indexValue);
     }
     return result;
 }
@@ -550,13 +560,14 @@ Vector<T> toNativeArguments(JSC::ExecState* exec, size_t startIndex = 0)
     ASSERT(startIndex <= length);
 
     Vector<T> result;
+    result.reserveInitialCapacity(length);
     typedef NativeValueTraits<T> TraitsType;
 
     for (size_t i = startIndex; i < length; ++i) {
         T indexValue;
         if (!TraitsType::nativeValue(exec, exec->argument(i), indexValue))
             return Vector<T>();
-        result.append(indexValue);
+        result.uncheckedAppend(indexValue);
     }
     return result;
 }
@@ -567,7 +578,7 @@ bool shouldAllowAccessToFrame(JSC::ExecState*, Frame*, String& message);
 bool shouldAllowAccessToDOMWindow(JSC::ExecState*, DOMWindow&, String& message);
 
 void printErrorMessageForFrame(Frame*, const String& message);
-JSC::JSValue objectToStringFunctionGetter(JSC::ExecState*, JSC::JSValue, JSC::PropertyName);
+JSC::EncodedJSValue objectToStringFunctionGetter(JSC::ExecState*, JSC::EncodedJSValue, JSC::EncodedJSValue, JSC::PropertyName);
 
 inline JSC::JSValue jsStringWithCache(JSC::ExecState* exec, const String& s)
 {

@@ -33,6 +33,7 @@
 #include "AssemblerBuffer.h"
 #include "AssemblerBufferWithConstantPool.h"
 #include "JITCompilationEffort.h"
+#include <limits.h>
 #include <stdarg.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -182,6 +183,7 @@ enum {
     FSQRT_OPCODE = 0xf06d,
     FSCHG_OPCODE = 0xf3fd,
     CLRT_OPCODE = 8,
+    SYNCO_OPCODE = 0x00ab,
 };
 
 namespace SH4Registers {
@@ -718,6 +720,11 @@ public:
     void nop()
     {
         oneShortOp(NOP_OPCODE, false);
+    }
+
+    void synco()
+    {
+        oneShortOp(SYNCO_OPCODE);
     }
 
     void sett()

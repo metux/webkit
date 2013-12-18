@@ -47,6 +47,7 @@
 #include "RenderTextControlSingleLine.h"
 #include "RenderTheme.h"
 #include "ShadowRoot.h"
+#include "TextBreakIterator.h"
 #include "TextControlInnerElements.h"
 #include "TextEvent.h"
 #include "TextIterator.h"
@@ -69,6 +70,10 @@ TextFieldInputType::~TextFieldInputType()
 
 bool TextFieldInputType::isKeyboardFocusable(KeyboardEvent*) const
 {
+#if PLATFORM(IOS)
+    if (element().isReadOnly())
+        return false;
+#endif
     return element().isTextFormControlFocusable();
 }
 
@@ -217,7 +222,7 @@ bool TextFieldInputType::needsContainer() const
 bool TextFieldInputType::shouldHaveSpinButton() const
 {
     Document& document = element().document();
-    RefPtr<RenderTheme> theme = document.page() ? document.page()->theme() : RenderTheme::defaultTheme();
+    RefPtr<RenderTheme> theme = document.page() ? &document.page()->theme() : RenderTheme::defaultTheme();
     return theme->shouldHaveSpinButton(&element());
 }
 

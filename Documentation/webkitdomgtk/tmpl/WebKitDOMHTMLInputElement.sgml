@@ -41,7 +41,17 @@ WebKitDOMHTMLInputElement
 
 </para>
 
+<!-- ##### ARG WebKitDOMHTMLInputElement:autocapitalize ##### -->
+<para>
+
+</para>
+
 <!-- ##### ARG WebKitDOMHTMLInputElement:autocomplete ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMHTMLInputElement:autocorrect ##### -->
 <para>
 
 </para>
@@ -1057,6 +1067,42 @@ WebKitDOMHTMLInputElement
 
 
 <!-- ##### FUNCTION webkit_dom_html_input_element_set_webkit_grammar ##### -->
+<para>
+
+</para>
+
+@self: 
+@value: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_input_element_get_autocorrect ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_input_element_set_autocorrect ##### -->
+<para>
+
+</para>
+
+@self: 
+@value: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_input_element_get_autocapitalize ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_input_element_set_autocapitalize ##### -->
 <para>
 
 </para>

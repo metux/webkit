@@ -26,11 +26,11 @@
 #include "config.h"
 #include "DownloadProxy.h"
 
+#include "APIData.h"
 #include "AuthenticationChallengeProxy.h"
 #include "DataReference.h"
 #include "DownloadProxyMap.h"
 #include "WebContext.h"
-#include "WebData.h"
 #include "WebProcessMessages.h"
 #include <wtf/text/CString.h>
 #include <wtf/text/WTFString.h>
@@ -50,14 +50,14 @@ static uint64_t generateDownloadID()
     return ++uniqueDownloadID;
 }
     
-PassRefPtr<DownloadProxy> DownloadProxy::create(DownloadProxyMap& downloadProxyMap, WebContext* webContext)
+PassRefPtr<DownloadProxy> DownloadProxy::create(DownloadProxyMap& downloadProxyMap, WebContext& webContext)
 {
     return adoptRef(new DownloadProxy(downloadProxyMap, webContext));
 }
 
-DownloadProxy::DownloadProxy(DownloadProxyMap& downloadProxyMap, WebContext* webContext)
+DownloadProxy::DownloadProxy(DownloadProxyMap& downloadProxyMap, WebContext& webContext)
     : m_downloadProxyMap(downloadProxyMap)
-    , m_webContext(webContext)
+    , m_webContext(&webContext)
     , m_downloadID(generateDownloadID())
 {
 }
@@ -175,12 +175,12 @@ void DownloadProxy::didFinish()
     m_downloadProxyMap.downloadFinished(this);
 }
 
-static PassRefPtr<WebData> createWebData(const CoreIPC::DataReference& data)
+static PassRefPtr<API::Data> createData(const CoreIPC::DataReference& data)
 {
     if (data.isEmpty())
         return 0;
 
-    return WebData::create(data.data(), data.size());
+    return API::Data::create(data.data(), data.size());
 }
 
 void DownloadProxy::didFail(const ResourceError& error, const CoreIPC::DataReference& resumeData)
@@ -188,7 +188,7 @@ void DownloadProxy::didFail(const ResourceError& error, const CoreIPC::DataRefer
     if (!m_webContext)
         return;
 
-    m_resumeData = createWebData(resumeData);
+    m_resumeData = createData(resumeData);
 
     m_webContext->downloadClient().didFail(m_webContext.get(), this, error);
 
@@ -198,7 +198,7 @@ void DownloadProxy::didFail(const ResourceError& error, const CoreIPC::DataRefer
 
 void DownloadProxy::didCancel(const CoreIPC::DataReference& resumeData)
 {
-    m_resumeData = createWebData(resumeData);
+    m_resumeData = createData(resumeData);
 
     m_webContext->downloadClient().didCancel(m_webContext.get(), this);
 

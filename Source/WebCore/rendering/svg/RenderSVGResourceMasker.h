@@ -30,12 +30,11 @@
 #include "SVGUnitTypes.h"
 
 #include <wtf/HashMap.h>
-#include <wtf/OwnPtr.h>
 
 namespace WebCore {
 
 struct MaskerData {
-    OwnPtr<ImageBuffer> maskImage;
+    std::unique_ptr<ImageBuffer> maskImage;
 };
 
 class RenderSVGResourceMasker FINAL : public RenderSVGResourceContainer {
@@ -46,7 +45,7 @@ public:
     SVGMaskElement& maskElement() const { return toSVGMaskElement(RenderSVGResourceContainer::element()); }
 
     virtual void removeAllClientsFromCache(bool markForInvalidation = true);
-    virtual void removeClientFromCache(RenderObject*, bool markForInvalidation = true);
+    virtual void removeClientFromCache(RenderObject&, bool markForInvalidation = true);
     virtual bool applyResource(RenderElement&, const RenderStyle&, GraphicsContext*&, unsigned short resourceMode) OVERRIDE;
     virtual FloatRect resourceBoundingBox(const RenderObject&) OVERRIDE;
 

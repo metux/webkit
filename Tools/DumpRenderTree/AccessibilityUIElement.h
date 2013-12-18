@@ -106,6 +106,7 @@ public:
     // Attributes - platform-independent implementations
     JSStringRef stringAttributeValue(JSStringRef attribute);
     double numberAttributeValue(JSStringRef attribute);
+    void uiElementArrayAttributeValue(JSStringRef attribute, Vector<AccessibilityUIElement>& elements) const;
     AccessibilityUIElement uiElementAttributeValue(JSStringRef attribute) const;    
     bool boolAttributeValue(JSStringRef attribute);
     bool isAttributeSupported(JSStringRef attribute);
@@ -202,6 +203,7 @@ public:
     JSStringRef stringForRange(unsigned location, unsigned length);
     JSStringRef attributedStringForRange(unsigned location, unsigned length);
     bool attributedStringRangeIsMisspelled(unsigned location, unsigned length);
+    unsigned uiElementCountForSearchPredicate(JSContextRef, AccessibilityUIElement* startElement, bool isDirectionNext, JSValueRef searchKey, JSStringRef searchText, bool visibleOnly);
     AccessibilityUIElement uiElementForSearchPredicate(JSContextRef, AccessibilityUIElement* startElement, bool isDirectionNext, JSValueRef searchKey, JSStringRef searchText, bool visibleOnly);
 #if PLATFORM(IOS)
     void elementsForRange(unsigned location, unsigned length, Vector<AccessibilityUIElement>& elements);
@@ -209,6 +211,14 @@ public:
     void increaseTextSelection();
     void decreaseTextSelection();
     AccessibilityUIElement linkedElement();
+#endif
+
+#if PLATFORM(GTK) || PLATFORM(EFL)
+    // Text-specific
+    JSStringRef characterAtOffset(int offset);
+    JSStringRef wordAtOffset(int offset);
+    JSStringRef lineAtOffset(int offset);
+    JSStringRef sentenceAtOffset(int offset);
 #endif
 
     // Table-specific

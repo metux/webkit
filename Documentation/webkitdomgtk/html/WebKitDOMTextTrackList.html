@@ -43,6 +43,9 @@
 <pre class="synopsis">                    <a class="link" href="WebKitDOMTextTrackList.html#WebKitDOMTextTrackList-struct" title="WebKitDOMTextTrackList">WebKitDOMTextTrackList</a>;
 <a class="link" href="WebKitDOMTextTrack.html" title="WebKitDOMTextTrack"><span class="returnvalue">WebKitDOMTextTrack</span></a> * <a class="link" href="WebKitDOMTextTrackList.html#webkit-dom-text-track-list-item" title="webkit_dom_text_track_list_item ()">webkit_dom_text_track_list_item</a>    (<em class="parameter"><code><a class="link" href="WebKitDOMTextTrackList.html" title="WebKitDOMTextTrackList"><span class="type">WebKitDOMTextTrackList</span></a> *self</code></em>,
                                                          <em class="parameter"><code><a href="../glib/glib-Basic-Types.html#gulong"><span class="type">gulong</span></a> index</code></em>);
+<a class="link" href="WebKitDOMTextTrack.html" title="WebKitDOMTextTrack"><span class="returnvalue">WebKitDOMTextTrack</span></a> * <a class="link" href="WebKitDOMTextTrackList.html#webkit-dom-text-track-list-get-track-by-id" title="webkit_dom_text_track_list_get_track_by_id ()">webkit_dom_text_track_list_get_track_by_id</a>
+                                                        (<em class="parameter"><code><a class="link" href="WebKitDOMTextTrackList.html" title="WebKitDOMTextTrackList"><span class="type">WebKitDOMTextTrackList</span></a> *self</code></em>,
+                                                         <em class="parameter"><code>const <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a> *id</code></em>);
 <a href="../glib/glib-Basic-Types.html#gboolean"><span class="returnvalue">gboolean</span></a>            <a class="link" href="WebKitDOMTextTrackList.html#webkit-dom-text-track-list-dispatch-event" title="webkit_dom_text_track_list_dispatch_event ()">webkit_dom_text_track_list_dispatch_event</a>
                                                         (<em class="parameter"><code><a class="link" href="WebKitDOMTextTrackList.html" title="WebKitDOMTextTrackList"><span class="type">WebKitDOMTextTrackList</span></a> *self</code></em>,
                                                          <em class="parameter"><code><a class="link" href="WebKitDOMEvent.html" title="WebKitDOMEvent"><span class="type">WebKitDOMEvent</span></a> *evt</code></em>,
@@ -103,6 +106,36 @@ WebKitDOMTextTrackList implements
 <tr>
 <td><p><span class="term"><em class="parameter"><code>index</code></em> :</span></p></td>
 <td>A <a href="../glib/glib-Basic-Types.html#gulong"><span class="type">gulong</span></a>
+</td>
+</tr>
+<tr>
+<td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
+<td>A <a class="link" href="WebKitDOMTextTrack.html" title="WebKitDOMTextTrack"><span class="type">WebKitDOMTextTrack</span></a>. <span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
+</td>
+</tr>
+</tbody>
+</table></div>
+</div>
+<hr>
+<div class="refsect2">
+<a name="webkit-dom-text-track-list-get-track-by-id"></a><h3>webkit_dom_text_track_list_get_track_by_id ()</h3>
+<pre class="programlisting"><a class="link" href="WebKitDOMTextTrack.html" title="WebKitDOMTextTrack"><span class="returnvalue">WebKitDOMTextTrack</span></a> * webkit_dom_text_track_list_get_track_by_id
+                                                        (<em class="parameter"><code><a class="link" href="WebKitDOMTextTrackList.html" title="WebKitDOMTextTrackList"><span class="type">WebKitDOMTextTrackList</span></a> *self</code></em>,
+                                                         <em class="parameter"><code>const <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a> *id</code></em>);</pre>
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
+<col align="left" valign="top">
+<col>
+</colgroup>
+<tbody>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>self</code></em> :</span></p></td>
+<td>A <a class="link" href="WebKitDOMTextTrackList.html" title="WebKitDOMTextTrackList"><span class="type">WebKitDOMTextTrackList</span></a>
+</td>
+</tr>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>id</code></em> :</span></p></td>
+<td>A <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a>
 </td>
 </tr>
 <tr>

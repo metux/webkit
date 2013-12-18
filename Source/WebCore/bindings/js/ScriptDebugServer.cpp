@@ -41,8 +41,8 @@
 #include "PageConsole.h"
 #include "ScriptBreakpoint.h"
 #include "ScriptDebugListener.h"
-#include "ScriptValue.h"
 #include "Sound.h"
+#include <bindings/ScriptValue.h>
 #include <debugger/DebuggerCallFrame.h>
 #include <parser/SourceProvider.h>
 #include <runtime/JSLock.h>
@@ -66,14 +66,14 @@ ScriptDebugServer::~ScriptDebugServer()
 {
 }
 
-BreakpointID ScriptDebugServer::setBreakpoint(SourceID sourceID, const ScriptBreakpoint& scriptBreakpoint, unsigned* actualLineNumber, unsigned* actualColumnNumber)
+JSC::BreakpointID ScriptDebugServer::setBreakpoint(JSC::SourceID sourceID, const ScriptBreakpoint& scriptBreakpoint, unsigned* actualLineNumber, unsigned* actualColumnNumber)
 {
     if (!sourceID)
-        return noBreakpointID;
+        return JSC::noBreakpointID;
 
     JSC::Breakpoint breakpoint(sourceID, scriptBreakpoint.lineNumber, scriptBreakpoint.columnNumber, scriptBreakpoint.condition, scriptBreakpoint.autoContinue);
-    BreakpointID id = Debugger::setBreakpoint(breakpoint, *actualLineNumber, *actualColumnNumber);
-    if (id != noBreakpointID && !scriptBreakpoint.actions.isEmpty()) {
+    JSC::BreakpointID id = Debugger::setBreakpoint(breakpoint, *actualLineNumber, *actualColumnNumber);
+    if (id != JSC::noBreakpointID && !scriptBreakpoint.actions.isEmpty()) {
 #ifndef NDEBUG
         BreakpointIDToActionsMap::iterator it = m_breakpointIDToActions.find(id);
         ASSERT(it == m_breakpointIDToActions.end());
@@ -84,9 +84,9 @@ BreakpointID ScriptDebugServer::setBreakpoint(SourceID sourceID, const ScriptBre
     return id;
 }
 
-void ScriptDebugServer::removeBreakpoint(BreakpointID id)
+void ScriptDebugServer::removeBreakpoint(JSC::BreakpointID id)
 {
-    ASSERT(id != noBreakpointID);
+    ASSERT(id != JSC::noBreakpointID);
     BreakpointIDToActionsMap::iterator it = m_breakpointIDToActions.find(id);
     if (it != m_breakpointIDToActions.end())
         m_breakpointIDToActions.remove(it);
@@ -99,7 +99,7 @@ bool ScriptDebugServer::evaluateBreakpointAction(const ScriptBreakpointAction& b
     DebuggerCallFrame* debuggerCallFrame = currentDebuggerCallFrame();
     switch (breakpointAction.type) {
     case ScriptBreakpointActionTypeLog: {
-        DOMWindow& window = asJSDOMWindow(debuggerCallFrame->dynamicGlobalObject())->impl();
+        DOMWindow& window = asJSDOMWindow(debuggerCallFrame->vmEntryGlobalObject())->impl();
         if (PageConsole* console = window.pageConsole())
             console->addMessage(JSMessageSource, LogMessageLevel, breakpointAction.data);
         break;
@@ -130,14 +130,14 @@ bool ScriptDebugServer::canSetScriptSource()
     return false;
 }
 
-bool ScriptDebugServer::setScriptSource(const String&, const String&, bool, String*, ScriptValue*, ScriptObject*)
+bool ScriptDebugServer::setScriptSource(const String&, const String&, bool, String*, Deprecated::ScriptValue*, Deprecated::ScriptObject*)
 {
     // FIXME(40300): implement this.
     return false;
 }
 
 
-void ScriptDebugServer::updateCallStack(ScriptValue*)
+void ScriptDebugServer::updateCallStack(Deprecated::ScriptValue*)
 {
     // This method is used for restart frame feature that is not implemented yet.
     // FIXME(40300): implement this.
@@ -159,7 +159,7 @@ void ScriptDebugServer::dispatchDidPause(ScriptDebugListener* listener)
         } else
             jsCallFrame = jsUndefined();
     }
-    listener->didPause(state, ScriptValue(state->vm(), jsCallFrame), ScriptValue());
+    listener->didPause(state, Deprecated::ScriptValue(state->vm(), jsCallFrame), Deprecated::ScriptValue());
 }
 
 void ScriptDebugServer::dispatchDidContinue(ScriptDebugListener* listener)
@@ -169,7 +169,7 @@ void ScriptDebugServer::dispatchDidContinue(ScriptDebugListener* listener)
 
 void ScriptDebugServer::dispatchDidParseSource(const ListenerSet& listeners, SourceProvider* sourceProvider, bool isContentScript)
 {
-    SourceID sourceID = sourceProvider->asID();
+    JSC::SourceID sourceID = sourceProvider->asID();
 
     ScriptDebugListener::Script script;
     script.url = sourceProvider->url();
@@ -288,10 +288,10 @@ void ScriptDebugServer::handleExceptionInBreakpointCondition(JSC::ExecState* exe
     reportException(exec, exception);
 }
 
-void ScriptDebugServer::handlePause(Debugger::ReasonForPause, JSGlobalObject* dynamicGlobalObject)
+void ScriptDebugServer::handlePause(Debugger::ReasonForPause, JSGlobalObject* vmEntryGlobalObject)
 {
-    dispatchFunctionToListeners(&ScriptDebugServer::dispatchDidPause, dynamicGlobalObject);
-    didPause(dynamicGlobalObject);
+    dispatchFunctionToListeners(&ScriptDebugServer::dispatchDidPause, vmEntryGlobalObject);
+    didPause(vmEntryGlobalObject);
 
     TimerBase::fireTimersInNestedEventLoop();
 
@@ -300,9 +300,10 @@ void ScriptDebugServer::handlePause(Debugger::ReasonForPause, JSGlobalObject* dy
     runEventLoopWhilePaused();
     m_runningNestedMessageLoop = false;
 
-    didContinue(dynamicGlobalObject);
-    dispatchFunctionToListeners(&ScriptDebugServer::dispatchDidContinue, dynamicGlobalObject);
+    didContinue(vmEntryGlobalObject);
+    dispatchFunctionToListeners(&ScriptDebugServer::dispatchDidContinue, vmEntryGlobalObject);
 }
+
 void ScriptDebugServer::recompileAllJSFunctionsSoon()
 {
     m_recompileTimer.startOneShot(0);
@@ -318,7 +319,7 @@ void ScriptDebugServer::clearCompiledScripts()
     // FIXME(89652): implement this.
 }
 
-void ScriptDebugServer::runScript(JSC::ExecState*, const String&, ScriptValue*, bool*, String*)
+void ScriptDebugServer::runScript(JSC::ExecState*, const String&, Deprecated::ScriptValue*, bool*, String*)
 {
     // FIXME(89652): implement this.
 }

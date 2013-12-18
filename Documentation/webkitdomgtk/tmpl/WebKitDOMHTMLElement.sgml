@@ -446,3 +446,111 @@ WebKitDOMHTMLElement
 @value: 
 
 
+<!-- ##### FUNCTION webkit_dom_html_element_get_id ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_element_set_id ##### -->
+<para>
+
+</para>
+
+@self: 
+@value: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_element_get_class_name ##### -->
+<para>
+
+</para>
+
+@element: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_element_set_class_name ##### -->
+<para>
+
+</para>
+
+@element: 
+@value: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_element_get_class_list ##### -->
+<para>
+
+</para>
+
+@element: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_element_set_item_id ##### -->
+<para>
+
+</para>
+
+@self: 
+@value: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_element_get_item_id ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_element_get_item_ref ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_element_get_item_prop ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_element_set_item_scope ##### -->
+<para>
+
+</para>
+
+@self: 
+@value: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_element_get_item_scope ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_element_get_item_type ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+

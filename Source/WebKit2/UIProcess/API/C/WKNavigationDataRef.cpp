@@ -26,15 +26,15 @@
 #include "config.h"
 #include "WKNavigationDataRef.h"
 
+#include "APINavigationData.h"
+#include "APIURLRequest.h"
 #include "WKAPICast.h"
-#include "WebNavigationData.h"
-#include "WebURLRequest.h"
 
 using namespace WebKit;
 
 WKTypeID WKNavigationDataGetTypeID()
 {
-    return toAPI(WebNavigationData::APIType);
+    return toAPI(API::NavigationData::APIType);
 }
 
 WKStringRef WKNavigationDataCopyTitle(WKNavigationDataRef navigationDataRef)
@@ -55,5 +55,5 @@ WKURLRef WKNavigationDataCopyNavigationDestinationURL(WKNavigationDataRef naviga
 
 WKURLRequestRef WKNavigationDataCopyOriginalRequest(WKNavigationDataRef navigationData)
 {
-    return toAPI(WebURLRequest::create(toImpl(navigationData)->originalRequest()).leakRef());
+    return toAPI(API::URLRequest::create(toImpl(navigationData)->originalRequest()).leakRef());
 }

@@ -71,9 +71,9 @@ void SMILTimeContainer::schedule(SVGSMILElement* animation, SVGElement* target, 
 #endif
 
     ElementAttributePair key(target, attributeName);
-    OwnPtr<AnimationsVector>& scheduled = m_scheduledAnimations.add(key, nullptr).iterator->value;
+    std::unique_ptr<AnimationsVector>& scheduled = m_scheduledAnimations.add(key, nullptr).iterator->value;
     if (!scheduled)
-        scheduled = adoptPtr(new AnimationsVector);
+        scheduled = std::make_unique<AnimationsVector>();
     ASSERT(!scheduled->contains(animation));
     scheduled->append(animation);
 
@@ -226,9 +226,8 @@ void SMILTimeContainer::updateDocumentOrderIndexes()
 {
     unsigned timingElementCount = 0;
 
-    auto smilDescendants = descendantsOfType<SVGSMILElement>(*m_ownerSVGElement);
-    for (auto smilElement = smilDescendants.begin(), end = smilDescendants.end(); smilElement != end; ++smilElement)
-        smilElement->setDocumentOrderIndex(timingElementCount++);
+    for (auto& smilElement : descendantsOfType<SVGSMILElement>(*m_ownerSVGElement))
+        smilElement.setDocumentOrderIndex(timingElementCount++);
 
     m_documentOrderIndexesDirty = false;
 }

@@ -326,3 +326,11 @@ WebKitDOMHTMLDocument
 @value: 
 
 
+<!-- ##### FUNCTION webkit_dom_html_document_open ##### -->
+<para>
+
+</para>
+
+@self: 
+
+

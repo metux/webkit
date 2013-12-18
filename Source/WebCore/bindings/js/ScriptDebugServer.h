@@ -32,11 +32,10 @@
 
 #if ENABLE(JAVASCRIPT_DEBUGGER)
 
-#include "BreakpointID.h"
 #include "ScriptBreakpoint.h"
 #include "ScriptDebugListener.h"
-#include "SourceID.h"
 #include "Timer.h"
+#include <bindings/ScriptObject.h>
 #include <debugger/Debugger.h>
 #include <wtf/HashMap.h>
 #include <wtf/HashSet.h>
@@ -50,22 +49,19 @@ class DebuggerCallFrame;
 class JSGlobalObject;
 class ExecState;
 }
-namespace WebCore {
 
-class ScriptDebugListener;
-class ScriptObject;
-class ScriptValue;
+namespace WebCore {
 
 class ScriptDebugServer : public JSC::Debugger {
     WTF_MAKE_NONCOPYABLE(ScriptDebugServer); WTF_MAKE_FAST_ALLOCATED;
 public:
-    BreakpointID setBreakpoint(SourceID, const ScriptBreakpoint&, unsigned* actualLineNumber, unsigned* actualColumnNumber);
-    void removeBreakpoint(BreakpointID);
+    JSC::BreakpointID setBreakpoint(JSC::SourceID, const ScriptBreakpoint&, unsigned* actualLineNumber, unsigned* actualColumnNumber);
+    void removeBreakpoint(JSC::BreakpointID);
     void clearBreakpoints();
 
     bool canSetScriptSource();
-    bool setScriptSource(const String& sourceID, const String& newContent, bool preview, String* error, ScriptValue* newCallFrames, ScriptObject* result);
-    void updateCallStack(ScriptValue* callFrame);
+    bool setScriptSource(const String& sourceID, const String& newContent, bool preview, String* error, Deprecated::ScriptValue* newCallFrames, Deprecated::ScriptObject* result);
+    void updateCallStack(Deprecated::ScriptValue* callFrame);
 
     bool causesRecompilation() { return true; }
     bool supportsSeparateScriptCompilationAndExecution() { return false; }
@@ -82,7 +78,7 @@ public:
 
     void compileScript(JSC::ExecState*, const String& expression, const String& sourceURL, String* scriptID, String* exceptionMessage);
     void clearCompiledScripts();
-    void runScript(JSC::ExecState*, const String& scriptID, ScriptValue* result, bool* wasThrown, String* exceptionMessage);
+    void runScript(JSC::ExecState*, const String& scriptID, Deprecated::ScriptValue* result, bool* wasThrown, String* exceptionMessage);
 
     class Task {
         WTF_MAKE_FAST_ALLOCATED;
@@ -121,7 +117,7 @@ protected:
 
 private:
     typedef Vector<ScriptBreakpointAction> BreakpointActions;
-    typedef HashMap<BreakpointID, BreakpointActions> BreakpointIDToActionsMap;
+    typedef HashMap<JSC::BreakpointID, BreakpointActions> BreakpointIDToActionsMap;
 
     virtual bool needPauseHandling(JSC::JSGlobalObject*) OVERRIDE;
     virtual void handleBreakpointHit(const JSC::Breakpoint&) OVERRIDE;

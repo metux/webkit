@@ -30,7 +30,7 @@
 
 #include "config.h"
 
-#if ENABLE(INSPECTOR) && ENABLE(WORKERS)
+#if ENABLE(INSPECTOR)
 
 #include "WorkerRuntimeAgent.h"
 
@@ -41,6 +41,8 @@
 #include "WorkerGlobalScope.h"
 #include "WorkerRunLoop.h"
 #include "WorkerThread.h"
+
+using namespace Inspector;
 
 namespace WebCore {
 
@@ -57,7 +59,7 @@ WorkerRuntimeAgent::~WorkerRuntimeAgent()
     m_instrumentingAgents->setWorkerRuntimeAgent(0);
 }
 
-void WorkerRuntimeAgent::didCreateFrontendAndBackend(InspectorFrontendChannel*, InspectorBackendDispatcher* backendDispatcher)
+void WorkerRuntimeAgent::didCreateFrontendAndBackend(Inspector::InspectorFrontendChannel*, InspectorBackendDispatcher* backendDispatcher)
 {
     m_backendDispatcher = InspectorRuntimeBackendDispatcher::create(backendDispatcher, this);
 }
@@ -106,4 +108,4 @@ void WorkerRuntimeAgent::pauseWorkerGlobalScope(WorkerGlobalScope* context)
 
 } // namespace WebCore
 
-#endif // ENABLE(INSPECTOR) && ENABLE(WORKERS)
+#endif // ENABLE(INSPECTOR)

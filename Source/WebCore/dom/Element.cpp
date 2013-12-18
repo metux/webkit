@@ -67,7 +67,7 @@
 #include "RenderWidget.h"
 #include "SelectorQuery.h"
 #include "Settings.h"
-#include "StylePropertySet.h"
+#include "StyleProperties.h"
 #include "StyleResolver.h"
 #include "TextIterator.h"
 #include "VoidCallback.h"
@@ -515,7 +515,7 @@ void Element::setActive(bool flag, bool pause)
     if (reactsToPress)
         setNeedsStyleRecalc();
 
-    if (renderer()->style().hasAppearance() && renderer()->theme()->stateChanged(renderer(), PressedState))
+    if (renderer()->style().hasAppearance() && renderer()->theme().stateChanged(renderer(), PressedState))
         reactsToPress = true;
 
     // The rest of this function implements a feature that only works if the
@@ -581,7 +581,7 @@ void Element::setHovered(bool flag)
         setNeedsStyleRecalc();
 
     if (renderer()->style().hasAppearance())
-        renderer()->theme()->stateChanged(renderer(), HoverState);
+        renderer()->theme().stateChanged(renderer(), HoverState);
 }
 
 void Element::scrollIntoView(bool alignToTop) 
@@ -982,13 +982,19 @@ PassRefPtr<ClientRect> Element::getBoundingClientRect()
     document().adjustFloatRectForScrollAndAbsoluteZoomAndFrameScale(result, renderer()->style());
     return ClientRect::create(result);
 }
+
+IntRect Element::clientRect() const
+{
+    if (RenderObject* renderer = this->renderer())
+        return document().view()->contentsToRootView(renderer->absoluteBoundingBoxRect());
+    return IntRect();
+}
     
 IntRect Element::screenRect() const
 {
-    if (!renderer())
-        return IntRect();
-    // FIXME: this should probably respect transforms
-    return document().view()->contentsToScreen(renderer()->absoluteBoundingBoxRectIgnoringTransforms());
+    if (RenderObject* renderer = this->renderer())
+        return document().view()->contentsToScreen(renderer->absoluteBoundingBoxRect());
+    return IntRect();
 }
 
 const AtomicString& Element::getAttribute(const AtomicString& localName) const
@@ -1899,7 +1905,7 @@ void Element::removeAttribute(const AtomicString& name)
     unsigned index = elementData()->findAttributeIndexByName(localName, false);
     if (index == ElementData::attributeNotFound) {
         if (UNLIKELY(localName == styleAttr) && elementData()->m_styleAttributeIsDirty && isStyledElement())
-            static_cast<StyledElement*>(this)->removeAllInlineStyleProperties();
+            toStyledElement(this)->removeAllInlineStyleProperties();
         return;
     }
 
@@ -1995,7 +2001,20 @@ void Element::focus(bool restorePreviousSelection, FocusDirection direction)
     }
         
     cancelFocusAppearanceUpdate();
+#if PLATFORM(IOS)
+    // Focusing a form element triggers animation in UIKit to scroll to the right position.
+    // Calling updateFocusAppearance() would generate an unnecessary call to ScrollView::setScrollPosition(),
+    // which would jump us around during this animation. See <rdar://problem/6699741>.
+    FrameView* view = document().view();
+    bool isFormControl = view && isFormControlElement();
+    if (isFormControl)
+        view->setProhibitsScrolling(true);
+#endif
     updateFocusAppearance(restorePreviousSelection);
+#if PLATFORM(IOS)
+    if (isFormControl)
+        view->setProhibitsScrolling(false);
+#endif
 }
 
 void Element::updateFocusAppearanceAfterAttachIfNeeded()
@@ -2148,14 +2167,15 @@ RenderStyle* Element::computedStyle(PseudoId pseudoElementSpecifier)
         if (pseudoElementSpecifier) {
             RenderStyle* cachedPseudoStyle = usedStyle->getCachedPseudoStyle(pseudoElementSpecifier);
             return cachedPseudoStyle ? cachedPseudoStyle : usedStyle;
-         } else
-            return usedStyle;
+        }
+        return usedStyle;
     }
 
-    if (!attached())
+    if (!attached()) {
         // FIXME: Try to do better than this. Ensure that styleForElement() works for elements that are not in the
         // document tree and figure out when to destroy the computed style for such elements.
-        return 0;
+        return nullptr;
+    }
 
     ElementRareData& data = ensureElementRareData();
     if (!data.computedStyle())
@@ -2326,57 +2346,6 @@ void Element::normalizeAttributes()
         if (RefPtr<Attr> attr = attrIfExists(attributeAt(i).name()))
             attr->normalize();
     }
-}
-
-bool Element::updateExistingPseudoElement(PseudoElement* existingPseudoElement, Style::Change change)
-{
-    // PseudoElement styles hang off their parent element's style so if we needed
-    // a style recalc we should Force one on the pseudo.
-    Style::resolveTree(*existingPseudoElement, needsStyleRecalc() ? Style::Force : change);
-
-    // FIXME: This is silly.
-    // Wait until our parent is not displayed or pseudoElementRendererIsNeeded
-    // is false, otherwise we could continously create and destroy PseudoElements
-    // when RenderElement::isChildAllowed on our parent returns false for the
-    // PseudoElement's renderer for each style recalc.
-    return renderer() && pseudoElementRendererIsNeeded(existingPseudoElement->renderStyle());
-}
-
-PassRefPtr<PseudoElement> Element::createPseudoElementIfNeeded(PseudoId pseudoId)
-{
-    if (!document().styleSheetCollection().usesBeforeAfterRules())
-        return 0;
-    if (!renderer() || !renderer()->canHaveGeneratedChildren())
-        return 0;
-    if (isPseudoElement())
-        return 0;
-    if (!pseudoElementRendererIsNeeded(renderer()->getCachedPseudoStyle(pseudoId)))
-        return 0;
-    RefPtr<PseudoElement> pseudoElement = PseudoElement::create(*this, pseudoId);
-    Style::attachRenderTree(*pseudoElement);
-    return pseudoElement.release();
-}
-
-void Element::updateBeforePseudoElement(Style::Change change)
-{
-    if (PseudoElement* existingPseudoElement = beforePseudoElement()) {
-        if (!updateExistingPseudoElement(existingPseudoElement, change))
-            clearBeforePseudoElement();
-        return;
-    }
-    if (RefPtr<PseudoElement> pseudo = createPseudoElementIfNeeded(BEFORE))
-        setBeforePseudoElement(pseudo.release());
-}
-
-void Element::updateAfterPseudoElement(Style::Change change)
-{
-    if (PseudoElement* existingPseudoElement = afterPseudoElement()) {
-        if (!updateExistingPseudoElement(existingPseudoElement, change))
-            clearAfterPseudoElement();
-        return;
-    }
-    if (RefPtr<PseudoElement> pseudo = createPseudoElementIfNeeded(AFTER))
-        setAfterPseudoElement(pseudo.release());
 }
 
 PseudoElement* Element::beforePseudoElement() const
@@ -2757,7 +2726,6 @@ inline void Element::updateName(const AtomicString& oldName, const AtomicString&
 
 void Element::updateNameForTreeScope(TreeScope& scope, const AtomicString& oldName, const AtomicString& newName)
 {
-    ASSERT(isInTreeScope());
     ASSERT(oldName != newName);
 
     if (!oldName.isEmpty())
@@ -2768,7 +2736,6 @@ void Element::updateNameForTreeScope(TreeScope& scope, const AtomicString& oldNa
 
 void Element::updateNameForDocument(HTMLDocument& document, const AtomicString& oldName, const AtomicString& newName)
 {
-    ASSERT(inDocument());
     ASSERT(oldName != newName);
 
     if (WindowNameCollection::nodeMatchesIfNameAttributeMatch(this)) {

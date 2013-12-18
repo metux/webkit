@@ -74,6 +74,11 @@
                                                         (<em class="parameter"><code><a class="link" href="WebKitDOMHTMLVideoElement.html" title="WebKitDOMHTMLVideoElement"><span class="type">WebKitDOMHTMLVideoElement</span></a> *self</code></em>);
 <a href="../glib/glib-Basic-Types.html#gboolean"><span class="returnvalue">gboolean</span></a>            <a class="link" href="WebKitDOMHTMLVideoElement.html#webkit-dom-html-video-element-get-webkit-displaying-fullscreen" title="webkit_dom_html_video_element_get_webkit_displaying_fullscreen ()">webkit_dom_html_video_element_get_webkit_displaying_fullscreen</a>
                                                         (<em class="parameter"><code><a class="link" href="WebKitDOMHTMLVideoElement.html" title="WebKitDOMHTMLVideoElement"><span class="type">WebKitDOMHTMLVideoElement</span></a> *self</code></em>);
+<a href="../glib/glib-Basic-Types.html#gboolean"><span class="returnvalue">gboolean</span></a>            <a class="link" href="WebKitDOMHTMLVideoElement.html#webkit-dom-html-video-element-get-webkit-wireless-video-playback-disabled" title="webkit_dom_html_video_element_get_webkit_wireless_video_playback_disabled ()">webkit_dom_html_video_element_get_webkit_wireless_video_playback_disabled</a>
+                                                        (<em class="parameter"><code><a class="link" href="WebKitDOMHTMLVideoElement.html" title="WebKitDOMHTMLVideoElement"><span class="type">WebKitDOMHTMLVideoElement</span></a> *self</code></em>);
+<span class="returnvalue">void</span>                <a class="link" href="WebKitDOMHTMLVideoElement.html#webkit-dom-html-video-element-set-webkit-wireless-video-playback-disabled" title="webkit_dom_html_video_element_set_webkit_wireless_video_playback_disabled ()">webkit_dom_html_video_element_set_webkit_wireless_video_playback_disabled</a>
+                                                        (<em class="parameter"><code><a class="link" href="WebKitDOMHTMLVideoElement.html" title="WebKitDOMHTMLVideoElement"><span class="type">WebKitDOMHTMLVideoElement</span></a> *self</code></em>,
+                                                         <em class="parameter"><code><a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a> value</code></em>);
 <a href="../glib/glib-Basic-Types.html#gulong"><span class="returnvalue">gulong</span></a>              <a class="link" href="WebKitDOMHTMLVideoElement.html#webkit-dom-html-video-element-get-webkit-decoded-frame-count" title="webkit_dom_html_video_element_get_webkit_decoded_frame_count ()">webkit_dom_html_video_element_get_webkit_decoded_frame_count</a>
                                                         (<em class="parameter"><code><a class="link" href="WebKitDOMHTMLVideoElement.html" title="WebKitDOMHTMLVideoElement"><span class="type">WebKitDOMHTMLVideoElement</span></a> *self</code></em>);
 <a href="../glib/glib-Basic-Types.html#gulong"><span class="returnvalue">gulong</span></a>              <a class="link" href="WebKitDOMHTMLVideoElement.html#webkit-dom-html-video-element-get-webkit-dropped-frame-count" title="webkit_dom_html_video_element_get_webkit_dropped_frame_count ()">webkit_dom_html_video_element_get_webkit_dropped_frame_count</a>
@@ -109,6 +114,7 @@ WebKitDOMHTMLVideoElement implements
   "<a class="link" href="WebKitDOMHTMLVideoElement.html#WebKitDOMHTMLVideoElement--webkit-displaying-fullscreen" title='The "webkit-displaying-fullscreen" property'>webkit-displaying-fullscreen</a>" <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read
   "<a class="link" href="WebKitDOMHTMLVideoElement.html#WebKitDOMHTMLVideoElement--webkit-dropped-frame-count" title='The "webkit-dropped-frame-count" property'>webkit-dropped-frame-count</a>" <a href="../glib/glib-Basic-Types.html#gulong"><span class="type">gulong</span></a>                : Read
   "<a class="link" href="WebKitDOMHTMLVideoElement.html#WebKitDOMHTMLVideoElement--webkit-supports-fullscreen" title='The "webkit-supports-fullscreen" property'>webkit-supports-fullscreen</a>" <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read
+  "<a class="link" href="WebKitDOMHTMLVideoElement.html#WebKitDOMHTMLVideoElement--webkit-wireless-video-playback-disabled" title='The "webkit-wireless-video-playback-disabled" property'>webkit-wireless-video-playback-disabled</a>" <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read / Write
   "<a class="link" href="WebKitDOMHTMLVideoElement.html#WebKitDOMHTMLVideoElement--width" title='The "width" property'>width</a>"                    <a href="../glib/glib-Basic-Types.html#gulong"><span class="type">gulong</span></a>                : Read / Write
 </pre>
 </div>
@@ -452,6 +458,55 @@ WebKitDOMHTMLVideoElement implements
 </div>
 <hr>
 <div class="refsect2">
+<a name="webkit-dom-html-video-element-get-webkit-wireless-video-playback-disabled"></a><h3>webkit_dom_html_video_element_get_webkit_wireless_video_playback_disabled ()</h3>
+<pre class="programlisting"><a href="../glib/glib-Basic-Types.html#gboolean"><span class="returnvalue">gboolean</span></a>            webkit_dom_html_video_element_get_webkit_wireless_video_playback_disabled
+                                                        (<em class="parameter"><code><a class="link" href="WebKitDOMHTMLVideoElement.html" title="WebKitDOMHTMLVideoElement"><span class="type">WebKitDOMHTMLVideoElement</span></a> *self</code></em>);</pre>
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
+<col align="left" valign="top">
+<col>
+</colgroup>
+<tbody>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>self</code></em> :</span></p></td>
+<td>A <a class="link" href="WebKitDOMHTMLVideoElement.html" title="WebKitDOMHTMLVideoElement"><span class="type">WebKitDOMHTMLVideoElement</span></a>
+</td>
+</tr>
+<tr>
+<td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
+<td>A <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>
+</td>
+</tr>
+</tbody>
+</table></div>
+</div>
+<hr>
+<div class="refsect2">
+<a name="webkit-dom-html-video-element-set-webkit-wireless-video-playback-disabled"></a><h3>webkit_dom_html_video_element_set_webkit_wireless_video_playback_disabled ()</h3>
+<pre class="programlisting"><span class="returnvalue">void</span>                webkit_dom_html_video_element_set_webkit_wireless_video_playback_disabled
+                                                        (<em class="parameter"><code><a class="link" href="WebKitDOMHTMLVideoElement.html" title="WebKitDOMHTMLVideoElement"><span class="type">WebKitDOMHTMLVideoElement</span></a> *self</code></em>,
+                                                         <em class="parameter"><code><a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a> value</code></em>);</pre>
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
+<col align="left" valign="top">
+<col>
+</colgroup>
+<tbody>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>self</code></em> :</span></p></td>
+<td>A <a class="link" href="WebKitDOMHTMLVideoElement.html" title="WebKitDOMHTMLVideoElement"><span class="type">WebKitDOMHTMLVideoElement</span></a>
+</td>
+</tr>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>value</code></em> :</span></p></td>
+<td>A <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>
+</td>
+</tr>
+</tbody>
+</table></div>
+</div>
+<hr>
+<div class="refsect2">
 <a name="webkit-dom-html-video-element-get-webkit-decoded-frame-count"></a><h3>webkit_dom_html_video_element_get_webkit_decoded_frame_count ()</h3>
 <pre class="programlisting"><a href="../glib/glib-Basic-Types.html#gulong"><span class="returnvalue">gulong</span></a>              webkit_dom_html_video_element_get_webkit_decoded_frame_count
                                                         (<em class="parameter"><code><a class="link" href="WebKitDOMHTMLVideoElement.html" title="WebKitDOMHTMLVideoElement"><span class="type">WebKitDOMHTMLVideoElement</span></a> *self</code></em>);</pre>
@@ -549,6 +604,13 @@ WebKitDOMHTMLVideoElement implements
 <a name="WebKitDOMHTMLVideoElement--webkit-supports-fullscreen"></a><h3>The <code class="literal">"webkit-supports-fullscreen"</code> property</h3>
 <pre class="programlisting">  "webkit-supports-fullscreen" <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read</pre>
 <p>read-only gboolean HTMLVideoElement:webkit-supports-fullscreen.</p>
+<p>Default value: FALSE</p>
+</div>
+<hr>
+<div class="refsect2">
+<a name="WebKitDOMHTMLVideoElement--webkit-wireless-video-playback-disabled"></a><h3>The <code class="literal">"webkit-wireless-video-playback-disabled"</code> property</h3>
+<pre class="programlisting">  "webkit-wireless-video-playback-disabled" <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read / Write</pre>
+<p>read-only gboolean HTMLVideoElement:webkit-wireless-video-playback-disabled.</p>
 <p>Default value: FALSE</p>
 </div>
 <hr>

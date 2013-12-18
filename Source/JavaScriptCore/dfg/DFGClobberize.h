@@ -116,6 +116,10 @@ void clobberize(Graph& graph, Node* node, ReadFunctor& read, WriteFunctor& write
     case ExtractOSREntryLocal:
     case Int52ToDouble:
     case Int52ToValue:
+    case CheckInBounds:
+    case ConstantStoragePointer:
+    case UInt32ToNumber:
+    case DoubleAsInt32:
         return;
         
     case MovHintAndCheck:
@@ -142,23 +146,30 @@ void clobberize(Graph& graph, Node* node, ReadFunctor& read, WriteFunctor& write
     case InvalidationPoint:
         write(SideState);
         return;
+        
+    case VariableWatchpoint:
+    case TypedArrayWatchpoint:
+        read(Watchpoint_fire);
+        write(SideState);
+        return;
+        
+    case NotifyWrite:
+        write(Watchpoint_fire);
+        write(SideState);
+        return;
 
     case CreateActivation:
     case CreateArguments:
         write(SideState);
+        write(Watchpoint_fire);
         read(GCState);
         write(GCState);
         return;
-
-    // These are forward-exiting nodes that assume that the subsequent instruction
-    // is a MovHint, and they try to roll forward over this MovHint in their
-    // execution. This makes hoisting them impossible without additional magic. We
-    // may add such magic eventually, but just not yet.
-    case UInt32ToNumber:
-    case DoubleAsInt32:
-        write(SideState);
-        return;
         
+    case FunctionReentryWatchpoint:
+        read(Watchpoint_fire);
+        return;
+
     case ToThis:
     case CreateThis:
         read(MiscFields);
@@ -516,7 +527,6 @@ void clobberize(Graph& graph, Node* node, ReadFunctor& read, WriteFunctor& write
         return;
         
     case GetGlobalVar:
-    case GlobalVarWatchpoint:
         read(AbstractHeap(Absolute, node->registerPointer()));
         return;
         

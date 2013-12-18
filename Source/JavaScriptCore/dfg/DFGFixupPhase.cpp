@@ -88,18 +88,18 @@ private:
     {
         NodeType op = node->op();
 
-#if DFG_ENABLE(DEBUG_PROPAGATION_VERBOSE)
-        dataLogF("   %s @%u: ", Graph::opName(op), node->index());
-#endif
-        
         switch (op) {
         case SetLocal: {
             // This gets handled by fixupSetLocalsInBlock().
             return;
         }
             
+        case BitOr: {
+            fixIntEdge(node->child1());
+            fixIntEdge(node->child2());
+            break;
+        }
         case BitAnd:
-        case BitOr:
         case BitXor:
         case BitRShift:
         case BitLShift:
@@ -112,6 +112,8 @@ private:
             
         case UInt32ToNumber: {
             fixEdge<KnownInt32Use>(node->child1());
+            if (bytecodeCanTruncateInteger(node->arithNodeFlags()))
+                node->convertToIdentity();
             break;
         }
             
@@ -233,11 +235,14 @@ private:
         case ArithMod: {
             if (Node::shouldSpeculateInt32ForArithmetic(node->child1().node(), node->child2().node())
                 && node->canSpeculateInt32()) {
-                if (isX86() || isARM64() || isARMv7s()) {
+                if (optimizeForX86() || optimizeForARM64() || optimizeForARMv7s()) {
                     fixEdge<Int32Use>(node->child1());
                     fixEdge<Int32Use>(node->child2());
                     break;
                 }
+                Edge child1 = node->child1();
+                Edge child2 = node->child2();
+                
                 injectInt32ToDoubleNode(node->child1());
                 injectInt32ToDoubleNode(node->child2());
 
@@ -248,6 +253,8 @@ private:
                 
                 node->setOp(DoubleAsInt32);
                 node->children.initialize(Edge(newDivision, KnownNumberUse), Edge(), Edge());
+                
+                m_insertionSet.insertNode(m_indexInBlock + 1, SpecNone, Phantom, node->codeOrigin, child1, child2);
                 break;
             }
             fixEdge<NumberUse>(node->child1());
@@ -877,6 +884,11 @@ private:
         case Int52ToValue:
         case InvalidationPoint:
         case CheckArray:
+        case CheckInBounds:
+        case ConstantStoragePointer:
+            // These are just nodes that we don't currently expect to see during fixup.
+            // If we ever wanted to insert them prior to fixup, then we just have to create
+            // fixup rules for them.
             RELEASE_ASSERT_NOT_REACHED();
             break;
 
@@ -903,7 +915,8 @@ private:
         case GetClosureVar:
         case GetGlobalVar:
         case PutGlobalVar:
-        case GlobalVarWatchpoint:
+        case NotifyWrite:
+        case VariableWatchpoint:
         case VarInjectionWatchpoint:
         case AllocationProfileWatchpoint:
         case Call:
@@ -938,6 +951,8 @@ private:
         case Unreachable:
         case ExtractOSREntryLocal:
         case LoopHint:
+        case FunctionReentryWatchpoint:
+        case TypedArrayWatchpoint:
             break;
 #else
         default:
@@ -946,14 +961,6 @@ private:
         }
         
         DFG_NODE_DO_TO_CHILDREN(m_graph, node, observeUntypedEdge);
-
-#if DFG_ENABLE(DEBUG_PROPAGATION_VERBOSE)
-        if (!(node->flags() & NodeHasVarArgs)) {
-            dataLogF("new children: ");
-            node->dumpChildren(WTF::dataFile());
-        }
-        dataLogF("\n");
-#endif
     }
     
     void observeUntypedEdge(Node*, Edge& edge)
@@ -1523,12 +1530,6 @@ private:
         if (direction == ForwardSpeculation)
             result->mergeFlags(NodeExitsForward);
         
-#if DFG_ENABLE(DEBUG_PROPAGATION_VERBOSE)
-        dataLogF(
-            "(replacing @%u->@%u with @%u->@%u) ",
-            m_currentNode->index(), edge->index(), m_currentNode->index(), result->index());
-#endif
-
         edge = Edge(result, useKind);
     }
     

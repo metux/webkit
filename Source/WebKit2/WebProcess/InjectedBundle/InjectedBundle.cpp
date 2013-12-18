@@ -39,7 +39,6 @@
 #include "WebContextMessageKinds.h"
 #include "WebCookieManager.h"
 #include "WebCoreArgumentCoders.h"
-#include "WebData.h"
 #include "WebDatabaseManager.h"
 #include "WebFrame.h"
 #include "WebFrameNetworkingContext.h"
@@ -94,7 +93,7 @@ InjectedBundle::~InjectedBundle()
 {
 }
 
-void InjectedBundle::initializeClient(WKBundleClient* client)
+void InjectedBundle::initializeClient(const WKBundleClientBase* client)
 {
     m_client.initialize(client);
 }
@@ -414,7 +413,7 @@ PassRefPtr<API::Array> InjectedBundle::originsWithApplicationCache()
     originIdentifiers.reserveInitialCapacity(origins.size());
 
     for (const auto& origin : origins)
-        originIdentifiers.uncheckedAppend(WebString::create(origin->databaseIdentifier()));
+        originIdentifiers.uncheckedAppend(API::String::create(origin->databaseIdentifier()));
 
     return API::Array::create(std::move(originIdentifiers));
 }
@@ -485,11 +484,8 @@ static Vector<String> toStringVector(API::Array* patterns)
         return patternsVector;
 
     patternsVector.reserveInitialCapacity(size);
-    for (size_t i = 0; i < size; ++i) {
-        WebString* entry = patterns->at<WebString>(i);
-        if (entry)
-            patternsVector.uncheckedAppend(entry->string());
-    }
+    for (const auto& entry : patterns->elementsOfType<API::String>())
+        patternsVector.uncheckedAppend(entry->string());
     return patternsVector;
 }
 
@@ -629,11 +625,12 @@ uint64_t InjectedBundle::webNotificationID(JSContextRef jsContext, JSValueRef js
 #endif
 }
 
-PassRefPtr<WebData> InjectedBundle::createWebDataFromUint8Array(JSContextRef context, JSValueRef data)
+// FIXME Get rid of this function and move it into WKBundle.cpp.
+PassRefPtr<API::Data> InjectedBundle::createWebDataFromUint8Array(JSContextRef context, JSValueRef data)
 {
     JSC::ExecState* execState = toJS(context);
     RefPtr<Uint8Array> arrayData = WebCore::toUint8Array(toJS(execState, data));
-    return WebData::create(static_cast<unsigned char*>(arrayData->baseAddress()), arrayData->byteLength());
+    return API::Data::create(static_cast<unsigned char*>(arrayData->baseAddress()), arrayData->byteLength());
 }
 
 void InjectedBundle::setTabKeyCyclesThroughElements(WebPage* page, bool enabled)

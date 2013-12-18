@@ -74,6 +74,9 @@
                                                         (<em class="parameter"><code><a class="link" href="WebKitDOMCSSStyleDeclaration.html" title="WebKitDOMCSSStyleDeclaration"><span class="type">WebKitDOMCSSStyleDeclaration</span></a> *self</code></em>);
 <a class="link" href="WebKitDOMCSSRule.html" title="WebKitDOMCSSRule"><span class="returnvalue">WebKitDOMCSSRule</span></a> *  <a class="link" href="WebKitDOMCSSStyleDeclaration.html#webkit-dom-css-style-declaration-get-parent-rule" title="webkit_dom_css_style_declaration_get_parent_rule ()">webkit_dom_css_style_declaration_get_parent_rule</a>
                                                         (<em class="parameter"><code><a class="link" href="WebKitDOMCSSStyleDeclaration.html" title="WebKitDOMCSSStyleDeclaration"><span class="type">WebKitDOMCSSStyleDeclaration</span></a> *self</code></em>);
+<a class="link" href="WebKitDOMCSSValue.html" title="WebKitDOMCSSValue"><span class="returnvalue">WebKitDOMCSSValue</span></a> * <a class="link" href="WebKitDOMCSSStyleDeclaration.html#webkit-dom-css-style-declaration-get-property-css-value" title="webkit_dom_css_style_declaration_get_property_css_value ()">webkit_dom_css_style_declaration_get_property_css_value</a>
+                                                        (<em class="parameter"><code><a class="link" href="WebKitDOMCSSStyleDeclaration.html" title="WebKitDOMCSSStyleDeclaration"><span class="type">WebKitDOMCSSStyleDeclaration</span></a> *self</code></em>,
+                                                         <em class="parameter"><code>const <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a> *propertyName</code></em>);
 </pre>
 </div>
 <div class="refsect1">
@@ -429,6 +432,43 @@
 <tr>
 <td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
 <td>A <a class="link" href="WebKitDOMCSSRule.html" title="WebKitDOMCSSRule"><span class="type">WebKitDOMCSSRule</span></a>. <span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
+</td>
+</tr>
+</tbody>
+</table></div>
+</div>
+<hr>
+<div class="refsect2">
+<a name="webkit-dom-css-style-declaration-get-property-css-value"></a><h3>webkit_dom_css_style_declaration_get_property_css_value ()</h3>
+<pre class="programlisting"><a class="link" href="WebKitDOMCSSValue.html" title="WebKitDOMCSSValue"><span class="returnvalue">WebKitDOMCSSValue</span></a> * webkit_dom_css_style_declaration_get_property_css_value
+                                                        (<em class="parameter"><code><a class="link" href="WebKitDOMCSSStyleDeclaration.html" title="WebKitDOMCSSStyleDeclaration"><span class="type">WebKitDOMCSSStyleDeclaration</span></a> *self</code></em>,
+                                                         <em class="parameter"><code>const <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a> *propertyName</code></em>);</pre>
+<div class="warning">
+<h3 class="title">Warning</h3>
+<p><code class="literal">webkit_dom_css_style_declaration_get_property_css_value</code> is deprecated and should not be used in newly-written code. 2.2</p>
+</div>
+<p>
+This functionality has been removed from WebKit, this function does nothing.
+</p>
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
+<col align="left" valign="top">
+<col>
+</colgroup>
+<tbody>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>self</code></em> :</span></p></td>
+<td>A <a class="link" href="WebKitDOMCSSStyleDeclaration.html" title="WebKitDOMCSSStyleDeclaration"><span class="type">WebKitDOMCSSStyleDeclaration</span></a>
+</td>
+</tr>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>propertyName</code></em> :</span></p></td>
+<td>A <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a>
+</td>
+</tr>
+<tr>
+<td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
+<td>a <a class="link" href="WebKitDOMCSSValue.html" title="WebKitDOMCSSValue"><span class="type">WebKitDOMCSSValue</span></a>. <span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
 </td>
 </tr>
 </tbody>

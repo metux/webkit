@@ -63,3 +63,12 @@ WebKitDOMPerformance
 @Returns: 
 
 
+<!-- ##### FUNCTION webkit_dom_performance_get_memory ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+

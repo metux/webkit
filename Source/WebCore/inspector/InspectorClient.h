@@ -27,6 +27,7 @@
 #ifndef InspectorClient_h
 #define InspectorClient_h
 
+#include "InspectorForwarding.h"
 #include <wtf/Forward.h>
 #include <wtf/HashMap.h>
 #include <wtf/HashSet.h>
@@ -34,7 +35,6 @@
 namespace WebCore {
 
 class InspectorController;
-class InspectorFrontendChannel;
 class Frame;
 class Page;
 
@@ -51,6 +51,9 @@ public:
 
     virtual void highlight() = 0;
     virtual void hideHighlight() = 0;
+
+    virtual void indicate() { }
+    virtual void hideIndication() { }
 
     virtual bool canClearBrowserCache() { return false; }
     virtual void clearBrowserCache() { }

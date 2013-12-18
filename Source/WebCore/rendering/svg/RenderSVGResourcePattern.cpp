@@ -54,10 +54,9 @@ void RenderSVGResourcePattern::removeAllClientsFromCache(bool markForInvalidatio
     markAllClientsForInvalidation(markForInvalidation ? RepaintInvalidation : ParentOnlyInvalidation);
 }
 
-void RenderSVGResourcePattern::removeClientFromCache(RenderObject* client, bool markForInvalidation)
+void RenderSVGResourcePattern::removeClientFromCache(RenderObject& client, bool markForInvalidation)
 {
-    ASSERT(client);
-    m_patternMap.remove(client);
+    m_patternMap.remove(&client);
     markClientForInvalidation(client, markForInvalidation ? RepaintInvalidation : ParentOnlyInvalidation);
 }
 
@@ -102,7 +101,7 @@ PatternData* RenderSVGResourcePattern::buildPattern(RenderObject* object, unsign
         static_cast<float>(m_attributes.patternTransform().yScale()));
 
     // Build tile image.
-    OwnPtr<ImageBuffer> tileImage = createTileImage(m_attributes, tileBoundaries, absoluteTileBoundaries, tileImageTransform, clampedAbsoluteTileBoundaries);
+    std::unique_ptr<ImageBuffer> tileImage = createTileImage(m_attributes, tileBoundaries, absoluteTileBoundaries, tileImageTransform, clampedAbsoluteTileBoundaries);
     if (!tileImage)
         return 0;
 
@@ -240,15 +239,11 @@ bool RenderSVGResourcePattern::buildTileImageTransform(RenderObject* renderer,
     return true;
 }
 
-PassOwnPtr<ImageBuffer> RenderSVGResourcePattern::createTileImage(const PatternAttributes& attributes,
-                                                                  const FloatRect& tileBoundaries,
-                                                                  const FloatRect& absoluteTileBoundaries,
-                                                                  const AffineTransform& tileImageTransform,
-                                                                  FloatRect& clampedAbsoluteTileBoundaries) const
+std::unique_ptr<ImageBuffer> RenderSVGResourcePattern::createTileImage(const PatternAttributes& attributes, const FloatRect& tileBoundaries, const FloatRect& absoluteTileBoundaries, const AffineTransform& tileImageTransform, FloatRect& clampedAbsoluteTileBoundaries) const
 {
     clampedAbsoluteTileBoundaries = SVGRenderingContext::clampedAbsoluteTargetRect(absoluteTileBoundaries);
 
-    OwnPtr<ImageBuffer> tileImage;
+    std::unique_ptr<ImageBuffer> tileImage;
 
     if (!SVGRenderingContext::createImageBufferForPattern(absoluteTileBoundaries, clampedAbsoluteTileBoundaries, tileImage, ColorSpaceDeviceRGB, Unaccelerated))
         return nullptr;
@@ -269,9 +264,7 @@ PassOwnPtr<ImageBuffer> RenderSVGResourcePattern::createTileImage(const PatternA
         contentTransformation = tileImageTransform;
 
     // Draw the content into the ImageBuffer.
-    auto children = childrenOfType<SVGElement>(*attributes.patternContentElement());
-    for (auto it = children.begin(), end = children.end(); it != end; ++it) {
-        const SVGElement& child = *it;
+    for (auto& child : childrenOfType<SVGElement>(*attributes.patternContentElement())) {
         if (!child.renderer())
             continue;
         if (child.renderer()->needsLayout())
@@ -279,7 +272,7 @@ PassOwnPtr<ImageBuffer> RenderSVGResourcePattern::createTileImage(const PatternA
         SVGRenderingContext::renderSubtreeToImageBuffer(tileImage.get(), *child.renderer(), contentTransformation);
     }
 
-    return tileImage.release();
+    return tileImage;
 }
 
 }

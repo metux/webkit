@@ -29,12 +29,13 @@
 #include "APIArray.h"
 #include "WebCoreArgumentCoders.h"
 #include "WebSecurityOrigin.h"
+#include <wtf/text/CString.h>
 
 using namespace WebCore;
 
 namespace WebKit {
 
-SecurityOriginData SecurityOriginData::fromSecurityOrigin(SecurityOrigin* securityOrigin)
+SecurityOriginData SecurityOriginData::fromSecurityOrigin(const SecurityOrigin* securityOrigin)
 {
     SecurityOriginData securityOriginData;
 
@@ -69,6 +70,17 @@ bool SecurityOriginData::decode(CoreIPC::ArgumentDecoder& decoder, SecurityOrigi
     return true;
 }
 
+SecurityOriginData SecurityOriginData::isolatedCopy() const
+{
+    SecurityOriginData result;
+
+    result.protocol = protocol.isolatedCopy();
+    result.host = host.isolatedCopy();
+    result.port = port;
+
+    return result;
+}
+
 void performAPICallbackWithSecurityOriginDataVector(const Vector<SecurityOriginData>& originDatas, ArrayCallback* callback)
 {
     if (!callback) {
@@ -87,6 +99,16 @@ void performAPICallbackWithSecurityOriginDataVector(const Vector<SecurityOriginD
     }
 
     callback->performCallbackWithReturnValue(API::Array::create(std::move(securityOrigins)).get());
+}
+
+bool operator==(const SecurityOriginData& a, const SecurityOriginData& b)
+{
+    if (&a == &b)
+        return true;
+
+    return a.protocol == b.protocol
+        && a.host == b.host
+        && a.port == b.port;
 }
 
 } // namespace WebKit

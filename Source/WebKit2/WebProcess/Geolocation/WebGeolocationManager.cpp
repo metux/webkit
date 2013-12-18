@@ -48,7 +48,7 @@ const char* WebGeolocationManager::supplementName()
 WebGeolocationManager::WebGeolocationManager(WebProcess* process)
     : m_process(process)
 {
-    m_process->addMessageReceiver(Messages::WebGeolocationManager::messageReceiverName(), this);
+    m_process->addMessageReceiver(Messages::WebGeolocationManager::messageReceiverName(), *this);
 }
 
 void WebGeolocationManager::registerWebPage(WebPage* page)
@@ -125,5 +125,12 @@ void WebGeolocationManager::didFailToDeterminePosition(const String& errorMessag
     UNUSED_PARAM(errorMessage);
 #endif // ENABLE(GEOLOCATION)
 }
+
+#if PLATFORM(IOS)
+void WebGeolocationManager::resetPermissions()
+{
+    m_process->resetAllGeolocationPermissions();
+}
+#endif // PLATFORM(IOS)
 
 } // namespace WebKit

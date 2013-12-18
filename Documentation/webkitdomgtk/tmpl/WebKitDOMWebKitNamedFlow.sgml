@@ -107,3 +107,31 @@ WebKitDOMWebKitNamedFlow
 @Returns: 
 
 
+<!-- ##### FUNCTION webkit_dom_webkit_named_flow_get_overflow ##### -->
+<para>
+
+</para>
+
+@flow: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_webkit_named_flow_get_content_nodes ##### -->
+<para>
+
+</para>
+
+@flow: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_webkit_named_flow_get_regions_by_content_node ##### -->
+<para>
+
+</para>
+
+@flow: 
+@content_node: 
+@Returns: 
+
+

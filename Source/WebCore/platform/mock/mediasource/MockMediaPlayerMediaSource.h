@@ -29,6 +29,7 @@
 #if ENABLE(MEDIA_SOURCE)
 
 #include "MediaPlayerPrivate.h"
+#include <wtf/MediaTime.h>
 
 namespace WebCore {
 
@@ -50,6 +51,7 @@ public:
 
     virtual MediaPlayer::ReadyState readyState() const OVERRIDE;
     void setReadyState(MediaPlayer::ReadyState);
+    void setNetworkState(MediaPlayer::NetworkState);
 
 private:
     MockMediaPlayerMediaSource(MediaPlayer*);
@@ -67,19 +69,24 @@ private:
     virtual bool seeking() const OVERRIDE;
     virtual bool paused() const OVERRIDE;
     virtual MediaPlayer::NetworkState networkState() const OVERRIDE;
+    virtual double maxTimeSeekableDouble() const OVERRIDE;
     virtual PassRefPtr<TimeRanges> buffered() const OVERRIDE;
     virtual bool didLoadingProgress() const OVERRIDE;
     virtual void setSize(const IntSize&) OVERRIDE;
     virtual void paint(GraphicsContext*, const IntRect&) OVERRIDE;
     virtual double currentTimeDouble() const OVERRIDE;
     virtual double durationDouble() const OVERRIDE;
-    virtual void seekDouble(double time) OVERRIDE;
+    virtual void seekWithTolerance(double time, double, double) OVERRIDE;
+    virtual unsigned long totalVideoFrames() OVERRIDE;
+    virtual unsigned long droppedVideoFrames() OVERRIDE;
+    virtual unsigned long corruptedVideoFrames() OVERRIDE;
+    virtual double totalFrameDelay() OVERRIDE;
 
     MediaPlayer* m_player;
     RefPtr<HTMLMediaSource> m_mediaSource;
     RefPtr<MockMediaSourcePrivate> m_mediaSourcePrivate;
 
-    double m_currentTime;
+    MediaTime m_currentTime;
     double m_duration;
     MediaPlayer::ReadyState m_readyState;
     MediaPlayer::NetworkState m_networkState;

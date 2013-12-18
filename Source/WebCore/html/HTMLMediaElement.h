@@ -35,6 +35,7 @@
 #include "MediaPlayer.h"
 
 #if ENABLE(PLUGIN_PROXY_FOR_VIDEO)
+#include "HTMLFrameOwnerElement.h"
 #include "HTMLPlugInImageElement.h"
 #include "MediaPlayerProxy.h"
 #endif
@@ -48,7 +49,9 @@
 #include "VideoTrack.h"
 #endif
 
-
+#if ENABLE(MEDIA_STREAM)
+#include "MediaStream.h"
+#endif
 
 namespace WebCore {
 
@@ -78,6 +81,9 @@ class DisplaySleepDisabler;
 #if ENABLE(ENCRYPTED_MEDIA_V2)
 class MediaKeys;
 #endif
+#if ENABLE(MEDIA_SOURCE)
+class VideoPlaybackQuality;
+#endif
 
 #if ENABLE(VIDEO_TRACK)
 class AudioTrackList;
@@ -92,7 +98,13 @@ typedef CueIntervalTree::IntervalType CueInterval;
 typedef Vector<CueInterval> CueList;
 #endif
 
-class HTMLMediaElement : public HTMLElement, private MediaPlayerClient, public MediaPlayerSupportsTypeClient, private MediaCanStartListener, public ActiveDOMObject, public MediaControllerInterface
+class HTMLMediaElement
+#if ENABLE(PLUGIN_PROXY_FOR_VIDEO)
+    : public HTMLFrameOwnerElement
+#else
+    : public HTMLElement
+#endif
+    , private MediaPlayerClient, public MediaPlayerSupportsTypeClient, private MediaCanStartListener, public ActiveDOMObject, public MediaControllerInterface
 #if ENABLE(VIDEO_TRACK)
     , private AudioTrackClient
     , private TextTrackClient
@@ -139,10 +151,15 @@ public:
 // error state
     PassRefPtr<MediaError> error() const;
 
-// network state
     void setSrc(const String&);
     const URL& currentSrc() const { return m_currentSrc; }
 
+#if ENABLE(MEDIA_STREAM)
+    MediaStream* srcObject() const { return m_mediaStreamSrcObject.get(); }
+    void setSrcObject(MediaStream*);
+#endif
+
+// network state
     enum NetworkState { NETWORK_EMPTY, NETWORK_IDLE, NETWORK_LOADING, NETWORK_NO_SOURCE };
     NetworkState networkState() const;
 
@@ -172,8 +189,7 @@ public:
     virtual PassRefPtr<TimeRanges> played() OVERRIDE;
     virtual PassRefPtr<TimeRanges> seekable() const OVERRIDE;
     bool ended() const;
-    bool autoplay() const;    
-    void setAutoplay(bool b);
+    bool autoplay() const;
     bool loop() const;    
     void setLoop(bool b);
     virtual void play() OVERRIDE;
@@ -194,7 +210,8 @@ public:
 #if ENABLE(MEDIA_SOURCE)
 //  Media Source.
     void closeMediaSource();
-#endif 
+    void incrementDroppedFrameCount() { ++m_droppedVideoFrames; }
+#endif
 
 #if ENABLE(ENCRYPTED_MEDIA)
     void webkitGenerateKeyRequest(const String& keySystem, PassRefPtr<Uint8Array> initData, ExceptionCode&);
@@ -318,13 +335,24 @@ public:
 #endif
 
 #if ENABLE(PLUGIN_PROXY_FOR_VIDEO)
-    void allocateMediaPlayerIfNecessary();
+    void ensureMediaPlayer();
     void setNeedWidgetUpdate(bool needWidgetUpdate) { m_needWidgetUpdate = needWidgetUpdate; }
     void deliverNotification(MediaPlayerProxyNotificationType notification);
     void setMediaPlayerProxy(WebMediaPlayerProxy* proxy);
     void getPluginProxyParams(URL& url, Vector<String>& names, Vector<String>& values);
     void createMediaPlayerProxy();
     void updateWidget(PluginCreationOption);
+#endif
+
+#if ENABLE(IOS_AIRPLAY)
+    void webkitShowPlaybackTargetPicker();
+    bool webkitCurrentPlaybackTargetIsWireless() const;
+
+    virtual bool addEventListener(const AtomicString& eventType, PassRefPtr<EventListener>, bool useCapture) OVERRIDE;
+    virtual bool removeEventListener(const AtomicString& eventType, EventListener*, bool useCapture) OVERRIDE;
+
+    DEFINE_ATTRIBUTE_EVENT_LISTENER(webkitcurrentplaybacktargetiswirelesschanged);
+    DEFINE_ATTRIBUTE_EVENT_LISTENER(webkitplaybacktargetavailabilitychanged);
 #endif
 
     // EventTarget function.
@@ -378,12 +406,23 @@ public:
     MediaController* controller() const;
     void setController(PassRefPtr<MediaController>);
 
+#if !PLATFORM(IOS)
     virtual bool willRespondToMouseClickEvents() OVERRIDE;
+#endif
 
     void enteredOrExitedFullscreen() { configureMediaControls(); }
 
 #if ENABLE(PLUGIN_PROXY_FOR_VIDEO)
     bool shouldUseVideoPluginProxy() const;
+#endif
+
+    unsigned long long fileSize() const;
+
+    void mediaLoadingFailed(MediaPlayer::NetworkState);
+    void mediaLoadingFailedFatally(MediaPlayer::NetworkState);
+
+#if ENABLE(MEDIA_SOURCE)
+    RefPtr<VideoPlaybackQuality> getVideoPlaybackQuality();
 #endif
 
 protected:
@@ -412,6 +451,9 @@ protected:
         RequireUserGestureForFullscreenRestriction = 1 << 2,
         RequirePageConsentToLoadMediaRestriction = 1 << 3,
         RequirePageConsentToResumeMediaRestriction = 1 << 4,
+#if ENABLE(IOS_AIRPLAY)
+        RequireUserGestureToShowPlaybackTargetPicker = 1 << 5,
+#endif
     };
     typedef unsigned BehaviorRestrictions;
     
@@ -420,6 +462,9 @@ protected:
     bool userGestureRequiredForFullscreen() const { return m_restrictions & RequireUserGestureForFullscreenRestriction; }
     bool pageConsentRequiredForLoad() const { return m_restrictions & RequirePageConsentToLoadMediaRestriction; }
     bool pageConsentRequiredForResume() const { return m_restrictions & RequirePageConsentToResumeMediaRestriction; }
+#if ENABLE(IOS_AIRPLAY)
+    bool userGestureRequiredToShowPlaybackTargetPicker() const { return m_restrictions & RequireUserGestureToShowPlaybackTargetPicker; }
+#endif
     
     void addBehaviorRestriction(BehaviorRestrictions restriction) { m_restrictions |= restriction; }
     void removeBehaviorRestriction(BehaviorRestrictions restriction) { m_restrictions &= ~restriction; }
@@ -502,6 +547,12 @@ private:
     virtual bool mediaPlayerKeyNeeded(MediaPlayer*, Uint8Array*) OVERRIDE;
 #endif
 
+#if ENABLE(IOS_AIRPLAY)
+    virtual void mediaPlayerCurrentPlaybackTargetIsWirelessChanged(MediaPlayer*) OVERRIDE;
+    virtual void mediaPlayerPlaybackTargetAvailabilityChanged(MediaPlayer*) OVERRIDE;
+    void enqueuePlaybackTargetAvailabilityChangedEvent();
+#endif
+
     virtual String mediaPlayerReferrer() const OVERRIDE;
     virtual String mediaPlayerUserAgent() const OVERRIDE;
     virtual CORSMode mediaPlayerCORSMode() const OVERRIDE;
@@ -554,14 +605,11 @@ private:
     void clearMediaPlayer(int flags);
     bool havePotentialSourceChild();
     void noneSupported();
-    void mediaEngineError(PassRefPtr<MediaError> err);
     void cancelPendingEventsAndCallbacks();
     void waitForSourceChange();
     void prepareToPlay();
 
     URL selectNextSourceChild(ContentType*, String* keySystem, InvalidURLAction);
-
-    void mediaLoadingFailed(MediaPlayer::NetworkState);
 
 #if ENABLE(VIDEO_TRACK)
     void updateActiveTextTrackCues(double);
@@ -597,6 +645,11 @@ private:
 
     double minTimeSeekable() const;
     double maxTimeSeekable() const;
+
+#if PLATFORM(IOS)
+    bool parseMediaPlayerAttribute(const QualifiedName&, const AtomicString&);
+    void userRequestsMediaLoading();
+#endif
 
     // Pauses playback without changing any states or generating events
     void setPausedInternal(bool);
@@ -690,6 +743,7 @@ private:
 
 #if ENABLE(MEDIA_SOURCE)
     RefPtr<HTMLMediaSource> m_mediaSource;
+    unsigned long m_droppedVideoFrames;
 #endif
 
     mutable double m_cachedTime;
@@ -738,6 +792,11 @@ private:
     bool m_parsingInProgress : 1;
 #if ENABLE(PAGE_VISIBILITY_API)
     bool m_isDisplaySleepDisablingSuspended : 1;
+#endif
+
+#if PLATFORM(IOS)
+    bool m_requestingPlay : 1;
+    bool m_userStartedPlayback : 1;
 #endif
 
 #if ENABLE(VIDEO_TRACK)
@@ -796,6 +855,10 @@ private:
 #if ENABLE(MEDIA_CONTROLS_SCRIPT)
     RefPtr<MediaControlsHost> m_mediaControlsHost;
     RefPtr<DOMWrapperWorld> m_isolatedWorld;
+#endif
+
+#if ENABLE(MEDIA_STREAM)
+    RefPtr<MediaStream> m_mediaStreamSrcObject;
 #endif
 };
 

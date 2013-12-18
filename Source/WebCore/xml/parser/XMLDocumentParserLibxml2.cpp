@@ -52,7 +52,6 @@
 #include "ResourceResponse.h"
 #include "ScriptElement.h"
 #include "ScriptSourceCode.h"
-#include "ScriptValue.h"
 #include "SecurityOrigin.h"
 #include "Settings.h"
 #include "TextResourceDecoder.h"
@@ -627,6 +626,7 @@ XMLDocumentParser::XMLDocumentParser(DocumentFragment& fragment, Element* parent
     if (elemStack.isEmpty())
         return;
 
+    // FIXME: Share code with isDefaultNamespace() per http://www.whatwg.org/specs/web-apps/current-work/multipage/the-xhtml-syntax.html#parsing-xhtml-fragments
     for (; !elemStack.isEmpty(); elemStack.removeLast()) {
         Element* element = elemStack.last();
         if (element->hasAttributes()) {
@@ -640,8 +640,7 @@ XMLDocumentParser::XMLDocumentParser(DocumentFragment& fragment, Element* parent
         }
     }
 
-    // If the parent element is not in document tree, there may be no xmlns attribute; just default to the parent's namespace.
-    if (m_defaultNamespaceURI.isNull() && !parentElement->inDocument())
+    if (m_defaultNamespaceURI.isNull())
         m_defaultNamespaceURI = parentElement->namespaceURI();
 }
 
@@ -972,8 +971,9 @@ void XMLDocumentParser::error(XMLErrors::ErrorType type, const char* message, va
     vsnprintf(m, sizeof(m) - 1, message, args);
 #endif
 
+    TextPosition position = textPosition();
     if (m_parserPaused)
-        m_pendingCallbacks->appendErrorCallback(type, reinterpret_cast<const xmlChar*>(m), lineNumber(), columnNumber());
+        m_pendingCallbacks->appendErrorCallback(type, reinterpret_cast<const xmlChar*>(m), position.m_line, position.m_column);
     else
         handleError(type, m, textPosition());
 
@@ -1425,16 +1425,6 @@ void* xmlDocPtrForString(CachedResourceLoader* cachedResourceLoader, const Strin
     return xmlReadMemory(characters, sizeInBytes, url.latin1().data(), encoding, XSLT_PARSE_OPTIONS);
 }
 #endif
-
-OrdinalNumber XMLDocumentParser::lineNumber() const
-{
-    return OrdinalNumber::fromOneBasedInt(context() ? context()->input->line : 1);
-}
-
-OrdinalNumber XMLDocumentParser::columnNumber() const
-{
-    return OrdinalNumber::fromOneBasedInt(context() ? context()->input->col : 1);
-}
 
 TextPosition XMLDocumentParser::textPosition() const
 {

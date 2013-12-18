@@ -698,8 +698,6 @@ public:
     void compileMovHint(Node*);
     void compileMovHintAndCheck(Node*);
 
-    void nonSpeculativeUInt32ToNumber(Node*);
-
 #if USE(JSVALUE64)
     void cachedGetById(CodeOrigin, GPRReg baseGPR, GPRReg resultGPR, unsigned identifierNumber, JITCompiler::Jump slowPathTarget = JITCompiler::Jump(), SpillRegistersMode = NeedToSpill);
     void cachedPutById(CodeOrigin, GPRReg base, GPRReg value, Edge valueUse, GPRReg scratchGPR, unsigned identifierNumber, PutKind, JITCompiler::Jump slowPathTarget = JITCompiler::Jump());
@@ -1084,9 +1082,9 @@ public:
         return appendCallWithExceptionCheck(operation);
     }
 
-    JITCompiler::Call callOperation(V_JITOperation_W operation, WatchpointSet* watchpointSet)
+    JITCompiler::Call callOperation(V_JITOperation_EVws operation, VariableWatchpointSet* watchpointSet)
     {
-        m_jit.setupArguments(TrustedImmPtr(watchpointSet));
+        m_jit.setupArgumentsWithExecState(TrustedImmPtr(watchpointSet));
         return appendCall(operation);
     }
 
@@ -1905,15 +1903,7 @@ public:
 
     void linkBranches();
 
-#ifndef NDEBUG
     void dump(const char* label = 0);
-#endif
-
-#if DFG_ENABLE(CONSISTENCY_CHECK)
-    void checkConsistency();
-#else
-    void checkConsistency() { }
-#endif
 
     bool isInteger(Node* node)
     {
@@ -2035,7 +2025,10 @@ public:
     void compileArithIMul(Node*);
     void compileArithDiv(Node*);
     void compileArithMod(Node*);
+    void compileConstantStoragePointer(Node*);
     void compileGetIndexedPropertyStorage(Node*);
+    JITCompiler::Jump jumpForTypedArrayOutOfBounds(Node*, GPRReg baseGPR, GPRReg indexGPR);
+    void emitTypedArrayBoundsCheck(Node*, GPRReg baseGPR, GPRReg indexGPR);
     void compileGetTypedArrayByteOffset(Node*);
     void compileGetByValOnIntTypedArray(Node*, TypedArrayType);
     void compilePutByValForIntTypedArray(GPRReg base, GPRReg property, Node*, TypedArrayType);

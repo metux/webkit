@@ -141,6 +141,8 @@ public:
                 }
                 RELEASE_ASSERT(node->op() == Phi || node->op() == SetArgument);
                 
+                bool isFlushed = m_flushedLocalOps.contains(node);
+                
                 if (node->op() == Phi) {
                     Edge edge = node->children.justOneChild();
                     if (edge)
@@ -151,7 +153,7 @@ public:
                         NodeFlags result = resultFor(format);
                         UseKind useKind = useKindFor(format);
                         
-                        node = m_insertionSet.insertNode(0, SpecNone, Phi, node->codeOrigin);
+                        node = m_insertionSet.insertNode(0, SpecNone, Phi, CodeOrigin());
                         node->mergeFlags(result);
                         RELEASE_ASSERT((node->flags() & NodeResultMask) == result);
                         
@@ -162,7 +164,7 @@ public:
                                 OpInfo(node), Edge(predecessor->variablesAtTail[i], useKind));
                         }
                         
-                        if (m_flushedLocalOps.contains(node)) {
+                        if (isFlushed) {
                             // Do nothing. For multiple reasons.
                             
                             // Reason #1: If the local is flushed then we don't need to bother
@@ -184,7 +186,7 @@ public:
                             // the value was already on the stack.
                         } else {
                             m_insertionSet.insertNode(
-                                0, SpecNone, MovHint, node->codeOrigin, OpInfo(variable),
+                                0, SpecNone, MovHint, CodeOrigin(), OpInfo(variable),
                                 Edge(node));
                         }
                     }

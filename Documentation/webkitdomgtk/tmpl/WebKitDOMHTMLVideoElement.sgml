@@ -66,6 +66,11 @@ WebKitDOMHTMLVideoElement
 
 </para>
 
+<!-- ##### ARG WebKitDOMHTMLVideoElement:webkit-wireless-video-playback-disabled ##### -->
+<para>
+
+</para>
+
 <!-- ##### ARG WebKitDOMHTMLVideoElement:width ##### -->
 <para>
 
@@ -193,6 +198,24 @@ WebKitDOMHTMLVideoElement
 
 @self: 
 @Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_video_element_get_webkit_wireless_video_playback_disabled ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_video_element_set_webkit_wireless_video_playback_disabled ##### -->
+<para>
+
+</para>
+
+@self: 
+@value: 
 
 
 <!-- ##### FUNCTION webkit_dom_html_video_element_get_webkit_decoded_frame_count ##### -->

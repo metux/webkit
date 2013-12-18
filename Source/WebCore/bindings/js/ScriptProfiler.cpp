@@ -35,8 +35,9 @@
 #include "JSDOMWindow.h"
 #include "MainFrame.h"
 #include "Page.h"
-#include "ScriptObject.h"
 #include "ScriptState.h"
+#include <bindings/ScriptObject.h>
+#include <bindings/ScriptValue.h>
 #include <profiler/LegacyProfiler.h>
 #include <wtf/Forward.h>
 
@@ -47,12 +48,12 @@ void ScriptProfiler::collectGarbage()
     gcController().garbageCollectSoon();
 }
 
-ScriptObject ScriptProfiler::objectByHeapObjectId(unsigned)
+Deprecated::ScriptObject ScriptProfiler::objectByHeapObjectId(unsigned)
 {
-    return ScriptObject();
+    return Deprecated::ScriptObject();
 }
 
-unsigned ScriptProfiler::getHeapObjectId(const ScriptValue&)
+unsigned ScriptProfiler::getHeapObjectId(const Deprecated::ScriptValue&)
 {
     return 0;
 }
@@ -68,12 +69,10 @@ void ScriptProfiler::startForPage(Page* inspectedPage, const String& title)
     start(scriptState, title);
 }
 
-#if ENABLE(WORKERS)
 void ScriptProfiler::startForWorkerGlobalScope(WorkerGlobalScope* context, const String& title)
 {
     start(execStateFromWorkerGlobalScope(context), title);
 }
-#endif
 
 PassRefPtr<ScriptProfile> ScriptProfiler::stop(JSC::ExecState* state, const String& title)
 {
@@ -87,12 +86,10 @@ PassRefPtr<ScriptProfile> ScriptProfiler::stopForPage(Page* inspectedPage, const
     return stop(scriptState, title);
 }
 
-#if ENABLE(WORKERS)
 PassRefPtr<ScriptProfile> ScriptProfiler::stopForWorkerGlobalScope(WorkerGlobalScope* context, const String& title)
 {
     return stop(execStateFromWorkerGlobalScope(context), title);
 }
-#endif
 
 } // namespace WebCore
 

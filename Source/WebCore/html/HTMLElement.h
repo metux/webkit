@@ -92,21 +92,25 @@ public:
     virtual bool isHTMLUnknownElement() const { return false; }
     virtual bool isTextControlInnerTextElement() const { return false; }
 
+    virtual bool willRespondToMouseMoveEvents() OVERRIDE;
+    virtual bool willRespondToMouseWheelEvents() OVERRIDE;
+    virtual bool willRespondToMouseClickEvents() OVERRIDE;
+
     virtual bool isLabelable() const { return false; }
     virtual FormNamedItem* asFormNamedItem() { return 0; }
 
 protected:
     HTMLElement(const QualifiedName& tagName, Document&, ConstructionType);
 
-    void addHTMLLengthToStyle(MutableStylePropertySet&, CSSPropertyID, const String& value);
-    void addHTMLColorToStyle(MutableStylePropertySet&, CSSPropertyID, const String& color);
+    void addHTMLLengthToStyle(MutableStyleProperties&, CSSPropertyID, const String& value);
+    void addHTMLColorToStyle(MutableStyleProperties&, CSSPropertyID, const String& color);
 
-    void applyAlignmentAttributeToStyle(const AtomicString&, MutableStylePropertySet&);
-    void applyBorderAttributeToStyle(const AtomicString&, MutableStylePropertySet&);
+    void applyAlignmentAttributeToStyle(const AtomicString&, MutableStyleProperties&);
+    void applyBorderAttributeToStyle(const AtomicString&, MutableStyleProperties&);
 
     virtual void parseAttribute(const QualifiedName&, const AtomicString&) OVERRIDE;
     virtual bool isPresentationAttribute(const QualifiedName&) const OVERRIDE;
-    virtual void collectStyleForPresentationAttribute(const QualifiedName&, const AtomicString&, MutableStylePropertySet&) OVERRIDE;
+    virtual void collectStyleForPresentationAttribute(const QualifiedName&, const AtomicString&, MutableStyleProperties&) OVERRIDE;
     unsigned parseBorderWidthAttribute(const AtomicString&) const;
 
     virtual void childrenChanged(const ChildChange&) OVERRIDE;
@@ -117,7 +121,7 @@ protected:
 private:
     virtual String nodeName() const OVERRIDE FINAL;
 
-    void mapLanguageAttributeToLocale(const AtomicString&, MutableStylePropertySet&);
+    void mapLanguageAttributeToLocale(const AtomicString&, MutableStyleProperties&);
 
     virtual HTMLFormElement* virtualForm() const;
 

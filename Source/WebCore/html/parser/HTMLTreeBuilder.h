@@ -57,9 +57,9 @@ class HTMLDocumentParser;
 class HTMLTreeBuilder {
     WTF_MAKE_NONCOPYABLE(HTMLTreeBuilder); WTF_MAKE_FAST_ALLOCATED;
 public:
-    static OwnPtr<HTMLTreeBuilder> create(HTMLDocumentParser& parser, HTMLDocument& document, ParserContentPolicy parserContentPolicy, bool reportErrors, const HTMLParserOptions& options)
+    static OwnPtr<HTMLTreeBuilder> create(HTMLDocumentParser& parser, HTMLDocument& document, ParserContentPolicy parserContentPolicy, const HTMLParserOptions& options)
     {
-        return adoptPtr(new HTMLTreeBuilder(parser, document, parserContentPolicy, reportErrors, options));
+        return adoptPtr(new HTMLTreeBuilder(parser, document, parserContentPolicy, options));
     }
     static OwnPtr<HTMLTreeBuilder> create(HTMLDocumentParser& parser, DocumentFragment& fragment, Element* contextElement, ParserContentPolicy parserContentPolicy, const HTMLParserOptions& options)
     {
@@ -72,10 +72,10 @@ public:
     bool isParsingFragment() const { return !!m_fragmentContext.fragment(); }
 #if ENABLE(TEMPLATE_ELEMENT)
     bool isParsingTemplateContents() const { return m_tree.openElements()->hasTemplateInHTMLScope(); }
-    bool isParsingFragmentOrTemplateContents() const { return isParsingFragment() || isParsingTemplateContents(); }
 #else
-    bool isParsingFragmentOrTemplateContents() const { return isParsingFragment(); }
+    bool isParsingTemplateContents() const { return false; }
 #endif
+    bool isParsingFragmentOrTemplateContents() const { return isParsingFragment() || isParsingTemplateContents(); }
 
     void detach();
 
@@ -120,8 +120,13 @@ private:
         AfterAfterFramesetMode,
     };
 
-    HTMLTreeBuilder(HTMLDocumentParser&, HTMLDocument&, ParserContentPolicy, bool reportErrors, const HTMLParserOptions&);
+    HTMLTreeBuilder(HTMLDocumentParser&, HTMLDocument&, ParserContentPolicy, const HTMLParserOptions&);
     HTMLTreeBuilder(HTMLDocumentParser&, DocumentFragment&, Element* contextElement, ParserContentPolicy, const HTMLParserOptions&);
+
+#if PLATFORM(IOS)
+    void insertPhoneNumberLink(const String&);
+    void linkifyPhoneNumbers(const String&);
+#endif
 
     void processToken(AtomicHTMLToken*);
 

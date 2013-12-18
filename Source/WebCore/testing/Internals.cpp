@@ -59,11 +59,10 @@
 #include "InspectorConsoleAgent.h"
 #include "InspectorController.h"
 #include "InspectorCounters.h"
-#include "InspectorFrontendChannel.h"
+#include "InspectorForwarding.h"
 #include "InspectorFrontendClientLocal.h"
 #include "InspectorInstrumentation.h"
 #include "InspectorOverlay.h"
-#include "InspectorValues.h"
 #include "InstrumentingAgents.h"
 #include "InternalSettings.h"
 #include "IntRect.h"
@@ -95,6 +94,9 @@
 #include "TypeConversions.h"
 #include "ViewportArguments.h"
 #include "WorkerThread.h"
+#include <bytecode/CodeBlock.h>
+#include <inspector/InspectorValues.h>
+#include <runtime/JSCJSValue.h>
 #include <wtf/text/CString.h>
 #include <wtf/text/StringBuffer.h>
 
@@ -157,6 +159,15 @@
 #if ENABLE(MEDIA_SOURCE)
 #include "MockMediaPlayerMediaSource.h"
 #endif
+
+using JSC::CodeBlock;
+using JSC::FunctionExecutable;
+using JSC::JSFunction;
+using JSC::JSValue;
+using JSC::ScriptExecutable;
+using JSC::StackVisitor;
+
+using namespace Inspector;
 
 namespace WebCore {
 
@@ -321,11 +332,7 @@ InternalSettings* Internals::settings() const
 
 unsigned Internals::workerThreadCount() const
 {
-#if ENABLE(WORKERS)
     return WorkerThread::workerThreadCount();
-#else
-    return 0;
-#endif
 }
 
 String Internals::address(Node* node)
@@ -1252,6 +1259,82 @@ void Internals::emitInspectorDidCancelFrame()
 #endif
 }
 
+class GetCallerCodeBlockFunctor {
+public:
+    GetCallerCodeBlockFunctor()
+        : m_iterations(0)
+        , m_codeBlock(0)
+    {
+    }
+
+    StackVisitor::Status operator()(StackVisitor& visitor)
+    {
+        ++m_iterations;
+        if (m_iterations < 2)
+            return StackVisitor::Continue;
+
+        m_codeBlock = visitor->codeBlock();
+        return StackVisitor::Done;
+    }
+
+    CodeBlock* codeBlock() const { return m_codeBlock; }
+
+private:
+    int m_iterations;
+    CodeBlock* m_codeBlock;
+};
+
+String Internals::parserMetaData(Deprecated::ScriptValue value)
+{
+    JSC::VM* vm = contextDocument()->vm();
+    JSC::ExecState* exec = vm->topCallFrame;
+    JSC::JSValue code = value.jsValue();
+    ScriptExecutable* executable;
+
+    if (!code || code.isNull() || code.isUndefined()) {
+        GetCallerCodeBlockFunctor iter;
+        exec->iterate(iter);
+        CodeBlock* codeBlock = iter.codeBlock();
+        executable = codeBlock->ownerExecutable(); 
+    } else if (code.isFunction()) {
+        JSFunction* funcObj = JSC::jsCast<JSFunction*>(code.toObject(exec));
+        executable = funcObj->jsExecutable();
+    } else
+        return String();
+
+    unsigned startLine = executable->lineNo();
+    unsigned startColumn = executable->startColumn();
+    unsigned endLine = executable->lastLine();
+    unsigned endColumn = executable->endColumn();
+
+    StringBuilder result;
+
+    if (executable->isFunctionExecutable()) {
+        FunctionExecutable* funcExecutable = reinterpret_cast<FunctionExecutable*>(executable);
+        String inferredName = funcExecutable->inferredName().string();
+        result.append("function \"");
+        result.append(inferredName);
+        result.append("\"");
+    } else if (executable->isEvalExecutable())
+        result.append("eval");
+    else {
+        ASSERT(executable->isProgramExecutable());
+        result.append("program");
+    }
+
+    result.append(" { ");
+    result.appendNumber(startLine);
+    result.append(":");
+    result.appendNumber(startColumn);
+    result.append(" - ");
+    result.appendNumber(endLine);
+    result.append(":");
+    result.appendNumber(endColumn);
+    result.append(" }");
+
+    return result.toString();
+}
+
 void Internals::setBatteryStatus(const String& eventType, bool charging, double chargingTime, double dischargingTime, double level, ExceptionCode& ec)
 {
     Document* document = contextDocument();
@@ -1454,11 +1537,7 @@ PassRefPtr<DOMWindow> Internals::openDummyInspectorFrontend(const String& url)
     DOMWindow* window = page->mainFrame().document()->domWindow();
     ASSERT(window);
 
-#if defined(_MSC_VER) && _MSC_VER <= 1700
-    m_frontendWindow = window->open(url, "", "", window, window); // Work around bug in VS2010 and earlier
-#else
     m_frontendWindow = window->open(url, "", "", *window, *window);
-#endif
     ASSERT(m_frontendWindow);
 
     Page* frontendPage = m_frontendWindow->document()->page();
@@ -2179,6 +2258,9 @@ bool Internals::isPluginUnavailabilityIndicatorObscured(Element* element, Except
 #if ENABLE(MEDIA_SOURCE)
 void Internals::initializeMockMediaSource()
 {
+#if USE(AVFOUNDATION)
+    WebCore::Settings::setAVFoundationEnabled(false);
+#endif
     MediaPlayerFactorySupport::callRegisterMediaEngine(MockMediaPlayerMediaSource::registerMediaEngine);
 }
 #endif

@@ -57,14 +57,6 @@ SH4_TMP_FPRS = [ SpecialRegister.new("dr10") ]
 class RegisterID
     def sh4Operand
         case name
-        when "a0"
-            "r4"
-        when "a1"
-            "r5"
-        when "a2"
-            "r6"
-        when "a3"
-            "r7"
         when "t0"
             "r0"
         when "t1"
@@ -73,10 +65,18 @@ class RegisterID
             "r2"
         when "t3"
             "r10"
-        when "t4"
+        when "t4", "a0"
             "r4"
-        when "t5"
+        when "t5", "a1"
             "r5"
+        when "t6", "a2"
+            "r6"
+        when "t7", "a3"
+            "r7"
+        when "t8"
+            "r8"
+        when "t9"
+            "r9"
         when "cfr"
             "r14"
         when "sp"
@@ -452,18 +452,19 @@ def sh4LowerMisplacedLabels(list)
     list.each {
         | node |
         if node.is_a? Instruction
-            case node.opcode
-            when "jmp", "call"
-                if node.operands[0].is_a? LabelReference
-                    tmp = Tmp.new(codeOrigin, :gpr)
-                    newList << Instruction.new(codeOrigin, "move", [node.operands[0], tmp])
-                    newList << Instruction.new(codeOrigin, node.opcode, [tmp])
+            operands = node.operands
+            newOperands = []
+            operands.each {
+                | operand |
+                if operand.is_a? LabelReference
+                    tmp = Tmp.new(operand.codeOrigin, :gpr)
+                    newList << Instruction.new(operand.codeOrigin, "move", [operand, tmp])
+                    newOperands << tmp
                 else
-                    newList << node
+                    newOperands << operand
                 end
-            else
-                newList << node
-            end
+            }
+            newList << Instruction.new(node.codeOrigin, node.opcode, newOperands, node.annotation)
         else
             newList << node
         end
@@ -489,6 +490,14 @@ def sh4LowerMisplacedSpecialRegisters(list)
         | node |
         if node.is_a? Instruction
             case node.opcode
+            when "move"
+                if node.operands[0].is_a? RegisterID and node.operands[0].sh4Operand == "pr"
+                    newList << Instruction.new(codeOrigin, "stspr", [node.operands[1]])
+                elsif node.operands[1].is_a? RegisterID and node.operands[1].sh4Operand == "pr"
+                    newList << Instruction.new(codeOrigin, "ldspr", [node.operands[0]])
+                else
+                    newList << node
+                end
             when "loadi", "loadis", "loadp"
                 if node.operands[1].is_a? RegisterID and node.operands[1].sh4Operand == "pr"
                     tmp = Tmp.new(codeOrigin, :gpr)
@@ -722,8 +731,8 @@ class Sequence
             "bbeq", "bbneq", "bbb", "bieq", "bpeq", "bineq", "bpneq", "bia", "bpa", "biaeq", "bpaeq", "bib", "bpb",
             "bigteq", "bpgteq", "bilt", "bplt", "bigt", "bpgt", "bilteq", "bplteq", "btiz", "btpz", "btinz", "btpnz", "btbz", "btbnz"])
         result = riscLowerMalformedImmediates(result, -128..127)
-        result = sh4LowerMisplacedLabels(result)
         result = riscLowerMisplacedAddresses(result)
+        result = sh4LowerMisplacedLabels(result)
         result = sh4LowerMisplacedSpecialRegisters(result)
 
         result = assignRegistersToTemporaries(result, :gpr, SH4_TMP_GPRS)
@@ -741,6 +750,7 @@ def sh4Operands(operands)
 end
 
 def emitSH4Branch(sh4opcode, operand)
+    raise "Invalid operand #{operand}" unless operand.is_a? RegisterID or operand.is_a? SpecialRegister
     $asm.puts "#{sh4opcode} @#{operand.sh4Operand}"
     $asm.puts "nop"
 end
@@ -764,12 +774,16 @@ def emitSH4ShiftImm(val, operand, direction)
     end
 end
 
-def emitSH4BranchIfT(label, neg)
+def emitSH4BranchIfT(dest, neg)
     outlabel = LocalLabel.unique("branchIfT")
     sh4opcode = neg ? "bt" : "bf"
     $asm.puts "#{sh4opcode} #{LocalLabelReference.new(codeOrigin, outlabel).asmLabel}"
-    $asm.puts "bra #{label.asmLabel}"
-    $asm.puts "nop"
+    if dest.is_a? LocalLabelReference
+        $asm.puts "bra #{dest.asmLabel}"
+        $asm.puts "nop"
+    else
+        emitSH4Branch("jmp", dest)
+    end
     outlabel.lower("SH4")
 end
 
@@ -1029,6 +1043,8 @@ class Instruction
             $asm.puts "lds #{sh4Operands(operands)}, pr"
         when "stspr"
             $asm.puts "sts pr, #{sh4Operands(operands)}"
+        when "memfence"
+            $asm.puts "synco"
         when "popCalleeSaves"
             $asm.puts "mov.l @r15+, r8"
             $asm.puts "mov.l @r15+, r9"
