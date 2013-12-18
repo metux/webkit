@@ -84,6 +84,10 @@
 #define ENABLE_ICONDATABASE 0
 #endif
 
+#if !defined(ENABLE_IOS_AUTOCORRECT_AND_AUTOCAPITALIZE)
+#define ENABLE_IOS_AUTOCORRECT_AND_AUTOCAPITALIZE 1
+#endif
+
 #if !defined(ENABLE_IOS_GESTURE_EVENTS)
 #define ENABLE_IOS_GESTURE_EVENTS 1
 #endif
@@ -285,6 +289,11 @@
 
 #endif /* PLATFORM(WIN_CAIRO) */
 
+/* --------- NIX port (Unix) --------- */
+#if PLATFORM(NIX)
+#include "nix/FeatureDefinesNix.h"
+#endif /* PLATFORM(NIX) */
+
 /* --------- EFL port (Unix) --------- */
 #if PLATFORM(EFL)
 
@@ -421,10 +430,6 @@
 #define ENABLE_CSS_TRANSFORMS_ANIMATIONS_TRANSITIONS_UNPREFIXED 0
 #endif
 
-#if !defined(ENABLE_CSS_VARIABLES)
-#define ENABLE_CSS_VARIABLES 0
-#endif
-
 #if !defined(ENABLE_CUSTOM_SCHEME_HANDLER)
 #define ENABLE_CUSTOM_SCHEME_HANDLER 0
 #endif
@@ -503,10 +508,6 @@
 
 #if !defined(ENABLE_GEOLOCATION)
 #define ENABLE_GEOLOCATION 0
-#endif
-
-#if !defined(ENABLE_GLIB_SUPPORT)
-#define ENABLE_GLIB_SUPPORT 0
 #endif
 
 #if !defined(ENABLE_HIDDEN_PAGE_DOM_TIMER_THROTTLING)
@@ -784,7 +785,7 @@
 #endif
 
 #if !defined(ENABLE_TEMPLATE_ELEMENT)
-#define ENABLE_TEMPLATE_ELEMENT 0
+#define ENABLE_TEMPLATE_ELEMENT 1
 #endif
 
 #if !defined(ENABLE_TEXT_AUTOSIZING)
@@ -861,10 +862,6 @@
 
 #if !defined(ENABLE_WEB_TIMING)
 #define ENABLE_WEB_TIMING 0
-#endif
-
-#if !defined(ENABLE_WORKERS)
-#define ENABLE_WORKERS 0
 #endif
 
 #if !defined(ENABLE_XHR_TIMEOUT)

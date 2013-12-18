@@ -306,6 +306,14 @@ WK_EXPORT bool WKPreferencesGetSimpleLineLayoutDebugBordersEnabled(WKPreferences
 
 WK_EXPORT void WKPreferencesResetTestRunnerOverrides(WKPreferencesRef preferencesRef);
 
+// Defaults to false.
+WK_EXPORT void WKPreferencesSetUseLegacyTextAlignPositionedElementBehavior(WKPreferencesRef preferencesRef, bool enabled);
+WK_EXPORT bool WKPreferencesUseLegacyTextAlignPositionedElementBehavior(WKPreferencesRef preferencesRef);
+
+// Defaults to false.
+WK_EXPORT void WKPreferencesSetMediaSourceEnabled(WKPreferencesRef preferencesRef, bool enabled);
+WK_EXPORT bool WKPreferencesGetMediaSourceEnabled(WKPreferencesRef preferencesRef);
+
 #ifdef __cplusplus
 }
 #endif

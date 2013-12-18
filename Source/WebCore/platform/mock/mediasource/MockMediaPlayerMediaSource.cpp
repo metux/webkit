@@ -83,7 +83,7 @@ MediaPlayer::SupportsType MockMediaPlayerMediaSource::supportsType(const MediaEn
 
 MockMediaPlayerMediaSource::MockMediaPlayerMediaSource(MediaPlayer* player)
     : m_player(player)
-    , m_currentTime(0)
+    , m_currentTime(MediaTime::zeroTime())
     , m_duration(0)
     , m_readyState(MediaPlayer::HaveNothing)
     , m_networkState(MediaPlayer::Empty)
@@ -161,6 +161,11 @@ MediaPlayer::ReadyState MockMediaPlayerMediaSource::readyState() const
     return m_readyState;
 }
 
+double MockMediaPlayerMediaSource::maxTimeSeekableDouble() const
+{
+    return m_duration;
+}
+
 PassRefPtr<TimeRanges> MockMediaPlayerMediaSource::buffered() const
 {
     return m_mediaSource ? m_mediaSource->buffered() : TimeRanges::create();
@@ -181,7 +186,7 @@ void MockMediaPlayerMediaSource::paint(GraphicsContext*, const IntRect&)
 
 double MockMediaPlayerMediaSource::currentTimeDouble() const
 {
-    return m_currentTime;
+    return m_currentTime.toDouble();
 }
 
 double MockMediaPlayerMediaSource::durationDouble() const
@@ -189,9 +194,13 @@ double MockMediaPlayerMediaSource::durationDouble() const
     return m_duration;
 }
 
-void MockMediaPlayerMediaSource::seekDouble(double time)
+void MockMediaPlayerMediaSource::seekWithTolerance(double time, double negativeTolerance, double positiveTolerance)
 {
-    m_currentTime = std::min(time, m_duration);
+    if (!negativeTolerance && !positiveTolerance) {
+        m_currentTime = MediaTime::createWithDouble(time);
+        m_mediaSourcePrivate->seekToTime(MediaTime::createWithDouble(time));
+    } else
+        m_currentTime = m_mediaSourcePrivate->seekToTime(MediaTime::createWithDouble(time), MediaTime::createWithDouble(negativeTolerance), MediaTime::createWithDouble(positiveTolerance));
     m_player->timeChanged();
 
     if (m_playing)
@@ -201,11 +210,11 @@ void MockMediaPlayerMediaSource::seekDouble(double time)
 void MockMediaPlayerMediaSource::advanceCurrentTime()
 {
     RefPtr<TimeRanges> buffered = this->buffered();
-    size_t pos = buffered->find(m_currentTime);
+    size_t pos = buffered->find(m_currentTime.toDouble());
     if (pos == notFound)
         return;
 
-    m_currentTime = std::min(m_duration, buffered->end(pos, IGNORE_EXCEPTION));
+    m_currentTime = MediaTime::createWithDouble(std::min(m_duration, buffered->end(pos, IGNORE_EXCEPTION)));
     m_player->timeChanged();
 }
 
@@ -225,6 +234,35 @@ void MockMediaPlayerMediaSource::setReadyState(MediaPlayer::ReadyState readyStat
 
     m_readyState = readyState;
     m_player->readyStateChanged();
+}
+
+void MockMediaPlayerMediaSource::setNetworkState(MediaPlayer::NetworkState networkState)
+{
+    if (networkState == m_networkState)
+        return;
+
+    m_networkState = networkState;
+    m_player->networkStateChanged();
+}
+
+unsigned long MockMediaPlayerMediaSource::totalVideoFrames()
+{
+    return m_mediaSourcePrivate ? m_mediaSourcePrivate->totalVideoFrames() : 0;
+}
+
+unsigned long MockMediaPlayerMediaSource::droppedVideoFrames()
+{
+    return m_mediaSourcePrivate ? m_mediaSourcePrivate->droppedVideoFrames() : 0;
+}
+
+unsigned long MockMediaPlayerMediaSource::corruptedVideoFrames()
+{
+    return m_mediaSourcePrivate ? m_mediaSourcePrivate->corruptedVideoFrames() : 0;
+}
+
+double MockMediaPlayerMediaSource::totalFrameDelay()
+{
+    return m_mediaSourcePrivate ? m_mediaSourcePrivate->totalFrameDelay() : 0;
 }
 
 }

@@ -171,6 +171,10 @@ public:
     void setDOMTimerAlignmentInterval(double);
     double domTimerAlignmentInterval() const;
 
+    // FIXME: Change these methods to take/return an unsigned integer after we upstream the iOS port.
+    void setLayoutInterval(int);
+    int layoutInterval() const { return m_layoutInterval; }
+
 #if ENABLE(HIDDEN_PAGE_DOM_TIMER_THROTTLING)
     bool hiddenPageDOMTimerThrottlingEnabled() const { return m_hiddenPageDOMTimerThrottlingEnabled; }
     void setHiddenPageDOMTimerThrottlingEnabled(bool);
@@ -191,14 +195,6 @@ public:
 #else
     void setCSSStickyPositionEnabled(bool) { }
     bool cssStickyPositionEnabled() const { return false; }
-#endif
-
-#if ENABLE(CSS_VARIABLES)
-    void setCSSVariablesEnabled(bool enabled) { m_cssVariablesEnabled = enabled; }
-    bool cssVariablesEnabled() const { return m_cssVariablesEnabled; }
-#else
-    void setCSSVariablesEnabled(bool) { }
-    bool cssVariablesEnabled() const { return false; }
 #endif
 
     void setShowTiledScrollingIndicator(bool);
@@ -284,6 +280,7 @@ private:
     URL m_userStyleSheetLocation;
     const std::unique_ptr<FontGenericFamilies> m_fontGenericFamilies;
     SecurityOrigin::StorageBlockingPolicy m_storageBlockingPolicy;
+    int m_layoutInterval;
 #if ENABLE(TEXT_AUTOSIZING)
     float m_textAutosizingFontScaleFactor;
     IntSize m_textAutosizingWindowSizeOverride;
@@ -306,9 +303,6 @@ private:
     bool m_isCSSCustomFilterEnabled : 1;
 #if ENABLE(CSS_STICKY_POSITION)
     bool m_cssStickyPositionEnabled : 1;
-#endif
-#if ENABLE(CSS_VARIABLES)
-    bool m_cssVariablesEnabled : 1;
 #endif
     bool m_showTiledScrollingIndicator : 1;
     bool m_tiledBackingStoreEnabled : 1;

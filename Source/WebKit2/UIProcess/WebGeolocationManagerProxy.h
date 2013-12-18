@@ -39,16 +39,19 @@ namespace WebKit {
 class WebContext;
 class WebGeolocationPosition;
 
-class WebGeolocationManagerProxy : public API::TypedObject<API::Object::Type::GeolocationManager>, public WebContextSupplement, private CoreIPC::MessageReceiver {
+class WebGeolocationManagerProxy : public API::ObjectImpl<API::Object::Type::GeolocationManager>, public WebContextSupplement, private CoreIPC::MessageReceiver {
 public:
     static const char* supplementName();
 
     static PassRefPtr<WebGeolocationManagerProxy> create(WebContext*);
 
-    void initializeProvider(const WKGeolocationProvider*);
+    void initializeProvider(const WKGeolocationProviderBase*);
 
     void providerDidChangePosition(WebGeolocationPosition*);
     void providerDidFailToDeterminePosition(const String& errorMessage = String());
+#if PLATFORM(IOS)
+    void resetPermissions();
+#endif
 
     using API::Object::ref;
     using API::Object::deref;

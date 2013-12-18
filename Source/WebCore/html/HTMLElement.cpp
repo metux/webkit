@@ -52,7 +52,7 @@
 #include "RenderLineBreak.h"
 #include "ScriptController.h"
 #include "Settings.h"
-#include "StylePropertySet.h"
+#include "StyleProperties.h"
 #include "SubframeLoader.h"
 #include "Text.h"
 #include "TextIterator.h"
@@ -138,13 +138,13 @@ unsigned HTMLElement::parseBorderWidthAttribute(const AtomicString& value) const
     return borderWidth;
 }
 
-void HTMLElement::applyBorderAttributeToStyle(const AtomicString& value, MutableStylePropertySet& style)
+void HTMLElement::applyBorderAttributeToStyle(const AtomicString& value, MutableStyleProperties& style)
 {
     addPropertyToPresentationAttributeStyle(style, CSSPropertyBorderWidth, parseBorderWidthAttribute(value), CSSPrimitiveValue::CSS_PX);
     addPropertyToPresentationAttributeStyle(style, CSSPropertyBorderStyle, CSSValueSolid);
 }
 
-void HTMLElement::mapLanguageAttributeToLocale(const AtomicString& value, MutableStylePropertySet& style)
+void HTMLElement::mapLanguageAttributeToLocale(const AtomicString& value, MutableStyleProperties& style)
 {
     if (!value.isEmpty()) {
         // Have to quote so the locale id is treated as a string instead of as a CSS keyword.
@@ -162,7 +162,12 @@ bool HTMLElement::isPresentationAttribute(const QualifiedName& name) const
     return StyledElement::isPresentationAttribute(name);
 }
 
-void HTMLElement::collectStyleForPresentationAttribute(const QualifiedName& name, const AtomicString& value, MutableStylePropertySet& style)
+static bool isLTROrRTLIgnoringCase(const AtomicString& dirAttributeValue)
+{
+    return equalIgnoringCase(dirAttributeValue, "rtl") || equalIgnoringCase(dirAttributeValue, "ltr");
+}
+
+void HTMLElement::collectStyleForPresentationAttribute(const QualifiedName& name, const AtomicString& value, MutableStyleProperties& style)
 {
     if (name == alignAttr) {
         if (equalIgnoringCase(value, "middle"))
@@ -175,11 +180,17 @@ void HTMLElement::collectStyleForPresentationAttribute(const QualifiedName& name
             addPropertyToPresentationAttributeStyle(style, CSSPropertyWordWrap, CSSValueBreakWord);
             addPropertyToPresentationAttributeStyle(style, CSSPropertyWebkitNbspMode, CSSValueSpace);
             addPropertyToPresentationAttributeStyle(style, CSSPropertyWebkitLineBreak, CSSValueAfterWhiteSpace);
+#if PLATFORM(IOS)
+            addPropertyToPresentationAttributeStyle(style, CSSPropertyWebkitTextSizeAdjust, CSSValueNone);
+#endif
         } else if (equalIgnoringCase(value, "plaintext-only")) {
             addPropertyToPresentationAttributeStyle(style, CSSPropertyWebkitUserModify, CSSValueReadWritePlaintextOnly);
             addPropertyToPresentationAttributeStyle(style, CSSPropertyWordWrap, CSSValueBreakWord);
             addPropertyToPresentationAttributeStyle(style, CSSPropertyWebkitNbspMode, CSSValueSpace);
             addPropertyToPresentationAttributeStyle(style, CSSPropertyWebkitLineBreak, CSSValueAfterWhiteSpace);
+#if PLATFORM(IOS)
+            addPropertyToPresentationAttributeStyle(style, CSSPropertyWebkitTextSizeAdjust, CSSValueNone);
+#endif
         } else if (equalIgnoringCase(value, "false"))
             addPropertyToPresentationAttributeStyle(style, CSSPropertyWebkitUserModify, CSSValueReadOnly);
     } else if (name == hiddenAttr) {
@@ -194,7 +205,8 @@ void HTMLElement::collectStyleForPresentationAttribute(const QualifiedName& name
         if (equalIgnoringCase(value, "auto"))
             addPropertyToPresentationAttributeStyle(style, CSSPropertyUnicodeBidi, unicodeBidiAttributeForDirAuto(*this));
         else {
-            addPropertyToPresentationAttributeStyle(style, CSSPropertyDirection, value);
+            if (isLTROrRTLIgnoringCase(value))
+                addPropertyToPresentationAttributeStyle(style, CSSPropertyDirection, value);
             if (!hasTagName(bdiTag) && !hasTagName(bdoTag) && !hasTagName(outputTag))
                 addPropertyToPresentationAttributeStyle(style, CSSPropertyUnicodeBidi, CSSValueEmbed);
         }
@@ -278,6 +290,11 @@ static NEVER_INLINE void populateEventNameForAttributeLocalNameMap(HashMap<Atomi
         &onvolumechangeAttr,
         &onwaitingAttr,
         &onwheelAttr,
+#if ENABLE(IOS_GESTURE_EVENTS)
+        &ongesturechangeAttr,
+        &ongestureendAttr,
+        &ongesturestartAttr,
+#endif
 #if ENABLE(FULLSCREEN_API)
         &onwebkitfullscreenchangeAttr,
         &onwebkitfullscreenerrorAttr,
@@ -602,7 +619,7 @@ void HTMLElement::insertAdjacentText(const String& where, const String& text, Ex
     insertAdjacent(where, textNode.get(), ec);
 }
 
-void HTMLElement::applyAlignmentAttributeToStyle(const AtomicString& alignment, MutableStylePropertySet& style)
+void HTMLElement::applyAlignmentAttributeToStyle(const AtomicString& alignment, MutableStyleProperties& style)
 {
     // Vertical alignment with respect to the current baseline of the text
     // right or left means floating images.
@@ -744,9 +761,8 @@ TranslateAttributeMode HTMLElement::translateAttributeMode() const
 
 bool HTMLElement::translate() const
 {
-    auto lineage = lineageOfType<HTMLElement>(*this);
-    for (auto element = lineage.begin(), end = lineage.end(); element != end; ++element) {
-        TranslateAttributeMode mode = element->translateAttributeMode();
+    for (auto& element : lineageOfType<HTMLElement>(*this)) {
+        TranslateAttributeMode mode = element.translateAttributeMode();
         if (mode == TranslateAttributeInherit)
             continue;
         ASSERT(mode == TranslateAttributeYes || mode == TranslateAttributeNo);
@@ -793,9 +809,9 @@ HTMLFormElement* HTMLElement::virtualForm() const
     return HTMLFormElement::findClosestFormAncestor(*this);
 }
 
-static inline bool elementAffectsDirectionality(const Node* node)
+static inline bool elementAffectsDirectionality(const Node& node)
 {
-    return node->isHTMLElement() && (node->hasTagName(bdiTag) || toHTMLElement(node)->hasAttribute(dirAttr));
+    return node.isHTMLElement() && (node.hasTagName(bdiTag) || toHTMLElement(node).hasAttribute(dirAttr));
 }
 
 static void setHasDirAutoFlagRecursively(Node* firstNode, bool flag, Node* lastNode = nullptr)
@@ -808,7 +824,7 @@ static void setHasDirAutoFlagRecursively(Node* firstNode, bool flag, Node* lastN
         if (node->selfOrAncestorHasDirAutoAttribute() == flag)
             return;
 
-        if (elementAffectsDirectionality(node)) {
+        if (elementAffectsDirectionality(*node)) {
             if (node == lastNode)
                 return;
             node = NodeTraversal::nextSkippingChildren(node, firstNode);
@@ -867,7 +883,7 @@ TextDirection HTMLElement::directionality(Node** strongDirectionalityTextNode) c
         // Skip elements with valid dir attribute
         if (node->isElementNode()) {
             AtomicString dirAttributeValue = toElement(node)->fastGetAttribute(dirAttr);
-            if (equalIgnoringCase(dirAttributeValue, "rtl") || equalIgnoringCase(dirAttributeValue, "ltr") || equalIgnoringCase(dirAttributeValue, "auto")) {
+            if (isLTROrRTLIgnoringCase(dirAttributeValue) || equalIgnoringCase(dirAttributeValue, "auto")) {
                 node = NodeTraversal::nextSkippingChildren(node, this);
                 continue;
             }
@@ -908,10 +924,9 @@ void HTMLElement::adjustDirectionalityIfNeededAfterChildAttributeChanged(Element
     setHasDirAutoFlagRecursively(child, false);
     if (!renderer() || renderer()->style().direction() == textDirection)
         return;
-    auto lineage = elementLineage(this);
-    for (auto elementToAdjust = lineage.begin(), end = lineage.end(); elementToAdjust != end; ++elementToAdjust) {
-        if (elementAffectsDirectionality(&*elementToAdjust)) {
-            elementToAdjust->setNeedsStyleRecalc();
+    for (auto& elementToAdjust : elementLineage(this)) {
+        if (elementAffectsDirectionality(elementToAdjust)) {
+            elementToAdjust.setNeedsStyleRecalc();
             return;
         }
     }
@@ -932,7 +947,7 @@ void HTMLElement::adjustDirectionalityIfNeededAfterChildrenChanged(Element* befo
     if (document().renderView() && (changeType == ElementRemoved || changeType == TextRemoved)) {
         Node* node = beforeChange ? beforeChange->nextSibling() : nullptr;
         for (; node; node = node->nextSibling()) {
-            if (elementAffectsDirectionality(node))
+            if (elementAffectsDirectionality(*node))
                 continue;
 
             setHasDirAutoFlagRecursively(node, false);
@@ -946,15 +961,14 @@ void HTMLElement::adjustDirectionalityIfNeededAfterChildrenChanged(Element* befo
     if (beforeChange)
         oldMarkedNode = changeType == ElementInserted ? ElementTraversal::nextSibling(beforeChange) : beforeChange->nextSibling();
 
-    while (oldMarkedNode && elementAffectsDirectionality(oldMarkedNode))
+    while (oldMarkedNode && elementAffectsDirectionality(*oldMarkedNode))
         oldMarkedNode = oldMarkedNode->nextSibling();
     if (oldMarkedNode)
         setHasDirAutoFlagRecursively(oldMarkedNode, false);
 
-    auto lineage = lineageOfType<HTMLElement>(*this);
-    for (auto elementToAdjust = lineage.begin(), end = lineage.end(); elementToAdjust != end; ++elementToAdjust) {
-        if (elementAffectsDirectionality(&*elementToAdjust)) {
-            elementToAdjust->calculateAndAdjustDirectionality();
+    for (auto& elementToAdjust : lineageOfType<HTMLElement>(*this)) {
+        if (elementAffectsDirectionality(elementToAdjust)) {
+            elementToAdjust.calculateAndAdjustDirectionality();
             return;
         }
     }
@@ -965,7 +979,7 @@ bool HTMLElement::isURLAttribute(const Attribute& attribute) const
     return StyledElement::isURLAttribute(attribute);
 }
 
-void HTMLElement::addHTMLLengthToStyle(MutableStylePropertySet& style, CSSPropertyID propertyID, const String& value)
+void HTMLElement::addHTMLLengthToStyle(MutableStyleProperties& style, CSSPropertyID propertyID, const String& value)
 {
     // FIXME: This function should not spin up the CSS parser, but should instead just figure out the correct
     // length unit and make the appropriate parsed value.
@@ -1054,7 +1068,7 @@ static RGBA32 parseColorStringWithCrazyLegacyRules(const String& colorString)
 }
 
 // Color parsing that matches HTML's "rules for parsing a legacy color value"
-void HTMLElement::addHTMLColorToStyle(MutableStylePropertySet& style, CSSPropertyID propertyID, const String& attributeValue)
+void HTMLElement::addHTMLColorToStyle(MutableStyleProperties& style, CSSPropertyID propertyID, const String& attributeValue)
 {
     // An empty string doesn't apply a color. (One containing only whitespace does, which is why this check occurs before stripping.)
     if (attributeValue.isEmpty())
@@ -1072,6 +1086,21 @@ void HTMLElement::addHTMLColorToStyle(MutableStylePropertySet& style, CSSPropert
         parsedColor.setRGB(parseColorStringWithCrazyLegacyRules(colorString));
 
     style.setProperty(propertyID, cssValuePool().createColorValue(parsedColor.rgb()));
+}
+
+bool HTMLElement::willRespondToMouseMoveEvents()
+{
+    return !isDisabledFormControl() && Element::willRespondToMouseMoveEvents();
+}
+
+bool HTMLElement::willRespondToMouseWheelEvents()
+{
+    return !isDisabledFormControl() && Element::willRespondToMouseWheelEvents();
+}
+
+bool HTMLElement::willRespondToMouseClickEvents()
+{
+    return !isDisabledFormControl() && Element::willRespondToMouseClickEvents();
 }
 
 } // namespace WebCore

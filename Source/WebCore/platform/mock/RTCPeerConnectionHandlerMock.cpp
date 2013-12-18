@@ -29,6 +29,7 @@
 
 #include "RTCPeerConnectionHandlerMock.h"
 
+#include "MediaConstraintsMock.h"
 #include "NotImplemented.h"
 #include "RTCDTMFSenderHandler.h"
 #include "RTCDataChannelHandler.h"
@@ -40,9 +41,9 @@
 
 namespace WebCore {
 
-PassOwnPtr<RTCPeerConnectionHandler> RTCPeerConnectionHandlerMock::create(RTCPeerConnectionHandlerClient* client)
+std::unique_ptr<RTCPeerConnectionHandler> RTCPeerConnectionHandlerMock::create(RTCPeerConnectionHandlerClient* client)
 {
-    return adoptPtr(new RTCPeerConnectionHandlerMock(client));
+    return std::make_unique<RTCPeerConnectionHandlerMock>(client);
 }
 
 RTCPeerConnectionHandlerMock::RTCPeerConnectionHandlerMock(RTCPeerConnectionHandlerClient* client)
@@ -50,11 +51,12 @@ RTCPeerConnectionHandlerMock::RTCPeerConnectionHandlerMock(RTCPeerConnectionHand
 {
 }
 
-bool RTCPeerConnectionHandlerMock::initialize(PassRefPtr<RTCConfiguration>, PassRefPtr<MediaConstraints>)
+bool RTCPeerConnectionHandlerMock::initialize(PassRefPtr<RTCConfiguration>, PassRefPtr<MediaConstraints> constraints)
 {
-    // FIXME: once there is support in RTCPeerConnection + constraints, this should be taken into account here
-    // and a LayouTest for that must be added.
-    // https://bugs.webkit.org/show_bug.cgi?id=123093
+    String invalidQuery = MediaConstraintsMock::verifyConstraints(constraints);
+    if (!invalidQuery.isEmpty())
+        return false;
+
     RefPtr<IceConnectionNotifier> notifier = adoptRef(new IceConnectionNotifier(m_client, RTCPeerConnectionHandlerClient::IceConnectionStateCompleted, RTCPeerConnectionHandlerClient::IceGatheringStateComplete));
     m_timerEvents.append(adoptRef(new TimerEvent(this, notifier)));
     return true;
@@ -64,10 +66,10 @@ void RTCPeerConnectionHandlerMock::createOffer(PassRefPtr<RTCSessionDescriptionR
 {
     String succeedValue;
     RefPtr<SessionRequestNotifier> notifier;
-    if (constraints->getMandatoryConstraintValue("succeed", succeedValue) && succeedValue == "true")
-        notifier = adoptRef(new SessionRequestNotifier(request, RTCSessionDescriptionDescriptor::create("offer", "local")));
+    if (constraints->getMandatoryConstraintValue("succeed", succeedValue) && succeedValue == "false")
+        notifier = adoptRef(new SessionRequestNotifier(request, 0, RTCPeerConnectionHandler::incompatibleConstraintsErrorName()));
     else
-        notifier = adoptRef(new SessionRequestNotifier(request, 0));
+        notifier = adoptRef(new SessionRequestNotifier(request, RTCSessionDescriptionDescriptor::create("offer", "local")));
 
     m_timerEvents.append(adoptRef(new TimerEvent(this, notifier)));
 }
@@ -77,38 +79,58 @@ void RTCPeerConnectionHandlerMock::createAnswer(PassRefPtr<RTCSessionDescription
     RefPtr<SessionRequestNotifier> notifier;
     // We can only create an answer if we have already had an offer and the remote session description is stored.
     String succeedValue;
-    if (!m_remoteSessionDescription.get() || (constraints->getMandatoryConstraintValue("succeed", succeedValue) && succeedValue == "false"))
-        notifier = adoptRef(new SessionRequestNotifier(request, 0));
+    if (constraints->getMandatoryConstraintValue("succeed", succeedValue) && succeedValue == "false")
+        notifier = adoptRef(new SessionRequestNotifier(request, 0, RTCPeerConnectionHandler::incompatibleConstraintsErrorName()));
     else
         notifier = adoptRef(new SessionRequestNotifier(request, RTCSessionDescriptionDescriptor::create("answer", "local")));
 
     m_timerEvents.append(adoptRef(new TimerEvent(this, notifier)));
 }
 
+RTCPeerConnectionHandlerClient::SignalingState RTCPeerConnectionHandlerMock::signalingStateFromSDP(RTCSessionDescriptionDescriptor* descriptor)
+{
+    if (descriptor->type() == "offer" && descriptor->sdp() == "local")
+        return RTCPeerConnectionHandlerClient::SignalingStateHaveLocalOffer;
+    if (descriptor->type() == "offer" && descriptor->sdp() == "remote")
+        return RTCPeerConnectionHandlerClient::SignalingStateHaveRemoteOffer;
+    if (descriptor->type() == "pranswer" && descriptor->sdp() == "local")
+        return RTCPeerConnectionHandlerClient::SignalingStateHaveLocalPrAnswer;
+    if (descriptor->type() == "pranswer" && descriptor->sdp() == "remote")
+        return RTCPeerConnectionHandlerClient::SignalingStateHaveRemotePrAnswer;
+
+    return RTCPeerConnectionHandlerClient::SignalingStateStable;
+}
+
 void RTCPeerConnectionHandlerMock::setLocalDescription(PassRefPtr<RTCVoidRequest> request, PassRefPtr<RTCSessionDescriptionDescriptor> descriptor)
 {
-    RefPtr<VoidRequestNotifier> notifier;
+    RefPtr<VoidRequestNotifier> voidNotifier;
+    RefPtr<SignalingStateNotifier> signalingNotifier;
     if (!descriptor.get() || descriptor->sdp() != "local")
-        notifier = adoptRef(new VoidRequestNotifier(request, false));
+        voidNotifier = adoptRef(new VoidRequestNotifier(request, false, RTCPeerConnectionHandler::internalErrorName()));
     else {
         m_localSessionDescription = descriptor;
-        notifier = adoptRef(new VoidRequestNotifier(request, true));
+        signalingNotifier = adoptRef(new SignalingStateNotifier(m_client, signalingStateFromSDP(m_localSessionDescription.get())));
+        voidNotifier = adoptRef(new VoidRequestNotifier(request, true));
+        m_timerEvents.append(adoptRef(new TimerEvent(this, signalingNotifier)));
     }
 
-    m_timerEvents.append(adoptRef(new TimerEvent(this, notifier)));
+    m_timerEvents.append(adoptRef(new TimerEvent(this, voidNotifier)));
 }
 
 void RTCPeerConnectionHandlerMock::setRemoteDescription(PassRefPtr<RTCVoidRequest> request, PassRefPtr<RTCSessionDescriptionDescriptor> descriptor)
 {
-    RefPtr<VoidRequestNotifier> notifier;
+    RefPtr<VoidRequestNotifier> voidNotifier;
+    RefPtr<SignalingStateNotifier> signalingNotifier;
     if (!descriptor.get() || descriptor->sdp() != "remote")
-        notifier = adoptRef(new VoidRequestNotifier(request, false));
+        voidNotifier = adoptRef(new VoidRequestNotifier(request, false, RTCPeerConnectionHandler::internalErrorName()));
     else {
         m_remoteSessionDescription = descriptor;
-        notifier = adoptRef(new VoidRequestNotifier(request, true));
+        signalingNotifier = adoptRef(new SignalingStateNotifier(m_client, signalingStateFromSDP(m_remoteSessionDescription.get())));
+        voidNotifier = adoptRef(new VoidRequestNotifier(request, true));
+        m_timerEvents.append(adoptRef(new TimerEvent(this, signalingNotifier)));
     }
 
-    m_timerEvents.append(adoptRef(new TimerEvent(this, notifier)));
+    m_timerEvents.append(adoptRef(new TimerEvent(this, voidNotifier)));
 }
 
 PassRefPtr<RTCSessionDescriptionDescriptor> RTCPeerConnectionHandlerMock::localDescription()
@@ -133,8 +155,12 @@ bool RTCPeerConnectionHandlerMock::addIceCandidate(PassRefPtr<RTCVoidRequest> re
     return true;
 }
 
-bool RTCPeerConnectionHandlerMock::addStream(PassRefPtr<MediaStreamPrivate>, PassRefPtr<MediaConstraints>)
+bool RTCPeerConnectionHandlerMock::addStream(PassRefPtr<MediaStreamPrivate>, PassRefPtr<MediaConstraints> constraints)
 {
+    String invalidQuery = MediaConstraintsMock::verifyConstraints(constraints);
+    if (!invalidQuery.isEmpty())
+        return false;
+
     // Spec states that every time a stream is added, a negotiationneeded event must be fired.
     m_client->negotiationNeeded();
     return true;
@@ -153,19 +179,19 @@ void RTCPeerConnectionHandlerMock::getStats(PassRefPtr<RTCStatsRequest>)
     notImplemented();
 }
 
-PassOwnPtr<RTCDataChannelHandler> RTCPeerConnectionHandlerMock::createDataChannel(const String& label, const RTCDataChannelInit& init)
+std::unique_ptr<RTCDataChannelHandler> RTCPeerConnectionHandlerMock::createDataChannel(const String& label, const RTCDataChannelInit& init)
 {
     RefPtr<RemoteDataChannelNotifier> notifier = adoptRef(new RemoteDataChannelNotifier(m_client));
     m_timerEvents.append(adoptRef(new TimerEvent(this, notifier)));
-    return adoptPtr(new RTCDataChannelHandlerMock(label, init));
+    return std::make_unique<RTCDataChannelHandlerMock>(label, init);
 }
 
-PassOwnPtr<RTCDTMFSenderHandler> RTCPeerConnectionHandlerMock::createDTMFSender(PassRefPtr<MediaStreamSource>)
+std::unique_ptr<RTCDTMFSenderHandler> RTCPeerConnectionHandlerMock::createDTMFSender(PassRefPtr<MediaStreamSource>)
 {
     // Requires a mock implementation of RTCDTMFSenderHandler.
     // This must be implemented once the mock implementation of RTCDataChannelHandler is ready.
     notImplemented();
-    return 0;
+    return nullptr;
 }
 
 void RTCPeerConnectionHandlerMock::stop()

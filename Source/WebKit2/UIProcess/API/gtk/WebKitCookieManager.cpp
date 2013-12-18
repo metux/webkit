@@ -20,6 +20,7 @@
 #include "config.h"
 #include "WebKitCookieManager.h"
 
+#include "APIString.h"
 #include "SoupCookiePersistentStorageType.h"
 #include "WebCookieManagerProxy.h"
 #include "WebKitCookieManagerPrivate.h"
@@ -100,12 +101,14 @@ WebKitCookieManager* webkitCookieManagerCreate(WebCookieManagerProxy* webCookieM
     WebKitCookieManager* manager = WEBKIT_COOKIE_MANAGER(g_object_new(WEBKIT_TYPE_COOKIE_MANAGER, NULL));
     manager->priv->webCookieManager = webCookieManager;
 
-    WKCookieManagerClient wkCookieManagerClient = {
-        kWKCookieManagerClientCurrentVersion,
-        manager, // clientInfo
+    WKCookieManagerClientV0 wkCookieManagerClient = {
+        {
+            0, // version
+            manager, // clientInfo
+        },
         cookiesDidChange
     };
-    WKCookieManagerSetClient(toAPI(webCookieManager), &wkCookieManagerClient);
+    WKCookieManagerSetClient(toAPI(webCookieManager), &wkCookieManagerClient.base);
     manager->priv->webCookieManager->startObservingCookieChanges();
 
     return manager;
@@ -203,7 +206,7 @@ static void webkitCookieManagerGetDomainsWithCookiesCallback(WKArrayRef wkDomain
     API::Array* domains = toImpl(wkDomains);
     GPtrArray* returnValue = g_ptr_array_sized_new(domains->size());
     for (size_t i = 0; i < domains->size(); ++i) {
-        WebString* domainString = static_cast<WebString*>(domains->at(i));
+        API::String* domainString = static_cast<API::String*>(domains->at(i));
         String domain = domainString->string();
         if (domain.isEmpty())
             continue;

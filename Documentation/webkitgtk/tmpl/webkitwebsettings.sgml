@@ -151,6 +151,11 @@ WebKitWebSettings
 
 </para>
 
+<!-- ##### ARG WebKitWebSettings:enable-mediasource ##### -->
+<para>
+
+</para>
+
 <!-- ##### ARG WebKitWebSettings:enable-offline-web-application-cache ##### -->
 <para>
 

@@ -35,6 +35,7 @@
 #include "AXObjectCache.h"
 #include "ArchiveResource.h"
 #include "BackForwardList.h"
+#include "BatteryClientGtk.h"
 #include "CairoUtilities.h"
 #include "Chrome.h"
 #include "ChromeClientGtk.h"
@@ -85,7 +86,6 @@
 #include "ResourceHandle.h"
 #include "RuntimeEnabledFeatures.h"
 #include "ScriptController.h"
-#include "ScriptValue.h"
 #include "Settings.h"
 #include "WebKitDOMDocumentPrivate.h"
 #include "webkitdownload.h"
@@ -114,6 +114,7 @@
 #include "webkitwebplugindatabaseprivate.h"
 #include "webkitwebwindowfeatures.h"
 #include "webkitwebviewprivate.h"
+#include <bindings/ScriptValue.h>
 #include <gdk/gdkkeysyms.h>
 #include <glib/gi18n-lib.h>
 #include <wtf/gobject/GOwnPtr.h>
@@ -671,6 +672,17 @@ static gboolean webkit_web_view_expose_event(GtkWidget* widget, GdkEventExpose* 
     gdk_region_get_rectangles(event->region, &rects.outPtr(), &rectCount);
 
     RefPtr<cairo_t> cr = adoptRef(gdk_cairo_create(event->window));
+
+    WebKitWebViewPrivate* priv = WEBKIT_WEB_VIEW(widget)->priv;
+#if USE(TEXTURE_MAPPER)
+    GdkRectangle clipRect;
+    gdk_region_get_clipbox(event->region, &clipRect);
+    if (priv->acceleratedCompositingContext->renderLayersToWindow(cr.get(), clipRect)) {
+        GTK_WIDGET_CLASS(webkit_web_view_parent_class)->expose_event(widget, event);
+        return FALSE;
+    }
+#endif
+
     for (int i = 0; i < rectCount; i++) {
         copyRectFromCairoSurfaceToContext(WEBKIT_WEB_VIEW(widget)->priv->backingStore->cairoSurface(),
                                           cr.get(), IntSize(), IntRect(rects.get()[i]));
@@ -3612,6 +3624,10 @@ static void webkit_web_view_update_settings(WebKitWebView* webView)
     WebCore::RuntimeEnabledFeatures::sharedFeatures().setCSSRegionsEnabled(true);
 #endif
 
+#if ENABLE(MEDIA_SOURCE)
+    coreSettings.setMediaSourceEnabled(settingsPrivate->enableMediaSource);
+#endif
+
     // Use mock scrollbars if in DumpRenderTree mode (i.e. testing layout tests).
     coreSettings.setMockScrollbarsEnabled(DumpRenderTreeSupportGtk::dumpRenderTreeModeEnabled());
 
@@ -3760,6 +3776,11 @@ static void webkit_web_view_settings_notify(WebKitWebSettings* webSettings, GPar
         settings.setCSSCustomFilterEnabled(g_value_get_boolean(&value));
 #endif
 
+#if ENABLE(MEDIA_SOURCE)
+    else if (name == g_intern_string("enable-mediasource"))
+        settings.setMediaSourceEnabled(g_value_get_boolean(&value));
+#endif
+
     else if (!g_object_class_find_property(G_OBJECT_GET_CLASS(webSettings), name))
         g_warning("Unexpected setting '%s'", name);
     g_value_unset(&value);
@@ -3815,6 +3836,10 @@ static void webkit_web_view_init(WebKitWebView* webView)
 #if ENABLE(NAVIGATOR_CONTENT_UTILS)
     priv->navigatorContentUtilsClient = WebKit::NavigatorContentUtilsClient::create();
     WebCore::provideNavigatorContentUtilsTo(priv->corePage, priv->navigatorContentUtilsClient.get());
+#endif
+
+#if ENABLE(BATTERY_STATUS)
+    WebCore::provideBatteryTo(priv->corePage, new BatteryClientGtk);
 #endif
 
     if (DumpRenderTreeSupportGtk::dumpRenderTreeModeEnabled()) {
@@ -5191,9 +5216,7 @@ gboolean webkit_web_view_get_view_source_mode (WebKitWebView* webView)
 {
     g_return_val_if_fail(WEBKIT_IS_WEB_VIEW(webView), FALSE);
 
-    core(webView)->mainFrame().inViewSourceMode();
-
-    return FALSE;
+    return core(webView)->mainFrame().inViewSourceMode();
 }
 
 // Internal subresource management

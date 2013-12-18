@@ -37,9 +37,6 @@ class HTMLVideoElement FINAL : public HTMLMediaElement {
 public:
     static PassRefPtr<HTMLVideoElement> create(const QualifiedName&, Document&, bool);
 
-    unsigned width() const;
-    unsigned height() const;
-    
     unsigned videoWidth() const;
     unsigned videoHeight() const;
     
@@ -54,6 +51,11 @@ public:
     void webkitEnterFullScreen(ExceptionCode& ec) { webkitEnterFullscreen(ec); }
     void webkitExitFullScreen() { webkitExitFullscreen(); }
 
+#if ENABLE(IOS_AIRPLAY)
+    bool webkitWirelessVideoPlaybackDisabled() const;
+    void setWebkitWirelessVideoPlaybackDisabled(bool);
+#endif
+
 #if ENABLE(MEDIA_STATISTICS)
     // Statistics
     unsigned webkitDecodedFrameCount() const;
@@ -63,6 +65,8 @@ public:
     // Used by canvas to gain raw pixel access
     void paintCurrentFrameInContext(GraphicsContext*, const IntRect&);
 
+    PassNativeImagePtr nativeImageForCurrentTime();
+
     // Used by WebGL to do GPU-GPU textures copy if possible.
     // See more details at MediaPlayer::copyVideoTextureToPlatformTexture() defined in Source/WebCore/platform/graphics/MediaPlayer.h.
     bool copyVideoTextureToPlatformTexture(GraphicsContext3D*, Platform3DObject texture, GC3Dint level, GC3Denum type, GC3Denum internalFormat, bool premultiplyAlpha, bool flipY);
@@ -70,16 +74,16 @@ public:
     bool shouldDisplayPosterImage() const { return displayMode() == Poster || displayMode() == PosterWaitingForVideo; }
 
     URL posterImageURL() const;
+    virtual RenderElement* createRenderer(PassRef<RenderStyle>) OVERRIDE;
 
 private:
     HTMLVideoElement(const QualifiedName&, Document&, bool);
 
     virtual bool rendererIsNeeded(const RenderStyle&) OVERRIDE;
-    virtual RenderElement* createRenderer(PassRef<RenderStyle>) OVERRIDE;
     virtual void didAttachRenderers() OVERRIDE;
     virtual void parseAttribute(const QualifiedName&, const AtomicString&) OVERRIDE;
     virtual bool isPresentationAttribute(const QualifiedName&) const OVERRIDE;
-    virtual void collectStyleForPresentationAttribute(const QualifiedName&, const AtomicString&, MutableStylePropertySet&) OVERRIDE;
+    virtual void collectStyleForPresentationAttribute(const QualifiedName&, const AtomicString&, MutableStyleProperties&) OVERRIDE;
     virtual bool isVideo() const OVERRIDE { return true; }
     virtual bool hasVideo() const OVERRIDE { return player() && player()->hasVideo(); }
     virtual bool supportsFullscreen() const OVERRIDE;

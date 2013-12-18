@@ -65,6 +65,9 @@ class VisiblePosition;
 #if ENABLE(SVG)
 class RenderSVGResourceContainer;
 #endif
+#if PLATFORM(IOS)
+class SelectionRect;
+#endif
 
 struct PaintInfo;
 
@@ -108,7 +111,11 @@ enum MapCoordinatesMode {
 };
 typedef unsigned MapCoordinatesFlags;
 
+#if PLATFORM(IOS)
+const int caretWidth = 2; // This value should be kept in sync with UIKit. See <rdar://problem/15580601>.
+#else
 const int caretWidth = 1;
+#endif
 
 #if ENABLE(DASHBOARD_SUPPORT) || ENABLE(DRAGGABLE_REGION)
 struct AnnotatedRegionValue {
@@ -152,7 +159,7 @@ public:
     explicit RenderObject(Node&);
     virtual ~RenderObject();
 
-    RenderTheme* theme() const;
+    RenderTheme& theme() const;
 
     virtual const char* renderName() const = 0;
 
@@ -368,8 +375,8 @@ public:
     virtual bool isRenderScrollbarPart() const { return false; }
 
     bool isRoot() const { return document().documentElement() == &m_node; }
-    bool isBody() const;
-    bool isHR() const;
+    bool isBody() const { return node() && node()->hasTagName(HTMLNames::bodyTag); }
+    bool isHR() const { return node() && node()->hasTagName(HTMLNames::hrTag); }
     bool isLegend() const;
 
     bool isHTMLMarquee() const;
@@ -534,9 +541,6 @@ public:
     };
     bool hasBoxDecorations() const { return m_bitfields.boxDecorationState() != NoBoxDecorations; }
     bool backgroundIsKnownToBeObscured();
-    bool borderImageIsLoadedAndCanBeRendered() const;
-    bool mustRepaintBackgroundOrBorder() const;
-    bool hasBackground() const { return style().hasBackground(); }
     bool hasEntirelyFixedBackground() const;
 
     bool needsLayout() const
@@ -566,21 +570,6 @@ public:
     bool hasClipOrOverflowClip() const { return hasClip() || hasOverflowClip(); }
 
     bool hasTransform() const { return m_bitfields.hasTransform(); }
-    bool hasMask() const { return style().hasMask(); }
-    bool hasClipPath() const { return style().clipPath(); }
-    bool hasHiddenBackface() const { return style().backfaceVisibility() == BackfaceVisibilityHidden; }
-
-#if ENABLE(CSS_FILTERS)
-    bool hasFilter() const { return style().hasFilter(); }
-#else
-    bool hasFilter() const { return false; }
-#endif
-
-#if ENABLE(CSS_COMPOSITING)
-    bool hasBlendMode() const { return style().hasBlendMode(); }
-#else
-    bool hasBlendMode() const { return false; }
-#endif
 
     inline bool preservesNewline() const;
 
@@ -653,7 +642,11 @@ public:
     void setHasLayer(bool b = true) { m_bitfields.setHasLayer(b); }
     void setHasTransform(bool b = true) { m_bitfields.setHasTransform(b); }
     void setHasReflection(bool b = true) { m_bitfields.setHasReflection(b); }
-    
+
+    // Hook so that RenderTextControl can return the line height of its inner renderer.
+    // For other renderers, the value is the same as lineHeight(false).
+    virtual int innerLineHeight() const;
+
     // used for element state updates that cannot be fixed with a
     // repaint and do not need a relayout
     virtual void updateFromElement() { }
@@ -707,7 +700,12 @@ public:
     virtual LayoutSize offsetFromContainer(RenderObject*, const LayoutPoint&, bool* offsetDependsOnPoint = 0) const;
     // Return the offset from an object up the container() chain. Asserts that none of the intermediate objects have transforms.
     LayoutSize offsetFromAncestorContainer(RenderObject*) const;
-    
+
+#if PLATFORM(IOS)
+    virtual void collectSelectionRects(Vector<SelectionRect>&, unsigned startOffset = 0, unsigned endOffset = std::numeric_limits<unsigned>::max());
+    virtual void absoluteQuadsForSelection(Vector<FloatQuad>& quads) const { absoluteQuads(quads); }
+#endif
+
     virtual void absoluteRects(Vector<IntRect>&, const LayoutPoint&) const { }
 
     // FIXME: useTransforms should go away eventually
@@ -753,9 +751,6 @@ public:
     // Repaint a specific subrectangle within a given object.  The rect |r| is in the object's coordinate space.
     void repaintRectangle(const LayoutRect&, bool immediate = false) const;
 
-    // Repaint only if our old bounds and new bounds are different. The caller may pass in newBounds and newOutlineBox if they are known.
-    bool repaintAfterLayoutIfNeeded(const RenderLayerModelObject* repaintContainer, const LayoutRect& oldBounds, const LayoutRect& oldOutlineBox, const LayoutRect* newBoundsPtr = 0, const LayoutRect* newOutlineBoxPtr = 0);
-
     bool checkForRepaintDuringLayout() const;
 
     // Returns the rect that should be repainted whenever this object changes.  The rect is in the view's
@@ -793,9 +788,6 @@ public:
     virtual unsigned int length() const { return 1; }
 
     bool isFloatingOrOutOfFlowPositioned() const { return (isFloating() || isOutOfFlowPositioned()); }
-
-    bool isTransparent() const { return style().opacity() < 1.0f; }
-    float opacity() const { return style().opacity(); }
 
     bool hasReflection() const { return m_bitfields.hasReflection(); }
 
@@ -893,9 +885,6 @@ public:
     bool shouldUseTransformFromContainer(const RenderObject* container) const;
     void getTransformFromContainer(const RenderObject* container, const LayoutSize& offsetInContainer, TransformationMatrix&) const;
     
-    // return true if this object requires a new stacking context
-    bool createsGroup() const { return isTransparent() || hasMask() || hasFilter() || hasBlendMode(); } 
-    
     virtual void addFocusRingRects(Vector<IntRect>&, const LayoutPoint& /* additionalOffset */, const RenderLayerModelObject* /* paintContainer */ = 0) { };
 
     LayoutRect absoluteOutlineBounds() const
@@ -905,9 +894,10 @@ public:
 
     RespectImageOrientationEnum shouldRespectImageOrientation() const;
 
-protected:
     void drawLineForBoxSide(GraphicsContext*, int x1, int y1, int x2, int y2, BoxSide,
                             Color, EBorderStyle, int adjbw1, int adjbw2, bool antialias = false);
+protected:
+    int columnNumberForOffset(int offset);
 
     void paintFocusRing(PaintInfo&, const LayoutPoint&, RenderStyle*);
     void paintOutline(PaintInfo&, const LayoutRect&);

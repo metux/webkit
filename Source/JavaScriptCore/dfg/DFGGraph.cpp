@@ -34,6 +34,8 @@
 #include "DFGVariableAccessDataDump.h"
 #include "FullBytecodeLiveness.h"
 #include "FunctionExecutableDump.h"
+#include "JIT.h"
+#include "JSActivation.h"
 #include "OperandsInlines.h"
 #include "Operations.h"
 #include <wtf/CommaPrinter.h>
@@ -288,6 +290,12 @@ void Graph::dump(PrintStream& out, const char* prefix, Node* node, DumpContext* 
         out.print(comma, "^", node->phi()->index());
     if (node->hasExecutionCounter())
         out.print(comma, RawPointer(node->executionCounter()));
+    if (node->hasVariableWatchpointSet())
+        out.print(comma, RawPointer(node->variableWatchpointSet()));
+    if (node->hasTypedArray())
+        out.print(comma, inContext(JSValue(node->typedArray()), context));
+    if (node->hasStoragePointer())
+        out.print(comma, RawPointer(node->storagePointer()));
     if (op == JSConstant) {
         out.print(comma, "$", node->constantNumber());
         JSValue value = valueOfJSConstant(node);
@@ -698,7 +706,70 @@ bool Graph::isLiveInBytecode(VirtualRegister operand, CodeOrigin codeOrigin)
     
     return true;
 }
-    
+
+unsigned Graph::frameRegisterCount()
+{
+    return m_nextMachineLocal + m_parameterSlots;
+}
+
+unsigned Graph::requiredRegisterCountForExit()
+{
+    unsigned count = JIT::frameRegisterCountFor(m_profiledBlock);
+    for (InlineCallFrameSet::iterator iter = m_inlineCallFrames->begin(); !!iter; ++iter) {
+        InlineCallFrame* inlineCallFrame = *iter;
+        CodeBlock* codeBlock = baselineCodeBlockForInlineCallFrame(inlineCallFrame);
+        unsigned requiredCount = VirtualRegister(inlineCallFrame->stackOffset).toLocal() + 1 + JIT::frameRegisterCountFor(codeBlock);
+        count = std::max(count, requiredCount);
+    }
+    return count;
+}
+
+unsigned Graph::requiredRegisterCountForExecutionAndExit()
+{
+    return std::max(frameRegisterCount(), requiredRegisterCountForExit());
+}
+
+JSActivation* Graph::tryGetActivation(Node* node)
+{
+    if (!node->hasConstant())
+        return 0;
+    return jsDynamicCast<JSActivation*>(valueOfJSConstant(node));
+}
+
+WriteBarrierBase<Unknown>* Graph::tryGetRegisters(Node* node)
+{
+    JSActivation* activation = tryGetActivation(node);
+    if (!activation)
+        return 0;
+    if (!activation->isTornOff())
+        return 0;
+    return activation->registers();
+}
+
+JSArrayBufferView* Graph::tryGetFoldableView(Node* node)
+{
+    if (!node->hasConstant())
+        return 0;
+    JSArrayBufferView* view = jsDynamicCast<JSArrayBufferView*>(valueOfJSConstant(node));
+    if (!view)
+        return 0;
+    if (!watchpoints().isStillValid(view))
+        return 0;
+    return view;
+}
+
+JSArrayBufferView* Graph::tryGetFoldableView(Node* node, ArrayMode arrayMode)
+{
+    if (arrayMode.typedArrayType() == NotTypedArray)
+        return 0;
+    return tryGetFoldableView(node);
+}
+
+JSArrayBufferView* Graph::tryGetFoldableViewForChild1(Node* node)
+{
+    return tryGetFoldableView(child(node, 0).node(), node->arrayMode());
+}
+
 } } // namespace JSC::DFG
 
 #endif

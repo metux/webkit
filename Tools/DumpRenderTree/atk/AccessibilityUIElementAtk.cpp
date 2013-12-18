@@ -81,13 +81,27 @@ const String attributesMap[][2] = {
     { "AXUnknownSortDirection", "unknown" }
 };
 
-String coreAttributeToAtkAttribute(JSStringRef attribute)
+#if ATK_CHECK_VERSION(2, 11, 3)
+const char* landmarkStringBanner = "AXLandmarkBanner";
+const char* landmarkStringComplementary = "AXLandmarkComplementary";
+const char* landmarkStringContentinfo = "AXLandmarkContentInfo";
+const char* landmarkStringMain = "AXLandmarkMain";
+const char* landmarkStringNavigation = "AXLandmarkNavigation";
+const char* landmarkStringSearch = "AXLandmarkSearch";
+#endif
+
+String jsStringToWTFString(JSStringRef attribute)
 {
     size_t bufferSize = JSStringGetMaximumUTF8CStringSize(attribute);
     GOwnPtr<gchar> buffer(static_cast<gchar*>(g_malloc(bufferSize)));
     JSStringGetUTF8CString(attribute, buffer.get(), bufferSize);
 
-    String attributeString = String::fromUTF8(buffer.get());
+    return String::fromUTF8(buffer.get());
+}
+
+String coreAttributeToAtkAttribute(JSStringRef attribute)
+{
+    String attributeString = jsStringToWTFString(attribute);
     for (int i = 0; i < NumberOfAttributes; ++i) {
         if (attributesMap[i][CoreDomain] == attributeString)
             return attributesMap[i][AtkDomain];
@@ -173,11 +187,33 @@ String getAtkAttributeSetAsString(AtkObject* accessible, AtkAttributeType type)
     return builder.toString();
 }
 
-inline const char* roleToString(AtkRole role)
+const char* roleToString(AtkObject* object)
 {
+    AtkRole role = atk_object_get_role(object);
+
+#if ATK_CHECK_VERSION(2, 11, 3)
+    if (role == ATK_ROLE_LANDMARK) {
+        String xmlRolesValue = getAttributeSetValueForId(object, ObjectAttributeType, "xml-roles");
+        if (equalIgnoringCase(xmlRolesValue, "banner"))
+            return landmarkStringBanner;
+        if (equalIgnoringCase(xmlRolesValue, "complementary"))
+            return landmarkStringComplementary;
+        if (equalIgnoringCase(xmlRolesValue, "contentinfo"))
+            return landmarkStringContentinfo;
+        if (equalIgnoringCase(xmlRolesValue, "main"))
+            return landmarkStringMain;
+        if (equalIgnoringCase(xmlRolesValue, "navigation"))
+            return landmarkStringNavigation;
+        if (equalIgnoringCase(xmlRolesValue, "search"))
+            return landmarkStringSearch;
+    }
+#endif
+
     switch (role) {
     case ATK_ROLE_ALERT:
         return "AXAlert";
+    case ATK_ROLE_DIALOG:
+        return "AXDialog";
     case ATK_ROLE_CANVAS:
         return "AXCanvas";
     case ATK_ROLE_CHECK_BOX:
@@ -188,7 +224,11 @@ inline const char* roleToString(AtkRole role)
         return "AXColumnHeader";
     case ATK_ROLE_COMBO_BOX:
         return "AXComboBox";
+    case ATK_ROLE_COMMENT:
+        return "AXComment";
     case ATK_ROLE_DOCUMENT_FRAME:
+        return "AXDocument";
+    case ATK_ROLE_DOCUMENT_WEB:
         return "AXWebArea";
     case ATK_ROLE_EMBEDDED:
         return "AXEmbedded";
@@ -242,6 +282,8 @@ inline const char* roleToString(AtkRole role)
         return "AXRadioMenuItem";
     case ATK_ROLE_ROW_HEADER:
         return "AXRowHeader";
+    case ATK_ROLE_CHECK_MENU_ITEM:
+        return "AXCheckMenuItem";
     case ATK_ROLE_RULER:
         return "AXRuler";
     case ATK_ROLE_SCROLL_BAR:
@@ -249,13 +291,15 @@ inline const char* roleToString(AtkRole role)
     case ATK_ROLE_SCROLL_PANE:
         return "AXScrollArea";
     case ATK_ROLE_SECTION:
-        return "AXDiv";
+        return "AXSection";
     case ATK_ROLE_SEPARATOR:
-        return "AXHorizontalRule";
+        return "AXSeparator";
     case ATK_ROLE_SLIDER:
         return "AXSlider";
     case ATK_ROLE_SPIN_BUTTON:
         return "AXSpinButton";
+    case ATK_ROLE_STATUSBAR:
+        return "AXStatusBar";
     case ATK_ROLE_TABLE:
         return "AXTable";
     case ATK_ROLE_TABLE_CELL:
@@ -282,6 +326,28 @@ inline const char* roleToString(AtkRole role)
         return "AXWindow";
     case ATK_ROLE_UNKNOWN:
         return "AXUnknown";
+#if ATK_CHECK_VERSION(2, 11, 3)
+    case ATK_ROLE_ARTICLE:
+        return "AXArticle";
+    case ATK_ROLE_DEFINITION:
+        return "AXDefinition";
+    case ATK_ROLE_LOG:
+        return "AXLog";
+    case ATK_ROLE_MARQUEE:
+        return "AXMarquee";
+    case ATK_ROLE_MATH:
+        return "AXMath";
+    case ATK_ROLE_TIMER:
+        return "AXTimer";
+#endif
+#if ATK_CHECK_VERSION(2, 11, 4)
+    case ATK_ROLE_DESCRIPTION_LIST:
+        return "AXDescriptionList";
+    case ATK_ROLE_DESCRIPTION_TERM:
+        return "AXDescriptionTerm";
+    case ATK_ROLE_DESCRIPTION_VALUE:
+        return "AXDescriptionValue";
+#endif
     default:
         // We want to distinguish ATK_ROLE_UNKNOWN from a known AtkRole which
         // our DRT isn't properly handling.
@@ -324,7 +390,7 @@ String attributesOfElement(AccessibilityUIElement* element)
     builder.append("AXParent: ");
     AccessibilityUIElement parent = element->parentElement();
     if (AtkObject* atkParent = parent.platformUIElement()) {
-        builder.append(roleToString(atk_object_get_role(atkParent)));
+        builder.append(roleToString(atkParent));
         const char* parentName = atk_object_get_name(atkParent);
         if (parentName && g_utf8_strlen(parentName, -1))
             builder.append(String::format(": %s", parentName));
@@ -668,11 +734,10 @@ JSStringRef AccessibilityUIElement::role()
     if (!ATK_IS_OBJECT(m_element))
         return JSStringCreateWithCharacters(0, 0);
 
-    AtkRole role = atk_object_get_role(ATK_OBJECT(m_element));
-    if (!role)
+    if (!atk_object_get_role(ATK_OBJECT(m_element)))
         return JSStringCreateWithCharacters(0, 0);
 
-    GOwnPtr<char> roleStringWithPrefix(g_strdup_printf("AXRole: %s", roleToString(role)));
+    GOwnPtr<char> roleStringWithPrefix(g_strdup_printf("AXRole: %s", roleToString(ATK_OBJECT(m_element))));
     return JSStringCreateWithUTF8CString(roleStringWithPrefix.get());
 }
 
@@ -1069,10 +1134,13 @@ JSStringRef AccessibilityUIElement::boundsForRange(unsigned location, unsigned l
     return JSStringCreateWithCharacters(0, 0);
 }
 
-JSStringRef AccessibilityUIElement::stringForRange(unsigned, unsigned) 
+JSStringRef AccessibilityUIElement::stringForRange(unsigned location, unsigned length)
 {
-    // FIXME: implement
-    return JSStringCreateWithCharacters(0, 0);
+    if (!ATK_IS_TEXT(m_element))
+        return JSStringCreateWithCharacters(0, 0);
+
+    String string = atk_text_get_text(ATK_TEXT(m_element), location, location + length);
+    return JSStringCreateWithUTF8CString(string.utf8().data());
 } 
 
 JSStringRef AccessibilityUIElement::attributedStringForRange(unsigned, unsigned)
@@ -1085,6 +1153,12 @@ bool AccessibilityUIElement::attributedStringRangeIsMisspelled(unsigned location
 {
     // FIXME: implement
     return false;
+}
+
+unsigned AccessibilityUIElement::uiElementCountForSearchPredicate(JSContextRef context, AccessibilityUIElement* startElement, bool isDirectionNext, JSValueRef searchKey, JSStringRef searchText, bool visibleOnly)
+{
+    // FIXME: implement
+    return 0;
 }
 
 AccessibilityUIElement AccessibilityUIElement::uiElementForSearchPredicate(JSContextRef context, AccessibilityUIElement* startElement, bool isDirectionNext, JSValueRef searchKey, JSStringRef searchText, bool visibleOnly)
@@ -1169,7 +1243,13 @@ bool AccessibilityUIElement::boolAttributeValue(JSStringRef attribute)
 
 bool AccessibilityUIElement::isAttributeSettable(JSStringRef attribute)
 {
-    // FIXME: implement
+    if (!ATK_IS_OBJECT(m_element))
+        return false;
+
+    String attributeString = jsStringToWTFString(attribute);
+    if (attributeString == "AXValue")
+        return checkElementState(m_element, ATK_STATE_EDITABLE);
+
     return false;
 }
 
@@ -1335,8 +1415,7 @@ bool AccessibilityUIElement::isMultiSelectable() const
 
 bool AccessibilityUIElement::isSelectedOptionActive() const
 {
-    // FIXME: implement
-    return false;
+    return checkElementState(m_element, ATK_STATE_ACTIVE);
 }
 
 bool AccessibilityUIElement::isVisible() const
@@ -1411,6 +1490,61 @@ JSStringRef AccessibilityUIElement::classList() const
 {
     // FIXME: implement
     return nullptr;
+}
+
+JSStringRef stringAtOffset(PlatformUIElement element, AtkTextBoundary boundary, int offset)
+{
+    if (!ATK_IS_TEXT(element))
+        return JSStringCreateWithCharacters(0, 0);
+
+    gint startOffset, endOffset;
+    StringBuilder builder;
+
+#if ATK_CHECK_VERSION(2, 10, 0)
+    AtkTextGranularity granularity;
+    switch (boundary) {
+    case ATK_TEXT_BOUNDARY_CHAR:
+        granularity = ATK_TEXT_GRANULARITY_CHAR;
+        break;
+    case ATK_TEXT_BOUNDARY_WORD_START:
+        granularity = ATK_TEXT_GRANULARITY_WORD;
+        break;
+    case ATK_TEXT_BOUNDARY_LINE_START:
+        granularity = ATK_TEXT_GRANULARITY_LINE;
+        break;
+    case ATK_TEXT_BOUNDARY_SENTENCE_START:
+        granularity = ATK_TEXT_GRANULARITY_SENTENCE;
+        break;
+    default:
+        return JSStringCreateWithCharacters(0, 0);
+    }
+
+    builder.append(atk_text_get_string_at_offset(ATK_TEXT(element), offset, granularity, &startOffset, &endOffset));
+#else
+    builder.append(atk_text_get_text_at_offset(ATK_TEXT(element), offset, boundary, &startOffset, &endOffset));
+#endif
+    builder.append(String::format(", %i, %i", startOffset, endOffset));
+    return JSStringCreateWithUTF8CString(builder.toString().utf8().data());
+}
+
+JSStringRef AccessibilityUIElement::characterAtOffset(int offset)
+{
+    return stringAtOffset(m_element, ATK_TEXT_BOUNDARY_CHAR, offset);
+}
+
+JSStringRef AccessibilityUIElement::wordAtOffset(int offset)
+{
+    return stringAtOffset(m_element, ATK_TEXT_BOUNDARY_WORD_START, offset);
+}
+
+JSStringRef AccessibilityUIElement::lineAtOffset(int offset)
+{
+    return stringAtOffset(m_element, ATK_TEXT_BOUNDARY_LINE_START, offset);
+}
+
+JSStringRef AccessibilityUIElement::sentenceAtOffset(int offset)
+{
+    return stringAtOffset(m_element, ATK_TEXT_BOUNDARY_SENTENCE_START, offset);
 }
 
 #endif

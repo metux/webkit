@@ -26,10 +26,15 @@
 #ifndef APIObject_h
 #define APIObject_h
 
+#include <functional>
 #include <wtf/RefCounted.h>
+#include <wtf/RefPtr.h>
 
 #if PLATFORM(MAC)
 #include "WKFoundation.h"
+#ifdef __OBJC__
+#include "WKObject.h"
+#endif
 #endif
 
 #define DELEGATE_REF_COUNTING_TO_COCOA (PLATFORM(MAC) && WK_API_ENABLED)
@@ -59,7 +64,10 @@ public:
         Data,
         Dictionary,
         Error,
+        FrameHandle,
         Image,
+        PageGroupData,
+        PageHandle,
         ProtectionSpace,
         RenderLayer,
         RenderObject,
@@ -165,6 +173,15 @@ public:
     virtual Type type() const = 0;
 
 #if DELEGATE_REF_COUNTING_TO_COCOA
+#ifdef __OBJC__
+    template<typename T, typename... Args>
+    static void constructInWrapper(NSObject <WKObject> *wrapper, Args&&... args)
+    {
+        Object* object = new (&wrapper._apiObject) T(std::forward<Args>(args)...);
+        object->m_wrapper = wrapper;
+    }
+#endif
+
     NSObject *wrapper() { return m_wrapper; }
 
     void ref();
@@ -186,16 +203,18 @@ private:
 };
 
 template <Object::Type ArgumentType>
-class TypedObject : public Object {
+class ObjectImpl : public Object {
 public:
     static const Type APIType = ArgumentType;
 
-    virtual ~TypedObject()
+    virtual ~ObjectImpl()
     {
     }
 
 protected:
-    TypedObject()
+    friend class Object;
+
+    ObjectImpl()
     {
     }
 
@@ -203,6 +222,7 @@ protected:
 
 #if DELEGATE_REF_COUNTING_TO_COCOA
     void* operator new(size_t size) { return newObject(size, APIType); }
+    void* operator new(size_t size, void* value) { return value; }
 #endif
 };
 

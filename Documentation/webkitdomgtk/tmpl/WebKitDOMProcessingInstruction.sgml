@@ -54,3 +54,22 @@ WebKitDOMProcessingInstruction
 @Returns: 
 
 
+<!-- ##### FUNCTION webkit_dom_processing_instruction_get_data ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_processing_instruction_set_data ##### -->
+<para>
+
+</para>
+
+@self: 
+@value: 
+@error: 
+
+

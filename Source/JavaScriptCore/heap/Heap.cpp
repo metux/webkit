@@ -35,13 +35,14 @@
 #include "HeapStatistics.h"
 #include "IncrementalSweeper.h"
 #include "Interpreter.h"
-#include "VM.h"
 #include "JSGlobalObject.h"
 #include "JSLock.h"
 #include "JSONObject.h"
 #include "Operations.h"
+#include "RecursiveAllocationScope.h"
 #include "Tracing.h"
 #include "UnlinkedCodeBlock.h"
+#include "VM.h"
 #include "WeakSetInlines.h"
 #include <algorithm>
 #include <wtf/RAMSize.h>
@@ -291,7 +292,7 @@ bool Heap::isPagedOut(double deadline)
 // Run all pending finalizers now because we won't get another chance.
 void Heap::lastChanceToFinalize()
 {
-    RELEASE_ASSERT(!m_vm->dynamicGlobalObject);
+    RELEASE_ASSERT(!m_vm->entryScope);
     RELEASE_ASSERT(m_operationInProgress == NoOperation);
 
     m_objectSpace.lastChanceToFinalize();
@@ -463,6 +464,7 @@ void Heap::markRoots()
     {
         GCPHASE(GatherStackRoots);
         stack().gatherConservativeRoots(stackRoots, m_jitStubRoutines, m_codeBlocks);
+        stack().sanitizeStack();
     }
 
 #if ENABLE(DFG_JIT)
@@ -689,7 +691,7 @@ void Heap::deleteAllCompiledCode()
 {
     // If JavaScript is running, it's not safe to delete code, since we'll end
     // up deleting code that is live on the stack.
-    if (m_vm->dynamicGlobalObject)
+    if (m_vm->entryScope)
         return;
 
     for (ExecutableBase* current = m_compiledCode.head(); current; current = current->next()) {
@@ -753,9 +755,10 @@ void Heap::collect(SweepToggle sweepToggle)
     JAVASCRIPTCORE_GC_BEGIN();
     RELEASE_ASSERT(m_operationInProgress == NoOperation);
     
-    m_deferralDepth++; // Make sure that we don't GC in this call.
-    m_vm->prepareToDiscardCode();
-    m_deferralDepth--; // Decrement deferal manually, so we don't GC when we do so, since we are already GCing!.
+    {
+        RecursiveAllocationScope scope(*this);
+        m_vm->prepareToDiscardCode();
+    }
     
     m_operationInProgress = Collection;
     m_extraMemoryUsage = 0;

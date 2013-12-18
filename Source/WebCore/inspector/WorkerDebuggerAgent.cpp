@@ -30,13 +30,15 @@
 
 #include "config.h"
 
-#if ENABLE(JAVASCRIPT_DEBUGGER) && ENABLE(INSPECTOR) && ENABLE(WORKERS)
+#if ENABLE(JAVASCRIPT_DEBUGGER) && ENABLE(INSPECTOR)
 #include "WorkerDebuggerAgent.h"
 
 #include "ScriptDebugServer.h"
 #include "WorkerGlobalScope.h"
 #include "WorkerThread.h"
 #include <wtf/MessageQueue.h>
+
+using namespace Inspector;
 
 namespace WebCore {
 
@@ -146,4 +148,4 @@ void WorkerDebuggerAgent::unmuteConsole()
 
 } // namespace WebCore
 
-#endif // ENABLE(JAVASCRIPT_DEBUGGER) && ENABLE(INSPECTOR) && ENABLE(WORKERS)
+#endif // ENABLE(JAVASCRIPT_DEBUGGER) && ENABLE(INSPECTOR)

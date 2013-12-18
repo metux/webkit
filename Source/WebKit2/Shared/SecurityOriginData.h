@@ -40,7 +40,7 @@ namespace WebKit {
 typedef GenericCallback<WKArrayRef> ArrayCallback;
 
 struct SecurityOriginData {
-    static SecurityOriginData fromSecurityOrigin(WebCore::SecurityOrigin*);
+    static SecurityOriginData fromSecurityOrigin(const WebCore::SecurityOrigin*);
     PassRefPtr<WebCore::SecurityOrigin> securityOrigin() const;
 
     void encode(CoreIPC::ArgumentEncoder&) const;
@@ -52,9 +52,13 @@ struct SecurityOriginData {
     String protocol;
     String host;
     int port;
+
+    SecurityOriginData isolatedCopy() const;
 };
 
 void performAPICallbackWithSecurityOriginDataVector(const Vector<SecurityOriginData>&, ArrayCallback*);
+
+bool operator==(const SecurityOriginData&, const SecurityOriginData&);
 
 } // namespace WebKit
 

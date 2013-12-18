@@ -55,6 +55,12 @@
 #include <wtf/HashMap.h>
 #include <wtf/text/StringHash.h>
 
+#if PLATFORM(IOS)
+#include "HTMLIFrameElement.h"
+#include "RenderBlockFlow.h"
+#include "YouTubeEmbedShadowElement.h"
+#endif
+
 namespace WebCore {
 
 using namespace HTMLNames;
@@ -108,7 +114,6 @@ HTMLPlugInImageElement::HTMLPlugInImageElement(const QualifiedName& tagName, Doc
     , m_shouldPreferPlugInsForImages(preferPlugInsForImagesOption == ShouldPreferPlugInsForImages)
     , m_needsDocumentActivationCallbacks(false)
     , m_simulatedMouseClickTimer(this, &HTMLPlugInImageElement::simulatedMouseClickTimerFired, simulatedMouseClickTimerDelay)
-    , m_swapRendererTimer(this, &HTMLPlugInImageElement::swapRendererTimerFired)
     , m_removeSnapshotTimer(this, &HTMLPlugInImageElement::removeSnapshotTimerFired)
     , m_createdDuringUserGesture(ScriptController::processingUserGesture())
     , m_isRestartedPlugin(false)
@@ -139,9 +144,6 @@ void HTMLPlugInImageElement::setDisplayState(DisplayState state)
 #endif
 
     HTMLPlugInElement::setDisplayState(state);
-
-    if (state == DisplayingSnapshot)
-        m_swapRendererTimer.startOneShot(0);
 }
 
 RenderEmbeddedObject* HTMLPlugInImageElement::renderEmbeddedObject() const
@@ -196,6 +198,9 @@ bool HTMLPlugInImageElement::wouldLoadAsNetscapePlugin(const String& url, const 
 
 RenderElement* HTMLPlugInImageElement::createRenderer(PassRef<RenderStyle> style)
 {
+    if (displayState() >= PreparingPluginReplacement)
+        return HTMLPlugInElement::createRenderer(std::move(style));
+
     // Once a PlugIn Element creates its renderer, it needs to be told when the Document goes
     // inactive or reactivates so it can clear the renderer before going into the page cache.
     if (!m_needsDocumentActivationCallbacks) {
@@ -221,7 +226,14 @@ RenderElement* HTMLPlugInImageElement::createRenderer(PassRef<RenderStyle> style
         return image;
     }
 
-    return new RenderEmbeddedObject(*this, std::move(style));
+#if PLATFORM(IOS)
+    if (ShadowRoot* shadowRoot = this->shadowRoot()) {
+        Element* shadowElement = toElement(shadowRoot->firstChild());
+        if (shadowElement && shadowElement->shadowPseudoId() == "-apple-youtube-shadow-iframe")
+            return new RenderBlockFlow(*this, std::move(style));
+    }
+#endif
+    return HTMLPlugInElement::createRenderer(std::move(style));
 }
 
 bool HTMLPlugInImageElement::willRecalcStyle(Style::Change)
@@ -324,7 +336,7 @@ PassRefPtr<RenderStyle> HTMLPlugInImageElement::customStyleForRenderer()
 
 void HTMLPlugInImageElement::updateWidgetCallback(Node* n, unsigned)
 {
-    static_cast<HTMLPlugInImageElement*>(n)->updateWidgetIfNecessary();
+    toHTMLPlugInImageElement(n)->updateWidgetIfNecessary();
 }
 
 void HTMLPlugInImageElement::updateSnapshot(PassRefPtr<Image> image)
@@ -363,6 +375,10 @@ static DOMWrapperWorld& plugInImageElementIsolatedWorld()
 
 void HTMLPlugInImageElement::didAddUserAgentShadowRoot(ShadowRoot* root)
 {
+    HTMLPlugInElement::didAddUserAgentShadowRoot(root);
+    if (displayState() >= PreparingPluginReplacement)
+        return;
+
     Page* page = document().page();
     if (!page)
         return;
@@ -409,16 +425,37 @@ bool HTMLPlugInImageElement::partOfSnapshotOverlay(Node* node)
     return node && snapshotLabel && (node == snapshotLabel.get() || node->isDescendantOf(snapshotLabel.get()));
 }
 
-void HTMLPlugInImageElement::swapRendererTimerFired(Timer<HTMLPlugInImageElement>*)
+#if PLATFORM(IOS)
+void HTMLPlugInImageElement::createShadowIFrameSubtree(const String& src)
 {
-    ASSERT(displayState() == DisplayingSnapshot);
-    if (userAgentShadowRoot())
+    if (this->shadowRoot())
         return;
 
-    // Create a shadow root, which will trigger the code to add a snapshot container
-    // and reattach, thus making a new Renderer.
-    ensureUserAgentShadowRoot();
+    if (src.isEmpty())
+        return;
+
+    RefPtr<YouTubeEmbedShadowElement> shadowElement = YouTubeEmbedShadowElement::create(document());
+    ShadowRoot& root = this->ensureUserAgentShadowRoot();
+    root.appendChild(shadowElement, ASSERT_NO_EXCEPTION);
+
+    RefPtr<HTMLIFrameElement> iframeElement = HTMLIFrameElement::create(HTMLNames::iframeTag, document());
+    if (hasAttribute(HTMLNames::widthAttr))
+        iframeElement->setAttribute(HTMLNames::widthAttr, AtomicString("100%", AtomicString::ConstructFromLiteral));
+    if (hasAttribute(HTMLNames::heightAttr)) {
+        iframeElement->setAttribute(HTMLNames::styleAttr, AtomicString("max-height: 100%", AtomicString::ConstructFromLiteral));
+        iframeElement->setAttribute(HTMLNames::heightAttr, getAttribute(HTMLNames::heightAttr));
+    }
+    iframeElement->setAttribute(HTMLNames::srcAttr, src);
+    iframeElement->setAttribute(HTMLNames::frameborderAttr, AtomicString("0", AtomicString::ConstructFromLiteral));
+
+    // Disable frame flattening for this iframe.
+    iframeElement->setAttribute(HTMLNames::scrollingAttr, AtomicString("no", AtomicString::ConstructFromLiteral));
+    shadowElement->appendChild(iframeElement, ASSERT_NO_EXCEPTION);
+
+    if (renderer())
+        Style::reattachRenderTree(*this);
 }
+#endif
 
 void HTMLPlugInImageElement::removeSnapshotTimerFired(Timer<HTMLPlugInImageElement>*)
 {
@@ -496,7 +533,7 @@ void HTMLPlugInImageElement::userDidClickSnapshot(PassRefPtr<MouseEvent> event, 
     LOG(Plugins, "%p User clicked on snapshotted plug-in. Restart.", this);
     restartSnapshottedPlugIn();
     if (forwardEvent)
-        setDisplayState(HTMLPlugInElement::RestartingWithPendingMouseClick);
+        setDisplayState(RestartingWithPendingMouseClick);
     restartSimilarPlugIns();
 }
 
@@ -730,6 +767,15 @@ void HTMLPlugInImageElement::defaultEventHandler(Event* event)
         }
     }
     HTMLPlugInElement::defaultEventHandler(event);
+}
+
+bool HTMLPlugInImageElement::requestObject(const String& url, const String& mimeType, const Vector<String>& paramNames, const Vector<String>& paramValues)
+{
+    if (HTMLPlugInElement::requestObject(url, mimeType, paramNames, paramValues))
+        return true;
+    
+    SubframeLoader& loader = document().frame()->loader().subframeLoader();
+    return loader.requestObject(*this, url, getNameAttribute(), mimeType, paramNames, paramValues);
 }
 
 } // namespace WebCore

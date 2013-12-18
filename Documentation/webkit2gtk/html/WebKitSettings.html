@@ -262,6 +262,16 @@ const <a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gc
 <span class="returnvalue">void</span>                <a class="link" href="WebKitSettings.html#webkit-settings-set-enable-media-stream" title="webkit_settings_set_enable_media_stream ()">webkit_settings_set_enable_media_stream</a>
                                                         (<em class="parameter"><code><a class="link" href="WebKitSettings.html" title="WebKitSettings"><span class="type">WebKitSettings</span></a> *settings</code></em>,
                                                          <em class="parameter"><code><a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a> enabled</code></em>);
+<a href="../glib/glib-Basic-Types.html#gboolean"><span class="returnvalue">gboolean</span></a>            <a class="link" href="WebKitSettings.html#webkit-settings-get-enable-spatial-navigation" title="webkit_settings_get_enable_spatial_navigation ()">webkit_settings_get_enable_spatial_navigation</a>
+                                                        (<em class="parameter"><code><a class="link" href="WebKitSettings.html" title="WebKitSettings"><span class="type">WebKitSettings</span></a> *settings</code></em>);
+<span class="returnvalue">void</span>                <a class="link" href="WebKitSettings.html#webkit-settings-set-enable-spatial-navigation" title="webkit_settings_set_enable_spatial_navigation ()">webkit_settings_set_enable_spatial_navigation</a>
+                                                        (<em class="parameter"><code><a class="link" href="WebKitSettings.html" title="WebKitSettings"><span class="type">WebKitSettings</span></a> *settings</code></em>,
+                                                         <em class="parameter"><code><a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a> enabled</code></em>);
+<a href="../glib/glib-Basic-Types.html#gboolean"><span class="returnvalue">gboolean</span></a>            <a class="link" href="WebKitSettings.html#webkit-settings-get-enable-mediasource" title="webkit_settings_get_enable_mediasource ()">webkit_settings_get_enable_mediasource</a>
+                                                        (<em class="parameter"><code><a class="link" href="WebKitSettings.html" title="WebKitSettings"><span class="type">WebKitSettings</span></a> *settings</code></em>);
+<span class="returnvalue">void</span>                <a class="link" href="WebKitSettings.html#webkit-settings-set-enable-mediasource" title="webkit_settings_set_enable_mediasource ()">webkit_settings_set_enable_mediasource</a>
+                                                        (<em class="parameter"><code><a class="link" href="WebKitSettings.html" title="WebKitSettings"><span class="type">WebKitSettings</span></a> *settings</code></em>,
+                                                         <em class="parameter"><code><a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a> enabled</code></em>);
 </pre>
 </div>
 <div class="refsect1">
@@ -294,6 +304,7 @@ const <a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gc
   "<a class="link" href="WebKitSettings.html#WebKitSettings--enable-java" title='The "enable-java" property'>enable-java</a>"              <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read / Write / Construct
   "<a class="link" href="WebKitSettings.html#WebKitSettings--enable-javascript" title='The "enable-javascript" property'>enable-javascript</a>"        <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read / Write / Construct
   "<a class="link" href="WebKitSettings.html#WebKitSettings--enable-media-stream" title='The "enable-media-stream" property'>enable-media-stream</a>"      <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read / Write / Construct
+  "<a class="link" href="WebKitSettings.html#WebKitSettings--enable-mediasource" title='The "enable-mediasource" property'>enable-mediasource</a>"       <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read / Write / Construct
   "<a class="link" href="WebKitSettings.html#WebKitSettings--enable-offline-web-application-cache" title='The "enable-offline-web-application-cache" property'>enable-offline-web-application-cache</a>" <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read / Write / Construct
   "<a class="link" href="WebKitSettings.html#WebKitSettings--enable-page-cache" title='The "enable-page-cache" property'>enable-page-cache</a>"        <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read / Write / Construct
   "<a class="link" href="WebKitSettings.html#WebKitSettings--enable-plugins" title='The "enable-plugins" property'>enable-plugins</a>"           <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read / Write / Construct
@@ -301,6 +312,7 @@ const <a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gc
   "<a class="link" href="WebKitSettings.html#WebKitSettings--enable-resizable-text-areas" title='The "enable-resizable-text-areas" property'>enable-resizable-text-areas</a>" <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read / Write / Construct
   "<a class="link" href="WebKitSettings.html#WebKitSettings--enable-site-specific-quirks" title='The "enable-site-specific-quirks" property'>enable-site-specific-quirks</a>" <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read / Write / Construct
   "<a class="link" href="WebKitSettings.html#WebKitSettings--enable-smooth-scrolling" title='The "enable-smooth-scrolling" property'>enable-smooth-scrolling</a>"  <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read / Write / Construct
+  "<a class="link" href="WebKitSettings.html#WebKitSettings--enable-spatial-navigation" title='The "enable-spatial-navigation" property'>enable-spatial-navigation</a>" <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read / Write / Construct
   "<a class="link" href="WebKitSettings.html#WebKitSettings--enable-tabs-to-links" title='The "enable-tabs-to-links" property'>enable-tabs-to-links</a>"     <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read / Write / Construct
   "<a class="link" href="WebKitSettings.html#WebKitSettings--enable-webaudio" title='The "enable-webaudio" property'>enable-webaudio</a>"          <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read / Write / Construct
   "<a class="link" href="WebKitSettings.html#WebKitSettings--enable-webgl" title='The "enable-webgl" property'>enable-webgl</a>"             <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read / Write / Construct
@@ -2878,6 +2890,118 @@ Set the <a class="link" href="WebKitSettings.html#WebKitSettings--enable-media-s
 </table></div>
 <p class="since">Since 2.4</p>
 </div>
+<hr>
+<div class="refsect2">
+<a name="webkit-settings-get-enable-spatial-navigation"></a><h3>webkit_settings_get_enable_spatial_navigation ()</h3>
+<pre class="programlisting"><a href="../glib/glib-Basic-Types.html#gboolean"><span class="returnvalue">gboolean</span></a>            webkit_settings_get_enable_spatial_navigation
+                                                        (<em class="parameter"><code><a class="link" href="WebKitSettings.html" title="WebKitSettings"><span class="type">WebKitSettings</span></a> *settings</code></em>);</pre>
+<p>
+Get the <a class="link" href="WebKitSettings.html#WebKitSettings--enable-spatial-navigation" title='The "enable-spatial-navigation" property'><span class="type">"enable-spatial-navigation"</span></a> property.
+</p>
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
+<col align="left" valign="top">
+<col>
+</colgroup>
+<tbody>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>settings</code></em> :</span></p></td>
+<td>a <a class="link" href="WebKitSettings.html" title="WebKitSettings"><span class="type">WebKitSettings</span></a>
+</td>
+</tr>
+<tr>
+<td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
+<td>
+<a href="../glib/glib-Standard-Macros.html#TRUE:CAPS"><code class="literal">TRUE</code></a> If HTML5 spatial navigation support is enabled or <a href="../glib/glib-Standard-Macros.html#FALSE:CAPS"><code class="literal">FALSE</code></a> otherwise.</td>
+</tr>
+</tbody>
+</table></div>
+<p class="since">Since 2.2</p>
+</div>
+<hr>
+<div class="refsect2">
+<a name="webkit-settings-set-enable-spatial-navigation"></a><h3>webkit_settings_set_enable_spatial_navigation ()</h3>
+<pre class="programlisting"><span class="returnvalue">void</span>                webkit_settings_set_enable_spatial_navigation
+                                                        (<em class="parameter"><code><a class="link" href="WebKitSettings.html" title="WebKitSettings"><span class="type">WebKitSettings</span></a> *settings</code></em>,
+                                                         <em class="parameter"><code><a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a> enabled</code></em>);</pre>
+<p>
+Set the <a class="link" href="WebKitSettings.html#WebKitSettings--enable-spatial-navigation" title='The "enable-spatial-navigation" property'><span class="type">"enable-spatial-navigation"</span></a> property.
+</p>
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
+<col align="left" valign="top">
+<col>
+</colgroup>
+<tbody>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>settings</code></em> :</span></p></td>
+<td>a <a class="link" href="WebKitSettings.html" title="WebKitSettings"><span class="type">WebKitSettings</span></a>
+</td>
+</tr>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>enabled</code></em> :</span></p></td>
+<td>Value to be set</td>
+</tr>
+</tbody>
+</table></div>
+<p class="since">Since 2.2</p>
+</div>
+<hr>
+<div class="refsect2">
+<a name="webkit-settings-get-enable-mediasource"></a><h3>webkit_settings_get_enable_mediasource ()</h3>
+<pre class="programlisting"><a href="../glib/glib-Basic-Types.html#gboolean"><span class="returnvalue">gboolean</span></a>            webkit_settings_get_enable_mediasource
+                                                        (<em class="parameter"><code><a class="link" href="WebKitSettings.html" title="WebKitSettings"><span class="type">WebKitSettings</span></a> *settings</code></em>);</pre>
+<p>
+Get the <a class="link" href="WebKitSettings.html#WebKitSettings--enable-mediasource" title='The "enable-mediasource" property'><span class="type">"enable-mediasource"</span></a> property.
+</p>
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
+<col align="left" valign="top">
+<col>
+</colgroup>
+<tbody>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>settings</code></em> :</span></p></td>
+<td>a <a class="link" href="WebKitSettings.html" title="WebKitSettings"><span class="type">WebKitSettings</span></a>
+</td>
+</tr>
+<tr>
+<td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
+<td>
+<a href="../glib/glib-Standard-Macros.html#TRUE:CAPS"><code class="literal">TRUE</code></a> If MediaSource support is enabled or <a href="../glib/glib-Standard-Macros.html#FALSE:CAPS"><code class="literal">FALSE</code></a> otherwise.</td>
+</tr>
+</tbody>
+</table></div>
+<p class="since">Since 2.4</p>
+</div>
+<hr>
+<div class="refsect2">
+<a name="webkit-settings-set-enable-mediasource"></a><h3>webkit_settings_set_enable_mediasource ()</h3>
+<pre class="programlisting"><span class="returnvalue">void</span>                webkit_settings_set_enable_mediasource
+                                                        (<em class="parameter"><code><a class="link" href="WebKitSettings.html" title="WebKitSettings"><span class="type">WebKitSettings</span></a> *settings</code></em>,
+                                                         <em class="parameter"><code><a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a> enabled</code></em>);</pre>
+<p>
+Set the <a class="link" href="WebKitSettings.html#WebKitSettings--enable-mediasource" title='The "enable-mediasource" property'><span class="type">"enable-mediasource"</span></a> property.
+</p>
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
+<col align="left" valign="top">
+<col>
+</colgroup>
+<tbody>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>settings</code></em> :</span></p></td>
+<td>a <a class="link" href="WebKitSettings.html" title="WebKitSettings"><span class="type">WebKitSettings</span></a>
+</td>
+</tr>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>enabled</code></em> :</span></p></td>
+<td>Value to be set</td>
+</tr>
+</tbody>
+</table></div>
+<p class="since">Since 2.4</p>
+</div>
 </div>
 <div class="refsect1">
 <a name="WebKitSettings.property-details"></a><h2>Property Details</h2>
@@ -3094,6 +3218,22 @@ See also http://dev.w3.org/2011/webrtc/editor/getusermedia.html
 </div>
 <hr>
 <div class="refsect2">
+<a name="WebKitSettings--enable-mediasource"></a><h3>The <code class="literal">"enable-mediasource"</code> property</h3>
+<pre class="programlisting">  "enable-mediasource"       <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read / Write / Construct</pre>
+<p>
+Enable or disable support for MediaSource on pages. MediaSource is an
+experimental proposal which extends HTMLMediaElement to allow
+JavaScript to generate media streams for playback.  The standard is
+currently a work-in-progress by the W3C HTML Media Task Force.
+</p>
+<p>
+See also http://www.w3.org/TR/media-source/
+</p>
+<p>Default value: FALSE</p>
+<p class="since">Since 2.4</p>
+</div>
+<hr>
+<div class="refsect2">
 <a name="WebKitSettings--enable-offline-web-application-cache"></a><h3>The <code class="literal">"enable-offline-web-application-cache"</code> property</h3>
 <pre class="programlisting">  "enable-offline-web-application-cache" <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read / Write / Construct</pre>
 <p>
@@ -3174,6 +3314,21 @@ special-case this and other cases to make some specific sites work.
 Enable or disable smooth scrolling.
 </p>
 <p>Default value: FALSE</p>
+</div>
+<hr>
+<div class="refsect2">
+<a name="WebKitSettings--enable-spatial-navigation"></a><h3>The <code class="literal">"enable-spatial-navigation"</code> property</h3>
+<pre class="programlisting">  "enable-spatial-navigation" <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read / Write / Construct</pre>
+<p>
+Whether to enable Spatial Navigation. This feature consists in the ability
+to navigate between focusable elements in a Web page, such as hyperlinks
+and form controls, by using Left, Right, Up and Down arrow keys.
+For example, if an user presses the Right key, heuristics determine whether
+there is an element they might be trying to reach towards the right, and if
+there are multiple elements, which element they probably wants.
+</p>
+<p>Default value: FALSE</p>
+<p class="since">Since 2.3</p>
 </div>
 <hr>
 <div class="refsect2">

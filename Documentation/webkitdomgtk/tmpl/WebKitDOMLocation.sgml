@@ -31,10 +31,122 @@ WebKitDOMLocation
 
 </para>
 
+<!-- ##### ARG WebKitDOMLocation:hash ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMLocation:host ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMLocation:hostname ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMLocation:href ##### -->
+<para>
+
+</para>
+
 <!-- ##### ARG WebKitDOMLocation:origin ##### -->
 <para>
 
 </para>
+
+<!-- ##### ARG WebKitDOMLocation:pathname ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMLocation:port ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMLocation:protocol ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMLocation:search ##### -->
+<para>
+
+</para>
+
+<!-- ##### FUNCTION webkit_dom_location_get_href ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_location_get_protocol ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_location_get_host ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_location_get_hostname ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_location_get_port ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_location_get_pathname ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_location_get_search ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_location_get_hash ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
 
 <!-- ##### FUNCTION webkit_dom_location_get_origin ##### -->
 <para>

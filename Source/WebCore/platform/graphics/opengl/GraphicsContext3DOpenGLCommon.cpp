@@ -326,6 +326,26 @@ void GraphicsContext3D::reshape(int width, int height)
     ::glFlush();
 }
 
+
+bool GraphicsContext3D::precisionsMatch(Platform3DObject vertexShader, Platform3DObject fragmentShader) const
+{
+    ShaderSourceEntry vertexEntry = m_shaderSourceMap.find(vertexShader)->value;
+    ShaderSourceEntry fragmentEntry = m_shaderSourceMap.find(fragmentShader)->value;
+
+    HashMap<String, ShPrecisionType> vertexSymbolPrecisionMap;
+
+    for (auto it = vertexEntry.uniformMap.begin(); it != vertexEntry.uniformMap.end(); ++it)
+        vertexSymbolPrecisionMap.add(it->value.mappedName, it->value.precision);
+
+    for (auto it = fragmentEntry.uniformMap.begin(); it != fragmentEntry.uniformMap.end(); ++it) {
+        HashMap<String, ShPrecisionType>::iterator vertexSymbol = vertexSymbolPrecisionMap.find(it->value.mappedName);
+        if (vertexSymbol != vertexSymbolPrecisionMap.end() && vertexSymbol->value != it->value.precision)
+            return false;
+    }
+
+    return true;
+}
+
 IntSize GraphicsContext3D::getInternalFramebufferSize() const
 {
     return IntSize(m_currentWidth, m_currentHeight);
@@ -1356,6 +1376,11 @@ GC3Dsizeiptr GraphicsContext3D::getVertexAttribOffset(GC3Duint index, GC3Denum p
 void GraphicsContext3D::texSubImage2D(GC3Denum target, GC3Dint level, GC3Dint xoff, GC3Dint yoff, GC3Dsizei width, GC3Dsizei height, GC3Denum format, GC3Denum type, const void* pixels)
 {
     makeContextCurrent();
+
+#if !USE(OPENGL_ES_2)
+    if (type == HALF_FLOAT_OES)
+        type = GL_HALF_FLOAT_ARB;
+#endif
 
     // FIXME: we will need to deal with PixelStore params when dealing with image buffers that differ from the subimage size.
     ::glTexSubImage2D(target, level, xoff, yoff, width, height, format, type, pixels);

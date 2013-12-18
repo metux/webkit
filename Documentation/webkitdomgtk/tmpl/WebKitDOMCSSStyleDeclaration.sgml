@@ -151,3 +151,13 @@ WebKitDOMCSSStyleDeclaration
 @Returns: 
 
 
+<!-- ##### FUNCTION webkit_dom_css_style_declaration_get_property_css_value ##### -->
+<para>
+
+</para>
+
+@self: 
+@propertyName: 
+@Returns: 
+
+

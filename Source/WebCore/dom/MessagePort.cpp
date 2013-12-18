@@ -72,7 +72,7 @@ void MessagePort::postMessage(PassRefPtr<SerializedScriptValue> message, const M
         for (unsigned int i = 0; i < ports->size(); ++i) {
             MessagePort* dataPort = (*ports)[i].get();
             if (dataPort == this || m_entangledChannel->isConnectedTo(dataPort)) {
-                ec = INVALID_STATE_ERR;
+                ec = DATA_CLONE_ERR;
                 return;
             }
         }
@@ -156,11 +156,9 @@ void MessagePort::dispatchMessages()
     OwnPtr<MessagePortChannelArray> channels;
     while (m_entangledChannel && m_entangledChannel->tryGetMessageFromRemote(message, channels)) {
 
-#if ENABLE(WORKERS)
         // close() in Worker onmessage handler should prevent next message from dispatching.
         if (m_scriptExecutionContext->isWorkerGlobalScope() && static_cast<WorkerGlobalScope*>(m_scriptExecutionContext)->isClosing())
             return;
-#endif
 
         OwnPtr<MessagePortArray> ports = MessagePort::entanglePorts(*m_scriptExecutionContext, channels.release());
         RefPtr<Event> evt = MessageEvent::create(ports.release(), message.release());

@@ -39,14 +39,14 @@ namespace WebKit {
 class WebContext;
 class WebBatteryStatus;
 
-class WebBatteryManagerProxy : public API::TypedObject<API::Object::Type::BatteryManager>, public WebContextSupplement, private CoreIPC::MessageReceiver {
+class WebBatteryManagerProxy : public API::ObjectImpl<API::Object::Type::BatteryManager>, public WebContextSupplement, private CoreIPC::MessageReceiver {
 public:
     static const char* supplementName();
 
     static PassRefPtr<WebBatteryManagerProxy> create(WebContext*);
     virtual ~WebBatteryManagerProxy();
 
-    void initializeProvider(const WKBatteryProvider*);
+    void initializeProvider(const WKBatteryProviderBase*);
 
     void providerDidChangeBatteryStatus(const WTF::AtomicString&, WebBatteryStatus*);
     void providerUpdateBatteryStatus(WebBatteryStatus*);

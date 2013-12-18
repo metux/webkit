@@ -33,12 +33,17 @@
 
 #if ENABLE(INSPECTOR)
 
-#include "InspectorAgentRegistry.h"
-#include "InspectorBaseAgent.h"
+#include <inspector/InspectorAgentRegistry.h>
 #include <wtf/Forward.h>
 #include <wtf/HashMap.h>
 #include <wtf/Noncopyable.h>
 #include <wtf/text/WTFString.h>
+
+namespace Inspector {
+class InspectorObject;
+class InspectorFrontendChannel;
+class InspectorBackendDispatcher;
+}
 
 namespace WebCore {
 
@@ -48,15 +53,12 @@ class GraphicsContext;
 class InjectedScriptManager;
 class InspectorAgent;
 class InspectorApplicationCacheAgent;
-class InspectorBackendDispatcher;
 class InspectorClient;
 class InspectorDOMAgent;
 class InspectorDOMDebuggerAgent;
 class InspectorDebuggerAgent;
-class InspectorFrontendChannel;
 class InspectorFrontendClient;
 class InspectorMemoryAgent;
-class InspectorObject;
 class InspectorOverlay;
 class InspectorPageAgent;
 class InspectorProfilerAgent;
@@ -87,15 +89,20 @@ public:
     void setInspectorFrontendClient(PassOwnPtr<InspectorFrontendClient>);
     bool hasInspectorFrontendClient() const;
     void didClearWindowObjectInWorld(Frame*, DOMWrapperWorld&);
-    void setInjectedScriptForOrigin(const String& origin, const String& source);
 
     void dispatchMessageFromFrontend(const String& message);
 
     bool hasFrontend() const { return !!m_inspectorFrontendChannel; }
-    void connectFrontend(InspectorFrontendChannel*);
+    bool hasLocalFrontend() const;
+    bool hasRemoteFrontend() const;
+
+    void connectFrontend(Inspector::InspectorFrontendChannel*);
     void disconnectFrontend();
     void setProcessId(long);
-    void webViewResized(const IntSize&);
+
+#if ENABLE(REMOTE_INSPECTOR)
+    void setHasRemoteFrontend(bool hasRemote) { m_hasRemoteFrontend = hasRemote; }
+#endif
 
     void inspect(Node*);
     void drawHighlight(GraphicsContext&) const;
@@ -103,7 +110,9 @@ public:
     void hideHighlight();
     Node* highlightedNode() const;
 
-    PassRefPtr<InspectorObject> buildObjectForHighlightedNode() const;
+    void setIndicating(bool);
+
+    PassRefPtr<Inspector::InspectorObject> buildObjectForHighlightedNode() const;
 
     bool isUnderTest();
     void evaluateForTestInFrontend(long callId, const String& script);
@@ -146,13 +155,17 @@ private:
     InspectorProfilerAgent* m_profilerAgent;
 #endif
 
-    RefPtr<InspectorBackendDispatcher> m_inspectorBackendDispatcher;
+    RefPtr<Inspector::InspectorBackendDispatcher> m_inspectorBackendDispatcher;
     OwnPtr<InspectorFrontendClient> m_inspectorFrontendClient;
-    InspectorFrontendChannel* m_inspectorFrontendChannel;
+    Inspector::InspectorFrontendChannel* m_inspectorFrontendChannel;
     Page* m_page;
     InspectorClient* m_inspectorClient;
-    InspectorAgentRegistry m_agents;
+    Inspector::InspectorAgentRegistry m_agents;
     bool m_isUnderTest;
+
+#if ENABLE(REMOTE_INSPECTOR)
+    bool m_hasRemoteFrontend;
+#endif
 };
 
 }

@@ -26,14 +26,11 @@
 
 #include "config.h"
 
-#if ENABLE(WORKERS)
-
 #include "WorkerThread.h"
 
 #include "DedicatedWorkerGlobalScope.h"
 #include "InspectorInstrumentation.h"
 #include "ScriptSourceCode.h"
-#include "ScriptValue.h"
 #include "SecurityOrigin.h"
 #include "ThreadGlobalData.h"
 #include "URL.h"
@@ -281,5 +278,3 @@ void WorkerThread::releaseFastMallocFreeMemoryInAllThreads()
 }
 
 } // namespace WebCore
-
-#endif // ENABLE(WORKERS)

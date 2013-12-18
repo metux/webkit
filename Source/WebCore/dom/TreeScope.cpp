@@ -154,7 +154,7 @@ void TreeScope::addElementById(const AtomicStringImpl& elementId, Element& eleme
 {
     if (!m_elementsById)
         m_elementsById = adoptPtr(new DocumentOrderedMap);
-    m_elementsById->add(elementId, element);
+    m_elementsById->add(elementId, element, *this);
     m_idTargetObserverRegistry->notifyObservers(elementId);
 }
 
@@ -179,7 +179,7 @@ void TreeScope::addElementByName(const AtomicStringImpl& name, Element& element)
 {
     if (!m_elementsByName)
         m_elementsByName = adoptPtr(new DocumentOrderedMap);
-    m_elementsByName->add(name, element);
+    m_elementsByName->add(name, element, *this);
 }
 
 void TreeScope::removeElementByName(const AtomicStringImpl& name, Element& element)
@@ -207,7 +207,7 @@ void TreeScope::addImageMap(HTMLMapElement& imageMap)
         return;
     if (!m_imageMapsByName)
         m_imageMapsByName = adoptPtr(new DocumentOrderedMap);
-    m_imageMapsByName->add(*name, imageMap);
+    m_imageMapsByName->add(*name, imageMap, *this);
 }
 
 void TreeScope::removeImageMap(HTMLMapElement& imageMap)
@@ -248,11 +248,17 @@ Node* nodeFromPoint(Document* document, int x, int y, LayoutPoint* localPoint)
         return nullptr;
 
     float scaleFactor = frame->pageZoomFactor() * frame->frameScaleFactor();
+#if !PLATFORM(IOS)
     IntPoint point = roundedIntPoint(FloatPoint(x * scaleFactor  + frameView->scrollX(), y * scaleFactor + frameView->scrollY()));
 
     if (!frameView->visibleContentRect().contains(point))
         return nullptr;
+#else
+    IntPoint point = roundedIntPoint(FloatPoint(x * scaleFactor  + frameView->actualScrollX(), y * scaleFactor + frameView->actualScrollY()));
 
+    if (!frameView->actualVisibleContentRect().contains(point))
+        return nullptr;
+#endif
     HitTestRequest request(HitTestRequest::ReadOnly | HitTestRequest::Active | HitTestRequest::DisallowShadowContent);
     HitTestResult result(point);
     document->renderView()->hitTest(request, result);
@@ -276,7 +282,7 @@ Element* TreeScope::elementFromPoint(int x, int y) const
 void TreeScope::addLabel(const AtomicStringImpl& forAttributeValue, HTMLLabelElement& element)
 {
     ASSERT(m_labelsByForAttribute);
-    m_labelsByForAttribute->add(forAttributeValue, element);
+    m_labelsByForAttribute->add(forAttributeValue, element, *this);
 }
 
 void TreeScope::removeLabel(const AtomicStringImpl& forAttributeValue, HTMLLabelElement& element)
@@ -294,11 +300,10 @@ HTMLLabelElement* TreeScope::labelElementForId(const AtomicString& forAttributeV
         // Populate the map on first access.
         m_labelsByForAttribute = adoptPtr(new DocumentOrderedMap);
 
-        auto labelDescendants = descendantsOfType<HTMLLabelElement>(*rootNode());
-        for (auto label = labelDescendants.begin(), end = labelDescendants.end(); label != end; ++label) {
-            const AtomicString& forValue = label->fastGetAttribute(forAttr);
+        for (auto& label : descendantsOfType<HTMLLabelElement>(*rootNode())) {
+            const AtomicString& forValue = label.fastGetAttribute(forAttr);
             if (!forValue.isEmpty())
-                addLabel(*forValue.impl(), *label);
+                addLabel(*forValue.impl(), label);
         }
     }
 
@@ -336,16 +341,15 @@ Element* TreeScope::findAnchor(const String& name)
         return nullptr;
     if (Element* element = getElementById(name))
         return element;
-    auto anchorDescendants = descendantsOfType<HTMLAnchorElement>(*rootNode());
-    for (auto anchor = anchorDescendants.begin(), end = anchorDescendants.end(); anchor != end; ++anchor) {
+    for (auto& anchor : descendantsOfType<HTMLAnchorElement>(*rootNode())) {
         if (rootNode()->document().inQuirksMode()) {
             // Quirks mode, case insensitive comparison of names.
-            if (equalIgnoringCase(anchor->name(), name))
-                return &*anchor;
+            if (equalIgnoringCase(anchor.name(), name))
+                return &anchor;
         } else {
             // Strict mode, names need to match exactly.
-            if (anchor->name() == name)
-                return &*anchor;
+            if (anchor.name() == name)
+                return &anchor;
         }
     }
     return nullptr;
@@ -425,6 +429,10 @@ TreeScope* commonTreeScope(Node* nodeA, Node* nodeB)
 
     for (; indexA > 0 && indexB > 0 && treeScopesA[indexA - 1] == treeScopesB[indexB - 1]; --indexA, --indexB) { }
 
+    // If the nodes had no common tree scope, return immediately.
+    if (indexA == treeScopesA.size())
+        return nullptr;
+    
     return treeScopesA[indexA] == treeScopesB[indexB] ? treeScopesA[indexA] : nullptr;
 }
 

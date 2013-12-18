@@ -34,11 +34,11 @@
 
 namespace WebKit {
 
-class WebConnection : public API::TypedObject<API::Object::Type::Connection>, public CoreIPC::MessageReceiver, public CoreIPC::MessageSender {
+class WebConnection : public API::ObjectImpl<API::Object::Type::Connection>, public CoreIPC::MessageReceiver, public CoreIPC::MessageSender {
 public:
     virtual ~WebConnection();
 
-    void initializeConnectionClient(const WKConnectionClient*);
+    void initializeConnectionClient(const WKConnectionClientBase*);
     void postMessage(const String&, API::Object*);
     void didClose();
 

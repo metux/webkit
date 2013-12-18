@@ -126,6 +126,11 @@ WebKitSettings
 
 </para>
 
+<!-- ##### ARG WebKitSettings:enable-mediasource ##### -->
+<para>
+
+</para>
+
 <!-- ##### ARG WebKitSettings:enable-offline-web-application-cache ##### -->
 <para>
 
@@ -157,6 +162,11 @@ WebKitSettings
 </para>
 
 <!-- ##### ARG WebKitSettings:enable-smooth-scrolling ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitSettings:enable-spatial-navigation ##### -->
 <para>
 
 </para>
@@ -1105,6 +1115,42 @@ WebKitSettings
 
 
 <!-- ##### FUNCTION webkit_settings_set_enable_media_stream ##### -->
+<para>
+
+</para>
+
+@settings: 
+@enabled: 
+
+
+<!-- ##### FUNCTION webkit_settings_get_enable_spatial_navigation ##### -->
+<para>
+
+</para>
+
+@settings: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_settings_set_enable_spatial_navigation ##### -->
+<para>
+
+</para>
+
+@settings: 
+@enabled: 
+
+
+<!-- ##### FUNCTION webkit_settings_get_enable_mediasource ##### -->
+<para>
+
+</para>
+
+@settings: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_settings_set_enable_mediasource ##### -->
 <para>
 
 </para>

@@ -51,11 +51,12 @@ static WebPageGroupMap& webPageGroupMap()
 
 PassRefPtr<WebPageGroup> WebPageGroup::create(const String& identifier, bool visibleToInjectedBundle, bool visibleToHistoryClient)
 {
-    RefPtr<WebPageGroup> pageGroup = adoptRef(new WebPageGroup(identifier, visibleToInjectedBundle, visibleToHistoryClient));
+    return adoptRef(new WebPageGroup(identifier, visibleToInjectedBundle, visibleToHistoryClient));
+}
 
-    webPageGroupMap().set(pageGroup->pageGroupID(), pageGroup.get());
-
-    return pageGroup.release();
+PassRef<WebPageGroup> WebPageGroup::createNonNull(const String& identifier, bool visibleToInjectedBundle, bool visibleToHistoryClient)
+{
+    return adoptRef(*new WebPageGroup(identifier, visibleToInjectedBundle, visibleToHistoryClient));
 }
 
 WebPageGroup* WebPageGroup::get(uint64_t pageGroupID)
@@ -74,6 +75,8 @@ WebPageGroup::WebPageGroup(const String& identifier, bool visibleToInjectedBundl
 
     m_data.visibleToInjectedBundle = visibleToInjectedBundle;
     m_data.visibleToHistoryClient = visibleToHistoryClient;
+    
+    webPageGroupMap().set(m_data.pageGroupID, this);
 }
 
 WebPageGroup::~WebPageGroup()
@@ -142,9 +145,9 @@ static Vector<String> toStringVector(API::Array* array)
     
     patternVector.reserveInitialCapacity(size);
     for (size_t i = 0; i < size; ++i) {
-        WebString* webString = array->at<WebString>(i);
-        ASSERT(webString);
-        patternVector.uncheckedAppend(webString->string());
+        API::String* string = array->at<API::String>(i);
+        ASSERT(string);
+        patternVector.uncheckedAppend(string->string());
     }
     
     return patternVector;

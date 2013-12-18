@@ -36,6 +36,10 @@
 
 namespace API {
 class Object;
+
+template<> struct ClientTraits<WKBundlePageLoaderClientBase> {
+    typedef std::tuple<WKBundlePageLoaderClientV0, WKBundlePageLoaderClientV1, WKBundlePageLoaderClientV2, WKBundlePageLoaderClientV3, WKBundlePageLoaderClientV4, WKBundlePageLoaderClientV5, WKBundlePageLoaderClientV6, WKBundlePageLoaderClientV7> Versions;
+};
 }
 
 namespace WebCore {
@@ -54,10 +58,10 @@ class InjectedBundleBackForwardListItem;
 class WebPage;
 class WebFrame;
 
-class InjectedBundlePageLoaderClient : public APIClient<WKBundlePageLoaderClient, kWKBundlePageLoaderClientCurrentVersion> {
+class InjectedBundlePageLoaderClient : public API::Client<WKBundlePageLoaderClientBase> {
 public:
     void willLoadURLRequest(WebPage*, const WebCore::ResourceRequest&, API::Object*);
-    void willLoadDataRequest(WebPage*, const WebCore::ResourceRequest&, const WebCore::SharedBuffer*, const String&, const String&, const WebCore::URL&, API::Object*);
+    void willLoadDataRequest(WebPage*, const WebCore::ResourceRequest&, WebCore::SharedBuffer*, const String&, const String&, const WebCore::URL&, API::Object*);
 
     bool shouldGoToBackForwardListItem(WebPage*, InjectedBundleBackForwardListItem*, RefPtr<API::Object>& userData);
     void didStartProvisionalLoadForFrame(WebPage*, WebFrame*, RefPtr<API::Object>& userData);

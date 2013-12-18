@@ -87,7 +87,7 @@ AffineTransform SVGGraphicsElement::animatedLocalTransform() const
 AffineTransform* SVGGraphicsElement::supplementalTransform()
 {
     if (!m_supplementalTransform)
-        m_supplementalTransform = adoptPtr(new AffineTransform);
+        m_supplementalTransform = std::make_unique<AffineTransform>();
     return m_supplementalTransform.get();
 }
 
@@ -134,13 +134,13 @@ void SVGGraphicsElement::svgAttributeChanged(const QualifiedName& attrName)
     if (SVGTests::handleAttributeChange(this, attrName))
         return;
 
-    RenderObject* object = renderer();
-    if (!object)
+    auto renderer = this->renderer();
+    if (!renderer)
         return;
 
     if (attrName == SVGNames::transformAttr) {
-        object->setNeedsTransformUpdate();
-        RenderSVGResource::markForLayoutAndParentResourceInvalidation(object);
+        renderer->setNeedsTransformUpdate();
+        RenderSVGResource::markForLayoutAndParentResourceInvalidation(*renderer);
         return;
     }
 

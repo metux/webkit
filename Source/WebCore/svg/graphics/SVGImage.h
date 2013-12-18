@@ -82,10 +82,8 @@ private:
 
     virtual bool dataChanged(bool allDataReceived) OVERRIDE;
 
-    // FIXME: SVGImages are underreporting decoded sizes and will be unable
-    // to prune because these functions are not implemented yet.
+    // FIXME: SVGImages will be unable to prune because this function is not implemented yet.
     virtual void destroyDecodedData(bool) OVERRIDE { }
-    virtual unsigned decodedSize() const OVERRIDE { return 0; }
 
     // FIXME: Implement this to be less conservative.
     virtual bool currentFrameKnownToBeOpaque() OVERRIDE { return false; }
@@ -96,14 +94,17 @@ private:
     void drawPatternForContainer(GraphicsContext*, const FloatSize, float, const FloatRect&, const AffineTransform&, const FloatPoint&, ColorSpace,
         CompositeOperator, const FloatRect&);
 
-    OwnPtr<SVGImageChromeClient> m_chromeClient;
-    OwnPtr<Page> m_page;
+    std::unique_ptr<SVGImageChromeClient> m_chromeClient;
+    std::unique_ptr<Page> m_page;
     IntSize m_intrinsicSize;
 };
 
 bool isInSVGImage(const Element*);
 
+IMAGE_TYPE_CASTS(SVGImage)
+
 }
+
 
 #endif // ENABLE(SVG)
 #endif // SVGImage_h

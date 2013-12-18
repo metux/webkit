@@ -48,14 +48,14 @@ WebBatteryManagerProxy::WebBatteryManagerProxy(WebContext* context)
     : WebContextSupplement(context)
     , m_isUpdating(false)
 {
-    WebContextSupplement::context()->addMessageReceiver(Messages::WebBatteryManagerProxy::messageReceiverName(), this);
+    WebContextSupplement::context()->addMessageReceiver(Messages::WebBatteryManagerProxy::messageReceiverName(), *this);
 }
 
 WebBatteryManagerProxy::~WebBatteryManagerProxy()
 {
 }
 
-void WebBatteryManagerProxy::initializeProvider(const WKBatteryProvider* provider)
+void WebBatteryManagerProxy::initializeProvider(const WKBatteryProviderBase* provider)
 {
     m_provider.initialize(provider);
 }

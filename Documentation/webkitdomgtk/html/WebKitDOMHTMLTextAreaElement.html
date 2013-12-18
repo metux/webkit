@@ -153,6 +153,16 @@
 <span class="returnvalue">void</span>                <a class="link" href="WebKitDOMHTMLTextAreaElement.html#webkit-dom-html-text-area-element-set-selection-direction" title="webkit_dom_html_text_area_element_set_selection_direction ()">webkit_dom_html_text_area_element_set_selection_direction</a>
                                                         (<em class="parameter"><code><a class="link" href="WebKitDOMHTMLTextAreaElement.html" title="WebKitDOMHTMLTextAreaElement"><span class="type">WebKitDOMHTMLTextAreaElement</span></a> *self</code></em>,
                                                          <em class="parameter"><code>const <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a> *value</code></em>);
+<a href="../glib/glib-Basic-Types.html#gboolean"><span class="returnvalue">gboolean</span></a>            <a class="link" href="WebKitDOMHTMLTextAreaElement.html#webkit-dom-html-text-area-element-get-autocorrect" title="webkit_dom_html_text_area_element_get_autocorrect ()">webkit_dom_html_text_area_element_get_autocorrect</a>
+                                                        (<em class="parameter"><code><a class="link" href="WebKitDOMHTMLTextAreaElement.html" title="WebKitDOMHTMLTextAreaElement"><span class="type">WebKitDOMHTMLTextAreaElement</span></a> *self</code></em>);
+<span class="returnvalue">void</span>                <a class="link" href="WebKitDOMHTMLTextAreaElement.html#webkit-dom-html-text-area-element-set-autocorrect" title="webkit_dom_html_text_area_element_set_autocorrect ()">webkit_dom_html_text_area_element_set_autocorrect</a>
+                                                        (<em class="parameter"><code><a class="link" href="WebKitDOMHTMLTextAreaElement.html" title="WebKitDOMHTMLTextAreaElement"><span class="type">WebKitDOMHTMLTextAreaElement</span></a> *self</code></em>,
+                                                         <em class="parameter"><code><a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a> value</code></em>);
+<a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gchar</span></a> *             <a class="link" href="WebKitDOMHTMLTextAreaElement.html#webkit-dom-html-text-area-element-get-autocapitalize" title="webkit_dom_html_text_area_element_get_autocapitalize ()">webkit_dom_html_text_area_element_get_autocapitalize</a>
+                                                        (<em class="parameter"><code><a class="link" href="WebKitDOMHTMLTextAreaElement.html" title="WebKitDOMHTMLTextAreaElement"><span class="type">WebKitDOMHTMLTextAreaElement</span></a> *self</code></em>);
+<span class="returnvalue">void</span>                <a class="link" href="WebKitDOMHTMLTextAreaElement.html#webkit-dom-html-text-area-element-set-autocapitalize" title="webkit_dom_html_text_area_element_set_autocapitalize ()">webkit_dom_html_text_area_element_set_autocapitalize</a>
+                                                        (<em class="parameter"><code><a class="link" href="WebKitDOMHTMLTextAreaElement.html" title="WebKitDOMHTMLTextAreaElement"><span class="type">WebKitDOMHTMLTextAreaElement</span></a> *self</code></em>,
+                                                         <em class="parameter"><code>const <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a> *value</code></em>);
 </pre>
 </div>
 <div class="refsect1">
@@ -175,6 +185,8 @@ WebKitDOMHTMLTextAreaElement implements
 <div class="refsect1">
 <a name="WebKitDOMHTMLTextAreaElement.properties"></a><h2>Properties</h2>
 <pre class="synopsis">
+  "<a class="link" href="WebKitDOMHTMLTextAreaElement.html#WebKitDOMHTMLTextAreaElement--autocapitalize" title='The "autocapitalize" property'>autocapitalize</a>"           <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a>*                : Read / Write
+  "<a class="link" href="WebKitDOMHTMLTextAreaElement.html#WebKitDOMHTMLTextAreaElement--autocorrect" title='The "autocorrect" property'>autocorrect</a>"              <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read / Write
   "<a class="link" href="WebKitDOMHTMLTextAreaElement.html#WebKitDOMHTMLTextAreaElement--autofocus" title='The "autofocus" property'>autofocus</a>"                <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read / Write
   "<a class="link" href="WebKitDOMHTMLTextAreaElement.html#WebKitDOMHTMLTextAreaElement--cols" title='The "cols" property'>cols</a>"                     <a href="../glib/glib-Basic-Types.html#glong"><span class="type">glong</span></a>                 : Read / Write
   "<a class="link" href="WebKitDOMHTMLTextAreaElement.html#WebKitDOMHTMLTextAreaElement--default-value" title='The "default-value" property'>default-value</a>"            <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a>*                : Read / Write
@@ -1297,9 +1309,121 @@ WebKitDOMHTMLTextAreaElement implements
 </tbody>
 </table></div>
 </div>
+<hr>
+<div class="refsect2">
+<a name="webkit-dom-html-text-area-element-get-autocorrect"></a><h3>webkit_dom_html_text_area_element_get_autocorrect ()</h3>
+<pre class="programlisting"><a href="../glib/glib-Basic-Types.html#gboolean"><span class="returnvalue">gboolean</span></a>            webkit_dom_html_text_area_element_get_autocorrect
+                                                        (<em class="parameter"><code><a class="link" href="WebKitDOMHTMLTextAreaElement.html" title="WebKitDOMHTMLTextAreaElement"><span class="type">WebKitDOMHTMLTextAreaElement</span></a> *self</code></em>);</pre>
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
+<col align="left" valign="top">
+<col>
+</colgroup>
+<tbody>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>self</code></em> :</span></p></td>
+<td>A <a class="link" href="WebKitDOMHTMLTextAreaElement.html" title="WebKitDOMHTMLTextAreaElement"><span class="type">WebKitDOMHTMLTextAreaElement</span></a>
+</td>
+</tr>
+<tr>
+<td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
+<td>A <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>
+</td>
+</tr>
+</tbody>
+</table></div>
+</div>
+<hr>
+<div class="refsect2">
+<a name="webkit-dom-html-text-area-element-set-autocorrect"></a><h3>webkit_dom_html_text_area_element_set_autocorrect ()</h3>
+<pre class="programlisting"><span class="returnvalue">void</span>                webkit_dom_html_text_area_element_set_autocorrect
+                                                        (<em class="parameter"><code><a class="link" href="WebKitDOMHTMLTextAreaElement.html" title="WebKitDOMHTMLTextAreaElement"><span class="type">WebKitDOMHTMLTextAreaElement</span></a> *self</code></em>,
+                                                         <em class="parameter"><code><a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a> value</code></em>);</pre>
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
+<col align="left" valign="top">
+<col>
+</colgroup>
+<tbody>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>self</code></em> :</span></p></td>
+<td>A <a class="link" href="WebKitDOMHTMLTextAreaElement.html" title="WebKitDOMHTMLTextAreaElement"><span class="type">WebKitDOMHTMLTextAreaElement</span></a>
+</td>
+</tr>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>value</code></em> :</span></p></td>
+<td>A <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>
+</td>
+</tr>
+</tbody>
+</table></div>
+</div>
+<hr>
+<div class="refsect2">
+<a name="webkit-dom-html-text-area-element-get-autocapitalize"></a><h3>webkit_dom_html_text_area_element_get_autocapitalize ()</h3>
+<pre class="programlisting"><a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gchar</span></a> *             webkit_dom_html_text_area_element_get_autocapitalize
+                                                        (<em class="parameter"><code><a class="link" href="WebKitDOMHTMLTextAreaElement.html" title="WebKitDOMHTMLTextAreaElement"><span class="type">WebKitDOMHTMLTextAreaElement</span></a> *self</code></em>);</pre>
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
+<col align="left" valign="top">
+<col>
+</colgroup>
+<tbody>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>self</code></em> :</span></p></td>
+<td>A <a class="link" href="WebKitDOMHTMLTextAreaElement.html" title="WebKitDOMHTMLTextAreaElement"><span class="type">WebKitDOMHTMLTextAreaElement</span></a>
+</td>
+</tr>
+<tr>
+<td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
+<td>A <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a>
+</td>
+</tr>
+</tbody>
+</table></div>
+</div>
+<hr>
+<div class="refsect2">
+<a name="webkit-dom-html-text-area-element-set-autocapitalize"></a><h3>webkit_dom_html_text_area_element_set_autocapitalize ()</h3>
+<pre class="programlisting"><span class="returnvalue">void</span>                webkit_dom_html_text_area_element_set_autocapitalize
+                                                        (<em class="parameter"><code><a class="link" href="WebKitDOMHTMLTextAreaElement.html" title="WebKitDOMHTMLTextAreaElement"><span class="type">WebKitDOMHTMLTextAreaElement</span></a> *self</code></em>,
+                                                         <em class="parameter"><code>const <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a> *value</code></em>);</pre>
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
+<col align="left" valign="top">
+<col>
+</colgroup>
+<tbody>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>self</code></em> :</span></p></td>
+<td>A <a class="link" href="WebKitDOMHTMLTextAreaElement.html" title="WebKitDOMHTMLTextAreaElement"><span class="type">WebKitDOMHTMLTextAreaElement</span></a>
+</td>
+</tr>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>value</code></em> :</span></p></td>
+<td>A <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a>
+</td>
+</tr>
+</tbody>
+</table></div>
+</div>
 </div>
 <div class="refsect1">
 <a name="WebKitDOMHTMLTextAreaElement.property-details"></a><h2>Property Details</h2>
+<div class="refsect2">
+<a name="WebKitDOMHTMLTextAreaElement--autocapitalize"></a><h3>The <code class="literal">"autocapitalize"</code> property</h3>
+<pre class="programlisting">  "autocapitalize"           <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a>*                : Read / Write</pre>
+<p>read-only gchar* HTMLTextAreaElement:autocapitalize.</p>
+<p>Default value: ""</p>
+</div>
+<hr>
+<div class="refsect2">
+<a name="WebKitDOMHTMLTextAreaElement--autocorrect"></a><h3>The <code class="literal">"autocorrect"</code> property</h3>
+<pre class="programlisting">  "autocorrect"              <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read / Write</pre>
+<p>read-only gboolean HTMLTextAreaElement:autocorrect.</p>
+<p>Default value: FALSE</p>
+</div>
+<hr>
 <div class="refsect2">
 <a name="WebKitDOMHTMLTextAreaElement--autofocus"></a><h3>The <code class="literal">"autofocus"</code> property</h3>
 <pre class="programlisting">  "autofocus"                <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>              : Read / Write</pre>

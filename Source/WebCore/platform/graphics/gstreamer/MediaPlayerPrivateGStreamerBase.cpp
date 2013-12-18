@@ -28,7 +28,6 @@
 
 #include "ColorSpace.h"
 #include "GStreamerUtilities.h"
-#include "GStreamerVersioning.h"
 #include "GraphicsContext.h"
 #include "GraphicsTypes.h"
 #include "ImageGStreamer.h"
@@ -39,13 +38,10 @@
 #include "VideoSinkGStreamer.h"
 #include "WebKitWebSourceGStreamer.h"
 #include <gst/gst.h>
+#include <wtf/gobject/GMutexLocker.h>
 #include <wtf/text/CString.h>
 
-#ifdef GST_API_VERSION_1
 #include <gst/audio/streamvolume.h>
-#else
-#include <gst/interfaces/streamvolume.h>
-#endif
 
 #if GST_CHECK_VERSION(1, 1, 0) && USE(ACCELERATED_COMPOSITING) && USE(TEXTURE_MAPPER_GL)
 #include "TextureMapperGL.h"
@@ -164,13 +160,7 @@ IntSize MediaPlayerPrivateGStreamerBase::naturalSize() const
     if (!m_videoSize.isEmpty())
         return m_videoSize;
 
-#ifdef GST_API_VERSION_1
     GRefPtr<GstCaps> caps = currentVideoSinkCaps();
-#else
-    g_mutex_lock(m_bufferMutex);
-    GRefPtr<GstCaps> caps = m_buffer ? GST_BUFFER_CAPS(m_buffer) : 0;
-    g_mutex_unlock(m_bufferMutex);
-#endif
     if (!caps)
         return IntSize();
 
@@ -317,30 +307,20 @@ void MediaPlayerPrivateGStreamerBase::muteChanged()
 #if USE(ACCELERATED_COMPOSITING) && USE(TEXTURE_MAPPER_GL) && !USE(COORDINATED_GRAPHICS)
 PassRefPtr<BitmapTexture> MediaPlayerPrivateGStreamerBase::updateTexture(TextureMapper* textureMapper)
 {
-    g_mutex_lock(m_bufferMutex);
-    if (!m_buffer) {
-        g_mutex_unlock(m_bufferMutex);
+    GMutexLocker lock(m_bufferMutex);
+    if (!m_buffer)
         return 0;
-    }
 
     const void* srcData = 0;
-#ifdef GST_API_VERSION_1
     GRefPtr<GstCaps> caps = currentVideoSinkCaps();
-#else
-    GRefPtr<GstCaps> caps = GST_BUFFER_CAPS(m_buffer);
-#endif
-    if (!caps) {
-        g_mutex_unlock(m_bufferMutex);
+    if (!caps)
         return 0;
-    }
 
     IntSize size;
     GstVideoFormat format;
     int pixelAspectRatioNumerator, pixelAspectRatioDenominator, stride;
-    if (!getVideoSizeAndFormatFromCaps(caps.get(), size, format, pixelAspectRatioNumerator, pixelAspectRatioDenominator, stride)) {
-        g_mutex_unlock(m_bufferMutex);
+    if (!getVideoSizeAndFormatFromCaps(caps.get(), size, format, pixelAspectRatioNumerator, pixelAspectRatioDenominator, stride))
         return 0;
-    }
 
     RefPtr<BitmapTexture> texture = textureMapper->acquireTextureFromPool(size);
 
@@ -351,29 +331,19 @@ PassRefPtr<BitmapTexture> MediaPlayerPrivateGStreamerBase::updateTexture(Texture
             const BitmapTextureGL* textureGL = static_cast<const BitmapTextureGL*>(texture.get());
             guint ids[4] = { textureGL->id(), 0, 0, 0 };
 
-            if (gst_video_gl_texture_upload_meta_upload(meta, ids)) {
-                g_mutex_unlock(m_bufferMutex);
+            if (gst_video_gl_texture_upload_meta_upload(meta, ids))
                 return texture;
-            }
         }
     }
 #endif
 
-#ifdef GST_API_VERSION_1
     GstMapInfo srcInfo;
     gst_buffer_map(m_buffer, &srcInfo, GST_MAP_READ);
     srcData = srcInfo.data;
-#else
-    srcData = GST_BUFFER_DATA(m_buffer);
-#endif
 
     texture->updateContents(srcData, WebCore::IntRect(WebCore::IntPoint(0, 0), size), WebCore::IntPoint(0, 0), stride, BitmapTexture::UpdateCannotModifyOriginalImageData);
 
-#ifdef GST_API_VERSION_1
     gst_buffer_unmap(m_buffer, &srcInfo);
-#endif
-
-    g_mutex_unlock(m_bufferMutex);
     return texture;
 }
 #endif
@@ -382,9 +352,10 @@ void MediaPlayerPrivateGStreamerBase::triggerRepaint(GstBuffer* buffer)
 {
     g_return_if_fail(GST_IS_BUFFER(buffer));
 
-    g_mutex_lock(m_bufferMutex);
-    gst_buffer_replace(&m_buffer, buffer);
-    g_mutex_unlock(m_bufferMutex);
+    {
+        GMutexLocker lock(m_bufferMutex);
+        gst_buffer_replace(&m_buffer, buffer);
+    }
 
 #if USE(ACCELERATED_COMPOSITING) && USE(TEXTURE_MAPPER_GL) && !USE(COORDINATED_GRAPHICS)
     if (supportsAcceleratedRendering() && m_player->mediaPlayerClient()->mediaPlayerRenderingCanBeAccelerated(m_player) && client()) {
@@ -414,31 +385,20 @@ void MediaPlayerPrivateGStreamerBase::paint(GraphicsContext* context, const IntR
     if (!m_player->visible())
         return;
 
-    g_mutex_lock(m_bufferMutex);
-    if (!m_buffer) {
-        g_mutex_unlock(m_bufferMutex);
+    GMutexLocker lock(m_bufferMutex);
+    if (!m_buffer)
         return;
-    }
 
-#ifdef GST_API_VERSION_1
     GRefPtr<GstCaps> caps = currentVideoSinkCaps();
-#else
-    GRefPtr<GstCaps> caps = GST_BUFFER_CAPS(m_buffer);
-#endif
-    if (!caps) {
-        g_mutex_unlock(m_bufferMutex);
+    if (!caps)
         return;
-    }
 
     RefPtr<ImageGStreamer> gstImage = ImageGStreamer::createImage(m_buffer, caps.get());
-    if (!gstImage) {
-        g_mutex_unlock(m_bufferMutex);
+    if (!gstImage)
         return;
-    }
 
     context->drawImage(reinterpret_cast<Image*>(gstImage->image().get()), ColorSpaceSRGB,
         rect, gstImage->rect(), CompositeCopy, ImageOrientationDescription(), false);
-    g_mutex_unlock(m_bufferMutex);
 }
 
 #if USE(ACCELERATED_COMPOSITING) && USE(TEXTURE_MAPPER_GL) && !USE(COORDINATED_GRAPHICS)
@@ -487,57 +447,41 @@ GRefPtr<GstCaps> MediaPlayerPrivateGStreamerBase::currentVideoSinkCaps() const
     return currentCaps;
 }
 
-void MediaPlayerPrivateGStreamerBase::createVideoSink(GstElement* pipeline)
+GstElement* MediaPlayerPrivateGStreamerBase::createVideoSink()
 {
-    if (!initializeGStreamer())
-        return;
+    ASSERT(initializeGStreamer());
 
-    UNUSED_PARAM(pipeline);
+    GstElement* videoSink = nullptr;
     m_webkitVideoSink = webkitVideoSinkNew();
 
     m_repaintHandler = g_signal_connect(m_webkitVideoSink.get(), "repaint-requested", G_CALLBACK(mediaPlayerPrivateRepaintCallback), this);
 
-    m_videoSinkBin = gst_bin_new(nullptr);
-
-    GstElement* videoSink = nullptr;
     m_fpsSink = gst_element_factory_make("fpsdisplaysink", "sink");
     if (m_fpsSink) {
-        // The verbose property has been added in -bad 0.10.22. Making
-        // this whole code depend on it because we don't want
-        // fpsdiplaysink to spit data on stdout.
-        GstElementFactory* factory = GST_ELEMENT_FACTORY(GST_ELEMENT_GET_CLASS(m_fpsSink)->elementfactory);
-        if (gst_plugin_feature_check_version(GST_PLUGIN_FEATURE(factory), 0, 10, 22)) {
-            g_object_set(m_fpsSink, "silent", TRUE , nullptr);
+        g_object_set(m_fpsSink.get(), "silent", TRUE , nullptr);
 
-            // Turn off text overlay unless logging is enabled.
+        // Turn off text overlay unless logging is enabled.
 #if LOG_DISABLED
-            g_object_set(m_fpsSink, "text-overlay", FALSE , nullptr);
+        g_object_set(m_fpsSink.get(), "text-overlay", FALSE , nullptr);
 #else
-            WTFLogChannel* channel = logChannelByName("Media");
-            if (channel->state != WTFLogChannelOn)
-                g_object_set(m_fpsSink, "text-overlay", FALSE , nullptr);
+        WTFLogChannel* channel = logChannelByName("Media");
+        if (channel->state != WTFLogChannelOn)
+            g_object_set(m_fpsSink.get(), "text-overlay", FALSE , nullptr);
 #endif // LOG_DISABLED
 
-            if (g_object_class_find_property(G_OBJECT_GET_CLASS(m_fpsSink), "video-sink")) {
-                g_object_set(m_fpsSink, "video-sink", m_webkitVideoSink.get(), nullptr);
-                gst_bin_add(GST_BIN(m_videoSinkBin.get()), m_fpsSink);
-                videoSink = m_fpsSink;
-            } else
-                m_fpsSink = nullptr;
+        if (g_object_class_find_property(G_OBJECT_GET_CLASS(m_fpsSink.get()), "video-sink")) {
+            g_object_set(m_fpsSink.get(), "video-sink", m_webkitVideoSink.get(), nullptr);
+            videoSink = m_fpsSink.get();
         } else
             m_fpsSink = nullptr;
     }
 
-    if (!m_fpsSink) {
-        gst_bin_add(GST_BIN(m_videoSinkBin.get()), m_webkitVideoSink.get());
+    if (!m_fpsSink)
         videoSink = m_webkitVideoSink.get();
-    }
 
     ASSERT(videoSink);
 
-    GstElement* firstChild = videoSink;
-    GRefPtr<GstPad> pad = adoptGRef(gst_element_get_static_pad(firstChild, "sink"));
-    gst_element_add_pad(m_videoSinkBin.get(), gst_ghost_pad_new("sink", pad.get()));
+    return videoSink;
 }
 
 void MediaPlayerPrivateGStreamerBase::setStreamVolumeElement(GstStreamVolume* volume)
@@ -564,7 +508,7 @@ unsigned MediaPlayerPrivateGStreamerBase::decodedFrameCount() const
 {
     guint64 decodedFrames = 0;
     if (m_fpsSink)
-        g_object_get(m_fpsSink, "frames-rendered", &decodedFrames, NULL);
+        g_object_get(m_fpsSink.get(), "frames-rendered", &decodedFrames, NULL);
     return static_cast<unsigned>(decodedFrames);
 }
 
@@ -572,7 +516,7 @@ unsigned MediaPlayerPrivateGStreamerBase::droppedFrameCount() const
 {
     guint64 framesDropped = 0;
     if (m_fpsSink)
-        g_object_get(m_fpsSink, "frames-dropped", &framesDropped, NULL);
+        g_object_get(m_fpsSink.get(), "frames-dropped", &framesDropped, NULL);
     return static_cast<unsigned>(framesDropped);
 }
 

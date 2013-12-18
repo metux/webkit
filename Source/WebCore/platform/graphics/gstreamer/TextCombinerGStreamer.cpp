@@ -24,7 +24,7 @@
  */
 
 #include "config.h"
-#if ENABLE(VIDEO) && USE(GSTREAMER) && ENABLE(VIDEO_TRACK) && defined(GST_API_VERSION_1)
+#if ENABLE(VIDEO) && USE(GSTREAMER) && ENABLE(VIDEO_TRACK)
 
 #include "TextCombinerGStreamer.h"
 
@@ -111,7 +111,8 @@ static void webkitTextCombinerPadGetProperty(GObject* object, guint propertyId, 
     switch (propertyId) {
     case PROP_PAD_TAGS:
         GST_OBJECT_LOCK(object);
-        g_value_set_boxed(value, pad->tags);
+        if (pad->tags)
+            g_value_take_boxed(value, gst_tag_list_copy(pad->tags));
         GST_OBJECT_UNLOCK(object);
         break;
     default:
@@ -202,7 +203,13 @@ static gboolean webkitTextCombinerPadEvent(GstPad* pad, GstObject* parent, GstEv
         gst_event_parse_tag(event, &tags);
         ASSERT(tags);
 
-        combinerPad->tags = gst_tag_list_merge(combinerPad->tags, tags, GST_TAG_MERGE_REPLACE);
+        GST_OBJECT_LOCK(pad);
+        if (!combinerPad->tags)
+            combinerPad->tags = gst_tag_list_copy(tags);
+        else
+            gst_tag_list_insert(combinerPad->tags, tags, GST_TAG_MERGE_REPLACE);
+        GST_OBJECT_UNLOCK(pad);
+
         g_object_notify(G_OBJECT(pad), "tags");
         break;
     }
@@ -291,4 +298,4 @@ GstElement* webkitTextCombinerNew()
     return GST_ELEMENT(g_object_new(WEBKIT_TYPE_TEXT_COMBINER, 0));
 }
 
-#endif // ENABLE(VIDEO) && USE(GSTREAMER) && ENABLE(VIDEO_TRACK) && defined(GST_API_VERSION_1)
+#endif // ENABLE(VIDEO) && USE(GSTREAMER) && ENABLE(VIDEO_TRACK)

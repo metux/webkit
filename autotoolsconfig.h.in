@@ -200,19 +200,6 @@
 /* */
 #undef _UNICODE
 
-/* Define to empty if `const' does not conform to ANSI C. */
-#undef const
-
-/* Define to `__inline__' or `__inline' if that's what the C compiler
-   calls it, or to nothing if 'inline' is not supported under any name.  */
-#ifndef __cplusplus
-#undef inline
-#endif
-
-/* Define to empty if the keyword `volatile' does not work. Warning: valid
-   code using `volatile' can become incorrect without. Disable with care. */
-#undef volatile
-
 
 #include "WebKitFeatures.h"
 #endif // __AUTOTOOLSCONFIG_H__

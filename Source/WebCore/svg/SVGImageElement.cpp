@@ -95,7 +95,7 @@ bool SVGImageElement::isPresentationAttribute(const QualifiedName& name) const
     return SVGGraphicsElement::isPresentationAttribute(name);
 }
 
-void SVGImageElement::collectStyleForPresentationAttribute(const QualifiedName& name, const AtomicString& value, MutableStylePropertySet& style)
+void SVGImageElement::collectStyleForPresentationAttribute(const QualifiedName& name, const AtomicString& value, MutableStyleProperties& style)
 {
     if (!isSupportedAttribute(name))
         SVGGraphicsElement::collectStyleForPresentationAttribute(name, value, style);
@@ -154,20 +154,20 @@ void SVGImageElement::svgAttributeChanged(const QualifiedName& attrName)
         return;
     }
 
-    RenderObject* renderer = this->renderer();
+    auto renderer = this->renderer();
     if (!renderer)
         return;
 
     if (isLengthAttribute) {
         if (toRenderSVGImage(renderer)->updateImageViewport())
-            RenderSVGResource::markForLayoutAndParentResourceInvalidation(renderer);
+            RenderSVGResource::markForLayoutAndParentResourceInvalidation(*renderer);
         return;
     }
 
     if (attrName == SVGNames::preserveAspectRatioAttr
         || SVGLangSpace::isKnownAttribute(attrName)
         || SVGExternalResourcesRequired::isKnownAttribute(attrName)) {
-        RenderSVGResource::markForLayoutAndParentResourceInvalidation(renderer);
+        RenderSVGResource::markForLayoutAndParentResourceInvalidation(*renderer);
         return;
     }
 

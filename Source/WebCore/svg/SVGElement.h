@@ -123,11 +123,11 @@ public:
     virtual void synchronizeSystemLanguage() { }
 
 #ifndef NDEBUG
-    bool isAnimatableAttribute(const QualifiedName&) const;
+    virtual bool isAnimatableAttribute(const QualifiedName&) const;
 #endif
 
-    MutableStylePropertySet* animatedSMILStyleProperties() const;
-    MutableStylePropertySet& ensureAnimatedSMILStyleProperties();
+    MutableStyleProperties* animatedSMILStyleProperties() const;
+    MutableStyleProperties& ensureAnimatedSMILStyleProperties();
     void setUseOverrideComputedStyle(bool);
 
     virtual bool haveLoadedRequiredResources();
@@ -156,7 +156,7 @@ protected:
     static CSSPropertyID cssPropertyIdForSVGAttributeName(const QualifiedName&);
 
     virtual bool isPresentationAttribute(const QualifiedName&) const OVERRIDE;
-    virtual void collectStyleForPresentationAttribute(const QualifiedName&, const AtomicString&, MutableStylePropertySet&) OVERRIDE;
+    virtual void collectStyleForPresentationAttribute(const QualifiedName&, const AtomicString&, MutableStyleProperties&) OVERRIDE;
     virtual InsertionNotificationRequest insertedInto(ContainerNode&) OVERRIDE;
     virtual void removedFrom(ContainerNode&) OVERRIDE;
     virtual void childrenChanged(const ChildChange&) OVERRIDE;
@@ -171,8 +171,7 @@ private:
     // https://bugs.webkit.org/show_bug.cgi?id=77938
     virtual bool areAuthorShadowsAllowed() const OVERRIDE { return false; }
 
-    RenderStyle* computedStyle(PseudoId = NOPSEUDO);
-    virtual RenderStyle* virtualComputedStyle(PseudoId pseudoElementSpecifier = NOPSEUDO) OVERRIDE { return computedStyle(pseudoElementSpecifier); }
+    virtual RenderStyle* computedStyle(PseudoId = NOPSEUDO) OVERRIDE FINAL;
     virtual bool willRecalcStyle(Style::Change) OVERRIDE;
 
     virtual bool isSupported(StringImpl* feature, StringImpl* version) const;

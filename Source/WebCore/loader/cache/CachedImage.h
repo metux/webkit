@@ -24,6 +24,7 @@
 #define CachedImage_h
 
 #include "CachedResource.h"
+#include "Image.h"
 #include "ImageObserver.h"
 #include "IntRect.h"
 #include "IntSizeHash.h"
@@ -119,6 +120,8 @@ private:
     virtual bool isImage() const OVERRIDE { return true; }
     virtual bool stillNeedsLoad() const OVERRIDE { return !errorOccurred() && status() == Unknown && !isLoading(); }
 
+    virtual bool decodedDataIsPurgeable() const OVERRIDE { return m_image && m_image->decodedDataIsPurgeable(); }
+
     // ImageObserver
     virtual void decodedSizeChanged(const Image*, int delta) OVERRIDE;
     virtual void didDraw(const Image*) OVERRIDE;
@@ -135,7 +138,7 @@ private:
 
     RefPtr<Image> m_image;
 #if ENABLE(SVG)
-    OwnPtr<SVGImageCache> m_svgImageCache;
+    std::unique_ptr<SVGImageCache> m_svgImageCache;
 #endif
     bool m_shouldPaintBrokenImage;
 };

@@ -51,14 +51,14 @@ class WebProcessProxy;
 typedef GenericCallback<WKArrayRef> ArrayCallback;
 typedef GenericCallback<WKHTTPCookieAcceptPolicy, HTTPCookieAcceptPolicy> HTTPCookieAcceptPolicyCallback;
 
-class WebCookieManagerProxy : public API::TypedObject<API::Object::Type::CookieManager>, public WebContextSupplement, private CoreIPC::MessageReceiver {
+class WebCookieManagerProxy : public API::ObjectImpl<API::Object::Type::CookieManager>, public WebContextSupplement, private CoreIPC::MessageReceiver {
 public:
     static const char* supplementName();
 
     static PassRefPtr<WebCookieManagerProxy> create(WebContext*);
     virtual ~WebCookieManagerProxy();
 
-    void initializeClient(const WKCookieManagerClient*);
+    void initializeClient(const WKCookieManagerClientBase*);
     
     void getHostnamesWithCookies(PassRefPtr<ArrayCallback>);
     void deleteCookiesForHostname(const String& hostname);

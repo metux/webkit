@@ -119,6 +119,7 @@ public:
     HTMLStackItem* currentStackItem() const { return m_openElements.topStackItem(); }
     HTMLStackItem* oneBelowTop() const { return m_openElements.oneBelowTop(); }
     Document& ownerDocumentForCurrentNode();
+    bool insideTemplateElement();
     HTMLElementStack* openElements() const { return &m_openElements; }
     HTMLFormattingElementList* activeFormattingElements() const { return &m_activeFormattingElements; }
     bool currentIsRootNode() { return m_openElements.topNode() == m_openElements.rootNode(); }
@@ -131,6 +132,10 @@ public:
     PassRefPtr<HTMLFormElement> takeForm();
 
     ParserContentPolicy parserContentPolicy() { return m_parserContentPolicy; }
+
+#if PLATFORM(IOS)
+    bool isTelephoneNumberParsingEnabled() { return m_document->isTelephoneNumberParsingEnabled(); }
+#endif
 
     class RedirectToFosterParentGuard {
         WTF_MAKE_NONCOPYABLE(RedirectToFosterParentGuard);

@@ -86,10 +86,9 @@
 #include "SVGNames.h"
 #include "ScriptController.h"
 #include "ScriptSourceCode.h"
-#include "ScriptValue.h"
 #include "ScrollingCoordinator.h"
 #include "Settings.h"
-#include "StylePropertySet.h"
+#include "StyleProperties.h"
 #include "TextIterator.h"
 #include "TextNodeTraversal.h"
 #include "TextResourceDecoder.h"
@@ -104,6 +103,7 @@
 #include "markup.h"
 #include "npruntime_impl.h"
 #include "runtime_root.h"
+#include <bindings/ScriptValue.h>
 #include <wtf/PassOwnPtr.h>
 #include <wtf/RefCountedLeakCounter.h>
 #include <wtf/StdLibExtras.h>
@@ -386,7 +386,7 @@ String Frame::searchForLabelsBeforeElement(const Vector<String>& labels, Element
             break;
 
         if (n->hasTagName(tdTag) && !startingTableCell) {
-            startingTableCell = static_cast<HTMLTableCellElement*>(n);
+            startingTableCell = toHTMLTableCellElement(n);
         } else if (n->hasTagName(trTag) && startingTableCell) {
             String result = searchForLabelsAboveCell(regExp.get(), startingTableCell, resultDistance);
             if (!result.isEmpty()) {
@@ -965,109 +965,5 @@ bool Frame::isURLAllowed(const URL& url) const
     }
     return true;
 }
-
-#if !PLATFORM(MAC) && !PLATFORM(WIN)
-struct ScopedFramePaintingState {
-    ScopedFramePaintingState(Frame* frame, Node* node)
-        : frame(frame)
-        , node(node)
-        , paintBehavior(frame->view()->paintBehavior())
-        , backgroundColor(frame->view()->baseBackgroundColor())
-    {
-        ASSERT(!node || node->renderer());
-        if (node)
-            node->renderer()->updateDragState(true);
-    }
-
-    ~ScopedFramePaintingState()
-    {
-        if (node && node->renderer())
-            node->renderer()->updateDragState(false);
-        frame->view()->setPaintBehavior(paintBehavior);
-        frame->view()->setBaseBackgroundColor(backgroundColor);
-        frame->view()->setNodeToDraw(0);
-    }
-
-    Frame* frame;
-    Node* node;
-    PaintBehavior paintBehavior;
-    Color backgroundColor;
-};
-
-DragImageRef Frame::nodeImage(Node* node)
-{
-    if (!node->renderer())
-        return nullptr;
-
-    const ScopedFramePaintingState state(this, node);
-
-    m_view->setPaintBehavior(state.paintBehavior | PaintBehaviorFlattenCompositingLayers);
-
-    // When generating the drag image for an element, ignore the document background.
-    m_view->setBaseBackgroundColor(Color::transparent);
-    m_doc->updateLayout();
-    m_view->setNodeToDraw(node); // Enable special sub-tree drawing mode.
-
-    // Document::updateLayout may have blown away the original renderer.
-    auto renderer = node->renderer();
-    if (!renderer)
-        return nullptr;
-
-    LayoutRect topLevelRect;
-    IntRect paintingRect = pixelSnappedIntRect(renderer->paintingRootRect(topLevelRect));
-
-    float deviceScaleFactor = 1;
-    if (m_page)
-        deviceScaleFactor = m_page->deviceScaleFactor();
-    paintingRect.setWidth(paintingRect.width() * deviceScaleFactor);
-    paintingRect.setHeight(paintingRect.height() * deviceScaleFactor);
-
-    OwnPtr<ImageBuffer> buffer(ImageBuffer::create(paintingRect.size(), deviceScaleFactor, ColorSpaceDeviceRGB));
-    if (!buffer)
-        return nullptr;
-    buffer->context()->translate(-paintingRect.x(), -paintingRect.y());
-    buffer->context()->clip(FloatRect(0, 0, paintingRect.maxX(), paintingRect.maxY()));
-
-    m_view->paintContents(buffer->context(), paintingRect);
-
-    RefPtr<Image> image = buffer->copyImage();
-
-    ImageOrientationDescription orientationDescription(renderer->shouldRespectImageOrientation());
-#if ENABLE(CSS_IMAGE_ORIENTATION)
-    orientationDescription.setImageOrientationEnum(renderer->style().imageOrientation());
-#endif
-    return createDragImageFromImage(image.get(), orientationDescription);
-}
-
-DragImageRef Frame::dragImageForSelection()
-{
-    if (!selection().isRange())
-        return 0;
-
-    const ScopedFramePaintingState state(this, 0);
-    m_view->setPaintBehavior(PaintBehaviorSelectionOnly);
-    m_doc->updateLayout();
-
-    IntRect paintingRect = enclosingIntRect(selection().bounds());
-
-    float deviceScaleFactor = 1;
-    if (m_page)
-        deviceScaleFactor = m_page->deviceScaleFactor();
-    paintingRect.setWidth(paintingRect.width() * deviceScaleFactor);
-    paintingRect.setHeight(paintingRect.height() * deviceScaleFactor);
-
-    OwnPtr<ImageBuffer> buffer(ImageBuffer::create(paintingRect.size(), deviceScaleFactor, ColorSpaceDeviceRGB));
-    if (!buffer)
-        return 0;
-    buffer->context()->translate(-paintingRect.x(), -paintingRect.y());
-    buffer->context()->clip(FloatRect(0, 0, paintingRect.maxX(), paintingRect.maxY()));
-
-    m_view->paintContents(buffer->context(), paintingRect);
-
-    RefPtr<Image> image = buffer->copyImage();
-    return createDragImageFromImage(image.get(), ImageOrientationDescription());
-}
-
-#endif
 
 } // namespace WebCore

@@ -30,20 +30,20 @@
 
 #include "config.h"
 
-#if ENABLE(INSPECTOR) && ENABLE(WORKERS)
+#if ENABLE(INSPECTOR)
 
 #include "WorkerInspectorController.h"
 
 #include "InjectedScriptHost.h"
 #include "InjectedScriptManager.h"
-#include "InspectorBackendDispatchers.h"
 #include "InspectorClient.h"
 #include "InspectorConsoleAgent.h"
-#include "InspectorFrontend.h"
-#include "InspectorFrontendChannel.h"
+#include "InspectorForwarding.h"
 #include "InspectorHeapProfilerAgent.h"
 #include "InspectorProfilerAgent.h"
 #include "InspectorTimelineAgent.h"
+#include "InspectorWebBackendDispatchers.h"
+#include "InspectorWebFrontendDispatchers.h"
 #include "InstrumentingAgents.h"
 #include "WorkerConsoleAgent.h"
 #include "WorkerDebuggerAgent.h"
@@ -51,7 +51,10 @@
 #include "WorkerReportingProxy.h"
 #include "WorkerRuntimeAgent.h"
 #include "WorkerThread.h"
+#include <inspector/InspectorBackendDispatcher.h>
 #include <wtf/PassOwnPtr.h>
+
+using namespace Inspector;
 
 namespace WebCore {
 
@@ -86,7 +89,6 @@ WorkerInspectorController::WorkerInspectorController(WorkerGlobalScope* workerGl
     OwnPtr<InspectorConsoleAgent> consoleAgent = WorkerConsoleAgent::create(m_instrumentingAgents.get(), m_injectedScriptManager.get());
 #if ENABLE(JAVASCRIPT_DEBUGGER)
     OwnPtr<InspectorDebuggerAgent> debuggerAgent = WorkerDebuggerAgent::create(m_instrumentingAgents.get(), workerGlobalScope, m_injectedScriptManager.get());
-    InspectorDebuggerAgent* debuggerAgentPtr = debuggerAgent.get();
     m_runtimeAgent->setScriptDebugServer(&debuggerAgent->scriptDebugServer());
     m_agents.append(debuggerAgent.release());
 
@@ -103,9 +105,6 @@ WorkerInspectorController::WorkerInspectorController(WorkerGlobalScope* workerGl
 #endif
         , 0
         , 0
-#if ENABLE(JAVASCRIPT_DEBUGGER)
-        , debuggerAgentPtr
-#endif
     );
 }
  

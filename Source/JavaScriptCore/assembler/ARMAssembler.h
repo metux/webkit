@@ -230,6 +230,7 @@ namespace JSC {
             MOVT = 0x03400000,
 #endif
             NOP = 0xe1a00000,
+            DMB_SY = 0xf57ff05f,
         };
 
         enum {
@@ -696,6 +697,11 @@ namespace JSC {
             m_buffer.putInt(NOP);
         }
 
+        void dmbSY()
+        {
+            m_buffer.putInt(DMB_SY);
+        }
+
         void bx(int rm, Condition cc = AL)
         {
             emitInstruction(toARMWord(cc) | BX, 0, 0, RM(rm));
@@ -1094,9 +1100,6 @@ namespace JSC {
         }
 #endif
 
-#if OS(LINUX) && COMPILER(RVCT)
-        static __asm void cacheFlush(void* code, size_t);
-#else
         static void cacheFlush(void* code, size_t size)
         {
 #if OS(LINUX) && COMPILER(GCC)
@@ -1127,7 +1130,6 @@ namespace JSC {
 #error "The cacheFlush support is missing on this platform."
 #endif
         }
-#endif
 
     private:
         static ARMWord RM(int reg)

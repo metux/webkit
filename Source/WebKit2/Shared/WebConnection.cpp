@@ -41,7 +41,7 @@ WebConnection::~WebConnection()
 {
 }
 
-void WebConnection::initializeConnectionClient(const WKConnectionClient* client)
+void WebConnection::initializeConnectionClient(const WKConnectionClientBase* client)
 {
     m_client.initialize(client);
 }
@@ -55,7 +55,7 @@ void WebConnection::postMessage(const String& messageName, API::Object* messageB
     encoder->encode(messageName);
     encodeMessageBody(*encoder, messageBody);
 
-    sendMessage(std::move(encoder));
+    sendMessage(std::move(encoder), 0);
 }
 
 void WebConnection::didClose()

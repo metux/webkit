@@ -27,6 +27,11 @@
 #define UserMessageCoders_h
 
 #include "APIArray.h"
+#include "APIData.h"
+#include "APIGeometry.h"
+#include "APINumber.h"
+#include "APIString.h"
+#include "APIURLRequest.h"
 #include "ArgumentDecoder.h"
 #include "ArgumentEncoder.h"
 #include "DataReference.h"
@@ -34,44 +39,39 @@
 #include "ShareableBitmap.h"
 #include "WebCertificateInfo.h"
 #include "WebCoreArgumentCoders.h"
-#include "WebData.h"
 #include "WebError.h"
-#include "WebGeometry.h"
 #include "WebImage.h"
-#include "WebNumber.h"
 #include "WebRenderLayer.h"
 #include "WebRenderObject.h"
 #include "WebSerializedScriptValue.h"
-#include "WebString.h"
 #include "WebURL.h"
-#include "WebURLRequest.h"
 #include "WebURLResponse.h"
 #include "WebUserContentURLPattern.h"
 
 namespace WebKit {
 
 //   - Null -> Null
-//   - Array -> Array
+//   - API::Array -> API::Array
 //   - Dictionary -> Dictionary
 //   - SerializedScriptValue -> SerializedScriptValue
-//   - String -> String
+//   - API::String -> API::String
 //   - UserContentURLPattern -> UserContentURLPattern
 //   - WebCertificateInfo -> WebCertificateInfo
-//   - WebData -> WebData
-//   - WebDouble -> WebDouble
+//   - API::Data -> API::Data
+//   - API::Double -> API::Double
 //   - WebImage -> WebImage
 //   - WebRenderLayer -> WebRenderLayer
 //   - WebRenderObject -> WebRenderObject
-//   - WebUInt64 -> WebUInt64
+//   - API::UInt64 -> API::UInt64
 //   - WebURL -> WebURL
-//   - WebURLRequest -> WebURLRequest
+//   - API::URLRequest -> API::URLRequest
 //   - WebURLResponse -> WebURLResponse
 //   - WebError -> WebError
 
 template<typename Owner>
 class UserMessageEncoder {
 public:
-    bool baseEncode(CoreIPC::ArgumentEncoder& encoder, API::Object::Type& type) const
+    bool baseEncode(CoreIPC::ArgumentEncoder& encoder, const Owner& coder, API::Object::Type& type) const
     {
         if (!m_root) {
             encoder << static_cast<uint32_t>(API::Object::Type::Null);
@@ -86,7 +86,7 @@ public:
             API::Array* array = static_cast<API::Array*>(m_root);
             encoder << static_cast<uint64_t>(array->size());
             for (size_t i = 0; i < array->size(); ++i)
-                encoder << Owner(array->at(i));
+                encoder << Owner(coder, array->at(i));
             return true;
         }
         case API::Object::Type::Dictionary: {
@@ -98,12 +98,12 @@ public:
             ImmutableDictionary::MapType::const_iterator end = map.end();
             for (; it != end; ++it) {
                 encoder << it->key;
-                encoder << Owner(it->value.get());
+                encoder << Owner(coder, it->value.get());
             }
             return true;
         }
         case API::Object::Type::String: {
-            WebString* string = static_cast<WebString*>(m_root);
+            API::String* string = static_cast<API::String*>(m_root);
             encoder << string->string();
             return true;
         }
@@ -113,34 +113,34 @@ public:
             return true;
         }
         case API::Object::Type::Boolean: {
-            WebBoolean* booleanObject = static_cast<WebBoolean*>(m_root);
+            API::Boolean* booleanObject = static_cast<API::Boolean*>(m_root);
             encoder << booleanObject->value();
             return true;
         }
         case API::Object::Type::Double: {
-            WebDouble* doubleObject = static_cast<WebDouble*>(m_root);
+            API::Double* doubleObject = static_cast<API::Double*>(m_root);
             encoder << doubleObject->value();
             return true;
         }
         case API::Object::Type::UInt64: {
-            WebUInt64* uint64Object = static_cast<WebUInt64*>(m_root);
+            API::UInt64* uint64Object = static_cast<API::UInt64*>(m_root);
             encoder << uint64Object->value();
             return true;
         }
         case API::Object::Type::Point: {
-            WebPoint* pointObject = static_cast<WebPoint*>(m_root);
+            API::Point* pointObject = static_cast<API::Point*>(m_root);
             encoder << pointObject->point().x;
             encoder << pointObject->point().y;
             return true;
         }
         case API::Object::Type::Size: {
-            WebSize* sizeObject = static_cast<WebSize*>(m_root);
+            API::Size* sizeObject = static_cast<API::Size*>(m_root);
             encoder << sizeObject->size().width;
             encoder << sizeObject->size().height;
             return true;
         }
         case API::Object::Type::Rect: {
-            WebRect* rectObject = static_cast<WebRect*>(m_root);
+            API::Rect* rectObject = static_cast<API::Rect*>(m_root);
             encoder << rectObject->rect().origin.x;
             encoder << rectObject->rect().origin.y;
             encoder << rectObject->rect().size.width;
@@ -149,15 +149,15 @@ public:
         }
         case API::Object::Type::RenderLayer: {
             WebRenderLayer* renderLayer = static_cast<WebRenderLayer*>(m_root);
-            encoder << Owner(renderLayer->renderer());
+            encoder << Owner(coder, renderLayer->renderer());
             encoder << renderLayer->isReflection();
             encoder << renderLayer->isClipping();
             encoder << renderLayer->isClipped();
             encoder << static_cast<uint32_t>(renderLayer->compositingLayerType());
             encoder << renderLayer->absoluteBoundingBox();
-            encoder << Owner(renderLayer->negativeZOrderList());
-            encoder << Owner(renderLayer->normalFlowList());
-            encoder << Owner(renderLayer->positiveZOrderList());
+            encoder << Owner(coder, renderLayer->negativeZOrderList());
+            encoder << Owner(coder, renderLayer->normalFlowList());
+            encoder << Owner(coder, renderLayer->positiveZOrderList());
             return true;
         }
         case API::Object::Type::RenderObject: {
@@ -165,10 +165,10 @@ public:
             encoder << renderObject->name();
             encoder << renderObject->elementTagName();
             encoder << renderObject->elementID();
-            encoder << Owner(renderObject->elementClassNames());
+            encoder << Owner(coder, renderObject->elementClassNames());
             encoder << renderObject->absolutePosition();
             encoder << renderObject->frameRect();
-            encoder << Owner(renderObject->children());
+            encoder << Owner(coder, renderObject->children());
             return true;
         }
         case API::Object::Type::URL: {
@@ -177,7 +177,7 @@ public:
             return true;
         }
         case API::Object::Type::URLRequest: {
-            WebURLRequest* urlRequestObject = static_cast<WebURLRequest*>(m_root);
+            API::URLRequest* urlRequestObject = static_cast<API::URLRequest*>(m_root);
             encoder << urlRequestObject->resourceRequest();
             return true;
         }
@@ -209,13 +209,13 @@ public:
             return true;
         }
         case API::Object::Type::Data: {
-            WebData* data = static_cast<WebData*>(m_root);
+            API::Data* data = static_cast<API::Data*>(m_root);
             encoder << data->dataReference();
             return true;
         }
         case API::Object::Type::CertificateInfo: {
             WebCertificateInfo* certificateInfo = static_cast<WebCertificateInfo*>(m_root);
-            encoder << certificateInfo->platformCertificateInfo();
+            encoder << certificateInfo->certificateInfo();
             return true;
         }
         case API::Object::Type::Error: {
@@ -242,18 +242,18 @@ protected:
 
 // Handles
 //   - Null -> Null
-//   - Array -> Array
+//   - API::Array -> API::Array
 //   - Dictionary -> Dictionary
 //   - SerializedScriptValue -> SerializedScriptValue
-//   - String -> String
+//   - API::String -> API::String
 //   - UserContentURLPattern -> UserContentURLPattern
 //   - WebCertificateInfo -> WebCertificateInfo
-//   - WebData -> WebData
-//   - WebDouble -> WebDouble
+//   - API::Data -> API::Data
+//   - API::Double -> API::Double
 //   - WebImage -> WebImage
-//   - WebUInt64 -> WebUInt64
+//   - API::UInt64 -> API::UInt64
 //   - WebURL -> WebURL
-//   - WebURLRequest -> WebURLRequest
+//   - API::URLRequest -> API::URLRequest
 //   - WebURLResponse -> WebURLResponse
 //   - WebError -> WebError
 
@@ -307,14 +307,14 @@ public:
                     return false;
             }
 
-            coder.m_root = ImmutableDictionary::adopt(map);
+            coder.m_root = ImmutableDictionary::create(std::move(map));
             break;
         }
         case API::Object::Type::String: {
             String string;
             if (!decoder.decode(string))
                 return false;
-            coder.m_root = WebString::create(string);
+            coder.m_root = API::String::create(string);
             break;
         }
         case API::Object::Type::SerializedScriptValue: {
@@ -330,21 +330,21 @@ public:
             double value;
             if (!decoder.decode(value))
                 return false;
-            coder.m_root = WebDouble::create(value);
+            coder.m_root = API::Double::create(value);
             break;
         }
         case API::Object::Type::UInt64: {
             uint64_t value;
             if (!decoder.decode(value))
                 return false;
-            coder.m_root = WebUInt64::create(value);
+            coder.m_root = API::UInt64::create(value);
             break;
         }
         case API::Object::Type::Boolean: {
             bool value;
             if (!decoder.decode(value))
                 return false;
-            coder.m_root = WebBoolean::create(value);
+            coder.m_root = API::Boolean::create(value);
             break;
         }
         case API::Object::Type::Size: {
@@ -354,7 +354,7 @@ public:
                 return false;
             if (!decoder.decode(height))
                 return false;
-            coder.m_root = WebSize::create(WKSizeMake(width, height));
+            coder.m_root = API::Size::create(WKSizeMake(width, height));
             break;
         }
         case API::Object::Type::Point: {
@@ -364,7 +364,7 @@ public:
                 return false;
             if (!decoder.decode(y))
                 return false;
-            coder.m_root = WebPoint::create(WKPointMake(x, y));
+            coder.m_root = API::Point::create(WKPointMake(x, y));
             break;
         }
         case API::Object::Type::Rect: {
@@ -380,7 +380,7 @@ public:
                 return false;
             if (!decoder.decode(height))
                 return false;
-            coder.m_root = WebRect::create(WKRectMake(x, y, width, height));
+            coder.m_root = API::Rect::create(WKRectMake(x, y, width, height));
             break;
         }
         case API::Object::Type::RenderLayer: {
@@ -464,7 +464,7 @@ public:
             WebCore::ResourceRequest request;
             if (!decoder.decode(request))
                 return false;
-            coder.m_root = WebURLRequest::create(request);
+            coder.m_root = API::URLRequest::create(request);
             break;
         }
         case API::Object::Type::URLResponse: {
@@ -500,14 +500,14 @@ public:
             CoreIPC::DataReference dataReference;
             if (!decoder.decode(dataReference))
                 return false;
-            coder.m_root = WebData::create(dataReference.data(), dataReference.size());
+            coder.m_root = API::Data::create(dataReference.data(), dataReference.size());
             break;
         }
         case API::Object::Type::CertificateInfo: {
-            PlatformCertificateInfo platformCertificateInfo;
-            if (!decoder.decode(platformCertificateInfo))
+            WebCore::CertificateInfo certificateInfo;
+            if (!decoder.decode(certificateInfo))
                 return false;
-            coder.m_root = WebCertificateInfo::create(platformCertificateInfo);
+            coder.m_root = WebCertificateInfo::create(certificateInfo);
             break;
         }
         case API::Object::Type::Error: {

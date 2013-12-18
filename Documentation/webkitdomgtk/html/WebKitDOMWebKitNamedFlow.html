@@ -58,6 +58,13 @@
                                                         (<em class="parameter"><code><a class="link" href="WebKitDOMWebKitNamedFlow.html" title="WebKitDOMWebKitNamedFlow"><span class="type">WebKitDOMWebKitNamedFlow</span></a> *self</code></em>);
 <a href="../glib/glib-Basic-Types.html#glong"><span class="returnvalue">glong</span></a>               <a class="link" href="WebKitDOMWebKitNamedFlow.html#webkit-dom-webkit-named-flow-get-first-empty-region-index" title="webkit_dom_webkit_named_flow_get_first_empty_region_index ()">webkit_dom_webkit_named_flow_get_first_empty_region_index</a>
                                                         (<em class="parameter"><code><a class="link" href="WebKitDOMWebKitNamedFlow.html" title="WebKitDOMWebKitNamedFlow"><span class="type">WebKitDOMWebKitNamedFlow</span></a> *self</code></em>);
+<a href="../glib/glib-Basic-Types.html#gboolean"><span class="returnvalue">gboolean</span></a>            <a class="link" href="WebKitDOMWebKitNamedFlow.html#webkit-dom-webkit-named-flow-get-overflow" title="webkit_dom_webkit_named_flow_get_overflow ()">webkit_dom_webkit_named_flow_get_overflow</a>
+                                                        (<em class="parameter"><code><a class="link" href="WebKitDOMWebKitNamedFlow.html" title="WebKitDOMWebKitNamedFlow"><span class="type">WebKitDOMWebKitNamedFlow</span></a> *flow</code></em>);
+<a class="link" href="WebKitDOMNodeList.html" title="WebKitDOMNodeList"><span class="returnvalue">WebKitDOMNodeList</span></a> * <a class="link" href="WebKitDOMWebKitNamedFlow.html#webkit-dom-webkit-named-flow-get-content-nodes" title="webkit_dom_webkit_named_flow_get_content_nodes ()">webkit_dom_webkit_named_flow_get_content_nodes</a>
+                                                        (<em class="parameter"><code><a class="link" href="WebKitDOMWebKitNamedFlow.html" title="WebKitDOMWebKitNamedFlow"><span class="type">WebKitDOMWebKitNamedFlow</span></a> *flow</code></em>);
+<a class="link" href="WebKitDOMNodeList.html" title="WebKitDOMNodeList"><span class="returnvalue">WebKitDOMNodeList</span></a> * <a class="link" href="WebKitDOMWebKitNamedFlow.html#webkit-dom-webkit-named-flow-get-regions-by-content-node" title="webkit_dom_webkit_named_flow_get_regions_by_content_node ()">webkit_dom_webkit_named_flow_get_regions_by_content_node</a>
+                                                        (<em class="parameter"><code><a class="link" href="WebKitDOMWebKitNamedFlow.html" title="WebKitDOMWebKitNamedFlow"><span class="type">WebKitDOMWebKitNamedFlow</span></a> *flow</code></em>,
+                                                         <em class="parameter"><code><a class="link" href="WebKitDOMNode.html" title="WebKitDOMNode"><span class="type">WebKitDOMNode</span></a> *content_node</code></em>);
 </pre>
 </div>
 <div class="refsect1">
@@ -279,6 +286,96 @@ WebKitDOMWebKitNamedFlow implements
 <tr>
 <td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
 <td>A <a href="../glib/glib-Basic-Types.html#glong"><span class="type">glong</span></a>
+</td>
+</tr>
+</tbody>
+</table></div>
+</div>
+<hr>
+<div class="refsect2">
+<a name="webkit-dom-webkit-named-flow-get-overflow"></a><h3>webkit_dom_webkit_named_flow_get_overflow ()</h3>
+<pre class="programlisting"><a href="../glib/glib-Basic-Types.html#gboolean"><span class="returnvalue">gboolean</span></a>            webkit_dom_webkit_named_flow_get_overflow
+                                                        (<em class="parameter"><code><a class="link" href="WebKitDOMWebKitNamedFlow.html" title="WebKitDOMWebKitNamedFlow"><span class="type">WebKitDOMWebKitNamedFlow</span></a> *flow</code></em>);</pre>
+<div class="warning">
+<h3 class="title">Warning</h3>
+<p><code class="literal">webkit_dom_webkit_named_flow_get_overflow</code> has been deprecated since version 1.10 and should not be used in newly-written code. Use <a class="link" href="WebKitDOMWebKitNamedFlow.html#webkit-dom-webkit-named-flow-get-overset" title="webkit_dom_webkit_named_flow_get_overset ()"><code class="function">webkit_dom_webkit_named_flow_get_overset()</code></a> instead.</p>
+</div>
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
+<col align="left" valign="top">
+<col>
+</colgroup>
+<tbody>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>flow</code></em> :</span></p></td>
+<td>A <a class="link" href="WebKitDOMWebKitNamedFlow.html" title="WebKitDOMWebKitNamedFlow"><span class="type">WebKitDOMWebKitNamedFlow</span></a>
+</td>
+</tr>
+<tr>
+<td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
+<td>A <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a>
+</td>
+</tr>
+</tbody>
+</table></div>
+</div>
+<hr>
+<div class="refsect2">
+<a name="webkit-dom-webkit-named-flow-get-content-nodes"></a><h3>webkit_dom_webkit_named_flow_get_content_nodes ()</h3>
+<pre class="programlisting"><a class="link" href="WebKitDOMNodeList.html" title="WebKitDOMNodeList"><span class="returnvalue">WebKitDOMNodeList</span></a> * webkit_dom_webkit_named_flow_get_content_nodes
+                                                        (<em class="parameter"><code><a class="link" href="WebKitDOMWebKitNamedFlow.html" title="WebKitDOMWebKitNamedFlow"><span class="type">WebKitDOMWebKitNamedFlow</span></a> *flow</code></em>);</pre>
+<div class="warning">
+<h3 class="title">Warning</h3>
+<p><code class="literal">webkit_dom_webkit_named_flow_get_content_nodes</code> has been deprecated since version 1.10 and should not be used in newly-written code. Use <a class="link" href="WebKitDOMWebKitNamedFlow.html#webkit-dom-webkit-named-flow-get-content" title="webkit_dom_webkit_named_flow_get_content ()"><code class="function">webkit_dom_webkit_named_flow_get_content()</code></a> instead.</p>
+</div>
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
+<col align="left" valign="top">
+<col>
+</colgroup>
+<tbody>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>flow</code></em> :</span></p></td>
+<td>A <a class="link" href="WebKitDOMWebKitNamedFlow.html" title="WebKitDOMWebKitNamedFlow"><span class="type">WebKitDOMWebKitNamedFlow</span></a>
+</td>
+</tr>
+<tr>
+<td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
+<td>a <a class="link" href="WebKitDOMNodeList.html" title="WebKitDOMNodeList"><span class="type">WebKitDOMNodeList</span></a>. <span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
+</td>
+</tr>
+</tbody>
+</table></div>
+</div>
+<hr>
+<div class="refsect2">
+<a name="webkit-dom-webkit-named-flow-get-regions-by-content-node"></a><h3>webkit_dom_webkit_named_flow_get_regions_by_content_node ()</h3>
+<pre class="programlisting"><a class="link" href="WebKitDOMNodeList.html" title="WebKitDOMNodeList"><span class="returnvalue">WebKitDOMNodeList</span></a> * webkit_dom_webkit_named_flow_get_regions_by_content_node
+                                                        (<em class="parameter"><code><a class="link" href="WebKitDOMWebKitNamedFlow.html" title="WebKitDOMWebKitNamedFlow"><span class="type">WebKitDOMWebKitNamedFlow</span></a> *flow</code></em>,
+                                                         <em class="parameter"><code><a class="link" href="WebKitDOMNode.html" title="WebKitDOMNode"><span class="type">WebKitDOMNode</span></a> *content_node</code></em>);</pre>
+<div class="warning">
+<h3 class="title">Warning</h3>
+<p><code class="literal">webkit_dom_webkit_named_flow_get_regions_by_content_node</code> has been deprecated since version 1.10 and should not be used in newly-written code. Use <a class="link" href="WebKitDOMWebKitNamedFlow.html#webkit-dom-webkit-named-flow-get-regions-by-content" title="webkit_dom_webkit_named_flow_get_regions_by_content ()"><code class="function">webkit_dom_webkit_named_flow_get_regions_by_content()</code></a> instead.</p>
+</div>
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
+<col align="left" valign="top">
+<col>
+</colgroup>
+<tbody>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>flow</code></em> :</span></p></td>
+<td>A <a class="link" href="WebKitDOMWebKitNamedFlow.html" title="WebKitDOMWebKitNamedFlow"><span class="type">WebKitDOMWebKitNamedFlow</span></a>
+</td>
+</tr>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>content_node</code></em> :</span></p></td>
+<td>A <a class="link" href="WebKitDOMNode.html" title="WebKitDOMNode"><span class="type">WebKitDOMNode</span></a>
+</td>
+</tr>
+<tr>
+<td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
+<td>a <a class="link" href="WebKitDOMNodeList.html" title="WebKitDOMNodeList"><span class="type">WebKitDOMNodeList</span></a>. <span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
 </td>
 </tr>
 </tbody>

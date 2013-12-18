@@ -46,7 +46,7 @@ BEGIN_REGISTER_ANIMATED_PROPERTIES(SVGFontElement)
 END_REGISTER_ANIMATED_PROPERTIES
 
 inline SVGFontElement::SVGFontElement(const QualifiedName& tagName, Document& document)
-    : SVGElement(tagName, document) 
+    : SVGElement(tagName, document)
     , m_missingGlyph(0)
     , m_isGlyphCacheValid(false)
 {
@@ -102,7 +102,7 @@ void SVGFontElement::registerLigaturesInGlyphCache(Vector<String>& ligatures)
                 glyphs.clear();
                 continue;
             }
-                
+
             // This glyph is never meant to be used for rendering, only as identifier as a part of a ligature.
             SVGGlyph newGlyphPart;
             newGlyphPart.isPartOfLigature = true;
@@ -118,29 +118,27 @@ void SVGFontElement::ensureGlyphCache()
 
     const SVGMissingGlyphElement* firstMissingGlyphElement = nullptr;
     Vector<String> ligatures;
-    auto children = childrenOfType<SVGElement>(*this);
-    for (auto child = children.begin(), end = children.end(); child != end; ++child) {
-        SVGElement* element = &*child;
-        if (isSVGGlyphElement(element)) {
-            SVGGlyphElement* glyph = toSVGGlyphElement(element);
-            AtomicString unicode = glyph->fastGetAttribute(SVGNames::unicodeAttr);
-            AtomicString glyphId = glyph->getIdAttribute();
+    for (auto& child : childrenOfType<SVGElement>(*this)) {
+        if (isSVGGlyphElement(child)) {
+            SVGGlyphElement& glyph = toSVGGlyphElement(child);
+            AtomicString unicode = glyph.fastGetAttribute(SVGNames::unicodeAttr);
+            AtomicString glyphId = glyph.getIdAttribute();
             if (glyphId.isEmpty() && unicode.isEmpty())
                 continue;
 
-            m_glyphMap.addGlyph(glyphId, unicode, glyph->buildGlyphIdentifier());
+            m_glyphMap.addGlyph(glyphId, unicode, glyph.buildGlyphIdentifier());
 
             // Register ligatures, if needed, don't mix up with surrogate pairs though!
             if (unicode.length() > 1 && !U16_IS_SURROGATE(unicode[0]))
                 ligatures.append(unicode.string());
-        } else if (isSVGHKernElement(element)) {
-            SVGHKernElement* hkern = toSVGHKernElement(element);
-            hkern->buildHorizontalKerningPair(m_horizontalKerningMap);
-        } else if (isSVGVKernElement(element)) {
-            SVGVKernElement* vkern = toSVGVKernElement(element);
-            vkern->buildVerticalKerningPair(m_verticalKerningMap);
-        } else if (isSVGMissingGlyphElement(element) && !firstMissingGlyphElement)
-            firstMissingGlyphElement = toSVGMissingGlyphElement(element);
+        } else if (isSVGHKernElement(child)) {
+            SVGHKernElement& hkern = toSVGHKernElement(child);
+            hkern.buildHorizontalKerningPair(m_horizontalKerningMap);
+        } else if (isSVGVKernElement(child)) {
+            SVGVKernElement& vkern = toSVGVKernElement(child);
+            vkern.buildVerticalKerningPair(m_verticalKerningMap);
+        } else if (isSVGMissingGlyphElement(child) && !firstMissingGlyphElement)
+            firstMissingGlyphElement = &toSVGMissingGlyphElement(child);
     }
 
     // Register each character of each ligature, if needed.
@@ -179,9 +177,9 @@ void SVGKerningMap::insert(const SVGKerningPair& kerningPair)
         if (unicodeMap.contains(*uIt))
             unicodeMap.get(*uIt)->append(svgKerning);
         else {
-            OwnPtr<SVGKerningVector> newVector = adoptPtr(new SVGKerningVector);
+            auto newVector = std::make_unique<SVGKerningVector>();
             newVector->append(svgKerning);
-            unicodeMap.add(*uIt, newVector.release());
+            unicodeMap.add(*uIt, std::move(newVector));
         }
     }
 
@@ -191,9 +189,9 @@ void SVGKerningMap::insert(const SVGKerningPair& kerningPair)
         if (glyphMap.contains(*gIt))
             glyphMap.get(*gIt)->append(svgKerning);
         else {
-            OwnPtr<SVGKerningVector> newVector = adoptPtr(new SVGKerningVector);
+            auto newVector = std::make_unique<SVGKerningVector>();
             newVector->append(svgKerning);
-            glyphMap.add(*gIt, newVector.release());
+            glyphMap.add(*gIt, std::move(newVector));
         }
     }
 
@@ -281,7 +279,7 @@ static inline float kerningForPairOfStringsAndGlyphs(const SVGKerningMap& kernin
 
     return 0;
 }
-    
+
 float SVGFontElement::horizontalKerningForPairOfStringsAndGlyphs(const String& u1, const String& g1, const String& u2, const String& g2) const
 {
     if (m_horizontalKerningMap.isEmpty())
@@ -316,7 +314,7 @@ SVGGlyph SVGFontElement::svgGlyphForGlyph(Glyph glyph)
     ensureGlyphCache();
     return m_glyphMap.svgGlyphForGlyph(glyph);
 }
-    
+
 Glyph SVGFontElement::missingGlyph()
 {
     ensureGlyphCache();

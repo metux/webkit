@@ -141,15 +141,15 @@ static RenderLayer::UpdateLayerPositionsFlags updateLayerPositionFlags(RenderLay
     return flags;
 }
 
-Pagination::Mode paginationModeForRenderStyle(RenderStyle* style)
+Pagination::Mode paginationModeForRenderStyle(const RenderStyle& style)
 {
-    EOverflow overflow = style->overflowY();
+    EOverflow overflow = style.overflowY();
     if (overflow != OPAGEDX && overflow != OPAGEDY)
         return Pagination::Unpaginated;
 
-    bool isHorizontalWritingMode = style->isHorizontalWritingMode();
-    TextDirection textDirection = style->direction();
-    WritingMode writingMode = style->writingMode();
+    bool isHorizontalWritingMode = style.isHorizontalWritingMode();
+    TextDirection textDirection = style.direction();
+    WritingMode writingMode = style.writingMode();
 
     // paged-x always corresponds to LeftToRightPaginated or RightToLeftPaginated. If the WritingMode
     // is horizontal, then we use TextDirection to choose between those options. If the WritingMode
@@ -205,7 +205,7 @@ FrameView::FrameView(Frame& frame)
 
     if (frame.isMainFrame()) {
         ScrollableArea::setVerticalScrollElasticity(ScrollElasticityAllowed);
-        ScrollableArea::setHorizontalScrollElasticity(ScrollElasticityAllowed);
+        ScrollableArea::setHorizontalScrollElasticity(ScrollElasticityAutomatic);
     }
 }
 
@@ -673,7 +673,7 @@ void FrameView::applyPaginationToViewport()
 
     EOverflow overflowY = documentOrBodyRenderer->style().overflowY();
     if (overflowY == OPAGEDX || overflowY == OPAGEDY) {
-        pagination.mode = WebCore::paginationModeForRenderStyle(&documentOrBodyRenderer->style());
+        pagination.mode = WebCore::paginationModeForRenderStyle(documentOrBodyRenderer->style());
         pagination.gap = static_cast<unsigned>(documentOrBodyRenderer->style().columnGap());
     }
 
@@ -3404,7 +3404,7 @@ void FrameView::updateControlTints()
         return;
 
     RenderView* renderView = this->renderView();
-    if ((renderView && renderView->theme()->supportsControlTints()) || hasCustomScrollbars())
+    if ((renderView && renderView->theme().supportsControlTints()) || hasCustomScrollbars())
         paintControlTints();
 }
 
@@ -4178,8 +4178,7 @@ void FrameView::setScrollPinningBehavior(ScrollPinningBehavior pinning)
 
 ScrollBehaviorForFixedElements FrameView::scrollBehaviorForFixedElements() const
 {
-    // FIXME: Implement. This should consult a setting that does not yet exist.
-    return StickToDocumentBounds;
+    return frame().settings().backgroundShouldExtendBeyondPage() ? StickToViewportBounds : StickToDocumentBounds;
 }
 
 RenderView* FrameView::renderView() const

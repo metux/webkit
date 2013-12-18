@@ -445,3 +445,21 @@ WebKitDOMNode
 @Returns: 
 
 
+<!-- ##### FUNCTION webkit_dom_node_get_attributes ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_node_has_attributes ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+

@@ -195,7 +195,7 @@ void HTMLOptionElement::parseAttribute(const QualifiedName& name, const AtomicSt
         if (oldDisabled != m_disabled) {
             didAffectSelector(AffectedSelectorDisabled | AffectedSelectorEnabled);
             if (renderer() && renderer()->style().hasAppearance())
-                renderer()->theme()->stateChanged(renderer(), EnabledState);
+                renderer()->theme().stateChanged(renderer(), EnabledState);
         }
     } else if (name == selectedAttr) {
         // FIXME: This doesn't match what the HTML specification says.
@@ -344,8 +344,8 @@ bool HTMLOptionElement::isDisabledFormControl() const
     if (!parentNode() || !parentNode()->isHTMLElement())
         return false;
 
-    HTMLElement* parentElement = static_cast<HTMLElement*>(parentNode());
-    return isHTMLOptGroupElement(parentElement) && parentElement->isDisabledFormControl();
+    HTMLElement& parentElement = toHTMLElement(*parentNode());
+    return isHTMLOptGroupElement(parentElement) && parentElement.isDisabledFormControl();
 }
 
 Node::InsertionNotificationRequest HTMLOptionElement::insertedInto(ContainerNode& insertionPoint)

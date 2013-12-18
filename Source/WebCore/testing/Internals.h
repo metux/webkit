@@ -31,6 +31,7 @@
 #include "ContextDestructionObserver.h"
 #include "ExceptionCodePlaceholder.h"
 #include "NodeList.h"
+#include <bindings/ScriptValue.h>
 #include <runtime/ArrayBuffer.h>
 #include <runtime/Float32Array.h>
 #include <wtf/PassRefPtr.h>
@@ -179,6 +180,8 @@ public:
 
     void emitInspectorDidBeginFrame();
     void emitInspectorDidCancelFrame();
+
+    String parserMetaData(Deprecated::ScriptValue = Deprecated::ScriptValue());
 
     bool hasSpellingMarker(int from, int length, ExceptionCode&);
     bool hasGrammarMarker(int from, int length, ExceptionCode&);

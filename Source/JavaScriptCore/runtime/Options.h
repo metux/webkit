@@ -100,6 +100,7 @@ typedef OptionRange optionRange;
     \
     v(bool, dumpGeneratedBytecodes, false) \
     v(bool, dumpBytecodeLivenessResults, false) \
+    v(bool, validateBytecode, false) \
     \
     /* showDisassembly implies showDFGDisassembly. */ \
     v(bool, showDisassembly, false) \
@@ -142,6 +143,8 @@ typedef OptionRange optionRange;
     \
     v(bool, forceUDis86Disassembler, false) \
     v(bool, forceLLVMDisassembler, false) \
+    \
+    v(bool, enableArchitectureSpecificOptimizations, true) \
     \
     v(unsigned, maximumOptimizationCandidateInstructionCount, 10000) \
     \

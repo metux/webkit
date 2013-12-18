@@ -51,7 +51,7 @@ public:
     virtual MediaTime duration() const OVERRIDE { return m_box.duration(); }
     virtual AtomicString trackID() const OVERRIDE { return m_id; }
 
-    virtual SampleFlags flags() const OVERRIDE { return None; }
+    virtual SampleFlags flags() const OVERRIDE;
     virtual PlatformSample platformSample() OVERRIDE;
 
 protected:
@@ -64,6 +64,14 @@ protected:
     MockSampleBox m_box;
     AtomicString m_id;
 };
+
+MediaSample::SampleFlags MockMediaSample::flags() const
+{
+    unsigned flags = None;
+    if (m_box.flags() & MockSampleBox::IsSync)
+        flags |= IsSync;
+    return SampleFlags(flags);
+}
 
 PlatformSample MockMediaSample::platformSample()
 {
@@ -92,7 +100,7 @@ RefPtr<MockSourceBufferPrivate> MockSourceBufferPrivate::create(MockMediaSourceP
 }
 
 MockSourceBufferPrivate::MockSourceBufferPrivate(MockMediaSourcePrivate* parent)
-    : m_parent(parent)
+    : m_mediaSource(parent)
     , m_client(0)
 {
 }
@@ -179,17 +187,19 @@ void MockSourceBufferPrivate::abort()
 
 void MockSourceBufferPrivate::removedFromMediaSource()
 {
-    m_parent->removeSourceBuffer(this);
+    if (m_mediaSource)
+        m_mediaSource->removeSourceBuffer(this);
 }
 
 MediaPlayer::ReadyState MockSourceBufferPrivate::readyState() const
 {
-    return m_parent->player()->readyState();
+    return m_mediaSource ? m_mediaSource->player()->readyState() : MediaPlayer::HaveNothing;
 }
 
 void MockSourceBufferPrivate::setReadyState(MediaPlayer::ReadyState readyState)
 {
-    m_parent->player()->setReadyState(readyState);
+    if (m_mediaSource)
+        m_mediaSource->player()->setReadyState(readyState);
 }
 
 void MockSourceBufferPrivate::evictCodedFrames()
@@ -200,6 +210,34 @@ void MockSourceBufferPrivate::evictCodedFrames()
 bool MockSourceBufferPrivate::isFull()
 {
     return false;
+}
+
+void MockSourceBufferPrivate::setActive(bool isActive)
+{
+    if (m_mediaSource)
+        m_mediaSource->sourceBufferPrivateDidChangeActiveState(this, isActive);
+}
+
+void MockSourceBufferPrivate::enqueueSample(PassRefPtr<MediaSample> sample, AtomicString)
+{
+    if (!m_mediaSource || !sample)
+        return;
+
+    PlatformSample platformSample = sample->platformSample();
+    if (platformSample.type != PlatformSample::MockSampleBoxType)
+        return;
+
+    MockSampleBox* box = platformSample.sample.mockSampleBox;
+    if (!box)
+        return;
+
+    m_mediaSource->incrementTotalVideoFrames();
+    if (box->isCorrupted())
+        m_mediaSource->incrementCorruptedFrames();
+    if (box->isDropped())
+        m_mediaSource->incrementDroppedFrames();
+    if (box->isDelayed())
+        m_mediaSource->incrementTotalFrameDelayBy(1);
 }
 
 bool MockSourceBufferPrivate::hasVideo() const
@@ -216,6 +254,20 @@ bool MockSourceBufferPrivate::hasAudio() const
         return false;
 
     return m_client->sourceBufferPrivateHasAudio(this);
+}
+
+
+MediaTime MockSourceBufferPrivate::fastSeekTimeForMediaTime(const MediaTime& time, const MediaTime& negativeThreshold, const MediaTime& positiveThreshold)
+{
+    if (m_client)
+        return m_client->sourceBufferPrivateFastSeekTimeForMediaTime(this, time, negativeThreshold, positiveThreshold);
+    return time;
+}
+
+void MockSourceBufferPrivate::seekToTime(const MediaTime& time)
+{
+    if (m_client)
+        m_client->sourceBufferPrivateSeekToTime(this, time);
 }
 
 }

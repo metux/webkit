@@ -36,6 +36,15 @@
 #include <wtf/RefCounted.h>
 #include <wtf/Vector.h>
 
+namespace Deprecated {
+class ScriptValue;
+}
+
+namespace Inspector {
+class InspectorObject;
+class InspectorValue;
+}
+
 namespace WebCore {
 
 class Database;
@@ -45,13 +54,7 @@ class InspectorConsoleAgent;
 class InspectorDOMAgent;
 class InspectorDOMStorageAgent;
 class InspectorDatabaseAgent;
-class InspectorDebuggerAgent;
-class InspectorObject;
-class InspectorValue;
 class Node;
-class ScriptDebugServer;
-class ScriptObject;
-class ScriptValue;
 class Storage;
 
 struct EventListenerInfo;
@@ -68,9 +71,6 @@ public:
 #endif
             , InspectorDOMStorageAgent* domStorageAgent
             , InspectorDOMAgent* domAgent
-#if ENABLE(JAVASCRIPT_DEBUGGER)
-            , InspectorDebuggerAgent* debuggerAgent
-#endif
         )
     {
         m_inspectorAgent = inspectorAgent;
@@ -80,27 +80,24 @@ public:
 #endif
         m_domStorageAgent = domStorageAgent;
         m_domAgent = domAgent;
-#if ENABLE(JAVASCRIPT_DEBUGGER)
-        m_debuggerAgent = debuggerAgent;
-#endif
     }
 
-    static Node* scriptValueAsNode(ScriptValue);
-    static ScriptValue nodeAsScriptValue(JSC::ExecState*, Node*);
+    static Node* scriptValueAsNode(Deprecated::ScriptValue);
+    static Deprecated::ScriptValue nodeAsScriptValue(JSC::ExecState*, Node*);
 
     void disconnect();
 
     class InspectableObject {
         WTF_MAKE_FAST_ALLOCATED;
     public:
-        virtual ScriptValue get(JSC::ExecState*);
+        virtual Deprecated::ScriptValue get(JSC::ExecState*);
         virtual ~InspectableObject() { }
     };
     void addInspectedObject(PassOwnPtr<InspectableObject>);
     void clearInspectedObjects();
     InspectableObject* inspectedObject(unsigned int num);
 
-    void inspectImpl(PassRefPtr<InspectorValue> objectToInspect, PassRefPtr<InspectorValue> hints);
+    void inspectImpl(PassRefPtr<Inspector::InspectorValue> objectToInspect, PassRefPtr<Inspector::InspectorValue> hints);
     void getEventListenersImpl(Node*, Vector<EventListenerInfo>& listenersArray);
 
     void clearConsoleMessages();
@@ -109,10 +106,6 @@ public:
     String databaseIdImpl(Database*);
 #endif
     String storageIdImpl(Storage*);
-
-#if ENABLE(JAVASCRIPT_DEBUGGER)
-    ScriptDebugServer& scriptDebugServer();
-#endif
 
 private:
     InjectedScriptHost();
@@ -124,9 +117,6 @@ private:
 #endif
     InspectorDOMStorageAgent* m_domStorageAgent;
     InspectorDOMAgent* m_domAgent;
-#if ENABLE(JAVASCRIPT_DEBUGGER)
-    InspectorDebuggerAgent* m_debuggerAgent;
-#endif
     Vector<OwnPtr<InspectableObject>> m_inspectedObjects;
     OwnPtr<InspectableObject> m_defaultInspectableObject;
 };

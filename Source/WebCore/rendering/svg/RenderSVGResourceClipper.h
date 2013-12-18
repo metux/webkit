@@ -31,14 +31,13 @@
 #include "SVGUnitTypes.h"
 
 #include <wtf/HashMap.h>
-#include <wtf/OwnPtr.h>
 
 namespace WebCore {
 
 struct ClipperData {
     WTF_MAKE_FAST_ALLOCATED;
 public:
-    OwnPtr<ImageBuffer> clipMaskImage;
+    std::unique_ptr<ImageBuffer> clipMaskImage;
 };
 
 class RenderSVGResourceClipper FINAL : public RenderSVGResourceContainer {
@@ -49,7 +48,7 @@ public:
     SVGClipPathElement& clipPathElement() const { return toSVGClipPathElement(nodeForNonAnonymous()); }
 
     virtual void removeAllClientsFromCache(bool markForInvalidation = true);
-    virtual void removeClientFromCache(RenderObject*, bool markForInvalidation = true);
+    virtual void removeClientFromCache(RenderObject&, bool markForInvalidation = true);
 
     virtual bool applyResource(RenderElement&, const RenderStyle&, GraphicsContext*&, unsigned short resourceMode) OVERRIDE;
     // clipPath can be clipped too, but don't have a boundingBox or repaintRect. So we can't call

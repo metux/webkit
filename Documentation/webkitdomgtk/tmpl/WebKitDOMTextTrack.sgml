@@ -41,7 +41,17 @@ WebKitDOMTextTrack
 
 </para>
 
+<!-- ##### ARG WebKitDOMTextTrack:kind ##### -->
+<para>
+
+</para>
+
 <!-- ##### ARG WebKitDOMTextTrack:label ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMTextTrack:language ##### -->
 <para>
 
 </para>
@@ -90,7 +100,25 @@ WebKitDOMTextTrack
 @Returns: 
 
 
+<!-- ##### FUNCTION webkit_dom_text_track_get_kind ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
 <!-- ##### FUNCTION webkit_dom_text_track_get_label ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_text_track_get_language ##### -->
 <para>
 
 </para>

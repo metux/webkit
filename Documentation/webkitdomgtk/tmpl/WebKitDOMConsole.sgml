@@ -43,3 +43,12 @@ WebKitDOMConsole
 @self: 
 
 
+<!-- ##### FUNCTION webkit_dom_console_get_memory ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+

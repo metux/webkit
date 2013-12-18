@@ -33,8 +33,6 @@
 #include "SVGFilterElement.h"
 #include "SVGUnitTypes.h"
 
-#include <wtf/OwnPtr.h>
-#include <wtf/PassOwnPtr.h>
 #include <wtf/RefPtr.h>
 
 namespace WebCore {
@@ -53,7 +51,7 @@ public:
 
     RefPtr<SVGFilter> filter;
     std::unique_ptr<SVGFilterBuilder> builder;
-    OwnPtr<ImageBuffer> sourceGraphicBuffer;
+    std::unique_ptr<ImageBuffer> sourceGraphicBuffer;
     GraphicsContext* savedContext;
     AffineTransform shearFreeAbsoluteTransform;
     FloatRect boundaries;
@@ -72,7 +70,7 @@ public:
     SVGFilterElement& filterElement() const { return toSVGFilterElement(RenderSVGResourceContainer::element()); }
 
     virtual void removeAllClientsFromCache(bool markForInvalidation = true);
-    virtual void removeClientFromCache(RenderObject*, bool markForInvalidation = true);
+    virtual void removeClientFromCache(RenderObject&, bool markForInvalidation = true);
 
     virtual bool applyResource(RenderElement&, const RenderStyle&, GraphicsContext*&, unsigned short resourceMode) OVERRIDE;
     virtual void postApplyResource(RenderElement&, GraphicsContext*&, unsigned short resourceMode, const Path*, const RenderSVGShape*) OVERRIDE;

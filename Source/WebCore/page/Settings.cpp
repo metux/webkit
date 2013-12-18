@@ -135,11 +135,17 @@ static const bool defaultUnifiedTextCheckerEnabled = false;
 static const bool defaultSmartInsertDeleteEnabled = true;
 static const bool defaultSelectTrailingWhitespaceEnabled = false;
 
+// This amount of time must have elapsed before we will even consider scheduling a layout without a delay.
+// FIXME: For faster machines this value can really be lowered to 200. 250 is adequate, but a little high
+// for dual G5s. :)
+static const int layoutScheduleThreshold = 250;
+
 Settings::Settings(Page* page)
     : m_page(0)
     , m_mediaTypeOverride("screen")
     , m_fontGenericFamilies(std::make_unique<FontGenericFamilies>())
     , m_storageBlockingPolicy(SecurityOrigin::AllowAllStorage)
+    , m_layoutInterval(layoutScheduleThreshold)
 #if ENABLE(TEXT_AUTOSIZING)
     , m_textAutosizingFontScaleFactor(1)
 #if HACK_FORCE_TEXT_AUTOSIZING_ON_DESKTOP
@@ -164,9 +170,6 @@ Settings::Settings(Page* page)
     , m_isCSSCustomFilterEnabled(false)
 #if ENABLE(CSS_STICKY_POSITION)
     , m_cssStickyPositionEnabled(true)
-#endif
-#if ENABLE(CSS_VARIABLES)
-    , m_cssVariablesEnabled(false)
 #endif
     , m_showTiledScrollingIndicator(false)
     , m_tiledBackingStoreEnabled(false)
@@ -474,6 +477,13 @@ void Settings::setDOMTimerAlignmentInterval(double interval)
 double Settings::domTimerAlignmentInterval() const
 {
     return m_page->timerAlignmentInterval();
+}
+
+void Settings::setLayoutInterval(int layoutInterval)
+{
+    // FIXME: It seems weird that this function may disregard the specified layout interval.
+    // We should either expose layoutScheduleThreshold or better communicate this invariant.
+    m_layoutInterval = std::max(layoutInterval, layoutScheduleThreshold);
 }
 
 void Settings::setUsesPageCache(bool usesPageCache)

@@ -38,18 +38,6 @@ namespace JSC { namespace DFG {
 void OSRExitCompiler::compileExit(const OSRExit& exit, const Operands<ValueRecovery>& operands, SpeculationRecovery* recovery)
 {
     // 1) Pro-forma stuff.
-#if DFG_ENABLE(DEBUG_VERBOSE)
-    dataLogF("OSR exit (");
-    for (CodeOrigin codeOrigin = exit.m_codeOrigin; ; codeOrigin = codeOrigin.inlineCallFrame->caller) {
-        dataLogF("bc#%u", codeOrigin.bytecodeIndex);
-        if (!codeOrigin.inlineCallFrame)
-            break;
-        dataLogF(" -> %p ", codeOrigin.inlineCallFrame->executable.get());
-    }
-    dataLogF(") at JIT offset 0x%x  ", m_jit.debugOffset());
-    dataLog(operands);
-#endif
-    
     if (Options::printEachOSRExit()) {
         SpeculationFailureDebugInfo* debugInfo = new SpeculationFailureDebugInfo;
         debugInfo->codeBlock = m_jit.codeBlock();
@@ -57,15 +45,6 @@ void OSRExitCompiler::compileExit(const OSRExit& exit, const Operands<ValueRecov
         m_jit.debugCall(debugOperationPrintSpeculationFailure, debugInfo);
     }
     
-#if DFG_ENABLE(JIT_BREAK_ON_SPECULATION_FAILURE)
-    m_jit.breakpoint();
-#endif
-    
-#if DFG_ENABLE(SUCCESS_STATS)
-    static SamplingCounter counter("SpeculationFailure");
-    m_jit.emitCount(counter);
-#endif
-
     // 2) Perform speculation recovery. This only comes into play when an operation
     //    starts mutating state before verifying the speculation it has already made.
     
@@ -198,7 +177,6 @@ void OSRExitCompiler::compileExit(const OSRExit& exit, const Operands<ValueRecov
         
         switch (recovery.technique()) {
         case UnboxedInt32InGPR:
-        case UInt32InGPR:
         case UnboxedBooleanInGPR:
         case UnboxedCellInGPR:
             m_jit.store32(
@@ -337,28 +315,6 @@ void OSRExitCompiler::compileExit(const OSRExit& exit, const Operands<ValueRecov
                 GPRInfo::regT0,
                 AssemblyHelpers::payloadFor(operand));
             break;
-            
-        case UInt32InGPR: {
-            m_jit.load32(
-                &bitwise_cast<EncodedValueDescriptor*>(scratch + index)->asBits.payload,
-                GPRInfo::regT0);
-            AssemblyHelpers::Jump positive = m_jit.branch32(
-                AssemblyHelpers::GreaterThanOrEqual,
-                GPRInfo::regT0, AssemblyHelpers::TrustedImm32(0));
-            m_jit.convertInt32ToDouble(GPRInfo::regT0, FPRInfo::fpRegT0);
-            m_jit.addDouble(
-                AssemblyHelpers::AbsoluteAddress(&AssemblyHelpers::twoToThe32),
-                FPRInfo::fpRegT0);
-            m_jit.storeDouble(FPRInfo::fpRegT0, AssemblyHelpers::addressFor(operand));
-            AssemblyHelpers::Jump done = m_jit.jump();
-            positive.link(&m_jit);
-            m_jit.store32(GPRInfo::regT0, AssemblyHelpers::payloadFor(operand));
-            m_jit.store32(
-                AssemblyHelpers::TrustedImm32(JSValue::Int32Tag),
-                AssemblyHelpers::tagFor(operand));
-            done.link(&m_jit);
-            break;
-        }
             
         case Constant:
             m_jit.store32(

@@ -50,7 +50,6 @@
 #include "InspectorCSSAgent.h"
 #include "InspectorCanvasAgent.h"
 #include "InspectorConsoleAgent.h"
-#include "InspectorController.h"
 #include "InspectorDOMAgent.h"
 #include "InspectorDOMDebuggerAgent.h"
 #include "InspectorDOMStorageAgent.h"
@@ -76,12 +75,13 @@
 #include "StyleResolver.h"
 #include "StyleRule.h"
 #include "WorkerGlobalScope.h"
-#include "WorkerInspectorController.h"
 #include "WorkerRuntimeAgent.h"
 #include "WorkerThread.h"
 #include "XMLHttpRequest.h"
 #include <wtf/StdLibExtras.h>
 #include <wtf/text/CString.h>
+
+using namespace Inspector;
 
 namespace WebCore {
 
@@ -142,8 +142,6 @@ void InspectorInstrumentation::didClearWindowObjectInWorldImpl(InstrumentingAgen
     InspectorPageAgent* pageAgent = instrumentingAgents->inspectorPageAgent();
     if (pageAgent)
         pageAgent->didClearWindowObjectInWorld(frame, world);
-    if (InspectorAgent* inspectorAgent = instrumentingAgents->inspectorAgent())
-        inspectorAgent->didClearWindowObjectInWorld(frame, world);
 #if ENABLE(JAVASCRIPT_DEBUGGER)
     if (PageDebuggerAgent* debuggerAgent = instrumentingAgents->pageDebuggerAgent()) {
         if (pageAgent && &world == &mainThreadNormalWorld() && frame == pageAgent->mainFrame())
@@ -860,9 +858,6 @@ void InspectorInstrumentation::domContentLoadedEventFiredImpl(InstrumentingAgent
     if (&frame->page()->mainFrame() != frame)
         return;
 
-    if (InspectorAgent* inspectorAgent = instrumentingAgents->inspectorAgent())
-        inspectorAgent->domContentLoadedEventFired();
-
     if (InspectorDOMAgent* domAgent = instrumentingAgents->inspectorDOMAgent())
         domAgent->mainFrameDOMContentLoaded();
 
@@ -920,7 +915,6 @@ void InspectorInstrumentation::didCommitLoadImpl(InstrumentingAgents* instrument
         if (InspectorLayerTreeAgent* layerTreeAgent = instrumentingAgents->inspectorLayerTreeAgent())
             layerTreeAgent->reset();
 #endif
-        inspectorAgent->didCommitLoad();
     }
     if (InspectorDOMAgent* domAgent = instrumentingAgents->inspectorDOMAgent())
         domAgent->didCommitLoad(loader->frame()->document());
@@ -1116,7 +1110,6 @@ void InspectorInstrumentation::didDispatchDOMStorageEventImpl(InstrumentingAgent
         domStorageAgent->didDispatchDOMStorageEvent(key, oldValue, newValue, storageType, securityOrigin, page);
 }
 
-#if ENABLE(WORKERS)
 bool InspectorInstrumentation::shouldPauseDedicatedWorkerOnStartImpl(InstrumentingAgents* instrumentingAgents)
 {
     if (InspectorWorkerAgent* workerAgent = instrumentingAgents->inspectorWorkerAgent())
@@ -1148,7 +1141,6 @@ void InspectorInstrumentation::workerGlobalScopeTerminatedImpl(InstrumentingAgen
     if (InspectorWorkerAgent* workerAgent = instrumentingAgents->inspectorWorkerAgent())
         workerAgent->workerGlobalScopeTerminated(proxy);
 }
-#endif
 
 #if ENABLE(WEB_SOCKETS)
 void InspectorInstrumentation::didCreateWebSocketImpl(InstrumentingAgents* instrumentingAgents, unsigned long identifier, const URL& requestURL, const URL&, const String& protocol, Document* document)
@@ -1213,13 +1205,6 @@ void InspectorInstrumentation::updateApplicationCacheStatusImpl(InstrumentingAge
 {
     if (InspectorApplicationCacheAgent* applicationCacheAgent = instrumentingAgents->inspectorApplicationCacheAgent())
         applicationCacheAgent->updateApplicationCacheStatus(frame);
-}
-
-bool InspectorInstrumentation::collectingHTMLParseErrors(InstrumentingAgents* instrumentingAgents)
-{
-    if (InspectorAgent* inspectorAgent = instrumentingAgents->inspectorAgent())
-        return inspectorAgent->hasFrontend();
-    return false;
 }
 
 bool InspectorInstrumentation::canvasAgentEnabled(ScriptExecutionContext* scriptExecutionContext)
@@ -1331,7 +1316,6 @@ InstrumentingAgents* InspectorInstrumentation::instrumentingAgentsForRenderer(Re
     return instrumentingAgentsForFrame(&renderer->frame());
 }
 
-#if ENABLE(WORKERS)
 InstrumentingAgents* InspectorInstrumentation::instrumentingAgentsForWorkerGlobalScope(WorkerGlobalScope* workerGlobalScope)
 {
     if (!workerGlobalScope)
@@ -1345,7 +1329,6 @@ InstrumentingAgents* InspectorInstrumentation::instrumentingAgentsForNonDocument
         return instrumentationForWorkerGlobalScope(static_cast<WorkerGlobalScope*>(context));
     return 0;
 }
-#endif
 
 #if ENABLE(GEOLOCATION)
 GeolocationPosition* InspectorInstrumentation::overrideGeolocationPositionImpl(InstrumentingAgents* instrumentingAgents, GeolocationPosition* position)

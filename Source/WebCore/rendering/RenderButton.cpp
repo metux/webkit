@@ -29,6 +29,10 @@
 #include "RenderTheme.h"
 #include "StyleInheritedData.h"
 
+#if PLATFORM(IOS)
+#include "RenderThemeIOS.h"
+#endif
+
 namespace WebCore {
 
 using namespace HTMLNames;
@@ -108,12 +112,12 @@ void RenderButton::styleDidChange(StyleDifference diff, const RenderStyle* oldSt
     if (m_inner) // RenderBlock handled updating the anonymous block's style.
         setupInnerStyle(&m_inner->style());
 
-    if (!m_default && theme()->isDefault(this)) {
+    if (!m_default && theme().isDefault(this)) {
         if (!m_timer)
             m_timer = adoptPtr(new Timer<RenderButton>(this, &RenderButton::timerFired));
         m_timer->startRepeating(0.03);
         m_default = true;
-    } else if (m_default && !theme()->isDefault(this)) {
+    } else if (m_default && !theme().isDefault(this)) {
         m_default = false;
         m_timer.clear();
     }
@@ -191,5 +195,15 @@ void RenderButton::timerFired(Timer<RenderButton>*)
 
     repaint();
 }
+
+#if PLATFORM(IOS)
+void RenderButton::layout()
+{
+    RenderFlexibleBox::layout();
+
+    // FIXME: We should not be adjusting styles during layout. See <rdar://problem/7675493>.
+    RenderThemeIOS::adjustRoundBorderRadius(style(), this);
+}
+#endif
 
 } // namespace WebCore

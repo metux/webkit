@@ -36,6 +36,11 @@ WebKitDOMHTMLMediaElement
 
 </para>
 
+<!-- ##### ARG WebKitDOMHTMLMediaElement:controller ##### -->
+<para>
+
+</para>
+
 <!-- ##### ARG WebKitDOMHTMLMediaElement:controls ##### -->
 <para>
 
@@ -151,6 +156,11 @@ WebKitDOMHTMLMediaElement
 
 </para>
 
+<!-- ##### ARG WebKitDOMHTMLMediaElement:webkit-current-playback-target-is-wireless ##### -->
+<para>
+
+</para>
+
 <!-- ##### ARG WebKitDOMHTMLMediaElement:webkit-has-closed-captions ##### -->
 <para>
 
@@ -207,6 +217,14 @@ WebKitDOMHTMLMediaElement
 
 @self: 
 @time: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_media_element_webkit_show_playback_target_picker ##### -->
+<para>
+
+</para>
+
+@self: 
 
 
 <!-- ##### FUNCTION webkit_dom_html_media_element_get_error ##### -->
@@ -577,5 +595,41 @@ WebKitDOMHTMLMediaElement
 
 @self: 
 @value: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_media_element_get_controller ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_media_element_get_webkit_current_playback_target_is_wireless ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_media_element_get_start_time ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_media_element_get_initial_time ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
 
 

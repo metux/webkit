@@ -47,6 +47,8 @@
 <span class="returnvalue">void</span>                <a class="link" href="WebKitDOMHTMLOptionsCollection.html#webkit-dom-html-options-collection-set-selected-index" title="webkit_dom_html_options_collection_set_selected_index ()">webkit_dom_html_options_collection_set_selected_index</a>
                                                         (<em class="parameter"><code><a class="link" href="WebKitDOMHTMLOptionsCollection.html" title="WebKitDOMHTMLOptionsCollection"><span class="type">WebKitDOMHTMLOptionsCollection</span></a> *self</code></em>,
                                                          <em class="parameter"><code><a href="../glib/glib-Basic-Types.html#glong"><span class="type">glong</span></a> value</code></em>);
+<a href="../glib/glib-Basic-Types.html#gulong"><span class="returnvalue">gulong</span></a>              <a class="link" href="WebKitDOMHTMLOptionsCollection.html#webkit-dom-html-options-collection-get-length" title="webkit_dom_html_options_collection_get_length ()">webkit_dom_html_options_collection_get_length</a>
+                                                        (<em class="parameter"><code><a class="link" href="WebKitDOMHTMLOptionsCollection.html" title="WebKitDOMHTMLOptionsCollection"><span class="type">WebKitDOMHTMLOptionsCollection</span></a> *self</code></em>);
 </pre>
 </div>
 <div class="refsect1">
@@ -61,6 +63,7 @@
 <div class="refsect1">
 <a name="WebKitDOMHTMLOptionsCollection.properties"></a><h2>Properties</h2>
 <pre class="synopsis">
+  "<a class="link" href="WebKitDOMHTMLOptionsCollection.html#WebKitDOMHTMLOptionsCollection--length" title='The "length" property'>length</a>"                   <a href="../glib/glib-Basic-Types.html#gulong"><span class="type">gulong</span></a>                : Read
   "<a class="link" href="WebKitDOMHTMLOptionsCollection.html#WebKitDOMHTMLOptionsCollection--selected-index" title='The "selected-index" property'>selected-index</a>"           <a href="../glib/glib-Basic-Types.html#glong"><span class="type">glong</span></a>                 : Read / Write
 </pre>
 </div>
@@ -156,9 +159,39 @@
 </tbody>
 </table></div>
 </div>
+<hr>
+<div class="refsect2">
+<a name="webkit-dom-html-options-collection-get-length"></a><h3>webkit_dom_html_options_collection_get_length ()</h3>
+<pre class="programlisting"><a href="../glib/glib-Basic-Types.html#gulong"><span class="returnvalue">gulong</span></a>              webkit_dom_html_options_collection_get_length
+                                                        (<em class="parameter"><code><a class="link" href="WebKitDOMHTMLOptionsCollection.html" title="WebKitDOMHTMLOptionsCollection"><span class="type">WebKitDOMHTMLOptionsCollection</span></a> *self</code></em>);</pre>
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
+<col align="left" valign="top">
+<col>
+</colgroup>
+<tbody>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>self</code></em> :</span></p></td>
+<td>A <a class="link" href="WebKitDOMHTMLOptionsCollection.html" title="WebKitDOMHTMLOptionsCollection"><span class="type">WebKitDOMHTMLOptionsCollection</span></a>
+</td>
+</tr>
+<tr>
+<td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
+<td>A <a href="../glib/glib-Basic-Types.html#gulong"><span class="type">gulong</span></a>
+</td>
+</tr>
+</tbody>
+</table></div>
+</div>
 </div>
 <div class="refsect1">
 <a name="WebKitDOMHTMLOptionsCollection.property-details"></a><h2>Property Details</h2>
+<div class="refsect2">
+<a name="WebKitDOMHTMLOptionsCollection--length"></a><h3>The <code class="literal">"length"</code> property</h3>
+<pre class="programlisting">  "length"                   <a href="../glib/glib-Basic-Types.html#gulong"><span class="type">gulong</span></a>                : Read</pre>
+<p>read-only gulong HTMLOptionsCollection:length.</p>
+</div>
+<hr>
 <div class="refsect2">
 <a name="WebKitDOMHTMLOptionsCollection--selected-index"></a><h3>The <code class="literal">"selected-index"</code> property</h3>
 <pre class="programlisting">  "selected-index"           <a href="../glib/glib-Basic-Types.html#glong"><span class="type">glong</span></a>                 : Read / Write</pre>

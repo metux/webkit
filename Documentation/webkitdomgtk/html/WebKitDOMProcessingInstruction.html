@@ -45,6 +45,12 @@
                                                         (<em class="parameter"><code><a class="link" href="WebKitDOMProcessingInstruction.html" title="WebKitDOMProcessingInstruction"><span class="type">WebKitDOMProcessingInstruction</span></a> *self</code></em>);
 <a class="link" href="WebKitDOMStyleSheet.html" title="WebKitDOMStyleSheet"><span class="returnvalue">WebKitDOMStyleSheet</span></a> * <a class="link" href="WebKitDOMProcessingInstruction.html#webkit-dom-processing-instruction-get-sheet" title="webkit_dom_processing_instruction_get_sheet ()">webkit_dom_processing_instruction_get_sheet</a>
                                                         (<em class="parameter"><code><a class="link" href="WebKitDOMProcessingInstruction.html" title="WebKitDOMProcessingInstruction"><span class="type">WebKitDOMProcessingInstruction</span></a> *self</code></em>);
+<a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gchar</span></a> *             <a class="link" href="WebKitDOMProcessingInstruction.html#webkit-dom-processing-instruction-get-data" title="webkit_dom_processing_instruction_get_data ()">webkit_dom_processing_instruction_get_data</a>
+                                                        (<em class="parameter"><code><a class="link" href="WebKitDOMProcessingInstruction.html" title="WebKitDOMProcessingInstruction"><span class="type">WebKitDOMProcessingInstruction</span></a> *self</code></em>);
+<span class="returnvalue">void</span>                <a class="link" href="WebKitDOMProcessingInstruction.html#webkit-dom-processing-instruction-set-data" title="webkit_dom_processing_instruction_set_data ()">webkit_dom_processing_instruction_set_data</a>
+                                                        (<em class="parameter"><code><a class="link" href="WebKitDOMProcessingInstruction.html" title="WebKitDOMProcessingInstruction"><span class="type">WebKitDOMProcessingInstruction</span></a> *self</code></em>,
+                                                         <em class="parameter"><code>const <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a> *value</code></em>,
+                                                         <em class="parameter"><code><a href="../glib/glib-Error-Reporting.html#GError"><span class="type">GError</span></a> **error</code></em>);
 </pre>
 </div>
 <div class="refsect1">
@@ -127,6 +133,74 @@ WebKitDOMProcessingInstruction implements
 <td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
 <td>A <a class="link" href="WebKitDOMStyleSheet.html" title="WebKitDOMStyleSheet"><span class="type">WebKitDOMStyleSheet</span></a>. <span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
 </td>
+</tr>
+</tbody>
+</table></div>
+</div>
+<hr>
+<div class="refsect2">
+<a name="webkit-dom-processing-instruction-get-data"></a><h3>webkit_dom_processing_instruction_get_data ()</h3>
+<pre class="programlisting"><a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gchar</span></a> *             webkit_dom_processing_instruction_get_data
+                                                        (<em class="parameter"><code><a class="link" href="WebKitDOMProcessingInstruction.html" title="WebKitDOMProcessingInstruction"><span class="type">WebKitDOMProcessingInstruction</span></a> *self</code></em>);</pre>
+<div class="warning">
+<h3 class="title">Warning</h3>
+<p><code class="literal">webkit_dom_processing_instruction_get_data</code> is deprecated and should not be used in newly-written code. 2.4</p>
+</div>
+<p>
+This functionality has been removed from WebKit, this function does nothing.
+</p>
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
+<col align="left" valign="top">
+<col>
+</colgroup>
+<tbody>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>self</code></em> :</span></p></td>
+<td>A <a class="link" href="WebKitDOMProcessingInstruction.html" title="WebKitDOMProcessingInstruction"><span class="type">WebKitDOMProcessingInstruction</span></a>
+</td>
+</tr>
+<tr>
+<td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
+<td>a <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a>
+</td>
+</tr>
+</tbody>
+</table></div>
+</div>
+<hr>
+<div class="refsect2">
+<a name="webkit-dom-processing-instruction-set-data"></a><h3>webkit_dom_processing_instruction_set_data ()</h3>
+<pre class="programlisting"><span class="returnvalue">void</span>                webkit_dom_processing_instruction_set_data
+                                                        (<em class="parameter"><code><a class="link" href="WebKitDOMProcessingInstruction.html" title="WebKitDOMProcessingInstruction"><span class="type">WebKitDOMProcessingInstruction</span></a> *self</code></em>,
+                                                         <em class="parameter"><code>const <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a> *value</code></em>,
+                                                         <em class="parameter"><code><a href="../glib/glib-Error-Reporting.html#GError"><span class="type">GError</span></a> **error</code></em>);</pre>
+<div class="warning">
+<h3 class="title">Warning</h3>
+<p><code class="literal">webkit_dom_processing_instruction_set_data</code> is deprecated and should not be used in newly-written code. 2.4</p>
+</div>
+<p>
+This functionality has been removed from WebKit, this function does nothing.
+</p>
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
+<col align="left" valign="top">
+<col>
+</colgroup>
+<tbody>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>self</code></em> :</span></p></td>
+<td>A <a class="link" href="WebKitDOMProcessingInstruction.html" title="WebKitDOMProcessingInstruction"><span class="type">WebKitDOMProcessingInstruction</span></a>
+</td>
+</tr>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>value</code></em> :</span></p></td>
+<td>A <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a>
+</td>
+</tr>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>error</code></em> :</span></p></td>
+<td><a href="../glib/glib-Error-Reporting.html#GError"><span class="type">GError</span></a></td>
 </tr>
 </tbody>
 </table></div>

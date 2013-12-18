@@ -57,13 +57,14 @@
 #include "MediaPlayerPrivateQTKit.h"
 #if USE(AVFOUNDATION)
 #include "MediaPlayerPrivateAVFoundationObjC.h"
+#if ENABLE(MEDIA_SOURCE)
+#include "MediaPlayerPrivateMediaSourceAVFObjC.h"
+#endif
 #endif
 #elif OS(WINCE)
 #include "MediaPlayerPrivateWinCE.h"
 #define PlatformMediaEngineClassName MediaPlayerPrivate
 #elif PLATFORM(WIN) && !USE(GSTREAMER)
-#include "MediaPlayerPrivateQuickTimeVisualContext.h"
-#define PlatformMediaEngineClassName MediaPlayerPrivateQuickTimeVisualContext
 #if USE(AVFOUNDATION)
 #include "MediaPlayerPrivateAVFoundationCF.h"
 #endif
@@ -213,6 +214,9 @@ static Vector<MediaPlayerFactory*>& installedMediaEngines(RequeryEngineOptions r
         if (Settings::isAVFoundationEnabled()) {
 #if PLATFORM(MAC) || PLATFORM(IOS)
             MediaPlayerPrivateAVFoundationObjC::registerMediaEngine(addMediaEngine);
+#if ENABLE(MEDIA_SOURCE)
+            MediaPlayerPrivateMediaSourceAVFObjC::registerMediaEngine(addMediaEngine);
+#endif
 #elif PLATFORM(WIN)
             MediaPlayerPrivateAVFoundationCF::registerMediaEngine(addMediaEngine);
 #endif
@@ -751,6 +755,11 @@ bool MediaPlayer::copyVideoTextureToPlatformTexture(GraphicsContext3D* context, 
     return m_private->copyVideoTextureToPlatformTexture(context, texture, level, type, internalFormat, premultiplyAlpha, flipY);
 }
 
+PassNativeImagePtr MediaPlayer::nativeImageForCurrentTime()
+{
+    return m_private->nativeImageForCurrentTime();
+}
+
 MediaPlayer::SupportsType MediaPlayer::supportsType(const MediaEngineSupportParameters& parameters, const MediaPlayerSupportsTypeClient* client)
 {
     // 4.8.10.3 MIME types - The canPlayType(type) method must return the empty string if type is a type that the 
@@ -1219,6 +1228,48 @@ size_t MediaPlayer::extraMemoryCost() const
 
     return m_private->extraMemoryCost();
 }
+
+unsigned long long MediaPlayer::fileSize() const
+{
+    if (!m_private)
+        return 0;
+    
+    return m_private->fileSize();
+}
+
+#if ENABLE(MEDIA_SOURCE)
+unsigned long MediaPlayer::totalVideoFrames()
+{
+    if (!m_private)
+        return 0;
+
+    return m_private->totalVideoFrames();
+}
+
+unsigned long MediaPlayer::droppedVideoFrames()
+{
+    if (!m_private)
+        return 0;
+
+    return m_private->droppedVideoFrames();
+}
+
+unsigned long MediaPlayer::corruptedVideoFrames()
+{
+    if (!m_private)
+        return 0;
+
+    return m_private->corruptedVideoFrames();
+}
+
+double MediaPlayer::totalFrameDelay()
+{
+    if (!m_private)
+        return 0;
+
+    return m_private->totalFrameDelay();
+}
+#endif
 
 void MediaPlayerFactorySupport::callRegisterMediaEngine(MediaEngineRegister registerMediaEngine)
 {

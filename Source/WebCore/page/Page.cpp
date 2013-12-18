@@ -59,6 +59,7 @@
 #include "PageActivityAssertionToken.h"
 #include "PageCache.h"
 #include "PageConsole.h"
+#include "PageDebuggable.h"
 #include "PageGroup.h"
 #include "PageThrottler.h"
 #include "PlugInClient.h"
@@ -186,6 +187,9 @@ Page::Page(PageClients& pageClients)
     , m_scriptedAnimationsSuspended(false)
     , m_pageThrottler(std::make_unique<PageThrottler>(*this))
     , m_console(std::make_unique<PageConsole>(*this))
+#if ENABLE(REMOTE_INSPECTOR)
+    , m_inspectorDebuggable(std::make_unique<PageDebuggable>(*this))
+#endif
     , m_lastSpatialNavigationCandidatesCount(0) // NOTE: Only called from Internals for Spatial Navigation testing.
     , m_framesHandlingBeforeUnloadEvent(0)
 {
@@ -202,6 +206,10 @@ Page::Page(PageClients& pageClients)
 
 #ifndef NDEBUG
     pageCounter.increment();
+#endif
+
+#if ENABLE(REMOTE_INSPECTOR)
+    m_inspectorDebuggable->init();
 #endif
 }
 
@@ -476,6 +484,20 @@ void Page::setNeedsRecalcStyleInAllFrames()
     for (Frame* frame = &mainFrame(); frame; frame = frame->tree().traverseNext()) {
         if (Document* document = frame->document())
             document->styleResolverChanged(DeferRecalcStyle);
+    }
+}
+
+void Page::jettisonStyleResolversInAllDocuments()
+{
+    if (!allPages)
+        return;
+
+    for (auto it = allPages->begin(), end = allPages->end(); it != end; ++it) {
+        Page& page = **it;
+        for (Frame* frame = &page.mainFrame(); frame; frame = frame->tree().traverseNext()) {
+            if (Document* document = frame->document())
+                document->clearStyleResolver();
+        }
     }
 }
 
@@ -1288,6 +1310,23 @@ void Page::addFooterWithHeight(int footerHeight)
 
     frameView->setFooterHeight(m_footerHeight);
     renderView->compositor().updateLayerForFooter(m_footerHeight);
+}
+#endif
+
+#if ENABLE(REMOTE_INSPECTOR)
+bool Page::remoteInspectionAllowed() const
+{
+    return m_inspectorDebuggable->remoteDebuggingAllowed();
+}
+
+void Page::setRemoteInspectionAllowed(bool allowed)
+{
+    m_inspectorDebuggable->setRemoteDebuggingAllowed(allowed);
+}
+
+void Page::remoteInspectorInformationDidChange() const
+{
+    m_inspectorDebuggable->update();
 }
 #endif
 

@@ -91,3 +91,21 @@ WebKitDOMHTMLStyleElement
 @Returns: 
 
 
+<!-- ##### FUNCTION webkit_dom_html_style_element_set_scoped ##### -->
+<para>
+
+</para>
+
+@self: 
+@value: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_style_element_get_scoped ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+

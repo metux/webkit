@@ -125,6 +125,11 @@ public:
     DEFINE_ATTRIBUTE_EVENT_LISTENER(touchend);
     DEFINE_ATTRIBUTE_EVENT_LISTENER(touchcancel);
 #endif
+#if ENABLE(IOS_GESTURE_EVENTS)
+    DEFINE_ATTRIBUTE_EVENT_LISTENER(gesturestart);
+    DEFINE_ATTRIBUTE_EVENT_LISTENER(gesturechange);
+    DEFINE_ATTRIBUTE_EVENT_LISTENER(gestureend);
+#endif
 #if ENABLE(FULLSCREEN_API)
     DEFINE_ATTRIBUTE_EVENT_LISTENER(webkitfullscreenchange);
     DEFINE_ATTRIBUTE_EVENT_LISTENER(webkitfullscreenerror);
@@ -219,7 +224,9 @@ public:
     PassRefPtr<ClientRectList> getClientRects();
     PassRefPtr<ClientRect> getBoundingClientRect();
     
-    // Returns the absolute bounding box translated into screen coordinates:
+    // Returns the absolute bounding box translated into client coordinates.
+    IntRect clientRect() const;
+    // Returns the absolute bounding box translated into screen coordinates.
     IntRect screenRect() const;
 
     void removeAttribute(const AtomicString& name);
@@ -338,7 +345,7 @@ public:
     virtual short tabIndex() const;
     virtual Element* focusDelegate();
 
-    RenderStyle* computedStyle(PseudoId = NOPSEUDO);
+    virtual RenderStyle* computedStyle(PseudoId = NOPSEUDO) OVERRIDE;
 
     // Methods for indicating the style is affected by dynamic updates (e.g., children changing, our position changing in our sibling list, etc.)
     bool styleAffectedByEmpty() const { return hasRareData() && rareDataStyleAffectedByEmpty(); }
@@ -549,8 +556,10 @@ public:
     virtual void willDetachRenderers();
     virtual void didDetachRenderers();
 
-    void updateBeforePseudoElement(Style::Change);
-    void updateAfterPseudoElement(Style::Change);
+    void setBeforePseudoElement(PassRefPtr<PseudoElement>);
+    void setAfterPseudoElement(PassRefPtr<PseudoElement>);
+    void clearBeforePseudoElement();
+    void clearAfterPseudoElement();
     void resetComputedStyle();
     void clearStyleDerivedDataBeforeDetachingRenderer();
     void clearHoverAndActiveStatusBeforeDetachingRenderer();
@@ -588,13 +597,6 @@ private:
     bool isUserActionElementFocused() const;
     bool isUserActionElementHovered() const;
 
-    PassRefPtr<PseudoElement> createPseudoElementIfNeeded(PseudoId);
-    bool updateExistingPseudoElement(PseudoElement* existing, Style::Change);
-
-    void setBeforePseudoElement(PassRefPtr<PseudoElement>);
-    void setAfterPseudoElement(PassRefPtr<PseudoElement>);
-    void clearBeforePseudoElement();
-    void clearAfterPseudoElement();
     void resetNeedsNodeRenderingTraversalSlowPath();
 
     virtual bool areAuthorShadowsAllowed() const { return true; }
@@ -639,8 +641,6 @@ private:
 
     void cancelFocusAppearanceUpdate();
 
-    virtual RenderStyle* virtualComputedStyle(PseudoId pseudoElementSpecifier = NOPSEUDO) OVERRIDE { return computedStyle(pseudoElementSpecifier); }
-    
     // cloneNode is private so that non-virtual cloneElementWithChildren and cloneElementWithoutChildren
     // are used instead.
     virtual PassRefPtr<Node> cloneNode(bool deep) OVERRIDE;

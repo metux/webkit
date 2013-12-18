@@ -31,3 +31,21 @@ WebKitDOMHTMLHeadElement
 
 </para>
 
+<!-- ##### FUNCTION webkit_dom_html_head_element_get_profile ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_head_element_set_profile ##### -->
+<para>
+
+</para>
+
+@self: 
+@value: 
+
+

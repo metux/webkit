@@ -39,7 +39,6 @@
 #include "GraphicsContext.h"
 #include "InspectorClient.h"
 #include "InspectorOverlayPage.h"
-#include "InspectorValues.h"
 #include "MainFrame.h"
 #include "Node.h"
 #include "Page.h"
@@ -55,10 +54,13 @@
 #include "RenderView.h"
 #include "ScriptController.h"
 #include "ScriptSourceCode.h"
-#include "ScriptValue.h"
 #include "Settings.h"
 #include "StyledElement.h"
+#include <bindings/ScriptValue.h>
+#include <inspector/InspectorValues.h>
 #include <wtf/text/StringBuilder.h>
+
+using namespace Inspector;
 
 namespace WebCore {
 
@@ -273,12 +275,6 @@ void InspectorOverlay::getHighlight(Highlight* highlight) const
         buildNodeHighlight(m_highlightNode.get(), nullptr, m_nodeHighlightConfig, highlight);
     else
         buildQuadHighlight(m_page, *m_highlightQuad, m_quadHighlightConfig, highlight);
-}
-
-void InspectorOverlay::resize(const IntSize& size)
-{
-    m_size = size;
-    update();
 }
 
 void InspectorOverlay::setPausedInDebuggerMessage(const String* message)
@@ -548,6 +544,7 @@ struct PathApplyInfo {
     FrameView* view;
     InspectorArray* array;
     RenderObject* renderer;
+    const ShapeOutsideInfo* shapeOutsideInfo;
 };
 
 static void appendPathCommandAndPoints(PathApplyInfo* info, const String& command, const FloatPoint points[], unsigned length)
@@ -555,7 +552,8 @@ static void appendPathCommandAndPoints(PathApplyInfo* info, const String& comman
     FloatPoint point;
     info->array->pushString(command);
     for (unsigned i = 0; i < length; i++) {
-        point = localPointToRoot(info->renderer, info->rootView, info->view, points[i]);
+        point = info->shapeOutsideInfo->shapeToRendererPoint(points[i]);
+        point = localPointToRoot(info->renderer, info->rootView, info->view, point);
         info->array->pushNumber(point.x());
         info->array->pushNumber(point.y());
     }
@@ -599,54 +597,32 @@ static PassRefPtr<InspectorObject> buildObjectForShapeOutside(Frame* containingF
     LayoutRect shapeBounds = shapeOutsideInfo->computedShapePhysicalBoundingBox();
     FloatQuad shapeQuad = renderer->localToAbsoluteQuad(FloatRect(shapeBounds));
     contentsQuadToPage(containingFrame->page()->mainFrame().view(), containingFrame->view(), shapeQuad);
-    shapeObject->setArray("bounds", buildArrayForQuad(shapeQuad));
+    shapeObject->setArray(ASCIILiteral("bounds"), buildArrayForQuad(shapeQuad));
 
-    Path path;
-    switch (shapeOutsideInfo->computedShape()->type()) {
-    case Shape::RoundedRectangleType: {
-        const RectangleShape* shape = static_cast<const RectangleShape*>(shapeOutsideInfo->computedShape());
-        FloatSize radii(shape->logicalRx(), shape->logicalRy());
-        radii = shapeOutsideInfo->shapeToRendererSize(radii);
-        path.addRoundedRect(shapeBounds, radii, Path::PreferBezierRoundedRect);
-        break;
-    }
+    Shape::DisplayPaths paths;
+    shapeOutsideInfo->computedShape().buildDisplayPaths(paths);
 
-    case Shape::PolygonType: {
-        const PolygonShape* shape = static_cast<const PolygonShape*>(shapeOutsideInfo->computedShape());
-        const FloatPolygon& polygon = shape->polygon();
-        FloatPoint vertex;
-
-        if (polygon.numberOfVertices()) {
-            vertex = shapeOutsideInfo->shapeToRendererPoint(polygon.vertexAt(0));
-            path.moveTo(vertex);
-        }
-
-        for (size_t i = 1; i < polygon.numberOfVertices(); i++) {
-            FloatPoint vertex = shapeOutsideInfo->shapeToRendererPoint(polygon.vertexAt(i));
-            path.addLineTo(vertex);
-        }
-
-        if (polygon.numberOfVertices())
-            path.closeSubpath();
-        break;
-    }
-
-    case Shape::RasterType:
-        // FIXME: Bug 124080 - RasterShapes are not yet supported and only display their shape bounds
-        break;
-    }
-
-    if (path.length()) {
+    if (paths.shape.length()) {
         RefPtr<InspectorArray> shapePath = InspectorArray::create();
         PathApplyInfo info;
         info.rootView = containingFrame->page()->mainFrame().view();
         info.view = containingFrame->view();
         info.array = shapePath.get();
         info.renderer = renderer;
+        info.shapeOutsideInfo = shapeOutsideInfo;
 
-        path.apply(&info, &appendPathSegment);
+        paths.shape.apply(&info, &appendPathSegment);
 
-        shapeObject->setArray("path", shapePath.release());
+        shapeObject->setArray(ASCIILiteral("shape"), shapePath.release());
+
+        if (paths.marginShape.length()) {
+            shapePath = InspectorArray::create();
+            info.array = shapePath.get();
+
+            paths.marginShape.apply(&info, &appendPathSegment);
+
+            shapeObject->setArray(ASCIILiteral("marginShape"), shapePath.release());
+        }
     }
 
     return shapeObject.release();
@@ -667,7 +643,7 @@ static PassRefPtr<InspectorObject> buildObjectForElementInfo(Node* node)
     HashSet<AtomicString> usedClassNames;
     if (element->hasClass() && element->isStyledElement()) {
         StringBuilder classNames;
-        const SpaceSplitString& classNamesString = static_cast<StyledElement*>(element)->classNames();
+        const SpaceSplitString& classNamesString = toStyledElement(element)->classNames();
         size_t classNameCount = classNamesString.size();
         for (size_t i = 0; i < classNameCount; ++i) {
             const AtomicString& className = classNamesString[i];

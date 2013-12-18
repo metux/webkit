@@ -45,10 +45,12 @@ namespace WebKit {
     M(Network) \
     M(NetworkScheduling) \
     M(Plugins) \
+    M(RemoteLayerTree) \
     M(SessionState) \
     M(StorageAPI) \
     M(TextInput) \
     M(View) \
+    M(IDB) \
 
 #define DECLARE_LOG_CHANNEL(name) \
     extern WTFLogChannel JOIN_LOG_CHANNEL_WITH_PREFIX(LOG_CHANNEL_PREFIX, name);

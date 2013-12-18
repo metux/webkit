@@ -37,13 +37,15 @@
 #include "IntRect.h"
 #include "URL.h"
 #include "LayoutRect.h"
+#include "NativeImagePtr.h"
 #include "Timer.h"
 #include "VideoTrackPrivate.h"
 #include <runtime/Uint8Array.h>
 #include <wtf/Forward.h>
 #include <wtf/HashSet.h>
-#include <wtf/OwnPtr.h>
+#include <wtf/MediaTime.h>
 #include <wtf/Noncopyable.h>
+#include <wtf/OwnPtr.h>
 #include <wtf/PassOwnPtr.h>
 #include <wtf/text/StringHash.h>
 
@@ -55,6 +57,7 @@
 #include "PlatformTextTrackMenu.h"
 #endif
 
+OBJC_CLASS AVAsset;
 OBJC_CLASS AVPlayer;
 OBJC_CLASS QTMovie;
 
@@ -85,7 +88,8 @@ struct PlatformMedia {
         ChromiumMediaPlayerType,
         QtMediaPlayerType,
         AVFoundationMediaPlayerType,
-        AVFoundationCFMediaPlayerType
+        AVFoundationCFMediaPlayerType,
+        AVFoundationAssetType,
     } type;
 
     union {
@@ -96,6 +100,7 @@ struct PlatformMedia {
         MediaPlayerPrivateInterface* qtMediaPlayer;
         AVPlayer* avfMediaPlayer;
         AVCFPlayer* avcfMediaPlayer;
+        AVAsset* avfAsset;
     } media;
 };
 
@@ -376,6 +381,8 @@ public:
     // http://src.chromium.org/viewvc/chrome/trunk/src/gpu/command_buffer/service/gles2_cmd_copy_texture_chromium.cc via shaders.
     bool copyVideoTextureToPlatformTexture(GraphicsContext3D*, Platform3DObject texture, GC3Dint level, GC3Denum type, GC3Denum internalFormat, bool premultiplyAlpha, bool flipY);
 
+    PassNativeImagePtr nativeImageForCurrentTime();
+
     enum NetworkState { Empty, Idle, Loading, Loaded, FormatError, NetworkError, DecodeError };
     NetworkState networkState();
 
@@ -504,6 +511,15 @@ public:
     String languageOfPrimaryAudioTrack() const;
 
     size_t extraMemoryCost() const;
+
+    unsigned long long fileSize() const;
+
+#if ENABLE(MEDIA_SOURCE)
+    unsigned long totalVideoFrames();
+    unsigned long droppedVideoFrames();
+    unsigned long corruptedVideoFrames();
+    double totalFrameDelay();
+#endif
 
 private:
     MediaPlayer(MediaPlayerClient*);

@@ -26,6 +26,11 @@ WebKitDOMHTMLOptionsCollection
 </para>
 
 
+<!-- ##### ARG WebKitDOMHTMLOptionsCollection:length ##### -->
+<para>
+
+</para>
+
 <!-- ##### ARG WebKitDOMHTMLOptionsCollection:selected-index ##### -->
 <para>
 
@@ -57,5 +62,14 @@ WebKitDOMHTMLOptionsCollection
 
 @self: 
 @value: 
+
+
+<!-- ##### FUNCTION webkit_dom_html_options_collection_get_length ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
 
 
