@@ -13,6 +13,7 @@ webkitgtk (2.3.3-1) UNRELEASED; urgency=low
     + Add myself to Uploaders.
     + Update package descriptions.
     + Build depend on libpng-dev, not libpng12-dev.
+    + Bump Standards-Version to 3.9.5; no changes needed.
   * debian/rules:
     + Support noopt and debug in DEB_BUILD_OPTIONS.
     + Disable JIT and MacroAssembler on powerpcspe and mips64el.
