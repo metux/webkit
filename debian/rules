@@ -169,6 +169,7 @@ ifeq (3.0,$(filter 3.0,$(GTK_VERSIONS)))
 		debian/tmp-3.0/usr/share/doc/libwebkitgtk-3.0-dev/html/
 
 ifeq ($(ENABLE_WEBKIT2),yes)
+	chrpath -d debian/tmp-3.0/usr/lib/$(DEB_HOST_MULTIARCH)/webkit2gtk-3.0/libexec/*
 	install -d -m 755 debian/tmp-3.0/usr/share/doc/libwebkit2gtk-3.0-dev/html
 	install -m 644 Documentation/webkit2gtk/html/* \
 		debian/tmp-3.0/usr/share/doc/libwebkit2gtk-3.0-dev/html/

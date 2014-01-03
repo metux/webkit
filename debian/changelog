@@ -22,6 +22,7 @@ webkitgtk (2.3.3-1) UNRELEASED; urgency=low
       enabled now.
     + Disable parallel builds since they're unstable at the moment.
     + Don't create the libexec dirs manually, this is no longer needed.
+    + Remove rpath from WebKitPluginProcess and WebKitWebProcess.
   * debian/libwebkitgtk-1.0-0.symbols,
     debian/libwebkitgtk-3.0-0.symbols,
     debian/libwebkit2gtk-3.0-25.symbols:
