@@ -227,6 +227,7 @@ libwebkit2gtk-3.0.so.25 libwebkit2gtk-3.0-25 #MINVER#
  webkit_dom_document_get_style_sheets@Base 2.0.2
  webkit_dom_document_get_title@Base 2.0.2
  webkit_dom_document_get_type@Base 2.0.2
+ webkit_dom_document_get_url@Base 2.3.3
  webkit_dom_document_get_visibility_state@Base 2.1.4
  webkit_dom_document_get_webkit_current_full_screen_element@Base 2.0.2
  webkit_dom_document_get_webkit_full_screen_keyboard_input_allowed@Base 2.0.2
@@ -812,7 +813,9 @@ libwebkit2gtk-3.0.so.25 libwebkit2gtk-3.0-25 #MINVER#
  webkit_dom_html_form_element_dispatch_form_input@Base 2.0.2
  webkit_dom_html_form_element_get_accept_charset@Base 2.0.2
  webkit_dom_html_form_element_get_action@Base 2.0.2
+ webkit_dom_html_form_element_get_autocapitalize@Base 2.3.3
  webkit_dom_html_form_element_get_autocomplete@Base 2.0.2
+ webkit_dom_html_form_element_get_autocorrect@Base 2.3.3
  webkit_dom_html_form_element_get_elements@Base 2.0.2
  webkit_dom_html_form_element_get_encoding@Base 2.0.2
  webkit_dom_html_form_element_get_enctype@Base 2.0.2
@@ -825,7 +828,9 @@ libwebkit2gtk-3.0.so.25 libwebkit2gtk-3.0-25 #MINVER#
  webkit_dom_html_form_element_reset@Base 2.0.2
  webkit_dom_html_form_element_set_accept_charset@Base 2.0.2
  webkit_dom_html_form_element_set_action@Base 2.0.2
+ webkit_dom_html_form_element_set_autocapitalize@Base 2.3.3
  webkit_dom_html_form_element_set_autocomplete@Base 2.0.2
+ webkit_dom_html_form_element_set_autocorrect@Base 2.3.3
  webkit_dom_html_form_element_set_encoding@Base 2.0.2
  webkit_dom_html_form_element_set_enctype@Base 2.0.2
  webkit_dom_html_form_element_set_method@Base 2.0.2
@@ -939,7 +944,9 @@ libwebkit2gtk-3.0.so.25 libwebkit2gtk-3.0-25 #MINVER#
  webkit_dom_html_input_element_get_accept@Base 2.0.2
  webkit_dom_html_input_element_get_align@Base 2.0.2
  webkit_dom_html_input_element_get_alt@Base 2.0.2
+ webkit_dom_html_input_element_get_autocapitalize@Base 2.3.3
  webkit_dom_html_input_element_get_autocomplete@Base 2.0.2
+ webkit_dom_html_input_element_get_autocorrect@Base 2.3.3
  webkit_dom_html_input_element_get_autofocus@Base 2.0.2
  webkit_dom_html_input_element_get_capture@Base 2.0.2
  webkit_dom_html_input_element_get_checked@Base 2.0.2
@@ -987,7 +994,9 @@ libwebkit2gtk-3.0.so.25 libwebkit2gtk-3.0-25 #MINVER#
  webkit_dom_html_input_element_set_accept@Base 2.0.2
  webkit_dom_html_input_element_set_align@Base 2.0.2
  webkit_dom_html_input_element_set_alt@Base 2.0.2
+ webkit_dom_html_input_element_set_autocapitalize@Base 2.3.3
  webkit_dom_html_input_element_set_autocomplete@Base 2.0.2
+ webkit_dom_html_input_element_set_autocorrect@Base 2.3.3
  webkit_dom_html_input_element_set_autofocus@Base 2.0.2
  webkit_dom_html_input_element_set_capture@Base 2.0.2
  webkit_dom_html_input_element_set_checked@Base 2.0.2
@@ -1106,6 +1115,7 @@ libwebkit2gtk-3.0.so.25 libwebkit2gtk-3.0-25 #MINVER#
  webkit_dom_html_media_element_fast_seek@Base 2.3.2
  webkit_dom_html_media_element_get_autoplay@Base 2.0.2
  webkit_dom_html_media_element_get_buffered@Base 2.0.2
+ webkit_dom_html_media_element_get_controller@Base 2.3.3
  webkit_dom_html_media_element_get_controls@Base 2.0.2
  webkit_dom_html_media_element_get_current_src@Base 2.0.2
  webkit_dom_html_media_element_get_current_time@Base 2.0.2
@@ -1132,6 +1142,7 @@ libwebkit2gtk-3.0.so.25 libwebkit2gtk-3.0-25 #MINVER#
  webkit_dom_html_media_element_get_volume@Base 2.0.2
  webkit_dom_html_media_element_get_webkit_audio_decoded_byte_count@Base 2.0.2
  webkit_dom_html_media_element_get_webkit_closed_captions_visible@Base 2.0.2
+ webkit_dom_html_media_element_get_webkit_current_playback_target_is_wireless@Base 2.3.3
  webkit_dom_html_media_element_get_webkit_has_closed_captions@Base 2.0.2
  webkit_dom_html_media_element_get_webkit_preserves_pitch@Base 2.0.2
  webkit_dom_html_media_element_get_webkit_video_decoded_byte_count@Base 2.0.2
@@ -1152,6 +1163,7 @@ libwebkit2gtk-3.0.so.25 libwebkit2gtk-3.0-25 #MINVER#
  webkit_dom_html_media_element_set_volume@Base 2.0.2
  webkit_dom_html_media_element_set_webkit_closed_captions_visible@Base 2.0.2
  webkit_dom_html_media_element_set_webkit_preserves_pitch@Base 2.0.2
+ webkit_dom_html_media_element_webkit_show_playback_target_picker@Base 2.3.3
  webkit_dom_html_menu_element_get_compact@Base 2.0.2
  webkit_dom_html_menu_element_get_type@Base 2.0.2
  webkit_dom_html_menu_element_set_compact@Base 2.0.2
@@ -1226,6 +1238,7 @@ libwebkit2gtk-3.0.so.25 libwebkit2gtk-3.0-25 #MINVER#
  webkit_dom_html_option_element_set_label@Base 2.0.2
  webkit_dom_html_option_element_set_selected@Base 2.0.2
  webkit_dom_html_option_element_set_value@Base 2.0.2
+ webkit_dom_html_options_collection_get_length@Base 2.3.3
  webkit_dom_html_options_collection_get_selected_index@Base 2.0.2
  webkit_dom_html_options_collection_get_type@Base 2.0.2
  webkit_dom_html_options_collection_named_item@Base 2.1.4
@@ -1423,6 +1436,8 @@ libwebkit2gtk-3.0.so.25 libwebkit2gtk-3.0-25 #MINVER#
  webkit_dom_html_table_section_element_set_ch_off@Base 2.0.2
  webkit_dom_html_table_section_element_set_v_align@Base 2.0.2
  webkit_dom_html_text_area_element_check_validity@Base 2.0.2
+ webkit_dom_html_text_area_element_get_autocapitalize@Base 2.3.3
+ webkit_dom_html_text_area_element_get_autocorrect@Base 2.3.3
  webkit_dom_html_text_area_element_get_autofocus@Base 2.0.2
  webkit_dom_html_text_area_element_get_cols@Base 2.0.2
  webkit_dom_html_text_area_element_get_default_value@Base 2.0.2
@@ -1448,6 +1463,8 @@ libwebkit2gtk-3.0.so.25 libwebkit2gtk-3.0-25 #MINVER#
  webkit_dom_html_text_area_element_get_wrap@Base 2.0.2
  webkit_dom_html_text_area_element_is_edited@Base 2.0.2
  webkit_dom_html_text_area_element_select@Base 2.0.2
+ webkit_dom_html_text_area_element_set_autocapitalize@Base 2.3.3
+ webkit_dom_html_text_area_element_set_autocorrect@Base 2.3.3
  webkit_dom_html_text_area_element_set_autofocus@Base 2.0.2
  webkit_dom_html_text_area_element_set_cols@Base 2.0.2
  webkit_dom_html_text_area_element_set_custom_validity@Base 2.0.2
@@ -1479,9 +1496,11 @@ libwebkit2gtk-3.0.so.25 libwebkit2gtk-3.0-25 #MINVER#
  webkit_dom_html_video_element_get_webkit_displaying_fullscreen@Base 2.0.2
  webkit_dom_html_video_element_get_webkit_dropped_frame_count@Base 2.0.2
  webkit_dom_html_video_element_get_webkit_supports_fullscreen@Base 2.0.2
+ webkit_dom_html_video_element_get_webkit_wireless_video_playback_disabled@Base 2.3.3
  webkit_dom_html_video_element_get_width@Base 2.0.2
  webkit_dom_html_video_element_set_height@Base 2.0.2
  webkit_dom_html_video_element_set_poster@Base 2.0.2
+ webkit_dom_html_video_element_set_webkit_wireless_video_playback_disabled@Base 2.3.3
  webkit_dom_html_video_element_set_width@Base 2.0.2
  webkit_dom_html_video_element_webkit_enter_full_screen@Base 2.0.2
  webkit_dom_html_video_element_webkit_enter_fullscreen@Base 2.0.2
@@ -1526,8 +1545,36 @@ libwebkit2gtk-3.0.so.25 libwebkit2gtk-3.0-25 #MINVER#
  webkit_dom_keyboard_event_get_type@Base 2.1.4
  webkit_dom_keyboard_event_init_keyboard_event@Base 2.1.4
  webkit_dom_location_get_ancestor_origins@Base 2.0.2
+ webkit_dom_location_get_hash@Base 2.3.3
+ webkit_dom_location_get_host@Base 2.3.3
+ webkit_dom_location_get_hostname@Base 2.3.3
+ webkit_dom_location_get_href@Base 2.3.3
  webkit_dom_location_get_origin@Base 2.0.2
+ webkit_dom_location_get_pathname@Base 2.3.3
+ webkit_dom_location_get_port@Base 2.3.3
+ webkit_dom_location_get_protocol@Base 2.3.3
+ webkit_dom_location_get_search@Base 2.3.3
  webkit_dom_location_get_type@Base 2.0.2
+ webkit_dom_media_controller_get_buffered@Base 2.3.3
+ webkit_dom_media_controller_get_current_time@Base 2.3.3
+ webkit_dom_media_controller_get_default_playback_rate@Base 2.3.3
+ webkit_dom_media_controller_get_duration@Base 2.3.3
+ webkit_dom_media_controller_get_muted@Base 2.3.3
+ webkit_dom_media_controller_get_paused@Base 2.3.3
+ webkit_dom_media_controller_get_playback_rate@Base 2.3.3
+ webkit_dom_media_controller_get_playback_state@Base 2.3.3
+ webkit_dom_media_controller_get_played@Base 2.3.3
+ webkit_dom_media_controller_get_seekable@Base 2.3.3
+ webkit_dom_media_controller_get_type@Base 2.3.3
+ webkit_dom_media_controller_get_volume@Base 2.3.3
+ webkit_dom_media_controller_pause@Base 2.3.3
+ webkit_dom_media_controller_play@Base 2.3.3
+ webkit_dom_media_controller_set_current_time@Base 2.3.3
+ webkit_dom_media_controller_set_default_playback_rate@Base 2.3.3
+ webkit_dom_media_controller_set_muted@Base 2.3.3
+ webkit_dom_media_controller_set_playback_rate@Base 2.3.3
+ webkit_dom_media_controller_set_volume@Base 2.3.3
+ webkit_dom_media_controller_unpause@Base 2.3.3
  webkit_dom_media_error_get_code@Base 2.0.2
  webkit_dom_media_error_get_type@Base 2.0.2
  webkit_dom_media_list_append_medium@Base 2.0.2
@@ -1822,6 +1869,7 @@ libwebkit2gtk-3.0.so.25 libwebkit2gtk-3.0-25 #MINVER#
  webkit_dom_text_track_get_type@Base 2.0.2
  webkit_dom_text_track_list_dispatch_event@Base 2.0.2
  webkit_dom_text_track_list_get_length@Base 2.0.2
+ webkit_dom_text_track_list_get_track_by_id@Base 2.3.3
  webkit_dom_text_track_list_get_type@Base 2.0.2
  webkit_dom_text_track_list_item@Base 2.0.2
  webkit_dom_text_track_remove_cue@Base 2.0.2
@@ -1867,6 +1915,12 @@ libwebkit2gtk-3.0.so.25 libwebkit2gtk-3.0-25 #MINVER#
  webkit_dom_validity_state_get_type_mismatch@Base 2.0.2
  webkit_dom_validity_state_get_valid@Base 2.0.2
  webkit_dom_validity_state_get_value_missing@Base 2.0.2
+ webkit_dom_video_playback_quality_get_corrupted_video_frames@Base 2.3.3
+ webkit_dom_video_playback_quality_get_creation_time@Base 2.3.3
+ webkit_dom_video_playback_quality_get_dropped_video_frames@Base 2.3.3
+ webkit_dom_video_playback_quality_get_total_frame_delay@Base 2.3.3
+ webkit_dom_video_playback_quality_get_total_video_frames@Base 2.3.3
+ webkit_dom_video_playback_quality_get_type@Base 2.3.3
  webkit_dom_video_track_get_id@Base 2.1.4
  webkit_dom_video_track_get_kind@Base 2.1.4
  webkit_dom_video_track_get_label@Base 2.1.4
@@ -2096,6 +2150,7 @@ libwebkit2gtk-3.0.so.25 libwebkit2gtk-3.0-25 #MINVER#
  webkit_settings_get_enable_java@Base 2.0.2
  webkit_settings_get_enable_javascript@Base 2.0.2
  webkit_settings_get_enable_media_stream@Base 2.3.2
+ webkit_settings_get_enable_mediasource@Base 2.3.3
  webkit_settings_get_enable_offline_web_application_cache@Base 2.0.2
  webkit_settings_get_enable_page_cache@Base 2.0.2
  webkit_settings_get_enable_plugins@Base 2.0.2
@@ -2103,6 +2158,7 @@ libwebkit2gtk-3.0.so.25 libwebkit2gtk-3.0-25 #MINVER#
  webkit_settings_get_enable_resizable_text_areas@Base 2.0.2
  webkit_settings_get_enable_site_specific_quirks@Base 2.0.2
  webkit_settings_get_enable_smooth_scrolling@Base 2.0.2
+ webkit_settings_get_enable_spatial_navigation@Base 2.3.3
  webkit_settings_get_enable_tabs_to_links@Base 2.0.2
  webkit_settings_get_enable_webaudio@Base 2.0.2
  webkit_settings_get_enable_webgl@Base 2.0.2
@@ -2145,6 +2201,7 @@ libwebkit2gtk-3.0.so.25 libwebkit2gtk-3.0-25 #MINVER#
  webkit_settings_set_enable_java@Base 2.0.2
  webkit_settings_set_enable_javascript@Base 2.0.2
  webkit_settings_set_enable_media_stream@Base 2.3.2
+ webkit_settings_set_enable_mediasource@Base 2.3.3
  webkit_settings_set_enable_offline_web_application_cache@Base 2.0.2
  webkit_settings_set_enable_page_cache@Base 2.0.2
  webkit_settings_set_enable_plugins@Base 2.0.2
@@ -2152,6 +2209,7 @@ libwebkit2gtk-3.0.so.25 libwebkit2gtk-3.0-25 #MINVER#
  webkit_settings_set_enable_resizable_text_areas@Base 2.0.2
  webkit_settings_set_enable_site_specific_quirks@Base 2.0.2
  webkit_settings_set_enable_smooth_scrolling@Base 2.0.2
+ webkit_settings_set_enable_spatial_navigation@Base 2.3.3
  webkit_settings_set_enable_tabs_to_links@Base 2.0.2
  webkit_settings_set_enable_webaudio@Base 2.0.2
  webkit_settings_set_enable_webgl@Base 2.0.2
