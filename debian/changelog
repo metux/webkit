@@ -20,6 +20,7 @@ webkitgtk (2.3.3-1) UNRELEASED; urgency=low
     + Disable JIT and MacroAssembler on powerpcspe and mips64el.
     + No need to pass --enable-wayland-target anymore, it's automatically
       enabled now.
+    + Disable parallel builds since they're unstable at the moment.
   * debian/libwebkitgtk-1.0-0.symbols,
     debian/libwebkitgtk-3.0-0.symbols,
     debian/libwebkit2gtk-3.0-25.symbols:

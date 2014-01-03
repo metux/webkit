@@ -80,10 +80,11 @@ ifneq (,$(filter debug,$(DEB_BUILD_OPTIONS)))
 	COMMON_CONFIGURE_ARGUMENTS += --enable-debug
 endif
 
-ifneq (,$(filter parallel=%,$(DEB_BUILD_OPTIONS)))
-	NUMJOBS = $(patsubst parallel=%,%,$(filter parallel=%,$(DEB_BUILD_OPTIONS)))
-	MAKEARGUMENTS += -j$(NUMJOBS)
-endif
+# Parallel builds are unstable, see #714072 and #722520
+# ifneq (,$(filter parallel=%,$(DEB_BUILD_OPTIONS)))
+# 	NUMJOBS = $(patsubst parallel=%,%,$(filter parallel=%,$(DEB_BUILD_OPTIONS)))
+# 	MAKEARGUMENTS += -j$(NUMJOBS)
+# endif
 
 ifeq ($(shell dpkg-vendor --derives-from Ubuntu && echo yes),yes)
 	DEB_DH_GENCONTROL_ARGS += -- -Vgst:Recommends=""
