@@ -37,10 +37,6 @@ else
 	EXTRA_DH_ARGUMENTS += -Nlibwebkit2gtk-3.0-25 -Nlibwebkit2gtk-3.0-dev -Nlibwebkit2gtk-3.0-25-dbg -Ngir1.2-webkit2-3.0
 endif
 
-ifeq ($(DEB_HOST_ARCH_OS),linux)
-	EXTRA_CONFIGURE_ARGUMENTS += --enable-wayland-target
-endif
-
 # Sacrifice speed in order to make it more likely resource limits
 # won't be hit.
 ifeq ($(DEB_HOST_ARCH_BITS),32)

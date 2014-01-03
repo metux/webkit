@@ -16,6 +16,8 @@ webkitgtk (2.3.3-1) UNRELEASED; urgency=low
   * debian/rules:
     + Support noopt and debug in DEB_BUILD_OPTIONS.
     + Disable JIT and MacroAssembler on powerpcspe and mips64el.
+    + No need to pass --enable-wayland-target anymore, it's automatically
+      enabled now.
 
  -- Alberto Garcia <berto@igalia.com>  Tue, 26 Nov 2013 16:55:59 +0200
 
