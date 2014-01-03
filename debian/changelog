@@ -1,4 +1,4 @@
-webkitgtk (2.3.3-1) UNRELEASED; urgency=low
+webkitgtk (2.3.3-1) experimental; urgency=low
 
   * New upstream release.
   * debian/patches/02_notebook_scroll.patch:
@@ -28,7 +28,7 @@ webkitgtk (2.3.3-1) UNRELEASED; urgency=low
     debian/libwebkit2gtk-3.0-25.symbols:
     + Updated for the new symbols.
 
- -- Alberto Garcia <berto@igalia.com>  Tue, 26 Nov 2013 16:55:59 +0200
+ -- Alberto Garcia <berto@igalia.com>  Fri, 03 Jan 2014 23:49:07 +0000
 
 webkitgtk (2.3.2-1) experimental; urgency=low
 
