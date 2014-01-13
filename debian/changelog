@@ -5,6 +5,8 @@ webkitgtk (2.3.4-1) UNRELEASED; urgency=low
     to run chrpath anymore.
     + debian/rules: remove it from the installation process.
     + debian/control: don't build depend on it.
+  * debian/libwebkit2gtk-3.0-25.symbols:
+    + Added new symbols.
 
  -- Alberto Garcia <berto@igalia.com>  Mon, 13 Jan 2014 13:11:29 +0200
 

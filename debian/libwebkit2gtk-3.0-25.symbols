@@ -1,5 +1,6 @@
 libwebkit2gtk-3.0.so.25 libwebkit2gtk-3.0-25 #MINVER#
  WebProcessMainGtk@Base 2.0.2
+ NetworkProcessMain@Base 2.3.4
  (c++)"WebKit::WebGtkExtensionManager::initialize(OpaqueWKBundle const*, void const*)@Base" 2.0.2
  (c++)"WebKit::WebGtkExtensionManager::shared()@Base" 2.0.2
  webkit_authentication_dialog_get_type@Base 2.0.2
@@ -2106,6 +2107,7 @@ libwebkit2gtk-3.0.so.25 libwebkit2gtk-3.0-25 #MINVER#
  webkit_response_policy_decision_get_request@Base 2.0.2
  webkit_response_policy_decision_get_response@Base 2.0.2
  webkit_response_policy_decision_get_type@Base 2.0.2
+ webkit_response_policy_decision_is_mime_type_supported@Base 2.3.4
  webkit_save_mode_get_type@Base 2.0.2
  webkit_script_dialog_confirm_set_confirmed@Base 2.0.2
  webkit_script_dialog_get_dialog_type@Base 2.0.2
