@@ -1,4 +1,4 @@
-webkitgtk (2.3.4-1) UNRELEASED; urgency=low
+webkitgtk (2.3.4-1) experimental; urgency=low
 
   * New upstream release.
   * WebKit is now built in fast-install mode by default, there's no need
@@ -8,7 +8,7 @@ webkitgtk (2.3.4-1) UNRELEASED; urgency=low
   * debian/libwebkit2gtk-3.0-25.symbols:
     + Added new symbols.
 
- -- Alberto Garcia <berto@igalia.com>  Mon, 13 Jan 2014 13:11:29 +0200
+ -- Alberto Garcia <berto@igalia.com>  Mon, 13 Jan 2014 19:48:47 +0000
 
 webkitgtk (2.3.3-1) experimental; urgency=low
 
