@@ -30,25 +30,21 @@
 #include "FloatPoint.h"
 #include <wtf/Vector.h>
 
+#if PLATFORM(IOS)
+#include <CoreGraphics/CGGeometry.h>
+#endif
+
 #if USE(CG)
 typedef struct CGRect CGRect;
 #endif
 
-#if PLATFORM(MAC)
+#if PLATFORM(MAC) && !PLATFORM(IOS)
 #ifdef NSGEOMETRY_TYPES_SAME_AS_CGGEOMETRY_TYPES
 typedef struct CGRect NSRect;
 #else
 typedef struct _NSRect NSRect;
 #endif
-#endif
-
-#if PLATFORM(BLACKBERRY)
-namespace BlackBerry {
-namespace Platform {
-class FloatRect;
-}
-}
-#endif
+#endif // PLATFORM(MAC) && !PLATFORM(IOS)
 
 #if USE(CAIRO)
 typedef struct _cairo_rectangle cairo_rectangle_t;
@@ -170,21 +166,17 @@ public:
     void fitToPoints(const FloatPoint& p0, const FloatPoint& p1, const FloatPoint& p2);
     void fitToPoints(const FloatPoint& p0, const FloatPoint& p1, const FloatPoint& p2, const FloatPoint& p3);
 
-#if PLATFORM(BLACKBERRY)
-    FloatRect(const BlackBerry::Platform::FloatRect&);
-    operator BlackBerry::Platform::FloatRect() const;
-    FloatRect normalized() const;
-#endif
-
 #if USE(CG)
     FloatRect(const CGRect&);
     operator CGRect() const;
 #endif
 
+#if !PLATFORM(IOS)
 #if PLATFORM(MAC) && !defined(NSGEOMETRY_TYPES_SAME_AS_CGGEOMETRY_TYPES)
     FloatRect(const NSRect&);
     operator NSRect() const;
 #endif
+#endif // !PLATFORM(IOS)
 
 #if USE(CAIRO)
     FloatRect(const cairo_rectangle_t&);
@@ -192,6 +184,9 @@ public:
 #endif
 
     void dump(PrintStream& out) const;
+
+    static FloatRect infiniteRect();
+    bool isInfinite() const;
 
 private:
     FloatPoint m_location;
@@ -244,6 +239,17 @@ inline bool operator==(const FloatRect& a, const FloatRect& b)
 inline bool operator!=(const FloatRect& a, const FloatRect& b)
 {
     return a.location() != b.location() || a.size() != b.size();
+}
+
+inline FloatRect FloatRect::infiniteRect()
+{
+    static FloatRect infiniteRect(-std::numeric_limits<float>::max() / 2, -std::numeric_limits<float>::max() / 2, std::numeric_limits<float>::max(), std::numeric_limits<float>::max());
+    return infiniteRect;
+}
+
+inline bool FloatRect::isInfinite() const
+{
+    return *this == infiniteRect();
 }
 
 IntRect enclosingIntRect(const FloatRect&);

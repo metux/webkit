@@ -101,7 +101,8 @@ Get the <a href="../webkitdomgtk/WebKitDOMDocument.html"><span class="type">WebK
 <tr>
 <td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
 <td>the <a href="../webkitdomgtk/WebKitDOMDocument.html"><span class="type">WebKitDOMDocument</span></a> currently loaded, or <a href="../glib/glib-Standard-Macros.html#NULL:CAPS"><code class="literal">NULL</code></a>
-if no document is currently loaded.</td>
+if no document is currently loaded. <span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
+</td>
 </tr>
 </tbody>
 </table></div>
@@ -167,7 +168,27 @@ loaded yet.</td>
 <a name="webkit-web-page-get-main-frame"></a><h3>webkit_web_page_get_main_frame ()</h3>
 <pre class="programlisting"><a class="link" href="WebKitFrame.html" title="WebKitFrame"><span class="returnvalue">WebKitFrame</span></a> *       webkit_web_page_get_main_frame      (<em class="parameter"><code><a class="link" href="WebKitWebPage.html" title="WebKitWebPage"><span class="type">WebKitWebPage</span></a> *web_page</code></em>);</pre>
 <p>
+Returns the main frame of a <a class="link" href="WebKitWebPage.html" title="WebKitWebPage"><span class="type">WebKitWebPage</span></a>.
 </p>
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
+<col align="left" valign="top">
+<col>
+</colgroup>
+<tbody>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>web_page</code></em> :</span></p></td>
+<td>a <a class="link" href="WebKitWebPage.html" title="WebKitWebPage"><span class="type">WebKitWebPage</span></a>
+</td>
+</tr>
+<tr>
+<td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
+<td>the <a class="link" href="WebKitFrame.html" title="WebKitFrame"><span class="type">WebKitFrame</span></a> that is the main frame of <em class="parameter"><code>web_page</code></em>. <span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span>
+</td>
+</tr>
+</tbody>
+</table></div>
+<p class="since">Since 2.2</p>
 </div>
 </div>
 <div class="refsect1">

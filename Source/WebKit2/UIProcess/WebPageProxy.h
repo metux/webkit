@@ -40,7 +40,6 @@
 #include "PlatformProcessIdentifier.h"
 #include "SandboxExtension.h"
 #include "ShareableBitmap.h"
-#include "ViewState.h"
 #include "WKBase.h"
 #include "WKPagePrivate.h"
 #include "WebColorPicker.h"
@@ -68,6 +67,7 @@
 #include <WebCore/ScrollTypes.h>
 #include <WebCore/TextChecking.h>
 #include <WebCore/TextGranularity.h>
+#include <WebCore/ViewState.h>
 #include <wtf/HashMap.h>
 #include <wtf/HashSet.h>
 #include <wtf/OwnPtr.h>
@@ -100,7 +100,7 @@ namespace API {
 class URLRequest;
 }
 
-namespace CoreIPC {
+namespace IPC {
 class ArgumentDecoder;
 class Connection;
 }
@@ -136,6 +136,7 @@ class NativeWebKeyboardEvent;
 class NativeWebMouseEvent;
 class NativeWebWheelEvent;
 class PageClient;
+class RemoteScrollingCoordinatorProxy;
 class StringPairVector;
 class WebBackForwardList;
 class WebBackForwardListItem;
@@ -207,7 +208,7 @@ public:
     {
         ASSERT(m_callback);
 
-        RefPtr<WebError> error = WebError::create();
+        RefPtr<API::Error> error = API::Error::create();
         m_callback(0, 0, 0, toAPI(error.get()), context());
         
         m_callback = 0;
@@ -252,7 +253,7 @@ public:
     {
         ASSERT(m_callback);
 
-        RefPtr<WebError> error = WebError::create();
+        RefPtr<API::Error> error = API::Error::create();
         m_callback(WebCore::IntPoint(), 0, 0, 0, toAPI(error.get()), context());
 
         m_callback = 0;
@@ -297,7 +298,7 @@ public:
     {
         ASSERT(m_callback);
 
-        RefPtr<WebError> error = WebError::create();
+        RefPtr<API::Error> error = API::Error::create();
         m_callback(WebCore::IntPoint(), 0, toAPI(error.get()), context());
         
         m_callback = 0;
@@ -321,8 +322,8 @@ class WebPageProxy : public API::ObjectImpl<API::Object::Type::Page>
     , public WebColorPicker::Client
 #endif
     , public WebPopupMenuProxy::Client
-    , public CoreIPC::MessageReceiver
-    , public CoreIPC::MessageSender {
+    , public IPC::MessageReceiver
+    , public IPC::MessageSender {
 public:
 
     static PassRefPtr<WebPageProxy> create(PageClient&, WebProcessProxy&, WebPageGroup&, uint64_t pageID);
@@ -335,6 +336,10 @@ public:
     WebFrameProxy* frameSetLargestFrame() const { return m_frameSetLargestFrame.get(); }
 
     DrawingAreaProxy* drawingArea() const { return m_drawingArea.get(); }
+    
+#if ENABLE(ASYNC_SCROLLING)
+    RemoteScrollingCoordinatorProxy* scrollingCoordinatorProxy() const { return m_scrollingCoordinatorProxy.get(); }
+#endif
 
     WebBackForwardList& backForwardList() { return m_backForwardList.get(); }
 
@@ -390,7 +395,7 @@ public:
     void tryRestoreScrollPosition();
     void didChangeBackForwardList(WebBackForwardListItem* addedItem, Vector<RefPtr<API::Object>>* removedItems);
     void shouldGoToBackForwardListItem(uint64_t itemID, bool& shouldGoToBackForwardListItem);
-    void willGoToBackForwardListItem(uint64_t itemID, CoreIPC::MessageDecoder&);
+    void willGoToBackForwardListItem(uint64_t itemID, IPC::MessageDecoder&);
 
     bool willHandleHorizontalScrollEvents() const;
 
@@ -419,13 +424,14 @@ public:
     void scrollView(const WebCore::IntRect& scrollRect, const WebCore::IntSize& scrollOffset);
 
     enum class WantsReplyOrNot { DoesNotWantReply, DoesWantReply };
-    void viewStateDidChange(ViewState::Flags mayHaveChanged, WantsReplyOrNot = WantsReplyOrNot::DoesNotWantReply);
-    bool isInWindow() const { return m_viewState & ViewState::IsInWindow; }
+    void viewStateDidChange(WebCore::ViewState::Flags mayHaveChanged, WantsReplyOrNot = WantsReplyOrNot::DoesNotWantReply);
+    bool isInWindow() const { return m_viewState & WebCore::ViewState::IsInWindow; }
     void waitForDidUpdateViewState();
 
     WebCore::IntSize viewSize() const;
-    bool isViewVisible() const { return m_viewState & ViewState::IsVisible; }
+    bool isViewVisible() const { return m_viewState & WebCore::ViewState::IsVisible; }
     bool isViewWindowActive() const;
+    bool isProcessSuppressible() const;
 
     void executeEditCommand(const String& commandName);
     void validateCommand(const String& commandName, PassRefPtr<ValidateCommandCallback>);
@@ -436,6 +442,8 @@ public:
     void extendSelection(WebCore::TextGranularity);
     void requestAutocorrectionData(const String& textForAutocorrection, PassRefPtr<AutocorrectionDataCallback>);
     void applyAutocorrection(const String& correction, const String& originalText, PassRefPtr<StringCallback>);
+    void requestAutocorrectionContext(PassRefPtr<AutocorrectionContextCallback>);
+    void getAutocorrectionContext(String& contextBefore, String& markedText, String& selectedText, String& contextAfter, uint64_t& location, uint64_t& length);
 #endif
 
     const EditorState& editorState() const { return m_editorState; }
@@ -464,8 +472,6 @@ public:
 
 #if PLATFORM(MAC)
     void windowAndViewFramesChanged(const WebCore::FloatRect& viewFrameInWindowCoordinates, const WebCore::FloatPoint& accessibilityViewCoordinates);
-    void viewExposedRectChanged(const WebCore::FloatRect& exposedRect, bool);
-    void exposedRectChangedTimerFired(WebCore::Timer<WebPageProxy>*);
     void setMainFrameIsScrollable(bool);
 
     void setComposition(const String& text, Vector<WebCore::CompositionUnderline> underlines, uint64_t selectionStart, uint64_t selectionEnd, uint64_t replacementRangeStart, uint64_t replacementRangeEnd);
@@ -555,8 +561,6 @@ public:
     void setCustomDeviceScaleFactor(float);
     void windowScreenDidChange(PlatformDisplayID);
 
-    LayerHostingMode layerHostingMode() const { return m_layerHostingMode; }
-
     void setUseFixedLayout(bool);
     void setFixedLayoutSize(const WebCore::IntSize&);
     bool useFixedLayout() const { return m_useFixedLayout; };
@@ -564,7 +568,7 @@ public:
 
     void listenForLayoutMilestones(WebCore::LayoutMilestones);
 
-    void setVisibilityState(WebCore::PageVisibilityState, bool isInitialState);
+    void setVisibilityStatePrerender();
     void didUpdateViewState() { m_waitingForDidUpdateViewState = false; }
 
     bool hasHorizontalScrollbar() const { return m_mainFrameHasHorizontalScrollbar; }
@@ -602,9 +606,9 @@ public:
 
 #if PLATFORM(MAC)
     // Called by the web process through a message.
-    void registerWebProcessAccessibilityToken(const CoreIPC::DataReference&);
+    void registerWebProcessAccessibilityToken(const IPC::DataReference&);
     // Called by the UI process when it is ready to send its tokens to the web process.
-    void registerUIProcessAccessibilityTokens(const CoreIPC::DataReference& elemenToken, const CoreIPC::DataReference& windowToken);
+    void registerUIProcessAccessibilityTokens(const IPC::DataReference& elemenToken, const IPC::DataReference& windowToken);
     bool readSelectionFromPasteboard(const String& pasteboardName);
     String stringSelectionForPasteboard();
     PassRefPtr<WebCore::SharedBuffer> dataSelectionForPasteboard(const String& pasteboardType);
@@ -637,7 +641,7 @@ public:
     void getContentsAsMHTMLData(PassRefPtr<DataCallback>, bool useBinaryEncoding);
 #endif
     void getMainResourceDataOfFrame(WebFrameProxy*, PassRefPtr<DataCallback>);
-    void getResourceDataFromFrame(WebFrameProxy*, WebURL*, PassRefPtr<DataCallback>);
+    void getResourceDataFromFrame(WebFrameProxy*, API::URL*, PassRefPtr<DataCallback>);
     void getRenderTreeExternalRepresentation(PassRefPtr<StringCallback>);
     void getSelectionOrContentsAsString(PassRefPtr<StringCallback>);
     void getSelectionAsWebArchiveData(PassRefPtr<DataCallback>);
@@ -781,14 +785,12 @@ public:
 #endif
 
     void saveDataToFileInDownloadsFolder(const String& suggestedFilename, const String& mimeType, const String& originatingURLString, API::Data*);
-    void savePDFToFileInDownloadsFolder(const String& suggestedFilename, const String& originatingURLString, const CoreIPC::DataReference&);
+    void savePDFToFileInDownloadsFolder(const String& suggestedFilename, const String& originatingURLString, const IPC::DataReference&);
 #if PLATFORM(MAC)
     void savePDFToTemporaryFolderAndOpenWithNativeApplicationRaw(const String& suggestedFilename, const String& originatingURLString, const uint8_t* data, unsigned long size, const String& pdfUUID);
-    void savePDFToTemporaryFolderAndOpenWithNativeApplication(const String& suggestedFilename, const String& originatingURLString, const CoreIPC::DataReference&, const String& pdfUUID);
+    void savePDFToTemporaryFolderAndOpenWithNativeApplication(const String& suggestedFilename, const String& originatingURLString, const IPC::DataReference&, const String& pdfUUID);
     void openPDFFromTemporaryFolderWithNativeApplication(const String& pdfUUID);
 #endif
-
-    void linkClicked(const String&, const WebMouseEvent&);
 
     WebCore::IntRect visibleScrollerThumbRect() const { return m_visibleScrollerThumbRect; }
 
@@ -844,8 +846,8 @@ public:
     void didFinishCheckingText(uint64_t requestID, const Vector<WebCore::TextCheckingResult>&);
     void didCancelCheckingText(uint64_t requestID);
 
-    void connectionWillOpen(CoreIPC::Connection*);
-    void connectionWillClose(CoreIPC::Connection*);
+    void connectionWillOpen(IPC::Connection*);
+    void connectionWillClose(IPC::Connection*);
 
     void didSaveToPageCache();
         
@@ -857,18 +859,18 @@ private:
     void platformInitialize();
     void initializeCreationParameters();
 
-    void updateViewState(ViewState::Flags flagsToUpdate = ViewState::AllFlags);
+    void updateViewState(WebCore::ViewState::Flags flagsToUpdate = WebCore::ViewState::AllFlags);
 
     void resetState();
     void resetStateAfterProcessExited();
 
-    // CoreIPC::MessageReceiver
-    virtual void didReceiveMessage(CoreIPC::Connection*, CoreIPC::MessageDecoder&) OVERRIDE;
-    virtual void didReceiveSyncMessage(CoreIPC::Connection*, CoreIPC::MessageDecoder&, std::unique_ptr<CoreIPC::MessageEncoder>&) OVERRIDE;
+    // IPC::MessageReceiver
+    virtual void didReceiveMessage(IPC::Connection*, IPC::MessageDecoder&) OVERRIDE;
+    virtual void didReceiveSyncMessage(IPC::Connection*, IPC::MessageDecoder&, std::unique_ptr<IPC::MessageEncoder>&) OVERRIDE;
 
-    // CoreIPC::MessageSender
-    virtual bool sendMessage(std::unique_ptr<CoreIPC::MessageEncoder>, unsigned messageSendFlags) OVERRIDE;
-    virtual CoreIPC::Connection* messageSenderConnection() OVERRIDE;
+    // IPC::MessageSender
+    virtual bool sendMessage(std::unique_ptr<IPC::MessageEncoder>, unsigned messageSendFlags) OVERRIDE;
+    virtual IPC::Connection* messageSenderConnection() OVERRIDE;
     virtual uint64_t messageSenderDestinationID() OVERRIDE;
 
     // WebPopupMenuProxy::Client
@@ -879,40 +881,40 @@ private:
 #endif
 
     // Implemented in generated WebPageProxyMessageReceiver.cpp
-    void didReceiveWebPageProxyMessage(CoreIPC::Connection*, CoreIPC::MessageDecoder&);
-    void didReceiveSyncWebPageProxyMessage(CoreIPC::Connection*, CoreIPC::MessageDecoder&, std::unique_ptr<CoreIPC::MessageEncoder>&);
+    void didReceiveWebPageProxyMessage(IPC::Connection*, IPC::MessageDecoder&);
+    void didReceiveSyncWebPageProxyMessage(IPC::Connection*, IPC::MessageDecoder&, std::unique_ptr<IPC::MessageEncoder>&);
 
     void didCreateMainFrame(uint64_t frameID);
     void didCreateSubframe(uint64_t frameID);
 
-    void didStartProvisionalLoadForFrame(uint64_t frameID, const String& url, const String& unreachableURL, CoreIPC::MessageDecoder&);
-    void didReceiveServerRedirectForProvisionalLoadForFrame(uint64_t frameID, const String&, CoreIPC::MessageDecoder&);
-    void didFailProvisionalLoadForFrame(uint64_t frameID, const WebCore::ResourceError&, CoreIPC::MessageDecoder&);
-    void didCommitLoadForFrame(uint64_t frameID, const String& mimeType, uint32_t frameLoadType, const WebCore::CertificateInfo&, CoreIPC::MessageDecoder&);
-    void didFinishDocumentLoadForFrame(uint64_t frameID, CoreIPC::MessageDecoder&);
-    void didFinishLoadForFrame(uint64_t frameID, CoreIPC::MessageDecoder&);
-    void didFailLoadForFrame(uint64_t frameID, const WebCore::ResourceError&, CoreIPC::MessageDecoder&);
-    void didSameDocumentNavigationForFrame(uint64_t frameID, uint32_t sameDocumentNavigationType, const String&, CoreIPC::MessageDecoder&);
-    void didReceiveTitleForFrame(uint64_t frameID, const String&, CoreIPC::MessageDecoder&);
-    void didFirstLayoutForFrame(uint64_t frameID, CoreIPC::MessageDecoder&);
-    void didFirstVisuallyNonEmptyLayoutForFrame(uint64_t frameID, CoreIPC::MessageDecoder&);
-    void didLayout(uint32_t layoutMilestones, CoreIPC::MessageDecoder&);
-    void didRemoveFrameFromHierarchy(uint64_t frameID, CoreIPC::MessageDecoder&);
-    void didDisplayInsecureContentForFrame(uint64_t frameID, CoreIPC::MessageDecoder&);
-    void didRunInsecureContentForFrame(uint64_t frameID, CoreIPC::MessageDecoder&);
-    void didDetectXSSForFrame(uint64_t frameID, CoreIPC::MessageDecoder&);
+    void didStartProvisionalLoadForFrame(uint64_t frameID, const String& url, const String& unreachableURL, IPC::MessageDecoder&);
+    void didReceiveServerRedirectForProvisionalLoadForFrame(uint64_t frameID, const String&, IPC::MessageDecoder&);
+    void didFailProvisionalLoadForFrame(uint64_t frameID, const WebCore::ResourceError&, IPC::MessageDecoder&);
+    void didCommitLoadForFrame(uint64_t frameID, const String& mimeType, uint32_t frameLoadType, const WebCore::CertificateInfo&, IPC::MessageDecoder&);
+    void didFinishDocumentLoadForFrame(uint64_t frameID, IPC::MessageDecoder&);
+    void didFinishLoadForFrame(uint64_t frameID, IPC::MessageDecoder&);
+    void didFailLoadForFrame(uint64_t frameID, const WebCore::ResourceError&, IPC::MessageDecoder&);
+    void didSameDocumentNavigationForFrame(uint64_t frameID, uint32_t sameDocumentNavigationType, const String&, IPC::MessageDecoder&);
+    void didReceiveTitleForFrame(uint64_t frameID, const String&, IPC::MessageDecoder&);
+    void didFirstLayoutForFrame(uint64_t frameID, IPC::MessageDecoder&);
+    void didFirstVisuallyNonEmptyLayoutForFrame(uint64_t frameID, IPC::MessageDecoder&);
+    void didLayout(uint32_t layoutMilestones, IPC::MessageDecoder&);
+    void didRemoveFrameFromHierarchy(uint64_t frameID, IPC::MessageDecoder&);
+    void didDisplayInsecureContentForFrame(uint64_t frameID, IPC::MessageDecoder&);
+    void didRunInsecureContentForFrame(uint64_t frameID, IPC::MessageDecoder&);
+    void didDetectXSSForFrame(uint64_t frameID, IPC::MessageDecoder&);
     void frameDidBecomeFrameSet(uint64_t frameID, bool);
     void didStartProgress();
     void didChangeProgress(double);
     void didFinishProgress();
 
-    void decidePolicyForNavigationAction(uint64_t frameID, uint32_t navigationType, uint32_t modifiers, int32_t mouseButton, uint64_t originatingFrameID, const WebCore::ResourceRequest& originalRequest, const WebCore::ResourceRequest& request, uint64_t listenerID, CoreIPC::MessageDecoder&, bool& receivedPolicyAction, uint64_t& policyAction, uint64_t& downloadID);
-    void decidePolicyForNewWindowAction(uint64_t frameID, uint32_t navigationType, uint32_t modifiers, int32_t mouseButton, const WebCore::ResourceRequest&, const String& frameName, uint64_t listenerID, CoreIPC::MessageDecoder&);
-    void decidePolicyForResponse(uint64_t frameID, const WebCore::ResourceResponse&, const WebCore::ResourceRequest&, bool canShowMIMEType, uint64_t listenerID, CoreIPC::MessageDecoder&);
-    void decidePolicyForResponseSync(uint64_t frameID, const WebCore::ResourceResponse&, const WebCore::ResourceRequest&, bool canShowMIMEType, uint64_t listenerID, CoreIPC::MessageDecoder&, bool& receivedPolicyAction, uint64_t& policyAction, uint64_t& downloadID);
-    void unableToImplementPolicy(uint64_t frameID, const WebCore::ResourceError&, CoreIPC::MessageDecoder&);
+    void decidePolicyForNavigationAction(uint64_t frameID, uint32_t navigationType, uint32_t modifiers, int32_t mouseButton, uint64_t originatingFrameID, const WebCore::ResourceRequest& originalRequest, const WebCore::ResourceRequest& request, uint64_t listenerID, IPC::MessageDecoder&, bool& receivedPolicyAction, uint64_t& policyAction, uint64_t& downloadID);
+    void decidePolicyForNewWindowAction(uint64_t frameID, uint32_t navigationType, uint32_t modifiers, int32_t mouseButton, const WebCore::ResourceRequest&, const String& frameName, uint64_t listenerID, IPC::MessageDecoder&);
+    void decidePolicyForResponse(uint64_t frameID, const WebCore::ResourceResponse&, const WebCore::ResourceRequest&, bool canShowMIMEType, uint64_t listenerID, IPC::MessageDecoder&);
+    void decidePolicyForResponseSync(uint64_t frameID, const WebCore::ResourceResponse&, const WebCore::ResourceRequest&, bool canShowMIMEType, uint64_t listenerID, IPC::MessageDecoder&, bool& receivedPolicyAction, uint64_t& policyAction, uint64_t& downloadID);
+    void unableToImplementPolicy(uint64_t frameID, const WebCore::ResourceError&, IPC::MessageDecoder&);
 
-    void willSubmitForm(uint64_t frameID, uint64_t sourceFrameID, const Vector<std::pair<String, String>>& textFieldValues, uint64_t listenerID, CoreIPC::MessageDecoder&);
+    void willSubmitForm(uint64_t frameID, uint64_t sourceFrameID, const Vector<std::pair<String, String>>& textFieldValues, uint64_t listenerID, IPC::MessageDecoder&);
 
     // UI client
     void createNewPage(const WebCore::ResourceRequest&, const WebCore::WindowFeatures&, uint32_t modifiers, int32_t mouseButton, uint64_t& newPageID, WebPageCreationParameters&);
@@ -923,7 +925,7 @@ private:
     void runJavaScriptPrompt(uint64_t frameID, const String&, const String&, String& result);
     void shouldInterruptJavaScript(bool& result);
     void setStatusText(const String&);
-    void mouseDidMoveOverElement(const WebHitTestResult::Data& hitTestResultData, uint32_t modifiers, CoreIPC::MessageDecoder&);
+    void mouseDidMoveOverElement(const WebHitTestResult::Data& hitTestResultData, uint32_t modifiers, IPC::MessageDecoder&);
 #if ENABLE(NETSCAPE_PLUGIN_API)
     void unavailablePluginButtonClicked(uint32_t opaquePluginUnavailabilityReason, const String& mimeType, const String& pluginURLString, const String& pluginsPageURLString, const String& frameURLString, const String& pageURLString);
 #endif // ENABLE(NETSCAPE_PLUGIN_API)
@@ -1024,8 +1026,8 @@ private:
 
 #if ENABLE(CONTEXT_MENUS)
     // Context Menu.
-    void showContextMenu(const WebCore::IntPoint& menuLocation, const WebHitTestResult::Data&, const Vector<WebContextMenuItemData>&, CoreIPC::MessageDecoder&);
-    void internalShowContextMenu(const WebCore::IntPoint& menuLocation, const WebHitTestResult::Data&, const Vector<WebContextMenuItemData>&, CoreIPC::MessageDecoder&);
+    void showContextMenu(const WebCore::IntPoint& menuLocation, const WebHitTestResult::Data&, const Vector<WebContextMenuItemData>&, IPC::MessageDecoder&);
+    void internalShowContextMenu(const WebCore::IntPoint& menuLocation, const WebHitTestResult::Data&, const Vector<WebContextMenuItemData>&, IPC::MessageDecoder&);
 #endif
 
     // Search popup results
@@ -1071,16 +1073,17 @@ private:
     void stopResponsivenessTimer();
 
     void voidCallback(uint64_t);
-    void dataCallback(const CoreIPC::DataReference&, uint64_t);
+    void dataCallback(const IPC::DataReference&, uint64_t);
     void imageCallback(const ShareableBitmap::Handle&, uint64_t);
     void stringCallback(const String&, uint64_t);
-    void scriptValueCallback(const CoreIPC::DataReference&, uint64_t);
+    void scriptValueCallback(const IPC::DataReference&, uint64_t);
     void computedPagesCallback(const Vector<WebCore::IntRect>&, double totalScaleFactorForPrinting, uint64_t);
     void validateCommandCallback(const String&, bool, int, uint64_t);
 #if PLATFORM(IOS)
     void gestureCallback(const WebCore::IntPoint&, uint32_t, uint32_t, uint32_t, uint64_t);
     void touchesCallback(const WebCore::IntPoint&, uint32_t, uint64_t);
     void autocorrectionDataCallback(const Vector<WebCore::FloatRect>&, const String&, float, uint64_t, uint64_t);
+    void autocorrectionContextCallback(const String&, const String&, const String&, const String&, uint64_t, uint64_t, uint64_t);
     void interpretKeyEvent(const EditorState&, bool isCharEvent, bool& handled);
 #endif
 #if PLATFORM(GTK)
@@ -1165,6 +1168,10 @@ private:
 #endif
 
     std::unique_ptr<DrawingAreaProxy> m_drawingArea;
+#if ENABLE(ASYNC_SCROLLING)
+    std::unique_ptr<RemoteScrollingCoordinatorProxy> m_scrollingCoordinatorProxy;
+#endif
+
     Ref<WebProcessProxy> m_process;
     Ref<WebPageGroup> m_pageGroup;
     RefPtr<WebFrameProxy> m_mainFrame;
@@ -1200,6 +1207,7 @@ private:
     HashMap<uint64_t, RefPtr<GestureCallback>> m_gestureCallbacks;
     HashMap<uint64_t, RefPtr<TouchesCallback>> m_touchesCallbacks;
     HashMap<uint64_t, RefPtr<AutocorrectionDataCallback>> m_autocorrectionCallbacks;
+    HashMap<uint64_t, RefPtr<AutocorrectionContextCallback>> m_autocorrectionContextCallbacks;
 #endif
 #if PLATFORM(GTK)
     HashMap<uint64_t, RefPtr<PrintFinishedCallback>> m_printFinishedCallbacks;
@@ -1218,7 +1226,7 @@ private:
     GeolocationPermissionRequestManagerProxy m_geolocationPermissionRequestManager;
     NotificationPermissionRequestManagerProxy m_notificationPermissionRequestManager;
 
-    ViewState::Flags m_viewState;
+    WebCore::ViewState::Flags m_viewState;
 
     bool m_canGoBack;
     bool m_canGoForward;
@@ -1358,20 +1366,6 @@ private:
     bool m_mayStartMediaWhenInWindow;
 
     bool m_waitingForDidUpdateViewState;
-
-#if PLATFORM(MAC)
-#if !PLATFORM(IOS)
-    WebCore::Timer<WebPageProxy> m_exposedRectChangedTimer;
-#endif // PLATFORM(IOS)
-    WebCore::FloatRect m_exposedRect;
-    WebCore::FloatRect m_lastSentExposedRect;
-    bool m_clipsToExposedRect;
-    bool m_lastSentClipsToExposedRect;
-#endif
-
-#if ENABLE(PAGE_VISIBILITY_API)
-    WebCore::PageVisibilityState m_visibilityState;
-#endif
 
 #if PLATFORM(MAC)
     HashMap<String, String> m_temporaryPDFFiles;

@@ -165,7 +165,7 @@ public:
     }
 
     explicit ExternalCharacterTokenBuffer(const String& string)
-        : m_current(string.characters())
+        : m_current(string.deprecatedCharacters())
         , m_end(m_current + string.length())
         , m_isAll8BitData(string.length() && string.is8Bit())
     {
@@ -1603,8 +1603,6 @@ void HTMLTreeBuilder::callTheAdoptionAgency(AtomicHTMLToken* token)
             if (ContainerNode* parent = lastNode->element()->parentNode())
                 parent->parserRemoveChild(*lastNode->element());
             node->element()->parserAppendChild(lastNode->element());
-            if (lastNode->element()->parentElement()->attached() && !lastNode->element()->attached())
-                lastNode->element()->lazyAttach();
             // 9.10
             lastNode = node;
         }
@@ -1624,8 +1622,6 @@ void HTMLTreeBuilder::callTheAdoptionAgency(AtomicHTMLToken* token)
 #endif
             ASSERT(lastNode->stackItem()->isElementNode());
             ASSERT(lastNode->element()->parentNode());
-            if (lastNode->element()->parentNode()->attached() && !lastNode->element()->attached())
-                lastNode->element()->lazyAttach();
         }
         // 11.
         RefPtr<HTMLStackItem> newItem = m_tree.createElementFromSavedToken(formattingElementRecord->stackItem().get());
@@ -1637,12 +1633,6 @@ void HTMLTreeBuilder::callTheAdoptionAgency(AtomicHTMLToken* token)
         //        be in HTMLConstructionSite. My guess is that steps 11--15
         //        should all be in some HTMLConstructionSite function.
         furthestBlockElement->parserAppendChild(newItem->element());
-        // FIXME: Why is this attach logic necessary? Style resolve should attach us if needed.
-        if (furthestBlockElement->attached() && !newItem->element()->attached()) {
-            // Notice that newItem->element() might already be attached if, for example, one of the reparented
-            // children is a style element, which attaches itself automatically.
-            Style::attachRenderTree(*newItem->element());
-        }
         // 14.
         m_tree.activeFormattingElements()->swapTo(formattingElement, newItem, bookmark);
         // 15.

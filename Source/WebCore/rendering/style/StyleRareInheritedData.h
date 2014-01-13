@@ -48,7 +48,7 @@ class StyleImage;
 class StyleRareInheritedData : public RefCounted<StyleRareInheritedData> {
 public:
     static PassRef<StyleRareInheritedData> create() { return adoptRef(*new StyleRareInheritedData); }
-    PassRef<StyleRareInheritedData> copy() const { return adoptRef(*new StyleRareInheritedData(*this)); }
+    PassRef<StyleRareInheritedData> copy() const;
     ~StyleRareInheritedData();
 
     bool operator==(const StyleRareInheritedData& o) const;
@@ -75,6 +75,8 @@ public:
     RefPtr<CursorList> cursorData;
     Length indent;
     float m_effectiveZoom;
+    
+    Length wordSpacing;
 
     // Paged media properties.
     short widows;
@@ -143,6 +145,9 @@ public:
     AtomicString m_lineGrid;
     unsigned m_tabSize;
 
+#if PLATFORM(IOS)
+    Color compositionFillColor;
+#endif
 #if ENABLE(IOS_TEXT_AUTOSIZING)
     TextSizeAdjustment textSizeAdjust;
 #endif

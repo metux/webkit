@@ -191,7 +191,7 @@ void NetworkResourceLoader::didReceiveResponseAsync(ResourceHandle* handle, cons
     }
 }
 
-void NetworkResourceLoader::didReceiveData(ResourceHandle*, const char* data, int length, int encodedDataLength)
+void NetworkResourceLoader::didReceiveData(ResourceHandle*, const char* data, unsigned length, int encodedDataLength)
 {
     // The NetworkProcess should never get a didReceiveData callback.
     // We should always be using didReceiveBuffer.
@@ -243,7 +243,12 @@ void NetworkResourceLoader::willSendRequestAsync(ResourceHandle* handle, const R
 
 void NetworkResourceLoader::continueWillSendRequest(const ResourceRequest& newRequest)
 {
+#if PLATFORM(MAC)
     m_suggestedRequestForWillSendRequest.updateFromDelegatePreservingOldHTTPBody(newRequest.nsURLRequest(DoNotUpdateHTTPBody));
+#elif USE(SOUP)
+    // FIXME: Implement ResourceRequest::updateFromDelegatePreservingOldHTTPBody. See https://bugs.webkit.org/show_bug.cgi?id=126127.
+    m_suggestedRequestForWillSendRequest.updateFromDelegatePreservingOldHTTPBody(newRequest);
+#endif
 
     RunLoop::main()->dispatch(bind(&NetworkResourceLoadScheduler::receivedRedirect, &NetworkProcess::shared().networkResourceLoadScheduler(), this, m_suggestedRequestForWillSendRequest.url()));
 
@@ -331,7 +336,15 @@ void NetworkResourceLoader::didCancelAuthenticationChallenge(ResourceHandle* han
     notImplemented();
 }
 
-CoreIPC::Connection* NetworkResourceLoader::messageSenderConnection()
+void NetworkResourceLoader::receivedCancellation(ResourceHandle* handle, const AuthenticationChallenge& challenge)
+{
+    ASSERT_UNUSED(handle, handle == m_handle);
+
+    m_handle->cancel();
+    didFail(m_handle.get(), cancelledError(m_request));
+}
+
+IPC::Connection* NetworkResourceLoader::messageSenderConnection()
 {
     return connectionToWebProcess()->connection();
 }
@@ -393,7 +406,7 @@ void NetworkResourceLoader::didReceiveDataArray(ResourceHandle*, CFArrayRef)
 #endif
 
 #if PLATFORM(MAC)
-void NetworkResourceLoader::willStopBufferingData(ResourceHandle*, const char*, int)
+void NetworkResourceLoader::willStopBufferingData(ResourceHandle*, const char*, unsigned)
 {
     notImplemented();
 }

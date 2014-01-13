@@ -58,13 +58,11 @@
 #include "TransformSource.h"
 #include "XMLNSNames.h"
 #include "XMLDocumentParserScope.h"
-#include <libxml/parser.h>
 #include <libxml/parserInternals.h>
 #include <wtf/Ref.h>
 #include <wtf/StringExtras.h>
 #include <wtf/Threading.h>
 #include <wtf/Vector.h>
-#include <wtf/text/CString.h>
 #include <wtf/unicode/UTF8.h>
 
 #if ENABLE(XSLT)
@@ -679,7 +677,7 @@ void XMLDocumentParser::doWrite(const String& parseString)
 
         switchToUTF16(context->context());
         XMLDocumentParserScope scope(document()->cachedResourceLoader());
-        xmlParseChunk(context->context(), reinterpret_cast<const char*>(parseString.characters()), sizeof(UChar) * parseString.length(), 0);
+        xmlParseChunk(context->context(), reinterpret_cast<const char*>(parseString.deprecatedCharacters()), sizeof(UChar) * parseString.length(), 0);
 
         // JavaScript (which may be run under the xmlParseChunk callstack) may
         // cause the parser to be stopped or detached.
@@ -844,7 +842,6 @@ void XMLDocumentParser::startElementNs(const xmlChar* xmlLocalName, const xmlCha
     if (!m_currentNode) // Synchronous DOM events may have removed the current node.
         return;
 
-    const ContainerNode* currentNode = m_currentNode;
 #if ENABLE(TEMPLATE_ELEMENT)
     if (newElement->hasTagName(HTMLNames::templateTag))
         pushCurrentNode(toHTMLTemplateElement(newElement.get())->content());
@@ -853,9 +850,6 @@ void XMLDocumentParser::startElementNs(const xmlChar* xmlLocalName, const xmlCha
 #else
     pushCurrentNode(newElement.get());
 #endif
-
-    if (m_view && currentNode->attached() && !newElement->attached())
-        Style::attachRenderTree(*newElement);
 
     if (newElement->hasTagName(HTMLNames::htmlTag))
         toHTMLHtmlElement(newElement.get())->insertedByParser();
@@ -1029,9 +1023,7 @@ void XMLDocumentParser::cdataBlock(const xmlChar* s, int len)
     exitText();
 
     RefPtr<CDATASection> newNode = CDATASection::create(m_currentNode->document(), toString(s, len));
-    m_currentNode->parserAppendChild(newNode.get());
-    if (m_view && !newNode->attached())
-        Style::attachTextRenderer(*newNode);
+    m_currentNode->parserAppendChild(newNode.release());
 }
 
 void XMLDocumentParser::comment(const xmlChar* s)
@@ -1047,7 +1039,7 @@ void XMLDocumentParser::comment(const xmlChar* s)
     exitText();
 
     RefPtr<Comment> newNode = Comment::create(m_currentNode->document(), toString(s));
-    m_currentNode->parserAppendChild(newNode.get());
+    m_currentNode->parserAppendChild(newNode.release());
 }
 
 enum StandaloneInfo {
@@ -1544,7 +1536,7 @@ HashMap<String, String> parseAttributes(const String& string, bool& attrsOK)
     sax.initialized = XML_SAX2_MAGIC;
     RefPtr<XMLParserContext> parser = XMLParserContext::createStringParser(&sax, &state);
     String parseString = "<?xml version=\"1.0\"?><attrs " + string + " />";
-    xmlParseChunk(parser->context(), reinterpret_cast<const char*>(parseString.characters()), parseString.length() * sizeof(UChar), 1);
+    xmlParseChunk(parser->context(), reinterpret_cast<const char*>(parseString.deprecatedCharacters()), parseString.length() * sizeof(UChar), 1);
     attrsOK = state.gotAttributes;
     return state.attributes;
 }

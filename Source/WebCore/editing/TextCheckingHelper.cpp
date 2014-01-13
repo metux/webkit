@@ -36,6 +36,7 @@
 #include "TextIterator.h"
 #include "VisiblePosition.h"
 #include "VisibleUnits.h"
+#include <wtf/text/StringView.h>
 
 namespace WebCore {
 
@@ -232,6 +233,7 @@ TextCheckingHelper::~TextCheckingHelper()
 {
 }
 
+#if !PLATFORM(IOS)
 String TextCheckingHelper::findFirstMisspelling(int& firstMisspellingOffset, bool markAll, RefPtr<Range>& firstMisspellingRange)
 {
     WordAwareIterator it(m_range.get());
@@ -343,7 +345,7 @@ String TextCheckingHelper::findFirstMisspellingOrBadGrammar(bool checkGrammar, b
                 
                 Vector<TextCheckingResult> results;
                 TextCheckingTypeMask checkingTypes = checkGrammar ? (TextCheckingTypeSpelling | TextCheckingTypeGrammar) : TextCheckingTypeSpelling;
-                checkTextOfParagraph(m_client->textChecker(), paragraphString.characters(), paragraphString.length(), checkingTypes, results);
+                checkTextOfParagraph(m_client->textChecker(), paragraphString.deprecatedCharacters(), paragraphString.length(), checkingTypes, results);
                 
                 for (unsigned i = 0; i < results.size(); i++) {
                     const TextCheckingResult* result = &results[i];
@@ -412,6 +414,7 @@ String TextCheckingHelper::findFirstMisspellingOrBadGrammar(bool checkGrammar, b
     }
     return firstFoundItem;
 }
+#endif // !PLATFORM(IOS)
 
 #if USE(GRAMMAR_CHECKING)
 int TextCheckingHelper::findFirstGrammarDetail(const Vector<GrammarDetail>& grammarDetails, int badGrammarPhraseLocation, int startOffset, int endOffset, bool markAll) const
@@ -471,7 +474,7 @@ String TextCheckingHelper::findFirstBadGrammar(GrammarDetail& outGrammarDetail, 
         Vector<GrammarDetail> grammarDetails;
         int badGrammarPhraseLocation = -1;
         int badGrammarPhraseLength = 0;
-        m_client->textChecker()->checkGrammarOfString(paragraph.textCharacters() + startOffset, paragraph.textLength() - startOffset, grammarDetails, &badGrammarPhraseLocation, &badGrammarPhraseLength);
+        m_client->textChecker()->checkGrammarOfString(paragraph.textDeprecatedCharacters() + startOffset, paragraph.textLength() - startOffset, grammarDetails, &badGrammarPhraseLocation, &badGrammarPhraseLength);
         
         if (!badGrammarPhraseLength) {
             ASSERT(badGrammarPhraseLocation == -1);
@@ -572,7 +575,7 @@ Vector<String> TextCheckingHelper::guessesForMisspelledOrUngrammaticalRange(bool
 
     Vector<TextCheckingResult> results;
     TextCheckingTypeMask checkingTypes = checkGrammar ? (TextCheckingTypeSpelling | TextCheckingTypeGrammar) : TextCheckingTypeSpelling;
-    checkTextOfParagraph(m_client->textChecker(), paragraph.textCharacters(), paragraph.textLength(), checkingTypes, results);
+    checkTextOfParagraph(m_client->textChecker(), paragraph.textDeprecatedCharacters(), paragraph.textLength(), checkingTypes, results);
     
     for (unsigned i = 0; i < results.size(); i++) {
         const TextCheckingResult* result = &results[i];
@@ -611,6 +614,7 @@ Vector<String> TextCheckingHelper::guessesForMisspelledOrUngrammaticalRange(bool
 }
 
 
+#if !PLATFORM(IOS)
 void TextCheckingHelper::markAllMisspellings(RefPtr<Range>& firstMisspellingRange)
 {
     // Use the "markAll" feature of findFirstMisspelling. Ignore the return value and the "out parameter";
@@ -629,6 +633,7 @@ void TextCheckingHelper::markAllBadGrammar()
     findFirstBadGrammar(ignoredGrammarDetail, ignoredOffset, true);
 }
 #endif
+#endif // !PLATFORM(IOS)
 
 bool TextCheckingHelper::unifiedTextCheckerEnabled() const
 {
@@ -639,7 +644,7 @@ void checkTextOfParagraph(TextCheckerClient* client, const UChar* text, int leng
                           TextCheckingTypeMask checkingTypes, Vector<TextCheckingResult>& results)
 {
 #if USE(UNIFIED_TEXT_CHECKING)
-    client->checkTextOfParagraph(text, length, checkingTypes, results);
+    results = client->checkTextOfParagraph(StringView(text, length), checkingTypes);
 #else
     Vector<TextCheckingResult> spellingResult;
     if (checkingTypes & TextCheckingTypeSpelling)

@@ -9,10 +9,12 @@ WebKitResponsePolicyDecision
 
 </para>
 
+
 <!-- ##### SECTION See_Also ##### -->
 <para>
 
 </para>
+
 
 <!-- ##### SECTION Stability_Level ##### -->
 
@@ -46,6 +48,15 @@ WebKitResponsePolicyDecision
 
 
 <!-- ##### FUNCTION webkit_response_policy_decision_get_response ##### -->
+<para>
+
+</para>
+
+@decision: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_response_policy_decision_is_mime_type_supported ##### -->
 <para>
 
 </para>

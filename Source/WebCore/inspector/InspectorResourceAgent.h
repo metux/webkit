@@ -77,11 +77,7 @@ typedef String ErrorString;
 
 class InspectorResourceAgent : public InspectorAgentBase, public Inspector::InspectorNetworkBackendDispatcherHandler {
 public:
-    static PassOwnPtr<InspectorResourceAgent> create(InstrumentingAgents* instrumentingAgents, InspectorPageAgent* pageAgent, InspectorClient* client)
-    {
-        return adoptPtr(new InspectorResourceAgent(instrumentingAgents, pageAgent, client));
-    }
-
+    InspectorResourceAgent(InstrumentingAgents*, InspectorPageAgent*, InspectorClient*);
     ~InspectorResourceAgent();
 
     virtual void didCreateFrontendAndBackend(Inspector::InspectorFrontendChannel*, Inspector::InspectorBackendDispatcher*) OVERRIDE;
@@ -108,8 +104,6 @@ public:
 
     void willDestroyCachedResource(CachedResource*);
 
-    void applyUserAgentOverride(String* userAgent);
-
     // FIXME: InspectorResourceAgent should now be aware of style recalculation.
     void willRecalculateStyle();
     void didRecalculateStyle();
@@ -133,7 +127,6 @@ public:
     // Called from frontend
     virtual void enable(ErrorString*);
     virtual void disable(ErrorString*);
-    virtual void setUserAgentOverride(ErrorString*, const String& userAgent);
     virtual void setExtraHTTPHeaders(ErrorString*, const RefPtr<Inspector::InspectorObject>&);
     virtual void getResponseBody(ErrorString*, const String& requestId, String* content, bool* base64Encoded);
 
@@ -146,15 +139,12 @@ public:
     virtual void setCacheDisabled(ErrorString*, bool cacheDisabled);
 
 private:
-    InspectorResourceAgent(InstrumentingAgents*, InspectorPageAgent*, InspectorClient*);
-
     void enable();
 
     InspectorPageAgent* m_pageAgent;
     InspectorClient* m_client;
     std::unique_ptr<Inspector::InspectorNetworkFrontendDispatcher> m_frontendDispatcher;
     RefPtr<Inspector::InspectorNetworkBackendDispatcher> m_backendDispatcher;
-    String m_userAgentOverride;
     OwnPtr<NetworkResourcesData> m_resourcesData;
     bool m_enabled;
     bool m_cacheDisabled;

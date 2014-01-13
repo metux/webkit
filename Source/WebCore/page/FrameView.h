@@ -31,6 +31,7 @@
 #include "LayoutRect.h"
 #include "Pagination.h"
 #include "PaintPhase.h"
+#include "RenderPtr.h"
 #include "ScrollView.h"
 #include <wtf/Forward.h>
 #include <wtf/ListHashSet.h>
@@ -41,7 +42,6 @@ namespace WebCore {
 
 class AXObjectCache;
 class Element;
-class Event;
 class FloatSize;
 class Frame;
 class HTMLFrameOwnerElement;
@@ -104,7 +104,7 @@ public:
 
     void layout(bool allowSubtree = true);
     bool didFirstLayout() const;
-    void layoutTimerFired(Timer<FrameView>*);
+    void layoutTimerFired(Timer<FrameView>&);
     void scheduleRelayout();
     void scheduleRelayoutOfSubtree(RenderElement&);
     void unscheduleRelayout();
@@ -121,6 +121,16 @@ public:
 
     bool needsFullRepaint() const { return m_needsFullRepaint; }
 
+    bool renderedCharactersExceed(unsigned threshold);
+
+#if PLATFORM(IOS)
+    bool useCustomFixedPositionLayoutRect() const { return m_useCustomFixedPositionLayoutRect; }
+    void setUseCustomFixedPositionLayoutRect(bool);
+    IntRect customFixedPositionLayoutRect() const { return m_customFixedPositionLayoutRect; }
+    void setCustomFixedPositionLayoutRect(const IntRect&);
+    bool updateFixedPositionLayoutRect();
+#endif
+
 #if ENABLE(REQUEST_ANIMATION_FRAME)
     void serviceScriptedAnimations(double monotonicAnimationStartTime);
 #endif
@@ -136,6 +146,9 @@ public:
     // Called when changes to the GraphicsLayer hierarchy have to be synchronized with
     // content rendered via the normal painting path.
     void setNeedsOneShotDrawingSynchronization();
+
+    GraphicsLayer* graphicsLayerForPlatformWidget(PlatformWidget);
+    void scheduleLayerFlushAllowingThrottling();
 
     virtual TiledBacking* tiledBacking() OVERRIDE;
 
@@ -193,7 +206,9 @@ public:
 
     virtual float visibleContentScaleFactor() const OVERRIDE;
 
+#if !PLATFORM(IOS)
     virtual void setFixedVisibleContentRect(const IntRect&) OVERRIDE;
+#endif
     virtual void setScrollPosition(const IntPoint&) OVERRIDE;
     void scrollPositionChangedViaPlatformWidget();
     virtual void updateLayerPositionsAfterScrolling() OVERRIDE;
@@ -254,10 +269,7 @@ public:
 
     void restoreScrollbar();
 
-    void scheduleEvent(PassRefPtr<Event>, PassRefPtr<Node>);
-    void pauseScheduledEvents();
-    void resumeScheduledEvents();
-    void postLayoutTimerFired(Timer<FrameView>*);
+    void postLayoutTimerFired(Timer<FrameView>&);
 
     bool wasScrolledByUser() const;
     void setWasScrolledByUser(bool);
@@ -433,6 +445,13 @@ public:
 
     void addTrackedRepaintRect(const IntRect&);
 
+    // exposedRect represents WebKit's understanding of what part
+    // of the view is actually exposed on screen (taking into account
+    // clipping by other UI elements), whereas visibleContentRect is
+    // internal to WebCore and doesn't respect those things.
+    void setExposedRect(FloatRect);
+    FloatRect exposedRect() const { return m_exposedRect; }
+
 protected:
     virtual bool scrollContentsFastPath(const IntSize& scrollDelta, const IntRect& rectToScroll, const IntRect& clipRect) OVERRIDE;
     virtual void scrollContentsSlowPath(const IntRect& updateRect) OVERRIDE;
@@ -525,7 +544,7 @@ private:
     virtual void notifyPageThatContentAreaWillPaint() const OVERRIDE;
 
     bool shouldUseLoadTimeDeferredRepaintDelay() const;
-    void deferredRepaintTimerFired(Timer<FrameView>*);
+    void deferredRepaintTimerFired(Timer<FrameView>&);
     void doDeferredRepaints();
     void updateDeferredRepaintDelayAfterRepaint();
     double adjustedDeferredRepaintDelay() const;
@@ -618,6 +637,8 @@ private:
 
     bool m_shouldUpdateWhileOffscreen;
 
+    FloatRect m_exposedRect;
+
     unsigned m_deferSetNeedsLayouts;
     bool m_setNeedsLayoutWasDeferred;
 
@@ -633,7 +654,12 @@ private:
     RefPtr<Node> m_maintainScrollPositionAnchor;
 
     // Renderer to hold our custom scroll corner.
-    RenderScrollbarPart* m_scrollCorner;
+    RenderPtr<RenderScrollbarPart> m_scrollCorner;
+
+#if PLATFORM(IOS)
+    bool m_useCustomFixedPositionLayoutRect;
+    IntRect m_customFixedPositionLayoutRect;
+#endif
 
     // If true, automatically resize the frame view around its content.
     bool m_shouldAutoSize;
@@ -674,11 +700,6 @@ private:
     bool m_visualUpdatesAllowedByClient;
     
     ScrollPinningBehavior m_scrollPinningBehavior;
-
-    unsigned m_scheduledEventSuppressionCount;
-
-    struct ScheduledEvent;
-    Vector<ScheduledEvent> m_scheduledEvents;
 };
 
 inline void FrameView::incrementVisuallyNonEmptyCharacterCount(unsigned count)

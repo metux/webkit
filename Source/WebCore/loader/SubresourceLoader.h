@@ -52,6 +52,13 @@ public:
     virtual bool isSubresourceLoader() OVERRIDE;
     CachedResource* cachedResource();
 
+#if PLATFORM(IOS)
+    virtual bool startLoading() OVERRIDE;
+
+    // FIXME: What is an "iOS" original request? Why is it necessary?
+    virtual const ResourceRequest& iOSOriginalRequest() const OVERRIDE { return m_iOSOriginalRequest; }
+#endif
+
 private:
     SubresourceLoader(Frame*, CachedResource*, const ResourceLoaderOptions&);
 
@@ -60,7 +67,7 @@ private:
     virtual void willSendRequest(ResourceRequest&, const ResourceResponse& redirectResponse) OVERRIDE;
     virtual void didSendData(unsigned long long bytesSent, unsigned long long totalBytesToBeSent) OVERRIDE;
     virtual void didReceiveResponse(const ResourceResponse&) OVERRIDE;
-    virtual void didReceiveData(const char*, int, long long encodedDataLength, DataPayloadType) OVERRIDE;
+    virtual void didReceiveData(const char*, unsigned, long long encodedDataLength, DataPayloadType) OVERRIDE;
     virtual void didReceiveBuffer(PassRefPtr<SharedBuffer>, long long encodedDataLength, DataPayloadType) OVERRIDE;
     virtual void didFinishLoading(double finishTime) OVERRIDE;
     virtual void didFail(const ResourceError&) OVERRIDE;
@@ -86,7 +93,10 @@ private:
     enum SubresourceLoaderState {
         Uninitialized,
         Initialized,
-        Finishing
+        Finishing,
+#if PLATFORM(IOS)
+        CancelledWhileInitializing
+#endif
     };
 
     class RequestCountTracker {
@@ -98,6 +108,9 @@ private:
         CachedResource* m_resource;
     };
 
+#if PLATFORM(IOS)
+    ResourceRequest m_iOSOriginalRequest;
+#endif
     CachedResource* m_resource;
     bool m_loadingMultipartContent;
     SubresourceLoaderState m_state;

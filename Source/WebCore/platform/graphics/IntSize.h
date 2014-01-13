@@ -32,7 +32,7 @@
 typedef struct CGSize CGSize;
 #endif
 
-#if PLATFORM(MAC)
+#if PLATFORM(MAC) && !PLATFORM(IOS)
 #ifdef NSGEOMETRY_TYPES_SAME_AS_CGGEOMETRY_TYPES
 typedef struct CGSize NSSize;
 #else
@@ -40,14 +40,14 @@ typedef struct _NSSize NSSize;
 #endif
 #endif
 
+#if PLATFORM(IOS)
+#ifndef NSSize
+#define NSSize CGSize
+#endif
+#endif
+
 #if PLATFORM(WIN)
 typedef struct tagSIZE SIZE;
-#elif PLATFORM(BLACKBERRY)
-namespace BlackBerry {
-namespace Platform {
-class IntSize;
-}
-}
 #endif
 
 namespace WebCore {
@@ -130,19 +130,16 @@ public:
     operator CGSize() const;
 #endif
 
+#if !PLATFORM(IOS)    
 #if PLATFORM(MAC) && !defined(NSGEOMETRY_TYPES_SAME_AS_CGGEOMETRY_TYPES)
     explicit IntSize(const NSSize &); // don't do this implicitly since it's lossy
     operator NSSize() const;
 #endif
+#endif // !PLATFORM(IOS)
 
 #if PLATFORM(WIN)
     IntSize(const SIZE&);
     operator SIZE() const;
-#endif
-
-#if PLATFORM(BLACKBERRY)
-    IntSize(const BlackBerry::Platform::IntSize&);
-    operator BlackBerry::Platform::IntSize() const;
 #endif
 
     void dump(PrintStream& out) const;

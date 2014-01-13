@@ -46,21 +46,16 @@
 #include "DOMImplementation.h"
 #include "DOMPatchSupport.h"
 #include "DOMWrapperWorld.h"
-#include "DeviceOrientationController.h"
 #include "Document.h"
 #include "DocumentLoader.h"
 #include "Frame.h"
 #include "FrameLoader.h"
 #include "FrameSnapshotting.h"
 #include "FrameView.h"
-#include "GeolocationController.h"
-#include "GeolocationError.h"
 #include "HTMLFrameOwnerElement.h"
 #include "HTMLNames.h"
 #include "IdentifiersFactory.h"
 #include "ImageBuffer.h"
-#include "InjectedScriptManager.h"
-#include "InspectorAgent.h"
 #include "InspectorClient.h"
 #include "InspectorDOMAgent.h"
 #include "InspectorInstrumentation.h"
@@ -230,11 +225,6 @@ bool InspectorPageAgent::dataContent(const char* data, unsigned size, const Stri
     return decodeBuffer(data, size, textEncodingName, result);
 }
 
-PassOwnPtr<InspectorPageAgent> InspectorPageAgent::create(InstrumentingAgents* instrumentingAgents, Page* page, InspectorAgent* inspectorAgent, InjectedScriptManager* injectedScriptManager, InspectorClient* client, InspectorOverlay* overlay)
-{
-    return adoptPtr(new InspectorPageAgent(instrumentingAgents, page, inspectorAgent, injectedScriptManager, client, overlay));
-}
-
 // static
 void InspectorPageAgent::resourceContent(ErrorString* errorString, Frame* frame, const URL& url, String* result, bool* base64Encoded)
 {
@@ -352,22 +342,15 @@ Inspector::TypeBuilder::Page::ResourceType::Enum InspectorPageAgent::cachedResou
     return resourceTypeJson(cachedResourceType(cachedResource));
 }
 
-InspectorPageAgent::InspectorPageAgent(InstrumentingAgents* instrumentingAgents, Page* page, InspectorAgent* inspectorAgent, InjectedScriptManager* injectedScriptManager, InspectorClient* client, InspectorOverlay* overlay)
+InspectorPageAgent::InspectorPageAgent(InstrumentingAgents* instrumentingAgents, Page* page, InspectorClient* client, InspectorOverlay* overlay)
     : InspectorAgentBase(ASCIILiteral("Page"), instrumentingAgents)
     , m_page(page)
-    , m_inspectorAgent(inspectorAgent)
-    , m_injectedScriptManager(injectedScriptManager)
     , m_client(client)
     , m_overlay(overlay)
     , m_lastScriptIdentifier(0)
-    , m_screenWidthOverride(0)
-    , m_screenHeightOverride(0)
-    , m_fontScaleFactorOverride(1)
-    , m_fitWindowOverride(false)
     , m_enabled(false)
     , m_isFirstLayoutAfterOnLoad(false)
     , m_originalScriptExecutionDisabled(false)
-    , m_geolocationOverridden(false)
     , m_ignoreScriptsEnabledNotification(false)
     , m_showPaintRects(false)
 {
@@ -412,16 +395,6 @@ void InspectorPageAgent::disable(ErrorString*)
     setShowFPSCounter(0, false);
     setEmulatedMedia(0, "");
     setContinuousPaintingEnabled(0, false);
-
-    if (!deviceMetricsChanged(0, 0, 1, false))
-        return;
-
-    // When disabling the agent, reset the override values if necessary.
-    updateViewMetrics(0, 0, 1, false);
-    m_screenWidthOverride = 0;
-    m_screenHeightOverride = 0;
-    m_fontScaleFactorOverride = 1;
-    m_fitWindowOverride = false;
 }
 
 void InspectorPageAgent::addScriptToEvaluateOnLoad(ErrorString*, const String& source, String* identifier)
@@ -448,10 +421,9 @@ void InspectorPageAgent::removeScriptToEvaluateOnLoad(ErrorString* error, const 
     m_scriptsToEvaluateOnLoad->remove(identifier);
 }
 
-void InspectorPageAgent::reload(ErrorString*, const bool* const optionalIgnoreCache, const String* optionalScriptToEvaluateOnLoad, const String* optionalScriptPreprocessor)
+void InspectorPageAgent::reload(ErrorString*, const bool* const optionalIgnoreCache, const String* optionalScriptToEvaluateOnLoad)
 {
     m_pendingScriptToEvaluateOnLoadOnce = optionalScriptToEvaluateOnLoad ? *optionalScriptToEvaluateOnLoad : "";
-    m_pendingScriptPreprocessor = optionalScriptPreprocessor ? *optionalScriptPreprocessor : "";
     m_page->mainFrame().loader().reload(optionalIgnoreCache ? *optionalIgnoreCache : false);
 }
 
@@ -692,46 +664,6 @@ void InspectorPageAgent::setDocumentContent(ErrorString* errorString, const Stri
     DOMPatchSupport::patchDocument(document, html);
 }
 
-void InspectorPageAgent::canOverrideDeviceMetrics(ErrorString*, bool* result)
-{
-    *result = m_client->canOverrideDeviceMetrics();
-}
-
-void InspectorPageAgent::setDeviceMetricsOverride(ErrorString* errorString, int width, int height, double fontScaleFactor, bool fitWindow)
-{
-    const static long maxDimension = 10000000;
-
-    if (width < 0 || height < 0 || width > maxDimension || height > maxDimension) {
-        *errorString = makeString("Width and height values must be positive, not greater than ", String::number(maxDimension));
-        return;
-    }
-
-    if (!width ^ !height) {
-        *errorString = "Both width and height must be either zero or non-zero at once";
-        return;
-    }
-
-    if (fontScaleFactor <= 0) {
-        *errorString = "fontScaleFactor must be positive";
-        return;
-    }
-
-    if (!deviceMetricsChanged(width, height, fontScaleFactor, fitWindow))
-        return;
-
-    m_screenWidthOverride = width;
-    m_screenHeightOverride = height;
-    m_fontScaleFactorOverride = fontScaleFactor;
-    m_fitWindowOverride = fitWindow;
-
-    updateViewMetrics(width, height, fontScaleFactor, fitWindow);
-}
-
-bool InspectorPageAgent::deviceMetricsChanged(int width, int height, double fontScaleFactor, bool fitWindow)
-{
-    return width != m_screenWidthOverride || height != m_screenHeightOverride || fontScaleFactor != m_fontScaleFactorOverride || fitWindow != m_fitWindowOverride;
-}
-
 void InspectorPageAgent::setShowPaintRects(ErrorString*, bool show)
 {
     m_showPaintRects = show;
@@ -815,9 +747,6 @@ void InspectorPageAgent::didClearWindowObjectInWorld(Frame* frame, DOMWrapperWor
     if (&world != &mainThreadNormalWorld())
         return;
 
-    if (frame->isMainFrame())
-        m_injectedScriptManager->discardInjectedScripts();
-
     if (!m_frontendDispatcher)
         return;
 
@@ -849,9 +778,7 @@ void InspectorPageAgent::frameNavigated(DocumentLoader* loader)
 {
     if (loader->frame()->isMainFrame()) {
         m_scriptToEvaluateOnLoadOnce = m_pendingScriptToEvaluateOnLoadOnce;
-        m_scriptPreprocessor = m_pendingScriptPreprocessor;
         m_pendingScriptToEvaluateOnLoadOnce = String();
-        m_pendingScriptPreprocessor = String();
     }
     m_frontendDispatcher->frameNavigated(buildObjectForFrame(loader->frame()));
 }
@@ -942,24 +869,24 @@ void InspectorPageAgent::loaderDetachedFromFrame(DocumentLoader* loader)
         m_loaderToIdentifier.remove(iterator);
 }
 
-void InspectorPageAgent::frameStartedLoading(Frame* frame)
+void InspectorPageAgent::frameStartedLoading(Frame& frame)
 {
-    m_frontendDispatcher->frameStartedLoading(frameId(frame));
+    m_frontendDispatcher->frameStartedLoading(frameId(&frame));
 }
 
-void InspectorPageAgent::frameStoppedLoading(Frame* frame)
+void InspectorPageAgent::frameStoppedLoading(Frame& frame)
 {
-    m_frontendDispatcher->frameStoppedLoading(frameId(frame));
+    m_frontendDispatcher->frameStoppedLoading(frameId(&frame));
 }
 
-void InspectorPageAgent::frameScheduledNavigation(Frame* frame, double delay)
+void InspectorPageAgent::frameScheduledNavigation(Frame& frame, double delay)
 {
-    m_frontendDispatcher->frameScheduledNavigation(frameId(frame), delay);
+    m_frontendDispatcher->frameScheduledNavigation(frameId(&frame), delay);
 }
 
-void InspectorPageAgent::frameClearedScheduledNavigation(Frame* frame)
+void InspectorPageAgent::frameClearedScheduledNavigation(Frame& frame)
 {
-    m_frontendDispatcher->frameClearedScheduledNavigation(frameId(frame));
+    m_frontendDispatcher->frameClearedScheduledNavigation(frameId(&frame));
 }
 
 void InspectorPageAgent::willRunJavaScriptDialog(const String& message)
@@ -970,18 +897,6 @@ void InspectorPageAgent::willRunJavaScriptDialog(const String& message)
 void InspectorPageAgent::didRunJavaScriptDialog()
 {
     m_frontendDispatcher->javascriptDialogClosed();
-}
-
-void InspectorPageAgent::applyScreenWidthOverride(long* width)
-{
-    if (m_screenWidthOverride)
-        *width = m_screenWidthOverride;
-}
-
-void InspectorPageAgent::applyScreenHeightOverride(long* height)
-{
-    if (m_screenHeightOverride)
-        *height = m_screenHeightOverride;
 }
 
 void InspectorPageAgent::didPaint(GraphicsContext* context, const LayoutRect& rect)
@@ -1010,10 +925,6 @@ void InspectorPageAgent::didLayout()
     if (!m_enabled)
         return;
 
-    if (isFirstLayout) {
-        if (m_screenWidthOverride && m_screenHeightOverride)
-            m_client->autoZoomPageToFitWidth();
-    }
     m_overlay->update();
 }
 
@@ -1094,16 +1005,6 @@ PassRefPtr<Inspector::TypeBuilder::Page::FrameResourceTree> InspectorPageAgent::
     return result;
 }
 
-void InspectorPageAgent::updateViewMetrics(int width, int height, double fontScaleFactor, bool fitWindow)
-{
-    m_client->overrideDeviceMetrics(width, height, static_cast<float>(fontScaleFactor), fitWindow);
-
-    Document* document = mainFrame()->document();
-    if (document)
-        document->styleResolverChanged(RecalcStyleImmediately);
-    InspectorInstrumentation::mediaQueryResultChanged(document);
-}
-
 #if ENABLE(TOUCH_EVENTS)
 void InspectorPageAgent::updateTouchEventEmulationInPage(bool enabled)
 {
@@ -1111,106 +1012,6 @@ void InspectorPageAgent::updateTouchEventEmulationInPage(bool enabled)
         mainFrame()->settings().setTouchEventEmulationEnabled(enabled);
 }
 #endif
-
-void InspectorPageAgent::setGeolocationOverride(ErrorString* error, const double* latitude, const double* longitude, const double* accuracy)
-{
-#if ENABLE (GEOLOCATION)
-    GeolocationController* controller = GeolocationController::from(m_page);
-    GeolocationPosition* position = 0;
-    if (!controller) {
-        *error = "Internal error: unable to override geolocation";
-        return;
-    }
-    position = controller->lastPosition();
-    if (!m_geolocationOverridden && position)
-        m_platformGeolocationPosition = position;
-
-    m_geolocationOverridden = true;
-    if (latitude && longitude && accuracy)
-        m_geolocationPosition = GeolocationPosition::create(currentTimeMS(), *latitude, *longitude, *accuracy);
-    else
-        m_geolocationPosition.clear();
-
-    controller->positionChanged(0); // Kick location update.
-#else
-    *error = "Geolocation is not available";
-    UNUSED_PARAM(latitude);
-    UNUSED_PARAM(longitude);
-    UNUSED_PARAM(accuracy);
-#endif
-}
-
-void InspectorPageAgent::clearGeolocationOverride(ErrorString* error)
-{
-    if (!m_geolocationOverridden)
-        return;
-#if ENABLE(GEOLOCATION)
-    UNUSED_PARAM(error);
-    m_geolocationOverridden = false;
-    m_geolocationPosition.clear();
-
-    GeolocationController* controller = GeolocationController::from(m_page);
-    if (controller && m_platformGeolocationPosition.get())
-        controller->positionChanged(m_platformGeolocationPosition.get());
-#else
-    *error = "Geolocation is not available";
-#endif
-}
-
-void InspectorPageAgent::canOverrideGeolocation(ErrorString*, bool* out_param)
-{
-#if ENABLE(GEOLOCATION)
-    *out_param = true;
-#else
-    *out_param = false;
-#endif
-}
-
-GeolocationPosition* InspectorPageAgent::overrideGeolocationPosition(GeolocationPosition* position)
-{
-    if (m_geolocationOverridden) {
-        if (position)
-            m_platformGeolocationPosition = position;
-        return m_geolocationPosition.get();
-    }
-    return position;
-}
-
-void InspectorPageAgent::setDeviceOrientationOverride(ErrorString* error, double alpha, double beta, double gamma)
-{
-    DeviceOrientationController* controller = DeviceOrientationController::from(m_page);
-    if (!controller) {
-        *error = "Internal error: unable to override device orientation";
-        return;
-    }
-
-    ErrorString clearError;
-    clearDeviceOrientationOverride(&clearError);
-
-    m_deviceOrientation = DeviceOrientationData::create(true, alpha, true, beta, true, gamma);
-    controller->didChangeDeviceOrientation(m_deviceOrientation.get());
-}
-
-void InspectorPageAgent::clearDeviceOrientationOverride(ErrorString*)
-{
-    m_deviceOrientation.clear();
-}
-
-void InspectorPageAgent::canOverrideDeviceOrientation(ErrorString*, bool* outParam)
-{
-#if ENABLE(DEVICE_ORIENTATION)
-    *outParam = true;
-#else
-    *outParam = false;
-#endif
-}
-
-DeviceOrientationData* InspectorPageAgent::overrideDeviceOrientation(DeviceOrientationData* deviceOrientation)
-{
-    if (m_deviceOrientation)
-        deviceOrientation = m_deviceOrientation.get();
-    return deviceOrientation;
-}
 
 void InspectorPageAgent::setTouchEmulationEnabled(ErrorString* error, bool enabled)
 {

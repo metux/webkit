@@ -42,7 +42,6 @@ inline CapabilityLevel canCompile(Node* node)
     case WeakJSConstant:
     case GetLocal:
     case SetLocal:
-    case MovHintAndCheck:
     case MovHint:
     case ZombieHint:
     case Phantom:
@@ -106,11 +105,15 @@ inline CapabilityLevel canCompile(Node* node)
     case TypedArrayWatchpoint:
     case VariableWatchpoint:
     case NotifyWrite:
+    case StoreBarrier:
+    case ConditionalStoreBarrier:
+    case StoreBarrierWithNullCheck:
     case ValueToInt32:
     case Branch:
     case LogicalNot:
     case CheckInBounds:
     case ConstantStoragePointer:
+    case Check:
         // These are OK.
         break;
     case GetById:

@@ -34,6 +34,7 @@
 #include "CodeOrigin.h"
 #include "DFGAbstractValue.h"
 #include "DFGAdjacencyList.h"
+#include "DFGArithMode.h"
 #include "DFGArrayMode.h"
 #include "DFGCommon.h"
 #include "DFGLazyJSValue.h"
@@ -180,6 +181,8 @@ struct Node {
         , m_virtualRegister(VirtualRegister())
         , m_refCount(1)
         , m_prediction(SpecNone)
+        , m_opInfo(0)
+        , m_opInfo2(0)
     {
         misc.replacement = 0;
         setOpAndDefaultFlags(op);
@@ -195,6 +198,7 @@ struct Node {
         , m_refCount(1)
         , m_prediction(SpecNone)
         , m_opInfo(imm.m_value)
+        , m_opInfo2(0)
     {
         misc.replacement = 0;
         setOpAndDefaultFlags(op);
@@ -274,59 +278,27 @@ struct Node {
         return filterFlags(~flags);
     }
     
-    SpeculationDirection speculationDirection()
-    {
-        if (flags() & NodeExitsForward)
-            return ForwardSpeculation;
-        return BackwardSpeculation;
-    }
-    
-    void setSpeculationDirection(SpeculationDirection direction)
-    {
-        switch (direction) {
-        case ForwardSpeculation:
-            mergeFlags(NodeExitsForward);
-            return;
-        case BackwardSpeculation:
-            clearFlags(NodeExitsForward);
-            return;
-        }
-        RELEASE_ASSERT_NOT_REACHED();
-    }
-    
     void setOpAndDefaultFlags(NodeType op)
     {
         m_op = op;
         m_flags = defaultFlags(op);
     }
 
-    void setOpAndDefaultNonExitFlags(NodeType op)
-    {
-        ASSERT(!(m_flags & NodeHasVarArgs));
-        setOpAndDefaultNonExitFlagsUnchecked(op);
-    }
-
-    void setOpAndDefaultNonExitFlagsUnchecked(NodeType op)
-    {
-        m_op = op;
-        m_flags = (defaultFlags(op) & ~NodeExitsForward) | (m_flags & NodeExitsForward);
-    }
-
     void convertToPhantom()
     {
-        setOpAndDefaultNonExitFlags(Phantom);
+        setOpAndDefaultFlags(Phantom);
     }
 
     void convertToPhantomUnchecked()
     {
-        setOpAndDefaultNonExitFlagsUnchecked(Phantom);
+        setOpAndDefaultFlags(Phantom);
     }
 
     void convertToIdentity()
     {
         RELEASE_ASSERT(child1());
         RELEASE_ASSERT(!child2());
-        setOpAndDefaultNonExitFlags(Identity);
+        setOpAndDefaultFlags(Identity);
     }
 
     bool mustGenerate()
@@ -531,9 +503,7 @@ struct Node {
     bool containsMovHint()
     {
         switch (op()) {
-        case SetLocal:
         case MovHint:
-        case MovHintAndCheck:
         case ZombieHint:
             return true;
         default:
@@ -567,6 +537,8 @@ struct Node {
         switch (op()) {
         case GetLocalUnlinked:
         case ExtractOSREntryLocal:
+        case MovHint:
+        case ZombieHint:
             return true;
         default:
             return false;
@@ -606,7 +578,19 @@ struct Node {
         ASSERT(hasPhi());
         return bitwise_cast<Node*>(m_opInfo);
     }
-    
+
+    bool isStoreBarrier()
+    {
+        switch (op()) {
+        case StoreBarrier:
+        case ConditionalStoreBarrier:
+        case StoreBarrierWithNullCheck:
+            return true;
+        default:
+            return false;
+        }
+    }
+
     bool hasIdentifier()
     {
         switch (op()) {
@@ -1138,6 +1122,34 @@ struct Node {
         return true;
     }
     
+    bool hasArithMode()
+    {
+        switch (op()) {
+        case ArithAdd:
+        case ArithSub:
+        case ArithNegate:
+        case ArithMul:
+        case ArithDiv:
+        case ArithMod:
+        case UInt32ToNumber:
+        case DoubleAsInt32:
+            return true;
+        default:
+            return false;
+        }
+    }
+
+    Arith::Mode arithMode()
+    {
+        ASSERT(hasArithMode());
+        return static_cast<Arith::Mode>(m_opInfo);
+    }
+    
+    void setArithMode(Arith::Mode mode)
+    {
+        m_opInfo = mode;
+    }
+    
     bool hasVirtualRegister()
     {
         return m_virtualRegister.isValid();
@@ -1178,11 +1190,6 @@ struct Node {
         case SetLocal:
         case MovHint:
         case ZombieHint:
-        case MovHintAndCheck:
-        case Int32ToDouble:
-        case ValueToInt32:
-        case UInt32ToNumber:
-        case DoubleAsInt32:
         case PhantomArguments:
             return true;
         case Phantom:
@@ -1555,6 +1562,7 @@ public:
     union {
         Node* replacement;
         BasicBlock* owner;
+        bool needsBarrier;
     } misc;
 };
 

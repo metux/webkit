@@ -78,7 +78,6 @@ JSCustomPushEventHandlerScope
 JSCustomToNativeObject
 JSGenerateToJSObject
 JSGenerateToNativeObject
-JSInlineGetOwnPropertySlot
 JSLegacyParent=*
 JSNoStaticTables
 JSWindowEventListener
@@ -108,3 +107,6 @@ TreatReturnedNullStringAs=Null|Undefined
 TreatUndefinedAs=NullString
 TypedArray=*
 URL
+
+# PLATFORM(IOS)
+AppleCopyright

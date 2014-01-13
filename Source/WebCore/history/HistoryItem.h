@@ -43,10 +43,6 @@
 typedef struct objc_object* id;
 #endif
 
-#if PLATFORM(BLACKBERRY)
-#include "HistoryItemViewState.h"
-#endif
-
 namespace WebCore {
 
 class CachedPage;
@@ -54,6 +50,7 @@ class Document;
 class FormData;
 class HistoryItem;
 class Image;
+class KeyedDecoder;
 class KeyedEncoder;
 class ResourceRequest;
 class URL;
@@ -95,6 +92,7 @@ public:
     void encodeBackForwardTree(Encoder&) const;
     void encodeBackForwardTree(KeyedEncoder&) const;
     static PassRefPtr<HistoryItem> decodeBackForwardTree(const String& urlString, const String& title, const String& originalURLString, Decoder&);
+    static PassRefPtr<HistoryItem> decodeBackForwardTree(const String& urlString, const String& title, const String& originalURLString, KeyedDecoder&);
 
     const String& originalURLString() const;
     const String& urlString() const;
@@ -195,10 +193,6 @@ public:
     // The properties will not be persisted; when the history item is removed, the properties will be lost.
     id getTransientProperty(const String&) const;
     void setTransientProperty(const String&, id);
-#endif
-
-#if PLATFORM(BLACKBERRY)
-    HistoryItemViewState& viewState() { return m_viewState; }
 #endif
 
 #ifndef NDEBUG
@@ -307,10 +301,6 @@ private:
 #if PLATFORM(MAC)
     RetainPtr<id> m_viewState;
     OwnPtr<HashMap<String, RetainPtr<id>>> m_transientProperties;
-#endif
-
-#if PLATFORM(BLACKBERRY)
-    HistoryItemViewState m_viewState;
 #endif
 }; //class HistoryItem
 

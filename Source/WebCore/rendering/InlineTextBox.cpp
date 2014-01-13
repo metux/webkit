@@ -25,6 +25,7 @@
 
 #include "Chrome.h"
 #include "ChromeClient.h"
+#include "DashArray.h"
 #include "Document.h"
 #include "DocumentMarkerController.h"
 #include "Editor.h"
@@ -64,6 +65,72 @@ COMPILE_ASSERT(sizeof(InlineTextBox) == sizeof(SameSizeAsInlineTextBox), InlineT
 
 typedef WTF::HashMap<const InlineTextBox*, LayoutRect> InlineTextBoxOverflowMap;
 static InlineTextBoxOverflowMap* gTextBoxesWithOverflow;
+
+#if ENABLE(CSS3_TEXT_DECORATION_SKIP_INK)
+static bool compareTuples(std::pair<float, float> l, std::pair<float, float> r)
+{
+    return l.first < r.first;
+}
+
+static DashArray translateIntersectionPointsToSkipInkBoundaries(const DashArray& intersections, float dilationAmount, float totalWidth)
+{
+    ASSERT(!(intersections.size() % 2));
+    
+    // Step 1: Make pairs so we can sort based on range starting-point. We dilate the ranges in this step as well.
+    Vector<std::pair<float, float>> tuples;
+    for (auto i = intersections.begin(); i != intersections.end(); i++, i++)
+        tuples.append(std::make_pair(*i - dilationAmount, *(i + 1) + dilationAmount));
+    std::sort(tuples.begin(), tuples.end(), &compareTuples);
+
+    // Step 2: Deal with intersecting ranges.
+    Vector<std::pair<float, float>> intermediateTuples;
+    if (tuples.size() >= 2) {
+        intermediateTuples.append(*tuples.begin());
+        for (auto i = tuples.begin() + 1; i != tuples.end(); i++) {
+            float& firstEnd = intermediateTuples.last().second;
+            float secondStart = i->first;
+            float secondEnd = i->second;
+            if (secondStart <= firstEnd && secondEnd <= firstEnd) {
+                // Ignore this range completely
+            } else if (secondStart <= firstEnd)
+                firstEnd = secondEnd;
+            else
+                intermediateTuples.append(*i);
+        }
+    } else
+        intermediateTuples = tuples;
+
+    // Step 3: Output the space between the ranges, but only if the space warrants an underline.
+    float previous = 0;
+    DashArray result;
+    for (auto i = intermediateTuples.begin(); i != intermediateTuples.end(); i++) {
+        if (i->first - previous > dilationAmount) {
+            result.append(previous);
+            result.append(i->first);
+        }
+        previous = i->second;
+    }
+    if (totalWidth - previous > dilationAmount) {
+        result.append(previous);
+        result.append(totalWidth);
+    }
+    
+    return result;
+}
+
+static void drawSkipInkUnderline(TextPainter& textPainter, GraphicsContext& context, FloatPoint localOrigin, float underlineOffset, float width, bool isPrinting)
+{
+    FloatPoint adjustedLocalOrigin = localOrigin;
+    adjustedLocalOrigin.move(0, underlineOffset);
+    FloatRect underlineBoundingBox = context.computeLineBoundsForText(adjustedLocalOrigin, width, isPrinting);
+    DashArray intersections = textPainter.dashesForIntersectionsWithRect(underlineBoundingBox);
+    DashArray a = translateIntersectionPointsToSkipInkBoundaries(intersections, underlineBoundingBox.height(), width);
+
+    ASSERT(!(a.size() % 2));
+    for (auto i = a.begin(); i != a.end(); i++, i++)
+        context.drawLineForText(FloatPoint(localOrigin.x() + *i, localOrigin.y() + underlineOffset), *(i+1) - *i, isPrinting);
+}
+#endif
 
 InlineTextBox::~InlineTextBox()
 {
@@ -1072,7 +1139,7 @@ void InlineTextBox::paintDecoration(GraphicsContext& context, const FloatPoint& 
         // Offset between lines - always non-zero, so lines never cross each other.
         float doubleOffset = textDecorationThickness + 1;
         
-        bool clipDecorationToMask = lineStyle.textDecorationSkip() == TextDecorationSkipInk;
+        bool clipDecorationToMask = false;
         
         GraphicsContextStateSaver stateSaver(context, false);
         
@@ -1115,10 +1182,23 @@ void InlineTextBox::paintDecoration(GraphicsContext& context, const FloatPoint& 
                 break;
             }
             default:
-                context.drawLineForText(FloatPoint(localOrigin.x(), localOrigin.y() + underlineOffset), width, isPrinting);
+#if ENABLE(CSS3_TEXT_DECORATION_SKIP_INK)
+                if (lineStyle.textDecorationSkip() == TextDecorationSkipInk) {
+                    if (!context.paintingDisabled()) {
+                        drawSkipInkUnderline(textPainter, context, localOrigin, underlineOffset, width, isPrinting);
 
-                if (decorationStyle == TextDecorationStyleDouble)
-                    context.drawLineForText(FloatPoint(localOrigin.x(), localOrigin.y() + underlineOffset + doubleOffset), width, isPrinting);
+                        if (decorationStyle == TextDecorationStyleDouble)
+                            drawSkipInkUnderline(textPainter, context, localOrigin, underlineOffset + doubleOffset, width, isPrinting);
+                    }
+                } else {
+#endif // CSS3_TEXT_DECORATION_SKIP_INK
+                    context.drawLineForText(FloatPoint(localOrigin.x(), localOrigin.y() + underlineOffset), width, isPrinting);
+
+                    if (decorationStyle == TextDecorationStyleDouble)
+                        context.drawLineForText(FloatPoint(localOrigin.x(), localOrigin.y() + underlineOffset + doubleOffset), width, isPrinting);
+#if ENABLE(CSS3_TEXT_DECORATION_SKIP_INK)
+                }
+#endif
             }
 #else
             // Leave one pixel of white between the baseline and the underline.
@@ -1136,11 +1216,24 @@ void InlineTextBox::paintDecoration(GraphicsContext& context, const FloatPoint& 
                 break;
             }
             default:
+#if ENABLE(CSS3_TEXT_DECORATION_SKIP_INK)
+                if (lineStyle.textDecorationSkip() == TextDecorationSkipInk) {
+                    if (!context.paintingDisabled()) {
+                        drawSkipInkUnderline(textPainter, context, localOrigin, 0, width, isPrinting);
+
+                        if (decorationStyle == TextDecorationStyleDouble)
+                            drawSkipInkUnderline(textPainter, context, localOrigin, -doubleOffset, width, isPrinting);
+                    }
+                } else {
+#endif // CSS3_TEXT_DECORATION_SKIP_INK
 #endif // CSS3_TEXT_DECORATION
-                context.drawLineForText(localOrigin, width, isPrinting);
+                    context.drawLineForText(localOrigin, width, isPrinting);
 #if ENABLE(CSS3_TEXT_DECORATION)
-                if (decorationStyle == TextDecorationStyleDouble)
-                    context.drawLineForText(FloatPoint(localOrigin.x(), localOrigin.y() - doubleOffset), width, isPrinting);
+                    if (decorationStyle == TextDecorationStyleDouble)
+                        context.drawLineForText(FloatPoint(localOrigin.x(), localOrigin.y() - doubleOffset), width, isPrinting);
+#if ENABLE(CSS3_TEXT_DECORATION_SKIP_INK)
+                }
+#endif
             }
 #endif // CSS3_TEXT_DECORATION
         }

@@ -37,7 +37,14 @@
 #include "SecurityOrigin.h"
 #include "Settings.h"
 #include "WebCoreJSClientData.h"
+#include <runtime/Microtask.h>
 #include <wtf/MainThread.h>
+
+#if PLATFORM(IOS)
+#include "ChromeClient.h"
+#include "WebSafeGCActivityCallbackIOS.h"
+#include "WebSafeIncrementalSweeperIOS.h"
+#endif
 
 using namespace JSC;
 
@@ -109,7 +116,11 @@ bool JSDOMWindowBase::supportsProfiling(const JSGlobalObject* object)
     if (!page)
         return false;
 
+#if ENABLE(INSPECTOR)
     return page->inspectorController()->profilerEnabled();
+#else
+    return false;
+#endif // ENABLE(INSPECTOR)
 #endif
 }
 
@@ -165,7 +176,7 @@ bool JSDOMWindowBase::shouldInterruptScriptBeforeTimeout(const JSGlobalObject* o
         return true;
 
 #if PLATFORM(IOS)
-    if (page->chrome().client()->isStopping())
+    if (page->chrome().client().isStopping())
         return true;
 #endif
 
@@ -181,10 +192,10 @@ bool JSDOMWindowBase::javaScriptExperimentsEnabled(const JSGlobalObject* object)
     return frame->settings().javaScriptExperimentsEnabled();
 }
 
-void JSDOMWindowBase::queueTaskToEventLoop(const JSGlobalObject* object, GlobalObjectMethodTable::QueueTaskToEventLoopCallbackFunctionPtr functionPtr, PassRefPtr<TaskContext> taskContext)
+void JSDOMWindowBase::queueTaskToEventLoop(const JSGlobalObject* object, PassRefPtr<Microtask> task)
 {
     const JSDOMWindowBase* thisObject = static_cast<const JSDOMWindowBase*>(object);
-    thisObject->scriptExecutionContext()->postTask(JSGlobalObjectTask::create((JSDOMWindowBase*)thisObject, functionPtr, taskContext));
+    thisObject->scriptExecutionContext()->postTask(JSGlobalObjectTask::create((JSDOMWindowBase*)thisObject, task));
 }
 
 void JSDOMWindowBase::willRemoveFromWindowShell()
@@ -201,16 +212,43 @@ VM* JSDOMWindowBase::commonVM()
 {
     ASSERT(isMainThread());
 
+#if !PLATFORM(IOS)
     static VM* vm = 0;
+#else
+    VM*& vm = commonVMInternal();
+#endif
     if (!vm) {
         ScriptController::initializeThreading();
         vm = VM::createLeaked(LargeHeap).leakRef();
+#if PLATFORM(IOS)
+        PassOwnPtr<WebSafeGCActivityCallback> activityCallback = WebSafeGCActivityCallback::create(&vm->heap);
+        vm->heap.setActivityCallback(activityCallback);
+        PassOwnPtr<WebSafeIncrementalSweeper> incrementalSweeper = WebSafeIncrementalSweeper::create(&vm->heap);
+        vm->heap.setIncrementalSweeper(incrementalSweeper);
+        vm->makeUsableFromMultipleThreads();
+        vm->heap.machineThreads().addCurrentThread();
+#else
         vm->exclusiveThread = currentThread();
+#endif // !PLATFORM(IOS)
         initNormalWorldClientData(vm);
     }
 
     return vm;
 }
+
+#if PLATFORM(IOS)
+bool JSDOMWindowBase::commonVMExists()
+{
+    return commonVMInternal();
+}
+
+VM*& JSDOMWindowBase::commonVMInternal()
+{
+    ASSERT(isMainThread());
+    static VM* commonVM;
+    return commonVM;
+}
+#endif
 
 // JSDOMGlobalObject* is ignored, accessing a window in any context will
 // use that DOMWindow's prototype chain.

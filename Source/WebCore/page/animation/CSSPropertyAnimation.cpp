@@ -125,13 +125,13 @@ static inline TransformOperations blendFunc(const AnimationBase* anim, const Tra
     return to.blendByUsingMatrixInterpolation(from, progress, anim->renderer()->isBox() ? toRenderBox(anim->renderer())->borderBoxRect().size() : LayoutSize());
 }
 
-static inline PassRefPtr<ClipPathOperation> blendFunc(const AnimationBase*, ClipPathOperation* from, ClipPathOperation* to, double progress)
+static inline PassRefPtr<ClipPathOperation> blendFunc(const AnimationBase* anim, ClipPathOperation* from, ClipPathOperation* to, double progress)
 {
     if (!from || !to)
         return to;
 
     // Other clip-path operations than BasicShapes can not be animated.
-    if (from->type() != ClipPathOperation::SHAPE || to->type() != ClipPathOperation::SHAPE)
+    if (from->type() != ClipPathOperation::Shape || to->type() != ClipPathOperation::Shape)
         return to;
 
     const BasicShape* fromShape = static_cast<ShapeClipPathOperation*>(from)->basicShape();
@@ -140,11 +140,12 @@ static inline PassRefPtr<ClipPathOperation> blendFunc(const AnimationBase*, Clip
     if (!fromShape->canBlend(toShape))
         return to;
 
-    return ShapeClipPathOperation::create(toShape->blend(fromShape, progress));
+    ASSERT(anim->renderer()->isBox());
+    return ShapeClipPathOperation::create(toShape->blend(fromShape, progress, *toRenderBox(anim->renderer())));
 }
 
 #if ENABLE(CSS_SHAPES)
-static inline PassRefPtr<ShapeValue> blendFunc(const AnimationBase*, ShapeValue* from, ShapeValue* to, double progress)
+static inline PassRefPtr<ShapeValue> blendFunc(const AnimationBase* anim, ShapeValue* from, ShapeValue* to, double progress)
 {
     if (!from || !to)
         return to;
@@ -159,7 +160,8 @@ static inline PassRefPtr<ShapeValue> blendFunc(const AnimationBase*, ShapeValue*
     if (!fromShape->canBlend(toShape))
         return to;
 
-    return ShapeValue::createShapeValue(toShape->blend(fromShape, progress));
+    ASSERT(anim->renderer()->isBox());
+    return ShapeValue::createShapeValue(toShape->blend(fromShape, progress, *toRenderBox(anim->renderer())));
 }
 #endif
 
@@ -1210,8 +1212,8 @@ CSSPropertyAnimationWrapperMap::CSSPropertyAnimationWrapperMap()
         new LengthPropertyWrapper<Length>(CSSPropertyLineHeight, &RenderStyle::specifiedLineHeight, &RenderStyle::setLineHeight),
         new PropertyWrapper<int>(CSSPropertyOutlineOffset, &RenderStyle::outlineOffset, &RenderStyle::setOutlineOffset),
         new PropertyWrapper<unsigned short>(CSSPropertyOutlineWidth, &RenderStyle::outlineWidth, &RenderStyle::setOutlineWidth),
-        new PropertyWrapper<int>(CSSPropertyLetterSpacing, &RenderStyle::letterSpacing, &RenderStyle::setLetterSpacing),
-        new PropertyWrapper<int>(CSSPropertyWordSpacing, &RenderStyle::wordSpacing, &RenderStyle::setWordSpacing),
+        new PropertyWrapper<float>(CSSPropertyLetterSpacing, &RenderStyle::letterSpacing, &RenderStyle::setLetterSpacing),
+        new LengthPropertyWrapper<Length>(CSSPropertyWordSpacing, &RenderStyle::wordSpacing, &RenderStyle::setWordSpacing),
         new LengthPropertyWrapper<Length>(CSSPropertyTextIndent, &RenderStyle::textIndent, &RenderStyle::setTextIndent),
 
         new PropertyWrapper<float>(CSSPropertyWebkitPerspective, &RenderStyle::perspective, &RenderStyle::setPerspective),

@@ -74,10 +74,6 @@
 #include "ShapeOutsideInfo.h"
 #endif
 
-#if ENABLE(IOS_TEXT_AUTOSIZING)
-#include "HTMLElement.h"
-#endif
-
 using namespace WTF;
 using namespace Unicode;
 
@@ -157,8 +153,12 @@ public:
 
         bool horizontalLayoutOverflowChanged = hasHorizontalLayoutOverflow != m_hadHorizontalLayoutOverflow;
         bool verticalLayoutOverflowChanged = hasVerticalLayoutOverflow != m_hadVerticalLayoutOverflow;
-        if (horizontalLayoutOverflowChanged || verticalLayoutOverflowChanged)
-            m_block->view().frameView().scheduleEvent(OverflowEvent::create(horizontalLayoutOverflowChanged, hasHorizontalLayoutOverflow, verticalLayoutOverflowChanged, hasVerticalLayoutOverflow), m_block->element());
+        if (!horizontalLayoutOverflowChanged && !verticalLayoutOverflowChanged)
+            return;
+
+        RefPtr<OverflowEvent> overflowEvent = OverflowEvent::create(horizontalLayoutOverflowChanged, hasHorizontalLayoutOverflow, verticalLayoutOverflowChanged, hasVerticalLayoutOverflow);
+        overflowEvent->setTarget(m_block->element());
+        m_block->document().enqueueOverflowEvent(overflowEvent.release());
     }
 
 private:
@@ -177,10 +177,6 @@ RenderBlock::RenderBlock(Element& element, PassRef<RenderStyle> style, unsigned 
     , m_hasMarkupTruncation(false)
     , m_hasBorderOrPaddingLogicalWidthChanged(false)
     , m_lineLayoutPath(UndeterminedPath)
-#if ENABLE(IOS_TEXT_AUTOSIZING)
-    , m_widthForTextAutosizing(-1)
-    , m_lineCountForTextAutosizing(NOT_SET)
-#endif
 {
 }
 
@@ -193,10 +189,6 @@ RenderBlock::RenderBlock(Document& document, PassRef<RenderStyle> style, unsigne
     , m_hasMarkupTruncation(false)
     , m_hasBorderOrPaddingLogicalWidthChanged(false)
     , m_lineLayoutPath(UndeterminedPath)
-#if ENABLE(IOS_TEXT_AUTOSIZING)
-    , m_widthForTextAutosizing(-1)
-    , m_lineCountForTextAutosizing(NOT_SET)
-#endif
 {
 }
 
@@ -500,15 +492,14 @@ RenderBlock* RenderBlock::containingColumnsBlock(bool allowAnonymousColumnBlock)
     return 0;
 }
 
-RenderBlock* RenderBlock::clone() const
+RenderPtr<RenderBlock> RenderBlock::clone() const
 {
-    RenderBlock* cloneBlock;
+    RenderPtr<RenderBlock> cloneBlock;
     if (isAnonymousBlock()) {
-        cloneBlock = createAnonymousBlock();
+        cloneBlock = RenderPtr<RenderBlock>(createAnonymousBlock());
         cloneBlock->setChildrenInline(childrenInline());
     } else {
-        auto cloneRenderer = element()->createRenderer(style());
-        cloneBlock = toRenderBlock(cloneRenderer);
+        cloneBlock = static_pointer_cast<RenderBlock>(element()->createElementRenderer(style()));
         cloneBlock->initializeStyle();
 
         // This takes care of setting the right value of childrenInline in case
@@ -525,7 +516,7 @@ void RenderBlock::splitBlocks(RenderBlock* fromBlock, RenderBlock* toBlock,
                               RenderObject* beforeChild, RenderBoxModelObject* oldCont)
 {
     // Create a clone of this inline.
-    RenderBlock* cloneBlock = clone();
+    RenderPtr<RenderBlock> cloneBlock = clone();
     if (!isAnonymousBlock())
         cloneBlock->setContinuation(oldCont);
 
@@ -539,11 +530,11 @@ void RenderBlock::splitBlocks(RenderBlock* fromBlock, RenderBlock* toBlock,
 
     // Now take all of the children from beforeChild to the end and remove
     // them from |this| and place them in the clone.
-    moveChildrenTo(cloneBlock, beforeChild, 0, true);
+    moveChildrenTo(cloneBlock.get(), beforeChild, 0, true);
     
     // Hook |clone| up as the continuation of the middle block.
     if (!cloneBlock->isAnonymousBlock())
-        middleBlock->setContinuation(cloneBlock);
+        middleBlock->setContinuation(cloneBlock.get());
 
     // We have been reparented and are now under the fromBlock.  We need
     // to walk up our block parent chain until we hit the containing anonymous columns block.
@@ -558,11 +549,11 @@ void RenderBlock::splitBlocks(RenderBlock* fromBlock, RenderBlock* toBlock,
         RenderBlock* blockCurr = toRenderBlock(curr);
         
         // Create a new clone.
-        RenderBlock* cloneChild = cloneBlock;
+        RenderPtr<RenderBlock> cloneChild = std::move(cloneBlock);
         cloneBlock = blockCurr->clone();
 
         // Insert our child clone as the first child.
-        cloneBlock->addChildIgnoringContinuation(cloneChild, 0);
+        cloneBlock->addChildIgnoringContinuation(cloneChild.leakPtr(), 0);
 
         // Hook the clone up as a continuation of |curr|.  Note we do encounter
         // anonymous blocks possibly as we walk up the block chain.  When we split an
@@ -570,13 +561,13 @@ void RenderBlock::splitBlocks(RenderBlock* fromBlock, RenderBlock* toBlock,
         // actually split a real element.
         if (!blockCurr->isAnonymousBlock()) {
             oldCont = blockCurr->continuation();
-            blockCurr->setContinuation(cloneBlock);
+            blockCurr->setContinuation(cloneBlock.get());
             cloneBlock->setContinuation(oldCont);
         }
 
         // Now we need to take all of the children starting from the first child
         // *after* currChild and append them all to the clone.
-        blockCurr->moveChildrenTo(cloneBlock, currChildNextSibling, 0, true);
+        blockCurr->moveChildrenTo(cloneBlock.get(), currChildNextSibling, 0, true);
 
         // Keep walking up the chain.
         currChild = curr;
@@ -585,7 +576,7 @@ void RenderBlock::splitBlocks(RenderBlock* fromBlock, RenderBlock* toBlock,
     }
 
     // Now we are at the columns block level. We need to put the clone into the toBlock.
-    toBlock->insertChildInternal(cloneBlock, nullptr, NotifyChildren);
+    toBlock->insertChildInternal(cloneBlock.leakPtr(), nullptr, NotifyChildren);
 
     // Now take all the children after currChild and remove them from the fromBlock
     // and put them in the toBlock.
@@ -2479,7 +2470,7 @@ void RenderBlock::paintCaret(PaintInfo& paintInfo, const LayoutPoint& paintOffse
     bool isContentEditable;
     if (type == CursorCaret) {
         caretPainter = frame().selection().caretRenderer();
-        isContentEditable = frame().selection().rendererIsEditable();
+        isContentEditable = frame().selection().hasEditableStyle();
     } else {
         caretPainter = frame().page()->dragCaretController().caretRenderer();
         isContentEditable = frame().page()->dragCaretController().isContentEditable();
@@ -3534,7 +3525,7 @@ static inline bool isEditingBoundary(RenderElement* ancestor, RenderObject& chil
     ASSERT(!ancestor || ancestor->nonPseudoElement());
     ASSERT(child.nonPseudoNode());
     return !ancestor || !ancestor->parent() || (ancestor->hasLayer() && ancestor->parent()->isRenderView())
-        || ancestor->nonPseudoElement()->rendererIsEditable() == child.nonPseudoNode()->rendererIsEditable();
+        || ancestor->nonPseudoElement()->hasEditableStyle() == child.nonPseudoNode()->hasEditableStyle();
 }
 
 // FIXME: This function should go on RenderObject as an instance method. Then
@@ -4985,6 +4976,8 @@ void RenderBlock::updateFirstLetter()
     if (style().styleType() == FIRST_LETTER)
         return;
 
+    // FIXME: We need to destroy the first-letter object if it is no longer the first child. Need to find
+    // an efficient way to check for that situation though before implementing anything.
     RenderElement* firstLetterBlock = findFirstLetterBlock(this);
     if (!firstLetterBlock)
         return;
@@ -5016,27 +5009,9 @@ void RenderBlock::updateFirstLetter()
     if (!descendant)
         return;
 
+    // If the child already has style, then it has already been created, so we just want
+    // to update it.
     if (descendant->parent()->style().styleType() == FIRST_LETTER) {
-        // Destroy the first-letter object if it is no longer the first child.
-        RenderObject* remainingText = descendant->parent()->nextSibling();
-        if (remainingText && descendant->node() != remainingText->node()) {
-            if (!remainingText->isText() || remainingText->isBR())
-                return;
-
-            if (auto oldFirstLetter = descendant->parent()->isBoxModelObject() ?  toRenderBoxModelObject(descendant->parent()) : nullptr) { 
-                if (auto oldRemainingText = oldFirstLetter->firstLetterRemainingText()) {
-                    LayoutStateDisabler layoutStateDisabler(&view());
-                    // Destroy the text fragment for the old first-letter and update oldRemainingText with its DOM text.
-                    oldRemainingText->setText(oldRemainingText->textNode()->data());
-                    createFirstLetterRenderer(firstLetterBlock, toRenderText(remainingText));
-                }    
-            }    
-
-            return;
-        }    
-
-        // If the child already has style, then it has already been created, so we just want
-        // to update it.
         updateFirstLetterStyle(firstLetterBlock, descendant);
         return;
     }
@@ -5485,7 +5460,7 @@ TextRun RenderBlock::constructTextRun(RenderObject* context, const Font& font, c
         return constructTextRunInternal(context, font, text->characters8(), text->textLength(), style, expansion);
     return constructTextRunInternal(context, font, text->characters16(), text->textLength(), style, expansion);
 #else
-    return constructTextRunInternal(context, font, text->characters(), text->textLength(), style, expansion);
+    return constructTextRunInternal(context, font, text->deprecatedCharacters(), text->textLength(), style, expansion);
 #endif
 }
 
@@ -5497,7 +5472,7 @@ TextRun RenderBlock::constructTextRun(RenderObject* context, const Font& font, c
         return constructTextRunInternal(context, font, text->characters8() + offset, length, style, expansion);
     return constructTextRunInternal(context, font, text->characters16() + offset, length, style, expansion);
 #else
-    return constructTextRunInternal(context, font, text->characters() + offset, length, style, expansion);
+    return constructTextRunInternal(context, font, text->deprecatedCharacters() + offset, length, style, expansion);
 #endif
 }
 
@@ -5510,7 +5485,7 @@ TextRun RenderBlock::constructTextRun(RenderObject* context, const Font& font, c
         return constructTextRunInternal(context, font, string.characters8(), length, style, expansion, flags);
     return constructTextRunInternal(context, font, string.characters(), length, style, expansion, flags);
 #else
-    return constructTextRunInternal(context, font, string.characters(), length, style, expansion, flags);
+    return constructTextRunInternal(context, font, string.deprecatedCharacters(), length, style, expansion, flags);
 #endif
 }
 
@@ -5569,123 +5544,5 @@ void RenderBlock::showLineTreeAndMark(const InlineBox*, const char*, const Inlin
 }
 
 #endif
-
-#if ENABLE(IOS_TEXT_AUTOSIZING)
-inline static bool isVisibleRenderText(RenderObject* renderer)
-{
-    if (!renderer->isText())
-        return false;
-    RenderText* renderText = toRenderText(renderer);
-    return !renderText->linesBoundingBox().isEmpty() && !renderText->text()->containsOnlyWhitespace();
-}
-
-inline static bool resizeTextPermitted(RenderObject* render)
-{
-    // We disallow resizing for text input fields and textarea to address <rdar://problem/5792987> and <rdar://problem/8021123>
-    auto renderer = render->parent();
-    while (renderer) {
-        // Get the first non-shadow HTMLElement and see if it's an input.
-        if (renderer->element() && renderer->element()->isHTMLElement() && !renderer->element()->isInShadowTree()) {
-            const HTMLElement& element = toHTMLElement(*renderer->element());
-            return !isHTMLInputElement(element) && !isHTMLTextAreaElement(element);
-        }
-        renderer = renderer->parent();
-    }
-    return true;
-}
-
-int RenderBlock::immediateLineCount()
-{
-    // Copied and modified from RenderBlock::lineCount.
-    // Only descend into list items.
-    int count = 0;
-    if (style().visibility() == VISIBLE) {
-        if (childrenInline()) {
-            for (RootInlineBox* box = firstRootBox(); box; box = box->nextRootBox())
-                count++;
-        } else {
-            for (RenderObject* obj = firstChild(); obj; obj = obj->nextSibling()) {
-                if (obj->isListItem())
-                    count += toRenderBlock(obj)->lineCount();
-            }
-        }
-    }
-    return count;
-}
-
-static bool isNonBlocksOrNonFixedHeightListItems(const RenderObject* render)
-{
-    if (!render->isRenderBlock())
-        return true;
-    if (render->isListItem()) {
-        RenderStyle* style = render->style();
-        return style && style->height().type() != Fixed;
-    }
-    return false;
-}
-
-//  For now, we auto size single lines of text the same as multiple lines.
-//  We've been experimenting with low values for single lines of text.
-static inline float oneLineTextMultiplier(float specifiedSize)
-{
-    return max((1.0f / log10f(specifiedSize) * 1.7f), 1.0f);
-}
-
-static inline float textMultiplier(float specifiedSize)
-{
-    return max((1.0f / log10f(specifiedSize) * 1.95f), 1.0f);
-}
-
-void RenderBlock::adjustComputedFontSizes(float size, float visibleWidth)
-{
-    // Don't do any work if the block is smaller than the visible area.
-    if (visibleWidth >= width())
-        return;
-
-    unsigned lineCount;
-    if (m_lineCountForTextAutosizing == NOT_SET) {
-        int count = immediateLineCount();
-        if (!count)
-            lineCount = NO_LINE;
-        else if (count == 1)
-            lineCount = ONE_LINE;
-        else
-            lineCount = MULTI_LINE;
-    } else
-        lineCount = m_lineCountForTextAutosizing;
-
-    ASSERT(lineCount != NOT_SET);
-    if (lineCount == NO_LINE)
-        return;
-
-    float actualWidth = m_widthForTextAutosizing != -1 ? static_cast<float>(m_widthForTextAutosizing) : static_cast<float>(width());
-    float scale = visibleWidth / actualWidth;
-    float minFontSize = roundf(size / scale);   
-
-    for (RenderObject* descendent = traverseNext(this, isNonBlocksOrNonFixedHeightListItems); descendent; descendent = descendent->traverseNext(this, isNonBlocksOrNonFixedHeightListItems)) {
-        if (isVisibleRenderText(descendent) && resizeTextPermitted(descendent)) {
-            RenderText* text = toRenderText(descendent);
-            RenderStyle* oldStyle = text->style();
-            FontDescription fontDescription = oldStyle->fontDescription();
-            float specifiedSize = fontDescription.specifiedSize();
-            float scaledSize = roundf(specifiedSize * scale);
-            if (scaledSize > 0 && scaledSize < minFontSize) {
-                // Record the width of the block and the line count the first time we resize text and use it from then on for text resizing.
-                // This makes text resizing consistent even if the block's width or line count changes (which can be caused by text resizing itself 5159915).
-                if (m_lineCountForTextAutosizing == NOT_SET)
-                    m_lineCountForTextAutosizing = lineCount;
-                if (m_widthForTextAutosizing == -1)
-                    m_widthForTextAutosizing = actualWidth;
-
-                float candidateNewSize = 0;
-                float lineTextMultiplier = lineCount == ONE_LINE ? oneLineTextMultiplier(specifiedSize) : textMultiplier(specifiedSize);
-                candidateNewSize = roundf(min(minFontSize, specifiedSize * lineTextMultiplier));
-                if (candidateNewSize > specifiedSize && candidateNewSize != fontDescription.computedSize() && text->node() && (!oldStyle || oldStyle->textSizeAdjust().isAuto()))
-                    document().addAutoSizingNode(text->node(), candidateNewSize);
-            }
-        }
-    }
-}
-#endif // ENABLE(IOS_TEXT_AUTOSIZING)
 
 } // namespace WebCore

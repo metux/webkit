@@ -43,6 +43,7 @@
 #include "PlatformScreen.h"
 #include "QualifiedName.h"
 #include "ReferrerPolicy.h"
+#include "RenderPtr.h"
 #include "ScriptExecutionContext.h"
 #include "StringWithDirection.h"
 #include "StyleResolveTree.h"
@@ -164,8 +165,8 @@ struct AnnotatedRegionValue;
 
 #if ENABLE(TOUCH_EVENTS)
 #if PLATFORM(IOS)
-#include "DocumentIOSForward.h"
-#endif
+#include <WebKitAdditions/DocumentIOSForward.h>
+#endif // PLATFORM(IOS)
 class Touch;
 class TouchList;
 #endif
@@ -250,6 +251,10 @@ public:
     static PassRefPtr<Document> createXHTML(Frame* frame, const URL& url)
     {
         return adoptRef(new Document(frame, url, XHTMLDocumentClass));
+    }
+    static PassRefPtr<Document> createNonRenderedPlaceholder(Frame* frame, const URL& url)
+    {
+        return adoptRef(new Document(frame, url, DefaultDocumentClass, NonRenderedPlaceholder));
     }
     virtual ~Document();
 
@@ -565,7 +570,7 @@ public:
     virtual void resumeActiveDOMObjects(ActiveDOMObject::ReasonForSuspension) OVERRIDE;
     virtual void stopActiveDOMObjects() OVERRIDE;
 
-    RenderView* renderView() const { return m_renderView; }
+    RenderView* renderView() const { return m_renderView.get(); }
 
     bool renderTreeBeingDestroyed() const { return m_renderTreeBeingDestroyed; }
     bool hasLivingRenderTree() const { return renderView() && !renderTreeBeingDestroyed(); }
@@ -711,8 +716,8 @@ public:
     void unscheduleStyleRecalc();
     bool hasPendingStyleRecalc() const;
     bool hasPendingForcedStyleRecalc() const;
-    void styleRecalcTimerFired(Timer<Document>*);
-    void optimizedStyleSheetUpdateTimerFired(Timer<Document>*);
+    void styleRecalcTimerFired(Timer<Document>&);
+    void optimizedStyleSheetUpdateTimerFired(Timer<Document>&);
 
     void registerNodeList(LiveNodeList&);
     void unregisterNodeList(LiveNodeList&);
@@ -892,8 +897,6 @@ public:
     bool queryCommandSupported(const String& command);
     String queryCommandValue(const String& command);
 
-    URL openSearchDescriptionURL();
-
     // designMode support
     enum InheritedBool { off = false, on = true, inherit };    
     void setDesignMode(InheritedBool value);
@@ -1052,6 +1055,7 @@ public:
 
     void enqueueWindowEvent(PassRefPtr<Event>);
     void enqueueDocumentEvent(PassRefPtr<Event>);
+    void enqueueOverflowEvent(PassRefPtr<Event>);
     void enqueuePageshowEvent(PageshowEventPersistence);
     void enqueueHashchangeEvent(const String& oldURL, const String& newURL);
     void enqueuePopstateEvent(PassRefPtr<SerializedScriptValue> stateObject);
@@ -1085,7 +1089,7 @@ public:
     RenderFullScreen* fullScreenRenderer() const { return m_fullScreenRenderer; }
     void fullScreenRendererDestroyed();
     
-    void fullScreenChangeDelayTimerFired(Timer<Document>*);
+    void fullScreenChangeDelayTimerFired(Timer<Document>&);
     bool fullScreenIsAllowedForElement(Element*) const;
     void fullScreenElementRemoved();
     void removeFullScreenElementOfSubtree(Node*, bool amongChildrenOnly = false);
@@ -1110,7 +1114,7 @@ public:
 
 #if ENABLE(TOUCH_EVENTS)
 #if PLATFORM(IOS)
-#include "DocumentIOS.h"
+#include <WebKitAdditions/DocumentIOS.h>
 #else
     PassRefPtr<Touch> createTouch(DOMWindow*, EventTarget*, int identifier, int pageX, int pageY, int screenX, int screenY, int radiusX, int radiusY, float rotationAngle, float force, ExceptionCode&) const;
 #endif // PLATFORM(IOS)
@@ -1218,7 +1222,8 @@ public:
     void setVisualUpdatesAllowedByClient(bool);
 
 protected:
-    Document(Frame*, const URL&, unsigned = DefaultDocumentClass, bool isSynthesized = false);
+    enum ConstructionFlags { Synthesized = 1, NonRenderedPlaceholder = 1 << 1 };
+    Document(Frame*, const URL&, unsigned = DefaultDocumentClass, unsigned constructionFlags = 0);
 
     void clearXMLVersion() { m_xmlVersion = String(); }
 
@@ -1232,12 +1237,11 @@ private:
 
     RenderObject* renderer() const WTF_DELETED_FUNCTION;
     void setRenderer(RenderObject*) WTF_DELETED_FUNCTION;
-    void setRenderView(RenderView*);
 
-    virtual void createRenderTree();
-    virtual void dropChildren() OVERRIDE;
-
+    void createRenderTree();
     void detachParser();
+
+    virtual void dropChildren() OVERRIDE;
 
     typedef void (*ArgumentsCallback)(const String& keyString, const String& valueString, Document*, void* data);
     void processArguments(const String& features, void* data, ArgumentsCallback);
@@ -1262,10 +1266,10 @@ private:
     virtual double timerAlignmentInterval() const OVERRIDE;
 
     void updateTitle(const StringWithDirection&);
-    void updateFocusAppearanceTimerFired(Timer<Document>*);
+    void updateFocusAppearanceTimerFired(Timer<Document>&);
     void updateBaseURL();
 
-    void resetHiddenFocusElementTimer(Timer<Document>*);
+    void resetHiddenFocusElementTimer(Timer<Document>&);
 
     void buildAccessKeyMap(TreeScope* root);
 
@@ -1273,9 +1277,9 @@ private:
 
     void seamlessParentUpdatedStylesheets();
 
-    void loadEventDelayTimerFired(Timer<Document>*);
+    void loadEventDelayTimerFired(Timer<Document>&);
 
-    void pendingTasksTimerFired(Timer<Document>*);
+    void pendingTasksTimerFired(Timer<Document>&);
 
     static void didReceiveTask(void*);
     
@@ -1298,13 +1302,13 @@ private:
 
     void setVisualUpdatesAllowed(ReadyState);
     void setVisualUpdatesAllowed(bool);
-    void visualUpdatesSuppressionTimerFired(Timer<Document>*);
+    void visualUpdatesSuppressionTimerFired(Timer<Document>&);
 
     void addListenerType(ListenerType listenerType) { m_listenerTypes |= listenerType; }
 
-    void didAssociateFormControlsTimerFired(Timer<Document>*);
+    void didAssociateFormControlsTimerFired(Timer<Document>&);
 
-    void styleResolverThrowawayTimerFired(DeferrableOneShotTimer<Document>*);
+    void styleResolverThrowawayTimerFired(DeferrableOneShotTimer<Document>&);
     DeferrableOneShotTimer<Document> m_styleResolverThrowawayTimer;
 
     OwnPtr<StyleResolver> m_styleResolver;
@@ -1496,12 +1500,13 @@ private:
     DocumentClassFlags m_documentClasses;
 
     bool m_isSynthesized;
+    bool m_isNonRenderedPlaceholder;
 
     bool m_isViewSource;
     bool m_sawElementsInKnownNamespaces;
     bool m_isSrcdocDocument;
 
-    RenderView* m_renderView;
+    RenderPtr<RenderView> m_renderView;
     mutable DocumentEventQueue m_eventQueue;
 
     WeakPtrFactory<Document> m_weakFactory;
@@ -1612,7 +1617,7 @@ private:
     RefPtr<DOMSecurityPolicy> m_domSecurityPolicy;
 #endif
 
-    void sharedObjectPoolClearTimerFired(Timer<Document>*);
+    void sharedObjectPoolClearTimerFired(Timer<Document>&);
     Timer<Document> m_sharedObjectPoolClearTimer;
 
     OwnPtr<DocumentSharedObjectPool> m_sharedObjectPool;

@@ -47,11 +47,14 @@ namespace Deprecated {
 class ScriptObject;
 }
 
+namespace Inspector {
+class InjectedScriptManager;
+}
+
 namespace WebCore {
 
 class Frame;
 class InjectedScriptCanvasModule;
-class InjectedScriptManager;
 class InspectorPageAgent;
 class InstrumentingAgents;
 
@@ -59,10 +62,7 @@ typedef String ErrorString;
 
 class InspectorCanvasAgent : public InspectorAgentBase, public Inspector::InspectorCanvasBackendDispatcherHandler {
 public:
-    static PassOwnPtr<InspectorCanvasAgent> create(InstrumentingAgents* instrumentingAgents, InspectorPageAgent* pageAgent, InjectedScriptManager* injectedScriptManager)
-    {
-        return adoptPtr(new InspectorCanvasAgent(instrumentingAgents, pageAgent, injectedScriptManager));
-    }
+    InspectorCanvasAgent(InstrumentingAgents*, InspectorPageAgent*, Inspector::InjectedScriptManager*);
     ~InspectorCanvasAgent();
 
     virtual void didCreateFrontendAndBackend(Inspector::InspectorFrontendChannel*, Inspector::InspectorBackendDispatcher*) OVERRIDE;
@@ -92,8 +92,6 @@ public:
     virtual void getResourceState(ErrorString*, const Inspector::TypeBuilder::Canvas::TraceLogId&, const Inspector::TypeBuilder::Canvas::ResourceId&, RefPtr<Inspector::TypeBuilder::Canvas::ResourceState>&);
 
 private:
-    InspectorCanvasAgent(InstrumentingAgents*, InspectorPageAgent*, InjectedScriptManager*);
-
     InjectedScriptCanvasModule injectedScriptCanvasModule(ErrorString*, JSC::ExecState*);
     InjectedScriptCanvasModule injectedScriptCanvasModule(ErrorString*, const Deprecated::ScriptObject&);
     InjectedScriptCanvasModule injectedScriptCanvasModule(ErrorString*, const String&);
@@ -103,7 +101,7 @@ private:
     Deprecated::ScriptObject notifyRenderingContextWasWrapped(const Deprecated::ScriptObject&);
 
     InspectorPageAgent* m_pageAgent;
-    InjectedScriptManager* m_injectedScriptManager;
+    Inspector::InjectedScriptManager* m_injectedScriptManager;
     std::unique_ptr<Inspector::InspectorCanvasFrontendDispatcher> m_frontendDispatcher;
     RefPtr<Inspector::InspectorCanvasBackendDispatcher> m_backendDispatcher;
     bool m_enabled;

@@ -1,3 +1,210 @@
+2014-01-13  Commit Queue  <commit-queue@webkit.org>
+
+        Unreviewed, rolling out r161808.
+        http://trac.webkit.org/changeset/161808
+        https://bugs.webkit.org/show_bug.cgi?id=126874
+
+        This patch make several files to be always regenerated on
+        every make (Requested by KaL on #webkit).
+
+        * GNUmakefile.am:
+
+2014-01-12  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        Unreviewed. Fix make distcheck.
+
+        * GNUmakefile.am: Add enum types template files to EXTRA_DIST.
+
+2014-01-12  Tobias Mueller  <tobiasmue@gnome.org>
+
+        --disable-dependency-tracking causes build failure due to missing directories
+        https://bugs.webkit.org/show_bug.cgi?id=94488
+
+        Reviewed by Gustavo Noronha Silva.
+
+        Autotools build fix: Ensure output directory existing
+        before generating DerivedSources. This allows for
+        --disable-dependency-tracking to be run.
+
+        * GNUmakefile.am: Added a new target of the directory in which files are meant to be stored ($(GENSOURCES_WEBKIT)).
+
+2014-01-10  Anders Carlsson  <andersca@apple.com>
+
+        Tweak ProgressTrackerClient functions
+        https://bugs.webkit.org/show_bug.cgi?id=126808
+
+        Reviewed by Sam Weinig.
+
+        * WebCoreSupport/FrameLoaderClientGtk.cpp:
+        (WebKit::FrameLoaderClient::progressStarted):
+        (WebKit::FrameLoaderClient::progressEstimateChanged):
+        (WebKit::FrameLoaderClient::progressFinished):
+        * WebCoreSupport/FrameLoaderClientGtk.h:
+
+2014-01-10  Anders Carlsson  <andersca@apple.com>
+
+        Move progress tracking functions from FrameLoaderClient to a new ProgressTrackerClient
+        https://bugs.webkit.org/show_bug.cgi?id=126801
+
+        Reviewed by Sam Weinig.
+
+        * WebCoreSupport/FrameLoaderClientGtk.h:
+        * webkit/webkitwebview.cpp:
+        (webkit_web_view_init):
+
+2014-01-08  Claudio Saavedra  <csaavedra@igalia.com>
+
+        [GTK] Add xdg.origin.url extended attribute to downloads
+        https://bugs.webkit.org/show_bug.cgi?id=126638
+
+        Reviewed by Carlos Garcia Campos.
+
+        This is proposed by fdo in
+        http://www.freedesktop.org/wiki/CommonExtendedAttributes/
+
+        * webkit/webkitdownload.cpp:
+        (webkit_download_open_stream_for_uri):
+
+2014-01-04  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        [GTK] Move all GTK/GObject unit tests to Tools/TestWebKitAPI
+        https://bugs.webkit.org/show_bug.cgi?id=126342
+
+        Reviewed by Gustavo Noronha Silva.
+
+        * tests/CMakeLists.txt: Removed.
+        * tests/GNUmakefile.am: Removed.
+
+2014-01-06  László Langó  <lango@inf.u-szeged.hu>
+
+        Use unsigned consistently, and check for invalid casts when calling into SharedBuffer from other code.
+        https://bugs.webkit.org/show_bug.cgi?id=124579
+
+        Reviewed by Anders Carlsson.
+
+        * webkit/webkitdownload.cpp:
+        (DownloadClient::didReceiveData):
+
+2014-01-02  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        REGRESSION(r160304): [GTK] Disable libtool fast install
+        https://bugs.webkit.org/show_bug.cgi?id=126381
+
+        Reviewed by Martin Robinson.
+
+        * tests/GNUmakefile.am:
+
+2014-01-02  Gavin Barraclough  <barraclough@apple.com>
+
+        Merge didMoveOnscreen / page visibility to isVisible
+        https://bugs.webkit.org/show_bug.cgi?id=126268
+
+        Reviewed by Tim Horton.
+
+        The onscreen state most closely tracks view visibility (though currently
+        also tracks a mix of in-window state). Make more consistent, simplify,
+        and move all animation suspension logic to Page, so it can be controlled
+        by the PageThrottler.
+
+        * WebCoreSupport/DumpRenderTreeSupportGtk.cpp:
+        (DumpRenderTreeSupportGtk::setPageVisibility):
+            - setVisibilityState -> setIsVisible/setIsPrerender.
+
+2014-01-02  Zan Dobersek  <zdobersek@igalia.com>
+
+        [GTK] Fix mismatched header guards in private WK1 header files
+        https://bugs.webkit.org/show_bug.cgi?id=126390
+
+        Reviewed by Martin Robinson.
+
+        Fix three mismatched header guards that are producing warnings when building with Clang.
+
+        * webkit/webkitsecurityoriginprivate.h:
+        * webkit/webkitviewportattributesprivate.h:
+        * webkit/webkitwebnavigationactionprivate.h:
+
+2013-12-30  Martin Robinson  <mrobinson@igalia.com>
+
+        [GTK] Make the output directory of GObject unit tests binaries consistent with the CMake build
+        https://bugs.webkit.org/show_bug.cgi?id=126297
+
+        Reviewed by Philippe Normand.
+
+        * tests/GNUmakefile.am: Build the tests in the new directory.
+
+2013-12-26  Martin Robinson  <mrobinson@igalia.com>
+
+        Small build fix for the GTK+ CMake port
+
+        * tests/CMakeLists.txt: Output the WebKit1 GObject API unit tests to the proper directory
+        and fix the path to the generated API source.
+
+2013-12-23  Martin Robinson  <mrobinson@igalia.com>
+
+        [GTK] [CMake] Build the WebKit1 GObject API tests
+        https://bugs.webkit.org/show_bug.cgi?id=125684
+
+        Reviewed by Daniel Bates.
+
+        * tests/CMakeLists.txt: Added.
+        * tests/testapplicationcache.c: Use the WTF config.h instead of including the autotools configuration directly.
+        * tests/testatk.c: Ditto.
+        * tests/testatkroles.c: Ditto.
+        * tests/testcontextmenu.c: Ditto.
+        * tests/testcopyandpaste.c: Ditto.
+        * tests/testdomdocument.c: Ditto.
+        * tests/testdomdomwindow.c: Ditto.
+        * tests/testdomnode.c: Ditto.
+        * tests/testdownload.c: Ditto.
+        * tests/testfavicondatabase.c: Ditto.
+        * tests/testglobals.c: Ditto.
+        * tests/testhittestresult.c: Ditto.
+        * tests/testhttpbackend.c: Ditto.
+        * tests/testkeyevents.c: Ditto.
+        * tests/testloading.c: Ditto.
+        * tests/testmimehandling.c: Ditto.
+        * tests/testnetworkrequest.c: Ditto.
+        * tests/testnetworkresponse.c: Ditto.
+        * tests/testwebbackforwardlist.c: Ditto.
+        * tests/testwebdatasource.c: Ditto.
+        * tests/testwebframe.c: Ditto.
+        * tests/testwebhistoryitem.c: Ditto.
+        * tests/testwebinspector.c: Ditto.
+        * tests/testwebplugindatabase.c: Ditto.
+        * tests/testwebresource.c: Ditto.
+        * tests/testwebsettings.c: Ditto.
+        * tests/testwebview.c: Ditto.
+        * tests/testwindow.c: Ditto.
+
+2013-12-20  Enrique Ocaña González  <eocanha@igalia.com>
+
+        [GTK] The fullscreen API should be enabled by default
+        https://bugs.webkit.org/show_bug.cgi?id=125993
+
+        Reviewed by Gustavo Noronha Silva.
+
+        Set the WebSettings property to TRUE
+
+        * webkit/webkitwebsettings.cpp:
+        (webkit_web_settings_class_init):
+
+2013-12-16  Martin Robinson  <mrobinson@igalia.com>
+
+        [GTK] [CMake] Add support for building WebKit1
+        https://bugs.webkit.org/show_bug.cgi?id=116377
+
+        Reviewed by Gustavo Noronha Silva.
+
+        * GNUmakefile.am: Switch to using the templates for building the GObject enums.
+        * webkit/webkitenumtypes.cpp.template: Added.
+        * webkit/webkitenumtypes.h.template: Added.
+
+2013-12-18  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        Unreviewed. Update NEWS and Versions.m4 for 2.3.3 release.
+
+        * NEWS: Added release notes for 2.3.3.
+
 2013-12-11  Joseph Pecoraro  <pecoraro@apple.com>
 
         Web Inspector: Push More Inspector Required Classes Down into JavaScriptCore

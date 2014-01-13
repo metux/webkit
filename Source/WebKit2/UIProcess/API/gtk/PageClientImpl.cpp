@@ -279,14 +279,9 @@ void PageClientImpl::handleDownloadRequest(DownloadProxy* download)
     webkitWebViewBaseHandleDownloadRequest(WEBKIT_WEB_VIEW_BASE(m_viewWidget), download);
 }
 
-bool PageClientImpl::isWindowVisible()
-{
-    return webkitWebViewBaseIsWindowVisible(WEBKIT_WEB_VIEW_BASE(m_viewWidget));
-}
-
 void PageClientImpl::didCommitLoadForMainFrame()
 {
-    notImplemented();
+    webkitWebViewBaseResetClickCounter(WEBKIT_WEB_VIEW_BASE(m_viewWidget));
 }
 
 #if ENABLE(FULLSCREEN_API)

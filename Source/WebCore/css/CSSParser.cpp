@@ -264,6 +264,12 @@ CSSParserContext::CSSParserContext(CSSParserMode mode, const URL& baseURL)
     , enforcesCSSMIMETypeInNoQuirksMode(true)
     , useLegacyBackgroundSizeShorthandBehavior(false)
 {
+#if PLATFORM(IOS)
+    // FIXME: Force the site specific quirk below to work on iOS. Investigating other site specific quirks
+    // to see if we can enable the preference all together is to be handled by:
+    // <rdar://problem/8493309> Investigate Enabling Site Specific Quirks in MobileSafari and UIWebView
+    needsSiteSpecificQuirks = true;
+#endif
 }
 
 CSSParserContext::CSSParserContext(Document& document, const URL& baseURL, const String& charset)
@@ -280,6 +286,12 @@ CSSParserContext::CSSParserContext(Document& document, const URL& baseURL, const
     , enforcesCSSMIMETypeInNoQuirksMode(!document.settings() || document.settings()->enforceCSSMIMETypeInNoQuirksMode())
     , useLegacyBackgroundSizeShorthandBehavior(document.settings() ? document.settings()->useLegacyBackgroundSizeShorthandBehavior() : false)
 {
+#if PLATFORM(IOS)
+    // FIXME: Force the site specific quirk below to work on iOS. Investigating other site specific quirks
+    // to see if we can enable the preference all together is to be handled by:
+    // <rdar://problem/8493309> Investigate Enabling Site Specific Quirks in MobileSafari and UIWebView
+    needsSiteSpecificQuirks = true;
+#endif
 }
 
 bool operator==(const CSSParserContext& a, const CSSParserContext& b)
@@ -2130,11 +2142,17 @@ bool CSSParser::parseValue(CSSPropertyID propId, bool important)
         break;
 
     case CSSPropertyLetterSpacing:       // normal | <length> | inherit
-    case CSSPropertyWordSpacing:         // normal | <length> | inherit
         if (id == CSSValueNormal)
             validPrimitive = true;
         else
             validPrimitive = validUnit(value, FLength);
+        break;
+
+    case CSSPropertyWordSpacing:         // normal | <length> | <percentage> | inherit
+        if (id == CSSValueNormal)
+            validPrimitive = true;
+        else
+            validPrimitive = validUnit(value, FLength | FPercent);
         break;
 
     case CSSPropertyTextIndent:
@@ -2217,17 +2235,18 @@ bool CSSParser::parseValue(CSSPropertyID propId, bool important)
         break;
 
     case CSSPropertyZIndex:              // auto | <integer> | inherit
-        if (id == CSSValueAuto) {
+        if (id == CSSValueAuto)
             validPrimitive = true;
-            break;
-        }
-        /* nobreak */
+        else
+            validPrimitive = (!id && validUnit(value, FInteger, CSSQuirksMode));
+        break;
+
     case CSSPropertyOrphans: // <integer> | inherit | auto (We've added support for auto for backwards compatibility)
     case CSSPropertyWidows: // <integer> | inherit | auto (Ditto)
         if (id == CSSValueAuto)
             validPrimitive = true;
         else
-            validPrimitive = (!id && validUnit(value, FInteger, CSSQuirksMode));
+            validPrimitive = (!id && validUnit(value, FPositiveInteger, CSSQuirksMode));
         break;
 
     case CSSPropertyLineHeight:
@@ -2759,6 +2778,19 @@ bool CSSParser::parseValue(CSSPropertyID propId, bool important)
 #endif
 
 #if PLATFORM(IOS)
+    // FIXME: CSSPropertyWebkitCompositionFillColor shouldn't be iOS-specific. Once we fix up its usage in
+    // InlineTextBox::paintCompositionBackground() we should move it outside the PLATFORM(IOS)-guard.
+    // See <https://bugs.webkit.org/show_bug.cgi?id=126296>.
+    case CSSPropertyWebkitCompositionFillColor:
+        if ((id >= CSSValueAqua && id <= CSSValueWindowtext) || id == CSSValueMenu
+            || (id >= CSSValueWebkitFocusRingColor && id < CSSValueWebkitText && inQuirksMode())) {
+            validPrimitive = true;
+        } else {
+            parsedValue = parseColor();
+            if (parsedValue)
+                m_valueList->next();
+        }
+        break;
     case CSSPropertyWebkitTouchCallout:
         if (id == CSSValueDefault || id == CSSValueNone)
             validPrimitive = true;
@@ -2918,20 +2950,7 @@ bool CSSParser::parseValue(CSSPropertyID propId, bool important)
             return parseFontVariantLigatures(important);
         break;
     case CSSPropertyWebkitClipPath:
-        if (id == CSSValueNone)
-            validPrimitive = true;
-        else if (value->unit == CSSParserValue::Function) {
-            RefPtr<CSSBasicShape> shapeValue =  parseBasicShape();
-            if (shapeValue)
-                parsedValue = cssValuePool().createValue(shapeValue.release());
-        }
-#if ENABLE(SVG)
-        else if (value->unit == CSSPrimitiveValue::CSS_URI) {
-            parsedValue = CSSPrimitiveValue::create(value->string, CSSPrimitiveValue::CSS_URI);
-            addProperty(propId, parsedValue.release(), important);
-            return true;
-        }
-#endif
+        parsedValue = parseClipPath();
         break;
 #if ENABLE(CSS_SHAPES)
     case CSSPropertyWebkitShapeInside:
@@ -5830,7 +5849,6 @@ PassRefPtr<CSSBasicShape> CSSParser::parseBasicShapePolygon(CSSParserValueList* 
     return shape;
 }
 
-#if ENABLE(CSS_SHAPES)
 static bool isBoxValue(CSSValueID valueId)
 {
     switch (valueId) {
@@ -5845,6 +5863,7 @@ static bool isBoxValue(CSSValueID valueId)
     return false;
 }
 
+#if ENABLE(CSS_SHAPES)
 PassRefPtr<CSSValue> CSSParser::parseShapeProperty(CSSPropertyID propId)
 {
     if (!RuntimeEnabledFeatures::sharedFeatures().cssShapesEnabled())
@@ -5853,9 +5872,9 @@ PassRefPtr<CSSValue> CSSParser::parseShapeProperty(CSSPropertyID propId)
     CSSParserValue* value = m_valueList->current();
     CSSValueID valueId = value->id;
     RefPtr<CSSPrimitiveValue> keywordValue;
-    RefPtr<CSSBasicShape> shapeValue;
+    RefPtr<CSSPrimitiveValue> shapeValue;
 
-    if (valueId == CSSValueAuto
+    if (valueId == CSSValueNone
         || (valueId == CSSValueOutsideShape && propId == CSSPropertyWebkitShapeInside)) {
         keywordValue = parseValidPrimitive(valueId, value);
         m_valueList->next();
@@ -5889,12 +5908,57 @@ PassRefPtr<CSSValue> CSSParser::parseShapeProperty(CSSPropertyID propId)
             return nullptr;
     }
 
-    if (shapeValue && keywordValue)
-        shapeValue->setBox(keywordValue.release());
+    ASSERT(!shapeValue || shapeValue->isShape());
 
-    return shapeValue ? cssValuePool().createValue(shapeValue.release()) : keywordValue.release();
+    if (shapeValue && keywordValue)
+        shapeValue->getShapeValue()->setLayoutBox(keywordValue.release());
+
+    return shapeValue ? shapeValue.release() : keywordValue.release();
 }
 #endif
+
+PassRefPtr<CSSValue> CSSParser::parseClipPath()
+{
+    CSSParserValue* value = m_valueList->current();
+    CSSValueID valueId = value->id;
+
+    if (valueId == CSSValueNone) {
+        m_valueList->next();
+        return parseValidPrimitive(valueId, value);
+    }
+#if ENABLE(SVG)
+    if (value->unit == CSSPrimitiveValue::CSS_URI) {
+        m_valueList->next();
+        return CSSPrimitiveValue::create(value->string, CSSPrimitiveValue::CSS_URI);
+    }
+#endif
+
+    bool shapeFound = false;
+    bool boxFound = false;
+    RefPtr<CSSValueList> list = CSSValueList::createSpaceSeparated();
+    for (unsigned i = 0; i < 2; ++i) {
+        if (!value)
+            break;
+        valueId = value->id;
+        if (value->unit == CSSParserValue::Function && !shapeFound) {
+            // parseBasicShape already asks for the next value list item.
+            RefPtr<CSSPrimitiveValue> shapeValue = parseBasicShape();
+            if (!shapeValue)
+                return nullptr;
+            list->append(shapeValue.release());
+            shapeFound = true;
+        } else if ((isBoxValue(valueId) || valueId == CSSValueBoundingBox) && !boxFound) {
+            list->append(parseValidPrimitive(valueId, value));
+            boxFound = true;
+            m_valueList->next();
+        } else
+            return nullptr;
+        value = m_valueList->current();
+    }
+    if (value)
+        return nullptr;
+    return list.release();
+}
 
 // FIXME This function is temporary to allow for an orderly transition between
 // the new CSS Shapes circle and ellipse syntax. It will be removed when the
@@ -5910,7 +5974,7 @@ static bool isDeprecatedBasicShape(CSSParserValueList* args)
     return false;
 }
 
-PassRefPtr<CSSBasicShape> CSSParser::parseBasicShape()
+PassRefPtr<CSSPrimitiveValue> CSSParser::parseBasicShape()
 {
     CSSParserValue* value = m_valueList->current();
     ASSERT(value->unit == CSSParserValue::Function);
@@ -5943,7 +6007,7 @@ PassRefPtr<CSSBasicShape> CSSParser::parseBasicShape()
         return nullptr;
 
     m_valueList->next();
-    return shape.release();
+    return cssValuePool().createValue(shape.release());
 }
 
 // [ 'font-style' || 'font-variant' || 'font-weight' ]? 'font-size' [ / 'line-height' ]? 'font-family'
@@ -9832,15 +9896,6 @@ bool CSSParser::cssGridLayoutEnabled() const
 }
 
 #if ENABLE(CSS_REGIONS)
-bool CSSParser::parseFlowThread(const String& flowName)
-{
-    setupParser("@-webkit-decls{-webkit-flow-into:", flowName, "}");
-    cssyyparse(this);
-
-    m_rule = 0;
-
-    return ((m_parsedProperties.size() == 1) && (m_parsedProperties.first().id() == CSSPropertyWebkitFlowInto));
-}
 
 // none | <ident>
 bool CSSParser::parseFlowThread(CSSPropertyID propId, bool important)
@@ -12698,7 +12753,8 @@ static CSSValueID cssValueKeywordID(const CharacterType* valueKeyword, unsigned 
     if (buffer[0] == '-') {
         // If the prefix is -apple- or -khtml-, change it to -webkit-.
         // This makes the string one character longer.
-        if (hasPrefix(buffer, length, "-apple-") || hasPrefix(buffer, length, "-khtml-")) {
+        // On iOS we don't want to change values starting with -apple-system to -webkit-system.
+        if ((hasPrefix(buffer, length, "-apple-") && !hasPrefix(buffer, length, "-apple-system")) || hasPrefix(buffer, length, "-khtml-")) {
             memmove(buffer + 7, buffer + 6, length + 1 - 6);
             memcpy(buffer, "-webkit", 7);
             ++length;

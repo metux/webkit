@@ -89,6 +89,9 @@ public:
     ~FrameLoader();
 
     void init();
+#if PLATFORM(IOS)
+    void initForSynthesizedDocument(const URL&);
+#endif
 
     Frame& frame() const { return m_frame; }
 
@@ -153,8 +156,10 @@ public:
     DocumentLoader* policyDocumentLoader() const { return m_policyDocumentLoader.get(); }
     DocumentLoader* provisionalDocumentLoader() const { return m_provisionalDocumentLoader.get(); }
     FrameState state() const { return m_state; }
-    static double timeOfLastCompletedLoad();
 
+#if PLATFORM(IOS)
+    RetainPtr<CFDictionaryRef> connectionProperties(ResourceLoader*);
+#endif
     const ResourceRequest& originalRequest() const;
     const ResourceRequest& initialRequest() const;
     void receivedMainResourceError(const ResourceError&);
@@ -241,6 +246,9 @@ public:
 
     void commitProvisionalLoad();
 
+    void setLoadsSynchronously(bool loadsSynchronously) { m_loadsSynchronously = loadsSynchronously; }
+    bool loadsSynchronously() const { return m_loadsSynchronously; }
+
     FrameLoaderStateMachine* stateMachine() const { return &m_stateMachine; }
 
     Frame* findFrameForNavigation(const AtomicString& name, Document* activeDocument = 0);
@@ -295,7 +303,7 @@ private:
 
     bool allChildrenAreComplete() const; // immediate children, not all descendants
 
-    void checkTimerFired(Timer<FrameLoader>*);
+    void checkTimerFired(Timer<FrameLoader>&);
     
     void loadSameDocumentItem(HistoryItem*);
     void loadDifferentDocumentItem(HistoryItem*, FrameLoadType, FormSubmissionCacheLoadPolicy);
@@ -313,10 +321,6 @@ private:
 
     SubstituteData defaultSubstituteDataForURL(const URL&);
 
-    static void callContinueLoadAfterNavigationPolicy(void*, const ResourceRequest&, PassRefPtr<FormState>, bool shouldContinue);
-    static void callContinueLoadAfterNewWindowPolicy(void*, const ResourceRequest&, PassRefPtr<FormState>, const String& frameName, const NavigationAction&, bool shouldContinue);
-    static void callContinueFragmentScrollAfterNavigationPolicy(void*, const ResourceRequest&, PassRefPtr<FormState>, bool shouldContinue);
-    
     bool handleBeforeUnloadEvent(Chrome&, FrameLoader* frameLoaderBeingNavigated);
 
     void continueLoadAfterNavigationPolicy(const ResourceRequest&, PassRefPtr<FormState>, bool shouldContinue);
@@ -435,8 +439,10 @@ private:
     bool m_didPerformFirstNavigation;
     bool m_loadingFromCachedPage;
     bool m_suppressOpenerInNewFrame;
-    
+
     bool m_currentNavigationHasShownBeforeUnloadConfirmPanel;
+
+    bool m_loadsSynchronously;
 
     SandboxFlags m_forcedSandboxFlags;
 

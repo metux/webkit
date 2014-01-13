@@ -217,7 +217,7 @@ void RenderInline::updateAlwaysCreateLineBoxes(bool fullLayout)
         || style().textEmphasisMark() != TextEmphasisMarkNone
         || (checkFonts && (!parentStyle->font().fontMetrics().hasIdenticalAscentDescentAndLineGap(style().font().fontMetrics())
         || parentStyle->lineHeight() != style().lineHeight()))
-        || (flowThread && flowThread->isRenderNamedFlowThread() && toRenderNamedFlowThread(flowThread)->hasRegionsWithStyling());
+        || (flowThread && flowThread->isRenderNamedFlowThread()); // FIXME: Enable the optimization once we make overflow computation for culled inlines in regions.
 
     if (!alwaysCreateLineBoxes && checkFonts && document().styleSheetCollection().usesFirstLineRules()) {
         // Have to check the first line style as well.
@@ -330,9 +330,9 @@ void RenderInline::addChildIgnoringContinuation(RenderObject* newChild, RenderOb
     newChild->setNeedsLayoutAndPrefWidthsRecalc();
 }
 
-RenderInline* RenderInline::clone() const
+RenderPtr<RenderInline> RenderInline::clone() const
 {
-    RenderInline* cloneInline = new RenderInline(*element(), style());
+    RenderPtr<RenderInline> cloneInline = createRenderer<RenderInline>(*element(), style());
     cloneInline->initializeStyle();
     cloneInline->setFlowThreadState(flowThreadState());
     return cloneInline;
@@ -343,7 +343,7 @@ void RenderInline::splitInlines(RenderBlock* fromBlock, RenderBlock* toBlock,
                                 RenderObject* beforeChild, RenderBoxModelObject* oldCont)
 {
     // Create a clone of this inline.
-    RenderInline* cloneInline = clone();
+    RenderPtr<RenderInline> cloneInline = clone();
     cloneInline->setContinuation(oldCont);
 
 #if ENABLE(FULLSCREEN_API)
@@ -369,7 +369,7 @@ void RenderInline::splitInlines(RenderBlock* fromBlock, RenderBlock* toBlock,
     }
 
     // Hook |clone| up as the continuation of the middle block.
-    middleBlock->setContinuation(cloneInline);
+    middleBlock->setContinuation(cloneInline.get());
 
     // We have been reparented and are now under the fromBlock.  We need
     // to walk up our inline parent chain until we hit the containing block.
@@ -387,16 +387,16 @@ void RenderInline::splitInlines(RenderBlock* fromBlock, RenderBlock* toBlock,
         ASSERT(curr->isRenderInline());
         if (splitDepth < cMaxSplitDepth) {
             // Create a new clone.
-            RenderInline* cloneChild = cloneInline;
+            RenderPtr<RenderInline> cloneChild = std::move(cloneInline);
             cloneInline = toRenderInline(curr)->clone();
 
             // Insert our child clone as the first child.
-            cloneInline->addChildIgnoringContinuation(cloneChild, 0);
+            cloneInline->addChildIgnoringContinuation(cloneChild.leakPtr(), 0);
 
             // Hook the clone up as a continuation of |curr|.
             RenderInline* inlineCurr = toRenderInline(curr);
             oldCont = inlineCurr->continuation();
-            inlineCurr->setContinuation(cloneInline);
+            inlineCurr->setContinuation(cloneInline.get());
             cloneInline->setContinuation(oldCont);
 
             // Now we need to take all of the children starting from the first child
@@ -418,7 +418,7 @@ void RenderInline::splitInlines(RenderBlock* fromBlock, RenderBlock* toBlock,
     }
 
     // Now we are at the block level. We need to put the clone into the toBlock.
-    toBlock->insertChildInternal(cloneInline, nullptr, NotifyChildren);
+    toBlock->insertChildInternal(cloneInline.leakPtr(), nullptr, NotifyChildren);
 
     // Now take all the children after currChild and remove them from the fromBlock
     // and put them in the toBlock.
@@ -1033,6 +1033,50 @@ LayoutRect RenderInline::linesVisualOverflowBoundingBox() const
     LayoutUnit logicalTop = firstLineBox()->logicalTopVisualOverflow(firstRootBox.lineTop());
     LayoutUnit logicalWidth = logicalRightSide - logicalLeftSide;
     LayoutUnit logicalHeight = lastLineBox()->logicalBottomVisualOverflow(lastRootBox.lineBottom()) - logicalTop;
+    
+    LayoutRect rect(logicalLeftSide, logicalTop, logicalWidth, logicalHeight);
+    if (!style().isHorizontalWritingMode())
+        rect = rect.transposedRect();
+    return rect;
+}
+
+LayoutRect RenderInline::linesVisualOverflowBoundingBoxInRegion(const RenderRegion* region) const
+{
+    ASSERT(alwaysCreateLineBoxes());
+    ASSERT(region);
+
+    if (!firstLineBox() || !lastLineBox())
+        return LayoutRect();
+
+    // Return the width of the minimal left side and the maximal right side.
+    LayoutUnit logicalLeftSide = LayoutUnit::max();
+    LayoutUnit logicalRightSide = LayoutUnit::min();
+    LayoutUnit logicalTop;
+    LayoutUnit logicalHeight;
+    InlineFlowBox* lastInlineInRegion = 0;
+    for (InlineFlowBox* curr = firstLineBox(); curr; curr = curr->nextLineBox()) {
+        const RootInlineBox& root = curr->root();
+        if (root.containingRegion() != region) {
+            if (lastInlineInRegion)
+                break;
+            continue;
+        }
+
+        if (!lastInlineInRegion)
+            logicalTop = curr->logicalTopVisualOverflow(root.lineTop());
+
+        lastInlineInRegion = curr;
+
+        logicalLeftSide = std::min(logicalLeftSide, curr->logicalLeftVisualOverflow());
+        logicalRightSide = std::max(logicalRightSide, curr->logicalRightVisualOverflow());
+    }
+
+    if (!lastInlineInRegion)
+        return LayoutRect();
+
+    logicalHeight = lastInlineInRegion->logicalBottomVisualOverflow(lastInlineInRegion->root().lineBottom()) - logicalTop;
+    
+    LayoutUnit logicalWidth = logicalRightSide - logicalLeftSide;
     
     LayoutRect rect(logicalLeftSide, logicalTop, logicalWidth, logicalHeight);
     if (!style().isHorizontalWritingMode())

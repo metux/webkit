@@ -149,8 +149,6 @@ public:
     unsigned encodedSize() const { return m_encodedSize; }
     unsigned decodedSize() const { return m_decodedSize; }
     unsigned overheadSize() const;
-
-    virtual bool decodedDataIsPurgeable() const { return false; }
     
     bool isLoaded() const { return !m_loading; } // FIXME. Method name is inaccurate. Loading might not have started yet.
 
@@ -228,7 +226,9 @@ public:
     void unregisterHandle(CachedResourceHandleBase* h);
     
     bool canUseCacheValidator() const;
-    bool mustRevalidateDueToCacheHeaders(CachePolicy) const;
+
+    virtual bool mustRevalidateDueToCacheHeaders(CachePolicy) const;
+
     bool isCacheValidator() const { return m_resourceToRevalidate; }
     CachedResource* resourceToRevalidate() const { return m_resourceToRevalidate; }
     
@@ -284,7 +284,7 @@ protected:
         void cancel();
     private:
         CachedResourceCallback(CachedResource*, CachedResourceClient*);
-        void timerFired(Timer<CachedResourceCallback>*);
+        void timerFired(Timer<CachedResourceCallback>&);
 
         CachedResource* m_resource;
         CachedResourceClient* m_client;
@@ -308,7 +308,7 @@ protected:
 private:
     bool addClientToSet(CachedResourceClient*);
 
-    void decodedDataDeletionTimerFired(DeferrableOneShotTimer<CachedResource>*);
+    void decodedDataDeletionTimerFired(DeferrableOneShotTimer<CachedResource>&);
 
     virtual PurgePriority purgePriority() const { return PurgeDefault; }
     virtual bool mayTryReplaceEncodedData() const { return false; }

@@ -27,12 +27,14 @@
 #define DrawingArea_h
 
 #include "DrawingAreaInfo.h"
-#include <WebCore/FloatPoint.h>
+#include "LayerTreeContext.h"
+#include <WebCore/FloatRect.h>
 #include <WebCore/IntRect.h>
+#include <WebCore/ViewState.h>
 #include <wtf/Forward.h>
 #include <wtf/Noncopyable.h>
 
-namespace CoreIPC {
+namespace IPC {
 class Connection;
 class MessageDecoder;
 }
@@ -59,7 +61,9 @@ public:
     static std::unique_ptr<DrawingArea> create(WebPage*, const WebPageCreationParameters&);
     virtual ~DrawingArea();
     
-    void didReceiveDrawingAreaMessage(CoreIPC::Connection*, CoreIPC::MessageDecoder&);
+    DrawingAreaType type() const { return m_type; }
+    
+    void didReceiveDrawingAreaMessage(IPC::Connection*, IPC::MessageDecoder&);
 
     virtual void setNeedsDisplay() = 0;
     virtual void setNeedsDisplayInRect(const WebCore::IntRect&) = 0;
@@ -82,11 +86,13 @@ public:
     virtual void updatePreferences(const WebPreferencesStore&) { }
     virtual void mainFrameContentSizeChanged(const WebCore::IntSize&) { }
 
-    virtual void setExposedRect(const WebCore::FloatRect&) { }
-    virtual void setClipsToExposedRect(bool) { }
+#if PLATFORM(MAC)
+    virtual void setExposedRect(const WebCore::FloatRect&) = 0;
+    virtual WebCore::FloatRect exposedRect() const = 0;
+#endif
     virtual void mainFrameScrollabilityChanged(bool) { }
 
-    virtual bool supportsThreadedScrolling() { return false; }
+    virtual bool supportsAsyncScrolling() { return false; }
 
     virtual void didChangeScrollOffsetForAnyFrame() { }
 
@@ -99,13 +105,13 @@ public:
 #endif
 
 #if USE(COORDINATED_GRAPHICS)
-    virtual void didReceiveCoordinatedLayerTreeHostMessage(CoreIPC::Connection*, CoreIPC::MessageDecoder&) = 0;
+    virtual void didReceiveCoordinatedLayerTreeHostMessage(IPC::Connection*, IPC::MessageDecoder&) = 0;
 #endif
 
     virtual void dispatchAfterEnsuringUpdatedScrollPosition(const Function<void ()>&);
 
-    virtual void suspendPainting() { }
-    virtual void resumePainting() { }
+    virtual void viewStateDidChange(WebCore::ViewState::Flags) { }
+    virtual void setLayerHostingMode(LayerHostingMode) { }
 
 protected:
     DrawingArea(DrawingAreaType, WebPage*);
@@ -114,12 +120,11 @@ protected:
     WebPage* m_webPage;
 
 private:
-    // CoreIPC message handlers.
+    // Message handlers.
     // FIXME: These should be pure virtual.
     virtual void updateBackingStoreState(uint64_t /*backingStoreStateID*/, bool /*respondImmediately*/, float /*deviceScaleFactor*/, const WebCore::IntSize& /*size*/, 
                                          const WebCore::IntSize& /*scrollOffset*/) { }
     virtual void didUpdate() { }
-    virtual void setLayerHostingMode(uint32_t) { }
 
 #if PLATFORM(MAC)
     // Used by TiledCoreAnimationDrawingArea.
@@ -127,11 +132,13 @@ private:
     virtual void setDeviceScaleFactor(float) { }
     virtual void setColorSpace(const ColorSpaceData&) { }
 
-    virtual void beginTransientZoom() { }
     virtual void adjustTransientZoom(double scale, WebCore::FloatPoint origin) { }
     virtual void commitTransientZoom(double scale, WebCore::FloatPoint origin) { }
 #endif
 };
+
+#define DRAWING_AREA_TYPE_CASTS(ToValueTypeName, predicate) \
+    TYPE_CASTS_BASE(ToValueTypeName, DrawingArea, value, value->predicate, value.predicate)
 
 } // namespace WebKit
 

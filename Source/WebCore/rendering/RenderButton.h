@@ -57,6 +57,10 @@ public:
     void setText(const String&);
     String text() const;
 
+#if PLATFORM(IOS)
+    virtual void layout() OVERRIDE;
+#endif
+
 private:
     void element() const WTF_DELETED_FUNCTION;
 
@@ -70,7 +74,7 @@ private:
 
     virtual bool requiresForcedStyleRecalcPropagation() const OVERRIDE { return true; }
 
-    void timerFired(Timer<RenderButton>*);
+    void timerFired(Timer<RenderButton>&);
 
     RenderTextFragment* m_buttonText;
     RenderBlock* m_inner;

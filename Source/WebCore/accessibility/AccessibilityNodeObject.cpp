@@ -120,10 +120,10 @@ PassRefPtr<AccessibilityNodeObject> AccessibilityNodeObject::create(Node* node)
     return adoptRef(new AccessibilityNodeObject(node));
 }
 
-void AccessibilityNodeObject::detach()
+void AccessibilityNodeObject::detach(AccessibilityDetachmentType detachmentType, AXObjectCache* cache)
 {
-    clearChildren();
-    AccessibilityObject::detach();
+    // AccessibilityObject calls clearChildren.
+    AccessibilityObject::detach(detachmentType, cache);
     m_node = 0;
 }
 
@@ -150,7 +150,7 @@ void AccessibilityNodeObject::childrenChanged()
             axObjectCache()->postNotification(parent, parent->document(), AXObjectCache::AXLiveRegionChanged);
         
         // If this element is an ARIA text control, notify the AT of changes.
-        if (parent->isARIATextControl() && !parent->isNativeTextControl() && !parent->node()->rendererIsEditable())
+        if (parent->isARIATextControl() && !parent->isNativeTextControl() && !parent->node()->hasEditableStyle())
             axObjectCache()->postNotification(parent, parent->document(), AXObjectCache::AXValueChanged);
     }
 }
@@ -411,6 +411,18 @@ bool AccessibilityNodeObject::computeAccessibilityIsIgnored() const
     ASSERT(m_initialized);
 #endif
 
+    // Handle non-rendered text that is exposed through aria-hidden=false.
+    if (m_node && m_node->isTextNode() && !renderer()) {
+        // Fallback content in iframe nodes should be ignored.
+        if (m_node->parentNode() && m_node->parentNode()->hasTagName(iframeTag) && m_node->parentNode()->renderer())
+            return true;
+
+        // Whitespace only text elements should be ignored when they have no renderer.
+        String string = stringValue().stripWhiteSpace().simplifyWhiteSpace();
+        if (!string.length())
+            return true;
+    }
+    
     // If this element is within a parent that cannot have children, it should not be exposed.
     if (isDescendantOfBarrenParent())
         return true;
@@ -427,7 +439,7 @@ bool AccessibilityNodeObject::canvasHasFallbackContent() const
     // If it has any children that are elements, we'll assume it might be fallback
     // content. If it has no children or its only children are not elements
     // (e.g. just text nodes), it doesn't have fallback content.
-    return elementChildren(canvasElement).first();
+    return childrenOfType<Element>(canvasElement).first();
 }
 
 bool AccessibilityNodeObject::isImageButton() const
@@ -725,13 +737,17 @@ bool AccessibilityNodeObject::isReadOnly() const
             return input->isReadOnly();
     }
 
-    return !node->rendererIsEditable();
+    return !node->hasEditableStyle();
 }
 
 bool AccessibilityNodeObject::isRequired() const
 {
-    if (equalIgnoringCase(getAttribute(aria_requiredAttr), "true"))
+    // Explicit aria-required values should trump native required attributes.
+    const AtomicString& requiredValue = getAttribute(aria_requiredAttr);
+    if (equalIgnoringCase(requiredValue, "true"))
         return true;
+    if (equalIgnoringCase(requiredValue, "false"))
+        return false;
 
     Node* n = this->node();
     if (n && (n->isElementNode() && toElement(n)->isFormControlElement()))
@@ -1167,7 +1183,7 @@ static Element* siblingWithAriaRole(String role, Node* node)
     if (!parent)
         return nullptr;
 
-    for (auto& sibling : elementChildren(*parent)) {
+    for (auto& sibling : childrenOfType<Element>(*parent)) {
         const AtomicString& siblingAriaRole = sibling.fastGetAttribute(roleAttr);
         if (equalIgnoringCase(siblingAriaRole, role))
             return &sibling;
@@ -2032,7 +2048,7 @@ AccessibilityRole AccessibilityNodeObject::remapAriaRoleDueToParent(Accessibilit
     return role;
 }   
 
-// If you call node->rendererIsEditable() since that will return true if an ancestor is editable.
+// If you call node->hasEditableStyle() since that will return true if an ancestor is editable.
 // This only returns true if this is the element that actually has the contentEditable attribute set.
 bool AccessibilityNodeObject::hasContentEditableAttributeSet() const
 {

@@ -66,6 +66,9 @@ void fillWithEmptyClients(Page::PageClients& pageClients)
 
     static NeverDestroyed<EmptyFrameLoaderClient> dummyFrameLoaderClient;
     pageClients.loaderClientForMainFrame = &dummyFrameLoaderClient.get();
+    
+    static NeverDestroyed<EmptyProgressTrackerClient> dummyProgressTrackerClient;
+    pageClients.progressTrackerClient = &dummyProgressTrackerClient.get();
 }
 
 class EmptyPopupMenu : public PopupMenu {
@@ -104,10 +107,10 @@ PassOwnPtr<ColorChooser> EmptyChromeClient::createColorChooser(ColorChooserClien
 }
 #endif
 
-#if ENABLE(DATE_AND_TIME_INPUT_TYPES)
+#if ENABLE(DATE_AND_TIME_INPUT_TYPES) && !PLATFORM(IOS)
 PassRefPtr<DateTimeChooser> EmptyChromeClient::openDateTimeChooser(DateTimeChooserClient*, const DateTimeChooserParameters&)
 {
-    return PassRefPtr<DateTimeChooser>();
+    return nullptr;
 }
 #endif
 

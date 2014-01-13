@@ -155,10 +155,11 @@ private:
     virtual PassOwnPtr<WebCore::ColorChooser> createColorChooser(WebCore::ColorChooserClient*, const WebCore::Color&) OVERRIDE;
 #endif
 
-#if PLATFORM(IOS)
-#if ENABLE(TOUCH_EVENTS)
+#if ENABLE(IOS_TOUCH_EVENTS)
     virtual void didPreventDefaultForEvent() OVERRIDE;
 #endif
+
+#if PLATFORM(IOS)
     virtual void didReceiveMobileDocType() OVERRIDE;
     virtual void setNeedsScrollNotifications(WebCore::Frame*, bool) OVERRIDE;
     virtual void observedContentChange(WebCore::Frame*) OVERRIDE;
@@ -224,6 +225,10 @@ private:
     }
 
     virtual bool layerTreeStateIsFrozen() const OVERRIDE;
+#endif
+
+#if ENABLE(ASYNC_SCROLLING)
+    virtual PassRefPtr<WebCore::ScrollingCoordinator> createScrollingCoordinator(WebCore::Page*) const OVERRIDE;
 #endif
 
 #if ENABLE(TOUCH_EVENTS)

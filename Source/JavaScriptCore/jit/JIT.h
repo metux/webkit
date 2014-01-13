@@ -316,25 +316,26 @@ namespace JSC {
         void addStructureTransitionCheck(JSCell*, Structure*, StructureStubInfo*, JumpList& failureCases, RegisterID scratch);
         void testPrototype(JSValue, JumpList& failureCases, StructureStubInfo*);
 
-        enum WriteBarrierMode { UnconditionalWriteBarrier, ShouldFilterImmediates };
+        enum WriteBarrierMode { UnconditionalWriteBarrier, ShouldFilterValue, ShouldFilterBaseAndValue };
         // value register in write barrier is used before any scratch registers
         // so may safely be the same as either of the scratch registers.
-        void emitWriteBarrier(RegisterID owner, RegisterID valueTag, RegisterID scratch, RegisterID scratch2, WriteBarrierMode, WriteBarrierUseKind);
-        void emitWriteBarrier(JSCell* owner, RegisterID value, RegisterID scratch, WriteBarrierMode, WriteBarrierUseKind);
+        Jump checkMarkWord(RegisterID owner, RegisterID scratch1, RegisterID scratch2);
+        Jump checkMarkWord(JSCell* owner);
+        void emitWriteBarrier(unsigned owner, unsigned value, WriteBarrierMode);
+        void emitWriteBarrier(JSCell* owner, unsigned value, WriteBarrierMode);
+/*
+        void emitWriteBarrier(RegisterID owner, RegisterID valueTag, RegisterID scratch1, RegisterID scratch2, WriteBarrierMode);
+        void emitWriteBarrier(JSCell* owner, RegisterID value, WriteBarrierMode);
+*/
 
         template<typename StructureType> // StructureType can be RegisterID or ImmPtr.
         void emitAllocateJSObject(RegisterID allocator, StructureType, RegisterID result, RegisterID scratch);
         
-#if ENABLE(VALUE_PROFILER)
         // This assumes that the value to profile is in regT0 and that regT3 is available for
         // scratch.
-        void emitValueProfilingSite(ValueProfile*, RegisterID);
-        void emitValueProfilingSite(unsigned bytecodeOffset, RegisterID);
-        void emitValueProfilingSite(RegisterID);
-#else
-        void emitValueProfilingSite(unsigned, RegisterID) { }
-        void emitValueProfilingSite(RegisterID) { }
-#endif
+        void emitValueProfilingSite(ValueProfile*);
+        void emitValueProfilingSite(unsigned bytecodeOffset);
+        void emitValueProfilingSite();
         void emitArrayProfilingSite(RegisterID structureAndIndexingType, RegisterID scratch, ArrayProfile*);
         void emitArrayProfilingSiteForBytecodeIndex(RegisterID structureAndIndexingType, RegisterID scratch, unsigned bytecodeIndex);
         void emitArrayProfileStoreToHoleSpecialCase(ArrayProfile*);
@@ -678,6 +679,7 @@ namespace JSC {
         MacroAssembler::Call callOperation(J_JITOperation_EAapJcpZ, int, ArrayAllocationProfile*, GPRReg, int32_t);
         MacroAssembler::Call callOperation(J_JITOperation_EAapJcpZ, int, ArrayAllocationProfile*, const JSValue*, int32_t);
         MacroAssembler::Call callOperation(J_JITOperation_EC, int, JSCell*);
+        MacroAssembler::Call callOperation(V_JITOperation_EC, JSCell*);
         MacroAssembler::Call callOperation(J_JITOperation_EJ, int, GPRReg);
 #if USE(JSVALUE64)
         MacroAssembler::Call callOperation(WithProfileTag, J_JITOperation_ESsiJI, int, StructureStubInfo*, GPRReg, StringImpl*);
@@ -820,11 +822,9 @@ namespace JSC {
         WeakRandom m_randomGenerator;
         static CodeRef stringGetByValStubGenerator(VM*);
 
-#if ENABLE(VALUE_PROFILER)
         bool m_canBeOptimized;
         bool m_canBeOptimizedOrInlined;
         bool m_shouldEmitProfiling;
-#endif
     } JIT_CLASS_ALIGNMENT;
 
 } // namespace JSC

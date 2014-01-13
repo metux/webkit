@@ -44,6 +44,12 @@ struct FloatWithRect;
 template <class Run> class BidiRunList;
 typedef Vector<WordMeasurement, 64> WordMeasurements;
 
+#if ENABLE(IOS_TEXT_AUTOSIZING)
+enum LineCount {
+    NOT_SET = 0, NO_LINE = 1, ONE_LINE = 2, MULTI_LINE = 3
+};
+#endif
+
 class RenderBlockFlow : public RenderBlock {
 public:
     RenderBlockFlow(Element&, PassRef<RenderStyle>);
@@ -475,6 +481,10 @@ public:
     static void appendRunsForObject(BidiRunList<BidiRun>&, int start, int end, RenderObject*, InlineBidiResolver&);
     RootInlineBox* createAndAppendRootInlineBox();
 
+    LayoutUnit startAlignedOffsetForLine(LayoutUnit position, bool shouldIndentText);
+    virtual ETextAlign textAlignmentForLine(bool endsWithSoftBreak) const;
+    virtual void adjustInlineDirectionLineBounds(int /* expansionOpportunityCount */, float& /* logicalLeft */, float& /* logicalWidth */) const { }
+
 private:
     void layoutLineBoxes(bool relayoutChildren, LayoutUnit& repaintLogicalTop, LayoutUnit& repaintLogicalBottom);
     void layoutSimpleLines(LayoutUnit& repaintLogicalTop, LayoutUnit& repaintLogicalBottom);
@@ -515,11 +525,17 @@ private:
     // region/page/column that has a different available line width than the old one. Used to know when you have to dirty a
     // line, i.e., that it can't be re-used.
     bool lineWidthForPaginatedLineChanged(RootInlineBox*, LayoutUnit lineDelta, RenderFlowThread*) const;
+    void updateLogicalWidthForAlignment(const ETextAlign&, BidiRun* trailingSpaceRun, float& logicalLeft, float& totalLogicalWidth, float& availableLogicalWidth, int expansionOpportunityCount);
 
 // END METHODS DEFINED IN RenderBlockLineLayout
 
     bool namedFlowFragmentNeedsUpdate() const;
     virtual bool canHaveChildren() const OVERRIDE;
+
+#if ENABLE(IOS_TEXT_AUTOSIZING)
+    int m_widthForTextAutosizing;
+    unsigned m_lineCountForTextAutosizing : 2;
+#endif
 
 public:
     // FIXME-BLOCKFLOW: These can be made protected again once all callers have been moved here.
@@ -534,6 +550,16 @@ public:
     RenderBlockFlowRareData* rareBlockFlowData() const { ASSERT_WITH_SECURITY_IMPLICATION(hasRareBlockFlowData()); return m_rareBlockFlowData.get(); }
     RenderBlockFlowRareData& ensureRareBlockFlowData();
     void materializeRareBlockFlowData();
+
+#if ENABLE(IOS_TEXT_AUTOSIZING)
+    int immediateLineCount();
+    void adjustComputedFontSizes(float size, float visibleWidth);
+    void resetComputedFontSize()
+    {
+        m_widthForTextAutosizing = -1;
+        m_lineCountForTextAutosizing = NOT_SET;
+    }
+#endif
 
 protected:
     OwnPtr<FloatingObjects> m_floatingObjects;

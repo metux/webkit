@@ -35,11 +35,8 @@ ChildProcess::ChildProcess()
     : m_terminationTimeout(0)
     , m_terminationCounter(0)
     , m_terminationTimer(RunLoop::main(), this, &ChildProcess::terminationTimerFired)
-#if PLATFORM(MAC)
-    , m_activeTaskCount(0)
-    , m_shouldSuspend(false)
-    , m_suspensionHysteresisTimer(RunLoop::main(), this, &ChildProcess::suspensionHysteresisTimerFired)
-#endif
+    , m_processSuppressionDisabled("Process Suppression Disabled by UIProcess")
+    , m_activeTasks("Process Suppression Disabled by WebProcess")
 {
 }
 
@@ -55,7 +52,7 @@ NO_RETURN static void watchdogCallback()
     _exit(EXIT_FAILURE);
 }
 
-static void didCloseOnConnectionWorkQueue(CoreIPC::Connection*)
+static void didCloseOnConnectionWorkQueue(IPC::Connection*)
 {
     // If the connection has been closed and we haven't responded in the main thread for 10 seconds
     // the process will exit forcibly.
@@ -74,10 +71,31 @@ void ChildProcess::initialize(const ChildProcessInitializationParameters& parame
     SandboxInitializationParameters sandboxParameters;
     initializeSandbox(parameters, sandboxParameters);
     
-    m_connection = CoreIPC::Connection::createClientConnection(parameters.connectionIdentifier, this, RunLoop::main());
+    m_connection = IPC::Connection::createClientConnection(parameters.connectionIdentifier, this, RunLoop::main());
     m_connection->setDidCloseOnConnectionWorkQueueCallback(didCloseOnConnectionWorkQueue);
     initializeConnection(m_connection.get());
     m_connection->open();
+}
+
+void ChildProcess::setProcessSuppressionEnabled(bool enabled)
+{
+    if (processSuppressionEnabled() == enabled)
+        return;
+
+    if (enabled)
+        m_processSuppressionDisabled.endActivity();
+    else
+        m_processSuppressionDisabled.beginActivity();
+}
+
+void ChildProcess::incrementActiveTaskCount()
+{
+    m_activeTasks.beginActivity();
+}
+
+void ChildProcess::decrementActiveTaskCount()
+{
+    m_activeTasks.endActivity();
 }
 
 void ChildProcess::initializeProcess(const ChildProcessInitializationParameters&)
@@ -88,21 +106,21 @@ void ChildProcess::initializeProcessName(const ChildProcessInitializationParamet
 {
 }
 
-void ChildProcess::initializeConnection(CoreIPC::Connection*)
+void ChildProcess::initializeConnection(IPC::Connection*)
 {
 }
 
-void ChildProcess::addMessageReceiver(CoreIPC::StringReference messageReceiverName, CoreIPC::MessageReceiver& messageReceiver)
+void ChildProcess::addMessageReceiver(IPC::StringReference messageReceiverName, IPC::MessageReceiver& messageReceiver)
 {
     m_messageReceiverMap.addMessageReceiver(messageReceiverName, messageReceiver);
 }
 
-void ChildProcess::addMessageReceiver(CoreIPC::StringReference messageReceiverName, uint64_t destinationID, CoreIPC::MessageReceiver& messageReceiver)
+void ChildProcess::addMessageReceiver(IPC::StringReference messageReceiverName, uint64_t destinationID, IPC::MessageReceiver& messageReceiver)
 {
     m_messageReceiverMap.addMessageReceiver(messageReceiverName, destinationID, messageReceiver);
 }
 
-void ChildProcess::removeMessageReceiver(CoreIPC::StringReference messageReceiverName, uint64_t destinationID)
+void ChildProcess::removeMessageReceiver(IPC::StringReference messageReceiverName, uint64_t destinationID)
 {
     m_messageReceiverMap.removeMessageReceiver(messageReceiverName, destinationID);
 }
@@ -129,7 +147,7 @@ void ChildProcess::enableTermination()
     m_terminationTimer.startOneShot(m_terminationTimeout);
 }
 
-CoreIPC::Connection* ChildProcess::messageSenderConnection()
+IPC::Connection* ChildProcess::messageSenderConnection()
 {
     return m_connection.get();
 }

@@ -40,15 +40,13 @@
 #include "Page.h"
 #include "PageConsole.h"
 #include "PageScriptDebugServer.h"
+#include "ScriptState.h"
+#include <inspector/InjectedScript.h>
+#include <inspector/InjectedScriptManager.h>
 
 using namespace Inspector;
 
 namespace WebCore {
-
-PassOwnPtr<PageDebuggerAgent> PageDebuggerAgent::create(InstrumentingAgents* instrumentingAgents, InspectorPageAgent* pageAgent, InjectedScriptManager* injectedScriptManager, InspectorOverlay* overlay)
-{
-    return adoptPtr(new PageDebuggerAgent(instrumentingAgents, pageAgent, injectedScriptManager, overlay));
-}
 
 PageDebuggerAgent::PageDebuggerAgent(InstrumentingAgents* instrumentingAgents, InspectorPageAgent* pageAgent, InjectedScriptManager* injectedScriptManager, InspectorOverlay* overlay)
     : InspectorDebuggerAgent(instrumentingAgents, injectedScriptManager)
@@ -118,7 +116,6 @@ void PageDebuggerAgent::setOverlayMessage(ErrorString*, const String* message)
 void PageDebuggerAgent::didClearMainFrameWindowObject()
 {
     reset();
-    scriptDebugServer().setScriptPreprocessor(m_pageAgent->scriptPreprocessor());
 }
 
 } // namespace WebCore

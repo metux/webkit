@@ -54,7 +54,7 @@ class NetworkResourceLoadParameters;
 class RemoteNetworkingContext;
 class SandboxExtension;
 
-class NetworkResourceLoader : public RefCounted<NetworkResourceLoader>, public WebCore::ResourceHandleClient, public CoreIPC::MessageSender {
+class NetworkResourceLoader : public RefCounted<NetworkResourceLoader>, public WebCore::ResourceHandleClient, public IPC::MessageSender {
 public:
     static RefPtr<NetworkResourceLoader> create(const NetworkResourceLoadParameters& parameters, NetworkConnectionToWebProcess* connection)
     {
@@ -82,7 +82,7 @@ public:
     virtual void willSendRequestAsync(WebCore::ResourceHandle*, const WebCore::ResourceRequest&, const WebCore::ResourceResponse& redirectResponse) OVERRIDE;
     virtual void didSendData(WebCore::ResourceHandle*, unsigned long long bytesSent, unsigned long long totalBytesToBeSent) OVERRIDE;
     virtual void didReceiveResponseAsync(WebCore::ResourceHandle*, const WebCore::ResourceResponse&) OVERRIDE;
-    virtual void didReceiveData(WebCore::ResourceHandle*, const char*, int, int encodedDataLength) OVERRIDE;
+    virtual void didReceiveData(WebCore::ResourceHandle*, const char*, unsigned, int encodedDataLength) OVERRIDE;
     virtual void didReceiveBuffer(WebCore::ResourceHandle*, PassRefPtr<WebCore::SharedBuffer>, int encodedDataLength) OVERRIDE;
     virtual void didFinishLoading(WebCore::ResourceHandle*, double finishTime) OVERRIDE;
     virtual void didFail(WebCore::ResourceHandle*, const WebCore::ResourceError&) OVERRIDE;
@@ -92,6 +92,7 @@ public:
     virtual void shouldUseCredentialStorageAsync(WebCore::ResourceHandle*) OVERRIDE;
     virtual void didReceiveAuthenticationChallenge(WebCore::ResourceHandle*, const WebCore::AuthenticationChallenge&) OVERRIDE;
     virtual void didCancelAuthenticationChallenge(WebCore::ResourceHandle*, const WebCore::AuthenticationChallenge&) OVERRIDE;
+    virtual void receivedCancellation(WebCore::ResourceHandle*, const WebCore::AuthenticationChallenge&) OVERRIDE;
     virtual bool usesAsyncCallbacks() OVERRIDE { return true; }
 
 #if USE(PROTECTION_SPACE_AUTH_CALLBACK)
@@ -108,11 +109,11 @@ public:
 #if !PLATFORM(IOS)
     virtual void willCacheResponseAsync(WebCore::ResourceHandle*, NSCachedURLResponse *) OVERRIDE;
 #endif
-    virtual void willStopBufferingData(WebCore::ResourceHandle*, const char*, int) OVERRIDE;
+    virtual void willStopBufferingData(WebCore::ResourceHandle*, const char*, unsigned) OVERRIDE;
 #endif // PLATFORM(MAC)
 
     // Message handlers.
-    void didReceiveNetworkResourceLoaderMessage(CoreIPC::Connection*, CoreIPC::MessageDecoder&);
+    void didReceiveNetworkResourceLoaderMessage(IPC::Connection*, IPC::MessageDecoder&);
 
 #if PLATFORM(IOS) || (PLATFORM(MAC) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 1090)
     static void tryGetShareableHandleFromCFURLCachedResponse(ShareableResource::Handle&, CFCachedURLResponseRef);
@@ -146,8 +147,8 @@ public:
 private:
     NetworkResourceLoader(const NetworkResourceLoadParameters&, NetworkConnectionToWebProcess*, PassRefPtr<Messages::NetworkConnectionToWebProcess::PerformSynchronousLoad::DelayedReply>);
 
-    // CoreIPC::MessageSender
-    virtual CoreIPC::Connection* messageSenderConnection() OVERRIDE;
+    // IPC::MessageSender
+    virtual IPC::Connection* messageSenderConnection() OVERRIDE;
     virtual uint64_t messageSenderDestinationID() OVERRIDE { return m_identifier; }
 
     void continueDidReceiveResponse();

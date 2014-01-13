@@ -821,7 +821,7 @@ bool RenderBox::canBeProgramaticallyScrolled() const
     if (scrollsOverflow() && hasScrollableOverflow)
         return true;
 
-    return element() && element()->rendererIsEditable();
+    return element() && element()->hasEditableStyle();
 }
 
 bool RenderBox::usesCompositedScrolling() const
@@ -3051,7 +3051,7 @@ LayoutUnit RenderBox::containingBlockLogicalWidthForPositioned(const RenderBoxMo
 #if PLATFORM(IOS)
             if (view().hasCustomFixedPosition(*this)) {
                 const RenderBox& containingBlockBox = toRenderBox(*containingBlock);
-                return customContainingBlockLogicalWidth(containingBlockBox.style(), &view(), containingBlockBox);
+                return customContainingBlockLogicalWidth(containingBlockBox.style(), view(), containingBlockBox);
             }
 #endif
             return toRenderBox(containingBlock)->clientLogicalWidth();
@@ -4485,14 +4485,11 @@ int RenderBox::baselinePosition(FontBaseline baselineType, bool /*firstLine*/, L
 
 RenderLayer* RenderBox::enclosingFloatPaintingLayer() const
 {
-    const RenderElement* curr = this;
-    while (curr) {
-        RenderLayer* layer = curr->hasLayer() && curr->isBox() ? toRenderBox(curr)->layer() : 0;
-        if (layer && layer->isSelfPaintingLayer())
-            return layer;
-        curr = curr->parent();
+    for (auto& box : lineageOfType<RenderBox>(*this)) {
+        if (box.layer() && box.layer()->isSelfPaintingLayer())
+            return box.layer();
     }
-    return 0;
+    return nullptr;
 }
 
 LayoutRect RenderBox::logicalVisualOverflowRectForPropagation(RenderStyle* parentStyle) const

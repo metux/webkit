@@ -81,18 +81,23 @@ using namespace HTMLNames;
 static bool hasBoxDecorationsOrBackgroundImage(const RenderStyle*);
 static IntRect clipBox(RenderBox& renderer);
 
-static inline bool isAcceleratedCanvas(RenderObject* renderer)
+CanvasCompositingStrategy canvasCompositingStrategy(const RenderObject& renderer)
 {
-#if ENABLE(WEBGL) || ENABLE(ACCELERATED_2D_CANVAS)
-    if (renderer->isCanvas()) {
-        const HTMLCanvasElement* canvas = toHTMLCanvasElement(renderer->node());
-        if (CanvasRenderingContext* context = canvas->renderingContext())
-            return context->isAccelerated();
-    }
+    ASSERT(renderer.isCanvas());
+    
+    const HTMLCanvasElement* canvas = toHTMLCanvasElement(renderer.node());
+    CanvasRenderingContext* context = canvas->renderingContext();
+    if (!context || !context->isAccelerated())
+        return UnacceleratedCanvas;
+    
+    if (context->is3d())
+        return CanvasAsLayerContents;
+
+#if ENABLE(ACCELERATED_2D_CANVAS)
+    return CanvasAsLayerContents;
 #else
-    UNUSED_PARAM(renderer);
+    return CanvasPaintedToLayer; // On Mac and iOS we paint accelerated canvases into their layers.
 #endif
-    return false;
 }
 
 // Get the scrolling coordinator in a way that works inside RenderLayerBacking's destructor.
@@ -137,6 +142,7 @@ RenderLayerBacking::RenderLayerBacking(RenderLayer& layer)
         tiledBacking->setIsInWindow(page->isInWindow());
 
         if (m_isMainFrameRenderViewLayer) {
+            tiledBacking->setExposedRect(renderer().frame().view()->exposedRect());
             tiledBacking->setUnparentsOffscreenTiles(true);
             if (page->settings().backgroundShouldExtendBeyondPage())
                 tiledBacking->setTileMargins(512, 512, 512, 512);
@@ -223,7 +229,7 @@ static TiledBacking::TileCoverage computeTileCoverage(RenderLayerBacking* backin
             backing->setDidSwitchToFullTileCoverageDuringLoading();
     }
     if (!(useMinimalTilesDuringLoading || useMinimalTilesDuringLiveResize)) {
-        bool clipsToExposedRect = backing->tiledBacking()->clipsToExposedRect();
+        bool clipsToExposedRect = !frameView.exposedRect().isInfinite();
         if (frameView.horizontalScrollbarMode() != ScrollbarAlwaysOff || clipsToExposedRect)
             tileCoverage |= TiledBacking::CoverageForHorizontalScrolling;
 
@@ -233,7 +239,7 @@ static TiledBacking::TileCoverage computeTileCoverage(RenderLayerBacking* backin
     if (ScrollingCoordinator* scrollingCoordinator = scrollingCoordinatorFromLayer(backing->owningLayer())) {
         // Ask our TiledBacking for large tiles unless the only reason we're main-thread-scrolling
         // is a page overlay (find-in-page, the Web Inspector highlight mechanism, etc.).
-        if (scrollingCoordinator->mainThreadScrollingReasons() & ~ScrollingCoordinator::ForcedOnMainThread)
+        if (scrollingCoordinator->synchronousScrollingReasons() & ~ScrollingCoordinator::ForcedOnMainThread)
             tileCoverage |= TiledBacking::CoverageForSlowScrolling;
     }
     return tileCoverage;
@@ -333,7 +339,7 @@ void RenderLayerBacking::createPrimaryGraphicsLayer()
     updateFilters(&renderer().style());
 #endif
 #if ENABLE(CSS_COMPOSITING)
-    updateLayerBlendMode(&renderer().style());
+    updateBlendMode(&renderer().style());
 #endif
 }
 
@@ -398,8 +404,12 @@ void RenderLayerBacking::updateFilters(const RenderStyle* style)
 #endif
 
 #if ENABLE(CSS_COMPOSITING)
-void RenderLayerBacking::updateLayerBlendMode(const RenderStyle*)
+void RenderLayerBacking::updateBlendMode(const RenderStyle* style)
 {
+    if (m_ancestorClippingLayer)
+        m_ancestorClippingLayer->setBlendMode(style->blendMode());
+    else
+        m_graphicsLayer->setBlendMode(style->blendMode());
 }
 #endif
 
@@ -626,7 +636,7 @@ bool RenderLayerBacking::updateGraphicsLayerConfiguration()
     }
 #endif
 #if ENABLE(WEBGL) || ENABLE(ACCELERATED_2D_CANVAS)
-    else if (isAcceleratedCanvas(&renderer())) {
+    else if (renderer().isCanvas() && canvasCompositingStrategy(renderer()) == CanvasAsLayerContents) {
         const HTMLCanvasElement* canvas = toHTMLCanvasElement(renderer().element());
         if (CanvasRenderingContext* context = canvas->renderingContext())
             m_graphicsLayer->setContentsToCanvas(context->platformLayer());
@@ -641,7 +651,7 @@ bool RenderLayerBacking::updateGraphicsLayerConfiguration()
 
 static IntRect clipBox(RenderBox& renderer)
 {
-    LayoutRect result = PaintInfo::infiniteRect();
+    LayoutRect result = LayoutRect::infiniteRect();
     if (renderer.hasOverflowClip())
         result = renderer.overflowClipRect(LayoutPoint(), 0); // FIXME: Incorrect for CSS regions.
 
@@ -671,7 +681,7 @@ void RenderLayerBacking::updateGraphicsLayerGeometry()
 #endif
 
 #if ENABLE(CSS_COMPOSITING)
-    updateLayerBlendMode(&renderer().style());
+    updateBlendMode(&renderer().style());
 #endif
 
     bool isSimpleContainer = isSimpleContainerCompositingLayer();
@@ -748,7 +758,7 @@ void RenderLayerBacking::updateGraphicsLayerGeometry()
         // for a compositing layer, rootLayer is the layer itself.
         RenderLayer::ClipRectsContext clipRectsContext(compAncestor, 0, TemporaryClipRects, IgnoreOverlayScrollbarSize, IgnoreOverflowClip);
         IntRect parentClipRect = pixelSnappedIntRect(m_owningLayer.backgroundClipRect(clipRectsContext).rect()); // FIXME: Incorrect for CSS regions.
-        ASSERT(parentClipRect != PaintInfo::infiniteRect());
+        ASSERT(parentClipRect != IntRect::infiniteRect());
         m_ancestorClippingLayer->setPosition(FloatPoint(parentClipRect.location() - graphicsLayerParentLocation));
         m_ancestorClippingLayer->setSize(parentClipRect.size());
 
@@ -1651,7 +1661,7 @@ void RenderLayerBacking::updateRootLayerConfiguration()
     }
 }
 
-static bool supportsDirectBoxDecorationsComposition(const RenderObject& renderer)
+static bool supportsDirectBoxDecorationsComposition(const RenderLayerModelObject& renderer)
 {
     if (!GraphicsLayer::supportsBackgroundColorContent())
         return false;
@@ -1832,9 +1842,9 @@ bool RenderLayerBacking::containsPaintedContent(bool isSimpleContainer) const
     if (renderer().isVideo() && toRenderVideo(renderer()).shouldDisplayVideo())
         return m_owningLayer.hasBoxDecorationsOrBackground();
 #endif
-#if PLATFORM(MAC) && !PLATFORM(IOS) && USE(CA)
-#elif ENABLE(WEBGL) || ENABLE(ACCELERATED_2D_CANVAS) || PLATFORM(IOS_SIMULATOR)
-    if (isAcceleratedCanvas(&renderer()))
+
+#if ENABLE(WEBGL) || ENABLE(ACCELERATED_2D_CANVAS)
+    if (renderer().isCanvas() && canvasCompositingStrategy(renderer()) == CanvasAsLayerContents)
         return m_owningLayer.hasBoxDecorationsOrBackground();
 #endif
 
@@ -1883,7 +1893,7 @@ void RenderLayerBacking::contentChanged(ContentChangeType changeType)
     }
 
 #if ENABLE(WEBGL) || ENABLE(ACCELERATED_2D_CANVAS)
-    if ((changeType == CanvasChanged || changeType == CanvasPixelsChanged) && isAcceleratedCanvas(&renderer())) {
+    if ((changeType == CanvasChanged || changeType == CanvasPixelsChanged) && renderer().isCanvas() && canvasCompositingStrategy(renderer()) == CanvasAsLayerContents) {
         m_graphicsLayer->setContentsNeedsDisplay();
         return;
     }
@@ -2037,7 +2047,7 @@ bool RenderLayerBacking::paintsIntoWindow() const
         return false;
 
     if (m_owningLayer.isRootLayer()) {
-#if PLATFORM(BLACKBERRY) || PLATFORM(IOS) || USE(COORDINATED_GRAPHICS)
+#if PLATFORM(IOS) || USE(COORDINATED_GRAPHICS)
         if (compositor().inForcedCompositingMode())
             return false;
 #endif
@@ -2064,12 +2074,13 @@ void RenderLayerBacking::setRequiresOwnBackingStore(bool requiresOwnBacking)
 }
 
 #if ENABLE(CSS_COMPOSITING)
-void RenderLayerBacking::setBlendMode(BlendMode)
+void RenderLayerBacking::setBlendMode(BlendMode blendMode)
 {
+    m_graphicsLayer->setBlendMode(blendMode);
 }
 #endif
 
-void RenderLayerBacking::setContentsNeedDisplay()
+void RenderLayerBacking::setContentsNeedDisplay(GraphicsLayer::ShouldClipToLayer shouldClip)
 {
     ASSERT(!paintsIntoCompositedAncestor());
 
@@ -2077,8 +2088,14 @@ void RenderLayerBacking::setContentsNeedDisplay()
     if (m_isMainFrameRenderViewLayer && frameView.isTrackingRepaints())
         frameView.addTrackedRepaintRect(owningLayer().absoluteBoundingBox());
     
-    if (m_graphicsLayer && m_graphicsLayer->drawsContent())
-        m_graphicsLayer->setNeedsDisplay();
+    if (m_graphicsLayer && m_graphicsLayer->drawsContent()) {
+        // By default, setNeedsDisplay will clip to the size of the GraphicsLayer, which does not include margin tiles.
+        // So if the TiledBacking has a margin that needs to be invalidated, we need to send in a rect to setNeedsDisplayInRect
+        // that is large enough to include the margin. TiledBacking::bounds() includes the margin.
+        TiledBacking* tiledBacking = this->tiledBacking();
+        FloatRect rectToRepaint = tiledBacking ? tiledBacking->bounds() : FloatRect(FloatPoint(0, 0), m_graphicsLayer->size());
+        m_graphicsLayer->setNeedsDisplayInRect(rectToRepaint, shouldClip);
+    }
     
     if (m_foregroundLayer && m_foregroundLayer->drawsContent())
         m_foregroundLayer->setNeedsDisplay();
