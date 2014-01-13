@@ -1,6 +1,10 @@
 webkitgtk (2.3.4-1) UNRELEASED; urgency=low
 
   * New upstream release.
+  * WebKit is now built in fast-install mode by default, there's no need
+    to run chrpath anymore.
+    + debian/rules: remove it from the installation process.
+    + debian/control: don't build depend on it.
 
  -- Alberto Garcia <berto@igalia.com>  Mon, 13 Jan 2014 13:11:29 +0200
 
