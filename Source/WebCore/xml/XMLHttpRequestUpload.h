@@ -26,16 +26,11 @@
 #ifndef XMLHttpRequestUpload_h
 #define XMLHttpRequestUpload_h
 
-#include "EventListener.h"
-#include "EventNames.h"
-#include "EventTarget.h"
 #include "XMLHttpRequest.h"
 #include <wtf/Forward.h>
 #include <wtf/HashMap.h>
 #include <wtf/RefCounted.h>
 #include <wtf/RefPtr.h>
-#include <wtf/Vector.h>
-#include <wtf/text/AtomicStringHash.h>
 
 namespace WebCore {
 
@@ -60,13 +55,17 @@ namespace WebCore {
         DEFINE_ATTRIBUTE_EVENT_LISTENER(loadstart);
         DEFINE_ATTRIBUTE_EVENT_LISTENER(progress);
 
-        void dispatchEventAndLoadEnd(PassRefPtr<Event>);
+        void dispatchThrottledProgressEvent(bool lengthComputable, unsigned long long loaded, unsigned long long total);
+        void dispatchProgressEvent(const AtomicString &type);
 
     private:
         virtual void refEventTarget() OVERRIDE FINAL { ref(); }
         virtual void derefEventTarget() OVERRIDE FINAL { deref(); }
 
         XMLHttpRequest* m_xmlHttpRequest;
+        bool m_lengthComputable;
+        unsigned long long m_loaded;
+        unsigned long long m_total;
     };
     
 } // namespace WebCore

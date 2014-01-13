@@ -27,13 +27,14 @@
 #define WebFrameLoaderClient_h
 
 #include <WebCore/FrameLoaderClient.h>
+#include <WebCore/ProgressTrackerClient.h>
 
 namespace WebKit {
 
 class PluginView;
 class WebFrame;
     
-class WebFrameLoaderClient : public WebCore::FrameLoaderClient {
+class WebFrameLoaderClient : public WebCore::FrameLoaderClient, public WebCore::ProgressTrackerClient {
 public:
     WebFrameLoaderClient();
     ~WebFrameLoaderClient();
@@ -118,9 +119,9 @@ private:
     // Maybe these should go into a ProgressTrackerClient some day
     virtual void willChangeEstimatedProgress() OVERRIDE;
     virtual void didChangeEstimatedProgress() OVERRIDE;
-    virtual void postProgressStartedNotification() OVERRIDE;
-    virtual void postProgressEstimateChangedNotification() OVERRIDE;
-    virtual void postProgressFinishedNotification() OVERRIDE;
+    virtual void progressStarted(WebCore::Frame&) OVERRIDE;
+    virtual void progressEstimateChanged(WebCore::Frame&) OVERRIDE;
+    virtual void progressFinished(WebCore::Frame&) OVERRIDE;
     
     virtual void setMainFrameDocumentReady(bool) OVERRIDE;
     

@@ -59,6 +59,7 @@ struct _BrowserWindow {
     GdkPixbuf *favicon;
     GtkWidget *reloadOrStopButton;
     GtkWidget *fullScreenMessageLabel;
+    GtkWindow *parentWindow;
     guint fullScreenMessageLabelId;
 };
 
@@ -230,14 +231,14 @@ static void browserWindowUpdateNavigationActions(BrowserWindow *window, WebKitBa
     gtk_widget_set_sensitive(window->backItem, webkit_web_view_can_go_back(window->webView));
     gtk_widget_set_sensitive(window->forwardItem, webkit_web_view_can_go_forward(window->webView));
 
-    GList *list = webkit_back_forward_list_get_back_list_with_limit(backForwadlist, 10);
+    GList *list = g_list_reverse(webkit_back_forward_list_get_back_list_with_limit(backForwadlist, 10));
     gtk_menu_tool_button_set_menu(GTK_MENU_TOOL_BUTTON(window->backItem),
-                                  browserWindowCreateBackForwardMenu(window, list));
+        browserWindowCreateBackForwardMenu(window, list));
     g_list_free(list);
 
     list = webkit_back_forward_list_get_forward_list_with_limit(backForwadlist, 10);
     gtk_menu_tool_button_set_menu(GTK_MENU_TOOL_BUTTON(window->forwardItem),
-                                  browserWindowCreateBackForwardMenu(window, list));
+        browserWindowCreateBackForwardMenu(window, list));
     g_list_free(list);
 }
 
@@ -269,6 +270,7 @@ static void webViewClose(WebKitWebView *webView, BrowserWindow *window)
 static void webViewRunAsModal(WebKitWebView *webView, BrowserWindow *window)
 {
     gtk_window_set_modal(GTK_WINDOW(window), TRUE);
+    gtk_window_set_transient_for(GTK_WINDOW(window), window->parentWindow);
 }
 
 static void webViewReadyToShow(WebKitWebView *webView, BrowserWindow *window)
@@ -378,10 +380,7 @@ static gboolean webViewDecidePolicy(WebKitWebView *webView, WebKitPolicyDecision
     }
     case WEBKIT_POLICY_DECISION_TYPE_RESPONSE: {
         WebKitResponsePolicyDecision *responseDecision = WEBKIT_RESPONSE_POLICY_DECISION(decision);
-        WebKitURIResponse *response = webkit_response_policy_decision_get_response(responseDecision);
-        const char *mimeType = webkit_uri_response_get_mime_type(response);
-
-        if (webkit_web_view_can_show_mime_type(webView, mimeType))
+        if (webkit_response_policy_decision_is_mime_type_supported(responseDecision))
             return FALSE;
 
         WebKitWebResource *mainResource = webkit_web_view_get_main_resource(webView);
@@ -703,10 +702,15 @@ GtkWidget *browser_window_new(WebKitWebView *view, GtkWindow *parent)
 {
     g_return_val_if_fail(WEBKIT_IS_WEB_VIEW(view), 0);
 
-    return GTK_WIDGET(g_object_new(BROWSER_TYPE_WINDOW,
-                                   "transient-for", parent,
-                                   "type", GTK_WINDOW_TOPLEVEL,
-                                   "view", view, NULL));
+    BrowserWindow *window = BROWSER_WINDOW(g_object_new(BROWSER_TYPE_WINDOW,
+        "type", GTK_WINDOW_TOPLEVEL, "view", view, NULL));
+
+    if (parent) {
+        window->parentWindow = parent;
+        g_object_add_weak_pointer(G_OBJECT(parent), &window->parentWindow);
+    }
+
+    return GTK_WIDGET(window);
 }
 
 WebKitWebView *browser_window_get_view(BrowserWindow *window)

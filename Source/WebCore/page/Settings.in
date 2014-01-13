@@ -50,7 +50,6 @@ localStorageEnabled initial=false
 allowUniversalAccessFromFileURLs initial=true
 allowFileAccessFromFileURLs initial=true
 javaScriptCanOpenWindowsAutomatically initial=false
-supportsMultipleWindows initial=true
 javaScriptCanAccessClipboard initial=false
 shouldPrintBackgrounds initial=false
 usesDashboardBackwardCompatibilityMode initial=false, conditional=DASHBOARD_SUPPORT
@@ -217,3 +216,5 @@ mediaSourceEnabled initial=false
 
 # FIXME: Rename to allowMultiElementImplicitFormSubmission once we upstream the iOS changes to WebView.mm.
 allowMultiElementImplicitSubmission initial=false
+
+mediaPlaybackAllowsAirPlay initial=true, conditional=IOS_AIRPLAY

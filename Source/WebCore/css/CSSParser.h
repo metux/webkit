@@ -179,7 +179,7 @@ public:
     PassRefPtr<CSSValue> parseShapeProperty(CSSPropertyID);
 #endif
 
-    PassRefPtr<CSSBasicShape> parseBasicShape();
+    PassRefPtr<CSSPrimitiveValue> parseBasicShape();
     PassRefPtr<CSSPrimitiveValue> parseShapeRadius(CSSParserValue*);
     PassRefPtr<CSSBasicShape> parseBasicShapeRectangle(CSSParserValueList*);
     PassRefPtr<CSSBasicShape> parseBasicShapeCircle(CSSParserValueList*);
@@ -277,6 +277,8 @@ public:
 #endif
 #endif
 
+    PassRefPtr<CSSValue> parseClipPath();
+
     static bool isBlendMode(CSSValueID);
     static bool isCompositeOperator(CSSValueID);
 
@@ -304,7 +306,6 @@ public:
 
     bool cssRegionsEnabled() const;
     bool cssCompositingEnabled() const;
-    bool parseFlowThread(const String& flowName);
     bool parseFlowThread(CSSPropertyID, bool important);
     bool parseRegionThread(CSSPropertyID, bool important);
 

@@ -36,7 +36,6 @@
 #include "FrameLoaderClient.h"
 #include "FrameLoaderStateMachine.h"
 #include "FrameView.h"
-#include "PlaceholderDocument.h"
 #include "PluginDocument.h"
 #include "RawDataDocumentParser.h"
 #include "ScriptController.h"
@@ -47,6 +46,10 @@
 #include "SinkDocument.h"
 #include "TextResourceDecoder.h"
 #include <wtf/Ref.h>
+
+#if PLATFORM(IOS)
+#include "PDFDocument.h"
+#endif
 
 namespace WebCore {
 
@@ -107,8 +110,12 @@ PassRefPtr<Document> DocumentWriter::createDocument(const URL& url)
 {
     if (!m_frame->loader().stateMachine()->isDisplayingInitialEmptyDocument() && m_frame->loader().client().shouldAlwaysUsePluginDocument(m_mimeType))
         return PluginDocument::create(m_frame, url);
+#if PLATFORM(IOS)
+    if (equalIgnoringCase(m_mimeType, "application/pdf"))
+        return PDFDocument::create(m_frame, url);
+#endif
     if (!m_frame->loader().client().hasHTMLView())
-        return PlaceholderDocument::create(m_frame, url);
+        return Document::createNonRenderedPlaceholder(m_frame, url);
     return DOMImplementation::createDocument(m_mimeType, m_frame, url, m_frame->inViewSourceMode());
 }
 

@@ -120,7 +120,9 @@ public:
     void clearDocumentLoader() { m_documentLoader = 0; }
 
     void removeCachedResource(CachedResource*) const;
-    void loadDone(CachedResource*);
+
+    void loadDone(CachedResource*, bool shouldPerformPostLoadActions = true);
+
     void garbageCollectDocumentResources();
     
     void incrementRequestCount(const CachedResource*);
@@ -154,7 +156,7 @@ private:
     bool shouldContinueAfterNotifyingLoadedFromMemoryCache(CachedResource*);
     bool checkInsecureContent(CachedResource::Type, const URL&) const;
 
-    void garbageCollectDocumentResourcesTimerFired(Timer<CachedResourceLoader>*);
+    void garbageCollectDocumentResourcesTimerFired(Timer<CachedResourceLoader>&);
     void performPostLoadActions();
 
     bool clientDefersImage(const URL&) const;

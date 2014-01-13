@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009, 2013 Apple Inc. All rights reserved.
+ * Copyright (C) 2009, 2013, 2014 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -45,12 +45,14 @@
 #include "ImageBuffer.h"
 #include "ImageData.h"
 #include "IntSize.h"
+#include "Logging.h"
 #include "NotImplemented.h"
 #include "OESElementIndexUint.h"
 #include "OESStandardDerivatives.h"
 #include "OESTextureFloat.h"
 #include "OESTextureFloatLinear.h"
 #include "OESTextureHalfFloat.h"
+#include "OESTextureHalfFloatLinear.h"
 #include "OESVertexArrayObject.h"
 #include "Page.h"
 #include "RenderBox.h"
@@ -2259,6 +2261,9 @@ PassRefPtr<WebGLActiveInfo> WebGLRenderingContext::getActiveAttrib(WebGLProgram*
     ActiveInfo info;
     if (!m_context->getActiveAttrib(objectOrZero(program), index, info))
         return 0;
+
+    LOG(WebGL, "Returning active attribute %d: %s", index, info.name.utf8().data());
+
     return WebGLActiveInfo::create(info.name, info.type, info.size);
 }
 
@@ -2273,6 +2278,9 @@ PassRefPtr<WebGLActiveInfo> WebGLRenderingContext::getActiveUniform(WebGLProgram
     if (!isGLES2Compliant())
         if (info.size > 1 && !info.name.endsWith("[0]"))
             info.name.append("[0]");
+
+    LOG(WebGL, "Returning active uniform %d: %s", index, info.name.utf8().data());
+
     return WebGLActiveInfo::create(info.name, info.type, info.size);
 }
 
@@ -2307,7 +2315,7 @@ GC3Dint WebGLRenderingContext::getAttribLocation(WebGLProgram* program, const St
         return -1;
     if (!program->getLinkStatus()) {
         synthesizeGLError(GraphicsContext3D::INVALID_OPERATION, "getAttribLocation", "program not linked");
-        return 0;
+        return -1;
     }
     return m_context->getAttribLocation(objectOrZero(program), name);
 }
@@ -2407,6 +2415,14 @@ WebGLExtension* WebGLRenderingContext::getExtension(const String& name)
             m_oesTextureHalfFloat = OESTextureHalfFloat::create(this);
         }
         return m_oesTextureHalfFloat.get();
+    }
+    if (equalIgnoringCase(name, "OES_texture_half_float_linear")
+        && m_context->getExtensions()->supports("GL_OES_texture_half_float_linear")) {
+        if (!m_oesTextureHalfFloatLinear) {
+            m_context->getExtensions()->ensureEnabled("GL_OES_texture_half_float_linear");
+            m_oesTextureHalfFloatLinear = OESTextureHalfFloatLinear::create(this);
+        }
+        return m_oesTextureHalfFloatLinear.get();
     }
     if (equalIgnoringCase(name, "OES_vertex_array_object")
         && m_context->getExtensions()->supports("GL_OES_vertex_array_object")) {
@@ -2787,9 +2803,11 @@ WebGLGetInfo WebGLRenderingContext::getProgramParameter(WebGLProgram* program, G
     case GraphicsContext3D::LINK_STATUS:
         return WebGLGetInfo(program->getLinkStatus());
     case GraphicsContext3D::ATTACHED_SHADERS:
+        m_context->getProgramiv(objectOrZero(program), pname, &value);
+        return WebGLGetInfo(value);
     case GraphicsContext3D::ACTIVE_ATTRIBUTES:
     case GraphicsContext3D::ACTIVE_UNIFORMS:
-        m_context->getProgramiv(objectOrZero(program), pname, &value);
+        m_context->getNonBuiltInActiveSymbolCount(objectOrZero(program), pname, &value);
         return WebGLGetInfo(value);
     default:
         synthesizeGLError(GraphicsContext3D::INVALID_ENUM, "getProgramParameter", "invalid parameter name");
@@ -2955,6 +2973,12 @@ Vector<String> WebGLRenderingContext::getSupportedExtensions()
     Vector<String> result;
     if (m_context->getExtensions()->supports("GL_OES_texture_float"))
         result.append("OES_texture_float");
+    if (m_context->getExtensions()->supports("GL_OES_texture_float_linear"))
+        result.append("OES_texture_float_linear");
+    if (m_context->getExtensions()->supports("GL_OES_texture_half_float"))
+        result.append("OES_texture_half_float");
+    if (m_context->getExtensions()->supports("GL_OES_texture_half_float_linear"))
+        result.append("OES_texture_half_float_linear");
     if (m_context->getExtensions()->supports("GL_OES_standard_derivatives"))
         result.append("OES_standard_derivatives");
     if (m_context->getExtensions()->supports("GL_EXT_texture_filter_anisotropic"))
@@ -3147,22 +3171,22 @@ PassRefPtr<WebGLUniformLocation> WebGLRenderingContext::getUniformLocation(WebGL
 {
     UNUSED_PARAM(ec);
     if (isContextLost() || !validateWebGLObject("getUniformLocation", program))
-        return 0;
+        return nullptr;
     if (!validateLocationLength("getUniformLocation", name))
-        return 0;
+        return nullptr;
     if (!validateString("getUniformLocation", name))
-        return 0;
+        return nullptr;
     if (isPrefixReserved(name))
-        return 0;
+        return nullptr;
     if (!program->getLinkStatus()) {
         synthesizeGLError(GraphicsContext3D::INVALID_OPERATION, "getUniformLocation", "program not linked");
-        return 0;
+        return nullptr;
     }
     WebGLStateRestorer(this, false);
     GC3Dint uniformLocation = m_context->getUniformLocation(objectOrZero(program), name);
     if (uniformLocation == -1)
-        return 0;
-    
+        return nullptr;
+
     GC3Dint activeUniforms = 0;
     m_context->getProgramiv(objectOrZero(program), GraphicsContext3D::ACTIVE_UNIFORMS, &activeUniforms);
     for (GC3Dint i = 0; i < activeUniforms; i++) {
@@ -3170,26 +3194,17 @@ PassRefPtr<WebGLUniformLocation> WebGLRenderingContext::getUniformLocation(WebGL
         if (!m_context->getActiveUniform(objectOrZero(program), i, info))
             return 0;
         // Strip "[0]" from the name if it's an array.
-        if (info.size > 1 && info.name.endsWith("[0]"))
+        if (info.name.endsWith("[0]"))
             info.name = info.name.left(info.name.length() - 3);
         // If it's an array, we need to iterate through each element, appending "[index]" to the name.
         for (GC3Dint index = 0; index < info.size; ++index) {
-            String uniformName = info.name;
-            if (info.size > 1) {
-                uniformName.append('[');
-                uniformName.append(String::number(index));
-                uniformName.append(']');
-            }
-            if (info.size > 1) {
-                if (name == uniformName || name == info.name)
-                    return WebGLUniformLocation::create(program, uniformLocation, info.type);
-            } else {
-                if (name == info.name)
-                    return WebGLUniformLocation::create(program, uniformLocation, info.type);
-            }
+            String uniformName = info.name + "[" + String::number(index) + "]";
+
+            if (name == uniformName || name == info.name)
+                return WebGLUniformLocation::create(program, uniformLocation, info.type);
         }
     }
-    return 0;
+    return nullptr;
 }
 
 WebGLGetInfo WebGLRenderingContext::getVertexAttrib(GC3Duint index, GC3Denum pname, ExceptionCode& ec)
@@ -3478,11 +3493,11 @@ void WebGLRenderingContext::readPixels(GC3Dint x, GC3Dint y, GC3Dsizei width, GC
             m_context->readPixels(x, y, width, height, format, type, data);
     }
 
-#if OS(DARWIN) || OS(QNX)
+#if OS(DARWIN)
     if (m_isRobustnessEXTSupported) // we haven't computed padding
         m_context->computeImageSizeInBytes(format, type, width, height, m_packAlignment, &totalBytesRequired, &padding);
     // FIXME: remove this section when GL driver bug on Mac AND the GLES driver bug
-    // on QC & Imagination QNX is fixed, i.e., when alpha is off, readPixels should
+    // on QC is fixed, i.e., when alpha is off, readPixels should
     // set alpha to 255 instead of 0.
     if (!m_framebufferBinding && !m_context->getContextAttributes().alpha) {
         unsigned char* pixels = reinterpret_cast<unsigned char*>(data);
@@ -4204,8 +4219,9 @@ void WebGLRenderingContext::uniform1iv(const WebGLUniformLocation* location, Int
 
     if (location->type() == GraphicsContext3D::SAMPLER_2D || location->type() == GraphicsContext3D::SAMPLER_CUBE)
         for (unsigned i = 0; i < v->length(); ++i) {
-            if (((GC3Dint*)v)[i] >= static_cast<int>(m_textureUnits.size())) {
-                synthesizeGLError(GraphicsContext3D::INVALID_VALUE, "uniform1i", "invalid texture unit");
+            if (v->data()[i] >= static_cast<int>(m_textureUnits.size())) {
+                LOG(WebGL, "Texture unit size=%zu, v[%d]=%d. Location type = %04X.", m_textureUnits.size(), i, v->data()[i], location->type());
+                synthesizeGLError(GraphicsContext3D::INVALID_VALUE, "uniform1iv", "invalid texture unit");
                 return;
             }
         }
@@ -4223,7 +4239,7 @@ void WebGLRenderingContext::uniform1iv(const WebGLUniformLocation* location, GC3
     if (location->type() == GraphicsContext3D::SAMPLER_2D || location->type() == GraphicsContext3D::SAMPLER_CUBE)
         for (unsigned i = 0; i < static_cast<unsigned>(size); ++i) {
             if (((GC3Dint*)v)[i] >= static_cast<int>(m_textureUnits.size())) {
-                synthesizeGLError(GraphicsContext3D::INVALID_VALUE, "uniform1i", "invalid texture unit");
+                synthesizeGLError(GraphicsContext3D::INVALID_VALUE, "uniform1iv", "invalid texture unit");
                 return;
             }
         }
@@ -4849,7 +4865,7 @@ WebGLGetInfo WebGLRenderingContext::getWebGLIntArrayParameter(GC3Denum pname)
 void WebGLRenderingContext::checkTextureCompleteness(const char* functionName, bool prepareToDraw)
 {
     bool resetActiveUnit = false;
-    WebGLTexture::TextureExtensionFlag extensions = static_cast<WebGLTexture::TextureExtensionFlag>(m_oesTextureFloatLinear ? WebGLTexture::TextureExtensionFloatLinearEnabled : 0);
+    WebGLTexture::TextureExtensionFlag extensions = static_cast<WebGLTexture::TextureExtensionFlag>((m_oesTextureFloatLinear ? WebGLTexture::TextureExtensionFloatLinearEnabled : 0) | (m_oesTextureHalfFloatLinear ? WebGLTexture::TextureExtensionHalfFloatLinearEnabled : 0));
 
     for (unsigned ii = 0; ii < m_textureUnits.size(); ++ii) {
         if ((m_textureUnits[ii].texture2DBinding && m_textureUnits[ii].texture2DBinding->needToUseBlackTexture(extensions))
@@ -4866,7 +4882,7 @@ void WebGLRenderingContext::checkTextureCompleteness(const char* functionName, b
             if (prepareToDraw) {
                 String msg(String("texture bound to texture unit ") + String::number(ii)
                     + " is not renderable. It maybe non-power-of-2 and have incompatible texture filtering or is not 'texture complete',"
-                    + " or it is a Float type with linear filtering and without the relevant float linear extension enabled.");
+                    + " or it is a float/half-float type with linear filtering and without the relevant float/half-float linear extension enabled.");
                 printGLWarningToConsole(functionName, msg.utf8().data());
                 tex2D = m_blackTexture2D.get();
                 texCubeMap = m_blackTextureCubeMap.get();

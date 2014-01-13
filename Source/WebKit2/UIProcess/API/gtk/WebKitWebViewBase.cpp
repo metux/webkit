@@ -196,7 +196,7 @@ static gboolean toplevelWindowVisibilityEvent(GtkWidget*, GdkEventVisibility* vi
     bool isWindowVisible = visibilityEvent->state != GDK_VISIBILITY_FULLY_OBSCURED;
     if (priv->isWindowVisible != isWindowVisible) {
         priv->isWindowVisible = isWindowVisible;
-        priv->pageProxy->viewStateDidChange(ViewState::WindowIsVisible);
+        priv->pageProxy->viewStateDidChange(ViewState::IsVisible);
     }
 
     return FALSE;
@@ -1164,4 +1164,9 @@ void webkitWebViewBaseSetInputMethodState(WebKitWebViewBase* webkitWebViewBase, 
 void webkitWebViewBaseUpdateTextInputState(WebKitWebViewBase* webkitWebViewBase)
 {
     webkitWebViewBase->priv->inputMethodFilter.setCursorRect(webkitWebViewBase->priv->pageProxy->editorState().cursorRect);
+}
+
+void webkitWebViewBaseResetClickCounter(WebKitWebViewBase* webkitWebViewBase)
+{
+    webkitWebViewBase->priv->clickCounter.reset();
 }

@@ -25,7 +25,14 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#if defined(HAVE_CONFIG_H) && HAVE_CONFIG_H
+#ifdef BUILDING_WITH_CMAKE
+#include "cmakeconfig.h"
+#else
 #include "autotoolsconfig.h"
+#endif
+#endif
+
 #include "LauncherInspectorWindow.h"
 #include <errno.h>
 #include <gdk/gdkkeysyms.h>
@@ -328,7 +335,7 @@ static GtkWidget* createWindow(WebKitWebView** outWebView)
 #else
     vbox = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
 #endif
-    statusbar = createStatusbar(webView);
+    statusbar = createStatusbar();
     gtk_box_pack_start(GTK_BOX(vbox), createToolbar(window, uriEntry, webView), FALSE, FALSE, 0);
     gtk_box_pack_start(GTK_BOX(vbox), createBrowser(window, uriEntry, statusbar, webView, vbox), TRUE, TRUE, 0);
     gtk_box_pack_start(GTK_BOX(vbox), statusbar, FALSE, FALSE, 0);

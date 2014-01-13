@@ -124,7 +124,6 @@ namespace JSC {
         END_IMPL();                       \
     } while (false)
 
-#if ENABLE(VALUE_PROFILER)
 #define RETURN_PROFILED(opcode, value) do {                  \
         JSValue rpPeturnValue = (value);                     \
         CHECK_EXCEPTION();                                   \
@@ -137,13 +136,6 @@ namespace JSC {
         pc[OPCODE_LENGTH(opcode) - 1].u.profile->m_buckets[0] = \
         JSValue::encode(value);                  \
     } while (false)
-
-#else // ENABLE(VALUE_PROFILER)
-#define RETURN_PROFILED(opcode, value) RETURN(value)
-
-#define PROFILE_VALUE(opcode, value) do { } while (false)
-
-#endif // ENABLE(VALUE_PROFILER)
 
 #define CALL_END_IMPL(exec, callTarget) RETURN_TWO((callTarget), (exec))
 
@@ -513,6 +505,14 @@ SLOW_PATH_DECL(slow_path_to_primitive)
 {
     BEGIN();
     RETURN(OP_C(2).jsValue().toPrimitive(exec));
+}
+
+SLOW_PATH_DECL(slow_path_enter)
+{
+    BEGIN();
+    ScriptExecutable* ownerExecutable = exec->codeBlock()->ownerExecutable();
+    Heap::heap(ownerExecutable)->writeBarrier(ownerExecutable);
+    END();
 }
 
 } // namespace JSC

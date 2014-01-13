@@ -59,6 +59,10 @@
 #include "RenderLayerCompositor.h"
 #endif
 
+#if PLATFORM(IOS)
+#include "WebCoreSystemInterface.h"
+#endif
+
 namespace WebCore {
 
 using namespace MediaFeatureNames;
@@ -364,7 +368,6 @@ static bool device_heightMediaFeatureEval(CSSValue* value, RenderStyle* style, F
         RenderStyle* rootStyle = frame->document()->documentElement()->renderStyle();
         int length;
         long height = sg.height();
-        InspectorInstrumentation::applyScreenHeightOverride(frame, &height);
         return computeLength(value, !frame->document()->inQuirksMode(), style, rootStyle, length) && compareValue(static_cast<int>(height), length, op);
     }
     // ({,min-,max-}device-height)
@@ -379,7 +382,6 @@ static bool device_widthMediaFeatureEval(CSSValue* value, RenderStyle* style, Fr
         RenderStyle* rootStyle = frame->document()->documentElement()->renderStyle();
         int length;
         long width = sg.width();
-        InspectorInstrumentation::applyScreenWidthOverride(frame, &width);
         return computeLength(value, !frame->document()->inQuirksMode(), style, rootStyle, length) && compareValue(static_cast<int>(width), length, op);
     }
     // ({,min-,max-}device-width)
@@ -396,7 +398,7 @@ static bool heightMediaFeatureEval(CSSValue* value, RenderStyle* style, Frame* f
     if (value) {
         int height = view->layoutHeight();
         if (RenderView* renderView = frame->document()->renderView())
-            height = adjustForAbsoluteZoom(height, renderView);
+            height = adjustForAbsoluteZoom(height, *renderView);
         RenderStyle* rootStyle = frame->document()->documentElement()->renderStyle();
         int length;
         return computeLength(value, !frame->document()->inQuirksMode(), style, rootStyle, length) && compareValue(height, length, op);
@@ -414,7 +416,7 @@ static bool widthMediaFeatureEval(CSSValue* value, RenderStyle* style, Frame* fr
     if (value) {
         int width = view->layoutWidth();
         if (RenderView* renderView = frame->document()->renderView())
-            width = adjustForAbsoluteZoom(width, renderView);
+            width = adjustForAbsoluteZoom(width, *renderView);
         RenderStyle* rootStyle = frame->document()->documentElement()->renderStyle();
         int length;
         return computeLength(value, !frame->document()->inQuirksMode(), style, rootStyle, length) && compareValue(width, length, op);
@@ -623,6 +625,22 @@ static bool view_modeMediaFeatureEval(CSSValue* value, RenderStyle*, Frame* fram
     return result;
 }
 #endif // ENABLE(VIEW_MODE_CSS_MEDIA)
+
+// FIXME: Find a better place for this function. Maybe ChromeClient?
+static inline bool isRunningOnIPhoneOrIPod()
+{
+#if PLATFORM(IOS)
+    static wkDeviceClass deviceClass = iosDeviceClass();
+    return deviceClass == wkDeviceClassiPhone || deviceClass == wkDeviceClassiPod;
+#else
+    return false;
+#endif
+}
+
+static bool video_playable_inlineMediaFeatureEval(CSSValue*, RenderStyle*, Frame* frame, MediaFeaturePrefix)
+{
+    return !isRunningOnIPhoneOrIPod() || frame->settings().mediaPlaybackAllowsInline();
+}
 
 enum PointerDeviceType { TouchPointer, MousePointer, NoPointer, UnknownPointer };
 

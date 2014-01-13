@@ -28,10 +28,13 @@
 
 #include "APIArray.h"
 #include "APIData.h"
+#include "APIError.h"
 #include "APIGeometry.h"
 #include "APINumber.h"
 #include "APIString.h"
+#include "APIURL.h"
 #include "APIURLRequest.h"
+#include "APIURLResponse.h"
 #include "ArgumentDecoder.h"
 #include "ArgumentEncoder.h"
 #include "DataReference.h"
@@ -39,13 +42,10 @@
 #include "ShareableBitmap.h"
 #include "WebCertificateInfo.h"
 #include "WebCoreArgumentCoders.h"
-#include "WebError.h"
 #include "WebImage.h"
 #include "WebRenderLayer.h"
 #include "WebRenderObject.h"
 #include "WebSerializedScriptValue.h"
-#include "WebURL.h"
-#include "WebURLResponse.h"
 #include "WebUserContentURLPattern.h"
 
 namespace WebKit {
@@ -63,15 +63,15 @@ namespace WebKit {
 //   - WebRenderLayer -> WebRenderLayer
 //   - WebRenderObject -> WebRenderObject
 //   - API::UInt64 -> API::UInt64
-//   - WebURL -> WebURL
+//   - API::URL -> API::URL
 //   - API::URLRequest -> API::URLRequest
-//   - WebURLResponse -> WebURLResponse
-//   - WebError -> WebError
+//   - API::URLResponse -> API::URLResponse
+//   - API::Error -> API::Error
 
 template<typename Owner>
 class UserMessageEncoder {
 public:
-    bool baseEncode(CoreIPC::ArgumentEncoder& encoder, const Owner& coder, API::Object::Type& type) const
+    bool baseEncode(IPC::ArgumentEncoder& encoder, const Owner& coder, API::Object::Type& type) const
     {
         if (!m_root) {
             encoder << static_cast<uint32_t>(API::Object::Type::Null);
@@ -172,7 +172,7 @@ public:
             return true;
         }
         case API::Object::Type::URL: {
-            WebURL* urlObject = static_cast<WebURL*>(m_root);
+            API::URL* urlObject = static_cast<API::URL*>(m_root);
             encoder << urlObject->string();
             return true;
         }
@@ -182,7 +182,7 @@ public:
             return true;
         }
         case API::Object::Type::URLResponse: {
-            WebURLResponse* urlResponseObject = static_cast<WebURLResponse*>(m_root);
+            API::URLResponse* urlResponseObject = static_cast<API::URLResponse*>(m_root);
             encoder << urlResponseObject->resourceResponse();
             return true;
         }
@@ -219,7 +219,7 @@ public:
             return true;
         }
         case API::Object::Type::Error: {
-            WebError* errorObject = static_cast<WebError*>(m_root);
+            API::Error* errorObject = static_cast<API::Error*>(m_root);
             encoder << errorObject->platformError();
             return true;
         }
@@ -252,15 +252,15 @@ protected:
 //   - API::Double -> API::Double
 //   - WebImage -> WebImage
 //   - API::UInt64 -> API::UInt64
-//   - WebURL -> WebURL
+//   - API::URL -> API::URL
 //   - API::URLRequest -> API::URLRequest
-//   - WebURLResponse -> WebURLResponse
-//   - WebError -> WebError
+//   - API::URLResponse -> API::URLResponse
+//   - API::Error -> API::Error
 
 template<typename Owner>
 class UserMessageDecoder {
 public:
-    static bool baseDecode(CoreIPC::ArgumentDecoder& decoder, Owner& coder, API::Object::Type& type)
+    static bool baseDecode(IPC::ArgumentDecoder& decoder, Owner& coder, API::Object::Type& type)
     {
         uint32_t typeAsUInt32;
         if (!decoder.decode(typeAsUInt32))
@@ -318,7 +318,7 @@ public:
             break;
         }
         case API::Object::Type::SerializedScriptValue: {
-            CoreIPC::DataReference dataReference;
+            IPC::DataReference dataReference;
             if (!decoder.decode(dataReference))
                 return false;
             
@@ -457,7 +457,7 @@ public:
             String string;
             if (!decoder.decode(string))
                 return false;
-            coder.m_root = WebURL::create(string);
+            coder.m_root = API::URL::create(string);
             break;
         }
         case API::Object::Type::URLRequest: {
@@ -471,7 +471,7 @@ public:
             WebCore::ResourceResponse response;
             if (!decoder.decode(response))
                 return false;
-            coder.m_root = WebURLResponse::create(response);
+            coder.m_root = API::URLResponse::create(response);
             break;
         }
         case API::Object::Type::UserContentURLPattern: {
@@ -497,7 +497,7 @@ public:
             return true;
         }
         case API::Object::Type::Data: {
-            CoreIPC::DataReference dataReference;
+            IPC::DataReference dataReference;
             if (!decoder.decode(dataReference))
                 return false;
             coder.m_root = API::Data::create(dataReference.data(), dataReference.size());
@@ -514,7 +514,7 @@ public:
             WebCore::ResourceError resourceError;
             if (!decoder.decode(resourceError))
                 return false;
-            coder.m_root = WebError::create(resourceError);
+            coder.m_root = API::Error::create(resourceError);
             break;
         }
         default:

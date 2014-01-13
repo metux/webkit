@@ -1012,7 +1012,7 @@ void JIT::emit_op_debug(Instruction* currentInstruction)
 }
 
 
-void JIT::emit_op_enter(Instruction*)
+void JIT::emit_op_enter(Instruction* currentInstruction)
 {
     emitEnterOptimizationCheck();
     
@@ -1021,6 +1021,9 @@ void JIT::emit_op_enter(Instruction*)
     // object lifetime and increasing GC pressure.
     for (int i = 0; i < m_codeBlock->m_numVars; ++i)
         emitStore(virtualRegisterForLocal(i).offset(), jsUndefined());
+
+    JITSlowPathCall slowPathCall(this, currentInstruction, slow_path_enter);
+    slowPathCall.call();
 }
 
 void JIT::emit_op_create_activation(Instruction* currentInstruction)
@@ -1167,7 +1170,7 @@ void JIT::emit_op_get_argument_by_val(Instruction* currentInstruction)
     
     loadPtr(BaseIndex(callFrameRegister, regT2, TimesEight, OBJECT_OFFSETOF(JSValue, u.asBits.payload) + CallFrame::thisArgumentOffset() * static_cast<int>(sizeof(Register))), regT0);
     loadPtr(BaseIndex(callFrameRegister, regT2, TimesEight, OBJECT_OFFSETOF(JSValue, u.asBits.tag) + CallFrame::thisArgumentOffset() * static_cast<int>(sizeof(Register))), regT1);
-    emitValueProfilingSite(regT4);
+    emitValueProfilingSite();
     emitStore(dst, regT1, regT0);
 }
 

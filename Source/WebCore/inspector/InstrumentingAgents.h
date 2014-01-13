@@ -31,14 +31,18 @@
 #ifndef InstrumentingAgents_h
 #define InstrumentingAgents_h
 
+#include <inspector/InspectorEnvironment.h>
 #include <wtf/FastMalloc.h>
 #include <wtf/Noncopyable.h>
 #include <wtf/PassRefPtr.h>
 #include <wtf/RefCounted.h>
 
+namespace Inspector {
+class InspectorAgent;
+}
+
 namespace WebCore {
 
-class InspectorAgent;
 class InspectorApplicationCacheAgent;
 class InspectorCSSAgent;
 class InspectorCanvasAgent;
@@ -65,15 +69,17 @@ class InstrumentingAgents : public RefCounted<InstrumentingAgents> {
     WTF_MAKE_NONCOPYABLE(InstrumentingAgents);
     WTF_MAKE_FAST_ALLOCATED;
 public:
-    static PassRefPtr<InstrumentingAgents> create()
+    static PassRefPtr<InstrumentingAgents> create(Inspector::InspectorEnvironment& environment)
     {
-        return adoptRef(new InstrumentingAgents());
+        return adoptRef(new InstrumentingAgents(environment));
     }
     ~InstrumentingAgents() { }
     void reset();
 
-    InspectorAgent* inspectorAgent() const { return m_inspectorAgent; }
-    void setInspectorAgent(InspectorAgent* agent) { m_inspectorAgent = agent; }
+    Inspector::InspectorEnvironment& inspectorEnvironment() const { return m_environment; }
+
+    Inspector::InspectorAgent* inspectorAgent() const { return m_inspectorAgent; }
+    void setInspectorAgent(Inspector::InspectorAgent* agent) { m_inspectorAgent = agent; }
 
     InspectorPageAgent* inspectorPageAgent() const { return m_inspectorPageAgent; }
     void setInspectorPageAgent(InspectorPageAgent* agent) { m_inspectorPageAgent = agent; }
@@ -139,9 +145,11 @@ public:
 #endif
 
 private:
-    InstrumentingAgents();
+    InstrumentingAgents(Inspector::InspectorEnvironment&);
 
-    InspectorAgent* m_inspectorAgent;
+    Inspector::InspectorEnvironment& m_environment;
+
+    Inspector::InspectorAgent* m_inspectorAgent;
     InspectorPageAgent* m_inspectorPageAgent;
     InspectorCSSAgent* m_inspectorCSSAgent;
 #if USE(ACCELERATED_COMPOSITING)

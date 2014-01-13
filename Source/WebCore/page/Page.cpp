@@ -123,13 +123,15 @@ float deviceScaleFactor(Frame* frame)
     return page->deviceScaleFactor();
 }
 
+static const ViewState::Flags PageInitialViewState = ViewState::IsVisible | ViewState::IsInWindow;
+
 Page::Page(PageClients& pageClients)
     : m_chrome(std::make_unique<Chrome>(*this, *pageClients.chromeClient))
     , m_dragCaretController(std::make_unique<DragCaretController>())
 #if ENABLE(DRAG_SUPPORT)
     , m_dragController(std::make_unique<DragController>(*this, *pageClients.dragClient))
 #endif
-    , m_focusController(std::make_unique<FocusController>(*this))
+    , m_focusController(std::make_unique<FocusController>(*this, PageInitialViewState))
 #if ENABLE(CONTEXT_MENUS)
     , m_contextMenuController(std::make_unique<ContextMenuController>(*this, *pageClients.contextMenuClient))
 #endif
@@ -140,7 +142,7 @@ Page::Page(PageClients& pageClients)
     , m_pointerLockController(PointerLockController::create(this))
 #endif
     , m_settings(Settings::create(this))
-    , m_progress(std::make_unique<ProgressTracker>())
+    , m_progress(std::make_unique<ProgressTracker>(*pageClients.progressTrackerClient))
     , m_backForwardController(std::make_unique<BackForwardController>(*this, pageClients.backForwardClient))
     , m_mainFrame(MainFrame::create(*this, *pageClients.loaderClientForMainFrame))
     , m_theme(RenderTheme::themeForPage(this))
@@ -171,11 +173,8 @@ Page::Page(PageClients& pageClients)
     , m_minimumTimerInterval(Settings::defaultMinDOMTimerInterval())
     , m_timerAlignmentInterval(Settings::defaultDOMTimerAlignmentInterval())
     , m_isEditable(false)
-    , m_isOnscreen(true)
-    , m_isInWindow(true)
-#if ENABLE(PAGE_VISIBILITY_API)
-    , m_visibilityState(PageVisibilityStateVisible)
-#endif
+    , m_isPrerender(false)
+    , m_viewState(PageInitialViewState)
     , m_requestedLayoutMilestones(0)
     , m_headerHeight(0)
     , m_footerHeight(0)
@@ -262,8 +261,11 @@ ViewportArguments Page::viewportArguments() const
 
 ScrollingCoordinator* Page::scrollingCoordinator()
 {
-    if (!m_scrollingCoordinator && m_settings->scrollingCoordinatorEnabled())
-        m_scrollingCoordinator = ScrollingCoordinator::create(this);
+    if (!m_scrollingCoordinator && m_settings->scrollingCoordinatorEnabled()) {
+        m_scrollingCoordinator = chrome().client().createScrollingCoordinator(this);
+        if (!m_scrollingCoordinator)
+            m_scrollingCoordinator = ScrollingCoordinator::create(this);
+    }
 
     return m_scrollingCoordinator.get();
 }
@@ -279,13 +281,13 @@ String Page::scrollingStateTreeAsText()
     return String();
 }
 
-String Page::mainThreadScrollingReasonsAsText()
+String Page::synchronousScrollingReasonsAsText()
 {
     if (Document* document = m_mainFrame->document())
         document->updateLayout();
 
     if (ScrollingCoordinator* scrollingCoordinator = this->scrollingCoordinator())
-        return scrollingCoordinator->mainThreadScrollingReasonsAsText();
+        return scrollingCoordinator->synchronousScrollingReasonsAsText();
 
     return String();
 }
@@ -874,37 +876,13 @@ unsigned Page::pageCount() const
     return contentRenderer ? contentRenderer->columnCount(contentRenderer->columnInfo()) : 0;
 }
 
-void Page::didMoveOnscreen()
-{
-    m_isOnscreen = true;
-
-    for (Frame* frame = &mainFrame(); frame; frame = frame->tree().traverseNext()) {
-        if (FrameView* frameView = frame->view())
-            frameView->didMoveOnscreen();
-    }
-    
-    resumeScriptedAnimations();
-}
-
-void Page::willMoveOffscreen()
-{
-    m_isOnscreen = false;
-
-    for (Frame* frame = &mainFrame(); frame; frame = frame->tree().traverseNext()) {
-        if (FrameView* frameView = frame->view())
-            frameView->willMoveOffscreen();
-    }
-    
-    suspendScriptedAnimations();
-}
-
 void Page::setIsInWindow(bool isInWindow)
 {
-    if (m_isInWindow == isInWindow)
-        return;
+    setViewState(isInWindow ? m_viewState | ViewState::IsInWindow : m_viewState & ~ViewState::IsInWindow);
+}
 
-    m_isInWindow = isInWindow;
-
+void Page::setIsInWindowInternal(bool isInWindow)
+{
     for (Frame* frame = &mainFrame(); frame; frame = frame->tree().traverseNext()) {
         if (FrameView* frameView = frame->view())
             frameView->setIsInWindow(isInWindow);
@@ -932,9 +910,9 @@ void Page::resumeScriptedAnimations()
     }
 }
 
-void Page::setThrottled(bool throttled)
+void Page::setIsVisuallyIdleInternal(bool isVisuallyIdle)
 {
-    m_pageThrottler->setThrottled(throttled);
+    m_pageThrottler->setIsVisuallyIdle(isVisuallyIdle);
 }
 
 void Page::userStyleSheetLocationChanged()
@@ -1235,19 +1213,59 @@ void Page::resumeAnimatingImages()
         CachedImage::resumeAnimatingImagesForLoader(frame->document()->cachedResourceLoader());
 }
 
-#if ENABLE(PAGE_VISIBILITY_API) || ENABLE(HIDDEN_PAGE_DOM_TIMER_THROTTLING)
-void Page::setVisibilityState(PageVisibilityState visibilityState, bool isInitialState)
+void Page::setViewState(ViewState::Flags viewState, bool isInitialState)
 {
-#if !ENABLE(PAGE_VISIBILITY_API)
-    UNUSED_PARAM(isInitialState);
-#else
+    ViewState::Flags changed = m_viewState ^ viewState;
+    m_viewState = viewState;
+
+    // We want to make sure to update the active state while hidden, so if the view is going
+    // to be visible then update the focus controller first (it may currently still be hidden).
+    if (changed && (m_viewState & ViewState::IsVisible))
+        m_focusController->setViewState(viewState);
+
+    if (changed & ViewState::IsVisible)
+        setIsVisibleInternal(viewState & ViewState::IsVisible, isInitialState);
+    if (changed & ViewState::IsInWindow)
+        setIsInWindowInternal(viewState & ViewState::IsInWindow);
+    if (changed & ViewState::IsVisuallyIdle)
+        setIsVisuallyIdleInternal(viewState & ViewState::IsVisuallyIdle);
+
+    if (changed && !(m_viewState & ViewState::IsVisible))
+        m_focusController->setViewState(viewState);
+}
+
+void Page::setIsVisible(bool isVisible, bool isInitialState)
+{
+    setViewState(isVisible ? m_viewState | ViewState::IsVisible : m_viewState & ~ViewState::IsVisible, isInitialState);
+}
+
+void Page::setIsVisibleInternal(bool isVisible, bool isInitialState)
+{
     // FIXME: The visibility state should be stored on the top-level document.
     // https://bugs.webkit.org/show_bug.cgi?id=116769
 
-    if (m_visibilityState == visibilityState)
-        return;
-    m_visibilityState = visibilityState;
+    if (isVisible) {
+        m_isPrerender = false;
 
+        for (Frame* frame = &mainFrame(); frame; frame = frame->tree().traverseNext()) {
+            if (FrameView* frameView = frame->view())
+                frameView->didMoveOnscreen();
+        }
+
+        resumeScriptedAnimations();
+
+        if (FrameView* view = mainFrame().view())
+            view->show();
+
+        unthrottleTimers();
+
+        if (m_settings->hiddenPageCSSAnimationSuspensionEnabled())
+            mainFrame().animation().resumeAnimations();
+
+        resumeAnimatingImages();
+    }
+
+#if ENABLE(PAGE_VISIBILITY_API)
     if (!isInitialState) {
         Vector<Ref<Document>> documents;
         for (Frame* frame = m_mainFrame.get(); frame; frame = frame->tree().traverseNext())
@@ -1256,26 +1274,42 @@ void Page::setVisibilityState(PageVisibilityState visibilityState, bool isInitia
         for (size_t i = 0, size = documents.size(); i < size; ++i)
             documents[i]->visibilityStateChanged();
     }
+#else
+    UNUSED_PARAM(isInitialState);
 #endif
 
-    if (visibilityState == WebCore::PageVisibilityStateHidden) {
+    if (!isVisible) {
         if (m_pageThrottler->shouldThrottleTimers())
             throttleTimers();
+
         if (m_settings->hiddenPageCSSAnimationSuspensionEnabled())
             mainFrame().animation().suspendAnimations();
-    } else {
-        unthrottleTimers();
-        if (m_settings->hiddenPageCSSAnimationSuspensionEnabled())
-            mainFrame().animation().resumeAnimations();
-        resumeAnimatingImages();
+
+        for (Frame* frame = &mainFrame(); frame; frame = frame->tree().traverseNext()) {
+            if (FrameView* frameView = frame->view())
+                frameView->willMoveOffscreen();
+        }
+
+        suspendScriptedAnimations();
+
+        if (FrameView* view = mainFrame().view())
+            view->hide();
     }
 }
-#endif // ENABLE(PAGE_VISIBILITY_API) || ENABLE(HIDDEN_PAGE_DOM_TIMER_THROTTLING)
+
+void Page::setIsPrerender()
+{
+    m_isPrerender = true;
+}
 
 #if ENABLE(PAGE_VISIBILITY_API)
 PageVisibilityState Page::visibilityState() const
 {
-    return m_visibilityState;
+    if (isVisible())
+        return PageVisibilityStateVisible;
+    if (m_isPrerender)
+        return PageVisibilityStatePrerender;
+    return PageVisibilityStateHidden;
 }
 #endif
 
@@ -1533,7 +1567,7 @@ void Page::hiddenPageDOMTimerThrottlingStateChanged()
 #if (ENABLE_PAGE_VISIBILITY_API)
 void Page::hiddenPageCSSAnimationSuspensionStateChanged()
 {
-    if (m_visibilityState == WebCore::PageVisibilityStateHidden) {
+    if (!isVisible()) {
         if (m_settings->hiddenPageCSSAnimationSuspensionEnabled())
             mainFrame().animation().suspendAnimations();
         else
@@ -1567,17 +1601,18 @@ bool Page::isAnyFrameHandlingBeforeUnloadEvent()
 }
 
 Page::PageClients::PageClients()
-    : alternativeTextClient(0)
-    , chromeClient(0)
+    : alternativeTextClient(nullptr)
+    , chromeClient(nullptr)
 #if ENABLE(CONTEXT_MENUS)
-    , contextMenuClient(0)
+    , contextMenuClient(nullptr)
 #endif
-    , editorClient(0)
-    , dragClient(0)
-    , inspectorClient(0)
-    , plugInClient(0)
-    , validationMessageClient(0)
-    , loaderClientForMainFrame(0)
+    , editorClient(nullptr)
+    , dragClient(nullptr)
+    , inspectorClient(nullptr)
+    , plugInClient(nullptr)
+    , progressTrackerClient(nullptr)
+    , validationMessageClient(nullptr)
+    , loaderClientForMainFrame(nullptr)
 {
 }
 

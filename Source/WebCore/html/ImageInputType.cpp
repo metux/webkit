@@ -101,11 +101,11 @@ void ImageInputType::handleDOMActivateEvent(Event* event)
     event->setDefaultHandled();
 }
 
-RenderElement* ImageInputType::createRenderer(PassRef<RenderStyle> style) const
+RenderPtr<RenderElement> ImageInputType::createInputRenderer(PassRef<RenderStyle> style)
 {
-    RenderImage* image = new RenderImage(element(), std::move(style));
+    auto image = createRenderer<RenderImage>(element(), std::move(style));
     image->setImageResource(RenderImageResource::create());
-    return image;
+    return std::move(image);
 }
 
 void ImageInputType::altAttributeChanged()
@@ -192,7 +192,7 @@ unsigned ImageInputType::height() const
     element->document().updateLayout();
 
     RenderBox* box = element->renderBox();
-    return box ? adjustForAbsoluteZoom(box->contentHeight(), box) : 0;
+    return box ? adjustForAbsoluteZoom(box->contentHeight(), *box) : 0;
 }
 
 unsigned ImageInputType::width() const
@@ -216,7 +216,7 @@ unsigned ImageInputType::width() const
     element->document().updateLayout();
 
     RenderBox* box = element->renderBox();
-    return box ? adjustForAbsoluteZoom(box->contentWidth(), box) : 0;
+    return box ? adjustForAbsoluteZoom(box->contentWidth(), *box) : 0;
 }
 
 } // namespace WebCore

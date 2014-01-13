@@ -54,6 +54,10 @@
 #include <wtf/text/CString.h>
 #include <wtf/Vector.h>
 
+#if USE(QUICK_LOOK)
+#include "QuickLook.h"
+#endif
+
 using namespace WTF;
 
 namespace WebCore {
@@ -139,48 +143,6 @@ static ResourceLoadPriority defaultPriorityForResourceType(CachedResource::Type 
     ASSERT_NOT_REACHED();
     return ResourceLoadPriorityLow;
 }
-
-#if PLATFORM(BLACKBERRY)
-static ResourceRequest::TargetType cachedResourceTypeToTargetType(CachedResource::Type type)
-{
-    switch (type) {
-    case CachedResource::MainResource:
-        return ResourceRequest::TargetIsMainFrame;
-    case CachedResource::CSSStyleSheet:
-#if ENABLE(XSLT)
-    case CachedResource::XSLStyleSheet:
-#endif
-        return ResourceRequest::TargetIsStyleSheet;
-    case CachedResource::Script: 
-        return ResourceRequest::TargetIsScript;
-    case CachedResource::FontResource:
-        return ResourceRequest::TargetIsFontResource;
-    case CachedResource::ImageResource:
-        return ResourceRequest::TargetIsImage;
-#if ENABLE(CSS_SHADERS)
-    case CachedResource::ShaderResource:
-#endif
-    case CachedResource::RawResource:
-        return ResourceRequest::TargetIsSubresource;    
-#if ENABLE(LINK_PREFETCH)
-    case CachedResource::LinkPrefetch:
-        return ResourceRequest::TargetIsPrefetch;
-    case CachedResource::LinkSubresource:
-        return ResourceRequest::TargetIsSubresource;
-#endif
-#if ENABLE(VIDEO_TRACK)
-    case CachedResource::TextTrackResource:
-        return ResourceRequest::TargetIsTextTrack;
-#endif
-#if ENABLE(SVG)
-    case CachedResource::SVGDocumentResource:
-        return ResourceRequest::TargetIsImage;
-#endif
-    }
-    ASSERT_NOT_REACHED();
-    return ResourceRequest::TargetIsSubresource;
-}
-#endif
 
 static double deadDecodedDataDeletionIntervalForResourceType(CachedResource::Type type)
 {
@@ -306,9 +268,14 @@ void CachedResource::load(CachedResourceLoader* cachedResourceLoader, const Reso
     m_options = options;
     m_loading = true;
 
-#if PLATFORM(BLACKBERRY)
-    if (m_resourceRequest.targetType() == ResourceRequest::TargetIsUnspecified)
-        m_resourceRequest.setTargetType(cachedResourceTypeToTargetType(type()));
+#if USE(QUICK_LOOK)
+    if (!m_resourceRequest.isNull() && m_resourceRequest.url().protocolIs(QLPreviewProtocol())) {
+        // When QuickLook is invoked to convert a document, it returns a unique URL in the
+        // NSURLReponse for the main document. To make safeQLURLForDocumentURLAndResourceURL()
+        // work, we need to use the QL URL not the original URL.
+        const URL& documentURL = cachedResourceLoader->frame() ? cachedResourceLoader->frame()->loader().documentLoader()->response().url() : cachedResourceLoader->document()->url();
+        m_resourceRequest.setURL(safeQLURLForDocumentURLAndResourceURL(documentURL, url()));
+    }
 #endif
 
     if (!accept().isEmpty())
@@ -572,7 +539,7 @@ void CachedResource::destroyDecodedDataIfNeeded()
     m_decodedDataDeletionTimer.restart();
 }
 
-void CachedResource::decodedDataDeletionTimerFired(DeferrableOneShotTimer<CachedResource>*)
+void CachedResource::decodedDataDeletionTimerFired(DeferrableOneShotTimer<CachedResource>&)
 {
     destroyDecodedData();
 }
@@ -917,7 +884,7 @@ void CachedResource::CachedResourceCallback::cancel()
         m_callbackTimer.stop();
 }
 
-void CachedResource::CachedResourceCallback::timerFired(Timer<CachedResourceCallback>*)
+void CachedResource::CachedResourceCallback::timerFired(Timer<CachedResourceCallback>&)
 {
     m_resource->didAddClient(m_client);
 }

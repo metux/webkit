@@ -116,9 +116,9 @@ RenderEmbeddedObject::~RenderEmbeddedObject()
     view().frameView().removeEmbeddedObjectToUpdate(*this);
 }
 
-RenderEmbeddedObject* RenderEmbeddedObject::createForApplet(HTMLAppletElement& applet, PassRef<RenderStyle> style)
+RenderPtr<RenderEmbeddedObject> RenderEmbeddedObject::createForApplet(HTMLAppletElement& applet, PassRef<RenderStyle> style)
 {
-    RenderEmbeddedObject* renderer = new RenderEmbeddedObject(applet, std::move(style));
+    auto renderer = createRenderer<RenderEmbeddedObject>(applet, std::move(style));
     renderer->setInline(true);
     return renderer;
 }
@@ -656,10 +656,7 @@ CursorDirective RenderEmbeddedObject::getCursor(const LayoutPoint& point, Cursor
 bool RenderEmbeddedObject::canHaveChildren() const
 {
 #if ENABLE(PLUGIN_PROXY_FOR_VIDEO)
-    if (!node())
-        return false;
-
-    if (toElement(node())->isMediaElement())
+    if (frameOwnerElement().isMediaElement())
         return true;
 #endif
 

@@ -20,7 +20,7 @@
  * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
  * OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
- * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
 #ifndef HTMLMediaElement_h
@@ -33,6 +33,7 @@
 #include "MediaCanStartListener.h"
 #include "MediaControllerInterface.h"
 #include "MediaPlayer.h"
+#include "MediaSession.h"
 
 #if ENABLE(PLUGIN_PROXY_FOR_VIDEO)
 #include "HTMLFrameOwnerElement.h"
@@ -53,11 +54,9 @@
 #include "MediaStream.h"
 #endif
 
+
 namespace WebCore {
 
-#if USE(AUDIO_SESSION)
-class AudioSessionManagerToken;
-#endif
 #if ENABLE(WEB_AUDIO)
 class AudioSourceProvider;
 class MediaElementAudioSourceNode;
@@ -104,7 +103,7 @@ class HTMLMediaElement
 #else
     : public HTMLElement
 #endif
-    , private MediaPlayerClient, public MediaPlayerSupportsTypeClient, private MediaCanStartListener, public ActiveDOMObject, public MediaControllerInterface
+    , private MediaPlayerClient, public MediaPlayerSupportsTypeClient, private MediaCanStartListener, public ActiveDOMObject, public MediaControllerInterface , public MediaSessionClient
 #if ENABLE(VIDEO_TRACK)
     , private AudioTrackClient
     , private TextTrackClient
@@ -452,7 +451,7 @@ protected:
         RequirePageConsentToLoadMediaRestriction = 1 << 3,
         RequirePageConsentToResumeMediaRestriction = 1 << 4,
 #if ENABLE(IOS_AIRPLAY)
-        RequireUserGestureToShowPlaybackTargetPicker = 1 << 5,
+        RequireUserGestureToShowPlaybackTargetPickerRestriction = 1 << 5,
 #endif
     };
     typedef unsigned BehaviorRestrictions;
@@ -463,7 +462,7 @@ protected:
     bool pageConsentRequiredForLoad() const { return m_restrictions & RequirePageConsentToLoadMediaRestriction; }
     bool pageConsentRequiredForResume() const { return m_restrictions & RequirePageConsentToResumeMediaRestriction; }
 #if ENABLE(IOS_AIRPLAY)
-    bool userGestureRequiredToShowPlaybackTargetPicker() const { return m_restrictions & RequireUserGestureToShowPlaybackTargetPicker; }
+    bool userGestureRequiredToShowPlaybackTargetPicker() const { return m_restrictions & RequireUserGestureToShowPlaybackTargetPickerRestriction; }
 #endif
     
     void addBehaviorRestriction(BehaviorRestrictions restriction) { m_restrictions |= restriction; }
@@ -475,7 +474,9 @@ protected:
     void endIgnoringTrackDisplayUpdateRequests();
 #endif
 
-    virtual RenderElement* createRenderer(PassRef<RenderStyle>) OVERRIDE;
+    virtual RenderPtr<RenderElement> createElementRenderer(PassRef<RenderStyle>) OVERRIDE;
+
+    MediaSession& mediaSession() const { return *m_mediaSession; }
 
 private:
     void createMediaPlayer();
@@ -580,9 +581,11 @@ private:
     virtual GraphicsDeviceAdapter* mediaPlayerGraphicsDeviceAdapter(const MediaPlayer*) const OVERRIDE;
 #endif
 
-    void loadTimerFired(Timer<HTMLMediaElement>*);
-    void progressEventTimerFired(Timer<HTMLMediaElement>*);
-    void playbackProgressTimerFired(Timer<HTMLMediaElement>*);
+    virtual bool mediaPlayerShouldWaitForResponseToAuthenticationChallenge(const AuthenticationChallenge&) OVERRIDE;
+
+    void loadTimerFired(Timer<HTMLMediaElement>&);
+    void progressEventTimerFired(Timer<HTMLMediaElement>&);
+    void playbackProgressTimerFired(Timer<HTMLMediaElement>&);
     void startPlaybackProgressTimer();
     void startProgressEventTimer();
     void stopPeriodicTimers();
@@ -648,7 +651,6 @@ private:
 
 #if PLATFORM(IOS)
     bool parseMediaPlayerAttribute(const QualifiedName&, const AtomicString&);
-    void userRequestsMediaLoading();
 #endif
 
     // Pauses playback without changing any states or generating events
@@ -690,6 +692,11 @@ private:
     DOMWrapperWorld& ensureIsolatedWorld();
     bool ensureMediaControlsInjectedScript();
 #endif
+
+    virtual MediaSession::MediaType mediaType() const OVERRIDE;
+
+    virtual void beginInterruption() OVERRIDE;
+    virtual void endInterruption(MediaSession::EndInterruptionFlags) OVERRIDE;
 
     Timer<HTMLMediaElement> m_loadTimer;
     Timer<HTMLMediaElement> m_progressEventTimer;
@@ -786,7 +793,6 @@ private:
     bool m_needWidgetUpdate : 1;
 #endif
 
-    bool m_loadInitiatedByUserGesture : 1;
     bool m_completelyLoaded : 1;
     bool m_havePreparedToPlay : 1;
     bool m_parsingInProgress : 1;
@@ -796,8 +802,9 @@ private:
 
 #if PLATFORM(IOS)
     bool m_requestingPlay : 1;
-    bool m_userStartedPlayback : 1;
 #endif
+
+    bool m_resumePlaybackAfterInterruption : 1;
 
 #if ENABLE(VIDEO_TRACK)
     bool m_tracksAreReady : 1;
@@ -845,10 +852,7 @@ private:
     RefPtr<PlatformTextTrackMenuInterface> m_platformMenu;
 #endif
 
-#if USE(AUDIO_SESSION)
-    OwnPtr<AudioSessionManagerToken> m_audioSessionManagerToken;
-#endif
-
+    std::unique_ptr<MediaSession> m_mediaSession;
     std::unique_ptr<PageActivityAssertionToken> m_activityToken;
     size_t m_reportedExtraMemoryCost;
 

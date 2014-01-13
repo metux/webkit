@@ -31,6 +31,7 @@
 #include "PlatformScreen.h"
 #include "Region.h"
 #include "Supplementable.h"
+#include "ViewState.h"
 #include "ViewportArguments.h"
 #include <wtf/Forward.h>
 #include <wtf/HashMap.h>
@@ -46,6 +47,10 @@
 
 #if PLATFORM(MAC)
 #include <wtf/SchedulePair.h>
+#endif
+
+#if PLATFORM(IOS)
+#include "Settings.h"
 #endif
 
 namespace JSC {
@@ -88,6 +93,7 @@ class PluginData;
 class PluginViewBase;
 class PointerLockController;
 class ProgressTracker;
+class ProgressTrackerClient;
 class Range;
 class RenderObject;
 class RenderTheme;
@@ -129,6 +135,7 @@ public:
         DragClient* dragClient;
         InspectorClient* inspectorClient;
         PlugInClient* plugInClient;
+        ProgressTrackerClient* progressTrackerClient;
         RefPtr<BackForwardClient> backForwardClient;
         ValidationMessageClient* validationMessageClient;
         FrameLoaderClient* loaderClientForMainFrame;
@@ -206,7 +213,7 @@ public:
     ScrollingCoordinator* scrollingCoordinator();
 
     String scrollingStateTreeAsText();
-    String mainThreadScrollingReasonsAsText();
+    String synchronousScrollingReasonsAsText();
     PassRefPtr<ClientRectList> nonFastScrollableRects(const Frame*);
 
     Settings& settings() const { return *m_settings; }
@@ -290,18 +297,18 @@ public:
     unsigned pageCount() const;
 
     // Notifications when the Page starts and stops being presented via a native window.
-    void didMoveOnscreen();
-    void willMoveOffscreen();
-    bool isOnscreen() const { return m_isOnscreen; }
+    void setViewState(ViewState::Flags, bool isInitial = false);
+    void setIsVisible(bool isVisible, bool isInitial);
+    void setIsPrerender();
+    bool isVisible() const { return m_viewState & ViewState::IsVisible; }
 
     // Notification that this Page was moved into or out of a native window.
     void setIsInWindow(bool);
-    bool isInWindow() const { return m_isInWindow; }
+    bool isInWindow() const { return m_viewState & ViewState::IsInWindow; }
 
     void suspendScriptedAnimations();
     void resumeScriptedAnimations();
     bool scriptedAnimationsSuspended() const { return m_scriptedAnimationsSuspended; }
-    void setThrottled(bool);
 
     void userStyleSheetLocationChanged();
     const String& userStyleSheet() const;
@@ -321,9 +328,16 @@ public:
     StorageNamespace* sessionStorage(bool optionalCreate = true);
     void setSessionStorage(PassRefPtr<StorageNamespace>);
 
+    // FIXME: We should make Settings::maxParseDuration() platform-independent, remove {has, set}CustomHTMLTokenizerTimeDelay()
+    // and customHTMLTokenizerTimeDelay() and modify theirs callers to update or query Settings::maxParseDuration().
     void setCustomHTMLTokenizerTimeDelay(double);
+#if PLATFORM(IOS)
+    bool hasCustomHTMLTokenizerTimeDelay() const { return m_settings->maxParseDuration() != -1; }
+    double customHTMLTokenizerTimeDelay() const { ASSERT(m_settings->maxParseDuration() != -1); return m_settings->maxParseDuration(); }
+#else
     bool hasCustomHTMLTokenizerTimeDelay() const { return m_customHTMLTokenizerTimeDelay != -1; }
     double customHTMLTokenizerTimeDelay() const { ASSERT(m_customHTMLTokenizerTimeDelay != -1); return m_customHTMLTokenizerTimeDelay; }
+#endif
 
     void setCustomHTMLTokenizerChunkSize(int);
     bool hasCustomHTMLTokenizerChunkSize() const { return m_customHTMLTokenizerChunkSize != -1; }
@@ -343,9 +357,6 @@ public:
 
 #if ENABLE(PAGE_VISIBILITY_API)
     PageVisibilityState visibilityState() const;
-#endif
-#if ENABLE(PAGE_VISIBILITY_API) || ENABLE(HIDDEN_PAGE_DOM_TIMER_THROTTLING)
-    void setVisibilityState(PageVisibilityState, bool);
 #endif
     void resumeAnimatingImages();
 
@@ -410,6 +421,10 @@ public:
 
 private:
     void initGroup();
+
+    void setIsInWindowInternal(bool);
+    void setIsVisibleInternal(bool isVisible, bool isInitial);
+    void setIsVisuallyIdleInternal(bool);
 
 #if ASSERT_DISABLED
     void checkSubframeCountConsistency() const { }
@@ -514,12 +529,8 @@ private:
     double m_timerAlignmentInterval;
 
     bool m_isEditable;
-    bool m_isOnscreen;
-    bool m_isInWindow;
-
-#if ENABLE(PAGE_VISIBILITY_API)
-    PageVisibilityState m_visibilityState;
-#endif
+    bool m_isPrerender;
+    ViewState::Flags m_viewState;
 
     LayoutMilestones m_requestedLayoutMilestones;
 

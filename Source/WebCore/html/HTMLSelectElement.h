@@ -111,6 +111,7 @@ public:
     
     // For use in the implementation of HTMLOptionElement.
     void optionSelectionStateChanged(HTMLOptionElement*, bool optionIsSelected);
+    bool allowsNonContiguousSelection() const { return m_allowsNonContiguousSelection; };
 
 protected:
     HTMLSelectElement(const QualifiedName&, Document&, HTMLFormElement*);
@@ -136,7 +137,7 @@ private:
     virtual bool isPresentationAttribute(const QualifiedName&) const OVERRIDE;
 
     virtual bool childShouldCreateRenderer(const Node&) const OVERRIDE;
-    virtual RenderElement* createRenderer(PassRef<RenderStyle>) OVERRIDE;
+    virtual RenderPtr<RenderElement> createElementRenderer(PassRef<RenderStyle>) OVERRIDE;
     virtual bool appendFormData(FormDataList&, bool) OVERRIDE;
 
     virtual void reset() OVERRIDE;
@@ -208,6 +209,7 @@ private:
     bool m_isProcessingUserDrivenChange;
     bool m_multiple;
     bool m_activeSelectionState;
+    bool m_allowsNonContiguousSelection;
     mutable bool m_shouldRecalcListItems;
 };
 

@@ -83,8 +83,7 @@ class PolygonShape : public Shape {
     WTF_MAKE_NONCOPYABLE(PolygonShape);
 public:
     PolygonShape(PassOwnPtr<Vector<FloatPoint>> vertices, WindRule fillRule)
-        : Shape()
-        , m_polygon(vertices, fillRule)
+        : m_polygon(vertices, fillRule)
         , m_marginBounds(nullptr)
         , m_paddingBounds(nullptr)
     {
@@ -95,7 +94,7 @@ public:
     virtual bool isEmpty() const OVERRIDE { return m_polygon.isEmpty(); }
     virtual void getExcludedIntervals(LayoutUnit logicalTop, LayoutUnit logicalHeight, SegmentList&) const OVERRIDE;
     virtual void getIncludedIntervals(LayoutUnit logicalTop, LayoutUnit logicalHeight, SegmentList&) const OVERRIDE;
-    virtual bool firstIncludedIntervalLogicalTop(LayoutUnit minLogicalIntervalTop, const LayoutSize& minLogicalIntervalSize, LayoutUnit&) const OVERRIDE;
+    virtual bool firstIncludedIntervalLogicalTop(LayoutUnit minLogicalIntervalTop, const FloatSize& minLogicalIntervalSize, LayoutUnit&) const OVERRIDE;
 
     virtual void buildDisplayPaths(DisplayPaths&) const OVERRIDE;
 

@@ -31,8 +31,6 @@
 #define InspectorDOMAgent_h
 
 #include "EventTarget.h"
-#include "InjectedScript.h"
-#include "InjectedScriptManager.h"
 #include "InspectorOverlay.h"
 #include "InspectorWebAgentBase.h"
 #include "InspectorWebBackendDispatchers.h"
@@ -53,6 +51,10 @@ namespace Deprecated {
 class ScriptValue;
 }
 
+namespace Inspector {
+class InjectedScriptManager;
+}
+
 namespace WebCore {
 
 class ContainerNode;
@@ -61,7 +63,6 @@ class DOMEditor;
 class Document;
 class Element;
 class Event;
-class InspectorClient;
 class InspectorHistory;
 class InspectorOverlay;
 class InspectorPageAgent;
@@ -105,14 +106,10 @@ public:
         virtual void didModifyDOMAttr(Element*) = 0;
     };
 
-    static PassOwnPtr<InspectorDOMAgent> create(InstrumentingAgents* instrumentingAgents, InspectorPageAgent* pageAgent, InjectedScriptManager* injectedScriptManager, InspectorOverlay* overlay, InspectorClient* client)
-    {
-        return adoptPtr(new InspectorDOMAgent(instrumentingAgents, pageAgent, injectedScriptManager, overlay, client));
-    }
+    InspectorDOMAgent(InstrumentingAgents*, InspectorPageAgent*, Inspector::InjectedScriptManager*, InspectorOverlay*);
+    ~InspectorDOMAgent();
 
     static String toErrorString(const ExceptionCode&);
-
-    ~InspectorDOMAgent();
 
     virtual void didCreateFrontendAndBackend(Inspector::InspectorFrontendChannel*, Inspector::InspectorBackendDispatcher*) OVERRIDE;
     virtual void willDestroyFrontendAndBackend() OVERRIDE;
@@ -155,7 +152,6 @@ public:
     virtual void redo(ErrorString*);
     virtual void markUndoableState(ErrorString*);
     virtual void focus(ErrorString*, int nodeId);
-    virtual void setFileInputFiles(ErrorString*, int nodeId, const RefPtr<Inspector::InspectorArray>& files);
 
     void getEventListeners(Node*, Vector<EventListenerInfo>& listenersArray, bool includeAncestors);
 
@@ -208,12 +204,13 @@ public:
     Element* assertElement(ErrorString*, int nodeId);
     Document* assertDocument(ErrorString*, int nodeId);
 
+    static Node* scriptValueAsNode(Deprecated::ScriptValue);
+    static Deprecated::ScriptValue nodeAsScriptValue(JSC::ExecState*, Node*);
+
     // Methods called from other agents.
     InspectorPageAgent* pageAgent() { return m_pageAgent; }
 
 private:
-    InspectorDOMAgent(InstrumentingAgents*, InspectorPageAgent*, InjectedScriptManager*, InspectorOverlay*, InspectorClient*);
-
     void setSearchingForNode(ErrorString*, bool enabled, Inspector::InspectorObject* highlightConfig);
     PassOwnPtr<HighlightConfig> highlightConfigFromInspectorObject(ErrorString*, Inspector::InspectorObject* highlightInspectorObject);
 
@@ -238,15 +235,15 @@ private:
     PassRefPtr<Inspector::TypeBuilder::DOM::EventListener> buildObjectForEventListener(const RegisteredEventListener&, const AtomicString& eventType, Node*, const String* objectGroupId);
 
     Node* nodeForPath(const String& path);
+    Node* nodeForObjectId(const String& objectId);
 
     void discardBindings();
 
     void innerHighlightQuad(PassOwnPtr<FloatQuad>, const RefPtr<Inspector::InspectorObject>* color, const RefPtr<Inspector::InspectorObject>* outlineColor, const bool* usePageCoordinates);
 
     InspectorPageAgent* m_pageAgent;
-    InjectedScriptManager* m_injectedScriptManager;
+    Inspector::InjectedScriptManager* m_injectedScriptManager;
     InspectorOverlay* m_overlay;
-    InspectorClient* m_client;
     std::unique_ptr<Inspector::InspectorDOMFrontendDispatcher> m_frontendDispatcher;
     RefPtr<Inspector::InspectorDOMBackendDispatcher> m_backendDispatcher;
     DOMListener* m_domListener;

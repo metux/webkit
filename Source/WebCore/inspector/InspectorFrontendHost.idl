@@ -50,6 +50,7 @@
     void moveWindowBy(float x, float y);
 
     DOMString localizedStringsURL();
+    DOMString debuggableType();
 
     void copyText(DOMString text);
     void openInNewTab(DOMString url);
@@ -69,11 +70,6 @@
     [Custom] void recordSettingChanged(unsigned long settingChanged);
 
     DOMString loadResourceSynchronously(DOMString url);
-
-    boolean supportsFileSystems();
-    void requestFileSystems();
-    void addFileSystem();
-    void removeFileSystem(DOMString fileSystemPath);
 
     boolean isUnderTest();
 

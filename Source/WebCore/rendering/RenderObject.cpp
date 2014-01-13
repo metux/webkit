@@ -49,6 +49,7 @@
 #include "RenderFlowThread.h"
 #include "RenderGeometryMap.h"
 #include "RenderInline.h"
+#include "RenderIterator.h"
 #include "RenderLayer.h"
 #include "RenderLayerBacking.h"
 #include "RenderNamedFlowThread.h"
@@ -288,9 +289,10 @@ RenderObject* RenderObject::lastLeafChild() const
 // Inspired by Node::traverseNextNode.
 RenderObject* RenderObject::traverseNext(const RenderObject* stayWithin) const
 {
-    if (firstChild()) {
-        ASSERT(!stayWithin || firstChild()->isDescendantOf(stayWithin));
-        return firstChild();
+    RenderObject* child = firstChildSlow();
+    if (child) {
+        ASSERT(!stayWithin || child->isDescendantOf(stayWithin));
+        return child;
     }
     if (this == stayWithin)
         return 0;
@@ -314,7 +316,7 @@ RenderObject* RenderObject::traverseNext(const RenderObject* stayWithin, HeightT
     BlockContentHeightType overflowType;
 
     // Check for suitable children.
-    for (RenderObject* child = firstChild(); child; child = child->nextSibling()) {
+    for (RenderObject* child = firstChildSlow(); child; child = child->nextSibling()) {
         overflowType = inclusionFunction(child);
         if (overflowType != FixedHeight) {
             currentDepth++;
@@ -358,7 +360,7 @@ RenderObject* RenderObject::traverseNext(const RenderObject* stayWithin, HeightT
 
 RenderObject* RenderObject::traverseNext(const RenderObject* stayWithin, TraverseNextInclusionFunction inclusionFunction) const
 {
-    for (RenderObject* child = firstChild(); child; child = child->nextSibling()) {
+    for (RenderObject* child = firstChildSlow(); child; child = child->nextSibling()) {
         if (inclusionFunction(child)) {
             ASSERT(!stayWithin || child->isDescendantOf(stayWithin));
             return child;
@@ -397,18 +399,16 @@ RenderObject* RenderObject::traverseNext(const RenderObject* stayWithin, Travers
 
 static RenderObject::BlockContentHeightType includeNonFixedHeight(const RenderObject* render)
 {
-    RenderStyle* style = render->style();
-    if (style) {
-        if (style->height().type() == Fixed) {
-            if (render->isRenderBlock()) {
-                const RenderBlock* block = toRenderBlock(render);
-                // For fixed height styles, if the overflow size of the element spills out of the specified
-                // height, assume we can apply text auto-sizing.
-                if (style->overflowY() == OVISIBLE && style->height().value() < block->layoutOverflowRect().maxY())
-                    return RenderObject::OverflowHeight;
-            }
-            return RenderObject::FixedHeight;
+    const RenderStyle& style = render->style();
+    if (style.height().type() == Fixed) {
+        if (render->isRenderBlock()) {
+            const RenderBlock* block = toRenderBlock(render);
+            // For fixed height styles, if the overflow size of the element spills out of the specified
+            // height, assume we can apply text auto-sizing.
+            if (style.overflowY() == OVISIBLE && style.height().value() < block->layoutOverflowRect().maxY())
+                return RenderObject::OverflowHeight;
         }
+        return RenderObject::FixedHeight;
     }
     return RenderObject::FlexibleHeight;
 }
@@ -435,8 +435,8 @@ void RenderObject::adjustComputedFontSizesOnBlocks(float size, float visibleWidt
             depthStack.append(newFixedDepth);
 
         int stackSize = depthStack.size();
-        if (descendent->isRenderBlock() && !descendent->isListItem() && (!stackSize || currentDepth - depthStack[stackSize - 1] > TextAutoSizingFixedHeightDepth))
-            static_cast<RenderBlock*>(descendent)->adjustComputedFontSizes(size, visibleWidth);
+        if (descendent->isRenderBlockFlow() && !descendent->isListItem() && (!stackSize || currentDepth - depthStack[stackSize - 1] > TextAutoSizingFixedHeightDepth))
+            toRenderBlockFlow(descendent)->adjustComputedFontSizes(size, visibleWidth);
         newFixedDepth = 0;
     }
 
@@ -463,8 +463,8 @@ void RenderObject::resetTextAutosizing()
             depthStack.append(newFixedDepth);
 
         int stackSize = depthStack.size();
-        if (descendent->isRenderBlock() && !descendent->isListItem() && (!stackSize || currentDepth - depthStack[stackSize - 1] > TextAutoSizingFixedHeightDepth))
-            toRenderBlock(descendent)->resetComputedFontSize();
+        if (descendent->isRenderBlockFlow() && !descendent->isListItem() && (!stackSize || currentDepth - depthStack[stackSize - 1] > TextAutoSizingFixedHeightDepth))
+            toRenderBlockFlow(descendent)->resetComputedFontSize();
         newFixedDepth = 0;
     }
 }
@@ -472,14 +472,11 @@ void RenderObject::resetTextAutosizing()
 
 RenderLayer* RenderObject::enclosingLayer() const
 {
-    const RenderObject* curr = this;
-    while (curr) {
-        RenderLayer* layer = curr->hasLayer() ? toRenderLayerModelObject(curr)->layer() : 0;
-        if (layer)
-            return layer;
-        curr = curr->parent();
+    for (auto& renderer : lineageOfType<RenderLayerModelObject>(*this)) {
+        if (renderer.layer())
+            return renderer.layer();
     }
-    return 0;
+    return nullptr;
 }
 
 bool RenderObject::scrollRectToVisible(const LayoutRect& rect, const ScrollAlignment& alignX, const ScrollAlignment& alignY)
@@ -494,28 +491,14 @@ bool RenderObject::scrollRectToVisible(const LayoutRect& rect, const ScrollAlign
 
 RenderBox* RenderObject::enclosingBox() const
 {
-    RenderObject* curr = const_cast<RenderObject*>(this);
-    while (curr) {
-        if (curr->isBox())
-            return toRenderBox(curr);
-        curr = curr->parent();
-    }
-    
-    ASSERT_NOT_REACHED();
-    return 0;
+    // FIXME: This should return a reference; it can always find the root RenderView.
+    return lineageOfType<RenderBox>(const_cast<RenderObject&>(*this)).first();
 }
 
 RenderBoxModelObject* RenderObject::enclosingBoxModelObject() const
 {
-    RenderObject* curr = const_cast<RenderObject*>(this);
-    while (curr) {
-        if (curr->isBoxModelObject())
-            return toRenderBoxModelObject(curr);
-        curr = curr->parent();
-    }
-
-    ASSERT_NOT_REACHED();
-    return 0;
+    // FIXME: This should return a reference; it can always find the root RenderView.
+    return lineageOfType<RenderBoxModelObject>(const_cast<RenderObject&>(*this)).first();
 }
 
 bool RenderObject::fixedPositionedWithNamedFlowContainingBlock() const
@@ -1741,7 +1724,7 @@ bool RenderObject::isRooted(RenderView** view) const
 
 RespectImageOrientationEnum RenderObject::shouldRespectImageOrientation() const
 {
-#if USE(CG) || USE(CAIRO) || PLATFORM(BLACKBERRY)
+#if USE(CG) || USE(CAIRO)
     // This can only be enabled for ports which honor the orientation flag in their drawing code.
     if (document().isImageDocument())
         return RespectImageOrientation;
@@ -2354,14 +2337,14 @@ VisiblePosition RenderObject::createVisiblePosition(int offset, EAffinity affini
 {
     // If this is a non-anonymous renderer in an editable area, then it's simple.
     if (Node* node = nonPseudoNode()) {
-        if (!node->rendererIsEditable()) {
+        if (!node->hasEditableStyle()) {
             // If it can be found, we prefer a visually equivalent position that is editable. 
             Position position = createLegacyEditingPosition(node, offset);
             Position candidate = position.downstream(CanCrossEditingBoundary);
-            if (candidate.deprecatedNode()->rendererIsEditable())
+            if (candidate.deprecatedNode()->hasEditableStyle())
                 return VisiblePosition(candidate, affinity);
             candidate = position.upstream(CanCrossEditingBoundary);
-            if (candidate.deprecatedNode()->rendererIsEditable())
+            if (candidate.deprecatedNode()->hasEditableStyle())
                 return VisiblePosition(candidate, affinity);
         }
         // FIXME: Eliminate legacy editing positions

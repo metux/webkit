@@ -170,7 +170,7 @@ public:
     static void CALLBACK internetStatusCallback(HINTERNET, DWORD_PTR, DWORD, LPVOID, DWORD);
 #endif
 
-#if USE(CURL) || USE(SOUP) || PLATFORM(BLACKBERRY)
+#if USE(CURL) || USE(SOUP)
     ResourceHandleInternal* getInternal() { return d.get(); }
 #endif
 
@@ -223,16 +223,12 @@ public:
 
     void setDefersLoading(bool);
 
-#if PLATFORM(BLACKBERRY)
-    void pauseLoad(bool); // FIXME: How is this different from setDefersLoading()?
-#endif
-
     void didChangePriority(ResourceLoadPriority);
 
     ResourceRequest& firstRequest();
     const String& lastHTTPMethod() const;
 
-    void fireFailure(Timer<ResourceHandle>*);
+    void failureTimerFired(Timer<ResourceHandle>&);
 
     NetworkingContext* context() const;
 
@@ -276,10 +272,17 @@ private:
     virtual void refAuthenticationClient() OVERRIDE { ref(); }
     virtual void derefAuthenticationClient() OVERRIDE { deref(); }
 
-#if PLATFORM(MAC) && !USE(CFNETWORK)
-    void createNSURLConnection(id delegate, bool shouldUseCredentialStorage, bool shouldContentSniff);
-#elif USE(CFNETWORK)
-    void createCFURLConnection(bool shouldUseCredentialStorage, bool shouldContentSniff, CFDictionaryRef clientProperties);
+#if PLATFORM(MAC) || USE(CFNETWORK)
+    enum class SchedulingBehavior {
+        Asynchronous,
+        Synchronous
+    };
+
+#if USE(CFNETWORK)
+    void createCFURLConnection(bool shouldUseCredentialStorage, bool shouldContentSniff, SchedulingBehavior, CFDictionaryRef clientProperties);
+#else
+    void createNSURLConnection(id delegate, bool shouldUseCredentialStorage, bool shouldContentSniff, SchedulingBehavior);
+#endif
 #endif
 
     friend class ResourceHandleInternal;

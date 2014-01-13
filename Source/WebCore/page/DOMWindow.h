@@ -32,6 +32,7 @@
 #include "FrameDestructionObserver.h"
 #include "URL.h"
 #include "Supplementable.h"
+#include <functional>
 
 namespace WebCore {
 
@@ -161,9 +162,7 @@ namespace WebCore {
         PassRefPtr<DOMWindow> open(const String& urlString, const AtomicString& frameName, const String& windowFeaturesString,
             DOMWindow& activeWindow, DOMWindow& firstWindow);
 
-        typedef void (*PrepareDialogFunction)(DOMWindow*, void* context);
-        void showModalDialog(const String& urlString, const String& dialogFeaturesString,
-            DOMWindow& activeWindow, DOMWindow& firstWindow, PrepareDialogFunction, void* functionContext);
+        void showModalDialog(const String& urlString, const String& dialogFeaturesString, DOMWindow& activeWindow, DOMWindow& firstWindow, std::function<void (DOMWindow&)> prepareDialogFunction);
 
         void alert(const String& message);
         bool confirm(const String& message);
@@ -397,8 +396,26 @@ namespace WebCore {
         DEFINE_ATTRIBUTE_EVENT_LISTENER(touchcancel);
 #endif
 
+#if ENABLE(IOS_GESTURE_EVENTS)
+        DEFINE_ATTRIBUTE_EVENT_LISTENER(gesturestart);
+        DEFINE_ATTRIBUTE_EVENT_LISTENER(gesturechange);
+        DEFINE_ATTRIBUTE_EVENT_LISTENER(gestureend);
+#endif
+
 #if ENABLE(WEB_TIMING)
         Performance* performance() const;
+#endif
+
+#if PLATFORM(IOS)
+        void incrementScrollEventListenersCount();
+        void decrementScrollEventListenersCount();
+        unsigned scrollEventListenerCount() const { return m_scrollEventListenerCount; }
+#endif
+
+        void resetAllGeolocationPermission();
+
+#if ENABLE(IOS_TOUCH_EVENTS) || ENABLE(IOS_GESTURE_EVENTS)
+        bool hasTouchEventListeners() const { return m_touchEventListenerCount > 0; }
 #endif
 
         // FIXME: When this DOMWindow is no longer the active DOMWindow (i.e.,
@@ -425,9 +442,7 @@ namespace WebCore {
         virtual void refEventTarget() OVERRIDE { ref(); }
         virtual void derefEventTarget() OVERRIDE { deref(); }
 
-        static PassRefPtr<Frame> createWindow(const String& urlString, const AtomicString& frameName, const WindowFeatures&,
-            DOMWindow& activeWindow, Frame* firstFrame, Frame* openerFrame,
-            PrepareDialogFunction = 0, void* functionContext = 0);
+        static PassRefPtr<Frame> createWindow(const String& urlString, const AtomicString& frameName, const WindowFeatures&, DOMWindow& activeWindow, Frame* firstFrame, Frame* openerFrame, std::function<void (DOMWindow&)> prepareDialogFunction = nullptr);
         bool isInsecureScriptAccess(DOMWindow& activeWindow, const String& urlString);
 
         void resetDOMWindowProperties();
@@ -456,6 +471,17 @@ namespace WebCore {
 
         String m_status;
         String m_defaultStatus;
+
+        enum PageStatus { PageStatusNone, PageStatusShown, PageStatusHidden };
+        PageStatus m_lastPageStatus;
+
+#if PLATFORM(IOS)
+        unsigned m_scrollEventListenerCount;
+#endif
+
+#if ENABLE(IOS_TOUCH_EVENTS) || ENABLE(IOS_GESTURE_EVENTS)
+        unsigned m_touchEventListenerCount;
+#endif
 
         mutable RefPtr<Storage> m_sessionStorage;
         mutable RefPtr<Storage> m_localStorage;

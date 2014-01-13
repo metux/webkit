@@ -88,8 +88,12 @@ AccessibilityObject::~AccessibilityObject()
     ASSERT(isDetached());
 }
 
-void AccessibilityObject::detach()
+void AccessibilityObject::detach(AccessibilityDetachmentType detachmentType, AXObjectCache* cache)
 {
+    // Menu close events need to notify the platform. No element is used in the notification because it's a destruction event.
+    if (detachmentType == ElementDestroyed && roleValue() == MenuRole && cache)
+        cache->postNotification(nullptr, &cache->document(), AXObjectCache::AXMenuClosed);
+    
     // Clear any children and call detachFromParent on them so that
     // no children are left with dangling pointers to their parent.
     clearChildren();
@@ -326,7 +330,7 @@ bool AccessibilityObject::hasMisspelling() const
     if (!textChecker)
         return false;
     
-    const UChar* chars = stringValue().characters();
+    const UChar* chars = stringValue().deprecatedCharacters();
     int charsLength = stringValue().length();
     bool isMisspelled = false;
 
@@ -1259,9 +1263,10 @@ FrameView* AccessibilityObject::documentFrameView() const
 }
 
 #if HAVE(ACCESSIBILITY)
-const AccessibilityObject::AccessibilityChildrenVector& AccessibilityObject::children()
+const AccessibilityObject::AccessibilityChildrenVector& AccessibilityObject::children(bool updateChildrenIfNeeded)
 {
-    updateChildrenIfNecessary();
+    if (updateChildrenIfNeeded)
+        updateChildrenIfNecessary();
 
     return m_children;
 }

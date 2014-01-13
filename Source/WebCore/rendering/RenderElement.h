@@ -31,7 +31,7 @@ class RenderElement : public RenderObject {
 public:
     virtual ~RenderElement();
 
-    static RenderElement* createFor(Element&, PassRef<RenderStyle>);
+    static RenderPtr<RenderElement> createFor(Element&, PassRef<RenderStyle>);
 
     bool hasInitializedStyle() const { return m_hasInitializedStyle; }
 
@@ -40,7 +40,7 @@ public:
 
     void initializeStyle();
 
-    virtual void setStyle(PassRef<RenderStyle>);
+    void setStyle(PassRef<RenderStyle>);
     // Called to update a style that is allowed to trigger animations.
     void setAnimatableStyle(PassRef<RenderStyle>);
 
@@ -120,8 +120,12 @@ public:
     bool isTransparent() const { return style().opacity() < 1.0f; }
     float opacity() const { return style().opacity(); }
 
+    bool visibleToHitTesting() const { return style().visibility() == VISIBLE && style().pointerEvents() != PE_NONE; }
+
     bool hasBackground() const { return style().hasBackground(); }
     bool hasMask() const { return style().hasMask(); }
+    bool hasClip() const { return isOutOfFlowPositioned() && style().hasClip(); }
+    bool hasClipOrOverflowClip() const { return hasClip() || hasOverflowClip(); }
     bool hasClipPath() const { return style().clipPath(); }
     bool hasHiddenBackface() const { return style().backfaceVisibility() == BackfaceVisibilityHidden; }
 
@@ -333,6 +337,18 @@ inline RenderElement* ContainerNode::renderer() const
 {
     return toRenderElement(Node::renderer());
 }
+
+inline int adjustForAbsoluteZoom(int value, const RenderElement& renderer)
+{
+    return adjustForAbsoluteZoom(value, renderer.style());
+}
+
+#if ENABLE(SUBPIXEL_LAYOUT)
+inline LayoutUnit adjustLayoutUnitForAbsoluteZoom(LayoutUnit value, const RenderElement& renderer)
+{
+    return adjustLayoutUnitForAbsoluteZoom(value, renderer.style());
+}
+#endif
 
 } // namespace WebCore
 

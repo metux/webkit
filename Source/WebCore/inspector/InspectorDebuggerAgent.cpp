@@ -34,14 +34,14 @@
 
 #include "CachedResource.h"
 #include "ContentSearchUtils.h"
-#include "InjectedScript.h"
-#include "InjectedScriptManager.h"
 #include "InspectorPageAgent.h"
 #include "InstrumentingAgents.h"
 #include "RegularExpression.h"
 #include "ScriptDebugServer.h"
 #include <bindings/ScriptObject.h>
 #include <bindings/ScriptValue.h>
+#include <inspector/InjectedScript.h>
+#include <inspector/InjectedScriptManager.h>
 #include <inspector/InspectorValues.h>
 #include <wtf/text/WTFString.h>
 
@@ -95,7 +95,6 @@ void InspectorDebuggerAgent::disable()
 
     stopListeningScriptDebugServer();
     scriptDebugServer().clearBreakpoints();
-    scriptDebugServer().clearCompiledScripts();
     scriptDebugServer().continueProgram();
     clear();
 
@@ -105,24 +104,9 @@ void InspectorDebuggerAgent::disable()
     m_enabled = false;
 }
 
-void InspectorDebuggerAgent::causesRecompilation(ErrorString*, bool* result)
-{
-    *result = scriptDebugServer().causesRecompilation();
-}
-
-void InspectorDebuggerAgent::canSetScriptSource(ErrorString*, bool* result)
-{
-    *result = scriptDebugServer().canSetScriptSource();
-}
-
-void InspectorDebuggerAgent::supportsSeparateScriptCompilationAndExecution(ErrorString*, bool* result)
-{
-    *result = scriptDebugServer().supportsSeparateScriptCompilationAndExecution();
-}
-
 void InspectorDebuggerAgent::enable(ErrorString*)
 {
-    if (enabled())
+    if (m_enabled)
         return;
 
     enable();
@@ -132,7 +116,7 @@ void InspectorDebuggerAgent::enable(ErrorString*)
 
 void InspectorDebuggerAgent::disable(ErrorString*)
 {
-    if (!enabled())
+    if (!m_enabled)
         return;
 
     disable();
@@ -163,11 +147,6 @@ void InspectorDebuggerAgent::setBreakpointsActive(ErrorString*, bool active)
 bool InspectorDebuggerAgent::isPaused()
 {
     return scriptDebugServer().isPaused();
-}
-
-bool InspectorDebuggerAgent::runningNestedMessageLoop()
-{
-    return scriptDebugServer().runningNestedMessageLoop();
 }
 
 void InspectorDebuggerAgent::addMessageToConsole(MessageSource source, MessageType type)
@@ -412,16 +391,6 @@ PassRefPtr<Inspector::TypeBuilder::Debugger::Location> InspectorDebuggerAgent::r
     return location;
 }
 
-static PassRefPtr<InspectorObject> scriptToInspectorObject(Deprecated::ScriptObject scriptObject)
-{
-    if (scriptObject.hasNoValue())
-        return 0;
-    RefPtr<InspectorValue> value = scriptObject.toInspectorValue(scriptObject.scriptState());
-    if (!value)
-        return 0;
-    return value->asObject();
-}
-
 void InspectorDebuggerAgent::searchInContent(ErrorString* error, const String& scriptIDStr, const String& query, const bool* const optionalCaseSensitive, const bool* const optionalIsRegex, RefPtr<Array<Inspector::TypeBuilder::GenericTypes::SearchMatch>>& results)
 {
     bool isRegex = optionalIsRegex ? *optionalIsRegex : false;
@@ -433,18 +402,6 @@ void InspectorDebuggerAgent::searchInContent(ErrorString* error, const String& s
         results = ContentSearchUtils::searchInTextByLines(it->value.source, query, caseSensitive, isRegex);
     else
         *error = "No script for id: " + scriptIDStr;
-}
-
-void InspectorDebuggerAgent::setScriptSource(ErrorString* error, const String& scriptID, const String& newContent, const bool* const preview, RefPtr<Array<Inspector::TypeBuilder::Debugger::CallFrame>>& newCallFrames, RefPtr<InspectorObject>& result)
-{
-    bool previewOnly = preview && *preview;
-    Deprecated::ScriptObject resultObject;
-    if (!scriptDebugServer().setScriptSource(scriptID, newContent, previewOnly, error, &m_currentCallStack, &resultObject))
-        return;
-    newCallFrames = currentCallFrames();
-    RefPtr<InspectorObject> object = scriptToInspectorObject(resultObject);
-    if (object)
-        result = object;
 }
 
 void InspectorDebuggerAgent::getScriptSource(ErrorString* error, const String& scriptIDStr, String* scriptSource)
@@ -539,11 +496,7 @@ void InspectorDebuggerAgent::setPauseOnExceptions(ErrorString* errorString, cons
         *errorString = "Unknown pause on exceptions mode: " + stringPauseState;
         return;
     }
-    setPauseOnExceptionsImpl(errorString, pauseState);
-}
 
-void InspectorDebuggerAgent::setPauseOnExceptionsImpl(ErrorString* errorString, int pauseState)
-{
     scriptDebugServer().setPauseOnExceptionsState(static_cast<ScriptDebugServer::PauseOnExceptionsState>(pauseState));
     if (scriptDebugServer().pauseOnExceptionsState() != pauseState)
         *errorString = "Internal error. Could not change pause on exceptions state";
@@ -567,60 +520,6 @@ void InspectorDebuggerAgent::evaluateOnCallFrame(ErrorString* errorString, const
     injectedScript.evaluateOnCallFrame(errorString, m_currentCallStack, callFrameId, expression, objectGroup ? *objectGroup : "", includeCommandLineAPI ? *includeCommandLineAPI : false, returnByValue ? *returnByValue : false, generatePreview ? *generatePreview : false, &result, wasThrown);
 
     if (doNotPauseOnExceptionsAndMuteConsole ? *doNotPauseOnExceptionsAndMuteConsole : false) {
-        unmuteConsole();
-        if (scriptDebugServer().pauseOnExceptionsState() != previousPauseOnExceptionsState)
-            scriptDebugServer().setPauseOnExceptionsState(previousPauseOnExceptionsState);
-    }
-}
-
-void InspectorDebuggerAgent::compileScript(ErrorString* errorString, const String& expression, const String& sourceURL, Inspector::TypeBuilder::OptOutput<ScriptId>* scriptID, Inspector::TypeBuilder::OptOutput<String>* syntaxErrorMessage)
-{
-    InjectedScript injectedScript = injectedScriptForEval(errorString, 0);
-    if (injectedScript.hasNoValue()) {
-        *errorString = "Inspected frame has gone";
-        return;
-    }
-
-    String scriptIDValue;
-    String exceptionMessage;
-    scriptDebugServer().compileScript(injectedScript.scriptState(), expression, sourceURL, &scriptIDValue, &exceptionMessage);
-    if (!scriptIDValue && !exceptionMessage) {
-        *errorString = "Script compilation failed";
-        return;
-    }
-    *syntaxErrorMessage = exceptionMessage;
-    *scriptID = scriptIDValue;
-}
-
-void InspectorDebuggerAgent::runScript(ErrorString* errorString, const ScriptId& scriptID, const int* executionContextId, const String* const objectGroup, const bool* const doNotPauseOnExceptionsAndMuteConsole, RefPtr<Inspector::TypeBuilder::Runtime::RemoteObject>& result, Inspector::TypeBuilder::OptOutput<bool>* wasThrown)
-{
-    InjectedScript injectedScript = injectedScriptForEval(errorString, executionContextId);
-    if (injectedScript.hasNoValue()) {
-        *errorString = "Inspected frame has gone";
-        return;
-    }
-
-    ScriptDebugServer::PauseOnExceptionsState previousPauseOnExceptionsState = scriptDebugServer().pauseOnExceptionsState();
-    if (doNotPauseOnExceptionsAndMuteConsole && *doNotPauseOnExceptionsAndMuteConsole) {
-        if (previousPauseOnExceptionsState != ScriptDebugServer::DontPauseOnExceptions)
-            scriptDebugServer().setPauseOnExceptionsState(ScriptDebugServer::DontPauseOnExceptions);
-        muteConsole();
-    }
-
-    Deprecated::ScriptValue value;
-    bool wasThrownValue;
-    String exceptionMessage;
-    scriptDebugServer().runScript(injectedScript.scriptState(), scriptID, &value, &wasThrownValue, &exceptionMessage);
-    *wasThrown = wasThrownValue;
-    if (value.hasNoValue()) {
-        *errorString = "Script execution failed";
-        return;
-    }
-    result = injectedScript.wrapObject(value, objectGroup ? *objectGroup : "");
-    if (wasThrownValue)
-        result->setDescription(exceptionMessage);
-
-    if (doNotPauseOnExceptionsAndMuteConsole && *doNotPauseOnExceptionsAndMuteConsole) {
         unmuteConsole();
         if (scriptDebugServer().pauseOnExceptionsState() != previousPauseOnExceptionsState)
             scriptDebugServer().setPauseOnExceptionsState(previousPauseOnExceptionsState);

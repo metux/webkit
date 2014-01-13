@@ -100,7 +100,7 @@ protected:
     virtual void defaultEventHandler(Event*) OVERRIDE;
 
     virtual bool requestObject(const String& url, const String& mimeType, const Vector<String>& paramNames, const Vector<String>& paramValues);
-    virtual RenderElement* createRenderer(PassRef<RenderStyle>) OVERRIDE;
+    virtual RenderPtr<RenderElement> createElementRenderer(PassRef<RenderStyle>) OVERRIDE;
     virtual void didAddUserAgentShadowRoot(ShadowRoot*) OVERRIDE;
 
     // Subclasses should use guardedDispatchBeforeLoadEvent instead of calling dispatchBeforeLoadEvent directly.
@@ -109,7 +109,7 @@ protected:
     bool m_inBeforeLoadEventHandler;
 
 private:
-    void swapRendererTimerFired(Timer<HTMLPlugInElement>*);
+    void swapRendererTimerFired(Timer<HTMLPlugInElement>&);
     bool shouldOverridePlugin(const String& url, const String& mimeType);
 
     bool dispatchBeforeLoadEvent(const String& sourceURL); // Not implemented, generates a compile error if subclasses call this by mistake.

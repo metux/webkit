@@ -557,6 +557,7 @@
 <ANCHOR id="WebKitResponsePolicyDecision-struct" href="webkit2gtk/WebKitResponsePolicyDecision.html#WebKitResponsePolicyDecision-struct">
 <ANCHOR id="webkit-response-policy-decision-get-request" href="webkit2gtk/WebKitResponsePolicyDecision.html#webkit-response-policy-decision-get-request">
 <ANCHOR id="webkit-response-policy-decision-get-response" href="webkit2gtk/WebKitResponsePolicyDecision.html#webkit-response-policy-decision-get-response">
+<ANCHOR id="webkit-response-policy-decision-is-mime-type-supported" href="webkit2gtk/WebKitResponsePolicyDecision.html#webkit-response-policy-decision-is-mime-type-supported">
 <ANCHOR id="WebKitResponsePolicyDecision.property-details" href="webkit2gtk/WebKitResponsePolicyDecision.html#WebKitResponsePolicyDecision.property-details">
 <ANCHOR id="WebKitResponsePolicyDecision--request" href="webkit2gtk/WebKitResponsePolicyDecision.html#WebKitResponsePolicyDecision--request">
 <ANCHOR id="WebKitResponsePolicyDecision--response" href="webkit2gtk/WebKitResponsePolicyDecision.html#WebKitResponsePolicyDecision--response">

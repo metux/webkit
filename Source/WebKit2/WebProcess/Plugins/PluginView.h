@@ -26,6 +26,7 @@
 #ifndef PluginView_h
 #define PluginView_h
 
+#include "LayerTreeContext.h"
 #include "NPRuntimeObjectMap.h"
 #include "Plugin.h"
 #include "PluginController.h"
@@ -37,6 +38,7 @@
 #include <WebCore/ResourceError.h>
 #include <WebCore/ResourceResponse.h>
 #include <WebCore/Timer.h>
+#include <WebCore/ViewState.h>
 #include <wtf/Deque.h>
 #include <wtf/RunLoop.h>
 
@@ -68,13 +70,14 @@ public:
     void manualLoadDidFinishLoading();
     void manualLoadDidFail(const WebCore::ResourceError&);
 
+    void viewStateDidChange(WebCore::ViewState::Flags changed);
+    void setLayerHostingMode(LayerHostingMode);
+
 #if PLATFORM(MAC)
-    void setWindowIsVisible(bool);
-    void setWindowIsFocused(bool);
+    void platformViewStateDidChange(WebCore::ViewState::Flags changed);
     void setDeviceScaleFactor(float);
     void windowAndViewFramesChanged(const WebCore::FloatRect& windowFrameInScreenCoordinates, const WebCore::FloatRect& viewFrameInWindowCoordinates);
     bool sendComplexTextInput(uint64_t pluginComplexTextInputIdentifier, const String& textInput);
-    void setLayerHostingMode(LayerHostingMode);
     RetainPtr<PDFDocument> pdfDocumentForPrinting() const { return m_plugin->pdfDocumentForPrinting(); }
     NSObject *accessibilityObject() const;
 #endif

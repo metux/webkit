@@ -18,6 +18,13 @@
 namespace Inspector {
 
 #if ENABLE(JAVASCRIPT_DEBUGGER)
+InspectorDebuggerBackendDispatcherHandler::~InspectorDebuggerBackendDispatcherHandler() { }
+#endif // ENABLE(JAVASCRIPT_DEBUGGER)
+InspectorInspectorBackendDispatcherHandler::~InspectorInspectorBackendDispatcherHandler() { }
+InspectorRuntimeBackendDispatcherHandler::~InspectorRuntimeBackendDispatcherHandler() { }
+
+
+#if ENABLE(JAVASCRIPT_DEBUGGER)
 
 PassRefPtr<InspectorDebuggerBackendDispatcher> InspectorDebuggerBackendDispatcher::create(InspectorBackendDispatcher* backendDispatcher, InspectorDebuggerBackendDispatcherHandler* agent)
 {
@@ -43,8 +50,6 @@ void InspectorDebuggerBackendDispatcher::dispatch(long callId, const String& met
             const char* name;
             CallHandler handler;
         } commands[] = {
-            { "causesRecompilation", &InspectorDebuggerBackendDispatcher::causesRecompilation },
-            { "supportsSeparateScriptCompilationAndExecution", &InspectorDebuggerBackendDispatcher::supportsSeparateScriptCompilationAndExecution },
             { "enable", &InspectorDebuggerBackendDispatcher::enable },
             { "disable", &InspectorDebuggerBackendDispatcher::disable },
             { "setBreakpointsActive", &InspectorDebuggerBackendDispatcher::setBreakpointsActive },
@@ -58,14 +63,10 @@ void InspectorDebuggerBackendDispatcher::dispatch(long callId, const String& met
             { "pause", &InspectorDebuggerBackendDispatcher::pause },
             { "resume", &InspectorDebuggerBackendDispatcher::resume },
             { "searchInContent", &InspectorDebuggerBackendDispatcher::searchInContent },
-            { "canSetScriptSource", &InspectorDebuggerBackendDispatcher::canSetScriptSource },
-            { "setScriptSource", &InspectorDebuggerBackendDispatcher::setScriptSource },
             { "getScriptSource", &InspectorDebuggerBackendDispatcher::getScriptSource },
             { "getFunctionDetails", &InspectorDebuggerBackendDispatcher::getFunctionDetails },
             { "setPauseOnExceptions", &InspectorDebuggerBackendDispatcher::setPauseOnExceptions },
             { "evaluateOnCallFrame", &InspectorDebuggerBackendDispatcher::evaluateOnCallFrame },
-            { "compileScript", &InspectorDebuggerBackendDispatcher::compileScript },
-            { "runScript", &InspectorDebuggerBackendDispatcher::runScript },
             { "setOverlayMessage", &InspectorDebuggerBackendDispatcher::setOverlayMessage },
         };
         size_t length = WTF_ARRAY_LENGTH(commands);
@@ -80,32 +81,6 @@ void InspectorDebuggerBackendDispatcher::dispatch(long callId, const String& met
     }
 
     ((*this).*it->value)(callId, *message.get());
-}
-
-void InspectorDebuggerBackendDispatcher::causesRecompilation(long callId, const InspectorObject&)
-{
-    ErrorString error;
-    RefPtr<InspectorObject> result = InspectorObject::create();
-    bool out_result;
-    m_agent->causesRecompilation(&error, &out_result);
-
-    if (!error.length())
-        result->setBoolean(ASCIILiteral("result"), out_result);
-
-    m_backendDispatcher->sendResponse(callId, result.release(), error);
-}
-
-void InspectorDebuggerBackendDispatcher::supportsSeparateScriptCompilationAndExecution(long callId, const InspectorObject&)
-{
-    ErrorString error;
-    RefPtr<InspectorObject> result = InspectorObject::create();
-    bool out_result;
-    m_agent->supportsSeparateScriptCompilationAndExecution(&error, &out_result);
-
-    if (!error.length())
-        result->setBoolean(ASCIILiteral("result"), out_result);
-
-    m_backendDispatcher->sendResponse(callId, result.release(), error);
 }
 
 void InspectorDebuggerBackendDispatcher::enable(long callId, const InspectorObject&)
@@ -324,51 +299,6 @@ void InspectorDebuggerBackendDispatcher::searchInContent(long callId, const Insp
     m_backendDispatcher->sendResponse(callId, result.release(), error);
 }
 
-void InspectorDebuggerBackendDispatcher::canSetScriptSource(long callId, const InspectorObject&)
-{
-    ErrorString error;
-    RefPtr<InspectorObject> result = InspectorObject::create();
-    bool out_result;
-    m_agent->canSetScriptSource(&error, &out_result);
-
-    if (!error.length())
-        result->setBoolean(ASCIILiteral("result"), out_result);
-
-    m_backendDispatcher->sendResponse(callId, result.release(), error);
-}
-
-void InspectorDebuggerBackendDispatcher::setScriptSource(long callId, const InspectorObject& message)
-{
-    RefPtr<InspectorArray> protocolErrors = InspectorArray::create();
-    RefPtr<InspectorObject> paramsContainer = message.getObject(ASCIILiteral("params"));
-    InspectorObject* paramsContainerPtr = paramsContainer.get();
-    InspectorArray* protocolErrorsPtr = protocolErrors.get();
-    String in_scriptId = InspectorBackendDispatcher::getString(paramsContainerPtr, ASCIILiteral("scriptId"), nullptr, protocolErrorsPtr);
-    String in_scriptSource = InspectorBackendDispatcher::getString(paramsContainerPtr, ASCIILiteral("scriptSource"), nullptr, protocolErrorsPtr);
-    bool preview_valueFound = false;
-    bool in_preview = InspectorBackendDispatcher::getBoolean(paramsContainerPtr, ASCIILiteral("preview"), &preview_valueFound, protocolErrorsPtr);
-    if (protocolErrors->length()) {
-        String errorMessage = String::format("Some arguments of method '%s' can't be processed", "Debugger.setScriptSource");
-        m_backendDispatcher->reportProtocolError(&callId, InspectorBackendDispatcher::InvalidParams, errorMessage, protocolErrors.release());
-        return;
-    }
-
-    ErrorString error;
-    RefPtr<InspectorObject> result = InspectorObject::create();
-    RefPtr<Inspector::TypeBuilder::Array<Inspector::TypeBuilder::Debugger::CallFrame> > out_callFrames;
-    RefPtr<Inspector::InspectorObject> out_result;
-    m_agent->setScriptSource(&error, in_scriptId, in_scriptSource, preview_valueFound ? &in_preview : nullptr, out_callFrames, out_result);
-
-    if (!error.length()) {
-        if (out_callFrames)
-            result->setValue(ASCIILiteral("callFrames"), out_callFrames);
-        if (out_result)
-            result->setValue(ASCIILiteral("result"), out_result);
-    }
-
-    m_backendDispatcher->sendResponse(callId, result.release(), error);
-}
-
 void InspectorDebuggerBackendDispatcher::getScriptSource(long callId, const InspectorObject& message)
 {
     RefPtr<InspectorArray> protocolErrors = InspectorArray::create();
@@ -466,70 +396,6 @@ void InspectorDebuggerBackendDispatcher::evaluateOnCallFrame(long callId, const 
     RefPtr<Inspector::TypeBuilder::Runtime::RemoteObject> out_result;
     Inspector::TypeBuilder::OptOutput<bool> out_wasThrown;
     m_agent->evaluateOnCallFrame(&error, in_callFrameId, in_expression, objectGroup_valueFound ? &in_objectGroup : nullptr, includeCommandLineAPI_valueFound ? &in_includeCommandLineAPI : nullptr, doNotPauseOnExceptionsAndMuteConsole_valueFound ? &in_doNotPauseOnExceptionsAndMuteConsole : nullptr, returnByValue_valueFound ? &in_returnByValue : nullptr, generatePreview_valueFound ? &in_generatePreview : nullptr, out_result, &out_wasThrown);
-
-    if (!error.length()) {
-        result->setValue(ASCIILiteral("result"), out_result);
-        if (out_wasThrown.isAssigned())
-            result->setBoolean(ASCIILiteral("wasThrown"), out_wasThrown.getValue());
-    }
-
-    m_backendDispatcher->sendResponse(callId, result.release(), error);
-}
-
-void InspectorDebuggerBackendDispatcher::compileScript(long callId, const InspectorObject& message)
-{
-    RefPtr<InspectorArray> protocolErrors = InspectorArray::create();
-    RefPtr<InspectorObject> paramsContainer = message.getObject(ASCIILiteral("params"));
-    InspectorObject* paramsContainerPtr = paramsContainer.get();
-    InspectorArray* protocolErrorsPtr = protocolErrors.get();
-    String in_expression = InspectorBackendDispatcher::getString(paramsContainerPtr, ASCIILiteral("expression"), nullptr, protocolErrorsPtr);
-    String in_sourceURL = InspectorBackendDispatcher::getString(paramsContainerPtr, ASCIILiteral("sourceURL"), nullptr, protocolErrorsPtr);
-    if (protocolErrors->length()) {
-        String errorMessage = String::format("Some arguments of method '%s' can't be processed", "Debugger.compileScript");
-        m_backendDispatcher->reportProtocolError(&callId, InspectorBackendDispatcher::InvalidParams, errorMessage, protocolErrors.release());
-        return;
-    }
-
-    ErrorString error;
-    RefPtr<InspectorObject> result = InspectorObject::create();
-    Inspector::TypeBuilder::OptOutput<Inspector::TypeBuilder::Debugger::ScriptId> out_scriptId;
-    Inspector::TypeBuilder::OptOutput<String> out_syntaxErrorMessage;
-    m_agent->compileScript(&error, in_expression, in_sourceURL, &out_scriptId, &out_syntaxErrorMessage);
-
-    if (!error.length()) {
-        if (out_scriptId.isAssigned())
-            result->setString(ASCIILiteral("scriptId"), out_scriptId.getValue());
-        if (out_syntaxErrorMessage.isAssigned())
-            result->setString(ASCIILiteral("syntaxErrorMessage"), out_syntaxErrorMessage.getValue());
-    }
-
-    m_backendDispatcher->sendResponse(callId, result.release(), error);
-}
-
-void InspectorDebuggerBackendDispatcher::runScript(long callId, const InspectorObject& message)
-{
-    RefPtr<InspectorArray> protocolErrors = InspectorArray::create();
-    RefPtr<InspectorObject> paramsContainer = message.getObject(ASCIILiteral("params"));
-    InspectorObject* paramsContainerPtr = paramsContainer.get();
-    InspectorArray* protocolErrorsPtr = protocolErrors.get();
-    String in_scriptId = InspectorBackendDispatcher::getString(paramsContainerPtr, ASCIILiteral("scriptId"), nullptr, protocolErrorsPtr);
-    bool contextId_valueFound = false;
-    int in_contextId = InspectorBackendDispatcher::getInt(paramsContainerPtr, ASCIILiteral("contextId"), &contextId_valueFound, protocolErrorsPtr);
-    bool objectGroup_valueFound = false;
-    String in_objectGroup = InspectorBackendDispatcher::getString(paramsContainerPtr, ASCIILiteral("objectGroup"), &objectGroup_valueFound, protocolErrorsPtr);
-    bool doNotPauseOnExceptionsAndMuteConsole_valueFound = false;
-    bool in_doNotPauseOnExceptionsAndMuteConsole = InspectorBackendDispatcher::getBoolean(paramsContainerPtr, ASCIILiteral("doNotPauseOnExceptionsAndMuteConsole"), &doNotPauseOnExceptionsAndMuteConsole_valueFound, protocolErrorsPtr);
-    if (protocolErrors->length()) {
-        String errorMessage = String::format("Some arguments of method '%s' can't be processed", "Debugger.runScript");
-        m_backendDispatcher->reportProtocolError(&callId, InspectorBackendDispatcher::InvalidParams, errorMessage, protocolErrors.release());
-        return;
-    }
-
-    ErrorString error;
-    RefPtr<InspectorObject> result = InspectorObject::create();
-    RefPtr<Inspector::TypeBuilder::Runtime::RemoteObject> out_result;
-    Inspector::TypeBuilder::OptOutput<bool> out_wasThrown;
-    m_agent->runScript(&error, in_scriptId, contextId_valueFound ? &in_contextId : nullptr, objectGroup_valueFound ? &in_objectGroup : nullptr, doNotPauseOnExceptionsAndMuteConsole_valueFound ? &in_doNotPauseOnExceptionsAndMuteConsole : nullptr, out_result, &out_wasThrown);
 
     if (!error.length()) {
         result->setValue(ASCIILiteral("result"), out_result);

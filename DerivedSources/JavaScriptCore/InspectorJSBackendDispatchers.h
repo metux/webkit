@@ -19,8 +19,6 @@ typedef String ErrorString;
 #if ENABLE(JAVASCRIPT_DEBUGGER)
 class JS_EXPORT_PRIVATE InspectorDebuggerBackendDispatcherHandler {
 public:
-    virtual void causesRecompilation(ErrorString*, bool* out_result) = 0;
-    virtual void supportsSeparateScriptCompilationAndExecution(ErrorString*, bool* out_result) = 0;
     virtual void enable(ErrorString*) = 0;
     virtual void disable(ErrorString*) = 0;
     virtual void setBreakpointsActive(ErrorString*, bool in_active) = 0;
@@ -34,17 +32,13 @@ public:
     virtual void pause(ErrorString*) = 0;
     virtual void resume(ErrorString*) = 0;
     virtual void searchInContent(ErrorString*, const String& in_scriptId, const String& in_query, const bool* in_caseSensitive, const bool* in_isRegex, RefPtr<Inspector::TypeBuilder::Array<Inspector::TypeBuilder::GenericTypes::SearchMatch> >& out_result) = 0;
-    virtual void canSetScriptSource(ErrorString*, bool* out_result) = 0;
-    virtual void setScriptSource(ErrorString*, const String& in_scriptId, const String& in_scriptSource, const bool* in_preview, RefPtr<Inspector::TypeBuilder::Array<Inspector::TypeBuilder::Debugger::CallFrame> >& opt_out_callFrames, RefPtr<Inspector::InspectorObject>& opt_out_result) = 0;
     virtual void getScriptSource(ErrorString*, const String& in_scriptId, String* out_scriptSource) = 0;
     virtual void getFunctionDetails(ErrorString*, const String& in_functionId, RefPtr<Inspector::TypeBuilder::Debugger::FunctionDetails>& out_details) = 0;
     virtual void setPauseOnExceptions(ErrorString*, const String& in_state) = 0;
     virtual void evaluateOnCallFrame(ErrorString*, const String& in_callFrameId, const String& in_expression, const String* in_objectGroup, const bool* in_includeCommandLineAPI, const bool* in_doNotPauseOnExceptionsAndMuteConsole, const bool* in_returnByValue, const bool* in_generatePreview, RefPtr<Inspector::TypeBuilder::Runtime::RemoteObject>& out_result, Inspector::TypeBuilder::OptOutput<bool>* opt_out_wasThrown) = 0;
-    virtual void compileScript(ErrorString*, const String& in_expression, const String& in_sourceURL, Inspector::TypeBuilder::OptOutput<Inspector::TypeBuilder::Debugger::ScriptId>* opt_out_scriptId, Inspector::TypeBuilder::OptOutput<String>* opt_out_syntaxErrorMessage) = 0;
-    virtual void runScript(ErrorString*, const String& in_scriptId, const int* in_contextId, const String* in_objectGroup, const bool* in_doNotPauseOnExceptionsAndMuteConsole, RefPtr<Inspector::TypeBuilder::Runtime::RemoteObject>& out_result, Inspector::TypeBuilder::OptOutput<bool>* opt_out_wasThrown) = 0;
     virtual void setOverlayMessage(ErrorString*, const String* in_message) = 0;
 protected:
-    virtual ~InspectorDebuggerBackendDispatcherHandler() { }
+    virtual ~InspectorDebuggerBackendDispatcherHandler();
 };
 
 #endif // ENABLE(JAVASCRIPT_DEBUGGER)
@@ -53,7 +47,7 @@ public:
     virtual void enable(ErrorString*) = 0;
     virtual void disable(ErrorString*) = 0;
 protected:
-    virtual ~InspectorInspectorBackendDispatcherHandler() { }
+    virtual ~InspectorInspectorBackendDispatcherHandler();
 };
 
 class JS_EXPORT_PRIVATE InspectorRuntimeBackendDispatcherHandler {
@@ -68,7 +62,7 @@ public:
     virtual void enable(ErrorString*) = 0;
     virtual void disable(ErrorString*) = 0;
 protected:
-    virtual ~InspectorRuntimeBackendDispatcherHandler() { }
+    virtual ~InspectorRuntimeBackendDispatcherHandler();
 };
 
 
@@ -79,8 +73,6 @@ public:
     static PassRefPtr<InspectorDebuggerBackendDispatcher> create(Inspector::InspectorBackendDispatcher*, InspectorDebuggerBackendDispatcherHandler*);
     virtual void dispatch(long callId, const String& method, PassRefPtr<Inspector::InspectorObject> message) OVERRIDE;
 private:
-    void causesRecompilation(long callId, const Inspector::InspectorObject& message);
-    void supportsSeparateScriptCompilationAndExecution(long callId, const Inspector::InspectorObject& message);
     void enable(long callId, const Inspector::InspectorObject& message);
     void disable(long callId, const Inspector::InspectorObject& message);
     void setBreakpointsActive(long callId, const Inspector::InspectorObject& message);
@@ -94,14 +86,10 @@ private:
     void pause(long callId, const Inspector::InspectorObject& message);
     void resume(long callId, const Inspector::InspectorObject& message);
     void searchInContent(long callId, const Inspector::InspectorObject& message);
-    void canSetScriptSource(long callId, const Inspector::InspectorObject& message);
-    void setScriptSource(long callId, const Inspector::InspectorObject& message);
     void getScriptSource(long callId, const Inspector::InspectorObject& message);
     void getFunctionDetails(long callId, const Inspector::InspectorObject& message);
     void setPauseOnExceptions(long callId, const Inspector::InspectorObject& message);
     void evaluateOnCallFrame(long callId, const Inspector::InspectorObject& message);
-    void compileScript(long callId, const Inspector::InspectorObject& message);
-    void runScript(long callId, const Inspector::InspectorObject& message);
     void setOverlayMessage(long callId, const Inspector::InspectorObject& message);
 private:
     InspectorDebuggerBackendDispatcher(Inspector::InspectorBackendDispatcher*, InspectorDebuggerBackendDispatcherHandler*);

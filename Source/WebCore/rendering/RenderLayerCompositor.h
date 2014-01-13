@@ -82,7 +82,8 @@ enum {
     CompositingReasonBlendingWithCompositedDescendants      = 1 << 20,
     CompositingReasonPerspective                            = 1 << 21,
     CompositingReasonPreserve3D                             = 1 << 22,
-    CompositingReasonRoot                                   = 1 << 23
+    CompositingReasonRoot                                   = 1 << 23,
+    CompositingReasonBlending                               = 1 << 24
 };
 typedef unsigned CompositingReasons;
 
@@ -334,7 +335,7 @@ private:
     void addToOverlapMap(OverlapMap&, RenderLayer&, IntRect& layerBounds, bool& boundsComputed);
     void addToOverlapMapRecursive(OverlapMap&, RenderLayer&, RenderLayer* ancestorLayer = nullptr);
 
-    void updateCompositingLayersTimerFired(Timer<RenderLayerCompositor>*);
+    void updateCompositingLayersTimerFired(Timer<RenderLayerCompositor>&);
 
     // Returns true if any layer's compositing changed
     void computeCompositingRequirements(RenderLayer* ancestorLayer, RenderLayer&, OverlapMap*, struct CompositingState&, bool& layersChanged, bool& descendantHas3DTransform);
@@ -392,7 +393,7 @@ private:
     bool requiresCompositingForScrollableFrame() const;
     bool requiresCompositingForPosition(RenderLayerModelObject&, const RenderLayer&, RenderLayer::ViewportConstrainedNotCompositedReason* = 0) const;
     bool requiresCompositingForOverflowScrolling(const RenderLayer&) const;
-    bool requiresCompositingForIndirectReason(RenderLayerModelObject&, bool hasCompositedDescendants, bool has3DTransformedDescendants, RenderLayer::IndirectCompositingReason&) const;
+    bool requiresCompositingForIndirectReason(RenderLayerModelObject&, bool hasCompositedDescendants, bool hasBlendedDescendants, bool has3DTransformedDescendants, RenderLayer::IndirectCompositingReason&) const;
 
 #if PLATFORM(IOS)
     bool requiresCompositingForScrolling(RenderLayerModelObject&) const;
@@ -426,9 +427,9 @@ private:
     void scheduleLayerFlushNow();
     bool isThrottlingLayerFlushes() const;
     void startLayerFlushTimerIfNeeded();
-    void layerFlushTimerFired(Timer<RenderLayerCompositor>*);
+    void layerFlushTimerFired(Timer<RenderLayerCompositor>&);
 
-    void paintRelatedMilestonesTimerFired(Timer<RenderLayerCompositor>*);
+    void paintRelatedMilestonesTimerFired(Timer<RenderLayerCompositor>&);
 
 #if !LOG_DISABLED
     const char* logReasonsForCompositing(const RenderLayer&);

@@ -46,6 +46,7 @@
 #include <WebCore/SuddenTermination.h>
 #include <WebCore/URL.h>
 #include <stdio.h>
+#include <wtf/NeverDestroyed.h>
 #include <wtf/RunLoop.h>
 #include <wtf/text/CString.h>
 #include <wtf/text/WTFString.h>
@@ -74,7 +75,7 @@ static uint64_t generatePageID()
 static WebProcessProxy::WebPageProxyMap& globalPageMap()
 {
     ASSERT(RunLoop::isMain());
-    DEFINE_STATIC_LOCAL(WebProcessProxy::WebPageProxyMap, pageMap, ());
+    static NeverDestroyed<WebProcessProxy::WebPageProxyMap> pageMap;
     return pageMap;
 }
 
@@ -109,7 +110,7 @@ void WebProcessProxy::getLaunchOptions(ProcessLauncher::LaunchOptions& launchOpt
     platformGetLaunchOptions(launchOptions);
 }
 
-void WebProcessProxy::connectionWillOpen(CoreIPC::Connection* connection)
+void WebProcessProxy::connectionWillOpen(IPC::Connection* connection)
 {
     ASSERT(this->connection() == connection);
 
@@ -123,7 +124,7 @@ void WebProcessProxy::connectionWillOpen(CoreIPC::Connection* connection)
     m_context->processWillOpenConnection(this);
 }
 
-void WebProcessProxy::connectionWillClose(CoreIPC::Connection* connection)
+void WebProcessProxy::connectionWillClose(IPC::Connection* connection)
 {
     ASSERT(this->connection() == connection);
 
@@ -169,7 +170,7 @@ PassRefPtr<WebPageProxy> WebProcessProxy::createWebPage(PageClient& pageClient, 
     m_pageMap.set(pageID, webPage.get());
     globalPageMap().set(pageID, webPage.get());
 #if PLATFORM(MAC)
-    if (pageIsProcessSuppressible(webPage.get()))
+    if (webPage->isProcessSuppressible())
         m_processSuppressiblePages.add(pageID);
     updateProcessSuppressionState();
 #endif
@@ -181,7 +182,7 @@ void WebProcessProxy::addExistingWebPage(WebPageProxy* webPage, uint64_t pageID)
     m_pageMap.set(pageID, webPage);
     globalPageMap().set(pageID, webPage);
 #if PLATFORM(MAC)
-    if (pageIsProcessSuppressible(webPage))
+    if (webPage->isProcessSuppressible())
         m_processSuppressiblePages.add(pageID);
     updateProcessSuppressionState();
 #endif
@@ -286,7 +287,7 @@ bool WebProcessProxy::fullKeyboardAccessEnabled()
 }
 #endif
 
-void WebProcessProxy::addBackForwardItem(uint64_t itemID, const String& originalURL, const String& url, const String& title, const CoreIPC::DataReference& backForwardData)
+void WebProcessProxy::addBackForwardItem(uint64_t itemID, const String& originalURL, const String& url, const String& title, const IPC::DataReference& backForwardData)
 {
     MESSAGE_CHECK_URL(originalURL);
     MESSAGE_CHECK_URL(url);
@@ -347,7 +348,7 @@ void WebProcessProxy::getDatabaseProcessConnection(PassRefPtr<Messages::WebProce
 }
 #endif // ENABLE(DATABASE_PROCESS)
 
-void WebProcessProxy::didReceiveMessage(CoreIPC::Connection* connection, CoreIPC::MessageDecoder& decoder)
+void WebProcessProxy::didReceiveMessage(IPC::Connection* connection, IPC::MessageDecoder& decoder)
 {
     if (dispatchMessage(connection, decoder))
         return;
@@ -363,7 +364,7 @@ void WebProcessProxy::didReceiveMessage(CoreIPC::Connection* connection, CoreIPC
     // FIXME: Add unhandled message logging.
 }
 
-void WebProcessProxy::didReceiveSyncMessage(CoreIPC::Connection* connection, CoreIPC::MessageDecoder& decoder, std::unique_ptr<CoreIPC::MessageEncoder>& replyEncoder)
+void WebProcessProxy::didReceiveSyncMessage(IPC::Connection* connection, IPC::MessageDecoder& decoder, std::unique_ptr<IPC::MessageEncoder>& replyEncoder)
 {
     if (dispatchSyncMessage(connection, decoder, replyEncoder))
         return;
@@ -379,7 +380,7 @@ void WebProcessProxy::didReceiveSyncMessage(CoreIPC::Connection* connection, Cor
     // FIXME: Add unhandled message logging.
 }
 
-void WebProcessProxy::didClose(CoreIPC::Connection*)
+void WebProcessProxy::didClose(IPC::Connection*)
 {
     // Protect ourselves, as the call to disconnect() below may otherwise cause us
     // to be deleted before we can finish our work.
@@ -397,7 +398,7 @@ void WebProcessProxy::didClose(CoreIPC::Connection*)
 
 }
 
-void WebProcessProxy::didReceiveInvalidMessage(CoreIPC::Connection* connection, CoreIPC::StringReference messageReceiverName, CoreIPC::StringReference messageName)
+void WebProcessProxy::didReceiveInvalidMessage(IPC::Connection* connection, IPC::StringReference messageReceiverName, IPC::StringReference messageName)
 {
     WTFLogAlways("Received an invalid message \"%s.%s\" from the web process.\n", messageReceiverName.toString().data(), messageName.toString().data());
 
@@ -406,7 +407,7 @@ void WebProcessProxy::didReceiveInvalidMessage(CoreIPC::Connection* connection, 
     // Terminate the WebProcess.
     terminate();
 
-    // Since we've invalidated the connection we'll never get a CoreIPC::Connection::Client::didClose
+    // Since we've invalidated the connection we'll never get a IPC::Connection::Client::didClose
     // callback so we'll explicitly call it here instead.
     didClose(connection);
 }
@@ -435,7 +436,7 @@ void WebProcessProxy::didBecomeResponsive(ResponsivenessTimer*)
         pages[i]->processDidBecomeResponsive();
 }
 
-void WebProcessProxy::didFinishLaunching(ProcessLauncher* launcher, CoreIPC::Connection::Identifier connectionIdentifier)
+void WebProcessProxy::didFinishLaunching(ProcessLauncher* launcher, IPC::Connection::Identifier connectionIdentifier)
 {
     ChildProcessProxy::didFinishLaunching(launcher, connectionIdentifier);
 
@@ -600,10 +601,10 @@ void WebProcessProxy::didUpdateHistoryTitle(uint64_t pageID, const String& title
     m_context->historyClient().didUpdateHistoryTitle(&m_context.get(), page, title, url, frame);
 }
 
-void WebProcessProxy::pageVisibilityChanged(WebKit::WebPageProxy *page)
+void WebProcessProxy::pageSuppressibilityChanged(WebKit::WebPageProxy *page)
 {
 #if PLATFORM(MAC)
-    if (pageIsProcessSuppressible(page))
+    if (page->isProcessSuppressible())
         m_processSuppressiblePages.add(page->pageID());
     else
         m_processSuppressiblePages.remove(page->pageID());
@@ -616,7 +617,7 @@ void WebProcessProxy::pageVisibilityChanged(WebKit::WebPageProxy *page)
 void WebProcessProxy::pagePreferencesChanged(WebKit::WebPageProxy *page)
 {
 #if PLATFORM(MAC)
-    if (pageIsProcessSuppressible(page))
+    if (page->isProcessSuppressible())
         m_processSuppressiblePages.add(page->pageID());
     else
         m_processSuppressiblePages.remove(page->pageID());
@@ -637,6 +638,11 @@ void WebProcessProxy::releasePageCache()
         send(Messages::WebProcess::ReleasePageCache(), 0);
 }
 
+void WebProcessProxy::windowServerConnectionStateChanged()
+{
+    for (const auto& page : m_pageMap.values())
+        page->viewStateDidChange(ViewState::IsVisuallyIdle);
+}
 
 void WebProcessProxy::requestTermination()
 {
@@ -650,7 +656,6 @@ void WebProcessProxy::requestTermination()
 
     disconnect();
 }
-
 
 void WebProcessProxy::enableSuddenTermination()
 {

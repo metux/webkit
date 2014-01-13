@@ -136,8 +136,10 @@ private:
             if (node->op() != otherNode->op())
                 continue;
             
-            if (node->arithNodeFlags() != otherNode->arithNodeFlags())
-                continue;
+            if (node->hasArithMode()) {
+                if (node->arithMode() != otherNode->arithMode())
+                    continue;
+            }
             
             Edge otherChild = otherNode->child1();
             if (!otherChild)
@@ -1051,7 +1053,7 @@ private:
         if (!node)
             return;
         ASSERT(node->mustGenerate());
-        node->setOpAndDefaultNonExitFlags(phantomType);
+        node->setOpAndDefaultFlags(phantomType);
         if (phantomType == Phantom)
             eliminateIrrelevantPhantomChildren(node);
         
@@ -1082,7 +1084,6 @@ private:
         case ArithSub:
         case ArithNegate:
         case ArithMul:
-        case ArithIMul:
         case ArithMod:
         case ArithDiv:
         case ArithAbs:
@@ -1239,7 +1240,6 @@ private:
             
         // Handle nodes that are conditionally pure: these are pure, and can
         // be CSE'd, so long as the prediction is the one we want.
-        case ValueAdd:
         case CompareLess:
         case CompareLessEq:
         case CompareGreater:

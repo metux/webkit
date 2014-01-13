@@ -80,6 +80,11 @@
 #include "GStreamerUtilities.h"
 #endif
 
+#if PLATFORM(IOS)
+#include "ScriptController.h"
+#include "Settings.h"
+#endif
+
 #include <runtime/ArrayBuffer.h>
 #include <wtf/Atomics.h>
 #include <wtf/MainThread.h>
@@ -629,7 +634,7 @@ void AudioContext::derefFinishedSourceNodes()
 void AudioContext::refNode(AudioNode* node)
 {
     ASSERT(isMainThread());
-    AutoLocker locker(this);
+    AutoLocker locker(*this);
     
     node->ref(AudioNode::RefTypeConnection);
     m_referencedNodes.append(node);
@@ -848,7 +853,7 @@ void AudioContext::deleteMarkedNodes()
     // Protect this object from being deleted before we release the mutex locked by AutoLocker.
     Ref<AudioContext> protect(*this);
     {
-        AutoLocker locker(this);
+        AutoLocker locker(*this);
 
         while (size_t n = m_nodesToDelete.size()) {
             AudioNode* node = m_nodesToDelete[n - 1];
@@ -880,7 +885,7 @@ void AudioContext::markSummingJunctionDirty(AudioSummingJunction* summingJunctio
 void AudioContext::removeMarkedSummingJunction(AudioSummingJunction* summingJunction)
 {
     ASSERT(isMainThread());
-    AutoLocker locker(this);
+    AutoLocker locker(*this);
     m_dirtySummingJunctions.remove(summingJunction);
 }
 

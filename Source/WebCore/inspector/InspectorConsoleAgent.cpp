@@ -29,13 +29,13 @@
 
 #include "InspectorConsoleAgent.h"
 
+#include "CommandLineAPIHost.h"
 #include "Console.h"
 #include "ConsoleMessage.h"
 #include "DOMWindow.h"
-#include "InjectedScriptHost.h"
-#include "InjectedScriptManager.h"
 #include "InspectorWebFrontendDispatchers.h"
 #include "InstrumentingAgents.h"
+#include "PageInjectedScriptManager.h"
 #include "ResourceError.h"
 #include "ResourceResponse.h"
 #include "ScriptArguments.h"
@@ -60,7 +60,7 @@ static const int expireConsoleMessagesStep = 100;
 
 int InspectorConsoleAgent::s_enabledAgentCount = 0;
 
-InspectorConsoleAgent::InspectorConsoleAgent(InstrumentingAgents* instrumentingAgents, InjectedScriptManager* injectedScriptManager)
+InspectorConsoleAgent::InspectorConsoleAgent(InstrumentingAgents* instrumentingAgents, PageInjectedScriptManager* injectedScriptManager)
     : InspectorAgentBase(ASCIILiteral("Console"), instrumentingAgents)
     , m_injectedScriptManager(injectedScriptManager)
     , m_previousMessage(0)
@@ -141,7 +141,7 @@ void InspectorConsoleAgent::willDestroyFrontendAndBackend()
 
 void InspectorConsoleAgent::addMessageToConsole(MessageSource source, MessageType type, MessageLevel level, const String& message, PassRefPtr<ScriptCallStack> callStack, unsigned long requestIdentifier)
 {
-    if (!developerExtrasEnabled())
+    if (!m_instrumentingAgents->inspectorEnvironment().developerExtrasEnabled())
         return;
 
     if (type == ClearMessageType) {
@@ -154,7 +154,7 @@ void InspectorConsoleAgent::addMessageToConsole(MessageSource source, MessageTyp
 
 void InspectorConsoleAgent::addMessageToConsole(MessageSource source, MessageType type, MessageLevel level, const String& message, JSC::ExecState* state, PassRefPtr<ScriptArguments> arguments, unsigned long requestIdentifier)
 {
-    if (!developerExtrasEnabled())
+    if (!m_instrumentingAgents->inspectorEnvironment().developerExtrasEnabled())
         return;
 
     if (type == ClearMessageType) {
@@ -167,7 +167,7 @@ void InspectorConsoleAgent::addMessageToConsole(MessageSource source, MessageTyp
 
 void InspectorConsoleAgent::addMessageToConsole(MessageSource source, MessageType type, MessageLevel level, const String& message, const String& scriptID, unsigned lineNumber, unsigned columnNumber, JSC::ExecState* state, unsigned long requestIdentifier)
 {
-    if (!developerExtrasEnabled())
+    if (!m_instrumentingAgents->inspectorEnvironment().developerExtrasEnabled())
         return;
 
     if (type == ClearMessageType) {
@@ -251,7 +251,7 @@ void InspectorConsoleAgent::frameWindowDiscarded(DOMWindow* window)
 
 void InspectorConsoleAgent::didFinishXHRLoading(unsigned long requestIdentifier, const String& url, const String& sendURL, unsigned sendLineNumber, unsigned sendColumnNumber)
 {
-    if (!developerExtrasEnabled())
+    if (!m_instrumentingAgents->inspectorEnvironment().developerExtrasEnabled())
         return;
     if (m_frontendDispatcher && m_monitoringXHREnabled) {
         String message = "XHR finished loading: \"" + url + "\".";
@@ -261,7 +261,7 @@ void InspectorConsoleAgent::didFinishXHRLoading(unsigned long requestIdentifier,
 
 void InspectorConsoleAgent::didReceiveResponse(unsigned long requestIdentifier, const ResourceResponse& response)
 {
-    if (!developerExtrasEnabled())
+    if (!m_instrumentingAgents->inspectorEnvironment().developerExtrasEnabled())
         return;
 
     if (response.httpStatusCode() >= 400) {
@@ -272,7 +272,7 @@ void InspectorConsoleAgent::didReceiveResponse(unsigned long requestIdentifier, 
 
 void InspectorConsoleAgent::didFailLoading(unsigned long requestIdentifier, const ResourceError& error)
 {
-    if (!developerExtrasEnabled())
+    if (!m_instrumentingAgents->inspectorEnvironment().developerExtrasEnabled())
         return;
     if (error.isCancellation()) // Report failures only.
         return;
@@ -299,7 +299,7 @@ static bool isGroupMessage(MessageType type)
 
 void InspectorConsoleAgent::addConsoleMessage(PassOwnPtr<ConsoleMessage> consoleMessage)
 {
-    ASSERT(developerExtrasEnabled());
+    ASSERT(m_instrumentingAgents->inspectorEnvironment().developerExtrasEnabled());
     ASSERT_ARG(consoleMessage, consoleMessage);
 
     if (m_previousMessage && !isGroupMessage(m_previousMessage->type()) && m_previousMessage->isEqual(consoleMessage.get())) {
@@ -319,10 +319,10 @@ void InspectorConsoleAgent::addConsoleMessage(PassOwnPtr<ConsoleMessage> console
     }
 }
 
-class InspectableHeapObject : public InjectedScriptHost::InspectableObject {
+class InspectableHeapObject FINAL : public CommandLineAPIHost::InspectableObject {
 public:
     explicit InspectableHeapObject(int heapObjectId) : m_heapObjectId(heapObjectId) { }
-    virtual Deprecated::ScriptValue get(JSC::ExecState*)
+    virtual Deprecated::ScriptValue get(JSC::ExecState*) OVERRIDE
     {
         return ScriptProfiler::objectByHeapObjectId(m_heapObjectId);
     }
@@ -332,7 +332,8 @@ private:
 
 void InspectorConsoleAgent::addInspectedHeapObject(ErrorString*, int inspectedHeapObjectId)
 {
-    m_injectedScriptManager->injectedScriptHost()->addInspectedObject(adoptPtr(new InspectableHeapObject(inspectedHeapObjectId)));
+    if (CommandLineAPIHost* commandLineAPIHost = m_injectedScriptManager->commandLineAPIHost())
+        commandLineAPIHost->addInspectedObject(adoptPtr(new InspectableHeapObject(inspectedHeapObjectId)));
 }
 
 } // namespace WebCore

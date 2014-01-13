@@ -113,7 +113,9 @@ protected:
     String m_url;
     URL m_loadedUrl;
 
-    static void updateWidgetCallback(Node*, unsigned = 0);
+    static void updateWidgetCallback(Node&, unsigned);
+    static void startLoadingImageCallback(Node&, unsigned);
+
     virtual void didAttachRenderers() OVERRIDE;
     virtual void willDetachRenderers() OVERRIDE;
 
@@ -125,13 +127,11 @@ protected:
     virtual void documentWillSuspendForPageCache() OVERRIDE;
     virtual void documentDidResumeFromPageCache() OVERRIDE;
 
-    virtual PassRefPtr<RenderStyle> customStyleForRenderer() OVERRIDE;
-
     virtual bool isRestartedPlugin() const OVERRIDE { return m_isRestartedPlugin; }
     virtual bool requestObject(const String& url, const String& mimeType, const Vector<String>& paramNames, const Vector<String>& paramValues) OVERRIDE;
 
 private:
-    virtual RenderElement* createRenderer(PassRef<RenderStyle>) OVERRIDE;
+    virtual RenderPtr<RenderElement> createElementRenderer(PassRef<RenderStyle>) OVERRIDE;
     virtual bool willRecalcStyle(Style::Change) OVERRIDE;
 
     virtual void didAddUserAgentShadowRoot(ShadowRoot*) OVERRIDE;
@@ -139,23 +139,23 @@ private:
     virtual void finishParsingChildren() OVERRIDE;
 
     void updateWidgetIfNecessary();
+    void startLoadingImage();
 
     virtual void updateSnapshot(PassRefPtr<Image>) OVERRIDE;
     virtual void dispatchPendingMouseClick() OVERRIDE;
-    void simulatedMouseClickTimerFired(DeferrableOneShotTimer<HTMLPlugInImageElement>*);
+    void simulatedMouseClickTimerFired(DeferrableOneShotTimer<HTMLPlugInImageElement>&);
 
     void restartSimilarPlugIns();
 
     virtual bool isPlugInImageElement() const OVERRIDE { return true; }
 
-    void removeSnapshotTimerFired(Timer<HTMLPlugInImageElement>*);
+    void removeSnapshotTimerFired(Timer<HTMLPlugInImageElement>&);
 
     virtual void defaultEventHandler(Event*) OVERRIDE;
 
     bool m_needsWidgetUpdate;
     bool m_shouldPreferPlugInsForImages;
     bool m_needsDocumentActivationCallbacks;
-    RefPtr<RenderStyle> m_customStyleForPageCache;
     RefPtr<MouseEvent> m_pendingClickEventFromSnapshot;
     DeferrableOneShotTimer<HTMLPlugInImageElement> m_simulatedMouseClickTimer;
     Timer<HTMLPlugInImageElement> m_removeSnapshotTimer;

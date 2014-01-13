@@ -221,6 +221,11 @@ String InspectorFrontendHost::localizedStringsURL()
     return m_client ? m_client->localizedStringsURL() : "";
 }
 
+String InspectorFrontendHost::debuggableType()
+{
+    return ASCIILiteral("web");
+}
+
 void InspectorFrontendHost::copyText(const String& text)
 {
     Pasteboard::createForCopyAndPaste()->writePlainText(text, Pasteboard::CannotSmartReplace);
@@ -306,31 +311,6 @@ String InspectorFrontendHost::loadResourceSynchronously(const String& url)
     ResourceResponse response;
     m_frontendPage->mainFrame().loader().loadResourceSynchronously(request, DoNotAllowStoredCredentials, DoNotAskClientForCrossOriginCredentials, error, response, data);
     return String::fromUTF8(data.data(), data.size());
-}
-
-bool InspectorFrontendHost::supportsFileSystems()
-{
-    if (m_client)
-        return m_client->supportsFileSystems();
-    return false;
-}
-
-void InspectorFrontendHost::requestFileSystems()
-{
-    if (m_client)
-        m_client->requestFileSystems();
-}
-
-void InspectorFrontendHost::addFileSystem()
-{
-    if (m_client)
-        m_client->addFileSystem();
-}
-
-void InspectorFrontendHost::removeFileSystem(const String& fileSystemPath)
-{
-    if (m_client)
-        m_client->removeFileSystem(fileSystemPath);
 }
 
 bool InspectorFrontendHost::isUnderTest()

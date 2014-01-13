@@ -43,6 +43,8 @@
                                                         (<em class="parameter"><code><a class="link" href="WebKitResponsePolicyDecision.html" title="WebKitResponsePolicyDecision"><span class="type">WebKitResponsePolicyDecision</span></a> *decision</code></em>);
 <a class="link" href="WebKitURIResponse.html" title="WebKitURIResponse"><span class="returnvalue">WebKitURIResponse</span></a> * <a class="link" href="WebKitResponsePolicyDecision.html#webkit-response-policy-decision-get-response" title="webkit_response_policy_decision_get_response ()">webkit_response_policy_decision_get_response</a>
                                                         (<em class="parameter"><code><a class="link" href="WebKitResponsePolicyDecision.html" title="WebKitResponsePolicyDecision"><span class="type">WebKitResponsePolicyDecision</span></a> *decision</code></em>);
+<a href="../glib/glib-Basic-Types.html#gboolean"><span class="returnvalue">gboolean</span></a>            <a class="link" href="WebKitResponsePolicyDecision.html#webkit-response-policy-decision-is-mime-type-supported" title="webkit_response_policy_decision_is_mime_type_supported ()">webkit_response_policy_decision_is_mime_type_supported</a>
+                                                        (<em class="parameter"><code><a class="link" href="WebKitResponsePolicyDecision.html" title="WebKitResponsePolicyDecision"><span class="type">WebKitResponsePolicyDecision</span></a> *decision</code></em>);
 </pre>
 </div>
 <div class="refsect1">
@@ -131,6 +133,35 @@ Gets the value of the <a class="link" href="WebKitResponsePolicyDecision.html#We
 </tr>
 </tbody>
 </table></div>
+</div>
+<hr>
+<div class="refsect2">
+<a name="webkit-response-policy-decision-is-mime-type-supported"></a><h3>webkit_response_policy_decision_is_mime_type_supported ()</h3>
+<pre class="programlisting"><a href="../glib/glib-Basic-Types.html#gboolean"><span class="returnvalue">gboolean</span></a>            webkit_response_policy_decision_is_mime_type_supported
+                                                        (<em class="parameter"><code><a class="link" href="WebKitResponsePolicyDecision.html" title="WebKitResponsePolicyDecision"><span class="type">WebKitResponsePolicyDecision</span></a> *decision</code></em>);</pre>
+<p>
+Gets whether the MIME type of the response can be displayed in the <a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a>
+that triggered this policy decision request. See also <a class="link" href="WebKitWebView.html#webkit-web-view-can-show-mime-type" title="webkit_web_view_can_show_mime_type ()"><code class="function">webkit_web_view_can_show_mime_type()</code></a>.
+</p>
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
+<col align="left" valign="top">
+<col>
+</colgroup>
+<tbody>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>decision</code></em> :</span></p></td>
+<td>a <a class="link" href="WebKitResponsePolicyDecision.html" title="WebKitResponsePolicyDecision"><span class="type">WebKitResponsePolicyDecision</span></a>
+</td>
+</tr>
+<tr>
+<td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
+<td>
+<a href="../glib/glib-Standard-Macros.html#TRUE:CAPS"><code class="literal">TRUE</code></a> if the MIME type of the response is supported or <a href="../glib/glib-Standard-Macros.html#FALSE:CAPS"><code class="literal">FALSE</code></a> otherwise</td>
+</tr>
+</tbody>
+</table></div>
+<p class="since">Since 2.4</p>
 </div>
 </div>
 <div class="refsect1">

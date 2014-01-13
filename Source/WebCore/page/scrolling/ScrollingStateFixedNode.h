@@ -26,7 +26,7 @@
 #ifndef ScrollingStateFixedNode_h
 #define ScrollingStateFixedNode_h
 
-#if ENABLE(THREADED_SCROLLING) || USE(COORDINATED_GRAPHICS)
+#if ENABLE(ASYNC_SCROLLING) || USE(COORDINATED_GRAPHICS)
 
 #include "ScrollingConstraints.h"
 #include "ScrollingStateNode.h"
@@ -39,9 +39,9 @@ class FixedPositionViewportConstraints;
 
 class ScrollingStateFixedNode FINAL : public ScrollingStateNode {
 public:
-    static PassOwnPtr<ScrollingStateFixedNode> create(ScrollingStateTree*, ScrollingNodeID);
+    static PassOwnPtr<ScrollingStateFixedNode> create(ScrollingStateTree&, ScrollingNodeID);
 
-    virtual PassOwnPtr<ScrollingStateNode> clone();
+    virtual PassOwnPtr<ScrollingStateNode> clone(ScrollingStateTree&);
 
     virtual ~ScrollingStateFixedNode();
 
@@ -53,10 +53,8 @@ public:
     const FixedPositionViewportConstraints& viewportConstraints() const { return m_constraints; }
 
 private:
-    ScrollingStateFixedNode(ScrollingStateTree*, ScrollingNodeID);
-    ScrollingStateFixedNode(const ScrollingStateFixedNode&);
-
-    virtual bool isFixedNode() const OVERRIDE { return true; }
+    ScrollingStateFixedNode(ScrollingStateTree&, ScrollingNodeID);
+    ScrollingStateFixedNode(const ScrollingStateFixedNode&, ScrollingStateTree&);
 
     virtual void syncLayerPositionForViewportRect(const LayoutRect& viewportRect) OVERRIDE;
 
@@ -65,10 +63,10 @@ private:
     FixedPositionViewportConstraints m_constraints;
 };
 
-SCROLLING_STATE_NODE_TYPE_CASTS(ScrollingStateFixedNode, isFixedNode());
+SCROLLING_STATE_NODE_TYPE_CASTS(ScrollingStateFixedNode, nodeType() == FixedNode);
 
 } // namespace WebCore
 
-#endif // ENABLE(THREADED_SCROLLING) || USE(COORDINATED_GRAPHICS)
+#endif // ENABLE(ASYNC_SCROLLING) || USE(COORDINATED_GRAPHICS)
 
 #endif // ScrollingStateFixedNode_h

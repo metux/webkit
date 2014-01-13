@@ -37,10 +37,6 @@
 #include <wtf/RefCounted.h>
 #include <wtf/text/WTFString.h>
 
-#if PLATFORM(BLACKBERRY)
-#include <wtf/ThreadSafeRefCounted.h>
-#endif
-
 // Annoyingly, wingdi.h #defines this.
 #ifdef PASSTHROUGH
 #undef PASSTHROUGH
@@ -54,11 +50,7 @@ namespace WebCore {
 class CachedSVGDocumentReference;
 #endif
 
-#if PLATFORM(BLACKBERRY)
-class FilterOperation : public ThreadSafeRefCounted<FilterOperation> {
-#else
 class FilterOperation : public RefCounted<FilterOperation> {
-#endif
 public:
     enum OperationType {
         REFERENCE, // url(#somefilter)
@@ -337,6 +329,11 @@ private:
     int m_stdDeviation;
     Color m_color;
 };
+
+#define FILTER_OPERATION_CASTS(ToValueTypeName, predicate) \
+    TYPE_CASTS_BASE(ToValueTypeName, FilterOperation, operation, operation->type() == FilterOperation::predicate, operation.type() == FilterOperation::predicate)
+
+FILTER_OPERATION_CASTS(ReferenceFilterOperation, REFERENCE)
 
 } // namespace WebCore
 

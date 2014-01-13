@@ -8,6 +8,7 @@ javascriptcore_h_api += \
 	Source/JavaScriptCore/API/WebKitAvailability.h
 
 javascriptcore_built_nosources += \
+	DerivedSources/JavaScriptCore/InjectedScriptSource.h \
 	DerivedSources/JavaScriptCore/KeywordLookup.h \
 	DerivedSources/JavaScriptCore/Lexer.lut.h \
 	DerivedSources/JavaScriptCore/RegExpJitTables.h \
@@ -22,7 +23,6 @@ javascriptcore_built_nosources += \
 	DerivedSources/JavaScriptCore/JSONObject.lut.h \
 	DerivedSources/JavaScriptCore/JSPromiseConstructor.lut.h \
 	DerivedSources/JavaScriptCore/JSPromisePrototype.lut.h \
-	DerivedSources/JavaScriptCore/JSPromiseResolverPrototype.lut.h \
 	DerivedSources/JavaScriptCore/MathObject.lut.h \
 	DerivedSources/JavaScriptCore/NamePrototype.lut.h \
 	DerivedSources/JavaScriptCore/NumberConstructor.lut.h \
@@ -212,6 +212,8 @@ javascriptcore_sources += \
 	Source/JavaScriptCore/dfg/DFGArgumentPosition.h \
 	Source/JavaScriptCore/dfg/DFGArgumentsSimplificationPhase.cpp \
 	Source/JavaScriptCore/dfg/DFGArgumentsSimplificationPhase.h \
+	Source/JavaScriptCore/dfg/DFGArithMode.cpp \
+	Source/JavaScriptCore/dfg/DFGArithMode.h \
 	Source/JavaScriptCore/dfg/DFGArrayMode.cpp \
 	Source/JavaScriptCore/dfg/DFGArrayMode.h \
 	Source/JavaScriptCore/dfg/DFGArrayifySlowPathGenerator.h \
@@ -387,6 +389,8 @@ javascriptcore_sources += \
 	Source/JavaScriptCore/dfg/DFGSSALoweringPhase.h \
 	Source/JavaScriptCore/dfg/DFGStackLayoutPhase.cpp \
 	Source/JavaScriptCore/dfg/DFGStackLayoutPhase.h \
+	Source/JavaScriptCore/dfg/DFGStoreBarrierElisionPhase.cpp \
+	Source/JavaScriptCore/dfg/DFGStoreBarrierElisionPhase.h \
 	Source/JavaScriptCore/dfg/DFGStrengthReductionPhase.cpp \
 	Source/JavaScriptCore/dfg/DFGStrengthReductionPhase.h \
 	Source/JavaScriptCore/dfg/DFGStructureAbstractValue.h \
@@ -500,6 +504,7 @@ javascriptcore_sources += \
 	Source/JavaScriptCore/heap/CopyVisitorInlines.h \
 	Source/JavaScriptCore/heap/CopyVisitor.cpp \
 	Source/JavaScriptCore/heap/CopyWorkList.h \
+	Source/JavaScriptCore/heap/CopyWriteBarrier.h \
 	Source/JavaScriptCore/heap/ConservativeRoots.cpp \
 	Source/JavaScriptCore/heap/ConservativeRoots.h \
     Source/JavaScriptCore/heap/DeferGC.cpp \
@@ -576,6 +581,8 @@ javascriptcore_sources += \
 	Source/JavaScriptCore/heap/WeakSet.h \
 	Source/JavaScriptCore/heap/WeakSetInlines.h \
 	Source/JavaScriptCore/heap/WeakReferenceHarvester.h \
+	Source/JavaScriptCore/heap/WriteBarrierBuffer.cpp \
+	Source/JavaScriptCore/heap/WriteBarrierBuffer.h \
 	Source/JavaScriptCore/heap/WriteBarrierSupport.cpp \
 	Source/JavaScriptCore/heap/WriteBarrierSupport.h \
 	Source/JavaScriptCore/config.h \
@@ -621,15 +628,32 @@ javascriptcore_sources += \
 	Source/JavaScriptCore/icu/unicode/utf_old.h \
 	Source/JavaScriptCore/icu/unicode/utypes.h \
 	Source/JavaScriptCore/icu/unicode/uversion.h \
+	Source/JavaScriptCore/inspector/InjectedScript.cpp \
+	Source/JavaScriptCore/inspector/InjectedScript.h \
+	Source/JavaScriptCore/inspector/InjectedScriptBase.cpp \
+	Source/JavaScriptCore/inspector/InjectedScriptBase.h \
+	Source/JavaScriptCore/inspector/InjectedScriptHost.cpp \
+	Source/JavaScriptCore/inspector/InjectedScriptHost.h \
+	Source/JavaScriptCore/inspector/InjectedScriptManager.cpp \
+	Source/JavaScriptCore/inspector/InjectedScriptManager.h \
+	Source/JavaScriptCore/inspector/InjectedScriptModule.cpp \
+	Source/JavaScriptCore/inspector/InjectedScriptModule.h \
 	Source/JavaScriptCore/inspector/InspectorAgentBase.h \
 	Source/JavaScriptCore/inspector/InspectorAgentRegistry.cpp \
 	Source/JavaScriptCore/inspector/InspectorAgentRegistry.h \
 	Source/JavaScriptCore/inspector/InspectorBackendDispatcher.cpp \
 	Source/JavaScriptCore/inspector/InspectorBackendDispatcher.h \
+	Source/JavaScriptCore/inspector/InspectorEnvironment.h \
 	Source/JavaScriptCore/inspector/InspectorFrontendChannel.h \
 	Source/JavaScriptCore/inspector/InspectorTypeBuilder.h \
 	Source/JavaScriptCore/inspector/InspectorValues.cpp \
 	Source/JavaScriptCore/inspector/InspectorValues.h \
+	Source/JavaScriptCore/inspector/JSInjectedScriptHost.cpp \
+	Source/JavaScriptCore/inspector/JSInjectedScriptHost.h \
+	Source/JavaScriptCore/inspector/JSInjectedScriptHostPrototype.cpp \
+	Source/JavaScriptCore/inspector/JSInjectedScriptHostPrototype.h \
+	Source/JavaScriptCore/inspector/agents/InspectorAgent.h \
+	Source/JavaScriptCore/inspector/agents/InspectorAgent.cpp \
 	Source/JavaScriptCore/interpreter/AbstractPC.cpp \
 	Source/JavaScriptCore/interpreter/AbstractPC.h \
 	Source/JavaScriptCore/interpreter/CachedCall.h \
@@ -972,18 +996,16 @@ javascriptcore_sources += \
 	Source/JavaScriptCore/runtime/JSONObject.h \
 	Source/JavaScriptCore/runtime/JSPromise.cpp \
 	Source/JavaScriptCore/runtime/JSPromise.h \
-	Source/JavaScriptCore/runtime/JSPromiseCallback.cpp \
-	Source/JavaScriptCore/runtime/JSPromiseCallback.h \
 	Source/JavaScriptCore/runtime/JSPromiseConstructor.cpp \
 	Source/JavaScriptCore/runtime/JSPromiseConstructor.h \
+	Source/JavaScriptCore/runtime/JSPromiseDeferred.cpp \
+	Source/JavaScriptCore/runtime/JSPromiseDeferred.h \
+	Source/JavaScriptCore/runtime/JSPromiseFunctions.cpp \
+	Source/JavaScriptCore/runtime/JSPromiseFunctions.h \
+	Source/JavaScriptCore/runtime/JSPromiseReaction.cpp \
+	Source/JavaScriptCore/runtime/JSPromiseReaction.h \
 	Source/JavaScriptCore/runtime/JSPromisePrototype.cpp \
 	Source/JavaScriptCore/runtime/JSPromisePrototype.h \
-	Source/JavaScriptCore/runtime/JSPromiseResolver.cpp \
-	Source/JavaScriptCore/runtime/JSPromiseResolver.h \
-	Source/JavaScriptCore/runtime/JSPromiseResolverConstructor.cpp \
-	Source/JavaScriptCore/runtime/JSPromiseResolverConstructor.h \
-	Source/JavaScriptCore/runtime/JSPromiseResolverPrototype.cpp \
-	Source/JavaScriptCore/runtime/JSPromiseResolverPrototype.h \
 	Source/JavaScriptCore/runtime/JSPropertyNameIterator.cpp \
 	Source/JavaScriptCore/runtime/JSPropertyNameIterator.h \
 	Source/JavaScriptCore/runtime/JSSegmentedVariableObject.cpp \
@@ -1044,6 +1066,7 @@ javascriptcore_sources += \
 	Source/JavaScriptCore/runtime/MathObject.cpp \
 	Source/JavaScriptCore/runtime/MathObject.h \
 	Source/JavaScriptCore/runtime/MemoryStatistics.h \
+	Source/JavaScriptCore/runtime/Microtask.h \
 	Source/JavaScriptCore/runtime/NameConstructor.cpp \
 	Source/JavaScriptCore/runtime/NameConstructor.h \
 	Source/JavaScriptCore/runtime/NameInstance.cpp \

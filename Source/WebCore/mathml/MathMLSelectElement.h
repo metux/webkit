@@ -37,7 +37,7 @@ public:
 
 private:
     MathMLSelectElement(const QualifiedName& tagName, Document&);
-    virtual RenderElement* createRenderer(PassRef<RenderStyle>) OVERRIDE;
+    virtual RenderPtr<RenderElement> createElementRenderer(PassRef<RenderStyle>) OVERRIDE;
 
     virtual bool childShouldCreateRenderer(const Node&) const OVERRIDE;
 
@@ -48,9 +48,11 @@ private:
     virtual bool willRespondToMouseClickEvents() OVERRIDE;
 
     void toggle();
-    int getSelectedChildAndIndex(Element*& selectedChild);
+    int getSelectedActionChildAndIndex(Element*& selectedChild);
+    Element* getSelectedActionChild();
+    Element* getSelectedSemanticsChild();
 
-    void updateSelectedChild();
+    void updateSelectedChild() OVERRIDE;
     Element* m_selectedChild;
 };
 

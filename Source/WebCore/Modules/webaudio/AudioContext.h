@@ -96,7 +96,6 @@ public:
     virtual void stop() OVERRIDE;
 
     Document* document() const; // ASSERTs if document no longer exists.
-    bool hasDocument();
 
     AudioDestinationNode* destination() { return m_destinationNode.get(); }
     size_t currentSampleFrame() const { return m_destinationNode->currentSampleFrame(); }
@@ -204,20 +203,20 @@ public:
 
     class AutoLocker {
     public:
-        AutoLocker(AudioContext* context)
+        explicit AutoLocker(AudioContext& context)
             : m_context(context)
         {
-            ASSERT(context);
-            context->lock(m_mustReleaseLock);
+            m_context.lock(m_mustReleaseLock);
         }
         
         ~AutoLocker()
         {
             if (m_mustReleaseLock)
-                m_context->unlock();
+                m_context.unlock();
         }
+
     private:
-        AudioContext* m_context;
+        AudioContext& m_context;
         bool m_mustReleaseLock;
     };
     
@@ -248,7 +247,6 @@ public:
     void fireCompletionEvent();
     
     static unsigned s_hardwareContextCount;
-
 
     // Restrictions to change default behaviors.
     enum BehaviorRestrictionFlags {

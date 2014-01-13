@@ -70,6 +70,7 @@
 #include "MainFrame.h"
 #include "MallocStatistics.h"
 #include "MediaPlayer.h"
+#include "MediaSessionManager.h"
 #include "MemoryCache.h"
 #include "MemoryInfo.h"
 #include "Page.h"
@@ -486,6 +487,7 @@ bool Internals::pauseTransitionAtTimeOnPseudoElement(const String& property, dou
     return frame()->animation().pauseTransitionAtTime(pseudoElement->renderer(), property, pauseTime);
 }
 
+// FIXME: Remove.
 bool Internals::attached(Node* node, ExceptionCode& ec)
 {
     if (!node) {
@@ -493,7 +495,7 @@ bool Internals::attached(Node* node, ExceptionCode& ec)
         return false;
     }
 
-    return node->attached();
+    return true;
 }
 
 String Internals::elementRenderTreeAsText(Element* element, ExceptionCode& ec)
@@ -502,6 +504,8 @@ String Internals::elementRenderTreeAsText(Element* element, ExceptionCode& ec)
         ec = INVALID_ACCESS_ERR;
         return String();
     }
+
+    element->document().updateStyleIfNeeded();
 
     String representation = externalRepresentation(element);
     if (representation.isEmpty()) {
@@ -749,6 +753,7 @@ unsigned Internals::markerCountForNode(Node* node, const String& markerType, Exc
 
 DocumentMarker* Internals::markerAt(Node* node, const String& markerType, unsigned index, ExceptionCode& ec)
 {
+    node->document().updateLayoutIgnorePendingStylesheets();
     if (!node) {
         ec = INVALID_ACCESS_ERR;
         return 0;
@@ -1203,6 +1208,8 @@ PassRefPtr<NodeList> Internals::nodesFromRect(Document* document, int centerX, i
     RenderView* renderView = document->renderView();
     if (!renderView)
         return 0;
+
+    document->updateLayoutIgnorePendingStylesheets();
 
     float zoomFactor = frame->pageZoomFactor();
     LayoutPoint point = roundedLayoutPoint(FloatPoint(centerX * zoomFactor + frameView->scrollX(), centerY * zoomFactor + frameView->scrollY()));
@@ -1698,7 +1705,7 @@ String Internals::mainThreadScrollingReasons(ExceptionCode& ec) const
     if (!page)
         return String();
 
-    return page->mainThreadScrollingReasonsAsText();
+    return page->synchronousScrollingReasonsAsText();
 }
 
 PassRefPtr<ClientRectList> Internals::nonFastScrollableRects(ExceptionCode& ec) const
@@ -1961,7 +1968,7 @@ void Internals::stopTrackingRepaints(ExceptionCode& ec)
     frameView->setTracksRepaints(false);
 }
 
-#if USE(LAZY_NATIVE_CURSOR)
+#if !PLATFORM(IOS)
 static const char* cursorTypeToString(Cursor::Type cursorType)
 {
     switch (cursorType) {
@@ -2024,9 +2031,9 @@ String Internals::getCurrentCursorInfo(ExceptionCode& ec)
         return String();
     }
 
+#if !PLATFORM(IOS)
     Cursor cursor = document->frame()->eventHandler().currentMouseCursor();
 
-#if USE(LAZY_NATIVE_CURSOR)
     StringBuilder result;
     result.append("type=");
     result.append(cursorTypeToString(cursor.type()));
@@ -2125,8 +2132,12 @@ bool Internals::isSelectPopupVisible(Node* node)
     if (!renderer->isMenuList())
         return false;
 
+#if !PLATFORM(IOS)
     RenderMenuList* menuList = toRenderMenuList(renderer);
     return menuList->popupIsVisible();
+#else
+    return false;
+#endif // !PLATFORM(IOS)
 }
 
 String Internals::captionsStyleSheetOverride(ExceptionCode& ec)
@@ -2264,5 +2275,20 @@ void Internals::initializeMockMediaSource()
     MediaPlayerFactorySupport::callRegisterMediaEngine(MockMediaPlayerMediaSource::registerMediaEngine);
 }
 #endif
+
+void Internals::beginMediaSessionInterruption()
+{
+    MediaSessionManager::sharedManager().beginInterruption();
+}
+
+void Internals::endMediaSessionInterruption(const String& flagsString)
+{
+    MediaSession::EndInterruptionFlags flags = MediaSession::NoFlags;
+
+    if (equalIgnoringCase(flagsString, "MayResumePlaying"))
+        flags = MediaSession::MayResumePlaying;
+    
+    MediaSessionManager::sharedManager().endInterruption(flags);
+}
 
 }

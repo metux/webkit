@@ -41,6 +41,7 @@
 #include "FrameLoader.h"
 #include "FrameLoaderClient.h"
 #include "HTMLAppletElement.h"
+#include "HTMLAudioElement.h"
 #include "HTMLFrameElementBase.h"
 #include "HTMLNames.h"
 #include "HTMLObjectElement.h"
@@ -242,7 +243,7 @@ PassRefPtr<Widget> SubframeLoader::loadMediaPlayerProxyPlugin(HTMLMediaElement& 
         completedURL = completeURL(url);
 
     if (!m_frame.document()->securityOrigin()->canDisplay(completedURL)) {
-        FrameLoader::reportLocalLoadFailed(m_frame, completedURL.string());
+        FrameLoader::reportLocalLoadFailed(&m_frame, completedURL.string());
         return nullptr;
     }
 
@@ -264,7 +265,7 @@ PassRefPtr<Widget> SubframeLoader::loadMediaPlayerProxyPlugin(HTMLMediaElement& 
 
     if (widget && renderer) {
         renderer->setWidget(widget);
-        renderer->node()->setNeedsStyleRecalc(SyntheticStyleChange);
+        renderer->frameOwnerElement().setNeedsStyleRecalc(SyntheticStyleChange);
     }
     m_containsPlugins = true;
 
@@ -432,6 +433,13 @@ bool SubframeLoader::loadPlugin(HTMLPlugInImageElement& pluginElement, const URL
 
     IntSize contentSize = roundedIntSize(LayoutSize(renderer->contentWidth(), renderer->contentHeight()));
     bool loadManually = document()->isPluginDocument() && !m_containsPlugins && toPluginDocument(document())->shouldLoadPluginManually();
+
+#if PLATFORM(IOS)
+    // On iOS, we only tell the plugin to be in full page mode if the containing plugin document is the top level document.
+    if (document()->ownerElement())
+        loadManually = false;
+#endif
+
     RefPtr<Widget> widget = m_frame.loader().client().createPlugin(contentSize, &pluginElement, url, paramNames, paramValues, mimeType, loadManually);
 
     if (!widget) {
@@ -445,7 +453,7 @@ bool SubframeLoader::loadPlugin(HTMLPlugInImageElement& pluginElement, const URL
     m_containsPlugins = true;
  
 #if ENABLE(PLUGIN_PROXY_FOR_VIDEO)
-    pluginElement->setNeedsStyleRecalc(SyntheticStyleChange);
+    pluginElement.setNeedsStyleRecalc(SyntheticStyleChange);
 #endif
     return true;
 }

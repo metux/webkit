@@ -33,13 +33,17 @@
 
 #if ENABLE(INSPECTOR)
 
+#include "InspectorInstrumentationCookie.h"
 #include <inspector/InspectorAgentRegistry.h>
+#include <inspector/InspectorEnvironment.h>
 #include <wtf/Forward.h>
 #include <wtf/HashMap.h>
 #include <wtf/Noncopyable.h>
+#include <wtf/Vector.h>
 #include <wtf/text/WTFString.h>
 
 namespace Inspector {
+class InspectorAgent;
 class InspectorObject;
 class InspectorFrontendChannel;
 class InspectorBackendDispatcher;
@@ -50,8 +54,6 @@ namespace WebCore {
 class DOMWrapperWorld;
 class Frame;
 class GraphicsContext;
-class InjectedScriptManager;
-class InspectorAgent;
 class InspectorApplicationCacheAgent;
 class InspectorClient;
 class InspectorDOMAgent;
@@ -66,16 +68,16 @@ class InspectorResourceAgent;
 class InstrumentingAgents;
 class IntSize;
 class Page;
-class PostWorkerNotificationToFrontendTask;
+class PageInjectedScriptManager;
 class Node;
 
 struct Highlight;
 
-class InspectorController {
+class InspectorController FINAL : public Inspector::InspectorEnvironment {
     WTF_MAKE_NONCOPYABLE(InspectorController);
     WTF_MAKE_FAST_ALLOCATED;
 public:
-    ~InspectorController();
+    virtual ~InspectorController();
 
     static PassOwnPtr<InspectorController> create(Page*, InspectorClient*);
     void inspectedPageDestroyed();
@@ -134,17 +136,23 @@ public:
     void willComposite();
     void didComposite();
 
+    virtual bool developerExtrasEnabled() const OVERRIDE;
+    virtual bool canAccessInspectedScriptState(JSC::ExecState*) const OVERRIDE;
+    virtual Inspector::InspectorFunctionCallHandler functionCallHandler() const OVERRIDE;
+    virtual Inspector::InspectorEvaluateHandler evaluateHandler() const OVERRIDE;
+    virtual void willCallInjectedScriptFunction(JSC::ExecState*, const String& scriptName, int scriptLine) OVERRIDE;
+    virtual void didCallInjectedScriptFunction() OVERRIDE;
+
 private:
     InspectorController(Page*, InspectorClient*);
 
-    friend class PostWorkerNotificationToFrontendTask;
     friend InstrumentingAgents* instrumentationForPage(Page*);
 
     RefPtr<InstrumentingAgents> m_instrumentingAgents;
-    OwnPtr<InjectedScriptManager> m_injectedScriptManager;
+    std::unique_ptr<PageInjectedScriptManager> m_injectedScriptManager;
     OwnPtr<InspectorOverlay> m_overlay;
 
-    InspectorAgent* m_inspectorAgent;
+    Inspector::InspectorAgent* m_inspectorAgent;
     InspectorDOMAgent* m_domAgent;
     InspectorResourceAgent* m_resourceAgent;
     InspectorPageAgent* m_pageAgent;
@@ -161,6 +169,7 @@ private:
     Page* m_page;
     InspectorClient* m_inspectorClient;
     Inspector::InspectorAgentRegistry m_agents;
+    Vector<InspectorInstrumentationCookie, 2> m_injectedScriptInstrumentationCookies;
     bool m_isUnderTest;
 
 #if ENABLE(REMOTE_INSPECTOR)
