@@ -1,0 +1,61 @@
+From: Alberto Garcia <berto@igalia.com>
+Subject: Restore removed SPARC code
+Bug: https://bugs.webkit.org/show_bug.cgi?id=124941
+Index: webkit/Source/WTF/wtf/Platform.h
+===================================================================
+--- webkit.orig/Source/WTF/wtf/Platform.h	2014-01-13 11:17:58.000000000 +0000
++++ webkit/Source/WTF/wtf/Platform.h	2014-01-15 10:42:11.087883129 +0000
+@@ -124,6 +124,23 @@
+ #define WTF_CPU_SH4 1
+ #endif
+ 
++/* CPU(SPARC32) - SPARC 32-bit */
++#if defined(__sparc) && !defined(__arch64__) || defined(__sparcv8)
++#define WTF_CPU_SPARC32 1
++#define WTF_CPU_BIG_ENDIAN 1
++#endif
++
++/* CPU(SPARC64) - SPARC 64-bit */
++#if defined(__sparc__) && defined(__arch64__) || defined (__sparcv9)
++#define WTF_CPU_SPARC64 1
++#define WTF_CPU_BIG_ENDIAN 1
++#endif
++
++/* CPU(SPARC) - any SPARC, true for CPU(SPARC32) and CPU(SPARC64) */
++#if CPU(SPARC32) || CPU(SPARC64)
++#define WTF_CPU_SPARC 1
++#endif
++
+ /* CPU(S390X) - S390 64-bit */
+ #if defined(__s390x__)
+ #define WTF_CPU_S390X 1
+@@ -313,7 +330,7 @@
+ 
+ #endif /* ARM */
+ 
+-#if CPU(ARM) || CPU(MIPS) || CPU(SH4)
++#if CPU(ARM) || CPU(MIPS) || CPU(SH4) || CPU(SPARC)
+ #define WTF_CPU_NEEDS_ALIGNED_ACCESS 1
+ #endif
+ 
+@@ -644,6 +661,7 @@
+     || (CPU(IA64) && !CPU(IA64_32)) \
+     || CPU(ALPHA) \
+     || CPU(ARM64) \
++    || CPU(SPARC64) \
+     || CPU(S390X) \
+     || CPU(PPC64)
+ #define WTF_USE_JSVALUE64 1
+Index: webkit/Source/WTF/wtf/dtoa/utils.h
+===================================================================
+--- webkit.orig/Source/WTF/wtf/dtoa/utils.h	2013-12-18 23:15:44.000000000 +0000
++++ webkit/Source/WTF/wtf/dtoa/utils.h	2014-01-15 10:42:11.091883124 +0000
+@@ -49,7 +49,7 @@
+ defined(__ARMEL__) || \
+ defined(_MIPS_ARCH_MIPS32R2)
+ #define DOUBLE_CONVERSION_CORRECT_DOUBLE_OPERATIONS 1
+-#elif CPU(MIPS) || CPU(PPC) || CPU(PPC64) || OS(WINCE) || CPU(SH4) || CPU(S390) || CPU(S390X) || CPU(IA64) || CPU(ALPHA) || CPU(ARM64) || CPU(HPPA)
++#elif CPU(MIPS) || CPU(PPC) || CPU(PPC64) || OS(WINCE) || CPU(SH4) || CPU(S390) || CPU(S390X) || CPU(IA64) || CPU(SPARC) || CPU(ALPHA) || CPU(ARM64) || CPU(HPPA)
+ #define DOUBLE_CONVERSION_CORRECT_DOUBLE_OPERATIONS 1
+ #elif defined(_M_IX86) || defined(__i386__)
+ #if defined(_WIN32)
