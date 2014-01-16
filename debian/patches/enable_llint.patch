@@ -1,0 +1,16 @@
+From: Alberto Garcia <berto@igalia.com>
+Subject: Enable LLINT in FreeBSD and Hurd
+Bug: https://bugs.webkit.org/show_bug.cgi?id=126502
+Index: webkit/Source/WTF/wtf/Platform.h
+===================================================================
+--- webkit.orig/Source/WTF/wtf/Platform.h	2014-01-15 10:42:45.903858964 +0000
++++ webkit/Source/WTF/wtf/Platform.h	2014-01-15 11:25:36.601767642 +0000
+@@ -712,7 +712,7 @@
+    low-level interpreter. */
+ #if !defined(ENABLE_LLINT) \
+     && ENABLE(JIT) \
+-    && (OS(DARWIN) || OS(LINUX)) \
++    && (OS(DARWIN) || OS(LINUX) || OS(FREEBSD) || OS(HURD)) \
+     && (PLATFORM(MAC) || PLATFORM(IOS) || PLATFORM(GTK)) \
+     && (CPU(X86) || CPU(X86_64) || CPU(ARM_THUMB2) || CPU(ARM_TRADITIONAL) || CPU(ARM64) || CPU(MIPS) || CPU(SH4))
+ #define ENABLE_LLINT 1

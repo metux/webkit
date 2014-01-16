@@ -2,6 +2,8 @@ webkitgtk (2.3.4-2) UNRELEASED; urgency=low
 
   * debian/patches/x86_asm_fix.patch:
     + Fix build failure on x86 due to incorrect asm generation.
+  * debian/patches/enable_llint.patch:
+    + Enable LLINT in FreeBSD and Hurd.
 
  -- Alberto Garcia <berto@igalia.com>  Thu, 16 Jan 2014 08:24:51 +0000
 
