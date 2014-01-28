@@ -1,4 +1,4 @@
-webkitgtk (2.3.4-3) UNRELEASED; urgency=low
+webkitgtk (2.3.4-3) experimental; urgency=low
 
   * debian/patches/atomic_build_fix.patch:
     + Add -latomic to fix build in some architectures.
@@ -7,7 +7,7 @@ webkitgtk (2.3.4-3) UNRELEASED; urgency=low
   * debian/patches/enable_llint.patch:
     + Refresh.
 
- -- Alberto Garcia <berto@igalia.com>  Tue, 28 Jan 2014 10:43:40 +0000
+ -- Alberto Garcia <berto@igalia.com>  Tue, 28 Jan 2014 10:47:31 +0000
 
 webkitgtk (2.3.4-2) experimental; urgency=low
 
