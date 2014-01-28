@@ -4,6 +4,8 @@ webkitgtk (2.3.4-3) UNRELEASED; urgency=low
     + Add -latomic to fix build in some architectures.
   * debian/patches/x86_asm_fix.patch:
     + Update patch with a better fix.
+  * debian/patches/enable_llint.patch:
+    + Refresh.
 
  -- Alberto Garcia <berto@igalia.com>  Tue, 28 Jan 2014 10:43:40 +0000
 
