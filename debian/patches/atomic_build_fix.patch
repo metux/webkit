@@ -1,0 +1,14 @@
+From: Alberto Garcia <berto@igalia.com>
+Subject: Add -latomic to fix build in some architectures
+Index: webkit/Source/WebKit2/GNUmakefile.am
+===================================================================
+--- webkit.orig/Source/WebKit2/GNUmakefile.am
++++ webkit/Source/WebKit2/GNUmakefile.am
+@@ -767,6 +767,7 @@ Programs_WebKitPluginProcess_SOURCES = \
+ 	$(webkit2_plugin_process_sources)
+ 
+ Programs_WebKitPluginProcess_LDADD = \
++	-latomic \
+ 	-lpthread \
+ 	libjavascriptcoregtk-@WEBKITGTK_API_MAJOR_VERSION@.@WEBKITGTK_API_MINOR_VERSION@.la \
+ 	libWebCoreLayerGtk2.a \
