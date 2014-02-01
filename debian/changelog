@@ -1,3 +1,10 @@
+webkitgtk (2.3.4-4) UNRELEASED; urgency=low
+
+  * debian/patches/atomic_build_fix.patch:
+    + Update the patch with a fix that actually works.
+
+ -- Alberto Garcia <berto@igalia.com>  Sat, 01 Feb 2014 09:18:42 +0000
+
 webkitgtk (2.3.4-3) experimental; urgency=low
 
   * debian/patches/atomic_build_fix.patch:
