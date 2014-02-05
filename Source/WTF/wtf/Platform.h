@@ -426,8 +426,6 @@
 #define WTF_PLATFORM_EFL 1
 #elif defined(BUILDING_GTK__)
 #define WTF_PLATFORM_GTK 1
-#elif defined(BUILDING_NIX__)
-#include "nix/PlatformNix.h"
 #elif OS(DARWIN)
 #define WTF_PLATFORM_COCOA 1
 #define WTF_PLATFORM_MAC 1
@@ -472,10 +470,6 @@
 #define WTF_USE_QUERY_PERFORMANCE_COUNTER  1
 #endif
 
-#if !USE(WCHAR_UNICODE)
-#define WTF_USE_ICU_UNICODE 1
-#endif
-
 #if PLATFORM(COCOA)
 
 #define WTF_USE_CF 1
@@ -516,7 +510,9 @@
 #define HAVE_READLINE 1
 #define WTF_USE_CFNETWORK 1
 #define WTF_USE_NETWORK_CFDATA_ARRAY_CALLBACK 1
+#define WTF_USE_UIKIT_EDITING 1
 #define WTF_USE_WEB_THREAD 1
+#define WTF_USE_QUICK_LOOK 1
 
 #if CPU(ARM64)
 #define ENABLE_JIT_CONSTANT_BLINDING 0
@@ -712,7 +708,7 @@
    low-level interpreter. */
 #if !defined(ENABLE_LLINT) \
     && ENABLE(JIT) \
-    && (OS(DARWIN) || OS(LINUX)) \
+    && (OS(DARWIN) || OS(LINUX) || OS(FREEBSD)) \
     && (PLATFORM(MAC) || PLATFORM(IOS) || PLATFORM(GTK)) \
     && (CPU(X86) || CPU(X86_64) || CPU(ARM_THUMB2) || CPU(ARM_TRADITIONAL) || CPU(ARM64) || CPU(MIPS) || CPU(SH4))
 #define ENABLE_LLINT 1
@@ -859,7 +855,11 @@
 
 /* CSS Selector JIT Compiler */
 #if !defined(ENABLE_CSS_SELECTOR_JIT)
+#if CPU(X86_64) && ENABLE(JIT) && PLATFORM(MAC)
+#define ENABLE_CSS_SELECTOR_JIT 1
+#else
 #define ENABLE_CSS_SELECTOR_JIT 0
+#endif
 #endif
 
 /* Accelerated compositing */
@@ -1040,7 +1040,7 @@
 #define ENABLE_OPENTYPE_VERTICAL 1
 #endif
 
-#if ENABLE(CSS3_TEXT_DECORATION) && PLATFORM(MAC)
+#if PLATFORM(MAC)
 #define ENABLE_CSS3_TEXT_DECORATION_SKIP_INK 1
 #endif
 

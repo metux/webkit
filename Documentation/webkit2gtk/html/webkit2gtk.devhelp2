@@ -51,6 +51,7 @@
   <functions>
     <keyword type="struct" name="struct WebKitWebContext" link="WebKitWebContext.html#WebKitWebContext-struct"/>
     <keyword type="enum" name="enum WebKitCacheModel" link="WebKitWebContext.html#WebKitCacheModel"/>
+    <keyword type="enum" name="enum WebKitProcessModel" link="WebKitWebContext.html#WebKitProcessModel" since="2.4"/>
     <keyword type="enum" name="enum WebKitTLSErrorsPolicy" link="WebKitWebContext.html#WebKitTLSErrorsPolicy"/>
     <keyword type="function" name="webkit_web_context_get_default ()" link="WebKitWebContext.html#webkit-web-context-get-default"/>
     <keyword type="function" name="webkit_web_context_get_cache_model ()" link="WebKitWebContext.html#webkit-web-context-get-cache-model"/>
@@ -73,12 +74,16 @@
     <keyword type="function" name="webkit_web_context_set_tls_errors_policy ()" link="WebKitWebContext.html#webkit-web-context-set-tls-errors-policy"/>
     <keyword type="function" name="webkit_web_context_get_tls_errors_policy ()" link="WebKitWebContext.html#webkit-web-context-get-tls-errors-policy"/>
     <keyword type="function" name="webkit_web_context_set_web_extensions_directory ()" link="WebKitWebContext.html#webkit-web-context-set-web-extensions-directory"/>
+    <keyword type="function" name="webkit_web_context_set_web_extensions_initialization_user_data ()" link="WebKitWebContext.html#webkit-web-context-set-web-extensions-initialization-user-data" since="2.4"/>
     <keyword type="function" name="webkit_web_context_prefetch_dns ()" link="WebKitWebContext.html#webkit-web-context-prefetch-dns"/>
     <keyword type="function" name="webkit_web_context_set_disk_cache_directory ()" link="WebKitWebContext.html#webkit-web-context-set-disk-cache-directory"/>
     <keyword type="function" name="webkit_web_context_allow_tls_certificate_for_host ()" link="WebKitWebContext.html#webkit-web-context-allow-tls-certificate-for-host" since="2.4"/>
+    <keyword type="function" name="webkit_web_context_get_process_model ()" link="WebKitWebContext.html#webkit-web-context-get-process-model" since="2.4"/>
+    <keyword type="function" name="webkit_web_context_set_process_model ()" link="WebKitWebContext.html#webkit-web-context-set-process-model" since="2.4"/>
     <keyword type="function" name="WebKitURISchemeRequestCallback ()" link="WebKitWebContext.html#WebKitURISchemeRequestCallback"/>
     <keyword type="function" name="webkit_web_context_register_uri_scheme ()" link="WebKitWebContext.html#webkit-web-context-register-uri-scheme"/>
     <keyword type="signal" name="The &quot;download-started&quot; signal" link="WebKitWebContext.html#WebKitWebContext-download-started"/>
+    <keyword type="signal" name="The &quot;initialize-web-extensions&quot; signal" link="WebKitWebContext.html#WebKitWebContext-initialize-web-extensions"/>
     <keyword type="struct" name="WebKitWebView" link="WebKitWebView.html#WebKitWebView-struct"/>
     <keyword type="enum" name="enum WebKitLoadEvent" link="WebKitWebView.html#WebKitLoadEvent"/>
     <keyword type="enum" name="enum WebKitPolicyDecisionType" link="WebKitWebView.html#WebKitPolicyDecisionType"/>
@@ -666,6 +671,7 @@
     <keyword type="function" name="webkit_certificate_info_get_tls_errors ()" link="WebKitCertificateInfo.html#webkit-certificate-info-get-tls-errors" since="2.4"/>
     <keyword type="struct" name="struct WebKitWebExtension" link="WebKitWebExtension.html#WebKitWebExtension-struct"/>
     <keyword type="function" name="WebKitWebExtensionInitializeFunction ()" link="WebKitWebExtension.html#WebKitWebExtensionInitializeFunction"/>
+    <keyword type="function" name="WebKitWebExtensionInitializeWithUserDataFunction ()" link="WebKitWebExtension.html#WebKitWebExtensionInitializeWithUserDataFunction" since="2.4"/>
     <keyword type="function" name="webkit_web_extension_get_page ()" link="WebKitWebExtension.html#webkit-web-extension-get-page"/>
     <keyword type="signal" name="The &quot;page-created&quot; signal" link="WebKitWebExtension.html#WebKitWebExtension-page-created"/>
     <keyword type="struct" name="struct WebKitWebPage" link="WebKitWebPage.html#WebKitWebPage-struct"/>
@@ -688,6 +694,8 @@
     <keyword type="constant" name="WEBKIT_CACHE_MODEL_DOCUMENT_VIEWER" link="WebKitWebContext.html#WEBKIT-CACHE-MODEL-DOCUMENT-VIEWER:CAPS"/>
     <keyword type="constant" name="WEBKIT_CACHE_MODEL_WEB_BROWSER" link="WebKitWebContext.html#WEBKIT-CACHE-MODEL-WEB-BROWSER:CAPS"/>
     <keyword type="constant" name="WEBKIT_CACHE_MODEL_DOCUMENT_BROWSER" link="WebKitWebContext.html#WEBKIT-CACHE-MODEL-DOCUMENT-BROWSER:CAPS"/>
+    <keyword type="constant" name="WEBKIT_PROCESS_MODEL_SHARED_SECONDARY_PROCESS" link="WebKitWebContext.html#WEBKIT-PROCESS-MODEL-SHARED-SECONDARY-PROCESS:CAPS"/>
+    <keyword type="constant" name="WEBKIT_PROCESS_MODEL_ONE_SECONDARY_PROCESS_PER_WEB_VIEW" link="WebKitWebContext.html#WEBKIT-PROCESS-MODEL-ONE-SECONDARY-PROCESS-PER-WEB-VIEW:CAPS"/>
     <keyword type="constant" name="WEBKIT_TLS_ERRORS_POLICY_IGNORE" link="WebKitWebContext.html#WEBKIT-TLS-ERRORS-POLICY-IGNORE:CAPS"/>
     <keyword type="constant" name="WEBKIT_TLS_ERRORS_POLICY_FAIL" link="WebKitWebContext.html#WEBKIT-TLS-ERRORS-POLICY-FAIL:CAPS"/>
     <keyword type="constant" name="WEBKIT_LOAD_STARTED" link="WebKitWebView.html#WEBKIT-LOAD-STARTED:CAPS"/>

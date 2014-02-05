@@ -77,6 +77,8 @@ public:
     void setExposedRect(const WebCore::FloatRect&);
     WebCore::FloatRect exposedRect() const { return m_exposedRect; }
     void exposedRectChangedTimerFired(WebCore::Timer<DrawingAreaProxy>*);
+    
+    void setCustomFixedPositionRect(const WebCore::FloatRect&);
 #endif
 
 protected:
@@ -90,7 +92,7 @@ protected:
     WebCore::IntSize m_scrollOffset;
 
     // IPC::MessageReceiver
-    virtual void didReceiveMessage(IPC::Connection*, IPC::MessageDecoder&) OVERRIDE;
+    virtual void didReceiveMessage(IPC::Connection*, IPC::MessageDecoder&) override;
 
 private:
     virtual void sizeDidChange() = 0;

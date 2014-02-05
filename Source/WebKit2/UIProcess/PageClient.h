@@ -172,6 +172,9 @@ public:
     virtual void notifyInputContextAboutDiscardedComposition() = 0;
     virtual void makeFirstResponder() = 0;
     virtual void setAcceleratedCompositingRootLayer(CALayer *) = 0;
+    virtual CALayer *acceleratedCompositingRootLayer() const = 0;
+    virtual RetainPtr<CGImageRef> takeViewSnapshot() = 0;
+    virtual void wheelEventWasNotHandledByWebCore(const NativeWebWheelEvent&) = 0;
 #endif
 
 #if USE(APPKIT)
@@ -243,6 +246,7 @@ public:
     virtual void stopAssistingNode() = 0;
     virtual void selectionDidChange() = 0;
     virtual bool interpretKeyEvent(const NativeWebKeyboardEvent&, bool isCharEvent) = 0;
+    virtual void positionInformationDidChange(const InteractionInformationAtPosition&) = 0;
 #endif
 
     // Auxiliary Client Creation

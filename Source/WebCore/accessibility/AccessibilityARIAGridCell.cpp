@@ -49,23 +49,23 @@ PassRefPtr<AccessibilityARIAGridCell> AccessibilityARIAGridCell::create(RenderOb
     return adoptRef(new AccessibilityARIAGridCell(renderer));
 }
 
-AccessibilityObject* AccessibilityARIAGridCell::parentTable() const
+AccessibilityTable* AccessibilityARIAGridCell::parentTable() const
 {
     AccessibilityObject* parent = parentObjectUnignored();
     if (!parent)
-        return 0;
+        return nullptr;
     
     if (parent->isAccessibilityTable())
-        return parent;
+        return toAccessibilityTable(parent);
 
     // It could happen that we hadn't reached the parent table yet (in
     // case objects for rows were not ignoring accessibility) so for
     // that reason we need to run parentObjectUnignored once again.
     parent = parent->parentObjectUnignored();
     if (!parent || !parent->isAccessibilityTable())
-        return 0;
+        return nullptr;
     
-    return parent;
+    return toAccessibilityTable(parent);
 }
     
 void AccessibilityARIAGridCell::rowIndexRange(std::pair<unsigned, unsigned>& rowRange)
@@ -84,7 +84,7 @@ void AccessibilityARIAGridCell::rowIndexRange(std::pair<unsigned, unsigned>& row
         if (!columnCount)
             return;
 
-        AccessibilityChildrenVector siblings = parent->children();
+        const auto& siblings = parent->children();
         unsigned childrenSize = siblings.size();
         for (unsigned k = 0; k < childrenSize; ++k) {
             if (siblings[k].get() == this) {
@@ -107,7 +107,7 @@ void AccessibilityARIAGridCell::columnIndexRange(std::pair<unsigned, unsigned>& 
     if (!parent->isTableRow() && !parent->isAccessibilityTable())
         return;
 
-    AccessibilityChildrenVector siblings = parent->children();
+    const AccessibilityChildrenVector& siblings = parent->children();
     unsigned childrenSize = siblings.size();
     for (unsigned k = 0; k < childrenSize; ++k) {
         if (siblings[k].get() == this) {

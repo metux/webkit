@@ -120,7 +120,7 @@ XMLHttpRequestStaticData::XMLHttpRequestStaticData()
 
 static const XMLHttpRequestStaticData& staticData()
 {
-    std::once_flag onceFlag;
+    static std::once_flag onceFlag;
     static const XMLHttpRequestStaticData* staticData;
 
     std::call_once(onceFlag, [] {
@@ -986,12 +986,10 @@ String XMLHttpRequest::getRequestHeader(const AtomicString& name) const
     return m_requestHeaders.get(name);
 }
 
-String XMLHttpRequest::getAllResponseHeaders(ExceptionCode& ec) const
+String XMLHttpRequest::getAllResponseHeaders() const
 {
-    if (m_state < HEADERS_RECEIVED) {
-        ec = INVALID_STATE_ERR;
+    if (m_state < HEADERS_RECEIVED || m_error)
         return "";
-    }
 
     StringBuilder stringBuilder;
 
@@ -1022,12 +1020,10 @@ String XMLHttpRequest::getAllResponseHeaders(ExceptionCode& ec) const
     return stringBuilder.toString();
 }
 
-String XMLHttpRequest::getResponseHeader(const AtomicString& name, ExceptionCode& ec) const
+String XMLHttpRequest::getResponseHeader(const AtomicString& name) const
 {
-    if (m_state < HEADERS_RECEIVED) {
-        ec = INVALID_STATE_ERR;
+    if (m_state < HEADERS_RECEIVED || m_error)
         return String();
-    }
 
     // See comment in getAllResponseHeaders above.
     if (isSetCookieHeader(name) && !securityOrigin()->canLoadLocalResources()) {
@@ -1245,10 +1241,12 @@ void XMLHttpRequest::dispatchErrorEvents(const AtomicString& type)
     if (!m_uploadComplete) {
         m_uploadComplete = true;
         if (m_upload && m_uploadEventsAllowed) {
+            m_upload->dispatchProgressEvent(eventNames().progressEvent);
             m_upload->dispatchProgressEvent(type);
             m_upload->dispatchProgressEvent(eventNames().loadendEvent);
         }
     }
+    m_progressEventThrottle.dispatchProgressEvent(eventNames().progressEvent);
     m_progressEventThrottle.dispatchProgressEvent(type);
     m_progressEventThrottle.dispatchProgressEvent(eventNames().loadendEvent);
 }

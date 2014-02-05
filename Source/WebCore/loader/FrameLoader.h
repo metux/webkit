@@ -216,7 +216,6 @@ public:
 
     void dispatchDidClearWindowObjectInWorld(DOMWrapperWorld&);
     void dispatchDidClearWindowObjectsInAllWorlds();
-    void dispatchDocumentElementAvailable();
 
     // The following sandbox flags will be forced, regardless of changes to
     // the sandbox attribute of any parent frames.
@@ -239,8 +238,6 @@ public:
     void loadDone();
     void finishedParsing();
     void checkCompleted();
-
-    void checkDidPerformFirstNavigation();
 
     bool isComplete() const;
 
@@ -436,7 +433,6 @@ private:
     Frame* m_opener;
     HashSet<Frame*> m_openedFrames;
 
-    bool m_didPerformFirstNavigation;
     bool m_loadingFromCachedPage;
     bool m_suppressOpenerInNewFrame;
 

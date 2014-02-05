@@ -169,7 +169,6 @@ wtf_sources += \
     Source/WTF/wtf/ThreadFunctionInvocation.h \
     Source/WTF/wtf/ThreadIdentifierDataPthreads.cpp \
     Source/WTF/wtf/ThreadIdentifierDataPthreads.h \
-    Source/WTF/wtf/ThreadRestrictionVerifier.h \
     Source/WTF/wtf/ThreadSafeRefCounted.h \
     Source/WTF/wtf/ThreadSpecific.h \
     Source/WTF/wtf/ThreadSpecificWin.cpp \
@@ -215,6 +214,7 @@ wtf_sources += \
     Source/WTF/wtf/gobject/GRefPtr.cpp \
     Source/WTF/wtf/gobject/GRefPtr.h \
     Source/WTF/wtf/gobject/GTypedefs.h \
+    Source/WTF/wtf/gobject/GUniquePtr.h \
     Source/WTF/wtf/gobject/GlibUtilities.cpp \
     Source/WTF/wtf/gobject/GlibUtilities.h \
     Source/WTF/wtf/gtk/MainThreadGtk.cpp \
@@ -232,6 +232,7 @@ wtf_sources += \
     Source/WTF/wtf/text/CString.cpp \
     Source/WTF/wtf/text/CString.h \
     Source/WTF/wtf/text/IntegerToStringConversion.h \
+    Source/WTF/wtf/text/LChar.h \
     Source/WTF/wtf/text/StringBuffer.h \
     Source/WTF/wtf/text/StringBuilder.cpp \
     Source/WTF/wtf/text/StringBuilder.h \

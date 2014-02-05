@@ -9,6 +9,9 @@
 <ANCHOR id="WEBKIT-CACHE-MODEL-DOCUMENT-VIEWER:CAPS" href="webkit2gtk/WebKitWebContext.html#WEBKIT-CACHE-MODEL-DOCUMENT-VIEWER:CAPS">
 <ANCHOR id="WEBKIT-CACHE-MODEL-WEB-BROWSER:CAPS" href="webkit2gtk/WebKitWebContext.html#WEBKIT-CACHE-MODEL-WEB-BROWSER:CAPS">
 <ANCHOR id="WEBKIT-CACHE-MODEL-DOCUMENT-BROWSER:CAPS" href="webkit2gtk/WebKitWebContext.html#WEBKIT-CACHE-MODEL-DOCUMENT-BROWSER:CAPS">
+<ANCHOR id="WebKitProcessModel" href="webkit2gtk/WebKitWebContext.html#WebKitProcessModel">
+<ANCHOR id="WEBKIT-PROCESS-MODEL-SHARED-SECONDARY-PROCESS:CAPS" href="webkit2gtk/WebKitWebContext.html#WEBKIT-PROCESS-MODEL-SHARED-SECONDARY-PROCESS:CAPS">
+<ANCHOR id="WEBKIT-PROCESS-MODEL-ONE-SECONDARY-PROCESS-PER-WEB-VIEW:CAPS" href="webkit2gtk/WebKitWebContext.html#WEBKIT-PROCESS-MODEL-ONE-SECONDARY-PROCESS-PER-WEB-VIEW:CAPS">
 <ANCHOR id="WebKitTLSErrorsPolicy" href="webkit2gtk/WebKitWebContext.html#WebKitTLSErrorsPolicy">
 <ANCHOR id="WEBKIT-TLS-ERRORS-POLICY-IGNORE:CAPS" href="webkit2gtk/WebKitWebContext.html#WEBKIT-TLS-ERRORS-POLICY-IGNORE:CAPS">
 <ANCHOR id="WEBKIT-TLS-ERRORS-POLICY-FAIL:CAPS" href="webkit2gtk/WebKitWebContext.html#WEBKIT-TLS-ERRORS-POLICY-FAIL:CAPS">
@@ -33,13 +36,17 @@
 <ANCHOR id="webkit-web-context-set-tls-errors-policy" href="webkit2gtk/WebKitWebContext.html#webkit-web-context-set-tls-errors-policy">
 <ANCHOR id="webkit-web-context-get-tls-errors-policy" href="webkit2gtk/WebKitWebContext.html#webkit-web-context-get-tls-errors-policy">
 <ANCHOR id="webkit-web-context-set-web-extensions-directory" href="webkit2gtk/WebKitWebContext.html#webkit-web-context-set-web-extensions-directory">
+<ANCHOR id="webkit-web-context-set-web-extensions-initialization-user-data" href="webkit2gtk/WebKitWebContext.html#webkit-web-context-set-web-extensions-initialization-user-data">
 <ANCHOR id="webkit-web-context-prefetch-dns" href="webkit2gtk/WebKitWebContext.html#webkit-web-context-prefetch-dns">
 <ANCHOR id="webkit-web-context-set-disk-cache-directory" href="webkit2gtk/WebKitWebContext.html#webkit-web-context-set-disk-cache-directory">
 <ANCHOR id="webkit-web-context-allow-tls-certificate-for-host" href="webkit2gtk/WebKitWebContext.html#webkit-web-context-allow-tls-certificate-for-host">
+<ANCHOR id="webkit-web-context-get-process-model" href="webkit2gtk/WebKitWebContext.html#webkit-web-context-get-process-model">
+<ANCHOR id="webkit-web-context-set-process-model" href="webkit2gtk/WebKitWebContext.html#webkit-web-context-set-process-model">
 <ANCHOR id="WebKitURISchemeRequestCallback" href="webkit2gtk/WebKitWebContext.html#WebKitURISchemeRequestCallback">
 <ANCHOR id="webkit-web-context-register-uri-scheme" href="webkit2gtk/WebKitWebContext.html#webkit-web-context-register-uri-scheme">
 <ANCHOR id="WebKitWebContext.signal-details" href="webkit2gtk/WebKitWebContext.html#WebKitWebContext.signal-details">
 <ANCHOR id="WebKitWebContext-download-started" href="webkit2gtk/WebKitWebContext.html#WebKitWebContext-download-started">
+<ANCHOR id="WebKitWebContext-initialize-web-extensions" href="webkit2gtk/WebKitWebContext.html#WebKitWebContext-initialize-web-extensions">
 <ANCHOR id="WebKitWebView" href="webkit2gtk/WebKitWebView.html">
 <ANCHOR id="WebKitWebView.synopsis" href="webkit2gtk/WebKitWebView.html#WebKitWebView.synopsis">
 <ANCHOR id="WebKitJavascriptResult" href="webkit2gtk/WebKitWebView.html#WebKitJavascriptResult">
@@ -993,6 +1000,7 @@
 <ANCHOR id="WebKitWebExtension.details" href="webkit2gtk/WebKitWebExtension.html#WebKitWebExtension.details">
 <ANCHOR id="WebKitWebExtension-struct" href="webkit2gtk/WebKitWebExtension.html#WebKitWebExtension-struct">
 <ANCHOR id="WebKitWebExtensionInitializeFunction" href="webkit2gtk/WebKitWebExtension.html#WebKitWebExtensionInitializeFunction">
+<ANCHOR id="WebKitWebExtensionInitializeWithUserDataFunction" href="webkit2gtk/WebKitWebExtension.html#WebKitWebExtensionInitializeWithUserDataFunction">
 <ANCHOR id="webkit-web-extension-get-page" href="webkit2gtk/WebKitWebExtension.html#webkit-web-extension-get-page">
 <ANCHOR id="WebKitWebExtension.signal-details" href="webkit2gtk/WebKitWebExtension.html#WebKitWebExtension.signal-details">
 <ANCHOR id="WebKitWebExtension-page-created" href="webkit2gtk/WebKitWebExtension.html#WebKitWebExtension-page-created">

@@ -103,7 +103,7 @@ void JSDOMWindowBase::printErrorMessage(const String& message) const
 
 bool JSDOMWindowBase::supportsProfiling(const JSGlobalObject* object)
 {
-#if !ENABLE(JAVASCRIPT_DEBUGGER) || !ENABLE(INSPECTOR)
+#if !ENABLE(INSPECTOR)
     UNUSED_PARAM(object);
     return false;
 #else
@@ -116,17 +116,13 @@ bool JSDOMWindowBase::supportsProfiling(const JSGlobalObject* object)
     if (!page)
         return false;
 
-#if ENABLE(INSPECTOR)
-    return page->inspectorController()->profilerEnabled();
-#else
-    return false;
+    return page->inspectorController().profilerEnabled();
 #endif // ENABLE(INSPECTOR)
-#endif
 }
 
 bool JSDOMWindowBase::supportsRichSourceInfo(const JSGlobalObject* object)
 {
-#if !ENABLE(JAVASCRIPT_DEBUGGER) || !ENABLE(INSPECTOR)
+#if !ENABLE(INSPECTOR)
     UNUSED_PARAM(object);
     return false;
 #else
@@ -139,7 +135,7 @@ bool JSDOMWindowBase::supportsRichSourceInfo(const JSGlobalObject* object)
     if (!page)
         return false;
 
-    bool enabled = page->inspectorController()->enabled();
+    bool enabled = page->inspectorController().enabled();
     ASSERT(enabled || !thisObject->debugger());
     ASSERT(enabled || !supportsProfiling(thisObject));
     return enabled;

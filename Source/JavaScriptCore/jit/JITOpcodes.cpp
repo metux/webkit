@@ -710,22 +710,10 @@ void JIT::emit_op_throw_static_error(Instruction* currentInstruction)
 
 void JIT::emit_op_debug(Instruction* currentInstruction)
 {
-#if ENABLE(DEBUG_WITH_BREAKPOINT)
-    UNUSED_PARAM(currentInstruction);
-    breakpoint();
-#elif ENABLE(JAVASCRIPT_DEBUGGER)
-    JSGlobalObject* globalObject = codeBlock()->globalObject();
-    Debugger* debugger = globalObject->debugger();
-    char* debuggerAddress = reinterpret_cast<char*>(globalObject) + JSGlobalObject::debuggerOffset();
-    Jump noDebugger = branchTestPtr(Zero, AbsoluteAddress(debuggerAddress));
-    char* flagAddress = reinterpret_cast<char*>(debugger) + Debugger::needsOpDebugCallbacksOffset();
-    Jump skipDebugHook = branchTest8(Zero, AbsoluteAddress(flagAddress));
+    load32(codeBlock()->debuggerRequestsAddress(), regT0);
+    Jump noDebuggerRequests = branchTest32(Zero, regT0);
     callOperation(operationDebug, currentInstruction[1].u.operand);
-    skipDebugHook.link(this);
-    noDebugger.link(this);
-#else
-    UNUSED_PARAM(currentInstruction);
-#endif
+    noDebuggerRequests.link(this);
 }
 
 void JIT::emit_op_eq_null(Instruction* currentInstruction)
@@ -898,14 +886,18 @@ void JIT::emitSlow_op_create_this(Instruction* currentInstruction, Vector<SlowCa
 
 void JIT::emit_op_profile_will_call(Instruction* currentInstruction)
 {
+    Jump profilerDone = branchTestPtr(Zero, AbsoluteAddress(m_vm->enabledProfilerAddress()));
     emitGetVirtualRegister(currentInstruction[1].u.operand, regT0);
     callOperation(operationProfileWillCall, regT0);
+    profilerDone.link(this);
 }
 
 void JIT::emit_op_profile_did_call(Instruction* currentInstruction)
 {
+    Jump profilerDone = branchTestPtr(Zero, AbsoluteAddress(m_vm->enabledProfilerAddress()));
     emitGetVirtualRegister(currentInstruction[1].u.operand, regT0);
     callOperation(operationProfileDidCall, regT0);
+    profilerDone.link(this);
 }
 
 

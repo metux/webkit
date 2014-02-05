@@ -106,9 +106,6 @@ public:
 #if ENABLE(DASHBOARD_SUPPORT)
     Vector<StyleDashboardRegion> m_dashboardRegions;
 #endif
-#if ENABLE(DRAGGABLE_REGION)
-    DraggableRegionMode m_draggableRegionMode;
-#endif
 
     DataRef<StyleDeprecatedFlexibleBoxData> m_deprecatedFlexibleBox; // Flexible box properties
     DataRef<StyleFlexibleBoxData> m_flexibleBox;
@@ -149,10 +146,8 @@ public:
 
     RefPtr<ClipPathOperation> m_clipPath;
 
-#if ENABLE(CSS3_TEXT_DECORATION)
     Color m_textDecorationColor;
     Color m_visitedLinkTextDecorationColor;
-#endif
     Color m_visitedLinkBackgroundColor;
     Color m_visitedLinkOutlineColor;
     Color m_visitedLinkBorderLeftColor;
@@ -187,9 +182,7 @@ public:
     unsigned m_borderFit : 1; // EBorderFit
     unsigned m_textCombine : 1; // CSS3 text-combine properties
 
-#if ENABLE(CSS3_TEXT_DECORATION)
     unsigned m_textDecorationStyle : 3; // TextDecorationStyle
-#endif
     unsigned m_wrapFlow: 3; // WrapFlow
     unsigned m_wrapThrough: 1; // WrapThrough
 

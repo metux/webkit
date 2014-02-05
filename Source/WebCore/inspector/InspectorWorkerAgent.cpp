@@ -83,7 +83,7 @@ public:
 
 private:
     // WorkerGlobalScopeProxy::PageInspector implementation
-    virtual void dispatchMessageFromWorker(const String& message)
+    virtual void dispatchMessageFromWorker(const String& message) override
     {
         RefPtr<InspectorValue> value = InspectorValue::parseJSON(message);
         if (!value)
@@ -113,7 +113,7 @@ InspectorWorkerAgent::InspectorWorkerAgent(InstrumentingAgents* instrumentingAge
 
 InspectorWorkerAgent::~InspectorWorkerAgent()
 {
-    m_instrumentingAgents->setInspectorWorkerAgent(0);
+    m_instrumentingAgents->setInspectorWorkerAgent(nullptr);
 }
 
 void InspectorWorkerAgent::didCreateFrontendAndBackend(Inspector::InspectorFrontendChannel* frontendChannel, InspectorBackendDispatcher* backendDispatcher)
@@ -122,7 +122,7 @@ void InspectorWorkerAgent::didCreateFrontendAndBackend(Inspector::InspectorFront
     m_backendDispatcher = InspectorWorkerBackendDispatcher::create(backendDispatcher, this);
 }
 
-void InspectorWorkerAgent::willDestroyFrontendAndBackend()
+void InspectorWorkerAgent::willDestroyFrontendAndBackend(InspectorDisconnectReason)
 {
     m_shouldPauseDedicatedWorkerOnStart = false;
     disable(nullptr);

@@ -85,6 +85,13 @@ class WebNetworkInfoManagerProxy;
 struct NetworkProcessCreationParameters;
 #endif
 
+#if PLATFORM(MAC)
+int networkProcessLatencyQOS();
+int networkProcessThroughputQOS();
+int webProcessLatencyQOS();
+int webProcessThroughputQOS();
+#endif
+
 class WebContext : public API::ObjectImpl<API::Object::Type::Context>, private IPC::MessageReceiver
 #if ENABLE(NETSCAPE_PLUGIN_API)
     , private PluginInfoStoreClient
@@ -149,6 +156,7 @@ public:
 
     StorageManager& storageManager() const { return *m_storageManager; }
 
+    PassRefPtr<WebPageProxy> createWebPage(PageClient&, WebPageGroup*, API::Session&, WebPageProxy* relatedPage = 0);
     PassRefPtr<WebPageProxy> createWebPage(PageClient&, WebPageGroup*, WebPageProxy* relatedPage = 0);
 
     const String& injectedBundlePath() const { return m_injectedBundlePath; }
@@ -186,8 +194,8 @@ public:
     void addVisitedLinkHash(WebCore::LinkHash);
 
     // MessageReceiver.
-    virtual void didReceiveMessage(IPC::Connection*, IPC::MessageDecoder&) OVERRIDE;
-    virtual void didReceiveSyncMessage(IPC::Connection*, IPC::MessageDecoder&, std::unique_ptr<IPC::MessageEncoder>&) OVERRIDE;
+    virtual void didReceiveMessage(IPC::Connection*, IPC::MessageDecoder&) override;
+    virtual void didReceiveSyncMessage(IPC::Connection*, IPC::MessageDecoder&, std::unique_ptr<IPC::MessageEncoder>&) override;
 
     void setCacheModel(CacheModel);
     CacheModel cacheModel() const { return m_cacheModel; }
@@ -292,6 +300,8 @@ public:
     static void willStartUsingPrivateBrowsing();
     static void willStopUsingPrivateBrowsing();
 
+    static bool isEphemeralSession(uint64_t sessionID);
+
 #if USE(SOUP)
     void setIgnoreTLSErrors(bool);
     bool ignoreTLSErrors() const { return m_ignoreTLSErrors; }
@@ -317,6 +327,8 @@ public:
 #if PLATFORM(MAC)
     void updateProcessSuppressionState() const;
 #endif
+
+    void setMemoryCacheDisabled(bool);
 
 private:
     void platformInitialize();
@@ -403,7 +415,7 @@ private:
 
 #if ENABLE(NETSCAPE_PLUGIN_API)
     // PluginInfoStoreClient:
-    virtual void pluginInfoStoreDidLoadPlugins(PluginInfoStore*) OVERRIDE;
+    virtual void pluginInfoStoreDidLoadPlugins(PluginInfoStore*) override;
 #endif
 
     IPC::MessageReceiverMap m_messageReceiverMap;
@@ -503,6 +515,8 @@ private:
 #if USE(SOUP)
     bool m_ignoreTLSErrors;
 #endif
+
+    bool m_memoryCacheDisabled;
 };
 
 template<typename T>

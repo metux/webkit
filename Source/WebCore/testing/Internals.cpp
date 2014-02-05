@@ -27,6 +27,7 @@
 #include "config.h"
 #include "Internals.h"
 
+#include "AXObjectCache.h"
 #include "AnimationController.h"
 #include "ApplicationCacheStorage.h"
 #include "BackForwardController.h"
@@ -96,6 +97,7 @@
 #include "ViewportArguments.h"
 #include "WorkerThread.h"
 #include <bytecode/CodeBlock.h>
+#include <inspector/InspectorAgentBase.h>
 #include <inspector/InspectorValues.h>
 #include <runtime/JSCJSValue.h>
 #include <wtf/text/CString.h>
@@ -116,10 +118,6 @@
 
 #if ENABLE(PROXIMITY_EVENTS)
 #include "DeviceProximityController.h"
-#endif
-
-#if ENABLE(TOUCH_ADJUSTMENT)
-#include "WebKitPoint.h"
 #endif
 
 #if ENABLE(MOUSE_CURSOR_SCALE)
@@ -179,20 +177,20 @@ class InspectorFrontendClientDummy : public InspectorFrontendClientLocal {
 public:
     InspectorFrontendClientDummy(InspectorController*, Page*);
     virtual ~InspectorFrontendClientDummy() { }
-    virtual void attachWindow(DockSide) OVERRIDE { }
-    virtual void detachWindow() OVERRIDE { }
+    virtual void attachWindow(DockSide) override { }
+    virtual void detachWindow() override { }
 
-    virtual String localizedStringsURL() OVERRIDE { return String(); }
+    virtual String localizedStringsURL() override { return String(); }
 
-    virtual void bringToFront() OVERRIDE { }
-    virtual void closeWindow() OVERRIDE { }
+    virtual void bringToFront() override { }
+    virtual void closeWindow() override { }
 
-    virtual void inspectedURLChanged(const String&) OVERRIDE { }
+    virtual void inspectedURLChanged(const String&) override { }
 
 protected:
-    virtual void setAttachedWindowHeight(unsigned) OVERRIDE { }
-    virtual void setAttachedWindowWidth(unsigned) OVERRIDE { }
-    virtual void setToolbarHeight(unsigned) OVERRIDE { }
+    virtual void setAttachedWindowHeight(unsigned) override { }
+    virtual void setAttachedWindowWidth(unsigned) override { }
+    virtual void setToolbarHeight(unsigned) override { }
 };
 
 InspectorFrontendClientDummy::InspectorFrontendClientDummy(InspectorController* controller, Page* page)
@@ -204,7 +202,7 @@ class InspectorFrontendChannelDummy : public InspectorFrontendChannel {
 public:
     explicit InspectorFrontendChannelDummy(Page*);
     virtual ~InspectorFrontendChannelDummy() { }
-    virtual bool sendMessageToFrontend(const String& message) OVERRIDE;
+    virtual bool sendMessageToFrontend(const String& message) override;
 
 private:
     Page* m_frontendPage;
@@ -279,9 +277,8 @@ void Internals::resetToConsistentState(Page* page)
     TextRun::setAllowsRoundingHacks(false);
     WebCore::overrideUserPreferredLanguages(Vector<String>());
     WebCore::Settings::setUsesOverlayScrollbars(false);
-#if ENABLE(INSPECTOR) && ENABLE(JAVASCRIPT_DEBUGGER)
-    if (page->inspectorController())
-        page->inspectorController()->setProfilerEnabled(false);
+#if ENABLE(INSPECTOR)
+    page->inspectorController().setProfilerEnabled(false);
 #endif
 #if ENABLE(VIDEO_TRACK) && !PLATFORM(WIN)
     page->group().captionPreferences()->setCaptionsStyleSheetOverride(emptyString());
@@ -292,6 +289,12 @@ void Internals::resetToConsistentState(Page* page)
     if (page->mainFrame().editor().isOverwriteModeEnabled())
         page->mainFrame().editor().toggleOverwriteModeEnabled();
     cacheStorage().setDefaultOriginQuota(ApplicationCacheStorage::noQuota());
+#if ENABLE(VIDEO)
+    MediaSessionManager::sharedManager().resetRestrictions();
+#endif
+#if HAVE(ACCESSIBILITY)
+    AXObjectCache::disableAccessibility();
+#endif
 }
 
 Internals::Internals(Document* document)
@@ -705,13 +708,13 @@ PassRefPtr<ClientRectList> Internals::inspectorHighlightRects(ExceptionCode& ec)
 {
 #if ENABLE(INSPECTOR)
     Document* document = contextDocument();
-    if (!document || !document->page() || !document->page()->inspectorController()) {
+    if (!document || !document->page()) {
         ec = INVALID_ACCESS_ERR;
         return ClientRectList::create();
     }
 
     Highlight highlight;
-    document->page()->inspectorController()->getHighlight(&highlight);
+    document->page()->inspectorController().getHighlight(&highlight);
     return ClientRectList::create(highlight.quads);
 #else
     UNUSED_PARAM(ec);
@@ -723,11 +726,11 @@ String Internals::inspectorHighlightObject(ExceptionCode& ec)
 {
 #if ENABLE(INSPECTOR)
     Document* document = contextDocument();
-    if (!document || !document->page() || !document->page()->inspectorController()) {
+    if (!document || !document->page()) {
         ec = INVALID_ACCESS_ERR;
         return String();
     }
-    RefPtr<InspectorObject> object = document->page()->inspectorController()->buildObjectForHighlightedNode();
+    RefPtr<InspectorObject> object = document->page()->inspectorController().buildObjectForHighlightedNode();
     return object ? object->toJSONString() : String();
 #else
     UNUSED_PARAM(ec);
@@ -1031,105 +1034,6 @@ void Internals::setDelegatesScrolling(bool enabled, ExceptionCode& ec)
     document->view()->setDelegatesScrolling(enabled);
 }
 
-#if ENABLE(TOUCH_ADJUSTMENT)
-PassRefPtr<WebKitPoint> Internals::touchPositionAdjustedToBestClickableNode(long x, long y, long width, long height, ExceptionCode& ec)
-{
-    Document* document = contextDocument();
-    if (!document || !document->frame()) {
-        ec = INVALID_ACCESS_ERR;
-        return 0;
-    }
-
-    IntSize radius(width / 2, height / 2);
-    IntPoint point(x + radius.width(), y + radius.height());
-
-    Node* targetNode;
-    IntPoint adjustedPoint;
-
-    bool foundNode = document->frame()->eventHandler().bestClickableNodeForTouchPoint(point, radius, adjustedPoint, targetNode);
-    if (foundNode)
-        return WebKitPoint::create(adjustedPoint.x(), adjustedPoint.y());
-
-    return 0;
-}
-
-Node* Internals::touchNodeAdjustedToBestClickableNode(long x, long y, long width, long height, ExceptionCode& ec)
-{
-    Document* document = contextDocument();
-    if (!document || !document->frame()) {
-        ec = INVALID_ACCESS_ERR;
-        return 0;
-    }
-
-    IntSize radius(width / 2, height / 2);
-    IntPoint point(x + radius.width(), y + radius.height());
-
-    Node* targetNode;
-    IntPoint adjustedPoint;
-    document->frame()->eventHandler().bestClickableNodeForTouchPoint(point, radius, adjustedPoint, targetNode);
-    return targetNode;
-}
-
-PassRefPtr<WebKitPoint> Internals::touchPositionAdjustedToBestContextMenuNode(long x, long y, long width, long height, ExceptionCode& ec)
-{
-    Document* document = contextDocument();
-    if (!document || !document->frame()) {
-        ec = INVALID_ACCESS_ERR;
-        return 0;
-    }
-
-    IntSize radius(width / 2, height / 2);
-    IntPoint point(x + radius.width(), y + radius.height());
-
-    Node* targetNode = 0;
-    IntPoint adjustedPoint;
-
-    bool foundNode = document->frame()->eventHandler().bestContextMenuNodeForTouchPoint(point, radius, adjustedPoint, targetNode);
-    if (foundNode)
-        return WebKitPoint::create(adjustedPoint.x(), adjustedPoint.y());
-
-    return WebKitPoint::create(x, y);
-}
-
-Node* Internals::touchNodeAdjustedToBestContextMenuNode(long x, long y, long width, long height, ExceptionCode& ec)
-{
-    Document* document = contextDocument();
-    if (!document || !document->frame()) {
-        ec = INVALID_ACCESS_ERR;
-        return 0;
-    }
-
-    IntSize radius(width / 2, height / 2);
-    IntPoint point(x + radius.width(), y + radius.height());
-
-    Node* targetNode = 0;
-    IntPoint adjustedPoint;
-    document->frame()->eventHandler().bestContextMenuNodeForTouchPoint(point, radius, adjustedPoint, targetNode);
-    return targetNode;
-}
-
-PassRefPtr<ClientRect> Internals::bestZoomableAreaForTouchPoint(long x, long y, long width, long height, ExceptionCode& ec)
-{
-    Document* document = contextDocument();
-    if (!document || !document->frame()) {
-        ec = INVALID_ACCESS_ERR;
-        return 0;
-    }
-
-    IntSize radius(width / 2, height / 2);
-    IntPoint point(x + radius.width(), y + radius.height());
-
-    Node* targetNode;
-    IntRect zoomableArea;
-    bool foundNode = document->frame()->eventHandler().bestZoomableAreaForTouchPoint(point, radius, zoomableArea, targetNode);
-    if (foundNode)
-        return ClientRect::create(zoomableArea);
-
-    return 0;
-}
-#endif
-
-
 int Internals::lastSpellCheckRequestSequence(ExceptionCode& ec)
 {
     Document* document = contextDocument();
@@ -1253,16 +1157,14 @@ PassRefPtr<NodeList> Internals::nodesFromRect(Document* document, int centerX, i
 void Internals::emitInspectorDidBeginFrame()
 {
 #if ENABLE(INSPECTOR)
-    InspectorController* inspectorController = contextDocument()->frame()->page()->inspectorController();
-    inspectorController->didBeginFrame();
+    contextDocument()->frame()->page()->inspectorController().didBeginFrame();
 #endif
 }
 
 void Internals::emitInspectorDidCancelFrame()
 {
 #if ENABLE(INSPECTOR)
-    InspectorController* inspectorController = contextDocument()->frame()->page()->inspectorController();
-    inspectorController->didCancelFrame();
+    contextDocument()->frame()->page()->inspectorController().didCancelFrame();
 #endif
 }
 
@@ -1550,13 +1452,13 @@ PassRefPtr<DOMWindow> Internals::openDummyInspectorFrontend(const String& url)
     Page* frontendPage = m_frontendWindow->document()->page();
     ASSERT(frontendPage);
 
-    OwnPtr<InspectorFrontendClientDummy> frontendClient = adoptPtr(new InspectorFrontendClientDummy(page->inspectorController(), frontendPage));
+    auto frontendClient = std::make_unique<InspectorFrontendClientDummy>(&page->inspectorController(), frontendPage);
 
-    frontendPage->inspectorController()->setInspectorFrontendClient(frontendClient.release());
+    frontendPage->inspectorController().setInspectorFrontendClient(std::move(frontendClient));
 
     m_frontendChannel = adoptPtr(new InspectorFrontendChannelDummy(frontendPage));
 
-    page->inspectorController()->connectFrontend(m_frontendChannel.get());
+    page->inspectorController().connectFrontend(m_frontendChannel.get());
 
     return m_frontendWindow;
 }
@@ -1567,7 +1469,7 @@ void Internals::closeDummyInspectorFrontend()
     ASSERT(page);
     ASSERT(m_frontendWindow);
 
-    page->inspectorController()->disconnectFrontend();
+    page->inspectorController().disconnectFrontend(InspectorDisconnectReason::InspectorDestroyed);
 
     m_frontendChannel.release();
 
@@ -1578,22 +1480,22 @@ void Internals::closeDummyInspectorFrontend()
 void Internals::setInspectorResourcesDataSizeLimits(int maximumResourcesContentSize, int maximumSingleResourceContentSize, ExceptionCode& ec)
 {
     Page* page = contextDocument()->frame()->page();
-    if (!page || !page->inspectorController()) {
+    if (!page) {
         ec = INVALID_ACCESS_ERR;
         return;
     }
-    page->inspectorController()->setResourcesDataSizeLimitsFromInternals(maximumResourcesContentSize, maximumSingleResourceContentSize);
+    page->inspectorController().setResourcesDataSizeLimitsFromInternals(maximumResourcesContentSize, maximumSingleResourceContentSize);
 }
 
 void Internals::setJavaScriptProfilingEnabled(bool enabled, ExceptionCode& ec)
 {
     Page* page = contextDocument()->frame()->page();
-    if (!page || !page->inspectorController()) {
+    if (!page) {
         ec = INVALID_ACCESS_ERR;
         return;
     }
 
-    page->inspectorController()->setProfilerEnabled(enabled);
+    page->inspectorController().setProfilerEnabled(enabled);
 }
 #endif // ENABLE(INSPECTOR)
 
@@ -2289,6 +2191,37 @@ void Internals::endMediaSessionInterruption(const String& flagsString)
         flags = MediaSession::MayResumePlaying;
     
     MediaSessionManager::sharedManager().endInterruption(flags);
+}
+
+void Internals::setMediaSessionRestrictions(const String& mediaTypeString, const String& restrictionsString, ExceptionCode& ec)
+{
+    MediaSession::MediaType mediaType = MediaSession::None;
+    if (equalIgnoringCase(mediaTypeString, "Video"))
+        mediaType = MediaSession::Video;
+    else if (equalIgnoringCase(mediaTypeString, "Audio"))
+        mediaType = MediaSession::Audio;
+    else if (equalIgnoringCase(mediaTypeString, "WebAudio"))
+        mediaType = MediaSession::WebAudio;
+    else {
+        ec = INVALID_ACCESS_ERR;
+        return;
+    }
+
+    MediaSessionManager::SessionRestrictions restrictions = MediaSessionManager::sharedManager().restrictions(mediaType);
+    MediaSessionManager::sharedManager().removeRestriction(mediaType, restrictions);
+
+    restrictions = MediaSessionManager::NoRestrictions;
+    
+    if (equalIgnoringCase(restrictionsString, "ConcurrentPlaybackNotPermitted"))
+        restrictions = MediaSessionManager::ConcurrentPlaybackNotPermitted;
+    if (equalIgnoringCase(restrictionsString, "InlineVideoPlaybackRestricted"))
+        restrictions += MediaSessionManager::InlineVideoPlaybackRestricted;
+    if (equalIgnoringCase(restrictionsString, "MetadataPreloadingNotPermitted"))
+        restrictions += MediaSessionManager::MetadataPreloadingNotPermitted;
+    if (equalIgnoringCase(restrictionsString, "AutoPreloadingNotPermitted"))
+        restrictions += MediaSessionManager::AutoPreloadingNotPermitted;
+
+    MediaSessionManager::sharedManager().addRestriction(mediaType, restrictions);
 }
 
 }

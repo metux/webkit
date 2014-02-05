@@ -42,8 +42,8 @@
 #endif
 
 #if ENABLE(IOS_TOUCH_EVENTS)
-#include "JSTouchConstructor.h"
-#include "JSTouchListConstructor.h"
+#include "JSTouchConstructorIOS.h"
+#include "JSTouchListConstructorIOS.h"
 #endif
 
 #if ENABLE(WEB_AUDIO)
@@ -344,7 +344,7 @@ void JSDOMWindow::put(JSCell* cell, ExecState* exec, PropertyName propertyName, 
         return;
     }
 
-    if (lookupPut(exec, propertyName, value, *s_info.propHashTable(exec), slot))
+    if (lookupPut(exec, propertyName, thisObject, value, *s_info.propHashTable(exec), slot))
         return;
 
     if (BindingSecurity::shouldAllowAccessToDOMWindow(exec, thisObject->impl()))

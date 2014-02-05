@@ -51,7 +51,7 @@ PageConsoleAgent::PageConsoleAgent(InstrumentingAgents* instrumentingAgents, Pag
 
 PageConsoleAgent::~PageConsoleAgent()
 {
-    m_inspectorDOMAgent = 0;
+    m_inspectorDOMAgent = nullptr;
 }
 
 void PageConsoleAgent::clearMessages(ErrorString* errorString)
@@ -60,10 +60,10 @@ void PageConsoleAgent::clearMessages(ErrorString* errorString)
     InspectorConsoleAgent::clearMessages(errorString);
 }
 
-class InspectableNode FINAL : public CommandLineAPIHost::InspectableObject {
+class InspectableNode final : public CommandLineAPIHost::InspectableObject {
 public:
     explicit InspectableNode(Node* node) : m_node(node) { }
-    virtual Deprecated::ScriptValue get(JSC::ExecState* state) OVERRIDE
+    virtual Deprecated::ScriptValue get(JSC::ExecState* state) override
     {
         return InspectorDOMAgent::nodeAsScriptValue(state, m_node);
     }

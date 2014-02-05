@@ -37,7 +37,7 @@ namespace WebCore {
     class ScriptExecutionContext;
     class XMLHttpRequest;
 
-    class XMLHttpRequestUpload FINAL : public EventTargetWithInlineData {
+    class XMLHttpRequestUpload final : public EventTargetWithInlineData {
     public:
         explicit XMLHttpRequestUpload(XMLHttpRequest*);
 
@@ -45,8 +45,8 @@ namespace WebCore {
         void deref() { m_xmlHttpRequest->deref(); }
         XMLHttpRequest* xmlHttpRequest() const { return m_xmlHttpRequest; }
 
-        virtual EventTargetInterface eventTargetInterface() const OVERRIDE { return XMLHttpRequestUploadEventTargetInterfaceType; }
-        virtual ScriptExecutionContext* scriptExecutionContext() const OVERRIDE { return m_xmlHttpRequest->scriptExecutionContext(); }
+        virtual EventTargetInterface eventTargetInterface() const override { return XMLHttpRequestUploadEventTargetInterfaceType; }
+        virtual ScriptExecutionContext* scriptExecutionContext() const override { return m_xmlHttpRequest->scriptExecutionContext(); }
 
         DEFINE_ATTRIBUTE_EVENT_LISTENER(abort);
         DEFINE_ATTRIBUTE_EVENT_LISTENER(error);
@@ -59,8 +59,8 @@ namespace WebCore {
         void dispatchProgressEvent(const AtomicString &type);
 
     private:
-        virtual void refEventTarget() OVERRIDE FINAL { ref(); }
-        virtual void derefEventTarget() OVERRIDE FINAL { deref(); }
+        virtual void refEventTarget() override final { ref(); }
+        virtual void derefEventTarget() override final { deref(); }
 
         XMLHttpRequest* m_xmlHttpRequest;
         bool m_lengthComputable;

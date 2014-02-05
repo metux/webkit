@@ -57,12 +57,12 @@ void InspectorApplicationCacheAgent::didCreateFrontendAndBackend(Inspector::Insp
     m_backendDispatcher = InspectorApplicationCacheBackendDispatcher::create(backendDispatcher, this);
 }
 
-void InspectorApplicationCacheAgent::willDestroyFrontendAndBackend()
+void InspectorApplicationCacheAgent::willDestroyFrontendAndBackend(InspectorDisconnectReason)
 {
     m_frontendDispatcher = nullptr;
     m_backendDispatcher.clear();
 
-    m_instrumentingAgents->setInspectorApplicationCacheAgent(0);
+    m_instrumentingAgents->setInspectorApplicationCacheAgent(nullptr);
 }
 
 void InspectorApplicationCacheAgent::enable(ErrorString*)
@@ -120,7 +120,7 @@ DocumentLoader* InspectorApplicationCacheAgent::assertFrameWithDocumentLoader(Er
 {
     Frame* frame = m_pageAgent->assertFrame(errorString, frameId);
     if (!frame)
-        return 0;
+        return nullptr;
 
     return InspectorPageAgent::assertDocumentLoader(errorString, frame);
 }

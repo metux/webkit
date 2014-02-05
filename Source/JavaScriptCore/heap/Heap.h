@@ -174,6 +174,7 @@ namespace JSC {
         
         template<typename Functor> typename Functor::ReturnType forEachProtectedCell(Functor&);
         template<typename Functor> typename Functor::ReturnType forEachProtectedCell();
+        template<typename Functor> inline void forEachCodeBlock(Functor&);
 
         HandleSet* handleSet() { return &m_handleSet; }
         HandleStack* handleStack() { return &m_handleStack; }
@@ -207,6 +208,7 @@ namespace JSC {
         friend class CopiedBlock;
         friend class DeferGC;
         friend class DeferGCForAWhile;
+        friend class DelayedReleaseScope;
         friend class GCAwareJITStubRoutine;
         friend class HandleSet;
         friend class JITStubRoutine;
@@ -234,7 +236,7 @@ namespace JSC {
         static const size_t maxExtraCost = 1024 * 1024;
         
         class FinalizerOwner : public WeakHandleOwner {
-            virtual void finalize(Handle<Unknown>, void* context) OVERRIDE;
+            virtual void finalize(Handle<Unknown>, void* context) override;
         };
 
         JS_EXPORT_PRIVATE bool isValidAllocation(size_t);
@@ -430,6 +432,11 @@ namespace JSC {
     {
         Functor functor;
         return forEachProtectedCell(functor);
+    }
+
+    template<typename Functor> inline void Heap::forEachCodeBlock(Functor& functor)
+    {
+        return m_codeBlocks.iterate<Functor>(functor);
     }
 
     inline void* Heap::allocateWithNormalDestructor(size_t bytes)

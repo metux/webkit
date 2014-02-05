@@ -31,6 +31,7 @@
 #include <WebCore/FloatRect.h>
 #include <WebCore/IntRect.h>
 #include <WebCore/ViewState.h>
+#include <functional>
 #include <wtf/Forward.h>
 #include <wtf/Noncopyable.h>
 
@@ -81,6 +82,7 @@ public:
     virtual void didUninstallPageOverlay(PageOverlay*) { }
     virtual void setPageOverlayNeedsDisplay(PageOverlay*, const WebCore::IntRect&) { }
     virtual void setPageOverlayOpacity(PageOverlay*, float) { }
+    virtual void clearPageOverlay(PageOverlay*) { }
 
     virtual void setPaintingEnabled(bool) { }
     virtual void updatePreferences(const WebPreferencesStore&) { }
@@ -89,6 +91,7 @@ public:
 #if PLATFORM(MAC)
     virtual void setExposedRect(const WebCore::FloatRect&) = 0;
     virtual WebCore::FloatRect exposedRect() const = 0;
+    virtual void setCustomFixedPositionRect(const WebCore::FloatRect&) = 0;
 #endif
     virtual void mainFrameScrollabilityChanged(bool) { }
 
@@ -108,7 +111,7 @@ public:
     virtual void didReceiveCoordinatedLayerTreeHostMessage(IPC::Connection*, IPC::MessageDecoder&) = 0;
 #endif
 
-    virtual void dispatchAfterEnsuringUpdatedScrollPosition(const Function<void ()>&);
+    virtual void dispatchAfterEnsuringUpdatedScrollPosition(std::function<void ()>);
 
     virtual void viewStateDidChange(WebCore::ViewState::Flags) { }
     virtual void setLayerHostingMode(LayerHostingMode) { }

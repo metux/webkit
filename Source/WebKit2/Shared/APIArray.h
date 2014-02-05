@@ -35,7 +35,7 @@
 
 namespace API {
 
-class Array FINAL : public ObjectImpl<Object::Type::Array> {
+class Array final : public ObjectImpl<Object::Type::Array> {
 private:
     template <class T>
     struct IsTypePredicate {
@@ -54,6 +54,7 @@ public:
     static PassRefPtr<Array> create();
     static PassRefPtr<Array> create(Vector<RefPtr<Object>> elements);
     static PassRefPtr<Array> createStringArray(const Vector<WTF::String>&);
+    Vector<WTF::String> toStringVector();
 
     virtual ~Array();
 

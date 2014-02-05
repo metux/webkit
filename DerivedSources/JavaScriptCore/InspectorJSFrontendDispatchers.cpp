@@ -16,8 +16,6 @@
 
 namespace Inspector {
 
-#if ENABLE(JAVASCRIPT_DEBUGGER)
-
 void InspectorDebuggerFrontendDispatcher::globalObjectCleared()
 {
     RefPtr<InspectorObject> jsonMessage = InspectorObject::create();
@@ -97,7 +95,16 @@ void InspectorDebuggerFrontendDispatcher::resumed()
     m_inspectorFrontendChannel->sendMessageToFrontend(jsonMessage->toJSONString());
 }
 
-#endif // ENABLE(JAVASCRIPT_DEBUGGER)
+void InspectorDebuggerFrontendDispatcher::didSampleProbe(PassRefPtr<Inspector::TypeBuilder::Debugger::ProbeSample> sample)
+{
+    RefPtr<InspectorObject> jsonMessage = InspectorObject::create();
+    jsonMessage->setString(ASCIILiteral("method"), ASCIILiteral("Debugger.didSampleProbe"));
+    RefPtr<InspectorObject> paramsObject = InspectorObject::create();
+    paramsObject->setValue(ASCIILiteral("sample"), sample);
+    jsonMessage->setObject(ASCIILiteral("params"), paramsObject);
+
+    m_inspectorFrontendChannel->sendMessageToFrontend(jsonMessage->toJSONString());
+}
 
 void InspectorInspectorFrontendDispatcher::evaluateForTestInFrontend(int testCallId, const String& script)
 {

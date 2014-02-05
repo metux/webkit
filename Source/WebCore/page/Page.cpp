@@ -82,6 +82,7 @@
 #include "StyleResolver.h"
 #include "SubframeLoader.h"
 #include "TextResourceDecoder.h"
+#include "UserContentController.h"
 #include "VisitedLinkState.h"
 #include "VoidCallback.h"
 #include "Widget.h"
@@ -123,20 +124,18 @@ float deviceScaleFactor(Frame* frame)
     return page->deviceScaleFactor();
 }
 
-static const ViewState::Flags PageInitialViewState = ViewState::IsVisible | ViewState::IsInWindow;
-
 Page::Page(PageClients& pageClients)
     : m_chrome(std::make_unique<Chrome>(*this, *pageClients.chromeClient))
     , m_dragCaretController(std::make_unique<DragCaretController>())
 #if ENABLE(DRAG_SUPPORT)
     , m_dragController(std::make_unique<DragController>(*this, *pageClients.dragClient))
 #endif
-    , m_focusController(std::make_unique<FocusController>(*this, PageInitialViewState))
+    , m_focusController(std::make_unique<FocusController>(*this))
 #if ENABLE(CONTEXT_MENUS)
     , m_contextMenuController(std::make_unique<ContextMenuController>(*this, *pageClients.contextMenuClient))
 #endif
 #if ENABLE(INSPECTOR)
-    , m_inspectorController(InspectorController::create(this, pageClients.inspectorClient))
+    , m_inspectorController(std::make_unique<InspectorController>(*this, pageClients.inspectorClient))
 #endif
 #if ENABLE(POINTER_LOCK)
     , m_pointerLockController(PointerLockController::create(this))
@@ -173,8 +172,9 @@ Page::Page(PageClients& pageClients)
     , m_minimumTimerInterval(Settings::defaultMinDOMTimerInterval())
     , m_timerAlignmentInterval(Settings::defaultDOMTimerAlignmentInterval())
     , m_isEditable(false)
+    , m_isInWindow(true)
+    , m_isVisible(true)
     , m_isPrerender(false)
-    , m_viewState(PageInitialViewState)
     , m_requestedLayoutMilestones(0)
     , m_headerHeight(0)
     , m_footerHeight(0)
@@ -241,6 +241,9 @@ Page::~Page()
 #ifndef NDEBUG
     pageCounter.decrement();
 #endif
+
+    if (m_userContentController)
+        m_userContentController->removePage(*this);
 }
 
 uint64_t Page::renderTreeSize() const
@@ -358,66 +361,6 @@ void Page::setOpenedByDOM()
     m_openedByDOM = true;
 }
 
-BackForwardClient* Page::backForwardClient() const
-{
-    return backForward().client();
-}
-
-bool Page::goBack()
-{
-    HistoryItem* item = backForward().backItem();
-    
-    if (item) {
-        goToItem(item, FrameLoadTypeBack);
-        return true;
-    }
-    return false;
-}
-
-bool Page::goForward()
-{
-    HistoryItem* item = backForward().forwardItem();
-    
-    if (item) {
-        goToItem(item, FrameLoadTypeForward);
-        return true;
-    }
-    return false;
-}
-
-bool Page::canGoBackOrForward(int distance) const
-{
-    if (distance == 0)
-        return true;
-    if (distance > 0 && distance <= backForward().forwardCount())
-        return true;
-    if (distance < 0 && -distance <= backForward().backCount())
-        return true;
-    return false;
-}
-
-void Page::goBackOrForward(int distance)
-{
-    if (distance == 0)
-        return;
-
-    HistoryItem* item = backForward().itemAtIndex(distance);
-    if (!item) {
-        if (distance > 0) {
-            if (int forwardCount = backForward().forwardCount())
-                item = backForward().itemAtIndex(forwardCount);
-        } else {
-            if (int backCount = backForward().backCount())
-                item = backForward().itemAtIndex(-backCount);
-        }
-    }
-
-    if (!item)
-        return;
-
-    goToItem(item, FrameLoadTypeIndexedBackForward);
-}
-
 void Page::goToItem(HistoryItem* item, FrameLoadType type)
 {
     // stopAllLoaders may end up running onload handlers, which could cause further history traversals that may lead to the passed in HistoryItem
@@ -428,11 +371,6 @@ void Page::goToItem(HistoryItem* item, FrameLoadType type)
         m_mainFrame->loader().stopAllLoaders();
 
     m_mainFrame->loader().history().goToItem(item, type);
-}
-
-int Page::getHistoryLength()
-{
-    return backForward().backCount() + 1 + backForward().forwardCount();
 }
 
 void Page::setGroupName(const String& name)
@@ -878,11 +816,11 @@ unsigned Page::pageCount() const
 
 void Page::setIsInWindow(bool isInWindow)
 {
-    setViewState(isInWindow ? m_viewState | ViewState::IsInWindow : m_viewState & ~ViewState::IsInWindow);
-}
+    if (m_isInWindow == isInWindow)
+        return;
 
-void Page::setIsInWindowInternal(bool isInWindow)
-{
+    m_isInWindow = isInWindow;
+
     for (Frame* frame = &mainFrame(); frame; frame = frame->tree().traverseNext()) {
         if (FrameView* frameView = frame->view())
             frameView->setIsInWindow(isInWindow);
@@ -910,7 +848,7 @@ void Page::resumeScriptedAnimations()
     }
 }
 
-void Page::setIsVisuallyIdleInternal(bool isVisuallyIdle)
+void Page::setIsVisuallyIdle(bool isVisuallyIdle)
 {
     m_pageThrottler->setIsVisuallyIdle(isVisuallyIdle);
 }
@@ -1213,36 +1151,14 @@ void Page::resumeAnimatingImages()
         CachedImage::resumeAnimatingImagesForLoader(frame->document()->cachedResourceLoader());
 }
 
-void Page::setViewState(ViewState::Flags viewState, bool isInitialState)
-{
-    ViewState::Flags changed = m_viewState ^ viewState;
-    m_viewState = viewState;
-
-    // We want to make sure to update the active state while hidden, so if the view is going
-    // to be visible then update the focus controller first (it may currently still be hidden).
-    if (changed && (m_viewState & ViewState::IsVisible))
-        m_focusController->setViewState(viewState);
-
-    if (changed & ViewState::IsVisible)
-        setIsVisibleInternal(viewState & ViewState::IsVisible, isInitialState);
-    if (changed & ViewState::IsInWindow)
-        setIsInWindowInternal(viewState & ViewState::IsInWindow);
-    if (changed & ViewState::IsVisuallyIdle)
-        setIsVisuallyIdleInternal(viewState & ViewState::IsVisuallyIdle);
-
-    if (changed && !(m_viewState & ViewState::IsVisible))
-        m_focusController->setViewState(viewState);
-}
-
 void Page::setIsVisible(bool isVisible, bool isInitialState)
-{
-    setViewState(isVisible ? m_viewState | ViewState::IsVisible : m_viewState & ~ViewState::IsVisible, isInitialState);
-}
-
-void Page::setIsVisibleInternal(bool isVisible, bool isInitialState)
 {
     // FIXME: The visibility state should be stored on the top-level document.
     // https://bugs.webkit.org/show_bug.cgi?id=116769
+
+    if (m_isVisible == isVisible)
+        return;
+    m_isVisible = isVisible;
 
     if (isVisible) {
         m_isPrerender = false;
@@ -1305,7 +1221,7 @@ void Page::setIsPrerender()
 #if ENABLE(PAGE_VISIBILITY_API)
 PageVisibilityState Page::visibilityState() const
 {
-    if (isVisible())
+    if (m_isVisible)
         return PageVisibilityStateVisible;
     if (m_isPrerender)
         return PageVisibilityStatePrerender;
@@ -1567,7 +1483,7 @@ void Page::hiddenPageDOMTimerThrottlingStateChanged()
 #if (ENABLE_PAGE_VISIBILITY_API)
 void Page::hiddenPageCSSAnimationSuspensionStateChanged()
 {
-    if (!isVisible()) {
+    if (!m_isVisible) {
         if (m_settings->hiddenPageCSSAnimationSuspensionEnabled())
             mainFrame().animation().suspendAnimations();
         else
@@ -1598,6 +1514,17 @@ void Page::decrementFrameHandlingBeforeUnloadEventCount()
 bool Page::isAnyFrameHandlingBeforeUnloadEvent()
 {
     return m_framesHandlingBeforeUnloadEvent;
+}
+
+void Page::setUserContentController(UserContentController* userContentController)
+{
+    if (m_userContentController)
+        m_userContentController->removePage(*this);
+
+    m_userContentController = userContentController;
+
+    if (m_userContentController)
+        m_userContentController->addPage(*this);
 }
 
 Page::PageClients::PageClients()

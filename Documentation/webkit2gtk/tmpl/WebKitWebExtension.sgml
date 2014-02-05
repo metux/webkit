@@ -9,12 +9,10 @@ WebKitWebExtension
 
 </para>
 
-
 <!-- ##### SECTION See_Also ##### -->
 <para>
 
 </para>
-
 
 <!-- ##### SECTION Stability_Level ##### -->
 
@@ -42,6 +40,15 @@ WebKitWebExtension
 </para>
 
 @extension: 
+
+
+<!-- ##### USER_FUNCTION WebKitWebExtensionInitializeWithUserDataFunction ##### -->
+<para>
+
+</para>
+
+@extension: 
+@user_data: 
 
 
 <!-- ##### FUNCTION webkit_web_extension_get_page ##### -->

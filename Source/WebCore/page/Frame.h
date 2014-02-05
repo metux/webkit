@@ -61,6 +61,10 @@ OBJC_CLASS NSString;
 typedef struct HBITMAP__* HBITMAP;
 #endif
 
+namespace JSC { namespace Yarr {
+class RegularExpression;
+} }
+
 namespace WebCore {
 
     class AnimationController;
@@ -81,7 +85,6 @@ namespace WebCore {
     class MainFrame;
     class Node;
     class Range;
-    class RegularExpression;
     class RenderLayer;
     class RenderView;
     class RenderWidget;
@@ -237,7 +240,7 @@ namespace WebCore {
         Document* documentAtPoint(const IntPoint& windowPoint);
         PassRefPtr<Range> rangeForPoint(const IntPoint& framePoint);
 
-        String searchForLabelsAboveCell(RegularExpression*, HTMLTableCellElement*, size_t* resultDistanceFromStartOfCell);
+        String searchForLabelsAboveCell(JSC::Yarr::RegularExpression*, HTMLTableCellElement*, size_t* resultDistanceFromStartOfCell);
         String searchForLabelsBeforeElement(const Vector<String>& labels, Element*, size_t* resultDistance, bool* resultIsInCellAbove);
         String matchLabelsAgainstElement(const Vector<String>& labels, Element*);
 
@@ -349,12 +352,12 @@ namespace WebCore {
 
     private:
         // TiledBackingStoreClient interface
-        virtual void tiledBackingStorePaintBegin() OVERRIDE FINAL;
-        virtual void tiledBackingStorePaint(GraphicsContext*, const IntRect&) OVERRIDE FINAL;
-        virtual void tiledBackingStorePaintEnd(const Vector<IntRect>& paintedArea) OVERRIDE FINAL;
-        virtual IntRect tiledBackingStoreContentsRect() OVERRIDE FINAL;
-        virtual IntRect tiledBackingStoreVisibleRect() OVERRIDE FINAL;
-        virtual Color tiledBackingStoreBackgroundColor() const OVERRIDE FINAL;
+        virtual void tiledBackingStorePaintBegin() override final;
+        virtual void tiledBackingStorePaint(GraphicsContext*, const IntRect&) override final;
+        virtual void tiledBackingStorePaintEnd(const Vector<IntRect>& paintedArea) override final;
+        virtual IntRect tiledBackingStoreContentsRect() override final;
+        virtual IntRect tiledBackingStoreVisibleRect() override final;
+        virtual Color tiledBackingStoreBackgroundColor() const override final;
 
         OwnPtr<TiledBackingStore> m_tiledBackingStore;
 #endif

@@ -51,6 +51,7 @@
 #include "TreeScope.h"
 #include "UserActionElementSet.h"
 #include "ViewportArguments.h"
+#include <chrono>
 #include <wtf/Deque.h>
 #include <wtf/HashSet.h>
 #include <wtf/OwnPtr.h>
@@ -159,7 +160,7 @@ class SVGDocumentExtensions;
 class TransformSource;
 #endif
 
-#if ENABLE(DASHBOARD_SUPPORT) || ENABLE(DRAGGABLE_REGION)
+#if ENABLE(DASHBOARD_SUPPORT)
 struct AnnotatedRegionValue;
 #endif
 
@@ -263,7 +264,7 @@ public:
     using ContainerNode::ref;
     using ContainerNode::deref;
 
-    virtual bool canContainRangeEndPoint() const OVERRIDE { return true; }
+    virtual bool canContainRangeEndPoint() const override { return true; }
 
     Element* getElementByAccessKey(const String& key);
     void invalidateAccessKeyMap();
@@ -433,7 +434,7 @@ public:
     String documentURI() const { return m_documentURI; }
     void setDocumentURI(const String&);
 
-    virtual URL baseURI() const OVERRIDE;
+    virtual URL baseURI() const override;
 
 #if ENABLE(PAGE_VISIBILITY_API)
     void visibilityStateChanged();
@@ -566,9 +567,9 @@ public:
     void prepareForDestruction();
 
     // Override ScriptExecutionContext methods to do additional work
-    virtual void suspendActiveDOMObjects(ActiveDOMObject::ReasonForSuspension) OVERRIDE;
-    virtual void resumeActiveDOMObjects(ActiveDOMObject::ReasonForSuspension) OVERRIDE;
-    virtual void stopActiveDOMObjects() OVERRIDE;
+    virtual void suspendActiveDOMObjects(ActiveDOMObject::ReasonForSuspension) override;
+    virtual void resumeActiveDOMObjects(ActiveDOMObject::ReasonForSuspension) override;
+    virtual void stopActiveDOMObjects() override;
 
     RenderView* renderView() const { return m_renderView.get(); }
 
@@ -605,7 +606,7 @@ public:
 
     bool wellFormed() const { return m_wellFormed; }
 
-    virtual const URL& url() const OVERRIDE FINAL { return m_url; }
+    virtual const URL& url() const override final { return m_url; }
     void setURL(const URL&);
 
     // To understand how these concepts relate to one another, please see the
@@ -617,12 +618,12 @@ public:
     const String& baseTarget() const { return m_baseTarget; }
     void processBaseElement();
 
-    virtual URL completeURL(const String&) const OVERRIDE FINAL;
+    virtual URL completeURL(const String&) const override final;
     URL completeURL(const String&, const URL& baseURLOverride) const;
 
-    virtual String userAgent(const URL&) const OVERRIDE;
+    virtual String userAgent(const URL&) const override;
 
-    virtual void disableEval(const String& errorMessage) OVERRIDE;
+    virtual void disableEval(const String& errorMessage) override;
 
     bool canNavigate(Frame* targetFrame);
     Frame* findUnsafeParentScrollPropagationBoundary();
@@ -661,11 +662,11 @@ public:
     void setReadyState(ReadyState);
     void setParsing(bool);
     bool parsing() const { return m_bParsing; }
-    int minimumLayoutDelay();
+    std::chrono::milliseconds minimumLayoutDelay();
 
     bool shouldScheduleLayout();
     bool isLayoutTimerActive();
-    int elapsedTime() const;
+    std::chrono::milliseconds elapsedTime() const;
     
     void setTextColor(const Color& color) { m_textColor = color; }
     Color textColor() const { return m_textColor; }
@@ -904,7 +905,7 @@ public:
     bool inDesignMode() const;
 
     Document* parentDocument() const;
-    Document* topDocument() const;
+    Document& topDocument() const;
     
     ScriptRunner* scriptRunner() { return m_scriptRunner.get(); }
 
@@ -959,7 +960,7 @@ public:
     bool isDNSPrefetchEnabled() const { return m_isDNSPrefetchEnabled; }
     void parseDNSPrefetchControlHeader(const String&);
 
-    virtual void postTask(PassOwnPtr<Task>) OVERRIDE; // Executes the task on context's thread asynchronously.
+    virtual void postTask(PassOwnPtr<Task>) override; // Executes the task on context's thread asynchronously.
 
     void suspendScriptedAnimationControllerCallbacks();
     void resumeScriptedAnimationControllerCallbacks();
@@ -1022,7 +1023,7 @@ public:
     void setFrameElementsShouldIgnoreScrolling(bool ignore) { m_frameElementsShouldIgnoreScrolling = ignore; }
     bool frameElementsShouldIgnoreScrolling() const { return m_frameElementsShouldIgnoreScrolling; }
 
-#if ENABLE(DASHBOARD_SUPPORT) || ENABLE(DRAGGABLE_REGION)
+#if ENABLE(DASHBOARD_SUPPORT)
     void setAnnotatedRegionsDirty(bool f) { m_annotatedRegionsDirty = f; }
     bool annotatedRegionsDirty() const { return m_annotatedRegionsDirty; }
     bool hasAnnotatedRegions () const { return m_hasAnnotatedRegions; }
@@ -1031,7 +1032,7 @@ public:
     void setAnnotatedRegions(const Vector<AnnotatedRegionValue>&);
 #endif
 
-    virtual void removeAllEventListeners() OVERRIDE;
+    virtual void removeAllEventListeners() override;
 
 #if ENABLE(SVG)
     const SVGDocumentExtensions* svgExtensions();
@@ -1047,8 +1048,8 @@ public:
     bool processingLoadEvent() const { return m_processingLoadEvent; }
     bool loadEventFinished() const { return m_loadEventFinished; }
 
-    virtual bool isContextThread() const OVERRIDE;
-    virtual bool isJSExecutionForbidden() const OVERRIDE { return false; }
+    virtual bool isContextThread() const override;
+    virtual bool isJSExecutionForbidden() const override { return false; }
 
     bool containsValidityStyleRules() const { return m_containsValidityStyleRules; }
     void setContainsValidityStyleRules() { m_containsValidityStyleRules = true; }
@@ -1059,7 +1060,7 @@ public:
     void enqueuePageshowEvent(PageshowEventPersistence);
     void enqueueHashchangeEvent(const String& oldURL, const String& newURL);
     void enqueuePopstateEvent(PassRefPtr<SerializedScriptValue> stateObject);
-    virtual DocumentEventQueue& eventQueue() const OVERRIDE { return m_eventQueue; }
+    virtual DocumentEventQueue& eventQueue() const override { return m_eventQueue; }
 
     void addMediaCanStartListener(MediaCanStartListener*);
     void removeMediaCanStartListener(MediaCanStartListener*);
@@ -1135,8 +1136,8 @@ public:
     void serviceScriptedAnimations(double monotonicAnimationStartTime);
 #endif
 
-    virtual EventTarget* errorEventTarget() OVERRIDE;
-    virtual void logExceptionToConsole(const String& errorMessage, const String& sourceURL, int lineNumber, int columnNumber, PassRefPtr<ScriptCallStack>) OVERRIDE;
+    virtual EventTarget* errorEventTarget() override;
+    virtual void logExceptionToConsole(const String& errorMessage, const String& sourceURL, int lineNumber, int columnNumber, PassRefPtr<ScriptCallStack>) override;
 
     void initDNSPrefetch();
 
@@ -1209,9 +1210,9 @@ public:
 
     void didAssociateFormControl(Element*);
 
-    virtual void addConsoleMessage(MessageSource, MessageLevel, const String& message, unsigned long requestIdentifier = 0) OVERRIDE;
+    virtual void addConsoleMessage(MessageSource, MessageLevel, const String& message, unsigned long requestIdentifier = 0) override;
 
-    virtual SecurityOrigin* topOrigin() const OVERRIDE;
+    virtual SecurityOrigin* topOrigin() const override;
 
 #if ENABLE(FONT_LOAD_EVENTS)
     PassRefPtr<FontLoader> fontloader();
@@ -1235,35 +1236,35 @@ private:
 
     void commonTeardown();
 
-    RenderObject* renderer() const WTF_DELETED_FUNCTION;
-    void setRenderer(RenderObject*) WTF_DELETED_FUNCTION;
+    RenderObject* renderer() const = delete;
+    void setRenderer(RenderObject*) = delete;
 
     void createRenderTree();
     void detachParser();
 
-    virtual void dropChildren() OVERRIDE;
+    virtual void dropChildren() override;
 
     typedef void (*ArgumentsCallback)(const String& keyString, const String& valueString, Document*, void* data);
     void processArguments(const String& features, void* data, ArgumentsCallback);
 
-    virtual bool isDocument() const OVERRIDE { return true; }
+    virtual bool isDocument() const override { return true; }
 
-    virtual void childrenChanged(const ChildChange&) OVERRIDE;
+    virtual void childrenChanged(const ChildChange&) override;
 
-    virtual String nodeName() const OVERRIDE;
-    virtual NodeType nodeType() const OVERRIDE;
-    virtual bool childTypeAllowed(NodeType) const OVERRIDE;
-    virtual PassRefPtr<Node> cloneNode(bool deep) OVERRIDE;
+    virtual String nodeName() const override;
+    virtual NodeType nodeType() const override;
+    virtual bool childTypeAllowed(NodeType) const override;
+    virtual PassRefPtr<Node> cloneNode(bool deep) override;
     void cloneDataFromDocument(const Document&);
 
-    virtual void refScriptExecutionContext() OVERRIDE { ref(); }
-    virtual void derefScriptExecutionContext() OVERRIDE { deref(); }
+    virtual void refScriptExecutionContext() override { ref(); }
+    virtual void derefScriptExecutionContext() override { deref(); }
 
-    virtual void addMessage(MessageSource, MessageLevel, const String& message, const String& sourceURL, unsigned lineNumber, unsigned columnNumber, PassRefPtr<ScriptCallStack>, JSC::ExecState* = 0, unsigned long requestIdentifier = 0) OVERRIDE;
+    virtual void addMessage(MessageSource, MessageLevel, const String& message, const String& sourceURL, unsigned lineNumber, unsigned columnNumber, PassRefPtr<ScriptCallStack>, JSC::ExecState* = 0, unsigned long requestIdentifier = 0) override;
 
-    virtual double minimumTimerInterval() const OVERRIDE;
+    virtual double minimumTimerInterval() const override;
 
-    virtual double timerAlignmentInterval() const OVERRIDE;
+    virtual double timerAlignmentInterval() const override;
 
     void updateTitle(const StringWithDirection&);
     void updateFocusAppearanceTimerFired(Timer<Document>&);
@@ -1433,7 +1434,7 @@ private:
     bool m_loadEventFinished;
 
     RefPtr<SerializedScriptValue> m_pendingStateObject;
-    double m_startTime;
+    std::chrono::steady_clock::time_point m_startTime;
     bool m_overMinimumLayoutThreshold;
     
     std::unique_ptr<ScriptRunner> m_scriptRunner;
@@ -1467,7 +1468,7 @@ private:
     OwnPtr<SVGDocumentExtensions> m_svgExtensions;
 #endif
 
-#if ENABLE(DASHBOARD_SUPPORT) || ENABLE(DRAGGABLE_REGION)
+#if ENABLE(DASHBOARD_SUPPORT)
     Vector<AnnotatedRegionValue> m_annotatedRegions;
     bool m_hasAnnotatedRegions;
     bool m_annotatedRegionsDirty;

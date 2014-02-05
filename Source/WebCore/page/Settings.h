@@ -34,6 +34,7 @@
 #include "SecurityOrigin.h"
 #include "SettingsMacros.h"
 #include "Timer.h"
+#include <chrono>
 #include <wtf/HashMap.h>
 #include <wtf/RefCounted.h>
 #include <wtf/text/AtomicString.h>
@@ -171,9 +172,8 @@ public:
     void setDOMTimerAlignmentInterval(double);
     double domTimerAlignmentInterval() const;
 
-    // FIXME: Change these methods to take/return an unsigned integer after we upstream the iOS port.
-    void setLayoutInterval(int);
-    int layoutInterval() const { return m_layoutInterval; }
+    void setLayoutInterval(std::chrono::milliseconds);
+    std::chrono::milliseconds layoutInterval() const { return m_layoutInterval; }
 
 #if ENABLE(HIDDEN_PAGE_DOM_TIMER_THROTTLING)
     bool hiddenPageDOMTimerThrottlingEnabled() const { return m_hiddenPageDOMTimerThrottlingEnabled; }
@@ -213,9 +213,6 @@ public:
     void setFontRenderingMode(FontRenderingMode mode);
     FontRenderingMode fontRenderingMode() const;
 
-    void setCSSCustomFilterEnabled(bool enabled) { m_isCSSCustomFilterEnabled = enabled; }
-    bool isCSSCustomFilterEnabled() const { return m_isCSSCustomFilterEnabled; }
-
 #if ENABLE(CSS_STICKY_POSITION)
     void setCSSStickyPositionEnabled(bool enabled) { m_cssStickyPositionEnabled = enabled; }
     bool cssStickyPositionEnabled() const { return m_cssStickyPositionEnabled; }
@@ -234,6 +231,9 @@ public:
 
     void setTiledBackingStoreEnabled(bool);
     bool tiledBackingStoreEnabled() const { return m_tiledBackingStoreEnabled; }
+
+    void setBackgroundShouldExtendBeyondPage(bool);
+    bool backgroundShouldExtendBeyondPage() const { return m_backgroundShouldExtendBeyondPage; }
 
 #if USE(AVFOUNDATION)
     static void setAVFoundationEnabled(bool flag);
@@ -304,6 +304,9 @@ public:
 
     static void setNetworkInterfaceName(const String&);
     static const String& networkInterfaceName();
+
+    static void setAVKitEnabled(bool flag) { gAVKitEnabled = flag; }
+    static bool avKitEnabled() { return gAVKitEnabled; }
 #endif
 
 private:
@@ -318,7 +321,7 @@ private:
     URL m_userStyleSheetLocation;
     const std::unique_ptr<FontGenericFamilies> m_fontGenericFamilies;
     SecurityOrigin::StorageBlockingPolicy m_storageBlockingPolicy;
-    int m_layoutInterval;
+    std::chrono::milliseconds m_layoutInterval;
 #if PLATFORM(IOS)
     double m_maxParseDuration;
 #endif
@@ -341,7 +344,6 @@ private:
     bool m_needsAdobeFrameReloadingQuirk : 1;
     bool m_usesPageCache : 1;
     unsigned m_fontRenderingMode : 1;
-    bool m_isCSSCustomFilterEnabled : 1;
 #if PLATFORM(IOS)
     bool m_standalone : 1;
     bool m_telephoneNumberParsingEnabled : 1;
@@ -357,6 +359,7 @@ private:
 #endif
     bool m_showTiledScrollingIndicator : 1;
     bool m_tiledBackingStoreEnabled : 1;
+    bool m_backgroundShouldExtendBeyondPage : 1;
     bool m_dnsPrefetchingEnabled : 1;
 
 #if ENABLE(TOUCH_EVENTS)
@@ -401,6 +404,7 @@ private:
     static bool gShouldRespectPriorityInCSSAttributeSetters;
 #if PLATFORM(IOS)
     static bool gNetworkDataUsageTrackingEnabled;
+    static bool gAVKitEnabled;
 #endif
 
     static double gHiddenPageDOMTimerAlignmentInterval;

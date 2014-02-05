@@ -42,6 +42,8 @@ namespace WebCore {
     class Page;
     class SecurityOrigin;
     class StorageNamespace;
+    class VisitedLinkProvider;
+    class UserContentController;
 
 #if ENABLE(VIDEO_TRACK)
     class CaptionPreferencesChangedListener;
@@ -65,12 +67,12 @@ namespace WebCore {
         // DumpRenderTree helper that triggers a StorageArea sync.
         static void syncLocalStorage();
 
-        static unsigned numberOfPageGroups();
-
         const HashSet<Page*>& pages() const { return m_pages; }
 
         void addPage(Page&);
         void removePage(Page&);
+
+        VisitedLinkProvider& visitedLinkProvider() { return *m_visitedLinkProvider; }
 
         bool isLinkVisited(LinkHash);
 
@@ -93,14 +95,11 @@ namespace WebCore {
 
         void addUserScriptToWorld(DOMWrapperWorld&, const String& source, const URL&, const Vector<String>& whitelist, const Vector<String>& blacklist, UserScriptInjectionTime, UserContentInjectedFrames);
         void addUserStyleSheetToWorld(DOMWrapperWorld&, const String& source, const URL&, const Vector<String>& whitelist, const Vector<String>& blacklist, UserContentInjectedFrames, UserStyleLevel = UserStyleUserLevel, UserStyleInjectionTime = InjectInExistingDocuments);
-        void removeUserScriptFromWorld(DOMWrapperWorld&, const URL&);
         void removeUserStyleSheetFromWorld(DOMWrapperWorld&, const URL&);
+        void removeUserScriptFromWorld(DOMWrapperWorld&, const URL&);
         void removeUserScriptsFromWorld(DOMWrapperWorld&);
         void removeUserStyleSheetsFromWorld(DOMWrapperWorld&);
         void removeAllUserContent();
-
-        const UserScriptMap* userScripts() const { return m_userScripts.get(); }
-        const UserStyleSheetMap* userStyleSheets() const { return m_userStyleSheets.get(); }
 
         GroupSettings& groupSettings() const { return *m_groupSettings; }
 
@@ -111,10 +110,11 @@ namespace WebCore {
 
     private:
         void addVisitedLink(LinkHash);
-        void invalidateInjectedStyleSheetCacheInAllFrames();
 
         String m_name;
         HashSet<Page*> m_pages;
+
+        RefPtr<VisitedLinkProvider> m_visitedLinkProvider;
 
         HashSet<LinkHash, LinkHashHash> m_visitedLinkHashes;
         bool m_visitedLinksPopulated;
@@ -123,8 +123,7 @@ namespace WebCore {
         RefPtr<StorageNamespace> m_localStorage;
         HashMap<RefPtr<SecurityOrigin>, RefPtr<StorageNamespace>> m_transientLocalStorageMap;
 
-        std::unique_ptr<UserScriptMap> m_userScripts;
-        std::unique_ptr<UserStyleSheetMap> m_userStyleSheets;
+        RefPtr<UserContentController> m_userContentController;
 
         const std::unique_ptr<GroupSettings> m_groupSettings;
 

@@ -518,7 +518,7 @@ template <class TreeBuilder> TreeDeconstructionPattern Parser<LexerType>::create
             }
         }
     }
-    return context.createBindingLocation(m_token.m_location, name, m_token.m_endPosition, m_token.m_startPosition, m_token.m_endPosition);
+    return context.createBindingLocation(m_token.m_location, name, m_token.m_startPosition, m_token.m_endPosition);
 }
 
 template <typename LexerType>
@@ -660,6 +660,7 @@ template <class TreeBuilder> TreeConstDeclList Parser<LexerType>::parseConstDecl
         if (hasInitializer) {
             next(TreeBuilder::DontBuildStrings); // consume '='
             initializer = parseAssignmentExpression(context);
+            failIfFalse(!!initializer, "Unable to parse initializer");
         }
         tail = context.appendConstDecl(location, tail, name, initializer);
         if (!constDecls)
@@ -1132,6 +1133,7 @@ template <class TreeBuilder> TreeStatement Parser<LexerType>::parseStatement(Tre
         if (directiveLiteralLength)
             *directiveLiteralLength = m_token.m_location.endOffset - m_token.m_location.startOffset;
         nonTrivialExpressionCount = m_nonTrivialExpressionCount;
+        FALLTHROUGH;
     default:
         TreeStatement exprStatement = parseExpressionStatement(context);
         if (directive && nonTrivialExpressionCount != m_nonTrivialExpressionCount)
@@ -1680,6 +1682,7 @@ template <class TreeBuilder> TreeProperty Parser<LexerType>::parseProperty(TreeB
     namedProperty:
     case IDENT:
         wasIdent = true;
+        FALLTHROUGH;
     case STRING: {
         const Identifier* ident = m_token.m_data.ident;
         if (complete || (wasIdent && (*ident == m_vm->propertyNames->get || *ident == m_vm->propertyNames->set)))

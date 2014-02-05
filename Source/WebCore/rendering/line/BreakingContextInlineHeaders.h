@@ -51,8 +51,7 @@ namespace WebCore {
 // We don't let our line box tree for a single line get any deeper than this.
 const unsigned cMaxLineDepth = 200;
 
-class WordMeasurement {
-public:
+struct WordMeasurement {
     WordMeasurement()
         : renderer(0)
         , width(0)
@@ -1069,16 +1068,16 @@ inline void checkMidpoints(LineMidpointState& lineMidpointState, InlineIterator&
     // Check to see if our last midpoint is a start point beyond the line break. If so,
     // shave it off the list, and shave off a trailing space if the previous end point doesn't
     // preserve whitespace.
-    if (lBreak.renderer() && lineMidpointState.numMidpoints && !(lineMidpointState.numMidpoints % 2)) {
-        InlineIterator* midpoints = lineMidpointState.midpoints.data();
-        InlineIterator& endpoint = midpoints[lineMidpointState.numMidpoints - 2];
-        const InlineIterator& startpoint = midpoints[lineMidpointState.numMidpoints - 1];
+    if (lBreak.renderer() && lineMidpointState.numMidpoints() && !(lineMidpointState.numMidpoints() % 2)) {
+        InlineIterator* midpoints = lineMidpointState.midpoints().data();
+        InlineIterator& endpoint = midpoints[lineMidpointState.numMidpoints() - 2];
+        const InlineIterator& startpoint = midpoints[lineMidpointState.numMidpoints() - 1];
         InlineIterator currpoint = endpoint;
         while (!currpoint.atEnd() && currpoint != startpoint && currpoint != lBreak)
             currpoint.increment();
         if (currpoint == lBreak) {
             // We hit the line break before the start point. Shave off the start point.
-            lineMidpointState.numMidpoints--;
+            lineMidpointState.decreaseNumMidpoints();
             if (endpoint.renderer()->style().collapseWhiteSpace() && endpoint.renderer()->isText())
                 endpoint.setOffset(endpoint.offset() - 1);
         }

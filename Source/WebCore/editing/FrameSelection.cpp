@@ -295,7 +295,7 @@ void FrameSelection::setSelection(const VisibleSelection& newSelection, SetSelec
 
     if (m_selection == s) {
         // Even if selection was not changed, selection offsets may have been changed.
-        notifyRendererOfSelectionChange(userTriggered);
+        updateSelectionCachesIfSelectionIsInsideTextFormControl(userTriggered);
         return;
     }
 
@@ -320,7 +320,7 @@ void FrameSelection::setSelection(const VisibleSelection& newSelection, SetSelec
     // It will be restored by the vertical arrow navigation code if necessary.
     m_xPosForVerticalArrowNavigation = NoXPosForVerticalArrowNavigation();
     selectFrameElementInParentIfFullySelected();
-    notifyRendererOfSelectionChange(userTriggered);
+    updateSelectionCachesIfSelectionIsInsideTextFormControl(userTriggered);
     m_frame->editor().respondToChangedSelection(oldSelection, options);
     if (userTriggered == UserTriggered) {
         ScrollAlignment alignment;
@@ -712,13 +712,11 @@ VisiblePosition FrameSelection::modifyMovingRight(TextGranularity granularity)
             pos = VisiblePosition(m_selection.extent(), m_selection.affinity()).right(true);
         break;
     case WordGranularity: {
-#if USE(ICU_UNICODE)
         // Visual word movement relies on isWordTextBreak which is not implemented in WinCE and QT.
         // https://bugs.webkit.org/show_bug.cgi?id=81136.
         bool skipsSpaceWhenMovingRight = m_frame && m_frame->editor().behavior().shouldSkipSpaceWhenMovingRight();
         pos = rightWordPosition(VisiblePosition(m_selection.extent(), m_selection.affinity()), skipsSpaceWhenMovingRight);
         break;
-#endif
     }
     case SentenceGranularity:
     case LineGranularity:
@@ -908,11 +906,9 @@ VisiblePosition FrameSelection::modifyMovingLeft(TextGranularity granularity)
             pos = VisiblePosition(m_selection.extent(), m_selection.affinity()).left(true);
         break;
     case WordGranularity: {
-#if USE(ICU_UNICODE)
         bool skipsSpaceWhenMovingRight = m_frame && m_frame->editor().behavior().shouldSkipSpaceWhenMovingRight();
         pos = leftWordPosition(VisiblePosition(m_selection.extent(), m_selection.affinity()), skipsSpaceWhenMovingRight);
         break;
-#endif
     }
     case SentenceGranularity:
     case LineGranularity:
@@ -1706,7 +1702,7 @@ void FrameSelection::selectAll()
         setSelection(newSelection);
 
     selectFrameElementInParentIfFullySelected();
-    notifyRendererOfSelectionChange(UserTriggered);
+    updateSelectionCachesIfSelectionIsInsideTextFormControl(UserTriggered);
 }
 
 bool FrameSelection::setSelectedRange(Range* range, EAffinity affinity, bool closeTyping)
@@ -1914,10 +1910,8 @@ void FrameSelection::caretBlinkTimerFired(Timer<FrameSelection>&)
 #endif
 }
 
-void FrameSelection::notifyRendererOfSelectionChange(EUserTriggered userTriggered)
+void FrameSelection::updateSelectionCachesIfSelectionIsInsideTextFormControl(EUserTriggered userTriggered)
 {
-    m_frame->document()->updateStyleIfNeeded();
-
     if (HTMLTextFormControlElement* textControl = enclosingTextFormControl(start()))
         textControl->selectionChanged(userTriggered == UserTriggered);
 }
@@ -2008,7 +2002,7 @@ FloatRect FrameSelection::bounds(bool clipToVisibleContent) const
         return LayoutRect();
 
     LayoutRect selectionRect = root->selectionBounds(clipToVisibleContent);
-    return clipToVisibleContent ? intersection(selectionRect, view->visibleContentRect()) : selectionRect;
+    return clipToVisibleContent ? intersection(selectionRect, view->visibleContentRect(ScrollableArea::LegacyIOSDocumentVisibleRect)) : selectionRect;
 }
 
 void FrameSelection::getClippedVisibleTextRectangles(Vector<FloatRect>& rectangles) const
@@ -2017,7 +2011,7 @@ void FrameSelection::getClippedVisibleTextRectangles(Vector<FloatRect>& rectangl
     if (!root)
         return;
 
-    FloatRect visibleContentRect = m_frame->view()->visibleContentRect();
+    FloatRect visibleContentRect = m_frame->view()->visibleContentRect(ScrollableArea::LegacyIOSDocumentVisibleRect);
 
     Vector<FloatQuad> quads;
     toNormalizedRange()->textQuads(quads, true);

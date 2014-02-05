@@ -29,7 +29,7 @@
 
 #include "config.h"
 
-#if ENABLE(JAVASCRIPT_DEBUGGER) && ENABLE(INSPECTOR)
+#if ENABLE(INSPECTOR)
 
 #include "InspectorProfilerAgent.h"
 
@@ -71,17 +71,17 @@ public:
     virtual ~PageProfilerAgent() { }
 
 private:
-    virtual void recompileScript()
+    virtual void recompileScript() override
     {
-        PageScriptDebugServer::shared().recompileAllJSFunctionsSoon();
+        PageScriptDebugServer::shared().recompileAllJSFunctions();
     }
 
-    virtual void startProfiling(const String& title)
+    virtual void startProfiling(const String& title) override
     {
         ScriptProfiler::startForPage(m_inspectedPage, title);
     }
 
-    virtual PassRefPtr<ScriptProfile> stopProfiling(const String& title)
+    virtual PassRefPtr<ScriptProfile> stopProfiling(const String& title) override
     {
         return ScriptProfiler::stopForPage(m_inspectedPage, title);
     }
@@ -101,14 +101,14 @@ public:
     virtual ~WorkerProfilerAgent() { }
 
 private:
-    virtual void recompileScript() { }
+    virtual void recompileScript() override { }
 
-    virtual void startProfiling(const String& title)
+    virtual void startProfiling(const String& title) override
     {
         ScriptProfiler::startForWorkerGlobalScope(m_workerGlobalScope, title);
     }
 
-    virtual PassRefPtr<ScriptProfile> stopProfiling(const String& title)
+    virtual PassRefPtr<ScriptProfile> stopProfiling(const String& title) override
     {
         return ScriptProfiler::stopForWorkerGlobalScope(m_workerGlobalScope, title);
     }
@@ -138,7 +138,7 @@ InspectorProfilerAgent::InspectorProfilerAgent(InstrumentingAgents* instrumentin
 
 InspectorProfilerAgent::~InspectorProfilerAgent()
 {
-    m_instrumentingAgents->setInspectorProfilerAgent(0);
+    m_instrumentingAgents->setInspectorProfilerAgent(nullptr);
 }
 
 void InspectorProfilerAgent::addProfile(PassRefPtr<ScriptProfile> prpProfile, unsigned lineNumber, unsigned columnNumber, const String& sourceURL)
@@ -202,23 +202,22 @@ void InspectorProfilerAgent::hasHeapProfiler(ErrorString*, bool* result)
 
 void InspectorProfilerAgent::enable(ErrorString*)
 {
-    if (enabled())
-        return;
     enable(false);
 }
 
 void InspectorProfilerAgent::disable(ErrorString*)
 {
-    disable();
+    disable(false);
 }
 
-void InspectorProfilerAgent::disable()
+void InspectorProfilerAgent::disable(bool skipRecompile)
 {
     if (!m_enabled)
         return;
     m_enabled = false;
     m_profileHeadersRequested = false;
-    recompileScript();
+    if (!skipRecompile)
+        recompileScript();
 }
 
 void InspectorProfilerAgent::enable(bool skipRecompile)
@@ -257,8 +256,8 @@ class OutputStream : public ScriptHeapSnapshot::OutputStream {
 public:
     OutputStream(InspectorProfilerFrontendDispatcher* frontend, unsigned uid)
         : m_frontendDispatcher(frontend), m_uid(uid) { }
-    void Write(const String& chunk) { m_frontendDispatcher->addHeapSnapshotChunk(m_uid, chunk); }
-    void Close() { m_frontendDispatcher->finishHeapSnapshot(m_uid); }
+    void Write(const String& chunk) override { m_frontendDispatcher->addHeapSnapshotChunk(m_uid, chunk); }
+    void Close() override { m_frontendDispatcher->finishHeapSnapshot(m_uid); }
 private:
     InspectorProfilerFrontendDispatcher* m_frontendDispatcher;
     int m_uid;
@@ -333,14 +332,15 @@ void InspectorProfilerAgent::didCreateFrontendAndBackend(Inspector::InspectorFro
     m_backendDispatcher = InspectorProfilerBackendDispatcher::create(backendDispatcher, this);
 }
 
-void InspectorProfilerAgent::willDestroyFrontendAndBackend()
+void InspectorProfilerAgent::willDestroyFrontendAndBackend(InspectorDisconnectReason reason)
 {
     m_frontendDispatcher = nullptr;
     m_backendDispatcher.clear();
 
     stop();
-    ErrorString error;
-    disable(&error);
+
+    bool skipRecompile = reason == InspectorDisconnectReason::InspectedTargetDestroyed;
+    disable(skipRecompile);
 }
 
 void InspectorProfilerAgent::start(ErrorString*)
@@ -376,16 +376,16 @@ class HeapSnapshotProgress: public ScriptProfiler::HeapSnapshotProgress {
 public:
     explicit HeapSnapshotProgress(InspectorProfilerFrontendDispatcher* frontend)
         : m_frontendDispatcher(frontend) { }
-    void Start(int totalWork)
+    void Start(int totalWork) override
     {
         m_totalWork = totalWork;
     }
-    void Worked(int workDone)
+    void Worked(int workDone) override
     {
         if (m_frontendDispatcher)
             m_frontendDispatcher->reportHeapSnapshotProgress(workDone, m_totalWork);
     }
-    void Done() { }
+    void Done() override { }
     bool isCanceled() { return false; }
 private:
     InspectorProfilerFrontendDispatcher* m_frontendDispatcher;
@@ -455,4 +455,4 @@ void InspectorProfilerAgent::getHeapObjectId(ErrorString* errorString, const Str
 
 } // namespace WebCore
 
-#endif // ENABLE(JAVASCRIPT_DEBUGGER) && ENABLE(INSPECTOR)
+#endif // ENABLE(INSPECTOR)

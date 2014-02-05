@@ -74,8 +74,7 @@ static bool isCharsetSpecifyingNode(const Node& node)
         return false;
     HTMLMetaCharsetParser::AttributeList attributes;
     if (element.hasAttributes()) {
-        for (unsigned i = 0; i < element.attributeCount(); ++i) {
-            const Attribute& attribute = element.attributeAt(i);
+        for (const Attribute& attribute : element.attributesIterator()) {
             // FIXME: We should deal appropriately with the attribute if they have a namespace.
             attributes.append(std::make_pair(attribute.name().toString(), attribute.value().string()));
         }
@@ -95,7 +94,7 @@ static const QualifiedName& frameOwnerURLAttributeName(const HTMLFrameOwnerEleme
     return isHTMLObjectElement(frameOwner) ? HTMLNames::dataAttr : HTMLNames::srcAttr;
 }
 
-class SerializerMarkupAccumulator FINAL : public WebCore::MarkupAccumulator {
+class SerializerMarkupAccumulator final : public WebCore::MarkupAccumulator {
 public:
     SerializerMarkupAccumulator(PageSerializer&, Document&, Vector<Node*>*);
     virtual ~SerializerMarkupAccumulator();
@@ -104,10 +103,10 @@ private:
     PageSerializer& m_serializer;
     Document& m_document;
 
-    virtual void appendText(StringBuilder&, const Text&) OVERRIDE;
-    virtual void appendElement(StringBuilder&, const Element&, Namespaces*) OVERRIDE;
-    virtual void appendCustomAttributes(StringBuilder&, const Element&, Namespaces*) OVERRIDE;
-    virtual void appendEndTag(const Node&) OVERRIDE;
+    virtual void appendText(StringBuilder&, const Text&) override;
+    virtual void appendElement(StringBuilder&, const Element&, Namespaces*) override;
+    virtual void appendCustomAttributes(StringBuilder&, const Element&, Namespaces*) override;
+    virtual void appendEndTag(const Node&) override;
 };
 
 SerializerMarkupAccumulator::SerializerMarkupAccumulator(PageSerializer& serializer, Document& document, Vector<Node*>* nodes)

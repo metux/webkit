@@ -369,12 +369,10 @@ inline TextDecoration& operator|= (TextDecoration& a, TextDecoration b) { return
 
 enum TextDecorationStyle {
     TextDecorationStyleSolid,
-#if ENABLE(CSS3_TEXT_DECORATION)
     TextDecorationStyleDouble,
     TextDecorationStyleDotted,
     TextDecorationStyleDashed,
     TextDecorationStyleWavy
-#endif // CSS3_TEXT_DECORATION
 };
 
 #if ENABLE(CSS3_TEXT)
@@ -387,7 +385,6 @@ enum TextJustify {
 };
 #endif // CSS3_TEXT
 
-#if ENABLE(CSS3_TEXT_DECORATION)
 enum TextDecorationSkipItems {
     TextDecorationSkipNone = 0,
     TextDecorationSkipInk = 1 << 0
@@ -398,8 +395,6 @@ enum TextUnderlinePosition {
     // FIXME: Implement support for 'under left' and 'under right' values.
     TextUnderlinePositionAuto = 0x1, TextUnderlinePositionAlphabetic = 0x2, TextUnderlinePositionUnder = 0x4
 };
-
-#endif
 
 enum EPageBreak {
     PBAUTO, PBALWAYS, PBAVOID
@@ -505,7 +500,13 @@ enum TextEmphasisFill { TextEmphasisFillFilled, TextEmphasisFillOpen };
 
 enum TextEmphasisMark { TextEmphasisMarkNone, TextEmphasisMarkAuto, TextEmphasisMarkDot, TextEmphasisMarkCircle, TextEmphasisMarkDoubleCircle, TextEmphasisMarkTriangle, TextEmphasisMarkSesame, TextEmphasisMarkCustom };
 
-enum TextEmphasisPosition { TextEmphasisPositionOver, TextEmphasisPositionUnder };
+enum TextEmphasisPositions {
+    TextEmphasisPositionOver = 1 << 0,
+    TextEmphasisPositionUnder = 1 << 1,
+    TextEmphasisPositionLeft = 1 << 2,
+    TextEmphasisPositionRight = 1 << 3
+};
+typedef unsigned TextEmphasisPosition;
 
 enum TextOrientation { TextOrientationVerticalRight, TextOrientationUpright, TextOrientationSideways, TextOrientationSidewaysRight };
 
@@ -536,10 +537,6 @@ enum WrapThrough { WrapThroughWrap, WrapThroughNone };
 enum RubyPosition { RubyPositionBefore, RubyPositionAfter };
 
 enum GridAutoFlow { AutoFlowNone, AutoFlowColumn, AutoFlowRow };
-
-#if ENABLE(DRAGGABLE_REGION)
-enum DraggableRegionMode { DraggableRegionNone, DraggableRegionDrag, DraggableRegionNoDrag };
-#endif
 
 // Reasonable maximum to prevent insane font sizes from causing crashes on some platforms (such as Windows).
 static const float maximumAllowedFontSize = 1000000.0f;

@@ -40,6 +40,7 @@
 <a name="WebKitWebContext.synopsis"></a><h2>Synopsis</h2>
 <pre class="synopsis">struct              <a class="link" href="WebKitWebContext.html#WebKitWebContext-struct" title="struct WebKitWebContext">WebKitWebContext</a>;
 enum                <a class="link" href="WebKitWebContext.html#WebKitCacheModel" title="enum WebKitCacheModel">WebKitCacheModel</a>;
+enum                <a class="link" href="WebKitWebContext.html#WebKitProcessModel" title="enum WebKitProcessModel">WebKitProcessModel</a>;
 enum                <a class="link" href="WebKitWebContext.html#WebKitTLSErrorsPolicy" title="enum WebKitTLSErrorsPolicy">WebKitTLSErrorsPolicy</a>;
 <a class="link" href="WebKitWebContext.html" title="WebKitWebContext"><span class="returnvalue">WebKitWebContext</span></a> *  <a class="link" href="WebKitWebContext.html#webkit-web-context-get-default" title="webkit_web_context_get_default ()">webkit_web_context_get_default</a>      (<em class="parameter"><code><span class="type">void</span></code></em>);
 <a class="link" href="WebKitWebContext.html#WebKitCacheModel" title="enum WebKitCacheModel"><span class="returnvalue">WebKitCacheModel</span></a>    <a class="link" href="WebKitWebContext.html#webkit-web-context-get-cache-model" title="webkit_web_context_get_cache_model ()">webkit_web_context_get_cache_model</a>  (<em class="parameter"><code><a class="link" href="WebKitWebContext.html" title="WebKitWebContext"><span class="type">WebKitWebContext</span></a> *context</code></em>);
@@ -91,6 +92,9 @@ const <a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gc
 <span class="returnvalue">void</span>                <a class="link" href="WebKitWebContext.html#webkit-web-context-set-web-extensions-directory" title="webkit_web_context_set_web_extensions_directory ()">webkit_web_context_set_web_extensions_directory</a>
                                                         (<em class="parameter"><code><a class="link" href="WebKitWebContext.html" title="WebKitWebContext"><span class="type">WebKitWebContext</span></a> *context</code></em>,
                                                          <em class="parameter"><code>const <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a> *directory</code></em>);
+<span class="returnvalue">void</span>                <a class="link" href="WebKitWebContext.html#webkit-web-context-set-web-extensions-initialization-user-data" title="webkit_web_context_set_web_extensions_initialization_user_data ()">webkit_web_context_set_web_extensions_initialization_user_data</a>
+                                                        (<em class="parameter"><code><a class="link" href="WebKitWebContext.html" title="WebKitWebContext"><span class="type">WebKitWebContext</span></a> *context</code></em>,
+                                                         <em class="parameter"><code><a href="../glib/glib-GVariant.html#GVariant"><span class="type">GVariant</span></a> *user_data</code></em>);
 <span class="returnvalue">void</span>                <a class="link" href="WebKitWebContext.html#webkit-web-context-prefetch-dns" title="webkit_web_context_prefetch_dns ()">webkit_web_context_prefetch_dns</a>     (<em class="parameter"><code><a class="link" href="WebKitWebContext.html" title="WebKitWebContext"><span class="type">WebKitWebContext</span></a> *context</code></em>,
                                                          <em class="parameter"><code>const <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a> *hostname</code></em>);
 <span class="returnvalue">void</span>                <a class="link" href="WebKitWebContext.html#webkit-web-context-set-disk-cache-directory" title="webkit_web_context_set_disk_cache_directory ()">webkit_web_context_set_disk_cache_directory</a>
@@ -100,6 +104,11 @@ const <a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gc
                                                         (<em class="parameter"><code><a class="link" href="WebKitWebContext.html" title="WebKitWebContext"><span class="type">WebKitWebContext</span></a> *context</code></em>,
                                                          <em class="parameter"><code><a class="link" href="WebKitCertificateInfo.html" title="WebKitCertificateInfo"><span class="type">WebKitCertificateInfo</span></a> *info</code></em>,
                                                          <em class="parameter"><code>const <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a> *host</code></em>);
+<a class="link" href="WebKitWebContext.html#WebKitProcessModel" title="enum WebKitProcessModel"><span class="returnvalue">WebKitProcessModel</span></a>  <a class="link" href="WebKitWebContext.html#webkit-web-context-get-process-model" title="webkit_web_context_get_process_model ()">webkit_web_context_get_process_model</a>
+                                                        (<em class="parameter"><code><a class="link" href="WebKitWebContext.html" title="WebKitWebContext"><span class="type">WebKitWebContext</span></a> *context</code></em>);
+<span class="returnvalue">void</span>                <a class="link" href="WebKitWebContext.html#webkit-web-context-set-process-model" title="webkit_web_context_set_process_model ()">webkit_web_context_set_process_model</a>
+                                                        (<em class="parameter"><code><a class="link" href="WebKitWebContext.html" title="WebKitWebContext"><span class="type">WebKitWebContext</span></a> *context</code></em>,
+                                                         <em class="parameter"><code><a class="link" href="WebKitWebContext.html#WebKitProcessModel" title="enum WebKitProcessModel"><span class="type">WebKitProcessModel</span></a> process_model</code></em>);
 
 <span class="returnvalue">void</span>                (<a class="link" href="WebKitWebContext.html#WebKitURISchemeRequestCallback" title="WebKitURISchemeRequestCallback ()">*WebKitURISchemeRequestCallback</a>)   (<em class="parameter"><code><a class="link" href="WebKitURISchemeRequest.html" title="WebKitURISchemeRequest"><span class="type">WebKitURISchemeRequest</span></a> *request</code></em>,
                                                          <em class="parameter"><code><a href="../glib/glib-Basic-Types.html#gpointer"><span class="type">gpointer</span></a> user_data</code></em>);
@@ -122,6 +131,7 @@ const <a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gc
 <a name="WebKitWebContext.signals"></a><h2>Signals</h2>
 <pre class="synopsis">
   "<a class="link" href="WebKitWebContext.html#WebKitWebContext-download-started" title='The "download-started" signal'>download-started</a>"                               : <a href="../gobject/gobject-Signals.html#G-SIGNAL-RUN-LAST:CAPS"><code class="literal">Run Last</code></a>
+  "<a class="link" href="WebKitWebContext.html#WebKitWebContext-initialize-web-extensions" title='The "initialize-web-extensions" signal'>initialize-web-extensions</a>"                      : <a href="../gobject/gobject-Signals.html#G-SIGNAL-RUN-LAST:CAPS"><code class="literal">Run Last</code></a>
 </pre>
 </div>
 <div class="refsect1">
@@ -131,8 +141,9 @@ The <a class="link" href="WebKitWebContext.html" title="WebKitWebContext"><span 
 <a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a>s.
 </p>
 <p>
-You can define the <a class="link" href="WebKitWebContext.html#WebKitCacheModel" title="enum WebKitCacheModel"><span class="type">WebKitCacheModel</span></a> with
-<a class="link" href="WebKitWebContext.html#webkit-web-context-set-cache-model" title="webkit_web_context_set_cache_model ()"><code class="function">webkit_web_context_set_cache_model()</code></a>, depending on the needs of
+You can define the <a class="link" href="WebKitWebContext.html#WebKitCacheModel" title="enum WebKitCacheModel"><span class="type">WebKitCacheModel</span></a> and <a class="link" href="WebKitWebContext.html#WebKitProcessModel" title="enum WebKitProcessModel"><span class="type">WebKitProcessModel</span></a> with
+<a class="link" href="WebKitWebContext.html#webkit-web-context-set-cache-model" title="webkit_web_context_set_cache_model ()"><code class="function">webkit_web_context_set_cache_model()</code></a> and
+<a class="link" href="WebKitWebContext.html#webkit-web-context-set-process-model" title="webkit_web_context_set_process_model ()"><code class="function">webkit_web_context_set_process_model()</code></a>, depending on the needs of
 your application. You can access the <a class="link" href="WebKitCookieManager.html" title="WebKitCookieManager"><span class="type">WebKitCookieManager</span></a> or the
 <a class="link" href="WebKitSecurityManager.html" title="WebKitSecurityManager"><span class="type">WebKitSecurityManager</span></a> to specify the behaviour of your application
 regarding cookies and security, using
@@ -199,6 +210,47 @@ Enum values used for determining the <a class="link" href="WebKitWebContext.html
 </tr>
 </tbody>
 </table></div>
+</div>
+<hr>
+<div class="refsect2">
+<a name="WebKitProcessModel"></a><h3>enum WebKitProcessModel</h3>
+<pre class="programlisting">typedef enum {
+    WEBKIT_PROCESS_MODEL_SHARED_SECONDARY_PROCESS,
+    WEBKIT_PROCESS_MODEL_ONE_SECONDARY_PROCESS_PER_WEB_VIEW,
+} WebKitProcessModel;
+</pre>
+<p>
+Enum values used for determining the <a class="link" href="WebKitWebContext.html" title="WebKitWebContext"><span class="type">WebKitWebContext</span></a> process model.
+</p>
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
+<col align="left" valign="top">
+<col>
+</colgroup>
+<tbody>
+<tr>
+<td><p><a name="WEBKIT-PROCESS-MODEL-SHARED-SECONDARY-PROCESS:CAPS"></a><span class="term"><code class="literal">WEBKIT_PROCESS_MODEL_SHARED_SECONDARY_PROCESS</code></span></p></td>
+<td>Use a single process to
+  perform content rendering. The process is shared among all the
+  <a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> instances created by the application: if the process
+  hangs or crashes all the web views in the application will be affected.
+  This is the default process model, and it should suffice for most cases.
+</td>
+</tr>
+<tr>
+<td><p><a name="WEBKIT-PROCESS-MODEL-ONE-SECONDARY-PROCESS-PER-WEB-VIEW:CAPS"></a><span class="term"><code class="literal">WEBKIT_PROCESS_MODEL_ONE_SECONDARY_PROCESS_PER_WEB_VIEW</code></span></p></td>
+<td>Use one process
+  for each <a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a>. The main advantage of this process model is that
+  the rendering process for a web view can crash while the rest of the
+  views keep working normally. This process model is indicated for
+  applications which may use a number of web views and the content of
+  in each must not interfere with the rest -- for example a full-fledged
+  web browser with support for multiple tabs.
+</td>
+</tr>
+</tbody>
+</table></div>
+<p class="since">Since 2.4</p>
 </div>
 <hr>
 <div class="refsect2">
@@ -869,8 +921,10 @@ Get the TLS errors policy of <em class="parameter"><code>context</code></em>
                                                          <em class="parameter"><code>const <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a> *directory</code></em>);</pre>
 <p>
 Set the directory where WebKit will look for Web Extensions.
-This method must be called before loading anything in this context, otherwise
-it will not have any effect.
+This method must be called before loading anything in this context,
+otherwise it will not have any effect. You can connect to
+<a class="link" href="WebKitWebContext.html#WebKitWebContext-initialize-web-extensions" title='The "initialize-web-extensions" signal'><span class="type">"initialize-web-extensions"</span></a> to call this method
+before anything is loaded.
 </p>
 <div class="variablelist"><table border="0" class="variablelist">
 <colgroup>
@@ -889,6 +943,41 @@ it will not have any effect.
 </tr>
 </tbody>
 </table></div>
+</div>
+<hr>
+<div class="refsect2">
+<a name="webkit-web-context-set-web-extensions-initialization-user-data"></a><h3>webkit_web_context_set_web_extensions_initialization_user_data ()</h3>
+<pre class="programlisting"><span class="returnvalue">void</span>                webkit_web_context_set_web_extensions_initialization_user_data
+                                                        (<em class="parameter"><code><a class="link" href="WebKitWebContext.html" title="WebKitWebContext"><span class="type">WebKitWebContext</span></a> *context</code></em>,
+                                                         <em class="parameter"><code><a href="../glib/glib-GVariant.html#GVariant"><span class="type">GVariant</span></a> *user_data</code></em>);</pre>
+<p>
+Set user data to be passed to Web Extensions on initialization.
+The data will be passed to the
+<a class="link" href="WebKitWebExtension.html#WebKitWebExtensionInitializeWithUserDataFunction" title="WebKitWebExtensionInitializeWithUserDataFunction ()"><span class="type">WebKitWebExtensionInitializeWithUserDataFunction</span></a>.
+This method must be called before loading anything in this context,
+otherwise it will not have any effect. You can connect to
+<a class="link" href="WebKitWebContext.html#WebKitWebContext-initialize-web-extensions" title='The "initialize-web-extensions" signal'><span class="type">"initialize-web-extensions"</span></a> to call this method
+before anything is loaded.
+</p>
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
+<col align="left" valign="top">
+<col>
+</colgroup>
+<tbody>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>context</code></em> :</span></p></td>
+<td>a <a class="link" href="WebKitWebContext.html" title="WebKitWebContext"><span class="type">WebKitWebContext</span></a>
+</td>
+</tr>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>user_data</code></em> :</span></p></td>
+<td>a <a href="../glib/glib-GVariant.html#GVariant"><span class="type">GVariant</span></a>
+</td>
+</tr>
+</tbody>
+</table></div>
+<p class="since">Since 2.4</p>
 </div>
 <hr>
 <div class="refsect2">
@@ -975,6 +1064,80 @@ Ignore further TLS errors on the <em class="parameter"><code>host</code></em> fo
 <tr>
 <td><p><span class="term"><em class="parameter"><code>host</code></em> :</span></p></td>
 <td>the host for which a certificate is to be allowed</td>
+</tr>
+</tbody>
+</table></div>
+<p class="since">Since 2.4</p>
+</div>
+<hr>
+<div class="refsect2">
+<a name="webkit-web-context-get-process-model"></a><h3>webkit_web_context_get_process_model ()</h3>
+<pre class="programlisting"><a class="link" href="WebKitWebContext.html#WebKitProcessModel" title="enum WebKitProcessModel"><span class="returnvalue">WebKitProcessModel</span></a>  webkit_web_context_get_process_model
+                                                        (<em class="parameter"><code><a class="link" href="WebKitWebContext.html" title="WebKitWebContext"><span class="type">WebKitWebContext</span></a> *context</code></em>);</pre>
+<p>
+Returns the current process model. For more information about this value
+see <a class="link" href="WebKitWebContext.html#webkit-web-context-set-process-model" title="webkit_web_context_set_process_model ()"><code class="function">webkit_web_context_set_process_model()</code></a>.
+</p>
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
+<col align="left" valign="top">
+<col>
+</colgroup>
+<tbody>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>context</code></em> :</span></p></td>
+<td>the <a class="link" href="WebKitWebContext.html" title="WebKitWebContext"><span class="type">WebKitWebContext</span></a>
+</td>
+</tr>
+<tr>
+<td><p><span class="term"><span class="emphasis"><em>Returns</em></span> :</span></p></td>
+<td>the current <a class="link" href="WebKitWebContext.html#WebKitProcessModel" title="enum WebKitProcessModel"><span class="type">WebKitProcessModel</span></a>
+</td>
+</tr>
+</tbody>
+</table></div>
+<p class="since">Since 2.4</p>
+</div>
+<hr>
+<div class="refsect2">
+<a name="webkit-web-context-set-process-model"></a><h3>webkit_web_context_set_process_model ()</h3>
+<pre class="programlisting"><span class="returnvalue">void</span>                webkit_web_context_set_process_model
+                                                        (<em class="parameter"><code><a class="link" href="WebKitWebContext.html" title="WebKitWebContext"><span class="type">WebKitWebContext</span></a> *context</code></em>,
+                                                         <em class="parameter"><code><a class="link" href="WebKitWebContext.html#WebKitProcessModel" title="enum WebKitProcessModel"><span class="type">WebKitProcessModel</span></a> process_model</code></em>);</pre>
+<p>
+Specifies a process model for WebViews, which WebKit will use to
+determine how auxiliary processes are handled. The default setting
+(<a class="link" href="WebKitWebContext.html#WEBKIT-PROCESS-MODEL-SHARED-SECONDARY-PROCESS:CAPS"><code class="literal">WEBKIT_PROCESS_MODEL_SHARED_SECONDARY_PROCESS</code></a>) is suitable for most
+applications which embed a small amount of WebViews, or are used to
+display documents which are considered safe -- like local files.
+</p>
+<p>
+Applications which may potentially use a large amount of WebViews --for
+example a multi-tabbed web browser-- may want to use
+<a class="link" href="WebKitWebContext.html#WEBKIT-PROCESS-MODEL-ONE-SECONDARY-PROCESS-PER-WEB-VIEW:CAPS"><code class="literal">WEBKIT_PROCESS_MODEL_ONE_SECONDARY_PROCESS_PER_WEB_VIEW</code></a> to use one
+process per view. Using this model, when a WebView hangs or crashes,
+the rest of the WebViews in the application will still work normally.
+</p>
+<p>
+This method <span style="color: red">&lt;strong&gt;must be called before any other functions&lt;/strong&gt;</span>,
+as early as possible in your application. Calling it later will make
+your application crash.
+</p>
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
+<col align="left" valign="top">
+<col>
+</colgroup>
+<tbody>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>context</code></em> :</span></p></td>
+<td>the <a class="link" href="WebKitWebContext.html" title="WebKitWebContext"><span class="type">WebKitWebContext</span></a>
+</td>
+</tr>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>process_model</code></em> :</span></p></td>
+<td>a <a class="link" href="WebKitWebContext.html#WebKitProcessModel" title="enum WebKitProcessModel"><span class="type">WebKitProcessModel</span></a>
+</td>
 </tr>
 </tbody>
 </table></div>
@@ -1166,6 +1329,36 @@ This signal is emitted when a new download request is made.
 </tr>
 </tbody>
 </table></div>
+</div>
+<hr>
+<div class="refsect2">
+<a name="WebKitWebContext-initialize-web-extensions"></a><h3>The <code class="literal">"initialize-web-extensions"</code> signal</h3>
+<pre class="programlisting"><span class="returnvalue">void</span>                user_function                      (<a class="link" href="WebKitWebContext.html" title="WebKitWebContext"><span class="type">WebKitWebContext</span></a> *context,
+                                                        <a href="../glib/glib-Basic-Types.html#gpointer"><span class="type">gpointer</span></a>          user_data)      : <a href="../gobject/gobject-Signals.html#G-SIGNAL-RUN-LAST:CAPS"><code class="literal">Run Last</code></a></pre>
+<p>
+This signal is emitted when a new web process is about to be
+launched. It signals the most appropriate moment to use
+<a class="link" href="WebKitWebContext.html#webkit-web-context-set-web-extensions-initialization-user-data" title="webkit_web_context_set_web_extensions_initialization_user_data ()"><code class="function">webkit_web_context_set_web_extensions_initialization_user_data()</code></a>
+and <a class="link" href="WebKitWebContext.html#webkit-web-context-set-web-extensions-directory" title="webkit_web_context_set_web_extensions_directory ()"><code class="function">webkit_web_context_set_web_extensions_directory()</code></a>.
+</p>
+<div class="variablelist"><table border="0" class="variablelist">
+<colgroup>
+<col align="left" valign="top">
+<col>
+</colgroup>
+<tbody>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>context</code></em> :</span></p></td>
+<td>the <a class="link" href="WebKitWebContext.html" title="WebKitWebContext"><span class="type">WebKitWebContext</span></a>
+</td>
+</tr>
+<tr>
+<td><p><span class="term"><em class="parameter"><code>user_data</code></em> :</span></p></td>
+<td>user data set when the signal handler was connected.</td>
+</tr>
+</tbody>
+</table></div>
+<p class="since">Since 2.4</p>
 </div>
 </div>
 </div>

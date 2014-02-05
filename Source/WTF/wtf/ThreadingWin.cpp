@@ -161,6 +161,8 @@ void initializeThreading()
     if (isInitialized)
         return;
 
+    isInitialized = true;
+
     WTF::double_conversion::initialize();
     // StringImpl::empty() does not construct its static string in a threadsafe fashion,
     // so ensure it has been initialized from here.
@@ -170,8 +172,6 @@ void initializeThreading()
     wtfThreadData();
     s_dtoaP5Mutex = new Mutex;
     initializeDates();
-    
-    isInitialized = true;
 }
 
 static HashMap<DWORD, HANDLE>& threadMap()

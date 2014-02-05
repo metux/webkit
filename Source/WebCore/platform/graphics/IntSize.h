@@ -26,6 +26,7 @@
 #ifndef IntSize_h
 #define IntSize_h
 
+#include <algorithm>
 #include <wtf/PrintStream.h>
 
 #if USE(CG)
@@ -87,14 +88,12 @@ public:
 
     IntSize expandedTo(const IntSize& other) const
     {
-        return IntSize(m_width > other.m_width ? m_width : other.m_width,
-            m_height > other.m_height ? m_height : other.m_height);
+        return IntSize(std::max(m_width, other.m_width), std::max(m_height, other.m_height));
     }
 
     IntSize shrunkTo(const IntSize& other) const
     {
-        return IntSize(m_width < other.m_width ? m_width : other.m_width,
-            m_height < other.m_height ? m_height : other.m_height);
+        return IntSize(std::min(m_width, other.m_width), std::min(m_height, other.m_height));
     }
 
     void clampNegativeToZero()

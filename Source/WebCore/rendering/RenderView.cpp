@@ -51,10 +51,6 @@
 #include "RenderLayerCompositor.h"
 #endif
 
-#if ENABLE(CSS_SHADERS) && USE(3D_GRAPHICS)
-#include "CustomFilterGlobalContext.h"
-#endif
-
 namespace WebCore {
 
 RenderView::RenderView(Document& document, PassRef<RenderStyle> style)
@@ -366,6 +362,34 @@ LayoutUnit RenderView::pageOrViewLogicalHeight() const
     return viewLogicalHeight();
 }
 
+LayoutUnit RenderView::clientLogicalWidthForFixedPosition() const
+{
+    // FIXME: If the FrameView's fixedVisibleContentRect() is not empty, perhaps it should be consulted here too?
+    if (frameView().fixedElementsLayoutRelativeToFrame())
+        return (isHorizontalWritingMode() ? frameView().visibleWidth() : frameView().visibleHeight()) / frameView().frame().frameScaleFactor();
+
+#if PLATFORM(IOS)
+    if (frameView().useCustomFixedPositionLayoutRect())
+        return isHorizontalWritingMode() ? frameView().customFixedPositionLayoutRect().width() : frameView().customFixedPositionLayoutRect().height();
+#endif
+
+    return clientLogicalWidth();
+}
+
+LayoutUnit RenderView::clientLogicalHeightForFixedPosition() const
+{
+    // FIXME: If the FrameView's fixedVisibleContentRect() is not empty, perhaps it should be consulted here too?
+    if (frameView().fixedElementsLayoutRelativeToFrame())
+        return (isHorizontalWritingMode() ? frameView().visibleHeight() : frameView().visibleWidth()) / frameView().frame().frameScaleFactor();
+
+#if PLATFORM(IOS)
+    if (frameView().useCustomFixedPositionLayoutRect())
+        return isHorizontalWritingMode() ? frameView().customFixedPositionLayoutRect().height() : frameView().customFixedPositionLayoutRect().width();
+#endif
+
+    return clientLogicalHeight();
+}
+
 #if PLATFORM(IOS)
 static inline LayoutSize fixedPositionOffset(const FrameView& frameView)
 {
@@ -437,14 +461,14 @@ bool RenderView::requiresColumns(int) const
     return frameView().pagination().mode != Pagination::Unpaginated;
 }
 
-void RenderView::calcColumnWidth()
+void RenderView::computeColumnCountAndWidth()
 {
     int columnWidth = contentLogicalWidth();
     if (style().hasInlineColumnAxis()) {
         if (int pageLength = frameView().pagination().pageLength)
             columnWidth = pageLength;
     }
-    setDesiredColumnCountAndWidth(1, columnWidth);
+    setComputedColumnCountAndWidth(1, columnWidth);
 }
 
 ColumnInfo::PaginationUnit RenderView::paginationUnit() const
@@ -581,33 +605,53 @@ void RenderView::repaintRootContents()
     repaint();
 }
 
-void RenderView::repaintViewRectangle(const LayoutRect& ur, bool immediate) const
+void RenderView::repaintViewRectangle(const LayoutRect& repaintRect, bool immediate) const
 {
-    if (!shouldRepaint(ur))
+    // FIXME: Get rid of the 'immediate' argument. It only works on Mac WK1 and should never be used.
+    if (!shouldRepaint(repaintRect))
         return;
 
-    // We always just invalidate the root view, since we could be an iframe that is clipped out
-    // or even invisible.
-    Element* elt = document().ownerElement();
-    if (!elt)
-        frameView().repaintContentRectangle(pixelSnappedIntRect(ur), immediate);
-    else if (RenderBox* obj = elt->renderBox()) {
-        LayoutRect vr = viewRect();
+    if (auto ownerElement = document().ownerElement()) {
+        if (!ownerElement->renderer())
+            return;
+        auto& ownerBox = toRenderBox(*ownerElement->renderer());
+        LayoutRect viewRect = this->viewRect();
 #if PLATFORM(IOS)
         // Don't clip using the visible rect since clipping is handled at a higher level on iPhone.
-        LayoutRect r = ur;
+        LayoutRect adjustedRect = repaintRect;
 #else
-        LayoutRect r = intersection(ur, vr);
+        LayoutRect adjustedRect = intersection(repaintRect, viewRect);
 #endif
-        
-        // Subtract out the contentsX and contentsY offsets to get our coords within the viewing
-        // rectangle.
-        r.moveBy(-vr.location());
-
-        // FIXME: Hardcoded offsets here are not good.
-        r.moveBy(obj->contentBoxRect().location());
-        obj->repaintRectangle(r, immediate);
+        adjustedRect.moveBy(-viewRect.location());
+        adjustedRect.moveBy(ownerBox.contentBoxRect().location());
+        ownerBox.repaintRectangle(adjustedRect, immediate);
+        return;
     }
+    IntRect pixelSnappedRect = pixelSnappedIntRect(repaintRect);
+
+    frameView().addTrackedRepaintRect(pixelSnappedRect);
+
+    if (!m_accumulatedRepaintRegion || immediate) {
+        frameView().repaintContentRectangle(pixelSnappedRect, immediate);
+        return;
+    }
+    m_accumulatedRepaintRegion->unite(pixelSnappedRect);
+
+    // Region will get slow if it gets too complex. Merge all rects so far to bounds if this happens.
+    // FIXME: Maybe there should be a region type that does this automatically.
+    static const unsigned maximumRepaintRegionGridSize = 16 * 16;
+    if (m_accumulatedRepaintRegion->gridSize() > maximumRepaintRegionGridSize)
+        m_accumulatedRepaintRegion = std::make_unique<Region>(m_accumulatedRepaintRegion->bounds());
+}
+
+void RenderView::flushAccumulatedRepaintRegion() const
+{
+    ASSERT(!document().ownerElement());
+    ASSERT(m_accumulatedRepaintRegion);
+    auto repaintRects = m_accumulatedRepaintRegion->rects();
+    for (auto& rect : repaintRects)
+        frameView().repaintContentRectangle(rect, false);
+    m_accumulatedRepaintRegion = nullptr;
 }
 
 void RenderView::repaintRectangleInViewAndCompositedLayers(const LayoutRect& ur, bool immediate)
@@ -905,8 +949,6 @@ void RenderView::setSelection(RenderObject* start, int startPos, RenderObject* e
     if (blockRepaintMode == RepaintNothing)
         return;
 
-    frameView().beginDeferredRepaints();
-
     // Have any of the old selected objects changed compared to the new selection?
     for (SelectedObjectMap::iterator i = oldSelectedObjects.begin(); i != oldObjectsEnd; ++i) {
         RenderObject* obj = i->key;
@@ -947,8 +989,6 @@ void RenderView::setSelection(RenderObject* start, int startPos, RenderObject* e
     SelectedBlockMap::iterator newBlocksEnd = newSelectedBlocks.end();
     for (SelectedBlockMap::iterator i = newSelectedBlocks.begin(); i != newBlocksEnd; ++i)
         i->value->repaint();
-
-    frameView().endDeferredRepaints();
 }
 
 void RenderView::getSelection(RenderObject*& startRenderer, int& startOffset, RenderObject*& endRenderer, int& endOffset) const
@@ -987,7 +1027,7 @@ LayoutRect RenderView::viewRect() const
 {
     if (shouldUsePrintingLayout())
         return LayoutRect(LayoutPoint(), size());
-    return frameView().visibleContentRect();
+    return frameView().visibleContentRect(ScrollableArea::LegacyIOSDocumentVisibleRect);
 }
 
 IntRect RenderView::unscaledDocumentRect() const
@@ -1009,7 +1049,7 @@ bool RenderView::rootBackgroundIsEntirelyFixed() const
 LayoutRect RenderView::backgroundRect(RenderBox* backgroundRenderer) const
 {
     if (!hasColumns())
-        return unscaledDocumentRect();
+        return frameView().hasExtendedBackground() ? frameView().extendedBackgroundRect() : unscaledDocumentRect();
 
     ColumnInfo* columnInfo = this->columnInfo();
     LayoutRect backgroundRect(0, 0, columnInfo->desiredColumnWidth(), columnInfo->columnHeight() * columnInfo->columnCount());
@@ -1081,7 +1121,7 @@ bool RenderView::shouldDisableLayoutStateForSubtree(RenderObject* renderer) cons
 
 IntSize RenderView::viewportSize() const
 {
-    return frameView().visibleContentRect(ScrollableArea::IncludeScrollbars).size();
+    return frameView().visibleContentRectIncludingScrollbars(ScrollableArea::LegacyIOSDocumentVisibleRect).size();
 }
 
 void RenderView::updateHitTestResult(HitTestResult& result, const LayoutPoint& point)
@@ -1151,15 +1191,6 @@ void RenderView::setIsInWindow(bool isInWindow)
     UNUSED_PARAM(isInWindow);
 #endif
 }
-
-#if ENABLE(CSS_SHADERS) && USE(3D_GRAPHICS)
-CustomFilterGlobalContext* RenderView::customFilterGlobalContext()
-{
-    if (!m_customFilterGlobalContext)
-        m_customFilterGlobalContext = adoptPtr(new CustomFilterGlobalContext());
-    return m_customFilterGlobalContext.get();
-}
-#endif
 
 void RenderView::styleDidChange(StyleDifference diff, const RenderStyle* oldStyle)
 {
@@ -1240,6 +1271,25 @@ ImageQualityController& RenderView::imageQualityController()
     if (!m_imageQualityController)
         m_imageQualityController = ImageQualityController::create(*this);
     return *m_imageQualityController;
+}
+
+RenderView::RepaintRegionAccumulator::RepaintRegionAccumulator(RenderView* view)
+    : m_rootView(view ? view->document().topDocument().renderView() : nullptr)
+{
+    if (!m_rootView)
+        return;
+    m_wasAccumulatingRepaintRegion = !!m_rootView->m_accumulatedRepaintRegion;
+    if (!m_wasAccumulatingRepaintRegion)
+        m_rootView->m_accumulatedRepaintRegion = std::make_unique<Region>();
+}
+
+RenderView::RepaintRegionAccumulator::~RepaintRegionAccumulator()
+{
+    if (!m_rootView)
+        return;
+    if (m_wasAccumulatingRepaintRegion)
+        return;
+    m_rootView->flushAccumulatedRepaintRegion();
 }
 
 } // namespace WebCore

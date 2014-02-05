@@ -41,7 +41,7 @@ namespace WebCore {
 
 class Scrollbar;
 
-class ScrollingStateScrollingNode FINAL : public ScrollingStateNode {
+class ScrollingStateScrollingNode final : public ScrollingStateNode {
 public:
     static PassOwnPtr<ScrollingStateScrollingNode> create(ScrollingStateTree&, ScrollingNodeID);
 
@@ -117,14 +117,14 @@ public:
     void setFooterLayer(const LayerRepresentation&);
 
 #if PLATFORM(MAC) && !PLATFORM(IOS)
-    ScrollbarPainter verticalScrollbarPainter() const { return m_verticalScrollbarPainter; }
-    ScrollbarPainter horizontalScrollbarPainter() const { return m_horizontalScrollbarPainter; }
+    ScrollbarPainter verticalScrollbarPainter() const { return m_verticalScrollbarPainter.get(); }
+    ScrollbarPainter horizontalScrollbarPainter() const { return m_horizontalScrollbarPainter.get(); }
 #endif
     void setScrollbarPaintersFromScrollbars(Scrollbar* verticalScrollbar, Scrollbar* horizontalScrollbar);
 
     bool requestedScrollPositionRepresentsProgrammaticScroll() const { return m_requestedScrollPositionRepresentsProgrammaticScroll; }
 
-    virtual void dumpProperties(TextStream&, int indent) const OVERRIDE;
+    virtual void dumpProperties(TextStream&, int indent) const override;
 
 private:
     ScrollingStateScrollingNode(ScrollingStateTree&, ScrollingNodeID);
@@ -135,8 +135,8 @@ private:
     LayerRepresentation m_footerLayer;
 
 #if PLATFORM(MAC) && !PLATFORM(IOS)
-    ScrollbarPainter m_verticalScrollbarPainter;
-    ScrollbarPainter m_horizontalScrollbarPainter;
+    RetainPtr<ScrollbarPainter> m_verticalScrollbarPainter;
+    RetainPtr<ScrollbarPainter> m_horizontalScrollbarPainter;
 #endif
 
     IntRect m_viewportRect;

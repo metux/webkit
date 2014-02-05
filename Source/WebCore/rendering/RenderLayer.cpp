@@ -126,13 +126,6 @@
 #include "SVGNames.h"
 #endif
 
-#if ENABLE(CSS_SHADERS) && USE(3D_GRAPHICS)
-#include "CustomFilterGlobalContext.h"
-#include "CustomFilterOperation.h"
-#include "CustomFilterValidatedProgram.h"
-#include "ValidatedCustomFilterOperation.h"
-#endif
-
 #define MIN_INTERSECT_FOR_REVEAL 32
 
 namespace WebCore {
@@ -1512,16 +1505,6 @@ void RenderLayer::setFilterBackendNeedsRepaintingInRect(const LayoutRect& rect, 
     FilterInfo& filterInfo = FilterInfo::get(*this);
     filterInfo.expandDirtySourceRect(rectForRepaint);
     
-#if ENABLE(CSS_SHADERS)
-    ASSERT(filterInfo.renderer());
-    if (filterInfo.renderer()->hasCustomShaderFilter()) {
-        // If we have at least one custom shader, we need to update the whole bounding box of the layer, because the
-        // shader can address any ouput pixel.
-        // Note: This is only for output rect, so there's no need to expand the dirty source rect.
-        rectForRepaint.unite(calculateLayerBounds(this));
-    }
-#endif
-    
     RenderLayer* parentLayer = enclosingFilterRepaintLayer();
     ASSERT(parentLayer);
     FloatQuad repaintQuad(rectForRepaint);
@@ -2340,7 +2323,7 @@ void RenderLayer::scrollTo(int x, int y)
         // If we're in the middle of layout, we'll just update layers once layout has finished.
         updateLayerPositionsAfterOverflowScroll();
         // Update regions, scrolling may change the clip of a particular region.
-#if ENABLE(DASHBOARD_SUPPORT) || ENABLE(DRAGGABLE_REGION)
+#if ENABLE(DASHBOARD_SUPPORT)
         view.frameView().updateAnnotatedRegions();
 #endif
         view.frameView().updateWidgetPositions();
@@ -2449,7 +2432,7 @@ void RenderLayer::scrollRectToVisible(const LayoutRect& rect, const ScrollAlignm
                 frameElementBase = toHTMLFrameElementBase(ownerElement);
 
             if (frameElementAndViewPermitScroll(frameElementBase, &frameView)) {
-                LayoutRect viewRect = frameView.visibleContentRect();
+                LayoutRect viewRect = frameView.visibleContentRect(LegacyIOSDocumentVisibleRect);
                 LayoutRect exposeRect = getRectToExpose(viewRect, viewRect, rect, alignX, alignY);
 
                 int xOffset = roundToInt(exposeRect.x());
@@ -2475,6 +2458,7 @@ void RenderLayer::scrollRectToVisible(const LayoutRect& rect, const ScrollAlignm
             IntSize scrollOffsetRelativeToDocument = frameView.scrollOffsetRelativeToDocument();
             visibleRectRelativeToDocument.setLocation(IntPoint(scrollOffsetRelativeToDocument.width(), scrollOffsetRelativeToDocument.height()));
 #else
+            // FIXME: is this equivalent to the code above?
             LayoutRect viewRect = frameView.actualVisibleContentRect();
             LayoutRect visibleRectRelativeToDocument = viewRect;
 #endif
@@ -2700,10 +2684,10 @@ IntPoint RenderLayer::minimumScrollPosition() const
 IntPoint RenderLayer::maximumScrollPosition() const
 {
     // FIXME: m_scrollSize may not be up-to-date if m_scrollDimensionsDirty is true.
-    return -scrollOrigin() + roundedIntSize(m_scrollSize) - visibleContentRect(IncludeScrollbars).size();
+    return -scrollOrigin() + roundedIntSize(m_scrollSize) - visibleContentRectIncludingScrollbars(ContentsVisibleRect).size();
 }
 
-IntRect RenderLayer::visibleContentRect(VisibleContentRectIncludesScrollbars scrollbarInclusion) const
+IntRect RenderLayer::visibleContentRectInternal(VisibleContentRectIncludesScrollbars scrollbarInclusion, VisibleContentRectBehavior) const
 {
     int verticalScrollbarWidth = 0;
     int horizontalScrollbarHeight = 0;
@@ -2742,7 +2726,7 @@ static int cornerStart(const RenderLayer* layer, int minX, int maxX, int thickne
     return maxX - thickness - layer->renderer().style().borderRightWidth();
 }
 
-static IntRect cornerRect(const RenderLayer* layer, const IntRect& bounds)
+static LayoutRect cornerRect(const RenderLayer* layer, const LayoutRect& bounds)
 {
     int horizontalThickness;
     int verticalThickness;
@@ -2761,7 +2745,7 @@ static IntRect cornerRect(const RenderLayer* layer, const IntRect& bounds)
         horizontalThickness = layer->verticalScrollbar()->width();
         verticalThickness = layer->horizontalScrollbar()->height();
     }
-    return IntRect(cornerStart(layer, bounds.x(), bounds.maxX(), horizontalThickness),
+    return LayoutRect(cornerStart(layer, bounds.x(), bounds.maxX(), horizontalThickness),
         bounds.maxY() - verticalThickness - layer->renderer().style().borderBottomWidth(),
         horizontalThickness, verticalThickness);
 }
@@ -2776,26 +2760,26 @@ IntRect RenderLayer::scrollCornerRect() const
     bool hasVerticalBar = verticalScrollbar();
     bool hasResizer = renderer().style().resize() != RESIZE_NONE;
     if ((hasHorizontalBar && hasVerticalBar) || (hasResizer && (hasHorizontalBar || hasVerticalBar)))
-        return cornerRect(this, renderBox()->pixelSnappedBorderBoxRect());
+        return pixelSnappedIntRect(cornerRect(this, renderBox()->borderBoxRect()));
     return IntRect();
 }
 
-static IntRect resizerCornerRect(const RenderLayer* layer, const IntRect& bounds)
+static LayoutRect resizerCornerRect(const RenderLayer* layer, const LayoutRect& bounds)
 {
     ASSERT(layer->renderer().isBox());
     if (layer->renderer().style().resize() == RESIZE_NONE)
-        return IntRect();
+        return LayoutRect();
     return cornerRect(layer, bounds);
 }
 
-IntRect RenderLayer::scrollCornerAndResizerRect() const
+LayoutRect RenderLayer::scrollCornerAndResizerRect() const
 {
     RenderBox* box = renderBox();
     if (!box)
         return IntRect();
-    IntRect scrollCornerAndResizer = scrollCornerRect();
+    LayoutRect scrollCornerAndResizer = scrollCornerRect();
     if (scrollCornerAndResizer.isEmpty())
-        scrollCornerAndResizer = resizerCornerRect(this, box->pixelSnappedBorderBoxRect());
+        scrollCornerAndResizer = resizerCornerRect(this, box->borderBoxRect());
     return scrollCornerAndResizer;
 }
 
@@ -2837,16 +2821,6 @@ IntPoint RenderLayer::convertFromContainingViewToScrollbar(const Scrollbar* scro
 IntSize RenderLayer::contentsSize() const
 {
     return IntSize(scrollWidth(), scrollHeight());
-}
-
-int RenderLayer::visibleHeight() const
-{
-    return m_layerSize.height();
-}
-
-int RenderLayer::visibleWidth() const
-{
-    return m_layerSize.width();
 }
 
 bool RenderLayer::shouldSuspendScrollAnimations() const
@@ -2926,7 +2900,7 @@ LayoutUnit RenderLayer::horizontalScrollbarStart(int minX) const
     const RenderBox* box = renderBox();
     int x = minX + box->borderLeft();
     if (renderer().style().shouldPlaceBlockDirectionScrollbarOnLogicalLeft())
-        x += m_vBar ? m_vBar->width() : resizerCornerRect(this, box->pixelSnappedBorderBoxRect()).width();
+        x += m_vBar ? m_vBar->width() : roundToInt(resizerCornerRect(this, box->borderBoxRect()).width());
     return x;
 }
 
@@ -3067,7 +3041,7 @@ void RenderLayer::setHasHorizontalScrollbar(bool hasScrollbar)
         m_vBar->styleChanged();
 
     // Force an update since we know the scrollbars have changed things.
-#if ENABLE(DASHBOARD_SUPPORT) || ENABLE(DRAGGABLE_REGION)
+#if ENABLE(DASHBOARD_SUPPORT)
     if (renderer().document().hasAnnotatedRegions())
         renderer().document().setAnnotatedRegionsDirty(true);
 #endif
@@ -3090,7 +3064,7 @@ void RenderLayer::setHasVerticalScrollbar(bool hasScrollbar)
         m_vBar->styleChanged();
 
     // Force an update since we know the scrollbars have changed things.
-#if ENABLE(DASHBOARD_SUPPORT) || ENABLE(DRAGGABLE_REGION)
+#if ENABLE(DASHBOARD_SUPPORT)
     if (renderer().document().hasAnnotatedRegions())
         renderer().document().setAnnotatedRegionsDirty(true);
 #endif
@@ -3302,7 +3276,7 @@ void RenderLayer::updateScrollbarsAfterLayout()
         updateSelfPaintingLayer();
 
         // Force an update since we know the scrollbars have changed things.
-#if ENABLE(DASHBOARD_SUPPORT) || ENABLE(DRAGGABLE_REGION)
+#if ENABLE(DASHBOARD_SUPPORT)
         if (renderer().document().hasAnnotatedRegions())
             renderer().document().setAnnotatedRegionsDirty(true);
 #endif
@@ -3509,7 +3483,7 @@ void RenderLayer::paintScrollCorner(GraphicsContext* context, const IntPoint& pa
         context->fillRect(absRect, Color::white, box->style().colorSpace());
 }
 
-void RenderLayer::drawPlatformResizerImage(GraphicsContext* context, IntRect resizerCornerRect)
+void RenderLayer::drawPlatformResizerImage(GraphicsContext* context, const LayoutRect& resizerCornerRect)
 {
     float deviceScaleFactor = WebCore::deviceScaleFactor(&renderer().frame());
 
@@ -3534,11 +3508,11 @@ void RenderLayer::drawPlatformResizerImage(GraphicsContext* context, IntRect res
         context->restore();
         return;
     }
-    IntRect imageRect(resizerCornerRect.maxXMaxYCorner() - cornerResizerSize, cornerResizerSize);
-    context->drawImage(resizeCornerImage.get(), renderer().style().colorSpace(), imageRect);
+    LayoutRect imageRect(resizerCornerRect.maxXMaxYCorner() - cornerResizerSize, cornerResizerSize);
+    context->drawImage(resizeCornerImage.get(), renderer().style().colorSpace(), pixelSnappedIntRect(imageRect));
 }
 
-void RenderLayer::paintResizer(GraphicsContext* context, const IntPoint& paintOffset, const IntRect& damageRect)
+void RenderLayer::paintResizer(GraphicsContext* context, const LayoutPoint& paintOffset, const LayoutRect& damageRect)
 {
     if (renderer().style().resize() == RESIZE_NONE)
         return;
@@ -3546,7 +3520,7 @@ void RenderLayer::paintResizer(GraphicsContext* context, const IntPoint& paintOf
     RenderBox* box = renderBox();
     ASSERT(box);
 
-    IntRect absRect = resizerCornerRect(this, box->pixelSnappedBorderBoxRect());
+    LayoutRect absRect = resizerCornerRect(this, box->borderBoxRect());
     absRect.moveBy(paintOffset);
     if (!absRect.intersects(damageRect))
         return;
@@ -3568,12 +3542,12 @@ void RenderLayer::paintResizer(GraphicsContext* context, const IntPoint& paintOf
     if (!hasOverlayScrollbars() && (m_vBar || m_hBar)) {
         GraphicsContextStateSaver stateSaver(*context);
         context->clip(absRect);
-        IntRect largerCorner = absRect;
-        largerCorner.setSize(IntSize(largerCorner.width() + 1, largerCorner.height() + 1));
+        LayoutRect largerCorner = absRect;
+        largerCorner.setSize(LayoutSize(largerCorner.width() + LayoutUnit::fromPixel(1), largerCorner.height() + LayoutUnit::fromPixel(1)));
         context->setStrokeColor(Color(makeRGB(217, 217, 217)), ColorSpaceDeviceRGB);
         context->setStrokeThickness(1.0f);
         context->setFillColor(Color::transparent, ColorSpaceDeviceRGB);
-        context->drawRect(largerCorner);
+        context->drawRect(pixelSnappedIntRect(largerCorner));
     }
 }
 
@@ -3601,7 +3575,7 @@ bool RenderLayer::hitTestOverflowControls(HitTestResult& result, const IntPoint&
     
     IntRect resizeControlRect;
     if (renderer().style().resize() != RESIZE_NONE) {
-        resizeControlRect = resizerCornerRect(this, box->pixelSnappedBorderBoxRect());
+        resizeControlRect = pixelSnappedIntRect(resizerCornerRect(this, box->borderBoxRect()));
         if (resizeControlRect.contains(localPoint))
             return true;
     }
@@ -4057,12 +4031,12 @@ void RenderLayer::paintFixedLayersInNamedFlows(GraphicsContext* context, const L
     if (!renderer().view().hasRenderNamedFlowThreads())
         return;
 
+    // Ensure the flow threads hierarchy is up-to-date before using it.
+    renderer().view().flowThreadController().updateNamedFlowsLayerListsIfNeeded();
+
     // Collect the fixed layers in a list to be painted
     Vector<RenderLayer*> fixedLayers;
     renderer().view().flowThreadController().collectFixedPositionedLayers(fixedLayers);
-
-    // Sort the fixed layers list
-    std::stable_sort(fixedLayers.begin(), fixedLayers.end(), compareZIndex);
 
     // Paint the layers
     for (size_t i = 0; i < fixedLayers.size(); ++i) {
@@ -4670,7 +4644,7 @@ bool RenderLayer::hitTest(const HitTestRequest& request, const HitTestLocation& 
 
     LayoutRect hitTestArea = isOutOfFlowRenderFlowThread() ? toRenderFlowThread(&renderer())->visualOverflowRect() : renderer().view().documentRect();
     if (!request.ignoreClipping())
-        hitTestArea.intersect(renderer().view().frameView().visibleContentRect());
+        hitTestArea.intersect(renderer().view().frameView().visibleContentRect(LegacyIOSDocumentVisibleRect));
 
     RenderLayer* insideLayer = hitTestLayer(this, 0, request, result, hitTestArea, hitTestLocation, false);
     if (!insideLayer) {
@@ -4810,9 +4784,6 @@ RenderLayer* RenderLayer::hitTestFixedLayersInNamedFlows(RenderLayer* /*rootLaye
 
     Vector<RenderLayer*> fixedLayers;
     renderer().view().flowThreadController().collectFixedPositionedLayers(fixedLayers);
-
-    // Sort the fixed layers list
-    std::stable_sort(fixedLayers.begin(), fixedLayers.end(), compareZIndex);
 
     // Hit test the layers
     RenderLayer* resultLayer = 0;
@@ -6318,7 +6289,7 @@ void RenderLayer::setBackingNeedsRepaint(GraphicsLayer::ShouldClipToLayer should
         backing()->setContentsNeedDisplay(shouldClip);
 }
 
-void RenderLayer::setBackingNeedsRepaintInRect(const LayoutRect& r)
+void RenderLayer::setBackingNeedsRepaintInRect(const LayoutRect& r, GraphicsLayer::ShouldClipToLayer shouldClip)
 {
     // https://bugs.webkit.org/show_bug.cgi?id=61159 describes an unreproducible crash here,
     // so assert but check that the layer is composited.
@@ -6333,7 +6304,7 @@ void RenderLayer::setBackingNeedsRepaintInRect(const LayoutRect& r)
 
         renderer().view().repaintViewRectangle(absRect);
     } else
-        backing()->setContentsNeedDisplayInRect(pixelSnappedIntRect(r));
+        backing()->setContentsNeedDisplayInRect(pixelSnappedIntRect(r), shouldClip);
 }
 
 // Since we're only painting non-composited layers, we know that they all share the same repaintContainer.
@@ -6811,67 +6782,7 @@ PassRef<RenderStyle> RenderLayer::createReflectionStyle()
     return newStyle;
 }
 
-#if ENABLE(CSS_SHADERS)
-
-bool RenderLayer::isCSSCustomFilterEnabled() const
-{
-    // We only want to enable shaders if WebGL is also enabled on this platform.
-    const Settings& settings = renderer().frame().settings();
-    return settings.isCSSCustomFilterEnabled() && settings.webGLEnabled();
-}
-
-#endif
-
 #if ENABLE(CSS_FILTERS)
-
-FilterOperations RenderLayer::computeFilterOperations(const RenderStyle* style)
-{
-#if !ENABLE(CSS_SHADERS)
-    return style->filter();
-#else
-    const FilterOperations& filters = style->filter();
-    if (!filters.hasCustomFilter())
-        return filters;
-
-    if (!isCSSCustomFilterEnabled()) {
-        // CSS Custom filters should not parse at all in this case, but there might be
-        // remaining styles that were parsed when the flag was enabled. Reproduces in DumpRenderTree
-        // because it resets the flag while the previous test is still loaded.
-        return FilterOperations();
-    }
-
-    FilterOperations outputFilters;
-    for (size_t i = 0; i < filters.size(); ++i) {
-        RefPtr<FilterOperation> filterOperation = filters.operations().at(i);
-        if (filterOperation->type() == FilterOperation::CUSTOM) {
-            // We have to wait until the program of CSS Shaders is loaded before setting it on the layer.
-            // Note that we will handle the loading of the shaders and repainting of the layer in updateOrRemoveFilterClients.
-            const CustomFilterOperation* customOperation = static_cast<const CustomFilterOperation*>(filterOperation.get());
-            RefPtr<CustomFilterProgram> program = customOperation->program();
-            if (!program->isLoaded())
-                continue;
-
-            RefPtr<CustomFilterValidatedProgram> validatedProgram = program->validatedProgram();
-            if (!validatedProgram) {
-                // Lazily create a validated program and store it on the CustomFilterProgram.
-                CustomFilterGlobalContext* globalContext = renderer().view().customFilterGlobalContext();
-                validatedProgram = CustomFilterValidatedProgram::create(globalContext, program->programInfo());
-                program->setValidatedProgram(validatedProgram);
-            }
-
-            if (!validatedProgram->isInitialized())
-                continue;
-
-            RefPtr<ValidatedCustomFilterOperation> validatedOperation = ValidatedCustomFilterOperation::create(validatedProgram.release(), 
-                customOperation->parameters(), customOperation->meshRows(), customOperation->meshColumns(), customOperation->meshType());
-            outputFilters.operations().append(validatedOperation.release());
-            continue;
-        }
-        outputFilters.operations().append(filterOperation.release());
-    }
-    return outputFilters;
-#endif
-}
 
 void RenderLayer::updateOrRemoveFilterClients()
 {
@@ -6879,13 +6790,6 @@ void RenderLayer::updateOrRemoveFilterClients()
         FilterInfo::remove(*this);
         return;
     }
-
-#if ENABLE(CSS_SHADERS)
-    if (renderer().style().filter().hasCustomFilter())
-        FilterInfo::get(*this).updateCustomFilterClients(renderer().style().filter());
-    else if (FilterInfo* filterInfo = FilterInfo::getIfExists(*this))
-        filterInfo->removeCustomFilterClients();
-#endif
 
 #if ENABLE(SVG)
     if (renderer().style().filter().hasReferenceFilter())
@@ -6902,7 +6806,7 @@ void RenderLayer::updateOrRemoveFilterEffectRenderer()
     // mode might have changed for this layer.
     if (!paintsWithFilters()) {
         // Don't delete the whole filter info here, because we might use it
-        // for loading CSS shader files.
+        // for loading SVG reference filter files.
         if (FilterInfo* filterInfo = FilterInfo::getIfExists(*this))
             filterInfo->setRenderer(0);
 
@@ -6926,7 +6830,7 @@ void RenderLayer::updateOrRemoveFilterEffectRenderer()
 
     // If the filter fails to build, remove it from the layer. It will still attempt to
     // go through regular processing (e.g. compositing), but never apply anything.
-    if (!filterInfo.renderer()->build(&renderer(), computeFilterOperations(&renderer().style()), FilterProperty))
+    if (!filterInfo.renderer()->build(&renderer(), renderer().style().filter(), FilterProperty))
         filterInfo.setRenderer(0);
 }
 
@@ -6940,7 +6844,7 @@ void RenderLayer::filterNeedsRepaint()
 
 void RenderLayer::paintNamedFlowThreadInsideRegion(GraphicsContext* context, RenderNamedFlowFragment* region, LayoutRect paintDirtyRect, LayoutPoint paintOffset, PaintBehavior paintBehavior, PaintLayerFlags paintFlags)
 {
-    LayoutRect regionContentBox = toRenderBox(region->layerOwner())->contentBoxRect();
+    LayoutRect regionContentBox = toRenderBox(region->layerOwner()).contentBoxRect();
     LayoutSize moveOffset = region->flowThreadPortionLocation() - (paintOffset + regionContentBox.location());
     IntPoint adjustedPaintOffset = roundedIntPoint(-moveOffset);
     paintDirtyRect.move(moveOffset);
@@ -6961,36 +6865,42 @@ void RenderLayer::paintFlowThreadIfRegion(GraphicsContext* context, const LayerP
         return;
     
     RenderBlockFlow* renderNamedFlowFragmentContainer = toRenderBlockFlow(&renderer());
-    RenderNamedFlowFragment* region = renderNamedFlowFragmentContainer->renderNamedFlowFragment();
-    if (!region->isValid())
+    RenderNamedFlowFragment* flowFragment = renderNamedFlowFragmentContainer->renderNamedFlowFragment();
+    if (!flowFragment->isValid())
         return;
     
     ClipRect regionClipRect;
-    if (paintingInfo.rootLayer != this && parent()) {
-        ClipRectsContext clipRectsContext(paintingInfo.rootLayer, region,
-            (paintFlags & PaintLayerTemporaryClipRects) ? TemporaryClipRects : PaintingClipRects,
-            IgnoreOverlayScrollbarSize, (isPaintingOverflowContents) ? IgnoreOverflowClip : RespectOverflowClip);
-        regionClipRect = backgroundClipRect(clipRectsContext);
-    } else
-        regionClipRect = dirtyRect;
-
-    RenderNamedFlowThread* flowThread = region->namedFlowThread();
-    LayoutRect regionContentBox = renderNamedFlowFragmentContainer->contentBoxRect();
-    
+    RenderNamedFlowThread* flowThread = flowFragment->namedFlowThread();
     RenderLayer* flowThreadLayer = flowThread->layer();
-    bool isLastRegionWithRegionFragmentBreak = (region->isLastRegion() && region->style().regionFragment() == BreakRegionFragment);
-    if (region->hasOverflowClip() || isLastRegionWithRegionFragmentBreak) {
-        LayoutPoint regionOffsetFromRoot;
-        convertToLayerCoords(flowThreadLayer, regionOffsetFromRoot);
-        regionClipRect = regionContentBox;
-        regionClipRect.moveBy(regionOffsetFromRoot);
+    bool isLastRegionWithRegionFragmentBreak = (flowFragment->isLastRegion() && flowFragment->style().regionFragment() == BreakRegionFragment);
+    if (flowFragment->hasOverflowClip() || isLastRegionWithRegionFragmentBreak) {
+        regionClipRect = renderNamedFlowFragmentContainer->paddingBoxRect();
+
+        // When the layer of the flow fragment's container is composited, the flow fragment container receives a
+        // GraphicsLayer of its own so the clipping coordinates (caused by overflow:hidden) must be relative to the
+        // GraphicsLayer coordinates in which the fragment gets painted. So what is computed so far is enough.
+        // If the layer of the flowFragment is not composited, then we change the coordinates to be relative to the flow
+        // thread's layer.
+        if (!isComposited()) {
+            LayoutPoint regionOffsetFromRoot;
+            convertToLayerCoords(flowThreadLayer, regionOffsetFromRoot);
+            regionClipRect.moveBy(regionOffsetFromRoot);
+        }
+    } else {
+        if (paintingInfo.rootLayer != this && parent()) {
+            ClipRectsContext clipRectsContext(paintingInfo.rootLayer, flowFragment,
+                (paintFlags & PaintLayerTemporaryClipRects) ? TemporaryClipRects : PaintingClipRects,
+                IgnoreOverlayScrollbarSize, (isPaintingOverflowContents) ? IgnoreOverflowClip : RespectOverflowClip);
+            regionClipRect = backgroundClipRect(clipRectsContext);
+        } else
+            regionClipRect = dirtyRect;
     }
 
     // Optimize clipping for the single fragment case.
     if (!regionClipRect.isEmpty() && regionClipRect != LayoutRect::infiniteRect())
         clipToRect(paintingInfo.rootLayer, context, paintingInfo.paintDirtyRect, regionClipRect);
 
-    flowThreadLayer->paintNamedFlowThreadInsideRegion(context, region, paintingInfo.paintDirtyRect, paintOffset, paintingInfo.paintBehavior, paintFlags);
+    flowThreadLayer->paintNamedFlowThreadInsideRegion(context, flowFragment, paintingInfo.paintDirtyRect, paintOffset, paintingInfo.paintBehavior, paintFlags);
 
     if (!regionClipRect.isEmpty() && regionClipRect != LayoutRect::infiniteRect())
         restoreClip(context, paintingInfo.paintDirtyRect, regionClipRect);
@@ -7009,6 +6919,14 @@ RenderLayer* RenderLayer::hitTestFlowThreadIfRegion(RenderLayer* rootLayer, cons
         return 0;
 
     RenderFlowThread* flowThread = region->flowThread();
+
+    // If the hit location is inside a clipped out area, don't forward the hit test to the flow thread.
+    if (rootLayer != this && parent()) {
+        ClipRectsContext clipRectsContext(rootLayer, hitTestLocation.region(), TemporaryClipRects);
+        ClipRect clipRect = backgroundClipRect(clipRectsContext);
+        if (!clipRect.intersects(hitTestLocation))
+            return 0;
+    }
 
     LayoutPoint regionOffsetFromRoot;
     convertToLayerCoords(rootLayer, regionOffsetFromRoot);

@@ -66,7 +66,7 @@ void InspectorLayerTreeAgent::didCreateFrontendAndBackend(Inspector::InspectorFr
     m_backendDispatcher = InspectorLayerTreeBackendDispatcher::create(backendDispatcher, this);
 }
 
-void InspectorLayerTreeAgent::willDestroyFrontendAndBackend()
+void InspectorLayerTreeAgent::willDestroyFrontendAndBackend(InspectorDisconnectReason)
 {
     m_frontendDispatcher = nullptr;
     m_backendDispatcher.clear();
@@ -89,7 +89,7 @@ void InspectorLayerTreeAgent::enable(ErrorString*)
 
 void InspectorLayerTreeAgent::disable(ErrorString*)
 {
-    m_instrumentingAgents->setInspectorLayerTreeAgent(0);
+    m_instrumentingAgents->setInspectorLayerTreeAgent(nullptr);
 }
 
 void InspectorLayerTreeAgent::layerTreeDidChange()

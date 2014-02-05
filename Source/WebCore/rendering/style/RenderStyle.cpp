@@ -107,6 +107,18 @@ PassRef<RenderStyle> RenderStyle::clone(const RenderStyle* other)
     return adoptRef(*new RenderStyle(*other));
 }
 
+PassRef<RenderStyle> RenderStyle::createStyleInheritingFromPseudoStyle(const RenderStyle& pseudoStyle)
+{
+    ASSERT(pseudoStyle.styleType() == BEFORE || pseudoStyle.styleType() == AFTER);
+
+    // Images are special and must inherit the pseudoStyle so the width and height of
+    // the pseudo element doesn't change the size of the image. In all other cases we
+    // can just share the style.
+    auto style = RenderStyle::create();
+    style.get().inheritFrom(&pseudoStyle);
+    return style;
+}
+
 ALWAYS_INLINE RenderStyle::RenderStyle()
     : m_box(defaultStyle().m_box)
     , visual(defaultStyle().visual)
@@ -502,6 +514,7 @@ bool RenderStyle::changeRequiresLayout(const RenderStyle* other, unsigned& chang
         if (rareInheritedData->highlight != other->rareInheritedData->highlight
             || rareInheritedData->indent != other->rareInheritedData->indent
 #if ENABLE(CSS3_TEXT)
+            || rareInheritedData->m_textAlignLast != other->rareInheritedData->m_textAlignLast
             || rareInheritedData->m_textIndentLine != other->rareInheritedData->m_textIndentLine
 #endif
             || rareInheritedData->m_effectiveZoom != other->rareInheritedData->m_effectiveZoom
@@ -764,11 +777,9 @@ bool RenderStyle::changeRequiresRepaintIfTextOrBorderOrOutline(const RenderStyle
     if (inherited->color != other->inherited->color
         || inherited_flags._text_decorations != other->inherited_flags._text_decorations
         || visual->textDecoration != other->visual->textDecoration
-#if ENABLE(CSS3_TEXT_DECORATION)
         || rareNonInheritedData->m_textDecorationStyle != other->rareNonInheritedData->m_textDecorationStyle
         || rareNonInheritedData->m_textDecorationColor != other->rareNonInheritedData->m_textDecorationColor
         || rareInheritedData->m_textDecorationSkip != other->rareInheritedData->m_textDecorationSkip
-#endif // CSS3_TEXT_DECORATION
         || rareInheritedData->textFillColor != other->rareInheritedData->textFillColor
         || rareInheritedData->textStrokeColor != other->rareInheritedData->textStrokeColor
         || rareInheritedData->textEmphasisColor != other->rareInheritedData->textEmphasisColor
@@ -1454,11 +1465,20 @@ int RenderStyle::computedLineHeight(RenderView* renderView) const
 void RenderStyle::setWordSpacing(Length v)
 {
     float fontWordSpacing;
-    if (v.isPercent())
+    switch (v.type()) {
+    case Auto:
+        fontWordSpacing = 0;
+        FALLTHROUGH;
+    case Percent:
         fontWordSpacing = v.getFloatValue() * font().spaceWidth() / 100;
-    else {
-        ASSERT(v.isFixed());
+        break;
+    case Fixed:
         fontWordSpacing = v.getFloatValue();
+        break;
+    default:
+        ASSERT_NOT_REACHED();
+        fontWordSpacing = 0;
+        break;
     }
     inherited.access()->font.setWordSpacing(fontWordSpacing);
     rareInheritedData.access()->wordSpacing = std::move(v);
@@ -1596,11 +1616,9 @@ Color RenderStyle::colorIncludingFallback(int colorProperty, bool visitedLink) c
     case CSSPropertyWebkitColumnRuleColor:
         result = visitedLink ? visitedLinkColumnRuleColor() : columnRuleColor();
         break;
-#if ENABLE(CSS3_TEXT_DECORATION)
     case CSSPropertyWebkitTextDecorationColor:
         // Text decoration color fallback is handled in RenderObject::decorationColor.
         return visitedLink ? visitedLinkTextDecorationColor() : textDecorationColor();
-#endif
     case CSSPropertyWebkitTextEmphasisColor:
         result = visitedLink ? visitedLinkTextEmphasisColor() : textEmphasisColor();
         break;
@@ -1632,11 +1650,9 @@ Color RenderStyle::visitedDependentColor(int colorProperty) const
 
     Color visitedColor = colorIncludingFallback(colorProperty, true);
 
-#if ENABLE(CSS3_TEXT_DECORATION)
     // Text decoration color validity is preserved (checked in RenderObject::decorationColor).
     if (colorProperty == CSSPropertyWebkitTextDecorationColor)
         return visitedColor;
-#endif
 
     // FIXME: Technically someone could explicitly specify the color transparent, but for now we'll just
     // assume that if the background color is transparent that it wasn't set. Note that it's weird that

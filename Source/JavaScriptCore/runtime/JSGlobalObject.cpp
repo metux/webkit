@@ -164,7 +164,7 @@ JSGlobalObject::JSGlobalObject(VM& vm, Structure* structure, const GlobalObjectM
 JSGlobalObject::~JSGlobalObject()
 {
     if (m_debugger)
-        m_debugger->detach(this);
+        m_debugger->detach(this, Debugger::GlobalObjectIsDestructing);
 
     if (LegacyProfiler* profiler = vm().enabledProfiler())
         profiler->stopProfiling(this);
@@ -698,7 +698,7 @@ void JSGlobalObject::addStaticGlobals(GlobalPropertyInfo* globals, int count)
 bool JSGlobalObject::getOwnPropertySlot(JSObject* object, ExecState* exec, PropertyName propertyName, PropertySlot& slot)
 {
     JSGlobalObject* thisObject = jsCast<JSGlobalObject*>(object);
-    if (getStaticFunctionSlot<Base>(exec, ExecState::globalObjectTable(exec), thisObject, propertyName, slot))
+    if (getStaticFunctionSlot<Base>(exec, ExecState::globalObjectTable(exec->vm()), thisObject, propertyName, slot))
         return true;
     return symbolTableGet(thisObject, propertyName, slot);
 }

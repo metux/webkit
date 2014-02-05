@@ -17,7 +17,6 @@ namespace Inspector {
 
 #if ENABLE(INSPECTOR)
 
-#if ENABLE(JAVASCRIPT_DEBUGGER)
 class JS_EXPORT_PRIVATE InspectorDebuggerFrontendDispatcher {
 public:
     InspectorDebuggerFrontendDispatcher(InspectorFrontendChannel* inspectorFrontendChannel) : m_inspectorFrontendChannel(inspectorFrontendChannel) { }
@@ -28,22 +27,22 @@ public:
         // Named after parameter 'reason' while generating command/event paused.
         struct Reason {
             enum Enum {
-                XHR = 23,
-                DOM = 24,
-                EventListener = 25,
-                Exception = 26,
-                Assert = 27,
-                CSPViolation = 28,
-                Other = 29,
+                XHR = 24,
+                DOM = 25,
+                EventListener = 26,
+                Exception = 27,
+                Assert = 28,
+                CSPViolation = 29,
+                Other = 30,
             };
         }; // struct Reason
     void paused(PassRefPtr<Inspector::TypeBuilder::Array<Inspector::TypeBuilder::Debugger::CallFrame> > callFrames, Reason::Enum reason, PassRefPtr<Inspector::InspectorObject> data);
     void resumed();
+    void didSampleProbe(PassRefPtr<Inspector::TypeBuilder::Debugger::ProbeSample> sample);
 private:
     InspectorFrontendChannel* m_inspectorFrontendChannel;
 };
 
-#endif // ENABLE(JAVASCRIPT_DEBUGGER)
 class JS_EXPORT_PRIVATE InspectorInspectorFrontendDispatcher {
 public:
     InspectorInspectorFrontendDispatcher(InspectorFrontendChannel* inspectorFrontendChannel) : m_inspectorFrontendChannel(inspectorFrontendChannel) { }

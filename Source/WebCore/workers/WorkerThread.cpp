@@ -216,9 +216,6 @@ public:
     {
         ASSERT_WITH_SECURITY_IMPLICATION(context->isWorkerGlobalScope());
         WorkerGlobalScope* workerGlobalScope = static_cast<WorkerGlobalScope*>(context);
-#if ENABLE(INSPECTOR)
-        workerGlobalScope->clearInspector();
-#endif
         // It's not safe to call clearScript until all the cleanup tasks posted by functions initiated by WorkerThreadShutdownStartTask have completed.
         workerGlobalScope->clearScript();
     }
@@ -285,7 +282,7 @@ void WorkerThread::stop()
 }
 
 class ReleaseFastMallocFreeMemoryTask : public ScriptExecutionContext::Task {
-    virtual void performTask(ScriptExecutionContext*) OVERRIDE { WTF::releaseFastMallocFreeMemory(); }
+    virtual void performTask(ScriptExecutionContext*) override { WTF::releaseFastMallocFreeMemory(); }
 };
 
 void WorkerThread::releaseFastMallocFreeMemoryInAllThreads()
