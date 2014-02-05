@@ -9,12 +9,10 @@ WebKitWebSettings
 
 </para>
 
-
 <!-- ##### SECTION See_Also ##### -->
 <para>
 
 </para>
-
 
 <!-- ##### SECTION Stability_Level ##### -->
 
@@ -79,11 +77,6 @@ WebKitWebSettings
 </para>
 
 <!-- ##### ARG WebKitWebSettings:enable-caret-browsing ##### -->
-<para>
-
-</para>
-
-<!-- ##### ARG WebKitWebSettings:enable-css-shaders ##### -->
 <para>
 
 </para>

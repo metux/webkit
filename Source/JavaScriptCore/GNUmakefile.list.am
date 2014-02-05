@@ -152,7 +152,6 @@ javascriptcore_sources += \
 	Source/JavaScriptCore/bytecode/LLIntCallLinkInfo.h \
 	Source/JavaScriptCore/bytecode/LazyOperandValueProfile.cpp \
 	Source/JavaScriptCore/bytecode/LazyOperandValueProfile.h \
-	Source/JavaScriptCore/bytecode/LineInfo.h \
 	Source/JavaScriptCore/bytecode/MethodOfGettingAValueProfile.cpp \
 	Source/JavaScriptCore/bytecode/MethodOfGettingAValueProfile.h \
 	Source/JavaScriptCore/bytecode/ObjectAllocationProfile.h \
@@ -185,6 +184,8 @@ javascriptcore_sources += \
 	Source/JavaScriptCore/bytecode/StructureStubClearingWatchpoint.h \
 	Source/JavaScriptCore/bytecode/UnlinkedCodeBlock.cpp \
 	Source/JavaScriptCore/bytecode/UnlinkedCodeBlock.h \
+	Source/JavaScriptCore/bytecode/UnlinkedInstructionStream.cpp \
+	Source/JavaScriptCore/bytecode/UnlinkedInstructionStream.h \
 	Source/JavaScriptCore/bytecode/ValueProfile.h \
 	Source/JavaScriptCore/bytecode/ValueRecovery.cpp \
 	Source/JavaScriptCore/bytecode/ValueRecovery.h \
@@ -628,6 +629,8 @@ javascriptcore_sources += \
 	Source/JavaScriptCore/icu/unicode/utf_old.h \
 	Source/JavaScriptCore/icu/unicode/utypes.h \
 	Source/JavaScriptCore/icu/unicode/uversion.h \
+	Source/JavaScriptCore/inspector/ContentSearchUtilities.cpp \
+	Source/JavaScriptCore/inspector/ContentSearchUtilities.h \
 	Source/JavaScriptCore/inspector/InjectedScript.cpp \
 	Source/JavaScriptCore/inspector/InjectedScript.h \
 	Source/JavaScriptCore/inspector/InjectedScriptBase.cpp \
@@ -652,8 +655,22 @@ javascriptcore_sources += \
 	Source/JavaScriptCore/inspector/JSInjectedScriptHost.h \
 	Source/JavaScriptCore/inspector/JSInjectedScriptHostPrototype.cpp \
 	Source/JavaScriptCore/inspector/JSInjectedScriptHostPrototype.h \
+	Source/JavaScriptCore/inspector/JSJavaScriptCallFrame.cpp \
+	Source/JavaScriptCore/inspector/JSJavaScriptCallFrame.h \
+	Source/JavaScriptCore/inspector/JSJavaScriptCallFramePrototype.cpp \
+	Source/JavaScriptCore/inspector/JSJavaScriptCallFramePrototype.h \
+	Source/JavaScriptCore/inspector/JavaScriptCallFrame.cpp \
+	Source/JavaScriptCore/inspector/JavaScriptCallFrame.h \
+	Source/JavaScriptCore/inspector/ScriptBreakpoint.h \
+	Source/JavaScriptCore/inspector/ScriptDebugListener.h \
+	Source/JavaScriptCore/inspector/ScriptDebugServer.cpp \
+	Source/JavaScriptCore/inspector/ScriptDebugServer.h \
 	Source/JavaScriptCore/inspector/agents/InspectorAgent.h \
 	Source/JavaScriptCore/inspector/agents/InspectorAgent.cpp \
+	Source/JavaScriptCore/inspector/agents/InspectorDebuggerAgent.h \
+	Source/JavaScriptCore/inspector/agents/InspectorDebuggerAgent.cpp \
+	Source/JavaScriptCore/inspector/agents/InspectorRuntimeAgent.h \
+	Source/JavaScriptCore/inspector/agents/InspectorRuntimeAgent.cpp \
 	Source/JavaScriptCore/interpreter/AbstractPC.cpp \
 	Source/JavaScriptCore/interpreter/AbstractPC.h \
 	Source/JavaScriptCore/interpreter/CachedCall.h \
@@ -1198,6 +1215,8 @@ javascriptcore_sources += \
 	Source/JavaScriptCore/tools/CodeProfiling.h \
 	Source/JavaScriptCore/tools/ProfileTreeNode.h \
 	Source/JavaScriptCore/tools/TieredMMapArray.h \
+	Source/JavaScriptCore/yarr/RegularExpression.h \
+	Source/JavaScriptCore/yarr/RegularExpression.cpp \
 	Source/JavaScriptCore/yarr/Yarr.h \
 	Source/JavaScriptCore/yarr/YarrCanonicalizeUCS2.cpp \
 	Source/JavaScriptCore/yarr/YarrCanonicalizeUCS2.h \

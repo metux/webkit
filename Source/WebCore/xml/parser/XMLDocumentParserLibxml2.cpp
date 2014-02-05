@@ -628,8 +628,7 @@ XMLDocumentParser::XMLDocumentParser(DocumentFragment& fragment, Element* parent
     for (; !elemStack.isEmpty(); elemStack.removeLast()) {
         Element* element = elemStack.last();
         if (element->hasAttributes()) {
-            for (unsigned i = 0; i < element->attributeCount(); i++) {
-                const Attribute& attribute = element->attributeAt(i);
+            for (const Attribute& attribute : element->attributesIterator()) {
                 if (attribute.localName() == xmlnsAtom)
                     m_defaultNamespaceURI = attribute.value();
                 else if (attribute.prefix() == xmlnsAtom)
@@ -855,7 +854,7 @@ void XMLDocumentParser::startElementNs(const xmlChar* xmlLocalName, const xmlCha
         toHTMLHtmlElement(newElement.get())->insertedByParser();
 
     if (!m_parsingFragment && isFirstElement && document()->frame())
-        document()->frame()->loader().dispatchDocumentElementAvailable();
+        document()->frame()->injectUserScripts(InjectAtDocumentStart);
 }
 
 void XMLDocumentParser::endElementNs()
@@ -1371,7 +1370,7 @@ void XMLDocumentParser::doEnd()
 #if ENABLE(XSLT)
     bool xmlViewerMode = !m_sawError && !m_sawCSS && !m_sawXSLTransform && hasNoStyleInformation(document());
     if (xmlViewerMode) {
-        XMLTreeViewer xmlTreeViewer(document());
+        XMLTreeViewer xmlTreeViewer(*document());
         xmlTreeViewer.transformDocumentToTreeView();
     } else if (m_sawXSLTransform) {
         void* doc = xmlDocPtrForString(document()->cachedResourceLoader(), m_originalSourceForTransform.toString(), document()->url().string());

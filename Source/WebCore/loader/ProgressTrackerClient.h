@@ -28,6 +28,8 @@
 
 namespace WebCore {
 
+class Frame;
+
 class ProgressTrackerClient {
 protected:
     virtual ~ProgressTrackerClient() { }

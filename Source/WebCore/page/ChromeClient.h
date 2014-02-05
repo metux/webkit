@@ -214,7 +214,7 @@ public:
     // the new cache.
     virtual void reachedApplicationCacheOriginQuota(SecurityOrigin*, int64_t totalSpaceNeeded) = 0;
 
-#if ENABLE(DASHBOARD_SUPPORT) || ENABLE(DRAGGABLE_REGION)
+#if ENABLE(DASHBOARD_SUPPORT)
     virtual void annotatedRegionsChanged();
 #endif
 
@@ -364,10 +364,6 @@ public:
     virtual void setLastSetCursorToCurrentCursor() = 0;
     virtual void AXStartFrameLoad() = 0;
     virtual void AXFinishFrameLoad() = 0;
-#endif
-
-#if PLATFORM(NIX)
-    virtual FloatRect screenRect() const = 0;
 #endif
 
 #if ENABLE(TOUCH_EVENTS)

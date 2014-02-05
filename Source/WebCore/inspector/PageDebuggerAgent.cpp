@@ -29,11 +29,11 @@
  */
 
 #include "config.h"
-
-#if ENABLE(JAVASCRIPT_DEBUGGER) && ENABLE(INSPECTOR)
-
 #include "PageDebuggerAgent.h"
 
+#if ENABLE(INSPECTOR)
+
+#include "CachedResource.h"
 #include "InspectorOverlay.h"
 #include "InspectorPageAgent.h"
 #include "InstrumentingAgents.h"
@@ -48,27 +48,44 @@ using namespace Inspector;
 
 namespace WebCore {
 
-PageDebuggerAgent::PageDebuggerAgent(InstrumentingAgents* instrumentingAgents, InspectorPageAgent* pageAgent, InjectedScriptManager* injectedScriptManager, InspectorOverlay* overlay)
-    : InspectorDebuggerAgent(instrumentingAgents, injectedScriptManager)
+PageDebuggerAgent::PageDebuggerAgent(InjectedScriptManager* injectedScriptManager, InstrumentingAgents* instrumentingAgents, InspectorPageAgent* pageAgent, InspectorOverlay* overlay)
+    : WebDebuggerAgent(injectedScriptManager, instrumentingAgents)
     , m_pageAgent(pageAgent)
     , m_overlay(overlay)
 {
 }
 
-PageDebuggerAgent::~PageDebuggerAgent()
-{
-}
-
 void PageDebuggerAgent::enable()
 {
-    InspectorDebuggerAgent::enable();
+    WebDebuggerAgent::enable();
     m_instrumentingAgents->setPageDebuggerAgent(this);
 }
 
-void PageDebuggerAgent::disable()
+void PageDebuggerAgent::disable(bool isBeingDestroyed)
 {
-    InspectorDebuggerAgent::disable();
-    m_instrumentingAgents->setPageDebuggerAgent(0);
+    WebDebuggerAgent::disable(isBeingDestroyed);
+    m_instrumentingAgents->setPageDebuggerAgent(nullptr);
+}
+
+String PageDebuggerAgent::sourceMapURLForScript(const Script& script)
+{
+    DEFINE_STATIC_LOCAL(String, sourceMapHTTPHeader, (ASCIILiteral("SourceMap")));
+    DEFINE_STATIC_LOCAL(String, sourceMapHTTPHeaderDeprecated, (ASCIILiteral("X-SourceMap")));
+
+    if (!script.url.isEmpty()) {
+        CachedResource* resource = m_pageAgent->cachedResource(m_pageAgent->mainFrame(), URL(ParsedURLString, script.url));
+        if (resource) {
+            String sourceMapHeader = resource->response().httpHeaderField(sourceMapHTTPHeader);
+            if (!sourceMapHeader.isEmpty())
+                return sourceMapHeader;
+
+            sourceMapHeader = resource->response().httpHeaderField(sourceMapHTTPHeaderDeprecated);
+            if (!sourceMapHeader.isEmpty())
+                return sourceMapHeader;
+        }
+    }
+
+    return InspectorDebuggerAgent::sourceMapURLForScript(script);
 }
 
 void PageDebuggerAgent::startListeningScriptDebugServer()
@@ -76,9 +93,9 @@ void PageDebuggerAgent::startListeningScriptDebugServer()
     scriptDebugServer().addListener(this, m_pageAgent->page());
 }
 
-void PageDebuggerAgent::stopListeningScriptDebugServer()
+void PageDebuggerAgent::stopListeningScriptDebugServer(bool isBeingDestroyed)
 {
-    scriptDebugServer().removeListener(this, m_pageAgent->page());
+    scriptDebugServer().removeListener(this, m_pageAgent->page(), isBeingDestroyed);
 }
 
 PageScriptDebugServer& PageDebuggerAgent::scriptDebugServer()
@@ -96,15 +113,22 @@ void PageDebuggerAgent::unmuteConsole()
     PageConsole::unmute();
 }
 
+void PageDebuggerAgent::breakpointActionLog(JSC::ExecState*, const String& message)
+{
+    m_pageAgent->page()->console().addMessage(JSMessageSource, LogMessageLevel, message);
+}
+
 InjectedScript PageDebuggerAgent::injectedScriptForEval(ErrorString* errorString, const int* executionContextId)
 {
     if (!executionContextId) {
         JSC::ExecState* scriptState = mainWorldExecState(m_pageAgent->mainFrame());
         return injectedScriptManager()->injectedScriptFor(scriptState);
     }
+
     InjectedScript injectedScript = injectedScriptManager()->injectedScriptForId(*executionContextId);
     if (injectedScript.hasNoValue())
-        *errorString = "Execution context with given id not found.";
+        *errorString = ASCIILiteral("Execution context with given id not found.");
+
     return injectedScript;
 }
 
@@ -115,9 +139,9 @@ void PageDebuggerAgent::setOverlayMessage(ErrorString*, const String* message)
 
 void PageDebuggerAgent::didClearMainFrameWindowObject()
 {
-    reset();
+    didClearGlobalObject();
 }
 
 } // namespace WebCore
 
-#endif // ENABLE(JAVASCRIPT_DEBUGGER) && ENABLE(INSPECTOR)
+#endif // ENABLE(INSPECTOR)

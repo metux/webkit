@@ -16,14 +16,13 @@ namespace Inspector {
 
 typedef String ErrorString;
 
-#if ENABLE(JAVASCRIPT_DEBUGGER)
 class JS_EXPORT_PRIVATE InspectorDebuggerBackendDispatcherHandler {
 public:
     virtual void enable(ErrorString*) = 0;
     virtual void disable(ErrorString*) = 0;
     virtual void setBreakpointsActive(ErrorString*, bool in_active) = 0;
-    virtual void setBreakpointByUrl(ErrorString*, int in_lineNumber, const String* in_url, const String* in_urlRegex, const int* in_columnNumber, const RefPtr<Inspector::InspectorObject>* in_options, Inspector::TypeBuilder::Debugger::BreakpointId* out_breakpointId, RefPtr<Inspector::TypeBuilder::Array<Inspector::TypeBuilder::Debugger::Location> >& out_locations) = 0;
-    virtual void setBreakpoint(ErrorString*, const RefPtr<Inspector::InspectorObject>& in_location, const RefPtr<Inspector::InspectorObject>* in_options, Inspector::TypeBuilder::Debugger::BreakpointId* out_breakpointId, RefPtr<Inspector::TypeBuilder::Debugger::Location>& out_actualLocation) = 0;
+    virtual void setBreakpointByUrl(ErrorString*, int in_lineNumber, const String* in_url, const String* in_urlRegex, const int* in_columnNumber, const RefPtr<Inspector::InspectorObject>* in_options, Inspector::TypeBuilder::Debugger::BreakpointId* out_breakpointId, RefPtr<Inspector::TypeBuilder::Array<Inspector::TypeBuilder::Debugger::Location> >& out_locations, RefPtr<Inspector::TypeBuilder::Array<Inspector::TypeBuilder::Debugger::BreakpointActionIdentifier> >& out_breakpointActionIdentifiers) = 0;
+    virtual void setBreakpoint(ErrorString*, const RefPtr<Inspector::InspectorObject>& in_location, const RefPtr<Inspector::InspectorObject>* in_options, Inspector::TypeBuilder::Debugger::BreakpointId* out_breakpointId, RefPtr<Inspector::TypeBuilder::Debugger::Location>& out_actualLocation, RefPtr<Inspector::TypeBuilder::Array<Inspector::TypeBuilder::Debugger::BreakpointActionIdentifier> >& out_breakpointActionIdentifiers) = 0;
     virtual void removeBreakpoint(ErrorString*, const String& in_breakpointId) = 0;
     virtual void continueToLocation(ErrorString*, const RefPtr<Inspector::InspectorObject>& in_location) = 0;
     virtual void stepOver(ErrorString*) = 0;
@@ -41,7 +40,6 @@ protected:
     virtual ~InspectorDebuggerBackendDispatcherHandler();
 };
 
-#endif // ENABLE(JAVASCRIPT_DEBUGGER)
 class JS_EXPORT_PRIVATE InspectorInspectorBackendDispatcherHandler {
 public:
     virtual void enable(ErrorString*) = 0;
@@ -67,11 +65,10 @@ protected:
 
 
 
-#if ENABLE(JAVASCRIPT_DEBUGGER)
-class JS_EXPORT_PRIVATE InspectorDebuggerBackendDispatcher FINAL : public Inspector::InspectorSupplementalBackendDispatcher {
+class JS_EXPORT_PRIVATE InspectorDebuggerBackendDispatcher final : public Inspector::InspectorSupplementalBackendDispatcher {
 public:
     static PassRefPtr<InspectorDebuggerBackendDispatcher> create(Inspector::InspectorBackendDispatcher*, InspectorDebuggerBackendDispatcherHandler*);
-    virtual void dispatch(long callId, const String& method, PassRefPtr<Inspector::InspectorObject> message) OVERRIDE;
+    virtual void dispatch(long callId, const String& method, PassRefPtr<Inspector::InspectorObject> message) override;
 private:
     void enable(long callId, const Inspector::InspectorObject& message);
     void disable(long callId, const Inspector::InspectorObject& message);
@@ -96,11 +93,10 @@ private:
     InspectorDebuggerBackendDispatcherHandler* m_agent;
 };
 
-#endif // ENABLE(JAVASCRIPT_DEBUGGER)
-class JS_EXPORT_PRIVATE InspectorInspectorBackendDispatcher FINAL : public Inspector::InspectorSupplementalBackendDispatcher {
+class JS_EXPORT_PRIVATE InspectorInspectorBackendDispatcher final : public Inspector::InspectorSupplementalBackendDispatcher {
 public:
     static PassRefPtr<InspectorInspectorBackendDispatcher> create(Inspector::InspectorBackendDispatcher*, InspectorInspectorBackendDispatcherHandler*);
-    virtual void dispatch(long callId, const String& method, PassRefPtr<Inspector::InspectorObject> message) OVERRIDE;
+    virtual void dispatch(long callId, const String& method, PassRefPtr<Inspector::InspectorObject> message) override;
 private:
     void enable(long callId, const Inspector::InspectorObject& message);
     void disable(long callId, const Inspector::InspectorObject& message);
@@ -109,10 +105,10 @@ private:
     InspectorInspectorBackendDispatcherHandler* m_agent;
 };
 
-class JS_EXPORT_PRIVATE InspectorRuntimeBackendDispatcher FINAL : public Inspector::InspectorSupplementalBackendDispatcher {
+class JS_EXPORT_PRIVATE InspectorRuntimeBackendDispatcher final : public Inspector::InspectorSupplementalBackendDispatcher {
 public:
     static PassRefPtr<InspectorRuntimeBackendDispatcher> create(Inspector::InspectorBackendDispatcher*, InspectorRuntimeBackendDispatcherHandler*);
-    virtual void dispatch(long callId, const String& method, PassRefPtr<Inspector::InspectorObject> message) OVERRIDE;
+    virtual void dispatch(long callId, const String& method, PassRefPtr<Inspector::InspectorObject> message) override;
 private:
     void parse(long callId, const Inspector::InspectorObject& message);
     void evaluate(long callId, const Inspector::InspectorObject& message);

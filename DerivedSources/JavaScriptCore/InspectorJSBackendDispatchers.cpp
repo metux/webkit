@@ -17,14 +17,10 @@
 
 namespace Inspector {
 
-#if ENABLE(JAVASCRIPT_DEBUGGER)
 InspectorDebuggerBackendDispatcherHandler::~InspectorDebuggerBackendDispatcherHandler() { }
-#endif // ENABLE(JAVASCRIPT_DEBUGGER)
 InspectorInspectorBackendDispatcherHandler::~InspectorInspectorBackendDispatcherHandler() { }
 InspectorRuntimeBackendDispatcherHandler::~InspectorRuntimeBackendDispatcherHandler() { }
 
-
-#if ENABLE(JAVASCRIPT_DEBUGGER)
 
 PassRefPtr<InspectorDebuggerBackendDispatcher> InspectorDebuggerBackendDispatcher::create(InspectorBackendDispatcher* backendDispatcher, InspectorDebuggerBackendDispatcherHandler* agent)
 {
@@ -146,11 +142,13 @@ void InspectorDebuggerBackendDispatcher::setBreakpointByUrl(long callId, const I
     RefPtr<InspectorObject> result = InspectorObject::create();
     Inspector::TypeBuilder::Debugger::BreakpointId out_breakpointId;
     RefPtr<Inspector::TypeBuilder::Array<Inspector::TypeBuilder::Debugger::Location> > out_locations;
-    m_agent->setBreakpointByUrl(&error, in_lineNumber, url_valueFound ? &in_url : nullptr, urlRegex_valueFound ? &in_urlRegex : nullptr, columnNumber_valueFound ? &in_columnNumber : nullptr, options_valueFound ? &in_options : nullptr, &out_breakpointId, out_locations);
+    RefPtr<Inspector::TypeBuilder::Array<Inspector::TypeBuilder::Debugger::BreakpointActionIdentifier> > out_breakpointActionIdentifiers;
+    m_agent->setBreakpointByUrl(&error, in_lineNumber, url_valueFound ? &in_url : nullptr, urlRegex_valueFound ? &in_urlRegex : nullptr, columnNumber_valueFound ? &in_columnNumber : nullptr, options_valueFound ? &in_options : nullptr, &out_breakpointId, out_locations, out_breakpointActionIdentifiers);
 
     if (!error.length()) {
         result->setString(ASCIILiteral("breakpointId"), out_breakpointId);
         result->setValue(ASCIILiteral("locations"), out_locations);
+        result->setValue(ASCIILiteral("breakpointActionIdentifiers"), out_breakpointActionIdentifiers);
     }
 
     m_backendDispatcher->sendResponse(callId, result.release(), error);
@@ -175,11 +173,13 @@ void InspectorDebuggerBackendDispatcher::setBreakpoint(long callId, const Inspec
     RefPtr<InspectorObject> result = InspectorObject::create();
     Inspector::TypeBuilder::Debugger::BreakpointId out_breakpointId;
     RefPtr<Inspector::TypeBuilder::Debugger::Location> out_actualLocation;
-    m_agent->setBreakpoint(&error, in_location, options_valueFound ? &in_options : nullptr, &out_breakpointId, out_actualLocation);
+    RefPtr<Inspector::TypeBuilder::Array<Inspector::TypeBuilder::Debugger::BreakpointActionIdentifier> > out_breakpointActionIdentifiers;
+    m_agent->setBreakpoint(&error, in_location, options_valueFound ? &in_options : nullptr, &out_breakpointId, out_actualLocation, out_breakpointActionIdentifiers);
 
     if (!error.length()) {
         result->setString(ASCIILiteral("breakpointId"), out_breakpointId);
         result->setValue(ASCIILiteral("actualLocation"), out_actualLocation);
+        result->setValue(ASCIILiteral("breakpointActionIdentifiers"), out_breakpointActionIdentifiers);
     }
 
     m_backendDispatcher->sendResponse(callId, result.release(), error);
@@ -426,8 +426,6 @@ void InspectorDebuggerBackendDispatcher::setOverlayMessage(long callId, const In
 
     m_backendDispatcher->sendResponse(callId, result.release(), error);
 }
-
-#endif // ENABLE(JAVASCRIPT_DEBUGGER)
 
 PassRefPtr<InspectorInspectorBackendDispatcher> InspectorInspectorBackendDispatcher::create(InspectorBackendDispatcher* backendDispatcher, InspectorInspectorBackendDispatcherHandler* agent)
 {

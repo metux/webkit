@@ -126,9 +126,9 @@ public:
     void pasteAsPlainText();
     void performDelete();
 
-#if !PLATFORM(IOS)
     void copyURL(const URL&, const String& title);
     void copyURL(const URL&, const String& title, Pasteboard&);
+#if !PLATFORM(IOS)
     void copyImage(const HitTestResult&);
 #endif
 
@@ -434,7 +434,7 @@ public:
 #endif // !PLATFORM(IOS)
 #endif
 
-#if PLATFORM(MAC) || PLATFORM(EFL) || PLATFORM(NIX)
+#if PLATFORM(MAC) || PLATFORM(EFL)
     void writeSelectionToPasteboard(Pasteboard&);
     void writeImageToPasteboard(Pasteboard&, Element& imageElement, const URL&, const String& title);
 #endif

@@ -908,11 +908,11 @@ void RenderObject::drawLineForBoxSide(GraphicsContext* graphicsContext, int x1, 
             // https://bugs.webkit.org/show_bug.cgi?id=58608
             if (side == BSTop || side == BSLeft)
                 color = color.dark();
-            // fall through
+            FALLTHROUGH;
         case OUTSET:
             if (borderStyle == OUTSET && (side == BSBottom || side == BSRight))
                 color = color.dark();
-            // fall through
+            FALLTHROUGH;
         case SOLID: {
             StrokeStyle oldStrokeStyle = graphicsContext->strokeStyle();
             graphicsContext->setStrokeStyle(NoStroke);
@@ -1065,7 +1065,7 @@ int RenderObject::columnNumberForOffset(int offset)
         return columnNumber;
 
     ColumnInfo* columnInfo = view.columnInfo();
-    if (columnInfo && columnInfo->progressionAxis() == ColumnInfo::BlockAxis) {
+    if (columnInfo && !columnInfo->progressionIsInline()) {
         if (!columnInfo->progressionIsReversed())
             columnNumber = (pagination.pageLength + pagination.gap - offset) / (pagination.pageLength + pagination.gap);
         else
@@ -1236,7 +1236,7 @@ RenderLayerModelObject* RenderObject::containerForRepaint() const
     return repaintContainer;
 }
 
-void RenderObject::repaintUsingContainer(const RenderLayerModelObject* repaintContainer, const IntRect& r, bool immediate) const
+void RenderObject::repaintUsingContainer(const RenderLayerModelObject* repaintContainer, const IntRect& r, bool immediate, bool shouldClipToLayer) const
 {
     if (!repaintContainer) {
         view().repaintViewRectangle(r, immediate);
@@ -1268,7 +1268,7 @@ void RenderObject::repaintUsingContainer(const RenderLayerModelObject* repaintCo
     
     if (v.usesCompositing()) {
         ASSERT(repaintContainer->hasLayer() && repaintContainer->layer()->isComposited());
-        repaintContainer->layer()->setBackingNeedsRepaintInRect(r);
+        repaintContainer->layer()->setBackingNeedsRepaintInRect(r, shouldClipToLayer ? GraphicsLayer::ClipToLayer : GraphicsLayer::DoNotClipToLayer);
     }
 #else
     if (repaintContainer->isRenderView())
@@ -1290,7 +1290,7 @@ void RenderObject::repaint(bool immediate) const
     repaintUsingContainer(repaintContainer ? repaintContainer : view, pixelSnappedIntRect(clippedOverflowRectForRepaint(repaintContainer)), immediate);
 }
 
-void RenderObject::repaintRectangle(const LayoutRect& r, bool immediate) const
+void RenderObject::repaintRectangle(const LayoutRect& r, bool immediate, bool shouldClipToLayer) const
 {
     // Don't repaint if we're unrooted (note that view() still returns the view when unrooted)
     RenderView* view;
@@ -1308,7 +1308,7 @@ void RenderObject::repaintRectangle(const LayoutRect& r, bool immediate) const
 
     RenderLayerModelObject* repaintContainer = containerForRepaint();
     computeRectForRepaint(repaintContainer, dirtyRect);
-    repaintUsingContainer(repaintContainer ? repaintContainer : view, pixelSnappedIntRect(dirtyRect), immediate);
+    repaintUsingContainer(repaintContainer ? repaintContainer : view, pixelSnappedIntRect(dirtyRect), immediate, shouldClipToLayer);
 }
 
 IntRect RenderObject::pixelSnappedAbsoluteClippedOverflowRect() const
@@ -1830,14 +1830,6 @@ inline void RenderObject::clearLayoutRootIfNeeded() const
 
 void RenderObject::willBeDestroyed()
 {
-    // If this renderer is being autoscrolled, stop the autoscroll timer
-    
-    // FIXME: RenderObject::destroy should not get called with a renderer whose document
-    // has a null frame, so we assert this. However, we don't want release builds to crash which is why we
-    // check that the frame is not null.
-    if (frame().eventHandler().autoscrollRenderer() == this)
-        frame().eventHandler().stopAutoscrollTimer(true);
-
     // For accessibility management, notify the parent of the imminent change to its child set.
     // We do it now, before remove(), while the parent pointer is still available.
     if (AXObjectCache* cache = document().existingAXObjectCache())
@@ -2088,12 +2080,10 @@ PassRefPtr<RenderStyle> RenderObject::getUncachedPseudoStyle(const PseudoStyleRe
 static Color decorationColor(RenderStyle* style)
 {
     Color result;
-#if ENABLE(CSS3_TEXT_DECORATION)
     // Check for text decoration color first.
     result = style->visitedDependentColor(CSSPropertyWebkitTextDecorationColor);
     if (result.isValid())
         return result;
-#endif // CSS3_TEXT_DECORATION
     if (style->textStrokeWidth() > 0) {
         // Prefer stroke color if possible but not if it's fully transparent.
         result = style->visitedDependentColor(CSSPropertyWebkitTextStrokeColor);
@@ -2151,7 +2141,7 @@ void RenderObject::getTextDecorationColors(int decorations, Color& underline, Co
     }
 }
 
-#if ENABLE(DASHBOARD_SUPPORT) || ENABLE(DRAGGABLE_REGION)
+#if ENABLE(DASHBOARD_SUPPORT)
 void RenderObject::addAnnotatedRegions(Vector<AnnotatedRegionValue>& regions)
 {
     // Convert the style regions to absolute coordinates.
@@ -2161,7 +2151,6 @@ void RenderObject::addAnnotatedRegions(Vector<AnnotatedRegionValue>& regions)
     RenderBox* box = toRenderBox(this);
     FloatPoint absPos = localToAbsolute();
 
-#if ENABLE(DASHBOARD_SUPPORT)
     const Vector<StyleDashboardRegion>& styleRegions = style().dashboardRegions();
     unsigned i, count = styleRegions.size();
     for (i = 0; i < count; i++) {
@@ -2190,14 +2179,6 @@ void RenderObject::addAnnotatedRegions(Vector<AnnotatedRegionValue>& regions)
 
         regions.append(region);
     }
-#else // ENABLE(DRAGGABLE_REGION)
-    if (style().getDraggableRegionMode() == DraggableRegionNone)
-        return;
-    AnnotatedRegionValue region;
-    region.draggable = style().getDraggableRegionMode() == DraggableRegionDrag;
-    region.bounds = LayoutRect(absPos.x(), absPos.y(), box->width(), box->height());
-    regions.append(region);
-#endif
 }
 
 void RenderObject::collectAnnotatedRegions(Vector<AnnotatedRegionValue>& regions)

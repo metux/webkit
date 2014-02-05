@@ -125,7 +125,7 @@ static inline TransformOperations blendFunc(const AnimationBase* anim, const Tra
     return to.blendByUsingMatrixInterpolation(from, progress, anim->renderer()->isBox() ? toRenderBox(anim->renderer())->borderBoxRect().size() : LayoutSize());
 }
 
-static inline PassRefPtr<ClipPathOperation> blendFunc(const AnimationBase* anim, ClipPathOperation* from, ClipPathOperation* to, double progress)
+static inline PassRefPtr<ClipPathOperation> blendFunc(const AnimationBase*, ClipPathOperation* from, ClipPathOperation* to, double progress)
 {
     if (!from || !to)
         return to;
@@ -140,12 +140,11 @@ static inline PassRefPtr<ClipPathOperation> blendFunc(const AnimationBase* anim,
     if (!fromShape->canBlend(toShape))
         return to;
 
-    ASSERT(anim->renderer()->isBox());
-    return ShapeClipPathOperation::create(toShape->blend(fromShape, progress, *toRenderBox(anim->renderer())));
+    return ShapeClipPathOperation::create(toShape->blend(fromShape, progress));
 }
 
 #if ENABLE(CSS_SHAPES)
-static inline PassRefPtr<ShapeValue> blendFunc(const AnimationBase* anim, ShapeValue* from, ShapeValue* to, double progress)
+static inline PassRefPtr<ShapeValue> blendFunc(const AnimationBase*, ShapeValue* from, ShapeValue* to, double progress)
 {
     if (!from || !to)
         return to;
@@ -154,14 +153,16 @@ static inline PassRefPtr<ShapeValue> blendFunc(const AnimationBase* anim, ShapeV
     if (from->type() != ShapeValue::Shape || to->type() != ShapeValue::Shape)
         return to;
 
+    if (from->layoutBox() != to->layoutBox())
+        return to;
+
     const BasicShape* fromShape = from->shape();
     const BasicShape* toShape = to->shape();
 
     if (!fromShape->canBlend(toShape))
         return to;
 
-    ASSERT(anim->renderer()->isBox());
-    return ShapeValue::createShapeValue(toShape->blend(fromShape, progress, *toRenderBox(anim->renderer())));
+    return ShapeValue::createShapeValue(toShape->blend(fromShape, progress), to->layoutBox());
 }
 #endif
 
@@ -222,7 +223,7 @@ static inline PassRefPtr<StyleImage> blendFilter(const AnimationBase* anim, Cach
 
     RefPtr<StyleCachedImage> styledImage = StyleCachedImage::create(image);
     auto imageValue = CSSImageValue::create(image->url(), styledImage.get());
-    auto filterValue = ComputedStyleExtractor::valueForFilter(anim->renderer(), &anim->renderer()->style(), filterResult, DoNotAdjustPixelValues);
+    auto filterValue = ComputedStyleExtractor::valueForFilter(&anim->renderer()->style(), filterResult, DoNotAdjustPixelValues);
 
     auto result = CSSFilterImageValue::create(std::move(imageValue), std::move(filterValue));
     result.get().setFilterOperations(filterResult);

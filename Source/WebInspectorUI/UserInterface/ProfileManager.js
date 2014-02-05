@@ -28,11 +28,12 @@ WebInspector.ProfileManager = function()
     WebInspector.Object.call(this);
 
     this._javaScriptProfileType = new WebInspector.JavaScriptProfileType;
-    this._cssSelectorProfileType = new WebInspector.CSSSelectorProfileType;
     this._canvasProfileType = new WebInspector.CanvasProfileType;
 
-    ProfilerAgent.enable();
-    ProfilerAgent.getProfileHeaders();
+    if (window.ProfilerAgent) {
+        ProfilerAgent.enable();
+        ProfilerAgent.getProfileHeaders();
+    }
 
     WebInspector.Frame.addEventListener(WebInspector.Frame.Event.MainResourceDidChange, this._mainResourceDidChange, this);
 
@@ -60,12 +61,9 @@ WebInspector.ProfileManager.prototype = {
         this._checkForInterruptions();
 
         this._recordingJavaScriptProfile = null;
-        this._recordingCSSSelectorProfile = null;
         this._recordingCanvasProfile = null;
 
         this._isProfiling = false;
-
-        this._cssSelectorProfileType.reset();
 
         this.dispatchEventToListeners(WebInspector.ProfileManager.Event.Cleared);
     },
@@ -83,45 +81,6 @@ WebInspector.ProfileManager.prototype = {
     stopProfilingJavaScript: function()
     {
         this._javaScriptProfileType.stopRecordingProfile();
-    },
-
-    isProfilingCSSSelectors: function()
-    {
-        return this._cssSelectorProfileType.isRecordingProfile();
-    },
-
-    startProfilingCSSSelectors: function()
-    {
-        this._cssSelectorProfileType.startRecordingProfile();
-        
-        var id = this._cssSelectorProfileType.nextProfileId();
-        this._recordingCSSSelectorProfile = new WebInspector.CSSSelectorProfileObject(WebInspector.UIString("CSS Selector Profile %d").format(id), id, true);
-        this.dispatchEventToListeners(WebInspector.ProfileManager.Event.ProfileWasAdded, {profile: this._recordingCSSSelectorProfile});
-        
-        this.dispatchEventToListeners(WebInspector.ProfileManager.Event.ProfilingStarted);
-    },
-    
-    stopProfilingCSSSelectors: function()
-    {
-        function cssProfilingStopped(error, profile)
-        {
-            if (error)
-                return;
-
-            console.assert(this._recordingCSSSelectorProfile);
-
-            this._recordingCSSSelectorProfile.data = profile.data;
-            this._recordingCSSSelectorProfile.totalTime = profile.totalTime;
-            this._recordingCSSSelectorProfile.recording = false;
-            
-            this.dispatchEventToListeners(WebInspector.ProfileManager.Event.ProfileWasUpdated, {profile: this._recordingCSSSelectorProfile});
-
-            this.dispatchEventToListeners(WebInspector.ProfileManager.Event.ProfilingEnded, {profile: this._recordingCSSSelectorProfile});
-
-            this._recordingCSSSelectorProfile = null;
-        }
-
-        this._cssSelectorProfileType.stopRecordingProfile(cssProfilingStopped.bind(this));
     },
 
     isProfilingCanvas: function()
@@ -247,9 +206,6 @@ WebInspector.ProfileManager.prototype = {
         if (this._recordingJavaScriptProfile) {
             this.dispatchEventToListeners(WebInspector.ProfileManager.Event.ProfilingInterrupted, {profile: this._recordingJavaScriptProfile});
             this._javaScriptProfileType.setRecordingProfile(false);
-        } else if (this._recordingCSSSelectorProfile) {
-            this.dispatchEventToListeners(WebInspector.ProfileManager.Event.ProfilingInterrupted, {profile: this._recordingCSSSelectorProfile});
-            this._cssSelectorProfileType.setRecordingProfile(false);
         } else if (this._recordingCanvasProfile) {
             this.dispatchEventToListeners(WebInspector.ProfileManager.Event.ProfilingInterrupted, {profile: this._recordingCanvasProfile});
             this._canvasProfileType.setRecordingProfile(false);
@@ -262,8 +218,6 @@ WebInspector.ProfileManager.prototype = {
 
         if (this._recordingJavaScriptProfile)
             this.startProfilingJavaScript();
-        else if (this._recordingCSSSelectorProfile)
-            this.startProfilingCSSSelectors();
         else if (this._recordingCanvasProfile)
             this.startProfilingCanvas();
     }

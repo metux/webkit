@@ -29,14 +29,12 @@
  */
 
 #include "config.h"
-
-#if ENABLE(INSPECTOR) && ENABLE(JAVASCRIPT_DEBUGGER)
-
 #include "InspectorDOMDebuggerAgent.h"
+
+#if ENABLE(INSPECTOR)
 
 #include "HTMLElement.h"
 #include "InspectorDOMAgent.h"
-#include "InspectorDebuggerAgent.h"
 #include "InspectorInstrumentation.h"
 #include "InspectorWebFrontendDispatchers.h"
 #include "InstrumentingAgents.h"
@@ -103,7 +101,7 @@ void InspectorDOMDebuggerAgent::didPause()
 
 void InspectorDOMDebuggerAgent::disable()
 {
-    m_instrumentingAgents->setInspectorDOMDebuggerAgent(0);
+    m_instrumentingAgents->setInspectorDOMDebuggerAgent(nullptr);
     clear();
 }
 
@@ -112,7 +110,7 @@ void InspectorDOMDebuggerAgent::didCreateFrontendAndBackend(Inspector::Inspector
     m_backendDispatcher = InspectorDOMDebuggerBackendDispatcher::create(backendDispatcher, this);
 }
 
-void InspectorDOMDebuggerAgent::willDestroyFrontendAndBackend()
+void InspectorDOMDebuggerAgent::willDestroyFrontendAndBackend(InspectorDisconnectReason)
 {
     m_backendDispatcher.clear();
 
@@ -121,8 +119,8 @@ void InspectorDOMDebuggerAgent::willDestroyFrontendAndBackend()
 
 void InspectorDOMDebuggerAgent::discardAgent()
 {
-    m_debuggerAgent->setListener(0);
-    m_debuggerAgent = 0;
+    m_debuggerAgent->setListener(nullptr);
+    m_debuggerAgent = nullptr;
 }
 
 void InspectorDOMDebuggerAgent::discardBindings()
@@ -428,4 +426,4 @@ void InspectorDOMDebuggerAgent::clear()
 
 } // namespace WebCore
 
-#endif // ENABLE(INSPECTOR) && ENABLE(JAVASCRIPT_DEBUGGER)
+#endif // ENABLE(INSPECTOR)

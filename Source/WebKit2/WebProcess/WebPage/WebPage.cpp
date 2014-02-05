@@ -61,6 +61,7 @@
 #include "WebContextMenuClient.h"
 #include "WebContextMessages.h"
 #include "WebCoreArgumentCoders.h"
+#include "WebDocumentLoader.h"
 #include "WebDragClient.h"
 #include "WebEditorClient.h"
 #include "WebEvent.h"
@@ -85,6 +86,7 @@
 #include "WebPreferencesStore.h"
 #include "WebProcess.h"
 #include "WebProcessProxyMessages.h"
+#include "WebProgressTrackerClient.h"
 #include <JavaScriptCore/APICast.h>
 #include <WebCore/ArchiveResource.h>
 #include <WebCore/Chrome.h>
@@ -222,6 +224,7 @@ PassRefPtr<WebPage> WebPage::create(uint64_t pageID, const WebPageCreationParame
 
 WebPage::WebPage(uint64_t pageID, const WebPageCreationParameters& parameters)
     : m_pageID(pageID)
+    , m_sessionID(0)
     , m_viewSize(parameters.viewSize)
     , m_hasSeenPlugin(false)
     , m_useFixedLayout(false)
@@ -246,8 +249,10 @@ WebPage::WebPage(uint64_t pageID, const WebPageCreationParameters& parameters)
     , m_pdfPluginEnabled(false)
     , m_hasCachedWindowFrame(false)
     , m_keyboardEventBeingInterpreted(0)
+#if !PLATFORM(IOS)
     , m_viewGestureGeometryCollector(*this)
-#elif PLATFORM(GTK)
+#endif
+#elif PLATFORM(GTK) && HAVE(ACCESSIBILITY)
     , m_accessibilityObject(0)
 #endif
     , m_setCanStartMediaTimer(RunLoop::main(), this, &WebPage::setCanStartMediaTimerFired)
@@ -273,7 +278,6 @@ WebPage::WebPage(uint64_t pageID, const WebPageCreationParameters& parameters)
 #if ENABLE(CONTEXT_MENUS)
     , m_isShowingContextMenu(false)
 #endif
-    , m_willGoToBackForwardItemCallbackEnabled(true)
 #if PLATFORM(IOS)
     , m_shouldReturnWordAtSelection(false)
 #endif
@@ -309,7 +313,7 @@ WebPage::WebPage(uint64_t pageID, const WebPageCreationParameters& parameters)
 #endif
     pageClients.plugInClient = new WebPlugInClient(this);
     pageClients.loaderClientForMainFrame = new WebFrameLoaderClient;
-    pageClients.progressTrackerClient = static_cast<WebFrameLoaderClient*>(pageClients.loaderClientForMainFrame);
+    pageClients.progressTrackerClient = new WebProgressTrackerClient(*this);
 
     m_page = adoptPtr(new Page(pageClients));
 
@@ -372,8 +376,17 @@ WebPage::WebPage(uint64_t pageID, const WebPageCreationParameters& parameters)
 
     setMemoryCacheMessagesEnabled(parameters.areMemoryCacheClientCallsEnabled);
 
-    m_page->setViewState(m_viewState, true);
-    updateIsInWindow(true);
+    setActive(parameters.viewState & ViewState::WindowIsActive);
+    setFocused(parameters.viewState & ViewState::IsFocused);
+
+    // Page defaults to in-window, but setIsInWindow depends on it being a valid indicator of actually having been put into a window.
+    bool isInWindow = parameters.viewState & ViewState::IsInWindow;
+    if (!isInWindow)
+        m_page->setIsInWindow(false);
+    else
+        WebProcess::shared().pageDidEnterWindow(m_pageID);
+
+    setIsInWindow(isInWindow);
 
     setMinimumLayoutSize(parameters.minimumLayoutSize);
     setAutoSizingShouldExpandToViewHeight(parameters.autoSizingShouldExpandToViewHeight);
@@ -417,6 +430,17 @@ WebPage::WebPage(uint64_t pageID, const WebPageCreationParameters& parameters)
     if (m_useAsyncScrolling)
         WebProcess::shared().eventDispatcher().addScrollingTreeForPage(this);
 #endif
+
+    m_page->setIsVisible(m_viewState & ViewState::IsVisible, true);
+    setIsVisuallyIdle(m_viewState & ViewState::IsVisuallyIdle);
+}
+
+void WebPage::reinitializeWebPage(const WebPageCreationParameters& parameters)
+{
+    if (m_viewState != parameters.viewState)
+        setViewStateInternal(parameters.viewState, true);
+    if (m_layerHostingMode != parameters.layerHostingMode)
+        setLayerHostingMode(parameters.layerHostingMode);
 }
 
 WebPage::~WebPage()
@@ -551,16 +575,24 @@ PassRefPtr<Plugin> WebPage::createPlugin(WebFrame* frame, HTMLPlugInElement* plu
     uint64_t pluginProcessToken;
     uint32_t pluginLoadPolicy;
     String unavailabilityDescription;
-    if (!sendSync(Messages::WebPageProxy::FindPlugin(parameters.mimeType, static_cast<uint32_t>(processType), parameters.url.string(), frameURLString, pageURLString, allowOnlyApplicationPlugins), Messages::WebPageProxy::FindPlugin::Reply(pluginProcessToken, newMIMEType, pluginLoadPolicy, unavailabilityDescription))) {
-        return 0;
+    if (!sendSync(Messages::WebPageProxy::FindPlugin(parameters.mimeType, static_cast<uint32_t>(processType), parameters.url.string(), frameURLString, pageURLString, allowOnlyApplicationPlugins), Messages::WebPageProxy::FindPlugin::Reply(pluginProcessToken, newMIMEType, pluginLoadPolicy, unavailabilityDescription)))
+        return nullptr;
+
+    bool isBlockedPlugin = static_cast<PluginModuleLoadPolicy>(pluginLoadPolicy) == PluginModuleBlocked;
+
+    if (isBlockedPlugin || !pluginProcessToken) {
+#if ENABLE(PDFKIT_PLUGIN)
+        String path = parameters.url.path();
+        if (shouldUsePDFPlugin() && (MIMETypeRegistry::isPDFOrPostScriptMIMEType(parameters.mimeType) || (parameters.mimeType.isEmpty() && (path.endsWith(".pdf", false) || path.endsWith(".ps", false))))) {
+            RefPtr<PDFPlugin> pdfPlugin = PDFPlugin::create(frame);
+            return pdfPlugin.release();
+        }
+#else
+        UNUSED_PARAM(frame);
+#endif
     }
 
-    switch (static_cast<PluginModuleLoadPolicy>(pluginLoadPolicy)) {
-    case PluginModuleLoadNormally:
-    case PluginModuleLoadUnsandboxed:
-        break;
-
-    case PluginModuleBlocked:
+    if (isBlockedPlugin) {
         bool replacementObscured = false;
         if (pluginElement->renderer()->isEmbeddedObject()) {
             RenderEmbeddedObject* renderObject = toRenderEmbeddedObject(pluginElement->renderer());
@@ -570,25 +602,29 @@ PassRefPtr<Plugin> WebPage::createPlugin(WebFrame* frame, HTMLPlugInElement* plu
         }
 
         send(Messages::WebPageProxy::DidBlockInsecurePluginVersion(parameters.mimeType, parameters.url.string(), frameURLString, pageURLString, replacementObscured));
-        return 0;
+        return nullptr;
     }
 
-    if (!pluginProcessToken) {
-#if ENABLE(PDFKIT_PLUGIN)
-        String path = parameters.url.path();
-        if (shouldUsePDFPlugin() && (MIMETypeRegistry::isPDFOrPostScriptMIMEType(parameters.mimeType) || (parameters.mimeType.isEmpty() && (path.endsWith(".pdf", false) || path.endsWith(".ps", false)))))
-            return PDFPlugin::create(frame);
-#else
-        UNUSED_PARAM(frame);
-#endif
-        return 0;
-    }
+    if (!pluginProcessToken)
+        return nullptr;
 
     bool isRestartedProcess = (pluginElement->displayState() == HTMLPlugInElement::Restarting || pluginElement->displayState() == HTMLPlugInElement::RestartingWithPendingMouseClick);
     return PluginProxy::create(pluginProcessToken, isRestartedProcess);
 }
 
 #endif // ENABLE(NETSCAPE_PLUGIN_API)
+
+#if ENABLE(WEBGL)
+WebCore::WebGLLoadPolicy WebPage::webGLPolicyForURL(WebFrame* frame, const String& url)
+{
+    uint32_t policyResult = 0;
+
+    if (sendSync(Messages::WebPageProxy::WebGLPolicyForURL(url), Messages::WebPageProxy::WebGLPolicyForURL::Reply(policyResult)))
+        return static_cast<WebGLLoadPolicy>(policyResult);
+
+    return WebGLAllow;
+}
+#endif // ENABLE(WEBGL)
 
 EditorState WebPage::editorState() const
 {
@@ -855,11 +891,6 @@ void WebPage::sendClose()
     send(Messages::WebPageProxy::ClosePage(false));
 }
 
-void WebPage::loadURL(const String& url, const SandboxExtension::Handle& sandboxExtensionHandle, IPC::MessageDecoder& decoder)
-{
-    loadURLRequest(ResourceRequest(URL(URL(), url)), sandboxExtensionHandle, decoder);
-}
-
 void WebPage::loadURLInFrame(const String& url, uint64_t frameID)
 {
     WebFrame* frame = WebProcess::shared().webFrame(frameID);
@@ -869,7 +900,7 @@ void WebPage::loadURLInFrame(const String& url, uint64_t frameID)
     frame->coreFrame()->loader().load(FrameLoadRequest(frame->coreFrame(), ResourceRequest(URL(URL(), url))));
 }
 
-void WebPage::loadURLRequest(const ResourceRequest& request, const SandboxExtension::Handle& sandboxExtensionHandle, IPC::MessageDecoder& decoder)
+void WebPage::loadRequest(const ResourceRequest& request, const SandboxExtension::Handle& sandboxExtensionHandle, IPC::MessageDecoder& decoder)
 {
     SendStopResponsivenessTimer stopper(this);
 
@@ -1891,6 +1922,18 @@ void WebPage::centerSelectionInVisibleArea()
     m_findController.showFindIndicatorInSelection();
 }
 
+void WebPage::setActive(bool isActive)
+{
+    m_page->focusController().setActive(isActive);
+}
+
+void WebPage::setViewIsVisible(bool isVisible)
+{
+    corePage()->focusController().setContentIsVisible(isVisible);
+
+    m_page->setIsVisible(m_viewState & ViewState::IsVisible, false);
+}
+
 void WebPage::setDrawsBackground(bool drawsBackground)
 {
     if (m_drawsBackground == drawsBackground)
@@ -1944,6 +1987,11 @@ void WebPage::viewWillEndLiveResize()
     Frame& frame = m_page->focusController().focusedOrMainFrame();
     if (FrameView* view = frame.view())
         view->willEndLiveResize();
+}
+
+void WebPage::setFocused(bool isFocused)
+{
+    m_page->focusController().setFocused(isFocused);
 }
 
 void WebPage::setInitialFocus(bool forward, bool isKeyboardEventValid, const WebKeyboardEvent& event)
@@ -2000,16 +2048,15 @@ inline bool WebPage::canHandleUserEvents() const
     return true;
 }
 
-void WebPage::updateIsInWindow(bool isInitialState)
+void WebPage::setIsInWindow(bool isInWindow)
 {
-    bool isInWindow = m_viewState & WebCore::ViewState::IsInWindow;
-
+    bool pageWasInWindow = m_page->isInWindow();
+    
     if (!isInWindow) {
         m_setCanStartMediaTimer.stop();
         m_page->setCanStartMedia(false);
         
-        // The WebProcess does not yet know about this page; no need to tell it we're leaving the window.
-        if (!isInitialState)
+        if (pageWasInWindow)
             WebProcess::shared().pageWillLeaveWindow(m_pageID);
     } else {
         // Defer the call to Page::setCanStartMedia() since it ends up sending a synchronous message to the UI process
@@ -2018,8 +2065,11 @@ void WebPage::updateIsInWindow(bool isInitialState)
         if (m_mayStartMediaWhenInWindow)
             m_setCanStartMediaTimer.startOneShot(0);
 
-        WebProcess::shared().pageDidEnterWindow(m_pageID);
+        if (!pageWasInWindow)
+            WebProcess::shared().pageDidEnterWindow(m_pageID);
     }
+
+    m_page->setIsInWindow(isInWindow);
 
     if (isInWindow)
         layoutIfNeeded();
@@ -2027,19 +2077,36 @@ void WebPage::updateIsInWindow(bool isInitialState)
 
 void WebPage::setViewState(ViewState::Flags viewState, bool wantsDidUpdateViewState)
 {
+    setViewStateInternal(viewState, false);
+
+    if (wantsDidUpdateViewState)
+        m_sendDidUpdateViewStateTimer.startOneShot(0);
+}
+
+void WebPage::setViewStateInternal(ViewState::Flags viewState, bool isInitialState)
+{
     ViewState::Flags changed = m_viewState ^ viewState;
     m_viewState = viewState;
 
     m_drawingArea->viewStateDidChange(changed);
-    m_page->setViewState(viewState);
+
+    // We want to make sure to update the active state while hidden, so if the view is hidden then update the active state
+    // early (in case it becomes visible), and if the view was visible then update active state later (in case it hides).
+    if (changed & ViewState::IsFocused)
+        setFocused(viewState & ViewState::IsFocused);
+    if (changed & ViewState::WindowIsActive && !(m_viewState & ViewState::IsVisible))
+        setActive(viewState & ViewState::WindowIsActive);
+    if (changed & ViewState::IsVisible)
+        setViewIsVisible(viewState & ViewState::IsVisible);
+    if (changed & ViewState::WindowIsActive && m_viewState & ViewState::IsVisible)
+        setActive(viewState & ViewState::WindowIsActive);
+    if (changed & ViewState::IsInWindow)
+         setIsInWindow(viewState & ViewState::IsInWindow);
+    if (changed & ViewState::IsVisuallyIdle)
+        setIsVisuallyIdle(viewState & ViewState::IsVisuallyIdle);
+
     for (auto* pluginView : m_pluginViews)
         pluginView->viewStateDidChange(changed);
-
-    if (changed & ViewState::IsInWindow)
-        updateIsInWindow();
-
-    if (wantsDidUpdateViewState)
-        m_sendDidUpdateViewStateTimer.startOneShot(0);
 }
 
 void WebPage::setLayerHostingMode(unsigned layerHostingMode)
@@ -2050,6 +2117,14 @@ void WebPage::setLayerHostingMode(unsigned layerHostingMode)
 
     for (auto* pluginView : m_pluginViews)
         pluginView->setLayerHostingMode(m_layerHostingMode);
+}
+
+uint64_t WebPage::sessionID() const
+{
+    if (m_sessionID)
+        return m_sessionID;
+
+    return m_page->settings().privateBrowsingEnabled() ? SessionTracker::legacyPrivateSessionID : SessionTracker::defaultSessionID;
 }
 
 void WebPage::didReceivePolicyDecision(uint64_t frameID, uint64_t listenerID, uint32_t policyAction, uint64_t downloadID)
@@ -2354,7 +2429,10 @@ void WebPage::updatePreferences(const WebPreferencesStore& store)
     settings.setLocalStorageEnabled(store.getBoolValueForKey(WebPreferencesKey::localStorageEnabledKey()));
     settings.setXSSAuditorEnabled(store.getBoolValueForKey(WebPreferencesKey::xssAuditorEnabledKey()));
     settings.setFrameFlatteningEnabled(store.getBoolValueForKey(WebPreferencesKey::frameFlatteningEnabledKey()));
-    settings.setPrivateBrowsingEnabled(store.getBoolValueForKey(WebPreferencesKey::privateBrowsingEnabledKey()));
+    if (m_sessionID)
+        settings.setPrivateBrowsingEnabled(SessionTracker::isEphemeralID(m_sessionID));
+    else
+        settings.setPrivateBrowsingEnabled(store.getBoolValueForKey(WebPreferencesKey::privateBrowsingEnabledKey()));
     settings.setDeveloperExtrasEnabled(store.getBoolValueForKey(WebPreferencesKey::developerExtrasEnabledKey()));
     settings.setJavaScriptExperimentsEnabled(store.getBoolValueForKey(WebPreferencesKey::javaScriptExperimentsEnabledKey()));
     settings.setTextAreasAreResizable(store.getBoolValueForKey(WebPreferencesKey::textAreasAreResizableKey()));
@@ -2400,7 +2478,6 @@ void WebPage::updatePreferences(const WebPreferencesStore& store)
     settings.setShowRepaintCounter(store.getBoolValueForKey(WebPreferencesKey::compositingRepaintCountersVisibleKey()));
     settings.setShowTiledScrollingIndicator(store.getBoolValueForKey(WebPreferencesKey::tiledScrollingIndicatorVisibleKey()));
     settings.setAggressiveTileRetentionEnabled(store.getBoolValueForKey(WebPreferencesKey::aggressiveTileRetentionEnabledKey()));
-    settings.setCSSCustomFilterEnabled(store.getBoolValueForKey(WebPreferencesKey::cssCustomFilterEnabledKey()));
     RuntimeEnabledFeatures::sharedFeatures().setCSSRegionsEnabled(store.getBoolValueForKey(WebPreferencesKey::cssRegionsEnabledKey()));
     RuntimeEnabledFeatures::sharedFeatures().setCSSCompositingEnabled(store.getBoolValueForKey(WebPreferencesKey::cssCompositingEnabledKey()));
     settings.setCSSGridLayoutEnabled(store.getBoolValueForKey(WebPreferencesKey::cssGridLayoutEnabledKey()));
@@ -2935,7 +3012,7 @@ void WebPage::clearSelection()
     m_page->focusController().focusedOrMainFrame().selection().clear();
 }
 
-void WebPage::didChangeScrollOffsetForMainFrame()
+void WebPage::updateMainFrameScrollOffsetPinning()
 {
     Frame& frame = m_page->mainFrame();
     IntPoint scrollPosition = frame.view()->scrollPosition();
@@ -2975,6 +3052,10 @@ void WebPage::mainFrameDidLayout()
             m_drawingArea->layerTreeHost()->setBackgroundColor(m_backgroundColor);
         }
     }
+#endif
+
+#if PLATFORM(MAC) && !PLATFORM(IOS)
+    m_viewGestureGeometryCollector.mainFrameDidLayout();
 #endif
 }
 
@@ -3643,6 +3724,11 @@ void WebPage::setVisibilityStatePrerender()
         m_page->setIsPrerender();
 }
 
+void WebPage::setIsVisuallyIdle(bool isVisuallyIdle)
+{
+    m_page->setIsVisuallyIdle(isVisuallyIdle);
+}
+
 void WebPage::setScrollingPerformanceLoggingEnabled(bool enabled)
 {
     m_scrollingPerformanceLoggingEnabled = enabled;
@@ -3879,6 +3965,8 @@ void WebPage::didCommitLoad(WebFrame* frame)
 #endif
 
     WebProcess::shared().updateActivePages();
+
+    updateMainFrameScrollOffsetPinning();
 }
 
 void WebPage::didFinishLoad(WebFrame* frame)
@@ -4069,6 +4157,15 @@ void WebPage::setScrollPinningBehavior(uint32_t pinning)
 {
     m_scrollPinningBehavior = static_cast<ScrollPinningBehavior>(pinning);
     m_page->mainFrame().view()->setScrollPinningBehavior(m_scrollPinningBehavior);
+}
+
+PassRefPtr<DocumentLoader> WebPage::createDocumentLoader(Frame& frame, const ResourceRequest& request, const SubstituteData& substituteData)
+{
+    RefPtr<WebDocumentLoader> documentLoader = WebDocumentLoader::create(request, substituteData);
+
+    // FIXME: Set the navigation ID if possible.
+
+    return documentLoader.release();
 }
 
 } // namespace WebKit

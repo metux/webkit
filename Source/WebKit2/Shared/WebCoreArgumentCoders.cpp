@@ -26,6 +26,7 @@
 #include "config.h"
 #include "WebCoreArgumentCoders.h"
 
+#include "DataReference.h"
 #include "ShareableBitmap.h"
 #include <WebCore/AuthenticationChallenge.h>
 #include <WebCore/CertificateInfo.h>
@@ -42,7 +43,10 @@
 #include <WebCore/GraphicsContext.h>
 #include <WebCore/GraphicsLayer.h>
 #include <WebCore/IDBDatabaseMetadata.h>
+#include <WebCore/IDBGetResult.h>
+#include <WebCore/IDBKeyData.h>
 #include <WebCore/IDBKeyPath.h>
+#include <WebCore/IDBKeyRangeData.h>
 #include <WebCore/Image.h>
 #include <WebCore/Length.h>
 #include <WebCore/PluginData.h>
@@ -911,6 +915,8 @@ void ArgumentCoder<DatabaseDetails>::encode(ArgumentEncoder& encoder, const Data
     encoder << details.displayName();
     encoder << details.expectedUsage();
     encoder << details.currentUsage();
+    encoder << details.creationTime();
+    encoder << details.modificationTime();
 }
     
 bool ArgumentCoder<DatabaseDetails>::decode(ArgumentDecoder& decoder, DatabaseDetails& details)
@@ -930,8 +936,16 @@ bool ArgumentCoder<DatabaseDetails>::decode(ArgumentDecoder& decoder, DatabaseDe
     uint64_t currentUsage;
     if (!decoder.decode(currentUsage))
         return false;
-    
-    details = DatabaseDetails(name, displayName, expectedUsage, currentUsage);
+
+    double creationTime;
+    if (!decoder.decode(creationTime))
+        return false;
+
+    double modificationTime;
+    if (!decoder.decode(modificationTime))
+        return false;
+
+    details = DatabaseDetails(name, displayName, expectedUsage, currentUsage, creationTime, modificationTime);
     return true;
 }
 
@@ -1462,12 +1476,6 @@ static void encodeFilterOperation(ArgumentEncoder& encoder, const FilterOperatio
         encoder << dropShadowFilter.color();
         break;
     }
-#if ENABLE(CSS_SHADERS)
-    case FilterOperation::CUSTOM:
-    case FilterOperation::VALIDATED_CUSTOM:
-        ASSERT_NOT_REACHED();
-        break;
-#endif
     case FilterOperation::PASSTHROUGH:
     case FilterOperation::NONE:
         break;
@@ -1531,12 +1539,6 @@ static bool decodeFilterOperation(ArgumentDecoder& decoder, RefPtr<FilterOperati
         filter = DropShadowFilterOperation::create(location, stdDeviation, color, type);
         break;
     }
-#if ENABLE(CSS_SHADERS)
-    case FilterOperation::CUSTOM:
-    case FilterOperation::VALIDATED_CUSTOM:
-        ASSERT_NOT_REACHED();
-        break;
-#endif
     case FilterOperation::PASSTHROUGH:
     case FilterOperation::NONE:
         break;
@@ -1622,6 +1624,104 @@ bool ArgumentCoder<IDBIndexMetadata>::decode(ArgumentDecoder& decoder, IDBIndexM
     return true;
 }
 
+void ArgumentCoder<IDBGetResult>::encode(ArgumentEncoder& encoder, const IDBGetResult& result)
+{
+    bool nullData = !result.valueBuffer;
+    encoder << nullData;
+
+    if (!nullData)
+        encoder << DataReference(reinterpret_cast<const uint8_t*>(result.valueBuffer->data()), result.valueBuffer->size());
+
+    encoder << result.keyData << result.keyPath;
+}
+
+bool ArgumentCoder<IDBGetResult>::decode(ArgumentDecoder& decoder, IDBGetResult& result)
+{
+    bool nullData;
+    if (!decoder.decode(nullData))
+        return false;
+
+    if (nullData)
+        result.valueBuffer = nullptr;
+    else {
+        DataReference data;
+        if (!decoder.decode(data))
+            return false;
+
+        result.valueBuffer = SharedBuffer::create(data.data(), data.size());
+    }
+
+    if (!decoder.decode(result.keyData))
+        return false;
+
+    if (!decoder.decode(result.keyPath))
+        return false;
+
+    return true;
+}
+
+void ArgumentCoder<IDBKeyData>::encode(ArgumentEncoder& encoder, const IDBKeyData& keyData)
+{
+    encoder << keyData.isNull;
+    if (keyData.isNull)
+        return;
+
+    encoder.encodeEnum(keyData.type);
+
+    switch (keyData.type) {
+    case IDBKey::InvalidType:
+        break;
+    case IDBKey::ArrayType:
+        encoder << keyData.arrayValue;
+        break;
+    case IDBKey::StringType:
+        encoder << keyData.stringValue;
+        break;
+    case IDBKey::DateType:
+    case IDBKey::NumberType:
+        encoder << keyData.numberValue;
+        break;
+    case IDBKey::MinType:
+        ASSERT_NOT_REACHED();
+        break;
+    }
+}
+
+bool ArgumentCoder<IDBKeyData>::decode(ArgumentDecoder& decoder, IDBKeyData& keyData)
+{
+    if (!decoder.decode(keyData.isNull))
+        return false;
+
+    if (keyData.isNull)
+        return true;
+
+    if (!decoder.decodeEnum(keyData.type))
+        return false;
+
+    switch (keyData.type) {
+    case IDBKey::InvalidType:
+        break;
+    case IDBKey::ArrayType:
+        if (!decoder.decode(keyData.arrayValue))
+            return false;
+        break;
+    case IDBKey::StringType:
+        if (!decoder.decode(keyData.stringValue))
+            return false;
+        break;
+    case IDBKey::DateType:
+    case IDBKey::NumberType:
+        if (!decoder.decode(keyData.numberValue))
+            return false;
+        break;
+    case IDBKey::MinType:
+        ASSERT_NOT_REACHED();
+        return false;
+    }
+
+    return true;
+}
+
 void ArgumentCoder<IDBKeyPath>::encode(ArgumentEncoder& encoder, const IDBKeyPath& keyPath)
 {
     encoder.encodeEnum(keyPath.type());
@@ -1670,6 +1770,38 @@ bool ArgumentCoder<IDBKeyPath>::decode(ArgumentDecoder& decoder, IDBKeyPath& key
     default:
         return false;
     }
+}
+
+void ArgumentCoder<IDBKeyRangeData>::encode(ArgumentEncoder& encoder, const IDBKeyRangeData& keyRange)
+{
+    encoder << keyRange.isNull;
+    if (keyRange.isNull)
+        return;
+
+    encoder << keyRange.upperKey << keyRange.lowerKey << keyRange.upperOpen << keyRange.lowerOpen;
+}
+
+bool ArgumentCoder<IDBKeyRangeData>::decode(ArgumentDecoder& decoder, IDBKeyRangeData& keyRange)
+{
+    if (!decoder.decode(keyRange.isNull))
+        return false;
+
+    if (keyRange.isNull)
+        return true;
+
+    if (!decoder.decode(keyRange.upperKey))
+        return false;
+
+    if (!decoder.decode(keyRange.lowerKey))
+        return false;
+
+    if (!decoder.decode(keyRange.upperOpen))
+        return false;
+
+    if (!decoder.decode(keyRange.lowerOpen))
+        return false;
+
+    return true;
 }
 
 void ArgumentCoder<IDBObjectStoreMetadata>::encode(ArgumentEncoder& encoder, const IDBObjectStoreMetadata& metadata)

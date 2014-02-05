@@ -67,13 +67,6 @@ class StyleKeyframe;
 class StyleSheetContents;
 class StyledElement;
 
-#if ENABLE(CSS_SHADERS)
-class WebKitCSSArrayFunctionValue;
-class WebKitCSSMatFunctionValue;
-class WebKitCSSMixFunctionValue;
-class WebKitCSSShaderValue;
-#endif
-
 class CSSParser {
     friend inline int cssyylex(void*, CSSParser*);
 
@@ -166,7 +159,7 @@ public:
     bool parseSingleGridAreaLonghand(RefPtr<CSSValue>&);
     bool parseGridTrackList(CSSPropertyID, bool important);
     bool parseGridTrackRepeatFunction(CSSValueList&);
-    PassRefPtr<CSSPrimitiveValue> parseGridTrackSize(CSSParserValueList& inputList);
+    PassRefPtr<CSSValue> parseGridTrackSize(CSSParserValueList& inputList);
     PassRefPtr<CSSPrimitiveValue> parseGridBreadth(CSSParserValue*);
     PassRefPtr<CSSValue> parseGridTemplate();
     void parseGridTrackNames(CSSParserValueList& inputList, CSSValueList& values);
@@ -179,6 +172,7 @@ public:
     PassRefPtr<CSSValue> parseShapeProperty(CSSPropertyID);
 #endif
 
+    PassRefPtr<CSSValue> parseBasicShapeAndOrBox(CSSPropertyID propId);
     PassRefPtr<CSSPrimitiveValue> parseBasicShape();
     PassRefPtr<CSSPrimitiveValue> parseShapeRadius(CSSParserValue*);
     PassRefPtr<CSSBasicShape> parseBasicShapeRectangle(CSSParserValueList*);
@@ -259,22 +253,6 @@ public:
 
     bool parseFilter(CSSParserValueList*, RefPtr<CSSValue>&);
     PassRefPtr<WebKitCSSFilterValue> parseBuiltinFilterArguments(CSSParserValueList*, WebKitCSSFilterValue::FilterOperationType);
-#if ENABLE(CSS_SHADERS)
-    PassRefPtr<WebKitCSSMatFunctionValue> parseMatValue(CSSParserValue*);
-    PassRefPtr<WebKitCSSMixFunctionValue> parseMixFunction(CSSParserValue*);
-    PassRefPtr<WebKitCSSArrayFunctionValue> parseCustomFilterArrayFunction(CSSParserValue*);
-    PassRefPtr<CSSValueList> parseCustomFilterTransform(CSSParserValueList*);
-    PassRefPtr<CSSValueList> parseCustomFilterParameters(CSSParserValueList*);
-    PassRefPtr<WebKitCSSFilterValue> parseCustomFilterFunctionWithAtRuleReferenceSyntax(CSSParserValue*);
-    PassRefPtr<WebKitCSSFilterValue> parseCustomFilterFunctionWithInlineSyntax(CSSParserValue*);
-    PassRefPtr<WebKitCSSFilterValue> parseCustomFilterFunction(CSSParserValue*);
-    bool parseFilterRuleSrc();
-    bool parseFilterRuleMix();
-    bool parseGeometry(CSSPropertyID, CSSParserValue*, bool);
-    bool parseGridDimensions(CSSParserValueList*, RefPtr<CSSValueList>&); 
-    bool parseFilterRuleParameters();
-    PassRefPtr<WebKitCSSShaderValue> parseFilterRuleSrcUriAndFormat(CSSParserValueList*);
-#endif
 #endif
 
     PassRefPtr<CSSValue> parseClipPath();
@@ -288,13 +266,12 @@ public:
     bool parsePerspectiveOrigin(CSSPropertyID propId, CSSPropertyID& propId1, CSSPropertyID& propId2,  RefPtr<CSSValue>&, RefPtr<CSSValue>&);
 
     bool parseTextEmphasisStyle(bool important);
+    bool parseTextEmphasisPosition(bool important);
 
     void addTextDecorationProperty(CSSPropertyID, PassRefPtr<CSSValue>, bool important);
     bool parseTextDecoration(CSSPropertyID propId, bool important);
-#if ENABLE(CSS3_TEXT_DECORATION)
     bool parseTextDecorationSkip(bool important);
     bool parseTextUnderlinePosition(bool important);
-#endif
 
     PassRefPtr<CSSValue> parseTextIndent();
     
@@ -335,9 +312,6 @@ public:
 #endif
 #if ENABLE(SHADOW_DOM)
     PassRefPtr<StyleRuleBase> createHostRule(RuleList*);
-#endif
-#if ENABLE(CSS_SHADERS)
-    PassRefPtr<StyleRuleBase> createFilterRule(const CSSParserString&);
 #endif
 
     void startDeclarationsForMarginBox();
@@ -386,10 +360,6 @@ public:
     bool m_hadSyntacticallyValidCSSRule;
     bool m_logErrors;
     bool m_ignoreErrorsInDeclaration;
-
-#if ENABLE(CSS_SHADERS)
-    bool m_inFilterRule;
-#endif
 
     AtomicString m_defaultNamespace;
 

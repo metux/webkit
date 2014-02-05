@@ -127,8 +127,7 @@ static void drawSkipInkUnderline(TextPainter& textPainter, GraphicsContext& cont
     DashArray a = translateIntersectionPointsToSkipInkBoundaries(intersections, underlineBoundingBox.height(), width);
 
     ASSERT(!(a.size() % 2));
-    for (auto i = a.begin(); i != a.end(); i++, i++)
-        context.drawLineForText(FloatPoint(localOrigin.x() + *i, localOrigin.y() + underlineOffset), *(i+1) - *i, isPrinting);
+    context.drawLinesForText(adjustedLocalOrigin, a, isPrinting);
 }
 #endif
 
@@ -462,14 +461,30 @@ FloatSize InlineTextBox::applyShadowToGraphicsContext(GraphicsContext* context, 
     return extraOffset;
 }
 
-bool InlineTextBox::getEmphasisMarkPosition(const RenderStyle& style, TextEmphasisPosition& emphasisPosition) const
+static inline bool emphasisPositionHasNeitherLeftNorRight(TextEmphasisPosition emphasisPosition)
+{
+    return !(emphasisPosition & TextEmphasisPositionLeft) && !(emphasisPosition & TextEmphasisPositionRight);
+}
+
+bool InlineTextBox::emphasisMarkExistsAndIsAbove(const RenderStyle& style, bool& above) const
 {
     // This function returns true if there are text emphasis marks and they are suppressed by ruby text.
     if (style.textEmphasisMark() == TextEmphasisMarkNone)
         return false;
 
-    emphasisPosition = style.textEmphasisPosition();
-    if (emphasisPosition == TextEmphasisPositionUnder)
+    TextEmphasisPosition emphasisPosition = style.textEmphasisPosition();
+    ASSERT(!((emphasisPosition & TextEmphasisPositionOver) && (emphasisPosition & TextEmphasisPositionUnder)));
+    ASSERT(!((emphasisPosition & TextEmphasisPositionLeft) && (emphasisPosition & TextEmphasisPositionRight)));
+    
+    if (emphasisPositionHasNeitherLeftNorRight(emphasisPosition))
+        above = emphasisPosition & TextEmphasisPositionOver;
+    else if (style.isHorizontalWritingMode())
+        above = emphasisPosition & TextEmphasisPositionOver;
+    else
+        above = emphasisPosition & TextEmphasisPositionRight;
+    
+    if ((style.isHorizontalWritingMode() && (emphasisPosition & TextEmphasisPositionUnder))
+        || (!style.isHorizontalWritingMode() && (emphasisPosition & TextEmphasisPositionLeft)))
         return true; // Ruby text is always over, so it cannot suppress emphasis marks under.
 
     RenderBlock* containingBlock = renderer().containingBlock();
@@ -629,11 +644,11 @@ void InlineTextBox::paint(PaintInfo& paintInfo, const LayoutPoint& paintOffset, 
     }
 
     int emphasisMarkOffset = 0;
-    TextEmphasisPosition emphasisMarkPosition;
-    bool hasTextEmphasis = getEmphasisMarkPosition(lineStyle, emphasisMarkPosition);
+    bool emphasisMarkAbove;
+    bool hasTextEmphasis = emphasisMarkExistsAndIsAbove(lineStyle, emphasisMarkAbove);
     const AtomicString& emphasisMark = hasTextEmphasis ? lineStyle.textEmphasisMarkString() : nullAtom;
     if (!emphasisMark.isEmpty())
-        emphasisMarkOffset = emphasisMarkPosition == TextEmphasisPositionOver ? -font.fontMetrics().ascent() - font.emphasisMarkDescent(emphasisMark) : font.fontMetrics().descent() + font.emphasisMarkAscent(emphasisMark);
+        emphasisMarkOffset = emphasisMarkAbove ? -font.fontMetrics().ascent() - font.emphasisMarkDescent(emphasisMark) : font.fontMetrics().descent() + font.emphasisMarkAscent(emphasisMark);
 
     const ShadowData* textShadow = paintInfo.forceBlackText() ? 0 : lineStyle.textShadow();
 
@@ -823,7 +838,6 @@ static StrokeStyle textDecorationStyleToStrokeStyle(TextDecorationStyle decorati
     case TextDecorationStyleSolid:
         strokeStyle = SolidStroke;
         break;
-#if ENABLE(CSS3_TEXT_DECORATION)
     case TextDecorationStyleDouble:
         strokeStyle = DoubleStroke;
         break;
@@ -836,13 +850,11 @@ static StrokeStyle textDecorationStyleToStrokeStyle(TextDecorationStyle decorati
     case TextDecorationStyleWavy:
         strokeStyle = WavyStroke;
         break;
-#endif // CSS3_TEXT_DECORATION
     }
 
     return strokeStyle;
 }
 
-#if ENABLE(CSS3_TEXT_DECORATION)
 static int computeUnderlineOffset(const TextUnderlinePosition underlinePosition, const FontMetrics& fontMetrics, const InlineTextBox* inlineTextBox, const int textDecorationThickness)
 {
     // Compute the gap between the font and the underline. Use at least one
@@ -1044,13 +1056,9 @@ static FloatRect boundingBoxForAllActiveDecorations(InlineTextBox& inlineTextBox
         boundingBox.unite(boundingBoxForSingleDecoration(context, textDecorationThickness, width, localOrigin, decorationStyle, isPrinting, 2 * baseline / 3, 2 * baseline / 3, doubleOffset + 2 * baseline / 3));
     return boundingBox;
 }
-#endif // CSS3_TEXT_DECORATION
 
 void InlineTextBox::paintDecoration(GraphicsContext& context, const FloatPoint& boxOrigin, TextDecoration decoration, TextDecorationStyle decorationStyle, const ShadowData* shadow, TextPainter& textPainter)
 {
-#if !ENABLE(CSS3_TEXT_DECORATION)
-    UNUSED_PARAM(textPainter);
-#endif
     // FIXME: We should improve this rule and not always just assume 1.
     const float textDecorationThickness = 1.f;
 
@@ -1135,7 +1143,6 @@ void InlineTextBox::paintDecoration(GraphicsContext& context, const FloatPoint& 
             shadow = shadow->next();
         }
 
-#if ENABLE(CSS3_TEXT_DECORATION)
         // Offset between lines - always non-zero, so lines never cross each other.
         float doubleOffset = textDecorationThickness + 1;
         
@@ -1166,11 +1173,9 @@ void InlineTextBox::paintDecoration(GraphicsContext& context, const FloatPoint& 
                 context.clipToImageBuffer(imageBuffer.get(), enclosingDeviceRect);
             }
         }
-#endif // CSS3_TEXT_DECORATION
         context.setStrokeStyle(textDecorationStyleToStrokeStyle(decorationStyle));
         if (decoration & TextDecorationUnderline) {
             context.setStrokeColor(underline, colorSpace);
-#if ENABLE(CSS3_TEXT_DECORATION)
             TextUnderlinePosition underlinePosition = lineStyle.textUnderlinePosition();
             const int underlineOffset = computeUnderlineOffset(underlinePosition, lineStyle.fontMetrics(), this, textDecorationThickness);
 
@@ -1200,14 +1205,9 @@ void InlineTextBox::paintDecoration(GraphicsContext& context, const FloatPoint& 
                 }
 #endif
             }
-#else
-            // Leave one pixel of white between the baseline and the underline.
-            context.drawLineForText(FloatPoint(localOrigin.x(), localOrigin.y() + baseline + 1), width, isPrinting);
-#endif // CSS3_TEXT_DECORATION
         }
         if (decoration & TextDecorationOverline) {
             context.setStrokeColor(overline, colorSpace);
-#if ENABLE(CSS3_TEXT_DECORATION)
             switch (decorationStyle) {
             case TextDecorationStyleWavy: {
                 FloatPoint start(localOrigin.x(), localOrigin.y() - doubleOffset);
@@ -1226,24 +1226,18 @@ void InlineTextBox::paintDecoration(GraphicsContext& context, const FloatPoint& 
                     }
                 } else {
 #endif // CSS3_TEXT_DECORATION_SKIP_INK
-#endif // CSS3_TEXT_DECORATION
                     context.drawLineForText(localOrigin, width, isPrinting);
-#if ENABLE(CSS3_TEXT_DECORATION)
                     if (decorationStyle == TextDecorationStyleDouble)
                         context.drawLineForText(FloatPoint(localOrigin.x(), localOrigin.y() - doubleOffset), width, isPrinting);
 #if ENABLE(CSS3_TEXT_DECORATION_SKIP_INK)
                 }
 #endif
             }
-#endif // CSS3_TEXT_DECORATION
         }
-#if ENABLE(CSS3_TEXT_DECORATION)
         if (clipDecorationToMask)
             stateSaver.restore();
-#endif
         if (decoration & TextDecorationLineThrough) {
             context.setStrokeColor(linethrough, colorSpace);
-#if ENABLE(CSS3_TEXT_DECORATION)
             switch (decorationStyle) {
             case TextDecorationStyleWavy: {
                 FloatPoint start(localOrigin.x(), localOrigin.y() + 2 * baseline / 3);
@@ -1252,13 +1246,10 @@ void InlineTextBox::paintDecoration(GraphicsContext& context, const FloatPoint& 
                 break;
             }
             default:
-#endif // CSS3_TEXT_DECORATION
                 context.drawLineForText(FloatPoint(localOrigin.x(), localOrigin.y() + 2 * baseline / 3), width, isPrinting);
-#if ENABLE(CSS3_TEXT_DECORATION)
                 if (decorationStyle == TextDecorationStyleDouble)
                     context.drawLineForText(FloatPoint(localOrigin.x(), localOrigin.y() + doubleOffset + 2 * baseline / 3), width, isPrinting);
             }
-#endif // CSS3_TEXT_DECORATION
         }
     } while (shadow);
 

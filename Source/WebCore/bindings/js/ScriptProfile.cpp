@@ -26,8 +26,6 @@
 
 #include "config.h"
 
-#if ENABLE(JAVASCRIPT_DEBUGGER)
-
 #include "ScriptProfile.h"
 
 #include "JSDOMBinding.h"
@@ -90,7 +88,6 @@ static PassRefPtr<Inspector::TypeBuilder::Profiler::CPUProfileNode> buildInspect
         .setTotalTime(node->totalTime())
         .setSelfTime(node->selfTime())
         .setNumberOfCalls(node->numberOfCalls())
-        .setVisible(node->visible())
         .setCallUID(node->callIdentifier().hash())
         .setChildren(children.release());
     return result.release();
@@ -108,5 +105,3 @@ PassRefPtr<Inspector::TypeBuilder::Profiler::CPUProfileNode> ScriptProfile::buil
 #endif
 
 } // namespace WebCore
-
-#endif // ENABLE(JAVASCRIPT_DEBUGGER)

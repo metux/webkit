@@ -77,7 +77,7 @@
 
 #if ENABLE(TOUCH_EVENTS)
 #if PLATFORM(IOS)
-#include <WebCore/PlatformTouchEventIOS.h>
+#include <WebKitAdditions/PlatformTouchEventIOS.h>
 #else
 #include <WebCore/PlatformTouchEvent.h>
 #endif
@@ -122,6 +122,7 @@ namespace WebCore {
     class ResourceResponse;
     class ResourceRequest;
     class SharedBuffer;
+    class SubstituteData;
     class TextCheckingRequest;
     class VisibleSelection;
     struct KeypressCommand;
@@ -155,6 +156,7 @@ class WebPopupMenu;
 class WebWheelEvent;
 struct AttributedString;
 struct EditorState;
+struct InteractionInformationAtPosition;
 struct PrintInfo;
 struct WebPageCreationParameters;
 struct WebPreferencesStore;
@@ -170,12 +172,16 @@ public:
     static PassRefPtr<WebPage> create(uint64_t pageID, const WebPageCreationParameters&);
     virtual ~WebPage();
 
+    void reinitializeWebPage(const WebPageCreationParameters&);
+
     void close();
 
     static WebPage* fromCorePage(WebCore::Page*);
 
     WebCore::Page* corePage() const { return m_page.get(); }
     uint64_t pageID() const { return m_pageID; }
+    uint64_t sessionID() const;
+    void setSessionID(uint64_t sessionID) { m_sessionID = sessionID; }
 
     void setSize(const WebCore::IntSize&);
     const WebCore::IntSize& size() const { return m_viewSize; }
@@ -242,8 +248,8 @@ public:
     WebOpenPanelResultListener* activeOpenPanelResultListener() const { return m_activeOpenPanelResultListener.get(); }
     void setActiveOpenPanelResultListener(PassRefPtr<WebOpenPanelResultListener>);
 
-    void didReceiveMessage(IPC::Connection*, IPC::MessageDecoder&) OVERRIDE;
-    void didReceiveSyncMessage(IPC::Connection*, IPC::MessageDecoder&, std::unique_ptr<IPC::MessageEncoder>&) OVERRIDE;
+    void didReceiveMessage(IPC::Connection*, IPC::MessageDecoder&) override;
+    void didReceiveSyncMessage(IPC::Connection*, IPC::MessageDecoder&, std::unique_ptr<IPC::MessageEncoder>&) override;
 
     // -- InjectedBundle methods
 #if ENABLE(CONTEXT_MENUS)
@@ -287,6 +293,10 @@ public:
     PassRefPtr<Plugin> createPlugin(WebFrame*, WebCore::HTMLPlugInElement*, const Plugin::Parameters&, String& newMIMEType);
 #endif
 
+#if ENABLE(WEBGL)
+    WebCore::WebGLLoadPolicy webGLPolicyForURL(WebFrame*, const String&);
+#endif // ENABLE(WEBGL)
+    
     EditorState editorState() const;
 
     String renderTreeExternalRepresentation() const;
@@ -419,6 +429,8 @@ public:
     void insertText(const String& text, uint64_t replacementRangeStart, uint64_t replacementRangeEnd);
     void setComposition(const String& text, Vector<WebCore::CompositionUnderline> underlines, uint64_t selectionStart, uint64_t selectionEnd);
     void confirmComposition();
+    void getPositionInformation(const WebCore::IntPoint&, InteractionInformationAtPosition&);
+    void requestPositionInformation(const WebCore::IntPoint&);
 #endif
 
     NotificationPermissionRequestManager* notificationPermissionRequestManager();
@@ -572,7 +584,7 @@ public:
     void setMediaVolume(float);
     void setMayStartMediaWhenInWindow(bool);
 
-    void didChangeScrollOffsetForMainFrame();
+    void updateMainFrameScrollOffsetPinning();
 
     void mainFrameDidLayout();
 
@@ -610,8 +622,6 @@ public:
 
     void numWheelEventHandlersChanged(unsigned);
     void recomputeShortCircuitHorizontalWheelEventsState();
-
-    bool willGoToBackForwardItemCallbackEnabled() const { return m_willGoToBackForwardItemCallbackEnabled; }
 
     void setVisibilityStatePrerender();
     void updateVisibilityState(bool isInitialState = false);
@@ -680,13 +690,15 @@ public:
 
     WKTypeRef pageOverlayCopyAccessibilityAttributeValue(WKStringRef attribute, WKTypeRef parameter);
     WKArrayRef pageOverlayCopyAccessibilityAttributesNames(bool parameterizedNames);
-    
+
+    PassRefPtr<WebCore::DocumentLoader> createDocumentLoader(WebCore::Frame&, const WebCore::ResourceRequest&, const WebCore::SubstituteData&);
+
 private:
     WebPage(uint64_t pageID, const WebPageCreationParameters&);
 
     // IPC::MessageSender
-    virtual IPC::Connection* messageSenderConnection() OVERRIDE;
-    virtual uint64_t messageSenderDestinationID() OVERRIDE;
+    virtual IPC::Connection* messageSenderConnection() override;
+    virtual uint64_t messageSenderDestinationID() override;
 
     void platformInitialize();
 
@@ -711,8 +723,7 @@ private:
 
     // Actions
     void tryClose();
-    void loadURL(const String&, const SandboxExtension::Handle&, IPC::MessageDecoder&);
-    void loadURLRequest(const WebCore::ResourceRequest&, const SandboxExtension::Handle&, IPC::MessageDecoder&);
+    void loadRequest(const WebCore::ResourceRequest&, const SandboxExtension::Handle&, IPC::MessageDecoder&);
     void loadData(const IPC::DataReference&, const String& MIMEType, const String& encodingName, const String& baseURL, IPC::MessageDecoder&);
     void loadHTMLString(const String& htmlString, const String& baseURL, IPC::MessageDecoder&);
     void loadAlternateHTMLString(const String& htmlString, const String& baseURL, const String& unreachableURL, IPC::MessageDecoder&);
@@ -728,8 +739,10 @@ private:
     void setViewIsVisible(bool);
     void setInitialFocus(bool forward, bool isKeyboardEventValid, const WebKeyboardEvent&);
     void setWindowResizerSize(const WebCore::IntSize&);
-    void updateIsInWindow(bool isInitialState = false);
+    void setIsInWindow(bool);
+    void setIsVisuallyIdle(bool);
     void setViewState(WebCore::ViewState::Flags, bool wantsDidUpdateViewState);
+    void setViewStateInternal(WebCore::ViewState::Flags, bool isInitialState);
     void validateCommand(const String&, uint64_t);
     void executeEditCommand(const String&);
 
@@ -756,8 +769,6 @@ private:
 
     void didRemoveBackForwardItem(uint64_t);
 
-    void setWillGoToBackForwardItemCallbackEnabled(bool enabled) { m_willGoToBackForwardItemCallbackEnabled = enabled; }
-    
     void setDrawsBackground(bool);
     void setDrawsTransparentBackground(bool);
 
@@ -862,6 +873,7 @@ private:
     void reportUsedFeatures();
 
     uint64_t m_pageID;
+    uint64_t m_sessionID;
 
     OwnPtr<WebCore::Page> m_page;
     RefPtr<WebFrame> m_mainFrame;
@@ -933,15 +945,17 @@ private:
 
     WebCore::KeyboardEvent* m_keyboardEventBeingInterpreted;
 
+#if !PLATFORM(IOS)
     ViewGestureGeometryCollector m_viewGestureGeometryCollector;
+#endif
 
 #elif HAVE(ACCESSIBILITY) && (PLATFORM(GTK) || PLATFORM(EFL))
     GRefPtr<WebPageAccessibilityObject> m_accessibilityObject;
+#endif
 
-#if USE(TEXTURE_MAPPER_GL)
+#if PLATFORM(GTK) && USE(TEXTURE_MAPPER_GL)
     // Our view's window in the UI process.
     uint64_t m_nativeWindowHandle;
-#endif
 #endif
 
 #if !PLATFORM(IOS)
@@ -1025,8 +1039,6 @@ private:
     bool m_isShowingContextMenu;
 #endif
     
-    bool m_willGoToBackForwardItemCallbackEnabled;
-
 #if PLATFORM(IOS)
     RefPtr<WebCore::Node> m_assistedNode;
     RefPtr<WebCore::Range> m_currentWordRange;

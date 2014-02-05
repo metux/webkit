@@ -32,7 +32,7 @@
 
 namespace WebCore {
 
-class MediaDocument FINAL : public HTMLDocument {
+class MediaDocument final : public HTMLDocument {
 public:
     static PassRefPtr<MediaDocument> create(Frame* frame, const URL& url)
     {
@@ -45,9 +45,9 @@ public:
 private:
     MediaDocument(Frame*, const URL&);
 
-    virtual PassRefPtr<DocumentParser> createParser();
+    virtual PassRefPtr<DocumentParser> createParser() override;
 
-    virtual void defaultEventHandler(Event*);
+    virtual void defaultEventHandler(Event*) override;
 
     void replaceMediaElementTimerFired(Timer<MediaDocument>&);
 

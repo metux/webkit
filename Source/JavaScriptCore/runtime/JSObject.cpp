@@ -394,7 +394,13 @@ void JSObject::put(JSCell* cell, ExecState* exec, PropertyName propertyName, JSV
             // prototypes it should be replaced, so break here.
             break;
         }
-
+        const ClassInfo* info = obj->classInfo();
+        if (info->hasStaticSetterOrReadonlyProperties(vm)) {
+            if (const HashEntry* entry = obj->findPropertyHashEntry(exec, propertyName)) {
+                putEntry(exec, entry, obj, propertyName, value, slot);
+                return;
+            }
+        }
         prototype = obj->prototype();
         if (prototype.isNull())
             break;
@@ -433,7 +439,7 @@ void JSObject::putByIndex(JSCell* cell, ExecState* exec, unsigned propertyName, 
             putByIndex(cell, exec, propertyName, value, shouldThrow);
             return;
         }
-        // Fall through.
+        FALLTHROUGH;
     }
         
     case ALL_CONTIGUOUS_INDEXING_TYPES: {
@@ -1269,7 +1275,7 @@ bool JSObject::deleteProperty(JSCell* cell, ExecState* exec, PropertyName proper
             return false; // this builtin property can't be deleted
 
         PutPropertySlot slot(thisObject);
-        putEntry(exec, entry, propertyName, jsUndefined(), slot);
+        putEntry(exec, entry, thisObject, propertyName, jsUndefined(), slot);
     }
 
     return true;
@@ -2042,7 +2048,7 @@ void JSObject::putByIndexBeyondVectorLength(ExecState* exec, unsigned i, JSValue
         SparseArrayValueMap* map = arrayStorage()->m_sparseMap.get();
         if (!(map && map->contains(i)) && attemptToInterceptPutByIndexOnHole(exec, i, value, shouldThrow))
             return;
-        // Otherwise, fall though.
+        FALLTHROUGH;
     }
 
     case NonArrayWithArrayStorage:

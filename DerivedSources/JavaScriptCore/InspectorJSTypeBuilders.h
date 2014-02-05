@@ -20,12 +20,10 @@ namespace Inspector {
 namespace TypeBuilder {
 
 // Forward declarations.
-#if ENABLE(JAVASCRIPT_DEBUGGER)
 namespace Debugger {
 class Scope;
 } // Debugger
 
-#endif // ENABLE(JAVASCRIPT_DEBUGGER)
 namespace Runtime {
 class RemoteObject;
 class ObjectPreview;
@@ -35,10 +33,12 @@ class PropertyPreview;
 // End of forward declarations.
 
 // Typedefs.
-#if ENABLE(JAVASCRIPT_DEBUGGER)
 namespace Debugger {
 /* Breakpoint identifier. */
 typedef String BreakpointId;
+
+/* Breakpoint action identifier. */
+typedef int BreakpointActionIdentifier;
 
 /* Unique script identifier. */
 typedef String ScriptId;
@@ -48,10 +48,12 @@ typedef String CallFrameId;
 
 } // Debugger
 
-#endif // ENABLE(JAVASCRIPT_DEBUGGER)
 namespace Runtime {
 /* Unique object identifier. */
 typedef String RemoteObjectId;
+
+/* Id of an execution context. */
+typedef int ExecutionContextId;
 
 /* Unique frame identifier. FIXME: Duplicate of Network.FrameId <https://webkit.org/b/125664> Web Inspector: FIX Type Dependency Issues */
 typedef String RuntimeFrameId;
@@ -64,7 +66,6 @@ typedef String RuntimeFrameId;
 
 JS_EXPORT_PRIVATE String getJSEnumConstantValue(int code);
 
-#if ENABLE(JAVASCRIPT_DEBUGGER)
 namespace Debugger {
 /* Location in the source code. */
 class Location : public Inspector::InspectorObjectBase {
@@ -151,6 +152,7 @@ public:
             Log = 0,
             Evaluate = 1,
             Sound = 2,
+            Probe = 3,
         };
     }; // struct Type
     enum {
@@ -489,11 +491,11 @@ public:
     // Named after property name 'type' while generating Scope.
     struct Type {
         enum Enum {
-            Global = 3,
-            Local = 4,
-            With = 5,
-            Closure = 6,
-            Catch = 7,
+            Global = 4,
+            Local = 5,
+            With = 6,
+            Closure = 7,
+            Catch = 8,
         };
 #if !ASSERT_DISABLED
         static void assertCorrectValue(Inspector::InspectorValue* value);
@@ -567,9 +569,103 @@ public:
 #endif  // !ASSERT_DISABLED
 };
 
+/* A sample collected by evaluating a probe breakpoint action. */
+class ProbeSample : public Inspector::InspectorObjectBase {
+public:
+    enum {
+        NoFieldsSet = 0,
+        ProbeIdSet = 1 << 0,
+        SampleIdSet = 1 << 1,
+        BatchIdSet = 1 << 2,
+        TimestampSet = 1 << 3,
+        PayloadSet = 1 << 4,
+        AllFieldsSet = (ProbeIdSet | SampleIdSet | BatchIdSet | TimestampSet | PayloadSet)
+    };
+
+    template<int STATE>
+    class Builder {
+    private:
+        RefPtr<Inspector::InspectorObject> m_result;
+
+        template<int STEP> Builder<STATE | STEP>& castState()
+        {
+            return *reinterpret_cast<Builder<STATE | STEP>*>(this);
+        }
+
+        Builder(PassRefPtr</*ProbeSample*/Inspector::InspectorObject> ptr)
+        {
+            COMPILE_ASSERT(STATE == NoFieldsSet, builder_created_in_non_init_state);
+            m_result = ptr;
+        }
+        friend class ProbeSample;
+    public:
+
+        Builder<STATE | ProbeIdSet>& setProbeId(int value)
+        {
+            COMPILE_ASSERT(!(STATE & ProbeIdSet), property_probeId_already_set);
+            m_result->setNumber(ASCIILiteral("probeId"), value);
+            return castState<ProbeIdSet>();
+        }
+
+        Builder<STATE | SampleIdSet>& setSampleId(int value)
+        {
+            COMPILE_ASSERT(!(STATE & SampleIdSet), property_sampleId_already_set);
+            m_result->setNumber(ASCIILiteral("sampleId"), value);
+            return castState<SampleIdSet>();
+        }
+
+        Builder<STATE | BatchIdSet>& setBatchId(int value)
+        {
+            COMPILE_ASSERT(!(STATE & BatchIdSet), property_batchId_already_set);
+            m_result->setNumber(ASCIILiteral("batchId"), value);
+            return castState<BatchIdSet>();
+        }
+
+        Builder<STATE | TimestampSet>& setTimestamp(double value)
+        {
+            COMPILE_ASSERT(!(STATE & TimestampSet), property_timestamp_already_set);
+            m_result->setNumber(ASCIILiteral("timestamp"), value);
+            return castState<TimestampSet>();
+        }
+
+        Builder<STATE | PayloadSet>& setPayload(PassRefPtr<Inspector::TypeBuilder::Runtime::RemoteObject> value)
+        {
+            COMPILE_ASSERT(!(STATE & PayloadSet), property_payload_already_set);
+            m_result->setValue(ASCIILiteral("payload"), value);
+            return castState<PayloadSet>();
+        }
+
+        operator RefPtr<ProbeSample>& ()
+        {
+            COMPILE_ASSERT(STATE == AllFieldsSet, result_is_not_ready);
+            COMPILE_ASSERT(sizeof(ProbeSample) == sizeof(Inspector::InspectorObject), cannot_cast);
+            return *reinterpret_cast<RefPtr<ProbeSample>*>(&m_result);
+        }
+
+        PassRefPtr<ProbeSample> release()
+        {
+            return RefPtr<ProbeSample>(*this).release();
+        }
+    };
+
+    /*
+     * Synthetic constructor:
+     * RefPtr<ProbeSample> result = ProbeSample::create()
+     *     .setProbeId(...)
+     *     .setSampleId(...)
+     *     .setBatchId(...)
+     *     .setTimestamp(...)
+     *     .setPayload(...);
+     */
+    static Builder<NoFieldsSet> create()
+    {
+        return Builder<NoFieldsSet>(Inspector::InspectorObject::create());
+    }
+    typedef Inspector::TypeBuilder::StructItemTraits ItemTraits;
+};
+
 } // Debugger
 
-#endif // ENABLE(JAVASCRIPT_DEBUGGER)
 namespace GenericTypes {
 /* Search match in a resource. */
 class SearchMatch : public Inspector::InspectorObjectBase {
@@ -648,12 +744,12 @@ public:
     // Named after property name 'type' while generating RemoteObject.
     struct Type {
         enum Enum {
-            Object = 8,
-            Function = 9,
-            Undefined = 10,
-            String = 11,
-            Number = 12,
-            Boolean = 13,
+            Object = 9,
+            Function = 10,
+            Undefined = 11,
+            String = 12,
+            Number = 13,
+            Boolean = 14,
         };
 #if !ASSERT_DISABLED
         static void assertCorrectValue(Inspector::InspectorValue* value);
@@ -662,11 +758,11 @@ public:
     // Named after property name 'subtype' while generating RemoteObject.
     struct Subtype {
         enum Enum {
-            Array = 14,
-            Null = 15,
-            Node = 16,
-            Regexp = 17,
-            Date = 18,
+            Array = 15,
+            Null = 16,
+            Node = 17,
+            Regexp = 18,
+            Date = 19,
         };
 #if !ASSERT_DISABLED
         static void assertCorrectValue(Inspector::InspectorValue* value);
@@ -860,12 +956,12 @@ public:
     // Named after property name 'type' while generating PropertyPreview.
     struct Type {
         enum Enum {
-            Object = 8,
-            Function = 9,
-            Undefined = 10,
-            String = 11,
-            Number = 12,
-            Boolean = 13,
+            Object = 9,
+            Function = 10,
+            Undefined = 11,
+            String = 12,
+            Number = 13,
+            Boolean = 14,
         };
 #if !ASSERT_DISABLED
         static void assertCorrectValue(Inspector::InspectorValue* value);
@@ -874,11 +970,11 @@ public:
     // Named after property name 'subtype' while generating PropertyPreview.
     struct Subtype {
         enum Enum {
-            Array = 14,
-            Null = 15,
-            Node = 16,
-            Regexp = 17,
-            Date = 18,
+            Array = 15,
+            Null = 16,
+            Node = 17,
+            Regexp = 18,
+            Date = 19,
         };
 #if !ASSERT_DISABLED
         static void assertCorrectValue(Inspector::InspectorValue* value);
@@ -1325,10 +1421,10 @@ public:
 /* Syntax error type: "none" for no error, "irrecoverable" for unrecoverable errors, "unterminated-literal" for when there is an unterminated literal, "recoverable" for when the expression is unfinished but valid so far. */
 struct SyntaxErrorType {
     enum Enum {
-        None = 19,
-        Irrecoverable = 20,
-        UnterminatedLiteral = 21,
-        Recoverable = 22,
+        None = 20,
+        Irrecoverable = 21,
+        UnterminatedLiteral = 22,
+        Recoverable = 23,
     };
 }; // struct SyntaxErrorType
 /* Range of an error in source code. */

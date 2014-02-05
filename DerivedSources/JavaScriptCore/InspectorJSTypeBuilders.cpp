@@ -21,6 +21,7 @@ static const char* const enum_constant_values[] = {
     "log",
     "evaluate",
     "sound",
+    "probe",
     "global",
     "local",
     "with",
@@ -60,7 +61,6 @@ String getJSEnumConstantValue(int code) {
 
 #if !ASSERT_DISABLED
 
-#if ENABLE(JAVASCRIPT_DEBUGGER)
 void Inspector::TypeBuilder::Debugger::Location::assertCorrectValue(Inspector::InspectorValue* value)
 {
     RefPtr<InspectorObject> object;
@@ -90,10 +90,8 @@ void Inspector::TypeBuilder::Debugger::Location::assertCorrectValue(Inspector::I
     if (foundPropertiesCount != object->size())
         FATAL("Unexpected properties in object: %s\n", object->toJSONString().ascii().data());
 }
-#endif // ENABLE(JAVASCRIPT_DEBUGGER)
 
 
-#if ENABLE(JAVASCRIPT_DEBUGGER)
 void Inspector::TypeBuilder::Debugger::FunctionDetails::assertCorrectValue(Inspector::InspectorValue* value)
 {
     RefPtr<InspectorObject> object;
@@ -141,10 +139,8 @@ void Inspector::TypeBuilder::Debugger::FunctionDetails::assertCorrectValue(Inspe
     if (foundPropertiesCount != object->size())
         FATAL("Unexpected properties in object: %s\n", object->toJSONString().ascii().data());
 }
-#endif // ENABLE(JAVASCRIPT_DEBUGGER)
 
 
-#if ENABLE(JAVASCRIPT_DEBUGGER)
 void Inspector::TypeBuilder::Debugger::CallFrame::assertCorrectValue(Inspector::InspectorValue* value)
 {
     RefPtr<InspectorObject> object;
@@ -184,10 +180,8 @@ void Inspector::TypeBuilder::Debugger::CallFrame::assertCorrectValue(Inspector::
     if (foundPropertiesCount != object->size())
         FATAL("Unexpected properties in object: %s\n", object->toJSONString().ascii().data());
 }
-#endif // ENABLE(JAVASCRIPT_DEBUGGER)
 
 
-#if ENABLE(JAVASCRIPT_DEBUGGER)
 void Inspector::TypeBuilder::Debugger::Scope::Type::assertCorrectValue(Inspector::InspectorValue* value)
 {
     WTF::String s;
@@ -195,10 +189,8 @@ void Inspector::TypeBuilder::Debugger::Scope::Type::assertCorrectValue(Inspector
     ASSERT(cast_res);
     ASSERT(s == "global" || s == "local" || s == "with" || s == "closure" || s == "catch");
 }
-#endif // ENABLE(JAVASCRIPT_DEBUGGER)
 
 
-#if ENABLE(JAVASCRIPT_DEBUGGER)
 void Inspector::TypeBuilder::Debugger::Scope::assertCorrectValue(Inspector::InspectorValue* value)
 {
     RefPtr<InspectorObject> object;
@@ -220,7 +212,6 @@ void Inspector::TypeBuilder::Debugger::Scope::assertCorrectValue(Inspector::Insp
     if (foundPropertiesCount != object->size())
         FATAL("Unexpected properties in object: %s\n", object->toJSONString().ascii().data());
 }
-#endif // ENABLE(JAVASCRIPT_DEBUGGER)
 
 
 void Inspector::TypeBuilder::Runtime::RemoteObject::Type::assertCorrectValue(Inspector::InspectorValue* value)

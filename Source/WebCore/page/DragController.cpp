@@ -655,7 +655,7 @@ Element* DragController::draggableElement(const Frame* sourceFrame, Element* sta
 static CachedImage* getCachedImage(Element& element)
 {
     RenderObject* renderer = element.renderer();
-    if (!renderer || !renderer->isImage())
+    if (!renderer || !renderer->isRenderImage())
         return 0;
     RenderImage* image = toRenderImage(renderer);
     return image->cachedImage();
@@ -768,7 +768,7 @@ bool DragController::startDrag(Frame& src, const DragState& state, DragOperation
             if (enclosingTextFormControl(src.selection().start()))
                 clipboard.pasteboard().writePlainText(src.editor().selectedTextForClipboard(), Pasteboard::CannotSmartReplace);
             else {
-#if PLATFORM(MAC) || PLATFORM(EFL) || PLATFORM(NIX)
+#if PLATFORM(MAC) || PLATFORM(EFL)
                 src.editor().writeSelectionToPasteboard(clipboard.pasteboard());
 #else
                 // FIXME: Convert all other platforms to match Mac and delete this.

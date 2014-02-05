@@ -301,11 +301,6 @@
 
 #endif /* PLATFORM(WIN_CAIRO) */
 
-/* --------- NIX port (Unix) --------- */
-#if PLATFORM(NIX)
-#include "nix/FeatureDefinesNix.h"
-#endif /* PLATFORM(NIX) */
-
 /* --------- EFL port (Unix) --------- */
 #if PLATFORM(EFL)
 
@@ -421,10 +416,6 @@
 #define ENABLE_CSS_IMAGE_SET 0
 #endif
 
-#if !defined(ENABLE_CSS_SHADERS)
-#define ENABLE_CSS_SHADERS 0
-#endif
-
 #if !defined(ENABLE_CSS_STICKY_POSITION)
 #define ENABLE_CSS_STICKY_POSITION 0
 #endif
@@ -471,10 +462,6 @@
 
 #if !defined(ENABLE_DOWNLOAD_ATTRIBUTE)
 #define ENABLE_DOWNLOAD_ATTRIBUTE 0
-#endif
-
-#if !defined(ENABLE_DRAGGABLE_REGION)
-#define ENABLE_DRAGGABLE_REGION 0
 #endif
 
 #if !defined(ENABLE_DRAG_SUPPORT)
@@ -585,10 +572,6 @@
 
 #if !defined(ENABLE_INSPECTOR)
 #define ENABLE_INSPECTOR 1
-#endif
-
-#if !defined(ENABLE_JAVASCRIPT_DEBUGGER)
-#define ENABLE_JAVASCRIPT_DEBUGGER 1
 #endif
 
 #if !defined(ENABLE_JAVASCRIPT_I18N_API)
@@ -807,10 +790,6 @@
 #define ENABLE_TEXT_SELECTION 1
 #endif
 
-#if !defined(ENABLE_THREADED_HTML_PARSER)
-#define ENABLE_THREADED_HTML_PARSER 0
-#endif
-
 #if !defined(ENABLE_ASYNC_SCROLLING)
 #define ENABLE_ASYNC_SCROLLING 0
 #endif
@@ -839,10 +818,6 @@
 #define ENABLE_VIEWPORT 0
 #endif
 
-#if !defined(ENABLE_VIEWSOURCE_ATTRIBUTE)
-#define ENABLE_VIEWSOURCE_ATTRIBUTE 1
-#endif
-
 #if !defined(ENABLE_VIEW_MODE_CSS_MEDIA)
 #define ENABLE_VIEW_MODE_CSS_MEDIA 1
 #endif
@@ -863,12 +838,20 @@
 #define ENABLE_WEB_AUDIO 0
 #endif
 
+#if !defined(ENABLE_WEB_REPLAY)
+#define ENABLE_WEB_REPLAY 0
+#endif
+
 #if !defined(ENABLE_WEB_SOCKETS)
 #define ENABLE_WEB_SOCKETS 1
 #endif
 
 #if !defined(ENABLE_WEB_TIMING)
 #define ENABLE_WEB_TIMING 0
+#endif
+
+#if !defined(ENABLE_WILL_REVEAL_EDGE_EVENTS)
+#define ENABLE_WILL_REVEAL_EDGE_EVENTS 1
 #endif
 
 #if !defined(ENABLE_XHR_TIMEOUT)
@@ -891,10 +874,6 @@
 
 #if ENABLE(VIDEO_TRACK) && !ENABLE(VIDEO)
 #error "ENABLE(VIDEO_TRACK) requires ENABLE(VIDEO)"
-#endif
-
-#if ENABLE(CSS_SHADERS) && !ENABLE(WEBGL)
-#error "ENABLE(CSS_SHADERS) requires ENABLE(WEBGL)"
 #endif
 
 #if ENABLE(REMOTE_INSPECTOR) && !ENABLE(INSPECTOR)

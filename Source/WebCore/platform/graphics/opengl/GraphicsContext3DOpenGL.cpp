@@ -51,7 +51,7 @@
 #define GL_RGB32F_ARB                       0x8815
 #elif PLATFORM(MAC)
 #include <OpenGL/gl.h>
-#elif PLATFORM(GTK) || PLATFORM(EFL) || PLATFORM(WIN) || PLATFORM(NIX)
+#elif PLATFORM(GTK) || PLATFORM(EFL) || PLATFORM(WIN)
 #include "OpenGLShims.h"
 #endif
 
@@ -101,8 +101,6 @@ bool GraphicsContext3D::reshapeFBOs(const IntSize& size)
 #endif
     }
 
-    bool mustRestoreFBO = false;
-
     // Resize multisample FBO.
     if (m_attrs.antialias) {
         GLint maxSampleCount;
@@ -110,10 +108,7 @@ bool GraphicsContext3D::reshapeFBOs(const IntSize& size)
         GLint sampleCount = std::min(8, maxSampleCount);
         if (sampleCount > maxSampleCount)
             sampleCount = maxSampleCount;
-        if (m_state.boundFBO != m_multisampleFBO) {
-            ::glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, m_multisampleFBO);
-            mustRestoreFBO = true;
-        }
+        ::glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, m_multisampleFBO);
         ::glBindRenderbufferEXT(GL_RENDERBUFFER_EXT, m_multisampleColorBuffer);
         ::glRenderbufferStorageMultisampleEXT(GL_RENDERBUFFER_EXT, sampleCount, m_internalColorFormat, width, height);
         ::glFramebufferRenderbufferEXT(GL_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT, GL_RENDERBUFFER_EXT, m_multisampleColorBuffer);
@@ -133,11 +128,7 @@ bool GraphicsContext3D::reshapeFBOs(const IntSize& size)
     }
 
     // resize regular FBO
-    if (m_state.boundFBO != m_fbo) {
-        mustRestoreFBO = true;
-        ::glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, m_fbo);
-    }
-
+    ::glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, m_fbo);
     ASSERT(m_texture);
 #if PLATFORM(IOS)
     ::glBindRenderbuffer(GL_RENDERBUFFER, m_texture);
@@ -164,14 +155,19 @@ bool GraphicsContext3D::reshapeFBOs(const IntSize& size)
             ::glFramebufferRenderbufferEXT(GL_FRAMEBUFFER_EXT, GL_DEPTH_ATTACHMENT_EXT, GL_RENDERBUFFER_EXT, m_depthStencilBuffer);
         ::glBindRenderbufferEXT(GL_RENDERBUFFER_EXT, 0);
     }
+
     if (glCheckFramebufferStatusEXT(GL_FRAMEBUFFER_EXT) != GL_FRAMEBUFFER_COMPLETE_EXT) {
         // FIXME: cleanup
         notImplemented();
     }
 
+    bool mustRestoreFBO = true;
     if (m_attrs.antialias) {
         ::glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, m_multisampleFBO);
         if (m_state.boundFBO == m_multisampleFBO)
+            mustRestoreFBO = false;
+    } else {
+        if (m_state.boundFBO == m_fbo)
             mustRestoreFBO = false;
     }
 
@@ -181,7 +177,9 @@ bool GraphicsContext3D::reshapeFBOs(const IntSize& size)
 void GraphicsContext3D::resolveMultisamplingIfNecessary(const IntRect& rect)
 {
     TemporaryOpenGLSetting scopedScissor(GL_SCISSOR_TEST, GL_FALSE);
-    TemporaryOpenGLSetting scopedDither(GL_SCISSOR_TEST, GL_FALSE);
+    TemporaryOpenGLSetting scopedDither(GL_DITHER, GL_FALSE);
+    TemporaryOpenGLSetting scopedDepth(GL_DEPTH_TEST, GL_FALSE);
+    TemporaryOpenGLSetting scopedStencil(GL_STENCIL_TEST, GL_FALSE);
 
     ::glBindFramebufferEXT(GL_READ_FRAMEBUFFER_EXT, m_multisampleFBO);
     ::glBindFramebufferEXT(GL_DRAW_FRAMEBUFFER_EXT, m_fbo);
@@ -352,6 +350,31 @@ void GraphicsContext3D::readPixels(GC3Dint x, GC3Dint y, GC3Dsizei width, GC3Dsi
     if (m_attrs.antialias && m_state.boundFBO == m_multisampleFBO)
         ::glBindFramebufferEXT(GraphicsContext3D::FRAMEBUFFER, m_multisampleFBO);
 }
+
+#if !PLATFORM(MAC)
+void GraphicsContext3D::drawArraysInstanced(GC3Denum mode, GC3Dint first, GC3Dsizei count, GC3Dsizei primcount)
+{
+    UNUSED_PARAM(mode);
+    UNUSED_PARAM(first);
+    UNUSED_PARAM(count);
+    UNUSED_PARAM(primcount);
+}
+
+void GraphicsContext3D::drawElementsInstanced(GC3Denum mode, GC3Dsizei count, GC3Denum type, GC3Dintptr offset, GC3Dsizei primcount)
+{
+    UNUSED_PARAM(mode);
+    UNUSED_PARAM(count);
+    UNUSED_PARAM(type);
+    UNUSED_PARAM(offset);
+    UNUSED_PARAM(primcount);
+}
+
+void GraphicsContext3D::vertexAttribDivisor(GC3Duint index, GC3Duint divisor)
+{
+    UNUSED_PARAM(index);
+    UNUSED_PARAM(divisor);
+}
+#endif
 
 }
 

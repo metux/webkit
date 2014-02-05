@@ -43,7 +43,6 @@
 #include "RenderLayer.h"
 #include "RenderLineBreak.h"
 #include "RenderListItem.h"
-#include "RenderMultiColumnBlock.h"
 #include "RenderRegion.h"
 #include "RenderRuby.h"
 #include "RenderRubyText.h"
@@ -124,19 +123,15 @@ RenderElement::~RenderElement()
 
 RenderPtr<RenderElement> RenderElement::createFor(Element& element, PassRef<RenderStyle> style)
 {
-    Document& document = element.document();
-
     // Minimal support for content properties replacing an entire element.
     // Works only if we have exactly one piece of content and it's a URL.
     // Otherwise acts as if we didn't support this feature.
     const ContentData* contentData = style.get().contentData();
     if (contentData && !contentData->next() && contentData->isImage() && !element.isPseudoElement()) {
-        auto image = createRenderer<RenderImage>(element, std::move(style));
-        if (const StyleImage* styleImage = static_cast<const ImageContentData*>(contentData)->image()) {
-            image->setImageResource(RenderImageResourceStyleImage::create(const_cast<StyleImage&>(*styleImage)));
+        auto styleImage = const_cast<StyleImage*>(static_cast<const ImageContentData*>(contentData)->image());
+        auto image = createRenderer<RenderImage>(element, std::move(style), styleImage);
+        if (styleImage)
             image->setIsGeneratedContent();
-        } else
-            image->setImageResource(RenderImageResource::create());
         return std::move(image);
     }
 
@@ -159,8 +154,6 @@ RenderPtr<RenderElement> RenderElement::createFor(Element& element, PassRef<Rend
     case INLINE_BLOCK:
     case RUN_IN:
     case COMPACT:
-        if ((!style.get().hasAutoColumnCount() || !style.get().hasAutoColumnWidth()) && document.regionBasedColumnsEnabled())
-            return createRenderer<RenderMultiColumnBlock>(element, std::move(style));
         return createRenderer<RenderBlockFlow>(element, std::move(style));
     case LIST_ITEM:
         return createRenderer<RenderListItem>(element, std::move(style));
@@ -593,7 +586,7 @@ void RenderElement::insertChildInternal(RenderObject* newChild, RenderObject* be
         setChildNeedsLayout(); // We may supply the static position for an absolute positioned child.
 
     if (AXObjectCache* cache = document().axObjectCache())
-        cache->childrenChanged(this);
+        cache->childrenChanged(this, newChild);
 }
 
 void RenderElement::removeChildInternal(RenderObject& oldChild, NotifyChildrenType notifyChildren)
@@ -832,7 +825,7 @@ void RenderElement::styleWillChange(StyleDifference diff, const RenderStyle& new
         bool visibilityChanged = m_style->visibility() != newStyle.visibility()
             || m_style->zIndex() != newStyle.zIndex()
             || m_style->hasAutoZIndex() != newStyle.hasAutoZIndex();
-#if ENABLE(DASHBOARD_SUPPORT) || ENABLE(DRAGGABLE_REGION)
+#if ENABLE(DASHBOARD_SUPPORT)
         if (visibilityChanged)
             document().setAnnotatedRegionsDirty(true);
 #endif
@@ -842,7 +835,7 @@ void RenderElement::styleWillChange(StyleDifference diff, const RenderStyle& new
 #endif
         if (visibilityChanged) {
             if (AXObjectCache* cache = document().existingAXObjectCache())
-                cache->childrenChanged(parent());
+                cache->childrenChanged(parent(), this);
         }
 
         // Keep layer hierarchy visibility bits up to date if visibility changes.

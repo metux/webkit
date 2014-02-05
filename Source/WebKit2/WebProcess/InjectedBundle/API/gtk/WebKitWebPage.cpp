@@ -172,6 +172,7 @@ static WKURLRequestRef willSendRequestForFrame(WKBundlePageRef page, WKBundleFra
 
     ResourceRequest resourceRequest;
     webkitURIRequestGetResourceRequest(request.get(), resourceRequest);
+    resourceRequest.setInitiatingPageID(toImpl(page)->pageID());
     RefPtr<API::URLRequest> newRequest = API::URLRequest::create(resourceRequest);
 
     ImmutableDictionary::MapType message;
@@ -384,7 +385,7 @@ void webkitWebPageDidReceiveMessage(WebKitWebPage* page, const String& messageNa
             WebCore::IntRect snapshotRect;
             switch (region) {
             case SnapshotRegionVisible:
-                snapshotRect = frameView->visibleContentRect(WebCore::ScrollableArea::ExcludeScrollbars);
+                snapshotRect = frameView->visibleContentRect();
                 break;
             case SnapshotRegionFullDocument:
                 snapshotRect = WebCore::IntRect(WebCore::IntPoint(0, 0), frameView->contentsSize());

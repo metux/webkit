@@ -1,3 +1,2422 @@
+2014-01-29  Csaba Osztrogonác  <ossy@webkit.org>
+
+        Remove ENABLE(JAVASCRIPT_DEBUGGER) leftovers
+        https://bugs.webkit.org/show_bug.cgi?id=127845
+
+        Reviewed by Joseph Pecoraro.
+
+        * Configurations/FeatureDefines.xcconfig:
+
+2014-01-29  Csaba Osztrogonác  <ossy@webkit.org>
+
+        Remove ENABLE(JAVASCRIPT_DEBUGGER) guards
+        https://bugs.webkit.org/show_bug.cgi?id=127840
+
+        Reviewed by Mark Lam.
+
+        * inspector/scripts/CodeGeneratorInspector.py:
+
+2014-01-28  Commit Queue  <commit-queue@webkit.org>
+
+        Unreviewed, rolling out r162987.
+        http://trac.webkit.org/changeset/162987
+        https://bugs.webkit.org/show_bug.cgi?id=127825
+
+        Broke Mountain Lion build (Requested by andersca on #webkit).
+
+        * inspector/InjectedScriptSource.js:
+        (.):
+        * runtime/JSObject.cpp:
+        (JSC::JSObject::getOwnPropertyDescriptor):
+        * runtime/PropertyDescriptor.cpp:
+        * runtime/PropertyDescriptor.h:
+        * runtime/PropertySlot.h:
+
+2014-01-28  Oliver Hunt  <oliver@apple.com>
+
+        Make DOM attributes appear to be faux accessor properties
+        https://bugs.webkit.org/show_bug.cgi?id=127797
+
+        Reviewed by Michael Saboff.
+
+        Add flag so we can identify which properties should have the old
+        custom property semantics vs. the new faux accessors. Update the
+        inspector protocol accordingly.
+
+        These faux accessors produce descriptors with "get" and "set"
+        properties, but both values are undefined so can't be used
+        directly. A few custom properties actually require their
+        existing magical behaviour, so we now have a flag to 
+        distinguish the expected output.
+
+        * inspector/InjectedScriptSource.js:
+        (.):
+        * runtime/JSObject.cpp:
+        (JSC::JSObject::getOwnPropertyDescriptor):
+        * runtime/PropertyDescriptor.cpp:
+        (JSC::PropertyDescriptor::setCustomDescriptor):
+        * runtime/PropertyDescriptor.h:
+        * runtime/PropertySlot.h:
+
+2014-01-28  Mark Lam  <mark.lam@apple.com>
+
+        Remove some unneeded debugger code.
+        https://bugs.webkit.org/show_bug.cgi?id=127805.
+
+        Reviewed by Oliver Hunt.
+
+        JSC will now always support the debugger. Hence, the #if ENABLE(JAVASCRIPT_DEBUGGER)
+        checks can be removed.
+
+        DebuggerCallFrame::callFrame() is also unused and will be removed.
+
+        * debugger/Breakpoint.h:
+        * debugger/Debugger.cpp:
+        * debugger/DebuggerCallFrame.h:
+        * inspector/InjectedScript.cpp:
+        (Inspector::InjectedScript::wrapCallFrames):
+        * inspector/InjectedScript.h:
+        * inspector/JSGlobalObjectScriptDebugServer.cpp:
+        * inspector/JSGlobalObjectScriptDebugServer.h:
+        * inspector/JSJavaScriptCallFrame.cpp:
+        * inspector/JSJavaScriptCallFrame.h:
+        * inspector/JSJavaScriptCallFramePrototype.cpp:
+        * inspector/JSJavaScriptCallFramePrototype.h:
+        * inspector/JavaScriptCallFrame.cpp:
+        * inspector/JavaScriptCallFrame.h:
+        * inspector/ScriptDebugListener.h:
+        * inspector/ScriptDebugServer.cpp:
+        * inspector/ScriptDebugServer.h:
+        * inspector/agents/InspectorDebuggerAgent.cpp:
+        * inspector/agents/InspectorDebuggerAgent.h:
+        * inspector/agents/InspectorRuntimeAgent.cpp:
+        (Inspector::InspectorRuntimeAgent::InspectorRuntimeAgent):
+        (Inspector::setPauseOnExceptionsState):
+        (Inspector::InspectorRuntimeAgent::evaluate):
+        (Inspector::InspectorRuntimeAgent::callFunctionOn):
+        (Inspector::InspectorRuntimeAgent::getProperties):
+        * inspector/agents/InspectorRuntimeAgent.h:
+
+2014-01-28  Geoffrey Garen  <ggaren@apple.com>
+
+        REGRESSION: JavascriptCore crash during OS Installation (due to
+        Heap::m_operationInProgress ASSERT vs DelayedReleaseScope)
+        https://bugs.webkit.org/show_bug.cgi?id=127793
+
+        Reviewed by Mark Hahnenberg.
+
+        This was a mistaken ASSERT.
+
+        * API/tests/testapi.mm:
+        (-[EvilAllocationObject doEvilThingsWithContext:]): Added a test to verify
+        that GC from a DelayedReleaseScope doesn't crash.
+
+        * heap/DelayedReleaseScope.h:
+        (JSC::DelayedReleaseScope::~DelayedReleaseScope): Our contract is that
+        it is valid to do anything while running a DelayedReleaseScope -dealloc
+        method, so the Heap must be ready for new allocations and collections.
+
+        Change the Heap's operationInProgress value to NoOperation while running
+        -dealloc methods, so that it doesn't ASSERT in the face of new allocations
+        and collections.
+
+        * heap/Heap.h: Made DelayedReleaseScope a friend because exposing a setter
+        for m_operationInProgress seemed like the worse of the two options for
+        encapsulation: we don't really want arbitrary clients to set the Heap's
+        m_operationInProgress.
+
+2014-01-28  Mark Lam  <mark.lam@apple.com>
+
+        Jettison DFG code when neither breakpoints or the profiler are active.
+        <https://webkit.org/b/127766>
+
+        Reviewed by Geoffrey Garen.
+
+        We need to jettison the DFG CodeBlocks under the following circumstances:
+        1. When adding breakpoints to a CodeBlock, jettison it if it is a DFG CodeBlock.
+        2. When enabling stepping mode in a CodeBlock, jettison it if it a DFG CodeBlock.
+        3. When settign the enabled profiler in the VM, we need to jettison all DFG
+           CodeBlocks.
+
+        Instead of emitting speculation checks, the DFG code will now treat Breakpoint,
+        ProfileWillCall, and ProfileDidCall as no-ops similar to a Phantom node. We
+        still need to track these nodes so that they match the corresponding opcodes
+        in the baseline JIT when we jettison and OSR exit. Without them, we would OSR
+        exit to the wrong location in the baseline JIT code.
+
+        In DFGDriver's compileImpl() and DFGPlan's finalizeWithoutNotifyingCallback()
+        we fail the compilation effort with a CompilationInvalidated result. This allows
+        the DFG compiler to re-attampt the compilation of the function after some time
+        if it is hot. The CompilationInvalidated result is supposed to cause the DFG
+        to exercise an exponential back off before re-attempting compilation again
+        (see runtime/CompilationResult.h).
+
+        This patch improves the Octane score from ~2950 to ~3067.
+
+        * bytecode/CodeBlock.cpp:
+        (JSC::CodeBlock::addBreakpoint):
+        (JSC::CodeBlock::setSteppingMode):
+        * bytecode/CodeBlock.h:
+        * debugger/Debugger.h:
+        * dfg/DFGAbstractInterpreterInlines.h:
+        (JSC::DFG::AbstractInterpreter<AbstractStateType>::executeEffects):
+        * dfg/DFGClobberize.h:
+        (JSC::DFG::clobberize):
+        * dfg/DFGDriver.cpp:
+        (JSC::DFG::compileImpl):
+        * dfg/DFGPlan.cpp:
+        (JSC::DFG::Plan::finalizeWithoutNotifyingCallback):
+        * dfg/DFGSpeculativeJIT32_64.cpp:
+        (JSC::DFG::SpeculativeJIT::compile):
+        * dfg/DFGSpeculativeJIT64.cpp:
+        (JSC::DFG::SpeculativeJIT::compile):
+        * profiler/LegacyProfiler.cpp:
+        (JSC::LegacyProfiler::startProfiling):
+        (JSC::LegacyProfiler::stopProfiling):
+        * runtime/VM.cpp:
+        (JSC::VM::VM):
+        (JSC::SetEnabledProfilerFunctor::operator()):
+        (JSC::VM::setEnabledProfiler):
+        * runtime/VM.h:
+        (JSC::VM::enabledProfiler):
+
+2014-01-27  Joseph Pecoraro  <pecoraro@apple.com>
+
+        -[JSContext evaluteScript:] calls JSEvaluteScript with startingLineNumber 0, later interpreted as a oneBasedInt
+        https://bugs.webkit.org/show_bug.cgi?id=127648
+
+        Reviewed by Geoffrey Garen.
+
+        The actual bug being fixed here is that the line number for
+        scripts evaluated via the JSC APIs is now sane. However,
+        there is no good infrastructure in place right now to test that.
+
+        * API/tests/testapi.c:
+        (main):
+        * API/tests/testapi.mm:
+        (testObjectiveCAPI):
+        Add tests for exception line numbers and handling of bad
+        startingLineNumbers in public APIs. These tests were already
+        passing, I just add them to make sure they are not regressed
+        in the future.
+
+        * API/JSBase.cpp:
+        (JSEvaluateScript):
+        (JSCheckScriptSyntax):
+        * API/JSBase.h:
+        * API/JSObjectRef.cpp:
+        (JSObjectMakeFunction):
+        * API/JSObjectRef.h:
+        * API/JSScriptRef.cpp:
+        * API/JSScriptRefPrivate.h:
+        * API/JSStringRef.h:
+        - Clarify documentation that startingLineNumber is 1 based and clamped.
+        - Add clamping in the implementation to put sane values into JSC::SourceProvider.
+
+        * inspector/agents/InspectorDebuggerAgent.cpp:
+        (Inspector::InspectorDebuggerAgent::didParseSource):
+        Remove the FIXME now that the SourceProvider is giving us expected values.
+
+2014-01-27  Joseph Pecoraro  <pecoraro@apple.com>
+
+        Web Inspector: CRASH when debugger closes remote inspecting JSContext
+        https://bugs.webkit.org/show_bug.cgi?id=127738
+
+        Reviewed by Timothy Hatcher.
+
+        RemoteInspectorXPCConnection could be accessed in a background dispatch
+        queue, while being deallocated on the main thread when a connection
+        was suddenly terminated.
+
+        Make RemoteInspectorXPCConnection a ThreadSafeRefCounted object. Always
+        keep the connection object ref'd until the main thread calls close()
+        and removes its reference. At that point we can close the connection,
+        queue, and deref safely on the background queue.
+
+        * inspector/remote/RemoteInspector.h:
+        * inspector/remote/RemoteInspector.mm:
+        (Inspector::RemoteInspector::setupXPCConnectionIfNeeded):
+        (Inspector::RemoteInspector::xpcConnectionFailed):
+        For simplicity RemoteInspectorXPCConnections's don't have any threading
+        primatives to prevent client callbacks after they are closed. RemoteInspector
+        does, so it just ignores possible callbacks from connections it no longer
+        cares about.
+
+        * inspector/remote/RemoteInspectorXPCConnection.h:
+        * inspector/remote/RemoteInspectorXPCConnection.mm:
+        (Inspector::RemoteInspectorXPCConnection::RemoteInspectorXPCConnection):
+        (Inspector::RemoteInspectorXPCConnection::~RemoteInspectorXPCConnection):
+        (Inspector::RemoteInspectorXPCConnection::close):
+        Keep the connection alive as long as the queue it can be used on
+        is alive. Clean up everything on the queue when close() is called.
+
+        (Inspector::RemoteInspectorXPCConnection::handleEvent):
+        Checking if closed here is not thread safe so it is meaningless.
+        Remove the check.
+
+        (Inspector::RemoteInspectorXPCConnection::sendMessage):
+        Bail based on the m_closed state.
+
+2014-01-27  Joseph Pecoraro  <pecoraro@apple.com>
+
+        JavaScriptCore: Enable -Wimplicit-fallthrough and add FALLTHROUGH annotation where needed
+        https://bugs.webkit.org/show_bug.cgi?id=127647
+
+        Reviewed by Anders Carlsson.
+
+        Explicitly annotate switch case fallthroughs in JavaScriptCore and
+        enable warnings for unannotated fallthroughs.
+
+        * dfg/DFGArithMode.h:
+        (doesOverflow):
+        Only insert FALLTHROUGH in release builds. In debug builds, the
+        FALLTHROUGH would be unreachable (due to the ASSERT_NOT_REACHED)
+        and would through a warning.
+
+        * dfg/DFGSpeculativeJIT64.cpp:
+        (JSC::DFG::SpeculativeJIT::fillSpeculateInt32Internal):
+        (JSC::DFG::SpeculativeJIT::fillSpeculateInt52):
+        Due to the templatized nature of this function, a fallthrough
+        in one of the template expansions would be unreachable. Disable
+        the warning for this function.
+
+        * Configurations/Base.xcconfig:
+        * bytecode/CodeBlock.cpp:
+        (JSC::CodeBlock::CodeBlock):
+        * dfg/DFGCFGSimplificationPhase.cpp:
+        (JSC::DFG::CFGSimplificationPhase::run):
+        * dfg/DFGValidate.cpp:
+        (JSC::DFG::Validate::validateCPS):
+        * parser/Lexer.cpp:
+        (JSC::Lexer<T>::lex):
+        * parser/Parser.cpp:
+        (JSC::Parser<LexerType>::parseStatement):
+        (JSC::Parser<LexerType>::parseProperty):
+        * runtime/JSArray.cpp:
+        (JSC::JSArray::push):
+        * runtime/JSONObject.cpp:
+        (JSC::Walker::walk):
+        * runtime/JSObject.cpp:
+        (JSC::JSObject::putByIndex):
+        (JSC::JSObject::putByIndexBeyondVectorLength):
+        * runtime/JSObject.h:
+        (JSC::JSObject::setIndexQuickly):
+        (JSC::JSObject::initializeIndex):
+        * runtime/LiteralParser.cpp:
+        (JSC::LiteralParser<CharType>::parse):
+        * yarr/YarrInterpreter.cpp:
+        (JSC::Yarr::Interpreter::backtrackParenthesesOnceBegin):
+        (JSC::Yarr::Interpreter::backtrackParenthesesOnceEnd):
+        * yarr/YarrParser.h:
+        (JSC::Yarr::Parser::CharacterClassParserDelegate::atomPatternCharacter):
+        (JSC::Yarr::Parser::CharacterClassParserDelegate::atomBuiltInCharacterClass):
+        (JSC::Yarr::Parser::parseEscape):
+        (JSC::Yarr::Parser::parseTokens):
+
+2014-01-27  Andy Estes  <aestes@apple.com>
+
+        Scrub WebKit API headers of WTF macros
+        https://bugs.webkit.org/show_bug.cgi?id=127706
+
+        Reviewed by David Kilzer.
+
+        * Configurations/FeatureDefines.xcconfig: Added ENABLE_INSPECTOR.
+
+2014-01-27  Mark Lam  <mark.lam@apple.com>
+
+        Remove unused CodeBlock::createActivation().
+        <https://webkit.org/b/127686>
+
+        Reviewed by Filip Pizlo.
+
+        * bytecode/CodeBlock.cpp:
+        * bytecode/CodeBlock.h:
+
+2014-01-26  Andreas Kling  <akling@apple.com>
+
+        JSC: Pack unlinked instructions harder.
+        <https://webkit.org/b/127660>
+
+        Store UnlinkedCodeBlock's instructions in a variable-length stream
+        to reduce memory usage. Compression rate ends up around 60-61%.
+
+        The format is very simple. Every instruction starts with a 1 byte
+        opcode. It's followed by an opcode-dependent number of argument
+        values, each encoded separately for maximum packing. There are
+        7 packed value formats:
+
+            5-bit positive integer
+            5-bit negative integer
+            13-bit positive integer
+            13-bit positive integer
+            5-bit constant register index
+            13-bit constant register index
+            32-bit value (fallback)
+
+        27.5 MB progression on Membuster3. (~2% of total memory.)
+
+        Reviewed by Filip Pizlo.
+
+        * JavaScriptCore.xcodeproj/project.pbxproj:
+        * bytecode/UnlinkedInstructionStream.h: Added.
+        (JSC::UnlinkedInstructionStream::count):
+        (JSC::UnlinkedInstructionStream::Reader::atEnd):
+        * bytecode/UnlinkedInstructionStream.cpp: Added.
+        (JSC::UnlinkedInstructionStream::Reader::Reader):
+        (JSC::UnlinkedInstructionStream::Reader::read8):
+        (JSC::UnlinkedInstructionStream::Reader::read32):
+        (JSC::UnlinkedInstructionStream::Reader::next):
+        (JSC::append8):
+        (JSC::append32):
+        (JSC::UnlinkedInstructionStream::UnlinkedInstructionStream):
+        (JSC::UnlinkedInstructionStream::unpackForDebugging):
+        * bytecompiler/BytecodeGenerator.cpp:
+        * bytecode/CodeBlock.cpp:
+        (JSC::CodeBlock::CodeBlock):
+        * bytecode/UnlinkedCodeBlock.cpp:
+        (JSC::UnlinkedCodeBlock::lineNumberForBytecodeOffset):
+        (JSC::dumpLineColumnEntry):
+        (JSC::UnlinkedCodeBlock::expressionRangeForBytecodeOffset):
+        (JSC::UnlinkedCodeBlock::setInstructions):
+        (JSC::UnlinkedCodeBlock::instructions):
+        * bytecode/UnlinkedCodeBlock.h:
+        (JSC::BytecodeGenerator::generate):
+
+2014-01-26  Joseph Pecoraro  <pecoraro@apple.com>
+
+        Web Inspector: Move InspectorDebuggerAgent into JavaScriptCore
+        https://bugs.webkit.org/show_bug.cgi?id=127629
+
+        Rubber-stamped by Sam Weinig.
+
+        * CMakeLists.txt:
+        * GNUmakefile.list.am:
+        * JavaScriptCore.vcxproj/JavaScriptCore.vcxproj:
+        * JavaScriptCore.vcxproj/JavaScriptCore.vcxproj.filters:
+        * JavaScriptCore.xcodeproj/project.pbxproj:
+        - Add new files to the build.
+        - Also, since non REMOTE_INSPECTOR ports cannot yet connect to a
+          JSGlobalObject for inspection remove those files as they don't
+          need to be built.
+
+        * inspector/EventLoop.cpp: Added.
+        (Inspector::EventLoop::cycle):
+        * inspector/EventLoop.h: Added.
+        (Inspector::EventLoop::EventLoop):
+        (Inspector::EventLoop::ended):
+        Add a JavaScriptCore version of EventLoop. This is currently only
+        used by the Mac port for JSGlobalObject remote inspection. Keep
+        the WebCore/platform version alive because for the Mac port it does
+        slightly different things involving AppKit.
+
+        * inspector/JSGlobalObjectInspectorController.cpp:
+        (Inspector::JSGlobalObjectInspectorController::JSGlobalObjectInspectorController):
+        Create DebuggerAgent and hook up ScriptDebugServer where needed.
+
+        * inspector/JSGlobalObjectScriptDebugServer.cpp: Added.
+        (Inspector::JSGlobalObjectScriptDebugServer::JSGlobalObjectScriptDebugServer):
+        (Inspector::JSGlobalObjectScriptDebugServer::addListener):
+        (Inspector::JSGlobalObjectScriptDebugServer::removeListener):
+        (Inspector::JSGlobalObjectScriptDebugServer::recompileAllJSFunctions):
+        (Inspector::JSGlobalObjectScriptDebugServer::runEventLoopWhilePaused):
+        * inspector/JSGlobalObjectScriptDebugServer.h: Added.
+        Simple implementation of ScriptDebugServer with a JSGlobalObject.
+
+        * inspector/agents/InspectorDebuggerAgent.cpp: Renamed from Source/WebCore/inspector/InspectorDebuggerAgent.cpp.
+        * inspector/agents/InspectorDebuggerAgent.h: Renamed from Source/WebCore/inspector/InspectorDebuggerAgent.h.
+        Copied from WebCore. A few methods need to be made virtual so that Web implementations
+        can override and extend the funcitonality. E.g. sourceMapURLForScript and enable/disable.
+        
+        * inspector/agents/JSGlobalObjectDebuggerAgent.cpp: Added.
+        * inspector/agents/JSGlobalObjectDebuggerAgent.h: Added.
+        (Inspector::JSGlobalObjectDebuggerAgent::JSGlobalObjectDebuggerAgent):
+        (Inspector::JSGlobalObjectDebuggerAgent::startListeningScriptDebugServer):
+        (Inspector::JSGlobalObjectDebuggerAgent::stopListeningScriptDebugServer):
+        (Inspector::JSGlobalObjectDebuggerAgent::injectedScriptForEval):
+        Simple implementation of DebuggerAGent with a JSGlobalObject.
+
+2014-01-25  Mark Lam  <mark.lam@apple.com>
+
+        Gardening: fix build breakage from previous commit.
+
+        Not reviewed.
+
+        * profiler/ProfileNode.cpp:
+        (JSC::ProfileNode::debugPrintData):
+        - Removed obsolete references to "visible" timers.
+
+2014-01-25  Timothy Hatcher  <timothy@apple.com>
+
+        Remove dead code from the JSC profiler.
+
+        https://bugs.webkit.org/show_bug.cgi?id=127643
+
+        Reviewed by Mark Lam.
+
+        * profiler/Profile.cpp:
+        * profiler/Profile.h:
+        * profiler/ProfileGenerator.cpp:
+        (JSC::ProfileGenerator::stopProfiling):
+        * profiler/ProfileNode.cpp:
+        (JSC::ProfileNode::ProfileNode):
+        (JSC::ProfileNode::stopProfiling):
+        (JSC::ProfileNode::endAndRecordCall):
+        (JSC::ProfileNode::debugPrintData):
+        (JSC::ProfileNode::debugPrintDataSampleStyle):
+        * profiler/ProfileNode.h:
+        (JSC::ProfileNode::totalTime):
+        (JSC::ProfileNode::setTotalTime):
+        (JSC::ProfileNode::selfTime):
+        (JSC::ProfileNode::setSelfTime):
+        (JSC::ProfileNode::totalPercent):
+        (JSC::ProfileNode::selfPercent):
+        Remove support for things like focus and exclude. The Inspector does those in JS now.
+
+2014-01-25  Sam Weinig  <sam@webkit.org>
+
+        Remove unused support for DRAGGABLE_REGION
+        https://bugs.webkit.org/show_bug.cgi?id=127642
+
+        Reviewed by Simon Fraser.
+
+        * Configurations/FeatureDefines.xcconfig:
+
+2014-01-25  Darin Adler  <darin@apple.com>
+
+        Try to fix Mac build.
+
+        * runtime/DatePrototype.cpp: Put the include of <unicode/udat.h> inside
+        a conditional since we don't have that header in our Mac build configuration.
+
+2014-01-25  Darin Adler  <darin@apple.com>
+
+        Call deprecatedCharacters instead of characters at more call sites
+        https://bugs.webkit.org/show_bug.cgi?id=127631
+
+        Reviewed by Sam Weinig.
+
+        * API/JSValueRef.cpp:
+        (JSValueMakeFromJSONString):
+        * API/OpaqueJSString.cpp:
+        (OpaqueJSString::~OpaqueJSString):
+        * bindings/ScriptValue.cpp:
+        (Deprecated::jsToInspectorValue):
+        * inspector/ContentSearchUtilities.cpp:
+        (Inspector::ContentSearchUtilities::createSearchRegexSource):
+        * inspector/InspectorValues.cpp:
+        * runtime/Identifier.h:
+        (JSC::Identifier::deprecatedCharacters):
+        * runtime/JSStringBuilder.h:
+        (JSC::JSStringBuilder::append):
+        Use the new name.
+
+2014-01-25  Darin Adler  <darin@apple.com>
+
+        Get rid of ICU_UNICODE and WCHAR_UNICODE remnants
+        https://bugs.webkit.org/show_bug.cgi?id=127623
+
+        Reviewed by Anders Carlsson.
+
+        * runtime/DatePrototype.cpp: Removed USE(ICU_UNICODE) checks, since that's always true now.
+
+2014-01-25  Darin Adler  <darin@apple.com>
+
+        [Mac] Rewrite locale-specific date formatting code to remove strange string creation
+        https://bugs.webkit.org/show_bug.cgi?id=127624
+
+        Reviewed by Anders Carlsson.
+
+        * runtime/DatePrototype.cpp:
+        (JSC::formatLocaleDate): Use some smart pointers and conversion operators we already
+        have to do the formatting in a more straightforward way.
+
+2014-01-25  Anders Carlsson  <andersca@apple.com>
+
+        Remove atomicIncrement/atomicDecrement
+        https://bugs.webkit.org/show_bug.cgi?id=127625
+
+        Reviewed by Andreas Kling.
+
+        Replace atomicIncrement/atomicDecrement with std::atomic.
+
+        * bytecode/Watchpoint.h:
+        * ftl/FTLLowerDFGToLLVM.cpp:
+        (JSC::FTL::LowerDFGToLLVM::lower):
+        * profiler/ProfilerDatabase.cpp:
+        (JSC::Profiler::Database::Database):
+        (JSC::Profiler::Database::addDatabaseToAtExit):
+
+2014-01-24  Joseph Pecoraro  <pecoraro@apple.com>
+
+        Web Inspector: Move InspectorRuntimeAgent into JavaScriptCore
+        https://bugs.webkit.org/show_bug.cgi?id=127605
+
+        Reviewed by Timothy Hatcher.
+
+        * CMakeLists.txt:
+        * GNUmakefile.list.am:
+        * JavaScriptCore.vcxproj/JavaScriptCore.vcxproj:
+        * JavaScriptCore.vcxproj/JavaScriptCore.vcxproj.filters:
+        * JavaScriptCore.xcodeproj/project.pbxproj:
+        Add new files to the build.
+
+        * inspector/agents/InspectorRuntimeAgent.h: Renamed from Source/WebCore/inspector/InspectorRuntimeAgent.h.
+        * inspector/agents/InspectorRuntimeAgent.cpp: Renamed from Source/WebCore/inspector/InspectorRuntimeAgent.cpp.
+        (Inspector::InspectorRuntimeAgent::InspectorRuntimeAgent):
+        (Inspector::InspectorRuntimeAgent::parse):
+        (Inspector::InspectorRuntimeAgent::evaluate):
+        (Inspector::InspectorRuntimeAgent::callFunctionOn):
+        (Inspector::InspectorRuntimeAgent::getProperties):
+        - Move the agent into JavaScriptCore.
+        - Modernize and cleanup.
+        - Make globalVM a pure virtual function for subclasses to implement.
+
+        * inspector/agents/JSGlobalObjectRuntimeAgent.h: Added.
+        * inspector/agents/JSGlobalObjectRuntimeAgent.cpp: Added.
+        (Inspector::JSGlobalObjectRuntimeAgent::JSGlobalObjectRuntimeAgent):
+        (Inspector::JSGlobalObjectRuntimeAgent::didCreateFrontendAndBackend):
+        (Inspector::JSGlobalObjectRuntimeAgent::willDestroyFrontendAndBackend):
+        (Inspector::JSGlobalObjectRuntimeAgent::globalVM):
+        (Inspector::JSGlobalObjectRuntimeAgent::injectedScriptForEval):
+        Straightforward JSGlobalObject implementation.
+
+        * inspector/JSGlobalObjectInspectorController.cpp:
+        (Inspector::JSGlobalObjectInspectorController::JSGlobalObjectInspectorController):
+        Add a runtime agent when inspecting a JSContext!
+
+2014-01-23  Joseph Pecoraro  <pecoraro@apple.com>
+
+        Move JavaScriptCallFrame and ScriptDebugServer into JavaScriptCore for inspector
+        https://bugs.webkit.org/show_bug.cgi?id=127543
+
+        Reviewed by Geoffrey Garen.
+
+        * CMakeLists.txt:
+        * GNUmakefile.list.am:
+        * JavaScriptCore.vcxproj/JavaScriptCore.vcxproj:
+        * JavaScriptCore.xcodeproj/project.pbxproj:
+        Add new files.
+
+        * inspector/ScriptDebugListener.h:
+        Extract WebCore knowledge from ScriptDebugServer. This will
+        eventually be made to work outside of WebCore.
+
+        * inspector/ScriptDebugServer.h: Renamed from Source/WebCore/bindings/js/ScriptDebugServer.h.
+        * inspector/ScriptDebugServer.cpp: Renamed from Source/WebCore/bindings/js/ScriptDebugServer.cpp.
+        (Inspector::ScriptDebugServer::evaluateBreakpointAction):
+        (Inspector::ScriptDebugServer::dispatchDidPause):
+        (Inspector::ScriptDebugServer::dispatchBreakpointActionLog):
+        (Inspector::ScriptDebugServer::dispatchBreakpointActionSound):
+        (Inspector::ScriptDebugServer::sourceParsed):
+        (Inspector::ScriptDebugServer::dispatchFunctionToListeners):
+        (Inspector::ScriptDebugServer::handlePause):
+        Modernize code, and call the new ScriptDebugListener callbacks where appropriate.
+
+        * inspector/JSJavaScriptCallFrame.cpp: Renamed from Source/WebCore/bindings/js/JSJavaScriptCallFrameCustom.cpp.
+        (Inspector::JSJavaScriptCallFrame::JSJavaScriptCallFrame):
+        (Inspector::JSJavaScriptCallFrame::finishCreation):
+        (Inspector::JSJavaScriptCallFrame::createPrototype):
+        (Inspector::JSJavaScriptCallFrame::destroy):
+        (Inspector::JSJavaScriptCallFrame::releaseImpl):
+        (Inspector::JSJavaScriptCallFrame::~JSJavaScriptCallFrame):
+        (Inspector::JSJavaScriptCallFrame::evaluate):
+        (Inspector::JSJavaScriptCallFrame::scopeType):
+        (Inspector::JSJavaScriptCallFrame::caller):
+        (Inspector::JSJavaScriptCallFrame::sourceID):
+        (Inspector::JSJavaScriptCallFrame::line):
+        (Inspector::JSJavaScriptCallFrame::column):
+        (Inspector::JSJavaScriptCallFrame::functionName):
+        (Inspector::JSJavaScriptCallFrame::scopeChain):
+        (Inspector::JSJavaScriptCallFrame::thisObject):
+        (Inspector::JSJavaScriptCallFrame::type):
+        (Inspector::toJS):
+        (Inspector::toJSJavaScriptCallFrame):
+        * inspector/JSJavaScriptCallFrame.h: Added.
+        (Inspector::JSJavaScriptCallFrame::createStructure):
+        (Inspector::JSJavaScriptCallFrame::create):
+        (Inspector::JSJavaScriptCallFrame::impl):
+        * inspector/JSJavaScriptCallFramePrototype.cpp: Added.
+        (Inspector::JSJavaScriptCallFramePrototype::finishCreation):
+        (Inspector::jsJavaScriptCallFramePrototypeFunctionEvaluate):
+        (Inspector::jsJavaScriptCallFramePrototypeFunctionScopeType):
+        (Inspector::jsJavaScriptCallFrameAttributeCaller):
+        (Inspector::jsJavaScriptCallFrameAttributeSourceID):
+        (Inspector::jsJavaScriptCallFrameAttributeLine):
+        (Inspector::jsJavaScriptCallFrameAttributeColumn):
+        (Inspector::jsJavaScriptCallFrameAttributeFunctionName):
+        (Inspector::jsJavaScriptCallFrameAttributeScopeChain):
+        (Inspector::jsJavaScriptCallFrameAttributeThisObject):
+        (Inspector::jsJavaScriptCallFrameAttributeType):
+        (Inspector::jsJavaScriptCallFrameConstantGLOBAL_SCOPE):
+        (Inspector::jsJavaScriptCallFrameConstantLOCAL_SCOPE):
+        (Inspector::jsJavaScriptCallFrameConstantWITH_SCOPE):
+        (Inspector::jsJavaScriptCallFrameConstantCLOSURE_SCOPE):
+        (Inspector::jsJavaScriptCallFrameConstantCATCH_SCOPE):
+        * inspector/JSJavaScriptCallFramePrototype.h: Added.
+        (Inspector::JSJavaScriptCallFramePrototype::create):
+        (Inspector::JSJavaScriptCallFramePrototype::createStructure):
+        (Inspector::JSJavaScriptCallFramePrototype::JSJavaScriptCallFramePrototype):
+        * inspector/JavaScriptCallFrame.cpp: Renamed from Source/WebCore/bindings/js/JavaScriptCallFrame.cpp.
+        (Inspector::JavaScriptCallFrame::caller):
+        * inspector/JavaScriptCallFrame.h: Renamed from Source/WebCore/bindings/js/JavaScriptCallFrame.h.
+        Port of JavaScriptCallFrame.idl to a set of native JS classes.
+
+2014-01-24  Mark Lam  <mark.lam@apple.com>
+
+        DebuggerCallFrame::evaluateWithCallFrame() should not execute a null executable.
+        <https://webkit.org/b/127600>
+
+        Reviewed by Oliver Hunt.
+
+        In DebuggerCallFrame::evaluateWithCallFrame(), if the script string that
+        is passed in is bad, it will fail to create an Executable i.e.
+        EvalExecutable::create() returns a null pointer. However,
+        DebuggerCallFrame::evaluateWithCallFrame() was just clearing the
+        exception and proceeded to execute the null pointer as an Executable.
+        A crash ensues.
+
+        Now, if an exception is detected while creating the Executable, we
+        abort instead.
+
+        * debugger/DebuggerCallFrame.cpp:
+        (JSC::DebuggerCallFrame::evaluateWithCallFrame):
+
+2014-01-24  Oliver Hunt  <oliver@apple.com>
+
+        Put functions need to take a base object and a this value, and perform type checks on |this|
+        https://bugs.webkit.org/show_bug.cgi?id=127594
+
+        Reviewed by Geoffrey Garen.
+
+        Change the signature for static setter functions, and update uses
+
+        * create_hash_table:
+        * runtime/Lookup.h:
+        (JSC::putEntry):
+        * runtime/PutPropertySlot.h:
+        * runtime/RegExpConstructor.cpp:
+        (JSC::setRegExpConstructorInput):
+        (JSC::setRegExpConstructorMultiline):
+
+2014-01-24  Oliver Hunt  <oliver@apple.com>
+
+        Generic JSObject::put should handle static properties in the classinfo hierarchy
+        https://bugs.webkit.org/show_bug.cgi?id=127523
+
+        Reviewed by Geoffrey Garen.
+
+        This patch makes JSObject::put correctly call static setters
+        defined by the ClassInfo.
+
+        To make this not clobber performance, the ClassInfo HashTable
+        now includes a flag to indicate that it contains setters. This
+        required updating the lut generator so that it tracked (and emitted)
+        this.
+
+        The rest of the change was making a number of the methods take
+        a VM rather than an ExecState*, so that Structure could set the
+        getter/setter flags during construction (if necessary).
+
+        This also means most objects do not need to perform a lookupPut
+        manually anymore, so most custom ::put's are no longer needed.
+        DOMWindow is the only exception as it has interesting security
+        related semantics.
+
+        * create_hash_table:
+        * interpreter/CallFrame.h:
+        (JSC::ExecState::arrayConstructorTable):
+        (JSC::ExecState::arrayPrototypeTable):
+        (JSC::ExecState::booleanPrototypeTable):
+        (JSC::ExecState::dataViewTable):
+        (JSC::ExecState::dateTable):
+        (JSC::ExecState::dateConstructorTable):
+        (JSC::ExecState::errorPrototypeTable):
+        (JSC::ExecState::globalObjectTable):
+        (JSC::ExecState::jsonTable):
+        (JSC::ExecState::numberConstructorTable):
+        (JSC::ExecState::numberPrototypeTable):
+        (JSC::ExecState::objectConstructorTable):
+        (JSC::ExecState::privateNamePrototypeTable):
+        (JSC::ExecState::regExpTable):
+        (JSC::ExecState::regExpConstructorTable):
+        (JSC::ExecState::regExpPrototypeTable):
+        (JSC::ExecState::stringConstructorTable):
+        (JSC::ExecState::promisePrototypeTable):
+        (JSC::ExecState::promiseConstructorTable):
+        * runtime/ArrayConstructor.cpp:
+        (JSC::ArrayConstructor::getOwnPropertySlot):
+        * runtime/ArrayPrototype.cpp:
+        (JSC::ArrayPrototype::getOwnPropertySlot):
+        * runtime/BooleanPrototype.cpp:
+        (JSC::BooleanPrototype::getOwnPropertySlot):
+        * runtime/ClassInfo.h:
+        (JSC::ClassInfo::propHashTable):
+        * runtime/DateConstructor.cpp:
+        (JSC::DateConstructor::getOwnPropertySlot):
+        * runtime/DatePrototype.cpp:
+        (JSC::DatePrototype::getOwnPropertySlot):
+        * runtime/ErrorPrototype.cpp:
+        (JSC::ErrorPrototype::getOwnPropertySlot):
+        * runtime/JSDataViewPrototype.cpp:
+        (JSC::JSDataViewPrototype::getOwnPropertySlot):
+        * runtime/JSGlobalObject.cpp:
+        (JSC::JSGlobalObject::getOwnPropertySlot):
+        * runtime/JSONObject.cpp:
+        (JSC::JSONObject::getOwnPropertySlot):
+        * runtime/JSObject.cpp:
+        (JSC::JSObject::put):
+        (JSC::JSObject::deleteProperty):
+        * runtime/JSPromiseConstructor.cpp:
+        (JSC::JSPromiseConstructor::getOwnPropertySlot):
+        * runtime/JSPromisePrototype.cpp:
+        (JSC::JSPromisePrototype::getOwnPropertySlot):
+        * runtime/Lookup.h:
+        (JSC::HashTable::copy):
+        (JSC::putEntry):
+        (JSC::lookupPut):
+        * runtime/NamePrototype.cpp:
+        (JSC::NamePrototype::getOwnPropertySlot):
+        * runtime/NumberConstructor.cpp:
+        (JSC::NumberConstructor::getOwnPropertySlot):
+        * runtime/NumberConstructor.h:
+        * runtime/NumberPrototype.cpp:
+        (JSC::NumberPrototype::getOwnPropertySlot):
+        * runtime/ObjectConstructor.cpp:
+        (JSC::ObjectConstructor::getOwnPropertySlot):
+        * runtime/RegExpConstructor.cpp:
+        (JSC::RegExpConstructor::getOwnPropertySlot):
+        * runtime/RegExpConstructor.h:
+        * runtime/RegExpObject.cpp:
+        (JSC::RegExpObject::getOwnPropertySlot):
+        (JSC::RegExpObject::put):
+        * runtime/RegExpPrototype.cpp:
+        (JSC::RegExpPrototype::getOwnPropertySlot):
+        * runtime/StringConstructor.cpp:
+        (JSC::StringConstructor::getOwnPropertySlot):
+        * runtime/Structure.cpp:
+        (JSC::Structure::Structure):
+        (JSC::Structure::freezeTransition):
+        (JSC::ClassInfo::hasStaticSetterOrReadonlyProperties):
+
+2014-01-24  Commit Queue  <commit-queue@webkit.org>
+
+        Unreviewed, rolling out r162713.
+        http://trac.webkit.org/changeset/162713
+        https://bugs.webkit.org/show_bug.cgi?id=127593
+
+        broke media/network-no-source-const-shadow (Requested by
+        thorton on #webkit).
+
+        * create_hash_table:
+        * interpreter/CallFrame.h:
+        (JSC::ExecState::arrayConstructorTable):
+        (JSC::ExecState::arrayPrototypeTable):
+        (JSC::ExecState::booleanPrototypeTable):
+        (JSC::ExecState::dataViewTable):
+        (JSC::ExecState::dateTable):
+        (JSC::ExecState::dateConstructorTable):
+        (JSC::ExecState::errorPrototypeTable):
+        (JSC::ExecState::globalObjectTable):
+        (JSC::ExecState::jsonTable):
+        (JSC::ExecState::numberConstructorTable):
+        (JSC::ExecState::numberPrototypeTable):
+        (JSC::ExecState::objectConstructorTable):
+        (JSC::ExecState::privateNamePrototypeTable):
+        (JSC::ExecState::regExpTable):
+        (JSC::ExecState::regExpConstructorTable):
+        (JSC::ExecState::regExpPrototypeTable):
+        (JSC::ExecState::stringConstructorTable):
+        (JSC::ExecState::promisePrototypeTable):
+        (JSC::ExecState::promiseConstructorTable):
+        * runtime/ArrayConstructor.cpp:
+        (JSC::ArrayConstructor::getOwnPropertySlot):
+        * runtime/ArrayPrototype.cpp:
+        (JSC::ArrayPrototype::getOwnPropertySlot):
+        * runtime/BooleanPrototype.cpp:
+        (JSC::BooleanPrototype::getOwnPropertySlot):
+        * runtime/ClassInfo.h:
+        (JSC::ClassInfo::propHashTable):
+        * runtime/DateConstructor.cpp:
+        (JSC::DateConstructor::getOwnPropertySlot):
+        * runtime/DatePrototype.cpp:
+        (JSC::DatePrototype::getOwnPropertySlot):
+        * runtime/ErrorPrototype.cpp:
+        (JSC::ErrorPrototype::getOwnPropertySlot):
+        * runtime/JSDataViewPrototype.cpp:
+        (JSC::JSDataViewPrototype::getOwnPropertySlot):
+        * runtime/JSGlobalObject.cpp:
+        (JSC::JSGlobalObject::getOwnPropertySlot):
+        * runtime/JSONObject.cpp:
+        (JSC::JSONObject::getOwnPropertySlot):
+        * runtime/JSObject.cpp:
+        (JSC::JSObject::put):
+        (JSC::JSObject::deleteProperty):
+        * runtime/JSPromiseConstructor.cpp:
+        (JSC::JSPromiseConstructor::getOwnPropertySlot):
+        * runtime/JSPromisePrototype.cpp:
+        (JSC::JSPromisePrototype::getOwnPropertySlot):
+        * runtime/Lookup.h:
+        (JSC::HashTable::copy):
+        (JSC::putEntry):
+        (JSC::lookupPut):
+        * runtime/NamePrototype.cpp:
+        (JSC::NamePrototype::getOwnPropertySlot):
+        * runtime/NumberConstructor.cpp:
+        (JSC::NumberConstructor::getOwnPropertySlot):
+        (JSC::NumberConstructor::put):
+        * runtime/NumberConstructor.h:
+        * runtime/NumberPrototype.cpp:
+        (JSC::NumberPrototype::getOwnPropertySlot):
+        * runtime/ObjectConstructor.cpp:
+        (JSC::ObjectConstructor::getOwnPropertySlot):
+        * runtime/RegExpConstructor.cpp:
+        (JSC::RegExpConstructor::getOwnPropertySlot):
+        (JSC::RegExpConstructor::put):
+        * runtime/RegExpConstructor.h:
+        * runtime/RegExpObject.cpp:
+        (JSC::RegExpObject::getOwnPropertySlot):
+        (JSC::RegExpObject::put):
+        * runtime/RegExpPrototype.cpp:
+        (JSC::RegExpPrototype::getOwnPropertySlot):
+        * runtime/StringConstructor.cpp:
+        (JSC::StringConstructor::getOwnPropertySlot):
+        * runtime/Structure.cpp:
+        (JSC::Structure::Structure):
+        (JSC::Structure::freezeTransition):
+
+2014-01-24  Mark Lam  <mark.lam@apple.com>
+
+        ASSERT(!m_markedSpace.m_currentDelayedReleaseScope) reloading page in inspector.
+        <https://webkit.org/b/127582>
+
+        Reviewed by Mark Hahnenberg.
+
+        1. We should not enter a HeapIterationScope when we iterate the CodeBlocks.
+           Apparently, iterating the CodeBlocks does not count as heap iteration.
+
+        2. If we're detaching the debugger due to the JSGlobalObject destructing,
+           then we don't need to clear the debugger requests in the associated
+           CodeBlocks. The JSGlobalObject destructing would mean that those
+           CodeBlocks would be destructing too, and it may not be safe to access
+           them anyway at this point.
+
+        The assertion failure is because we had entered a HeapIterationScope
+        while the JSGlobalObject is destructing, which in turn means that GC
+        sweeping is in progress. It's not legal to iterate the heap while the GC
+        is sweeping. Once we fixed the above 2 issues, we will no longer have
+        the conditions that manifests this assertion failure.
+
+        * debugger/Debugger.cpp:
+        (JSC::Debugger::detach):
+        (JSC::Debugger::setSteppingMode):
+        (JSC::Debugger::toggleBreakpoint):
+        (JSC::Debugger::clearBreakpoints):
+        (JSC::Debugger::clearDebuggerRequests):
+        * debugger/Debugger.h:
+        * runtime/JSGlobalObject.cpp:
+        (JSC::JSGlobalObject::~JSGlobalObject):
+
+2014-01-24  Brent Fulgham  <bfulgham@apple.com>
+
+        [Win] Convert some NMake files to MSBuild project files
+        https://bugs.webkit.org/show_bug.cgi?id=127579
+
+        Reviewed by Tim Horton.
+
+        * JavaScriptCore.vcxproj/JavaScriptCore.make: Removed.
+        * JavaScriptCore.vcxproj/JavaScriptCore.proj: Added.
+
+2014-01-24  Mark Lam  <mark.lam@apple.com>
+
+        Fixed a bad assertion in CodeBlock::removeBreakpoint().
+        <https://webkit.org/b/127581>
+
+        Reviewed by Joseph Pecoraro.
+
+        * bytecode/CodeBlock.h:
+        (JSC::CodeBlock::removeBreakpoint):
+
+2014-01-24  Joseph Pecoraro  <pecoraro@apple.com>
+
+        fast/profiler tests ASSERTing after moving recompileAllJSFunctions off a timer
+        https://bugs.webkit.org/show_bug.cgi?id=127566
+
+        Reviewed by Oliver Hunt.
+
+        Make the VM handle recompilation as soon as possible after it is requested.
+
+        * debugger/Debugger.cpp:
+        (JSC::Debugger::recompileAllJSFunctions):
+        When in a JavaScript stack, mark for recompilation when possible.
+
+        * runtime/VMEntryScope.h:
+        (JSC::VMEntryScope::setRecompilationNeeded):
+        * runtime/VMEntryScope.cpp:
+        (JSC::VMEntryScope::VMEntryScope):
+        (JSC::VMEntryScope::~VMEntryScope):
+        Handle recompilation when the top VMEntryScope is popped.
+        Pass the needs recompilation flag up the stack if needed.
+
+2014-01-24  Oliver Hunt  <oliver@apple.com>
+
+        Generic JSObject::put should handle static properties in the classinfo hierarchy
+        https://bugs.webkit.org/show_bug.cgi?id=127523
+
+        Reviewed by Geoffrey Garen.
+
+        This patch makes JSObject::put correctly call static setters
+        defined by the ClassInfo.
+
+        To make this not clobber performance, the ClassInfo HashTable
+        now includes a flag to indicate that it contains setters. This
+        required updating the lut generator so that it tracked (and emitted)
+        this.
+
+        The rest of the change was making a number of the methods take
+        a VM rather than an ExecState*, so that Structure could set the
+        getter/setter flags during construction (if necessary).
+
+        This also means most objects do not need to perform a lookupPut
+        manually anymore, so most custom ::put's are no longer needed.
+        DOMWindow is the only exception as it has interesting security
+        related semantics.
+
+        * create_hash_table:
+        * interpreter/CallFrame.h:
+        (JSC::ExecState::arrayConstructorTable):
+        (JSC::ExecState::arrayPrototypeTable):
+        (JSC::ExecState::booleanPrototypeTable):
+        (JSC::ExecState::dataViewTable):
+        (JSC::ExecState::dateTable):
+        (JSC::ExecState::dateConstructorTable):
+        (JSC::ExecState::errorPrototypeTable):
+        (JSC::ExecState::globalObjectTable):
+        (JSC::ExecState::jsonTable):
+        (JSC::ExecState::numberConstructorTable):
+        (JSC::ExecState::numberPrototypeTable):
+        (JSC::ExecState::objectConstructorTable):
+        (JSC::ExecState::privateNamePrototypeTable):
+        (JSC::ExecState::regExpTable):
+        (JSC::ExecState::regExpConstructorTable):
+        (JSC::ExecState::regExpPrototypeTable):
+        (JSC::ExecState::stringConstructorTable):
+        (JSC::ExecState::promisePrototypeTable):
+        (JSC::ExecState::promiseConstructorTable):
+        * runtime/ArrayConstructor.cpp:
+        (JSC::ArrayConstructor::getOwnPropertySlot):
+        * runtime/ArrayPrototype.cpp:
+        (JSC::ArrayPrototype::getOwnPropertySlot):
+        * runtime/BooleanPrototype.cpp:
+        (JSC::BooleanPrototype::getOwnPropertySlot):
+        * runtime/ClassInfo.h:
+        (JSC::ClassInfo::propHashTable):
+        * runtime/DateConstructor.cpp:
+        (JSC::DateConstructor::getOwnPropertySlot):
+        * runtime/DatePrototype.cpp:
+        (JSC::DatePrototype::getOwnPropertySlot):
+        * runtime/ErrorPrototype.cpp:
+        (JSC::ErrorPrototype::getOwnPropertySlot):
+        * runtime/JSDataViewPrototype.cpp:
+        (JSC::JSDataViewPrototype::getOwnPropertySlot):
+        * runtime/JSGlobalObject.cpp:
+        (JSC::JSGlobalObject::getOwnPropertySlot):
+        * runtime/JSONObject.cpp:
+        (JSC::JSONObject::getOwnPropertySlot):
+        * runtime/JSObject.cpp:
+        (JSC::JSObject::put):
+        (JSC::JSObject::deleteProperty):
+        * runtime/JSPromiseConstructor.cpp:
+        (JSC::JSPromiseConstructor::getOwnPropertySlot):
+        * runtime/JSPromisePrototype.cpp:
+        (JSC::JSPromisePrototype::getOwnPropertySlot):
+        * runtime/Lookup.h:
+        (JSC::HashTable::copy):
+        (JSC::putEntry):
+        (JSC::lookupPut):
+        * runtime/NamePrototype.cpp:
+        (JSC::NamePrototype::getOwnPropertySlot):
+        * runtime/NumberConstructor.cpp:
+        (JSC::NumberConstructor::getOwnPropertySlot):
+        * runtime/NumberConstructor.h:
+        * runtime/NumberPrototype.cpp:
+        (JSC::NumberPrototype::getOwnPropertySlot):
+        * runtime/ObjectConstructor.cpp:
+        (JSC::ObjectConstructor::getOwnPropertySlot):
+        * runtime/RegExpConstructor.cpp:
+        (JSC::RegExpConstructor::getOwnPropertySlot):
+        * runtime/RegExpConstructor.h:
+        * runtime/RegExpObject.cpp:
+        (JSC::RegExpObject::getOwnPropertySlot):
+        (JSC::RegExpObject::put):
+        * runtime/RegExpPrototype.cpp:
+        (JSC::RegExpPrototype::getOwnPropertySlot):
+        * runtime/StringConstructor.cpp:
+        (JSC::StringConstructor::getOwnPropertySlot):
+        * runtime/Structure.cpp:
+        (JSC::Structure::Structure):
+        (JSC::Structure::freezeTransition):
+        (JSC::ClassInfo::hasStaticSetterOrReadonlyProperties):
+
+2014-01-24  Mark Lam  <mark.lam@apple.com>
+
+        Skip op_profiler callbacks if !VM::m_enabledProfiler.
+        https://bugs.webkit.org/show_bug.cgi?id=127567.
+
+        Reviewed by Geoffrey Garen.
+
+        The profiler may not be always active (recording). When it's not active
+        (as in VM::m_enabledProfiler is null), then we might as well skip the
+        op_profiler callbacks. The callbacks themselves were already previously
+        gated by a VM::enabledProfiler() check. So, this change does not change
+        any profiler behavior.
+
+        For the DFG, we'll turn the op_profiler handling into speculation checks
+        and OSR exit to the baseline JIT if the profiler becomes active.
+
+        This brings the Octane score up to ~3000 from ~2840.
+
+        * dfg/DFGAbstractInterpreterInlines.h:
+        (JSC::DFG::AbstractInterpreter<AbstractStateType>::executeEffects):
+        * dfg/DFGByteCodeParser.cpp:
+        (JSC::DFG::ByteCodeParser::parseBlock):
+        * dfg/DFGClobberize.h:
+        (JSC::DFG::clobberize):
+        * dfg/DFGNodeType.h:
+        * dfg/DFGSpeculativeJIT32_64.cpp:
+        (JSC::DFG::SpeculativeJIT::compile):
+        * dfg/DFGSpeculativeJIT64.cpp:
+        (JSC::DFG::SpeculativeJIT::compile):
+        * jit/JITOpcodes.cpp:
+        (JSC::JIT::emit_op_profile_will_call):
+        (JSC::JIT::emit_op_profile_did_call):
+        * jit/JITOpcodes32_64.cpp:
+        (JSC::JIT::emit_op_profile_will_call):
+        (JSC::JIT::emit_op_profile_did_call):
+        * llint/LowLevelInterpreter.asm:
+        * runtime/VM.h:
+        (JSC::VM::enabledProfilerAddress):
+
+2014-01-24  Mark Lam  <mark.lam@apple.com>
+
+        Removing the need for Debugger* and m_shouldPause op_debug check.
+        <https://webkit.org/b/127532>
+
+        Reviewed by Geoffrey Garen.
+
+        This patch replaces the checking of the Debugger::m_shouldPause flag
+        with a procedure to set a SteppingMode flag on all CodeBlocks under
+        the management of the debugger. This simplifies the op_debug checking
+        logic in all the execution engines.
+
+        * bytecode/CodeBlock.cpp:
+        * bytecode/CodeBlock.h:
+        (JSC::CodeBlock::hasDebuggerRequests):
+        (JSC::CodeBlock::debuggerRequestsAddress):
+        (JSC::CodeBlock::setSteppingMode):
+        (JSC::CodeBlock::clearDebuggerRequests):
+        - CodeBlock::m_debuggerRequests is a union of m_numBreakpoints and the
+          new m_steppingMode. The debugger can add/remove breakpoints to the
+          CodeBlock as well as set the stepping mode. By having
+          m_debuggerRequests as a union of the 2 bit fields, the op_debug code
+          can now check if any of the 2 requests made on the CodeBlock is still
+          in effect just by testing a single int.
+
+        * debugger/Debugger.cpp:
+        (JSC::Debugger::Debugger):
+        (JSC::Debugger::detach):
+        - This was bug from before where I forgot to clear the CodeBlock
+          breakpoints before detaching. We now take care of it by clearing all
+          debugger requests made to the CodeBlock.
+
+        (JSC::Debugger::SetSteppingModeFunctor::SetSteppingModeFunctor):
+        (JSC::Debugger::SetSteppingModeFunctor::operator()):
+        (JSC::Debugger::setSteppingMode):
+        (JSC::Debugger::ClearCodeBlockDebuggerRequestsFunctor::ClearCodeBlockDebuggerRequestsFunctor):
+        (JSC::Debugger::ClearCodeBlockDebuggerRequestsFunctor::operator()):
+        (JSC::Debugger::clearBreakpoints):
+
+        (JSC::Debugger::ClearDebuggerRequestsFunctor::ClearDebuggerRequestsFunctor):
+        (JSC::Debugger::ClearDebuggerRequestsFunctor::operator()):
+        (JSC::Debugger::clearDebuggerRequests):
+        - We need a distinct clearDebuggerRequests() from clearBreakpoints()
+          because:
+          1. When we detach a globalObject, we only want to clear the debugger
+             requests in CodeBlocks from that global.
+          2. Clearing the debugger requests in the CodeBlocks is not the same
+             as clearing the breakpoints. The breakpoints are still in effect
+             for the next time a globalObject is attached, or for other
+             globalObjects that are still attached.
+
+        (JSC::Debugger::setPauseOnNextStatement):
+        (JSC::Debugger::breakProgram):
+        (JSC::Debugger::stepIntoStatement):
+        (JSC::Debugger::updateCallFrameAndPauseIfNeeded):
+        (JSC::Debugger::pauseIfNeeded):
+        (JSC::Debugger::exception):
+        (JSC::Debugger::willExecuteProgram):
+        (JSC::Debugger::didReachBreakpoint):
+        * debugger/Debugger.h:
+        - We're always going to support the debugger. So, there's no longer
+          a need to check ENABLE(JAVASCRIPT_DEBUGGER). Removed the unneeded code.
+
+        * dfg/DFGSpeculativeJIT32_64.cpp:
+        (JSC::DFG::SpeculativeJIT::compile):
+        * dfg/DFGSpeculativeJIT64.cpp:
+        (JSC::DFG::SpeculativeJIT::compile):
+        * interpreter/Interpreter.cpp:
+        (JSC::Interpreter::debug):
+        * jit/JITOpcodes.cpp:
+        (JSC::JIT::emit_op_debug):
+        * jit/JITOpcodes32_64.cpp:
+        (JSC::JIT::emit_op_debug):
+        * llint/LowLevelInterpreter.asm:
+        * runtime/JSGlobalObject.h:
+        (JSC::JSGlobalObject::setDebugger):
+
+2014-01-24  Michael Saboff  <msaboff@apple.com>
+
+        ARM Offline assembler temporary register allocator has duplicate register when building fat binaries
+        https://bugs.webkit.org/show_bug.cgi?id=127545
+
+        Reviewed by Mark Lam.
+
+        Eliminate the conditional addition of r11/r7 from getModifiedListARMCommon as the
+        .concat will add the new register to ARM_EXTRA_GPRS.  If getModifiedListARMCommon is
+        invoked a second time, there will be a second r11 or r7, which messes things up.
+        Instead, r6 was added to ARM_EXTRA_GPRS.  r6 is currently an unused register.
+
+        * offlineasm/arm.rb:
+
+2014-01-23  Joseph Pecoraro  <pecoraro@apple.com>
+
+        Move ContentSearchUtils, ScriptBreakpoint, and ScriptDebugListener into JavaScriptCore for inspector
+        https://bugs.webkit.org/show_bug.cgi?id=127537
+
+        Reviewed by Timothy Hatcher.
+
+        * CMakeLists.txt:
+        * GNUmakefile.list.am:
+        * JavaScriptCore.vcxproj/JavaScriptCore.vcxproj:
+        * JavaScriptCore.vcxproj/JavaScriptCore.vcxproj.filters:
+        * JavaScriptCore.xcodeproj/project.pbxproj:
+        * inspector/ContentSearchUtilities.cpp: Renamed from Source/WebCore/inspector/ContentSearchUtils.cpp.
+        (Inspector::ContentSearchUtilities::createSearchRegexSource):
+        (Inspector::ContentSearchUtilities::sizetExtractor):
+        (Inspector::ContentSearchUtilities::textPositionFromOffset):
+        (Inspector::ContentSearchUtilities::getRegularExpressionMatchesByLines):
+        (Inspector::ContentSearchUtilities::lineEndings):
+        (Inspector::ContentSearchUtilities::buildObjectForSearchMatch):
+        (Inspector::ContentSearchUtilities::createSearchRegex):
+        (Inspector::ContentSearchUtilities::countRegularExpressionMatches):
+        (Inspector::ContentSearchUtilities::searchInTextByLines):
+        (Inspector::ContentSearchUtilities::scriptCommentPattern):
+        (Inspector::ContentSearchUtilities::stylesheetCommentPattern):
+        (Inspector::ContentSearchUtilities::findMagicComment):
+        (Inspector::ContentSearchUtilities::findScriptSourceURL):
+        (Inspector::ContentSearchUtilities::findScriptSourceMapURL):
+        (Inspector::ContentSearchUtilities::findStylesheetSourceMapURL):
+        * inspector/ContentSearchUtilities.h: Renamed from Source/WebCore/inspector/ContentSearchUtils.h.
+        * inspector/ScriptBreakpoint.h: Renamed from Source/WebCore/inspector/ScriptBreakpoint.h.
+        (Inspector::ScriptBreakpointAction::ScriptBreakpointAction):
+        (Inspector::ScriptBreakpoint::ScriptBreakpoint):
+        * inspector/ScriptDebugListener.h: Renamed from Source/WebCore/inspector/ScriptDebugListener.h.
+        (Inspector::ScriptDebugListener::Script::Script):
+        (Inspector::ScriptDebugListener::~ScriptDebugListener):
+        * runtime/RegExp.cpp:
+        (JSC::RegExp::match):
+
+2014-01-23  Joseph Pecoraro  <pecoraro@apple.com>
+
+        Move RegularExpression into JavaScriptCore for inspector
+        https://bugs.webkit.org/show_bug.cgi?id=127526
+
+        Reviewed by Geoffrey Garen.
+
+        Move RegularExpression into JavaScriptCore/yarr so it can
+        be used later on by JavaScriptCore/inspector. Convert to
+        the JSC::Yarr namespace.
+
+        * CMakeLists.txt:
+        * GNUmakefile.list.am:
+        * JavaScriptCore.vcxproj/JavaScriptCore.vcxproj:
+        * JavaScriptCore.vcxproj/JavaScriptCore.vcxproj.filters:
+        * JavaScriptCore.xcodeproj/project.pbxproj:
+        * yarr/RegularExpression.cpp: Renamed from Source/WebCore/platform/text/RegularExpression.cpp.
+        (JSC::Yarr::RegularExpression::Private::create):
+        (JSC::Yarr::RegularExpression::Private::Private):
+        (JSC::Yarr::RegularExpression::Private::compile):
+        (JSC::Yarr::RegularExpression::RegularExpression):
+        (JSC::Yarr::RegularExpression::~RegularExpression):
+        (JSC::Yarr::RegularExpression::operator=):
+        (JSC::Yarr::RegularExpression::match):
+        (JSC::Yarr::RegularExpression::searchRev):
+        (JSC::Yarr::RegularExpression::matchedLength):
+        (JSC::Yarr::replace):
+        (JSC::Yarr::RegularExpression::isValid):
+        * yarr/RegularExpression.h: Renamed from Source/WebCore/platform/text/RegularExpression.h.
+
+2014-01-23  Joseph Pecoraro  <pecoraro@apple.com>
+
+        Web Inspector: Remove recompileAllJSFunctions timer in ScriptDebugServer
+        https://bugs.webkit.org/show_bug.cgi?id=127409
+
+        Reviewed by Geoffrey Garen.
+
+        * inspector/InspectorAgentBase.h:
+        When disconnecting agents, provide a InspectorDisconnectReason for
+        the disconnection. It could be that an inspector frontend is just
+        disconnecting or that the inspected object is going away entirely
+        and we can avoid doing some work.
+
+        * runtime/JSGlobalObjectDebuggable.h:
+        * runtime/JSGlobalObjectDebuggable.cpp:
+        (JSC::JSGlobalObjectDebuggable::~JSGlobalObjectDebuggable):
+        (JSC::JSGlobalObjectDebuggable::disconnect):
+        (JSC::JSGlobalObjectDebuggable::disconnectInternal):
+        Pass different reasons for the different disconnects.
+
+        * inspector/InspectorAgentRegistry.cpp:
+        (Inspector::InspectorAgentRegistry::willDestroyFrontendAndBackend):
+        * inspector/InspectorAgentRegistry.h:
+        * inspector/JSGlobalObjectInspectorController.cpp:
+        (Inspector::JSGlobalObjectInspectorController::disconnectFrontend):
+        * inspector/JSGlobalObjectInspectorController.h:
+        * inspector/agents/InspectorAgent.cpp:
+        (Inspector::InspectorAgent::willDestroyFrontendAndBackend):
+        * inspector/agents/InspectorAgent.h:
+        Pass InspectorDisconnectReason around where needed.
+
+2014-01-23  Mark Lam  <mark.lam@apple.com>
+
+        Enable DFG for the Debugger and Profiler.
+        <https://webkit.org/b/122847>
+
+        Reviewed by Geoffrey Garen.
+
+        In this patch, we implement DFG op_debug as a series of 3 checks:
+        1. Check if the debugger pointer is non-null. This is needed in case
+           the debugger has been detached but the DFG code is still running
+           on the stack.
+        2. Check if Debugger::m_shouldPause is true.
+        3. Check if CodeBlock::m_numBreakpoints is non-zero.
+
+        These are the same 3 checks done in the LLINT and baselineJIT. But unlike
+        the LLINT and baselineJIT, these DFG checks are implemented as
+        speculationChecks. If the check fails, we OSR exit to the baselineJIT and
+        let it do the work of servicing the op_debug callback.
+
+        Stepping through code in the debugger would work the same way. The top
+        function being debugged has to be a LLINT or baselineJIT function because
+        we would have OSR exited if there is a breakpoint in that function. When
+        we step out of that function to its caller, we expect that the caller will
+        call back to the debugger at the next op_debug. If the caller function is
+        a DFG function, the op_debug site will fail its speculation check on
+        Debugger::m_shouldPause and deopt into a baselineJIT function. Execution
+        continues from there as usual, and the debugger gets its callback.
+
+        For the profile, op_profile_will_call and op_profile_did_call are
+        implemented as simple runtime calls to service the profiler.
+
+        With this patch, Octane performance with the WebInspector open jump from
+        ~2000 to ~2500 (25% progression).
+
+        * bytecode/CodeBlock.h:
+        (JSC::CodeBlock::numBreakpointsAddress):
+        * bytecode/ExitKind.cpp:
+        (JSC::exitKindToString):
+        * bytecode/ExitKind.h:
+        * debugger/Debugger.cpp:
+        (JSC::Debugger::toggleBreakpoint):
+        - removed an obsolete assertion. The debugger can now handle DFG
+          CodeBlocks too.
+        * debugger/Debugger.h:
+        * dfg/DFGAbstractInterpreterInlines.h:
+        (JSC::DFG::AbstractInterpreter<AbstractStateType>::executeEffects):
+        * dfg/DFGByteCodeParser.cpp:
+        (JSC::DFG::ByteCodeParser::parseBlock):
+        * dfg/DFGCapabilities.cpp:
+        (JSC::DFG::capabilityLevel):
+        * dfg/DFGClobberize.h:
+        (JSC::DFG::clobberize):
+        * dfg/DFGFixupPhase.cpp:
+        (JSC::DFG::FixupPhase::fixupNode):
+        * dfg/DFGNodeType.h:
+        * dfg/DFGPredictionPropagationPhase.cpp:
+        (JSC::DFG::PredictionPropagationPhase::propagate):
+        * dfg/DFGSafeToExecute.h:
+        (JSC::DFG::safeToExecute):
+        * dfg/DFGSpeculativeJIT.h:
+        (JSC::DFG::SpeculativeJIT::callOperation):
+        * dfg/DFGSpeculativeJIT32_64.cpp:
+        (JSC::DFG::SpeculativeJIT::compile):
+        * dfg/DFGSpeculativeJIT64.cpp:
+        (JSC::DFG::SpeculativeJIT::compile):
+        * runtime/JSGlobalObject.h:
+        (JSC::JSGlobalObject::debuggerAddress):
+
+2014-01-23  Max Vujovic  <mvujovic@adobe.com>
+
+        Remove CSS Custom Filters code and tests
+        https://bugs.webkit.org/show_bug.cgi?id=127382
+
+        Reviewed by Simon Fraser.
+
+        * Configurations/FeatureDefines.xcconfig:
+
+2014-01-22  Brent Fulgham  <bfulgham@apple.com>
+
+        [Win] Update project and solution files for 64-bit builds.
+        https://bugs.webkit.org/show_bug.cgi?id=127457
+
+        Reviewed by Eric Carlson.
+
+        * JavaScriptCore.vcxproj/JavaScriptCore.submit.sln: Add 64-bit target.
+        * JavaScriptCore.vcxproj/JavaScriptCore.vcxproj: Update for VS2013
+        * JavaScriptCore.vcxproj/JavaScriptCore.vcxproj.filters: Add missing
+        file from project view.
+        * JavaScriptCore.vcxproj/jsc/jsc.vcxproj: Update for VS2013
+        * JavaScriptCore.vcxproj/testRegExp/testRegExp.vcxproj: Ditto
+        * JavaScriptCore.vcxproj/testapi/testapi.vcxproj: Ditto
+
+2014-01-22  Mark Lam  <mark.lam@apple.com>
+
+        Poor man's fast breakpoints for a 2.3x debugger speedup.
+        <https://webkit.org/b/122836>
+
+        Reviewed by Geoffrey Garen.
+
+        Previously we gained back some performance (run at baseline JIT speeds)
+        when the WebInspector is opened provided no breakpoints are set. This
+        was achieved by simply skipping all op_debug callbacks to the debugger
+        if no breakpoints are set. If any breakpoints are set, the debugger will
+        set a m_needsOpDebugCallbacks flag which causes the callbacks to be
+        called, and we don't get the baseline JIT speeds anymore.
+
+        With this patch, we will now track the number of breakpoints set in the
+        CodeBlock that they are set in. The LLINT and baseline JIT code will
+        check CodeBlock::m_numBreakpoints to determine if the op_debug callbacks
+        need to be called. With this, we will only enable op_debug callbacks for
+        CodeBlocks that need it i.e. those with breakpoints set in them.
+
+        Debugger::m_needsOpDebugCallbacks is now obsoleted. The LLINT and baseline
+        JIT code still needs to check Debugger::m_shouldPause to determine if the
+        debugger is in stepping mode and hence, needs op_debug callbacks enabled
+        for everything until the debugger "continues" the run and exit stepping
+        mode.
+
+        Also in this patch, I fixed a regression in DOM breakpoints which relies
+        Debugger::breakProgram() to pause the debugger.
+
+        * bytecode/CodeBlock.cpp:
+        (JSC::CodeBlock::dumpBytecode):
+        - Missed accounting for op_debug's new hasBreakpointFlag operand here when
+          it was added.
+        (JSC::CodeBlock::CodeBlock):
+        (JSC::CodeBlock::hasOpDebugForLineAndColumn):
+        - This is needed in Debugger::toggleBreakpoint() to determine if a
+          breakpoint falls within a CodeBlock or not. Simply checking the bounds
+          of the CodeBlock is insufficient. For example, let's say we have the
+          following JS code:
+
+              // begin global scope
+              function f1() {
+                  function f2() {
+                     ... // set breakpoint here.
+                  }
+              }
+              // end global scope
+
+          Using the CodeBlock bounds alone, the breakpoint above will to appear
+          to be in the global program CodeBlock, and the CodeBlocks for function
+          f1() and f2(). With CodeBlock::hasOpDebugForLineAndColumn() we can
+          rule out the global program CodeBlock and f1(), and only apply the
+          breakpoint to f2(0 where it belongs.
+
+          CodeBlock::hasOpDebugForLineAndColumn() works by iterating over all
+          the opcodes in the CodeBlock to look for op_debug's. For each op_debug,
+          it calls CodeBlock::expressionRangeForBytecodeOffset() to do a binary
+          seach to get the line and column info for that op_debug. This is a
+          N * log(N) algorithm. However, a quick hands on test using the
+          WebInspector (with this patch applied) to exercise setting, breaking
+          on, and clearing breakpoints, as well as stepping through some code
+          shows no noticeable degradation of the user experience compared to the
+          baseline without this patch.
+
+        * bytecode/CodeBlock.h:
+        (JSC::CodeBlock::numBreakpoints):
+        (JSC::CodeBlock::numBreakpointsOffset):
+        (JSC::CodeBlock::addBreakpoint):
+        (JSC::CodeBlock::removeBreakpoint):
+        (JSC::CodeBlock::clearAllBreakpoints):
+        * debugger/Breakpoint.h:
+        - defined Breakpoint::unspecifiedColumn so that we can explicitly indicate
+          when the WebInspector was setting a line breakpoint and did not provide
+          a column value. CodeBlock::hasOpDebugForLineAndColumn() needs this
+          information in order to loosen its matching criteria for op_debug
+          bytecodes for the specified breakpoint line and column values provided
+          by the debugger.
+
+          Previously, we just hijack a 0 value column as an unspecified column.
+          However, the WebInspector operates on 0-based ints for column values.
+          Hence, 0 should be a valid column value and should not be hijacked to
+          mean an unspecified column.
+
+        * debugger/Debugger.cpp:
+        (JSC::Debugger::Debugger):
+        - added tracking of the VM that the debugger is used with. This is
+          needed by Debugger::breakProgram().
+
+          The VM pointer is attained from the first JSGlobalObject that the debugger
+          attaches to. When the debugger detaches from the last JSGlobalObject, it
+          will nullify its VM pointer to allow a new one to be set on the next
+          attach.
+
+          We were always only using each debugger instance with one VM. This change
+          makes it explicit with an assert to ensure that all globalObjects that
+          the debugger attaches to beongs to the same VM.
+
+        (JSC::Debugger::attach):
+        (JSC::Debugger::detach):
+        (JSC::Debugger::setShouldPause):
+
+        (JSC::Debugger::registerCodeBlock):
+        (JSC::Debugger::unregisterCodeBlock):
+        - registerCodeBlock() is responsible for applying pre-existing breakpoints
+          to new CodeBlocks being installed. Similarly, unregisterCodeBlock()
+          clears the breakpoints.
+
+        (JSC::Debugger::toggleBreakpoint):
+        - This is the workhorse function that checks if a breakpoint falls within
+          a CodeBlock or not. If it does, then it can either enable or disable
+          said breakpoint in the CodeBlock. In the current implementation,
+          enabling/disabling the breakpoint simply means incrementing/decrementing
+          the CodeBlock's m_numBreakpoints.
+
+        (JSC::Debugger::applyBreakpoints):
+
+        (JSC::Debugger::ToggleBreakpointFunctor::ToggleBreakpointFunctor):
+        (JSC::Debugger::ToggleBreakpointFunctor::operator()):
+        (JSC::Debugger::toggleBreakpoint):
+        - Iterates all relevant CodeBlocks and apply the specified breakpoint
+          if appropriate. This is called when a new breakpoint is being defined
+          by the WebInspector and needs to be applied to an already installed
+          CodeBlock.
+
+        (JSC::Debugger::setBreakpoint):
+        (JSC::Debugger::removeBreakpoint):
+        (JSC::Debugger::hasBreakpoint):
+        (JSC::Debugger::ClearBreakpointsFunctor::ClearBreakpointsFunctor):
+        (JSC::Debugger::ClearBreakpointsFunctor::operator()):
+        (JSC::Debugger::clearBreakpoints):
+
+        (JSC::Debugger::breakProgram):
+        - Fixed a regression that broke DOM breakpoints. The issue is that with
+          the skipping of op_debug callbacks, we don't always have an updated
+          m_currentCallFrame. Normally, m_currentCallFrame is provided as arg
+          in the op_debug callback. In this case, we can get the CallFrame* from
+          m_vm->topCallFrame.
+
+        (JSC::Debugger::updateCallFrameAndPauseIfNeeded):
+        (JSC::Debugger::pauseIfNeeded):
+        (JSC::Debugger::willExecuteProgram):
+        * debugger/Debugger.h:
+        (JSC::Debugger::Debugger):
+        (JSC::Debugger::shouldPause):
+
+        * heap/CodeBlockSet.h:
+        (JSC::CodeBlockSet::iterate):
+        * heap/Heap.h:
+        (JSC::Heap::forEachCodeBlock):
+        - Added utility to iterate all CodeBlocks in the heap / VM.
+
+        * interpreter/Interpreter.cpp:
+        (JSC::Interpreter::debug):
+
+        * jit/JITOpcodes.cpp:
+        (JSC::JIT::emit_op_debug):
+        * jit/JITOpcodes32_64.cpp:
+        (JSC::JIT::emit_op_debug):
+        * llint/LowLevelInterpreter.asm:
+        - These now checks CodeBlock::m_numBreakpoints and Debugger::m_shouldPause
+          instead of Debugger::m_needsOpDebugCallbacks.
+
+        * runtime/Executable.cpp:
+        (JSC::ScriptExecutable::installCode):
+
+2014-01-22  Myles C. Maxfield  <mmaxfield@apple.com>
+
+        Remove CSS3_TEXT_DECORATION define
+        https://bugs.webkit.org/show_bug.cgi?id=127333
+
+        This is required for unprefixing the text-decoration-* CSS properties.
+
+        Reviewed by Simon Fraser.
+
+        * Configurations/FeatureDefines.xcconfig:
+
+2014-01-22  Alexey Proskuryakov  <ap@apple.com>
+
+        Update JS whitespace definition for changes in Unicode 6.3
+        https://bugs.webkit.org/show_bug.cgi?id=127450
+        <rdar://15863457>
+
+        Reviewed by Oliver Hunt.
+
+        Covered by existing tests when running against a Unicode back-end that supports
+        Unicode 6.3 or higher.
+
+        * runtime/JSGlobalObjectFunctions.cpp: (JSC::isStrWhiteSpace): Explicitly allow
+        U+180E MONGOLIAN VOWEL SEPARATOR, because we need to keep recognizing all characters
+        that used to be whitespace.
+
+2014-01-21  Mark Hahnenberg  <mhahnenberg@apple.com>
+
+        Registers used in writeBarrierOnOperand can cause clobbering on some platforms
+        https://bugs.webkit.org/show_bug.cgi?id=127357
+
+        Reviewed by Filip Pizlo.
+
+        Some platforms use t0 and t1 for their first two arguments, so using those to load the 
+        cell for the write barrier is a bad idea because it will get clobbered.
+
+        * llint/LowLevelInterpreter32_64.asm:
+        * llint/LowLevelInterpreter64.asm:
+
+2014-01-21  Mark Rowe  <mrowe@apple.com>
+
+        Mac production build fix.
+
+        Move the shell script build phase to copy jsc into JavaScriptCore.framework
+        out of the jsc target and in to the All target so that it's not run during
+        production builds. Xcode appears to the parent directories of paths referenced
+        in the Output Files of the build phase, which leads to problems when the
+        SYMROOT for the JavaScriptCore framework and the jsc executables are later merged.
+
+        I've also fixed the path to the Resources folder in the script while I'm here.
+        On iOS the framework bundle is shallow so the correct destination is Resources/
+        rather than Versions/A/Resources. This is handled by tweaking the
+        JAVASCRIPTCORE_RESOURCES_DIR configuration setting to be relative rather than
+        a complete path so we can reuse it in the script. The references in JSC.xcconfig
+        and ToolExecutable.xcconfig are updated to prepend JAVASCRIPTCORE_FRAMEWORKS_DIR
+        to preserve their former values.
+
+        * Configurations/Base.xcconfig:
+        * Configurations/JSC.xcconfig:
+        * Configurations/ToolExecutable.xcconfig:
+        * JavaScriptCore.xcodeproj/project.pbxproj:
+
+2014-01-19  Andreas Kling  <akling@apple.com>
+
+        JSC Parser: Shrink BindingNode.
+        <https://webkit.org/b/127253>
+
+        The "divot" and "end" source locations are always identical for
+        BindingNodes, so store only "start" and "end" instead.
+
+        1.19 MB progression on Membuster3.
+
+        Reviewed by Geoff Garen.
+
+        * bytecompiler/NodesCodegen.cpp:
+        (JSC::BindingNode::bindValue):
+        * parser/ASTBuilder.h:
+        (JSC::ASTBuilder::createBindingLocation):
+        * parser/NodeConstructors.h:
+        (JSC::BindingNode::create):
+        (JSC::BindingNode::BindingNode):
+        * parser/Nodes.h:
+        (JSC::BindingNode::divotStart):
+        (JSC::BindingNode::divotEnd):
+        * parser/Parser.cpp:
+        (JSC::Parser<LexerType>::createBindingPattern):
+        * parser/SyntaxChecker.h:
+        (JSC::SyntaxChecker::operatorStackPop):
+
+2014-01-20  Filip Pizlo  <fpizlo@apple.com>
+
+        op_captured_mov and op_new_captured_func in UnlinkedCodeBlocks should use the IdentifierMap instead of the strings directly
+        https://bugs.webkit.org/show_bug.cgi?id=127311
+        <rdar://problem/15853958>
+
+        Reviewed by Andreas Kling.
+        
+        This makes UnlinkedCodeBlocks use 32-bit instruction streams again.
+
+        * bytecode/CodeBlock.cpp:
+        (JSC::CodeBlock::CodeBlock):
+        * bytecode/UnlinkedCodeBlock.h:
+        (JSC::UnlinkedInstruction::UnlinkedInstruction):
+        * bytecompiler/BytecodeGenerator.cpp:
+        (JSC::BytecodeGenerator::addVar):
+        (JSC::BytecodeGenerator::emitInitLazyRegister):
+        (JSC::BytecodeGenerator::createArgumentsIfNecessary):
+        * bytecompiler/BytecodeGenerator.h:
+        (JSC::BytecodeGenerator::watchableVariable):
+        (JSC::BytecodeGenerator::hasWatchableVariable):
+
+2014-01-20  Mark Lam  <mark.lam@apple.com>
+
+        Removing CodeBlock::opDebugBytecodeOffsetForLineAndColumn() and friends.
+        <https://webkit.org/b/127321>
+
+        Reviewed by Geoffrey Garen.
+
+        We're changing plans and will be going with CodeBlock level breakpoints
+        instead of bytecode level breakpoints. As a result, we no longer need
+        the services of CodeBlock::opDebugBytecodeOffsetForLineAndColumn() (and
+        friends). This patch will remove that unused code.
+
+        * GNUmakefile.list.am:
+        * JavaScriptCore.vcxproj/JavaScriptCore.vcxproj:
+        * JavaScriptCore.vcxproj/JavaScriptCore.vcxproj.filters:
+        * JavaScriptCore.xcodeproj/project.pbxproj:
+        * bytecode/CodeBlock.cpp:
+        * bytecode/CodeBlock.h:
+        * bytecode/LineColumnInfo.h: Removed.
+        * bytecode/UnlinkedCodeBlock.cpp:
+        (JSC::UnlinkedCodeBlock::dumpExpressionRangeInfo):
+        * bytecode/UnlinkedCodeBlock.h:
+
+2014-01-20  Mark Hahnenberg  <mhahnenberg@apple.com>
+
+        CodeBlockSet::traceMarked doesn't need to visit the ownerExecutable
+        https://bugs.webkit.org/show_bug.cgi?id=127301
+
+        Reviewed by Oliver Hunt.
+
+        We used to just call CodeBlock::visitAggregate, but now we call visitChildren 
+        on the ownerExecutable, which is unnecessary. 
+
+        * heap/CodeBlockSet.cpp:
+        (JSC::CodeBlockSet::traceMarked):
+
+2014-01-20  Anders Carlsson  <andersca@apple.com>
+
+        Fix build.
+
+        * heap/BlockAllocator.h:
+
+2014-01-20  Anders Carlsson  <andersca@apple.com>
+
+        Stop using ThreadCondition in BlockAllocator
+        https://bugs.webkit.org/show_bug.cgi?id=126313
+
+        Reviewed by Sam Weinig.
+
+        * heap/BlockAllocator.cpp:
+        (JSC::BlockAllocator::~BlockAllocator):
+        (JSC::BlockAllocator::waitForDuration):
+        (JSC::BlockAllocator::blockFreeingThreadMain):
+        * heap/BlockAllocator.h:
+        (JSC::BlockAllocator::deallocate):
+
+2014-01-19  Anders Carlsson  <andersca@apple.com>
+
+        Convert GCThreadSharedData over to STL threading primitives
+        https://bugs.webkit.org/show_bug.cgi?id=127256
+
+        Reviewed by Andreas Kling.
+
+        * heap/GCThread.cpp:
+        (JSC::GCThread::waitForNextPhase):
+        (JSC::GCThread::gcThreadMain):
+        * heap/GCThreadSharedData.cpp:
+        (JSC::GCThreadSharedData::GCThreadSharedData):
+        (JSC::GCThreadSharedData::~GCThreadSharedData):
+        (JSC::GCThreadSharedData::startNextPhase):
+        (JSC::GCThreadSharedData::endCurrentPhase):
+        (JSC::GCThreadSharedData::didStartMarking):
+        (JSC::GCThreadSharedData::didFinishMarking):
+        * heap/GCThreadSharedData.h:
+        * heap/SlotVisitor.cpp:
+        (JSC::SlotVisitor::donateKnownParallel):
+        (JSC::SlotVisitor::drainFromShared):
+
+2014-01-18  Andreas Kling  <akling@apple.com>
+
+        CodeBlock: Size m_callLinkInfos and m_byValInfos to fit earlier.
+        <https://webkit.org/b/127239>
+
+        Reviewed by Anders Carlsson.
+
+        * bytecode/CodeBlock.h:
+        (JSC::CodeBlock::setNumberOfByValInfos):
+        (JSC::CodeBlock::setNumberOfCallLinkInfos):
+
+            Use resizeToFit() instead of grow() for these vectors, since
+            we know the final size here.
+
+        * bytecode/CodeBlock.cpp:
+        (JSC::CodeBlock::shrinkToFit):
+
+            No need to shrink here anymore. We were not even shrinking
+            m_byValInfo before!
+
+2014-01-18  Andreas Kling  <akling@apple.com>
+
+        CodeBlock: Size m_function{Exprs,Decls} to fit from creation.
+        <https://webkit.org/b/127238>
+
+        Reviewed by Anders Carlsson.
+
+        * bytecode/CodeBlock.cpp:
+        (JSC::CodeBlock::CodeBlock):
+
+            Use resizeToFit() instead of grow() for m_functionExprs and
+            m_functionDecls since we know they will never change size.
+
+        (JSC::CodeBlock::shrinkToFit):
+
+            No need to shrink them here anymore.
+
+2014-01-18  Andreas Kling  <akling@apple.com>
+
+        Remove unused CodeBlock::m_additionalIdentifiers member.
+        <https://webkit.org/b/127237>
+
+        Reviewed by Anders Carlsson.
+
+        * bytecode/CodeBlock.h:
+        * bytecode/CodeBlock.cpp:
+        (JSC::CodeBlock::CodeBlock):
+        (JSC::CodeBlock::shrinkToFit):
+
+            Remove m_additionalIdentifiers, nothing uses it.
+
+2014-01-18  Andreas Kling  <akling@apple.com>
+
+        Remove two unused CodeBlock functions.
+        <https://webkit.org/b/127235>
+
+        Kill copyPostParseDataFrom() and copyPostParseDataFromAlternative()
+        since they are not used.
+
+        Reviewed by Anders Carlsson.
+
+        * bytecode/CodeBlock.cpp:
+        * bytecode/CodeBlock.h:
+
+2014-01-18  Andreas Kling  <akling@apple.com>
+
+        CodeBlock: Size m_exceptionHandlers to fit from creation.
+        <https://webkit.org/b/127234>
+
+        Avoid allocation churn for CodeBlock::m_exceptionHandlers.
+
+        Reviewed by Anders Carlsson.
+
+        * bytecode/CodeBlock.h:
+
+            Removed unused CodeBlock::allocateHandlers() function.
+
+        * bytecode/CodeBlock.cpp:
+        (JSC::CodeBlock::CodeBlock):
+
+            Use resizeToFit() instead of grow() for m_exceptionHandlers
+            since we know it's never going to change size.
+
+        (JSC::CodeBlock::shrinkToFit):
+
+            No need to shrink m_exceptionHandlers here since it's already
+            the perfect size.
+
+2014-01-18  Mark Lam  <mark.lam@apple.com>
+
+        Add a hasBreakpointFlag arg to the op_debug bytecode.
+        https://bugs.webkit.org/show_bug.cgi?id=127230.
+
+        Reviewed by Geoffrey Garen.
+
+        This is in anticipation of upcoming changes to support bytecode level
+        breakpoints. This patch adds the flag to the op_debug bytecode and
+        initializes it, but does not use it yet.
+
+        * bytecode/Opcode.h:
+        (JSC::padOpcodeName):
+        * bytecompiler/BytecodeGenerator.cpp:
+        (JSC::BytecodeGenerator::emitDebugHook):
+        * llint/LowLevelInterpreter.asm:
+
+2014-01-18  Alberto Garcia  <berto@igalia.com>
+
+        JavaScriptCore uses PLATFORM(MAC) when it means OS(DARWIN)
+        https://bugs.webkit.org/show_bug.cgi?id=99683
+
+        Reviewed by Anders Carlsson.
+
+        * jit/ThunkGenerators.cpp:
+        * tools/CodeProfile.cpp:
+        (JSC::symbolName):
+        (JSC::CodeProfile::sample):
+
+2014-01-18  Anders Carlsson  <andersca@apple.com>
+
+        Remove ENABLE_THREADED_HTML_PARSER defines everywhere
+        https://bugs.webkit.org/show_bug.cgi?id=127225
+
+        Reviewed by Andreas Kling.
+
+        This concludes the removal of over 8.8 million lines of threaded parser code.
+
+        * Configurations/FeatureDefines.xcconfig:
+
+2014-01-18  Mark Lam  <mark.lam@apple.com>
+
+        Adding UnlinkedCodeBlock::opDebugBytecodeOffsetForLineAndColumn()..
+        https://bugs.webkit.org/show_bug.cgi?id=127127.
+
+        Reviewed by Geoffrey Garen.
+
+        In order to implement bytecode level breakpoints, we need a mechanism
+        for computing the best fit op_debug bytecode offset for any valid given
+        line and column value in the source. The "best fit" op_debug bytecode
+        in this case is defined below in the comment for
+        UnlinkedCodeBlock::opDebugBytecodeOffsetForLineAndColumn().
+
+        * GNUmakefile.list.am:
+        * JavaScriptCore.vcxproj/JavaScriptCore.vcxproj:
+        * JavaScriptCore.vcxproj/JavaScriptCore.vcxproj.filters:
+        * JavaScriptCore.xcodeproj/project.pbxproj:
+        * bytecode/CodeBlock.cpp:
+        (JSC::CodeBlock::opDebugBytecodeOffsetForLineAndColumn):
+        - Convert the line and column to unlinked line and column values and
+          pass them to UnlinkedCodeBlock::opDebugBytecodeOffsetForLineAndColumn()
+          to do the real work.
+
+        * bytecode/CodeBlock.h:
+        * bytecode/LineColumnInfo.h: Added.
+        (JSC::LineColumnInfo::operator <):
+        (JSC::LineColumnInfo::LineColumnPair::LineColumnPair):
+        (JSC::LineColumnInfo::operator ==):
+        (JSC::LineColumnInfo::operator !=):
+        (JSC::LineColumnInfo::operator <=):
+        (JSC::LineColumnInfo::operator >):
+        (JSC::LineColumnInfo::operator >=):
+        * bytecode/LineInfo.h: Removed.
+
+        * bytecode/UnlinkedCodeBlock.cpp:
+        (JSC::UnlinkedCodeBlock::decodeExpressionRangeLineAndColumn):
+        - Factored this out of expressionRangeForBytecodeOffset() so that it can
+          be called from multiple places.
+        (JSC::dumpLineColumnEntry):
+        (JSC::UnlinkedCodeBlock::dumpExpressionRangeInfo):
+        (JSC::UnlinkedCodeBlock::dumpOpDebugLineColumnInfoList):
+        - Some dumpers for debugging use only.
+        (JSC::UnlinkedCodeBlock::expressionRangeForBytecodeOffset):
+        (JSC::UnlinkedCodeBlock::opDebugBytecodeOffsetForLineAndColumn):
+        - Finds the earliest op_debug bytecode whose line and column matches the
+          specified line and column values. If an exact match is not found, then
+          finds the nearest op_debug bytecode that precedes the specified line
+          and column values. If there are more than one op_debug at that preceding
+          line and column value, then the earliest of those op_debug bytecodes will
+          be be selected. The offset of the selected bytecode will be returned.
+
+          We want the earliest one because when we have multiple op_debug bytecodes
+          that map to a given line and column, a debugger user would expect to break
+          on the first one and step through the rest thereafter if needed.
+
+        (JSC::compareLineColumnInfo):
+        (JSC::UnlinkedCodeBlock::opDebugLineColumnInfoList):
+        - Creates the sorted opDebugLineColumnInfoList on demand. This list is
+          stored in the UnlinkedCodeBlock's rareData.
+        * bytecode/UnlinkedCodeBlock.h:
+
+2014-01-18  Zan Dobersek  <zdobersek@igalia.com>
+
+        Inspector scripts are not compatible with Python v3
+        https://bugs.webkit.org/show_bug.cgi?id=127128
+
+        Reviewed by Benjamin Poulain.
+
+        * inspector/scripts/generate-combined-inspector-json.py: Turn print statements into print function calls.
+        * inspector/scripts/jsmin.py: Try importing the StringIO class from the StringIO module (which will work for
+        Python v2) or, on import error, import the class from the io module (which will work for Python v3).
+
+2014-01-17  Anders Carlsson  <andersca@apple.com>
+
+        String::is8Bit() crashes if m_impl is null, handle this.
+
+        * API/OpaqueJSString.h:
+        (OpaqueJSString::OpaqueJSString):
+
+2014-01-17  Anders Carlsson  <andersca@apple.com>
+
+        Try to fix the Windows build.
+
+        * API/OpaqueJSString.cpp:
+        (OpaqueJSString::~OpaqueJSString):
+        (OpaqueJSString::characters):
+        * API/OpaqueJSString.h:
+        (OpaqueJSString::OpaqueJSString):
+
+2014-01-17  Anders Carlsson  <andersca@apple.com>
+
+        Get rid of OpaqueJSString::deprecatedCharacters()
+        https://bugs.webkit.org/show_bug.cgi?id=127161
+
+        Reviewed by Sam Weinig.
+
+        Handle OpaqueJSString::m_string being either 8-bit or 16-bit and add extra
+        code paths for the 8-bit cases.
+        
+        Unfortunately, JSStringGetCharactersPtr is still expected to return a 16-bit character pointer.
+        Handle this by storing a separate 16-bit string and initializing it on demand when JSStringGetCharactersPtr
+        is called and the backing string is 8-bit.
+        
+        This has the nice side effect of making JSStringGetCharactersPtr thread-safe when it wasn't before.
+        (In theory, someone could have a JSStringRef backed by an 8-bit string and call JSStringGetCharactersPtr on it
+        causing an unsafe upconversion to a 16-bit string).
+
+        * API/JSStringRef.cpp:
+        (JSStringGetCharactersPtr):
+        Call OpaqueJSString::characters.
+
+        (JSStringGetUTF8CString):
+        Add a code path that handles 8-bit strings.
+
+        (JSStringIsEqual):
+        Call OpaqueJSString::equal.
+
+        * API/JSStringRefCF.cpp:
+        (JSStringCreateWithCFString):
+        Reformat the code to use an early return instead of putting most of the code inside the body of an if statement.
+
+        (JSStringCopyCFString):
+        Create an 8-bit CFStringRef if possible.
+
+        * API/OpaqueJSString.cpp:
+        (OpaqueJSString::create):
+        Use nullptr.
+
+        (OpaqueJSString::~OpaqueJSString):
+        Free m_characters.
+
+        (OpaqueJSString::characters):
+        Do the up-conversion and store the result in m_characters.
+
+        (OpaqueJSString::equal):
+        New helper function.
+
+        * API/OpaqueJSString.h:
+        (OpaqueJSString::is8Bit):
+        New function that returns whether a string is 8-bit or not.
+
+        (OpaqueJSString::characters8):
+        (OpaqueJSString::characters16):
+        Add getters.
+
+2014-01-17  Peter Molnar  <pmolnar.u-szeged@partner.samsung.com>
+
+        Remove workaround for compilers not supporting deleted functions
+        https://bugs.webkit.org/show_bug.cgi?id=127166
+
+        Reviewed by Andreas Kling.
+
+        * inspector/InspectorAgentRegistry.h:
+
+2014-01-17  Commit Queue  <commit-queue@webkit.org>
+
+        Unreviewed, rolling out r162185, r162186, and r162187.
+        http://trac.webkit.org/changeset/162185
+        http://trac.webkit.org/changeset/162186
+        http://trac.webkit.org/changeset/162187
+        https://bugs.webkit.org/show_bug.cgi?id=127164
+
+        Broke JSStringCreateWithCharactersNoCopy, as evidenced by a
+        JSC API test (Requested by ap on #webkit).
+
+        * API/JSStringRef.cpp:
+        (JSStringGetCharactersPtr):
+        (JSStringGetUTF8CString):
+        (JSStringIsEqual):
+        * API/JSStringRefCF.cpp:
+        (JSStringCreateWithCFString):
+        (JSStringCopyCFString):
+        * API/OpaqueJSString.cpp:
+        (OpaqueJSString::create):
+        (OpaqueJSString::identifier):
+        * API/OpaqueJSString.h:
+        (OpaqueJSString::create):
+        (OpaqueJSString::characters):
+        (OpaqueJSString::deprecatedCharacters):
+        (OpaqueJSString::OpaqueJSString):
+
+2014-01-16  Anders Carlsson  <andersca@apple.com>
+
+        Export OpaqueJSString destructor.
+
+        * API/OpaqueJSString.h:
+
+2014-01-16  Anders Carlsson  <andersca@apple.com>
+
+        Build fix.
+
+        * API/OpaqueJSString.h:
+
+2014-01-16  Anders Carlsson  <andersca@apple.com>
+
+        Get rid of OpaqueJSString::deprecatedCharacters()
+        https://bugs.webkit.org/show_bug.cgi?id=127161
+
+        Reviewed by Sam Weinig.
+
+        Handle OpaqueJSString::m_string being either 8-bit or 16-bit and add extra
+        code paths for the 8-bit cases.
+        
+        Unfortunately, JSStringGetCharactersPtr is still expected to return a 16-bit character pointer.
+        Handle this by storing a separate 16-bit string and initializing it on demand when JSStringGetCharactersPtr
+        is called. This has the nice side effect of making JSStringGetCharactersPtr thread-safe when it wasn't before.
+        (In theory, someone could have a JSStringRef backed by an 8-bit string and call JSStringGetCharactersPtr on it
+        causing an unsafe upconversion to a 16-bit string).
+
+        * API/JSStringRef.cpp:
+        (JSStringGetCharactersPtr):
+        Call OpaqueJSString::characters.
+
+        (JSStringGetUTF8CString):
+        Add a code path that handles 8-bit strings.
+
+        (JSStringIsEqual):
+        Call OpaqueJSString::equal.
+
+        * API/JSStringRefCF.cpp:
+        (JSStringCreateWithCFString):
+        Reformat the code to use an early return instead of putting most of the code inside the body of an if statement.
+
+        (JSStringCopyCFString):
+        Create an 8-bit CFStringRef if possible.
+
+        * API/OpaqueJSString.cpp:
+        (OpaqueJSString::create):
+        Use nullptr.
+
+        (OpaqueJSString::~OpaqueJSString):
+        Free m_characters.
+
+        (OpaqueJSString::characters):
+        Do the up-conversion and store the result in m_characters.
+
+        (OpaqueJSString::equal):
+        New helper function.
+
+        * API/OpaqueJSString.h:
+        (OpaqueJSString::is8Bit):
+        New function that returns whether a string is 8-bit or not.
+
+        (OpaqueJSString::characters8):
+        (OpaqueJSString::characters16):
+        Add getters.
+
+2014-01-16  Anders Carlsson  <andersca@apple.com>
+
+        Change all uses of FINAL to final now that all our compilers support it
+        https://bugs.webkit.org/show_bug.cgi?id=127142
+
+        Reviewed by Benjamin Poulain.
+
+        * inspector/JSGlobalObjectInspectorController.h:
+        * inspector/agents/InspectorAgent.h:
+        * inspector/remote/RemoteInspector.h:
+        * inspector/remote/RemoteInspectorDebuggableConnection.h:
+        * inspector/scripts/CodeGeneratorInspector.py:
+        (Generator.go):
+        * runtime/JSGlobalObjectDebuggable.h:
+        * runtime/JSPromiseReaction.cpp:
+
+2014-01-16  Oliver Hunt  <oliver@apple.com>
+
+        throwing an objc object (or general binding object) triggers an assertion
+        https://bugs.webkit.org/show_bug.cgi?id=127146
+
+        Reviewed by Alexey Proskuryakov.
+
+        This is simply a bogus assertion as we can't guarantee a bindings object
+        won't intercept assignment to .stack
+
+        * interpreter/Interpreter.cpp:
+        (JSC::Interpreter::unwind):
+
+2014-01-16  Peter Molnar  <pmolnar.u-szeged@partner.samsung.com>
+
+        Remove workaround for compilers not supporting explicit override control
+        https://bugs.webkit.org/show_bug.cgi?id=127111
+
+        Reviewed by Anders Carlsson.
+
+        Now all compilers support explicit override control, this workaround can be removed.
+
+        * API/JSAPIWrapperObject.mm:
+        * API/JSCallbackObject.h:
+        * API/JSManagedValue.mm:
+        * API/JSScriptRef.cpp:
+        * bytecode/CodeBlock.h:
+        * bytecode/CodeBlockJettisoningWatchpoint.h:
+        * bytecode/ProfiledCodeBlockJettisoningWatchpoint.h:
+        * bytecode/StructureStubClearingWatchpoint.h:
+        * dfg/DFGArrayifySlowPathGenerator.h:
+        * dfg/DFGCallArrayAllocatorSlowPathGenerator.h:
+        * dfg/DFGFailedFinalizer.h:
+        * dfg/DFGJITCode.h:
+        * dfg/DFGJITFinalizer.h:
+        * dfg/DFGSaneStringGetByValSlowPathGenerator.h:
+        * dfg/DFGSlowPathGenerator.h:
+        * dfg/DFGSpeculativeJIT64.cpp:
+        * heap/Heap.h:
+        * heap/IncrementalSweeper.h:
+        * heap/SuperRegion.h:
+        * inspector/InspectorValues.h:
+        * inspector/JSGlobalObjectInspectorController.h:
+        * inspector/agents/InspectorAgent.h:
+        * inspector/remote/RemoteInspector.h:
+        * inspector/remote/RemoteInspectorDebuggableConnection.h:
+        * inspector/scripts/CodeGeneratorInspector.py:
+        (Generator.go):
+        * jit/ClosureCallStubRoutine.h:
+        * jit/ExecutableAllocatorFixedVMPool.cpp:
+        * jit/GCAwareJITStubRoutine.h:
+        * jit/JITCode.h:
+        * jit/JITToDFGDeferredCompilationCallback.h:
+        * parser/Nodes.h:
+        * parser/SourceProvider.h:
+        * runtime/DataView.h:
+        * runtime/GCActivityCallback.h:
+        * runtime/GenericTypedArrayView.h:
+        * runtime/JSGlobalObjectDebuggable.h:
+        * runtime/JSPromiseReaction.cpp:
+        * runtime/RegExpCache.h:
+        * runtime/SimpleTypedArrayController.h:
+        * runtime/SymbolTable.h:
+        * runtime/WeakMapData.h:
+
+2014-01-15  Joseph Pecoraro  <pecoraro@apple.com>
+
+        [iOS] Clean up REMOTE_INSPECTOR code in OpenSource after the iOS merge
+        https://bugs.webkit.org/show_bug.cgi?id=127069
+
+        Reviewed by Timothy Hatcher.
+
+        * JavaScriptCore.xcodeproj/project.pbxproj:
+        Export XPCConnection because it is needed by RemoteInspector.h.
+
+        * inspector/remote/RemoteInspectorXPCConnection.h:
+        * inspector/remote/RemoteInspector.h:
+        * inspector/remote/RemoteInspector.mm:
+        (Inspector::RemoteInspector::startDisabled):
+        (Inspector::RemoteInspector::shared):
+        Allow RemoteInspector singleton to start disabled.
+
+2014-01-15  Brian Burg  <bburg@apple.com>
+
+        Web Inspector: capture probe samples on the backend
+        https://bugs.webkit.org/show_bug.cgi?id=126668
+
+        Reviewed by Joseph Pecoraro.
+
+        Add the 'probe' breakpoint action to the protocol. Change the setBreakpoint
+        commands to return a list of assigned breakpoint action identifiers
+        Add a type for breakpoint action identifiers. Add an event for sending
+        captured probe samples to the inspector frontend.
+
+        * inspector/protocol/Debugger.json:
+
+2014-01-10  Mark Hahnenberg  <mhahnenberg@apple.com>
+
+        Copying should be generational
+        https://bugs.webkit.org/show_bug.cgi?id=126555
+
+        Reviewed by Geoffrey Garen.
+
+        This patch adds support for copying to our generational collector. Eden collections 
+        always trigger copying. Full collections use our normal fragmentation-based heuristics.
+
+        The way this works is that the CopiedSpace now has the notion of an old generation set of CopiedBlocks
+        and a new generation of CopiedBlocks. During each mutator cycle new CopiedSpace allocations reside
+        in the new generation. When a collection occurs, those blocks are moved to the old generation.
+
+        One key thing to remember is that both new and old generation objects in the MarkedSpace can
+        refer to old or new generation allocations in CopiedSpace. This is why we must fire write barriers 
+        when assigning to an old (MarkedSpace) object's Butterfly.
+
+        * heap/CopiedAllocator.h:
+        (JSC::CopiedAllocator::tryAllocateDuringCopying):
+        * heap/CopiedBlock.h:
+        (JSC::CopiedBlock::CopiedBlock):
+        (JSC::CopiedBlock::didEvacuateBytes):
+        (JSC::CopiedBlock::isOld):
+        (JSC::CopiedBlock::didPromote):
+        * heap/CopiedBlockInlines.h:
+        (JSC::CopiedBlock::reportLiveBytes):
+        (JSC::CopiedBlock::reportLiveBytesDuringCopying):
+        * heap/CopiedSpace.cpp:
+        (JSC::CopiedSpace::CopiedSpace):
+        (JSC::CopiedSpace::~CopiedSpace):
+        (JSC::CopiedSpace::init):
+        (JSC::CopiedSpace::tryAllocateOversize):
+        (JSC::CopiedSpace::tryReallocateOversize):
+        (JSC::CopiedSpace::doneFillingBlock):
+        (JSC::CopiedSpace::didStartFullCollection):
+        (JSC::CopiedSpace::doneCopying):
+        (JSC::CopiedSpace::size):
+        (JSC::CopiedSpace::capacity):
+        (JSC::CopiedSpace::isPagedOut):
+        * heap/CopiedSpace.h:
+        (JSC::CopiedSpace::CopiedGeneration::CopiedGeneration):
+        * heap/CopiedSpaceInlines.h:
+        (JSC::CopiedSpace::contains):
+        (JSC::CopiedSpace::recycleEvacuatedBlock):
+        (JSC::CopiedSpace::allocateBlock):
+        (JSC::CopiedSpace::startedCopying):
+        * heap/CopyVisitor.cpp:
+        (JSC::CopyVisitor::copyFromShared):
+        * heap/CopyVisitorInlines.h:
+        (JSC::CopyVisitor::allocateNewSpace):
+        (JSC::CopyVisitor::allocateNewSpaceSlow):
+        * heap/GCThreadSharedData.cpp:
+        (JSC::GCThreadSharedData::didStartCopying):
+        * heap/Heap.cpp:
+        (JSC::Heap::copyBackingStores):
+        * heap/SlotVisitorInlines.h:
+        (JSC::SlotVisitor::copyLater):
+        * heap/TinyBloomFilter.h:
+        (JSC::TinyBloomFilter::add):
+
+2014-01-14  Mark Lam  <mark.lam@apple.com>
+
+        ASSERTION FAILED: !hasError() in JSC::Parser<LexerType>::createSavePoint().
+        https://bugs.webkit.org/show_bug.cgi?id=126990.
+
+        Reviewed by Geoffrey Garen.
+
+        * parser/Parser.cpp:
+        (JSC::Parser<LexerType>::parseConstDeclarationList):
+        - We were missing an error check after attempting to parse an initializer
+          expression. This is now fixed.
+
+2014-01-14  Joseph Pecoraro  <pecoraro@apple.com>
+
+        Web Inspector: For Remote Inspection link WebProcess's to their parent UIProcess
+        https://bugs.webkit.org/show_bug.cgi?id=126995
+
+        Reviewed by Timothy Hatcher.
+
+        * inspector/remote/RemoteInspector.mm:
+        (Inspector::RemoteInspector::listingForDebuggable):
+        For each WebView, list the parent process. Listing the parent per WebView
+        is already supported back when we supported processes that could host WebViews
+        for multiple applications.
+
+        * inspector/remote/RemoteInspectorConstants.h:
+        Add a separate key for the bundle identifier, separate from application identifier.
+
+        * inspector/remote/RemoteInspectorDebuggable.cpp:
+        (Inspector::RemoteInspectorDebuggable::info):
+        * inspector/remote/RemoteInspectorDebuggable.h:
+        (Inspector::RemoteInspectorDebuggableInfo::RemoteInspectorDebuggableInfo):
+        (Inspector::RemoteInspectorDebuggableInfo::hasParentProcess):
+        If a RemoteInspectorDebuggable has a non-zero parent process identifier
+        it is a proxy for the parent process.
+
+2014-01-14  Brian J. Burg  <burg@cs.washington.edu>
+
+        Add ENABLE(WEB_REPLAY) feature flag to the build system
+        https://bugs.webkit.org/show_bug.cgi?id=126949
+
+        Reviewed by Joseph Pecoraro.
+
+        * Configurations/FeatureDefines.xcconfig:
+
+2014-01-14  Peter Molnar  <pmolnar.u-szeged@partner.samsung.com>
+
+        [EFL] FTL buildfix, add missing includes
+        https://bugs.webkit.org/show_bug.cgi?id=126641
+
+        Reviewed by Csaba Osztrogonác.
+
+        * ftl/FTLOSREntry.cpp:
+        * ftl/FTLOSRExitCompiler.cpp:
+
+2014-01-14  Joseph Pecoraro  <pecoraro@apple.com>
+
+        Web Inspector: RemoteInspector::updateDebuggable may miss a push
+        https://bugs.webkit.org/show_bug.cgi?id=126965
+
+        Reviewed by Timothy Hatcher.
+
+        * inspector/remote/RemoteInspector.mm:
+        (Inspector::RemoteInspector::updateDebuggable):
+        Always push an update. If a debuggable went from allowed to
+        not allowed, we would have missed pushing an update.
+
+2014-01-13  Mark Hahnenberg  <mhahnenberg@apple.com>
+
+        Performance regression on dromaeo due to generational marking
+        https://bugs.webkit.org/show_bug.cgi?id=126901
+
+        Reviewed by Oliver Hunt.
+
+        We were seeing some performance regression with ENABLE_GGC == 0, so this patch
+        ifdefs out more things to get rid of the additional overhead.
+
+        * heap/Heap.cpp:
+        (JSC::Heap::markRoots):
+        (JSC::Heap::writeBarrier):
+        * heap/MarkedBlock.cpp:
+        (JSC::MarkedBlock::clearMarks):
+        (JSC::MarkedBlock::clearMarksWithCollectionType):
+        * heap/MarkedSpace.cpp:
+        (JSC::MarkedSpace::resetAllocators):
+        * heap/MarkedSpace.h:
+        (JSC::MarkedSpace::didAllocateInBlock):
+        * heap/SlotVisitorInlines.h:
+        (JSC::SlotVisitor::internalAppend):
+        (JSC::SlotVisitor::reportExtraMemoryUsage):
+
+2014-01-13  Brian Burg  <bburg@apple.com>
+
+        Web Inspector: protocol generator should support integer-typed declarations
+        https://bugs.webkit.org/show_bug.cgi?id=126828
+
+        Reviewed by Joseph Pecoraro.
+
+        Add new binding classes for parameter/ad-hoc and normal integer type declarations.
+
+        * inspector/scripts/CodeGeneratorInspector.py:
+        (TypeBindings.create_type_declaration_):
+        (TypeBindings.create_type_declaration_.PlainInteger):
+        (TypeBindings.create_type_declaration_.PlainInteger.resolve_inner):
+        (TypeBindings.create_type_declaration_.PlainInteger.request_user_runtime_cast):
+        (TypeBindings.create_type_declaration_.PlainInteger.request_internal_runtime_cast):
+        (TypeBindings.create_type_declaration_.PlainInteger.get_code_generator):
+        (TypeBindings.create_type_declaration_.PlainInteger.get_validator_call_text):
+        (TypeBindings.create_type_declaration_.PlainInteger.reduce_to_raw_type):
+        (TypeBindings.create_type_declaration_.PlainInteger.get_type_model):
+        (TypeBindings.create_type_declaration_.PlainInteger.get_setter_value_expression_pattern):
+        (TypeBindings.create_type_declaration_.PlainInteger.get_array_item_c_type_text):
+        (TypeBindings.create_type_declaration_.TypedefInteger):
+        (TypeBindings.create_type_declaration_.TypedefInteger.resolve_inner):
+        (TypeBindings.create_type_declaration_.TypedefInteger.request_user_runtime_cast):
+        (TypeBindings.create_type_declaration_.TypedefInteger.request_internal_runtime_cast):
+        (TypeBindings.create_type_declaration_.TypedefInteger.get_code_generator):
+        (TypeBindings.create_type_declaration_.TypedefInteger.get_code_generator.CodeGenerator):
+        (TypeBindings.create_type_declaration_.TypedefInteger.get_code_generator.CodeGenerator.generate_type_builder):
+        (TypeBindings.create_type_declaration_.TypedefInteger.get_code_generator.CodeGenerator.generate_type_builder.int):
+        (TypeBindings.create_type_declaration_.TypedefInteger.get_code_generator.CodeGenerator.register_use):
+        (TypeBindings.create_type_declaration_.TypedefInteger.get_code_generator.CodeGenerator.get_generate_pass_id):
+        (TypeBindings.create_type_declaration_.TypedefInteger.get_validator_call_text):
+        (TypeBindings.create_type_declaration_.TypedefInteger.reduce_to_raw_type):
+        (TypeBindings.create_type_declaration_.TypedefInteger.get_type_model):
+        (TypeBindings.create_type_declaration_.TypedefInteger.get_setter_value_expression_pattern):
+        (TypeBindings.create_type_declaration_.TypedefInteger.get_array_item_c_type_text):
+
+2014-01-13  Zalan Bujtas  <zalan@apple.com>
+
+        Enable SUBPIXEL_LAYOUT on Mac
+        <https://webkit.org/b/126283>
+
+        Reviewed by Simon Fraser.
+
+        * Configurations/FeatureDefines.xcconfig:
+
 2014-01-13  Zan Dobersek  <zdobersek@igalia.com>
 
         Unreviewed. Changes in r161686 are exposing a bug in GCC where the global .cfi_startproc directive

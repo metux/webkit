@@ -394,7 +394,7 @@ static void decidePolicyForNavigationAction(WKPageRef, WKFrameRef frameRef, WKFr
     toImpl(listenerRef)->ignore();
 
     // And instead load it in the inspected page.
-    webInspectorProxy->page()->loadURLRequest(toImpl(requestRef));
+    webInspectorProxy->page()->loadRequest(toImpl(requestRef)->resourceRequest());
 }
 
 #if ENABLE(INSPECTOR_SERVER)
@@ -449,7 +449,7 @@ void WebInspectorProxy::createInspectorPage(uint64_t& inspectorPageID, WebPageCr
         0, /* decidePolicyForResponse */
     };
 
-    inspectorPage->initializePolicyClient(reinterpret_cast<const WKPagePolicyClientBase*>(&policyClient));
+    WKPageSetPagePolicyClient(toAPI(inspectorPage), &policyClient.base);
 
     String url = inspectorPageURL();
 
@@ -471,7 +471,7 @@ void WebInspectorProxy::createInspectorPage(uint64_t& inspectorPageID, WebPageCr
 
     m_page->process().assumeReadAccessToBaseURL(inspectorBaseURL());
 
-    inspectorPage->loadURL(url);
+    inspectorPage->loadRequest(URL(URL(), url));
 
     m_createdInspectorPage = true;
 }

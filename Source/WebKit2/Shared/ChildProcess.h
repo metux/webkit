@@ -69,6 +69,7 @@ public:
 
 #if PLATFORM(MAC)
     void setApplicationIsDaemon();
+    void setQOS(int latencyQOS, int throughputQOS);
 #endif
 
     IPC::Connection* parentProcessConnection() const { return m_connection.get(); }
@@ -97,8 +98,8 @@ protected:
 
 private:
     // IPC::MessageSender
-    virtual IPC::Connection* messageSenderConnection() OVERRIDE;
-    virtual uint64_t messageSenderDestinationID() OVERRIDE;
+    virtual IPC::Connection* messageSenderConnection() override;
+    virtual uint64_t messageSenderDestinationID() override;
 
     void terminationTimerFired();
 

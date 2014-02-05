@@ -97,7 +97,7 @@ public:
     unsigned hyphens : 2; // Hyphens
     unsigned textEmphasisFill : 1; // TextEmphasisFill
     unsigned textEmphasisMark : 3; // TextEmphasisMark
-    unsigned textEmphasisPosition : 1; // TextEmphasisPosition
+    unsigned textEmphasisPosition : 4; // TextEmphasisPosition
     unsigned m_textOrientation : 2; // TextOrientation
 #if ENABLE(CSS3_TEXT)
     unsigned m_textIndentLine : 1; // TextIndentLine
@@ -122,10 +122,8 @@ public:
     unsigned m_textAlignLast : 3; // TextAlignLast
     unsigned m_textJustify : 3; // TextJustify
 #endif // CSS3_TEXT
-#if ENABLE(CSS3_TEXT_DECORATION)
     unsigned m_textDecorationSkip : 5; // TextDecorationSkip
     unsigned m_textUnderlinePosition : 3; // TextUnderlinePosition
-#endif
     unsigned m_rubyPosition : 1; // RubyPosition
 
 #if PLATFORM(IOS)

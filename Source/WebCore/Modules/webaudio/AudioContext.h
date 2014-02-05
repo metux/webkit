@@ -32,9 +32,9 @@
 #include "EventListener.h"
 #include "EventTarget.h"
 #include "MediaCanStartListener.h"
+#include <atomic>
 #include <wtf/HashSet.h>
 #include <wtf/MainThread.h>
-#include <wtf/OwnPtr.h>
 #include <wtf/PassRefPtr.h>
 #include <wtf/RefCounted.h>
 #include <wtf/RefPtr.h>
@@ -93,7 +93,7 @@ public:
     HRTFDatabaseLoader* hrtfDatabaseLoader() const { return m_hrtfDatabaseLoader.get(); }
 
     // Document notification
-    virtual void stop() OVERRIDE;
+    virtual void stop() override;
 
     Document* document() const; // ASSERTs if document no longer exists.
 
@@ -234,8 +234,8 @@ public:
     void removeMarkedSummingJunction(AudioSummingJunction*);
 
     // EventTarget
-    virtual EventTargetInterface eventTargetInterface() const OVERRIDE FINAL { return AudioContextEventTargetInterfaceType; }
-    virtual ScriptExecutionContext* scriptExecutionContext() const OVERRIDE FINAL;
+    virtual EventTargetInterface eventTargetInterface() const override final { return AudioContextEventTargetInterfaceType; }
+    virtual ScriptExecutionContext* scriptExecutionContext() const override final;
 
     DEFINE_ATTRIBUTE_EVENT_LISTENER(complete);
 
@@ -283,7 +283,7 @@ private:
     void scheduleNodeDeletion();
     static void deleteMarkedNodesDispatch(void* userData);
 
-    virtual void mediaCanStart() OVERRIDE;
+    virtual void mediaCanStart() override;
 
     bool m_isInitialized;
     bool m_isAudioThreadFinished;
@@ -348,8 +348,8 @@ private:
     RefPtr<HRTFDatabaseLoader> m_hrtfDatabaseLoader;
 
     // EventTarget
-    virtual void refEventTarget() OVERRIDE { ref(); }
-    virtual void derefEventTarget() OVERRIDE { deref(); }
+    virtual void refEventTarget() override { ref(); }
+    virtual void derefEventTarget() override { deref(); }
 
     RefPtr<AudioBuffer> m_renderTarget;
     
@@ -362,7 +362,7 @@ private:
     enum { MaxNumberOfChannels = 32 };
 
     // Number of AudioBufferSourceNodes that are active (playing).
-    int m_activeSourceCount;
+    std::atomic<int> m_activeSourceCount;
 
     BehaviorRestrictions m_restrictions;
 };

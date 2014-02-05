@@ -34,6 +34,7 @@
 #include <gio/gio.h>
 #include <wtf/gobject/GOwnPtr.h>
 #include <wtf/gobject/GRefPtr.h>
+#include <wtf/gobject/GUniquePtr.h>
 #include <wtf/text/CString.h>
 
 #if PLATFORM(GTK)
@@ -94,7 +95,7 @@ public:
         m_destinationURI = m_download->decideDestinationWithSuggestedFilename(suggestedFilename, overwrite);
         if (m_destinationURI.isEmpty()) {
 #if PLATFORM(GTK)
-            GOwnPtr<char> buffer(g_strdup_printf(_("Cannot determine destination URI for download with suggested filename %s"), suggestedFilename.utf8().data()));
+            GUniquePtr<char> buffer(g_strdup_printf(_("Cannot determine destination URI for download with suggested filename %s"), suggestedFilename.utf8().data()));
             String errorMessage = String::fromUTF8(buffer.get());
 #else
             String errorMessage = makeString("Cannot determine destination URI for download with suggested filename ", suggestedFilename);
@@ -232,8 +233,12 @@ void Download::cancel()
 {
     if (!m_resourceHandle)
         return;
-    static_cast<DownloadClient*>(m_downloadClient.get())->cancel(m_resourceHandle.get());
-    m_resourceHandle = 0;
+
+    // Cancelling the download will delete it and platformInvalidate() will be called by the destructor.
+    // So, we need to set m_resourceHandle to nullptr before actually cancelling the download to make sure
+    // it won't be cancelled again by platformInvalidate. See https://bugs.webkit.org/show_bug.cgi?id=127650.
+    RefPtr<ResourceHandle> resourceHandle = m_resourceHandle.release();
+    static_cast<DownloadClient*>(m_downloadClient.get())->cancel(resourceHandle.get());
 }
 
 void Download::platformInvalidate()

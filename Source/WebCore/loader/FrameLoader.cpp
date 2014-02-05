@@ -246,7 +246,6 @@ FrameLoader::FrameLoader(Frame& frame, FrameLoaderClient& client)
     , m_shouldCallCheckCompleted(false)
     , m_shouldCallCheckLoadComplete(false)
     , m_opener(nullptr)
-    , m_didPerformFirstNavigation(false)
     , m_loadingFromCachedPage(false)
     , m_suppressOpenerInNewFrame(false)
     , m_currentNavigationHasShownBeforeUnloadConfirmPanel(false)
@@ -799,9 +798,6 @@ void FrameLoader::checkCompleted()
     Ref<Frame> protect(m_frame);
     m_shouldCallCheckCompleted = false;
 
-    if (m_frame.view())
-        m_frame.view()->handleLoadCompleted();
-
     // Have we completed before?
     if (m_isComplete)
         return;
@@ -846,9 +842,6 @@ void FrameLoader::checkCompleted()
     completed();
     if (m_frame.page())
         checkLoadComplete();
-
-    if (m_frame.view())
-        m_frame.view()->handleLoadCompleted();
 }
 
 void FrameLoader::checkTimerFired(Timer<FrameLoader>&)
@@ -955,7 +948,7 @@ ObjectContentType FrameLoader::defaultObjectContentType(const URL& url, const St
     if (mimeType.isEmpty())
         mimeType = mimeTypeFromURL(url);
 
-#if !PLATFORM(MAC) && !PLATFORM(EFL) && !PLATFORM(NIX) // Mac has no PluginDatabase, nor does Nix or EFL
+#if !PLATFORM(MAC) && !PLATFORM(EFL) // Mac has no PluginDatabase, nor does EFL
     if (mimeType.isEmpty()) {
         String decodedPath = decodeURLEscapeSequences(url.path());
         mimeType = PluginDatabase::installedPlugins()->MIMETypeForExtension(decodedPath.substring(decodedPath.reverseFind('.') + 1));
@@ -965,7 +958,7 @@ ObjectContentType FrameLoader::defaultObjectContentType(const URL& url, const St
     if (mimeType.isEmpty())
         return ObjectContentFrame; // Go ahead and hope that we can display the content.
 
-#if !PLATFORM(MAC) && !PLATFORM(EFL) && !PLATFORM(NIX) // Mac has no PluginDatabase, nor does Nix or EFL
+#if !PLATFORM(MAC) && !PLATFORM(EFL) // Mac has no PluginDatabase, nor does EFL
     bool plugInSupportsMIMEType = PluginDatabase::installedPlugins()->isMIMETypeRegistered(mimeType);
 #else
     bool plugInSupportsMIMEType = false;
@@ -1185,10 +1178,11 @@ void FrameLoader::prepareForLoadStart()
     m_progressTracker->progressStarted();
     m_client.dispatchDidStartProvisionalLoad();
 
-    // Notify accessibility.
-    if (AXObjectCache* cache = m_frame.document()->existingAXObjectCache()) {
-        AXObjectCache::AXLoadingEvent loadingEvent = loadType() == FrameLoadTypeReload ? AXObjectCache::AXLoadingReloaded : AXObjectCache::AXLoadingStarted;
-        cache->frameLoadingEventNotification(&m_frame, loadingEvent);
+    if (AXObjectCache::accessibilityEnabled()) {
+        if (AXObjectCache* cache = m_frame.document()->existingAXObjectCache()) {
+            AXObjectCache::AXLoadingEvent loadingEvent = loadType() == FrameLoadTypeReload ? AXObjectCache::AXLoadingReloaded : AXObjectCache::AXLoadingStarted;
+            cache->frameLoadingEventNotification(&m_frame, loadingEvent);
+        }
     }
 }
 
@@ -1773,7 +1767,7 @@ void FrameLoader::commitProvisionalLoad()
     RefPtr<DocumentLoader> pdl = m_provisionalDocumentLoader;
     Ref<Frame> protect(m_frame);
 
-    OwnPtr<CachedPage> cachedPage;
+    std::unique_ptr<CachedPage> cachedPage;
     if (m_loadingFromCachedPage)
         cachedPage = pageCache()->take(history().provisionalItem());
 
@@ -2954,10 +2948,10 @@ void FrameLoader::continueLoadAfterNavigationPolicy(const ResourceRequest&, Pass
     if (!m_frame.page())
         return;
 
-#if ENABLE(JAVASCRIPT_DEBUGGER) && ENABLE(INSPECTOR)
+#if ENABLE(INSPECTOR)
     if (Page* page = m_frame.page()) {
         if (m_frame.isMainFrame())
-            page->inspectorController()->resume();
+            page->inspectorController().resume();
     }
 #endif
 
@@ -3143,18 +3137,6 @@ bool FrameLoader::shouldTreatURLAsSrcdocDocument(const URL& url) const
     if (!ownerElement->hasTagName(iframeTag))
         return false;
     return ownerElement->fastHasAttribute(srcdocAttr);
-}
-
-void FrameLoader::checkDidPerformFirstNavigation()
-{
-    Page* page = m_frame.page();
-    if (!page)
-        return;
-
-    if (!m_didPerformFirstNavigation && page->backForward().currentItem() && !page->backForward().backItem() && !page->backForward().forwardItem()) {
-        m_didPerformFirstNavigation = true;
-        m_client.didPerformFirstNavigation();
-    }
 }
 
 Frame* FrameLoader::findFrameForNavigation(const AtomicString& name, Document* activeDocument)
@@ -3344,12 +3326,6 @@ String FrameLoader::referrer() const
     return m_documentLoader ? m_documentLoader->request().httpReferrer() : "";
 }
 
-void FrameLoader::dispatchDocumentElementAvailable()
-{
-    m_frame.injectUserScripts(InjectAtDocumentStart);
-    m_client.documentElementAvailable();
-}
-
 void FrameLoader::dispatchDidClearWindowObjectsInAllWorlds()
 {
     if (!m_frame.script().canExecuteScripts(NotAboutToExecuteScript))
@@ -3370,7 +3346,7 @@ void FrameLoader::dispatchDidClearWindowObjectInWorld(DOMWrapperWorld& world)
 
 #if ENABLE(INSPECTOR)
     if (Page* page = m_frame.page())
-        page->inspectorController()->didClearWindowObjectInWorld(&m_frame, world);
+        page->inspectorController().didClearWindowObjectInWorld(&m_frame, world);
 #endif
 
     InspectorInstrumentation::didClearWindowObjectInWorld(&m_frame, world);
