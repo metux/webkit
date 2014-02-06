@@ -14,6 +14,8 @@ webkitgtk (2.3.5-1) UNRELEASED; urgency=low
     + debian/libjavascriptcoregtk-3.0-bin.install: list package contents.
     + debian/libjavascriptcoregtk-3.0-bin.manpages,
       debian/jsc.1: add manual page.
+  * debian/libwebkit2gtk-3.0-25.symbols:
+    + Add new symbols.
 
  -- Alberto Garcia <berto@igalia.com>  Wed, 05 Feb 2014 15:53:47 +0200
 
