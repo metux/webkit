@@ -3,8 +3,8 @@ Subject: Restore removed SPARC code
 Bug: https://bugs.webkit.org/show_bug.cgi?id=124941
 Index: webkit/Source/WTF/wtf/Platform.h
 ===================================================================
---- webkit.orig/Source/WTF/wtf/Platform.h	2014-01-13 11:17:58.000000000 +0000
-+++ webkit/Source/WTF/wtf/Platform.h	2014-01-15 10:42:11.087883129 +0000
+--- webkit.orig/Source/WTF/wtf/Platform.h
++++ webkit/Source/WTF/wtf/Platform.h
 @@ -124,6 +124,23 @@
  #define WTF_CPU_SH4 1
  #endif
@@ -38,7 +38,7 @@ Index: webkit/Source/WTF/wtf/Platform.h
  #define WTF_CPU_NEEDS_ALIGNED_ACCESS 1
  #endif
  
-@@ -644,6 +661,7 @@
+@@ -640,6 +657,7 @@
      || (CPU(IA64) && !CPU(IA64_32)) \
      || CPU(ALPHA) \
      || CPU(ARM64) \
@@ -48,8 +48,8 @@ Index: webkit/Source/WTF/wtf/Platform.h
  #define WTF_USE_JSVALUE64 1
 Index: webkit/Source/WTF/wtf/dtoa/utils.h
 ===================================================================
---- webkit.orig/Source/WTF/wtf/dtoa/utils.h	2013-12-18 23:15:44.000000000 +0000
-+++ webkit/Source/WTF/wtf/dtoa/utils.h	2014-01-15 10:42:11.091883124 +0000
+--- webkit.orig/Source/WTF/wtf/dtoa/utils.h
++++ webkit/Source/WTF/wtf/dtoa/utils.h
 @@ -49,7 +49,7 @@
  defined(__ARMEL__) || \
  defined(_MIPS_ARCH_MIPS32R2)

@@ -1,6 +1,12 @@
 webkitgtk (2.3.5-1) UNRELEASED; urgency=low
 
   * New upstream release.
+  * debian/patches/02_notebook_scroll.patch,
+    debian/patches/enable_llint.patch,
+    debian/patches/restore_sparc_code.patch:
+    + Refresh.
+  * debian/patches/x86_asm_fix.patch:
+    + Remove, this has been merged upstream.
 
  -- Alberto Garcia <berto@igalia.com>  Wed, 05 Feb 2014 15:53:47 +0200
 

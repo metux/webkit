@@ -5,11 +5,11 @@ Index: webkit/Source/WTF/wtf/Platform.h
 ===================================================================
 --- webkit.orig/Source/WTF/wtf/Platform.h
 +++ webkit/Source/WTF/wtf/Platform.h
-@@ -730,7 +730,7 @@
+@@ -726,7 +726,7 @@
     low-level interpreter. */
  #if !defined(ENABLE_LLINT) \
      && ENABLE(JIT) \
--    && (OS(DARWIN) || OS(LINUX)) \
+-    && (OS(DARWIN) || OS(LINUX) || OS(FREEBSD)) \
 +    && (OS(DARWIN) || OS(LINUX) || OS(FREEBSD) || OS(HURD)) \
      && (PLATFORM(MAC) || PLATFORM(IOS) || PLATFORM(GTK)) \
      && (CPU(X86) || CPU(X86_64) || CPU(ARM_THUMB2) || CPU(ARM_TRADITIONAL) || CPU(ARM64) || CPU(MIPS) || CPU(SH4))
