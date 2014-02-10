@@ -2,6 +2,7 @@ webkitgtk (2.3.5-2) UNRELEASED; urgency=medium
 
   * debian/control:
     + Update package descriptions.
+    + Remove redundant Priority fields from libwebkitgtk-{1,3}.0-common.
 
  -- Alberto Garcia <berto@igalia.com>  Tue, 11 Feb 2014 12:42:34 +0200
 
