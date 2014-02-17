@@ -7,6 +7,8 @@ webkitgtk (2.3.90-1) UNRELEASED; urgency=medium
     + Remove duplicate build dependency on flex.
   * debian/patches/install-minibrowser.patch:
     + Ship the MiniBrowser binary, which is useful for testing purposes.
+  * debian/patches/02_notebook_scroll.patch:
+    + Refresh.
 
  -- Alberto Garcia <berto@igalia.com>  Tue, 11 Feb 2014 12:42:34 +0200
 

@@ -2,7 +2,7 @@ Index: webkit/Source/WebKit/gtk/webkit/webkitwebview.cpp
 ===================================================================
 --- webkit.orig/Source/WebKit/gtk/webkit/webkitwebview.cpp
 +++ webkit/Source/WebKit/gtk/webkit/webkitwebview.cpp
-@@ -809,6 +809,12 @@ static gboolean webkit_web_view_scroll_e
+@@ -808,6 +808,12 @@ static gboolean webkit_web_view_scroll_e
      if (!frame.view())
          return FALSE;
  
