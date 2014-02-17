@@ -66,7 +66,6 @@
 #include <WebCore/GtkUtilities.h>
 #include <WebCore/RefPtrCairo.h>
 #include <glib/gi18n-lib.h>
-#include <wtf/gobject/GOwnPtr.h>
 #include <wtf/gobject/GRefPtr.h>
 #include <wtf/text/CString.h>
 
@@ -132,6 +131,7 @@ enum {
     PROP_0,
 
     PROP_WEB_CONTEXT,
+    PROP_RELATED_VIEW,
     PROP_GROUP,
     PROP_TITLE,
     PROP_ESTIMATED_LOAD_PROGRESS,
@@ -157,6 +157,7 @@ struct _WebKitWebViewPrivate {
     }
 
     WebKitWebContext* context;
+    WebKitWebView* relatedView;
     CString title;
     CString customTextEncoding;
     double estimatedLoadProgress;
@@ -336,7 +337,7 @@ static void webkitWebViewCancelFaviconRequest(WebKitWebView* webView)
 
 static void gotFaviconCallback(GObject* object, GAsyncResult* result, gpointer userData)
 {
-    GOwnPtr<GError> error;
+    GUniqueOutPtr<GError> error;
     RefPtr<cairo_surface_t> favicon = adoptRef(webkit_favicon_database_get_favicon_finish(WEBKIT_FAVICON_DATABASE(object), result, &error.outPtr()));
     if (g_error_matches(error.get(), G_IO_ERROR, G_IO_ERROR_CANCELLED))
         return;
@@ -502,7 +503,9 @@ static void webkitWebViewConstructed(GObject* object)
 
     WebKitWebView* webView = WEBKIT_WEB_VIEW(object);
     WebKitWebViewPrivate* priv = webView->priv;
-    webkitWebContextCreatePageForWebView(priv->context, webView, priv->group.get());
+    webkitWebContextCreatePageForWebView(priv->context, webView, priv->group.get(), priv->relatedView);
+    // The related view is only valid during the construction.
+    priv->relatedView = nullptr;
 
     webkitWebViewBaseSetDownloadRequestHandler(WEBKIT_WEB_VIEW_BASE(webView), webkitWebViewHandleDownloadRequest);
 
@@ -529,6 +532,11 @@ static void webkitWebViewSetProperty(GObject* object, guint propId, const GValue
     case PROP_WEB_CONTEXT: {
         gpointer webContext = g_value_get_object(value);
         webView->priv->context = webContext ? WEBKIT_WEB_CONTEXT(webContext) : webkit_web_context_get_default();
+        break;
+    }
+    case PROP_RELATED_VIEW: {
+        gpointer relatedView = g_value_get_object(value);
+        webView->priv->relatedView = relatedView ? WEBKIT_WEB_VIEW(relatedView) : nullptr;
         break;
     }
     case PROP_GROUP: {
@@ -636,6 +644,25 @@ static void webkit_web_view_class_init(WebKitWebViewClass* webViewClass)
                                                         _("The web context for the view"),
                                                         WEBKIT_TYPE_WEB_CONTEXT,
                                                         static_cast<GParamFlags>(WEBKIT_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY)));
+    /**
+     * WebKitWebView:related-view:
+     *
+     * The related #WebKitWebView used when creating the view to share the
+     * same web process. This property is not readable because the related
+     * web view is only valid during the object construction.
+     *
+     * Since: 2.4
+     */
+    g_object_class_install_property(
+        gObjectClass,
+        PROP_RELATED_VIEW,
+        g_param_spec_object(
+            "related-view",
+            _("Related WebView"),
+            _("The related WebKitWebView used when creating the view to share the same web process"),
+            WEBKIT_TYPE_WEB_VIEW,
+            static_cast<GParamFlags>(WEBKIT_PARAM_WRITABLE | G_PARAM_CONSTRUCT_ONLY)));
+
     /**
      * WebKitWebView:group:
      *
@@ -889,6 +916,11 @@ static void webkit_web_view_class_init(WebKitWebViewClass* webViewClass)
      * Emitted when the creation of a new #WebKitWebView is requested.
      * If this signal is handled the signal handler should return the
      * newly created #WebKitWebView.
+     *
+     * When using %WEBKIT_PROCESS_MODEL_MULTIPLE_SECONDARY_PROCESSES
+     * process model, the new #WebKitWebView should be related to
+     * @web_view to share the same web process, see webkit_web_view_new_with_related_view
+     * for more details.
      *
      * The new #WebKitWebView should not be displayed to the user
      * until the #WebKitWebView::ready-to-show signal is emitted.
@@ -1879,6 +1911,29 @@ GtkWidget* webkit_web_view_new_with_context(WebKitWebContext* context)
     g_return_val_if_fail(WEBKIT_IS_WEB_CONTEXT(context), 0);
 
     return GTK_WIDGET(g_object_new(WEBKIT_TYPE_WEB_VIEW, "web-context", context, NULL));
+}
+
+/**
+ * webkit_web_view_new_with_related_view:
+ * @web_view: the related #WebKitWebView
+ *
+ * Creates a new #WebKitWebView sharing the same web process with @web_view.
+ * This method doesn't have any effect when %WEBKIT_PROCESS_MODEL_SHARED_SECONDARY_PROCESS
+ * process model is used, because a single web process is shared for all the web views in the
+ * same #WebKitWebContext. When using %WEBKIT_PROCESS_MODEL_MULTIPLE_SECONDARY_PROCESSES process model,
+ * this method should always be used when creating the #WebKitWebView in the #WebKitWebView::create signal.
+ * You can also use this method to implement other process models based on %WEBKIT_PROCESS_MODEL_MULTIPLE_SECONDARY_PROCESSES,
+ * like for example, sharing the same web process for all the views in the same security domain.
+ *
+ * Returns: (transfer full): The newly created #WebKitWebView widget
+ *
+ * Since: 2.4
+ */
+GtkWidget* webkit_web_view_new_with_related_view(WebKitWebView* webView)
+{
+    g_return_val_if_fail(WEBKIT_IS_WEB_VIEW(webView), nullptr);
+
+    return GTK_WIDGET(g_object_new(WEBKIT_TYPE_WEB_VIEW, "related-view", webView, nullptr));
 }
 
 /**

@@ -653,6 +653,27 @@ WebKitDOMDocument
 @Returns: 
 
 
+<!-- ##### FUNCTION webkit_dom_document_create_touch ##### -->
+<para>
+
+</para>
+
+@self: 
+@window: 
+@target: 
+@identifier: 
+@pageX: 
+@pageY: 
+@screenX: 
+@screenY: 
+@webkitRadiusX: 
+@webkitRadiusY: 
+@webkitRotationAngle: 
+@webkitForce: 
+@error: 
+@Returns: 
+
+
 <!-- ##### FUNCTION webkit_dom_document_get_doctype ##### -->
 <para>
 

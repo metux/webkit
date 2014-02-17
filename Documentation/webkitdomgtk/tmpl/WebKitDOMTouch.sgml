@@ -1,0 +1,196 @@
+<!-- ##### SECTION Title ##### -->
+WebKitDOMTouch
+
+<!-- ##### SECTION Short_Description ##### -->
+
+
+<!-- ##### SECTION Long_Description ##### -->
+<para>
+
+</para>
+
+<!-- ##### SECTION See_Also ##### -->
+<para>
+
+</para>
+
+<!-- ##### SECTION Stability_Level ##### -->
+
+
+<!-- ##### SECTION Image ##### -->
+
+
+<!-- ##### STRUCT WebKitDOMTouch ##### -->
+<para>
+
+</para>
+
+
+<!-- ##### ARG WebKitDOMTouch:client-x ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMTouch:client-y ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMTouch:identifier ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMTouch:page-x ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMTouch:page-y ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMTouch:screen-x ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMTouch:screen-y ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMTouch:target ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMTouch:webkit-force ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMTouch:webkit-radius-x ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMTouch:webkit-radius-y ##### -->
+<para>
+
+</para>
+
+<!-- ##### ARG WebKitDOMTouch:webkit-rotation-angle ##### -->
+<para>
+
+</para>
+
+<!-- ##### FUNCTION webkit_dom_touch_get_client_x ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_touch_get_client_y ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_touch_get_screen_x ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_touch_get_screen_y ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_touch_get_page_x ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_touch_get_page_y ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_touch_get_target ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_touch_get_identifier ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_touch_get_webkit_radius_x ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_touch_get_webkit_radius_y ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_touch_get_webkit_rotation_angle ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_dom_touch_get_webkit_force ##### -->
+<para>
+
+</para>
+
+@self: 
+@Returns: 
+
+
