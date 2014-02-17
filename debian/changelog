@@ -9,6 +9,8 @@ webkitgtk (2.3.90-1) UNRELEASED; urgency=medium
     + Ship the MiniBrowser binary, which is useful for testing purposes.
   * debian/patches/dfg-jit.patch:
     + Enable DFG JIT on FreeBSD and Hurd.
+  * debian/patches/fix-gtkdoc-error.patch:
+    + Fix error in gtk-doc generation.
   * debian/patches/02_notebook_scroll.patch:
     + Refresh.
 
