@@ -3004,8 +3004,11 @@ webcore_sources += \
 	Source/WebCore/dom/TextNodeTraversal.cpp \
 	Source/WebCore/dom/TextNodeTraversal.h \
 	Source/WebCore/dom/Text.h \
+	Source/WebCore/dom/Touch.cpp \
 	Source/WebCore/dom/Touch.h \
+	Source/WebCore/dom/TouchEvent.cpp \
 	Source/WebCore/dom/TouchEvent.h \
+	Source/WebCore/dom/TouchList.cpp \
 	Source/WebCore/dom/TouchList.h \
 	Source/WebCore/dom/TransformSource.h \
 	Source/WebCore/dom/TransformSourceLibxslt.cpp \
@@ -5866,8 +5869,6 @@ platform_sources += \
 	Source/WebCore/platform/leveldb/LevelDBTransaction.cpp \
 	Source/WebCore/platform/leveldb/LevelDBWriteBatch.h \
 	Source/WebCore/platform/leveldb/LevelDBWriteBatch.cpp \
-	Source/WebCore/platform/network/soup/GOwnPtrSoup.cpp \
-	Source/WebCore/platform/network/soup/GOwnPtrSoup.h \
 	Source/WebCore/platform/network/soup/GUniquePtrSoup.h \
 	Source/WebCore/platform/network/soup/ProxyServerSoup.cpp \
 	Source/WebCore/platform/network/soup/ResourceError.h \
@@ -6042,6 +6043,8 @@ platform_sources += \
 	Source/WebCore/platform/PlatformScreen.h \
 	Source/WebCore/platform/PlatformStrategies.cpp \
 	Source/WebCore/platform/PlatformStrategies.h \
+	Source/WebCore/platform/PlatformTouchEvent.h \
+	Source/WebCore/platform/PlatformTouchPoint.h \
 	Source/WebCore/platform/PlatformWheelEvent.h \
 	Source/WebCore/platform/PopupMenuClient.h \
 	Source/WebCore/platform/PopupMenu.h \
@@ -6194,6 +6197,8 @@ platformgtk_sources += \
 	Source/WebCore/platform/gtk/GtkInputMethodFilter.h \
 	Source/WebCore/platform/gtk/GtkPopupMenu.cpp \
 	Source/WebCore/platform/gtk/GtkPopupMenu.h \
+	Source/WebCore/platform/gtk/GtkTouchContextHelper.cpp \
+	Source/WebCore/platform/gtk/GtkTouchContextHelper.h \
 	Source/WebCore/platform/gtk/GtkUtilities.cpp \
 	Source/WebCore/platform/gtk/GtkUtilities.h \
 	Source/WebCore/platform/gtk/GtkVersioning.c \

@@ -235,6 +235,11 @@ WebKitWebView
 
 </para>
 
+<!-- ##### ARG WebKitWebView:related-view ##### -->
+<para>
+
+</para>
+
 <!-- ##### ARG WebKitWebView:title ##### -->
 <para>
 
@@ -375,6 +380,15 @@ WebKitWebView
 </para>
 
 @context: 
+@Returns: 
+
+
+<!-- ##### FUNCTION webkit_web_view_new_with_related_view ##### -->
+<para>
+
+</para>
+
+@web_view: 
 @Returns: 
 
 

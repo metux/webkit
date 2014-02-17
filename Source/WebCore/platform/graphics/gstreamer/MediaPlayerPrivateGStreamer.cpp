@@ -37,7 +37,6 @@
 #include <gst/gst.h>
 #include <gst/pbutils/missing-plugins.h>
 #include <limits>
-#include <wtf/gobject/GOwnPtr.h>
 #include <wtf/gobject/GUniquePtr.h>
 #include <wtf/text/CString.h>
 
@@ -863,6 +862,9 @@ void MediaPlayerPrivateGStreamer::newTextSample()
 
 void MediaPlayerPrivateGStreamer::setRate(float rate)
 {
+    // Higher rate causes crash.
+    rate = clampTo(rate, -20, 20);
+
     // Avoid useless playback rate update.
     if (m_playbackRate == rate) {
         // and make sure that upper layers were notified if rate was set
@@ -945,8 +947,8 @@ PassRefPtr<TimeRanges> MediaPlayerPrivateGStreamer::buffered() const
 
 gboolean MediaPlayerPrivateGStreamer::handleMessage(GstMessage* message)
 {
-    GOwnPtr<GError> err;
-    GOwnPtr<gchar> debug;
+    GUniqueOutPtr<GError> err;
+    GUniqueOutPtr<gchar> debug;
     MediaPlayer::NetworkState error;
     bool issueError = true;
     bool attemptNextLocation = false;
