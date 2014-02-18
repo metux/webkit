@@ -25,3 +25,13 @@ Index: webkitgtk/Tools/MiniBrowser/gtk/GNUmakefile.am
  	Programs/MiniBrowser
  endif
  
+@@ -44,9 +44,6 @@ Programs_MiniBrowser_LDADD = \
+ 	$(GTK_LIBS) \
+ 	$(LIBSOUP_LIBS)
+ 
+-Programs_MiniBrowser_LDFLAGS = \
+-	-no-install
+-
+ CLEANFILES += \
+ 	$(top_builddir)/Programs/MiniBrowser \
+ 	$(minibrowser_built_sources) \
