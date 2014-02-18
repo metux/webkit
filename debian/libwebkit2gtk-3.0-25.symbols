@@ -185,6 +185,7 @@ libwebkit2gtk-3.0.so.25 libwebkit2gtk-3.0-25 #MINVER#
  webkit_dom_document_create_processing_instruction@Base 2.0.2
  webkit_dom_document_create_range@Base 2.0.2
  webkit_dom_document_create_text_node@Base 2.0.2
+ webkit_dom_document_create_touch@Base 2.3.90
  webkit_dom_document_create_tree_walker@Base 2.0.2
  webkit_dom_document_element_from_point@Base 2.0.2
  webkit_dom_document_evaluate@Base 2.0.2
@@ -1879,6 +1880,19 @@ libwebkit2gtk-3.0.so.25 libwebkit2gtk-3.0-25 #MINVER#
  webkit_dom_time_ranges_get_length@Base 2.0.2
  webkit_dom_time_ranges_get_type@Base 2.0.2
  webkit_dom_time_ranges_start@Base 2.0.2
+ webkit_dom_touch_get_client_x@Base 2.3.90
+ webkit_dom_touch_get_client_y@Base 2.3.90
+ webkit_dom_touch_get_identifier@Base 2.3.90
+ webkit_dom_touch_get_page_x@Base 2.3.90
+ webkit_dom_touch_get_page_y@Base 2.3.90
+ webkit_dom_touch_get_screen_x@Base 2.3.90
+ webkit_dom_touch_get_screen_y@Base 2.3.90
+ webkit_dom_touch_get_target@Base 2.3.90
+ webkit_dom_touch_get_type@Base 2.3.90
+ webkit_dom_touch_get_webkit_force@Base 2.3.90
+ webkit_dom_touch_get_webkit_radius_x@Base 2.3.90
+ webkit_dom_touch_get_webkit_radius_y@Base 2.3.90
+ webkit_dom_touch_get_webkit_rotation_angle@Base 2.3.90
  webkit_dom_track_event_get_type@Base 2.0.2
  webkit_dom_tree_walker_first_child@Base 2.0.2
  webkit_dom_tree_walker_get_current_node@Base 2.0.2
@@ -2360,6 +2374,7 @@ libwebkit2gtk-3.0.so.25 libwebkit2gtk-3.0-25 #MINVER#
  webkit_web_view_new@Base 2.0.2
  webkit_web_view_new_with_context@Base 2.0.2
  webkit_web_view_new_with_group@Base 2.0.2
+ webkit_web_view_new_with_related_view@Base 2.3.90
  webkit_web_view_reload@Base 2.0.2
  webkit_web_view_reload_bypass_cache@Base 2.0.2
  webkit_web_view_run_javascript@Base 2.0.2

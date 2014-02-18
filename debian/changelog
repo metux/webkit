@@ -1,6 +1,10 @@
 webkitgtk (2.3.90-1) UNRELEASED; urgency=medium
 
   * New upstream release.
+  * debian/libwebkitgtk-1.0-0.symbols,
+    debian/libwebkitgtk-3.0-0.symbols,
+    debian/libwebkit2gtk-3.0-25.symbols:
+    + Add new symbols.
   * debian/control:
     + Update package descriptions.
     + Remove redundant Priority fields from libwebkitgtk-{1,3}.0-common.
