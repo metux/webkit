@@ -1,3 +1,30 @@
+2014-03-03  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        [GTK] WebKit2WebExtension GIR can't be used in vala
+        https://bugs.webkit.org/show_bug.cgi?id=127179
+
+        Reviewed by Martin Robinson.
+
+        Add a different pkg-config file for the web extensions API.
+
+        * Source/cmake/OptionsGTK.cmake:
+        * configure.ac:
+
+2014-02-27  Koop Mast  <kwm@FreeBSD.org>
+
+        Fallback on checking for libz manualy if zlib.pc isn't available.
+        https://bugs.webkit.org/show_bug.cgi?id=127061
+
+        Reviewed by Gustavo Noronha Silva.
+
+        * Source/autotools/FindDependencies.m4:
+
+2014-02-17  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        Unreviewed. Update NEWS and Versions.m4 for 2.3.90 release.
+
+        * Source/autotools/Versions.m4: Bump version numbers.
+
 2014-02-12  Ryan Lortie  <desrt@desrt.ca>
 
         'ar T' is not portable and breaks the build on FreeBSD
