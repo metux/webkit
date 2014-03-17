@@ -1,6 +1,9 @@
 webkitgtk (2.3.92-1) UNRELEASED; urgency=low
 
   * New upstream release.
+  * debian/patches/dfg-jit.patch,
+    debian/patches/install-minibrowser.patch:
+    + Refresh.
 
  -- Alberto Garcia <berto@igalia.com>  Mon, 17 Mar 2014 10:34:24 +0000
 

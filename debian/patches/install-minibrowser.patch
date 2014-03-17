@@ -5,7 +5,7 @@ Index: webkitgtk/Tools/MiniBrowser/gtk/main.c
 ===================================================================
 --- webkitgtk.orig/Tools/MiniBrowser/gtk/main.c
 +++ webkitgtk/Tools/MiniBrowser/gtk/main.c
-@@ -269,8 +269,6 @@ int main(int argc, char *argv[])
+@@ -265,8 +265,6 @@ int main(int argc, char *argv[])
      }
      g_option_context_free (context);
  
