@@ -1,3 +1,125 @@
+2014-03-12  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        [GTK] [Stable] deadlock in gobject introspection
+        https://bugs.webkit.org/show_bug.cgi?id=125651
+
+        Reviewed by Sergio Villar Senin.
+
+        Make the default SoupNetworkSession a destroyable object to ensure
+        the wrapped SoupSession is finalized when the process finishes. This
+        is important because soup cancels any ongoing connection when finalized.
+
+        * platform/network/soup/SoupNetworkSession.cpp:
+        (WebCore::SoupNetworkSession::defaultSession): Do not use NeverDestroyed.
+        * platform/network/soup/SoupNetworkSession.h:
+
+2014-03-10  Mario Sanchez Prada  <mario.prada@samsung.com>
+
+        [GTK] Add support for Geoclue2
+        https://bugs.webkit.org/show_bug.cgi?id=120185
+
+        Reviewed by Carlos Garcia Campos.
+
+        Patch by Anton Obzhirov <a.obzhirov@samsung.com> and Mario Sanchez Prada <mario.prada@samsung.com>
+
+        Implement a new geolocation provider based on Geoclue2, which will only
+        be used if a good enough version of Geoclue2 is found  at configure time.
+
+        * GNUmakefile.am: Generate C-API for accessing the D-Bus API
+        provided by Geoclue2, and place it in DerivedSources.
+        * GNUmakefile.list.am: Add GeolocationProviderGeoclue2.cpp, and
+        include the generated proxy files when using Geoclue2.
+        * PlatformGTK.cmake: Likewise, for CMake based builds.
+        * platform/geoclue/GeolocationProviderGeoclue.h: Modified to
+        accomodate the needs both for Geoclue and Geoclue2 providers.
+        * platform/geoclue/GeolocationProviderGeoclue1.cpp: Renamed from Source/WebCore/platform/geoclue/GeolocationProviderGeoclue.cpp.
+        (GeolocationProviderGeoclue::getPositionCallback):
+        (GeolocationProviderGeoclue::positionChangedCallback):
+        (GeolocationProviderGeoclue::createGeocluePositionCallback):
+        (GeolocationProviderGeoclue::geoclueClientSetRequirementsCallback):
+        (GeolocationProviderGeoclue::createGeoclueClientCallback):
+        (GeolocationProviderGeoclue::GeolocationProviderGeoclue):
+        (GeolocationProviderGeoclue::~GeolocationProviderGeoclue):
+        (GeolocationProviderGeoclue::startUpdating):
+        (GeolocationProviderGeoclue::stopUpdating):
+        (GeolocationProviderGeoclue::setEnableHighAccuracy):
+        (GeolocationProviderGeoclue::initializeGeoclueClient):
+        (GeolocationProviderGeoclue::initializeGeocluePosition):
+        (GeolocationProviderGeoclue::updateClientRequirements):
+        (GeolocationProviderGeoclue::positionChanged):
+        (GeolocationProviderGeoclue::errorOccurred):
+        * platform/geoclue/GeolocationProviderGeoclue2.cpp: Added.
+        (GeolocationProviderGeoclue::GeolocationProviderGeoclue):
+        (GeolocationProviderGeoclue::~GeolocationProviderGeoclue):
+        (GeolocationProviderGeoclue::startUpdating):
+        (GeolocationProviderGeoclue::stopUpdating):
+        (GeolocationProviderGeoclue::setEnableHighAccuracy):
+        (GeolocationProviderGeoclue::createGeoclueManagerProxyCallback):
+        (GeolocationProviderGeoclue::getGeoclueClientCallback):
+        (GeolocationProviderGeoclue::createGeoclueClientProxyCallback):
+        (GeolocationProviderGeoclue::startClientCallback):
+        (GeolocationProviderGeoclue::locationUpdatedCallback):
+        (GeolocationProviderGeoclue::createLocationProxyCallback):
+        (GeolocationProviderGeoclue::startGeoclueClient):
+        (GeolocationProviderGeoclue::updateLocation):
+        (GeolocationProviderGeoclue::errorOccurred):
+        (GeolocationProviderGeoclue::updateClientRequirements):
+
+2014-03-07  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        [GTK] Timeout sources not correctly removed
+        https://bugs.webkit.org/show_bug.cgi?id=129877
+
+        Reviewed by Philippe Normand.
+
+        Set source ID variables to 0 after removing the sources from the
+        context. Also give a name to the sources.
+
+        * platform/graphics/gstreamer/TrackPrivateBaseGStreamer.cpp:
+        (WebCore::TrackPrivateBaseGStreamer::disconnect):
+        (WebCore::TrackPrivateBaseGStreamer::activeChanged):
+        (WebCore::TrackPrivateBaseGStreamer::tagsChanged):
+        (WebCore::TrackPrivateBaseGStreamer::notifyTrackOfActiveChanged):
+
+2014-03-03  Lorenzo Tilve  <ltilve@igalia.com>
+
+        Optimize StylePropertiesSet::findPropertyIndex() to improve CSS properties performance
+        https://bugs.webkit.org/show_bug.cgi?id=129605
+
+        Reviewed by Andreas Kling.
+
+        Merged from Blink (patch by Mikhail Pozdnyakov):
+        https://src.chromium.org/viewvc/blink?view=revision&revision=167325
+
+        Avoid checking whether 'StylePropertiesSet' is mutable and accesing directly to its
+        data members to achieve performance improvements
+
+        Before the optimization applied:
+            mean: 3064.8337171934063 runs/s
+            median: 3097.5899379343855 runs/s
+            stdev: 66.89274074044187 runs/s
+            min: 2891.7479324362585 runs/s
+            max: 3113.288683440125 runs/s
+
+        After the optimization applied:
+            mean: 3343.8356114138105 runs/s
+            median: 3356.25682957446 runs/s
+            stdev: 36.297533087489036 runs/s
+            min: 3238.5468032264243 runs/s
+            max: 3368.664837531425 runs/s
+
+        Performance gain for the average value is approx. 9.1%, in the
+        range of the 10% - 8.2% for the min and max measured
+        values (Linux desktop x64).
+
+        * css/StyleProperties.cpp:
+        (WebCore::ImmutableStyleProperties::findPropertyIndex):
+        (WebCore::MutableStyleProperties::findPropertyIndex):
+        * css/StyleProperties.h:
+        (WebCore::toMutableStyleProperties):
+        (WebCore::toImmutableStyleProperties):
+        (WebCore::StyleProperties::findPropertyIndex):
+
 2014-03-03  Tomas Popela  <tpopela@redhat.com>
 
         [GTK] webkit_dom_range_compare_boundary_points fails when 0 is passed as how parameter

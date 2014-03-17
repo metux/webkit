@@ -22,6 +22,9 @@ AM_CONDITIONAL([OS_GNU],[test "$os_gnu" = "yes"])
 AM_CONDITIONAL([OS_DARWIN],[test "$os_darwin" = "yes"])
 AM_CONDITIONAL([OS_FREEBSD],[test "$os_freebsd" = "yes"])
 
+AM_CONDITIONAL([COMPILER_GCC],[test "$c_compiler" = "gcc" && test "$cxx_compiler" = "g++"])
+AM_CONDITIONAL([COMPILER_CLANG],[test "$c_compiler" = "clang" && test "$cxx_compiler" = "clang++"])
+
 # Target conditionals.
 AM_CONDITIONAL([TARGET_X11], [test "$enable_x11_target" = "yes"])
 AM_CONDITIONAL([TARGET_WAYLAND], [test "$enable_wayland_target" = "yes"])
@@ -29,6 +32,9 @@ AM_CONDITIONAL([TARGET_X11_OR_WAYLAND], [test "$enable_x11_target" = "yes" || te
 AM_CONDITIONAL([TARGET_WIN32], [test "$enable_win32_target" = "yes"])
 AM_CONDITIONAL([TARGET_QUARTZ], [test "$enable_quartz_target" = "yes"])
 AM_CONDITIONAL([TARGET_DIRECTFB], [test "$enable_directfb_target" = "yes"])
+
+# Geoclue conditionals.
+AM_CONDITIONAL([USE_GEOCLUE2],[test "$found_geoclue2" = "yes"])
 
 # GStreamer feature conditionals.
 AM_CONDITIONAL([USE_GSTREAMER], [test "$enable_video" = "yes" || test "$enable_web_audio" = "yes"])

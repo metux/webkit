@@ -1,3 +1,45 @@
+2014-03-10  Mario Sanchez Prada  <mario.prada@samsung.com>
+
+        [GTK] Add support for Geoclue2
+        https://bugs.webkit.org/show_bug.cgi?id=120185
+
+        Reviewed by Carlos Garcia Campos.
+
+        Patch by Anton Obzhirov <a.obzhirov@samsung.com> and Mario Sanchez Prada <mario.prada@samsung.com>
+
+        Add support for Geoclue2 using autotools.
+
+        * Source/autotools/FindDependencies.m4: Add support for handling
+        both Geoclue 1.0 and 2.0.
+        * Source/autotools/PrintBuildConfiguration.m4: Print the version
+        of geoclue that is being used.
+        * Source/autotools/SetupAutoconfHeader.m4: Define GEOCLUE_API_VERSION_2.
+        * Source/autotools/SetupAutomake.m4: Likewise, for AM_CONDITIONAL.
+        * Source/autotools/Versions.m4: Added minimum required version for Geoclue2.
+
+        Add support for Geoclue2 using CMake.
+
+        * Source/cmake/FindGeoClue2.cmake: Added.
+        * Source/cmake/OptionsGTK.cmake:  Add support for handling Geoclue 1.0 and 2.0.
+        * Source/cmakeconfig.h.cmake: Define WTF_USE_GEOCLUE2.
+
+2014-01-30  Zan Dobersek  <zdobersek@igalia.com>
+
+        [GTK] Only disable -ftree-dce optimization when compiling with GCC
+        https://bugs.webkit.org/show_bug.cgi?id=127911
+
+        Reviewed by Carlos Garcia Campos.
+
+        * Source/autotools/SetupAutomake.m4: Define the COMPILER_GCC and COMPILER_CLANG Automake macros.
+        These can be used when compiler-specific flags have to be used. The latter one is not actually needed
+        at the moment, but is added for the sake of completeness.
+
+2014-03-03  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        Unreviewed. Update NEWS and Versions.m4 for 2.3.91 release.
+
+        * Source/autotools/Versions.m4: Bump version numbers.
+
 2014-03-03  Carlos Garcia Campos  <cgarcia@igalia.com>
 
         [GTK] WebKit2WebExtension GIR can't be used in vala
