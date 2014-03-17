@@ -72,6 +72,18 @@ javascriptcore_cppflags += \
 	-I$(srcdir)/Source/WTF \
 	$(LLVM_CFLAGS)
 
+# FIXME: the -fomit-frame-pointer and -ftree-dce optimizations are disabled after they've been causing
+# trouble with the merged jsCStack code. The former is required due to otherwise incorrectly compiled
+# operationCallEval function, while the latter is required when using GCC 4.8. See bugs #127777 and
+# #127909 for more information.
+javascriptcore_cppflags += \
+	-fno-omit-frame-pointer
+
+if COMPILER_GCC
+javascriptcore_cppflags += \
+	-fno-tree-dce
+endif
+
 javascriptcore_cflags += \
 	$(global_cflags) \
 	$(GLIB_CFLAGS) \

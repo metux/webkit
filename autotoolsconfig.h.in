@@ -163,6 +163,9 @@
 #undef WTF_USE_EGL
 
 /* */
+#undef WTF_USE_GEOCLUE2
+
+/* */
 #undef WTF_USE_GLX
 
 /* */
