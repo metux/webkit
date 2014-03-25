@@ -1,4 +1,4 @@
-webkitgtk (2.4.0-1) UNRELEASED; urgency=medium
+webkitgtk (2.4.0-1) experimental; urgency=medium
 
   * New upstream stable release.
   * debian/patches/fix-textrel-x86.patch:
