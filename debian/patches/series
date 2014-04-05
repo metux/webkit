@@ -6,3 +6,4 @@ restore_sparc_code.patch
 enable_llint.patch
 02_notebook_scroll.patch
 fix-textrel-x86.patch
+ftbfs-armhf.patch
