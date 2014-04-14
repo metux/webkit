@@ -28,6 +28,11 @@ WebKitDOMTreeWalker
 </para>
 
 
+<!-- ##### ARG WebKitDOMTreeWalker:current-node ##### -->
+<para>
+
+</para>
+
 <!-- ##### ARG WebKitDOMTreeWalker:expand-entity-references ##### -->
 <para>
 

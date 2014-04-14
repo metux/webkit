@@ -867,6 +867,7 @@
     <keyword type="function" name="webkit_dom_tree_walker_get_current_node ()" link="WebKitDOMTreeWalker.html#webkit-dom-tree-walker-get-current-node"/>
     <keyword type="function" name="webkit_dom_tree_walker_set_current_node ()" link="WebKitDOMTreeWalker.html#webkit-dom-tree-walker-set-current-node"/>
     <keyword type="struct" name="WebKitDOMTreeWalker" link="WebKitDOMTreeWalker.html#WebKitDOMTreeWalker-struct"/>
+    <keyword type="property" name="The “current-node” property" link="WebKitDOMTreeWalker.html#WebKitDOMTreeWalker--current-node"/>
     <keyword type="property" name="The “expand-entity-references” property" link="WebKitDOMTreeWalker.html#WebKitDOMTreeWalker--expand-entity-references"/>
     <keyword type="property" name="The “filter” property" link="WebKitDOMTreeWalker.html#WebKitDOMTreeWalker--filter"/>
     <keyword type="property" name="The “root” property" link="WebKitDOMTreeWalker.html#WebKitDOMTreeWalker--root"/>
