@@ -1,41 +1,12 @@
 #!/usr/bin/make -f
 
-# Uncomment this to turn on verbose mode.
-#export DH_VERBOSE=1
+DEB_BUILD_ARCH     ?= $(shell dpkg-architecture -qDEB_BUILD_ARCH)
+DEB_HOST_ARCH_BITS ?= $(shell dpkg-architecture -qDEB_HOST_ARCH_BITS)
+DEB_HOST_MULTIARCH ?= $(shell dpkg-architecture -qDEB_HOST_MULTIARCH)
 
-DEB_HOST_GNU_TYPE   ?= $(shell dpkg-architecture -qDEB_HOST_GNU_TYPE)
-DEB_BUILD_GNU_TYPE  ?= $(shell dpkg-architecture -qDEB_BUILD_GNU_TYPE)
-DEB_BUILD_ARCH      ?= $(shell dpkg-architecture -qDEB_BUILD_ARCH)
-DEB_HOST_ARCH_BITS  ?= $(shell dpkg-architecture -qDEB_HOST_ARCH_BITS)
-DEB_HOST_MULTIARCH  ?= $(shell dpkg-architecture -qDEB_HOST_MULTIARCH)
-
-GTK_VERSIONS = 2.0 3.0
-ENABLE_WEBKIT2 ?= yes
-
+CPPFLAGS = $(shell dpkg-buildflags --get CPPFLAGS) -Wall
 CFLAGS = $(shell dpkg-buildflags --get CFLAGS)
-CFLAGS += -Wall -Wl,--as-needed
-LDFLAGS = $(shell dpkg-buildflags --get LDFLAGS)
-CPPFLAGS = $(shell dpkg-buildflags --get CPPFLAGS)
-
-COMMON_CONFIGURE_ARGUMENTS = \
-	--libdir=\$${prefix}/lib/$(DEB_HOST_MULTIARCH) \
-	--disable-silent-rules \
-	--host=$(DEB_HOST_GNU_TYPE) \
-	--build=$(DEB_BUILD_GNU_TYPE) \
-	--enable-gtk-doc \
-	--enable-introspection \
-	--enable-geolocation
-
-# This is used by the GTK+ 3.0 library only.
-EXTRA_CONFIGURE_ARGUMENTS =
-EXTRA_DH_ARGUMENTS =
-
-ifeq ($(ENABLE_WEBKIT2),yes)
-	EXTRA_CONFIGURE_ARGUMENTS += --enable-webkit2 --libexecdir=\$${libdir}/webkit2gtk-3.0/libexec
-else
-	EXTRA_CONFIGURE_ARGUMENTS += --disable-webkit2
-	EXTRA_DH_ARGUMENTS += -Nlibwebkit2gtk-3.0-25 -Nlibwebkit2gtk-3.0-dev -Nlibwebkit2gtk-3.0-25-dbg -Ngir1.2-webkit2-3.0
-endif
+LDFLAGS = $(shell dpkg-buildflags --get LDFLAGS) -Wl,--as-needed
 
 # Sacrifice speed in order to make it more likely resource limits
 # won't be hit.
@@ -44,47 +15,40 @@ ifeq ($(DEB_HOST_ARCH_BITS),32)
 endif
 
 ifeq ($(DEB_BUILD_ARCH),alpha)
-        LDFLAGS += -Wl,--no-relax
+	LDFLAGS += -Wl,--no-relax
 endif
 
 # Disable debugging symbols on these arches.
-ifneq (,$(filter $(DEB_BUILD_ARCH),hurd-i386 ia64 mips mipsel powerpcspe s390 s390x sparc))
+ifneq (,$(filter $(DEB_BUILD_ARCH),hurd-i386 ia64 kfreebsd-i386 mips mipsel powerpcspe s390 s390x sparc))
 	CFLAGS := $(CFLAGS:-g=)
 endif
 
 # Let's try to keep debugging symbols on these arches.
-ifneq (,$(filter $(DEB_BUILD_ARCH),armel armhf kfreebsd-amd64 kfreebsd-i386 powerpc))
+ifneq (,$(filter $(DEB_BUILD_ARCH),armel armhf kfreebsd-amd64 powerpc))
 	CFLAGS += -gstabs
 endif
 
 # disable jit on some architectures (bug #651636)
 ifneq (,$(filter $(DEB_BUILD_ARCH),armel mips mipsel))
-	COMMON_CONFIGURE_ARGUMENTS += --disable-jit
+	EXTRA_CMAKE_ARGUMENTS += -DENABLE_JIT=OFF
 endif
 
 # See https://bugs.webkit.org/show_bug.cgi?id=113638
-ifneq (,$(filter $(DEB_BUILD_ARCH),alpha hppa ia64 powerpc powerpcspe ppc64 sparc sparc64 s390 s390x mips64el))
-	CPPFLAGS += -DENABLE_JIT=0 -DENABLE_YARR_JIT=0 -DENABLE_ASSEMBLER=0
-endif
-
-# Disabling GLX on ARM will make it use EGL, which works better.
-ifneq (,$(filter $(DEB_BUILD_ARCH),armel armhf))
-       COMMON_CONFIGURE_ARGUMENTS += --enable-glx=no
+ifneq (,$(filter $(DEB_BUILD_ARCH),arm64 alpha hppa ia64 powerpc powerpcspe ppc64 sparc sparc64 s390 s390x mipsn32 mipsn32el mips64 mips64el))
+	EXTRA_CMAKE_ARGUMENTS += -DENABLE_JIT=OFF
+	CPPFLAGS += -DENABLE_YARR_JIT=0 -DENABLE_ASSEMBLER=0
 endif
 
 ifneq (,$(filter noopt,$(DEB_BUILD_OPTIONS)))
-	COMMON_CONFIGURE_ARGUMENTS += --disable-fast-malloc --disable-optimizations
+	EXTRA_CMAKE_ARGUMENTS += -DUSE_SYSTEM_MALLOC=ON
 endif
 
 ifneq (,$(filter debug,$(DEB_BUILD_OPTIONS)))
-	COMMON_CONFIGURE_ARGUMENTS += --enable-debug
+	EXTRA_CMAKE_ARGUMENTS += -DCMAKE_BUILD_TYPE=Debug
+else
+	EXTRA_CMAKE_ARGUMENTS += -DCMAKE_BUILD_TYPE=Release
+	CPPFLAGS += -DNDEBUG
 endif
-
-# Parallel builds are unstable, see #714072 and #722520
-# ifneq (,$(filter parallel=%,$(DEB_BUILD_OPTIONS)))
-# 	NUMJOBS = $(patsubst parallel=%,%,$(filter parallel=%,$(DEB_BUILD_OPTIONS)))
-# 	MAKEARGUMENTS += -j$(NUMJOBS)
-# endif
 
 ifeq ($(shell dpkg-vendor --derives-from Ubuntu && echo yes),yes)
 	DEB_DH_GENCONTROL_ARGS += -- -Vgst:Recommends=""
@@ -92,186 +56,55 @@ else
 	DEB_DH_GENCONTROL_ARGS += -- -Vgst:Recommends="gstreamer1.0-plugins-bad, gstreamer1.0-libav,"
 endif
 
-clean:
-	dh_testdir
-	dh_testroot
+%:
+	dh $@ --parallel
 
-	rm -f reconf-stamp build-stamp install-stamp
-	rm -rf build-*
-	rm -rf debian/tmp-*
-	rm -f Source/WebKit/gtk/docs/version.xml
-	find . -name \*.pyc -delete
+override_dh_auto_configure:
+	slimit -m debian/jquery-1.9.1.js > \
+	   Source/WebInspectorUI/Tools/PrettyPrinting/populate/jquery.min.js
+	CFLAGS="$(CFLAGS) $(CPPFLAGS)" \
+	CXXFLAGS="$(CFLAGS) $(CPPFLAGS)" \
+	LDFLAGS="$(LDFLAGS)" \
+	dh_auto_configure -- \
+	   -DPORT=GTK \
+	   -DCMAKE_INSTALL_LIBEXECDIR=lib/$(DEB_HOST_MULTIARCH) \
+	   -DCMAKE_C_FLAGS_RELEASE="" \
+	   -DCMAKE_C_FLAGS_DEBUG="" \
+	   -DCMAKE_CXX_FLAGS_RELEASE="" \
+	   -DCMAKE_CXX_FLAGS_DEBUG="" \
+	   $(EXTRA_CMAKE_ARGUMENTS)
 
-	dh_autoreconf_clean
+override_dh_strip:
+	dh_strip -plibwebkit2gtk-4.0-37 --dbg-package=libwebkit2gtk-4.0-37-dbg
+	dh_strip -plibjavascriptcoregtk-4.0-18 --dbg-package=libjavascriptcoregtk-4.0-18-dbg
+	dh_strip
 
+override_dh_makeshlibs:
+	dh_makeshlibs -plibwebkit2gtk-4.0-37 -Xinjected-bundle
+	dh_makeshlibs -plibjavascriptcoregtk-4.0-18
+
+override_dh_shlibdeps:
+	dh_shlibdeps
+	dh_girepository
+
+override_dh_clean:
 	dh_clean
+	rm -f Source/WebInspectorUI/Tools/PrettyPrinting/populate/jquery.min.js
 
-build: build-arch build-indep
+override_dh_auto_test:
 
-build-indep:
+VERSION := $(shell dpkg-parsechangelog | sed -ne 's/^Version: \(.*\)-.*/\1/p')
+UPSTREAM_VERSION := $(shell echo $(VERSION) | sed 's/+dfsg1//')
 
-build-arch: build-stamp
-
-reconf-stamp:
+get-orig-source:
 	dh_testdir
-	# See https://bugs.webkit.org/show_bug.cgi?id=117334
-	dh_autoreconf autoreconf -- -fiv -I Source/autotools
-	touch reconf-stamp
-
-build-stamp: reconf-stamp
-	dh_testdir
-
-ifeq (2.0,$(filter 2.0,$(GTK_VERSIONS)))
-	test -d build-2.0 || mkdir build-2.0
-	cd build-2.0; \
-	env -u AR_FLAGS \
-	CFLAGS="$(CFLAGS)" \
-	CXXFLAGS="$(CFLAGS)" \
-	CPPFLAGS="$(CPPFLAGS)" \
-	LDFLAGS="$(LDFLAGS)" \
-	CC="gcc-4.8" \
-	CXX="g++-4.8" \
-	../configure --prefix=/usr \
-		--with-gtk=2.0 \
-		$(COMMON_CONFIGURE_ARGUMENTS) \
-		--disable-webkit2
-
-	$(MAKE) $(MAKEARGUMENTS) -C build-2.0
-
-	$(MAKE) -C build-2.0 install DESTDIR="$(CURDIR)"/debian/tmp-2.0
-	install -d -m 755 debian/tmp-2.0/usr/share/doc/libwebkitgtk-dev/html/
-	install -m 644 Documentation/webkitgtk/html/* \
-		debian/tmp-2.0/usr/share/doc/libwebkitgtk-dev/html/
-
-	rm -rf build-2.0
-endif
-
-ifeq (3.0,$(filter 3.0,$(GTK_VERSIONS)))
-	test -d build-3.0 || mkdir build-3.0
-	cd build-3.0; \
-	env -u AR_FLAGS \
-	CFLAGS="$(CFLAGS)" \
-	CXXFLAGS="$(CFLAGS)" \
-	CPPFLAGS="$(CPPFLAGS)" \
-	LDFLAGS="$(LDFLAGS)" \
-	CC="gcc-4.8" \
-	CXX="g++-4.8" \
-	../configure --prefix=/usr \
-		--with-gtk=3.0 \
-		$(COMMON_CONFIGURE_ARGUMENTS) \
-		$(EXTRA_CONFIGURE_ARGUMENTS)
-
-	$(MAKE) $(MAKEARGUMENTS) -C build-3.0
-
-	$(MAKE) -C build-3.0 install DESTDIR="$(CURDIR)"/debian/tmp-3.0
-	mv debian/tmp-3.0/usr/bin/jsc-3 debian/tmp-3.0/usr/bin/jsc
-	install -d -m 755 debian/tmp-3.0/usr/share/doc/libwebkitgtk-3.0-dev/html
-	install -m 644 Documentation/webkitgtk/html/* \
-		debian/tmp-3.0/usr/share/doc/libwebkitgtk-3.0-dev/html/
-
-ifeq ($(ENABLE_WEBKIT2),yes)
-	install -d -m 755 debian/tmp-3.0/usr/share/doc/libwebkit2gtk-3.0-dev/html
-	install -m 644 Documentation/webkit2gtk/html/* \
-		debian/tmp-3.0/usr/share/doc/libwebkit2gtk-3.0-dev/html/
-endif
-
-	rm -rf build-3.0
-endif
-
-	touch $@
-
-# Build architecture-independent files here.
-binary-indep: build
-	dh_testdir
-	dh_testroot
-	dh_installdocs -i $(EXTRA_DH_ARGUMENTS)
-	dh_installchangelogs -i $(EXTRA_DH_ARGUMENTS)
-ifeq (2.0,$(filter 2.0,$(GTK_VERSIONS)))
-	dh_install -plibwebkitgtk-1.0-common --sourcedir=debian/tmp-2.0
-endif
-ifeq (3.0,$(filter 3.0,$(GTK_VERSIONS)))
-	dh_install -plibwebkitgtk-3.0-common --sourcedir=debian/tmp-3.0
-endif
-	dh_link -i $(EXTRA_DH_ARGUMENTS)
-	dh_compress -i $(EXTRA_DH_ARGUMENTS)
-	dh_fixperms -i $(EXTRA_DH_ARGUMENTS)
-	dh_installdeb -i $(EXTRA_DH_ARGUMENTS)
-	dh_gencontrol -i $(EXTRA_DH_ARGUMENTS)
-	dh_md5sums -i $(EXTRA_DH_ARGUMENTS)
-	dh_builddeb -i $(EXTRA_DH_ARGUMENTS) -- -Zxz
-
-# Build architecture-dependent files here.
-binary-arch: build install
-	dh_testdir
-	dh_testroot
-	dh_installdocs -a $(EXTRA_DH_ARGUMENTS)
-	dh_installchangelogs -a $(EXTRA_DH_ARGUMENTS)
-ifeq (2.0,$(filter 2.0,$(GTK_VERSIONS)))
-	dh_install -plibjavascriptcoregtk-1.0-0 --sourcedir=debian/tmp-2.0
-	dh_install -plibjavascriptcoregtk-1.0-dev --sourcedir=debian/tmp-2.0
-	dh_install -plibjavascriptcoregtk-1.0-0-dbg --sourcedir=debian/tmp-2.0
-	dh_install -pgir1.2-javascriptcoregtk-1.0 --sourcedir=debian/tmp-2.0
-	dh_install -plibwebkitgtk-1.0-0 --sourcedir=debian/tmp-2.0
-	dh_install -plibwebkitgtk-dev --sourcedir=debian/tmp-2.0
-	dh_install -plibwebkitgtk-1.0-0-dbg --sourcedir=debian/tmp-2.0
-	dh_install -pgir1.2-webkit-1.0 --sourcedir=debian/tmp-2.0
-endif
-ifeq (3.0,$(filter 3.0,$(GTK_VERSIONS)))
-	dh_install -plibjavascriptcoregtk-3.0-0 --sourcedir=debian/tmp-3.0
-	dh_install -plibjavascriptcoregtk-3.0-dev --sourcedir=debian/tmp-3.0
-	dh_install -plibjavascriptcoregtk-3.0-0-dbg --sourcedir=debian/tmp-3.0
-	dh_install -plibjavascriptcoregtk-3.0-bin --sourcedir=debian/tmp-3.0
-	dh_install -pgir1.2-javascriptcoregtk-3.0 --sourcedir=debian/tmp-3.0
-	dh_install -plibwebkitgtk-3.0-0 --sourcedir=debian/tmp-3.0
-	dh_install -plibwebkitgtk-3.0-dev --sourcedir=debian/tmp-3.0
-	dh_install -plibwebkitgtk-3.0-0-dbg --sourcedir=debian/tmp-3.0
-	dh_install -pgir1.2-webkit-3.0 --sourcedir=debian/tmp-3.0
-	dh_install -plibwebkitgtk-common-dev --sourcedir=debian/tmp-3.0
-	dh_installman -plibjavascriptcoregtk-3.0-bin
-ifeq ($(ENABLE_WEBKIT2),yes)
-	dh_install -plibwebkit2gtk-3.0-25 --sourcedir=debian/tmp-3.0
-	dh_install -plibwebkit2gtk-3.0-dev --sourcedir=debian/tmp-3.0
-	dh_install -plibwebkit2gtk-3.0-25-dbg --sourcedir=debian/tmp-3.0
-	dh_install -pgir1.2-webkit2-3.0 --sourcedir=debian/tmp-3.0
-endif
-endif
-	dh_link -a $(EXTRA_DH_ARGUMENTS)
-ifeq (2.0,$(filter 2.0,$(GTK_VERSIONS)))
-	dh_strip -plibjavascriptcoregtk-1.0-0 --dbg-package=libjavascriptcoregtk-1.0-0-dbg
-	dh_strip -plibwebkitgtk-1.0-0 --dbg-package=libwebkitgtk-1.0-0-dbg
-endif
-ifeq (3.0,$(filter 3.0,$(GTK_VERSIONS)))
-	dh_strip -plibjavascriptcoregtk-3.0-0 --dbg-package=libjavascriptcoregtk-3.0-0-dbg
-	dh_strip -plibjavascriptcoregtk-3.0-bin
-	dh_strip -plibwebkitgtk-3.0-0 --dbg-package=libwebkitgtk-3.0-0-dbg
-ifeq ($(ENABLE_WEBKIT2),yes)
-	dh_strip -plibwebkit2gtk-3.0-25 --dbg-package=libwebkit2gtk-3.0-25-dbg
-endif
-endif
-	dh_compress -a $(EXTRA_DH_ARGUMENTS)
-	dh_fixperms -a $(EXTRA_DH_ARGUMENTS)
-ifeq (2.0,$(filter 2.0,$(GTK_VERSIONS)))
-	dh_makeshlibs -plibjavascriptcoregtk-1.0-0 -V 'libjavascriptcoregtk-1.0-0 (>= 1.5.1)' -- -c4
-	dh_makeshlibs -plibwebkitgtk-1.0-0 -V 'libwebkitgtk-1.0-0 (>= 1.3.9)' -- -c4
-	dh_girepository --package=gir1.2-javascriptcoregtk-1.0
-	dh_girepository --package=gir1.2-webkit-1.0
-endif
-ifeq (3.0,$(filter 3.0,$(GTK_VERSIONS)))
-	dh_makeshlibs -plibjavascriptcoregtk-3.0-0 -V 'libjavascriptcoregtk-3.0-0 (>= 1.5.1)' -- -c4
-	dh_makeshlibs -plibwebkitgtk-3.0-0 -V 'libwebkitgtk-3.0-0 (>= 1.3.9)' -- -c4
-	dh_girepository --package=gir1.2-javascriptcoregtk-3.0
-	dh_girepository --package=gir1.2-webkit-3.0
-ifeq ($(ENABLE_WEBKIT2),yes)
-	dh_makeshlibs -plibwebkit2gtk-3.0-25 -Xinjected-bundle -V 'libwebkit2gtk-3.0-25 (>= 1.11.90)' -- -c4
-	dh_girepository --package=gir1.2-webkit2-3.0
-endif
-endif
-	dh_installdeb -a $(EXTRA_DH_ARGUMENTS)
-	dh_shlibdeps -a $(EXTRA_DH_ARGUMENTS)
-	dh_gencontrol -a $(EXTRA_DH_ARGUMENTS)
-	dh_md5sums -a $(EXTRA_DH_ARGUMENTS)
-	dh_builddeb -a $(EXTRA_DH_ARGUMENTS) -- -Zxz
-
-binary: binary-indep binary-arch
-
-.PHONY: build clean install binary binary-indep binary-arch
+	uscan --rename --download-current-version
+	mkdir "webkit2gtk-$(VERSION)"
+	tar -C "webkit2gtk-$(VERSION)" \
+		--strip-components=1 \
+		--exclude=Source/WebInspectorUI/Tools/PrettyPrinting/populate/jquery.min.js \
+		--exclude=Tools/WebKitTestRunner/gtk/fonts/FontWithNoValidEncoding.fon \
+		-xaf "../webkit2gtk_$(UPSTREAM_VERSION).orig.tar.xz"
+	fakeroot tar -caf "../webkit2gtk_$(VERSION).orig.tar.xz" \
+		"webkit2gtk-$(VERSION)"
+	rm -rf "webkit2gtk-$(VERSION)"

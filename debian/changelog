@@ -10,6 +10,10 @@ webkit2gtk (2.5.3+dfsg1-1) UNRELEASED; urgency=medium
     + Update upstream branch name.
   * debian/watch:
     + Add dversionmangle rule to strip +dfsg1 from the package.
+  * debian/rules:
+    + Rewrite completely using the debhelper sequencer and build with
+      cmake instead of autotools.
+    + Add get-orig-source target.
   * debian/control:
     + Remove all packages that use the old WebKit API, as well as the
       -common packages.
