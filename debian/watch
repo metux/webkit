@@ -1,2 +1,3 @@
 version=3
-http://webkitgtk.org/releases/ webkitgtk-([\d]+\.[\d]*[\d]\.[\d]+).tar.xz
+opts="dversionmangle=s/\+dfsg\d+$//" \
+   http://webkitgtk.org/releases/ webkitgtk-([\d]+\.[\d]*[\d]\.[\d]+).tar.xz

@@ -1,3 +1,18 @@
+webkit2gtk (2.5.3+dfsg1-1) UNRELEASED; urgency=medium
+
+  * New upstream release from the upcoming 2.6 branch.
+    + Rename source package to webkit2gtk, since now WebKitGTK+ only
+      provides the new WebKit2 API. We have to keep the old webkitgtk
+      packages around until all apps using the old API have ben ported.
+    + Add the +dfsg1 suffix to the version number since we have to remove
+      a few non-free files from the source tarball.
+  * debian/gbp.conf:
+    + Update upstream branch name.
+  * debian/watch:
+    + Add dversionmangle rule to strip +dfsg1 from the package.
+
+ -- Alberto Garcia <berto@igalia.com>  Mon, 25 Aug 2014 10:58:41 +0300
+
 webkitgtk (2.4.1-1) experimental; urgency=medium
 
   * New upstream release.
