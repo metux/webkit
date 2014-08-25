@@ -23,6 +23,8 @@ webkit2gtk (2.5.3+dfsg1-1) UNRELEASED; urgency=medium
     + Refresh.
   * debian/patches/install-minibrowser.patch:
     + Rewrite to make it work with cmake.
+  * debian/patches/change-libexec-dir.patch:
+    + Install all auxiliary binaries in the same directory.
 
  -- Alberto Garcia <berto@igalia.com>  Mon, 25 Aug 2014 10:58:41 +0300
 
