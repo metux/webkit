@@ -19,6 +19,9 @@ webkit2gtk (2.5.3+dfsg1-1) UNRELEASED; urgency=medium
       -common packages.
     + libjavascriptcoregtk-3.0-0 => libjavascriptcoregtk-4.0-18.
     + libwebkit2gtk-3.0-25 => libwebkit2gtk-4.0-37.
+    + Don't depend on any specific compiler.
+    + Add build dependencies on cmake and slimit.
+    + Replace libgeoclue-dev with geoclue-2.0.
     + Split libwebkit2gtk-4.0-doc from the -dev package.
   * debian/jquery-1.9.1.js:
     + Provide uncompressed version of jquery to replace the compressed one
