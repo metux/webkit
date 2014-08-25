@@ -11,10 +11,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -169,7 +169,7 @@ public:
     using Parent::methodTable;
 
 protected:
-    static const unsigned StructureFlags = ProhibitsPropertyCaching | OverridesGetOwnPropertySlot | InterceptsGetOwnPropertySlotByIndexEvenWhenLengthIsNotZero | ImplementsHasInstance | OverridesHasInstance | OverridesVisitChildren | OverridesGetPropertyNames | Parent::StructureFlags;
+    static const unsigned StructureFlags = ProhibitsPropertyCaching | OverridesGetOwnPropertySlot | InterceptsGetOwnPropertySlotByIndexEvenWhenLengthIsNotZero | ImplementsHasInstance | OverridesHasInstance | OverridesGetPropertyNames | Parent::StructureFlags;
 
 private:
     static String className(const JSObject*);
@@ -196,8 +196,6 @@ private:
     {
         JSCallbackObject* thisObject = jsCast<JSCallbackObject*>(cell);
         ASSERT_GC_OBJECT_INHERITS((static_cast<Parent*>(thisObject)), JSCallbackObject<Parent>::info());
-        COMPILE_ASSERT(StructureFlags & OverridesVisitChildren, OverridesVisitChildrenWithoutSettingFlag);
-        ASSERT(thisObject->Parent::structure()->typeInfo().overridesVisitChildren());
         Parent::visitChildren(thisObject, visitor);
         thisObject->m_callbackObjectData->visitChildren(visitor);
     }
@@ -211,8 +209,8 @@ private:
     static EncodedJSValue JSC_HOST_CALL construct(ExecState*);
    
     JSValue getStaticValue(ExecState*, PropertyName);
-    static EncodedJSValue staticFunctionGetter(ExecState*, EncodedJSValue, EncodedJSValue, PropertyName);
-    static EncodedJSValue callbackGetter(ExecState*, EncodedJSValue, EncodedJSValue, PropertyName);
+    static EncodedJSValue staticFunctionGetter(ExecState*, JSObject*, EncodedJSValue, PropertyName);
+    static EncodedJSValue callbackGetter(ExecState*, JSObject*, EncodedJSValue, PropertyName);
 
     OwnPtr<JSCallbackObjectData> m_callbackObjectData;
 };

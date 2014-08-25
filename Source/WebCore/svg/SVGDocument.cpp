@@ -19,7 +19,6 @@
  */
 
 #include "config.h"
-#if ENABLE(SVG)
 #include "SVGDocument.h"
 
 #include "EventNames.h"
@@ -47,22 +46,6 @@ SVGSVGElement* SVGDocument::rootElement() const
         return toSVGSVGElement(elem);
 
     return 0;
-}
-
-void SVGDocument::dispatchZoomEvent(float prevScale, float newScale)
-{
-    RefPtr<SVGZoomEvent> event = static_pointer_cast<SVGZoomEvent>(createEvent("SVGZoomEvents", IGNORE_EXCEPTION));
-    event->initEvent(eventNames().zoomEvent, true, false);
-    event->setPreviousScale(prevScale);
-    event->setNewScale(newScale);
-    rootElement()->dispatchEvent(event.release(), IGNORE_EXCEPTION);
-}
-
-void SVGDocument::dispatchScrollEvent()
-{
-    RefPtr<Event> event = createEvent("SVGEvents", IGNORE_EXCEPTION);
-    event->initEvent(eventNames().scrollEvent, true, false);
-    rootElement()->dispatchEvent(event.release(), IGNORE_EXCEPTION);
 }
 
 bool SVGDocument::zoomAndPanEnabled() const
@@ -93,19 +76,9 @@ void SVGDocument::updatePan(const FloatPoint& pos) const
     }
 }
 
-bool SVGDocument::childShouldCreateRenderer(const Node& child) const
-{
-    if (isSVGSVGElement(child))
-        return toSVGSVGElement(child).isValid();
-    return true;
-}
-
 PassRefPtr<Document> SVGDocument::cloneDocumentWithoutChildren() const
 {
     return create(nullptr, url());
 }
 
 }
-
-// vim:ts=4:noet
-#endif // ENABLE(SVG)

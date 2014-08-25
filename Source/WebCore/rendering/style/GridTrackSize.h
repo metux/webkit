@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2012 Google Inc. All rights reserved.
+ * Copyright (C) 2013, 2014 Igalia S.L.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -30,6 +31,8 @@
 
 #ifndef GridTrackSize_h
 #define GridTrackSize_h
+
+#if ENABLE(CSS_GRID_LAYOUT)
 
 #include "GridLength.h"
 
@@ -69,7 +72,7 @@ public:
     {
         ASSERT(!m_minTrackBreadth.isLength() || !m_minTrackBreadth.length().isUndefined());
         if (m_minTrackBreadth.isLength() && m_minTrackBreadth.length().isAuto()) {
-            DEFINE_STATIC_LOCAL(GridLength, minContent, (MinContent));
+            DEPRECATED_DEFINE_STATIC_LOCAL(GridLength, minContent, (MinContent));
             return minContent;
         }
         return m_minTrackBreadth;
@@ -79,7 +82,7 @@ public:
     {
         ASSERT(!m_maxTrackBreadth.isLength() || !m_maxTrackBreadth.length().isUndefined());
         if (m_maxTrackBreadth.isLength() && m_maxTrackBreadth.length().isAuto()) {
-            DEFINE_STATIC_LOCAL(GridLength, maxContent, (MaxContent));
+            DEPRECATED_DEFINE_STATIC_LOCAL(GridLength, maxContent, (MaxContent));
             return maxContent;
         }
         return m_maxTrackBreadth;
@@ -95,6 +98,8 @@ public:
     GridTrackSizeType type() const { return m_type; }
 
     bool isContentSized() const { return m_minTrackBreadth.isContentSized() || m_maxTrackBreadth.isContentSized(); }
+
+    bool isPercentage() const { return m_type == LengthTrackSizing && length().isLength() && length().length().isPercent(); }
 
     bool operator==(const GridTrackSize& other) const
     {
@@ -113,5 +118,7 @@ private:
 };
 
 } // namespace WebCore
+
+#endif /* ENABLE(CSS_GRID_LAYOUT) */
 
 #endif // GridTrackSize_h

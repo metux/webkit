@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008, 2013 Apple Inc. All Rights Reserved.
+ * Copyright (C) 2008, 2013, 2014 Apple Inc. All Rights Reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -29,8 +29,10 @@
 #include "CallFrameInlines.h"
 #include "CodeBlock.h"
 #include "Interpreter.h"
-#include "Operations.h"
+#include "JSActivation.h"
+#include "JSCInlines.h"
 #include "VMEntryScope.h"
+#include <wtf/StringPrintStream.h>
 
 namespace JSC {
 
@@ -116,11 +118,11 @@ CodeOrigin CallFrame::codeOrigin()
     return CodeOrigin(locationAsBytecodeOffset());
 }
 
-Register* CallFrame::frameExtentInternal()
+Register* CallFrame::topOfFrameInternal()
 {
     CodeBlock* codeBlock = this->codeBlock();
     ASSERT(codeBlock);
-    return registers() + virtualRegisterForLocal(codeBlock->frameRegisterCount()).offset();
+    return registers() + codeBlock->stackPointerOffset();
 }
 
 JSGlobalObject* CallFrame::vmEntryGlobalObject()
@@ -132,6 +134,59 @@ JSGlobalObject* CallFrame::vmEntryGlobalObject()
     // dynamic global object must be set since code is running
     ASSERT(vm().entryScope);
     return vm().entryScope->globalObject();
+}
+
+JSActivation* CallFrame::activation() const
+{
+    CodeBlock* codeBlock = this->codeBlock();
+    RELEASE_ASSERT(codeBlock->needsActivation());
+    VirtualRegister activationRegister = codeBlock->activationRegister();
+    return registers()[activationRegister.offset()].Register::activation();
+}
+
+void CallFrame::setActivation(JSActivation* activation)
+{
+    CodeBlock* codeBlock = this->codeBlock();
+    RELEASE_ASSERT(codeBlock->needsActivation());
+    VirtualRegister activationRegister = codeBlock->activationRegister();
+    registers()[activationRegister.offset()] = activation;
+}
+
+void CallFrame::dump(PrintStream& out)
+{
+    if (CodeBlock* codeBlock = this->codeBlock()) {
+        out.print(codeBlock->inferredName(), "#", codeBlock->hashAsStringIfPossible(), " [", codeBlock->jitType(), "]");
+
+        out.print("(");
+        thisValue().dumpForBacktrace(out);
+
+        for (size_t i = 0; i < argumentCount(); ++i) {
+            out.print(", ");
+            JSValue value = argument(i);
+            value.dumpForBacktrace(out);
+        }
+
+        out.print(")");
+
+        return;
+    }
+
+    out.print(returnPC());
+}
+
+const char* CallFrame::describeFrame()
+{
+    const size_t bufferSize = 200;
+    static char buffer[bufferSize + 1];
+    
+    WTF::StringPrintStream stringStream;
+
+    dump(stringStream);
+
+    strncpy(buffer, stringStream.toCString().data(), bufferSize);
+    buffer[bufferSize] = '\0';
+    
+    return buffer;
 }
 
 } // namespace JSC

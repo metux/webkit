@@ -28,7 +28,8 @@
 #include "config.h"
 #include "PlatformWebView.h"
 
-#include <WebKit2/WKViewPrivate.h>
+#include <WebKit/WKImageCairo.h>
+#include <WebKit/WKViewPrivate.h>
 #include <gtk/gtk.h>
 
 namespace WTR {
@@ -42,7 +43,7 @@ PlatformWebView::PlatformWebView(WKContextRef context, WKPageGroupRef pageGroup,
     gtk_container_add(GTK_CONTAINER(m_window), GTK_WIDGET(m_view));
 
     GtkAllocation size = { 0, 0, 800, 600 };
-    gtk_widget_size_allocate(m_window, &size);
+    gtk_widget_size_allocate(GTK_WIDGET(m_view), &size);
     gtk_window_resize(GTK_WINDOW(m_window), 800, 600);
     gtk_widget_show_all(m_window);
 
@@ -57,12 +58,10 @@ PlatformWebView::~PlatformWebView()
 
 void PlatformWebView::resizeTo(unsigned width, unsigned height)
 {
-    GtkAllocation size = { 0, 0, static_cast<int>(width), static_cast<int>(height) };
-    gtk_widget_size_allocate(m_window, &size);
-    gtk_window_resize(GTK_WINDOW(m_window), width, height);
-
-    while (gtk_events_pending())
-        gtk_main_iteration();
+    WKRect frame = windowFrame();
+    frame.size.width = width;
+    frame.size.height = height;
+    setWindowFrame(frame);
 }
 
 WKPageRef PlatformWebView::page()
@@ -79,14 +78,8 @@ void PlatformWebView::focus()
 WKRect PlatformWebView::windowFrame()
 {
     GtkAllocation geometry;
-#ifdef GTK_API_VERSION_2
-    gint depth;
-    gdk_window_get_geometry(gtk_widget_get_window(GTK_WIDGET(m_window)),
-                            &geometry.x, &geometry.y, &geometry.width, &geometry.height, &depth);
-#else
     gdk_window_get_geometry(gtk_widget_get_window(GTK_WIDGET(m_window)),
                             &geometry.x, &geometry.y, &geometry.width, &geometry.height);
-#endif
 
     WKRect frame;
     frame.origin.x = geometry.x;
@@ -98,8 +91,13 @@ WKRect PlatformWebView::windowFrame()
 
 void PlatformWebView::setWindowFrame(WKRect frame)
 {
-    gtk_window_move(GTK_WINDOW(m_window), frame.origin.x, frame.origin.y);
-    resizeTo(frame.size.width, frame.size.height);
+    gdk_window_move_resize(gtk_widget_get_window(GTK_WIDGET(m_window)),
+        frame.origin.x, frame.origin.y, frame.size.width, frame.size.height);
+    GtkAllocation size = { 0, 0, static_cast<int>(frame.size.width), static_cast<int>(frame.size.height) };
+    gtk_widget_size_allocate(GTK_WIDGET(m_view), &size);
+
+    while (gtk_events_pending())
+        gtk_main_iteration();
 }
 
 void PlatformWebView::addChromeInputField()
@@ -114,11 +112,28 @@ void PlatformWebView::makeWebViewFirstResponder()
 {
 }
 
+void PlatformWebView::changeWindowScaleIfNeeded(float)
+{
+}
+
 WKRetainPtr<WKImageRef> PlatformWebView::windowSnapshotImage()
 {
-    // FIXME: implement to capture pixels in the UI process,
-    // which may be necessary to capture things like 3D transforms.
-    return 0;
+    int width = gtk_widget_get_allocated_width(GTK_WIDGET(m_view));
+    int height = gtk_widget_get_allocated_height(GTK_WIDGET(m_view));
+
+    while (gtk_events_pending())
+        gtk_main_iteration();
+
+    cairo_surface_t* imageSurface = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, width, height);
+
+    cairo_t* context = cairo_create(imageSurface);
+    gtk_widget_draw(GTK_WIDGET(m_view), context);
+    cairo_destroy(context);
+
+    WKRetainPtr<WKImageRef> wkImage = adoptWK(WKImageCreateFromCairoSurface(imageSurface, 0 /* options */));
+
+    cairo_surface_destroy(imageSurface);
+    return wkImage;
 }
 
 void PlatformWebView::didInitializeClients()

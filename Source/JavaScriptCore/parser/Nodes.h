@@ -112,7 +112,7 @@ namespace JSC {
     };
 
     class ParserArenaRefCounted : public RefCounted<ParserArenaRefCounted> {
-        WTF_FASTMALLOC_OPERATORS;
+        WTF_MAKE_FAST_ALLOCATED;
     protected:
         ParserArenaRefCounted(VM*);
 
@@ -152,6 +152,7 @@ namespace JSC {
         virtual bool isPure(BytecodeGenerator&) const { return false; }        
         virtual bool isConstant() const { return false; }
         virtual bool isLocation() const { return false; }
+        virtual bool isAssignmentLocation() const { return isLocation(); }
         virtual bool isResolveNode() const { return false; }
         virtual bool isBracketAccessorNode() const { return false; }
         virtual bool isDotAccessorNode() const { return false; }
@@ -1039,7 +1040,7 @@ namespace JSC {
         ExpressionNode* m_base;
         ExpressionNode* m_subscript;
         ExpressionNode* m_right;
-        Operator m_operator : 30;
+        unsigned m_operator : 30;
         bool m_subscriptHasAssignments : 1;
         bool m_rightHasAssignments : 1;
     };
@@ -1081,7 +1082,7 @@ namespace JSC {
         ExpressionNode* m_base;
         const Identifier& m_ident;
         ExpressionNode* m_right;
-        Operator m_operator : 31;
+        unsigned m_operator : 31;
         bool m_rightHasAssignments : 1;
     };
 
@@ -1279,6 +1280,10 @@ namespace JSC {
         ForInNode(VM*, const JSTokenLocation&, DeconstructionPatternNode*, ExpressionNode*, StatementNode*);
 
     private:
+        RegisterID* tryGetBoundLocal(BytecodeGenerator&);
+        void emitLoopHeader(BytecodeGenerator&, RegisterID* propertyName);
+        void emitMultiLoopBytecode(BytecodeGenerator&, RegisterID* dst);
+
         virtual void emitBytecode(BytecodeGenerator&, RegisterID* = 0) override;
     };
     
@@ -1431,6 +1436,7 @@ namespace JSC {
         bool needsActivation() const { return (hasCapturedVariables()) || (m_features & (EvalFeature | WithFeature | CatchFeature)); }
         bool hasCapturedVariables() const { return !!m_capturedVariables.size(); }
         size_t capturedVariableCount() const { return m_capturedVariables.size(); }
+        const IdentifierSet& capturedVariables() const { return m_capturedVariables; }
         bool captures(const Identifier& ident) { return m_capturedVariables.contains(ident.impl()); }
 
         VarStack& varStack() { return m_varStack; }
@@ -1446,6 +1452,8 @@ namespace JSC {
         StatementNode* singleStatement() const;
 
         void emitStatementsBytecode(BytecodeGenerator&, RegisterID* destination);
+        
+        void setClosedVariables(Vector<RefPtr<StringImpl>>&&) { }
 
     protected:
         void setSource(const SourceCode& source) { m_source = source; }
@@ -1475,11 +1483,13 @@ namespace JSC {
 
         static const bool scopeIsFunction = false;
 
+        void setClosedVariables(Vector<RefPtr<StringImpl>>&&);
+        const Vector<RefPtr<StringImpl>>& closedVariables() const { return m_closedVariables; }
     private:
         ProgramNode(VM*, const JSTokenLocation& start, const JSTokenLocation& end, unsigned startColumn, unsigned endColumn, SourceElements*, VarStack*, FunctionStack*, IdentifierSet&, const SourceCode&, CodeFeatures, int numConstants);
 
         virtual void emitBytecode(BytecodeGenerator&, RegisterID* = 0) override;
-
+        Vector<RefPtr<StringImpl>> m_closedVariables;
         unsigned m_startColumn;
         unsigned m_endColumn;
     };
@@ -1532,15 +1542,15 @@ namespace JSC {
 
         virtual void emitBytecode(BytecodeGenerator&, RegisterID* = 0) override;
 
-        void finishParsing(const SourceCode&, ParameterNode*, const Identifier&, FunctionNameIsInScopeToggle);
-        void finishParsing(PassRefPtr<FunctionParameters>, const Identifier&, FunctionNameIsInScopeToggle);
+        void finishParsing(const SourceCode&, ParameterNode*, const Identifier&, FunctionMode);
+        void finishParsing(PassRefPtr<FunctionParameters>, const Identifier&, FunctionMode);
         
+        void overrideName(const Identifier& ident) { m_ident = ident; }
         const Identifier& ident() { return m_ident; }
         void setInferredName(const Identifier& inferredName) { ASSERT(!inferredName.isNull()); m_inferredName = inferredName; }
         const Identifier& inferredName() { return m_inferredName.isEmpty() ? m_ident : m_inferredName; }
 
-        bool functionNameIsInScope() { return m_functionNameIsInScopeToggle == FunctionNameIsInScope; }
-        FunctionNameIsInScopeToggle functionNameIsInScopeToggle() { return m_functionNameIsInScopeToggle; }
+        FunctionMode functionMode() { return m_functionMode; }
 
         void setFunctionNameStart(int functionNameStart) { m_functionNameStart = functionNameStart; }
         int functionNameStart() const { return m_functionNameStart; }
@@ -1557,7 +1567,7 @@ namespace JSC {
 
         Identifier m_ident;
         Identifier m_inferredName;
-        FunctionNameIsInScopeToggle m_functionNameIsInScopeToggle;
+        FunctionMode m_functionMode;
         RefPtr<FunctionParameters> m_parameters;
         int m_functionNameStart;
         unsigned m_startColumn;
@@ -1671,7 +1681,7 @@ namespace JSC {
         using ParserArenaDeletable::operator new;
 
     private:
-        virtual bool isLocation() const override { return true; }
+        virtual bool isAssignmentLocation() const override { return true; }
         virtual bool isDeconstructionNode() const override { return true; }
         virtual RegisterID* emitBytecode(BytecodeGenerator&, RegisterID* = 0) override;
 

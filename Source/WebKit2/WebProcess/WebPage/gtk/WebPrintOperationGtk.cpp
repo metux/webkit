@@ -40,10 +40,11 @@
 #include <WebCore/ResourceError.h>
 #include <WebCore/URL.h>
 #include <gtk/gtk.h>
+#include <memory>
 #include <wtf/Vector.h>
 #include <wtf/gobject/GUniquePtr.h>
 
-#ifdef HAVE_GTK_UNIX_PRINTING
+#if HAVE(GTK_UNIX_PRINTING)
 #include "PrinterListGtk.h"
 #include <cairo-pdf.h>
 #include <cairo-ps.h>
@@ -52,7 +53,7 @@
 
 namespace WebKit {
 
-#ifdef HAVE_GTK_UNIX_PRINTING
+#if HAVE(GTK_UNIX_PRINTING)
 class WebPrintOperationGtkUnix final: public WebPrintOperationGtk {
 public:
     WebPrintOperationGtkUnix(WebPage* page, const PrintInfo& printInfo)
@@ -104,7 +105,7 @@ public:
         print(surface, 72, 72);
     }
 
-    void startPage(cairo_t* cr) override
+    void startPage(cairo_t*) override
     {
         if (!currentPageIsFirstPageOfSheet())
           return;
@@ -139,7 +140,7 @@ public:
             cairo_show_page(cr);
     }
 
-    static void printJobComplete(GtkPrintJob* printJob, WebPrintOperationGtkUnix* printOperation, const GError* error)
+    static void printJobComplete(GtkPrintJob*, WebPrintOperationGtkUnix* printOperation, const GError* error)
     {
         printOperation->printDone(error ? printError(printOperation->frameURL(), error->message) : WebCore::ResourceError());
         printOperation->m_printJob = 0;
@@ -379,11 +380,13 @@ struct PrintPagesData {
 
 PassRefPtr<WebPrintOperationGtk> WebPrintOperationGtk::create(WebPage* page, const PrintInfo& printInfo)
 {
-#ifdef HAVE_GTK_UNIX_PRINTING
+#if HAVE(GTK_UNIX_PRINTING)
     return adoptRef(new WebPrintOperationGtkUnix(page, printInfo));
 #elif defined(G_OS_WIN32)
     return adoptRef(new WebPrintOperationGtkWin32(page, printInfo));
 #else
+    UNUSED_PARAM(page);
+    UNUSED_PARAM(printInfo);
     return 0;
 #endif
 }
@@ -713,7 +716,7 @@ void WebPrintOperationGtk::print(cairo_surface_t* surface, double xDPI, double y
 {
     ASSERT(m_printContext);
 
-    OwnPtr<PrintPagesData> data = adoptPtr(new PrintPagesData(this));
+    auto data = std::make_unique<PrintPagesData>(this);
     if (!data->isValid) {
         cairo_surface_finish(surface);
         printDone(invalidPageRangeToPrint(frameURL()));
@@ -729,7 +732,7 @@ void WebPrintOperationGtk::print(cairo_surface_t* surface, double xDPI, double y
     // operation has finished. See https://bugs.webkit.org/show_bug.cgi?id=122801.
     unsigned idlePriority = m_printMode == PrintInfo::PrintModeSync ? G_PRIORITY_DEFAULT - 10 : G_PRIORITY_DEFAULT_IDLE + 10;
     GMainLoop* mainLoop = data->mainLoop.get();
-    m_printPagesIdleId = gdk_threads_add_idle_full(idlePriority, printPagesIdle, data.leakPtr(), printPagesIdleDone);
+    m_printPagesIdleId = gdk_threads_add_idle_full(idlePriority, printPagesIdle, data.release(), printPagesIdleDone);
     if (m_printMode == PrintInfo::PrintModeSync) {
         ASSERT(mainLoop);
         g_main_loop_run(mainLoop);

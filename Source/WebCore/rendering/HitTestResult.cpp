@@ -46,13 +46,10 @@
 #include "RenderInline.h"
 #include "Scrollbar.h"
 #include "ShadowRoot.h"
-#include "UserGestureIndicator.h"
-
-#if ENABLE(SVG)
 #include "SVGImageElement.h"
 #include "SVGNames.h"
+#include "UserGestureIndicator.h"
 #include "XLinkNames.h"
-#endif
 
 namespace WebCore {
 
@@ -95,7 +92,7 @@ HitTestResult::HitTestResult(const HitTestResult& other)
     , m_isOverWidget(other.isOverWidget())
 {
     // Only copy the NodeSet in case of rect hit test.
-    m_rectBasedTestResult = adoptPtr(other.m_rectBasedTestResult ? new NodeSet(*other.m_rectBasedTestResult) : 0);
+    m_rectBasedTestResult = other.m_rectBasedTestResult ? std::make_unique<NodeSet>(*other.m_rectBasedTestResult) : nullptr;
 }
 
 HitTestResult::~HitTestResult()
@@ -114,7 +111,7 @@ HitTestResult& HitTestResult::operator=(const HitTestResult& other)
     m_isOverWidget = other.isOverWidget();
 
     // Only copy the NodeSet in case of rect hit test.
-    m_rectBasedTestResult = adoptPtr(other.m_rectBasedTestResult ? new NodeSet(*other.m_rectBasedTestResult) : 0);
+    m_rectBasedTestResult = other.m_rectBasedTestResult ? std::make_unique<NodeSet>(*other.m_rectBasedTestResult) : nullptr;
 
     return *this;
 }
@@ -323,10 +320,8 @@ URL HitTestResult::absoluteImageURL() const
         || isHTMLImageElement(m_innerNonSharedNode.get())
         || isHTMLInputElement(m_innerNonSharedNode.get())
         || m_innerNonSharedNode->hasTagName(objectTag)
-#if ENABLE(SVG)
-        || isSVGImageElement(m_innerNonSharedNode.get())
-#endif
-       ) {
+        || isSVGImageElement(m_innerNonSharedNode.get())) 
+        {
         Element* element = toElement(m_innerNonSharedNode.get());
         urlString = element->imageSourceURL();
     } else
@@ -512,20 +507,9 @@ void HitTestResult::toggleMediaMuteState() const
 
 URL HitTestResult::absoluteLinkURL() const
 {
-    if (!m_innerURLElement)
-        return URL();
-
-    AtomicString urlString;
-    if (isHTMLAnchorElement(m_innerURLElement.get()) || isHTMLAreaElement(m_innerURLElement.get()) || m_innerURLElement->hasTagName(linkTag))
-        urlString = m_innerURLElement->getAttribute(hrefAttr);
-#if ENABLE(SVG)
-    else if (m_innerURLElement->hasTagName(SVGNames::aTag))
-        urlString = m_innerURLElement->getAttribute(XLinkNames::hrefAttr);
-#endif
-    else
-        return URL();
-
-    return m_innerURLElement->document().completeURL(stripLeadingAndTrailingHTMLSpaces(urlString));
+    if (m_innerURLElement)
+        return m_innerURLElement->absoluteLinkURL();
+    return URL();
 }
 
 bool HitTestResult::isLiveLink() const
@@ -535,10 +519,9 @@ bool HitTestResult::isLiveLink() const
 
     if (isHTMLAnchorElement(m_innerURLElement.get()))
         return toHTMLAnchorElement(m_innerURLElement.get())->isLiveLink();
-#if ENABLE(SVG)
+
     if (m_innerURLElement->hasTagName(SVGNames::aTag))
         return m_innerURLElement->isLink();
-#endif
 
     return false;
 }
@@ -645,14 +628,14 @@ void HitTestResult::append(const HitTestResult& other)
 const HitTestResult::NodeSet& HitTestResult::rectBasedTestResult() const
 {
     if (!m_rectBasedTestResult)
-        m_rectBasedTestResult = adoptPtr(new NodeSet);
+        m_rectBasedTestResult = std::make_unique<NodeSet>();
     return *m_rectBasedTestResult;
 }
 
 HitTestResult::NodeSet& HitTestResult::mutableRectBasedTestResult()
 {
     if (!m_rectBasedTestResult)
-        m_rectBasedTestResult = adoptPtr(new NodeSet);
+        m_rectBasedTestResult = std::make_unique<NodeSet>();
     return *m_rectBasedTestResult;
 }
 

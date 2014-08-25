@@ -69,7 +69,9 @@ ARM_SCRATCH_FPR = SpecialRegister.new("d6")
 
 def armMoveImmediate(value, register)
     # Currently we only handle the simple cases, and fall back to mov/movt for the complex ones.
-    if value >= 0 && value < 256
+    if value.is_a? String
+      $asm.puts "mov #{register.armOperand}, (#{value})"
+    elsif value >= 0 && value < 256
         $asm.puts "mov #{register.armOperand}, \##{value}"
     elsif (~value) >= 0 && (~value) < 256
         $asm.puts "mvn #{register.armOperand}, \##{~value}"
@@ -106,6 +108,8 @@ class RegisterID
             "lr"
         when "sp"
             "sp"
+        when "pc"
+            "pc"
         else
             raise "Bad register #{name} for ARM at #{codeOriginString}"
         end
@@ -335,7 +339,7 @@ class Instruction
                 else
                     $asm.puts "adds #{operands[2].armOperand}, #{operands[1].armOperand}, #{operands[0].armOperand}"
                 end
-            elsif operands.size == 3 and operands[0].immediate?
+            elsif operands.size == 3 and operands[0].register?
                 raise unless operands[1].register?
                 raise unless operands[2].register?
                 $asm.puts "adds #{armFlippedOperands(operands)}"
@@ -462,24 +466,15 @@ class Instruction
                 | op |
                 $asm.puts "push { #{op.armOperand} }"
             }
-        when "popCalleeSaves"
-            if isARMv7
-                $asm.puts "pop {r4-r6, r8-r11}"                
-            else
-                $asm.puts "pop {r4-r10}"
-            end
-        when "pushCalleeSaves"
-            if isARMv7
-                $asm.puts "push {r4-r6, r8-r11}"
-            else
-                $asm.puts "push {r4-r10}"
-            end
         when "move"
             if operands[0].immediate?
                 armMoveImmediate(operands[0].value, operands[1])
             else
                 $asm.puts "mov #{armFlippedOperands(operands)}"
             end
+        when "mvlbl"
+                $asm.puts "movw #{operands[1].armOperand}, \#:lower16:#{operands[0].value}"
+                $asm.puts "movt #{operands[1].armOperand}, \#:upper16:#{operands[0].value}"
         when "nop"
             $asm.puts "nop"
         when "bieq", "bpeq", "bbeq"
@@ -601,6 +596,8 @@ class Instruction
             $asm.puts "smull #{operands[2].armOperand}, #{operands[3].armOperand}, #{operands[0].armOperand}, #{operands[1].armOperand}"
         when "memfence"
             $asm.puts "dmb sy"
+        when "clrbp"
+            $asm.puts "bic #{operands[2].armOperand}, #{operands[0].armOperand}, #{operands[1].armOperand}"
         else
             lowerDefault
         end

@@ -51,7 +51,7 @@ namespace WebCore {
 using namespace HTMLNames;
 
 RenderSearchField::RenderSearchField(HTMLInputElement& element, PassRef<RenderStyle> style)
-    : RenderTextControlSingleLine(element, std::move(style))
+    : RenderTextControlSingleLine(element, WTF::move(style))
     , m_searchPopupIsVisible(false)
     , m_searchPopup(0)
 {
@@ -85,7 +85,7 @@ void RenderSearchField::addSearchResult()
     if (value.isEmpty())
         return;
 
-    if (frame().settings().privateBrowsingEnabled())
+    if (frame().page()->usesEphemeralSession())
         return;
 
     int size = static_cast<int>(m_recentSearches.size());
@@ -181,7 +181,7 @@ void RenderSearchField::updateCancelButtonVisibility() const
 
     auto cancelButtonStyle = RenderStyle::clone(&curStyle);
     cancelButtonStyle.get().setVisibility(buttonVisibility);
-    cancelButtonRenderer->setStyle(std::move(cancelButtonStyle));
+    cancelButtonRenderer->setStyle(WTF::move(cancelButtonStyle));
 }
 
 EVisibility RenderSearchField::visibilityForCancelButton() const
@@ -261,7 +261,7 @@ PopupMenuStyle RenderSearchField::itemStyle(unsigned) const
 PopupMenuStyle RenderSearchField::menuStyle() const
 {
     return PopupMenuStyle(style().visitedDependentColor(CSSPropertyColor), style().visitedDependentColor(CSSPropertyBackgroundColor), style().font(), style().visibility() == VISIBLE,
-        style().display() == NONE, style().textIndent(), style().direction(), isOverride(style().unicodeBidi()), PopupMenuStyle::CustomBackgroundColor);
+        style().display() == NONE, true, style().textIndent(), style().direction(), isOverride(style().unicodeBidi()), PopupMenuStyle::CustomBackgroundColor);
 }
 
 int RenderSearchField::clientInsetLeft() const

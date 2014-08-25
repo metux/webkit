@@ -31,7 +31,7 @@
 #include "CodeBlock.h"
 #include "DFGNode.h"
 #include "DFGPlan.h"
-#include "Operations.h"
+#include "JSCInlines.h"
 #include "VM.h"
 
 namespace JSC { namespace DFG {
@@ -40,9 +40,9 @@ void CommonData::notifyCompilingStructureTransition(Plan& plan, CodeBlock* codeB
 {
     plan.transitions.addLazily(
         codeBlock,
-        node->codeOrigin.codeOriginOwner(),
-        node->structureTransitionData().previousStructure,
-        node->structureTransitionData().newStructure);
+        node->origin.semantic.codeOriginOwner(),
+        node->transition()->previous,
+        node->transition()->next);
 }
 
 unsigned CommonData::addCodeOrigin(CodeOrigin codeOrigin)

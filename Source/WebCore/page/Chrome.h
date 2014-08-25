@@ -28,7 +28,7 @@
 #include <wtf/Forward.h>
 #include <wtf/RefPtr.h>
 
-#if PLATFORM(MAC)
+#if PLATFORM(COCOA)
 #ifndef __OBJC__
 class NSView;
 #endif
@@ -69,15 +69,19 @@ public:
     ChromeClient& client() { return m_client; }
 
     // HostWindow methods.
-    virtual void invalidateRootView(const IntRect&, bool) override;
-    virtual void invalidateContentsAndRootView(const IntRect&, bool) override;
-    virtual void invalidateContentsForSlowScroll(const IntRect&, bool) override;
+    virtual void invalidateRootView(const IntRect&) override;
+    virtual void invalidateContentsAndRootView(const IntRect&) override;
+    virtual void invalidateContentsForSlowScroll(const IntRect&) override;
     virtual void scroll(const IntSize&, const IntRect&, const IntRect&) override;
 #if USE(TILED_BACKING_STORE)
     virtual void delegatedScrollRequested(const IntPoint& scrollPoint) override;
 #endif
     virtual IntPoint screenToRootView(const IntPoint&) const override;
     virtual IntRect rootViewToScreen(const IntRect&) const override;
+#if PLATFORM(IOS)
+    virtual IntPoint accessibilityScreenToRootView(const IntPoint&) const override;
+    virtual IntRect rootViewToAccessibilityScreen(const IntRect&) const override;
+#endif
     virtual PlatformPageClient platformPageClient() const override;
     virtual void scrollbarsModeDidChange() const override;
     virtual void setCursor(const Cursor&) override;
@@ -90,10 +94,12 @@ public:
     virtual PlatformDisplayID displayID() const override;
     virtual void windowScreenDidChange(PlatformDisplayID) override;
 
+    FloatSize screenSize() const override;
+    FloatSize availableScreenSize() const override;
+
     void scrollRectIntoView(const IntRect&) const;
 
     void contentsSizeChanged(Frame*, const IntSize&) const;
-    void layoutUpdated(Frame*) const;
 
     void setWindowRect(const FloatRect&) const;
     FloatRect windowRect() const;
@@ -157,20 +163,17 @@ public:
 #endif
 
 #if ENABLE(DATE_AND_TIME_INPUT_TYPES) && !PLATFORM(IOS)
-    PassRefPtr<DateTimeChooser> openDateTimeChooser(DateTimeChooserClient*, const DateTimeChooserParameters&)
+    PassRefPtr<DateTimeChooser> openDateTimeChooser(DateTimeChooserClient*, const DateTimeChooserParameters&);
 #endif
 
     void runOpenPanel(Frame*, PassRefPtr<FileChooser>);
     void loadIconForFiles(const Vector<String>&, FileIconLoader*);
-#if ENABLE(DIRECTORY_UPLOAD)
-    void enumerateChosenDirectory(FileChooser*);
-#endif
 
     void dispatchViewportPropertiesDidChange(const ViewportArguments&) const;
 
     bool requiresFullscreenForVideoPlayback();
 
-#if PLATFORM(MAC)
+#if PLATFORM(COCOA)
     void focusNSView(NSView*);
 #endif
 

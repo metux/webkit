@@ -11,7 +11,7 @@
  * 2.  Redistributions in binary form must reproduce the above copyright
  *     notice, this list of conditions and the following disclaimer in the
  *     documentation and/or other materials provided with the distribution. 
- * 3.  Neither the name of Apple Computer, Inc. ("Apple") nor the names of
+ * 3.  Neither the name of Apple Inc. ("Apple") nor the names of
  *     its contributors may be used to endorse or promote products derived
  *     from this software without specific prior written permission. 
  *
@@ -59,8 +59,6 @@
 #ifndef Threading_h
 #define Threading_h
 
-#include <wtf/Platform.h>
-
 #include <stdint.h>
 #include <wtf/Assertions.h>
 #include <wtf/Atomics.h>
@@ -83,6 +81,11 @@ WTF_EXPORT_PRIVATE void initializeThreading();
 // The thread name must be a literal since on some platforms it's passed in to the thread.
 WTF_EXPORT_PRIVATE ThreadIdentifier createThread(ThreadFunction, void*, const char* threadName);
 
+// Mark the current thread as requiring UI responsiveness.
+WTF_EXPORT_PRIVATE void setCurrentThreadIsUserInteractive();
+
+WTF_EXPORT_PRIVATE void setCurrentThreadIsUserInitiated();
+
 // Internal platform-specific createThread implementation.
 ThreadIdentifier createThreadInternal(ThreadFunction, void*, const char* threadName);
 
@@ -91,6 +94,7 @@ ThreadIdentifier createThreadInternal(ThreadFunction, void*, const char* threadN
 void initializeCurrentThreadInternal(const char* threadName);
 
 WTF_EXPORT_PRIVATE ThreadIdentifier currentThread();
+WTF_EXPORT_PRIVATE void changeThreadPriority(ThreadIdentifier, int);
 WTF_EXPORT_PRIVATE int waitForThreadCompletion(ThreadIdentifier);
 WTF_EXPORT_PRIVATE void detachThread(ThreadIdentifier);
 
@@ -99,6 +103,7 @@ WTF_EXPORT_PRIVATE void detachThread(ThreadIdentifier);
 using WTF::ThreadIdentifier;
 using WTF::createThread;
 using WTF::currentThread;
+using WTF::changeThreadPriority;
 using WTF::detachThread;
 using WTF::waitForThreadCompletion;
 

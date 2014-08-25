@@ -28,7 +28,6 @@
 
 #if ENABLE(NETWORK_PROCESS)
 
-#include "BlobRegistrationData.h"
 #include "ConnectionStack.h"
 #include "NetworkBlobRegistry.h"
 #include "NetworkConnectionToWebProcessMessages.h"
@@ -38,10 +37,10 @@
 #include "NetworkResourceLoaderMessages.h"
 #include "RemoteNetworkingContext.h"
 #include "SessionTracker.h"
-#include <WebCore/BlobData.h>
 #include <WebCore/PlatformCookieJar.h>
 #include <WebCore/ResourceLoaderOptions.h>
 #include <WebCore/ResourceRequest.h>
+#include <WebCore/SessionID.h>
 #include <wtf/RunLoop.h>
 
 using namespace WebCore;
@@ -57,7 +56,6 @@ NetworkConnectionToWebProcess::NetworkConnectionToWebProcess(IPC::Connection::Id
     : m_serialLoadingEnabled(false)
 {
     m_connection = IPC::Connection::createServerConnection(connectionIdentifier, this, RunLoop::main());
-    m_connection->setOnlySendMessagesAsDispatchWhenWaitingForSyncReplyWhenProcessingSuchAMessage(true);
     m_connection->open();
 }
 
@@ -138,6 +136,15 @@ void NetworkConnectionToWebProcess::removeLoadIdentifier(ResourceLoadIdentifier 
     loader->abort();
 }
 
+void NetworkConnectionToWebProcess::setDefersLoading(ResourceLoadIdentifier identifier, bool defers)
+{
+    RefPtr<NetworkResourceLoader> loader = m_networkResourceLoaders.get(identifier);
+    if (!loader)
+        return;
+
+    loader->setDefersLoading(defers);
+}
+
 void NetworkConnectionToWebProcess::servePendingRequests(uint32_t resourceLoadPriority)
 {
     NetworkProcess::shared().networkResourceLoadScheduler().servePendingRequests(static_cast<ResourceLoadPriority>(resourceLoadPriority));
@@ -148,9 +155,9 @@ void NetworkConnectionToWebProcess::setSerialLoadingEnabled(bool enabled)
     m_serialLoadingEnabled = enabled;
 }
 
-static NetworkStorageSession& storageSession(uint64_t sessionID)
+static NetworkStorageSession& storageSession(SessionID sessionID)
 {
-    if (SessionTracker::isEphemeralID(sessionID)) {
+    if (sessionID.isEphemeral()) {
         NetworkStorageSession* privateSession = SessionTracker::session(sessionID);
         if (privateSession)
             return *privateSession;
@@ -161,7 +168,7 @@ static NetworkStorageSession& storageSession(uint64_t sessionID)
     return NetworkStorageSession::defaultStorageSession();
 }
 
-void NetworkConnectionToWebProcess::startDownload(uint64_t sessionID, uint64_t downloadID, const ResourceRequest& request)
+void NetworkConnectionToWebProcess::startDownload(SessionID, uint64_t downloadID, const ResourceRequest& request)
 {
     // FIXME: Do something with the session ID.
     NetworkProcess::shared().downloadManager().startDownload(downloadID, request);
@@ -183,45 +190,46 @@ void NetworkConnectionToWebProcess::convertMainResourceLoadToDownload(uint64_t m
     loader->didConvertHandleToDownload();
 }
 
-void NetworkConnectionToWebProcess::cookiesForDOM(uint64_t sessionID, const URL& firstParty, const URL& url, String& result)
+void NetworkConnectionToWebProcess::cookiesForDOM(SessionID sessionID, const URL& firstParty, const URL& url, String& result)
 {
     result = WebCore::cookiesForDOM(storageSession(sessionID), firstParty, url);
 }
 
-void NetworkConnectionToWebProcess::setCookiesFromDOM(uint64_t sessionID, const URL& firstParty, const URL& url, const String& cookieString)
+void NetworkConnectionToWebProcess::setCookiesFromDOM(SessionID sessionID, const URL& firstParty, const URL& url, const String& cookieString)
 {
     WebCore::setCookiesFromDOM(storageSession(sessionID), firstParty, url, cookieString);
 }
 
-void NetworkConnectionToWebProcess::cookiesEnabled(uint64_t sessionID, const URL& firstParty, const URL& url, bool& result)
+void NetworkConnectionToWebProcess::cookiesEnabled(SessionID sessionID, const URL& firstParty, const URL& url, bool& result)
 {
     result = WebCore::cookiesEnabled(storageSession(sessionID), firstParty, url);
 }
 
-void NetworkConnectionToWebProcess::cookieRequestHeaderFieldValue(uint64_t sessionID, const URL& firstParty, const URL& url, String& result)
+void NetworkConnectionToWebProcess::cookieRequestHeaderFieldValue(SessionID sessionID, const URL& firstParty, const URL& url, String& result)
 {
     result = WebCore::cookieRequestHeaderFieldValue(storageSession(sessionID), firstParty, url);
 }
 
-void NetworkConnectionToWebProcess::getRawCookies(uint64_t sessionID, const URL& firstParty, const URL& url, Vector<Cookie>& result)
+void NetworkConnectionToWebProcess::getRawCookies(SessionID sessionID, const URL& firstParty, const URL& url, Vector<Cookie>& result)
 {
     WebCore::getRawCookies(storageSession(sessionID), firstParty, url, result);
 }
 
-void NetworkConnectionToWebProcess::deleteCookie(uint64_t sessionID, const URL& url, const String& cookieName)
+void NetworkConnectionToWebProcess::deleteCookie(SessionID sessionID, const URL& url, const String& cookieName)
 {
     WebCore::deleteCookie(storageSession(sessionID), url, cookieName);
 }
 
-void NetworkConnectionToWebProcess::registerBlobURL(const URL& url, const BlobRegistrationData& data)
+void NetworkConnectionToWebProcess::registerFileBlobURL(const URL& url, const String& path, const SandboxExtension::Handle& extensionHandle, const String& contentType)
 {
-    Vector<RefPtr<SandboxExtension>> extensions;
-    for (size_t i = 0, count = data.sandboxExtensions().size(); i < count; ++i) {
-        if (RefPtr<SandboxExtension> extension = SandboxExtension::create(data.sandboxExtensions()[i]))
-            extensions.append(extension);
-    }
+    RefPtr<SandboxExtension> extension = SandboxExtension::create(extensionHandle);
 
-    NetworkBlobRegistry::shared().registerBlobURL(this, url, data.releaseData(), extensions);
+    NetworkBlobRegistry::shared().registerFileBlobURL(this, url, path, extension.release(), contentType);
+}
+
+void NetworkConnectionToWebProcess::registerBlobURL(const URL& url, Vector<BlobPart> blobParts, const String& contentType)
+{
+    NetworkBlobRegistry::shared().registerBlobURL(this, url, WTF::move(blobParts), contentType);
 }
 
 void NetworkConnectionToWebProcess::registerBlobURLFromURL(const URL& url, const URL& srcURL)
@@ -229,9 +237,19 @@ void NetworkConnectionToWebProcess::registerBlobURLFromURL(const URL& url, const
     NetworkBlobRegistry::shared().registerBlobURL(this, url, srcURL);
 }
 
+void NetworkConnectionToWebProcess::registerBlobURLForSlice(const URL& url, const URL& srcURL, int64_t start, int64_t end)
+{
+    NetworkBlobRegistry::shared().registerBlobURLForSlice(this, url, srcURL, start, end);
+}
+
 void NetworkConnectionToWebProcess::unregisterBlobURL(const URL& url)
 {
     NetworkBlobRegistry::shared().unregisterBlobURL(this, url);
+}
+
+void NetworkConnectionToWebProcess::blobSize(const URL& url, uint64_t& resultSize)
+{
+    resultSize = NetworkBlobRegistry::shared().blobSize(this, url);
 }
 
 } // namespace WebKit

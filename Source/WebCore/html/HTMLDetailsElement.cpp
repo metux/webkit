@@ -22,6 +22,7 @@
 #include "HTMLDetailsElement.h"
 
 #if ENABLE(DETAILS_ELEMENT)
+#include "ElementIterator.h"
 #include "HTMLSummaryElement.h"
 #include "InsertionPoint.h"
 #include "LocalizedStrings.h"
@@ -35,7 +36,7 @@ using namespace HTMLNames;
 
 static const AtomicString& summaryQuerySelector()
 {
-    DEFINE_STATIC_LOCAL(AtomicString, selector, ("summary:first-of-type", AtomicString::ConstructFromLiteral));
+    DEPRECATED_DEFINE_STATIC_LOCAL(AtomicString, selector, ("summary:first-of-type", AtomicString::ConstructFromLiteral));
     return selector;
 };
 
@@ -112,7 +113,7 @@ HTMLDetailsElement::HTMLDetailsElement(const QualifiedName& tagName, Document& d
 
 RenderPtr<RenderElement> HTMLDetailsElement::createElementRenderer(PassRef<RenderStyle> style)
 {
-    return createRenderer<RenderBlockFlow>(*this, std::move(style));
+    return createRenderer<RenderBlockFlow>(*this, WTF::move(style));
 }
 
 void HTMLDetailsElement::didAddUserAgentShadowRoot(ShadowRoot* root)
@@ -121,12 +122,10 @@ void HTMLDetailsElement::didAddUserAgentShadowRoot(ShadowRoot* root)
     root->appendChild(DetailsContentElement::create(document()), ASSERT_NO_EXCEPTION);
 }
 
-Element* HTMLDetailsElement::findMainSummary() const
+const Element* HTMLDetailsElement::findMainSummary() const
 {
-    for (Node* child = firstChild(); child; child = child->nextSibling()) {
-        if (child->hasTagName(summaryTag))
-            return toElement(child);
-    }
+    if (auto summary = childrenOfType<HTMLSummaryElement>(*this).first())
+        return summary;
 
     return static_cast<DetailsSummaryElement*>(userAgentShadowRoot()->firstChild())->fallbackSummary();
 }

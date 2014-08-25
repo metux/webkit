@@ -52,8 +52,8 @@
 #include "JSMediaStreamTrack.h"
 #endif
 
-#if ENABLE(SCRIPTED_SPEECH)
-#include "JSSpeechRecognitionResultList.h"
+#if ENABLE(GAMEPAD)
+#include "JSGamepad.h"
 #endif
 
 using namespace JSC;
@@ -258,10 +258,10 @@ void JSDictionary::convertValue(JSC::ExecState* exec, JSC::JSValue value, RefPtr
 }
 #endif
 
-#if ENABLE(SCRIPTED_SPEECH)
-void JSDictionary::convertValue(JSC::ExecState*, JSC::JSValue value, RefPtr<SpeechRecognitionResultList>& result)
+#if ENABLE(GAMEPAD)
+void JSDictionary::convertValue(JSC::ExecState*, JSC::JSValue value, RefPtr<Gamepad>& result)
 {
-    result = toSpeechRecognitionResultList(value);
+    result = toGamepad(value);
 }
 #endif
 

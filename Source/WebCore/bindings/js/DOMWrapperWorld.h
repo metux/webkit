@@ -23,7 +23,6 @@
 #define DOMWrapperWorld_h
 
 #include "JSDOMGlobalObject.h"
-#include <runtime/WeakGCMap.h>
 #include <wtf/Forward.h>
 
 namespace WebCore {
@@ -33,11 +32,10 @@ class JSDOMWrapper;
 class ScriptController;
 
 typedef HashMap<void*, JSC::Weak<JSC::JSObject>> DOMObjectWrapperMap;
-typedef JSC::WeakGCMap<StringImpl*, JSC::JSString, PtrHash<StringImpl*>> JSStringCache;
 
 class DOMWrapperWorld : public RefCounted<DOMWrapperWorld> {
 public:
-    static PassRefPtr<DOMWrapperWorld> create(JSC::VM* vm, bool isNormal = false)
+    static PassRefPtr<DOMWrapperWorld> create(JSC::VM& vm, bool isNormal = false)
     {
         return adoptRef(new DOMWrapperWorld(vm, isNormal));
     }
@@ -51,18 +49,17 @@ public:
 
     // FIXME: can we make this private?
     DOMObjectWrapperMap m_wrappers;
-    JSStringCache m_stringCache;
     HashMap<CSSValue*, void*> m_cssValueRoots;
 
     bool isNormal() const { return m_isNormal; }
 
-    JSC::VM* vm() const { return m_vm; }
+    JSC::VM& vm() const { return m_vm; }
 
 protected:
-    DOMWrapperWorld(JSC::VM*, bool isNormal);
+    DOMWrapperWorld(JSC::VM&, bool isNormal);
 
 private:
-    JSC::VM* m_vm;
+    JSC::VM& m_vm;
     HashSet<ScriptController*> m_scriptControllersWithWindowShells;
     bool m_isNormal;
 };

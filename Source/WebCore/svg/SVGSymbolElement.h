@@ -21,7 +21,6 @@
 #ifndef SVGSymbolElement_h
 #define SVGSymbolElement_h
 
-#if ENABLE(SVG)
 #include "SVGAnimatedBoolean.h"
 #include "SVGAnimatedPreserveAspectRatio.h"
 #include "SVGAnimatedRect.h"
@@ -40,8 +39,6 @@ public:
 private:
     SVGSymbolElement(const QualifiedName&, Document&);
 
-    virtual bool supportsFocus() const override { return true; }
-
     bool isSupportedAttribute(const QualifiedName&);
     virtual void parseAttribute(const QualifiedName&, const AtomicString&) override;
     virtual void svgAttributeChanged(const QualifiedName&) override;
@@ -58,5 +55,4 @@ private:
 
 } // namespace WebCore
 
-#endif // ENABLE(SVG)
 #endif

@@ -67,7 +67,7 @@ public:
     virtual String extensions() override;
     virtual ThreadableWebSocketChannel::SendResult send(const String& message) override;
     virtual ThreadableWebSocketChannel::SendResult send(const JSC::ArrayBuffer&, unsigned byteOffset, unsigned byteLength) override;
-    virtual ThreadableWebSocketChannel::SendResult send(const Blob&) override;
+    virtual ThreadableWebSocketChannel::SendResult send(Blob&) override;
     virtual unsigned long bufferedAmount() const override;
     virtual void close(int code, const String& reason) override;
     virtual void fail(const String& reason) override;
@@ -89,7 +89,7 @@ public:
         void connect(const URL&, const String& protocol);
         void send(const String& message);
         void send(const JSC::ArrayBuffer&);
-        void send(const Blob&);
+        void send(Blob&);
         void bufferedAmount();
         void close(int code, const String& reason);
         void fail(const String& reason);
@@ -135,7 +135,7 @@ private:
         void connect(const URL&, const String& protocol);
         ThreadableWebSocketChannel::SendResult send(const String& message);
         ThreadableWebSocketChannel::SendResult send(const JSC::ArrayBuffer&, unsigned byteOffset, unsigned byteLength);
-        ThreadableWebSocketChannel::SendResult send(const Blob&);
+        ThreadableWebSocketChannel::SendResult send(Blob&);
         unsigned long bufferedAmount();
         void close(int code, const String& reason);
         void fail(const String& reason);
@@ -152,7 +152,7 @@ private:
         static void setWebSocketChannel(ScriptExecutionContext*, Bridge* thisPtr, Peer*, PassRefPtr<ThreadableWebSocketChannelClientWrapper>);
 
         // Executed on the main thread to create a Peer for this bridge.
-        static void mainThreadInitialize(ScriptExecutionContext*, WorkerLoaderProxy*, PassRefPtr<ThreadableWebSocketChannelClientWrapper>, const String& taskMode);
+        static void mainThreadInitialize(ScriptExecutionContext&, WorkerLoaderProxy*, PassRefPtr<ThreadableWebSocketChannelClientWrapper>, const String& taskMode);
 
         // Executed on the worker context's thread.
         void clearClientWrapper();
@@ -169,16 +169,16 @@ private:
 
     WorkerThreadableWebSocketChannel(WorkerGlobalScope*, WebSocketChannelClient*, const String& taskMode);
 
-    static void mainThreadConnect(ScriptExecutionContext*, Peer*, const URL&, const String& protocol);
-    static void mainThreadSend(ScriptExecutionContext*, Peer*, const String& message);
-    static void mainThreadSendArrayBuffer(ScriptExecutionContext*, Peer*, PassOwnPtr<Vector<char>>);
-    static void mainThreadSendBlob(ScriptExecutionContext*, Peer*, const URL&, const String& type, long long size);
-    static void mainThreadBufferedAmount(ScriptExecutionContext*, Peer*);
-    static void mainThreadClose(ScriptExecutionContext*, Peer*, int code, const String& reason);
-    static void mainThreadFail(ScriptExecutionContext*, Peer*, const String& reason);
-    static void mainThreadDestroy(ScriptExecutionContext*, PassOwnPtr<Peer>);
-    static void mainThreadSuspend(ScriptExecutionContext*, Peer*);
-    static void mainThreadResume(ScriptExecutionContext*, Peer*);
+    static void mainThreadConnect(ScriptExecutionContext&, Peer*, const URL&, const String& protocol);
+    static void mainThreadSend(ScriptExecutionContext&, Peer*, const String& message);
+    static void mainThreadSendArrayBuffer(ScriptExecutionContext&, Peer*, PassOwnPtr<Vector<char>>);
+    static void mainThreadSendBlob(ScriptExecutionContext&, Peer*, const URL&, const String& type, long long size);
+    static void mainThreadBufferedAmount(ScriptExecutionContext&, Peer*);
+    static void mainThreadClose(ScriptExecutionContext&, Peer*, int code, const String& reason);
+    static void mainThreadFail(ScriptExecutionContext&, Peer*, const String& reason);
+    static void mainThreadDestroy(ScriptExecutionContext&, Peer*);
+    static void mainThreadSuspend(ScriptExecutionContext&, Peer*);
+    static void mainThreadResume(ScriptExecutionContext&, Peer*);
 
     class WorkerGlobalScopeDidInitializeTask;
 

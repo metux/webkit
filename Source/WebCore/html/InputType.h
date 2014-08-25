@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2010 Google Inc. All rights reserved.
- * Copyright (C) 2011 Apple Inc. All rights reserved.
+ * Copyright (C) 2011, 2014 Apple Inc. All rights reserved.
  * Copyright (C) 2012 Samsung Electronics. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -33,7 +33,6 @@
 #ifndef InputType_h
 #define InputType_h
 
-#include "FeatureObserver.h"
 #include "HTMLTextFormControlElement.h"
 #include "RenderPtr.h"
 #include "StepRange.h"
@@ -230,12 +229,7 @@ public:
     virtual HTMLElement* sliderTrackElement() const { return nullptr; }
     virtual HTMLElement* placeholderElement() const;
 
-#if ENABLE(INPUT_SPEECH)
-    virtual HTMLElement* speechButtonElement() const { return nullptr; }
-#endif
-
     // Miscellaneous functions
-
     virtual bool rendererIsNeeded();
     virtual RenderPtr<RenderElement> createInputRenderer(PassRef<RenderStyle>);
     virtual void addSearchResult();
@@ -245,6 +239,7 @@ public:
     virtual void stepAttributeChanged();
     virtual void altAttributeChanged();
     virtual void srcAttributeChanged();
+    virtual void maxResultsAttributeChanged();
     virtual bool shouldRespectAlignAttribute();
     virtual FileList* files();
     virtual void setFiles(PassRefPtr<FileList>);
@@ -265,7 +260,6 @@ public:
     virtual void setValue(const String&, bool valueChanged, TextFieldEventBehavior);
     virtual bool shouldResetOnDocumentActivation();
     virtual bool shouldRespectListAttribute();
-    virtual bool shouldRespectSpeechAttribute();
     virtual bool isEnumeratable();
     virtual bool isCheckable();
     virtual bool isSteppable() const;
@@ -325,7 +319,6 @@ protected:
     HTMLInputElement& element() const { return m_element; }
     Chrome* chrome() const;
     Decimal parseToNumberOrNaN(const String&) const;
-    void observeFeatureIfVisible(FeatureObserver::Feature) const;
 
 private:
     // Helper for stepUp()/stepDown(). Adds step value * count to the current value.

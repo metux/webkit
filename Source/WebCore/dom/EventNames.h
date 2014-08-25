@@ -120,6 +120,12 @@ namespace WebCore {
     macro(upgradeneeded) \
     macro(versionchange) \
     macro(visibilitychange) \
+    /* ENABLE(WILL_REVEAL_EDGE_EVENT) */ \
+    macro(webkitwillrevealbottom) \
+    macro(webkitwillrevealleft) \
+    macro(webkitwillrevealright) \
+    macro(webkitwillrevealtop) \
+    /* End of ENABLE(WILL_REVEAL_EDGE_EVENT) */ \
     macro(wheel) \
     macro(write) \
     macro(writeend) \
@@ -157,6 +163,8 @@ namespace WebCore {
     macro(volumechange) \
     macro(waiting) \
     \
+    macro(active) \
+    macro(inactive) \
     macro(addtrack) \
     macro(cuechange) \
     macro(enter) \
@@ -250,10 +258,8 @@ namespace WebCore {
     \
     macro(show) \
     \
-    macro(webkitpointerlockchange) \
-    macro(webkitpointerlockerror) \
-    \
-    macro(webkitregionlayoutupdate) \
+    macro(pointerlockchange) \
+    macro(pointerlockerror) \
     \
     macro(webkitregionoversetchange) \
     \
@@ -275,6 +281,11 @@ namespace WebCore {
     macro(gesturechange) \
     macro(gestureend) \
     /* End of ENABLE(IOS_GESTURE_EVENTS) */ \
+    \
+    /* ENABLE(GAMEPAD) */ \
+    macro(gamepadconnected) \
+    macro(gamepaddisconnected) \
+    /* End of ENABLE(GAMEPAD) */ \
 
 // end of DOM_EVENT_NAMES_FOR_EACH
 
@@ -313,6 +324,14 @@ public:
         names.append(touchcancelEvent);
         return names;
     }
+
+#if ENABLE(GAMEPAD)
+    inline bool isGamepadEventType(const AtomicString& eventType) const
+    {
+        return eventType == gamepadconnectedEvent
+            || eventType == gamepaddisconnectedEvent;
+    }
+#endif
 };
 
 inline EventNames& eventNames()

@@ -25,7 +25,7 @@
 
 #ifndef SVGSMILElement_h
 #define SVGSMILElement_h
-#if ENABLE(SVG)
+
 #include "SMILTime.h"
 #include "SVGElement.h"
 
@@ -52,7 +52,7 @@ public:
     virtual bool hasValidAttributeName();
     virtual void animationAttributeChanged() = 0;
 
-    SMILTimeContainer* timeContainer() const { return m_timeContainer.get(); }
+    SMILTimeContainer* timeContainer() { return m_timeContainer.get(); }
 
     SVGElement* targetElement() const { return m_targetElement; }
     const QualifiedName& attributeName() const { return m_attributeName; }
@@ -120,9 +120,13 @@ protected:
     virtual void setTargetElement(SVGElement*);
     virtual void setAttributeName(const QualifiedName&);
 
+    virtual void didNotifySubtreeInsertions(ContainerNode*) override;
+
 private:
     void buildPendingResource() override;
     void clearResourceReferences();
+
+    virtual void clearTarget() override;
 
     virtual void startedActiveInterval() = 0;
     void endedActiveInterval();
@@ -194,7 +198,7 @@ private:
 
     virtual bool isSMILElement() const override final { return true; }
 
-    mutable SVGElement* m_targetElement;
+    SVGElement* m_targetElement;
 
     Vector<Condition> m_conditions;
     bool m_conditionsConnected;
@@ -242,5 +246,4 @@ NODE_TYPE_CASTS(SVGSMILElement)
 
 }
 
-#endif // ENABLE(SVG)
 #endif // SVGSMILElement_h

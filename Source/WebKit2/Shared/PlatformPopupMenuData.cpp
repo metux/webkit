@@ -36,9 +36,11 @@ PlatformPopupMenuData::PlatformPopupMenuData()
 
 void PlatformPopupMenuData::encode(IPC::ArgumentEncoder& encoder) const
 {
-#if PLATFORM(MAC)
+#if PLATFORM(COCOA)
     encoder << fontInfo;
     encoder << shouldPopOver;
+    encoder << hideArrows;
+    encoder.encodeEnum(menuSize);
 #else
     UNUSED_PARAM(encoder);
 #endif
@@ -46,10 +48,14 @@ void PlatformPopupMenuData::encode(IPC::ArgumentEncoder& encoder) const
 
 bool PlatformPopupMenuData::decode(IPC::ArgumentDecoder& decoder, PlatformPopupMenuData& data)
 {
-#if PLATFORM(MAC)
+#if PLATFORM(COCOA)
     if (!decoder.decode(data.fontInfo))
         return false;
     if (!decoder.decode(data.shouldPopOver))
+        return false;
+    if (!decoder.decode(data.hideArrows))
+        return false;
+    if (!decoder.decodeEnum(data.menuSize))
         return false;
 #else
     UNUSED_PARAM(decoder);

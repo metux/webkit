@@ -31,7 +31,7 @@
 #include "DFGGraph.h"
 #include "DFGPhase.h"
 #include "DFGValueSource.h"
-#include "Operations.h"
+#include "JSCInlines.h"
 
 namespace JSC { namespace DFG {
 
@@ -103,7 +103,7 @@ public:
         }
         if (codeBlock()->uncheckedActivationRegister().isValid())
             usedLocals.set(codeBlock()->activationRegister().toLocal());
-        for (InlineCallFrameSet::iterator iter = m_graph.m_inlineCallFrames->begin(); !!iter; ++iter) {
+        for (InlineCallFrameSet::iterator iter = m_graph.m_plan.inlineCallFrames->begin(); !!iter; ++iter) {
             InlineCallFrame* inlineCallFrame = *iter;
             if (!inlineCallFrame->executable->usesArguments())
                 continue;
@@ -197,9 +197,10 @@ public:
             
             RELEASE_ASSERT(inlineCallFrame->isClosureCall == !!data.calleeVariable);
             if (inlineCallFrame->isClosureCall) {
+                VariableAccessData* variable = data.calleeVariable->find();
                 ValueSource source = ValueSource::forFlushFormat(
-                    data.calleeVariable->machineLocal(),
-                    data.calleeVariable->flushFormat());
+                    variable->machineLocal(),
+                    variable->flushFormat());
                 inlineCallFrame->calleeRecovery = source.valueRecovery();
             } else
                 RELEASE_ASSERT(inlineCallFrame->calleeRecovery.isConstant());
@@ -227,7 +228,7 @@ public:
                         newSlowArguments[i].index = virtualRegisterForLocal(allocation[reg.toLocal()]).offset();
                 }
             
-                m_graph.m_slowArguments = std::move(newSlowArguments);
+                m_graph.m_slowArguments = WTF::move(newSlowArguments);
             }
         }
         

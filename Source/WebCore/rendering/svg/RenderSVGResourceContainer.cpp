@@ -18,8 +18,6 @@
  */
 
 #include "config.h"
-
-#if ENABLE(SVG)
 #include "RenderSVGResourceContainer.h"
 
 #include "RenderLayer.h"
@@ -38,7 +36,7 @@ static inline SVGDocumentExtensions& svgExtensionsFromElement(SVGElement& elemen
 }
 
 RenderSVGResourceContainer::RenderSVGResourceContainer(SVGElement& element, PassRef<RenderStyle> style)
-    : RenderSVGHiddenContainer(element, std::move(style))
+    : RenderSVGHiddenContainer(element, WTF::move(style))
     , m_id(element.getIdAttribute())
     , m_registered(false)
     , m_isInvalidating(false)
@@ -98,9 +96,9 @@ void RenderSVGResourceContainer::markAllClientsForInvalidation(InvalidationMode 
     bool needsLayout = mode == LayoutAndBoundariesInvalidation;
     bool markForInvalidation = mode != ParentOnlyInvalidation;
 
-    for (auto client : m_clients) {
+    for (auto* client : m_clients) {
         if (client->isSVGResourceContainer()) {
-            client->toRenderSVGResourceContainer()->removeAllClientsFromCache(markForInvalidation);
+            toRenderSVGResourceContainer(*client).removeAllClientsFromCache(markForInvalidation);
             continue;
         }
 
@@ -118,7 +116,7 @@ void RenderSVGResourceContainer::markAllClientsForInvalidation(InvalidationMode 
 void RenderSVGResourceContainer::markAllClientLayersForInvalidation()
 {
 #if ENABLE(CSS_FILTERS)
-    for (auto clientLayer : m_clientLayers)
+    for (auto* clientLayer : m_clientLayers)
         clientLayer->filterNeedsRepaint();
 #endif
 }
@@ -141,17 +139,15 @@ void RenderSVGResourceContainer::markClientForInvalidation(RenderObject& client,
     }
 }
 
-void RenderSVGResourceContainer::addClient(RenderObject* client)
+void RenderSVGResourceContainer::addClient(RenderElement& client)
 {
-    ASSERT(client);
-    m_clients.add(client);
+    m_clients.add(&client);
 }
 
-void RenderSVGResourceContainer::removeClient(RenderObject* client)
+void RenderSVGResourceContainer::removeClient(RenderElement& client)
 {
-    ASSERT(client);
-    removeClientFromCache(*client, false);
-    m_clients.remove(client);
+    removeClientFromCache(client, false);
+    m_clients.remove(&client);
 }
 
 void RenderSVGResourceContainer::addClientRenderLayer(RenderLayer* client)
@@ -180,11 +176,10 @@ void RenderSVGResourceContainer::registerResource()
     extensions.addResource(m_id, this);
 
     // Update cached resources of pending clients.
-    auto end = clients->end();
-    for (auto it = clients->begin(); it != end; ++it) {
-        ASSERT((*it)->hasPendingResources());
-        extensions.clearHasPendingResourcesIfPossible(*it);
-        auto renderer = (*it)->renderer();
+    for (auto* client : *clients) {
+        ASSERT(client->hasPendingResources());
+        extensions.clearHasPendingResourcesIfPossible(client);
+        auto* renderer = client->renderer();
         if (!renderer)
             continue;
         SVGResourcesCache::clientStyleChanged(*renderer, StyleDifferenceLayout, renderer->style());
@@ -192,20 +187,20 @@ void RenderSVGResourceContainer::registerResource()
     }
 }
 
-bool RenderSVGResourceContainer::shouldTransformOnTextPainting(RenderObject* object, AffineTransform& resourceTransform)
+bool RenderSVGResourceContainer::shouldTransformOnTextPainting(const RenderElement& renderer, AffineTransform& resourceTransform)
 {
-    ASSERT_UNUSED(object, object);
 #if USE(CG)
+    UNUSED_PARAM(renderer);
     UNUSED_PARAM(resourceTransform);
     return false;
 #else
     // This method should only be called for RenderObjects that deal with text rendering. Cmp. RenderObject.h's is*() methods.
-    ASSERT(object->isSVGText() || object->isSVGTextPath() || object->isSVGInline());
+    ASSERT(renderer.isSVGText() || renderer.isSVGTextPath() || renderer.isSVGInline());
 
     // In text drawing, the scaling part of the graphics context CTM is removed, compare SVGInlineTextBox::paintTextWithShadows.
     // So, we use that scaling factor here, too, and then push it down to pattern or gradient space
     // in order to keep the pattern or gradient correctly scaled.
-    float scalingFactor = SVGRenderingContext::calculateScreenFontSizeScalingFactor(object);
+    float scalingFactor = SVGRenderingContext::calculateScreenFontSizeScalingFactor(renderer);
     if (scalingFactor == 1)
         return false;
     resourceTransform.scale(scalingFactor);
@@ -226,5 +221,3 @@ AffineTransform RenderSVGResourceContainer::transformOnNonScalingStroke(RenderOb
 }
 
 }
-
-#endif

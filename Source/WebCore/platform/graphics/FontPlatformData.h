@@ -86,6 +86,7 @@ inline CTFontRef toCTFontRef(NSFont *nsFont) { return reinterpret_cast<CTFontRef
 #endif
 
 class FontPlatformData {
+    WTF_MAKE_FAST_ALLOCATED;
 public:
     FontPlatformData(WTF::HashTableDeletedValueType);
     FontPlatformData();
@@ -216,7 +217,7 @@ public:
 #endif
     }
 
-#if PLATFORM(WIN) && (USE(CG) || USE(CAIRO))
+#if (OS(DARWIN) && USE(CG)) || (PLATFORM(WIN) && (USE(CG) || USE(CAIRO)))
     PassRefPtr<SharedBuffer> openTypeTable(uint32_t table) const;
 #endif
 

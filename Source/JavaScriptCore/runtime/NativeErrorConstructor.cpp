@@ -25,27 +25,38 @@
 #include "JSFunction.h"
 #include "JSString.h"
 #include "NativeErrorPrototype.h"
-#include "Operations.h"
+#include "JSCInlines.h"
 
 namespace JSC {
 
 STATIC_ASSERT_IS_TRIVIALLY_DESTRUCTIBLE(NativeErrorConstructor);
 
-const ClassInfo NativeErrorConstructor::s_info = { "Function", &InternalFunction::s_info, 0, 0, CREATE_METHOD_TABLE(NativeErrorConstructor) };
+const ClassInfo NativeErrorConstructor::s_info = { "Function", &InternalFunction::s_info, 0, CREATE_METHOD_TABLE(NativeErrorConstructor) };
 
 NativeErrorConstructor::NativeErrorConstructor(VM& vm, Structure* structure)
     : InternalFunction(vm, structure)
 {
 }
 
+void NativeErrorConstructor::finishCreation(VM& vm, JSGlobalObject* globalObject, Structure* prototypeStructure, const String& name)
+{
+    Base::finishCreation(vm, name);
+    ASSERT(inherits(info()));
+    
+    NativeErrorPrototype* prototype = NativeErrorPrototype::create(vm, globalObject, prototypeStructure, name, this);
+    
+    putDirect(vm, vm.propertyNames->length, jsNumber(1), DontDelete | ReadOnly | DontEnum); // ECMA 15.11.7.5
+    putDirect(vm, vm.propertyNames->prototype, prototype, DontDelete | ReadOnly | DontEnum);
+    m_errorStructure.set(vm, this, ErrorInstance::createStructure(vm, globalObject, prototype));
+    ASSERT(m_errorStructure);
+    ASSERT(m_errorStructure->isObject());
+}
+
 void NativeErrorConstructor::visitChildren(JSCell* cell, SlotVisitor& visitor)
 {
     NativeErrorConstructor* thisObject = jsCast<NativeErrorConstructor*>(cell);
     ASSERT_GC_OBJECT_INHERITS(thisObject, info());
-    COMPILE_ASSERT(StructureFlags & OverridesVisitChildren, OverridesVisitChildrenWithoutSettingFlag);
-    ASSERT(thisObject->structure()->typeInfo().overridesVisitChildren());
-
-    InternalFunction::visitChildren(thisObject, visitor);
+    Base::visitChildren(thisObject, visitor);
     visitor.append(&thisObject->m_errorStructure);
 }
 

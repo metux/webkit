@@ -83,10 +83,14 @@ JSGenericTypedArrayView<Adaptor>* JSGenericTypedArrayView<Adaptor>::create(
     unsigned byteOffset, unsigned length)
 {
     RefPtr<ArrayBuffer> buffer = passedBuffer;
-    if (!ArrayBufferView::verifySubRange<typename Adaptor::Type>(buffer, byteOffset, length)) {
-        exec->vm().throwException(
-            exec, createRangeError(exec, "Byte offset and length out of range of buffer"));
-        return 0;
+    size_t size = sizeof(typename Adaptor::Type);
+    if (!ArrayBufferView::verifySubRangeLength(buffer, byteOffset, length, size)) {
+        exec->vm().throwException(exec, createRangeError(exec, "Length out of range of buffer"));
+        return nullptr;
+    }
+    if (!ArrayBufferView::verifyByteOffsetAlignment(byteOffset, size)) {
+        exec->vm().throwException(exec, createRangeError(exec, "Byte offset is not aligned"));
+        return nullptr;
     }
     ConstructionContext context(exec->vm(), structure, buffer, byteOffset, length);
     ASSERT(context);
@@ -266,7 +270,8 @@ bool JSGenericTypedArrayView<Adaptor>::set(
             return false;
         // We could optimize this case. But right now, we don't.
         for (unsigned i = 0; i < length; ++i) {
-            if (!setIndexQuickly(exec, offset + i, object->get(exec, i)))
+            JSValue value = object->get(exec, i);
+            if (!setIndex(exec, offset + i, value))
                 return false;
         }
         return true;
@@ -389,13 +394,7 @@ void JSGenericTypedArrayView<Adaptor>::putByIndex(
         return;
     }
     
-    if (!thisObject->canSetIndexQuickly(propertyName)) {
-        // Yes, really. Firefox returns without throwing anything if you store beyond
-        // the bounds.
-        return;
-    }
-    
-    thisObject->setIndexQuickly(exec, propertyName, value);
+    thisObject->setIndex(exec, propertyName, value);
 }
 
 template<typename Adaptor>
@@ -416,7 +415,7 @@ void JSGenericTypedArrayView<Adaptor>::getOwnNonIndexPropertyNames(
 {
     JSGenericTypedArrayView* thisObject = jsCast<JSGenericTypedArrayView*>(object);
     
-    if (mode == IncludeDontEnumProperties)
+    if (shouldIncludeDontEnumProperties(mode))
         array.add(exec->propertyNames().length);
     
     Base::getOwnNonIndexPropertyNames(thisObject, exec, array, mode);

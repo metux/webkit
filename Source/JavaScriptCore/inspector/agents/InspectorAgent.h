@@ -11,7 +11,7 @@
  * 2.  Redistributions in binary form must reproduce the above copyright
  *     notice, this list of conditions and the following disclaimer in the
  *     documentation and/or other materials provided with the distribution.
- * 3.  Neither the name of Apple Computer, Inc. ("Apple") nor the names of
+ * 3.  Neither the name of Apple Inc. ("Apple") nor the names of
  *     its contributors may be used to endorse or promote products derived
  *     from this software without specific prior written permission.
  *
@@ -30,22 +30,26 @@
 #ifndef InspectorAgent_h
 #define InspectorAgent_h
 
+#if ENABLE(INSPECTOR)
+
 #include "InspectorJSBackendDispatchers.h"
 #include "InspectorJSFrontendDispatchers.h"
 #include "inspector/InspectorAgentBase.h"
 #include <wtf/Forward.h>
-#include <wtf/PassOwnPtr.h>
 #include <wtf/Vector.h>
 
 namespace Inspector {
 
 class InspectorObject;
 class InstrumentingAgents;
+class InspectorInspectorBackendDispatcher;
+class InspectorInspectorFrontendDispatchers;
 
 typedef String ErrorString;
 
 class JS_EXPORT_PRIVATE InspectorAgent final : public InspectorAgentBase, public InspectorInspectorBackendDispatcherHandler {
     WTF_MAKE_NONCOPYABLE(InspectorAgent);
+    WTF_MAKE_FAST_ALLOCATED;
 public:
     InspectorAgent();
     virtual ~InspectorAgent();
@@ -57,16 +61,18 @@ public:
     virtual void disable(ErrorString*) override;
 
     void inspect(PassRefPtr<TypeBuilder::Runtime::RemoteObject> objectToInspect, PassRefPtr<InspectorObject> hints);
-    void evaluateForTestInFrontend(long testCallId, const String& script);
+    void evaluateForTestInFrontend(const String& script);
 
 private:
     std::unique_ptr<InspectorInspectorFrontendDispatcher> m_frontendDispatcher;
     RefPtr<InspectorInspectorBackendDispatcher> m_backendDispatcher;
-    Vector<std::pair<long, String>> m_pendingEvaluateTestCommands;
+    Vector<String> m_pendingEvaluateTestCommands;
     std::pair<RefPtr<TypeBuilder::Runtime::RemoteObject>, RefPtr<InspectorObject>> m_pendingInspectData;
     bool m_enabled;
 };
 
 } // namespace Inspector
+
+#endif // ENABLE(INSPECTOR)
 
 #endif // !defined(InspectorAgent_h)

@@ -23,24 +23,27 @@
 #define CSSToStyleMap_h
 
 #include "CSSPropertyNames.h"
-#include "LengthBox.h"
+#include <wtf/FastMalloc.h>
+#include <wtf/Noncopyable.h>
 
 namespace WebCore {
 
-class FillLayer;
-class CSSValue;
 class Animation;
+class CSSValue;
+class FillLayer;
 class RenderStyle;
 class StyleImage;
 class StyleResolver;
 class NinePieceImage;
+
+struct LengthBox;
 
 class CSSToStyleMap {
     WTF_MAKE_NONCOPYABLE(CSSToStyleMap);
     WTF_MAKE_FAST_ALLOCATED;
 
 public:
-    CSSToStyleMap(StyleResolver* resolver) : m_resolver(resolver) { }
+    CSSToStyleMap(StyleResolver*);
 
     void mapFillAttachment(CSSPropertyID, FillLayer*, CSSValue*);
     void mapFillClip(CSSPropertyID, FillLayer*, CSSValue*);

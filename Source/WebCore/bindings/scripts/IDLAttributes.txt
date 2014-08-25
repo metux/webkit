@@ -19,6 +19,7 @@
 #
 
 ActiveDOMObject
+AtomicString
 CPPPureInterface
 CachedAttribute
 CallbackNeedsOperatorEqual
@@ -43,6 +44,7 @@ CustomIndexedSetter
 CustomIsReachable
 CustomNamedGetter
 CustomNamedSetter
+CustomProxyToJSObject
 CustomPutFunction
 CustomReturn
 CustomSetter
@@ -57,6 +59,7 @@ EnabledAtRuntime=*
 EnabledBySetting=*
 EnforceRange
 EventTarget
+ForwardDeclareInHeader
 GenerateIsReachable=|Impl|ImplWebGLRenderingContext|ImplDocument|ImplElementRoot|ImplFrame|ImplOwnerNodeRoot
 GetterRaisesException
 GlobalContext=DOMWindow|WorkerGlobalScope|SharedWorkerGlobalScope|DedicatedWorkerGlobalScope
@@ -79,24 +82,29 @@ JSCustomToNativeObject
 JSGenerateToJSObject
 JSGenerateToNativeObject
 JSLegacyParent=*
-JSNoStaticTables
 JSWindowEventListener
 MasqueradesAsUndefined
 NamedConstructor=*
 NewImpurePropertyFiresWatchpoints
 NoInterfaceObject
+Nondeterministic
 NotEnumerable
 NotDeletable
 ObjCCustomImplementation
+ObjCExplicitAtomicString
+ObjCImplementedAsUnsignedLong
 ObjCLegacyUnnamedParameters
 ObjCPolymorphic
 ObjCProtocol
+ObjCUseDefaultView
 OperationsNotDeletable
 PassContext
 RaisesException
 Reflect=*
 Replaceable
 ReplaceableConstructor
+ReportExtraMemoryCost
+RequiresExistingAtomicString
 ReturnNewObject
 SetterRaisesException
 SkipVTableValidation

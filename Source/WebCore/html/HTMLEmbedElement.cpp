@@ -71,8 +71,12 @@ static inline RenderWidget* findWidgetRenderer(const Node* n)
 RenderWidget* HTMLEmbedElement::renderWidgetForJSBindings() const
 {
     FrameView* view = document().view();
-    if (!view || (!view->isInLayout() && !view->isPainting()))
-        document().updateLayoutIgnorePendingStylesheets();
+    if (!view || (!view->isInLayout() && !view->isPainting())) {
+        // Needs to load the plugin immediatedly because this function is called
+        // when JavaScript code accesses the plugin.
+        // FIXME: <rdar://16893708> Check if dispatching events here is safe.
+        document().updateLayoutIgnorePendingStylesheets(Document::RunPostLayoutTasksSynchronously);
+    }
     return findWidgetRenderer(this);
 }
 
@@ -97,20 +101,23 @@ void HTMLEmbedElement::collectStyleForPresentationAttribute(const QualifiedName&
 void HTMLEmbedElement::parseAttribute(const QualifiedName& name, const AtomicString& value)
 {
     if (name == typeAttr) {
-        m_serviceType = value.string().lower();
-        size_t pos = m_serviceType.find(";");
-        if (pos != notFound)
-            m_serviceType = m_serviceType.left(pos);
-    } else if (name == codeAttr)
+        m_serviceType = value.string().left(value.find(";")).lower();
+        // FIXME: The only difference between this and HTMLObjectElement's corresponding
+        // code is that HTMLObjectElement does setNeedsWidgetUpdate(true). Consider moving
+        // this up to the HTMLPlugInImageElement to be shared.
+    } else if (name == codeAttr) {
         m_url = stripLeadingAndTrailingHTMLSpaces(value);
-    else if (name == srcAttr) {
+        // FIXME: Why no call to the image loader?
+        // FIXME: If both code and src attributes are specified, last one parsed/changed wins. That can't be right!
+    } else if (name == srcAttr) {
         m_url = stripLeadingAndTrailingHTMLSpaces(value);
         document().updateStyleIfNeeded();
         if (renderer() && isImageType()) {
             if (!m_imageLoader)
-                m_imageLoader = adoptPtr(new HTMLImageLoader(this));
+                m_imageLoader = std::make_unique<HTMLImageLoader>(*this);
             m_imageLoader->updateFromElementIgnoringPreviousError();
         }
+        // FIXME: If both code and src attributes are specified, last one parsed/changed wins. That can't be right!
     } else
         HTMLPlugInImageElement::parseAttribute(name, value);
 }

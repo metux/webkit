@@ -34,7 +34,7 @@ class SourceCode;
 
 namespace Inspector {
 
-typedef JSC::JSValue (*InspectorFunctionCallHandler)(JSC::ExecState* exec, JSC::JSValue functionObject, JSC::CallType callType, const JSC::CallData& callData, JSC::JSValue thisValue, const JSC::ArgList& args);
+typedef JSC::JSValue (*InspectorFunctionCallHandler)(JSC::ExecState* exec, JSC::JSValue functionObject, JSC::CallType callType, const JSC::CallData& callData, JSC::JSValue thisValue, const JSC::ArgList& args, JSC::JSValue* exception);
 typedef JSC::JSValue (*InspectorEvaluateHandler)(JSC::ExecState*, const JSC::SourceCode&, JSC::JSValue thisValue, JSC::JSValue* exception);
 
 class InspectorEnvironment {
@@ -45,7 +45,7 @@ public:
     virtual InspectorFunctionCallHandler functionCallHandler() const = 0;
     virtual InspectorEvaluateHandler evaluateHandler() const = 0;
     virtual void willCallInjectedScriptFunction(JSC::ExecState*, const String& scriptName, int scriptLine) = 0;
-    virtual void didCallInjectedScriptFunction() = 0;
+    virtual void didCallInjectedScriptFunction(JSC::ExecState*) = 0;
 };
 
 } // namespace Inspector

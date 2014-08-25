@@ -2,12 +2,13 @@
     Copyright (C) 2004, 2005, 2007 Nikolas Zimmermann <zimmermann@kde.org>
                   2004, 2005, 2007 Rob Buis <buis@kde.org>
     Copyright (C) Research In Motion Limited 2010. All rights reserved.
+    Copyright (C) 2014 Adobe Systems Incorporated. All rights reserved.
 
     Based on khtml code by:
     Copyright (C) 1999 Antti Koivisto (koivisto@kde.org)
     Copyright (C) 1999-2003 Lars Knoll (knoll@kde.org)
     Copyright (C) 2002-2003 Dirk Mueller (mueller@kde.org)
-    Copyright (C) 2002 Apple Computer, Inc.
+    Copyright (C) 2002 Apple Inc.
 
     This library is free software; you can redistribute it and/or
     modify it under the terms of the GNU Library General Public
@@ -26,8 +27,6 @@
 */
 
 #include "config.h"
-
-#if ENABLE(SVG)
 #include "SVGRenderStyleDefs.h"
 
 #include "RenderStyle.h"
@@ -206,7 +205,7 @@ StyleShadowSVGData::StyleShadowSVGData()
 
 inline StyleShadowSVGData::StyleShadowSVGData(const StyleShadowSVGData& other)
     : RefCounted<StyleShadowSVGData>()
-    , shadow(other.shadow ? adoptPtr(new ShadowData(*other.shadow)) : nullptr)
+    , shadow(other.shadow ? std::make_unique<ShadowData>(*other.shadow) : nullptr)
 {
 }
 
@@ -278,6 +277,28 @@ bool StyleInheritedResourceData::operator==(const StyleInheritedResourceData& ot
         && markerEnd == other.markerEnd;
 }
 
+StyleLayoutData::StyleLayoutData()
+    : x(RenderStyle::initialZeroLength())
+    , y(RenderStyle::initialZeroLength())
+{
 }
 
-#endif // ENABLE(SVG)
+inline StyleLayoutData::StyleLayoutData(const StyleLayoutData& other)
+    : RefCounted<StyleLayoutData>()
+    , x(other.x)
+    , y(other.y)
+{
+}
+
+PassRef<StyleLayoutData> StyleLayoutData::copy() const
+{
+    return adoptRef(*new StyleLayoutData(*this));
+}
+
+bool StyleLayoutData::operator==(const StyleLayoutData& other) const
+{
+    return x == other.x
+        && y == other.y;
+}
+
+}

@@ -36,7 +36,7 @@
 #include "LocalScope.h"
 #include "Lookup.h"
 #include "ObjectConstructor.h"
-#include "Operations.h"
+#include "JSCInlines.h"
 #include "PropertyNameArray.h"
 #include <wtf/MathExtras.h>
 #include <wtf/text/StringBuilder.h>
@@ -588,7 +588,7 @@ bool Stringifier::Holder::appendNextProperty(Stringifier& stringifier, StringBui
 
 // ------------------------------ JSONObject --------------------------------
 
-const ClassInfo JSONObject::s_info = { "JSON", &JSNonFinalObject::s_info, 0, ExecState::jsonTable, CREATE_METHOD_TABLE(JSONObject) };
+const ClassInfo JSONObject::s_info = { "JSON", &JSNonFinalObject::s_info, &jsonTable, CREATE_METHOD_TABLE(JSONObject) };
 
 /* Source for JSONObject.lut.h
 @begin jsonTable
@@ -601,7 +601,7 @@ const ClassInfo JSONObject::s_info = { "JSON", &JSNonFinalObject::s_info, 0, Exe
 
 bool JSONObject::getOwnPropertySlot(JSObject* object, ExecState* exec, PropertyName propertyName, PropertySlot& slot)
 {
-    return getStaticFunctionSlot<JSObject>(exec, ExecState::jsonTable(exec->vm()), jsCast<JSONObject*>(object), propertyName, slot);
+    return getStaticFunctionSlot<JSObject>(exec, jsonTable, jsCast<JSONObject*>(object), propertyName, slot);
 }
 
 class Walker {
@@ -654,7 +654,7 @@ NEVER_INLINE JSValue Walker::walk(JSValue unfiltered)
                 ASSERT(inValue.isObject());
                 ASSERT(isJSArray(asObject(inValue)) || asObject(inValue)->inherits(JSArray::info()));
                 if (objectStack.size() + arrayStack.size() > maximumFilterRecursion)
-                    return m_exec->vm().throwException(m_exec, createStackOverflowError(m_exec));
+                    return throwStackOverflowError(m_exec);
 
                 JSArray* array = asArray(inValue);
                 arrayStack.push(array);
@@ -705,7 +705,7 @@ NEVER_INLINE JSValue Walker::walk(JSValue unfiltered)
                 ASSERT(inValue.isObject());
                 ASSERT(!isJSArray(asObject(inValue)) && !asObject(inValue)->inherits(JSArray::info()));
                 if (objectStack.size() + arrayStack.size() > maximumFilterRecursion)
-                    return m_exec->vm().throwException(m_exec, createStackOverflowError(m_exec));
+                    return throwStackOverflowError(m_exec);
 
                 JSObject* object = asObject(inValue);
                 objectStack.push(object);

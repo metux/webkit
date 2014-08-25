@@ -27,24 +27,28 @@ messages -> NetworkConnectionToWebProcess LegacyReceiver {
     ScheduleResourceLoad(WebKit::NetworkResourceLoadParameters resourceLoadParameters)
     PerformSynchronousLoad(WebKit::NetworkResourceLoadParameters resourceLoadParameters) -> (WebCore::ResourceError error, WebCore::ResourceResponse response, Vector<char> data) Delayed
     RemoveLoadIdentifier(uint64_t resourceLoadIdentifier)
+    SetDefersLoading(uint64_t resourceLoadIdentifier, bool defers)
     
     ServePendingRequests(uint32_t resourceLoadPriority)
     
     SetSerialLoadingEnabled(bool enabled) -> ()
 
-    StartDownload(uint64_t sessionID, uint64_t downloadID, WebCore::ResourceRequest request)
+    StartDownload(WebCore::SessionID sessionID, uint64_t downloadID, WebCore::ResourceRequest request)
     ConvertMainResourceLoadToDownload(uint64_t mainResourceLoadIdentifier, uint64_t downloadID, WebCore::ResourceRequest request, WebCore::ResourceResponse response)
 
-    CookiesForDOM(uint64_t sessionID, WebCore::URL firstParty, WebCore::URL url) -> (String result)
-    SetCookiesFromDOM(uint64_t sessionID, WebCore::URL firstParty, WebCore::URL url, String cookieString)
-    CookiesEnabled(uint64_t sessionID, WebCore::URL firstParty, WebCore::URL url) -> (bool enabled)
-    CookieRequestHeaderFieldValue(uint64_t sessionID, WebCore::URL firstParty, WebCore::URL url) -> (String result)
-    GetRawCookies(uint64_t sessionID, WebCore::URL firstParty, WebCore::URL url) -> (Vector<WebCore::Cookie> cookies)
-    DeleteCookie(uint64_t sessionID, WebCore::URL url, String cookieName)
+    CookiesForDOM(WebCore::SessionID sessionID, WebCore::URL firstParty, WebCore::URL url) -> (String result)
+    SetCookiesFromDOM(WebCore::SessionID sessionID, WebCore::URL firstParty, WebCore::URL url, String cookieString)
+    CookiesEnabled(WebCore::SessionID sessionID, WebCore::URL firstParty, WebCore::URL url) -> (bool enabled)
+    CookieRequestHeaderFieldValue(WebCore::SessionID sessionID, WebCore::URL firstParty, WebCore::URL url) -> (String result)
+    GetRawCookies(WebCore::SessionID sessionID, WebCore::URL firstParty, WebCore::URL url) -> (Vector<WebCore::Cookie> cookies)
+    DeleteCookie(WebCore::SessionID sessionID, WebCore::URL url, String cookieName)
 
-    RegisterBlobURL(WebCore::URL url, WebKit::BlobRegistrationData data)
+    RegisterFileBlobURL(WebCore::URL url, String path, WebKit::SandboxExtension::Handle extensionHandle, String contentType)
+    RegisterBlobURL(WebCore::URL url, Vector<WebCore::BlobPart> blobParts, String contentType)
     RegisterBlobURLFromURL(WebCore::URL url, WebCore::URL srcURL)
+    RegisterBlobURLForSlice(WebCore::URL url, WebCore::URL srcURL, int64_t start, int64_t end)
     UnregisterBlobURL(WebCore::URL url)
+    BlobSize(WebCore::URL url) -> (uint64_t resultSize)
 }
 
 #endif // ENABLE(NETWORK_PROCESS)

@@ -21,7 +21,6 @@
 #ifndef SVGGraphicsElement_h
 #define SVGGraphicsElement_h
 
-#if ENABLE(SVG)
 #include "SVGAnimatedTransformList.h"
 #include "SVGElement.h"
 #include "SVGTests.h"
@@ -47,6 +46,9 @@ public:
 
     virtual FloatRect getBBox(StyleUpdateStrategy = AllowStyleUpdate) override;
 
+    bool shouldIsolateBlending() const { return m_shouldIsolateBlending; }
+    void setShouldIsolateBlending(bool isolate) { m_shouldIsolateBlending = isolate; }
+
     // "base class" methods for all the elements which render as paths
     virtual void toClipPath(Path&);
     virtual RenderPtr<RenderElement> createElementRenderer(PassRef<RenderStyle>) override;
@@ -55,6 +57,9 @@ protected:
     SVGGraphicsElement(const QualifiedName&, Document&);
 
     bool isSupportedAttribute(const QualifiedName&);
+
+    virtual bool supportsFocus() const override { return Element::supportsFocus() || hasFocusEventListeners(); }
+
     virtual void parseAttribute(const QualifiedName&, const AtomicString&) override;
     virtual void svgAttributeChanged(const QualifiedName&) override;
 
@@ -72,6 +77,9 @@ private:
 
     // Used by <animateMotion>
     std::unique_ptr<AffineTransform> m_supplementalTransform;
+
+    // Used to isolate blend operations caused by masking.
+    bool m_shouldIsolateBlending;
 };
 
 void isSVGGraphicsElement(const SVGGraphicsElement&); // Catch unnecessary runtime check of type known at compile time.
@@ -81,5 +89,4 @@ NODE_TYPE_CASTS(SVGGraphicsElement)
 
 } // namespace WebCore
 
-#endif // ENABLE(SVG)
 #endif // SVGGraphicsElement_h

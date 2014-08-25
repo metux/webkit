@@ -53,6 +53,7 @@ public:
     virtual PassRefPtr<SubresourceLoader> scheduleSubresourceLoad(Frame*, CachedResource*, const ResourceRequest&, ResourceLoadPriority, const ResourceLoaderOptions&);
     virtual PassRefPtr<NetscapePlugInStreamLoader> schedulePluginStreamLoad(Frame*, NetscapePlugInStreamLoaderClient*, const ResourceRequest&);
     virtual void remove(ResourceLoader*);
+    virtual void setDefersLoading(ResourceLoader*, bool);
     virtual void crossOriginRedirectReceived(ResourceLoader*, const URL& redirectURL);
     
     virtual void servePendingRequests(ResourceLoadPriority minimumPriority = ResourceLoadPriorityVeryLow);
@@ -75,6 +76,10 @@ protected:
     virtual ~ResourceLoadScheduler();
 
     void notifyDidScheduleResourceRequest(ResourceLoader*);
+
+#if USE(QUICK_LOOK)
+    bool maybeLoadQuickLookResource(ResourceLoader&);
+#endif
 
 private:
     void scheduleLoad(ResourceLoader*, ResourceLoadPriority);

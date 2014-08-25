@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008, 2012 Apple Inc. All rights reserved.
+ * Copyright (C) 2008, 2012, 2014 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -26,6 +26,7 @@
 #ifndef AbstractMacroAssembler_h
 #define AbstractMacroAssembler_h
 
+#include "AbortReason.h"
 #include "AssemblerBuffer.h"
 #include "CodeLocation.h"
 #include "MacroAssemblerCodeRef.h"
@@ -140,7 +141,7 @@ public:
         {
             return Address(base, offset + additionalOffset);
         }
-
+        
         RegisterID base;
         int32_t offset;
     };
@@ -434,7 +435,7 @@ public:
 
     // DataLabel32:
     //
-    // A DataLabelPtr is used to refer to a location in the code containing a pointer to be
+    // A DataLabel32 is used to refer to a location in the code containing a 32-bit constant to be
     // patched after the code has been generated.
     class DataLabel32 {
         template<class TemplateAssemblerType>
@@ -693,7 +694,8 @@ public:
         
         JumpList(Jump jump)
         {
-            append(jump);
+            if (jump.isSet())
+                append(jump);
         }
 
         void link(AbstractMacroAssembler<AssemblerType>* masm)
@@ -840,6 +842,7 @@ protected:
     AbstractMacroAssembler()
         : m_randomSource(cryptographicallyRandomNumber())
     {
+        invalidateAllTempRegisters();
     }
 
     uint32_t random()

@@ -12,7 +12,7 @@
  *    copyright notice, this list of conditions and the following
  *    disclaimer in the documentation and/or other materials
  *    provided with the distribution.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
  * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
  * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
@@ -31,9 +31,14 @@
 #define BoxShape_h
 
 #include "FloatRoundedRect.h"
+#include "RenderStyleConstants.h"
 #include "Shape.h"
 
 namespace WebCore {
+
+class RenderBox;
+
+RoundedRect computeRoundedRectForBoxShape(CSSBoxType, const RenderBox&);
 
 class BoxShape : public Shape {
 public:
@@ -43,17 +48,13 @@ public:
     }
 
     virtual LayoutRect shapeMarginLogicalBoundingBox() const override;
-    virtual LayoutRect shapePaddingLogicalBoundingBox() const override;
     virtual bool isEmpty() const override { return m_bounds.isEmpty(); }
-    virtual void getExcludedIntervals(LayoutUnit logicalTop, LayoutUnit logicalHeight, SegmentList&) const override;
-    virtual void getIncludedIntervals(LayoutUnit logicalTop, LayoutUnit logicalHeight, SegmentList&) const override;
-    virtual bool firstIncludedIntervalLogicalTop(LayoutUnit minLogicalIntervalTop, const FloatSize& minLogicalIntervalSize, LayoutUnit&) const override;
+    virtual LineSegment getExcludedInterval(LayoutUnit logicalTop, LayoutUnit logicalHeight) const override;
 
     virtual void buildDisplayPaths(DisplayPaths&) const override;
 
 private:
     FloatRoundedRect shapeMarginBounds() const;
-    FloatRoundedRect shapePaddingBounds() const;
 
     FloatRoundedRect m_bounds;
 };

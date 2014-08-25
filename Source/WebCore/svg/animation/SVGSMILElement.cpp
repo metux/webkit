@@ -24,8 +24,6 @@
  */
 
 #include "config.h"
-
-#if ENABLE(SVG)
 #include "SVGSMILElement.h"
 
 #include "Attribute.h"
@@ -148,6 +146,11 @@ void SVGSMILElement::clearResourceReferences()
     document().accessSVGExtensions()->removeAllTargetReferencesForElement(this);
 }
 
+void SVGSMILElement::clearTarget()
+{
+    setTargetElement(nullptr);
+}
+
 void SVGSMILElement::buildPendingResource()
 {
     clearResourceReferences();
@@ -199,7 +202,7 @@ static inline QualifiedName constructQualifiedName(const SVGElement* svgElement,
     
     String prefix;
     String localName;
-    if (!Document::parseQualifiedName(attributeName, prefix, localName, ASSERT_NO_EXCEPTION))
+    if (!Document::parseQualifiedName(attributeName, prefix, localName, IGNORE_EXCEPTION))
         return anyQName();
     
     String namespaceURI = svgElement->lookupNamespaceURI(prefix);    
@@ -260,9 +263,12 @@ Node::InsertionNotificationRequest SVGSMILElement::insertedInto(ContainerNode& r
     if (m_timeContainer)
         m_timeContainer->notifyIntervalsChanged();
 
-    buildPendingResource();
+    return InsertionShouldCallDidNotifySubtreeInsertions;
+}
 
-    return InsertionDone;
+void SVGSMILElement::didNotifySubtreeInsertions(ContainerNode*)
+{
+    buildPendingResource();
 }
 
 void SVGSMILElement::removedFrom(ContainerNode& rootParent)
@@ -299,7 +305,7 @@ SMILTime SVGSMILElement::parseOffsetValue(const String& data)
         result = parse.left(parse.length() - 1).toDouble(&ok);
     else
         result = parse.toDouble(&ok);
-    if (!ok)
+    if (!ok || !SMILTime(result).isFinite())
         return SMILTime::unresolved();
     return result;
 }
@@ -311,7 +317,7 @@ SMILTime SVGSMILElement::parseClockValue(const String& data)
     
     String parse = data.stripWhiteSpace();
 
-    DEFINE_STATIC_LOCAL(const AtomicString, indefiniteValue, ("indefinite", AtomicString::ConstructFromLiteral));
+    DEPRECATED_DEFINE_STATIC_LOCAL(const AtomicString, indefiniteValue, ("indefinite", AtomicString::ConstructFromLiteral));
     if (parse == indefiniteValue)
         return SMILTime::indefinite();
 
@@ -335,7 +341,7 @@ SMILTime SVGSMILElement::parseClockValue(const String& data)
     } else
         return parseOffsetValue(parse);
 
-    if (!ok)
+    if (!ok || !SMILTime(result).isFinite())
         return SMILTime::unresolved();
     return result;
 }
@@ -434,7 +440,7 @@ void SVGSMILElement::parseBeginOrEnd(const String& parseString, BeginOrEnd begin
 
 bool SVGSMILElement::isSupportedAttribute(const QualifiedName& attrName)
 {
-    DEFINE_STATIC_LOCAL(HashSet<QualifiedName>, supportedAttributes, ());
+    DEPRECATED_DEFINE_STATIC_LOCAL(HashSet<QualifiedName>, supportedAttributes, ());
     if (supportedAttributes.isEmpty()) {
         supportedAttributes.add(SVGNames::beginAttr);
         supportedAttributes.add(SVGNames::endAttr);
@@ -623,8 +629,8 @@ bool SVGSMILElement::isFrozen() const
     
 SVGSMILElement::Restart SVGSMILElement::restart() const
 {    
-    DEFINE_STATIC_LOCAL(const AtomicString, never, ("never", AtomicString::ConstructFromLiteral));
-    DEFINE_STATIC_LOCAL(const AtomicString, whenNotActive, ("whenNotActive", AtomicString::ConstructFromLiteral));
+    DEPRECATED_DEFINE_STATIC_LOCAL(const AtomicString, never, ("never", AtomicString::ConstructFromLiteral));
+    DEPRECATED_DEFINE_STATIC_LOCAL(const AtomicString, whenNotActive, ("whenNotActive", AtomicString::ConstructFromLiteral));
     const AtomicString& value = fastGetAttribute(SVGNames::restartAttr);
     if (value == never)
         return RestartNever;
@@ -635,7 +641,7 @@ SVGSMILElement::Restart SVGSMILElement::restart() const
     
 SVGSMILElement::FillMode SVGSMILElement::fill() const
 {   
-    DEFINE_STATIC_LOCAL(const AtomicString, freeze, ("freeze", AtomicString::ConstructFromLiteral));
+    DEPRECATED_DEFINE_STATIC_LOCAL(const AtomicString, freeze, ("freeze", AtomicString::ConstructFromLiteral));
     const AtomicString& value = fastGetAttribute(SVGNames::fillAttr);
     return value == freeze ? FillFreeze : FillRemove;
 }
@@ -668,7 +674,7 @@ SMILTime SVGSMILElement::repeatCount() const
     if (value.isNull())
         return SMILTime::unresolved();
 
-    DEFINE_STATIC_LOCAL(const AtomicString, indefiniteValue, ("indefinite", AtomicString::ConstructFromLiteral));
+    DEPRECATED_DEFINE_STATIC_LOCAL(const AtomicString, indefiniteValue, ("indefinite", AtomicString::ConstructFromLiteral));
     if (value == indefiniteValue)
         return SMILTime::indefinite();
     bool ok;
@@ -682,7 +688,7 @@ SMILTime SVGSMILElement::maxValue() const
         return m_cachedMax;
     const AtomicString& value = fastGetAttribute(SVGNames::maxAttr);
     SMILTime result = parseClockValue(value);
-    return m_cachedMax = (result.isUnresolved() || result < 0) ? SMILTime::indefinite() : result;
+    return m_cachedMax = (result.isUnresolved() || result <= 0) ? SMILTime::indefinite() : result;
 }
     
 SMILTime SVGSMILElement::minValue() const
@@ -1118,7 +1124,7 @@ bool SVGSMILElement::progress(SMILTime elapsed, SVGSMILElement* resultElement, b
 void SVGSMILElement::notifyDependentsIntervalChanged(NewOrExistingInterval newOrExisting)
 {
     ASSERT(m_intervalBegin.isFinite());
-    DEFINE_STATIC_LOCAL(HashSet<SVGSMILElement*>, loopBreaker, ());
+    DEPRECATED_DEFINE_STATIC_LOCAL(HashSet<SVGSMILElement*>, loopBreaker, ());
     if (loopBreaker.contains(this))
         return;
     loopBreaker.add(this);
@@ -1190,5 +1196,3 @@ void SVGSMILElement::endedActiveInterval()
 }
 
 }
-
-#endif

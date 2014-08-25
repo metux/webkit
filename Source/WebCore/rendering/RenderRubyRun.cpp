@@ -42,7 +42,7 @@
 namespace WebCore {
 
 RenderRubyRun::RenderRubyRun(Document& document, PassRef<RenderStyle> style)
-    : RenderBlockFlow(document, std::move(style))
+    : RenderBlockFlow(document, WTF::move(style))
 {
     setReplaced(true);
     setInline(true);
@@ -154,7 +154,7 @@ void RenderRubyRun::addChild(RenderObject* child, RenderObject* beforeChild)
     }
 }
 
-void RenderRubyRun::removeChild(RenderObject& child)
+RenderObject* RenderRubyRun::removeChild(RenderObject& child)
 {
     // If the child is a ruby text, then merge the ruby base with the base of
     // the right sibling run, if possible.
@@ -167,7 +167,7 @@ void RenderRubyRun::removeChild(RenderObject& child)
             if (rightRun->hasRubyBase()) {
                 RenderRubyBase* rightBase = rightRun->rubyBaseSafe();
                 // Collect all children in a single base, then swap the bases.
-                rightBase->moveChildren(base);
+                rightBase->mergeChildrenWithBase(base);
                 moveChildTo(rightRun, base);
                 rightRun->moveChildTo(this, rightBase);
                 // The now empty ruby base will be removed below.
@@ -176,13 +176,13 @@ void RenderRubyRun::removeChild(RenderObject& child)
         }
     }
 
-    RenderBlockFlow::removeChild(child);
+    RenderObject* next = RenderBlockFlow::removeChild(child);
 
     if (!beingDestroyed() && !documentBeingDestroyed()) {
         // Check if our base (if any) is now empty. If so, destroy it.
         RenderBlock* base = rubyBase();
         if (base && !base->firstChild()) {
-            RenderBlockFlow::removeChild(*base);
+            next = RenderBlockFlow::removeChild(*base);
             base->deleteLines();
             base->destroy();
         }
@@ -192,15 +192,18 @@ void RenderRubyRun::removeChild(RenderObject& child)
             parent()->removeChild(*this);
             deleteLines();
             destroy();
+            next = nullptr;
         }
     }
+    
+    return next;
 }
 
 RenderRubyBase* RenderRubyRun::createRubyBase() const
 {
     auto newStyle = RenderStyle::createAnonymousStyleWithDisplay(&style(), BLOCK);
     newStyle.get().setTextAlign(CENTER); // FIXME: use WEBKIT_CENTER?
-    auto renderer = new RenderRubyBase(document(), std::move(newStyle));
+    auto renderer = new RenderRubyBase(document(), WTF::move(newStyle));
     renderer->initializeStyle();
     return renderer;
 }

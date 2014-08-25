@@ -34,7 +34,7 @@
 #include "LineClampValue.h"
 #include "NinePieceImage.h"
 #include "ShapeValue.h"
-#include <wtf/OwnPtr.h>
+#include <memory>
 #include <wtf/PassRefPtr.h>
 #include <wtf/Vector.h>
 
@@ -47,13 +47,18 @@ class StyleDeprecatedFlexibleBoxData;
 class StyleFilterData;
 #endif
 class StyleFlexibleBoxData;
+#if ENABLE(CSS_GRID_LAYOUT)
 class StyleGridData;
 class StyleGridItemData;
+#endif
 class StyleMarqueeData;
 class StyleMultiColData;
 class StyleReflection;
 class StyleResolver;
 class StyleTransformData;
+#if ENABLE(CSS_SCROLL_SNAP)
+class StyleScrollSnapPoints;
+#endif
 
 class ContentData;
 struct LengthSize;
@@ -117,19 +122,25 @@ public:
     DataRef<StyleFilterData> m_filter; // Filter operations (url, sepia, blur, etc.)
 #endif
 
+#if ENABLE(CSS_GRID_LAYOUT)
     DataRef<StyleGridData> m_grid;
     DataRef<StyleGridItemData> m_gridItem;
+#endif
+
+#if ENABLE(CSS_SCROLL_SNAP)
+    DataRef<StyleScrollSnapPoints> m_scrollSnapPoints;
+#endif
 
     std::unique_ptr<ContentData> m_content;
-    OwnPtr<CounterDirectiveMap> m_counterDirectives;
+    std::unique_ptr<CounterDirectiveMap> m_counterDirectives;
     String m_altText;
 
-    OwnPtr<ShadowData> m_boxShadow;  // For box-shadow decorations.
+    std::unique_ptr<ShadowData> m_boxShadow; // For box-shadow decorations.
     
     RefPtr<StyleReflection> m_boxReflect;
 
-    OwnPtr<AnimationList> m_animations;
-    OwnPtr<AnimationList> m_transitions;
+    std::unique_ptr<AnimationList> m_animations;
+    std::unique_ptr<AnimationList> m_transitions;
 
     FillLayer m_mask;
     NinePieceImage m_maskBoxImage;
@@ -137,10 +148,8 @@ public:
     LengthSize m_pageSize;
 
 #if ENABLE(CSS_SHAPES)
-    RefPtr<ShapeValue> m_shapeInside;
     RefPtr<ShapeValue> m_shapeOutside;
     Length m_shapeMargin;
-    Length m_shapePadding;
     float m_shapeImageThreshold;
 #endif
 
@@ -159,6 +168,11 @@ public:
 
     AtomicString m_flowThread;
     AtomicString m_regionThread;
+
+#if ENABLE(CSS_SCROLL_SNAP)
+    ScrollSnapType m_scrollSnapType; // ScrollSnapType
+#endif
+
     unsigned m_regionFragment : 1; // RegionFragment
 
     unsigned m_regionBreakAfter : 2; // EPageBreak
@@ -174,6 +188,9 @@ public:
     unsigned m_alignSelf : 3; // EAlignItems
     unsigned m_justifyContent : 3; // EJustifyContent
 
+    unsigned m_justifySelf : 4; // EJustifySelf
+    unsigned m_justifySelfOverflowAlignment : 2; // EJustifySelfOverflowAlignment
+
     unsigned userDrag : 2; // EUserDrag
     unsigned textOverflow : 1; // Whether or not lines that spill out should be truncated with "..."
     unsigned marginBeforeCollapse : 2; // EMarginCollapse
@@ -183,17 +200,14 @@ public:
     unsigned m_textCombine : 1; // CSS3 text-combine properties
 
     unsigned m_textDecorationStyle : 3; // TextDecorationStyle
-    unsigned m_wrapFlow: 3; // WrapFlow
-    unsigned m_wrapThrough: 1; // WrapThrough
 
-#if USE(ACCELERATED_COMPOSITING)
     unsigned m_runningAcceleratedAnimation : 1;
-#endif
 
-    unsigned m_hasAspectRatio : 1; // Whether or not an aspect ratio has been specified.
+    unsigned m_aspectRatioType : 2;
 
 #if ENABLE(CSS_COMPOSITING)
     unsigned m_effectiveBlendMode: 5; // EBlendMode
+    unsigned m_isolation : 1; // Isolation
 #endif
 
     unsigned m_objectFit : 3; // ObjectFit

@@ -50,7 +50,7 @@
 #define GL_UNPACK_SKIP_ROWS 0x0CF3
 #endif
 
-#if USE(ACCELERATED_COMPOSITING) && USE(TEXTURE_MAPPER)
+#if USE(TEXTURE_MAPPER)
 
 namespace WebCore {
 struct TextureMapperGLData {
@@ -1128,10 +1128,12 @@ PassRefPtr<BitmapTexture> TextureMapperGL::createTexture()
     return adoptRef(texture);
 }
 
-PassOwnPtr<TextureMapper> TextureMapper::platformCreateAccelerated()
+#if USE(TEXTURE_MAPPER_GL)
+std::unique_ptr<TextureMapper> TextureMapper::platformCreateAccelerated()
 {
-    return TextureMapperGL::create();
+    return std::make_unique<TextureMapperGL>();
 }
+#endif
 
 };
 #endif

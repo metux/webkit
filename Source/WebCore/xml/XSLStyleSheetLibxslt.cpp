@@ -33,15 +33,14 @@
 #include "XMLDocumentParserScope.h"
 #include "XSLImportRule.h"
 #include "XSLTProcessor.h"
-
 #include <libxml/uri.h>
 #include <libxslt/xsltutils.h>
 
-#if PLATFORM(MAC)
+#if OS(DARWIN) && !PLATFORM(EFL) && !PLATFORM(GTK)
 #include "SoftLinking.h"
 #endif
 
-#if PLATFORM(MAC)
+#if OS(DARWIN) && !PLATFORM(EFL) && !PLATFORM(GTK)
 SOFT_LINK_LIBRARY(libxslt)
 SOFT_LINK(libxslt, xsltIsBlank, int, (xmlChar *str), (str))
 SOFT_LINK(libxslt, xsltGetNsProp, xmlChar *, (xmlNodePtr node, const xmlChar *name, const xmlChar *nameSpace), (node, name, nameSpace))
@@ -148,7 +147,8 @@ bool XSLStyleSheet::parseString(const String& string)
 
     XMLDocumentParserScope scope(cachedResourceLoader(), XSLTProcessor::genericErrorFunc, XSLTProcessor::parseErrorFunc, console);
 
-    const char* buffer = reinterpret_cast<const char*>(string.deprecatedCharacters());
+    auto upconvertedCharacters = StringView(string).upconvertedCharacters();
+    const char* buffer = reinterpret_cast<const char*>(upconvertedCharacters.get());
     int size = string.length() * sizeof(UChar);
 
     xmlParserCtxtPtr ctxt = xmlCreateMemoryParserCtxt(buffer, size);

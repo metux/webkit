@@ -46,10 +46,12 @@ static void testWebViewCustomCharset(WebViewTest* test, gconstpointer)
 static void testWebViewSettings(WebViewTest* test, gconstpointer)
 {
     WebKitSettings* defaultSettings = webkit_web_view_get_settings(test->m_webView);
+    test->assertObjectIsDeletedWhenTestFinishes(G_OBJECT(defaultSettings));
     g_assert(defaultSettings);
     g_assert(webkit_settings_get_enable_javascript(defaultSettings));
 
     GRefPtr<WebKitSettings> newSettings = adoptGRef(webkit_settings_new());
+    test->assertObjectIsDeletedWhenTestFinishes(G_OBJECT(newSettings.get()));
     g_object_set(G_OBJECT(newSettings.get()), "enable-javascript", FALSE, NULL);
     webkit_web_view_set_settings(test->m_webView, newSettings.get());
 
@@ -63,10 +65,15 @@ static void testWebViewSettings(WebViewTest* test, gconstpointer)
     g_assert(webkit_web_view_get_settings(WEBKIT_WEB_VIEW(webView2.get())) == settings);
 
     GRefPtr<WebKitSettings> newSettings2 = adoptGRef(webkit_settings_new());
+    test->assertObjectIsDeletedWhenTestFinishes(G_OBJECT(newSettings2.get()));
     webkit_web_view_set_settings(WEBKIT_WEB_VIEW(webView2.get()), newSettings2.get());
     settings = webkit_web_view_get_settings(WEBKIT_WEB_VIEW(webView2.get()));
     g_assert(settings == newSettings2.get());
     g_assert(webkit_settings_get_enable_javascript(settings));
+
+    GRefPtr<GtkWidget> webView3 = webkit_web_view_new_with_settings(newSettings2.get());
+    test->assertObjectIsDeletedWhenTestFinishes(G_OBJECT(webView3.get()));
+    g_assert(webkit_web_view_get_settings(WEBKIT_WEB_VIEW(webView3.get())) == newSettings2.get());
 }
 
 static void testWebViewZoomLevel(WebViewTest* test, gconstpointer)
@@ -418,27 +425,6 @@ static void testWebViewSave(SaveWebViewTest* test, gconstpointer)
     g_assert_cmpint(g_file_info_get_size(fileInfo.get()), ==, totalBytesFromStream);
 }
 
-static void testWebViewMode(WebViewTest* test, gconstpointer)
-{
-    static const char* indexHTML = "<html><body><p>Test Web View Mode</p></body></html>";
-
-    // Web mode.
-    g_assert_cmpuint(webkit_web_view_get_view_mode(test->m_webView), ==, WEBKIT_VIEW_MODE_WEB);
-    test->loadHtml(indexHTML, 0);
-    test->waitUntilLoadFinished();
-    WebKitJavascriptResult* javascriptResult = test->runJavaScriptAndWaitUntilFinished("window.document.body.textContent;", 0);
-    GUniquePtr<char> valueString(WebViewTest::javascriptResultToCString(javascriptResult));
-    g_assert_cmpstr(valueString.get(), ==, "Test Web View Mode");
-
-    // Source mode.
-    webkit_web_view_set_view_mode(test->m_webView, WEBKIT_VIEW_MODE_SOURCE);
-    test->loadHtml(indexHTML, 0);
-    test->waitUntilLoadFinished();
-    javascriptResult = test->runJavaScriptAndWaitUntilFinished("window.document.body.textContent;", 0);
-    valueString.reset(WebViewTest::javascriptResultToCString(javascriptResult));
-    g_assert_cmpstr(valueString.get(), ==, indexHTML);
-}
-
 // To test page visibility API. Currently only 'visible' and 'hidden' states are implemented fully in WebCore.
 // See also http://www.w3.org/TR/2011/WD-page-visibility-20110602/ and https://developers.google.com/chrome/whitepapers/pagevisibility
 static void testWebViewPageVisibility(WebViewTest* test, gconstpointer)
@@ -597,7 +583,6 @@ void beforeAll()
     WebViewTest::add("WebKitWebView", "can-show-mime-type", testWebViewCanShowMIMEType);
     FormClientTest::add("WebKitWebView", "submit-form", testWebViewSubmitForm);
     SaveWebViewTest::add("WebKitWebView", "save", testWebViewSave);
-    WebViewTest::add("WebKitWebView", "view-mode", testWebViewMode);
     SnapshotWebViewTest::add("WebKitWebView", "snapshot", testWebViewSnapshot);
     WebViewTest::add("WebKitWebView", "page-visibility", testWebViewPageVisibility);
 }

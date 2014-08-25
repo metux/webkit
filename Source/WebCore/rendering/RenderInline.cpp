@@ -25,6 +25,7 @@
 
 #include "Chrome.h"
 #include "FloatQuad.h"
+#include "FrameSelection.h"
 #include "GraphicsContext.h"
 #include "HitTestResult.h"
 #include "InlineElementBox.h"
@@ -50,13 +51,13 @@
 namespace WebCore {
 
 RenderInline::RenderInline(Element& element, PassRef<RenderStyle> style)
-    : RenderBoxModelObject(element, std::move(style), RenderInlineFlag)
+    : RenderBoxModelObject(element, WTF::move(style), RenderInlineFlag)
 {
     setChildrenInline(true);
 }
 
 RenderInline::RenderInline(Document& document, PassRef<RenderStyle> style)
-    : RenderBoxModelObject(document, std::move(style), RenderInlineFlag)
+    : RenderBoxModelObject(document, WTF::move(style), RenderInlineFlag)
 {
     setChildrenInline(true);
 }
@@ -93,10 +94,8 @@ void RenderInline::willBeDestroyed()
         if (firstLineBox()) {
             // We can't wait for RenderBoxModelObject::destroy to clear the selection,
             // because by then we will have nuked the line boxes.
-            // FIXME: The FrameSelection should be responsible for this when it
-            // is notified of DOM mutations.
             if (isSelectionBorder())
-                view().clearSelection();
+                frame().selection().setNeedsSelectionUpdate();
 
             // If line boxes are contained inside a root, that means we're an inline.
             // In that case, we need to remove all the line boxes so that the parent
@@ -119,16 +118,18 @@ void RenderInline::willBeDestroyed()
 RenderInline* RenderInline::inlineElementContinuation() const
 {
     RenderBoxModelObject* continuation = this->continuation();
-    if (!continuation || continuation->isInline())
+    if (!continuation)
+        return nullptr;
+
+    if (continuation->isRenderInline())
         return toRenderInline(continuation);
-    return toRenderBlock(continuation)->inlineElementContinuation();
+
+    return continuation->isRenderBlock() ? toRenderBlock(continuation)->inlineElementContinuation() : nullptr;
 }
 
 void RenderInline::updateFromStyle()
 {
     RenderBoxModelObject::updateFromStyle();
-
-    setInline(true); // Needed for run-ins, since run-in is considered a block display type.
 
     // FIXME: Support transforms and reflections on inline flows someday.
     setHasTransform(false);
@@ -145,11 +146,19 @@ static RenderElement* inFlowPositionedInlineAncestor(RenderElement* p)
     return 0;
 }
 
-static void updateStyleOfAnonymousBlockContinuations(RenderBlock* block, const RenderStyle* newStyle, const RenderStyle* oldStyle)
+static void updateStyleOfAnonymousBlockContinuations(RenderBox* box, const RenderStyle* newStyle, const RenderStyle* oldStyle)
 {
-    for (;block && block->isAnonymousBlock(); block = toRenderBlock(block->nextSibling())) {
-        if (!block->isAnonymousBlockContinuation() || block->style().position() == newStyle->position())
+    for (;box && box->isAnonymousBlock(); box = box->nextSiblingBox()) {
+        if (box->style().position() == newStyle->position())
             continue;
+        
+        if (!box->isRenderBlock())
+            continue;
+
+        RenderBlock* block = toRenderBlock(box);
+        if (!block->isAnonymousBlockContinuation())
+            continue;
+        
         // If we are no longer in-flow positioned but our descendant block(s) still have an in-flow positioned ancestor then
         // their containing anonymous block should keep its in-flow positioning. 
         RenderInline* cont = block->inlineElementContinuation();
@@ -157,7 +166,7 @@ static void updateStyleOfAnonymousBlockContinuations(RenderBlock* block, const R
             continue;
         auto blockStyle = RenderStyle::createAnonymousStyleWithDisplay(&block->style(), BLOCK);
         blockStyle.get().setPosition(newStyle->position());
-        block->setStyle(std::move(blockStyle));
+        block->setStyle(WTF::move(blockStyle));
     }
 }
 
@@ -251,7 +260,7 @@ LayoutRect RenderInline::localCaretRect(InlineBox* inlineBox, int, LayoutUnit* e
     if (extraWidthToEndOfLine)
         *extraWidthToEndOfLine = 0;
 
-    LayoutRect caretRect = localCaretRectForEmptyElement(borderAndPaddingWidth(), 0);
+    LayoutRect caretRect = localCaretRectForEmptyElement(horizontalBorderAndPaddingExtent(), 0);
 
     if (InlineBox* firstBox = firstLineBox())
         caretRect.moveBy(roundedLayoutPoint(firstBox->topLeft()));
@@ -316,7 +325,7 @@ void RenderInline::addChildIgnoringContinuation(RenderObject* newChild, RenderOb
         if (auto positionedAncestor = inFlowPositionedInlineAncestor(this))
             newStyle.get().setPosition(positionedAncestor->style().position());
 
-        RenderBlock* newBox = new RenderBlockFlow(document(), std::move(newStyle));
+        RenderBlock* newBox = new RenderBlockFlow(document(), WTF::move(newStyle));
         newBox->initializeStyle();
         RenderBoxModelObject* oldContinuation = continuation();
         setContinuation(newBox);
@@ -387,7 +396,7 @@ void RenderInline::splitInlines(RenderBlock* fromBlock, RenderBlock* toBlock,
         ASSERT(curr->isRenderInline());
         if (splitDepth < cMaxSplitDepth) {
             // Create a new clone.
-            RenderPtr<RenderInline> cloneChild = std::move(cloneInline);
+            RenderPtr<RenderInline> cloneChild = WTF::move(cloneInline);
             cloneInline = toRenderInline(curr)->clone();
 
             // Insert our child clone as the first child.
@@ -575,9 +584,9 @@ void RenderInline::generateCulledLineBoxRects(GeneratorContext& yield, const Ren
                 int logicalTop = rootBox.logicalTop() + (rootBox.lineStyle().font().fontMetrics().ascent() - containerStyle.font().fontMetrics().ascent());
                 int logicalHeight = containerStyle.font().fontMetrics().height();
                 if (isHorizontal)
-                    yield(FloatRect(currBox->inlineBoxWrapper()->x() - currBox->marginLeft(), logicalTop, currBox->width() + currBox->marginWidth(), logicalHeight));
+                    yield(FloatRect(currBox->inlineBoxWrapper()->x() - currBox->marginLeft(), logicalTop, currBox->width() + currBox->horizontalMarginExtent(), logicalHeight));
                 else
-                    yield(FloatRect(logicalTop, currBox->inlineBoxWrapper()->y() - currBox->marginTop(), logicalHeight, currBox->height() + currBox->marginHeight()));
+                    yield(FloatRect(logicalTop, currBox->inlineBoxWrapper()->y() - currBox->marginTop(), logicalHeight, currBox->height() + currBox->verticalMarginExtent()));
             }
         } else if (curr->isRenderInline()) {
             // If the child doesn't need line boxes either, then we can recur.
@@ -729,8 +738,6 @@ static LayoutUnit computeMargin(const RenderInline* renderer, const Length& marg
         return margin.value();
     if (margin.isPercent())
         return minimumValueForLength(margin, std::max<LayoutUnit>(0, renderer->containingBlock()->availableLogicalWidth()));
-    if (margin.isViewportPercentage())
-        return valueForLength(margin, 0, &renderer->view());
     return 0;
 }
 
@@ -785,8 +792,6 @@ const char* RenderInline::renderName() const
         return "RenderInline (generated)";
     if (isAnonymous())
         return "RenderInline (generated)";
-    if (isRunIn())
-        return "RenderInline (run-in)";
     return "RenderInline";
 }
 
@@ -837,14 +842,14 @@ bool RenderInline::hitTestCulledInline(const HitTestRequest& request, HitTestRes
     return false;
 }
 
-VisiblePosition RenderInline::positionForPoint(const LayoutPoint& point)
+VisiblePosition RenderInline::positionForPoint(const LayoutPoint& point, const RenderRegion* region)
 {
     // FIXME: Does not deal with relative or sticky positioned inlines (should it?)
     RenderBlock* cb = containingBlock();
     if (firstLineBox()) {
         // This inline actually has a line box.  We must have clicked in the border/padding of one of these boxes.  We
         // should try to find a result by asking our containing block.
-        return cb->positionForPoint(point);
+        return cb->positionForPoint(point, region);
     }
 
     // Translate the coords from the pre-anonymous block to the post-anonymous block.
@@ -853,11 +858,11 @@ VisiblePosition RenderInline::positionForPoint(const LayoutPoint& point)
     while (c) {
         RenderBox* contBlock = c->isInline() ? c->containingBlock() : toRenderBlock(c);
         if (c->isInline() || c->firstChild())
-            return c->positionForPoint(parentBlockPoint - contBlock->locationOffset());
+            return c->positionForPoint(parentBlockPoint - contBlock->locationOffset(), region);
         c = toRenderBlock(c)->inlineElementContinuation();
     }
     
-    return RenderBoxModelObject::positionForPoint(point);
+    return RenderBoxModelObject::positionForPoint(point, region);
 }
 
 namespace {
@@ -1086,8 +1091,8 @@ LayoutRect RenderInline::linesVisualOverflowBoundingBoxInRegion(const RenderRegi
 
 LayoutRect RenderInline::clippedOverflowRectForRepaint(const RenderLayerModelObject* repaintContainer) const
 {
-    // Only run-ins and first-letter renderers are allowed in here during layout. They mutate the tree triggering repaints.
-    ASSERT(!view().layoutStateEnabled() || isRunIn() || style().styleType() == FIRST_LETTER);
+    // Only first-letter renderers are allowed in here during layout. They mutate the tree triggering repaints.
+    ASSERT(!view().layoutStateEnabled() || style().styleType() == FIRST_LETTER);
 
     if (!firstLineBoxIncludingCulling() && !continuation())
         return LayoutRect();
@@ -1113,9 +1118,6 @@ LayoutRect RenderInline::clippedOverflowRectForRepaint(const RenderLayerModelObj
 
     if (hitRepaintContainer || !cb)
         return repaintRect;
-
-    if (cb->hasColumns())
-        cb->adjustRectForColumns(repaintRect);
 
     if (cb->hasOverflowClip())
         cb->applyCachedClipAndScrollOffsetForRepaint(repaintRect);
@@ -1166,16 +1168,6 @@ void RenderInline::computeRectForRepaint(const RenderLayerModelObject* repaintCo
 
     LayoutPoint topLeft = rect.location();
 
-    if (o->isRenderBlockFlow() && !style().hasOutOfFlowPosition()) {
-        RenderBlock* cb = toRenderBlock(o);
-        if (cb->hasColumns()) {
-            LayoutRect repaintRect(topLeft, rect.size());
-            cb->adjustRectForColumns(repaintRect);
-            topLeft = repaintRect.location();
-            rect = repaintRect;
-        }
-    }
-
     if (style().hasInFlowPosition() && layer()) {
         // Apply the in-flow position offset when invalidating a rectangle. The layer
         // is translated, but the render box isn't, so we need to do this to get the
@@ -1204,7 +1196,7 @@ void RenderInline::computeRectForRepaint(const RenderLayerModelObject* repaintCo
     o->computeRectForRepaint(repaintContainer, rect, fixed);
 }
 
-LayoutSize RenderInline::offsetFromContainer(RenderObject* container, const LayoutPoint& point, bool* offsetDependsOnPoint) const
+LayoutSize RenderInline::offsetFromContainer(RenderObject* container, const LayoutPoint&, bool* offsetDependsOnPoint) const
 {
     ASSERT(container == this->container());
     
@@ -1212,15 +1204,11 @@ LayoutSize RenderInline::offsetFromContainer(RenderObject* container, const Layo
     if (isInFlowPositioned())
         offset += offsetForInFlowPosition();
 
-    container->adjustForColumns(offset, point);
-
-    if (container->hasOverflowClip())
+    if (container->isBox())
         offset -= toRenderBox(container)->scrolledContentOffset();
 
     if (offsetDependsOnPoint)
-        *offsetDependsOnPoint = container->hasColumns()
-            || (container->isBox() && container->style().isFlippedBlocksWritingMode())
-            || container->isRenderFlowThread();
+        *offsetDependsOnPoint = (container->isBox() && container->style().isFlippedBlocksWritingMode()) || container->isRenderFlowThread();
 
     return offset;
 }
@@ -1246,8 +1234,8 @@ void RenderInline::mapLocalToContainer(const RenderLayerModelObject* repaintCont
 
     if (mode & ApplyContainerFlip && o->isBox()) {
         if (o->style().isFlippedBlocksWritingMode()) {
-            IntPoint centerPoint = roundedIntPoint(transformState.mappedPoint());
-            transformState.move(toRenderBox(o)->flipForWritingModeIncludingColumns(centerPoint) - centerPoint);
+            LayoutPoint centerPoint = roundedLayoutPoint(transformState.mappedPoint());
+            transformState.move(toRenderBox(o)->flipForWritingMode(centerPoint) - centerPoint);
         }
         mode &= ~ApplyContainerFlip;
     }
@@ -1399,7 +1387,7 @@ InlineFlowBox* RenderInline::createAndAppendInlineFlowBox()
     setAlwaysCreateLineBoxes();
     auto newFlowBox = createInlineFlowBox();
     auto flowBox = newFlowBox.get();
-    m_lineBoxes.appendLineBox(std::move(newFlowBox));
+    m_lineBoxes.appendLineBox(WTF::move(newFlowBox));
     return flowBox;
 }
 
@@ -1408,10 +1396,10 @@ LayoutUnit RenderInline::lineHeight(bool firstLine, LineDirectionMode /*directio
     if (firstLine && document().styleSheetCollection().usesFirstLineRules()) {
         const RenderStyle& firstLineStyle = this->firstLineStyle();
         if (&firstLineStyle != &style())
-            return firstLineStyle.computedLineHeight(&view());
+            return firstLineStyle.computedLineHeight();
     }
 
-    return style().computedLineHeight(&view());
+    return style().computedLineHeight();
 }
 
 int RenderInline::baselinePosition(FontBaseline baselineType, bool firstLine, LineDirectionMode direction, LinePositionMode linePositionMode) const
@@ -1489,9 +1477,9 @@ void RenderInline::addFocusRingRects(Vector<IntRect>& rects, const LayoutPoint& 
 
     if (RenderBoxModelObject* continuation = this->continuation()) {
         if (continuation->isInline())
-            continuation->addFocusRingRects(rects, flooredLayoutPoint(additionalOffset + continuation->containingBlock()->location() - containingBlock()->location()), paintContainer);
+            continuation->addFocusRingRects(rects, flooredLayoutPoint(LayoutPoint(additionalOffset + continuation->containingBlock()->location() - containingBlock()->location())), paintContainer);
         else
-            continuation->addFocusRingRects(rects, flooredLayoutPoint(additionalOffset + toRenderBox(continuation)->location() - containingBlock()->location()), paintContainer);
+            continuation->addFocusRingRects(rects, flooredLayoutPoint(LayoutPoint(additionalOffset + toRenderBox(continuation)->location() - containingBlock()->location())), paintContainer);
     }
 }
 
@@ -1499,14 +1487,14 @@ void RenderInline::paintOutline(PaintInfo& paintInfo, const LayoutPoint& paintOf
 {
     if (!hasOutline())
         return;
-    
+
     RenderStyle& styleToUse = style();
-    if (styleToUse.outlineStyleIsAuto() || hasOutlineAnnotation()) {
-        if (!theme().supportsFocusRing(&styleToUse)) {
-            // Only paint the focus ring by hand if the theme isn't able to draw the focus ring.
-            paintFocusRing(paintInfo, paintOffset, &styleToUse);
-        }
-    }
+    // Only paint the focus ring by hand if the theme isn't able to draw it.
+    if (styleToUse.outlineStyleIsAuto() && !theme().supportsFocusRing(styleToUse))
+        paintFocusRing(paintInfo, paintOffset, &styleToUse);
+
+    if (hasOutlineAnnotation() && !styleToUse.outlineStyleIsAuto() && !theme().supportsFocusRing(styleToUse))
+        addPDFURLRect(paintInfo, paintOffset);
 
     GraphicsContext* graphicsContext = paintInfo.context;
     if (graphicsContext->paintingDisabled())

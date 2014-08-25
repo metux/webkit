@@ -28,13 +28,12 @@
 
 #include "IntPoint.h"
 #include "LayoutUnit.h"
-#include <wtf/Vector.h>
 
 #if USE(CG)
 typedef struct CGRect CGRect;
 #endif
 
-#if PLATFORM(MAC) && !PLATFORM(IOS)
+#if PLATFORM(MAC)
 #ifdef NSGEOMETRY_TYPES_SAME_AS_CGGEOMETRY_TYPES
 typedef struct CGRect NSRect;
 #else
@@ -54,8 +53,6 @@ typedef struct tagRECT RECT;
 #ifdef GTK_API_VERSION_2
 typedef struct _GdkRectangle GdkRectangle;
 #endif
-#elif PLATFORM(EFL)
-typedef struct _Eina_Rectangle Eina_Rectangle;
 #endif
 
 #if USE(CAIRO)
@@ -193,16 +190,11 @@ public:
     operator CGRect() const;
 #endif
 
-#if !PLATFORM(IOS)
-#if (PLATFORM(MAC) && !defined(NSGEOMETRY_TYPES_SAME_AS_CGGEOMETRY_TYPES))
+#if PLATFORM(MAC) && !defined(NSGEOMETRY_TYPES_SAME_AS_CGGEOMETRY_TYPES)
     operator NSRect() const;
 #endif
-#endif // !PLATFORM(IOS)
 
-    void dump(PrintStream& out) const;
-
-    static IntRect infiniteRect();
-    bool isInfinite() const;
+    void dump(WTF::PrintStream& out) const;
 
 private:
     IntPoint m_location;
@@ -223,8 +215,6 @@ inline IntRect unionRect(const IntRect& a, const IntRect& b)
     return c;
 }
 
-IntRect unionRect(const Vector<IntRect>&);
-
 inline bool operator==(const IntRect& a, const IntRect& b)
 {
     return a.location() == b.location() && a.size() == b.size();
@@ -235,26 +225,13 @@ inline bool operator!=(const IntRect& a, const IntRect& b)
     return a.location() != b.location() || a.size() != b.size();
 }
 
-inline IntRect IntRect::infiniteRect()
-{
-    static IntRect infiniteRect(-LayoutUnit::max() / 2, -LayoutUnit::max() / 2, LayoutUnit::max(), LayoutUnit::max());
-    return infiniteRect;
-}
-
-inline bool IntRect::isInfinite() const
-{
-    return *this == infiniteRect();
-}
-
 #if USE(CG)
 IntRect enclosingIntRect(const CGRect&);
 #endif
 
-#if !PLATFORM(IOS)
-#if (PLATFORM(MAC) && !defined(NSGEOMETRY_TYPES_SAME_AS_CGGEOMETRY_TYPES))
+#if PLATFORM(MAC) && !defined(NSGEOMETRY_TYPES_SAME_AS_CGGEOMETRY_TYPES)
 IntRect enclosingIntRect(const NSRect&);
 #endif
-#endif // !PLATFORM(IOS)
 
 } // namespace WebCore
 

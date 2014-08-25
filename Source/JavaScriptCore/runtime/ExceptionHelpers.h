@@ -10,7 +10,7 @@
  * 2.  Redistributions in binary form must reproduce the above copyright
  *     notice, this list of conditions and the following disclaimer in the
  *     documentation and/or other materials provided with the distribution.
- * 3.  Neither the name of Apple Computer, Inc. ("Apple") nor the names of
+ * 3.  Neither the name of Apple Inc. ("Apple") nor the names of
  *     its contributors may be used to endorse or promote products derived
  *     from this software without specific prior written permission.
  *
@@ -50,9 +50,9 @@ JSObject* createNotAFunctionError(ExecState*, JSValue);
 JSObject* createErrorForInvalidGlobalAssignment(ExecState*, const String&);
 JSString* errorDescriptionForValue(ExecState*, JSValue);
 
-JSObject* throwOutOfMemoryError(ExecState*);
-JSObject* throwStackOverflowError(ExecState*);
-JSObject* throwTerminatedExecutionException(ExecState*);
+JS_EXPORT_PRIVATE JSObject* throwOutOfMemoryError(ExecState*);
+JS_EXPORT_PRIVATE JSObject* throwStackOverflowError(ExecState*);
+JS_EXPORT_PRIVATE JSObject* throwTerminatedExecutionException(ExecState*);
 
 
 class TerminatedExecutionError : public JSNonFinalObject {

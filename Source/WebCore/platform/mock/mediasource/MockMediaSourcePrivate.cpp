@@ -10,10 +10,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -30,19 +30,22 @@
 
 #include "ContentType.h"
 #include "ExceptionCodePlaceholder.h"
+#include "MediaSourcePrivateClient.h"
 #include "MockMediaPlayerMediaSource.h"
 #include "MockSourceBufferPrivate.h"
 
 namespace WebCore {
 
-RefPtr<MockMediaSourcePrivate> MockMediaSourcePrivate::create(MockMediaPlayerMediaSource* parent)
+RefPtr<MockMediaSourcePrivate> MockMediaSourcePrivate::create(MockMediaPlayerMediaSource* parent, MediaSourcePrivateClient* client)
 {
-    return adoptRef(new MockMediaSourcePrivate(parent));
+    RefPtr<MockMediaSourcePrivate> mediaSourcePrivate = adoptRef(new MockMediaSourcePrivate(parent, client));
+    client->setPrivateAndOpen(*mediaSourcePrivate);
+    return mediaSourcePrivate;
 }
 
-MockMediaSourcePrivate::MockMediaSourcePrivate(MockMediaPlayerMediaSource* parent)
+MockMediaSourcePrivate::MockMediaSourcePrivate(MockMediaPlayerMediaSource* parent, MediaSourcePrivateClient* client)
     : m_player(parent)
-    , m_duration(std::numeric_limits<float>::quiet_NaN())
+    , m_client(client)
     , m_isEnded(false)
     , m_totalVideoFrames(0)
     , m_droppedVideoFrames(0)
@@ -86,16 +89,17 @@ void MockMediaSourcePrivate::removeSourceBuffer(SourceBufferPrivate* buffer)
 
 double MockMediaSourcePrivate::duration()
 {
-    return m_duration;
+    return m_client->duration();
 }
 
-void MockMediaSourcePrivate::setDuration(double duration)
+std::unique_ptr<PlatformTimeRanges> MockMediaSourcePrivate::buffered()
 {
-    if (duration == m_duration)
-        return;
+    return m_client->buffered();
+}
 
-    m_duration = duration;
-    m_player->updateDuration(duration);
+void MockMediaSourcePrivate::durationChanged()
+{
+    m_player->updateDuration(MediaTime::createWithDouble(duration()));
 }
 
 void MockMediaSourcePrivate::markEndOfStream(EndOfStreamStatus status)
@@ -118,6 +122,16 @@ MediaPlayer::ReadyState MockMediaSourcePrivate::readyState() const
 void MockMediaSourcePrivate::setReadyState(MediaPlayer::ReadyState readyState)
 {
     m_player->setReadyState(readyState);
+}
+
+void MockMediaSourcePrivate::waitForSeekCompleted()
+{
+    m_player->waitForSeekCompleted();
+}
+
+void MockMediaSourcePrivate::seekCompleted()
+{
+    m_player->seekCompleted();
 }
 
 void MockMediaSourcePrivate::sourceBufferPrivateDidChangeActiveState(MockSourceBufferPrivate* buffer, bool active)

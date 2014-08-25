@@ -26,7 +26,7 @@
 #include "JSGlobalObject.h"
 #include "JSLock.h"
 #include "JSObject.h"
-
+#include "JSCInlines.h"
 
 namespace JSC {
 
@@ -108,23 +108,29 @@ MarkedSpace::~MarkedSpace()
     ASSERT(!m_blocks.set().size());
 }
 
-struct LastChanceToFinalize : MarkedBlock::VoidFunctor {
-    void operator()(MarkedBlock* block) { block->lastChanceToFinalize(); }
+struct LastChanceToFinalize {
+    void operator()(MarkedAllocator& allocator) { allocator.lastChanceToFinalize(); }
 };
 
 void MarkedSpace::lastChanceToFinalize()
 {
     DelayedReleaseScope delayedReleaseScope(*this);
     stopAllocating();
-    forEachBlock<LastChanceToFinalize>();
+    forEachAllocator<LastChanceToFinalize>();
 }
 
 void MarkedSpace::sweep()
 {
-    if (Options::logGC())
-        dataLog("Eagerly sweeping...");
     m_heap->sweeper()->willFinishSweeping();
     forEachBlock<Sweep>();
+}
+
+void MarkedSpace::zombifySweep()
+{
+    if (Options::logGC())
+        dataLog("Zombifying sweep...");
+    m_heap->sweeper()->willFinishSweeping();
+    forEachBlock<ZombifySweep>();
 }
 
 void MarkedSpace::resetAllocators()
@@ -213,7 +219,6 @@ struct ResumeAllocatingFunctor {
 void MarkedSpace::resumeAllocating()
 {
     ASSERT(isIterating());
-    DelayedReleaseScope scope(*this);
     forEachAllocator<ResumeAllocatingFunctor>();
 }
 
@@ -318,11 +323,20 @@ void MarkedSpace::clearNewlyAllocated()
 #endif
 }
 
-#ifndef NDEBUG
-struct VerifyMarked : MarkedBlock::VoidFunctor {
-    void operator()(MarkedBlock* block) { ASSERT(block->needsSweeping()); }
-};
-#endif
+#ifndef NDEBUG 
+struct VerifyMarkedOrRetired : MarkedBlock::VoidFunctor { 
+    void operator()(MarkedBlock* block)
+    {
+        switch (block->m_state) {
+        case MarkedBlock::Marked:
+        case MarkedBlock::Retired:
+            return;
+        default:
+            RELEASE_ASSERT_NOT_REACHED();
+        }
+    }
+}; 
+#endif 
 
 void MarkedSpace::clearMarks()
 {
@@ -331,8 +345,10 @@ void MarkedSpace::clearMarks()
             m_blocksWithNewObjects[i]->clearMarks();
     } else
         forEachBlock<ClearMarks>();
+
 #ifndef NDEBUG
-    forEachBlock<VerifyMarked>();
+    VerifyMarkedOrRetired verifyFunctor;
+    forEachBlock(verifyFunctor);
 #endif
 }
 
@@ -346,6 +362,7 @@ void MarkedSpace::willStartIterating()
 void MarkedSpace::didFinishIterating()
 {
     ASSERT(isIterating());
+    DelayedReleaseScope scope(*this);
     resumeAllocating();
     m_isIterating = false;
 }

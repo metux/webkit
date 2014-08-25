@@ -44,13 +44,13 @@ namespace WebCore {
 using namespace HTMLNames;
 
 typedef HashMap<AtomicString, RefPtr<CounterNode>> CounterMap;
-typedef HashMap<const RenderObject*, OwnPtr<CounterMap>> CounterMaps;
+typedef HashMap<const RenderObject*, std::unique_ptr<CounterMap>> CounterMaps;
 
 static CounterNode* makeCounterNode(RenderObject*, const AtomicString& identifier, bool alwaysCreateCounter);
 
 static CounterMaps& counterMaps()
 {
-    DEFINE_STATIC_LOCAL(CounterMaps, staticCounterMaps, ());
+    DEPRECATED_DEFINE_STATIC_LOCAL(CounterMaps, staticCounterMaps, ());
     return staticCounterMaps;
 }
 
@@ -324,7 +324,7 @@ static CounterNode* makeCounterNode(RenderObject* object, const AtomicString& id
         nodeMap = counterMaps().get(element);
     else {
         nodeMap = new CounterMap;
-        counterMaps().set(element, adoptPtr(nodeMap));
+        counterMaps().set(element, std::unique_ptr<CounterMap>(nodeMap));
         element->setHasCounterNodeMap(true);
     }
     nodeMap->set(identifier, newNode);
@@ -436,7 +436,7 @@ void RenderCounter::computePreferredLogicalWidths(float lead)
     SetLayoutNeededForbiddenScope layoutForbiddenScope(this, false);
 #endif
 
-    setTextInternal(originalText());
+    setRenderedText(originalText());
 
     RenderText::computePreferredLogicalWidths(lead);
 }

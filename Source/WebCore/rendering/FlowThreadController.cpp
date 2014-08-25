@@ -40,11 +40,6 @@
 
 namespace WebCore {
 
-PassOwnPtr<FlowThreadController> FlowThreadController::create(RenderView* view)
-{
-    return adoptPtr(new FlowThreadController(view));
-}
-
 FlowThreadController::FlowThreadController(RenderView* view)
     : m_view(view)
     , m_currentRenderFlowThread(0)
@@ -60,7 +55,7 @@ FlowThreadController::~FlowThreadController()
 RenderNamedFlowThread& FlowThreadController::ensureRenderFlowThreadWithName(const AtomicString& name)
 {
     if (!m_renderNamedFlowThreadList)
-        m_renderNamedFlowThreadList = adoptPtr(new RenderNamedFlowThreadList());
+        m_renderNamedFlowThreadList = std::make_unique<RenderNamedFlowThreadList>();
     else {
         for (auto iter = m_renderNamedFlowThreadList->begin(), end = m_renderNamedFlowThreadList->end(); iter != end; ++iter) {
             RenderNamedFlowThread* flowRenderer = *iter;
@@ -246,6 +241,7 @@ void FlowThreadController::updateFlowThreadsIntoMeasureContentPhase()
         RenderNamedFlowThread* flowRenderer = *iter;
         ASSERT(flowRenderer->inFinalLayoutPhase());
 
+        flowRenderer->dispatchNamedFlowEvents();
         flowRenderer->setLayoutPhase(RenderFlowThread::LayoutPhaseMeasureContent);
     }
 }
@@ -263,20 +259,12 @@ void FlowThreadController::updateFlowThreadsIntoFinalPhase()
     }
 }
 
-#if USE(ACCELERATED_COMPOSITING)
-void FlowThreadController::updateRenderFlowThreadLayersIfNeeded()
+void FlowThreadController::updateFlowThreadsLayerToRegionMappingsIfNeeded()
 {
-    // Walk the flow chain in reverse order because RenderRegions might become RenderLayers for the following flow threads.
-    for (auto iter = m_renderNamedFlowThreadList->rbegin(), end = m_renderNamedFlowThreadList->rend(); iter != end; ++iter) {
+    for (auto iter = m_renderNamedFlowThreadList->begin(), end = m_renderNamedFlowThreadList->end(); iter != end; ++iter) {
         RenderNamedFlowThread* flowRenderer = *iter;
         flowRenderer->updateAllLayerToRegionMappingsIfNeeded();
     }
-}
-#endif
-
-bool FlowThreadController::isContentElementRegisteredWithAnyNamedFlow(const Element& contentElement) const
-{
-    return m_mapNamedFlowContentElement.contains(&contentElement);
 }
 
 void FlowThreadController::updateNamedFlowsLayerListsIfNeeded()

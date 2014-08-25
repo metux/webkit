@@ -37,14 +37,14 @@ namespace WebCore {
 
 const QualifiedName& pseudoElementTagName()
 {
-    DEFINE_STATIC_LOCAL(QualifiedName, name, (nullAtom, "<pseudo>", nullAtom));
+    DEPRECATED_DEFINE_STATIC_LOCAL(QualifiedName, name, (nullAtom, "<pseudo>", nullAtom));
     return name;
 }
 
 String PseudoElement::pseudoElementNameForEvents(PseudoId pseudoId)
 {
-    DEFINE_STATIC_LOCAL(const String, after, (ASCIILiteral("::after")));
-    DEFINE_STATIC_LOCAL(const String, before, (ASCIILiteral("::before")));
+    DEPRECATED_DEFINE_STATIC_LOCAL(const String, after, (ASCIILiteral("::after")));
+    DEPRECATED_DEFINE_STATIC_LOCAL(const String, before, (ASCIILiteral("::before")));
     switch (pseudoId) {
     case AFTER:
         return after;
@@ -67,14 +67,12 @@ PseudoElement::PseudoElement(Element& host, PseudoId pseudoId)
 PseudoElement::~PseudoElement()
 {
     ASSERT(!m_hostElement);
-#if USE(ACCELERATED_COMPOSITING)
     InspectorInstrumentation::pseudoElementDestroyed(document().page(), this);
-#endif
 }
 
-PassRefPtr<RenderStyle> PseudoElement::customStyleForRenderer()
+PassRefPtr<RenderStyle> PseudoElement::customStyleForRenderer(RenderStyle& parentStyle)
 {
-    return m_hostElement->renderer()->getCachedPseudoStyle(m_pseudoId);
+    return m_hostElement->renderer()->getCachedPseudoStyle(m_pseudoId, &parentStyle);
 }
 
 void PseudoElement::didAttachRenderers()
@@ -115,7 +113,7 @@ void PseudoElement::didRecalcStyle(Style::Change)
         if (!child->isRenderImage() && !child->isQuote())
             continue;
         PassRef<RenderStyle> createdStyle = RenderStyle::createStyleInheritingFromPseudoStyle(renderer->style());
-        toRenderElement(*child).setStyle(std::move(createdStyle));
+        toRenderElement(*child).setStyle(WTF::move(createdStyle));
     }
 }
 

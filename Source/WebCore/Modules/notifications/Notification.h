@@ -37,10 +37,8 @@
 #include "EventTarget.h"
 #include "URL.h"
 #include "NotificationClient.h"
-#include "SharedBuffer.h"
 #include "TextDirection.h"
 #include "ThreadableLoaderClient.h"
-#include <wtf/OwnPtr.h>
 #include <wtf/PassRefPtr.h>
 #include <wtf/RefCounted.h>
 #include <wtf/RefPtr.h>
@@ -68,10 +66,10 @@ class Notification final : public RefCounted<Notification>, public ActiveDOMObje
 public:
     Notification();
 #if ENABLE(LEGACY_NOTIFICATIONS)
-    static PassRefPtr<Notification> create(const String& title, const String& body, const String& iconURI, ScriptExecutionContext*, ExceptionCode&, PassRefPtr<NotificationCenter> provider);
+    static PassRef<Notification> create(const String& title, const String& body, const String& iconURI, ScriptExecutionContext*, ExceptionCode&, PassRefPtr<NotificationCenter> provider);
 #endif
 #if ENABLE(NOTIFICATIONS)
-    static PassRefPtr<Notification> create(ScriptExecutionContext&, const String& title, const Dictionary& options);
+    static PassRef<Notification> create(ScriptExecutionContext&, const String& title, const Dictionary& options);
 #endif
     
     virtual ~Notification();
@@ -181,7 +179,7 @@ private:
     RefPtr<NotificationCenter> m_notificationCenter;
 
 #if ENABLE(NOTIFICATIONS)
-    OwnPtr<Timer<Notification>> m_taskTimer;
+    std::unique_ptr<Timer<Notification>> m_taskTimer;
 #endif
 };
 

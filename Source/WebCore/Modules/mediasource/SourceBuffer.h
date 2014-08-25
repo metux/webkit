@@ -52,6 +52,7 @@ namespace WebCore {
 
 class AudioTrackList;
 class MediaSource;
+class PlatformTimeRanges;
 class SourceBufferPrivate;
 class TextTrackList;
 class TimeRanges;
@@ -72,16 +73,24 @@ public:
     void appendBuffer(PassRefPtr<ArrayBuffer> data, ExceptionCode&);
     void appendBuffer(PassRefPtr<ArrayBufferView> data, ExceptionCode&);
     void abort(ExceptionCode&);
+    void remove(double start, double end, ExceptionCode&);
 
     void abortIfUpdating();
     void removedFromMediaSource();
     const MediaTime& highestPresentationEndTimestamp() const { return m_highestPresentationEndTimestamp; }
+    void seekToTime(const MediaTime&);
 
 #if ENABLE(VIDEO_TRACK)
     VideoTrackList* videoTracks();
     AudioTrackList* audioTracks();
     TextTrackList* textTracks();
 #endif
+
+    bool hasCurrentTime() const;
+    bool hasFutureTime() const;
+    bool canPlayThrough();
+
+    bool active() const { return m_active; }
 
     // ActiveDOMObject interface
     virtual bool hasPendingActivity() const override;
@@ -93,6 +102,8 @@ public:
 
     using RefCounted<SourceBuffer>::ref;
     using RefCounted<SourceBuffer>::deref;
+
+    struct TrackBuffer;
 
 protected:
     // EventTarget interface
@@ -109,9 +120,9 @@ private:
     virtual bool sourceBufferPrivateHasAudio(const SourceBufferPrivate*) const override;
     virtual bool sourceBufferPrivateHasVideo(const SourceBufferPrivate*) const override;
     virtual void sourceBufferPrivateDidBecomeReadyForMoreSamples(SourceBufferPrivate*, AtomicString trackID) override;
-    virtual void sourceBufferPrivateSeekToTime(SourceBufferPrivate*, const MediaTime&);
     virtual MediaTime sourceBufferPrivateFastSeekTimeForMediaTime(SourceBufferPrivate*, const MediaTime&, const MediaTime& negativeThreshold, const MediaTime& positiveThreshold);
-
+    virtual void sourceBufferPrivateAppendComplete(SourceBufferPrivate*, AppendResult) override;
+    virtual void sourceBufferPrivateDidReceiveRenderingError(SourceBufferPrivate*, int errorCode) override;
 
     // AudioTrackClient
     virtual void audioTrackEnabledChanged(AudioTrack*) override;
@@ -140,11 +151,24 @@ private:
 
     bool validateInitializationSegment(const InitializationSegment&);
 
-    struct TrackBuffer;
+    void reenqueueMediaForTime(TrackBuffer&, AtomicString trackID, const MediaTime&);
     void provideMediaData(TrackBuffer&, AtomicString trackID);
     void didDropSample();
 
-    RefPtr<SourceBufferPrivate> m_private;
+    void monitorBufferingRate();
+
+    void removeTimerFired(Timer<SourceBuffer>*);
+    void removeCodedFrames(const MediaTime& start, const MediaTime& end);
+
+    void reportExtraMemoryCost();
+
+    std::unique_ptr<PlatformTimeRanges> bufferedAccountingForEndOfStream() const;
+
+    // Internals
+    friend class Internals;
+    Vector<String> bufferedSamplesForTrackID(const AtomicString&);
+
+    Ref<SourceBufferPrivate> m_private;
     MediaSource* m_source;
     GenericEventQueue m_asyncEventQueue;
 
@@ -172,6 +196,15 @@ private:
     enum AppendStateType { WaitingForSegment, ParsingInitSegment, ParsingMediaSegment };
     AppendStateType m_appendState;
 
+    double m_timeOfBufferingMonitor;
+    double m_bufferedSinceLastMonitor;
+    double m_averageBufferRate;
+
+    size_t m_reportedExtraMemoryCost;
+
+    MediaTime m_pendingRemoveStart;
+    MediaTime m_pendingRemoveEnd;
+    Timer<SourceBuffer> m_removeTimer;
 };
 
 } // namespace WebCore

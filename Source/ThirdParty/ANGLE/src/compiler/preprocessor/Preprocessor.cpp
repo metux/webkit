@@ -81,11 +81,6 @@ void Preprocessor::predefineMacro(const char* name, int value)
     mImpl->macroSet[name] = macro;
 }
 
-void Preprocessor::setMaxTokenLength(size_t maxLength)
-{
-    mImpl->tokenizer.setMaxTokenLength(maxLength);
-}
-
 void Preprocessor::lex(Token* token)
 {
     bool validToken = false;
@@ -101,11 +96,11 @@ void Preprocessor::lex(Token* token)
             assert(false);
             break;
           case Token::PP_NUMBER:
-            mImpl->diagnostics->report(Diagnostics::INVALID_NUMBER,
+            mImpl->diagnostics->report(Diagnostics::PP_INVALID_NUMBER,
                                        token->location, token->text);
             break;
           case Token::PP_OTHER:
-            mImpl->diagnostics->report(Diagnostics::INVALID_CHARACTER,
+            mImpl->diagnostics->report(Diagnostics::PP_INVALID_CHARACTER,
                                        token->location, token->text);
             break;
           default:
@@ -115,5 +110,9 @@ void Preprocessor::lex(Token* token)
     }
 }
 
-}  // namespace pp
+void Preprocessor::setMaxTokenSize(size_t maxTokenSize)
+{
+    mImpl->tokenizer.setMaxTokenSize(maxTokenSize);
+}
 
+}  // namespace pp

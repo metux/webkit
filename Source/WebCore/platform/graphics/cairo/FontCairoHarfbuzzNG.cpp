@@ -11,10 +11,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -29,6 +29,7 @@
 
 #include "GraphicsContext.h"
 #include "HarfBuzzShaper.h"
+#include "LayoutRect.h"
 #include "Logging.h"
 #include "NotImplemented.h"
 #include "PlatformContextCairo.h"
@@ -84,13 +85,16 @@ int Font::offsetForPositionForComplexText(const TextRun& run, float x, bool) con
     return 0;
 }
 
-FloatRect Font::selectionRectForComplexText(const TextRun& run, const FloatPoint& point, int h, int from, int to) const
+void Font::adjustSelectionRectForComplexText(const TextRun& run, LayoutRect& selectionRect, int from, int to) const
 {
     HarfBuzzShaper shaper(this, run);
-    if (shaper.shape())
-        return shaper.selectionRect(point, h, from, to);
+    if (shaper.shape()) {
+        // FIXME: This should mimic Mac port.
+        FloatRect rect = shaper.selectionRect(FloatPoint(selectionRect.location()), selectionRect.height().toInt(), from, to);
+        selectionRect = LayoutRect(rect);
+        return;
+    }
     LOG_ERROR("Shaper couldn't shape text run.");
-    return FloatRect();
 }
 
 }

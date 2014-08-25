@@ -60,7 +60,7 @@ public:
     // In-process NetscapePlugins don't support asynchronous initialization.
     virtual bool isBeingAsynchronouslyInitialized() const { return false; }
 
-#if PLATFORM(MAC)
+#if PLATFORM(COCOA)
     NPError setDrawingModel(NPDrawingModel);
     NPError setEventModel(NPEventModel);
     NPBool convertPoint(double sourceX, double sourceY, NPCoordinateSpace sourceSpace, double& destX, double& destY, NPCoordinateSpace destSpace);
@@ -120,9 +120,6 @@ public:
 
     void pluginThreadAsyncCall(void (*function)(void*), void* userData);
 
-    // Called on the plug-in run loop (which is currently the main thread run loop).
-    void handlePluginThreadAsyncCall(void (*function)(void*), void* userData);
-
     unsigned scheduleTimer(unsigned interval, bool repeat, void (*timerFunc)(NPP, unsigned timerID));
     void unscheduleTimer(unsigned timerID);
 
@@ -180,13 +177,13 @@ private:
     virtual void destroy();
     virtual void paint(WebCore::GraphicsContext*, const WebCore::IntRect& dirtyRect);
     virtual PassRefPtr<ShareableBitmap> snapshot();
-#if PLATFORM(MAC)
+#if PLATFORM(COCOA)
     virtual PlatformLayer* pluginLayer();
 #endif
     virtual bool isTransparent();
     virtual bool wantsWheelEvents() override;
     virtual void geometryDidChange(const WebCore::IntSize& pluginSize, const WebCore::IntRect& clipRect, const WebCore::AffineTransform& pluginToRootViewTransform);
-    virtual void visibilityDidChange();
+    virtual void visibilityDidChange(bool isVisible);
     virtual void frameDidFinishLoading(uint64_t requestID);
     virtual void frameDidFail(uint64_t requestID, bool wasCancelled);
     virtual void didEvaluateJavaScript(uint64_t requestID, const String& result);
@@ -222,7 +219,7 @@ private:
     virtual unsigned countFindMatches(const String&, WebCore::FindOptions, unsigned maxMatchCount) override;
     virtual bool findString(const String&, WebCore::FindOptions, unsigned maxMatchCount) override;
 
-#if PLATFORM(MAC)
+#if PLATFORM(COCOA)
     virtual void windowFocusChanged(bool);
     virtual void windowAndViewFramesChanged(const WebCore::IntRect& windowFrameInScreenCoordinates, const WebCore::IntRect& viewFrameInWindowCoordinates);
     virtual void windowVisibilityChanged(bool);
@@ -303,6 +300,7 @@ private:
     bool m_inNPPNew;
     bool m_shouldUseManualLoader;
     bool m_hasCalledSetWindow;
+    bool m_isVisible;
 
     RefPtr<NetscapePluginStream> m_manualStream;
     Vector<bool, 8> m_popupEnabledStates;

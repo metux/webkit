@@ -60,12 +60,16 @@ public:
     void addMessageReceiver(IPC::StringReference messageReceiverName, uint64_t destinationID, IPC::MessageReceiver&);
     void removeMessageReceiver(IPC::StringReference messageReceiverName, uint64_t destinationID);
 
-    bool isValid() const { return m_connection; }
-    bool isLaunching() const;
-    bool canSendMessage() const { return isValid() || isLaunching(); }
+    enum class State {
+        Launching,
+        Running,
+        Terminated,
+    };
+    State state() const;
 
     PlatformProcessIdentifier processIdentifier() const { return m_processLauncher->processIdentifier(); }
 
+    bool canSendMessage() const { return state() != State::Terminated;}
     bool sendMessage(std::unique_ptr<IPC::MessageEncoder>, unsigned messageSendFlags);
 
 protected:
@@ -77,7 +81,7 @@ protected:
 
     bool dispatchMessage(IPC::Connection*, IPC::MessageDecoder&);
     bool dispatchSyncMessage(IPC::Connection*, IPC::MessageDecoder&, std::unique_ptr<IPC::MessageEncoder>&);
-
+    
 private:
     virtual void getLaunchOptions(ProcessLauncher::LaunchOptions&) = 0;
     virtual void connectionWillOpen(IPC::Connection*);
@@ -97,7 +101,7 @@ bool ChildProcessProxy::send(T&& message, uint64_t destinationID, unsigned messa
     auto encoder = std::make_unique<IPC::MessageEncoder>(T::receiverName(), T::name(), destinationID);
     encoder->encode(message.arguments());
 
-    return sendMessage(std::move(encoder), messageSendFlags);
+    return sendMessage(WTF::move(encoder), messageSendFlags);
 }
 
 template<typename U> 
@@ -108,7 +112,7 @@ bool ChildProcessProxy::sendSync(U&& message, typename U::Reply&& reply, uint64_
     if (!m_connection)
         return false;
 
-    return connection()->sendSync(std::forward<U>(message), std::move(reply), destinationID, timeout);
+    return connection()->sendSync(std::forward<U>(message), WTF::move(reply), destinationID, timeout);
 }
 
 } // namespace WebKit

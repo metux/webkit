@@ -35,6 +35,10 @@
 #include <wtf/PassRefPtr.h>
 #include <wtf/text/WTFString.h>
 
+#if ENABLE(CONTENT_FILTERING)
+#include <WebCore/ContentFilter.h>
+#endif
+
 namespace IPC {
     class ArgumentDecoder;
     class Connection;
@@ -50,7 +54,7 @@ class WebFormSubmissionListenerProxy;
 class WebFramePolicyListenerProxy;
 class WebPageProxy;
 
-typedef GenericCallback<WKDataRef> DataCallback;
+typedef GenericCallback<API::Data*> DataCallback;
 
 class WebFrameProxy : public API::ObjectImpl<API::Object::Type::Frame> {
 public:
@@ -95,9 +99,9 @@ public:
     bool isDisplayingMarkupDocument() const;
     bool isDisplayingPDFDocument() const;
 
-    void getWebArchive(PassRefPtr<DataCallback>);
-    void getMainResourceData(PassRefPtr<DataCallback>);
-    void getResourceData(API::URL*, PassRefPtr<DataCallback>);
+    void getWebArchive(std::function<void (API::Data*, CallbackBase::Error)>);
+    void getMainResourceData(std::function<void (API::Data*, CallbackBase::Error)>);
+    void getResourceData(API::URL*, std::function<void (API::Data*, CallbackBase::Error)>);
 
     void didStartProvisionalLoad(const String& url);
     void didReceiveServerRedirectForProvisionalLoad(const String& url);
@@ -109,9 +113,14 @@ public:
     void didChangeTitle(const String&);
 
     // Policy operations.
-    void receivedPolicyDecision(WebCore::PolicyAction, uint64_t listenerID);
+    void receivedPolicyDecision(WebCore::PolicyAction, uint64_t listenerID, uint64_t navigationID = 0);
     WebFramePolicyListenerProxy* setUpPolicyListenerProxy(uint64_t listenerID);
     WebFormSubmissionListenerProxy* setUpFormSubmissionListenerProxy(uint64_t listenerID);
+
+#if ENABLE(CONTENT_FILTERING)
+    void setContentFilterForBlockedLoad(std::unique_ptr<WebCore::ContentFilter> contentFilter) { m_contentFilterForBlockedLoad = WTF::move(contentFilter); }
+    bool contentFilterDidHandleNavigationAction(const WebCore::ResourceRequest&);
+#endif
 
 private:
     WebFrameProxy(WebPageProxy* page, uint64_t frameID);
@@ -126,6 +135,10 @@ private:
     RefPtr<WebCertificateInfo> m_certificateInfo;
     RefPtr<WebFrameListenerProxy> m_activeListener;
     uint64_t m_frameID;
+
+#if ENABLE(CONTENT_FILTERING)
+    std::unique_ptr<WebCore::ContentFilter> m_contentFilterForBlockedLoad;
+#endif
 };
 
 } // namespace WebKit

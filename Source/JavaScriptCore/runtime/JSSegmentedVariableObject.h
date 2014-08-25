@@ -10,7 +10,7 @@
  * 2.  Redistributions in binary form must reproduce the above copyright
  *     notice, this list of conditions and the following disclaimer in the
  *     documentation and/or other materials provided with the distribution. 
- * 3.  Neither the name of Apple Computer, Inc. ("Apple") nor the names of
+ * 3.  Neither the name of Apple Inc. ("Apple") nor the names of
  *     its contributors may be used to endorse or promote products derived
  *     from this software without specific prior written permission. 
  *
@@ -79,8 +79,6 @@ public:
     JS_EXPORT_PRIVATE static void visitChildren(JSCell*, SlotVisitor&);
 
 protected:
-    static const unsigned StructureFlags = OverridesVisitChildren | JSSymbolTableObject::StructureFlags;
-
     JSSegmentedVariableObject(VM& vm, Structure* structure, JSScope* scope)
         : JSSymbolTableObject(vm, structure, scope)
     {

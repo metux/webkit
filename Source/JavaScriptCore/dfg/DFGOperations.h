@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011, 2013 Apple Inc. All rights reserved.
+ * Copyright (C) 2011, 2013, 2014 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -28,13 +28,12 @@
 
 #if ENABLE(DFG_JIT)
 
-#include "DFGJITCompiler.h"
 #include "JITOperations.h"
 #include "PutKind.h"
 
-namespace JSC {
+namespace JSC { namespace DFG {
 
-namespace DFG {
+struct OSRExitBase;
 
 extern "C" {
 
@@ -98,6 +97,7 @@ size_t JIT_OPERATION operationRegExpTest(ExecState*, JSCell*, JSCell*) WTF_INTER
 size_t JIT_OPERATION operationCompareStrictEqCell(ExecState*, EncodedJSValue encodedOp1, EncodedJSValue encodedOp2) WTF_INTERNAL;
 size_t JIT_OPERATION operationCompareStrictEq(ExecState*, EncodedJSValue encodedOp1, EncodedJSValue encodedOp2) WTF_INTERNAL;
 JSCell* JIT_OPERATION operationCreateInlinedArguments(ExecState*, InlineCallFrame*) WTF_INTERNAL;
+JSCell* JIT_OPERATION operationCreateInlinedArgumentsDuringOSRExit(ExecState*, InlineCallFrame*) WTF_INTERNAL;
 void JIT_OPERATION operationTearOffInlinedArguments(ExecState*, JSCell*, JSCell*, InlineCallFrame*) WTF_INTERNAL;
 EncodedJSValue JIT_OPERATION operationGetInlinedArgumentByVal(ExecState*, int32_t, InlineCallFrame*, int32_t) WTF_INTERNAL;
 EncodedJSValue JIT_OPERATION operationGetArgumentByVal(ExecState*, int32_t, int32_t) WTF_INTERNAL;
@@ -125,14 +125,10 @@ JSCell* JIT_OPERATION operationMakeRope2(ExecState*, JSString*, JSString*);
 JSCell* JIT_OPERATION operationMakeRope3(ExecState*, JSString*, JSString*, JSString*);
 char* JIT_OPERATION operationFindSwitchImmTargetForDouble(ExecState*, EncodedJSValue, size_t tableIndex);
 char* JIT_OPERATION operationSwitchString(ExecState*, size_t tableIndex, JSString*);
-void JIT_OPERATION operationInvalidate(ExecState*, VariableWatchpointSet*);
+void JIT_OPERATION operationNotifyWrite(ExecState*, VariableWatchpointSet*, EncodedJSValue);
 
-#if ENABLE(FTL_JIT)
-// FIXME: Make calls work well. Currently they're a pure regression.
-// https://bugs.webkit.org/show_bug.cgi?id=113621
-EncodedJSValue JIT_OPERATION operationFTLCall(ExecState*) WTF_INTERNAL;
-EncodedJSValue JIT_OPERATION operationFTLConstruct(ExecState*) WTF_INTERNAL;
-#endif // ENABLE(FTL_JIT)
+int64_t JIT_OPERATION operationConvertBoxedDoubleToInt52(EncodedJSValue);
+int64_t JIT_OPERATION operationConvertDoubleToInt52(double);
 
 // These operations implement the implicitly called ToInt32 and ToBoolean conversions from ES5.
 // This conversion returns an int32_t within a size_t such that the value is zero extended to fill the register.
@@ -140,7 +136,7 @@ size_t JIT_OPERATION dfgConvertJSValueToInt32(ExecState*, EncodedJSValue) WTF_IN
 
 void JIT_OPERATION debugOperationPrintSpeculationFailure(ExecState*, void*, void*) WTF_INTERNAL;
 
-void JIT_OPERATION triggerReoptimizationNow(CodeBlock*) WTF_INTERNAL;
+void JIT_OPERATION triggerReoptimizationNow(CodeBlock*, OSRExitBase*) WTF_INTERNAL;
 
 #if ENABLE(FTL_JIT)
 void JIT_OPERATION triggerTierUpNow(ExecState*) WTF_INTERNAL;

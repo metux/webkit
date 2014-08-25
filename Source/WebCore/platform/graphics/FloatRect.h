@@ -11,10 +11,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -28,23 +28,18 @@
 #define FloatRect_h
 
 #include "FloatPoint.h"
-#include <wtf/Vector.h>
-
-#if PLATFORM(IOS)
-#include <CoreGraphics/CGGeometry.h>
-#endif
 
 #if USE(CG)
 typedef struct CGRect CGRect;
 #endif
 
-#if PLATFORM(MAC) && !PLATFORM(IOS)
+#if PLATFORM(MAC)
 #ifdef NSGEOMETRY_TYPES_SAME_AS_CGGEOMETRY_TYPES
 typedef struct CGRect NSRect;
 #else
 typedef struct _NSRect NSRect;
 #endif
-#endif // PLATFORM(MAC) && !PLATFORM(IOS)
+#endif // PLATFORM(MAC)
 
 #if USE(CAIRO)
 typedef struct _cairo_rectangle cairo_rectangle_t;
@@ -147,6 +142,9 @@ public:
     bool contains(float px, float py) const
         { return px >= x() && px <= maxX() && py >= y() && py <= maxY(); }
 
+    bool overlapsYRange(float y1, float y2) const { return !isEmpty() && y2 >= y1 && y2 >= y() && y1 <= maxY(); }
+    bool overlapsXRange(float x1, float x2) const { return !isEmpty() && x2 >= x1 && x2 >= x() && x1 <= maxX(); }
+
     void inflateX(float dx) {
         m_location.setX(m_location.x() - dx);
         m_size.setWidth(m_size.width() + dx + dx);
@@ -171,19 +169,17 @@ public:
     operator CGRect() const;
 #endif
 
-#if !PLATFORM(IOS)
 #if PLATFORM(MAC) && !defined(NSGEOMETRY_TYPES_SAME_AS_CGGEOMETRY_TYPES)
     FloatRect(const NSRect&);
     operator NSRect() const;
 #endif
-#endif // !PLATFORM(IOS)
 
 #if USE(CAIRO)
     FloatRect(const cairo_rectangle_t&);
     operator cairo_rectangle_t() const;
 #endif
 
-    void dump(PrintStream& out) const;
+    void dump(WTF::PrintStream& out) const;
 
     static FloatRect infiniteRect();
     bool isInfinite() const;
@@ -213,8 +209,6 @@ inline FloatRect unionRect(const FloatRect& a, const FloatRect& b)
     c.unite(b);
     return c;
 }
-
-FloatRect unionRect(const Vector<FloatRect>&);
 
 inline FloatRect& operator+=(FloatRect& a, const FloatRect& b)
 {
@@ -252,15 +246,13 @@ inline bool FloatRect::isInfinite() const
     return *this == infiniteRect();
 }
 
+FloatRect enclosingRectExtendedToDevicePixels(const FloatRect&, float deviceScaleFactor);
 IntRect enclosingIntRect(const FloatRect&);
 
 // Returns a valid IntRect contained within the given FloatRect.
 IntRect enclosedIntRect(const FloatRect&);
 
 IntRect roundedIntRect(const FloatRect&);
-
-// Map rect r from srcRect to an equivalent rect in destRect.
-FloatRect mapRect(const FloatRect& r, const FloatRect& srcRect, const FloatRect& destRect);
 
 }
 

@@ -70,10 +70,10 @@ private:
     virtual bool supportsFocus() const override;
 
     virtual int scrollLeft() override;
-    virtual void setScrollLeft(int scrollLeft) override;
+    virtual void setScrollLeft(int) override;
     
     virtual int scrollTop() override;
-    virtual void setScrollTop(int scrollTop) override;
+    virtual void setScrollTop(int) override;
     
     virtual int scrollHeight() override;
     virtual int scrollWidth() override;

@@ -10,7 +10,7 @@
  * 2.  Redistributions in binary form must reproduce the above copyright
  *     notice, this list of conditions and the following disclaimer in the
  *     documentation and/or other materials provided with the distribution.
- * 3.  Neither the name of Apple Computer, Inc. ("Apple") nor the names of
+ * 3.  Neither the name of Apple Inc. ("Apple") nor the names of
  *     its contributors may be used to endorse or promote products derived
  *     from this software without specific prior written permission.
  *
@@ -65,7 +65,7 @@ public:
 typedef Deque<FunctionWithContext> FunctionQueue;
 
 static bool callbacksPaused; // This global variable is only accessed from main thread.
-#if !PLATFORM(MAC)
+#if !OS(DARWIN) || PLATFORM(EFL) || PLATFORM(GTK)
 static ThreadIdentifier mainThreadIdentifier;
 #endif
 
@@ -83,7 +83,7 @@ static FunctionQueue& functionQueue()
 }
 
 
-#if !PLATFORM(MAC)
+#if !OS(DARWIN) || PLATFORM(EFL) || PLATFORM(GTK)
 
 void initializeMainThread()
 {
@@ -142,7 +142,7 @@ void initializeWebThread()
 #endif
 
 // 0.1 sec delays in UI is approximate threshold when they become noticeable. Have a limit that's half of that.
-static const double maxRunLoopSuspensionTime = 0.05;
+static const auto maxRunLoopSuspensionTime = std::chrono::milliseconds(50);
 
 void dispatchFunctionsFromMainThread()
 {
@@ -151,7 +151,7 @@ void dispatchFunctionsFromMainThread()
     if (callbacksPaused)
         return;
 
-    double startTime = monotonicallyIncreasingTime();
+    auto startTime = std::chrono::steady_clock::now();
 
     FunctionWithContext invocation;
     while (true) {
@@ -168,7 +168,7 @@ void dispatchFunctionsFromMainThread()
         // yield so the user input can be processed. Otherwise user may not be able to even close the window.
         // This code has effect only in case the scheduleDispatchFunctionsOnMainThread() is implemented in a way that
         // allows input events to be processed before we are back here.
-        if (monotonicallyIncreasingTime() - startTime > maxRunLoopSuspensionTime) {
+        if (std::chrono::steady_clock::now() - startTime > maxRunLoopSuspensionTime) {
             scheduleDispatchFunctionsOnMainThread();
             break;
         }
@@ -214,7 +214,7 @@ static void callFunctionObject(void* context)
 
 void callOnMainThread(std::function<void ()> function)
 {
-    callOnMainThread(callFunctionObject, std::make_unique<std::function<void ()>>(std::move(function)).release());
+    callOnMainThread(callFunctionObject, std::make_unique<std::function<void ()>>(WTF::move(function)).release());
 }
 
 void setMainThreadCallbacksPaused(bool paused)
@@ -230,7 +230,7 @@ void setMainThreadCallbacksPaused(bool paused)
         scheduleDispatchFunctionsOnMainThread();
 }
 
-#if !PLATFORM(MAC)
+#if !OS(DARWIN) || PLATFORM(EFL) || PLATFORM(GTK)
 bool isMainThread()
 {
     return currentThread() == mainThreadIdentifier;
@@ -274,7 +274,7 @@ bool isMainThreadOrGCThread()
 
     return isMainThread();
 }
-#elif PLATFORM(MAC)
+#elif OS(DARWIN) && !PLATFORM(EFL) && !PLATFORM(GTK)
 // This is necessary because JavaScriptCore.exp doesn't support preprocessor macros.
 bool isMainThreadOrGCThread()
 {

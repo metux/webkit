@@ -10,10 +10,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -43,36 +43,31 @@
 #include "RenderInline.h"
 #include "RenderIterator.h"
 #include "RenderLayer.h"
+#include "RenderLayerBacking.h"
 #include "RenderLineBreak.h"
 #include "RenderListItem.h"
 #include "RenderListMarker.h"
 #include "RenderNamedFlowFragment.h"
 #include "RenderNamedFlowThread.h"
 #include "RenderRegion.h"
+#include "RenderSVGContainer.h"
+#include "RenderSVGGradientStop.h"
+#include "RenderSVGImage.h"
+#include "RenderSVGInlineText.h"
+#include "RenderSVGPath.h"
+#include "RenderSVGResourceContainer.h"
+#include "RenderSVGRoot.h"
+#include "RenderSVGText.h"
 #include "RenderTableCell.h"
 #include "RenderView.h"
 #include "RenderWidget.h"
+#include "SVGRenderTreeAsText.h"
 #include "ShadowRoot.h"
 #include "SimpleLineLayoutResolver.h"
 #include "StyleProperties.h"
 #include <wtf/HexNumber.h>
 #include <wtf/Vector.h>
 #include <wtf/unicode/CharacterNames.h>
-
-#if ENABLE(SVG)
-#include "RenderSVGContainer.h"
-#include "RenderSVGGradientStop.h"
-#include "RenderSVGImage.h"
-#include "RenderSVGInlineText.h"
-#include "RenderSVGPath.h"
-#include "RenderSVGRoot.h"
-#include "RenderSVGText.h"
-#include "SVGRenderTreeAsText.h"
-#endif
-
-#if USE(ACCELERATED_COMPOSITING)
-#include "RenderLayerBacking.h"
-#endif
 
 namespace WebCore {
 
@@ -205,15 +200,8 @@ void RenderTreeAsText::writeRenderObject(TextStream& ts, const RenderObject& o, 
         // FIXME: Would be better to dump the bounding box x and y rather than the first run's x and y, but that would involve updating
         // many test results.
         const RenderText& text = toRenderText(o);
-        IntRect linesBox = text.linesBoundingBox();
-        if (text.simpleLineLayout()) {
-            int y = linesBox.y();
-            if (text.containingBlock()->isTableCell())
-                y -= toRenderTableCell(o.containingBlock())->intrinsicPaddingBefore();
-            r = IntRect(linesBox.x(), y, linesBox.width(), linesBox.height());
-        } else
-            r = IntRect(text.firstRunX(), text.firstRunY(), linesBox.width(), linesBox.height());
-        if (adjustForTableCells && !text.firstTextBox())
+        r = IntRect(text.firstRunLocation(), text.linesBoundingBox().size());
+        if (!text.firstTextBox() && !text.simpleLineLayout())
             adjustForTableCells = false;
     } else if (o.isBR()) {
         const RenderLineBreak& br = toRenderLineBreak(o);
@@ -511,7 +499,6 @@ static void writeSimpleLine(TextStream& ts, const RenderText& o, const LayoutRec
 
 void write(TextStream& ts, const RenderObject& o, int indent, RenderAsTextBehavior behavior)
 {
-#if ENABLE(SVG)
     if (o.isSVGShape()) {
         write(ts, *toRenderSVGShape(&o), indent);
         return;
@@ -521,11 +508,11 @@ void write(TextStream& ts, const RenderObject& o, int indent, RenderAsTextBehavi
         return;
     }
     if (o.isSVGResourceContainer()) {
-        writeSVGResourceContainer(ts, o, indent);
+        writeSVGResourceContainer(ts, toRenderSVGResourceContainer(o), indent);
         return;
     }
     if (o.isSVGContainer()) {
-        writeSVGContainer(ts, o, indent);
+        writeSVGContainer(ts, toRenderSVGContainer(o), indent);
         return;
     }
     if (o.isSVGRoot()) {
@@ -544,7 +531,6 @@ void write(TextStream& ts, const RenderObject& o, int indent, RenderAsTextBehavi
         writeSVGImage(ts, *toRenderSVGImage(&o), indent);
         return;
     }
-#endif
 
     writeIndent(ts, indent);
 
@@ -639,14 +625,17 @@ static void write(TextStream& ts, RenderLayer& l,
         ts << " layerType: background only";
     else if (paintPhase == LayerPaintPhaseForeground)
         ts << " layerType: foreground only";
-    
-#if USE(ACCELERATED_COMPOSITING)
+
     if (behavior & RenderAsTextShowCompositedLayers) {
         if (l.isComposited())
             ts << " (composited, bounds=" << l.backing()->compositedBounds() << ", drawsContent=" << l.backing()->graphicsLayer()->drawsContent() << ", paints into ancestor=" << l.backing()->paintsIntoCompositedAncestor() << ")";
     }
-#else
-    UNUSED_PARAM(behavior);
+
+#if ENABLE(CSS_COMPOSITING)
+    if (l.isolatesBlending())
+        ts << " isolatesBlending";
+    if (l.hasBlendMode())
+        ts << " blendMode: " << compositeOperatorName(CompositeSourceOver, l.blendMode());
 #endif
     
     ts << "\n";
@@ -752,12 +741,12 @@ static void writeLayers(TextStream& ts, const RenderLayer* rootLayer, RenderLaye
     // Calculate the clip rects we should use.
     LayoutRect layerBounds;
     ClipRect damageRect, clipRectToApply, outlineRect;
-    l->calculateRects(RenderLayer::ClipRectsContext(rootLayer, 0, TemporaryClipRects), paintDirtyRect, layerBounds, damageRect, clipRectToApply, outlineRect);
+    l->calculateRects(RenderLayer::ClipRectsContext(rootLayer, TemporaryClipRects), paintDirtyRect, layerBounds, damageRect, clipRectToApply, outlineRect, l->offsetFromAncestor(rootLayer));
 
     // Ensure our lists are up-to-date.
     l->updateLayerListsIfNeeded();
 
-    bool shouldPaint = (behavior & RenderAsTextShowAllLayers) ? true : l->intersectsDamageRect(layerBounds, damageRect.rect(), rootLayer);
+    bool shouldPaint = (behavior & RenderAsTextShowAllLayers) ? true : l->intersectsDamageRect(layerBounds, damageRect.rect(), rootLayer, l->offsetFromAncestor(rootLayer));
     Vector<RenderLayer*>* negList = l->negZOrderList();
     bool paintsBackgroundSeparately = negList && negList->size() > 0;
     if (shouldPaint && paintsBackgroundSeparately)

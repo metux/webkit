@@ -37,8 +37,8 @@
 #include "IDBRequest.h"
 #include "IDBTransaction.h"
 #include "Logging.h"
-#include "ScriptCallStack.h"
 #include "ScriptExecutionContext.h"
+#include <inspector/ScriptCallStack.h>
 #include <limits>
 
 namespace WebCore {
@@ -50,25 +50,25 @@ PassRefPtr<IDBCursor> IDBCursor::create(PassRefPtr<IDBCursorBackend> backend, In
 
 const AtomicString& IDBCursor::directionNext()
 {
-    DEFINE_STATIC_LOCAL(AtomicString, next, ("next", AtomicString::ConstructFromLiteral));
+    DEPRECATED_DEFINE_STATIC_LOCAL(AtomicString, next, ("next", AtomicString::ConstructFromLiteral));
     return next;
 }
 
 const AtomicString& IDBCursor::directionNextUnique()
 {
-    DEFINE_STATIC_LOCAL(AtomicString, nextunique, ("nextunique", AtomicString::ConstructFromLiteral));
+    DEPRECATED_DEFINE_STATIC_LOCAL(AtomicString, nextunique, ("nextunique", AtomicString::ConstructFromLiteral));
     return nextunique;
 }
 
 const AtomicString& IDBCursor::directionPrev()
 {
-    DEFINE_STATIC_LOCAL(AtomicString, prev, ("prev", AtomicString::ConstructFromLiteral));
+    DEPRECATED_DEFINE_STATIC_LOCAL(AtomicString, prev, ("prev", AtomicString::ConstructFromLiteral));
     return prev;
 }
 
 const AtomicString& IDBCursor::directionPrevUnique()
 {
-    DEFINE_STATIC_LOCAL(AtomicString, prevunique, ("prevunique", AtomicString::ConstructFromLiteral));
+    DEPRECATED_DEFINE_STATIC_LOCAL(AtomicString, prevunique, ("prevunique", AtomicString::ConstructFromLiteral));
     return prevunique;
 }
 
@@ -142,7 +142,7 @@ PassRefPtr<IDBRequest> IDBCursor::update(JSC::ExecState* state, Deprecated::Scri
     const IDBKeyPath& keyPath = objectStore->metadata().keyPath;
     const bool usesInLineKeys = !keyPath.isNull();
     if (usesInLineKeys) {
-        RefPtr<IDBKey> keyPathKey = createIDBKeyFromScriptValueAndKeyPath(m_request->requestState(), value, keyPath);
+        RefPtr<IDBKey> keyPathKey = createIDBKeyFromScriptValueAndKeyPath(m_request->requestState()->exec(), value, keyPath);
         if (!keyPathKey || !keyPathKey->isEqual(m_currentPrimaryKey.get())) {
             ec = IDBDatabaseException::DataError;
             return 0;
@@ -276,7 +276,7 @@ void IDBCursor::setValueReady(DOMRequestState* state, PassRefPtr<IDBKey> key, Pa
         const IDBObjectStoreMetadata metadata = objectStore->metadata();
         if (metadata.autoIncrement && !metadata.keyPath.isNull()) {
 #ifndef NDEBUG
-            RefPtr<IDBKey> expectedKey = createIDBKeyFromScriptValueAndKeyPath(m_request->requestState(), value, metadata.keyPath);
+            RefPtr<IDBKey> expectedKey = createIDBKeyFromScriptValueAndKeyPath(m_request->requestState()->exec(), value, metadata.keyPath);
             ASSERT(!expectedKey || expectedKey->isEqual(m_currentPrimaryKey.get()));
 #endif
             bool injected = injectIDBKeyIntoScriptValue(m_request->requestState(), m_currentPrimaryKey, value, metadata.keyPath);

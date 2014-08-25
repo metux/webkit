@@ -10,10 +10,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -50,7 +50,7 @@
 #undef VERSION
 #endif
 
-#if PLATFORM(MAC)
+#if PLATFORM(COCOA)
 #if PLATFORM(IOS)
 #include <OpenGLES/ES2/gl.h>
 #ifdef __OBJC__
@@ -477,23 +477,21 @@ public:
         virtual ~ErrorMessageCallback() { }
     };
 
-    void setContextLostCallback(PassOwnPtr<ContextLostCallback>);
-    void setErrorMessageCallback(PassOwnPtr<ErrorMessageCallback>);
+    void setContextLostCallback(std::unique_ptr<ContextLostCallback>);
+    void setErrorMessageCallback(std::unique_ptr<ErrorMessageCallback>);
 
     static PassRefPtr<GraphicsContext3D> create(Attributes, HostWindow*, RenderStyle = RenderOffscreen);
     static PassRefPtr<GraphicsContext3D> createForCurrentGLContext();
     ~GraphicsContext3D();
 
-#if PLATFORM(MAC)
+#if PLATFORM(COCOA)
     PlatformGraphicsContext3D platformGraphicsContext3D() const { return m_contextObj; }
     Platform3DObject platformTexture() const { return m_compositorTexture; }
     CALayer* platformLayer() const { return reinterpret_cast<CALayer*>(m_webGLLayer.get()); }
 #else
     PlatformGraphicsContext3D platformGraphicsContext3D();
     Platform3DObject platformTexture() const;
-#if USE(ACCELERATED_COMPOSITING) 
     PlatformLayer* platformLayer() const;
-#endif
 #endif
 
     bool makeContextCurrent();
@@ -877,6 +875,10 @@ public:
     // getError in the order they were added.
     void synthesizeGLError(GC3Denum error);
 
+    // Read real OpenGL errors, and move them to the synthetic
+    // error list. Return true if at least one error is moved.
+    bool moveErrorsToSyntheticErrorList();
+
     // Support for extensions. Returns a non-null object, though not
     // all methods it contains may necessarily be supported on the
     // current hardware. Must call Extensions3D::supports() to
@@ -966,6 +968,7 @@ public:
 
 private:
     GraphicsContext3D(Attributes, HostWindow*, RenderStyle = RenderOffscreen);
+    static int numActiveContexts;
 
     // Helper for packImageData/extractImageData/extractTextureData which implement packing of pixel
     // data into the specified OpenGL destination format and type.
@@ -999,13 +1002,12 @@ private:
     int m_currentWidth, m_currentHeight;
     bool isResourceSafe();
 
-#if PLATFORM(IOS)
-    PlatformGraphicsContext3D m_contextObj;
-    RetainPtr<PlatformLayer> m_webGLLayer;
-#elif PLATFORM(MAC)
-    CGLContextObj m_contextObj;
+#if PLATFORM(COCOA)
     RetainPtr<WebGLLayer> m_webGLLayer;
-#elif PLATFORM(WIN) && USE(CA)
+    PlatformGraphicsContext3D m_contextObj;
+#endif
+
+#if PLATFORM(WIN) && USE(CA)
     RefPtr<PlatformCALayer> m_webGLLayer;
 #endif
 
@@ -1087,7 +1089,11 @@ private:
             return filteredToActualUniformIndexMap.size();
         }
     };
-    std::unique_ptr<ActiveShaderSymbolCounts> m_shaderSymbolCount;
+    typedef HashMap<Platform3DObject, ActiveShaderSymbolCounts> ShaderProgramSymbolCountMap;
+    ShaderProgramSymbolCountMap m_shaderProgramSymbolCountMap;
+
+    typedef HashMap<String, String> HashedSymbolMap;
+    HashedSymbolMap m_possiblyUnusedAttributeMap;
 
     String mappedSymbolName(Platform3DObject program, ANGLEShaderSymbolType, const String& name);
     String mappedSymbolName(Platform3DObject shaders[2], size_t count, const String& name);
@@ -1144,7 +1150,7 @@ private:
     ListHashSet<GC3Denum> m_syntheticErrors;
 
     friend class GraphicsContext3DPrivate;
-    OwnPtr<GraphicsContext3DPrivate> m_private;
+    std::unique_ptr<GraphicsContext3DPrivate> m_private;
 };
 
 } // namespace WebCore

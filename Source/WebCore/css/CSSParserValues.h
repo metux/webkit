@@ -113,13 +113,17 @@ struct CSSParserValue {
         int iValue;
         CSSParserString string;
         CSSParserFunction* function;
+        CSSParserValueList* valueList;
     };
     enum {
-        Operator = 0x100000,
-        Function = 0x100001,
-        Q_EMS    = 0x100002
+        Operator  = 0x100000,
+        Function  = 0x100001,
+        ValueList = 0x100002,
+        Q_EMS     = 0x100003,
     };
     int unit;
+
+    void setFromValueList(std::unique_ptr<CSSParserValueList>);
 
     PassRefPtr<CSSValue> createCSSValue();
 };
@@ -151,6 +155,12 @@ public:
         --m_current;
         return current();
     }
+    void setCurrentIndex(unsigned index)
+    {
+        ASSERT(index < m_values.size());
+        if (index < m_values.size())
+            m_current = index;
+    }
 
     CSSParserValue* valueAt(unsigned i) { return i < m_values.size() ? &m_values[i] : 0; }
 
@@ -165,17 +175,22 @@ struct CSSParserFunction {
     WTF_MAKE_FAST_ALLOCATED;
 public:
     CSSParserString name;
-    OwnPtr<CSSParserValueList> args;
+    std::unique_ptr<CSSParserValueList> args;
 };
 
 class CSSParserSelector {
     WTF_MAKE_FAST_ALLOCATED;
 public:
+    static CSSParserSelector* parsePagePseudoSelector(const CSSParserString& pseudoTypeString);
+    static CSSParserSelector* parsePseudoElementSelector(CSSParserString& pseudoTypeString);
+    static CSSParserSelector* parsePseudoElementCueFunctionSelector(const CSSParserString& functionIdentifier, Vector<std::unique_ptr<CSSParserSelector>>* selectorVector);
+    static CSSParserSelector* parsePseudoClassAndCompatibilityElementSelector(CSSParserString& pseudoTypeString);
+
     CSSParserSelector();
     explicit CSSParserSelector(const QualifiedName&);
     ~CSSParserSelector();
 
-    PassOwnPtr<CSSSelector> releaseSelector() { return m_selector.release(); }
+    std::unique_ptr<CSSSelector> releaseSelector() { return WTF::move(m_selector); }
 
     void setValue(const AtomicString& value) { m_selector->setValue(value); }
     void setAttribute(const QualifiedName& value, bool isCaseInsensitive) { m_selector->setAttribute(value, isCaseInsensitive); }
@@ -184,24 +199,35 @@ public:
     void setRelation(CSSSelector::Relation value) { m_selector->m_relation = value; }
     void setForPage() { m_selector->setForPage(); }
 
-    void adoptSelectorVector(Vector<OwnPtr<CSSParserSelector>>& selectorVector);
 
-    CSSSelector::PseudoType pseudoType() const { return m_selector->pseudoType(); }
+    void adoptSelectorVector(Vector<std::unique_ptr<CSSParserSelector>>& selectorVector);
+
+    void setPseudoClassValue(const CSSParserString& pseudoClassString);
+    CSSSelector::PseudoClassType pseudoClassType() const { return m_selector->pseudoClassType(); }
     bool isCustomPseudoElement() const { return m_selector->isCustomPseudoElement(); }
+
+    bool isPseudoElementCueFunction() const
+    {
+#if ENABLE(VIDEO_TRACK)
+        return m_selector->m_match == CSSSelector::PseudoElement && m_selector->pseudoElementType() == CSSSelector::PseudoElementCue;
+#else
+        return false;
+#endif
+    }
 
     bool isSimple() const;
     bool hasShadowDescendant() const;
 
     CSSParserSelector* tagHistory() const { return m_tagHistory.get(); }
-    void setTagHistory(PassOwnPtr<CSSParserSelector> selector) { m_tagHistory = selector; }
-    void clearTagHistory() { m_tagHistory.clear(); }
-    void insertTagHistory(CSSSelector::Relation before, PassOwnPtr<CSSParserSelector>, CSSSelector::Relation after);
-    void appendTagHistory(CSSSelector::Relation, PassOwnPtr<CSSParserSelector>);
+    void setTagHistory(std::unique_ptr<CSSParserSelector> selector) { m_tagHistory = WTF::move(selector); }
+    void clearTagHistory() { m_tagHistory.reset(); }
+    void insertTagHistory(CSSSelector::Relation before, std::unique_ptr<CSSParserSelector>, CSSSelector::Relation after);
+    void appendTagHistory(CSSSelector::Relation, std::unique_ptr<CSSParserSelector>);
     void prependTagSelector(const QualifiedName&, bool tagIsForNamespaceRule = false);
 
 private:
-    OwnPtr<CSSSelector> m_selector;
-    OwnPtr<CSSParserSelector> m_tagHistory;
+    std::unique_ptr<CSSSelector> m_selector;
+    std::unique_ptr<CSSParserSelector> m_tagHistory;
 };
 
 inline bool CSSParserSelector::hasShadowDescendant() const
@@ -209,6 +235,12 @@ inline bool CSSParserSelector::hasShadowDescendant() const
     return m_selector->relation() == CSSSelector::ShadowDescendant;
 }
 
+inline void CSSParserValue::setFromValueList(std::unique_ptr<CSSParserValueList> valueList)
+{
+    id = CSSValueInvalid;
+    this->valueList = valueList.release();
+    unit = ValueList;
+}
 }
 
 #endif

@@ -10,10 +10,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -44,7 +44,7 @@ typedef struct _Evas_Event_Mouse_Move Evas_Event_Mouse_Move;
 namespace WebCore {
     
     // These button numbers match the ones used in the DOM API, 0 through 2, except for NoButton which isn't specified.
-    enum MouseButton { NoButton = -1, LeftButton, MiddleButton, RightButton };
+    enum MouseButton : int8_t { NoButton = -1, LeftButton, MiddleButton, RightButton };
 
     class PlatformMouseEvent : public PlatformEvent {
     public:
@@ -53,7 +53,7 @@ namespace WebCore {
             , m_button(NoButton)
             , m_clickCount(0)
             , m_modifierFlags(0)
-#if PLATFORM(MAC) && !PLATFORM(IOS)
+#if PLATFORM(MAC)
             , m_eventNumber(0)
 #elif PLATFORM(WIN)
             , m_didActivateWebView(false)
@@ -69,7 +69,7 @@ namespace WebCore {
             , m_button(button)
             , m_clickCount(clickCount)
             , m_modifierFlags(0)
-#if PLATFORM(MAC) && !PLATFORM(IOS)
+#if PLATFORM(MAC)
             , m_eventNumber(0)
 #elif PLATFORM(WIN)
             , m_didActivateWebView(false)
@@ -101,7 +101,7 @@ namespace WebCore {
         PlatformMouseEvent(const Evas_Event_Mouse_Move*, IntPoint);
 #endif
 
-#if PLATFORM(MAC) && !PLATFORM(IOS)
+#if PLATFORM(MAC)
         int eventNumber() const { return m_eventNumber; }
 #endif
 
@@ -121,12 +121,19 @@ namespace WebCore {
         int m_clickCount;
         unsigned m_modifierFlags;
 
-#if PLATFORM(MAC) && !PLATFORM(IOS)
+#if PLATFORM(MAC)
         int m_eventNumber;
 #elif PLATFORM(WIN)
         bool m_didActivateWebView;
 #endif
     };
+
+#if PLATFORM(WIN)
+    // These methods are necessary to work around the fact that MSVC will not find a most-specific
+    // operator== to use after implicitly converting MouseButton to an unsigned short.
+    bool operator==(unsigned short a, MouseButton b);
+    bool operator!=(unsigned short a, MouseButton b);
+#endif
 
 } // namespace WebCore
 

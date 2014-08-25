@@ -2,6 +2,7 @@
  * Copyright (C) 2004, 2005, 2006, 2007, 2008 Nikolas Zimmermann <zimmermann@kde.org>
  * Copyright (C) 2004, 2005, 2006, 2007 Rob Buis <buis@kde.org>
  * Copyright (C) Research In Motion Limited 2010. All rights reserved.
+ * Copyright (C) 2014 Adobe Systems Incorporated. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -20,8 +21,6 @@
  */
 
 #include "config.h"
-
-#if ENABLE(SVG)
 #include "SVGPatternElement.h"
 
 #include "AffineTransform.h"
@@ -41,6 +40,7 @@
 #include "SVGSVGElement.h"
 #include "SVGTransformable.h"
 #include "XLinkNames.h"
+#include <wtf/NeverDestroyed.h>
 
 namespace WebCore {
 
@@ -93,22 +93,22 @@ PassRefPtr<SVGPatternElement> SVGPatternElement::create(const QualifiedName& tag
 
 bool SVGPatternElement::isSupportedAttribute(const QualifiedName& attrName)
 {
-    DEFINE_STATIC_LOCAL(HashSet<QualifiedName>, supportedAttributes, ());
-    if (supportedAttributes.isEmpty()) {
+    static NeverDestroyed<HashSet<QualifiedName>> supportedAttributes;
+    if (supportedAttributes.get().isEmpty()) {
         SVGURIReference::addSupportedAttributes(supportedAttributes);
         SVGTests::addSupportedAttributes(supportedAttributes);
         SVGLangSpace::addSupportedAttributes(supportedAttributes);
         SVGExternalResourcesRequired::addSupportedAttributes(supportedAttributes);
         SVGFitToViewBox::addSupportedAttributes(supportedAttributes);
-        supportedAttributes.add(SVGNames::patternUnitsAttr);
-        supportedAttributes.add(SVGNames::patternContentUnitsAttr);
-        supportedAttributes.add(SVGNames::patternTransformAttr);
-        supportedAttributes.add(SVGNames::xAttr);
-        supportedAttributes.add(SVGNames::yAttr);
-        supportedAttributes.add(SVGNames::widthAttr);
-        supportedAttributes.add(SVGNames::heightAttr);
+        supportedAttributes.get().add(SVGNames::patternUnitsAttr);
+        supportedAttributes.get().add(SVGNames::patternContentUnitsAttr);
+        supportedAttributes.get().add(SVGNames::patternTransformAttr);
+        supportedAttributes.get().add(SVGNames::xAttr);
+        supportedAttributes.get().add(SVGNames::yAttr);
+        supportedAttributes.get().add(SVGNames::widthAttr);
+        supportedAttributes.get().add(SVGNames::heightAttr);
     }
-    return supportedAttributes.contains<SVGAttributeHashTranslator>(attrName);
+    return supportedAttributes.get().contains<SVGAttributeHashTranslator>(attrName);
 }
 
 void SVGPatternElement::parseAttribute(const QualifiedName& name, const AtomicString& value)
@@ -160,12 +160,14 @@ void SVGPatternElement::svgAttributeChanged(const QualifiedName& attrName)
     }
 
     SVGElementInstance::InvalidationGuard invalidationGuard(this);
-    
+
     if (attrName == SVGNames::xAttr
         || attrName == SVGNames::yAttr
         || attrName == SVGNames::widthAttr
-        || attrName == SVGNames::heightAttr)
-        updateRelativeLengthsInformation();
+        || attrName == SVGNames::heightAttr) {
+        invalidateSVGPresentationAttributeStyle();
+        return;
+    }
 
     if (RenderObject* object = renderer())
         object->setNeedsLayout();
@@ -184,7 +186,7 @@ void SVGPatternElement::childrenChanged(const ChildChange& change)
 
 RenderPtr<RenderElement> SVGPatternElement::createElementRenderer(PassRef<RenderStyle> style)
 {
-    return createRenderer<RenderSVGResourcePattern>(*this, std::move(style));
+    return createRenderer<RenderSVGResourcePattern>(*this, WTF::move(style));
 }
 
 static void setPatternAttributes(const SVGPatternElement& element, PatternAttributes& attributes)
@@ -253,14 +255,4 @@ AffineTransform SVGPatternElement::localCoordinateSpaceTransform(SVGLocatable::C
     return matrix;
 }
 
-bool SVGPatternElement::selfHasRelativeLengths() const
-{
-    return x().isRelative()
-        || y().isRelative()
-        || width().isRelative()
-        || height().isRelative();
 }
-
-}
-
-#endif // ENABLE(SVG)

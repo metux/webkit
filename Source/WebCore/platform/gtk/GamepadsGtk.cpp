@@ -26,7 +26,7 @@
 #include "config.h"
 #include "Gamepads.h"
 
-#if ENABLE(GAMEPAD)
+#if ENABLE(GAMEPAD_DEPRECATED)
 
 #include "GamepadDeviceLinux.h"
 #include "GamepadList.h"
@@ -187,7 +187,7 @@ void GamepadsGtk::updateGamepadList(GamepadList* into)
     }
 }
 
-void GamepadsGtk::onUEventCallback(GUdevClient* udevClient, gchar* action, GUdevDevice* device, gpointer data)
+void GamepadsGtk::onUEventCallback(GUdevClient*, gchar* action, GUdevDevice* device, gpointer data)
 {
     if (!isGamepadDevice(device))
         return;
@@ -216,10 +216,10 @@ gboolean GamepadsGtk::isGamepadDevice(GUdevDevice* device)
 
 void sampleGamepads(GamepadList* into)
 {
-    DEFINE_STATIC_LOCAL(GamepadsGtk, gamepadsGtk, (into->length()));
+    DEPRECATED_DEFINE_STATIC_LOCAL(GamepadsGtk, gamepadsGtk, (into->length()));
     gamepadsGtk.updateGamepadList(into);
 }
 
 } // namespace WebCore
 
-#endif // ENABLE(GAMEPAD)
+#endif // ENABLE(GAMEPAD_DEPRECATED)

@@ -29,16 +29,16 @@
 #include <stdint.h>
 
 namespace IPC {
-    class ArgumentDecoder;
-    class ArgumentEncoder;
+class ArgumentDecoder;
+class ArgumentEncoder;
 }
 
 namespace WebKit {
 
-enum LayerHostingMode {
-    LayerHostingModeDefault,
-#if HAVE(LAYER_HOSTING_IN_WINDOW_SERVER)
-    LayerHostingModeInWindowServer
+enum class LayerHostingMode {
+    InProcess,
+#if HAVE(OUT_OF_PROCESS_LAYER_HOSTING)
+    OutOfProcess
 #endif
 };
 
@@ -52,13 +52,7 @@ public:
 
     bool isEmpty() const;
 
-#if PLATFORM(MAC)
-    uint32_t contextID;
-#elif PLATFORM(GTK)
-    uint64_t windowHandle;
-#elif PLATFORM(EFL)
-    uint32_t coordinatedLayerID;
-#endif
+    uint64_t contextID;
 };
 
 bool operator==(const LayerTreeContext&, const LayerTreeContext&);

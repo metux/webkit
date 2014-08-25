@@ -36,6 +36,8 @@
 #include <WebCore/CachedResource.h>
 #include <WebCore/MemoryCache.h>
 #include <WebCore/ResourceBuffer.h>
+#include <WebCore/SessionID.h>
+#include <WebCore/SharedBuffer.h>
 
 #if ENABLE(NETWORK_PROCESS)
 
@@ -65,7 +67,7 @@ void NetworkProcessConnection::didReceiveMessage(IPC::Connection* connection, IP
     didReceiveNetworkProcessConnectionMessage(connection, decoder);
 }
 
-void NetworkProcessConnection::didReceiveSyncMessage(IPC::Connection* connection, IPC::MessageDecoder& decoder, std::unique_ptr<IPC::MessageEncoder>& replyEncoder)
+void NetworkProcessConnection::didReceiveSyncMessage(IPC::Connection*, IPC::MessageDecoder&, std::unique_ptr<IPC::MessageEncoder>&)
 {
     ASSERT_NOT_REACHED();
 }
@@ -81,15 +83,15 @@ void NetworkProcessConnection::didReceiveInvalidMessage(IPC::Connection*, IPC::S
 }
 
 #if ENABLE(SHAREABLE_RESOURCE)
-void NetworkProcessConnection::didCacheResource(const ResourceRequest& request, const ShareableResource::Handle& handle)
+void NetworkProcessConnection::didCacheResource(const ResourceRequest& request, const ShareableResource::Handle& handle, SessionID sessionID)
 {
-    CachedResource* resource = memoryCache()->resourceForRequest(request);
+    CachedResource* resource = memoryCache()->resourceForRequest(request, sessionID);
     if (!resource)
         return;
     
     RefPtr<SharedBuffer> buffer = handle.tryWrapInSharedBuffer();
     if (!buffer) {
-        LOG_ERROR("Unabled to create SharedBuffer from ShareableResource handle for resource url %s", request.url().string().utf8().data());
+        LOG_ERROR("Unable to create SharedBuffer from ShareableResource handle for resource url %s", request.url().string().utf8().data());
         return;
     }
 

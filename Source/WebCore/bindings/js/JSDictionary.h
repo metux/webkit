@@ -30,7 +30,7 @@
 #include <heap/Strong.h>
 #include <heap/StrongInlines.h>
 #include <interpreter/CallFrame.h>
-#include <runtime/Operations.h>
+#include <runtime/JSCInlines.h>
 #include <runtime/Uint8Array.h>
 #include <wtf/Forward.h>
 
@@ -46,6 +46,7 @@ class Dictionary;
 class DOMError;
 class DOMWindow;
 class EventTarget;
+class Gamepad;
 class MediaKeyError;
 class MediaStream;
 class MediaStreamTrack;
@@ -54,10 +55,6 @@ class SerializedScriptValue;
 class Storage;
 class TrackBase;
 class VoidCallback;
-
-#if ENABLE(SCRIPTED_SPEECH)
-class SpeechRecognitionResultList;
-#endif
 
 class JSDictionary {
 public:
@@ -137,8 +134,8 @@ private:
     static void convertValue(JSC::ExecState*, JSC::JSValue, RefPtr<DOMError>& result);
     static void convertValue(JSC::ExecState*, JSC::JSValue, RefPtr<VoidCallback>& result);
 #endif
-#if ENABLE(SCRIPTED_SPEECH)
-    static void convertValue(JSC::ExecState*, JSC::JSValue, RefPtr<SpeechRecognitionResultList>&);
+#if ENABLE(GAMEPAD)
+    static void convertValue(JSC::ExecState*, JSC::JSValue, RefPtr<Gamepad>&);
 #endif
 
     JSC::ExecState* m_exec;

@@ -10,7 +10,7 @@
  * 2.  Redistributions in binary form must reproduce the above copyright
  *     notice, this list of conditions and the following disclaimer in the
  *     documentation and/or other materials provided with the distribution.
- * 3.  Neither the name of Apple Computer, Inc. ("Apple") nor the names of
+ * 3.  Neither the name of Apple Inc. ("Apple") nor the names of
  *     its contributors may be used to endorse or promote products derived
  *     from this software without specific prior written permission.
  *
@@ -136,7 +136,7 @@ AccessibilityObject* AccessibilityListBox::listBoxOptionAccessibilityObject(HTML
 {
     // skip hr elements
     if (!element || element->hasTagName(hrTag))
-        return 0;
+        return nullptr;
     
     AccessibilityObject* listBoxObject = m_renderer->document().axObjectCache()->getOrCreate(ListBoxOptionRole);
     toAccessibilityListBoxOption(listBoxObject)->setHTMLElement(element);
@@ -149,15 +149,15 @@ AccessibilityObject* AccessibilityListBox::elementAccessibilityHitTest(const Int
     // the internal HTMLSelectElement methods for returning a listbox option at a point
     // ignore optgroup elements.
     if (!m_renderer)
-        return 0;
+        return nullptr;
     
     Node* node = m_renderer->node();
     if (!node)
-        return 0;
+        return nullptr;
     
     LayoutRect parentRect = boundingBoxRect();
     
-    AccessibilityObject* listBoxOption = 0;
+    AccessibilityObject* listBoxOption = nullptr;
     unsigned length = m_children.size();
     for (unsigned i = 0; i < length; i++) {
         LayoutRect rect = toRenderListBox(m_renderer)->itemBoundingBoxRect(parentRect.location(), i);

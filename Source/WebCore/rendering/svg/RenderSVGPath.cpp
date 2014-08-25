@@ -26,8 +26,6 @@
  */
 
 #include "config.h"
-
-#if ENABLE(SVG)
 #include "RenderSVGPath.h"
 
 #include "SVGPathElement.h"
@@ -36,7 +34,7 @@
 namespace WebCore {
 
 RenderSVGPath::RenderSVGPath(SVGGraphicsElement& element, PassRef<RenderStyle> style)
-    : RenderSVGShape(element, std::move(style))
+    : RenderSVGShape(element, WTF::move(style))
 {
 }
 
@@ -133,7 +131,7 @@ bool RenderSVGPath::shouldStrokeZeroLengthSubpath() const
 
 Path* RenderSVGPath::zeroLengthLinecapPath(const FloatPoint& linecapPosition) const
 {
-    DEFINE_STATIC_LOCAL(Path, tempPath, ());
+    DEPRECATED_DEFINE_STATIC_LOCAL(Path, tempPath, ());
 
     tempPath.clear();
     if (style().svgStyle().capStyle() == SquareCap)
@@ -161,6 +159,11 @@ void RenderSVGPath::updateZeroLengthSubpaths()
     subpathData.pathIsDone();
 }
 
+bool RenderSVGPath::isRenderingDisabled() const
+{
+    // For a polygon, polyline or path, rendering is disabled if there is no path data.
+    // No path data is possible in the case of a missing or empty 'd' or 'points' attribute.
+    return path().isEmpty();
 }
 
-#endif // ENABLE(SVG)
+}

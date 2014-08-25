@@ -26,10 +26,9 @@
 #ifndef TestInvocation_h
 #define TestInvocation_h
 
+#include <WebKit/WKRetainPtr.h>
 #include <string>
-#include <WebKit2/WKRetainPtr.h>
 #include <wtf/Noncopyable.h>
-#include <wtf/OwnPtr.h>
 #include <wtf/text/StringBuilder.h>
 
 namespace WTR {
@@ -39,6 +38,9 @@ class TestInvocation {
 public:
     explicit TestInvocation(const std::string& pathOrURL);
     ~TestInvocation();
+
+    WKURLRef url() const;
+    const char* pathOrURL() const { return m_pathOrURL.c_str(); }
 
     void setIsPixelTest(const std::string& expectedPixelHash);
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2007, 2008, 2009 Apple Inc. All rights reserved.
+ * Copyright (C) 2007, 2008, 2009, 2014 Apple Inc. All rights reserved.
  * Copyright (C) 2008 Cameron Zwarich (cwzwarich@uwaterloo.ca)
  *
  * Redistribution and use in source and binary forms, with or without
@@ -7,13 +7,13 @@
  * are met:
  *
  * 1.  Redistributions of source code must retain the above copyright
- *     notice, this list of conditions and the following disclaimer. 
+ *     notice, this list of conditions and the following disclaimer.
  * 2.  Redistributions in binary form must reproduce the above copyright
  *     notice, this list of conditions and the following disclaimer in the
- *     documentation and/or other materials provided with the distribution. 
- * 3.  Neither the name of Apple Computer, Inc. ("Apple") nor the names of
+ *     documentation and/or other materials provided with the distribution.
+ * 3.  Neither the name of Apple Inc. ("Apple") nor the names of
  *     its contributors may be used to endorse or promote products derived
- *     from this software without specific prior written permission. 
+ *     from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY APPLE AND ITS CONTRIBUTORS "AS IS" AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
@@ -41,6 +41,7 @@
 #include "BooleanPrototype.h"
 #include "CodeBlock.h"
 #include "CodeCache.h"
+#include "ConsolePrototype.h"
 #include "DateConstructor.h"
 #include "DatePrototype.h"
 #include "Debugger.h"
@@ -60,9 +61,11 @@
 #include "JSArrayBufferPrototype.h"
 #include "JSArrayIterator.h"
 #include "JSBoundFunction.h"
+#include "JSCInlines.h"
 #include "JSCallbackConstructor.h"
 #include "JSCallbackFunction.h"
 #include "JSCallbackObject.h"
+#include "JSConsole.h"
 #include "JSDataView.h"
 #include "JSDataViewPrototype.h"
 #include "JSFunction.h"
@@ -100,7 +103,6 @@
 #include "ObjCCallbackFunction.h"
 #include "ObjectConstructor.h"
 #include "ObjectPrototype.h"
-#include "Operations.h"
 #include "ParserError.h"
 #include "RegExpConstructor.h"
 #include "RegExpMatchesArray.h"
@@ -113,6 +115,7 @@
 #include "StrictEvalActivation.h"
 #include "StringConstructor.h"
 #include "StringPrototype.h"
+#include "VariableWatchpointSetInlines.h"
 #include "WeakMapConstructor.h"
 #include "WeakMapPrototype.h"
 
@@ -124,14 +127,19 @@
 
 #if ENABLE(REMOTE_INSPECTOR)
 #include "JSGlobalObjectDebuggable.h"
-#include "RemoteInspector.h"
+#include "JSGlobalObjectInspectorController.h"
+#endif
+
+#if ENABLE(WEB_REPLAY)
+#include "EmptyInputCursor.h"
+#include "JSReplayInputs.h"
 #endif
 
 #include "JSGlobalObject.lut.h"
 
 namespace JSC {
 
-const ClassInfo JSGlobalObject::s_info = { "GlobalObject", &Base::s_info, 0, ExecState::globalObjectTable, CREATE_METHOD_TABLE(JSGlobalObject) };
+const ClassInfo JSGlobalObject::s_info = { "GlobalObject", &Base::s_info, &globalObjectTable, CREATE_METHOD_TABLE(JSGlobalObject) };
 
 const GlobalObjectMethodTable JSGlobalObject::s_globalObjectMethodTable = { &allowsAccessFrom, &supportsProfiling, &supportsRichSourceInfo, &shouldInterruptScript, &javaScriptExperimentsEnabled, 0, &shouldInterruptScriptBeforeTimeout };
 
@@ -152,17 +160,27 @@ const GlobalObjectMethodTable JSGlobalObject::s_globalObjectMethodTable = { &all
 
 JSGlobalObject::JSGlobalObject(VM& vm, Structure* structure, const GlobalObjectMethodTable* globalObjectMethodTable)
     : Base(vm, structure, 0)
+    , m_vm(vm)
+#if ENABLE(WEB_REPLAY)
+    , m_inputCursor(EmptyInputCursor::create())
+#endif
     , m_masqueradesAsUndefinedWatchpoint(adoptRef(new WatchpointSet(IsWatched)))
     , m_havingABadTimeWatchpoint(adoptRef(new WatchpointSet(IsWatched)))
     , m_varInjectionWatchpoint(adoptRef(new WatchpointSet(IsWatched)))
     , m_weakRandom(Options::forceWeakRandomSeed() ? Options::forcedWeakRandomSeed() : static_cast<unsigned>(randomNumber() * (std::numeric_limits<unsigned>::max() + 1.0)))
     , m_evalEnabled(true)
+    , m_experimentsEnabled(false)
+    , m_consoleClient(nullptr)
     , m_globalObjectMethodTable(globalObjectMethodTable ? globalObjectMethodTable : &s_globalObjectMethodTable)
 {
 }
 
 JSGlobalObject::~JSGlobalObject()
 {
+#if ENABLE(REMOTE_INSPECTOR)
+    m_inspectorController->globalObjectDestroyed();
+#endif
+
     if (m_debugger)
         m_debugger->detach(this, Debugger::GlobalObjectIsDestructing);
 
@@ -176,23 +194,24 @@ void JSGlobalObject::destroy(JSCell* cell)
 }
 
 void JSGlobalObject::setGlobalThis(VM& vm, JSObject* globalThis)
-{ 
+{
     m_globalThis.set(vm, this, globalThis);
 }
 
-void JSGlobalObject::init(JSObject* thisValue)
+void JSGlobalObject::init()
 {
     ASSERT(vm().currentThreadIsHoldingAPILock());
 
-    setGlobalThis(vm(), thisValue);
     JSGlobalObject::globalExec()->init(0, 0, this, CallFrame::noCaller(), 0, 0);
 
     m_debugger = 0;
 
 #if ENABLE(REMOTE_INSPECTOR)
+    m_inspectorController = std::make_unique<Inspector::JSGlobalObjectInspectorController>(*this);
     m_inspectorDebuggable = std::make_unique<JSGlobalObjectDebuggable>(*this);
     m_inspectorDebuggable->init();
     m_inspectorDebuggable->setRemoteDebuggingAllowed(true);
+    m_consoleClient = m_inspectorController->consoleClient();
 #endif
 
     reset(prototype());
@@ -224,7 +243,7 @@ JSGlobalObject::NewGlobalVar JSGlobalObject::addGlobalVar(const Identifier& iden
     int index = symbolTable()->size(locker);
     SymbolTableEntry newEntry(index, (constantMode == IsConstant) ? ReadOnly : 0);
     if (constantMode == IsVariable)
-        newEntry.prepareToWatch();
+        newEntry.prepareToWatch(symbolTable());
     SymbolTable::Map::AddResult result = symbolTable()->add(locker, ident.impl(), newEntry);
     if (result.isNewEntry)
         addRegisters(1);
@@ -238,11 +257,12 @@ JSGlobalObject::NewGlobalVar JSGlobalObject::addGlobalVar(const Identifier& iden
 
 void JSGlobalObject::addFunction(ExecState* exec, const Identifier& propertyName, JSValue value)
 {
-    removeDirect(exec->vm(), propertyName); // Newly declared functions overwrite existing properties.
+    VM& vm = exec->vm();
+    removeDirect(vm, propertyName); // Newly declared functions overwrite existing properties.
     NewGlobalVar var = addGlobalVar(propertyName, IsVariable);
     registerAt(var.registerNumber).set(exec->vm(), this, value);
     if (var.set)
-        var.set->notifyWrite(value);
+        var.set->notifyWrite(vm, value, VariableWriteFireDetail(this, propertyName));
 }
 
 static inline JSObject* lastInPrototypeChain(JSObject* object)
@@ -261,7 +281,7 @@ void JSGlobalObject::reset(JSValue prototype)
     m_functionPrototype.set(vm, this, FunctionPrototype::create(vm, FunctionPrototype::createStructure(vm, this, jsNull()))); // The real prototype will be set once ObjectPrototype is created.
     m_functionStructure.set(vm, this, JSFunction::createStructure(vm, this, m_functionPrototype.get()));
     m_boundFunctionStructure.set(vm, this, JSBoundFunction::createStructure(vm, this, m_functionPrototype.get()));
-    m_namedFunctionStructure.set(vm, this, Structure::addPropertyTransition(vm, m_functionStructure.get(), vm.propertyNames->name, DontDelete | ReadOnly | DontEnum, 0, m_functionNameOffset));
+    m_namedFunctionStructure.set(vm, this, Structure::addPropertyTransition(vm, m_functionStructure.get(), vm.propertyNames->name, DontDelete | ReadOnly | DontEnum, m_functionNameOffset));
     m_internalFunctionStructure.set(vm, this, InternalFunction::createStructure(vm, this, m_functionPrototype.get()));
     JSFunction* callFunction = 0;
     JSFunction* applyFunction = 0;
@@ -346,7 +366,8 @@ void JSGlobalObject::reset(JSValue prototype)
 
     // Constructors
 
-    JSCell* objectConstructor = ObjectConstructor::create(vm, ObjectConstructor::createStructure(vm, this, m_functionPrototype.get()), m_objectPrototype.get());
+    ObjectConstructor* objectConstructor = ObjectConstructor::create(vm, ObjectConstructor::createStructure(vm, this, m_functionPrototype.get()), m_objectPrototype.get());
+    m_objectConstructor.set(vm, this, objectConstructor);
     JSCell* functionConstructor = FunctionConstructor::create(vm, FunctionConstructor::createStructure(vm, this, m_functionPrototype.get()), m_functionPrototype.get());
     JSCell* arrayConstructor = ArrayConstructor::create(vm, ArrayConstructor::createStructure(vm, this, m_functionPrototype.get()), m_arrayPrototype.get());
 
@@ -370,7 +391,9 @@ void JSGlobalObject::reset(JSValue prototype)
     m_syntaxErrorConstructor.set(vm, this, NativeErrorConstructor::create(vm, this, nativeErrorStructure, nativeErrorPrototypeStructure, ASCIILiteral("SyntaxError")));
     m_typeErrorConstructor.set(vm, this, NativeErrorConstructor::create(vm, this, nativeErrorStructure, nativeErrorPrototypeStructure, ASCIILiteral("TypeError")));
     m_URIErrorConstructor.set(vm, this, NativeErrorConstructor::create(vm, this, nativeErrorStructure, nativeErrorPrototypeStructure, ASCIILiteral("URIError")));
+#if ENABLE(PROMISES)
     m_promiseConstructor.set(vm, this, JSPromiseConstructor::create(vm, JSPromiseConstructor::createStructure(vm, this, m_functionPrototype.get()), m_promisePrototype.get()));
+#endif
 
     m_objectPrototype->putDirectWithoutTransition(vm, vm.propertyNames->constructor, objectConstructor, DontEnum);
     m_functionPrototype->putDirectWithoutTransition(vm, vm.propertyNames->constructor, functionConstructor, DontEnum);
@@ -390,20 +413,22 @@ void JSGlobalObject::reset(JSValue prototype)
     putDirectWithoutTransition(vm, vm.propertyNames->SyntaxError, m_syntaxErrorConstructor.get(), DontEnum);
     putDirectWithoutTransition(vm, vm.propertyNames->TypeError, m_typeErrorConstructor.get(), DontEnum);
     putDirectWithoutTransition(vm, vm.propertyNames->URIError, m_URIErrorConstructor.get(), DontEnum);
+#if ENABLE(PROMISES)
     putDirectWithoutTransition(vm, vm.propertyNames->Promise, m_promiseConstructor.get(), DontEnum);
+#endif
 
 
 #define PUT_CONSTRUCTOR_FOR_SIMPLE_TYPE(capitalName, lowerName, properName, instanceType, jsName) \
     putDirectWithoutTransition(vm, vm.propertyNames-> jsName, lowerName ## Constructor, DontEnum); \
 
-    FOR_EACH_SIMPLE_BUILTIN_TYPE(PUT_CONSTRUCTOR_FOR_SIMPLE_TYPE)
+    FOR_EACH_SIMPLE_BUILTIN_TYPE_WITH_CONSTRUCTOR(PUT_CONSTRUCTOR_FOR_SIMPLE_TYPE)
 
 #undef PUT_CONSTRUCTOR_FOR_SIMPLE_TYPE
     PrototypeMap& prototypeMap = vm.prototypeMap;
     Structure* iteratorResultStructure = prototypeMap.emptyObjectStructureForPrototype(m_objectPrototype.get(), JSFinalObject::defaultInlineCapacity());
     PropertyOffset offset;
-    iteratorResultStructure = Structure::addPropertyTransition(vm, iteratorResultStructure, vm.propertyNames->done, 0, 0, offset);
-    iteratorResultStructure = Structure::addPropertyTransition(vm, iteratorResultStructure, vm.propertyNames->value, 0, 0, offset);
+    iteratorResultStructure = Structure::addPropertyTransition(vm, iteratorResultStructure, vm.propertyNames->done, 0, offset);
+    iteratorResultStructure = Structure::addPropertyTransition(vm, iteratorResultStructure, vm.propertyNames->value, 0, offset);
     m_iteratorResultStructure.set(vm, this, iteratorResultStructure);
 
     m_evalFunction.set(vm, this, JSFunction::create(vm, this, 1, vm.propertyNames->eval.string(), globalFuncEval));
@@ -428,11 +453,16 @@ void JSGlobalObject::reset(JSValue prototype)
         m_typedArrays[typedArrayIndex].prototype->putDirectWithoutTransition(vm, vm.propertyNames->constructor, typedArrayConstructors[typedArrayIndex], DontEnum);
         putDirectWithoutTransition(vm, Identifier(exec, typedArrayConstructors[typedArrayIndex]->name(exec)), typedArrayConstructors[typedArrayIndex], DontEnum);
     }
-
+    
+    JSFunction* builtinLog = JSFunction::create(vm, this, 1, vm.propertyNames->emptyIdentifier.string(), globalFuncBuiltinLog);
     GlobalPropertyInfo staticGlobals[] = {
         GlobalPropertyInfo(vm.propertyNames->NaN, jsNaN(), DontEnum | DontDelete | ReadOnly),
         GlobalPropertyInfo(vm.propertyNames->Infinity, jsNumber(std::numeric_limits<double>::infinity()), DontEnum | DontDelete | ReadOnly),
-        GlobalPropertyInfo(vm.propertyNames->undefinedKeyword, jsUndefined(), DontEnum | DontDelete | ReadOnly)
+        GlobalPropertyInfo(vm.propertyNames->undefinedKeyword, jsUndefined(), DontEnum | DontDelete | ReadOnly),
+        GlobalPropertyInfo(vm.propertyNames->undefinedPrivateName, jsUndefined(), DontEnum | DontDelete | ReadOnly),
+        GlobalPropertyInfo(vm.propertyNames->ObjectPrivateName, objectConstructor, DontEnum | DontDelete | ReadOnly),
+        GlobalPropertyInfo(vm.propertyNames->TypeErrorPrivateName, m_typeErrorConstructor.get(), DontEnum | DontDelete | ReadOnly),
+        GlobalPropertyInfo(vm.propertyNames->BuiltinLogPrivateName, builtinLog, DontEnum | DontDelete | ReadOnly)
     };
     addStaticGlobals(staticGlobals, WTF_ARRAY_LENGTH(staticGlobals));
     
@@ -440,6 +470,11 @@ void JSGlobalObject::reset(JSValue prototype)
     m_specialPointers[Special::ApplyFunction] = m_applyFunction.get();
     m_specialPointers[Special::ObjectConstructor] = objectConstructor;
     m_specialPointers[Special::ArrayConstructor] = arrayConstructor;
+
+    ConsolePrototype* consolePrototype = ConsolePrototype::create(vm, this, ConsolePrototype::createStructure(vm, this, m_objectPrototype.get()));
+    m_consoleStructure.set(vm, this, JSConsole::createStructure(vm, this, consolePrototype));
+    JSConsole* consoleObject = JSConsole::create(vm, m_consoleStructure.get());
+    putDirectWithoutTransition(vm, Identifier(exec, "console"), consoleObject, DontEnum);
 
     if (m_experimentsEnabled) {
         NamePrototype* privateNamePrototype = NamePrototype::create(exec, NamePrototype::createStructure(vm, this, m_objectPrototype.get()));
@@ -476,10 +511,10 @@ ObjectsWithBrokenIndexingFinder::ObjectsWithBrokenIndexingFinder(
 inline bool hasBrokenIndexing(JSObject* object)
 {
     // This will change if we have more indexing types.
-    IndexingType type = object->structure()->indexingType();
+    IndexingType type = object->indexingType();
     // This could be made obviously more efficient, but isn't made so right now, because
     // we expect this to be an unlikely slow path anyway.
-    return hasUndecided(type) || hasInt32(type) || hasDouble(type) || hasContiguous(type) || hasFastArrayStorage(type);
+    return hasUndecided(type) || hasInt32(type) || hasDouble(type) || hasContiguous(type) || hasArrayStorage(type);
 }
 
 void ObjectsWithBrokenIndexingFinder::operator()(JSCell* cell)
@@ -526,7 +561,7 @@ void JSGlobalObject::haveABadTime(VM& vm)
     // Make sure that all allocations or indexed storage transitions that are inlining
     // the assumption that it's safe to transition to a non-SlowPut array storage don't
     // do so anymore.
-    m_havingABadTimeWatchpoint->fireAll();
+    m_havingABadTimeWatchpoint->fireAll("Having a bad time");
     ASSERT(isHavingABadTime()); // The watchpoint is what tells us that we're having a bad time.
     
     // Make sure that all JSArray allocations that load the appropriate structure from
@@ -552,20 +587,20 @@ void JSGlobalObject::haveABadTime(VM& vm)
 
 bool JSGlobalObject::objectPrototypeIsSane()
 {
-    return !hasIndexedProperties(m_objectPrototype->structure()->indexingType())
+    return !hasIndexedProperties(m_objectPrototype->indexingType())
         && m_objectPrototype->prototype().isNull();
 }
 
 bool JSGlobalObject::arrayPrototypeChainIsSane()
 {
-    return !hasIndexedProperties(m_arrayPrototype->structure()->indexingType())
+    return !hasIndexedProperties(m_arrayPrototype->indexingType())
         && m_arrayPrototype->prototype() == m_objectPrototype.get()
         && objectPrototypeIsSane();
 }
 
 bool JSGlobalObject::stringPrototypeChainIsSane()
 {
-    return !hasIndexedProperties(m_stringPrototype->structure()->indexingType())
+    return !hasIndexedProperties(m_stringPrototype->indexingType())
         && m_stringPrototype->prototype() == m_objectPrototype.get()
         && objectPrototypeIsSane();
 }
@@ -588,14 +623,15 @@ void JSGlobalObject::resetPrototype(VM& vm, JSValue prototype)
     JSObject* objectPrototype = m_objectPrototype.get();
     if (oldLastInPrototypeChain != objectPrototype)
         oldLastInPrototypeChain->setPrototype(vm, objectPrototype);
+
+    // Whenever we change the prototype of the global object, we need to create a new JSProxy with the correct prototype.
+    setGlobalThis(vm, JSProxy::create(vm, JSProxy::createStructure(vm, this, prototype, PureForwardingProxyType), this));
 }
 
 void JSGlobalObject::visitChildren(JSCell* cell, SlotVisitor& visitor)
 { 
     JSGlobalObject* thisObject = jsCast<JSGlobalObject*>(cell);
     ASSERT_GC_OBJECT_INHERITS(thisObject, info());
-    COMPILE_ASSERT(StructureFlags & OverridesVisitChildren, OverridesVisitChildrenWithoutSettingFlag);
-    ASSERT(thisObject->structure()->typeInfo().overridesVisitChildren());
     Base::visitChildren(thisObject, visitor);
 
     visitor.append(&thisObject->m_globalThis);
@@ -608,7 +644,10 @@ void JSGlobalObject::visitChildren(JSCell* cell, SlotVisitor& visitor)
     visitor.append(&thisObject->m_syntaxErrorConstructor);
     visitor.append(&thisObject->m_typeErrorConstructor);
     visitor.append(&thisObject->m_URIErrorConstructor);
+    visitor.append(&thisObject->m_objectConstructor);
+#if ENABLE(PROMISES)
     visitor.append(&thisObject->m_promiseConstructor);
+#endif
 
     visitor.append(&thisObject->m_evalFunction);
     visitor.append(&thisObject->m_callFunction);
@@ -648,6 +687,7 @@ void JSGlobalObject::visitChildren(JSCell* cell, SlotVisitor& visitor)
     visitor.append(&thisObject->m_privateNameStructure);
     visitor.append(&thisObject->m_regExpMatchesArrayStructure);
     visitor.append(&thisObject->m_regExpStructure);
+    visitor.append(&thisObject->m_consoleStructure);
     visitor.append(&thisObject->m_internalFunctionStructure);
 
 #if ENABLE(PROMISES)
@@ -698,7 +738,7 @@ void JSGlobalObject::addStaticGlobals(GlobalPropertyInfo* globals, int count)
 bool JSGlobalObject::getOwnPropertySlot(JSObject* object, ExecState* exec, PropertyName propertyName, PropertySlot& slot)
 {
     JSGlobalObject* thisObject = jsCast<JSGlobalObject*>(object);
-    if (getStaticFunctionSlot<Base>(exec, ExecState::globalObjectTable(exec->vm()), thisObject, propertyName, slot))
+    if (getStaticFunctionSlot<Base>(exec, globalObjectTable, thisObject, propertyName, slot))
         return true;
     return symbolTableGet(thisObject, propertyName, slot);
 }
@@ -769,6 +809,24 @@ bool JSGlobalObject::remoteDebuggingEnabled() const
     return false;
 #endif
 }
+
+#if ENABLE(WEB_REPLAY)
+void JSGlobalObject::setInputCursor(PassRefPtr<InputCursor> prpCursor)
+{
+    m_inputCursor = prpCursor;
+    ASSERT(m_inputCursor);
+
+    InputCursor& cursor = inputCursor();
+    // Save or set the random seed. This performed here rather than the constructor
+    // to avoid threading the input cursor through all the abstraction layers.
+    if (cursor.isCapturing())
+        cursor.appendInput<SetRandomSeed>(m_weakRandom.seedUnsafe());
+    else if (cursor.isReplaying()) {
+        if (SetRandomSeed* input = cursor.fetchInput<SetRandomSeed>())
+            m_weakRandom.initializeSeed(static_cast<unsigned>(input->randomSeed()));
+    }
+}
+#endif
 
 void JSGlobalObject::setName(const String& name)
 {

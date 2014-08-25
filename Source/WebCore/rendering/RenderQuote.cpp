@@ -32,7 +32,7 @@ using namespace WTF::Unicode;
 namespace WebCore {
 
 RenderQuote::RenderQuote(Document& document, PassRef<RenderStyle> style, QuoteType quote)
-    : RenderInline(document, std::move(style))
+    : RenderInline(document, WTF::move(style))
     , m_type(quote)
     , m_depth(-1)
     , m_next(0)
@@ -343,7 +343,7 @@ void RenderQuote::updateText()
     if (m_text == text)
         return;
 
-    while (RenderObject* child = firstChild())
+    while (RenderObject* child = lastChild())
         child->destroy();
 
     if (text == emptyString() || text == String()) {

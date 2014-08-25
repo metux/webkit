@@ -46,6 +46,8 @@ void WKBundleInspectorShow(WKBundleInspectorRef inspectorRef)
 {
 #if ENABLE(INSPECTOR)
     toImpl(inspectorRef)->show();
+#else
+    UNUSED_PARAM(inspectorRef);
 #endif
 }
 
@@ -53,13 +55,18 @@ void WKBundleInspectorClose(WKBundleInspectorRef inspectorRef)
 {
 #if ENABLE(INSPECTOR)
     toImpl(inspectorRef)->close();
+#else
+    UNUSED_PARAM(inspectorRef);
 #endif
 }
 
-void WKBundleInspectorEvaluateScriptForTest(WKBundleInspectorRef inspectorRef, long callID, WKStringRef script)
+void WKBundleInspectorEvaluateScriptForTest(WKBundleInspectorRef inspectorRef, WKStringRef script)
 {
 #if ENABLE(INSPECTOR)
-    toImpl(inspectorRef)->evaluateScriptForTest(callID, toWTFString(script));
+    toImpl(inspectorRef)->evaluateScriptForTest(toWTFString(script));
+#else
+    UNUSED_PARAM(script);
+    UNUSED_PARAM(inspectorRef);
 #endif
 }
 
@@ -70,5 +77,8 @@ void WKBundleInspectorSetPageProfilingEnabled(WKBundleInspectorRef inspectorRef,
         toImpl(inspectorRef)->startPageProfiling();
     else
         toImpl(inspectorRef)->stopPageProfiling();
+#else
+    UNUSED_PARAM(enabled);
+    UNUSED_PARAM(inspectorRef);
 #endif
 }

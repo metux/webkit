@@ -3,6 +3,7 @@
  * Copyright (C) 2007 Collabora Ltd. All rights reserved.
  * Copyright (C) 2007 Alp Toker <alp@atoker.com>
  * Copyright (C) 2009, 2010 Igalia S.L
+ * Copyright (C) 2014 Cable Television Laboratories, Inc.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -32,6 +33,11 @@
 #include <gst/gst.h>
 #include <gst/pbutils/install-plugins.h>
 #include <wtf/Forward.h>
+#include <wtf/gobject/GMainLoopSource.h>
+
+#if ENABLE(VIDEO_TRACK) && USE(GSTREAMER_MPEGTS)
+#include <wtf/text/AtomicStringHash.h>
+#endif
 
 #if ENABLE(MEDIA_SOURCE)
 #include "MediaSourceGStreamer.h"
@@ -40,10 +46,12 @@
 typedef struct _GstBuffer GstBuffer;
 typedef struct _GstMessage GstMessage;
 typedef struct _GstElement GstElement;
+typedef struct _GstMpegtsSection GstMpegtsSection;
 
 namespace WebCore {
 
 class AudioTrackPrivateGStreamer;
+class InbandMetadataTextTrackPrivateGStreamer;
 class InbandTextTrackPrivateGStreamer;
 class VideoTrackPrivateGStreamer;
 
@@ -59,7 +67,7 @@ public:
 
     void load(const String &url);
 #if ENABLE(MEDIA_SOURCE)
-    void load(const String& url, PassRefPtr<HTMLMediaSource>);
+    void load(const String& url, MediaSourcePrivateClient*);
 #endif
     void commitLoad();
     void cancelLoad();
@@ -81,7 +89,7 @@ public:
     void setPreload(MediaPlayer::Preload);
     void fillTimerFired(Timer<MediaPlayerPrivateGStreamer>*);
 
-    PassRefPtr<TimeRanges> buffered() const;
+    std::unique_ptr<PlatformTimeRanges> buffered() const;
     float maxTimeSeekable() const;
     bool didLoadingProgress() const;
     unsigned totalBytes() const;
@@ -142,6 +150,9 @@ private:
 
     void setDownloadBuffering();
     void processBufferingStats(GstMessage*);
+#if ENABLE(VIDEO_TRACK) && USE(GSTREAMER_MPEGTS)
+    void processMpegTsSection(GstMpegtsSection*);
+#endif
 #if ENABLE(VIDEO_TRACK)
     void processTableOfContents(GstMessage*);
     void processTableOfContentsEntry(GstTocEntry*, GstTocEntry* parent);
@@ -170,10 +181,11 @@ private:
     int m_mediaLocationCurrentIndex;
     bool m_resetPipeline;
     bool m_paused;
+    bool m_playbackRatePause;
     bool m_seeking;
     bool m_seekIsPending;
     float m_timeOfOverlappingSeek;
-    bool m_canFallBackToLastFinishedSeekPositon;
+    bool m_canFallBackToLastFinishedSeekPosition;
     bool m_buffering;
     float m_playbackRate;
     float m_lastPlaybackRate;
@@ -190,11 +202,11 @@ private:
     bool m_volumeAndMuteInitialized;
     bool m_hasVideo;
     bool m_hasAudio;
-    guint m_audioTimerHandler;
-    guint m_textTimerHandler;
-    guint m_videoTimerHandler;
-    guint m_videoCapsTimerHandler;
-    guint m_readyTimerHandler;
+    GMainLoopSource m_audioTimerHandler;
+    GMainLoopSource m_textTimerHandler;
+    GMainLoopSource m_videoTimerHandler;
+    GMainLoopSource m_videoCapsTimerHandler;
+    GMainLoopSource m_readyTimerHandler;
     mutable long m_totalBytes;
     URL m_url;
     bool m_preservesPitch;
@@ -205,10 +217,13 @@ private:
     Vector<RefPtr<AudioTrackPrivateGStreamer>> m_audioTracks;
     Vector<RefPtr<InbandTextTrackPrivateGStreamer>> m_textTracks;
     Vector<RefPtr<VideoTrackPrivateGStreamer>> m_videoTracks;
-    RefPtr<InbandTextTrackPrivate> m_chaptersTrack;
+    RefPtr<InbandMetadataTextTrackPrivateGStreamer> m_chaptersTrack;
+#endif
+#if ENABLE(VIDEO_TRACK) && USE(GSTREAMER_MPEGTS)
+    HashMap<AtomicString, RefPtr<InbandMetadataTextTrackPrivateGStreamer>> m_metadataTracks;
 #endif
 #if ENABLE(MEDIA_SOURCE)
-    RefPtr<HTMLMediaSource> m_mediaSource;
+    RefPtr<MediaSourcePrivateClient> m_mediaSource;
 #endif
 };
 }

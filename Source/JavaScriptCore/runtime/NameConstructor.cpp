@@ -28,13 +28,13 @@
 
 #include "JSGlobalObject.h"
 #include "NamePrototype.h"
-#include "Operations.h"
+#include "JSCInlines.h"
 
 namespace JSC {
 
 STATIC_ASSERT_IS_TRIVIALLY_DESTRUCTIBLE(NameConstructor);
 
-const ClassInfo NameConstructor::s_info = { "Function", &Base::s_info, 0, 0, CREATE_METHOD_TABLE(NameConstructor) };
+const ClassInfo NameConstructor::s_info = { "Function", &Base::s_info, 0, CREATE_METHOD_TABLE(NameConstructor) };
 
 NameConstructor::NameConstructor(VM& vm, Structure* structure)
     : InternalFunction(vm, structure)

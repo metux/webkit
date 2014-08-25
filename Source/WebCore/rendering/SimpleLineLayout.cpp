@@ -46,7 +46,6 @@
 #include "Text.h"
 #include "TextPaintStyle.h"
 #include "break_lines.h"
-#include <wtf/unicode/Unicode.h>
 
 namespace WebCore {
 namespace SimpleLineLayout {
@@ -90,11 +89,6 @@ static bool canUseForText(const RenderText& textRenderer, const SimpleFontData& 
 
 bool canUseFor(const RenderBlockFlow& flow)
 {
-#if !PLATFORM(MAC) && !PLATFORM(GTK) && !PLATFORM(EFL)
-    // FIXME: Non-mac platforms are hitting ASSERT(run.charactersLength() >= run.length())
-    // https://bugs.webkit.org/show_bug.cgi?id=123338
-    return false;
-#else
     if (!flow.frame().settings().simpleLineLayoutEnabled())
         return false;
     if (!flow.firstChild())
@@ -109,6 +103,9 @@ bool canUseFor(const RenderBlockFlow& flow)
         return false;
     if (flow.flowThreadState() != RenderObject::NotInsideFlowThread)
         return false;
+    // Printing does pagination without a flow thread.
+    if (flow.document().paginated())
+        return false;
     if (flow.hasOutline())
         return false;
     if (flow.isRubyText() || flow.isRubyBase())
@@ -121,15 +118,6 @@ bool canUseFor(const RenderBlockFlow& flow)
     // FIXME: Placeholders do something strange.
     if (flow.parent()->isTextControl() && toRenderTextControl(*flow.parent()).textFormControlElement().placeholderElement())
         return false;
-    // These tests only works during layout. Outside layout this function may give false positives.
-    if (flow.view().layoutState()) {
-#if ENABLE(CSS_SHAPES)
-        if (flow.view().layoutState()->shapeInsideInfo())
-            return false;
-#endif
-        if (flow.view().layoutState()->m_columnInfo)
-            return false;
-    }
     const RenderStyle& style = flow.style();
     if (style.textDecorationsInEffect() != TextDecorationNone)
         return false;
@@ -164,10 +152,6 @@ bool canUseFor(const RenderBlockFlow& flow)
         return false;
     if (style.textShadow())
         return false;
-#if ENABLE(CSS_SHAPES)
-    if (style.resolvedShapeInside())
-        return true;
-#endif
     if (style.textOverflow() || (flow.isAnonymousBlock() && flow.parent()->style().textOverflow()))
         return false;
     if (style.hasPseudoStyle(FIRST_LINE) || style.hasPseudoStyle(FIRST_LETTER))
@@ -181,19 +165,20 @@ bool canUseFor(const RenderBlockFlow& flow)
     const RenderText& textRenderer = toRenderText(*flow.firstChild());
     if (flow.containsFloats()) {
         // We can't use the code path if any lines would need to be shifted below floats. This is because we don't keep per-line y coordinates.
-        // It is enough to test the first line width only as currently all floats must be overhanging.
-        if (textRenderer.minLogicalWidth() > LineWidth(const_cast<RenderBlockFlow&>(flow), false, DoNotIndentText).availableWidth())
-            return false;
+        float minimumWidthNeeded = textRenderer.minLogicalWidth();
+        for (auto& floatRenderer : *flow.floatingObjectSet()) {
+            ASSERT(floatRenderer);
+            float availableWidth = flow.availableLogicalWidthForLine(floatRenderer->y(), false);
+            if (availableWidth < minimumWidthNeeded)
+                return false;
+        }
     }
     if (textRenderer.isCombineText() || textRenderer.isCounter() || textRenderer.isQuote() || textRenderer.isTextFragment()
-#if ENABLE(SVG)
-        || textRenderer.isSVGInlineText()
-#endif
-        )
+        || textRenderer.isSVGInlineText())
         return false;
     if (style.font().codePath(TextRun(textRenderer.text())) != Font::Simple)
         return false;
-    if (style.font().isSVGFont())
+    if (style.font().primaryFont()->isSVGFont())
         return false;
 
     // We assume that all lines have metrics based purely on the primary font.
@@ -204,7 +189,6 @@ bool canUseFor(const RenderBlockFlow& flow)
         return false;
 
     return true;
-#endif
 }
 
 struct Style {
@@ -415,7 +399,7 @@ void createTextRuns(Layout::RunVector& runs, unsigned& lineCount, RenderBlockFlo
 {
     const Style style(flow.style());
 
-    const CharacterType* text = textRenderer.text()->getCharacters<CharacterType>();
+    const CharacterType* text = textRenderer.text()->characters<CharacterType>();
     const unsigned textLength = textRenderer.textLength();
 
     LayoutUnit borderAndPaddingBefore = flow.borderAndPaddingBefore();

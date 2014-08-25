@@ -58,12 +58,15 @@ private:
     virtual void bringFrontendToFront() override;
     virtual void didResizeMainFrame(WebCore::Frame*) override;
 
-#if ENABLE(REMOTE_INSPECTOR)
-    virtual pid_t parentProcessIdentifier() const override;
-#endif
-
     virtual void highlight() override;
     virtual void hideHighlight() override;
+
+#if PLATFORM(IOS)
+    virtual void showInspectorIndication() override;
+    virtual void hideInspectorIndication() override;
+
+    virtual void didSetSearchingForNode(bool) override;
+#endif
 
     virtual bool sendMessageToFrontend(const String&) override;
 

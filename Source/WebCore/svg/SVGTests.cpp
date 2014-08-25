@@ -19,8 +19,6 @@
  */
 
 #include "config.h"
-
-#if ENABLE(SVG)
 #include "SVGTests.h"
 
 #include "Attribute.h"
@@ -30,6 +28,7 @@
 #include "SVGElement.h"
 #include "SVGNames.h"
 #include "SVGStringList.h"
+#include <wtf/NeverDestroyed.h>
 
 #if ENABLE(MATHML)
 #include "MathMLNames.h"
@@ -91,12 +90,12 @@ SVGTests::SVGTests()
 
 SVGAttributeToPropertyMap& SVGTests::attributeToPropertyMap()
 {
-    DEFINE_STATIC_LOCAL(SVGAttributeToPropertyMap, map, ());
-    if (!map.isEmpty())
+    static NeverDestroyed<SVGAttributeToPropertyMap> map;
+    if (!map.get().isEmpty())
         return map;
-    map.addProperty(requiredFeaturesPropertyInfo());
-    map.addProperty(requiredExtensionsPropertyInfo());
-    map.addProperty(systemLanguagePropertyInfo());
+    map.get().addProperty(requiredFeaturesPropertyInfo());
+    map.get().addProperty(requiredExtensionsPropertyInfo());
+    map.get().addProperty(systemLanguagePropertyInfo());
     return map;
 }
 
@@ -221,5 +220,3 @@ SVGStringList& SVGTests::systemLanguage()
 }
 
 }
-
-#endif // ENABLE(SVG)

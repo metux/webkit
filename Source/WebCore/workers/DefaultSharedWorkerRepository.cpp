@@ -35,7 +35,6 @@
 #include "DefaultSharedWorkerRepository.h"
 
 #include "ActiveDOMObject.h"
-#include "CrossThreadTask.h"
 #include "Document.h"
 #include "ExceptionCode.h"
 #include "InspectorInstrumentation.h"
@@ -44,7 +43,6 @@
 #include "NotImplemented.h"
 #include "PageGroup.h"
 #include "PlatformStrategies.h"
-#include "ScriptCallStack.h"
 #include "SecurityOrigin.h"
 #include "SecurityOriginHash.h"
 #include "SharedWorker.h"
@@ -56,8 +54,10 @@
 #include "WorkerReportingProxy.h"
 #include "WorkerScriptLoader.h"
 #include "WorkerScriptLoaderClient.h"
+#include <inspector/ScriptCallStack.h>
 #include <mutex>
 #include <wtf/HashSet.h>
+#include <wtf/NeverDestroyed.h>
 #include <wtf/Threading.h>
 #include <wtf/text/WTFString.h>
 
@@ -80,8 +80,8 @@ public:
     bool matches(const String& name, PassRefPtr<SecurityOrigin> origin, const URL& urlToMatch) const;
 
     // WorkerLoaderProxy
-    virtual void postTaskToLoader(PassOwnPtr<ScriptExecutionContext::Task>);
-    virtual bool postTaskForModeToWorkerGlobalScope(PassOwnPtr<ScriptExecutionContext::Task>, const String&);
+    virtual void postTaskToLoader(ScriptExecutionContext::Task);
+    virtual bool postTaskForModeToWorkerGlobalScope(ScriptExecutionContext::Task, const String&);
 
     // WorkerReportingProxy
     virtual void postExceptionToWorkerObject(const String& errorMessage, int lineNumber, int columnNumber, const String& sourceURL);
@@ -140,7 +140,7 @@ bool SharedWorkerProxy::matches(const String& name, PassRefPtr<SecurityOrigin> o
     return name == m_name;
 }
 
-void SharedWorkerProxy::postTaskToLoader(PassOwnPtr<ScriptExecutionContext::Task> task)
+void SharedWorkerProxy::postTaskToLoader(ScriptExecutionContext::Task task)
 {
     MutexLocker lock(m_workerDocumentsLock);
 
@@ -153,15 +153,15 @@ void SharedWorkerProxy::postTaskToLoader(PassOwnPtr<ScriptExecutionContext::Task
     // Just pick an arbitrary active document from the HashSet and pass load requests to it.
     // FIXME: Do we need to deal with the case where the user closes the document mid-load, via a shadow document or some other solution?
     Document* document = *(m_workerDocuments.begin());
-    document->postTask(task);
+    document->postTask(WTF::move(task));
 }
 
-bool SharedWorkerProxy::postTaskForModeToWorkerGlobalScope(PassOwnPtr<ScriptExecutionContext::Task> task, const String& mode)
+bool SharedWorkerProxy::postTaskForModeToWorkerGlobalScope(ScriptExecutionContext::Task task, const String& mode)
 {
     if (isClosing())
         return false;
     ASSERT(m_thread);
-    m_thread->runLoop().postTaskForMode(task, mode);
+    m_thread->runLoop().postTaskForMode(WTF::move(task), mode);
     return true;
 }
 
@@ -178,28 +178,28 @@ GroupSettings* SharedWorkerProxy::groupSettings() const
     return 0;
 }
 
-static void postExceptionTask(ScriptExecutionContext* context, const String& errorMessage, int lineNumber, int columnNumber, const String& sourceURL)
-{
-    context->reportException(errorMessage, lineNumber, columnNumber, sourceURL, 0);
-}
-
 void SharedWorkerProxy::postExceptionToWorkerObject(const String& errorMessage, int lineNumber, int columnNumber, const String& sourceURL)
 {
     MutexLocker lock(m_workerDocumentsLock);
-    for (HashSet<Document*>::iterator iter = m_workerDocuments.begin(); iter != m_workerDocuments.end(); ++iter)
-        (*iter)->postTask(createCallbackTask(&postExceptionTask, errorMessage, lineNumber, columnNumber, sourceURL));
-}
+    String errorMessageCopy = errorMessage.isolatedCopy();
+    String sourceURLCopy = sourceURL.isolatedCopy();
 
-static void postConsoleMessageTask(ScriptExecutionContext* document, MessageSource source, MessageLevel level, const String& message, const String& sourceURL, unsigned lineNumber, unsigned columnNumber)
-{
-    document->addConsoleMessage(source, level, message, sourceURL, lineNumber, columnNumber);
+    for (auto& document : m_workerDocuments)
+        document->postTask([=] (ScriptExecutionContext& context) {
+            context.reportException(errorMessageCopy, lineNumber, columnNumber, sourceURLCopy, nullptr);
+        });
 }
 
 void SharedWorkerProxy::postConsoleMessageToWorkerObject(MessageSource source, MessageLevel level, const String& message, int lineNumber, int columnNumber, const String& sourceURL)
 {
     MutexLocker lock(m_workerDocumentsLock);
-    for (HashSet<Document*>::iterator iter = m_workerDocuments.begin(); iter != m_workerDocuments.end(); ++iter)
-        (*iter)->postTask(createCallbackTask(&postConsoleMessageTask, source, level, message, sourceURL, lineNumber, columnNumber));
+    String messageCopy = message.isolatedCopy();
+    String sourceURLCopy = sourceURL.isolatedCopy();
+
+    for (auto& document : m_workerDocuments)
+        document->postTask([=] (ScriptExecutionContext& context) {
+            context.addConsoleMessage(source, level, messageCopy, sourceURLCopy, lineNumber, columnNumber);
+        });
 }
 
 #if ENABLE(INSPECTOR)
@@ -254,36 +254,25 @@ void SharedWorkerProxy::close()
 
 class SharedWorkerConnectTask : public ScriptExecutionContext::Task {
 public:
-    static PassOwnPtr<SharedWorkerConnectTask> create(PassOwnPtr<MessagePortChannel> channel)
+    SharedWorkerConnectTask(MessagePortChannel* channel)
+        : ScriptExecutionContext::Task([=] (ScriptExecutionContext& context) {
+            RefPtr<MessagePort> port = MessagePort::create(context);
+            port->entangle(std::unique_ptr<MessagePortChannel>(channel));
+            ASSERT_WITH_SECURITY_IMPLICATION(context.isWorkerGlobalScope());
+            WorkerGlobalScope* workerGlobalScope = toWorkerGlobalScope(&context);
+            // Since close() stops the thread event loop, this should not ever get called while closing.
+            ASSERT(!workerGlobalScope->isClosing());
+            ASSERT_WITH_SECURITY_IMPLICATION(workerGlobalScope->isSharedWorkerGlobalScope());
+            workerGlobalScope->dispatchEvent(createConnectEvent(port));
+        })
     {
-        return adoptPtr(new SharedWorkerConnectTask(channel));
     }
-
-private:
-    SharedWorkerConnectTask(PassOwnPtr<MessagePortChannel> channel)
-        : m_channel(channel)
-    {
-    }
-
-    virtual void performTask(ScriptExecutionContext* scriptContext)
-    {
-        RefPtr<MessagePort> port = MessagePort::create(*scriptContext);
-        port->entangle(m_channel.release());
-        ASSERT_WITH_SECURITY_IMPLICATION(scriptContext->isWorkerGlobalScope());
-        WorkerGlobalScope* workerGlobalScope = static_cast<WorkerGlobalScope*>(scriptContext);
-        // Since close() stops the thread event loop, this should not ever get called while closing.
-        ASSERT(!workerGlobalScope->isClosing());
-        ASSERT_WITH_SECURITY_IMPLICATION(workerGlobalScope->isSharedWorkerGlobalScope());
-        workerGlobalScope->dispatchEvent(createConnectEvent(port));
-    }
-
-    OwnPtr<MessagePortChannel> m_channel;
 };
 
 // Loads the script on behalf of a worker.
 class SharedWorkerScriptLoader : public RefCounted<SharedWorkerScriptLoader>, private WorkerScriptLoaderClient {
 public:
-    SharedWorkerScriptLoader(PassRefPtr<SharedWorker>, PassOwnPtr<MessagePortChannel>, PassRefPtr<SharedWorkerProxy>);
+    SharedWorkerScriptLoader(PassRefPtr<SharedWorker>, std::unique_ptr<MessagePortChannel>, PassRefPtr<SharedWorkerProxy>);
     void load(const URL&);
 
 private:
@@ -292,14 +281,14 @@ private:
     virtual void notifyFinished();
 
     RefPtr<SharedWorker> m_worker;
-    OwnPtr<MessagePortChannel> m_port;
+    std::unique_ptr<MessagePortChannel> m_port;
     RefPtr<SharedWorkerProxy> m_proxy;
     RefPtr<WorkerScriptLoader> m_scriptLoader;
 };
 
-SharedWorkerScriptLoader::SharedWorkerScriptLoader(PassRefPtr<SharedWorker> worker, PassOwnPtr<MessagePortChannel> port, PassRefPtr<SharedWorkerProxy> proxy)
+SharedWorkerScriptLoader::SharedWorkerScriptLoader(PassRefPtr<SharedWorker> worker, std::unique_ptr<MessagePortChannel> port, PassRefPtr<SharedWorkerProxy> proxy)
     : m_worker(worker)
-    , m_port(port)
+    , m_port(WTF::move(port))
     , m_proxy(proxy)
 {
 }
@@ -331,9 +320,9 @@ void SharedWorkerScriptLoader::notifyFinished()
     else {
         InspectorInstrumentation::scriptImported(m_worker->scriptExecutionContext(), m_scriptLoader->identifier(), m_scriptLoader->script());
         DefaultSharedWorkerRepository::instance().workerScriptLoaded(*m_proxy, m_worker->scriptExecutionContext()->userAgent(m_scriptLoader->url()),
-                                                                     m_scriptLoader->script(), m_port.release(),
-                                                                     m_worker->scriptExecutionContext()->contentSecurityPolicy()->deprecatedHeader(),
-                                                                     m_worker->scriptExecutionContext()->contentSecurityPolicy()->deprecatedHeaderType());
+            m_scriptLoader->script(), WTF::move(m_port),
+            m_worker->scriptExecutionContext()->contentSecurityPolicy()->deprecatedHeader(),
+            m_worker->scriptExecutionContext()->contentSecurityPolicy()->deprecatedHeaderType());
     }
     m_worker->unsetPendingActivity(m_worker.get());
     this->deref(); // This frees this object - must be the last action in this function.
@@ -342,12 +331,12 @@ void SharedWorkerScriptLoader::notifyFinished()
 DefaultSharedWorkerRepository& DefaultSharedWorkerRepository::instance()
 {
     static std::once_flag onceFlag;
-    static DefaultSharedWorkerRepository* instance;
+    static LazyNeverDestroyed<DefaultSharedWorkerRepository> instance;
     std::call_once(onceFlag, []{
-        instance = new DefaultSharedWorkerRepository;
+        instance.construct();
     });
 
-    return *instance;
+    return instance;
 }
 
 bool DefaultSharedWorkerRepository::isAvailable()
@@ -355,7 +344,7 @@ bool DefaultSharedWorkerRepository::isAvailable()
     return platformStrategies()->sharedWorkerStrategy()->isAvailable();
 }
 
-void DefaultSharedWorkerRepository::workerScriptLoaded(SharedWorkerProxy& proxy, const String& userAgent, const String& workerScript, PassOwnPtr<MessagePortChannel> port, const String& contentSecurityPolicy, ContentSecurityPolicy::HeaderType contentSecurityPolicyType)
+void DefaultSharedWorkerRepository::workerScriptLoaded(SharedWorkerProxy& proxy, const String& userAgent, const String& workerScript, std::unique_ptr<MessagePortChannel> port, const String& contentSecurityPolicy, ContentSecurityPolicy::HeaderType contentSecurityPolicyType)
 {
     MutexLocker lock(m_lock);
     if (proxy.isClosing())
@@ -367,7 +356,8 @@ void DefaultSharedWorkerRepository::workerScriptLoaded(SharedWorkerProxy& proxy,
         proxy.setThread(thread);
         thread->start();
     }
-    proxy.thread()->runLoop().postTask(SharedWorkerConnectTask::create(port));
+
+    proxy.thread()->runLoop().postTask(SharedWorkerConnectTask(port.release()));
 }
 
 bool DefaultSharedWorkerRepository::hasSharedWorkers(Document* document)
@@ -398,7 +388,7 @@ void DefaultSharedWorkerRepository::documentDetached(Document* document)
         m_proxies[i]->documentDetached(document);
 }
 
-void DefaultSharedWorkerRepository::connectToWorker(PassRefPtr<SharedWorker> worker, PassOwnPtr<MessagePortChannel> port, const URL& url, const String& name, ExceptionCode& ec)
+void DefaultSharedWorkerRepository::connectToWorker(PassRefPtr<SharedWorker> worker, std::unique_ptr<MessagePortChannel> port, const URL& url, const String& name, ExceptionCode& ec)
 {
     MutexLocker lock(m_lock);
     ASSERT(worker->scriptExecutionContext()->securityOrigin()->canAccess(SecurityOrigin::create(url).get()));
@@ -415,9 +405,9 @@ void DefaultSharedWorkerRepository::connectToWorker(PassRefPtr<SharedWorker> wor
     }
     // If proxy is already running, just connect to it - otherwise, kick off a loader to load the script.
     if (proxy->thread())
-        proxy->thread()->runLoop().postTask(SharedWorkerConnectTask::create(port));
+        proxy->thread()->runLoop().postTask(SharedWorkerConnectTask(port.release()));
     else {
-        RefPtr<SharedWorkerScriptLoader> loader = adoptRef(new SharedWorkerScriptLoader(worker, port, proxy.release()));
+        RefPtr<SharedWorkerScriptLoader> loader = adoptRef(new SharedWorkerScriptLoader(worker, WTF::move(port), proxy.release()));
         loader->load(url);
     }
 }

@@ -1,7 +1,7 @@
 /*
  *  Copyright (C) 2000 Harri Porten (porten@kde.org)
  *  Copyright (C) 2006 Jon Shier (jshier@iastate.edu)
- *  Copyright (C) 2003, 2004, 2005, 2006, 2007, 2008, 2009 Apple Inc. All rights reseved.
+ *  Copyright (C) 2003-2009, 2014 Apple Inc. All rights reseved.
  *  Copyright (C) 2006 Alexey Proskuryakov (ap@webkit.org)
  *
  *  This library is free software; you can redistribute it and/or
@@ -24,7 +24,6 @@
 #include "JSDOMWindowBase.h"
 
 #include "Chrome.h"
-#include "Console.h"
 #include "DOMWindow.h"
 #include "Frame.h"
 #include "InspectorController.h"
@@ -55,12 +54,13 @@ static bool shouldAllowAccessFrom(const JSGlobalObject* thisObject, ExecState* e
     return BindingSecurity::shouldAllowAccessToDOMWindow(exec, asJSDOMWindow(thisObject)->impl());
 }
 
-const ClassInfo JSDOMWindowBase::s_info = { "Window", &JSDOMGlobalObject::s_info, 0, 0, CREATE_METHOD_TABLE(JSDOMWindowBase) };
+const ClassInfo JSDOMWindowBase::s_info = { "Window", &JSDOMGlobalObject::s_info, 0, CREATE_METHOD_TABLE(JSDOMWindowBase) };
 
 const GlobalObjectMethodTable JSDOMWindowBase::s_globalObjectMethodTable = { &shouldAllowAccessFrom, &supportsProfiling, &supportsRichSourceInfo, &shouldInterruptScript, &javaScriptExperimentsEnabled, &queueTaskToEventLoop, &shouldInterruptScriptBeforeTimeout };
 
 JSDOMWindowBase::JSDOMWindowBase(VM& vm, Structure* structure, PassRefPtr<DOMWindow> window, JSDOMWindowShell* shell)
     : JSDOMGlobalObject(vm, structure, &shell->world(), &s_globalObjectMethodTable)
+    , m_windowCloseWatchpoints((window && window->frame()) ? IsWatched : IsInvalidated)
     , m_impl(window)
     , m_shell(shell)
 {
@@ -191,7 +191,7 @@ bool JSDOMWindowBase::javaScriptExperimentsEnabled(const JSGlobalObject* object)
 void JSDOMWindowBase::queueTaskToEventLoop(const JSGlobalObject* object, PassRefPtr<Microtask> task)
 {
     const JSDOMWindowBase* thisObject = static_cast<const JSDOMWindowBase*>(object);
-    thisObject->scriptExecutionContext()->postTask(JSGlobalObjectTask::create((JSDOMWindowBase*)thisObject, task));
+    thisObject->scriptExecutionContext()->postTask(JSGlobalObjectTask((JSDOMWindowBase*)thisObject, task));
 }
 
 void JSDOMWindowBase::willRemoveFromWindowShell()
@@ -204,47 +204,32 @@ JSDOMWindowShell* JSDOMWindowBase::shell() const
     return m_shell;
 }
 
-VM* JSDOMWindowBase::commonVM()
+VM& JSDOMWindowBase::commonVM()
 {
     ASSERT(isMainThread());
 
-#if !PLATFORM(IOS)
-    static VM* vm = 0;
-#else
-    VM*& vm = commonVMInternal();
-#endif
+    static VM* vm = nullptr;
     if (!vm) {
         ScriptController::initializeThreading();
         vm = VM::createLeaked(LargeHeap).leakRef();
-#if PLATFORM(IOS)
-        PassOwnPtr<WebSafeGCActivityCallback> activityCallback = WebSafeGCActivityCallback::create(&vm->heap);
-        vm->heap.setActivityCallback(activityCallback);
-        PassOwnPtr<WebSafeIncrementalSweeper> incrementalSweeper = WebSafeIncrementalSweeper::create(&vm->heap);
-        vm->heap.setIncrementalSweeper(incrementalSweeper);
+#if !PLATFORM(IOS)
+        vm->setExclusiveThread(std::this_thread::get_id());
+#else
+        vm->heap.setFullActivityCallback(WebSafeFullGCActivityCallback::create(&vm->heap));
+#if ENABLE(GGC)
+        vm->heap.setEdenActivityCallback(WebSafeEdenGCActivityCallback::create(&vm->heap));
+#else
+        vm->heap.setEdenActivityCallback(vm->heap.fullActivityCallback());
+#endif
+        vm->heap.setIncrementalSweeper(WebSafeIncrementalSweeper::create(&vm->heap));
         vm->makeUsableFromMultipleThreads();
         vm->heap.machineThreads().addCurrentThread();
-#else
-        vm->exclusiveThread = currentThread();
-#endif // !PLATFORM(IOS)
+#endif
         initNormalWorldClientData(vm);
     }
 
-    return vm;
+    return *vm;
 }
-
-#if PLATFORM(IOS)
-bool JSDOMWindowBase::commonVMExists()
-{
-    return commonVMInternal();
-}
-
-VM*& JSDOMWindowBase::commonVMInternal()
-{
-    ASSERT(isMainThread());
-    static VM* commonVM;
-    return commonVM;
-}
-#endif
 
 // JSDOMGlobalObject* is ignored, accessing a window in any context will
 // use that DOMWindow's prototype chain.
@@ -280,6 +265,25 @@ JSDOMWindow* toJSDOMWindow(JSValue value)
     if (classInfo == JSDOMWindowShell::info())
         return jsCast<JSDOMWindowShell*>(asObject(value))->window();
     return 0;
+}
+
+void JSDOMWindowBase::fireFrameClearedWatchpointsForWindow(DOMWindow* window)
+{
+    JSC::VM& vm = JSDOMWindowBase::commonVM();
+    WebCoreJSClientData* clientData = static_cast<WebCoreJSClientData*>(vm.clientData);
+    Vector<Ref<DOMWrapperWorld>> wrapperWorlds;
+    clientData->getAllWorlds(wrapperWorlds);
+    for (unsigned i = 0; i < wrapperWorlds.size(); ++i) {
+        DOMObjectWrapperMap& wrappers = wrapperWorlds[i]->m_wrappers;
+        auto result = wrappers.find(window);
+        if (result == wrappers.end())
+            continue;
+        JSC::JSObject* wrapper = result->value.get();
+        if (!wrapper)
+            continue;
+        JSDOMWindowBase* jsWindow = JSC::jsCast<JSDOMWindowBase*>(wrapper);
+        jsWindow->m_windowCloseWatchpoints.fireAll("Frame cleared");
+    }
 }
 
 } // namespace WebCore

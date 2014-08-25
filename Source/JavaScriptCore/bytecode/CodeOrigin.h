@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011, 2012, 2013 Apple Inc. All rights reserved.
+ * Copyright (C) 2011, 2012, 2013, 2014 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -63,7 +63,7 @@ struct CodeOrigin {
     
     CodeOrigin(WTF::HashTableDeletedValueType)
         : bytecodeIndex(invalidBytecodeIndex)
-        , inlineCallFrame(bitwise_cast<InlineCallFrame*>(static_cast<uintptr_t>(1)))
+        , inlineCallFrame(deletedMarker())
     {
     }
     
@@ -75,6 +75,7 @@ struct CodeOrigin {
     }
     
     bool isSet() const { return bytecodeIndex != invalidBytecodeIndex; }
+    bool operator!() const { return !isSet(); }
     
     bool isHashTableDeletedValue() const
     {
@@ -97,21 +98,69 @@ struct CodeOrigin {
     bool operator==(const CodeOrigin& other) const;
     bool operator!=(const CodeOrigin& other) const { return !(*this == other); }
     
+    // This checks if the two code origins correspond to the same stack trace snippets,
+    // but ignore whether the InlineCallFrame's are identical.
+    bool isApproximatelyEqualTo(const CodeOrigin& other) const;
+    
+    unsigned approximateHash() const;
+    
     // Get the inline stack. This is slow, and is intended for debugging only.
     Vector<CodeOrigin> inlineStack() const;
     
     void dump(PrintStream&) const;
     void dumpInContext(PrintStream&, DumpContext*) const;
+
+private:
+    static InlineCallFrame* deletedMarker()
+    {
+        return bitwise_cast<InlineCallFrame*>(static_cast<uintptr_t>(1));
+    }
 };
 
 struct InlineCallFrame {
-    Vector<ValueRecovery> arguments;
+    enum Kind {
+        Call,
+        Construct,
+        
+        // For these, the stackOffset incorporates the argument count plus the true return PC
+        // slot.
+        GetterCall,
+        SetterCall
+    };
+    
+    static Kind kindFor(CodeSpecializationKind kind)
+    {
+        switch (kind) {
+        case CodeForCall:
+            return Call;
+        case CodeForConstruct:
+            return Construct;
+        }
+        RELEASE_ASSERT_NOT_REACHED();
+        return Call;
+    }
+    
+    static CodeSpecializationKind specializationKindFor(Kind kind)
+    {
+        switch (kind) {
+        case Call:
+        case GetterCall:
+        case SetterCall:
+            return CodeForCall;
+        case Construct:
+            return CodeForConstruct;
+        }
+        RELEASE_ASSERT_NOT_REACHED();
+        return CodeForCall;
+    }
+    
+    Vector<ValueRecovery> arguments; // Includes 'this'.
     WriteBarrier<ScriptExecutable> executable;
     ValueRecovery calleeRecovery;
     CodeOrigin caller;
     BitVector capturedVars; // Indexed by the machine call frame's variable numbering.
     signed stackOffset : 30;
-    bool isCall : 1;
+    Kind kind : 2;
     bool isClosureCall : 1; // If false then we know that callee/scope are constants and the DFG won't treat them as variables, i.e. they have to be recovered manually.
     VirtualRegister argumentsRegister; // This is only set if the code uses arguments. The unmodified arguments register follows the unmodifiedArgumentsRegister() convention (see CodeBlock.h).
     
@@ -120,12 +169,12 @@ struct InlineCallFrame {
     // we forgot to initialize explicitly.
     InlineCallFrame()
         : stackOffset(0)
-        , isCall(false)
+        , kind(Call)
         , isClosureCall(false)
     {
     }
     
-    CodeSpecializationKind specializationKind() const { return specializationFromIsCall(isCall); }
+    CodeSpecializationKind specializationKind() const { return specializationKindFor(kind); }
 
     JSFunction* calleeConstant() const
     {
@@ -133,12 +182,18 @@ struct InlineCallFrame {
             return jsCast<JSFunction*>(calleeRecovery.constant());
         return 0;
     }
+
+    void visitAggregate(SlotVisitor& visitor)
+    {
+        visitor.append(&executable);
+    }
     
     // Get the callee given a machine call frame to which this InlineCallFrame belongs.
     JSFunction* calleeForCallFrame(ExecState*) const;
     
     CString inferredName() const;
     CodeBlockHash hash() const;
+    CString hashAsStringIfPossible() const;
     
     CodeBlock* baselineCodeBlock() const;
     
@@ -185,9 +240,17 @@ struct CodeOriginHash {
     static const bool safeToCompareToEmptyOrDeleted = true;
 };
 
+struct CodeOriginApproximateHash {
+    static unsigned hash(const CodeOrigin& key) { return key.approximateHash(); }
+    static bool equal(const CodeOrigin& a, const CodeOrigin& b) { return a.isApproximatelyEqualTo(b); }
+    static const bool safeToCompareToEmptyOrDeleted = true;
+};
+
 } // namespace JSC
 
 namespace WTF {
+
+void printInternal(PrintStream&, JSC::InlineCallFrame::Kind);
 
 template<typename T> struct DefaultHash;
 template<> struct DefaultHash<JSC::CodeOrigin> {

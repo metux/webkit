@@ -26,11 +26,11 @@
 #ifndef WKContext_h
 #define WKContext_h
 
-#include <WebKit2/WKBase.h>
-#include <WebKit2/WKContextConnectionClient.h>
-#include <WebKit2/WKContextDownloadClient.h>
-#include <WebKit2/WKContextHistoryClient.h>
-#include <WebKit2/WKContextInjectedBundleClient.h>
+#include <WebKit/WKBase.h>
+#include <WebKit/WKContextConnectionClient.h>
+#include <WebKit/WKContextDownloadClient.h>
+#include <WebKit/WKContextHistoryClient.h>
+#include <WebKit/WKContextInjectedBundleClient.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -47,6 +47,7 @@ typedef uint32_t WKCacheModel;
 typedef void (*WKContextPlugInAutoStartOriginHashesChangedCallback)(WKContextRef context, const void *clientInfo);
 typedef void (*WKContextNetworkProcessDidCrashCallback)(WKContextRef context, const void *clientInfo);
 typedef void (*WKContextPlugInInformationBecameAvailableCallback)(WKContextRef context, WKArrayRef plugIn, const void *clientInfo);
+typedef WKDataRef (*WKContextCopyWebCryptoMasterKeyCallback)(WKContextRef context, const void *clientInfo);
 
 typedef struct WKContextClientBase {
     int                                                                 version;
@@ -62,7 +63,19 @@ typedef struct WKContextClientV0 {
     WKContextPlugInInformationBecameAvailableCallback                   plugInInformationBecameAvailable;
 } WKContextClientV0;
 
-enum { kWKContextClientCurrentVersion WK_ENUM_DEPRECATED("Use an explicit version number instead") = 0 };
+typedef struct WKContextClientV1 {
+    WKContextClientBase                                                 base;
+
+    // Version 0.
+    WKContextPlugInAutoStartOriginHashesChangedCallback                 plugInAutoStartOriginHashesChanged;
+    WKContextNetworkProcessDidCrashCallback                             networkProcessDidCrash;
+    WKContextPlugInInformationBecameAvailableCallback                   plugInInformationBecameAvailable;
+
+    // Version 1.
+    WKContextCopyWebCryptoMasterKeyCallback                             copyWebCryptoMasterKey;
+} WKContextClientV1;
+
+enum { kWKContextClientCurrentVersion WK_ENUM_DEPRECATED("Use an explicit version number instead") = 1 };
 typedef struct WKContextClient {
     int                                                                 version;
     const void *                                                        clientInfo;
@@ -89,6 +102,7 @@ WK_EXPORT WKTypeID WKContextGetTypeID();
 
 WK_EXPORT WKContextRef WKContextCreate();
 WK_EXPORT WKContextRef WKContextCreateWithInjectedBundlePath(WKStringRef path);
+WK_EXPORT WKContextRef WKContextCreateWithConfiguration(WKContextConfigurationRef configuration);
 
 WK_EXPORT void WKContextSetClient(WKContextRef context, const WKContextClientBase* client);
 WK_EXPORT void WKContextSetInjectedBundleClient(WKContextRef context, const WKContextInjectedBundleClientBase* client);
@@ -123,7 +137,6 @@ WK_EXPORT WKGeolocationManagerRef WKContextGetGeolocationManager(WKContextRef co
 WK_EXPORT WKIconDatabaseRef WKContextGetIconDatabase(WKContextRef context);
 WK_EXPORT WKKeyValueStorageManagerRef WKContextGetKeyValueStorageManager(WKContextRef context);
 WK_EXPORT WKMediaCacheManagerRef WKContextGetMediaCacheManager(WKContextRef context);
-WK_EXPORT WKNetworkInfoManagerRef WKContextGetNetworkInfoManager(WKContextRef context);
 WK_EXPORT WKNotificationManagerRef WKContextGetNotificationManager(WKContextRef context);
 WK_EXPORT WKPluginSiteDataManagerRef WKContextGetPluginSiteDataManager(WKContextRef context);
 WK_EXPORT WKResourceCacheManagerRef WKContextGetResourceCacheManager(WKContextRef context);

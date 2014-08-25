@@ -27,12 +27,14 @@
 #include "WebEditorClient.h"
 
 #include "EditorState.h"
+#include "ServicesOverlayController.h"
 #include "WebCoreArgumentCoders.h"
-#include "WebFrameLoaderClient.h"
+#include "WebFrame.h"
 #include "WebPage.h"
 #include "WebPageProxy.h"
 #include "WebPageProxyMessages.h"
 #include "WebProcess.h"
+#include "WebUndoStep.h"
 #include <WebCore/ArchiveResource.h>
 #include <WebCore/DocumentFragment.h>
 #include <WebCore/FocusController.h>
@@ -47,7 +49,6 @@
 #include <WebCore/Page.h>
 #include <WebCore/SpellChecker.h>
 #include <WebCore/StyleProperties.h>
-#include <WebCore/TextIterator.h>
 #include <WebCore/UndoStep.h>
 #include <WebCore/UserTypingGestureIndicator.h>
 #include <wtf/NeverDestroyed.h>
@@ -279,7 +280,7 @@ void WebEditorClient::redo()
     m_page->sendSync(Messages::WebPageProxy::ExecuteUndoRedo(static_cast<uint32_t>(WebPageProxy::Redo)), Messages::WebPageProxy::ExecuteUndoRedo::Reply(result));
 }
 
-#if !PLATFORM(GTK) && !PLATFORM(MAC) && !PLATFORM(EFL)
+#if !PLATFORM(GTK) && !PLATFORM(COCOA) && !PLATFORM(EFL)
 void WebEditorClient::handleKeyboardEvent(KeyboardEvent* event)
 {
     if (m_page->handleEditingKeyboardEvent(event))
@@ -297,8 +298,7 @@ void WebEditorClient::textFieldDidBeginEditing(Element* element)
     if (!isHTMLInputElement(element))
         return;
 
-    WebFrameLoaderClient* webFrameLoaderClient = toWebFrameLoaderClient(element->document().frame()->loader().client());
-    WebFrame* webFrame = webFrameLoaderClient ? webFrameLoaderClient->webFrame() : 0;
+    WebFrame* webFrame = WebFrame::fromCoreFrame(*element->document().frame());
     ASSERT(webFrame);
 
     m_page->injectedBundleFormClient().textFieldDidBeginEditing(m_page, toHTMLInputElement(element), webFrame);
@@ -309,8 +309,7 @@ void WebEditorClient::textFieldDidEndEditing(Element* element)
     if (!isHTMLInputElement(element))
         return;
 
-    WebFrameLoaderClient* webFrameLoaderClient = toWebFrameLoaderClient(element->document().frame()->loader().client());
-    WebFrame* webFrame = webFrameLoaderClient ? webFrameLoaderClient->webFrame() : 0;
+    WebFrame* webFrame = WebFrame::fromCoreFrame(*element->document().frame());
     ASSERT(webFrame);
 
     m_page->injectedBundleFormClient().textFieldDidEndEditing(m_page, toHTMLInputElement(element), webFrame);
@@ -321,14 +320,12 @@ void WebEditorClient::textDidChangeInTextField(Element* element)
     if (!isHTMLInputElement(element))
         return;
 
-    if (!UserTypingGestureIndicator::processingUserTypingGesture() || UserTypingGestureIndicator::focusedElementAtGestureStart() != element)
-        return;
+    bool initiatedByUserTyping = UserTypingGestureIndicator::processingUserTypingGesture() && UserTypingGestureIndicator::focusedElementAtGestureStart() == element;
 
-    WebFrameLoaderClient* webFrameLoaderClient = toWebFrameLoaderClient(element->document().frame()->loader().client());
-    WebFrame* webFrame = webFrameLoaderClient ? webFrameLoaderClient->webFrame() : 0;
+    WebFrame* webFrame = WebFrame::fromCoreFrame(*element->document().frame());
     ASSERT(webFrame);
 
-    m_page->injectedBundleFormClient().textDidChangeInTextField(m_page, toHTMLInputElement(element), webFrame);
+    m_page->injectedBundleFormClient().textDidChangeInTextField(m_page, toHTMLInputElement(element), webFrame, initiatedByUserTyping);
 }
 
 void WebEditorClient::textDidChangeInTextArea(Element* element)
@@ -336,12 +333,18 @@ void WebEditorClient::textDidChangeInTextArea(Element* element)
     if (!isHTMLTextAreaElement(element))
         return;
 
-    WebFrameLoaderClient* webFrameLoaderClient = toWebFrameLoaderClient(element->document().frame()->loader().client());
-    WebFrame* webFrame = webFrameLoaderClient ? webFrameLoaderClient->webFrame() : 0;
+    WebFrame* webFrame = WebFrame::fromCoreFrame(*element->document().frame());
     ASSERT(webFrame);
 
     m_page->injectedBundleFormClient().textDidChangeInTextArea(m_page, toHTMLTextAreaElement(element), webFrame);
 }
+
+#if !PLATFORM(IOS)
+void WebEditorClient::overflowScrollPositionChanged()
+{
+    notImplemented();
+}
+#endif
 
 static bool getActionTypeForKeyEvent(KeyboardEvent* event, WKInputFieldActionType& type)
 {
@@ -365,6 +368,29 @@ static bool getActionTypeForKeyEvent(KeyboardEvent* event, WKInputFieldActionTyp
     return true;
 }
 
+static API::InjectedBundle::FormClient::InputFieldAction toInputFieldAction(WKInputFieldActionType action)
+{
+    switch (action) {
+    case WKInputFieldActionTypeMoveUp:
+        return API::InjectedBundle::FormClient::InputFieldAction::MoveUp;
+    case WKInputFieldActionTypeMoveDown:
+        return API::InjectedBundle::FormClient::InputFieldAction::MoveDown;
+    case WKInputFieldActionTypeCancel:
+        return API::InjectedBundle::FormClient::InputFieldAction::Cancel;
+    case WKInputFieldActionTypeInsertTab:
+        return API::InjectedBundle::FormClient::InputFieldAction::InsertTab;
+    case WKInputFieldActionTypeInsertNewline:
+        return API::InjectedBundle::FormClient::InputFieldAction::InsertNewline;
+    case WKInputFieldActionTypeInsertDelete:
+        return API::InjectedBundle::FormClient::InputFieldAction::InsertDelete;
+    case WKInputFieldActionTypeInsertBacktab:
+        return API::InjectedBundle::FormClient::InputFieldAction::InsertBacktab;
+    }
+
+    ASSERT_NOT_REACHED();
+    return API::InjectedBundle::FormClient::InputFieldAction::Cancel;
+}
+
 bool WebEditorClient::doTextFieldCommandFromEvent(Element* element, KeyboardEvent* event)
 {
     if (!isHTMLInputElement(element))
@@ -374,11 +400,10 @@ bool WebEditorClient::doTextFieldCommandFromEvent(Element* element, KeyboardEven
     if (!getActionTypeForKeyEvent(event, actionType))
         return false;
 
-    WebFrameLoaderClient* webFrameLoaderClient = toWebFrameLoaderClient(element->document().frame()->loader().client());
-    WebFrame* webFrame = webFrameLoaderClient ? webFrameLoaderClient->webFrame() : 0;
+    WebFrame* webFrame = WebFrame::fromCoreFrame(*element->document().frame());
     ASSERT(webFrame);
 
-    return m_page->injectedBundleFormClient().shouldPerformActionInTextField(m_page, toHTMLInputElement(element), actionType, webFrame);
+    return m_page->injectedBundleFormClient().shouldPerformActionInTextField(m_page, toHTMLInputElement(element), toInputFieldAction(actionType), webFrame);
 }
 
 void WebEditorClient::textWillBeDeletedInTextField(Element* element)
@@ -386,17 +411,16 @@ void WebEditorClient::textWillBeDeletedInTextField(Element* element)
     if (!isHTMLInputElement(element))
         return;
 
-    WebFrameLoaderClient* webFrameLoaderClient = toWebFrameLoaderClient(element->document().frame()->loader().client());
-    WebFrame* webFrame = webFrameLoaderClient ? webFrameLoaderClient->webFrame() : 0;
+    WebFrame* webFrame = WebFrame::fromCoreFrame(*element->document().frame());
     ASSERT(webFrame);
 
-    m_page->injectedBundleFormClient().shouldPerformActionInTextField(m_page, toHTMLInputElement(element), WKInputFieldActionTypeInsertDelete, webFrame);
+    m_page->injectedBundleFormClient().shouldPerformActionInTextField(m_page, toHTMLInputElement(element), toInputFieldAction(WKInputFieldActionTypeInsertDelete), webFrame);
 }
 
 bool WebEditorClient::shouldEraseMarkersAfterChangeSelection(WebCore::TextCheckingType type) const
 {
     // This prevents erasing spelling markers on OS X Lion or later to match AppKit on these Mac OS X versions.
-#if PLATFORM(MAC) || PLATFORM(EFL)
+#if PLATFORM(COCOA) || PLATFORM(EFL)
     return type != TextCheckingTypeSpelling;
 #else
     UNUSED_PARAM(type);
@@ -414,12 +438,11 @@ void WebEditorClient::learnWord(const String& word)
     m_page->send(Messages::WebPageProxy::LearnWord(word));
 }
 
-void WebEditorClient::checkSpellingOfString(const UChar* text, int length, int* misspellingLocation, int* misspellingLength)
+void WebEditorClient::checkSpellingOfString(StringView text, int* misspellingLocation, int* misspellingLength)
 {
     int32_t resultLocation = -1;
     int32_t resultLength = 0;
-    // FIXME: It would be nice if we wouldn't have to copy the text here.
-    m_page->sendSync(Messages::WebPageProxy::CheckSpellingOfString(String(text, length)),
+    m_page->sendSync(Messages::WebPageProxy::CheckSpellingOfString(text.toStringWithoutCopying()),
         Messages::WebPageProxy::CheckSpellingOfString::Reply(resultLocation, resultLength));
     *misspellingLocation = resultLocation;
     *misspellingLength = resultLength;
@@ -431,12 +454,11 @@ String WebEditorClient::getAutoCorrectSuggestionForMisspelledWord(const String&)
     return String();
 }
 
-void WebEditorClient::checkGrammarOfString(const UChar* text, int length, Vector<WebCore::GrammarDetail>& grammarDetails, int* badGrammarLocation, int* badGrammarLength)
+void WebEditorClient::checkGrammarOfString(StringView text, Vector<WebCore::GrammarDetail>& grammarDetails, int* badGrammarLocation, int* badGrammarLength)
 {
     int32_t resultLocation = -1;
     int32_t resultLength = 0;
-    // FIXME: It would be nice if we wouldn't have to copy the text here.
-    m_page->sendSync(Messages::WebPageProxy::CheckGrammarOfString(String(text, length)),
+    m_page->sendSync(Messages::WebPageProxy::CheckGrammarOfString(text.toStringWithoutCopying()),
         Messages::WebPageProxy::CheckGrammarOfString::Reply(grammarDetails, resultLocation, resultLength));
     *badGrammarLocation = resultLocation;
     *badGrammarLength = resultLength;
@@ -508,5 +530,21 @@ bool WebEditorClient::supportsGlobalSelection()
     return false;
 #endif
 }
+
+#if ENABLE(SERVICE_CONTROLS) || ENABLE(TELEPHONE_NUMBER_DETECTION)
+void WebEditorClient::selectedTelephoneNumberRangesChanged()
+{
+#if PLATFORM(MAC)
+    m_page->servicesOverlayController().selectedTelephoneNumberRangesChanged();
+#endif
+}
+void WebEditorClient::selectionRectsDidChange(const Vector<LayoutRect>& rects, const Vector<GapRects>& gapRects, bool isTextOnly)
+{
+#if PLATFORM(MAC)
+    if (m_page->serviceControlsEnabled())
+        m_page->servicesOverlayController().selectionRectsDidChange(rects, gapRects, isTextOnly);
+#endif
+}
+#endif // ENABLE(SERVICE_CONTROLS) && ENABLE(TELEPHONE_NUMBER_DETECTION)
 
 } // namespace WebKit

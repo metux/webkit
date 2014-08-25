@@ -33,6 +33,8 @@
 #include "DownloadManager.h"
 #include "MessageReceiverMap.h"
 #include "NetworkResourceLoadScheduler.h"
+#include <WebCore/SessionID.h>
+#include <memory>
 #include <wtf/Forward.h>
 #include <wtf/NeverDestroyed.h>
 
@@ -62,7 +64,7 @@ public:
     template <typename T>
     void addSupplement()
     {
-        m_supplements.add(T::supplementName(), adoptPtr<NetworkProcessSupplement>(new T(this)));
+        m_supplements.add(T::supplementName(), std::make_unique<T>(this));
     }
 
     void removeNetworkConnectionToWebProcess(NetworkConnectionToWebProcess*);
@@ -80,6 +82,9 @@ private:
 
     virtual void terminate() override;
     void platformTerminate();
+
+    static void lowMemoryHandler(bool critical);
+    static void platformLowMemoryHandler(bool critical);
 
     // ChildProcess
     virtual void initializeProcess(const ChildProcessInitializationParameters&) override;
@@ -104,8 +109,8 @@ private:
     void didReceiveNetworkProcessMessage(IPC::Connection*, IPC::MessageDecoder&);
     void initializeNetworkProcess(const NetworkProcessCreationParameters&);
     void createNetworkConnectionToWebProcess();
-    void ensurePrivateBrowsingSession(uint64_t sessionID);
-    void destroyPrivateBrowsingSession(uint64_t sessionID);
+    void ensurePrivateBrowsingSession(WebCore::SessionID);
+    void destroyPrivateBrowsingSession(WebCore::SessionID);
     void downloadRequest(uint64_t downloadID, const WebCore::ResourceRequest&);
     void cancelDownload(uint64_t downloadID);
     void setCacheModel(uint32_t);
@@ -130,10 +135,12 @@ private:
     bool m_hasSetCacheModel;
     CacheModel m_cacheModel;
 
-    typedef HashMap<const char*, OwnPtr<NetworkProcessSupplement>, PtrHash<const char*>> NetworkProcessSupplementMap;
+    typedef HashMap<const char*, std::unique_ptr<NetworkProcessSupplement>, PtrHash<const char*>> NetworkProcessSupplementMap;
     NetworkProcessSupplementMap m_supplements;
 
-#if PLATFORM(MAC)
+#if PLATFORM(COCOA)
+    void platformInitializeNetworkProcessCocoa(const NetworkProcessCreationParameters&);
+
     // FIXME: We'd like to be able to do this without the #ifdef, but WorkQueue + BinarySemaphore isn't good enough since
     // multiple requests to clear the cache can come in before previous requests complete, and we need to wait for all of them.
     // In the future using WorkQueue and a counting semaphore would work, as would WorkQueue supporting the libdispatch concept of "work groups".

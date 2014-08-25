@@ -52,12 +52,7 @@ public:
         explicit Backup(Settings&);
         void restoreTo(Settings&);
 
-        bool m_originalCSSExclusionsEnabled;
         bool m_originalCSSShapesEnabled;
-#if ENABLE(SHADOW_DOM)
-        bool m_originalShadowDOMEnabled;
-        bool m_originalAuthorShadowDOMForAnyElementEnabled;
-#endif
         EditingBehaviorType m_originalEditingBehavior;
 
         // Initially empty, only used if changed by a test.
@@ -91,6 +86,7 @@ public:
         bool m_useLegacyBackgroundSizeShorthandBehavior;
         bool m_autoscrollForDragAndDropEnabled;
         bool m_pluginReplacementEnabled;
+        bool m_shouldConvertPositionStyleOnCopy;
     };
 
     static PassRefPtr<InternalSettings> create(Page* page)
@@ -103,11 +99,8 @@ public:
     virtual ~InternalSettings();
     void resetToConsistentState();
 
-    void setMockScrollbarsEnabled(bool enabled, ExceptionCode&);
-    void setUsesOverlayScrollbars(bool enabled, ExceptionCode&);
-    void setTouchEventEmulationEnabled(bool enabled, ExceptionCode&);
-    void setShadowDOMEnabled(bool enabled, ExceptionCode&);
-    void setAuthorShadowDOMForAnyElementEnabled(bool);
+    void setUsesOverlayScrollbars(bool, ExceptionCode&);
+    void setTouchEventEmulationEnabled(bool, ExceptionCode&);
     void setStandardFontFamily(const String& family, const String& script, ExceptionCode&);
     void setSerifFontFamily(const String& family, const String& script, ExceptionCode&);
     void setSansSerifFontFamily(const String& family, const String& script, ExceptionCode&);
@@ -119,24 +112,24 @@ public:
     void setTextAutosizingWindowSizeOverride(int width, int height, ExceptionCode&);
     void setTextAutosizingFontScaleFactor(float fontScaleFactor, ExceptionCode&);
     void setMediaTypeOverride(const String& mediaType, ExceptionCode&);
-    void setCSSExclusionsEnabled(bool enabled, ExceptionCode&);
-    void setCSSShapesEnabled(bool enabled, ExceptionCode&);
+    void setCSSShapesEnabled(bool, ExceptionCode&);
     void setCanStartMedia(bool, ExceptionCode&);
     void setEditingBehavior(const String&, ExceptionCode&);
     void setShouldDisplayTrackKind(const String& kind, bool enabled, ExceptionCode&);
     bool shouldDisplayTrackKind(const String& kind, ExceptionCode&);
     void setStorageBlockingPolicy(const String&, ExceptionCode&);
     void setLangAttributeAwareFormControlUIEnabled(bool);
-    void setImagesEnabled(bool enabled, ExceptionCode&);
+    void setImagesEnabled(bool, ExceptionCode&);
     void setMinimumTimerInterval(double intervalInSeconds, ExceptionCode&);
     void setDefaultVideoPosterURL(const String& url, ExceptionCode&);
     void setTimeWithoutMouseMovementBeforeHidingControls(double time, ExceptionCode&);
-    void setUseLegacyBackgroundSizeShorthandBehavior(bool enabled, ExceptionCode&);
-    void setAutoscrollForDragAndDropEnabled(bool enabled, ExceptionCode&);
-    void setFontFallbackPrefersPictographs(bool preferPictographs, ExceptionCode&);
+    void setUseLegacyBackgroundSizeShorthandBehavior(bool, ExceptionCode&);
+    void setAutoscrollForDragAndDropEnabled(bool, ExceptionCode&);
+    void setFontFallbackPrefersPictographs(bool, ExceptionCode&);
     void setPluginReplacementEnabled(bool);
-    void setBackgroundShouldExtendBeyondPage(bool hasExtendedBackground, ExceptionCode&);
-
+    void setBackgroundShouldExtendBeyondPage(bool, ExceptionCode&);
+    void setShouldConvertPositionStyleOnCopy(bool, ExceptionCode&);
+    void setScrollingTreeIncludesFrames(bool, ExceptionCode&);
 
 private:
     explicit InternalSettings(Page*);

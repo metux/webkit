@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013 Apple Inc. All rights reserved.
+ * Copyright (C) 2013, 2014 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -26,10 +26,9 @@
 #ifndef FTLAbstractHeapRepository_h
 #define FTLAbstractHeapRepository_h
 
-#include <wtf/Platform.h>
-
 #if ENABLE(FTL_JIT)
 
+#include "DFGArrayMode.h"
 #include "FTLAbstractHeap.h"
 #include "IndexingType.h"
 
@@ -37,41 +36,58 @@ namespace JSC { namespace FTL {
 
 #define FOR_EACH_ABSTRACT_HEAP(macro) \
     macro(length) \
+    macro(structureTable) \
     macro(typedArrayProperties) \
     macro(WriteBarrierBuffer_bufferContents)
 
 #define FOR_EACH_ABSTRACT_FIELD(macro) \
+    macro(ArrayBuffer_data, ArrayBuffer::offsetOfData()) \
+    macro(Butterfly_arrayBuffer, Butterfly::offsetOfArrayBuffer()) \
     macro(Butterfly_publicLength, Butterfly::offsetOfPublicLength()) \
     macro(Butterfly_vectorLength, Butterfly::offsetOfVectorLength()) \
     macro(CallFrame_callerFrame, CallFrame::callerFrameOffset()) \
+    macro(GetterSetter_getter, GetterSetter::offsetOfGetter()) \
+    macro(GetterSetter_setter, GetterSetter::offsetOfSetter()) \
     macro(JSArrayBufferView_length, JSArrayBufferView::offsetOfLength()) \
     macro(JSArrayBufferView_mode, JSArrayBufferView::offsetOfMode()) \
     macro(JSArrayBufferView_vector, JSArrayBufferView::offsetOfVector()) \
-    macro(JSCell_structure, JSCell::structureOffset()) \
+    macro(JSCell_structureID, JSCell::structureIDOffset()) \
+    macro(JSCell_typeInfoFlags, JSCell::typeInfoFlagsOffset()) \
+    macro(JSCell_typeInfoType, JSCell::typeInfoTypeOffset()) \
+    macro(JSCell_indexingType, JSCell::indexingTypeOffset()) \
+    macro(JSCell_gcData, JSCell::gcDataOffset()) \
+    macro(JSFunction_executable, JSFunction::offsetOfExecutable()) \
+    macro(JSFunction_scope, JSFunction::offsetOfScopeChain()) \
     macro(JSObject_butterfly, JSObject::butterflyOffset()) \
+    macro(JSPropertyNameEnumerator_cachedInlineCapacity, JSPropertyNameEnumerator::cachedInlineCapacityOffset()) \
+    macro(JSPropertyNameEnumerator_cachedPropertyNamesLength, JSPropertyNameEnumerator::cachedPropertyNamesLengthOffset()) \
+    macro(JSPropertyNameEnumerator_cachedPropertyNamesVector, JSPropertyNameEnumerator::cachedPropertyNamesVectorOffset()) \
+    macro(JSPropertyNameEnumerator_cachedStructureID, JSPropertyNameEnumerator::cachedStructureIDOffset()) \
     macro(JSScope_next, JSScope::offsetOfNext()) \
+    macro(JSString_flags, JSString::offsetOfFlags()) \
     macro(JSString_length, JSString::offsetOfLength()) \
     macro(JSString_value, JSString::offsetOfValue()) \
     macro(JSVariableObject_registers, JSVariableObject::offsetOfRegisters()) \
+    macro(JSWrapperObject_internalValue, JSWrapperObject::internalValueOffset()) \
     macro(MarkedAllocator_freeListHead, MarkedAllocator::offsetOfFreeListHead()) \
     macro(MarkedBlock_markBits, MarkedBlock::offsetOfMarks()) \
     macro(StringImpl_data, StringImpl::dataOffset()) \
     macro(StringImpl_hashAndFlags, StringImpl::flagsOffset()) \
     macro(Structure_classInfo, Structure::classInfoOffset()) \
     macro(Structure_globalObject, Structure::globalObjectOffset()) \
-    macro(Structure_indexingType, Structure::indexingTypeOffset()) \
-    macro(Structure_typeInfoFlags, Structure::typeInfoFlagsOffset()) \
-    macro(Structure_typeInfoType, Structure::typeInfoTypeOffset())
+    macro(Structure_prototype, Structure::prototypeOffset()) \
+    macro(Structure_structureID, Structure::structureIDOffset())
 
 #define FOR_EACH_INDEXED_ABSTRACT_HEAP(macro) \
-    macro(characters8, sizeof(LChar)) \
-    macro(characters16, sizeof(UChar)) \
-    macro(indexedInt32Properties, sizeof(EncodedJSValue)) \
-    macro(indexedDoubleProperties, sizeof(double)) \
-    macro(indexedContiguousProperties, sizeof(EncodedJSValue)) \
-    macro(indexedArrayStorageProperties, sizeof(EncodedJSValue)) \
-    macro(singleCharacterStrings, sizeof(JSString*)) \
-    macro(variables, sizeof(Register))
+    macro(JSRopeString_fibers, JSRopeString::offsetOfFibers(), sizeof(WriteBarrier<JSString>)) \
+    macro(characters8, 0, sizeof(LChar)) \
+    macro(characters16, 0, sizeof(UChar)) \
+    macro(indexedInt32Properties, 0, sizeof(EncodedJSValue)) \
+    macro(indexedDoubleProperties, 0, sizeof(double)) \
+    macro(indexedContiguousProperties, 0, sizeof(EncodedJSValue)) \
+    macro(indexedArrayStorageProperties, 0, sizeof(EncodedJSValue)) \
+    macro(singleCharacterStrings, 0, sizeof(JSString*)) \
+    macro(variables, 0, sizeof(Register))
     
 #define FOR_EACH_NUMBERED_ABSTRACT_HEAP(macro) \
     macro(properties)
@@ -97,7 +113,7 @@ public:
     
     AbstractField& JSCell_freeListNext;
     
-#define INDEXED_ABSTRACT_HEAP_DECLARATION(name, size) IndexedAbstractHeap name;
+#define INDEXED_ABSTRACT_HEAP_DECLARATION(name, offset, size) IndexedAbstractHeap name;
     FOR_EACH_INDEXED_ABSTRACT_HEAP(INDEXED_ABSTRACT_HEAP_DECLARATION)
 #undef INDEXED_ABSTRACT_HEAP_DECLARATION
     
@@ -129,6 +145,24 @@ public:
         default:
             RELEASE_ASSERT_NOT_REACHED();
             return 0;
+        }
+    }
+    
+    IndexedAbstractHeap& forArrayType(DFG::Array::Type type)
+    {
+        switch (type) {
+        case DFG::Array::Int32:
+            return indexedInt32Properties;
+        case DFG::Array::Double:
+            return indexedDoubleProperties;
+        case DFG::Array::Contiguous:
+            return indexedContiguousProperties;
+        case DFG::Array::ArrayStorage:
+        case DFG::Array::SlowPutArrayStorage:
+            return indexedArrayStorageProperties;
+        default:
+            RELEASE_ASSERT_NOT_REACHED();
+            return indexedInt32Properties;
         }
     }
 

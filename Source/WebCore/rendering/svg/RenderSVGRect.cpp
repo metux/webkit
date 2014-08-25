@@ -26,8 +26,6 @@
  */
 
 #include "config.h"
-
-#if ENABLE(SVG)
 #include "RenderSVGRect.h"
 
 #include "SVGNames.h"
@@ -35,7 +33,7 @@
 namespace WebCore {
 
 RenderSVGRect::RenderSVGRect(SVGRectElement& element, PassRef<RenderStyle> style)
-    : RenderSVGShape(element, std::move(style))
+    : RenderSVGShape(element, WTF::move(style))
     , m_usePathFallback(false)
 {
 }
@@ -58,19 +56,26 @@ void RenderSVGRect::updateShapeFromElement()
     m_outerStrokeRect = FloatRect();
 
     SVGLengthContext lengthContext(&rectElement());
-    // Fallback to RenderSVGShape if rect has rounded corners or a non-scaling stroke.
-    if (rectElement().rx().value(lengthContext) > 0 || rectElement().ry().value(lengthContext) > 0 || hasNonScalingStroke()) {
-        RenderSVGShape::updateShapeFromElement();
-        m_usePathFallback = true;
+    FloatSize boundingBoxSize(lengthContext.valueForLength(style().width(), LengthModeWidth), lengthContext.valueForLength(style().height(), LengthModeHeight));
+
+    // Element is invalid if either dimension is negative.
+    if (boundingBoxSize.width() < 0 || boundingBoxSize.height() < 0)
         return;
+
+    // Rendering enabled? Spec: "A value of zero disables rendering of the element."
+    if (!boundingBoxSize.isEmpty()) {
+        if (rectElement().rx().value(lengthContext) > 0 || rectElement().ry().value(lengthContext) > 0 || hasNonScalingStroke()) {
+            // Fall back to RenderSVGShape
+            RenderSVGShape::updateShapeFromElement();
+            m_usePathFallback = true;
+            return;
+        }
+        m_usePathFallback = false;
     }
 
-    m_usePathFallback = false;
-    FloatSize boundingBoxSize(rectElement().width().value(lengthContext), rectElement().height().value(lengthContext));
-    if (boundingBoxSize.isEmpty())
-        return;
-
-    m_fillBoundingBox = FloatRect(FloatPoint(rectElement().x().value(lengthContext), rectElement().y().value(lengthContext)), boundingBoxSize);
+    m_fillBoundingBox = FloatRect(FloatPoint(lengthContext.valueForLength(style().svgStyle().x(), LengthModeWidth),
+        lengthContext.valueForLength(style().svgStyle().y(), LengthModeHeight)),
+        boundingBoxSize);
 
     // To decide if the stroke contains a point we create two rects which represent the inner and
     // the outer stroke borders. A stroke contains the point, if the point is between them.
@@ -148,6 +153,10 @@ bool RenderSVGRect::shapeDependentFillContains(const FloatPoint& point, const Wi
     return m_fillBoundingBox.contains(point.x(), point.y());
 }
 
+bool RenderSVGRect::isRenderingDisabled() const
+{
+    // A width or height of zero disables rendering for the element, and results in an empty bounding box.
+    return m_fillBoundingBox.isEmpty();
 }
 
-#endif // ENABLE(SVG)
+}

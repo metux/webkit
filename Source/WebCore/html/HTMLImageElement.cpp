@@ -33,8 +33,17 @@
 #include "HTMLDocument.h"
 #include "HTMLFormElement.h"
 #include "HTMLParserIdioms.h"
+#include "HTMLSrcsetParser.h"
 #include "Page.h"
 #include "RenderImage.h"
+#include "Settings.h"
+#include "ShadowRoot.h"
+#include "SourceSizeList.h"
+#include <wtf/text/StringBuilder.h>
+
+#if ENABLE(SERVICE_CONTROLS)
+#include "ImageControlsRootElement.h"
+#endif
 
 namespace WebCore {
 
@@ -42,9 +51,13 @@ using namespace HTMLNames;
 
 HTMLImageElement::HTMLImageElement(const QualifiedName& tagName, Document& document, HTMLFormElement* form)
     : HTMLElement(tagName, document)
-    , m_imageLoader(this)
+    , m_imageLoader(*this)
     , m_form(form)
     , m_compositeOperator(CompositeSourceOver)
+    , m_imageDevicePixelRatio(1.0f)
+#if ENABLE(SERVICE_CONTROLS)
+    , m_experimentalImageMenuEnabled(false)
+#endif
 {
     ASSERT(hasTagName(imgTag));
     setHasCustomStyleResolveCallbacks();
@@ -112,13 +125,30 @@ const AtomicString& HTMLImageElement::imageSourceURL() const
     return m_bestFitImageURL.isEmpty() ? fastGetAttribute(srcAttr) : m_bestFitImageURL;
 }
 
+void HTMLImageElement::setBestFitURLAndDPRFromImageCandidate(const ImageCandidate& candidate)
+{
+    m_bestFitImageURL = candidate.string.toString();
+#if ENABLE(PICTURE_SIZES)
+    m_currentSrc = AtomicString(document().completeURL(imageSourceURL()).string());
+#endif
+    if (candidate.density >= 0)
+        m_imageDevicePixelRatio = 1 / candidate.density;
+    if (renderer() && renderer()->isImage())
+        toRenderImage(renderer())->setImageDevicePixelRatio(m_imageDevicePixelRatio);
+}
+
 void HTMLImageElement::parseAttribute(const QualifiedName& name, const AtomicString& value)
 {
     if (name == altAttr) {
         if (renderer() && renderer()->isRenderImage())
             toRenderImage(renderer())->updateAltText();
     } else if (name == srcAttr || name == srcsetAttr) {
-        m_bestFitImageURL = bestFitSourceForImageAttributes(document().deviceScaleFactor(), fastGetAttribute(srcAttr), fastGetAttribute(srcsetAttr));
+        ImageCandidate candidate = bestFitSourceForImageAttributes(document().deviceScaleFactor(), fastGetAttribute(srcAttr), fastGetAttribute(srcsetAttr)
+#if ENABLE(PICTURE_SIZES)
+            , SourceSizeList::parseSizesAttribute(fastGetAttribute(sizesAttr), document().renderView(), document().frame())
+#endif
+        );
+        setBestFitURLAndDPRFromImageCandidate(candidate);
         m_imageLoader.updateFromElementIgnoringPreviousError();
     } else if (name == usemapAttr) {
         setIsLink(!value.isNull() && !shouldProhibitLinks(this));
@@ -144,6 +174,11 @@ void HTMLImageElement::parseAttribute(const QualifiedName& name, const AtomicStr
         BlendMode blendOp = BlendModeNormal;
         if (!parseCompositeAndBlendOperator(value, m_compositeOperator, blendOp))
             m_compositeOperator = CompositeSourceOver;
+#if ENABLE(SERVICE_CONTROLS)
+    } else if (name == webkitimagemenuAttr) {
+        m_experimentalImageMenuEnabled = !value.isNull();
+        updateImageControls();
+#endif
     } else {
         if (name == nameAttr) {
             bool willHaveName = !value.isNull();
@@ -177,9 +212,9 @@ String HTMLImageElement::altText() const
 RenderPtr<RenderElement> HTMLImageElement::createElementRenderer(PassRef<RenderStyle> style)
 {
     if (style.get().hasContent())
-        return RenderElement::createFor(*this, std::move(style));
+        return RenderElement::createFor(*this, WTF::move(style));
 
-    return createRenderer<RenderImage>(*this, std::move(style));
+    return createRenderer<RenderImage>(*this, WTF::move(style), nullptr, m_imageDevicePixelRatio);
 }
 
 bool HTMLImageElement::canStartSelection() const
@@ -196,6 +231,11 @@ void HTMLImageElement::didAttachRenderers()
         return;
     if (m_imageLoader.hasPendingBeforeLoadEvent())
         return;
+
+#if ENABLE(SERVICE_CONTROLS)
+    updateImageControls();
+#endif
+
     RenderImage* renderImage = toRenderImage(renderer());
     RenderImageResource& renderImageResource = renderImage->imageResource();
     if (renderImageResource.hasImage())
@@ -314,6 +354,37 @@ bool HTMLImageElement::isURLAttribute(const Attribute& attribute) const
         || HTMLElement::isURLAttribute(attribute);
 }
 
+bool HTMLImageElement::attributeContainsURL(const Attribute& attribute) const
+{
+    return attribute.name() == srcsetAttr
+        || HTMLElement::attributeContainsURL(attribute);
+}
+
+String HTMLImageElement::completeURLsInAttributeValue(const URL& base, const Attribute& attribute) const
+{
+    if (attribute.name() == srcsetAttr) {
+        Vector<ImageCandidate> imageCandidates = parseImageCandidatesFromSrcsetAttribute(StringView(attribute.value()));
+        StringBuilder result;
+        for (const auto& candidate : imageCandidates) {
+            if (&candidate != &imageCandidates[0])
+                result.appendLiteral(", ");
+            result.append(URL(base, candidate.string.toString()).string());
+            if (candidate.density != UninitializedDescriptor) {
+                result.append(' ');
+                result.appendNumber(candidate.density);
+                result.append('x');
+            }
+            if (candidate.resourceWidth != UninitializedDescriptor) {
+                result.append(' ');
+                result.appendNumber(candidate.resourceWidth);
+                result.append('x');
+            }
+        }
+        return result.toString();
+    }
+    return HTMLElement::completeURLsInAttributeValue(base, attribute);
+}
+
 bool HTMLImageElement::matchesLowercasedUsemap(const AtomicStringImpl& name) const
 {
     ASSERT(String(&const_cast<AtomicStringImpl&>(name)).lower().impl() == &name);
@@ -353,6 +424,7 @@ void HTMLImageElement::setWidth(int value)
 
 int HTMLImageElement::x() const
 {
+    document().updateLayoutIgnorePendingStylesheets();
     auto renderer = this->renderer();
     if (!renderer)
         return 0;
@@ -363,6 +435,7 @@ int HTMLImageElement::x() const
 
 int HTMLImageElement::y() const
 {
+    document().updateLayoutIgnorePendingStylesheets();
     auto renderer = this->renderer();
     if (!renderer)
         return 0;
@@ -404,6 +477,77 @@ bool HTMLImageElement::isServerMap() const
 
     return document().completeURL(stripLeadingAndTrailingHTMLSpaces(usemap)).isEmpty();
 }
+
+#if ENABLE(SERVICE_CONTROLS)
+void HTMLImageElement::updateImageControls()
+{
+    // If this image element is inside a shadow tree then it is part of an image control.
+    if (isInShadowTree())
+        return;
+
+    Settings* settings = document().settings();
+    if (!settings || !settings->imageControlsEnabled())
+        return;
+
+    bool hasControls = hasImageControls();
+    if (!m_experimentalImageMenuEnabled && hasControls)
+        destroyImageControls();
+    else if (m_experimentalImageMenuEnabled && !hasControls)
+        createImageControls();
+}
+
+void HTMLImageElement::createImageControls()
+{
+    ASSERT(m_experimentalImageMenuEnabled);
+    ASSERT(!hasImageControls());
+
+    RefPtr<ImageControlsRootElement> imageControls = ImageControlsRootElement::maybeCreate(document());
+    if (!imageControls)
+        return;
+
+    ensureUserAgentShadowRoot().appendChild(imageControls);
+
+    RenderObject* renderObject = renderer();
+    if (!renderObject)
+        return;
+
+    toRenderImage(renderObject)->setHasShadowControls(true);
+}
+
+void HTMLImageElement::destroyImageControls()
+{
+    ShadowRoot* shadowRoot = userAgentShadowRoot();
+    if (!shadowRoot)
+        return;
+
+    if (Node* node = shadowRoot->firstChild()) {
+        ASSERT_WITH_SECURITY_IMPLICATION(node->isImageControlsRootElement());
+        shadowRoot->removeChild(node);
+    }
+
+    RenderObject* renderObject = renderer();
+    if (!renderObject)
+        return;
+
+    toRenderImage(renderObject)->setHasShadowControls(false);
+}
+
+bool HTMLImageElement::hasImageControls() const
+{
+    if (ShadowRoot* shadowRoot = userAgentShadowRoot()) {
+        Node* node = shadowRoot->firstChild();
+        ASSERT_WITH_SECURITY_IMPLICATION(!node || node->isImageControlsRootElement());
+        return node;
+    }
+
+    return false;
+}
+
+bool HTMLImageElement::childShouldCreateRenderer(const Node& child) const
+{
+    return hasShadowRootParent(child) && HTMLElement::childShouldCreateRenderer(child);
+}
+#endif // ENABLE(SERVICE_CONTROLS)
 
 #if PLATFORM(IOS)
 // FIXME: This is a workaround for <rdar://problem/7725158>. We should find a better place for the touchCalloutEnabled() logic.

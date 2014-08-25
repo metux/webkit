@@ -10,10 +10,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -186,6 +186,9 @@ public:
 
     TextDirection primaryDirection() const;
 
+    // Returns the number of positions that exist between two positions.
+    static unsigned positionCountBetweenPositions(const Position&, const Position&);
+
     static bool hasRenderedNonAnonymousDescendantsWithHeight(const RenderElement&);
     static bool nodeIsUserSelectNone(Node*);
 #if ENABLE(USERSELECT_ALL)
@@ -269,17 +272,14 @@ inline bool operator<=(const Position& a, const Position& b)
 
 inline Position positionInParentBeforeNode(const Node* node)
 {
-    // FIXME: This should ASSERT(node->parentNode())
-    // At least one caller currently hits this ASSERT though, which indicates
-    // that the caller is trying to make a position relative to a disconnected node (which is likely an error)
-    // Specifically, editing/deleting/delete-ligature-001.html crashes with ASSERT(node->parentNode())
-    return Position(Position::findParent(node), node->nodeIndex(), Position::PositionIsOffsetInAnchor);
+    ASSERT(node->parentNode());
+    return Position(node->parentNode(), node->nodeIndex(), Position::PositionIsOffsetInAnchor);
 }
 
 inline Position positionInParentAfterNode(const Node* node)
 {
-    ASSERT(Position::findParent(node));
-    return Position(Position::findParent(node), node->nodeIndex() + 1, Position::PositionIsOffsetInAnchor);
+    ASSERT(node->parentNode());
+    return Position(node->parentNode(), node->nodeIndex() + 1, Position::PositionIsOffsetInAnchor);
 }
 
 // positionBeforeNode and positionAfterNode return neighbor-anchored positions, construction is O(1)

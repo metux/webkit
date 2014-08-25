@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011, 2013 Apple Inc. All rights reserved.
+ * Copyright (C) 2011, 2013, 2014 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -33,7 +33,7 @@
 #include "DFGBranchDirection.h"
 #include "DFGFlushedAt.h"
 #include "DFGNode.h"
-#include "DFGVariadicFunction.h"
+#include "DFGStructureClobberState.h"
 #include "Operands.h"
 #include <wtf/HashMap.h>
 #include <wtf/HashSet.h>
@@ -48,7 +48,9 @@ class InsertionSet;
 typedef Vector<BasicBlock*, 2> PredecessorList;
 
 struct BasicBlock : RefCounted<BasicBlock> {
-    BasicBlock(unsigned bytecodeBegin, unsigned numArguments, unsigned numLocals);
+    BasicBlock(
+        unsigned bytecodeBegin, unsigned numArguments, unsigned numLocals,
+        float executionCount);
     ~BasicBlock();
     
     void ensureLocals(unsigned newNumLocals);
@@ -96,15 +98,11 @@ struct BasicBlock : RefCounted<BasicBlock> {
     void removePredecessor(BasicBlock* block);
     void replacePredecessor(BasicBlock* from, BasicBlock* to);
 
-#define DFG_DEFINE_APPEND_NODE(templatePre, templatePost, typeParams, valueParamsComma, valueParams, valueArgs) \
-    templatePre typeParams templatePost Node* appendNode(Graph&, SpeculatedType valueParamsComma valueParams);
-    DFG_VARIADIC_TEMPLATE_FUNCTION(DFG_DEFINE_APPEND_NODE)
-#undef DFG_DEFINE_APPEND_NODE
+    template<typename... Params>
+    Node* appendNode(Graph&, SpeculatedType, Params...);
     
-#define DFG_DEFINE_APPEND_NODE(templatePre, templatePost, typeParams, valueParamsComma, valueParams, valueArgs) \
-    templatePre typeParams templatePost Node* appendNonTerminal(Graph&, SpeculatedType valueParamsComma valueParams);
-    DFG_VARIADIC_TEMPLATE_FUNCTION(DFG_DEFINE_APPEND_NODE)
-#undef DFG_DEFINE_APPEND_NODE
+    template<typename... Params>
+    Node* appendNonTerminal(Graph&, SpeculatedType, Params...);
     
     void dump(PrintStream& out) const;
     
@@ -119,6 +117,8 @@ struct BasicBlock : RefCounted<BasicBlock> {
     bool cfaShouldRevisit;
     bool cfaFoundConstants;
     bool cfaDidFinish;
+    StructureClobberState cfaStructureClobberStateAtHead;
+    StructureClobberState cfaStructureClobberStateAtTail;
     BranchDirection cfaBranchDirection;
 #if !ASSERT_DISABLED
     bool isLinked;
@@ -134,13 +134,33 @@ struct BasicBlock : RefCounted<BasicBlock> {
     Operands<AbstractValue> valuesAtHead;
     Operands<AbstractValue> valuesAtTail;
     
+    // The intersection of assumptions we have made previously at the head of this block. Note
+    // that under normal circumstances, each time we run the CFA, we will get strictly more precise
+    // results. But we don't actually require this to be the case. It's fine for the CFA to loosen
+    // up for any odd reason. It's fine when this happens, because anything that the CFA proves
+    // must be true from that point forward, except if some registered watchpoint fires, in which
+    // case the code won't ever run. So, the CFA proving something less precise later on is just an
+    // outcome of the CFA being imperfect; the more precise thing that it had proved earlier is no
+    // less true.
+    //
+    // But for the purpose of OSR entry, we need to make sure that we remember what assumptions we
+    // had used for optimizing any given basic block. That's what this is for.
+    //
+    // It's interesting that we could use this to make the CFA more precise: all future CFAs could
+    // filter their results with this thing to sort of maintain maximal precision. Because we
+    // expect CFA to usually be monotonically more precise each time we run it to fixpoint, this
+    // would not be a productive optimization: it would make setting up a basic block more
+    // expensive and would only benefit bizarre pathological cases.
+    Operands<AbstractValue> intersectionOfPastValuesAtHead;
+    bool intersectionOfCFAHasVisited;
+    
+    float executionCount;
+    
     // These fields are reserved for NaturalLoops.
     static const unsigned numberOfInnerMostLoopIndices = 2;
     unsigned innerMostLoopIndices[numberOfInnerMostLoopIndices];
 
     struct SSAData {
-        Operands<FlushedAt> flushAtHead;
-        Operands<FlushedAt> flushAtTail;
         Operands<Availability> availabilityAtHead;
         Operands<Availability> availabilityAtTail;
         HashSet<Node*> liveAtHead;
@@ -151,8 +171,8 @@ struct BasicBlock : RefCounted<BasicBlock> {
         SSAData(BasicBlock*);
         ~SSAData();
     };
-    OwnPtr<SSAData> ssa;
-
+    std::unique_ptr<SSAData> ssa;
+    
 private:
     friend class InsertionSet;
     Vector<Node*, 8> m_nodes;

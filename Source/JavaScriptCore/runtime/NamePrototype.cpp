@@ -27,7 +27,7 @@
 #include "NamePrototype.h"
 
 #include "Error.h"
-#include "Operations.h"
+#include "JSCInlines.h"
 
 namespace JSC {
 
@@ -39,7 +39,7 @@ static EncodedJSValue JSC_HOST_CALL privateNameProtoFuncToString(ExecState*);
 
 namespace JSC {
 
-const ClassInfo NamePrototype::s_info = { "Name", &Base::s_info, 0, ExecState::privateNamePrototypeTable, CREATE_METHOD_TABLE(NamePrototype) };
+const ClassInfo NamePrototype::s_info = { "Name", &Base::s_info, &privateNamePrototypeTable, CREATE_METHOD_TABLE(NamePrototype) };
 
 /* Source for NamePrototype.lut.h
 @begin privateNamePrototypeTable
@@ -60,14 +60,14 @@ void NamePrototype::finishCreation(VM& vm)
 
 bool NamePrototype::getOwnPropertySlot(JSObject* object, ExecState* exec, PropertyName propertyName, PropertySlot &slot)
 {
-    return getStaticFunctionSlot<Base>(exec, ExecState::privateNamePrototypeTable(exec->vm()), jsCast<NamePrototype*>(object), propertyName, slot);
+    return getStaticFunctionSlot<Base>(exec, privateNamePrototypeTable, jsCast<NamePrototype*>(object), propertyName, slot);
 }
 
 // ------------------------------ Functions ---------------------------
 
 EncodedJSValue JSC_HOST_CALL privateNameProtoFuncToString(ExecState* exec)
 {
-    JSValue thisValue = exec->hostThisValue();
+    JSValue thisValue = exec->thisValue();
     if (!thisValue.isObject())
         return throwVMTypeError(exec);
 

@@ -55,7 +55,7 @@ COMPILE_ASSERT(sizeof(RenderTableCell) == sizeof(SameSizeAsRenderTableCell), Ren
 COMPILE_ASSERT(sizeof(CollapsedBorderValue) == 8, CollapsedBorderValue_should_stay_small);
 
 RenderTableCell::RenderTableCell(Element& element, PassRef<RenderStyle> style)
-    : RenderBlockFlow(element, std::move(style))
+    : RenderBlockFlow(element, WTF::move(style))
     , m_column(unsetColumnIndex)
     , m_cellWidthChanged(false)
     , m_intrinsicPaddingBefore(0)
@@ -67,7 +67,7 @@ RenderTableCell::RenderTableCell(Element& element, PassRef<RenderStyle> style)
 }
 
 RenderTableCell::RenderTableCell(Document& document, PassRef<RenderStyle> style)
-    : RenderBlockFlow(document, std::move(style))
+    : RenderBlockFlow(document, WTF::move(style))
     , m_column(unsetColumnIndex)
     , m_cellWidthChanged(false)
     , m_hasColSpan(false)
@@ -930,46 +930,46 @@ inline RenderTableCell* RenderTableCell::cellAtBottom(const RenderStyle* styleFo
     return styleForCellFlow->isLeftToRightDirection() ? table()->cellAfter(this) : table()->cellBefore(this);
 }
 
-int RenderTableCell::borderLeft() const
+LayoutUnit RenderTableCell::borderLeft() const
 {
-    return table()->collapseBorders() ? borderHalfLeft(false) : RenderBlockFlow::borderLeft();
+    return table()->collapseBorders() ? LayoutUnit::fromPixel(borderHalfLeft(false)) : RenderBlockFlow::borderLeft();
 }
 
-int RenderTableCell::borderRight() const
+LayoutUnit RenderTableCell::borderRight() const
 {
-    return table()->collapseBorders() ? borderHalfRight(false) : RenderBlockFlow::borderRight();
+    return table()->collapseBorders() ? LayoutUnit::fromPixel(borderHalfRight(false)) : RenderBlockFlow::borderRight();
 }
 
-int RenderTableCell::borderTop() const
+LayoutUnit RenderTableCell::borderTop() const
 {
-    return table()->collapseBorders() ? borderHalfTop(false) : RenderBlockFlow::borderTop();
+    return table()->collapseBorders() ? LayoutUnit::fromPixel(borderHalfTop(false)) : RenderBlockFlow::borderTop();
 }
 
-int RenderTableCell::borderBottom() const
+LayoutUnit RenderTableCell::borderBottom() const
 {
-    return table()->collapseBorders() ? borderHalfBottom(false) : RenderBlockFlow::borderBottom();
+    return table()->collapseBorders() ? LayoutUnit::fromPixel(borderHalfBottom(false)) : RenderBlockFlow::borderBottom();
 }
 
 // FIXME: https://bugs.webkit.org/show_bug.cgi?id=46191, make the collapsed border drawing
 // work with different block flow values instead of being hard-coded to top-to-bottom.
-int RenderTableCell::borderStart() const
+LayoutUnit RenderTableCell::borderStart() const
 {
-    return table()->collapseBorders() ? borderHalfStart(false) : RenderBlockFlow::borderStart();
+    return table()->collapseBorders() ? LayoutUnit::fromPixel(borderHalfStart(false)) : RenderBlockFlow::borderStart();
 }
 
-int RenderTableCell::borderEnd() const
+LayoutUnit RenderTableCell::borderEnd() const
 {
-    return table()->collapseBorders() ? borderHalfEnd(false) : RenderBlockFlow::borderEnd();
+    return table()->collapseBorders() ? LayoutUnit::fromPixel(borderHalfEnd(false)) : RenderBlockFlow::borderEnd();
 }
 
-int RenderTableCell::borderBefore() const
+LayoutUnit RenderTableCell::borderBefore() const
 {
-    return table()->collapseBorders() ? borderHalfBefore(false) : RenderBlockFlow::borderBefore();
+    return table()->collapseBorders() ? LayoutUnit::fromPixel(borderHalfBefore(false)) : RenderBlockFlow::borderBefore();
 }
 
-int RenderTableCell::borderAfter() const
+LayoutUnit RenderTableCell::borderAfter() const
 {
-    return table()->collapseBorders() ? borderHalfAfter(false) : RenderBlockFlow::borderAfter();
+    return table()->collapseBorders() ? LayoutUnit::fromPixel(borderHalfAfter(false)) : RenderBlockFlow::borderAfter();
 }
 
 int RenderTableCell::borderHalfLeft(bool outer) const
@@ -1136,31 +1136,6 @@ void RenderTableCell::sortBorderValues(RenderTable::CollapsedBorderValues& borde
         compareBorderValuesForQSort);
 }
 
-bool RenderTableCell::alignLeftRightBorderPaintRect(int& leftXOffset, int& rightXOffset)
-{
-    const RenderStyle& styleForTopCell = styleForCellFlow();
-    int left = cachedCollapsedLeftBorder(&styleForTopCell).width();
-    int right = cachedCollapsedRightBorder(&styleForTopCell).width();
-    leftXOffset = std::max<int>(leftXOffset, left);
-    rightXOffset = std::max<int>(rightXOffset, right);
-    if (colSpan() > 1)
-        return false;
-    return true;
-}
-
-bool RenderTableCell::alignTopBottomBorderPaintRect(int& topYOffset, int& bottomYOffset)
-{
-    const RenderStyle& styleForBottomCell = styleForCellFlow();
-    int top = cachedCollapsedTopBorder(&styleForBottomCell).width();
-    int bottom = cachedCollapsedBottomBorder(&styleForBottomCell).width();
-    topYOffset = std::max<int>(topYOffset, top);
-    bottomYOffset = std::max<int>(bottomYOffset, bottom);
-    if (rowSpan() > 1)
-        return false;
-    return true;
-}
-
-
 void RenderTableCell::paintCollapsedBorders(PaintInfo& paintInfo, const LayoutPoint& paintOffset)
 {
     ASSERT(paintInfo.phase == PaintPhaseCollapsedTableBorders);
@@ -1194,38 +1169,6 @@ void RenderTableCell::paintCollapsedBorders(PaintInfo& paintInfo, const LayoutPo
     int leftWidth = leftVal.width();
     int rightWidth = rightVal.width();
 
-    int leftXOffsetTop = leftWidth;
-    int leftXOffsetBottom = leftWidth;
-    int rightXOffsetTop = rightWidth;
-    int rightXOffsetBottom = rightWidth;
-    int topYOffsetLeft = topWidth;
-    int topYOffsetRight = topWidth;
-    int bottomYOffsetLeft = bottomWidth;
-    int bottomYOffsetRight = bottomWidth;
-
-    // We use the direction/writing-mode given by the section here because we want to know if we're
-    // at the section's edge.
-    bool shouldDrawTopBorder = !cellAtTop(&section()->style());
-    bool shouldDrawLeftBorder = !cellAtLeft(&section()->style());
-    bool shouldDrawRightBorder = true;
-
-    if (RenderTableCell* top = cellAtTop(&styleForCellFlow)) {
-        shouldDrawTopBorder = shouldDrawTopBorder && top->alignLeftRightBorderPaintRect(leftXOffsetTop, rightXOffsetTop);
-        if (this->colSpan() > 1)
-            shouldDrawTopBorder = false;
-    }
-
-    if (RenderTableCell* bottom = cellAtBottom(&styleForCellFlow))
-        bottom->alignLeftRightBorderPaintRect(leftXOffsetBottom, rightXOffsetBottom);
-
-    if (RenderTableCell* left = cellAtLeft(&styleForCellFlow))
-        shouldDrawLeftBorder = shouldDrawLeftBorder && left->alignTopBottomBorderPaintRect(topYOffsetLeft, bottomYOffsetLeft);
-
-    if (RenderTableCell* right = cellAtRight(&styleForCellFlow))
-        shouldDrawRightBorder = right->alignTopBottomBorderPaintRect(topYOffsetRight, bottomYOffsetRight);
-
-    IntRect cellRect = pixelSnappedIntRect(paintRect.x(), paintRect.y(), paintRect.width(), paintRect.height());
-
     IntRect borderRect = pixelSnappedIntRect(paintRect.x() - leftWidth / 2,
         paintRect.y() - topWidth / 2,
         paintRect.width() + leftWidth / 2 + (rightWidth + 1) / 2,
@@ -1236,33 +1179,18 @@ void RenderTableCell::paintCollapsedBorders(PaintInfo& paintInfo, const LayoutPo
     EBorderStyle leftStyle = collapsedBorderStyle(leftVal.style());
     EBorderStyle rightStyle = collapsedBorderStyle(rightVal.style());
     
-    bool renderTop = topStyle > BHIDDEN && !topVal.isTransparent() && shouldDrawTopBorder;
+    bool renderTop = topStyle > BHIDDEN && !topVal.isTransparent();
     bool renderBottom = bottomStyle > BHIDDEN && !bottomVal.isTransparent();
-    bool renderLeft = leftStyle > BHIDDEN && !leftVal.isTransparent() && shouldDrawLeftBorder;
-    bool renderRight = rightStyle > BHIDDEN && !rightVal.isTransparent() && shouldDrawRightBorder;
+    bool renderLeft = leftStyle > BHIDDEN && !leftVal.isTransparent();
+    bool renderRight = rightStyle > BHIDDEN && !rightVal.isTransparent();
 
     // We never paint diagonals at the joins.  We simply let the border with the highest
     // precedence paint on top of borders with lower precedence.  
     CollapsedBorders borders;
-    if (topVal.style() == DOTTED)
-        borders.addBorder(topVal, BSTop, renderTop, cellRect.x() - leftXOffsetTop / 2, cellRect.y() - topWidth / 2, cellRect.maxX() + rightXOffsetTop / 2, cellRect.y() + topWidth / 2 + topWidth % 2, topStyle);
-    else
-        borders.addBorder(topVal, BSTop, renderTop, borderRect.x(), borderRect.y(), borderRect.maxX(), borderRect.y() + topWidth, topStyle);
-
-    if (bottomVal.style() == DOTTED)
-        borders.addBorder(bottomVal, BSBottom, renderBottom, cellRect.x() - leftXOffsetBottom / 2, cellRect.maxY() - bottomWidth / 2, cellRect.maxX() + rightXOffsetBottom / 2, cellRect.maxY() + bottomWidth / 2 + bottomWidth % 2, bottomStyle);
-    else
-        borders.addBorder(bottomVal, BSBottom, renderBottom, borderRect.x(), borderRect.maxY() - bottomWidth, borderRect.maxX(), borderRect.maxY(), bottomStyle);
-
-    if (leftVal.style() == DOTTED)
-        borders.addBorder(leftVal, BSLeft, renderLeft, cellRect.x() - leftWidth / 2, cellRect.y() - topYOffsetLeft / 2, cellRect.x() + leftWidth / 2 + leftWidth % 2, cellRect.maxY() + bottomYOffsetLeft / 2 + bottomYOffsetLeft % 2, leftStyle);
-    else
-        borders.addBorder(leftVal, BSLeft, renderLeft, borderRect.x(), borderRect.y(), borderRect.x() + leftWidth, borderRect.maxY(), leftStyle);
-
-    if (rightVal.style() == DOTTED)
-        borders.addBorder(rightVal, BSRight, renderRight, cellRect.maxX() - rightWidth / 2, cellRect.y()  - topYOffsetRight / 2, cellRect.maxX() + rightWidth / 2 + rightWidth % 2, cellRect.maxY()  + bottomYOffsetRight / 2 + bottomYOffsetRight % 2, rightStyle);
-    else
-        borders.addBorder(rightVal, BSRight, renderRight, borderRect.maxX() - rightWidth, borderRect.y(), borderRect.maxX(), borderRect.maxY(), rightStyle);
+    borders.addBorder(topVal, BSTop, renderTop, borderRect.x(), borderRect.y(), borderRect.maxX(), borderRect.y() + topWidth, topStyle);
+    borders.addBorder(bottomVal, BSBottom, renderBottom, borderRect.x(), borderRect.maxY() - bottomWidth, borderRect.maxX(), borderRect.maxY(), bottomStyle);
+    borders.addBorder(leftVal, BSLeft, renderLeft, borderRect.x(), borderRect.y(), borderRect.x() + leftWidth, borderRect.maxY(), leftStyle);
+    borders.addBorder(rightVal, BSRight, renderRight, borderRect.maxX() - rightWidth, borderRect.y(), borderRect.maxX(), borderRect.maxY(), rightStyle);
 
     bool antialias = shouldAntialiasLines(graphicsContext);
     
@@ -1319,17 +1247,17 @@ void RenderTableCell::paintBoxDecorations(PaintInfo& paintInfo, const LayoutPoin
         return;
 
     LayoutRect paintRect = LayoutRect(paintOffset, pixelSnappedSize());
-    paintBoxShadow(paintInfo, paintRect, &style(), Normal);
+    paintBoxShadow(paintInfo, paintRect, style(), Normal);
     
     // Paint our cell background.
     paintBackgroundsBehindCell(paintInfo, paintOffset, this);
 
-    paintBoxShadow(paintInfo, paintRect, &style(), Inset);
+    paintBoxShadow(paintInfo, paintRect, style(), Inset);
 
-    if (!style().hasBorder() || tableElt->collapseBorders())
+    if (!style().hasBorder() || tableElt->collapseBorders() || (!firstChild() && document().inQuirksMode()))
         return;
 
-    paintBorder(paintInfo, paintRect, &style());
+    paintBorder(paintInfo, paintRect, style());
 }
 
 void RenderTableCell::paintMask(PaintInfo& paintInfo, const LayoutPoint& paintOffset)

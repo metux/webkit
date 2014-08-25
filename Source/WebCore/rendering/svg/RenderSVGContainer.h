@@ -23,8 +23,6 @@
 #ifndef RenderSVGContainer_h
 #define RenderSVGContainer_h
 
-#if ENABLE(SVG)
-
 #include "RenderSVGModelObject.h"
 
 namespace WebCore {
@@ -52,7 +50,7 @@ protected:
     virtual void layout() override;
 
     virtual void addChild(RenderObject* child, RenderObject* beforeChild = 0) override final;
-    virtual void removeChild(RenderObject&) override final;
+    virtual RenderObject* removeChild(RenderObject&) override final;
     virtual void addFocusRingRects(Vector<IntRect>&, const LayoutPoint& additionalOffset, const RenderLayerModelObject* paintContainer = 0) override final;
 
     virtual FloatRect objectBoundingBox() const override final { return m_objectBoundingBox; }
@@ -86,5 +84,4 @@ RENDER_OBJECT_TYPE_CASTS(RenderSVGContainer, isSVGContainer())
 
 } // namespace WebCore
 
-#endif // ENABLE(SVG)
 #endif // RenderSVGContainer_h

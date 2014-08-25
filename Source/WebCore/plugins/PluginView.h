@@ -12,10 +12,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -57,6 +57,11 @@ typedef PlatformWidget PlatformPluginWidget;
 typedef struct _GtkSocket GtkSocket;
 #endif
 
+#if PLATFORM(X11)
+typedef unsigned long Window;
+typedef struct _XDisplay Display;
+#endif
+
 namespace JSC {
     namespace Bindings {
         class Instance;
@@ -65,6 +70,7 @@ namespace JSC {
 
 namespace WebCore {
     class Frame;
+    class FrameView;
     class Image;
     class HTMLPlugInElement;
     class KeyboardEvent;
@@ -233,6 +239,11 @@ namespace WebCore {
         static void keepAlive(NPP);
 #endif
         void keepAlive();
+
+#if PLATFORM(X11)
+        static Display* getPluginDisplay(Frame*);
+        static Window getRootWindow(Frame* parentFrame);
+#endif
 
     private:
         PluginView(Frame* parentFrame, const IntSize&, PluginPackage*, HTMLPlugInElement*, const URL&, const Vector<String>& paramNames, const Vector<String>& paramValues, const String& mimeType, bool loadManually);

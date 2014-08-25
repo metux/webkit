@@ -24,7 +24,6 @@
 
 #include "CSSCharsetRule.h"
 #include "CSSFontFaceRule.h"
-#include "CSSHostRule.h"
 #include "CSSImportRule.h"
 #include "CSSMediaRule.h"
 #include "CSSPageRule.h"
@@ -87,11 +86,6 @@ void StyleRuleBase::destroy()
     case Keyframes:
         delete static_cast<StyleRuleKeyframes*>(this);
         return;
-#if ENABLE(SHADOW_DOM)
-    case HostInternal:
-        delete static_cast<StyleRuleHost*>(this);
-        return;
-#endif
 #if ENABLE(CSS_DEVICE_ADAPTATION)
     case Viewport:
         delete static_cast<StyleRuleViewport*>(this);
@@ -130,10 +124,6 @@ PassRef<StyleRuleBase> StyleRuleBase::copy() const
 #endif
     case Keyframes:
         return static_cast<const StyleRuleKeyframes*>(this)->copy();
-#if ENABLE(SHADOW_DOM)
-    case HostInternal:
-        return static_cast<const StyleRuleHost*>(this)->copy();
-#endif
 #if ENABLE(CSS_DEVICE_ADAPTATION)
     case Viewport:
         return static_cast<const StyleRuleViewport*>(this)->copy();
@@ -192,11 +182,6 @@ PassRefPtr<CSSRule> StyleRuleBase::createCSSOMWrapper(CSSStyleSheet* parentSheet
         rule = WebKitCSSViewportRule::create(static_cast<StyleRuleViewport*>(self), parentSheet);
         break;
 #endif
-#if ENABLE(SHADOW_DOM)
-    case HostInternal:
-        rule = CSSHostRule::create(static_cast<StyleRuleHost*>(self), parentSheet);
-        break;
-#endif
     case Unknown:
     case Charset:
     case Keyframe:
@@ -218,7 +203,7 @@ unsigned StyleRule::averageSizeInBytes()
 
 StyleRule::StyleRule(int sourceLine, PassRef<StyleProperties> properties)
     : StyleRuleBase(Style, sourceLine)
-    , m_properties(std::move(properties))
+    , m_properties(WTF::move(properties))
 {
 }
 
@@ -247,7 +232,7 @@ PassRef<StyleRule> StyleRule::create(int sourceLine, const Vector<const CSSSelec
     for (unsigned i = 0; i < selectors.size(); ++i)
         new (NotNull, &selectorListArray[i]) CSSSelector(*selectors.at(i));
     selectorListArray[selectors.size() - 1].setLastInSelectorList();
-    auto rule = StyleRule::create(sourceLine, std::move(properties));
+    auto rule = StyleRule::create(sourceLine, WTF::move(properties));
     rule.get().parserAdoptSelectorArray(selectorListArray);
     return rule;
 }
@@ -280,7 +265,7 @@ Vector<RefPtr<StyleRule>> StyleRule::splitIntoMultipleRulesWithMaximumSelectorCo
 
 StyleRulePage::StyleRulePage(PassRef<StyleProperties> properties)
     : StyleRuleBase(Page)
-    , m_properties(std::move(properties))
+    , m_properties(WTF::move(properties))
 {
 }
 
@@ -304,7 +289,7 @@ MutableStyleProperties& StyleRulePage::mutableProperties()
 
 StyleRuleFontFace::StyleRuleFontFace(PassRef<StyleProperties> properties)
     : StyleRuleBase(FontFace, 0)
-    , m_properties(std::move(properties))
+    , m_properties(WTF::move(properties))
 {
 }
 
@@ -341,7 +326,7 @@ StyleRuleGroup::StyleRuleGroup(const StyleRuleGroup& o)
 
 void StyleRuleGroup::wrapperInsertRule(unsigned index, PassRef<StyleRuleBase> rule)
 {
-    m_childRules.insert(index, std::move(rule));
+    m_childRules.insert(index, WTF::move(rule));
 }
     
 void StyleRuleGroup::wrapperRemoveRule(unsigned index)
@@ -380,7 +365,7 @@ StyleRuleSupports::StyleRuleSupports(const StyleRuleSupports& o)
 }
 #endif
 
-StyleRuleRegion::StyleRuleRegion(Vector<OwnPtr<CSSParserSelector>>* selectors, Vector<RefPtr<StyleRuleBase>>& adoptRules)
+StyleRuleRegion::StyleRuleRegion(Vector<std::unique_ptr<CSSParserSelector>>* selectors, Vector<RefPtr<StyleRuleBase>>& adoptRules)
     : StyleRuleGroup(Region, adoptRules)
 {
     m_selectorList.adoptSelectorVector(*selectors);
@@ -396,7 +381,7 @@ StyleRuleRegion::StyleRuleRegion(const StyleRuleRegion& o)
 #if ENABLE(CSS_DEVICE_ADAPTATION)
 StyleRuleViewport::StyleRuleViewport(PassRef<StyleProperties> properties)
     : StyleRuleBase(Viewport, 0)
-    , m_properties(std::move(properties))
+    , m_properties(WTF::move(properties))
 {
 }
 

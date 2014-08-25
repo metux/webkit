@@ -21,7 +21,6 @@
 #ifndef SVGPatternElement_h
 #define SVGPatternElement_h
 
-#if ENABLE(SVG)
 #include "SVGAnimatedBoolean.h"
 #include "SVGAnimatedEnumeration.h"
 #include "SVGAnimatedLength.h"
@@ -65,7 +64,7 @@ private:
 
     virtual RenderPtr<RenderElement> createElementRenderer(PassRef<RenderStyle>) override;
 
-    virtual bool selfHasRelativeLengths() const override;
+    virtual bool selfHasRelativeLengths() const override { return true; }
 
     BEGIN_DECLARE_ANIMATED_PROPERTIES(SVGPatternElement)
         DECLARE_ANIMATED_LENGTH(X, x)
@@ -91,5 +90,4 @@ NODE_TYPE_CASTS(SVGPatternElement)
 
 } // namespace WebCore
 
-#endif // ENABLE(SVG)
 #endif

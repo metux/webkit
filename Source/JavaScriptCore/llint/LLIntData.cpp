@@ -25,39 +25,38 @@
 
 #include "config.h"
 #include "LLIntData.h"
-
-#if ENABLE(LLINT)
-
 #include "BytecodeConventions.h"
 #include "CodeType.h"
 #include "Instruction.h"
 #include "JSScope.h"
 #include "LLIntCLoop.h"
+#include "MaxFrameExtentForSlowPathCall.h"
 #include "Opcode.h"
 #include "PropertyOffset.h"
 
 namespace JSC { namespace LLInt {
 
 Instruction* Data::s_exceptionInstructions = 0;
-Opcode* Data::s_opcodeMap = 0;
+Opcode Data::s_opcodeMap[numOpcodeIDs] = { };
+
+#if ENABLE(JIT)
+extern "C" void llint_entry(void*);
+#endif
 
 void initialize()
 {
     Data::s_exceptionInstructions = new Instruction[maxOpcodeLength + 1];
-    Data::s_opcodeMap = new Opcode[numOpcodeIDs];
 
-    #if ENABLE(LLINT_C_LOOP)
+#if !ENABLE(JIT)
     CLoop::initialize();
 
-    #else // !ENABLE(LLINT_C_LOOP)
+#else // ENABLE(JIT)
+    llint_entry(&Data::s_opcodeMap);
+
     for (int i = 0; i < maxOpcodeLength + 1; ++i)
         Data::s_exceptionInstructions[i].u.pointer =
             LLInt::getCodePtr(llint_throw_from_slow_path_trampoline);
-    #define OPCODE_ENTRY(opcode, length) \
-        Data::s_opcodeMap[opcode] = LLInt::getCodePtr(llint_##opcode);
-    FOR_EACH_OPCODE_ID(OPCODE_ENTRY);
-    #undef OPCODE_ENTRY
-    #endif // !ENABLE(LLINT_C_LOOP)
+#endif // ENABLE(JIT)
 }
 
 #if COMPILER(CLANG)
@@ -87,6 +86,7 @@ void Data::performAssertions(VM& vm)
     ASSERT(JSStack::CallFrameHeaderSize == CallFrameHeaderSlots);
 
     ASSERT(!CallFrame::callerFrameOffset());
+    ASSERT(JSStack::CallerFrameAndPCSize == (PtrSize * 2) / SlotSize);
     ASSERT(CallFrame::returnPCOffset() == CallFrame::callerFrameOffset() + PtrSize);
     ASSERT(JSStack::CodeBlock * sizeof(Register) == CallFrame::returnPCOffset() + PtrSize);
     ASSERT(JSStack::ScopeChain * sizeof(Register) == JSStack::CodeBlock * sizeof(Register) + SlotSize);
@@ -123,7 +123,16 @@ void Data::performAssertions(VM& vm)
     ASSERT(ValueUndefined == (TagBitTypeOther | TagBitUndefined));
     ASSERT(ValueNull == TagBitTypeOther);
 #endif
-    ASSERT(StringType == 5);
+#if (CPU(X86_64) && !OS(WINDOWS)) || CPU(ARM64) || !ENABLE(JIT)
+    ASSERT(!maxFrameExtentForSlowPathCall);
+#elif CPU(ARM) || CPU(SH4)
+    ASSERT(maxFrameExtentForSlowPathCall == 24);
+#elif CPU(X86) || CPU(MIPS)
+    ASSERT(maxFrameExtentForSlowPathCall == 40);
+#elif CPU(X86_64) && OS(WINDOWS)
+    ASSERT(maxFrameExtentForSlowPathCall == 64);
+#endif
+    ASSERT(StringType == 6);
     ASSERT(ObjectType == 17);
     ASSERT(FinalObjectType == 18);
     ASSERT(MasqueradesAsUndefined == 1);
@@ -161,5 +170,3 @@ void Data::performAssertions(VM& vm)
 #endif
 
 } } // namespace JSC::LLInt
-
-#endif // ENABLE(LLINT)

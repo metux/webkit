@@ -41,7 +41,6 @@ class ResourceRequest;
 
 namespace WebKit {
 
-class BlobRegistrationData;
 class NetworkConnectionToWebProcess;
 class NetworkResourceLoader;
 class SyncNetworkResourceLoader;
@@ -73,21 +72,25 @@ private:
     void performSynchronousLoad(const NetworkResourceLoadParameters&, PassRefPtr<Messages::NetworkConnectionToWebProcess::PerformSynchronousLoad::DelayedReply>);
 
     void removeLoadIdentifier(ResourceLoadIdentifier);
+    void setDefersLoading(ResourceLoadIdentifier, bool);
     void crossOriginRedirectReceived(ResourceLoadIdentifier, const WebCore::URL& redirectURL);
     void servePendingRequests(uint32_t resourceLoadPriority);
     void setSerialLoadingEnabled(bool);
-    void startDownload(uint64_t sessionID, uint64_t downloadID, const WebCore::ResourceRequest&);
+    void startDownload(WebCore::SessionID, uint64_t downloadID, const WebCore::ResourceRequest&);
     void convertMainResourceLoadToDownload(uint64_t mainResourceLoadIdentifier, uint64_t downloadID, const WebCore::ResourceRequest&, const WebCore::ResourceResponse&);
 
-    void cookiesForDOM(uint64_t sessionID, const WebCore::URL& firstParty, const WebCore::URL&, String& result);
-    void setCookiesFromDOM(uint64_t sessionID, const WebCore::URL& firstParty, const WebCore::URL&, const String&);
-    void cookiesEnabled(uint64_t sessionID, const WebCore::URL& firstParty, const WebCore::URL&, bool& result);
-    void cookieRequestHeaderFieldValue(uint64_t sessionID, const WebCore::URL& firstParty, const WebCore::URL&, String& result);
-    void getRawCookies(uint64_t sessionID, const WebCore::URL& firstParty, const WebCore::URL&, Vector<WebCore::Cookie>&);
-    void deleteCookie(uint64_t sessionID, const WebCore::URL&, const String& cookieName);
+    void cookiesForDOM(WebCore::SessionID, const WebCore::URL& firstParty, const WebCore::URL&, String& result);
+    void setCookiesFromDOM(WebCore::SessionID, const WebCore::URL& firstParty, const WebCore::URL&, const String&);
+    void cookiesEnabled(WebCore::SessionID, const WebCore::URL& firstParty, const WebCore::URL&, bool& result);
+    void cookieRequestHeaderFieldValue(WebCore::SessionID, const WebCore::URL& firstParty, const WebCore::URL&, String& result);
+    void getRawCookies(WebCore::SessionID, const WebCore::URL& firstParty, const WebCore::URL&, Vector<WebCore::Cookie>&);
+    void deleteCookie(WebCore::SessionID, const WebCore::URL&, const String& cookieName);
 
-    void registerBlobURL(const WebCore::URL&, const BlobRegistrationData&);
+    void registerFileBlobURL(const WebCore::URL&, const String& path, const SandboxExtension::Handle&, const String& contentType);
+    void registerBlobURL(const WebCore::URL&, Vector<WebCore::BlobPart>, const String& contentType);
     void registerBlobURLFromURL(const WebCore::URL&, const WebCore::URL& srcURL);
+    void registerBlobURLForSlice(const WebCore::URL&, const WebCore::URL& srcURL, int64_t start, int64_t end);
+    void blobSize(const WebCore::URL&, uint64_t& resultSize);
     void unregisterBlobURL(const WebCore::URL&);
 
     RefPtr<IPC::Connection> m_connection;

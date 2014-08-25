@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012, 2013 Apple Inc. All rights reserved.
+ * Copyright (C) 2012, 2013, 2014 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -35,7 +35,7 @@
 #include "DFGInsertionSet.h"
 #include "DFGPhase.h"
 #include "GetByIdStatus.h"
-#include "Operations.h"
+#include "JSCInlines.h"
 #include "PutByIdStatus.h"
 
 namespace JSC { namespace DFG {
@@ -62,6 +62,16 @@ public:
                 changed |= foldConstants(block);
         }
         
+        if (changed && m_graph.m_form == SSA) {
+            // It's now possible that we have Upsilons pointed at JSConstants. Fix that.
+            for (BlockIndex blockIndex = m_graph.numBlocks(); blockIndex--;) {
+                BasicBlock* block = m_graph.block(blockIndex);
+                if (!block)
+                    continue;
+                fixUpsilons(block);
+            }
+        }
+         
         return changed;
     }
 
@@ -76,13 +86,21 @@ private:
             
             Node* node = block->at(indexInBlock);
 
+            bool alreadyHandled = false;
             bool eliminated = false;
                     
             switch (node->op()) {
+            case BooleanToNumber: {
+                if (node->child1().useKind() == UntypedUse
+                    && !m_interpreter.needsTypeCheck(node->child1(), SpecBoolean))
+                    node->child1().setUseKind(BooleanUse);
+                break;
+            }
+                
             case CheckArgumentsNotCreated: {
                 if (!isEmptySpeculation(
                         m_state.variables().operand(
-                            m_graph.argumentsRegisterFor(node->codeOrigin)).m_type))
+                            m_graph.argumentsRegisterFor(node->origin.semantic)).m_type))
                     break;
                 node->convertToPhantom();
                 eliminated = true;
@@ -97,24 +115,9 @@ private:
                     set = node->structure();
                 else
                     set = node->structureSet();
-                if (value.m_currentKnownStructure.isSubsetOf(set)) {
+                if (value.m_structure.isSubsetOf(set)) {
                     m_interpreter.execute(indexInBlock); // Catch the fact that we may filter on cell.
                     node->convertToPhantom();
-                    eliminated = true;
-                    break;
-                }
-                StructureAbstractValue& structureValue = value.m_futurePossibleStructure;
-                if (structureValue.isSubsetOf(set)
-                    && structureValue.hasSingleton()) {
-                    Structure* structure = structureValue.singleton();
-                    m_interpreter.execute(indexInBlock); // Catch the fact that we may filter on cell.
-                    AdjacencyList children = node->children;
-                    children.removeEdge(0);
-                    if (!!children.child1())
-                        m_insertionSet.insertNode(indexInBlock, SpecNone, Phantom, node->codeOrigin, children);
-                    node->children.setChild2(Edge());
-                    node->children.setChild3(Edge());
-                    node->convertToStructureTransitionWatchpoint(structure);
                     eliminated = true;
                     break;
                 }
@@ -130,8 +133,17 @@ private:
                 break;
             }
                 
+            case PutStructure: {
+                if (m_state.forNode(node->child1()).m_structure.onlyStructure() != node->transition()->next)
+                    break;
+                
+                node->convertToPhantom();
+                eliminated = true;
+                break;
+            }
+                
             case CheckFunction: {
-                if (m_state.forNode(node->child1()).value() != node->function())
+                if (m_state.forNode(node->child1()).value() != node->function()->value())
                     break;
                 node->convertToPhantom();
                 eliminated = true;
@@ -150,210 +162,241 @@ private:
                 
                 break;
             }
+                
+            case MultiGetByOffset: {
+                Edge baseEdge = node->child1();
+                Node* base = baseEdge.node();
+                MultiGetByOffsetData& data = node->multiGetByOffsetData();
+
+                // First prune the variants, then check if the MultiGetByOffset can be
+                // strength-reduced to a GetByOffset.
+                
+                AbstractValue baseValue = m_state.forNode(base);
+                
+                m_interpreter.execute(indexInBlock); // Push CFA over this node after we get the state before.
+                alreadyHandled = true; // Don't allow the default constant folder to do things to this.
+                
+                for (unsigned i = 0; i < data.variants.size(); ++i) {
+                    GetByIdVariant& variant = data.variants[i];
+                    variant.structureSet().filter(baseValue);
+                    if (variant.structureSet().isEmpty()) {
+                        data.variants[i--] = data.variants.last();
+                        data.variants.removeLast();
+                        changed = true;
+                    }
+                }
+                
+                if (data.variants.size() != 1)
+                    break;
+                
+                emitGetByOffset(
+                    indexInBlock, node, baseValue, data.variants[0], data.identifierNumber);
+                changed = true;
+                break;
+            }
+                
+            case MultiPutByOffset: {
+                Edge baseEdge = node->child1();
+                Node* base = baseEdge.node();
+                MultiPutByOffsetData& data = node->multiPutByOffsetData();
+                
+                AbstractValue baseValue = m_state.forNode(base);
+
+                m_interpreter.execute(indexInBlock); // Push CFA over this node after we get the state before.
+                alreadyHandled = true; // Don't allow the default constant folder to do things to this.
+                
+
+                for (unsigned i = 0; i < data.variants.size(); ++i) {
+                    PutByIdVariant& variant = data.variants[i];
+                    variant.oldStructure().filter(baseValue);
+                    
+                    if (variant.oldStructure().isEmpty()) {
+                        data.variants[i--] = data.variants.last();
+                        data.variants.removeLast();
+                        changed = true;
+                        continue;
+                    }
+                    
+                    if (variant.kind() == PutByIdVariant::Transition
+                        && variant.oldStructure().onlyStructure() == variant.newStructure()) {
+                        variant = PutByIdVariant::replace(
+                            variant.oldStructure(),
+                            variant.offset());
+                        changed = true;
+                    }
+                }
+
+                if (data.variants.size() != 1)
+                    break;
+                
+                emitPutByOffset(
+                    indexInBlock, node, baseValue, data.variants[0], data.identifierNumber);
+                changed = true;
+                break;
+            }
         
             case GetById:
             case GetByIdFlush: {
-                CodeOrigin codeOrigin = node->codeOrigin;
                 Edge childEdge = node->child1();
                 Node* child = childEdge.node();
                 unsigned identifierNumber = node->identifierNumber();
                 
-                if (childEdge.useKind() != CellUse)
+                AbstractValue baseValue = m_state.forNode(child);
+
+                m_interpreter.execute(indexInBlock); // Push CFA over this node after we get the state before.
+                alreadyHandled = true; // Don't allow the default constant folder to do things to this.
+
+                if (baseValue.m_structure.isTop() || baseValue.m_structure.isClobbered()
+                    || (node->child1().useKind() == UntypedUse || (baseValue.m_type & ~SpecCell)))
                     break;
-                
-                Structure* structure = m_state.forNode(child).bestProvenStructure();
-                if (!structure)
-                    break;
-                
-                bool needsWatchpoint = !m_state.forNode(child).m_currentKnownStructure.hasSingleton();
-                bool needsCellCheck = m_state.forNode(child).m_type & ~SpecCell;
                 
                 GetByIdStatus status = GetByIdStatus::computeFor(
-                    vm(), structure, m_graph.identifiers()[identifierNumber]);
+                    vm(), baseValue.m_structure.set(), m_graph.identifiers()[identifierNumber]);
+                if (!status.isSimple())
+                    break;
                 
-                if (!status.isSimple()) {
-                    // FIXME: We could handle prototype cases.
-                    // https://bugs.webkit.org/show_bug.cgi?id=110386
+                for (unsigned i = status.numVariants(); i--;) {
+                    if (!status[i].constantChecks().isEmpty()
+                        || status[i].alternateBase()) {
+                        // FIXME: We could handle prototype cases.
+                        // https://bugs.webkit.org/show_bug.cgi?id=110386
+                        break;
+                    }
+                }
+                
+                if (status.numVariants() == 1) {
+                    emitGetByOffset(indexInBlock, node, baseValue, status[0], identifierNumber);
+                    changed = true;
                     break;
                 }
                 
-                ASSERT(status.structureSet().size() == 1);
-                ASSERT(!status.chain());
-                ASSERT(status.structureSet().singletonStructure() == structure);
+                if (!isFTL(m_graph.m_plan.mode))
+                    break;
                 
-                // Now before we do anything else, push the CFA forward over the GetById
-                // and make sure we signal to the loop that it should continue and not
-                // do any eliminations.
-                m_interpreter.execute(indexInBlock);
-                eliminated = true;
-                
-                if (needsWatchpoint) {
-                    m_insertionSet.insertNode(
-                        indexInBlock, SpecNone, StructureTransitionWatchpoint, codeOrigin,
-                        OpInfo(structure), childEdge);
-                } else if (needsCellCheck) {
-                    m_insertionSet.insertNode(
-                        indexInBlock, SpecNone, Phantom, codeOrigin, childEdge);
-                }
-                
-                childEdge.setUseKind(KnownCellUse);
-                
-                Edge propertyStorage;
-                
-                if (isInlineOffset(status.offset()))
-                    propertyStorage = childEdge;
-                else {
-                    propertyStorage = Edge(m_insertionSet.insertNode(
-                        indexInBlock, SpecNone, GetButterfly, codeOrigin, childEdge));
-                }
-                
-                node->convertToGetByOffset(m_graph.m_storageAccessData.size(), propertyStorage);
-                
-                StorageAccessData storageAccessData;
-                storageAccessData.offset = status.offset();
-                storageAccessData.identifierNumber = identifierNumber;
-                m_graph.m_storageAccessData.append(storageAccessData);
+                MultiGetByOffsetData* data = m_graph.m_multiGetByOffsetData.add();
+                data->variants = status.variants();
+                data->identifierNumber = identifierNumber;
+                node->convertToMultiGetByOffset(data);
+                changed = true;
                 break;
             }
                 
             case PutById:
-            case PutByIdDirect: {
-                CodeOrigin codeOrigin = node->codeOrigin;
+            case PutByIdDirect:
+            case PutByIdFlush: {
+                NodeOrigin origin = node->origin;
                 Edge childEdge = node->child1();
                 Node* child = childEdge.node();
                 unsigned identifierNumber = node->identifierNumber();
                 
                 ASSERT(childEdge.useKind() == CellUse);
                 
-                Structure* structure = m_state.forNode(child).bestProvenStructure();
-                if (!structure)
+                AbstractValue baseValue = m_state.forNode(child);
+
+                m_interpreter.execute(indexInBlock); // Push CFA over this node after we get the state before.
+                alreadyHandled = true; // Don't allow the default constant folder to do things to this.
+
+                if (baseValue.m_structure.isTop() || baseValue.m_structure.isClobbered())
                     break;
-                
-                bool needsWatchpoint = !m_state.forNode(child).m_currentKnownStructure.hasSingleton();
-                bool needsCellCheck = m_state.forNode(child).m_type & ~SpecCell;
                 
                 PutByIdStatus status = PutByIdStatus::computeFor(
                     vm(),
-                    m_graph.globalObjectFor(codeOrigin),
-                    structure,
+                    m_graph.globalObjectFor(origin.semantic),
+                    baseValue.m_structure.set(),
                     m_graph.identifiers()[identifierNumber],
                     node->op() == PutByIdDirect);
                 
-                if (!status.isSimpleReplace() && !status.isSimpleTransition())
+                if (!status.isSimple())
                     break;
                 
-                ASSERT(status.oldStructure() == structure);
+                ASSERT(status.numVariants());
                 
-                // Now before we do anything else, push the CFA forward over the PutById
-                // and make sure we signal to the loop that it should continue and not
-                // do any eliminations.
-                m_interpreter.execute(indexInBlock);
-                eliminated = true;
+                if (status.numVariants() > 1 && !isFTL(m_graph.m_plan.mode))
+                    break;
                 
-                if (needsWatchpoint) {
-                    m_insertionSet.insertNode(
-                        indexInBlock, SpecNone, StructureTransitionWatchpoint, codeOrigin,
-                        OpInfo(structure), childEdge);
-                } else if (needsCellCheck) {
-                    m_insertionSet.insertNode(
-                        indexInBlock, SpecNone, Phantom, codeOrigin, childEdge);
+                changed = true;
+                
+                for (unsigned i = status.numVariants(); i--;)
+                    addChecks(origin, indexInBlock, status[i].constantChecks());
+                
+                if (status.numVariants() == 1) {
+                    emitPutByOffset(indexInBlock, node, baseValue, status[0], identifierNumber);
+                    break;
                 }
                 
-                childEdge.setUseKind(KnownCellUse);
+                ASSERT(isFTL(m_graph.m_plan.mode));
+
+                MultiPutByOffsetData* data = m_graph.m_multiPutByOffsetData.add();
+                data->variants = status.variants();
+                data->identifierNumber = identifierNumber;
+                node->convertToMultiPutByOffset(data);
+                break;
+            }
+
+            case ToPrimitive: {
+                if (m_state.forNode(node->child1()).m_type & ~(SpecFullNumber | SpecBoolean | SpecString))
+                    break;
                 
-                StructureTransitionData* transitionData = 0;
-                if (status.isSimpleTransition()) {
-                    transitionData = m_graph.addStructureTransitionData(
-                        StructureTransitionData(structure, status.newStructure()));
-                    
-                    if (node->op() == PutById) {
-                        if (!structure->storedPrototype().isNull()) {
-                            addStructureTransitionCheck(
-                                codeOrigin, indexInBlock,
-                                structure->storedPrototype().asCell());
-                        }
+                node->convertToIdentity();
+                changed = true;
+                break;
+            }
+                
+            case GetMyArgumentByVal: {
+                InlineCallFrame* inlineCallFrame = node->origin.semantic.inlineCallFrame;
+                JSValue value = m_state.forNode(node->child1()).m_value;
+                if (inlineCallFrame && value && value.isInt32()) {
+                    int32_t index = value.asInt32();
+                    if (index >= 0
+                        && static_cast<size_t>(index + 1) < inlineCallFrame->arguments.size()) {
+                        // Roll the interpreter over this.
+                        m_interpreter.execute(indexInBlock);
+                        eliminated = true;
                         
-                        m_graph.chains().addLazily(status.structureChain());
+                        int operand =
+                            inlineCallFrame->stackOffset +
+                            m_graph.baselineCodeBlockFor(inlineCallFrame)->argumentIndexAfterCapture(index);
                         
-                        for (unsigned i = 0; i < status.structureChain()->size(); ++i) {
-                            JSValue prototype = status.structureChain()->at(i)->storedPrototype();
-                            if (prototype.isNull())
-                                continue;
-                            ASSERT(prototype.isCell());
-                            addStructureTransitionCheck(
-                                codeOrigin, indexInBlock, prototype.asCell());
-                        }
+                        m_insertionSet.insertNode(
+                            indexInBlock, SpecNone, CheckArgumentsNotCreated, node->origin);
+                        m_insertionSet.insertNode(
+                            indexInBlock, SpecNone, Phantom, node->origin, node->children);
+                        
+                        node->convertToGetLocalUnlinked(VirtualRegister(operand));
+                        break;
                     }
                 }
                 
-                Edge propertyStorage;
-                
-                if (isInlineOffset(status.offset()))
-                    propertyStorage = childEdge;
-                else if (status.isSimpleReplace() || structure->outOfLineCapacity() == status.newStructure()->outOfLineCapacity()) {
-                    propertyStorage = Edge(m_insertionSet.insertNode(
-                        indexInBlock, SpecNone, GetButterfly, codeOrigin, childEdge));
-                } else if (!structure->outOfLineCapacity()) {
-                    ASSERT(status.newStructure()->outOfLineCapacity());
-                    ASSERT(!isInlineOffset(status.offset()));
-                    Node* allocatePropertyStorage = m_insertionSet.insertNode(
-                        indexInBlock, SpecNone, AllocatePropertyStorage,
-                        codeOrigin, OpInfo(transitionData), childEdge);
-                    m_insertionSet.insertNode(indexInBlock, SpecNone, StoreBarrier, codeOrigin, Edge(node->child1().node(), KnownCellUse));
-                    propertyStorage = Edge(allocatePropertyStorage);
-                } else {
-                    ASSERT(structure->outOfLineCapacity());
-                    ASSERT(status.newStructure()->outOfLineCapacity() > structure->outOfLineCapacity());
-                    ASSERT(!isInlineOffset(status.offset()));
-                    
-                    Node* reallocatePropertyStorage = m_insertionSet.insertNode(
-                        indexInBlock, SpecNone, ReallocatePropertyStorage, codeOrigin,
-                        OpInfo(transitionData), childEdge,
-                        Edge(m_insertionSet.insertNode(
-                            indexInBlock, SpecNone, GetButterfly, codeOrigin, childEdge)));
-                    m_insertionSet.insertNode(indexInBlock, SpecNone, StoreBarrier, codeOrigin, Edge(node->child1().node(), KnownCellUse));
-                    propertyStorage = Edge(reallocatePropertyStorage);
-                }
-                
-                if (status.isSimpleTransition()) {
-                    Node* putStructure = m_graph.addNode(SpecNone, PutStructure, codeOrigin, OpInfo(transitionData), childEdge);
-                    m_insertionSet.insertNode(indexInBlock, SpecNone, StoreBarrier, codeOrigin, Edge(node->child1().node(), KnownCellUse));
-                    m_insertionSet.insert(indexInBlock, putStructure);
-                }
-
-                node->convertToPutByOffset(m_graph.m_storageAccessData.size(), propertyStorage);
-                m_insertionSet.insertNode(indexInBlock, SpecNone, ConditionalStoreBarrier, codeOrigin, 
-                    Edge(node->child2().node(), KnownCellUse), Edge(node->child3().node(), UntypedUse));
-                
-                StorageAccessData storageAccessData;
-                storageAccessData.offset = status.offset();
-                storageAccessData.identifierNumber = identifierNumber;
-                m_graph.m_storageAccessData.append(storageAccessData);
                 break;
             }
-
-            case ConditionalStoreBarrier: {
-                if (!m_interpreter.needsTypeCheck(node->child2().node(), ~SpecCell)) {
-                    node->convertToPhantom();
-                    eliminated = true;
+                
+            case Check: {
+                alreadyHandled = true;
+                m_interpreter.execute(indexInBlock);
+                for (unsigned i = 0; i < AdjacencyList::Size; ++i) {
+                    Edge edge = node->children.child(i);
+                    if (!edge)
+                        break;
+                    if (edge.isProved() || edge.willNotHaveCheck()) {
+                        node->children.removeEdge(i--);
+                        changed = true;
+                    }
                 }
-                break;
-            }
-
-            case StoreBarrier:
-            case StoreBarrierWithNullCheck: {
                 break;
             }
 
             default:
                 break;
             }
-                
+            
             if (eliminated) {
                 changed = true;
                 continue;
             }
                 
+            if (alreadyHandled)
+                continue;
+            
             m_interpreter.execute(indexInBlock);
             if (!m_state.isValid()) {
                 // If we invalidated then we shouldn't attempt to constant-fold. Here's an
@@ -372,31 +415,21 @@ private:
             }
             if (!node->shouldGenerate() || m_state.didClobber() || node->hasConstant())
                 continue;
-            JSValue value = m_state.forNode(node).value();
-            if (!value)
+            
+            // Interesting fact: this freezing that we do right here may turn an fragile value into
+            // a weak value. See DFGValueStrength.h.
+            FrozenValue* value = m_graph.freeze(m_state.forNode(node).value());
+            if (!*value)
                 continue;
             
-            // Check if merging the abstract value of the constant into the abstract value
-            // we've proven for this node wouldn't widen the proof. If it widens the proof
-            // (i.e. says that the set contains more things in it than it previously did)
-            // then we refuse to fold.
-            AbstractValue oldValue = m_state.forNode(node);
-            AbstractValue constantValue;
-            constantValue.set(m_graph, value);
-            if (oldValue.merge(constantValue))
-                continue;
-                
-            CodeOrigin codeOrigin = node->codeOrigin;
+            NodeOrigin origin = node->origin;
             AdjacencyList children = node->children;
             
-            if (node->op() == GetLocal)
-                m_graph.dethread();
-            else
-                ASSERT(!node->hasVariableAccessData(m_graph));
-            
             m_graph.convertToConstant(node, value);
-            m_insertionSet.insertNode(
-                indexInBlock, SpecNone, Phantom, codeOrigin, children);
+            if (!children.isEmpty()) {
+                m_insertionSet.insertNode(
+                    indexInBlock, SpecNone, Phantom, origin, children);
+            }
             
             changed = true;
         }
@@ -405,22 +438,170 @@ private:
         
         return changed;
     }
-
-    void addStructureTransitionCheck(CodeOrigin codeOrigin, unsigned indexInBlock, JSCell* cell)
-    {
-        Node* weakConstant = m_insertionSet.insertNode(
-            indexInBlock, speculationFromValue(cell), WeakJSConstant, codeOrigin, OpInfo(cell));
         
-        if (m_graph.watchpoints().isStillValid(cell->structure()->transitionWatchpointSet())) {
-            m_insertionSet.insertNode(
-                indexInBlock, SpecNone, StructureTransitionWatchpoint, codeOrigin,
-                OpInfo(cell->structure()), Edge(weakConstant, CellUse));
+    void emitGetByOffset(unsigned indexInBlock, Node* node, const AbstractValue& baseValue, const GetByIdVariant& variant, unsigned identifierNumber)
+    {
+        NodeOrigin origin = node->origin;
+        Edge childEdge = node->child1();
+        Node* child = childEdge.node();
+
+        addBaseCheck(indexInBlock, node, baseValue, variant.structureSet());
+        
+        JSValue baseForLoad;
+        if (variant.alternateBase())
+            baseForLoad = variant.alternateBase();
+        else
+            baseForLoad = baseValue.m_value;
+        if (JSValue value = m_graph.tryGetConstantProperty(baseForLoad, variant.baseStructure(), variant.offset())) {
+            m_graph.convertToConstant(node, m_graph.freeze(value));
             return;
         }
+        
+        if (variant.alternateBase()) {
+            child = m_insertionSet.insertConstant(indexInBlock, origin, variant.alternateBase());
+            childEdge = Edge(child, KnownCellUse);
+        } else
+            childEdge.setUseKind(KnownCellUse);
+        
+        Edge propertyStorage;
+        
+        if (isInlineOffset(variant.offset()))
+            propertyStorage = childEdge;
+        else {
+            propertyStorage = Edge(m_insertionSet.insertNode(
+                indexInBlock, SpecNone, GetButterfly, origin, childEdge));
+        }
+        
+        node->convertToGetByOffset(m_graph.m_storageAccessData.size(), propertyStorage);
+        
+        StorageAccessData storageAccessData;
+        storageAccessData.offset = variant.offset();
+        storageAccessData.identifierNumber = identifierNumber;
+        m_graph.m_storageAccessData.append(storageAccessData);
+    }
 
+    void emitPutByOffset(unsigned indexInBlock, Node* node, const AbstractValue& baseValue, const PutByIdVariant& variant, unsigned identifierNumber)
+    {
+        NodeOrigin origin = node->origin;
+        Edge childEdge = node->child1();
+        
+        addBaseCheck(indexInBlock, node, baseValue, variant.oldStructure());
+
+        childEdge.setUseKind(KnownCellUse);
+
+        Transition* transition = 0;
+        if (variant.kind() == PutByIdVariant::Transition) {
+            transition = m_graph.m_transitions.add(
+                variant.oldStructureForTransition(), variant.newStructure());
+        }
+
+        Edge propertyStorage;
+
+        if (isInlineOffset(variant.offset()))
+            propertyStorage = childEdge;
+        else if (!variant.reallocatesStorage()) {
+            propertyStorage = Edge(m_insertionSet.insertNode(
+                indexInBlock, SpecNone, GetButterfly, origin, childEdge));
+        } else if (!variant.oldStructureForTransition()->outOfLineCapacity()) {
+            ASSERT(variant.newStructure()->outOfLineCapacity());
+            ASSERT(!isInlineOffset(variant.offset()));
+            Node* allocatePropertyStorage = m_insertionSet.insertNode(
+                indexInBlock, SpecNone, AllocatePropertyStorage,
+                origin, OpInfo(transition), childEdge);
+            m_insertionSet.insertNode(indexInBlock, SpecNone, StoreBarrier, origin, Edge(node->child1().node(), KnownCellUse));
+            propertyStorage = Edge(allocatePropertyStorage);
+        } else {
+            ASSERT(variant.oldStructureForTransition()->outOfLineCapacity());
+            ASSERT(variant.newStructure()->outOfLineCapacity() > variant.oldStructureForTransition()->outOfLineCapacity());
+            ASSERT(!isInlineOffset(variant.offset()));
+
+            Node* reallocatePropertyStorage = m_insertionSet.insertNode(
+                indexInBlock, SpecNone, ReallocatePropertyStorage, origin,
+                OpInfo(transition), childEdge,
+                Edge(m_insertionSet.insertNode(
+                    indexInBlock, SpecNone, GetButterfly, origin, childEdge)));
+            m_insertionSet.insertNode(indexInBlock, SpecNone, StoreBarrier, origin, Edge(node->child1().node(), KnownCellUse));
+            propertyStorage = Edge(reallocatePropertyStorage);
+        }
+
+        if (variant.kind() == PutByIdVariant::Transition) {
+            Node* putStructure = m_graph.addNode(SpecNone, PutStructure, origin, OpInfo(transition), childEdge);
+            m_insertionSet.insertNode(indexInBlock, SpecNone, StoreBarrier, origin, Edge(node->child1().node(), KnownCellUse));
+            m_insertionSet.insert(indexInBlock, putStructure);
+        }
+
+        node->convertToPutByOffset(m_graph.m_storageAccessData.size(), propertyStorage);
         m_insertionSet.insertNode(
-            indexInBlock, SpecNone, CheckStructure, codeOrigin,
-            OpInfo(m_graph.addStructureSet(cell->structure())), Edge(weakConstant, CellUse));
+            indexInBlock, SpecNone, StoreBarrier, origin, 
+            Edge(node->child2().node(), KnownCellUse));
+
+        StorageAccessData storageAccessData;
+        storageAccessData.offset = variant.offset();
+        storageAccessData.identifierNumber = identifierNumber;
+        m_graph.m_storageAccessData.append(storageAccessData);
+    }
+    
+    void addBaseCheck(
+        unsigned indexInBlock, Node* node, const AbstractValue& baseValue, const StructureSet& set)
+    {
+        if (!baseValue.m_structure.isSubsetOf(set)) {
+            // Arises when we prune MultiGetByOffset. We could have a
+            // MultiGetByOffset with a single variant that checks for structure S,
+            // and the input has structures S and T, for example.
+            m_insertionSet.insertNode(
+                indexInBlock, SpecNone, CheckStructure, node->origin,
+                OpInfo(m_graph.addStructureSet(set)), node->child1());
+            return;
+        }
+        
+        if (baseValue.m_type & ~SpecCell) {
+            m_insertionSet.insertNode(
+                indexInBlock, SpecNone, Phantom, node->origin, node->child1());
+        }
+    }
+    
+    void addChecks(
+        NodeOrigin origin, unsigned indexInBlock, const ConstantStructureCheckVector& checks)
+    {
+        for (unsigned i = 0; i < checks.size(); ++i) {
+            addStructureTransitionCheck(
+                origin, indexInBlock, checks[i].constant(), checks[i].structure());
+        }
+    }
+
+    void addStructureTransitionCheck(NodeOrigin origin, unsigned indexInBlock, JSCell* cell, Structure* structure)
+    {
+        if (m_graph.watchpoints().consider(cell->structure()))
+            return;
+
+        Node* weakConstant = m_insertionSet.insertNode(
+            indexInBlock, speculationFromValue(cell), JSConstant, origin,
+            OpInfo(m_graph.freeze(cell)));
+        
+        m_insertionSet.insertNode(
+            indexInBlock, SpecNone, CheckStructure, origin,
+            OpInfo(m_graph.addStructureSet(structure)), Edge(weakConstant, CellUse));
+    }
+    
+    void fixUpsilons(BasicBlock* block)
+    {
+        for (unsigned nodeIndex = block->size(); nodeIndex--;) {
+            Node* node = block->at(nodeIndex);
+            if (node->op() != Upsilon)
+                continue;
+            switch (node->phi()->op()) {
+            case Phi:
+                break;
+            case JSConstant:
+            case DoubleConstant:
+            case Int52Constant:
+                node->convertToPhantom();
+                break;
+            default:
+                DFG_CRASH(m_graph, node, "Bad Upsilon phi() pointer");
+                break;
+            }
+        }
     }
     
     InPlaceAbstractState m_state;

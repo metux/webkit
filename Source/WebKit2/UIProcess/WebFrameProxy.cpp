@@ -127,6 +127,9 @@ bool WebFrameProxy::isDisplayingPDFDocument() const
 void WebFrameProxy::didStartProvisionalLoad(const String& url)
 {
     m_frameLoadState.didStartProvisionalLoad(url);
+#if ENABLE(CONTENT_FILTERING)
+    m_contentFilterForBlockedLoad = nullptr;
+#endif
 }
 
 void WebFrameProxy::didReceiveServerRedirectForProvisionalLoad(const String& url)
@@ -169,14 +172,14 @@ void WebFrameProxy::didChangeTitle(const String& title)
     m_title = title;
 }
 
-void WebFrameProxy::receivedPolicyDecision(WebCore::PolicyAction action, uint64_t listenerID)
+void WebFrameProxy::receivedPolicyDecision(WebCore::PolicyAction action, uint64_t listenerID, uint64_t navigationID)
 {
     if (!m_page)
         return;
 
     ASSERT(m_activeListener);
     ASSERT(m_activeListener->listenerID() == listenerID);
-    m_page->receivedPolicyDecision(action, this, listenerID);
+    m_page->receivedPolicyDecision(action, this, listenerID, navigationID);
 }
 
 WebFramePolicyListenerProxy* WebFrameProxy::setUpPolicyListenerProxy(uint64_t listenerID)
@@ -195,39 +198,55 @@ WebFormSubmissionListenerProxy* WebFrameProxy::setUpFormSubmissionListenerProxy(
     return static_cast<WebFormSubmissionListenerProxy*>(m_activeListener.get());
 }
 
-void WebFrameProxy::getWebArchive(PassRefPtr<DataCallback> callback)
+void WebFrameProxy::getWebArchive(std::function<void (API::Data*, CallbackBase::Error)> callbackFunction)
 {
     if (!m_page) {
-        callback->invalidate();
+        callbackFunction(nullptr, CallbackBase::Error::Unknown);
         return;
     }
 
-    m_page->getWebArchiveOfFrame(this, callback);
+    m_page->getWebArchiveOfFrame(this, callbackFunction);
 }
 
-void WebFrameProxy::getMainResourceData(PassRefPtr<DataCallback> callback)
+void WebFrameProxy::getMainResourceData(std::function<void (API::Data*, CallbackBase::Error)> callbackFunction)
 {
     if (!m_page) {
-        callback->invalidate();
+        callbackFunction(nullptr, CallbackBase::Error::Unknown);
         return;
     }
 
-    m_page->getMainResourceDataOfFrame(this, callback);
+    m_page->getMainResourceDataOfFrame(this, callbackFunction);
 }
 
-void WebFrameProxy::getResourceData(API::URL* resourceURL, PassRefPtr<DataCallback> callback)
+void WebFrameProxy::getResourceData(API::URL* resourceURL, std::function<void (API::Data*, CallbackBase::Error)> callbackFunction)
 {
     if (!m_page) {
-        callback->invalidate();
+        callbackFunction(nullptr, CallbackBase::Error::Unknown);
         return;
     }
 
-    m_page->getResourceDataFromFrame(this, resourceURL, callback);
+    m_page->getResourceDataFromFrame(this, resourceURL, callbackFunction);
 }
 
 void WebFrameProxy::setUnreachableURL(const String& unreachableURL)
 {
     m_frameLoadState.setUnreachableURL(unreachableURL);
 }
+
+#if ENABLE(CONTENT_FILTERING)
+bool WebFrameProxy::contentFilterDidHandleNavigationAction(const WebCore::ResourceRequest& request)
+{
+#if PLATFORM(IOS)
+    if (m_contentFilterForBlockedLoad) {
+        RefPtr<WebPageProxy> retainedPage = m_page;
+        return m_contentFilterForBlockedLoad->handleUnblockRequestAndDispatchIfSuccessful(request, [retainedPage] {
+            retainedPage->reload(false);
+        });
+    }
+#endif
+
+    return false;
+}
+#endif
 
 } // namespace WebKit

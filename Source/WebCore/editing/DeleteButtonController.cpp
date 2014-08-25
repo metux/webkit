@@ -10,10 +10,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -145,18 +145,18 @@ static HTMLElement* enclosingDeletableElement(const VisibleSelection& selection)
 
     RefPtr<Range> range = selection.toNormalizedRange();
     if (!range)
-        return 0;
+        return nullptr;
 
     Node* container = range->commonAncestorContainer(ASSERT_NO_EXCEPTION);
     ASSERT(container);
 
     // The enclosingNodeOfType function only works on nodes that are editable
-    // (which is strange, given its name).
-    if (!container->hasEditableStyle())
-        return 0;
+    // and capable of having editing positions inside them (which is strange, given its name).
+    if (!container->hasEditableStyle() || editingIgnoresContent(container))
+        return nullptr;
 
     Node* element = enclosingNodeOfType(firstPositionInNode(container), &isDeletableElement);
-    return element && element->isHTMLElement() ? toHTMLElement(element) : 0;
+    return element && element->isHTMLElement() ? toHTMLElement(element) : nullptr;
 }
 
 void DeleteButtonController::respondToChangedSelection(const VisibleSelection& oldSelection)
@@ -245,9 +245,8 @@ void DeleteButtonController::createDeletionUI()
     button->setInlineStyleProperty(CSSPropertyHeight, buttonHeight, CSSPrimitiveValue::CSS_PX);
     button->setInlineStyleProperty(CSSPropertyVisibility, CSSValueVisible);
 
-    float deviceScaleFactor = WebCore::deviceScaleFactor(&m_frame);
     RefPtr<Image> buttonImage;
-    if (deviceScaleFactor >= 2)
+    if (m_target->document().deviceScaleFactor() >= 2)
         buttonImage = Image::loadPlatformResource("deleteButton@2x");
     else
         buttonImage = Image::loadPlatformResource("deleteButton");
@@ -255,7 +254,7 @@ void DeleteButtonController::createDeletionUI()
     if (buttonImage->isNull())
         return;
 
-    button->setCachedImage(new CachedImage(buttonImage.get()));
+    button->setCachedImage(new CachedImage(buttonImage.get(), m_frame.page()->sessionID()));
 
     container->appendChild(button.get(), ec);
     ASSERT(!ec);

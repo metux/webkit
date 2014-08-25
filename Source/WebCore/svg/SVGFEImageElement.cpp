@@ -21,7 +21,7 @@
 
 #include "config.h"
 
-#if ENABLE(SVG) && ENABLE(FILTERS)
+#if ENABLE(FILTERS)
 #include "SVGFEImageElement.h"
 
 #include "Attr.h"
@@ -37,6 +37,7 @@
 #include "SVGNames.h"
 #include "SVGPreserveAspectRatio.h"
 #include "XLinkNames.h"
+#include <wtf/NeverDestroyed.h>
 
 namespace WebCore {
 
@@ -115,14 +116,14 @@ void SVGFEImageElement::buildPendingResource()
 
 bool SVGFEImageElement::isSupportedAttribute(const QualifiedName& attrName)
 {
-    DEFINE_STATIC_LOCAL(HashSet<QualifiedName>, supportedAttributes, ());
-    if (supportedAttributes.isEmpty()) {
+    static NeverDestroyed<HashSet<QualifiedName>> supportedAttributes;
+    if (supportedAttributes.get().isEmpty()) {
         SVGURIReference::addSupportedAttributes(supportedAttributes);
         SVGLangSpace::addSupportedAttributes(supportedAttributes);
         SVGExternalResourcesRequired::addSupportedAttributes(supportedAttributes);
-        supportedAttributes.add(SVGNames::preserveAspectRatioAttr);
+        supportedAttributes.get().add(SVGNames::preserveAspectRatioAttr);
     }
-    return supportedAttributes.contains<SVGAttributeHashTranslator>(attrName);
+    return supportedAttributes.get().contains<SVGAttributeHashTranslator>(attrName);
 }
 
 void SVGFEImageElement::parseAttribute(const QualifiedName& name, const AtomicString& value)
@@ -177,8 +178,12 @@ void SVGFEImageElement::svgAttributeChanged(const QualifiedName& attrName)
 Node::InsertionNotificationRequest SVGFEImageElement::insertedInto(ContainerNode& rootParent)
 {
     SVGFilterPrimitiveStandardAttributes::insertedInto(rootParent);
+    return InsertionShouldCallDidNotifySubtreeInsertions;
+}
+
+void SVGFEImageElement::didNotifySubtreeInsertions(ContainerNode*)
+{
     buildPendingResource();
-    return InsertionDone;
 }
 
 void SVGFEImageElement::removedFrom(ContainerNode& rootParent)
@@ -222,4 +227,4 @@ void SVGFEImageElement::addSubresourceAttributeURLs(ListHashSet<URL>& urls) cons
 
 }
 
-#endif // ENABLE(SVG)
+#endif // ENABLE(FILTERS)

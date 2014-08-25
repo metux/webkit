@@ -29,16 +29,21 @@
 #include "CachedRawResourceClient.h"
 #include "CachedResourceClientWalker.h"
 #include "CachedResourceLoader.h"
+#include "HTTPHeaderNames.h"
 #include "ResourceBuffer.h"
 #include "SubresourceLoader.h"
 #include <wtf/PassRefPtr.h>
+#include <wtf/text/StringView.h>
 
 namespace WebCore {
 
-CachedRawResource::CachedRawResource(ResourceRequest& resourceRequest, Type type)
-    : CachedResource(resourceRequest, type)
+CachedRawResource::CachedRawResource(ResourceRequest& resourceRequest, Type type, SessionID sessionID)
+    : CachedResource(resourceRequest, type, sessionID)
     , m_identifier(0)
+    , m_allowEncodedDataReplacement(true)
 {
+    // FIXME: The wrong CachedResource::Type here may cause a bad cast elsewhere.
+    ASSERT(isMainOrRawResource());
 }
 
 const char* CachedRawResource::calculateIncrementalDataChunk(ResourceBuffer* data, unsigned& incrementalDataLength)
@@ -56,7 +61,7 @@ const char* CachedRawResource::calculateIncrementalDataChunk(ResourceBuffer* dat
 void CachedRawResource::addDataBuffer(ResourceBuffer* data)
 {
     CachedResourceHandle<CachedRawResource> protect(this);
-    ASSERT(m_options.dataBufferingPolicy == BufferData);
+    ASSERT(m_options.dataBufferingPolicy() == BufferData);
     m_data = data;
 
     unsigned incrementalDataLength;
@@ -64,7 +69,7 @@ void CachedRawResource::addDataBuffer(ResourceBuffer* data)
     if (data)
         setEncodedSize(data->size());
     notifyClientsDataWasReceived(incrementalData, incrementalDataLength);
-    if (m_options.dataBufferingPolicy == DoNotBufferData) {
+    if (m_options.dataBufferingPolicy() == DoNotBufferData) {
         if (m_loader)
             m_loader->setDataBufferingPolicy(DoNotBufferData);
         clear();
@@ -73,14 +78,14 @@ void CachedRawResource::addDataBuffer(ResourceBuffer* data)
 
 void CachedRawResource::addData(const char* data, unsigned length)
 {
-    ASSERT(m_options.dataBufferingPolicy == DoNotBufferData);
+    ASSERT(m_options.dataBufferingPolicy() == DoNotBufferData);
     notifyClientsDataWasReceived(data, length);
 }
 
 void CachedRawResource::finishLoading(ResourceBuffer* data)
 {
     CachedResourceHandle<CachedRawResource> protect(this);
-    DataBufferingPolicy dataBufferingPolicy = m_options.dataBufferingPolicy;
+    DataBufferingPolicy dataBufferingPolicy = m_options.dataBufferingPolicy();
     if (dataBufferingPolicy == BufferData) {
         m_data = data;
 
@@ -91,8 +96,10 @@ void CachedRawResource::finishLoading(ResourceBuffer* data)
         notifyClientsDataWasReceived(incrementalData, incrementalDataLength);
     }
 
+    m_allowEncodedDataReplacement = !m_loader->isQuickLookResource();
+
     CachedResource::finishLoading(data);
-    if (dataBufferingPolicy == BufferData && m_options.dataBufferingPolicy == DoNotBufferData) {
+    if (dataBufferingPolicy == BufferData && m_options.dataBufferingPolicy() == DoNotBufferData) {
         if (m_loader)
             m_loader->setDataBufferingPolicy(DoNotBufferData);
         clear();
@@ -181,7 +188,7 @@ void CachedRawResource::switchClientsToRevalidatedResource()
     ASSERT(m_loader);
     // If we're in the middle of a successful revalidation, responseReceived() hasn't been called, so we haven't set m_identifier.
     ASSERT(!m_identifier);
-    static_cast<CachedRawResource*>(resourceToRevalidate())->m_identifier = m_loader->identifier();
+    toCachedRawResource(resourceToRevalidate())->m_identifier = m_loader->identifier();
     CachedResource::switchClientsToRevalidatedResource();
 }
 
@@ -193,28 +200,33 @@ void CachedRawResource::setDefersLoading(bool defers)
 
 void CachedRawResource::setDataBufferingPolicy(DataBufferingPolicy dataBufferingPolicy)
 {
-    m_options.dataBufferingPolicy = dataBufferingPolicy;
+    m_options.setDataBufferingPolicy(dataBufferingPolicy);
 }
 
-static bool shouldIgnoreHeaderForCacheReuse(AtomicString headerName)
+static bool shouldIgnoreHeaderForCacheReuse(const String& headerName)
 {
+    HTTPHeaderName name;
+    if (!findHTTPHeaderName(headerName, name))
+        return false;
+
+    switch (name) {
     // FIXME: This list of headers that don't affect cache policy almost certainly isn't complete.
-    DEFINE_STATIC_LOCAL(HashSet<AtomicString>, m_headers, ());
-    if (m_headers.isEmpty()) {
-        m_headers.add("Accept");
-        m_headers.add("Cache-Control");
-        m_headers.add("Origin");
-        m_headers.add("Pragma");
-        m_headers.add("Purpose");
-        m_headers.add("Referer");
-        m_headers.add("User-Agent");
+    case HTTPHeaderName::Accept:
+    case HTTPHeaderName::CacheControl:
+    case HTTPHeaderName::Pragma:
+    case HTTPHeaderName::Purpose:
+    case HTTPHeaderName::Referer:
+    case HTTPHeaderName::UserAgent:
+        return true;
+
+    default:
+        return false;
     }
-    return m_headers.contains(headerName);
 }
 
 bool CachedRawResource::canReuse(const ResourceRequest& newRequest) const
 {
-    if (m_options.dataBufferingPolicy == DoNotBufferData)
+    if (m_options.dataBufferingPolicy() == DoNotBufferData)
         return false;
 
     if (m_resourceRequest.httpMethod() != newRequest.httpMethod())
@@ -233,17 +245,13 @@ bool CachedRawResource::canReuse(const ResourceRequest& newRequest) const
     const HTTPHeaderMap& newHeaders = newRequest.httpHeaderFields();
     const HTTPHeaderMap& oldHeaders = m_resourceRequest.httpHeaderFields();
 
-    HTTPHeaderMap::const_iterator end = newHeaders.end();
-    for (HTTPHeaderMap::const_iterator i = newHeaders.begin(); i != end; ++i) {
-        AtomicString headerName = i->key;
-        if (!shouldIgnoreHeaderForCacheReuse(headerName) && i->value != oldHeaders.get(headerName))
+    for (const auto& header : newHeaders) {
+        if (!shouldIgnoreHeaderForCacheReuse(header.key) && header.value != oldHeaders.get(header.key))
             return false;
     }
 
-    end = oldHeaders.end();
-    for (HTTPHeaderMap::const_iterator i = oldHeaders.begin(); i != end; ++i) {
-        AtomicString headerName = i->key;
-        if (!shouldIgnoreHeaderForCacheReuse(headerName) && i->value != newHeaders.get(headerName))
+    for (const auto& header : oldHeaders) {
+        if (!shouldIgnoreHeaderForCacheReuse(header.key) && header.value != newHeaders.get(header.key))
             return false;
     }
 

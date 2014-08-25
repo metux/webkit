@@ -26,8 +26,8 @@
 
 #include "FloatRect.h"
 #include "FontCache.h"
-#include "IntPoint.h"
 #include "GlyphBuffer.h"
+#include "LayoutRect.h"
 #include "TextRun.h"
 #include "WidthIterator.h"
 #include <wtf/MainThread.h>
@@ -62,6 +62,11 @@ const uint8_t Font::s_roundingHackCharacterTable[256] = {
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
 };
+
+static bool isDrawnWithSVGFont(const TextRun& run)
+{
+    return run.renderingContext();
+}
 
 static bool useBackslashAsYenSignForFamily(const AtomicString& family)
 {
@@ -210,7 +215,7 @@ struct FontGlyphsCacheKey {
 struct FontGlyphsCacheEntry {
     WTF_MAKE_FAST_ALLOCATED;
 public:
-    FontGlyphsCacheEntry(FontGlyphsCacheKey&& k, PassRef<FontGlyphs> g) : key(k), glyphs(std::move(g)) { }
+    FontGlyphsCacheEntry(FontGlyphsCacheKey&& k, PassRef<FontGlyphs> g) : key(WTF::move(k)), glyphs(WTF::move(g)) { }
     FontGlyphsCacheKey key;
     Ref<FontGlyphs> glyphs;
 };
@@ -234,7 +239,7 @@ static bool operator==(const FontGlyphsCacheKey& a, const FontGlyphsCacheKey& b)
 
 static FontGlyphsCache& fontGlyphsCache()
 {
-    DEFINE_STATIC_LOCAL(FontGlyphsCache, cache, ());
+    DEPRECATED_DEFINE_STATIC_LOCAL(FontGlyphsCache, cache, ());
     return cache;
 }
 
@@ -302,7 +307,7 @@ static PassRef<FontGlyphs> retrieveOrAddCachedFontGlyphs(const FontDescription& 
         return addResult.iterator->value->glyphs.get();
 
     OwnPtr<FontGlyphsCacheEntry>& newEntry = addResult.iterator->value;
-    newEntry = adoptPtr(new FontGlyphsCacheEntry(std::move(key), FontGlyphs::create(fontSelector)));
+    newEntry = adoptPtr(new FontGlyphsCacheEntry(WTF::move(key), FontGlyphs::create(fontSelector)));
     PassRef<FontGlyphs> glyphs = newEntry->glyphs.get();
 
     static const unsigned unreferencedPruneInterval = 50;
@@ -334,7 +339,12 @@ float Font::drawText(GraphicsContext* context, const TextRun& run, const FloatPo
 
     to = (to == -1 ? run.length() : to);
 
-    if (codePath(run) != Complex)
+    CodePath codePathToUse = codePath(run);
+    // FIXME: Use the fast code path once it handles partial runs with kerning and ligatures. See http://webkit.org/b/100050
+    if (codePathToUse != Complex && typesettingFeatures() && (from || to != run.length()) && !isDrawnWithSVGFont(run))
+        codePathToUse = Complex;
+
+    if (codePathToUse != Complex)
         return drawSimpleText(context, run, point, from, to);
 
     return drawComplexText(context, run, point, from, to);
@@ -348,7 +358,12 @@ void Font::drawEmphasisMarks(GraphicsContext* context, const TextRun& run, const
     if (to < 0)
         to = run.length();
 
-    if (codePath(run) != Complex)
+    CodePath codePathToUse = codePath(run);
+    // FIXME: Use the fast code path once it handles partial runs with kerning and ligatures. See http://webkit.org/b/100050
+    if (codePathToUse != Complex && typesettingFeatures() && (from || to != run.length()) && !isDrawnWithSVGFont(run))
+        codePathToUse = Complex;
+
+    if (codePathToUse != Complex)
         drawEmphasisMarksForSimpleText(context, run, mark, point, from, to);
     else
         drawEmphasisMarksForComplexText(context, run, mark, point, from, to);
@@ -390,8 +405,8 @@ float Font::width(const TextRun& run, HashSet<const SimpleFontData*>* fallbackFo
 float Font::width(const TextRun& run, int& charsConsumed, String& glyphName) const
 {
 #if ENABLE(SVG_FONTS)
-    if (TextRun::RenderingContext* renderingContext = run.renderingContext())
-        return renderingContext->floatWidthUsingSVGFont(*this, run, charsConsumed, glyphName);
+    if (isDrawnWithSVGFont(run))
+        return run.renderingContext()->floatWidthUsingSVGFont(*this, run, charsConsumed, glyphName);
 #endif
 
     charsConsumed = run.length();
@@ -399,7 +414,7 @@ float Font::width(const TextRun& run, int& charsConsumed, String& glyphName) con
     return width(run);
 }
 
-#if !PLATFORM(MAC)
+#if !PLATFORM(COCOA)
 PassOwnPtr<TextLayout> Font::createLayout(RenderText*, float, bool) const
 {
     return nullptr;
@@ -416,19 +431,101 @@ float Font::width(TextLayout&, unsigned, unsigned, HashSet<const SimpleFontData*
 }
 #endif
 
-FloatRect Font::selectionRectForText(const TextRun& run, const FloatPoint& point, int h, int from, int to) const
+
+
+static const char* fontFamiliesWithInvalidCharWidth[] = {
+    "American Typewriter",
+    "Arial Hebrew",
+    "Chalkboard",
+    "Cochin",
+    "Corsiva Hebrew",
+    "Courier",
+    "Euphemia UCAS",
+    "Geneva",
+    "Gill Sans",
+    "Hei",
+    "Helvetica",
+    "Hoefler Text",
+    "InaiMathi",
+    "Kai",
+    "Lucida Grande",
+    "Marker Felt",
+    "Monaco",
+    "Mshtakan",
+    "New Peninim MT",
+    "Osaka",
+    "Raanana",
+    "STHeiti",
+    "Symbol",
+    "Times",
+    "Apple Braille",
+    "Apple LiGothic",
+    "Apple LiSung",
+    "Apple Symbols",
+    "AppleGothic",
+    "AppleMyungjo",
+    "#GungSeo",
+    "#HeadLineA",
+    "#PCMyungjo",
+    "#PilGi",
+};
+
+// For font families where any of the fonts don't have a valid entry in the OS/2 table
+// for avgCharWidth, fallback to the legacy webkit behavior of getting the avgCharWidth
+// from the width of a '0'. This only seems to apply to a fixed number of Mac fonts,
+// but, in order to get similar rendering across platforms, we do this check for
+// all platforms.
+bool Font::hasValidAverageCharWidth() const
+{
+    AtomicString family = firstFamily();
+    if (family.isEmpty())
+        return false;
+
+#if PLATFORM(MAC) || PLATFORM(IOS)
+    // Internal fonts on OS X and iOS also have an invalid entry in the table for avgCharWidth.
+    if (primaryFontDataIsSystemFont())
+        return false;
+#endif
+
+    static HashSet<AtomicString>* fontFamiliesWithInvalidCharWidthMap = 0;
+
+    if (!fontFamiliesWithInvalidCharWidthMap) {
+        fontFamiliesWithInvalidCharWidthMap = new HashSet<AtomicString>;
+
+        for (size_t i = 0; i < WTF_ARRAY_LENGTH(fontFamiliesWithInvalidCharWidth); ++i)
+            fontFamiliesWithInvalidCharWidthMap->add(AtomicString(fontFamiliesWithInvalidCharWidth[i]));
+    }
+
+    return !fontFamiliesWithInvalidCharWidthMap->contains(family);
+}
+
+bool Font::fastAverageCharWidthIfAvailable(float& width) const
+{
+    bool success = hasValidAverageCharWidth();
+    if (success)
+        width = roundf(primaryFont()->avgCharWidth()); // FIXME: primaryFont() might not correspond to firstFamily().
+    return success;
+}
+
+void Font::adjustSelectionRectForText(const TextRun& run, LayoutRect& selectionRect, int from, int to) const
 {
     to = (to == -1 ? run.length() : to);
 
-    if (codePath(run) != Complex)
-        return selectionRectForSimpleText(run, point, h, from, to);
+    CodePath codePathToUse = codePath(run);
+    // FIXME: Use the fast code path once it handles partial runs with kerning and ligatures. See http://webkit.org/b/100050
+    if (codePathToUse != Complex && typesettingFeatures() && (from || to != run.length()) && !isDrawnWithSVGFont(run))
+        codePathToUse = Complex;
 
-    return selectionRectForComplexText(run, point, h, from, to);
+    if (codePathToUse != Complex)
+        return adjustSelectionRectForSimpleText(run, selectionRect, from, to);
+
+    return adjustSelectionRectForComplexText(run, selectionRect, from, to);
 }
 
 int Font::offsetForPosition(const TextRun& run, float x, bool includePartialGlyphs) const
 {
-    if (codePath(run) != Complex)
+    // FIXME: Use the fast code path once it handles partial runs with kerning and ligatures. See http://webkit.org/b/100050
+    if (codePath(run) != Complex && (!typesettingFeatures() || isDrawnWithSVGFont(run)))
         return offsetForPositionForSimpleText(run, x, includePartialGlyphs);
 
     return offsetForPositionForComplexText(run, x, includePartialGlyphs);
@@ -495,7 +592,7 @@ Font::CodePath Font::codePath(const TextRun& run) const
         return s_codePath;
 
 #if ENABLE(SVG_FONTS)
-    if (run.renderingContext())
+    if (isDrawnWithSVGFont(run))
         return Simple;
 #endif
 
@@ -955,6 +1052,58 @@ bool Font::canReceiveTextEmphasis(UChar32 c)
         return false;
 
     return true;
+}
+    
+GlyphToPathTranslator::GlyphUnderlineType computeUnderlineType(const TextRun& textRun, const GlyphBuffer& glyphBuffer, int index)
+{
+    // In general, we want to skip descenders. However, skipping descenders on CJK characters leads to undesirable renderings,
+    // so we want to draw through CJK characters (on a character-by-character basis).
+    UChar32 baseCharacter;
+    int offsetInString = glyphBuffer.offsetInString(index);
+
+    if (offsetInString == GlyphBuffer::kNoOffset) {
+        // We have no idea which character spawned this glyph. Bail.
+        return GlyphToPathTranslator::GlyphUnderlineType::DrawOverGlyph;
+    }
+    
+    if (textRun.is8Bit())
+        baseCharacter = textRun.characters8()[offsetInString];
+    else
+        U16_NEXT(textRun.characters16(), offsetInString, textRun.length(), baseCharacter);
+    
+    // u_getIntPropertyValue with UCHAR_IDEOGRAPHIC doesn't return true for Japanese or Korean codepoints.
+    // Instead, we can use the "Unicode allocation block" for the character.
+    UBlockCode blockCode = ublock_getCode(baseCharacter);
+    switch (blockCode) {
+    case UBLOCK_CJK_RADICALS_SUPPLEMENT:
+    case UBLOCK_CJK_SYMBOLS_AND_PUNCTUATION:
+    case UBLOCK_ENCLOSED_CJK_LETTERS_AND_MONTHS:
+    case UBLOCK_CJK_COMPATIBILITY:
+    case UBLOCK_CJK_UNIFIED_IDEOGRAPHS_EXTENSION_A:
+    case UBLOCK_CJK_UNIFIED_IDEOGRAPHS:
+    case UBLOCK_CJK_COMPATIBILITY_IDEOGRAPHS:
+    case UBLOCK_CJK_COMPATIBILITY_FORMS:
+    case UBLOCK_CJK_UNIFIED_IDEOGRAPHS_EXTENSION_B:
+    case UBLOCK_CJK_COMPATIBILITY_IDEOGRAPHS_SUPPLEMENT:
+    case UBLOCK_CJK_STROKES:
+    case UBLOCK_CJK_UNIFIED_IDEOGRAPHS_EXTENSION_C:
+    case UBLOCK_CJK_UNIFIED_IDEOGRAPHS_EXTENSION_D:
+    case UBLOCK_IDEOGRAPHIC_DESCRIPTION_CHARACTERS:
+    case UBLOCK_LINEAR_B_IDEOGRAMS:
+    case UBLOCK_ENCLOSED_IDEOGRAPHIC_SUPPLEMENT:
+    case UBLOCK_HIRAGANA:
+    case UBLOCK_KATAKANA:
+    case UBLOCK_BOPOMOFO:
+    case UBLOCK_BOPOMOFO_EXTENDED:
+    case UBLOCK_HANGUL_JAMO:
+    case UBLOCK_HANGUL_COMPATIBILITY_JAMO:
+    case UBLOCK_HANGUL_SYLLABLES:
+    case UBLOCK_HANGUL_JAMO_EXTENDED_A:
+    case UBLOCK_HANGUL_JAMO_EXTENDED_B:
+        return GlyphToPathTranslator::GlyphUnderlineType::DrawOverGlyph;
+    default:
+        return GlyphToPathTranslator::GlyphUnderlineType::SkipDescenders;
+    }
 }
 
 }

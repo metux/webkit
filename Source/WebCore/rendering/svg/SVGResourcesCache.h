@@ -20,10 +20,10 @@
 #ifndef SVGResourcesCache_h
 #define SVGResourcesCache_h
 
-#if ENABLE(SVG)
 #include "RenderStyleConstants.h"
+#include <memory>
 #include <wtf/HashMap.h>
-#include <wtf/OwnPtr.h>
+#include <wtf/Noncopyable.h>
 
 namespace WebCore {
 
@@ -63,11 +63,10 @@ private:
     void addResourcesFromRenderer(RenderElement&, const RenderStyle&);
     void removeResourcesFromRenderer(RenderElement&);
 
-    typedef HashMap<const RenderObject*, OwnPtr<SVGResources>> CacheMap;
+    typedef HashMap<const RenderObject*, std::unique_ptr<SVGResources>> CacheMap;
     CacheMap m_cache;
 };
 
 }
 
-#endif
 #endif

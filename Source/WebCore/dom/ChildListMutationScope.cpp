@@ -43,14 +43,14 @@ namespace WebCore {
 typedef HashMap<ContainerNode*, ChildListMutationAccumulator*> AccumulatorMap;
 static AccumulatorMap& accumulatorMap()
 {
-    DEFINE_STATIC_LOCAL(AccumulatorMap, map, ());
+    DEPRECATED_DEFINE_STATIC_LOCAL(AccumulatorMap, map, ());
     return map;
 }
 
-ChildListMutationAccumulator::ChildListMutationAccumulator(ContainerNode& target, PassOwnPtr<MutationObserverInterestGroup> observers)
+ChildListMutationAccumulator::ChildListMutationAccumulator(ContainerNode& target, std::unique_ptr<MutationObserverInterestGroup> observers)
     : m_target(target)
-    , m_lastAdded(0)
-    , m_observers(observers)
+    , m_lastAdded(nullptr)
+    , m_observers(WTF::move(observers))
 {
 }
 

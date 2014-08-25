@@ -30,7 +30,7 @@
 #include <WebCore/ResourceRequest.h>
 #include <wtf/Noncopyable.h>
 
-#if PLATFORM(MAC)
+#if PLATFORM(COCOA)
 #include <wtf/RetainPtr.h>
 
 OBJC_CLASS NSURLDownload;
@@ -40,6 +40,7 @@ OBJC_CLASS WKDownloadAsDelegate;
 #if PLATFORM(GTK) || PLATFORM(EFL)
 #include <WebCore/ResourceHandle.h>
 #include <WebCore/ResourceHandleClient.h>
+#include <memory>
 #endif
 
 #if USE(CFNETWORK)
@@ -99,6 +100,8 @@ public:
     static void receivedCredential(const WebCore::AuthenticationChallenge&, const WebCore::Credential&);
     static void receivedRequestToContinueWithoutCredential(const WebCore::AuthenticationChallenge&);
     static void receivedCancellation(const WebCore::AuthenticationChallenge&);
+    static void receivedRequestToPerformDefaultHandling(const WebCore::AuthenticationChallenge&);
+    static void receivedChallengeRejection(const WebCore::AuthenticationChallenge&);
 
     void useCredential(const WebCore::AuthenticationChallenge&, const WebCore::Credential&);
     void continueWithoutCredential(const WebCore::AuthenticationChallenge&);
@@ -119,7 +122,7 @@ private:
 
     RefPtr<SandboxExtension> m_sandboxExtension;
 
-#if PLATFORM(MAC)
+#if PLATFORM(COCOA)
     RetainPtr<NSURLDownload> m_nsURLDownload;
     RetainPtr<WKDownloadAsDelegate> m_delegate;
 #endif
@@ -131,7 +134,7 @@ private:
     RefPtr<DownloadAuthenticationClient> m_authenticationClient;
 #endif
 #if PLATFORM(GTK) || PLATFORM(EFL)
-    OwnPtr<WebCore::ResourceHandleClient> m_downloadClient;
+    std::unique_ptr<WebCore::ResourceHandleClient> m_downloadClient;
     RefPtr<WebCore::ResourceHandle> m_resourceHandle;
 #endif
 };

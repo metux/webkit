@@ -29,6 +29,7 @@
 #include "JSCJSValueInlines.h"
 #include "Lexer.h"
 #include "NodeInfo.h"
+#include "JSCInlines.h"
 #include "SourceProvider.h"
 #include "VM.h"
 #include <utility>
@@ -49,7 +50,7 @@
 #define failWithMessage(...) do { { handleErrorToken(); updateErrorMessage(true, __VA_ARGS__); } return 0; } while (0)
 #define failWithStackOverflow() do { updateErrorMessage(false, "Stack exhausted"); m_hasStackOverflow = true; return 0; } while (0)
 #define failIfFalse(cond, ...) do { if (!(cond)) { handleErrorToken(); internalFailWithMessage(true, __VA_ARGS__); } } while (0)
-#define failIfTrue(cond, ...) do { if ((cond)) { handleErrorToken(); internalFailWithMessage(true, __VA_ARGS__); } } while (0)
+#define failIfTrue(cond, ...) do { if (cond) { handleErrorToken(); internalFailWithMessage(true, __VA_ARGS__); } } while (0)
 #define failIfTrueIfStrict(cond, ...) do { if ((cond) && strictMode()) internalFailWithMessage(false, __VA_ARGS__); } while (0)
 #define failIfFalseIfStrict(cond, ...) do { if ((!(cond)) && strictMode()) internalFailWithMessage(false, __VA_ARGS__); } while (0)
 #define consumeOrFail(tokenType, ...) do { if (!consume(tokenType)) { handleErrorToken(); internalFailWithMessage(true, __VA_ARGS__); } } while (0)
@@ -57,7 +58,7 @@
 #define matchOrFail(tokenType, ...) do { if (!match(tokenType)) { handleErrorToken(); internalFailWithMessage(true, __VA_ARGS__); } } while (0)
 #define failIfStackOverflow() do { if (!canRecurse()) failWithStackOverflow(); } while (0)
 #define semanticFail(...) do { internalFailWithMessage(false, __VA_ARGS__); } while (0)
-#define semanticFailIfTrue(cond, ...) do { if ((cond)) internalFailWithMessage(false, __VA_ARGS__); } while (0)
+#define semanticFailIfTrue(cond, ...) do { if (cond) internalFailWithMessage(false, __VA_ARGS__); } while (0)
 #define semanticFailIfFalse(cond, ...) do { if (!(cond)) internalFailWithMessage(false, __VA_ARGS__); } while (0)
 #define regexFail(failure) do { setErrorMessage(failure); return 0; } while (0)
 #define failDueToUnexpectedToken() do {\
@@ -204,8 +205,9 @@ Parser<LexerType>::Parser(VM* vm, const SourceCode& source, FunctionParameters* 
     , m_lastIdentifier(0)
     , m_lastFunctionName(nullptr)
     , m_sourceElements(0)
+    , m_parsingBuiltin(strictness == JSParseBuiltin)
 {
-    m_lexer = adoptPtr(new LexerType(vm));
+    m_lexer = adoptPtr(new LexerType(vm, strictness));
     m_arena = m_vm->parserArena.get();
     m_lexer->setCode(source, m_arena);
     m_token.m_location.line = source.firstLine();
@@ -219,11 +221,25 @@ Parser<LexerType>::Parser(VM* vm, const SourceCode& source, FunctionParameters* 
     if (strictness == JSParseStrict)
         scope->setStrictMode();
     if (parameters) {
+        bool hadBindingParameters = false;
         for (unsigned i = 0; i < parameters->size(); i++) {
             auto parameter = parameters->at(i);
-            if (!parameter->isBindingNode())
+            if (!parameter->isBindingNode()) {
+                hadBindingParameters = true;
                 continue;
+            }
             scope->declareParameter(&static_cast<BindingNode*>(parameter)->boundProperty());
+        }
+        if (hadBindingParameters) {
+            Vector<Identifier> boundParameterNames;
+            for (unsigned i = 0; i < parameters->size(); i++) {
+                auto parameter = parameters->at(i);
+                if (parameter->isBindingNode())
+                    continue;
+                parameter->collectBoundIdentifiers(boundParameterNames);
+            }
+            for (auto& boundParameterName : boundParameterNames)
+                scope->declareVariable(&boundParameterName);
         }
     }
     if (!name.isNull())
@@ -256,6 +272,7 @@ String Parser<LexerType>::parseInner()
     IdentifierSet capturedVariables;
     bool modifiedParameter = false;
     scope->getCapturedVariables(capturedVariables, modifiedParameter);
+    
     CodeFeatures features = context.features();
     if (scope->strictMode())
         features |= StrictModeFeature;
@@ -263,21 +280,36 @@ String Parser<LexerType>::parseInner()
         features |= ShadowsArgumentsFeature;
     if (modifiedParameter)
         features |= ModifiedParameterFeature;
-
+    
+    Vector<RefPtr<StringImpl>> closedVariables;
+    if (m_parsingBuiltin) {
+        RELEASE_ASSERT(!capturedVariables.size());
+        IdentifierSet usedVariables;
+        scope->getUsedVariables(usedVariables);
+        for (const auto& variable : usedVariables) {
+            if (scope->hasDeclaredVariable(Identifier(m_vm, variable.get())))
+                continue;
+            
+            if (scope->hasDeclaredParameter(Identifier(m_vm, variable.get())))
+                continue;
+            closedVariables.append(variable);
+        }
+    }
     didFinishParsing(sourceElements, context.varDeclarations(), context.funcDeclarations(), features,
-        context.numConstants(), capturedVariables);
+        context.numConstants(), capturedVariables, WTF::move(closedVariables));
 
     return parseError;
 }
 
 template <typename LexerType>
 void Parser<LexerType>::didFinishParsing(SourceElements* sourceElements, ParserArenaData<DeclarationStacks::VarStack>* varStack, 
-    ParserArenaData<DeclarationStacks::FunctionStack>* funcStack, CodeFeatures features, int numConstants, IdentifierSet& capturedVars)
+    ParserArenaData<DeclarationStacks::FunctionStack>* funcStack, CodeFeatures features, int numConstants, IdentifierSet& capturedVars, const Vector<RefPtr<StringImpl>>&& closedVariables)
 {
     m_sourceElements = sourceElements;
     m_varDeclarations = varStack;
     m_funcDeclarations = funcStack;
     m_capturedVariables.swap(capturedVars);
+    m_closedVariables = closedVariables;
     m_features = features;
     m_numConstants = numConstants;
 }
@@ -452,8 +484,9 @@ template <class TreeBuilder> TreeExpression Parser<LexerType>::parseVarDeclarati
             lastPattern = pattern;
             if (hasInitializer) {
                 next(TreeBuilder::DontBuildStrings); // consume '='
-                TreeExpression rhs = parseExpression(context);
+                TreeExpression rhs = parseAssignmentExpression(context);
                 node = context.createDeconstructingAssignment(location, pattern, rhs);
+                lastInitializer = rhs;
             }
         }
         
@@ -475,7 +508,7 @@ template <class TreeBuilder> TreeDeconstructionPattern Parser<LexerType>::create
     ASSERT(!name.isEmpty());
     ASSERT(!name.isNull());
     
-    ASSERT(name.impl()->isIdentifier());
+    ASSERT(name.impl()->isAtomic());
     if (depth) {
         if (kind == DeconstructToVariables)
             failIfFalseIfStrict(declareVariable(&name), "Cannot deconstruct to a variable named '", name.impl(), "' in strict mode");
@@ -498,7 +531,8 @@ template <class TreeBuilder> TreeDeconstructionPattern Parser<LexerType>::create
             }
         }
         if (kind != DeconstructToExpressions)
-            context.addVar(&name, kind == DeconstructToParameters ? 0 : DeclarationStacks::HasInitializer);
+            context.addVar(&name, DeclarationStacks::HasInitializer);
+
     } else {
         if (kind == DeconstructToVariables) {
             failIfFalseIfStrict(declareVariable(&name), "Cannot declare a variable named '", name.impl(), "' in strict mode");
@@ -701,18 +735,21 @@ template <class TreeBuilder> TreeStatement Parser<LexerType>::parseForStatement(
         if (match(SEMICOLON))
             goto standardForLoop;
         
-        failIfFalse(declarations == 1, "must declare variables after 'var'");
-        failIfTrue(forInInitializer, "Cannot use initialiser syntax in a for-in loop");
-        
+        failIfFalse(declarations == 1, "can only declare a single variable in an enumeration");
+        failIfTrueIfStrict(forInInitializer, "Cannot use initialiser syntax in a strict mode enumeration");
+
+        if (forInInitializer)
+            failIfFalse(context.isBindingNode(forInTarget), "Cannot use initialiser syntax when binding to a pattern during enumeration");
+
         // Handle for-in with var declaration
         JSTextPosition inLocation = tokenStartPosition();
         bool isOfEnumeration = false;
         if (!consume(INTOKEN)) {
             failIfFalse(match(IDENT) && *m_token.m_data.ident == m_vm->propertyNames->of, "Expected either 'in' or 'of' in enumeration syntax");
             isOfEnumeration = true;
+            failIfTrue(forInInitializer, "Cannot use initialiser syntax in a for-of enumeration");
             next();
         }
-        
         TreeExpression expr = parseExpression(context);
         failIfFalse(expr, "Expected expression to enumerate");
         JSTextPosition exprEnd = lastTokenEndPosition();
@@ -1089,7 +1126,7 @@ template <class TreeBuilder> TreeStatement Parser<LexerType>::parseStatement(Tre
     case CONSTTOKEN:
         return parseConstDeclaration(context);
     case FUNCTION:
-        failIfFalseIfStrict(m_statementDepth == 1, "Nested functions cannot be declared in strict mode");
+        failIfFalseIfStrict(m_statementDepth == 1, "Strict mode does not allow function declarations in a lexically nested statement");
         return parseFunctionDeclaration(context);
     case SEMICOLON: {
         JSTokenLocation location(tokenLocation());
@@ -1294,7 +1331,7 @@ template <class TreeBuilder> bool Parser<LexerType>::parseFunctionInfo(TreeBuild
     matchOrFail(CLOSEBRACE, "Expected a closing '}' after a ", stringForFunctionMode(mode), " body");
     
     if (newInfo)
-        m_functionCache->add(openBraceOffset, std::move(newInfo));
+        m_functionCache->add(openBraceOffset, WTF::move(newInfo));
     
     next();
     return true;
@@ -2107,7 +2144,7 @@ template <class TreeBuilder> TreeExpression Parser<LexerType>::parseMemberExpres
             if (newCount) {
                 newCount--;
                 JSTextPosition expressionEnd = lastTokenEndPosition();
-                TreeArguments arguments = parseArguments(context, DontAllowSpread);
+                TreeArguments arguments = parseArguments(context, AllowSpread);
                 failIfFalse(arguments, "Cannot parse call arguments");
                 base = context.createNewExpr(location, base, arguments, expressionStart, expressionEnd, lastTokenEndPosition());
             } else {
@@ -2345,6 +2382,10 @@ template <typename LexerType> void Parser<LexerType>::printUnexpectedTokenText(W
         
     case RESERVED:
         out.print("Unexpected use of reserved word '", getToken(), "'");
+        return;
+
+    case INVALID_PRIVATE_NAME_ERRORTOK:
+        out.print("Invalid private name '", getToken(), "'");
         return;
             
     case IDENT:

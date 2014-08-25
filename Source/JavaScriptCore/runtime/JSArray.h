@@ -61,20 +61,20 @@ public:
 
     JS_EXPORT_PRIVATE static bool defineOwnProperty(JSObject*, ExecState*, PropertyName, const PropertyDescriptor&, bool throwException);
 
-    static bool getOwnPropertySlot(JSObject*, ExecState*, PropertyName, PropertySlot&);
+    JS_EXPORT_PRIVATE static bool getOwnPropertySlot(JSObject*, ExecState*, PropertyName, PropertySlot&);
 
     DECLARE_EXPORT_INFO;
         
     unsigned length() const { return getArrayLength(); }
     // OK to use on new arrays, but not if it might be a RegExpMatchArray.
-    bool setLength(ExecState*, unsigned, bool throwException = false);
+    JS_EXPORT_PRIVATE bool setLength(ExecState*, unsigned, bool throwException = false);
 
-    void sort(ExecState*);
-    void sort(ExecState*, JSValue compareFunction, CallType, const CallData&);
-    void sortNumeric(ExecState*, JSValue compareFunction, CallType, const CallData&);
+    JS_EXPORT_PRIVATE void sort(ExecState*);
+    JS_EXPORT_PRIVATE void sort(ExecState*, JSValue compareFunction, CallType, const CallData&);
+    JS_EXPORT_PRIVATE void sortNumeric(ExecState*, JSValue compareFunction, CallType, const CallData&);
 
-    void push(ExecState*, JSValue);
-    JSValue pop(ExecState*);
+    JS_EXPORT_PRIVATE void push(ExecState*, JSValue);
+    JS_EXPORT_PRIVATE JSValue pop(ExecState*);
 
     enum ShiftCountMode {
         // This form of shift hints that we're doing queueing. With this assumption in hand,
@@ -89,14 +89,14 @@ public:
 
     bool shiftCountForShift(ExecState* exec, unsigned startIndex, unsigned count)
     {
-        return shiftCountWithArrayStorage(startIndex, count, ensureArrayStorage(exec->vm()));
+        return shiftCountWithArrayStorage(exec->vm(), startIndex, count, ensureArrayStorage(exec->vm()));
     }
-    bool shiftCountForSplice(ExecState* exec, unsigned startIndex, unsigned count)
+    bool shiftCountForSplice(ExecState* exec, unsigned& startIndex, unsigned count)
     {
         return shiftCountWithAnyIndexingType(exec, startIndex, count);
     }
     template<ShiftCountMode shiftCountMode>
-    bool shiftCount(ExecState* exec, unsigned startIndex, unsigned count)
+    bool shiftCount(ExecState* exec, unsigned& startIndex, unsigned count)
     {
         switch (shiftCountMode) {
         case ShiftCountForShift:
@@ -131,8 +131,8 @@ public:
         }
     }
 
-    void fillArgList(ExecState*, MarkedArgumentBuffer&);
-    void copyToArguments(ExecState*, CallFrame*, uint32_t length);
+    JS_EXPORT_PRIVATE void fillArgList(ExecState*, MarkedArgumentBuffer&);
+    JS_EXPORT_PRIVATE void copyToArguments(ExecState*, CallFrame*, uint32_t length, int32_t firstVarArgOffset);
 
     static Structure* createStructure(VM& vm, JSGlobalObject* globalObject, JSValue prototype, IndexingType indexingType)
     {
@@ -156,8 +156,8 @@ private:
         return !map || !map->lengthIsReadOnly();
     }
         
-    bool shiftCountWithAnyIndexingType(ExecState*, unsigned startIndex, unsigned count);
-    bool shiftCountWithArrayStorage(unsigned startIndex, unsigned count, ArrayStorage*);
+    bool shiftCountWithAnyIndexingType(ExecState*, unsigned& startIndex, unsigned count);
+    JS_EXPORT_PRIVATE bool shiftCountWithArrayStorage(VM&, unsigned startIndex, unsigned count, ArrayStorage*);
 
     bool unshiftCountWithAnyIndexingType(ExecState*, unsigned startIndex, unsigned count);
     bool unshiftCountWithArrayStorage(ExecState*, unsigned startIndex, unsigned count, ArrayStorage*);
@@ -190,6 +190,18 @@ inline Butterfly* createContiguousArrayButterfly(VM& vm, JSCell* intendedOwner, 
     return result;
 }
 
+inline Butterfly* createArrayButterflyWithExactLength(VM& vm, JSCell* intendedOwner, unsigned initialLength)
+{
+    Butterfly* butterfly = Butterfly::create(
+        vm, intendedOwner, 0, 0, true, indexingHeaderForArray(initialLength, initialLength),
+        ArrayStorage::sizeFor(initialLength));
+    ArrayStorage* storage = butterfly->arrayStorage();
+    storage->m_indexBias = 0;
+    storage->m_sparseMap.clear();
+    storage->m_numValuesInVector = 0;
+    return butterfly;
+}
+
 inline Butterfly* createArrayButterfly(VM& vm, JSCell* intendedOwner, unsigned initialLength)
 {
     Butterfly* butterfly = Butterfly::create(
@@ -208,7 +220,7 @@ Butterfly* createArrayButterflyInDictionaryIndexingMode(
 inline JSArray* JSArray::create(VM& vm, Structure* structure, unsigned initialLength)
 {
     Butterfly* butterfly;
-    if (LIKELY(!hasArrayStorage(structure->indexingType()))) {
+    if (LIKELY(!hasAnyArrayStorage(structure->indexingType()))) {
         ASSERT(
             hasUndecided(structure->indexingType())
             || hasInt32(structure->indexingType())
@@ -219,7 +231,7 @@ inline JSArray* JSArray::create(VM& vm, Structure* structure, unsigned initialLe
         ASSERT(initialLength < MIN_SPARSE_ARRAY_INDEX);
         if (hasDouble(structure->indexingType())) {
             for (unsigned i = 0; i < vectorLength; ++i)
-                butterfly->contiguousDouble()[i] = QNaN;
+                butterfly->contiguousDouble()[i] = PNaN;
         }
     } else {
         ASSERT(
@@ -239,7 +251,7 @@ inline JSArray* JSArray::tryCreateUninitialized(VM& vm, Structure* structure, un
         return 0;
         
     Butterfly* butterfly;
-    if (LIKELY(!hasArrayStorage(structure->indexingType()))) {
+    if (LIKELY(!hasAnyArrayStorage(structure->indexingType()))) {
         ASSERT(
             hasUndecided(structure->indexingType())
             || hasInt32(structure->indexingType())
@@ -254,7 +266,7 @@ inline JSArray* JSArray::tryCreateUninitialized(VM& vm, Structure* structure, un
         butterfly->setPublicLength(initialLength);
         if (hasDouble(structure->indexingType())) {
             for (unsigned i = initialLength; i < vectorLength; ++i)
-                butterfly->contiguousDouble()[i] = QNaN;
+                butterfly->contiguousDouble()[i] = PNaN;
         }
     } else {
         void* temp;

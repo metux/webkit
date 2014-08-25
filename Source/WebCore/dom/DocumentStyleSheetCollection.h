@@ -28,6 +28,7 @@
 #ifndef DocumentStyleSheetCollection_h
 #define DocumentStyleSheetCollection_h
 
+#include <memory>
 #include <wtf/FastMalloc.h>
 #include <wtf/ListHashSet.h>
 #include <wtf/RefPtr.h>
@@ -104,7 +105,6 @@ public:
     void setUsesSiblingRulesOverride(bool b) { m_usesSiblingRulesOverride = b; }
     bool usesFirstLineRules() const { return m_usesFirstLineRules; }
     bool usesFirstLetterRules() const { return m_usesFirstLetterRules; }
-    void setUsesFirstLetterRules(bool b) { m_usesFirstLetterRules = b; }
     bool usesBeforeAfterRules() const { return m_usesBeforeAfterRules || m_usesBeforeAfterRulesOverride; }
     void setUsesBeforeAfterRulesOverride(bool b) { m_usesBeforeAfterRulesOverride = b; }
     bool usesRemUnits() const { return m_usesRemUnits; }
@@ -132,7 +132,7 @@ private:
     Vector<RefPtr<CSSStyleSheet>> m_activeAuthorStyleSheets;
 
     // This is a mirror of m_activeAuthorStyleSheets that gets populated on demand for activeStyleSheetsContains().
-    mutable OwnPtr<HashSet<const CSSStyleSheet*>> m_weakCopyOfActiveStyleSheetListForFastLookup;
+    mutable std::unique_ptr<HashSet<const CSSStyleSheet*>> m_weakCopyOfActiveStyleSheetListForFastLookup;
 
     // Track the number of currently loading top-level stylesheets needed for rendering.
     // Sheets loaded using the @import directive are not included in this count.

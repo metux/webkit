@@ -114,16 +114,16 @@ MediaStream::~MediaStream()
     m_private->setClient(0);
 }
 
-bool MediaStream::ended() const
+bool MediaStream::active() const
 {
-    return m_private->ended();
+    return m_private->active();
 }
 
-void MediaStream::setEnded()
+void MediaStream::setActive(bool isActive)
 {
-    if (ended())
+    if (active() == isActive)
         return;
-    m_private->setEnded();
+    m_private->setActive(isActive);
 }
 
 PassRefPtr<MediaStream> MediaStream::clone()
@@ -143,11 +143,6 @@ void MediaStream::cloneMediaStreamTrackVector(Vector<RefPtr<MediaStreamTrack>>& 
 
 void MediaStream::addTrack(PassRefPtr<MediaStreamTrack> prpTrack, ExceptionCode& ec)
 {
-    if (ended()) {
-        ec = INVALID_STATE_ERR;
-        return;
-    }
-
     if (!prpTrack) {
         ec = TYPE_MISMATCH_ERR;
         return;
@@ -172,12 +167,13 @@ bool MediaStream::addTrack(PassRefPtr<MediaStreamTrack> prpTrack)
     tracks->append(track);
     track->addObserver(this);
     m_private->addTrack(&track->privateTrack());
+    setActive(true);
     return true;
 }
 
 void MediaStream::removeTrack(PassRefPtr<MediaStreamTrack> prpTrack, ExceptionCode& ec)
 {
-    if (ended()) {
+    if (!active()) {
         ec = INVALID_STATE_ERR;
         return;
     }
@@ -215,7 +211,7 @@ bool MediaStream::removeTrack(PassRefPtr<MediaStreamTrack> prpTrack)
 
     track->removeObserver(this);
     if (!m_audioTracks.size() && !m_videoTracks.size())
-        setEnded();
+        setActive(false);
 
     return true;
 }
@@ -253,6 +249,17 @@ MediaStreamTrack* MediaStream::getTrackById(String id)
     return nullptr;
 }
 
+Vector<RefPtr<MediaStreamTrack>> MediaStream::getTracks()
+{
+    Vector<RefPtr<MediaStreamTrack>> tracks;
+    for (auto it = m_audioTracks.begin(), end = m_audioTracks.end(); it != end; ++it)
+        tracks.append((*it).get());
+    for (auto it = m_videoTracks.begin(), end = m_videoTracks.end(); it != end; ++it)
+        tracks.append((*it).get());
+
+    return tracks;
+}
+
 void MediaStream::trackDidEnd()
 {
     for (auto it = m_audioTracks.begin(), end = m_audioTracks.end(); it != end; ++it) {
@@ -264,15 +271,16 @@ void MediaStream::trackDidEnd()
             return;
     }
 
-    setEnded();
+    if (!m_audioTracks.size() && !m_videoTracks.size())
+        setActive(false);
 }
 
-void MediaStream::streamDidEnd()
+void MediaStream::setStreamIsActive(bool streamActive)
 {
-    if (ended())
-        return;
-
-    scheduleDispatchEvent(Event::create(eventNames().endedEvent, false, false));
+    if (streamActive)
+        scheduleDispatchEvent(Event::create(eventNames().activeEvent, false, false));
+    else
+        scheduleDispatchEvent(Event::create(eventNames().inactiveEvent, false, false));
 }
 
 void MediaStream::contextDestroyed()
@@ -289,7 +297,7 @@ void MediaStream::addRemoteSource(MediaStreamSource* source)
 void MediaStream::removeRemoteSource(MediaStreamSource* source)
 {
     ASSERT(source);
-    if (ended())
+    if (!active())
         return;
 
     Vector<RefPtr<MediaStreamTrack>>* tracks = trackVectorForType(source->type());
@@ -311,7 +319,7 @@ void MediaStream::removeRemoteSource(MediaStreamSource* source)
 void MediaStream::addRemoteTrack(MediaStreamTrackPrivate* privateTrack)
 {
     ASSERT(privateTrack);
-    if (ended())
+    if (!active())
         return;
 
     RefPtr<MediaStreamTrack> track;
@@ -337,7 +345,7 @@ void MediaStream::addRemoteTrack(MediaStreamTrackPrivate* privateTrack)
 void MediaStream::removeRemoteTrack(MediaStreamTrackPrivate* privateTrack)
 {
     ASSERT(privateTrack);
-    if (ended())
+    if (!active())
         return;
 
     RefPtr<MediaStreamTrack> track = getTrackById(privateTrack->id());

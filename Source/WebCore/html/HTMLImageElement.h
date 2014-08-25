@@ -32,6 +32,7 @@
 namespace WebCore {
 
 class HTMLFormElement;
+struct ImageCandidate;
 
 class HTMLImageElement : public HTMLElement, public FormNamedItem {
     friend class HTMLFormElement;
@@ -47,6 +48,9 @@ public:
 
     int naturalWidth() const;
     int naturalHeight() const;
+#if ENABLE_PICTURE_SIZES
+    const AtomicString& currentSrc() const { return m_currentSrc; }
+#endif
 
     bool isServerMap() const;
 
@@ -85,24 +89,27 @@ public:
 
     virtual const AtomicString& imageSourceURL() const override;
 
+    bool hasShadowControls() const { return m_experimentalImageMenuEnabled; }
+
 protected:
     HTMLImageElement(const QualifiedName&, Document&, HTMLFormElement* = 0);
 
     virtual void didMoveToNewDocument(Document* oldDocument) override;
 
 private:
-    virtual bool areAuthorShadowsAllowed() const override { return false; }
-
     virtual void parseAttribute(const QualifiedName&, const AtomicString&) override;
     virtual bool isPresentationAttribute(const QualifiedName&) const override;
     virtual void collectStyleForPresentationAttribute(const QualifiedName&, const AtomicString&, MutableStyleProperties&) override;
 
     virtual void didAttachRenderers() override;
     virtual RenderPtr<RenderElement> createElementRenderer(PassRef<RenderStyle>) override;
+    void setBestFitURLAndDPRFromImageCandidate(const ImageCandidate&);
 
     virtual bool canStartSelection() const override;
 
     virtual bool isURLAttribute(const Attribute&) const override;
+    virtual bool attributeContainsURL(const Attribute&) const override;
+    virtual String completeURLsInAttributeValue(const URL& base, const Attribute&) const override;
 
     virtual bool draggable() const override;
 
@@ -120,7 +127,20 @@ private:
     HTMLFormElement* m_form;
     CompositeOperator m_compositeOperator;
     AtomicString m_bestFitImageURL;
+#if ENABLE_PICTURE_SIZES
+    AtomicString m_currentSrc;
+#endif
     AtomicString m_lowercasedUsemap;
+    float m_imageDevicePixelRatio;
+    bool m_experimentalImageMenuEnabled;
+
+#if ENABLE(SERVICE_CONTROLS)
+    void updateImageControls();
+    void createImageControls();
+    void destroyImageControls();
+    bool hasImageControls() const;
+    virtual bool childShouldCreateRenderer(const Node&) const override;
+#endif
 };
 
 NODE_TYPE_CASTS(HTMLImageElement)

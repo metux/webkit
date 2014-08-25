@@ -6,22 +6,22 @@
 <meta name="generator" content="DocBook XSL Stylesheets V1.78.1">
 <link rel="home" href="index.html" title="WebKitDOMGTK+ Reference Manual">
 <link rel="up" href="ch01.html" title="Class Overview">
-<link rel="prev" href="WebKitDOMNodeFilter.html" title="WebKitDOMNodeFilter">
+<link rel="prev" href="WebKitDOMNode.html" title="WebKitDOMNode">
 <link rel="next" href="WebKitDOMNodeList.html" title="WebKitDOMNodeList">
 <meta name="generator" content="GTK-Doc V1.20.1 (XML mode)">
 <link rel="stylesheet" href="style.css" type="text/css">
 </head>
 <body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF">
-<table class="navigation" id="top" width="100%" summary="Navigation header" cellpadding="2" cellspacing="10"><tr valign="middle">
+<table class="navigation" id="top" width="100%" summary="Navigation header" cellpadding="2" cellspacing="5"><tr valign="middle">
 <td width="100%" align="left" class="shortcuts">
-<a href="#" class="shortcut">Top</a><span id="nav_description"> <span class="dim">|</span> 
-                  <a href="#WebKitDOMNodeIterator.description" class="shortcut">Description</a></span><span id="nav_hierarchy"> <span class="dim">|</span> 
-                  <a href="#WebKitDOMNodeIterator.object-hierarchy" class="shortcut">Object Hierarchy</a></span><span id="nav_properties"> <span class="dim">|</span> 
+<a href="#" class="shortcut">Top</a><span id="nav_description">  <span class="dim">|</span> 
+                  <a href="#WebKitDOMNodeIterator.description" class="shortcut">Description</a></span><span id="nav_hierarchy">  <span class="dim">|</span> 
+                  <a href="#WebKitDOMNodeIterator.object-hierarchy" class="shortcut">Object Hierarchy</a></span><span id="nav_properties">  <span class="dim">|</span> 
                   <a href="#WebKitDOMNodeIterator.properties" class="shortcut">Properties</a></span>
 </td>
 <td><a accesskey="h" href="index.html"><img src="home.png" width="16" height="16" border="0" alt="Home"></a></td>
 <td><a accesskey="u" href="ch01.html"><img src="up.png" width="16" height="16" border="0" alt="Up"></a></td>
-<td><a accesskey="p" href="WebKitDOMNodeFilter.html"><img src="left.png" width="16" height="16" border="0" alt="Prev"></a></td>
+<td><a accesskey="p" href="WebKitDOMNode.html"><img src="left.png" width="16" height="16" border="0" alt="Prev"></a></td>
 <td><a accesskey="n" href="WebKitDOMNodeList.html"><img src="right.png" width="16" height="16" border="0" alt="Next"></a></td>
 </tr></table>
 <div class="refentry">
@@ -194,7 +194,7 @@
 webkit_dom_node_iterator_next_node (<em class="parameter"><code><a class="link" href="WebKitDOMNodeIterator.html" title="WebKitDOMNodeIterator"><span class="type">WebKitDOMNodeIterator</span></a> *self</code></em>,
                                     <em class="parameter"><code><a href="../glib/glib-Error-Reporting.html#GError"><span class="type">GError</span></a> **error</code></em>);</pre>
 <div class="refsect3">
-<a name="id-1.2.37.8.2.4"></a><h4>Parameters</h4>
+<a name="id-1.2.30.8.2.4"></a><h4>Parameters</h4>
 <div class="informaltable"><table width="100%" border="0">
 <colgroup>
 <col width="150px" class="parameters_name">
@@ -216,7 +216,7 @@ webkit_dom_node_iterator_next_node (<em class="parameter"><code><a class="link" 
 </table></div>
 </div>
 <div class="refsect3">
-<a name="id-1.2.37.8.2.5"></a><h4>Returns</h4>
+<a name="id-1.2.30.8.2.5"></a><h4>Returns</h4>
 <p> A <a class="link" href="WebKitDOMNode.html" title="WebKitDOMNode"><span class="type">WebKitDOMNode</span></a>. </p>
 <p><span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span></p>
 </div>
@@ -229,7 +229,7 @@ webkit_dom_node_iterator_previous_node
                                (<em class="parameter"><code><a class="link" href="WebKitDOMNodeIterator.html" title="WebKitDOMNodeIterator"><span class="type">WebKitDOMNodeIterator</span></a> *self</code></em>,
                                 <em class="parameter"><code><a href="../glib/glib-Error-Reporting.html#GError"><span class="type">GError</span></a> **error</code></em>);</pre>
 <div class="refsect3">
-<a name="id-1.2.37.8.3.4"></a><h4>Parameters</h4>
+<a name="id-1.2.30.8.3.4"></a><h4>Parameters</h4>
 <div class="informaltable"><table width="100%" border="0">
 <colgroup>
 <col width="150px" class="parameters_name">
@@ -251,7 +251,7 @@ webkit_dom_node_iterator_previous_node
 </table></div>
 </div>
 <div class="refsect3">
-<a name="id-1.2.37.8.3.5"></a><h4>Returns</h4>
+<a name="id-1.2.30.8.3.5"></a><h4>Returns</h4>
 <p> A <a class="link" href="WebKitDOMNode.html" title="WebKitDOMNode"><span class="type">WebKitDOMNode</span></a>. </p>
 <p><span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span></p>
 </div>
@@ -262,7 +262,7 @@ webkit_dom_node_iterator_previous_node
 <pre class="programlisting"><span class="returnvalue">void</span>
 webkit_dom_node_iterator_detach (<em class="parameter"><code><a class="link" href="WebKitDOMNodeIterator.html" title="WebKitDOMNodeIterator"><span class="type">WebKitDOMNodeIterator</span></a> *self</code></em>);</pre>
 <div class="refsect3">
-<a name="id-1.2.37.8.4.4"></a><h4>Parameters</h4>
+<a name="id-1.2.30.8.4.4"></a><h4>Parameters</h4>
 <div class="informaltable"><table width="100%" border="0">
 <colgroup>
 <col width="150px" class="parameters_name">
@@ -283,7 +283,7 @@ webkit_dom_node_iterator_detach (<em class="parameter"><code><a class="link" hre
 <pre class="programlisting"><a class="link" href="WebKitDOMNode.html" title="WebKitDOMNode"><span class="returnvalue">WebKitDOMNode</span></a> *
 webkit_dom_node_iterator_get_root (<em class="parameter"><code><a class="link" href="WebKitDOMNodeIterator.html" title="WebKitDOMNodeIterator"><span class="type">WebKitDOMNodeIterator</span></a> *self</code></em>);</pre>
 <div class="refsect3">
-<a name="id-1.2.37.8.5.4"></a><h4>Parameters</h4>
+<a name="id-1.2.30.8.5.4"></a><h4>Parameters</h4>
 <div class="informaltable"><table width="100%" border="0">
 <colgroup>
 <col width="150px" class="parameters_name">
@@ -298,7 +298,7 @@ webkit_dom_node_iterator_get_root (<em class="parameter"><code><a class="link" h
 </table></div>
 </div>
 <div class="refsect3">
-<a name="id-1.2.37.8.5.5"></a><h4>Returns</h4>
+<a name="id-1.2.30.8.5.5"></a><h4>Returns</h4>
 <p> A <a class="link" href="WebKitDOMNode.html" title="WebKitDOMNode"><span class="type">WebKitDOMNode</span></a>. </p>
 <p><span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span></p>
 </div>
@@ -310,7 +310,7 @@ webkit_dom_node_iterator_get_root (<em class="parameter"><code><a class="link" h
 webkit_dom_node_iterator_get_what_to_show
                                (<em class="parameter"><code><a class="link" href="WebKitDOMNodeIterator.html" title="WebKitDOMNodeIterator"><span class="type">WebKitDOMNodeIterator</span></a> *self</code></em>);</pre>
 <div class="refsect3">
-<a name="id-1.2.37.8.6.4"></a><h4>Parameters</h4>
+<a name="id-1.2.30.8.6.4"></a><h4>Parameters</h4>
 <div class="informaltable"><table width="100%" border="0">
 <colgroup>
 <col width="150px" class="parameters_name">
@@ -325,7 +325,7 @@ webkit_dom_node_iterator_get_what_to_show
 </table></div>
 </div>
 <div class="refsect3">
-<a name="id-1.2.37.8.6.5"></a><h4>Returns</h4>
+<a name="id-1.2.30.8.6.5"></a><h4>Returns</h4>
 <p> A <a href="../glib/glib-Basic-Types.html#gulong"><span class="type">gulong</span></a></p>
 <p></p>
 </div>
@@ -336,7 +336,7 @@ webkit_dom_node_iterator_get_what_to_show
 <pre class="programlisting"><a class="link" href="WebKitDOMNodeFilter.html" title="WebKitDOMNodeFilter"><span class="returnvalue">WebKitDOMNodeFilter</span></a> *
 webkit_dom_node_iterator_get_filter (<em class="parameter"><code><a class="link" href="WebKitDOMNodeIterator.html" title="WebKitDOMNodeIterator"><span class="type">WebKitDOMNodeIterator</span></a> *self</code></em>);</pre>
 <div class="refsect3">
-<a name="id-1.2.37.8.7.4"></a><h4>Parameters</h4>
+<a name="id-1.2.30.8.7.4"></a><h4>Parameters</h4>
 <div class="informaltable"><table width="100%" border="0">
 <colgroup>
 <col width="150px" class="parameters_name">
@@ -351,7 +351,7 @@ webkit_dom_node_iterator_get_filter (<em class="parameter"><code><a class="link"
 </table></div>
 </div>
 <div class="refsect3">
-<a name="id-1.2.37.8.7.5"></a><h4>Returns</h4>
+<a name="id-1.2.30.8.7.5"></a><h4>Returns</h4>
 <p> A <a class="link" href="WebKitDOMNodeFilter.html" title="WebKitDOMNodeFilter"><span class="type">WebKitDOMNodeFilter</span></a>. </p>
 <p><span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span></p>
 </div>
@@ -363,7 +363,7 @@ webkit_dom_node_iterator_get_filter (<em class="parameter"><code><a class="link"
 webkit_dom_node_iterator_get_expand_entity_references
                                (<em class="parameter"><code><a class="link" href="WebKitDOMNodeIterator.html" title="WebKitDOMNodeIterator"><span class="type">WebKitDOMNodeIterator</span></a> *self</code></em>);</pre>
 <div class="refsect3">
-<a name="id-1.2.37.8.8.4"></a><h4>Parameters</h4>
+<a name="id-1.2.30.8.8.4"></a><h4>Parameters</h4>
 <div class="informaltable"><table width="100%" border="0">
 <colgroup>
 <col width="150px" class="parameters_name">
@@ -378,7 +378,7 @@ webkit_dom_node_iterator_get_expand_entity_references
 </table></div>
 </div>
 <div class="refsect3">
-<a name="id-1.2.37.8.8.5"></a><h4>Returns</h4>
+<a name="id-1.2.30.8.8.5"></a><h4>Returns</h4>
 <p> A <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a></p>
 <p></p>
 </div>
@@ -390,7 +390,7 @@ webkit_dom_node_iterator_get_expand_entity_references
 webkit_dom_node_iterator_get_reference_node
                                (<em class="parameter"><code><a class="link" href="WebKitDOMNodeIterator.html" title="WebKitDOMNodeIterator"><span class="type">WebKitDOMNodeIterator</span></a> *self</code></em>);</pre>
 <div class="refsect3">
-<a name="id-1.2.37.8.9.4"></a><h4>Parameters</h4>
+<a name="id-1.2.30.8.9.4"></a><h4>Parameters</h4>
 <div class="informaltable"><table width="100%" border="0">
 <colgroup>
 <col width="150px" class="parameters_name">
@@ -405,7 +405,7 @@ webkit_dom_node_iterator_get_reference_node
 </table></div>
 </div>
 <div class="refsect3">
-<a name="id-1.2.37.8.9.5"></a><h4>Returns</h4>
+<a name="id-1.2.30.8.9.5"></a><h4>Returns</h4>
 <p> A <a class="link" href="WebKitDOMNode.html" title="WebKitDOMNode"><span class="type">WebKitDOMNode</span></a>. </p>
 <p><span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span></p>
 </div>
@@ -417,7 +417,7 @@ webkit_dom_node_iterator_get_reference_node
 webkit_dom_node_iterator_get_pointer_before_reference_node
                                (<em class="parameter"><code><a class="link" href="WebKitDOMNodeIterator.html" title="WebKitDOMNodeIterator"><span class="type">WebKitDOMNodeIterator</span></a> *self</code></em>);</pre>
 <div class="refsect3">
-<a name="id-1.2.37.8.10.4"></a><h4>Parameters</h4>
+<a name="id-1.2.30.8.10.4"></a><h4>Parameters</h4>
 <div class="informaltable"><table width="100%" border="0">
 <colgroup>
 <col width="150px" class="parameters_name">
@@ -432,7 +432,7 @@ webkit_dom_node_iterator_get_pointer_before_reference_node
 </table></div>
 </div>
 <div class="refsect3">
-<a name="id-1.2.37.8.10.5"></a><h4>Returns</h4>
+<a name="id-1.2.30.8.10.5"></a><h4>Returns</h4>
 <p> A <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a></p>
 <p></p>
 </div>

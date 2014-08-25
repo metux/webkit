@@ -51,7 +51,7 @@ namespace WebCore {
 
 class InspectorInstrumentation;
 class InstrumentingAgents;
-class PageInjectedScriptManager;
+class WebInjectedScriptManager;
 class WorkerGlobalScope;
 class WorkerRuntimeAgent;
 
@@ -72,14 +72,14 @@ public:
     virtual Inspector::InspectorFunctionCallHandler functionCallHandler() const override;
     virtual Inspector::InspectorEvaluateHandler evaluateHandler() const override;
     virtual void willCallInjectedScriptFunction(JSC::ExecState*, const String& scriptName, int scriptLine) override;
-    virtual void didCallInjectedScriptFunction() override;
+    virtual void didCallInjectedScriptFunction(JSC::ExecState*) override;
 
 private:
     friend InstrumentingAgents* instrumentationForWorkerGlobalScope(WorkerGlobalScope*);
 
     WorkerGlobalScope& m_workerGlobalScope;
     RefPtr<InstrumentingAgents> m_instrumentingAgents;
-    std::unique_ptr<PageInjectedScriptManager> m_injectedScriptManager;
+    std::unique_ptr<WebInjectedScriptManager> m_injectedScriptManager;
     WorkerRuntimeAgent* m_runtimeAgent;
     Inspector::InspectorAgentRegistry m_agents;
     std::unique_ptr<InspectorFrontendChannel> m_frontendChannel;

@@ -28,6 +28,7 @@
 class WebViewTest: public Test {
 public:
     MAKE_GLIB_TEST_FIXTURE(WebViewTest);
+    WebViewTest(WebKitWebView*);
     WebViewTest();
     virtual ~WebViewTest();
 
@@ -35,6 +36,7 @@ public:
     virtual void loadHtml(const char* html, const char* baseURI);
     virtual void loadPlainText(const char* plainText);
     virtual void loadRequest(WebKitURIRequest*);
+    virtual void loadBytes(GBytes*, const char* mimeType, const char* encoding, const char* baseURI);
     void loadAlternateHTML(const char* html, const char* contentURI, const char* baseURI);
     void goBack();
     void goForward();

@@ -35,10 +35,11 @@
 #include "JSMap.h"
 #include "JSMapIterator.h"
 #include "MapData.h"
+#include "StructureInlines.h"
 
 namespace JSC {
 
-const ClassInfo MapPrototype::s_info = { "Map", &Base::s_info, 0, 0, CREATE_METHOD_TABLE(MapPrototype) };
+const ClassInfo MapPrototype::s_info = { "Map", &Base::s_info, 0, CREATE_METHOD_TABLE(MapPrototype) };
 
 static EncodedJSValue JSC_HOST_CALL mapProtoFuncClear(ExecState*);
 static EncodedJSValue JSC_HOST_CALL mapProtoFuncDelete(ExecState*);

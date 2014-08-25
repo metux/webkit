@@ -29,6 +29,8 @@
 #include "config.h"
 #include "ResourceHandle.h"
 
+#if USE(SOUP)
+
 #include "CookieJarSoup.h"
 #include "CredentialStorage.h"
 #include "FileSystem.h"
@@ -52,18 +54,17 @@
 #include <libsoup/soup.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#if !COMPILER(MSVC)
 #include <unistd.h>
+#endif
 #include <wtf/CurrentTime.h>
 #include <wtf/SHA1.h>
 #include <wtf/gobject/GRefPtr.h>
 #include <wtf/text/Base64.h>
 #include <wtf/text/CString.h>
 
-#if ENABLE(BLOB)
 #include "BlobData.h"
 #include "BlobRegistryImpl.h"
-#include "BlobStorageData.h"
-#endif
 
 #if PLATFORM(GTK)
 #include "CredentialBackingStore.h"
@@ -240,14 +241,14 @@ static bool gIgnoreSSLErrors = false;
 
 static HashSet<String>& allowsAnyHTTPSCertificateHosts()
 {
-    DEFINE_STATIC_LOCAL(HashSet<String>, hosts, ());
+    DEPRECATED_DEFINE_STATIC_LOCAL(HashSet<String>, hosts, ());
     return hosts;
 }
 
 typedef HashMap<String, HostTLSCertificateSet> CertificatesMap;
 static CertificatesMap& clientCertificates()
 {
-    DEFINE_STATIC_LOCAL(CertificatesMap, certificates, ());
+    DEPRECATED_DEFINE_STATIC_LOCAL(CertificatesMap, certificates, ());
     return certificates;
 }
 
@@ -312,11 +313,6 @@ static void gotHeadersCallback(SoupMessage* message, gpointer data)
         return;
 
     ResourceHandleInternal* d = handle->getInternal();
-
-#if ENABLE(WEB_TIMING)
-    if (d->m_response.resourceLoadTiming())
-        d->m_response.resourceLoadTiming()->receiveHeadersEnd = milisecondsSinceRequest(d->m_response.resourceLoadTiming()->requestTime);
-#endif
 
 #if PLATFORM(GTK)
     // We are a bit more conservative with the persistent credential storage than the session store,
@@ -384,10 +380,7 @@ static void restartedCallback(SoupMessage*, gpointer data)
     if (!handle || handle->cancelledOrClientless())
         return;
 
-    ResourceHandleInternal* d = handle->getInternal();
-    ResourceResponse& redirectResponse = d->m_response;
-    redirectResponse.setResourceLoadTiming(ResourceLoadTiming::create());
-    redirectResponse.resourceLoadTiming()->requestTime = monotonicallyIncreasingTime();
+    handle->m_requestTime = monotonicallyIncreasingTime();
 }
 #endif
 
@@ -677,13 +670,6 @@ static void sendRequestCallback(GObject*, GAsyncResult* result, gpointer data)
     }
 
     if (soupMessage) {
-        if (SOUP_STATUS_IS_REDIRECTION(soupMessage->status_code) && shouldRedirect(handle.get())) {
-            d->m_inputStream = inputStream;
-            g_input_stream_skip_async(d->m_inputStream.get(), gDefaultReadBufferSize, G_PRIORITY_DEFAULT,
-                d->m_cancellable.get(), redirectSkipCallback, handle.get());
-            return;
-        }
-
         if (handle->shouldContentSniff() && soupMessage->status_code != SOUP_STATUS_NOT_MODIFIED) {
             const char* sniffedType = soup_request_get_content_type(d->m_soupRequest.get());
             d->m_response.setSniffedContentType(sniffedType);
@@ -695,6 +681,12 @@ static void sendRequestCallback(GObject*, GAsyncResult* result, gpointer data)
             return;
         }
 
+        if (SOUP_STATUS_IS_REDIRECTION(soupMessage->status_code) && shouldRedirect(handle.get())) {
+            d->m_inputStream = inputStream;
+            g_input_stream_skip_async(d->m_inputStream.get(), gDefaultReadBufferSize, G_PRIORITY_DEFAULT,
+                d->m_cancellable.get(), redirectSkipCallback, handle.get());
+            return;
+        }
     } else {
         d->m_response.setURL(handle->firstRequest().url());
         const gchar* contentType = soup_request_get_content_type(d->m_soupRequest.get());
@@ -702,6 +694,10 @@ static void sendRequestCallback(GObject*, GAsyncResult* result, gpointer data)
         d->m_response.setTextEncodingName(extractCharsetFromMediaType(contentType));
         d->m_response.setExpectedContentLength(soup_request_get_content_length(d->m_soupRequest.get()));
     }
+
+#if ENABLE(WEB_TIMING)
+    d->m_response.resourceLoadTiming().responseStart = milisecondsSinceRequest(handle->m_requestTime);
+#endif
 
     if (soupMessage && d->m_response.isMultipart())
         d->m_multipartInputStream = adoptGRef(soup_multipart_input_stream_new(soupMessage, inputStream.get()));
@@ -758,26 +754,24 @@ static bool addFileToSoupMessageBody(SoupMessage* message, const String& fileNam
     return true;
 }
 
-#if ENABLE(BLOB)
 static bool blobIsOutOfDate(const BlobDataItem& blobItem)
 {
     ASSERT(blobItem.type == BlobDataItem::File);
-    if (!isValidFileTime(blobItem.expectedModificationTime))
+    if (!isValidFileTime(blobItem.file->expectedModificationTime()))
         return false;
 
     time_t fileModificationTime;
-    if (!getFileModificationTime(blobItem.path, fileModificationTime))
+    if (!getFileModificationTime(blobItem.file->path(), fileModificationTime))
         return true;
 
-    return fileModificationTime != static_cast<time_t>(blobItem.expectedModificationTime);
+    return fileModificationTime != static_cast<time_t>(blobItem.file->expectedModificationTime());
 }
 
 static void addEncodedBlobItemToSoupMessageBody(SoupMessage* message, const BlobDataItem& blobItem, unsigned long& totalBodySize)
 {
     if (blobItem.type == BlobDataItem::Data) {
-        totalBodySize += blobItem.length;
-        soup_message_body_append(message->request_body, SOUP_MEMORY_TEMPORARY,
-                                 blobItem.data->data() + blobItem.offset, blobItem.length);
+        totalBodySize += blobItem.length();
+        soup_message_body_append(message->request_body, SOUP_MEMORY_TEMPORARY, blobItem.data->data() + blobItem.offset(), blobItem.length());
         return;
     }
 
@@ -785,23 +779,18 @@ static void addEncodedBlobItemToSoupMessageBody(SoupMessage* message, const Blob
     if (blobIsOutOfDate(blobItem))
         return;
 
-    addFileToSoupMessageBody(message,
-                             blobItem.path,
-                             blobItem.offset,
-                             blobItem.length == BlobDataItem::toEndOfFile ? 0 : blobItem.length,
-                             totalBodySize);
+    addFileToSoupMessageBody(message, blobItem.file->path(), blobItem.offset(), blobItem.length() == BlobDataItem::toEndOfFile ? 0 : blobItem.length(),  totalBodySize);
 }
 
 static void addEncodedBlobToSoupMessageBody(SoupMessage* message, const FormDataElement& element, unsigned long& totalBodySize)
 {
-    RefPtr<BlobStorageData> blobData = static_cast<BlobRegistryImpl&>(blobRegistry()).getBlobDataFromURL(URL(ParsedURLString, element.m_url));
+    RefPtr<BlobData> blobData = static_cast<BlobRegistryImpl&>(blobRegistry()).getBlobDataFromURL(URL(ParsedURLString, element.m_url));
     if (!blobData)
         return;
 
     for (size_t i = 0; i < blobData->items().size(); ++i)
         addEncodedBlobItemToSoupMessageBody(message, blobData->items()[i], totalBodySize);
 }
-#endif // ENABLE(BLOB)
 
 static bool addFormElementsToSoupMessage(SoupMessage* message, const char*, FormData* httpBody, unsigned long& totalBodySize)
 {
@@ -810,14 +799,14 @@ static bool addFormElementsToSoupMessage(SoupMessage* message, const char*, Form
     for (size_t i = 0; i < numElements; i++) {
         const FormDataElement& element = httpBody->elements()[i];
 
-        if (element.m_type == FormDataElement::data) {
+        if (element.m_type == FormDataElement::Type::Data) {
             totalBodySize += element.m_data.size();
             soup_message_body_append(message->request_body, SOUP_MEMORY_TEMPORARY,
                                      element.m_data.data(), element.m_data.size());
             continue;
         }
 
-        if (element.m_type == FormDataElement::encodedFile) {
+        if (element.m_type == FormDataElement::Type::EncodedFile) {
             if (!addFileToSoupMessageBody(message ,
                                          element.m_filename,
                                          0 /* offset */,
@@ -827,10 +816,8 @@ static bool addFormElementsToSoupMessage(SoupMessage* message, const char*, Form
             continue;
         }
 
-#if ENABLE(BLOB)
-        ASSERT(element.m_type == FormDataElement::encodedBlob);
+        ASSERT(element.m_type == FormDataElement::Type::EncodedBlob);
         addEncodedBlobToSoupMessageBody(message, element, totalBodySize);
-#endif
     }
     return true;
 }
@@ -841,35 +828,9 @@ static int milisecondsSinceRequest(double requestTime)
     return static_cast<int>((monotonicallyIncreasingTime() - requestTime) * 1000.0);
 }
 
-static void wroteBodyCallback(SoupMessage*, gpointer data)
-{
-    RefPtr<ResourceHandle> handle = static_cast<ResourceHandle*>(data);
-    if (!handle)
-        return;
-
-    ResourceHandleInternal* d = handle->getInternal();
-    if (!d->m_response.resourceLoadTiming())
-        return;
-
-    d->m_response.resourceLoadTiming()->sendEnd = milisecondsSinceRequest(d->m_response.resourceLoadTiming()->requestTime);
-}
-
 void ResourceHandle::didStartRequest()
 {
-    ResourceHandleInternal* d = getInternal();
-    if (!d->m_response.resourceLoadTiming())
-        return;
-
-    d->m_response.resourceLoadTiming()->sendStart = milisecondsSinceRequest(d->m_response.resourceLoadTiming()->requestTime);
-    if (d->m_response.resourceLoadTiming()->sslStart != -1) {
-        // WebCore/inspector/front-end/RequestTimingView.js assumes
-        // that SSL time is included in connection time so must
-        // substract here the SSL delta that will be added later (see
-        // WebInspector.RequestTimingView.createTimingTable in the
-        // file above for more details).
-        d->m_response.resourceLoadTiming()->sendStart -=
-            d->m_response.resourceLoadTiming()->sslEnd - d->m_response.resourceLoadTiming()->sslStart;
-    }
+    getInternal()->m_response.resourceLoadTiming().requestStart = milisecondsSinceRequest(m_requestTime);
 }
 
 static void networkEventCallback(SoupMessage*, GSocketClientEvent event, GIOStream*, gpointer data)
@@ -882,43 +843,41 @@ static void networkEventCallback(SoupMessage*, GSocketClientEvent event, GIOStre
         return;
 
     ResourceHandleInternal* d = handle->getInternal();
-    int deltaTime = milisecondsSinceRequest(d->m_response.resourceLoadTiming()->requestTime);
+    int deltaTime = milisecondsSinceRequest(handle->m_requestTime);
     switch (event) {
     case G_SOCKET_CLIENT_RESOLVING:
-        d->m_response.resourceLoadTiming()->dnsStart = deltaTime;
+        d->m_response.resourceLoadTiming().domainLookupStart = deltaTime;
         break;
     case G_SOCKET_CLIENT_RESOLVED:
-        d->m_response.resourceLoadTiming()->dnsEnd = deltaTime;
+        d->m_response.resourceLoadTiming().domainLookupEnd = deltaTime;
         break;
     case G_SOCKET_CLIENT_CONNECTING:
-        d->m_response.resourceLoadTiming()->connectStart = deltaTime;
-        if (d->m_response.resourceLoadTiming()->dnsStart != -1)
+        d->m_response.resourceLoadTiming().connectStart = deltaTime;
+        if (d->m_response.resourceLoadTiming().domainLookupStart != -1) {
             // WebCore/inspector/front-end/RequestTimingView.js assumes
             // that DNS time is included in connection time so must
             // substract here the DNS delta that will be added later (see
             // WebInspector.RequestTimingView.createTimingTable in the
             // file above for more details).
-            d->m_response.resourceLoadTiming()->connectStart -=
-                d->m_response.resourceLoadTiming()->dnsEnd - d->m_response.resourceLoadTiming()->dnsStart;
+            d->m_response.resourceLoadTiming().connectStart -=
+                d->m_response.resourceLoadTiming().domainLookupEnd - d->m_response.resourceLoadTiming().domainLookupStart;
+        }
         break;
     case G_SOCKET_CLIENT_CONNECTED:
         // Web Timing considers that connection time involves dns, proxy & TLS negotiation...
         // so we better pick G_SOCKET_CLIENT_COMPLETE for connectEnd
         break;
     case G_SOCKET_CLIENT_PROXY_NEGOTIATING:
-        d->m_response.resourceLoadTiming()->proxyStart = deltaTime;
         break;
     case G_SOCKET_CLIENT_PROXY_NEGOTIATED:
-        d->m_response.resourceLoadTiming()->proxyEnd = deltaTime;
         break;
     case G_SOCKET_CLIENT_TLS_HANDSHAKING:
-        d->m_response.resourceLoadTiming()->sslStart = deltaTime;
+        d->m_response.resourceLoadTiming().secureConnectionStart = deltaTime;
         break;
     case G_SOCKET_CLIENT_TLS_HANDSHAKED:
-        d->m_response.resourceLoadTiming()->sslEnd = deltaTime;
         break;
     case G_SOCKET_CLIENT_COMPLETE:
-        d->m_response.resourceLoadTiming()->connectEnd = deltaTime;
+        d->m_response.resourceLoadTiming().connectEnd = deltaTime;
         break;
     default:
         ASSERT_NOT_REACHED();
@@ -974,10 +933,8 @@ static bool createSoupMessageForHandleAndRequest(ResourceHandle* handle, const R
     soup_message_set_flags(d->m_soupMessage.get(), static_cast<SoupMessageFlags>(soup_message_get_flags(d->m_soupMessage.get()) | SOUP_MESSAGE_NO_REDIRECT));
 
 #if ENABLE(WEB_TIMING)
-    d->m_response.setResourceLoadTiming(ResourceLoadTiming::create());
     g_signal_connect(d->m_soupMessage.get(), "network-event", G_CALLBACK(networkEventCallback), handle);
     g_signal_connect(d->m_soupMessage.get(), "restarted", G_CALLBACK(restartedCallback), handle);
-    g_signal_connect(d->m_soupMessage.get(), "wrote-body", G_CALLBACK(wroteBodyCallback), handle);
 #endif
 
 #if SOUP_CHECK_VERSION(2, 43, 1)
@@ -1050,8 +1007,7 @@ bool ResourceHandle::start()
 void ResourceHandle::sendPendingRequest()
 {
 #if ENABLE(WEB_TIMING)
-    if (d->m_response.resourceLoadTiming())
-        d->m_response.resourceLoadTiming()->requestTime = monotonicallyIncreasingTime();
+    m_requestTime = monotonicallyIncreasingTime();
 #endif
 
     if (d->m_firstRequest.timeoutInterval() > 0) {
@@ -1238,6 +1194,16 @@ void ResourceHandle::receivedCancellation(const AuthenticationChallenge& challen
     clearAuthentication();
 }
 
+void ResourceHandle::receivedRequestToPerformDefaultHandling(const AuthenticationChallenge&)
+{
+    ASSERT_NOT_REACHED();
+}
+
+void ResourceHandle::receivedChallengeRejection(const AuthenticationChallenge&)
+{
+    ASSERT_NOT_REACHED();
+}
+
 static bool waitingToSendRequest(ResourceHandle* handle)
 {
     // We need to check for d->m_soupRequest because the request may have raised a failure
@@ -1375,13 +1341,6 @@ void ResourceHandle::continueDidReceiveResponse()
     continueAfterDidReceiveResponse(this);
 }
 
-void ResourceHandle::continueShouldUseCredentialStorage(bool)
-{
-    ASSERT(client());
-    ASSERT(client()->usesAsyncCallbacks());
-    // FIXME: Implement this method if needed: https://bugs.webkit.org/show_bug.cgi?id=126114.
-}
-
 static gboolean requestTimeoutCallback(gpointer data)
 {
     RefPtr<ResourceHandle> handle = static_cast<ResourceHandle*>(data);
@@ -1392,3 +1351,5 @@ static gboolean requestTimeoutCallback(gpointer data)
 }
 
 }
+
+#endif

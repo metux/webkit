@@ -20,8 +20,6 @@
  */
 
 #include "config.h"
-
-#if ENABLE(SVG)
 #include "SVGMarkerElement.h"
 
 #include "Attribute.h"
@@ -30,6 +28,7 @@
 #include "SVGFitToViewBox.h"
 #include "SVGNames.h"
 #include "SVGSVGElement.h"
+#include <wtf/NeverDestroyed.h>
 
 namespace WebCore {
  
@@ -94,13 +93,13 @@ PassRefPtr<SVGMarkerElement> SVGMarkerElement::create(const QualifiedName& tagNa
 
 const AtomicString& SVGMarkerElement::orientTypeIdentifier()
 {
-    DEFINE_STATIC_LOCAL(AtomicString, s_identifier, ("SVGOrientType", AtomicString::ConstructFromLiteral));
+    DEPRECATED_DEFINE_STATIC_LOCAL(AtomicString, s_identifier, ("SVGOrientType", AtomicString::ConstructFromLiteral));
     return s_identifier;
 }
 
 const AtomicString& SVGMarkerElement::orientAngleIdentifier()
 {
-    DEFINE_STATIC_LOCAL(AtomicString, s_identifier, ("SVGOrientAngle", AtomicString::ConstructFromLiteral));
+    DEPRECATED_DEFINE_STATIC_LOCAL(AtomicString, s_identifier, ("SVGOrientAngle", AtomicString::ConstructFromLiteral));
     return s_identifier;
 }
 
@@ -111,19 +110,19 @@ AffineTransform SVGMarkerElement::viewBoxToViewTransform(float viewWidth, float 
 
 bool SVGMarkerElement::isSupportedAttribute(const QualifiedName& attrName)
 {
-    DEFINE_STATIC_LOCAL(HashSet<QualifiedName>, supportedAttributes, ());
-    if (supportedAttributes.isEmpty()) {
+    static NeverDestroyed<HashSet<QualifiedName>> supportedAttributes;
+    if (supportedAttributes.get().isEmpty()) {
         SVGLangSpace::addSupportedAttributes(supportedAttributes);
         SVGExternalResourcesRequired::addSupportedAttributes(supportedAttributes);
         SVGFitToViewBox::addSupportedAttributes(supportedAttributes);
-        supportedAttributes.add(SVGNames::markerUnitsAttr);
-        supportedAttributes.add(SVGNames::refXAttr);
-        supportedAttributes.add(SVGNames::refYAttr);
-        supportedAttributes.add(SVGNames::markerWidthAttr);
-        supportedAttributes.add(SVGNames::markerHeightAttr);
-        supportedAttributes.add(SVGNames::orientAttr);
+        supportedAttributes.get().add(SVGNames::markerUnitsAttr);
+        supportedAttributes.get().add(SVGNames::refXAttr);
+        supportedAttributes.get().add(SVGNames::refYAttr);
+        supportedAttributes.get().add(SVGNames::markerWidthAttr);
+        supportedAttributes.get().add(SVGNames::markerHeightAttr);
+        supportedAttributes.get().add(SVGNames::orientAttr);
     }
-    return supportedAttributes.contains<SVGAttributeHashTranslator>(attrName);
+    return supportedAttributes.get().contains<SVGAttributeHashTranslator>(attrName);
 }
 
 void SVGMarkerElement::parseAttribute(const QualifiedName& name, const AtomicString& value)
@@ -216,7 +215,7 @@ void SVGMarkerElement::setOrientToAngle(const SVGAngle& angle)
 
 RenderPtr<RenderElement> SVGMarkerElement::createElementRenderer(PassRef<RenderStyle> style)
 {
-    return createRenderer<RenderSVGResourceMarker>(*this, std::move(style));
+    return createRenderer<RenderSVGResourceMarker>(*this, WTF::move(style));
 }
 
 bool SVGMarkerElement::selfHasRelativeLengths() const
@@ -238,7 +237,7 @@ void SVGMarkerElement::synchronizeOrientType(SVGElement* contextElement)
     if (ownerType->m_orientType.value != SVGMarkerOrientAuto)
         return;
 
-    DEFINE_STATIC_LOCAL(AtomicString, autoString, ("auto", AtomicString::ConstructFromLiteral));
+    DEPRECATED_DEFINE_STATIC_LOCAL(AtomicString, autoString, ("auto", AtomicString::ConstructFromLiteral));
     ownerType->m_orientType.synchronize(ownerType, orientTypePropertyInfo()->attributeName, autoString);
 }
 
@@ -257,5 +256,3 @@ PassRefPtr<SVGAnimatedEnumerationPropertyTearOff<SVGMarkerOrientType>> SVGMarker
 }
 
 }
-
-#endif

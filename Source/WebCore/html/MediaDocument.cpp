@@ -58,10 +58,11 @@ public:
     }
     
 private:
-    MediaDocumentParser(Document& document)
+    MediaDocumentParser(MediaDocument& document)
         : RawDataDocumentParser(document)
         , m_mediaElement(0)
     {
+        m_outgoingReferrer = document.outgoingReferrer();
     }
 
     virtual void appendBytes(DocumentWriter&, const char*, size_t) override;
@@ -69,6 +70,7 @@ private:
     void createDocumentStructure();
 
     HTMLMediaElement* m_mediaElement;
+    String m_outgoingReferrer;
 };
     
 void MediaDocumentParser::createDocumentStructure()
@@ -81,6 +83,16 @@ void MediaDocumentParser::createDocumentStructure()
     if (document()->frame())
         document()->frame()->injectUserScripts(InjectAtDocumentStart);
 
+#if PLATFORM(IOS)
+    RefPtr<Element> headElement = document()->createElement(headTag, false);
+    rootElement->appendChild(headElement, IGNORE_EXCEPTION);
+
+    RefPtr<Element> metaElement = document()->createElement(metaTag, false);
+    metaElement->setAttribute(nameAttr, "viewport");
+    metaElement->setAttribute(contentAttr, "width=device-width,initial-scale=1,user-scalable=no");
+    headElement->appendChild(metaElement, IGNORE_EXCEPTION);
+#endif
+
     RefPtr<Element> body = document()->createElement(bodyTag, false);
     rootElement->appendChild(body, IGNORE_EXCEPTION);
 
@@ -91,6 +103,13 @@ void MediaDocumentParser::createDocumentStructure()
     m_mediaElement->setAttribute(autoplayAttr, "");
 
     m_mediaElement->setAttribute(nameAttr, "media");
+
+    StringBuilder elementStyle;
+    elementStyle.appendLiteral("max-width: 100%; max-height: 100%;");
+#if PLATFORM(IOS)
+    elementStyle.appendLiteral("width: 100%; height: 100%;");
+#endif
+    m_mediaElement->setAttribute(styleAttr, elementStyle.toString());
 
     RefPtr<Element> sourceElement = document()->createElement(sourceTag, false);
     HTMLSourceElement& source = toHTMLSourceElement(*sourceElement);
@@ -107,6 +126,7 @@ void MediaDocumentParser::createDocumentStructure()
         return;
 
     frame->loader().activeDocumentLoader()->setMainResourceDataBufferingPolicy(DoNotBufferData);
+    frame->loader().setOutgoingReferrer(frame->document()->completeURL(m_outgoingReferrer));
 }
 
 void MediaDocumentParser::appendBytes(DocumentWriter&, const char*, size_t)
@@ -122,8 +142,10 @@ MediaDocument::MediaDocument(Frame* frame, const URL& url)
     : HTMLDocument(frame, url, MediaDocumentClass)
     , m_replaceMediaElementTimer(this, &MediaDocument::replaceMediaElementTimerFired)
 {
-    setCompatibilityMode(QuirksMode);
+    setCompatibilityMode(DocumentCompatibilityMode::QuirksMode);
     lockCompatibilityMode();
+    if (frame)
+        m_outgoingReferrer = frame->loader().outgoingReferrer();
 }
 
 MediaDocument::~MediaDocument()
@@ -187,7 +209,7 @@ void MediaDocument::defaultEventHandler(Event* event)
         if (!video)
             return;
 
-        KeyboardEvent* keyboardEvent = static_cast<KeyboardEvent*>(event);
+        KeyboardEvent* keyboardEvent = toKeyboardEvent(event);
         if (keyboardEvent->keyIdentifier() == "U+0020") { // space
             if (video->paused()) {
                 if (video->canPlay())

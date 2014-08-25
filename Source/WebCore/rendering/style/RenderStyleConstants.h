@@ -46,9 +46,7 @@ enum PrintColorAdjust {
 // - StyleDifferenceLayout - A full layout is required.
 enum StyleDifference {
     StyleDifferenceEqual,
-#if USE(ACCELERATED_COMPOSITING)
     StyleDifferenceRecompositeLayer,
-#endif
     StyleDifferenceRepaint,
     StyleDifferenceRepaintIfTextOrBorderOrOutline,
     StyleDifferenceRepaintLayer,
@@ -70,14 +68,12 @@ enum StyleDifferenceContextSensitiveProperty {
 };
 
 // Static pseudo styles. Dynamic ones are produced on the fly.
-enum PseudoId {
+enum PseudoId : unsigned char {
     // The order must be NOP ID, public IDs, and then internal IDs.
     NOPSEUDO, FIRST_LINE, FIRST_LETTER, BEFORE, AFTER, SELECTION, FIRST_LINE_INHERITED, SCROLLBAR,
     // Internal IDs follow:
     SCROLLBAR_THUMB, SCROLLBAR_BUTTON, SCROLLBAR_TRACK, SCROLLBAR_TRACK_PIECE, SCROLLBAR_CORNER, RESIZER,
-    INPUT_LIST_BUTTON,
     AFTER_LAST_INTERNAL_PSEUDOID,
-    FULL_SCREEN, FULL_SCREEN_DOCUMENT, FULL_SCREEN_ANCESTOR, ANIMATING_FULL_SCREEN_TRANSITION,
     FIRST_PUBLIC_PSEUDOID = FIRST_LINE,
     FIRST_INTERNAL_PSEUDOID = SCROLLBAR_THUMB,
     PUBLIC_PSEUDOID_MASK = ((1 << FIRST_INTERNAL_PSEUDOID) - 1) & ~((1 << FIRST_PUBLIC_PSEUDOID) - 1)
@@ -188,6 +184,9 @@ enum EAlignItems { AlignAuto, AlignFlexStart, AlignFlexEnd, AlignCenter, AlignSt
 enum EFlexDirection { FlowRow, FlowRowReverse, FlowColumn, FlowColumnReverse };
 enum EFlexWrap { FlexNoWrap, FlexWrap, FlexWrapReverse };
 enum EJustifyContent { JustifyFlexStart, JustifyFlexEnd, JustifyCenter, JustifySpaceBetween, JustifySpaceAround };
+enum EJustifySelf {JustifySelfAuto, JustifySelfStretch, JustifySelfBaseline, JustifySelfCenter, JustifySelfStart, JustifySelfEnd, JustifySelfSelfStart, JustifySelfSelfEnd, JustifySelfFlexStart, JustifySelfFlexEnd, JustifySelfLeft, JustifySelfRight};
+enum EJustifySelfOverflowAlignment {JustifySelfOverflowAlignmentDefault, JustifySelfOverflowAlignmentTrue, JustifySelfOverflowAlignmentSafe};
+
 
 enum ETextSecurity {
     TSNONE, TSDISC, TSCIRCLE, TSSQUARE
@@ -214,6 +213,10 @@ enum EUserSelect {
 // CSS3 Image Values
 enum ObjectFit {
     ObjectFitFill, ObjectFitContain, ObjectFitCover, ObjectFitNone, ObjectFitScaleDown
+};
+
+enum AspectRatioType {
+    AspectRatioAuto, AspectRatioFromIntrinsic, AspectRatioFromDimensions, AspectRatioSpecified
 };
 
 // Word Break Values. Matches WinIE, rather than CSS3
@@ -381,13 +384,15 @@ enum TextAlignLast {
 };
 
 enum TextJustify {
-    TextJustifyAuto, TextJustifyNone, TextJustifyInterWord, TextJustifyInterIdeograph, TextJustifyInterCluster, TextJustifyDistribute, TextJustifyKashida
+    TextJustifyAuto, TextJustifyNone, TextJustifyInterWord, TextJustifyDistribute
 };
 #endif // CSS3_TEXT
 
 enum TextDecorationSkipItems {
     TextDecorationSkipNone = 0,
-    TextDecorationSkipInk = 1 << 0
+    TextDecorationSkipInk = 1 << 0,
+    TextDecorationSkipObjects = 1 << 1,
+    TextDecorationSkipAuto = 1 << 2
 };
 typedef unsigned TextDecorationSkip;
 
@@ -463,13 +468,15 @@ enum CursorVisibility {
 
 // The order of this enum must match the order of the display values in CSSValueKeywords.in.
 enum EDisplay {
-    INLINE, BLOCK, LIST_ITEM, RUN_IN, COMPACT, INLINE_BLOCK,
+    INLINE, BLOCK, LIST_ITEM, COMPACT, INLINE_BLOCK,
     TABLE, INLINE_TABLE, TABLE_ROW_GROUP,
     TABLE_HEADER_GROUP, TABLE_FOOTER_GROUP, TABLE_ROW,
     TABLE_COLUMN_GROUP, TABLE_COLUMN, TABLE_CELL,
     TABLE_CAPTION, BOX, INLINE_BOX,
     FLEX, INLINE_FLEX,
+#if ENABLE(CSS_GRID_LAYOUT)
     GRID, INLINE_GRID,
+#endif
     NONE
 };
 
@@ -530,13 +537,30 @@ enum LineSnap { LineSnapNone, LineSnapBaseline, LineSnapContain };
 
 enum LineAlign { LineAlignNone, LineAlignEdges };
 
-enum WrapFlow { WrapFlowAuto, WrapFlowBoth, WrapFlowStart, WrapFlowEnd, WrapFlowMaximum, WrapFlowClear };
-
-enum WrapThrough { WrapThroughWrap, WrapThroughNone };
-
 enum RubyPosition { RubyPositionBefore, RubyPositionAfter };
 
-enum GridAutoFlow { AutoFlowNone, AutoFlowColumn, AutoFlowRow };
+#if ENABLE(CSS_GRID_LAYOUT)
+static const size_t GridAutoFlowBits = 5;
+enum InternalGridAutoFlowAlgorithm {
+    InternalAutoFlowAlgorithmSparse = 0x1,
+    InternalAutoFlowAlgorithmDense = 0x2,
+    InternalAutoFlowAlgorithmStack = 0x4
+};
+
+enum InternalGridAutoFlowDirection {
+    InternalAutoFlowDirectionRow = 0x8,
+    InternalAutoFlowDirectionColumn = 0x10
+};
+
+enum GridAutoFlow {
+    AutoFlowRow = InternalAutoFlowAlgorithmSparse | InternalAutoFlowDirectionRow,
+    AutoFlowColumn = InternalAutoFlowAlgorithmSparse | InternalAutoFlowDirectionColumn,
+    AutoFlowRowDense = InternalAutoFlowAlgorithmDense | InternalAutoFlowDirectionRow,
+    AutoFlowColumnDense = InternalAutoFlowAlgorithmDense | InternalAutoFlowDirectionColumn,
+    AutoFlowStackRow = InternalAutoFlowAlgorithmStack | InternalAutoFlowDirectionRow,
+    AutoFlowStackColumn = InternalAutoFlowAlgorithmStack | InternalAutoFlowDirectionColumn
+};
+#endif
 
 // Reasonable maximum to prevent insane font sizes from causing crashes on some platforms (such as Windows).
 static const float maximumAllowedFontSize = 1000000.0f;
@@ -546,7 +570,18 @@ enum TextIndentLine { TextIndentFirstLine, TextIndentEachLine };
 enum TextIndentType { TextIndentNormal, TextIndentHanging };
 #endif
 
-enum LayoutBox { BoxMissing = 0, MarginBox, BorderBox, PaddingBox, ContentBox, BoundingBox };
+enum Isolation { IsolationAuto, IsolationIsolate };
+
+// Fill, Stroke, ViewBox are just used for SVG.
+enum CSSBoxType { BoxMissing = 0, MarginBox, BorderBox, PaddingBox, ContentBox, Fill, Stroke, ViewBox };
+
+#if ENABLE(CSS_SCROLL_SNAP)
+enum class ScrollSnapType {
+    None,
+    Proximity,
+    Mandatory
+};
+#endif
 
 } // namespace WebCore
 

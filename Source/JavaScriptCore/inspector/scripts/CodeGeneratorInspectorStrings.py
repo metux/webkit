@@ -72,7 +72,7 @@ backend_dispatcher_dispatch_method = (
 
     typedef void (${dispatcherName}::*CallHandler)(long callId, const Inspector::InspectorObject& message);
     typedef HashMap<String, CallHandler> DispatchMap;
-    DEFINE_STATIC_LOCAL(DispatchMap, dispatchMap, ());
+    DEPRECATED_DEFINE_STATIC_LOCAL(DispatchMap, dispatchMap, ());
     if (dispatchMap.isEmpty()) {
         static const struct MethodTable {
             const char* name;
@@ -148,6 +148,8 @@ backend_h = (
 """#ifndef Inspector${outputFileNamePrefix}BackendDispatchers_h
 #define Inspector${outputFileNamePrefix}BackendDispatchers_h
 
+#if ENABLE(INSPECTOR)
+
 #include "Inspector${outputFileNamePrefix}TypeBuilders.h"
 #include <inspector/InspectorBackendDispatcher.h>
 #include <wtf/PassRefPtr.h>
@@ -162,15 +164,18 @@ ${handlerInterfaces}
 ${dispatcherInterfaces}
 } // namespace Inspector
 
+#endif // ENABLE(INSPECTOR)
+
 #endif // !defined(Inspector${outputFileNamePrefix}BackendDispatchers_h)
 """)
 
 backend_cpp = (
 """
 #include "config.h"
-#include "Inspector${outputFileNamePrefix}BackendDispatchers.h"
 
 #if ENABLE(INSPECTOR)
+
+#include "Inspector${outputFileNamePrefix}BackendDispatchers.h"
 
 #include <inspector/InspectorFrontendChannel.h>
 #include <inspector/InspectorValues.h>
@@ -191,9 +196,10 @@ frontend_cpp = (
 """
 
 #include "config.h"
-#include "Inspector${outputFileNamePrefix}FrontendDispatchers.h"
 
 #if ENABLE(INSPECTOR)
+
+#include "Inspector${outputFileNamePrefix}FrontendDispatchers.h"
 
 #include <wtf/text/CString.h>
 #include <wtf/text/WTFString.h>

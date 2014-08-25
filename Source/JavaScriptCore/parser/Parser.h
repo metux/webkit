@@ -88,23 +88,6 @@ enum DeconstructionKind {
 template <typename T> inline bool isEvalNode() { return false; }
 template <> inline bool isEvalNode<EvalNode>() { return true; }
 
-struct DepthManager {
-    DepthManager(int* depth)
-        : m_originalDepth(*depth)
-        , m_depth(depth)
-    {
-    }
-
-    ~DepthManager()
-    {
-        *m_depth = m_originalDepth;
-    }
-
-private:
-    int m_originalDepth;
-    int* m_depth;
-};
-
 struct ScopeLabelInfo {
     ScopeLabelInfo(StringImpl* ident, bool isLoop)
         : m_ident(ident)
@@ -259,6 +242,10 @@ struct Scope {
         return isValidStrictMode ? BindingSucceeded : StrictBindingFailed;
     }
 
+    void getUsedVariables(IdentifierSet& usedVariables)
+    {
+        usedVariables.swap(m_usedVariables);
+    }
 
     void useVariable(const Identifier* ident, bool isEval)
     {
@@ -411,9 +398,10 @@ public:
     ~Parser();
 
     template <class ParsedNode>
-    PassRefPtr<ParsedNode> parse(ParserError&);
+    PassRefPtr<ParsedNode> parse(ParserError&, bool needReparsingAdjustment);
 
     JSTextPosition positionBeforeLastNewline() const { return m_lexer->positionBeforeLastNewline(); }
+    Vector<RefPtr<StringImpl>>&& closedVariables() { return WTF::move(m_closedVariables); }
 
 private:
     struct AllowInOverride {
@@ -540,7 +528,7 @@ private:
     String parseInner();
 
     void didFinishParsing(SourceElements*, ParserArenaData<DeclarationStacks::VarStack>*, 
-        ParserArenaData<DeclarationStacks::FunctionStack>*, CodeFeatures, int, IdentifierSet&);
+        ParserArenaData<DeclarationStacks::FunctionStack>*, CodeFeatures, int, IdentifierSet&, const Vector<RefPtr<StringImpl>>&&);
 
     // Used to determine type of error to report.
     bool isFunctionBodyNode(ScopeNode*) { return false; }
@@ -840,9 +828,11 @@ private:
     const Identifier* m_lastFunctionName;
     RefPtr<SourceProviderCache> m_functionCache;
     SourceElements* m_sourceElements;
+    bool m_parsingBuiltin;
     ParserArenaData<DeclarationStacks::VarStack>* m_varDeclarations;
     ParserArenaData<DeclarationStacks::FunctionStack>* m_funcDeclarations;
     IdentifierSet m_capturedVariables;
+    Vector<RefPtr<StringImpl>> m_closedVariables;
     CodeFeatures m_features;
     int m_numConstants;
     
@@ -867,12 +857,12 @@ private:
 
 template <typename LexerType>
 template <class ParsedNode>
-PassRefPtr<ParsedNode> Parser<LexerType>::parse(ParserError& error)
+PassRefPtr<ParsedNode> Parser<LexerType>::parse(ParserError& error, bool needReparsingAdjustment)
 {
     int errLine;
     String errMsg;
 
-    if (ParsedNode::scopeIsFunction)
+    if (ParsedNode::scopeIsFunction && needReparsingAdjustment)
         m_lexer->setIsReparsing();
 
     m_sourceElements = 0;
@@ -947,20 +937,26 @@ PassRefPtr<ParsedNode> Parser<LexerType>::parse(ParserError& error)
 }
 
 template <class ParsedNode>
-PassRefPtr<ParsedNode> parse(VM* vm, const SourceCode& source, FunctionParameters* parameters, const Identifier& name, JSParserStrictness strictness, JSParserMode parserMode, ParserError& error, JSTextPosition* positionBeforeLastNewline = 0)
+PassRefPtr<ParsedNode> parse(VM* vm, const SourceCode& source, FunctionParameters* parameters, const Identifier& name, JSParserStrictness strictness, JSParserMode parserMode, ParserError& error, JSTextPosition* positionBeforeLastNewline = 0, bool needReparsingAdjustment = false)
 {
     SamplingRegion samplingRegion("Parsing");
 
     ASSERT(!source.provider()->source().isNull());
     if (source.provider()->source().is8Bit()) {
         Parser<Lexer<LChar>> parser(vm, source, parameters, name, strictness, parserMode);
-        RefPtr<ParsedNode> result = parser.parse<ParsedNode>(error);
+        RefPtr<ParsedNode> result = parser.parse<ParsedNode>(error, needReparsingAdjustment);
         if (positionBeforeLastNewline)
             *positionBeforeLastNewline = parser.positionBeforeLastNewline();
+        if (strictness == JSParseBuiltin) {
+            if (!result)
+                WTF::dataLog("Error compiling builtin: ", error.m_message, "\n");
+            RELEASE_ASSERT(result);
+            result->setClosedVariables(parser.closedVariables());
+        }
         return result.release();
     }
     Parser<Lexer<UChar>> parser(vm, source, parameters, name, strictness, parserMode);
-    RefPtr<ParsedNode> result = parser.parse<ParsedNode>(error);
+    RefPtr<ParsedNode> result = parser.parse<ParsedNode>(error, needReparsingAdjustment);
     if (positionBeforeLastNewline)
         *positionBeforeLastNewline = parser.positionBeforeLastNewline();
     return result.release();

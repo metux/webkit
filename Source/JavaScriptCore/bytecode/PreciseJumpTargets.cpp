@@ -26,6 +26,8 @@
 #include "config.h"
 #include "PreciseJumpTargets.h"
 
+#include "JSCInlines.h"
+
 namespace JSC {
 
 template <size_t vectorSize>
@@ -71,12 +73,6 @@ static void getJumpTargetsForBytecodeOffset(CodeBlock* codeBlock, Interpreter* i
         out.append(bytecodeOffset + current[2].u.operand);
         break;
     }
-    case op_get_pnames:
-        out.append(bytecodeOffset + current[5].u.operand);
-        break;
-    case op_next_pname:
-        out.append(bytecodeOffset + current[6].u.operand);
-        break;
     case op_check_has_instance:
         out.append(bytecodeOffset + current[4].u.operand);
         break;

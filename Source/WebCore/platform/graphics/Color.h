@@ -10,10 +10,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -26,10 +26,10 @@
 #ifndef Color_h
 #define Color_h
 
-#include "AnimationUtilities.h"
+#include <unicode/uchar.h>
 #include <wtf/FastMalloc.h>
 #include <wtf/Forward.h>
-#include <wtf/unicode/Unicode.h>
+#include <wtf/text/LChar.h>
 
 #if USE(CG)
 #include "ColorSpace.h"
@@ -177,32 +177,7 @@ inline bool operator!=(const Color& a, const Color& b)
 
 Color colorFromPremultipliedARGB(RGBA32);
 RGBA32 premultipliedARGBFromColor(const Color&);
-
-inline Color blend(const Color& from, const Color& to, double progress, bool blendPremultiplied = true)
-{
-    // We need to preserve the state of the valid flag at the end of the animation
-    if (progress == 1 && !to.isValid())
-        return Color();
-    
-    if (blendPremultiplied) {
-        // Contrary to the name, RGBA32 actually stores ARGB, so we can initialize Color directly from premultipliedARGBFromColor().
-        // Also, premultipliedARGBFromColor() bails on zero alpha, so special-case that.
-        Color premultFrom = from.alpha() ? premultipliedARGBFromColor(from) : 0;
-        Color premultTo = to.alpha() ? premultipliedARGBFromColor(to) : 0;
-
-        Color premultBlended(blend(premultFrom.red(), premultTo.red(), progress),
-                     blend(premultFrom.green(), premultTo.green(), progress),
-                     blend(premultFrom.blue(), premultTo.blue(), progress),
-                     blend(premultFrom.alpha(), premultTo.alpha(), progress));
-
-        return Color(colorFromPremultipliedARGB(premultBlended.rgb()));
-    }
-
-    return Color(blend(from.red(), to.red(), progress),
-                 blend(from.green(), to.green(), progress),
-                 blend(from.blue(), to.blue(), progress),
-                 blend(from.alpha(), to.alpha(), progress));
-}
+Color blend(const Color& from, const Color& to, double progress, bool blendPremultiplied = true);
 
 inline uint16_t fastDivideBy255(uint16_t value)
 {

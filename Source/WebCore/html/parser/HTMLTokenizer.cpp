@@ -35,7 +35,6 @@
 #include <wtf/ASCIICType.h>
 #include <wtf/CurrentTime.h>
 #include <wtf/text/CString.h>
-#include <wtf/unicode/Unicode.h>
 
 using namespace WTF;
 
@@ -1051,9 +1050,9 @@ bool HTMLTokenizer::nextToken(SegmentedString& source, HTMLToken& token)
     END_STATE()
 
     HTML_BEGIN_STATE(MarkupDeclarationOpenState) {
-        DEFINE_STATIC_LOCAL(String, dashDashString, (ASCIILiteral("--")));
-        DEFINE_STATIC_LOCAL(String, doctypeString, (ASCIILiteral("doctype")));
-        DEFINE_STATIC_LOCAL(String, cdataString, (ASCIILiteral("[CDATA[")));
+        DEPRECATED_DEFINE_STATIC_LOCAL(String, dashDashString, (ASCIILiteral("--")));
+        DEPRECATED_DEFINE_STATIC_LOCAL(String, doctypeString, (ASCIILiteral("doctype")));
+        DEPRECATED_DEFINE_STATIC_LOCAL(String, cdataString, (ASCIILiteral("[CDATA[")));
         if (cc == '-') {
             SegmentedString::LookAheadResult result = source.lookAhead(dashDashString);
             if (result == SegmentedString::DidMatch) {
@@ -1254,8 +1253,8 @@ bool HTMLTokenizer::nextToken(SegmentedString& source, HTMLToken& token)
             m_token->setForceQuirks();
             return emitAndReconsumeIn(source, HTMLTokenizer::DataState);
         } else {
-            DEFINE_STATIC_LOCAL(String, publicString, (ASCIILiteral("public")));
-            DEFINE_STATIC_LOCAL(String, systemString, (ASCIILiteral("system")));
+            DEPRECATED_DEFINE_STATIC_LOCAL(String, publicString, (ASCIILiteral("public")));
+            DEPRECATED_DEFINE_STATIC_LOCAL(String, systemString, (ASCIILiteral("system")));
             if (cc == 'P' || cc == 'p') {
                 SegmentedString::LookAheadResult result = source.lookAheadIgnoringCase(publicString);
                 if (result == SegmentedString::DidMatch) {

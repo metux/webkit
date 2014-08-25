@@ -262,9 +262,9 @@ bool Connection::processMessage()
     if (messageInfo.isMessageBodyIsOutOfLine())
         messageBody = reinterpret_cast<uint8_t*>(oolMessageBody->data());
 
-    auto decoder = std::make_unique<MessageDecoder>(DataReference(messageBody, messageInfo.bodySize()), std::move(attachments));
+    auto decoder = std::make_unique<MessageDecoder>(DataReference(messageBody, messageInfo.bodySize()), WTF::move(attachments));
 
-    processIncomingMessage(std::move(decoder));
+    processIncomingMessage(WTF::move(decoder));
 
     if (m_readBufferSize > messageLength) {
         memmove(m_readBuffer.data(), m_readBuffer.data() + messageLength, m_readBufferSize - messageLength);
@@ -541,21 +541,35 @@ bool Connection::sendOutgoingMessage(std::unique_ptr<MessageEncoder> encoder)
     return true;
 }
 
-Connection::SocketPair Connection::createPlatformConnection()
+Connection::SocketPair Connection::createPlatformConnection(unsigned options)
 {
     int sockets[2];
     RELEASE_ASSERT(socketpair(AF_UNIX, SOCKET_TYPE, 0, sockets) != -1);
 
-    // Don't expose the child socket to the parent process.
-    while (fcntl(sockets[1], F_SETFD, FD_CLOEXEC)  == -1)
-        RELEASE_ASSERT(errno != EINTR);
+    if (options & SetCloexecOnServer) {
+        // Don't expose the child socket to the parent process.
+        while (fcntl(sockets[1], F_SETFD, FD_CLOEXEC)  == -1)
+            RELEASE_ASSERT(errno != EINTR);
+    }
 
-    // Don't expose the parent socket to potential future children.
-    while (fcntl(sockets[0], F_SETFD, FD_CLOEXEC) == -1)
-        RELEASE_ASSERT(errno != EINTR);
+    if (options & SetCloexecOnClient) {
+        // Don't expose the parent socket to potential future children.
+        while (fcntl(sockets[0], F_SETFD, FD_CLOEXEC) == -1)
+            RELEASE_ASSERT(errno != EINTR);
+    }
 
     SocketPair socketPair = { sockets[0], sockets[1] };
     return socketPair;
+}
+    
+void Connection::willSendSyncMessage(unsigned flags)
+{
+    UNUSED_PARAM(flags);
+}
+    
+void Connection::didReceiveSyncReply(unsigned flags)
+{
+    UNUSED_PARAM(flags);    
 }
 
 } // namespace IPC

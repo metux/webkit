@@ -11,10 +11,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -36,6 +36,7 @@
 #include "ResourceBuffer.h"
 #include "SharedBuffer.h"
 #include "TextResourceDecoder.h"
+#include "TypedElementDescendantIterator.h"
 #include "WOFFFileFormat.h"
 #include <wtf/Vector.h>
 
@@ -50,8 +51,8 @@
 
 namespace WebCore {
 
-CachedFont::CachedFont(const ResourceRequest& resourceRequest)
-    : CachedResource(resourceRequest, FontResource)
+CachedFont::CachedFont(const ResourceRequest& resourceRequest, SessionID sessionID)
+    : CachedResource(resourceRequest, FontResource, sessionID)
     , m_loadInitiated(false)
     , m_hasCreatedFontDataWrappingResource(false)
 {
@@ -97,9 +98,11 @@ bool CachedFont::ensureCustomFontData()
         SharedBuffer* buffer = m_data.get()->sharedBuffer();
         ASSERT(buffer);
 
+        bool fontIsWOFF = false;
+#if (!PLATFORM(MAC) || __MAC_OS_X_VERSION_MIN_REQUIRED <= 1090) && (!PLATFORM(IOS) || __IPHONE_OS_VERSION_MIN_REQUIRED < 80000)
         RefPtr<SharedBuffer> sfntBuffer;
 
-        bool fontIsWOFF = isWOFF(buffer);
+        fontIsWOFF = isWOFF(buffer);
         if (fontIsWOFF) {
             Vector<char> sfnt;
             if (convertWOFFToSfnt(buffer, sfnt)) {
@@ -108,6 +111,7 @@ bool CachedFont::ensureCustomFontData()
             } else
                 buffer = nullptr;
         }
+#endif
 
         m_fontData = buffer ? createFontCustomPlatformData(*buffer) : nullptr;
         if (m_fontData)
@@ -129,52 +133,33 @@ FontPlatformData CachedFont::platformDataFromCustomData(float size, bool bold, b
 }
 
 #if ENABLE(SVG_FONTS)
+
 bool CachedFont::ensureSVGFontData()
 {
     if (!m_externalSVGDocument && !errorOccurred() && !isLoading() && m_data) {
-        m_externalSVGDocument = SVGDocument::create(0, URL());
-
+        m_externalSVGDocument = SVGDocument::create(nullptr, URL());
         RefPtr<TextResourceDecoder> decoder = TextResourceDecoder::create("application/xml");
-        String svgSource = decoder->decode(m_data->data(), m_data->size());
-        svgSource.append(decoder->flush());
-        
-        m_externalSVGDocument->setContent(svgSource);
-        
+        m_externalSVGDocument->setContent(decoder->decodeAndFlush(m_data->data(), m_data->size()));
         if (decoder->sawError())
-            m_externalSVGDocument = 0;
+            m_externalSVGDocument = nullptr;
     }
-
     return m_externalSVGDocument;
 }
 
 SVGFontElement* CachedFont::getSVGFontById(const String& fontName) const
 {
-    RefPtr<NodeList> list = m_externalSVGDocument->getElementsByTagNameNS(SVGNames::fontTag.namespaceURI(), SVGNames::fontTag.localName());
-    if (!list)
-        return 0;
-
-    unsigned listLength = list->length();
-    if (!listLength)
-        return 0;
-
-#ifndef NDEBUG
-    for (unsigned i = 0; i < listLength; ++i) {
-        ASSERT(list->item(i));
-        ASSERT(isSVGFontElement(list->item(i)));
-    }
-#endif
+    auto elements = descendantsOfType<SVGFontElement>(*m_externalSVGDocument);
 
     if (fontName.isEmpty())
-        return toSVGFontElement(list->item(0));
+        return elements.first();
 
-    for (unsigned i = 0; i < listLength; ++i) {
-        SVGFontElement* element = toSVGFontElement(list->item(i));
-        if (element->getIdAttribute() == fontName)
-            return element;
+    for (auto& element : elements) {
+        if (element.getIdAttribute() == fontName)
+            return &element;
     }
-
-    return 0;
+    return nullptr;
 }
+
 #endif
 
 void CachedFont::allClientsRemoved()

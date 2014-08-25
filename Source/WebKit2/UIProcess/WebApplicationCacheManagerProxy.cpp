@@ -57,12 +57,12 @@ WebApplicationCacheManagerProxy::~WebApplicationCacheManagerProxy()
 
 void WebApplicationCacheManagerProxy::contextDestroyed()
 {
-    invalidateCallbackMap(m_arrayCallbacks);
+    invalidateCallbackMap(m_arrayCallbacks, CallbackBase::Error::OwnerWasInvalidated);
 }
 
 void WebApplicationCacheManagerProxy::processDidClose(WebProcessProxy*)
 {
-    invalidateCallbackMap(m_arrayCallbacks);
+    invalidateCallbackMap(m_arrayCallbacks, CallbackBase::Error::ProcessExited);
 }
 
 bool WebApplicationCacheManagerProxy::shouldTerminate(WebProcessProxy*) const
@@ -80,13 +80,15 @@ void WebApplicationCacheManagerProxy::derefWebContextSupplement()
     API::Object::deref();
 }
 
-void WebApplicationCacheManagerProxy::getApplicationCacheOrigins(PassRefPtr<ArrayCallback> prpCallback)
+void WebApplicationCacheManagerProxy::getApplicationCacheOrigins(std::function<void (API::Array*, CallbackBase::Error)> callbackFunction)
 {
-    if (!context())
-        return;
+    RefPtr<ArrayCallback> callback = ArrayCallback::create(WTF::move(callbackFunction));
 
-    RefPtr<ArrayCallback> callback = prpCallback;
-    
+    if (!context()) {
+        callback->invalidate();
+        return;
+    }
+
     uint64_t callbackID = callback->callbackID();
     m_arrayCallbacks.set(callbackID, callback.release());
 
@@ -106,9 +108,9 @@ void WebApplicationCacheManagerProxy::deleteEntriesForOrigin(WebSecurityOrigin* 
         return;
 
     SecurityOriginData securityOriginData;
-    securityOriginData.protocol = origin->protocol();
-    securityOriginData.host = origin->host();
-    securityOriginData.port = origin->port();
+    securityOriginData.protocol = origin->securityOrigin().protocol();
+    securityOriginData.host = origin->securityOrigin().host();
+    securityOriginData.port = origin->securityOrigin().port();
 
     // FIXME (Multi-WebProcess): <rdar://problem/12239765> Make manipulating cache information work with per-tab WebProcess.
     context()->sendToAllProcessesRelaunchingThemIfNecessary(Messages::WebApplicationCacheManager::DeleteEntriesForOrigin(securityOriginData));

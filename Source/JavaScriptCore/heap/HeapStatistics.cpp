@@ -29,7 +29,7 @@
 #include "Heap.h"
 #include "HeapIterationScope.h"
 #include "JSObject.h"
-#include "Operations.h"
+#include "JSCInlines.h"
 #include "Options.h"
 #include <stdlib.h>
 #if OS(UNIX)
@@ -195,7 +195,7 @@ inline void StorageStatistics::operator()(JSCell* cell)
         return;
 
     JSObject* object = jsCast<JSObject*>(cell);
-    if (hasIndexedProperties(object->structure()->indexingType()))
+    if (hasIndexedProperties(object->indexingType()))
         return;
 
     if (object->structure()->isUncacheableDictionary())
@@ -233,7 +233,7 @@ void HeapStatistics::showObjectStatistics(Heap* heap)
     dataLogF("\n=== Heap Statistics: ===\n");
     dataLogF("size: %ldkB\n", static_cast<long>(heap->m_sizeAfterLastCollect / KB));
     dataLogF("capacity: %ldkB\n", static_cast<long>(heap->capacity() / KB));
-    dataLogF("pause time: %lfms\n\n", heap->m_lastGCLength);
+    dataLogF("pause time: %lfms\n\n", heap->m_lastFullGCLength);
 
     StorageStatistics storageStatistics;
     {

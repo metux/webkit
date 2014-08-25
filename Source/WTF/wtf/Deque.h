@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2007, 2008 Apple Inc. All rights reserved.
+ * Copyright (C) 2007, 2008, 2014 Apple Inc. All rights reserved.
  * Copyright (C) 2009 Google Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -11,7 +11,7 @@
  * 2.  Redistributions in binary form must reproduce the above copyright
  *     notice, this list of conditions and the following disclaimer in the
  *     documentation and/or other materials provided with the distribution.
- * 3.  Neither the name of Apple Computer, Inc. ("Apple") nor the names of
+ * 3.  Neither the name of Apple Inc. ("Apple") nor the names of
  *     its contributors may be used to endorse or promote products derived
  *     from this software without specific prior written permission.
  *
@@ -162,7 +162,8 @@ namespace WTF {
         typedef T& reference;
         typedef std::bidirectional_iterator_tag iterator_category;
 
-        DequeIterator(Deque<T, inlineCapacity>* deque, size_t index) : Base(deque, index) { }
+        DequeIterator(Deque<T, inlineCapacity>* deque, size_t index)
+            : Base(deque, index) { }
 
         DequeIterator(const Iterator& other) : Base(other) { }
         DequeIterator& operator=(const Iterator& other) { Base::assign(other); return *this; }
@@ -193,7 +194,8 @@ namespace WTF {
         typedef const T& reference;
         typedef std::bidirectional_iterator_tag iterator_category;
 
-        DequeConstIterator(const Deque<T, inlineCapacity>* deque, size_t index) : Base(deque, index) { }
+        DequeConstIterator(const Deque<T, inlineCapacity>* deque, size_t index)
+            : Base(deque, index) { }
 
         DequeConstIterator(const Iterator& other) : Base(other) { }
         DequeConstIterator(const NonConstIterator& other) : Base(other) { }
@@ -293,7 +295,7 @@ namespace WTF {
     {
         // FIXME: This is inefficient if we're using an inline buffer and T is
         // expensive to copy since it will copy the buffer twice instead of once.
-        Deque<T> copy(other);
+        Deque<T, inlineCapacity> copy(other);
         swap(copy);
         return *this;
     }
@@ -325,7 +327,7 @@ namespace WTF {
         invalidateIterators();
         std::swap(m_start, other.m_start);
         std::swap(m_end, other.m_end);
-        m_buffer.swap(other.m_buffer);
+        m_buffer.swap(other.m_buffer, 0, 0);
         checkValidity();
         other.checkValidity();
     }
@@ -391,7 +393,7 @@ namespace WTF {
     template<typename T, size_t inlineCapacity>
     inline auto Deque<T, inlineCapacity>::takeFirst() -> T
     {
-        T oldFirst = std::move(first());
+        T oldFirst = WTF::move(first());
         removeFirst();
         return oldFirst;
     }
@@ -399,7 +401,7 @@ namespace WTF {
     template<typename T, size_t inlineCapacity>
     inline auto Deque<T, inlineCapacity>::takeLast() -> T
     {
-        T oldLast = std::move(last());
+        T oldLast = WTF::move(last());
         removeLast();
         return oldLast;
     }

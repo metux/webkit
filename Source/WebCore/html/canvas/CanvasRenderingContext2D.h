@@ -10,10 +10,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -37,12 +37,9 @@
 #include "GraphicsTypes.h"
 #include "ImageBuffer.h"
 #include "Path.h"
+#include "PlatformLayer.h"
 #include <wtf/Vector.h>
 #include <wtf/text/WTFString.h>
-
-#if USE(ACCELERATED_COMPOSITING)
-#include "PlatformLayer.h"
-#endif
 
 namespace WebCore {
 
@@ -61,10 +58,7 @@ typedef int ExceptionCode;
 
 class CanvasRenderingContext2D : public CanvasRenderingContext, public CanvasPathMethods {
 public:
-    static OwnPtr<CanvasRenderingContext2D> create(HTMLCanvasElement* canvas, bool usesCSSCompatibilityParseMode, bool usesDashboardCompatibilityMode)
-    {
-        return adoptPtr(new CanvasRenderingContext2D(canvas, usesCSSCompatibilityParseMode, usesDashboardCompatibilityMode));
-    }
+    CanvasRenderingContext2D(HTMLCanvasElement*, bool usesCSSCompatibilityParseMode, bool usesDashboardCompatibilityMode);
     virtual ~CanvasRenderingContext2D();
 
     const CanvasStyle& strokeStyle() const { return state().m_strokeStyle; }
@@ -137,17 +131,19 @@ public:
 
     void beginPath();
 
-#if ENABLE(CANVAS_PATH)
-    PassRefPtr<DOMPath> currentPath();
-    void setCurrentPath(DOMPath*);
-#endif
-
     void fill(const String& winding = "nonzero");
     void stroke();
     void clip(const String& winding = "nonzero");
 
+    void fill(DOMPath*, const String& winding = "nonzero");
+    void stroke(DOMPath*);
+    void clip(DOMPath*, const String& winding = "nonzero");
+
     bool isPointInPath(const float x, const float y, const String& winding = "nonzero");
     bool isPointInStroke(const float x, const float y);
+
+    bool isPointInPath(DOMPath*, const float x, const float y, const String& winding = "nonzero");
+    bool isPointInStroke(DOMPath*, const float x, const float y);
 
     void clearRect(float x, float y, float width, float height);
     void fillRect(float x, float y, float width, float height);
@@ -199,6 +195,8 @@ public:
     void putImageData(ImageData*, float dx, float dy, float dirtyX, float dirtyY, float dirtyWidth, float dirtyHeight, ExceptionCode&);
     void webkitPutImageDataHD(ImageData*, float dx, float dy, ExceptionCode&);
     void webkitPutImageDataHD(ImageData*, float dx, float dy, float dirtyX, float dirtyY, float dirtyWidth, float dirtyHeight, ExceptionCode&);
+
+    void drawFocusIfNeeded(Element*);
 
     float webkitBackingStorePixelRatio() const { return canvas()->deviceScaleFactor(); }
 
@@ -272,8 +270,6 @@ private:
         CanvasDidDrawApplyAll = 0xffffffff
     };
 
-    CanvasRenderingContext2D(HTMLCanvasElement*, bool usesCSSCompatibilityParseMode, bool usesDashboardCompatibilityMode);
-
     State& modifiableState() { ASSERT(!m_unrealizedSaveCount); return m_stateStack.last(); }
     const State& state() const { return m_stateStack.last(); }
 
@@ -306,6 +302,16 @@ private:
     void clearPathForDashboardBackwardCompatibilityMode();
 #endif
 
+    void beginCompositeLayer();
+    void endCompositeLayer();
+
+    void fillInternal(const Path&, const String& winding);
+    void strokeInternal(const Path&);
+    void clipInternal(const Path&, const String& winding);
+
+    bool isPointInPathInternal(const Path&, float x, float y, const String& winding);
+    bool isPointInStrokeInternal(const Path&, float x, float y);
+
     void clearCanvas();
     Path transformAreaToDevice(const Path&) const;
     Path transformAreaToDevice(const FloatRect&) const;
@@ -317,7 +323,6 @@ private:
 
     void inflateStrokeRect(FloatRect&) const;
 
-    template<class T> void fullCanvasCompositedFill(const T&);
     template<class T> void fullCanvasCompositedDrawImage(T*, ColorSpace, const FloatRect&, const FloatRect&, CompositeOperator);
 
     void prepareGradientForDashboard(CanvasGradient* gradient) const;
@@ -330,7 +335,7 @@ private:
 
     virtual bool hasInvertibleTransform() const override { return state().m_hasInvertibleTransform; }
 
-#if ENABLE(ACCELERATED_2D_CANVAS) && USE(ACCELERATED_COMPOSITING)
+#if ENABLE(ACCELERATED_2D_CANVAS)
     virtual PlatformLayer* platformLayer() const override;
 #endif
 

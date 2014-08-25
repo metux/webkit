@@ -64,8 +64,8 @@ bool ImageInputType::appendFormData(FormDataList& encoding, bool) const
         return true;
     }
 
-    DEFINE_STATIC_LOCAL(String, dotXString, (ASCIILiteral(".x")));
-    DEFINE_STATIC_LOCAL(String, dotYString, (ASCIILiteral(".y")));
+    DEPRECATED_DEFINE_STATIC_LOCAL(String, dotXString, (ASCIILiteral(".x")));
+    DEPRECATED_DEFINE_STATIC_LOCAL(String, dotYString, (ASCIILiteral(".y")));
     encoding.appendData(name + dotXString, m_clickLocation.x());
     encoding.appendData(name + dotYString, m_clickLocation.y());
 
@@ -103,7 +103,7 @@ void ImageInputType::handleDOMActivateEvent(Event* event)
 
 RenderPtr<RenderElement> ImageInputType::createInputRenderer(PassRef<RenderStyle> style)
 {
-    return createRenderer<RenderImage>(element(), std::move(style));
+    return createRenderer<RenderImage>(element(), WTF::move(style));
 }
 
 void ImageInputType::altAttributeChanged()

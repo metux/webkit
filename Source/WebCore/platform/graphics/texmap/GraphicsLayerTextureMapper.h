@@ -34,7 +34,7 @@ namespace WebCore {
 
 class GraphicsLayerTextureMapper : public GraphicsLayer, public TextureMapperPlatformLayer::Client {
 public:
-    explicit GraphicsLayerTextureMapper(GraphicsLayerClient*);
+    explicit GraphicsLayerTextureMapper(GraphicsLayerClient&);
     virtual ~GraphicsLayerTextureMapper();
 
     void setScrollClient(TextureMapperLayer::ScrollingClient* client) { m_layer->setScrollClient(client); }
@@ -63,7 +63,7 @@ public:
     virtual void setContentsOpaque(bool b);
     virtual void setBackfaceVisibility(bool b);
     virtual void setOpacity(float opacity);
-    virtual void setContentsRect(const IntRect& r);
+    virtual void setContentsRect(const FloatRect&);
     virtual void setReplicatedByLayer(GraphicsLayer*);
     virtual void setContentsToImage(Image*);
     virtual void setContentsToSolidColor(const Color&);
@@ -76,12 +76,12 @@ public:
     virtual void flushCompositingState(const FloatRect&);
     virtual void flushCompositingStateForThisLayerOnly();
     virtual void setName(const String& name);
-    virtual bool hasContentsLayer() const { return m_contentsLayer; }
+    virtual bool usesContentsLayer() const { return m_contentsLayer; }
     virtual PlatformLayer* platformLayer() const { return m_contentsLayer; }
 
     inline int changeMask() const { return m_changeMask; }
 
-    virtual bool addAnimation(const KeyframeValueList&, const IntSize&, const Animation*, const String&, double);
+    virtual bool addAnimation(const KeyframeValueList&, const FloatSize&, const Animation*, const String&, double);
     virtual void pauseAnimation(const String&, double);
     virtual void removeAnimation(const String&);
     void setAnimations(const GraphicsLayerAnimations&);
@@ -160,7 +160,7 @@ private:
     };
     void notifyChange(ChangeMask);
 
-    OwnPtr<TextureMapperLayer> m_layer;
+    std::unique_ptr<TextureMapperLayer> m_layer;
     RefPtr<TextureMapperTiledBackingStore> m_compositedImage;
     NativeImagePtr m_compositedNativeImagePtr;
     RefPtr<TextureMapperBackingStore> m_backingStore;

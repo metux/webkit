@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2004, 2005, 2006 Apple Computer, Inc.  All rights reserved.
+ * Copyright (C) 2004, 2005, 2006 Apple Inc.  All rights reserved.
  * Copyright (C) 2008 Collabora Ltd.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -11,10 +11,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -38,11 +38,11 @@
 #include <wtf/Forward.h>
 #include <wtf/RefCounted.h>
 
-#if PLATFORM(MAC)
+#if PLATFORM(COCOA)
 #include <wtf/RetainPtr.h>
 #endif
 
-#if PLATFORM(MAC)
+#if PLATFORM(COCOA)
 OBJC_CLASS NSView;
 OBJC_CLASS NSWindow;
 typedef NSView *PlatformWidget;
@@ -60,20 +60,10 @@ typedef GtkWidget* PlatformWidget;
 #endif
 
 #if PLATFORM(EFL)
-#if USE(EO)
-typedef struct _Eo_Opaque Evas_Object;
-#else
-typedef struct _Evas_Object Evas_Object;
-#endif
 typedef Evas_Object* PlatformWidget;
 #endif
 
-#if PLATFORM(EFL)
-class PageClientEfl;
-typedef PageClientEfl* PlatformPageClient;
-#else
 typedef PlatformWidget PlatformPageClient;
-#endif
 
 namespace WebCore {
 
@@ -184,18 +174,13 @@ public:
     // the frame rects be the same no matter what transforms are applied.
     virtual bool transformsAffectFrameRect() { return true; }
 
-#if PLATFORM(MAC)
+#if PLATFORM(COCOA)
     NSView* getOuterView() const;
 
     void removeFromSuperview();
 #endif
 #if PLATFORM(IOS)
     void addToSuperview(NSView*);
-#endif
-
-#if PLATFORM(EFL)
-    void setEvasObject(Evas_Object*);
-    Evas_Object* evasObject() { return m_evasObject; }
 #endif
 
     // Virtual methods to convert points to/from the containing ScrollView
@@ -220,7 +205,7 @@ private:
 
 private:
     ScrollView* m_parent;
-#if !PLATFORM(MAC)
+#if !PLATFORM(COCOA)
     PlatformWidget m_widget;
 #else
     RetainPtr<NSView> m_widget;
@@ -229,16 +214,12 @@ private:
     bool m_parentVisible;
 
     IntRect m_frame; // Not used when a native widget exists.
-
-#if PLATFORM(EFL)
-    Evas_Object* m_evasObject;
-#endif
 };
 
 #define WIDGET_TYPE_CASTS(ToValueTypeName, predicate) \
     TYPE_CASTS_BASE(ToValueTypeName, Widget, object, object->predicate, object.predicate)
 
-#if !PLATFORM(MAC)
+#if !PLATFORM(COCOA)
 
 inline PlatformWidget Widget::platformWidget() const
 {

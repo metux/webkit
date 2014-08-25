@@ -12,10 +12,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -33,6 +33,8 @@
 #include <wtf/Forward.h>
 
 #if USE(CG)
+#include <wtf/RetainPtr.h>
+#include <CoreGraphics/CGPath.h>
 typedef struct CGPath PlatformPath;
 #elif USE(CAIRO)
 namespace WebCore {
@@ -55,6 +57,7 @@ namespace WebCore {
     class AffineTransform;
     class FloatPoint;
     class FloatRect;
+    class FloatRoundedRect;
     class FloatSize;
     class GraphicsContext;
     class RoundedRect;
@@ -82,6 +85,9 @@ namespace WebCore {
         WTF_MAKE_FAST_ALLOCATED;
     public:
         Path();
+#if USE(CG)
+        Path(RetainPtr<CGMutablePathRef>);
+#endif
         ~Path();
 
         Path(const Path&);
@@ -124,8 +130,10 @@ namespace WebCore {
         };
 
         void addRoundedRect(const FloatRect&, const FloatSize& roundingRadii, RoundedRectStrategy = PreferNativeRoundedRect);
-        void addRoundedRect(const FloatRect&, const FloatSize& topLeftRadius, const FloatSize& topRightRadius, const FloatSize& bottomLeftRadius, const FloatSize& bottomRightRadius, RoundedRectStrategy = PreferNativeRoundedRect);
+        void addRoundedRect(const FloatRoundedRect&, RoundedRectStrategy = PreferNativeRoundedRect);
         void addRoundedRect(const RoundedRect&);
+
+        void addPath(const Path&, const AffineTransform&);
 
         void translate(const FloatSize&);
 
@@ -138,7 +146,6 @@ namespace WebCore {
         void apply(void* info, PathApplierFunction) const;
         void transform(const AffineTransform&);
 
-        void addPathForRoundedRect(const FloatRect&, const FloatSize& topLeftRadius, const FloatSize& topRightRadius, const FloatSize& bottomLeftRadius, const FloatSize& bottomRightRadius, RoundedRectStrategy = PreferNativeRoundedRect);
         void addBeziersForRoundedRect(const FloatRect&, const FloatSize& topLeftRadius, const FloatSize& topRightRadius, const FloatSize& bottomLeftRadius, const FloatSize& bottomRightRadius);
 
 #if USE(CG)

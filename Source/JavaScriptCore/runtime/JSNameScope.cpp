@@ -27,19 +27,16 @@
 #include "JSNameScope.h"
 
 #include "Error.h"
-#include "Operations.h"
+#include "JSCInlines.h"
 
 namespace JSC {
 
-const ClassInfo JSNameScope::s_info = { "NameScope", &Base::s_info, 0, 0, CREATE_METHOD_TABLE(JSNameScope) };
+const ClassInfo JSNameScope::s_info = { "NameScope", &Base::s_info, 0, CREATE_METHOD_TABLE(JSNameScope) };
 
 void JSNameScope::visitChildren(JSCell* cell, SlotVisitor& visitor)
 {
     JSNameScope* thisObject = jsCast<JSNameScope*>(cell);
     ASSERT_GC_OBJECT_INHERITS(thisObject, info());
-    COMPILE_ASSERT(StructureFlags & OverridesVisitChildren, OverridesVisitChildrenWithoutSettingFlag);
-    ASSERT(thisObject->structure()->typeInfo().overridesVisitChildren());
-
     Base::visitChildren(thisObject, visitor);
     visitor.append(&thisObject->m_registerStore);
 }

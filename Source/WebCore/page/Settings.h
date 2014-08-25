@@ -11,10 +11,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -35,11 +35,11 @@
 #include "SettingsMacros.h"
 #include "Timer.h"
 #include <chrono>
+#include <unicode/uscript.h>
 #include <wtf/HashMap.h>
 #include <wtf/RefCounted.h>
 #include <wtf/text/AtomicString.h>
 #include <wtf/text/AtomicStringHash.h>
-#include <wtf/unicode/Unicode.h>
 
 namespace WebCore {
 
@@ -146,7 +146,6 @@ public:
     //  - HTTP Cookies
     //  - Plug-ins (that support NPNVprivateModeBool)
     void setPrivateBrowsingEnabled(bool);
-    bool privateBrowsingEnabled() const { return m_privateBrowsingEnabled; }
 
     void setDNSPrefetchingEnabled(bool);
     bool dnsPrefetchingEnabled() const { return m_dnsPrefetchingEnabled; }
@@ -169,7 +168,6 @@ public:
     static void setDefaultDOMTimerAlignmentInterval(double);
     static double defaultDOMTimerAlignmentInterval();
 
-    void setDOMTimerAlignmentInterval(double);
     double domTimerAlignmentInterval() const;
 
     void setLayoutInterval(std::chrono::milliseconds);
@@ -180,46 +178,11 @@ public:
     void setHiddenPageDOMTimerThrottlingEnabled(bool);
 #endif
 
-#if PLATFORM(IOS)
-    // FIXME: This setting isn't specific to iOS.
-    void setMaxParseDuration(double maxParseDuration) { m_maxParseDuration = maxParseDuration; }
-    double maxParseDuration() const { return m_maxParseDuration; }
-
-    void setStandalone(bool);
-    bool standalone() const { return m_standalone; }
-
-    void setTelephoneNumberParsingEnabled(bool flag) { m_telephoneNumberParsingEnabled = flag; }
-    bool telephoneNumberParsingEnabled() const { return m_telephoneNumberParsingEnabled; }
-
-    void setMediaDataLoadsAutomatically(bool flag) { m_mediaDataLoadsAutomatically = flag; }
-    bool mediaDataLoadsAutomatically() const { return m_mediaDataLoadsAutomatically; }
-
-    void setShouldTransformsAffectOverflow(bool flag) { m_shouldTransformsAffectOverflow = flag; }
-    bool shouldTransformsAffectOverflow() const { return m_shouldTransformsAffectOverflow; }
-
-    void setShouldDispatchJavaScriptWindowOnErrorEvents(bool flag) { m_shouldDispatchJavaScriptWindowOnErrorEvents = flag; }
-    bool shouldDispatchJavaScriptWindowOnErrorEvents() const { return m_shouldDispatchJavaScriptWindowOnErrorEvents; }
-
-    void setAlwaysUseBaselineOfPrimaryFont(bool flag) { m_alwaysUseBaselineOfPrimaryFont = flag; }
-    bool alwaysUseBaselineOfPrimaryFont() const { return m_alwaysUseBaselineOfPrimaryFont; }
-
-    void setAlwaysUseAcceleratedOverflowScroll(bool flag) { m_alwaysUseAcceleratedOverflowScroll = flag; }
-    bool alwaysUseAcceleratedOverflowScroll() const { return m_alwaysUseAcceleratedOverflowScroll; }
-#endif
-
     void setUsesPageCache(bool);
     bool usesPageCache() const { return m_usesPageCache; }
         
     void setFontRenderingMode(FontRenderingMode mode);
     FontRenderingMode fontRenderingMode() const;
-
-#if ENABLE(CSS_STICKY_POSITION)
-    void setCSSStickyPositionEnabled(bool enabled) { m_cssStickyPositionEnabled = enabled; }
-    bool cssStickyPositionEnabled() const { return m_cssStickyPositionEnabled; }
-#else
-    void setCSSStickyPositionEnabled(bool) { }
-    bool cssStickyPositionEnabled() const { return false; }
-#endif
 
     void setShowTiledScrollingIndicator(bool);
     bool showTiledScrollingIndicator() const { return m_showTiledScrollingIndicator; }
@@ -229,9 +192,6 @@ public:
     static bool shouldUseHighResolutionTimers() { return gShouldUseHighResolutionTimers; }
 #endif
 
-    void setTiledBackingStoreEnabled(bool);
-    bool tiledBackingStoreEnabled() const { return m_tiledBackingStoreEnabled; }
-
     void setBackgroundShouldExtendBeyondPage(bool);
     bool backgroundShouldExtendBeyondPage() const { return m_backgroundShouldExtendBeyondPage; }
 
@@ -240,7 +200,7 @@ public:
     static bool isAVFoundationEnabled() { return gAVFoundationEnabled; }
 #endif
 
-#if PLATFORM(MAC)
+#if PLATFORM(COCOA)
     static void setQTKitEnabled(bool flag);
     static bool isQTKitEnabled() { return gQTKitEnabled; }
 #endif
@@ -269,9 +229,6 @@ public:
 
     void setScrollingPerformanceLoggingEnabled(bool);
     bool scrollingPerformanceLoggingEnabled() { return m_scrollingPerformanceLoggingEnabled; }
-        
-    void setAggressiveTileRetentionEnabled(bool);
-    bool aggressiveTileRetentionEnabled() { return m_aggressiveTileRetentionEnabled; }
 
     static void setShouldRespectPriorityInCSSAttributeSetters(bool);
     static bool shouldRespectPriorityInCSSAttributeSetters();
@@ -279,21 +236,14 @@ public:
     void setTimeWithoutMouseMovementBeforeHidingControls(double time) { m_timeWithoutMouseMovementBeforeHidingControls = time; }
     double timeWithoutMouseMovementBeforeHidingControls() const { return m_timeWithoutMouseMovementBeforeHidingControls; }
 
-#if ENABLE(PAGE_VISIBILITY_API)
     bool hiddenPageCSSAnimationSuspensionEnabled() const { return m_hiddenPageCSSAnimationSuspensionEnabled; }
     void setHiddenPageCSSAnimationSuspensionEnabled(bool);
-#endif
 
     void setFontFallbackPrefersPictographs(bool);
     bool fontFallbackPrefersPictographs() const { return m_fontFallbackPrefersPictographs; }
 
     static bool lowPowerVideoAudioBufferSizeEnabled() { return gLowPowerVideoAudioBufferSizeEnabled; }
     static void setLowPowerVideoAudioBufferSizeEnabled(bool);
-
-#if ENABLE(PLUGIN_PROXY_FOR_VIDEO)
-    static void setVideoPluginProxyEnabled(bool flag);
-    static bool isVideoPluginProxyEnabled() { return gVideoPluginProxyEnabled; }
-#endif
 
 #if PLATFORM(IOS)
     static void setAudioSessionCategoryOverride(unsigned);
@@ -307,6 +257,12 @@ public:
 
     static void setAVKitEnabled(bool flag) { gAVKitEnabled = flag; }
     static bool avKitEnabled() { return gAVKitEnabled; }
+
+    static void setShouldOptOutOfNetworkStateObservation(bool flag) { gShouldOptOutOfNetworkStateObservation = flag; }
+    static bool shouldOptOutOfNetworkStateObservation() { return gShouldOptOutOfNetworkStateObservation; }
+
+    static void setShouldManageAudioSessionCategory(bool flag) { gManageAudioSession = flag; }
+    static bool shouldManageAudioSessionCategory() { return gManageAudioSession; }
 #endif
 
 private:
@@ -322,9 +278,6 @@ private:
     const std::unique_ptr<FontGenericFamilies> m_fontGenericFamilies;
     SecurityOrigin::StorageBlockingPolicy m_storageBlockingPolicy;
     std::chrono::milliseconds m_layoutInterval;
-#if PLATFORM(IOS)
-    double m_maxParseDuration;
-#endif
 #if ENABLE(TEXT_AUTOSIZING)
     float m_textAutosizingFontScaleFactor;
     IntSize m_textAutosizingWindowSizeOverride;
@@ -337,28 +290,13 @@ private:
     bool m_isJavaEnabled : 1;
     bool m_isJavaEnabledForLocalFiles : 1;
     bool m_loadsImagesAutomatically : 1;
-    bool m_privateBrowsingEnabled : 1;
     bool m_areImagesEnabled : 1;
     bool m_arePluginsEnabled : 1;
     bool m_isScriptEnabled : 1;
     bool m_needsAdobeFrameReloadingQuirk : 1;
     bool m_usesPageCache : 1;
     unsigned m_fontRenderingMode : 1;
-#if PLATFORM(IOS)
-    bool m_standalone : 1;
-    bool m_telephoneNumberParsingEnabled : 1;
-    bool m_mediaDataLoadsAutomatically : 1;
-    bool m_shouldTransformsAffectOverflow : 1;
-    bool m_shouldDispatchJavaScriptWindowOnErrorEvents : 1;
-    bool m_alwaysUseBaselineOfPrimaryFont : 1;
-    bool m_allowMultiElementImplicitFormSubmission : 1;
-    bool m_alwaysUseAcceleratedOverflowScroll : 1;
-#endif
-#if ENABLE(CSS_STICKY_POSITION)
-    bool m_cssStickyPositionEnabled : 1;
-#endif
     bool m_showTiledScrollingIndicator : 1;
-    bool m_tiledBackingStoreEnabled : 1;
     bool m_backgroundShouldExtendBeyondPage : 1;
     bool m_dnsPrefetchingEnabled : 1;
 
@@ -366,7 +304,6 @@ private:
     bool m_touchEventEmulationEnabled : 1;
 #endif
     bool m_scrollingPerformanceLoggingEnabled : 1;
-    bool m_aggressiveTileRetentionEnabled : 1;
 
     double m_timeWithoutMouseMovementBeforeHidingControls;
 
@@ -376,9 +313,7 @@ private:
 #if ENABLE(HIDDEN_PAGE_DOM_TIMER_THROTTLING)
     bool m_hiddenPageDOMTimerThrottlingEnabled : 1;
 #endif
-#if ENABLE(PAGE_VISIBILITY_API)
     bool m_hiddenPageCSSAnimationSuspensionEnabled : 1;
-#endif
     bool m_fontFallbackPrefersPictographs : 1;
 
     static double gDefaultMinDOMTimerInterval;
@@ -388,7 +323,7 @@ private:
     static bool gAVFoundationEnabled;
 #endif
 
-#if PLATFORM(MAC)
+#if PLATFORM(COCOA)
     static bool gQTKitEnabled;
 #endif
         
@@ -405,15 +340,13 @@ private:
 #if PLATFORM(IOS)
     static bool gNetworkDataUsageTrackingEnabled;
     static bool gAVKitEnabled;
+    static bool gShouldOptOutOfNetworkStateObservation;
+    static bool gManageAudioSession;
 #endif
 
     static double gHiddenPageDOMTimerAlignmentInterval;
 
     static bool gLowPowerVideoAudioBufferSizeEnabled;
-
-#if ENABLE(PLUGIN_PROXY_FOR_VIDEO)
-    static bool gVideoPluginProxyEnabled;
-#endif
 };
 
 } // namespace WebCore

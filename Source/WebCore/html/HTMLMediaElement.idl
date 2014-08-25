@@ -10,10 +10,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -63,11 +63,11 @@
     readonly attribute boolean seeking;
 
     // playback state
-    attribute double currentTime;
-    readonly attribute double duration;
+    [SetterRaisesException] attribute unrestricted double currentTime;
+    readonly attribute unrestricted double duration;
     readonly attribute boolean paused;
-    attribute double defaultPlaybackRate;
-    attribute double playbackRate;
+    attribute unrestricted double defaultPlaybackRate;
+    attribute unrestricted double playbackRate;
     readonly attribute TimeRanges played;
     readonly attribute TimeRanges seekable;
     readonly attribute boolean ended;
@@ -75,13 +75,28 @@
     [Reflect] attribute boolean loop;
     void play();
     void pause();
-    void fastSeek(double time);
+    void fastSeek(unrestricted double time);
 
     // controls
     attribute boolean controls;
-    [SetterRaisesException] attribute double volume;
+    [SetterRaisesException] attribute unrestricted double volume;
     attribute boolean muted;
     [Reflect=muted] attribute boolean defaultMuted;
+
+    attribute EventListener onemptied;
+    attribute EventListener onloadedmetadata;
+    attribute EventListener onloadeddata;
+    attribute EventListener oncanplay;
+    attribute EventListener oncanplaythrough;
+    attribute EventListener onplaying;
+    attribute EventListener onended;
+    attribute EventListener onwaiting;
+    attribute EventListener ondurationchange;
+    attribute EventListener ontimeupdate;
+    attribute EventListener onplay;
+    attribute EventListener onpause;
+    attribute EventListener onratechange;
+    attribute EventListener onvolumechange;
 
     // WebKit extensions
     attribute boolean webkitPreservesPitch;

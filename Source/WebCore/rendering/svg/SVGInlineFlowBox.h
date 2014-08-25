@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2006 Oliver Hunt <ojh16@student.canterbury.ac.nz>
- * Copyright (C) 2006 Apple Computer Inc.
+ * Copyright (C) 2006 Apple Inc.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -21,7 +21,6 @@
 #ifndef SVGInlineFlowBox_h
 #define SVGInlineFlowBox_h
 
-#if ENABLE(SVG)
 #include "InlineFlowBox.h"
 #include "RenderSVGInline.h"
 
@@ -56,7 +55,5 @@ private:
 INLINE_BOX_OBJECT_TYPE_CASTS(SVGInlineFlowBox, isSVGInlineFlowBox())
 
 } // namespace WebCore
-
-#endif // ENABLE(SVG)
 
 #endif // SVGInlineFlowBox_h

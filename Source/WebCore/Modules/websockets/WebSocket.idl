@@ -34,13 +34,11 @@
     EnabledAtRuntime,
     Conditional=WEB_SOCKETS,
     ActiveDOMObject,
-    Constructor(DOMString url),
-    Constructor(DOMString url, sequence<DOMString> protocols),
+    Constructor(DOMString url, [Default=Undefined] optional sequence<DOMString>? protocols),
     Constructor(DOMString url, DOMString protocol),
     ConstructorRaisesException,
     ConstructorCallWith=ScriptExecutionContext,
     EventTarget,
-    JSNoStaticTables,
 ] interface WebSocket {
     readonly attribute DOMString URL; // Lowercased .url is the one in the spec, but leaving .URL for compatibility reasons.
     readonly attribute DOMString url;

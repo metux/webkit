@@ -37,23 +37,25 @@
 #include <wtf/Threading.h>
 
 #if USE(GLIB)
-#include <wtf/gobject/GRefPtr.h>
+#include <wtf/gobject/GMainLoopSource.h>
 #endif
 
 #if PLATFORM(EFL)
 #include <Ecore.h>
+#include <wtf/efl/UniquePtrEfl.h>
 #endif
 
 namespace WTF {
 
 class RunLoop : public FunctionDispatcher {
+    WTF_MAKE_NONCOPYABLE(RunLoop);
 public:
     // Must be called from the main thread (except for the Mac platform, where it
     // can be called from any thread).
     WTF_EXPORT_PRIVATE static void initializeMainRunLoop();
 
-    WTF_EXPORT_PRIVATE static RunLoop* current();
-    WTF_EXPORT_PRIVATE static RunLoop* main();
+    WTF_EXPORT_PRIVATE static RunLoop& current();
+    WTF_EXPORT_PRIVATE static RunLoop& main();
     WTF_EXPORT_PRIVATE static bool isMain();
     ~RunLoop();
 
@@ -63,14 +65,14 @@ public:
     WTF_EXPORT_PRIVATE void stop();
     WTF_EXPORT_PRIVATE void wakeUp();
 
-#if PLATFORM(MAC)
+#if PLATFORM(COCOA)
     WTF_EXPORT_PRIVATE void runForDuration(double duration);
 #endif
     
     class TimerBase {
         friend class RunLoop;
     public:
-        WTF_EXPORT_PRIVATE explicit TimerBase(RunLoop*);
+        WTF_EXPORT_PRIVATE explicit TimerBase(RunLoop&);
         WTF_EXPORT_PRIVATE virtual ~TimerBase();
 
         void startRepeating(double repeatInterval) { start(repeatInterval, true); }
@@ -84,13 +86,13 @@ public:
     private:
         WTF_EXPORT_PRIVATE void start(double nextFireInterval, bool repeat);
 
-        RunLoop* m_runLoop;
+        RunLoop& m_runLoop;
 
 #if PLATFORM(WIN)
         static void timerFired(RunLoop*, uint64_t ID);
         uint64_t m_ID;
         bool m_isRepeating;
-#elif PLATFORM(MAC)
+#elif PLATFORM(COCOA)
         static void timerFired(CFRunLoopTimerRef, void*);
         RetainPtr<CFRunLoopTimerRef> m_timer;
 #elif PLATFORM(EFL)
@@ -98,11 +100,7 @@ public:
         Ecore_Timer* m_timer;
         bool m_isRepeating;
 #elif USE(GLIB)
-        static gboolean timerFiredCallback(RunLoop::TimerBase*);
-        gboolean isRepeating() const { return m_isRepeating; }
-        void clearTimerSource();
-        GRefPtr<GSource> m_timerSource;
-        gboolean m_isRepeating;
+        GMainLoopSource m_timerSource;
 #endif
     };
 
@@ -111,7 +109,7 @@ public:
     public:
         typedef void (TimerFiredClass::*TimerFiredFunction)();
 
-        Timer(RunLoop* runLoop, TimerFiredClass* o, TimerFiredFunction f)
+        Timer(RunLoop& runLoop, TimerFiredClass* o, TimerFiredFunction f)
             : TimerBase(runLoop)
             , m_object(o)
             , m_function(f)
@@ -143,16 +141,14 @@ private:
 
     typedef HashMap<uint64_t, TimerBase*> TimerMap;
     TimerMap m_activeTimers;
-#elif PLATFORM(MAC)
+#elif PLATFORM(COCOA)
     static void performWork(void*);
     RetainPtr<CFRunLoopRef> m_runLoop;
     RetainPtr<CFRunLoopSourceRef> m_runLoopSource;
     int m_nestingLevel;
 #elif PLATFORM(EFL)
-    bool m_initEfl;
-
     Mutex m_pipeLock;
-    OwnPtr<Ecore_Pipe> m_pipe;
+    EflUniquePtr<Ecore_Pipe> m_pipe;
 
     Mutex m_wakeUpEventRequestedLock;
     bool m_wakeUpEventRequested;

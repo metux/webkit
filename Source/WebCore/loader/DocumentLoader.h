@@ -11,7 +11,7 @@
  * 2.  Redistributions in binary form must reproduce the above copyright
  *     notice, this list of conditions and the following disclaimer in the
  *     documentation and/or other materials provided with the distribution. 
- * 3.  Neither the name of Apple Computer, Inc. ("Apple") nor the names of
+ * 3.  Neither the name of Apple Inc. ("Apple") nor the names of
  *     its contributors may be used to endorse or promote products derived
  *     from this software without specific prior written permission. 
  *
@@ -51,15 +51,14 @@
 #include <wtf/RunLoopTimer.h>
 #endif
 
-namespace WTF {
-class SchedulePair;
-}
+#if USE(QUICK_LOOK)
+#include "QuickLook.h"
+#endif
 
 namespace WebCore {
+
     class ApplicationCacheHost;
-#if ENABLE(WEB_ARCHIVE) || ENABLE(MHTML)
     class Archive;
-#endif
     class ArchiveResource;
     class ArchiveResourceCollection;
     class CachedRawResource;
@@ -74,7 +73,7 @@ namespace WebCore {
     class SharedBuffer;
     class SubstituteResource;
 
-    typedef HashSet<RefPtr<ResourceLoader>> ResourceLoaderSet;
+    typedef HashMap<unsigned long, RefPtr<ResourceLoader>> ResourceLoaderMap;
     typedef Vector<ResourceResponse> ResponseVector;
 
     class DocumentLoader : public RefCounted<DocumentLoader>, private CachedRawResourceClient {
@@ -145,8 +144,8 @@ namespace WebCore {
         const String& overrideEncoding() const { return m_overrideEncoding; }
 
 #if PLATFORM(MAC)
-        void schedule(WTF::SchedulePair*);
-        void unschedule(WTF::SchedulePair*);
+        void schedule(SchedulePair&);
+        void unschedule(SchedulePair&);
 #endif
 
 #if ENABLE(WEB_ARCHIVE) || ENABLE(MHTML)
@@ -157,7 +156,7 @@ namespace WebCore {
         SharedBuffer* parsedArchiveData() const;
 
         bool scheduleArchiveLoad(ResourceLoader*, const ResourceRequest&);
-#endif // ENABLE(WEB_ARCHIVE) || ENABLE(MHTML)
+#endif
 
         // Return the ArchiveResource for the URL only when loading an Archive
         ArchiveResource* archiveResourceForURL(const URL&) const;
@@ -167,8 +166,7 @@ namespace WebCore {
         // Return an ArchiveResource for the URL, either creating from live data or
         // pulling from the ArchiveResourceCollection
         PassRefPtr<ArchiveResource> subresource(const URL&) const;
-        void getSubresources(Vector<PassRefPtr<ArchiveResource>>&) const;
-
+        Vector<RefPtr<ArchiveResource>> subresources() const;
 
 #ifndef NDEBUG
         bool isSubstituteLoadPending(ResourceLoader*) const;
@@ -238,7 +236,7 @@ namespace WebCore {
         
         void didTellClientAboutLoad(const String& url)
         { 
-#if !PLATFORM(MAC)
+#if !PLATFORM(COCOA)
             // Don't include data urls here, as if a lot of data is loaded
             // that way, we hold on to the (large) url string for too long.
             if (protocolIs(url, "data"))
@@ -262,13 +260,13 @@ namespace WebCore {
 
         void checkLoadComplete();
 
-#if USE(CONTENT_FILTERING)
-        void setContentFilterForBlockedLoad(PassRefPtr<ContentFilter>);
-        bool handleContentFilterRequest(const ResourceRequest&);
-#endif
-
         // The URL of the document resulting from this DocumentLoader.
         URL documentURL() const;
+
+#if USE(QUICK_LOOK)
+        void setQuickLookHandle(std::unique_ptr<QuickLookHandle> quickLookHandle) { m_quickLookHandle = WTF::move(quickLookHandle); }
+        QuickLookHandle* quickLookHandle() const { return m_quickLookHandle.get(); }
+#endif
 
     protected:
         DocumentLoader(const ResourceRequest&, const SubstituteData&);
@@ -331,9 +329,9 @@ namespace WebCore {
         Ref<CachedResourceLoader> m_cachedResourceLoader;
 
         CachedResourceHandle<CachedRawResource> m_mainResource;
-        ResourceLoaderSet m_subresourceLoaders;
-        ResourceLoaderSet m_multipartSubresourceLoaders;
-        ResourceLoaderSet m_plugInStreamLoaders;
+        ResourceLoaderMap m_subresourceLoaders;
+        ResourceLoaderMap m_multipartSubresourceLoaders;
+        ResourceLoaderMap m_plugInStreamLoaders;
         
         mutable DocumentWriter m_writer;
 
@@ -420,9 +418,12 @@ namespace WebCore {
         friend class ApplicationCacheHost;  // for substitute resource delivery
         OwnPtr<ApplicationCacheHost> m_applicationCacheHost;
 
-#if USE(CONTENT_FILTERING)
-        RefPtr<ContentFilter> m_contentFilter;
-        RefPtr<ContentFilter> m_contentFilterForBlockedLoad;
+#if ENABLE(CONTENT_FILTERING)
+        std::unique_ptr<ContentFilter> m_contentFilter;
+#endif
+
+#if USE(QUICK_LOOK)
+        std::unique_ptr<QuickLookHandle> m_quickLookHandle;
 #endif
     };
 

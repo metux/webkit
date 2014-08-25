@@ -3,7 +3,7 @@
  *           (C) 1999 Antti Koivisto (koivisto@kde.org)
  *           (C) 2001 Peter Kelly (pmk@post.com)
  *           (C) 2001 Dirk Mueller (mueller@kde.org)
- * Copyright (C) 2004, 2005, 2006, 2008, 2010 Apple Inc. All rights reserved.
+ * Copyright (C) 2004, 2005, 2006, 2008, 2010, 2014 Apple Inc. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -30,6 +30,7 @@
 #include "CSSValuePool.h"
 #include "ContentSecurityPolicy.h"
 #include "DOMTokenList.h"
+#include "HTMLElement.h"
 #include "HTMLParserIdioms.h"
 #include "InspectorInstrumentation.h"
 #include "PropertySetCSSStyleDeclaration.h"
@@ -69,7 +70,7 @@ static bool operator!=(const PresentationAttributeCacheKey& a, const Presentatio
 
 static PresentationAttributeCache& presentationAttributeCache()
 {
-    DEFINE_STATIC_LOCAL(PresentationAttributeCache, cache, ());
+    DEPRECATED_DEFINE_STATIC_LOCAL(PresentationAttributeCache, cache, ());
     return cache;
 }
 
@@ -114,17 +115,17 @@ private:
 
 static PresentationAttributeCacheCleaner& presentationAttributeCacheCleaner()
 {
-    DEFINE_STATIC_LOCAL(PresentationAttributeCacheCleaner, cleaner, ());
+    DEPRECATED_DEFINE_STATIC_LOCAL(PresentationAttributeCacheCleaner, cleaner, ());
     return cleaner;
 }
 
-void StyledElement::synchronizeStyleAttributeInternal() const
+void StyledElement::synchronizeStyleAttributeInternal(StyledElement* styledElement)
 {
-    ASSERT(elementData());
-    ASSERT(elementData()->styleAttributeIsDirty());
-    elementData()->setStyleAttributeIsDirty(false);
-    if (const StyleProperties* inlineStyle = this->inlineStyle())
-        const_cast<StyledElement*>(this)->setSynchronizedLazyAttribute(styleAttr, inlineStyle->asText());
+    ASSERT(styledElement->elementData());
+    ASSERT(styledElement->elementData()->styleAttributeIsDirty());
+    styledElement->elementData()->setStyleAttributeIsDirty(false);
+    if (const StyleProperties* inlineStyle = styledElement->inlineStyle())
+        styledElement->setSynchronizedLazyAttribute(styleAttr, inlineStyle->asText());
 }
 
 StyledElement::~StyledElement()
@@ -149,7 +150,7 @@ MutableStyleProperties& StyledElement::ensureMutableInlineStyle()
     return static_cast<MutableStyleProperties&>(*inlineStyle);
 }
 
-void StyledElement::attributeChanged(const QualifiedName& name, const AtomicString& newValue, AttributeModificationReason reason)
+void StyledElement::attributeChanged(const QualifiedName& name, const AtomicString& oldValue, const AtomicString& newValue, AttributeModificationReason reason)
 {
     if (name == styleAttr)
         styleAttributeChanged(newValue, reason);
@@ -158,7 +159,7 @@ void StyledElement::attributeChanged(const QualifiedName& name, const AtomicStri
         setNeedsStyleRecalc(InlineStyleChange);
     }
 
-    Element::attributeChanged(name, newValue, reason);
+    Element::attributeChanged(name, oldValue, newValue, reason);
 }
 
 PropertySetCSSStyleDeclaration* StyledElement::inlineStyleCSSOMWrapper()

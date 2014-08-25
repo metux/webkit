@@ -20,20 +20,19 @@
 #include "config.h"
 #include "SVGImageForContainer.h"
 
-#if ENABLE(SVG)
 #include "AffineTransform.h"
 #include "FloatRect.h"
 #include "FloatSize.h"
+#include "FrameView.h"
 #include "Image.h"
-#include "SVGImage.h"
 
 namespace WebCore {
 
-IntSize SVGImageForContainer::size() const
+FloatSize SVGImageForContainer::size() const
 {
     FloatSize scaledContainerSize(m_containerSize);
     scaledContainerSize.scale(m_zoom);
-    return roundedIntSize(scaledContainerSize);
+    return FloatSize(roundedIntSize(scaledContainerSize));
 }
 
 void SVGImageForContainer::draw(GraphicsContext* context, const FloatRect& dstRect,
@@ -55,5 +54,3 @@ PassNativeImagePtr SVGImageForContainer::nativeImageForCurrentFrame()
 }
 
 } // namespace WebCore
-
-#endif // ENABLE(SVG)

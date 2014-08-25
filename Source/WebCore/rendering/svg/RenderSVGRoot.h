@@ -23,7 +23,6 @@
 #ifndef RenderSVGRoot_h
 #define RenderSVGRoot_h
 
-#if ENABLE(SVG)
 #include "FloatRect.h"
 #include "RenderReplaced.h"
 
@@ -32,6 +31,7 @@
 namespace WebCore {
 
 class AffineTransform;
+class RenderSVGResourceContainer;
 class SVGSVGElement;
 
 class RenderSVGRoot final : public RenderReplaced {
@@ -44,7 +44,7 @@ public:
     bool isEmbeddedThroughSVGImage() const;
     bool isEmbeddedThroughFrameContainingSVGDocument() const;
 
-    virtual void computeIntrinsicRatioInformation(FloatSize& intrinsicSize, double& intrinsicRatio, bool& isPercentageIntrinsicSize) const override;
+    virtual void computeIntrinsicRatioInformation(FloatSize& intrinsicSize, double& intrinsicRatio) const override;
 
     bool isLayoutSizeChanged() const { return m_isLayoutSizeChanged; }
     virtual void setNeedsBoundariesUpdate() override { m_needsBoundariesOrTransformUpdate = true; }
@@ -55,8 +55,6 @@ public:
     void setContainerSize(const IntSize& containerSize) { m_containerSize = containerSize; }
 
     virtual bool hasRelativeDimensions() const override;
-    virtual bool hasRelativeIntrinsicLogicalWidth() const override;
-    virtual bool hasRelativeLogicalHeight() const override;
 
     // localToBorderBoxTransform maps local SVG viewport coordinates to local CSS box coordinates.  
     const AffineTransform& localToBorderBoxTransform() const { return m_localToBorderBoxTransform; }
@@ -82,7 +80,7 @@ private:
     virtual void willBeDestroyed() override;
     virtual void styleDidChange(StyleDifference, const RenderStyle* oldStyle) override;
     virtual void addChild(RenderObject* child, RenderObject* beforeChild = 0) override;
-    virtual void removeChild(RenderObject&) override;
+    virtual RenderObject* removeChild(RenderObject&) override;
 
     virtual const AffineTransform& localToParentTransform() const override;
 
@@ -105,6 +103,7 @@ private:
     virtual bool canBeSelectionLeaf() const override { return false; }
     virtual bool canHaveChildren() const override { return true; }
 
+    bool shouldApplyViewportClip() const;
     void updateCachedBoundaries();
     void buildLocalToBorderBoxTransform();
 
@@ -120,12 +119,11 @@ private:
     bool m_isLayoutSizeChanged : 1;
     bool m_needsBoundariesOrTransformUpdate : 1;
     bool m_hasSVGShadow : 1;
+    bool m_hasBoxDecorations : 1;
 };
 
-template<> inline bool isRendererOfType<const RenderSVGRoot>(const RenderObject& renderer) { return renderer.isSVGRoot(); }
 RENDER_OBJECT_TYPE_CASTS(RenderSVGRoot, isSVGRoot())
 
 } // namespace WebCore
 
-#endif // ENABLE(SVG)
 #endif // RenderSVGRoot_h

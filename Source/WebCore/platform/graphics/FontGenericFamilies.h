@@ -26,6 +26,7 @@
 #ifndef FontGenericFamilies_h
 #define FontGenericFamilies_h
 
+#include <unicode/uscript.h>
 #include <wtf/HashMap.h>
 #include <wtf/text/AtomicString.h>
 
@@ -43,6 +44,7 @@ struct UScriptCodeHashTraits : WTF::GenericHashTraits<int> {
 typedef HashMap<int, AtomicString, DefaultHash<int>::Hash, UScriptCodeHashTraits> ScriptFontFamilyMap;
 
 class FontGenericFamilies {
+    WTF_MAKE_FAST_ALLOCATED;
 public:
     FontGenericFamilies();
 

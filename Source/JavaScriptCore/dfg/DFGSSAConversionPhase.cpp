@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013 Apple Inc. All rights reserved.
+ * Copyright (C) 2013, 2014 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -32,12 +32,13 @@
 #include "DFGGraph.h"
 #include "DFGInsertionSet.h"
 #include "DFGPhase.h"
-#include "Operations.h"
+#include "JSCInlines.h"
 
 namespace JSC { namespace DFG {
 
 class SSAConversionPhase : public Phase {
     static const bool verbose = false;
+    static const bool dumpGraph = false;
     
 public:
     SSAConversionPhase(Graph& graph)
@@ -51,23 +52,9 @@ public:
     {
         RELEASE_ASSERT(m_graph.m_form == ThreadedCPS);
         
-        // Figure out which SetLocal's need flushing. Need to do this while the
-        // Phi graph is still intact.
-        for (BlockIndex blockIndex = m_graph.numBlocks(); blockIndex--;) {
-            BasicBlock* block = m_graph.block(blockIndex);
-            if (!block)
-                continue;
-            for (unsigned nodeIndex = block->size(); nodeIndex--;) {
-                Node* node = block->at(nodeIndex);
-                if (node->op() != Flush)
-                    continue;
-                addFlushedLocalOp(node);
-            }
-        }
-        while (!m_flushedLocalOpWorklist.isEmpty()) {
-            Node* node = m_flushedLocalOpWorklist.takeLast();
-            ASSERT(m_flushedLocalOps.contains(node));
-            DFG_NODE_DO_TO_CHILDREN(m_graph, node, addFlushedLocalEdge);
+        if (dumpGraph) {
+            dataLog("Graph dump at top of SSA conversion:\n");
+            m_graph.dump();
         }
         
         // Eliminate all duplicate or self-pointing Phi edges. This means that
@@ -108,15 +95,26 @@ public:
         // If it turns out to be a non-trivial Phi, make sure that we create an
         // SSA Phi and Upsilons in predecessor blocks. We reuse
         // BasicBlock::variablesAtHead for tracking which nodes to refer to.
+        Operands<bool> nonTrivialPhis(OperandsLike, m_graph.block(0)->variablesAtHead);
         for (BlockIndex blockIndex = m_graph.numBlocks(); blockIndex--;) {
             BasicBlock* block = m_graph.block(blockIndex);
             if (!block)
                 continue;
-            
+
+            nonTrivialPhis.fill(false);
+            for (unsigned i = block->phis.size(); i--;) {
+                Node* phi = block->phis[i];
+                if (!phi->children.justOneChild())
+                    nonTrivialPhis.operand(phi->local()) = true;
+            }
+                
             for (unsigned i = block->variablesAtHead.size(); i--;) {
                 Node* node = block->variablesAtHead[i];
                 if (!node)
                     continue;
+                
+                if (verbose)
+                    dataLog("At block #", blockIndex, " for operand r", block->variablesAtHead.operandForIndex(i), " have node ", node, "\n");
                 
                 VariableAccessData* variable = node->variableAccessData();
                 if (variable->isCaptured()) {
@@ -141,26 +139,33 @@ public:
                 }
                 RELEASE_ASSERT(node->op() == Phi || node->op() == SetArgument);
                 
-                bool isFlushed = m_flushedLocalOps.contains(node);
+                bool isFlushed = !!(node->flags() & NodeIsFlushed);
                 
                 if (node->op() == Phi) {
-                    Edge edge = node->children.justOneChild();
-                    if (edge)
+                    if (!nonTrivialPhis.operand(node->local())) {
+                        Edge edge = node->children.justOneChild();
+                        ASSERT(edge);
+                        if (verbose)
+                            dataLog("    One child: ", edge, ", ", RawPointer(edge.node()), "\n");
                         node = edge.node(); // It's something from a different basic block.
-                    else {
+                    } else {
+                        if (verbose)
+                            dataLog("    Non-trivial.\n");
                         // It's a non-trivial Phi.
                         FlushFormat format = variable->flushFormat();
                         NodeFlags result = resultFor(format);
                         UseKind useKind = useKindFor(format);
                         
-                        node = m_insertionSet.insertNode(0, SpecNone, Phi, CodeOrigin());
+                        node = m_insertionSet.insertNode(0, SpecNone, Phi, NodeOrigin());
+                        if (verbose)
+                            dataLog("    Inserted new node: ", node, "\n");
                         node->mergeFlags(result);
                         RELEASE_ASSERT((node->flags() & NodeResultMask) == result);
                         
                         for (unsigned j = block->predecessors.size(); j--;) {
                             BasicBlock* predecessor = block->predecessors[j];
                             predecessor->appendNonTerminal(
-                                m_graph, SpecNone, Upsilon, predecessor->last()->codeOrigin,
+                                m_graph, SpecNone, Upsilon, predecessor->last()->origin,
                                 OpInfo(node), Edge(predecessor->variablesAtTail[i], useKind));
                         }
                         
@@ -186,8 +191,8 @@ public:
                             // the value was already on the stack.
                         } else {
                             m_insertionSet.insertNode(
-                                0, SpecNone, MovHint, CodeOrigin(),
-                                OpInfo(variable->local().offset()), Edge(node));
+                                0, SpecNone, MovHint, NodeOrigin(),
+                                OpInfo(variable->local().offset()), node->defaultEdge());
                         }
                     }
                 }
@@ -220,20 +225,28 @@ public:
         // Clear all replacements, since other phases may have used them.
         m_graph.clearReplacements();
         
+        if (dumpGraph) {
+            dataLog("Graph just before identifying replacements:\n");
+            m_graph.dump();
+        }
+        
         // For all of the old CPS Phis, figure out what they correspond to in SSA.
         for (BlockIndex blockIndex = m_graph.numBlocks(); blockIndex--;) {
             BasicBlock* block = m_graph.block(blockIndex);
             if (!block)
                 continue;
+            if (verbose)
+                dataLog("Dealing with block #", blockIndex, "\n");
             for (unsigned phiIndex = block->phis.size(); phiIndex--;) {
                 Node* phi = block->phis[phiIndex];
                 if (verbose) {
                     dataLog(
-                        "Considering ", phi, ", for r", phi->local(),
-                        ", and its replacement in ", *block, ", ",
+                        "Considering ", phi, " (", RawPointer(phi), "), for r",
+                        phi->local(), ", and its replacement in ", *block, ", ",
                         block->variablesAtHead.operand(phi->local()), "\n");
                 }
-                phi->misc.replacement = block->variablesAtHead.operand(phi->local());
+                ASSERT(phi != block->variablesAtHead.operand(phi->local()));
+                phi->replacement = block->variablesAtHead.operand(phi->local());
             }
         }
         
@@ -248,8 +261,10 @@ public:
                 Node* node = block->variablesAtHead[i];
                 if (!node)
                     continue;
-                while (node->misc.replacement)
-                    node = node->misc.replacement;
+                while (node->replacement) {
+                    ASSERT(node != node->replacement);
+                    node = node->replacement;
+                }
                 block->variablesAtHead[i] = node;
             }
         }
@@ -270,12 +285,7 @@ public:
         //   to the node specified by variablesAtHead.
         // - SetLocal gets NodeMustGenerate if it's flushed, or turns into a
         //   Check otherwise.
-        // - Flush loses its children but remains, because we want to know when a
-        //   flushed SetLocal's value is no longer needed. This also makes it simpler
-        //   to reason about the format of a local, since we can just do a backwards
-        //   analysis (see FlushLivenessAnalysisPhase). As part of the backwards
-        //   analysis, we say that the type of a local can be either int32, double,
-        //   value, or dead.
+        // - Flush loses its children and turns into a Phantom.
         // - PhantomLocal becomes Phantom, and its child is whatever is specified
         //   by variablesAtHead.
         // - SetArgument turns into GetArgument unless it's a captured variable.
@@ -291,11 +301,11 @@ public:
                 continue;
             
             for (unsigned phiIndex = block->phis.size(); phiIndex--;) {
-                block->phis[phiIndex]->misc.replacement =
+                block->phis[phiIndex]->replacement =
                     block->variablesAtHead.operand(block->phis[phiIndex]->local());
             }
             for (unsigned nodeIndex = block->size(); nodeIndex--;)
-                ASSERT(!block->at(nodeIndex)->misc.replacement);
+                ASSERT(!block->at(nodeIndex)->replacement);
             
             for (unsigned nodeIndex = 0; nodeIndex < block->size(); ++nodeIndex) {
                 Node* node = block->at(nodeIndex);
@@ -305,11 +315,11 @@ public:
                 switch (node->op()) {
                 case SetLocal: {
                     VariableAccessData* variable = node->variableAccessData();
-                    if (variable->isCaptured() || m_flushedLocalOps.contains(node))
+                    if (variable->isCaptured() || !!(node->flags() & NodeIsFlushed))
                         node->mergeFlags(NodeMustGenerate);
                     else
                         node->setOpAndDefaultFlags(Check);
-                    node->misc.replacement = node->child1().node(); // Only for Upsilons.
+                    node->replacement = node->child1().node(); // Only for Upsilons.
                     break;
                 }
                     
@@ -323,27 +333,41 @@ public:
                     if (variable->isCaptured())
                         break;
                     node->convertToPhantom();
-                    node->misc.replacement = block->variablesAtHead.operand(variable->local());
+                    node->replacement = block->variablesAtHead.operand(variable->local());
                     break;
                 }
                     
                 case Flush: {
                     node->children.reset();
+                    node->convertToPhantom();
                     // This is only for Upsilons. An Upsilon will only refer to a Flush if
                     // there were no SetLocals or GetLocals in the block.
-                    node->misc.replacement = block->variablesAtHead.operand(node->local());
+                    node->replacement = block->variablesAtHead.operand(node->local());
                     break;
                 }
                     
                 case PhantomLocal: {
+                    ASSERT(node->child1().useKind() == UntypedUse);
                     VariableAccessData* variable = node->variableAccessData();
-                    if (variable->isCaptured())
-                        break;
-                    node->child1().setNode(block->variablesAtHead.operand(variable->local()));
+                    if (variable->isCaptured()) {
+                        // This is a fun case. We could have a captured variable that had some
+                        // or all of its uses strength reduced to phantoms rather than flushes.
+                        // SSA conversion will currently still treat it as flushed, in the sense
+                        // that it will just keep the SetLocal. Therefore, there is nothing that
+                        // needs to be done here: we don't need to also keep the source value
+                        // alive. And even if we did want to keep the source value alive, we
+                        // wouldn't be able to, because the variablesAtHead value for a captured
+                        // local wouldn't have been computed by the Phi reduction algorithm
+                        // above.
+                        node->children.reset();
+                    } else {
+                        node->child1() =
+                            block->variablesAtHead.operand(variable->local())->defaultEdge();
+                    }
                     node->convertToPhantom();
                     // This is only for Upsilons. An Upsilon will only refer to a
                     // PhantomLocal if there were no SetLocals or GetLocals in the block.
-                    node->misc.replacement = block->variablesAtHead.operand(variable->local());
+                    node->replacement = block->variablesAtHead.operand(variable->local());
                     break;
                 }
                     
@@ -352,7 +376,7 @@ public:
                     if (variable->isCaptured())
                         break;
                     node->setOpAndDefaultFlags(GetArgument);
-                    node->mergeFlags(resultFor(node->variableAccessData()->flushFormat()));
+                    node->setResult(resultFor(node->variableAccessData()->flushFormat()));
                     break;
                 }
 
@@ -374,7 +398,7 @@ public:
             block->variablesAtTail.clear();
             block->valuesAtHead.clear();
             block->valuesAtHead.clear();
-            block->ssa = adoptPtr(new BasicBlock::SSAData(block));
+            block->ssa = std::make_unique<BasicBlock::SSAData>(block);
         }
         
         m_graph.m_arguments.clear();
@@ -446,22 +470,7 @@ private:
         }
     }
     
-    void addFlushedLocalOp(Node* node)
-    {
-        if (m_flushedLocalOps.contains(node))
-            return;
-        m_flushedLocalOps.add(node);
-        m_flushedLocalOpWorklist.append(node);
-    }
-
-    void addFlushedLocalEdge(Node*, Edge edge)
-    {
-        addFlushedLocalOp(edge.node());
-    }
-    
     InsertionSet m_insertionSet;
-    HashSet<Node*> m_flushedLocalOps;
-    Vector<Node*> m_flushedLocalOpWorklist;
     bool m_changed;
 };
 

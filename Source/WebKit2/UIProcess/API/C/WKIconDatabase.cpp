@@ -57,6 +57,23 @@ void WKIconDatabaseSetIconDataForIconURL(WKIconDatabaseRef iconDatabaseRef, WKDa
     toImpl(iconDatabaseRef)->setIconDataForIconURL(toImpl(iconDataRef)->dataReference(), toWTFString(iconURLRef));
 }
 
+void WKIconDatabaseSetIconURLForPageURL(WKIconDatabaseRef iconDatabaseRef, WKURLRef iconURLRef, WKURLRef pageURLRef)
+{
+    toImpl(iconDatabaseRef)->setIconURLForPageURL(toWTFString(iconURLRef), toWTFString(pageURLRef));
+}
+
+WKURLRef WKIconDatabaseCopyIconURLForPageURL(WKIconDatabaseRef iconDatabaseRef, WKURLRef pageURLRef)
+{
+    String iconURLString;
+    toImpl(iconDatabaseRef)->synchronousIconURLForPageURL(toWTFString(pageURLRef), iconURLString);
+    return toCopiedURLAPI(iconURLString);
+}
+
+WKDataRef WKIconDatabaseCopyIconDataForPageURL(WKIconDatabaseRef iconDatabaseRef, WKURLRef pageURL)
+{
+    return toAPI(toImpl(iconDatabaseRef)->iconDataForPageURL(toWTFString(pageURL)).leakRef());
+}
+
 void WKIconDatabaseEnableDatabaseCleanup(WKIconDatabaseRef iconDatabaseRef)
 {
     toImpl(iconDatabaseRef)->enableDatabaseCleanup();

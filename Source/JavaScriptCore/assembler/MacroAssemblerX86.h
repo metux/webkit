@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008 Apple Inc. All rights reserved.
+ * Copyright (C) 2008, 2014 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -111,6 +111,18 @@ public:
         m_assembler.movzbl_mr(address, dest);
     }
 
+    void abortWithReason(AbortReason reason)
+    {
+        move(TrustedImm32(reason), X86Registers::eax);
+        breakpoint();
+    }
+
+    void abortWithReason(AbortReason reason, intptr_t misc)
+    {
+        move(TrustedImm32(misc), X86Registers::edx);
+        abortWithReason(reason);
+    }
+
     ConvertibleLoadLabel convertibleLoadPtr(Address address, RegisterID dest)
     {
         ConvertibleLoadLabel result = ConvertibleLoadLabel(this);
@@ -123,11 +135,11 @@ public:
         m_assembler.addsd_mr(address.m_ptr, dest);
     }
 
-    void storeDouble(FPRegisterID src, const void* address)
+    void storeDouble(FPRegisterID src, TrustedImmPtr address)
     {
         ASSERT(isSSE2Present());
-        ASSERT(address);
-        m_assembler.movsd_rm(src, address);
+        ASSERT(address.m_value);
+        m_assembler.movsd_rm(src, address.m_value);
     }
 
     void convertInt32ToDouble(AbsoluteAddress src, FPRegisterID dest)
@@ -157,6 +169,8 @@ public:
     }
     
     // Possibly clobbers src.
+    // FIXME: Don't do that.
+    // https://bugs.webkit.org/show_bug.cgi?id=131690
     void moveDoubleToInts(FPRegisterID src, RegisterID dest1, RegisterID dest2)
     {
         movePackedToInt32(src, dest1);
@@ -257,6 +271,14 @@ public:
         return Jump(m_assembler.jCC(x86Condition(cond)));
     }
 
+    Jump branch32WithPatch(RelationalCondition cond, Address left, DataLabel32& dataLabel, TrustedImm32 initialRightValue = TrustedImm32(0))
+    {
+        padBeforePatch();
+        m_assembler.cmpl_im_force32(initialRightValue.m_value, left.offset, left.base);
+        dataLabel = DataLabel32(this);
+        return Jump(m_assembler.jCC(x86Condition(cond)));
+    }
+
     DataLabelPtr storePtrWithPatch(TrustedImmPtr initialValue, ImplicitAddress address)
     {
         padBeforePatch();
@@ -277,6 +299,7 @@ public:
     }
 
     static bool canJumpReplacePatchableBranchPtrWithPatch() { return true; }
+    static bool canJumpReplacePatchableBranch32WithPatch() { return true; }
     
     static CodeLocationLabel startOfBranchPtrWithPatchOnRegister(CodeLocationDataLabelPtr label)
     {
@@ -299,6 +322,17 @@ public:
         return label.labelAtOffset(-totalBytes);
     }
     
+    static CodeLocationLabel startOfPatchableBranch32WithPatchOnAddress(CodeLocationDataLabel32 label)
+    {
+        const int opcodeBytes = 1;
+        const int modRMBytes = 1;
+        const int offsetBytes = 0;
+        const int immediateBytes = 4;
+        const int totalBytes = opcodeBytes + modRMBytes + offsetBytes + immediateBytes;
+        ASSERT(totalBytes >= maxJumpReplacementSize());
+        return label.labelAtOffset(-totalBytes);
+    }
+    
     static void revertJumpReplacementToBranchPtrWithPatch(CodeLocationLabel instructionStart, RegisterID reg, void* initialValue)
     {
         X86Assembler::revertJumpTo_cmpl_ir_force32(instructionStart.executableAddress(), reinterpret_cast<intptr_t>(initialValue), reg);
@@ -308,6 +342,12 @@ public:
     {
         ASSERT(!address.offset);
         X86Assembler::revertJumpTo_cmpl_im_force32(instructionStart.executableAddress(), reinterpret_cast<intptr_t>(initialValue), 0, address.base);
+    }
+
+    static void revertJumpReplacementToPatchableBranch32WithPatch(CodeLocationLabel instructionStart, Address address, int32_t initialValue)
+    {
+        ASSERT(!address.offset);
+        X86Assembler::revertJumpTo_cmpl_im_force32(instructionStart.executableAddress(), initialValue, 0, address.base);
     }
 
 #if USE(MASM_PROBE)

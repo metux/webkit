@@ -69,8 +69,7 @@ public:
     Color visitedLinkTextFillColor;
     Color visitedLinkTextEmphasisColor;    
 
-    OwnPtr<ShadowData> textShadow; // Our text shadow information for shadowed text drawing.
-    AtomicString highlight; // Apple-specific extension for custom highlight rendering.
+    std::unique_ptr<ShadowData> textShadow; // Our text shadow information for shadowed text drawing.
     
     RefPtr<CursorList> cursorData;
     Length indent;
@@ -120,7 +119,7 @@ public:
 #endif
 #if ENABLE(CSS3_TEXT)
     unsigned m_textAlignLast : 3; // TextAlignLast
-    unsigned m_textJustify : 3; // TextJustify
+    unsigned m_textJustify : 2; // TextJustify
 #endif // CSS3_TEXT
     unsigned m_textDecorationSkip : 5; // TextDecorationSkip
     unsigned m_textUnderlinePosition : 3; // TextUnderlinePosition

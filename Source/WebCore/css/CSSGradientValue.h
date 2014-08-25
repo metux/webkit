@@ -10,10 +10,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -35,6 +35,7 @@ namespace WebCore {
 
 class FloatPoint;
 class Gradient;
+class RenderView;
 
 enum CSSGradientType {
     CSSDeprecatedLinearGradient,
@@ -61,7 +62,7 @@ struct CSSGradientColorStop {
 
 class CSSGradientValue : public CSSImageGeneratorValue {
 public:
-    PassRefPtr<Image> image(RenderElement*, const IntSize&);
+    PassRefPtr<Image> image(RenderElement*, const FloatSize&);
 
     void setFirstX(PassRefPtr<CSSPrimitiveValue> val) { m_firstX = val; }
     void setFirstY(PassRefPtr<CSSPrimitiveValue> val) { m_firstY = val; }
@@ -79,7 +80,7 @@ public:
     CSSGradientType gradientType() const { return m_gradientType; }
 
     bool isFixedSize() const { return false; }
-    IntSize fixedSize(const RenderElement*) const { return IntSize(); }
+    FloatSize fixedSize(const RenderElement*) const { return FloatSize(); }
 
     bool isPending() const { return false; }
     bool knownToBeOpaque(const RenderElement*) const;
@@ -109,10 +110,10 @@ protected:
     {
     }
 
-    void addStops(Gradient*, RenderElement*, const RenderStyle& rootStyle, float maxLengthForRepeat = 0);
+    void addStops(Gradient&, const CSSToLengthConversionData&, float maxLengthForRepeat = 0);
 
     // Resolve points/radii to front end values.
-    FloatPoint computeEndPoint(CSSPrimitiveValue*, CSSPrimitiveValue*, const RenderStyle&, const RenderStyle& rootStyle, const IntSize&);
+    FloatPoint computeEndPoint(CSSPrimitiveValue*, CSSPrimitiveValue*, const CSSToLengthConversionData&, const FloatSize&);
 
     bool isCacheable() const;
 
@@ -145,7 +146,7 @@ public:
     String customCSSText() const;
 
     // Create the gradient for a given size.
-    PassRefPtr<Gradient> createGradient(RenderElement*, const IntSize&);
+    PassRefPtr<Gradient> createGradient(RenderElement&, const FloatSize&);
 
     PassRef<CSSLinearGradientValue> clone() const
     {
@@ -195,7 +196,7 @@ public:
     void setEndVerticalSize(PassRefPtr<CSSPrimitiveValue> val) { m_endVerticalSize = val; }
 
     // Create the gradient for a given size.
-    PassRefPtr<Gradient> createGradient(RenderElement*, const IntSize&);
+    PassRefPtr<Gradient> createGradient(RenderElement&, const FloatSize&);
 
     bool equals(const CSSRadialGradientValue&) const;
 
@@ -218,7 +219,7 @@ private:
 
 
     // Resolve points/radii to front end values.
-    float resolveRadius(CSSPrimitiveValue*, const RenderStyle&, const RenderStyle& rootStyle, float* widthOrHeight = 0);
+    float resolveRadius(CSSPrimitiveValue&, const CSSToLengthConversionData&, float* widthOrHeight = 0);
 
     // These may be null for non-deprecated gradients.
     RefPtr<CSSPrimitiveValue> m_firstRadius;

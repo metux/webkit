@@ -19,7 +19,6 @@
  */
 
 #include "config.h"
-#if ENABLE(PROGRESS_ELEMENT)
 #include "RenderProgress.h"
 
 #include "HTMLNames.h"
@@ -32,7 +31,7 @@
 namespace WebCore {
 
 RenderProgress::RenderProgress(HTMLElement& element, PassRef<RenderStyle> style)
-    : RenderBlockFlow(element, std::move(style))
+    : RenderBlockFlow(element, WTF::move(style))
     , m_position(HTMLProgressElement::InvalidPosition)
     , m_animationStartTime(0)
     , m_animationRepeatInterval(0)
@@ -67,13 +66,8 @@ void RenderProgress::computeLogicalHeight(LayoutUnit logicalHeight, LayoutUnit l
         frame.setHeight(computedValues.m_extent);
     else
         frame.setWidth(computedValues.m_extent);
-    IntSize frameSize = theme().progressBarRectForBounds(this, pixelSnappedIntRect(frame)).size();
+    IntSize frameSize = theme().progressBarRectForBounds(*this, pixelSnappedIntRect(frame)).size();
     computedValues.m_extent = isHorizontalWritingMode() ? frameSize.height() : frameSize.width();
-}
-
-bool RenderProgress::canBeReplacedWithInlineRunIn() const
-{
-    return false;
 }
 
 double RenderProgress::animationProgress() const
@@ -96,8 +90,8 @@ void RenderProgress::animationTimerFired(Timer<RenderProgress>&)
 
 void RenderProgress::updateAnimationState()
 {
-    m_animationDuration = theme().animationDurationForProgressBar(this);
-    m_animationRepeatInterval = theme().animationRepeatIntervalForProgressBar(this);
+    m_animationDuration = theme().animationDurationForProgressBar(*this);
+    m_animationRepeatInterval = theme().animationRepeatIntervalForProgressBar(*this);
 
     bool animating = style().hasAppearance() && m_animationDuration > 0;
     if (animating == m_animating)
@@ -125,4 +119,3 @@ HTMLProgressElement* RenderProgress::progressElement() const
 
 } // namespace WebCore
 
-#endif

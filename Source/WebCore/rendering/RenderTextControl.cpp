@@ -22,6 +22,7 @@
 #include "config.h"
 #include "RenderTextControl.h"
 
+#include "CSSPrimitiveValueMappings.h"
 #include "HTMLTextFormControlElement.h"
 #include "HitTestResult.h"
 #include "RenderText.h"
@@ -29,15 +30,15 @@
 #include "RenderTheme.h"
 #include "ScrollbarTheme.h"
 #include "StyleInheritedData.h"
+#include "StyleProperties.h"
 #include "TextControlInnerElements.h"
-#include "TextIterator.h"
 #include "VisiblePosition.h"
 #include <wtf/unicode/CharacterNames.h>
 
 namespace WebCore {
 
 RenderTextControl::RenderTextControl(HTMLTextFormControlElement& element, PassRef<RenderStyle> style)
-    : RenderBlockFlow(element, std::move(style))
+    : RenderBlockFlow(element, WTF::move(style))
 {
 }
 
@@ -68,18 +69,8 @@ void RenderTextControl::styleDidChange(StyleDifference diff, const RenderStyle* 
         innerTextRenderer->style().setHeight(Length());
         innerTextRenderer->style().setWidth(Length());
         innerTextRenderer->setStyle(createInnerTextStyle(&style()));
-        innerText->setNeedsStyleRecalc();
     }
     textFormControlElement().updatePlaceholderVisibility(false);
-}
-
-static inline bool updateUserModifyProperty(const HTMLTextFormControlElement& element, RenderStyle* style)
-{
-    bool isDisabled = element.isDisabledFormControl();
-    bool isReadOnlyControl = element.isReadOnly();
-
-    style->setUserModify((isReadOnlyControl || isDisabled) ? READ_ONLY : READ_WRITE_PLAINTEXT_ONLY);
-    return isDisabled;
 }
 
 void RenderTextControl::adjustInnerTextStyle(const RenderStyle* startStyle, RenderStyle* textBlockStyle) const
@@ -89,8 +80,16 @@ void RenderTextControl::adjustInnerTextStyle(const RenderStyle* startStyle, Rend
     textBlockStyle->setDirection(style().direction());
     textBlockStyle->setUnicodeBidi(style().unicodeBidi());
 
-    bool disabled = updateUserModifyProperty(textFormControlElement(), textBlockStyle);
-    if (disabled)
+    HTMLTextFormControlElement& control = textFormControlElement();
+    if (HTMLElement* innerText = control.innerTextElement()) {
+        if (const StyleProperties* properties = innerText->presentationAttributeStyle()) {
+            RefPtr<CSSValue> value = properties->getPropertyCSSValue(CSSPropertyWebkitUserModify);
+            if (value && value->isPrimitiveValue())
+                textBlockStyle->setUserModify(toCSSPrimitiveValue(*value));
+        }
+    }
+
+    if (control.isDisabledFormControl())
         textBlockStyle->setColor(theme().disabledTextColor(textBlockStyle->visitedDependentColor(CSSPropertyColor), startStyle->visitedDependentColor(CSSPropertyBackgroundColor)));
 #if PLATFORM(IOS)
     if (textBlockStyle->textSecurity() != TSNONE && !textBlockStyle->isLeftToRightDirection()) {
@@ -136,13 +135,6 @@ int RenderTextControl::textBlockLogicalWidth() const
     return unitWidth;
 }
 
-void RenderTextControl::updateFromElement()
-{
-    TextControlInnerTextElement* innerText = innerTextElement();
-    if (innerText && innerText->renderer())
-        updateUserModifyProperty(textFormControlElement(), &innerText->renderer()->style());
-}
-
 int RenderTextControl::scrollbarThickness() const
 {
     // FIXME: We should get the size of the scrollbar from the RenderTheme instead.
@@ -154,8 +146,8 @@ void RenderTextControl::computeLogicalHeight(LayoutUnit logicalHeight, LayoutUni
     TextControlInnerTextElement* innerText = innerTextElement();
     ASSERT(innerText);
     if (RenderBox* innerTextBox = innerText->renderBox()) {
-        LayoutUnit nonContentHeight = innerTextBox->borderAndPaddingHeight() + innerTextBox->marginHeight();
-        logicalHeight = computeControlLogicalHeight(innerTextBox->lineHeight(true, HorizontalLine, PositionOfInteriorLineBoxes), nonContentHeight) + borderAndPaddingHeight();
+        LayoutUnit nonContentHeight = innerTextBox->verticalBorderAndPaddingExtent() + innerTextBox->verticalMarginExtent();
+        logicalHeight = computeControlLogicalHeight(innerTextBox->lineHeight(true, HorizontalLine, PositionOfInteriorLineBoxes), nonContentHeight) + verticalBorderAndPaddingExtent();
 
         // We are able to have a horizontal scrollbar if the overflow style is scroll, or if its auto and there's no word wrap.
         if ((isHorizontalWritingMode() && (style().overflowX() == OSCROLL ||  (style().overflowX() == OAUTO && innerText->renderer()->style().overflowWrap() == NormalOverflowWrap)))
@@ -173,83 +165,17 @@ void RenderTextControl::hitInnerTextElement(HitTestResult& result, const LayoutP
         return;
 
     LayoutPoint adjustedLocation = accumulatedOffset + location();
-    LayoutPoint localPoint = pointInContainer - toLayoutSize(adjustedLocation + innerText->renderBox()->location());
-    if (hasOverflowClip())
-        localPoint += scrolledContentOffset();
+    LayoutPoint localPoint = pointInContainer - toLayoutSize(adjustedLocation + innerText->renderBox()->location()) + scrolledContentOffset();
     result.setInnerNode(innerText);
     result.setInnerNonSharedNode(innerText);
     result.setLocalPoint(localPoint);
 }
 
-static const char* fontFamiliesWithInvalidCharWidth[] = {
-    "American Typewriter",
-    "Arial Hebrew",
-    "Chalkboard",
-    "Cochin",
-    "Corsiva Hebrew",
-    "Courier",
-    "Euphemia UCAS",
-    "Geneva",
-    "Gill Sans",
-    "Hei",
-    "Helvetica",
-    "Hoefler Text",
-    "InaiMathi",
-    "Kai",
-    "Lucida Grande",
-    "Marker Felt",
-    "Monaco",
-    "Mshtakan",
-    "New Peninim MT",
-    "Osaka",
-    "Raanana",
-    "STHeiti",
-    "Symbol",
-    "Times",
-    "Apple Braille",
-    "Apple LiGothic",
-    "Apple LiSung",
-    "Apple Symbols",
-    "AppleGothic",
-    "AppleMyungjo",
-    "#GungSeo",
-    "#HeadLineA",
-    "#PCMyungjo",
-    "#PilGi",
-};
-
-// For font families where any of the fonts don't have a valid entry in the OS/2 table
-// for avgCharWidth, fallback to the legacy webkit behavior of getting the avgCharWidth
-// from the width of a '0'. This only seems to apply to a fixed number of Mac fonts,
-// but, in order to get similar rendering across platforms, we do this check for
-// all platforms.
-bool RenderTextControl::hasValidAvgCharWidth(AtomicString family)
+float RenderTextControl::getAverageCharWidth()
 {
-    if (family.isEmpty())
-        return false;
-
-    // Internal fonts on OS X also have an invalid entry in the table for avgCharWidth.
-    // They are hidden by having a name that begins with a period, so simply search
-    // for that here rather than try to keep the list up to date.
-    if (family.startsWith('.'))
-        return false;
-
-    static HashSet<AtomicString>* fontFamiliesWithInvalidCharWidthMap = 0;
-    
-    if (!fontFamiliesWithInvalidCharWidthMap) {
-        fontFamiliesWithInvalidCharWidthMap = new HashSet<AtomicString>;
-
-        for (size_t i = 0; i < WTF_ARRAY_LENGTH(fontFamiliesWithInvalidCharWidth); ++i)
-            fontFamiliesWithInvalidCharWidthMap->add(AtomicString(fontFamiliesWithInvalidCharWidth[i]));
-    }
-
-    return !fontFamiliesWithInvalidCharWidthMap->contains(family);
-}
-
-float RenderTextControl::getAvgCharWidth(AtomicString family)
-{
-    if (hasValidAvgCharWidth(family))
-        return roundf(style().font().primaryFont()->avgCharWidth());
+    float width;
+    if (style().font().fastAverageCharWidthIfAvailable(width))
+        return width;
 
     const UChar ch = '0';
     const String str = String(&ch, 1);
@@ -269,8 +195,7 @@ float RenderTextControl::scaleEmToUnits(int x) const
 void RenderTextControl::computeIntrinsicLogicalWidths(LayoutUnit& minLogicalWidth, LayoutUnit& maxLogicalWidth) const
 {
     // Use average character width. Matches IE.
-    const AtomicString& family = style().font().firstFamily();
-    maxLogicalWidth = preferredContentLogicalWidth(const_cast<RenderTextControl*>(this)->getAvgCharWidth(family));
+    maxLogicalWidth = preferredContentLogicalWidth(const_cast<RenderTextControl*>(this)->getAverageCharWidth());
     if (RenderBox* innerTextRenderBox = innerTextElement()->renderBox())
         maxLogicalWidth += innerTextRenderBox->paddingStart() + innerTextRenderBox->paddingEnd();
     if (!style().logicalWidth().isPercent())
@@ -343,10 +268,5 @@ int RenderTextControl::innerLineHeight() const
     return style().computedLineHeight();
 }
 #endif
-
-bool RenderTextControl::canBeReplacedWithInlineRunIn() const
-{
-    return false;
-}
 
 } // namespace WebCore

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013 Apple Inc. All rights reserved.
+ * Copyright (C) 2013, 2014 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -30,8 +30,38 @@
 
 #include "DFGGraph.h"
 #include "DFGNodeAllocator.h"
+#include "JSCInlines.h"
 
 namespace JSC { namespace DFG {
+
+bool MultiPutByOffsetData::writesStructures() const
+{
+    for (unsigned i = variants.size(); i--;) {
+        if (variants[i].writesStructures())
+            return true;
+    }
+    return false;
+}
+
+bool MultiPutByOffsetData::reallocatesStorage() const
+{
+    for (unsigned i = variants.size(); i--;) {
+        if (variants[i].reallocatesStorage())
+            return true;
+    }
+    return false;
+}
+
+void BranchTarget::dump(PrintStream& out) const
+{
+    if (!block)
+        return;
+    
+    out.print(*block);
+    
+    if (count == count) // If the count is not NaN, then print it.
+        out.print("/w:", count);
+}
 
 unsigned Node::index() const
 {
@@ -53,6 +83,15 @@ bool Node::hasVariableAccessData(Graph& graph)
     default:
         return false;
     }
+}
+
+void Node::convertToIdentity()
+{
+    RELEASE_ASSERT(child1());
+    RELEASE_ASSERT(!child2());
+    NodeFlags result = canonicalResultRepresentation(this->result());
+    setOpAndDefaultFlags(Identity);
+    setResult(result);
 }
 
 } } // namespace JSC::DFG
@@ -85,7 +124,10 @@ void printInternal(PrintStream& out, Node* node)
         return;
     }
     out.print("@", node->index());
-    out.print(AbbreviatedSpeculationDump(node->prediction()));
+    if (node->hasDoubleResult())
+        out.print("<Double>");
+    else if (node->hasInt52Result())
+        out.print("<Int52>");
 }
 
 } // namespace WTF

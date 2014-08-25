@@ -10,10 +10,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -31,7 +31,6 @@
 #include "DOMWindow.h"
 #include "Document.h"
 #include "DocumentLoader.h"
-#include "EventHandler.h"
 #include "EventNames.h"
 #include "ExceptionCode.h"
 #include "FocusController.h"
@@ -43,23 +42,17 @@
 #include "Logging.h"
 #include "MainFrame.h"
 #include "Page.h"
+#include "PageCache.h"
 #include "PageTransitionEvent.h"
+#include "SVGDocumentExtensions.h"
 #include "ScriptController.h"
 #include "SerializedScriptValue.h"
 #include <wtf/RefCountedLeakCounter.h>
 #include <wtf/text/CString.h>
 
-#if ENABLE(SVG)
-#include "SVGDocumentExtensions.h"
-#endif
-
 #if ENABLE(TOUCH_EVENTS)
 #include "Chrome.h"
 #include "ChromeClient.h"
-#endif
-
-#if USE(ACCELERATED_COMPOSITING)
-#include "PageCache.h"
 #endif
 
 namespace WebCore {
@@ -70,12 +63,9 @@ CachedFrameBase::CachedFrameBase(Frame& frame)
     : m_document(frame.document())
     , m_documentLoader(frame.loader().documentLoader())
     , m_view(frame.view())
-    , m_mousePressNode(frame.eventHandler().mousePressNode())
     , m_url(frame.document()->url())
     , m_isMainFrame(!frame.tree().parent())
-#if USE(ACCELERATED_COMPOSITING)
     , m_isComposited(frame.view()->hasCompositedContent())
-#endif
 {
 }
 
@@ -98,13 +88,10 @@ void CachedFrameBase::restore()
     Frame& frame = m_view->frame();
     m_cachedFrameScriptData->restore(frame);
 
-#if ENABLE(SVG)
     if (m_document->svgExtensions())
         m_document->accessSVGExtensions()->unpauseAnimations();
-#endif
 
     frame.animation().resumeAnimationsForDocument(m_document.get());
-    frame.eventHandler().setMousePressNode(m_mousePressNode.get());
     m_document->resumeActiveDOMObjects(ActiveDOMObject::DocumentWillBecomeInactive);
     m_document->resumeScriptedAnimationControllerCallbacks();
 
@@ -112,10 +99,8 @@ void CachedFrameBase::restore()
     // cached page.
     frame.script().updatePlatformScriptObjects();
 
-#if USE(ACCELERATED_COMPOSITING)
     if (m_isComposited)
         frame.view()->restoreBackingStores();
-#endif
 
     frame.loader().client().didRestoreFromPageCache();
 
@@ -188,10 +173,8 @@ CachedFrame::CachedFrame(Frame& frame)
 
     frame.loader().client().savePlatformDataToCachedFrame(this);
 
-#if USE(ACCELERATED_COMPOSITING)
     if (m_isComposited && pageCache()->shouldClearBackingStores())
         frame.view()->clearBackingStores();
-#endif
 
     // documentWillSuspendForPageCache() can set up a layout timer on the FrameView, so clear timers after that.
     frame.clearTimers();
@@ -252,7 +235,6 @@ void CachedFrame::clear()
 
     m_document = nullptr;
     m_view = nullptr;
-    m_mousePressNode = nullptr;
     m_url = URL();
 
     m_cachedFramePlatformData = nullptr;
@@ -296,7 +278,7 @@ void CachedFrame::destroy()
 
 void CachedFrame::setCachedFramePlatformData(std::unique_ptr<CachedFramePlatformData> data)
 {
-    m_cachedFramePlatformData = std::move(data);
+    m_cachedFramePlatformData = WTF::move(data);
 }
 
 CachedFramePlatformData* CachedFrame::cachedFramePlatformData()

@@ -20,7 +20,6 @@
 #ifndef SVGTextPathElement_h
 #define SVGTextPathElement_h
 
-#if ENABLE(SVG)
 #include "SVGNames.h"
 #include "SVGTextContentElement.h"
 #include "SVGURIReference.h"
@@ -111,7 +110,10 @@ public:
     };
 
     static PassRefPtr<SVGTextPathElement> create(const QualifiedName&, Document&);
- 
+
+protected:
+    virtual void didNotifySubtreeInsertions(ContainerNode*) override;
+
 private:
     SVGTextPathElement(const QualifiedName&, Document&);
 
@@ -145,5 +147,4 @@ NODE_TYPE_CASTS(SVGTextPathElement)
 
 } // namespace WebCore
 
-#endif // ENABLE(SVG)
 #endif

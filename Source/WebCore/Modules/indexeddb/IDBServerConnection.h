@@ -59,20 +59,20 @@ public:
 
     typedef std::function<void (bool success)> BoolCallbackFunction;
 
-    // Factory-level operations
-    virtual void deleteDatabase(const String& name, BoolCallbackFunction successCallback) = 0;
-
     // Database-level operations
     typedef std::function<void (const IDBDatabaseMetadata&, bool success)> GetIDBDatabaseMetadataFunction;
     virtual void getOrEstablishIDBDatabaseMetadata(GetIDBDatabaseMetadataFunction) = 0;
     virtual void close() = 0;
+    virtual void deleteDatabase(const String& name, BoolCallbackFunction successCallback) = 0;
 
     // Transaction-level operations
     virtual void openTransaction(int64_t transactionID, const HashSet<int64_t>& objectStoreIds, IndexedDB::TransactionMode, BoolCallbackFunction successCallback) = 0;
     virtual void beginTransaction(int64_t transactionID, std::function<void()> completionCallback) = 0;
     virtual void commitTransaction(int64_t transactionID, BoolCallbackFunction successCallback) = 0;
     virtual void resetTransaction(int64_t transactionID, std::function<void()> completionCallback) = 0;
+    virtual bool resetTransactionSync(int64_t transactionID) = 0;
     virtual void rollbackTransaction(int64_t transactionID, std::function<void()> completionCallback) = 0;
+    virtual bool rollbackTransactionSync(int64_t transactionID) = 0;
 
     virtual void setIndexKeys(int64_t transactionID, int64_t databaseID, int64_t objectStoreID, const IDBObjectStoreMetadata&, IDBKey& primaryKey, const Vector<int64_t>& indexIDs, const Vector<Vector<RefPtr<IDBKey>>>& indexKeys, std::function<void(PassRefPtr<IDBDatabaseError>)> completionCallback) = 0;
 
@@ -81,7 +81,7 @@ public:
     virtual void deleteIndex(IDBTransactionBackend&, const DeleteIndexOperation&, std::function<void(PassRefPtr<IDBDatabaseError>)> completionCallback) = 0;
     virtual void get(IDBTransactionBackend&, const GetOperation&, std::function<void(const IDBGetResult&, PassRefPtr<IDBDatabaseError>)> completionCallback) = 0;
     virtual void put(IDBTransactionBackend&, const PutOperation&, std::function<void(PassRefPtr<IDBKey>, PassRefPtr<IDBDatabaseError>)> completionCallback) = 0;
-    virtual void openCursor(IDBTransactionBackend&, const OpenCursorOperation&, std::function<void(int64_t, PassRefPtr<IDBDatabaseError>)> completionCallback) = 0;
+    virtual void openCursor(IDBTransactionBackend&, const OpenCursorOperation&, std::function<void(int64_t, PassRefPtr<IDBKey>, PassRefPtr<IDBKey>, PassRefPtr<SharedBuffer>, PassRefPtr<IDBDatabaseError>)> completionCallback) = 0;
     virtual void count(IDBTransactionBackend&, const CountOperation&, std::function<void(int64_t, PassRefPtr<IDBDatabaseError>)> completionCallback) = 0;
     virtual void deleteRange(IDBTransactionBackend&, const DeleteRangeOperation&, std::function<void(PassRefPtr<IDBDatabaseError>)> completionCallback) = 0;
     virtual void clearObjectStore(IDBTransactionBackend&, const ClearObjectStoreOperation&, std::function<void(PassRefPtr<IDBDatabaseError>)> completionCallback) = 0;

@@ -33,6 +33,7 @@
 namespace WebCore {
 
 class CSSCalcValue;
+class CSSToLengthConversionData;
 class Counter;
 class DashboardRegion;
 class Pair;
@@ -41,6 +42,10 @@ class RGBColor;
 class Rect;
 class RenderStyle;
 class CSSBasicShape;
+
+#if ENABLE(CSS_SCROLL_SNAP)
+class LengthRepeat;
+#endif
 
 struct Length;
 struct LengthSize;
@@ -103,6 +108,9 @@ public:
         CSS_DPI = 31,
         CSS_DPCM = 32,
         CSS_FR = 33,
+#if ENABLE(CSS_SCROLL_SNAP)
+        CSS_LENGTH_REPEAT = 34,
+#endif
         CSS_PAIR = 100, // We envision this being exposed as a means of getting computed style values for pairs (border-spacing/radius, background-position, etc.)
 #if ENABLE(DASHBOARD_SUPPORT)
         CSS_DASHBOARD_REGION = 101, // FIXME: Dashboard region should not be a primitive value.
@@ -147,7 +155,6 @@ public:
         UAngle,
         UTime,
         UFrequency,
-        UViewportPercentageLength,
 #if ENABLE(CSS_IMAGE_RESOLUTION) || ENABLE(RESOLUTION_MEDIA_QUERY)
         UResolution,
 #endif
@@ -175,12 +182,15 @@ public:
     bool isLength() const
     {
         unsigned short type = primitiveType();
-        return (type >= CSS_EMS && type <= CSS_PC) || type == CSS_REMS || type == CSS_CHS;
+        return (type >= CSS_EMS && type <= CSS_PC) || type == CSS_REMS || type == CSS_CHS || isViewportPercentageLength();
     }
     bool isNumber() const { return primitiveType() == CSS_NUMBER; }
     bool isPercentage() const { return primitiveType() == CSS_PERCENTAGE; }
     bool isPx() const { return primitiveType() == CSS_PX; }
     bool isRect() const { return m_primitiveUnitType == CSS_RECT; }
+#if ENABLE(CSS_SCROLL_SNAP)
+    bool isLengthRepeat() const { return m_primitiveUnitType == CSS_LENGTH_REPEAT; }
+#endif
     bool isRGBColor() const { return m_primitiveUnitType == CSS_RGBCOLOR; }
     bool isShape() const { return m_primitiveUnitType == CSS_SHAPE; }
     bool isString() const { return m_primitiveUnitType == CSS_STRING; }
@@ -214,7 +224,7 @@ public:
     static PassRef<CSSPrimitiveValue> create(double value, UnitTypes type) { return adoptRef(*new CSSPrimitiveValue(value, type)); }
     static PassRef<CSSPrimitiveValue> create(const String& value, UnitTypes type) { return adoptRef(*new CSSPrimitiveValue(value, type)); }
     static PassRef<CSSPrimitiveValue> create(const Length& value, const RenderStyle* style) { return adoptRef(*new CSSPrimitiveValue(value, style)); }
-    static PassRef<CSSPrimitiveValue> create(const LengthSize& value) { return adoptRef(*new CSSPrimitiveValue(value)); }
+    static PassRef<CSSPrimitiveValue> create(const LengthSize& value, const RenderStyle* style) { return adoptRef(*new CSSPrimitiveValue(value, style)); }
 
     template<typename T> static PassRef<CSSPrimitiveValue> create(T value)
     {
@@ -265,10 +275,10 @@ public:
      * this is screen/printer dependent, so we probably need a config option for this,
      * and some tool to calibrate.
      */
-    template<typename T> T computeLength(const RenderStyle* currStyle, const RenderStyle* rootStyle, float multiplier = 1.0f, bool computingFontSize = false) const;
+    template<typename T> T computeLength(const CSSToLengthConversionData&) const;
 
     // Converts to a Length, mapping various unit types appropriately.
-    template<int> Length convertToLength(const RenderStyle* currStyle, const RenderStyle* rootStyle, double multiplier = 1.0, bool computingFontSize = false) const;
+    template<int> Length convertToLength(const CSSToLengthConversionData&) const;
 
     // use with care!!!
     void setPrimitiveType(unsigned short type) { m_primitiveUnitType = type; }
@@ -303,6 +313,11 @@ public:
     Quad* getQuadValue(ExceptionCode&) const;
     Quad* getQuadValue() const { return m_primitiveUnitType != CSS_QUAD ? 0 : m_value.quad; }
 
+#if ENABLE(CSS_SCROLL_SNAP)
+    LengthRepeat* getLengthRepeatValue(ExceptionCode&) const;
+    LengthRepeat* getLengthRepeatValue() const { return m_primitiveUnitType != CSS_LENGTH_REPEAT ? 0 : m_value.lengthRepeat; }
+#endif
+
     PassRefPtr<RGBColor> getRGBColorValue(ExceptionCode&) const;
     RGBA32 getRGBA32Value() const { return m_primitiveUnitType != CSS_RGBCOLOR ? 0 : m_value.rgbcolor; }
 
@@ -328,8 +343,6 @@ public:
 
     void addSubresourceStyleURLs(ListHashSet<URL>&, const StyleSheetContents*) const;
 
-    Length viewportPercentageLength() const;
-
     PassRefPtr<CSSPrimitiveValue> cloneForCSSOM() const;
     void setCSSOMSafe() { m_isCSSOMSafe = true; }
 
@@ -346,7 +359,7 @@ private:
     CSSPrimitiveValue(unsigned color); // RGB value
     CSSPrimitiveValue(const Length&);
     CSSPrimitiveValue(const Length&, const RenderStyle*);
-    CSSPrimitiveValue(const LengthSize&);
+    CSSPrimitiveValue(const LengthSize&, const RenderStyle*);
     CSSPrimitiveValue(const String&, UnitTypes);
     CSSPrimitiveValue(double, UnitTypes);
 
@@ -368,17 +381,25 @@ private:
     template<typename T> operator T*(); // compile-time guard
 
     void init(const Length&);
-    void init(const LengthSize&);
+    void init(const LengthSize&, const RenderStyle*);
     void init(PassRefPtr<Counter>);
     void init(PassRefPtr<Rect>);
     void init(PassRefPtr<Pair>);
     void init(PassRefPtr<Quad>);
+#if ENABLE(CSS_SCROLL_SNAP)
+    void init(PassRefPtr<LengthRepeat>);
+#endif
     void init(PassRefPtr<DashboardRegion>); // FIXME: Dashboard region should not be a primitive value.
     void init(PassRefPtr<CSSBasicShape>);
     void init(PassRefPtr<CSSCalcValue>);
     bool getDoubleValueInternal(UnitTypes targetUnitType, double* result) const;
 
-    double computeLengthDouble(const RenderStyle* currentStyle, const RenderStyle* rootStyle, float multiplier, bool computingFontSize) const;
+    double computeLengthDouble(const CSSToLengthConversionData&) const;
+
+    ALWAYS_INLINE String formatNumberForcustomCSSText() const;
+    template <unsigned characterCount>
+    ALWAYS_INLINE PassRef<StringImpl> formatNumberValue(const char (&characters)[characterCount]) const;
+    NEVER_INLINE PassRef<StringImpl> formatNumberValue(const char* suffix, unsigned suffixLength) const;
 
     union {
         CSSPropertyID propertyID;
@@ -389,6 +410,9 @@ private:
         Counter* counter;
         Rect* rect;
         Quad* quad;
+#if ENABLE(CSS_SCROLL_SNAP)
+        LengthRepeat* lengthRepeat;
+#endif
         unsigned rgbcolor;
         Pair* pair;
         DashboardRegion* region;

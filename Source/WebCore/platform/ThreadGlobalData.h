@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008 Apple Inc. All Rights Reserved.
+ * Copyright (C) 2008, 2014 Apple Inc. All Rights Reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -10,10 +10,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -40,7 +40,7 @@ using WTF::ThreadSpecific;
 namespace WebCore {
 
     class EventNames;
-    class ThreadLocalInspectorCounters;
+    class ReplayInputTypes;
     class ThreadTimers;
 
     struct CachedResourceRequestInitiators;
@@ -57,19 +57,18 @@ namespace WebCore {
         const CachedResourceRequestInitiators& cachedResourceRequestInitiators() { return *m_cachedResourceRequestInitiators; }
         EventNames& eventNames() { return *m_eventNames; }
         ThreadTimers& threadTimers() { return *m_threadTimers; }
+#if ENABLE(WEB_REPLAY)
+        ReplayInputTypes& inputTypes() { return *m_inputTypes; }
+#endif
 
         ICUConverterWrapper& cachedConverterICU() { return *m_cachedConverterICU; }
 
-#if PLATFORM(MAC) && !PLATFORM(IOS)
+#if PLATFORM(MAC)
         TECConverterWrapper& cachedConverterTEC() { return *m_cachedConverterTEC; }
 #endif
 
-#if ENABLE(WORKERS) && USE(WEB_THREAD)
+#if USE(WEB_THREAD)
         void setWebCoreThreadData();
-#endif
-
-#if ENABLE(INSPECTOR)
-        ThreadLocalInspectorCounters& inspectorCounters() { return *m_inspectorCounters; }
 #endif
 
     private:
@@ -77,18 +76,18 @@ namespace WebCore {
         OwnPtr<EventNames> m_eventNames;
         OwnPtr<ThreadTimers> m_threadTimers;
 
+#if ENABLE(WEB_REPLAY)
+        std::unique_ptr<ReplayInputTypes> m_inputTypes;
+#endif
+
 #ifndef NDEBUG
         bool m_isMainThread;
 #endif
 
         OwnPtr<ICUConverterWrapper> m_cachedConverterICU;
 
-#if PLATFORM(MAC) && !PLATFORM(IOS)
+#if PLATFORM(MAC)
         OwnPtr<TECConverterWrapper> m_cachedConverterTEC;
-#endif
-
-#if ENABLE(INSPECTOR)
-        OwnPtr<ThreadLocalInspectorCounters> m_inspectorCounters;
 #endif
 
         static ThreadSpecific<ThreadGlobalData>* staticData;

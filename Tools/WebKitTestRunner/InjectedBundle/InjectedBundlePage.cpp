@@ -31,19 +31,19 @@
 #include "WebCoreTestSupport.h"
 #include <cmath>
 #include <JavaScriptCore/JSRetainPtr.h>
-#include <WebKit2/WKArray.h>
-#include <WebKit2/WKBundle.h>
-#include <WebKit2/WKBundleBackForwardList.h>
-#include <WebKit2/WKBundleBackForwardListItem.h>
-#include <WebKit2/WKBundleFrame.h>
-#include <WebKit2/WKBundleFramePrivate.h>
-#include <WebKit2/WKBundleHitTestResult.h>
-#include <WebKit2/WKBundleNavigationAction.h>
-#include <WebKit2/WKBundleNodeHandlePrivate.h>
-#include <WebKit2/WKBundlePagePrivate.h>
-#include <WebKit2/WKBundlePrivate.h>
-#include <WebKit2/WKSecurityOrigin.h>
-#include <WebKit2/WKURLRequest.h>
+#include <WebKit/WKArray.h>
+#include <WebKit/WKBundle.h>
+#include <WebKit/WKBundleBackForwardList.h>
+#include <WebKit/WKBundleBackForwardListItem.h>
+#include <WebKit/WKBundleFrame.h>
+#include <WebKit/WKBundleFramePrivate.h>
+#include <WebKit/WKBundleHitTestResult.h>
+#include <WebKit/WKBundleNavigationAction.h>
+#include <WebKit/WKBundleNodeHandlePrivate.h>
+#include <WebKit/WKBundlePagePrivate.h>
+#include <WebKit/WKBundlePrivate.h>
+#include <WebKit/WKSecurityOrigin.h>
+#include <WebKit/WKURLRequest.h>
 #include <wtf/HashMap.h>
 #include <wtf/text/CString.h>
 #include <wtf/text/StringBuilder.h>
@@ -268,8 +268,8 @@ InjectedBundlePage::InjectedBundlePage(WKBundlePageRef page)
     : m_page(page)
     , m_world(AdoptWK, WKBundleScriptWorldCreateWorld())
 {
-    WKBundlePageLoaderClientV7 loaderClient = {
-        { 7, this },
+    WKBundlePageLoaderClientV8 loaderClient = {
+        { 8, this },
         didStartProvisionalLoadForFrame,
         didReceiveServerRedirectForProvisionalLoadForFrame,
         didFailProvisionalLoadWithErrorForFrame,
@@ -305,6 +305,7 @@ InjectedBundlePage::InjectedBundlePage(WKBundlePageRef page)
         0, // willLoadURLRequest
         0, // willLoadDataRequest
         0, // willDestroyFrame
+        0, // userAgentForURL
     };
     WKBundlePageSetPageLoaderClient(m_page, &loaderClient.base);
 
@@ -1086,8 +1087,8 @@ WKURLRequestRef InjectedBundlePage::willSendRequestForFrame(WKBundlePageRef page
             if (!mainFrameURL || WKStringIsEqualToUTF8CString(adoptWK(WKURLCopyString(mainFrameURL.get())).get(), "about:blank"))
                 mainFrameURL = adoptWK(WKBundleFrameCopyProvisionalURL(mainFrame));
 
-            WKRetainPtr<WKStringRef> mainFrameHost = WKURLCopyHostName(mainFrameURL.get());
-            WKRetainPtr<WKStringRef> mainFrameScheme = WKURLCopyScheme(mainFrameURL.get());
+            WKRetainPtr<WKStringRef> mainFrameHost = adoptWK(WKURLCopyHostName(mainFrameURL.get()));
+            WKRetainPtr<WKStringRef> mainFrameScheme = adoptWK(WKURLCopyScheme(mainFrameURL.get()));
             mainFrameIsExternal = isHTTPOrHTTPSScheme(mainFrameScheme.get()) && !isLocalHost(mainFrameHost.get());
         }
         if (!mainFrameIsExternal) {
@@ -1862,7 +1863,7 @@ void InjectedBundlePage::dumpBackForwardList(StringBuilder& stringBuilder)
     stringBuilder.appendLiteral("===============================================\n");
 }
 
-#if !PLATFORM(MAC)
+#if !PLATFORM(COCOA)
 void InjectedBundlePage::platformDidStartProvisionalLoadForFrame(WKBundleFrameRef)
 {
 }

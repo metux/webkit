@@ -48,8 +48,9 @@ my $verbose = 0;
 my %numericTypeHash = ("int" => 1, "short" => 1, "long" => 1, "long long" => 1,
                        "unsigned int" => 1, "unsigned short" => 1,
                        "unsigned long" => 1, "unsigned long long" => 1,
-                       "float" => 1, "double" => 1, "byte" => 1,
-                       "octet" => 1);
+                       "float" => 1, "double" => 1, 
+                       "unrestricted float" => 1, "unrestricted double" => 1,
+                       "byte" => 1, "octet" => 1);
 
 my %primitiveTypeHash = ( "boolean" => 1, "void" => 1, "Date" => 1);
 
@@ -449,6 +450,14 @@ sub GetArrayType
     return "";
 }
 
+sub GetArrayOrSequenceType
+{
+    my $object = shift;
+    my $type = shift;
+
+    return $object->GetArrayType($type) || $object->GetSequenceType($type);
+}
+
 sub AssertNotSequenceType
 {
     my $object = shift;
@@ -593,15 +602,19 @@ sub SetterExpression
         return ("set" . $generator->WK_ucfirst($generator->AttributeNameForGetterAndSetter($attribute)));
     }
 
+    my $attributeType = $attribute->signature->type;
+
     my $functionName;
-    if ($attribute->signature->type eq "boolean") {
+    if ($attributeType eq "boolean") {
         $functionName = "setBooleanAttribute";
-    } elsif ($attribute->signature->type eq "long") {
+    } elsif ($attributeType eq "long") {
         $functionName = "setIntegralAttribute";
-    } elsif ($attribute->signature->type eq "unsigned long") {
+    } elsif ($attributeType eq "unsigned long") {
         $functionName = "setUnsignedIntegralAttribute";
-    } else {
+    } elsif ($generator->IsSVGAnimatedType($attributeType)) {
         $functionName = "setAttribute";
+    } else {
+        $functionName = "setAttributeWithoutSynchronization";
     }
 
     return ($functionName, $contentAttributeName);

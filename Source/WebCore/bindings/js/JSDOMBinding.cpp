@@ -24,9 +24,9 @@
 
 #include "CachedScript.h"
 #include "DOMConstructorWithDocument.h"
-#include "DOMObjectHashTableMap.h"
 #include "DOMStringList.h"
 #include "ExceptionCode.h"
+#include "ExceptionCodeDescription.h"
 #include "ExceptionHeaders.h"
 #include "ExceptionInterfaces.h"
 #include "Frame.h"
@@ -34,16 +34,19 @@
 #include "JSDOMWindowCustom.h"
 #include "JSExceptionBase.h"
 #include "SecurityOrigin.h"
-#include "ScriptCallStack.h"
-#include "ScriptCallStackFactory.h"
+#include <inspector/ScriptCallStack.h>
+#include <inspector/ScriptCallStackFactory.h>
 #include <interpreter/Interpreter.h>
 #include <runtime/DateInstance.h>
 #include <runtime/Error.h>
+#include <runtime/ErrorHandlingScope.h>
 #include <runtime/ExceptionHelpers.h>
 #include <runtime/JSFunction.h>
+#include <stdarg.h>
 #include <wtf/MathExtras.h>
 
 using namespace JSC;
+using namespace Inspector;
 
 namespace WebCore {
 
@@ -52,12 +55,7 @@ STATIC_ASSERT_IS_TRIVIALLY_DESTRUCTIBLE(DOMConstructorWithDocument);
 
 void addImpureProperty(const AtomicString& propertyName)
 {
-    JSDOMWindow::commonVM()->addImpureProperty(propertyName);
-}
-
-const JSC::HashTable& getHashTableForGlobalData(VM& vm, const JSC::HashTable& staticTable)
-{
-    return DOMObjectHashTableMap::mapFor(vm).get(staticTable);
+    JSDOMWindow::commonVM().addImpureProperty(propertyName);
 }
 
 JSValue jsStringOrNull(ExecState* exec, const String& s)
@@ -98,15 +96,6 @@ JSValue jsStringOrUndefined(ExecState* exec, const URL& url)
     if (url.isNull())
         return jsUndefined();
     return jsStringWithCache(exec, url.string());
-}
-
-AtomicStringImpl* findAtomicString(PropertyName propertyName)
-{
-    StringImpl* impl = propertyName.publicName();
-    if (!impl)
-        return 0;
-    ASSERT(impl->existingHash());
-    return AtomicString::find(impl);
 }
 
 String valueToStringWithNullCheck(ExecState* exec, JSValue value)
@@ -151,10 +140,11 @@ JSC::JSValue jsArray(JSC::ExecState* exec, JSDOMGlobalObject* globalObject, Pass
 
 void reportException(ExecState* exec, JSValue exception, CachedScript* cachedScript)
 {
+    RELEASE_ASSERT(exec->vm().currentThreadIsHoldingAPILock());
     if (isTerminatedExecutionException(exception))
         return;
 
-    Interpreter::ErrorHandlingMode mode(exec);
+    ErrorHandlingScope errorScope(exec->vm());
 
     RefPtr<ScriptCallStack> callStack(createScriptCallStackFromException(exec, exception, ScriptCallStack::maxCallStackSizeToCapture));
     exec->clearException();
@@ -169,20 +159,10 @@ void reportException(ExecState* exec, JSValue exception, CachedScript* cachedScr
     int lineNumber = 0;
     int columnNumber = 0;
     String exceptionSourceURL;
-    if (callStack->size()) {
-        const ScriptCallFrame& frame = callStack->at(0);
-        lineNumber = frame.lineNumber();
-        columnNumber = frame.columnNumber();
-        exceptionSourceURL = frame.sourceURL();
-    } else {
-        // There may not be an exceptionStack for a <script> SyntaxError. Fallback to getting at least the line and sourceURL from the exception.
-        JSObject* exceptionObject = exception.toObject(exec);
-        JSValue lineValue = exceptionObject->getDirect(exec->vm(), Identifier(exec, "line"));
-        lineNumber = lineValue && lineValue.isNumber() ? int(lineValue.toNumber(exec)) : 0;
-        JSValue columnValue = exceptionObject->getDirect(exec->vm(), Identifier(exec, "column"));
-        columnNumber = columnValue && columnValue.isNumber() ? int(columnValue.toNumber(exec)) : 0;
-        JSValue sourceURLValue = exceptionObject->getDirect(exec->vm(), Identifier(exec, "sourceURL"));
-        exceptionSourceURL = sourceURLValue && sourceURLValue.isString() ? sourceURLValue.toString(exec)->value(exec) : ASCIILiteral("undefined");
+    if (const ScriptCallFrame* callFrame = callStack->firstNonNativeCallFrame()) {
+        lineNumber = callFrame->lineNumber();
+        columnNumber = callFrame->columnNumber();
+        exceptionSourceURL = callFrame->sourceURL();
     }
 
     String errorMessage;
@@ -276,7 +256,7 @@ void printErrorMessageForFrame(Frame* frame, const String& message)
     frame->document()->domWindow()->printErrorMessage(message);
 }
 
-EncodedJSValue objectToStringFunctionGetter(ExecState* exec, EncodedJSValue, EncodedJSValue, PropertyName propertyName)
+EncodedJSValue objectToStringFunctionGetter(ExecState* exec, JSObject*, EncodedJSValue, PropertyName propertyName)
 {
     return JSValue::encode(JSFunction::create(exec->vm(), exec->lexicalGlobalObject(), 0, propertyName.publicName(), objectProtoFuncToString));
 }
@@ -531,6 +511,105 @@ bool BindingSecurity::shouldAllowAccessToFrame(JSC::ExecState* state, Frame* tar
 bool BindingSecurity::shouldAllowAccessToNode(JSC::ExecState* state, Node* target)
 {
     return target && canAccessDocument(state, &target->document());
+}
+    
+static EncodedJSValue throwTypeError(JSC::ExecState& state, const String& errorMessage)
+{
+    return throwVMError(&state, createTypeError(&state, errorMessage));
+}
+
+static void appendArgumentMustBe(StringBuilder& builder, unsigned argumentIndex, const char* argumentName, const char* interfaceName, const char* functionName)
+{
+    builder.appendLiteral("Argument ");
+    builder.appendNumber(argumentIndex + 1);
+    builder.appendLiteral(" ('");
+    builder.append(argumentName);
+    builder.appendLiteral("') to ");
+    if (!functionName) {
+        builder.appendLiteral("the ");
+        builder.append(interfaceName);
+        builder.appendLiteral(" constructor");
+    } else {
+        builder.append(interfaceName);
+        builder.append('.');
+        builder.append(functionName);
+    }
+    builder.appendLiteral(" must be ");
+}
+
+JSC::EncodedJSValue reportDeprecatedGetterError(JSC::ExecState& state, const char* interfaceName, const char* attributeName)
+{
+    auto& context = *jsCast<JSDOMGlobalObject*>(state.lexicalGlobalObject())->scriptExecutionContext();
+    context.addConsoleMessage(MessageSource::JS, MessageLevel::Error, makeString("Deprecated attempt to access property '", attributeName, "' on a non-", interfaceName, " object."));
+    return JSValue::encode(jsUndefined());
+}
+    
+void reportDeprecatedSetterError(JSC::ExecState& state, const char* interfaceName, const char* attributeName)
+{
+    auto& context = *jsCast<JSDOMGlobalObject*>(state.lexicalGlobalObject())->scriptExecutionContext();
+    context.addConsoleMessage(MessageSource::JS, MessageLevel::Error, makeString("Deprecated attempt to set property '", attributeName, "' on a non-", interfaceName, " object."));
+}
+
+JSC::EncodedJSValue throwArgumentMustBeEnumError(JSC::ExecState& state, unsigned argumentIndex, const char* argumentName, const char* functionInterfaceName, const char* functionName, const char* expectedValues)
+{
+    StringBuilder builder;
+    appendArgumentMustBe(builder, argumentIndex, argumentName, functionInterfaceName, functionName);
+    builder.appendLiteral("one of: ");
+    builder.append(expectedValues);
+    return throwTypeError(state, builder.toString());
+}
+
+JSC::EncodedJSValue throwArgumentMustBeFunctionError(JSC::ExecState& state, unsigned argumentIndex, const char* argumentName, const char* interfaceName, const char* functionName)
+{
+    StringBuilder builder;
+    appendArgumentMustBe(builder, argumentIndex, argumentName, interfaceName, functionName);
+    builder.appendLiteral("a function");
+    return throwTypeError(state, builder.toString());
+}
+
+JSC::EncodedJSValue throwArgumentTypeError(JSC::ExecState& state, unsigned argumentIndex, const char* argumentName, const char* functionInterfaceName, const char* functionName, const char* expectedType)
+{
+    StringBuilder builder;
+    appendArgumentMustBe(builder, argumentIndex, argumentName, functionInterfaceName, functionName);
+    builder.appendLiteral("an instance of ");
+    builder.append(expectedType);
+    return throwTypeError(state, builder.toString());
+}
+
+void throwArrayElementTypeError(JSC::ExecState& state)
+{
+    throwTypeError(state, "Invalid Array element type");
+}
+
+void throwAttributeTypeError(JSC::ExecState& state, const char* interfaceName, const char* attributeName, const char* expectedType)
+{
+    throwTypeError(state, makeString("The ", interfaceName, '.', attributeName, " attribute must be an instance of ", expectedType));
+}
+
+JSC::EncodedJSValue throwConstructorDocumentUnavailableError(JSC::ExecState& state, const char* interfaceName)
+{
+    // FIXME: This is confusing exception wording. Can we reword to be clearer and more specific?
+    return throwVMError(&state, createReferenceError(&state, makeString(interfaceName, " constructor associated document is unavailable")));
+}
+
+JSC::EncodedJSValue throwGetterTypeError(JSC::ExecState& state, const char* interfaceName, const char* attributeName)
+{
+    return throwTypeError(state, makeString("The ", interfaceName, '.', attributeName, " getter can only be used on instances of ", interfaceName));
+}
+
+void throwSequenceTypeError(JSC::ExecState& state)
+{
+    throwTypeError(state, "Value is not a sequence");
+}
+
+void throwSetterTypeError(JSC::ExecState& state, const char* interfaceName, const char* attributeName)
+{
+    throwTypeError(state, makeString("The ", interfaceName, '.', attributeName, " setter can only be used on instances of ", interfaceName));
+}
+
+EncodedJSValue throwThisTypeError(JSC::ExecState& state, const char* interfaceName, const char* functionName)
+{
+    return throwTypeError(state, makeString("Can only call ", interfaceName, '.', functionName, " on instances of ", interfaceName));
 }
 
 } // namespace WebCore

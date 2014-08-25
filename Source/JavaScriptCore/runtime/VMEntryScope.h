@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013 Apple Inc. All rights reserved.
+ * Copyright (C) 2013, 2014 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -27,6 +27,7 @@
 #define VMEntryScope_h
 
 #include "Interpreter.h"
+#include <wtf/HashMap.h>
 #include <wtf/StackBounds.h>
 #include <wtf/StackStats.h>
 
@@ -42,23 +43,15 @@ public:
 
     JSGlobalObject* globalObject() const { return m_globalObject; }
 
-    void setRecompilationNeeded(bool recompileNeeded) { m_recompilationNeeded = recompileNeeded; }
+    typedef std::function<void (VM&, JSGlobalObject*)> EntryScopeDidPopListener;
+    void setEntryScopeDidPopListener(void*, EntryScopeDidPopListener);
 
 private:
-    size_t requiredCapacity() const;
-
     VM& m_vm;
-    StackStats::CheckPoint m_stackCheckPoint;
-    StackBounds m_stack;
     JSGlobalObject* m_globalObject;
-
-    // m_prev and m_prevStackLimit may belong to a different thread's stack.
-    VMEntryScope* m_prev;
-    void* m_prevStackLimit;
-    bool m_recompilationNeeded;
+    HashMap<void*, EntryScopeDidPopListener> m_allEntryScopeDidPopListeners;
 };
 
 } // namespace JSC
 
 #endif // VMEntryScope_h
-

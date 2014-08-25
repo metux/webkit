@@ -29,8 +29,6 @@
 #include "APIObject.h"
 #include "WebCoreArgumentCoders.h"
 #include <WebCore/URL.h>
-#include <wtf/OwnPtr.h>
-#include <wtf/PassOwnPtr.h>
 #include <wtf/PassRefPtr.h>
 #include <wtf/text/WTFString.h>
 
@@ -50,13 +48,18 @@ public:
         auto absoluteURL = std::make_unique<WebCore::URL>(*baseURL->m_parsedURL.get(), relativeURL);
         const WTF::String& absoluteURLString = absoluteURL->string();
 
-        return adoptRef(new URL(std::move(absoluteURL), absoluteURLString));
+        return adoptRef(new URL(WTF::move(absoluteURL), absoluteURLString));
     }
 
     bool isNull() const { return m_string.isNull(); }
     bool isEmpty() const { return m_string.isEmpty(); }
 
     const WTF::String& string() const { return m_string; }
+
+    static bool equals(const URL& a, const URL& b)
+    {
+        return a.url() == b.url();
+    }
 
     WTF::String host() const
     {
@@ -105,8 +108,14 @@ private:
 
     URL(std::unique_ptr<WebCore::URL> parsedURL, const WTF::String& string)
         : m_string(string)
-        , m_parsedURL(std::move(parsedURL))
+        , m_parsedURL(WTF::move(parsedURL))
     {
+    }
+
+    const WebCore::URL& url() const
+    {
+        parseURLIfNecessary();
+        return *m_parsedURL;
     }
 
     void parseURLIfNecessary() const

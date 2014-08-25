@@ -26,6 +26,7 @@
 
 #include <gst/audio/audio.h>
 #include <gst/gst.h>
+#include <wtf/MathExtras.h>
 #include <wtf/gobject/GUniquePtr.h>
 
 namespace WebCore {
@@ -52,7 +53,8 @@ bool getVideoSizeAndFormatFromCaps(GstCaps* caps, WebCore::IntSize& size, GstVid
 {
     GstVideoInfo info;
 
-    if (!gst_caps_is_fixed(caps) || !gst_video_info_from_caps(&info, caps))
+    gst_video_info_init(&info);
+    if (!gst_video_info_from_caps(&info, caps))
         return false;
 
     format = GST_VIDEO_INFO_FORMAT(&info);
@@ -131,6 +133,30 @@ bool initializeGStreamer()
     bool gstInitialized = gst_init_check(0, 0, &error.outPtr());
     ASSERT_WITH_MESSAGE(gstInitialized, "GStreamer initialization failed: %s", error ? error->message : "unknown error occurred");
     return gstInitialized;
+}
+
+unsigned getGstPlayFlag(const char* nick)
+{
+    static GFlagsClass* flagsClass = static_cast<GFlagsClass*>(g_type_class_ref(g_type_from_name("GstPlayFlags")));
+    ASSERT(flagsClass);
+
+    GFlagsValue* flag = g_flags_get_value_by_nick(flagsClass, nick);
+    if (!flag)
+        return 0;
+
+    return flag->value;
+}
+
+GstClockTime toGstClockTime(float time)
+{
+    // Extract the integer part of the time (seconds) and the fractional part (microseconds). Attempt to
+    // round the microseconds so no floating point precision is lost and we can perform an accurate seek.
+    float seconds;
+    float microSeconds = modff(time, &seconds) * 1000000;
+    GTimeVal timeValue;
+    timeValue.tv_sec = static_cast<glong>(seconds);
+    timeValue.tv_usec = static_cast<glong>(roundf(microSeconds / 10000) * 10000);
+    return GST_TIMEVAL_TO_TIME(timeValue);
 }
 
 }

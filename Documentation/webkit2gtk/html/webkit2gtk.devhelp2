@@ -15,6 +15,7 @@
       <sub name="WebKitDownload" link="WebKitDownload.html"/>
       <sub name="WebKitPermissionRequest" link="WebKitPermissionRequest.html"/>
       <sub name="WebKitGeolocationPermissionRequest" link="WebKitGeolocationPermissionRequest.html"/>
+      <sub name="WebKitNavigationAction" link="WebKitNavigationAction.html"/>
       <sub name="WebKitPolicyDecision" link="WebKitPolicyDecision.html"/>
       <sub name="WebKitNavigationPolicyDecision" link="WebKitNavigationPolicyDecision.html"/>
       <sub name="WebKitResponsePolicyDecision" link="WebKitResponsePolicyDecision.html"/>
@@ -34,8 +35,8 @@
       <sub name="WebKitContextMenuItem" link="WebKitContextMenuItem.html"/>
       <sub name="WebKitFormSubmissionRequest" link="WebKitFormSubmissionRequest.html"/>
       <sub name="WebKitSecurityManager" link="WebKitSecurityManager.html"/>
-      <sub name="WebKitWebViewGroup" link="WebKitWebViewGroup.html"/>
-      <sub name="WebKitCertificateInfo" link="WebKitCertificateInfo.html"/>
+      <sub name="WebKitUserContentManager" link="WebKitUserContentManager.html"/>
+      <sub name="User content" link="webkit2gtk-WebKitUserContent.html"/>
     </sub>
     <sub name="Web Extensions" link="ch02.html">
       <sub name="WebKitWebExtension" link="WebKitWebExtension.html"/>
@@ -44,8 +45,10 @@
       <sub name="WebKitScriptWorld" link="WebKitScriptWorld.html"/>
     </sub>
     <sub name="Index" link="index-all.html"/>
+    <sub name="Index of deprecated symbols" link="api-index-deprecated.html"/>
     <sub name="Index of new symbols in 2.2" link="api-index-2-2.html"/>
     <sub name="Index of new symbols in 2.4" link="api-index-2-4.html"/>
+    <sub name="Index of new symbols in 2.6" link="api-index-2-6.html"/>
     <sub name="Annotation Glossary" link="annotation-glossary.html"/>
   </chapters>
   <functions>
@@ -73,7 +76,7 @@
     <keyword type="function" name="webkit_web_context_set_web_extensions_initialization_user_data ()" link="WebKitWebContext.html#webkit-web-context-set-web-extensions-initialization-user-data" since="2.4"/>
     <keyword type="function" name="webkit_web_context_prefetch_dns ()" link="WebKitWebContext.html#webkit-web-context-prefetch-dns"/>
     <keyword type="function" name="webkit_web_context_set_disk_cache_directory ()" link="WebKitWebContext.html#webkit-web-context-set-disk-cache-directory"/>
-    <keyword type="function" name="webkit_web_context_allow_tls_certificate_for_host ()" link="WebKitWebContext.html#webkit-web-context-allow-tls-certificate-for-host" since="2.4"/>
+    <keyword type="function" name="webkit_web_context_allow_tls_certificate_for_host ()" link="WebKitWebContext.html#webkit-web-context-allow-tls-certificate-for-host" since="2.6"/>
     <keyword type="function" name="webkit_web_context_get_process_model ()" link="WebKitWebContext.html#webkit-web-context-get-process-model" since="2.4"/>
     <keyword type="function" name="webkit_web_context_set_process_model ()" link="WebKitWebContext.html#webkit-web-context-set-process-model" since="2.4"/>
     <keyword type="function" name="WebKitURISchemeRequestCallback ()" link="WebKitWebContext.html#WebKitURISchemeRequestCallback"/>
@@ -87,13 +90,15 @@
     <keyword type="function" name="webkit_web_view_new ()" link="WebKitWebView.html#webkit-web-view-new"/>
     <keyword type="function" name="webkit_web_view_new_with_context ()" link="WebKitWebView.html#webkit-web-view-new-with-context"/>
     <keyword type="function" name="webkit_web_view_new_with_related_view ()" link="WebKitWebView.html#webkit-web-view-new-with-related-view" since="2.4"/>
-    <keyword type="function" name="webkit_web_view_new_with_group ()" link="WebKitWebView.html#webkit-web-view-new-with-group"/>
+    <keyword type="function" name="webkit_web_view_new_with_settings ()" link="WebKitWebView.html#webkit-web-view-new-with-settings" since="2.6"/>
+    <keyword type="function" name="webkit_web_view_new_with_user_content_manager ()" link="WebKitWebView.html#webkit-web-view-new-with-user-content-manager" since="2.6"/>
     <keyword type="function" name="webkit_web_view_get_context ()" link="WebKitWebView.html#webkit-web-view-get-context"/>
-    <keyword type="function" name="webkit_web_view_get_group ()" link="WebKitWebView.html#webkit-web-view-get-group"/>
+    <keyword type="function" name="webkit_web_view_get_user_content_manager ()" link="WebKitWebView.html#webkit-web-view-get-user-content-manager" since="2.6"/>
     <keyword type="function" name="webkit_web_view_load_uri ()" link="WebKitWebView.html#webkit-web-view-load-uri"/>
     <keyword type="function" name="webkit_web_view_load_html ()" link="WebKitWebView.html#webkit-web-view-load-html"/>
     <keyword type="function" name="webkit_web_view_load_alternate_html ()" link="WebKitWebView.html#webkit-web-view-load-alternate-html"/>
     <keyword type="function" name="webkit_web_view_load_plain_text ()" link="WebKitWebView.html#webkit-web-view-load-plain-text"/>
+    <keyword type="function" name="webkit_web_view_load_bytes ()" link="WebKitWebView.html#webkit-web-view-load-bytes" since="2.6"/>
     <keyword type="function" name="webkit_web_view_load_request ()" link="WebKitWebView.html#webkit-web-view-load-request"/>
     <keyword type="function" name="webkit_web_view_can_go_back ()" link="WebKitWebView.html#webkit-web-view-can-go-back"/>
     <keyword type="function" name="webkit_web_view_go_back ()" link="WebKitWebView.html#webkit-web-view-go-back"/>
@@ -133,8 +138,6 @@
     <keyword type="function" name="webkit_web_view_save_to_file ()" link="WebKitWebView.html#webkit-web-view-save-to-file"/>
     <keyword type="function" name="webkit_web_view_save_to_file_finish ()" link="WebKitWebView.html#webkit-web-view-save-to-file-finish"/>
     <keyword type="function" name="webkit_web_view_download_uri ()" link="WebKitWebView.html#webkit-web-view-download-uri"/>
-    <keyword type="function" name="webkit_web_view_set_view_mode ()" link="WebKitWebView.html#webkit-web-view-set-view-mode"/>
-    <keyword type="function" name="webkit_web_view_get_view_mode ()" link="WebKitWebView.html#webkit-web-view-get-view-mode"/>
     <keyword type="function" name="webkit_web_view_get_tls_info ()" link="WebKitWebView.html#webkit-web-view-get-tls-info"/>
     <keyword type="function" name="webkit_web_view_get_snapshot ()" link="WebKitWebView.html#webkit-web-view-get-snapshot"/>
     <keyword type="function" name="webkit_web_view_get_snapshot_finish ()" link="WebKitWebView.html#webkit-web-view-get-snapshot-finish"/>
@@ -152,7 +155,6 @@
     <keyword type="enum" name="enum WebKitLoadEvent" link="WebKitWebView.html#WebKitLoadEvent"/>
     <keyword type="enum" name="enum WebKitPolicyDecisionType" link="WebKitWebView.html#WebKitPolicyDecisionType"/>
     <keyword type="enum" name="enum WebKitSaveMode" link="WebKitWebView.html#WebKitSaveMode"/>
-    <keyword type="enum" name="enum WebKitViewMode" link="WebKitWebView.html#WebKitViewMode"/>
     <keyword type="enum" name="enum WebKitInsecureContentEvent" link="WebKitWebView.html#WebKitInsecureContentEvent"/>
     <keyword type="enum" name="enum WebKitSnapshotOptions" link="WebKitWebView.html#WebKitSnapshotOptions"/>
     <keyword type="enum" name="enum WebKitSnapshotRegion" link="WebKitWebView.html#WebKitSnapshotRegion"/>
@@ -167,12 +169,12 @@
     <keyword type="enum" name="enum WebKitScriptDialogType" link="WebKitWebView.html#WebKitScriptDialogType"/>
     <keyword type="property" name="The “estimated-load-progress” property" link="WebKitWebView.html#WebKitWebView--estimated-load-progress"/>
     <keyword type="property" name="The “favicon” property" link="WebKitWebView.html#WebKitWebView--favicon"/>
-    <keyword type="property" name="The “group” property" link="WebKitWebView.html#WebKitWebView--group"/>
     <keyword type="property" name="The “is-loading” property" link="WebKitWebView.html#WebKitWebView--is-loading"/>
     <keyword type="property" name="The “related-view” property" link="WebKitWebView.html#WebKitWebView--related-view"/>
+    <keyword type="property" name="The “settings” property" link="WebKitWebView.html#WebKitWebView--settings"/>
     <keyword type="property" name="The “title” property" link="WebKitWebView.html#WebKitWebView--title"/>
     <keyword type="property" name="The “uri” property" link="WebKitWebView.html#WebKitWebView--uri"/>
-    <keyword type="property" name="The “view-mode” property" link="WebKitWebView.html#WebKitWebView--view-mode"/>
+    <keyword type="property" name="The “user-content-manager” property" link="WebKitWebView.html#WebKitWebView--user-content-manager"/>
     <keyword type="property" name="The “web-context” property" link="WebKitWebView.html#WebKitWebView--web-context"/>
     <keyword type="property" name="The “zoom-level” property" link="WebKitWebView.html#WebKitWebView--zoom-level"/>
     <keyword type="signal" name="The “authenticate” signal" link="WebKitWebView.html#WebKitWebView-authenticate"/>
@@ -438,20 +440,30 @@
     <keyword type="function" name="webkit_permission_request_deny ()" link="WebKitPermissionRequest.html#webkit-permission-request-deny"/>
     <keyword type="struct" name="WebKitPermissionRequest" link="WebKitPermissionRequest.html#WebKitPermissionRequest-struct"/>
     <keyword type="struct" name="struct WebKitGeolocationPermissionRequest" link="WebKitGeolocationPermissionRequest.html#WebKitGeolocationPermissionRequest-struct"/>
+    <keyword type="function" name="webkit_navigation_action_copy ()" link="WebKitNavigationAction.html#webkit-navigation-action-copy" since="2.6"/>
+    <keyword type="function" name="webkit_navigation_action_free ()" link="WebKitNavigationAction.html#webkit-navigation-action-free" since="2.6"/>
+    <keyword type="function" name="webkit_navigation_action_get_navigation_type ()" link="WebKitNavigationAction.html#webkit-navigation-action-get-navigation-type" since="2.6"/>
+    <keyword type="function" name="webkit_navigation_action_get_mouse_button ()" link="WebKitNavigationAction.html#webkit-navigation-action-get-mouse-button" since="2.6"/>
+    <keyword type="function" name="webkit_navigation_action_get_modifiers ()" link="WebKitNavigationAction.html#webkit-navigation-action-get-modifiers" since="2.6"/>
+    <keyword type="function" name="webkit_navigation_action_get_request ()" link="WebKitNavigationAction.html#webkit-navigation-action-get-request" since="2.6"/>
+    <keyword type="function" name="webkit_navigation_action_is_user_gesture ()" link="WebKitNavigationAction.html#webkit-navigation-action-is-user-gesture" since="2.6"/>
+    <keyword type="struct" name="WebKitNavigationAction" link="WebKitNavigationAction.html#WebKitNavigationAction-struct"/>
     <keyword type="function" name="webkit_policy_decision_download ()" link="WebKitPolicyDecision.html#webkit-policy-decision-download"/>
     <keyword type="function" name="webkit_policy_decision_ignore ()" link="WebKitPolicyDecision.html#webkit-policy-decision-ignore"/>
     <keyword type="function" name="webkit_policy_decision_use ()" link="WebKitPolicyDecision.html#webkit-policy-decision-use"/>
     <keyword type="struct" name="struct WebKitPolicyDecision" link="WebKitPolicyDecision.html#WebKitPolicyDecision-struct"/>
+    <keyword type="function" name="webkit_navigation_policy_decision_get_navigation_action ()" link="WebKitNavigationPolicyDecision.html#webkit-navigation-policy-decision-get-navigation-action" since="2.6"/>
     <keyword type="function" name="webkit_navigation_policy_decision_get_frame_name ()" link="WebKitNavigationPolicyDecision.html#webkit-navigation-policy-decision-get-frame-name"/>
-    <keyword type="function" name="webkit_navigation_policy_decision_get_modifiers ()" link="WebKitNavigationPolicyDecision.html#webkit-navigation-policy-decision-get-modifiers"/>
-    <keyword type="function" name="webkit_navigation_policy_decision_get_mouse_button ()" link="WebKitNavigationPolicyDecision.html#webkit-navigation-policy-decision-get-mouse-button"/>
-    <keyword type="function" name="webkit_navigation_policy_decision_get_navigation_type ()" link="WebKitNavigationPolicyDecision.html#webkit-navigation-policy-decision-get-navigation-type"/>
-    <keyword type="function" name="webkit_navigation_policy_decision_get_request ()" link="WebKitNavigationPolicyDecision.html#webkit-navigation-policy-decision-get-request"/>
+    <keyword type="function" name="webkit_navigation_policy_decision_get_modifiers ()" link="WebKitNavigationPolicyDecision.html#webkit-navigation-policy-decision-get-modifiers" deprecated="2.6: Use webkit_navigation_policy_decision_get_navigation_action() instead."/>
+    <keyword type="function" name="webkit_navigation_policy_decision_get_mouse_button ()" link="WebKitNavigationPolicyDecision.html#webkit-navigation-policy-decision-get-mouse-button" deprecated="2.6: Use webkit_navigation_policy_decision_get_navigation_action() instead."/>
+    <keyword type="function" name="webkit_navigation_policy_decision_get_navigation_type ()" link="WebKitNavigationPolicyDecision.html#webkit-navigation-policy-decision-get-navigation-type" deprecated="2.6: Use webkit_navigation_policy_decision_get_navigation_action() instead."/>
+    <keyword type="function" name="webkit_navigation_policy_decision_get_request ()" link="WebKitNavigationPolicyDecision.html#webkit-navigation-policy-decision-get-request" deprecated="2.6: Use webkit_navigation_policy_decision_get_navigation_action() instead."/>
     <keyword type="struct" name="struct WebKitNavigationPolicyDecision" link="WebKitNavigationPolicyDecision.html#WebKitNavigationPolicyDecision-struct"/>
     <keyword type="enum" name="enum WebKitNavigationType" link="WebKitNavigationPolicyDecision.html#WebKitNavigationType"/>
     <keyword type="property" name="The “frame-name” property" link="WebKitNavigationPolicyDecision.html#WebKitNavigationPolicyDecision--frame-name"/>
     <keyword type="property" name="The “modifiers” property" link="WebKitNavigationPolicyDecision.html#WebKitNavigationPolicyDecision--modifiers"/>
     <keyword type="property" name="The “mouse-button” property" link="WebKitNavigationPolicyDecision.html#WebKitNavigationPolicyDecision--mouse-button"/>
+    <keyword type="property" name="The “navigation-action” property" link="WebKitNavigationPolicyDecision.html#WebKitNavigationPolicyDecision--navigation-action"/>
     <keyword type="property" name="The “navigation-type” property" link="WebKitNavigationPolicyDecision.html#WebKitNavigationPolicyDecision--navigation-type"/>
     <keyword type="property" name="The “request” property" link="WebKitNavigationPolicyDecision.html#WebKitNavigationPolicyDecision--request"/>
     <keyword type="function" name="webkit_response_policy_decision_get_request ()" link="WebKitResponsePolicyDecision.html#webkit-response-policy-decision-get-request"/>
@@ -657,20 +669,23 @@
     <keyword type="function" name="webkit_security_manager_register_uri_scheme_as_empty_document ()" link="WebKitSecurityManager.html#webkit-security-manager-register-uri-scheme-as-empty-document"/>
     <keyword type="function" name="webkit_security_manager_uri_scheme_is_empty_document ()" link="WebKitSecurityManager.html#webkit-security-manager-uri-scheme-is-empty-document"/>
     <keyword type="struct" name="struct WebKitSecurityManager" link="WebKitSecurityManager.html#WebKitSecurityManager-struct"/>
-    <keyword type="function" name="webkit_web_view_group_new ()" link="WebKitWebViewGroup.html#webkit-web-view-group-new"/>
-    <keyword type="function" name="webkit_web_view_group_get_name ()" link="WebKitWebViewGroup.html#webkit-web-view-group-get-name"/>
-    <keyword type="function" name="webkit_web_view_group_get_settings ()" link="WebKitWebViewGroup.html#webkit-web-view-group-get-settings"/>
-    <keyword type="function" name="webkit_web_view_group_set_settings ()" link="WebKitWebViewGroup.html#webkit-web-view-group-set-settings"/>
-    <keyword type="function" name="webkit_web_view_group_add_user_style_sheet ()" link="WebKitWebViewGroup.html#webkit-web-view-group-add-user-style-sheet"/>
-    <keyword type="function" name="webkit_web_view_group_remove_all_user_style_sheets ()" link="WebKitWebViewGroup.html#webkit-web-view-group-remove-all-user-style-sheets"/>
-    <keyword type="struct" name="struct WebKitWebViewGroup" link="WebKitWebViewGroup.html#WebKitWebViewGroup-struct"/>
-    <keyword type="enum" name="enum WebKitInjectedContentFrames" link="WebKitWebViewGroup.html#WebKitInjectedContentFrames"/>
-    <keyword type="property" name="The “settings” property" link="WebKitWebViewGroup.html#WebKitWebViewGroup--settings"/>
-    <keyword type="function" name="webkit_certificate_info_copy ()" link="WebKitCertificateInfo.html#webkit-certificate-info-copy" since="2.4"/>
-    <keyword type="function" name="webkit_certificate_info_free ()" link="WebKitCertificateInfo.html#webkit-certificate-info-free" since="2.4"/>
-    <keyword type="function" name="webkit_certificate_info_get_tls_certificate ()" link="WebKitCertificateInfo.html#webkit-certificate-info-get-tls-certificate" since="2.4"/>
-    <keyword type="function" name="webkit_certificate_info_get_tls_errors ()" link="WebKitCertificateInfo.html#webkit-certificate-info-get-tls-errors" since="2.4"/>
-    <keyword type="struct" name="WebKitCertificateInfo" link="WebKitCertificateInfo.html#WebKitCertificateInfo-struct"/>
+    <keyword type="function" name="webkit_user_content_manager_new ()" link="WebKitUserContentManager.html#webkit-user-content-manager-new" since="2.6"/>
+    <keyword type="function" name="webkit_user_content_manager_add_style_sheet ()" link="WebKitUserContentManager.html#webkit-user-content-manager-add-style-sheet" since="2.6"/>
+    <keyword type="function" name="webkit_user_content_manager_remove_all_style_sheets ()" link="WebKitUserContentManager.html#webkit-user-content-manager-remove-all-style-sheets" since="2.6"/>
+    <keyword type="function" name="webkit_user_content_manager_add_script ()" link="WebKitUserContentManager.html#webkit-user-content-manager-add-script" since="2.6"/>
+    <keyword type="function" name="webkit_user_content_manager_remove_all_scripts ()" link="WebKitUserContentManager.html#webkit-user-content-manager-remove-all-scripts" since="2.6"/>
+    <keyword type="struct" name="struct WebKitUserContentManager" link="WebKitUserContentManager.html#WebKitUserContentManager-struct"/>
+    <keyword type="function" name="webkit_user_style_sheet_ref ()" link="webkit2gtk-WebKitUserContent.html#webkit-user-style-sheet-ref" since="2.6"/>
+    <keyword type="function" name="webkit_user_style_sheet_unref ()" link="webkit2gtk-WebKitUserContent.html#webkit-user-style-sheet-unref" since="2.6"/>
+    <keyword type="function" name="webkit_user_style_sheet_new ()" link="webkit2gtk-WebKitUserContent.html#webkit-user-style-sheet-new" since="2.6"/>
+    <keyword type="function" name="webkit_user_script_ref ()" link="webkit2gtk-WebKitUserContent.html#webkit-user-script-ref" since="2.6"/>
+    <keyword type="function" name="webkit_user_script_unref ()" link="webkit2gtk-WebKitUserContent.html#webkit-user-script-unref" since="2.6"/>
+    <keyword type="function" name="webkit_user_script_new ()" link="webkit2gtk-WebKitUserContent.html#webkit-user-script-new" since="2.6"/>
+    <keyword type="struct" name="WebKitUserStyleSheet" link="webkit2gtk-WebKitUserContent.html#WebKitUserStyleSheet-struct"/>
+    <keyword type="struct" name="WebKitUserScript" link="webkit2gtk-WebKitUserContent.html#WebKitUserScript-struct"/>
+    <keyword type="enum" name="enum WebKitUserContentInjectedFrames" link="webkit2gtk-WebKitUserContent.html#WebKitUserContentInjectedFrames" since="2.6"/>
+    <keyword type="enum" name="enum WebKitUserStyleLevel" link="webkit2gtk-WebKitUserContent.html#WebKitUserStyleLevel" since="2.6"/>
+    <keyword type="enum" name="enum WebKitUserScriptInjectionTime" link="webkit2gtk-WebKitUserContent.html#WebKitUserScriptInjectionTime" since="2.6"/>
     <keyword type="function" name="WebKitWebExtensionInitializeFunction ()" link="WebKitWebExtension.html#WebKitWebExtensionInitializeFunction"/>
     <keyword type="function" name="WebKitWebExtensionInitializeWithUserDataFunction ()" link="WebKitWebExtension.html#WebKitWebExtensionInitializeWithUserDataFunction" since="2.4"/>
     <keyword type="function" name="webkit_web_extension_get_page ()" link="WebKitWebExtension.html#webkit-web-extension-get-page"/>

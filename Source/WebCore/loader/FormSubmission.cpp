@@ -76,10 +76,10 @@ static void appendMailtoPostFormDataToURL(URL& url, const FormData& data, const 
     body = String(bodyData.data(), bodyData.size()).replaceWithLiteral('+', "%20");
 
     String query = url.query();
-    if (!query.isEmpty())
-        query.append('&');
-    query.append(body);
-    url.setQuery(query);
+    if (query.isEmpty())
+        url.setQuery(body);
+    else
+        url.setQuery(query + '&' + body);
 }
 
 void FormSubmission::Attributes::parseAction(const String& action)
@@ -124,7 +124,7 @@ void FormSubmission::Attributes::copyFrom(const Attributes& other)
     m_acceptCharset = other.m_acceptCharset;
 }
 
-inline FormSubmission::FormSubmission(Method method, const URL& action, const String& target, const String& contentType, PassRefPtr<FormState> state, PassRefPtr<FormData> data, const String& boundary, bool lockHistory, PassRefPtr<Event> event)
+inline FormSubmission::FormSubmission(Method method, const URL& action, const String& target, const String& contentType, PassRefPtr<FormState> state, PassRefPtr<FormData> data, const String& boundary, LockHistory lockHistory, PassRefPtr<Event> event)
     : m_method(method)
     , m_action(action)
     , m_target(target)
@@ -137,7 +137,7 @@ inline FormSubmission::FormSubmission(Method method, const URL& action, const St
 {
 }
 
-PassRefPtr<FormSubmission> FormSubmission::create(HTMLFormElement* form, const Attributes& attributes, PassRefPtr<Event> event, bool lockHistory, FormSubmissionTrigger trigger)
+PassRefPtr<FormSubmission> FormSubmission::create(HTMLFormElement* form, const Attributes& attributes, PassRefPtr<Event> event, LockHistory lockHistory, FormSubmissionTrigger trigger)
 {
     ASSERT(form);
 

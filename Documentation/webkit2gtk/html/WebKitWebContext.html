@@ -12,11 +12,11 @@
 <link rel="stylesheet" href="style.css" type="text/css">
 </head>
 <body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF">
-<table class="navigation" id="top" width="100%" summary="Navigation header" cellpadding="2" cellspacing="10"><tr valign="middle">
+<table class="navigation" id="top" width="100%" summary="Navigation header" cellpadding="2" cellspacing="5"><tr valign="middle">
 <td width="100%" align="left" class="shortcuts">
-<a href="#" class="shortcut">Top</a><span id="nav_description"> <span class="dim">|</span> 
-                  <a href="#WebKitWebContext.description" class="shortcut">Description</a></span><span id="nav_hierarchy"> <span class="dim">|</span> 
-                  <a href="#WebKitWebContext.object-hierarchy" class="shortcut">Object Hierarchy</a></span><span id="nav_signals"> <span class="dim">|</span> 
+<a href="#" class="shortcut">Top</a><span id="nav_description">  <span class="dim">|</span> 
+                  <a href="#WebKitWebContext.description" class="shortcut">Description</a></span><span id="nav_hierarchy">  <span class="dim">|</span> 
+                  <a href="#WebKitWebContext.object-hierarchy" class="shortcut">Object Hierarchy</a></span><span id="nav_signals">  <span class="dim">|</span> 
                   <a href="#WebKitWebContext.signals" class="shortcut">Signals</a></span>
 </td>
 <td><a accesskey="h" href="index.html"><img src="home.png" width="16" height="16" border="0" alt="Home"></a></td>
@@ -286,12 +286,12 @@
 <tr>
 <td class="signal_type"><span class="returnvalue">void</span></td>
 <td class="signal_name"><a class="link" href="WebKitWebContext.html#WebKitWebContext-download-started" title="The “download-started” signal">download-started</a></td>
-<td class="signal_flags"><a href="../gobject/gobject-Signals.html#G-SIGNAL-RUN-LAST:CAPS">Run Last</a></td>
+<td class="signal_flags">Run Last</td>
 </tr>
 <tr>
 <td class="signal_type"><span class="returnvalue">void</span></td>
 <td class="signal_name"><a class="link" href="WebKitWebContext.html#WebKitWebContext-initialize-web-extensions" title="The “initialize-web-extensions” signal">initialize-web-extensions</a></td>
-<td class="signal_flags"><a href="../gobject/gobject-Signals.html#G-SIGNAL-RUN-LAST:CAPS">Run Last</a></td>
+<td class="signal_flags">Run Last</td>
 </tr>
 </tbody>
 </table></div>
@@ -1155,7 +1155,7 @@ it will not have any effect.</p>
 <pre class="programlisting"><span class="returnvalue">void</span>
 webkit_web_context_allow_tls_certificate_for_host
                                (<em class="parameter"><code><a class="link" href="WebKitWebContext.html" title="WebKitWebContext"><span class="type">WebKitWebContext</span></a> *context</code></em>,
-                                <em class="parameter"><code><a class="link" href="WebKitCertificateInfo.html" title="WebKitCertificateInfo"><span class="type">WebKitCertificateInfo</span></a> *info</code></em>,
+                                <em class="parameter"><code><a href="../gio/GTlsCertificate.html"><span class="type">GTlsCertificate</span></a> *certificate</code></em>,
                                 <em class="parameter"><code>const <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a> *host</code></em>);</pre>
 <p>Ignore further TLS errors on the <em class="parameter"><code>host</code></em>
  for the certificate present in <em class="parameter"><code>info</code></em>
@@ -1175,8 +1175,8 @@ webkit_web_context_allow_tls_certificate_for_host
 <td class="parameter_annotations"> </td>
 </tr>
 <tr>
-<td class="parameter_name"><p>info</p></td>
-<td class="parameter_description"><p>a <a class="link" href="WebKitCertificateInfo.html" title="WebKitCertificateInfo"><span class="type">WebKitCertificateInfo</span></a></p></td>
+<td class="parameter_name"><p>certificate</p></td>
+<td class="parameter_description"><p>a <a href="../gio/GTlsCertificate.html"><span class="type">GTlsCertificate</span></a></p></td>
 <td class="parameter_annotations"> </td>
 </tr>
 <tr>
@@ -1187,7 +1187,7 @@ webkit_web_context_allow_tls_certificate_for_host
 </tbody>
 </table></div>
 </div>
-<p class="since">Since 2.4</p>
+<p class="since">Since 2.6</p>
 </div>
 <hr>
 <div class="refsect2">
@@ -1596,7 +1596,7 @@ user_function (<a class="link" href="WebKitWebContext.html" title="WebKitWebCont
 </tbody>
 </table></div>
 </div>
-<p>Flags: <a href="../gobject/gobject-Signals.html#G-SIGNAL-RUN-LAST:CAPS">Run Last</a></p>
+<p>Flags: Run Last</p>
 </div>
 <hr>
 <div class="refsect2">
@@ -1630,7 +1630,7 @@ and <a class="link" href="WebKitWebContext.html#webkit-web-context-set-web-exten
 </tbody>
 </table></div>
 </div>
-<p>Flags: <a href="../gobject/gobject-Signals.html#G-SIGNAL-RUN-LAST:CAPS">Run Last</a></p>
+<p>Flags: Run Last</p>
 <p class="since">Since 2.4</p>
 </div>
 </div>

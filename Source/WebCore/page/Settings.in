@@ -25,7 +25,6 @@ validationMessageTimerMagnification type=int, initial=50
 minimumAccelerated2dCanvasSize type=int, initial=257*256
 
 layoutFallbackWidth type=int, initial=980
-maximumDecodedImageSize type=size_t, initial=std::numeric_limits<size_t>::max()
 deviceWidth type=int, initial=0
 deviceHeight type=int, initial=0
 
@@ -85,8 +84,6 @@ allowScriptsToCloseWindows initial=false
 canvasUsesAcceleratedDrawing initial=false
 acceleratedDrawingEnabled initial=false
 acceleratedFiltersEnabled initial=false
-regionBasedColumnsEnabled initial=false
-cssGridLayoutEnabled initial=false
 useLegacyTextAlignPositionedElementBehavior initial=false
 
 # FIXME: This should really be disabled by default as it makes platforms that don't support the feature download files
@@ -95,11 +92,8 @@ downloadableBinaryFontsEnabled initial=true
 
 xssAuditorEnabled initial=false
 unsafePluginPastingEnabled initial=true
-acceleratedCompositingForFixedPositionEnabled initial=false
+acceleratedCompositingForFixedPositionEnabled initial=defaultAcceleratedCompositingForFixedPositionEnabled
 acceleratedCompositingForOverflowScrollEnabled initial=false
-
-# Works only in conjunction with forceCompositingMode.
-compositedScrollingForFramesEnabled initial=false
 
 experimentalNotificationsEnabled initial=false
 webGLEnabled initial=false
@@ -138,13 +132,16 @@ shouldDisplaySubtitles initial=false, conditional=VIDEO_TRACK
 shouldDisplayCaptions initial=false, conditional=VIDEO_TRACK
 shouldDisplayTextDescriptions initial=false, conditional=VIDEO_TRACK
 scrollingCoordinatorEnabled initial=false
+scrollingTreeIncludesFrames initial=defaultScrollingTreeIncludesFrames
 scrollAnimatorEnabled initial=true, conditional=SMOOTH_SCROLLING
+forceUpdateScrollbarsOnMainThreadForPerformanceTesting initial=false
 notificationsEnabled initial=true
 
 # Some apps needs isLoadingInAPISense to account for active subresource loaders.
 needsIsLoadingInAPISenseQuirk initial=false
 
 shouldRespectImageOrientation initial=defaultShouldRespectImageOrientation
+imageSubsamplingEnabled initial=defaultImageSubsamplingEnabled
 wantsBalancedSetDefersLoadingBehavior initial=false
 requestAnimationFrameEnabled initial=true
 deviceSupportsTouch initial=false
@@ -192,15 +189,45 @@ selectTrailingWhitespaceEnabled initial=defaultSelectTrailingWhitespaceEnabled
 
 selectionIncludesAltImageText initial=true
 useLegacyBackgroundSizeShorthandBehavior initial=false
+fixedBackgroundsPaintRelativeToDocument initial=defaultFixedBackgroundsPaintRelativeToDocument
 
 minimumZoomFontSize type=float, initial=15, conditional=IOS_TEXT_AUTOSIZING
 
 simpleLineLayoutEnabled initial=true, setNeedsStyleRecalcInAllFrames=1
 simpleLineLayoutDebugBordersEnabled initial=false, setNeedsStyleRecalcInAllFrames=1
 
-mediaSourceEnabled initial=false
+subpixelCSSOMElementMetricsEnabled initial=false
+
+mediaSourceEnabled initial=true, conditional=MEDIA_SOURCE
 
 # FIXME: Rename to allowMultiElementImplicitFormSubmission once we upstream the iOS changes to WebView.mm.
 allowMultiElementImplicitSubmission initial=false
 
 mediaPlaybackAllowsAirPlay initial=true, conditional=IOS_AIRPLAY
+
+shouldConvertPositionStyleOnCopy initial=false
+
+maxParseDuration type=double, initial=-1
+standalone initial=false
+telephoneNumberParsingEnabled initial=false
+mediaDataLoadsAutomatically initial=false
+shouldTransformsAffectOverflow initial=true
+shouldDispatchJavaScriptWindowOnErrorEvents initial=false
+alwaysUseAcceleratedOverflowScroll initial=false
+imageControlsEnabled initial=false, conditional=SERVICE_CONTROLS
+
+# FIXME: This is unneeded and should be removed.
+alwaysUseBaselineOfPrimaryFont initial=false
+
+enableInheritURIQueryComponent initial=false
+
+aggressiveTileRetentionEnabled initial=false
+temporaryTileCohortRetentionEnabled initial=true
+
+useImageDocumentForSubframePDF initial=false
+
+# Allow clients to permit navigation to an invalid URL. Some apps may use invalid URLs
+# as a means to pass data from the web-portion of their app to the native portion.
+allowNavigationToInvalidURL initial=false
+
+longMousePressEnabled initial=false

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008, 2011 Apple Inc. All Rights Reserved.
+ * Copyright (C) 2008, 2011, 2014 Apple Inc. All Rights Reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -33,13 +33,13 @@ namespace WebCore {
 
 class FloatPoint;
 class GraphicsContext;
+class LayoutPoint;
+class LayoutSize;
 class PlatformTouchEvent;
 class PlatformWheelEvent;
 class ScrollAnimator;
-#if USE(ACCELERATED_COMPOSITING)
 class GraphicsLayer;
 class TiledBacking;
-#endif
 
 class ScrollableArea {
 public:
@@ -58,6 +58,16 @@ public:
 
     bool handleWheelEvent(const PlatformWheelEvent&);
 
+#if ENABLE(CSS_SCROLL_SNAP)
+    const Vector<LayoutUnit>* horizontalSnapOffsets() const { return m_horizontalSnapOffsets.get(); };
+    const Vector<LayoutUnit>* verticalSnapOffsets() const { return m_verticalSnapOffsets.get(); };
+    virtual void updateSnapOffsets() { };
+    void setHorizontalSnapOffsets(std::unique_ptr<Vector<LayoutUnit>>);
+    void setVerticalSnapOffsets(std::unique_ptr<Vector<LayoutUnit>>);
+    void clearHorizontalSnapOffsets();
+    void clearVerticalSnapOffsets();
+#endif
+
 #if ENABLE(TOUCH_EVENTS)
     virtual bool isTouchScrollable() const { return false; }
     virtual bool handleTouchEvent(const PlatformTouchEvent&);
@@ -68,8 +78,8 @@ public:
     virtual void didStartScroll() { }
     virtual void didEndScroll() { }
     virtual void didUpdateScroll() { }
-    virtual void setIsUserScroll(bool) { }
 #endif
+    virtual void setIsUserScroll(bool) { }
 
     // Functions for controlling if you can scroll past the end of the document.
     bool constrainsScrollingToContentEdge() const { return m_constrainsScrollingToContentEdge; }
@@ -125,6 +135,8 @@ public:
 
     virtual bool updatesScrollLayerPositionOnMainThread() const = 0;
 
+    virtual bool forceUpdateScrollbarsOnMainThreadForPerformanceTesting() const = 0;
+
     // Convert points and rects between the scrollbar and its containing view.
     // The client needs to implement these in order to be aware of layout effects
     // like CSS transforms.
@@ -151,6 +163,13 @@ public:
     virtual IntPoint scrollPosition() const;
     virtual IntPoint minimumScrollPosition() const;
     virtual IntPoint maximumScrollPosition() const;
+    virtual bool scrolledToTop() const;
+    virtual bool scrolledToBottom() const;
+    virtual bool scrolledToLeft() const;
+    virtual bool scrolledToRight() const;
+
+    bool isScrolledProgrammatically() const { return m_scrolledProgrammatically; }
+    void setScrolledProgrammatically(bool state) { m_scrolledProgrammatically = state; }
 
     enum VisibleContentRectIncludesScrollbars { ExcludeScrollbars, IncludeScrollbars };
     enum VisibleContentRectBehavior {
@@ -198,8 +217,8 @@ public:
     // NOTE: Only called from Internals for testing.
     void setScrollOffsetFromInternals(const IntPoint&);
 
-    static IntPoint constrainScrollPositionForOverhang(const IntRect& visibleContentRect, const IntSize& totalContentsSize, const IntPoint& scrollPosition, const IntPoint& scrollOrigin, int headerHeight, int footetHeight);
-    IntPoint constrainScrollPositionForOverhang(const IntPoint& scrollPosition);
+    static LayoutPoint constrainScrollPositionForOverhang(const LayoutRect& visibleContentRect, const LayoutSize& totalContentsSize, const LayoutPoint& scrollPosition, const LayoutPoint& scrollOrigin, int headerHeight, int footetHeight);
+    LayoutPoint constrainScrollPositionForOverhang(const LayoutPoint& scrollPosition);
 
     // Computes the double value for the scrollbar's current position and the current overhang amount.
     // This function is static so that it can be called from the main thread or the scrolling thread.
@@ -221,16 +240,17 @@ public:
     bool isPinnedVerticallyInDirection(int verticalScrollDelta) const;
 #endif
 
-#if USE(ACCELERATED_COMPOSITING)
     virtual TiledBacking* tiledBacking() const { return 0; }
     virtual bool usesCompositedScrolling() const { return false; }
 
     virtual GraphicsLayer* layerForHorizontalScrollbar() const { return 0; }
     virtual GraphicsLayer* layerForVerticalScrollbar() const { return 0; }
 
+    bool hasLayerForHorizontalScrollbar() const;
+    bool hasLayerForVerticalScrollbar() const;
+
     void verticalScrollbarLayerDidChange();
     void horizontalScrollbarLayerDidChange();
-#endif
 
 protected:
     ScrollableArea();
@@ -242,19 +262,14 @@ protected:
     virtual void invalidateScrollbarRect(Scrollbar*, const IntRect&) = 0;
     virtual void invalidateScrollCornerRect(const IntRect&) = 0;
 
-#if USE(ACCELERATED_COMPOSITING)
     friend class ScrollingCoordinator;
     virtual GraphicsLayer* layerForScrolling() const { return 0; }
     virtual GraphicsLayer* layerForScrollCorner() const { return 0; }
 #if ENABLE(RUBBER_BANDING)
     virtual GraphicsLayer* layerForOverhangAreas() const { return 0; }
 #endif
-#endif
-    bool hasLayerForHorizontalScrollbar() const;
-    bool hasLayerForVerticalScrollbar() const;
-    bool hasLayerForScrollCorner() const;
 
-    virtual void sendWillRevealEdgeEventsIfNeeded(const IntPoint&, const IntPoint&) { }
+    bool hasLayerForScrollCorner() const;
 
 private:
     virtual IntRect visibleContentRectInternal(VisibleContentRectIncludesScrollbars, VisibleContentRectBehavior) const;
@@ -269,6 +284,11 @@ private:
     virtual void setScrollOffset(const IntPoint&) = 0;
 
     mutable OwnPtr<ScrollAnimator> m_scrollAnimator;
+
+#if ENABLE(CSS_SCROLL_SNAP)
+    std::unique_ptr<Vector<LayoutUnit>> m_horizontalSnapOffsets;
+    std::unique_ptr<Vector<LayoutUnit>> m_verticalSnapOffsets;
+#endif
 
     // There are 8 possible combinations of writing mode and direction. Scroll origin will be non-zero in the x or y axis
     // if there is any reversed direction or writing-mode. The combinations are:
@@ -293,6 +313,7 @@ private:
     unsigned m_scrollbarOverlayStyle : 2; // ScrollbarOverlayStyle
 
     unsigned m_scrollOriginChanged : 1;
+    unsigned m_scrolledProgrammatically : 1;
 };
 
 } // namespace WebCore

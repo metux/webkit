@@ -10,10 +10,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -62,7 +62,7 @@ class Frame;
 class Range;
 class SharedBuffer;
 
-enum ShouldSerializeSelectedTextForClipboard { DefaultSelectedTextType, IncludeImageAltTextForClipboard };
+enum ShouldSerializeSelectedTextForDataTransfer { DefaultSelectedTextType, IncludeImageAltTextForDataTransfer };
 
 // For writing to the pasteboard. Generally sorted with the richest formats on top.
 
@@ -83,7 +83,7 @@ struct PasteboardWebContent {
 struct PasteboardURL {
     URL url;
     String title;
-#if PLATFORM(MAC) && !PLATFORM(IOS)
+#if PLATFORM(MAC)
     String userVisibleForm;
 #endif
 };
@@ -119,7 +119,7 @@ public:
 
 struct PasteboardPlainText {
     String text;
-#if PLATFORM(MAC) && !PLATFORM(IOS)
+#if PLATFORM(MAC)
     bool isURL;
 #endif
 };
@@ -136,7 +136,7 @@ public:
     Vector<String> types();
     String readString(const String& type);
 
-    bool writeString(const String& type, const String& data);
+    void writeString(const String& type, const String& data);
     void clear();
     void clear(const String& type);
 
@@ -165,7 +165,7 @@ public:
 #if PLATFORM(GTK) || PLATFORM(WIN)
     PassRefPtr<DocumentFragment> documentFragment(Frame&, Range&, bool allowPlainText, bool& chosePlainText); // FIXME: Layering violation.
     void writeImage(Element&, const URL&, const String& title); // FIXME: Layering violation.
-    void writeSelection(Range&, bool canSmartCopyOrDelete, Frame&, ShouldSerializeSelectedTextForClipboard = DefaultSelectedTextType); // FIXME: Layering violation.
+    void writeSelection(Range&, bool canSmartCopyOrDelete, Frame&, ShouldSerializeSelectedTextForDataTransfer = DefaultSelectedTextType); // FIXME: Layering violation.
 #endif
 
 #if PLATFORM(GTK)
@@ -180,7 +180,7 @@ public:
     static String resourceMIMEType(const NSString *mimeType);
 #endif
 
-#if PLATFORM(MAC) && !PLATFORM(IOS)
+#if PLATFORM(MAC)
     explicit Pasteboard(const String& pasteboardName);
     static PassOwnPtr<Pasteboard> create(const String& pasteboardName);
 
@@ -223,7 +223,7 @@ private:
     long m_changeCount;
 #endif
 
-#if PLATFORM(MAC) && !PLATFORM(IOS)
+#if PLATFORM(MAC)
     String m_pasteboardName;
     long m_changeCount;
 #endif
@@ -240,7 +240,7 @@ private:
 extern NSString *WebArchivePboardType;
 #endif
 
-#if PLATFORM(MAC) && !PLATFORM(IOS)
+#if PLATFORM(MAC)
 extern const char* const WebArchivePboardType;
 extern const char* const WebURLNamePboardType;
 #endif

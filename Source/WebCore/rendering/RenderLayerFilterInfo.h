@@ -36,20 +36,21 @@
 #include "CachedResourceHandle.h"
 #include "CachedSVGDocumentClient.h"
 #include "RenderLayer.h"
+#include <memory>
 
 namespace WebCore {
 
 class Element;
 
-class RenderLayer::FilterInfo
-#if ENABLE(SVG)
-    final : public CachedSVGDocumentClient
-#endif
+class RenderLayer::FilterInfo final : public CachedSVGDocumentClient
 {
 public:
     static FilterInfo& get(RenderLayer&);
     static FilterInfo* getIfExists(const RenderLayer&);
     static void remove(RenderLayer&);
+
+    explicit FilterInfo(RenderLayer&);
+    ~FilterInfo();
 
     const LayoutRect& dirtySourceRect() const { return m_dirtySourceRect; }
     void expandDirtySourceRect(const LayoutRect& rect) { m_dirtySourceRect.unite(rect); }
@@ -58,22 +59,15 @@ public:
     FilterEffectRenderer* renderer() const { return m_renderer.get(); }
     void setRenderer(PassRefPtr<FilterEffectRenderer>);
     
-#if ENABLE(SVG)
     void updateReferenceFilterClients(const FilterOperations&);
     void removeReferenceFilterClients();
-#endif
 
 private:
-    explicit FilterInfo(RenderLayer&);
-    ~FilterInfo();
-
     friend void WTF::deleteOwnedPtr<FilterInfo>(FilterInfo*);
 
-#if ENABLE(SVG)
     virtual void notifyFinished(CachedResource*) override;
-#endif
 
-    static HashMap<const RenderLayer*, OwnPtr<FilterInfo>>& map();
+    static HashMap<const RenderLayer*, std::unique_ptr<FilterInfo>>& map();
 
 #if PLATFORM(IOS)
 #pragma clang diagnostic push
@@ -89,10 +83,8 @@ private:
     RefPtr<FilterEffectRenderer> m_renderer;
     LayoutRect m_dirtySourceRect;
 
-#if ENABLE(SVG)
     Vector<RefPtr<Element>> m_internalSVGReferences;
     Vector<CachedResourceHandle<CachedSVGDocument>> m_externalSVGReferences;
-#endif
 };
 
 } // namespace WebCore

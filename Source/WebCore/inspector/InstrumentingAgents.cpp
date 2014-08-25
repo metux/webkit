@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2011 Google Inc. All rights reserved.
+ * Copyright (C) 2014 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -48,16 +49,18 @@ InstrumentingAgents::InstrumentingAgents(InspectorEnvironment& environment)
     , m_inspectorAgent(nullptr)
     , m_inspectorPageAgent(nullptr)
     , m_inspectorCSSAgent(nullptr)
-#if USE(ACCELERATED_COMPOSITING)
     , m_inspectorLayerTreeAgent(nullptr)
-#endif
-    , m_inspectorConsoleAgent(nullptr)
+    , m_webConsoleAgent(nullptr)
     , m_inspectorDOMAgent(nullptr)
     , m_inspectorResourceAgent(nullptr)
     , m_pageRuntimeAgent(nullptr)
     , m_workerRuntimeAgent(nullptr)
     , m_inspectorTimelineAgent(nullptr)
+    , m_persistentInspectorTimelineAgent(nullptr)
     , m_inspectorDOMStorageAgent(nullptr)
+#if ENABLE(WEB_REPLAY)
+    , m_inspectorReplayAgent(nullptr)
+#endif
 #if ENABLE(SQL_DATABASE)
     , m_inspectorDatabaseAgent(nullptr)
 #endif
@@ -67,7 +70,6 @@ InstrumentingAgents::InstrumentingAgents(InspectorEnvironment& environment)
     , m_inspectorDOMDebuggerAgent(nullptr)
     , m_inspectorProfilerAgent(nullptr)
     , m_inspectorWorkerAgent(nullptr)
-    , m_inspectorCanvasAgent(nullptr)
 {
 }
 
@@ -76,16 +78,18 @@ void InstrumentingAgents::reset()
     m_inspectorAgent = nullptr;
     m_inspectorPageAgent = nullptr;
     m_inspectorCSSAgent = nullptr;
-#if USE(ACCELERATED_COMPOSITING)
     m_inspectorLayerTreeAgent = nullptr;
-#endif
-    m_inspectorConsoleAgent = nullptr;
+    m_webConsoleAgent = nullptr;
     m_inspectorDOMAgent = nullptr;
     m_inspectorResourceAgent = nullptr;
     m_pageRuntimeAgent = nullptr;
     m_workerRuntimeAgent = nullptr;
     m_inspectorTimelineAgent = nullptr;
+    m_persistentInspectorTimelineAgent = nullptr;
     m_inspectorDOMStorageAgent = nullptr;
+#if ENABLE(WEB_REPLAY)
+    m_inspectorReplayAgent = nullptr;
+#endif
 #if ENABLE(SQL_DATABASE)
     m_inspectorDatabaseAgent = nullptr;
 #endif
@@ -95,7 +99,6 @@ void InstrumentingAgents::reset()
     m_inspectorDOMDebuggerAgent = nullptr;
     m_inspectorProfilerAgent = nullptr;
     m_inspectorWorkerAgent = nullptr;
-    m_inspectorCanvasAgent = nullptr;
 }
 
 InstrumentingAgents* instrumentationForPage(Page* page)

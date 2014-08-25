@@ -41,16 +41,17 @@ public:
     void setWebFrame(WebFrame* webFrame) { m_frame = webFrame; }
     WebFrame* webFrame() const { return m_frame; }
 
+    bool frameHasCustomContentProvider() const { return m_frameHasCustomContentProvider; }
+
 private:
     virtual void frameLoaderDestroyed() override;
 
-    virtual bool hasHTMLView() const override { return true; }
+    virtual bool hasHTMLView() const override;
     virtual bool hasWebView() const override;
     
     virtual void makeRepresentation(WebCore::DocumentLoader*) override;
-    virtual void forceLayout() override;
 #if PLATFORM(IOS)
-    virtual void forceLayoutWithoutRecalculatingStyles() override;
+    virtual bool forceLayoutOnRestoreFromPageCache() override;
 #endif
     virtual void forceLayoutForNonHTML() override;
     
@@ -129,6 +130,7 @@ private:
     virtual void updateGlobalHistoryRedirectLinks() override;
     
     virtual bool shouldGoToHistoryItem(WebCore::HistoryItem*) const override;
+    virtual void willChangeCurrentHistoryItem() override;
 
     virtual void didDisplayInsecureContent() override;
     virtual void didRunInsecureContent(WebCore::SecurityOrigin*, const WebCore::URL&) override;
@@ -175,9 +177,9 @@ private:
 
     virtual void dispatchDidBecomeFrameset(bool) override;
 
-    virtual bool canCachePage() const override { return true; }
+    virtual bool canCachePage() const override;
     virtual void convertMainResourceLoadToDownload(WebCore::DocumentLoader*, const WebCore::ResourceRequest&, const WebCore::ResourceResponse&) override;
-    
+
     virtual PassRefPtr<WebCore::Frame> createFrame(const WebCore::URL& url, const String& name, WebCore::HTMLFrameOwnerElement* ownerElement,
                                           const String& referrer, bool allowsScrolling, int marginWidth, int marginHeight) override;
     
@@ -187,16 +189,11 @@ private:
     
 #if ENABLE(WEBGL)
     virtual WebCore::WebGLLoadPolicy webGLPolicyForURL(const String&) const override;
+    virtual WebCore::WebGLLoadPolicy resolveWebGLPolicyForURL(const String&) const override;
 #endif // ENABLE(WEBGL)
 
     virtual PassRefPtr<WebCore::Widget> createJavaAppletWidget(const WebCore::IntSize&, WebCore::HTMLAppletElement*, const WebCore::URL& baseURL, const Vector<String>& paramNames, const Vector<String>& paramValues) override;
     
-#if ENABLE(PLUGIN_PROXY_FOR_VIDEO)
-    virtual PassRefPtr<WebCore::Widget> createMediaPlayerProxyPlugin(const WebCore::IntSize&, WebCore::HTMLMediaElement*, const WebCore::URL&, const Vector<String>&, const Vector<String>&, const String&) override;
-    virtual void hideMediaPlayerProxyPlugin(WebCore::Widget*) override;
-    virtual void showMediaPlayerProxyPlugin(WebCore::Widget*) override;
-#endif
-
     virtual WebCore::ObjectContentType objectContentType(const WebCore::URL&, const String& mimeType, bool shouldPreferPlugInsForImages) override;
     virtual String overrideMediaType() const override;
 
@@ -209,7 +206,7 @@ private:
 
     virtual void registerForIconNotification(bool listen = true) override;
     
-#if PLATFORM(MAC)
+#if PLATFORM(COCOA)
     virtual RemoteAXObjectRef accessibilityRemoteObject() override;
     
     virtual NSCachedURLResponse* willCacheResponse(WebCore::DocumentLoader*, unsigned long identifier, NSCachedURLResponse*) const override;
@@ -227,10 +224,19 @@ private:
 
     virtual void forcePageTransitionIfNeeded() override;
 
+#if USE(QUICK_LOOK)
+    virtual void didCreateQuickLookHandle(WebCore::QuickLookHandle&) override;
+#endif
+
+#if ENABLE(CONTENT_FILTERING)
+    virtual void contentFilterDidBlockLoad(std::unique_ptr<WebCore::ContentFilter>) override;
+#endif
+
     WebFrame* m_frame;
     RefPtr<PluginView> m_pluginView;
     bool m_hasSentResponseToPluginView;
-    bool m_didCompletePageTransitionAlready;
+    bool m_didCompletePageTransition;
+    bool m_frameHasCustomContentProvider;
     bool m_frameCameFromPageCache;
 };
 

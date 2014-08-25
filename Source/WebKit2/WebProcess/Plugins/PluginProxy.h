@@ -35,8 +35,9 @@
 #include <WebCore/FindOptions.h>
 #include <WebCore/IntRect.h>
 #include <WebCore/SecurityOrigin.h>
+#include <memory>
 
-#if PLATFORM(MAC)
+#if PLATFORM(COCOA)
 #include <wtf/RetainPtr.h>
 OBJC_CLASS CALayer;
 #endif
@@ -78,13 +79,13 @@ private:
     virtual void paint(WebCore::GraphicsContext*, const WebCore::IntRect& dirtyRect);
     virtual bool supportsSnapshotting() const;
     virtual PassRefPtr<ShareableBitmap> snapshot();
-#if PLATFORM(MAC)
+#if PLATFORM(COCOA)
     virtual PlatformLayer* pluginLayer();
 #endif
     virtual bool isTransparent();
     virtual bool wantsWheelEvents() override;
     virtual void geometryDidChange(const WebCore::IntSize& pluginSize, const WebCore::IntRect& clipRect, const WebCore::AffineTransform& pluginToRootViewTransform);
-    virtual void visibilityDidChange();
+    virtual void visibilityDidChange(bool isVisible);
     virtual void frameDidFinishLoading(uint64_t requestID);
     virtual void frameDidFail(uint64_t requestID, bool wasCancelled);
     virtual void didEvaluateJavaScript(uint64_t requestID, const String& result);
@@ -112,7 +113,7 @@ private:
     virtual bool handlesPageScaleFactor();
     
     virtual NPObject* pluginScriptableNPObject();
-#if PLATFORM(MAC)
+#if PLATFORM(COCOA)
     virtual void windowFocusChanged(bool);
     virtual void windowAndViewFramesChanged(const WebCore::IntRect& windowFrameInScreenCoordinates, const WebCore::IntRect& viewFrameInWindowCoordinates);
     virtual void windowVisibilityChanged(bool);
@@ -139,6 +140,10 @@ private:
 
     virtual String getSelectionString() const override { return String(); }
 
+#if PLATFORM(COCOA)
+    virtual WebCore::AudioHardwareActivityType audioHardwareActivity() const override;
+#endif
+
     float contentsScaleFactor();
     bool needsBackingStore() const;
     bool updateBackingStore();
@@ -159,7 +164,7 @@ private:
     void cancelStreamLoad(uint64_t streamID);
     void cancelManualStreamLoad();
     void setStatusbarText(const String& statusbarText);
-#if PLATFORM(MAC)
+#if PLATFORM(COCOA)
     void pluginFocusOrWindowFocusChanged(bool);
     void setComplexTextInputState(uint64_t);
     void setLayerHostingContextID(uint32_t);
@@ -167,6 +172,7 @@ private:
 #if PLUGIN_ARCHITECTURE(X11)
     void createPluginContainer(uint64_t& windowID);
     void windowedPluginGeometryDidChange(const WebCore::IntRect& frameRect, const WebCore::IntRect& clipRect, uint64_t windowID);
+    void windowedPluginVisibilityDidChange(bool isVisible, uint64_t windowID);
 #endif
 
     bool canInitializeAsynchronously() const;
@@ -211,10 +217,10 @@ private:
     // The client ID for the CA layer in the plug-in process. Will be 0 if the plug-in is not a CA plug-in.
     uint32_t m_remoteLayerClientID;
     
-    OwnPtr<PluginCreationParameters> m_pendingPluginCreationParameters;
+    std::unique_ptr<PluginCreationParameters> m_pendingPluginCreationParameters;
     bool m_waitingOnAsynchronousInitialization;
 
-#if PLATFORM(MAC)
+#if PLATFORM(COCOA)
     RetainPtr<CALayer> m_pluginLayer;
 #endif
 

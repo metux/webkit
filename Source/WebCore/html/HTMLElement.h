@@ -47,7 +47,6 @@ public:
     virtual String title() const override final;
 
     virtual short tabIndex() const override;
-    void setTabIndex(int);
 
     String innerHTML() const;
     String outerHTML() const;
@@ -89,7 +88,7 @@ public:
     bool hasDirectionAuto() const;
     TextDirection directionalityIfhasDirAutoAttribute(bool& isAuto) const;
 
-    virtual bool isHTMLUnknownElement() const { return false; }
+    bool isHTMLUnknownElement() const { return getFlag(IsHTMLUnknownElementFlag); }
     virtual bool isTextControlInnerTextElement() const { return false; }
 
     virtual bool willRespondToMouseMoveEvents() override;
@@ -98,6 +97,10 @@ public:
 
     virtual bool isLabelable() const { return false; }
     virtual FormNamedItem* asFormNamedItem() { return 0; }
+
+    static void populateEventNameForAttributeLocalNameMap(HashMap<AtomicStringImpl*, AtomicString>&);
+
+    bool hasTagName(const HTMLQualifiedName& name) const { return hasLocalName(name.localName()); }
 
 protected:
     HTMLElement(const QualifiedName& tagName, Document&, ConstructionType);
@@ -150,6 +153,11 @@ template <> inline bool isElementOfType<const HTMLElement>(const HTMLElement&) {
 template <> inline bool isElementOfType<const HTMLElement>(const Element& element) { return element.isHTMLElement(); }
 
 NODE_TYPE_CASTS(HTMLElement)
+
+inline bool Node::hasTagName(const HTMLQualifiedName& name) const
+{
+    return isHTMLElement() && toHTMLElement(*this).hasTagName(name);
+}
 
 } // namespace WebCore
 

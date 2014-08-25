@@ -29,7 +29,7 @@
 #include "JSString.h"
 #include "Lexer.h"
 #include "Nodes.h"
-#include "Operations.h"
+#include "JSCInlines.h"
 #include "Parser.h"
 #include <wtf/text/StringBuilder.h>
 
@@ -37,7 +37,7 @@ namespace JSC {
 
 STATIC_ASSERT_IS_TRIVIALLY_DESTRUCTIBLE(FunctionConstructor);
 
-const ClassInfo FunctionConstructor::s_info = { "Function", &Base::s_info, 0, 0, CREATE_METHOD_TABLE(FunctionConstructor) };
+const ClassInfo FunctionConstructor::s_info = { "Function", &Base::s_info, 0, CREATE_METHOD_TABLE(FunctionConstructor) };
 
 FunctionConstructor::FunctionConstructor(VM& vm, Structure* structure)
     : InternalFunction(vm, structure)

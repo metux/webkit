@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011 Apple Inc. All rights reserved.
+ * Copyright (C) 2011, 2014 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -32,6 +32,7 @@
 #include "CachedResourceHandle.h"
 #include "Timer.h"
 #include "WebVTTParser.h"
+#include <memory>
 #include <wtf/OwnPtr.h>
 
 namespace WebCore {
@@ -56,32 +57,27 @@ class TextTrackLoader : public CachedResourceClient, private WebVTTParserClient 
     WTF_MAKE_NONCOPYABLE(TextTrackLoader); 
     WTF_MAKE_FAST_ALLOCATED;
 public:
-    static PassOwnPtr<TextTrackLoader> create(TextTrackLoaderClient& client, ScriptExecutionContext* context)
-    {
-        return adoptPtr(new TextTrackLoader(client, context));
-    }
+    TextTrackLoader(TextTrackLoaderClient&, ScriptExecutionContext*);
     virtual ~TextTrackLoader();
     
     bool load(const URL&, const String& crossOriginMode);
     void cancelLoad();
     void getNewCues(Vector<RefPtr<TextTrackCue>>& outputCues);
 #if ENABLE(WEBVTT_REGIONS)
-    void getNewRegions(Vector<RefPtr<TextTrackRegion>>& outputRegions);
+    void getNewRegions(Vector<RefPtr<VTTRegion>>& outputRegions);
 #endif
 private:
 
     // CachedResourceClient
-    virtual void notifyFinished(CachedResource*);
-    virtual void deprecatedDidReceiveCachedResource(CachedResource*);
+    virtual void notifyFinished(CachedResource*) override;
+    virtual void deprecatedDidReceiveCachedResource(CachedResource*) override;
     
     // WebVTTParserClient
-    virtual void newCuesParsed();
+    virtual void newCuesParsed() override;
 #if ENABLE(WEBVTT_REGIONS)
-    virtual void newRegionsParsed();
+    virtual void newRegionsParsed() override;
 #endif
-    virtual void fileFailedToParse();
-    
-    TextTrackLoader(TextTrackLoaderClient&, ScriptExecutionContext*);
+    virtual void fileFailedToParse() override;
     
     void processNewCueData(CachedResource*);
     void cueLoadTimerFired(Timer<TextTrackLoader>*);
@@ -90,7 +86,7 @@ private:
     enum State { Idle, Loading, Finished, Failed };
     
     TextTrackLoaderClient& m_client;
-    OwnPtr<WebVTTParser> m_cueParser;
+    std::unique_ptr<WebVTTParser> m_cueParser;
     CachedResourceHandle<CachedTextTrack> m_resource;
     ScriptExecutionContext* m_scriptExecutionContext;
     Timer<TextTrackLoader> m_cueLoadTimer;

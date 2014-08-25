@@ -31,10 +31,15 @@
 #include "ChildProcessProxy.h"
 #include "ProcessLauncher.h"
 #include "WebProcessProxyMessages.h"
+#include <memory>
 #include <wtf/Deque.h>
 
 #if ENABLE(CUSTOM_PROTOCOLS)
 #include "CustomProtocolManagerProxy.h"
+#endif
+
+#if PLATFORM(IOS)
+#include "ProcessAssertion.h"
 #endif
 
 namespace WebCore {
@@ -57,7 +62,7 @@ public:
 
     DownloadProxy* createDownloadProxy();
 
-#if PLATFORM(MAC)
+#if PLATFORM(COCOA)
     void setProcessSuppressionEnabled(bool);
 #endif
 
@@ -91,10 +96,14 @@ private:
     unsigned m_numPendingConnectionRequests;
     Deque<RefPtr<Messages::WebProcessProxy::GetNetworkProcessConnection::DelayedReply>> m_pendingConnectionReplies;
 
-    OwnPtr<DownloadProxyMap> m_downloadProxyMap;
+    std::unique_ptr<DownloadProxyMap> m_downloadProxyMap;
 
 #if ENABLE(CUSTOM_PROTOCOLS)
     CustomProtocolManagerProxy m_customProtocolManagerProxy;
+#endif
+    
+#if PLATFORM(IOS)
+    std::unique_ptr<ProcessAssertion> m_assertion;
 #endif
 };
 

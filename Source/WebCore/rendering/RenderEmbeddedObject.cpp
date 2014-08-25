@@ -58,10 +58,6 @@
 #include "TextRun.h"
 #include <wtf/StackStats.h>
 
-#if ENABLE(PLUGIN_PROXY_FOR_VIDEO)
-#include "HTMLMediaElement.h"
-#endif
-
 namespace WebCore {
 
 using namespace HTMLNames;
@@ -101,7 +97,7 @@ static const Color& unavailablePluginBorderColor()
 }
 
 RenderEmbeddedObject::RenderEmbeddedObject(HTMLFrameOwnerElement& element, PassRef<RenderStyle> style)
-    : RenderWidget(element, std::move(style))
+    : RenderWidget(element, WTF::move(style))
     , m_isPluginUnavailable(false)
     , m_isUnavailablePluginIndicatorHidden(false)
     , m_unavailablePluginIndicatorIsPressed(false)
@@ -118,12 +114,11 @@ RenderEmbeddedObject::~RenderEmbeddedObject()
 
 RenderPtr<RenderEmbeddedObject> RenderEmbeddedObject::createForApplet(HTMLAppletElement& applet, PassRef<RenderStyle> style)
 {
-    auto renderer = createRenderer<RenderEmbeddedObject>(applet, std::move(style));
+    auto renderer = createRenderer<RenderEmbeddedObject>(applet, WTF::move(style));
     renderer->setInline(true);
     return renderer;
 }
 
-#if USE(ACCELERATED_COMPOSITING)
 bool RenderEmbeddedObject::requiresLayer() const
 {
     if (RenderWidget::requiresLayer())
@@ -141,7 +136,6 @@ bool RenderEmbeddedObject::allowsAcceleratedCompositing() const
     return widget() && widget()->isPluginViewBase() && toPluginViewBase(widget())->platformLayer();
 #endif
 }
-#endif
 
 #if !PLATFORM(IOS)
 static String unavailablePluginReplacementText(RenderEmbeddedObject::PluginUnavailabilityReason pluginUnavailabilityReason)
@@ -225,7 +219,7 @@ void RenderEmbeddedObject::paintSnapshotImage(PaintInfo& paintInfo, const Layout
 #if ENABLE(CSS_IMAGE_ORIENTATION)
     orientationDescription.setImageOrientationEnum(style().imageOrientation());
 #endif
-    context->drawImage(image, style().colorSpace(), alignedRect, CompositeSourceOver, orientationDescription, useLowQualityScaling);
+    context->drawImage(image, style().colorSpace(), alignedRect, ImagePaintingOptions(orientationDescription, useLowQualityScaling));
 }
 
 void RenderEmbeddedObject::paintContents(PaintInfo& paintInfo, const LayoutPoint& paintOffset)
@@ -610,9 +604,9 @@ void RenderEmbeddedObject::handleUnavailablePluginIndicatorEvent(Event* event)
     if (!event->isMouseEvent())
         return;
 
-    MouseEvent* mouseEvent = static_cast<MouseEvent*>(event);
+    MouseEvent* mouseEvent = toMouseEvent(event);
     HTMLPlugInElement& element = toHTMLPlugInElement(frameOwnerElement());
-    if (event->type() == eventNames().mousedownEvent && static_cast<MouseEvent*>(event)->button() == LeftButton) {
+    if (event->type() == eventNames().mousedownEvent && toMouseEvent(event)->button() == LeftButton) {
         m_mouseDownWasInUnavailablePluginIndicator = isInUnavailablePluginIndicator(mouseEvent);
         if (m_mouseDownWasInUnavailablePluginIndicator) {
             frame().eventHandler().setCapturingMouseEventsElement(&element);
@@ -621,7 +615,7 @@ void RenderEmbeddedObject::handleUnavailablePluginIndicatorEvent(Event* event)
         }
         event->setDefaultHandled();
     }
-    if (event->type() == eventNames().mouseupEvent && static_cast<MouseEvent*>(event)->button() == LeftButton) {
+    if (event->type() == eventNames().mouseupEvent && toMouseEvent(event)->button() == LeftButton) {
         if (m_unavailablePluginIndicatorIsPressed) {
             frame().eventHandler().setCapturingMouseEventsElement(nullptr);
             element.setIsCapturingMouseEvents(false);
@@ -655,11 +649,6 @@ CursorDirective RenderEmbeddedObject::getCursor(const LayoutPoint& point, Cursor
 
 bool RenderEmbeddedObject::canHaveChildren() const
 {
-#if ENABLE(PLUGIN_PROXY_FOR_VIDEO)
-    if (frameOwnerElement().isMediaElement())
-        return true;
-#endif
-
     if (isSnapshottedPlugIn())
         return true;
 

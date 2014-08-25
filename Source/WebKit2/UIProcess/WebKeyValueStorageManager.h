@@ -36,7 +36,7 @@
 
 namespace WebKit {
 
-typedef GenericCallback<WKArrayRef> ArrayCallback;
+typedef GenericCallback<API::Array*> ArrayCallback;
 
 class WebKeyValueStorageManager : public API::ObjectImpl<API::Object::Type::KeyValueStorageManager>, public WebContextSupplement {
 public:
@@ -45,12 +45,17 @@ public:
     static PassRefPtr<WebKeyValueStorageManager> create(WebContext*);
     virtual ~WebKeyValueStorageManager();
 
-    void getKeyValueStorageOrigins(PassRefPtr<ArrayCallback>);
+    void getKeyValueStorageOrigins(std::function<void (API::Array*, CallbackBase::Error)>);
+    void getStorageDetailsByOrigin(std::function<void (API::Array*, CallbackBase::Error)>);
     void deleteEntriesForOrigin(WebSecurityOrigin*);
     void deleteAllEntries();
 
     using API::Object::ref;
     using API::Object::deref;
+
+    static String originKey();
+    static String creationTimeKey();
+    static String modificationTimeKey();
 
 private:
     explicit WebKeyValueStorageManager(WebContext*);

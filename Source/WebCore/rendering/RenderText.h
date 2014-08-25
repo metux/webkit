@@ -72,13 +72,11 @@ public:
 
     Vector<FloatQuad> absoluteQuadsClippedToEllipsis() const;
 
-    virtual VisiblePosition positionForPoint(const LayoutPoint&) override;
+    virtual VisiblePosition positionForPoint(const LayoutPoint&, const RenderRegion*) override;
 
-    bool is8Bit() const { return m_text.is8Bit(); }
+    bool is8Bit() const { return m_text.impl()->is8Bit(); }
     const LChar* characters8() const { return m_text.impl()->characters8(); }
     const UChar* characters16() const { return m_text.impl()->characters16(); }
-    const UChar* characters() const { return deprecatedCharacters(); } // FIXME: Delete this.
-    const UChar* deprecatedCharacters() const { return m_text.deprecatedCharacters(); }
     UChar characterAt(unsigned) const;
     UChar uncheckedCharacterAt(unsigned) const;
     UChar operator[](unsigned i) const { return uncheckedCharacterAt(i); }
@@ -101,9 +99,7 @@ public:
     virtual IntRect linesBoundingBox() const;
     LayoutRect linesVisualOverflowBoundingBox() const;
 
-    FloatPoint firstRunOrigin() const;
-    float firstRunX() const;
-    float firstRunY() const;
+    IntPoint firstRunLocation() const;
 
     virtual void setText(const String&, bool force = false);
     void setTextWithOffset(const String&, unsigned offset, unsigned len, bool force = false);
@@ -112,6 +108,8 @@ public:
     virtual void setSelectionState(SelectionState) override final;
     virtual LayoutRect selectionRectForRepaint(const RenderLayerModelObject* repaintContainer, bool clipToVisibleContent = true) override;
     virtual LayoutRect localCaretRect(InlineBox*, int caretOffset, LayoutUnit* extraWidthToEndOfLine = 0) override;
+
+    LayoutRect collectSelectionRectsForLineBoxes(const RenderLayerModelObject* repaintContainer, bool clipToVisibleContent, Vector<LayoutRect>& rects);
 
     LayoutUnit marginLeft() const { return minimumValueForLength(style().marginLeft(), 0); }
     LayoutUnit marginRight() const { return minimumValueForLength(style().marginRight(), 0); }
@@ -162,10 +160,12 @@ protected:
     virtual void computePreferredLogicalWidths(float leadWidth);
     virtual void willBeDestroyed() override;
 
-    virtual void setTextInternal(const String&);
+    virtual void setRenderedText(const String&);
     virtual UChar previousCharacter() const;
 
 private:
+    RenderText(Node&, const String&);
+
     virtual bool canHaveChildren() const override final { return false; }
 
     void computePreferredLogicalWidths(float leadWidth, HashSet<const SimpleFontData*>& fallbackFonts, GlyphOverflow&);
@@ -185,6 +185,8 @@ private:
     bool computeUseBackslashAsYenSymbol() const;
 
     void secureText(UChar mask);
+
+    LayoutRect collectSelectionRectsForLineBoxes(const RenderLayerModelObject* repaintContainer, bool clipToVisibleContent, Vector<LayoutRect>*);
 
     void node() const = delete;
 
@@ -219,6 +221,8 @@ private:
     RenderTextLineBoxes m_lineBoxes;
 };
 
+RENDER_OBJECT_TYPE_CASTS(RenderText, isText())
+
 inline UChar RenderText::uncheckedCharacterAt(unsigned i) const
 {
     ASSERT_WITH_SECURITY_IMPLICATION(i < textLength());
@@ -233,9 +237,6 @@ inline UChar RenderText::characterAt(unsigned i) const
     return uncheckedCharacterAt(i);
 }
 
-template <> inline bool isRendererOfType<const RenderText>(const RenderObject& renderer) { return renderer.isText(); }
-RENDER_OBJECT_TYPE_CASTS(RenderText, isText())
-
 inline RenderStyle& RenderText::style() const
 {
     return parent()->style();
@@ -247,7 +248,8 @@ inline RenderStyle& RenderText::firstLineStyle() const
 }
 
 void applyTextTransform(const RenderStyle&, String&, UChar);
-
+void makeCapitalized(String*, UChar previous);
+    
 inline RenderText* Text::renderer() const
 {
     return toRenderText(Node::renderer());

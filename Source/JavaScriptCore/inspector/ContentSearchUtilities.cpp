@@ -37,6 +37,7 @@
 #include "Yarr.h"
 #include <wtf/BumpPointerAllocator.h>
 #include <wtf/StdLibExtras.h>
+#include <wtf/text/StringBuilder.h>
 
 using namespace JSC::Yarr;
 
@@ -47,17 +48,16 @@ static const char regexSpecialCharacters[] = "[](){}+-*.,?\\^$|";
 
 static String createSearchRegexSource(const String& text)
 {
-    String result;
-    const UChar* characters = text.deprecatedCharacters();
-    String specials(regexSpecialCharacters);
+    StringBuilder result;
 
     for (unsigned i = 0; i < text.length(); i++) {
-        if (specials.find(characters[i]) != notFound)
-            result.append("\\");
-        result.append(characters[i]);
+        UChar character = text[i];
+        if (isASCII(character) && strchr(regexSpecialCharacters, character))
+            result.append('\\');
+        result.append(character);
     }
 
-    return result;
+    return result.toString();
 }
 
 static inline size_t sizetExtractor(const size_t* value)
@@ -67,58 +67,61 @@ static inline size_t sizetExtractor(const size_t* value)
 
 TextPosition textPositionFromOffset(size_t offset, const Vector<size_t>& lineEndings)
 {
-    const size_t* foundLineEnding = approximateBinarySearch<size_t, size_t>(lineEndings, lineEndings.size(), offset, sizetExtractor);
-    size_t lineIndex = foundLineEnding - &lineEndings.at(0);
-    if (offset > *foundLineEnding)
+    const size_t* foundNextStart = approximateBinarySearch<size_t, size_t>(lineEndings, lineEndings.size(), offset, sizetExtractor);
+    size_t lineIndex = foundNextStart - &lineEndings.at(0);
+    if (offset >= *foundNextStart)
         ++lineIndex;
-    size_t lineStartOffset = lineIndex > 0 ? lineEndings.at(lineIndex - 1) + 1 : 0;
+    size_t lineStartOffset = lineIndex > 0 ? lineEndings.at(lineIndex - 1) : 0;
     size_t column = offset - lineStartOffset;
     return TextPosition(OrdinalNumber::fromZeroBasedInt(lineIndex), OrdinalNumber::fromZeroBasedInt(column));
 }
 
-static Vector<std::pair<int, String>> getRegularExpressionMatchesByLines(const JSC::Yarr::RegularExpression& regex, const String& text)
+static Vector<std::pair<size_t, String>> getRegularExpressionMatchesByLines(const JSC::Yarr::RegularExpression& regex, const String& text)
 {
-    Vector<std::pair<int, String>> result;
+    Vector<std::pair<size_t, String>> result;
     if (text.isEmpty())
         return result;
 
-    OwnPtr<Vector<size_t>> endings(lineEndings(text));
+    std::unique_ptr<Vector<size_t>> endings(lineEndings(text));
     size_t size = endings->size();
-    unsigned start = 0;
+    size_t start = 0;
+
     for (size_t lineNumber = 0; lineNumber < size; ++lineNumber) {
-        size_t lineEnd = endings->at(lineNumber);
-        String line = text.substring(start, lineEnd - start);
-        if (line.endsWith('\r'))
-            line = line.left(line.length() - 1);
+        size_t nextStart = endings->at(lineNumber);
+        String line = text.substring(start, nextStart - start);
 
         int matchLength;
         if (regex.match(line, 0, &matchLength) != -1)
-            result.append(std::pair<int, String>(lineNumber, line));
+            result.append(std::pair<size_t, String>(lineNumber, line));
 
-        start = lineEnd + 1;
+        start = nextStart;
     }
+
     return result;
 }
 
-PassOwnPtr<Vector<size_t>> lineEndings(const String& text)
+std::unique_ptr<Vector<size_t>> lineEndings(const String& text)
 {
-    OwnPtr<Vector<size_t>> result(adoptPtr(new Vector<size_t>()));
+    auto result = std::make_unique<Vector<size_t>>();
 
-    unsigned start = 0;
+    size_t start = 0;
     while (start < text.length()) {
-        size_t lineEnd = text.find('\n', start);
-        if (lineEnd == notFound)
+        size_t nextStart = text.findNextLineStart(start);
+        if (nextStart == notFound) {
+            result->append(text.length());
             break;
+        }
 
-        result->append(lineEnd);
-        start = lineEnd + 1;
+        result->append(nextStart);
+        start = nextStart;
     }
+
     result->append(text.length());
 
-    return result.release();
+    return result;
 }
 
-static PassRefPtr<Inspector::TypeBuilder::GenericTypes::SearchMatch> buildObjectForSearchMatch(int lineNumber, const String& lineContent)
+static PassRefPtr<Inspector::TypeBuilder::GenericTypes::SearchMatch> buildObjectForSearchMatch(size_t lineNumber, const String& lineContent)
 {
     return Inspector::TypeBuilder::GenericTypes::SearchMatch::create()
         .setLineNumber(lineNumber)
@@ -156,10 +159,10 @@ PassRefPtr<Inspector::TypeBuilder::Array<Inspector::TypeBuilder::GenericTypes::S
     RefPtr<Inspector::TypeBuilder::Array<Inspector::TypeBuilder::GenericTypes::SearchMatch>> result = Inspector::TypeBuilder::Array<Inspector::TypeBuilder::GenericTypes::SearchMatch>::create();
 
     JSC::Yarr::RegularExpression regex = ContentSearchUtilities::createSearchRegex(query, caseSensitive, isRegex);
-    Vector<std::pair<int, String>> matches = getRegularExpressionMatchesByLines(regex, text);
+    Vector<std::pair<size_t, String>> matches = getRegularExpressionMatchesByLines(regex, text);
 
-    for (Vector<std::pair<int, String>>::const_iterator it = matches.begin(); it != matches.end(); ++it)
-        result->addItem(buildObjectForSearchMatch(it->first, it->second));
+    for (const auto& match : matches)
+        result->addItem(buildObjectForSearchMatch(match.first, match.second));
 
     return result;
 }
@@ -212,6 +215,6 @@ String findStylesheetSourceMapURL(const String& content)
 }
 
 } // namespace ContentSearchUtilities
-} // namespace WebCore
+} // namespace Inspector
 
 #endif // ENABLE(INSPECTOR)

@@ -28,6 +28,7 @@
     NoInterfaceObject,
 ] interface Internals {
     DOMString address(Node node);
+    DOMString description(any value);
 
     [RaisesException] DOMString elementRenderTreeAsText(Element element);
     boolean isPreloaded(DOMString url);
@@ -35,15 +36,10 @@
 
     [RaisesException] CSSStyleDeclaration computedStyleIncludingVisitedInfo(Node node);
 
-#if defined(ENABLE_SHADOW_DOM) && ENABLE_SHADOW_DOM
-    [RaisesException] ShadowRoot ensureShadowRoot(Element host);
-    [RaisesException] ShadowRoot createShadowRoot(Element host);
-    [RaisesException] ShadowRoot shadowRoot(Element host);
-#else
     [RaisesException] Node ensureShadowRoot(Element host);
     [RaisesException] Node createShadowRoot(Element host);
     [RaisesException] Node shadowRoot(Element host);
-#endif
+
     [RaisesException] DOMString shadowRootType(Node root);
     [RaisesException] Element includerFor(Node node);
     [RaisesException] DOMString shadowPseudoId(Element element);
@@ -59,12 +55,12 @@
     [RaisesException] void suspendAnimations();
     [RaisesException] void resumeAnimations();
     [RaisesException] boolean animationsAreSuspended();
-    [RaisesException] boolean pauseAnimationAtTimeOnElement(DOMString animationName, double pauseTime, Element element);
-    [RaisesException] boolean pauseAnimationAtTimeOnPseudoElement(DOMString animationName, double pauseTime, Element element, DOMString pseudoId);
+    [RaisesException] boolean pauseAnimationAtTimeOnElement(DOMString animationName, unrestricted double pauseTime, Element element);
+    [RaisesException] boolean pauseAnimationAtTimeOnPseudoElement(DOMString animationName, unrestricted double pauseTime, Element element, DOMString pseudoId);
 
     // CSS Transition testing.
-    [RaisesException] boolean pauseTransitionAtTimeOnElement(DOMString propertyName, double pauseTime, Element element);
-    [RaisesException] boolean pauseTransitionAtTimeOnPseudoElement(DOMString property, double pauseTime, Element element, DOMString pseudoId);
+    [RaisesException] boolean pauseTransitionAtTimeOnElement(DOMString propertyName, unrestricted double pauseTime, Element element);
+    [RaisesException] boolean pauseTransitionAtTimeOnPseudoElement(DOMString property, unrestricted double pauseTime, Element element, DOMString pseudoId);
 
     [RaisesException] boolean attached(Node node);
 
@@ -86,12 +82,15 @@
     [RaisesException] Range markerRangeForNode(Node node, DOMString markerType, unsigned long index);
     [RaisesException] DOMString markerDescriptionForNode(Node node, DOMString markerType, unsigned long index);
     void addTextMatchMarker(Range range, boolean isActive);
+    [RaisesException] void setMarkedTextMatchesAreHighlighted(boolean flag);
+
+    void invalidateFontCache();
 
     [RaisesException] void setScrollViewPosition(long x, long y);
 
     [RaisesException] void setPagination(DOMString mode, long gap, optional long pageLength);
 
-    [RaisesException] DOMString configurationForViewport(float devicePixelRatio,
+    [RaisesException] DOMString configurationForViewport(unrestricted float devicePixelRatio,
                                        long deviceWidth,
                                        long deviceHeight,
                                        long availableWidth,
@@ -103,6 +102,7 @@
     [RaisesException] void setSuggestedValue(Element inputElement, DOMString value);
     [RaisesException] void setEditingValue(Element inputElement, DOMString value);
     [RaisesException] void setAutofilled(Element inputElement, boolean enabled);
+    [RaisesException] unsigned long countMatchesForText(DOMString text, unsigned long findOptions, DOMString markMatches);
 
     [RaisesException] void paintControlTints();
 
@@ -128,11 +128,12 @@
         unsigned long topPadding, unsigned long rightPadding, unsigned long bottomPadding, unsigned long leftPadding,
         boolean ignoreClipping, boolean allowShadowContent, boolean allowChildFrameContent);
 
-    void emitInspectorDidBeginFrame();
-    void emitInspectorDidCancelFrame();
-
     // Calling parserMetaData() with no arguments gets the metadata for the script of the current scope.
     DOMString parserMetaData(optional any func);
+
+    void updateEditorUINowIfScheduled();
+
+    Node findEditingDeleteButton();
 
     [RaisesException] boolean hasSpellingMarker(long from, long length);
     [RaisesException] boolean hasGrammarMarker(long from, long length);
@@ -176,37 +177,41 @@
     [RaisesException] void insertUserCSS(DOMString css);
 
 #if defined(ENABLE_BATTERY_STATUS) && ENABLE_BATTERY_STATUS
-    [RaisesException] void setBatteryStatus(DOMString eventType, boolean charging, double chargingTime, double dischargingTime, double level);
-#endif
-
-#if defined(ENABLE_NETWORK_INFO) && ENABLE_NETWORK_INFO
-    [RaisesException] void setNetworkInformation(DOMString eventType, double bandwidth, boolean metered);
+    [RaisesException] void setBatteryStatus(DOMString eventType, boolean charging, unrestricted double chargingTime, unrestricted double dischargingTime, unrestricted double level);
 #endif
 
 #if defined(ENABLE_PROXIMITY_EVENTS) && ENABLE_PROXIMITY_EVENTS
-    [RaisesException] void setDeviceProximity(DOMString eventType, double value, double min, double max);
+    [RaisesException] void setDeviceProximity(DOMString eventType, unrestricted double value, unrestricted double min, unrestricted double max);
 #endif
 
-    [Conditional=INSPECTOR] unsigned long numberOfLiveNodes();
-    [Conditional=INSPECTOR] unsigned long numberOfLiveDocuments();
+    // As per spec: http://www.w3.org/TR/WebIDL/#idl-sequence
+    // "Sequences must not be used as the type of an attribute, constant or exception field."
+    // FIXME: this will lead to BUG interals.consoleProfiles !== interals.consoleProfiles as profile will always returns new array.
+    readonly attribute ScriptProfile[] consoleProfiles;
+
+    unsigned long numberOfLiveNodes();
+    unsigned long numberOfLiveDocuments();
     [Conditional=INSPECTOR] sequence<DOMString> consoleMessageArgumentCounts();
     [Conditional=INSPECTOR] DOMWindow openDummyInspectorFrontend(DOMString url);
     [Conditional=INSPECTOR] void closeDummyInspectorFrontend();
-    [Conditional=INSPECTOR, RaisesException] void setInspectorResourcesDataSizeLimits(long maximumResourcesContentSize, long maximumSingleResourceContentSize);
     [Conditional=INSPECTOR, RaisesException] void setJavaScriptProfilingEnabled(boolean creates);
+    [Conditional=INSPECTOR, RaisesException] void setInspectorIsUnderTest(boolean isUnderTest);
 
     DOMString counterValue(Element element);
-    long pageNumber(Element element, optional float pageWidth, optional float pageHeight);
+    long pageNumber(Element element, optional unrestricted float pageWidth, optional unrestricted float pageHeight);
     DOMString[] shortcutIconURLs();
     DOMString[] allIconURLs();
-    long numberOfPages(optional double pageWidthInPixels, optional double pageHeightInPixels);
+    long numberOfPages(optional unrestricted double pageWidthInPixels, optional unrestricted double pageHeightInPixels);
     [RaisesException] DOMString pageProperty(DOMString propertyName, long pageNumber);
     [RaisesException] DOMString pageSizeAndMarginsInPixels(long pageIndex, long width, long height, long marginTop, long marginRight, long marginBottom, long marginLeft);
 
-    [RaisesException] void setPageScaleFactor(float scaleFactor, long x, long y);
+    [RaisesException] void setPageScaleFactor(unrestricted float scaleFactor, long x, long y);
+    [RaisesException] void setPageZoomFactor(unrestricted float zoomFactor);
 
-    void setHeaderHeight(float height);
-    void setFooterHeight(float height);
+    void setHeaderHeight(unrestricted float height);
+    void setFooterHeight(unrestricted float height);
+
+    void setTopContentInset(unrestricted float contentInset);
 
 #if defined(ENABLE_FULLSCREEN_API) && ENABLE_FULLSCREEN_API
     void webkitWillEnterFullScreenForElement(Element element);
@@ -230,6 +235,11 @@
     //  startTrackingRepaints, repaintRectsAsText, stopTrackingRepaints.
     [RaisesException] void startTrackingRepaints();
     [RaisesException] void stopTrackingRepaints();
+
+    // |node| should be Document, HTMLIFrameElement, or unspecified.
+    // If |node| is an HTMLIFrameElement, it assumes node.contentDocument is
+    // specified without security checks. Unspecified means this document.
+    [RaisesException] void updateLayoutIgnorePendingStylesheetsAndRunPostLayoutTasks(optional Node node);
 
     // Returns a string with information about the mouse cursor used at the specified client location.
     [RaisesException] DOMString getCurrentCursorInfo();
@@ -258,7 +268,7 @@
 
     [Conditional=VIDEO] TimeRanges createTimeRanges(Float32Array startTimes, Float32Array
      endTimes);
-    [Conditional=VIDEO] double closestTimeToTimeRanges(double time, TimeRanges ranges);
+    [Conditional=VIDEO] unrestricted double closestTimeToTimeRanges(unrestricted double time, TimeRanges ranges);
 
     boolean isSelectPopupVisible(Node node);
 
@@ -267,12 +277,20 @@
 #endif
 
     [RaisesException] boolean isPluginUnavailabilityIndicatorObscured(Element element);
+    [RaisesException] boolean isPluginSnapshotted(Element element);
 
     [RaisesException] ClientRect selectionBounds();
-    
-    [Conditional=MEDIA_SOURCE] void initializeMockMediaSource();
 
-    void beginMediaSessionInterruption();
-    void endMediaSessionInterruption(DOMString flags);
-    [RaisesException] void setMediaSessionRestrictions(DOMString mediaType, DOMString restrictions);
+    [Conditional=MEDIA_SOURCE] void initializeMockMediaSource();
+    [Conditional=MEDIA_SOURCE] DOMString[] bufferedSamplesForTrackID(SourceBuffer buffer, DOMString trackID);
+
+    [Conditional=VIDEO] void beginMediaSessionInterruption();
+    [Conditional=VIDEO] void endMediaSessionInterruption(DOMString flags);
+    [Conditional=VIDEO] void applicationWillEnterForeground();
+    [Conditional=VIDEO] void applicationWillEnterBackground();
+    [Conditional=VIDEO, RaisesException] void setMediaSessionRestrictions(DOMString mediaType, DOMString restrictions);
+    [Conditional=VIDEO, RaisesException] void postRemoteControlCommand(DOMString command);
+    
+    [Conditional=VIDEO] void simulateSystemSleep();
+    [Conditional=VIDEO] void simulateSystemWake();
 };

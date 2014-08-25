@@ -20,7 +20,6 @@
 #include "config.h"
 #include "SVGTextQuery.h"
 
-#if ENABLE(SVG)
 #include "FloatConversion.h"
 #include "InlineFlowBox.h"
 #include "RenderBlockFlow.h"
@@ -293,7 +292,7 @@ bool SVGTextQuery::subStringLengthCallback(Data* queryData, const SVGTextFragmen
     if (!mapStartEndPositionsIntoFragmentCoordinates(queryData, fragment, startPosition, endPosition))
         return false;
 
-    SVGTextMetrics metrics = SVGTextMetrics::measureCharacterRange(queryData->textRenderer, fragment.characterOffset + startPosition, endPosition - startPosition);
+    SVGTextMetrics metrics = SVGTextMetrics::measureCharacterRange(*queryData->textRenderer, fragment.characterOffset + startPosition, endPosition - startPosition);
     data->subStringLength += queryData->isVerticalText ? metrics.height() : metrics.width();
     return false;
 }
@@ -331,7 +330,7 @@ bool SVGTextQuery::startPositionOfCharacterCallback(Data* queryData, const SVGTe
     data->startPosition = FloatPoint(fragment.x, fragment.y);
 
     if (startPosition) {
-        SVGTextMetrics metrics = SVGTextMetrics::measureCharacterRange(queryData->textRenderer, fragment.characterOffset, startPosition);
+        SVGTextMetrics metrics = SVGTextMetrics::measureCharacterRange(*queryData->textRenderer, fragment.characterOffset, startPosition);
         if (queryData->isVerticalText)
             data->startPosition.move(0, metrics.height());
         else
@@ -379,7 +378,7 @@ bool SVGTextQuery::endPositionOfCharacterCallback(Data* queryData, const SVGText
 
     data->endPosition = FloatPoint(fragment.x, fragment.y);
 
-    SVGTextMetrics metrics = SVGTextMetrics::measureCharacterRange(queryData->textRenderer, fragment.characterOffset, startPosition + 1);
+    SVGTextMetrics metrics = SVGTextMetrics::measureCharacterRange(*queryData->textRenderer, fragment.characterOffset, startPosition + 1);
     if (queryData->isVerticalText)
         data->endPosition.move(0, metrics.height());
     else
@@ -466,14 +465,14 @@ static inline void calculateGlyphBoundaries(SVGTextQuery::Data* queryData, const
     extent.setLocation(FloatPoint(fragment.x, fragment.y - queryData->textRenderer->scaledFont().fontMetrics().floatAscent() / scalingFactor));
 
     if (startPosition) {
-        SVGTextMetrics metrics = SVGTextMetrics::measureCharacterRange(queryData->textRenderer, fragment.characterOffset, startPosition);
+        SVGTextMetrics metrics = SVGTextMetrics::measureCharacterRange(*queryData->textRenderer, fragment.characterOffset, startPosition);
         if (queryData->isVerticalText)
             extent.move(0, metrics.height());
         else
             extent.move(metrics.width(), 0);
     }
 
-    SVGTextMetrics metrics = SVGTextMetrics::measureCharacterRange(queryData->textRenderer, fragment.characterOffset + startPosition, 1);
+    SVGTextMetrics metrics = SVGTextMetrics::measureCharacterRange(*queryData->textRenderer, fragment.characterOffset + startPosition, 1);
     extent.setSize(FloatSize(metrics.width(), metrics.height()));
 
     AffineTransform fragmentTransform;
@@ -551,5 +550,3 @@ int SVGTextQuery::characterNumberAtPosition(const SVGPoint& position) const
 }
 
 }
-
-#endif

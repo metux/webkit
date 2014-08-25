@@ -2,7 +2,7 @@
  * Copyright (C) 1999 Lars Knoll (knoll@kde.org)
  *           (C) 1999 Antti Koivisto (koivisto@kde.org)
  *           (C) 2001 Dirk Mueller (mueller@kde.org)
- * Copyright (C) 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011, 2013 Apple Inc. All rights reserved.
+ * Copyright (C) 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011, 2013, 2014 Apple Inc. All rights reserved.
  *           (C) 2006 Alexey Proskuryakov (ap@nypop.com)
  * Copyright (C) 2007 Samuel Weinig (sam@webkit.org)
  * Copyright (C) 2009, 2010, 2011, 2012 Google Inc. All rights reserved.
@@ -471,7 +471,7 @@ void InputType::forwardEvent(Event*)
 
 bool InputType::shouldSubmitImplicitly(Event* event)
 {
-    return event->isKeyboardEvent() && event->type() == eventNames().keypressEvent && static_cast<KeyboardEvent*>(event)->charCode() == '\r';
+    return event->isKeyboardEvent() && event->type() == eventNames().keypressEvent && toKeyboardEvent(event)->charCode() == '\r';
 }
 
 PassRefPtr<HTMLFormElement> InputType::formForSubmission() const
@@ -481,7 +481,7 @@ PassRefPtr<HTMLFormElement> InputType::formForSubmission() const
 
 RenderPtr<RenderElement> InputType::createInputRenderer(PassRef<RenderStyle> style)
 {
-    return RenderPtr<RenderElement>(RenderElement::createFor(element(), std::move(style)));
+    return RenderPtr<RenderElement>(RenderElement::createFor(element(), WTF::move(style)));
 }
 
 void InputType::blur()
@@ -601,6 +601,10 @@ void InputType::altAttributeChanged()
 }
 
 void InputType::srcAttributeChanged()
+{
+}
+
+void InputType::maxResultsAttributeChanged()
 {
 }
 
@@ -751,11 +755,6 @@ bool InputType::shouldResetOnDocumentActivation()
 }
 
 bool InputType::shouldRespectListAttribute()
-{
-    return false;
-}
-
-bool InputType::shouldRespectSpeechAttribute()
 {
     return false;
 }
@@ -1147,14 +1146,6 @@ void InputType::stepUpFromRenderer(int n)
                 applyStep(n + 1, AnyIsDefaultStep, DispatchInputAndChangeEvent, IGNORE_EXCEPTION);
         } else
             applyStep(n, AnyIsDefaultStep, DispatchInputAndChangeEvent, IGNORE_EXCEPTION);
-    }
-}
-
-void InputType::observeFeatureIfVisible(FeatureObserver::Feature feature) const
-{
-    if (RenderStyle* style = element().renderStyle()) {
-        if (style->visibility() != HIDDEN)
-            FeatureObserver::observe(&element().document(), feature);
     }
 }
 

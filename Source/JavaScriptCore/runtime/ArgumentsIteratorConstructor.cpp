@@ -31,10 +31,11 @@
 #include "JSCJSValueInlines.h"
 #include "JSCellInlines.h"
 #include "JSGlobalObject.h"
+#include "StructureInlines.h"
 
 namespace JSC {
 
-const ClassInfo ArgumentsIteratorConstructor::s_info = { "ArgumentsIterator", &Base::s_info, 0, 0, CREATE_METHOD_TABLE(ArgumentsIteratorConstructor) };
+const ClassInfo ArgumentsIteratorConstructor::s_info = { "ArgumentsIterator", &Base::s_info, 0, CREATE_METHOD_TABLE(ArgumentsIteratorConstructor) };
 
 void ArgumentsIteratorConstructor::finishCreation(VM& vm, ArgumentsIteratorPrototype* prototype)
 {

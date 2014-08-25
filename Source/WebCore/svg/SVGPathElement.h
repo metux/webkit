@@ -21,7 +21,6 @@
 #ifndef SVGPathElement_h
 #define SVGPathElement_h
 
-#if ENABLE(SVG)
 #include "SVGAnimatedBoolean.h"
 #include "SVGAnimatedNumber.h"
 #include "SVGExternalResourcesRequired.h"
@@ -102,7 +101,6 @@ private:
     SVGPathElement(const QualifiedName&, Document&);
 
     virtual bool isValid() const override { return SVGTests::isValid(); }
-    virtual bool supportsFocus() const override { return true; }
 
     bool isSupportedAttribute(const QualifiedName&);
     virtual void parseAttribute(const QualifiedName&, const AtomicString&) override;
@@ -135,5 +133,4 @@ NODE_TYPE_CASTS(SVGPathElement)
 
 } // namespace WebCore
 
-#endif // ENABLE(SVG)
 #endif

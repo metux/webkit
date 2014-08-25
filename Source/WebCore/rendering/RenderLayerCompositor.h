@@ -13,7 +13,7 @@
  * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -25,8 +25,6 @@
 
 #ifndef RenderLayerCompositor_h
 #define RenderLayerCompositor_h
-
-#if USE(ACCELERATED_COMPOSITING)
 
 #include "ChromeClient.h"
 #include "GraphicsLayerClient.h"
@@ -83,7 +81,7 @@ enum {
     CompositingReasonPerspective                            = 1 << 21,
     CompositingReasonPreserve3D                             = 1 << 22,
     CompositingReasonRoot                                   = 1 << 23,
-    CompositingReasonBlending                               = 1 << 24
+    CompositingReasonIsolatesCompositedBlendingDescendants  = 1 << 24,
 };
 typedef unsigned CompositingReasons;
 
@@ -143,9 +141,6 @@ public:
     // we discover that an iframe is overlapped during painting).
     void scheduleCompositingLayerUpdate();
 
-    // Update the maps that we use to distribute layers to coresponding regions.
-    void updateRenderFlowThreadLayersIfNeeded();
-    
     // Update the compositing state of the given layer. Returns true if that state changed.
     enum CompositingChangeRepaint { CompositingChangeRepaintNow, CompositingChangeWillRepaintLater };
     bool updateLayerCompositingState(RenderLayer&, CompositingChangeRepaint = CompositingChangeRepaintNow);
@@ -165,10 +160,6 @@ public:
     bool needsFixedRootBackgroundLayer(const RenderLayer&) const;
     GraphicsLayer* fixedRootBackgroundLayer() const;
     
-    // Return the bounding box required for compositing layer and its childern, relative to ancestorLayer.
-    // If layerBoundingBox is not 0, on return it contains the bounding box of this layer only.
-    LayoutRect calculateCompositedBounds(const RenderLayer&, const RenderLayer& ancestorLayer) const;
-
     // Repaint the appropriate layers when the given RenderLayer starts or stops being composited.
     void repaintOnCompositingChange(RenderLayer&);
     
@@ -181,15 +172,17 @@ public:
     // Get the nearest ancestor layer that has overflow or clip, but is not a stacking context
     RenderLayer* enclosingNonStackingClippingLayer(const RenderLayer&) const;
 
-    // Repaint parts of all composited layers that intersect the given absolute rectangle (or the entire layer if the pointer is null).
-    void repaintCompositedLayers(const IntRect* = 0);
+    // Repaint all composited layers.
+    void repaintCompositedLayers();
 
     // Returns true if the given layer needs it own backing store.
-    bool requiresOwnBackingStore(const RenderLayer&, const RenderLayer* compositingAncestorLayer, const IntRect& layerCompositedBoundsInAncestor, const IntRect& ancestorCompositedBounds) const;
+    bool requiresOwnBackingStore(const RenderLayer&, const RenderLayer* compositingAncestorLayer, const LayoutRect& layerCompositedBoundsInAncestor, const LayoutRect& ancestorCompositedBounds) const;
 
     RenderLayer& rootRenderLayer() const;
     GraphicsLayer* rootGraphicsLayer() const;
     GraphicsLayer* scrollLayer() const;
+    GraphicsLayer* clipLayer() const;
+    GraphicsLayer* rootContentLayer() const;
 
 #if ENABLE(RUBBER_BANDING)
     GraphicsLayer* headerLayer() const;
@@ -247,12 +240,13 @@ public:
     virtual float deviceScaleFactor() const override;
     virtual float contentsScaleMultiplierForNewTiles(const GraphicsLayer*) const override;
     virtual float pageScaleFactor() const override;
+    virtual float zoomedOutPageScaleFactor() const override;
+
     virtual void didCommitChangesForLayer(const GraphicsLayer*) const override;
     virtual void notifyFlushBeforeDisplayRefresh(const GraphicsLayer*) override;
 
     void layerTiledBackingUsageChanged(const GraphicsLayer*, bool /*usingTiledBacking*/);
     
-    bool keepLayersPixelAligned() const;
     bool acceleratedDrawingEnabled() const { return m_acceleratedDrawingEnabled; }
 
     void deviceOrPageScaleFactorChanged();
@@ -272,19 +266,22 @@ public:
     GraphicsLayer* updateLayerForFooter(bool wantsLayer);
 #endif
 
-    void updateViewportConstraintStatus(RenderLayer&);
-    void removeViewportConstrainedLayer(RenderLayer&);
+    ScrollableArea* scrollableAreaForScrollLayerID(ScrollingNodeID) const;
+
+    void updateScrollCoordinatedStatus(RenderLayer&);
+    void removeFromScrollCoordinatedLayers(RenderLayer&);
+
+    void willRemoveScrollingLayerWithBacking(RenderLayer&, RenderLayerBacking&);
+    void didAddScrollingLayer(RenderLayer&);
 
 #if PLATFORM(IOS)
     void registerAllViewportConstrainedLayers();
     void unregisterAllViewportConstrainedLayers();
 
-    void scrollingLayerAddedOrUpdated(RenderLayer*);
-    void scrollingLayerRemoved(RenderLayer*, PlatformLayer* scrollingLayer, PlatformLayer* contentsLayer);
-
     void registerAllScrollingLayers();
     void unregisterAllScrollingLayers();
 #endif
+
     void resetTrackedRepaintRects();
     void setTracksRepaints(bool);
 
@@ -301,7 +298,8 @@ public:
     
     void didPaintBacking(RenderLayerBacking*);
 
-    bool mainFrameBackingIsTiledWithMargin() const;
+    void setRootExtendedBackgroundColor(const Color&);
+    Color rootExtendedBackgroundColor() const { return m_rootExtendedBackgroundColor; }
 
 private:
     class OverlapMap;
@@ -309,14 +307,13 @@ private:
     // GraphicsLayerClient implementation
     virtual void notifyAnimationStarted(const GraphicsLayer*, double) override { }
     virtual void notifyFlushRequired(const GraphicsLayer*) override;
-    virtual void paintContents(const GraphicsLayer*, GraphicsContext&, GraphicsLayerPaintingPhase, const IntRect&) override;
-
+    virtual void paintContents(const GraphicsLayer*, GraphicsContext&, GraphicsLayerPaintingPhase, const FloatRect&) override;
+    virtual void customPositionForVisibleRectComputation(const GraphicsLayer*, FloatPoint&) const override;
     virtual bool isTrackingRepaints() const override;
     
     // GraphicsLayerUpdaterClient implementation
-    virtual void flushLayers(GraphicsLayerUpdater*) override;
-    virtual void customPositionForVisibleRectComputation(const GraphicsLayer*, FloatPoint&) const override;
-    
+    virtual void flushLayersSoon(GraphicsLayerUpdater*) override;
+
     // Whether the given RL needs a compositing layer.
     bool needsToBeComposited(const RenderLayer&, RenderLayer::ViewportConstrainedNotCompositedReason* = 0) const;
     // Whether the layer has an intrinsic need for compositing layer.
@@ -328,9 +325,10 @@ private:
     bool updateBacking(RenderLayer&, CompositingChangeRepaint shouldRepaint);
 
     void clearBackingForLayerIncludingDescendants(RenderLayer&);
+    void setIsInWindowForLayerIncludingDescendants(RenderLayer&, bool isInWindow);
 
-    // Repaint the given rect (which is layer's coords), and regions of child layers that intersect that rect.
-    void recursiveRepaintLayer(RenderLayer&, const IntRect* = nullptr);
+    // Repaint this and its child layers.
+    void recursiveRepaintLayer(RenderLayer&);
 
     void addToOverlapMap(OverlapMap&, RenderLayer&, IntRect& layerBounds, bool& boundsComputed);
     void addToOverlapMapRecursive(OverlapMap&, RenderLayer&, RenderLayer* ancestorLayer = nullptr);
@@ -363,6 +361,7 @@ private:
     bool layerHas3DContent(const RenderLayer&) const;
     bool isRunningAcceleratedTransformAnimation(RenderLayerModelObject&) const;
 
+    void appendOverlayLayers(Vector<GraphicsLayer*>&);
     bool hasAnyAdditionalCompositedLayers(const RenderLayer& rootLayer) const;
 
     void ensureRootLayer();
@@ -377,32 +376,38 @@ private:
 
     void updateScrollLayerPosition();
 
+    FloatPoint positionForClipLayer() const;
+
     void notifyIFramesOfCompositingChange();
 
     bool isFlushingLayers() const { return m_flushingLayers; }
+    void updateScrollCoordinatedLayersAfterFlushIncludingSubframes();
+    void updateScrollCoordinatedLayersAfterFlush();
     
     Page* page() const;
-    TiledBacking* pageTiledBacking() const;
     
     GraphicsLayerFactory* graphicsLayerFactory() const;
     ScrollingCoordinator* scrollingCoordinator() const;
 
-    // Whether a running transition or animation enforces the need for a compositing layer.
+#if USE(REQUEST_ANIMATION_FRAME_DISPLAY_MONITOR)
+    PassRefPtr<DisplayRefreshMonitor> createDisplayRefreshMonitor(PlatformDisplayID) const;
+#endif
+
     bool requiresCompositingForAnimation(RenderLayerModelObject&) const;
     bool requiresCompositingForTransform(RenderLayerModelObject&) const;
+    bool requiresCompositingForBackfaceVisibility(RenderLayerModelObject&) const;
     bool requiresCompositingForVideo(RenderLayerModelObject&) const;
     bool requiresCompositingForCanvas(RenderLayerModelObject&) const;
     bool requiresCompositingForPlugin(RenderLayerModelObject&) const;
     bool requiresCompositingForFrame(RenderLayerModelObject&) const;
     bool requiresCompositingForFilters(RenderLayerModelObject&) const;
-    bool requiresCompositingForBlending(RenderLayerModelObject&) const;
     bool requiresCompositingForScrollableFrame() const;
     bool requiresCompositingForPosition(RenderLayerModelObject&, const RenderLayer&, RenderLayer::ViewportConstrainedNotCompositedReason* = 0) const;
     bool requiresCompositingForOverflowScrolling(const RenderLayer&) const;
-    bool requiresCompositingForIndirectReason(RenderLayerModelObject&, bool hasCompositedDescendants, bool hasBlendedDescendants, bool has3DTransformedDescendants, RenderLayer::IndirectCompositingReason&) const;
+    bool requiresCompositingForIndirectReason(RenderLayerModelObject&, bool hasCompositedDescendants, bool has3DTransformedDescendants, RenderLayer::IndirectCompositingReason&) const;
 
 #if PLATFORM(IOS)
-    bool requiresCompositingForScrolling(RenderLayerModelObject&) const;
+    bool requiresCompositingForScrolling(const RenderLayer&) const;
 
     void updateCustomLayersAfterFlush();
 
@@ -410,10 +415,18 @@ private:
 
 #endif
 
-    void addViewportConstrainedLayer(RenderLayer&);
-    void registerOrUpdateViewportConstrainedLayer(RenderLayer&);
-    void unregisterViewportConstrainedLayer(RenderLayer&);
+    enum ScrollCoordinationReason {
+        FixedOrSticky = 1 << 0,
+        Scrolling = 1 << 1
+    };
+    typedef unsigned ScrollCoordinationReasons;
 
+    void updateScrollCoordinationForThisFrame(ScrollingNodeID);
+    ScrollingNodeID attachScrollingNode(RenderLayer&, ScrollingNodeType, ScrollingNodeID parentNodeID);
+    void updateScrollCoordinatedLayer(RenderLayer&, ScrollCoordinationReasons);
+    void detachScrollCoordinatedLayer(RenderLayer&);
+    void reattachSubframeScrollLayers();
+    
     FixedPositionViewportConstraints computeFixedViewportConstraints(RenderLayer&) const;
     StickyPositionViewportConstraints computeStickyViewportConstraints(RenderLayer&) const;
 
@@ -426,7 +439,12 @@ private:
     bool requiresContentShadowLayer() const;
 #endif
 
+    // True if the FrameView uses a ScrollingCoordinator.
     bool hasCoordinatedScrolling() const;
+
+    bool isAsyncScrollableStickyLayer(const RenderLayer&, const RenderLayer** enclosingAcceleratedOverflowLayer = nullptr) const;
+    bool isViewportConstrainedFixedOrStickyLayer(const RenderLayer&) const;
+    
     bool shouldCompositeOverflowControls() const;
 
     void scheduleLayerFlushNow();
@@ -467,6 +485,7 @@ private:
     bool m_shouldFlushOnReattach;
     bool m_forceCompositingMode;
     bool m_inPostLayoutUpdate; // true when it's OK to trust layout information (e.g. layer sizes and positions)
+    bool m_subframeScrollLayersNeedReattach;
 
     bool m_isTrackingRepaints; // Used for testing.
 
@@ -482,8 +501,8 @@ private:
     HashSet<RenderLayer*> m_scrollingLayers;
     HashSet<RenderLayer*> m_scrollingLayersNeedingUpdate;
 #endif
-    HashSet<RenderLayer*> m_viewportConstrainedLayers;
-    HashSet<RenderLayer*> m_viewportConstrainedLayersNeedingUpdate;
+    HashSet<RenderLayer*> m_scrollCoordinatedLayers;
+    HashSet<RenderLayer*> m_scrollCoordinatedLayersNeedingUpdate;
 
     // Enclosing layer for overflow controls and the clipping layer
     std::unique_ptr<GraphicsLayer> m_overflowControlsHostLayer;
@@ -501,7 +520,7 @@ private:
     std::unique_ptr<GraphicsLayer> m_layerForFooter;
 #endif
 
-    OwnPtr<GraphicsLayerUpdater> m_layerUpdater; // Updates tiled layer visible area periodically while animations are running.
+    std::unique_ptr<GraphicsLayerUpdater> m_layerUpdater; // Updates tiled layer visible area periodically while animations are running.
 
     Timer<RenderLayerCompositor> m_layerFlushTimer;
     bool m_layerFlushThrottlingEnabled;
@@ -517,11 +536,13 @@ private:
     double m_obligatoryBackingStoreBytes;
     double m_secondaryBackingStoreBytes;
 #endif
+
+    Color m_rootExtendedBackgroundColor;
+
+    HashMap<ScrollingNodeID, RenderLayer*> m_scrollingNodeToLayerMap;
 };
 
 
 } // namespace WebCore
-
-#endif // USE(ACCELERATED_COMPOSITING)
 
 #endif // RenderLayerCompositor_h

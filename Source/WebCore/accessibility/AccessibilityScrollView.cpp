@@ -51,7 +51,7 @@ AccessibilityScrollView::~AccessibilityScrollView()
 void AccessibilityScrollView::detach(AccessibilityDetachmentType detachmentType, AXObjectCache* cache)
 {
     AccessibilityObject::detach(detachmentType, cache);
-    m_scrollView = 0;
+    m_scrollView = nullptr;
 }
 
 PassRefPtr<AccessibilityScrollView> AccessibilityScrollView::create(ScrollView* view)
@@ -70,7 +70,7 @@ AccessibilityObject* AccessibilityScrollView::scrollBar(AccessibilityOrientation
         return m_horizontalScrollbar ? m_horizontalScrollbar.get() : 0;
     }
     
-    return 0;
+    return nullptr;
 }
 
 // If this is WebKit1 then the native scroll view needs to return the
@@ -124,14 +124,14 @@ void AccessibilityScrollView::updateScrollbars()
         m_horizontalScrollbar = addChildScrollbar(m_scrollView->horizontalScrollbar());
     else if (!m_scrollView->horizontalScrollbar() && m_horizontalScrollbar) {
         removeChildScrollbar(m_horizontalScrollbar.get());
-        m_horizontalScrollbar = 0;
+        m_horizontalScrollbar = nullptr;
     }
 
     if (m_scrollView->verticalScrollbar() && !m_verticalScrollbar)
         m_verticalScrollbar = addChildScrollbar(m_scrollView->verticalScrollbar());
     else if (!m_scrollView->verticalScrollbar() && m_verticalScrollbar) {
         removeChildScrollbar(m_verticalScrollbar.get());
-        m_verticalScrollbar = 0;
+        m_verticalScrollbar = nullptr;
     }
 }
     
@@ -147,9 +147,13 @@ void AccessibilityScrollView::removeChildScrollbar(AccessibilityObject* scrollba
 AccessibilityScrollbar* AccessibilityScrollView::addChildScrollbar(Scrollbar* scrollbar)
 {
     if (!scrollbar)
-        return 0;
+        return nullptr;
     
-    AccessibilityScrollbar* scrollBarObject = toAccessibilityScrollbar(axObjectCache()->getOrCreate(scrollbar));
+    AXObjectCache* cache = axObjectCache();
+    if (!cache)
+        return nullptr;
+
+    AccessibilityScrollbar* scrollBarObject = toAccessibilityScrollbar(cache->getOrCreate(scrollbar));
     scrollBarObject->setParent(this);
     m_children.append(scrollBarObject);
     return scrollBarObject;
@@ -158,8 +162,8 @@ AccessibilityScrollbar* AccessibilityScrollView::addChildScrollbar(Scrollbar* sc
 void AccessibilityScrollView::clearChildren()
 {
     AccessibilityObject::clearChildren();
-    m_verticalScrollbar = 0;
-    m_horizontalScrollbar = 0;
+    m_verticalScrollbar = nullptr;
+    m_horizontalScrollbar = nullptr;
 }
 
 bool AccessibilityScrollView::computeAccessibilityIsIgnored() const
@@ -186,20 +190,23 @@ void AccessibilityScrollView::addChildren()
 AccessibilityObject* AccessibilityScrollView::webAreaObject() const
 {
     if (!m_scrollView || !m_scrollView->isFrameView())
-        return 0;
+        return nullptr;
     
     Document* doc = toFrameView(m_scrollView)->frame().document();
     if (!doc || !doc->hasLivingRenderTree())
-        return 0;
+        return nullptr;
 
-    return axObjectCache()->getOrCreate(doc);
+    if (AXObjectCache* cache = axObjectCache())
+        return cache->getOrCreate(doc);
+    
+    return nullptr;
 }
 
 AccessibilityObject* AccessibilityScrollView::accessibilityHitTest(const IntPoint& point) const
 {
     AccessibilityObject* webArea = webAreaObject();
     if (!webArea)
-        return 0;
+        return nullptr;
     
     if (m_horizontalScrollbar && m_horizontalScrollbar->elementRect().contains(point))
         return m_horizontalScrollbar.get();
@@ -214,13 +221,15 @@ LayoutRect AccessibilityScrollView::elementRect() const
     if (!m_scrollView)
         return LayoutRect();
 
-    return m_scrollView->frameRect();
+    LayoutRect rect = m_scrollView->frameRect();
+    rect.setY(rect.y() + m_scrollView->topContentInset());
+    return rect;
 }
 
 FrameView* AccessibilityScrollView::documentFrameView() const
 {
     if (!m_scrollView || !m_scrollView->isFrameView())
-        return 0;
+        return nullptr;
     
     return toFrameView(m_scrollView);
 }    
@@ -228,25 +237,33 @@ FrameView* AccessibilityScrollView::documentFrameView() const
 AccessibilityObject* AccessibilityScrollView::parentObject() const
 {
     if (!m_scrollView || !m_scrollView->isFrameView())
-        return 0;
-    
+        return nullptr;
+
+    AXObjectCache* cache = axObjectCache();
+    if (!cache)
+        return nullptr;
+
     HTMLFrameOwnerElement* owner = toFrameView(m_scrollView)->frame().ownerElement();
     if (owner && owner->renderer())
-        return axObjectCache()->getOrCreate(owner);
+        return cache->getOrCreate(owner);
 
-    return 0;
+    return nullptr;
 }
     
 AccessibilityObject* AccessibilityScrollView::parentObjectIfExists() const
 {
     if (!m_scrollView || !m_scrollView->isFrameView())
-        return 0;
+        return nullptr;
     
+    AXObjectCache* cache = axObjectCache();
+    if (!cache)
+        return nullptr;
+
     HTMLFrameOwnerElement* owner = toFrameView(m_scrollView)->frame().ownerElement();
     if (owner && owner->renderer())
-        return axObjectCache()->get(owner);
+        return cache->get(owner);
     
-    return 0;
+    return nullptr;
 }
 
 ScrollableArea* AccessibilityScrollView::getScrollableAreaIfScrollable() const

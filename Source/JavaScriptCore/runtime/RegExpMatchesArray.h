@@ -52,7 +52,7 @@ namespace JSC {
     protected:
         void finishCreation(VM&);
 
-        static const unsigned StructureFlags = OverridesGetOwnPropertySlot | OverridesVisitChildren | OverridesGetPropertyNames | Base::StructureFlags;
+        static const unsigned StructureFlags = OverridesGetOwnPropertySlot | OverridesGetPropertyNames | Base::StructureFlags;
 
     private:
         ALWAYS_INLINE void reifyAllPropertiesIfNecessary(ExecState* exec)
@@ -134,6 +134,11 @@ namespace JSC {
         MatchResult m_result;
         ReifiedState m_state;
 };
+
+inline bool isRegExpMatchesArray(JSValue value)
+{
+    return value.isCell() && value.asCell()->classInfo() == RegExpMatchesArray::info();
+}
 
 }
 

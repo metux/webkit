@@ -10,7 +10,7 @@
  * 2.  Redistributions in binary form must reproduce the above copyright
  *     notice, this list of conditions and the following disclaimer in the
  *     documentation and/or other materials provided with the distribution. 
- * 3.  Neither the name of Apple Computer, Inc. ("Apple") nor the names of
+ * 3.  Neither the name of Apple Inc. ("Apple") nor the names of
  *     its contributors may be used to endorse or promote products derived
  *     from this software without specific prior written permission. 
  *
@@ -37,6 +37,8 @@
 #include <stdint.h>
 
 namespace WTF {
+
+class PrintStream;
 
 class WTF_EXPORT_PRIVATE MediaTime {
     WTF_MAKE_FAST_ALLOCATED;
@@ -97,9 +99,11 @@ public:
     const int64_t& timeValue() const { return m_timeValue; }
     const int32_t& timeScale() const { return m_timeScale; }
 
+    void dump(PrintStream& out) const;
+
     friend WTF_EXPORT_PRIVATE MediaTime abs(const MediaTime& rhs);
 private:
-    static const int32_t DefaultTimeScale = 6000;
+    static const int32_t DefaultTimeScale = 10000000;
     static const int32_t MaximumTimeScale;
 
     void setTimeScale(int32_t);

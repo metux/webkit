@@ -10,10 +10,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -53,16 +53,16 @@ using namespace HTMLNames;
 
 bool JSHTMLDocument::canGetItemsForName(ExecState*, HTMLDocument* document, PropertyName propertyName)
 {
-    AtomicStringImpl* atomicPropertyName = findAtomicString(propertyName);
+    AtomicStringImpl* atomicPropertyName = propertyName.publicName();
     return atomicPropertyName && document->hasDocumentNamedItem(*atomicPropertyName);
 }
 
-EncodedJSValue JSHTMLDocument::nameGetter(ExecState* exec, EncodedJSValue slotBase, EncodedJSValue, PropertyName propertyName)
+EncodedJSValue JSHTMLDocument::nameGetter(ExecState* exec, JSObject* slotBase, EncodedJSValue, PropertyName propertyName)
 {
-    JSHTMLDocument* thisObj = jsCast<JSHTMLDocument*>(JSValue::decode(slotBase));
+    JSHTMLDocument* thisObj = jsCast<JSHTMLDocument*>(slotBase);
     HTMLDocument& document = thisObj->impl();
 
-    AtomicStringImpl* atomicPropertyName = findAtomicString(propertyName);
+    AtomicStringImpl* atomicPropertyName = propertyName.publicName();
     if (!atomicPropertyName || !document.hasDocumentNamedItem(*atomicPropertyName))
         return JSValue::encode(jsUndefined());
 
@@ -113,7 +113,7 @@ JSValue JSHTMLDocument::open(ExecState* exec)
                 CallType callType = ::getCallData(function, callData);
                 if (callType == CallTypeNone)
                     return throwTypeError(exec);
-                return JSMainThreadExecState::call(exec, function, callType, callData, wrapper, ArgList(exec));
+                return JSC::call(exec, function, callType, callData, wrapper, ArgList(exec));
             }
         }
         return jsUndefined();

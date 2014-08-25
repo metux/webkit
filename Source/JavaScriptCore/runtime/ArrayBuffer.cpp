@@ -28,7 +28,7 @@
 
 #include "ArrayBufferNeuteringWatchpoint.h"
 #include "JSArrayBufferView.h"
-#include "Operations.h"
+#include "JSCInlines.h"
 #include <wtf/RefPtr.h>
 
 namespace JSC {
@@ -57,7 +57,7 @@ bool ArrayBuffer::transfer(ArrayBufferContents& result)
         if (JSArrayBufferView* view = jsDynamicCast<JSArrayBufferView*>(cell))
             view->neuter();
         else if (ArrayBufferNeuteringWatchpoint* watchpoint = jsDynamicCast<ArrayBufferNeuteringWatchpoint*>(cell))
-            watchpoint->set()->fireAll();
+            watchpoint->fireAll();
     }
     return true;
 }

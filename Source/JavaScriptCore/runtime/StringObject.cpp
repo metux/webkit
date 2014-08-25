@@ -23,14 +23,14 @@
 
 #include "Error.h"
 #include "JSGlobalObject.h"
-#include "Operations.h"
+#include "JSCInlines.h"
 #include "PropertyNameArray.h"
 
 namespace JSC {
 
 STATIC_ASSERT_IS_TRIVIALLY_DESTRUCTIBLE(StringObject);
 
-const ClassInfo StringObject::s_info = { "String", &JSWrapperObject::s_info, 0, 0, CREATE_METHOD_TABLE(StringObject) };
+const ClassInfo StringObject::s_info = { "String", &JSWrapperObject::s_info, 0, CREATE_METHOD_TABLE(StringObject) };
 
 StringObject::StringObject(VM& vm, Structure* structure)
     : JSWrapperObject(vm, structure)
@@ -150,7 +150,7 @@ void StringObject::getOwnPropertyNames(JSObject* object, ExecState* exec, Proper
     int size = thisObject->internalValue()->length();
     for (int i = 0; i < size; ++i)
         propertyNames.add(Identifier::from(exec, i));
-    if (mode == IncludeDontEnumProperties)
+    if (shouldIncludeDontEnumProperties(mode))
         propertyNames.add(exec->propertyNames().length);
     return JSObject::getOwnPropertyNames(thisObject, exec, propertyNames, mode);
 }

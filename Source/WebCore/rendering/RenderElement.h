@@ -23,9 +23,12 @@
 #ifndef RenderElement_h
 #define RenderElement_h
 
+#include "AnimationController.h"
 #include "RenderObject.h"
 
 namespace WebCore {
+
+class ControlStates;
 
 class RenderElement : public RenderObject {
 public:
@@ -64,7 +67,7 @@ public:
     virtual bool isChildAllowed(const RenderObject&, const RenderStyle&) const { return true; }
     virtual void addChild(RenderObject* newChild, RenderObject* beforeChild = 0);
     virtual void addChildIgnoringContinuation(RenderObject* newChild, RenderObject* beforeChild = 0) { return addChild(newChild, beforeChild); }
-    virtual void removeChild(RenderObject&);
+    virtual RenderObject* removeChild(RenderObject&);
 
     // The following functions are used when the render tree hierarchy changes to make sure layers get
     // properly added and removed. Since containership can be implemented by any subclass, and since a hierarchy
@@ -76,7 +79,7 @@ public:
 
     enum NotifyChildrenType { NotifyChildren, DontNotifyChildren };
     void insertChildInternal(RenderObject*, RenderObject* beforeChild, NotifyChildrenType);
-    void removeChildInternal(RenderObject&, NotifyChildrenType);
+    RenderObject* removeChildInternal(RenderObject&, NotifyChildrenType);
 
     virtual RenderElement* hoverAncestor() const;
 
@@ -107,7 +110,7 @@ public:
 
     // Updates only the local style ptr of the object. Does not update the state of the object,
     // and so only should be called when the style is known not to have changed (or from setStyle).
-    void setStyleInternal(PassRef<RenderStyle> style) { m_style = std::move(style); }
+    void setStyleInternal(PassRef<RenderStyle> style) { m_style = WTF::move(style); }
 
     // Repaint only if our old bounds and new bounds are different. The caller may pass in newBounds and newOutlineBox if they are known.
     bool repaintAfterLayoutIfNeeded(const RenderLayerModelObject* repaintContainer, const LayoutRect& oldBounds, const LayoutRect& oldOutlineBox, const LayoutRect* newBoundsPtr = nullptr, const LayoutRect* newOutlineBoxPtr = nullptr);
@@ -141,6 +144,21 @@ public:
     bool hasBlendMode() const { return false; }
 #endif
 
+#if ENABLE(CSS_SHAPES)
+    bool hasShapeOutside() const { return style().shapeOutside(); }
+#else
+    bool hasShapeOutside() const { return false; }
+#endif
+
+    bool repaintForPausedImageAnimationsIfNeeded(const IntRect& visibleRect);
+    bool hasPausedImageAnimations() const { return m_hasPausedImageAnimations; }
+    void setHasPausedImageAnimations(bool b) { m_hasPausedImageAnimations = b; }
+
+    RenderNamedFlowThread* renderNamedFlowThreadWrapper();
+
+    void setRenderBoxNeedsLazyRepaint(bool b) { m_renderBoxNeedsLazyRepaint = b; }
+    bool renderBoxNeedsLazyRepaint() const { return m_renderBoxNeedsLazyRepaint; }
+
 protected:
     enum BaseTypeFlags {
         RenderLayerModelObjectFlag = 1 << 0,
@@ -159,7 +177,7 @@ protected:
     enum StylePropagationType { PropagateToAllChildren, PropagateToBlockChildrenOnly };
     void propagateStyleToAnonymousChildren(StylePropagationType);
 
-    LayoutUnit valueForLength(const Length&, LayoutUnit maximumValue, bool roundPercentages = false) const;
+    LayoutUnit valueForLength(const Length&, LayoutUnit maximumValue) const;
     LayoutUnit minimumValueForLength(const Length&, LayoutUnit maximumValue, bool roundPercentages = false) const;
 
     void setFirstChild(RenderObject* child) { m_firstChild = child; }
@@ -176,7 +194,13 @@ protected:
     void setRenderInlineAlwaysCreatesLineBoxes(bool b) { m_renderInlineAlwaysCreatesLineBoxes = b; }
     bool renderInlineAlwaysCreatesLineBoxes() const { return m_renderInlineAlwaysCreatesLineBoxes; }
 
+    static bool hasControlStatesForRenderer(const RenderObject*);
+    static ControlStates* controlStatesForRenderer(const RenderObject*);
+    static void removeControlStatesForRenderer(const RenderObject*);
+    static void addControlStatesForRenderer(const RenderObject*, ControlStates*);
+
 private:
+    RenderElement(ContainerNode&, PassRef<RenderStyle>, unsigned baseTypeFlags);
     void node() const = delete;
     void nonPseudoNode() const = delete;
     void generatingNode() const = delete;
@@ -198,12 +222,15 @@ private:
     StyleDifference adjustStyleDifference(StyleDifference, unsigned contextSensitiveProperties) const;
     RenderStyle* cachedFirstLineStyle() const;
 
+    virtual void newImageAnimationFrameAvailable(CachedImage&) final override;
+
     unsigned m_baseTypeFlags : 6;
     bool m_ancestorLineBoxDirty : 1;
     bool m_hasInitializedStyle : 1;
 
-    // Specific to RenderInline.
     bool m_renderInlineAlwaysCreatesLineBoxes : 1;
+    bool m_renderBoxNeedsLazyRepaint : 1;
+    bool m_hasPausedImageAnimations : 1;
 
     RenderObject* m_firstChild;
     RenderObject* m_lastChild;
@@ -216,7 +243,12 @@ private:
     static bool s_noLongerAffectsParentBlock;
 };
 
-template <> inline bool isRendererOfType<const RenderElement>(const RenderObject& renderer) { return renderer.isRenderElement(); }
+RENDER_OBJECT_TYPE_CASTS(RenderElement, isRenderElement())
+
+inline void RenderElement::setAnimatableStyle(PassRef<RenderStyle> style)
+{
+    setStyle(animation().updateAnimations(*this, WTF::move(style)));
+}
 
 inline RenderStyle& RenderElement::firstLineStyle() const
 {
@@ -240,14 +272,14 @@ inline void RenderElement::setChildNeedsLayout(MarkingBehavior markParents)
         markContainingBlocksForLayout();
 }
 
-inline LayoutUnit RenderElement::valueForLength(const Length& length, LayoutUnit maximumValue, bool roundPercentages) const
+inline LayoutUnit RenderElement::valueForLength(const Length& length, LayoutUnit maximumValue) const
 {
-    return WebCore::valueForLength(length, maximumValue, &view(), roundPercentages);
+    return WebCore::valueForLength(length, maximumValue);
 }
 
 inline LayoutUnit RenderElement::minimumValueForLength(const Length& length, LayoutUnit maximumValue, bool roundPercentages) const
 {
-    return WebCore::minimumValueForLength(length, maximumValue, &view(), roundPercentages);
+    return WebCore::minimumValueForLength(length, maximumValue, roundPercentages);
 }
 
 inline bool RenderElement::isRenderLayerModelObject() const
@@ -279,8 +311,6 @@ inline bool RenderElement::isRenderInline() const
 {
     return m_baseTypeFlags & RenderInlineFlag;
 }
-
-RENDER_OBJECT_TYPE_CASTS(RenderElement, isRenderElement())
 
 inline Element* RenderElement::generatingElement() const
 {

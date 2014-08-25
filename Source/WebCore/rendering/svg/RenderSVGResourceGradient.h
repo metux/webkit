@@ -22,12 +22,11 @@
 #ifndef RenderSVGResourceGradient_h
 #define RenderSVGResourceGradient_h
 
-#if ENABLE(SVG)
 #include "Gradient.h"
 #include "ImageBuffer.h"
 #include "RenderSVGResourceContainer.h"
 #include "SVGGradientElement.h"
-
+#include <memory>
 #include <wtf/HashMap.h>
 
 namespace WebCore {
@@ -46,7 +45,7 @@ public:
     SVGGradientElement& gradientElement() const { return static_cast<SVGGradientElement&>(RenderSVGResourceContainer::element()); }
 
     virtual void removeAllClientsFromCache(bool markForInvalidation = true) override final;
-    virtual void removeClientFromCache(RenderObject&, bool markForInvalidation = true) override final;
+    virtual void removeClientFromCache(RenderElement&, bool markForInvalidation = true) override final;
 
     virtual bool applyResource(RenderElement&, const RenderStyle&, GraphicsContext*&, unsigned short resourceMode) override final;
     virtual void postApplyResource(RenderElement&, GraphicsContext*&, unsigned short resourceMode, const Path*, const RenderSVGShape*) override final;
@@ -68,7 +67,7 @@ protected:
 
 private:
     bool m_shouldCollectGradientAttributes : 1;
-    HashMap<RenderObject*, OwnPtr<GradientData>> m_gradientMap;
+    HashMap<RenderObject*, std::unique_ptr<GradientData>> m_gradientMap;
 
 #if USE(CG)
     GraphicsContext* m_savedContext;
@@ -78,5 +77,4 @@ private:
 
 }
 
-#endif
 #endif

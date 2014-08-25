@@ -43,6 +43,8 @@
 #include "ScriptState.h"
 #include <inspector/InjectedScript.h>
 #include <inspector/InjectedScriptManager.h>
+#include <inspector/ScriptCallStack.h>
+#include <inspector/ScriptCallStackFactory.h>
 
 using namespace Inspector;
 
@@ -52,6 +54,7 @@ PageDebuggerAgent::PageDebuggerAgent(InjectedScriptManager* injectedScriptManage
     : WebDebuggerAgent(injectedScriptManager, instrumentingAgents)
     , m_pageAgent(pageAgent)
     , m_overlay(overlay)
+    , m_scriptDebugServer(*pageAgent->page())
 {
 }
 
@@ -69,8 +72,8 @@ void PageDebuggerAgent::disable(bool isBeingDestroyed)
 
 String PageDebuggerAgent::sourceMapURLForScript(const Script& script)
 {
-    DEFINE_STATIC_LOCAL(String, sourceMapHTTPHeader, (ASCIILiteral("SourceMap")));
-    DEFINE_STATIC_LOCAL(String, sourceMapHTTPHeaderDeprecated, (ASCIILiteral("X-SourceMap")));
+    DEPRECATED_DEFINE_STATIC_LOCAL(String, sourceMapHTTPHeader, (ASCIILiteral("SourceMap")));
+    DEPRECATED_DEFINE_STATIC_LOCAL(String, sourceMapHTTPHeaderDeprecated, (ASCIILiteral("X-SourceMap")));
 
     if (!script.url.isEmpty()) {
         CachedResource* resource = m_pageAgent->cachedResource(m_pageAgent->mainFrame(), URL(ParsedURLString, script.url));
@@ -90,17 +93,17 @@ String PageDebuggerAgent::sourceMapURLForScript(const Script& script)
 
 void PageDebuggerAgent::startListeningScriptDebugServer()
 {
-    scriptDebugServer().addListener(this, m_pageAgent->page());
+    scriptDebugServer().addListener(this);
 }
 
 void PageDebuggerAgent::stopListeningScriptDebugServer(bool isBeingDestroyed)
 {
-    scriptDebugServer().removeListener(this, m_pageAgent->page(), isBeingDestroyed);
+    scriptDebugServer().removeListener(this, isBeingDestroyed);
 }
 
 PageScriptDebugServer& PageDebuggerAgent::scriptDebugServer()
 {
-    return PageScriptDebugServer::shared();
+    return m_scriptDebugServer;
 }
 
 void PageDebuggerAgent::muteConsole()
@@ -113,9 +116,9 @@ void PageDebuggerAgent::unmuteConsole()
     PageConsole::unmute();
 }
 
-void PageDebuggerAgent::breakpointActionLog(JSC::ExecState*, const String& message)
+void PageDebuggerAgent::breakpointActionLog(JSC::ExecState* exec, const String& message)
 {
-    m_pageAgent->page()->console().addMessage(JSMessageSource, LogMessageLevel, message);
+    m_pageAgent->page()->console().addMessage(MessageSource::JS, MessageLevel::Log, message, createScriptCallStack(exec, ScriptCallStack::maxCallStackSizeToCapture));
 }
 
 InjectedScript PageDebuggerAgent::injectedScriptForEval(ErrorString* errorString, const int* executionContextId)

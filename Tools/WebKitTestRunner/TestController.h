@@ -29,10 +29,9 @@
 #include "GeolocationProviderMock.h"
 #include "WebNotificationProvider.h"
 #include "WorkQueueManager.h"
-#include <WebKit2/WKRetainPtr.h>
+#include <WebKit/WKRetainPtr.h>
 #include <string>
 #include <vector>
-#include <wtf/OwnPtr.h>
 #include <wtf/Vector.h>
 
 namespace WTR {
@@ -73,6 +72,8 @@ public:
     bool useWaitToDumpWatchdogTimer() { return m_useWaitToDumpWatchdogTimer; }
     void runUntil(bool& done, TimeoutDuration);
     void notifyDone();
+    
+    void configureViewForTest(const TestInvocation&);
 
     int getCustomTimeout();
     
@@ -91,10 +92,13 @@ public:
     void setCustomPolicyDelegate(bool enabled, bool permissive);
 
     // Page Visibility.
-    void setVisibilityState(WKPageVisibilityState, bool isInitialState);
+    void setHidden(bool);
 
     bool resetStateToConsistentValues();
     void resetPreferencesToConsistentValues();
+
+    void terminateWebContentProcess();
+    void reattachPageToWebProcess();
 
     WorkQueueManager& workQueueManager() { return m_workQueueManager; }
 
@@ -103,6 +107,8 @@ public:
     void setAuthenticationPassword(String password) { m_authenticationPassword = password; }
 
     void setBlockAllPlugins(bool shouldBlock) { m_shouldBlockAllPlugins = shouldBlock; }
+
+    void setShouldLogHistoryClientCallbacks(bool shouldLog) { m_shouldLogHistoryClientCallbacks = shouldLog; }
 
 private:
     void initialize(int argc, const char* argv[]);
@@ -115,10 +121,16 @@ private:
     void platformInitialize();
     void platformDestroy();
     void platformInitializeContext();
+    void platformConfigureViewForTest(const TestInvocation&);
+    void platformWillRunTest(const TestInvocation&);
     void platformRunUntil(bool& done, double timeout);
     void platformDidCommitLoadForFrame(WKPageRef, WKFrameRef);
     void initializeInjectedBundlePath();
     void initializeTestPluginDirectory();
+
+    void updateWebViewSizeForTest(const TestInvocation&);
+    void updateWindowScaleForTest(const TestInvocation&);
+    void updateLayoutTypeForTest(const TestInvocation&);
 
     void decidePolicyForGeolocationPermissionRequestIfPossible();
 
@@ -149,6 +161,8 @@ private:
 
     static void unavailablePluginButtonClicked(WKPageRef, WKPluginUnavailabilityReason, WKDictionaryRef, const void*);
 
+    static bool canAuthenticateAgainstProtectionSpaceInFrame(WKPageRef, WKFrameRef, WKProtectionSpaceRef, const void *clientInfo);
+
     static void didReceiveAuthenticationChallengeInFrame(WKPageRef, WKFrameRef, WKAuthenticationChallengeRef, const void *clientInfo);
     void didReceiveAuthenticationChallengeInFrame(WKPageRef, WKFrameRef, WKAuthenticationChallengeRef);
 
@@ -159,17 +173,28 @@ private:
     static void decidePolicyForResponse(WKPageRef, WKFrameRef, WKURLResponseRef, WKURLRequestRef, bool canShowMIMEType, WKFramePolicyListenerRef, WKTypeRef, const void*);
     void decidePolicyForResponse(WKFrameRef, WKURLResponseRef, WKFramePolicyListenerRef);
 
+    // WKContextHistoryClient
+    static void didNavigateWithNavigationData(WKContextRef, WKPageRef, WKNavigationDataRef, WKFrameRef, const void*);
+    void didNavigateWithNavigationData(WKNavigationDataRef, WKFrameRef);
+
+    static void didPerformClientRedirect(WKContextRef, WKPageRef, WKURLRef sourceURL, WKURLRef destinationURL, WKFrameRef, const void*);
+    void didPerformClientRedirect(WKURLRef sourceURL, WKURLRef destinationURL, WKFrameRef);
+
+    static void didPerformServerRedirect(WKContextRef, WKPageRef, WKURLRef sourceURL, WKURLRef destinationURL, WKFrameRef, const void*);
+    void didPerformServerRedirect(WKURLRef sourceURL, WKURLRef destinationURL, WKFrameRef);
+
+    static void didUpdateHistoryTitle(WKContextRef, WKPageRef, WKStringRef title, WKURLRef, WKFrameRef, const void*);
+    void didUpdateHistoryTitle(WKStringRef title, WKURLRef, WKFrameRef);
+
     static WKPageRef createOtherPage(WKPageRef oldPage, WKURLRequestRef, WKDictionaryRef, WKEventModifiers, WKEventMouseButton, const void*);
 
     static void runModal(WKPageRef, const void* clientInfo);
     static void runModal(PlatformWebView*);
 
-    void setHidden(bool);
-
     static const char* libraryPathForTesting();
     static const char* platformLibraryPathForTesting();
 
-    OwnPtr<TestInvocation> m_currentInvocation;
+    std::unique_ptr<TestInvocation> m_currentInvocation;
 
     bool m_verbose;
     bool m_printSeparators;
@@ -182,7 +207,7 @@ private:
 
     WebNotificationProvider m_webNotificationProvider;
 
-    OwnPtr<PlatformWebView> m_mainWebView;
+    std::unique_ptr<PlatformWebView> m_mainWebView;
     WKRetainPtr<WKContextRef> m_context;
     WKRetainPtr<WKPageGroupRef> m_pageGroup;
 
@@ -207,7 +232,7 @@ private:
     
     bool m_beforeUnloadReturnValue;
 
-    OwnPtr<GeolocationProviderMock> m_geolocationProvider;
+    std::unique_ptr<GeolocationProviderMock> m_geolocationProvider;
     Vector<WKRetainPtr<WKGeolocationPermissionRequestRef> > m_geolocationPermissionRequests;
     bool m_isGeolocationPermissionSet;
     bool m_isGeolocationPermissionAllowed;
@@ -225,7 +250,9 @@ private:
     bool m_shouldUseAcceleratedDrawing;
     bool m_shouldUseRemoteLayerTree;
 
-    OwnPtr<EventSenderProxy> m_eventSenderProxy;
+    bool m_shouldLogHistoryClientCallbacks;
+
+    std::unique_ptr<EventSenderProxy> m_eventSenderProxy;
 
     WorkQueueManager m_workQueueManager;
 };

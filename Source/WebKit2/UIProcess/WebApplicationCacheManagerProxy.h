@@ -43,7 +43,7 @@ namespace WebKit {
 class WebSecurityOrigin;
 struct SecurityOriginData;
 
-typedef GenericCallback<WKArrayRef> ArrayCallback;
+typedef GenericCallback<API::Array*> ArrayCallback;
 
 class WebApplicationCacheManagerProxy : public API::ObjectImpl<API::Object::Type::ApplicationCacheManager>, public WebContextSupplement, private IPC::MessageReceiver {
 public:
@@ -52,7 +52,7 @@ public:
     static PassRefPtr<WebApplicationCacheManagerProxy> create(WebContext*);
     virtual ~WebApplicationCacheManagerProxy();
 
-    void getApplicationCacheOrigins(PassRefPtr<ArrayCallback>);
+    void getApplicationCacheOrigins(std::function<void (API::Array*, CallbackBase::Error)>);
     void deleteEntriesForOrigin(WebSecurityOrigin*);
     void deleteAllEntries();
 

@@ -51,6 +51,9 @@ public:
 
     virtual void absoluteRects(Vector<IntRect>&, const LayoutPoint& accumulatedOffset) const override;
     virtual void absoluteQuads(Vector<FloatQuad>&, bool* wasFixed) const override;
+#if PLATFORM(IOS)
+virtual void collectSelectionRects(Vector<SelectionRect>&, unsigned startOffset = 0, unsigned endOffset = std::numeric_limits<unsigned>::max()) override;
+#endif
 
 private:
     void node() const = delete;
@@ -58,7 +61,7 @@ private:
     virtual bool canHaveChildren() const override { return false; }
     virtual void paint(PaintInfo&, const LayoutPoint&) override final { }
 
-    virtual VisiblePosition positionForPoint(const LayoutPoint&) override;
+    virtual VisiblePosition positionForPoint(const LayoutPoint&, const RenderRegion*) override;
     virtual int caretMinOffset() const override;
     virtual int caretMaxOffset() const override;
     virtual bool canBeSelectionLeaf() const override;

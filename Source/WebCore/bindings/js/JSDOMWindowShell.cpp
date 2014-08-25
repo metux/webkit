@@ -10,7 +10,7 @@
  * 2.  Redistributions in binary form must reproduce the above copyright
  *     notice, this list of conditions and the following disclaimer in the
  *     documentation and/or other materials provided with the distribution.
- * 3.  Neither the name of Apple Computer, Inc. ("Apple") nor the names of
+ * 3.  Neither the name of Apple Inc. ("Apple") nor the names of
  *     its contributors may be used to endorse or promote products derived
  *     from this software without specific prior written permission.
  *
@@ -41,7 +41,7 @@ using namespace JSC;
 
 namespace WebCore {
 
-const ClassInfo JSDOMWindowShell::s_info = { "JSDOMWindowShell", &Base::s_info, 0, 0, CREATE_METHOD_TABLE(JSDOMWindowShell) };
+const ClassInfo JSDOMWindowShell::s_info = { "JSDOMWindowShell", &Base::s_info, 0, CREATE_METHOD_TABLE(JSDOMWindowShell) };
 
 JSDOMWindowShell::JSDOMWindowShell(VM& vm, Structure* structure, DOMWrapperWorld& world)
     : Base(vm, structure)
@@ -78,7 +78,7 @@ void JSDOMWindowShell::setWindow(PassRefPtr<DOMWindow> domWindow)
     // when we allocate the global object. (Once the global object is fully
     // constructed, it can mark its own prototype.)
     
-    VM& vm = *JSDOMWindow::commonVM();
+    VM& vm = JSDOMWindow::commonVM();
     Structure* prototypeStructure = JSDOMWindowPrototype::createStructure(vm, 0, jsNull());
     Strong<JSDOMWindowPrototype> prototype(vm, JSDOMWindowPrototype::create(vm, 0, prototypeStructure));
 

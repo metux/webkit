@@ -10,7 +10,7 @@
  * 2.  Redistributions in binary form must reproduce the above copyright
  *     notice, this list of conditions and the following disclaimer in the
  *     documentation and/or other materials provided with the distribution.
- * 3.  Neither the name of Apple Computer, Inc. ("Apple") nor the names of
+ * 3.  Neither the name of Apple Inc. ("Apple") nor the names of
  *     its contributors may be used to endorse or promote products derived
  *     from this software without specific prior written permission.
  *
@@ -182,6 +182,8 @@ public:
     virtual void ariaFlowToElements(AccessibilityChildrenVector&) const override;
     virtual bool supportsARIADescribedBy() const override;
     virtual void ariaDescribedByElements(AccessibilityChildrenVector&) const override;
+    virtual bool supportsARIAControls() const override;
+    virtual void ariaControlsElements(AccessibilityChildrenVector&) const override;
     virtual bool ariaHasPopup() const override;
 
     virtual bool supportsARIADropping() const override;
@@ -215,6 +217,7 @@ protected:
     RenderObject* m_renderer;
     
     void setRenderObject(RenderObject* renderer) { m_renderer = renderer; }
+    void ariaElementsFromAttribute(AccessibilityChildrenVector&, const QualifiedName&) const;
     bool needsToUpdateChildren() const { return m_childrenDirty; }
     virtual ScrollableArea* getScrollableAreaIfScrollable() const override;
     virtual void scrollTo(const IntPoint&) const override;
@@ -230,7 +233,7 @@ private:
     bool isAllowedChildOfTree() const;
     bool hasTextAlternative() const;
     String positionalDescriptionForMSAA() const;
-    PlainTextRange ariaSelectedTextRange() const;
+    PlainTextRange documentBasedSelectedTextRange() const;
     Element* rootEditableElementForPosition(const Position&) const;
     bool nodeIsTextControl(const Node*) const;
     virtual void setNeedsToUpdateChildren() override { m_childrenDirty = true; }
@@ -261,10 +264,13 @@ private:
     void addCanvasChildren();
     void addAttachmentChildren();
     void addRemoteSVGChildren();
-#if PLATFORM(MAC)
+#if PLATFORM(COCOA)
     void updateAttachmentViewParents();
 #endif
-
+    virtual String expandedTextValue() const;
+    virtual bool supportsExpandedTextValue() const;
+    void updateRoleAfterChildrenCreation();
+    
     void ariaSelectedRows(AccessibilityChildrenVector&);
     
     bool elementAttributeValue(const QualifiedName&) const;
@@ -272,12 +278,12 @@ private:
     
     virtual ESpeak speakProperty() const override;
     
-    virtual const AtomicString& ariaLiveRegionStatus() const override;
+    virtual const String ariaLiveRegionStatus() const override;
     virtual const AtomicString& ariaLiveRegionRelevant() const override;
     virtual bool ariaLiveRegionAtomic() const override;
     virtual bool ariaLiveRegionBusy() const override;
 
-    bool inheritsPresentationalRole() const;
+    virtual bool inheritsPresentationalRole() const override;
 
 #if ENABLE(MATHML)
     // All math elements return true for isMathElement().

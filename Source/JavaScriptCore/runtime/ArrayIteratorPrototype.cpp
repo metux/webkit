@@ -31,10 +31,11 @@
 #include "JSCellInlines.h"
 #include "JSGlobalObject.h"
 #include "ObjectConstructor.h"
+#include "StructureInlines.h"
 
 namespace JSC {
 
-const ClassInfo ArrayIteratorPrototype::s_info = { "Array Iterator", &Base::s_info, 0, 0, CREATE_METHOD_TABLE(ArrayIteratorPrototype) };
+const ClassInfo ArrayIteratorPrototype::s_info = { "Array Iterator", &Base::s_info, 0, CREATE_METHOD_TABLE(ArrayIteratorPrototype) };
 
 static EncodedJSValue JSC_HOST_CALL arrayIteratorPrototypeIterate(ExecState*);
 

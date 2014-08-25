@@ -21,7 +21,6 @@
 #ifndef SVGClipPathElement_h
 #define SVGClipPathElement_h
 
-#if ENABLE(SVG)
 #include "SVGAnimatedBoolean.h"
 #include "SVGAnimatedEnumeration.h"
 #include "SVGExternalResourcesRequired.h"
@@ -41,6 +40,7 @@ private:
     SVGClipPathElement(const QualifiedName&, Document&);
 
     virtual bool isValid() const override { return SVGTests::isValid(); }
+    virtual bool supportsFocus() const override { return false; }
     virtual bool needsPendingResourceHandling() const override { return false; }
 
     bool isSupportedAttribute(const QualifiedName&);
@@ -60,5 +60,4 @@ NODE_TYPE_CASTS(SVGClipPathElement)
 
 }
 
-#endif
 #endif

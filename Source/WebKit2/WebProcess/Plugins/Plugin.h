@@ -26,6 +26,7 @@
 #ifndef Plugin_h
 #define Plugin_h
 
+#include <WebCore/AudioHardwareListener.h>
 #include <WebCore/FindOptions.h>
 #include <WebCore/GraphicsLayer.h>
 #include <WebCore/URL.h>
@@ -35,7 +36,7 @@
 #include <wtf/RetainPtr.h>
 #include <wtf/Vector.h>
 
-#if PLATFORM(MAC)
+#if PLATFORM(COCOA)
 #include "LayerHostingContext.h"
 
 OBJC_CLASS NSObject;
@@ -79,7 +80,7 @@ public:
         String mimeType;
         bool isFullFramePlugin;
         bool shouldUseManualLoader;
-#if PLATFORM(MAC)
+#if PLATFORM(COCOA)
         LayerHostingMode layerHostingMode;
 #endif
 
@@ -125,7 +126,7 @@ public:
     // Tells the plug-in to draw itself into a bitmap, and return that.
     virtual PassRefPtr<ShareableBitmap> snapshot() = 0;
 
-#if PLATFORM(MAC)
+#if PLATFORM(COCOA)
     // If a plug-in is using the Core Animation drawing model, this returns its plug-in layer.
     virtual PlatformLayer* pluginLayer() = 0;
 #endif
@@ -141,7 +142,7 @@ public:
     virtual void geometryDidChange(const WebCore::IntSize& pluginSize, const WebCore::IntRect& clipRect, const WebCore::AffineTransform& pluginToRootViewTransform) = 0;
 
     // Tells the plug-in that it has been explicitly hidden or shown. (Note that this is not called when the plug-in becomes obscured from view on screen.)
-    virtual void visibilityDidChange() = 0;
+    virtual void visibilityDidChange(bool isVisible) = 0;
 
     // Tells the plug-in that a frame load request that the plug-in made by calling PluginController::loadURL has finished.
     virtual void frameDidFinishLoading(uint64_t requestID) = 0;
@@ -218,7 +219,7 @@ public:
     // Get the NPObject that corresponds to the plug-in's scriptable object. Returns a retained object.
     virtual NPObject* pluginScriptableNPObject() = 0;
 
-#if PLATFORM(MAC)
+#if PLATFORM(COCOA)
     // Tells the plug-in about window focus changes.
     virtual void windowFocusChanged(bool) = 0;
 
@@ -258,7 +259,7 @@ public:
     virtual WebCore::Scrollbar* horizontalScrollbar() = 0;
     virtual WebCore::Scrollbar* verticalScrollbar() = 0;
 
-#if PLATFORM(MAC)
+#if PLATFORM(COCOA)
     virtual RetainPtr<PDFDocument> pdfDocumentForPrinting() const { return 0; }
     virtual NSObject *accessibilityObject() const { return 0; }
 #endif
@@ -276,6 +277,8 @@ public:
     virtual bool performDictionaryLookupAtLocation(const WebCore::FloatPoint&) = 0;
 
     virtual String getSelectionString() const = 0;
+    
+    virtual WebCore::AudioHardwareActivityType audioHardwareActivity() const { return WebCore::AudioHardwareActivityType::Unknown; }
 
 protected:
     Plugin();

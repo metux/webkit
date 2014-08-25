@@ -28,23 +28,18 @@
 
 #include "JSWrappable.h"
 #include <JavaScriptCore/JSRetainPtr.h>
-#include <WebKit2/WKBundleScriptWorld.h>
-#include <WebKit2/WKRetainPtr.h>
+#include <WebKit/WKBundleScriptWorld.h>
+#include <WebKit/WKRetainPtr.h>
 #include <string>
 #include <wtf/PassRefPtr.h>
 
-#if PLATFORM(MAC)
+#if PLATFORM(COCOA)
 #include <wtf/RetainPtr.h>
 #include <CoreFoundation/CFRunLoop.h>
 typedef RetainPtr<CFRunLoopTimerRef> PlatformTimerRef;
 #elif PLATFORM(GTK)
 typedef unsigned int PlatformTimerRef;
 #elif PLATFORM(EFL)
-#if USE(EO)
-typedef struct _Eo_Opaque Ecore_Timer;
-#else
-typedef struct _Ecore_Timer Ecore_Timer;
-#endif
 typedef Ecore_Timer* PlatformTimerRef;
 #endif
 
@@ -198,7 +193,7 @@ public:
 
     void showWebInspector();
     void closeWebInspector();
-    void evaluateInWebInspector(long callId, JSStringRef script);
+    void evaluateInWebInspector(JSStringRef script);
 
     void setPOSIXLocale(JSStringRef);
 

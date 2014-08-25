@@ -48,6 +48,7 @@ namespace JSC {
         {
             ASSERT(m_value);
             ASSERT(!m_value.isGetterSetter());
+            ASSERT(!m_value.isCustomGetterSetter());
         }
         JS_EXPORT_PRIVATE bool writable() const;
         JS_EXPORT_PRIVATE bool enumerable() const;
@@ -63,6 +64,7 @@ namespace JSC {
         JSObject* setterObject() const;
         JS_EXPORT_PRIVATE void setUndefined();
         JS_EXPORT_PRIVATE void setDescriptor(JSValue value, unsigned attributes);
+        JS_EXPORT_PRIVATE void setCustomDescriptor(unsigned attributes);
         JS_EXPORT_PRIVATE void setAccessorDescriptor(GetterSetter* accessor, unsigned attributes);
         JS_EXPORT_PRIVATE void setWritable(bool);
         JS_EXPORT_PRIVATE void setEnumerable(bool);

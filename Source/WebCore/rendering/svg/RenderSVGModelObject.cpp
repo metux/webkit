@@ -29,8 +29,6 @@
  */
 
 #include "config.h"
-
-#if ENABLE(SVG)
 #include "RenderSVGModelObject.h"
 
 #include "RenderLayerModelObject.h"
@@ -42,7 +40,7 @@
 namespace WebCore {
 
 RenderSVGModelObject::RenderSVGModelObject(SVGElement& element, PassRef<RenderStyle> style)
-    : RenderElement(element, std::move(style), 0)
+    : RenderElement(element, WTF::move(style), 0)
     , m_hasSVGShadow(false)
 {
 }
@@ -76,7 +74,7 @@ LayoutRect RenderSVGModelObject::outlineBoundsForRepaint(const RenderLayerModelO
     adjustRectForOutlineAndShadow(box);
 
     FloatQuad containerRelativeQuad = localToContainerQuad(FloatRect(box), repaintContainer);
-    return containerRelativeQuad.enclosingBoundingBox();
+    return LayoutRect(pixelSnappedForPainting(LayoutRect(containerRelativeQuad.boundingBox()), document().deviceScaleFactor()));
 }
 
 void RenderSVGModelObject::absoluteRects(Vector<IntRect>& rects, const LayoutPoint& accumulatedOffset) const
@@ -193,5 +191,3 @@ bool RenderSVGModelObject::checkEnclosure(RenderElement* renderer, const FloatRe
 }
 
 } // namespace WebCore
-
-#endif // ENABLE(SVG)

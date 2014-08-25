@@ -360,6 +360,9 @@ namespace WTF {
         void swap(HashTable&);
         HashTable& operator=(const HashTable&);
 
+        HashTable(HashTable&&);
+        HashTable& operator=(HashTable&&);
+
         // When the hash table is empty, just return the same iterator for end as for begin.
         // This is more efficient because we don't have to skip all the empty and deleted
         // buckets, and iterating an empty table is a common case that's worth optimizing.
@@ -373,7 +376,7 @@ namespace WTF {
         bool isEmpty() const { return !m_keyCount; }
 
         AddResult add(const ValueType& value) { return add<IdentityTranslatorType>(Extractor::extract(value), value); }
-        AddResult add(ValueType&& value) { return add<IdentityTranslatorType>(Extractor::extract(value), std::move(value)); }
+        AddResult add(ValueType&& value) { return add<IdentityTranslatorType>(Extractor::extract(value), WTF::move(value)); }
 
         // A special version of add() that finds the object by hashing and comparing
         // with some other type, to avoid the cost of type conversion if the object is already
@@ -393,6 +396,8 @@ namespace WTF {
         void remove(iterator);
         void removeWithoutEntryConsistencyCheck(iterator);
         void removeWithoutEntryConsistencyCheck(const_iterator);
+        template<typename Functor>
+        void removeIf(const Functor&);
         void clear();
 
         static bool isEmptyBucket(const ValueType& value) { return isHashTraitsEmptyValue<KeyTraits>(Extractor::extract(value)); }
@@ -783,7 +788,7 @@ namespace WTF {
 
     template<typename Key, typename Value, typename Extractor, typename HashFunctions, typename Traits, typename KeyTraits>
     template<typename HashTranslator, typename T, typename Extra>
-    inline auto HashTable<Key, Value, Extractor, HashFunctions, Traits, KeyTraits>::add(T&& key, Extra&& extra) -> AddResult
+    ALWAYS_INLINE auto HashTable<Key, Value, Extractor, HashFunctions, Traits, KeyTraits>::add(T&& key, Extra&& extra) -> AddResult
     {
         checkKey<HashTranslator>(key);
 
@@ -919,7 +924,7 @@ namespace WTF {
 
         Value* newEntry = lookupForWriting(Extractor::extract(entry)).first;
         newEntry->~Value();
-        new (NotNull, newEntry) ValueType(std::move(entry));
+        new (NotNull, newEntry) ValueType(WTF::move(entry));
 
         return newEntry;
     }
@@ -1031,6 +1036,28 @@ namespace WTF {
     }
 
     template<typename Key, typename Value, typename Extractor, typename HashFunctions, typename Traits, typename KeyTraits>
+    template<typename Functor>
+    inline void HashTable<Key, Value, Extractor, HashFunctions, Traits, KeyTraits>::removeIf(const Functor& functor)
+    {
+        for (unsigned i = m_tableSize; i--;) {
+            if (isEmptyOrDeletedBucket(m_table[i]))
+                continue;
+            
+            if (!functor(m_table[i]))
+                continue;
+            
+            deleteBucket(m_table[i]);
+            ++m_deletedCount;
+            --m_keyCount;
+        }
+        
+        if (shouldShrink())
+            shrink();
+        
+        internalCheckTableConsistency();
+    }
+
+    template<typename Key, typename Value, typename Extractor, typename HashFunctions, typename Traits, typename KeyTraits>
     auto HashTable<Key, Value, Extractor, HashFunctions, Traits, KeyTraits>::allocateTable(int size) -> ValueType*
     {
         // would use a template member function with explicit specializations here, but
@@ -1096,7 +1123,7 @@ namespace WTF {
                 continue;
             }
 
-            Value* reinsertedEntry = reinsert(std::move(oldTable[i]));
+            Value* reinsertedEntry = reinsert(WTF::move(oldTable[i]));
             if (&oldTable[i] == entry) {
                 ASSERT(!newEntry);
                 newEntry = reinsertedEntry;
@@ -1155,25 +1182,11 @@ namespace WTF {
         invalidateIterators();
         other.invalidateIterators();
 
-        ValueType* tmp_table = m_table;
-        m_table = other.m_table;
-        other.m_table = tmp_table;
-
-        int tmp_tableSize = m_tableSize;
-        m_tableSize = other.m_tableSize;
-        other.m_tableSize = tmp_tableSize;
-
-        int tmp_tableSizeMask = m_tableSizeMask;
-        m_tableSizeMask = other.m_tableSizeMask;
-        other.m_tableSizeMask = tmp_tableSizeMask;
-
-        int tmp_keyCount = m_keyCount;
-        m_keyCount = other.m_keyCount;
-        other.m_keyCount = tmp_keyCount;
-
-        int tmp_deletedCount = m_deletedCount;
-        m_deletedCount = other.m_deletedCount;
-        other.m_deletedCount = tmp_deletedCount;
+        std::swap(m_table, other.m_table);
+        std::swap(m_tableSize, other.m_tableSize);
+        std::swap(m_tableSizeMask, other.m_tableSizeMask);
+        std::swap(m_keyCount, other.m_keyCount);
+        std::swap(m_deletedCount, other.m_deletedCount);
 
 #if DUMP_HASHTABLE_STATS_PER_TABLE
         m_stats.swap(other.m_stats);
@@ -1187,6 +1200,41 @@ namespace WTF {
         // HashSets. https://bugs.webkit.org/show_bug.cgi?id=118455
         HashTable tmp(other);
         swap(tmp);
+        return *this;
+    }
+
+    template<typename Key, typename Value, typename Extractor, typename HashFunctions, typename Traits, typename KeyTraits>
+    inline HashTable<Key, Value, Extractor, HashFunctions, Traits, KeyTraits>::HashTable(HashTable&& other)
+#if CHECK_HASHTABLE_ITERATORS
+        : m_iterators(nullptr)
+        , m_mutex(std::make_unique<std::mutex>())
+#endif
+    {
+        other.invalidateIterators();
+
+        m_table = other.m_table;
+        m_tableSize = other.m_tableSize;
+        m_tableSizeMask = other.m_tableSizeMask;
+        m_keyCount = other.m_keyCount;
+        m_deletedCount = other.m_deletedCount;
+
+        other.m_table = nullptr;
+        other.m_tableSize = 0;
+        other.m_tableSizeMask = 0;
+        other.m_keyCount = 0;
+        other.m_deletedCount = 0;
+
+#if DUMP_HASHTABLE_STATS_PER_TABLE
+        m_stats = WTF::move(other.m_stats);
+        other.m_stats = nullptr;
+#endif
+    }
+
+    template<typename Key, typename Value, typename Extractor, typename HashFunctions, typename Traits, typename KeyTraits>
+    inline auto HashTable<Key, Value, Extractor, HashFunctions, Traits, KeyTraits>::operator=(HashTable&& other) -> HashTable&
+    {
+        HashTable temp = WTF::move(other);
+        swap(temp);
         return *this;
     }
 

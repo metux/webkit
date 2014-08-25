@@ -30,6 +30,7 @@
 #include "InlineElementBox.h"
 #include "PseudoElement.h"
 #include "RenderListMarker.h"
+#include "RenderMultiColumnFlowThread.h"
 #include "RenderView.h"
 #include "StyleInheritedData.h"
 #include <wtf/StackStats.h>
@@ -41,7 +42,7 @@ namespace WebCore {
 using namespace HTMLNames;
 
 RenderListItem::RenderListItem(Element& element, PassRef<RenderStyle> style)
-    : RenderBlockFlow(element, std::move(style))
+    : RenderBlockFlow(element, WTF::move(style))
     , m_hasExplicitValue(false)
     , m_isValueUpToDate(false)
     , m_notInList(false)
@@ -63,10 +64,10 @@ void RenderListItem::styleDidChange(StyleDifference diff, const RenderStyle* old
     // up (e.g., in some deeply nested line box). See CSS3 spec.
     newStyle.get().inheritFrom(&style());
     if (!m_marker) {
-        m_marker = createRenderer<RenderListMarker>(*this, std::move(newStyle));
+        m_marker = createRenderer<RenderListMarker>(*this, WTF::move(newStyle));
         m_marker->initializeStyle();
     } else
-        m_marker->setStyle(std::move(newStyle));
+        m_marker->setStyle(WTF::move(newStyle));
 }
 
 void RenderListItem::willBeDestroyed()
@@ -279,7 +280,10 @@ void RenderListItem::insertOrMoveMarkerRendererIfNeeded()
         // in this case.
         if (currentParent && currentParent->isAnonymousBlock())
             return;
-        newParent = this;
+        if (multiColumnFlowThread())
+            newParent = multiColumnFlowThread();
+        else
+            newParent = this;
     }
 
     if (newParent != currentParent) {
@@ -493,7 +497,6 @@ void RenderListItem::updateListMarkerNumbers()
 {
     Element* listNode = enclosingList(this);
     // The list node can be the shadow root which has no renderer.
-    ASSERT(listNode);
     if (!listNode)
         return;
 

@@ -18,8 +18,6 @@
  */
 
 #include "config.h"
-
-#if ENABLE(SVG)
 #include "SVGAnimatedEnumeration.h"
 
 #include "SVGAnimationElement.h"
@@ -88,8 +86,11 @@ static inline unsigned enumerationValueForTargetAttribute(SVGElement* targetElem
         return SVGPropertyTraits<ComponentTransferType>::fromString(value);
     }
 
-    if (attrName == SVGNames::modeAttr)
-        return SVGPropertyTraits<BlendModeType>::fromString(value);
+    if (attrName == SVGNames::modeAttr) {
+        BlendMode mode = BlendModeNormal;
+        parseBlendMode(value, mode);
+        return mode;
+    }
     if (attrName == SVGNames::stitchTilesAttr)
         return SVGPropertyTraits<SVGStitchOptions>::fromString(value);
     if (attrName == SVGNames::xChannelSelectorAttr)
@@ -164,5 +165,3 @@ float SVGAnimatedEnumerationAnimator::calculateDistance(const String&, const Str
 }
 
 }
-
-#endif // ENABLE(SVG)

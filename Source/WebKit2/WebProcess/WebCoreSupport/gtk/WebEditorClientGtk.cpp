@@ -27,6 +27,7 @@
 #include "WebPageProxyMessages.h"
 #include "WebProcess.h"
 #include <WebCore/DataObjectGtk.h>
+#include <WebCore/Document.h>
 #include <WebCore/KeyboardEvent.h>
 #include <WebCore/PasteboardHelper.h>
 #include <WebCore/WindowsKeyboardCodes.h>
@@ -54,7 +55,7 @@ bool WebEditorClient::executePendingEditorCommands(Frame* frame, const Vector<WT
         if (command.isTextInsertion() && !allowTextInsertion)
             return false;
 
-        commands.append(std::move(command));
+        commands.append(WTF::move(command));
     }
 
     for (auto& command : commands) {
@@ -148,7 +149,7 @@ public:
 private:
     GClosure* m_closure;
 
-    static void destroyOnClosureFinalization(gpointer data, GClosure* closure)
+    static void destroyOnClosureFinalization(gpointer data, GClosure*)
     {
         // Calling delete void* will free the memory but won't invoke
         // the destructor, something that is a must for us.
@@ -159,14 +160,15 @@ private:
 
 static Frame* frameSettingClipboard;
 
-static void collapseSelection(GtkClipboard* clipboard, Frame* frame)
+static void collapseSelection(GtkClipboard*, Frame* frame)
 {
     if (frameSettingClipboard && frameSettingClipboard == frame)
         return;
 
     // Collapse the selection without clearing it.
     ASSERT(frame);
-    frame->selection().setBase(frame->selection().extent(), frame->selection().affinity());
+    const VisibleSelection& selection = frame->selection().selection();
+    frame->selection().setBase(selection.extent(), selection.affinity());
 }
 #endif
 

@@ -10,10 +10,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -29,8 +29,8 @@
 #if ENABLE(MEDIA_SOURCE)
 
 #include "ExceptionCodePlaceholder.h"
-#include "HTMLMediaSource.h"
 #include "MediaPlayer.h"
+#include "MediaSourcePrivateClient.h"
 #include "MockMediaSourcePrivate.h"
 #include <wtf/Functional.h>
 #include <wtf/MainThread.h>
@@ -41,7 +41,7 @@ namespace WebCore {
 // MediaPlayer Enigne Support
 void MockMediaPlayerMediaSource::registerMediaEngine(MediaEngineRegistrar registrar)
 {
-    registrar(create, getSupportedTypes, supportsType, 0, 0, 0);
+    registrar(create, getSupportedTypes, supportsType, 0, 0, 0, 0);
 }
 
 PassOwnPtr<MediaPlayerPrivateInterface> MockMediaPlayerMediaSource::create(MediaPlayer* player)
@@ -51,7 +51,7 @@ PassOwnPtr<MediaPlayerPrivateInterface> MockMediaPlayerMediaSource::create(Media
 
 static HashSet<String> mimeTypeCache()
 {
-    DEFINE_STATIC_LOCAL(HashSet<String>, cache, ());
+    DEPRECATED_DEFINE_STATIC_LOCAL(HashSet<String>, cache, ());
     static bool isInitialized = false;
 
     if (!isInitialized) {
@@ -84,10 +84,10 @@ MediaPlayer::SupportsType MockMediaPlayerMediaSource::supportsType(const MediaEn
 MockMediaPlayerMediaSource::MockMediaPlayerMediaSource(MediaPlayer* player)
     : m_player(player)
     , m_currentTime(MediaTime::zeroTime())
-    , m_duration(0)
     , m_readyState(MediaPlayer::HaveNothing)
     , m_networkState(MediaPlayer::Empty)
     , m_playing(false)
+    , m_seekCompleted(true)
 {
 }
 
@@ -100,11 +100,9 @@ void MockMediaPlayerMediaSource::load(const String&)
     ASSERT_NOT_REACHED();
 }
 
-void MockMediaPlayerMediaSource::load(const String&, PassRefPtr<HTMLMediaSource> source)
+void MockMediaPlayerMediaSource::load(const String&, MediaSourcePrivateClient* source)
 {
-    m_mediaSource = source;
-    m_mediaSourcePrivate = MockMediaSourcePrivate::create(this);
-    m_mediaSource->setPrivateAndOpen(*m_mediaSourcePrivate);
+    m_mediaSourcePrivate = MockMediaSourcePrivate::create(this, source);
 }
 
 void MockMediaPlayerMediaSource::cancelLoad()
@@ -143,7 +141,7 @@ void MockMediaPlayerMediaSource::setVisible(bool)
 
 bool MockMediaPlayerMediaSource::seeking() const
 {
-    return false;
+    return !m_seekCompleted;
 }
 
 bool MockMediaPlayerMediaSource::paused() const
@@ -163,12 +161,15 @@ MediaPlayer::ReadyState MockMediaPlayerMediaSource::readyState() const
 
 double MockMediaPlayerMediaSource::maxTimeSeekableDouble() const
 {
-    return m_duration;
+    return m_duration.toDouble();
 }
 
-PassRefPtr<TimeRanges> MockMediaPlayerMediaSource::buffered() const
+std::unique_ptr<PlatformTimeRanges> MockMediaPlayerMediaSource::buffered() const
 {
-    return m_mediaSource ? m_mediaSource->buffered() : TimeRanges::create();
+    if (m_mediaSourcePrivate)
+        return m_mediaSourcePrivate->buffered();
+
+    return PlatformTimeRanges::create();
 }
 
 bool MockMediaPlayerMediaSource::didLoadingProgress() const
@@ -191,7 +192,7 @@ double MockMediaPlayerMediaSource::currentTimeDouble() const
 
 double MockMediaPlayerMediaSource::durationDouble() const
 {
-    return m_duration;
+    return m_mediaSourcePrivate ? m_mediaSourcePrivate->duration() : 0;
 }
 
 void MockMediaPlayerMediaSource::seekWithTolerance(double time, double negativeTolerance, double positiveTolerance)
@@ -201,24 +202,31 @@ void MockMediaPlayerMediaSource::seekWithTolerance(double time, double negativeT
         m_mediaSourcePrivate->seekToTime(MediaTime::createWithDouble(time));
     } else
         m_currentTime = m_mediaSourcePrivate->seekToTime(MediaTime::createWithDouble(time), MediaTime::createWithDouble(negativeTolerance), MediaTime::createWithDouble(positiveTolerance));
-    m_player->timeChanged();
 
-    if (m_playing)
-        callOnMainThread(bind(&MockMediaPlayerMediaSource::advanceCurrentTime, this));
+    if (m_seekCompleted) {
+        m_player->timeChanged();
+
+        if (m_playing)
+            callOnMainThread(bind(&MockMediaPlayerMediaSource::advanceCurrentTime, this));
+    }
 }
 
 void MockMediaPlayerMediaSource::advanceCurrentTime()
 {
-    RefPtr<TimeRanges> buffered = this->buffered();
-    size_t pos = buffered->find(m_currentTime.toDouble());
+    if (!m_mediaSourcePrivate)
+        return;
+
+    auto buffered = m_mediaSourcePrivate->buffered();
+    size_t pos = buffered->find(m_currentTime);
     if (pos == notFound)
         return;
 
-    m_currentTime = MediaTime::createWithDouble(std::min(m_duration, buffered->end(pos, IGNORE_EXCEPTION)));
+    bool ignoreError;
+    m_currentTime = std::min(m_duration, buffered->end(pos, ignoreError));
     m_player->timeChanged();
 }
 
-void MockMediaPlayerMediaSource::updateDuration(double duration)
+void MockMediaPlayerMediaSource::updateDuration(const MediaTime& duration)
 {
     if (m_duration == duration)
         return;
@@ -243,6 +251,23 @@ void MockMediaPlayerMediaSource::setNetworkState(MediaPlayer::NetworkState netwo
 
     m_networkState = networkState;
     m_player->networkStateChanged();
+}
+
+void MockMediaPlayerMediaSource::waitForSeekCompleted()
+{
+    m_seekCompleted = false;
+}
+
+void MockMediaPlayerMediaSource::seekCompleted()
+{
+    if (m_seekCompleted)
+        return;
+    m_seekCompleted = true;
+
+    m_player->timeChanged();
+
+    if (m_playing)
+        callOnMainThread(bind(&MockMediaPlayerMediaSource::advanceCurrentTime, this));
 }
 
 unsigned long MockMediaPlayerMediaSource::totalVideoFrames()

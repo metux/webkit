@@ -32,7 +32,7 @@
 #include "DFGClobberize.h"
 #include "DFGGraph.h"
 #include "DFGPhase.h"
-#include "Operations.h"
+#include "JSCInlines.h"
 
 namespace JSC { namespace DFG {
 
@@ -64,8 +64,6 @@ public:
 private:
     void handle()
     {
-        DFG_NODE_DO_TO_CHILDREN(m_graph, m_node, handleEdge);
-        
         switch (m_node->op()) {
         case CompareEqConstant:
         case IsUndefined:
@@ -111,19 +109,12 @@ private:
         case NewArray:
         case NewArrayWithSize:
         case NewArrayBuffer:
-            if (!globalObject()->isHavingABadTime() && !hasArrayStorage(m_node->indexingType()))
+            if (!globalObject()->isHavingABadTime() && !hasAnyArrayStorage(m_node->indexingType()))
                 addLazily(globalObject()->havingABadTimeWatchpoint());
             break;
             
         case AllocationProfileWatchpoint:
-            addLazily(jsCast<JSFunction*>(m_node->function())->allocationProfileWatchpointSet());
-            break;
-            
-        case StructureTransitionWatchpoint:
-            m_graph.watchpoints().addLazily(
-                m_node->codeOrigin,
-                m_node->child1()->op() == WeakJSConstant ? BadWeakConstantCacheWatchpoint : BadCacheWatchpoint,
-                m_node->structure()->transitionWatchpointSet());
+            addLazily(jsCast<JSFunction*>(m_node->function()->value())->allocationProfileWatchpointSet());
             break;
             
         case VariableWatchpoint:
@@ -147,29 +138,9 @@ private:
         }
     }
     
-    void handleEdge(Node*, Edge edge)
-    {
-        switch (edge.useKind()) {
-        case StringObjectUse:
-        case StringOrStringObjectUse: {
-            Structure* stringObjectStructure = globalObject()->stringObjectStructure();
-            Structure* stringPrototypeStructure = stringObjectStructure->storedPrototype().asCell()->structure();
-            ASSERT(m_graph.watchpoints().isValidOrMixed(stringPrototypeStructure->transitionWatchpointSet()));
-            
-            m_graph.watchpoints().addLazily(
-                m_node->codeOrigin, NotStringObject,
-                stringPrototypeStructure->transitionWatchpointSet());
-            break;
-        }
-            
-        default:
-            break;
-        }
-    }
-    
     void handleMasqueradesAsUndefined()
     {
-        if (m_graph.masqueradesAsUndefinedWatchpointIsStillValid(m_node->codeOrigin))
+        if (m_graph.masqueradesAsUndefinedWatchpointIsStillValid(m_node->origin.semantic))
             addLazily(globalObject()->masqueradesAsUndefinedWatchpoint());
     }
     
@@ -198,7 +169,7 @@ private:
     
     JSGlobalObject* globalObject()
     {
-        return m_graph.globalObjectFor(m_node->codeOrigin);
+        return m_graph.globalObjectFor(m_node->origin.semantic);
     }
     
     Node* m_node;

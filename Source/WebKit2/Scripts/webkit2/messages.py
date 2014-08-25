@@ -93,22 +93,12 @@ def reply_parameter_type(type):
     return '%s&' % type
 
 
-def arguments_type_old(parameters, parameter_type_function):
-    arguments_type = 'IPC::Arguments%d' % len(parameters)
-    if len(parameters):
-        arguments_type = '%s<%s>' % (arguments_type, ', '.join(parameter_type_function(parameter.type) for parameter in parameters))
-    return arguments_type
-
-
 def arguments_type(message):
     return 'std::tuple<%s>' % ', '.join(function_parameter_type(parameter.type) for parameter in message.parameters)
 
-def base_class(message):
-    return arguments_type(message.parameters, function_parameter_type)
-
 
 def reply_type(message):
-    return arguments_type_old(message.reply_parameters, reply_parameter_type)
+    return 'IPC::Arguments<%s>' % (', '.join(reply_parameter_type(parameter.type) for parameter in message.reply_parameters))
 
 
 def decode_type(message):
@@ -118,9 +108,6 @@ def decode_type(message):
         parameters = parameters[:-1]
 
     return 'std::tuple<%s>' % ', '.join(parameter.type for parameter in parameters)
-
-def delayed_reply_type(message):
-    return arguments_type_old(message.reply_parameters, function_parameter_type)
 
 
 def message_to_struct_declaration(message):
@@ -155,7 +142,7 @@ def message_to_struct_declaration(message):
         result.append('\n        : m_arguments(%s)\n' % ', '.join([x[1] for x in function_parameters]))
         result.append('    {\n')
         result.append('    }\n\n')
-    result.append('    const %s arguments() const\n' % arguments_type(message))
+    result.append('    const %s& arguments() const\n' % arguments_type(message))
     result.append('    {\n')
     result.append('        return m_arguments;\n')
     result.append('    }\n')
@@ -172,10 +159,10 @@ def struct_or_class(namespace, type):
         'WebCore::EditorCommandsForKeyEvent',
         'WebCore::CompositionUnderline',
         'WebCore::Cookie',
-        'WebCore::DragSession',
         'WebCore::FloatPoint3D',
         'WebCore::FileChooserSettings',
         'WebCore::GrammarDetail',
+        'WebCore::Highlight',
         'WebCore::IDBDatabaseMetadata',
         'WebCore::IDBGetResult',
         'WebCore::IDBIndexMetadata',
@@ -204,16 +191,20 @@ def struct_or_class(namespace, type):
         'WebCore::ViewportArguments',
         'WebCore::ViewportAttributes',
         'WebCore::WindowFeatures',
+        'WebKit::AssistedNodeInformation',
         'WebKit::AttributedString',
+        'WebKit::BackForwardListItemState',
         'WebKit::ColorSpaceData',
         'WebKit::ContextMenuState',
         'WebKit::DatabaseProcessCreationParameters',
         'WebKit::DictionaryPopupInfo',
         'WebKit::DrawingAreaInfo',
+        'WebKit::EditingRange',
         'WebKit::EditorState',
         'WebKit::InteractionInformationAtPosition',
         'WebKit::NavigationActionData',
         'WebKit::NetworkProcessCreationParameters',
+        'WebKit::PageState',
         'WebKit::PlatformPopupMenuData',
         'WebKit::PluginCreationParameters',
         'WebKit::PluginProcessCreationParameters',
@@ -221,10 +212,12 @@ def struct_or_class(namespace, type):
         'WebKit::SecurityOriginData',
         'WebKit::StatisticsData',
         'WebKit::TextCheckerState',
+        'WebKit::WKOptionItem',
         'WebKit::WebNavigationDataStore',
         'WebKit::WebPageCreationParameters',
         'WebKit::WebPreferencesStore',
         'WebKit::WebProcessCreationParameters',
+        'WebKit::WebScriptMessageHandlerHandle',
         'WebKit::WindowGeometry',
     ])
 
@@ -407,6 +400,7 @@ def argument_coder_headers_for_type(type):
         'String': '"ArgumentCoders.h"',
         'WebKit::InjectedBundleUserMessageEncoder': '"InjectedBundleUserMessageCoders.h"',
         'WebKit::WebContextUserMessageEncoder': '"WebContextUserMessageCoders.h"',
+        'WebKit::ScriptMessageHandlerHandle': '"WebScriptMessageHandler.h"',
     }
 
     headers = []
@@ -437,19 +431,23 @@ def headers_for_type(type):
         'WebCore::KeyframeValueList': ['<WebCore/GraphicsLayer.h>'],
         'WebCore::KeypressCommand': ['<WebCore/KeyboardEvent.h>'],
         'WebCore::FileChooserSettings': ['<WebCore/FileChooser.h>'],
+        'WebCore::Highlight': ['<WebCore/InspectorOverlay.h>'],
         'WebCore::PluginInfo': ['<WebCore/PluginData.h>'],
         'WebCore::PasteboardImage': ['<WebCore/Pasteboard.h>'],
         'WebCore::PasteboardWebContent': ['<WebCore/Pasteboard.h>'],
         'WebCore::TextCheckingRequestData': ['<WebCore/TextChecking.h>'],
         'WebCore::TextCheckingResult': ['<WebCore/TextCheckerClient.h>'],
         'WebCore::ViewportAttributes': ['<WebCore/ViewportArguments.h>'],
+        'WebKit::BackForwardListItemState': ['"SessionState.h"'],
         'WebKit::InjectedBundleUserMessageEncoder': [],
+        'WebKit::PageState': ['"SessionState.h"'],
         'WebKit::WebContextUserMessageEncoder': [],
         'WebKit::WebGestureEvent': ['"WebEvent.h"'],
         'WebKit::WebKeyboardEvent': ['"WebEvent.h"'],
         'WebKit::WebMouseEvent': ['"WebEvent.h"'],
         'WebKit::WebTouchEvent': ['"WebEvent.h"'],
         'WebKit::WebWheelEvent': ['"WebEvent.h"'],
+        'WebKit::WebScriptMessageHandlerHandle': ['"WebScriptMessageHandler.h"'],
     }
 
     headers = []
@@ -470,7 +468,7 @@ def headers_for_type(type):
         if split[0] == 'WebKit' or split[0] == 'IPC':
             headers.append('"%s.h"' % split[1])
         else:
-            headers.append('<%s/%s.h>' % tuple(split))
+            headers.append('<%s/%s.h>' % tuple(split[0:2]))
 
     return headers
 
@@ -560,7 +558,7 @@ def generate_message_handler(file):
 
             result.append('%s::DelayedReply::DelayedReply(PassRefPtr<IPC::Connection> connection, std::unique_ptr<IPC::MessageEncoder> encoder)\n' % message.name)
             result.append('    : m_connection(connection)\n')
-            result.append('    , m_encoder(std::move(encoder))\n')
+            result.append('    , m_encoder(WTF::move(encoder))\n')
             result.append('{\n')
             result.append('}\n')
             result.append('\n')
@@ -573,9 +571,9 @@ def generate_message_handler(file):
             result.append('{\n')
             result.append('    ASSERT(m_encoder);\n')
             result += ['    *m_encoder << %s;\n' % x.name for x in message.reply_parameters]
-            result.append('    bool result = m_connection->sendSyncReply(std::move(m_encoder));\n')
+            result.append('    bool _result = m_connection->sendSyncReply(WTF::move(m_encoder));\n')
             result.append('    m_connection = nullptr;\n')
-            result.append('    return result;\n')
+            result.append('    return _result;\n')
             result.append('}\n')
             result.append('\n')
 
@@ -607,6 +605,7 @@ def generate_message_handler(file):
         else:
             if not receiver.has_attribute(LEGACY_RECEIVER_ATTRIBUTE):
                 result.append('    UNUSED_PARAM(connection);\n')
+            result.append('    UNUSED_PARAM(decoder);\n')
             result.append('    ASSERT_NOT_REACHED();\n')
         result.append('}\n')
 
@@ -620,6 +619,8 @@ def generate_message_handler(file):
         result += [sync_message_statement(receiver, message) for message in sync_messages]
         if not receiver.has_attribute(LEGACY_RECEIVER_ATTRIBUTE):
             result.append('    UNUSED_PARAM(connection);\n')
+        result.append('    UNUSED_PARAM(decoder);\n')
+        result.append('    UNUSED_PARAM(replyEncoder);\n')
         result.append('    ASSERT_NOT_REACHED();\n')
         result.append('}\n')
 

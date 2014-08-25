@@ -13,10 +13,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -52,6 +52,7 @@
 #include "MarkupAccumulator.h"
 #include "Range.h"
 #include "RenderBlock.h"
+#include "Settings.h"
 #include "StyleProperties.h"
 #include "TextIterator.h"
 #include "VisibleSelection.h"
@@ -103,8 +104,8 @@ static void completeURLs(DocumentFragment* fragment, const String& baseURL)
         if (!element.hasAttributes())
             continue;
         for (const Attribute& attribute : element.attributesIterator()) {
-            if (element.isURLAttribute(attribute) && !attribute.value().isEmpty())
-                changes.append(AttributeChange(&element, attribute.name(), URL(parsedBaseURL, attribute.value()).string()));
+            if (element.attributeContainsURL(attribute) && !attribute.value().isEmpty())
+                changes.append(AttributeChange(&element, attribute.name(), element.completeURLsInAttributeValue(parsedBaseURL, attribute)));
         }
     }
 
@@ -117,12 +118,15 @@ class StyledMarkupAccumulator final : public MarkupAccumulator {
 public:
     enum RangeFullySelectsNode { DoesFullySelectNode, DoesNotFullySelectNode };
 
-    StyledMarkupAccumulator(Vector<Node*>* nodes, EAbsoluteURLs, EAnnotateForInterchange, const Range*, Node* highestNodeToBeSerialized = 0);
+    StyledMarkupAccumulator(Vector<Node*>* nodes, EAbsoluteURLs, EAnnotateForInterchange, const Range*, bool needsPositionStyleConversion, Node* highestNodeToBeSerialized = 0);
 
     Node* serializeNodes(Node* startNode, Node* pastEnd);
     void wrapWithNode(Node&, bool convertBlocksToInlines = false, RangeFullySelectsNode = DoesFullySelectNode);
     void wrapWithStyleNode(StyleProperties*, Document&, bool isBlock = false);
     String takeResults();
+    
+    bool needRelativeStyleWrapper() const { return m_needRelativeStyleWrapper; }
+    bool needClearingDiv() const { return m_needClearingDiv; }
 
     using MarkupAccumulator::appendString;
 
@@ -158,13 +162,18 @@ private:
     const EAnnotateForInterchange m_shouldAnnotate;
     Node* m_highestNodeToBeSerialized;
     RefPtr<EditingStyle> m_wrappingStyle;
+    bool m_needRelativeStyleWrapper;
+    bool m_needsPositionStyleConversion;
+    bool m_needClearingDiv;
 };
 
-inline StyledMarkupAccumulator::StyledMarkupAccumulator(Vector<Node*>* nodes, EAbsoluteURLs shouldResolveURLs, EAnnotateForInterchange shouldAnnotate,
-    const Range* range, Node* highestNodeToBeSerialized)
+inline StyledMarkupAccumulator::StyledMarkupAccumulator(Vector<Node*>* nodes, EAbsoluteURLs shouldResolveURLs, EAnnotateForInterchange shouldAnnotate, const Range* range, bool needsPositionStyleConversion, Node* highestNodeToBeSerialized)
     : MarkupAccumulator(nodes, shouldResolveURLs, range)
     , m_shouldAnnotate(shouldAnnotate)
     , m_highestNodeToBeSerialized(highestNodeToBeSerialized)
+    , m_needRelativeStyleWrapper(false)
+    , m_needsPositionStyleConversion(needsPositionStyleConversion)
+    , m_needClearingDiv(false)
 {
 }
 
@@ -203,8 +212,8 @@ void StyledMarkupAccumulator::appendStyleNodeOpenTag(StringBuilder& out, StylePr
 
 const String& StyledMarkupAccumulator::styleNodeCloseTag(bool isBlock)
 {
-    DEFINE_STATIC_LOCAL(const String, divClose, (ASCIILiteral("</div>")));
-    DEFINE_STATIC_LOCAL(const String, styleSpanClose, (ASCIILiteral("</span>")));
+    DEPRECATED_DEFINE_STATIC_LOCAL(const String, divClose, (ASCIILiteral("</div>")));
+    DEPRECATED_DEFINE_STATIC_LOCAL(const String, styleSpanClose, (ASCIILiteral("</span>")));
     return isBlock ? divClose : styleSpanClose;
 }
 
@@ -240,7 +249,7 @@ void StyledMarkupAccumulator::appendText(StringBuilder& out, const Text& text)
     if (!shouldAnnotate() || parentIsTextarea)
         MarkupAccumulator::appendText(out, text);
     else {
-        const bool useRenderedText = !enclosingNodeWithTag(firstPositionInNode(const_cast<Text*>(&text)), selectTag);
+        const bool useRenderedText = !enclosingElementWithTag(firstPositionInNode(const_cast<Text*>(&text)), selectTag);
         String content = useRenderedText ? renderedText(text, m_range) : stringValueForRange(text, m_range);
         StringBuilder buffer;
         appendCharactersReplacingEntities(buffer, content, 0, content.length(), EntityMaskInPCDATA);
@@ -260,14 +269,17 @@ String StyledMarkupAccumulator::renderedText(const Node& node, const Range* rang
     unsigned startOffset = 0;
     unsigned endOffset = textNode.length();
 
+    TextIteratorBehavior behavior = TextIteratorDefaultBehavior;
     if (range && &node == range->startContainer())
         startOffset = range->startOffset();
     if (range && &node == range->endContainer())
         endOffset = range->endOffset();
+    else if (range)
+        behavior = TextIteratorBehavesAsIfNodesFollowing;
 
     Position start = createLegacyEditingPosition(const_cast<Node*>(&node), startOffset);
     Position end = createLegacyEditingPosition(const_cast<Node*>(&node), endOffset);
-    return plainText(Range::create(node.document(), start, end).get());
+    return plainText(Range::create(node.document(), start, end).get(), behavior);
 }
 
 String StyledMarkupAccumulator::stringValueForRange(const Node& node, const Range* range)
@@ -318,6 +330,11 @@ void StyledMarkupAccumulator::appendElement(StringBuilder& out, const Element& e
 
             if (addDisplayInline)
                 newInlineStyle->forceInline();
+            
+            if (m_needsPositionStyleConversion) {
+                m_needRelativeStyleWrapper |= newInlineStyle->convertPositionStyle();
+                m_needClearingDiv |= newInlineStyle->isFloating();
+            }
 
             // If the node is not fully selected by the range, then we don't want to keep styles that affect its relationship to the nodes around it
             // only the ones that affect it and the nodes within it.
@@ -370,7 +387,7 @@ Node* StyledMarkupAccumulator::traverseNodesForSerialization(Node* startNode, No
             // Don't write out empty block containers that aren't fully selected.
             continue;
 
-        if (!n->renderer() && !enclosingNodeWithTag(firstPositionInOrBeforeNode(n), selectTag)) {
+        if (!n->renderer() && !enclosingElementWithTag(firstPositionInOrBeforeNode(n), selectTag)) {
             next = NodeTraversal::nextSkippingChildren(n);
             // Don't skip over pastEnd.
             if (pastEnd && pastEnd->isDescendantOf(n))
@@ -530,7 +547,7 @@ static Node* highestAncestorToWrapMarkup(const Range* range, EAnnotateForInterch
     if (!specialCommonAncestor && isTabSpanNode(commonAncestor))
         specialCommonAncestor = commonAncestor;
 
-    if (Node *enclosingAnchor = enclosingNodeWithTag(firstPositionInNode(specialCommonAncestor ? specialCommonAncestor : commonAncestor), aTag))
+    if (auto* enclosingAnchor = enclosingElementWithTag(firstPositionInNode(specialCommonAncestor ? specialCommonAncestor : commonAncestor), aTag))
         specialCommonAncestor = enclosingAnchor;
 
     return specialCommonAncestor;
@@ -541,7 +558,7 @@ static Node* highestAncestorToWrapMarkup(const Range* range, EAnnotateForInterch
 static String createMarkupInternal(Document& document, const Range& range, const Range& updatedRange, Vector<Node*>* nodes,
     EAnnotateForInterchange shouldAnnotate, bool convertBlocksToInlines, EAbsoluteURLs shouldResolveURLs)
 {
-    DEFINE_STATIC_LOCAL(const String, interchangeNewlineString, (ASCIILiteral("<br class=\"" AppleInterchangeNewline "\">")));
+    DEPRECATED_DEFINE_STATIC_LOCAL(const String, interchangeNewlineString, (ASCIILiteral("<br class=\"" AppleInterchangeNewline "\">")));
 
     bool collapsed = updatedRange.collapsed(ASSERT_NO_EXCEPTION);
     if (collapsed)
@@ -552,14 +569,17 @@ static String createMarkupInternal(Document& document, const Range& range, const
 
     document.updateLayoutIgnorePendingStylesheets();
 
-    Node* body = enclosingNodeWithTag(firstPositionInNode(commonAncestor), bodyTag);
+    auto* body = enclosingElementWithTag(firstPositionInNode(commonAncestor), bodyTag);
     Node* fullySelectedRoot = 0;
     // FIXME: Do this for all fully selected blocks, not just the body.
-    if (body && areRangesEqual(VisibleSelection::selectionFromContentsOfNode(body).toNormalizedRange().get(), &range))
+    if (body && VisiblePosition(firstPositionInNode(body)) == VisiblePosition(range.startPosition())
+        && VisiblePosition(lastPositionInNode(body)) == VisiblePosition(range.endPosition()))
         fullySelectedRoot = body;
     Node* specialCommonAncestor = highestAncestorToWrapMarkup(&updatedRange, shouldAnnotate);
 
-    StyledMarkupAccumulator accumulator(nodes, shouldResolveURLs, shouldAnnotate, &updatedRange, specialCommonAncestor);
+    bool needsPositionStyleConversion = body && fullySelectedRoot == body
+        && document.settings() && document.settings()->shouldConvertPositionStyleOnCopy();
+    StyledMarkupAccumulator accumulator(nodes, shouldResolveURLs, shouldAnnotate, &updatedRange, needsPositionStyleConversion, specialCommonAncestor);
     Node* pastEnd = updatedRange.pastLastNode();
 
     Node* startNode = updatedRange.firstNode();
@@ -608,11 +628,17 @@ static String createMarkupInternal(Document& document, const Range& range, const
             if (nodes)
                 nodes->append(ancestor);
             
-            lastClosed = ancestor;
-            
             if (ancestor == specialCommonAncestor)
                 break;
         }
+    }
+    
+    if (accumulator.needRelativeStyleWrapper() && needsPositionStyleConversion) {
+        if (accumulator.needClearingDiv())
+            accumulator.appendString("<div style=\"clear: both;\"></div>");
+        RefPtr<EditingStyle> positionRelativeStyle = styleFromMatchedRulesAndInlineDecl(body);
+        positionRelativeStyle->style()->setProperty(CSSPropertyPosition, CSSValueRelative);
+        accumulator.wrapWithStyleNode(positionRelativeStyle->style(), document, true);
     }
 
     // FIXME: The interchange newline should be placed in the block that it's in, not after all of the content, unconditionally.
@@ -920,8 +946,8 @@ PassRefPtr<DocumentFragment> createContextualFragment(const String& markup, HTML
         return 0;
     }
 
-    if (element->hasLocalName(colTag) || element->hasLocalName(colgroupTag) || element->hasLocalName(framesetTag)
-        || element->hasLocalName(headTag) || element->hasLocalName(styleTag) || element->hasLocalName(titleTag)) {
+    if (element->hasTagName(colTag) || element->hasTagName(colgroupTag) || element->hasTagName(framesetTag)
+        || element->hasTagName(headTag) || element->hasTagName(styleTag) || element->hasTagName(titleTag)) {
         ec = NOT_SUPPORTED_ERR;
         return 0;
     }

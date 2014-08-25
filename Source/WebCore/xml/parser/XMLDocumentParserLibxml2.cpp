@@ -126,7 +126,7 @@ public:
             callback->attributes[i * 5 + 4] = callback->attributes[i * 5 + 3] + len;
         }
 
-        m_callbacks.append(std::move(callback));
+        m_callbacks.append(WTF::move(callback));
     }
 
     void appendEndElementNSCallback()
@@ -141,7 +141,7 @@ public:
         callback->s = xmlStrndup(s, len);
         callback->len = len;
 
-        m_callbacks.append(std::move(callback));
+        m_callbacks.append(WTF::move(callback));
     }
 
     void appendProcessingInstructionCallback(const xmlChar* target, const xmlChar* data)
@@ -151,7 +151,7 @@ public:
         callback->target = xmlStrdup(target);
         callback->data = xmlStrdup(data);
 
-        m_callbacks.append(std::move(callback));
+        m_callbacks.append(WTF::move(callback));
     }
 
     void appendCDATABlockCallback(const xmlChar* s, int len)
@@ -161,7 +161,7 @@ public:
         callback->s = xmlStrndup(s, len);
         callback->len = len;
 
-        m_callbacks.append(std::move(callback));
+        m_callbacks.append(WTF::move(callback));
     }
 
     void appendCommentCallback(const xmlChar* s)
@@ -170,7 +170,7 @@ public:
 
         callback->s = xmlStrdup(s);
 
-        m_callbacks.append(std::move(callback));
+        m_callbacks.append(WTF::move(callback));
     }
 
     void appendInternalSubsetCallback(const xmlChar* name, const xmlChar* externalID, const xmlChar* systemID)
@@ -181,7 +181,7 @@ public:
         callback->externalID = xmlStrdup(externalID);
         callback->systemID = xmlStrdup(systemID);
 
-        m_callbacks.append(std::move(callback));
+        m_callbacks.append(WTF::move(callback));
     }
 
     void appendErrorCallback(XMLErrors::ErrorType type, const xmlChar* message, OrdinalNumber lineNumber, OrdinalNumber columnNumber)
@@ -193,7 +193,7 @@ public:
         callback->lineNumber = lineNumber;
         callback->columnNumber = columnNumber;
 
-        m_callbacks.append(std::move(callback));
+        m_callbacks.append(WTF::move(callback));
     }
 
     void callAndRemoveFirstCallback(XMLDocumentParser* parser)
@@ -361,7 +361,11 @@ static int matchFunc(const char*)
 class OffsetBuffer {
     WTF_MAKE_FAST_ALLOCATED;
 public:
-    OffsetBuffer(const Vector<char>& b) : m_buffer(b), m_currentOffset(0) { }
+    OffsetBuffer(Vector<char> buffer)
+        : m_buffer(WTF::move(buffer))
+        , m_currentOffset(0)
+    {
+    }
 
     int readOutBytes(char* outputBuffer, unsigned askedToRead)
     {
@@ -465,7 +469,7 @@ static void* openFunc(const char* uri)
     if (!shouldAllowExternalLoad(response.url()))
         return &globalDescriptor;
 
-    return new OffsetBuffer(data);
+    return new OffsetBuffer(WTF::move(data));
 }
 
 static int readFunc(void* context, char* buffer, int len)
@@ -674,9 +678,11 @@ void XMLDocumentParser::doWrite(const String& parseString)
         // keep this alive until this function is done.
         Ref<XMLDocumentParser> protect(*this);
 
-        switchToUTF16(context->context());
         XMLDocumentParserScope scope(document()->cachedResourceLoader());
-        xmlParseChunk(context->context(), reinterpret_cast<const char*>(parseString.deprecatedCharacters()), sizeof(UChar) * parseString.length(), 0);
+
+        // FIXME: Can we parse 8-bit strings directly as Latin-1 instead of upconverting to UTF-16?
+        switchToUTF16(context->context());
+        xmlParseChunk(context->context(), reinterpret_cast<const char*>(StringView(parseString).upconvertedCharacters().get()), sizeof(UChar) * parseString.length(), 0);
 
         // JavaScript (which may be run under the xmlParseChunk callstack) may
         // cause the parser to be stopped or detached.
@@ -1374,7 +1380,7 @@ void XMLDocumentParser::doEnd()
         xmlTreeViewer.transformDocumentToTreeView();
     } else if (m_sawXSLTransform) {
         void* doc = xmlDocPtrForString(document()->cachedResourceLoader(), m_originalSourceForTransform.toString(), document()->url().string());
-        document()->setTransformSource(adoptPtr(new TransformSource(doc)));
+        document()->setTransformSource(std::make_unique<TransformSource>(doc));
 
         document()->setParsing(false); // Make the document think it's done, so it will apply XSL stylesheets.
         document()->styleResolverChanged(RecalcStyleImmediately);
@@ -1526,6 +1532,8 @@ static void attributesStartElementNsHandler(void* closure, const xmlChar* xmlLoc
 
 HashMap<String, String> parseAttributes(const String& string, bool& attrsOK)
 {
+    String parseString = "<?xml version=\"1.0\"?><attrs " + string + " />";
+
     AttributeParseState state;
     state.gotAttributes = false;
 
@@ -1533,11 +1541,14 @@ HashMap<String, String> parseAttributes(const String& string, bool& attrsOK)
     memset(&sax, 0, sizeof(sax));
     sax.startElementNs = attributesStartElementNsHandler;
     sax.initialized = XML_SAX2_MAGIC;
+
     RefPtr<XMLParserContext> parser = XMLParserContext::createStringParser(&sax, &state);
-    String parseString = "<?xml version=\"1.0\"?><attrs " + string + " />";
-    xmlParseChunk(parser->context(), reinterpret_cast<const char*>(parseString.deprecatedCharacters()), parseString.length() * sizeof(UChar), 1);
+
+    // FIXME: Can we parse 8-bit strings directly as Latin-1 instead of upconverting to UTF-16?
+    xmlParseChunk(parser->context(), reinterpret_cast<const char*>(StringView(parseString).upconvertedCharacters().get()), parseString.length() * sizeof(UChar), 1);
+
     attrsOK = state.gotAttributes;
-    return state.attributes;
+    return WTF::move(state.attributes);
 }
 
 }

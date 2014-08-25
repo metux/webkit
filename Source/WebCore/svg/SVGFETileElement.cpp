@@ -20,7 +20,7 @@
 
 #include "config.h"
 
-#if ENABLE(SVG) && ENABLE(FILTERS)
+#if ENABLE(FILTERS)
 #include "SVGFETileElement.h"
 
 #include "Attribute.h"
@@ -29,6 +29,7 @@
 #include "SVGFilterBuilder.h"
 #include "SVGNames.h"
 #include "SVGRenderStyle.h"
+#include <wtf/NeverDestroyed.h>
 
 namespace WebCore {
 
@@ -54,10 +55,10 @@ PassRefPtr<SVGFETileElement> SVGFETileElement::create(const QualifiedName& tagNa
 
 bool SVGFETileElement::isSupportedAttribute(const QualifiedName& attrName)
 {
-    DEFINE_STATIC_LOCAL(HashSet<QualifiedName>, supportedAttributes, ());
-    if (supportedAttributes.isEmpty())
-        supportedAttributes.add(SVGNames::inAttr);
-    return supportedAttributes.contains<SVGAttributeHashTranslator>(attrName);
+    static NeverDestroyed<HashSet<QualifiedName>> supportedAttributes;
+    if (supportedAttributes.get().isEmpty())
+        supportedAttributes.get().add(SVGNames::inAttr);
+    return supportedAttributes.get().contains<SVGAttributeHashTranslator>(attrName);
 }
 
 void SVGFETileElement::parseAttribute(const QualifiedName& name, const AtomicString& value)
@@ -106,4 +107,4 @@ PassRefPtr<FilterEffect> SVGFETileElement::build(SVGFilterBuilder* filterBuilder
 
 }
 
-#endif // ENABLE(SVG)
+#endif // ENABLE(FILTERS)

@@ -60,7 +60,6 @@ class Node;
 class NodeList;
 class StyleResolver;
 class StyleRule;
-class UpdateRegionLayoutTask;
 class ChangeRegionOversetTask;
 
 #if ENABLE(INSPECTOR)
@@ -71,6 +70,7 @@ class InspectorCSSAgent
     , public Inspector::InspectorCSSBackendDispatcherHandler
     , public InspectorStyleSheet::Listener {
     WTF_MAKE_NONCOPYABLE(InspectorCSSAgent);
+    WTF_MAKE_FAST_ALLOCATED;
 public:
     class InlineStyleOverrideScope {
     public:
@@ -94,7 +94,7 @@ public:
 
     static CSSStyleRule* asCSSStyleRule(CSSRule*);
 
-    bool forcePseudoState(Element*, CSSSelector::PseudoType);
+    bool forcePseudoState(Element*, CSSSelector::PseudoClassType);
     virtual void didCreateFrontendAndBackend(Inspector::InspectorFrontendChannel*, Inspector::InspectorBackendDispatcher*) override;
     virtual void willDestroyFrontendAndBackend(Inspector::InspectorDisconnectReason) override;
     virtual void discardAgent() override;
@@ -104,8 +104,6 @@ public:
     void mediaQueryResultChanged();
     void didCreateNamedFlow(Document*, WebKitNamedFlow*);
     void willRemoveNamedFlow(Document*, WebKitNamedFlow*);
-    void didUpdateRegionLayout(Document*, WebKitNamedFlow*);
-    void regionLayoutUpdated(WebKitNamedFlow*, int documentNodeId);
     void didChangeRegionOverset(Document*, WebKitNamedFlow*);
     void regionOversetChanged(WebKitNamedFlow*, int documentNodeId);
     void didRegisterNamedFlowContentElement(Document*, WebKitNamedFlow*, Node* contentElement, Node* nextContentElement = nullptr);
@@ -156,7 +154,7 @@ private:
     PassRefPtr<Inspector::TypeBuilder::CSS::CSSRule> buildObjectForRule(StyleRule*, StyleResolver&);
     PassRefPtr<Inspector::TypeBuilder::CSS::CSSRule> buildObjectForRule(CSSStyleRule*);
     PassRefPtr<Inspector::TypeBuilder::Array<Inspector::TypeBuilder::CSS::CSSRule>> buildArrayForRuleList(CSSRuleList*);
-    PassRefPtr<Inspector::TypeBuilder::Array<Inspector::TypeBuilder::CSS::RuleMatch>> buildArrayForMatchedRuleList(const Vector<RefPtr<StyleRuleBase>>&, StyleResolver&, Element*);
+    PassRefPtr<Inspector::TypeBuilder::Array<Inspector::TypeBuilder::CSS::RuleMatch>> buildArrayForMatchedRuleList(const Vector<RefPtr<StyleRule>>&, StyleResolver&, Element*);
     PassRefPtr<Inspector::TypeBuilder::CSS::CSSStyle> buildObjectForAttributesStyle(Element*);
     PassRefPtr<Inspector::TypeBuilder::Array<Inspector::TypeBuilder::CSS::Region>> buildArrayForRegions(ErrorString*, PassRefPtr<NodeList>, int documentNodeId);
     PassRefPtr<Inspector::TypeBuilder::CSS::NamedFlow> buildObjectForNamedFlow(ErrorString*, WebKitNamedFlow*, int documentNodeId);
@@ -181,8 +179,7 @@ private:
     DocumentToViaInspectorStyleSheet m_documentToInspectorStyleSheet;
     NodeIdToForcedPseudoState m_nodeIdToForcedPseudoState;
     HashSet<int> m_namedFlowCollectionsRequested;
-    OwnPtr<UpdateRegionLayoutTask> m_updateRegionLayoutTask;
-    OwnPtr<ChangeRegionOversetTask> m_changeRegionOversetTask;
+    std::unique_ptr<ChangeRegionOversetTask> m_changeRegionOversetTask;
 
     int m_lastStyleSheetId;
 };

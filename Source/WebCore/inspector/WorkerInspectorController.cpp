@@ -36,21 +36,19 @@
 
 #include "CommandLineAPIHost.h"
 #include "InspectorClient.h"
-#include "InspectorConsoleAgent.h"
 #include "InspectorForwarding.h"
-#include "InspectorHeapProfilerAgent.h"
 #include "InspectorInstrumentation.h"
-#include "InspectorProfilerAgent.h"
 #include "InspectorTimelineAgent.h"
 #include "InspectorWebBackendDispatchers.h"
 #include "InspectorWebFrontendDispatchers.h"
 #include "InstrumentingAgents.h"
 #include "JSMainThreadExecState.h"
-#include "PageInjectedScriptHost.h"
-#include "PageInjectedScriptManager.h"
+#include "WebInjectedScriptHost.h"
+#include "WebInjectedScriptManager.h"
 #include "WorkerConsoleAgent.h"
 #include "WorkerDebuggerAgent.h"
 #include "WorkerGlobalScope.h"
+#include "WorkerProfilerAgent.h"
 #include "WorkerReportingProxy.h"
 #include "WorkerRuntimeAgent.h"
 #include "WorkerThread.h"
@@ -71,7 +69,7 @@ public:
 private:
     virtual bool sendMessageToFrontend(const String& message) override
     {
-        m_workerGlobalScope.thread()->workerReportingProxy().postMessageToPageInspector(message);
+        m_workerGlobalScope.thread().workerReportingProxy().postMessageToPageInspector(message);
         return true;
     }
     WorkerGlobalScope& m_workerGlobalScope;
@@ -82,23 +80,27 @@ private:
 WorkerInspectorController::WorkerInspectorController(WorkerGlobalScope& workerGlobalScope)
     : m_workerGlobalScope(workerGlobalScope)
     , m_instrumentingAgents(InstrumentingAgents::create(*this))
-    , m_injectedScriptManager(std::make_unique<PageInjectedScriptManager>(*this, PageInjectedScriptHost::create()))
+    , m_injectedScriptManager(std::make_unique<WebInjectedScriptManager>(*this, WebInjectedScriptHost::create()))
     , m_runtimeAgent(nullptr)
 {
     auto runtimeAgent = std::make_unique<WorkerRuntimeAgent>(m_injectedScriptManager.get(), &workerGlobalScope);
     m_runtimeAgent = runtimeAgent.get();
     m_instrumentingAgents->setWorkerRuntimeAgent(m_runtimeAgent);
-    m_agents.append(std::move(runtimeAgent));
+    m_agents.append(WTF::move(runtimeAgent));
 
-    auto consoleAgent = std::make_unique<WorkerConsoleAgent>(m_instrumentingAgents.get(), m_injectedScriptManager.get());
+    auto consoleAgent = std::make_unique<WorkerConsoleAgent>(m_injectedScriptManager.get());
+    m_instrumentingAgents->setWebConsoleAgent(consoleAgent.get());
+
     auto debuggerAgent = std::make_unique<WorkerDebuggerAgent>(m_injectedScriptManager.get(), m_instrumentingAgents.get(), &workerGlobalScope);
     m_runtimeAgent->setScriptDebugServer(&debuggerAgent->scriptDebugServer());
-    m_agents.append(std::move(debuggerAgent));
+    m_agents.append(WTF::move(debuggerAgent));
 
-    m_agents.append(InspectorProfilerAgent::create(m_instrumentingAgents.get(), consoleAgent.get(), &workerGlobalScope, m_injectedScriptManager.get()));
-    m_agents.append(std::make_unique<InspectorHeapProfilerAgent>(m_instrumentingAgents.get(), m_injectedScriptManager.get()));
-    m_agents.append(std::make_unique<InspectorTimelineAgent>(m_instrumentingAgents.get(), nullptr, nullptr, InspectorTimelineAgent::WorkerInspector, nullptr));
-    m_agents.append(std::move(consoleAgent));
+    auto profilerAgent = std::make_unique<WorkerProfilerAgent>(m_instrumentingAgents.get(), &workerGlobalScope);
+    profilerAgent->setScriptDebugServer(&debuggerAgent->scriptDebugServer());
+    m_agents.append(WTF::move(profilerAgent));
+
+    m_agents.append(std::make_unique<InspectorTimelineAgent>(m_instrumentingAgents.get(), nullptr, InspectorTimelineAgent::WorkerInspector, nullptr));
+    m_agents.append(WTF::move(consoleAgent));
 
     if (CommandLineAPIHost* commandLineAPIHost = m_injectedScriptManager->commandLineAPIHost()) {
         commandLineAPIHost->init(nullptr
@@ -166,11 +168,12 @@ void WorkerInspectorController::willCallInjectedScriptFunction(JSC::ExecState* s
     m_injectedScriptInstrumentationCookies.append(cookie);
 }
 
-void WorkerInspectorController::didCallInjectedScriptFunction()
+void WorkerInspectorController::didCallInjectedScriptFunction(JSC::ExecState* scriptState)
 {
     ASSERT(!m_injectedScriptInstrumentationCookies.isEmpty());
+    ScriptExecutionContext* scriptExecutionContext = scriptExecutionContextFromExecState(scriptState);
     InspectorInstrumentationCookie cookie = m_injectedScriptInstrumentationCookies.takeLast();
-    InspectorInstrumentation::didCallFunction(cookie);
+    InspectorInstrumentation::didCallFunction(cookie, scriptExecutionContext);
 }
 
 } // namespace WebCore

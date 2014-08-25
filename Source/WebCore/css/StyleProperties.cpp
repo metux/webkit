@@ -50,9 +50,7 @@ static size_t sizeForImmutableStylePropertiesWithPropertyCount(unsigned count)
 
 static bool isInitialOrInherit(const String& value)
 {
-    DEFINE_STATIC_LOCAL(String, initial, ("initial"));
-    DEFINE_STATIC_LOCAL(String, inherit, ("inherit"));
-    return value.length() == 7 && (value == initial || value == inherit);
+    return value.length() == 7 && (value == "initial" || value == "inherit");
 }
 
 PassRef<ImmutableStyleProperties> ImmutableStyleProperties::create(const CSSProperty* properties, unsigned count, CSSParserMode cssParserMode)
@@ -159,12 +157,18 @@ String StyleProperties::getPropertyValue(CSSPropertyID propertyID) const
         return getShorthandValue(webkitFlexShorthand());
     case CSSPropertyWebkitFlexFlow:
         return getShorthandValue(webkitFlexFlowShorthand());
+#if ENABLE(CSS_GRID_LAYOUT)
     case CSSPropertyWebkitGridArea:
         return getShorthandValue(webkitGridAreaShorthand());
+    case CSSPropertyWebkitGridTemplate:
+        return getShorthandValue(webkitGridTemplateShorthand());
+    case CSSPropertyWebkitGrid:
+        return getShorthandValue(webkitGridShorthand());
     case CSSPropertyWebkitGridColumn:
         return getShorthandValue(webkitGridColumnShorthand());
     case CSSPropertyWebkitGridRow:
         return getShorthandValue(webkitGridRowShorthand());
+#endif
     case CSSPropertyFont:
         return fontValue();
     case CSSPropertyMargin:
@@ -197,14 +201,12 @@ String StyleProperties::getPropertyValue(CSSPropertyID propertyID) const
         return getLayeredShorthandValue(webkitTransitionShorthand());
     case CSSPropertyWebkitAnimation:
         return getLayeredShorthandValue(webkitAnimationShorthand());
-#if ENABLE(SVG)
     case CSSPropertyMarker: {
         RefPtr<CSSValue> value = getPropertyCSSValue(CSSPropertyMarkerStart);
         if (value)
             return value->cssText();
         return String();
     }
-#endif
     case CSSPropertyBorderRadius:
         return get4Values(borderRadiusShorthand());
     default:
@@ -826,13 +828,14 @@ String StyleProperties::asText() const
                 borderFallbackShorthandProperty = CSSPropertyBorderColor;
 
             // FIXME: Deal with cases where only some of border-(top|right|bottom|left) are specified.
-            if (!shorthandPropertyAppeared.test(CSSPropertyBorder - firstCSSProperty)) {
+            ASSERT(CSSPropertyBorder - firstCSSProperty < shorthandPropertyAppeared.size());
+            if (!shorthandPropertyAppeared[CSSPropertyBorder - firstCSSProperty]) {
                 value = borderPropertyValue(ReturnNullOnUncommonValues);
                 if (value.isNull())
                     shorthandPropertyAppeared.set(CSSPropertyBorder - firstCSSProperty);
                 else
                     shorthandPropertyID = CSSPropertyBorder;
-            } else if (shorthandPropertyUsed.test(CSSPropertyBorder - firstCSSProperty))
+            } else if (shorthandPropertyUsed[CSSPropertyBorder - firstCSSProperty])
                 shorthandPropertyID = CSSPropertyBorder;
             if (!shorthandPropertyID)
                 shorthandPropertyID = borderFallbackShorthandProperty;
@@ -927,9 +930,10 @@ String StyleProperties::asText() const
 
         unsigned shortPropertyIndex = shorthandPropertyID - firstCSSProperty;
         if (shorthandPropertyID) {
-            if (shorthandPropertyUsed.test(shortPropertyIndex))
+            ASSERT(shortPropertyIndex < shorthandPropertyUsed.size());
+            if (shorthandPropertyUsed[shortPropertyIndex])
                 continue;
-            if (!shorthandPropertyAppeared.test(shortPropertyIndex) && value.isNull())
+            if (!shorthandPropertyAppeared[shortPropertyIndex] && value.isNull())
                 value = getPropertyValue(shorthandPropertyID);
             shorthandPropertyAppeared.set(shortPropertyIndex);
         }
@@ -1169,34 +1173,6 @@ bool StyleProperties::propertyMatches(CSSPropertyID propertyID, const CSSValue* 
     if (foundPropertyIndex == -1)
         return false;
     return propertyAt(foundPropertyIndex).value()->equals(*propertyValue);
-}
-
-void MutableStyleProperties::removeEquivalentProperties(const StyleProperties* style)
-{
-    Vector<CSSPropertyID> propertiesToRemove;
-    unsigned size = m_propertyVector.size();
-    for (unsigned i = 0; i < size; ++i) {
-        PropertyReference property = propertyAt(i);
-        if (style->propertyMatches(property.id(), property.value()))
-            propertiesToRemove.append(property.id());
-    }    
-    // FIXME: This should use mass removal.
-    for (unsigned i = 0; i < propertiesToRemove.size(); ++i)
-        removeProperty(propertiesToRemove[i]);
-}
-
-void MutableStyleProperties::removeEquivalentProperties(const ComputedStyleExtractor* computedStyle)
-{
-    Vector<CSSPropertyID> propertiesToRemove;
-    unsigned size = m_propertyVector.size();
-    for (unsigned i = 0; i < size; ++i) {
-        PropertyReference property = propertyAt(i);
-        if (computedStyle->propertyMatches(property.id(), property.value()))
-            propertiesToRemove.append(property.id());
-    }    
-    // FIXME: This should use mass removal.
-    for (unsigned i = 0; i < propertiesToRemove.size(); ++i)
-        removeProperty(propertiesToRemove[i]);
 }
 
 PassRef<MutableStyleProperties> StyleProperties::mutableCopy() const

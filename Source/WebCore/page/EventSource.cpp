@@ -41,12 +41,12 @@
 #include "EventException.h"
 #include "ExceptionCode.h"
 #include "Frame.h"
+#include "HTTPHeaderNames.h"
 #include "MemoryCache.h"
 #include "MessageEvent.h"
 #include "ResourceError.h"
 #include "ResourceRequest.h"
 #include "ResourceResponse.h"
-#include "ScriptCallStack.h"
 #include "ScriptController.h"
 #include "ScriptExecutionContext.h"
 #include "SecurityOrigin.h"
@@ -120,20 +120,20 @@ void EventSource::connect()
 
     ResourceRequest request(m_url);
     request.setHTTPMethod("GET");
-    request.setHTTPHeaderField("Accept", "text/event-stream");
-    request.setHTTPHeaderField("Cache-Control", "no-cache");
+    request.setHTTPHeaderField(HTTPHeaderName::Accept, "text/event-stream");
+    request.setHTTPHeaderField(HTTPHeaderName::CacheControl, "no-cache");
     if (!m_lastEventId.isEmpty())
-        request.setHTTPHeaderField("Last-Event-ID", m_lastEventId);
+        request.setHTTPHeaderField(HTTPHeaderName::LastEventID, m_lastEventId);
 
     SecurityOrigin* origin = scriptExecutionContext()->securityOrigin();
 
     ThreadableLoaderOptions options;
-    options.sendLoadCallbacks = SendCallbacks;
-    options.sniffContent = DoNotSniffContent;
-    options.allowCredentials = (origin->canRequest(m_url) || m_withCredentials) ? AllowStoredCredentials : DoNotAllowStoredCredentials;
+    options.setSendLoadCallbacks(SendCallbacks);
+    options.setSniffContent(DoNotSniffContent);
+    options.setAllowCredentials((origin->canRequest(m_url) || m_withCredentials) ? AllowStoredCredentials : DoNotAllowStoredCredentials);
     options.preflightPolicy = PreventPreflight;
     options.crossOriginRequestPolicy = UseAccessControl;
-    options.dataBufferingPolicy = DoNotBufferData;
+    options.setDataBufferingPolicy(DoNotBufferData);
     options.securityOrigin = origin;
 
     m_loader = ThreadableLoader::create(scriptExecutionContext(), this, request, options);
@@ -228,7 +228,7 @@ void EventSource::didReceiveResponse(unsigned long, const ResourceResponse& resp
             message.append(charset);
             message.appendLiteral("\") that is not UTF-8. Aborting the connection.");
             // FIXME: We are missing the source line.
-            scriptExecutionContext()->addConsoleMessage(JSMessageSource, ErrorMessageLevel, message.toString());
+            scriptExecutionContext()->addConsoleMessage(MessageSource::JS, MessageLevel::Error, message.toString());
         }
     } else {
         // To keep the signal-to-noise ratio low, we only log 200-response with an invalid MIME type.
@@ -238,7 +238,7 @@ void EventSource::didReceiveResponse(unsigned long, const ResourceResponse& resp
             message.append(response.mimeType());
             message.appendLiteral("\") that is not \"text/event-stream\". Aborting the connection.");
             // FIXME: We are missing the source line.
-            scriptExecutionContext()->addConsoleMessage(JSMessageSource, ErrorMessageLevel, message.toString());
+            scriptExecutionContext()->addConsoleMessage(MessageSource::JS, MessageLevel::Error, message.toString());
         }
     }
 
@@ -256,7 +256,8 @@ void EventSource::didReceiveData(const char* data, int length)
     ASSERT(m_state == OPEN);
     ASSERT(m_requestInFlight);
 
-    append(m_receiveBuf, m_decoder->decode(data, length));
+    // FIXME: Need to call flush at some point.
+    append(m_receiveBuf, StringView(m_decoder->decode(data, length)));
     parseEventStream();
 }
 
@@ -290,7 +291,7 @@ void EventSource::didFail(const ResourceError& error)
 void EventSource::didFailAccessControlCheck(const ResourceError& error)
 {
     String message = makeString("EventSource cannot load ", error.failingURL(), ". ", error.localizedDescription());
-    scriptExecutionContext()->addConsoleMessage(JSMessageSource, ErrorMessageLevel, message);
+    scriptExecutionContext()->addConsoleMessage(MessageSource::JS, MessageLevel::Error, message);
 
     abortConnectionAttempt();
 }

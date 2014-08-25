@@ -27,10 +27,11 @@
 #include "JSArgumentsIterator.h"
 
 #include "Arguments.h"
+#include "JSCInlines.h"
 
 namespace JSC {
 
-const ClassInfo JSArgumentsIterator::s_info = { "ArgumentsIterator", &Base::s_info, 0, 0, CREATE_METHOD_TABLE(JSArgumentsIterator) };
+const ClassInfo JSArgumentsIterator::s_info = { "ArgumentsIterator", &Base::s_info, 0, CREATE_METHOD_TABLE(JSArgumentsIterator) };
 
 void JSArgumentsIterator::finishCreation(VM& vm, Arguments* arguments)
 {

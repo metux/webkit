@@ -2,6 +2,7 @@
  * Copyright (C) 2004, 2005, 2006, 2008 Nikolas Zimmermann <zimmermann@kde.org>
  * Copyright (C) 2004, 2005, 2006, 2007, 2008, 2009 Rob Buis <buis@kde.org>
  * Copyright (C) 2006 Alexander Kellett <lypanov@kde.org>
+ * Copyright (C) 2014 Adobe Systems Incorporated. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -20,8 +21,6 @@
  */
 
 #include "config.h"
-
-#if ENABLE(SVG)
 #include "SVGImageElement.h"
 
 #include "Attribute.h"
@@ -33,6 +32,7 @@
 #include "SVGNames.h"
 #include "SVGSVGElement.h"
 #include "XLinkNames.h"
+#include <wtf/NeverDestroyed.h>
 
 namespace WebCore {
 
@@ -62,7 +62,7 @@ inline SVGImageElement::SVGImageElement(const QualifiedName& tagName, Document& 
     , m_y(LengthModeHeight)
     , m_width(LengthModeWidth)
     , m_height(LengthModeHeight)
-    , m_imageLoader(this)
+    , m_imageLoader(*this)
 {
     registerAnimatedPropertiesForSVGImageElement();
 }
@@ -74,35 +74,18 @@ PassRefPtr<SVGImageElement> SVGImageElement::create(const QualifiedName& tagName
 
 bool SVGImageElement::isSupportedAttribute(const QualifiedName& attrName)
 {
-    DEFINE_STATIC_LOCAL(HashSet<QualifiedName>, supportedAttributes, ());
-    if (supportedAttributes.isEmpty()) {
+    static NeverDestroyed<HashSet<QualifiedName>> supportedAttributes;
+    if (supportedAttributes.get().isEmpty()) {
         SVGLangSpace::addSupportedAttributes(supportedAttributes);
         SVGExternalResourcesRequired::addSupportedAttributes(supportedAttributes);
         SVGURIReference::addSupportedAttributes(supportedAttributes);
-        supportedAttributes.add(SVGNames::xAttr);
-        supportedAttributes.add(SVGNames::yAttr);
-        supportedAttributes.add(SVGNames::widthAttr);
-        supportedAttributes.add(SVGNames::heightAttr);
-        supportedAttributes.add(SVGNames::preserveAspectRatioAttr);
+        supportedAttributes.get().add(SVGNames::xAttr);
+        supportedAttributes.get().add(SVGNames::yAttr);
+        supportedAttributes.get().add(SVGNames::widthAttr);
+        supportedAttributes.get().add(SVGNames::heightAttr);
+        supportedAttributes.get().add(SVGNames::preserveAspectRatioAttr);
     }
-    return supportedAttributes.contains<SVGAttributeHashTranslator>(attrName);
-}
-
-bool SVGImageElement::isPresentationAttribute(const QualifiedName& name) const
-{
-    if (name == SVGNames::widthAttr || name == SVGNames::heightAttr)
-        return true;
-    return SVGGraphicsElement::isPresentationAttribute(name);
-}
-
-void SVGImageElement::collectStyleForPresentationAttribute(const QualifiedName& name, const AtomicString& value, MutableStyleProperties& style)
-{
-    if (!isSupportedAttribute(name))
-        SVGGraphicsElement::collectStyleForPresentationAttribute(name, value, style);
-    else if (name == SVGNames::widthAttr)
-        addPropertyToPresentationAttributeStyle(style, CSSPropertyWidth, value);
-    else if (name == SVGNames::heightAttr)
-        addPropertyToPresentationAttributeStyle(style, CSSPropertyHeight, value);
+    return supportedAttributes.get().contains<SVGAttributeHashTranslator>(attrName);
 }
 
 void SVGImageElement::parseAttribute(const QualifiedName& name, const AtomicString& value)
@@ -140,7 +123,13 @@ void SVGImageElement::svgAttributeChanged(const QualifiedName& attrName)
     }
 
     SVGElementInstance::InvalidationGuard invalidationGuard(this);
-    
+
+    if (attrName == SVGNames::widthAttr
+        || attrName == SVGNames::heightAttr) {
+        invalidateSVGPresentationAttributeStyle();
+        return;
+    }
+
     bool isLengthAttribute = attrName == SVGNames::xAttr
                           || attrName == SVGNames::yAttr
                           || attrName == SVGNames::widthAttr
@@ -174,17 +163,9 @@ void SVGImageElement::svgAttributeChanged(const QualifiedName& attrName)
     ASSERT_NOT_REACHED();
 }
 
-bool SVGImageElement::selfHasRelativeLengths() const
-{
-    return x().isRelative()
-        || y().isRelative()
-        || width().isRelative()
-        || height().isRelative();
-}
-
 RenderPtr<RenderElement> SVGImageElement::createElementRenderer(PassRef<RenderStyle> style)
 {
-    return createRenderer<RenderSVGImage>(*this, std::move(style));
+    return createRenderer<RenderSVGImage>(*this, WTF::move(style));
 }
 
 bool SVGImageElement::haveLoadedRequiredResources()
@@ -232,5 +213,3 @@ void SVGImageElement::didMoveToNewDocument(Document* oldDocument)
 }
 
 }
-
-#endif // ENABLE(SVG)

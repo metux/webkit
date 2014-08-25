@@ -49,9 +49,7 @@ public:
     // RenderElement when using fallback content.
     RenderWidget* renderWidget() const;
 
-#if ENABLE(SVG)
     SVGDocument* getSVGDocument(ExceptionCode&) const;
-#endif
 
     virtual ScrollbarMode scrollingMode() const { return ScrollbarAuto; }
 
@@ -93,7 +91,7 @@ public:
 private:
     static HashCountedSet<ContainerNode*>& disabledSubtreeRoots()
     {
-        DEFINE_STATIC_LOCAL(HashCountedSet<ContainerNode*>, nodes, ());
+        DEPRECATED_DEFINE_STATIC_LOCAL(HashCountedSet<ContainerNode*>, nodes, ());
         return nodes;
     }
 

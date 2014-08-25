@@ -38,11 +38,7 @@
 
 namespace WebKit {
 
-/*
- *          Current
- *   |---------*--------------| Entries
- *      Back        Forward
- */
+struct BackForwardListState;
 
 class WebBackForwardList : public API::ObjectImpl<API::Object::Type::BackForwardList> {
 public:
@@ -56,28 +52,30 @@ public:
 
     void addItem(WebBackForwardListItem*);
     void goToItem(WebBackForwardListItem*);
+    void removeAllItems();
     void clear();
 
     WebBackForwardListItem* currentItem() const;
     WebBackForwardListItem* backItem() const;
     WebBackForwardListItem* forwardItem() const;
     WebBackForwardListItem* itemAtIndex(int) const;
-    
+
     const BackForwardListItemVector& entries() const { return m_entries; }
 
     uint32_t currentIndex() const { return m_currentIndex; }
     int backListCount() const;
     int forwardListCount() const;
 
+    PassRefPtr<API::Array> backList() const;
+    PassRefPtr<API::Array> forwardList() const;
+
     PassRefPtr<API::Array> backListAsAPIArrayWithLimit(unsigned limit) const;
     PassRefPtr<API::Array> forwardListAsAPIArrayWithLimit(unsigned limit) const;
 
-#if USE(CF)
-    CFDictionaryRef createCFDictionaryRepresentation(WebPageProxy::WebPageProxySessionStateFilterCallback, void* context) const;
-    bool restoreFromCFDictionaryRepresentation(CFDictionaryRef);
-    bool restoreFromV0CFDictionaryRepresentation(CFDictionaryRef);
-    bool restoreFromV1CFDictionaryRepresentation(CFDictionaryRef);
-#endif
+    BackForwardListState backForwardListState(const std::function<bool (WebBackForwardListItem&)>&) const;
+    void restoreFromState(BackForwardListState);
+
+    Vector<BackForwardListItemState> itemStates() const;
 
 private:
     explicit WebBackForwardList(WebPageProxy&);

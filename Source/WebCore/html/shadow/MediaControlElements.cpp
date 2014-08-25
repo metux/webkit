@@ -11,7 +11,7 @@
  * 2.  Redistributions in binary form must reproduce the above copyright
  *     notice, this list of conditions and the following disclaimer in the
  *     documentation and/or other materials provided with the distribution.
- * 3.  Neither the name of Apple Computer, Inc. ("Apple") nor the names of
+ * 3.  Neither the name of Apple Inc. ("Apple") nor the names of
  *     its contributors may be used to endorse or promote products derived
  *     from this software without specific prior written permission.
  *
@@ -42,6 +42,7 @@
 #include "ImageBuffer.h"
 #include "Language.h"
 #include "LocalizedStrings.h"
+#include "Logging.h"
 #include "MediaControls.h"
 #include "PageGroup.h"
 #include "RenderLayer.h"
@@ -55,8 +56,8 @@
 #include "TextTrackList.h"
 #endif
 
-#if ENABLE(PLUGIN_PROXY_FOR_VIDEO)
-#include "RenderWidget.h"
+#if ENABLE(WEBVTT_REGIONS)
+#include "VTTRegionList.h"
 #endif
 
 namespace WebCore {
@@ -74,17 +75,12 @@ MediaControlPanelElement::MediaControlPanelElement(Document& document)
     , m_opaque(true)
     , m_transitionTimer(this, &MediaControlPanelElement::transitionTimerFired)
 {
+    setPseudo(AtomicString("-webkit-media-controls-panel", AtomicString::ConstructFromLiteral));
 }
 
 PassRefPtr<MediaControlPanelElement> MediaControlPanelElement::create(Document& document)
 {
     return adoptRef(new MediaControlPanelElement(document));
-}
-
-const AtomicString& MediaControlPanelElement::shadowPseudoId() const
-{
-    DEFINE_STATIC_LOCAL(AtomicString, id, ("-webkit-media-controls-panel", AtomicString::ConstructFromLiteral));
-    return id;
 }
 
 void MediaControlPanelElement::startDrag(const LayoutPoint& eventLocation)
@@ -225,7 +221,7 @@ void MediaControlPanelElement::defaultEventHandler(Event* event)
     MediaControlDivElement::defaultEventHandler(event);
 
     if (event->isMouseEvent()) {
-        LayoutPoint location = static_cast<MouseEvent*>(event)->absoluteLocation();
+        LayoutPoint location = toMouseEvent(event)->absoluteLocation();
         if (event->type() == eventNames().mousedownEvent && event->target() == this) {
             startDrag(location);
             event->setDefaultHandled();
@@ -261,17 +257,12 @@ MediaControlPanelEnclosureElement::MediaControlPanelEnclosureElement(Document& d
     // Mapping onto same MediaControlElementType as panel element, since it has similar properties.
     : MediaControlDivElement(document, MediaControlsPanel)
 {
+    setPseudo(AtomicString("-webkit-media-controls-enclosure", AtomicString::ConstructFromLiteral));
 }
 
 PassRefPtr<MediaControlPanelEnclosureElement> MediaControlPanelEnclosureElement::create(Document& document)
 {
     return adoptRef(new MediaControlPanelEnclosureElement(document));
-}
-
-const AtomicString& MediaControlPanelEnclosureElement::shadowPseudoId() const
-{
-    DEFINE_STATIC_LOCAL(AtomicString, id, ("-webkit-media-controls-enclosure", AtomicString::ConstructFromLiteral));
-    return id;
 }
 
 // ----------------------------
@@ -280,6 +271,7 @@ MediaControlOverlayEnclosureElement::MediaControlOverlayEnclosureElement(Documen
     // Mapping onto same MediaControlElementType as panel element, since it has similar properties.
     : MediaControlDivElement(document, MediaControlsPanel)
 {
+    setPseudo(AtomicString("-webkit-media-controls-overlay-enclosure", AtomicString::ConstructFromLiteral));
 }
 
 PassRefPtr<MediaControlOverlayEnclosureElement> MediaControlOverlayEnclosureElement::create(Document& document)
@@ -287,17 +279,12 @@ PassRefPtr<MediaControlOverlayEnclosureElement> MediaControlOverlayEnclosureElem
     return adoptRef(new MediaControlOverlayEnclosureElement(document));
 }
 
-const AtomicString& MediaControlOverlayEnclosureElement::shadowPseudoId() const
-{
-    DEFINE_STATIC_LOCAL(AtomicString, id, ("-webkit-media-controls-overlay-enclosure", AtomicString::ConstructFromLiteral));
-    return id;
-}
-
 // ----------------------------
 
 MediaControlTimelineContainerElement::MediaControlTimelineContainerElement(Document& document)
     : MediaControlDivElement(document, MediaTimelineContainer)
 {
+    setPseudo(AtomicString("-webkit-media-controls-timeline-container", AtomicString::ConstructFromLiteral));
 }
 
 PassRefPtr<MediaControlTimelineContainerElement> MediaControlTimelineContainerElement::create(Document& document)
@@ -305,12 +292,6 @@ PassRefPtr<MediaControlTimelineContainerElement> MediaControlTimelineContainerEl
     RefPtr<MediaControlTimelineContainerElement> element = adoptRef(new MediaControlTimelineContainerElement(document));
     element->hide();
     return element.release();
-}
-
-const AtomicString& MediaControlTimelineContainerElement::shadowPseudoId() const
-{
-    DEFINE_STATIC_LOCAL(AtomicString, id, ("-webkit-media-controls-timeline-container", AtomicString::ConstructFromLiteral));
-    return id;
 }
 
 void MediaControlTimelineContainerElement::setTimeDisplaysHidden(bool hidden)
@@ -334,7 +315,7 @@ void MediaControlTimelineContainerElement::setTimeDisplaysHidden(bool hidden)
 
 RenderPtr<RenderElement> MediaControlTimelineContainerElement::createElementRenderer(PassRef<RenderStyle> style)
 {
-    return createRenderer<RenderMediaControlTimelineContainer>(*this, std::move(style));
+    return createRenderer<RenderMediaControlTimelineContainer>(*this, WTF::move(style));
 }
 
 // ----------------------------
@@ -342,6 +323,7 @@ RenderPtr<RenderElement> MediaControlTimelineContainerElement::createElementRend
 MediaControlVolumeSliderContainerElement::MediaControlVolumeSliderContainerElement(Document& document)
     : MediaControlDivElement(document, MediaVolumeSliderContainer)
 {
+    setPseudo(AtomicString("-webkit-media-controls-volume-slider-container", AtomicString::ConstructFromLiteral));
 }
 
 PassRefPtr<MediaControlVolumeSliderContainerElement> MediaControlVolumeSliderContainerElement::create(Document& document)
@@ -353,7 +335,7 @@ PassRefPtr<MediaControlVolumeSliderContainerElement> MediaControlVolumeSliderCon
 
 RenderPtr<RenderElement> MediaControlVolumeSliderContainerElement::createElementRenderer(PassRef<RenderStyle> style)
 {
-    return createRenderer<RenderMediaVolumeSliderContainer>(*this, std::move(style));
+    return createRenderer<RenderMediaVolumeSliderContainer>(*this, WTF::move(style));
 }
 
 void MediaControlVolumeSliderContainerElement::defaultEventHandler(Event* event)
@@ -362,7 +344,7 @@ void MediaControlVolumeSliderContainerElement::defaultEventHandler(Event* event)
         return;
 
     // Poor man's mouseleave event detection.
-    MouseEvent* mouseEvent = static_cast<MouseEvent*>(event);
+    MouseEvent* mouseEvent = toMouseEvent(event);
     EventTarget* relatedTarget = mouseEvent->relatedTarget();
     if (!relatedTarget || !relatedTarget->toNode())
         return;
@@ -373,18 +355,13 @@ void MediaControlVolumeSliderContainerElement::defaultEventHandler(Event* event)
     hide();
 }
 
-const AtomicString& MediaControlVolumeSliderContainerElement::shadowPseudoId() const
-{
-    DEFINE_STATIC_LOCAL(AtomicString, id, ("-webkit-media-controls-volume-slider-container", AtomicString::ConstructFromLiteral));
-    return id;
-}
-
 // ----------------------------
 
 MediaControlStatusDisplayElement::MediaControlStatusDisplayElement(Document& document)
     : MediaControlDivElement(document, MediaStatusDisplay)
     , m_stateBeingDisplayed(Nothing)
 {
+    setPseudo(AtomicString("-webkit-media-controls-status-display", AtomicString::ConstructFromLiteral));
 }
 
 PassRefPtr<MediaControlStatusDisplayElement> MediaControlStatusDisplayElement::create(Document& document)
@@ -427,19 +404,13 @@ void MediaControlStatusDisplayElement::update()
     }
 }
 
-const AtomicString& MediaControlStatusDisplayElement::shadowPseudoId() const
-{
-    DEFINE_STATIC_LOCAL(AtomicString, id, ("-webkit-media-controls-status-display", AtomicString::ConstructFromLiteral));
-    return id;
-}
-
-
 // ----------------------------
 
 MediaControlPanelMuteButtonElement::MediaControlPanelMuteButtonElement(Document& document, MediaControls* controls)
     : MediaControlMuteButtonElement(document, MediaMuteButton)
     , m_controls(controls)
 {
+    setPseudo(AtomicString("-webkit-media-controls-mute-button", AtomicString::ConstructFromLiteral));
 }
 
 PassRefPtr<MediaControlPanelMuteButtonElement> MediaControlPanelMuteButtonElement::create(Document& document, MediaControls* controls)
@@ -460,17 +431,12 @@ void MediaControlPanelMuteButtonElement::defaultEventHandler(Event* event)
     MediaControlMuteButtonElement::defaultEventHandler(event);
 }
 
-const AtomicString& MediaControlPanelMuteButtonElement::shadowPseudoId() const
-{
-    DEFINE_STATIC_LOCAL(AtomicString, id, ("-webkit-media-controls-mute-button", AtomicString::ConstructFromLiteral));
-    return id;
-}
-
 // ----------------------------
 
 MediaControlVolumeSliderMuteButtonElement::MediaControlVolumeSliderMuteButtonElement(Document& document)
     : MediaControlMuteButtonElement(document, MediaMuteButton)
 {
+    setPseudo(AtomicString("-webkit-media-controls-volume-slider-mute-button", AtomicString::ConstructFromLiteral));
 }
 
 PassRefPtr<MediaControlVolumeSliderMuteButtonElement> MediaControlVolumeSliderMuteButtonElement::create(Document& document)
@@ -481,17 +447,12 @@ PassRefPtr<MediaControlVolumeSliderMuteButtonElement> MediaControlVolumeSliderMu
     return button.release();
 }
 
-const AtomicString& MediaControlVolumeSliderMuteButtonElement::shadowPseudoId() const
-{
-    DEFINE_STATIC_LOCAL(AtomicString, id, ("-webkit-media-controls-volume-slider-mute-button", AtomicString::ConstructFromLiteral));
-    return id;
-}
-
 // ----------------------------
 
 MediaControlPlayButtonElement::MediaControlPlayButtonElement(Document& document)
     : MediaControlInputElement(document, MediaPlayButton)
 {
+    setPseudo(AtomicString("-webkit-media-controls-play-button", AtomicString::ConstructFromLiteral));
 }
 
 PassRefPtr<MediaControlPlayButtonElement> MediaControlPlayButtonElement::create(Document& document)
@@ -520,17 +481,12 @@ void MediaControlPlayButtonElement::updateDisplayType()
     setDisplayType(mediaController()->canPlay() ? MediaPlayButton : MediaPauseButton);
 }
 
-const AtomicString& MediaControlPlayButtonElement::shadowPseudoId() const
-{
-    DEFINE_STATIC_LOCAL(AtomicString, id, ("-webkit-media-controls-play-button", AtomicString::ConstructFromLiteral));
-    return id;
-}
-
 // ----------------------------
 
 MediaControlOverlayPlayButtonElement::MediaControlOverlayPlayButtonElement(Document& document)
     : MediaControlInputElement(document, MediaOverlayPlayButton)
 {
+    setPseudo(AtomicString("-webkit-media-controls-overlay-play-button", AtomicString::ConstructFromLiteral));
 }
 
 PassRefPtr<MediaControlOverlayPlayButtonElement> MediaControlOverlayPlayButtonElement::create(Document& document)
@@ -559,18 +515,12 @@ void MediaControlOverlayPlayButtonElement::updateDisplayType()
         hide();
 }
 
-const AtomicString& MediaControlOverlayPlayButtonElement::shadowPseudoId() const
-{
-    DEFINE_STATIC_LOCAL(AtomicString, id, ("-webkit-media-controls-overlay-play-button", AtomicString::ConstructFromLiteral));
-    return id;
-}
-
-
 // ----------------------------
 
 MediaControlSeekForwardButtonElement::MediaControlSeekForwardButtonElement(Document& document)
     : MediaControlSeekButtonElement(document, MediaSeekForwardButton)
 {
+    setPseudo(AtomicString("-webkit-media-controls-seek-forward-button", AtomicString::ConstructFromLiteral));
 }
 
 PassRefPtr<MediaControlSeekForwardButtonElement> MediaControlSeekForwardButtonElement::create(Document& document)
@@ -581,17 +531,12 @@ PassRefPtr<MediaControlSeekForwardButtonElement> MediaControlSeekForwardButtonEl
     return button.release();
 }
 
-const AtomicString& MediaControlSeekForwardButtonElement::shadowPseudoId() const
-{
-    DEFINE_STATIC_LOCAL(AtomicString, id, ("-webkit-media-controls-seek-forward-button", AtomicString::ConstructFromLiteral));
-    return id;
-}
-
 // ----------------------------
 
 MediaControlSeekBackButtonElement::MediaControlSeekBackButtonElement(Document& document)
     : MediaControlSeekButtonElement(document, MediaSeekBackButton)
 {
+    setPseudo(AtomicString("-webkit-media-controls-seek-back-button", AtomicString::ConstructFromLiteral));
 }
 
 PassRefPtr<MediaControlSeekBackButtonElement> MediaControlSeekBackButtonElement::create(Document& document)
@@ -602,17 +547,12 @@ PassRefPtr<MediaControlSeekBackButtonElement> MediaControlSeekBackButtonElement:
     return button.release();
 }
 
-const AtomicString& MediaControlSeekBackButtonElement::shadowPseudoId() const
-{
-    DEFINE_STATIC_LOCAL(AtomicString, id, ("-webkit-media-controls-seek-back-button", AtomicString::ConstructFromLiteral));
-    return id;
-}
-
 // ----------------------------
 
 MediaControlRewindButtonElement::MediaControlRewindButtonElement(Document& document)
     : MediaControlInputElement(document, MediaRewindButton)
 {
+    setPseudo(AtomicString("-webkit-media-controls-rewind-button", AtomicString::ConstructFromLiteral));
 }
 
 PassRefPtr<MediaControlRewindButtonElement> MediaControlRewindButtonElement::create(Document& document)
@@ -632,17 +572,12 @@ void MediaControlRewindButtonElement::defaultEventHandler(Event* event)
     HTMLInputElement::defaultEventHandler(event);
 }
 
-const AtomicString& MediaControlRewindButtonElement::shadowPseudoId() const
-{
-    DEFINE_STATIC_LOCAL(AtomicString, id, ("-webkit-media-controls-rewind-button", AtomicString::ConstructFromLiteral));
-    return id;
-}
-
 // ----------------------------
 
 MediaControlReturnToRealtimeButtonElement::MediaControlReturnToRealtimeButtonElement(Document& document)
     : MediaControlInputElement(document, MediaReturnToRealtimeButton)
 {
+    setPseudo(AtomicString("-webkit-media-controls-return-to-realtime-button", AtomicString::ConstructFromLiteral));
 }
 
 PassRefPtr<MediaControlReturnToRealtimeButtonElement> MediaControlReturnToRealtimeButtonElement::create(Document& document)
@@ -663,23 +598,18 @@ void MediaControlReturnToRealtimeButtonElement::defaultEventHandler(Event* event
     HTMLInputElement::defaultEventHandler(event);
 }
 
-const AtomicString& MediaControlReturnToRealtimeButtonElement::shadowPseudoId() const
-{
-    DEFINE_STATIC_LOCAL(AtomicString, id, ("-webkit-media-controls-return-to-realtime-button", AtomicString::ConstructFromLiteral));
-    return id;
-}
-
 // ----------------------------
 
 MediaControlToggleClosedCaptionsButtonElement::MediaControlToggleClosedCaptionsButtonElement(Document& document, MediaControls* controls)
     : MediaControlInputElement(document, MediaShowClosedCaptionsButton)
-#if PLATFORM(MAC) || PLATFORM(WIN) || PLATFORM(GTK)
+#if PLATFORM(COCOA) || PLATFORM(WIN) || PLATFORM(GTK)
     , m_controls(controls)
 #endif
 {
-#if !PLATFORM(MAC) && !PLATFORM(WIN) || !PLATFORM(GTK)
+#if !PLATFORM(COCOA) && !PLATFORM(WIN) || !PLATFORM(GTK)
     UNUSED_PARAM(controls);
 #endif
+    setPseudo(AtomicString("-webkit-media-controls-toggle-closed-captions-button", AtomicString::ConstructFromLiteral));
 }
 
 PassRefPtr<MediaControlToggleClosedCaptionsButtonElement> MediaControlToggleClosedCaptionsButtonElement::create(Document& document, MediaControls* controls)
@@ -707,7 +637,7 @@ void MediaControlToggleClosedCaptionsButtonElement::defaultEventHandler(Event* e
         // UI. Not all ports may want the closed captions button to toggle a list of tracks, so
         // we have to use #if.
         // https://bugs.webkit.org/show_bug.cgi?id=101877
-#if !PLATFORM(MAC) && !PLATFORM(WIN) && !PLATFORM(GTK)
+#if !PLATFORM(COCOA) && !PLATFORM(WIN) && !PLATFORM(GTK)
         mediaController()->setClosedCaptionsVisible(!mediaController()->closedCaptionsVisible());
         setChecked(mediaController()->closedCaptionsVisible());
         updateDisplayType();
@@ -720,17 +650,12 @@ void MediaControlToggleClosedCaptionsButtonElement::defaultEventHandler(Event* e
     HTMLInputElement::defaultEventHandler(event);
 }
 
-const AtomicString& MediaControlToggleClosedCaptionsButtonElement::shadowPseudoId() const
-{
-    DEFINE_STATIC_LOCAL(AtomicString, id, ("-webkit-media-controls-toggle-closed-captions-button", AtomicString::ConstructFromLiteral));
-    return id;
-}
-
 // ----------------------------
 
 MediaControlClosedCaptionsContainerElement::MediaControlClosedCaptionsContainerElement(Document& document)
     : MediaControlDivElement(document, MediaClosedCaptionsContainer)
 {
+    setPseudo(AtomicString("-webkit-media-controls-closed-captions-container", AtomicString::ConstructFromLiteral));
 }
 
 PassRefPtr<MediaControlClosedCaptionsContainerElement> MediaControlClosedCaptionsContainerElement::create(Document& document)
@@ -739,12 +664,6 @@ PassRefPtr<MediaControlClosedCaptionsContainerElement> MediaControlClosedCaption
     element->setAttribute(dirAttr, "auto");
     element->hide();
     return element.release();
-}
-
-const AtomicString& MediaControlClosedCaptionsContainerElement::shadowPseudoId() const
-{
-    DEFINE_STATIC_LOCAL(AtomicString, id, ("-webkit-media-controls-closed-captions-container", AtomicString::ConstructFromLiteral));
-    return id;
 }
 
 // ----------------------------
@@ -758,6 +677,7 @@ MediaControlClosedCaptionsTrackListElement::MediaControlClosedCaptionsTrackListE
 #if !ENABLE(VIDEO_TRACK)
     UNUSED_PARAM(controls);
 #endif
+    setPseudo(AtomicString("-webkit-media-controls-closed-captions-track-list", AtomicString::ConstructFromLiteral));
 }
 
 PassRefPtr<MediaControlClosedCaptionsTrackListElement> MediaControlClosedCaptionsTrackListElement::create(Document& document, MediaControls* controls)
@@ -804,16 +724,10 @@ void MediaControlClosedCaptionsTrackListElement::defaultEventHandler(Event* even
 #endif
 }
 
-const AtomicString& MediaControlClosedCaptionsTrackListElement::shadowPseudoId() const
-{
-    DEFINE_STATIC_LOCAL(AtomicString, id, ("-webkit-media-controls-closed-captions-track-list", AtomicString::ConstructFromLiteral));
-    return id;
-}
-
 void MediaControlClosedCaptionsTrackListElement::updateDisplay()
 {
 #if ENABLE(VIDEO_TRACK)
-    DEFINE_STATIC_LOCAL(AtomicString, selectedClassValue, ("selected", AtomicString::ConstructFromLiteral));
+    DEPRECATED_DEFINE_STATIC_LOCAL(AtomicString, selectedClassValue, ("selected", AtomicString::ConstructFromLiteral));
 
     if (!mediaController()->hasClosedCaptions())
         return;
@@ -923,6 +837,7 @@ MediaControlTimelineElement::MediaControlTimelineElement(Document& document, Med
     : MediaControlInputElement(document, MediaSlider)
     , m_controls(controls)
 {
+    setPseudo(AtomicString("-webkit-media-controls-timeline", AtomicString::ConstructFromLiteral));
 }
 
 PassRefPtr<MediaControlTimelineElement> MediaControlTimelineElement::create(Document& document, MediaControls* controls)
@@ -939,7 +854,7 @@ PassRefPtr<MediaControlTimelineElement> MediaControlTimelineElement::create(Docu
 void MediaControlTimelineElement::defaultEventHandler(Event* event)
 {
     // Left button is 0. Rejects mouse events not from left button.
-    if (event->isMouseEvent() && static_cast<MouseEvent*>(event)->button())
+    if (event->isMouseEvent() && toMouseEvent(event)->button())
         return;
 
     if (!renderer())
@@ -985,18 +900,12 @@ void MediaControlTimelineElement::setDuration(double duration)
     setAttribute(maxAttr, AtomicString::number(std::isfinite(duration) ? duration : 0));
 }
 
-
-const AtomicString& MediaControlTimelineElement::shadowPseudoId() const
-{
-    DEFINE_STATIC_LOCAL(AtomicString, id, ("-webkit-media-controls-timeline", AtomicString::ConstructFromLiteral));
-    return id;
-}
-
 // ----------------------------
 
 MediaControlPanelVolumeSliderElement::MediaControlPanelVolumeSliderElement(Document& document)
     : MediaControlVolumeSliderElement(document)
 {
+    setPseudo(AtomicString("-webkit-media-controls-volume-slider", AtomicString::ConstructFromLiteral));
 }
 
 PassRefPtr<MediaControlPanelVolumeSliderElement> MediaControlPanelVolumeSliderElement::create(Document& document)
@@ -1009,17 +918,12 @@ PassRefPtr<MediaControlPanelVolumeSliderElement> MediaControlPanelVolumeSliderEl
     return slider.release();
 }
 
-const AtomicString& MediaControlPanelVolumeSliderElement::shadowPseudoId() const
-{
-    DEFINE_STATIC_LOCAL(AtomicString, id, ("-webkit-media-controls-volume-slider", AtomicString::ConstructFromLiteral));
-    return id;
-}
-
 // ----------------------------
 
 MediaControlFullscreenVolumeSliderElement::MediaControlFullscreenVolumeSliderElement(Document& document)
     : MediaControlVolumeSliderElement(document)
 {
+    setPseudo(AtomicString("-webkit-media-controls-fullscreen-volume-slider", AtomicString::ConstructFromLiteral));
 }
 
 PassRefPtr<MediaControlFullscreenVolumeSliderElement> MediaControlFullscreenVolumeSliderElement::create(Document& document)
@@ -1032,17 +936,12 @@ PassRefPtr<MediaControlFullscreenVolumeSliderElement> MediaControlFullscreenVolu
     return slider.release();
 }
 
-const AtomicString& MediaControlFullscreenVolumeSliderElement::shadowPseudoId() const
-{
-    DEFINE_STATIC_LOCAL(AtomicString, id, ("-webkit-media-controls-fullscreen-volume-slider", AtomicString::ConstructFromLiteral));
-    return id;
-}
-
 // ----------------------------
 
 MediaControlFullscreenButtonElement::MediaControlFullscreenButtonElement(Document& document)
     : MediaControlInputElement(document, MediaEnterFullscreenButton)
 {
+    setPseudo(AtomicString("-webkit-media-controls-fullscreen-button", AtomicString::ConstructFromLiteral));
 }
 
 PassRefPtr<MediaControlFullscreenButtonElement> MediaControlFullscreenButtonElement::create(Document& document)
@@ -1076,12 +975,6 @@ void MediaControlFullscreenButtonElement::defaultEventHandler(Event* event)
     HTMLInputElement::defaultEventHandler(event);
 }
 
-const AtomicString& MediaControlFullscreenButtonElement::shadowPseudoId() const
-{
-    DEFINE_STATIC_LOCAL(AtomicString, id, ("-webkit-media-controls-fullscreen-button", AtomicString::ConstructFromLiteral));
-    return id;
-}
-
 void MediaControlFullscreenButtonElement::setIsFullscreen(bool isFullscreen)
 {
     setDisplayType(isFullscreen ? MediaExitFullscreenButton : MediaEnterFullscreenButton);
@@ -1092,6 +985,7 @@ void MediaControlFullscreenButtonElement::setIsFullscreen(bool isFullscreen)
 MediaControlFullscreenVolumeMinButtonElement::MediaControlFullscreenVolumeMinButtonElement(Document& document)
     : MediaControlInputElement(document, MediaUnMuteButton)
 {
+    setPseudo(AtomicString("-webkit-media-controls-fullscreen-volume-min-button", AtomicString::ConstructFromLiteral));
 }
 
 PassRefPtr<MediaControlFullscreenVolumeMinButtonElement> MediaControlFullscreenVolumeMinButtonElement::create(Document& document)
@@ -1112,17 +1006,12 @@ void MediaControlFullscreenVolumeMinButtonElement::defaultEventHandler(Event* ev
     HTMLInputElement::defaultEventHandler(event);
 }
 
-const AtomicString& MediaControlFullscreenVolumeMinButtonElement::shadowPseudoId() const
-{
-    DEFINE_STATIC_LOCAL(AtomicString, id, ("-webkit-media-controls-fullscreen-volume-min-button", AtomicString::ConstructFromLiteral));
-    return id;
-}
-
 // ----------------------------
 
 MediaControlFullscreenVolumeMaxButtonElement::MediaControlFullscreenVolumeMaxButtonElement(Document& document)
 : MediaControlInputElement(document, MediaMuteButton)
 {
+    setPseudo(AtomicString("-webkit-media-controls-fullscreen-volume-max-button", AtomicString::ConstructFromLiteral));
 }
 
 PassRefPtr<MediaControlFullscreenVolumeMaxButtonElement> MediaControlFullscreenVolumeMaxButtonElement::create(Document& document)
@@ -1143,17 +1032,12 @@ void MediaControlFullscreenVolumeMaxButtonElement::defaultEventHandler(Event* ev
     HTMLInputElement::defaultEventHandler(event);
 }
 
-const AtomicString& MediaControlFullscreenVolumeMaxButtonElement::shadowPseudoId() const
-{
-    DEFINE_STATIC_LOCAL(AtomicString, id, ("-webkit-media-controls-fullscreen-volume-max-button", AtomicString::ConstructFromLiteral));
-    return id;
-}
-
 // ----------------------------
 
 MediaControlTimeRemainingDisplayElement::MediaControlTimeRemainingDisplayElement(Document& document)
     : MediaControlTimeDisplayElement(document, MediaTimeRemainingDisplay)
 {
+    setPseudo(getMediaControlTimeRemainingDisplayElementShadowPseudoId());
 }
 
 PassRefPtr<MediaControlTimeRemainingDisplayElement> MediaControlTimeRemainingDisplayElement::create(Document& document)
@@ -1163,13 +1047,8 @@ PassRefPtr<MediaControlTimeRemainingDisplayElement> MediaControlTimeRemainingDis
 
 static const AtomicString& getMediaControlTimeRemainingDisplayElementShadowPseudoId()
 {
-    DEFINE_STATIC_LOCAL(AtomicString, id, ("-webkit-media-controls-time-remaining-display", AtomicString::ConstructFromLiteral));
+    DEPRECATED_DEFINE_STATIC_LOCAL(AtomicString, id, ("-webkit-media-controls-time-remaining-display", AtomicString::ConstructFromLiteral));
     return id;
-}
-
-const AtomicString& MediaControlTimeRemainingDisplayElement::shadowPseudoId() const
-{
-    return getMediaControlTimeRemainingDisplayElementShadowPseudoId();
 }
 
 // ----------------------------
@@ -1177,6 +1056,7 @@ const AtomicString& MediaControlTimeRemainingDisplayElement::shadowPseudoId() co
 MediaControlCurrentTimeDisplayElement::MediaControlCurrentTimeDisplayElement(Document& document)
     : MediaControlTimeDisplayElement(document, MediaCurrentTimeDisplay)
 {
+    setPseudo(getMediaControlCurrentTimeDisplayElementShadowPseudoId());
 }
 
 PassRefPtr<MediaControlCurrentTimeDisplayElement> MediaControlCurrentTimeDisplayElement::create(Document& document)
@@ -1186,13 +1066,8 @@ PassRefPtr<MediaControlCurrentTimeDisplayElement> MediaControlCurrentTimeDisplay
 
 static const AtomicString& getMediaControlCurrentTimeDisplayElementShadowPseudoId()
 {
-    DEFINE_STATIC_LOCAL(AtomicString, id, ("-webkit-media-controls-current-time-display", AtomicString::ConstructFromLiteral));
+    DEPRECATED_DEFINE_STATIC_LOCAL(AtomicString, id, ("-webkit-media-controls-current-time-display", AtomicString::ConstructFromLiteral));
     return id;
-}
-
-const AtomicString& MediaControlCurrentTimeDisplayElement::shadowPseudoId() const
-{
-    return getMediaControlCurrentTimeDisplayElementShadowPseudoId();
 }
 
 // ----------------------------
@@ -1204,7 +1079,9 @@ MediaControlTextTrackContainerElement::MediaControlTextTrackContainerElement(Doc
     , m_updateTimer(this, &MediaControlTextTrackContainerElement::updateTimerFired)
     , m_fontSize(0)
     , m_fontSizeIsImportant(false)
+    , m_updateTextTrackRepresentationStyle(false)
 {
+    setPseudo(AtomicString("-webkit-media-text-track-container", AtomicString::ConstructFromLiteral));
 }
 
 PassRefPtr<MediaControlTextTrackContainerElement> MediaControlTextTrackContainerElement::create(Document& document)
@@ -1216,19 +1093,13 @@ PassRefPtr<MediaControlTextTrackContainerElement> MediaControlTextTrackContainer
 
 RenderPtr<RenderElement> MediaControlTextTrackContainerElement::createElementRenderer(PassRef<RenderStyle> style)
 {
-    return createRenderer<RenderTextTrackContainerElement>(*this, std::move(style));
+    return createRenderer<RenderTextTrackContainerElement>(*this, WTF::move(style));
 }
 
-const AtomicString& MediaControlTextTrackContainerElement::textTrackContainerElementShadowPseudoId()
+static bool compareCueIntervalForDisplay(const CueInterval& one, const CueInterval& two)
 {
-    DEFINE_STATIC_LOCAL(AtomicString, id, ("-webkit-media-text-track-container", AtomicString::ConstructFromLiteral));
-    return id;
-}
-    
-const AtomicString& MediaControlTextTrackContainerElement::shadowPseudoId() const
-{
-    return textTrackContainerElementShadowPseudoId();
-}
+    return one.data()->isPositionedAbove(two.data());
+};
 
 void MediaControlTextTrackContainerElement::updateDisplay()
 {
@@ -1277,55 +1148,83 @@ void MediaControlTextTrackContainerElement::updateDisplay()
     // within the TextTrackCue instance itself. If parameters of the cue change,
     // the display tree is cleared.
 
+    // If the number of CSS boxes in the output is less than the number of cues
+    // we wish to render (e.g., we are adding another cue in a set of roll-up
+    // cues), remove all the existing CSS boxes representing the cues and re-add
+    // them so that the new cue is at the bottom.
+    if (childNodeCount() < activeCues.size())
+        removeChildren();
+
+    // Sort the active cues for the appropriate display order. For example, for roll-up
+    // or paint-on captions, we need to add the cues in reverse chronological order,
+    // so that the newest captions appear at the bottom.
+    std::sort(activeCues.begin(), activeCues.end(), &compareCueIntervalForDisplay);
+
     // 10. For each text track cue cue in cues that has not yet had
     // corresponding CSS boxes added to output, in text track cue order, run the
     // following substeps:
     for (size_t i = 0; i < activeCues.size(); ++i) {
-        TextTrackCue* cue = activeCues[i].data();
+        if (!mediaController()->closedCaptionsVisible())
+            continue;
+
+        TextTrackCue* textTrackCue = activeCues[i].data();
+        if (!textTrackCue->isRenderable())
+            continue;
+
+        VTTCue* cue = toVTTCue(textTrackCue);
 
         ASSERT(cue->isActive());
         if (!cue->track() || !cue->track()->isRendered() || !cue->isActive() || cue->text().isEmpty())
             continue;
 
-        RefPtr<TextTrackCueBox> displayBox = cue->getDisplayTree(m_videoDisplaySize.size());
-        if (displayBox->hasChildNodes() && !contains(displayBox.get())) {
-            // Note: the display tree of a cue is removed when the active flag of the cue is unset.
-            appendChild(displayBox, ASSERT_NO_EXCEPTION);
-            cue->setFontSize(m_fontSize, m_videoDisplaySize.size(), m_fontSizeIsImportant);
+        LOG(Media, "MediaControlTextTrackContainerElement::updateDisplay(%p) - adding and positioning cue #%zu: \"%s\", start=%.2f, end=%.2f, line=%.2f", this, i, cue->text().utf8().data(), cue->startTime(), cue->endTime(), cue->line());
+
+        RefPtr<VTTCueBox> displayBox = cue->getDisplayTree(m_videoDisplaySize.size(), m_fontSize);
+#if ENABLE(WEBVTT_REGIONS)
+        if (cue->track()->mode() == TextTrack::disabledKeyword())
+            continue;
+
+        VTTRegion* region = cue->track()->regions()->getRegionById(cue->regionId());
+        if (!region) {
+            // If cue has an empty text track cue region identifier or there is no
+            // WebVTT region whose region identifier is identical to cue's text
+            // track cue region identifier, run the following substeps:
+#endif
+            if (displayBox->hasChildNodes() && !contains(displayBox.get())) {
+                // Note: the display tree of a cue is removed when the active flag of the cue is unset.
+                appendChild(displayBox, ASSERT_NO_EXCEPTION);
+                cue->setFontSize(m_fontSize, m_videoDisplaySize.size(), m_fontSizeIsImportant);
+            }
+#if ENABLE(WEBVTT_REGIONS)
+        } else {
+            // Let region be the WebVTT region whose region identifier
+            // matches the text track cue region identifier of cue.
+            RefPtr<HTMLDivElement> regionNode = region->getDisplayTree();
+
+            // Append the region to the viewport, if it was not already.
+            if (!contains(regionNode.get()))
+                appendChild(region->getDisplayTree());
+
+            region->appendTextTrackCueBox(displayBox);
         }
+#endif
     }
 
     // 11. Return output.
     if (hasChildNodes()) {
         show();
-        if (mediaElement->requiresTextTrackRepresentation()) {
-            if (!m_textTrackRepresentation)
-                m_textTrackRepresentation = TextTrackRepresentation::create(this);
-            mediaElement->setTextTrackRepresentation(m_textTrackRepresentation.get());
-
-            if (Page* page = document().page())
-                m_textTrackRepresentation->setContentScale(page->deviceScaleFactor());
-
-            m_textTrackRepresentation->update();
-            setInlineStyleProperty(CSSPropertyWidth, m_videoDisplaySize.size().width(), CSSPrimitiveValue::CSS_PX);
-            setInlineStyleProperty(CSSPropertyHeight, m_videoDisplaySize.size().height(), CSSPrimitiveValue::CSS_PX);
-        }
+        updateTextTrackRepresentation();
     } else {
         hide();
         clearTextTrackRepresentation();
     }
 }
 
-void MediaControlTextTrackContainerElement::updateTimerFired(Timer<MediaControlTextTrackContainerElement>&)
+void MediaControlTextTrackContainerElement::updateActiveCuesFontSize()
 {
     if (!document().page())
         return;
 
-    if (m_textTrackRepresentation) {
-        setInlineStyleProperty(CSSPropertyWidth, m_videoDisplaySize.size().width(), CSSPrimitiveValue::CSS_PX);
-        setInlineStyleProperty(CSSPropertyHeight, m_videoDisplaySize.size().height(), CSSPrimitiveValue::CSS_PX);
-    }
-    
     HTMLMediaElement* mediaElement = parentMediaElement(this);
     if (!mediaElement)
         return;
@@ -1337,16 +1236,73 @@ void MediaControlTextTrackContainerElement::updateTimerFired(Timer<MediaControlT
     CueList activeCues = mediaElement->currentlyActiveCues();
     for (size_t i = 0; i < activeCues.size(); ++i) {
         TextTrackCue* cue = activeCues[i].data();
-        cue->setFontSize(m_fontSize, m_videoDisplaySize.size(), m_fontSizeIsImportant);
+        if (!cue->isRenderable())
+            continue;
+
+        toVTTCue(cue)->setFontSize(m_fontSize, m_videoDisplaySize.size(), m_fontSizeIsImportant);
     }
+
+}
+
+void MediaControlTextTrackContainerElement::updateTimerFired(Timer<MediaControlTextTrackContainerElement>&)
+{
+    if (!document().page())
+        return;
+
+    if (m_textTrackRepresentation)
+        updateStyleForTextTrackRepresentation();
+
+    updateActiveCuesFontSize();
     updateDisplay();
+}
+
+void MediaControlTextTrackContainerElement::updateTextTrackRepresentation()
+{
+    HTMLMediaElement* mediaElement = parentMediaElement(this);
+    if (!mediaElement)
+        return;
+
+    if (!mediaElement->requiresTextTrackRepresentation())
+        return;
+
+    if (!m_textTrackRepresentation) {
+        m_textTrackRepresentation = TextTrackRepresentation::create(this);
+        m_updateTextTrackRepresentationStyle = true;
+        mediaElement->setTextTrackRepresentation(m_textTrackRepresentation.get());
+    }
+
+    m_textTrackRepresentation->update();
+    updateStyleForTextTrackRepresentation();
 }
 
 void MediaControlTextTrackContainerElement::clearTextTrackRepresentation()
 {
+    if (!m_textTrackRepresentation)
+        return;
+
+    m_textTrackRepresentation = nullptr;
+    m_updateTextTrackRepresentationStyle = true;
     if (HTMLMediaElement* mediaElement = parentMediaElement(this))
         mediaElement->setTextTrackRepresentation(nullptr);
-    m_textTrackRepresentation = nullptr;
+    updateStyleForTextTrackRepresentation();
+    updateActiveCuesFontSize();
+}
+
+void MediaControlTextTrackContainerElement::updateStyleForTextTrackRepresentation()
+{
+    if (!m_updateTextTrackRepresentationStyle)
+        return;
+    m_updateTextTrackRepresentationStyle = false;
+
+    if (m_textTrackRepresentation) {
+        setInlineStyleProperty(CSSPropertyWidth, m_videoDisplaySize.size().width(), CSSPrimitiveValue::CSS_PX);
+        setInlineStyleProperty(CSSPropertyHeight, m_videoDisplaySize.size().height(), CSSPrimitiveValue::CSS_PX);
+        setInlineStyleProperty(CSSPropertyPosition, CSSValueAbsolute);
+        setInlineStyleProperty(CSSPropertyLeft, 0, CSSPrimitiveValue::CSS_PX);
+        setInlineStyleProperty(CSSPropertyTop, 0, CSSPrimitiveValue::CSS_PX);
+        return;
+    }
+
     removeInlineStyleProperty(CSSPropertyPosition);
     removeInlineStyleProperty(CSSPropertyWidth);
     removeInlineStyleProperty(CSSPropertyHeight);
@@ -1356,6 +1312,8 @@ void MediaControlTextTrackContainerElement::clearTextTrackRepresentation()
 
 void MediaControlTextTrackContainerElement::enteredFullscreen()
 {
+    if (hasChildNodes())
+        updateTextTrackRepresentation();
     updateSizes(true);
 }
 
@@ -1374,25 +1332,22 @@ void MediaControlTextTrackContainerElement::updateSizes(bool forceUpdate)
     if (!document().page())
         return;
 
-    IntRect videoBox;
+    mediaElement->syncTextTrackBounds();
 
+    IntRect videoBox;
     if (m_textTrackRepresentation)
         videoBox = m_textTrackRepresentation->bounds();
     else {
-#if ENABLE(PLUGIN_PROXY_FOR_VIDEO)
-        if (!mediaElement->renderer() || !mediaElement->renderer()->isWidget())
-            return;
-        videoBox = pixelSnappedIntRect(toRenderWidget(mediaElement->renderer())->contentBoxRect());
-#else
         if (!mediaElement->renderer() || !mediaElement->renderer()->isVideo())
             return;
         videoBox = toRenderVideo(*mediaElement->renderer()).videoBox();
-#endif
     }
 
     if (!forceUpdate && m_videoDisplaySize == videoBox)
         return;
+
     m_videoDisplaySize = videoBox;
+    m_updateTextTrackRepresentationStyle = true;
 
     // FIXME (121170): This function is called during layout, and should lay out the text tracks immediately.
     m_updateTimer.startOneShot(0);
@@ -1428,13 +1383,15 @@ PassRefPtr<Image> MediaControlTextTrackContainerElement::createTextTrackRepresen
     if (!buffer)
         return nullptr;
 
-    layer->paint(buffer->context(), paintingRect, PaintBehaviorFlattenCompositingLayers, nullptr, nullptr, RenderLayer::PaintLayerPaintingCompositingAllPhases);
+    layer->paint(buffer->context(), paintingRect, LayoutSize(), PaintBehaviorFlattenCompositingLayers, nullptr, RenderLayer::PaintLayerPaintingCompositingAllPhases);
 
     return buffer->copyImage();
 }
 
 void MediaControlTextTrackContainerElement::textTrackRepresentationBoundsChanged(const IntRect&)
 {
+    if (hasChildNodes())
+        updateTextTrackRepresentation();
     updateSizes();
 }
 

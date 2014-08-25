@@ -26,8 +26,6 @@
 #ifndef DFGDominators_h
 #define DFGDominators_h
 
-#include <wtf/Platform.h>
-
 #if ENABLE(DFG_JIT)
 
 #include "DFGAnalysis.h"
@@ -44,7 +42,7 @@ public:
     Dominators();
     ~Dominators();
     
-    void compute(Graph& graph);
+    void compute(Graph&);
     
     bool dominates(BlockIndex from, BlockIndex to) const
     {
@@ -57,7 +55,7 @@ public:
         return dominates(from->index, to->index);
     }
     
-    void dump(Graph& graph, PrintStream&) const;
+    void dump(Graph&, PrintStream&) const;
     
 private:
     bool pruneDominators(Graph&, BlockIndex);

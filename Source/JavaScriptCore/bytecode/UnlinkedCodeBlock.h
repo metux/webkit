@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012, 2013 Apple Inc. All Rights Reserved.
+ * Copyright (C) 2012, 2013, 2014 Apple Inc. All Rights Reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -66,26 +66,35 @@ typedef unsigned UnlinkedObjectAllocationProfile;
 typedef unsigned UnlinkedLLIntCallLinkInfo;
 
 struct ExecutableInfo {
-    ExecutableInfo(bool needsActivation, bool usesEval, bool isStrictMode, bool isConstructor)
+    ExecutableInfo(bool needsActivation, bool usesEval, bool isStrictMode, bool isConstructor, bool isBuiltinFunction)
         : m_needsActivation(needsActivation)
         , m_usesEval(usesEval)
         , m_isStrictMode(isStrictMode)
         , m_isConstructor(isConstructor)
+        , m_isBuiltinFunction(isBuiltinFunction)
     {
     }
-    bool m_needsActivation;
-    bool m_usesEval;
-    bool m_isStrictMode;
-    bool m_isConstructor;
+    bool m_needsActivation : 1;
+    bool m_usesEval : 1;
+    bool m_isStrictMode : 1;
+    bool m_isConstructor : 1;
+    bool m_isBuiltinFunction : 1;
+};
+
+enum UnlinkedFunctionKind {
+    UnlinkedNormalFunction,
+    UnlinkedBuiltinFunction,
 };
 
 class UnlinkedFunctionExecutable : public JSCell {
 public:
+    friend class BuiltinExecutables;
     friend class CodeCache;
+    friend class VM;
     typedef JSCell Base;
-    static UnlinkedFunctionExecutable* create(VM* vm, const SourceCode& source, FunctionBodyNode* node, bool isFromGlobalCode = false)
+    static UnlinkedFunctionExecutable* create(VM* vm, const SourceCode& source, FunctionBodyNode* node, UnlinkedFunctionKind unlinkedFunctionKind)
     {
-        UnlinkedFunctionExecutable* instance = new (NotNull, allocateCell<UnlinkedFunctionExecutable>(vm->heap)) UnlinkedFunctionExecutable(vm, vm->unlinkedFunctionExecutableStructure.get(), source, node, isFromGlobalCode);
+        UnlinkedFunctionExecutable* instance = new (NotNull, allocateCell<UnlinkedFunctionExecutable>(vm->heap)) UnlinkedFunctionExecutable(vm, vm->unlinkedFunctionExecutableStructure.get(), source, node, unlinkedFunctionKind);
         instance->finishCreation(*vm);
         return instance;
     }
@@ -99,7 +108,15 @@ public:
     }
     size_t parameterCount() const;
     bool isInStrictContext() const { return m_isInStrictContext; }
-    FunctionNameIsInScopeToggle functionNameIsInScopeToggle() const { return m_functionNameIsInScopeToggle; }
+    FunctionMode functionMode() const { return m_functionMode; }
+    JSParserStrictness toStrictness() const
+    {
+        if (m_isBuiltinFunction)
+            return JSParseBuiltin;
+        if (m_isInStrictContext)
+            return JSParseStrict;
+        return JSParseNormal;
+    }
 
     unsigned firstLineOffset() const { return m_firstLineOffset; }
     unsigned lineCount() const { return m_lineCount; }
@@ -108,14 +125,16 @@ public:
     unsigned unlinkedBodyEndColumn() const { return m_unlinkedBodyEndColumn; }
     unsigned startOffset() const { return m_startOffset; }
     unsigned sourceLength() { return m_sourceLength; }
+    unsigned highFidelityTypeProfilingStartOffset() const { return m_highFidelityTypeProfilingStartOffset; }
+    unsigned highFidelityTypeProfilingEndOffset() const { return m_highFidelityTypeProfilingEndOffset; }
 
     String paramString() const;
 
-    UnlinkedFunctionCodeBlock* codeBlockFor(VM&, const SourceCode&, CodeSpecializationKind, DebuggerMode, ProfilerMode, ParserError&);
+    UnlinkedFunctionCodeBlock* codeBlockFor(VM&, const SourceCode&, CodeSpecializationKind, DebuggerMode, ProfilerMode, bool bodyIncludesBraces, ParserError&);
 
     static UnlinkedFunctionExecutable* fromGlobalCode(const Identifier&, ExecState*, Debugger*, const SourceCode&, JSObject** exception);
 
-    FunctionExecutable* link(VM&, const SourceCode&, size_t lineOffset, size_t sourceOffset);
+    FunctionExecutable* link(VM&, const SourceCode&, size_t lineOffset);
 
     void clearCodeForRecompilation()
     {
@@ -142,8 +161,10 @@ public:
     static const bool hasImmortalStructure = true;
     static void destroy(JSCell*);
 
+    bool isBuiltinFunction() const { return m_isBuiltinFunction; }
+
 private:
-    UnlinkedFunctionExecutable(VM*, Structure*, const SourceCode&, FunctionBodyNode*, bool isFromGlobalCode);
+    UnlinkedFunctionExecutable(VM*, Structure*, const SourceCode&, FunctionBodyNode*, UnlinkedFunctionKind);
     WriteBarrier<UnlinkedFunctionCodeBlock> m_codeBlockForCall;
     WriteBarrier<UnlinkedFunctionCodeBlock> m_codeBlockForConstruct;
 
@@ -151,7 +172,7 @@ private:
     bool m_forceUsesArguments : 1;
     bool m_isInStrictContext : 1;
     bool m_hasCapturedVariables : 1;
-    bool m_isFromGlobalCode : 1;
+    bool m_isBuiltinFunction : 1;
 
     Identifier m_name;
     Identifier m_inferredName;
@@ -166,10 +187,12 @@ private:
     unsigned m_unlinkedBodyEndColumn;
     unsigned m_startOffset;
     unsigned m_sourceLength;
+    unsigned m_highFidelityTypeProfilingStartOffset;
+    unsigned m_highFidelityTypeProfilingEndOffset;
 
     CodeFeatures m_features;
 
-    FunctionNameIsInScopeToggle m_functionNameIsInScopeToggle;
+    FunctionMode m_functionMode;
 
 protected:
     void finishCreation(VM& vm)
@@ -186,7 +209,7 @@ public:
         return Structure::create(vm, globalObject, proto, TypeInfo(UnlinkedFunctionExecutableType, StructureFlags), info());
     }
 
-    static const unsigned StructureFlags = OverridesVisitChildren | JSCell::StructureFlags;
+    static const unsigned StructureFlags = StructureIsImmortal | JSCell::StructureFlags;
 
     DECLARE_EXPORT_INFO;
 };
@@ -249,10 +272,11 @@ public:
     bool usesEval() const { return m_usesEval; }
 
     bool needsFullScopeChain() const { return m_needsFullScopeChain; }
-    void setNeedsFullScopeChain(bool needsFullScopeChain) { m_needsFullScopeChain = needsFullScopeChain; }
 
     void addExpressionInfo(unsigned instructionOffset, int divot,
         int startOffset, int endOffset, unsigned line, unsigned column);
+
+    void addHighFidelityTypeProfileExpressionInfo(unsigned instructionOffset, unsigned startDivot, unsigned endDivot);
 
     bool hasExpressionInfo() { return m_expressionInfo.size(); }
 
@@ -319,6 +343,8 @@ public:
     void setIsNumericCompareFunction(bool isNumericCompareFunction) { m_isNumericCompareFunction = isNumericCompareFunction; }
     bool isNumericCompareFunction() const { return m_isNumericCompareFunction; }
 
+    bool isBuiltinFunction() const { return m_isBuiltinFunction; }
+    
     void shrinkToFit()
     {
         m_jumpTargets.shrinkToFit();
@@ -384,6 +410,7 @@ public:
     UnlinkedHandlerInfo& exceptionHandler(int index) { ASSERT(m_rareData); return m_rareData->m_exceptionHandlers[index]; }
 
     SymbolTable* symbolTable() const { return m_symbolTable.get(); }
+    void setSymbolTable(SymbolTable* table) { m_symbolTable.set(*m_vm, this, table); }
 
     VM* vm() const { return m_vm; }
 
@@ -403,7 +430,7 @@ public:
 
     VirtualRegister thisRegister() const { return m_thisRegister; }
     VirtualRegister activationRegister() const { return m_activationRegister; }
-
+    bool hasActivationRegister() const { return m_activationRegister.isValid(); }
 
     void addPropertyAccessInstruction(unsigned propertyAccessInstruction)
     {
@@ -442,6 +469,8 @@ public:
 
     void expressionRangeForBytecodeOffset(unsigned bytecodeOffset, int& divot,
         int& startOffset, int& endOffset, unsigned& line, unsigned& column);
+
+    bool highFidelityTypeProfileExpressionInfoForBytecodeOffset(unsigned bytecodeOffset, unsigned& startDivot, unsigned& endDivot);
 
     void recordParse(CodeFeatures features, bool hasCapturedVariables, unsigned firstLine, unsigned lineCount, unsigned endColumn)
     {
@@ -500,6 +529,7 @@ private:
     bool m_isStrictMode : 1;
     bool m_isConstructor : 1;
     bool m_hasCapturedVariables : 1;
+    bool m_isBuiltinFunction : 1;
     unsigned m_firstLine;
     unsigned m_lineCount;
     unsigned m_endColumn;
@@ -553,10 +583,15 @@ public:
 private:
     OwnPtr<RareData> m_rareData;
     Vector<ExpressionRangeInfo> m_expressionInfo;
+    struct HighFidelityTypeProfileExpressionRange {
+        unsigned m_startDivot;
+        unsigned m_endDivot;
+    };
+    HashMap<unsigned, HighFidelityTypeProfileExpressionRange> m_highFidelityTypeProfileInfoMap;
 
 protected:
 
-    static const unsigned StructureFlags = OverridesVisitChildren | Base::StructureFlags;
+    static const unsigned StructureFlags = StructureIsImmortal | Base::StructureFlags;
     static void visitChildren(JSCell*, SlotVisitor&);
 
 public:
@@ -572,8 +607,6 @@ protected:
         : Base(vm, structure, codeType, info)
     {
     }
-
-    static const unsigned StructureFlags = OverridesVisitChildren | Base::StructureFlags;
 
     DECLARE_INFO;
 };
@@ -625,8 +658,6 @@ public:
         return Structure::create(vm, globalObject, proto, TypeInfo(UnlinkedProgramCodeBlockType, StructureFlags), info());
     }
 
-    static const unsigned StructureFlags = OverridesVisitChildren | Base::StructureFlags;
-
     DECLARE_INFO;
 };
 
@@ -667,8 +698,6 @@ public:
         return Structure::create(vm, globalObject, proto, TypeInfo(UnlinkedEvalCodeBlockType, StructureFlags), info());
     }
 
-    static const unsigned StructureFlags = OverridesVisitChildren | Base::StructureFlags;
-
     DECLARE_INFO;
 };
 
@@ -695,8 +724,6 @@ public:
     {
         return Structure::create(vm, globalObject, proto, TypeInfo(UnlinkedFunctionCodeBlockType, StructureFlags), info());
     }
-
-    static const unsigned StructureFlags = OverridesVisitChildren | Base::StructureFlags;
 
     DECLARE_INFO;
 };

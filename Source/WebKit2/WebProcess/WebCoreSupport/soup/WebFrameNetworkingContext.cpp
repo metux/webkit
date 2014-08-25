@@ -32,6 +32,7 @@
 #include "WebPage.h"
 #include <WebCore/CookieJarSoup.h>
 #include <WebCore/NetworkStorageSession.h>
+#include <WebCore/SessionID.h>
 #include <WebCore/Settings.h>
 #include <WebCore/SoupNetworkSession.h>
 #include <wtf/NeverDestroyed.h>
@@ -40,14 +41,14 @@ using namespace WebCore;
 
 namespace WebKit {
 
-void WebFrameNetworkingContext::ensurePrivateBrowsingSession(uint64_t sessionID)
+void WebFrameNetworkingContext::ensurePrivateBrowsingSession(SessionID sessionID)
 {
     ASSERT(isMainThread());
 
     if (SessionTracker::session(sessionID))
         return;
 
-    SessionTracker::setSession(sessionID, NetworkStorageSession::createPrivateBrowsingSession(String::number(sessionID)));
+    SessionTracker::setSession(sessionID, NetworkStorageSession::createPrivateBrowsingSession(String::number(sessionID.sessionID())));
 }
 
 void WebFrameNetworkingContext::setCookieAcceptPolicyForAllContexts(HTTPCookieAcceptPolicy policy)
@@ -84,8 +85,8 @@ WebFrameNetworkingContext::WebFrameNetworkingContext(WebFrame* frame)
 
 NetworkStorageSession& WebFrameNetworkingContext::storageSession() const
 {
-    if (frame() && frame()->settings().privateBrowsingEnabled())
-        return *SessionTracker::session(SessionTracker::legacyPrivateSessionID);
+    if (frame() && frame()->page()->usesEphemeralSession())
+        return *SessionTracker::session(SessionID::legacyPrivateSessionID());
 
     return NetworkStorageSession::defaultStorageSession();
 }

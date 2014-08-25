@@ -28,7 +28,7 @@ messages -> WebProcessProxy LegacyReceiver {
     DidPerformServerRedirect(uint64_t pageID, String sourceURLString, String destinationURLString, uint64_t frameID)
     DidUpdateHistoryTitle(uint64_t pageID, String title, String url, uint64_t frameID)
 
-    AddBackForwardItem(uint64_t itemID, String originalURL, String url, String title, IPC::DataReference backForwardData)
+    AddBackForwardItem(uint64_t itemID, uint64_t pageID, WebKit::PageState pageState)
     DidDestroyFrame(uint64_t frameID) 
 
     ShouldTerminate() -> (bool shouldTerminate)
@@ -47,4 +47,6 @@ messages -> WebProcessProxy LegacyReceiver {
 #if ENABLE(DATABASE_PROCESS)
     GetDatabaseProcessConnection() -> (IPC::Attachment connectionHandle) Delayed
 #endif
+    ProcessReadyToSuspend()
+    DidCancelProcessSuspension()
 }

@@ -11,10 +11,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -36,6 +36,7 @@
 #include "Path.h"
 #include "PlatformPathCairo.h"
 #include "RefPtrCairo.h"
+#include <wtf/Assertions.h>
 #include <wtf/Vector.h>
 
 #if ENABLE(ACCELERATED_2D_CANVAS)
@@ -259,4 +260,38 @@ IntSize cairoSurfaceSize(cairo_surface_t* surface)
     }
 }
 
+void flipImageSurfaceVertically(cairo_surface_t* surface)
+{
+    ASSERT(cairo_surface_get_type(surface) == CAIRO_SURFACE_TYPE_IMAGE);
+
+    IntSize size = cairoSurfaceSize(surface);
+    ASSERT(!size.isEmpty());
+
+    int stride = cairo_image_surface_get_stride(surface);
+    int halfHeight = size.height() / 2;
+
+    uint8_t* source = static_cast<uint8_t*>(cairo_image_surface_get_data(surface));
+    std::unique_ptr<uint8_t[]> tmp = std::make_unique<uint8_t[]>(stride);
+
+    for (int i = 0; i < halfHeight; ++i) {
+        uint8_t* top = source + (i * stride);
+        uint8_t* bottom = source + ((size.height()-i-1) * stride);
+
+        memcpy(tmp.get(), top, stride);
+        memcpy(top, bottom, stride);
+        memcpy(bottom, tmp.get(), stride);
+    }
+}
+
+void cairoSurfaceSetDeviceScale(cairo_surface_t* surface, double xScale, double yScale)
+{
+    // This function was added pretty much simultaneous to when 1.13 was branched.
+#if HAVE(CAIRO_SURFACE_SET_DEVICE_SCALE)
+    cairo_surface_set_device_scale(surface, xScale, yScale);
+#else
+    UNUSED_PARAM(surface);
+    ASSERT_UNUSED(xScale, 1 == xScale);
+    ASSERT_UNUSED(yScale, 1 == yScale);
+#endif
+}
 } // namespace WebCore

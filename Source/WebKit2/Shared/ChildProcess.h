@@ -63,11 +63,8 @@ public:
     void removeMessageReceiver(IPC::StringReference messageReceiverName, uint64_t destinationID);
 
     void setProcessSuppressionEnabled(bool);
-    bool processSuppressionEnabled() const { return !m_processSuppressionDisabled.isActive(); }
-    void incrementActiveTaskCount();
-    void decrementActiveTaskCount();
 
-#if PLATFORM(MAC)
+#if PLATFORM(COCOA)
     void setApplicationIsDaemon();
     void setQOS(int latencyQOS, int throughputQOS);
 #endif
@@ -92,7 +89,7 @@ protected:
 
     virtual void stopRunLoop();
 
-#if PLATFORM(MAC)
+#if USE(APPKIT)
     static void stopNSAppRunLoop();
 #endif
 
@@ -119,7 +116,6 @@ private:
     IPC::MessageReceiverMap m_messageReceiverMap;
 
     UserActivity m_processSuppressionDisabled;
-    UserActivity m_activeTasks;
 };
 
 } // namespace WebKit

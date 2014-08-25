@@ -10,7 +10,7 @@
  * 2.  Redistributions in binary form must reproduce the above copyright
  *     notice, this list of conditions and the following disclaimer in the
  *     documentation and/or other materials provided with the distribution.
- * 3.  Neither the name of Apple Computer, Inc. ("Apple") nor the names of
+ * 3.  Neither the name of Apple Inc. ("Apple") nor the names of
  *     its contributors may be used to endorse or promote products derived
  *     from this software without specific prior written permission.
  *
@@ -34,6 +34,7 @@
 #include "AbstractSQLTransactionBackend.h"
 #include "DatabaseBasicTypes.h"
 #include "SQLTransactionStateMachine.h"
+#include <memory>
 #include <wtf/Deque.h>
 #include <wtf/Forward.h>
 #include <wtf/text/WTFString.h>
@@ -85,7 +86,7 @@ private:
     virtual PassRefPtr<SQLError> transactionError() override;
     virtual AbstractSQLStatement* currentStatement() override;
     virtual void setShouldRetryCurrentStatement(bool) override;
-    virtual void executeSQL(PassOwnPtr<AbstractSQLStatement>, const String& statement,
+    virtual void executeSQL(std::unique_ptr<AbstractSQLStatement>, const String& statement,
         const Vector<SQLValue>& arguments, int permissions) override;
 
     void doCleanup();
@@ -135,7 +136,7 @@ private:
     Mutex m_statementMutex;
     Deque<RefPtr<SQLStatementBackend>> m_statementQueue;
 
-    OwnPtr<SQLiteTransaction> m_sqliteTransaction;
+    std::unique_ptr<SQLiteTransaction> m_sqliteTransaction;
     RefPtr<OriginLock> m_originLock;
 };
 

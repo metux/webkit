@@ -19,8 +19,6 @@
  */
 
 #include "config.h"
-
-#if ENABLE(SVG)
 #include "SVGGraphicsElement.h"
 
 #include "AffineTransform.h"
@@ -30,6 +28,7 @@
 #include "SVGElementInstance.h"
 #include "SVGNames.h"
 #include "SVGPathData.h"
+#include <wtf/NeverDestroyed.h>
 
 namespace WebCore {
 
@@ -44,6 +43,7 @@ END_REGISTER_ANIMATED_PROPERTIES
 
 SVGGraphicsElement::SVGGraphicsElement(const QualifiedName& tagName, Document& document)
     : SVGElement(tagName, document)
+    , m_shouldIsolateBlending(false)
 {
     registerAnimatedPropertiesForSVGGraphicsElement();
 }
@@ -76,6 +76,14 @@ AffineTransform SVGGraphicsElement::animatedLocalTransform() const
 
         // Flatten any 3D transform.
         matrix = transform.toAffineTransform();
+        // CSS bakes the zoom factor into lengths, including translation components.
+        // In order to align CSS & SVG transforms, we need to invert this operation.
+        float zoom = style->effectiveZoom();
+        if (zoom != 1) {
+            matrix.setE(matrix.e() / zoom);
+            matrix.setF(matrix.f() / zoom);
+        }
+
     } else
         transform().concatenate(matrix);
 
@@ -93,12 +101,12 @@ AffineTransform* SVGGraphicsElement::supplementalTransform()
 
 bool SVGGraphicsElement::isSupportedAttribute(const QualifiedName& attrName)
 {
-    DEFINE_STATIC_LOCAL(HashSet<QualifiedName>, supportedAttributes, ());
-    if (supportedAttributes.isEmpty()) {
+    static NeverDestroyed<HashSet<QualifiedName>> supportedAttributes;
+    if (supportedAttributes.get().isEmpty()) {
         SVGTests::addSupportedAttributes(supportedAttributes);
-        supportedAttributes.add(SVGNames::transformAttr);
+        supportedAttributes.get().add(SVGNames::transformAttr);
     }
-    return supportedAttributes.contains<SVGAttributeHashTranslator>(attrName);
+    return supportedAttributes.get().contains<SVGAttributeHashTranslator>(attrName);
 }
 
 void SVGGraphicsElement::parseAttribute(const QualifiedName& name, const AtomicString& value)
@@ -165,7 +173,7 @@ FloatRect SVGGraphicsElement::getBBox(StyleUpdateStrategy styleUpdateStrategy)
 RenderPtr<RenderElement> SVGGraphicsElement::createElementRenderer(PassRef<RenderStyle> style)
 {
     // By default, any subclass is expected to do path-based drawing
-    return createRenderer<RenderSVGPath>(*this, std::move(style));
+    return createRenderer<RenderSVGPath>(*this, WTF::move(style));
 }
 
 void SVGGraphicsElement::toClipPath(Path& path)
@@ -176,5 +184,3 @@ void SVGGraphicsElement::toClipPath(Path& path)
 }
 
 }
-
-#endif // ENABLE(SVG)

@@ -22,8 +22,6 @@
  */
 
 #include "config.h"
-
-#if ENABLE(SVG)
 #include "SVGLinearGradientElement.h"
 
 #include "Attribute.h"
@@ -37,6 +35,7 @@
 #include "SVGTransform.h"
 #include "SVGTransformList.h"
 #include "SVGUnitTypes.h"
+#include <wtf/NeverDestroyed.h>
 
 namespace WebCore {
 
@@ -73,14 +72,14 @@ PassRefPtr<SVGLinearGradientElement> SVGLinearGradientElement::create(const Qual
 
 bool SVGLinearGradientElement::isSupportedAttribute(const QualifiedName& attrName)
 {
-    DEFINE_STATIC_LOCAL(HashSet<QualifiedName>, supportedAttributes, ());
-    if (supportedAttributes.isEmpty()) {
-        supportedAttributes.add(SVGNames::x1Attr);
-        supportedAttributes.add(SVGNames::x2Attr);
-        supportedAttributes.add(SVGNames::y1Attr);
-        supportedAttributes.add(SVGNames::y2Attr);
+    static NeverDestroyed<HashSet<QualifiedName>> supportedAttributes;
+    if (supportedAttributes.get().isEmpty()) {
+        supportedAttributes.get().add(SVGNames::x1Attr);
+        supportedAttributes.get().add(SVGNames::x2Attr);
+        supportedAttributes.get().add(SVGNames::y1Attr);
+        supportedAttributes.get().add(SVGNames::y2Attr);
     }
-    return supportedAttributes.contains<SVGAttributeHashTranslator>(attrName);
+    return supportedAttributes.get().contains<SVGAttributeHashTranslator>(attrName);
 }
 
 void SVGLinearGradientElement::parseAttribute(const QualifiedName& name, const AtomicString& value)
@@ -120,7 +119,7 @@ void SVGLinearGradientElement::svgAttributeChanged(const QualifiedName& attrName
 
 RenderPtr<RenderElement> SVGLinearGradientElement::createElementRenderer(PassRef<RenderStyle> style)
 {
-    return createRenderer<RenderSVGResourceLinearGradient>(*this, std::move(style));
+    return createRenderer<RenderSVGResourceLinearGradient>(*this, WTF::move(style));
 }
 
 static void setGradientAttributes(SVGGradientElement& element, LinearGradientAttributes& attributes, bool isLinear = true)
@@ -203,5 +202,3 @@ bool SVGLinearGradientElement::selfHasRelativeLengths() const
 }
 
 }
-
-#endif // ENABLE(SVG)

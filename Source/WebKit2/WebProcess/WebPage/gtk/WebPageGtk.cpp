@@ -42,6 +42,7 @@
 #include <WebCore/PasteboardHelper.h>
 #include <WebCore/PlatformKeyboardEvent.h>
 #include <WebCore/Settings.h>
+#include <WebCore/UserAgentGtk.h>
 #include <wtf/gobject/GUniquePtr.h>
 
 using namespace WebCore;
@@ -63,6 +64,10 @@ void WebPage::platformInitialize()
 #if USE(TEXTURE_MAPPER_GL)
     m_nativeWindowHandle = 0;
 #endif
+}
+
+void WebPage::platformDetach()
+{
 }
 
 #if HAVE(ACCESSIBILITY)
@@ -162,10 +167,18 @@ PassRefPtr<SharedBuffer> WebPage::cachedResponseDataForURL(const URL&)
 }
 
 #if USE(TEXTURE_MAPPER_GL)
-void WebPage::setAcceleratedCompositingWindowId(int64_t nativeWindowHandle)
+void WebPage::setAcceleratedCompositingWindowId(uint64_t nativeWindowHandle)
 {
     m_nativeWindowHandle = nativeWindowHandle;
 }
 #endif
+
+String WebPage::platformUserAgent(const URL& url) const
+{
+    if (url.isNull() || !m_page->settings().needsSiteSpecificQuirks())
+        return String();
+
+    return WebCore::standardUserAgentForURL(url);
+}
 
 } // namespace WebKit

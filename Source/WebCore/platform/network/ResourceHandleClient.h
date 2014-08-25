@@ -1,6 +1,6 @@
 /*
- * Copyright (C) 2006 Apple Computer, Inc.  All rights reserved.
- * Copyright (C) 2013 Apple Computer, Inc.  All rights reserved.
+ * Copyright (C) 2006 Apple Inc.  All rights reserved.
+ * Copyright (C) 2013 Apple Inc.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -11,10 +11,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -35,7 +35,7 @@
 #include <wtf/RetainPtr.h>
 #endif
 
-#if PLATFORM(MAC)
+#if PLATFORM(COCOA)
 OBJC_CLASS NSCachedURLResponse;
 #endif
 
@@ -49,6 +49,10 @@ namespace WebCore {
     class ResourceRequest;
     class ResourceResponse;
     class SharedBuffer;
+
+#if USE(QUICK_LOOK)
+    class QuickLookHandle;
+#endif
 
     enum CacheStoragePolicy {
         StorageAllowed,
@@ -83,8 +87,6 @@ namespace WebCore {
         // Client will call ResourceHandle::continueDidReceiveResponse() when ready.
         virtual void didReceiveResponseAsync(ResourceHandle*, const ResourceResponse&);
 
-        // Client will pass an updated request using ResourceHandle::continueShouldUseCredentialStorage() when ready.
-        virtual void shouldUseCredentialStorageAsync(ResourceHandle*);
 #if USE(PROTECTION_SPACE_AUTH_CALLBACK)
         // Client will pass an updated request using ResourceHandle::continueCanAuthenticateAgainstProtectionSpace() when ready.
         virtual void canAuthenticateAgainstProtectionSpaceAsync(ResourceHandle*, const ProtectionSpace&);
@@ -92,7 +94,7 @@ namespace WebCore {
         // Client will pass an updated request using ResourceHandle::continueWillCacheResponse() when ready.
 #if USE(CFNETWORK)
         virtual void willCacheResponseAsync(ResourceHandle*, CFCachedURLResponseRef);
-#elif PLATFORM(MAC)
+#elif PLATFORM(COCOA)
         virtual void willCacheResponseAsync(ResourceHandle*, NSCachedURLResponse *);
 #endif
 
@@ -120,11 +122,13 @@ namespace WebCore {
         virtual bool shouldCacheResponse(ResourceHandle*, CFCachedURLResponseRef) { return true; }
 #endif // PLATFORM(WIN)
 
-#elif PLATFORM(MAC)
+#elif PLATFORM(COCOA)
         virtual NSCachedURLResponse *willCacheResponse(ResourceHandle*, NSCachedURLResponse *response) { return response; }
-        virtual void willStopBufferingData(ResourceHandle*, const char*, unsigned) { }
 #endif
 
+#if USE(QUICK_LOOK)
+        virtual void didCreateQuickLookHandle(QuickLookHandle&) { }
+#endif
     };
 
 }

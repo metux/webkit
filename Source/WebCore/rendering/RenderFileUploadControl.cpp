@@ -59,7 +59,7 @@ const int defaultWidthNumChars = 38;
 const int buttonShadowHeight = 2;
 
 RenderFileUploadControl::RenderFileUploadControl(HTMLInputElement& input, PassRef<RenderStyle> style)
-    : RenderBlockFlow(input, std::move(style))
+    : RenderBlockFlow(input, WTF::move(style))
     , m_canReceiveDroppedFiles(input.canReceiveDroppedFiles())
 {
 }
@@ -71,11 +71,6 @@ RenderFileUploadControl::~RenderFileUploadControl()
 HTMLInputElement& RenderFileUploadControl::inputElement() const
 {
     return toHTMLInputElement(nodeForNonAnonymous());
-}
-
-bool RenderFileUploadControl::canBeReplacedWithInlineRunIn() const
-{
-    return false;
 }
 
 void RenderFileUploadControl::updateFromElement()
@@ -187,7 +182,7 @@ void RenderFileUploadControl::paintObject(PaintInfo& paintInfo, const LayoutPoin
                 // Draw the file icon and decorations.
                 IntRect iconRect(iconX, iconY, iconWidth, iconHeight);
                 RenderTheme::FileUploadDecorations decorationsType = inputElement().files()->length() == 1 ? RenderTheme::SingleFile : RenderTheme::MultipleFiles;
-                theme().paintFileUploadIconDecorations(this, buttonRenderer, paintInfo, iconRect, inputElement().icon(), decorationsType);
+                theme().paintFileUploadIconDecorations(*this, *buttonRenderer, paintInfo, iconRect, inputElement().icon(), decorationsType);
             }
 #else
             // Draw the file icon
@@ -244,14 +239,14 @@ void RenderFileUploadControl::computePreferredLogicalWidths()
         m_minPreferredLogicalWidth = std::min(m_minPreferredLogicalWidth, adjustContentBoxLogicalWidthForBoxSizing(style().maxWidth().value()));
     }
 
-    int toAdd = borderAndPaddingWidth();
+    int toAdd = horizontalBorderAndPaddingExtent();
     m_minPreferredLogicalWidth += toAdd;
     m_maxPreferredLogicalWidth += toAdd;
 
     setPreferredLogicalWidthsDirty(false);
 }
 
-VisiblePosition RenderFileUploadControl::positionForPoint(const LayoutPoint&)
+VisiblePosition RenderFileUploadControl::positionForPoint(const LayoutPoint&, const RenderRegion*)
 {
     return VisiblePosition();
 }

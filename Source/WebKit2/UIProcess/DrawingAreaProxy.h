@@ -28,14 +28,15 @@
 #define DrawingAreaProxy_h
 
 #include "DrawingAreaInfo.h"
+#include "GenericCallback.h"
 #include "MessageReceiver.h"
 #include <WebCore/FloatRect.h>
 #include <WebCore/IntRect.h>
 #include <WebCore/IntSize.h>
-#include <WebCore/Timer.h>
 #include <chrono>
 #include <stdint.h>
 #include <wtf/Noncopyable.h>
+#include <wtf/RunLoop.h>
 
 namespace WebKit {
 
@@ -74,12 +75,20 @@ public:
     virtual void commitTransientZoom(double, WebCore::FloatPoint) { }
 
 #if PLATFORM(MAC)
-    void setExposedRect(const WebCore::FloatRect&);
+    virtual void setExposedRect(const WebCore::FloatRect&);
     WebCore::FloatRect exposedRect() const { return m_exposedRect; }
-    void exposedRectChangedTimerFired(WebCore::Timer<DrawingAreaProxy>*);
-    
-    void setCustomFixedPositionRect(const WebCore::FloatRect&);
 #endif
+#if PLATFORM(COCOA)
+    void exposedRectChangedTimerFired();
+#endif
+
+    virtual void updateDebugIndicator() { }
+
+    virtual void waitForDidUpdateViewState() { }
+    
+    virtual void dispatchAfterEnsuringDrawing(std::function<void (CallbackBase::Error)>) { ASSERT_NOT_REACHED(); }
+
+    virtual void hideContentUntilNextUpdate() { ASSERT_NOT_REACHED(); }
 
 protected:
     explicit DrawingAreaProxy(DrawingAreaType, WebPageProxy*);
@@ -101,20 +110,23 @@ private:
     // FIXME: These should be pure virtual.
     virtual void update(uint64_t /* backingStoreStateID */, const UpdateInfo&) { }
     virtual void didUpdateBackingStoreState(uint64_t /* backingStoreStateID */, const UpdateInfo&, const LayerTreeContext&) { }
-#if USE(ACCELERATED_COMPOSITING)
     virtual void enterAcceleratedCompositingMode(uint64_t /* backingStoreStateID */, const LayerTreeContext&) { }
     virtual void exitAcceleratedCompositingMode(uint64_t /* backingStoreStateID */, const UpdateInfo&) { }
     virtual void updateAcceleratedCompositingMode(uint64_t /* backingStoreStateID */, const LayerTreeContext&) { }
-#endif
-#if PLATFORM(MAC)
+#if PLATFORM(COCOA)
     virtual void didUpdateGeometry() { }
     virtual void intrinsicContentSizeDidChange(const WebCore::IntSize& newIntrinsicContentSize) { }
 
-    WebCore::Timer<DrawingAreaProxy> m_exposedRectChangedTimer;
+#if PLATFORM(MAC)
+    RunLoop::Timer<DrawingAreaProxy> m_exposedRectChangedTimer;
     WebCore::FloatRect m_exposedRect;
     WebCore::FloatRect m_lastSentExposedRect;
+#endif // PLATFORM(MAC)
 #endif
 };
+
+#define DRAWING_AREA_PROXY_TYPE_CASTS(ToValueTypeName, predicate) \
+    TYPE_CASTS_BASE(ToValueTypeName, DrawingAreaProxy, value, value->predicate, value.predicate)
 
 } // namespace WebKit
 

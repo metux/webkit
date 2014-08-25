@@ -10,10 +10,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -26,13 +26,13 @@
 #ifndef ResourceBuffer_h
 #define ResourceBuffer_h
 
-#include "SharedBuffer.h"
-
 #include <wtf/PassOwnPtr.h>
 #include <wtf/PassRefPtr.h>
 #include <wtf/RefCounted.h>
+#include <wtf/RefPtr.h>
+#include <wtf/RetainPtr.h>
 
-#if PLATFORM(MAC)
+#if USE(FOUNDATION)
 OBJC_CLASS NSData;
 #endif
 
@@ -46,7 +46,7 @@ public:
 
     static PassRefPtr<ResourceBuffer> create() { return adoptRef(new ResourceBuffer); }
     static PassRefPtr<ResourceBuffer> create(const char* data, unsigned size) { return adoptRef(new ResourceBuffer(data, size)); }
-    static PassRefPtr<ResourceBuffer> adoptSharedBuffer(PassRefPtr<SharedBuffer> shared) { return shared ? adoptRef(new ResourceBuffer(shared)) : 0; }
+    static PassRefPtr<ResourceBuffer> adoptSharedBuffer(PassRefPtr<SharedBuffer>);
 
     virtual ~ResourceBuffer();
 
@@ -64,7 +64,7 @@ public:
     unsigned getSomeData(const char*& data, unsigned position = 0) const;
     
     SharedBuffer* sharedBuffer() const;
-#if PLATFORM(MAC)
+#if USE(FOUNDATION)
     void tryReplaceSharedBufferContents(SharedBuffer*);
 #endif
     PassRefPtr<ResourceBuffer> copy() const;
@@ -80,8 +80,8 @@ public:
     // Ensure this buffer has no other clients before calling this.
     PassOwnPtr<PurgeableBuffer> releasePurgeableBuffer();
 
-#if PLATFORM(MAC)
-    SharedBuffer::NSDataRetainPtrWithoutImplicitConversionOperator createNSData();
+#if USE(FOUNDATION)
+    RetainPtr<NSData> createNSData();
 #endif
 #if USE(CF)
     RetainPtr<CFDataRef> createCFData();

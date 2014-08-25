@@ -21,6 +21,7 @@
 #ifndef WTF_HashMap_h
 #define WTF_HashMap_h
 
+#include <initializer_list>
 #include <wtf/HashTable.h>
 #include <wtf/IteratorRange.h>
 
@@ -72,13 +73,11 @@ public:
     {
     }
 
-#if COMPILER_SUPPORTS(CXX_GENERALIZED_INITIALIZERS)
     HashMap(std::initializer_list<KeyValuePairType> initializerList)
     {
         for (const auto& keyValuePair : initializerList)
             add(keyValuePair.key, keyValuePair.value);
     }
-#endif
 
     void swap(HashMap&);
 
@@ -115,8 +114,14 @@ public:
     template<typename V> AddResult add(const KeyType&, V&&);
     template<typename V> AddResult add(KeyType&&, V&&);
 
+    // Same as add(), but aggressively inlined.
+    template<typename V> AddResult fastAdd(const KeyType&, V&&);
+    template<typename V> AddResult fastAdd(KeyType&&, V&&);
+
     bool remove(const KeyType&);
     bool remove(iterator);
+    template<typename Functor>
+    void removeIf(const Functor& functor);
     void clear();
 
     MappedType take(const KeyType&); // efficient combination of get with remove
@@ -277,7 +282,7 @@ auto HashMap<KeyArg, MappedArg, HashArg, KeyTraitsArg, MappedTraitsArg>::inlineS
 
 template<typename KeyArg, typename MappedArg, typename HashArg, typename KeyTraitsArg, typename MappedTraitsArg>
 template<typename K, typename V>
-auto HashMap<KeyArg, MappedArg, HashArg, KeyTraitsArg, MappedTraitsArg>::inlineAdd(K&& key, V&& value) -> AddResult
+ALWAYS_INLINE auto HashMap<KeyArg, MappedArg, HashArg, KeyTraitsArg, MappedTraitsArg>::inlineAdd(K&& key, V&& value) -> AddResult
 {
     return m_impl.template add<HashMapTranslator<KeyValuePairTraits, HashFunctions>>(std::forward<K>(key), std::forward<V>(value));
 }
@@ -293,7 +298,7 @@ template<typename KeyArg, typename MappedArg, typename HashArg, typename KeyTrai
 template<typename T>
 auto HashMap<KeyArg, MappedArg, HashArg, KeyTraitsArg, MappedTraitsArg>::set(KeyType&& key, T&& mapped) -> AddResult
 {
-    return inlineSet(std::move(key), std::forward<T>(mapped));
+    return inlineSet(WTF::move(key), std::forward<T>(mapped));
 }
 
 template<typename KeyArg, typename MappedArg, typename HashArg, typename KeyTraitsArg, typename MappedTraitsArg>
@@ -314,7 +319,21 @@ template<typename KeyArg, typename MappedArg, typename HashArg, typename KeyTrai
 template<typename T>
 auto HashMap<KeyArg, MappedArg, HashArg, KeyTraitsArg, MappedTraitsArg>::add(KeyType&& key, T&& mapped) -> AddResult
 {
-    return inlineAdd(std::move(key), std::forward<T>(mapped));
+    return inlineAdd(WTF::move(key), std::forward<T>(mapped));
+}
+
+template<typename KeyArg, typename MappedArg, typename HashArg, typename KeyTraitsArg, typename MappedTraitsArg>
+template<typename T>
+ALWAYS_INLINE auto HashMap<KeyArg, MappedArg, HashArg, KeyTraitsArg, MappedTraitsArg>::fastAdd(const KeyType& key, T&& mapped) -> AddResult
+{
+    return inlineAdd(key, std::forward<T>(mapped));
+}
+
+template<typename KeyArg, typename MappedArg, typename HashArg, typename KeyTraitsArg, typename MappedTraitsArg>
+template<typename T>
+ALWAYS_INLINE auto HashMap<KeyArg, MappedArg, HashArg, KeyTraitsArg, MappedTraitsArg>::fastAdd(KeyType&& key, T&& mapped) -> AddResult
+{
+    return inlineAdd(WTF::move(key), std::forward<T>(mapped));
 }
 
 template<typename T, typename U, typename V, typename W, typename MappedTraits>
@@ -337,6 +356,13 @@ inline bool HashMap<T, U, V, W, X>::remove(iterator it)
 }
 
 template<typename T, typename U, typename V, typename W, typename X>
+template<typename Functor>
+inline void HashMap<T, U, V, W, X>::removeIf(const Functor& functor)
+{
+    m_impl.removeIf(functor);
+}
+
+template<typename T, typename U, typename V, typename W, typename X>
 inline bool HashMap<T, U, V, W, X>::remove(const KeyType& key)
 {
     return remove(find(key));
@@ -354,7 +380,7 @@ auto HashMap<T, U, V, W, MappedTraits>::take(const KeyType& key) -> MappedType
     iterator it = find(key);
     if (it == end())
         return MappedTraits::emptyValue();
-    MappedType value = std::move(it->value);
+    MappedType value = WTF::move(it->value);
     remove(it);
     return value;
 }

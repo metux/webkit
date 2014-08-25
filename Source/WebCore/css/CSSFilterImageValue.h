@@ -50,16 +50,16 @@ class CSSFilterImageValue : public CSSImageGeneratorValue {
 public:
     static PassRef<CSSFilterImageValue> create(PassRef<CSSValue> imageValue, PassRef<CSSValue> filterValue)
     {
-        return adoptRef(*new CSSFilterImageValue(std::move(imageValue), std::move(filterValue)));
+        return adoptRef(*new CSSFilterImageValue(WTF::move(imageValue), WTF::move(filterValue)));
     }
 
     ~CSSFilterImageValue();
 
     String customCSSText() const;
 
-    PassRefPtr<Image> image(RenderElement*, const IntSize&);
+    PassRefPtr<Image> image(RenderElement*, const FloatSize&);
     bool isFixedSize() const { return true; }
-    IntSize fixedSize(const RenderElement*);
+    FloatSize fixedSize(const RenderElement*);
 
     bool isPending() const;
     bool knownToBeOpaque(const RenderElement*) const;

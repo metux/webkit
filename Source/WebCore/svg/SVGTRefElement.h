@@ -21,7 +21,6 @@
 #ifndef SVGTRefElement_h
 #define SVGTRefElement_h
 
-#if ENABLE(SVG)
 #include "SVGTextPositioningElement.h"
 #include "SVGURIReference.h"
 
@@ -33,6 +32,9 @@ class SVGTRefElement final : public SVGTextPositioningElement,
                              public SVGURIReference {
 public:
     static PassRefPtr<SVGTRefElement> create(const QualifiedName&, Document&);
+
+protected:
+    virtual void didNotifySubtreeInsertions(ContainerNode*) override;
 
 private:
     friend class SVGTRefTargetEventListener;
@@ -51,6 +53,8 @@ private:
     virtual InsertionNotificationRequest insertedInto(ContainerNode&) override;
     virtual void removedFrom(ContainerNode&) override;
 
+    virtual void clearTarget() override;
+
     void updateReferencedText(Element*);
 
     void detachTarget();
@@ -61,10 +65,9 @@ private:
         DECLARE_ANIMATED_STRING(Href, href)
     END_DECLARE_ANIMATED_PROPERTIES
 
-    RefPtr<SVGTRefTargetEventListener> m_targetListener;
+    Ref<SVGTRefTargetEventListener> m_targetListener;
 };
 
 } // namespace WebCore
 
-#endif // ENABLE(SVG)
 #endif

@@ -30,7 +30,7 @@
 #include "IncrementalSweeper.h"
 #include "JSCell.h"
 #include "JSDestructibleObject.h"
-#include "Operations.h"
+#include "JSCInlines.h"
 
 namespace JSC {
 
@@ -54,13 +54,18 @@ MarkedBlock::MarkedBlock(Region* region, MarkedAllocator* allocator, size_t cell
     HEAP_LOG_BLOCK_STATE_TRANSITION(this);
 }
 
+template<MarkedBlock::DestructorType dtorType>
 inline void MarkedBlock::callDestructor(JSCell* cell)
 {
     // A previous eager sweep may already have run cell's destructor.
     if (cell->isZapped())
         return;
 
-    cell->methodTableForDestruction()->destroy(cell);
+    ASSERT(cell->structureID());
+    if (dtorType == MarkedBlock::Normal)
+        jsCast<JSDestructibleObject*>(cell)->classInfo()->methodTable.destroy(cell);
+    else
+        cell->structure(*vm())->classInfo()->methodTable.destroy(cell);
     cell->zap();
 }
 
@@ -70,6 +75,8 @@ MarkedBlock::FreeList MarkedBlock::specializedSweep()
     ASSERT(blockState != Allocated && blockState != FreeListed);
     ASSERT(!(dtorType == MarkedBlock::None && sweepMode == SweepOnly));
 
+    SamplingRegion samplingRegion((dtorType != MarkedBlock::None && blockState != New) ? "Calling destructors" : "sweeping");
+    
     // This produces a free list that is ordered in reverse through the block.
     // This is fine, since the allocation code makes no assumptions about the
     // order of the free list.
@@ -82,7 +89,7 @@ MarkedBlock::FreeList MarkedBlock::specializedSweep()
         JSCell* cell = reinterpret_cast_ptr<JSCell*>(&atoms()[i]);
 
         if (dtorType != MarkedBlock::None && blockState != New)
-            callDestructor(cell);
+            callDestructor<dtorType>(cell);
 
         if (sweepMode == SweepToFreeList) {
             FreeCell* freeCell = reinterpret_cast<FreeCell*>(cell);
@@ -129,6 +136,7 @@ MarkedBlock::FreeList MarkedBlock::sweepHelper(SweepMode sweepMode)
         // Happens when a block transitions to fully allocated.
         ASSERT(sweepMode == SweepToFreeList);
         return FreeList();
+    case Retired:
     case Allocated:
         RELEASE_ASSERT_NOT_REACHED();
         return FreeList();
@@ -226,11 +234,16 @@ void MarkedBlock::clearMarksWithCollectionType()
 #if ENABLE(GGC)
         m_rememberedSet.clearAll();
 #endif
+        // This will become true at the end of the mark phase. We set it now to
+        // avoid an extra pass to do so later.
+        m_state = Marked;
+        return;
     }
 
-    // This will become true at the end of the mark phase. We set it now to
-    // avoid an extra pass to do so later.
-    m_state = Marked;
+    ASSERT(collectionType == EdenCollection);
+    // If a block was retired then there's no way an EdenCollection can un-retire it.
+    if (m_state != Retired)
+        m_state = Marked;
 }
 
 void MarkedBlock::lastChanceToFinalize()
@@ -256,6 +269,29 @@ MarkedBlock::FreeList MarkedBlock::resumeAllocating()
 
     // Re-create our free list from before stopping allocation. 
     return sweep(SweepToFreeList);
+}
+
+void MarkedBlock::didRetireBlock(const FreeList& freeList)
+{
+    HEAP_LOG_BLOCK_STATE_TRANSITION(this);
+    FreeCell* head = freeList.head;
+
+    // Currently we don't notify the Heap that we're giving up on this block. 
+    // The Heap might be able to make a better decision about how many bytes should 
+    // be allocated before the next collection if it knew about this retired block.
+    // On the other hand we'll waste at most 10% of our Heap space between FullCollections 
+    // and only under heavy fragmentation.
+
+    // We need to zap the free list when retiring a block so that we don't try to destroy 
+    // previously destroyed objects when we re-sweep the block in the future.
+    FreeCell* next;
+    for (FreeCell* current = head; current; current = next) {
+        next = current->next;
+        reinterpret_cast<JSCell*>(current)->zap();
+    }
+
+    ASSERT(m_state == FreeListed);
+    m_state = Retired;
 }
 
 } // namespace JSC

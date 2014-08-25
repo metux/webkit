@@ -11,10 +11,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -75,6 +75,7 @@ namespace WebCore {
 
     class AffineTransform;
     class DrawingBuffer;
+    class FloatRoundedRect;
     class Gradient;
     class GraphicsContextPlatformPrivate;
     class ImageBuffer;
@@ -192,6 +193,37 @@ namespace WebCore {
     void setStrokeAndFillColor(PlatformGraphicsContext*, CGColorRef);
 #endif
 
+    struct ImagePaintingOptions {
+        ImagePaintingOptions(CompositeOperator compositeOperator = CompositeSourceOver, BlendMode blendMode = BlendModeNormal, ImageOrientationDescription orientationDescription = ImageOrientationDescription(), bool useLowQualityScale = false)
+            : m_compositeOperator(compositeOperator)
+            , m_blendMode(blendMode)
+            , m_orientationDescription(orientationDescription)
+            , m_useLowQualityScale(useLowQualityScale)
+        {
+        }
+
+        ImagePaintingOptions(ImageOrientationDescription orientationDescription, bool useLowQualityScale = false, CompositeOperator compositeOperator = CompositeSourceOver, BlendMode blendMode = BlendModeNormal)
+            : m_compositeOperator(compositeOperator)
+            , m_blendMode(blendMode)
+            , m_orientationDescription(orientationDescription)
+            , m_useLowQualityScale(useLowQualityScale)
+        {
+        }
+
+        ImagePaintingOptions(bool useLowQualityScale, ImageOrientationDescription orientationDescription = ImageOrientationDescription(), CompositeOperator compositeOperator = CompositeSourceOver, BlendMode blendMode = BlendModeNormal)
+            : m_compositeOperator(compositeOperator)
+            , m_blendMode(blendMode)
+            , m_orientationDescription(orientationDescription)
+            , m_useLowQualityScale(useLowQualityScale)
+        {
+        }
+
+        CompositeOperator m_compositeOperator;
+        BlendMode m_blendMode;
+        ImageOrientationDescription m_orientationDescription;
+        bool m_useLowQualityScale;
+    };
+
     class GraphicsContext {
         WTF_MAKE_NONCOPYABLE(GraphicsContext); WTF_MAKE_FAST_ALLOCATED;
     public:
@@ -251,7 +283,7 @@ namespace WebCore {
         void applyFillPattern();
         void drawPath(const Path&);
 
-        void drawNativeImage(PassNativeImagePtr, const FloatSize& selfSize, ColorSpace styleColorSpace, const FloatRect& destRect, const FloatRect& srcRect, float scale = 1, CompositeOperator = CompositeSourceOver, BlendMode = BlendModeNormal, ImageOrientation = DefaultImageOrientation);
+        void drawNativeImage(PassNativeImagePtr, const FloatSize& selfSize, ColorSpace styleColorSpace, const FloatRect& destRect, const FloatRect& srcRect, CompositeOperator = CompositeSourceOver, BlendMode = BlendModeNormal, ImageOrientation = DefaultImageOrientation);
 
         // Allow font smoothing (LCD antialiasing). Not part of the graphics state.
         void setAllowsFontSmoothing(bool);
@@ -270,8 +302,8 @@ namespace WebCore {
         // FIXME: ...except drawRect(), which fills properly but always strokes
         // using a 1-pixel stroke inset from the rect borders (of the correct
         // stroke color).
-        void drawRect(const IntRect&);
-        void drawLine(const IntPoint&, const IntPoint&);
+        void drawRect(const FloatRect&, float borderThickness = 1);
+        void drawLine(const FloatPoint&, const FloatPoint&);
 
 #if PLATFORM(IOS)
         void drawJoinedLines(CGPoint points[], unsigned count, bool antialias, CGLineCap = kCGLineCapButt);
@@ -294,46 +326,35 @@ namespace WebCore {
         void fillRect(const FloatRect&, const Color&, ColorSpace);
         void fillRect(const FloatRect&, Gradient&);
         void fillRect(const FloatRect&, const Color&, ColorSpace, CompositeOperator, BlendMode = BlendModeNormal);
-        void fillRoundedRect(const IntRect&, const IntSize& topLeft, const IntSize& topRight, const IntSize& bottomLeft, const IntSize& bottomRight, const Color&, ColorSpace);
-        void fillRoundedRect(const RoundedRect&, const Color&, ColorSpace, BlendMode = BlendModeNormal);
-        void fillRectWithRoundedHole(const IntRect&, const RoundedRect& roundedHoleRect, const Color&, ColorSpace);
+        void fillRoundedRect(const FloatRoundedRect&, const Color&, ColorSpace, BlendMode = BlendModeNormal);
+        void fillRectWithRoundedHole(const FloatRect&, const FloatRoundedRect& roundedHoleRect, const Color&, ColorSpace);
 
         void clearRect(const FloatRect&);
 
         void strokeRect(const FloatRect&, float lineWidth);
 
-        void drawImage(Image*, ColorSpace styleColorSpace, const IntPoint&, CompositeOperator = CompositeSourceOver, ImageOrientationDescription = ImageOrientationDescription());
-        void drawImage(Image*, ColorSpace styleColorSpace, const IntRect&, CompositeOperator = CompositeSourceOver, ImageOrientationDescription = ImageOrientationDescription(), bool useLowQualityScale = false);
-        void drawImage(Image*, ColorSpace styleColorSpace, const IntPoint& destPoint, const IntRect& srcRect, CompositeOperator = CompositeSourceOver, ImageOrientationDescription = ImageOrientationDescription());
-        void drawImage(Image*, ColorSpace styleColorSpace, const FloatRect& destRect);
-        void drawImage(Image*, ColorSpace styleColorSpace, const FloatRect& destRect, const FloatRect& srcRect, CompositeOperator = CompositeSourceOver, ImageOrientationDescription = ImageOrientationDescription(), bool useLowQualityScale = false);
-        void drawImage(Image*, ColorSpace styleColorSpace, const FloatRect& destRect, const FloatRect& srcRect, CompositeOperator, BlendMode, ImageOrientationDescription = ImageOrientationDescription(), bool useLowQualityScale = false);
-        
-        void drawTiledImage(Image*, ColorSpace styleColorSpace, const IntRect& destRect, const IntPoint& srcPoint, const IntSize& tileSize,
-            CompositeOperator = CompositeSourceOver, bool useLowQualityScale = false, BlendMode = BlendModeNormal);
-        void drawTiledImage(Image*, ColorSpace styleColorSpace, const IntRect& destRect, const IntRect& srcRect,
-                            const FloatSize& tileScaleFactor, Image::TileRule hRule = Image::StretchTile, Image::TileRule vRule = Image::StretchTile,
-                            CompositeOperator = CompositeSourceOver, bool useLowQualityScale = false);
+        void drawImage(Image*, ColorSpace, const FloatPoint& destination, const ImagePaintingOptions& = ImagePaintingOptions());
+        void drawImage(Image*, ColorSpace, const FloatRect& destination, const ImagePaintingOptions& = ImagePaintingOptions());
+        void drawImage(Image*, ColorSpace, const FloatRect& destination, const FloatRect& source, const ImagePaintingOptions& = ImagePaintingOptions());
 
-        void drawImageBuffer(ImageBuffer*, ColorSpace styleColorSpace, const IntPoint&, CompositeOperator = CompositeSourceOver, BlendMode = BlendModeNormal);
-        void drawImageBuffer(ImageBuffer*, ColorSpace styleColorSpace, const IntRect&, CompositeOperator = CompositeSourceOver, BlendMode = BlendModeNormal, bool useLowQualityScale = false);
-        void drawImageBuffer(ImageBuffer*, ColorSpace styleColorSpace, const IntPoint& destPoint, const IntRect& srcRect, CompositeOperator = CompositeSourceOver, BlendMode = BlendModeNormal);
-        void drawImageBuffer(ImageBuffer*, ColorSpace styleColorSpace, const IntRect& destRect, const IntRect& srcRect, CompositeOperator = CompositeSourceOver, BlendMode = BlendModeNormal, bool useLowQualityScale = false);
-        void drawImageBuffer(ImageBuffer*, ColorSpace styleColorSpace, const FloatRect& destRect);
-        void drawImageBuffer(ImageBuffer*, ColorSpace styleColorSpace, const FloatRect& destRect, const FloatRect& srcRect, CompositeOperator = CompositeSourceOver, BlendMode = BlendModeNormal, bool useLowQualityScale = false);
+        void drawTiledImage(Image*, ColorSpace, const FloatRect& destination, const FloatPoint& source, const FloatSize& tileSize,
+            const ImagePaintingOptions& = ImagePaintingOptions());
+        void drawTiledImage(Image*, ColorSpace, const FloatRect& destination, const FloatRect& source, const FloatSize& tileScaleFactor,
+            Image::TileRule, Image::TileRule, const ImagePaintingOptions& = ImagePaintingOptions());
+
+        void drawImageBuffer(ImageBuffer*, ColorSpace, const FloatPoint& destination, const ImagePaintingOptions& = ImagePaintingOptions());
+        void drawImageBuffer(ImageBuffer*, ColorSpace, const FloatRect& destination, const ImagePaintingOptions& = ImagePaintingOptions());
+        void drawImageBuffer(ImageBuffer*, ColorSpace, const FloatRect& destination, const FloatRect& source, const ImagePaintingOptions& = ImagePaintingOptions());
 
         void setImageInterpolationQuality(InterpolationQuality);
         InterpolationQuality imageInterpolationQuality() const;
 
         void clip(const IntRect&);
         void clip(const FloatRect&);
-        void clipRoundedRect(const RoundedRect&);
+        void clipRoundedRect(const FloatRoundedRect&);
 
-        // FIXME: Consider writing this in terms of a specialized RoundedRect that uses FloatRect and FloatSize radii.
-        void clipRoundedRect(const FloatRect&, const FloatSize& topLeft, const FloatSize& topRight, const FloatSize& bottomLeft, const FloatSize& bottomRight);
-
-        void clipOut(const IntRect&);
-        void clipOutRoundedRect(const RoundedRect&);
+        void clipOut(const FloatRect&);
+        void clipOutRoundedRect(const FloatRoundedRect&);
         void clipPath(const Path&, WindRule);
         void clipConvexPolygon(size_t numPoints, const FloatPoint*, bool antialias = true);
         void clipToImageBuffer(ImageBuffer*, const FloatRect&);
@@ -353,14 +374,13 @@ namespace WebCore {
 #else
         float drawText(const Font&, const TextRun&, const FloatPoint&, int from = 0, int to = -1);
 #endif
+        void drawGlyphs(const Font&, const SimpleFontData&, const GlyphBuffer&, int from, int numGlyphs, const FloatPoint&);
         void drawEmphasisMarks(const Font&, const TextRun& , const AtomicString& mark, const FloatPoint&, int from = 0, int to = -1);
 #if !PLATFORM(IOS)
         void drawBidiText(const Font&, const TextRun&, const FloatPoint&, Font::CustomFontNotReadyAction = Font::DoNotPaintIfFontNotReady);
 #else
         float drawBidiText(const Font&, const TextRun&, const FloatPoint&, Font::CustomFontNotReadyAction = Font::DoNotPaintIfFontNotReady, BidiStatus* = 0, int length = -1);
 #endif
-        void drawHighlightForText(const Font&, const TextRun&, const FloatPoint&, int h, const Color& backgroundColor, ColorSpace, int from = 0, int to = -1);
-
         enum RoundingMode {
             RoundAllSides,
             RoundOriginAndDimensions
@@ -368,8 +388,8 @@ namespace WebCore {
         FloatRect roundToDevicePixels(const FloatRect&, RoundingMode = RoundAllSides);
 
         FloatRect computeLineBoundsForText(const FloatPoint&, float width, bool printing);
-        void drawLineForText(const FloatPoint&, float width, bool printing);
-        void drawLinesForText(const FloatPoint&, const DashArray& widths, bool printing);
+        void drawLineForText(const FloatPoint&, float width, bool printing, bool doubleLines = false);
+        void drawLinesForText(const FloatPoint&, const DashArray& widths, bool printing, bool doubleLines = false);
         enum DocumentMarkerLineStyle {
 #if PLATFORM(IOS)
             TextCheckingDictationPhraseWithAlternativesLineStyle,
@@ -408,6 +428,9 @@ namespace WebCore {
 
         void drawFocusRing(const Vector<IntRect>&, int width, int offset, const Color&);
         void drawFocusRing(const Path&, int width, int offset, const Color&);
+#if PLATFORM(MAC)
+        void drawFocusRing(const Vector<IntRect>&, int width, int offset, double timeOffset, bool& needsRedraw);
+#endif
 
         void setLineCap(LineCap);
         void setLineDash(const DashArray&, float dashOffset);
@@ -452,7 +475,7 @@ namespace WebCore {
 #endif
         // Create an image buffer compatible with this context, with suitable resolution
         // for drawing into the buffer and then into this context.
-        std::unique_ptr<ImageBuffer> createCompatibleBuffer(const IntSize&, bool hasAlpha = true) const;
+        std::unique_ptr<ImageBuffer> createCompatibleBuffer(const FloatSize&, bool hasAlpha = true) const;
         bool isCompatibleWithBuffer(ImageBuffer*) const;
 
         // This function applies the device scale factor to the context, making the context capable of
@@ -534,11 +557,7 @@ namespace WebCore {
         static void adjustLineToPixelBoundaries(FloatPoint& p1, FloatPoint& p2, float strokeWidth, StrokeStyle);
 
     private:
-#if !PLATFORM(IOS)
-        void platformInit(PlatformGraphicsContext*);
-#else
-        void platformInit(PlatformGraphicsContext*, bool shouldUseContextColors);
-#endif
+        void platformInit(PlatformGraphicsContext*, bool shouldUseContextColors = false);
         void platformDestroy();
 
 #if PLATFORM(WIN) && !USE(WINGDI)
@@ -573,6 +592,10 @@ namespace WebCore {
 
         void platformFillEllipse(const FloatRect&);
         void platformStrokeEllipse(const FloatRect&);
+
+        void platformFillRoundedRect(const FloatRoundedRect&, const Color&, ColorSpace);
+
+        FloatRect computeLineBoundsAndAntialiasingModeForText(const FloatPoint&, float width, bool printing, bool& shouldAntialias, Color&);
 
         GraphicsContextPlatformPrivate* m_data;
 

@@ -35,6 +35,7 @@
 #include "NavigationScheduler.h"
 #include "ScrollTypes.h"
 #include "UserScriptTypes.h"
+#include <memory>
 #include <wtf/RefCounted.h>
 
 #if PLATFORM(IOS)
@@ -44,10 +45,6 @@
 
 #if PLATFORM(WIN)
 #include "FrameWin.h"
-#endif
-
-#if USE(TILED_BACKING_STORE)
-#include "TiledBackingStoreClient.h"
 #endif
 
 #if PLATFORM(IOS)
@@ -90,7 +87,6 @@ namespace WebCore {
     class RenderWidget;
     class ScriptController;
     class Settings;
-    class TiledBackingStore;
     class VisiblePosition;
     class Widget;
 
@@ -107,10 +103,6 @@ namespace WebCore {
     typedef Node* (*NodeQualifier)(const HitTestResult&, Node* terminationNode, IntRect* nodeBounds);
 #endif
 
-#if !USE(TILED_BACKING_STORE)
-    class TiledBackingStoreClient { };
-#endif
-
     enum {
         LayerTreeFlagsIncludeDebugInfo = 1 << 0,
         LayerTreeFlagsIncludeVisibleRects = 1 << 1,
@@ -121,7 +113,7 @@ namespace WebCore {
     };
     typedef unsigned LayerTreeFlags;
 
-    class Frame : public RefCounted<Frame>, public TiledBackingStoreClient {
+    class Frame : public RefCounted<Frame> {
     public:
         static PassRefPtr<Frame> create(Page*, HTMLFrameOwnerElement*, FrameLoaderClient*);
 
@@ -181,9 +173,6 @@ namespace WebCore {
         bool shouldUsePrintingLayout() const;
         FloatSize resizePageRectsKeepingRatio(const FloatSize& originalSize, const FloatSize& expectedSize);
 
-        bool inViewSourceMode() const;
-        void setInViewSourceMode(bool = true);
-
         void setDocument(PassRefPtr<Document>);
 
         void setPageZoomFactor(float factor);
@@ -195,9 +184,7 @@ namespace WebCore {
         // Scale factor of this frame with respect to the container.
         float frameScaleFactor() const;
 
-#if USE(ACCELERATED_COMPOSITING)
         void deviceOrPageScaleFactorChanged();
-#endif
 
 #if PLATFORM(IOS)
         const ViewportArguments& viewportArguments() const;
@@ -227,8 +214,8 @@ namespace WebCore {
         // Orientation is the interface orientation in degrees. Some examples are:
         //  0 is straight up; -90 is when the device is rotated 90 clockwise;
         //  90 is when rotated counter clockwise.
-        void sendOrientationChangeEvent(int orientation);
-        int orientation() const { return m_orientation; }
+        void orientationChanged();
+        int orientation() const;
 #endif
 
         void clearTimers();
@@ -240,14 +227,9 @@ namespace WebCore {
         Document* documentAtPoint(const IntPoint& windowPoint);
         PassRefPtr<Range> rangeForPoint(const IntPoint& framePoint);
 
-        String searchForLabelsAboveCell(JSC::Yarr::RegularExpression*, HTMLTableCellElement*, size_t* resultDistanceFromStartOfCell);
+        String searchForLabelsAboveCell(const JSC::Yarr::RegularExpression&, HTMLTableCellElement*, size_t* resultDistanceFromStartOfCell);
         String searchForLabelsBeforeElement(const Vector<String>& labels, Element*, size_t* resultDistance, bool* resultIsInCellAbove);
         String matchLabelsAgainstElement(const Vector<String>& labels, Element*);
-
-#if ENABLE(IOS_TEXT_AUTOSIZING)
-        void setTextAutosizingWidth(float);
-        float textAutosizingWidth() const;
-#endif
 
 #if PLATFORM(IOS)
         // Scroll the selection in an overflow layer on iOS.
@@ -258,7 +240,6 @@ namespace WebCore {
         void updateLayout() const;
         NSRect caretRect() const;
         NSRect rectForScrollToVisible() const;
-        NSRect rectForSelection(VisibleSelection&) const;
         DOMCSSStyleDeclaration* styleAtSelectionStart() const;
         unsigned formElementsCharacterCount() const;
         void setTimersPaused(bool);
@@ -304,9 +285,9 @@ namespace WebCore {
         RefPtr<Document> m_doc;
 
         const std::unique_ptr<ScriptController> m_script;
-        const OwnPtr<Editor> m_editor;
-        const OwnPtr<FrameSelection> m_selection;
-        const OwnPtr<EventHandler> m_eventHandler;
+        const std::unique_ptr<Editor> m_editor;
+        const std::unique_ptr<FrameSelection> m_selection;
+        const std::unique_ptr<EventHandler> m_eventHandler;
         const std::unique_ptr<AnimationController> m_animationController;
 
 #if PLATFORM(IOS)
@@ -330,37 +311,8 @@ namespace WebCore {
         VisibleSelection m_rangedSelectionInitialExtent;
 #endif
 
-#if ENABLE(IOS_TEXT_AUTOSIZING)
-        float m_textAutosizingWidth;
-#endif
-
         float m_pageZoomFactor;
         float m_textZoomFactor;
-
-#if ENABLE(ORIENTATION_EVENTS)
-        int m_orientation;
-#endif
-
-        bool m_inViewSourceMode;
-
-#if USE(TILED_BACKING_STORE)
-    // FIXME: The tiled backing store belongs in FrameView, not Frame.
-
-    public:
-        TiledBackingStore* tiledBackingStore() const { return m_tiledBackingStore.get(); }
-        void setTiledBackingStoreEnabled(bool);
-
-    private:
-        // TiledBackingStoreClient interface
-        virtual void tiledBackingStorePaintBegin() override final;
-        virtual void tiledBackingStorePaint(GraphicsContext*, const IntRect&) override final;
-        virtual void tiledBackingStorePaintEnd(const Vector<IntRect>& paintedArea) override final;
-        virtual IntRect tiledBackingStoreContentsRect() override final;
-        virtual IntRect tiledBackingStoreVisibleRect() override final;
-        virtual Color tiledBackingStoreBackgroundColor() const override final;
-
-        OwnPtr<TiledBackingStore> m_tiledBackingStore;
-#endif
 
         int m_activeDOMObjectsAndAnimationsSuspendedCount;
     };
@@ -413,16 +365,6 @@ namespace WebCore {
     inline HTMLFrameOwnerElement* Frame::ownerElement() const
     {
         return m_ownerElement;
-    }
-
-    inline bool Frame::inViewSourceMode() const
-    {
-        return m_inViewSourceMode;
-    }
-
-    inline void Frame::setInViewSourceMode(bool mode)
-    {
-        m_inViewSourceMode = mode;
     }
 
     inline FrameTree& Frame::tree() const

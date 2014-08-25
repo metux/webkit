@@ -10,10 +10,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -39,7 +39,6 @@
 #include <inttypes.h>
 #include <stdarg.h>
 #include <stddef.h>
-#include <wtf/Platform.h>
 
 #ifdef NDEBUG
 /* Disable ASSERT* macros in release mode. */
@@ -112,7 +111,7 @@ extern "C" {
 
    Signals are ignored by the crash reporter on OS X so we must do better.
 */
-#if COMPILER(CLANG)
+#if COMPILER(CLANG) || COMPILER(MSVC)
 #define NO_RETURN_DUE_TO_CRASH NO_RETURN
 #else
 #define NO_RETURN_DUE_TO_CRASH
@@ -134,7 +133,7 @@ WTF_EXPORT_PRIVATE void WTFLog(WTFLogChannel*, const char* format, ...) WTF_ATTR
 WTF_EXPORT_PRIVATE void WTFLogVerbose(const char* file, int line, const char* function, WTFLogChannel*, const char* format, ...) WTF_ATTRIBUTE_PRINTF(5, 6);
 WTF_EXPORT_PRIVATE void WTFLogAlwaysV(const char* format, va_list);
 WTF_EXPORT_PRIVATE void WTFLogAlways(const char* format, ...) WTF_ATTRIBUTE_PRINTF(1, 2);
-WTF_EXPORT_PRIVATE void WTFLogAlwaysAndCrash(const char* format, ...) WTF_ATTRIBUTE_PRINTF(1, 2) NO_RETURN_DUE_TO_CRASH;
+WTF_EXPORT_PRIVATE NO_RETURN_DUE_TO_CRASH void WTFLogAlwaysAndCrash(const char* format, ...) WTF_ATTRIBUTE_PRINTF(1, 2);
 WTF_EXPORT_PRIVATE WTFLogChannel* WTFLogChannelByName(WTFLogChannel*[], size_t count, const char*);
 WTF_EXPORT_PRIVATE void WTFInitializeLogChannelStatesFromString(WTFLogChannel*[], size_t count, const char*);
 
@@ -146,8 +145,6 @@ typedef void (*WTFCrashHookFunction)();
 WTF_EXPORT_PRIVATE void WTFSetCrashHook(WTFCrashHookFunction);
 WTF_EXPORT_PRIVATE void WTFInstallReportBacktraceOnCrashHook();
 
-// Exist for binary compatibility with older Safari. Do not use.
-WTF_EXPORT_PRIVATE void WTFInvokeCrashHook();
 #ifdef __cplusplus
 }
 #endif
@@ -159,7 +156,7 @@ WTF_EXPORT_PRIVATE void WTFInvokeCrashHook();
 #ifdef __cplusplus
 extern "C" {
 #endif
-WTF_EXPORT_PRIVATE void WTFCrash() NO_RETURN_DUE_TO_CRASH;
+    WTF_EXPORT_PRIVATE NO_RETURN_DUE_TO_CRASH void WTFCrash();
 #ifdef __cplusplus
 }
 #endif
@@ -171,7 +168,7 @@ WTF_EXPORT_PRIVATE void WTFCrash() NO_RETURN_DUE_TO_CRASH;
 #ifdef __cplusplus
 extern "C" {
 #endif
-    WTF_EXPORT_PRIVATE void WTFCrashWithSecurityImplication() NO_RETURN_DUE_TO_CRASH;
+    WTF_EXPORT_PRIVATE NO_RETURN_DUE_TO_CRASH void WTFCrashWithSecurityImplication();
 #ifdef __cplusplus
 }
 #endif
@@ -373,7 +370,7 @@ while (0)
 #pragma clang diagnostic ignored "-Wmissing-noreturn"
 static inline void UNREACHABLE_FOR_PLATFORM()
 {
-    ASSERT_NOT_REACHED();
+    CRASH();
 }
 #pragma clang diagnostic pop
 #else

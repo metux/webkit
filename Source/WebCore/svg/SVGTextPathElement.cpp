@@ -19,8 +19,6 @@
  */
 
 #include "config.h"
-
-#if ENABLE(SVG)
 #include "SVGTextPathElement.h"
 
 #include "Attribute.h"
@@ -29,6 +27,7 @@
 #include "SVGElementInstance.h"
 #include "SVGNames.h"
 #include "XLinkNames.h"
+#include <wtf/NeverDestroyed.h>
 
 namespace WebCore {
 
@@ -73,14 +72,14 @@ void SVGTextPathElement::clearResourceReferences()
 
 bool SVGTextPathElement::isSupportedAttribute(const QualifiedName& attrName)
 {
-    DEFINE_STATIC_LOCAL(HashSet<QualifiedName>, supportedAttributes, ());
-    if (supportedAttributes.isEmpty()) {
+    static NeverDestroyed<HashSet<QualifiedName>> supportedAttributes;
+    if (supportedAttributes.get().isEmpty()) {
         SVGURIReference::addSupportedAttributes(supportedAttributes);
-        supportedAttributes.add(SVGNames::startOffsetAttr);
-        supportedAttributes.add(SVGNames::methodAttr);
-        supportedAttributes.add(SVGNames::spacingAttr);
+        supportedAttributes.get().add(SVGNames::startOffsetAttr);
+        supportedAttributes.get().add(SVGNames::methodAttr);
+        supportedAttributes.get().add(SVGNames::spacingAttr);
     }
-    return supportedAttributes.contains<SVGAttributeHashTranslator>(attrName);
+    return supportedAttributes.get().contains<SVGAttributeHashTranslator>(attrName);
 }
 
 void SVGTextPathElement::parseAttribute(const QualifiedName& name, const AtomicString& value)
@@ -129,7 +128,7 @@ void SVGTextPathElement::svgAttributeChanged(const QualifiedName& attrName)
 
 RenderPtr<RenderElement> SVGTextPathElement::createElementRenderer(PassRef<RenderStyle> style)
 {
-    return createRenderer<RenderSVGTextPath>(*this, std::move(style));
+    return createRenderer<RenderSVGTextPath>(*this, WTF::move(style));
 }
 
 bool SVGTextPathElement::childShouldCreateRenderer(const Node& child) const
@@ -180,8 +179,12 @@ void SVGTextPathElement::buildPendingResource()
 Node::InsertionNotificationRequest SVGTextPathElement::insertedInto(ContainerNode& rootParent)
 {
     SVGTextContentElement::insertedInto(rootParent);
+    return InsertionShouldCallDidNotifySubtreeInsertions;
+}
+
+void SVGTextPathElement::didNotifySubtreeInsertions(ContainerNode*)
+{
     buildPendingResource();
-    return InsertionDone;
 }
 
 void SVGTextPathElement::removedFrom(ContainerNode& rootParent)
@@ -198,5 +201,3 @@ bool SVGTextPathElement::selfHasRelativeLengths() const
 }
 
 }
-
-#endif // ENABLE(SVG)

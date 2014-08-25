@@ -1,4 +1,4 @@
-# Copyright (C) 2011, 2012 Apple Inc. All rights reserved.
+# Copyright (C) 2011, 2012, 2014 Apple Inc. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -40,14 +40,14 @@ require "risc"
 #  x1  => t1, a1, r1
 #  x2  => t2, a2
 #  x3  => a3
+#  x5  => t4
+#  x6  => t6
 #  x9  => (nonArgGPR1 in baseline)
-# x10  => t4 (unused in baseline)
-# x11  => t5 (unused in baseline)
-# x12  => t6 (unused in baseline)
 # x13  => scratch (unused in baseline)
 # x16  => scratch
 # x17  => scratch
 # x23  => t3
+# x24  => t5
 # x27  => csr1 (tagTypeNumber)
 # x28  => csr2 (tagMask)
 # x29  => cfr
@@ -113,11 +113,13 @@ class RegisterID
         when 't3'
             arm64GPRName('x23', kind)
         when 't4'
-            arm64GPRName('x10', kind)
+            arm64GPRName('x5', kind)
         when 't5'
-            arm64GPRName('x11', kind)
+            arm64GPRName('x24', kind)
         when 't6'
-            arm64GPRName('x12', kind)
+            arm64GPRName('x6', kind)
+        when 't7'
+            arm64GPRName('x7', kind)
         when 'cfr'
             arm64GPRName('x29', kind)
         when 'csr1'
@@ -127,7 +129,7 @@ class RegisterID
         when 'sp'
             'sp'
         when 'lr'
-            'lr'
+            'x30'
         else
             raise "Bad register name #{@name} at #{codeOriginString}"
         end
@@ -584,22 +586,6 @@ class Instruction
                 | ops |
                 $asm.puts "stp #{ops[0].arm64Operand(:ptr)}, #{ops[1].arm64Operand(:ptr)}, [sp, #-16]!"
             }
-        when "popLRAndFP"
-            $asm.puts "ldp fp, lr, [sp], #16"
-        when "pushLRAndFP"
-            $asm.puts "stp fp, lr, [sp, #-16]!"
-        when "popCalleeSaves"
-            $asm.puts "ldp x28, x27, [sp], #16"
-            $asm.puts "ldp x26, x25, [sp], #16"
-            $asm.puts "ldp x24, x23, [sp], #16"
-            $asm.puts "ldp x22, x21, [sp], #16"
-            $asm.puts "ldp x20, x19, [sp], #16"
-        when "pushCalleeSaves"
-            $asm.puts "stp x20, x19, [sp, #-16]!"
-            $asm.puts "stp x22, x21, [sp, #-16]!"
-            $asm.puts "stp x24, x23, [sp, #-16]!"
-            $asm.puts "stp x26, x25, [sp, #-16]!"
-            $asm.puts "stp x28, x27, [sp, #-16]!"
         when "move"
             if operands[0].immediate?
                 emitARM64MoveImmediate(operands[0].value, operands[1])
@@ -607,13 +593,13 @@ class Instruction
                 emitARM64("mov", operands, :ptr)
             end
         when "sxi2p"
-            emitARM64("sxtw", operands, :ptr)
+            emitARM64("sxtw", operands, [:int, :ptr])
         when "sxi2q"
-            emitARM64("sxtw", operands, :ptr)
+            emitARM64("sxtw", operands, [:int, :ptr])
         when "zxi2p"
-            emitARM64("uxtw", operands, :ptr)
+            emitARM64("uxtw", operands, [:int, :ptr])
         when "zxi2q"
-            emitARM64("uxtw", operands, :ptr)
+            emitARM64("uxtw", operands, [:int, :ptr])
         when "nop"
             $asm.puts "nop"
         when "bieq", "bbeq"
@@ -818,6 +804,8 @@ class Instruction
             $asm.puts "smaddl #{operands[2].arm64Operand(:ptr)}, #{operands[0].arm64Operand(:int)}, #{operands[1].arm64Operand(:int)}, xzr"
         when "memfence"
             $asm.puts "dmb sy"
+        when "pcrtoaddr"
+          $asm.puts "adr #{operands[1].arm64Operand(:ptr)}, #{operands[0].value}"
         else
             lowerDefault
         end

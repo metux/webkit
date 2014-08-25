@@ -10,10 +10,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -28,7 +28,6 @@
 #include "JSBasePrivate.h"
 
 #include "APICast.h"
-#include "APIShims.h"
 #include "CallFrame.h"
 #include "Completion.h"
 #include "InitializeThreading.h"
@@ -36,9 +35,13 @@
 #include "JSLock.h"
 #include "JSObject.h"
 #include "OpaqueJSString.h"
-#include "Operations.h"
+#include "JSCInlines.h"
 #include "SourceCode.h"
 #include <wtf/text/StringHash.h>
+
+#if ENABLE(REMOTE_INSPECTOR)
+#include "JSGlobalObjectInspectorController.h"
+#endif
 
 using namespace JSC;
 
@@ -49,7 +52,7 @@ JSValueRef JSEvaluateScript(JSContextRef ctx, JSStringRef script, JSObjectRef th
         return 0;
     }
     ExecState* exec = toJS(ctx);
-    APIEntryShim entryShim(exec);
+    JSLockHolder locker(exec);
 
     JSObject* jsThisObject = toJS(thisObject);
 
@@ -65,6 +68,14 @@ JSValueRef JSEvaluateScript(JSContextRef ctx, JSStringRef script, JSObjectRef th
     if (evaluationException) {
         if (exception)
             *exception = toRef(exec, evaluationException);
+#if ENABLE(REMOTE_INSPECTOR)
+        // FIXME: If we have a debugger attached we could learn about ParseError exceptions through
+        // ScriptDebugServer::sourceParsed and this path could produce a duplicate warning. The
+        // Debugger path is currently ignored by inspector.
+        // NOTE: If we don't have a debugger, this SourceCode will be forever lost to the inspector.
+        // We could stash it in the inspector in case an inspector is ever opened.
+        globalObject->inspectorController().reportAPIException(exec, evaluationException);
+#endif
         return 0;
     }
 
@@ -82,7 +93,7 @@ bool JSCheckScriptSyntax(JSContextRef ctx, JSStringRef script, JSStringRef sourc
         return false;
     }
     ExecState* exec = toJS(ctx);
-    APIEntryShim entryShim(exec);
+    JSLockHolder locker(exec);
 
     startingLineNumber = std::max(1, startingLineNumber);
 
@@ -94,6 +105,9 @@ bool JSCheckScriptSyntax(JSContextRef ctx, JSStringRef script, JSStringRef sourc
     if (!isValidSyntax) {
         if (exception)
             *exception = toRef(exec, syntaxException);
+#if ENABLE(REMOTE_INSPECTOR)
+        exec->vmEntryGlobalObject()->inspectorController().reportAPIException(exec, syntaxException);
+#endif
         return false;
     }
 
@@ -111,7 +125,7 @@ void JSGarbageCollect(JSContextRef ctx)
         return;
 
     ExecState* exec = toJS(ctx);
-    APIEntryShim entryShim(exec, false);
+    JSLockHolder locker(exec);
 
     exec->vm().heap.reportAbandonedObjectGraph();
 }
@@ -123,11 +137,12 @@ void JSReportExtraMemoryCost(JSContextRef ctx, size_t size)
         return;
     }
     ExecState* exec = toJS(ctx);
-    APIEntryShim entryShim(exec);
+    JSLockHolder locker(exec);
     exec->vm().heap.reportExtraMemoryCost(size);
 }
 
 extern "C" JS_EXPORT void JSSynchronousGarbageCollectForDebugging(JSContextRef);
+extern "C" JS_EXPORT void JSSynchronousEdenCollectForDebugging(JSContextRef);
 
 void JSSynchronousGarbageCollectForDebugging(JSContextRef ctx)
 {
@@ -135,8 +150,18 @@ void JSSynchronousGarbageCollectForDebugging(JSContextRef ctx)
         return;
 
     ExecState* exec = toJS(ctx);
-    APIEntryShim entryShim(exec);
+    JSLockHolder locker(exec);
     exec->vm().heap.collectAllGarbage();
+}
+
+void JSSynchronousEdenCollectForDebugging(JSContextRef ctx)
+{
+    if (!ctx)
+        return;
+
+    ExecState* exec = toJS(ctx);
+    JSLockHolder locker(exec);
+    exec->vm().heap.collect(EdenCollection);
 }
 
 void JSDisableGCTimer(void)

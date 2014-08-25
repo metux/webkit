@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2004, 2005, 2006, 2008 Apple Inc. All rights reserved.
+ * Copyright (C) 2004, 2005, 2006, 2008, 2014 Apple Inc. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -35,6 +35,7 @@
 
 namespace WTF {
 
+class AtomicStringTable;
 struct AtomicStringHash;
 
 class AtomicString {
@@ -77,15 +78,22 @@ public:
     // We have to declare the copy constructor and copy assignment operator as well, otherwise
     // they'll be implicitly deleted by adding the move constructor and move assignment operator.
     AtomicString(const AtomicString& other) : m_string(other.m_string) { }
-    AtomicString(AtomicString&& other) : m_string(std::move(other.m_string)) { }
+    AtomicString(AtomicString&& other) : m_string(WTF::move(other.m_string)) { }
     AtomicString& operator=(const AtomicString& other) { m_string = other.m_string; return *this; }
-    AtomicString& operator=(AtomicString&& other) { m_string = std::move(other.m_string); return *this; }
+    AtomicString& operator=(AtomicString&& other) { m_string = WTF::move(other.m_string); return *this; }
 
     // Hash table deleted values, which are only constructed and never copied or destroyed.
     AtomicString(WTF::HashTableDeletedValueType) : m_string(WTF::HashTableDeletedValue) { }
     bool isHashTableDeletedValue() const { return m_string.isHashTableDeletedValue(); }
 
-    WTF_EXPORT_STRING_API static AtomicStringImpl* find(const StringImpl*);
+    WTF_EXPORT_STRING_API static AtomicStringImpl* find(LChar*, unsigned length);
+    WTF_EXPORT_STRING_API static AtomicStringImpl* find(UChar*, unsigned length);
+    static AtomicStringImpl* find(StringImpl* string)
+    {
+        if (!string || string->isAtomic())
+            return static_cast<AtomicStringImpl*>(string);
+        return findSlowCase(*string);
+    }
 
     operator const String&() const { return m_string; }
     const String& string() const { return m_string; };
@@ -93,7 +101,6 @@ public:
     AtomicStringImpl* impl() const { return static_cast<AtomicStringImpl *>(m_string.impl()); }
 
     bool is8Bit() const { return m_string.is8Bit(); }
-    const UChar* characters() const { return m_string.deprecatedCharacters(); } // FIXME: Delete this.
     const LChar* characters8() const { return m_string.characters8(); }
     const UChar* characters16() const { return m_string.characters16(); }
     unsigned length() const { return m_string.length(); }
@@ -133,9 +140,10 @@ public:
     bool endsWith(const char (&prefix)[matchLength], bool caseSensitive = true) const
         { return m_string.endsWith<matchLength>(prefix, caseSensitive); }
     
+    WTF_EXPORT_STRING_API AtomicString convertToASCIILowercase() const;
     WTF_EXPORT_STRING_API AtomicString lower() const;
     AtomicString upper() const { return AtomicString(impl()->upper()); }
-    
+
     int toInt(bool* ok = 0) const { return m_string.toInt(ok); }
     double toDouble(bool* ok = 0) const { return m_string.toDouble(ok); }
     float toFloat(bool* ok = 0) const { return m_string.toFloat(ok); }
@@ -163,12 +171,6 @@ public:
     void show() const;
 #endif
 
-private:
-    // The explicit constructors with AtomicString::ConstructFromLiteral must be used for literals.
-    AtomicString(ASCIILiteral);
-
-    String m_string;
-    
     WTF_EXPORT_STRING_API static PassRefPtr<StringImpl> add(const LChar*);
     ALWAYS_INLINE static PassRefPtr<StringImpl> add(const char* s) { return add(reinterpret_cast<const LChar*>(s)); };
     WTF_EXPORT_STRING_API static PassRefPtr<StringImpl> add(const LChar*, unsigned length);
@@ -180,17 +182,36 @@ private:
     ALWAYS_INLINE static PassRefPtr<StringImpl> add(StringImpl* string)
     {
         if (!string || string->isAtomic()) {
-            ASSERT_WITH_MESSAGE(!string || isInAtomicStringTable(string), "The atomic string comes from an other thread!");
+            ASSERT_WITH_MESSAGE(!string || !string->length() || isInAtomicStringTable(string), "The atomic string comes from an other thread!");
             return string;
         }
-        return addSlowCase(string);
+        return addSlowCase(*string);
     }
     WTF_EXPORT_STRING_API static PassRefPtr<StringImpl> addFromLiteralData(const char* characters, unsigned length);
-    WTF_EXPORT_STRING_API static PassRefPtr<StringImpl> addSlowCase(StringImpl*);
 #if USE(CF)
     WTF_EXPORT_STRING_API static PassRefPtr<StringImpl> add(CFStringRef);
 #endif
 
+    template<typename StringTableProvider>
+    ALWAYS_INLINE static PassRefPtr<StringImpl> addWithStringTableProvider(StringTableProvider& stringTableProvider, StringImpl* string)
+    {
+        if (!string || string->isAtomic()) {
+            ASSERT_WITH_MESSAGE(!string || !string->length() || isInAtomicStringTable(string), "The atomic string comes from an other thread!");
+            return string;
+        }
+        return addSlowCase(*stringTableProvider.atomicStringTable(), *string);
+    }
+
+private:
+    // The explicit constructors with AtomicString::ConstructFromLiteral must be used for literals.
+    AtomicString(ASCIILiteral);
+
+    String m_string;
+    
+    WTF_EXPORT_STRING_API static PassRefPtr<StringImpl> addSlowCase(StringImpl&);
+    WTF_EXPORT_STRING_API static PassRefPtr<StringImpl> addSlowCase(AtomicStringTable&, StringImpl&);
+
+    WTF_EXPORT_STRING_API static AtomicStringImpl* findSlowCase(StringImpl&);
     WTF_EXPORT_STRING_API static AtomicString fromUTF8Internal(const char*, const char*);
 
 #if !ASSERT_DISABLED

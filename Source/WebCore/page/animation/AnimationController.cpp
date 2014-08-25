@@ -10,7 +10,7 @@
  * 2.  Redistributions in binary form must reproduce the above copyright
  *     notice, this list of conditions and the following disclaimer in the
  *     documentation and/or other materials provided with the distribution. 
- * 3.  Neither the name of Apple Computer, Inc. ("Apple") nor the names of
+ * 3.  Neither the name of Apple Inc. ("Apple") nor the names of
  *     its contributors may be used to endorse or promote products derived
  *     from this software without specific prior written permission. 
  *
@@ -167,7 +167,7 @@ void AnimationControllerPrivate::fireEventsAndUpdateStyle()
     bool updateStyle = !m_eventsToDispatch.isEmpty() || !m_elementChangesToDispatch.isEmpty();
 
     // fire all the events
-    Vector<EventToDispatch> eventsToDispatch = std::move(m_eventsToDispatch);
+    Vector<EventToDispatch> eventsToDispatch = WTF::move(m_eventsToDispatch);
     Vector<EventToDispatch>::const_iterator eventsToDispatchEnd = eventsToDispatch.end();
     for (Vector<EventToDispatch>::const_iterator it = eventsToDispatch.begin(); it != eventsToDispatchEnd; ++it) {
         Element* element = it->element.get();
@@ -206,7 +206,7 @@ void AnimationControllerPrivate::addEventToDispatch(PassRefPtr<Element> element,
 
 void AnimationControllerPrivate::addElementChangeToDispatch(PassRef<Element> element)
 {
-    m_elementChangesToDispatch.append(std::move(element));
+    m_elementChangesToDispatch.append(WTF::move(element));
     ASSERT(!m_elementChangesToDispatch.last()->document().inPageCache());
     startUpdateStyleIfNeededDispatcher();
 }
@@ -236,16 +236,16 @@ void AnimationControllerPrivate::animationTimerFired(Timer<AnimationControllerPr
     fireEventsAndUpdateStyle();
 }
 
-bool AnimationControllerPrivate::isRunningAnimationOnRenderer(RenderElement* renderer, CSSPropertyID property, bool isRunningNow) const
+bool AnimationControllerPrivate::isRunningAnimationOnRenderer(RenderElement* renderer, CSSPropertyID property, AnimationBase::RunningState runningState) const
 {
     const CompositeAnimation* animation = m_compositeAnimations.get(renderer);
-    return animation && animation->isAnimatingProperty(property, false, isRunningNow);
+    return animation && animation->isAnimatingProperty(property, false, runningState);
 }
 
-bool AnimationControllerPrivate::isRunningAcceleratedAnimationOnRenderer(RenderElement* renderer, CSSPropertyID property, bool isRunningNow) const
+bool AnimationControllerPrivate::isRunningAcceleratedAnimationOnRenderer(RenderElement* renderer, CSSPropertyID property, AnimationBase::RunningState runningState) const
 {
     const CompositeAnimation* animation = m_compositeAnimations.get(renderer);
-    return animation && animation->isAnimatingProperty(property, true, isRunningNow);
+    return animation && animation->isAnimatingProperty(property, true, runningState);
 }
 
 void AnimationControllerPrivate::suspendAnimations()
@@ -508,7 +508,7 @@ PassRef<RenderStyle> AnimationController::updateAnimations(RenderElement& render
     // We don't support anonymous pseudo elements like :first-line or :first-letter.
     ASSERT(renderer.element());
 
-    Ref<RenderStyle> newStyleBeforeAnimation(std::move(newStyle));
+    Ref<RenderStyle> newStyleBeforeAnimation(WTF::move(newStyle));
 
     CompositeAnimation& rendererAnimations = m_data->ensureCompositeAnimation(&renderer);
     auto blendedStyle = rendererAnimations.animate(renderer, oldStyle, newStyleBeforeAnimation.get());
@@ -555,14 +555,14 @@ bool AnimationController::pauseTransitionAtTime(RenderElement* renderer, const S
     return m_data->pauseTransitionAtTime(renderer, property, t);
 }
 
-bool AnimationController::isRunningAnimationOnRenderer(RenderElement* renderer, CSSPropertyID property, bool isRunningNow) const
+bool AnimationController::isRunningAnimationOnRenderer(RenderElement* renderer, CSSPropertyID property, AnimationBase::RunningState runningState) const
 {
-    return m_data->isRunningAnimationOnRenderer(renderer, property, isRunningNow);
+    return m_data->isRunningAnimationOnRenderer(renderer, property, runningState);
 }
 
-bool AnimationController::isRunningAcceleratedAnimationOnRenderer(RenderElement* renderer, CSSPropertyID property, bool isRunningNow) const
+bool AnimationController::isRunningAcceleratedAnimationOnRenderer(RenderElement* renderer, CSSPropertyID property, AnimationBase::RunningState runningState) const
 {
-    return m_data->isRunningAcceleratedAnimationOnRenderer(renderer, property, isRunningNow);
+    return m_data->isRunningAcceleratedAnimationOnRenderer(renderer, property, runningState);
 }
 
 bool AnimationController::isSuspended() const
@@ -634,12 +634,7 @@ void AnimationController::endAnimationUpdate()
 
 bool AnimationController::supportsAcceleratedAnimationOfProperty(CSSPropertyID property)
 {
-#if USE(ACCELERATED_COMPOSITING)
     return CSSPropertyAnimation::animationOfPropertyIsAccelerated(property);
-#else
-    UNUSED_PARAM(property);
-    return false;
-#endif
 }
 
 } // namespace WebCore

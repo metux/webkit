@@ -65,23 +65,43 @@ void ChildProcessProxy::connect()
 
 void ChildProcessProxy::terminate()
 {
+#if PLATFORM(COCOA)
+    if (m_connection && m_connection->kill())
+        return;
+#endif
+
+    // FIXME: We should really merge process launching into IPC connection creation and get rid of the process launcher.
     if (m_processLauncher)
         m_processLauncher->terminateProcess();
 }
 
+ChildProcessProxy::State ChildProcessProxy::state() const
+{
+    if (m_processLauncher && m_processLauncher->isLaunching())
+        return ChildProcessProxy::State::Launching;
+
+    if (!m_connection)
+        return ChildProcessProxy::State::Terminated;
+
+    return ChildProcessProxy::State::Running;
+}
+
 bool ChildProcessProxy::sendMessage(std::unique_ptr<IPC::MessageEncoder> encoder, unsigned messageSendFlags)
 {
-    // If we're waiting for the child process to launch, we need to stash away the messages so we can send them once we have a connection.
-    if (isLaunching()) {
-        m_pendingMessages.append(std::make_pair(std::move(encoder), messageSendFlags));
+    switch (state()) {
+    case State::Launching:
+        // If we're waiting for the child process to launch, we need to stash away the messages so we can send them once we have a connection.
+        m_pendingMessages.append(std::make_pair(WTF::move(encoder), messageSendFlags));
         return true;
+
+    case State::Running:
+        return connection()->sendMessage(WTF::move(encoder), messageSendFlags);
+
+    case State::Terminated:
+        return false;
     }
 
-    // If the web process has exited, connection will be null here.
-    if (!m_connection)
-        return false;
-
-    return connection()->sendMessage(std::move(encoder), messageSendFlags);
+    return false;
 }
 
 void ChildProcessProxy::addMessageReceiver(IPC::StringReference messageReceiverName, IPC::MessageReceiver& messageReceiver)
@@ -109,20 +129,12 @@ bool ChildProcessProxy::dispatchSyncMessage(IPC::Connection* connection, IPC::Me
     return m_messageReceiverMap.dispatchSyncMessage(connection, decoder, replyEncoder);
 }
 
-bool ChildProcessProxy::isLaunching() const
-{
-    if (m_processLauncher)
-        return m_processLauncher->isLaunching();
-
-    return false;
-}
-
 void ChildProcessProxy::didFinishLaunching(ProcessLauncher*, IPC::Connection::Identifier connectionIdentifier)
 {
     ASSERT(!m_connection);
 
     m_connection = IPC::Connection::createServerConnection(connectionIdentifier, this, RunLoop::main());
-#if OS(DARWIN)
+#if PLATFORM(MAC)
     m_connection->setShouldCloseConnectionOnMachExceptions();
 #endif
 
@@ -130,9 +142,9 @@ void ChildProcessProxy::didFinishLaunching(ProcessLauncher*, IPC::Connection::Id
     m_connection->open();
 
     for (size_t i = 0; i < m_pendingMessages.size(); ++i) {
-        std::unique_ptr<IPC::MessageEncoder> message = std::move(m_pendingMessages[i].first);
+        std::unique_ptr<IPC::MessageEncoder> message = WTF::move(m_pendingMessages[i].first);
         unsigned messageSendFlags = m_pendingMessages[i].second;
-        m_connection->sendMessage(std::move(message), messageSendFlags);
+        m_connection->sendMessage(WTF::move(message), messageSendFlags);
     }
 
     m_pendingMessages.clear();
@@ -140,11 +152,11 @@ void ChildProcessProxy::didFinishLaunching(ProcessLauncher*, IPC::Connection::Id
 
 void ChildProcessProxy::abortProcessLaunchIfNeeded()
 {
-    if (!isLaunching())
+    if (state() != State::Launching)
         return;
 
     m_processLauncher->invalidate();
-    m_processLauncher = 0;
+    m_processLauncher = nullptr;
 }
 
 void ChildProcessProxy::clearConnection()

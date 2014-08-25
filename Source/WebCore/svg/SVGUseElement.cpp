@@ -23,8 +23,6 @@
  */
 
 #include "config.h"
-
-#if ENABLE(SVG)
 #include "SVGUseElement.h"
 
 #include "CachedResourceLoader.h"
@@ -53,6 +51,7 @@
 #include "XLinkNames.h"
 #include "XMLDocumentParser.h"
 #include "XMLSerializer.h"
+#include <wtf/NeverDestroyed.h>
 
 // Dump SVGElementInstance object tree - useful to debug instanceRoot problems
 // #define DUMP_INSTANCE_TREE
@@ -131,17 +130,17 @@ SVGElementInstance* SVGUseElement::animatedInstanceRoot() const
 
 bool SVGUseElement::isSupportedAttribute(const QualifiedName& attrName)
 {
-    DEFINE_STATIC_LOCAL(HashSet<QualifiedName>, supportedAttributes, ());
-    if (supportedAttributes.isEmpty()) {
+    static NeverDestroyed<HashSet<QualifiedName>> supportedAttributes;
+    if (supportedAttributes.get().isEmpty()) {
         SVGLangSpace::addSupportedAttributes(supportedAttributes);
         SVGExternalResourcesRequired::addSupportedAttributes(supportedAttributes);
         SVGURIReference::addSupportedAttributes(supportedAttributes);
-        supportedAttributes.add(SVGNames::xAttr);
-        supportedAttributes.add(SVGNames::yAttr);
-        supportedAttributes.add(SVGNames::widthAttr);
-        supportedAttributes.add(SVGNames::heightAttr);
+        supportedAttributes.get().add(SVGNames::xAttr);
+        supportedAttributes.get().add(SVGNames::yAttr);
+        supportedAttributes.get().add(SVGNames::widthAttr);
+        supportedAttributes.get().add(SVGNames::heightAttr);
     }
-    return supportedAttributes.contains<SVGAttributeHashTranslator>(attrName);
+    return supportedAttributes.get().contains<SVGAttributeHashTranslator>(attrName);
 }
 
 void SVGUseElement::parseAttribute(const QualifiedName& name, const AtomicString& value)
@@ -184,10 +183,15 @@ Node::InsertionNotificationRequest SVGUseElement::insertedInto(ContainerNode& ro
         return InsertionDone;
     ASSERT(!m_targetElementInstance || !isWellFormedDocument(document()));
     ASSERT(!hasPendingResources() || !isWellFormedDocument(document()));
-    if (!m_wasInsertedByParser)
-        buildPendingResource();
     SVGExternalResourcesRequired::insertedIntoDocument(this);
+    if (!m_wasInsertedByParser)
+        return InsertionShouldCallDidNotifySubtreeInsertions;
     return InsertionDone;
+}
+
+void SVGUseElement::didNotifySubtreeInsertions(ContainerNode*)
+{
+    buildPendingResource();
 }
 
 void SVGUseElement::removedFrom(ContainerNode& rootParent)
@@ -336,31 +340,31 @@ static bool isDisallowedElement(const Element& element)
     if (!element.isSVGElement())
         return true;
 
-    DEFINE_STATIC_LOCAL(HashSet<QualifiedName>, allowedElementTags, ());
-    if (allowedElementTags.isEmpty()) {
-        allowedElementTags.add(SVGNames::aTag);
-        allowedElementTags.add(SVGNames::circleTag);
-        allowedElementTags.add(SVGNames::descTag);
-        allowedElementTags.add(SVGNames::ellipseTag);
-        allowedElementTags.add(SVGNames::gTag);
-        allowedElementTags.add(SVGNames::imageTag);
-        allowedElementTags.add(SVGNames::lineTag);
-        allowedElementTags.add(SVGNames::metadataTag);
-        allowedElementTags.add(SVGNames::pathTag);
-        allowedElementTags.add(SVGNames::polygonTag);
-        allowedElementTags.add(SVGNames::polylineTag);
-        allowedElementTags.add(SVGNames::rectTag);
-        allowedElementTags.add(SVGNames::svgTag);
-        allowedElementTags.add(SVGNames::switchTag);
-        allowedElementTags.add(SVGNames::symbolTag);
-        allowedElementTags.add(SVGNames::textTag);
-        allowedElementTags.add(SVGNames::textPathTag);
-        allowedElementTags.add(SVGNames::titleTag);
-        allowedElementTags.add(SVGNames::trefTag);
-        allowedElementTags.add(SVGNames::tspanTag);
-        allowedElementTags.add(SVGNames::useTag);
+    static NeverDestroyed<HashSet<QualifiedName>> allowedElementTags;
+    if (allowedElementTags.get().isEmpty()) {
+        allowedElementTags.get().add(SVGNames::aTag);
+        allowedElementTags.get().add(SVGNames::circleTag);
+        allowedElementTags.get().add(SVGNames::descTag);
+        allowedElementTags.get().add(SVGNames::ellipseTag);
+        allowedElementTags.get().add(SVGNames::gTag);
+        allowedElementTags.get().add(SVGNames::imageTag);
+        allowedElementTags.get().add(SVGNames::lineTag);
+        allowedElementTags.get().add(SVGNames::metadataTag);
+        allowedElementTags.get().add(SVGNames::pathTag);
+        allowedElementTags.get().add(SVGNames::polygonTag);
+        allowedElementTags.get().add(SVGNames::polylineTag);
+        allowedElementTags.get().add(SVGNames::rectTag);
+        allowedElementTags.get().add(SVGNames::svgTag);
+        allowedElementTags.get().add(SVGNames::switchTag);
+        allowedElementTags.get().add(SVGNames::symbolTag);
+        allowedElementTags.get().add(SVGNames::textTag);
+        allowedElementTags.get().add(SVGNames::textPathTag);
+        allowedElementTags.get().add(SVGNames::titleTag);
+        allowedElementTags.get().add(SVGNames::trefTag);
+        allowedElementTags.get().add(SVGNames::tspanTag);
+        allowedElementTags.get().add(SVGNames::useTag);
     }
-    return !allowedElementTags.contains<SVGAttributeHashTranslator>(element.tagQName());
+    return !allowedElementTags.get().contains<SVGAttributeHashTranslator>(element.tagQName());
 }
 
 static bool subtreeContainsDisallowedElement(SVGElement& start)
@@ -521,18 +525,18 @@ void SVGUseElement::buildShadowAndInstanceTree(SVGElement* target)
 
 RenderPtr<RenderElement> SVGUseElement::createElementRenderer(PassRef<RenderStyle> style)
 {
-    return createRenderer<RenderSVGTransformableContainer>(*this, std::move(style));
+    return createRenderer<RenderSVGTransformableContainer>(*this, WTF::move(style));
 }
 
-static bool isDirectReference(const Node* node)
+static bool isDirectReference(const SVGElement& element)
 {
-    return node->hasTagName(SVGNames::pathTag)
-           || node->hasTagName(SVGNames::rectTag)
-           || node->hasTagName(SVGNames::circleTag)
-           || node->hasTagName(SVGNames::ellipseTag)
-           || node->hasTagName(SVGNames::polygonTag)
-           || node->hasTagName(SVGNames::polylineTag)
-           || node->hasTagName(SVGNames::textTag);
+    return element.hasTagName(SVGNames::pathTag)
+        || element.hasTagName(SVGNames::rectTag)
+        || element.hasTagName(SVGNames::circleTag)
+        || element.hasTagName(SVGNames::ellipseTag)
+        || element.hasTagName(SVGNames::polygonTag)
+        || element.hasTagName(SVGNames::polylineTag)
+        || element.hasTagName(SVGNames::textTag);
 }
 
 void SVGUseElement::toClipPath(Path& path)
@@ -543,12 +547,12 @@ void SVGUseElement::toClipPath(Path& path)
     if (!n)
         return;
 
-    if (n->isSVGElement() && toSVGElement(n)->isSVGGraphicsElement()) {
-        if (!isDirectReference(n))
+    if (n->isSVGElement() && toSVGElement(*n).isSVGGraphicsElement()) {
+        if (!isDirectReference(toSVGElement(*n))) {
             // Spec: Indirect references are an error (14.3.5)
             document().accessSVGExtensions()->reportError("Not allowed to use indirect reference in <clip-path>");
-        else {
-            toSVGGraphicsElement(n)->toClipPath(path);
+        } else {
+            toSVGGraphicsElement(*n).toClipPath(path);
             // FIXME: Avoid manual resolution of x/y here. Its potentially harmful.
             SVGLengthContext lengthContext(this);
             path.translate(FloatSize(x().value(lengthContext), y().value(lengthContext)));
@@ -559,14 +563,17 @@ void SVGUseElement::toClipPath(Path& path)
 
 RenderElement* SVGUseElement::rendererClipChild() const
 {
-    Node* n = m_targetElementInstance ? m_targetElementInstance->shadowTreeElement() : 0;
-    if (!n)
-        return 0;
+    if (!m_targetElementInstance)
+        return nullptr;
 
-    if (n->isSVGElement() && isDirectReference(n))
-        return toSVGElement(n)->renderer();
+    auto* element = m_targetElementInstance->shadowTreeElement();
+    if (!element)
+        return nullptr;
 
-    return 0;
+    if (!isDirectReference(*element))
+        return nullptr;
+
+    return element->renderer();
 }
 
 void SVGUseElement::buildInstanceTree(SVGElement* target, SVGElementInstance* targetInstance, bool& foundProblem, bool foundUse)
@@ -993,5 +1000,3 @@ void SVGUseElement::setCachedDocument(CachedResourceHandle<CachedSVGDocument> ca
 }
 
 }
-
-#endif // ENABLE(SVG)

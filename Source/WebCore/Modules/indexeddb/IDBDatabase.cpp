@@ -31,22 +31,20 @@
 #include "DOMStringList.h"
 #include "EventQueue.h"
 #include "ExceptionCode.h"
-#include "HistogramSupport.h"
 #include "IDBAny.h"
 #include "IDBDatabaseCallbacks.h"
 #include "IDBDatabaseError.h"
 #include "IDBDatabaseException.h"
 #include "IDBEventDispatcher.h"
-#include "IDBHistograms.h"
 #include "IDBIndex.h"
 #include "IDBKeyPath.h"
 #include "IDBObjectStore.h"
 #include "IDBTransaction.h"
 #include "IDBVersionChangeEvent.h"
 #include "Logging.h"
-#include "ScriptCallStack.h"
 #include "ScriptExecutionContext.h"
 #include <atomic>
+#include <inspector/ScriptCallStack.h>
 #include <limits>
 #include <wtf/Atomics.h>
 
@@ -135,7 +133,9 @@ PassRefPtr<DOMStringList> IDBDatabase::objectStoreNames() const
 
 uint64_t IDBDatabase::version() const
 {
-    return m_metadata.version;
+    // NoIntVersion is a special value for internal use only and shouldn't be exposed to script.
+    // DefaultIntVersion should be exposed instead.
+    return m_metadata.version != IDBDatabaseMetadata::NoIntVersion ? m_metadata.version : static_cast<uint64_t>(IDBDatabaseMetadata::DefaultIntVersion);
 }
 
 PassRefPtr<IDBObjectStore> IDBDatabase::createObjectStore(const String& name, const Dictionary& options, ExceptionCode& ec)
@@ -159,7 +159,6 @@ PassRefPtr<IDBObjectStore> IDBDatabase::createObjectStore(const String& name, co
 PassRefPtr<IDBObjectStore> IDBDatabase::createObjectStore(const String& name, const IDBKeyPath& keyPath, bool autoIncrement, ExceptionCode& ec)
 {
     LOG(StorageAPI, "IDBDatabase::createObjectStore");
-    HistogramSupport::histogramEnumeration("WebCore.IndexedDB.FrontEndAPICalls", IDBCreateObjectStoreCall, IDBMethodsMax);
     if (!m_versionChangeTransaction) {
         ec = IDBDatabaseException::InvalidStateError;
         return 0;
@@ -199,7 +198,6 @@ PassRefPtr<IDBObjectStore> IDBDatabase::createObjectStore(const String& name, co
 void IDBDatabase::deleteObjectStore(const String& name, ExceptionCode& ec)
 {
     LOG(StorageAPI, "IDBDatabase::deleteObjectStore");
-    HistogramSupport::histogramEnumeration("WebCore.IndexedDB.FrontEndAPICalls", IDBDeleteObjectStoreCall, IDBMethodsMax);
     if (!m_versionChangeTransaction) {
         ec = IDBDatabaseException::InvalidStateError;
         return;
@@ -223,7 +221,6 @@ void IDBDatabase::deleteObjectStore(const String& name, ExceptionCode& ec)
 PassRefPtr<IDBTransaction> IDBDatabase::transaction(ScriptExecutionContext* context, const Vector<String>& scope, const String& modeString, ExceptionCode& ec)
 {
     LOG(StorageAPI, "IDBDatabase::transaction");
-    HistogramSupport::histogramEnumeration("WebCore.IndexedDB.FrontEndAPICalls", IDBTransactionCall, IDBMethodsMax);
     if (!scope.size()) {
         ec = IDBDatabaseException::InvalidAccessError;
         return 0;

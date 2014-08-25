@@ -125,7 +125,7 @@ static AtkAttributeSet* getAttributeSetForAccessibilityObject(const Accessibilit
     }
 
     if (!style->textIndent().isUndefined()) {
-        int indentation = valueForLength(style->textIndent(), object->size().width(), &renderer->view());
+        int indentation = valueForLength(style->textIndent(), object->size().width());
         buffer.reset(g_strdup_printf("%i", indentation));
         result = addToAtkAttributeSet(result, atk_text_attribute_get_name(ATK_TEXT_ATTR_INDENT), buffer.get());
     }
@@ -204,7 +204,7 @@ static AtkAttributeSet* getAttributeSetForAccessibilityObject(const Accessibilit
     if (!language.isEmpty())
         result = addToAtkAttributeSet(result, atk_text_attribute_get_name(ATK_TEXT_ATTR_LANGUAGE), language.utf8().data());
 
-    String invalidStatus = object->invalidStatus().string();
+    String invalidStatus = object->invalidStatus();
     if (invalidStatus != "false") {
         // Register the custom attribute for 'aria-invalid' if not done yet.
         if (atkTextAttributeInvalid == ATK_TEXT_ATTR_INVALID)
@@ -1233,29 +1233,9 @@ static gboolean webkitAccessibleTextRemoveSelection(AtkText* text, gint selectio
 
 static gboolean webkitAccessibleTextSetCaretOffset(AtkText* text, gint offset)
 {
-    g_return_val_if_fail(ATK_TEXT(text), FALSE);
-    returnValIfWebKitAccessibleIsInvalid(WEBKIT_ACCESSIBLE(text), FALSE);
-
-    AccessibilityObject* coreObject = core(text);
-    if (!coreObject->isAccessibilityRenderObject())
-        return FALSE;
-
-    // We need to adjust the offsets for the list item marker.
-    int offsetAdjustment = offsetAdjustmentForListItem(coreObject);
-    if (offsetAdjustment) {
-        if (offset < offsetAdjustment)
-            return FALSE;
-
-        offset = atkOffsetToWebCoreOffset(text, offset);
-    }
-
-    PlainTextRange textRange(offset, 0);
-    VisiblePositionRange range = coreObject->visiblePositionRangeForRange(textRange);
-    if (range.isNull())
-        return FALSE;
-
-    coreObject->setSelectedVisiblePositionRange(range);
-    return TRUE;
+    // Internally, setting the caret offset is equivalent to set a zero-length
+    // selection, so delegate in that implementation and void duplicated code.
+    return webkitAccessibleTextSetSelection(text, 0, offset, offset);
 }
 
 #if ATK_CHECK_VERSION(2, 10, 0)

@@ -4,6 +4,7 @@
  * Copyright (C) 2005 Alexander Kellett <lypanov@kde.org>
  * Copyright (C) 2009 Dirk Schulze <krit@webkit.org>
  * Copyright (C) Research In Motion Limited 2009-2010. All rights reserved.
+ * Copyright (C) 2014 Adobe Systems Incorporated. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -22,8 +23,6 @@
  */
 
 #include "config.h"
-
-#if ENABLE(SVG)
 #include "SVGMaskElement.h"
 
 #include "Attribute.h"
@@ -33,6 +32,7 @@
 #include "SVGRenderSupport.h"
 #include "SVGUnitTypes.h"
 #include "StyleResolver.h"
+#include <wtf/NeverDestroyed.h>
 
 namespace WebCore {
 
@@ -79,19 +79,19 @@ PassRefPtr<SVGMaskElement> SVGMaskElement::create(const QualifiedName& tagName, 
 
 bool SVGMaskElement::isSupportedAttribute(const QualifiedName& attrName)
 {
-    DEFINE_STATIC_LOCAL(HashSet<QualifiedName>, supportedAttributes, ());
-    if (supportedAttributes.isEmpty()) {
+    static NeverDestroyed<HashSet<QualifiedName>> supportedAttributes;
+    if (supportedAttributes.get().isEmpty()) {
         SVGTests::addSupportedAttributes(supportedAttributes);
         SVGLangSpace::addSupportedAttributes(supportedAttributes);
         SVGExternalResourcesRequired::addSupportedAttributes(supportedAttributes);
-        supportedAttributes.add(SVGNames::maskUnitsAttr);
-        supportedAttributes.add(SVGNames::maskContentUnitsAttr);
-        supportedAttributes.add(SVGNames::xAttr);
-        supportedAttributes.add(SVGNames::yAttr);
-        supportedAttributes.add(SVGNames::widthAttr);
-        supportedAttributes.add(SVGNames::heightAttr);
+        supportedAttributes.get().add(SVGNames::maskUnitsAttr);
+        supportedAttributes.get().add(SVGNames::maskContentUnitsAttr);
+        supportedAttributes.get().add(SVGNames::xAttr);
+        supportedAttributes.get().add(SVGNames::yAttr);
+        supportedAttributes.get().add(SVGNames::widthAttr);
+        supportedAttributes.get().add(SVGNames::heightAttr);
     }
-    return supportedAttributes.contains<SVGAttributeHashTranslator>(attrName);
+    return supportedAttributes.get().contains<SVGAttributeHashTranslator>(attrName);
 }
 
 void SVGMaskElement::parseAttribute(const QualifiedName& name, const AtomicString& value)
@@ -135,12 +135,14 @@ void SVGMaskElement::svgAttributeChanged(const QualifiedName& attrName)
     }
 
     SVGElementInstance::InvalidationGuard invalidationGuard(this);
-    
+
     if (attrName == SVGNames::xAttr
         || attrName == SVGNames::yAttr
         || attrName == SVGNames::widthAttr
-        || attrName == SVGNames::heightAttr)
-        updateRelativeLengthsInformation();
+        || attrName == SVGNames::heightAttr) {
+        invalidateSVGPresentationAttributeStyle();
+        return;
+    }
 
     if (RenderObject* object = renderer())
         object->setNeedsLayout();
@@ -159,17 +161,7 @@ void SVGMaskElement::childrenChanged(const ChildChange& change)
 
 RenderPtr<RenderElement> SVGMaskElement::createElementRenderer(PassRef<RenderStyle> style)
 {
-    return createRenderer<RenderSVGResourceMasker>(*this, std::move(style));
-}
-
-bool SVGMaskElement::selfHasRelativeLengths() const
-{
-    return x().isRelative()
-        || y().isRelative()
-        || width().isRelative()
-        || height().isRelative();
+    return createRenderer<RenderSVGResourceMasker>(*this, WTF::move(style));
 }
 
 }
-
-#endif // ENABLE(SVG)

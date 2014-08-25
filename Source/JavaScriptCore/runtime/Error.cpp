@@ -34,7 +34,7 @@
 #include "JSObject.h"
 #include "JSString.h"
 #include "NativeErrorConstructor.h"
-#include "Operations.h"
+#include "JSCInlines.h"
 #include "SourceCode.h"
 
 #include <wtf/text/StringBuilder.h>
@@ -160,7 +160,7 @@ JSObject* throwSyntaxError(ExecState* exec)
     return exec->vm().throwException(exec, createSyntaxError(exec, ASCIILiteral("Syntax error")));
 }
 
-const ClassInfo StrictModeTypeErrorFunction::s_info = { "Function", &Base::s_info, 0, 0, CREATE_METHOD_TABLE(StrictModeTypeErrorFunction) };
+const ClassInfo StrictModeTypeErrorFunction::s_info = { "Function", &Base::s_info, 0, CREATE_METHOD_TABLE(StrictModeTypeErrorFunction) };
 
 void StrictModeTypeErrorFunction::destroy(JSCell* cell)
 {

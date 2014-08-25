@@ -37,7 +37,6 @@
 #include "InspectorWebBackendDispatchers.h"
 #include <inspector/agents/InspectorDebuggerAgent.h>
 #include <wtf/HashMap.h>
-#include <wtf/PassOwnPtr.h>
 #include <wtf/RefCounted.h>
 #include <wtf/text/WTFString.h>
 
@@ -56,6 +55,7 @@ typedef String ErrorString;
 
 class InspectorDOMDebuggerAgent : public InspectorAgentBase, public Inspector::InspectorDebuggerAgent::Listener, public Inspector::InspectorDOMDebuggerBackendDispatcherHandler {
     WTF_MAKE_NONCOPYABLE(InspectorDOMDebuggerAgent);
+    WTF_MAKE_FAST_ALLOCATED;
 public:
     InspectorDOMDebuggerAgent(InstrumentingAgents*, InspectorDOMAgent*, Inspector::InspectorDebuggerAgent*);
     virtual ~InspectorDOMDebuggerAgent();

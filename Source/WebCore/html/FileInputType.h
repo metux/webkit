@@ -43,7 +43,7 @@ class DragData;
 class FileList;
 class Icon;
 
-class FileInputType : public BaseClickableWithKeyInputType, private FileChooserClient, private FileIconLoaderClient {
+class FileInputType final : public BaseClickableWithKeyInputType, private FileChooserClient, private FileIconLoaderClient {
 public:
     explicit FileInputType(HTMLInputElement&);
     virtual ~FileInputType();
@@ -91,9 +91,6 @@ private:
     virtual void updateRendering(PassRefPtr<Icon>) override;
 
     PassRefPtr<FileList> createFileList(const Vector<FileChooserFileInfo>& files) const;
-#if ENABLE(DIRECTORY_UPLOAD)
-    void receiveDropForDirectoryUpload(const Vector<String>&);
-#endif
     void requestIcon(const Vector<String>&);
 
     void applyFileChooserSettings(const FileChooserSettings&);

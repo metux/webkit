@@ -1,7 +1,7 @@
 /*
  * This file is part of the select element renderer in WebCore.
  *
- * Copyright (C) 2006, 2007, 2009 Apple Inc. All rights reserved.
+ * Copyright (C) 2006, 2007, 2009, 2014 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -12,7 +12,7 @@
  * 2.  Redistributions in binary form must reproduce the above copyright
  *     notice, this list of conditions and the following disclaimer in the
  *     documentation and/or other materials provided with the distribution. 
- * 3.  Neither the name of Apple Computer, Inc. ("Apple") nor the names of
+ * 3.  Neither the name of Apple Inc. ("Apple") nor the names of
  *     its contributors may be used to endorse or promote products derived
  *     from this software without specific prior written permission. 
  *
@@ -38,7 +38,7 @@ namespace WebCore {
 
 class HTMLSelectElement;
 
-class RenderListBox final : public RenderBlockFlow, private ScrollableArea {
+class RenderListBox final : public RenderBlockFlow, public ScrollableArea {
 public:
     RenderListBox(HTMLSelectElement&, PassRef<RenderStyle>);
     virtual ~RenderListBox();
@@ -59,6 +59,13 @@ public:
 
     int size() const;
 
+    virtual bool scroll(ScrollDirection, ScrollGranularity, float multiplier = 1, Element** stopElement = nullptr, RenderBox* startBox = nullptr, const IntPoint& wheelEventAbsolutePoint = IntPoint()) override;
+
+    virtual bool scrolledToTop() const override;
+    virtual bool scrolledToBottom() const override;
+    virtual bool scrolledToLeft() const override;
+    virtual bool scrolledToRight() const override;
+
 private:
     void element() const = delete;
 
@@ -67,14 +74,12 @@ private:
     virtual bool isListBox() const override { return true; }
 
     virtual void updateFromElement() override;
-    virtual bool canBeReplacedWithInlineRunIn() const override;
     virtual bool hasControlClip() const override { return true; }
     virtual void paintObject(PaintInfo&, const LayoutPoint&) override;
     virtual LayoutRect controlClipRect(const LayoutPoint&) const override;
 
     virtual bool isPointInOverflowControl(HitTestResult&, const LayoutPoint& locationInContainer, const LayoutPoint& accumulatedOffset) override;
 
-    virtual bool scroll(ScrollDirection, ScrollGranularity, float multiplier = 1, Element** stopElement = nullptr, RenderBox* startBox = nullptr, const IntPoint& wheelEventAbsolutePoint = IntPoint()) override;
     virtual bool logicalScroll(ScrollLogicalDirection, ScrollGranularity, float multiplier = 1, Element** stopElement = 0) override;
 
     virtual void computeIntrinsicLogicalWidths(LayoutUnit& minLogicalWidth, LayoutUnit& maxLogicalWidth) const override;
@@ -123,6 +128,7 @@ private:
     virtual bool isHandlingWheelEvent() const override;
     virtual bool shouldSuspendScrollAnimations() const override;
     virtual bool updatesScrollLayerPositionOnMainThread() const override { return true; }
+    virtual bool forceUpdateScrollbarsOnMainThreadForPerformanceTesting() const override;
 
     virtual ScrollableArea* enclosingScrollableArea() const override;
     virtual IntRect scrollableAreaBoundingBox() const override;

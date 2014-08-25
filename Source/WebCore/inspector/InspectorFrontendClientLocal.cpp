@@ -116,15 +116,15 @@ void InspectorFrontendClientLocal::Settings::setProperty(const String&, const St
 {
 }
 
-InspectorFrontendClientLocal::InspectorFrontendClientLocal(InspectorController* inspectorController, Page* frontendPage, PassOwnPtr<Settings> settings)
+InspectorFrontendClientLocal::InspectorFrontendClientLocal(InspectorController* inspectorController, Page* frontendPage, std::unique_ptr<Settings> settings)
     : m_inspectorController(inspectorController)
     , m_frontendPage(frontendPage)
-    , m_settings(settings)
+    , m_settings(WTF::move(settings))
     , m_frontendLoaded(false)
     , m_dockSide(UNDOCKED)
 {
     m_frontendPage->settings().setAllowFileAccessFromFileURLs(true);
-    m_dispatchTask = adoptPtr(new InspectorBackendDispatchTask(inspectorController));
+    m_dispatchTask = std::make_unique<InspectorBackendDispatchTask>(inspectorController);
 }
 
 InspectorFrontendClientLocal::~InspectorFrontendClientLocal()
@@ -224,7 +224,7 @@ void InspectorFrontendClientLocal::openInNewTab(const String& url)
     frame->page()->setOpenedByDOM();
 
     // FIXME: Why does one use mainFrame and the other frame?
-    frame->loader().changeLocation(mainFrame.document()->securityOrigin(), frame->document()->completeURL(url), "", false, false);
+    frame->loader().changeLocation(mainFrame.document()->securityOrigin(), frame->document()->completeURL(url), "", LockHistory::No, LockBackForwardList::No);
 }
 
 void InspectorFrontendClientLocal::moveWindowBy(float x, float y)

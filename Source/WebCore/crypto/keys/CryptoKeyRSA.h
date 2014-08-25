@@ -31,9 +31,14 @@
 
 #if ENABLE(SUBTLE_CRYPTO)
 
-#if PLATFORM(MAC) || PLATFORM(IOS)
+#if OS(DARWIN) && !PLATFORM(EFL) && !PLATFORM(GTK)
 typedef struct _CCRSACryptor *CCRSACryptorRef;
 typedef CCRSACryptorRef PlatformRSAKey;
+#endif
+
+#if PLATFORM(GTK)
+typedef struct _PlatformRSAKeyGtk PlatformRSAKeyGtk;
+typedef PlatformRSAKeyGtk *PlatformRSAKey;
 #endif
 
 namespace WebCore {

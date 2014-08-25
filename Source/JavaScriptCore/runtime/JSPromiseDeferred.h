@@ -26,6 +26,8 @@
 #ifndef JSPromiseDeferred_h
 #define JSPromiseDeferred_h
 
+#if ENABLE(PROMISES)
+
 #include "JSCell.h"
 #include "Structure.h"
 
@@ -40,7 +42,7 @@ public:
 
     static Structure* createStructure(VM& vm, JSGlobalObject* globalObject, JSValue prototype)
     {
-        return Structure::create(vm, globalObject, prototype, TypeInfo(CompoundType, StructureFlags), info());
+        return Structure::create(vm, globalObject, prototype, TypeInfo(CellType, StructureFlags), info());
     }
 
     static const bool hasImmortalStructure = true;
@@ -54,7 +56,6 @@ public:
 private:
     JSPromiseDeferred(VM&);
     void finishCreation(VM&, JSObject*, JSValue, JSValue);
-    static const unsigned StructureFlags = OverridesVisitChildren | Base::StructureFlags;
     static void visitChildren(JSCell*, SlotVisitor&);
 
     WriteBarrier<JSObject> m_promise;
@@ -76,5 +77,7 @@ void performDeferredReject(ExecState*, JSPromiseDeferred*, JSValue argument);
 JSValue abruptRejection(ExecState*, JSPromiseDeferred*);
 
 } // namespace JSC
+
+#endif // ENABLE(PROMISES)
 
 #endif // JSPromiseDeferred_h

@@ -67,7 +67,7 @@ struct RenderFlexibleBox::Violation {
 
 
 RenderFlexibleBox::RenderFlexibleBox(Element& element, PassRef<RenderStyle> style)
-    : RenderBlock(element, std::move(style), 0)
+    : RenderBlock(element, WTF::move(style), 0)
     , m_orderIterator(*this)
     , m_numberOfInFlowChildrenOnFirstLine(-1)
 {
@@ -75,7 +75,7 @@ RenderFlexibleBox::RenderFlexibleBox(Element& element, PassRef<RenderStyle> styl
 }
 
 RenderFlexibleBox::RenderFlexibleBox(Document& document, PassRef<RenderStyle> style)
-    : RenderBlock(document, std::move(style), 0)
+    : RenderBlock(document, WTF::move(style), 0)
     , m_orderIterator(*this)
     , m_numberOfInFlowChildrenOnFirstLine(-1)
 {
@@ -259,7 +259,7 @@ void RenderFlexibleBox::layoutBlock(bool relayoutChildren, LayoutUnit)
 
     LayoutRepainter repainter(*this, checkForRepaintDuringLayout());
 
-    if (updateLogicalWidthAndColumnWidth())
+    if (recomputeLogicalWidth())
         relayoutChildren = true;
 
     LayoutUnit previousHeight = logicalHeight();
@@ -267,34 +267,30 @@ void RenderFlexibleBox::layoutBlock(bool relayoutChildren, LayoutUnit)
 
     LayoutStateMaintainer statePusher(view(), *this, locationOffset(), hasTransform() || hasReflection() || style().isFlippedBlocksWritingMode());
 
-    prepareShapesAndPaginationBeforeBlockLayout(relayoutChildren);
+    preparePaginationBeforeBlockLayout(relayoutChildren);
 
     m_numberOfInFlowChildrenOnFirstLine = -1;
 
-    RenderBlock::startDelayUpdateScrollInfo();
+    beginUpdateScrollInfoAfterLayoutTransaction();
 
     dirtyForLayoutFromPercentageHeightDescendants();
 
-    Vector<LineContext> lineContexts;
-    OrderIterator::OrderValues orderValues;
-    computeMainAxisPreferredSizes(orderValues);
-    m_orderIterator.setOrderValues(std::move(orderValues));
+    prepareOrderIteratorAndMargins();
 
     ChildFrameRects oldChildRects;
     appendChildFrameRects(oldChildRects);
+    Vector<LineContext> lineContexts;
     layoutFlexItems(relayoutChildren, lineContexts);
 
     updateLogicalHeight();
     repositionLogicalHeightDependentFlexItems(lineContexts);
 
-    RenderBlock::finishDelayUpdateScrollInfo();
+    endAndCommitUpdateScrollInfoAfterLayoutTransaction();
 
     if (logicalHeight() != previousHeight)
         relayoutChildren = true;
 
     layoutPositionedObjects(relayoutChildren || isRoot());
-
-    updateShapesAfterBlockLayout();
 
     repaintChildrenDuringLayoutIfMoved(oldChildRects);
     // FIXME: css3/flexbox/repaint-rtl-column.html seems to repaint more overflow than it needs to.
@@ -634,7 +630,7 @@ LayoutUnit RenderFlexibleBox::flowAwareMarginAfterForChild(RenderBox& child) con
 
 LayoutUnit RenderFlexibleBox::crossAxisMarginExtentForChild(RenderBox& child) const
 {
-    return isHorizontalFlow() ? child.marginHeight() : child.marginWidth();
+    return isHorizontalFlow() ? child.verticalMarginExtent() : child.horizontalMarginExtent();
 }
 
 LayoutUnit RenderFlexibleBox::crossAxisScrollbarExtent() const
@@ -657,7 +653,7 @@ void RenderFlexibleBox::setFlowAwareLocationForChild(RenderBox& child, const Lay
 
 LayoutUnit RenderFlexibleBox::mainAxisBorderAndPaddingExtentForChild(RenderBox& child) const
 {
-    return isHorizontalFlow() ? child.borderAndPaddingWidth() : child.borderAndPaddingHeight();
+    return isHorizontalFlow() ? child.horizontalBorderAndPaddingExtent() : child.verticalBorderAndPaddingExtent();
 }
 
 LayoutUnit RenderFlexibleBox::mainAxisScrollbarExtentForChild(RenderBox& child) const
@@ -836,16 +832,12 @@ LayoutUnit RenderFlexibleBox::computeChildMarginValue(const Length& margin)
     return minimumValueForLength(margin, availableSize);
 }
 
-void RenderFlexibleBox::computeMainAxisPreferredSizes(OrderIterator::OrderValues& orderValues)
+void RenderFlexibleBox::prepareOrderIteratorAndMargins()
 {
-    ASSERT(orderValues.isEmpty());
+    OrderIteratorPopulator populator(m_orderIterator);
 
     for (RenderBox* child = firstChildBox(); child; child = child->nextSiblingBox()) {
-        // Avoid growing the vector for the common-case default value of 0. This optimizes the most common case which is
-        // one or a few values with the default order 0
-        int order = child->style().order();
-        if (orderValues.isEmpty() || orderValues.last() != order)
-            orderValues.append(order);
+        populator.collectChild(*child);
 
         if (child->isOutOfFlowPositioned())
             continue;
@@ -901,7 +893,7 @@ bool RenderFlexibleBox::computeNextFlexLine(OrderedFlexItemList& orderedChildren
 
         LayoutUnit childMainAxisExtent = preferredMainAxisContentExtentForChild(*child, hasInfiniteLineLength);
         LayoutUnit childMainAxisMarginBoxExtent = mainAxisBorderAndPaddingExtentForChild(*child) + childMainAxisExtent;
-        childMainAxisMarginBoxExtent += isHorizontalFlow() ? child->marginWidth() : child->marginHeight();
+        childMainAxisMarginBoxExtent += isHorizontalFlow() ? child->horizontalMarginExtent() : child->verticalMarginExtent();
 
         if (isMultiline() && preferredMainAxisExtent + childMainAxisMarginBoxExtent > lineBreakLength && lineHasInFlowItem)
             break;

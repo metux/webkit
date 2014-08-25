@@ -30,9 +30,11 @@
 
 namespace WebKit {
 
+class WebPageProxy;
+
 class PageLoadState {
 public:
-    PageLoadState();
+    explicit PageLoadState(WebPageProxy&);
     ~PageLoadState();
 
     enum class State {
@@ -59,31 +61,27 @@ public:
 
         virtual void willChangeEstimatedProgress() = 0;
         virtual void didChangeEstimatedProgress() = 0;
+
+        virtual void willChangeCanGoBack() = 0;
+        virtual void didChangeCanGoBack() = 0;
+
+        virtual void willChangeCanGoForward() = 0;
+        virtual void didChangeCanGoForward() = 0;
+
+        virtual void willChangeNetworkRequestsInProgress() = 0;
+        virtual void didChangeNetworkRequestsInProgress() = 0;
     };
 
     class Transaction {
         WTF_MAKE_NONCOPYABLE(Transaction);
     public:
-        Transaction(Transaction&& other)
-            : m_pageLoadState(other.m_pageLoadState)
-        {
-            other.m_pageLoadState = nullptr;
-        }
-
-        ~Transaction()
-        {
-            if (m_pageLoadState)
-                m_pageLoadState->endTransaction();
-        }
+        Transaction(Transaction&&);
+        ~Transaction();
 
     private:
         friend class PageLoadState;
 
-        explicit Transaction(PageLoadState& pageLoadState)
-            : m_pageLoadState(&pageLoadState)
-        {
-            m_pageLoadState->beginTransaction();
-        }
+        explicit Transaction(PageLoadState&);
 
         class Token {
         public:
@@ -100,6 +98,7 @@ public:
 #endif
         };
 
+        RefPtr<WebPageProxy> m_webPageProxy;
         PageLoadState* m_pageLoadState;
     };
 
@@ -122,6 +121,7 @@ public:
     bool hasOnlySecureContent() const;
 
     double estimatedProgress() const;
+    bool networkRequestsInProgress() const { return m_committedState.networkRequestsInProgress; }
 
     const String& pendingAPIRequestURL() const;
     void setPendingAPIRequestURL(const Transaction::Token&, const String&);
@@ -144,13 +144,18 @@ public:
     const String& title() const;
     void setTitle(const Transaction::Token&, const String&);
 
+    bool canGoBack() const;
+    void setCanGoBack(const Transaction::Token&, bool);
+
+    bool canGoForward() const;
+    void setCanGoForward(const Transaction::Token&, bool);
+
     void didStartProgress(const Transaction::Token&);
     void didChangeProgress(const Transaction::Token&, double);
     void didFinishProgress(const Transaction::Token&);
+    void setNetworkRequestsInProgress(const Transaction::Token&, bool);
 
 private:
-    static bool isLoadingState(State);
-
     void beginTransaction() { ++m_outstandingTransactionCount; }
     void endTransaction();
 
@@ -162,7 +167,10 @@ private:
         Data()
             : state(State::Finished)
             , hasInsecureContent(false)
+            , canGoBack(false)
+            , canGoForward(false)
             , estimatedProgress(0)
+            , networkRequestsInProgress(false)
         {
         }
 
@@ -178,12 +186,19 @@ private:
 
         String title;
 
+        bool canGoBack;
+        bool canGoForward;
+
         double estimatedProgress;
+        bool networkRequestsInProgress;
     };
 
+    static bool isLoading(const Data&);
     static String activeURL(const Data&);
     static bool hasOnlySecureContent(const Data&);
     static double estimatedProgress(const Data&);
+
+    WebPageProxy& m_webPageProxy;
 
     Data m_committedState;
     Data m_uncommittedState;

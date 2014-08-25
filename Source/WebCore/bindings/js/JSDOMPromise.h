@@ -26,6 +26,8 @@
 #ifndef JSDOMPromise_h
 #define JSDOMPromise_h
 
+#if ENABLE(PROMISES)
+
 #include "JSCryptoKey.h"
 #include "JSCryptoKeyPair.h"
 #include "JSDOMBinding.h"
@@ -58,6 +60,7 @@ template<class ResolveResultType>
 inline void DeferredWrapper::resolve(const ResolveResultType& result)
 {
     JSC::ExecState* exec = m_globalObject->globalExec();
+    JSC::JSLockHolder locker(exec);
     resolve(exec, toJS(exec, m_globalObject.get(), result));
 }
 
@@ -65,6 +68,7 @@ template<class RejectResultType>
 inline void DeferredWrapper::reject(const RejectResultType& result)
 {
     JSC::ExecState* exec = m_globalObject->globalExec();
+    JSC::JSLockHolder locker(exec);
     reject(exec, toJS(exec, m_globalObject.get(), result));
 }
 
@@ -72,6 +76,7 @@ template<>
 inline void DeferredWrapper::reject(const std::nullptr_t&)
 {
     JSC::ExecState* exec = m_globalObject->globalExec();
+    JSC::JSLockHolder locker(exec);
     reject(exec, JSC::jsNull());
 }
 
@@ -79,6 +84,7 @@ template<>
 inline void DeferredWrapper::resolve<String>(const String& result)
 {
     JSC::ExecState* exec = m_globalObject->globalExec();
+    JSC::JSLockHolder locker(exec);
     resolve(exec, jsString(exec, result));
 }
 
@@ -86,6 +92,7 @@ template<>
 inline void DeferredWrapper::resolve<bool>(const bool& result)
 {
     JSC::ExecState* exec = m_globalObject->globalExec();
+    JSC::JSLockHolder locker(exec);
     resolve(exec, JSC::jsBoolean(result));
 }
 
@@ -93,6 +100,7 @@ template<>
 inline void DeferredWrapper::resolve<Vector<unsigned char>>(const Vector<unsigned char>& result)
 {
     JSC::ExecState* exec = m_globalObject->globalExec();
+    JSC::JSLockHolder locker(exec);
     RefPtr<ArrayBuffer> buffer = ArrayBuffer::create(result.data(), result.size());
     resolve(exec, toJS(exec, m_globalObject.get(), buffer.get()));
 }
@@ -101,9 +109,12 @@ template<>
 inline void DeferredWrapper::reject<String>(const String& result)
 {
     JSC::ExecState* exec = m_globalObject->globalExec();
+    JSC::JSLockHolder locker(exec);
     reject(exec, jsString(exec, result));
 }
 
 }
+
+#endif // ENABLE(PROMISES)
 
 #endif // JSDOMPromise_h

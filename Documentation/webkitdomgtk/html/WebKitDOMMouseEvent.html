@@ -6,22 +6,22 @@
 <meta name="generator" content="DocBook XSL Stylesheets V1.78.1">
 <link rel="home" href="index.html" title="WebKitDOMGTK+ Reference Manual">
 <link rel="up" href="ch01.html" title="Class Overview">
-<link rel="prev" href="WebKitDOMMessagePort.html" title="WebKitDOMMessagePort">
+<link rel="prev" href="WebKitDOMKeyboardEvent.html" title="WebKitDOMKeyboardEvent">
 <link rel="next" href="WebKitDOMNamedNodeMap.html" title="WebKitDOMNamedNodeMap">
 <meta name="generator" content="GTK-Doc V1.20.1 (XML mode)">
 <link rel="stylesheet" href="style.css" type="text/css">
 </head>
 <body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF">
-<table class="navigation" id="top" width="100%" summary="Navigation header" cellpadding="2" cellspacing="10"><tr valign="middle">
+<table class="navigation" id="top" width="100%" summary="Navigation header" cellpadding="2" cellspacing="5"><tr valign="middle">
 <td width="100%" align="left" class="shortcuts">
-<a href="#" class="shortcut">Top</a><span id="nav_description"> <span class="dim">|</span> 
-                  <a href="#WebKitDOMMouseEvent.description" class="shortcut">Description</a></span><span id="nav_hierarchy"> <span class="dim">|</span> 
-                  <a href="#WebKitDOMMouseEvent.object-hierarchy" class="shortcut">Object Hierarchy</a></span><span id="nav_properties"> <span class="dim">|</span> 
+<a href="#" class="shortcut">Top</a><span id="nav_description">  <span class="dim">|</span> 
+                  <a href="#WebKitDOMMouseEvent.description" class="shortcut">Description</a></span><span id="nav_hierarchy">  <span class="dim">|</span> 
+                  <a href="#WebKitDOMMouseEvent.object-hierarchy" class="shortcut">Object Hierarchy</a></span><span id="nav_properties">  <span class="dim">|</span> 
                   <a href="#WebKitDOMMouseEvent.properties" class="shortcut">Properties</a></span>
 </td>
 <td><a accesskey="h" href="index.html"><img src="home.png" width="16" height="16" border="0" alt="Home"></a></td>
 <td><a accesskey="u" href="ch01.html"><img src="up.png" width="16" height="16" border="0" alt="Up"></a></td>
-<td><a accesskey="p" href="WebKitDOMMessagePort.html"><img src="left.png" width="16" height="16" border="0" alt="Prev"></a></td>
+<td><a accesskey="p" href="WebKitDOMKeyboardEvent.html"><img src="left.png" width="16" height="16" border="0" alt="Prev"></a></td>
 <td><a accesskey="n" href="WebKitDOMNamedNodeMap.html"><img src="right.png" width="16" height="16" border="0" alt="Next"></a></td>
 </tr></table>
 <div class="refentry">
@@ -134,22 +134,6 @@
 <a href="../glib/glib-Basic-Types.html#glong"><span class="returnvalue">glong</span></a>
 </td>
 <td class="function_name">
-<a class="link" href="WebKitDOMMouseEvent.html#webkit-dom-mouse-event-get-webkit-movement-x" title="webkit_dom_mouse_event_get_webkit_movement_x ()">webkit_dom_mouse_event_get_webkit_movement_x</a> <span class="c_punctuation">()</span>
-</td>
-</tr>
-<tr>
-<td class="function_type">
-<a href="../glib/glib-Basic-Types.html#glong"><span class="returnvalue">glong</span></a>
-</td>
-<td class="function_name">
-<a class="link" href="WebKitDOMMouseEvent.html#webkit-dom-mouse-event-get-webkit-movement-y" title="webkit_dom_mouse_event_get_webkit_movement_y ()">webkit_dom_mouse_event_get_webkit_movement_y</a> <span class="c_punctuation">()</span>
-</td>
-</tr>
-<tr>
-<td class="function_type">
-<a href="../glib/glib-Basic-Types.html#glong"><span class="returnvalue">glong</span></a>
-</td>
-<td class="function_name">
 <a class="link" href="WebKitDOMMouseEvent.html#webkit-dom-mouse-event-get-offset-x" title="webkit_dom_mouse_event_get_offset_x ()">webkit_dom_mouse_event_get_offset_x</a> <span class="c_punctuation">()</span>
 </td>
 </tr>
@@ -243,6 +227,16 @@
 </tr>
 <tr>
 <td class="property_type"><a href="../glib/glib-Basic-Types.html#glong"><span class="type">glong</span></a></td>
+<td class="property_name"><a class="link" href="WebKitDOMMouseEvent.html#WebKitDOMMouseEvent--movement-x" title="The “movement-x” property">movement-x</a></td>
+<td class="property_flags">Read</td>
+</tr>
+<tr>
+<td class="property_type"><a href="../glib/glib-Basic-Types.html#glong"><span class="type">glong</span></a></td>
+<td class="property_name"><a class="link" href="WebKitDOMMouseEvent.html#WebKitDOMMouseEvent--movement-y" title="The “movement-y” property">movement-y</a></td>
+<td class="property_flags">Read</td>
+</tr>
+<tr>
+<td class="property_type"><a href="../glib/glib-Basic-Types.html#glong"><span class="type">glong</span></a></td>
 <td class="property_name"><a class="link" href="WebKitDOMMouseEvent.html#WebKitDOMMouseEvent--offset-x" title="The “offset-x” property">offset-x</a></td>
 <td class="property_flags">Read</td>
 </tr>
@@ -276,16 +270,6 @@
 <td class="property_type">
 <a class="link" href="WebKitDOMNode.html" title="WebKitDOMNode"><span class="type">WebKitDOMNode</span></a> *</td>
 <td class="property_name"><a class="link" href="WebKitDOMMouseEvent.html#WebKitDOMMouseEvent--to-element" title="The “to-element” property">to-element</a></td>
-<td class="property_flags">Read</td>
-</tr>
-<tr>
-<td class="property_type"><a href="../glib/glib-Basic-Types.html#glong"><span class="type">glong</span></a></td>
-<td class="property_name"><a class="link" href="WebKitDOMMouseEvent.html#WebKitDOMMouseEvent--webkit-movement-x" title="The “webkit-movement-x” property">webkit-movement-x</a></td>
-<td class="property_flags">Read</td>
-</tr>
-<tr>
-<td class="property_type"><a href="../glib/glib-Basic-Types.html#glong"><span class="type">glong</span></a></td>
-<td class="property_name"><a class="link" href="WebKitDOMMouseEvent.html#WebKitDOMMouseEvent--webkit-movement-y" title="The “webkit-movement-y” property">webkit-movement-y</a></td>
 <td class="property_flags">Read</td>
 </tr>
 <tr>
@@ -352,7 +336,7 @@ webkit_dom_mouse_event_init_mouse_event
                                 <em class="parameter"><code><a href="../glib/glib-Basic-Types.html#gushort"><span class="type">gushort</span></a> button</code></em>,
                                 <em class="parameter"><code><a class="link" href="WebKitDOMEventTarget.html" title="WebKitDOMEventTarget"><span class="type">WebKitDOMEventTarget</span></a> *relatedTarget</code></em>);</pre>
 <div class="refsect3">
-<a name="id-1.2.33.8.2.4"></a><h4>Parameters</h4>
+<a name="id-1.2.27.8.2.4"></a><h4>Parameters</h4>
 <div class="informaltable"><table width="100%" border="0">
 <colgroup>
 <col width="150px" class="parameters_name">
@@ -450,7 +434,7 @@ webkit_dom_mouse_event_init_mouse_event
 <pre class="programlisting"><a href="../glib/glib-Basic-Types.html#glong"><span class="returnvalue">glong</span></a>
 webkit_dom_mouse_event_get_screen_x (<em class="parameter"><code><a class="link" href="WebKitDOMMouseEvent.html" title="WebKitDOMMouseEvent"><span class="type">WebKitDOMMouseEvent</span></a> *self</code></em>);</pre>
 <div class="refsect3">
-<a name="id-1.2.33.8.3.4"></a><h4>Parameters</h4>
+<a name="id-1.2.27.8.3.4"></a><h4>Parameters</h4>
 <div class="informaltable"><table width="100%" border="0">
 <colgroup>
 <col width="150px" class="parameters_name">
@@ -465,7 +449,7 @@ webkit_dom_mouse_event_get_screen_x (<em class="parameter"><code><a class="link"
 </table></div>
 </div>
 <div class="refsect3">
-<a name="id-1.2.33.8.3.5"></a><h4>Returns</h4>
+<a name="id-1.2.27.8.3.5"></a><h4>Returns</h4>
 <p> A <a href="../glib/glib-Basic-Types.html#glong"><span class="type">glong</span></a></p>
 <p></p>
 </div>
@@ -476,7 +460,7 @@ webkit_dom_mouse_event_get_screen_x (<em class="parameter"><code><a class="link"
 <pre class="programlisting"><a href="../glib/glib-Basic-Types.html#glong"><span class="returnvalue">glong</span></a>
 webkit_dom_mouse_event_get_screen_y (<em class="parameter"><code><a class="link" href="WebKitDOMMouseEvent.html" title="WebKitDOMMouseEvent"><span class="type">WebKitDOMMouseEvent</span></a> *self</code></em>);</pre>
 <div class="refsect3">
-<a name="id-1.2.33.8.4.4"></a><h4>Parameters</h4>
+<a name="id-1.2.27.8.4.4"></a><h4>Parameters</h4>
 <div class="informaltable"><table width="100%" border="0">
 <colgroup>
 <col width="150px" class="parameters_name">
@@ -491,7 +475,7 @@ webkit_dom_mouse_event_get_screen_y (<em class="parameter"><code><a class="link"
 </table></div>
 </div>
 <div class="refsect3">
-<a name="id-1.2.33.8.4.5"></a><h4>Returns</h4>
+<a name="id-1.2.27.8.4.5"></a><h4>Returns</h4>
 <p> A <a href="../glib/glib-Basic-Types.html#glong"><span class="type">glong</span></a></p>
 <p></p>
 </div>
@@ -502,7 +486,7 @@ webkit_dom_mouse_event_get_screen_y (<em class="parameter"><code><a class="link"
 <pre class="programlisting"><a href="../glib/glib-Basic-Types.html#glong"><span class="returnvalue">glong</span></a>
 webkit_dom_mouse_event_get_client_x (<em class="parameter"><code><a class="link" href="WebKitDOMMouseEvent.html" title="WebKitDOMMouseEvent"><span class="type">WebKitDOMMouseEvent</span></a> *self</code></em>);</pre>
 <div class="refsect3">
-<a name="id-1.2.33.8.5.4"></a><h4>Parameters</h4>
+<a name="id-1.2.27.8.5.4"></a><h4>Parameters</h4>
 <div class="informaltable"><table width="100%" border="0">
 <colgroup>
 <col width="150px" class="parameters_name">
@@ -517,7 +501,7 @@ webkit_dom_mouse_event_get_client_x (<em class="parameter"><code><a class="link"
 </table></div>
 </div>
 <div class="refsect3">
-<a name="id-1.2.33.8.5.5"></a><h4>Returns</h4>
+<a name="id-1.2.27.8.5.5"></a><h4>Returns</h4>
 <p> A <a href="../glib/glib-Basic-Types.html#glong"><span class="type">glong</span></a></p>
 <p></p>
 </div>
@@ -528,7 +512,7 @@ webkit_dom_mouse_event_get_client_x (<em class="parameter"><code><a class="link"
 <pre class="programlisting"><a href="../glib/glib-Basic-Types.html#glong"><span class="returnvalue">glong</span></a>
 webkit_dom_mouse_event_get_client_y (<em class="parameter"><code><a class="link" href="WebKitDOMMouseEvent.html" title="WebKitDOMMouseEvent"><span class="type">WebKitDOMMouseEvent</span></a> *self</code></em>);</pre>
 <div class="refsect3">
-<a name="id-1.2.33.8.6.4"></a><h4>Parameters</h4>
+<a name="id-1.2.27.8.6.4"></a><h4>Parameters</h4>
 <div class="informaltable"><table width="100%" border="0">
 <colgroup>
 <col width="150px" class="parameters_name">
@@ -543,7 +527,7 @@ webkit_dom_mouse_event_get_client_y (<em class="parameter"><code><a class="link"
 </table></div>
 </div>
 <div class="refsect3">
-<a name="id-1.2.33.8.6.5"></a><h4>Returns</h4>
+<a name="id-1.2.27.8.6.5"></a><h4>Returns</h4>
 <p> A <a href="../glib/glib-Basic-Types.html#glong"><span class="type">glong</span></a></p>
 <p></p>
 </div>
@@ -554,7 +538,7 @@ webkit_dom_mouse_event_get_client_y (<em class="parameter"><code><a class="link"
 <pre class="programlisting"><a href="../glib/glib-Basic-Types.html#gboolean"><span class="returnvalue">gboolean</span></a>
 webkit_dom_mouse_event_get_ctrl_key (<em class="parameter"><code><a class="link" href="WebKitDOMMouseEvent.html" title="WebKitDOMMouseEvent"><span class="type">WebKitDOMMouseEvent</span></a> *self</code></em>);</pre>
 <div class="refsect3">
-<a name="id-1.2.33.8.7.4"></a><h4>Parameters</h4>
+<a name="id-1.2.27.8.7.4"></a><h4>Parameters</h4>
 <div class="informaltable"><table width="100%" border="0">
 <colgroup>
 <col width="150px" class="parameters_name">
@@ -569,7 +553,7 @@ webkit_dom_mouse_event_get_ctrl_key (<em class="parameter"><code><a class="link"
 </table></div>
 </div>
 <div class="refsect3">
-<a name="id-1.2.33.8.7.5"></a><h4>Returns</h4>
+<a name="id-1.2.27.8.7.5"></a><h4>Returns</h4>
 <p> A <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a></p>
 <p></p>
 </div>
@@ -580,7 +564,7 @@ webkit_dom_mouse_event_get_ctrl_key (<em class="parameter"><code><a class="link"
 <pre class="programlisting"><a href="../glib/glib-Basic-Types.html#gboolean"><span class="returnvalue">gboolean</span></a>
 webkit_dom_mouse_event_get_shift_key (<em class="parameter"><code><a class="link" href="WebKitDOMMouseEvent.html" title="WebKitDOMMouseEvent"><span class="type">WebKitDOMMouseEvent</span></a> *self</code></em>);</pre>
 <div class="refsect3">
-<a name="id-1.2.33.8.8.4"></a><h4>Parameters</h4>
+<a name="id-1.2.27.8.8.4"></a><h4>Parameters</h4>
 <div class="informaltable"><table width="100%" border="0">
 <colgroup>
 <col width="150px" class="parameters_name">
@@ -595,7 +579,7 @@ webkit_dom_mouse_event_get_shift_key (<em class="parameter"><code><a class="link
 </table></div>
 </div>
 <div class="refsect3">
-<a name="id-1.2.33.8.8.5"></a><h4>Returns</h4>
+<a name="id-1.2.27.8.8.5"></a><h4>Returns</h4>
 <p> A <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a></p>
 <p></p>
 </div>
@@ -606,7 +590,7 @@ webkit_dom_mouse_event_get_shift_key (<em class="parameter"><code><a class="link
 <pre class="programlisting"><a href="../glib/glib-Basic-Types.html#gboolean"><span class="returnvalue">gboolean</span></a>
 webkit_dom_mouse_event_get_alt_key (<em class="parameter"><code><a class="link" href="WebKitDOMMouseEvent.html" title="WebKitDOMMouseEvent"><span class="type">WebKitDOMMouseEvent</span></a> *self</code></em>);</pre>
 <div class="refsect3">
-<a name="id-1.2.33.8.9.4"></a><h4>Parameters</h4>
+<a name="id-1.2.27.8.9.4"></a><h4>Parameters</h4>
 <div class="informaltable"><table width="100%" border="0">
 <colgroup>
 <col width="150px" class="parameters_name">
@@ -621,7 +605,7 @@ webkit_dom_mouse_event_get_alt_key (<em class="parameter"><code><a class="link" 
 </table></div>
 </div>
 <div class="refsect3">
-<a name="id-1.2.33.8.9.5"></a><h4>Returns</h4>
+<a name="id-1.2.27.8.9.5"></a><h4>Returns</h4>
 <p> A <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a></p>
 <p></p>
 </div>
@@ -632,7 +616,7 @@ webkit_dom_mouse_event_get_alt_key (<em class="parameter"><code><a class="link" 
 <pre class="programlisting"><a href="../glib/glib-Basic-Types.html#gboolean"><span class="returnvalue">gboolean</span></a>
 webkit_dom_mouse_event_get_meta_key (<em class="parameter"><code><a class="link" href="WebKitDOMMouseEvent.html" title="WebKitDOMMouseEvent"><span class="type">WebKitDOMMouseEvent</span></a> *self</code></em>);</pre>
 <div class="refsect3">
-<a name="id-1.2.33.8.10.4"></a><h4>Parameters</h4>
+<a name="id-1.2.27.8.10.4"></a><h4>Parameters</h4>
 <div class="informaltable"><table width="100%" border="0">
 <colgroup>
 <col width="150px" class="parameters_name">
@@ -647,7 +631,7 @@ webkit_dom_mouse_event_get_meta_key (<em class="parameter"><code><a class="link"
 </table></div>
 </div>
 <div class="refsect3">
-<a name="id-1.2.33.8.10.5"></a><h4>Returns</h4>
+<a name="id-1.2.27.8.10.5"></a><h4>Returns</h4>
 <p> A <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a></p>
 <p></p>
 </div>
@@ -658,7 +642,7 @@ webkit_dom_mouse_event_get_meta_key (<em class="parameter"><code><a class="link"
 <pre class="programlisting"><a href="../glib/glib-Basic-Types.html#gushort"><span class="returnvalue">gushort</span></a>
 webkit_dom_mouse_event_get_button (<em class="parameter"><code><a class="link" href="WebKitDOMMouseEvent.html" title="WebKitDOMMouseEvent"><span class="type">WebKitDOMMouseEvent</span></a> *self</code></em>);</pre>
 <div class="refsect3">
-<a name="id-1.2.33.8.11.4"></a><h4>Parameters</h4>
+<a name="id-1.2.27.8.11.4"></a><h4>Parameters</h4>
 <div class="informaltable"><table width="100%" border="0">
 <colgroup>
 <col width="150px" class="parameters_name">
@@ -673,7 +657,7 @@ webkit_dom_mouse_event_get_button (<em class="parameter"><code><a class="link" h
 </table></div>
 </div>
 <div class="refsect3">
-<a name="id-1.2.33.8.11.5"></a><h4>Returns</h4>
+<a name="id-1.2.27.8.11.5"></a><h4>Returns</h4>
 <p> A <a href="../glib/glib-Basic-Types.html#gushort"><span class="type">gushort</span></a></p>
 <p></p>
 </div>
@@ -685,7 +669,7 @@ webkit_dom_mouse_event_get_button (<em class="parameter"><code><a class="link" h
 webkit_dom_mouse_event_get_related_target
                                (<em class="parameter"><code><a class="link" href="WebKitDOMMouseEvent.html" title="WebKitDOMMouseEvent"><span class="type">WebKitDOMMouseEvent</span></a> *self</code></em>);</pre>
 <div class="refsect3">
-<a name="id-1.2.33.8.12.4"></a><h4>Parameters</h4>
+<a name="id-1.2.27.8.12.4"></a><h4>Parameters</h4>
 <div class="informaltable"><table width="100%" border="0">
 <colgroup>
 <col width="150px" class="parameters_name">
@@ -700,63 +684,9 @@ webkit_dom_mouse_event_get_related_target
 </table></div>
 </div>
 <div class="refsect3">
-<a name="id-1.2.33.8.12.5"></a><h4>Returns</h4>
+<a name="id-1.2.27.8.12.5"></a><h4>Returns</h4>
 <p> A <a class="link" href="WebKitDOMEventTarget.html" title="WebKitDOMEventTarget"><span class="type">WebKitDOMEventTarget</span></a>. </p>
 <p><span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span></p>
-</div>
-</div>
-<hr>
-<div class="refsect2">
-<a name="webkit-dom-mouse-event-get-webkit-movement-x"></a><h3>webkit_dom_mouse_event_get_webkit_movement_x ()</h3>
-<pre class="programlisting"><a href="../glib/glib-Basic-Types.html#glong"><span class="returnvalue">glong</span></a>
-webkit_dom_mouse_event_get_webkit_movement_x
-                               (<em class="parameter"><code><a class="link" href="WebKitDOMMouseEvent.html" title="WebKitDOMMouseEvent"><span class="type">WebKitDOMMouseEvent</span></a> *self</code></em>);</pre>
-<div class="refsect3">
-<a name="id-1.2.33.8.13.4"></a><h4>Parameters</h4>
-<div class="informaltable"><table width="100%" border="0">
-<colgroup>
-<col width="150px" class="parameters_name">
-<col class="parameters_description">
-<col width="200px" class="parameters_annotations">
-</colgroup>
-<tbody><tr>
-<td class="parameter_name"><p>self</p></td>
-<td class="parameter_description"><p>A <a class="link" href="WebKitDOMMouseEvent.html" title="WebKitDOMMouseEvent"><span class="type">WebKitDOMMouseEvent</span></a></p></td>
-<td class="parameter_annotations"> </td>
-</tr></tbody>
-</table></div>
-</div>
-<div class="refsect3">
-<a name="id-1.2.33.8.13.5"></a><h4>Returns</h4>
-<p> A <a href="../glib/glib-Basic-Types.html#glong"><span class="type">glong</span></a></p>
-<p></p>
-</div>
-</div>
-<hr>
-<div class="refsect2">
-<a name="webkit-dom-mouse-event-get-webkit-movement-y"></a><h3>webkit_dom_mouse_event_get_webkit_movement_y ()</h3>
-<pre class="programlisting"><a href="../glib/glib-Basic-Types.html#glong"><span class="returnvalue">glong</span></a>
-webkit_dom_mouse_event_get_webkit_movement_y
-                               (<em class="parameter"><code><a class="link" href="WebKitDOMMouseEvent.html" title="WebKitDOMMouseEvent"><span class="type">WebKitDOMMouseEvent</span></a> *self</code></em>);</pre>
-<div class="refsect3">
-<a name="id-1.2.33.8.14.4"></a><h4>Parameters</h4>
-<div class="informaltable"><table width="100%" border="0">
-<colgroup>
-<col width="150px" class="parameters_name">
-<col class="parameters_description">
-<col width="200px" class="parameters_annotations">
-</colgroup>
-<tbody><tr>
-<td class="parameter_name"><p>self</p></td>
-<td class="parameter_description"><p>A <a class="link" href="WebKitDOMMouseEvent.html" title="WebKitDOMMouseEvent"><span class="type">WebKitDOMMouseEvent</span></a></p></td>
-<td class="parameter_annotations"> </td>
-</tr></tbody>
-</table></div>
-</div>
-<div class="refsect3">
-<a name="id-1.2.33.8.14.5"></a><h4>Returns</h4>
-<p> A <a href="../glib/glib-Basic-Types.html#glong"><span class="type">glong</span></a></p>
-<p></p>
 </div>
 </div>
 <hr>
@@ -765,7 +695,7 @@ webkit_dom_mouse_event_get_webkit_movement_y
 <pre class="programlisting"><a href="../glib/glib-Basic-Types.html#glong"><span class="returnvalue">glong</span></a>
 webkit_dom_mouse_event_get_offset_x (<em class="parameter"><code><a class="link" href="WebKitDOMMouseEvent.html" title="WebKitDOMMouseEvent"><span class="type">WebKitDOMMouseEvent</span></a> *self</code></em>);</pre>
 <div class="refsect3">
-<a name="id-1.2.33.8.15.4"></a><h4>Parameters</h4>
+<a name="id-1.2.27.8.13.4"></a><h4>Parameters</h4>
 <div class="informaltable"><table width="100%" border="0">
 <colgroup>
 <col width="150px" class="parameters_name">
@@ -780,7 +710,7 @@ webkit_dom_mouse_event_get_offset_x (<em class="parameter"><code><a class="link"
 </table></div>
 </div>
 <div class="refsect3">
-<a name="id-1.2.33.8.15.5"></a><h4>Returns</h4>
+<a name="id-1.2.27.8.13.5"></a><h4>Returns</h4>
 <p> A <a href="../glib/glib-Basic-Types.html#glong"><span class="type">glong</span></a></p>
 <p></p>
 </div>
@@ -791,7 +721,7 @@ webkit_dom_mouse_event_get_offset_x (<em class="parameter"><code><a class="link"
 <pre class="programlisting"><a href="../glib/glib-Basic-Types.html#glong"><span class="returnvalue">glong</span></a>
 webkit_dom_mouse_event_get_offset_y (<em class="parameter"><code><a class="link" href="WebKitDOMMouseEvent.html" title="WebKitDOMMouseEvent"><span class="type">WebKitDOMMouseEvent</span></a> *self</code></em>);</pre>
 <div class="refsect3">
-<a name="id-1.2.33.8.16.4"></a><h4>Parameters</h4>
+<a name="id-1.2.27.8.14.4"></a><h4>Parameters</h4>
 <div class="informaltable"><table width="100%" border="0">
 <colgroup>
 <col width="150px" class="parameters_name">
@@ -806,7 +736,7 @@ webkit_dom_mouse_event_get_offset_y (<em class="parameter"><code><a class="link"
 </table></div>
 </div>
 <div class="refsect3">
-<a name="id-1.2.33.8.16.5"></a><h4>Returns</h4>
+<a name="id-1.2.27.8.14.5"></a><h4>Returns</h4>
 <p> A <a href="../glib/glib-Basic-Types.html#glong"><span class="type">glong</span></a></p>
 <p></p>
 </div>
@@ -817,7 +747,7 @@ webkit_dom_mouse_event_get_offset_y (<em class="parameter"><code><a class="link"
 <pre class="programlisting"><a href="../glib/glib-Basic-Types.html#glong"><span class="returnvalue">glong</span></a>
 webkit_dom_mouse_event_get_x (<em class="parameter"><code><a class="link" href="WebKitDOMMouseEvent.html" title="WebKitDOMMouseEvent"><span class="type">WebKitDOMMouseEvent</span></a> *self</code></em>);</pre>
 <div class="refsect3">
-<a name="id-1.2.33.8.17.4"></a><h4>Parameters</h4>
+<a name="id-1.2.27.8.15.4"></a><h4>Parameters</h4>
 <div class="informaltable"><table width="100%" border="0">
 <colgroup>
 <col width="150px" class="parameters_name">
@@ -832,7 +762,7 @@ webkit_dom_mouse_event_get_x (<em class="parameter"><code><a class="link" href="
 </table></div>
 </div>
 <div class="refsect3">
-<a name="id-1.2.33.8.17.5"></a><h4>Returns</h4>
+<a name="id-1.2.27.8.15.5"></a><h4>Returns</h4>
 <p> A <a href="../glib/glib-Basic-Types.html#glong"><span class="type">glong</span></a></p>
 <p></p>
 </div>
@@ -843,7 +773,7 @@ webkit_dom_mouse_event_get_x (<em class="parameter"><code><a class="link" href="
 <pre class="programlisting"><a href="../glib/glib-Basic-Types.html#glong"><span class="returnvalue">glong</span></a>
 webkit_dom_mouse_event_get_y (<em class="parameter"><code><a class="link" href="WebKitDOMMouseEvent.html" title="WebKitDOMMouseEvent"><span class="type">WebKitDOMMouseEvent</span></a> *self</code></em>);</pre>
 <div class="refsect3">
-<a name="id-1.2.33.8.18.4"></a><h4>Parameters</h4>
+<a name="id-1.2.27.8.16.4"></a><h4>Parameters</h4>
 <div class="informaltable"><table width="100%" border="0">
 <colgroup>
 <col width="150px" class="parameters_name">
@@ -858,7 +788,7 @@ webkit_dom_mouse_event_get_y (<em class="parameter"><code><a class="link" href="
 </table></div>
 </div>
 <div class="refsect3">
-<a name="id-1.2.33.8.18.5"></a><h4>Returns</h4>
+<a name="id-1.2.27.8.16.5"></a><h4>Returns</h4>
 <p> A <a href="../glib/glib-Basic-Types.html#glong"><span class="type">glong</span></a></p>
 <p></p>
 </div>
@@ -870,7 +800,7 @@ webkit_dom_mouse_event_get_y (<em class="parameter"><code><a class="link" href="
 webkit_dom_mouse_event_get_from_element
                                (<em class="parameter"><code><a class="link" href="WebKitDOMMouseEvent.html" title="WebKitDOMMouseEvent"><span class="type">WebKitDOMMouseEvent</span></a> *self</code></em>);</pre>
 <div class="refsect3">
-<a name="id-1.2.33.8.19.4"></a><h4>Parameters</h4>
+<a name="id-1.2.27.8.17.4"></a><h4>Parameters</h4>
 <div class="informaltable"><table width="100%" border="0">
 <colgroup>
 <col width="150px" class="parameters_name">
@@ -885,7 +815,7 @@ webkit_dom_mouse_event_get_from_element
 </table></div>
 </div>
 <div class="refsect3">
-<a name="id-1.2.33.8.19.5"></a><h4>Returns</h4>
+<a name="id-1.2.27.8.17.5"></a><h4>Returns</h4>
 <p> A <a class="link" href="WebKitDOMNode.html" title="WebKitDOMNode"><span class="type">WebKitDOMNode</span></a>. </p>
 <p><span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span></p>
 </div>
@@ -896,7 +826,7 @@ webkit_dom_mouse_event_get_from_element
 <pre class="programlisting"><a class="link" href="WebKitDOMNode.html" title="WebKitDOMNode"><span class="returnvalue">WebKitDOMNode</span></a> *
 webkit_dom_mouse_event_get_to_element (<em class="parameter"><code><a class="link" href="WebKitDOMMouseEvent.html" title="WebKitDOMMouseEvent"><span class="type">WebKitDOMMouseEvent</span></a> *self</code></em>);</pre>
 <div class="refsect3">
-<a name="id-1.2.33.8.20.4"></a><h4>Parameters</h4>
+<a name="id-1.2.27.8.18.4"></a><h4>Parameters</h4>
 <div class="informaltable"><table width="100%" border="0">
 <colgroup>
 <col width="150px" class="parameters_name">
@@ -911,7 +841,7 @@ webkit_dom_mouse_event_get_to_element (<em class="parameter"><code><a class="lin
 </table></div>
 </div>
 <div class="refsect3">
-<a name="id-1.2.33.8.20.5"></a><h4>Returns</h4>
+<a name="id-1.2.27.8.18.5"></a><h4>Returns</h4>
 <p> A <a class="link" href="WebKitDOMNode.html" title="WebKitDOMNode"><span class="type">WebKitDOMNode</span></a>. </p>
 <p><span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span></p>
 </div>
@@ -984,6 +914,22 @@ webkit_dom_mouse_event_get_to_element (<em class="parameter"><code><a class="lin
 </div>
 <hr>
 <div class="refsect2">
+<a name="WebKitDOMMouseEvent--movement-x"></a><h3>The <code class="literal">“movement-x”</code> property</h3>
+<pre class="programlisting">  “movement-x”               <a href="../glib/glib-Basic-Types.html#glong"><span class="type">glong</span></a></pre>
+<p>read-only glong MouseEvent:movement-x.</p>
+<p>Flags: Read</p>
+<p>Default value: 0</p>
+</div>
+<hr>
+<div class="refsect2">
+<a name="WebKitDOMMouseEvent--movement-y"></a><h3>The <code class="literal">“movement-y”</code> property</h3>
+<pre class="programlisting">  “movement-y”               <a href="../glib/glib-Basic-Types.html#glong"><span class="type">glong</span></a></pre>
+<p>read-only glong MouseEvent:movement-y.</p>
+<p>Flags: Read</p>
+<p>Default value: 0</p>
+</div>
+<hr>
+<div class="refsect2">
 <a name="WebKitDOMMouseEvent--offset-x"></a><h3>The <code class="literal">“offset-x”</code> property</h3>
 <pre class="programlisting">  “offset-x”                 <a href="../glib/glib-Basic-Types.html#glong"><span class="type">glong</span></a></pre>
 <p>read-only glong MouseEvent:offset-x.</p>
@@ -1035,22 +981,6 @@ webkit_dom_mouse_event_get_to_element (<em class="parameter"><code><a class="lin
 <pre class="programlisting">  “to-element”               <a class="link" href="WebKitDOMNode.html" title="WebKitDOMNode"><span class="type">WebKitDOMNode</span></a> *</pre>
 <p>read-only WebKitDOMNode* MouseEvent:to-element.</p>
 <p>Flags: Read</p>
-</div>
-<hr>
-<div class="refsect2">
-<a name="WebKitDOMMouseEvent--webkit-movement-x"></a><h3>The <code class="literal">“webkit-movement-x”</code> property</h3>
-<pre class="programlisting">  “webkit-movement-x”        <a href="../glib/glib-Basic-Types.html#glong"><span class="type">glong</span></a></pre>
-<p>read-only glong MouseEvent:webkit-movement-x.</p>
-<p>Flags: Read</p>
-<p>Default value: 0</p>
-</div>
-<hr>
-<div class="refsect2">
-<a name="WebKitDOMMouseEvent--webkit-movement-y"></a><h3>The <code class="literal">“webkit-movement-y”</code> property</h3>
-<pre class="programlisting">  “webkit-movement-y”        <a href="../glib/glib-Basic-Types.html#glong"><span class="type">glong</span></a></pre>
-<p>read-only glong MouseEvent:webkit-movement-y.</p>
-<p>Flags: Read</p>
-<p>Default value: 0</p>
 </div>
 <hr>
 <div class="refsect2">

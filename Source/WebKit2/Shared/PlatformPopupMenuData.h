@@ -28,6 +28,7 @@
 
 #include "FontInfo.h"
 #include "ShareableBitmap.h"
+#include <WebCore/PopupMenuStyle.h>
 #include <wtf/text/WTFString.h>
 
 namespace IPC {
@@ -43,9 +44,11 @@ struct PlatformPopupMenuData {
     void encode(IPC::ArgumentEncoder&) const;
     static bool decode(IPC::ArgumentDecoder&, PlatformPopupMenuData&);
 
-#if PLATFORM(MAC)
+#if PLATFORM(COCOA)
     FontInfo fontInfo;
     bool shouldPopOver;
+    bool hideArrows;
+    WebCore::PopupMenuStyle::PopupMenuSize menuSize;
 #endif
 };
 

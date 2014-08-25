@@ -1,6 +1,6 @@
 /*
  *  Copyright (C) 1999-2000 Harri Porten (porten@kde.org)
- *  Copyright (C) 2002, 2005, 2006, 2007, 2008, 2009, 2013 Apple Inc. All rights reserved.
+ *  Copyright (C) 2002, 2005, 2006, 2007, 2008, 2009, 2013, 2014 Apple Inc. All rights reserved.
  *
  *  This library is free software; you can redistribute it and/or
  *  modify it under the terms of the GNU Library General Public
@@ -22,16 +22,9 @@
 #ifndef Operations_h
 #define Operations_h
 
+#include "CallFrame.h"
 #include "ExceptionHelpers.h"
-#include "GCIncomingRefCountedInlines.h"
-#include "Interpreter.h"
-#include "JSArrayBufferViewInlines.h"
-#include "JSCJSValueInlines.h"
-#include "JSFunctionInlines.h"
-#include "JSProxy.h"
-#include "JSString.h"
-#include "SlotVisitorInlines.h"
-#include "StructureInlines.h"
+#include "JSCJSValue.h"
 
 namespace JSC {
 
@@ -45,13 +38,13 @@ ALWAYS_INLINE JSValue jsString(ExecState* exec, JSString* s1, JSString* s2)
 {
     VM& vm = exec->vm();
 
-    unsigned length1 = s1->length();
+    int32_t length1 = s1->length();
     if (!length1)
         return s2;
-    unsigned length2 = s2->length();
+    int32_t length2 = s2->length();
     if (!length2)
         return s1;
-    if ((length1 + length2) < length1)
+    if (sumOverflows<int32_t>(length1, length2))
         return throwOutOfMemoryError(exec);
 
     return JSRopeString::create(vm, s1, s2);
@@ -61,9 +54,13 @@ ALWAYS_INLINE JSValue jsString(ExecState* exec, const String& u1, const String& 
 {
     VM* vm = &exec->vm();
 
-    unsigned length1 = u1.length();
-    unsigned length2 = u2.length();
-    unsigned length3 = u3.length();
+    int32_t length1 = u1.length();
+    int32_t length2 = u2.length();
+    int32_t length3 = u3.length();
+    
+    if (length1 < 0 || length2 < 0 || length3 < 0)
+        return throwOutOfMemoryError(exec);
+    
     if (!length1)
         return jsString(exec, jsString(vm, u2), jsString(vm, u3));
     if (!length2)
@@ -71,9 +68,7 @@ ALWAYS_INLINE JSValue jsString(ExecState* exec, const String& u1, const String& 
     if (!length3)
         return jsString(exec, jsString(vm, u1), jsString(vm, u2));
 
-    if ((length1 + length2) < length1)
-        return throwOutOfMemoryError(exec);
-    if ((length1 + length2 + length3) < length3)
+    if (sumOverflows<int32_t>(length1, length2, length3))
         return throwOutOfMemoryError(exec);
 
     return JSRopeString::create(exec->vm(), jsString(vm, u1), jsString(vm, u2), jsString(vm, u3));
@@ -84,15 +79,10 @@ ALWAYS_INLINE JSValue jsStringFromRegisterArray(ExecState* exec, Register* strin
     VM* vm = &exec->vm();
     JSRopeString::RopeBuilder ropeBuilder(*vm);
 
-    unsigned oldLength = 0;
-
     for (unsigned i = 0; i < count; ++i) {
         JSValue v = strings[-static_cast<int>(i)].jsValue();
-        ropeBuilder.append(v.toString(exec));
-
-        if (ropeBuilder.length() < oldLength) // True for overflow
+        if (!ropeBuilder.append(v.toString(exec)))
             return throwOutOfMemoryError(exec);
-        oldLength = ropeBuilder.length();
     }
 
     return ropeBuilder.release();
@@ -104,15 +94,10 @@ ALWAYS_INLINE JSValue jsStringFromArguments(ExecState* exec, JSValue thisValue)
     JSRopeString::RopeBuilder ropeBuilder(*vm);
     ropeBuilder.append(thisValue.toString(exec));
 
-    unsigned oldLength = 0;
-
     for (unsigned i = 0; i < exec->argumentCount(); ++i) {
         JSValue v = exec->argument(i);
-        ropeBuilder.append(v.toString(exec));
-
-        if (ropeBuilder.length() < oldLength) // True for overflow
+        if (!ropeBuilder.append(v.toString(exec)))
             return throwOutOfMemoryError(exec);
-        oldLength = ropeBuilder.length();
     }
 
     return ropeBuilder.release();
@@ -211,6 +196,7 @@ ALWAYS_INLINE JSValue jsAdd(CallFrame* callFrame, JSValue v1, JSValue v2)
 
 inline size_t normalizePrototypeChainForChainAccess(CallFrame* callFrame, JSValue base, JSValue slotBase, const Identifier& propertyName, PropertyOffset& slotOffset)
 {
+    VM& vm = callFrame->vm();
     JSCell* cell = base.asCell();
     size_t count = 0;
         
@@ -237,10 +223,10 @@ inline size_t normalizePrototypeChainForChainAccess(CallFrame* callFrame, JSValu
 
         // Since we're accessing a prototype in a loop, it's a good bet that it
         // should not be treated as a dictionary.
-        if (cell->structure()->isDictionary()) {
+        if (cell->structure(vm)->isDictionary()) {
             asObject(cell)->flattenDictionaryObject(callFrame->vm());
             if (slotBase == cell)
-                slotOffset = cell->structure()->get(callFrame->vm(), propertyName); 
+                slotOffset = cell->structure(vm)->get(callFrame->vm(), propertyName); 
         }
             
         ++count;
@@ -251,12 +237,13 @@ inline size_t normalizePrototypeChainForChainAccess(CallFrame* callFrame, JSValu
 
 inline size_t normalizePrototypeChain(CallFrame* callFrame, JSCell* base)
 {
+    VM& vm = callFrame->vm();
     size_t count = 0;
     while (1) {
         if (base->isProxy())
             return InvalidPrototypeChain;
             
-        JSValue v = base->structure()->prototypeForLookup(callFrame);
+        JSValue v = base->structure(vm)->prototypeForLookup(callFrame);
         if (v.isNull())
             return count;
 
@@ -264,7 +251,7 @@ inline size_t normalizePrototypeChain(CallFrame* callFrame, JSCell* base)
 
         // Since we're accessing a prototype in a loop, it's a good bet that it
         // should not be treated as a dictionary.
-        if (base->structure()->isDictionary())
+        if (base->structure(vm)->isDictionary())
             asObject(base)->flattenDictionaryObject(callFrame->vm());
 
         ++count;
@@ -274,7 +261,7 @@ inline size_t normalizePrototypeChain(CallFrame* callFrame, JSCell* base)
 inline bool isPrototypeChainNormalized(JSGlobalObject* globalObject, Structure* structure)
 {
     for (;;) {
-        if (structure->typeInfo().type() == ProxyType)
+        if (structure->isProxy())
             return false;
             
         JSValue v = structure->prototypeForLookup(globalObject);

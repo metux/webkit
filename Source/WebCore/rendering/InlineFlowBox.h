@@ -53,7 +53,6 @@ public:
         , m_hasAnnotationsBefore(false)
         , m_hasAnnotationsAfter(false)
         , m_isFirstAfterPageBreak(false)
-        , m_hasContainingRegion(false)
 #if !ASSERT_WITH_SECURITY_IMPLICATION_DISABLED
         , m_hasBadChildList(false)
 #endif
@@ -114,8 +113,6 @@ public:
 
     virtual void clearTruncation() override;
 
-    IntRect roundedFrameRect() const;
-    
     void paintBoxDecorations(PaintInfo&, const LayoutPoint&);
     void paintMask(PaintInfo&, const LayoutPoint&);
     void paintFillLayers(const PaintInfo&, const Color&, const FillLayer*, const LayoutRect&, CompositeOperator = CompositeSourceOver);
@@ -141,25 +138,25 @@ public:
             return 0;
         return isHorizontal() ? renderer().marginRight() : renderer().marginBottom();
     }
-    int borderLogicalLeft() const
+    float borderLogicalLeft() const
     {
         if (!includeLogicalLeftEdge())
             return 0;
         return isHorizontal() ? lineStyle().borderLeftWidth() : lineStyle().borderTopWidth();
     }
-    int borderLogicalRight() const
+    float borderLogicalRight() const
     {
         if (!includeLogicalRightEdge())
             return 0;
         return isHorizontal() ? lineStyle().borderRightWidth() : lineStyle().borderBottomWidth();
     }
-    int paddingLogicalLeft() const
+    float paddingLogicalLeft() const
     {
         if (!includeLogicalLeftEdge())
             return 0;
         return isHorizontal() ? renderer().paddingLeft() : renderer().paddingTop();
     }
-    int paddingLogicalRight() const
+    float paddingLogicalRight() const
     {
         if (!includeLogicalRightEdge())
             return 0;
@@ -177,8 +174,8 @@ public:
     // Helper functions used during line construction and placement.
     void determineSpacingForFlowBoxes(bool lastLine, bool isLogicallyLastRunWrapped, RenderObject* logicallyLastRunRenderer);
     LayoutUnit getFlowSpacingLogicalWidth();
-    float placeBoxesInInlineDirection(float logicalLeft, bool& needsWordSpacing, GlyphOverflowAndFallbackFontsMap&);
-    float placeBoxRangeInInlineDirection(InlineBox* firstChild, InlineBox* lastChild, float& logicalLeft, float& minLogicalLeft, float& maxLogicalRight, bool& needsWordSpacing, GlyphOverflowAndFallbackFontsMap&);
+    float placeBoxesInInlineDirection(float logicalLeft, bool& needsWordSpacing);
+    float placeBoxRangeInInlineDirection(InlineBox* firstChild, InlineBox* lastChild, float& logicalLeft, float& minLogicalLeft, float& maxLogicalRight, bool& needsWordSpacing);
     void beginPlacingBoxRangesInInlineDirection(float logicalLeft) { setLogicalLeft(logicalLeft); }
     void endPlacingBoxRangesInInlineDirection(float logicalLeft, float logicalRight, float minLogicalLeft, float maxLogicalRight)
     {
@@ -187,13 +184,13 @@ public:
             clearKnownToHaveNoOverflow();
     }
 
-    void computeLogicalBoxHeights(RootInlineBox*, LayoutUnit& maxPositionTop, LayoutUnit& maxPositionBottom,
-                                  int& maxAscent, int& maxDescent, bool& setMaxAscent, bool& setMaxDescent,
-                                  bool strictMode, GlyphOverflowAndFallbackFontsMap&, FontBaseline, VerticalPositionCache&);
+    void computeLogicalBoxHeights(RootInlineBox&, LayoutUnit& maxPositionTop, LayoutUnit& maxPositionBottom,
+        int& maxAscent, int& maxDescent, bool& setMaxAscent, bool& setMaxDescent,
+        bool strictMode, GlyphOverflowAndFallbackFontsMap&, FontBaseline, VerticalPositionCache&);
     void adjustMaxAscentAndDescent(int& maxAscent, int& maxDescent,
-                                   int maxPositionTop, int maxPositionBottom);
+        int maxPositionTop, int maxPositionBottom);
     void placeBoxesInBlockDirection(LayoutUnit logicalTop, LayoutUnit maxHeight, int maxAscent, bool strictMode, LayoutUnit& lineTop, LayoutUnit& lineBottom, bool& setLineTop,
-                                    LayoutUnit& lineTopIncludingMargins, LayoutUnit& lineBottomIncludingMargins, bool& hasAnnotationsBefore, bool& hasAnnotationsAfter, FontBaseline);
+        LayoutUnit& lineTopIncludingMargins, LayoutUnit& lineBottomIncludingMargins, bool& hasAnnotationsBefore, bool& hasAnnotationsAfter, FontBaseline);
     void flipLinesInBlockDirection(LayoutUnit lineTop, LayoutUnit lineBottom);
     bool requiresIdeographicBaseline(const GlyphOverflowAndFallbackFontsMap&) const;
 
@@ -248,8 +245,8 @@ public:
     { 
         return m_overflow ? m_overflow->visualOverflowRect() : enclosingLayoutRect(frameRectIncludingLineHeight(lineTop, lineBottom));
     }
-    LayoutUnit logicalLeftVisualOverflow() const { return m_overflow ? (isHorizontal() ? m_overflow->visualOverflowRect().x() : m_overflow->visualOverflowRect().y()) : static_cast<LayoutUnit>(logicalLeft()); }
-    LayoutUnit logicalRightVisualOverflow() const { return m_overflow ? (isHorizontal() ? m_overflow->visualOverflowRect().maxX() : m_overflow->visualOverflowRect().maxY()) : static_cast<LayoutUnit>(ceilf(logicalRight())); }
+    LayoutUnit logicalLeftVisualOverflow() const { return m_overflow ? (isHorizontal() ? m_overflow->visualOverflowRect().x() : m_overflow->visualOverflowRect().y()) : LayoutUnit(logicalLeft()); }
+    LayoutUnit logicalRightVisualOverflow() const { return m_overflow ? (isHorizontal() ? m_overflow->visualOverflowRect().maxX() : m_overflow->visualOverflowRect().maxY()) : LayoutUnit(ceilf(logicalRight())); }
     LayoutUnit logicalTopVisualOverflow(LayoutUnit lineTop) const
     {
         if (m_overflow)
@@ -300,7 +297,7 @@ private:
 
     void addBoxShadowVisualOverflow(LayoutRect& logicalVisualOverflow);
     void addBorderOutsetVisualOverflow(LayoutRect& logicalVisualOverflow);
-    void addTextBoxVisualOverflow(InlineTextBox*, GlyphOverflowAndFallbackFontsMap&, LayoutRect& logicalVisualOverflow);
+    void addTextBoxVisualOverflow(InlineTextBox&, GlyphOverflowAndFallbackFontsMap&, LayoutRect& logicalVisualOverflow);
     void addReplacedChildOverflow(const InlineBox*, LayoutRect& logicalLayoutOverflow, LayoutRect& logicalVisualOverflow);
     void constrainToLineTopAndBottomIfNeeded(LayoutRect&) const;
 
@@ -339,8 +336,6 @@ protected:
 
     unsigned m_isFirstAfterPageBreak : 1;
 
-    unsigned m_hasContainingRegion : 1;
-
     // End of RootInlineBox-specific members.
 
 #if !ASSERT_WITH_SECURITY_IMPLICATION_DISABLED
@@ -352,17 +347,20 @@ private:
 INLINE_BOX_OBJECT_TYPE_CASTS(InlineFlowBox, isInlineFlowBox())
 
 #ifdef NDEBUG
+
 inline void InlineFlowBox::checkConsistency() const
 {
 }
+
 #endif
+
+#if ASSERT_WITH_SECURITY_IMPLICATION_DISABLED
 
 inline void InlineFlowBox::setHasBadChildList()
 {
-#if !ASSERT_WITH_SECURITY_IMPLICATION_DISABLED
-    m_hasBadChildList = true;
-#endif
 }
+
+#endif
 
 } // namespace WebCore
 

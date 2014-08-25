@@ -31,8 +31,7 @@
 #ifndef Blob_h
 #define Blob_h
 
-#include "BlobData.h"
-#include "URL.h"
+#include "BlobPart.h"
 #include "ScriptWrappable.h"
 #include "URLRegistry.h"
 #include <wtf/PassRefPtr.h>
@@ -50,16 +49,20 @@ public:
         return adoptRef(new Blob);
     }
 
-    static PassRefPtr<Blob> create(std::unique_ptr<BlobData> blobData, long long size)
+    static PassRefPtr<Blob> create(Vector<char> data, const String& contentType)
     {
-        return adoptRef(new Blob(std::move(blobData), size));
+        return adoptRef(new Blob(WTF::move(data), contentType));
     }
 
-    // For deserialization.
-    static PassRefPtr<Blob> create(const URL& srcURL, const String& type, long long size)
+    static PassRefPtr<Blob> create(Vector<BlobPart> blobParts, const String& contentType)
+    {
+        return adoptRef(new Blob(WTF::move(blobParts), contentType));
+    }
+
+    static PassRefPtr<Blob> deserialize(const URL& srcURL, const String& type, long long size)
     {
         ASSERT(Blob::isNormalizedContentType(type));
-        return adoptRef(new Blob(srcURL, type, size));
+        return adoptRef(new Blob(deserializationContructor, srcURL, type, size));
     }
 
     virtual ~Blob();
@@ -67,7 +70,7 @@ public:
     const URL& url() const { return m_internalURL; }
     const String& type() const { return m_type; }
 
-    virtual unsigned long long size() const { return static_cast<unsigned long long>(m_size); }
+    unsigned long long size() const;
     virtual bool isFile() const { return false; }
 
     // The checks described in the File API spec.
@@ -81,16 +84,24 @@ public:
     // URLRegistrable
     virtual URLRegistry& registry() const override;
 
-#if ENABLE(BLOB)
-    PassRefPtr<Blob> slice(long long start = 0, long long end = std::numeric_limits<long long>::max(), const String& contentType = String()) const;
-#endif
+    PassRefPtr<Blob> slice(long long start = 0, long long end = std::numeric_limits<long long>::max(), const String& contentType = String()) const
+    {
+        return adoptRef(new Blob(m_internalURL, start, end, contentType));
+    }
 
 protected:
     Blob();
-    Blob(std::unique_ptr<BlobData>, long long size);
+    Blob(Vector<char>, const String& contentType);
+    Blob(Vector<BlobPart>, const String& contentType);
 
-    // For deserialization.
-    Blob(const URL& srcURL, const String& type, long long size);
+    enum UninitializedContructor { uninitializedContructor };
+    Blob(UninitializedContructor);
+
+    enum DeserializationContructor { deserializationContructor };
+    Blob(DeserializationContructor, const URL& srcURL, const String& type, long long size);
+
+    // For slicing.
+    Blob(const URL& srcURL, long long start, long long end, const String& contentType);
 
     // This is an internal URL referring to the blob data associated with this object. It serves
     // as an identifier for this blob. The internal URL is never used to source the blob's content
@@ -98,7 +109,7 @@ protected:
     URL m_internalURL;
 
     String m_type;
-    long long m_size;
+    mutable long long m_size;
 };
 
 } // namespace WebCore

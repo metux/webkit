@@ -22,16 +22,13 @@
 #include "HTMLFrameOwnerElement.h"
 
 #include "DOMWindow.h"
+#include "ExceptionCode.h"
 #include "Frame.h"
 #include "FrameLoader.h"
 #include "RenderWidget.h"
 #include "ShadowRoot.h"
-#include <wtf/Ref.h>
-
-#if ENABLE(SVG)
-#include "ExceptionCode.h"
 #include "SVGDocument.h"
-#endif
+#include <wtf/Ref.h>
 
 namespace WebCore {
 
@@ -114,7 +111,6 @@ bool HTMLFrameOwnerElement::isKeyboardFocusable(KeyboardEvent* event) const
     return m_contentFrame && HTMLElement::isKeyboardFocusable(event);
 }
 
-#if ENABLE(SVG)
 SVGDocument* HTMLFrameOwnerElement::getSVGDocument(ExceptionCode& ec) const
 {
     Document* doc = contentDocument();
@@ -124,18 +120,15 @@ SVGDocument* HTMLFrameOwnerElement::getSVGDocument(ExceptionCode& ec) const
     ec = NOT_SUPPORTED_ERR;
     return 0;
 }
-#endif
-
-static void needsStyleRecalcCallback(Node& node, unsigned data)
-{
-    node.setNeedsStyleRecalc(static_cast<StyleChangeType>(data));
-}
 
 void HTMLFrameOwnerElement::scheduleSetNeedsStyleRecalc(StyleChangeType changeType)
 {
-    if (postAttachCallbacksAreSuspended())
-        queuePostAttachCallback(needsStyleRecalcCallback, *this, static_cast<unsigned>(changeType));
-    else
+    if (Style::postResolutionCallbacksAreSuspended()) {
+        RefPtr<HTMLFrameOwnerElement> element = this;
+        Style::queuePostResolutionCallback([element, changeType]{
+            element->setNeedsStyleRecalc(changeType);
+        });
+    } else
         setNeedsStyleRecalc(changeType);
 }
 

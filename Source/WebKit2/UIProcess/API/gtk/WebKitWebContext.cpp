@@ -26,7 +26,6 @@
 #include "WebCookieManagerProxy.h"
 #include "WebGeolocationManagerProxy.h"
 #include "WebKitBatteryProvider.h"
-#include "WebKitCertificateInfoPrivate.h"
 #include "WebKitCookieManagerPrivate.h"
 #include "WebKitDownloadClient.h"
 #include "WebKitDownloadPrivate.h"
@@ -37,17 +36,20 @@
 #include "WebKitPrivate.h"
 #include "WebKitRequestManagerClient.h"
 #include "WebKitSecurityManagerPrivate.h"
+#include "WebKitSettingsPrivate.h"
 #include "WebKitTextChecker.h"
 #include "WebKitURISchemeRequestPrivate.h"
+#include "WebKitUserContentManagerPrivate.h"
 #include "WebKitWebContextPrivate.h"
 #include "WebKitWebViewBasePrivate.h"
-#include "WebKitWebViewGroupPrivate.h"
+#include "WebKitWebViewPrivate.h"
 #include "WebResourceCacheManagerProxy.h"
 #include <WebCore/FileSystem.h>
 #include <WebCore/IconDatabase.h>
 #include <WebCore/Language.h>
+#include <memory>
 #include <wtf/HashMap.h>
-#include <wtf/OwnPtr.h>
+#include <wtf/NeverDestroyed.h>
 #include <wtf/PassRefPtr.h>
 #include <wtf/RefCounted.h>
 #include <wtf/gobject/GRefPtr.h>
@@ -148,13 +150,12 @@ struct _WebKitWebContextPrivate {
     RefPtr<WebKitBatteryProvider> batteryProvider;
 #endif
 #if ENABLE(SPELLCHECK)
-    OwnPtr<WebKitTextChecker> textChecker;
+    std::unique_ptr<WebKitTextChecker> textChecker;
 #endif
     CString faviconDatabaseDirectory;
     WebKitTLSErrorsPolicy tlsErrorsPolicy;
 
     HashMap<uint64_t, WebKitWebView*> webViews;
-    GRefPtr<WebKitWebViewGroup> defaultWebViewGroup;
 
     CString webExtensionsDirectory;
     GRefPtr<GVariant> webExtensionsInitializationUserData;
@@ -163,6 +164,32 @@ struct _WebKitWebContextPrivate {
 static guint signals[LAST_SIGNAL] = { 0, };
 
 WEBKIT_DEFINE_TYPE(WebKitWebContext, webkit_web_context, G_TYPE_OBJECT)
+
+static inline WebKit::ProcessModel toProcessModel(WebKitProcessModel webKitProcessModel)
+{
+    switch (webKitProcessModel) {
+    case WEBKIT_PROCESS_MODEL_SHARED_SECONDARY_PROCESS:
+        return ProcessModelSharedSecondaryProcess;
+    case WEBKIT_PROCESS_MODEL_MULTIPLE_SECONDARY_PROCESSES:
+        return ProcessModelMultipleSecondaryProcesses;
+    default:
+        ASSERT_NOT_REACHED();
+        return ProcessModelSharedSecondaryProcess;
+    }
+}
+
+static inline WebKitProcessModel toWebKitProcessModel(WebKit::ProcessModel processModel)
+{
+    switch (processModel) {
+    case ProcessModelSharedSecondaryProcess:
+        return WEBKIT_PROCESS_MODEL_SHARED_SECONDARY_PROCESS;
+    case ProcessModelMultipleSecondaryProcesses:
+        return WEBKIT_PROCESS_MODEL_MULTIPLE_SECONDARY_PROCESSES;
+    default:
+        ASSERT_NOT_REACHED();
+        return WEBKIT_PROCESS_MODEL_SHARED_SECONDARY_PROCESS;
+    }
+}
 
 static void webkit_web_context_class_init(WebKitWebContextClass* webContextClass)
 {
@@ -226,7 +253,11 @@ static gpointer createDefaultWebContext(gpointer)
     static GRefPtr<WebKitWebContext> webContext = adoptGRef(WEBKIT_WEB_CONTEXT(g_object_new(WEBKIT_TYPE_WEB_CONTEXT, NULL)));
     WebKitWebContextPrivate* priv = webContext->priv;
 
-    priv->context = WebContext::create(WebCore::filenameToString(injectedBundleFilename().data()));
+    WebContextConfiguration webContextConfiguration;
+    webContextConfiguration.injectedBundlePath = WebCore::filenameToString(injectedBundleFilename().data());
+    WebContext::applyPlatformSpecificConfigurationDefaults(webContextConfiguration);
+    priv->context = WebContext::create(WTF::move(webContextConfiguration));
+
     priv->requestManager = webContext->priv->context->supplement<WebSoupCustomProtocolRequestManager>();
     priv->context->setCacheModel(CacheModelPrimaryWebBrowser);
     priv->tlsErrorsPolicy = WEBKIT_TLS_ERRORS_POLICY_IGNORE;
@@ -354,7 +385,7 @@ typedef HashMap<DownloadProxy*, GRefPtr<WebKitDownload> > DownloadsMap;
 
 static DownloadsMap& downloadsMap()
 {
-    DEFINE_STATIC_LOCAL(DownloadsMap, downloads, ());
+    static NeverDestroyed<DownloadsMap> downloads;
     return downloads;
 }
 
@@ -532,7 +563,7 @@ static void destroyPluginList(GList* plugins)
     g_list_free_full(plugins, g_object_unref);
 }
 
-static void webkitWebContextGetPluginThread(GTask* task, gpointer object, gpointer taskData, GCancellable*)
+static void webkitWebContextGetPluginThread(GTask* task, gpointer object, gpointer /* taskData */, GCancellable*)
 {
     Vector<PluginModuleInfo> plugins = WEBKIT_WEB_CONTEXT(object)->priv->context->pluginInfoStore().plugins();
     GList* returnValue = 0;
@@ -862,26 +893,26 @@ void webkit_web_context_prefetch_dns(WebKitWebContext* context, const char* host
 
     ImmutableDictionary::MapType message;
     message.set(String::fromUTF8("Hostname"), API::String::create(String::fromUTF8(hostname)));
-    context->priv->context->postMessageToInjectedBundle(String::fromUTF8("PrefetchDNS"), ImmutableDictionary::create(std::move(message)).get());
+    context->priv->context->postMessageToInjectedBundle(String::fromUTF8("PrefetchDNS"), ImmutableDictionary::create(WTF::move(message)).get());
 }
 
 /**
  * webkit_web_context_allow_tls_certificate_for_host:
  * @context: a #WebKitWebContext
- * @info: a #WebKitCertificateInfo
+ * @certificate: a #GTlsCertificate
  * @host: the host for which a certificate is to be allowed
  *
  * Ignore further TLS errors on the @host for the certificate present in @info.
  *
- * Since: 2.4
+ * Since: 2.6
  */
-void webkit_web_context_allow_tls_certificate_for_host(WebKitWebContext* context, WebKitCertificateInfo* info, const gchar* host)
+void webkit_web_context_allow_tls_certificate_for_host(WebKitWebContext* context, GTlsCertificate* certificate, const gchar* host)
 {
     g_return_if_fail(WEBKIT_IS_WEB_CONTEXT(context));
-    g_return_if_fail(info);
+    g_return_if_fail(G_IS_TLS_CERTIFICATE(certificate));
     g_return_if_fail(host);
 
-    RefPtr<WebCertificateInfo> webCertificateInfo = WebCertificateInfo::create(webkitCertificateInfoGetCertificateInfo(info));
+    RefPtr<WebCertificateInfo> webCertificateInfo = WebCertificateInfo::create(WebCore::CertificateInfo(certificate, static_cast<GTlsCertificateFlags>(0)));
     context->priv->context->allowSpecificHTTPSCertificateForHost(webCertificateInfo.get(), String::fromUTF8(host));
 }
 
@@ -916,18 +947,7 @@ void webkit_web_context_set_process_model(WebKitWebContext* context, WebKitProce
 {
     g_return_if_fail(WEBKIT_IS_WEB_CONTEXT(context));
 
-    ProcessModel newProcessModel;
-
-    switch (processModel) {
-    case WEBKIT_PROCESS_MODEL_SHARED_SECONDARY_PROCESS:
-        newProcessModel = ProcessModelSharedSecondaryProcess;
-        break;
-    case WEBKIT_PROCESS_MODEL_MULTIPLE_SECONDARY_PROCESSES:
-        newProcessModel = ProcessModelMultipleSecondaryProcesses;
-        break;
-    default:
-        g_assert_not_reached();
-    }
+    ProcessModel newProcessModel(toProcessModel(processModel));
 
     if (newProcessModel == context->priv->context->processModel())
         return;
@@ -951,14 +971,7 @@ WebKitProcessModel webkit_web_context_get_process_model(WebKitWebContext* contex
 {
     g_return_val_if_fail(WEBKIT_IS_WEB_CONTEXT(context), WEBKIT_PROCESS_MODEL_SHARED_SECONDARY_PROCESS);
 
-    switch (context->priv->context->processModel()) {
-    case ProcessModelSharedSecondaryProcess:
-        return WEBKIT_PROCESS_MODEL_SHARED_SECONDARY_PROCESS;
-    case ProcessModelMultipleSecondaryProcesses:
-        return WEBKIT_PROCESS_MODEL_MULTIPLE_SECONDARY_PROCESSES;
-    default:
-        g_assert_not_reached();
-    }
+    return toWebKitProcessModel(context->priv->context->processModel());
 }
 
 WebKitDownload* webkitWebContextGetOrCreateDownload(DownloadProxy* downloadProxy)
@@ -1037,18 +1050,16 @@ void webkitWebContextDidFinishLoadingCustomProtocol(WebKitWebContext* context, u
     context->priv->uriSchemeRequests.remove(customProtocolID);
 }
 
-void webkitWebContextCreatePageForWebView(WebKitWebContext* context, WebKitWebView* webView, WebKitWebViewGroup* webViewGroup, WebKitWebView* relatedView)
+void webkitWebContextCreatePageForWebView(WebKitWebContext* context, WebKitWebView* webView, WebKitUserContentManager* userContentManager, WebKitWebView* relatedView)
 {
     WebKitWebViewBase* webViewBase = WEBKIT_WEB_VIEW_BASE(webView);
-    WebPageGroup* pageGroup = webViewGroup ? webkitWebViewGroupGetPageGroup(webViewGroup) : 0;
     WebPageProxy* relatedPage = relatedView ? webkitWebViewBaseGetPage(WEBKIT_WEB_VIEW_BASE(relatedView)) : nullptr;
-    webkitWebViewBaseCreateWebPage(webViewBase, context->priv->context.get(), pageGroup, relatedPage);
+    WebPreferences* preferences = webkitSettingsGetPreferences(webkit_web_view_get_settings(webView));
+    WebUserContentControllerProxy* userContentControllerProxy = userContentManager ? webkitUserContentManagerGetUserContentControllerProxy(userContentManager) : nullptr;
+    webkitWebViewBaseCreateWebPage(webViewBase, context->priv->context.get(), preferences, nullptr, userContentControllerProxy, relatedPage);
 
     WebPageProxy* page = webkitWebViewBaseGetPage(webViewBase);
     context->priv->webViews.set(page->pageID(), webView);
-
-    if (!pageGroup && !context->priv->defaultWebViewGroup)
-        context->priv->defaultWebViewGroup = adoptGRef(webkitWebViewGroupCreate(&page->pageGroup()));
 }
 
 void webkitWebContextWebViewDestroyed(WebKitWebContext* context, WebKitWebView* webView)
@@ -1060,9 +1071,4 @@ void webkitWebContextWebViewDestroyed(WebKitWebContext* context, WebKitWebView* 
 WebKitWebView* webkitWebContextGetWebViewForPage(WebKitWebContext* context, WebPageProxy* page)
 {
     return page ? context->priv->webViews.get(page->pageID()) : 0;
-}
-
-WebKitWebViewGroup* webkitWebContextGetDefaultWebViewGroup(WebKitWebContext* context)
-{
-    return context->priv->defaultWebViewGroup.get();
 }

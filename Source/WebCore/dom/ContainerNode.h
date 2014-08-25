@@ -33,6 +33,7 @@
 namespace WebCore {
 
 class FloatPoint;
+class QualifiedName;
 class RenderElement;
 
 typedef void (*NodeCallback)(Node&, unsigned);
@@ -79,11 +80,11 @@ private:
 };
 
 class ContainerNode : public Node {
-    friend class PostAttachCallbackDisabler;
 public:
     virtual ~ContainerNode();
 
     Node* firstChild() const { return m_firstChild; }
+    static ptrdiff_t firstChildMemoryOffset() { return OBJECT_OFFSETOF(ContainerNode, m_firstChild); }
     Node* lastChild() const { return m_lastChild; }
     bool hasChildNodes() const { return m_firstChild; }
 
@@ -121,15 +122,13 @@ public:
 
     void disconnectDescendantFrames();
 
-    virtual bool childShouldCreateRenderer(const Node&) const { return true; }
-
     using Node::setAttributeEventListener;
     void setAttributeEventListener(const AtomicString& eventType, const QualifiedName& attributeName, const AtomicString& value);
 
     RenderElement* renderer() const;
 
-    Element* querySelector(const AtomicString& selectors, ExceptionCode&);
-    RefPtr<NodeList> querySelectorAll(const AtomicString& selectors, ExceptionCode&);
+    Element* querySelector(const String& selectors, ExceptionCode&);
+    RefPtr<NodeList> querySelectorAll(const String& selectors, ExceptionCode&);
 
     PassRefPtr<NodeList> getElementsByTagName(const AtomicString&);
     PassRefPtr<NodeList> getElementsByTagNameNS(const AtomicString& namespaceURI, const AtomicString& localName);
@@ -138,10 +137,7 @@ public:
     PassRefPtr<RadioNodeList> radioNodeList(const AtomicString&);
 
 protected:
-    explicit ContainerNode(Document*, ConstructionType = CreateContainer);
-
-    static void queuePostAttachCallback(NodeCallback, Node&, unsigned = 0);
-    static bool postAttachCallbacksAreSuspended();
+    explicit ContainerNode(Document&, ConstructionType = CreateContainer);
 
     template<class GenericNode, class GenericNodeContainer>
     friend void appendChildToContainer(GenericNode* child, GenericNodeContainer&);
@@ -156,10 +152,6 @@ protected:
 private:
     void removeBetween(Node* previousChild, Node* nextChild, Node& oldChild);
     void insertBeforeCommon(Node& nextChild, Node& oldChild);
-
-    static void dispatchPostAttachCallbacks();
-    static void suspendPostAttachCallbacks(Document&);
-    static void resumePostAttachCallbacks(Document&);
 
     bool getUpperLeftCorner(FloatPoint&) const;
     bool getLowerRightCorner(FloatPoint&) const;
@@ -182,7 +174,7 @@ void isContainerNode(const ContainerNode&); // Catch unnecessary runtime check o
 
 NODE_TYPE_CASTS(ContainerNode)
 
-inline ContainerNode::ContainerNode(Document* document, ConstructionType type)
+inline ContainerNode::ContainerNode(Document& document, ConstructionType type)
     : Node(document, type)
     , m_firstChild(0)
     , m_lastChild(0)
@@ -236,7 +228,7 @@ inline bool Node::needsNodeRenderingTraversalSlowPath() const
 
 inline bool Node::isTreeScope() const
 {
-    return treeScope().rootNode() == this;
+    return &treeScope().rootNode() == this;
 }
 
 // This constant controls how much buffer is initially allocated
@@ -259,12 +251,13 @@ public:
     explicit ChildNodesLazySnapshot(Node& parentNode)
         : m_currentNode(parentNode.firstChild())
         , m_currentIndex(0)
+        , m_hasSnapshot(false)
     {
         m_nextSnapshot = latestSnapshot;
         latestSnapshot = this;
     }
 
-    ~ChildNodesLazySnapshot()
+    ALWAYS_INLINE ~ChildNodesLazySnapshot()
     {
         latestSnapshot = m_nextSnapshot;
     }
@@ -273,31 +266,30 @@ public:
     PassRefPtr<Node> nextNode()
     {
         if (LIKELY(!hasSnapshot())) {
-            RefPtr<Node> node = m_currentNode;
+            RefPtr<Node> node = m_currentNode.release();
             if (node)
                 m_currentNode = node->nextSibling();
             return node.release();
         }
-        Vector<RefPtr<Node>>& nodeVector = *m_childNodes;
-        if (m_currentIndex >= nodeVector.size())
+        if (m_currentIndex >= m_snapshot.size())
             return 0;
-        return nodeVector[m_currentIndex++];
+        return m_snapshot[m_currentIndex++];
     }
 
     void takeSnapshot()
     {
         if (hasSnapshot())
             return;
-        m_childNodes = adoptPtr(new Vector<RefPtr<Node>>());
+        m_hasSnapshot = true;
         Node* node = m_currentNode.get();
         while (node) {
-            m_childNodes->append(node);
+            m_snapshot.append(node);
             node = node->nextSibling();
         }
     }
 
     ChildNodesLazySnapshot* nextSnapshot() { return m_nextSnapshot; }
-    bool hasSnapshot() { return !!m_childNodes.get(); }
+    bool hasSnapshot() { return m_hasSnapshot; }
 
     static void takeChildNodesLazySnapshot()
     {
@@ -313,7 +305,8 @@ private:
 
     RefPtr<Node> m_currentNode;
     unsigned m_currentIndex;
-    OwnPtr<Vector<RefPtr<Node>>> m_childNodes; // Lazily instantiated.
+    bool m_hasSnapshot;
+    Vector<RefPtr<Node>> m_snapshot; // Lazily instantiated.
     ChildNodesLazySnapshot* m_nextSnapshot;
 };
 

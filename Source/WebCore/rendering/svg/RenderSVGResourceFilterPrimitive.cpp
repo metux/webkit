@@ -27,7 +27,7 @@
 
 #include "config.h"
 
-#if ENABLE(SVG) && ENABLE(FILTERS)
+#if ENABLE(FILTERS)
 #include "RenderSVGResourceFilterPrimitive.h"
 
 #include "SVGFEImage.h"
@@ -37,7 +37,7 @@
 namespace WebCore {
 
 RenderSVGResourceFilterPrimitive::RenderSVGResourceFilterPrimitive(SVGFilterPrimitiveStandardAttributes& filterPrimitiveElement, PassRef<RenderStyle> style)
-    : RenderSVGHiddenContainer(filterPrimitiveElement, std::move(style))
+    : RenderSVGHiddenContainer(filterPrimitiveElement, WTF::move(style))
 {
 }
 
@@ -72,7 +72,7 @@ void RenderSVGResourceFilterPrimitive::styleDidChange(StyleDifference diff, cons
 
 FloatRect RenderSVGResourceFilterPrimitive::determineFilterPrimitiveSubregion(FilterEffect* effect)
 {
-    SVGFilter* filter = toSVGFilter(effect->filter());
+    SVGFilter* filter = toSVGFilter(&(effect->filter()));
     ASSERT(filter);
 
     // FETile, FETurbulence, FEFlood don't have input effects, take the filter region as unite rect.
@@ -115,4 +115,4 @@ FloatRect RenderSVGResourceFilterPrimitive::determineFilterPrimitiveSubregion(Fi
 
 } // namespace WebCore
 
-#endif // ENABLE(SVG) && ENABLE(FILTERS)
+#endif // ENABLE(FILTERS)

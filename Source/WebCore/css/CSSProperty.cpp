@@ -1,6 +1,6 @@
 /**
  * (C) 1999-2003 Lars Knoll (knoll@kde.org)
- * Copyright (C) 2004, 2005, 2006 Apple Computer, Inc.
+ * Copyright (C) 2004, 2005, 2006 Apple Inc.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -25,6 +25,7 @@
 #include "RenderStyleConstants.h"
 #include "StylePropertyShorthand.h"
 
+#include <wtf/NeverDestroyed.h>
 #include <wtf/text/StringBuilder.h>
 
 namespace WebCore {
@@ -48,9 +49,9 @@ CSSPropertyID StylePropertyMetadata::shorthandID() const
 
 void CSSProperty::wrapValueInCommaSeparatedList()
 {
-    RefPtr<CSSValue> value = m_value.release();
-    m_value = CSSValueList::createCommaSeparated();
-    toCSSValueList(m_value.get())->append(value.release());
+    auto list = CSSValueList::createCommaSeparated();
+    list.get().append(m_value.releaseNonNull());
+    m_value = WTF::move(list);
 }
 
 enum LogicalBoxSide { BeforeSide, EndSide, AfterSide, StartSide };
@@ -173,7 +174,7 @@ static CSSPropertyID resolveToPhysicalProperty(WritingMode writingMode, LogicalE
 static const StylePropertyShorthand& borderDirections()
 {
     static const CSSPropertyID properties[4] = { CSSPropertyBorderTop, CSSPropertyBorderRight, CSSPropertyBorderBottom, CSSPropertyBorderLeft };
-    DEFINE_STATIC_LOCAL(StylePropertyShorthand, borderDirections, (CSSPropertyBorder, properties, WTF_ARRAY_LENGTH(properties)));
+    static NeverDestroyed<StylePropertyShorthand> borderDirections(CSSPropertyBorder, properties, WTF_ARRAY_LENGTH(properties));
     return borderDirections;
 }
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013 Apple Inc. All rights reserved.
+ * Copyright (C) 2013, 2014 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -25,8 +25,6 @@
 
 #ifndef DFGJITCode_h
 #define DFGJITCode_h
-
-#include <wtf/Platform.h>
 
 #if ENABLE(DFG_JIT)
 
@@ -122,8 +120,10 @@ public:
     DFG::VariableEventStream variableEventStream;
     DFG::MinifiedGraph minifiedDFG;
 #if ENABLE(FTL_JIT)
-    ExecutionCounter tierUpCounter;
+    UpperTierExecutionCounter tierUpCounter;
     RefPtr<CodeBlock> osrEntryBlock;
+    unsigned osrEntryRetry;
+    bool abandonOSREntry;
 #endif // ENABLE(FTL_JIT)
 };
 

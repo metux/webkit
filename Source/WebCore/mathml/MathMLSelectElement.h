@@ -34,6 +34,9 @@ namespace WebCore {
 class MathMLSelectElement final : public MathMLInlineContainerElement {
 public:
     static PassRefPtr<MathMLSelectElement> create(const QualifiedName& tagName, Document&);
+    static bool isMathMLEncoding(const AtomicString& value);
+    static bool isSVGEncoding(const AtomicString& value);
+    static bool isHTMLEncoding(const AtomicString& value);
 
 private:
     MathMLSelectElement(const QualifiedName& tagName, Document&);
@@ -43,7 +46,7 @@ private:
 
     virtual void finishParsingChildren() override;
     virtual void childrenChanged(const ChildChange&) override;
-    virtual void attributeChanged(const QualifiedName&, const AtomicString&, AttributeModificationReason = ModifiedDirectly) override;
+    virtual void attributeChanged(const QualifiedName&, const AtomicString& oldValue, const AtomicString& newValue, AttributeModificationReason = ModifiedDirectly) override;
     virtual void defaultEventHandler(Event*) override;
     virtual bool willRespondToMouseClickEvents() override;
 

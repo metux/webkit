@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008, 2009, 2013 Apple Inc. All rights reserved.
+ * Copyright (C) 2008, 2009, 2013, 2014 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -10,7 +10,7 @@
  * 2.  Redistributions in binary form must reproduce the above copyright
  *     notice, this list of conditions and the following disclaimer in the
  *     documentation and/or other materials provided with the distribution. 
- * 3.  Neither the name of Apple Computer, Inc. ("Apple") nor the names of
+ * 3.  Neither the name of Apple Inc. ("Apple") nor the names of
  *     its contributors may be used to endorse or promote products derived
  *     from this software without specific prior written permission. 
  *
@@ -31,7 +31,6 @@
 
 #include "DateInstanceCache.h"
 #include "ExecutableAllocator.h"
-#include "GPRInfo.h"
 #include "Heap.h"
 #include "Intrinsic.h"
 #include "JITThunks.h"
@@ -40,16 +39,18 @@
 #include "LLIntData.h"
 #include "MacroAssemblerCodeRef.h"
 #include "NumericStrings.h"
-#include "ProfilerDatabase.h"
 #include "PrivateName.h"
 #include "PrototypeMap.h"
 #include "SmallStrings.h"
+#include "SourceCode.h"
 #include "Strong.h"
 #include "ThunkGenerators.h"
 #include "TypedArrayController.h"
+#include "TypeLocation.h"
 #include "Watchdog.h"
 #include "Watchpoint.h"
 #include "WeakRandom.h"
+#include <wtf/Bag.h>
 #include <wtf/BumpPointerAllocator.h>
 #include <wtf/DateMath.h>
 #include <wtf/Forward.h>
@@ -68,13 +69,16 @@
 
 namespace JSC {
 
+    class ArityCheckFailReturnThunks;
+    class BuiltinExecutables;
     class CodeBlock;
     class CodeCache;
     class CommonIdentifiers;
     class ExecState;
     class HandleStack;
+    class HighFidelityTypeProfiler;
+    class HighFidelityLog;
     class Identifier;
-    class IdentifierTable;
     class Interpreter;
     class JSGlobalObject;
     class JSObject;
@@ -84,6 +88,7 @@ namespace JSC {
     class NativeExecutable;
     class ParserArena;
     class RegExpCache;
+    class ScriptExecutable;
     class SourceProvider;
     class SourceProviderCache;
     struct StackFrame;
@@ -96,6 +101,7 @@ namespace JSC {
     class UnlinkedEvalCodeBlock;
     class UnlinkedFunctionExecutable;
     class UnlinkedProgramCodeBlock;
+    class VirtualRegister;
     class VMEntryScope;
     class Watchpoint;
     class WatchpointSet;
@@ -103,7 +109,6 @@ namespace JSC {
 #if ENABLE(DFG_JIT)
     namespace DFG {
     class LongLivedState;
-    class Worklist;
     }
 #endif // ENABLE(DFG_JIT)
 #if ENABLE(FTL_JIT)
@@ -111,6 +116,12 @@ namespace JSC {
     class Thunks;
     }
 #endif // ENABLE(FTL_JIT)
+    namespace CommonSlowPaths {
+    struct ArityCheckData;
+    }
+    namespace Profiler {
+    class Database;
+    }
 
     struct HashTable;
     struct Instruction;
@@ -204,10 +215,6 @@ namespace JSC {
 
         void makeUsableFromMultipleThreads() { heap.machineThreads().makeUsableFromMultipleThreads(); }
         
-#if ENABLE(DFG_JIT)
-        DFG::Worklist* ensureWorklist();
-#endif // ENABLE(DFG_JIT)
-
     private:
         RefPtr<JSLock> m_apiLock;
 
@@ -224,44 +231,23 @@ namespace JSC {
         
 #if ENABLE(DFG_JIT)
         OwnPtr<DFG::LongLivedState> dfgState;
-        RefPtr<DFG::Worklist> worklist;
 #endif // ENABLE(DFG_JIT)
 
         VMType vmType;
         ClientData* clientData;
         ExecState* topCallFrame;
-        Watchdog watchdog;
-
-        const OwnPtr<const HashTable> arrayConstructorTable;
-        const OwnPtr<const HashTable> arrayPrototypeTable;
-        const OwnPtr<const HashTable> booleanPrototypeTable;
-        const OwnPtr<const HashTable> dataViewTable;
-        const OwnPtr<const HashTable> dateTable;
-        const OwnPtr<const HashTable> dateConstructorTable;
-        const OwnPtr<const HashTable> errorPrototypeTable;
-        const OwnPtr<const HashTable> globalObjectTable;
-        const OwnPtr<const HashTable> jsonTable;
-        const OwnPtr<const HashTable> numberConstructorTable;
-        const OwnPtr<const HashTable> numberPrototypeTable;
-        const OwnPtr<const HashTable> objectConstructorTable;
-        const OwnPtr<const HashTable> privateNamePrototypeTable;
-        const OwnPtr<const HashTable> regExpTable;
-        const OwnPtr<const HashTable> regExpConstructorTable;
-        const OwnPtr<const HashTable> regExpPrototypeTable;
-        const OwnPtr<const HashTable> stringConstructorTable;
-#if ENABLE(PROMISES)
-        const OwnPtr<const HashTable> promisePrototypeTable;
-        const OwnPtr<const HashTable> promiseConstructorTable;
-#endif
+        std::unique_ptr<Watchdog> watchdog;
 
         Strong<Structure> structureStructure;
         Strong<Structure> structureRareDataStructure;
-        Strong<Structure> debuggerActivationStructure;
+        Strong<Structure> debuggerScopeStructure;
         Strong<Structure> terminatedExecutionErrorStructure;
         Strong<Structure> stringStructure;
         Strong<Structure> notAnObjectStructure;
         Strong<Structure> propertyNameIteratorStructure;
+        Strong<Structure> propertyNameEnumeratorStructure;
         Strong<Structure> getterSetterStructure;
+        Strong<Structure> customGetterSetterStructure;
         Strong<Structure> apiWrapperStructure;
         Strong<Structure> JSScopeStructure;
         Strong<Structure> executableStructure;
@@ -274,7 +260,6 @@ namespace JSC {
         Strong<Structure> structureChainStructure;
         Strong<Structure> sparseArrayValueMapStructure;
         Strong<Structure> arrayBufferNeuteringWatchpointStructure;
-        Strong<Structure> withScopeStructure;
         Strong<Structure> unlinkedFunctionExecutableStructure;
         Strong<Structure> unlinkedProgramCodeBlockStructure;
         Strong<Structure> unlinkedEvalCodeBlockStructure;
@@ -282,17 +267,24 @@ namespace JSC {
         Strong<Structure> propertyTableStructure;
         Strong<Structure> mapDataStructure;
         Strong<Structure> weakMapDataStructure;
+#if ENABLE(PROMISES)
         Strong<Structure> promiseDeferredStructure;
         Strong<Structure> promiseReactionStructure;
+#endif
         Strong<JSCell> iterationTerminator;
+        Strong<JSCell> emptyPropertyNameEnumerator;
 
-        IdentifierTable* identifierTable;
+        AtomicStringTable* m_atomicStringTable;
         CommonIdentifiers* propertyNames;
         const MarkedArgumentBuffer* emptyList; // Lists are supposed to be allocated on the stack to have their elements properly marked, which is not the case here - but this list has nothing to mark.
         SmallStrings smallStrings;
         NumericStrings numericStrings;
         DateInstanceCache dateInstanceCache;
         WTF::SimpleStats machineCodeBytesPerBytecodeWordForBaselineJIT;
+        WeakGCMap<StringImpl*, JSString, PtrHash<StringImpl*>> stringCache;
+        Strong<JSString> lastCachedString;
+
+        AtomicStringTable* atomicStringTable() const { return m_atomicStringTable; }
 
         void setInDefineOwnProperty(bool inDefineOwnProperty)
         {
@@ -309,10 +301,8 @@ namespace JSC {
 
         void* enabledProfilerAddress() { return &m_enabledProfiler; }
 
-#if ENABLE(JIT) && ENABLE(LLINT)
+#if ENABLE(JIT)
         bool canUseJIT() { return m_canUseJIT; }
-#elif ENABLE(JIT)
-        bool canUseJIT() { return true; } // jit only
 #else
         bool canUseJIT() { return false; } // interpreter only
 #endif
@@ -340,7 +330,10 @@ namespace JSC {
             return jitStubs->ctiStub(this, generator);
         }
         NativeExecutable* getHostFunction(NativeFunction, Intrinsic);
-#endif
+        
+        std::unique_ptr<ArityCheckFailReturnThunks> arityCheckFailReturnThunks;
+#endif // ENABLE(JIT)
+        std::unique_ptr<CommonSlowPaths::ArityCheckData> arityCheckData;
 #if ENABLE(FTL_JIT)
         std::unique_ptr<FTL::Thunks> ftlThunks;
 #endif
@@ -372,12 +365,24 @@ namespace JSC {
         JS_EXPORT_PRIVATE JSValue throwException(ExecState*, JSValue);
         JS_EXPORT_PRIVATE JSObject* throwException(ExecState*, JSObject*);
         
-        void** addressOfJSStackLimit() { return &m_jsStackLimit; }
+        void* stackPointerAtVMEntry() const { return m_stackPointerAtVMEntry; }
+        void setStackPointerAtVMEntry(void*);
+
+        size_t reservedZoneSize() const { return m_reservedZoneSize; }
+        size_t updateReservedZoneSize(size_t reservedZoneSize);
+
+#if ENABLE(FTL_JIT)
+        void updateFTLLargestStackSize(size_t);
+        void** addressOfFTLStackLimit() { return &m_ftlStackLimit; }
+#endif
+
+#if !ENABLE(JIT)
         void* jsStackLimit() { return m_jsStackLimit; }
         void setJSStackLimit(void* limit) { m_jsStackLimit = limit; }
-
+#endif
         void* stackLimit() { return m_stackLimit; }
-        void setStackLimit(void* limit) { m_stackLimit = limit; }
+        void** addressOfStackLimit() { return &m_stackLimit; }
+
         bool isSafeToRecurse(size_t neededStackInBytes = 0) const
         {
             ASSERT(wtfThreadData().stack().isGrowingDownward());
@@ -386,10 +391,12 @@ namespace JSC {
             return curr >= limit && static_cast<size_t>(curr - limit) >= neededStackInBytes;
         }
 
+        void* lastStackTop() { return m_lastStackTop; }
+        void setLastStackTop(void* lastStackTop) { m_lastStackTop = lastStackTop; }
+
         const ClassInfo* const jsArrayClassInfo;
         const ClassInfo* const jsFinalObjectClassInfo;
 
-        ReturnAddressPtr exceptionLocation;
         JSValue hostCallReturnValue;
         ExecState* newCallFrameReturnValue;
         ExecState* callFrameForThrow;
@@ -412,7 +419,9 @@ namespace JSC {
                 // max(scratch buffer size) * 4.
                 sizeOfLastScratchBuffer = size * 2;
 
-                scratchBuffers.append(ScratchBuffer::create(sizeOfLastScratchBuffer));
+                ScratchBuffer* newBuffer = ScratchBuffer::create(sizeOfLastScratchBuffer);
+                RELEASE_ASSERT(newBuffer);
+                scratchBuffers.append(newBuffer);
             }
 
             ScratchBuffer* result = scratchBuffers.last();
@@ -437,11 +446,13 @@ namespace JSC {
         BumpPointerAllocator m_regExpAllocator;
 
 #if ENABLE(REGEXP_TRACING)
-        typedef ListHashSet<RefPtr<RegExp>> RTTraceList;
+        typedef ListHashSet<RegExp*> RTTraceList;
         RTTraceList* m_rtTraceList;
 #endif
 
-        ThreadIdentifier exclusiveThread;
+        bool hasExclusiveThread() const { return m_apiLock->hasExclusiveThread(); }
+        std::thread::id exclusiveThread() const { return m_apiLock->exclusiveThread(); }
+        void setExclusiveThread(std::thread::id threadId) { m_apiLock->setExclusiveThread(threadId); }
 
         JS_EXPORT_PRIVATE void resetDateCache();
 
@@ -450,7 +461,7 @@ namespace JSC {
         JS_EXPORT_PRIVATE void dumpSampleData(ExecState* exec);
         RegExpCache* regExpCache() { return m_regExpCache; }
 #if ENABLE(REGEXP_TRACING)
-        void addRegExpToTrace(PassRefPtr<RegExp> regExp);
+        void addRegExpToTrace(RegExp*);
 #endif
         JS_EXPORT_PRIVATE void dumpRegExpTrace();
 
@@ -469,21 +480,29 @@ namespace JSC {
         bool haveEnoughNewStringsToHashCons() { return m_newStringsSinceLastHashCons > s_minNumberOfNewStringsToHashCons; }
         void resetNewStringsSinceLastHashCons() { m_newStringsSinceLastHashCons = 0; }
 
-        bool currentThreadIsHoldingAPILock() const
-        {
-            return m_apiLock->currentThreadIsHoldingLock() || exclusiveThread == currentThread();
-        }
+        bool currentThreadIsHoldingAPILock() const { return m_apiLock->currentThreadIsHoldingLock(); }
 
         JSLock& apiLock() { return *m_apiLock; }
         CodeCache* codeCache() { return m_codeCache.get(); }
 
-        void prepareToDiscardCode();
+        void waitForCompilationsToComplete();
         
         JS_EXPORT_PRIVATE void discardAllCode();
 
         void registerWatchpointForImpureProperty(const Identifier&, Watchpoint*);
         // FIXME: Use AtomicString once it got merged with Identifier.
         JS_EXPORT_PRIVATE void addImpureProperty(const String&);
+        
+        BuiltinExecutables* builtinExecutables() { return m_builtinExecutables.get(); }
+
+        bool isProfilingTypesWithHighFidelity() { return !!m_highFidelityTypeProfiler; }
+        bool enableHighFidelityTypeProfiling();
+        bool disableHighFidelityTypeProfiling();
+        HighFidelityLog* highFidelityLog() { return m_highFidelityLog.get(); }
+        HighFidelityTypeProfiler* highFidelityTypeProfiler() { return m_highFidelityTypeProfiler.get(); }
+        TypeLocation* nextTypeLocation();
+        JS_EXPORT_PRIVATE void dumpHighFidelityProfilingTypes();
+        GlobalVariableID getNextUniqueVariableID() { return m_nextUniqueVariableID++; }
 
     private:
         friend class LLIntOffsetsExtractor;
@@ -493,6 +512,9 @@ namespace JSC {
         VM(VMType, HeapType);
         static VM*& sharedInstanceInternal();
         void createNativeThunk();
+
+        void updateStackLimit();
+
 #if ENABLE(ASSEMBLER)
         bool m_canUseAssembler;
 #endif
@@ -505,8 +527,9 @@ namespace JSC {
 #if ENABLE(GC_VALIDATION)
         const ClassInfo* m_initializingObjectClass;
 #endif
-
-#if USE(SEPARATE_C_AND_JS_STACK)
+        void* m_stackPointerAtVMEntry;
+        size_t m_reservedZoneSize;
+#if !ENABLE(JIT)
         struct {
             void* m_stackLimit;
             void* m_jsStackLimit;
@@ -516,15 +539,24 @@ namespace JSC {
             void* m_stackLimit;
             void* m_jsStackLimit;
         };
+#if ENABLE(FTL_JIT)
+        void* m_ftlStackLimit;
+        size_t m_largestFTLStackSize;
 #endif
+#endif
+        void* m_lastStackTop;
         JSValue m_exception;
         bool m_inDefineOwnProperty;
         OwnPtr<CodeCache> m_codeCache;
-        RefCountedArray<StackFrame> m_exceptionStack;
-
         LegacyProfiler* m_enabledProfiler;
-
+        OwnPtr<BuiltinExecutables> m_builtinExecutables;
+        RefCountedArray<StackFrame> m_exceptionStack;
         HashMap<String, RefPtr<WatchpointSet>> m_impurePropertyWatchpointSets;
+        std::unique_ptr<HighFidelityTypeProfiler> m_highFidelityTypeProfiler;
+        std::unique_ptr<HighFidelityLog> m_highFidelityLog;
+        GlobalVariableID m_nextUniqueVariableID;
+        unsigned m_highFidelityTypeProfilingEnabledCount;
+        std::unique_ptr<Bag<TypeLocation>> m_typeLocationInfo;
     };
 
 #if ENABLE(GC_VALIDATION)
@@ -543,6 +575,13 @@ namespace JSC {
     {
         return &m_vm->heap;
     }
+
+#if ENABLE(JIT)
+    extern "C" void sanitizeStackForVMImpl(VM*);
+#endif
+
+    void sanitizeStackForVM(VM*);
+    void logSanitizeStack(VM*);
 
 } // namespace JSC
 

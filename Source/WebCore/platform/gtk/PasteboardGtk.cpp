@@ -34,13 +34,12 @@
 #include "URL.h"
 #include "PasteboardHelper.h"
 #include "RenderImage.h"
+#include "SVGElement.h"
+#include "SVGNames.h"
+#include "XLinkNames.h"
 #include "markup.h"
 #include <gtk/gtk.h>
 
-#if ENABLE(SVG)
-#include "SVGNames.h"
-#include "XLinkNames.h"
-#endif
 
 namespace WebCore {
 
@@ -136,33 +135,31 @@ static ClipboardDataType dataObjectTypeFromHTMLClipboardType(const String& rawTy
     return ClipboardDataTypeUnknown;
 }
 
-bool Pasteboard::writeString(const String& type, const String& data)
+void Pasteboard::writeString(const String& type, const String& data)
 {
     switch (dataObjectTypeFromHTMLClipboardType(type)) {
     case ClipboardDataTypeURIList:
     case ClipboardDataTypeURL:
         m_dataObject->setURIList(data);
-        return true;
+        return;
     case ClipboardDataTypeMarkup:
         m_dataObject->setMarkup(data);
-        return true;
+        return;
     case ClipboardDataTypeText:
         m_dataObject->setText(data);
-        return true;
+        return;
     case ClipboardDataTypeUnknown:
         m_dataObject->setUnknownTypeData(type, data);
-        return true;
+        return;
     case ClipboardDataTypeImage:
         break;
     }
-
-    return false;
 }
 
-void Pasteboard::writeSelection(Range& selectedRange, bool canSmartCopyOrDelete, Frame& frame, ShouldSerializeSelectedTextForClipboard shouldSerializeSelectedTextForClipboard)
+void Pasteboard::writeSelection(Range& selectedRange, bool canSmartCopyOrDelete, Frame& frame, ShouldSerializeSelectedTextForDataTransfer shouldSerializeSelectedTextForDataTransfer)
 {
     m_dataObject->clearAll();
-    m_dataObject->setText(shouldSerializeSelectedTextForClipboard == IncludeImageAltTextForClipboard ? frame.editor().selectedTextForClipboard() : frame.editor().selectedText());
+    m_dataObject->setText(shouldSerializeSelectedTextForDataTransfer == IncludeImageAltTextForDataTransfer ? frame.editor().selectedTextForDataTransfer() : frame.editor().selectedText());
     m_dataObject->setMarkup(createMarkup(selectedRange, 0, AnnotateForInterchange, false, ResolveNonLocalURLs));
 
     if (m_gtkClipboard)
@@ -195,10 +192,8 @@ static URL getURLForImageElement(Element& element)
     AtomicString urlString;
     if (isHTMLImageElement(element) || isHTMLInputElement(element))
         urlString = element.getAttribute(HTMLNames::srcAttr);
-#if ENABLE(SVG)
     else if (element.hasTagName(SVGNames::imageTag))
         urlString = element.getAttribute(XLinkNames::hrefAttr);
-#endif
     else if (element.hasTagName(HTMLNames::embedTag) || isHTMLObjectElement(element))
         urlString = element.imageSourceURL();
 
@@ -302,7 +297,7 @@ bool Pasteboard::canSmartReplace()
 }
 
 #if ENABLE(DRAG_SUPPORT)
-void Pasteboard::setDragImage(DragImageRef, const IntPoint& hotSpot)
+void Pasteboard::setDragImage(DragImageRef, const IntPoint&)
 {
 }
 #endif

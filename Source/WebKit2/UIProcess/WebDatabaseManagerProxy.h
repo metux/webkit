@@ -44,7 +44,7 @@ class WebContext;
 class WebProcessProxy;
 class WebSecurityOrigin;
 
-typedef GenericCallback<WKArrayRef> ArrayCallback;
+typedef GenericCallback<API::Array*> ArrayCallback;
 
 class WebDatabaseManagerProxy : public API::ObjectImpl<API::Object::Type::DatabaseManager>, public WebContextSupplement, private IPC::MessageReceiver {
 public:
@@ -55,8 +55,8 @@ public:
 
     void initializeClient(const WKDatabaseManagerClientBase*);
 
-    void getDatabasesByOrigin(PassRefPtr<ArrayCallback>);
-    void getDatabaseOrigins(PassRefPtr<ArrayCallback>);
+    void getDatabasesByOrigin(std::function<void (API::Array*, CallbackBase::Error)>);
+    void getDatabaseOrigins(std::function<void (API::Array*, CallbackBase::Error)>);
     void deleteDatabaseWithNameForOrigin(const String& databaseIdentifier, WebSecurityOrigin*);
     void deleteDatabasesForOrigin(WebSecurityOrigin*);
     void deleteAllDatabases();

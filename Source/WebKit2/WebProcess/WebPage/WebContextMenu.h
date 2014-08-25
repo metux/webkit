@@ -28,8 +28,13 @@
 #include <wtf/PassRefPtr.h>
 #include <wtf/RefCounted.h>
 
+namespace WebCore {
+class Image;
+}
+
 namespace WebKit {
 
+class ShareableBitmap;
 class WebPage;
 
 class WebContextMenu : public RefCounted<WebContextMenu> {

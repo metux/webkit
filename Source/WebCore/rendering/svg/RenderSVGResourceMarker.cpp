@@ -20,8 +20,6 @@
  */
 
 #include "config.h"
-
-#if ENABLE(SVG)
 #include "RenderSVGResourceMarker.h"
 
 #include "GraphicsContext.h"
@@ -33,7 +31,7 @@ namespace WebCore {
 RenderSVGResourceType RenderSVGResourceMarker::s_resourceType = MarkerResourceType;
 
 RenderSVGResourceMarker::RenderSVGResourceMarker(SVGMarkerElement& element, PassRef<RenderStyle> style)
-    : RenderSVGResourceContainer(element, std::move(style))
+    : RenderSVGResourceContainer(element, WTF::move(style))
 {
 }
 
@@ -59,7 +57,7 @@ void RenderSVGResourceMarker::removeAllClientsFromCache(bool markForInvalidation
     markAllClientsForInvalidation(markForInvalidation ? LayoutAndBoundariesInvalidation : ParentOnlyInvalidation);
 }
 
-void RenderSVGResourceMarker::removeClientFromCache(RenderObject& client, bool markForInvalidation)
+void RenderSVGResourceMarker::removeClientFromCache(RenderElement& client, bool markForInvalidation)
 {
     markClientForInvalidation(client, markForInvalidation ? BoundariesInvalidation : ParentOnlyInvalidation);
 }
@@ -157,5 +155,3 @@ void RenderSVGResourceMarker::calcViewport()
 }
 
 }
-
-#endif // ENABLE(SVG)

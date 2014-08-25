@@ -44,25 +44,22 @@ void RenderCombineText::styleDidChange(StyleDifference diff, const RenderStyle* 
     RenderText::styleDidChange(diff, oldStyle);
 
     if (m_isCombined) {
-        RenderText::setTextInternal(originalText()); // This RenderCombineText has been combined once. Restore the original text for the next combineText().
+        RenderText::setRenderedText(originalText()); // This RenderCombineText has been combined once. Restore the original text for the next combineText().
         m_isCombined = false;
     }
 
     m_needsFontUpdate = true;
 }
 
-void RenderCombineText::setTextInternal(const String& text)
+void RenderCombineText::setRenderedText(const String& text)
 {
-    RenderText::setTextInternal(text);
+    RenderText::setRenderedText(text);
 
     m_needsFontUpdate = true;
 }
 
 float RenderCombineText::width(unsigned from, unsigned length, const Font& font, float xPosition, HashSet<const SimpleFontData*>* fallbackFonts, GlyphOverflow* glyphOverflow) const
 {
-    if (!deprecatedCharacters())
-        return 0;
-
     if (m_isCombined)
         return font.size();
 
@@ -139,8 +136,8 @@ void RenderCombineText::combineText()
         m_combineFontStyle->font().update(fontSelector);
 
     if (m_isCombined) {
-        DEFINE_STATIC_LOCAL(String, objectReplacementCharacterString, (&objectReplacementCharacter, 1));
-        RenderText::setTextInternal(objectReplacementCharacterString.impl());
+        DEPRECATED_DEFINE_STATIC_LOCAL(String, objectReplacementCharacterString, (&objectReplacementCharacter, 1));
+        RenderText::setRenderedText(objectReplacementCharacterString.impl());
     }
 }
 

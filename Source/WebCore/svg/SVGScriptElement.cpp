@@ -19,8 +19,6 @@
  */
 
 #include "config.h"
-
-#if ENABLE(SVG)
 #include "SVGScriptElement.h"
 
 #include "Attribute.h"
@@ -31,6 +29,7 @@
 #include "SVGAnimatedStaticPropertyTearOff.h"
 #include "SVGElementInstance.h"
 #include "XLinkNames.h"
+#include <wtf/NeverDestroyed.h>
 
 namespace WebCore {
 
@@ -45,7 +44,7 @@ END_REGISTER_ANIMATED_PROPERTIES
 
 inline SVGScriptElement::SVGScriptElement(const QualifiedName& tagName, Document& document, bool wasInsertedByParser, bool alreadyStarted)
     : SVGElement(tagName, document)
-    , ScriptElement(this, wasInsertedByParser, alreadyStarted)
+    , ScriptElement(*this, wasInsertedByParser, alreadyStarted)
     , m_svgLoadEventTimer(this, &SVGElement::svgLoadEventTimerFired)
 {
     ASSERT(hasTagName(SVGNames::scriptTag));
@@ -59,14 +58,14 @@ PassRefPtr<SVGScriptElement> SVGScriptElement::create(const QualifiedName& tagNa
 
 bool SVGScriptElement::isSupportedAttribute(const QualifiedName& attrName)
 {
-    DEFINE_STATIC_LOCAL(HashSet<QualifiedName>, supportedAttributes, ());
-    if (supportedAttributes.isEmpty()) {
+    static NeverDestroyed<HashSet<QualifiedName>> supportedAttributes;
+    if (supportedAttributes.get().isEmpty()) {
         SVGURIReference::addSupportedAttributes(supportedAttributes);
         SVGExternalResourcesRequired::addSupportedAttributes(supportedAttributes);
-        supportedAttributes.add(SVGNames::typeAttr);
-        supportedAttributes.add(HTMLNames::onerrorAttr);
+        supportedAttributes.get().add(SVGNames::typeAttr);
+        supportedAttributes.get().add(HTMLNames::onerrorAttr);
     }
-    return supportedAttributes.contains<SVGAttributeHashTranslator>(attrName);
+    return supportedAttributes.get().contains<SVGAttributeHashTranslator>(attrName);
 }
 
 void SVGScriptElement::parseAttribute(const QualifiedName& name, const AtomicString& value)
@@ -199,15 +198,10 @@ PassRefPtr<Element> SVGScriptElement::cloneElementWithoutAttributesAndChildren()
 }
 
 #ifndef NDEBUG
-bool SVGScriptElement::isAnimatableAttribute(const QualifiedName& name) const
+bool SVGScriptElement::filterOutAnimatableAttribute(const QualifiedName& name) const
 {
-    if (name == SVGNames::typeAttr)
-        return false;
-
-    return SVGElement::isAnimatableAttribute(name);
+    return name == SVGNames::typeAttr;
 }
 #endif
 
 }
-
-#endif // ENABLE(SVG)

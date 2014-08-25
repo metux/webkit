@@ -11,7 +11,7 @@
  * 2.  Redistributions in binary form must reproduce the above copyright
  *     notice, this list of conditions and the following disclaimer in the
  *     documentation and/or other materials provided with the distribution. 
- * 3.  Neither the name of Apple Computer, Inc. ("Apple") nor the names of
+ * 3.  Neither the name of Apple Inc. ("Apple") nor the names of
  *     its contributors may be used to endorse or promote products derived
  *     from this software without specific prior written permission. 
  *
@@ -62,6 +62,7 @@ ResourceLoader::ResourceLoader(Frame* frame, ResourceLoaderOptions options)
     , m_cancellationStatus(NotCancelled)
     , m_defersLoading(frame->page()->defersLoading())
     , m_options(options)
+    , m_isQuickLookResource(false)
 {
 }
 
@@ -121,7 +122,7 @@ bool ResourceLoader::init(const ResourceRequest& r)
 #endif
     
     m_defersLoading = m_frame->page()->defersLoading();
-    if (m_options.securityCheck == DoSecurityCheck && !m_frame->document()->securityOrigin()->canDisplay(clientRequest.url())) {
+    if (m_options.securityCheck() == DoSecurityCheck && !m_frame->document()->securityOrigin()->canDisplay(clientRequest.url())) {
         FrameLoader::reportLocalLoadFailed(m_frame.get(), clientRequest.url().string());
         releaseResources();
         return false;
@@ -174,7 +175,7 @@ void ResourceLoader::start()
     }
 
     if (!m_reachedTerminalState)
-        m_handle = ResourceHandle::create(m_frame->loader().networkingContext(), m_request, this, m_defersLoading, m_options.sniffContent == SniffContent);
+        m_handle = ResourceHandle::create(m_frame->loader().networkingContext(), m_request, this, m_defersLoading, m_options.sniffContent() == SniffContent);
 }
 
 void ResourceLoader::setDefersLoading(bool defers)
@@ -187,6 +188,8 @@ void ResourceLoader::setDefersLoading(bool defers)
         m_deferredRequest = ResourceRequest();
         start();
     }
+
+    platformStrategies()->loaderStrategy()->resourceLoadScheduler()->setDefersLoading(this, defers);
 }
 
 FrameLoader* ResourceLoader::frameLoader() const
@@ -198,17 +201,24 @@ FrameLoader* ResourceLoader::frameLoader() const
 
 void ResourceLoader::setDataBufferingPolicy(DataBufferingPolicy dataBufferingPolicy)
 { 
-    m_options.dataBufferingPolicy = dataBufferingPolicy; 
+    m_options.setDataBufferingPolicy(dataBufferingPolicy); 
 
     // Reset any already buffered data
     if (dataBufferingPolicy == DoNotBufferData)
         m_resourceData = 0;
 }
     
+void ResourceLoader::willSwitchToSubstituteResource()
+{
+    ASSERT(!m_documentLoader->isSubstituteLoadPending(this));
+    platformStrategies()->loaderStrategy()->resourceLoadScheduler()->remove(this);
+    if (m_handle)
+        m_handle->cancel();
+}
 
 void ResourceLoader::addDataOrBuffer(const char* data, unsigned length, SharedBuffer* buffer, DataPayloadType dataPayloadType)
 {
-    if (m_options.dataBufferingPolicy == DoNotBufferData)
+    if (m_options.dataBufferingPolicy() == DoNotBufferData)
         return;
 
     if (dataPayloadType == DataPayloadWholeResource) {
@@ -266,7 +276,7 @@ void ResourceLoader::willSendRequest(ResourceRequest& request, const ResourceRes
         createdResourceIdentifier = true;
     }
 
-    if (m_options.sendLoadCallbacks == SendCallbacks) {
+    if (m_options.sendLoadCallbacks() == SendCallbacks) {
         if (createdResourceIdentifier)
             frameLoader()->notifier().assignIdentifierToInitialRequest(m_identifier, documentLoader(), request);
 
@@ -303,7 +313,7 @@ void ResourceLoader::didReceiveResponse(const ResourceResponse& r)
     if (FormData* data = m_request.httpBody())
         data->removeGeneratedFilesIfNeeded();
         
-    if (m_options.sendLoadCallbacks == SendCallbacks)
+    if (m_options.sendLoadCallbacks() == SendCallbacks)
         frameLoader()->notifier().didReceiveResponse(this, m_response);
 }
 
@@ -338,17 +348,8 @@ void ResourceLoader::didReceiveDataOrBuffer(const char* data, unsigned length, P
     // FIXME: If we get a resource with more than 2B bytes, this code won't do the right thing.
     // However, with today's computers and networking speeds, this won't happen in practice.
     // Could be an issue with a giant local file.
-    if (m_options.sendLoadCallbacks == SendCallbacks && m_frame)
+    if (m_options.sendLoadCallbacks() == SendCallbacks && m_frame)
         frameLoader()->notifier().didReceiveData(this, buffer ? buffer->data() : data, buffer ? buffer->size() : length, static_cast<int>(encodedDataLength));
-}
-
-void ResourceLoader::willStopBufferingData(const char* data, unsigned length)
-{
-    if (m_options.dataBufferingPolicy == DoNotBufferData)
-        return;
-
-    ASSERT(!m_resourceData);
-    m_resourceData = ResourceBuffer::create(data, length);
 }
 
 void ResourceLoader::didFinishLoading(double finishTime)
@@ -373,7 +374,7 @@ void ResourceLoader::didFinishLoadingOnePart(double finishTime)
     if (m_notifiedLoadComplete)
         return;
     m_notifiedLoadComplete = true;
-    if (m_options.sendLoadCallbacks == SendCallbacks)
+    if (m_options.sendLoadCallbacks() == SendCallbacks)
         frameLoader()->notifier().didFinishLoad(this, finishTime);
 }
 
@@ -399,14 +400,14 @@ void ResourceLoader::cleanupForError(const ResourceError& error)
     if (m_notifiedLoadComplete)
         return;
     m_notifiedLoadComplete = true;
-    if (m_options.sendLoadCallbacks == SendCallbacks && m_identifier)
+    if (m_options.sendLoadCallbacks() == SendCallbacks && m_identifier)
         frameLoader()->notifier().didFailToLoad(this, error);
 }
 
 void ResourceLoader::didChangePriority(ResourceLoadPriority loadPriority)
 {
-    if (handle())
-        handle()->didChangePriority(loadPriority);
+    if (m_handle)
+        m_handle->didChangePriority(loadPriority);
 }
 
 void ResourceLoader::cancel()
@@ -536,7 +537,7 @@ void ResourceLoader::cannotShowURL(ResourceHandle*)
 
 bool ResourceLoader::shouldUseCredentialStorage()
 {
-    if (m_options.allowCredentials == DoNotAllowStoredCredentials)
+    if (m_options.allowCredentials() == DoNotAllowStoredCredentials)
         return false;
     
     Ref<ResourceLoader> protect(*this);
@@ -545,23 +546,23 @@ bool ResourceLoader::shouldUseCredentialStorage()
 
 void ResourceLoader::didReceiveAuthenticationChallenge(const AuthenticationChallenge& challenge)
 {
-    ASSERT(handle()->hasAuthenticationChallenge());
+    ASSERT(m_handle->hasAuthenticationChallenge());
 
     // Protect this in this delegate method since the additional processing can do
     // anything including possibly derefing this; one example of this is Radar 3266216.
     Ref<ResourceLoader> protect(*this);
 
-    if (m_options.allowCredentials == AllowStoredCredentials) {
-        if (m_options.clientCredentialPolicy == AskClientForAllCredentials || (m_options.clientCredentialPolicy == DoNotAskClientForCrossOriginCredentials && m_frame->document()->securityOrigin()->canRequest(originalRequest().url()))) {
+    if (m_options.allowCredentials() == AllowStoredCredentials) {
+        if (m_options.clientCredentialPolicy() == AskClientForAllCredentials || (m_options.clientCredentialPolicy() == DoNotAskClientForCrossOriginCredentials && m_frame->document()->securityOrigin()->canRequest(originalRequest().url()))) {
             frameLoader()->notifier().didReceiveAuthenticationChallenge(this, challenge);
             return;
         }
     }
     // Only these platforms provide a way to continue without credentials.
     // If we can't continue with credentials, we need to cancel the load altogether.
-#if PLATFORM(MAC) || USE(CFNETWORK) || USE(CURL) || PLATFORM(GTK) || PLATFORM(EFL)
+#if PLATFORM(COCOA) || USE(CFNETWORK) || USE(CURL) || PLATFORM(GTK) || PLATFORM(EFL)
     challenge.authenticationClient()->receivedRequestToContinueWithoutCredential(challenge);
-    ASSERT(!handle() || !handle()->hasAuthenticationChallenge());
+    ASSERT(!m_handle || !m_handle->hasAuthenticationChallenge());
 #else
     didFail(blockedError());
 #endif
@@ -576,23 +577,51 @@ void ResourceLoader::didCancelAuthenticationChallenge(const AuthenticationChalle
 }
 
 #if USE(PROTECTION_SPACE_AUTH_CALLBACK)
+
 bool ResourceLoader::canAuthenticateAgainstProtectionSpace(const ProtectionSpace& protectionSpace)
 {
     Ref<ResourceLoader> protect(*this);
     return frameLoader()->client().canAuthenticateAgainstProtectionSpace(documentLoader(), identifier(), protectionSpace);
 }
+
 #endif
     
 #if PLATFORM(IOS)
+
 RetainPtr<CFDictionaryRef> ResourceLoader::connectionProperties(ResourceHandle*)
 {
     return frameLoader()->connectionProperties(this);
 }
+
 #endif
 
 void ResourceLoader::receivedCancellation(const AuthenticationChallenge&)
 {
     cancel();
 }
+
+#if PLATFORM(MAC)
+
+void ResourceLoader::schedule(SchedulePair& pair)
+{
+    if (m_handle)
+        m_handle->schedule(pair);
+}
+
+void ResourceLoader::unschedule(SchedulePair& pair)
+{
+    if (m_handle)
+        m_handle->unschedule(pair);
+}
+
+#endif
+
+#if USE(QUICK_LOOK)
+void ResourceLoader::didCreateQuickLookHandle(QuickLookHandle& handle)
+{
+    m_isQuickLookResource = true;
+    frameLoader()->client().didCreateQuickLookHandle(handle);
+}
+#endif
 
 }

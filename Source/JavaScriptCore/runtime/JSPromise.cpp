@@ -41,7 +41,7 @@ namespace JSC {
 
 static void triggerPromiseReactions(VM&, JSGlobalObject*, Vector<WriteBarrier<JSPromiseReaction>>&, JSValue);
 
-const ClassInfo JSPromise::s_info = { "Promise", &Base::s_info, 0, 0, CREATE_METHOD_TABLE(JSPromise) };
+const ClassInfo JSPromise::s_info = { "Promise", &Base::s_info, 0, CREATE_METHOD_TABLE(JSPromise) };
 
 JSPromise* JSPromise::create(VM& vm, JSGlobalObject* globalObject, JSPromiseConstructor* constructor)
 {
@@ -78,8 +78,6 @@ void JSPromise::visitChildren(JSCell* cell, SlotVisitor& visitor)
 {
     JSPromise* thisObject = jsCast<JSPromise*>(cell);
     ASSERT_GC_OBJECT_INHERITS(thisObject, info());
-    COMPILE_ASSERT(StructureFlags & OverridesVisitChildren, OverridesVisitChildrenWithoutSettingFlag);
-    ASSERT(thisObject->structure()->typeInfo().overridesVisitChildren());
 
     Base::visitChildren(thisObject, visitor);
 

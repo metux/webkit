@@ -31,6 +31,7 @@
 #include "ContextDestructionObserver.h"
 #include "ExceptionCodePlaceholder.h"
 #include "NodeList.h"
+#include "PageConsole.h"
 #include <bindings/ScriptValue.h>
 #include <runtime/ArrayBuffer.h>
 #include <runtime/Float32Array.h>
@@ -50,14 +51,14 @@ class Element;
 class Frame;
 class InspectorFrontendChannelDummy;
 class InternalSettings;
+class MallocStatistics;
 class MemoryInfo;
 class Node;
 class Page;
 class Range;
 class ScriptExecutionContext;
-class ShadowRoot;
-class MallocStatistics;
 class SerializedScriptValue;
+class SourceBuffer;
 class TimeRanges;
 class TypeConversions;
 
@@ -74,20 +75,16 @@ public:
     String elementRenderTreeAsText(Element*, ExceptionCode&);
 
     String address(Node*);
+    String description(Deprecated::ScriptValue);
 
     bool isPreloaded(const String& url);
     bool isLoadingFromMemoryCache(const String& url);
 
     PassRefPtr<CSSComputedStyleDeclaration> computedStyleIncludingVisitedInfo(Node*, ExceptionCode&) const;
 
-#if ENABLE(SHADOW_DOM)
-    typedef ShadowRoot ShadowRootIfShadowDOMEnabledOrNode;
-#else
-    typedef Node ShadowRootIfShadowDOMEnabledOrNode;
-#endif
-    ShadowRootIfShadowDOMEnabledOrNode* ensureShadowRoot(Element* host, ExceptionCode&);
-    ShadowRootIfShadowDOMEnabledOrNode* createShadowRoot(Element* host, ExceptionCode&);
-    ShadowRootIfShadowDOMEnabledOrNode* shadowRoot(Element* host, ExceptionCode&);
+    Node* ensureShadowRoot(Element* host, ExceptionCode&);
+    Node* createShadowRoot(Element* host, ExceptionCode&);
+    Node* shadowRoot(Element* host, ExceptionCode&);
     String shadowRootType(const Node*, ExceptionCode&) const;
     Element* includerFor(Node*, ExceptionCode&);
     String shadowPseudoId(Element*, ExceptionCode&);
@@ -135,6 +132,9 @@ public:
     PassRefPtr<Range> markerRangeForNode(Node*, const String& markerType, unsigned index, ExceptionCode&);
     String markerDescriptionForNode(Node*, const String& markerType, unsigned index, ExceptionCode&);
     void addTextMatchMarker(const Range*, bool isActive);
+    void setMarkedTextMatchesAreHighlighted(bool, ExceptionCode&);
+
+    void invalidateFontCache();
 
     void setScrollViewPosition(long x, long y, ExceptionCode&);
     void setPagination(const String& mode, int gap, ExceptionCode& ec) { setPagination(mode, gap, 0, ec); }
@@ -170,10 +170,10 @@ public:
     PassRefPtr<NodeList> nodesFromRect(Document*, int x, int y, unsigned topPadding, unsigned rightPadding,
         unsigned bottomPadding, unsigned leftPadding, bool ignoreClipping, bool allowShadowContent, bool allowChildFrameContent, ExceptionCode&) const;
 
-    void emitInspectorDidBeginFrame();
-    void emitInspectorDidCancelFrame();
-
     String parserMetaData(Deprecated::ScriptValue = Deprecated::ScriptValue());
+
+    Node* findEditingDeleteButton();
+    void updateEditorUINowIfScheduled();
 
     bool hasSpellingMarker(int from, int length, ExceptionCode&);
     bool hasGrammarMarker(int from, int length, ExceptionCode&);
@@ -188,6 +188,8 @@ public:
     bool isOverwriteModeEnabled(ExceptionCode&);
     void toggleOverwriteModeEnabled(ExceptionCode&);
 
+    unsigned countMatchesForText(const String&, unsigned findOptions, const String& markMatches, ExceptionCode&);
+
     unsigned numberOfScrollableAreas(ExceptionCode&);
 
     bool isPageBoxVisible(int pageNumber, ExceptionCode&);
@@ -198,8 +200,6 @@ public:
     unsigned workerThreadCount() const;
 
     void setBatteryStatus(const String& eventType, bool charging, double chargingTime, double dischargingTime, double level, ExceptionCode&);
-
-    void setNetworkInformation(const String& eventType, double bandwidth, bool metered, ExceptionCode&);
 
     void setDeviceProximity(const String& eventType, double value, double min, double max, ExceptionCode&);
 
@@ -225,14 +225,17 @@ public:
     void insertAuthorCSS(const String&, ExceptionCode&) const;
     void insertUserCSS(const String&, ExceptionCode&) const;
 
-#if ENABLE(INSPECTOR)
+    const ProfilesArray& consoleProfiles() const;
+
     unsigned numberOfLiveNodes() const;
     unsigned numberOfLiveDocuments() const;
+
+#if ENABLE(INSPECTOR)
     Vector<String> consoleMessageArgumentCounts() const;
     PassRefPtr<DOMWindow> openDummyInspectorFrontend(const String& url);
     void closeDummyInspectorFrontend();
-    void setInspectorResourcesDataSizeLimits(int maximumResourcesContentSize, int maximumSingleResourceContentSize, ExceptionCode&);
     void setJavaScriptProfilingEnabled(bool enabled, ExceptionCode&);
+    void setInspectorIsUnderTest(bool isUnderTest, ExceptionCode&);
 #endif
 
     String counterValue(Element*);
@@ -246,9 +249,12 @@ public:
     String pageSizeAndMarginsInPixels(int, int, int, int, int, int, int, ExceptionCode& = ASSERT_NO_EXCEPTION) const;
 
     void setPageScaleFactor(float scaleFactor, int x, int y, ExceptionCode&);
+    void setPageZoomFactor(float zoomFactor, ExceptionCode&);
 
     void setHeaderHeight(float);
     void setFooterHeight(float);
+
+    void setTopContentInset(float);
 
 #if ENABLE(FULLSCREEN_API)
     void webkitWillEnterFullScreenForElement(Element*);
@@ -270,6 +276,8 @@ public:
 
     void startTrackingRepaints(ExceptionCode&);
     void stopTrackingRepaints(ExceptionCode&);
+    void updateLayoutIgnorePendingStylesheetsAndRunPostLayoutTasks(ExceptionCode&);
+    void updateLayoutIgnorePendingStylesheetsAndRunPostLayoutTasks(Node*, ExceptionCode&);
 
     PassRefPtr<ArrayBuffer> serializeObject(PassRefPtr<SerializedScriptValue>) const;
     PassRefPtr<SerializedScriptValue> deserializeBuffer(PassRefPtr<ArrayBuffer>) const;
@@ -319,14 +327,24 @@ public:
 #endif
 
     bool isPluginUnavailabilityIndicatorObscured(Element*, ExceptionCode&);
+    bool isPluginSnapshotted(Element*, ExceptionCode&);
 
 #if ENABLE(MEDIA_SOURCE)
     void initializeMockMediaSource();
+    Vector<String> bufferedSamplesForTrackID(SourceBuffer*, const AtomicString&);
 #endif
 
+#if ENABLE(VIDEO)
     void beginMediaSessionInterruption();
     void endMediaSessionInterruption(const String&);
-    void setMediaSessionRestrictions(const String& mediaType, const String& restrictions, ExceptionCode& ec);
+    void applicationWillEnterForeground() const;
+    void applicationWillEnterBackground() const;
+    void setMediaSessionRestrictions(const String& mediaType, const String& restrictions, ExceptionCode&);
+    void postRemoteControlCommand(const String&, ExceptionCode&);
+#endif
+
+    void simulateSystemSleep() const;
+    void simulateSystemWake() const;
 
 private:
     explicit Internals(Document*);

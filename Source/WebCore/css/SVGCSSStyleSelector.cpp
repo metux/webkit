@@ -1,12 +1,12 @@
 /*
-    Copyright (C) 2005 Apple Computer, Inc.
+    Copyright (C) 2005 Apple Inc.
     Copyright (C) 2004, 2005, 2007 Nikolas Zimmermann <zimmermann@kde.org>
                   2004, 2005, 2008 Rob Buis <buis@kde.org>
     Copyright (C) 2007 Alexey Proskuryakov <ap@webkit.org>
 
     Based on khtml css code by:
     Copyright(C) 1999-2003 Lars Knoll(knoll@kde.org)
-             (C) 2003 Apple Computer, Inc.
+             (C) 2003 Apple Inc.
              (C) 2004 Allan Sandfeld Jensen(kde@carewolf.com)
              (C) 2004 Germain Garand(germain@ebooksfrance.org)
 
@@ -27,8 +27,6 @@
 */
 
 #include "config.h"
-
-#if ENABLE(SVG)
 #include "StyleResolver.h"
 
 #include "CSSPrimitiveValueMappings.h"
@@ -112,8 +110,8 @@ void StyleResolver::applySVGProperty(CSSPropertyID id, CSSValue* value)
     const State& state = m_state;
     SVGRenderStyle& svgStyle = state.style()->accessSVGStyle();
 
-    bool isInherit = state.parentNode() && value->isInheritedValue();
-    bool isInitial = value->isInitialValue() || (!state.parentNode() && value->isInheritedValue());
+    bool isInherit = state.parentStyle() && value->isInheritedValue();
+    bool isInitial = value->isInitialValue() || (!state.parentStyle() && value->isInheritedValue());
 
     // What follows is a list that maps the CSS properties into their
     // corresponding front-end RenderStyle values. Shorthands(e.g. border,
@@ -203,6 +201,36 @@ void StyleResolver::applySVGProperty(CSSPropertyID id, CSSValue* value)
             HANDLE_INHERIT_AND_INITIAL(clipRule, ClipRule)
             if (primitiveValue)
                 svgStyle.setClipRule(*primitiveValue);
+            break;
+        }
+        case CSSPropertyPaintOrder: {
+            HANDLE_INHERIT_AND_INITIAL(paintOrder, PaintOrder)
+            // 'normal' is the only primitiveValue
+            if (primitiveValue)
+                svgStyle.setPaintOrder(PaintOrderNormal);
+            if (!value->isValueList())
+                break;
+            CSSValueList* orderTypeList = toCSSValueList(value);
+
+            // Serialization happened during parsing. No additional checking needed.
+            unsigned length = orderTypeList->length();
+            primitiveValue = toCSSPrimitiveValue(orderTypeList->itemWithoutBoundsCheck(0));
+            PaintOrder paintOrder;
+            switch (primitiveValue->getValueID()) {
+            case CSSValueFill:
+                paintOrder = length > 1 ? PaintOrderFillMarkers : PaintOrderFill;
+                break;
+            case CSSValueStroke:
+                paintOrder = length > 1 ? PaintOrderStrokeMarkers : PaintOrderStroke;
+                break;
+            case CSSValueMarkers:
+                paintOrder = length > 1 ? PaintOrderMarkersStroke : PaintOrderMarkers;
+                break;
+            default:
+                ASSERT_NOT_REACHED();
+                paintOrder = PaintOrderNormal;
+            }
+            svgStyle.setPaintOrder(static_cast<PaintOrder>(paintOrder));
             break;
         }
         case CSSPropertyFillRule:
@@ -550,7 +578,7 @@ void StyleResolver::applySVGProperty(CSSPropertyID id, CSSValue* value)
             break;
         case CSSPropertyWebkitSvgShadow: {
             if (isInherit)
-                return svgStyle.setShadow(adoptPtr(state.parentStyle()->svgStyle().shadow() ? new ShadowData(*state.parentStyle()->svgStyle().shadow()) : 0));
+                return svgStyle.setShadow(state.parentStyle()->svgStyle().shadow() ? std::make_unique<ShadowData>(*state.parentStyle()->svgStyle().shadow()) : nullptr);
             if (isInitial || primitiveValue) // initial | none
                 return svgStyle.setShadow(nullptr);
 
@@ -565,9 +593,9 @@ void StyleResolver::applySVGProperty(CSSPropertyID id, CSSValue* value)
             if (!firstValue->isShadowValue())
                 return;
             CSSShadowValue* item = toCSSShadowValue(firstValue);
-            IntPoint location(item->x->computeLength<int>(state.style(), state.rootElementStyle()),
-                item->y->computeLength<int>(state.style(), state.rootElementStyle()));
-            int blur = item->blur ? item->blur->computeLength<int>(state.style(), state.rootElementStyle()) : 0;
+            IntPoint location(item->x->computeLength<int>(state.cssToLengthConversionData().copyWithAdjustedZoom(1.0f)),
+                item->y->computeLength<int>(state.cssToLengthConversionData().copyWithAdjustedZoom(1.0f)));
+            int blur = item->blur ? item->blur->computeLength<int>(state.cssToLengthConversionData().copyWithAdjustedZoom(1.0f)) : 0;
             Color color;
             if (item->color)
                 color = colorFromPrimitiveValue(item->color.get());
@@ -576,8 +604,8 @@ void StyleResolver::applySVGProperty(CSSPropertyID id, CSSValue* value)
             ASSERT(!item->spread);
             ASSERT(!item->style);
 
-            OwnPtr<ShadowData> shadowData = adoptPtr(new ShadowData(location, blur, 0, Normal, false, color.isValid() ? color : Color::transparent));
-            svgStyle.setShadow(shadowData.release());
+            auto shadowData = std::make_unique<ShadowData>(location, blur, 0, Normal, false, color.isValid() ? color : Color::transparent);
+            svgStyle.setShadow(WTF::move(shadowData));
             return;
         }
         case CSSPropertyVectorEffect: {
@@ -613,5 +641,3 @@ void StyleResolver::applySVGProperty(CSSPropertyID id, CSSValue* value)
 }
 
 }
-
-#endif

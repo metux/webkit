@@ -10,7 +10,7 @@
  * 2.  Redistributions in binary form must reproduce the above copyright
  *     notice, this list of conditions and the following disclaimer in the
  *     documentation and/or other materials provided with the distribution.
- * 3.  Neither the name of Apple Computer, Inc. ("Apple") nor the names of
+ * 3.  Neither the name of Apple Inc. ("Apple") nor the names of
  *     its contributors may be used to endorse or promote products derived
  *     from this software without specific prior written permission.
  *
@@ -36,6 +36,7 @@
 #include "SecurityPolicy.h"
 #include "ThreadableBlobRegistry.h"
 #include <wtf/MainThread.h>
+#include <wtf/NeverDestroyed.h>
 #include <wtf/StdLibExtras.h>
 #include <wtf/text/StringBuilder.h>
 
@@ -54,11 +55,9 @@ static bool schemeRequiresHost(const URL& url)
 
 bool SecurityOrigin::shouldUseInnerURL(const URL& url)
 {
-#if ENABLE(BLOB)
     // FIXME: Blob URLs don't have inner URLs. Their form is "blob:<inner-origin>/<UUID>", so treating the part after "blob:" as a URL is incorrect.
     if (url.protocolIs("blob"))
         return true;
-#endif
     UNUSED_PARAM(url);
     return false;
 }
@@ -77,12 +76,8 @@ URL SecurityOrigin::extractInnerURL(const URL& url)
 
 static PassRefPtr<SecurityOrigin> getCachedOrigin(const URL& url)
 {
-#if ENABLE(BLOB)
     if (url.protocolIs("blob"))
         return ThreadableBlobRegistry::getCachedOrigin(url);
-#else
-    UNUSED_PARAM(url);
-#endif
     return 0;
 }
 
@@ -444,10 +439,13 @@ String SecurityOrigin::cachePartition() const
     if (m_storageBlockingPolicy != BlockThirdPartyStorage)
         return String();
 
-    if (m_protocol != "http" && m_protocol != "https")
-        return String();
+    if (isHTTPFamily())
+        return host();
 
-    return host();
+    if (SchemeRegistry::shouldPartitionCacheForURLScheme(m_protocol))
+        return host();
+
+    return String();
 }
 #endif
 
@@ -497,39 +495,47 @@ PassRefPtr<SecurityOrigin> SecurityOrigin::createFromString(const String& origin
 
 static const char separatorCharacter = '_';
 
-PassRefPtr<SecurityOrigin> SecurityOrigin::createFromDatabaseIdentifier(const String& databaseIdentifier)
+PassRefPtr<SecurityOrigin> SecurityOrigin::maybeCreateFromDatabaseIdentifier(const String& databaseIdentifier)
 { 
     // Make sure there's a first separator
     size_t separator1 = databaseIdentifier.find(separatorCharacter);
     if (separator1 == notFound)
-        return create(URL());
+        return nullptr;
         
     // Make sure there's a second separator
     size_t separator2 = databaseIdentifier.reverseFind(separatorCharacter);
     if (separator2 == notFound)
-        return create(URL());
-        
+        return nullptr;
+
     // Ensure there were at least 2 separator characters. Some hostnames on intranets have
     // underscores in them, so we'll assume that any additional underscores are part of the host.
     if (separator1 == separator2)
-        return create(URL());
-        
+        return nullptr;
+
     // Make sure the port section is a valid port number or doesn't exist
     bool portOkay;
     int port = databaseIdentifier.right(databaseIdentifier.length() - separator2 - 1).toInt(&portOkay);
     bool portAbsent = (separator2 == databaseIdentifier.length() - 1);
     if (!(portOkay || portAbsent))
-        return create(URL());
-    
+        return nullptr;
+
     if (port < 0 || port > MaxAllowedPort)
-        return create(URL());
-        
+        return nullptr;
+
     // Split out the 3 sections of data
     String protocol = databaseIdentifier.substring(0, separator1);
     String host = databaseIdentifier.substring(separator1 + 1, separator2 - separator1 - 1);
     
     host = decodeURLEscapeSequences(host);
     return create(URL(URL(), protocol + "://" + host + ":" + String::number(port) + "/"));
+}
+
+PassRefPtr<SecurityOrigin> SecurityOrigin::createFromDatabaseIdentifier(const String& databaseIdentifier)
+{
+    RefPtr<SecurityOrigin> origin = maybeCreateFromDatabaseIdentifier(databaseIdentifier);
+    if (origin)
+        return origin.release();
+    return create(URL());
 }
 
 PassRefPtr<SecurityOrigin> SecurityOrigin::create(const String& protocol, const String& host, int port)
@@ -594,10 +600,10 @@ bool SecurityOrigin::isSameSchemeHostPort(const SecurityOrigin* other) const
     return true;
 }
 
-String SecurityOrigin::urlWithUniqueSecurityOrigin()
+URL SecurityOrigin::urlWithUniqueSecurityOrigin()
 {
     ASSERT(isMainThread());
-    DEFINE_STATIC_LOCAL(const String, uniqueSecurityOriginURL, (ASCIILiteral("data:,")));
+    static NeverDestroyed<URL> uniqueSecurityOriginURL(ParsedURLString, ASCIILiteral("data:,"));
     return uniqueSecurityOriginURL;
 }
 

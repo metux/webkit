@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2006 Apple Computer, Inc.
+ * Copyright (C) 2006 Apple Inc.
  * Copyright (C) 2007 Nikolas Zimmermann <zimmermann@kde.org>
  * Copyright (C) Research In Motion Limited 2010-2012. All rights reserved.
  *
@@ -22,7 +22,6 @@
 #ifndef RenderSVGText_h
 #define RenderSVGText_h
 
-#if ENABLE(SVG)
 #include "AffineTransform.h"
 #include "RenderSVGBlock.h"
 #include "SVGTextLayoutAttributesBuilder.h"
@@ -47,8 +46,8 @@ public:
     void setNeedsTextMetricsUpdate() { m_needsTextMetricsUpdate = true; }
     virtual FloatRect repaintRectInLocalCoordinates() const;
 
-    static RenderSVGText* locateRenderSVGTextAncestor(RenderObject*);
-    static const RenderSVGText* locateRenderSVGTextAncestor(const RenderObject*);
+    static RenderSVGText* locateRenderSVGTextAncestor(RenderObject&);
+    static const RenderSVGText* locateRenderSVGTextAncestor(const RenderObject&);
 
     bool needsReordering() const { return m_needsReordering; }
     Vector<SVGTextLayoutAttributes*>& layoutAttributes() { return m_layoutAttributes; }
@@ -59,6 +58,9 @@ public:
     void subtreeStyleDidChange(RenderSVGInlineText*);
     void subtreeTextDidChange(RenderSVGInlineText*);
 
+    virtual FloatRect objectBoundingBox() const override { return frameRect(); }
+    virtual FloatRect strokeBoundingBox() const override;
+
 private:
     void graphicsElement() const = delete;
 
@@ -68,7 +70,7 @@ private:
     virtual void paint(PaintInfo&, const LayoutPoint&);
     virtual bool nodeAtPoint(const HitTestRequest&, HitTestResult&, const HitTestLocation& locationInContainer, const LayoutPoint& accumulatedOffset, HitTestAction) override;
     virtual bool nodeAtFloatPoint(const HitTestRequest&, HitTestResult&, const FloatPoint& pointInParent, HitTestAction);
-    virtual VisiblePosition positionForPoint(const LayoutPoint&);
+    virtual VisiblePosition positionForPoint(const LayoutPoint&, const RenderRegion*);
 
     virtual bool requiresLayer() const { return false; }
     virtual void layout();
@@ -82,11 +84,8 @@ private:
     virtual void mapLocalToContainer(const RenderLayerModelObject* repaintContainer, TransformState&, MapCoordinatesFlags = ApplyContainerFlip, bool* wasFixed = 0) const override;
     virtual const RenderObject* pushMappingToContainer(const RenderLayerModelObject* ancestorToStopAt, RenderGeometryMap&) const override;
     virtual void addChild(RenderObject* child, RenderObject* beforeChild = 0);
-    virtual void removeChild(RenderObject&) override;
+    virtual RenderObject* removeChild(RenderObject&) override;
     virtual void willBeDestroyed() override;
-
-    virtual FloatRect objectBoundingBox() const { return frameRect(); }
-    virtual FloatRect strokeBoundingBox() const;
 
     virtual const AffineTransform& localToParentTransform() const { return m_localTransform; }
     virtual AffineTransform localTransform() const { return m_localTransform; }
@@ -110,5 +109,4 @@ RENDER_OBJECT_TYPE_CASTS(RenderSVGText, isSVGText())
 
 }
 
-#endif // ENABLE(SVG)
 #endif

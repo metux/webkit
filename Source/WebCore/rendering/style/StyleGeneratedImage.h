@@ -35,7 +35,7 @@ class StyleGeneratedImage final : public StyleImage {
 public:
     static PassRefPtr<StyleGeneratedImage> create(PassRef<CSSImageGeneratorValue> value)
     {
-        return adoptRef(new StyleGeneratedImage(std::move(value)));
+        return adoptRef(new StyleGeneratedImage(WTF::move(value)));
     }
 
     CSSImageGeneratorValue& imageValue() { return m_imageGeneratorValue.get(); }
@@ -45,29 +45,25 @@ private:
 
     virtual PassRefPtr<CSSValue> cssValue() const override;
 
-    virtual LayoutSize imageSize(const RenderElement*, float multiplier) const override;
+    virtual FloatSize imageSize(const RenderElement*, float multiplier) const override;
     virtual bool imageHasRelativeWidth() const override { return !m_fixedSize; }
     virtual bool imageHasRelativeHeight() const override { return !m_fixedSize; }
     virtual void computeIntrinsicDimensions(const RenderElement*, Length& intrinsicWidth, Length& intrinsicHeight, FloatSize& intrinsicRatio) override;
     virtual bool usesImageContainerSize() const override { return !m_fixedSize; }
-    virtual void setContainerSizeForRenderer(const RenderElement*, const IntSize& containerSize, float) override { m_containerSize = containerSize; }
+    virtual void setContainerSizeForRenderer(const RenderElement*, const FloatSize& containerSize, float) override { m_containerSize = containerSize; }
     virtual void addClient(RenderElement*) override;
     virtual void removeClient(RenderElement*) override;
-    virtual PassRefPtr<Image> image(RenderElement*, const IntSize&) const override;
+    virtual PassRefPtr<Image> image(RenderElement*, const FloatSize&) const override;
     virtual bool knownToBeOpaque(const RenderElement*) const override;
 
     StyleGeneratedImage(PassRef<CSSImageGeneratorValue>);
     
     Ref<CSSImageGeneratorValue> m_imageGeneratorValue;
-    IntSize m_containerSize;
+    FloatSize m_containerSize;
     bool m_fixedSize;
 };
 
-inline StyleGeneratedImage* toStyleGeneratedImage(StyleImage* image)
-{
-    ASSERT_WITH_SECURITY_IMPLICATION(!image || image->isGeneratedImage());
-    return static_cast<StyleGeneratedImage*>(image);
-}
+STYLE_IMAGE_TYPE_CASTS(StyleGeneratedImage, StyleImage, isGeneratedImage)
 
 }
 #endif

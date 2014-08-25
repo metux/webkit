@@ -62,10 +62,13 @@
     macro(__lookupGetter__) \
     macro(__lookupSetter__) \
     macro(add) \
+    macro(additionalJettisonReason) \
     macro(anonymous) \
-    macro(apply) \
     macro(arguments) \
+    macro(assign) \
+    macro(back) \
     macro(bind) \
+    macro(blur) \
     macro(buffer) \
     macro(byteLength) \
     macro(byteOffset) \
@@ -73,11 +76,12 @@
     macro(bytecodeIndex) \
     macro(bytecodes) \
     macro(bytecodesID) \
-    macro(call) \
     macro(callee) \
     macro(caller) \
     macro(cast) \
     macro(clear) \
+    macro(close) \
+    macro(closed) \
     macro(compilationKind) \
     macro(compilations) \
     macro(compile) \
@@ -96,14 +100,18 @@
     macro(exec) \
     macro(executionCount) \
     macro(exitKind) \
+    macro(focus) \
     macro(forEach) \
+    macro(forward) \
     macro(fromCharCode) \
     macro(get) \
     macro(global) \
+    macro(go) \
     macro(has) \
     macro(hasOwnProperty) \
     macro(hash) \
     macro(header) \
+    macro(href) \
     macro(id) \
     macro(ignoreCase) \
     macro(index) \
@@ -114,6 +122,7 @@
     macro(isPrototypeOf) \
     macro(isView) \
     macro(isWatchpoint) \
+    macro(jettisonReason) \
     macro(join) \
     macro(keys) \
     macro(lastIndex) \
@@ -132,10 +141,14 @@
     macro(osrExitSites) \
     macro(osrExits) \
     macro(parse) \
+    macro(postMessage) \
     macro(profiledBytecodes) \
     macro(propertyIsEnumerable) \
     macro(prototype) \
+    macro(reload) \
+    macro(replace) \
     macro(set) \
+    macro(showModalDialog) \
     macro(size) \
     macro(slice) \
     macro(source) \
@@ -152,8 +165,9 @@
     macro(toPrecision) \
     macro(toString) \
     macro(value) \
-    macro(values) \
     macro(valueOf) \
+    macro(values) \
+    macro(webkit) \
     macro(window) \
     macro(writable)
 
@@ -216,23 +230,34 @@
     macro(index) \
     macro(values) \
     macro(deferred) \
-    macro(countdownHolder)
+    macro(countdownHolder) \
+    macro(Object) \
+    macro(TypeError) \
+    macro(undefined) \
+    macro(BuiltinLog)
 
 namespace JSC {
-
+    
+    class BuiltinNames;
+    
     class CommonIdentifiers {
         WTF_MAKE_NONCOPYABLE(CommonIdentifiers); WTF_MAKE_FAST_ALLOCATED;
     private:
         CommonIdentifiers(VM*);
+        ~CommonIdentifiers();
         friend class VM;
-
+        
     public:
+        const BuiltinNames& builtinNames() const { return *m_builtinNames; }
         const Identifier nullIdentifier;
         const Identifier emptyIdentifier;
         const Identifier underscoreProto;
         const Identifier thisIdentifier;
         const Identifier useStrictIdentifier;
-        const Identifier hasNextIdentifier;
+    private:
+        std::unique_ptr<BuiltinNames> m_builtinNames;
+
+    public:
         
 #define JSC_IDENTIFIER_DECLARE_KEYWORD_NAME_GLOBAL(name) const Identifier name##Keyword;
         JSC_COMMON_IDENTIFIERS_EACH_KEYWORD(JSC_IDENTIFIER_DECLARE_KEYWORD_NAME_GLOBAL)
@@ -245,6 +270,9 @@ namespace JSC {
 #define JSC_IDENTIFIER_DECLARE_PRIVATE_PROPERTY_NAME_GLOBAL(name) const Identifier name##PrivateName;
         JSC_COMMON_PRIVATE_IDENTIFIERS_EACH_PROPERTY_NAME(JSC_IDENTIFIER_DECLARE_PRIVATE_PROPERTY_NAME_GLOBAL)
 #undef JSC_IDENTIFIER_DECLARE_PRIVATE_PROPERTY_NAME_GLOBAL
+        
+        const Identifier* getPrivateName(const Identifier&) const;
+        Identifier getPublicName(const Identifier&) const;
     };
 
 } // namespace JSC

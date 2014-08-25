@@ -123,10 +123,7 @@ void PutOperation::perform(std::function<void()> completionCallback)
     ASSERT(m_transaction->mode() != IndexedDB::TransactionMode::ReadOnly);
     ASSERT(m_indexIDs.size() == m_indexKeys.size());
 
-    RefPtr<PutOperation> operation(this);
-    STANDARD_DATABASE_ERROR_CALLBACK;
-
-    m_transaction->database().serverConnection().put(*m_transaction, *this, [this, operation, operationCallback](PassRefPtr<IDBKey> key, PassRefPtr<IDBDatabaseError> prpError) {
+    m_transaction->database().serverConnection().put(*m_transaction, *this, [this, completionCallback](PassRefPtr<IDBKey> key, PassRefPtr<IDBDatabaseError> prpError) {
         RefPtr<IDBDatabaseError> error = prpError;
         if (key) {
             ASSERT(!error);
@@ -135,7 +132,7 @@ void PutOperation::perform(std::function<void()> completionCallback)
             ASSERT(error);
             m_callbacks->onError(error);
         }
-        operationCallback(error.release());
+        completionCallback();
     });
 }
 
@@ -154,14 +151,16 @@ void OpenCursorOperation::perform(std::function<void()> completionCallback)
     LOG(StorageAPI, "OpenCursorOperation");
 
     RefPtr<OpenCursorOperation> operation(this);
-    auto callback = [this, operation, completionCallback](int64_t cursorID, PassRefPtr<IDBDatabaseError>) {
-        // FIXME: When the LevelDB port fails to open a backing store cursor it calls onSuccess(nullptr);
-        // This seems nonsensical and might have to change soon, breaking them.
-        if (!cursorID)
+    auto callback = [this, operation, completionCallback](int64_t cursorID, PassRefPtr<IDBKey> key, PassRefPtr<IDBKey> primaryKey, PassRefPtr<SharedBuffer> valueBuffer, PassRefPtr<IDBDatabaseError> error) {
+        if (error) {
+            m_callbacks->onError(error);
+        } else if (!key) {
+            // If there's no error but also no key, then the cursor had no records.
             m_callbacks->onSuccess(static_cast<SharedBuffer*>(0));
-        else {
+        } else {
             RefPtr<IDBCursorBackend> cursor = IDBCursorBackend::create(cursorID, m_cursorType, m_taskType, *m_transaction, m_objectStoreID);
-            m_callbacks->onSuccess(cursor, cursor->key(), cursor->primaryKey(), cursor->value());
+            cursor->updateCursorData(key.get(), primaryKey.get(), valueBuffer.get());
+            m_callbacks->onSuccess(cursor.release());
         }
 
         completionCallback();
@@ -240,7 +239,7 @@ void IDBDatabaseBackend::VersionChangeOperation::perform(std::function<void()> c
 
     uint64_t oldVersion = m_transaction->database().metadata().version;
     RefPtr<IDBDatabaseBackend::VersionChangeOperation> operation(this);
-    ASSERT(static_cast<uint64_t>(m_version) > oldVersion);
+    ASSERT(static_cast<uint64_t>(m_version) > oldVersion || oldVersion == IDBDatabaseMetadata::NoIntVersion);
 
     std::function<void(PassRefPtr<IDBDatabaseError>)> operationCallback = [oldVersion, operation, this, completionCallback](PassRefPtr<IDBDatabaseError> prpError) {
         RefPtr<IDBDatabaseError> error = prpError;
@@ -250,7 +249,7 @@ void IDBDatabaseBackend::VersionChangeOperation::perform(std::function<void()> c
         } else {
             ASSERT(!m_transaction->database().hasPendingSecondHalfOpen());
             m_transaction->database().setCurrentVersion(m_version);
-            m_transaction->database().setPendingSecondHalfOpen(IDBPendingOpenCall::create(*m_callbacks, *m_databaseCallbacks, m_transaction->id(), m_version));
+            m_transaction->database().setPendingSecondHalfOpen(std::make_unique<IDBPendingOpenCall>(*m_callbacks, *m_databaseCallbacks, m_transaction->id(), m_version));
             m_callbacks->onUpgradeNeeded(oldVersion, &m_transaction->database(), m_transaction->database().metadata());
         }
         completionCallback();

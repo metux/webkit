@@ -10,7 +10,7 @@
 * 2.  Redistributions in binary form must reproduce the above copyright
 *     notice, this list of conditions and the following disclaimer in the
 *     documentation and/or other materials provided with the distribution.
-* 3.  Neither the name of Apple Computer, Inc. ("Apple") nor the names of
+* 3.  Neither the name of Apple Inc. ("Apple") nor the names of
 *     its contributors may be used to endorse or promote products derived
 *     from this software without specific prior written permission.
 *
@@ -74,7 +74,6 @@
 #include "SVGNames.h"
 #include "Text.h"
 #include "TextControlInnerElements.h"
-#include "TextIterator.h"
 #include "UserGestureIndicator.h"
 #include "VisibleUnits.h"
 #include "Widget.h"
@@ -124,7 +123,7 @@ void AccessibilityNodeObject::detach(AccessibilityDetachmentType detachmentType,
 {
     // AccessibilityObject calls clearChildren.
     AccessibilityObject::detach(detachmentType, cache);
-    m_node = 0;
+    m_node = nullptr;
 }
 
 void AccessibilityNodeObject::childrenChanged()
@@ -153,7 +152,7 @@ void AccessibilityNodeObject::childrenChanged()
             cache->postNotification(parent, parent->document(), AXObjectCache::AXLiveRegionChanged);
         
         // If this element is an ARIA text control, notify the AT of changes.
-        if (parent->isARIATextControl() && !parent->isNativeTextControl() && !parent->node()->hasEditableStyle())
+        if ((parent->isARIATextControl() || parent->hasContentEditableAttributeSet()) && !parent->isNativeTextControl())
             cache->postNotification(parent, parent->document(), AXObjectCache::AXValueChanged);
     }
 }
@@ -171,12 +170,12 @@ void AccessibilityNodeObject::updateAccessibilityRole()
 AccessibilityObject* AccessibilityNodeObject::firstChild() const
 {
     if (!node())
-        return 0;
+        return nullptr;
     
     Node* firstChild = node()->firstChild();
 
     if (!firstChild)
-        return 0;
+        return nullptr;
     
     return axObjectCache()->getOrCreate(firstChild);
 }
@@ -184,11 +183,11 @@ AccessibilityObject* AccessibilityNodeObject::firstChild() const
 AccessibilityObject* AccessibilityNodeObject::lastChild() const
 {
     if (!node())
-        return 0;
+        return nullptr;
     
     Node* lastChild = node()->lastChild();
     if (!lastChild)
-        return 0;
+        return nullptr;
     
     return axObjectCache()->getOrCreate(lastChild);
 }
@@ -196,11 +195,11 @@ AccessibilityObject* AccessibilityNodeObject::lastChild() const
 AccessibilityObject* AccessibilityNodeObject::previousSibling() const
 {
     if (!node())
-        return 0;
+        return nullptr;
 
     Node* previousSibling = node()->previousSibling();
     if (!previousSibling)
-        return 0;
+        return nullptr;
 
     return axObjectCache()->getOrCreate(previousSibling);
 }
@@ -208,11 +207,11 @@ AccessibilityObject* AccessibilityNodeObject::previousSibling() const
 AccessibilityObject* AccessibilityNodeObject::nextSibling() const
 {
     if (!node())
-        return 0;
+        return nullptr;
 
     Node* nextSibling = node()->nextSibling();
     if (!nextSibling)
-        return 0;
+        return nullptr;
 
     return axObjectCache()->getOrCreate(nextSibling);
 }
@@ -225,13 +224,16 @@ AccessibilityObject* AccessibilityNodeObject::parentObjectIfExists() const
 AccessibilityObject* AccessibilityNodeObject::parentObject() const
 {
     if (!node())
-        return 0;
+        return nullptr;
 
     Node* parentObj = node()->parentNode();
-    if (parentObj)
-        return axObjectCache()->getOrCreate(parentObj);
+    if (!parentObj)
+        return nullptr;
     
-    return 0;
+    if (AXObjectCache* cache = axObjectCache())
+        return cache->getOrCreate(parentObj);
+    
+    return nullptr;
 }
 
 LayoutRect AccessibilityNodeObject::elementRect() const
@@ -267,7 +269,7 @@ void AccessibilityNodeObject::setNode(Node* node)
 Document* AccessibilityNodeObject::document() const
 {
     if (!node())
-        return 0;
+        return nullptr;
     return &node()->document();
 }
 
@@ -426,7 +428,12 @@ bool AccessibilityNodeObject::computeAccessibilityIsIgnored() const
         if (!string.length())
             return true;
     }
-    
+
+    AccessibilityObjectInclusion decision = defaultObjectInclusion();
+    if (decision == IncludeObject)
+        return false;
+    if (decision == IgnoreObject)
+        return true;
     // If this element is within a parent that cannot have children, it should not be exposed.
     if (isDescendantOfBarrenParent())
         return true;
@@ -633,7 +640,10 @@ bool AccessibilityNodeObject::isEnabled() const
         if (equalIgnoringCase(disabledStatus, "false"))
             break;
     }
-
+    
+    if (roleValue() == HorizontalRuleRole)
+        return false;
+    
     Node* node = this->node();
     if (!node || !node->isElementNode())
         return true;
@@ -951,7 +961,7 @@ Element* AccessibilityNodeObject::anchorElement() const
 {
     Node* node = this->node();
     if (!node)
-        return 0;
+        return nullptr;
 
     AXObjectCache* cache = axObjectCache();
 
@@ -962,7 +972,7 @@ Element* AccessibilityNodeObject::anchorElement() const
             return toElement(node);
     }
 
-    return 0;
+    return nullptr;
 }
 
 static bool isNodeActionElement(Node* node)
@@ -980,7 +990,7 @@ static bool isNodeActionElement(Node* node)
 static Element* nativeActionElement(Node* start)
 {
     if (!start)
-        return 0;
+        return nullptr;
     
     // Do a deep-dive to see if any nodes should be used as the action element.
     // We have to look at Nodes, since this method should only be called on objects that do not have children (like buttons).
@@ -993,14 +1003,14 @@ static Element* nativeActionElement(Node* start)
         if (Element* subChild = nativeActionElement(child))
             return subChild;
     }
-    return 0;
+    return nullptr;
 }
     
 Element* AccessibilityNodeObject::actionElement() const
 {
     Node* node = this->node();
     if (!node)
-        return 0;
+        return nullptr;
 
     if (isNodeActionElement(node))
         return toElement(node);
@@ -1031,25 +1041,25 @@ Element* AccessibilityNodeObject::actionElement() const
     return elt;
 }
 
-Element* AccessibilityNodeObject::mouseButtonListener() const
+Element* AccessibilityNodeObject::mouseButtonListener(MouseButtonListenerResultFilter filter) const
 {
     Node* node = this->node();
     if (!node)
-        return 0;
+        return nullptr;
 
     // check if our parent is a mouse button listener
     // FIXME: Do the continuation search like anchorElement does
     for (auto& element : elementLineage(node->isElementNode() ? toElement(node) : node->parentElement())) {
-        // If we've reached the body and this is not a control element, do not expose press action for this element.
-        // It can cause false positives, where every piece of text is labeled as accepting press actions. 
-        if (element.hasTagName(bodyTag) && isStaticText())
+        // If we've reached the body and this is not a control element, do not expose press action for this element unless filter is IncludeBodyElement.
+        // It can cause false positives, where every piece of text is labeled as accepting press actions.
+        if (element.hasTagName(bodyTag) && isStaticText() && filter == ExcludeBodyElement)
             break;
         
         if (element.hasEventListeners(eventNames().clickEvent) || element.hasEventListeners(eventNames().mousedownEvent) || element.hasEventListeners(eventNames().mouseupEvent))
             return &element;
     }
 
-    return 0;
+    return nullptr;
 }
 
 bool AccessibilityNodeObject::isDescendantOfBarrenParent() const
@@ -1155,7 +1165,7 @@ bool AccessibilityNodeObject::isGenericFocusableElement() const
 HTMLLabelElement* AccessibilityNodeObject::labelForElement(Element* element) const
 {
     if (!element->isHTMLElement() || !toHTMLElement(element)->isLabelable())
-        return 0;
+        return nullptr;
 
     const AtomicString& id = element->getIdAttribute();
     if (!id.isEmpty()) {
@@ -1204,28 +1214,34 @@ Element* AccessibilityNodeObject::menuElementForMenuButton() const
 
 AccessibilityObject* AccessibilityNodeObject::menuForMenuButton() const
 {
-    return axObjectCache()->getOrCreate(menuElementForMenuButton());
+    if (AXObjectCache* cache = axObjectCache())
+        return cache->getOrCreate(menuElementForMenuButton());
+    return nullptr;
 }
 
 Element* AccessibilityNodeObject::menuItemElementForMenu() const
 {
     if (ariaRoleAttribute() != MenuRole)
-        return 0;
+        return nullptr;
     
     return siblingWithAriaRole("menuitem", node());    
 }
 
 AccessibilityObject* AccessibilityNodeObject::menuButtonForMenu() const
 {
+    AXObjectCache* cache = axObjectCache();
+    if (!cache)
+        return nullptr;
+
     Element* menuItem = menuItemElementForMenu();
 
     if (menuItem) {
         // ARIA just has generic menu items. AppKit needs to know if this is a top level items like MenuBarButton or MenuBarItem
-        AccessibilityObject* menuItemAX = axObjectCache()->getOrCreate(menuItem);
+        AccessibilityObject* menuItemAX = cache->getOrCreate(menuItem);
         if (menuItemAX && menuItemAX->isMenuButton())
             return menuItemAX;
     }
-    return 0;
+    return nullptr;
 }
 
 bool AccessibilityNodeObject::usesAltTagForTextComputation() const
@@ -1300,11 +1316,9 @@ void AccessibilityNodeObject::alternativeText(Vector<AccessibilityText>& textOrd
             textOrder.append(AccessibilityText(accessibleNameForNode(object->node()), AlternativeText));
     }
     
-#if ENABLE(SVG)
     // SVG elements all can have a <svg:title> element inside which should act as the descriptive text.
     if (node->isSVGElement())
         textOrder.append(AccessibilityText(toSVGElement(node)->title(), AlternativeText));
-#endif
     
 #if ENABLE(MATHML)
     if (node->isMathMLElement())
@@ -1344,7 +1358,7 @@ void AccessibilityNodeObject::visibleText(Vector<AccessibilityText>& textOrder) 
     case CheckBoxRole:
     case ListBoxOptionRole:
     // MacOS does not expect native <li> elements to expose label information, it only expects leaf node elements to do that.
-#if !PLATFORM(MAC)
+#if !PLATFORM(COCOA)
     case ListItemRole:
 #endif
     case MenuButtonRole:
@@ -1387,28 +1401,16 @@ void AccessibilityNodeObject::helpText(Vector<AccessibilityText>& textOrder) con
     String describedBy = ariaDescribedByAttribute();
     if (!describedBy.isEmpty())
         textOrder.append(AccessibilityText(describedBy, SummaryText));
-    
-    // Add help type text that is derived from ancestors.
-    for (Node* curr = node(); curr; curr = curr->parentNode()) {
-        const AtomicString& summary = getAttribute(summaryAttr);
-        if (!summary.isEmpty())
-            textOrder.append(AccessibilityText(summary, SummaryText));
-        
-        // The title attribute should be used as help text unless it is already being used as descriptive text.
-        const AtomicString& title = getAttribute(titleAttr);
-        if (!title.isEmpty())
-            textOrder.append(AccessibilityText(title, TitleTagText));
-        
-        // Only take help text from an ancestor element if its a group or an unknown role. If help was
-        // added to those kinds of elements, it is likely it was meant for a child element.
-        AccessibilityObject* axObj = axObjectCache()->getOrCreate(curr);
-        if (!axObj)
-            return;
-        
-        AccessibilityRole role = axObj->roleValue();
-        if (role != GroupRole && role != UnknownRole)
-            break;
-    }
+
+    // Summary attribute used as help text on tables.
+    const AtomicString& summary = getAttribute(summaryAttr);
+    if (!summary.isEmpty())
+        textOrder.append(AccessibilityText(summary, SummaryText));
+
+    // The title attribute should be used as help text unless it is already being used as descriptive text.
+    const AtomicString& title = getAttribute(titleAttr);
+    if (!title.isEmpty())
+        textOrder.append(AccessibilityText(title, TitleTagText));
 }
 
 void AccessibilityNodeObject::accessibilityText(Vector<AccessibilityText>& textOrder)
@@ -1436,7 +1438,7 @@ void AccessibilityNodeObject::ariaLabeledByText(Vector<AccessibilityText>& textO
             axElements.append(axElement);
         }
         
-        textOrder.append(AccessibilityText(ariaLabeledBy, AlternativeText, axElements));
+        textOrder.append(AccessibilityText(ariaLabeledBy, AlternativeText, WTF::move(axElements)));
     }
 }
     
@@ -1504,11 +1506,9 @@ String AccessibilityNodeObject::accessibilityDescription() const
             return alt;
     }
 
-#if ENABLE(SVG)
     // SVG elements all can have a <svg:title> element inside which should act as the descriptive text.
     if (m_node && m_node->isSVGElement())
         return toSVGElement(m_node)->title();
-#endif
     
 #if ENABLE(MATHML)
     if (m_node && m_node->isMathMLElement())
@@ -1787,7 +1787,7 @@ String AccessibilityNodeObject::stringValue() const
     if (node->hasTagName(selectTag)) {
         HTMLSelectElement* selectElement = toHTMLSelectElement(node);
         int selectedIndex = selectElement->selectedIndex();
-        const Vector<HTMLElement*> listItems = selectElement->listItems();
+        const Vector<HTMLElement*>& listItems = selectElement->listItems();
         if (selectedIndex >= 0 && static_cast<size_t>(selectedIndex) < listItems.size()) {
             const AtomicString& overriddenDescription = listItems[selectedIndex]->fastGetAttribute(aria_labelAttr);
             if (!overriddenDescription.isNull())
@@ -1836,11 +1836,11 @@ void AccessibilityNodeObject::colorValue(int& r, int& g, int& b) const
 // ARIA Implementer's Guide.                                                                                            
 static String accessibleNameForNode(Node* node)
 {
-    if (!node->isHTMLElement())
+    ASSERT(node);
+    if (!node || !node->isElementNode())
         return String();
     
-    HTMLElement* element = toHTMLElement(node);
-    
+    Element* element = toElement(node);
     const AtomicString& ariaLabel = element->fastGetAttribute(aria_labelAttr);
     if (!ariaLabel.isEmpty())
         return ariaLabel;
@@ -1858,8 +1858,8 @@ static String accessibleNameForNode(Node* node)
     String text;
     if (axObject)
         text = axObject->textUnderElement();
-    else if (node->isElementNode())
-        text = toElement(node)->innerText();
+    else
+        text = element->innerText();
     
     if (!text.isEmpty())
         return text;
@@ -2007,17 +2007,6 @@ AccessibilityRole AccessibilityNodeObject::remapAriaRoleDueToParent(Accessibilit
     
     return role;
 }   
-
-// If you call node->hasEditableStyle() since that will return true if an ancestor is editable.
-// This only returns true if this is the element that actually has the contentEditable attribute set.
-bool AccessibilityNodeObject::hasContentEditableAttributeSet() const
-{
-    if (!hasAttribute(contenteditableAttr))
-        return false;
-    const AtomicString& contentEditableValue = getAttribute(contenteditableAttr);
-    // Both "true" (case-insensitive) and the empty string count as true.
-    return contentEditableValue.isEmpty() || equalIgnoringCase(contentEditableValue, "true");
-}
 
 bool AccessibilityNodeObject::canSetSelectedAttribute() const
 {

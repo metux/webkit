@@ -27,9 +27,9 @@
 #define DatasetDOMStringMap_h
 
 #include "ScriptWrappable.h"
+#include <wtf/Forward.h>
 #include <wtf/Noncopyable.h>
 #include <wtf/Vector.h>
-#include <wtf/text/WTFString.h>
 
 namespace WebCore {
 
@@ -48,10 +48,9 @@ public:
     void deref();
 
     void getNames(Vector<String>&);
-    String item(const String& name);
-    bool contains(const String& name);
+    const AtomicString& item(const String& name, bool& isValid);
     void setItem(const String& name, const String& value, ExceptionCode&);
-    void deleteItem(const String& name, ExceptionCode&);
+    bool deleteItem(const String& name);
 
     Element* element() { return &m_element; }
 

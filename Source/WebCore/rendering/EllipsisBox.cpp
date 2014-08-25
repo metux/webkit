@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2003, 2006 Apple Computer, Inc.
+ * Copyright (C) 2003, 2006 Apple Inc.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -59,7 +59,7 @@ void EllipsisBox::paint(PaintInfo& paintInfo, const LayoutPoint& paintOffset, La
         paintSelection(context, paintOffset, lineStyle, font);
 
         // Select the correct color for painting the text.
-        Color foreground = paintInfo.forceBlackText() ? Color::black : blockFlow().selectionForegroundColor();
+        Color foreground = paintInfo.forceTextColor() ? paintInfo.forcedTextColor() : blockFlow().selectionForegroundColor();
         if (foreground.isValid() && foreground != textColor)
             context->setFillColor(foreground, lineStyle.colorSpace());
     }
@@ -113,7 +113,10 @@ IntRect EllipsisBox::selectionRect()
     const Font& font = lineStyle.font();
     const RootInlineBox& rootBox = root();
     // FIXME: Why is this always LTR? Fix by passing correct text run flags below.
-    return enclosingIntRect(font.selectionRectForText(RenderBlock::constructTextRun(&blockFlow(), font, m_str, lineStyle, TextRun::AllowTrailingExpansion), IntPoint(x(), y() + rootBox.selectionTopAdjustedForPrecedingBlock()), rootBox.selectionHeightAdjustedForPrecedingBlock()));
+    LayoutRect selectionRect = LayoutRect(x(), y() + rootBox.selectionTopAdjustedForPrecedingBlock(), 0, rootBox.selectionHeightAdjustedForPrecedingBlock());
+    font.adjustSelectionRectForText(RenderBlock::constructTextRun(&blockFlow(), font, m_str, lineStyle, TextRun::AllowTrailingExpansion), selectionRect);
+    // FIXME: use directional pixel snapping instead.
+    return enclosingIntRect(selectionRect);
 }
 
 void EllipsisBox::paintSelection(GraphicsContext* context, const LayoutPoint& paintOffset, const RenderStyle& style, const Font& font)
@@ -129,15 +132,12 @@ void EllipsisBox::paintSelection(GraphicsContext* context, const LayoutPoint& pa
         c = Color(0xff - c.red(), 0xff - c.green(), 0xff - c.blue());
 
     const RootInlineBox& rootBox = root();
-    LayoutUnit top = rootBox.selectionTop();
-    LayoutUnit h = rootBox.selectionHeight();
-    FloatRect clipRect(x() + paintOffset.x(), top + paintOffset.y(), m_logicalWidth, h);
-    alignSelectionRectToDevicePixels(clipRect);
-
     GraphicsContextStateSaver stateSaver(*context);
-    context->clip(clipRect);
     // FIXME: Why is this always LTR? Fix by passing correct text run flags below.
-    context->drawHighlightForText(font, RenderBlock::constructTextRun(&blockFlow(), font, m_str, style, TextRun::AllowTrailingExpansion), roundedIntPoint(LayoutPoint(x() + paintOffset.x(), y() + paintOffset.y() + top)), h, c, style.colorSpace());
+    LayoutRect selectionRect = LayoutRect(x() + paintOffset.x(), y() + paintOffset.y() + rootBox.selectionTop(), 0, rootBox.selectionHeight());
+    TextRun run = RenderBlock::constructTextRun(&blockFlow(), font, m_str, style, TextRun::AllowTrailingExpansion);
+    font.adjustSelectionRectForText(run, selectionRect, 0, -1);
+    context->fillRect(directionalPixelSnappedForPainting(selectionRect, renderer().document().deviceScaleFactor(), run.ltr()), c, style.colorSpace());
 }
 
 bool EllipsisBox::nodeAtPoint(const HitTestRequest& request, HitTestResult& result, const HitTestLocation& locationInContainer, const LayoutPoint& accumulatedOffset, LayoutUnit lineTop, LayoutUnit lineBottom)

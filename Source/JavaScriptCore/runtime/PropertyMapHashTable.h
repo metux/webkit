@@ -1,5 +1,5 @@
 /*
- *  Copyright (C) 2004, 2005, 2006, 2007, 2008 Apple Inc. All rights reserved.
+ *  Copyright (C) 2004, 2005, 2006, 2007, 2008, 2014 Apple Inc. All rights reserved.
  *
  *  This library is free software; you can redistribute it and/or
  *  modify it under the terms of the GNU Library General Public
@@ -21,6 +21,7 @@
 #ifndef PropertyMapHashTable_h
 #define PropertyMapHashTable_h
 
+#include "JSExportMacros.h"
 #include "PropertyOffset.h"
 #include "Structure.h"
 #include "WriteBarrier.h"
@@ -32,24 +33,29 @@
 #include <wtf/text/StringImpl.h>
 
 
-#ifndef NDEBUG
 #define DUMP_PROPERTYMAP_STATS 0
-#else
-#define DUMP_PROPERTYMAP_STATS 0
-#endif
-
-#if DUMP_PROPERTYMAP_STATS
-
-extern int numProbes;
-extern int numCollisions;
-extern int numRehashes;
-extern int numRemoves;
-
-#endif
+#define DUMP_PROPERTYMAP_COLLISIONS 0
 
 #define PROPERTY_MAP_DELETED_ENTRY_KEY ((StringImpl*)1)
 
 namespace JSC {
+
+#if DUMP_PROPERTYMAP_STATS
+
+struct PropertyMapHashTableStats {
+    std::atomic<unsigned> numFinds;
+    std::atomic<unsigned> numCollisions;
+    std::atomic<unsigned> numLookups;
+    std::atomic<unsigned> numLookupProbing;
+    std::atomic<unsigned> numAdds;
+    std::atomic<unsigned> numRemoves;
+    std::atomic<unsigned> numRehashes;
+    std::atomic<unsigned> numReinserts;
+};
+
+JS_EXPORTDATA extern PropertyMapHashTableStats* propertyMapHashTableStats;
+
+#endif
 
 inline bool isPowerOf2(unsigned v)
 {
@@ -76,13 +82,11 @@ struct PropertyMapEntry {
     StringImpl* key;
     PropertyOffset offset;
     unsigned attributes;
-    WriteBarrier<JSCell> specificValue;
 
-    PropertyMapEntry(VM& vm, JSCell* owner, StringImpl* key, PropertyOffset offset, unsigned attributes, JSCell* specificValue)
+    PropertyMapEntry(StringImpl* key, PropertyOffset offset, unsigned attributes)
         : key(key)
         , offset(offset)
         , attributes(attributes)
-        , specificValue(vm, owner, specificValue, WriteBarrier<JSCell>::MayBeNull)
     {
     }
 };
@@ -138,10 +142,8 @@ public:
 
     static Structure* createStructure(VM& vm, JSGlobalObject* globalObject, JSValue prototype)
     {
-        return Structure::create(vm, globalObject, prototype, TypeInfo(CompoundType, OverridesVisitChildren), info());
+        return Structure::create(vm, globalObject, prototype, TypeInfo(CellType, StructureFlags), info());
     }
-
-    static void visitChildren(JSCell*, SlotVisitor&);
 
     typedef StringImpl* KeyType;
     typedef PropertyMapEntry ValueType;
@@ -157,8 +159,8 @@ public:
 
     // Constructor is passed an initial capacity, a PropertyTable to copy, or both.
     static PropertyTable* create(VM&, unsigned initialCapacity);
-    static PropertyTable* clone(VM&, JSCell* owner, const PropertyTable&);
-    static PropertyTable* clone(VM&, JSCell* owner, unsigned initialCapacity, const PropertyTable&);
+    static PropertyTable* clone(VM&, const PropertyTable&);
+    static PropertyTable* clone(VM&, unsigned initialCapacity, const PropertyTable&);
     ~PropertyTable();
 
     // Ordered iteration methods.
@@ -170,6 +172,7 @@ public:
     // Find a value in the table.
     find_iterator find(const KeyType&);
     find_iterator findWithString(const KeyType&);
+    ValueType* get(const KeyType&);
     // Add a value to the table
     enum EffectOnPropertyOffset { PropertyOffsetMayChange, PropertyOffsetMustNotChange };
     std::pair<find_iterator, bool> add(const ValueType& entry, PropertyOffset&, EffectOnPropertyOffset);
@@ -195,17 +198,20 @@ public:
     PropertyOffset nextOffset(PropertyOffset inlineCapacity);
 
     // Copy this PropertyTable, ensuring the copy has at least the capacity provided.
-    PropertyTable* copy(VM&, JSCell* owner, unsigned newCapacity);
+    PropertyTable* copy(VM&, unsigned newCapacity);
 
 #ifndef NDEBUG
     size_t sizeInMemory();
     void checkConsistency();
 #endif
 
+protected:
+    static const unsigned StructureFlags = StructureIsImmortal;
+
 private:
     PropertyTable(VM&, unsigned initialCapacity);
-    PropertyTable(VM&, JSCell*, const PropertyTable&);
-    PropertyTable(VM&, JSCell*, unsigned initialCapacity, const PropertyTable&);
+    PropertyTable(VM&, const PropertyTable&);
+    PropertyTable(VM&, unsigned initialCapacity, const PropertyTable&);
 
     PropertyTable(const PropertyTable&);
     // Used to insert a value known not to be in the table, and where we know capacity to be available.
@@ -253,7 +259,7 @@ private:
     unsigned m_deletedCount;
     OwnPtr< Vector<PropertyOffset>> m_deletedOffsets;
 
-    static const unsigned MinimumTableSize = 8;
+    static const unsigned MinimumTableSize = 16;
     static const unsigned EmptyEntryIndex = 0;
 };
 
@@ -280,12 +286,12 @@ inline PropertyTable::const_iterator PropertyTable::end() const
 inline PropertyTable::find_iterator PropertyTable::find(const KeyType& key)
 {
     ASSERT(key);
-    ASSERT(key->isIdentifier() || key->isEmptyUnique());
+    ASSERT(key->isAtomic() || key->isEmptyUnique());
     unsigned hash = key->existingHash();
     unsigned step = 0;
 
 #if DUMP_PROPERTYMAP_STATS
-    ++numProbes;
+    ++propertyMapHashTableStats->numFinds;
 #endif
 
     while (true) {
@@ -295,29 +301,63 @@ inline PropertyTable::find_iterator PropertyTable::find(const KeyType& key)
         if (key == table()[entryIndex - 1].key)
             return std::make_pair(&table()[entryIndex - 1], hash & m_indexMask);
 
+        if (!step)
+            step = WTF::doubleHash(key->existingHash()) | 1;
+
 #if DUMP_PROPERTYMAP_STATS
-        ++numCollisions;
+        ++propertyMapHashTableStats->numCollisions;
+#endif
+
+#if DUMP_PROPERTYMAP_COLLISIONS
+        dataLog("PropertyTable collision for ", key, " (", hash, ") with step ", step, "\n");
+        dataLog("Collided with ", table()[entryIndex - 1].key, "(", table()[entryIndex - 1].key->existingHash(), ")\n");
+#endif
+
+        hash += step;
+    }
+}
+
+inline PropertyTable::ValueType* PropertyTable::get(const KeyType& key)
+{
+    ASSERT(key);
+    ASSERT(key->isAtomic() || key->isEmptyUnique());
+
+    if (!m_keyCount)
+        return nullptr;
+
+    unsigned hash = key->existingHash();
+    unsigned step = 0;
+
+#if DUMP_PROPERTYMAP_STATS
+    ++propertyMapHashTableStats->numLookups;
+#endif
+
+    while (true) {
+        unsigned entryIndex = m_index[hash & m_indexMask];
+        if (entryIndex == EmptyEntryIndex)
+            return nullptr;
+        if (key == table()[entryIndex - 1].key)
+            return &table()[entryIndex - 1];
+
+#if DUMP_PROPERTYMAP_STATS
+        ++propertyMapHashTableStats->numLookupProbing;
 #endif
 
         if (!step)
             step = WTF::doubleHash(key->existingHash()) | 1;
         hash += step;
-
-#if DUMP_PROPERTYMAP_STATS
-        ++numRehashes;
-#endif
     }
 }
 
 inline PropertyTable::find_iterator PropertyTable::findWithString(const KeyType& key)
 {
     ASSERT(key);
-    ASSERT(!key->isIdentifier() && !key->hasHash());
+    ASSERT(!key->isAtomic() && !key->hasHash());
     unsigned hash = key->hash();
     unsigned step = 0;
 
 #if DUMP_PROPERTYMAP_STATS
-    ++numProbes;
+    ++propertyMapHashTableStats->numLookups;
 #endif
 
     while (true) {
@@ -325,20 +365,16 @@ inline PropertyTable::find_iterator PropertyTable::findWithString(const KeyType&
         if (entryIndex == EmptyEntryIndex)
             return std::make_pair((ValueType*)0, hash & m_indexMask);
         const KeyType& keyInMap = table()[entryIndex - 1].key;
-        if (equal(key, keyInMap) && keyInMap->isIdentifier())
+        if (equal(key, keyInMap) && keyInMap->isAtomic())
             return std::make_pair(&table()[entryIndex - 1], hash & m_indexMask);
 
 #if DUMP_PROPERTYMAP_STATS
-        ++numCollisions;
+        ++propertyMapHashTableStats->numLookupProbing;
 #endif
 
         if (!step)
             step = WTF::doubleHash(key->existingHash()) | 1;
         hash += step;
-
-#if DUMP_PROPERTYMAP_STATS
-        ++numRehashes;
-#endif
     }
 }
 
@@ -350,6 +386,10 @@ inline std::pair<PropertyTable::find_iterator, bool> PropertyTable::add(const Va
         RELEASE_ASSERT(iter.first->offset <= offset);
         return std::make_pair(iter, false);
     }
+
+#if DUMP_PROPERTYMAP_STATS
+    ++propertyMapHashTableStats->numAdds;
+#endif
 
     // Ref the key
     entry.key->ref();
@@ -384,7 +424,7 @@ inline void PropertyTable::remove(const find_iterator& iter)
         return;
 
 #if DUMP_PROPERTYMAP_STATS
-    ++numRemoves;
+    ++propertyMapHashTableStats->numRemoves;
 #endif
 
     // Replace this one element with the deleted sentinel. Also clear out
@@ -454,15 +494,15 @@ inline PropertyOffset PropertyTable::nextOffset(PropertyOffset inlineCapacity)
     return offsetForPropertyNumber(size(), inlineCapacity);
 }
 
-inline PropertyTable* PropertyTable::copy(VM& vm, JSCell* owner, unsigned newCapacity)
+inline PropertyTable* PropertyTable::copy(VM& vm, unsigned newCapacity)
 {
     ASSERT(newCapacity >= m_keyCount);
 
     // Fast case; if the new table will be the same m_indexSize as this one, we can memcpy it,
     // save rehashing all keys.
     if (sizeForCapacity(newCapacity) == m_indexSize)
-        return PropertyTable::clone(vm, owner, *this);
-    return PropertyTable::clone(vm, owner, newCapacity, *this);
+        return PropertyTable::clone(vm, *this);
+    return PropertyTable::clone(vm, newCapacity, *this);
 }
 
 #ifndef NDEBUG
@@ -477,6 +517,10 @@ inline size_t PropertyTable::sizeInMemory()
 
 inline void PropertyTable::reinsert(const ValueType& entry)
 {
+#if DUMP_PROPERTYMAP_STATS
+    ++propertyMapHashTableStats->numReinserts;
+#endif
+
     // Used to insert a value known not to be in the table, and where
     // we know capacity to be available.
     ASSERT(canInsert());
@@ -492,6 +536,10 @@ inline void PropertyTable::reinsert(const ValueType& entry)
 
 inline void PropertyTable::rehash(unsigned newCapacity)
 {
+#if DUMP_PROPERTYMAP_STATS
+    ++propertyMapHashTableStats->numRehashes;
+#endif
+
     unsigned* oldEntryIndices = m_index;
     iterator iter = this->begin();
     iterator end = this->end();

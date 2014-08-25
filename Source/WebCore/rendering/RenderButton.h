@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005 Apple Computer
+ * Copyright (C) 2005 Apple Inc.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -23,7 +23,7 @@
 
 #include "RenderFlexibleBox.h"
 #include "Timer.h"
-#include <wtf/OwnPtr.h>
+#include <memory>
 
 namespace WebCore {
 
@@ -43,7 +43,7 @@ public:
     virtual bool canBeSelectionLeaf() const override;
 
     virtual void addChild(RenderObject* newChild, RenderObject *beforeChild = 0) override;
-    virtual void removeChild(RenderObject&) override;
+    virtual RenderObject* removeChild(RenderObject&) override;
     virtual void removeLeftoverAnonymousBlock(RenderBlock*) override { }
     virtual bool createsAnonymousWrapper() const override { return true; }
 
@@ -79,7 +79,7 @@ private:
     RenderTextFragment* m_buttonText;
     RenderBlock* m_inner;
 
-    OwnPtr<Timer<RenderButton>> m_timer;
+    std::unique_ptr<Timer<RenderButton>> m_timer;
     bool m_default;
 };
 

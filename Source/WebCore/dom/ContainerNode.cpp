@@ -37,19 +37,19 @@
 #include "JSLazyEventListener.h"
 #include "JSNode.h"
 #include "LabelsNodeList.h"
-#include "LoaderStrategy.h"
-#include "MemoryCache.h"
 #include "MutationEvent.h"
 #include "NameNodeList.h"
 #include "NodeRareData.h"
 #include "NodeRenderStyle.h"
-#include "PlatformStrategies.h"
 #include "RadioNodeList.h"
 #include "RenderBox.h"
 #include "RenderTheme.h"
 #include "RenderWidget.h"
 #include "ResourceLoadScheduler.h"
 #include "RootInlineBox.h"
+#include "SVGDocumentExtensions.h"
+#include "SVGElement.h"
+#include "SVGNames.h"
 #include "SelectorQuery.h"
 #include "TemplateContentDocumentFragment.h"
 #include <wtf/CurrentTime.h>
@@ -62,15 +62,6 @@ namespace WebCore {
 
 static void dispatchChildInsertionEvents(Node&);
 static void dispatchChildRemovalEvents(Node&);
-
-typedef std::pair<RefPtr<Node>, unsigned> CallbackParameters;
-typedef std::pair<NodeCallback, CallbackParameters> CallbackInfo;
-typedef Vector<CallbackInfo> NodeCallbackQueue;
-
-static NodeCallbackQueue* s_postAttachCallbackQueue;
-
-static size_t s_attachDepth;
-static bool s_shouldReEnableMemoryCacheCallsAfterAttach;
 
 ChildNodesLazySnapshot* ChildNodesLazySnapshot::latestSnapshot = 0;
 
@@ -107,7 +98,7 @@ void ContainerNode::removeDetachedChildren()
 static inline void destroyRenderTreeIfNeeded(Node& child)
 {
     // FIXME: Get rid of the named flow test.
-    if (!child.renderer() && !child.inNamedFlow())
+    if (!child.renderer() && !child.isNamedFlowContentNode())
         return;
     if (child.isElementNode())
         Style::detachRenderTree(toElement(child));
@@ -150,8 +141,8 @@ void ContainerNode::takeAllChildrenFrom(ContainerNode* oldParent)
 
 ContainerNode::~ContainerNode()
 {
-    if (Document* document = documentInternal())
-        willBeDeletedFrom(document);
+    if (!isDocumentNode())
+        willBeDeletedFrom(document());
     removeDetachedChildren();
 }
 
@@ -577,6 +568,14 @@ bool ContainerNode::removeChild(Node* oldChild, ExceptionCode& ec)
 
         ChildNodeRemovalNotifier(*this).notify(child.get());
     }
+
+
+    if (document().svgExtensions()) {
+        Element* shadowHost = this->shadowHost();
+        if (!shadowHost || !shadowHost->hasTagName(SVGNames::useTag))
+            document().accessSVGExtensions()->rebuildElements();
+    }
+
     dispatchSubtreeModifiedEvent();
 
     return true;
@@ -668,6 +667,12 @@ void ContainerNode::removeChildren()
             ChildNodeRemovalNotifier(*this).notify(removedChildren[i].get());
     }
 
+    if (document().svgExtensions()) {
+        Element* shadowHost = this->shadowHost();
+        if (!shadowHost || !shadowHost->hasTagName(SVGNames::useTag))
+            document().accessSVGExtensions()->rebuildElements();
+    }
+
     dispatchSubtreeModifiedEvent();
 }
 
@@ -756,67 +761,6 @@ void ContainerNode::parserAppendChild(PassRefPtr<Node> newChild)
     ChildNodeInsertionNotifier(*this).notify(*newChild);
 
     newChild->setNeedsStyleRecalc(ReconstructRenderTree);
-}
-
-void ContainerNode::suspendPostAttachCallbacks(Document& document)
-{
-    if (!s_attachDepth) {
-        ASSERT(!s_shouldReEnableMemoryCacheCallsAfterAttach);
-        if (Page* page = document.page()) {
-            // FIXME: How can this call be specific to one Page, while the
-            // s_attachDepth is a global? Doesn't make sense.
-            if (page->areMemoryCacheClientCallsEnabled()) {
-                page->setMemoryCacheClientCallsEnabled(false);
-                s_shouldReEnableMemoryCacheCallsAfterAttach = true;
-            }
-        }
-        platformStrategies()->loaderStrategy()->resourceLoadScheduler()->suspendPendingRequests();
-    }
-    ++s_attachDepth;
-}
-
-void ContainerNode::resumePostAttachCallbacks(Document& document)
-{
-    if (s_attachDepth == 1) {
-        Ref<Document> protect(document);
-
-        if (s_postAttachCallbackQueue)
-            dispatchPostAttachCallbacks();
-        if (s_shouldReEnableMemoryCacheCallsAfterAttach) {
-            s_shouldReEnableMemoryCacheCallsAfterAttach = false;
-            if (Page* page = document.page())
-                page->setMemoryCacheClientCallsEnabled(true);
-        }
-        platformStrategies()->loaderStrategy()->resourceLoadScheduler()->resumePendingRequests();
-    }
-    --s_attachDepth;
-}
-
-void ContainerNode::queuePostAttachCallback(NodeCallback callback, Node& node, unsigned callbackData)
-{
-    if (!s_postAttachCallbackQueue)
-        s_postAttachCallbackQueue = new NodeCallbackQueue;
-    
-    s_postAttachCallbackQueue->append(CallbackInfo(callback, CallbackParameters(&node, callbackData)));
-}
-
-bool ContainerNode::postAttachCallbacksAreSuspended()
-{
-    return s_attachDepth;
-}
-
-void ContainerNode::dispatchPostAttachCallbacks()
-{
-    // We recalculate size() each time through the loop because a callback
-    // can add more callbacks to the end of the queue.
-    for (size_t i = 0; i < s_postAttachCallbackQueue->size(); ++i) {
-        const CallbackInfo& info = (*s_postAttachCallbackQueue)[i];
-        NodeCallback callback = info.first;
-        CallbackParameters params = info.second;
-
-        callback(*params.first, params.second);
-    }
-    s_postAttachCallbackQueue->clear();
 }
 
 void ContainerNode::childrenChanged(const ChildChange& change)
@@ -1071,30 +1015,18 @@ void ContainerNode::setAttributeEventListener(const AtomicString& eventType, con
     setAttributeEventListener(eventType, JSLazyEventListener::createForNode(*this, attributeName, attributeValue));
 }
 
-Element* ContainerNode::querySelector(const AtomicString& selectors, ExceptionCode& ec)
+Element* ContainerNode::querySelector(const String& selectors, ExceptionCode& ec)
 {
-    if (selectors.isEmpty()) {
-        ec = SYNTAX_ERR;
-        return nullptr;
-    }
-
-    SelectorQuery* selectorQuery = document().selectorQueryCache().add(selectors, document(), ec);
-    if (!selectorQuery)
-        return nullptr;
-    return selectorQuery->queryFirst(*this);
+    if (SelectorQuery* selectorQuery = document().selectorQueryForString(selectors, ec))
+        return selectorQuery->queryFirst(*this);
+    return nullptr;
 }
 
-RefPtr<NodeList> ContainerNode::querySelectorAll(const AtomicString& selectors, ExceptionCode& ec)
+RefPtr<NodeList> ContainerNode::querySelectorAll(const String& selectors, ExceptionCode& ec)
 {
-    if (selectors.isEmpty()) {
-        ec = SYNTAX_ERR;
-        return nullptr;
-    }
-
-    SelectorQuery* selectorQuery = document().selectorQueryCache().add(selectors, document(), ec);
-    if (!selectorQuery)
-        return nullptr;
-    return selectorQuery->queryAll(*this);
+    if (SelectorQuery* selectorQuery = document().selectorQueryForString(selectors, ec))
+        return selectorQuery->queryAll(*this);
+    return nullptr;
 }
 
 PassRefPtr<NodeList> ContainerNode::getElementsByTagName(const AtomicString& localName)
@@ -1103,8 +1035,8 @@ PassRefPtr<NodeList> ContainerNode::getElementsByTagName(const AtomicString& loc
         return 0;
 
     if (document().isHTMLDocument())
-        return ensureRareData().ensureNodeLists().addCacheWithAtomicName<HTMLTagNodeList>(*this, LiveNodeList::HTMLTagNodeListType, localName);
-    return ensureRareData().ensureNodeLists().addCacheWithAtomicName<TagNodeList>(*this, LiveNodeList::TagNodeListType, localName);
+        return ensureRareData().ensureNodeLists().addCacheWithAtomicName<HTMLTagNodeList>(*this, localName);
+    return ensureRareData().ensureNodeLists().addCacheWithAtomicName<TagNodeList>(*this, localName);
 }
 
 PassRefPtr<NodeList> ContainerNode::getElementsByTagNameNS(const AtomicString& namespaceURI, const AtomicString& localName)
@@ -1120,18 +1052,18 @@ PassRefPtr<NodeList> ContainerNode::getElementsByTagNameNS(const AtomicString& n
 
 PassRefPtr<NodeList> ContainerNode::getElementsByName(const String& elementName)
 {
-    return ensureRareData().ensureNodeLists().addCacheWithAtomicName<NameNodeList>(*this, LiveNodeList::NameNodeListType, elementName);
+    return ensureRareData().ensureNodeLists().addCacheWithAtomicName<NameNodeList>(*this, elementName);
 }
 
 PassRefPtr<NodeList> ContainerNode::getElementsByClassName(const String& classNames)
 {
-    return ensureRareData().ensureNodeLists().addCacheWithName<ClassNodeList>(*this, LiveNodeList::ClassNodeListType, classNames);
+    return ensureRareData().ensureNodeLists().addCacheWithName<ClassNodeList>(*this, classNames);
 }
 
 PassRefPtr<RadioNodeList> ContainerNode::radioNodeList(const AtomicString& name)
 {
     ASSERT(hasTagName(HTMLNames::formTag) || hasTagName(HTMLNames::fieldsetTag));
-    return ensureRareData().ensureNodeLists().addCacheWithAtomicName<RadioNodeList>(*this, LiveNodeList::RadioNodeListType, name);
+    return ensureRareData().ensureNodeLists().addCacheWithAtomicName<RadioNodeList>(*this, name);
 }
 
 } // namespace WebCore

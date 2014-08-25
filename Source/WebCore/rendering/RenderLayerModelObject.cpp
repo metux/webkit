@@ -36,12 +36,12 @@ bool RenderLayerModelObject::s_hadTransform = false;
 bool RenderLayerModelObject::s_layerWasSelfPainting = false;
 
 RenderLayerModelObject::RenderLayerModelObject(Element& element, PassRef<RenderStyle> style, unsigned baseTypeFlags)
-    : RenderElement(element, std::move(style), baseTypeFlags | RenderLayerModelObjectFlag)
+    : RenderElement(element, WTF::move(style), baseTypeFlags | RenderLayerModelObjectFlag)
 {
 }
 
 RenderLayerModelObject::RenderLayerModelObject(Document& document, PassRef<RenderStyle> style, unsigned baseTypeFlags)
-    : RenderElement(document, std::move(style), baseTypeFlags | RenderLayerModelObjectFlag)
+    : RenderElement(document, WTF::move(style), baseTypeFlags | RenderLayerModelObjectFlag)
 {
 }
 
@@ -151,6 +151,10 @@ void RenderLayerModelObject::styleDidChange(StyleDifference diff, const RenderSt
             }
         }
     } else if (layer() && layer()->parent()) {
+#if ENABLE(CSS_COMPOSITING)
+        if (oldStyle->hasBlendMode())
+            layer()->parent()->dirtyAncestorChainHasBlendingDescendants();
+#endif
         setHasTransform(false); // Either a transform wasn't specified or the object doesn't support transforms, so just null out the bit.
         setHasReflection(false);
         layer()->removeOnlyThisLayer(); // calls destroyLayer() which clears m_layer
@@ -166,10 +170,10 @@ void RenderLayerModelObject::styleDidChange(StyleDifference diff, const RenderSt
             setChildNeedsLayout();
     }
 
-    bool newStyleIsViewportConstained = style().hasViewportConstrainedPosition();
+    bool newStyleIsViewportConstrained = style().hasViewportConstrainedPosition();
     bool oldStyleIsViewportConstrained = oldStyle && oldStyle->hasViewportConstrainedPosition();
-    if (newStyleIsViewportConstained != oldStyleIsViewportConstrained) {
-        if (newStyleIsViewportConstained && layer())
+    if (newStyleIsViewportConstrained != oldStyleIsViewportConstrained) {
+        if (newStyleIsViewportConstrained && layer())
             view().frameView().addViewportConstrainedObject(this);
         else
             view().frameView().removeViewportConstrainedObject(this);

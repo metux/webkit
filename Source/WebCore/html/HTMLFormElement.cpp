@@ -253,18 +253,18 @@ bool HTMLFormElement::validateInteractively(Event* event)
                 continue;
             String message("An invalid form control with name='%name' is not focusable.");
             message.replace("%name", control.name());
-            document().addConsoleMessage(RenderingMessageSource, ErrorMessageLevel, message);
+            document().addConsoleMessage(MessageSource::Rendering, MessageLevel::Error, message);
         }
     }
 
     return false;
 }
 
-bool HTMLFormElement::prepareForSubmission(Event* event)
+void HTMLFormElement::prepareForSubmission(Event* event)
 {
     Frame* frame = document().frame();
     if (m_isSubmittingOrPreparingForSubmission || !frame)
-        return m_isSubmittingOrPreparingForSubmission;
+        return;
 
     m_isSubmittingOrPreparingForSubmission = true;
     m_shouldSubmit = false;
@@ -272,7 +272,7 @@ bool HTMLFormElement::prepareForSubmission(Event* event)
     // Interactive validation must be done before dispatching the submit event.
     if (!validateInteractively(event)) {
         m_isSubmittingOrPreparingForSubmission = false;
-        return false;
+        return;
     }
 
     StringPairVector controlNamesAndValues;
@@ -280,6 +280,8 @@ bool HTMLFormElement::prepareForSubmission(Event* event)
     RefPtr<FormState> formState = FormState::create(this, controlNamesAndValues, &document(), NotSubmittedByJavaScript);
     frame->loader().client().dispatchWillSendSubmitEvent(formState.release());
 
+    Ref<HTMLFormElement> protect(*this);
+    // Event handling can result in m_shouldSubmit becoming true, regardless of dispatchEvent() return value.
     if (dispatchEvent(Event::create(eventNames().submitEvent, true, true)))
         m_shouldSubmit = true;
 
@@ -287,8 +289,6 @@ bool HTMLFormElement::prepareForSubmission(Event* event)
 
     if (m_shouldSubmit)
         submit(event, true, true, NotSubmittedByJavaScript);
-
-    return m_shouldSubmit;
 }
 
 void HTMLFormElement::submit()
@@ -333,7 +333,7 @@ void HTMLFormElement::submit(Event* event, bool activateSubmitButton, bool proce
     m_isSubmittingOrPreparingForSubmission = true;
     m_wasUserSubmitted = processingUserGesture;
 
-    HTMLFormControlElement* firstSuccessfulSubmitButton = 0;
+    RefPtr<HTMLFormControlElement> firstSuccessfulSubmitButton;
     bool needButtonActivation = activateSubmitButton; // do we need to activate a submit button?
 
     for (unsigned i = 0; i < m_associatedElements.size(); ++i) {
@@ -352,7 +352,8 @@ void HTMLFormElement::submit(Event* event, bool activateSubmitButton, bool proce
     if (needButtonActivation && firstSuccessfulSubmitButton)
         firstSuccessfulSubmitButton->setActivatedSubmit(true);
 
-    bool lockHistory = !processingUserGesture;
+    LockHistory lockHistory = processingUserGesture ? LockHistory::No : LockHistory::Yes;
+    Ref<HTMLFormElement> protect(*this); // Form submission can execute arbitary JavaScript.
     frame->loader().submitForm(FormSubmission::create(this, m_attributes, event, lockHistory, formSubmissionTrigger));
 
     if (needButtonActivation && firstSuccessfulSubmitButton)
@@ -699,7 +700,7 @@ void HTMLFormElement::addToPastNamesMap(FormNamedItem* item, const AtomicString&
     if (pastName.isEmpty())
         return;
     if (!m_pastNamesMap)
-        m_pastNamesMap = adoptPtr(new PastNamesMap);
+        m_pastNamesMap = std::make_unique<PastNamesMap>();
     m_pastNamesMap->set(pastName.impl(), item);
 }
 

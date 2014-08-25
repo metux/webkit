@@ -78,10 +78,7 @@ public:
     CachedResourceHandle<CachedFont> requestFont(CachedResourceRequest&);
     CachedResourceHandle<CachedRawResource> requestRawResource(CachedResourceRequest&);
     CachedResourceHandle<CachedRawResource> requestMainResource(CachedResourceRequest&);
-
-#if ENABLE(SVG)
     CachedResourceHandle<CachedSVGDocument> requestSVGDocument(CachedResourceRequest&);
-#endif
 #if ENABLE(XSLT)
     CachedResourceHandle<CachedXSLStyleSheet> requestXSLStyleSheet(CachedResourceRequest&);
 #endif
@@ -114,6 +111,7 @@ public:
     Document* document() const { return m_document; } // Can be null
     void setDocument(Document* document) { m_document = document; }
     void clearDocumentLoader() { m_documentLoader = 0; }
+    SessionID sessionID() const;
 
     void removeCachedResource(CachedResource*) const;
 
@@ -135,12 +133,14 @@ public:
 
     static const ResourceLoaderOptions& defaultCachedResourceOptions();
 
+    void documentDidFinishLoadEvent();
+
 private:
     explicit CachedResourceLoader(DocumentLoader*);
 
     CachedResourceHandle<CachedResource> requestResource(CachedResource::Type, CachedResourceRequest&);
     CachedResourceHandle<CachedResource> revalidateResource(const CachedResourceRequest&, CachedResource*);
-    CachedResourceHandle<CachedResource> loadResource(CachedResource::Type, CachedResourceRequest&, const String& charset);
+    CachedResourceHandle<CachedResource> loadResource(CachedResource::Type, CachedResourceRequest&);
 #if ENABLE(RESOURCE_TIMING)
     void storeResourceTimingInitiatorInformation(const CachedResourceHandle<CachedResource>&, const CachedResourceRequest&);
 #endif
@@ -149,7 +149,7 @@ private:
     enum RevalidationPolicy { Use, Revalidate, Reload, Load };
     RevalidationPolicy determineRevalidationPolicy(CachedResource::Type, ResourceRequest&, bool forPreload, CachedResource* existingResource, CachedResourceRequest::DeferOption) const;
     
-    bool shouldContinueAfterNotifyingLoadedFromMemoryCache(CachedResource*);
+    bool shouldContinueAfterNotifyingLoadedFromMemoryCache(const CachedResourceRequest&, CachedResource*);
     bool checkInsecureContent(CachedResource::Type, const URL&) const;
 
     void garbageCollectDocumentResourcesTimerFired(Timer<CachedResourceLoader>&);

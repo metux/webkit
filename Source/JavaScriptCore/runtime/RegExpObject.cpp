@@ -30,7 +30,7 @@
 #include "JSString.h"
 #include "Lexer.h"
 #include "Lookup.h"
-#include "Operations.h"
+#include "JSCInlines.h"
 #include "RegExpConstructor.h"
 #include "RegExpMatchesArray.h"
 #include "RegExpPrototype.h"
@@ -39,10 +39,10 @@
 
 namespace JSC {
 
-static EncodedJSValue regExpObjectGlobal(ExecState*, EncodedJSValue, EncodedJSValue, PropertyName);
-static EncodedJSValue regExpObjectIgnoreCase(ExecState*, EncodedJSValue, EncodedJSValue, PropertyName);
-static EncodedJSValue regExpObjectMultiline(ExecState*, EncodedJSValue, EncodedJSValue, PropertyName);
-static EncodedJSValue regExpObjectSource(ExecState*, EncodedJSValue, EncodedJSValue, PropertyName);
+static EncodedJSValue regExpObjectGlobal(ExecState*, JSObject*, EncodedJSValue, PropertyName);
+static EncodedJSValue regExpObjectIgnoreCase(ExecState*, JSObject*, EncodedJSValue, PropertyName);
+static EncodedJSValue regExpObjectMultiline(ExecState*, JSObject*, EncodedJSValue, PropertyName);
+static EncodedJSValue regExpObjectSource(ExecState*, JSObject*, EncodedJSValue, PropertyName);
 
 } // namespace JSC
 
@@ -52,7 +52,7 @@ namespace JSC {
 
 STATIC_ASSERT_IS_TRIVIALLY_DESTRUCTIBLE(RegExpObject);
 
-const ClassInfo RegExpObject::s_info = { "RegExp", &Base::s_info, 0, ExecState::regExpTable, CREATE_METHOD_TABLE(RegExpObject) };
+const ClassInfo RegExpObject::s_info = { "RegExp", &Base::s_info, &regExpTable, CREATE_METHOD_TABLE(RegExpObject) };
 
 /* Source for RegExpObject.lut.h
 @begin regExpTable
@@ -81,9 +81,6 @@ void RegExpObject::visitChildren(JSCell* cell, SlotVisitor& visitor)
 {
     RegExpObject* thisObject = jsCast<RegExpObject*>(cell);
     ASSERT_GC_OBJECT_INHERITS(thisObject, info());
-    COMPILE_ASSERT(StructureFlags & OverridesVisitChildren, OverridesVisitChildrenWithoutSettingFlag);
-    ASSERT(thisObject->structure()->typeInfo().overridesVisitChildren());
-
     Base::visitChildren(thisObject, visitor);
     visitor.append(&thisObject->m_regExp);
     visitor.append(&thisObject->m_lastIndex);
@@ -97,7 +94,7 @@ bool RegExpObject::getOwnPropertySlot(JSObject* object, ExecState* exec, Propert
         slot.setValue(regExp, attributes, regExp->getLastIndex());
         return true;
     }
-    return getStaticValueSlot<RegExpObject, JSObject>(exec, ExecState::regExpTable(exec->vm()), jsCast<RegExpObject*>(object), propertyName, slot);
+    return getStaticValueSlot<RegExpObject, JSObject>(exec, regExpTable, jsCast<RegExpObject*>(object), propertyName, slot);
 }
 
 bool RegExpObject::deleteProperty(JSCell* cell, ExecState* exec, PropertyName propertyName)
@@ -109,16 +106,23 @@ bool RegExpObject::deleteProperty(JSCell* cell, ExecState* exec, PropertyName pr
 
 void RegExpObject::getOwnNonIndexPropertyNames(JSObject* object, ExecState* exec, PropertyNameArray& propertyNames, EnumerationMode mode)
 {
-    if (mode == IncludeDontEnumProperties)
+    if (shouldIncludeDontEnumProperties(mode))
         propertyNames.add(exec->propertyNames().lastIndex);
     Base::getOwnNonIndexPropertyNames(object, exec, propertyNames, mode);
 }
 
 void RegExpObject::getPropertyNames(JSObject* object, ExecState* exec, PropertyNameArray& propertyNames, EnumerationMode mode)
 {
-    if (mode == IncludeDontEnumProperties)
+    if (shouldIncludeDontEnumProperties(mode))
         propertyNames.add(exec->propertyNames().lastIndex);
     Base::getPropertyNames(object, exec, propertyNames, mode);
+}
+
+void RegExpObject::getGenericPropertyNames(JSObject* object, ExecState* exec, PropertyNameArray& propertyNames, EnumerationMode mode)
+{
+    if (shouldIncludeDontEnumProperties(mode))
+        propertyNames.add(exec->propertyNames().lastIndex);
+    Base::getGenericPropertyNames(object, exec, propertyNames, mode);
 }
 
 static bool reject(ExecState* exec, bool throwException, const char* message)
@@ -155,22 +159,17 @@ bool RegExpObject::defineOwnProperty(JSObject* object, ExecState* exec, Property
     return Base::defineOwnProperty(object, exec, propertyName, descriptor, shouldThrow);
 }
 
-static inline RegExpObject* asRegExpObject(EncodedJSValue value)
-{
-    return jsCast<RegExpObject*>(JSValue::decode(value));
-}
-
-EncodedJSValue regExpObjectGlobal(ExecState*, EncodedJSValue slotBase, EncodedJSValue, PropertyName)
+EncodedJSValue regExpObjectGlobal(ExecState*, JSObject* slotBase, EncodedJSValue, PropertyName)
 {
     return JSValue::encode(jsBoolean(asRegExpObject(slotBase)->regExp()->global()));
 }
 
-EncodedJSValue regExpObjectIgnoreCase(ExecState*, EncodedJSValue slotBase, EncodedJSValue, PropertyName)
+EncodedJSValue regExpObjectIgnoreCase(ExecState*, JSObject* slotBase, EncodedJSValue, PropertyName)
 {
     return JSValue::encode(jsBoolean(asRegExpObject(slotBase)->regExp()->ignoreCase()));
 }
  
-EncodedJSValue regExpObjectMultiline(ExecState*, EncodedJSValue slotBase, EncodedJSValue, PropertyName)
+EncodedJSValue regExpObjectMultiline(ExecState*, JSObject* slotBase, EncodedJSValue, PropertyName)
 {            
     return JSValue::encode(jsBoolean(asRegExpObject(slotBase)->regExp()->multiline()));
 }
@@ -283,7 +282,7 @@ static inline JSValue regExpObjectSourceInternal(ExecState* exec, String pattern
 
     
     
-EncodedJSValue regExpObjectSource(ExecState* exec, EncodedJSValue slotBase, EncodedJSValue, PropertyName)
+EncodedJSValue regExpObjectSource(ExecState* exec, JSObject* slotBase, EncodedJSValue, PropertyName)
 {
     String pattern = asRegExpObject(slotBase)->regExp()->pattern();
     if (pattern.is8Bit())

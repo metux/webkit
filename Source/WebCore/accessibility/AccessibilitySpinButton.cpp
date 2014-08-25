@@ -37,7 +37,7 @@ PassRefPtr<AccessibilitySpinButton> AccessibilitySpinButton::create()
 }
     
 AccessibilitySpinButton::AccessibilitySpinButton()
-    : m_spinButtonElement(0)
+    : m_spinButtonElement(nullptr)
 {
 }
 
@@ -130,7 +130,7 @@ LayoutRect AccessibilitySpinButtonPart::elementRect() const
     return parentRect;
 }
 
-bool AccessibilitySpinButtonPart::press() const
+bool AccessibilitySpinButtonPart::press()
 {
     if (!m_parent || !m_parent->isSpinButton())
         return false;

@@ -97,20 +97,19 @@ public:
     bool isFilterImageValue() const { return m_classType == FilterImageClass; }
     bool isWebKitCSSFilterValue() const { return m_classType == WebKitCSSFilterClass; }
 #endif // ENABLE(CSS_FILTERS)
-    bool isGridTemplateValue() const { return m_classType == GridTemplateClass; }
-#if ENABLE(SVG)
+#if ENABLE(CSS_GRID_LAYOUT)
+    bool isGridTemplateAreasValue() const { return m_classType == GridTemplateAreasClass; }
+    bool isGridLineNamesValue() const { return m_classType == GridLineNamesClass; }
+#endif
     bool isSVGColor() const { return m_classType == SVGColorClass || m_classType == SVGPaintClass; }
     bool isSVGPaint() const { return m_classType == SVGPaintClass; }
-#endif
     bool isUnicodeRangeValue() const { return m_classType == UnicodeRangeClass; }
 
     bool isCSSOMSafe() const { return m_isCSSOMSafe; }
     bool isSubtypeExposedToCSSOM() const
     { 
         return isPrimitiveValue() 
-#if ENABLE(SVG)
             || isSVGColor()
-#endif
             || isValueList();
     }
 
@@ -161,11 +160,11 @@ protected:
         UnicodeRangeClass,
         LineBoxContainClass,
         CalculationClass,
-        GridTemplateClass,
-#if ENABLE(SVG)
+#if ENABLE(CSS_GRID_LAYOUT)
+        GridTemplateAreasClass,
+#endif
         SVGColorClass,
         SVGPaintClass,
-#endif
 
         // List class types must appear after ValueListClass.
         ValueListClass,
@@ -176,6 +175,9 @@ protected:
         WebKitCSSFilterClass,
 #endif
         WebKitCSSTransformClass,
+#if ENABLE(CSS_GRID_LAYOUT)
+        GridLineNamesClass,
+#endif
         // Do not append non-list class types here.
     };
 

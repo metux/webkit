@@ -33,6 +33,10 @@
 #include "UserScript.h"
 #include "UserStyleSheet.h"
 
+#if ENABLE(USER_MESSAGE_HANDLERS)
+#include "UserMessageHandlerDescriptor.h"
+#endif
+
 namespace WebCore {
 
 RefPtr<UserContentController> UserContentController::create()
@@ -68,7 +72,7 @@ void UserContentController::addUserScript(DOMWrapperWorld& world, std::unique_pt
     auto& scriptsInWorld = m_userScripts->add(&world, nullptr).iterator->value;
     if (!scriptsInWorld)
         scriptsInWorld = std::make_unique<UserScriptVector>();
-    scriptsInWorld->append(std::move(userScript));
+    scriptsInWorld->append(WTF::move(userScript));
 }
 
 void UserContentController::removeUserScript(DOMWrapperWorld& world, const URL& url)
@@ -106,7 +110,7 @@ void UserContentController::addUserStyleSheet(DOMWrapperWorld& world, std::uniqu
     auto& styleSheetsInWorld = m_userStyleSheets->add(&world, nullptr).iterator->value;
     if (!styleSheetsInWorld)
         styleSheetsInWorld = std::make_unique<UserStyleSheetVector>();
-    styleSheetsInWorld->append(std::move(userStyleSheet));
+    styleSheetsInWorld->append(WTF::move(userStyleSheet));
 
     if (injectionTime == InjectInExistingDocuments)
         invalidateInjectedStyleSheetCacheInAllFrames();
@@ -150,6 +154,24 @@ void UserContentController::removeUserStyleSheets(DOMWrapperWorld& world)
 
     invalidateInjectedStyleSheetCacheInAllFrames();
 }
+
+#if ENABLE(USER_MESSAGE_HANDLERS)
+void UserContentController::addUserMessageHandlerDescriptor(UserMessageHandlerDescriptor& descriptor)
+{
+    if (!m_userMessageHandlerDescriptors)
+        m_userMessageHandlerDescriptors = std::make_unique<UserMessageHandlerDescriptorMap>();
+
+    m_userMessageHandlerDescriptors->add(std::make_pair(descriptor.name(), &descriptor.world()), &descriptor);
+}
+
+void UserContentController::removeUserMessageHandlerDescriptor(UserMessageHandlerDescriptor& descriptor)
+{
+    if (!m_userMessageHandlerDescriptors)
+        return;
+
+    m_userMessageHandlerDescriptors->remove(std::make_pair(descriptor.name(), &descriptor.world()));
+}
+#endif
 
 void UserContentController::removeAllUserContent()
 {

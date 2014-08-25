@@ -31,6 +31,8 @@ namespace WebCore {
 class CharacterData : public Node {
 public:
     String data() const { return m_data; }
+    static ptrdiff_t dataMemoryOffset() { return OBJECT_OFFSETOF(CharacterData, m_data); }
+
     void setData(const String&, ExceptionCode&);
     unsigned length() const { return m_data.length(); }
     String substringData(unsigned offset, unsigned count, ExceptionCode&);
@@ -49,7 +51,7 @@ public:
 
 protected:
     CharacterData(Document& document, const String& text, ConstructionType type)
-        : Node(&document, type)
+        : Node(document, type)
         , m_data(!text.isNull() ? text : emptyString())
     {
         ASSERT(type == CreateOther || type == CreateText || type == CreateEditingText);

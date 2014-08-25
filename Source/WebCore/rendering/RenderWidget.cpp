@@ -24,17 +24,15 @@
 #include "RenderWidget.h"
 
 #include "AXObjectCache.h"
+#include "FloatRoundedRect.h"
 #include "Frame.h"
 #include "HTMLFrameOwnerElement.h"
 #include "HitTestResult.h"
 #include "RenderLayer.h"
+#include "RenderLayerBacking.h"
 #include "RenderView.h"
 #include <wtf/StackStats.h>
 #include <wtf/Ref.h>
-
-#if USE(ACCELERATED_COMPOSITING)
-#include "RenderLayerBacking.h"
-#endif
 
 namespace WebCore {
 
@@ -48,7 +46,7 @@ unsigned WidgetHierarchyUpdatesSuspensionScope::s_widgetHierarchyUpdateSuspendCo
 
 WidgetHierarchyUpdatesSuspensionScope::WidgetToParentMap& WidgetHierarchyUpdatesSuspensionScope::widgetNewParentMap()
 {
-    DEFINE_STATIC_LOCAL(WidgetToParentMap, map, ());
+    DEPRECATED_DEFINE_STATIC_LOCAL(WidgetToParentMap, map, ());
     return map;
 }
 
@@ -83,7 +81,7 @@ static void moveWidgetToParentSoon(Widget* child, FrameView* parent)
 }
 
 RenderWidget::RenderWidget(HTMLFrameOwnerElement& element, PassRef<RenderStyle> style)
-    : RenderReplaced(element, std::move(style))
+    : RenderReplaced(element, WTF::move(style))
     , m_weakPtrFactory(this)
 {
     setInline(false);
@@ -141,10 +139,9 @@ bool RenderWidget::setWidgetGeometry(const LayoutRect& frame)
     if (!weakThis)
         return true;
 
-#if USE(ACCELERATED_COMPOSITING)
     if (boundsChanged && hasLayer() && layer()->isComposited())
         layer()->backing()->updateAfterWidgetResize();
-#endif
+
     return oldFrameRect.size() != newFrameRect.size();
 }
 
@@ -272,11 +269,6 @@ void RenderWidget::paint(PaintInfo& paintInfo, const LayoutPoint& paintOffset)
     if (paintInfo.phase != PaintPhaseForeground)
         return;
 
-#if PLATFORM(MAC)
-    if (style().highlight() != nullAtom && !paintInfo.context->paintingDisabled())
-        paintCustomHighlight(paintOffset, style().highlight(), true);
-#endif
-
     if (style().hasBorderRadius()) {
         LayoutRect borderRect = LayoutRect(adjustedPaintOffset, size());
 
@@ -285,8 +277,8 @@ void RenderWidget::paint(PaintInfo& paintInfo, const LayoutPoint& paintOffset)
 
         // Push a clip if we have a border radius, since we want to round the foreground content that gets painted.
         paintInfo.context->save();
-        RoundedRect roundedInnerRect = style().getRoundedInnerBorderFor(borderRect,
-            paddingTop() + borderTop(), paddingBottom() + borderBottom(), paddingLeft() + borderLeft(), paddingRight() + borderRight(), true, true);
+        FloatRoundedRect roundedInnerRect = FloatRoundedRect(style().getRoundedInnerBorderFor(borderRect,
+            paddingTop() + borderTop(), paddingBottom() + borderBottom(), paddingLeft() + borderLeft(), paddingRight() + borderRight(), true, true));
         clipRoundedInnerRect(paintInfo.context, borderRect, roundedInnerRect);
     }
 
@@ -384,7 +376,6 @@ bool RenderWidget::nodeAtPoint(const HitTestRequest& request, HitTestResult& res
     return inside;
 }
 
-#if USE(ACCELERATED_COMPOSITING)
 bool RenderWidget::requiresLayer() const
 {
     return RenderReplaced::requiresLayer() || requiresAcceleratedCompositing();
@@ -400,7 +391,6 @@ bool RenderWidget::requiresAcceleratedCompositing() const
 
     return false;
 }
-#endif
 
 bool RenderWidget::needsPreferredWidthsRecalculation() const
 {

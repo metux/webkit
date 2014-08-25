@@ -1,6 +1,7 @@
 /*
  * Copyright (C) 2006 Apple Inc. All rights reserved.
  * Copyright (C) 2008 Nikolas Zimmermann <zimmermann@kde.org>
+ * Copyright (C) 2014 Adobe Systems Incorporated. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -19,8 +20,6 @@
  */
 
 #include "config.h"
-
-#if ENABLE(SVG)
 #include "SVGForeignObjectElement.h"
 
 #include "Attribute.h"
@@ -32,6 +31,7 @@
 #include "SVGNames.h"
 #include "XLinkNames.h"
 #include <wtf/Assertions.h>
+#include <wtf/NeverDestroyed.h>
 
 namespace WebCore {
 
@@ -71,16 +71,16 @@ PassRefPtr<SVGForeignObjectElement> SVGForeignObjectElement::create(const Qualif
 
 bool SVGForeignObjectElement::isSupportedAttribute(const QualifiedName& attrName)
 {
-    DEFINE_STATIC_LOCAL(HashSet<QualifiedName>, supportedAttributes, ());
-    if (supportedAttributes.isEmpty()) {
+    static NeverDestroyed<HashSet<QualifiedName>> supportedAttributes;
+    if (supportedAttributes.get().isEmpty()) {
         SVGLangSpace::addSupportedAttributes(supportedAttributes);
         SVGExternalResourcesRequired::addSupportedAttributes(supportedAttributes);
-        supportedAttributes.add(SVGNames::xAttr);
-        supportedAttributes.add(SVGNames::yAttr);
-        supportedAttributes.add(SVGNames::widthAttr);
-        supportedAttributes.add(SVGNames::heightAttr);
+        supportedAttributes.get().add(SVGNames::xAttr);
+        supportedAttributes.get().add(SVGNames::yAttr);
+        supportedAttributes.get().add(SVGNames::widthAttr);
+        supportedAttributes.get().add(SVGNames::heightAttr);
     }
-    return supportedAttributes.contains<SVGAttributeHashTranslator>(attrName);
+    return supportedAttributes.get().contains<SVGAttributeHashTranslator>(attrName);
 }
 
 void SVGForeignObjectElement::parseAttribute(const QualifiedName& name, const AtomicString& value)
@@ -113,13 +113,14 @@ void SVGForeignObjectElement::svgAttributeChanged(const QualifiedName& attrName)
     }
 
     SVGElementInstance::InvalidationGuard invalidationGuard(this);
-    
-    bool isLengthAttribute = attrName == SVGNames::xAttr
-                          || attrName == SVGNames::yAttr
-                          || attrName == SVGNames::widthAttr
-                          || attrName == SVGNames::heightAttr;
 
-    if (isLengthAttribute)
+    if (attrName == SVGNames::widthAttr
+        || attrName == SVGNames::heightAttr) {
+        invalidateSVGPresentationAttributeStyle();
+        return;
+    }
+
+    if (attrName == SVGNames::xAttr || attrName == SVGNames::yAttr)
         updateRelativeLengthsInformation();
 
     if (auto renderer = this->renderer())
@@ -128,7 +129,7 @@ void SVGForeignObjectElement::svgAttributeChanged(const QualifiedName& attrName)
 
 RenderPtr<RenderElement> SVGForeignObjectElement::createElementRenderer(PassRef<RenderStyle> style)
 {
-    return createRenderer<RenderSVGForeignObject>(*this, std::move(style));
+    return createRenderer<RenderSVGForeignObject>(*this, WTF::move(style));
 }
 
 bool SVGForeignObjectElement::childShouldCreateRenderer(const Node& child) const
@@ -159,14 +160,4 @@ bool SVGForeignObjectElement::rendererIsNeeded(const RenderStyle& style)
     return SVGGraphicsElement::rendererIsNeeded(style);
 }
 
-bool SVGForeignObjectElement::selfHasRelativeLengths() const
-{
-    return x().isRelative()
-        || y().isRelative()
-        || width().isRelative()
-        || height().isRelative();
 }
-
-}
-
-#endif

@@ -33,7 +33,7 @@
 #include "DFGInsertionSet.h"
 #include "DFGPhase.h"
 #include "DFGVariableAccessDataDump.h"
-#include "Operations.h"
+#include "JSCInlines.h"
 #include <wtf/HashMap.h>
 
 namespace JSC { namespace DFG {
@@ -127,20 +127,20 @@ public:
                     if (!iter->value.m_structure && !iter->value.m_arrayModeIsValid)
                         break;
 
-                    CodeOrigin codeOrigin = node->codeOrigin;
+                    NodeOrigin origin = node->origin;
                     
                     Node* getLocal = insertionSet.insertNode(
-                        indexInBlock + 1, variable->prediction(), GetLocal, codeOrigin,
+                        indexInBlock + 1, variable->prediction(), GetLocal, origin,
                         OpInfo(variable), Edge(node));
                     if (iter->value.m_structure) {
                         insertionSet.insertNode(
-                            indexInBlock + 1, SpecNone, CheckStructure, codeOrigin,
+                            indexInBlock + 1, SpecNone, CheckStructure, origin,
                             OpInfo(m_graph.addStructureSet(iter->value.m_structure)),
                             Edge(getLocal, CellUse));
                     } else if (iter->value.m_arrayModeIsValid) {
                         ASSERT(iter->value.m_arrayModeHoistingOkay);
                         insertionSet.insertNode(
-                            indexInBlock + 1, SpecNone, CheckArray, codeOrigin,
+                            indexInBlock + 1, SpecNone, CheckArray, origin,
                             OpInfo(iter->value.m_arrayMode.asWord()),
                             Edge(getLocal, CellUse));
                     } else
@@ -163,18 +163,18 @@ public:
                     if (!iter->value.m_structure && !iter->value.m_arrayModeIsValid)
                         break;
 
-                    CodeOrigin codeOrigin = node->codeOrigin;
+                    NodeOrigin origin = node->origin;
                     Edge child1 = node->child1();
                     
                     if (iter->value.m_structure) {
                         insertionSet.insertNode(
-                            indexInBlock, SpecNone, CheckStructure, codeOrigin,
+                            indexInBlock, SpecNone, CheckStructure, origin,
                             OpInfo(m_graph.addStructureSet(iter->value.m_structure)),
                             Edge(child1.node(), CellUse));
                     } else if (iter->value.m_arrayModeIsValid) {
                         ASSERT(iter->value.m_arrayModeHoistingOkay);
                         insertionSet.insertNode(
-                            indexInBlock, SpecNone, CheckArray, codeOrigin,
+                            indexInBlock, SpecNone, CheckArray, origin,
                             OpInfo(iter->value.m_arrayMode.asWord()),
                             Edge(child1.node(), CellUse));
                     } else
@@ -215,8 +215,7 @@ private:
             for (unsigned indexInBlock = 0; indexInBlock < block->size(); ++indexInBlock) {
                 Node* node = block->at(indexInBlock);
                 switch (node->op()) {
-                case CheckStructure:
-                case StructureTransitionWatchpoint: {
+                case CheckStructure: {
                     Node* child = node->child1().node();
                     if (child->op() != GetLocal)
                         break;
@@ -243,7 +242,10 @@ private:
                 case GetIndexedPropertyStorage:
                 case GetTypedArrayByteOffset:
                 case Phantom:
+                case HardPhantom:
                 case MovHint:
+                case MultiGetByOffset:
+                case MultiPutByOffset:
                     // Don't count these uses.
                     break;
                     
@@ -280,13 +282,6 @@ private:
                                 break;
                             
                             noticeStructureCheck(variable, subNode->structureSet());
-                            break;
-                        }
-                        case StructureTransitionWatchpoint: {
-                            if (subNode->child1() != source)
-                                break;
-                            
-                            noticeStructureCheck(variable, subNode->structure());
                             break;
                         }
                         default:
@@ -328,7 +323,6 @@ private:
                 }
 
                 case CheckStructure:
-                case StructureTransitionWatchpoint:
                 case GetByOffset:
                 case PutByOffset:
                 case PutStructure:
@@ -341,7 +335,10 @@ private:
                 case GetArrayLength:
                 case GetIndexedPropertyStorage:
                 case Phantom:
+                case HardPhantom:
                 case MovHint:
+                case MultiGetByOffset:
+                case MultiPutByOffset:
                     // Don't count these uses.
                     break;
                     
@@ -378,13 +375,6 @@ private:
                                 break;
                             
                             noticeStructureCheckAccountingForArrayMode(variable, subNode->structureSet());
-                            break;
-                        }
-                        case StructureTransitionWatchpoint: {
-                            if (subNode->child1() != source)
-                                break;
-                            
-                            noticeStructureCheckAccountingForArrayMode(variable, subNode->structure());
                             break;
                         }
                         case CheckArray: {
@@ -497,7 +487,7 @@ private:
             noticeStructureCheck(variable, 0);
             return;
         }
-        noticeStructureCheck(variable, set.singletonStructure());
+        noticeStructureCheck(variable, set.onlyStructure());
     }
 
     void noticeCheckArray(VariableAccessData* variable, ArrayMode arrayMode)

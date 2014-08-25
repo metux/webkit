@@ -10,10 +10,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -32,7 +32,7 @@
 #include "LayoutSize.h"
 #include "RenderObject.h"
 #include "TransformationMatrix.h"
-#include <wtf/OwnPtr.h>
+#include <memory>
 
 namespace WebCore {
 
@@ -64,7 +64,7 @@ struct RenderGeometryMapStep {
     }
     const RenderObject* m_renderer;
     LayoutSize m_offset;
-    OwnPtr<TransformationMatrix> m_transform; // Includes offset if non-null.
+    std::unique_ptr<TransformationMatrix> m_transform; // Includes offset if non-null.
     bool m_accumulatingTransform;
     bool m_isNonUniform; // Mapping depends on the input point, e.g. because of CSS columns.
     bool m_isFixedPosition;
@@ -137,7 +137,7 @@ private:
 } // namespace WebCore
 
 namespace WTF {
-// This is required for a struct with OwnPtr. We know RenderGeometryMapStep is simple enough that
+// This is required for a struct with std::unique_ptr<>. We know RenderGeometryMapStep is simple enough that
 // initializing to 0 and moving with memcpy (and then not destructing the original) will work.
 template<> struct VectorTraits<WebCore::RenderGeometryMapStep> : SimpleClassVectorTraits { };
 }

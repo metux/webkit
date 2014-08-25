@@ -26,8 +26,6 @@
 #ifndef DFGOSRExit_h
 #define DFGOSRExit_h
 
-#include <wtf/Platform.h>
-
 #if ENABLE(DFG_JIT)
 
 #include "CodeOrigin.h"
@@ -105,10 +103,17 @@ struct OSRExit : public OSRExitBase {
     unsigned m_streamIndex;
     
     RefPtr<ValueRecoveryOverride> m_valueRecoveryOverride;
+    
+    bool considerAddingAsFrequentExitSite(CodeBlock* profiledCodeBlock)
+    {
+        return OSRExitBase::considerAddingAsFrequentExitSite(profiledCodeBlock, ExitFromDFG);
+    }
 };
 
 struct SpeculationFailureDebugInfo {
     CodeBlock* codeBlock;
+    ExitKind kind;
+    unsigned bytecodeOffset;
 };
 
 } } // namespace JSC::DFG

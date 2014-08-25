@@ -21,8 +21,6 @@
  */
 
 #include "config.h"
-
-#if ENABLE(SVG)
 #include "RenderSVGViewportContainer.h"
 
 #include "GraphicsContext.h"
@@ -35,7 +33,7 @@
 namespace WebCore {
 
 RenderSVGViewportContainer::RenderSVGViewportContainer(SVGSVGElement& element, PassRef<RenderStyle> style)
-    : RenderSVGContainer(element, std::move(style))
+    : RenderSVGContainer(element, WTF::move(style))
     , m_didTransformToRootUpdate(false)
     , m_isLayoutSizeChanged(false)
     , m_needsTransformUpdate(true)
@@ -153,5 +151,3 @@ void RenderSVGViewportContainer::paint(PaintInfo& paintInfo, const LayoutPoint& 
 }
 
 }
-
-#endif // ENABLE(SVG)

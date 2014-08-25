@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2006, 2007, 2008, 2013 Apple Inc. All rights reserved.
+ * Copyright (C) 2006, 2007, 2008, 2013, 2014 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -10,10 +10,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -26,8 +26,8 @@
 #ifndef Editor_h
 #define Editor_h
 
-#include "ClipboardAccessPolicy.h"
 #include "Color.h"
+#include "DataTransferAccessPolicy.h"
 #include "DictationAlternative.h"
 #include "DocumentMarker.h"
 #include "EditAction.h"
@@ -37,11 +37,12 @@
 #include "FindOptions.h"
 #include "FrameSelection.h"
 #include "TextChecking.h"
-#include "TextIterator.h"
+#include "TextIteratorBehavior.h"
 #include "VisibleSelection.h"
 #include "WritingDirection.h"
+#include <memory>
 
-#if PLATFORM(MAC)
+#if PLATFORM(COCOA)
 OBJC_CLASS NSAttributedString;
 OBJC_CLASS NSDictionary;
 #endif
@@ -50,7 +51,7 @@ namespace WebCore {
 
 class AlternativeTextController;
 class ArchiveResource;
-class Clipboard;
+class DataTransfer;
 class CompositeEditCommand;
 class DeleteButtonController;
 class EditCommand;
@@ -89,9 +90,14 @@ struct CompositionUnderline {
 enum EditorCommandSource { CommandFromMenuOrKeyBinding, CommandFromDOM, CommandFromDOMWithUserInterface };
 enum EditorParagraphSeparator { EditorParagraphSeparatorIsDiv, EditorParagraphSeparatorIsP };
 
+enum class MailBlockquoteHandling {
+    RespectBlockquote,
+    IgnoreBlockquote,
+};
+
 class Editor {
 public:
-    static PassOwnPtr<Editor> create(Frame& frame) { return adoptPtr(new Editor(frame)); }
+    explicit Editor(Frame&);
     ~Editor();
 
     EditorClient* client() const;
@@ -174,7 +180,7 @@ public:
     void removeUnchangeableStyles();
 #endif
     
-    bool dispatchCPPEvent(const AtomicString&, ClipboardAccessPolicy);
+    bool dispatchCPPEvent(const AtomicString&, DataTransferAccessPolicy);
     
     void applyStyle(StyleProperties*, EditAction = EditActionUnspecified);
     void applyParagraphStyle(StyleProperties*, EditAction = EditActionUnspecified);
@@ -334,7 +340,7 @@ public:
     void handleAlternativeTextUIResult(const String& correction);
     void dismissCorrectionPanelAsIgnored();
 
-    void pasteAsFragment(PassRefPtr<DocumentFragment>, bool smartReplace, bool matchStyle);
+    void pasteAsFragment(PassRefPtr<DocumentFragment>, bool smartReplace, bool matchStyle, MailBlockquoteHandling = MailBlockquoteHandling::RespectBlockquote);
     void pasteAsPlainText(const String&, bool smartReplace);
 
     // This is only called on the mac where paste is implemented primarily at the WebKit level.
@@ -346,7 +352,7 @@ public:
     Node* findEventTargetFrom(const VisibleSelection& selection) const;
 
     String selectedText() const;
-    String selectedTextForClipboard() const;
+    String selectedTextForDataTransfer() const;
     bool findString(const String&, FindOptions);
 
     PassRefPtr<Range> rangeOfString(const String&, Range*, FindOptions);
@@ -362,6 +368,7 @@ public:
     IntRect firstRectForRange(Range*) const;
 
     void respondToChangedSelection(const VisibleSelection& oldSelection, FrameSelection::SetSelectionOptions);
+    void updateEditorUINowIfScheduled();
     bool shouldChangeSelection(const VisibleSelection& oldSelection, const VisibleSelection& newSelection, EAffinity, bool stillSelecting) const;
     unsigned countMatchesForText(const String&, Range*, FindOptions, unsigned limit, bool markMatches, Vector<RefPtr<Range>>*);
     bool markedTextMatchesAreHighlighted() const;
@@ -375,7 +382,7 @@ public:
     void textDidChangeInTextArea(Element*);
     WritingDirection baseWritingDirectionForSelectionStart() const;
 
-    void replaceSelectionWithFragment(PassRefPtr<DocumentFragment>, bool selectReplacement, bool smartReplace, bool matchStyle);
+    void replaceSelectionWithFragment(PassRefPtr<DocumentFragment>, bool selectReplacement, bool smartReplace, bool matchStyle, MailBlockquoteHandling = MailBlockquoteHandling::RespectBlockquote);
     void replaceSelectionWithText(const String&, bool selectReplacement, bool smartReplace);
     bool selectionStartHasMarkerFor(DocumentMarker::MarkerType, int from, int length) const;
     void updateMarkersForWordsAffectedByEditing(bool onlyHandleWordsContainingSelection);
@@ -419,7 +426,8 @@ public:
     DeleteButtonController& deleteButtonController() const { return *m_deleteButtonController; }
 #endif
 
-#if PLATFORM(MAC)
+#if PLATFORM(COCOA)
+    static RenderStyle* styleForSelectionStart(Frame* , Node *&nodeToRemove);
     bool insertParagraphSeparatorInQuotedContent();
     const SimpleFontData* fontForSelection(bool&) const;
     NSDictionary* fontAttributesForSelectionStart() const;
@@ -429,27 +437,31 @@ public:
 #if !PLATFORM(IOS)
     bool canCopyExcludingStandaloneImages();
     void takeFindStringFromSelection();
-    void readSelectionFromPasteboard(const String& pasteboardName);
+    void readSelectionFromPasteboard(const String& pasteboardName, MailBlockquoteHandling = MailBlockquoteHandling::RespectBlockquote);
+    void replaceNodeFromPasteboard(Node*, const String& pasteboardName);
     PassRefPtr<SharedBuffer> dataSelectionForPasteboard(const String& pasteboardName);
 #endif // !PLATFORM(IOS)
 #endif
 
-#if PLATFORM(MAC) || PLATFORM(EFL)
+#if PLATFORM(COCOA) || PLATFORM(EFL)
     void writeSelectionToPasteboard(Pasteboard&);
     void writeImageToPasteboard(Pasteboard&, Element& imageElement, const URL&, const String& title);
 #endif
 
+#if ENABLE(TELEPHONE_NUMBER_DETECTION) && !PLATFORM(IOS)
+    void scanSelectionForTelephoneNumbers();
+    const Vector<RefPtr<Range>>& detectedTelephoneNumberRanges() const { return m_detectedTelephoneNumberRanges; }
+#endif
+
 private:
     class WebContentReader;
-
-    explicit Editor(Frame&);
 
     Document& document() const;
 
     bool canDeleteRange(Range*) const;
     bool canSmartReplaceWithPasteboard(Pasteboard&);
     void pasteAsPlainTextWithPasteboard(Pasteboard&);
-    void pasteWithPasteboard(Pasteboard*, bool allowPlainText);
+    void pasteWithPasteboard(Pasteboard*, bool allowPlainText, MailBlockquoteHandling = MailBlockquoteHandling::RespectBlockquote);
     String plainTextFromPasteboard(const PasteboardPlainText&);
 
     void revealSelectionAfterEditingOperation(const ScrollAlignment& = ScrollAlignment::alignCenterIfNeeded, RevealExtentOption = DoNotRevealExtent);
@@ -463,13 +475,17 @@ private:
     void setComposition(const String&, SetCompositionMode);
 
     void changeSelectionAfterCommand(const VisibleSelection& newSelection, FrameSelection::SetSelectionOptions);
-    void notifyComponentsOnChangedSelection(const VisibleSelection& oldSelection, FrameSelection::SetSelectionOptions);
+
+    enum EditorActionSpecifier { CutAction, CopyAction };
+    void performCutOrCopy(EditorActionSpecifier);
+
+    void editorUIUpdateTimerFired(Timer<Editor>&);
 
     Node* findEventTargetFromSelection() const;
 
     bool unifiedTextCheckerEnabled() const;
 
-#if PLATFORM(MAC)
+#if PLATFORM(COCOA)
     PassRefPtr<SharedBuffer> selectionInWebArchiveFormat();
     PassRefPtr<Range> adjustedSelectionRange();
     PassRefPtr<DocumentFragment> createFragmentForImageResourceAndAddResource(PassRefPtr<ArchiveResource>);
@@ -479,7 +495,7 @@ private:
 
     Frame& m_frame;
 #if ENABLE(DELETION_UI)
-    OwnPtr<DeleteButtonController> m_deleteButtonController;
+    std::unique_ptr<DeleteButtonController> m_deleteButtonController;
 #endif
     RefPtr<CompositeEditCommand> m_lastEditCommand;
     RefPtr<Text> m_compositionNode;
@@ -489,13 +505,27 @@ private:
     bool m_ignoreCompositionSelectionChange;
     bool m_shouldStartNewKillRingSequence;
     bool m_shouldStyleWithCSS;
-    const OwnPtr<KillRing> m_killRing;
-    const OwnPtr<SpellChecker> m_spellChecker;
-    const OwnPtr<AlternativeTextController> m_alternativeTextController;
+    const std::unique_ptr<KillRing> m_killRing;
+    const std::unique_ptr<SpellChecker> m_spellChecker;
+    const std::unique_ptr<AlternativeTextController> m_alternativeTextController;
     VisibleSelection m_mark;
     bool m_areMarkedTextMatchesHighlighted;
     EditorParagraphSeparator m_defaultParagraphSeparator;
     bool m_overwriteModeEnabled;
+
+    VisibleSelection m_oldSelectionForEditorUIUpdate;
+    Timer<Editor> m_editorUIUpdateTimer;
+    bool m_editorUIUpdateTimerShouldCheckSpellingAndGrammar;
+    bool m_editorUIUpdateTimerWasTriggeredByDictation;
+
+#if ENABLE(TELEPHONE_NUMBER_DETECTION) && !PLATFORM(IOS)
+    bool shouldDetectTelephoneNumbers();
+    void scanSelectionForTelephoneNumbers(Timer<Editor>&);
+    void scanRangeForTelephoneNumbers(Range&, const StringView&, Vector<RefPtr<Range>>& markedRanges);
+
+    Timer<Editor> m_telephoneNumberDetectionUpdateTimer;
+    Vector<RefPtr<Range>> m_detectedTelephoneNumberRanges;
+#endif
 };
 
 inline void Editor::setStartNewKillRingSequence(bool flag)

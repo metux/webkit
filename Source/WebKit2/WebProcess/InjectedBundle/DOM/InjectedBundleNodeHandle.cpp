@@ -215,6 +215,11 @@ bool InjectedBundleNodeHandle::htmlTextAreaElementLastChangeWasUserEdit()
     return toHTMLTextAreaElement(m_node.get())->lastChangeWasUserEdit();
 }
 
+bool InjectedBundleNodeHandle::isTextField() const
+{
+    return isHTMLInputElement(m_node.get()) && toHTMLInputElement(m_node.get())->isText();
+}
+
 PassRefPtr<InjectedBundleNodeHandle> InjectedBundleNodeHandle::htmlTableCellElementCellAbove()
 {
     if (!m_node->hasTagName(tdTag))
@@ -226,40 +231,37 @@ PassRefPtr<InjectedBundleNodeHandle> InjectedBundleNodeHandle::htmlTableCellElem
 PassRefPtr<WebFrame> InjectedBundleNodeHandle::documentFrame()
 {
     if (!m_node->isDocumentNode())
-        return 0;
+        return nullptr;
 
     Frame* frame = static_cast<Document*>(m_node.get())->frame();
     if (!frame)
-        return 0;
+        return nullptr;
 
-    WebFrameLoaderClient* webFrameLoaderClient = toWebFrameLoaderClient(frame->loader().client());
-    return webFrameLoaderClient ? webFrameLoaderClient->webFrame() : 0;
+    return WebFrame::fromCoreFrame(*frame);
 }
 
 PassRefPtr<WebFrame> InjectedBundleNodeHandle::htmlFrameElementContentFrame()
 {
     if (!m_node->hasTagName(frameTag))
-        return 0;
+        return nullptr;
 
     Frame* frame = static_cast<HTMLFrameElement*>(m_node.get())->contentFrame();
     if (!frame)
-        return 0;
+        return nullptr;
 
-    WebFrameLoaderClient* webFrameLoaderClient = toWebFrameLoaderClient(frame->loader().client());
-    return webFrameLoaderClient ? webFrameLoaderClient->webFrame() : 0;
+    return WebFrame::fromCoreFrame(*frame);
 }
 
 PassRefPtr<WebFrame> InjectedBundleNodeHandle::htmlIFrameElementContentFrame()
 {
     if (!m_node->hasTagName(iframeTag))
-        return 0;
+        return nullptr;
 
     Frame* frame = toHTMLIFrameElement(m_node.get())->contentFrame();
     if (!frame)
-        return 0;
+        return nullptr;
 
-    WebFrameLoaderClient* webFrameLoaderClient = toWebFrameLoaderClient(frame->loader().client());
-    return webFrameLoaderClient ? webFrameLoaderClient->webFrame() : 0;
+    return WebFrame::fromCoreFrame(*frame);
 }
 
 } // namespace WebKit

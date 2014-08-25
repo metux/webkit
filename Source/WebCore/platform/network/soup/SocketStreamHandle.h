@@ -34,6 +34,9 @@
 #define SocketStreamHandle_h
 
 #include "SocketStreamHandleBase.h"
+
+#if USE(SOUP)
+
 #include <wtf/PassRefPtr.h>
 #include <wtf/RefCounted.h>
 #include <wtf/gobject/GRefPtr.h>
@@ -64,7 +67,7 @@ namespace WebCore {
         GRefPtr<GInputStream> m_inputStream;
         GRefPtr<GPollableOutputStream> m_outputStream;
         GRefPtr<GSource> m_writeReadySource;
-        char* m_readBuffer;
+        std::unique_ptr<char[]> m_readBuffer;
         void* m_id;
 
         SocketStreamHandle(const URL&, SocketStreamHandleClient*);
@@ -75,10 +78,15 @@ namespace WebCore {
         void receivedCredential(const AuthenticationChallenge&, const Credential&);
         void receivedRequestToContinueWithoutCredential(const AuthenticationChallenge&);
         void receivedCancellation(const AuthenticationChallenge&);
+        void receivedRequestToPerformDefaultHandling(const AuthenticationChallenge&);
+        void receivedChallengeRejection(const AuthenticationChallenge&);
+
         void beginWaitingForSocketWritability();
         void stopWaitingForSocketWritability();
     };
 
 }  // namespace WebCore
+
+#endif
 
 #endif  // SocketStreamHandle_h

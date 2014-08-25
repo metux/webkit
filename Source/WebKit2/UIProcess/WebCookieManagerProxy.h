@@ -48,8 +48,8 @@ namespace WebKit {
 class WebContext;
 class WebProcessProxy;
 
-typedef GenericCallback<WKArrayRef> ArrayCallback;
-typedef GenericCallback<WKHTTPCookieAcceptPolicy, HTTPCookieAcceptPolicy> HTTPCookieAcceptPolicyCallback;
+typedef GenericCallback<API::Array*> ArrayCallback;
+typedef GenericCallback<HTTPCookieAcceptPolicy> HTTPCookieAcceptPolicyCallback;
 
 class WebCookieManagerProxy : public API::ObjectImpl<API::Object::Type::CookieManager>, public WebContextSupplement, private IPC::MessageReceiver {
 public:
@@ -60,12 +60,13 @@ public:
 
     void initializeClient(const WKCookieManagerClientBase*);
     
-    void getHostnamesWithCookies(PassRefPtr<ArrayCallback>);
+    void getHostnamesWithCookies(std::function<void (API::Array*, CallbackBase::Error)>);
     void deleteCookiesForHostname(const String& hostname);
     void deleteAllCookies();
+    void deleteAllCookiesModifiedAfterDate(double);
 
     void setHTTPCookieAcceptPolicy(HTTPCookieAcceptPolicy);
-    void getHTTPCookieAcceptPolicy(PassRefPtr<HTTPCookieAcceptPolicyCallback>);
+    void getHTTPCookieAcceptPolicy(std::function<void (HTTPCookieAcceptPolicy, CallbackBase::Error)>);
 
     void startObservingCookieChanges();
     void stopObservingCookieChanges();
@@ -97,7 +98,7 @@ private:
     // IPC::MessageReceiver
     virtual void didReceiveMessage(IPC::Connection*, IPC::MessageDecoder&) override;
 
-#if PLATFORM(MAC)
+#if PLATFORM(COCOA)
     void persistHTTPCookieAcceptPolicy(HTTPCookieAcceptPolicy);
 #endif
 

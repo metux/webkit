@@ -47,7 +47,7 @@ public:
 
     static Structure* createStructure(VM& vm, JSGlobalObject* globalObject, JSValue prototype)
     {
-        return Structure::create(vm, globalObject, prototype, TypeInfo(CompoundType, StructureFlags), info());
+        return Structure::create(vm, globalObject, prototype, TypeInfo(CellType, StructureFlags), info());
     }
 
     static const bool needsDestruction = true;
@@ -61,7 +61,7 @@ public:
 
     DECLARE_INFO;
 
-    static const unsigned StructureFlags = OverridesVisitChildren | Base::StructureFlags;
+    static const unsigned StructureFlags = StructureIsImmortal | Base::StructureFlags;
 
 private:
     WeakMapData(VM&);

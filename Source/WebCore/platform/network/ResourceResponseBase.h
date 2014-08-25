@@ -11,10 +11,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -77,12 +77,20 @@ public:
     
     const String& httpStatusText() const;
     void setHTTPStatusText(const String&);
-    
-    String httpHeaderField(const AtomicString& name) const;
-    String httpHeaderField(const char* name) const;
-    void setHTTPHeaderField(const AtomicString& name, const String& value);
-    void addHTTPHeaderField(const AtomicString& name, const String& value);
+
     const HTTPHeaderMap& httpHeaderFields() const;
+
+    String httpHeaderField(const String& name) const;
+    String httpHeaderField(HTTPHeaderName) const;
+    void setHTTPHeaderField(const String& name, const String& value);
+    void setHTTPHeaderField(HTTPHeaderName, const String& value);
+
+    void addHTTPHeaderField(const String& name, const String& value);
+
+    // Instead of passing a string literal to any of these functions, just use a HTTPHeaderName instead.
+    template<size_t length> String httpHeaderField(const char (&)[length]) const = delete;
+    template<size_t length> void setHTTPHeaderField(const char (&)[length], const String&) = delete;
+    template<size_t length> void addHTTPHeaderField(const char (&)[length], const String&) = delete;
 
     bool isMultipart() const { return mimeType() == "multipart/x-mixed-replace"; }
 
@@ -109,8 +117,7 @@ public:
     bool wasCached() const;
     void setWasCached(bool);
 
-    ResourceLoadTiming* resourceLoadTiming() const;
-    void setResourceLoadTiming(PassRefPtr<ResourceLoadTiming>);
+    ResourceLoadTiming& resourceLoadTiming() const { return m_resourceLoadTiming; }
 
     // The ResourceResponse subclass may "shadow" this method to provide platform-specific memory usage information
     unsigned memoryUsage() const
@@ -141,13 +148,13 @@ protected:
     static bool platformCompare(const ResourceResponse&, const ResourceResponse&) { return true; }
 
     URL m_url;
-    String m_mimeType;
+    AtomicString m_mimeType;
     long long m_expectedContentLength;
-    String m_textEncodingName;
+    AtomicString m_textEncodingName;
     String m_suggestedFilename;
-    String m_httpStatusText;
+    AtomicString m_httpStatusText;
     HTTPHeaderMap m_httpHeaderFields;
-    RefPtr<ResourceLoadTiming> m_resourceLoadTiming;
+    mutable ResourceLoadTiming m_resourceLoadTiming;
 
     int m_httpStatusCode;
     unsigned m_connectionID;
@@ -168,7 +175,7 @@ public:
 private:
     const ResourceResponse& asResourceResponse() const;
     void parseCacheControlDirectives() const;
-    void updateHeaderParsedState(const AtomicString& name);
+    void updateHeaderParsedState(HTTPHeaderName);
 
     mutable bool m_haveParsedCacheControlHeader : 1;
     mutable bool m_haveParsedAgeHeader : 1;
@@ -195,8 +202,8 @@ public:
     String m_suggestedFilename;
     int m_httpStatusCode;
     String m_httpStatusText;
-    OwnPtr<CrossThreadHTTPHeaderMapData> m_httpHeaders;
-    RefPtr<ResourceLoadTiming> m_resourceLoadTiming;
+    std::unique_ptr<CrossThreadHTTPHeaderMapData> m_httpHeaders;
+    ResourceLoadTiming m_resourceLoadTiming;
 };
 
 } // namespace WebCore

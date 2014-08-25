@@ -12,10 +12,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -44,6 +44,7 @@
 #include "GraphicsContext.h"
 #include "HTMLNames.h"
 #include "HTMLPlugInElement.h"
+#include "HTTPHeaderNames.h"
 #include "Image.h"
 #include "JSDOMBinding.h"
 #include "JSDOMWindow.h"
@@ -387,8 +388,8 @@ void PluginView::stop()
     if (savedData) {
         // TODO: Actually save this data instead of just discarding it
         if (savedData->buf)
-            m_plugin->browserFuncs()->memfree(savedData->buf);
-        m_plugin->browserFuncs()->memfree(savedData);
+            NPN_MemFree(savedData->buf);
+        NPN_MemFree(savedData);
     }
 #endif
 
@@ -408,9 +409,11 @@ PluginView* PluginView::currentPluginView()
 static char* createUTF8String(const String& str)
 {
     CString cstr = str.utf8();
-    char* result = reinterpret_cast<char*>(fastMalloc(cstr.length() + 1));
+    const size_t cstrLength = cstr.length();
+    char* result = reinterpret_cast<char*>(fastMalloc(cstrLength + 1));
 
-    strncpy(result, cstr.data(), cstr.length() + 1);
+    memcpy(result, cstr.data(), cstrLength);
+    result[cstrLength] = '\0';
 
     return result;
 }
@@ -1161,11 +1164,11 @@ NPError PluginView::handlePost(const char* url, const char* target, uint32_t len
                 // Sometimes plugins like to set Content-Length themselves when they post,
                 // but WebFoundation does not like that. So we will remove the header
                 // and instead truncate the data to the requested length.
-                String contentLength = headerFields.get("Content-Length");
+                String contentLength = headerFields.get(HTTPHeaderName::ContentLength);
 
                 if (!contentLength.isNull())
                     dataLength = min(contentLength.toInt(), (int)dataLength);
-                headerFields.remove("Content-Length");
+                headerFields.remove(HTTPHeaderName::ContentLength);
 
                 postData += location;
                 postDataLength = dataLength;
@@ -1175,7 +1178,7 @@ NPError PluginView::handlePost(const char* url, const char* target, uint32_t len
 
     frameLoadRequest.resourceRequest().setHTTPMethod("POST");
     frameLoadRequest.resourceRequest().setURL(makeURL(m_parentFrame->document()->baseURL(), url));
-    frameLoadRequest.resourceRequest().addHTTPHeaderFields(headerFields);
+    frameLoadRequest.resourceRequest().setHTTPHeaderFields(WTF::move(headerFields));
     frameLoadRequest.resourceRequest().setHTTPBody(FormData::create(postData, postDataLength));
     frameLoadRequest.setFrameName(target);
 
@@ -1354,7 +1357,7 @@ NPError PluginView::getValue(NPNVariable variable, void* value)
         Page* page = m_parentFrame->page();
         if (!page)
             return NPERR_GENERIC_ERROR;
-        *((NPBool*)value) = page->settings().privateBrowsingEnabled();
+        *((NPBool*)value) = page->usesEphemeralSession();
         return NPERR_NO_ERROR;
     }
 
@@ -1386,7 +1389,7 @@ NPError PluginView::getValueForURL(NPNURLVariable variable, const char* url, cha
                 const CString cookieStr = cookies(frame->document(), u).utf8();
                 if (!cookieStr.isNull()) {
                     const int size = cookieStr.length();
-                    *value = static_cast<char*>(m_plugin->browserFuncs()->memalloc(size+1));
+                    *value = static_cast<char*>(NPN_MemAlloc(size+1));
                     if (*value) {
                         memset(*value, 0, size+1);
                         memcpy(*value, cookieStr.data(), size+1);
@@ -1409,7 +1412,7 @@ NPError PluginView::getValueForURL(NPNURLVariable variable, const char* url, cha
             const CString proxyStr = toString(proxyServersForURL(u, context)).utf8();
             if (!proxyStr.isNull()) {
                 const int size = proxyStr.length();
-                *value = static_cast<char*>(m_plugin->browserFuncs()->memalloc(size+1));
+                *value = static_cast<char*>(NPN_MemAlloc(size+1));
                 if (*value) {
                     memset(*value, 0, size+1);
                     memcpy(*value, proxyStr.data(), size+1);

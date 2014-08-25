@@ -17,6 +17,9 @@
  */
 
 #include "config.h"
+
+#if USE(SOUP)
+
 #include "SharedBuffer.h"
 
 #include "PurgeableBuffer.h"
@@ -26,6 +29,7 @@ namespace WebCore {
 
 SharedBuffer::SharedBuffer(SoupBuffer* soupBuffer)
     : m_size(0)
+    , m_buffer(adoptRef(new DataBuffer))
     , m_soupBuffer(soupBuffer)
 {
     ASSERT(soupBuffer);
@@ -41,7 +45,7 @@ void SharedBuffer::clearPlatformData()
     m_soupBuffer.reset();
 }
 
-void SharedBuffer::tryReplaceContentsWithPlatformBuffer(SharedBuffer* newContents)
+void SharedBuffer::tryReplaceContentsWithPlatformBuffer(SharedBuffer*)
 {
     ASSERT_NOT_REACHED();
 }
@@ -76,4 +80,11 @@ unsigned SharedBuffer::platformDataSize() const
     return m_soupBuffer->length;
 }
 
+bool SharedBuffer::maybeAppendPlatformData(SharedBuffer*)
+{
+    return false;
+}
+
 } // namespace WebCore
+
+#endif

@@ -10,7 +10,7 @@
  * 2.  Redistributions in binary form must reproduce the above copyright
  *     notice, this list of conditions and the following disclaimer in the
  *     documentation and/or other materials provided with the distribution.
- * 3.  Neither the name of Apple Computer, Inc. ("Apple") nor the names of
+ * 3.  Neither the name of Apple Inc. ("Apple") nor the names of
  *     its contributors may be used to endorse or promote products derived
  *     from this software without specific prior written permission.
  *
@@ -32,7 +32,7 @@
 #include "Arguments.h"
 #include "JSArray.h"
 #include "JSFunction.h"
-#include "Operations.h"
+#include "JSCInlines.h"
 #include "StringObject.h"
 #include "ValueProfile.h"
 #include <wtf/BoundsCheckedPointer.h>
@@ -161,8 +161,8 @@ void dumpSpeculation(PrintStream& out, SpeculatedType value)
     if (value & SpecInt52)
         myOut.print("Int52");
         
-    if ((value & SpecDouble) == SpecDouble)
-        myOut.print("Double");
+    if ((value & SpecBytecodeDouble) == SpecBytecodeDouble)
+        myOut.print("Bytecodedouble");
     else {
         if (value & SpecInt52AsDouble)
             myOut.print("Int52asdouble");
@@ -174,11 +174,14 @@ void dumpSpeculation(PrintStream& out, SpeculatedType value)
         else
             isTop = false;
         
-        if (value & SpecDoubleNaN)
-            myOut.print("Doublenan");
+        if (value & SpecDoublePureNaN)
+            myOut.print("Doublepurenan");
         else
             isTop = false;
     }
+    
+    if (value & SpecDoubleImpureNaN)
+        out.print("Doubleimpurenan");
     
     if (value & SpecBoolean)
         myOut.print("Bool");
@@ -255,6 +258,8 @@ static const char* speculationToAbbreviatedString(SpeculatedType prediction)
         return "<Boolean>";
     if (isOtherSpeculation(prediction))
         return "<Other>";
+    if (isMiscSpeculation(prediction))
+        return "<Misc>";
     return "";
 }
 
@@ -329,7 +334,7 @@ SpeculatedType speculationFromCell(JSCell* cell)
 {
     if (JSString* string = jsDynamicCast<JSString*>(cell)) {
         if (const StringImpl* impl = string->tryGetValueImpl()) {
-            if (impl->isIdentifier())
+            if (impl->isAtomic())
                 return SpecStringIdent;
         }
         return SpecStringVar;
@@ -346,7 +351,7 @@ SpeculatedType speculationFromValue(JSValue value)
     if (value.isDouble()) {
         double number = value.asNumber();
         if (number != number)
-            return SpecDoubleNaN;
+            return SpecDoublePureNaN;
         if (value.isMachineInt())
             return SpecInt52AsDouble;
         return SpecNonIntAsDouble;
@@ -389,6 +394,128 @@ TypedArrayType typedArrayTypeFromSpeculation(SpeculatedType type)
         return TypeFloat64;
     
     return NotTypedArray;
+}
+
+SpeculatedType leastUpperBoundOfStrictlyEquivalentSpeculations(SpeculatedType type)
+{
+    if (type & SpecInteger)
+        type |= SpecInteger;
+    if (type & SpecString)
+        type |= SpecString;
+    return type;
+}
+
+bool valuesCouldBeEqual(SpeculatedType a, SpeculatedType b)
+{
+    a = leastUpperBoundOfStrictlyEquivalentSpeculations(a);
+    b = leastUpperBoundOfStrictlyEquivalentSpeculations(b);
+    
+    // Anything could be equal to a string.
+    if (a & SpecString)
+        return true;
+    if (b & SpecString)
+        return true;
+    
+    // If both sides are definitely only objects, then equality is fairly sane.
+    if (isObjectSpeculation(a) && isObjectSpeculation(b))
+        return !!(a & b);
+    
+    // If either side could be an object or not, then we could call toString or
+    // valueOf, which could return anything.
+    if (a & SpecObject)
+        return true;
+    if (b & SpecObject)
+        return true;
+    
+    // Neither side is an object or string, so the world is relatively sane.
+    return !!(a & b);
+}
+
+SpeculatedType typeOfDoubleSum(SpeculatedType a, SpeculatedType b)
+{
+    SpeculatedType result = a | b;
+    // Impure NaN could become pure NaN during addition because addition may clear bits.
+    if (result & SpecDoubleImpureNaN)
+        result |= SpecDoublePureNaN;
+    // Values could overflow, or fractions could become integers.
+    if (result & SpecDoubleReal)
+        result |= SpecDoubleReal;
+    return result;
+}
+
+SpeculatedType typeOfDoubleDifference(SpeculatedType a, SpeculatedType b)
+{
+    return typeOfDoubleSum(a, b);
+}
+
+SpeculatedType typeOfDoubleProduct(SpeculatedType a, SpeculatedType b)
+{
+    return typeOfDoubleSum(a, b);
+}
+
+static SpeculatedType polluteDouble(SpeculatedType value)
+{
+    // Impure NaN could become pure NaN because the operation could clear some bits.
+    if (value & SpecDoubleImpureNaN)
+        value |= SpecDoubleNaN;
+    // Values could overflow, fractions could become integers, or an error could produce
+    // PureNaN.
+    if (value & SpecDoubleReal)
+        value |= SpecDoubleReal | SpecDoublePureNaN;
+    return value;
+}
+
+SpeculatedType typeOfDoubleQuotient(SpeculatedType a, SpeculatedType b)
+{
+    return polluteDouble(a | b);
+}
+
+SpeculatedType typeOfDoubleMinMax(SpeculatedType a, SpeculatedType b)
+{
+    SpeculatedType result = a | b;
+    // Impure NaN could become pure NaN during addition because addition may clear bits.
+    if (result & SpecDoubleImpureNaN)
+        result |= SpecDoublePureNaN;
+    return result;
+}
+
+SpeculatedType typeOfDoubleNegation(SpeculatedType value)
+{
+    // Impure NaN could become pure NaN because bits might get cleared.
+    if (value & SpecDoubleImpureNaN)
+        value |= SpecDoublePureNaN;
+    // We could get negative zero, which mixes SpecInt52AsDouble and SpecNotIntAsDouble.
+    // We could also overflow a large negative int into something that is no longer
+    // representable as an int.
+    if (value & SpecDoubleReal)
+        value |= SpecDoubleReal;
+    return value;
+}
+
+SpeculatedType typeOfDoubleAbs(SpeculatedType value)
+{
+    return typeOfDoubleNegation(value);
+}
+
+SpeculatedType typeOfDoubleFRound(SpeculatedType value)
+{
+    // We might lose bits, which leads to a NaN being purified.
+    if (value & SpecDoubleImpureNaN)
+        value |= SpecDoublePureNaN;
+    // We might lose bits, which leads to a value becoming integer-representable.
+    if (value & SpecNonIntAsDouble)
+        value |= SpecInt52AsDouble;
+    return value;
+}
+
+SpeculatedType typeOfDoubleBinaryOp(SpeculatedType a, SpeculatedType b)
+{
+    return polluteDouble(a | b);
+}
+
+SpeculatedType typeOfDoubleUnaryOp(SpeculatedType value)
+{
+    return polluteDouble(value);
 }
 
 } // namespace JSC

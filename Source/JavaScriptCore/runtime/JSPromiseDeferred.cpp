@@ -26,6 +26,8 @@
 #include "config.h"
 #include "JSPromiseDeferred.h"
 
+#if ENABLE(PROMISES)
+
 #include "Error.h"
 #include "JSCJSValueInlines.h"
 #include "JSCellInlines.h"
@@ -33,10 +35,11 @@
 #include "JSPromiseConstructor.h"
 #include "JSPromiseFunctions.h"
 #include "SlotVisitorInlines.h"
+#include "StructureInlines.h"
 
 namespace JSC {
 
-const ClassInfo JSPromiseDeferred::s_info = { "JSPromiseDeferred", 0, 0, 0, CREATE_METHOD_TABLE(JSPromiseDeferred) };
+const ClassInfo JSPromiseDeferred::s_info = { "JSPromiseDeferred", 0, 0, CREATE_METHOD_TABLE(JSPromiseDeferred) };
 
 JSPromiseDeferred* JSPromiseDeferred::create(ExecState* exec, JSGlobalObject* globalObject)
 {
@@ -75,8 +78,6 @@ void JSPromiseDeferred::visitChildren(JSCell* cell, SlotVisitor& visitor)
 {
     JSPromiseDeferred* thisObject = jsCast<JSPromiseDeferred*>(cell);
     ASSERT_GC_OBJECT_INHERITS(thisObject, info());
-    COMPILE_ASSERT(StructureFlags & OverridesVisitChildren, OverridesVisitChildrenWithoutSettingFlag);
-    ASSERT(thisObject->structure()->typeInfo().overridesVisitChildren());
 
     Base::visitChildren(thisObject, visitor);
 
@@ -244,3 +245,5 @@ JSValue abruptRejection(ExecState* exec, JSPromiseDeferred* deferred)
 }
 
 } // namespace JSC
+
+#endif // ENABLE(PROMISES)

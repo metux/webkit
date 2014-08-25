@@ -30,6 +30,7 @@
 #include "DeferGC.h"
 #include "Handle.h"
 #include "JSCell.h"
+#include "JSDestructibleObject.h"
 #include "JSObject.h"
 #include "JSString.h"
 #include "Structure.h"
@@ -38,12 +39,17 @@
 namespace JSC {
 
 inline JSCell::JSCell(CreatingEarlyCellTag)
+    : m_gcData(NotMarked)
 {
     ASSERT(!isCompilationThread());
 }
 
-inline JSCell::JSCell(VM& vm, Structure* structure)
-    : m_structure(vm, this, structure)
+inline JSCell::JSCell(VM&, Structure* structure)
+    : m_structureID(structure->id())
+    , m_indexingType(structure->indexingType())
+    , m_type(structure->typeInfo().type())
+    , m_flags(structure->typeInfo().inlineTypeFlags())
+    , m_gcData(NotMarked)
 {
     ASSERT(!isCompilationThread());
 }
@@ -56,7 +62,7 @@ inline void JSCell::finishCreation(VM& vm)
 #else
     UNUSED_PARAM(vm);
 #endif
-    ASSERT(m_structure);
+    ASSERT(m_structureID);
 }
 
 inline void JSCell::finishCreation(VM& vm, Structure* structure, CreatingEarlyCellTag)
@@ -64,23 +70,45 @@ inline void JSCell::finishCreation(VM& vm, Structure* structure, CreatingEarlyCe
 #if ENABLE(GC_VALIDATION)
     ASSERT(vm.isInitializingObject());
     vm.setInitializingObjectClass(0);
-    if (structure)
+    if (structure) {
 #endif
-        m_structure.setEarlyValue(vm, this, structure);
+        m_structureID = structure->id();
+        m_indexingType = structure->indexingType();
+        m_type = structure->typeInfo().type();
+        m_flags = structure->typeInfo().inlineTypeFlags();
+#if ENABLE(GC_VALIDATION)
+    }
+#else
+    UNUSED_PARAM(vm);
+#endif
     // Very first set of allocations won't have a real structure.
-    ASSERT(m_structure || !vm.structureStructure);
+    ASSERT(m_structureID || !vm.structureStructure);
+}
+
+inline JSType JSCell::type() const
+{
+    return m_type;
+}
+
+inline IndexingType JSCell::indexingType() const
+{
+    return m_indexingType;
 }
 
 inline Structure* JSCell::structure() const
 {
-    return m_structure.get();
+    return Heap::heap(this)->structureIDTable().get(m_structureID);
+}
+
+inline Structure* JSCell::structure(VM& vm) const
+{
+    return vm.heap.structureIDTable().get(m_structureID);
 }
 
 inline void JSCell::visitChildren(JSCell* cell, SlotVisitor& visitor)
 {
-    MARK_LOG_PARENT(visitor, cell);
-
-    visitor.append(&cell->m_structure);
+    Structure* structure = cell->structure(visitor.vm());
+    visitor.appendUnbarrieredPointer(&structure);
 }
 
 template<typename T>
@@ -116,50 +144,64 @@ inline bool isZapped(const JSCell* cell)
 
 inline bool JSCell::isObject() const
 {
-    return m_structure->isObject();
+    return TypeInfo::isObject(m_type);
 }
 
 inline bool JSCell::isString() const
 {
-    return m_structure->typeInfo().type() == StringType;
+    return m_type == StringType;
 }
 
 inline bool JSCell::isGetterSetter() const
 {
-    return m_structure->typeInfo().type() == GetterSetterType;
+    return m_type == GetterSetterType;
+}
+
+inline bool JSCell::isCustomGetterSetter() const
+{
+    return m_type == CustomGetterSetterType;
 }
 
 inline bool JSCell::isProxy() const
 {
-    return structure()->typeInfo().type() == ProxyType;
+    return m_type == ImpureProxyType || m_type == PureForwardingProxyType;
 }
 
 inline bool JSCell::isAPIValueWrapper() const
 {
-    return m_structure->typeInfo().type() == APIValueWrapperType;
+    return m_type == APIValueWrapperType;
 }
 
 inline void JSCell::setStructure(VM& vm, Structure* structure)
 {
-    ASSERT(structure->typeInfo().overridesVisitChildren() == this->structure()->typeInfo().overridesVisitChildren());
-    ASSERT(structure->classInfo() == m_structure->classInfo());
-    ASSERT(!m_structure
-        || m_structure->transitionWatchpointSetHasBeenInvalidated()
-        || m_structure.get() == structure);
-    m_structure.set(vm, this, structure);
-}
-
-inline const MethodTable* JSCell::methodTableForDestruction() const
-{
-    return &classInfo()->methodTable;
+    ASSERT(structure->classInfo() == this->structure()->classInfo());
+    ASSERT(!this->structure()
+        || this->structure()->transitionWatchpointSetHasBeenInvalidated()
+        || Heap::heap(this)->structureIDTable().get(structure->id()) == structure);
+    vm.heap.writeBarrier(this, structure);
+    m_structureID = structure->id();
+    m_flags = structure->typeInfo().inlineTypeFlags();
+    m_type = structure->typeInfo().type();
+    m_indexingType = structure->indexingType();
 }
 
 inline const MethodTable* JSCell::methodTable() const
 {
-    if (Structure* rootStructure = m_structure->structure())
-        RELEASE_ASSERT(rootStructure == rootStructure->structure());
+    VM& vm = *Heap::heap(this)->vm();
+    Structure* structure = this->structure(vm);
+    if (Structure* rootStructure = structure->structure(vm))
+        RELEASE_ASSERT(rootStructure == rootStructure->structure(vm));
 
-    return &classInfo()->methodTable;
+    return &structure->classInfo()->methodTable;
+}
+
+inline const MethodTable* JSCell::methodTable(VM& vm) const
+{
+    Structure* structure = this->structure(vm);
+    if (Structure* rootStructure = structure->structure(vm))
+        RELEASE_ASSERT(rootStructure == rootStructure->structure(vm));
+
+    return &structure->classInfo()->methodTable;
 }
 
 inline bool JSCell::inherits(const ClassInfo* info) const
@@ -171,16 +213,30 @@ inline bool JSCell::inherits(const ClassInfo* info) const
 // identifier. The first time we perform a property access with a given string, try
 // performing the property map lookup without forming an identifier. We detect this
 // case by checking whether the hash has yet been set for this string.
-ALWAYS_INLINE JSValue JSCell::fastGetOwnProperty(ExecState* exec, const String& name)
+ALWAYS_INLINE JSValue JSCell::fastGetOwnProperty(VM& vm, Structure& structure, const String& name)
 {
-    if (!structure()->typeInfo().overridesGetOwnPropertySlot() && !structure()->hasGetterSetterProperties()) {
-        PropertyOffset offset = name.impl()->hasHash()
-            ? structure()->get(exec->vm(), Identifier(exec, name))
-            : structure()->get(exec->vm(), name);
-        if (offset != invalidOffset)
-            return asObject(this)->locationForOffset(offset)->get();
-    }
+    ASSERT(canUseFastGetOwnProperty(structure));
+    PropertyOffset offset = name.impl()->hasHash()
+        ? structure.get(vm, Identifier(&vm, name))
+        : structure.get(vm, name);
+    if (offset != invalidOffset)
+        return asObject(this)->locationForOffset(offset)->get();
     return JSValue();
+}
+
+inline bool JSCell::canUseFastGetOwnProperty(const Structure& structure)
+{
+    return !structure.hasGetterSetterProperties() 
+        && !structure.hasCustomGetterSetterProperties()
+        && !structure.typeInfo().overridesGetOwnPropertySlot();
+}
+
+inline const ClassInfo* JSCell::classInfo() const
+{
+    MarkedBlock* block = MarkedBlock::blockFor(this);
+    if (block->destructorType() == MarkedBlock::Normal)
+        return static_cast<const JSDestructibleObject*>(this)->classInfo();
+    return structure(*block->vm())->classInfo();
 }
 
 inline bool JSCell::toBoolean(ExecState* exec) const

@@ -10,10 +10,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -117,6 +117,7 @@ protected:
 // 4 bytes : signed : duration time value
 // 4 bytes : signed : track ID
 // 1 byte  : unsigned : flags
+// 1 byte  : unsigned : generation
 //
 class MockSampleBox final : public MockBox {
 public:
@@ -128,6 +129,7 @@ public:
     MediaTime duration() const { return m_duration; }
     int32_t trackID() const { return m_trackID; }
     uint8_t flags() const { return m_flags; }
+    uint8_t generation() const { return m_generation; }
 
     enum {
         IsSync = 1 << 0,
@@ -146,6 +148,7 @@ protected:
     MediaTime m_duration;
     int32_t m_trackID;
     uint8_t m_flags;
+    uint8_t m_generation;
 };
 
 }

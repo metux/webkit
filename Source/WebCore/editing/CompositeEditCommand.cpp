@@ -10,10 +10,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -220,7 +220,7 @@ void CompositeEditCommand::apply()
     document().updateLayoutIgnorePendingStylesheets();
 
     {
-        EventQueueScope scope;
+        EventQueueScope eventQueueScope;
 #if ENABLE(DELETION_UI)
         DeleteButtonControllerDisableScope deleteButtonControllerDisableScope(&frame());
 #endif
@@ -667,7 +667,7 @@ void CompositeEditCommand::setNodeAttribute(PassRefPtr<Element> element, const Q
 static inline bool containsOnlyWhitespace(const String& text)
 {
     for (unsigned i = 0; i < text.length(); ++i) {
-        if (!isWhitespace(text.deprecatedCharacters()[i]))
+        if (!isWhitespace(text[i]))
             return false;
     }
     
@@ -773,9 +773,9 @@ void CompositeEditCommand::prepareWhitespaceAtPositionForSplit(Position& positio
     VisiblePosition previousVisiblePos(visiblePos.previous());
     Position previous(previousVisiblePos.deepEquivalent());
     
-    if (isCollapsibleWhitespace(previousVisiblePos.characterAfter()) && previous.deprecatedNode()->isTextNode() && !previous.deprecatedNode()->hasTagName(brTag))
+    if (deprecatedIsCollapsibleWhitespace(previousVisiblePos.characterAfter()) && previous.deprecatedNode()->isTextNode() && !previous.deprecatedNode()->hasTagName(brTag))
         replaceTextInNodePreservingMarkers(toText(previous.deprecatedNode()), previous.deprecatedEditingOffset(), 1, nonBreakingSpaceString());
-    if (isCollapsibleWhitespace(visiblePos.characterAfter()) && position.deprecatedNode()->isTextNode() && !position.deprecatedNode()->hasTagName(brTag))
+    if (deprecatedIsCollapsibleWhitespace(visiblePos.characterAfter()) && position.deprecatedNode()->isTextNode() && !position.deprecatedNode()->hasTagName(brTag))
         replaceTextInNodePreservingMarkers(toText(position.deprecatedNode()), position.deprecatedEditingOffset(), 1, nonBreakingSpaceString());
 }
 
@@ -1059,7 +1059,7 @@ void CompositeEditCommand::cloneParagraphUnderNewElement(const Position& start, 
     if (outerNode->isRootEditableElement()) {
         lastNode = blockElement;
     } else {
-        lastNode = outerNode->cloneNode(isTableElement(outerNode.get()));
+        lastNode = outerNode->cloneNode(isRenderedTable(outerNode.get()));
         appendNode(lastNode, blockElement);
     }
 
@@ -1074,7 +1074,7 @@ void CompositeEditCommand::cloneParagraphUnderNewElement(const Position& start, 
 
         for (size_t i = ancestors.size(); i != 0; --i) {
             Node* item = ancestors[i - 1].get();
-            RefPtr<Node> child = item->cloneNode(isTableElement(item));
+            RefPtr<Node> child = item->cloneNode(isRenderedTable(item));
             appendNode(child, toElement(lastNode.get()));
             lastNode = child.release();
         }
@@ -1192,7 +1192,7 @@ void CompositeEditCommand::moveParagraphWithClones(const VisiblePosition& startO
     beforeParagraph = VisiblePosition(beforeParagraph.deepEquivalent());
     afterParagraph = VisiblePosition(afterParagraph.deepEquivalent());
 
-    if (beforeParagraph.isNotNull() && !isTableElement(beforeParagraph.deepEquivalent().deprecatedNode())
+    if (beforeParagraph.isNotNull() && !isRenderedTable(beforeParagraph.deepEquivalent().deprecatedNode())
         && ((!isEndOfParagraph(beforeParagraph) && !isStartOfParagraph(beforeParagraph)) || beforeParagraph == afterParagraph)) {
         // FIXME: Trim text between beforeParagraph and afterParagraph if they aren't equal.
         insertNodeAt(createBreakElement(document()), beforeParagraph.deepEquivalent());

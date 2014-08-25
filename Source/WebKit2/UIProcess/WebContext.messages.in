@@ -22,9 +22,6 @@
 
 messages -> WebContext LegacyReceiver {
 
-    # Visited link provider messages.
-    AddVisitedLinkHash(uint64_t linkHash)
-
     DidGetStatistics(WebKit::StatisticsData statisticsData, uint64_t callbackID)
 
 #if PLATFORM(IOS)
@@ -37,7 +34,7 @@ messages -> WebContext LegacyReceiver {
     GetPasteboardItemsCount() -> (uint64_t itemsCount)
 #endif
 
-#if PLATFORM(MAC)
+#if PLATFORM(COCOA)
     # Pasteboard messages.
     GetPasteboardTypes(String pasteboardName) -> (Vector<String> types)
     GetPasteboardPathnamesForType(String pasteboardName, String pasteboardType) -> (Vector<String> pathnames)
@@ -55,13 +52,13 @@ messages -> WebContext LegacyReceiver {
     SetPasteboardBufferForType(String pasteboardName, String pasteboardType, WebKit::SharedMemory::Handle handle, uint64_t size) -> (uint64_t changeCount)
 #endif
 
-#if !PLATFORM(MAC)
+#if !PLATFORM(COCOA)
     // FIXME: This a dummy message, to avoid breaking the build for platforms that don't require
     // any synchronous messages, and should be removed when <rdar://problem/8775115> is fixed.
     Dummy() -> (bool dummyReturn)
 #endif
 
     # Plug-in messages.
-    void AddPlugInAutoStartOriginHash(String pageOrigin, uint32_t hash)
-    void PlugInDidReceiveUserInteraction(uint32_t hash)
+    void AddPlugInAutoStartOriginHash(String pageOrigin, uint32_t hash, WebCore::SessionID sessionID)
+    void PlugInDidReceiveUserInteraction(uint32_t hash, WebCore::SessionID sessionID)
 }

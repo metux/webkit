@@ -238,7 +238,6 @@ static PassRefPtr<IDBIndex> indexForObjectStore(IDBObjectStore* idbObjectStore, 
     return idbIndex;
 }
 
-#if !PLATFORM(MAC)
 static PassRefPtr<KeyPath> keyPathFromIDBKeyPath(const IDBKeyPath& idbKeyPath)
 {
     RefPtr<KeyPath> keyPath;
@@ -265,7 +264,6 @@ static PassRefPtr<KeyPath> keyPathFromIDBKeyPath(const IDBKeyPath& idbKeyPath)
 
     return keyPath.release();
 }
-#endif // !PLATFORM(MAC)
 
 class DatabaseLoader : public ExecutableWithDatabase {
 public:
@@ -278,9 +276,6 @@ public:
 
     virtual void execute(PassRefPtr<IDBDatabase> prpDatabase) override
     {
-#if PLATFORM(MAC)
-        ASSERT_UNUSED(prpDatabase, prpDatabase);
-#else
         RefPtr<IDBDatabase> idbDatabase = prpDatabase;
         if (!requestCallback()->isActive())
             return;
@@ -289,14 +284,10 @@ public:
 
         RefPtr<Inspector::TypeBuilder::Array<Inspector::TypeBuilder::IndexedDB::ObjectStore>> objectStores = Inspector::TypeBuilder::Array<Inspector::TypeBuilder::IndexedDB::ObjectStore>::create();
 
-        for (IDBDatabaseMetadata::ObjectStoreMap::const_iterator it = databaseMetadata.objectStores.begin(); it != databaseMetadata.objectStores.end(); ++it) {
-            const IDBObjectStoreMetadata& objectStoreMetadata = it->value;
-
+        for (const IDBObjectStoreMetadata& objectStoreMetadata : databaseMetadata.objectStores.values()) {
             RefPtr<Inspector::TypeBuilder::Array<Inspector::TypeBuilder::IndexedDB::ObjectStoreIndex>> indexes = Inspector::TypeBuilder::Array<Inspector::TypeBuilder::IndexedDB::ObjectStoreIndex>::create();
 
-            for (IDBObjectStoreMetadata::IndexMap::const_iterator it = objectStoreMetadata.indexes.begin(); it != objectStoreMetadata.indexes.end(); ++it) {
-                const IDBIndexMetadata& indexMetadata = it->value;
-
+            for (const IDBIndexMetadata& indexMetadata : objectStoreMetadata.indexes.values()) {
                 RefPtr<ObjectStoreIndex> objectStoreIndex = ObjectStoreIndex::create()
                     .setName(indexMetadata.name)
                     .setKeyPath(keyPathFromIDBKeyPath(indexMetadata.keyPath))
@@ -310,16 +301,16 @@ public:
                 .setKeyPath(keyPathFromIDBKeyPath(objectStoreMetadata.keyPath))
                 .setAutoIncrement(objectStoreMetadata.autoIncrement)
                 .setIndexes(indexes);
+
             objectStores->addItem(objectStore);
         }
+
         RefPtr<DatabaseWithObjectStores> result = DatabaseWithObjectStores::create()
             .setName(databaseMetadata.name)
-            .setIntVersion(databaseMetadata.version)
-            .setVersion(String::number(databaseMetadata.version))
+            .setVersion(databaseMetadata.version)
             .setObjectStores(objectStores);
 
         m_requestCallback->sendSuccess(result);
-#endif // PLATFORM(MAC)
     }
 
     virtual RequestCallback* requestCallback() override { return m_requestCallback.get(); }
@@ -338,10 +329,10 @@ static PassRefPtr<IDBKey> idbKeyFromInspectorObject(InspectorObject* key)
     if (!key->getString("type", &type))
         return nullptr;
 
-    DEFINE_STATIC_LOCAL(String, number, (ASCIILiteral("number")));
-    DEFINE_STATIC_LOCAL(String, string, (ASCIILiteral("string")));
-    DEFINE_STATIC_LOCAL(String, date, (ASCIILiteral("date")));
-    DEFINE_STATIC_LOCAL(String, array, (ASCIILiteral("array")));
+    DEPRECATED_DEFINE_STATIC_LOCAL(String, number, (ASCIILiteral("number")));
+    DEPRECATED_DEFINE_STATIC_LOCAL(String, string, (ASCIILiteral("string")));
+    DEPRECATED_DEFINE_STATIC_LOCAL(String, date, (ASCIILiteral("date")));
+    DEPRECATED_DEFINE_STATIC_LOCAL(String, array, (ASCIILiteral("array")));
 
     if (type == number) {
         double number;

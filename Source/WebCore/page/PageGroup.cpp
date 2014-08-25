@@ -29,6 +29,7 @@
 #include "Chrome.h"
 #include "ChromeClient.h"
 #include "DOMWrapperWorld.h"
+#include "DefaultVisitedLinkStore.h"
 #include "Document.h"
 #include "DocumentStyleSheetCollection.h"
 #include "GroupSettings.h"
@@ -39,11 +40,11 @@
 #include "Settings.h"
 #include "StorageNamespace.h"
 #include "UserContentController.h"
-#include "VisitedLinkProvider.h"
+#include "VisitedLinkStore.h"
 #include <wtf/StdLibExtras.h>
 
 #if ENABLE(VIDEO_TRACK)
-#if (PLATFORM(MAC) && !PLATFORM(IOS)) || HAVE(MEDIA_ACCESSIBILITY_FRAMEWORK)
+#if PLATFORM(MAC) || HAVE(MEDIA_ACCESSIBILITY_FRAMEWORK)
 #include "CaptionUserPreferencesMediaAF.h"
 #else
 #include "CaptionUserPreferences.h"
@@ -64,7 +65,6 @@ static bool shouldTrackVisitedLinks = false;
 
 PageGroup::PageGroup(const String& name)
     : m_name(name)
-    , m_visitedLinkProvider(VisitedLinkProvider::create())
     , m_visitedLinksPopulated(false)
     , m_identifier(getUniqueIdentifier())
     , m_userContentController(UserContentController::create())
@@ -73,8 +73,7 @@ PageGroup::PageGroup(const String& name)
 }
 
 PageGroup::PageGroup(Page& page)
-    : m_visitedLinkProvider(VisitedLinkProvider::create())
-    , m_visitedLinksPopulated(false)
+    : m_visitedLinksPopulated(false)
     , m_identifier(getUniqueIdentifier())
     , m_userContentController(UserContentController::create())
     , m_groupSettings(std::make_unique<GroupSettings>())
@@ -168,7 +167,8 @@ void PageGroup::addPage(Page& page)
     ASSERT(!m_pages.contains(&page));
     m_pages.add(&page);
 
-    page.setUserContentController(m_userContentController.get());
+    if (!page.userContentController())
+        page.setUserContentController(m_userContentController.get());
 }
 
 void PageGroup::removePage(Page& page)
@@ -176,7 +176,16 @@ void PageGroup::removePage(Page& page)
     ASSERT(m_pages.contains(&page));
     m_pages.remove(&page);
 
-    page.setUserContentController(nullptr);
+    if (page.userContentController() == m_userContentController)
+        page.setUserContentController(nullptr);
+}
+
+VisitedLinkStore& PageGroup::visitedLinkStore()
+{
+    if (!m_visitedLinkStore)
+        m_visitedLinkStore = DefaultVisitedLinkStore::create();
+
+    return *m_visitedLinkStore;
 }
 
 bool PageGroup::isLinkVisited(LinkHash visitedLinkHash)
@@ -200,7 +209,8 @@ inline void PageGroup::addVisitedLink(LinkHash hash)
     ASSERT(shouldTrackVisitedLinks);
     if (!m_visitedLinkHashes.add(hash).isNewEntry)
         return;
-    Page::visitedStateChanged(this, hash);
+    for (auto& page : m_pages)
+        page->invalidateStylesForLink(hash);
     pageCache()->markPagesForVistedLinkStyleRecalc();
 }
 
@@ -225,7 +235,9 @@ void PageGroup::removeVisitedLink(const URL& url)
     ASSERT(m_visitedLinkHashes.contains(hash));
     m_visitedLinkHashes.remove(hash);
 
-    Page::allVisitedStateChanged(this);
+    // FIXME: Why can't we just invalidate the single visited link hash here?
+    for (auto& page : m_pages)
+        page->invalidateStylesForAllLinks();
     pageCache()->markPagesForVistedLinkStyleRecalc();
 }
 
@@ -235,7 +247,9 @@ void PageGroup::removeVisitedLinks()
     if (m_visitedLinkHashes.isEmpty())
         return;
     m_visitedLinkHashes.clear();
-    Page::allVisitedStateChanged(this);
+
+    for (auto& page : m_pages)
+        page->invalidateStylesForAllLinks();
     pageCache()->markPagesForVistedLinkStyleRecalc();
 }
 
@@ -275,13 +289,13 @@ StorageNamespace* PageGroup::transientLocalStorage(SecurityOrigin* topOrigin)
 void PageGroup::addUserScriptToWorld(DOMWrapperWorld& world, const String& source, const URL& url, const Vector<String>& whitelist, const Vector<String>& blacklist, UserScriptInjectionTime injectionTime, UserContentInjectedFrames injectedFrames)
 {
     auto userScript = std::make_unique<UserScript>(source, url, whitelist, blacklist, injectionTime, injectedFrames);
-    m_userContentController->addUserScript(world, std::move(userScript));
+    m_userContentController->addUserScript(world, WTF::move(userScript));
 }
 
 void PageGroup::addUserStyleSheetToWorld(DOMWrapperWorld& world, const String& source, const URL& url, const Vector<String>& whitelist, const Vector<String>& blacklist, UserContentInjectedFrames injectedFrames, UserStyleLevel level, UserStyleInjectionTime injectionTime)
 {
     auto userStyleSheet = std::make_unique<UserStyleSheet>(source, url, whitelist, blacklist, injectedFrames, level);
-    m_userContentController->addUserStyleSheet(world, std::move(userStyleSheet), injectionTime);
+    m_userContentController->addUserStyleSheet(world, WTF::move(userStyleSheet), injectionTime);
 
 }
 
@@ -321,7 +335,7 @@ void PageGroup::captionPreferencesChanged()
 CaptionUserPreferences* PageGroup::captionPreferences()
 {
     if (!m_captionPreferences) {
-#if (PLATFORM(MAC) && !PLATFORM(IOS)) || HAVE(MEDIA_ACCESSIBILITY_FRAMEWORK)
+#if PLATFORM(MAC) || HAVE(MEDIA_ACCESSIBILITY_FRAMEWORK)
         m_captionPreferences = std::make_unique<CaptionUserPreferencesMediaAF>(*this);
 #else
         m_captionPreferences = std::make_unique<CaptionUserPreferences>(*this);

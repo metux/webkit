@@ -26,13 +26,16 @@
 #include "config.h"
 #include "PageLoadState.h"
 
+#include "WebPageProxy.h"
+
 namespace WebKit {
 
 // Progress always starts at this value. This helps provide feedback as soon as a load starts.
 static const double initialProgressValue = 0.1;
 
-PageLoadState::PageLoadState()
-    : m_mayHaveUncommittedChanges(false)
+PageLoadState::PageLoadState(WebPageProxy& webPageProxy)
+    : m_webPageProxy(webPageProxy)
+    , m_mayHaveUncommittedChanges(false)
     , m_outstandingTransactionCount(0)
 {
 }
@@ -40,6 +43,26 @@ PageLoadState::PageLoadState()
 PageLoadState::~PageLoadState()
 {
     ASSERT(m_observers.isEmpty());
+}
+
+PageLoadState::Transaction::Transaction(PageLoadState& pageLoadState)
+    : m_webPageProxy(&pageLoadState.m_webPageProxy)
+    , m_pageLoadState(&pageLoadState)
+{
+    m_pageLoadState->beginTransaction();
+}
+
+PageLoadState::Transaction::Transaction(Transaction&& other)
+    : m_webPageProxy(WTF::move(other.m_webPageProxy))
+    , m_pageLoadState(other.m_pageLoadState)
+{
+    other.m_pageLoadState = nullptr;
+}
+
+PageLoadState::Transaction::~Transaction()
+{
+    if (m_pageLoadState)
+        m_pageLoadState->endTransaction();
 }
 
 void PageLoadState::addObserver(Observer& observer)
@@ -72,12 +95,19 @@ void PageLoadState::commitChanges()
 
     m_mayHaveUncommittedChanges = false;
 
+    bool canGoBackChanged = m_committedState.canGoBack != m_uncommittedState.canGoBack;
+    bool canGoForwardChanged = m_committedState.canGoForward != m_uncommittedState.canGoForward;
     bool titleChanged = m_committedState.title != m_uncommittedState.title;
-    bool isLoadingChanged = isLoadingState(m_committedState.state) != isLoadingState(m_uncommittedState.state);
+    bool isLoadingChanged = isLoading(m_committedState) != isLoading(m_uncommittedState);
     bool activeURLChanged = activeURL(m_committedState) != activeURL(m_uncommittedState);
     bool hasOnlySecureContentChanged = hasOnlySecureContent(m_committedState) != hasOnlySecureContent(m_uncommittedState);
     bool estimatedProgressChanged = estimatedProgress(m_committedState) != estimatedProgress(m_uncommittedState);
+    bool networkRequestsInProgressChanged = m_committedState.networkRequestsInProgress != m_uncommittedState.networkRequestsInProgress;
 
+    if (canGoBackChanged)
+        callObserverCallback(&Observer::willChangeCanGoBack);
+    if (canGoForwardChanged)
+        callObserverCallback(&Observer::willChangeCanGoForward);
     if (titleChanged)
         callObserverCallback(&Observer::willChangeTitle);
     if (isLoadingChanged)
@@ -88,10 +118,14 @@ void PageLoadState::commitChanges()
         callObserverCallback(&Observer::willChangeHasOnlySecureContent);
     if (estimatedProgressChanged)
         callObserverCallback(&Observer::willChangeEstimatedProgress);
+    if (networkRequestsInProgressChanged)
+        callObserverCallback(&Observer::willChangeNetworkRequestsInProgress);
 
     m_committedState = m_uncommittedState;
 
     // The "did" ordering is the reverse of the "will". This is a requirement of Cocoa Key-Value Observing.
+    if (networkRequestsInProgressChanged)
+        callObserverCallback(&Observer::didChangeNetworkRequestsInProgress);
     if (estimatedProgressChanged)
         callObserverCallback(&Observer::didChangeEstimatedProgress);
     if (hasOnlySecureContentChanged)
@@ -102,6 +136,10 @@ void PageLoadState::commitChanges()
         callObserverCallback(&Observer::didChangeIsLoading);
     if (titleChanged)
         callObserverCallback(&Observer::didChangeTitle);
+    if (canGoForwardChanged)
+        callObserverCallback(&Observer::didChangeCanGoForward);
+    if (canGoBackChanged)
+        callObserverCallback(&Observer::didChangeCanGoBack);
 }
 
 void PageLoadState::reset(const Transaction::Token& token)
@@ -121,11 +159,12 @@ void PageLoadState::reset(const Transaction::Token& token)
     m_uncommittedState.title = String();
 
     m_uncommittedState.estimatedProgress = 0;
+    m_uncommittedState.networkRequestsInProgress = false;
 }
 
 bool PageLoadState::isLoading() const
 {
-    return isLoadingState(m_committedState.state);
+    return isLoading(m_committedState);
 }
 
 String PageLoadState::activeURL(const Data& data)
@@ -295,6 +334,28 @@ void PageLoadState::setTitle(const Transaction::Token& token, const String& titl
     m_uncommittedState.title = title;
 }
 
+bool PageLoadState::canGoBack() const
+{
+    return m_committedState.canGoBack;
+}
+
+void PageLoadState::setCanGoBack(const Transaction::Token& token, bool canGoBack)
+{
+    ASSERT_UNUSED(token, &token.m_pageLoadState == this);
+    m_uncommittedState.canGoBack = canGoBack;
+}
+
+bool PageLoadState::canGoForward() const
+{
+    return m_committedState.canGoForward;
+}
+
+void PageLoadState::setCanGoForward(const Transaction::Token& token, bool canGoForward)
+{
+    ASSERT_UNUSED(token, &token.m_pageLoadState == this);
+    m_uncommittedState.canGoForward = canGoForward;
+}
+
 void PageLoadState::didStartProgress(const Transaction::Token& token)
 {
     ASSERT_UNUSED(token, &token.m_pageLoadState == this);
@@ -313,9 +374,18 @@ void PageLoadState::didFinishProgress(const Transaction::Token& token)
     m_uncommittedState.estimatedProgress = 1;
 }
 
-bool PageLoadState::isLoadingState(State state)
+void PageLoadState::setNetworkRequestsInProgress(const Transaction::Token& token, bool networkRequestsInProgress)
 {
-    switch (state) {
+    ASSERT_UNUSED(token, &token.m_pageLoadState == this);
+    m_uncommittedState.networkRequestsInProgress = networkRequestsInProgress;
+}
+
+bool PageLoadState::isLoading(const Data& data)
+{
+    if (!data.pendingAPIRequestURL.isNull())
+        return true;
+
+    switch (data.state) {
     case State::Provisional:
     case State::Committed:
         return true;

@@ -30,13 +30,12 @@
 
 #include "config.h"
 
-#if ENABLE(BLOB)
-
 #include "FileReaderLoader.h"
 
 #include "Blob.h"
 #include "BlobURL.h"
 #include "FileReaderLoaderClient.h"
+#include "HTTPHeaderNames.h"
 #include "ResourceRequest.h"
 #include "ResourceResponse.h"
 #include "ScriptExecutionContext.h"
@@ -90,13 +89,13 @@ void FileReaderLoader::start(ScriptExecutionContext* scriptExecutionContext, Blo
     ResourceRequest request(m_urlForReading);
     request.setHTTPMethod("GET");
     if (m_hasRange)
-        request.setHTTPHeaderField("Range", String::format("bytes=%d-%d", m_rangeStart, m_rangeEnd));
+        request.setHTTPHeaderField(HTTPHeaderName::Range, String::format("bytes=%d-%d", m_rangeStart, m_rangeEnd));
 
     ThreadableLoaderOptions options;
-    options.sendLoadCallbacks = SendCallbacks;
-    options.sniffContent = DoNotSniffContent;
+    options.setSendLoadCallbacks(SendCallbacks);
+    options.setSniffContent(DoNotSniffContent);
     options.preflightPolicy = ConsiderPreflight;
-    options.allowCredentials = AllowStoredCredentials;
+    options.setAllowCredentials(AllowStoredCredentials);
     options.crossOriginRequestPolicy = DenyCrossOriginRequests;
 
     if (m_client)
@@ -316,15 +315,12 @@ void FileReaderLoader::convertToText()
     // requirement in order to be consistent with how WebKit decodes the web content: always has the BOM override the
     // provided encoding.     
     // FIXME: consider supporting incremental decoding to improve the perf.
-    StringBuilder builder;
     if (!m_decoder)
         m_decoder = TextResourceDecoder::create("text/plain", m_encoding.isValid() ? m_encoding : UTF8Encoding());
-    builder.append(m_decoder->decode(static_cast<const char*>(m_rawData->data()), m_bytesLoaded));
-
     if (isCompleted())
-        builder.append(m_decoder->flush());
-
-    m_stringResult = builder.toString();
+        m_stringResult = m_decoder->decodeAndFlush(static_cast<const char*>(m_rawData->data()), m_bytesLoaded);
+    else
+        m_stringResult = m_decoder->decode(static_cast<const char*>(m_rawData->data()), m_bytesLoaded);
 }
 
 void FileReaderLoader::convertToDataURL()
@@ -360,5 +356,3 @@ void FileReaderLoader::setEncoding(const String& encoding)
 }
 
 } // namespace WebCore
- 
-#endif // ENABLE(BLOB)

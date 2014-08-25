@@ -28,12 +28,12 @@
 #include "DashArray.h"
 #include "FontDescription.h"
 #include "FontGlyphs.h"
+#include "Path.h"
 #include "SimpleFontData.h"
 #include "TextDirection.h"
 #include "TypesettingFeatures.h"
 #include <wtf/HashMap.h>
 #include <wtf/HashSet.h>
-#include <wtf/MathExtras.h>
 #include <wtf/unicode/CharacterNames.h>
 
 // "X11/X.h" defines Complex to 0 and conflicts
@@ -52,6 +52,7 @@ class FontPlatformData;
 class FontSelector;
 class GlyphBuffer;
 class GraphicsContext;
+class LayoutRect;
 class RenderText;
 class TextLayout;
 class TextRun;
@@ -68,6 +69,24 @@ struct GlyphOverflow {
     {
     }
 
+    inline bool isEmpty()
+    {
+        return !left && !right && !top && !bottom;
+    }
+
+    inline void extendTo(const GlyphOverflow& other)
+    {
+        left = std::max(left, other.left);
+        right = std::max(right, other.right);
+        top = std::max(top, other.top);
+        bottom = std::max(bottom, other.bottom);
+    }
+
+    bool operator!=(const GlyphOverflow& other)
+    {
+        return left != other.left || right != other.right || top != other.top || bottom != other.bottom;
+    }
+
     int left;
     int right;
     int top;
@@ -75,6 +94,17 @@ struct GlyphOverflow {
     bool computeBounds;
 };
 
+class GlyphToPathTranslator {
+public:
+    enum class GlyphUnderlineType {SkipDescenders, SkipGlyph, DrawOverGlyph};
+    virtual bool containsMorePaths() = 0;
+    virtual Path path() = 0;
+    virtual std::pair<float, float> extents() = 0;
+    virtual GlyphUnderlineType underlineType() = 0;
+    virtual void advance() = 0;
+    virtual ~GlyphToPathTranslator() { }
+};
+GlyphToPathTranslator::GlyphUnderlineType computeUnderlineType(const TextRun&, const GlyphBuffer&, int index);
 
 class Font {
 public:
@@ -104,6 +134,7 @@ public:
 
     enum CustomFontNotReadyAction { DoNotPaintIfFontNotReady, UseFallbackIfFontNotReady };
     float drawText(GraphicsContext*, const TextRun&, const FloatPoint&, int from = 0, int to = -1, CustomFontNotReadyAction = DoNotPaintIfFontNotReady) const;
+    void drawGlyphs(GraphicsContext*, const SimpleFontData*, const GlyphBuffer&, int from, int numGlyphs, const FloatPoint&) const;
     void drawEmphasisMarks(GraphicsContext*, const TextRun&, const AtomicString& mark, const FloatPoint&, int from = 0, int to = -1) const;
 
     DashArray dashesForIntersectionsWithRect(const TextRun&, const FloatPoint& textOrigin, const FloatRect& lineExtents) const;
@@ -116,7 +147,7 @@ public:
     static float width(TextLayout&, unsigned from, unsigned len, HashSet<const SimpleFontData*>* fallbackFonts = 0);
 
     int offsetForPosition(const TextRun&, float position, bool includePartialGlyphs) const;
-    FloatRect selectionRectForText(const TextRun&, const FloatPoint&, int h, int from = 0, int to = -1) const;
+    void adjustSelectionRectForText(const TextRun&, LayoutRect& selectionRect, int from = 0, int to = -1) const;
 
     bool isSmallCaps() const { return m_fontDescription.smallCaps(); }
 
@@ -126,7 +157,6 @@ public:
     void setLetterSpacing(float s) { m_letterSpacing = s; }
     bool isFixedPitch() const;
     bool isPrinterFont() const { return m_fontDescription.usePrinterFont(); }
-    bool isSVGFont() const { return primaryFont()->isSVGFont(); }
     
     FontRenderingMode renderingMode() const { return m_fontDescription.renderingMode(); }
 
@@ -146,6 +176,8 @@ public:
     float spaceWidth() const { return primaryFont()->spaceWidth() + m_letterSpacing; }
     float tabWidth(const SimpleFontData&, unsigned tabSize, float position) const;
     float tabWidth(unsigned tabSize, float position) const { return tabWidth(*primaryFont(), tabSize, position); }
+    bool hasValidAverageCharWidth() const;
+    bool fastAverageCharWidthIfAvailable(float &width) const; // returns true on success
 
     int emphasisMarkAscent(const AtomicString&) const;
     int emphasisMarkDescent(const AtomicString&) const;
@@ -157,7 +189,7 @@ public:
     {
         return glyphDataAndPageForCharacter(c, mirror, variant).first;
     }
-#if PLATFORM(MAC)
+#if PLATFORM(COCOA)
     const SimpleFontData* fontDataForCombiningCharacterSequence(const UChar*, size_t length, FontDataVariant) const;
 #endif
     std::pair<GlyphData, GlyphPage*> glyphDataAndPageForCharacter(UChar32 c, bool mirror, FontDataVariant variant) const
@@ -180,6 +212,8 @@ public:
     static CodePath characterRangeCodePath(const LChar*, unsigned) { return Simple; }
     static CodePath characterRangeCodePath(const UChar*, unsigned len);
 
+    bool primaryFontDataIsSystemFont() const;
+
 private:
     enum ForTextEmphasisOrNot { NotForTextEmphasis, ForTextEmphasis };
 
@@ -187,12 +221,11 @@ private:
     float getGlyphsAndAdvancesForSimpleText(const TextRun&, int from, int to, GlyphBuffer&, ForTextEmphasisOrNot = NotForTextEmphasis) const;
     float drawSimpleText(GraphicsContext*, const TextRun&, const FloatPoint&, int from, int to) const;
     void drawEmphasisMarksForSimpleText(GraphicsContext*, const TextRun&, const AtomicString& mark, const FloatPoint&, int from, int to) const;
-    void drawGlyphs(GraphicsContext*, const SimpleFontData*, const GlyphBuffer&, int from, int to, const FloatPoint&) const;
     void drawGlyphBuffer(GraphicsContext*, const TextRun&, const GlyphBuffer&, FloatPoint&) const;
     void drawEmphasisMarks(GraphicsContext*, const TextRun&, const GlyphBuffer&, const AtomicString&, const FloatPoint&) const;
     float floatWidthForSimpleText(const TextRun&, HashSet<const SimpleFontData*>* fallbackFonts = 0, GlyphOverflow* = 0) const;
     int offsetForPositionForSimpleText(const TextRun&, float position, bool includePartialGlyphs) const;
-    FloatRect selectionRectForSimpleText(const TextRun&, const FloatPoint&, int h, int from, int to) const;
+    void adjustSelectionRectForSimpleText(const TextRun&, LayoutRect& selectionRect, int from, int to) const;
 
     bool getEmphasisMarkGlyphData(const AtomicString&, GlyphData&) const;
 
@@ -205,7 +238,7 @@ private:
     void drawEmphasisMarksForComplexText(GraphicsContext*, const TextRun&, const AtomicString& mark, const FloatPoint&, int from, int to) const;
     float floatWidthForComplexText(const TextRun&, HashSet<const SimpleFontData*>* fallbackFonts = 0, GlyphOverflow* = 0) const;
     int offsetForPositionForComplexText(const TextRun&, float position, bool includePartialGlyphs) const;
-    FloatRect selectionRectForComplexText(const TextRun&, const FloatPoint&, int h, int from, int to) const;
+    void adjustSelectionRectForComplexText(const TextRun&, LayoutRect& selectionRect, int from, int to) const;
 
     friend struct WidthIterator;
     friend class SVGTextRunRenderingContext;

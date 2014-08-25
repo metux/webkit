@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011, 2012, 2013 Apple Inc. All rights reserved.
+ * Copyright (C) 2011-2014 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -26,6 +26,8 @@
 #ifndef DFGVariableAccessData_h
 #define DFGVariableAccessData_h
 
+#if ENABLE(DFG_JIT)
+
 #include "DFGCommon.h"
 #include "DFGDoubleFormatState.h"
 #include "DFGFlushFormat.h"
@@ -34,7 +36,6 @@
 #include "Operands.h"
 #include "SpeculatedType.h"
 #include "VirtualRegister.h"
-#include <wtf/Platform.h>
 #include <wtf/UnionFind.h>
 #include <wtf/Vector.h>
 
@@ -46,39 +47,8 @@ enum DoubleBallot { VoteValue, VoteDouble };
 
 class VariableAccessData : public UnionFind<VariableAccessData> {
 public:
-    VariableAccessData()
-        : m_local(static_cast<VirtualRegister>(std::numeric_limits<int>::min()))
-        , m_prediction(SpecNone)
-        , m_argumentAwarePrediction(SpecNone)
-        , m_flags(0)
-        , m_isCaptured(false)
-        , m_shouldNeverUnbox(false)
-        , m_isArgumentsAlias(false)
-        , m_structureCheckHoistingFailed(false)
-        , m_checkArrayHoistingFailed(false)
-        , m_isProfitableToUnbox(false)
-        , m_isLoadedFrom(false)
-        , m_doubleFormatState(EmptyDoubleFormatState)
-    {
-        clearVotes();
-    }
-    
-    VariableAccessData(VirtualRegister local, bool isCaptured)
-        : m_local(local)
-        , m_prediction(SpecNone)
-        , m_argumentAwarePrediction(SpecNone)
-        , m_flags(0)
-        , m_isCaptured(isCaptured)
-        , m_shouldNeverUnbox(isCaptured)
-        , m_isArgumentsAlias(false)
-        , m_structureCheckHoistingFailed(false)
-        , m_checkArrayHoistingFailed(false)
-        , m_isProfitableToUnbox(false)
-        , m_isLoadedFrom(false)
-        , m_doubleFormatState(EmptyDoubleFormatState)
-    {
-        clearVotes();
-    }
+    VariableAccessData();
+    VariableAccessData(VirtualRegister local, bool isCaptured);
     
     VirtualRegister local()
     {
@@ -92,11 +62,7 @@ public:
         return m_machineLocal;
     }
 
-    bool mergeIsCaptured(bool isCaptured)
-    {
-        return checkAndSet(m_shouldNeverUnbox, m_shouldNeverUnbox | isCaptured)
-            | checkAndSet(m_isCaptured, m_isCaptured | isCaptured);
-    }
+    bool mergeIsCaptured(bool isCaptured);
     
     bool isCaptured()
     {
@@ -113,14 +79,7 @@ public:
         return m_isProfitableToUnbox;
     }
     
-    bool mergeShouldNeverUnbox(bool shouldNeverUnbox)
-    {
-        bool newShouldNeverUnbox = m_shouldNeverUnbox | shouldNeverUnbox;
-        if (newShouldNeverUnbox == m_shouldNeverUnbox)
-            return false;
-        m_shouldNeverUnbox = newShouldNeverUnbox;
-        return true;
-    }
+    bool mergeShouldNeverUnbox(bool shouldNeverUnbox);
     
     // Returns true if it would be unsound to store the value in an unboxed fashion.
     // If this returns false, it simply means that it is sound to unbox; it doesn't
@@ -184,14 +143,7 @@ public:
         return m_isLoadedFrom;
     }
     
-    bool predict(SpeculatedType prediction)
-    {
-        VariableAccessData* self = find();
-        bool result = mergeSpeculation(self->m_prediction, prediction);
-        if (result)
-            mergeSpeculation(m_argumentAwarePrediction, m_prediction);
-        return result;
-    }
+    bool predict(SpeculatedType prediction);
     
     SpeculatedType nonUnifiedPrediction()
     {
@@ -208,10 +160,7 @@ public:
         return find()->m_argumentAwarePrediction;
     }
     
-    bool mergeArgumentAwarePrediction(SpeculatedType prediction)
-    {
-        return mergeSpeculation(find()->m_argumentAwarePrediction, prediction);
-    }
+    bool mergeArgumentAwarePrediction(SpeculatedType prediction);
     
     void clearVotes()
     {
@@ -220,10 +169,10 @@ public:
         m_votes[1] = 0;
     }
     
-    void vote(unsigned ballot)
+    void vote(unsigned ballot, float weight = 1)
     {
         ASSERT(ballot < 2);
-        m_votes[ballot]++;
+        m_votes[ballot] += weight;
     }
     
     double voteRatio()
@@ -232,39 +181,7 @@ public:
         return static_cast<double>(m_votes[1]) / m_votes[0];
     }
     
-    bool shouldUseDoubleFormatAccordingToVote()
-    {
-        // We don't support this facility for arguments, yet.
-        // FIXME: make this work for arguments.
-        if (local().isArgument())
-            return false;
-        
-        // If the variable is not a number prediction, then this doesn't
-        // make any sense.
-        if (!isFullNumberSpeculation(prediction())) {
-            // FIXME: we may end up forcing a local in inlined argument position to be a double even
-            // if it is sometimes not even numeric, since this never signals the fact that it doesn't
-            // want doubles. https://bugs.webkit.org/show_bug.cgi?id=109511
-            return false;
-        }
-        
-        // If the variable is predicted to hold only doubles, then it's a
-        // no-brainer: it should be formatted as a double.
-        if (isDoubleSpeculation(prediction()))
-            return true;
-        
-        // If the variable is known to be used as an integer, then be safe -
-        // don't force it to be a double.
-        if (flags() & NodeBytecodeUsesAsInt)
-            return false;
-        
-        // If the variable has been voted to become a double, then make it a
-        // double.
-        if (voteRatio() >= Options::doubleVoteRatioForDoubleFormat())
-            return true;
-        
-        return false;
-    }
+    bool shouldUseDoubleFormatAccordingToVote();
     
     DoubleFormatState doubleFormatState()
     {
@@ -280,43 +197,11 @@ public:
         return doubleState && isProfitableToUnbox();
     }
     
-    bool tallyVotesForShouldUseDoubleFormat()
-    {
-        ASSERT(isRoot());
-        
-        if (local().isArgument() || shouldNeverUnbox())
-            return DFG::mergeDoubleFormatState(m_doubleFormatState, NotUsingDoubleFormat);
-        
-        if (m_doubleFormatState == CantUseDoubleFormat)
-            return false;
-        
-        bool newValueOfShouldUseDoubleFormat = shouldUseDoubleFormatAccordingToVote();
-        if (!newValueOfShouldUseDoubleFormat) {
-            // We monotonically convert to double. Hence, if the fixpoint leads us to conclude that we should
-            // switch back to int, we instead ignore this and stick with double.
-            return false;
-        }
-        
-        if (m_doubleFormatState == UsingDoubleFormat)
-            return false;
-        
-        return DFG::mergeDoubleFormatState(m_doubleFormatState, UsingDoubleFormat);
-    }
+    bool tallyVotesForShouldUseDoubleFormat();
     
-    bool mergeDoubleFormatState(DoubleFormatState doubleFormatState)
-    {
-        return DFG::mergeDoubleFormatState(find()->m_doubleFormatState, doubleFormatState);
-    }
+    bool mergeDoubleFormatState(DoubleFormatState);
     
-    bool makePredictionForDoubleFormat()
-    {
-        ASSERT(isRoot());
-        
-        if (m_doubleFormatState != UsingDoubleFormat)
-            return false;
-        
-        return mergeSpeculation(m_prediction, SpecDouble);
-    }
+    bool makePredictionForDoubleFormat();
     
     NodeFlags flags() const { return m_flags; }
     
@@ -325,34 +210,9 @@ public:
         return checkAndSet(m_flags, m_flags | newFlags);
     }
     
-    FlushFormat flushFormat()
-    {
-        ASSERT(find() == this);
-        
-        if (isArgumentsAlias())
-            return FlushedArguments;
-        
-        if (!shouldUnboxIfPossible())
-            return FlushedJSValue;
-        
-        if (shouldUseDoubleFormat())
-            return FlushedDouble;
-        
-        SpeculatedType prediction = argumentAwarePrediction();
-        if (isInt32Speculation(prediction))
-            return FlushedInt32;
-        
-        if (enableInt52() && !m_local.isArgument() && isMachineIntSpeculation(prediction))
-            return FlushedInt52;
-        
-        if (isCellSpeculation(prediction))
-            return FlushedCell;
-        
-        if (isBooleanSpeculation(prediction))
-            return FlushedBoolean;
-        
-        return FlushedJSValue;
-    }
+    FlushFormat flushFormat();
+    
+    bool couldRepresentInt52();
     
     FlushedAt flushedAt()
     {
@@ -360,6 +220,8 @@ public:
     }
 
 private:
+    bool couldRepresentInt52Impl();
+    
     // This is slightly space-inefficient, since anything we're unified with
     // will have the same operand and should have the same prediction. But
     // putting them here simplifies the code, and we don't expect DFG space
@@ -384,5 +246,7 @@ private:
 };
 
 } } // namespace JSC::DFG
+
+#endif // ENABLE(DFG_JIT)
 
 #endif // DFGVariableAccessData_h

@@ -20,10 +20,12 @@
 #include "config.h"
 #include "SVGPathData.h"
 
-#if ENABLE(SVG)
 #include "Path.h"
+#include "RenderElement.h"
+#include "RenderStyle.h"
 #include "SVGCircleElement.h"
 #include "SVGEllipseElement.h"
+#include "SVGLengthContext.h"
 #include "SVGLineElement.h"
 #include "SVGNames.h"
 #include "SVGPathElement.h"
@@ -105,16 +107,20 @@ static void updatePathFromPolylineElement(SVGElement* element, Path& path)
 static void updatePathFromRectElement(SVGElement* element, Path& path)
 {
     SVGRectElement* rect = toSVGRectElement(element);
+    RenderElement* renderer = rect->renderer();
+    if (!renderer)
+        return;
 
+    RenderStyle& style = renderer->style();
     SVGLengthContext lengthContext(element);
-    float width = rect->width().value(lengthContext);
+    float width = lengthContext.valueForLength(style.width(), LengthModeWidth);
     if (width <= 0)
         return;
-    float height = rect->height().value(lengthContext);
+    float height = lengthContext.valueForLength(style.height(), LengthModeHeight);
     if (height <= 0)
         return;
-    float x = rect->x().value(lengthContext);
-    float y = rect->y().value(lengthContext);
+    float x = lengthContext.valueForLength(style.svgStyle().x(), LengthModeWidth);
+    float y = lengthContext.valueForLength(style.svgStyle().y(), LengthModeHeight);
     float rx = rect->rx().value(lengthContext);
     float ry = rect->ry().value(lengthContext);
     bool hasRx = rx > 0;
@@ -157,5 +163,3 @@ void updatePathFromGraphicsElement(SVGElement* element, Path& path)
 }
 
 } // namespace WebCore
-
-#endif // ENABLE(SVG)

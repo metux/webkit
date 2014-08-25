@@ -33,6 +33,7 @@
 #include "MathMLNames.h"
 #include "RenderMathMLOperator.h"
 #include "RenderMathMLSpace.h"
+#include "RenderMathMLToken.h"
 
 namespace WebCore {
     
@@ -52,30 +53,42 @@ PassRefPtr<MathMLTextElement> MathMLTextElement::create(const QualifiedName& tag
 void MathMLTextElement::didAttachRenderers()
 {
     MathMLElement::didAttachRenderers();
-    if (renderer())
-        renderer()->updateFromElement();
+    if (renderer() && renderer()->isRenderMathMLToken())
+        toRenderMathMLToken(renderer())->updateTokenContent();
 }
 
 void MathMLTextElement::childrenChanged(const ChildChange& change)
 {
     MathMLElement::childrenChanged(change);
-    if (renderer())
-        renderer()->updateFromElement();
+    if (renderer() && renderer()->isRenderMathMLToken())
+        toRenderMathMLToken(renderer())->updateTokenContent();
 }
 
 RenderPtr<RenderElement> MathMLTextElement::createElementRenderer(PassRef<RenderStyle> style)
 {
-    if (hasLocalName(MathMLNames::moTag))
-        return createRenderer<RenderMathMLOperator>(*this, std::move(style));
-    if (hasLocalName(MathMLNames::mspaceTag))
-        return createRenderer<RenderMathMLSpace>(*this, std::move(style));
+    if (hasTagName(MathMLNames::moTag))
+        return createRenderer<RenderMathMLOperator>(*this, WTF::move(style));
+    if (hasTagName(MathMLNames::mspaceTag))
+        return createRenderer<RenderMathMLSpace>(*this, WTF::move(style));
+    if (hasTagName(MathMLNames::annotationTag))
+        return MathMLElement::createElementRenderer(WTF::move(style));
 
-    return MathMLElement::createElementRenderer(std::move(style));
+    ASSERT(hasTagName(MathMLNames::miTag) || hasTagName(MathMLNames::mnTag) || hasTagName(MathMLNames::msTag) || hasTagName(MathMLNames::mtextTag));
+
+    return createRenderer<RenderMathMLToken>(*this, WTF::move(style));
 }
 
 bool MathMLTextElement::childShouldCreateRenderer(const Node& child) const
 {
-    return child.isTextNode();
+    if (hasTagName(MathMLNames::mspaceTag))
+        return false;
+
+    // FIXME: phrasing content should be accepted in <mo> elements too (https://bugs.webkit.org/show_bug.cgi?id=130245).
+    if (hasTagName(MathMLNames::annotationTag) || hasTagName(MathMLNames::moTag))
+        return child.isTextNode();
+
+    // The HTML specification defines <mi>, <mo>, <mn>, <ms> and <mtext> as insertion points.
+    return isPhrasingContent(child) && StyledElement::childShouldCreateRenderer(child);
 }
 
 }

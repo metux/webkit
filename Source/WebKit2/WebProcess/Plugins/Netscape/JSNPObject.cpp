@@ -33,6 +33,7 @@
 #include "NPRuntimeObjectMap.h"
 #include "NPRuntimeUtilities.h"
 #include <JavaScriptCore/Error.h>
+#include <JavaScriptCore/IdentifierInlines.h>
 #include <JavaScriptCore/JSGlobalObject.h>
 #include <JavaScriptCore/JSLock.h>
 #include <JavaScriptCore/ObjectPrototype.h>
@@ -54,7 +55,7 @@ static NPIdentifier npIdentifierFromIdentifier(PropertyName propertyName)
     return static_cast<NPIdentifier>(IdentifierRep::get(name.utf8().data()));
 }
 
-const ClassInfo JSNPObject::s_info = { "NPObject", &Base::s_info, 0, 0, CREATE_METHOD_TABLE(JSNPObject) };
+const ClassInfo JSNPObject::s_info = { "NPObject", &Base::s_info, 0, CREATE_METHOD_TABLE(JSNPObject) };
 
 JSNPObject::JSNPObject(JSGlobalObject* globalObject, Structure* structure, NPRuntimeObjectMap* objectMap, NPObject* npObject)
     : JSDestructibleObject(globalObject->vm(), structure)
@@ -89,7 +90,6 @@ void JSNPObject::destroy(JSCell* cell)
 void JSNPObject::invalidate()
 {
     ASSERT(m_npObject);
-    ASSERT_GC_OBJECT_INHERITS(this, info());
 
     releaseNPObject(m_npObject);
     m_npObject = 0;
@@ -417,9 +417,9 @@ void JSNPObject::getOwnPropertyNames(JSObject* object, ExecState* exec, Property
     npnMemFree(identifiers);
 }
 
-EncodedJSValue JSNPObject::propertyGetter(ExecState* exec, EncodedJSValue slotBase, EncodedJSValue, PropertyName propertyName)
+EncodedJSValue JSNPObject::propertyGetter(ExecState* exec, JSObject* slotBase, EncodedJSValue, PropertyName propertyName)
 {
-    JSNPObject* thisObj = jsCast<JSNPObject*>(JSValue::decode(slotBase));
+    JSNPObject* thisObj = jsCast<JSNPObject*>(slotBase);
     ASSERT_GC_OBJECT_INHERITS(thisObj, info());
     
     if (!thisObj->m_npObject)
@@ -453,9 +453,9 @@ EncodedJSValue JSNPObject::propertyGetter(ExecState* exec, EncodedJSValue slotBa
     return JSValue::encode(propertyValue);
 }
 
-EncodedJSValue JSNPObject::methodGetter(ExecState* exec, EncodedJSValue slotBase, EncodedJSValue, PropertyName propertyName)
+EncodedJSValue JSNPObject::methodGetter(ExecState* exec, JSObject* slotBase, EncodedJSValue, PropertyName propertyName)
 {
-    JSNPObject* thisObj = jsCast<JSNPObject*>(JSValue::decode(slotBase));
+    JSNPObject* thisObj = jsCast<JSNPObject*>(slotBase);
     ASSERT_GC_OBJECT_INHERITS(thisObj, info());
     
     if (!thisObj->m_npObject)

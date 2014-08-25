@@ -10,7 +10,7 @@
  * 2.  Redistributions in binary form must reproduce the above copyright
  *     notice, this list of conditions and the following disclaimer in the
  *     documentation and/or other materials provided with the distribution.
- * 3.  Neither the name of Apple Computer, Inc. ("Apple") nor the names of
+ * 3.  Neither the name of Apple Inc. ("Apple") nor the names of
  *     its contributors may be used to endorse or promote products derived
  *     from this software without specific prior written permission.
  *
@@ -148,13 +148,13 @@ namespace WTF {
             return at(size() - 1);
         }
 
-        template <typename U> void append(const U& value)
+        template <typename U> void append(U&& value)
         {
             ++m_size;
 
             if (!segmentExistsFor(m_size - 1))
                 m_segments.append(new Segment);
-            segmentFor(m_size - 1)->uncheckedAppend(value);
+            segmentFor(m_size - 1)->uncheckedAppend(std::forward<U>(value));
         }
 
         T& alloc()

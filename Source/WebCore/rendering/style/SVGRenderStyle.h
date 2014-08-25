@@ -1,8 +1,9 @@
 /*
     Copyright (C) 2004, 2005, 2007 Nikolas Zimmermann <zimmermann@kde.org>
                   2004, 2005 Rob Buis <buis@kde.org>
-    Copyright (C) 2005, 2006 Apple Computer, Inc.
+    Copyright (C) 2005, 2006 Apple Inc.
     Copyright (C) Research In Motion Limited 2010. All rights reserved.
+    Copyright (C) 2014 Adobe Systems Incorporated. All rights reserved.
 
     This library is free software; you can redistribute it and/or
     modify it under the terms of the GNU Library General Public
@@ -23,7 +24,6 @@
 #ifndef SVGRenderStyle_h
 #define SVGRenderStyle_h
 
-#if ENABLE(SVG)
 #include "CSSValueList.h"
 #include "DataRef.h"
 #include "ExceptionCodePlaceholder.h"
@@ -96,6 +96,7 @@ public:
     static String initialMarkerMidResource() { return String(); }
     static String initialMarkerEndResource() { return String(); }
     static EMaskType initialMaskType() { return MT_LUMINANCE; }
+    static PaintOrder initialPaintOrder() { return PaintOrderNormal; }
 
     static SVGLength initialBaselineShiftValue()
     {
@@ -144,6 +145,17 @@ public:
     void setGlyphOrientationHorizontal(EGlyphOrientation val) { svg_inherited_flags._glyphOrientationHorizontal = val; }
     void setGlyphOrientationVertical(EGlyphOrientation val) { svg_inherited_flags._glyphOrientationVertical = val; }
     void setMaskType(EMaskType val) { svg_noninherited_flags.f.maskType = val; }
+    void setPaintOrder(PaintOrder val) { svg_inherited_flags.paintOrder = val; }
+    void setX(const Length& obj)
+    {
+        if (!(layout->x == obj))
+            layout.access()->x = obj;
+    }
+    void setY(const Length& obj)
+    {
+        if (!(layout->y == obj))
+            layout.access()->y = obj;
+    }
 
     void setFillOpacity(float obj)
     {
@@ -263,7 +275,7 @@ public:
             misc.access()->baselineShiftValue = obj;
     }
 
-    void setShadow(PassOwnPtr<ShadowData> obj) { shadowSVG.access()->shadow = obj; }
+    void setShadow(std::unique_ptr<ShadowData> obj) { shadowSVG.access()->shadow = WTF::move(obj); }
 
     // Setters for non-inherited resources
     void setClipperResource(const String& obj)
@@ -341,6 +353,8 @@ public:
     const Color& lightingColor() const { return misc->lightingColor; }
     SVGLength baselineShiftValue() const { return misc->baselineShiftValue; }
     ShadowData* shadow() const { return shadowSVG->shadow.get(); }
+    const Length& x() const { return layout->x; }
+    const Length& y() const { return layout->y; }
     String clipperResource() const { return resources->clipper; }
     String filterResource() const { return resources->filter; }
     String maskerResource() const { return resources->masker; }
@@ -348,6 +362,8 @@ public:
     String markerMidResource() const { return inheritedResources->markerMid; }
     String markerEndResource() const { return inheritedResources->markerEnd; }
     EMaskType maskType() const { return (EMaskType) svg_noninherited_flags.f.maskType; }
+    PaintOrder paintOrder() const { return (PaintOrder) svg_inherited_flags.paintOrder; }
+    Vector<PaintType> paintTypesForPaintOrder() const;
 
     const SVGPaint::SVGPaintType& visitedLinkFillPaintType() const { return fill->visitedLinkPaintType; }
     const Color& visitedLinkFillPaintColor() const { return fill->visitedLinkPaintColor; }
@@ -365,6 +381,7 @@ public:
     bool hasVisibleStroke() const { return hasStroke() && !strokeWidth().isZero(); }
     bool hasFill() const { return fillPaintType() != SVGPaint::SVG_PAINTTYPE_NONE; }
     bool isVerticalWritingMode() const { return writingMode() == WM_TBRL || writingMode() == WM_TB; }
+    bool isolatesBlending() const { return hasMasker() || hasFilter() || shadow(); }
 
 protected:
     // inherit
@@ -382,7 +399,8 @@ protected:
                 && (_colorInterpolationFilters == other._colorInterpolationFilters)
                 && (_writingMode == other._writingMode)
                 && (_glyphOrientationHorizontal == other._glyphOrientationHorizontal)
-                && (_glyphOrientationVertical == other._glyphOrientationVertical);
+                && (_glyphOrientationVertical == other._glyphOrientationVertical)
+                && (paintOrder == other.paintOrder);
         }
 
         bool operator!=(const InheritedFlags& other) const
@@ -402,6 +420,7 @@ protected:
         unsigned _writingMode : 3; // SVGWritingMode
         unsigned _glyphOrientationHorizontal : 3; // EGlyphOrientation
         unsigned _glyphOrientationVertical : 3; // EGlyphOrientation
+        unsigned paintOrder : 3; // PaintOrder
     } svg_inherited_flags;
 
     // don't inherit
@@ -434,6 +453,7 @@ protected:
     DataRef<StyleStopData> stops;
     DataRef<StyleMiscData> misc;
     DataRef<StyleShadowSVGData> shadowSVG;
+    DataRef<StyleLayoutData> layout;
     DataRef<StyleResourceData> resources;
 
 private:
@@ -457,6 +477,7 @@ private:
         svg_inherited_flags._writingMode = initialWritingMode();
         svg_inherited_flags._glyphOrientationHorizontal = initialGlyphOrientationHorizontal();
         svg_inherited_flags._glyphOrientationVertical = initialGlyphOrientationVertical();
+        svg_inherited_flags.paintOrder = initialPaintOrder();
 
         svg_noninherited_flags._niflags = 0;
         svg_noninherited_flags.f._alignmentBaseline = initialAlignmentBaseline();
@@ -470,5 +491,4 @@ private:
 
 } // namespace WebCore
 
-#endif // ENABLE(SVG)
 #endif // SVGRenderStyle_h

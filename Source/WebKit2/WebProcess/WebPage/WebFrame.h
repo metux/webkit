@@ -43,6 +43,7 @@ class Array;
 }
 
 namespace WebCore {
+class CertificateInfo;
 class Frame;
 class HTMLFrameOwnerElement;
 class IntPoint;
@@ -68,13 +69,15 @@ public:
     void invalidate();
 
     WebPage* page() const;
+
+    static WebFrame* fromCoreFrame(WebCore::Frame&);
     WebCore::Frame* coreFrame() const { return m_coreFrame; }
 
     uint64_t frameID() const { return m_frameID; }
 
     uint64_t setUpPolicyListener(WebCore::FramePolicyFunction);
     void invalidatePolicyListener();
-    void didReceivePolicyDecision(uint64_t listenerID, WebCore::PolicyAction, uint64_t downloadID);
+    void didReceivePolicyDecision(uint64_t listenerID, WebCore::PolicyAction, uint64_t navigationID, uint64_t downloadID);
 
     void startDownload(const WebCore::ResourceRequest&);
     void convertMainResourceLoadToDownload(WebCore::DocumentLoader*, const WebCore::ResourceRequest&, const WebCore::ResourceResponse&);
@@ -89,6 +92,7 @@ public:
     bool isMainFrame() const;
     String name() const;
     String url() const;
+    WebCore::CertificateInfo certificateInfo() const;
     String innerText() const;
     bool isFrameSet() const;
     WebFrame* parentFrame() const;
@@ -127,6 +131,8 @@ public:
 
     void setTextDirection(const String&);
 
+    void documentLoaderDetached(uint64_t navigationID);
+
     // Simple listener class used by plug-ins to know when frames finish or fail loading.
     class LoadListener {
     public:
@@ -138,7 +144,7 @@ public:
     void setLoadListener(LoadListener* loadListener) { m_loadListener = loadListener; }
     LoadListener* loadListener() const { return m_loadListener; }
     
-#if PLATFORM(MAC)
+#if PLATFORM(COCOA)
     typedef bool (*FrameFilterFunction)(WKBundleFrameRef, WKBundleFrameRef subframe, void* context);
     RetainPtr<CFDataRef> webArchiveData(FrameFilterFunction, void* context);
 #endif

@@ -134,11 +134,22 @@ static void testTLSErrorsPolicy(SSLTest* test, gconstpointer)
     g_assert(!test->m_loadEvents.contains(LoadTrackingTest::LoadCommitted));
 }
 
+static void testTLSErrorsRedirect(SSLTest* test, gconstpointer)
+{
+    webkit_web_context_set_tls_errors_policy(webkit_web_view_get_context(test->m_webView), WEBKIT_TLS_ERRORS_POLICY_FAIL);
+    test->loadURI(kHttpsServer->getURIForPath("/redirect").data());
+    test->waitUntilLoadFinished();
+    g_assert(test->m_loadFailed);
+    g_assert(test->m_loadEvents.contains(LoadTrackingTest::ProvisionalLoadFailed));
+    g_assert(!test->m_loadEvents.contains(LoadTrackingTest::LoadCommitted));
+}
+
 class TLSErrorsTest: public SSLTest {
 public:
     MAKE_GLIB_TEST_FIXTURE(TLSErrorsTest);
 
     TLSErrorsTest()
+        : m_tlsErrors(static_cast<GTlsCertificateFlags>(0))
     {
         g_signal_connect(m_webView, "load-failed-with-tls-errors", G_CALLBACK(runLoadFailedWithTLSErrorsCallback), this);
     }
@@ -146,21 +157,19 @@ public:
     ~TLSErrorsTest()
     {
         g_signal_handlers_disconnect_matched(m_webView, G_SIGNAL_MATCH_DATA, 0, 0, 0, 0, this);
-        if (m_certificateInfo)
-            webkit_certificate_info_free(m_certificateInfo);
     }
 
-    static gboolean runLoadFailedWithTLSErrorsCallback(WebKitWebView*, WebKitCertificateInfo* info, const char* host, TLSErrorsTest* test)
+    static gboolean runLoadFailedWithTLSErrorsCallback(WebKitWebView*, GTlsCertificate* certificate, GTlsCertificateFlags tlsErrors, const char* host, TLSErrorsTest* test)
     {
-        test->runLoadFailedWithTLSErrors(info, host);
+        test->runLoadFailedWithTLSErrors(certificate, tlsErrors, host);
         return TRUE;
     }
 
-    void runLoadFailedWithTLSErrors(WebKitCertificateInfo* info, const char* host)
+    void runLoadFailedWithTLSErrors(GTlsCertificate* certificate, GTlsCertificateFlags tlsErrors, const char* host)
     {
-        if (m_certificateInfo)
-            webkit_certificate_info_free(m_certificateInfo);
-        m_certificateInfo = webkit_certificate_info_copy(info);
+        assertObjectIsDeletedWhenTestFinishes(G_OBJECT(certificate));
+        m_certificate = certificate;
+        m_tlsErrors = tlsErrors;
         m_host.reset(g_strdup(host));
         g_main_loop_quit(m_mainLoop);
     }
@@ -170,18 +179,13 @@ public:
         g_main_loop_run(m_mainLoop);
     }
 
-    WebKitCertificateInfo* certificateInfo()
-    {
-        return m_certificateInfo;
-    }
-
-    const char* host()
-    {
-        return m_host.get();
-    }
+    GTlsCertificate* certificate() const { return m_certificate.get(); }
+    GTlsCertificateFlags tlsErrors() const { return m_tlsErrors; }
+    const char* host() const { return m_host.get(); }
 
 private:
-    WebKitCertificateInfo* m_certificateInfo;
+    GRefPtr<GTlsCertificate> m_certificate;
+    GTlsCertificateFlags m_tlsErrors;
     GUniquePtr<char> m_host;
 };
 
@@ -194,14 +198,14 @@ static void testLoadFailedWithTLSErrors(TLSErrorsTest* test, gconstpointer)
     test->loadURI(kHttpsServer->getURIForPath("/test-tls/").data());
     test->waitUntilLoadFailedWithTLSErrors();
     // Test the WebKitCertificateInfo API.
-    g_assert(G_IS_TLS_CERTIFICATE(webkit_certificate_info_get_tls_certificate(test->certificateInfo())));
-    g_assert_cmpuint(webkit_certificate_info_get_tls_errors(test->certificateInfo()), ==, G_TLS_CERTIFICATE_UNKNOWN_CA);
+    g_assert(G_IS_TLS_CERTIFICATE(test->certificate()));
+    g_assert_cmpuint(test->tlsErrors(), ==, G_TLS_CERTIFICATE_UNKNOWN_CA);
     g_assert_cmpstr(test->host(), ==, soup_uri_get_host(kHttpsServer->baseURI()));
     g_assert_cmpint(test->m_loadEvents[0], ==, LoadTrackingTest::ProvisionalLoadStarted);
     g_assert_cmpint(test->m_loadEvents[1], ==, LoadTrackingTest::LoadFinished);
 
     // Test allowing an exception for this certificate on this host.
-    webkit_web_context_allow_tls_certificate_for_host(context, test->certificateInfo(), test->host());
+    webkit_web_context_allow_tls_certificate_for_host(context, test->certificate(), test->host());
     // The page should now load without errors.
     test->loadURI(kHttpsServer->getURIForPath("/test-tls/").data());
     test->waitUntilLoadFinished();
@@ -233,6 +237,9 @@ static void httpsServerCallback(SoupServer* server, SoupMessage* message, const 
         soup_message_set_status(message, SOUP_STATUS_OK);
         soup_message_body_append(message->response_body, SOUP_MEMORY_STATIC, TLSSuccessHTMLString, strlen(TLSSuccessHTMLString));
         soup_message_body_complete(message->response_body);
+    } else if (g_str_equal(path, "/redirect")) {
+        soup_message_set_status(message, SOUP_STATUS_MOVED_PERMANENTLY);
+        soup_message_headers_append(message->response_headers, "Location", kHttpServer->getURIForPath("/test-image").data());
     } else
         soup_message_set_status(message, SOUP_STATUS_NOT_FOUND);
 }
@@ -245,7 +252,7 @@ static void httpServerCallback(SoupServer* server, SoupMessage* message, const c
     }
 
     if (g_str_equal(path, "/test-script")) {
-        GUniquePtr<char> pathToFile(g_build_filename(Test::getResourcesDir().data(), "link-title.js", NULL));
+        GUniquePtr<char> pathToFile(g_build_filename(Test::getResourcesDir().data(), "link-title.js", nullptr));
         char* contents;
         gsize length;
         g_file_get_contents(pathToFile.get(), &contents, &length, 0);
@@ -254,7 +261,7 @@ static void httpServerCallback(SoupServer* server, SoupMessage* message, const c
         soup_message_set_status(message, SOUP_STATUS_OK);
         soup_message_body_complete(message->response_body);
     } else if (g_str_equal(path, "/test-image")) {
-        GUniquePtr<char> pathToFile(g_build_filename(Test::getWebKit1TestResoucesDir().data(), "blank.ico", NULL));
+        GUniquePtr<char> pathToFile(g_build_filename(Test::getResourcesDir().data(), "blank.ico", nullptr));
         char* contents;
         gsize length;
         g_file_get_contents(pathToFile.get(), &contents, &length, 0);
@@ -280,6 +287,7 @@ void beforeAll()
     // and expects that no exception will have been added for this certificate and host pair as is
     // done in the tls-permission-request test.
     SSLTest::add("WebKitWebView", "tls-errors-policy", testTLSErrorsPolicy);
+    SSLTest::add("WebKitWebView", "tls-errors-redirect-to-http", testTLSErrorsRedirect);
     TLSErrorsTest::add("WebKitWebView", "load-failed-with-tls-errors", testLoadFailedWithTLSErrors);
 }
 

@@ -31,6 +31,7 @@
 #include <WebCore/ResourceError.h>
 #include <WebCore/ResourceRequest.h>
 #include <WebCore/ResourceResponse.h>
+#include <memory>
 #include <wtf/RefCounted.h>
 
 #if ENABLE(NETWORK_PROCESS)
@@ -55,18 +56,17 @@ private:
 #endif
     virtual void didReceiveResponse(NetworkResourceLoader*, const WebCore::ResourceResponse&) override;
     virtual void didReceiveBuffer(NetworkResourceLoader*, WebCore::SharedBuffer*, int encodedDataLength) override;
-    virtual void didSendData(NetworkResourceLoader*, unsigned long long bytesSent, unsigned long long totalBytesToBeSent) override { }
+    virtual void didSendData(NetworkResourceLoader*, unsigned long long /* bytesSent */, unsigned long long /* totalBytesToBeSent */) override { }
     virtual void didFinishLoading(NetworkResourceLoader*, double finishTime) override;
     virtual void didFail(NetworkResourceLoader*, const WebCore::ResourceError&) override;
 
-    void sendDelayedReply();
+    void sendDelayedReply(NetworkResourceLoader&);
 
     WebCore::ResourceRequest m_originalRequest;
     WebCore::ResourceRequest m_currentRequest;
     RefPtr<Messages::NetworkConnectionToWebProcess::PerformSynchronousLoad::DelayedReply> m_delayedReply;
     WebCore::ResourceResponse m_response;
     WebCore::ResourceError m_error;
-    OwnPtr<Vector<char>> m_responseData;
 };
 
 } // namespace WebKit

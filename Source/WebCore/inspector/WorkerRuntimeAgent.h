@@ -34,7 +34,6 @@
 #if ENABLE(INSPECTOR)
 
 #include <inspector/agents/InspectorRuntimeAgent.h>
-#include <wtf/PassOwnPtr.h>
 
 namespace WebCore {
 
@@ -54,7 +53,7 @@ public:
     void pauseWorkerGlobalScope(WorkerGlobalScope*);
 
 private:
-    virtual JSC::VM* globalVM() override;
+    virtual JSC::VM& globalVM() override;
     virtual Inspector::InjectedScript injectedScriptForEval(ErrorString*, const int* executionContextId) override;
     virtual void muteConsole() override;
     virtual void unmuteConsole() override;

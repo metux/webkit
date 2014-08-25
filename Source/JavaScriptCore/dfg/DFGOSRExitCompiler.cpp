@@ -34,7 +34,7 @@
 #include "DFGOSRExitPreparation.h"
 #include "LinkBuffer.h"
 #include "OperandsInlines.h"
-#include "Operations.h"
+#include "JSCInlines.h"
 #include "RepatchBuffer.h"
 #include <wtf/StringPrintStream.h>
 
@@ -88,15 +88,15 @@ void compileOSRExit(ExecState* exec)
             
             Profiler::OSRExit* profilerExit = compilation->addOSRExit(
                 exitIndex, Profiler::OriginStack(database, codeBlock, exit.m_codeOrigin),
-                exit.m_kind, isWatchpoint(exit.m_kind));
+                exit.m_kind, exit.m_kind == UncountableInvalidation);
             jit.add64(CCallHelpers::TrustedImm32(1), CCallHelpers::AbsoluteAddress(profilerExit->counterAddress()));
         }
         
         exitCompiler.compileExit(exit, operands, recovery);
         
-        LinkBuffer patchBuffer(*vm, &jit, codeBlock);
+        LinkBuffer patchBuffer(*vm, jit, codeBlock);
         exit.m_code = FINALIZE_CODE_IF(
-            shouldShowDisassembly(),
+            shouldShowDisassembly() || Options::verboseOSR(),
             patchBuffer,
             ("DFG OSR exit #%u (%s, %s) from %s, with operands = %s",
                 exitIndex, toCString(exit.m_codeOrigin).data(),

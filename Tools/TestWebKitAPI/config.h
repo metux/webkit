@@ -23,12 +23,8 @@
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#if defined(HAVE_CONFIG_H) && HAVE_CONFIG_H
-#ifdef BUILDING_WITH_CMAKE
+#if defined(HAVE_CONFIG_H) && HAVE_CONFIG_H && defined(BUILDING_WITH_CMAKE)
 #include "cmakeconfig.h"
-#else
-#include "autotoolsconfig.h"
-#endif
 #endif
 
 #include <wtf/Platform.h>
@@ -69,7 +65,7 @@
 #include <stdint.h>
 
 #if !PLATFORM(IOS) && !PLATFORM(WIN) && !(PLATFORM(GTK) && !defined(BUILDING_WEBKIT2__))
-#include <WebKit2/WebKit2_C.h>
+#include <WebKit/WebKit2_C.h>
 #endif
 
 #ifdef __clang__
@@ -87,6 +83,6 @@
 #pragma clang diagnostic pop
 #endif
 
-#if PLATFORM(MAC) && defined(__OBJC__)
+#if PLATFORM(COCOA) && defined(__OBJC__)
 #import <WebKit/WebKit.h>
 #endif

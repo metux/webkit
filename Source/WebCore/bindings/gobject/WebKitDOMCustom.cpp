@@ -28,6 +28,11 @@
 #include "WebKitDOMPrivate.h"
 #include "gobject/ConvertToUTF8String.h"
 
+#if ENABLE(VIDEO)
+#include "TextTrack.h"
+#include "WebKitDOMTextTrackPrivate.h"
+#endif
+
 using namespace WebKit;
 
 gboolean webkit_dom_html_text_area_element_is_edited(WebKitDOMHTMLTextAreaElement* area)
@@ -42,18 +47,6 @@ gboolean webkit_dom_html_input_element_is_edited(WebKitDOMHTMLInputElement* inpu
     g_return_val_if_fail(WEBKIT_DOM_IS_HTML_INPUT_ELEMENT(input), FALSE);
 
     return core(input)->lastChangeWasUserEdit();
-}
-
-void webkit_dom_html_media_element_set_current_time(WebKitDOMHTMLMediaElement* self, gdouble value, GError**)
-{
-#if ENABLE(VIDEO)
-    WebCore::JSMainThreadNullState state;
-    g_return_if_fail(WEBKIT_DOM_IS_HTML_MEDIA_ELEMENT(self));
-    WebCore::HTMLMediaElement* item = WebKit::core(self);
-    item->setCurrentTime(value);
-#else
-    WEBKIT_WARN_FEATURE_NOT_PRESENT("Video")
-#endif /* ENABLE(VIDEO) */
 }
 
 

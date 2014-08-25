@@ -10,7 +10,7 @@
  * 2.  Redistributions in binary form must reproduce the above copyright
  *     notice, this list of conditions and the following disclaimer in the
  *     documentation and/or other materials provided with the distribution.
- * 3.  Neither the name of Apple Computer, Inc. ("Apple") nor the names of
+ * 3.  Neither the name of Apple Inc. ("Apple") nor the names of
  *     its contributors may be used to endorse or promote products derived
  *     from this software without specific prior written permission.
  *
@@ -42,7 +42,6 @@ enum XMLHttpRequestResponseType {
     ConstructorCallWith=ScriptExecutionContext,
     JSCustomMarkFunction,
     EventTarget,
-    JSNoStaticTables,
 ] interface XMLHttpRequest {
     // From XMLHttpRequestEventTarget
     // event handler attributes
@@ -88,8 +87,8 @@ enum XMLHttpRequestResponseType {
     [SetterRaisesException] attribute XMLHttpRequestResponseType responseType;
     [GetterRaisesException, CachedAttribute, CustomGetter] readonly attribute Object response;
 
-    [GetterRaisesException] readonly attribute unsigned short status;
-    [GetterRaisesException] readonly attribute DOMString statusText;
+    readonly attribute unsigned short status;
+    readonly attribute DOMString statusText;
 
     // Extension
     void overrideMimeType(DOMString override);

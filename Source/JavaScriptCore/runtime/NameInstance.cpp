@@ -27,11 +27,11 @@
 #include "NameInstance.h"
 
 #include "JSScope.h"
-#include "Operations.h"
+#include "JSCInlines.h"
 
 namespace JSC {
 
-const ClassInfo NameInstance::s_info = { "Name", &Base::s_info, 0, 0, CREATE_METHOD_TABLE(NameInstance) };
+const ClassInfo NameInstance::s_info = { "Name", &Base::s_info, 0, CREATE_METHOD_TABLE(NameInstance) };
 
 NameInstance::NameInstance(VM& vm, Structure* structure, JSString* nameString)
     : Base(vm, structure)

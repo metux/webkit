@@ -20,7 +20,6 @@
 #ifndef SVGImageCache_h
 #define SVGImageCache_h
 
-#if ENABLE(SVG)
 #include "FloatSize.h"
 #include "Image.h"
 #include "IntSize.h"
@@ -32,6 +31,7 @@ namespace WebCore {
 class CachedImage;
 class CachedImageClient;
 class ImageBuffer;
+class LayoutSize;
 class SVGImage;
 class SVGImageForContainer;
 class RenderObject;
@@ -44,8 +44,8 @@ public:
 
     void removeClientFromCache(const CachedImageClient*);
 
-    void setContainerSizeForRenderer(const CachedImageClient*, const IntSize&, float);
-    IntSize imageSizeForRenderer(const RenderObject*) const;
+    void setContainerSizeForRenderer(const CachedImageClient*, const LayoutSize&, float);
+    FloatSize imageSizeForRenderer(const RenderObject*) const;
 
     Image* imageForRenderer(const RenderObject*);
 
@@ -58,5 +58,4 @@ private:
 
 } // namespace WebCore
 
-#endif // ENABLE(SVG)
 #endif // SVGImageCache_h

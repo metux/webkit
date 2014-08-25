@@ -16,7 +16,8 @@ WEBKIT_WEB_VIEW_BASE_GET_CLASS
 webkit_web_view_base_get_type
 WebKitWebViewBasePrivate
 WEBKIT_API
-WEBKIT_OBSOLETE_API
+WEBKIT_DEPRECATED
+WEBKIT_DEPRECATED_FOR
 </SECTION>
 
 <SECTION>
@@ -73,13 +74,60 @@ webkit_web_context_get_type
 </SECTION>
 
 <SECTION>
+<FILE>WebKitUserContent</FILE>
+<TITLE>WebKitUserContent</TITLE>
+WebKitUserStyleSheet
+WebKitUserScript
+WebKitUserContentInjectedFrames
+WebKitUserStyleLevel
+WebKitUserScriptInjectionTime
+webkit_user_style_sheet_ref
+webkit_user_style_sheet_unref
+webkit_user_style_sheet_new
+webkit_user_script_ref
+webkit_user_script_unref
+webkit_user_script_new
+
+<SUBSECTION Standard>
+WEBKIT_TYPE_USER_STYLE_SHEET
+WEBKIT_TYPE_USER_SCRIPT
+
+<SUBSECTION Private>
+webkit_user_style_sheet_get_type
+webkit_user_script_get_type
+</SECTION>
+
+<SECTION>
+<FILE>WebKitUserContentManager</FILE>
+<TITLE>WebKitUserContentManager</TITLE>
+WebKitUserContentManager
+webkit_user_content_manager_new
+webkit_user_content_manager_add_style_sheet
+webkit_user_content_manager_remove_all_style_sheets
+webkit_user_content_manager_add_script
+webkit_user_content_manager_remove_all_scripts
+
+<SUBSECTION Standard>
+WEBKIT_IS_USER_CONTENT_MANAGER
+WEBKIT_IS_USER_CONTENT_MANAGER_CLASS
+WEBKIT_TYPE_USER_CONTENT_MANAGER
+WEBKIT_USER_CONTENT_MANAGER
+WEBKIT_USER_CONTENT_MANAGER_CLASS
+WEBKIT_USER_CONTENT_MANAGER_GET_CLASS
+WebKitUserContentManagerClass
+
+<SUBSECTION Private>
+WebKitUserContentManagerPrivate
+webkit_user_content_manager_get_type
+</SECTION>
+
+<SECTION>
 <FILE>WebKitWebView</FILE>
 <TITLE>WebKitWebView</TITLE>
 WebKitWebView
 WebKitLoadEvent
 WebKitPolicyDecisionType
 WebKitSaveMode
-WebKitViewMode
 WebKitInsecureContentEvent
 WebKitSnapshotOptions
 WebKitSnapshotRegion
@@ -96,13 +144,15 @@ WEBKIT_EDITING_COMMAND_REDO
 webkit_web_view_new
 webkit_web_view_new_with_context
 webkit_web_view_new_with_related_view
-webkit_web_view_new_with_group
+webkit_web_view_new_with_settings
+webkit_web_view_new_with_user_content_manager
 webkit_web_view_get_context
-webkit_web_view_get_group
+webkit_web_view_get_user_content_manager
 webkit_web_view_load_uri
 webkit_web_view_load_html
 webkit_web_view_load_alternate_html
 webkit_web_view_load_plain_text
+webkit_web_view_load_bytes
 webkit_web_view_load_request
 webkit_web_view_can_go_back
 webkit_web_view_go_back
@@ -142,8 +192,6 @@ webkit_web_view_save_finish
 webkit_web_view_save_to_file
 webkit_web_view_save_to_file_finish
 webkit_web_view_download_uri
-webkit_web_view_set_view_mode
-webkit_web_view_get_view_mode
 webkit_web_view_get_tls_info
 webkit_web_view_get_snapshot
 webkit_web_view_get_snapshot_finish
@@ -524,6 +572,24 @@ webkit_geolocation_permission_request_get_type
 </SECTION>
 
 <SECTION>
+<FILE>WebKitNavigationAction</FILE>
+WebKitNavigationAction
+webkit_navigation_action_copy
+webkit_navigation_action_free
+webkit_navigation_action_get_navigation_type
+webkit_navigation_action_get_mouse_button
+webkit_navigation_action_get_modifiers
+webkit_navigation_action_get_request
+webkit_navigation_action_is_user_gesture
+
+<SUBSECTION Standard>
+WEBKIT_TYPE_NAVIGATION_ACTION
+
+<SUBSECTION Private>
+webkit_navigation_action_get_type
+</SECTION>
+
+<SECTION>
 <FILE>WebKitPolicyDecision</FILE>
 WebKitPolicyDecision
 webkit_policy_decision_download
@@ -548,6 +614,7 @@ webkit_policy_decision_get_type
 <FILE>WebKitNavigationPolicyDecision</FILE>
 WebKitNavigationPolicyDecision
 WebKitNavigationType
+webkit_navigation_policy_decision_get_navigation_action
 webkit_navigation_policy_decision_get_frame_name
 webkit_navigation_policy_decision_get_modifiers
 webkit_navigation_policy_decision_get_mouse_button
@@ -1003,31 +1070,6 @@ webkit_security_manager_get_type
 </SECTION>
 
 <SECTION>
-<FILE>WebKitWebViewGroup</FILE>
-WebKitWebViewGroup
-WebKitInjectedContentFrames
-webkit_web_view_group_new
-webkit_web_view_group_get_name
-webkit_web_view_group_get_settings
-webkit_web_view_group_set_settings
-webkit_web_view_group_add_user_style_sheet
-webkit_web_view_group_remove_all_user_style_sheets
-
-<SUBSECTION Standard>
-WebKitWebViewGroupClass
-WEBKIT_TYPE_WEB_VIEW_GROUP
-WEBKIT_WEB_VIEW_GROUP
-WEBKIT_IS_WEB_VIEW_GROUP
-WEBKIT_WEB_VIEW_GROUP_CLASS
-WEBKIT_IS_WEB_VIEW_GROUP_CLASS
-WEBKIT_WEB_VIEW_GROUP_GET_CLASS
-
-<SUBSECTION Private>
-WebKitWebViewGroupPrivate
-webkit_web_view_group_get_type
-</SECTION>
-
-<SECTION>
 <FILE>WebKitWebExtension</FILE>
 WebKitWebExtension
 WebKitWebExtensionInitializeFunction
@@ -1110,19 +1152,4 @@ WEBKIT_SCRIPT_WORLD_GET_CLASS
 <SUBSECTION Private>
 WebKitScriptWorldPrivate
 webkit_script_world_get_type
-</SECTION>
-
-<SECTION>
-<FILE>WebKitCertificateInfo</FILE>
-WebKitCertificateInfo
-webkit_certificate_info_copy
-webkit_certificate_info_free
-webkit_certificate_info_get_tls_certificate
-webkit_certificate_info_get_tls_errors
-
-<SUBSECTION Standard>
-WEBKIT_TYPE_CERTIFICATE_INFO
-
-<SUBSECTION Private>
-webkit_certificate_info_get_type
 </SECTION>

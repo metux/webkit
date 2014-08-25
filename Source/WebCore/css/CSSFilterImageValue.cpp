@@ -30,6 +30,7 @@
 #if ENABLE(CSS_FILTERS)
 
 #include "CSSImageValue.h"
+#include "CachedImage.h"
 #include "CachedResourceLoader.h"
 #include "CrossfadeGeneratedImage.h"
 #include "FilterEffectRenderer.h"
@@ -59,13 +60,13 @@ String CSSFilterImageValue::customCSSText() const
     return result.toString();
 }
 
-IntSize CSSFilterImageValue::fixedSize(const RenderElement* renderer)
+FloatSize CSSFilterImageValue::fixedSize(const RenderElement* renderer)
 {
     CachedResourceLoader* cachedResourceLoader = renderer->document().cachedResourceLoader();
     CachedImage* cachedImage = cachedImageForCSSValue(m_imageValue.get(), cachedResourceLoader);
 
     if (!cachedImage)
-        return IntSize();
+        return FloatSize();
 
     return cachedImage->imageForRenderer(renderer)->size();
 }
@@ -96,7 +97,7 @@ void CSSFilterImageValue::loadSubimages(CachedResourceLoader* cachedResourceLoad
     m_filterSubimageObserver.setReady(true);
 }
 
-PassRefPtr<Image> CSSFilterImageValue::image(RenderElement* renderer, const IntSize& size)
+PassRefPtr<Image> CSSFilterImageValue::image(RenderElement* renderer, const FloatSize& size)
 {
     if (size.isEmpty())
         return 0;
@@ -119,7 +120,7 @@ PassRefPtr<Image> CSSFilterImageValue::image(RenderElement* renderer, const IntS
     texture->context()->drawImage(image, ColorSpaceDeviceRGB, IntPoint());
 
     RefPtr<FilterEffectRenderer> filterRenderer = FilterEffectRenderer::create();
-    filterRenderer->setSourceImage(std::move(texture));
+    filterRenderer->setSourceImage(WTF::move(texture));
     filterRenderer->setSourceImageRect(FloatRect(FloatPoint(), size));
     filterRenderer->setFilterRegion(FloatRect(FloatPoint(), size));
     if (!filterRenderer->build(renderer, m_filterOperations, FilterFunction))

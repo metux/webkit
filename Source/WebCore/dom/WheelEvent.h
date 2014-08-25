@@ -27,6 +27,7 @@
 
 #include "FloatPoint.h"
 #include "MouseEvent.h"
+#include "PlatformWheelEvent.h"
 
 namespace WebCore {
 
@@ -63,13 +64,9 @@ public:
         return adoptRef(new WheelEvent(type, initializer));
     }
 
-    static PassRefPtr<WheelEvent> create(const FloatPoint& wheelTicks,
-        const FloatPoint& rawDelta, unsigned deltaMode, PassRefPtr<AbstractView> view,
-        const IntPoint& screenLocation, const IntPoint& pageLocation,
-        bool ctrlKey, bool altKey, bool shiftKey, bool metaKey, bool directionInvertedFromDevice, double timestamp)
+    static PassRefPtr<WheelEvent> create(const PlatformWheelEvent& event, PassRefPtr<AbstractView> view)
     {
-        return adoptRef(new WheelEvent(wheelTicks, rawDelta, deltaMode, view,
-        screenLocation, pageLocation, ctrlKey, altKey, shiftKey, metaKey, directionInvertedFromDevice, timestamp));
+        return adoptRef(new WheelEvent(event, view));
     }
 
     void initWheelEvent(int rawDeltaX, int rawDeltaY, PassRefPtr<AbstractView>,
@@ -80,6 +77,7 @@ public:
         int screenX, int screenY, int pageX, int pageY,
         bool ctrlKey, bool altKey, bool shiftKey, bool metaKey);
 
+    const PlatformWheelEvent* wheelEvent() const { return m_initializedWithPlatformWheelEvent ? &m_wheelEvent : nullptr; }
     double deltaX() const { return m_deltaX; } // Positive when scrolling right.
     double deltaY() const { return m_deltaY; } // Positive when scrolling down.
     double deltaZ() const { return m_deltaZ; }
@@ -88,27 +86,35 @@ public:
     int wheelDeltaY() const { return m_wheelDelta.y(); } // Deprecated, negative when scrolling down.
     unsigned deltaMode() const { return m_deltaMode; }
 
-    bool webkitDirectionInvertedFromDevice() const { return m_directionInvertedFromDevice; }
+    bool webkitDirectionInvertedFromDevice() const { return m_wheelEvent.directionInvertedFromDevice(); }
     // Needed for Objective-C legacy support
     bool isHorizontal() const { return m_wheelDelta.x(); }
 
     virtual EventInterface eventInterface() const override;
     virtual bool isMouseEvent() const override;
 
+#if PLATFORM(MAC)
+    PlatformWheelEventPhase phase() const { return m_wheelEvent.phase(); }
+    PlatformWheelEventPhase momentumPhase() const { return m_wheelEvent.momentumPhase(); }
+#endif
+
 private:
     WheelEvent();
     WheelEvent(const AtomicString&, const WheelEventInit&);
-    WheelEvent(const FloatPoint& wheelTicks, const FloatPoint& rawDelta,
-        unsigned, PassRefPtr<AbstractView>, const IntPoint& screenLocation, const IntPoint& pageLocation,
-        bool ctrlKey, bool altKey, bool shiftKey, bool metaKey, bool directionInvertedFromDevice, double timestamp);
+    WheelEvent(const PlatformWheelEvent&, PassRefPtr<AbstractView>);
+
+    virtual bool isWheelEvent() const override;
 
     IntPoint m_wheelDelta;
     double m_deltaX;
     double m_deltaY;
     double m_deltaZ;
     unsigned m_deltaMode;
-    bool m_directionInvertedFromDevice;
+    PlatformWheelEvent m_wheelEvent;
+    bool m_initializedWithPlatformWheelEvent;
 };
+
+EVENT_TYPE_CASTS(WheelEvent)
 
 } // namespace WebCore
 

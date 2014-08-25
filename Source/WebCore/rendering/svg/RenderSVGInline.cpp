@@ -20,8 +20,6 @@
  */
 
 #include "config.h"
-
-#if ENABLE(SVG)
 #include "RenderSVGInline.h"
 
 #include "RenderSVGInlineText.h"
@@ -33,7 +31,7 @@
 namespace WebCore {
     
 RenderSVGInline::RenderSVGInline(SVGGraphicsElement& element, PassRef<RenderStyle> style)
-    : RenderInline(element, std::move(style))
+    : RenderInline(element, WTF::move(style))
 {
     setAlwaysCreateLineBoxes();
 }
@@ -42,29 +40,29 @@ std::unique_ptr<InlineFlowBox> RenderSVGInline::createInlineFlowBox()
 {
     auto box = std::make_unique<SVGInlineFlowBox>(*this);
     box->setHasVirtualLogicalHeight();
-    return std::move(box);
+    return WTF::move(box);
 }
 
 FloatRect RenderSVGInline::objectBoundingBox() const
 {
-    if (const RenderObject* object = RenderSVGText::locateRenderSVGTextAncestor(this))
-        return object->objectBoundingBox();
+    if (auto* textAncestor = RenderSVGText::locateRenderSVGTextAncestor(*this))
+        return textAncestor->objectBoundingBox();
 
     return FloatRect();
 }
 
 FloatRect RenderSVGInline::strokeBoundingBox() const
 {
-    if (const RenderObject* object = RenderSVGText::locateRenderSVGTextAncestor(this))
-        return object->strokeBoundingBox();
+    if (auto* textAncestor = RenderSVGText::locateRenderSVGTextAncestor(*this))
+        return textAncestor->strokeBoundingBox();
 
     return FloatRect();
 }
 
 FloatRect RenderSVGInline::repaintRectInLocalCoordinates() const
 {
-    if (const RenderObject* object = RenderSVGText::locateRenderSVGTextAncestor(this))
-        return object->repaintRectInLocalCoordinates();
+    if (auto* textAncestor = RenderSVGText::locateRenderSVGTextAncestor(*this))
+        return textAncestor->repaintRectInLocalCoordinates();
 
     return FloatRect();
 }
@@ -91,11 +89,11 @@ const RenderObject* RenderSVGInline::pushMappingToContainer(const RenderLayerMod
 
 void RenderSVGInline::absoluteQuads(Vector<FloatQuad>& quads, bool* wasFixed) const
 {
-    const RenderObject* object = RenderSVGText::locateRenderSVGTextAncestor(this);
-    if (!object)
+    auto* textAncestor = RenderSVGText::locateRenderSVGTextAncestor(*this);
+    if (!textAncestor)
         return;
 
-    FloatRect textBoundingBox = object->strokeBoundingBox();
+    FloatRect textBoundingBox = textAncestor->strokeBoundingBox();
     for (InlineFlowBox* box = firstLineBox(); box; box = box->nextLineBox())
         quads.append(localToAbsoluteQuad(FloatRect(textBoundingBox.x() + box->x(), textBoundingBox.y() + box->y(), box->logicalWidth(), box->logicalHeight()), false, wasFixed));
 }
@@ -114,30 +112,36 @@ void RenderSVGInline::styleDidChange(StyleDifference diff, const RenderStyle* ol
     SVGResourcesCache::clientStyleChanged(*this, diff, style());
 }
 
+void RenderSVGInline::updateFromStyle()
+{
+    RenderInline::updateFromStyle();
+
+    // SVG text layout code expects us to be an inline-level element.
+    setInline(true);
+}
+
 void RenderSVGInline::addChild(RenderObject* child, RenderObject* beforeChild)
 {
     RenderInline::addChild(child, beforeChild);
     SVGResourcesCache::clientWasAddedToTree(*child);
 
-    if (RenderSVGText* textRenderer = RenderSVGText::locateRenderSVGTextAncestor(this))
-        textRenderer->subtreeChildWasAdded(child);
+    if (auto* textAncestor = RenderSVGText::locateRenderSVGTextAncestor(*this))
+        textAncestor->subtreeChildWasAdded(child);
 }
 
-void RenderSVGInline::removeChild(RenderObject& child)
+RenderObject* RenderSVGInline::removeChild(RenderObject& child)
 {
     SVGResourcesCache::clientWillBeRemovedFromTree(child);
 
-    RenderSVGText* textRenderer = RenderSVGText::locateRenderSVGTextAncestor(this);
-    if (!textRenderer) {
-        RenderInline::removeChild(child);
-        return;
-    }
+    auto* textAncestor = RenderSVGText::locateRenderSVGTextAncestor(*this);
+    if (!textAncestor)
+        return RenderInline::removeChild(child);
+
     Vector<SVGTextLayoutAttributes*, 2> affectedAttributes;
-    textRenderer->subtreeChildWillBeRemoved(&child, affectedAttributes);
-    RenderInline::removeChild(child);
-    textRenderer->subtreeChildWasRemoved(affectedAttributes);
+    textAncestor->subtreeChildWillBeRemoved(&child, affectedAttributes);
+    RenderObject* next = RenderInline::removeChild(child);
+    textAncestor->subtreeChildWasRemoved(affectedAttributes);
+    return next;
 }
 
 }
-
-#endif // ENABLE(SVG)

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2006 Apple Computer, Inc.
+ * Copyright (C) 2006 Apple Inc.
  * Copyright (C) 2012 Nokia Corporation and/or its subsidiary(-ies)
  *
  * This library is free software; you can redistribute it and/or
@@ -28,9 +28,9 @@
 #include "HitTestRequest.h"
 #include "LayoutRect.h"
 #include "TextDirection.h"
+#include <memory>
 #include <wtf/Forward.h>
 #include <wtf/ListHashSet.h>
-#include <wtf/OwnPtr.h>
 #include <wtf/RefPtr.h>
 
 namespace WebCore {
@@ -43,7 +43,6 @@ class HTMLMediaElement;
 class Image;
 class URL;
 class Node;
-class RenderRegion;
 class Scrollbar;
 
 class HitTestResult {
@@ -158,7 +157,7 @@ private:
     RefPtr<Scrollbar> m_scrollbar;
     bool m_isOverWidget; // Returns true if we are over a widget (and not in the border/padding area of a RenderWidget for example).
 
-    mutable OwnPtr<NodeSet> m_rectBasedTestResult;
+    mutable std::unique_ptr<NodeSet> m_rectBasedTestResult;
 };
 
 String displayString(const String&, const Node*);

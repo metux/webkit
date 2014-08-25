@@ -1,106 +1,58 @@
 =================
-WebKitGTK+  2.4.1
+WebKitGTK+  2.5.3
 =================
 
-What's new in WebKitGTK+ 2.4.1?
+What's new in WebKitGTK+ 2.5.3?
 
-  - Add CORS support for media elements to GStreamer media backend.
-  - Fix wrong flags used in fcntl call that failed in FreeBSD.
-  - Correctly handle HTTP authentication for cross-origin requests.
-  - Correctly handle cookies for cross-origin requests.
-  - Fix a crash in the plugin process with some plugins that redefine
-    NPN functions.
-  - Fix acceletared video when the video format has an alpha component.
-  - Fix sites using geolocation after reloading when using Geoclue2.
-  - Append Safari version to UserAgent to fix redirections in
-    www.globalforestwatch.org.
-
-=================
-WebKitGTK+  2.4.0
-=================
-
-What's new in WebKitGTK+ 2.4.0?
-
-  - Fix infinite loop in WebProcess due to a race condition that can
-    happen when the socket event source is cancelled.
-  - Fix more runtime critical warnings about main loop sources not found
-    when trying to remove them.
-  - Lower the timeout used when waiting for the ShoulTerminate reply
-    in the WebProcess to release unused processes earlier.
-  - Fix the build for non X11 platforms.
-
-=================
-WebKitGTK+ 2.3.92
-=================
-
-What's new in WebKitGTK+ 2.3.92?
-
-  - Add support for Geoclue2.
-  - Always finalize the soup session object when the networking
-    process finishes.
-  - Make sure the web process doesn't finish if there's an ongoing
-    print operation.
-  - Fix runtime critical warnings about main loop sources not found
-    when trying to remove them.
-  - Fixed several crashes in JavaScriptCore when visiting facebook.
-  - Improve CSS properties performance.
-  - Fix web process leak when the WebView is leaked by the application.
-  - Fix the build when using vala bindings due to UI and web process
-    main headers included together.
-
-=================
-WebKitGTK+ 2.3.91
-=================
-
-What's new in WebKitGTK+ 2.3.91?
-
-  - Use a persistent cache for plugins metadata to avoid blocking the
-    UI while scanning plugins during page loads.
-  - Make the web inspector always load in multiprocess mode.
-  - Add a pkg-config file for WebKit2 web process extensions API.
-  - Fix the generation of g_return macros for GObject DOM bindings in
-    some cases where non pointer parameters were handled as pointers.
-  - Enable DFG_JIT on FreeBSD.
-  - Use system default compiler instead of gcc when building DOM
-    generated sources.
-  - Several build fixes for FreeBSD.
-  - Fix the build with wayland support enabled.
-
-=================
-WebKitGTK+ 2.3.90
-=================
-
-What's new in WebKitGTK+ 2.3.90?
-
-  - Add initial touch support to WebKit2.
-  - Add API to create a WebKitWebView related to another one to share
-    the same Web Process.
-  - Create the inspector view using the same web process as the
-    inspected page.
-  - Fix wrong mix of fcntl commands and flags in WebKit2.
-  - Fix marshaller used in WebKitWebPage::document-loaded signal.
-  - Fix a crash in GStreamer media backend when playback rate is too high.
+  - Fix a crash when drag and drop to a WebKitWebView.
+  - Fix slow motion rendering problem in GStreamer media backend due to integer rounding.
+  - Make sure the plugins cache is always used even if the cache directory doesn't exist.
   - Fix the build on FreeBSD.
+  - Install the HTML API docs for WebKit2 and WebKitDOM in a versioned directory.
+  - Intall the GObject instrospection files to the correct path.
 
 =================
-WebKitGTK+  2.3.5
+WebKitGTK+  2.5.2
 =================
 
-What's new in WebKitGTK+ 2.3.5?
+What's new in WebKitGTK+ 2.5.2?
 
-  - Add API to allow setting a multiple web process model.
-  - Add API to pass initialization user data from the UI process to
-    the web extensions.
-  - Implement languages support with network process.
-  - Implement custom URI schemes with network process.
-  - Disable MemoryCache when the DOCUMENT_VIEWER cache model is set.
-  - Expose aria-describedby with ATK_RELATION_DESCRIBED_BY.
-  - Fix a bug that prevented from entering fullscreen again in HTML5
-    videos after fullscreen was left with ESC.
-  - Set playback rate when pipeline is not ready in GStreamer media backend.
-  - Fix a lockup when playing Icecast radio in GStreamer media backend.
-  - Fix a web process crash when a download is cancelled.
-  - Fix several crashes when printing via JavaScript.
+  - Make GTK+2 dependency optional.
+  - Use the ld version script for non developer builds.
+  - Add webkit_navigation_policy_decision_get_navigation_action() API
+    and deprecated the methods and properties in WebKitNavigationPolicyDecision
+    that are now redundant.
+  - Add support for user scripts to WebKitUserContentManager.
+  - Do not use GtkWindow:resize-grip-visible with recent GTK+ versions.
+  - Fix caps negotiation failure in playback pipeline in GSTreamer media backend.
+  - Rename translation domain to WebKit2GTK-4.0.
+  - Install the processes in a versioned directory.
+
+=================
+WebKitGTK+  2.5.1
+=================
+
+What's new in WebKitGTK+ 2.5.1?
+
+  - WebKit1 API has been removed.
+  - Binary version bump to make WebKit1 and WebKit2 parallel installable.
+  - Switch to CMake build system.
+  - The WebKitWebView::create signal now receives a WebKitNavigationAction
+    with information about the navigation action that triggered the signal.
+  - WebKitWebViewGroup has been removed from the API and WebKitUserContentManager
+    has been added to handle user stylesheets.
+  - WebKitCertificateInfo has also been removed. WebKitWebView::load-failed-with-tls-errors
+    signal now receives a GTlsCertificate and GTlsCertificateFlags, and
+    webkit_web_context_allow_tls_certificate_for_host() receives a GTlsCertificate.
+  - The view mode API (webkit_web_view_set_view_mode() and webkit_web_view_get_view_mode())
+    has been removed, since WebCore doesn't support view source mode anymore.
+  - The DOM bindings API has been split into stable and unstable parts,
+    and all deprecated methods have been removed. The stable part will
+    keep API/ABI backwards compatibility, while the unstable part might change.
+  - Add API to load arbitrary data optionally giving the encoding and MIME Type.
+  - Add support for plugins using GTK+ 3.
+  - Add HighDPI support for non-accelerated compositing contents.
+  - Use a different user agent string depending on the site.
 
 =================
 WebKitGTK+  2.3.4

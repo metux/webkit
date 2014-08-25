@@ -64,6 +64,9 @@ public:
             refGPtr(ptr);
     }
 
+    GRefPtr(GRefPtr&& o) : m_ptr(o.leakRef()) { }
+    template <typename U> GRefPtr(GRefPtr<U>&& o) : m_ptr(o.leakRef()) { }
+
     ~GRefPtr()
     {
         if (T* ptr = m_ptr)
@@ -106,6 +109,7 @@ public:
     operator UnspecifiedBoolType() const { return m_ptr ? &GRefPtr::m_ptr : 0; }
 
     GRefPtr& operator=(const GRefPtr&);
+    GRefPtr& operator=(GRefPtr&&);
     GRefPtr& operator=(T*);
     template <typename U> GRefPtr& operator=(const GRefPtr<U>&);
 
@@ -129,6 +133,13 @@ template <typename T> inline GRefPtr<T>& GRefPtr<T>::operator=(const GRefPtr<T>&
     m_ptr = optr;
     if (ptr)
         derefGPtr(ptr);
+    return *this;
+}
+
+template <typename T> inline GRefPtr<T>& GRefPtr<T>::operator=(GRefPtr<T>&& o)
+{
+    GRefPtr ptr = WTF::move(o);
+    swap(ptr);
     return *this;
 }
 
@@ -203,24 +214,24 @@ template <typename T> GRefPtr<T> adoptGRef(T* p)
     return GRefPtr<T>(p, GRefPtrAdopt);
 }
 
-template <> GHashTable* refGPtr(GHashTable* ptr);
-template <> void derefGPtr(GHashTable* ptr);
-template <> GMainContext* refGPtr(GMainContext* ptr);
-template <> void derefGPtr(GMainContext* ptr);
-template <> GMainLoop* refGPtr(GMainLoop* ptr);
-template <> void derefGPtr(GMainLoop* ptr);
-template <> GVariant* refGPtr(GVariant* ptr);
-template <> void derefGPtr(GVariant* ptr);
-template <> GSource* refGPtr(GSource* ptr);
-template <> void derefGPtr(GSource* ptr);
-template <> GPtrArray* refGPtr(GPtrArray*);
-template <> void derefGPtr(GPtrArray*);
-template <> GByteArray* refGPtr(GByteArray*);
-template <> void derefGPtr(GByteArray*);
-template <> GBytes* refGPtr(GBytes*);
-template <> void derefGPtr(GBytes*);
-template <> GClosure* refGPtr(GClosure*);
-template <> void derefGPtr(GClosure*);
+template <> WTF_EXPORT_PRIVATE GHashTable* refGPtr(GHashTable* ptr);
+template <> WTF_EXPORT_PRIVATE void derefGPtr(GHashTable* ptr);
+template <> WTF_EXPORT_PRIVATE GMainContext* refGPtr(GMainContext* ptr);
+template <> WTF_EXPORT_PRIVATE void derefGPtr(GMainContext* ptr);
+template <> WTF_EXPORT_PRIVATE GMainLoop* refGPtr(GMainLoop* ptr);
+template <> WTF_EXPORT_PRIVATE void derefGPtr(GMainLoop* ptr);
+template <> WTF_EXPORT_PRIVATE GVariant* refGPtr(GVariant* ptr);
+template <> WTF_EXPORT_PRIVATE void derefGPtr(GVariant* ptr);
+template <> WTF_EXPORT_PRIVATE GSource* refGPtr(GSource* ptr);
+template <> WTF_EXPORT_PRIVATE void derefGPtr(GSource* ptr);
+template <> WTF_EXPORT_PRIVATE GPtrArray* refGPtr(GPtrArray*);
+template <> WTF_EXPORT_PRIVATE void derefGPtr(GPtrArray*);
+template <> WTF_EXPORT_PRIVATE GByteArray* refGPtr(GByteArray*);
+template <> WTF_EXPORT_PRIVATE void derefGPtr(GByteArray*);
+template <> WTF_EXPORT_PRIVATE GBytes* refGPtr(GBytes*);
+template <> WTF_EXPORT_PRIVATE void derefGPtr(GBytes*);
+template <> WTF_EXPORT_PRIVATE GClosure* refGPtr(GClosure*);
+template <> WTF_EXPORT_PRIVATE void derefGPtr(GClosure*);
 
 template <typename T> inline T* refGPtr(T* ptr)
 {

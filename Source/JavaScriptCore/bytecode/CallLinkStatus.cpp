@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012, 2013 Apple Inc. All rights reserved.
+ * Copyright (C) 2012, 2013, 2014 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -26,24 +26,25 @@
 #include "config.h"
 #include "CallLinkStatus.h"
 
+#include "CallLinkInfo.h"
 #include "CodeBlock.h"
+#include "DFGJITCode.h"
 #include "LLIntCallLinkInfo.h"
-#include "Operations.h"
+#include "JSCInlines.h"
 #include <wtf/CommaPrinter.h>
 
 namespace JSC {
 
+static const bool verbose = false;
+
 CallLinkStatus::CallLinkStatus(JSValue value)
     : m_callTarget(value)
     , m_executable(0)
-    , m_structure(0)
     , m_couldTakeSlowPath(false)
     , m_isProved(false)
 {
     if (!value || !value.isCell())
         return;
-    
-    m_structure = value.asCell()->structure();
     
     if (!value.asCell()->inherits(JSFunction::info()))
         return;
@@ -81,48 +82,178 @@ Intrinsic CallLinkStatus::intrinsicFor(CodeSpecializationKind kind) const
     return m_executable->intrinsicFor(kind);
 }
 
-CallLinkStatus CallLinkStatus::computeFromLLInt(CodeBlock* profiledBlock, unsigned bytecodeIndex)
+CallLinkStatus CallLinkStatus::computeFromLLInt(const ConcurrentJITLocker& locker, CodeBlock* profiledBlock, unsigned bytecodeIndex)
 {
     UNUSED_PARAM(profiledBlock);
     UNUSED_PARAM(bytecodeIndex);
-#if ENABLE(LLINT)
+#if ENABLE(DFG_JIT)
+    if (profiledBlock->hasExitSite(locker, DFG::FrequentExitSite(bytecodeIndex, BadFunction))) {
+        // We could force this to be a closure call, but instead we'll just assume that it
+        // takes slow path.
+        return takesSlowPath();
+    }
+#else
+    UNUSED_PARAM(locker);
+#endif
+
+    VM& vm = *profiledBlock->vm();
+    
     Instruction* instruction = profiledBlock->instructions().begin() + bytecodeIndex;
+    OpcodeID op = vm.interpreter->getOpcodeID(instruction[0].u.opcode);
+    if (op != op_call && op != op_construct)
+        return CallLinkStatus();
+    
     LLIntCallLinkInfo* callLinkInfo = instruction[5].u.callLinkInfo;
     
     return CallLinkStatus(callLinkInfo->lastSeenCallee.get());
-#else
-    return CallLinkStatus();
-#endif
 }
 
-CallLinkStatus CallLinkStatus::computeFor(CodeBlock* profiledBlock, unsigned bytecodeIndex)
+CallLinkStatus CallLinkStatus::computeFor(
+    CodeBlock* profiledBlock, unsigned bytecodeIndex, const CallLinkInfoMap& map)
 {
     ConcurrentJITLocker locker(profiledBlock->m_lock);
     
     UNUSED_PARAM(profiledBlock);
     UNUSED_PARAM(bytecodeIndex);
-#if ENABLE(JIT)
-    if (!profiledBlock->hasBaselineJITProfiling())
-        return computeFromLLInt(profiledBlock, bytecodeIndex);
+    UNUSED_PARAM(map);
+#if ENABLE(DFG_JIT)
+    ExitSiteData exitSiteData = computeExitSiteData(locker, profiledBlock, bytecodeIndex);
+    if (exitSiteData.m_takesSlowPath)
+        return takesSlowPath();
     
-    if (profiledBlock->couldTakeSlowCase(bytecodeIndex))
-        return CallLinkStatus::takesSlowPath();
+    CallLinkInfo* callLinkInfo = map.get(CodeOrigin(bytecodeIndex));
+    if (!callLinkInfo)
+        return computeFromLLInt(locker, profiledBlock, bytecodeIndex);
     
-    CallLinkInfo& callLinkInfo = profiledBlock->getCallLinkInfo(bytecodeIndex);
-    if (callLinkInfo.stub)
-        return CallLinkStatus(callLinkInfo.stub->executable(), callLinkInfo.stub->structure());
-    
-    JSFunction* target = callLinkInfo.lastSeenCallee.get();
-    if (!target)
-        return computeFromLLInt(profiledBlock, bytecodeIndex);
-    
-    if (callLinkInfo.hasSeenClosure)
-        return CallLinkStatus(target->executable(), target->structure());
-
-    return CallLinkStatus(target);
+    return computeFor(locker, *callLinkInfo, exitSiteData);
 #else
     return CallLinkStatus();
 #endif
+}
+
+CallLinkStatus::ExitSiteData CallLinkStatus::computeExitSiteData(
+    const ConcurrentJITLocker& locker, CodeBlock* profiledBlock, unsigned bytecodeIndex,
+    ExitingJITType exitingJITType)
+{
+    ExitSiteData exitSiteData;
+    
+#if ENABLE(DFG_JIT)
+    exitSiteData.m_takesSlowPath =
+        profiledBlock->hasExitSite(locker, DFG::FrequentExitSite(bytecodeIndex, BadCache, exitingJITType))
+        || profiledBlock->hasExitSite(locker, DFG::FrequentExitSite(bytecodeIndex, BadExecutable, exitingJITType));
+    exitSiteData.m_badFunction =
+        profiledBlock->hasExitSite(locker, DFG::FrequentExitSite(bytecodeIndex, BadFunction, exitingJITType));
+#else
+    UNUSED_PARAM(locker);
+    UNUSED_PARAM(profiledBlock);
+    UNUSED_PARAM(bytecodeIndex);
+    UNUSED_PARAM(exitingJITType);
+#endif
+    
+    return exitSiteData;
+}
+
+#if ENABLE(JIT)
+CallLinkStatus CallLinkStatus::computeFor(const ConcurrentJITLocker&, CallLinkInfo& callLinkInfo)
+{
+    // Note that despite requiring that the locker is held, this code is racy with respect
+    // to the CallLinkInfo: it may get cleared while this code runs! This is because
+    // CallLinkInfo::unlink() may be called from a different CodeBlock than the one that owns
+    // the CallLinkInfo and currently we save space by not having CallLinkInfos know who owns
+    // them. So, there is no way for either the caller of CallLinkInfo::unlock() or unlock()
+    // itself to figure out which lock to lock.
+    //
+    // Fortunately, that doesn't matter. The only things we ask of CallLinkInfo - the slow
+    // path count, the stub, and the target - can all be asked racily. Stubs and targets can
+    // only be deleted at next GC, so if we load a non-null one, then it must contain data
+    // that is still marginally valid (i.e. the pointers ain't stale). This kind of raciness
+    // is probably OK for now.
+    
+    if (callLinkInfo.slowPathCount >= Options::couldTakeSlowCaseMinimumCount())
+        return takesSlowPath();
+    
+    if (ClosureCallStubRoutine* stub = callLinkInfo.stub.get())
+        return CallLinkStatus(stub->executable());
+    
+    JSFunction* target = callLinkInfo.lastSeenCallee.get();
+    if (!target)
+        return CallLinkStatus();
+    
+    if (callLinkInfo.hasSeenClosure)
+        return CallLinkStatus(target->executable());
+
+    return CallLinkStatus(target);
+}
+
+CallLinkStatus CallLinkStatus::computeFor(
+    const ConcurrentJITLocker& locker, CallLinkInfo& callLinkInfo, ExitSiteData exitSiteData)
+{
+    if (exitSiteData.m_takesSlowPath)
+        return takesSlowPath();
+    
+    CallLinkStatus result = computeFor(locker, callLinkInfo);
+    if (exitSiteData.m_badFunction)
+        result.makeClosureCall();
+    
+    return result;
+}
+#endif
+
+void CallLinkStatus::computeDFGStatuses(
+    CodeBlock* dfgCodeBlock, CallLinkStatus::ContextMap& map)
+{
+#if ENABLE(DFG_JIT)
+    RELEASE_ASSERT(dfgCodeBlock->jitType() == JITCode::DFGJIT);
+    CodeBlock* baselineCodeBlock = dfgCodeBlock->alternative();
+    for (auto iter = dfgCodeBlock->callLinkInfosBegin(); !!iter; ++iter) {
+        CallLinkInfo& info = **iter;
+        CodeOrigin codeOrigin = info.codeOrigin;
+        
+        // Check if we had already previously made a terrible mistake in the FTL for this
+        // code origin. Note that this is approximate because we could have a monovariant
+        // inline in the FTL that ended up failing. We should fix that at some point by
+        // having data structures to track the context of frequent exits. This is currently
+        // challenging because it would require creating a CodeOrigin-based database in
+        // baseline CodeBlocks, but those CodeBlocks don't really have a place to put the
+        // InlineCallFrames.
+        CodeBlock* currentBaseline =
+            baselineCodeBlockForOriginAndBaselineCodeBlock(codeOrigin, baselineCodeBlock);
+        ExitSiteData exitSiteData;
+        {
+            ConcurrentJITLocker locker(currentBaseline->m_lock);
+            exitSiteData = computeExitSiteData(
+                locker, currentBaseline, codeOrigin.bytecodeIndex, ExitFromFTL);
+        }
+        
+        {
+            ConcurrentJITLocker locker(dfgCodeBlock->m_lock);
+            map.add(info.codeOrigin, computeFor(locker, info, exitSiteData));
+        }
+    }
+#else
+    UNUSED_PARAM(dfgCodeBlock);
+#endif // ENABLE(DFG_JIT)
+    
+    if (verbose) {
+        dataLog("Context map:\n");
+        ContextMap::iterator iter = map.begin();
+        ContextMap::iterator end = map.end();
+        for (; iter != end; ++iter) {
+            dataLog("    ", iter->key, ":\n");
+            dataLog("        ", iter->value, "\n");
+        }
+    }
+}
+
+CallLinkStatus CallLinkStatus::computeFor(
+    CodeBlock* profiledBlock, CodeOrigin codeOrigin,
+    const CallLinkInfoMap& baselineMap, const CallLinkStatus::ContextMap& dfgMap)
+{
+    auto iter = dfgMap.find(codeOrigin);
+    if (iter != dfgMap.end())
+        return iter->value;
+    
+    return computeFor(profiledBlock, codeOrigin.bytecodeIndex, baselineMap);
 }
 
 void CallLinkStatus::dump(PrintStream& out) const
@@ -148,9 +279,6 @@ void CallLinkStatus::dump(PrintStream& out) const
         if (!isCompilationThread())
             out.print("/", m_executable->hashFor(CodeForCall));
     }
-    
-    if (m_structure)
-        out.print(comma, "Structure: ", RawPointer(m_structure));
 }
 
 } // namespace JSC

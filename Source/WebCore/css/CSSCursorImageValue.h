@@ -35,7 +35,7 @@ class CSSCursorImageValue : public CSSValue {
 public:
     static PassRef<CSSCursorImageValue> create(PassRef<CSSValue> imageValue, bool hasHotSpot, const IntPoint& hotSpot)
     {
-        return adoptRef(*new CSSCursorImageValue(std::move(imageValue), hasHotSpot, hotSpot));
+        return adoptRef(*new CSSCursorImageValue(WTF::move(imageValue), hasHotSpot, hotSpot));
     }
 
     ~CSSCursorImageValue();
@@ -55,9 +55,7 @@ public:
     StyleImage* cachedImage(CachedResourceLoader*);
     StyleImage* cachedOrPendingImage(Document&);
 
-#if ENABLE(SVG)
     void removeReferencedElement(SVGElement*);
-#endif
 
     bool equals(const CSSCursorImageValue&) const;
 
@@ -66,11 +64,9 @@ private:
 
     void detachPendingImage();
 
-#if ENABLE(SVG)
     bool isSVGCursor() const;
     String cachedImageURL();
     void clearCachedImage();
-#endif
 
     Ref<CSSValue> m_imageValue;
 
@@ -79,9 +75,7 @@ private:
     RefPtr<StyleImage> m_image;
     bool m_accessedImage;
 
-#if ENABLE(SVG)
     HashSet<SVGElement*> m_referencedElements;
-#endif
 };
 
 CSS_VALUE_TYPE_CASTS(CSSCursorImageValue, isCursorImageValue())

@@ -26,8 +26,6 @@
 #ifndef DFGSlowPathGenerator_h
 #define DFGSlowPathGenerator_h
 
-#include <wtf/Platform.h>
-
 #if ENABLE(DFG_JIT)
 
 #include "DFGCommon.h"
@@ -52,7 +50,7 @@ public:
         jit->m_currentNode = m_currentNode;
         generateInternal(jit);
         if (!ASSERT_DISABLED)
-            jit->m_jit.breakpoint(); // make sure that the generator jumps back to somewhere
+            jit->m_jit.abortWithReason(DFGSlowPathGeneratorFellThrough);
     }
     MacroAssembler::Label label() const { return m_label; }
     virtual MacroAssembler::Call call() const

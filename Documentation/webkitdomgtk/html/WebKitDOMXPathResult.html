@@ -6,23 +6,23 @@
 <meta name="generator" content="DocBook XSL Stylesheets V1.78.1">
 <link rel="home" href="index.html" title="WebKitDOMGTK+ Reference Manual">
 <link rel="up" href="ch01.html" title="Class Overview">
-<link rel="prev" href="WebKitDOMXPathNSResolver.html" title="WebKitDOMXPathNSResolver">
-<link rel="next" href="WebKitDOMPerformance.html" title="WebKitDOMPerformance">
+<link rel="prev" href="WebKitDOMXPathExpression.html" title="WebKitDOMXPathExpression">
+<link rel="next" href="index-all.html" title="Index">
 <meta name="generator" content="GTK-Doc V1.20.1 (XML mode)">
 <link rel="stylesheet" href="style.css" type="text/css">
 </head>
 <body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF">
-<table class="navigation" id="top" width="100%" summary="Navigation header" cellpadding="2" cellspacing="10"><tr valign="middle">
+<table class="navigation" id="top" width="100%" summary="Navigation header" cellpadding="2" cellspacing="5"><tr valign="middle">
 <td width="100%" align="left" class="shortcuts">
-<a href="#" class="shortcut">Top</a><span id="nav_description"> <span class="dim">|</span> 
-                  <a href="#WebKitDOMXPathResult.description" class="shortcut">Description</a></span><span id="nav_hierarchy"> <span class="dim">|</span> 
-                  <a href="#WebKitDOMXPathResult.object-hierarchy" class="shortcut">Object Hierarchy</a></span><span id="nav_properties"> <span class="dim">|</span> 
+<a href="#" class="shortcut">Top</a><span id="nav_description">  <span class="dim">|</span> 
+                  <a href="#WebKitDOMXPathResult.description" class="shortcut">Description</a></span><span id="nav_hierarchy">  <span class="dim">|</span> 
+                  <a href="#WebKitDOMXPathResult.object-hierarchy" class="shortcut">Object Hierarchy</a></span><span id="nav_properties">  <span class="dim">|</span> 
                   <a href="#WebKitDOMXPathResult.properties" class="shortcut">Properties</a></span>
 </td>
 <td><a accesskey="h" href="index.html"><img src="home.png" width="16" height="16" border="0" alt="Home"></a></td>
 <td><a accesskey="u" href="ch01.html"><img src="up.png" width="16" height="16" border="0" alt="Up"></a></td>
-<td><a accesskey="p" href="WebKitDOMXPathNSResolver.html"><img src="left.png" width="16" height="16" border="0" alt="Prev"></a></td>
-<td><a accesskey="n" href="WebKitDOMPerformance.html"><img src="right.png" width="16" height="16" border="0" alt="Next"></a></td>
+<td><a accesskey="p" href="WebKitDOMXPathExpression.html"><img src="left.png" width="16" height="16" border="0" alt="Prev"></a></td>
+<td><a accesskey="n" href="index-all.html"><img src="right.png" width="16" height="16" border="0" alt="Next"></a></td>
 </tr></table>
 <div class="refentry">
 <a name="WebKitDOMXPathResult"></a><div class="titlepage"></div>
@@ -172,10 +172,52 @@
 <col width="150px" class="name">
 <col class="description">
 </colgroup>
-<tbody><tr>
+<tbody>
+<tr>
 <td class="datatype_keyword"> </td>
 <td class="function_name"><a class="link" href="WebKitDOMXPathResult.html#WebKitDOMXPathResult-struct" title="WebKitDOMXPathResult">WebKitDOMXPathResult</a></td>
-</tr></tbody>
+</tr>
+<tr>
+<td class="define_keyword">#define</td>
+<td class="function_name"><a class="link" href="WebKitDOMXPathResult.html#WEBKIT-DOM-XPATH-RESULT-ANY-TYPE:CAPS" title="WEBKIT_DOM_XPATH_RESULT_ANY_TYPE">WEBKIT_DOM_XPATH_RESULT_ANY_TYPE</a></td>
+</tr>
+<tr>
+<td class="define_keyword">#define</td>
+<td class="function_name"><a class="link" href="WebKitDOMXPathResult.html#WEBKIT-DOM-XPATH-RESULT-NUMBER-TYPE:CAPS" title="WEBKIT_DOM_XPATH_RESULT_NUMBER_TYPE">WEBKIT_DOM_XPATH_RESULT_NUMBER_TYPE</a></td>
+</tr>
+<tr>
+<td class="define_keyword">#define</td>
+<td class="function_name"><a class="link" href="WebKitDOMXPathResult.html#WEBKIT-DOM-XPATH-RESULT-STRING-TYPE:CAPS" title="WEBKIT_DOM_XPATH_RESULT_STRING_TYPE">WEBKIT_DOM_XPATH_RESULT_STRING_TYPE</a></td>
+</tr>
+<tr>
+<td class="define_keyword">#define</td>
+<td class="function_name"><a class="link" href="WebKitDOMXPathResult.html#WEBKIT-DOM-XPATH-RESULT-BOOLEAN-TYPE:CAPS" title="WEBKIT_DOM_XPATH_RESULT_BOOLEAN_TYPE">WEBKIT_DOM_XPATH_RESULT_BOOLEAN_TYPE</a></td>
+</tr>
+<tr>
+<td class="define_keyword">#define</td>
+<td class="function_name"><a class="link" href="WebKitDOMXPathResult.html#WEBKIT-DOM-XPATH-RESULT-UNORDERED-NODE-ITERATOR-TYPE:CAPS" title="WEBKIT_DOM_XPATH_RESULT_UNORDERED_NODE_ITERATOR_TYPE">WEBKIT_DOM_XPATH_RESULT_UNORDERED_NODE_ITERATOR_TYPE</a></td>
+</tr>
+<tr>
+<td class="define_keyword">#define</td>
+<td class="function_name"><a class="link" href="WebKitDOMXPathResult.html#WEBKIT-DOM-XPATH-RESULT-ORDERED-NODE-ITERATOR-TYPE:CAPS" title="WEBKIT_DOM_XPATH_RESULT_ORDERED_NODE_ITERATOR_TYPE">WEBKIT_DOM_XPATH_RESULT_ORDERED_NODE_ITERATOR_TYPE</a></td>
+</tr>
+<tr>
+<td class="define_keyword">#define</td>
+<td class="function_name"><a class="link" href="WebKitDOMXPathResult.html#WEBKIT-DOM-XPATH-RESULT-UNORDERED-NODE-SNAPSHOT-TYPE:CAPS" title="WEBKIT_DOM_XPATH_RESULT_UNORDERED_NODE_SNAPSHOT_TYPE">WEBKIT_DOM_XPATH_RESULT_UNORDERED_NODE_SNAPSHOT_TYPE</a></td>
+</tr>
+<tr>
+<td class="define_keyword">#define</td>
+<td class="function_name"><a class="link" href="WebKitDOMXPathResult.html#WEBKIT-DOM-XPATH-RESULT-ORDERED-NODE-SNAPSHOT-TYPE:CAPS" title="WEBKIT_DOM_XPATH_RESULT_ORDERED_NODE_SNAPSHOT_TYPE">WEBKIT_DOM_XPATH_RESULT_ORDERED_NODE_SNAPSHOT_TYPE</a></td>
+</tr>
+<tr>
+<td class="define_keyword">#define</td>
+<td class="function_name"><a class="link" href="WebKitDOMXPathResult.html#WEBKIT-DOM-XPATH-RESULT-ANY-UNORDERED-NODE-TYPE:CAPS" title="WEBKIT_DOM_XPATH_RESULT_ANY_UNORDERED_NODE_TYPE">WEBKIT_DOM_XPATH_RESULT_ANY_UNORDERED_NODE_TYPE</a></td>
+</tr>
+<tr>
+<td class="define_keyword">#define</td>
+<td class="function_name"><a class="link" href="WebKitDOMXPathResult.html#WEBKIT-DOM-XPATH-RESULT-FIRST-ORDERED-NODE-TYPE:CAPS" title="WEBKIT_DOM_XPATH_RESULT_FIRST_ORDERED_NODE_TYPE">WEBKIT_DOM_XPATH_RESULT_FIRST_ORDERED_NODE_TYPE</a></td>
+</tr>
+</tbody>
 </table></div>
 </div>
 <div class="refsect1">
@@ -198,7 +240,7 @@
 webkit_dom_xpath_result_iterate_next (<em class="parameter"><code><a class="link" href="WebKitDOMXPathResult.html" title="WebKitDOMXPathResult"><span class="type">WebKitDOMXPathResult</span></a> *self</code></em>,
                                       <em class="parameter"><code><a href="../glib/glib-Error-Reporting.html#GError"><span class="type">GError</span></a> **error</code></em>);</pre>
 <div class="refsect3">
-<a name="id-1.2.141.8.2.4"></a><h4>Parameters</h4>
+<a name="id-1.2.101.8.2.4"></a><h4>Parameters</h4>
 <div class="informaltable"><table width="100%" border="0">
 <colgroup>
 <col width="150px" class="parameters_name">
@@ -220,7 +262,7 @@ webkit_dom_xpath_result_iterate_next (<em class="parameter"><code><a class="link
 </table></div>
 </div>
 <div class="refsect3">
-<a name="id-1.2.141.8.2.5"></a><h4>Returns</h4>
+<a name="id-1.2.101.8.2.5"></a><h4>Returns</h4>
 <p> A <a class="link" href="WebKitDOMNode.html" title="WebKitDOMNode"><span class="type">WebKitDOMNode</span></a>. </p>
 <p><span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span></p>
 </div>
@@ -233,7 +275,7 @@ webkit_dom_xpath_result_snapshot_item (<em class="parameter"><code><a class="lin
                                        <em class="parameter"><code><a href="../glib/glib-Basic-Types.html#gulong"><span class="type">gulong</span></a> index</code></em>,
                                        <em class="parameter"><code><a href="../glib/glib-Error-Reporting.html#GError"><span class="type">GError</span></a> **error</code></em>);</pre>
 <div class="refsect3">
-<a name="id-1.2.141.8.3.4"></a><h4>Parameters</h4>
+<a name="id-1.2.101.8.3.4"></a><h4>Parameters</h4>
 <div class="informaltable"><table width="100%" border="0">
 <colgroup>
 <col width="150px" class="parameters_name">
@@ -260,7 +302,7 @@ webkit_dom_xpath_result_snapshot_item (<em class="parameter"><code><a class="lin
 </table></div>
 </div>
 <div class="refsect3">
-<a name="id-1.2.141.8.3.5"></a><h4>Returns</h4>
+<a name="id-1.2.101.8.3.5"></a><h4>Returns</h4>
 <p> A <a class="link" href="WebKitDOMNode.html" title="WebKitDOMNode"><span class="type">WebKitDOMNode</span></a>. </p>
 <p><span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span></p>
 </div>
@@ -272,7 +314,7 @@ webkit_dom_xpath_result_snapshot_item (<em class="parameter"><code><a class="lin
 webkit_dom_xpath_result_get_result_type
                                (<em class="parameter"><code><a class="link" href="WebKitDOMXPathResult.html" title="WebKitDOMXPathResult"><span class="type">WebKitDOMXPathResult</span></a> *self</code></em>);</pre>
 <div class="refsect3">
-<a name="id-1.2.141.8.4.4"></a><h4>Parameters</h4>
+<a name="id-1.2.101.8.4.4"></a><h4>Parameters</h4>
 <div class="informaltable"><table width="100%" border="0">
 <colgroup>
 <col width="150px" class="parameters_name">
@@ -287,7 +329,7 @@ webkit_dom_xpath_result_get_result_type
 </table></div>
 </div>
 <div class="refsect3">
-<a name="id-1.2.141.8.4.5"></a><h4>Returns</h4>
+<a name="id-1.2.101.8.4.5"></a><h4>Returns</h4>
 <p> A <a href="../glib/glib-Basic-Types.html#gushort"><span class="type">gushort</span></a></p>
 <p></p>
 </div>
@@ -300,7 +342,7 @@ webkit_dom_xpath_result_get_number_value
                                (<em class="parameter"><code><a class="link" href="WebKitDOMXPathResult.html" title="WebKitDOMXPathResult"><span class="type">WebKitDOMXPathResult</span></a> *self</code></em>,
                                 <em class="parameter"><code><a href="../glib/glib-Error-Reporting.html#GError"><span class="type">GError</span></a> **error</code></em>);</pre>
 <div class="refsect3">
-<a name="id-1.2.141.8.5.4"></a><h4>Parameters</h4>
+<a name="id-1.2.101.8.5.4"></a><h4>Parameters</h4>
 <div class="informaltable"><table width="100%" border="0">
 <colgroup>
 <col width="150px" class="parameters_name">
@@ -322,7 +364,7 @@ webkit_dom_xpath_result_get_number_value
 </table></div>
 </div>
 <div class="refsect3">
-<a name="id-1.2.141.8.5.5"></a><h4>Returns</h4>
+<a name="id-1.2.101.8.5.5"></a><h4>Returns</h4>
 <p> A <a href="../glib/glib-Basic-Types.html#gdouble"><span class="type">gdouble</span></a></p>
 <p></p>
 </div>
@@ -335,7 +377,7 @@ webkit_dom_xpath_result_get_string_value
                                (<em class="parameter"><code><a class="link" href="WebKitDOMXPathResult.html" title="WebKitDOMXPathResult"><span class="type">WebKitDOMXPathResult</span></a> *self</code></em>,
                                 <em class="parameter"><code><a href="../glib/glib-Error-Reporting.html#GError"><span class="type">GError</span></a> **error</code></em>);</pre>
 <div class="refsect3">
-<a name="id-1.2.141.8.6.4"></a><h4>Parameters</h4>
+<a name="id-1.2.101.8.6.4"></a><h4>Parameters</h4>
 <div class="informaltable"><table width="100%" border="0">
 <colgroup>
 <col width="150px" class="parameters_name">
@@ -357,7 +399,7 @@ webkit_dom_xpath_result_get_string_value
 </table></div>
 </div>
 <div class="refsect3">
-<a name="id-1.2.141.8.6.5"></a><h4>Returns</h4>
+<a name="id-1.2.101.8.6.5"></a><h4>Returns</h4>
 <p> A <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a></p>
 <p></p>
 </div>
@@ -370,7 +412,7 @@ webkit_dom_xpath_result_get_boolean_value
                                (<em class="parameter"><code><a class="link" href="WebKitDOMXPathResult.html" title="WebKitDOMXPathResult"><span class="type">WebKitDOMXPathResult</span></a> *self</code></em>,
                                 <em class="parameter"><code><a href="../glib/glib-Error-Reporting.html#GError"><span class="type">GError</span></a> **error</code></em>);</pre>
 <div class="refsect3">
-<a name="id-1.2.141.8.7.4"></a><h4>Parameters</h4>
+<a name="id-1.2.101.8.7.4"></a><h4>Parameters</h4>
 <div class="informaltable"><table width="100%" border="0">
 <colgroup>
 <col width="150px" class="parameters_name">
@@ -392,7 +434,7 @@ webkit_dom_xpath_result_get_boolean_value
 </table></div>
 </div>
 <div class="refsect3">
-<a name="id-1.2.141.8.7.5"></a><h4>Returns</h4>
+<a name="id-1.2.101.8.7.5"></a><h4>Returns</h4>
 <p> A <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a></p>
 <p></p>
 </div>
@@ -405,7 +447,7 @@ webkit_dom_xpath_result_get_single_node_value
                                (<em class="parameter"><code><a class="link" href="WebKitDOMXPathResult.html" title="WebKitDOMXPathResult"><span class="type">WebKitDOMXPathResult</span></a> *self</code></em>,
                                 <em class="parameter"><code><a href="../glib/glib-Error-Reporting.html#GError"><span class="type">GError</span></a> **error</code></em>);</pre>
 <div class="refsect3">
-<a name="id-1.2.141.8.8.4"></a><h4>Parameters</h4>
+<a name="id-1.2.101.8.8.4"></a><h4>Parameters</h4>
 <div class="informaltable"><table width="100%" border="0">
 <colgroup>
 <col width="150px" class="parameters_name">
@@ -427,7 +469,7 @@ webkit_dom_xpath_result_get_single_node_value
 </table></div>
 </div>
 <div class="refsect3">
-<a name="id-1.2.141.8.8.5"></a><h4>Returns</h4>
+<a name="id-1.2.101.8.8.5"></a><h4>Returns</h4>
 <p> A <a class="link" href="WebKitDOMNode.html" title="WebKitDOMNode"><span class="type">WebKitDOMNode</span></a>. </p>
 <p><span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span></p>
 </div>
@@ -439,7 +481,7 @@ webkit_dom_xpath_result_get_single_node_value
 webkit_dom_xpath_result_get_invalid_iterator_state
                                (<em class="parameter"><code><a class="link" href="WebKitDOMXPathResult.html" title="WebKitDOMXPathResult"><span class="type">WebKitDOMXPathResult</span></a> *self</code></em>);</pre>
 <div class="refsect3">
-<a name="id-1.2.141.8.9.4"></a><h4>Parameters</h4>
+<a name="id-1.2.101.8.9.4"></a><h4>Parameters</h4>
 <div class="informaltable"><table width="100%" border="0">
 <colgroup>
 <col width="150px" class="parameters_name">
@@ -454,7 +496,7 @@ webkit_dom_xpath_result_get_invalid_iterator_state
 </table></div>
 </div>
 <div class="refsect3">
-<a name="id-1.2.141.8.9.5"></a><h4>Returns</h4>
+<a name="id-1.2.101.8.9.5"></a><h4>Returns</h4>
 <p> A <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a></p>
 <p></p>
 </div>
@@ -467,7 +509,7 @@ webkit_dom_xpath_result_get_snapshot_length
                                (<em class="parameter"><code><a class="link" href="WebKitDOMXPathResult.html" title="WebKitDOMXPathResult"><span class="type">WebKitDOMXPathResult</span></a> *self</code></em>,
                                 <em class="parameter"><code><a href="../glib/glib-Error-Reporting.html#GError"><span class="type">GError</span></a> **error</code></em>);</pre>
 <div class="refsect3">
-<a name="id-1.2.141.8.10.4"></a><h4>Parameters</h4>
+<a name="id-1.2.101.8.10.4"></a><h4>Parameters</h4>
 <div class="informaltable"><table width="100%" border="0">
 <colgroup>
 <col width="150px" class="parameters_name">
@@ -489,7 +531,7 @@ webkit_dom_xpath_result_get_snapshot_length
 </table></div>
 </div>
 <div class="refsect3">
-<a name="id-1.2.141.8.10.5"></a><h4>Returns</h4>
+<a name="id-1.2.101.8.10.5"></a><h4>Returns</h4>
 <p> A <a href="../glib/glib-Basic-Types.html#gulong"><span class="type">gulong</span></a></p>
 <p></p>
 </div>
@@ -502,6 +544,66 @@ webkit_dom_xpath_result_get_snapshot_length
 <pre class="programlisting">typedef struct _WebKitDOMXPathResult WebKitDOMXPathResult;</pre>
 <p>
 </p>
+</div>
+<hr>
+<div class="refsect2">
+<a name="WEBKIT-DOM-XPATH-RESULT-ANY-TYPE:CAPS"></a><h3>WEBKIT_DOM_XPATH_RESULT_ANY_TYPE</h3>
+<pre class="programlisting">#define WEBKIT_DOM_XPATH_RESULT_ANY_TYPE 0
+</pre>
+</div>
+<hr>
+<div class="refsect2">
+<a name="WEBKIT-DOM-XPATH-RESULT-NUMBER-TYPE:CAPS"></a><h3>WEBKIT_DOM_XPATH_RESULT_NUMBER_TYPE</h3>
+<pre class="programlisting">#define WEBKIT_DOM_XPATH_RESULT_NUMBER_TYPE 1
+</pre>
+</div>
+<hr>
+<div class="refsect2">
+<a name="WEBKIT-DOM-XPATH-RESULT-STRING-TYPE:CAPS"></a><h3>WEBKIT_DOM_XPATH_RESULT_STRING_TYPE</h3>
+<pre class="programlisting">#define WEBKIT_DOM_XPATH_RESULT_STRING_TYPE 2
+</pre>
+</div>
+<hr>
+<div class="refsect2">
+<a name="WEBKIT-DOM-XPATH-RESULT-BOOLEAN-TYPE:CAPS"></a><h3>WEBKIT_DOM_XPATH_RESULT_BOOLEAN_TYPE</h3>
+<pre class="programlisting">#define WEBKIT_DOM_XPATH_RESULT_BOOLEAN_TYPE 3
+</pre>
+</div>
+<hr>
+<div class="refsect2">
+<a name="WEBKIT-DOM-XPATH-RESULT-UNORDERED-NODE-ITERATOR-TYPE:CAPS"></a><h3>WEBKIT_DOM_XPATH_RESULT_UNORDERED_NODE_ITERATOR_TYPE</h3>
+<pre class="programlisting">#define WEBKIT_DOM_XPATH_RESULT_UNORDERED_NODE_ITERATOR_TYPE 4
+</pre>
+</div>
+<hr>
+<div class="refsect2">
+<a name="WEBKIT-DOM-XPATH-RESULT-ORDERED-NODE-ITERATOR-TYPE:CAPS"></a><h3>WEBKIT_DOM_XPATH_RESULT_ORDERED_NODE_ITERATOR_TYPE</h3>
+<pre class="programlisting">#define WEBKIT_DOM_XPATH_RESULT_ORDERED_NODE_ITERATOR_TYPE 5
+</pre>
+</div>
+<hr>
+<div class="refsect2">
+<a name="WEBKIT-DOM-XPATH-RESULT-UNORDERED-NODE-SNAPSHOT-TYPE:CAPS"></a><h3>WEBKIT_DOM_XPATH_RESULT_UNORDERED_NODE_SNAPSHOT_TYPE</h3>
+<pre class="programlisting">#define WEBKIT_DOM_XPATH_RESULT_UNORDERED_NODE_SNAPSHOT_TYPE 6
+</pre>
+</div>
+<hr>
+<div class="refsect2">
+<a name="WEBKIT-DOM-XPATH-RESULT-ORDERED-NODE-SNAPSHOT-TYPE:CAPS"></a><h3>WEBKIT_DOM_XPATH_RESULT_ORDERED_NODE_SNAPSHOT_TYPE</h3>
+<pre class="programlisting">#define WEBKIT_DOM_XPATH_RESULT_ORDERED_NODE_SNAPSHOT_TYPE 7
+</pre>
+</div>
+<hr>
+<div class="refsect2">
+<a name="WEBKIT-DOM-XPATH-RESULT-ANY-UNORDERED-NODE-TYPE:CAPS"></a><h3>WEBKIT_DOM_XPATH_RESULT_ANY_UNORDERED_NODE_TYPE</h3>
+<pre class="programlisting">#define WEBKIT_DOM_XPATH_RESULT_ANY_UNORDERED_NODE_TYPE 8
+</pre>
+</div>
+<hr>
+<div class="refsect2">
+<a name="WEBKIT-DOM-XPATH-RESULT-FIRST-ORDERED-NODE-TYPE:CAPS"></a><h3>WEBKIT_DOM_XPATH_RESULT_FIRST_ORDERED_NODE_TYPE</h3>
+<pre class="programlisting">#define WEBKIT_DOM_XPATH_RESULT_FIRST_ORDERED_NODE_TYPE 9
+</pre>
 </div>
 </div>
 <div class="refsect1">

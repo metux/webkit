@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009, 2010, 2012, 2013 Apple Inc. All rights reserved.
+ * Copyright (C) 2009, 2010, 2012, 2013, 2014 Apple Inc. All rights reserved.
  * Copyright (C) 2010 University of Szeged
  *
  * Redistribution and use in source and binary forms, with or without
@@ -583,6 +583,8 @@ public:
     {
     }
 
+    AssemblerBuffer& buffer() { return m_formatter.m_buffer; }
+
 private:
 
     // ARMv7, Appx-A.6.3
@@ -646,6 +648,8 @@ private:
         OP_ADD_SP_imm_T1    = 0xA800,
         OP_ADD_SP_imm_T2    = 0xB000,
         OP_SUB_SP_imm_T1    = 0xB080,
+        OP_PUSH_T1          = 0xB400,
+        OP_POP_T1           = 0xBC00,
         OP_BKPT             = 0xBE00,
         OP_IT               = 0xBF00,
         OP_NOP_T1           = 0xBF00,
@@ -654,6 +658,8 @@ private:
     typedef enum {
         OP_B_T1         = 0xD000,
         OP_B_T2         = 0xE000,
+        OP_POP_T2       = 0xE8BD,
+        OP_PUSH_T2      = 0xE92D,
         OP_AND_reg_T2   = 0xEA00,
         OP_TST_reg_T2   = 0xEA10,
         OP_ORR_reg_T2   = 0xEA40,
@@ -799,11 +805,11 @@ private:
     class ARMInstructionFormatter;
 
     // false means else!
-    bool ifThenElseConditionBit(Condition condition, bool isIf)
+    static bool ifThenElseConditionBit(Condition condition, bool isIf)
     {
         return isIf ? (condition & 1) : !(condition & 1);
     }
-    uint8_t ifThenElse(Condition condition, bool inst2if, bool inst3if, bool inst4if)
+    static uint8_t ifThenElse(Condition condition, bool inst2if, bool inst3if, bool inst4if)
     {
         int mask = (ifThenElseConditionBit(condition, inst2if) << 3)
             | (ifThenElseConditionBit(condition, inst3if) << 2)
@@ -812,7 +818,7 @@ private:
         ASSERT((condition != ConditionAL) || !(mask & (mask - 1)));
         return (condition << 4) | mask;
     }
-    uint8_t ifThenElse(Condition condition, bool inst2if, bool inst3if)
+    static uint8_t ifThenElse(Condition condition, bool inst2if, bool inst3if)
     {
         int mask = (ifThenElseConditionBit(condition, inst2if) << 3)
             | (ifThenElseConditionBit(condition, inst3if) << 2)
@@ -820,7 +826,7 @@ private:
         ASSERT((condition != ConditionAL) || !(mask & (mask - 1)));
         return (condition << 4) | mask;
     }
-    uint8_t ifThenElse(Condition condition, bool inst2if)
+    static uint8_t ifThenElse(Condition condition, bool inst2if)
     {
         int mask = (ifThenElseConditionBit(condition, inst2if) << 3)
             | 4;
@@ -828,7 +834,7 @@ private:
         return (condition << 4) | mask;
     }
 
-    uint8_t ifThenElse(Condition condition)
+    static uint8_t ifThenElse(Condition condition)
     {
         int mask = 8;
         return (condition << 4) | mask;
@@ -855,7 +861,7 @@ public:
         ASSERT(rn != ARMRegisters::pc);
         ASSERT(imm.isValid());
 
-        if (rn == ARMRegisters::sp) {
+        if (rn == ARMRegisters::sp && imm.isUInt16()) {
             ASSERT(!(imm.getUInt16() & 3));
             if (!(rd & 8) && imm.isUInt10()) {
                 m_formatter.oneWordOp5Reg3Imm8(OP_ADD_SP_imm_T1, rd, static_cast<uint8_t>(imm.getUInt10() >> 2));
@@ -894,6 +900,11 @@ public:
     // NOTE: In an IT block, add doesn't modify the flags register.
     ALWAYS_INLINE void add(RegisterID rd, RegisterID rn, RegisterID rm)
     {
+        if (rd == ARMRegisters::sp) {
+            mov(rd, rn);
+            rn = rd;
+        }
+
         if (rd == rn)
             m_formatter.oneWordOp8RegReg143(OP_ADD_reg_T2, rm, rd);
         else if (rd == rm)
@@ -1488,9 +1499,49 @@ public:
         m_formatter.twoWordOp12Reg4FourFours(OP_ROR_reg_T2, rn, FourFours(0xf, rd, 0, rm));
     }
 
+    ALWAYS_INLINE void pop(RegisterID dest)
+    {
+        if (dest < ARMRegisters::r8)
+            m_formatter.oneWordOp7Imm9(OP_POP_T1, 1 << dest);
+        else {
+            // Load postindexed with writeback.
+            ldr(dest, ARMRegisters::sp, sizeof(void*), false, true);
+        }
+    }
+
+    ALWAYS_INLINE void pop(uint32_t registerList)
+    {
+        ASSERT(WTF::bitCount(registerList) > 1);
+        ASSERT(!((1 << ARMRegisters::pc) & registerList) || !((1 << ARMRegisters::lr) & registerList));
+        ASSERT(!((1 << ARMRegisters::sp) & registerList));
+        m_formatter.twoWordOp16Imm16(OP_POP_T2, registerList);
+    }
+
+    ALWAYS_INLINE void push(RegisterID src)
+    {
+        if (src < ARMRegisters::r8)
+            m_formatter.oneWordOp7Imm9(OP_PUSH_T1, 1 << src);
+        else if (src == ARMRegisters::lr)
+            m_formatter.oneWordOp7Imm9(OP_PUSH_T1, 0x100);
+        else {
+            // Store preindexed with writeback.
+            str(src, ARMRegisters::sp, -sizeof(void*), true, true);
+        }
+    }
+
+    ALWAYS_INLINE void push(uint32_t registerList)
+    {
+        ASSERT(WTF::bitCount(registerList) > 1);
+        ASSERT(!((1 << ARMRegisters::pc) & registerList));
+        ASSERT(!((1 << ARMRegisters::sp) & registerList));
+        m_formatter.twoWordOp16Imm16(OP_PUSH_T2, registerList);
+    }
+
 #if CPU(APPLE_ARMV7S)
+    template<int datasize>
     ALWAYS_INLINE void sdiv(RegisterID rd, RegisterID rn, RegisterID rm)
     {
+        static_assert(datasize == 32, "sdiv datasize must be 32 for armv7s");        
         ASSERT(!BadReg(rd));
         ASSERT(!BadReg(rn));
         ASSERT(!BadReg(rm));
@@ -2036,14 +2087,7 @@ public:
         return b.m_offset - a.m_offset;
     }
 
-    int executableOffsetFor(int location)
-    {
-        if (!location)
-            return 0;
-        return static_cast<int32_t*>(m_formatter.data())[location / sizeof(int32_t) - 1];
-    }
-    
-    int jumpSizeDelta(JumpType jumpType, JumpLinkType jumpLinkType) { return JUMP_ENUM_SIZE(jumpType) - JUMP_ENUM_SIZE(jumpLinkType); }
+    static int jumpSizeDelta(JumpType jumpType, JumpLinkType jumpLinkType) { return JUMP_ENUM_SIZE(jumpType) - JUMP_ENUM_SIZE(jumpLinkType); }
     
     // Assembler admin methods:
 
@@ -2052,7 +2096,7 @@ public:
         return a.from() < b.from();
     }
 
-    bool canCompact(JumpType jumpType)
+    static bool canCompact(JumpType jumpType)
     {
         // The following cannot be compacted:
         //   JumpFixed: represents custom jump sequence
@@ -2061,7 +2105,7 @@ public:
         return (jumpType == JumpNoCondition) || (jumpType == JumpCondition);
     }
     
-    JumpLinkType computeJumpType(JumpType jumpType, const uint8_t* from, const uint8_t* to)
+    static JumpLinkType computeJumpType(JumpType jumpType, const uint8_t* from, const uint8_t* to)
     {
         if (jumpType == JumpFixed)
             return LinkInvalid;
@@ -2105,20 +2149,11 @@ public:
         return LinkConditionalBX;
     }
     
-    JumpLinkType computeJumpType(LinkRecord& record, const uint8_t* from, const uint8_t* to)
+    static JumpLinkType computeJumpType(LinkRecord& record, const uint8_t* from, const uint8_t* to)
     {
         JumpLinkType linkType = computeJumpType(record.type(), from, to);
         record.setLinkType(linkType);
         return linkType;
-    }
-    
-    void recordLinkOffsets(int32_t regionStart, int32_t regionEnd, int32_t offset)
-    {
-        int32_t ptr = regionStart / sizeof(int32_t);
-        const int32_t end = regionEnd / sizeof(int32_t);
-        int32_t* offsets = static_cast<int32_t*>(m_formatter.data());
-        while (ptr < end)
-            offsets[ptr++] = offset;
     }
     
     Vector<LinkRecord, 0, UnsafeVectorOverflow>& jumpsToLink()
@@ -2127,7 +2162,7 @@ public:
         return m_jumpsToLink;
     }
 
-    void ALWAYS_INLINE link(LinkRecord& record, uint8_t* from, uint8_t* to)
+    static void ALWAYS_INLINE link(LinkRecord& record, uint8_t* from, uint8_t* to)
     {
         switch (record.linkType()) {
         case LinkJumpT1:
@@ -2578,7 +2613,7 @@ private:
         return ((relative << 7) >> 7) == relative;
     }
     
-    void linkJumpT1(Condition cond, uint16_t* instruction, void* target)
+    static void linkJumpT1(Condition cond, uint16_t* instruction, void* target)
     {
         // FIMXE: this should be up in the MacroAssembler layer. :-(        
         ASSERT(!(reinterpret_cast<intptr_t>(instruction) & 1));
@@ -2614,7 +2649,7 @@ private:
         instruction[-1] = OP_B_T2 | ((relative & 0xffe) >> 1);
     }
     
-    void linkJumpT3(Condition cond, uint16_t* instruction, void* target)
+    static void linkJumpT3(Condition cond, uint16_t* instruction, void* target)
     {
         // FIMXE: this should be up in the MacroAssembler layer. :-(
         ASSERT(!(reinterpret_cast<intptr_t>(instruction) & 1));
@@ -2647,7 +2682,7 @@ private:
         instruction[-1] = OP_B_T4b | ((relative & 0x800000) >> 10) | ((relative & 0x400000) >> 11) | ((relative & 0xffe) >> 1);
     }
     
-    void linkConditionalJumpT4(Condition cond, uint16_t* instruction, void* target)
+    static void linkConditionalJumpT4(Condition cond, uint16_t* instruction, void* target)
     {
         // FIMXE: this should be up in the MacroAssembler layer. :-(        
         ASSERT(!(reinterpret_cast<intptr_t>(instruction) & 1));
@@ -2673,7 +2708,7 @@ private:
         instruction[-1] = OP_BX | (JUMP_TEMPORARY_REGISTER << 3);
     }
     
-    void linkConditionalBX(Condition cond, uint16_t* instruction, void* target)
+    static void linkConditionalBX(Condition cond, uint16_t* instruction, void* target)
     {
         // FIMXE: this should be up in the MacroAssembler layer. :-(        
         ASSERT(!(reinterpret_cast<intptr_t>(instruction) & 1));
@@ -2753,6 +2788,11 @@ private:
             m_buffer.putShort(op | (reg1 << 6) | (reg2 << 3) | reg3);
         }
 
+        ALWAYS_INLINE void oneWordOp7Imm9(OpcodeID op, uint16_t imm)
+        {
+            m_buffer.putShort(op | imm);
+        }
+
         ALWAYS_INLINE void oneWordOp8Imm8(OpcodeID op, uint8_t imm)
         {
             m_buffer.putShort(op | imm);
@@ -2791,6 +2831,12 @@ private:
             m_buffer.putShort(op2);
         }
 
+        ALWAYS_INLINE void twoWordOp16Imm16(OpcodeID1 op1, uint16_t imm)
+        {
+            m_buffer.putShort(op1);
+            m_buffer.putShort(imm);
+        }
+        
         ALWAYS_INLINE void twoWordOp5i6Imm4Reg4EncodedImm(OpcodeID1 op, int imm4, RegisterID rd, ARMThumbImmediate imm)
         {
             ARMThumbImmediate newImm = imm;
@@ -2851,7 +2897,6 @@ private:
 
         unsigned debugOffset() { return m_buffer.debugOffset(); }
 
-    private:
         AssemblerBuffer m_buffer;
     } m_formatter;
 

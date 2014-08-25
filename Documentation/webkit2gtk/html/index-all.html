@@ -7,17 +7,17 @@
 <link rel="home" href="index.html" title="WebKit2GTK+ Reference Manual">
 <link rel="up" href="index.html" title="WebKit2GTK+ Reference Manual">
 <link rel="prev" href="WebKitScriptWorld.html" title="WebKitScriptWorld">
-<link rel="next" href="api-index-2-2.html" title="Index of new symbols in 2.2">
+<link rel="next" href="api-index-deprecated.html" title="Index of deprecated symbols">
 <meta name="generator" content="GTK-Doc V1.20.1 (XML mode)">
 <link rel="stylesheet" href="style.css" type="text/css">
 </head>
 <body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF">
-<table class="navigation" id="top" width="100%" summary="Navigation header" cellpadding="2" cellspacing="10"><tr valign="middle">
+<table class="navigation" id="top" width="100%" summary="Navigation header" cellpadding="2" cellspacing="5"><tr valign="middle">
 <td width="100%" align="left" class="shortcuts"></td>
 <td><a accesskey="h" href="index.html"><img src="home.png" width="16" height="16" border="0" alt="Home"></a></td>
 <td><img src="up-insensitive.png" width="16" height="16" border="0"></td>
 <td><a accesskey="p" href="WebKitScriptWorld.html"><img src="left.png" width="16" height="16" border="0" alt="Prev"></a></td>
-<td><a accesskey="n" href="api-index-2-2.html"><img src="right.png" width="16" height="16" border="0" alt="Next"></a></td>
+<td><a accesskey="n" href="api-index-deprecated.html"><img src="right.png" width="16" height="16" border="0" alt="Next"></a></td>
 </tr></table>
 <div class="index">
 <div class="titlepage"><div><div><h1 class="title">
@@ -93,16 +93,6 @@
 <h3>C</h3>
 <dl>
 <dt>WebKitCacheModel, <a class="indexterm" href="WebKitWebContext.html#WebKitCacheModel">enum WebKitCacheModel</a>
-</dt>
-<dt>WebKitCertificateInfo, <a class="indexterm" href="WebKitCertificateInfo.html#WebKitCertificateInfo-struct">WebKitCertificateInfo</a>
-</dt>
-<dt>webkit_certificate_info_copy, <a class="indexterm" href="WebKitCertificateInfo.html#webkit-certificate-info-copy">webkit_certificate_info_copy ()</a>
-</dt>
-<dt>webkit_certificate_info_free, <a class="indexterm" href="WebKitCertificateInfo.html#webkit-certificate-info-free">webkit_certificate_info_free ()</a>
-</dt>
-<dt>webkit_certificate_info_get_tls_certificate, <a class="indexterm" href="WebKitCertificateInfo.html#webkit-certificate-info-get-tls-certificate">webkit_certificate_info_get_tls_certificate ()</a>
-</dt>
-<dt>webkit_certificate_info_get_tls_errors, <a class="indexterm" href="WebKitCertificateInfo.html#webkit-certificate-info-get-tls-errors">webkit_certificate_info_get_tls_errors ()</a>
 </dt>
 <dt>WEBKIT_CHECK_VERSION, <a class="indexterm" href="webkit2gtk-WebKitVersion.html#WEBKIT-CHECK-VERSION:CAPS">WEBKIT_CHECK_VERSION()</a>
 </dt>
@@ -419,12 +409,8 @@
 </div>
 <div class="indexdiv">
 <h3>I</h3>
-<dl>
-<dt>WebKitInjectedContentFrames, <a class="indexterm" href="WebKitWebViewGroup.html#WebKitInjectedContentFrames">enum WebKitInjectedContentFrames</a>
-</dt>
-<dt>WebKitInsecureContentEvent, <a class="indexterm" href="WebKitWebView.html#WebKitInsecureContentEvent">enum WebKitInsecureContentEvent</a>
-</dt>
-</dl>
+<dl><dt>WebKitInsecureContentEvent, <a class="indexterm" href="WebKitWebView.html#WebKitInsecureContentEvent">enum WebKitInsecureContentEvent</a>
+</dt></dl>
 </div>
 <div class="indexdiv">
 <h3>J</h3>
@@ -478,6 +464,8 @@
 <div class="indexdiv">
 <h3>N</h3>
 <dl>
+<dt>WebKitNavigationAction, <a class="indexterm" href="WebKitNavigationAction.html#WebKitNavigationAction-struct">WebKitNavigationAction</a>
+</dt>
 <dt>WebKitNavigationPolicyDecision, <a class="indexterm" href="WebKitNavigationPolicyDecision.html#WebKitNavigationPolicyDecision-struct">struct WebKitNavigationPolicyDecision</a>
 </dt>
 <dt>WebKitNavigationPolicyDecision:frame-name, <a class="indexterm" href="WebKitNavigationPolicyDecision.html#WebKitNavigationPolicyDecision--frame-name">The “frame-name” property</a>
@@ -486,17 +474,35 @@
 </dt>
 <dt>WebKitNavigationPolicyDecision:mouse-button, <a class="indexterm" href="WebKitNavigationPolicyDecision.html#WebKitNavigationPolicyDecision--mouse-button">The “mouse-button” property</a>
 </dt>
+<dt>WebKitNavigationPolicyDecision:navigation-action, <a class="indexterm" href="WebKitNavigationPolicyDecision.html#WebKitNavigationPolicyDecision--navigation-action">The “navigation-action” property</a>
+</dt>
 <dt>WebKitNavigationPolicyDecision:navigation-type, <a class="indexterm" href="WebKitNavigationPolicyDecision.html#WebKitNavigationPolicyDecision--navigation-type">The “navigation-type” property</a>
 </dt>
 <dt>WebKitNavigationPolicyDecision:request, <a class="indexterm" href="WebKitNavigationPolicyDecision.html#WebKitNavigationPolicyDecision--request">The “request” property</a>
 </dt>
 <dt>WebKitNavigationType, <a class="indexterm" href="WebKitNavigationPolicyDecision.html#WebKitNavigationType">enum WebKitNavigationType</a>
 </dt>
+<dt>webkit_navigation_action_copy, <a class="indexterm" href="WebKitNavigationAction.html#webkit-navigation-action-copy">webkit_navigation_action_copy ()</a>
+</dt>
+<dt>webkit_navigation_action_free, <a class="indexterm" href="WebKitNavigationAction.html#webkit-navigation-action-free">webkit_navigation_action_free ()</a>
+</dt>
+<dt>webkit_navigation_action_get_modifiers, <a class="indexterm" href="WebKitNavigationAction.html#webkit-navigation-action-get-modifiers">webkit_navigation_action_get_modifiers ()</a>
+</dt>
+<dt>webkit_navigation_action_get_mouse_button, <a class="indexterm" href="WebKitNavigationAction.html#webkit-navigation-action-get-mouse-button">webkit_navigation_action_get_mouse_button ()</a>
+</dt>
+<dt>webkit_navigation_action_get_navigation_type, <a class="indexterm" href="WebKitNavigationAction.html#webkit-navigation-action-get-navigation-type">webkit_navigation_action_get_navigation_type ()</a>
+</dt>
+<dt>webkit_navigation_action_get_request, <a class="indexterm" href="WebKitNavigationAction.html#webkit-navigation-action-get-request">webkit_navigation_action_get_request ()</a>
+</dt>
+<dt>webkit_navigation_action_is_user_gesture, <a class="indexterm" href="WebKitNavigationAction.html#webkit-navigation-action-is-user-gesture">webkit_navigation_action_is_user_gesture ()</a>
+</dt>
 <dt>webkit_navigation_policy_decision_get_frame_name, <a class="indexterm" href="WebKitNavigationPolicyDecision.html#webkit-navigation-policy-decision-get-frame-name">webkit_navigation_policy_decision_get_frame_name ()</a>
 </dt>
 <dt>webkit_navigation_policy_decision_get_modifiers, <a class="indexterm" href="WebKitNavigationPolicyDecision.html#webkit-navigation-policy-decision-get-modifiers">webkit_navigation_policy_decision_get_modifiers ()</a>
 </dt>
 <dt>webkit_navigation_policy_decision_get_mouse_button, <a class="indexterm" href="WebKitNavigationPolicyDecision.html#webkit-navigation-policy-decision-get-mouse-button">webkit_navigation_policy_decision_get_mouse_button ()</a>
+</dt>
+<dt>webkit_navigation_policy_decision_get_navigation_action, <a class="indexterm" href="WebKitNavigationPolicyDecision.html#webkit-navigation-policy-decision-get-navigation-action">webkit_navigation_policy_decision_get_navigation_action ()</a>
 </dt>
 <dt>webkit_navigation_policy_decision_get_navigation_type, <a class="indexterm" href="WebKitNavigationPolicyDecision.html#webkit-navigation-policy-decision-get-navigation-type">webkit_navigation_policy_decision_get_navigation_type ()</a>
 </dt>
@@ -1025,12 +1031,41 @@
 </dt>
 <dt>webkit_uri_scheme_request_get_web_view, <a class="indexterm" href="WebKitURISchemeRequest.html#webkit-uri-scheme-request-get-web-view">webkit_uri_scheme_request_get_web_view ()</a>
 </dt>
+<dt>WebKitUserContentInjectedFrames, <a class="indexterm" href="webkit2gtk-WebKitUserContent.html#WebKitUserContentInjectedFrames">enum WebKitUserContentInjectedFrames</a>
+</dt>
+<dt>WebKitUserContentManager, <a class="indexterm" href="WebKitUserContentManager.html#WebKitUserContentManager-struct">struct WebKitUserContentManager</a>
+</dt>
+<dt>WebKitUserScript, <a class="indexterm" href="webkit2gtk-WebKitUserContent.html#WebKitUserScript-struct">WebKitUserScript</a>
+</dt>
+<dt>WebKitUserScriptInjectionTime, <a class="indexterm" href="webkit2gtk-WebKitUserContent.html#WebKitUserScriptInjectionTime">enum WebKitUserScriptInjectionTime</a>
+</dt>
+<dt>WebKitUserStyleLevel, <a class="indexterm" href="webkit2gtk-WebKitUserContent.html#WebKitUserStyleLevel">enum WebKitUserStyleLevel</a>
+</dt>
+<dt>WebKitUserStyleSheet, <a class="indexterm" href="webkit2gtk-WebKitUserContent.html#WebKitUserStyleSheet-struct">WebKitUserStyleSheet</a>
+</dt>
+<dt>webkit_user_content_manager_add_script, <a class="indexterm" href="WebKitUserContentManager.html#webkit-user-content-manager-add-script">webkit_user_content_manager_add_script ()</a>
+</dt>
+<dt>webkit_user_content_manager_add_style_sheet, <a class="indexterm" href="WebKitUserContentManager.html#webkit-user-content-manager-add-style-sheet">webkit_user_content_manager_add_style_sheet ()</a>
+</dt>
+<dt>webkit_user_content_manager_new, <a class="indexterm" href="WebKitUserContentManager.html#webkit-user-content-manager-new">webkit_user_content_manager_new ()</a>
+</dt>
+<dt>webkit_user_content_manager_remove_all_scripts, <a class="indexterm" href="WebKitUserContentManager.html#webkit-user-content-manager-remove-all-scripts">webkit_user_content_manager_remove_all_scripts ()</a>
+</dt>
+<dt>webkit_user_content_manager_remove_all_style_sheets, <a class="indexterm" href="WebKitUserContentManager.html#webkit-user-content-manager-remove-all-style-sheets">webkit_user_content_manager_remove_all_style_sheets ()</a>
+</dt>
+<dt>webkit_user_script_new, <a class="indexterm" href="webkit2gtk-WebKitUserContent.html#webkit-user-script-new">webkit_user_script_new ()</a>
+</dt>
+<dt>webkit_user_script_ref, <a class="indexterm" href="webkit2gtk-WebKitUserContent.html#webkit-user-script-ref">webkit_user_script_ref ()</a>
+</dt>
+<dt>webkit_user_script_unref, <a class="indexterm" href="webkit2gtk-WebKitUserContent.html#webkit-user-script-unref">webkit_user_script_unref ()</a>
+</dt>
+<dt>webkit_user_style_sheet_new, <a class="indexterm" href="webkit2gtk-WebKitUserContent.html#webkit-user-style-sheet-new">webkit_user_style_sheet_new ()</a>
+</dt>
+<dt>webkit_user_style_sheet_ref, <a class="indexterm" href="webkit2gtk-WebKitUserContent.html#webkit-user-style-sheet-ref">webkit_user_style_sheet_ref ()</a>
+</dt>
+<dt>webkit_user_style_sheet_unref, <a class="indexterm" href="webkit2gtk-WebKitUserContent.html#webkit-user-style-sheet-unref">webkit_user_style_sheet_unref ()</a>
+</dt>
 </dl>
-</div>
-<div class="indexdiv">
-<h3>V</h3>
-<dl><dt>WebKitViewMode, <a class="indexterm" href="WebKitWebView.html#WebKitViewMode">enum WebKitViewMode</a>
-</dt></dl>
 </div>
 <div class="indexdiv">
 <h3>W</h3>
@@ -1137,25 +1172,21 @@
 </dt>
 <dt>WebKitWebView:favicon, <a class="indexterm" href="WebKitWebView.html#WebKitWebView--favicon">The “favicon” property</a>
 </dt>
-<dt>WebKitWebView:group, <a class="indexterm" href="WebKitWebView.html#WebKitWebView--group">The “group” property</a>
-</dt>
 <dt>WebKitWebView:is-loading, <a class="indexterm" href="WebKitWebView.html#WebKitWebView--is-loading">The “is-loading” property</a>
 </dt>
 <dt>WebKitWebView:related-view, <a class="indexterm" href="WebKitWebView.html#WebKitWebView--related-view">The “related-view” property</a>
+</dt>
+<dt>WebKitWebView:settings, <a class="indexterm" href="WebKitWebView.html#WebKitWebView--settings">The “settings” property</a>
 </dt>
 <dt>WebKitWebView:title, <a class="indexterm" href="WebKitWebView.html#WebKitWebView--title">The “title” property</a>
 </dt>
 <dt>WebKitWebView:uri, <a class="indexterm" href="WebKitWebView.html#WebKitWebView--uri">The “uri” property</a>
 </dt>
-<dt>WebKitWebView:view-mode, <a class="indexterm" href="WebKitWebView.html#WebKitWebView--view-mode">The “view-mode” property</a>
+<dt>WebKitWebView:user-content-manager, <a class="indexterm" href="WebKitWebView.html#WebKitWebView--user-content-manager">The “user-content-manager” property</a>
 </dt>
 <dt>WebKitWebView:web-context, <a class="indexterm" href="WebKitWebView.html#WebKitWebView--web-context">The “web-context” property</a>
 </dt>
 <dt>WebKitWebView:zoom-level, <a class="indexterm" href="WebKitWebView.html#WebKitWebView--zoom-level">The “zoom-level” property</a>
-</dt>
-<dt>WebKitWebViewGroup, <a class="indexterm" href="WebKitWebViewGroup.html#WebKitWebViewGroup-struct">struct WebKitWebViewGroup</a>
-</dt>
-<dt>WebKitWebViewGroup:settings, <a class="indexterm" href="WebKitWebViewGroup.html#WebKitWebViewGroup--settings">The “settings” property</a>
 </dt>
 <dt>webkit_web_context_allow_tls_certificate_for_host, <a class="indexterm" href="WebKitWebContext.html#webkit-web-context-allow-tls-certificate-for-host">webkit_web_context_allow_tls_certificate_for_host ()</a>
 </dt>
@@ -1273,8 +1304,6 @@
 </dt>
 <dt>webkit_web_view_get_find_controller, <a class="indexterm" href="WebKitWebView.html#webkit-web-view-get-find-controller">webkit_web_view_get_find_controller ()</a>
 </dt>
-<dt>webkit_web_view_get_group, <a class="indexterm" href="WebKitWebView.html#webkit-web-view-get-group">webkit_web_view_get_group ()</a>
-</dt>
 <dt>webkit_web_view_get_inspector, <a class="indexterm" href="WebKitWebView.html#webkit-web-view-get-inspector">webkit_web_view_get_inspector ()</a>
 </dt>
 <dt>webkit_web_view_get_javascript_global_context, <a class="indexterm" href="WebKitWebView.html#webkit-web-view-get-javascript-global-context">webkit_web_view_get_javascript_global_context ()</a>
@@ -1295,7 +1324,7 @@
 </dt>
 <dt>webkit_web_view_get_uri, <a class="indexterm" href="WebKitWebView.html#webkit-web-view-get-uri">webkit_web_view_get_uri ()</a>
 </dt>
-<dt>webkit_web_view_get_view_mode, <a class="indexterm" href="WebKitWebView.html#webkit-web-view-get-view-mode">webkit_web_view_get_view_mode ()</a>
+<dt>webkit_web_view_get_user_content_manager, <a class="indexterm" href="WebKitWebView.html#webkit-web-view-get-user-content-manager">webkit_web_view_get_user_content_manager ()</a>
 </dt>
 <dt>webkit_web_view_get_window_properties, <a class="indexterm" href="WebKitWebView.html#webkit-web-view-get-window-properties">webkit_web_view_get_window_properties ()</a>
 </dt>
@@ -1307,21 +1336,11 @@
 </dt>
 <dt>webkit_web_view_go_to_back_forward_list_item, <a class="indexterm" href="WebKitWebView.html#webkit-web-view-go-to-back-forward-list-item">webkit_web_view_go_to_back_forward_list_item ()</a>
 </dt>
-<dt>webkit_web_view_group_add_user_style_sheet, <a class="indexterm" href="WebKitWebViewGroup.html#webkit-web-view-group-add-user-style-sheet">webkit_web_view_group_add_user_style_sheet ()</a>
-</dt>
-<dt>webkit_web_view_group_get_name, <a class="indexterm" href="WebKitWebViewGroup.html#webkit-web-view-group-get-name">webkit_web_view_group_get_name ()</a>
-</dt>
-<dt>webkit_web_view_group_get_settings, <a class="indexterm" href="WebKitWebViewGroup.html#webkit-web-view-group-get-settings">webkit_web_view_group_get_settings ()</a>
-</dt>
-<dt>webkit_web_view_group_new, <a class="indexterm" href="WebKitWebViewGroup.html#webkit-web-view-group-new">webkit_web_view_group_new ()</a>
-</dt>
-<dt>webkit_web_view_group_remove_all_user_style_sheets, <a class="indexterm" href="WebKitWebViewGroup.html#webkit-web-view-group-remove-all-user-style-sheets">webkit_web_view_group_remove_all_user_style_sheets ()</a>
-</dt>
-<dt>webkit_web_view_group_set_settings, <a class="indexterm" href="WebKitWebViewGroup.html#webkit-web-view-group-set-settings">webkit_web_view_group_set_settings ()</a>
-</dt>
 <dt>webkit_web_view_is_loading, <a class="indexterm" href="WebKitWebView.html#webkit-web-view-is-loading">webkit_web_view_is_loading ()</a>
 </dt>
 <dt>webkit_web_view_load_alternate_html, <a class="indexterm" href="WebKitWebView.html#webkit-web-view-load-alternate-html">webkit_web_view_load_alternate_html ()</a>
+</dt>
+<dt>webkit_web_view_load_bytes, <a class="indexterm" href="WebKitWebView.html#webkit-web-view-load-bytes">webkit_web_view_load_bytes ()</a>
 </dt>
 <dt>webkit_web_view_load_html, <a class="indexterm" href="WebKitWebView.html#webkit-web-view-load-html">webkit_web_view_load_html ()</a>
 </dt>
@@ -1335,9 +1354,11 @@
 </dt>
 <dt>webkit_web_view_new_with_context, <a class="indexterm" href="WebKitWebView.html#webkit-web-view-new-with-context">webkit_web_view_new_with_context ()</a>
 </dt>
-<dt>webkit_web_view_new_with_group, <a class="indexterm" href="WebKitWebView.html#webkit-web-view-new-with-group">webkit_web_view_new_with_group ()</a>
-</dt>
 <dt>webkit_web_view_new_with_related_view, <a class="indexterm" href="WebKitWebView.html#webkit-web-view-new-with-related-view">webkit_web_view_new_with_related_view ()</a>
+</dt>
+<dt>webkit_web_view_new_with_settings, <a class="indexterm" href="WebKitWebView.html#webkit-web-view-new-with-settings">webkit_web_view_new_with_settings ()</a>
+</dt>
+<dt>webkit_web_view_new_with_user_content_manager, <a class="indexterm" href="WebKitWebView.html#webkit-web-view-new-with-user-content-manager">webkit_web_view_new_with_user_content_manager ()</a>
 </dt>
 <dt>webkit_web_view_reload, <a class="indexterm" href="WebKitWebView.html#webkit-web-view-reload">webkit_web_view_reload ()</a>
 </dt>
@@ -1362,8 +1383,6 @@
 <dt>webkit_web_view_set_custom_charset, <a class="indexterm" href="WebKitWebView.html#webkit-web-view-set-custom-charset">webkit_web_view_set_custom_charset ()</a>
 </dt>
 <dt>webkit_web_view_set_settings, <a class="indexterm" href="WebKitWebView.html#webkit-web-view-set-settings">webkit_web_view_set_settings ()</a>
-</dt>
-<dt>webkit_web_view_set_view_mode, <a class="indexterm" href="WebKitWebView.html#webkit-web-view-set-view-mode">webkit_web_view_set_view_mode ()</a>
 </dt>
 <dt>webkit_web_view_set_zoom_level, <a class="indexterm" href="WebKitWebView.html#webkit-web-view-set-zoom-level">webkit_web_view_set_zoom_level ()</a>
 </dt>

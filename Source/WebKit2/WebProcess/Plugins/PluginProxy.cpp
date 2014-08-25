@@ -96,7 +96,7 @@ bool PluginProxy::initialize(const Parameters& parameters)
     m_connection->addPluginProxy(this);
 
     // Ask the plug-in process to create a plug-in.
-    m_pendingPluginCreationParameters = adoptPtr(new PluginCreationParameters);
+    m_pendingPluginCreationParameters = std::make_unique<PluginCreationParameters>();
 
     m_pendingPluginCreationParameters->pluginInstanceID = m_pluginInstanceID;
     m_pendingPluginCreationParameters->windowNPObjectID = windowNPObjectID();
@@ -105,10 +105,7 @@ bool PluginProxy::initialize(const Parameters& parameters)
     m_pendingPluginCreationParameters->contentsScaleFactor = contentsScaleFactor();
     m_pendingPluginCreationParameters->isPrivateBrowsingEnabled = controller()->isPrivateBrowsingEnabled();
     m_pendingPluginCreationParameters->artificialPluginInitializationDelayEnabled = controller()->artificialPluginInitializationDelayEnabled();
-
-#if USE(ACCELERATED_COMPOSITING)
     m_pendingPluginCreationParameters->isAcceleratedCompositingEnabled = controller()->isAcceleratedCompositingEnabled();
-#endif
 
     if (!canInitializeAsynchronously())
         return initializeSynchronously();
@@ -173,7 +170,7 @@ void PluginProxy::didCreatePluginInternal(bool wantsWheelEvents, uint32_t remote
 
     // Whether synchronously or asynchronously, this plug-in was created and we shouldn't need to remember
     // anything about how.
-    m_pendingPluginCreationParameters.clear();
+    m_pendingPluginCreationParameters = nullptr;
     m_waitingOnAsynchronousInitialization = false;
 }
 
@@ -187,7 +184,7 @@ void PluginProxy::didFailToCreatePluginInternal()
 
     // Whether synchronously or asynchronously, this plug-in failed to create and we shouldn't need to remember
     // anything about how.
-    m_pendingPluginCreationParameters.clear();
+    m_pendingPluginCreationParameters = nullptr;
     m_waitingOnAsynchronousInitialization = false;
 }
 
@@ -303,10 +300,10 @@ void PluginProxy::geometryDidChange(const IntSize& pluginSize, const IntRect& cl
     geometryDidChange();
 }
 
-void PluginProxy::visibilityDidChange()
+void PluginProxy::visibilityDidChange(bool isVisible)
 {
     ASSERT(m_isStarted);
-    notImplemented();
+    m_connection->connection()->send(Messages::PluginControllerProxy::VisibilityDidChange(isVisible), m_pluginInstanceID);
 }
 
 void PluginProxy::frameDidFinishLoading(uint64_t requestID)
@@ -488,7 +485,7 @@ NPObject* PluginProxy::pluginScriptableNPObject()
     return m_connection->npRemoteObjectMap()->createNPObjectProxy(pluginScriptableNPObjectID, this);
 }
 
-#if PLATFORM(MAC)
+#if PLATFORM(COCOA)
 void PluginProxy::windowFocusChanged(bool hasFocus)
 {
     m_connection->connection()->send(Messages::PluginControllerProxy::WindowFocusChanged(hasFocus), m_pluginInstanceID);
@@ -683,6 +680,11 @@ void PluginProxy::windowedPluginGeometryDidChange(const WebCore::IntRect& frameR
 {
     controller()->windowedPluginGeometryDidChange(frameRect, clipRect, windowID);
 }
+
+void PluginProxy::windowedPluginVisibilityDidChange(bool isVisible, uint64_t windowID)
+{
+    controller()->windowedPluginVisibilityDidChange(isVisible, windowID);
+}
 #endif
 
 void PluginProxy::update(const IntRect& paintedRect)
@@ -712,6 +714,13 @@ PassRefPtr<WebCore::SharedBuffer> PluginProxy::liveResourceData() const
 {
     return 0;
 }
+
+#if PLATFORM(COCOA)
+WebCore::AudioHardwareActivityType PluginProxy::audioHardwareActivity() const
+{
+    return m_connection->audioHardwareActivity();
+}
+#endif
 
 } // namespace WebKit
 

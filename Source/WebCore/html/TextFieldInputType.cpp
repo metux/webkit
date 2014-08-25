@@ -176,21 +176,30 @@ void TextFieldInputType::forwardEvent(Event* event)
             return;
     }
 
-    if (element().renderer() && (event->isMouseEvent() || event->isDragEvent() || event->eventInterface() == WheelEventInterfaceType || event->type() == eventNames().blurEvent || event->type() == eventNames().focusEvent)) {
-        RenderTextControlSingleLine* renderTextControl = toRenderTextControlSingleLine(element().renderer());
-        if (event->type() == eventNames().blurEvent) {
-            if (RenderTextControlInnerBlock* innerTextRenderer = innerTextElement()->renderer()) {
-                if (RenderLayer* innerLayer = innerTextRenderer->layer()) {
-                    IntSize scrollOffset(!renderTextControl->style().isLeftToRightDirection() ? innerLayer->scrollWidth() : 0, 0);
-                    innerLayer->scrollToOffset(scrollOffset, RenderLayer::ScrollOffsetClamped);
+    if (event->isMouseEvent()
+        || event->isDragEvent()
+        || event->eventInterface() == WheelEventInterfaceType
+        || event->type() == eventNames().blurEvent
+        || event->type() == eventNames().focusEvent)
+    {
+        element().document().updateStyleIfNeededForNode(element());
+
+        if (element().renderer()) {
+            RenderTextControlSingleLine* renderTextControl = toRenderTextControlSingleLine(element().renderer());
+            if (event->type() == eventNames().blurEvent) {
+                if (RenderTextControlInnerBlock* innerTextRenderer = innerTextElement()->renderer()) {
+                    if (RenderLayer* innerLayer = innerTextRenderer->layer()) {
+                        IntSize scrollOffset(!renderTextControl->style().isLeftToRightDirection() ? innerLayer->scrollWidth() : 0, 0);
+                        innerLayer->scrollToOffset(scrollOffset, RenderLayer::ScrollOffsetClamped);
+                    }
                 }
-            }
 
-            renderTextControl->capsLockStateMayHaveChanged();
-        } else if (event->type() == eventNames().focusEvent)
-            renderTextControl->capsLockStateMayHaveChanged();
+                renderTextControl->capsLockStateMayHaveChanged();
+            } else if (event->type() == eventNames().focusEvent)
+                renderTextControl->capsLockStateMayHaveChanged();
 
-        element().forwardEvent(event);
+            element().forwardEvent(event);
+        }
     }
 }
 
@@ -202,28 +211,24 @@ void TextFieldInputType::handleBlurEvent()
 
 bool TextFieldInputType::shouldSubmitImplicitly(Event* event)
 {
-    return (event->type() == eventNames().textInputEvent && event->eventInterface() == TextEventInterfaceType && static_cast<TextEvent*>(event)->data() == "\n") || InputType::shouldSubmitImplicitly(event);
+    return (event->type() == eventNames().textInputEvent && event->eventInterface() == TextEventInterfaceType && toTextEvent(event)->data() == "\n") || InputType::shouldSubmitImplicitly(event);
 }
 
 RenderPtr<RenderElement> TextFieldInputType::createInputRenderer(PassRef<RenderStyle> style)
 {
-    return createRenderer<RenderTextControlSingleLine>(element(), std::move(style));
+    return createRenderer<RenderTextControlSingleLine>(element(), WTF::move(style));
 }
 
 bool TextFieldInputType::needsContainer() const
 {
-#if ENABLE(INPUT_SPEECH)
-    return element().isSpeechEnabled();
-#else
     return false;
-#endif
 }
 
 bool TextFieldInputType::shouldHaveSpinButton() const
 {
     Document& document = element().document();
     RefPtr<RenderTheme> theme = document.page() ? &document.page()->theme() : RenderTheme::defaultTheme();
-    return theme->shouldHaveSpinButton(&element());
+    return theme->shouldHaveSpinButton(element());
 }
 
 void TextFieldInputType::createShadowSubtree()
@@ -253,14 +258,6 @@ void TextFieldInputType::createShadowSubtree()
     m_innerBlock->appendChild(m_innerText, IGNORE_EXCEPTION);
     m_container->appendChild(m_innerBlock, IGNORE_EXCEPTION);
 
-#if ENABLE(INPUT_SPEECH)
-    ASSERT(!m_speechButton);
-    if (element().isSpeechEnabled()) {
-        m_speechButton = InputFieldSpeechButtonElement::create(document);
-        m_container->appendChild(m_speechButton, IGNORE_EXCEPTION);
-    }
-#endif
-
     if (shouldHaveSpinButton) {
         m_innerSpinButton = SpinButtonElement::create(document, *this);
         m_container->appendChild(m_innerSpinButton, IGNORE_EXCEPTION);
@@ -288,13 +285,6 @@ HTMLElement* TextFieldInputType::innerSpinButtonElement() const
     return m_innerSpinButton.get();
 }
 
-#if ENABLE(INPUT_SPEECH)
-HTMLElement* TextFieldInputType::speechButtonElement() const
-{
-    return m_speechButton.get();
-}
-#endif
-
 HTMLElement* TextFieldInputType::placeholderElement() const
 {
     return m_placeholder.get();
@@ -306,9 +296,6 @@ void TextFieldInputType::destroyShadowSubtree()
     m_innerText.clear();
     m_placeholder.clear();
     m_innerBlock.clear();
-#if ENABLE(INPUT_SPEECH)
-    m_speechButton.clear();
-#endif
     if (m_innerSpinButton)
         m_innerSpinButton->removeSpinButtonOwner();
     m_innerSpinButton.clear();
@@ -374,14 +361,19 @@ void TextFieldInputType::handleBeforeTextInsertedEvent(BeforeTextInsertedEvent* 
     // We use RenderTextControlSingleLine::text() instead of InputElement::value()
     // because they can be mismatched by sanitizeValue() in
     // HTMLInputElement::subtreeHasChanged() in some cases.
-    unsigned oldLength = numGraphemeClusters(element().innerTextValue());
+    String innerText = element().innerTextValue();
+    unsigned oldLength = numGraphemeClusters(innerText);
 
     // selectionLength represents the selection length of this text field to be
     // removed by this insertion.
     // If the text field has no focus, we don't need to take account of the
     // selection length. The selection is the source of text drag-and-drop in
     // that case, and nothing in the text field will be removed.
-    unsigned selectionLength = element().focused() ? numGraphemeClusters(plainText(element().document().frame()->selection().selection().toNormalizedRange().get())) : 0;
+    unsigned selectionLength = 0;
+    if (element().focused()) {
+        ASSERT(enclosingTextFormControl(element().document().frame()->selection().selection().start()) == &element());
+        selectionLength = numGraphemeClusters(innerText.substring(element().selectionStart(), element().selectionEnd()));
+    }
     ASSERT(oldLength >= selectionLength);
 
     // Selected characters will be removed by the next text event.
@@ -443,8 +435,6 @@ String TextFieldInputType::convertFromVisibleValue(const String& visibleValue) c
 
 void TextFieldInputType::subtreeHasChanged()
 {
-    ASSERT(element().renderer());
-
     bool wasChanged = element().wasChangedSinceLastFormControlChangeEvent();
     element().setChangedSinceLastFormControlChangeEvent(true);
 
