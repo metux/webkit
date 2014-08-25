@@ -24,6 +24,9 @@ webkit2gtk (2.5.3+dfsg1-1) UNRELEASED; urgency=medium
     + Replace libgeoclue-dev with geoclue-2.0.
     + Split libwebkit2gtk-4.0-doc from the -dev package.
     + Remove Mike Hommey from the Uploaders field.
+  * debian/copyright:
+    + Make it compliant with the copyright format v1.0 and refactor the
+      licenses a bit.
   * debian/jquery-1.9.1.js:
     + Provide uncompressed version of jquery to replace the compressed one
       that had to be removed from the original tarball.
