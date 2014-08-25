@@ -26,8 +26,6 @@
 #ifndef DFGAllocator_h
 #define DFGAllocator_h
 
-#include <wtf/Platform.h>
-
 #if ENABLE(DFG_JIT)
 
 #include "DFGCommon.h"
@@ -52,7 +50,7 @@ public:
     void* allocate(); // Use placement new to allocate, and avoid using this method.
     void free(T*); // Call this method to delete; never use 'delete' directly.
     
-    void freeAll(); // Only call this if T has a trivial destructor.
+    void freeAll(); // Only call this if you've either freed everything or if T has a trivial destructor.
     void reset(); // Like freeAll(), but also returns all memory to the OS.
     
     unsigned indexOf(const T*);
@@ -155,11 +153,14 @@ void Allocator<T>::reset()
 template<typename T>
 unsigned Allocator<T>::indexOf(const T* object)
 {
-    unsigned baseIndex = 0;
+    unsigned numRegions = 0;
+    for (Region* region = m_regionHead; region; region = region->m_next)
+        numRegions++;
+    unsigned regionIndex = 0;
     for (Region* region = m_regionHead; region; region = region->m_next) {
         if (region->isInThisRegion(object))
-            return baseIndex + (object - region->data());
-        baseIndex += Region::numberOfThingsPerRegion();
+            return (numRegions - 1 - regionIndex) * Region::numberOfThingsPerRegion() + (object - region->data());
+        regionIndex++;
     }
     CRASH();
     return 0;

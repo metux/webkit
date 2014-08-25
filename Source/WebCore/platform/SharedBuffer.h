@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2006 Apple Computer, Inc.  All rights reserved.
+ * Copyright (C) 2006 Apple Inc.  All rights reserved.
  * Copyright (C) Research In Motion Limited 2009-2010. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -11,10 +11,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -27,9 +27,11 @@
 #ifndef SharedBuffer_h
 #define SharedBuffer_h
 
+#include <runtime/ArrayBuffer.h>
 #include <wtf/Forward.h>
 #include <wtf/OwnPtr.h>
 #include <wtf/RefCounted.h>
+#include <wtf/ThreadSafeRefCounted.h>
 #include <wtf/Vector.h>
 #include <wtf/text/WTFString.h>
 
@@ -41,7 +43,7 @@
 #include "GUniquePtrSoup.h"
 #endif
 
-#if PLATFORM(MAC)
+#if USE(FOUNDATION)
 OBJC_CLASS NSData;
 #endif
 
@@ -66,28 +68,13 @@ public:
     
     ~SharedBuffer();
     
-#if PLATFORM(MAC)
-    // FIXME: This class exists as a temporary workaround so that code that does:
-    // [buffer->createNSData() autorelease] will fail to compile.
-    // Once both Mac and iOS builds with this change we can change the return type to be RetainPtr<NSData>,
-    // since we're mostly worried about existing code breaking (it's unlikely that we'd use retain/release together
-    // with RetainPtr in new code.
-    class NSDataRetainPtrWithoutImplicitConversionOperator : public RetainPtr<NSData*> {
-    public:
-        template<typename T>
-        NSDataRetainPtrWithoutImplicitConversionOperator(RetainPtr<T*>&& other)
-            : RetainPtr<NSData*>(std::move(other))
-        {
-        }
-
-        explicit operator PtrType() = delete;
-    };
-
-    NSDataRetainPtrWithoutImplicitConversionOperator createNSData();
+#if USE(FOUNDATION)
+    RetainPtr<NSData> createNSData();
     static PassRefPtr<SharedBuffer> wrapNSData(NSData *data);
 #endif
 #if USE(CF)
     RetainPtr<CFDataRef> createCFData();
+    CFDataRef existingCFData();
     static PassRefPtr<SharedBuffer> wrapCFData(CFDataRef);
 #endif
 
@@ -99,6 +86,9 @@ public:
     // to be merged into a flat buffer. Use getSomeData() whenever possible
     // for better performance.
     const char* data() const;
+    // Creates an ArrayBuffer and copies this SharedBuffer's contents to that
+    // ArrayBuffer without merging segmented buffers into a flat buffer.
+    PassRefPtr<ArrayBuffer> createArrayBuffer() const;
 
     unsigned size() const;
 
@@ -114,6 +104,7 @@ public:
     unsigned platformDataSize() const;
 
 #if USE(NETWORK_CFDATA_ARRAY_CALLBACK)
+    static PassRefPtr<SharedBuffer> wrapCFDataArray(CFArrayRef);
     void append(CFDataRef);
 #endif
 
@@ -167,6 +158,11 @@ public:
     void createPurgeableBuffer() const;
 
     void tryReplaceContentsWithPlatformBuffer(SharedBuffer*);
+    bool hasPlatformData() const;
+
+    struct DataBuffer : public ThreadSafeRefCounted<DataBuffer> {
+        Vector<char> data;
+    };
 
 private:
     SharedBuffer();
@@ -183,18 +179,25 @@ private:
 
     void clearPlatformData();
     void maybeTransferPlatformData();
-    bool hasPlatformData() const;
+    bool maybeAppendPlatformData(SharedBuffer*);
 
     void copyBufferAndClear(char* destination, unsigned bytesToCopy) const;
 
+    void appendToDataBuffer(const char *, unsigned) const;
+    void duplicateDataBufferIfNecessary() const;
+    void clearDataBuffer();
+
     unsigned m_size;
-    mutable Vector<char> m_buffer;
+    mutable RefPtr<DataBuffer> m_buffer;
+
     bool m_shouldUsePurgeableMemory;
     mutable OwnPtr<PurgeableBuffer> m_purgeableBuffer;
 #if USE(NETWORK_CFDATA_ARRAY_CALLBACK)
+    explicit SharedBuffer(CFArrayRef);
     mutable Vector<RetainPtr<CFDataRef>> m_dataArray;
     unsigned copySomeDataFromDataArray(const char*& someData, unsigned position) const;
     const char *singleDataArrayBuffer() const;
+    bool maybeAppendDataArray(SharedBuffer*);
 #else
     mutable Vector<char*> m_segments;
 #endif

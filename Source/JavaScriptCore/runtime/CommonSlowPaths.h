@@ -33,10 +33,7 @@
 #include "NameInstance.h"
 #include "StackAlignment.h"
 #include "VM.h"
-#include <wtf/Platform.h>
 #include <wtf/StdLibExtras.h>
-
-#if ENABLE(JIT) || ENABLE(LLINT)
 
 namespace JSC {
 
@@ -49,6 +46,12 @@ namespace JSC {
 
 namespace CommonSlowPaths {
 
+struct ArityCheckData {
+    unsigned paddedStackSpace;
+    void* thunkToCall;
+    void* returnPC;
+};
+
 ALWAYS_INLINE int arityCheckFor(ExecState* exec, JSStack* stack, CodeSpecializationKind kind)
 {
     JSFunction* callee = jsCast<JSFunction*>(exec->callee());
@@ -58,18 +61,12 @@ ALWAYS_INLINE int arityCheckFor(ExecState* exec, JSStack* stack, CodeSpecializat
     
     ASSERT(argumentCountIncludingThis < newCodeBlock->numParameters());
     int missingArgumentCount = newCodeBlock->numParameters() - argumentCountIncludingThis;
-    int paddedMissingArgumentCount = WTF::roundUpToMultipleOf(stackAlignmentRegisters(), missingArgumentCount);
+    int neededStackSpace = missingArgumentCount + 1; // Allow space to save the original return PC.
+    int paddedStackSpace = WTF::roundUpToMultipleOf(stackAlignmentRegisters(), neededStackSpace);
 
-#if USE(SEPARATE_C_AND_JS_STACK)
-    if (!stack->grow(exec->registers() - paddedMissingArgumentCount))
+    if (!stack->ensureCapacityFor(exec->registers() - paddedStackSpace))
         return -1;
-#else
-    UNUSED_PARAM(stack);
-    if (!exec->vm().isSafeToRecurse(paddedMissingArgumentCount * sizeof(Register)))
-        return -1;
-#endif // USE(SEPARATE_C_AND_JS_STACK)
-
-    return paddedMissingArgumentCount;
+    return paddedStackSpace / stackAlignmentRegisters();
 }
 
 inline bool opIn(ExecState* exec, JSValue propName, JSValue baseVal)
@@ -92,6 +89,33 @@ inline bool opIn(ExecState* exec, JSValue propName, JSValue baseVal)
     if (exec->vm().exception())
         return false;
     return baseObj->hasProperty(exec, property);
+}
+
+inline void tryCachePutToScopeGlobal(
+    ExecState* exec, CodeBlock* codeBlock, Instruction* pc, JSObject* scope,
+    ResolveModeAndType modeAndType, PutPropertySlot& slot)
+{
+    // Covers implicit globals. Since they don't exist until they first execute, we didn't know how to cache them at compile time.
+    
+    if (modeAndType.type() != GlobalProperty && modeAndType.type() != GlobalPropertyWithVarInjectionChecks)
+        return;
+    
+    if (!slot.isCacheablePut()
+        || slot.base() != scope
+        || !scope->structure()->propertyAccessesAreCacheable())
+        return;
+    
+    if (slot.type() == PutPropertySlot::NewProperty) {
+        // Don't cache if we've done a transition. We want to detect the first replace so that we
+        // can invalidate the watchpoint.
+        return;
+    }
+    
+    scope->structure()->didCachePropertyReplacement(exec->vm(), slot.cachedOffset());
+
+    ConcurrentJITLocker locker(codeBlock->m_lock);
+    pc[5].u.structure.set(exec->vm(), codeBlock->ownerExecutable(), scope->structure());
+    pc[6].u.operand = slot.cachedOffset();
 }
 
 } // namespace CommonSlowPaths
@@ -200,9 +224,17 @@ SLOW_PATH_HIDDEN_DECL(slow_path_in);
 SLOW_PATH_HIDDEN_DECL(slow_path_del_by_val);
 SLOW_PATH_HIDDEN_DECL(slow_path_strcat);
 SLOW_PATH_HIDDEN_DECL(slow_path_to_primitive);
+SLOW_PATH_HIDDEN_DECL(slow_path_get_enumerable_length);
+SLOW_PATH_HIDDEN_DECL(slow_path_has_generic_property);
+SLOW_PATH_HIDDEN_DECL(slow_path_has_structure_property);
+SLOW_PATH_HIDDEN_DECL(slow_path_has_indexed_property);
+SLOW_PATH_HIDDEN_DECL(slow_path_get_direct_pname);
+SLOW_PATH_HIDDEN_DECL(slow_path_get_structure_property_enumerator);
+SLOW_PATH_HIDDEN_DECL(slow_path_get_generic_property_enumerator);
+SLOW_PATH_HIDDEN_DECL(slow_path_next_enumerator_pname);
+SLOW_PATH_HIDDEN_DECL(slow_path_to_index_string);
+SLOW_PATH_HIDDEN_DECL(slow_path_profile_types_with_high_fidelity);
 
 } // namespace JSC
-
-#endif // ENABLE(JIT) || ENABLE(LLINT)
 
 #endif // CommonSlowPaths_h

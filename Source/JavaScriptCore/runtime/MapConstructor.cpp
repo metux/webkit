@@ -32,10 +32,11 @@
 #include "JSGlobalObject.h"
 #include "JSMap.h"
 #include "MapPrototype.h"
+#include "StructureInlines.h"
 
 namespace JSC {
 
-const ClassInfo MapConstructor::s_info = { "Function", &Base::s_info, 0, 0, CREATE_METHOD_TABLE(MapConstructor) };
+const ClassInfo MapConstructor::s_info = { "Function", &Base::s_info, 0, CREATE_METHOD_TABLE(MapConstructor) };
 
 void MapConstructor::finishCreation(VM& vm, MapPrototype* mapPrototype)
 {

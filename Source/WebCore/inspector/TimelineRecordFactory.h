@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2009 Google Inc. All rights reserved.
+ * Copyright (C) 2014 University of Washington.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -36,12 +37,21 @@
 #include <wtf/Forward.h>
 #include <wtf/text/WTFString.h>
 
+namespace JSC {
+class Profile;
+}
+
+namespace Inspector {
+struct ScriptBreakpointAction;
+}
+
 namespace WebCore {
 
     class Event;
     class FloatQuad;
     class ResourceRequest;
     class ResourceResponse;
+    class ScriptProfile;
 
     class TimelineRecordFactory {
     public:
@@ -51,6 +61,9 @@ namespace WebCore {
         static PassRefPtr<Inspector::InspectorObject> createGCEventData(const size_t usedHeapSizeDelta);
 
         static PassRefPtr<Inspector::InspectorObject> createFunctionCallData(const String& scriptName, int scriptLine);
+        static PassRefPtr<Inspector::InspectorObject> createConsoleProfileData(const String& title);
+
+        static PassRefPtr<Inspector::InspectorObject> createProbeSampleData(const Inspector::ScriptBreakpointAction&, int hitCount);
 
         static PassRefPtr<Inspector::InspectorObject> createEventDispatchData(const Event&);
 
@@ -91,6 +104,8 @@ namespace WebCore {
         static PassRefPtr<Inspector::InspectorObject> createPaintData(const FloatQuad&);
 
         static void appendLayoutRoot(Inspector::InspectorObject* data, const FloatQuad&);
+
+        static void appendProfile(Inspector::InspectorObject*, PassRefPtr<JSC::Profile>);
 
 #if ENABLE(WEB_SOCKETS)
         static inline PassRefPtr<Inspector::InspectorObject> createWebSocketCreateData(unsigned long identifier, const URL& url, const String& protocol)

@@ -19,8 +19,6 @@
  */
 
 #include "config.h"
-
-#if ENABLE(SVG)
 #include "SVGPathElement.h"
 
 #include "Attribute.h"
@@ -53,6 +51,7 @@
 #include "SVGPathSegMovetoRel.h"
 #include "SVGPathUtilities.h"
 #include "SVGSVGElement.h"
+#include <wtf/NeverDestroyed.h>
 
 namespace WebCore {
 
@@ -215,14 +214,14 @@ PassRefPtr<SVGPathSegCurvetoQuadraticSmoothRel> SVGPathElement::createSVGPathSeg
 
 bool SVGPathElement::isSupportedAttribute(const QualifiedName& attrName)
 {
-    DEFINE_STATIC_LOCAL(HashSet<QualifiedName>, supportedAttributes, ());
-    if (supportedAttributes.isEmpty()) {
+    static NeverDestroyed<HashSet<QualifiedName>> supportedAttributes;
+    if (supportedAttributes.get().isEmpty()) {
         SVGLangSpace::addSupportedAttributes(supportedAttributes);
         SVGExternalResourcesRequired::addSupportedAttributes(supportedAttributes);
-        supportedAttributes.add(SVGNames::dAttr);
-        supportedAttributes.add(SVGNames::pathLengthAttr);
+        supportedAttributes.get().add(SVGNames::dAttr);
+        supportedAttributes.get().add(SVGNames::pathLengthAttr);
     }
-    return supportedAttributes.contains<SVGAttributeHashTranslator>(attrName);
+    return supportedAttributes.get().contains<SVGAttributeHashTranslator>(attrName);
 }
 
 void SVGPathElement::parseAttribute(const QualifiedName& name, const AtomicString& value)
@@ -286,7 +285,7 @@ void SVGPathElement::invalidateMPathDependencies()
     // <mpath> can only reference <path> but this dependency is not handled in
     // markForLayoutAndParentResourceInvalidation so we update any mpath dependencies manually.
     if (HashSet<SVGElement*>* dependencies = document().accessSVGExtensions()->setOfElementsReferencingTarget(this)) {
-        for (auto element : *dependencies) {
+        for (auto* element : *dependencies) {
             if (element->hasTagName(SVGNames::mpathTag))
                 toSVGMPathElement(element)->targetPathChanged();
         }
@@ -407,9 +406,7 @@ FloatRect SVGPathElement::getBBox(StyleUpdateStrategy styleUpdateStrategy)
 RenderPtr<RenderElement> SVGPathElement::createElementRenderer(PassRef<RenderStyle> style)
 {
     // By default, any subclass is expected to do path-based drawing
-    return createRenderer<RenderSVGPath>(*this, std::move(style));
+    return createRenderer<RenderSVGPath>(*this, WTF::move(style));
 }
 
 }
-
-#endif // ENABLE(SVG)

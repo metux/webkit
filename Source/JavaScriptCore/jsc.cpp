@@ -22,10 +22,10 @@
 
 #include "config.h"
 
-#include "APIShims.h"
+#include "ArrayPrototype.h"
 #include "ButterflyInlines.h"
 #include "BytecodeGenerator.h"
-#include "CallFrameInlines.h"
+#include "CodeBlock.h"
 #include "Completion.h"
 #include "CopiedSpaceInlines.h"
 #include "ExceptionHelpers.h"
@@ -34,13 +34,15 @@
 #include "Interpreter.h"
 #include "JSArray.h"
 #include "JSArrayBuffer.h"
+#include "JSCInlines.h"
 #include "JSFunction.h"
 #include "JSLock.h"
 #include "JSProxy.h"
 #include "JSString.h"
-#include "Operations.h"
+#include "ProfilerDatabase.h"
 #include "SamplingTool.h"
 #include "StackVisitor.h"
+#include "StructureInlines.h"
 #include "StructureRareDataInlines.h"
 #include "TestRunnerUtils.h"
 #include <math.h>
@@ -92,13 +94,363 @@
 using namespace JSC;
 using namespace WTF;
 
+namespace JSC {
+WTF_IMPORT extern const struct HashTable globalObjectTable;
+}
+
+namespace {
+
+NO_RETURN_WITH_VALUE static void jscExit(int status)
+{
+#if ENABLE(DFG_JIT)
+    if (DFG::isCrashing()) {
+        for (;;) {
+#if OS(WINDOWS)
+            Sleep(1000);
+#else
+            pause();
+#endif
+        }
+    }
+#endif // ENABLE(DFG_JIT)
+    exit(status);
+}
+
+class Element;
+class ElementHandleOwner;
+class Masuqerader;
+class Root;
+class RuntimeArray;
+
+class Element : public JSNonFinalObject {
+public:
+    Element(VM& vm, Structure* structure, Root* root)
+        : Base(vm, structure)
+        , m_root(root)
+    {
+    }
+
+    typedef JSNonFinalObject Base;
+    static const bool needsDestruction = false;
+
+    Root* root() const { return m_root; }
+    void setRoot(Root* root) { m_root = root; }
+
+    static Element* create(VM& vm, JSGlobalObject* globalObject, Root* root)
+    {
+        Structure* structure = createStructure(vm, globalObject, jsNull());
+        Element* element = new (NotNull, allocateCell<Element>(vm.heap, sizeof(Element))) Element(vm, structure, root);
+        element->finishCreation(vm);
+        return element;
+    }
+
+    void finishCreation(VM&);
+
+    static ElementHandleOwner* handleOwner();
+
+    static Structure* createStructure(VM& vm, JSGlobalObject* globalObject, JSValue prototype)
+    {
+        return Structure::create(vm, globalObject, prototype, TypeInfo(ObjectType, StructureFlags), info());
+    }
+
+    DECLARE_INFO;
+
+private:
+    Root* m_root;
+};
+
+class ElementHandleOwner : public WeakHandleOwner {
+public:
+    virtual bool isReachableFromOpaqueRoots(Handle<JSC::Unknown> handle, void*, SlotVisitor& visitor)
+    {
+        Element* element = jsCast<Element*>(handle.slot()->asCell());
+        return visitor.containsOpaqueRoot(element->root());
+    }
+};
+
+class Masquerader : public JSNonFinalObject {
+public:
+    Masquerader(VM& vm, Structure* structure)
+        : Base(vm, structure)
+    {
+    }
+
+    typedef JSNonFinalObject Base;
+
+    static Masquerader* create(VM& vm, JSGlobalObject* globalObject)
+    {
+        globalObject->masqueradesAsUndefinedWatchpoint()->fireAll("Masquerading object allocated");
+        Structure* structure = createStructure(vm, globalObject, jsNull());
+        Masquerader* result = new (NotNull, allocateCell<Masquerader>(vm.heap, sizeof(Masquerader))) Masquerader(vm, structure);
+        result->finishCreation(vm);
+        return result;
+    }
+
+    static Structure* createStructure(VM& vm, JSGlobalObject* globalObject, JSValue prototype)
+    {
+        return Structure::create(vm, globalObject, prototype, TypeInfo(ObjectType, StructureFlags), info());
+    }
+
+    DECLARE_INFO;
+
+protected:
+    static const unsigned StructureFlags = JSC::MasqueradesAsUndefined | Base::StructureFlags;
+};
+
+class Root : public JSDestructibleObject {
+public:
+    Root(VM& vm, Structure* structure)
+        : Base(vm, structure)
+    {
+    }
+
+    Element* element()
+    {
+        return m_element.get();
+    }
+
+    void setElement(Element* element)
+    {
+        Weak<Element> newElement(element, Element::handleOwner());
+        m_element.swap(newElement);
+    }
+
+    static Root* create(VM& vm, JSGlobalObject* globalObject)
+    {
+        Structure* structure = createStructure(vm, globalObject, jsNull());
+        Root* root = new (NotNull, allocateCell<Root>(vm.heap, sizeof(Root))) Root(vm, structure);
+        root->finishCreation(vm);
+        return root;
+    }
+
+    typedef JSDestructibleObject Base;
+
+    DECLARE_INFO;
+    static const bool needsDestruction = true;
+
+    static Structure* createStructure(VM& vm, JSGlobalObject* globalObject, JSValue prototype)
+    {
+        return Structure::create(vm, globalObject, prototype, TypeInfo(ObjectType, StructureFlags), info());
+    }
+
+    static void visitChildren(JSCell* thisObject, SlotVisitor& visitor)
+    {
+        Base::visitChildren(thisObject, visitor);
+        visitor.addOpaqueRoot(thisObject);
+    }
+
+private:
+    Weak<Element> m_element;
+};
+
+class ImpureGetter : public JSNonFinalObject {
+public:
+    ImpureGetter(VM& vm, Structure* structure)
+        : Base(vm, structure)
+    {
+    }
+
+    DECLARE_INFO;
+    typedef JSNonFinalObject Base;
+
+    static Structure* createStructure(VM& vm, JSGlobalObject* globalObject, JSValue prototype)
+    {
+        return Structure::create(vm, globalObject, prototype, TypeInfo(ObjectType, StructureFlags), info());
+    }
+
+    static ImpureGetter* create(VM& vm, Structure* structure, JSObject* delegate)
+    {
+        ImpureGetter* getter = new (NotNull, allocateCell<ImpureGetter>(vm.heap, sizeof(ImpureGetter))) ImpureGetter(vm, structure);
+        getter->finishCreation(vm, delegate);
+        return getter;
+    }
+
+    void finishCreation(VM& vm, JSObject* delegate)
+    {
+        Base::finishCreation(vm);
+        if (delegate)
+            m_delegate.set(vm, this, delegate);
+    }
+
+    static const unsigned StructureFlags = JSC::HasImpureGetOwnPropertySlot | JSC::OverridesGetOwnPropertySlot | Base::StructureFlags;
+
+    static bool getOwnPropertySlot(JSObject* object, ExecState* exec, PropertyName name, PropertySlot& slot)
+    {
+        ImpureGetter* thisObject = jsCast<ImpureGetter*>(object);
+        
+        if (thisObject->m_delegate && thisObject->m_delegate->getPropertySlot(exec, name, slot))
+            return true;
+
+        return Base::getOwnPropertySlot(object, exec, name, slot);
+    }
+
+    static void visitChildren(JSCell* cell, SlotVisitor& visitor)
+    {
+        Base::visitChildren(cell, visitor);
+        ImpureGetter* thisObject = jsCast<ImpureGetter*>(cell);
+        visitor.append(&thisObject->m_delegate);
+    }
+
+    void setDelegate(VM& vm, JSObject* delegate)
+    {
+        m_delegate.set(vm, this, delegate);
+    }
+
+private:
+    WriteBarrier<JSObject> m_delegate;
+};
+
+class RuntimeArray : public JSArray {
+public:
+    typedef JSArray Base;
+
+    static RuntimeArray* create(ExecState* exec)
+    {
+        VM& vm = exec->vm();
+        JSGlobalObject* globalObject = exec->lexicalGlobalObject();
+        Structure* structure = createStructure(vm, globalObject, createPrototype(vm, globalObject));
+        RuntimeArray* runtimeArray = new (NotNull, allocateCell<RuntimeArray>(*exec->heap())) RuntimeArray(exec, structure);
+        runtimeArray->finishCreation(exec);
+        vm.heap.addFinalizer(runtimeArray, destroy);
+        return runtimeArray;
+    }
+
+    ~RuntimeArray() { }
+
+    static void destroy(JSCell* cell)
+    {
+        static_cast<RuntimeArray*>(cell)->RuntimeArray::~RuntimeArray();
+    }
+
+    static const bool needsDestruction = false;
+
+    static bool getOwnPropertySlot(JSObject* object, ExecState* exec, PropertyName propertyName, PropertySlot& slot)
+    {
+        RuntimeArray* thisObject = jsCast<RuntimeArray*>(object);
+        if (propertyName == exec->propertyNames().length) {
+            slot.setCacheableCustom(thisObject, DontDelete | ReadOnly | DontEnum, thisObject->lengthGetter);
+            return true;
+        }
+
+        unsigned index = propertyName.asIndex();
+        if (index < thisObject->getLength()) {
+            ASSERT(index != PropertyName::NotAnIndex);
+            slot.setValue(thisObject, DontDelete | DontEnum, jsNumber(thisObject->m_vector[index]));
+            return true;
+        }
+
+        return JSObject::getOwnPropertySlot(thisObject, exec, propertyName, slot);
+    }
+
+    static bool getOwnPropertySlotByIndex(JSObject* object, ExecState* exec, unsigned index, PropertySlot& slot)
+    {
+        RuntimeArray* thisObject = jsCast<RuntimeArray*>(object);
+        if (index < thisObject->getLength()) {
+            slot.setValue(thisObject, DontDelete | DontEnum, jsNumber(thisObject->m_vector[index]));
+            return true;
+        }
+
+        return JSObject::getOwnPropertySlotByIndex(thisObject, exec, index, slot);
+    }
+
+    static NO_RETURN_DUE_TO_CRASH void put(JSCell*, ExecState*, PropertyName, JSValue, PutPropertySlot&)
+    {
+        RELEASE_ASSERT_NOT_REACHED();
+    }
+
+    static NO_RETURN_DUE_TO_CRASH bool deleteProperty(JSCell*, ExecState*, PropertyName)
+    {
+        RELEASE_ASSERT_NOT_REACHED();
+#if !COMPILER(CLANG) && !COMPILER(MSVC)
+        return true;
+#endif
+    }
+
+    unsigned getLength() const { return m_vector.size(); }
+
+    DECLARE_INFO;
+
+    static ArrayPrototype* createPrototype(VM&, JSGlobalObject* globalObject)
+    {
+        return globalObject->arrayPrototype();
+    }
+
+    static Structure* createStructure(VM& vm, JSGlobalObject* globalObject, JSValue prototype)
+    {
+        return Structure::create(vm, globalObject, prototype, TypeInfo(ObjectType, StructureFlags), info(), ArrayClass);
+    }
+
+protected:
+    void finishCreation(ExecState* exec)
+    {
+        Base::finishCreation(exec->vm());
+        ASSERT(inherits(info()));
+
+        for (size_t i = 0; i < exec->argumentCount(); i++)
+            m_vector.append(exec->argument(i).toInt32(exec));
+    }
+
+    static const unsigned StructureFlags = OverridesGetOwnPropertySlot | InterceptsGetOwnPropertySlotByIndexEvenWhenLengthIsNotZero | OverridesGetPropertyNames | JSArray::StructureFlags;
+
+private:
+    RuntimeArray(ExecState* exec, Structure* structure)
+        : JSArray(exec->vm(), structure, 0)
+    {
+    }
+
+    static EncodedJSValue lengthGetter(ExecState* exec, JSObject*, EncodedJSValue thisValue, PropertyName)
+    {
+        RuntimeArray* thisObject = jsDynamicCast<RuntimeArray*>(JSValue::decode(thisValue));
+        if (!thisObject)
+            return throwVMTypeError(exec);
+        return JSValue::encode(jsNumber(thisObject->getLength()));
+    }
+
+    Vector<int> m_vector;
+};
+
+const ClassInfo Element::s_info = { "Element", &Base::s_info, 0, CREATE_METHOD_TABLE(Element) };
+const ClassInfo Masquerader::s_info = { "Masquerader", &Base::s_info, 0, CREATE_METHOD_TABLE(Masquerader) };
+const ClassInfo Root::s_info = { "Root", &Base::s_info, 0, CREATE_METHOD_TABLE(Root) };
+const ClassInfo ImpureGetter::s_info = { "ImpureGetter", &Base::s_info, 0, CREATE_METHOD_TABLE(ImpureGetter) };
+const ClassInfo RuntimeArray::s_info = { "RuntimeArray", &Base::s_info, 0, CREATE_METHOD_TABLE(RuntimeArray) };
+
+ElementHandleOwner* Element::handleOwner()
+{
+    static ElementHandleOwner* owner = 0;
+    if (!owner)
+        owner = new ElementHandleOwner();
+    return owner;
+}
+
+void Element::finishCreation(VM& vm)
+{
+    Base::finishCreation(vm);
+    m_root->setElement(this);
+}
+
+}
+
 static bool fillBufferWithContentsOfFile(const String& fileName, Vector<char>& buffer);
 
+static EncodedJSValue JSC_HOST_CALL functionCreateProxy(ExecState*);
+static EncodedJSValue JSC_HOST_CALL functionCreateRuntimeArray(ExecState*);
+static EncodedJSValue JSC_HOST_CALL functionCreateImpureGetter(ExecState*);
+static EncodedJSValue JSC_HOST_CALL functionSetImpureGetterDelegate(ExecState*);
+
+static EncodedJSValue JSC_HOST_CALL functionSetElementRoot(ExecState*);
+static EncodedJSValue JSC_HOST_CALL functionCreateRoot(ExecState*);
+static EncodedJSValue JSC_HOST_CALL functionCreateElement(ExecState*);
+static EncodedJSValue JSC_HOST_CALL functionGetElement(ExecState*);
 static EncodedJSValue JSC_HOST_CALL functionPrint(ExecState*);
 static EncodedJSValue JSC_HOST_CALL functionDebug(ExecState*);
 static EncodedJSValue JSC_HOST_CALL functionDescribe(ExecState*);
+static EncodedJSValue JSC_HOST_CALL functionDescribeArray(ExecState*);
 static EncodedJSValue JSC_HOST_CALL functionJSCStack(ExecState*);
-static EncodedJSValue JSC_HOST_CALL functionGC(ExecState*);
+static EncodedJSValue JSC_HOST_CALL functionGCAndSweep(ExecState*);
+static EncodedJSValue JSC_HOST_CALL functionFullGC(ExecState*);
+static EncodedJSValue JSC_HOST_CALL functionEdenGC(ExecState*);
+static EncodedJSValue JSC_HOST_CALL functionDeleteAllCompiledCode(ExecState*);
 #ifndef NDEBUG
 static EncodedJSValue JSC_HOST_CALL functionReleaseExecutableMemory(ExecState*);
 static EncodedJSValue JSC_HOST_CALL functionDumpCallFrame(ExecState*);
@@ -111,9 +463,20 @@ static EncodedJSValue JSC_HOST_CALL functionCheckSyntax(ExecState*);
 static EncodedJSValue JSC_HOST_CALL functionReadline(ExecState*);
 static EncodedJSValue JSC_HOST_CALL functionPreciseTime(ExecState*);
 static EncodedJSValue JSC_HOST_CALL functionNeverInlineFunction(ExecState*);
+static EncodedJSValue JSC_HOST_CALL functionOptimizeNextInvocation(ExecState*);
 static EncodedJSValue JSC_HOST_CALL functionNumberOfDFGCompiles(ExecState*);
+static EncodedJSValue JSC_HOST_CALL functionReoptimizationRetryCount(ExecState*);
 static EncodedJSValue JSC_HOST_CALL functionTransferArrayBuffer(ExecState*);
 static NO_RETURN_WITH_VALUE EncodedJSValue JSC_HOST_CALL functionQuit(ExecState*);
+static EncodedJSValue JSC_HOST_CALL functionFalse1(ExecState*);
+static EncodedJSValue JSC_HOST_CALL functionFalse2(ExecState*);
+static EncodedJSValue JSC_HOST_CALL functionUndefined1(ExecState*);
+static EncodedJSValue JSC_HOST_CALL functionUndefined2(ExecState*);
+static EncodedJSValue JSC_HOST_CALL functionEffectful42(ExecState*);
+static EncodedJSValue JSC_HOST_CALL functionIdentity(ExecState*);
+static EncodedJSValue JSC_HOST_CALL functionMakeMasquerader(ExecState*);
+static EncodedJSValue JSC_HOST_CALL functionHasCustomProperties(ExecState*);
+static EncodedJSValue JSC_HOST_CALL functionDumpTypesForAllVariables (ExecState*);
 
 #if ENABLE(SAMPLING_FLAGS)
 static EncodedJSValue JSC_HOST_CALL functionSetSamplingFlags(ExecState*);
@@ -193,7 +556,6 @@ public:
         GlobalObject* object = new (NotNull, allocateCell<GlobalObject>(vm.heap)) GlobalObject(vm, structure);
         object->finishCreation(vm, arguments);
         vm.heap.addFinalizer(object, destroy);
-        object->setGlobalThis(vm, JSProxy::create(vm, JSProxy::createStructure(vm, object, object->prototype()), object));
         return object;
     }
 
@@ -216,9 +578,13 @@ protected:
         
         addFunction(vm, "debug", functionDebug, 1);
         addFunction(vm, "describe", functionDescribe, 1);
+        addFunction(vm, "describeArray", functionDescribeArray, 1);
         addFunction(vm, "print", functionPrint, 1);
         addFunction(vm, "quit", functionQuit, 0);
-        addFunction(vm, "gc", functionGC, 0);
+        addFunction(vm, "gc", functionGCAndSweep, 0);
+        addFunction(vm, "fullGC", functionFullGC, 0);
+        addFunction(vm, "edenGC", functionEdenGC, 0);
+        addFunction(vm, "deleteAllCompiledCode", functionDeleteAllCompiledCode, 0);
 #ifndef NDEBUG
         addFunction(vm, "dumpCallFrame", functionDumpCallFrame, 0);
         addFunction(vm, "releaseExecutableMemory", functionReleaseExecutableMemory, 0);
@@ -234,16 +600,41 @@ protected:
         addFunction(vm, "neverInlineFunction", functionNeverInlineFunction, 1);
         addFunction(vm, "noInline", functionNeverInlineFunction, 1);
         addFunction(vm, "numberOfDFGCompiles", functionNumberOfDFGCompiles, 1);
+        addFunction(vm, "optimizeNextInvocation", functionOptimizeNextInvocation, 1);
+        addFunction(vm, "reoptimizationRetryCount", functionReoptimizationRetryCount, 1);
         addFunction(vm, "transferArrayBuffer", functionTransferArrayBuffer, 1);
 #if ENABLE(SAMPLING_FLAGS)
         addFunction(vm, "setSamplingFlags", functionSetSamplingFlags, 1);
         addFunction(vm, "clearSamplingFlags", functionClearSamplingFlags, 1);
 #endif
+        addConstructableFunction(vm, "Root", functionCreateRoot, 0);
+        addConstructableFunction(vm, "Element", functionCreateElement, 1);
+        addFunction(vm, "getElement", functionGetElement, 1);
+        addFunction(vm, "setElementRoot", functionSetElementRoot, 2);
+        
+        putDirectNativeFunction(vm, this, Identifier(&vm, "DFGTrue"), 0, functionFalse1, DFGTrueIntrinsic, DontEnum | JSC::Function);
+        putDirectNativeFunction(vm, this, Identifier(&vm, "OSRExit"), 0, functionUndefined1, OSRExitIntrinsic, DontEnum | JSC::Function);
+        putDirectNativeFunction(vm, this, Identifier(&vm, "isFinalTier"), 0, functionFalse2, IsFinalTierIntrinsic, DontEnum | JSC::Function);
+        putDirectNativeFunction(vm, this, Identifier(&vm, "predictInt32"), 0, functionUndefined2, SetInt32HeapPredictionIntrinsic, DontEnum | JSC::Function);
+        putDirectNativeFunction(vm, this, Identifier(&vm, "fiatInt52"), 0, functionIdentity, FiatInt52Intrinsic, DontEnum | JSC::Function);
+        
+        addFunction(vm, "effectful42", functionEffectful42, 0);
+        addFunction(vm, "makeMasquerader", functionMakeMasquerader, 0);
+        addFunction(vm, "hasCustomProperties", functionHasCustomProperties, 0);
+
+        addFunction(vm, "createProxy", functionCreateProxy, 1);
+        addFunction(vm, "createRuntimeArray", functionCreateRuntimeArray, 0);
+
+        addFunction(vm, "createImpureGetter", functionCreateImpureGetter, 1);
+        addFunction(vm, "setImpureGetterDelegate", functionSetImpureGetterDelegate, 2);
+        addFunction(vm, "dumpTypesForAllVariables", functionDumpTypesForAllVariables , 4);
         
         JSArray* array = constructEmptyArray(globalExec(), 0);
         for (size_t i = 0; i < arguments.size(); ++i)
             array->putDirectIndex(globalExec(), i, jsString(globalExec(), arguments[i]));
         putDirect(vm, Identifier(globalExec(), "arguments"), array);
+        
+        putDirect(vm, Identifier(globalExec(), "console"), jsUndefined());
     }
 
     void addFunction(VM& vm, const char* name, NativeFunction function, unsigned arguments)
@@ -259,7 +650,7 @@ protected:
     }
 };
 
-const ClassInfo GlobalObject::s_info = { "global", &JSGlobalObject::s_info, 0, ExecState::globalObjectTable, CREATE_METHOD_TABLE(GlobalObject) };
+const ClassInfo GlobalObject::s_info = { "global", &JSGlobalObject::s_info, &globalObjectTable, CREATE_METHOD_TABLE(GlobalObject) };
 const GlobalObjectMethodTable GlobalObject::s_globalObjectMethodTable = { &allowsAccessFrom, &supportsProfiling, &supportsRichSourceInfo, &shouldInterruptScript, &javaScriptExperimentsEnabled, 0, &shouldInterruptScriptBeforeTimeout };
 
 
@@ -270,20 +661,7 @@ GlobalObject::GlobalObject(VM& vm, Structure* structure)
 
 static inline String stringFromUTF(const char* utf8)
 {
-    // Find the the first non-ascii character, or nul.
-    const char* pos = utf8;
-    while (*pos > 0)
-        pos++;
-    size_t asciiLength = pos - utf8;
-    
-    // Fast case - string is all ascii.
-    if (!*pos)
-        return String(utf8, asciiLength);
-    
-    // Slow case - contains non-ascii characters, use fromUTF8WithLatin1Fallback.
-    ASSERT(*pos < 0);
-    ASSERT(strlen(utf8) == asciiLength + strlen(pos));
-    return String::fromUTF8WithLatin1Fallback(utf8, asciiLength + strlen(pos));
+    return String::fromUTF8WithLatin1Fallback(utf8, strlen(utf8));
 }
 
 static inline SourceCode jscSource(const char* utf8, const String& filename)
@@ -323,8 +701,19 @@ EncodedJSValue JSC_HOST_CALL functionDebug(ExecState* exec)
 
 EncodedJSValue JSC_HOST_CALL functionDescribe(ExecState* exec)
 {
-    fprintf(stderr, "--> %s\n", toCString(exec->argument(0)).data());
-    return JSValue::encode(jsUndefined());
+    if (exec->argumentCount() < 1)
+        return JSValue::encode(jsUndefined());
+    return JSValue::encode(jsString(exec, toString(exec->argument(0))));
+}
+
+EncodedJSValue JSC_HOST_CALL functionDescribeArray(ExecState* exec)
+{
+    if (exec->argumentCount() < 1)
+        return JSValue::encode(jsUndefined());
+    JSObject* object = jsDynamicCast<JSObject*>(exec->argument(0));
+    if (!object)
+        return JSValue::encode(jsString(exec, "<not object>"));
+    return JSValue::encode(jsString(exec, toString("<Public length: ", object->getArrayLength(), "; vector length: ", object->getVectorLength(), ">")));
 }
 
 class FunctionJSCStackFunctor {
@@ -355,10 +744,105 @@ EncodedJSValue JSC_HOST_CALL functionJSCStack(ExecState* exec)
     return JSValue::encode(jsUndefined());
 }
 
-EncodedJSValue JSC_HOST_CALL functionGC(ExecState* exec)
+EncodedJSValue JSC_HOST_CALL functionCreateRoot(ExecState* exec)
+{
+    JSLockHolder lock(exec);
+    return JSValue::encode(Root::create(exec->vm(), exec->lexicalGlobalObject()));
+}
+
+EncodedJSValue JSC_HOST_CALL functionCreateElement(ExecState* exec)
+{
+    JSLockHolder lock(exec);
+    JSValue arg = exec->argument(0);
+    return JSValue::encode(Element::create(exec->vm(), exec->lexicalGlobalObject(), arg.isNull() ? nullptr : jsCast<Root*>(exec->argument(0))));
+}
+
+EncodedJSValue JSC_HOST_CALL functionGetElement(ExecState* exec)
+{
+    JSLockHolder lock(exec);
+    Element* result = jsCast<Root*>(exec->argument(0).asCell())->element();
+    return JSValue::encode(result ? result : jsUndefined());
+}
+
+EncodedJSValue JSC_HOST_CALL functionSetElementRoot(ExecState* exec)
+{
+    JSLockHolder lock(exec);
+    Element* element = jsCast<Element*>(exec->argument(0));
+    Root* root = jsCast<Root*>(exec->argument(1));
+    element->setRoot(root);
+    return JSValue::encode(jsUndefined());
+}
+
+EncodedJSValue JSC_HOST_CALL functionCreateProxy(ExecState* exec)
+{
+    JSLockHolder lock(exec);
+    JSValue target = exec->argument(0);
+    if (!target.isObject())
+        return JSValue::encode(jsUndefined());
+    JSObject* jsTarget = asObject(target.asCell());
+    Structure* structure = JSProxy::createStructure(exec->vm(), exec->lexicalGlobalObject(), jsTarget->prototype());
+    JSProxy* proxy = JSProxy::create(exec->vm(), structure, jsTarget);
+    return JSValue::encode(proxy);
+}
+
+EncodedJSValue JSC_HOST_CALL functionCreateRuntimeArray(ExecState* exec)
+{
+    JSLockHolder lock(exec);
+    RuntimeArray* array = RuntimeArray::create(exec);
+    return JSValue::encode(array);
+}
+
+EncodedJSValue JSC_HOST_CALL functionCreateImpureGetter(ExecState* exec)
+{
+    JSLockHolder lock(exec);
+    JSValue target = exec->argument(0);
+    JSObject* delegate = nullptr;
+    if (target.isObject())
+        delegate = asObject(target.asCell());
+    Structure* structure = ImpureGetter::createStructure(exec->vm(), exec->lexicalGlobalObject(), jsNull());
+    ImpureGetter* result = ImpureGetter::create(exec->vm(), structure, delegate);
+    return JSValue::encode(result);
+}
+
+EncodedJSValue JSC_HOST_CALL functionSetImpureGetterDelegate(ExecState* exec)
+{
+    JSLockHolder lock(exec);
+    JSValue base = exec->argument(0);
+    if (!base.isObject())
+        return JSValue::encode(jsUndefined());
+    JSValue delegate = exec->argument(1);
+    if (!delegate.isObject())
+        return JSValue::encode(jsUndefined());
+    ImpureGetter* impureGetter = jsCast<ImpureGetter*>(asObject(base.asCell()));
+    impureGetter->setDelegate(exec->vm(), asObject(delegate.asCell()));
+    return JSValue::encode(jsUndefined());
+}
+
+EncodedJSValue JSC_HOST_CALL functionGCAndSweep(ExecState* exec)
 {
     JSLockHolder lock(exec);
     exec->heap()->collectAllGarbage();
+    return JSValue::encode(jsUndefined());
+}
+
+EncodedJSValue JSC_HOST_CALL functionFullGC(ExecState* exec)
+{
+    JSLockHolder lock(exec);
+    exec->heap()->collect(FullCollection);
+    return JSValue::encode(jsUndefined());
+}
+
+EncodedJSValue JSC_HOST_CALL functionEdenGC(ExecState* exec)
+{
+    JSLockHolder lock(exec);
+    exec->heap()->collect(EdenCollection);
+    return JSValue::encode(jsUndefined());
+}
+
+EncodedJSValue JSC_HOST_CALL functionDeleteAllCompiledCode(ExecState* exec)
+{
+    JSLockHolder lock(exec);
+    exec->heap()->deleteAllCompiledCode();
     return JSValue::encode(jsUndefined());
 }
 
@@ -500,9 +984,26 @@ EncodedJSValue JSC_HOST_CALL functionNeverInlineFunction(ExecState* exec)
     return JSValue::encode(setNeverInline(exec));
 }
 
+EncodedJSValue JSC_HOST_CALL functionOptimizeNextInvocation(ExecState* exec)
+{
+    return JSValue::encode(optimizeNextInvocation(exec));
+}
+
 EncodedJSValue JSC_HOST_CALL functionNumberOfDFGCompiles(ExecState* exec)
 {
     return JSValue::encode(numberOfDFGCompiles(exec));
+}
+
+EncodedJSValue JSC_HOST_CALL functionReoptimizationRetryCount(ExecState* exec)
+{
+    if (exec->argumentCount() < 1)
+        return JSValue::encode(jsUndefined());
+    
+    CodeBlock* block = getSomeBaselineCodeBlockForFunction(exec->argument(0));
+    if (!block)
+        return JSValue::encode(jsNumber(0));
+    
+    return JSValue::encode(jsNumber(block->reoptimizationRetryCounter()));
 }
 
 EncodedJSValue JSC_HOST_CALL functionTransferArrayBuffer(ExecState* exec)
@@ -522,12 +1023,44 @@ EncodedJSValue JSC_HOST_CALL functionTransferArrayBuffer(ExecState* exec)
 
 EncodedJSValue JSC_HOST_CALL functionQuit(ExecState*)
 {
-    exit(EXIT_SUCCESS);
+    jscExit(EXIT_SUCCESS);
 
-#if COMPILER(MSVC) && OS(WINCE)
+#if COMPILER(MSVC)
     // Without this, Visual Studio will complain that this method does not return a value.
     return JSValue::encode(jsUndefined());
 #endif
+}
+
+EncodedJSValue JSC_HOST_CALL functionFalse1(ExecState*) { return JSValue::encode(jsBoolean(false)); }
+EncodedJSValue JSC_HOST_CALL functionFalse2(ExecState*) { return JSValue::encode(jsBoolean(false)); }
+
+EncodedJSValue JSC_HOST_CALL functionUndefined1(ExecState*) { return JSValue::encode(jsUndefined()); }
+EncodedJSValue JSC_HOST_CALL functionUndefined2(ExecState*) { return JSValue::encode(jsUndefined()); }
+
+EncodedJSValue JSC_HOST_CALL functionIdentity(ExecState* exec) { return JSValue::encode(exec->argument(0)); }
+
+EncodedJSValue JSC_HOST_CALL functionEffectful42(ExecState*)
+{
+    return JSValue::encode(jsNumber(42));
+}
+
+EncodedJSValue JSC_HOST_CALL functionMakeMasquerader(ExecState* exec)
+{
+    return JSValue::encode(Masquerader::create(exec->vm(), exec->lexicalGlobalObject()));
+}
+
+EncodedJSValue JSC_HOST_CALL functionHasCustomProperties(ExecState* exec)
+{
+    JSValue value = exec->argument(0);
+    if (value.isObject())
+        return JSValue::encode(jsBoolean(asObject(value)->hasCustomProperties()));
+    return JSValue::encode(jsBoolean(false));
+}
+
+EncodedJSValue JSC_HOST_CALL functionDumpTypesForAllVariables(ExecState* exec)
+{
+    exec->vm().dumpHighFidelityProfilingTypes();
+    return JSValue::encode(jsUndefined());
 }
 
 // Use SEH for Release builds only to get rid of the crash report dialog
@@ -624,7 +1157,7 @@ int main(int argc, char** argv)
     ecore_shutdown();
 #endif
 
-    return res;
+    jscExit(res);
 }
 
 static bool runWithScripts(GlobalObject* globalObject, const Vector<Script>& scripts, bool dump)
@@ -768,7 +1301,7 @@ static NO_RETURN void printUsageStatement(bool help = false)
     fprintf(stderr, "  --<jsc VM option>=<value>  Sets the specified JSC VM option\n");
     fprintf(stderr, "\n");
 
-    exit(help ? EXIT_SUCCESS : EXIT_FAILURE);
+    jscExit(help ? EXIT_SUCCESS : EXIT_FAILURE);
 }
 
 void CommandLine::parseArguments(int argc, char** argv)
@@ -857,7 +1390,7 @@ void CommandLine::parseArguments(int argc, char** argv)
     if (needToDumpOptions)
         JSC::Options::dumpAllOptions(stderr);
     if (needToExit)
-        exit(EXIT_SUCCESS);
+        jscExit(EXIT_SUCCESS);
 }
 
 int jscmain(int argc, char** argv)
@@ -868,7 +1401,7 @@ int jscmain(int argc, char** argv)
     VM* vm = VM::create(LargeHeap).leakRef();
     int result;
     {
-        APIEntryShim shim(vm);
+        JSLockHolder locker(vm);
 
         if (options.m_profile && !vm->m_perBytecodeProfiler)
             vm->m_perBytecodeProfiler = adoptPtr(new Profiler::Database(*vm));
@@ -887,6 +1420,11 @@ int jscmain(int argc, char** argv)
             if (!vm->m_perBytecodeProfiler->save(options.m_profilerOutput.utf8().data()))
                 fprintf(stderr, "could not save profiler output.\n");
         }
+        
+#if ENABLE(JIT)
+        if (Options::enableExceptionFuzz())
+            printf("JSC EXCEPTION FUZZ: encountered %u checks.\n", numberOfExceptionFuzzChecks());
+#endif
     }
     
     return result;

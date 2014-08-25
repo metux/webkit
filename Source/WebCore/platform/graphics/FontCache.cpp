@@ -11,7 +11,7 @@
  * 2.  Redistributions in binary form must reproduce the above copyright
  *     notice, this list of conditions and the following disclaimer in the
  *     documentation and/or other materials provided with the distribution. 
- * 3.  Neither the name of Apple Computer, Inc. ("Apple") nor the names of
+ * 3.  Neither the name of Apple Inc. ("Apple") nor the names of
  *     its contributors may be used to endorse or promote products derived
  *     from this software without specific prior written permission. 
  *
@@ -34,9 +34,11 @@
 #include "FontGlyphs.h"
 #include "FontPlatformData.h"
 #include "FontSelector.h"
+#include "MemoryPressureHandler.h"
 #include "WebKitFontFamilyNames.h"
 #include <wtf/HashMap.h>
 #include <wtf/ListHashSet.h>
+#include <wtf/NeverDestroyed.h>
 #include <wtf/StdLibExtras.h>
 #include <wtf/text/AtomicStringHash.h>
 #include <wtf/text/StringHash.h>
@@ -46,7 +48,6 @@
 #endif
 
 #if PLATFORM(IOS)
-#include "MemoryPressureHandler.h"
 #include <wtf/Noncopyable.h>
 
 // FIXME: We may be able to simplify this code using C++11 threading primitives, including std::call_once().
@@ -84,11 +85,10 @@ using namespace WTF;
 
 namespace WebCore {
 
-// FIXME: We should return a reference instead of a pointer since we never return a nullptr.
-FontCache* fontCache()
+FontCache& fontCache()
 {
-    DEFINE_STATIC_LOCAL(FontCache, globalFontCache, ());
-    return &globalFontCache;
+    static NeverDestroyed<FontCache> globalFontCache;
+    return globalFontCache.get();
 }
 
 FontCache::FontCache()
@@ -285,7 +285,7 @@ struct FontVerticalDataCacheKeyTraits : WTF::GenericHashTraits<FontCache::FontFi
     static const bool needsDestruction = true;
     static const FontCache::FontFileKey& emptyValue()
     {
-        DEFINE_STATIC_LOCAL(FontCache::FontFileKey, key, (nullAtom));
+        static NeverDestroyed<FontCache::FontFileKey> key = nullAtom;
         return key;
     }
     static void constructDeletedValue(FontCache::FontFileKey& slot)
@@ -302,7 +302,7 @@ typedef HashMap<FontCache::FontFileKey, RefPtr<OpenTypeVerticalData>, FontVertic
 
 FontVerticalDataCache& fontVerticalDataCacheInstance()
 {
-    DEFINE_STATIC_LOCAL(FontVerticalDataCache, fontVerticalDataCache, ());
+    static NeverDestroyed<FontVerticalDataCache> fontVerticalDataCache;
     return fontVerticalDataCache;
 }
 
@@ -340,7 +340,7 @@ struct FontDataCacheKeyTraits : WTF::GenericHashTraits<FontPlatformData> {
     static const bool needsDestruction = true;
     static const FontPlatformData& emptyValue()
     {
-        DEFINE_STATIC_LOCAL(FontPlatformData, key, (0.f, false, false));
+        static NeverDestroyed<FontPlatformData> key(0.f, false, false);
         return key;
     }
     static void constructDeletedValue(FontPlatformData& slot)
@@ -360,12 +360,14 @@ static FontDataCache* gFontDataCache = 0;
 #if PLATFORM(IOS)
 const int cMaxInactiveFontData = 120;
 const int cTargetInactiveFontData = 100;
-const int cMaxUnderMemoryPressureInactiveFontData = 50;
-const int cTargetUnderMemoryPressureInactiveFontData = 30;
 #else
 const int cMaxInactiveFontData = 225;
 const int cTargetInactiveFontData = 200;
 #endif
+
+const int cMaxUnderMemoryPressureInactiveFontData = 50;
+const int cTargetUnderMemoryPressureInactiveFontData = 30;
+
 static ListHashSet<RefPtr<SimpleFontData>>* gInactiveFontData = 0;
 
 PassRefPtr<SimpleFontData> FontCache::getCachedFontData(const FontDescription& fontDescription, const AtomicString& family, bool checkingAlternateName, ShouldRetain shouldRetain)
@@ -447,17 +449,12 @@ void FontCache::releaseFontData(const SimpleFontData* fontData)
 
 void FontCache::purgeInactiveFontDataIfNeeded()
 {
-#if PLATFORM(IOS)
-    bool underMemoryPressure = memoryPressureHandler().hasReceivedMemoryPressure();
+    bool underMemoryPressure = memoryPressureHandler().isUnderMemoryPressure();
     int inactiveFontDataLimit = underMemoryPressure ? cMaxUnderMemoryPressureInactiveFontData : cMaxInactiveFontData;
     int targetFontDataLimit = underMemoryPressure ? cTargetUnderMemoryPressureInactiveFontData : cTargetInactiveFontData;
 
     if (gInactiveFontData && !m_purgePreventCount && gInactiveFontData->size() > inactiveFontDataLimit)
         purgeInactiveFontData(gInactiveFontData->size() - targetFontDataLimit);
-#else
-    if (gInactiveFontData && !m_purgePreventCount && gInactiveFontData->size() > cMaxInactiveFontData)
-        purgeInactiveFontData(gInactiveFontData->size() - cTargetInactiveFontData);
-#endif
 }
 
 void FontCache::purgeInactiveFontData(int count)
@@ -573,7 +570,7 @@ PassRefPtr<FontData> FontCache::getFontData(const FontDescription& description, 
     if (familyIndex == familyCount)
         familyIndex = cAllFamiliesScanned;
 
-#if PLATFORM(MAC)
+#if PLATFORM(COCOA)
     if (!result) {
         // We didn't find a font. Try to find a similar font using our own specific knowledge about our platform.
         // For example on OS X, we know to map any families containing the words Arabic, Pashto, or Urdu to the

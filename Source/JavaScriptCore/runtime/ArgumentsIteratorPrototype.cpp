@@ -27,10 +27,11 @@
 #include "ArgumentsIteratorPrototype.h"
 
 #include "JSArgumentsIterator.h"
+#include "JSCInlines.h"
 
 namespace JSC {
 
-const ClassInfo ArgumentsIteratorPrototype::s_info = { "ArgumentsIterator", &Base::s_info, 0, 0, CREATE_METHOD_TABLE(ArgumentsIteratorPrototype) };
+const ClassInfo ArgumentsIteratorPrototype::s_info = { "ArgumentsIterator", &Base::s_info, 0, CREATE_METHOD_TABLE(ArgumentsIteratorPrototype) };
 
 static EncodedJSValue JSC_HOST_CALL argumentsIteratorPrototypeFuncIterator(ExecState*);
 static EncodedJSValue JSC_HOST_CALL argumentsIteratorPrototypeFuncNext(ExecState*);

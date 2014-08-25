@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005, 2006, 2007 Apple Inc.  All rights reserved.
+ * Copyright (C) 2005, 2006, 2007, 2014 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -10,7 +10,7 @@
  * 2.  Redistributions in binary form must reproduce the above copyright
  *     notice, this list of conditions and the following disclaimer in the
  *     documentation and/or other materials provided with the distribution. 
- * 3.  Neither the name of Apple Computer, Inc. ("Apple") nor the names of
+ * 3.  Neither the name of Apple Inc. ("Apple") nor the names of
  *     its contributors may be used to endorse or promote products derived
  *     from this software without specific prior written permission. 
  *
@@ -34,6 +34,7 @@
 #include "TextRun.h"
 #include <wtf/Assertions.h>
 #include <wtf/Vector.h>
+#include <wtf/text/StringView.h>
 #include <wtf/unicode/CharacterNames.h>
 
 namespace WebCore {
@@ -69,6 +70,8 @@ static unsigned centerTruncateToBuffer(const String& string, unsigned length, un
 
 #if PLATFORM(IOS)
     // FIXME: We should guard this code behind an editing behavior. Then we can remove the PLATFORM(IOS)-guard.
+    // Or just turn it on for all platforms. It seems like good behavior everywhere. Might be better to generalize
+    // it to handle all whitespace, not just "space".
 
     // Strip single character before ellipsis character, when that character is preceded by a space
     if (omitStart > 1 && string[omitStart - 1] != space && omitStart > 2 && string[omitStart - 2] == space)
@@ -86,15 +89,13 @@ static unsigned centerTruncateToBuffer(const String& string, unsigned length, un
         ++omitEnd;
 #endif
 
-    unsigned truncatedLength = shouldInsertEllipsis ? omitStart + 1 + (length - omitEnd) : length - (omitEnd - omitStart);
+    unsigned truncatedLength = omitStart + shouldInsertEllipsis + (length - omitEnd);
     ASSERT(truncatedLength <= length);
 
-    memcpy(buffer, string.deprecatedCharacters(), sizeof(UChar) * omitStart);
-    if (shouldInsertEllipsis) {
-        buffer[omitStart] = horizontalEllipsis;
-        memcpy(&buffer[omitStart + 1], &string.deprecatedCharacters()[omitEnd], sizeof(UChar) * (length - omitEnd));
-    } else
-        memcpy(&buffer[omitStart], &string.deprecatedCharacters()[omitEnd], sizeof(UChar) * (length - omitEnd));
+    StringView(string).substring(0, omitStart).getCharactersWithUpconvert(buffer);
+    if (shouldInsertEllipsis)
+        buffer[omitStart++] = horizontalEllipsis;
+    StringView(string).substring(omitEnd, length - omitEnd).getCharactersWithUpconvert(&buffer[omitStart]);
     return truncatedLength;
 }
 
@@ -105,6 +106,8 @@ static unsigned rightTruncateToBuffer(const String& string, unsigned length, uns
 
 #if PLATFORM(IOS)
     // FIXME: We should guard this code behind an editing behavior. Then we can remove the PLATFORM(IOS)-guard.
+    // Or just turn it on for all platforms. It seems like good behavior everywhere. Might be better to generalize
+    // it to handle all whitespace, not just "space".
 
     // Strip single character before ellipsis character, when that character is preceded by a space
     if (keepCount > 1 && string[keepCount - 1] != space && keepCount > 2 && string[keepCount - 2] == space)
@@ -119,7 +122,7 @@ static unsigned rightTruncateToBuffer(const String& string, unsigned length, uns
     unsigned keepLength = textBreakAtOrPreceding(it, keepCount);
     unsigned truncatedLength = shouldInsertEllipsis ? keepLength + 1 : keepLength;
 
-    memcpy(buffer, string.deprecatedCharacters(), sizeof(UChar) * keepLength);
+    StringView(string).substring(0, keepLength).getCharactersWithUpconvert(buffer);
     if (shouldInsertEllipsis)
         buffer[keepLength] = horizontalEllipsis;
 
@@ -133,7 +136,7 @@ static unsigned rightClipToCharacterBuffer(const String& string, unsigned length
 
     NonSharedCharacterBreakIterator it(StringView(string).substring(0, length));
     unsigned keepLength = textBreakAtOrPreceding(it, keepCount);
-    memcpy(buffer, string.deprecatedCharacters(), sizeof(UChar) * keepLength);
+    StringView(string).substring(0, keepLength).getCharactersWithUpconvert(buffer);
 
     return keepLength;
 }
@@ -145,14 +148,18 @@ static unsigned rightClipToWordBuffer(const String& string, unsigned length, uns
 
     TextBreakIterator* it = wordBreakIterator(StringView(string).substring(0, length));
     unsigned keepLength = textBreakAtOrPreceding(it, keepCount);
-    memcpy(buffer, string.deprecatedCharacters(), sizeof(UChar) * keepLength);
+    StringView(string).substring(0, keepLength).getCharactersWithUpconvert(buffer);
 
 #if PLATFORM(IOS)
     // FIXME: We should guard this code behind an editing behavior. Then we can remove the PLATFORM(IOS)-guard.
+    // Or just turn it on for all platforms. It seems like good behavior everywhere. Might be better to generalize
+    // it to handle all whitespace, not just "space".
+
     // Motivated by <rdar://problem/7439327> truncation should not include a trailing space
-    while ((keepLength > 0) && (string[keepLength - 1] == space))
+    while (keepLength && string[keepLength - 1] == space)
         --keepLength;
 #endif
+
     return keepLength;
 }
 
@@ -178,10 +185,10 @@ static unsigned leftTruncateToBuffer(const String& string, unsigned length, unsi
 
     if (shouldInsertEllipsis) {
         buffer[0] = horizontalEllipsis;
-        memcpy(&buffer[1], &string.deprecatedCharacters()[adjustedStartIndex], sizeof(UChar) * (length - adjustedStartIndex + 1));
+        StringView(string).substring(adjustedStartIndex, length - adjustedStartIndex + 1).getCharactersWithUpconvert(&buffer[1]);
         return length - adjustedStartIndex + 1;
     }
-    memcpy(&buffer[0], &string.deprecatedCharacters()[adjustedStartIndex], sizeof(UChar) * (length - adjustedStartIndex + 1));
+    StringView(string).substring(adjustedStartIndex, length - adjustedStartIndex + 1).getCharactersWithUpconvert(&buffer[0]);
     return length - adjustedStartIndex;
 }
 
@@ -218,7 +225,7 @@ static String truncateString(const String& string, float maxWidth, const Font& f
         truncatedLength = centerTruncateToBuffer(string, length, keepCount, stringBuffer, shouldInsertEllipsis);
     } else {
         keepCount = length;
-        memcpy(stringBuffer, string.deprecatedCharacters(), sizeof(UChar) * length);
+        StringView(string).getCharactersWithUpconvert(stringBuffer);
         truncatedLength = length;
     }
 
@@ -250,11 +257,10 @@ static String truncateString(const String& string, float maxWidth, const Font& f
             / (widthForSmallestKnownToNotFit - widthForLargestKnownToFit);
         keepCount = static_cast<unsigned>(maxWidth * ratio);
         
-        if (keepCount <= keepCountForLargestKnownToFit) {
+        if (keepCount <= keepCountForLargestKnownToFit)
             keepCount = keepCountForLargestKnownToFit + 1;
-        } else if (keepCount >= keepCountForSmallestKnownToNotFit) {
+        else if (keepCount >= keepCountForSmallestKnownToNotFit)
             keepCount = keepCountForSmallestKnownToNotFit - 1;
-        }
         
         ASSERT_WITH_SECURITY_IMPLICATION(keepCount < length);
         ASSERT(keepCount > 0);
@@ -301,7 +307,7 @@ String StringTruncator::rightTruncate(const String& string, float maxWidth, cons
 
 float StringTruncator::width(const String& string, const Font& font, EnableRoundingHacksOrNot enableRoundingHacks)
 {
-    return stringWidth(font, string.deprecatedCharacters(), string.length(), !enableRoundingHacks);
+    return stringWidth(font, StringView(string).upconvertedCharacters(), string.length(), !enableRoundingHacks);
 }
 
 String StringTruncator::centerTruncate(const String& string, float maxWidth, const Font& font, EnableRoundingHacksOrNot enableRoundingHacks, float& resultWidth, bool shouldInsertEllipsis, float customTruncationElementWidth)

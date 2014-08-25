@@ -10,10 +10,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -38,6 +38,7 @@
 #include "SourceBufferPrivateClient.h"
 #include <map>
 #include <runtime/ArrayBuffer.h>
+#include <wtf/PrintStream.h>
 
 namespace WebCore {
 
@@ -46,20 +47,24 @@ public:
     static RefPtr<MockMediaSample> create(const MockSampleBox& box) { return adoptRef(new MockMediaSample(box)); }
     virtual ~MockMediaSample() { }
 
-    virtual MediaTime presentationTime() const override { return m_box.presentationTimestamp(); }
-    virtual MediaTime decodeTime() const override { return m_box.decodeTimestamp(); }
-    virtual MediaTime duration() const override { return m_box.duration(); }
-    virtual AtomicString trackID() const override { return m_id; }
-
-    virtual SampleFlags flags() const override;
-    virtual PlatformSample platformSample() override;
-
-protected:
+private:
     MockMediaSample(const MockSampleBox& box)
         : m_box(box)
         , m_id(String::format("%d", box.trackID()))
     {
     }
+
+    virtual MediaTime presentationTime() const override { return m_box.presentationTimestamp(); }
+    virtual MediaTime decodeTime() const override { return m_box.decodeTimestamp(); }
+    virtual MediaTime duration() const override { return m_box.duration(); }
+    virtual AtomicString trackID() const override { return m_id; }
+    virtual size_t sizeInBytes() const override { return sizeof(m_box); }
+    virtual SampleFlags flags() const override;
+    virtual PlatformSample platformSample() override;
+    virtual FloatSize presentationSize() const override { return FloatSize(); }
+    virtual void dump(PrintStream&) const override;
+
+    unsigned generation() const { return m_box.generation(); }
 
     MockSampleBox m_box;
     AtomicString m_id;
@@ -77,6 +82,11 @@ PlatformSample MockMediaSample::platformSample()
 {
     PlatformSample sample = { PlatformSample::MockSampleBoxType, { &m_box } };
     return sample;
+}
+
+void MockMediaSample::dump(PrintStream& out) const
+{
+    out.print("{PTS(", presentationTime(), "), DTS(", decodeTime(), "), duration(", duration(), "), flags(", (int)flags(), "), generation(", generation(), ")}");
 }
 
 class MockMediaDescription final : public MediaDescription {
@@ -114,12 +124,12 @@ void MockSourceBufferPrivate::setClient(SourceBufferPrivateClient* client)
     m_client = client;
 }
 
-SourceBufferPrivate::AppendResult MockSourceBufferPrivate::append(const unsigned char* data, unsigned length)
+void MockSourceBufferPrivate::append(const unsigned char* data, unsigned length)
 {
     m_inputBuffer.append(data, length);
-    AppendResult result = AppendSucceeded;
+    SourceBufferPrivateClient::AppendResult result = SourceBufferPrivateClient::AppendSucceeded;
 
-    while (m_inputBuffer.size() && result == AppendSucceeded) {
+    while (m_inputBuffer.size() && result == SourceBufferPrivateClient::AppendSucceeded) {
         RefPtr<ArrayBuffer> buffer = ArrayBuffer::create(m_inputBuffer.data(), m_inputBuffer.size());
         size_t boxLength = MockBox::peekLength(buffer.get());
         if (boxLength > buffer->byteLength())
@@ -133,12 +143,13 @@ SourceBufferPrivate::AppendResult MockSourceBufferPrivate::append(const unsigned
             MockSampleBox sampleBox = MockSampleBox(buffer.get());
             didReceiveSample(sampleBox);
         } else
-            result = ParsingFailed;
+            result = SourceBufferPrivateClient::ParsingFailed;
 
         m_inputBuffer.remove(0, boxLength);
     }
 
-    return result;
+    if (m_client)
+        m_client->sourceBufferPrivateAppendComplete(this, result);
 }
 
 void MockSourceBufferPrivate::didReceiveInitializationSegment(const MockInitializationBox& initBox)

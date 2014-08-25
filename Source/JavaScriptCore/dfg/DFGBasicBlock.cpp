@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013 Apple Inc. All rights reserved.
+ * Copyright (C) 2013, 2014 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -28,11 +28,12 @@
 
 #if ENABLE(DFG_JIT)
 
-#include "Operations.h"
+#include "JSCInlines.h"
 
 namespace JSC { namespace DFG {
 
-BasicBlock::BasicBlock(unsigned bytecodeBegin, unsigned numArguments, unsigned numLocals)
+BasicBlock::BasicBlock(
+    unsigned bytecodeBegin, unsigned numArguments, unsigned numLocals, float executionCount)
     : bytecodeBegin(bytecodeBegin)
     , index(NoBlock)
     , isOSRTarget(false)
@@ -40,6 +41,8 @@ BasicBlock::BasicBlock(unsigned bytecodeBegin, unsigned numArguments, unsigned n
     , cfaShouldRevisit(false)
     , cfaFoundConstants(false)
     , cfaDidFinish(true)
+    , cfaStructureClobberStateAtHead(StructuresAreWatched)
+    , cfaStructureClobberStateAtTail(StructuresAreWatched)
     , cfaBranchDirection(InvalidBranchDirection)
 #if !ASSERT_DISABLED
     , isLinked(false)
@@ -49,6 +52,9 @@ BasicBlock::BasicBlock(unsigned bytecodeBegin, unsigned numArguments, unsigned n
     , variablesAtTail(numArguments, numLocals)
     , valuesAtHead(numArguments, numLocals)
     , valuesAtTail(numArguments, numLocals)
+    , intersectionOfPastValuesAtHead(numArguments, numLocals, AbstractValue::fullTop())
+    , intersectionOfCFAHasVisited(true)
+    , executionCount(executionCount)
 {
 }
 
@@ -60,6 +66,7 @@ void BasicBlock::ensureLocals(unsigned newNumLocals)
     variablesAtTail.ensureLocals(newNumLocals);
     valuesAtHead.ensureLocals(newNumLocals);
     valuesAtTail.ensureLocals(newNumLocals);
+    intersectionOfPastValuesAtHead.ensureLocals(newNumLocals, AbstractValue::fullTop());
 }
 
 bool BasicBlock::isInPhis(Node* node) const
@@ -109,9 +116,7 @@ void BasicBlock::dump(PrintStream& out) const
 }
 
 BasicBlock::SSAData::SSAData(BasicBlock* block)
-    : flushAtHead(OperandsLike, block->variablesAtHead)
-    , flushAtTail(OperandsLike, block->variablesAtHead)
-    , availabilityAtHead(OperandsLike, block->variablesAtHead)
+    : availabilityAtHead(OperandsLike, block->variablesAtHead)
     , availabilityAtTail(OperandsLike, block->variablesAtHead)
 {
 }

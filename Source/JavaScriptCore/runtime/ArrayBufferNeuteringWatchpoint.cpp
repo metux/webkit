@@ -26,12 +26,12 @@
 #include "config.h"
 #include "ArrayBufferNeuteringWatchpoint.h"
 
-#include "Operations.h"
+#include "JSCInlines.h"
 
 namespace JSC {
 
 const ClassInfo ArrayBufferNeuteringWatchpoint::s_info = {
-    "ArrayBufferNeuteringWatchpoint", 0, 0, 0,
+    "ArrayBufferNeuteringWatchpoint", 0, 0,
     CREATE_METHOD_TABLE(ArrayBufferNeuteringWatchpoint)
 };
 
@@ -57,7 +57,12 @@ ArrayBufferNeuteringWatchpoint* ArrayBufferNeuteringWatchpoint::create(VM& vm)
 
 Structure* ArrayBufferNeuteringWatchpoint::createStructure(VM& vm)
 {
-    return Structure::create(vm, 0, jsNull(), TypeInfo(CompoundType, StructureFlags), info());
+    return Structure::create(vm, 0, jsNull(), TypeInfo(CellType, StructureFlags), info());
+}
+
+void ArrayBufferNeuteringWatchpoint::fireAll()
+{
+    set()->fireAll("Array buffer was neutered");
 }
 
 } // namespace JSC

@@ -26,6 +26,7 @@
 #ifndef ASTBuilder_h
 #define ASTBuilder_h
 
+#include "BuiltinNames.h"
 #include "NodeConstructors.h"
 #include "SyntaxChecker.h"
 #include <utility>
@@ -405,6 +406,11 @@ public:
         return result;
     }
 
+    bool isBindingNode(const DeconstructionPattern& pattern)
+    {
+        return pattern->isBindingNode();
+    }
+
     StatementNode* createEmptyStatement(const JSTokenLocation& location) { return new (m_vm) EmptyStatementNode(location); }
 
     StatementNode* createVarStatement(const JSTokenLocation& location, ExpressionNode* expr, int start, int end)
@@ -543,7 +549,7 @@ public:
     {
         if (m_vm->propertyNames->arguments == *ident)
             usesArguments();
-        ASSERT(ident->impl()->isIdentifier());
+        ASSERT(ident->impl()->isAtomic());
         m_scope.m_varDeclarations->data.append(std::make_pair(*ident, attrs));
     }
 
@@ -888,9 +894,9 @@ ExpressionNode* ASTBuilder::makeFunctionCallNode(const JSTokenLocation& location
     ASSERT(func->isDotAccessorNode());
     DotAccessorNode* dot = static_cast<DotAccessorNode*>(func);
     FunctionCallDotNode* node;
-    if (dot->identifier() == m_vm->propertyNames->call)
+    if (dot->identifier() == m_vm->propertyNames->builtinNames().callPublicName() || dot->identifier() == m_vm->propertyNames->builtinNames().callPrivateName())
         node = new (m_vm) CallFunctionCallDotNode(location, dot->base(), dot->identifier(), args, divot, divotStart, divotEnd);
-    else if (dot->identifier() == m_vm->propertyNames->apply)
+    else if (dot->identifier() == m_vm->propertyNames->builtinNames().applyPublicName() || dot->identifier() == m_vm->propertyNames->builtinNames().applyPrivateName())
         node = new (m_vm) ApplyFunctionCallDotNode(location, dot->base(), dot->identifier(), args, divot, divotStart, divotEnd);
     else
         node = new (m_vm) FunctionCallDotNode(location, dot->base(), dot->identifier(), args, divot, divotStart, divotEnd);

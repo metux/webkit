@@ -31,7 +31,6 @@
 #include "MessageReceiver.h"
 #include "WKOriginDataManager.h"
 #include "WebContextSupplement.h"
-#include "WebOriginDataManagerProxyChangeClient.h"
 #include <wtf/PassRefPtr.h>
 #include <wtf/RefPtr.h>
 #include <wtf/Vector.h>
@@ -45,7 +44,7 @@ namespace WebKit {
 class WebSecurityOrigin;
 struct SecurityOriginData;
 
-typedef GenericCallback<WKArrayRef> ArrayCallback;
+typedef GenericCallback<API::Array*> ArrayCallback;
 
 class WebOriginDataManagerProxy : public API::ObjectImpl<API::Object::Type::OriginDataManager>, public WebContextSupplement, private IPC::MessageReceiver {
 public:
@@ -54,22 +53,23 @@ public:
     static PassRefPtr<WebOriginDataManagerProxy> create(WebContext*);
     virtual ~WebOriginDataManagerProxy();
 
-    void getOrigins(WKOriginDataTypes, PassRefPtr<ArrayCallback>);
-    void deleteEntriesForOrigin(WKOriginDataTypes, WebSecurityOrigin*);
-    void deleteAllEntries(WKOriginDataTypes);
-
-    void startObservingChanges(WKOriginDataTypes);
-    void stopObservingChanges(WKOriginDataTypes);
-    void setChangeClient(const WKOriginDataManagerChangeClientBase*);
+    void getOrigins(WKOriginDataTypes, std::function<void (API::Array*, CallbackBase::Error)>);
+    void deleteEntriesForOrigin(WKOriginDataTypes, WebSecurityOrigin*, std::function<void (CallbackBase::Error)>);
+    void deleteEntriesModifiedBetweenDates(WKOriginDataTypes, double startDate, double endDate, std::function<void (CallbackBase::Error)>);
+    void deleteAllEntries(WKOriginDataTypes, std::function<void (CallbackBase::Error)>);
 
     using API::Object::ref;
     using API::Object::deref;
 
+    // IPC::MessageReceiver
+    virtual void didReceiveMessage(IPC::Connection*, IPC::MessageDecoder&) override;
+
 private:
     explicit WebOriginDataManagerProxy(WebContext*);
 
-    void didGetOrigins(const Vector<SecurityOriginData>&, uint64_t callbackID);
-    void didChange();
+    void didGetOrigins(IPC::Connection*, const Vector<SecurityOriginData>&, uint64_t callbackID);
+    void didDeleteEntries(IPC::Connection*, uint64_t callbackID);
+    void didDeleteAllEntries(IPC::Connection*, uint64_t callbackID);
 
     // WebContextSupplement
     virtual void contextDestroyed() override;
@@ -78,12 +78,8 @@ private:
     virtual void refWebContextSupplement() override;
     virtual void derefWebContextSupplement() override;
 
-    // IPC::MessageReceiver
-    virtual void didReceiveMessage(IPC::Connection*, IPC::MessageDecoder&) override;
-
     HashMap<uint64_t, RefPtr<ArrayCallback>> m_arrayCallbacks;
-
-    WebOriginDataManagerProxyChangeClient m_client;
+    HashMap<uint64_t, RefPtr<VoidCallback>> m_voidCallbacks;
 };
 
 } // namespace WebKit

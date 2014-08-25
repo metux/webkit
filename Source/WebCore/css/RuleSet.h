@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 1999 Lars Knoll (knoll@kde.org)
- * Copyright (C) 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011 Apple Inc. All rights reserved.
+ * Copyright (C) 2003-2014 Apple Inc. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -29,14 +29,14 @@
 #include <wtf/HashMap.h>
 #include <wtf/HashSet.h>
 #include <wtf/text/AtomicString.h>
+#include <wtf/text/CString.h>
 
 namespace WebCore {
 
 enum AddRuleFlags {
     RuleHasNoSpecialState         = 0,
     RuleHasDocumentSecurityOrigin = 1,
-    RuleCanUseFastCheckSelector   = 1 << 1,
-    RuleIsInRegionRule            = 1 << 2,
+    RuleIsInRegionRule            = 1 << 1,
 };
     
 enum PropertyWhitelistType {
@@ -61,12 +61,11 @@ public:
     RuleData(StyleRule*, unsigned selectorIndex, unsigned position, AddRuleFlags);
 
     unsigned position() const { return m_position; }
-    StyleRule* rule() const { return m_rule; }
+    StyleRule* rule() const { return m_rule.get(); }
     const CSSSelector* selector() const { return m_rule->selectorList().selectorAt(m_selectorIndex); }
     unsigned selectorIndex() const { return m_selectorIndex; }
 
-    bool hasFastCheckableSelector() const { return m_hasFastCheckableSelector; }
-    bool hasMultipartSelector() const { return m_hasMultipartSelector; }
+    bool canMatchPseudoElement() const { return m_canMatchPseudoElement; }
     bool hasRightmostSelectorMatchingHTMLBasedOnRuleHash() const { return m_hasRightmostSelectorMatchingHTMLBasedOnRuleHash; }
     bool containsUncommonAttributeSelector() const { return m_containsUncommonAttributeSelector; }
     unsigned specificity() const { return m_specificity; }
@@ -85,27 +84,37 @@ public:
         m_compilationStatus = status;
         m_compiledSelectorCodeRef = codeRef;
     }
+#if CSS_SELECTOR_JIT_PROFILING
+    ~RuleData()
+    {
+        if (m_compiledSelectorCodeRef.code().executableAddress())
+            dataLogF("RuleData compiled selector %d \"%s\"\n", m_compiledSelectorUseCount, selector()->selectorText().utf8().data());
+    }
+    void compiledSelectorUsed() const { m_compiledSelectorUseCount++; }
+#endif
 #endif // ENABLE(CSS_SELECTOR_JIT)
 
 private:
-    StyleRule* m_rule;
+    RefPtr<StyleRule> m_rule;
     unsigned m_selectorIndex : 13;
+    unsigned m_hasDocumentSecurityOrigin : 1;
     // This number was picked fairly arbitrarily. We can probably lower it if we need to.
     // Some simple testing showed <100,000 RuleData's on large sites.
     unsigned m_position : 18;
-    unsigned m_hasFastCheckableSelector : 1;
     unsigned m_specificity : 24;
-    unsigned m_hasMultipartSelector : 1;
     unsigned m_hasRightmostSelectorMatchingHTMLBasedOnRuleHash : 1;
+    unsigned m_canMatchPseudoElement : 1;
     unsigned m_containsUncommonAttributeSelector : 1;
     unsigned m_linkMatchType : 2; //  SelectorChecker::LinkMatchMask
-    unsigned m_hasDocumentSecurityOrigin : 1;
     unsigned m_propertyWhitelistType : 2;
     // Use plain array instead of a Vector to minimize memory overhead.
     unsigned m_descendantSelectorIdentifierHashes[maximumIdentifierCount];
 #if ENABLE(CSS_SELECTOR_JIT)
     mutable SelectorCompilationStatus m_compilationStatus;
     mutable JSC::MacroAssemblerCodeRef m_compiledSelectorCodeRef;
+#if CSS_SELECTOR_JIT_PROFILING
+    mutable unsigned m_compiledSelectorUseCount;
+#endif
 #endif // ENABLE(CSS_SELECTOR_JIT)
 };
     
@@ -114,6 +123,9 @@ struct SameSizeAsRuleData {
     unsigned compilationStatus;
     void* compiledSelectorPointer;
     void* codeRefPtr;
+#if CSS_SELECTOR_JIT_PROFILING
+    unsigned compiledSelectorUseCount;
+#endif
 #endif // ENABLE(CSS_SELECTOR_JIT)
 
     void* a;
@@ -128,18 +140,18 @@ class RuleSet {
     WTF_MAKE_NONCOPYABLE(RuleSet); WTF_MAKE_FAST_ALLOCATED;
 public:
     struct RuleSetSelectorPair {
-        RuleSetSelectorPair(const CSSSelector* selector, PassOwnPtr<RuleSet> ruleSet) : selector(selector), ruleSet(ruleSet) { }
+        RuleSetSelectorPair(const CSSSelector* selector, std::unique_ptr<RuleSet> ruleSet) : selector(selector), ruleSet(WTF::move(ruleSet)) { }
         RuleSetSelectorPair(const RuleSetSelectorPair& pair) : selector(pair.selector), ruleSet(const_cast<RuleSetSelectorPair*>(&pair)->ruleSet.release()) { }
 
         const CSSSelector* selector;
-        OwnPtr<RuleSet> ruleSet;
+        std::unique_ptr<RuleSet> ruleSet;
     };
 
-    static PassOwnPtr<RuleSet> create() { return adoptPtr(new RuleSet); }
+    RuleSet();
 
-    typedef HashMap<AtomicStringImpl*, OwnPtr<Vector<RuleData>>> AtomRuleMap;
+    typedef HashMap<AtomicStringImpl*, std::unique_ptr<Vector<RuleData>>> AtomRuleMap;
 
-    void addRulesFromSheet(StyleSheetContents*, const MediaQueryEvaluator&, StyleResolver* = 0, const ContainerNode* = 0);
+    void addRulesFromSheet(StyleSheetContents*, const MediaQueryEvaluator&, StyleResolver* = 0);
 
     void addStyleRule(StyleRule*, AddRuleFlags);
     void addRule(StyleRule*, unsigned selectorIndex, AddRuleFlags);
@@ -166,11 +178,10 @@ public:
 
     unsigned ruleCount() const { return m_ruleCount; }
 
-private:
-    void addChildRules(const Vector<RefPtr<StyleRuleBase>>&, const MediaQueryEvaluator& medium, StyleResolver*, const ContainerNode* scope, bool hasDocumentSecurityOrigin, AddRuleFlags);
-    bool findBestRuleSetAndAdd(const CSSSelector*, RuleData&);
+    bool hasShadowPseudoElementRules() const { return !m_shadowPseudoElementRules.isEmpty(); }
 
-    RuleSet();
+private:
+    void addChildRules(const Vector<RefPtr<StyleRuleBase>>&, const MediaQueryEvaluator& medium, StyleResolver*, bool hasDocumentSecurityOrigin, AddRuleFlags);
 
     AtomRuleMap m_idRules;
     AtomRuleMap m_classRules;

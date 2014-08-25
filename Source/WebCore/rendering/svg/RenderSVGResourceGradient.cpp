@@ -21,8 +21,6 @@
  */
 
 #include "config.h"
-
-#if ENABLE(SVG)
 #include "RenderSVGResourceGradient.h"
 
 #include "GradientAttributes.h"
@@ -33,7 +31,7 @@
 namespace WebCore {
 
 RenderSVGResourceGradient::RenderSVGResourceGradient(SVGGradientElement& node, PassRef<RenderStyle> style)
-    : RenderSVGResourceContainer(node, std::move(style))
+    : RenderSVGResourceContainer(node, WTF::move(style))
     , m_shouldCollectGradientAttributes(true)
 #if USE(CG)
     , m_savedContext(0)
@@ -48,7 +46,7 @@ void RenderSVGResourceGradient::removeAllClientsFromCache(bool markForInvalidati
     markAllClientsForInvalidation(markForInvalidation ? RepaintInvalidation : ParentOnlyInvalidation);
 }
 
-void RenderSVGResourceGradient::removeClientFromCache(RenderObject& client, bool markForInvalidation)
+void RenderSVGResourceGradient::removeClientFromCache(RenderElement& client, bool markForInvalidation)
 {
     m_gradientMap.remove(&client);
     markClientForInvalidation(client, markForInvalidation ? RepaintInvalidation : ParentOnlyInvalidation);
@@ -57,11 +55,11 @@ void RenderSVGResourceGradient::removeClientFromCache(RenderObject& client, bool
 #if USE(CG)
 static inline bool createMaskAndSwapContextForTextGradient(GraphicsContext*& context, GraphicsContext*& savedContext, std::unique_ptr<ImageBuffer>& imageBuffer, RenderObject* object)
 {
-    RenderObject* textRootBlock = RenderSVGText::locateRenderSVGTextAncestor(object);
+    auto* textRootBlock = RenderSVGText::locateRenderSVGTextAncestor(*object);
     ASSERT(textRootBlock);
 
     AffineTransform absoluteTransform;
-    SVGRenderingContext::calculateTransformationToOutermostCoordinateSystem(textRootBlock, absoluteTransform);
+    SVGRenderingContext::calculateTransformationToOutermostCoordinateSystem(*textRootBlock, absoluteTransform);
 
     FloatRect repaintRect = textRootBlock->repaintRectInLocalCoordinates();
     std::unique_ptr<ImageBuffer> maskImage;
@@ -73,17 +71,17 @@ static inline bool createMaskAndSwapContextForTextGradient(GraphicsContext*& con
     ASSERT(maskImage);
     savedContext = context;
     context = maskImageContext;
-    imageBuffer = std::move(maskImage);
+    imageBuffer = WTF::move(maskImage);
     return true;
 }
 
 static inline AffineTransform clipToTextMask(GraphicsContext* context, std::unique_ptr<ImageBuffer>& imageBuffer, FloatRect& targetRect, RenderObject* object, bool boundingBoxMode, const AffineTransform& gradientTransform)
 {
-    RenderObject* textRootBlock = RenderSVGText::locateRenderSVGTextAncestor(object);
+    auto* textRootBlock = RenderSVGText::locateRenderSVGTextAncestor(*object);
     ASSERT(textRootBlock);
 
     AffineTransform absoluteTransform;
-    SVGRenderingContext::calculateTransformationToOutermostCoordinateSystem(textRootBlock, absoluteTransform);
+    SVGRenderingContext::calculateTransformationToOutermostCoordinateSystem(*textRootBlock, absoluteTransform);
 
     targetRect = textRootBlock->repaintRectInLocalCoordinates();
     SVGRenderingContext::clipToImageBuffer(context, absoluteTransform, targetRect, imageBuffer, false);
@@ -122,9 +120,9 @@ bool RenderSVGResourceGradient::applyResource(RenderElement& renderer, const Ren
     if (gradientUnits() == SVGUnitTypes::SVG_UNIT_TYPE_OBJECTBOUNDINGBOX && objectBoundingBox.isEmpty())
         return false;
 
-    OwnPtr<GradientData>& gradientData = m_gradientMap.add(&renderer, nullptr).iterator->value;
+    auto& gradientData = m_gradientMap.add(&renderer, nullptr).iterator->value;
     if (!gradientData)
-        gradientData = adoptPtr(new GradientData);
+        gradientData = std::make_unique<GradientData>();
 
     bool isPaintingText = resourceMode & ApplyToTextMode;
 
@@ -152,7 +150,7 @@ bool RenderSVGResourceGradient::applyResource(RenderElement& renderer, const Ren
             // Depending on font scaling factor, we may need to rescale the gradient here since
             // text painting removes the scale factor from the context.
             AffineTransform additionalTextTransform;
-            if (shouldTransformOnTextPainting(&renderer, additionalTextTransform))
+            if (shouldTransformOnTextPainting(renderer, additionalTextTransform))
                 gradientData->userspaceTransform *= additionalTextTransform;
         }
         gradientData->gradient->setGradientSpaceTransform(gradientData->userspaceTransform);
@@ -263,5 +261,3 @@ GradientSpreadMethod RenderSVGResourceGradient::platformSpreadMethodFromSVGType(
 }
 
 }
-
-#endif

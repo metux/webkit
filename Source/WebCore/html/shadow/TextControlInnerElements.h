@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2006, 2008, 2010 Apple Inc. All rights reserved.
+ * Copyright (C) 2006, 2008, 2010, 2014 Apple Inc. All rights reserved.
  * Copyright (C) 2010 Google Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -11,10 +11,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -28,13 +28,11 @@
 #define TextControlInnerElements_h
 
 #include "HTMLDivElement.h"
-#include "SpeechInputListener.h"
 #include <wtf/Forward.h>
 
 namespace WebCore {
 
 class RenderTextControlInnerBlock;
-class SpeechInput;
 
 class TextControlInnerContainer final : public HTMLDivElement {
 public:
@@ -50,7 +48,7 @@ public:
 
 protected:
     TextControlInnerElement(Document&);
-    virtual PassRefPtr<RenderStyle> customStyleForRenderer() override;
+    virtual PassRefPtr<RenderStyle> customStyleForRenderer(RenderStyle& parentStyle) override;
 
 private:
     virtual bool isMouseFocusable() const override { return false; }
@@ -67,7 +65,7 @@ public:
 private:
     TextControlInnerTextElement(Document&);
     virtual RenderPtr<RenderElement> createElementRenderer(PassRef<RenderStyle>) override;
-    virtual PassRefPtr<RenderStyle> customStyleForRenderer() override;
+    virtual PassRefPtr<RenderStyle> customStyleForRenderer(RenderStyle& parentStyle) override;
     virtual bool isMouseFocusable() const override { return false; }
     virtual bool isTextControlInnerTextElement() const override { return true; }
 };
@@ -87,7 +85,6 @@ public:
 
 private:
     SearchFieldResultsButtonElement(Document&);
-    virtual const AtomicString& shadowPseudoId() const override;
     virtual bool isMouseFocusable() const override { return false; }
 };
 
@@ -103,65 +100,11 @@ public:
 
 private:
     SearchFieldCancelButtonElement(Document&);
-    virtual const AtomicString& shadowPseudoId() const override;
     virtual void willDetachRenderers() override;
     virtual bool isMouseFocusable() const override { return false; }
 
     bool m_capturing;
 };
-
-#if ENABLE(INPUT_SPEECH)
-
-class InputFieldSpeechButtonElement final
-    : public HTMLDivElement,
-      public SpeechInputListener {
-public:
-    enum SpeechInputState {
-        Idle,
-        Recording,
-        Recognizing,
-    };
-
-    static PassRefPtr<InputFieldSpeechButtonElement> create(Document&);
-    virtual ~InputFieldSpeechButtonElement();
-
-    virtual void defaultEventHandler(Event*);
-#if !PLATFORM(IOS)
-    virtual bool willRespondToMouseClickEvents();
-#endif
-    virtual bool isInputFieldSpeechButtonElement() const { return true; }
-    SpeechInputState state() const { return m_state; }
-    void startSpeechInput();
-    void stopSpeechInput();
-
-    // SpeechInputListener methods.
-    void didCompleteRecording(int);
-    void didCompleteRecognition(int);
-    void setRecognitionResult(int, const SpeechInputResultArray&);
-
-private:
-    InputFieldSpeechButtonElement(Document&);
-    SpeechInput* speechInput();
-    void setState(SpeechInputState state);
-    virtual const AtomicString& shadowPseudoId() const;
-    virtual bool isMouseFocusable() const override { return false; }
-    virtual void willAttachRenderers() override;
-    virtual void willDetachRenderers() override;
-
-
-    bool m_capturing;
-    SpeechInputState m_state;
-    int m_listenerId;
-    SpeechInputResultArray m_results;
-};
-
-inline InputFieldSpeechButtonElement* toInputFieldSpeechButtonElement(Element* element)
-{
-    ASSERT_WITH_SECURITY_IMPLICATION(!element || element->isInputFieldSpeechButtonElement());
-    return static_cast<InputFieldSpeechButtonElement*>(element);
-}
-
-#endif // ENABLE(INPUT_SPEECH)
 
 } // namespace
 

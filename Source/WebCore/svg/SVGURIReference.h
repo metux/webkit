@@ -21,8 +21,8 @@
 #ifndef SVGURIReference_h
 #define SVGURIReference_h
 
-#if ENABLE(SVG)
 #include "Document.h"
+#include "QualifiedName.h"
 
 namespace WebCore {
 
@@ -57,5 +57,4 @@ protected:
 
 } // namespace WebCore
 
-#endif // ENABLE(SVG)
 #endif // SVGURIReference_h

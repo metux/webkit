@@ -67,6 +67,10 @@ void ProcessLauncher::launchProcess()
         break;
     case PluginProcess:
         executablePath = executablePathOfPluginProcess();
+#if ENABLE(PLUGIN_PROCESS_GTK2)
+        if (m_launchOptions.extraInitializationData.contains("requires-gtk2"))
+            executablePath.append('2');
+#endif
         pluginPath = m_launchOptions.extraInitializationData.get("plugin-path");
         realPluginPath = fileSystemRepresentation(pluginPath);
         break;
@@ -122,7 +126,7 @@ void ProcessLauncher::launchProcess()
     m_processIdentifier = pid;
 
     // We've finished launching the process, message back to the main run loop.
-    RunLoop::main()->dispatch(bind(&ProcessLauncher::didFinishLaunchingProcess, this, m_processIdentifier, socketPair.server));
+    RunLoop::main().dispatch(bind(&ProcessLauncher::didFinishLaunchingProcess, this, m_processIdentifier, socketPair.server));
 }
 
 void ProcessLauncher::terminateProcess()

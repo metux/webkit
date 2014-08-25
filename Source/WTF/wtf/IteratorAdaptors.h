@@ -26,15 +26,17 @@
 #ifndef WTF_IteratorAdaptors_h
 #define WTF_IteratorAdaptors_h
 
+#include <type_traits>
+
 namespace WTF {
 
 template<typename Predicate, typename Iterator>
 class FilterIterator {
 public:
     FilterIterator(Predicate pred, Iterator begin, Iterator end)
-        : m_pred(std::move(pred))
-        , m_iter(std::move(begin))
-        , m_end(std::move(end))
+        : m_pred(WTF::move(pred))
+        , m_iter(WTF::move(begin))
+        , m_end(WTF::move(end))
     {
         while (m_iter != m_end && !m_pred(*m_iter))
             ++m_iter;
@@ -50,7 +52,7 @@ public:
         return *this;
     }
 
-    decltype(*std::declval<Iterator>()) operator*() const
+    const typename std::remove_const<decltype(*std::declval<Iterator>())>::type operator*() const
     {
         ASSERT(m_iter != m_end);
         ASSERT(m_pred(*m_iter));
@@ -75,9 +77,9 @@ inline FilterIterator<Predicate, Iterator> makeFilterIterator(Predicate&& pred, 
 template<typename Transform, typename Iterator>
 class TransformIterator {
 public:
-    TransformIterator(const Transform& transform, const Iterator& iter)
-        : m_transform(std::move(transform))
-        , m_iter(std::move(iter))
+    TransformIterator(Transform&& transform, Iterator&& iter)
+        : m_transform(WTF::move(transform))
+        , m_iter(WTF::move(iter))
     {
     }
 
@@ -87,7 +89,7 @@ public:
         return *this;
     }
 
-    decltype(std::declval<Transform>()(*std::declval<Iterator>())) operator*() const
+    const typename std::remove_const<decltype(std::declval<Transform>()(*std::declval<Iterator>()))>::type operator*() const
     {
         return m_transform(*m_iter);
     }
@@ -103,7 +105,7 @@ private:
 template<typename Transform, typename Iterator>
 inline TransformIterator<Transform, Iterator> makeTransformIterator(Transform&& transform, Iterator&& iter)
 {
-    return TransformIterator<Transform, Iterator>(std::forward<Transform>(transform), std::forward<Iterator>(iter));
+    return TransformIterator<Transform, Iterator>(WTF::move(transform), WTF::move(iter));
 }
 
 } // namespace WTF

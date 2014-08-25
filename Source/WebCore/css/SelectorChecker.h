@@ -2,7 +2,7 @@
  * Copyright (C) 1999 Lars Knoll (knoll@kde.org)
  *           (C) 2004-2005 Allan Sandfeld Jensen (kde@carewolf.com)
  * Copyright (C) 2006, 2007 Nicholas Shanks (webkit@nickshanks.com)
- * Copyright (C) 2005, 2006, 2007, 2008, 2009, 2010, 2011, 2012, 2013 Apple Inc. All rights reserved.
+ * Copyright (C) 2005, 2006, 2007, 2008, 2009, 2010, 2011, 2012, 2013, 2014 Apple Inc. All rights reserved.
  * Copyright (C) 2007 Alexey Proskuryakov <ap@webkit.org>
  * Copyright (C) 2007, 2008 Eric Seidel <eric@webkit.org>
  * Copyright (C) 2008, 2009 Torch Mobile Inc. All rights reserved. (http://www.torchmobile.com/)
@@ -47,7 +47,9 @@ class SelectorChecker {
 
 public:
     enum VisitedMatchType { VisitedMatchDisabled, VisitedMatchEnabled };
-    enum Mode { ResolvingStyle = 0, CollectingRules, QueryingRules, SharingRules };
+    enum class Mode : unsigned char {
+        ResolvingStyle = 0, CollectingRules, QueryingRules, SharingRules, StyleInvalidation
+    };
 
     SelectorChecker(Document&, Mode);
 
@@ -56,13 +58,14 @@ public:
         SelectorCheckingContext(const CSSSelector* selector, Element* element, VisitedMatchType visitedMatchType)
             : selector(selector)
             , element(element)
-            , scope(0)
+            , scope(nullptr)
             , visitedMatchType(visitedMatchType)
             , pseudoId(NOPSEUDO)
-            , elementStyle(0)
-            , scrollbar(0)
+            , elementStyle(nullptr)
+            , scrollbar(nullptr)
+            , firstSelectorOfTheFragment(selector)
             , scrollbarPart(NoPart)
-            , isSubSelector(false)
+            , inFunctionalPseudoClass(false)
             , hasScrollbarPseudo(false)
             , hasSelectionPseudo(false)
         { }
@@ -74,16 +77,14 @@ public:
         PseudoId pseudoId;
         RenderStyle* elementStyle;
         RenderScrollbar* scrollbar;
+        const CSSSelector* firstSelectorOfTheFragment;
         ScrollbarPart scrollbarPart;
-        bool isSubSelector;
+        bool inFunctionalPseudoClass;
         bool hasScrollbarPseudo;
         bool hasSelectionPseudo;
     };
 
-    bool match(const SelectorCheckingContext& context, PseudoId& pseudoId) const
-    {
-        return matchRecursively(context, pseudoId) == SelectorMatches;
-    }
+    bool match(const SelectorCheckingContext&) const;
 
     static bool tagMatches(const Element*, const QualifiedName&);
     static bool isCommonPseudoClassSelector(const CSSSelector*);
@@ -97,7 +98,7 @@ private:
     Match matchRecursively(const SelectorCheckingContext&, PseudoId&) const;
     bool checkOne(const SelectorCheckingContext&) const;
 
-    bool checkScrollbarPseudoClass(const SelectorCheckingContext&, Document*, const CSSSelector*) const;
+    bool checkScrollbarPseudoClass(const SelectorCheckingContext&, const CSSSelector*) const;
 
     bool m_strictParsing;
     bool m_documentIsHTML;
@@ -108,11 +109,11 @@ inline bool SelectorChecker::isCommonPseudoClassSelector(const CSSSelector* sele
 {
     if (selector->m_match != CSSSelector::PseudoClass)
         return false;
-    CSSSelector::PseudoType pseudoType = selector->pseudoType();
-    return pseudoType == CSSSelector::PseudoLink
-        || pseudoType == CSSSelector::PseudoAnyLink
-        || pseudoType == CSSSelector::PseudoVisited
-        || pseudoType == CSSSelector::PseudoFocus;
+    CSSSelector::PseudoClassType pseudoType = selector->pseudoClassType();
+    return pseudoType == CSSSelector::PseudoClassLink
+        || pseudoType == CSSSelector::PseudoClassAnyLink
+        || pseudoType == CSSSelector::PseudoClassVisited
+        || pseudoType == CSSSelector::PseudoClassFocus;
 }
 
 inline bool SelectorChecker::tagMatches(const Element* element, const QualifiedName& tagQName)

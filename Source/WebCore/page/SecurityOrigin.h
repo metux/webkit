@@ -10,7 +10,7 @@
  * 2.  Redistributions in binary form must reproduce the above copyright
  *     notice, this list of conditions and the following disclaimer in the
  *     documentation and/or other materials provided with the distribution.
- * 3.  Neither the name of Apple Computer, Inc. ("Apple") nor the names of
+ * 3.  Neither the name of Apple Inc. ("Apple") nor the names of
  *     its contributors may be used to endorse or promote products derived
  *     from this software without specific prior written permission.
  *
@@ -54,6 +54,11 @@ public:
     static PassRefPtr<SecurityOrigin> createUnique();
 
     static PassRefPtr<SecurityOrigin> createFromDatabaseIdentifier(const String&);
+    // Alternate form of createFromDatabaseIdentifier that returns a nullptr on failure, instead of an empty origin.
+    // FIXME: Many users of createFromDatabaseIdentifier seem to expect maybeCreateFromDatabaseIdentifier behavior,
+    // but they aren't getting it so they might be buggy.
+    static PassRefPtr<SecurityOrigin> maybeCreateFromDatabaseIdentifier(const String&);
+
     static PassRefPtr<SecurityOrigin> createFromString(const String&);
     static PassRefPtr<SecurityOrigin> create(const String& protocol, const String& host, int port);
 
@@ -205,7 +210,7 @@ public:
     // (and whether it was set) but considering the host. It is used for postMessage.
     bool isSameSchemeHostPort(const SecurityOrigin*) const;
 
-    static String urlWithUniqueSecurityOrigin();
+    static URL urlWithUniqueSecurityOrigin();
 
 private:
     SecurityOrigin();
@@ -215,6 +220,10 @@ private:
     // FIXME: Rename this function to something more semantic.
     bool passesFileCheck(const SecurityOrigin*) const;
     bool isThirdParty(const SecurityOrigin*) const;
+
+    // This method checks that the scheme for this origin is an HTTP-family
+    // scheme, e.g. HTTP and HTTPS.
+    bool isHTTPFamily() const { return m_protocol == "http" || m_protocol == "https"; }
     
     enum ShouldAllowFromThirdParty { AlwaysAllowFromThirdParty, MaybeAllowFromThirdParty };
     bool canAccessStorage(const SecurityOrigin*, ShouldAllowFromThirdParty = MaybeAllowFromThirdParty) const;

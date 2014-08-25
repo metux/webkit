@@ -78,9 +78,9 @@ bool HTMLAppletElement::rendererIsNeeded(const RenderStyle& style)
 RenderPtr<RenderElement> HTMLAppletElement::createElementRenderer(PassRef<RenderStyle> style)
 {
     if (!canEmbedJava())
-        return RenderElement::createFor(*this, std::move(style));
+        return RenderElement::createFor(*this, WTF::move(style));
 
-    return RenderEmbeddedObject::createForApplet(*this, std::move(style));
+    return RenderEmbeddedObject::createForApplet(*this, WTF::move(style));
 }
 
 RenderWidget* HTMLAppletElement::renderWidgetForJSBindings() const
@@ -88,7 +88,10 @@ RenderWidget* HTMLAppletElement::renderWidgetForJSBindings() const
     if (!canEmbedJava())
         return 0;
 
-    document().updateLayoutIgnorePendingStylesheets();
+    // Needs to load the plugin immediatedly because this function is called
+    // when JavaScript code accesses the plugin.
+    // FIXME: <rdar://16893708> Check if dispatching events here is safe.
+    document().updateLayoutIgnorePendingStylesheets(Document::RunPostLayoutTasksSynchronously);
     return renderWidget();
 }
 
@@ -114,9 +117,9 @@ void HTMLAppletElement::updateWidget(PluginCreationOption pluginCreationOption)
     RenderEmbeddedObject* renderer = renderEmbeddedObject();
 
     LayoutUnit contentWidth = renderer->style().width().isFixed() ? LayoutUnit(renderer->style().width().value()) :
-        renderer->width() - renderer->borderAndPaddingWidth();
+        renderer->width() - renderer->horizontalBorderAndPaddingExtent();
     LayoutUnit contentHeight = renderer->style().height().isFixed() ? LayoutUnit(renderer->style().height().value()) :
-        renderer->height() - renderer->borderAndPaddingHeight();
+        renderer->height() - renderer->verticalBorderAndPaddingExtent();
 
     Vector<String> paramNames;
     Vector<String> paramValues;

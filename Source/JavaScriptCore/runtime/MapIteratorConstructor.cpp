@@ -31,10 +31,11 @@
 #include "JSGlobalObject.h"
 #include "JSMapIterator.h"
 #include "MapIteratorPrototype.h"
+#include "StructureInlines.h"
 
 namespace JSC {
 
-const ClassInfo MapIteratorConstructor::s_info = { "MapIterator Iterator", &Base::s_info, 0, 0, CREATE_METHOD_TABLE(MapIteratorConstructor) };
+const ClassInfo MapIteratorConstructor::s_info = { "MapIterator Iterator", &Base::s_info, 0, CREATE_METHOD_TABLE(MapIteratorConstructor) };
 
 void MapIteratorConstructor::finishCreation(VM& vm, MapIteratorPrototype* prototype)
 {

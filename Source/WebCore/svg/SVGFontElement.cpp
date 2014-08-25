@@ -94,9 +94,9 @@ void SVGFontElement::registerLigaturesInGlyphCache(Vector<String>& ligatures)
         unsigned unicodeLength = unicode.length();
         ASSERT(unicodeLength > 1);
 
-        const UChar* characters = unicode.deprecatedCharacters();
         for (unsigned i = 0; i < unicodeLength; ++i) {
-            String lookupString(characters + i, 1);
+            UChar character = unicode[i];
+            String lookupString(&character, 1);
             m_glyphMap.collectGlyphsForString(lookupString, glyphs);
             if (!glyphs.isEmpty()) {
                 glyphs.clear();
@@ -179,7 +179,7 @@ void SVGKerningMap::insert(const SVGKerningPair& kerningPair)
         else {
             auto newVector = std::make_unique<SVGKerningVector>();
             newVector->append(svgKerning);
-            unicodeMap.add(*uIt, std::move(newVector));
+            unicodeMap.add(*uIt, WTF::move(newVector));
         }
     }
 
@@ -191,7 +191,7 @@ void SVGKerningMap::insert(const SVGKerningPair& kerningPair)
         else {
             auto newVector = std::make_unique<SVGKerningVector>();
             newVector->append(svgKerning);
-            glyphMap.add(*gIt, std::move(newVector));
+            glyphMap.add(*gIt, WTF::move(newVector));
         }
     }
 

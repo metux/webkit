@@ -26,22 +26,22 @@
 #ifndef WKPage_h
 #define WKPage_h
 
-#include <WebKit2/WKBase.h>
-#include <WebKit2/WKError.h>
-#include <WebKit2/WKEvent.h>
-#include <WebKit2/WKFindOptions.h>
-#include <WebKit2/WKGeometry.h>
-#include <WebKit2/WKNativeEvent.h>
-#include <WebKit2/WKPageContextMenuClient.h>
-#include <WebKit2/WKPageFindClient.h>
-#include <WebKit2/WKPageFindMatchesClient.h>
-#include <WebKit2/WKPageFormClient.h>
-#include <WebKit2/WKPageLoadTypes.h>
-#include <WebKit2/WKPageLoaderClient.h>
-#include <WebKit2/WKPagePolicyClient.h>
-#include <WebKit2/WKPageUIClient.h>
-#include <WebKit2/WKPageVisibilityTypes.h>
-#include <WebKit2/WKSessionRef.h>
+#include <WebKit/WKBase.h>
+#include <WebKit/WKErrorRef.h>
+#include <WebKit/WKEvent.h>
+#include <WebKit/WKFindOptions.h>
+#include <WebKit/WKGeometry.h>
+#include <WebKit/WKNativeEvent.h>
+#include <WebKit/WKPageContextMenuClient.h>
+#include <WebKit/WKPageFindClient.h>
+#include <WebKit/WKPageFindMatchesClient.h>
+#include <WebKit/WKPageFormClient.h>
+#include <WebKit/WKPageLoadTypes.h>
+#include <WebKit/WKPageLoaderClient.h>
+#include <WebKit/WKPagePolicyClient.h>
+#include <WebKit/WKPageUIClient.h>
+#include <WebKit/WKPageVisibilityTypes.h>
+#include <WebKit/WKSessionRef.h>
 
 #ifndef __cplusplus
 #include <stdbool.h>
@@ -108,8 +108,6 @@ WK_EXPORT double WKPageGetEstimatedProgress(WKPageRef page);
 
 WK_EXPORT uint64_t WKPageGetRenderTreeSize(WKPageRef page);
 
-WK_EXPORT void WKPageSetMemoryCacheClientCallsEnabled(WKPageRef page, bool memoryCacheClientCallsEnabled);
-
 WK_EXPORT WKInspectorRef WKPageGetInspector(WKPageRef page);
 
 WK_EXPORT WKVibrationRef WKPageGetVibration(WKPageRef page);
@@ -132,8 +130,14 @@ WK_EXPORT WKStringRef WKPageGetSessionHistoryURLValueType(void);
 WK_EXPORT WKStringRef WKPageGetSessionBackForwardListItemValueType(void);
 
 typedef bool (*WKPageSessionStateFilterCallback)(WKPageRef page, WKStringRef valueType, WKTypeRef value, void* context);
-WK_EXPORT WKDataRef WKPageCopySessionState(WKPageRef page, void* context, WKPageSessionStateFilterCallback urlAllowedCallback);
-WK_EXPORT void WKPageRestoreFromSessionState(WKPageRef page, WKDataRef sessionStateData);
+
+// FIXME: This should return a WKSessionStateRef object, not a WKTypeRef.
+// It currently returns a WKTypeRef for backwards compatibility with Safari.
+WK_EXPORT WKTypeRef WKPageCopySessionState(WKPageRef page, void* context, WKPageSessionStateFilterCallback urlAllowedCallback);
+
+// FIXME: This should take a WKSessionStateRef object, not a WKTypeRef.
+// It currently takes a WKTypeRef for backwards compatibility with Safari.
+WK_EXPORT void WKPageRestoreFromSessionState(WKPageRef page, WKTypeRef sessionState);
 
 WK_EXPORT double WKPageGetBackingScaleFactor(WKPageRef page);
 WK_EXPORT void WKPageSetCustomBackingScaleFactor(WKPageRef page, double customScaleFactor);
@@ -155,8 +159,6 @@ WK_EXPORT WKSize WKPageFixedLayoutSize(WKPageRef page);
 
 WK_EXPORT void WKPageListenForLayoutMilestones(WKPageRef page, WKLayoutMilestones milestones);
 
-WK_EXPORT void WKPageSetVisibilityState(WKPageRef page, WKPageVisibilityState state, bool isInitialState);
-
 WK_EXPORT bool WKPageHasHorizontalScrollbar(WKPageRef page);
 WK_EXPORT bool WKPageHasVerticalScrollbar(WKPageRef page);
 
@@ -167,7 +169,11 @@ WK_EXPORT bool WKPageIsPinnedToLeftSide(WKPageRef page);
 WK_EXPORT bool WKPageIsPinnedToRightSide(WKPageRef page);
 WK_EXPORT bool WKPageIsPinnedToTopSide(WKPageRef page);
 WK_EXPORT bool WKPageIsPinnedToBottomSide(WKPageRef page);
-
+    
+// This API is poorly named. Even when these values are set to false, rubber-banding will
+// still be allowed to occur at the end of a momentum scroll. These values are used along
+// with pin state to determine if wheel events should be handled in the web process or if
+// they should be passed up to the client.
 WK_EXPORT bool WKPageRubberBandsAtLeft(WKPageRef);
 WK_EXPORT void WKPageSetRubberBandsAtLeft(WKPageRef, bool rubberBandsAtLeft);
 WK_EXPORT bool WKPageRubberBandsAtRight(WKPageRef);
@@ -176,7 +182,13 @@ WK_EXPORT bool WKPageRubberBandsAtTop(WKPageRef);
 WK_EXPORT void WKPageSetRubberBandsAtTop(WKPageRef, bool rubberBandsAtTop);
 WK_EXPORT bool WKPageRubberBandsAtBottom(WKPageRef);
 WK_EXPORT void WKPageSetRubberBandsAtBottom(WKPageRef, bool rubberBandsAtBottom);
-
+    
+// Rubber-banding is enabled by default.
+WK_EXPORT bool WKPageVerticalRubberBandingIsEnabled(WKPageRef);
+WK_EXPORT void WKPageSetEnableVerticalRubberBanding(WKPageRef, bool enableVerticalRubberBanding);
+WK_EXPORT bool WKPageHorizontalRubberBandingIsEnabled(WKPageRef);
+WK_EXPORT void WKPageSetEnableHorizontalRubberBanding(WKPageRef, bool enableHorizontalRubberBanding);
+    
 WK_EXPORT void WKPageSetBackgroundExtendsBeyondPage(WKPageRef, bool backgroundExtendsBeyondPage);
 WK_EXPORT bool WKPageBackgroundExtendsBeyondPage(WKPageRef);
 

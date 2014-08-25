@@ -38,12 +38,11 @@
 #include <wtf/Deque.h>
 #include <wtf/Forward.h>
 #include <wtf/PassRefPtr.h>
-#include <wtf/OwnPtr.h>
 #include <wtf/text/CString.h>
 
 #if OS(DARWIN)
+#include "XPCPtr.h"
 #include <mach/mach_port.h>
-#include <xpc/xpc.h>
 #endif
 
 #if PLATFORM(GTK) || PLATFORM(EFL)
@@ -56,6 +55,8 @@ class RunLoop;
 
 namespace IPC {
 
+struct WaitForMessageState;
+
 enum MessageSendFlags {
     // Whether this message should be dispatched when waiting for a sync reply.
     // This is the default for synchronous messages.
@@ -63,8 +64,16 @@ enum MessageSendFlags {
 };
 
 enum SyncMessageSendFlags {
-    // Will allow events to continue being handled while waiting for the sync reply.
-    SpinRunLoopWhileWaitingForReply = 1 << 0,
+    // Use this to inform that this sync call will suspend this process until the user responds with input.
+    InformPlatformProcessWillSuspend = 1 << 0,
+    // Some platform accessibility clients can't suspend gracefully and need to spin the run loop so WebProcess doesn't hang.
+    // FIXME (126021): Remove when no platforms need to support this.
+    SpinRunLoopWhileWaitingForReply = 1 << 1,
+};
+
+enum WaitForMessageFlags {
+    // Use this to make waitForMessage be interrupted immediately by any incoming sync messages.
+    InterruptWaitingIfSyncMessageArrives = 1 << 0,
 };
     
 #define MESSAGE_CHECK_BASE(assertion, connection) do \
@@ -93,26 +102,26 @@ public:
     struct Identifier {
         Identifier()
             : port(MACH_PORT_NULL)
-            , xpcConnection(0)
         {
         }
 
         Identifier(mach_port_t port)
             : port(port)
-            , xpcConnection(0)
         {
         }
 
-        Identifier(mach_port_t port, xpc_connection_t xpcConnection)
+        Identifier(mach_port_t port, XPCPtr<xpc_connection_t> xpcConnection)
             : port(port)
-            , xpcConnection(xpcConnection)
+            , xpcConnection(WTF::move(xpcConnection))
         {
         }
 
         mach_port_t port;
-        xpc_connection_t xpcConnection;
+        XPCPtr<xpc_connection_t> xpcConnection;
     };
     static bool identifierIsNull(Identifier identifier) { return identifier.port == MACH_PORT_NULL; }
+    xpc_connection_t xpcConnection() { return m_xpcConnection.get(); }
+    bool getAuditToken(audit_token_t&);
 #elif USE(UNIX_DOMAIN_SOCKETS)
     typedef int Identifier;
     static bool identifierIsNull(Identifier identifier) { return !identifier; }
@@ -130,13 +139,13 @@ public:
     static Connection::SocketPair createPlatformConnection(unsigned options = SetCloexecOnClient | SetCloexecOnServer);
 #endif
 
-    static PassRefPtr<Connection> createServerConnection(Identifier, Client*, WTF::RunLoop* clientRunLoop);
-    static PassRefPtr<Connection> createClientConnection(Identifier, Client*, WTF::RunLoop* clientRunLoop);
+    static PassRefPtr<Connection> createServerConnection(Identifier, Client*, WTF::RunLoop& clientRunLoop);
+    static PassRefPtr<Connection> createClientConnection(Identifier, Client*, WTF::RunLoop& clientRunLoop);
     ~Connection();
 
     Client* client() const { return m_client; }
 
-#if OS(DARWIN)
+#if PLATFORM(MAC)
     void setShouldCloseConnectionOnMachExceptions();
 #endif
 
@@ -162,7 +171,7 @@ public:
 
     template<typename T> bool send(T&& message, uint64_t destinationID, unsigned messageSendFlags = 0);
     template<typename T> bool sendSync(T&& message, typename T::Reply&& reply, uint64_t destinationID, std::chrono::milliseconds timeout = std::chrono::milliseconds::max(), unsigned syncSendFlags = 0);
-    template<typename T> bool waitForAndDispatchImmediately(uint64_t destinationID, std::chrono::milliseconds timeout);
+    template<typename T> bool waitForAndDispatchImmediately(uint64_t destinationID, std::chrono::milliseconds timeout, unsigned waitForMessageFlags = 0);
 
     std::unique_ptr<MessageEncoder> createSyncMessageEncoder(StringReference messageReceiverName, StringReference messageName, uint64_t destinationID, uint64_t& syncRequestID);
     bool sendMessage(std::unique_ptr<MessageEncoder>, unsigned messageSendFlags = 0);
@@ -177,14 +186,21 @@ public:
 
     bool inSendSync() const { return m_inSendSyncCount; }
 
+    Identifier identifier() const;
+
+#if PLATFORM(COCOA)
+    bool kill();
+    void terminateSoon(double intervalInSeconds);
+#endif
+
 private:
-    Connection(Identifier, bool isServer, Client*, WTF::RunLoop* clientRunLoop);
+    Connection(Identifier, bool isServer, Client*, WTF::RunLoop& clientRunLoop);
     void platformInitialize(Identifier);
     void platformInvalidate();
     
     bool isValid() const { return m_client; }
     
-    std::unique_ptr<MessageDecoder> waitForMessage(StringReference messageReceiverName, StringReference messageName, uint64_t destinationID, std::chrono::milliseconds timeout);
+    std::unique_ptr<MessageDecoder> waitForMessage(StringReference messageReceiverName, StringReference messageName, uint64_t destinationID, std::chrono::milliseconds timeout, unsigned waitForMessageFlags);
     
     std::unique_ptr<MessageDecoder> waitForSyncReply(uint64_t syncRequestID, std::chrono::milliseconds timeout, unsigned syncSendFlags);
 
@@ -192,8 +208,6 @@ private:
     void processIncomingMessage(std::unique_ptr<MessageDecoder>);
     void processIncomingSyncReply(std::unique_ptr<MessageDecoder>);
 
-    void addWorkQueueMessageReceiverOnConnectionWorkQueue(StringReference messageReceiverName, WorkQueue*, WorkQueueMessageReceiver*);
-    void removeWorkQueueMessageReceiverOnConnectionWorkQueue(StringReference messageReceiverName);
     void dispatchWorkQueueMessageReceiverMessage(WorkQueueMessageReceiver*, MessageDecoder*);
 
     bool canSendOutgoingMessages() const;
@@ -203,7 +217,6 @@ private:
     void connectionDidClose();
     
     // Called on the listener thread.
-    void dispatchConnectionDidClose();
     void dispatchOneMessage();
     void dispatchMessage(std::unique_ptr<MessageDecoder>);
     void dispatchMessage(MessageDecoder&);
@@ -214,6 +227,9 @@ private:
     // Can be called on any thread.
     void enqueueIncomingMessage(std::unique_ptr<MessageDecoder>);
 
+    void willSendSyncMessage(unsigned syncSendFlags);
+    void didReceiveSyncReply(unsigned syncSendFlags);
+    
     Client* m_client;
     bool m_isServer;
     std::atomic<uint64_t> m_syncRequestID;
@@ -224,7 +240,7 @@ private:
 
     bool m_isConnected;
     RefPtr<WorkQueue> m_connectionQueue;
-    WTF::RunLoop* m_clientRunLoop;
+    WTF::RunLoop& m_clientRunLoop;
 
     HashMap<StringReference, std::pair<RefPtr<WorkQueue>, RefPtr<WorkQueueMessageReceiver>>> m_workQueueMessageReceivers;
 
@@ -243,7 +259,8 @@ private:
     
     std::condition_variable m_waitForMessageCondition;
     std::mutex m_waitForMessageMutex;
-    HashMap<std::pair<std::pair<StringReference, StringReference>, uint64_t>, std::unique_ptr<MessageDecoder>> m_waitForMessageMap;
+
+    WaitForMessageState* m_waitingForMessage;
 
     // Represents a sync request for which we're waiting on a reply.
     struct PendingSyncReply {
@@ -286,7 +303,6 @@ private:
     // Called on the connection queue.
     void receiveSourceEventHandler();
     void initializeDeadNameSource();
-    void exceptionSourceEventHandler();
 
     mach_port_t m_sendPort;
     dispatch_source_t m_deadNameSource;
@@ -294,12 +310,16 @@ private:
     mach_port_t m_receivePort;
     dispatch_source_t m_receivePortDataAvailableSource;
 
+#if !PLATFORM(IOS)
+    void exceptionSourceEventHandler();
+
     // If setShouldCloseConnectionOnMachExceptions has been called, this has
     // the exception port that exceptions from the other end will be sent on.
     mach_port_t m_exceptionPort;
     dispatch_source_t m_exceptionPortDataAvailableSource;
+#endif
 
-    xpc_connection_t m_xpcConnection;
+    XPCPtr<xpc_connection_t> m_xpcConnection;
 
 #elif USE(UNIX_DOMAIN_SOCKETS)
     // Called on the connection queue.
@@ -321,7 +341,7 @@ template<typename T> bool Connection::send(T&& message, uint64_t destinationID, 
     auto encoder = std::make_unique<MessageEncoder>(T::receiverName(), T::name(), destinationID);
     encoder->encode(message.arguments());
     
-    return sendMessage(std::move(encoder), messageSendFlags);
+    return sendMessage(WTF::move(encoder), messageSendFlags);
 }
 
 template<typename T> bool Connection::sendSync(T&& message, typename T::Reply&& reply, uint64_t destinationID, std::chrono::milliseconds timeout, unsigned syncSendFlags)
@@ -335,7 +355,7 @@ template<typename T> bool Connection::sendSync(T&& message, typename T::Reply&& 
     encoder->encode(message.arguments());
 
     // Now send the message and wait for a reply.
-    std::unique_ptr<MessageDecoder> replyDecoder = sendSyncMessage(syncRequestID, std::move(encoder), timeout, syncSendFlags);
+    std::unique_ptr<MessageDecoder> replyDecoder = sendSyncMessage(syncRequestID, WTF::move(encoder), timeout, syncSendFlags);
     if (!replyDecoder)
         return false;
 
@@ -343,9 +363,9 @@ template<typename T> bool Connection::sendSync(T&& message, typename T::Reply&& 
     return replyDecoder->decode(reply);
 }
 
-template<typename T> bool Connection::waitForAndDispatchImmediately(uint64_t destinationID, std::chrono::milliseconds timeout)
+template<typename T> bool Connection::waitForAndDispatchImmediately(uint64_t destinationID, std::chrono::milliseconds timeout, unsigned waitForMessageFlags)
 {
-    std::unique_ptr<MessageDecoder> decoder = waitForMessage(T::receiverName(), T::name(), destinationID, timeout);
+    std::unique_ptr<MessageDecoder> decoder = waitForMessage(T::receiverName(), T::name(), destinationID, timeout, waitForMessageFlags);
     if (!decoder)
         return false;
 

@@ -32,6 +32,7 @@
 #include <WebCore/NotImplemented.h>
 #include <WebCore/ResourceHandleInternal.h>
 #include <gio/gio.h>
+#include <wtf/gobject/GMainLoopSource.h>
 #include <wtf/gobject/GRefPtr.h>
 #include <wtf/gobject/GUniquePtr.h>
 #include <wtf/text/CString.h>
@@ -49,14 +50,11 @@ class DownloadClient : public ResourceHandleClient {
 public:
     DownloadClient(Download* download)
         : m_download(download)
-        , m_handleResponseLaterID(0)
     {
     }
 
     ~DownloadClient()
     {
-        if (m_handleResponseLaterID)
-            g_source_remove(m_handleResponseLaterID);
     }
 
     void deleteIntermediateFileInNeeded()
@@ -117,8 +115,8 @@ public:
 
     void didReceiveData(ResourceHandle*, const char* data, unsigned length, int /*encodedDataLength*/)
     {
-        if (m_handleResponseLaterID) {
-            g_source_remove(m_handleResponseLaterID);
+        if (m_handleResponseLater.isScheduled()) {
+            m_handleResponseLater.cancel();
             handleResponse();
         }
 
@@ -177,26 +175,19 @@ public:
 
     void handleResponse()
     {
-        m_handleResponseLaterID = 0;
-        didReceiveResponse(0, m_delayedResponse);
-    }
-
-    static gboolean handleResponseLaterCallback(DownloadClient* downloadClient)
-    {
-        downloadClient->handleResponse();
-        return FALSE;
+        didReceiveResponse(nullptr, m_delayedResponse);
     }
 
     void handleResponseLater(const ResourceResponse& response)
     {
         ASSERT(m_response.isNull());
-        ASSERT(!m_handleResponseLaterID);
+        ASSERT(!m_handleResponseLater.isScheduled());
 
         m_delayedResponse = response;
 
         // Call didReceiveResponse in an idle to make sure the download is added
         // to the DownloadManager downloads map.
-        m_handleResponseLaterID = g_idle_add_full(G_PRIORITY_DEFAULT, reinterpret_cast<GSourceFunc>(handleResponseLaterCallback), this, 0);
+        m_handleResponseLater.schedule("[WebKit] DownloadHandleResponseLater", std::function<void()>(std::bind(&DownloadClient::handleResponse, this)));
     }
 
     Download* m_download;
@@ -205,14 +196,14 @@ public:
     String m_destinationURI;
     GRefPtr<GFile> m_intermediateFile;
     ResourceResponse m_delayedResponse;
-    unsigned m_handleResponseLaterID;
+    GMainLoopSource m_handleResponseLater;
 };
 
 void Download::start()
 {
     ASSERT(!m_downloadClient);
     ASSERT(!m_resourceHandle);
-    m_downloadClient = adoptPtr(new DownloadClient(this));
+    m_downloadClient = std::make_unique<DownloadClient>(this);
     m_resourceHandle = ResourceHandle::create(0, m_request, m_downloadClient.get(), false, false);
     didStart();
 }
@@ -221,7 +212,7 @@ void Download::startWithHandle(ResourceHandle* resourceHandle, const ResourceRes
 {
     ASSERT(!m_downloadClient);
     ASSERT(!m_resourceHandle);
-    m_downloadClient = adoptPtr(new DownloadClient(this));
+    m_downloadClient = std::make_unique<DownloadClient>(this);
     resourceHandle->setClient(m_downloadClient.get());
     m_resourceHandle = resourceHandle;
     didStart();
@@ -247,7 +238,8 @@ void Download::platformInvalidate()
         m_resourceHandle->cancel();
         m_resourceHandle = 0;
     }
-    m_downloadClient.release();
+
+    m_downloadClient = nullptr;
 }
 
 void Download::didDecideDestination(const String& /*destination*/, bool /*allowOverwrite*/)
@@ -286,6 +278,16 @@ void Download::useCredential(const AuthenticationChallenge&, const Credential&)
 }
 
 void Download::cancelAuthenticationChallenge(const AuthenticationChallenge&)
+{
+    notImplemented();
+}
+
+void Download::receivedRequestToPerformDefaultHandling(const AuthenticationChallenge&)
+{
+    notImplemented();
+}
+
+void Download::receivedChallengeRejection(const AuthenticationChallenge&)
 {
     notImplemented();
 }

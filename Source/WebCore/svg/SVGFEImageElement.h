@@ -21,7 +21,7 @@
 #ifndef SVGFEImageElement_h
 #define SVGFEImageElement_h
 
-#if ENABLE(SVG) && ENABLE(FILTERS)
+#if ENABLE(FILTERS)
 #include "CachedImageClient.h"
 #include "CachedResourceHandle.h"
 #include "ImageBuffer.h"
@@ -42,6 +42,9 @@ public:
     static PassRefPtr<SVGFEImageElement> create(const QualifiedName&, Document&);
 
     virtual ~SVGFEImageElement();
+
+protected:
+    virtual void didNotifySubtreeInsertions(ContainerNode*) override;
 
 private:
     SVGFEImageElement(const QualifiedName&, Document&);
@@ -72,5 +75,5 @@ private:
 
 } // namespace WebCore
 
-#endif // ENABLE(SVG)
+#endif // ENABLE(FILTERS)
 #endif

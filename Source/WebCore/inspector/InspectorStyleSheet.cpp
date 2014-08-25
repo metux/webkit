@@ -28,7 +28,6 @@
 
 #include "InspectorStyleSheet.h"
 
-#include "CSSHostRule.h"
 #include "CSSImportRule.h"
 #include "CSSMediaRule.h"
 #include "CSSParser.h"
@@ -49,6 +48,7 @@
 #include "InspectorCSSAgent.h"
 #include "InspectorPageAgent.h"
 #include "Node.h"
+#include "SVGElement.h"
 #include "SVGNames.h"
 #include "StyleProperties.h"
 #include "StyleResolver.h"
@@ -59,8 +59,6 @@
 #include "WebKitCSSKeyframesRule.h"
 #include <inspector/ContentSearchUtilities.h>
 #include <inspector/InspectorValues.h>
-#include <wtf/OwnPtr.h>
-#include <wtf/PassOwnPtr.h>
 #include <wtf/Vector.h>
 #include <wtf/text/StringBuilder.h>
 #include <yarr/RegularExpression.h>
@@ -78,15 +76,15 @@ public:
     void setText(const String& text);
     bool hasText() const { return m_hasText; }
     RuleSourceDataList* sourceData() const { return m_sourceData.get(); }
-    void setSourceData(PassOwnPtr<RuleSourceDataList>);
-    bool hasSourceData() const { return m_sourceData; }
+    void setSourceData(std::unique_ptr<RuleSourceDataList>);
+    bool hasSourceData() const { return m_sourceData != nullptr; }
     PassRefPtr<WebCore::CSSRuleSourceData> ruleSourceDataAt(unsigned) const;
 
 private:
 
     String m_text;
     bool m_hasText;
-    OwnPtr<RuleSourceDataList> m_sourceData;
+    std::unique_ptr<RuleSourceDataList> m_sourceData;
 };
 
 ParsedStyleSheet::ParsedStyleSheet()
@@ -109,10 +107,6 @@ static void flattenSourceData(RuleSourceDataList* dataList, RuleSourceDataList* 
             target->append(data);
         else if (data->type == CSSRuleSourceData::MEDIA_RULE)
             flattenSourceData(&data->childRules, target);
-#if ENABLE(SHADOW_DOM)
-        else if (data->type == CSSRuleSourceData::HOST_RULE)
-            flattenSourceData(&data->childRules, target);
-#endif
 #if ENABLE(CSS3_CONDITIONAL_RULES)
         else if (data->type == CSSRuleSourceData::SUPPORTS_RULE)
             flattenSourceData(&data->childRules, target);
@@ -120,14 +114,14 @@ static void flattenSourceData(RuleSourceDataList* dataList, RuleSourceDataList* 
     }
 }
 
-void ParsedStyleSheet::setSourceData(PassOwnPtr<RuleSourceDataList> sourceData)
+void ParsedStyleSheet::setSourceData(std::unique_ptr<RuleSourceDataList> sourceData)
 {
     if (!sourceData) {
-        m_sourceData.clear();
+        m_sourceData.reset();
         return;
     }
 
-    m_sourceData = adoptPtr(new RuleSourceDataList());
+    m_sourceData = std::make_unique<RuleSourceDataList>();
 
     // FIXME: This is a temporary solution to retain the original flat sourceData structure
     // containing only style rules, even though CSSParser now provides the full rule source data tree.
@@ -226,11 +220,6 @@ static PassRefPtr<CSSRuleList> asCSSRuleList(CSSRule* rule)
     if (rule->type() == CSSRule::WEBKIT_KEYFRAMES_RULE)
         return static_cast<WebKitCSSKeyframesRule*>(rule)->cssRules();
 
-#if ENABLE(SHADOW_DOM)
-    if (rule->type() == CSSRule::HOST_RULE)
-        return static_cast<CSSHostRule*>(rule)->cssRules();
-#endif
-
 #if ENABLE(CSS3_CONDITIONAL_RULES)
     if (rule->type() == CSSRule::SUPPORTS_RULE)
         return static_cast<CSSSupportsRule*>(rule)->cssRules();
@@ -294,9 +283,9 @@ static void fillMediaListChain(CSSRule* rule, Array<Inspector::TypeBuilder::CSS:
     }
 }
 
-static PassOwnPtr<CSSParser> createCSSParser(Document* document)
+static std::unique_ptr<CSSParser> createCSSParser(Document* document)
 {
-    return adoptPtr(new CSSParser(document ? CSSParserContext(*document) : strictCSSParserContext()));
+    return std::make_unique<CSSParser>(document ? CSSParserContext(*document) : strictCSSParserContext());
 }
 
 PassRefPtr<InspectorStyle> InspectorStyle::create(const InspectorCSSId& styleId, PassRefPtr<CSSStyleDeclaration> style, InspectorStyleSheet* parentStyleSheet)
@@ -359,7 +348,7 @@ PassRefPtr<Inspector::TypeBuilder::Array<Inspector::TypeBuilder::CSS::CSSCompute
 bool InspectorStyle::setPropertyText(unsigned index, const String& propertyText, bool overwrite, String* oldText, ExceptionCode& ec)
 {
     ASSERT(m_parentStyleSheet);
-    DEFINE_STATIC_LOCAL(String, bogusPropertyName, (ASCIILiteral("-webkit-boguz-propertee")));
+    DEPRECATED_DEFINE_STATIC_LOCAL(String, bogusPropertyName, (ASCIILiteral("-webkit-boguz-propertee")));
 
     if (!m_parentStyleSheet->ensureParsedDataReady()) {
         ec = NOT_FOUND_ERR;
@@ -531,7 +520,7 @@ PassRefPtr<Inspector::TypeBuilder::CSS::CSSStyle> InspectorStyle::styleWithPrope
     HashSet<String> foundShorthands;
     String previousPriority;
     String previousStatus;
-    OwnPtr<Vector<size_t>> lineEndings(m_parentStyleSheet ? m_parentStyleSheet->lineEndings() : PassOwnPtr<Vector<size_t>>());
+    std::unique_ptr<Vector<size_t>> lineEndings(m_parentStyleSheet ? m_parentStyleSheet->lineEndings() : nullptr);
     RefPtr<CSSRuleSourceData> sourceData = extractSourceData();
     unsigned ruleBodyRangeStart = sourceData ? sourceData->ruleBodyRange.start : 0;
 
@@ -542,7 +531,7 @@ PassRefPtr<Inspector::TypeBuilder::CSS::CSSStyle> InspectorStyle::styleWithPrope
         Inspector::TypeBuilder::CSS::CSSProperty::Status::Enum status = it->disabled ? Inspector::TypeBuilder::CSS::CSSProperty::Status::Disabled : Inspector::TypeBuilder::CSS::CSSProperty::Status::Active;
 
         RefPtr<Inspector::TypeBuilder::CSS::CSSProperty> property = Inspector::TypeBuilder::CSS::CSSProperty::create()
-            .setName(name)
+            .setName(name.lower())
             .setValue(propertyEntry.value);
 
         propertiesObject->addItem(property);
@@ -646,22 +635,23 @@ bool InspectorStyle::setText(const String& text, ExceptionCode& ec)
 String InspectorStyle::shorthandValue(const String& shorthandProperty) const
 {
     String value = m_style->getPropertyValue(shorthandProperty);
-    if (value.isEmpty()) {
-        for (unsigned i = 0; i < m_style->length(); ++i) {
-            String individualProperty = m_style->item(i);
-            if (m_style->getPropertyShorthand(individualProperty) != shorthandProperty)
-                continue;
-            if (m_style->isPropertyImplicit(individualProperty))
-                continue;
-            String individualValue = m_style->getPropertyValue(individualProperty);
-            if (individualValue == "initial")
-                continue;
-            if (value.length())
-                value.append(" ");
-            value.append(individualValue);
-        }
+    if (!value.isEmpty())
+        return value;
+    StringBuilder builder;
+    for (unsigned i = 0; i < m_style->length(); ++i) {
+        String individualProperty = m_style->item(i);
+        if (m_style->getPropertyShorthand(individualProperty) != shorthandProperty)
+            continue;
+        if (m_style->isPropertyImplicit(individualProperty))
+            continue;
+        String individualValue = m_style->getPropertyValue(individualProperty);
+        if (individualValue == "initial")
+            continue;
+        if (!builder.isEmpty())
+            builder.append(' ');
+        builder.append(individualValue);
     }
-    return value;
+    return builder.toString();
 }
 
 String InspectorStyle::shorthandPriority(const String& shorthandProperty) const
@@ -696,7 +686,7 @@ Vector<String> InspectorStyle::longhandProperties(const String& shorthandPropert
 
 NewLineAndWhitespace& InspectorStyle::newLineAndWhitespaceDelimiters() const
 {
-    DEFINE_STATIC_LOCAL(String, defaultPrefix, (ASCIILiteral("    ")));
+    DEPRECATED_DEFINE_STATIC_LOCAL(String, defaultPrefix, (ASCIILiteral("    ")));
 
     if (m_formatAcquired)
         return m_format;
@@ -723,14 +713,13 @@ NewLineAndWhitespace& InspectorStyle::newLineAndWhitespaceDelimiters() const
     int propertyIndex = 0;
     bool isFullPrefixScanned = false;
     bool lineFeedTerminated = false;
-    const UChar* characters = text.deprecatedCharacters();
     while (propertyIndex < propertyCount) {
         const WebCore::CSSPropertySourceData& currentProperty = sourcePropertyData->at(propertyIndex++);
 
         bool processNextProperty = false;
         int scanEnd = currentProperty.range.start;
         for (int i = scanStart; i < scanEnd; ++i) {
-            UChar ch = characters[i];
+            UChar ch = text[i];
             bool isLineFeed = isHTMLLineBreak(ch);
             if (isLineFeed) {
                 if (!lineFeedTerminated)
@@ -1005,7 +994,7 @@ PassRefPtr<Inspector::TypeBuilder::CSS::CSSStyleSheetHeader> InspectorStyleSheet
 
 static PassRefPtr<Inspector::TypeBuilder::Array<String>> selectorsFromSource(const CSSRuleSourceData* sourceData, const String& sheetText)
 {
-    DEFINE_STATIC_LOCAL(JSC::Yarr::RegularExpression, comment, ("/\\*[^]*?\\*/", TextCaseSensitive, JSC::Yarr::MultilineEnabled));
+    DEPRECATED_DEFINE_STATIC_LOCAL(JSC::Yarr::RegularExpression, comment, ("/\\*[^]*?\\*/", TextCaseSensitive, JSC::Yarr::MultilineEnabled));
     RefPtr<Inspector::TypeBuilder::Array<String>> result = Inspector::TypeBuilder::Array<String>::create();
     const SelectorRangeList& ranges = sourceData->selectorRanges;
     for (size_t i = 0, size = ranges.size(); i < size; ++i) {
@@ -1221,10 +1210,10 @@ RefPtr<CSSRuleSourceData> InspectorStyleSheet::ruleSourceDataFor(CSSStyleDeclara
     return m_parsedStyleSheet->ruleSourceDataAt(ruleIndexByStyle(style));
 }
 
-PassOwnPtr<Vector<size_t>> InspectorStyleSheet::lineEndings() const
+std::unique_ptr<Vector<size_t>> InspectorStyleSheet::lineEndings() const
 {
     if (!m_parsedStyleSheet->hasText())
-        return PassOwnPtr<Vector<size_t>>();
+        return nullptr;
     return ContentSearchUtilities::lineEndings(m_parsedStyleSheet->text());
 }
 
@@ -1280,9 +1269,9 @@ bool InspectorStyleSheet::ensureSourceData()
         return false;
 
     RefPtr<StyleSheetContents> newStyleSheet = StyleSheetContents::create();
-    OwnPtr<RuleSourceDataList> ruleSourceDataResult = adoptPtr(new RuleSourceDataList());
+    auto ruleSourceDataResult = std::make_unique<RuleSourceDataList>();
     createCSSParser(m_pageStyleSheet->ownerDocument())->parseSheet(newStyleSheet.get(), m_parsedStyleSheet->text(), 0, ruleSourceDataResult.get());
-    m_parsedStyleSheet->setSourceData(ruleSourceDataResult.release());
+    m_parsedStyleSheet->setSourceData(WTF::move(ruleSourceDataResult));
     return m_parsedStyleSheet->hasSourceData();
 }
 
@@ -1397,11 +1386,7 @@ bool InspectorStyleSheet::inlineStyleSheetText(String* result) const
         return false;
     Element* ownerElement = toElement(ownerNode);
 
-    if (!isHTMLStyleElement(ownerElement)
-#if ENABLE(SVG)
-        && !ownerElement->hasTagName(SVGNames::styleTag)
-#endif
-    )
+    if (!isHTMLStyleElement(ownerElement) && !ownerElement->hasTagName(SVGNames::styleTag))
         return false;
     *result = ownerElement->textContent();
     return true;
@@ -1490,7 +1475,7 @@ bool InspectorStyleSheetForInlineStyle::setStyleText(CSSStyleDeclaration* style,
     return !ec;
 }
 
-PassOwnPtr<Vector<size_t>> InspectorStyleSheetForInlineStyle::lineEndings() const
+std::unique_ptr<Vector<size_t>> InspectorStyleSheetForInlineStyle::lineEndings() const
 {
     return ContentSearchUtilities::lineEndings(elementStyleText());
 }

@@ -13,7 +13,7 @@
  * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -27,6 +27,7 @@
 #ifndef RenderMultiColumnSet_h
 #define RenderMultiColumnSet_h
 
+#include "RenderMultiColumnFlowThread.h"
 #include "RenderRegionSet.h"
 #include <wtf/Vector.h>
 
@@ -48,6 +49,26 @@ public:
 
     virtual bool isRenderMultiColumnSet() const override { return true; }
 
+    RenderBlockFlow* multiColumnBlockFlow() const { return toRenderBlockFlow(parent()); }
+    RenderMultiColumnFlowThread* multiColumnFlowThread() const { return static_cast<RenderMultiColumnFlowThread*>(flowThread()); }
+
+    RenderMultiColumnSet* nextSiblingMultiColumnSet() const;
+    RenderMultiColumnSet* previousSiblingMultiColumnSet() const;
+
+    // Return the first object in the flow thread that's rendered inside this set.
+    RenderObject* firstRendererInFlowThread() const;
+    // Return the last object in the flow thread that's rendered inside this set.
+    RenderObject* lastRendererInFlowThread() const;
+
+    // Return true if the specified renderer (descendant of the flow thread) is inside this column set.
+    bool containsRendererInFlowThread(RenderObject*) const;
+
+    void setLogicalTopInFlowThread(LayoutUnit);
+    LayoutUnit logicalTopInFlowThread() const { return isHorizontalWritingMode() ? flowThreadPortionRect().y() : flowThreadPortionRect().x(); }
+    void setLogicalBottomInFlowThread(LayoutUnit);
+    LayoutUnit logicalBottomInFlowThread() const { return isHorizontalWritingMode() ? flowThreadPortionRect().maxY() : flowThreadPortionRect().maxX(); }
+    LayoutUnit logicalHeightInFlowThread() const { return isHorizontalWritingMode() ? flowThreadPortionRect().height() : flowThreadPortionRect().width(); }
+
     unsigned computedColumnCount() const { return m_computedColumnCount; }
     LayoutUnit computedColumnWidth() const { return m_computedColumnWidth; }
     LayoutUnit computedColumnHeight() const { return m_computedColumnHeight; }
@@ -67,10 +88,12 @@ public:
     void clearForcedBreaks();
     void addForcedBreak(LayoutUnit offsetFromFirstPage);
 
-    // (Re-)calculate the column height when contents are supposed to be balanced. If 'initial' is
-    // set, guess an initial column height; otherwise, stretch the column height a tad. Return true
-    // if column height changed and another layout pass is required.
-    bool recalculateBalancedHeight(bool initial);
+    // (Re-)calculate the column height. This is first and foremost needed by sets that are to
+    // balance the column height, but even when it isn't to be balanced, this is necessary if the
+    // multicol container's height is constrained. If |initial| is set, and we are to balance, guess
+    // an initial column height; otherwise, stretch the column height a tad. Return true if column
+    // height changed and another layout pass is required.
+    bool recalculateColumnHeight(bool initial);
 
     // Record space shortage (the amount of space that would have been enough to prevent some
     // element from being moved to the next column) at a column break. The smallest amount of space
@@ -80,37 +103,65 @@ public:
 
     virtual void updateLogicalWidth() override;
 
-    void prepareForLayout();
+    void prepareForLayout(bool initial);
+    // Begin laying out content for this column set. This happens at the beginning of flow thread
+    // layout, and when advancing from a previous column set or spanner to this one.
+    void beginFlow(RenderBlock* container);
+    // Finish laying out content for this column set. This happens at end of flow thread layout, and
+    // when advancing to the next column set or spanner.
+    void endFlow(RenderBlock* container, LayoutUnit bottomInContainer);
+    // Has this set been flowed in this layout pass?
+    bool hasBeenFlowed() const { return logicalBottomInFlowThread() != RenderFlowThread::maxLogicalHeight(); }
+
+    bool requiresBalancing() const;
+
+    LayoutPoint columnTranslationForOffset(const LayoutUnit&) const;
+    
+    void paintColumnRules(PaintInfo&, const LayoutPoint& paintOffset);
+
+    enum ColumnHitTestTranslationMode {
+        ClampHitTestTranslationToColumns,
+        DoNotClampHitTestTranslationToColumns
+    };
+    LayoutPoint translateRegionPointToFlowThread(const LayoutPoint & logicalPoint, ColumnHitTestTranslationMode = DoNotClampHitTestTranslationToColumns) const;
+
+    virtual void updateHitTestResult(HitTestResult&, const LayoutPoint&) override;
+    
+    LayoutRect columnRectAt(unsigned index) const;
+    unsigned columnCount() const;
 
 protected:
     void addOverflowFromChildren() override;
     
 private:
+    virtual void layout() override;
+
     virtual void computeLogicalHeight(LayoutUnit logicalHeight, LayoutUnit logicalTop, LogicalExtentComputedValues&) const override;
 
-    virtual void paintObject(PaintInfo&, const LayoutPoint& paintOffset) override;
+    virtual void paintObject(PaintInfo&, const LayoutPoint&) override { }
 
     virtual LayoutUnit pageLogicalWidth() const override { return m_computedColumnWidth; }
     virtual LayoutUnit pageLogicalHeight() const override { return m_computedColumnHeight; }
 
     virtual LayoutUnit pageLogicalTopForOffset(LayoutUnit offset) const override;
-    
-    // FIXME: This will change once we have column sets constrained by enclosing pages, etc.
-    virtual LayoutUnit logicalHeightOfAllFlowThreadContent() const override { return m_computedColumnHeight; }
-    
-    virtual void repaintFlowThreadContent(const LayoutRect& repaintRect, bool immediate) override;
+
+    virtual LayoutUnit logicalHeightOfAllFlowThreadContent() const override { return logicalHeightInFlowThread(); }
+
+    virtual void repaintFlowThreadContent(const LayoutRect& repaintRect) override;
 
     virtual void collectLayerFragments(LayerFragments&, const LayoutRect& layerBoundingBox, const LayoutRect& dirtyRect) override;
 
-    virtual void adjustRegionBoundsFromFlowThreadPortionRect(const IntPoint& layerOffset, IntRect& regionBounds) override;
+    virtual void adjustRegionBoundsFromFlowThreadPortionRect(const LayoutPoint& layerOffset, LayoutRect& regionBounds) override;
+
+    virtual VisiblePosition positionForPoint(const LayoutPoint&, const RenderRegion*) override;
 
     virtual const char* renderName() const;
-    
-    void paintColumnRules(PaintInfo&, const LayoutPoint& paintOffset);
 
+    LayoutUnit calculateMaxColumnHeight() const;
     LayoutUnit columnGap() const;
-    LayoutRect columnRectAt(unsigned index) const;
-    unsigned columnCount() const;
+
+    LayoutUnit columnLogicalLeft(unsigned) const;
+    LayoutUnit columnLogicalTop(unsigned) const;
 
     LayoutRect flowThreadPortionRectAt(unsigned index) const;
     LayoutRect flowThreadPortionOverflowRect(const LayoutRect& flowThreadPortion, unsigned index, unsigned colCount, LayoutUnit colGap);
@@ -139,6 +190,7 @@ private:
     unsigned m_computedColumnCount; // Used column count (the resulting 'N' from the pseudo-algorithm in the multicol spec)
     LayoutUnit m_computedColumnWidth; // Used column width (the resulting 'W' from the pseudo-algorithm in the multicol spec)
     LayoutUnit m_computedColumnHeight;
+    LayoutUnit m_availableColumnHeight;
     
     // The following variables are used when balancing the column set.
     LayoutUnit m_maxColumnHeight; // Maximum column height allowed.

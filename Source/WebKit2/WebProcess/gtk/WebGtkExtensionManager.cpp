@@ -27,14 +27,14 @@
 #include "WKType.h"
 #include "WebKitWebExtensionPrivate.h"
 #include <WebCore/FileSystem.h>
-#include <wtf/OwnPtr.h>
+#include <memory>
 #include <wtf/text/CString.h>
 
 namespace WebKit {
 
 WebGtkExtensionManager& WebGtkExtensionManager::shared()
 {
-    DEFINE_STATIC_LOCAL(WebGtkExtensionManager, extensionManager, ());
+    static NeverDestroyed<WebGtkExtensionManager> extensionManager;
     return extensionManager;
 }
 
@@ -105,11 +105,11 @@ void WebGtkExtensionManager::initialize(WKBundleRef bundle, WKTypeRef userDataSt
     scanModules(webExtensionsDirectory, modulePaths);
 
     for (size_t i = 0; i < modulePaths.size(); ++i) {
-        OwnPtr<Module> module = adoptPtr(new Module(modulePaths[i]));
+        auto module = std::make_unique<Module>(modulePaths[i]);
         if (!module->load())
             continue;
         if (initializeWebExtension(module.get(), userData.get()))
-            m_extensionModules.append(module.leakPtr());
+            m_extensionModules.append(module.release());
     }
 }
 

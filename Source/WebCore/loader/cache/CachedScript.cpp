@@ -29,6 +29,7 @@
 
 #include "CachedResourceClient.h"
 #include "CachedResourceClientWalker.h"
+#include "HTTPHeaderNames.h"
 #include "HTTPParsers.h"
 #include "MIMETypeRegistry.h"
 #include "MemoryCache.h"
@@ -39,8 +40,8 @@
 
 namespace WebCore {
 
-CachedScript::CachedScript(const ResourceRequest& resourceRequest, const String& charset)
-    : CachedResource(resourceRequest, Script)
+CachedScript::CachedScript(const ResourceRequest& resourceRequest, const String& charset, SessionID sessionID)
+    : CachedResource(resourceRequest, Script, sessionID)
     , m_decoder(TextResourceDecoder::create(ASCIILiteral("application/javascript"), charset))
 {
     // It's javascript we want.
@@ -65,7 +66,7 @@ String CachedScript::encoding() const
 
 String CachedScript::mimeType() const
 {
-    return extractMIMETypeFromMediaType(m_response.httpHeaderField("Content-Type")).lower();
+    return extractMIMETypeFromMediaType(m_response.httpHeaderField(HTTPHeaderName::ContentType)).lower();
 }
 
 const String& CachedScript::script()
@@ -73,8 +74,7 @@ const String& CachedScript::script()
     ASSERT(!isPurgeable());
 
     if (!m_script && m_data) {
-        m_script = m_decoder->decode(m_data->data(), encodedSize());
-        m_script.append(m_decoder->flush());
+        m_script = m_decoder->decodeAndFlush(m_data->data(), encodedSize());
         setDecodedSize(m_script.sizeInBytes());
     }
     m_decodedDataDeletionTimer.restart();
@@ -100,7 +100,7 @@ void CachedScript::destroyDecodedData()
 #if ENABLE(NOSNIFF)
 bool CachedScript::mimeTypeAllowedByNosniff() const
 {
-    return !parseContentTypeOptionsHeader(m_response.httpHeaderField("X-Content-Type-Options")) == ContentTypeOptionsNosniff || MIMETypeRegistry::isSupportedJavaScriptMIMEType(mimeType());
+    return !parseContentTypeOptionsHeader(m_response.httpHeaderField(HTTPHeaderName::XContentTypeOptions)) == ContentTypeOptionsNosniff || MIMETypeRegistry::isSupportedJavaScriptMIMEType(mimeType());
 }
 #endif
 

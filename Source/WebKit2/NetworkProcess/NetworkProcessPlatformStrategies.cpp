@@ -74,11 +74,6 @@ StorageStrategy* NetworkProcessPlatformStrategies::createStorageStrategy()
     return 0;
 }
 
-VisitedLinkStrategy* NetworkProcessPlatformStrategies::createVisitedLinkStrategy()
-{
-    return 0;
-}
-
 ResourceLoadScheduler* NetworkProcessPlatformStrategies::resourceLoadScheduler()
 {
     ASSERT_NOT_REACHED();
@@ -90,13 +85,9 @@ void NetworkProcessPlatformStrategies::loadResourceSynchronously(NetworkingConte
     ASSERT_NOT_REACHED();
 }
 
-#if ENABLE(BLOB)
 BlobRegistry* NetworkProcessPlatformStrategies::createBlobRegistry()
 {
     return new BlobRegistryImpl;
 }
-
-#endif
-
 
 }

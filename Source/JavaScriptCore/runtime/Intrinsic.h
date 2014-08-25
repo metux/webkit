@@ -51,9 +51,18 @@ enum Intrinsic {
     RegExpTestIntrinsic,
     StringPrototypeValueOfIntrinsic,
     IMulIntrinsic,
+    FRoundIntrinsic,
     ArrayIteratorNextValueIntrinsic,
     ArrayIteratorNextKeyIntrinsic,
-    ArrayIteratorNextGenericIntrinsic
+    ArrayIteratorNextGenericIntrinsic,
+    
+    // Debugging intrinsics. These are meant to be used as testing hacks within
+    // jsc.cpp and should never be exposed to users.
+    DFGTrueIntrinsic,
+    OSRExitIntrinsic,
+    IsFinalTierIntrinsic,
+    SetInt32HeapPredictionIntrinsic,
+    FiatInt52Intrinsic,
 };
 
 } // namespace JSC

@@ -79,39 +79,46 @@ ALWAYS_INLINE uint32_t toUInt32FromStringImpl(StringImpl* impl)
 class PropertyName {
 public:
     PropertyName(const Identifier& propertyName)
-        : m_impl(propertyName.impl())
+        : m_impl(static_cast<AtomicStringImpl*>(propertyName.impl()))
     {
-        ASSERT(!m_impl || m_impl->isIdentifier() || m_impl->isEmptyUnique());
+        ASSERT(!m_impl || m_impl->isAtomic());
     }
 
     PropertyName(const PrivateName& propertyName)
-        : m_impl(propertyName.uid())
+        : m_impl(static_cast<AtomicStringImpl*>(propertyName.uid()))
     {
-        ASSERT(m_impl && m_impl->isEmptyUnique());
+        ASSERT(m_impl);
+        ASSERT(m_impl->isEmptyUnique());
+        ASSERT(m_impl->isAtomic());
     }
 
-    StringImpl* uid() const
+    AtomicStringImpl* uid() const
     {
-        ASSERT(!m_impl || (m_impl->isIdentifier() == !m_impl->isEmptyUnique()));
         return m_impl;
     }
 
-    StringImpl* publicName() const
+    AtomicStringImpl* publicName() const
     {
-        ASSERT(!m_impl || (m_impl->isIdentifier() == !m_impl->isEmptyUnique()));
-        return m_impl->isIdentifier() ? m_impl : 0;
+        return m_impl->isEmptyUnique() ? nullptr : m_impl;
     }
 
     static const uint32_t NotAnIndex = UINT_MAX;
 
     uint32_t asIndex()
     {
-        ASSERT(!m_impl || (m_impl->isIdentifier() == !m_impl->isEmptyUnique()));
         return m_impl ? toUInt32FromStringImpl(m_impl) : NotAnIndex;
+    }
+    
+    void dump(PrintStream& out) const
+    {
+        if (m_impl)
+            out.print(m_impl);
+        else
+            out.print("<null property name>");
     }
 
 private:
-    StringImpl* m_impl;
+    AtomicStringImpl* m_impl;
 };
 
 inline bool operator==(PropertyName a, const Identifier& b)

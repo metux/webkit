@@ -12,7 +12,7 @@
  * 2.  Redistributions in binary form must reproduce the above copyright
  *     notice, this list of conditions and the following disclaimer in the
  *     documentation and/or other materials provided with the distribution. 
- * 3.  Neither the name of Apple Computer, Inc. ("Apple") nor the names of
+ * 3.  Neither the name of Apple Inc. ("Apple") nor the names of
  *     its contributors may be used to endorse or promote products derived
  *     from this software without specific prior written permission. 
  *
@@ -46,17 +46,15 @@
 #include "Page.h"
 #include "PageCache.h"
 #include "PageGroup.h"
-#include "PlatformStrategies.h"
 #include "ScrollingCoordinator.h"
-#include "Settings.h"
-#include "VisitedLinkStrategy.h"
+#include "VisitedLinkStore.h"
 #include <wtf/text/CString.h>
 
 namespace WebCore {
 
-static inline void addVisitedLink(Page* page, const URL& url)
+static inline void addVisitedLink(Page& page, const URL& url)
 {
-    platformStrategies()->visitedLinkStrategy()->addVisitedLink(page, visitedLinkHash(url.string()));
+    page.visitedLinkStore().addVisitedLink(page, visitedLinkHash(url.string()));
 }
 
 HistoryController::HistoryController(Frame& frame)
@@ -72,13 +70,18 @@ HistoryController::~HistoryController()
 
 void HistoryController::saveScrollPositionAndViewStateToItem(HistoryItem* item)
 {
-    if (!item || !m_frame.view())
+    FrameView* frameView = m_frame.view();
+    if (!item || !frameView)
         return;
 
     if (m_frame.document()->inPageCache())
-        item->setScrollPoint(m_frame.view()->cachedScrollPosition());
+        item->setScrollPoint(frameView->cachedScrollPosition());
     else
-        item->setScrollPoint(m_frame.view()->scrollPosition());
+        item->setScrollPoint(frameView->scrollPosition());
+#if PLATFORM(IOS)
+    item->setExposedContentRect(frameView->exposedContentRect());
+    item->setUnobscuredContentRect(frameView->unobscuredContentRect());
+#endif
 
     Page* page = m_frame.page();
     if (page && m_frame.isMainFrame())
@@ -110,7 +113,7 @@ void HistoryController::clearScrollPositionAndViewState()
 */
 void HistoryController::restoreScrollPositionAndViewState()
 {
-    if (!m_frame.loader().stateMachine()->committedFirstRealDocumentLoad())
+    if (!m_frame.loader().stateMachine().committedFirstRealDocumentLoad())
         return;
 
     ASSERT(m_currentItem);
@@ -122,31 +125,34 @@ void HistoryController::restoreScrollPositionAndViewState()
     // so there *is* no scroll or view state to restore!
     if (!m_currentItem)
         return;
-    
-    // FIXME: It would be great to work out a way to put this code in WebCore instead of calling
-    // through to the client. It's currently used only for the PDF view on Mac.
-    m_frame.loader().client().restoreViewState();
 
-    // Don't restore scroll point on iOS as FrameLoaderClient::restoreViewState() does that.
-#if !PLATFORM(IOS)
+    FrameView* view = m_frame.view();
+
     // FIXME: There is some scrolling related work that needs to happen whenever a page goes into the
     // page cache and similar work that needs to occur when it comes out. This is where we do the work
     // that needs to happen when we exit, and the work that needs to happen when we enter is in
     // Document::setIsInPageCache(bool). It would be nice if there was more symmetry in these spots.
     // https://bugs.webkit.org/show_bug.cgi?id=98698
-    if (FrameView* view = m_frame.view()) {
+    if (view) {
         Page* page = m_frame.page();
         if (page && m_frame.isMainFrame()) {
             if (ScrollingCoordinator* scrollingCoordinator = page->scrollingCoordinator())
                 scrollingCoordinator->frameViewRootLayerDidChange(view);
         }
+    }
 
-        if (!view->wasScrolledByUser()) {
-            if (page && m_frame.isMainFrame() && m_currentItem->pageScaleFactor())
-                page->setPageScaleFactor(m_currentItem->pageScaleFactor(), m_currentItem->scrollPoint());
-            else
-                view->setScrollPosition(m_currentItem->scrollPoint());
-        }
+    // FIXME: It would be great to work out a way to put this code in WebCore instead of calling
+    // through to the client.
+    m_frame.loader().client().restoreViewState();
+
+#if !PLATFORM(IOS)
+    // Don't restore scroll point on iOS as FrameLoaderClient::restoreViewState() does that.
+    if (view && !view->wasScrolledByUser()) {
+        Page* page = m_frame.page();
+        if (page && m_frame.isMainFrame() && m_currentItem->pageScaleFactor())
+            page->setPageScaleFactor(m_currentItem->pageScaleFactor(), m_currentItem->scrollPoint());
+        else
+            view->setScrollPosition(m_currentItem->scrollPoint());
     }
 #endif
 }
@@ -160,7 +166,7 @@ void HistoryController::saveDocumentState()
 {
     // FIXME: Reading this bit of FrameLoader state here is unfortunate.  I need to study
     // this more to see if we can remove this dependency.
-    if (m_frame.loader().stateMachine()->creatingInitialEmptyDocument())
+    if (m_frame.loader().stateMachine().creatingInitialEmptyDocument())
         return;
 
     // For a standard page load, we will have a previous item set, which will be used to
@@ -200,18 +206,18 @@ void HistoryController::saveDocumentAndScrollState()
 void HistoryController::restoreDocumentState()
 {
     switch (m_frame.loader().loadType()) {
-        case FrameLoadTypeReload:
-        case FrameLoadTypeReloadFromOrigin:
-        case FrameLoadTypeSame:
-        case FrameLoadTypeReplace:
-            // Not restoring the document state.
-            return;
-        case FrameLoadTypeBack:
-        case FrameLoadTypeForward:
-        case FrameLoadTypeIndexedBackForward:
-        case FrameLoadTypeRedirectWithLockedBackForwardList:
-        case FrameLoadTypeStandard:
-            break;
+    case FrameLoadType::Reload:
+    case FrameLoadType::ReloadFromOrigin:
+    case FrameLoadType::Same:
+    case FrameLoadType::Replace:
+        // Not restoring the document state.
+        return;
+    case FrameLoadType::Back:
+    case FrameLoadType::Forward:
+    case FrameLoadType::IndexedBackForward:
+    case FrameLoadType::RedirectWithLockedBackForwardList:
+    case FrameLoadType::Standard:
+        break;
     }
     
     if (!m_currentItem)
@@ -278,7 +284,7 @@ void HistoryController::goToItem(HistoryItem* targetItem, FrameLoadType type)
     }
 
     // Set the BF cursor before commit, which lets the user quickly click back/forward again.
-    // - plus, it only makes sense for the top level of the operation through the frametree,
+    // - plus, it only makes sense for the top level of the operation through the frame tree,
     // as opposed to happening for some/one of the page commits that might happen soon
     RefPtr<HistoryItem> currentItem = page->backForward().currentItem();
     page->backForward().setCurrentItem(targetItem);
@@ -288,7 +294,8 @@ void HistoryController::goToItem(HistoryItem* targetItem, FrameLoadType type)
     // This must be done before trying to navigate the desired frame, because some
     // navigations can commit immediately (such as about:blank).  We must be sure that
     // all frames have provisional items set before the commit.
-    recursiveSetProvisionalItem(targetItem, currentItem.get(), type);
+    recursiveSetProvisionalItem(targetItem, currentItem.get());
+
     // Now that all other frames have provisional items, do the actual navigation.
     recursiveGoToItem(targetItem, currentItem.get(), type);
 }
@@ -328,7 +335,7 @@ void HistoryController::updateForReload()
     if (m_currentItem) {
         pageCache()->remove(m_currentItem.get());
     
-        if (m_frame.loader().loadType() == FrameLoadTypeReload || m_frame.loader().loadType() == FrameLoadTypeReloadFromOrigin)
+        if (m_frame.loader().loadType() == FrameLoadType::Reload || m_frame.loader().loadType() == FrameLoadType::ReloadFromOrigin)
             saveScrollPositionAndViewStateToItem(m_currentItem.get());
     }
 
@@ -349,7 +356,7 @@ void HistoryController::updateForStandardLoad(HistoryUpdateType updateType)
 
     FrameLoader& frameLoader = m_frame.loader();
 
-    bool needPrivacy = m_frame.settings().privateBrowsingEnabled();
+    bool needPrivacy = m_frame.page()->usesEphemeralSession();
     const URL& historyURL = frameLoader.documentLoader()->urlForHistory();
 
     if (!frameLoader.documentLoader()->isClientRedirect()) {
@@ -372,7 +379,7 @@ void HistoryController::updateForStandardLoad(HistoryUpdateType updateType)
 
     if (!historyURL.isEmpty() && !needPrivacy) {
         if (Page* page = m_frame.page())
-            addVisitedLink(page, historyURL);
+            addVisitedLink(*page, historyURL);
 
         if (!frameLoader.documentLoader()->didCreateGlobalHistoryEntry() && frameLoader.documentLoader()->unreachableURL().isEmpty() && !m_frame.document()->url().isEmpty())
             frameLoader.client().updateGlobalHistoryRedirectLinks();
@@ -386,7 +393,7 @@ void HistoryController::updateForRedirectWithLockedBackForwardList()
         LOG(History, "WebCoreHistory: Updating History for redirect load in frame %s", m_frame.loader().documentLoader()->title().string().utf8().data());
 #endif
     
-    bool needPrivacy = m_frame.settings().privateBrowsingEnabled();
+    bool needPrivacy = m_frame.page()->usesEphemeralSession();
     const URL& historyURL = m_frame.loader().documentLoader()->urlForHistory();
 
     if (m_frame.loader().documentLoader()->isClientRedirect()) {
@@ -413,7 +420,7 @@ void HistoryController::updateForRedirectWithLockedBackForwardList()
 
     if (!historyURL.isEmpty() && !needPrivacy) {
         if (Page* page = m_frame.page())
-            addVisitedLink(page, historyURL);
+            addVisitedLink(*page, historyURL);
 
         if (!m_frame.loader().documentLoader()->didCreateGlobalHistoryEntry() && m_frame.loader().documentLoader()->unreachableURL().isEmpty() && !m_frame.document()->url().isEmpty())
             m_frame.loader().client().updateGlobalHistoryRedirectLinks();
@@ -434,12 +441,12 @@ void HistoryController::updateForClientRedirect()
         m_currentItem->clearScrollPoint();
     }
 
-    bool needPrivacy = m_frame.settings().privateBrowsingEnabled();
+    bool needPrivacy = m_frame.page()->usesEphemeralSession();
     const URL& historyURL = m_frame.loader().documentLoader()->urlForHistory();
 
     if (!historyURL.isEmpty() && !needPrivacy) {
         if (Page* page = m_frame.page())
-            addVisitedLink(page, historyURL);
+            addVisitedLink(*page, historyURL);
     }
 }
 
@@ -458,10 +465,8 @@ void HistoryController::updateForCommit()
         // the provisional item for restoring state.
         // Note previousItem must be set before we close the URL, which will
         // happen when the data source is made non-provisional below
-        m_frameLoadComplete = false;
-        m_previousItem = m_currentItem;
         ASSERT(m_provisionalItem);
-        m_currentItem = m_provisionalItem;
+        setCurrentItem(m_provisionalItem.get());
         m_provisionalItem = 0;
 
         // Tell all other frames in the tree to commit their provisional items and
@@ -473,14 +478,14 @@ void HistoryController::updateForCommit()
 
 bool HistoryController::isReplaceLoadTypeWithProvisionalItem(FrameLoadType type)
 {
-    // Going back to an error page in a subframe can trigger a FrameLoadTypeReplace
+    // Going back to an error page in a subframe can trigger a FrameLoadType::Replace
     // while m_provisionalItem is set, so we need to commit it.
-    return type == FrameLoadTypeReplace && m_provisionalItem;
+    return type == FrameLoadType::Replace && m_provisionalItem;
 }
 
 bool HistoryController::isReloadTypeWithProvisionalItem(FrameLoadType type)
 {
-    return (type == FrameLoadTypeReload || type == FrameLoadTypeReloadFromOrigin) && m_provisionalItem;
+    return (type == FrameLoadType::Reload || type == FrameLoadType::ReloadFromOrigin) && m_provisionalItem;
 }
 
 void HistoryController::recursiveUpdateForCommit()
@@ -502,9 +507,7 @@ void HistoryController::recursiveUpdateForCommit()
             view->setWasScrolledByUser(false);
 
         // Now commit the provisional item
-        m_frameLoadComplete = false;
-        m_previousItem = m_currentItem;
-        m_currentItem = m_provisionalItem;
+        setCurrentItem(m_provisionalItem.get());
         m_provisionalItem = 0;
 
         // Restore form state (works from currentItem)
@@ -524,14 +527,14 @@ void HistoryController::updateForSameDocumentNavigation()
     if (m_frame.document()->url().isEmpty())
         return;
 
-    if (m_frame.settings().privateBrowsingEnabled())
+    if (m_frame.page()->usesEphemeralSession())
         return;
 
     Page* page = m_frame.page();
     if (!page)
         return;
 
-    addVisitedLink(page, m_frame.document()->url());
+    addVisitedLink(*page, m_frame.document()->url());
     m_frame.mainFrame().loader().history().recursiveUpdateForSameDocumentNavigation();
 
     if (m_currentItem) {
@@ -553,9 +556,7 @@ void HistoryController::recursiveUpdateForSameDocumentNavigation()
         return;
 
     // Commit the provisional item.
-    m_frameLoadComplete = false;
-    m_previousItem = m_currentItem;
-    m_currentItem = m_provisionalItem;
+    setCurrentItem(m_provisionalItem.get());
     m_provisionalItem = 0;
 
     // Iterate over the rest of the tree.
@@ -573,6 +574,8 @@ void HistoryController::updateForFrameLoadCompleted()
 
 void HistoryController::setCurrentItem(HistoryItem* item)
 {
+    m_frame.loader().client().willChangeCurrentHistoryItem();
+
     m_frameLoadComplete = false;
     m_previousItem = m_currentItem;
     m_currentItem = item;
@@ -592,6 +595,13 @@ bool HistoryController::currentItemShouldBeReplaced() const
     //   and that was the about:blank Document created when the browsing context
     //   was created, then the navigation must be done with replacement enabled."
     return m_currentItem && !m_previousItem && equalIgnoringCase(m_currentItem->urlString(), blankURL());
+}
+
+void HistoryController::clearPreviousItem()
+{
+    m_previousItem = nullptr;
+    for (Frame* child = m_frame.tree().firstChild(); child; child = child->tree().nextSibling())
+        child->loader().history().clearPreviousItem();
 }
 
 void HistoryController::setProvisionalItem(HistoryItem* item)
@@ -651,9 +661,7 @@ PassRefPtr<HistoryItem> HistoryController::createItem()
     initializeItem(item.get());
     
     // Set the item for which we will save document state
-    m_frameLoadComplete = false;
-    m_previousItem = m_currentItem;
-    m_currentItem = item;
+    setCurrentItem(item.get());
     
     return item.release();
 }
@@ -700,26 +708,25 @@ PassRefPtr<HistoryItem> HistoryController::createItemTree(Frame& targetFrame, bo
 // tracking whether each frame already has the content the item requests.  If there is
 // a match, we set the provisional item and recurse.  Otherwise we will reload that
 // frame and all its kids in recursiveGoToItem.
-void HistoryController::recursiveSetProvisionalItem(HistoryItem* item, HistoryItem* fromItem, FrameLoadType type)
+void HistoryController::recursiveSetProvisionalItem(HistoryItem* item, HistoryItem* fromItem)
 {
     ASSERT(item);
 
-    if (itemsAreClones(item, fromItem)) {
-        // Set provisional item, which will be committed in recursiveUpdateForCommit.
-        m_provisionalItem = item;
+    if (!itemsAreClones(item, fromItem))
+        return;
 
-        const HistoryItemVector& childItems = item->children();
+    // Set provisional item, which will be committed in recursiveUpdateForCommit.
+    m_provisionalItem = item;
 
-        int size = childItems.size();
+    for (const auto& childItem : item->children()) {
+        const String& childFrameName = childItem->target();
 
-        for (int i = 0; i < size; ++i) {
-            String childFrameName = childItems[i]->target();
-            HistoryItem* fromChildItem = fromItem->childItemWithTarget(childFrameName);
-            ASSERT(fromChildItem);
-            Frame* childFrame = m_frame.tree().child(childFrameName);
-            ASSERT(childFrame);
-            childFrame->loader().history().recursiveSetProvisionalItem(childItems[i].get(), fromChildItem, type);
-        }
+        HistoryItem* fromChildItem = fromItem->childItemWithTarget(childFrameName);
+        ASSERT(fromChildItem);
+        Frame* childFrame = m_frame.tree().child(childFrameName);
+        ASSERT(childFrame);
+
+        childFrame->loader().history().recursiveSetProvisionalItem(childItem.get(), fromChildItem);
     }
 }
 
@@ -729,21 +736,20 @@ void HistoryController::recursiveGoToItem(HistoryItem* item, HistoryItem* fromIt
 {
     ASSERT(item);
 
-    if (itemsAreClones(item, fromItem)) {
-        // Just iterate over the rest, looking for frames to navigate.
-        const HistoryItemVector& childItems = item->children();
-
-        int size = childItems.size();
-        for (int i = 0; i < size; ++i) {
-            String childFrameName = childItems[i]->target();
-            HistoryItem* fromChildItem = fromItem->childItemWithTarget(childFrameName);
-            ASSERT(fromChildItem);
-            Frame* childFrame = m_frame.tree().child(childFrameName);
-            ASSERT(childFrame);
-            childFrame->loader().history().recursiveGoToItem(childItems[i].get(), fromChildItem, type);
-        }
-    } else {
+    if (!itemsAreClones(item, fromItem)) {
         m_frame.loader().loadItem(item, type);
+        return;
+    }
+
+    // Just iterate over the rest, looking for frames to navigate.
+    for (const auto& childItem : item->children()) {
+        const String& childFrameName = childItem->target();
+
+        HistoryItem* fromChildItem = fromItem->childItemWithTarget(childFrameName);
+        ASSERT(fromChildItem);
+        Frame* childFrame = m_frame.tree().child(childFrameName);
+        ASSERT(childFrame);
+        childFrame->loader().history().recursiveGoToItem(childItem.get(), fromChildItem, type);
     }
 }
 
@@ -848,10 +854,10 @@ void HistoryController::pushState(PassRefPtr<SerializedScriptValue> stateObject,
 
     page->backForward().addItem(topItem.release());
 
-    if (m_frame.settings().privateBrowsingEnabled())
+    if (m_frame.page()->usesEphemeralSession())
         return;
 
-    addVisitedLink(page, URL(ParsedURLString, urlString));
+    addVisitedLink(*page, URL(ParsedURLString, urlString));
     m_frame.loader().client().updateGlobalHistory();
 }
 
@@ -867,11 +873,11 @@ void HistoryController::replaceState(PassRefPtr<SerializedScriptValue> stateObje
     m_currentItem->setFormData(0);
     m_currentItem->setFormContentType(String());
 
-    if (m_frame.settings().privateBrowsingEnabled())
+    if (m_frame.page()->usesEphemeralSession())
         return;
 
     ASSERT(m_frame.page());
-    addVisitedLink(m_frame.page(), URL(ParsedURLString, urlString));
+    addVisitedLink(*m_frame.page(), URL(ParsedURLString, urlString));
     m_frame.loader().client().updateGlobalHistory();
 }
 
@@ -883,8 +889,10 @@ void HistoryController::replaceCurrentItem(HistoryItem* item)
     m_previousItem = nullptr;
     if (m_provisionalItem)
         m_provisionalItem = item;
-    else
+    else {
+        m_frame.loader().client().willChangeCurrentHistoryItem();
         m_currentItem = item;
+    }
 }
 
 } // namespace WebCore

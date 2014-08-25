@@ -1570,8 +1570,6 @@ Node* Range::firstNode() const
         return 0;
     if (m_start.container()->offsetInCharacters())
         return m_start.container();
-    if (isRendererReplacedElement(m_start.container()->renderer()))
-        return m_start.container();
     if (Node* child = m_start.container()->childNode(m_start.offset()))
         return child;
     if (!m_start.offset())
@@ -1698,28 +1696,6 @@ static bool intervalsSufficientlyOverlap(int startA, int endA, int startB, int e
     return minEnd - maxStart >= sufficientOverlap * std::min(lengthA, lengthB);
 }
 
-#ifndef NDEBUG
-static void printRects(Vector<SelectionRect>& rects)
-{
-    size_t numberOfRects = rects.size();
-    for (size_t i = 0; i < numberOfRects; ++i) {
-        fprintf(stderr, "%zu\t[%d, %d] - [%d, %d]\t%c %s\tis first: %s\tis last:%s\tcontains start: %s\tcontains end: %s\tline: %d\truby: %s\tcolumn: %d\n",
-            i,
-            rects[i].rect().x(), rects[i].rect().y(), rects[i].rect().width(), rects[i].rect().height(),
-            rects[i].isHorizontal() ? 'H' : 'V',
-            rects[i].direction() == LTR ? "LTR" : "RTL",
-            rects[i].isFirstOnLine() ? "yes" : "no",
-            rects[i].isLastOnLine() ? "yes" : "no",
-            rects[i].containsStart() ? "yes" : "no",
-            rects[i].containsEnd() ? "yes" : "no",
-            rects[i].lineNumber(),
-            rects[i].isRubyText() ? "yes": "no",
-            rects[i].columnNumber());
-    }
-    fprintf(stderr, "--------------------------------------\n");
-}
-#endif
-
 static inline void adjustLineHeightOfSelectionRects(Vector<SelectionRect>& rects, size_t numberOfRects, int lineNumber, int lineTop, int lineHeight)
 {
     ASSERT(rects.size() >= numberOfRects);
@@ -1735,7 +1711,7 @@ static inline void adjustLineHeightOfSelectionRects(Vector<SelectionRect>& rects
 
 static SelectionRect coalesceSelectionRects(const SelectionRect& original, const SelectionRect& previous)
 {
-    SelectionRect result(unionRect(previous.rect(), original.rect()), original.isHorizontal(), original.columnNumber());
+    SelectionRect result(unionRect(previous.rect(), original.rect()), original.isHorizontal(), original.pageNumber());
     result.setDirection(original.containsStart() || original.containsEnd() ? original.direction() : previous.direction());
     result.setContainsStart(previous.containsStart() || original.containsStart());
     result.setContainsEnd(previous.containsEnd() || original.containsEnd());
@@ -1790,10 +1766,6 @@ void Range::collectSelectionRects(Vector<SelectionRect>& rects)
             newRects.shrink(0);
         }
     }
-
-#ifndef NDEBUG
-    printRects(rects);
-#endif
 
     // The range could span over nodes with different writing modes.
     // If this is the case, we use the writing mode of the common ancestor.
@@ -1851,7 +1823,7 @@ void Range::collectSelectionRects(Vector<SelectionRect>& rects)
                 lineBottom = currentRectBottom;
             } else {
                 lastLineBottom = lineBottom;
-                if (currentRectTop <= lastLineBottom && i && rects[i].columnNumber() == rects[i - 1].columnNumber()) {
+                if (currentRectTop <= lastLineBottom && i && rects[i].pageNumber() == rects[i - 1].pageNumber()) {
                     lastLineTop = lineTop;
                     lineBottom = lastLineTop;
                 } else {
@@ -1942,13 +1914,13 @@ void Range::collectSelectionRects(Vector<SelectionRect>& rects)
                 // For iBooks, the interior lines may cross multiple horizontal pages.
                 interiorUnionRect.unite(currentRect.rect());
             } else {
-                unionedRects.append(SelectionRect(interiorUnionRect, currentRect.isHorizontal(), currentRect.columnNumber()));
+                unionedRects.append(SelectionRect(interiorUnionRect, currentRect.isHorizontal(), currentRect.pageNumber()));
                 interiorUnionRect = currentRect.rect();
             }
         } else {
             // Processing last line.
             if (!interiorUnionRect.isEmpty()) {
-                unionedRects.append(SelectionRect(interiorUnionRect, currentRect.isHorizontal(), currentRect.columnNumber()));
+                unionedRects.append(SelectionRect(interiorUnionRect, currentRect.isHorizontal(), currentRect.pageNumber()));
                 interiorUnionRect = IntRect();
             }
 
@@ -1995,6 +1967,19 @@ void Range::formatForDebugger(char* buffer, unsigned length) const
 }
 #endif
 
+bool Range::contains(const Range& other) const
+{
+    if (commonAncestorContainer(ASSERT_NO_EXCEPTION)->ownerDocument() != other.commonAncestorContainer(ASSERT_NO_EXCEPTION)->ownerDocument())
+        return false;
+
+    short startToStart = compareBoundaryPoints(Range::START_TO_START, &other, ASSERT_NO_EXCEPTION);
+    if (startToStart > 0)
+        return false;
+
+    short endToEnd = compareBoundaryPoints(Range::END_TO_END, &other, ASSERT_NO_EXCEPTION);
+    return endToEnd >= 0;
+}
+
 bool areRangesEqual(const Range* a, const Range* b)
 {
     if (a == b)
@@ -2004,30 +1989,41 @@ bool areRangesEqual(const Range* a, const Range* b)
     return a->startPosition() == b->startPosition() && a->endPosition() == b->endPosition();
 }
 
+bool rangesOverlap(const Range* a, const Range* b)
+{
+    if (!a || !b)
+        return false;
+
+    if (a == b)
+        return true;
+
+    if (a->commonAncestorContainer(ASSERT_NO_EXCEPTION)->ownerDocument() != b->commonAncestorContainer(ASSERT_NO_EXCEPTION)->ownerDocument())
+        return false;
+
+    short startToStart = a->compareBoundaryPoints(Range::START_TO_START, b, ASSERT_NO_EXCEPTION);
+    short endToEnd = a->compareBoundaryPoints(Range::END_TO_END, b, ASSERT_NO_EXCEPTION);
+
+    // First range contains the second range.
+    if (startToStart <= 0 && endToEnd >= 0)
+        return true;
+
+    // End of first range is inside second range.
+    if (a->compareBoundaryPoints(Range::START_TO_END, b, ASSERT_NO_EXCEPTION) >= 0 && endToEnd <= 0)
+        return true;
+
+    // Start of first range is inside second range.
+    if (startToStart >= 0 && a->compareBoundaryPoints(Range::END_TO_START, b, ASSERT_NO_EXCEPTION) <= 0)
+        return true;
+
+    return false;
+}
+
 PassRefPtr<Range> rangeOfContents(Node& node)
 {
     RefPtr<Range> range = Range::create(node.document());
     int exception = 0;
     range->selectNodeContents(&node, exception);
     return range.release();
-}
-
-int Range::maxStartOffset() const
-{
-    if (!m_start.container())
-        return 0;
-    if (!m_start.container()->offsetInCharacters())
-        return m_start.container()->childNodeCount();
-    return m_start.container()->maxCharacterOffset();
-}
-
-int Range::maxEndOffset() const
-{
-    if (!m_end.container())
-        return 0;
-    if (!m_end.container()->offsetInCharacters())
-        return m_end.container()->childNodeCount();
-    return m_end.container()->maxCharacterOffset();
 }
 
 static inline void boundaryNodeChildrenChanged(RangeBoundaryPoint& boundary, ContainerNode& container)

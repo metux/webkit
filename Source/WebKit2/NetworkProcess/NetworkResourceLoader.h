@@ -35,12 +35,14 @@
 #include <WebCore/ResourceHandleClient.h>
 #include <WebCore/ResourceLoaderOptions.h>
 #include <WebCore/ResourceRequest.h>
+#include <WebCore/SessionID.h>
 #include <wtf/MainThread.h>
 #include <wtf/RunLoop.h>
 
 typedef const struct _CFCachedURLResponse* CFCachedURLResponseRef;
 
 namespace WebCore {
+class BlobDataFileReference;
 class ResourceBuffer;
 class ResourceHandle;
 class ResourceRequest;
@@ -71,12 +73,16 @@ public:
 
     WebCore::ResourceLoadPriority priority() { return m_priority; }
     WebCore::ResourceRequest& request() { return m_request; }
+    WebCore::SessionID sessionID() const { return m_sessionID; }
 
     WebCore::ResourceHandle* handle() const { return m_handle.get(); }
     void didConvertHandleToDownload();
 
     void start();
     void abort();
+
+    void setDefersLoading(bool);
+    bool defersLoading() const { return m_defersLoading; }
 
     // ResourceHandleClient methods
     virtual void willSendRequestAsync(WebCore::ResourceHandle*, const WebCore::ResourceRequest&, const WebCore::ResourceResponse& redirectResponse) override;
@@ -89,7 +95,6 @@ public:
     virtual void wasBlocked(WebCore::ResourceHandle*) override;
     virtual void cannotShowURL(WebCore::ResourceHandle*) override;
     virtual bool shouldUseCredentialStorage(WebCore::ResourceHandle*) override;
-    virtual void shouldUseCredentialStorageAsync(WebCore::ResourceHandle*) override;
     virtual void didReceiveAuthenticationChallenge(WebCore::ResourceHandle*, const WebCore::AuthenticationChallenge&) override;
     virtual void didCancelAuthenticationChallenge(WebCore::ResourceHandle*, const WebCore::AuthenticationChallenge&) override;
     virtual void receivedCancellation(WebCore::ResourceHandle*, const WebCore::AuthenticationChallenge&) override;
@@ -104,26 +109,29 @@ public:
     virtual void didReceiveDataArray(WebCore::ResourceHandle*, CFArrayRef) override;
 #endif
 
-#if PLATFORM(MAC)
+#if PLATFORM(COCOA)
     static size_t fileBackedResourceMinimumSize();
-#if !PLATFORM(IOS)
+
+#if USE(CFNETWORK)
+    virtual void willCacheResponseAsync(WebCore::ResourceHandle*, CFCachedURLResponseRef) override;
+#else
     virtual void willCacheResponseAsync(WebCore::ResourceHandle*, NSCachedURLResponse *) override;
-    virtual void willStopBufferingData(WebCore::ResourceHandle*, const char*, unsigned) override;
 #endif
-#endif // PLATFORM(MAC)
+#endif
 
     // Message handlers.
     void didReceiveNetworkResourceLoaderMessage(IPC::Connection*, IPC::MessageDecoder&);
 
 #if PLATFORM(IOS) || (PLATFORM(MAC) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 1090)
     static void tryGetShareableHandleFromCFURLCachedResponse(ShareableResource::Handle&, CFCachedURLResponseRef);
+    static void tryGetShareableHandleFromSharedBuffer(ShareableResource::Handle&, WebCore::SharedBuffer*);
 #endif
 
     bool isSynchronous() const;
     bool isLoadingMainResource() const { return m_isLoadingMainResource; }
     
-    void setHostRecord(HostRecord* hostRecord) { ASSERT(isMainThread()); m_hostRecord = hostRecord; }
-    HostRecord* hostRecord() const { ASSERT(isMainThread()); return m_hostRecord.get(); }
+    void setHostRecord(HostRecord* hostRecord) { ASSERT(RunLoop::isMain()); m_hostRecord = hostRecord; }
+    HostRecord* hostRecord() const { ASSERT(RunLoop::isMain()); return m_hostRecord.get(); }
 
     template<typename T>
     bool sendAbortingOnFailure(T&& message, unsigned messageSendFlags = 0)
@@ -134,15 +142,12 @@ public:
         return result;
     }
 
-
 #if USE(PROTECTION_SPACE_AUTH_CALLBACK)
     void continueCanAuthenticateAgainstProtectionSpace(bool);
 #endif
     void continueWillSendRequest(const WebCore::ResourceRequest& newRequest);
 
-#if PLATFORM(IOS) || (PLATFORM(MAC) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 1090)
-    static void tryGetShareableHandleFromSharedBuffer(ShareableResource::Handle&, WebCore::SharedBuffer*);
-#endif
+    WebCore::SharedBuffer* bufferedData() const { return m_bufferedData.get(); }
 
 private:
     NetworkResourceLoader(const NetworkResourceLoadParameters&, NetworkConnectionToWebProcess*, PassRefPtr<Messages::NetworkConnectionToWebProcess::PerformSynchronousLoad::DelayedReply>);
@@ -174,22 +179,26 @@ private:
     ResourceLoadIdentifier m_identifier;
     uint64_t m_webPageID;
     uint64_t m_webFrameID;
-    uint64_t m_sessionID;
+    WebCore::SessionID m_sessionID;
     WebCore::ResourceRequest m_request;
+    WebCore::ResourceRequest m_deferredRequest;
     WebCore::ResourceLoadPriority m_priority;
     WebCore::ContentSniffingPolicy m_contentSniffingPolicy;
     WebCore::StoredCredentials m_allowStoredCredentials;
     WebCore::ClientCredentialPolicy m_clientCredentialPolicy;
     bool m_shouldClearReferrerOnHTTPSToHTTPRedirect;
     bool m_isLoadingMainResource;
+    bool m_defersLoading;
 
     Vector<RefPtr<SandboxExtension>> m_requestBodySandboxExtensions;
     Vector<RefPtr<SandboxExtension>> m_resourceSandboxExtensions;
+    Vector<RefPtr<WebCore::BlobDataFileReference>> m_fileReferences;
     bool m_sandboxExtensionsAreConsumed;
 
     RefPtr<NetworkConnectionToWebProcess> m_connection;
     
     RefPtr<HostRecord> m_hostRecord;
+    RefPtr<WebCore::SharedBuffer> m_bufferedData;
 };
 
 } // namespace WebKit

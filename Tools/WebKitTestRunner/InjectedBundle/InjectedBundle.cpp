@@ -29,13 +29,12 @@
 #include "ActivateFonts.h"
 #include "InjectedBundlePage.h"
 #include "StringFunctions.h"
-#include <WebKit2/WKBundle.h>
-#include <WebKit2/WKBundlePage.h>
-#include <WebKit2/WKBundlePagePrivate.h>
-#include <WebKit2/WKBundlePrivate.h>
-#include <WebKit2/WKRetainPtr.h>
-#include <WebKit2/WebKit2_C.h>
-#include <wtf/PassOwnPtr.h>
+#include <WebKit/WKBundle.h>
+#include <WebKit/WKBundlePage.h>
+#include <WebKit/WKBundlePagePrivate.h>
+#include <WebKit/WKBundlePrivate.h>
+#include <WebKit/WKRetainPtr.h>
+#include <WebKit/WebKit2_C.h>
 #include <wtf/text/CString.h>
 #include <wtf/text/StringBuilder.h>
 #include <wtf/Vector.h>
@@ -101,12 +100,11 @@ void InjectedBundle::initialize(WKBundleRef bundle, WKTypeRef initializationUser
     platformInitialize(initializationUserData);
 
     activateFonts();
-    WKBundleActivateMacFontAscentHack(m_bundle);
 }
 
 void InjectedBundle::didCreatePage(WKBundlePageRef page)
 {
-    m_pages.append(adoptPtr(new InjectedBundlePage(page)));
+    m_pages.append(std::make_unique<InjectedBundlePage>(page));
 }
 
 void InjectedBundle::willDestroyPage(WKBundlePageRef page)
@@ -159,7 +157,9 @@ void InjectedBundle::didReceiveMessage(WKStringRef messageName, WKTypeRef messag
 
         beginTesting(messageBodyDictionary);
         return;
-    } else if (WKStringIsEqualToUTF8CString(messageName, "Reset")) {
+    }
+    
+    if (WKStringIsEqualToUTF8CString(messageName, "Reset")) {
         ASSERT(messageBody);
         ASSERT(WKGetTypeID(messageBody) == WKDictionaryGetTypeID());
         WKDictionaryRef messageBodyDictionary = static_cast<WKDictionaryRef>(messageBody);
@@ -180,22 +180,27 @@ void InjectedBundle::didReceiveMessage(WKStringRef messageName, WKTypeRef messag
 
         return;
     }
+
     if (WKStringIsEqualToUTF8CString(messageName, "CallAddChromeInputFieldCallback")) {
         m_testRunner->callAddChromeInputFieldCallback();
         return;
     }
+
     if (WKStringIsEqualToUTF8CString(messageName, "CallRemoveChromeInputFieldCallback")) {
         m_testRunner->callRemoveChromeInputFieldCallback();
         return;
     }
+
     if (WKStringIsEqualToUTF8CString(messageName, "CallFocusWebViewCallback")) {
         m_testRunner->callFocusWebViewCallback();
         return;
     }
+
     if (WKStringIsEqualToUTF8CString(messageName, "CallSetBackingScaleFactorCallback")) {
         m_testRunner->callSetBackingScaleFactorCallback();
         return;
     }   
+
     if (WKStringIsEqualToUTF8CString(messageName, "WorkQueueProcessedCallback")) {
         if (!topLoadingFrame() && !m_testRunner->waitToDump())
             page()->dump();
@@ -238,7 +243,6 @@ void InjectedBundle::beginTesting(WKDictionaryRef settings)
     m_textInputController = TextInputController::create();
     m_accessibilityController = AccessibilityController::create();
 
-    WKBundleSetShouldTrackVisitedLinks(m_bundle, false);
     WKBundleRemoveAllVisitedLinks(m_bundle);
     WKBundleSetAllowUniversalAccessFromFileURLs(m_bundle, m_pageGroup, true);
     WKBundleSetJavaScriptCanAccessClipboard(m_bundle, m_pageGroup, true);
@@ -252,8 +256,6 @@ void InjectedBundle::beginTesting(WKDictionaryRef settings)
     WKBundleSetPopupBlockingEnabled(m_bundle, m_pageGroup, false);
     WKBundleSetAlwaysAcceptCookies(m_bundle, false);
     WKBundleSetSerialLoadingEnabled(m_bundle, false);
-    WKBundleSetShadowDOMEnabled(m_bundle, true);
-    WKBundleSetSeamlessIFramesEnabled(m_bundle, true);
     WKBundleSetCacheModel(m_bundle, 1 /*CacheModelDocumentBrowser*/);
 
     WKBundleRemoveAllUserContent(m_bundle, m_pageGroup);
@@ -383,6 +385,13 @@ void InjectedBundle::postSimulateWebNotificationClick(uint64_t notificationID)
     WKBundlePostMessage(m_bundle, messageName.get(), messageBody.get());
 }
 
+void InjectedBundle::postSetAddsVisitedLinks(bool addsVisitedLinks)
+{
+    WKRetainPtr<WKStringRef> messageName(AdoptWK, WKStringCreateWithUTF8CString("SetAddsVisitedLinks"));
+    WKRetainPtr<WKBooleanRef> messageBody(AdoptWK, WKBooleanCreate(addsVisitedLinks));
+    WKBundlePostMessage(m_bundle, messageName.get(), messageBody.get());
+}
+
 void InjectedBundle::setGeolocationPermission(bool enabled)
 {
     WKRetainPtr<WKStringRef> messageName(AdoptWK, WKStringCreateWithUTF8CString("SetGeolocationPermission"));
@@ -466,17 +475,13 @@ void InjectedBundle::setCustomPolicyDelegate(bool enabled, bool permissive)
     WKBundlePostMessage(m_bundle, messageName.get(), messageBody.get());
 }
 
-void InjectedBundle::setVisibilityState(WKPageVisibilityState visibilityState, bool isInitialState)
+void InjectedBundle::setHidden(bool hidden)
 {
-    WKRetainPtr<WKStringRef> messageName(AdoptWK, WKStringCreateWithUTF8CString("SetVisibilityState"));
+    WKRetainPtr<WKStringRef> messageName(AdoptWK, WKStringCreateWithUTF8CString("SetHidden"));
     WKRetainPtr<WKMutableDictionaryRef> messageBody(AdoptWK, WKMutableDictionaryCreate());
 
-    WKRetainPtr<WKStringRef> visibilityStateKeyWK(AdoptWK, WKStringCreateWithUTF8CString("visibilityState"));
-    WKRetainPtr<WKUInt64Ref> visibilityStateWK(AdoptWK, WKUInt64Create(visibilityState));
-    WKDictionarySetItem(messageBody.get(), visibilityStateKeyWK.get(), visibilityStateWK.get());
-
-    WKRetainPtr<WKStringRef> isInitialKeyWK(AdoptWK, WKStringCreateWithUTF8CString("isInitialState"));
-    WKRetainPtr<WKBooleanRef> isInitialWK(AdoptWK, WKBooleanCreate(isInitialState));
+    WKRetainPtr<WKStringRef> isInitialKeyWK(AdoptWK, WKStringCreateWithUTF8CString("hidden"));
+    WKRetainPtr<WKBooleanRef> isInitialWK(AdoptWK, WKBooleanCreate(hidden));
     WKDictionarySetItem(messageBody.get(), isInitialKeyWK.get(), isInitialWK.get());
 
     WKBundlePostMessage(m_bundle, messageName.get(), messageBody.get());

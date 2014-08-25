@@ -23,7 +23,7 @@
 
 #include "config.h"
 
-#if ENABLE(SVG) && ENABLE(FILTERS)
+#if ENABLE(FILTERS)
 #include "RenderSVGResourceFilter.h"
 
 #include "ElementChildIterator.h"
@@ -49,7 +49,7 @@ namespace WebCore {
 RenderSVGResourceType RenderSVGResourceFilter::s_resourceType = FilterResourceType;
 
 RenderSVGResourceFilter::RenderSVGResourceFilter(SVGFilterElement& element, PassRef<RenderStyle> style)
-    : RenderSVGResourceContainer(element, std::move(style))
+    : RenderSVGResourceContainer(element, WTF::move(style))
 {
 }
 
@@ -64,7 +64,7 @@ void RenderSVGResourceFilter::removeAllClientsFromCache(bool markForInvalidation
     markAllClientsForInvalidation(markForInvalidation ? LayoutAndBoundariesInvalidation : ParentOnlyInvalidation);
 }
 
-void RenderSVGResourceFilter::removeClientFromCache(RenderObject& client, bool markForInvalidation)
+void RenderSVGResourceFilter::removeClientFromCache(RenderElement& client, bool markForInvalidation)
 {
     if (FilterData* filterData = m_filter.get(&client)) {
         if (filterData->savedContext)
@@ -76,7 +76,7 @@ void RenderSVGResourceFilter::removeClientFromCache(RenderObject& client, bool m
     markClientForInvalidation(client, markForInvalidation ? BoundariesInvalidation : ParentOnlyInvalidation);
 }
 
-std::unique_ptr<SVGFilterBuilder> RenderSVGResourceFilter::buildPrimitives(SVGFilter* filter)
+std::unique_ptr<SVGFilterBuilder> RenderSVGResourceFilter::buildPrimitives(SVGFilter* filter) const
 {
     FloatRect targetBoundingBox = filter->targetBoundingBox();
 
@@ -99,17 +99,17 @@ std::unique_ptr<SVGFilterBuilder> RenderSVGResourceFilter::buildPrimitives(SVGFi
 
 bool RenderSVGResourceFilter::fitsInMaximumImageSize(const FloatSize& size, FloatSize& scale)
 {
-    bool matchesFilterSize = true;
-    if (size.width() > kMaxFilterSize) {
-        scale.setWidth(scale.width() * kMaxFilterSize / size.width());
-        matchesFilterSize = false;
-    }
-    if (size.height() > kMaxFilterSize) {
-        scale.setHeight(scale.height() * kMaxFilterSize / size.height());
-        matchesFilterSize = false;
-    }
+    FloatSize scaledSize(size);
+    scaledSize.scale(scale.width(), scale.height());
+    float scaledArea = scaledSize.width() * scaledSize.height();
 
-    return matchesFilterSize;
+    if (scaledArea <= FilterEffect::maxFilterArea())
+        return true;
+
+    // If area of scaled size is bigger than the upper limit, adjust the scale
+    // to fit.
+    scale.scale(sqrt(FilterEffect::maxFilterArea() / scaledArea));
+    return false;
 }
 
 bool RenderSVGResourceFilter::applyResource(RenderElement& renderer, const RenderStyle&, GraphicsContext*& context, unsigned short resourceMode)
@@ -133,7 +133,7 @@ bool RenderSVGResourceFilter::applyResource(RenderElement& renderer, const Rende
 
     // Determine absolute transformation matrix for filter. 
     AffineTransform absoluteTransform;
-    SVGRenderingContext::calculateTransformationToOutermostCoordinateSystem(&renderer, absoluteTransform);
+    SVGRenderingContext::calculateTransformationToOutermostCoordinateSystem(renderer, absoluteTransform);
     if (!absoluteTransform.isInvertible())
         return false;
 
@@ -192,7 +192,7 @@ bool RenderSVGResourceFilter::applyResource(RenderElement& renderer, const Rende
     if (filterData->drawingRegion.isEmpty()) {
         ASSERT(!m_filter.contains(&renderer));
         filterData->savedContext = context;
-        m_filter.set(&renderer, std::move(filterData));
+        m_filter.set(&renderer, WTF::move(filterData));
         return false;
     }
 
@@ -206,7 +206,7 @@ bool RenderSVGResourceFilter::applyResource(RenderElement& renderer, const Rende
     if (!SVGRenderingContext::createImageBuffer(filterData->drawingRegion, effectiveTransform, sourceGraphic, ColorSpaceLinearRGB, renderingMode)) {
         ASSERT(!m_filter.contains(&renderer));
         filterData->savedContext = context;
-        m_filter.set(&renderer, std::move(filterData));
+        m_filter.set(&renderer, WTF::move(filterData));
         return false;
     }
     
@@ -216,13 +216,13 @@ bool RenderSVGResourceFilter::applyResource(RenderElement& renderer, const Rende
     GraphicsContext* sourceGraphicContext = sourceGraphic->context();
     ASSERT(sourceGraphicContext);
   
-    filterData->sourceGraphicBuffer = std::move(sourceGraphic);
+    filterData->sourceGraphicBuffer = WTF::move(sourceGraphic);
     filterData->savedContext = context;
 
     context = sourceGraphicContext;
 
     ASSERT(!m_filter.contains(&renderer));
-    m_filter.set(&renderer, std::move(filterData));
+    m_filter.set(&renderer, WTF::move(filterData));
 
     return true;
 }
@@ -270,7 +270,7 @@ void RenderSVGResourceFilter::postApplyResource(RenderElement& renderer, Graphic
         // initial filtering process. We just take the stored filter result on a
         // second drawing.
         if (filterData->state != FilterData::Built)
-            filterData->filter->setSourceImage(std::move(filterData->sourceGraphicBuffer));
+            filterData->filter->setSourceImage(WTF::move(filterData->sourceGraphicBuffer));
 
         // Always true if filterData is just built (filterData->state == FilterData::Built).
         if (!lastEffect->hasResult()) {

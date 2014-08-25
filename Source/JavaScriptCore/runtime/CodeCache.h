@@ -65,7 +65,7 @@ public:
     SourceCodeKey(const SourceCode& sourceCode, const String& name, CodeType codeType, JSParserStrictness jsParserStrictness)
         : m_sourceCode(sourceCode)
         , m_name(name)
-        , m_flags((codeType << 1) | jsParserStrictness)
+        , m_flags((codeType << 2) | jsParserStrictness)
         , m_hash(string().impl()->hash())
     {
     }
@@ -235,6 +235,7 @@ private:
 
 // Caches top-level code such as <script>, eval(), new Function, and JSEvaluateScript().
 class CodeCache {
+    WTF_MAKE_FAST_ALLOCATED;
 public:
     static PassOwnPtr<CodeCache> create() { return adoptPtr(new CodeCache); }
 

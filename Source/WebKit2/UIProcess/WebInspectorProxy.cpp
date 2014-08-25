@@ -41,6 +41,7 @@
 #include "WebProcessProxy.h"
 #include <WebCore/SchemeRegistry.h>
 #include <wtf/NeverDestroyed.h>
+#include <wtf/text/StringBuilder.h>
 
 #if ENABLE(INSPECTOR_SERVER)
 #include "WebInspectorServer.h"
@@ -105,11 +106,11 @@ private:
 
 #ifndef NDEBUG
         // Allow developers to inspect the Web Inspector in debug builds.
-        pageGroup->preferences()->setDeveloperExtrasEnabled(true);
-        pageGroup->preferences()->setLogsPageMessagesToSystemConsoleEnabled(true);
+        pageGroup->preferences().setDeveloperExtrasEnabled(true);
+        pageGroup->preferences().setLogsPageMessagesToSystemConsoleEnabled(true);
 #endif
 
-        pageGroup->preferences()->setApplicationChromeModeEnabled(true);
+        pageGroup->preferences().setApplicationChromeModeEnabled(true);
 
         return pageGroup.release();
     }
@@ -270,10 +271,10 @@ void WebInspectorProxy::attach(AttachmentSide side)
     m_isAttached = true;
     m_attachmentSide = side;
 
-    inspectorPageGroup()->preferences()->setInspectorAttachmentSide(side);
+    inspectorPageGroup()->preferences().setInspectorAttachmentSide(side);
 
     if (m_isVisible)
-        inspectorPageGroup()->preferences()->setInspectorStartsAttached(true);
+        inspectorPageGroup()->preferences().setInspectorStartsAttached(true);
 
     switch (m_attachmentSide) {
     case AttachmentSideBottom:
@@ -296,7 +297,7 @@ void WebInspectorProxy::detach()
     m_isAttached = false;
 
     if (m_isVisible)
-        inspectorPageGroup()->preferences()->setInspectorStartsAttached(false);
+        inspectorPageGroup()->preferences().setInspectorStartsAttached(false);
 
     m_page->process().send(Messages::WebInspector::Detached(), m_page->pageID());
 
@@ -305,13 +306,13 @@ void WebInspectorProxy::detach()
 
 void WebInspectorProxy::setAttachedWindowHeight(unsigned height)
 {
-    inspectorPageGroup()->preferences()->setInspectorAttachedHeight(height);
+    inspectorPageGroup()->preferences().setInspectorAttachedHeight(height);
     platformSetAttachedWindowHeight(height);
 }
 
 void WebInspectorProxy::setAttachedWindowWidth(unsigned width)
 {
-    inspectorPageGroup()->preferences()->setInspectorAttachedWidth(width);
+    inspectorPageGroup()->preferences().setInspectorAttachedWidth(width);
     platformSetAttachedWindowWidth(width);
 }
 
@@ -362,15 +363,26 @@ bool WebInspectorProxy::isInspectorPage(WebPageProxy& page)
     return WebInspectorPageGroups::shared().isInspectorPageGroup(page.pageGroup());
 }
 
-static bool isMainInspectorPage(const WebInspectorProxy* webInspectorProxy, WKURLRequestRef requestRef)
+static bool isMainOrTestInspectorPage(const WebInspectorProxy* webInspectorProxy, WKURLRequestRef requestRef)
 {
-    // Use URL so we can compare just the paths.
-    URL inspectorURL(URL(), webInspectorProxy->inspectorPageURL());
     URL requestURL(URL(), toImpl(requestRef)->resourceRequest().url());
+    if (!WebCore::SchemeRegistry::shouldTreatURLSchemeAsLocal(requestURL.protocol()))
+        return false;
 
-    ASSERT(WebCore::SchemeRegistry::shouldTreatURLSchemeAsLocal(inspectorURL.protocol()));
+    // Use URL so we can compare just the paths.
+    URL mainPageURL(URL(), webInspectorProxy->inspectorPageURL());
+    ASSERT(WebCore::SchemeRegistry::shouldTreatURLSchemeAsLocal(mainPageURL.protocol()));
+    if (decodeURLEscapeSequences(requestURL.path()) == decodeURLEscapeSequences(mainPageURL.path()))
+        return true;
 
-    return WebCore::SchemeRegistry::shouldTreatURLSchemeAsLocal(requestURL.protocol()) && decodeURLEscapeSequences(requestURL.path()) == decodeURLEscapeSequences(inspectorURL.path());
+    // We might not have a Test URL in Production builds.
+    String testPageURLString = webInspectorProxy->inspectorTestPageURL();
+    if (testPageURLString.isNull())
+        return false;
+
+    URL testPageURL(URL(), webInspectorProxy->inspectorTestPageURL());
+    ASSERT(WebCore::SchemeRegistry::shouldTreatURLSchemeAsLocal(testPageURL.protocol()));
+    return decodeURLEscapeSequences(requestURL.path()) == decodeURLEscapeSequences(testPageURL.path());
 }
 
 static void decidePolicyForNavigationAction(WKPageRef, WKFrameRef frameRef, WKFrameNavigationType, WKEventModifiers, WKEventMouseButton, WKFrameRef, WKURLRequestRef requestRef, WKFramePolicyListenerRef listenerRef, WKTypeRef, const void* clientInfo)
@@ -385,7 +397,7 @@ static void decidePolicyForNavigationAction(WKPageRef, WKFrameRef frameRef, WKFr
     ASSERT(webInspectorProxy);
 
     // Allow loading of the main inspector file.
-    if (isMainInspectorPage(webInspectorProxy, requestRef)) {
+    if (isMainOrTestInspectorPage(webInspectorProxy, requestRef)) {
         toImpl(listenerRef)->use();
         return;
     }
@@ -429,7 +441,7 @@ void WebInspectorProxy::createInspectorPage(uint64_t& inspectorPageID, WebPageCr
         return;
 
     m_isAttached = shouldOpenAttached();
-    m_attachmentSide = static_cast<AttachmentSide>(inspectorPageGroup()->preferences()->inspectorAttachmentSide());
+    m_attachmentSide = static_cast<AttachmentSide>(inspectorPageGroup()->preferences().inspectorAttachmentSide());
 
     WebPageProxy* inspectorPage = platformCreateInspectorPage();
     ASSERT(inspectorPage);
@@ -451,27 +463,65 @@ void WebInspectorProxy::createInspectorPage(uint64_t& inspectorPageID, WebPageCr
 
     WKPageSetPagePolicyClient(toAPI(inspectorPage), &policyClient.base);
 
-    String url = inspectorPageURL();
+    StringBuilder url;
 
-    url.append("?dockSide=");
+    url.append(inspectorPageURL());
+
+    url.appendLiteral("?dockSide=");
 
     if (m_isAttached) {
         switch (m_attachmentSide) {
         case AttachmentSideBottom:
-            url.append("bottom");
+            url.appendLiteral("bottom");
             m_page->process().send(Messages::WebInspector::AttachedBottom(), m_page->pageID());
             break;
         case AttachmentSideRight:
-            url.append("right");
+            url.appendLiteral("right");
             m_page->process().send(Messages::WebInspector::AttachedRight(), m_page->pageID());
             break;
         }
     } else
-        url.append("undocked");
+        url.appendLiteral("undocked");
 
     m_page->process().assumeReadAccessToBaseURL(inspectorBaseURL());
 
-    inspectorPage->loadRequest(URL(URL(), url));
+    inspectorPage->loadRequest(URL(URL(), url.toString()));
+
+    m_createdInspectorPage = true;
+}
+
+void WebInspectorProxy::createInspectorPageForTest(uint64_t& inspectorPageID, WebPageCreationParameters& inspectorPageParameters)
+{
+    inspectorPageID = 0;
+
+    if (!m_page)
+        return;
+
+    m_isAttached = false;
+
+    WebPageProxy* inspectorPage = platformCreateInspectorPage();
+    ASSERT(inspectorPage);
+    if (!inspectorPage)
+        return;
+
+    inspectorPageID = inspectorPage->pageID();
+    inspectorPageParameters = inspectorPage->creationParameters();
+
+    WKPagePolicyClientV1 policyClient = {
+        { 1, this },
+        0, /* decidePolicyForNavigationAction_deprecatedForUseWithV0 */
+        0, /* decidePolicyForNewWindowAction */
+        0, /* decidePolicyForResponse_deprecatedForUseWithV0 */
+        0, /* unableToImplementPolicy */
+        decidePolicyForNavigationAction,
+        0, /* decidePolicyForResponse */
+    };
+
+    WKPageSetPagePolicyClient(toAPI(inspectorPage), &policyClient.base);
+
+    m_page->process().assumeReadAccessToBaseURL(inspectorBaseURL());
+
+    inspectorPage->loadRequest(URL(URL(), inspectorTestPageURL()));
 
     m_createdInspectorPage = true;
 }
@@ -563,7 +613,7 @@ bool WebInspectorProxy::canAttach()
 
 bool WebInspectorProxy::shouldOpenAttached()
 {
-    return inspectorPageGroup()->preferences()->inspectorStartsAttached() && canAttach();
+    return inspectorPageGroup()->preferences().inspectorStartsAttached() && canAttach();
 }
 
 #if ENABLE(INSPECTOR_SERVER)

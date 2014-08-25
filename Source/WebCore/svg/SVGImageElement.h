@@ -21,7 +21,6 @@
 #ifndef SVGImageElement_h
 #define SVGImageElement_h
 
-#if ENABLE(SVG)
 #include "SVGAnimatedBoolean.h"
 #include "SVGAnimatedLength.h"
 #include "SVGAnimatedPreserveAspectRatio.h"
@@ -42,12 +41,9 @@ private:
     SVGImageElement(const QualifiedName&, Document&);
     
     virtual bool isValid() const override { return SVGTests::isValid(); }
-    virtual bool supportsFocus() const override { return true; }
 
     bool isSupportedAttribute(const QualifiedName&);
     virtual void parseAttribute(const QualifiedName&, const AtomicString&) override;
-    virtual bool isPresentationAttribute(const QualifiedName&) const override;
-    virtual void collectStyleForPresentationAttribute(const QualifiedName&, const AtomicString&, MutableStyleProperties&) override;
     virtual void svgAttributeChanged(const QualifiedName&) override;
 
     virtual void didAttachRenderers() override;
@@ -60,7 +56,7 @@ private:
 
     virtual bool haveLoadedRequiredResources() override;
 
-    virtual bool selfHasRelativeLengths() const override;
+    virtual bool selfHasRelativeLengths() const override { return true; }
     virtual void didMoveToNewDocument(Document* oldDocument) override;
 
     BEGIN_DECLARE_ANIMATED_PROPERTIES(SVGImageElement)
@@ -80,5 +76,4 @@ NODE_TYPE_CASTS(SVGImageElement)
 
 } // namespace WebCore
 
-#endif // ENABLE(SVG)
 #endif

@@ -29,7 +29,7 @@
 
 #include "BytecodeGenerator.h"
 #include "CodeSpecializationKind.h"
-#include "Operations.h"
+#include "JSCInlines.h"
 #include "Parser.h"
 #include "StrongInlines.h"
 #include "UnlinkedCodeBlock.h"
@@ -79,7 +79,7 @@ UnlinkedCodeBlockType* CodeCache::getGlobalCodeBlock(VM& vm, ExecutableType* exe
 {
     SourceCodeKey key = SourceCodeKey(source, String(), CacheTypes<UnlinkedCodeBlockType>::codeType, strictness);
     CodeCacheMap::AddResult addResult = m_sourceCode.add(key, SourceCodeValue());
-    bool canCache = debuggerMode == DebuggerOff && profilerMode == ProfilerOff;
+    bool canCache = debuggerMode == DebuggerOff && profilerMode == ProfilerOff && !vm.isProfilingTypesWithHighFidelity();
     if (!addResult.isNewEntry && canCache) {
         UnlinkedCodeBlockType* unlinkedCodeBlock = jsCast<UnlinkedCodeBlockType*>(addResult.iterator->value.cell.get());
         unsigned firstLine = source.firstLine() + unlinkedCodeBlock->firstLine();
@@ -144,24 +144,26 @@ UnlinkedFunctionExecutable* CodeCache::getFunctionExecutableFromGlobalCode(VM& v
     JSTextPosition positionBeforeLastNewline;
     RefPtr<ProgramNode> program = parse<ProgramNode>(&vm, source, 0, Identifier(), JSParseNormal, JSParseProgramCode, error, &positionBeforeLastNewline);
     if (!program) {
-        ASSERT(error.m_type != ParserError::ErrorNone);
+        RELEASE_ASSERT(error.m_type != ParserError::ErrorNone);
         m_sourceCode.remove(addResult.iterator);
         return 0;
     }
 
     // This function assumes an input string that would result in a single anonymous function expression.
     StatementNode* exprStatement = program->singleStatement();
-    ASSERT(exprStatement);
-    ASSERT(exprStatement->isExprStatement());
+    RELEASE_ASSERT(exprStatement);
+    RELEASE_ASSERT(exprStatement->isExprStatement());
     ExpressionNode* funcExpr = static_cast<ExprStatementNode*>(exprStatement)->expr();
-    ASSERT(funcExpr);
+    RELEASE_ASSERT(funcExpr);
     RELEASE_ASSERT(funcExpr->isFuncExprNode());
     FunctionBodyNode* body = static_cast<FuncExprNode*>(funcExpr)->body();
+    RELEASE_ASSERT(!program->hasCapturedVariables());
+    
     body->setEndPosition(positionBeforeLastNewline);
-    ASSERT(body);
-    ASSERT(body->ident().isNull());
+    RELEASE_ASSERT(body);
+    RELEASE_ASSERT(body->ident().isNull());
 
-    UnlinkedFunctionExecutable* functionExecutable = UnlinkedFunctionExecutable::create(&vm, source, body, true);
+    UnlinkedFunctionExecutable* functionExecutable = UnlinkedFunctionExecutable::create(&vm, source, body, UnlinkedNormalFunction);
     functionExecutable->m_nameValue.set(vm, functionExecutable, jsString(&vm, name.string()));
 
     addResult.iterator->value = SourceCodeValue(vm, functionExecutable, m_sourceCode.age());

@@ -30,8 +30,9 @@
 #include <glib.h>
 
 #include <wtf/Forward.h>
+#include <wtf/gobject/GMainLoopSource.h>
 
-#if USE(ACCELERATED_COMPOSITING) && USE(TEXTURE_MAPPER_GL) && !USE(COORDINATED_GRAPHICS)
+#if USE(TEXTURE_MAPPER_GL) && !USE(COORDINATED_GRAPHICS)
 #include "TextureMapperPlatformLayer.h"
 #endif
 
@@ -48,7 +49,7 @@ class IntSize;
 class IntRect;
 
 class MediaPlayerPrivateGStreamerBase : public MediaPlayerPrivateInterface
-#if USE(ACCELERATED_COMPOSITING) && USE(TEXTURE_MAPPER_GL) && !USE(COORDINATED_GRAPHICS)
+#if USE(TEXTURE_MAPPER_GL) && !USE(COORDINATED_GRAPHICS)
     , public TextureMapperPlatformLayer
 #endif
 {
@@ -95,9 +96,14 @@ public:
     unsigned audioDecodedByteCount() const;
     unsigned videoDecodedByteCount() const;
 
-#if USE(ACCELERATED_COMPOSITING) && USE(TEXTURE_MAPPER_GL) && !USE(COORDINATED_GRAPHICS)
+#if USE(TEXTURE_MAPPER_GL) && !USE(COORDINATED_GRAPHICS)
     virtual PlatformLayer* platformLayer() const { return const_cast<MediaPlayerPrivateGStreamerBase*>(this); }
+#if PLATFORM(WIN_CAIRO)
+    // FIXME: Accelerated rendering has not been implemented for WinCairo yet.
+    virtual bool supportsAcceleratedRendering() const { return false; }
+#else
     virtual bool supportsAcceleratedRendering() const { return true; }
+#endif
     virtual void paintToTextureMapper(TextureMapper*, const FloatRect&, const TransformationMatrix&, float);
 #endif
 
@@ -117,15 +123,15 @@ protected:
     MediaPlayer::ReadyState m_readyState;
     MediaPlayer::NetworkState m_networkState;
     IntSize m_size;
-    GMutex* m_bufferMutex;
+    GMutex m_bufferMutex;
     GstBuffer* m_buffer;
-    unsigned long m_volumeTimerHandler;
-    unsigned long m_muteTimerHandler;
+    GMainLoopSource m_volumeTimerHandler;
+    GMainLoopSource m_muteTimerHandler;
     unsigned long m_repaintHandler;
     unsigned long m_volumeSignalHandler;
     unsigned long m_muteSignalHandler;
     mutable IntSize m_videoSize;
-#if USE(ACCELERATED_COMPOSITING) && USE(TEXTURE_MAPPER_GL) && !USE(COORDINATED_GRAPHICS)
+#if USE(TEXTURE_MAPPER_GL) && !USE(COORDINATED_GRAPHICS)
     PassRefPtr<BitmapTexture> updateTexture(TextureMapper*);
 #endif
 };

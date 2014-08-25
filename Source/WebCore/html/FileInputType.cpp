@@ -45,21 +45,18 @@ namespace WebCore {
 
 using namespace HTMLNames;
 
-class UploadButtonElement : public HTMLInputElement {
+class UploadButtonElement final : public HTMLInputElement {
 public:
     static PassRefPtr<UploadButtonElement> create(Document&);
     static PassRefPtr<UploadButtonElement> createForMultiple(Document&);
 
 private:
     UploadButtonElement(Document&);
-
-    virtual const AtomicString& shadowPseudoId() const override;
 };
 
 PassRefPtr<UploadButtonElement> UploadButtonElement::create(Document& document)
 {
     RefPtr<UploadButtonElement> button = adoptRef(new UploadButtonElement(document));
-    button->setType("button");
     button->setValue(fileButtonChooseFileLabel());
     return button.release();
 }
@@ -67,7 +64,6 @@ PassRefPtr<UploadButtonElement> UploadButtonElement::create(Document& document)
 PassRefPtr<UploadButtonElement> UploadButtonElement::createForMultiple(Document& document)
 {
     RefPtr<UploadButtonElement> button = adoptRef(new UploadButtonElement(document));
-    button->setType("button");
     button->setValue(fileButtonChooseMultipleFilesLabel());
     return button.release();
 }
@@ -75,12 +71,8 @@ PassRefPtr<UploadButtonElement> UploadButtonElement::createForMultiple(Document&
 UploadButtonElement::UploadButtonElement(Document& document)
     : HTMLInputElement(inputTag, document, 0, false)
 {
-}
-
-const AtomicString& UploadButtonElement::shadowPseudoId() const
-{
-    DEFINE_STATIC_LOCAL(AtomicString, pseudoId, ("-webkit-file-upload-button", AtomicString::ConstructFromLiteral));
-    return pseudoId;
+    setType(ASCIILiteral("button"));
+    setPseudo(AtomicString("-webkit-file-upload-button", AtomicString::ConstructFromLiteral));
 }
 
 FileInputType::FileInputType(HTMLInputElement& element)
@@ -188,17 +180,12 @@ void FileInputType::handleDOMActivateEvent(Event* event)
     if (Chrome* chrome = this->chrome()) {
         FileChooserSettings settings;
         HTMLInputElement& input = element();
-#if ENABLE(DIRECTORY_UPLOAD)
-        settings.allowsDirectoryUpload = input.fastHasAttribute(webkitdirectoryAttr);
-        settings.allowsMultipleFiles = settings.allowsDirectoryUpload || input.fastHasAttribute(multipleAttr);
-#else
         settings.allowsMultipleFiles = input.fastHasAttribute(multipleAttr);
-#endif
         settings.acceptMIMETypes = input.acceptMIMETypes();
         settings.acceptFileExtensions = input.acceptFileExtensions();
         settings.selectedFiles = m_fileList->paths();
 #if ENABLE(MEDIA_CAPTURE)
-        settings.capture = input.capture();
+        settings.capture = input.shouldUseMediaCapture();
 #endif
 
         applyFileChooserSettings(settings);
@@ -210,7 +197,7 @@ void FileInputType::handleDOMActivateEvent(Event* event)
 
 RenderPtr<RenderElement> FileInputType::createInputRenderer(PassRef<RenderStyle> style)
 {
-    return createRenderer<RenderFileUploadControl>(element(), std::move(style));
+    return createRenderer<RenderFileUploadControl>(element(), WTF::move(style));
 }
 
 bool FileInputType::canSetStringValue() const
@@ -261,6 +248,7 @@ bool FileInputType::getTypeSpecificValue(String& value)
 
 void FileInputType::setValue(const String&, bool, TextFieldEventBehavior)
 {
+    // FIXME: Should we clear the file list, or replace it with a new empty one here? This is observable from JavaScript through custom properties.
     m_fileList->clear();
     m_icon.clear();
     element().setNeedsStyleRecalc();
@@ -268,37 +256,11 @@ void FileInputType::setValue(const String&, bool, TextFieldEventBehavior)
 
 PassRefPtr<FileList> FileInputType::createFileList(const Vector<FileChooserFileInfo>& files) const
 {
-    RefPtr<FileList> fileList(FileList::create());
-    size_t size = files.size();
+    Vector<RefPtr<File>> fileObjects;
+    for (const FileChooserFileInfo& info : files)
+        fileObjects.append(File::createWithName(info.path, info.displayName));
 
-#if ENABLE(DIRECTORY_UPLOAD)
-    // If a directory is being selected, the UI allows a directory to be chosen
-    // and the paths provided here share a root directory somewhere up the tree;
-    // we want to store only the relative paths from that point.
-    if (size && element().fastHasAttribute(webkitdirectoryAttr)) {
-        // Find the common root path.
-        String rootPath = directoryName(files[0].path);
-        for (size_t i = 1; i < size; i++) {
-            while (!files[i].path.startsWith(rootPath))
-                rootPath = directoryName(rootPath);
-        }
-        rootPath = directoryName(rootPath);
-        ASSERT(rootPath.length());
-        int rootLength = rootPath.length();
-        if (rootPath[rootLength - 1] != '\\' && rootPath[rootLength - 1] != '/')
-            rootLength += 1;
-        for (size_t i = 0; i < size; i++) {
-            // Normalize backslashes to slashes before exposing the relative path to script.
-            String relativePath = files[i].path.substring(rootLength).replace('\\', '/');
-            fileList->append(File::createWithRelativePath(files[i].path, relativePath));
-        }
-        return fileList;
-    }
-#endif
-
-    for (size_t i = 0; i < size; i++)
-        fileList->append(File::createWithName(files[i].path, files[i].displayName, File::AllContentTypes));
-    return fileList;
+    return FileList::create(WTF::move(fileObjects));
 }
 
 bool FileInputType::isFileUpload() const
@@ -379,7 +341,6 @@ void FileInputType::setFiles(PassRefPtr<FileList> files)
     m_fileList = files;
 
     input->setFormControlValueMatchesRenderer(true);
-    input->notifyFormStateChanged();
     input->setNeedsValidityCheck();
 
     Vector<String> paths;
@@ -417,26 +378,6 @@ void FileInputType::filesChosen(const Vector<FileChooserFileInfo>& files)
     setFiles(createFileList(files));
 }
 
-#if ENABLE(DIRECTORY_UPLOAD)
-void FileInputType::receiveDropForDirectoryUpload(const Vector<String>& paths)
-{
-    Chrome* chrome = this->chrome();
-    if (!chrome)
-        return;
-
-    FileChooserSettings settings;
-    HTMLInputElement* input = element();
-    settings.allowsDirectoryUpload = true;
-    settings.allowsMultipleFiles = true;
-    settings.selectedFiles.append(paths[0]);
-    settings.acceptMIMETypes = input->acceptMIMETypes();
-    settings.acceptFileExtensions = input->acceptFileExtensions();
-
-    applyFileChooserSettings(settings);
-    chrome->enumerateChosenDirectory(m_fileChooser);
-}
-#endif
-
 void FileInputType::updateRendering(PassRefPtr<Icon> icon)
 {
     if (m_icon == icon)
@@ -456,12 +397,6 @@ bool FileInputType::receiveDroppedFiles(const DragData& dragData)
         return false;
 
     HTMLInputElement* input = &element();
-#if ENABLE(DIRECTORY_UPLOAD)
-    if (input->fastHasAttribute(webkitdirectoryAttr)) {
-        receiveDropForDirectoryUpload(paths);
-        return true;
-    }
-#endif
 
     Vector<FileChooserFileInfo> files;
     for (unsigned i = 0; i < paths.size(); ++i)

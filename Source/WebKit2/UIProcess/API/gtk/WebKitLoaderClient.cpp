@@ -22,6 +22,7 @@
 #include "WebKitLoaderClient.h"
 
 #include "WebKitBackForwardListPrivate.h"
+#include "WebKitPrivate.h"
 #include "WebKitURIResponsePrivate.h"
 #include "WebKitWebViewBasePrivate.h"
 #include "WebKitWebViewPrivate.h"
@@ -31,7 +32,7 @@
 using namespace WebKit;
 using namespace WebCore;
 
-static void didStartProvisionalLoadForFrame(WKPageRef page, WKFrameRef frame, WKTypeRef userData, const void* clientInfo)
+static void didStartProvisionalLoadForFrame(WKPageRef, WKFrameRef frame, WKTypeRef /* userData */, const void* clientInfo)
 {
     if (!WKFrameIsMainFrame(frame))
         return;
@@ -39,7 +40,7 @@ static void didStartProvisionalLoadForFrame(WKPageRef page, WKFrameRef frame, WK
     webkitWebViewLoadChanged(WEBKIT_WEB_VIEW(clientInfo), WEBKIT_LOAD_STARTED);
 }
 
-static void didReceiveServerRedirectForProvisionalLoadForFrame(WKPageRef page, WKFrameRef frame, WKTypeRef userData, const void* clientInfo)
+static void didReceiveServerRedirectForProvisionalLoadForFrame(WKPageRef, WKFrameRef frame, WKTypeRef /* userData */, const void* clientInfo)
 {
     if (!WKFrameIsMainFrame(frame))
         return;
@@ -47,14 +48,14 @@ static void didReceiveServerRedirectForProvisionalLoadForFrame(WKPageRef page, W
     webkitWebViewLoadChanged(WEBKIT_WEB_VIEW(clientInfo), WEBKIT_LOAD_REDIRECTED);
 }
 
-static void didFailProvisionalLoadWithErrorForFrame(WKPageRef page, WKFrameRef frame, WKErrorRef error, WKTypeRef userData, const void* clientInfo)
+static void didFailProvisionalLoadWithErrorForFrame(WKPageRef, WKFrameRef frame, WKErrorRef error, WKTypeRef /* userData */, const void* clientInfo)
 {
     if (!WKFrameIsMainFrame(frame))
         return;
 
     const ResourceError& resourceError = toImpl(error)->platformError();
     GUniquePtr<GError> webError(g_error_new_literal(g_quark_from_string(resourceError.domain().utf8().data()),
-        resourceError.errorCode(), resourceError.localizedDescription().utf8().data()));
+        toWebKitError(resourceError.errorCode()), resourceError.localizedDescription().utf8().data()));
     if (resourceError.tlsErrors()) {
         webkitWebViewLoadFailedWithTLSErrors(WEBKIT_WEB_VIEW(clientInfo), resourceError.failingURL().utf8().data(), webError.get(),
             static_cast<GTlsCertificateFlags>(resourceError.tlsErrors()), resourceError.certificate());
@@ -62,7 +63,7 @@ static void didFailProvisionalLoadWithErrorForFrame(WKPageRef page, WKFrameRef f
         webkitWebViewLoadFailed(WEBKIT_WEB_VIEW(clientInfo), WEBKIT_LOAD_STARTED, resourceError.failingURL().utf8().data(), webError.get());
 }
 
-static void didCommitLoadForFrame(WKPageRef page, WKFrameRef frame, WKTypeRef userData, const void* clientInfo)
+static void didCommitLoadForFrame(WKPageRef, WKFrameRef frame, WKTypeRef /* userData */, const void* clientInfo)
 {
     if (!WKFrameIsMainFrame(frame))
         return;
@@ -70,7 +71,7 @@ static void didCommitLoadForFrame(WKPageRef page, WKFrameRef frame, WKTypeRef us
     webkitWebViewLoadChanged(WEBKIT_WEB_VIEW(clientInfo), WEBKIT_LOAD_COMMITTED);
 }
 
-static void didFinishLoadForFrame(WKPageRef page, WKFrameRef frame, WKTypeRef userData, const void* clientInfo)
+static void didFinishLoadForFrame(WKPageRef, WKFrameRef frame, WKTypeRef /* userData */, const void* clientInfo)
 {
     if (!WKFrameIsMainFrame(frame))
         return;
@@ -78,19 +79,19 @@ static void didFinishLoadForFrame(WKPageRef page, WKFrameRef frame, WKTypeRef us
     webkitWebViewLoadChanged(WEBKIT_WEB_VIEW(clientInfo), WEBKIT_LOAD_FINISHED);
 }
 
-static void didFailLoadWithErrorForFrame(WKPageRef page, WKFrameRef frame, WKErrorRef error, WKTypeRef, const void* clientInfo)
+static void didFailLoadWithErrorForFrame(WKPageRef, WKFrameRef frame, WKErrorRef error, WKTypeRef, const void* clientInfo)
 {
     if (!WKFrameIsMainFrame(frame))
         return;
 
     const ResourceError& resourceError = toImpl(error)->platformError();
     GUniquePtr<GError> webError(g_error_new_literal(g_quark_from_string(resourceError.domain().utf8().data()),
-        resourceError.errorCode(), resourceError.localizedDescription().utf8().data()));
+        toWebKitError(resourceError.errorCode()), resourceError.localizedDescription().utf8().data()));
     webkitWebViewLoadFailed(WEBKIT_WEB_VIEW(clientInfo), WEBKIT_LOAD_COMMITTED,
                             resourceError.failingURL().utf8().data(), webError.get());
 }
 
-static void didSameDocumentNavigationForFrame(WKPageRef page, WKFrameRef frame, WKSameDocumentNavigationType, WKTypeRef, const void* clientInfo)
+static void didSameDocumentNavigationForFrame(WKPageRef, WKFrameRef frame, WKSameDocumentNavigationType, WKTypeRef, const void* clientInfo)
 {
     if (!WKFrameIsMainFrame(frame))
         return;
@@ -98,7 +99,7 @@ static void didSameDocumentNavigationForFrame(WKPageRef page, WKFrameRef frame, 
     webkitWebViewUpdateURI(WEBKIT_WEB_VIEW(clientInfo));
 }
 
-static void didReceiveTitleForFrame(WKPageRef page, WKStringRef titleRef, WKFrameRef frameRef, WKTypeRef, const void* clientInfo)
+static void didReceiveTitleForFrame(WKPageRef, WKStringRef titleRef, WKFrameRef frameRef, WKTypeRef, const void* clientInfo)
 {
     if (!WKFrameIsMainFrame(frameRef))
         return;
@@ -106,12 +107,12 @@ static void didReceiveTitleForFrame(WKPageRef page, WKStringRef titleRef, WKFram
     webkitWebViewSetTitle(WEBKIT_WEB_VIEW(clientInfo), toImpl(titleRef)->string().utf8());
 }
 
-static void didDisplayInsecureContentForFrame(WKPageRef page, WKFrameRef frame, WKTypeRef userData, const void *clientInfo)
+static void didDisplayInsecureContentForFrame(WKPageRef, WKFrameRef, WKTypeRef /* userData */, const void *clientInfo)
 {
     webkitWebViewInsecureContentDetected(WEBKIT_WEB_VIEW(clientInfo), WEBKIT_INSECURE_CONTENT_DISPLAYED);
 }
 
-static void didRunInsecureContentForFrame(WKPageRef page, WKFrameRef frame, WKTypeRef userData, const void *clientInfo)
+static void didRunInsecureContentForFrame(WKPageRef, WKFrameRef, WKTypeRef /* userData */, const void *clientInfo)
 {
     webkitWebViewInsecureContentDetected(WEBKIT_WEB_VIEW(clientInfo), WEBKIT_INSECURE_CONTENT_RUN);
 }
@@ -121,17 +122,17 @@ static void didChangeProgress(WKPageRef page, const void* clientInfo)
     webkitWebViewSetEstimatedLoadProgress(WEBKIT_WEB_VIEW(clientInfo), WKPageGetEstimatedProgress(page));
 }
 
-static void didChangeBackForwardList(WKPageRef page, WKBackForwardListItemRef addedItem, WKArrayRef removedItems, const void* clientInfo)
+static void didChangeBackForwardList(WKPageRef, WKBackForwardListItemRef addedItem, WKArrayRef removedItems, const void* clientInfo)
 {
     webkitBackForwardListChanged(webkit_web_view_get_back_forward_list(WEBKIT_WEB_VIEW(clientInfo)), toImpl(addedItem), toImpl(removedItems));
 }
 
-static void didReceiveAuthenticationChallengeInFrame(WKPageRef page, WKFrameRef frame, WKAuthenticationChallengeRef authenticationChallenge, const void *clientInfo)
+static void didReceiveAuthenticationChallengeInFrame(WKPageRef, WKFrameRef, WKAuthenticationChallengeRef authenticationChallenge, const void *clientInfo)
 {
     webkitWebViewHandleAuthenticationChallenge(WEBKIT_WEB_VIEW(clientInfo), toImpl(authenticationChallenge));
 }
 
-static void processDidCrash(WKPageRef page, const void* clientInfo)
+static void processDidCrash(WKPageRef, const void* clientInfo)
 {
     webkitWebViewWebProcessCrashed(WEBKIT_WEB_VIEW(clientInfo));
 }

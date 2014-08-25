@@ -63,7 +63,7 @@ GtkAction* WebPopupMenuProxyGtk::createGtkActionForMenuItem(const WebPopupItem& 
     return action;
 }
 
-void WebPopupMenuProxyGtk::showPopupMenu(const IntRect& rect, TextDirection textDirection, double pageScaleFactor, const Vector<WebPopupItem>& items, const PlatformPopupMenuData& data, int32_t selectedIndex)
+void WebPopupMenuProxyGtk::showPopupMenu(const IntRect& rect, TextDirection, double /* pageScaleFactor */, const Vector<WebPopupItem>& items, const PlatformPopupMenuData&, int32_t selectedIndex)
 {
     if (m_popup)
         m_popup->clear();
@@ -97,9 +97,13 @@ void WebPopupMenuProxyGtk::showPopupMenu(const IntRect& rect, TextDirection text
     // menu right after calling WebPopupMenuProxy::showPopupMenu().
     m_runLoop = adoptGRef(g_main_loop_new(0, FALSE));
 
+// This is to suppress warnings about gdk_threads_leave and gdk_threads_enter.
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
     gdk_threads_leave();
     g_main_loop_run(m_runLoop.get());
     gdk_threads_enter();
+#pragma GCC diagnostic pop
 
     m_runLoop.clear();
 

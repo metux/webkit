@@ -33,6 +33,7 @@
 #include "DocumentLoader.h"
 #include "FrameLoader.h"
 #include "FrameLoaderClient.h"
+#include "HTTPHeaderNames.h"
 #include "InspectorInstrumentation.h"
 #include "URL.h"
 #include "LoaderStrategy.h"
@@ -91,7 +92,7 @@ const char* const headerPrefixesToIgnoreAfterRevalidation[] = {
     "x-webkit-"
 };
 
-static inline bool shouldUpdateHeaderAfterRevalidation(const AtomicString& header)
+static inline bool shouldUpdateHeaderAfterRevalidation(const String& header)
 {
     for (size_t i = 0; i < WTF_ARRAY_LENGTH(headersToIgnoreAfterRevalidation); i++) {
         if (equalIgnoringCase(header, headersToIgnoreAfterRevalidation[i]))
@@ -121,10 +122,8 @@ static ResourceLoadPriority defaultPriorityForResourceType(CachedResource::Type 
     case CachedResource::XSLStyleSheet:
         return ResourceLoadPriorityHigh;
 #endif
-#if ENABLE(SVG)
     case CachedResource::SVGDocumentResource:
         return ResourceLoadPriorityLow;
-#endif
 #if ENABLE(LINK_PREFETCH)
     case CachedResource::LinkPrefetch:
         return ResourceLoadPriorityVeryLow;
@@ -140,17 +139,19 @@ static ResourceLoadPriority defaultPriorityForResourceType(CachedResource::Type 
     return ResourceLoadPriorityLow;
 }
 
-static double deadDecodedDataDeletionIntervalForResourceType(CachedResource::Type type)
+static std::chrono::milliseconds deadDecodedDataDeletionIntervalForResourceType(CachedResource::Type type)
 {
     if (type == CachedResource::Script)
-        return 0;
+        return std::chrono::milliseconds { 0 };
+
     return memoryCache()->deadDecodedDataDeletionInterval();
 }
 
 DEFINE_DEBUG_ONLY_GLOBAL(RefCountedLeakCounter, cachedResourceLeakCounter, ("CachedResource"));
 
-CachedResource::CachedResource(const ResourceRequest& request, Type type)
+CachedResource::CachedResource(const ResourceRequest& request, Type type, SessionID sessionID)
     : m_resourceRequest(request)
+    , m_sessionID(sessionID)
     , m_loadPriority(defaultPriorityForResourceType(type))
     , m_responseTimestamp(currentTime())
     , m_decodedDataDeletionTimer(this, &CachedResource::decodedDataDeletionTimerFired, deadDecodedDataDeletionIntervalForResourceType(type))
@@ -182,6 +183,7 @@ CachedResource::CachedResource(const ResourceRequest& request, Type type)
     , m_proxyResource(0)
 {
     ASSERT(m_type == unsigned(type)); // m_type is a bitfield, so this tests careless updates of the enum.
+    ASSERT(sessionID.isValid());
 #ifndef NDEBUG
     cachedResourceLeakCounter.increment();
 #endif
@@ -201,7 +203,7 @@ CachedResource::~CachedResource()
     ASSERT(canDelete());
     ASSERT(!inCache());
     ASSERT(!m_deleted);
-    ASSERT(url().isNull() || memoryCache()->resourceForRequest(resourceRequest()) != this);
+    ASSERT(url().isNull() || memoryCache()->resourceForRequest(resourceRequest(), sessionID()) != this);
 
 #ifndef NDEBUG
     m_deleted = true;
@@ -256,7 +258,7 @@ void CachedResource::load(CachedResourceLoader* cachedResourceLoader, const Reso
     }
 
     FrameLoader& frameLoader = cachedResourceLoader->frame()->loader();
-    if (options.securityCheck == DoSecurityCheck && (frameLoader.state() == FrameStateProvisional || !frameLoader.activeDocumentLoader() || frameLoader.activeDocumentLoader()->isStopping())) {
+    if (options.securityCheck() == DoSecurityCheck && (frameLoader.state() == FrameStateProvisional || !frameLoader.activeDocumentLoader() || frameLoader.activeDocumentLoader()->isStopping())) {
         failBeforeStarting();
         return;
     }
@@ -281,22 +283,22 @@ void CachedResource::load(CachedResourceLoader* cachedResourceLoader, const Reso
         CachedResource* resourceToRevalidate = m_resourceToRevalidate;
         ASSERT(resourceToRevalidate->canUseCacheValidator());
         ASSERT(resourceToRevalidate->isLoaded());
-        const String& lastModified = resourceToRevalidate->response().httpHeaderField("Last-Modified");
-        const String& eTag = resourceToRevalidate->response().httpHeaderField("ETag");
+        const String& lastModified = resourceToRevalidate->response().httpHeaderField(HTTPHeaderName::LastModified);
+        const String& eTag = resourceToRevalidate->response().httpHeaderField(HTTPHeaderName::ETag);
         if (!lastModified.isEmpty() || !eTag.isEmpty()) {
             ASSERT(cachedResourceLoader->cachePolicy(type()) != CachePolicyReload);
             if (cachedResourceLoader->cachePolicy(type()) == CachePolicyRevalidate)
-                m_resourceRequest.setHTTPHeaderField("Cache-Control", "max-age=0");
+                m_resourceRequest.setHTTPHeaderField(HTTPHeaderName::CacheControl, "max-age=0");
             if (!lastModified.isEmpty())
-                m_resourceRequest.setHTTPHeaderField("If-Modified-Since", lastModified);
+                m_resourceRequest.setHTTPHeaderField(HTTPHeaderName::IfModifiedSince, lastModified);
             if (!eTag.isEmpty())
-                m_resourceRequest.setHTTPHeaderField("If-None-Match", eTag);
+                m_resourceRequest.setHTTPHeaderField(HTTPHeaderName::IfNoneMatch, eTag);
         }
     }
 
 #if ENABLE(LINK_PREFETCH)
     if (type() == CachedResource::LinkPrefetch || type() == CachedResource::LinkSubresource)
-        m_resourceRequest.setHTTPHeaderField("Purpose", "prefetch");
+        m_resourceRequest.setHTTPHeaderField(HTTPHeaderName::Purpose, "prefetch");
 #endif
     m_resourceRequest.setPriority(loadPriority());
 
@@ -324,7 +326,7 @@ void CachedResource::load(CachedResourceLoader* cachedResourceLoader, const Reso
 
 void CachedResource::checkNotify()
 {
-    if (isLoading())
+    if (isLoading() || stillNeedsLoad())
         return;
 
     CachedResourceClientWalker<CachedResourceClient> w(m_clients);
@@ -334,12 +336,12 @@ void CachedResource::checkNotify()
 
 void CachedResource::addDataBuffer(ResourceBuffer*)
 {
-    ASSERT(m_options.dataBufferingPolicy == BufferData);
+    ASSERT(m_options.dataBufferingPolicy() == BufferData);
 }
 
 void CachedResource::addData(const char*, unsigned)
 {
-    ASSERT(m_options.dataBufferingPolicy == DoNotBufferData);
+    ASSERT(m_options.dataBufferingPolicy() == DoNotBufferData);
 }
 
 void CachedResource::finishLoading(ResourceBuffer*)
@@ -360,7 +362,7 @@ void CachedResource::error(CachedResource::Status status)
     
 void CachedResource::cancelLoad()
 {
-    if (!isLoading())
+    if (!isLoading() && !stillNeedsLoad())
         return;
 
     setStatus(LoadError);
@@ -513,15 +515,14 @@ void CachedResource::removeClient(CachedResourceClient* client)
         if (!m_switchingClientsToRevalidatedResource)
             allClientsRemoved();
         destroyDecodedDataIfNeeded();
-        if (response().cacheControlContainsNoStore()) {
+        if (response().cacheControlContainsNoStore() && url().protocolIs("https")) {
             // RFC2616 14.9.2:
             // "no-store: ... MUST make a best-effort attempt to remove the information from volatile storage as promptly as possible"
             // "... History buffers MAY store such responses as part of their normal operation."
             // We allow non-secure content to be reused in history, but we do not allow secure content to be reused.
-            if (url().protocolIs("https"))
-                memoryCache()->remove(this);
-        } else
-            memoryCache()->prune();
+            memoryCache()->remove(this);
+        }
+        memoryCache()->prune();
     }
     // This object may be dead here.
 }
@@ -530,12 +531,12 @@ void CachedResource::destroyDecodedDataIfNeeded()
 {
     if (!m_decodedSize)
         return;
-    if (!memoryCache()->deadDecodedDataDeletionInterval())
+    if (!memoryCache()->deadDecodedDataDeletionInterval().count())
         return;
     m_decodedDataDeletionTimer.restart();
 }
 
-void CachedResource::decodedDataDeletionTimerFired(DeferrableOneShotTimer<CachedResource>&)
+void CachedResource::decodedDataDeletionTimerFired()
 {
     destroyDecodedData();
 }
@@ -715,17 +716,15 @@ void CachedResource::updateResponseAfterRevalidation(const ResourceResponse& val
 
     // RFC2616 10.3.5
     // Update cached headers from the 304 response
-    const HTTPHeaderMap& newHeaders = validatingResponse.httpHeaderFields();
-    HTTPHeaderMap::const_iterator end = newHeaders.end();
-    for (HTTPHeaderMap::const_iterator it = newHeaders.begin(); it != end; ++it) {
+    for (const auto& header : validatingResponse.httpHeaderFields()) {
         // Entity headers should not be sent by servers when generating a 304
         // response; misconfigured servers send them anyway. We shouldn't allow
         // such headers to update the original request. We'll base this on the
         // list defined by RFC2616 7.1, with a few additions for extension headers
         // we care about.
-        if (!shouldUpdateHeaderAfterRevalidation(it->key))
+        if (!shouldUpdateHeaderAfterRevalidation(header.key))
             continue;
-        m_response.setHTTPHeaderField(it->key, it->value);
+        m_response.setHTTPHeaderField(header.key, header.value);
     }
 }
 
@@ -812,10 +811,6 @@ bool CachedResource::makePurgeable(bool purgeable)
         if (!m_data)
             return false;
         
-        // Should not make buffer purgeable if it has refs other than this since we don't want two copies.
-        if (!m_data->hasOneRef())
-            return false;
-
         m_data->createPurgeableBuffer();
         if (!m_data->hasPurgeableBuffer())
             return false;
@@ -892,7 +887,7 @@ bool CachedResource::isUsingDiskImageCache() const
 }
 #endif
 
-#if PLATFORM(MAC)
+#if USE(FOUNDATION)
 void CachedResource::tryReplaceEncodedData(PassRefPtr<SharedBuffer> newBuffer)
 {
     if (!m_data)
@@ -900,9 +895,10 @@ void CachedResource::tryReplaceEncodedData(PassRefPtr<SharedBuffer> newBuffer)
     
     if (!mayTryReplaceEncodedData())
         return;
-    
-    // Because the disk cache is asynchronous and racey with regards to the data we might be asked to replace,
-    // we need to verify that the new buffer has the same contents as our old buffer.
+
+    // We have to do the memcmp because we can't tell if the replacement file backed data is for the
+    // same resource or if we made a second request with the same URL which gave us a different
+    // resource. We have seen this happen for cached POST resources.
     if (m_data->size() != newBuffer->size() || memcmp(m_data->data(), newBuffer->data(), m_data->size()))
         return;
 

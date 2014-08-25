@@ -29,17 +29,12 @@
 #include "Error.h"
 #include "JSDataView.h"
 #include "Lookup.h"
-#include "Operations.h"
+#include "JSCInlines.h"
 #include "ToNativeFromValue.h"
 #include "TypedArrayAdaptors.h"
 #include <wtf/FlipBytes.h>
 
 namespace JSC {
-
-const ClassInfo JSDataViewPrototype::s_info = {
-    "DataViewPrototype", &Base::s_info, 0, ExecState::dataViewTable,
-    CREATE_METHOD_TABLE(JSDataViewPrototype)
-};
 
 /* Source for JSDataViewPrototype.lut.h
 @begin dataViewTable
@@ -61,6 +56,34 @@ const ClassInfo JSDataViewPrototype::s_info = {
   setFloat64            dataViewProtoFuncSetFloat64          DontEnum|Function       0
 @end
 */
+
+static EncodedJSValue JSC_HOST_CALL dataViewProtoFuncGetInt8(ExecState*);
+static EncodedJSValue JSC_HOST_CALL dataViewProtoFuncGetInt16(ExecState*);
+static EncodedJSValue JSC_HOST_CALL dataViewProtoFuncGetInt32(ExecState*);
+static EncodedJSValue JSC_HOST_CALL dataViewProtoFuncGetUint8(ExecState*);
+static EncodedJSValue JSC_HOST_CALL dataViewProtoFuncGetUint16(ExecState*);
+static EncodedJSValue JSC_HOST_CALL dataViewProtoFuncGetUint32(ExecState*);
+static EncodedJSValue JSC_HOST_CALL dataViewProtoFuncGetFloat32(ExecState*);
+static EncodedJSValue JSC_HOST_CALL dataViewProtoFuncGetFloat64(ExecState*);
+static EncodedJSValue JSC_HOST_CALL dataViewProtoFuncSetInt8(ExecState*);
+static EncodedJSValue JSC_HOST_CALL dataViewProtoFuncSetInt16(ExecState*);
+static EncodedJSValue JSC_HOST_CALL dataViewProtoFuncSetInt32(ExecState*);
+static EncodedJSValue JSC_HOST_CALL dataViewProtoFuncSetUint8(ExecState*);
+static EncodedJSValue JSC_HOST_CALL dataViewProtoFuncSetUint16(ExecState*);
+static EncodedJSValue JSC_HOST_CALL dataViewProtoFuncSetUint32(ExecState*);
+static EncodedJSValue JSC_HOST_CALL dataViewProtoFuncSetFloat32(ExecState*);
+static EncodedJSValue JSC_HOST_CALL dataViewProtoFuncSetFloat64(ExecState*);
+
+}
+
+#include "JSDataViewPrototype.lut.h"
+
+namespace JSC {
+
+const ClassInfo JSDataViewPrototype::s_info = {
+    "DataViewPrototype", &Base::s_info, &dataViewTable,
+    CREATE_METHOD_TABLE(JSDataViewPrototype)
+};
 
 JSDataViewPrototype::JSDataViewPrototype(VM& vm, Structure* structure)
     : Base(vm, structure)
@@ -87,7 +110,7 @@ bool JSDataViewPrototype::getOwnPropertySlot(
     JSObject* object, ExecState* exec, PropertyName propertyName, PropertySlot& slot)
 {
     return getStaticFunctionSlot<JSObject>(
-        exec, ExecState::dataViewTable(exec->vm()), jsCast<JSDataViewPrototype*>(object),
+        exec, dataViewTable, jsCast<JSDataViewPrototype*>(object),
         propertyName, slot);
 }
 
@@ -116,13 +139,24 @@ EncodedJSValue getData(ExecState* exec)
     unsigned byteLength = dataView->length();
     if (elementSize > byteLength || byteOffset > byteLength - elementSize)
         return throwVMError(exec, createRangeError(exec, "Out of bounds access"));
-    
-    typename Adaptor::Type value = *reinterpret_cast<typename Adaptor::Type*>(static_cast<uint8_t*>(dataView->vector()) + byteOffset);
-    
-    if (needToFlipBytesIfLittleEndian(littleEndian))
-        value = flipBytes(value);
-    
-    return JSValue::encode(Adaptor::toJSValue(value));
+
+    const unsigned dataSize = sizeof(typename Adaptor::Type);
+    union {
+        typename Adaptor::Type value;
+        uint8_t rawBytes[dataSize];
+    } u;
+
+    uint8_t* dataPtr = static_cast<uint8_t*>(dataView->vector()) + byteOffset;
+
+    if (needToFlipBytesIfLittleEndian(littleEndian)) {
+        for (unsigned i = dataSize; i--;)
+            u.rawBytes[i] = *dataPtr++;
+    } else {
+        for (unsigned i = 0; i < dataSize; i++)
+            u.rawBytes[i] = *dataPtr++;
+    }
+
+    return JSValue::encode(Adaptor::toJSValue(u.value));
 }
 
 template<typename Adaptor>
@@ -138,8 +172,14 @@ EncodedJSValue setData(ExecState* exec)
     unsigned byteOffset = exec->uncheckedArgument(0).toUInt32(exec);
     if (exec->hadException())
         return JSValue::encode(jsUndefined());
-    
-    typename Adaptor::Type value = toNativeFromValue<Adaptor>(exec, exec->uncheckedArgument(1));
+
+    const unsigned dataSize = sizeof(typename Adaptor::Type);
+    union {
+        typename Adaptor::Type value;
+        uint8_t rawBytes[dataSize];
+    } u;
+
+    u.value = toNativeFromValue<Adaptor>(exec, exec->uncheckedArgument(1));
     if (exec->hadException())
         return JSValue::encode(jsUndefined());
     
@@ -154,12 +194,17 @@ EncodedJSValue setData(ExecState* exec)
     unsigned byteLength = dataView->length();
     if (elementSize > byteLength || byteOffset > byteLength - elementSize)
         return throwVMError(exec, createRangeError(exec, "Out of bounds access"));
-    
-    if (needToFlipBytesIfLittleEndian(littleEndian))
-        value = flipBytes(value);
-    
-    *reinterpret_cast<typename Adaptor::Type*>(static_cast<uint8_t*>(dataView->vector()) + byteOffset) = value;
-    
+
+    uint8_t* dataPtr = static_cast<uint8_t*>(dataView->vector()) + byteOffset;
+
+    if (needToFlipBytesIfLittleEndian(littleEndian)) {
+        for (unsigned i = dataSize; i--;)
+            *dataPtr++ = u.rawBytes[i];
+    } else {
+        for (unsigned i = 0; i < dataSize; i++)
+            *dataPtr++ = u.rawBytes[i];
+    }
+
     return JSValue::encode(jsUndefined());
 }
 
@@ -244,6 +289,3 @@ static EncodedJSValue JSC_HOST_CALL dataViewProtoFuncSetFloat64(ExecState* exec)
 }
 
 } // namespace JSC
-
-#include "JSDataViewPrototype.lut.h"
-

@@ -51,21 +51,18 @@ using namespace Inspector;
 namespace WebCore {
 
 
-PassRefPtr<XHRReplayData> XHRReplayData::create(const String &method, const URL& url, bool async, PassRefPtr<FormData> formData, bool includeCredentials)
+PassRefPtr<XHRReplayData> XHRReplayData::create(const String &method, const URL& url, bool async, PassRefPtr<FormData> formData, const HTTPHeaderMap& headers, bool includeCredentials)
 {
-    return adoptRef(new XHRReplayData(method, url, async, formData, includeCredentials));
+    return adoptRef(new XHRReplayData(method, url, async, formData, headers, includeCredentials));
 }
 
-void XHRReplayData::addHeader(const AtomicString& key, const String& value)
-{
-    m_headers.set(key, value);
-}
 
-XHRReplayData::XHRReplayData(const String &method, const URL& url, bool async, PassRefPtr<FormData> formData, bool includeCredentials)
+XHRReplayData::XHRReplayData(const String &method, const URL& url, bool async, PassRefPtr<FormData> formData, const HTTPHeaderMap& headers, bool includeCredentials)
     : m_method(method)
     , m_url(url)
     , m_async(async)
     , m_formData(formData)
+    , m_headers(headers)
     , m_includeCredentials(includeCredentials)
 {
 }
@@ -135,8 +132,7 @@ size_t NetworkResourcesData::ResourceData::decodeDataToContent()
 {
     ASSERT(!hasContent());
     size_t dataLength = m_dataBuffer->size();
-    m_content = m_decoder->decode(m_dataBuffer->data(), m_dataBuffer->size());
-    m_content.append(m_decoder->flush());
+    m_content = m_decoder->decodeAndFlush(m_dataBuffer->data(), m_dataBuffer->size());
     m_dataBuffer = nullptr;
     return contentSizeInBytes(m_content) - dataLength;
 }
@@ -350,13 +346,6 @@ void NetworkResourcesData::clear(const String& preservedLoaderId)
     m_requestIdToResourceDataMap.swap(preservedMap);
 
     m_reusedXHRReplayDataRequestIds.clear();
-}
-
-void NetworkResourcesData::setResourcesDataSizeLimits(size_t maximumResourcesContentSize, size_t maximumSingleResourceContentSize)
-{
-    clear();
-    m_maximumResourcesContentSize = maximumResourcesContentSize;
-    m_maximumSingleResourceContentSize = maximumSingleResourceContentSize;
 }
 
 NetworkResourcesData::ResourceData* NetworkResourcesData::resourceDataForRequestId(const String& requestId)

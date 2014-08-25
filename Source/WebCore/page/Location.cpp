@@ -10,7 +10,7 @@
  * 2.  Redistributions in binary form must reproduce the above copyright
  *     notice, this list of conditions and the following disclaimer in the
  *     documentation and/or other materials provided with the distribution. 
- * 3.  Neither the name of Apple Computer, Inc. ("Apple") nor the names of
+ * 3.  Neither the name of Apple Inc. ("Apple") nor the names of
  *     its contributors may be used to endorse or promote products derived
  *     from this software without specific prior written permission. 
  *
@@ -264,7 +264,6 @@ void Location::reload(DOMWindow& activeWindow)
 void Location::setLocation(const String& url, DOMWindow& activeWindow, DOMWindow& firstWindow)
 {
     ASSERT(m_frame);
-    // We call findFrameForNavigation to handle the case of a seamless iframe correctly.
     Frame* frame = m_frame->loader().findFrameForNavigation(String(), activeWindow.document());
     if (!frame)
         return;

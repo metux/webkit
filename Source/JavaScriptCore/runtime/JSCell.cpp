@@ -28,16 +28,27 @@
 #include "JSString.h"
 #include "JSObject.h"
 #include "NumberObject.h"
-#include "Operations.h"
+#include "JSCInlines.h"
 #include <wtf/MathExtras.h>
 
 namespace JSC {
 
+COMPILE_ASSERT(sizeof(JSCell) == sizeof(uint64_t), jscell_is_eight_bytes);
 STATIC_ASSERT_IS_TRIVIALLY_DESTRUCTIBLE(JSCell);
 
 void JSCell::destroy(JSCell* cell)
 {
     cell->JSCell::~JSCell();
+}
+
+void JSCell::dump(PrintStream& out) const
+{
+    methodTable()->dumpToStream(this, out);
+}
+
+void JSCell::dumpToStream(const JSCell* cell, PrintStream& out)
+{
+    out.printf("<%p, %s>", cell, cell->className());
 }
 
 void JSCell::copyBackingStore(JSCell*, CopyVisitor&, CopyToken)
@@ -90,7 +101,7 @@ void JSCell::put(JSCell* cell, ExecState* exec, PropertyName identifier, JSValue
         return;
     }
     JSObject* thisObject = cell->toObject(exec, exec->lexicalGlobalObject());
-    thisObject->methodTable()->put(thisObject, exec, identifier, value, slot);
+    thisObject->methodTable(exec->vm())->put(thisObject, exec, identifier, value, slot);
 }
 
 void JSCell::putByIndex(JSCell* cell, ExecState* exec, unsigned identifier, JSValue value, bool shouldThrow)
@@ -101,19 +112,19 @@ void JSCell::putByIndex(JSCell* cell, ExecState* exec, unsigned identifier, JSVa
         return;
     }
     JSObject* thisObject = cell->toObject(exec, exec->lexicalGlobalObject());
-    thisObject->methodTable()->putByIndex(thisObject, exec, identifier, value, shouldThrow);
+    thisObject->methodTable(exec->vm())->putByIndex(thisObject, exec, identifier, value, shouldThrow);
 }
 
 bool JSCell::deleteProperty(JSCell* cell, ExecState* exec, PropertyName identifier)
 {
     JSObject* thisObject = cell->toObject(exec, exec->lexicalGlobalObject());
-    return thisObject->methodTable()->deleteProperty(thisObject, exec, identifier);
+    return thisObject->methodTable(exec->vm())->deleteProperty(thisObject, exec, identifier);
 }
 
 bool JSCell::deletePropertyByIndex(JSCell* cell, ExecState* exec, unsigned identifier)
 {
     JSObject* thisObject = cell->toObject(exec, exec->lexicalGlobalObject());
-    return thisObject->methodTable()->deletePropertyByIndex(thisObject, exec, identifier);
+    return thisObject->methodTable(exec->vm())->deletePropertyByIndex(thisObject, exec, identifier);
 }
 
 JSValue JSCell::toThis(JSCell* cell, ExecState* exec, ECMAMode ecmaMode)
@@ -191,7 +202,7 @@ String JSCell::className(const JSObject*)
     return String();
 }
 
-const char* JSCell::className()
+const char* JSCell::className() const
 {
     return classInfo()->className;
 }
@@ -223,6 +234,22 @@ PassRefPtr<ArrayBufferView> JSCell::getTypedArrayImpl(JSArrayBufferView*)
 {
     RELEASE_ASSERT_NOT_REACHED();
     return 0;
+}
+
+uint32_t JSCell::getEnumerableLength(ExecState*, JSObject*)
+{
+    RELEASE_ASSERT_NOT_REACHED();
+    return 0;
+}
+
+void JSCell::getStructurePropertyNames(JSObject*, ExecState*, PropertyNameArray&, EnumerationMode)
+{
+    RELEASE_ASSERT_NOT_REACHED();
+}
+
+void JSCell::getGenericPropertyNames(JSObject*, ExecState*, PropertyNameArray&, EnumerationMode)
+{
+    RELEASE_ASSERT_NOT_REACHED();
 }
 
 } // namespace JSC

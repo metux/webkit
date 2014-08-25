@@ -23,12 +23,13 @@
 
 #include "Lookup.h"
 #include "ObjectPrototype.h"
-#include "Operations.h"
+#include "JSCInlines.h"
 #include <time.h>
 #include <wtf/Assertions.h>
 #include <wtf/MathExtras.h>
 #include <wtf/RandomNumber.h>
 #include <wtf/RandomNumberSeed.h>
+#include <wtf/Vector.h>
 
 namespace JSC {
 
@@ -50,6 +51,7 @@ static EncodedJSValue JSC_HOST_CALL mathProtoFuncExp(ExecState*);
 static EncodedJSValue JSC_HOST_CALL mathProtoFuncExpm1(ExecState*);
 static EncodedJSValue JSC_HOST_CALL mathProtoFuncFloor(ExecState*);
 static EncodedJSValue JSC_HOST_CALL mathProtoFuncFround(ExecState*);
+static EncodedJSValue JSC_HOST_CALL mathProtoFuncHypot(ExecState*);
 static EncodedJSValue JSC_HOST_CALL mathProtoFuncLog(ExecState*);
 static EncodedJSValue JSC_HOST_CALL mathProtoFuncLog1p(ExecState*);
 static EncodedJSValue JSC_HOST_CALL mathProtoFuncLog10(ExecState*);
@@ -59,6 +61,7 @@ static EncodedJSValue JSC_HOST_CALL mathProtoFuncMin(ExecState*);
 static EncodedJSValue JSC_HOST_CALL mathProtoFuncPow(ExecState*);
 static EncodedJSValue JSC_HOST_CALL mathProtoFuncRandom(ExecState*);
 static EncodedJSValue JSC_HOST_CALL mathProtoFuncRound(ExecState*);
+static EncodedJSValue JSC_HOST_CALL mathProtoFuncSign(ExecState*);
 static EncodedJSValue JSC_HOST_CALL mathProtoFuncSin(ExecState*);
 static EncodedJSValue JSC_HOST_CALL mathProtoFuncSinh(ExecState*);
 static EncodedJSValue JSC_HOST_CALL mathProtoFuncSqrt(ExecState*);
@@ -71,7 +74,7 @@ static EncodedJSValue JSC_HOST_CALL mathProtoFuncIMul(ExecState*);
 
 namespace JSC {
 
-const ClassInfo MathObject::s_info = { "Math", &Base::s_info, 0, 0, CREATE_METHOD_TABLE(MathObject) };
+const ClassInfo MathObject::s_info = { "Math", &Base::s_info, 0, CREATE_METHOD_TABLE(MathObject) };
 
 MathObject::MathObject(VM& vm, Structure* structure)
     : JSNonFinalObject(vm, structure)
@@ -107,7 +110,8 @@ void MathObject::finishCreation(VM& vm, JSGlobalObject* globalObject)
     putDirectNativeFunctionWithoutTransition(vm, globalObject, Identifier(&vm, "exp"), 1, mathProtoFuncExp, ExpIntrinsic, DontEnum | Function);
     putDirectNativeFunctionWithoutTransition(vm, globalObject, Identifier(&vm, "expm1"), 1, mathProtoFuncExpm1, NoIntrinsic, DontEnum | Function);
     putDirectNativeFunctionWithoutTransition(vm, globalObject, Identifier(&vm, "floor"), 1, mathProtoFuncFloor, FloorIntrinsic, DontEnum | Function);
-    putDirectNativeFunctionWithoutTransition(vm, globalObject, Identifier(&vm, "fround"), 1, mathProtoFuncFround, NoIntrinsic, DontEnum | Function);
+    putDirectNativeFunctionWithoutTransition(vm, globalObject, Identifier(&vm, "fround"), 1, mathProtoFuncFround, FRoundIntrinsic, DontEnum | Function);
+    putDirectNativeFunctionWithoutTransition(vm, globalObject, Identifier(&vm, "hypot"), 2, mathProtoFuncHypot, NoIntrinsic, DontEnum | Function);
     putDirectNativeFunctionWithoutTransition(vm, globalObject, Identifier(&vm, "log"), 1, mathProtoFuncLog, LogIntrinsic, DontEnum | Function);
     putDirectNativeFunctionWithoutTransition(vm, globalObject, Identifier(&vm, "log10"), 1, mathProtoFuncLog10, NoIntrinsic, DontEnum | Function);
     putDirectNativeFunctionWithoutTransition(vm, globalObject, Identifier(&vm, "log1p"), 1, mathProtoFuncLog1p, NoIntrinsic, DontEnum | Function);
@@ -117,6 +121,7 @@ void MathObject::finishCreation(VM& vm, JSGlobalObject* globalObject)
     putDirectNativeFunctionWithoutTransition(vm, globalObject, Identifier(&vm, "pow"), 2, mathProtoFuncPow, PowIntrinsic, DontEnum | Function);
     putDirectNativeFunctionWithoutTransition(vm, globalObject, Identifier(&vm, "random"), 0, mathProtoFuncRandom, NoIntrinsic, DontEnum | Function);
     putDirectNativeFunctionWithoutTransition(vm, globalObject, Identifier(&vm, "round"), 1, mathProtoFuncRound, RoundIntrinsic, DontEnum | Function);
+    putDirectNativeFunctionWithoutTransition(vm, globalObject, Identifier(&vm, "sign"), 1, mathProtoFuncSign, NoIntrinsic, DontEnum | Function);
     putDirectNativeFunctionWithoutTransition(vm, globalObject, Identifier(&vm, "sin"), 1, mathProtoFuncSin, SinIntrinsic, DontEnum | Function);
     putDirectNativeFunctionWithoutTransition(vm, globalObject, Identifier(&vm, "sinh"), 1, mathProtoFuncSinh, NoIntrinsic, DontEnum | Function);
     putDirectNativeFunctionWithoutTransition(vm, globalObject, Identifier(&vm, "sqrt"), 1, mathProtoFuncSqrt, SqrtIntrinsic, DontEnum | Function);
@@ -175,6 +180,35 @@ EncodedJSValue JSC_HOST_CALL mathProtoFuncFloor(ExecState* exec)
     return JSValue::encode(jsNumber(floor(exec->argument(0).toNumber(exec))));
 }
 
+EncodedJSValue JSC_HOST_CALL mathProtoFuncHypot(ExecState* exec)
+{
+    unsigned argsCount = exec->argumentCount();
+    double max = 0;
+    Vector<double, 8> args;
+    args.reserveInitialCapacity(argsCount);
+    for (unsigned i = 0; i < argsCount; ++i) {
+        args.uncheckedAppend(exec->uncheckedArgument(i).toNumber(exec));
+        if (exec->hadException())
+            return JSValue::encode(jsNull());
+        if (std::isinf(args[i]))
+            return JSValue::encode(jsDoubleNumber(+std::numeric_limits<double>::infinity()));
+        max = std::max(fabs(args[i]), max);
+    }
+    if (!max)
+        max = 1;
+    // Kahan summation algorithm significantly reduces the numerical error in the total obtained.
+    double sum = 0;
+    double compensation = 0;
+    for (double argument : args) {
+        double scaledArgument = argument / max;
+        double summand = scaledArgument * scaledArgument - compensation;
+        double preliminary = sum + summand;
+        compensation = (preliminary - sum) - summand;
+        sum = preliminary;
+    }
+    return JSValue::encode(jsDoubleNumber(sqrt(sum) * max));
+}
+
 EncodedJSValue JSC_HOST_CALL mathProtoFuncLog(ExecState* exec)
 {
     return JSValue::encode(jsDoubleNumber(log(exec->argument(0).toNumber(exec))));
@@ -187,10 +221,8 @@ EncodedJSValue JSC_HOST_CALL mathProtoFuncMax(ExecState* exec)
     for (unsigned k = 0; k < argsCount; ++k) {
         double val = exec->uncheckedArgument(k).toNumber(exec);
         if (std::isnan(val)) {
-            result = QNaN;
-            break;
-        }
-        if (val > result || (!val && !result && !std::signbit(val)))
+            result = PNaN;
+        } else if (val > result || (!val && !result && !std::signbit(val)))
             result = val;
     }
     return JSValue::encode(jsNumber(result));
@@ -203,10 +235,8 @@ EncodedJSValue JSC_HOST_CALL mathProtoFuncMin(ExecState* exec)
     for (unsigned k = 0; k < argsCount; ++k) {
         double val = exec->uncheckedArgument(k).toNumber(exec);
         if (std::isnan(val)) {
-            result = QNaN;
-            break;
-        }
-        if (val < result || (!val && !result && std::signbit(val)))
+            result = PNaN;
+        } else if (val < result || (!val && !result && std::signbit(val)))
             result = val;
     }
     return JSValue::encode(jsNumber(result));
@@ -273,6 +303,16 @@ EncodedJSValue JSC_HOST_CALL mathProtoFuncRound(ExecState* exec)
     double arg = exec->argument(0).toNumber(exec);
     double integer = ceil(arg);
     return JSValue::encode(jsNumber(integer - (integer - arg > 0.5)));
+}
+
+EncodedJSValue JSC_HOST_CALL mathProtoFuncSign(ExecState* exec)
+{
+    double arg = exec->argument(0).toNumber(exec);
+    if (std::isnan(arg))
+        return JSValue::encode(jsNaN());
+    if (!arg)
+        return JSValue::encode(std::signbit(arg) ? jsNumber(-0.0) : jsNumber(0));
+    return JSValue::encode(jsNumber(std::signbit(arg) ? -1 : 1));
 }
 
 EncodedJSValue JSC_HOST_CALL mathProtoFuncSin(ExecState* exec)

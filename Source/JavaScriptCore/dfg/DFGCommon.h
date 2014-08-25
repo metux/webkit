@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011, 2012, 2013 Apple Inc. All rights reserved.
+ * Copyright (C) 2011-2014 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -26,7 +26,7 @@
 #ifndef DFGCommon_h
 #define DFGCommon_h
 
-#include <wtf/Platform.h>
+#include "DFGCompilationMode.h"
 
 #if ENABLE(DFG_JIT)
 
@@ -63,14 +63,14 @@ enum RefNodeMode {
     DontRefNode
 };
 
-inline bool verboseCompilationEnabled()
+inline bool verboseCompilationEnabled(CompilationMode mode = DFGMode)
 {
-    return Options::verboseCompilation() || Options::dumpGraphAtEachPhase();
+    return Options::verboseCompilation() || Options::dumpGraphAtEachPhase() || (isFTL(mode) && Options::verboseFTLCompilation());
 }
 
-inline bool logCompilationChanges()
+inline bool logCompilationChanges(CompilationMode mode = DFGMode)
 {
-    return verboseCompilationEnabled() || Options::logCompilationChanges();
+    return verboseCompilationEnabled(mode) || Options::logCompilationChanges();
 }
 
 inline bool shouldDumpGraphAtEachPhase()
@@ -87,15 +87,6 @@ inline bool validationEnabled()
 #endif
 }
 
-inline bool enableConcurrentJIT()
-{
-#if ENABLE(CONCURRENT_JIT)
-    return Options::enableConcurrentJIT() && Options::numberOfCompilerThreads();
-#else
-    return false;
-#endif
-}
-
 inline bool enableInt52()
 {
 #if USE(JSVALUE64)
@@ -105,9 +96,57 @@ inline bool enableInt52()
 #endif
 }
 
-enum SpillRegistersMode { NeedToSpill, DontSpill };
-
 enum NoResultTag { NoResult };
+
+// The prediction propagator effectively does four passes, with the last pass
+// being done by the separate FixuPhase.
+enum PredictionPass {
+    // We're converging in a straght-forward forward flow fixpoint. This is the
+    // most conventional part of the propagator - it makes only monotonic decisions
+    // based on value profiles and rare case profiles. It ignores baseline JIT rare
+    // case profiles. The goal here is to develop a good guess of which variables
+    // are likely to be purely numerical, which generally doesn't require knowing
+    // the rare case profiles.
+    PrimaryPass,
+    
+    // At this point we know what is numerical and what isn't. Non-numerical inputs
+    // to arithmetic operations will not have useful information in the Baseline JIT
+    // rare case profiles because Baseline may take slow path on non-numerical
+    // inputs even if the DFG could handle the input on the fast path. Boolean
+    // inputs are the most obvious example. This pass of prediction propagation will
+    // use Baseline rare case profiles for purely numerical operations and it will
+    // ignore them for everything else. The point of this pass is to develop a good
+    // guess of which variables are likely to be doubles.
+    //
+    // This pass is intentionally weird and goes against what is considered good
+    // form when writing a static analysis: a new data flow of booleans will cause
+    // us to ignore rare case profiles except that by then, we will have already
+    // propagated double types based on our prior assumption that we shouldn't
+    // ignore rare cases. This probably won't happen because the PrimaryPass is
+    // almost certainly going to establish what is and isn't numerical. But it's
+    // conceivable that during this pass we will discover a new boolean data flow.
+    // This ends up being sound because the prediction propagator could literally
+    // make any guesses it wants and still be sound (worst case, we OSR exit more
+    // often or use too general of types are run a bit slower). This will converge
+    // because we force monotonicity on the types of nodes and variables. So, the
+    // worst thing that can happen is that we violate basic laws of theoretical
+    // decency.
+    RareCasePass,
+    
+    // At this point we know what is numerical and what isn't, and we also know what
+    // is a double and what isn't. So, we start forcing variables to be double.
+    // Doing so may have a cascading effect so this is a fixpoint. It's monotonic
+    // in the sense that once a variable is forced double, it cannot be forced in
+    // the other direction.
+    DoubleVotingPass,
+    
+    // This pass occurs once we have converged. At this point we are just installing
+    // type checks based on the conclusions we have already reached. It's important
+    // for this pass to reach the same conclusions that DoubleVotingPass reached.
+    FixupPass
+};
+
+enum StructureWatchpointState { HaveNotStartedWatching, WatchingAllWatchableStructures };
 
 enum OptimizationFixpointState { BeforeFixpoint, FixpointNotConverged, FixpointConverged };
 
@@ -217,6 +256,13 @@ bool checkAndSet(T& left, U right)
     return true;
 }
 
+// If possible, this will acquire a lock to make sure that if multiple threads
+// start crashing at the same time, you get coherent dump output. Use this only
+// when you're forcing a crash with diagnostics.
+void startCrashing();
+
+JS_EXPORT_PRIVATE bool isCrashing();
+
 } } // namespace JSC::DFG
 
 namespace WTF {
@@ -235,7 +281,13 @@ namespace JSC { namespace DFG {
 
 // Put things here that must be defined even if ENABLE(DFG_JIT) is false.
 
-enum CapabilityLevel { CannotCompile, CanInline, CanCompile, CanCompileAndInline, CapabilityLevelNotSet };
+enum CapabilityLevel {
+    CannotCompile,
+    CanInline,
+    CanCompile,
+    CanCompileAndInline,
+    CapabilityLevelNotSet
+};
 
 inline bool canCompile(CapabilityLevel level)
 {
@@ -291,11 +343,12 @@ inline CapabilityLevel leastUpperBound(CapabilityLevel a, CapabilityLevel b)
 }
 
 // Unconditionally disable DFG disassembly support if the DFG is not compiled in.
-inline bool shouldShowDisassembly()
+inline bool shouldShowDisassembly(CompilationMode mode = DFGMode)
 {
 #if ENABLE(DFG_JIT)
-    return Options::showDisassembly() || Options::showDFGDisassembly();
+    return Options::showDisassembly() || Options::showDFGDisassembly() || (isFTL(mode) && Options::showFTLDisassembly());
 #else
+    UNUSED_PARAM(mode);
     return false;
 #endif
 }

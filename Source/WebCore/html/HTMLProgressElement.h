@@ -21,7 +21,6 @@
 #ifndef HTMLProgressElement_h
 #define HTMLProgressElement_h
 
-#if ENABLE(PROGRESS_ELEMENT)
 #include "LabelableElement.h"
 
 namespace WebCore {
@@ -50,7 +49,6 @@ private:
     HTMLProgressElement(const QualifiedName&, Document&);
     virtual ~HTMLProgressElement();
 
-    virtual bool areAuthorShadowsAllowed() const override { return false; }
     virtual bool shouldAppearIndeterminate() const override;
     virtual bool supportLabels() const override { return true; }
 
@@ -73,5 +71,4 @@ NODE_TYPE_CASTS(HTMLProgressElement)
 
 } // namespace
 
-#endif
 #endif

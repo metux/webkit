@@ -53,10 +53,6 @@ PageClientImpl::PageClientImpl(GtkWidget* viewWidget)
 {
 }
 
-PageClientImpl::~PageClientImpl()
-{
-}
-
 void PageClientImpl::getEditorCommandsForKeyEvent(const NativeWebKeyboardEvent& event, const AtomicString& eventType, Vector<WTF::String>& commandList)
 {
     ASSERT(eventType == eventNames().keydownEvent || eventType == eventNames().keypressEvent);
@@ -82,9 +78,14 @@ void PageClientImpl::displayView()
     notImplemented();
 }
 
-void PageClientImpl::scrollView(const WebCore::IntRect& scrollRect, const WebCore::IntSize& scrollOffset)
+void PageClientImpl::scrollView(const WebCore::IntRect& scrollRect, const WebCore::IntSize& /* scrollOffset */)
 {
     setViewNeedsDisplay(scrollRect);
+}
+
+void PageClientImpl::requestScroll(const WebCore::FloatPoint&, bool)
+{
+    notImplemented();
 }
 
 WebCore::IntSize PageClientImpl::viewSize()
@@ -116,7 +117,7 @@ bool PageClientImpl::isViewInWindow()
     return webkitWebViewBaseIsInWindow(WEBKIT_WEB_VIEW_BASE(m_viewWidget));
 }
 
-void PageClientImpl::PageClientImpl::processDidCrash()
+void PageClientImpl::PageClientImpl::processDidExit()
 {
     notImplemented();
 }
@@ -147,7 +148,7 @@ void PageClientImpl::setCursor(const Cursor& cursor)
         gdk_window_set_cursor(window, newCursor);
 }
 
-void PageClientImpl::setCursorHiddenUntilMouseMoves(bool hiddenUntilMouseMoves)
+void PageClientImpl::setCursorHiddenUntilMouseMoves(bool /* hiddenUntilMouseMoves */)
 {
     notImplemented();
 }
@@ -189,7 +190,7 @@ FloatRect PageClientImpl::convertToUserSpace(const FloatRect& viewRect)
     return viewRect;
 }
 
-IntPoint PageClientImpl::screenToWindow(const IntPoint& point)
+IntPoint PageClientImpl::screenToRootView(const IntPoint& point)
 {
     IntPoint widgetPositionOnScreen = convertWidgetPointToScreenPoint(m_viewWidget, IntPoint());
     IntPoint result(point);
@@ -197,7 +198,7 @@ IntPoint PageClientImpl::screenToWindow(const IntPoint& point)
     return result;
 }
 
-IntRect PageClientImpl::windowToScreen(const IntRect& rect)
+IntRect PageClientImpl::rootViewToScreen(const IntRect& rect)
 {
     return IntRect(convertWidgetPointToScreenPoint(m_viewWidget, rect.location()), rect.size());
 }
@@ -232,12 +233,11 @@ PassRefPtr<WebColorPicker> PageClientImpl::createColorPicker(WebPageProxy*, cons
 }
 #endif
 
-void PageClientImpl::setFindIndicator(PassRefPtr<FindIndicator>, bool fadeOut, bool animate)
+void PageClientImpl::setFindIndicator(PassRefPtr<FindIndicator>, bool /* fadeOut */, bool /* animate */)
 {
     notImplemented();
 }
 
-#if USE(ACCELERATED_COMPOSITING)
 void PageClientImpl::enterAcceleratedCompositingMode(const LayerTreeContext&)
 {
     notImplemented();
@@ -252,7 +252,6 @@ void PageClientImpl::updateAcceleratedCompositingMode(const LayerTreeContext&)
 {
     notImplemented();
 }
-#endif // USE(ACCELERATED_COMPOSITING)
 
 void PageClientImpl::pageClosed()
 {
@@ -279,7 +278,7 @@ void PageClientImpl::handleDownloadRequest(DownloadProxy* download)
     webkitWebViewBaseHandleDownloadRequest(WEBKIT_WEB_VIEW_BASE(m_viewWidget), download);
 }
 
-void PageClientImpl::didCommitLoadForMainFrame()
+void PageClientImpl::didCommitLoadForMainFrame(const String& /* mimeType */, bool /* useCustomContentProvider */ )
 {
     webkitWebViewBaseResetClickCounter(WEBKIT_WEB_VIEW_BASE(m_viewWidget));
 }
@@ -317,12 +316,12 @@ void PageClientImpl::exitFullScreen()
     webkitWebViewBaseExitFullScreen(WEBKIT_WEB_VIEW_BASE(m_viewWidget));
 }
 
-void PageClientImpl::beganEnterFullScreen(const IntRect& initialFrame, const IntRect& finalFrame)
+void PageClientImpl::beganEnterFullScreen(const IntRect& /* initialFrame */, const IntRect& /* finalFrame */)
 {
     notImplemented();
 }
 
-void PageClientImpl::beganExitFullScreen(const IntRect& initialFrame, const IntRect& finalFrame)
+void PageClientImpl::beganExitFullScreen(const IntRect& /* initialFrame */, const IntRect& /* finalFrame */)
 {
     notImplemented();
 }
@@ -377,6 +376,26 @@ void PageClientImpl::doneWithTouchEvent(const NativeWebTouchEvent& event, bool w
     pointerEvent->any.send_event = TRUE;
 
     gtk_widget_event(m_viewWidget, pointerEvent.get());
+}
+
+void PageClientImpl::didFinishLoadingDataForCustomContentProvider(const String&, const IPC::DataReference&)
+{
+}
+
+void PageClientImpl::navigationGestureDidBegin()
+{
+}
+
+void PageClientImpl::navigationGestureWillEnd(bool, WebBackForwardListItem&)
+{
+}
+
+void PageClientImpl::navigationGestureDidEnd(bool, WebBackForwardListItem&)
+{
+}
+
+void PageClientImpl::willRecordNavigationSnapshot(WebBackForwardListItem&)
+{
 }
 
 } // namespace WebKit

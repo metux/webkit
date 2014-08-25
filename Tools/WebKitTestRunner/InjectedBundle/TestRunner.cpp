@@ -33,20 +33,20 @@
 #include "StringFunctions.h"
 #include "TestController.h"
 #include <JavaScriptCore/JSCTestRunnerUtils.h>
-#include <WebKit2/WKBundle.h>
-#include <WebKit2/WKBundleBackForwardList.h>
-#include <WebKit2/WKBundleFrame.h>
-#include <WebKit2/WKBundleFramePrivate.h>
-#include <WebKit2/WKBundleInspector.h>
-#include <WebKit2/WKBundleNodeHandlePrivate.h>
-#include <WebKit2/WKBundlePage.h>
-#include <WebKit2/WKBundlePagePrivate.h>
-#include <WebKit2/WKBundlePrivate.h>
-#include <WebKit2/WKBundleScriptWorld.h>
-#include <WebKit2/WKData.h>
-#include <WebKit2/WKRetainPtr.h>
-#include <WebKit2/WKSerializedScriptValue.h>
-#include <WebKit2/WebKit2_C.h>
+#include <WebKit/WKBundle.h>
+#include <WebKit/WKBundleBackForwardList.h>
+#include <WebKit/WKBundleFrame.h>
+#include <WebKit/WKBundleFramePrivate.h>
+#include <WebKit/WKBundleInspector.h>
+#include <WebKit/WKBundleNodeHandlePrivate.h>
+#include <WebKit/WKBundlePage.h>
+#include <WebKit/WKBundlePagePrivate.h>
+#include <WebKit/WKBundlePrivate.h>
+#include <WebKit/WKBundleScriptWorld.h>
+#include <WebKit/WKData.h>
+#include <WebKit/WKRetainPtr.h>
+#include <WebKit/WKSerializedScriptValue.h>
+#include <WebKit/WebKit2_C.h>
 #include <wtf/CurrentTime.h>
 #include <wtf/HashMap.h>
 #include <wtf/StdLibExtras.h>
@@ -190,7 +190,7 @@ void TestRunner::addUserStyleSheet(JSStringRef source, bool allFrames)
 
 void TestRunner::keepWebHistory()
 {
-    WKBundleSetShouldTrackVisitedLinks(InjectedBundle::shared().bundle(), true);
+    InjectedBundle::shared().postSetAddsVisitedLinks(true);
 }
 
 void TestRunner::execCommand(JSStringRef name, JSStringRef argument)
@@ -275,14 +275,15 @@ static inline JSValueRef stringArrayToJS(JSContextRef context, WKArrayRef string
 {
     const size_t count = WKArrayGetSize(strings);
 
-    auto jsStringsArray = std::make_unique<JSValueRef[]>(count);
+    JSValueRef arrayResult = JSObjectMakeArray(context, 0, 0, 0);
+    JSObjectRef arrayObj = JSValueToObject(context, arrayResult, 0);
     for (size_t i = 0; i < count; ++i) {
         WKStringRef stringRef = static_cast<WKStringRef>(WKArrayGetItemAtIndex(strings, i));
         JSRetainPtr<JSStringRef> stringJS = toJS(stringRef);
-        jsStringsArray[i] = JSValueMakeString(context, stringJS.get());
+        JSObjectSetPropertyAtIndex(context, arrayObj, i, JSValueMakeString(context, stringJS.get()), 0);
     }
 
-    return JSObjectMakeArray(context, count, jsStringsArray.get(), 0);
+    return arrayResult;
 }
 
 JSValueRef TestRunner::originsWithApplicationCache()
@@ -412,11 +413,11 @@ void TestRunner::closeWebInspector()
 #endif // ENABLE(INSPECTOR)
 }
 
-void TestRunner::evaluateInWebInspector(long callID, JSStringRef script)
+void TestRunner::evaluateInWebInspector(JSStringRef script)
 {
 #if ENABLE(INSPECTOR)
     WKRetainPtr<WKStringRef> scriptWK = toWK(script);
-    WKBundleInspectorEvaluateScriptForTest(WKBundlePageGetInspector(InjectedBundle::shared().page()->page()), callID, scriptWK.get());
+    WKBundleInspectorEvaluateScriptForTest(WKBundlePageGetInspector(InjectedBundle::shared().page()->page()), scriptWK.get());
 #endif // ENABLE(INSPECTOR)
 }
 
@@ -485,19 +486,12 @@ void TestRunner::setDefersLoading(bool shouldDeferLoading)
 
 void TestRunner::setPageVisibility(JSStringRef state)
 {
-    WKPageVisibilityState visibilityState = kWKPageVisibilityStateVisible;
-
-    if (JSStringIsEqualToUTF8CString(state, "hidden"))
-        visibilityState = kWKPageVisibilityStateHidden;
-    else if (JSStringIsEqualToUTF8CString(state, "prerender"))
-        visibilityState = kWKPageVisibilityStatePrerender;
-
-    InjectedBundle::shared().setVisibilityState(visibilityState, false);
+    InjectedBundle::shared().setHidden(JSStringIsEqualToUTF8CString(state, "hidden") || JSStringIsEqualToUTF8CString(state, "prerender"));
 }
 
 void TestRunner::resetPageVisibility()
 {
-    InjectedBundle::shared().setVisibilityState(kWKPageVisibilityStateVisible, true);
+    InjectedBundle::shared().setHidden(false);
 }
 
 typedef WTF::HashMap<unsigned, JSValueRef> CallbackMap;

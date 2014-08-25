@@ -29,7 +29,8 @@
 
 #include "NodeTraversal.h"
 #include "Range.h"
-#include "RenderObject.h"
+#include "RenderBlockFlow.h"
+#include "RenderText.h"
 #include "RenderedDocumentMarker.h"
 #include "TextIterator.h"
 #include <stdio.h>
@@ -166,12 +167,20 @@ void DocumentMarkerController::addMarker(Node* node, const DocumentMarker& newMa
     if (newMarker.endOffset() == newMarker.startOffset())
         return;
 
+    if (auto* renderer = node->renderer()) {
+        // FIXME: Factor the marker painting code out of InlineTextBox and teach simple line layout to use it.
+        if (renderer->isText())
+            toRenderText(*renderer).ensureLineBoxes();
+        else if (renderer->isRenderBlockFlow())
+            toRenderBlockFlow(*renderer).ensureLineBoxes();
+    }
+
     m_possiblyExistingMarkerTypes.add(newMarker.type());
 
-    OwnPtr<MarkerList>& list = m_markers.add(node, nullptr).iterator->value;
+    std::unique_ptr<MarkerList>& list = m_markers.add(node, nullptr).iterator->value;
 
     if (!list) {
-        list = adoptPtr(new MarkerList);
+        list = std::make_unique<MarkerList>();
         list->append(RenderedDocumentMarker(newMarker));
 #if PLATFORM(IOS)
     } else if (newMarker.type() == DocumentMarker::DictationPhraseWithAlternatives || newMarker.type() == DocumentMarker::DictationResult) {

@@ -12,7 +12,7 @@
  * 2.  Redistributions in binary form must reproduce the above copyright
  *     notice, this list of conditions and the following disclaimer in the
  *     documentation and/or other materials provided with the distribution. 
- * 3.  Neither the name of Apple Computer, Inc. ("Apple") nor the names of
+ * 3.  Neither the name of Apple Inc. ("Apple") nor the names of
  *     its contributors may be used to endorse or promote products derived
  *     from this software without specific prior written permission. 
  *
@@ -46,23 +46,19 @@
 #include "QuickLook.h"
 #endif
 
-#if USE(CONTENT_FILTERING)
-#include "ContentFilter.h"
-#endif
-
 namespace WebCore {
 
 PolicyChecker::PolicyChecker(Frame& frame)
     : m_frame(frame)
     , m_delegateIsDecidingNavigationPolicy(false)
     , m_delegateIsHandlingUnimplementablePolicy(false)
-    , m_loadType(FrameLoadTypeStandard)
+    , m_loadType(FrameLoadType::Standard)
 {
 }
 
 void PolicyChecker::checkNavigationPolicy(const ResourceRequest& newRequest, NavigationPolicyDecisionFunction function)
 {
-    checkNavigationPolicy(newRequest, m_frame.loader().activeDocumentLoader(), nullptr, std::move(function));
+    checkNavigationPolicy(newRequest, m_frame.loader().activeDocumentLoader(), nullptr, WTF::move(function));
 }
 
 void PolicyChecker::checkNavigationPolicy(const ResourceRequest& request, DocumentLoader* loader, PassRefPtr<FormState> formState, NavigationPolicyDecisionFunction function)
@@ -85,7 +81,7 @@ void PolicyChecker::checkNavigationPolicy(const ResourceRequest& request, Docume
     // treat it like a reload so it maintains the right state for b/f list.
     if (loader->substituteData().isValid() && !loader->substituteData().failingURL().isEmpty()) {
         if (isBackForwardLoadType(m_loadType))
-            m_loadType = FrameLoadTypeReload;
+            m_loadType = FrameLoadType::Reload;
         function(request, 0, true);
         return;
     }
@@ -99,22 +95,13 @@ void PolicyChecker::checkNavigationPolicy(const ResourceRequest& request, Docume
 
     loader->setLastCheckedRequest(request);
 
-    m_callback.set(request, formState.get(), std::move(function));
+    m_callback.set(request, formState.get(), WTF::move(function));
 
 #if USE(QUICK_LOOK)
     // Always allow QuickLook-generated URLs based on the protocol scheme.
     if (!request.isNull() && request.url().protocolIs(QLPreviewProtocol())) {
         continueAfterNavigationPolicy(PolicyUse);
         return;
-    }
-#endif
-
-#if USE(CONTENT_FILTERING)
-    if (DocumentLoader* documentLoader = m_frame.loader().documentLoader()) {
-        if (documentLoader->handleContentFilterRequest(request)) {
-            continueAfterNavigationPolicy(PolicyIgnore);
-            return;
-        }
     }
 #endif
 
@@ -133,7 +120,7 @@ void PolicyChecker::checkNewWindowPolicy(const NavigationAction& action, const R
     if (!DOMWindow::allowPopUp(&m_frame))
         return continueAfterNavigationPolicy(PolicyIgnore);
 
-    m_callback.set(request, formState, frameName, action, std::move(function));
+    m_callback.set(request, formState, frameName, action, WTF::move(function));
     m_frame.loader().client().dispatchDecidePolicyForNewWindowAction(action, request, formState, frameName, [this](PolicyAction action) {
         continueAfterNewWindowPolicy(action);
     });
@@ -141,7 +128,7 @@ void PolicyChecker::checkNewWindowPolicy(const NavigationAction& action, const R
 
 void PolicyChecker::checkContentPolicy(const ResourceResponse& response, ContentPolicyDecisionFunction function)
 {
-    m_callback.set(std::move(function));
+    m_callback.set(WTF::move(function));
     m_frame.loader().client().dispatchDecidePolicyForResponse(response, m_frame.loader().activeDocumentLoader()->request(), [this](PolicyAction action) {
         continueAfterContentPolicy(action);
     });

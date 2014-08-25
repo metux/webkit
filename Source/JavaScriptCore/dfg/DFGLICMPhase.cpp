@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013 Apple Inc. All rights reserved.
+ * Copyright (C) 2013, 2014 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -38,7 +38,7 @@
 #include "DFGInsertionSet.h"
 #include "DFGPhase.h"
 #include "DFGSafeToExecute.h"
-#include "Operations.h"
+#include "JSCInlines.h"
 
 namespace JSC { namespace DFG {
 
@@ -62,13 +62,14 @@ class LICMPhase : public Phase {
 public:
     LICMPhase(Graph& graph)
         : Phase(graph, "LICM")
+        , m_state(graph)
         , m_interpreter(graph, m_state)
     {
     }
     
     bool run()
     {
-        ASSERT(m_graph.m_form == SSA);
+        DFG_ASSERT(m_graph, nullptr, m_graph.m_form == SSA);
         
         m_graph.m_dominators.computeIfNecessary(m_graph);
         m_graph.m_naturalLoops.computeIfNecessary(m_graph);
@@ -81,12 +82,28 @@ public:
             BasicBlock* block = m_graph.block(blockIndex);
             if (!block)
                 continue;
+            
+            // Skip blocks that are proved to not execute.
+            // FIXME: This shouldn't be needed.
+            // https://bugs.webkit.org/show_bug.cgi?id=128584
+            if (!block->cfaHasVisited)
+                continue;
+            
             const NaturalLoop* loop = m_graph.m_naturalLoops.innerMostLoopOf(block);
             if (!loop)
                 continue;
             LoopData& data = m_data[loop->index()];
-            for (unsigned nodeIndex = block->size(); nodeIndex--;)
-                addWrites(m_graph, block->at(nodeIndex), data.writes);
+            for (unsigned nodeIndex = 0; nodeIndex < block->size(); ++nodeIndex) {
+                Node* node = block->at(nodeIndex);
+                
+                // Don't look beyond parts of the code that definitely always exit.
+                // FIXME: This shouldn't be needed.
+                // https://bugs.webkit.org/show_bug.cgi?id=128584
+                if (node->op() == ForceOSRExit)
+                    break;
+
+                addWrites(m_graph, node, data.writes);
+            }
         }
         
         // For each loop:
@@ -107,11 +124,11 @@ public:
                 BasicBlock* predecessor = header->predecessors[i];
                 if (m_graph.m_dominators.dominates(header, predecessor))
                     continue;
-                RELEASE_ASSERT(!preHeader || preHeader == predecessor);
+                DFG_ASSERT(m_graph, nullptr, !preHeader || preHeader == predecessor);
                 preHeader = predecessor;
             }
             
-            RELEASE_ASSERT(preHeader->last()->op() == Jump);
+            DFG_ASSERT(m_graph, preHeader->last(), preHeader->last()->op() == Jump);
             
             data.preHeader = preHeader;
         }
@@ -134,7 +151,7 @@ public:
         // For maximum profit, we walk blocks in DFS order to ensure that we generally
         // tend to hoist dominators before dominatees.
         Vector<BasicBlock*> depthFirst;
-        m_graph.getBlocksInDepthFirstOrder(depthFirst);
+        m_graph.getBlocksInPreOrder(depthFirst);
         Vector<const NaturalLoop*> loopStack;
         bool changed = false;
         for (
@@ -228,8 +245,9 @@ private:
         }
         
         data.preHeader->insertBeforeLast(node);
-        node->misc.owner = data.preHeader;
-        node->codeOriginForExitTarget = data.preHeader->last()->codeOriginForExitTarget;
+        node->owner = data.preHeader;
+        NodeOrigin originalOrigin = node->origin;
+        node->origin.forExit = data.preHeader->last()->origin.forExit;
         
         // Modify the states at the end of the preHeader of the loop we hoisted to,
         // and all pre-headers inside the loop.
@@ -250,9 +268,9 @@ private:
         // It just so happens that all of the nodes we currently know how to hoist
         // don't have var-arg children. That may change and then we can fix this
         // code. But for now we just assert that's the case.
-        RELEASE_ASSERT(!(node->flags() & NodeHasVarArgs));
+        DFG_ASSERT(m_graph, node, !(node->flags() & NodeHasVarArgs));
         
-        nodeRef = m_graph.addNode(SpecNone, Phantom, node->codeOrigin, node->children);
+        nodeRef = m_graph.addNode(SpecNone, Phantom, originalOrigin, node->children);
         
         return true;
     }

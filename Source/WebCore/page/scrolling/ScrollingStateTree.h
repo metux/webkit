@@ -28,7 +28,7 @@
 
 #if ENABLE(ASYNC_SCROLLING) || USE(COORDINATED_GRAPHICS)
 
-#include "ScrollingStateScrollingNode.h"
+#include "ScrollingStateFrameScrollingNode.h"
 #include <wtf/OwnPtr.h>
 #include <wtf/PassOwnPtr.h>
 #include <wtf/RefPtr.h>
@@ -49,15 +49,15 @@ public:
     static PassOwnPtr<ScrollingStateTree> create(AsyncScrollingCoordinator* = 0);
     ~ScrollingStateTree();
 
-    ScrollingStateScrollingNode* rootStateNode() const { return m_rootStateNode.get(); }
+    ScrollingStateFrameScrollingNode* rootStateNode() const { return m_rootStateNode.get(); }
     ScrollingStateNode* stateNodeForID(ScrollingNodeID);
 
     ScrollingNodeID attachNode(ScrollingNodeType, ScrollingNodeID, ScrollingNodeID parentID);
     void detachNode(ScrollingNodeID);
     void clear();
     
-    const Vector<ScrollingNodeID>& removedNodes() const { return m_nodesRemovedSinceLastCommit; }
-    void setRemovedNodes(Vector<ScrollingNodeID>);
+    const HashSet<ScrollingNodeID>& removedNodes() const { return m_nodesRemovedSinceLastCommit; }
+    void setRemovedNodes(HashSet<ScrollingNodeID>);
 
     // Copies the current tree state and clears the changed properties mask in the original.
     PassOwnPtr<ScrollingStateTree> commit(LayerRepresentation::Type preferredLayerRepresentation);
@@ -66,6 +66,7 @@ public:
     bool hasChangedProperties() const { return m_hasChangedProperties; }
 
     bool hasNewRootStateNode() const { return m_hasNewRootStateNode; }
+    void setHasNewRootStateNode(bool hasNewRoot) { m_hasNewRootStateNode = hasNewRoot; }
     
     int nodeCount() const { return m_stateNodeMap.size(); }
 
@@ -78,21 +79,36 @@ public:
 private:
     ScrollingStateTree(AsyncScrollingCoordinator*);
 
-    void setRootStateNode(PassOwnPtr<ScrollingStateScrollingNode> rootStateNode) { m_rootStateNode = rootStateNode; }
+    void setRootStateNode(PassRefPtr<ScrollingStateFrameScrollingNode> rootStateNode) { m_rootStateNode = rootStateNode; }
     void addNode(ScrollingStateNode*);
-    void removeNode(ScrollingStateNode*);
-    void didRemoveNode(ScrollingNodeID);
+
+    PassRefPtr<ScrollingStateNode> createNode(ScrollingNodeType, ScrollingNodeID);
+    
+    enum class SubframeNodeRemoval {
+        Delete,
+        Orphan
+    };
+    void removeNodeAndAllDescendants(ScrollingStateNode*, SubframeNodeRemoval = SubframeNodeRemoval::Delete);
+
+    void recursiveNodeWillBeRemoved(ScrollingStateNode* currNode, SubframeNodeRemoval);
+    void willRemoveNode(ScrollingStateNode*);
 
     AsyncScrollingCoordinator* m_scrollingCoordinator;
     StateNodeMap m_stateNodeMap;
-    OwnPtr<ScrollingStateScrollingNode> m_rootStateNode;
-    Vector<ScrollingNodeID> m_nodesRemovedSinceLastCommit;
+    RefPtr<ScrollingStateFrameScrollingNode> m_rootStateNode;
+    HashSet<ScrollingNodeID> m_nodesRemovedSinceLastCommit;
+    HashMap<ScrollingNodeID, RefPtr<ScrollingStateNode>> m_orphanedSubframeNodes;
     bool m_hasChangedProperties;
     bool m_hasNewRootStateNode;
     LayerRepresentation::Type m_preferredLayerRepresentation;
 };
 
 } // namespace WebCore
+
+#ifndef NDEBUG
+void showScrollingStateTree(const WebCore::ScrollingStateTree*);
+void showScrollingStateTree(const WebCore::ScrollingStateNode*);
+#endif
 
 #endif // ENABLE(ASYNC_SCROLLING) || USE(COORDINATED_GRAPHICS)
 

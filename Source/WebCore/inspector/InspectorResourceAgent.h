@@ -34,7 +34,7 @@
 #include "InspectorWebAgentBase.h"
 #include "InspectorWebBackendDispatchers.h"
 #include "InspectorWebFrontendDispatchers.h"
-#include <wtf/PassOwnPtr.h>
+#include <wtf/HashSet.h>
 #include <wtf/RefCounted.h>
 #include <wtf/Vector.h>
 #include <wtf/text/WTFString.h>
@@ -57,7 +57,6 @@ class HTTPHeaderMap;
 class InspectorClient;
 class InspectorPageAgent;
 class InstrumentingAgents;
-class URL;
 class NetworkResourcesData;
 class Page;
 class ResourceError;
@@ -66,6 +65,7 @@ class ResourceRequest;
 class ResourceResponse;
 class SharedBuffer;
 class ThreadableLoaderClient;
+class URL;
 class XHRReplayData;
 class XMLHttpRequest;
 
@@ -76,6 +76,7 @@ struct WebSocketFrame;
 typedef String ErrorString;
 
 class InspectorResourceAgent : public InspectorAgentBase, public Inspector::InspectorNetworkBackendDispatcherHandler {
+    WTF_MAKE_FAST_ALLOCATED;
 public:
     InspectorResourceAgent(InstrumentingAgents*, InspectorPageAgent*, InspectorClient*);
     ~InspectorResourceAgent();
@@ -121,22 +122,18 @@ public:
     void didReceiveWebSocketFrameError(unsigned long identifier, const String&);
 #endif
 
-    // called from Internals for layout test purposes.
-    void setResourcesDataSizeLimitsFromInternals(int maximumResourcesContentSize, int maximumSingleResourceContentSize);
-
-    // Called from frontend
+    // Called from frontend.
     virtual void enable(ErrorString*) override;
     virtual void disable(ErrorString*) override;
     virtual void setExtraHTTPHeaders(ErrorString*, const RefPtr<Inspector::InspectorObject>&) override;
     virtual void getResponseBody(ErrorString*, const String& requestId, String* content, bool* base64Encoded) override;
-
     virtual void replayXHR(ErrorString*, const String& requestId) override;
-
     virtual void canClearBrowserCache(ErrorString*, bool*) override;
     virtual void clearBrowserCache(ErrorString*) override;
     virtual void canClearBrowserCookies(ErrorString*, bool*) override;
     virtual void clearBrowserCookies(ErrorString*) override;
     virtual void setCacheDisabled(ErrorString*, bool cacheDisabled) override;
+    virtual void loadResource(ErrorString*, const String& frameId, const String& url, PassRefPtr<LoadResourceCallback>) override;
 
 private:
     void enable();
@@ -145,11 +142,13 @@ private:
     InspectorClient* m_client;
     std::unique_ptr<Inspector::InspectorNetworkFrontendDispatcher> m_frontendDispatcher;
     RefPtr<Inspector::InspectorNetworkBackendDispatcher> m_backendDispatcher;
-    OwnPtr<NetworkResourcesData> m_resourcesData;
+    std::unique_ptr<NetworkResourcesData> m_resourcesData;
     bool m_enabled;
     bool m_cacheDisabled;
     bool m_loadingXHRSynchronously;
     RefPtr<Inspector::InspectorObject> m_extraRequestHeaders;
+
+    HashSet<unsigned long> m_hiddenRequestIdentifiers;
 
     typedef HashMap<ThreadableLoaderClient*, RefPtr<XHRReplayData>> PendingXHRReplayDataMap;
     PendingXHRReplayDataMap m_pendingXHRReplayData;

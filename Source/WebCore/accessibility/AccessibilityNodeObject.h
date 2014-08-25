@@ -10,7 +10,7 @@
  * 2.  Redistributions in binary form must reproduce the above copyright
  *     notice, this list of conditions and the following disclaimer in the
  *     documentation and/or other materials provided with the distribution.
- * 3.  Neither the name of Apple Computer, Inc. ("Apple") nor the names of
+ * 3.  Neither the name of Apple Inc. ("Apple") nor the names of
  *     its contributors may be used to endorse or promote products derived
  *     from this software without specific prior written permission.
  *
@@ -54,7 +54,12 @@ class RenderTextControl;
 class RenderView;
 class VisibleSelection;
 class Widget;
-    
+
+enum MouseButtonListenerResultFilter {
+    ExcludeBodyElement = 1,
+    IncludeBodyElement,
+};
+
 class AccessibilityNodeObject : public AccessibilityObject {
 protected:
     explicit AccessibilityNodeObject(Node*);
@@ -131,7 +136,7 @@ public:
     virtual bool hasAttributesRequiredForInclusion() const override final;
 
     virtual Element* actionElement() const override;
-    Element* mouseButtonListener() const;
+    Element* mouseButtonListener(MouseButtonListenerResultFilter = ExcludeBodyElement) const;
     virtual Element* anchorElement() const override;
     AccessibilityObject* menuForMenuButton() const;
    
@@ -172,7 +177,6 @@ protected:
     virtual AccessibilityRole ariaRoleAttribute() const override;
     AccessibilityRole determineAriaRoleAttribute() const;
     AccessibilityRole remapAriaRoleDueToParent(AccessibilityRole) const;
-    bool hasContentEditableAttributeSet() const;
     virtual bool isDescendantOfBarrenParent() const override;
     void alterSliderValue(bool increase);
     void changeValueByStep(bool increase);

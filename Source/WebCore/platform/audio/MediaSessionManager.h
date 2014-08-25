@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013 Apple Inc. All rights reserved.
+ * Copyright (C) 2013-2014 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -26,8 +26,11 @@
 #ifndef MediaSessionManager_h
 #define MediaSessionManager_h
 
+#include "AudioHardwareListener.h"
 #include "MediaSession.h"
+#include "RemoteCommandListener.h"
 #include "Settings.h"
+#include "SystemSleepListener.h"
 #include <map>
 #include <wtf/Vector.h>
 
@@ -35,17 +38,36 @@ namespace WebCore {
 
 class HTMLMediaElement;
 class MediaSession;
+class RemoteCommandListener;
 
-class MediaSessionManager {
+class MediaSessionManagerClient {
+public:
+    virtual ~MediaSessionManagerClient() { }
+
+    virtual bool isListeningForRemoteControlCommands() = 0;
+    virtual void startListeningForRemoteControlCommands() = 0;
+    virtual void stopListeningForRemoteControlCommands() = 0;
+    virtual void didBeginPlayback() = 0;
+
+protected:
+    MediaSessionManagerClient() { }
+};
+
+class MediaSessionManager : private RemoteCommandListenerClient, private SystemSleepListener::Client, private AudioHardwareListener::Client {
 public:
     static MediaSessionManager& sharedManager();
     virtual ~MediaSessionManager() { }
 
     bool has(MediaSession::MediaType) const;
     int count(MediaSession::MediaType) const;
+    bool activeAudioSessionRequired() const;
 
-    void beginInterruption();
+    void beginInterruption(MediaSession::InterruptionType);
     void endInterruption(MediaSession::EndInterruptionFlags);
+
+    void applicationWillEnterForeground() const;
+    void applicationWillEnterBackground() const;
+    void wirelessRoutesAvailableChanged();
 
     enum SessionRestrictionFlags {
         NoRestrictions = 0,
@@ -53,6 +75,7 @@ public:
         InlineVideoPlaybackRestricted = 1 << 1,
         MetadataPreloadingNotPermitted = 1 << 2,
         AutoPreloadingNotPermitted = 1 << 3,
+        BackgroundPlaybackNotPermitted = 1 << 4,
     };
     typedef unsigned SessionRestrictions;
     
@@ -61,8 +84,19 @@ public:
     SessionRestrictions restrictions(MediaSession::MediaType);
     virtual void resetRestrictions();
 
-    void sessionWillBeginPlayback(const MediaSession&) const;
+    virtual void sessionWillBeginPlayback(MediaSession&);
+    virtual void sessionWillEndPlayback(MediaSession&);
+    
     bool sessionRestrictsInlineVideoPlayback(const MediaSession&) const;
+
+#if ENABLE(IOS_AIRPLAY)
+    virtual bool hasWirelessTargetsAvailable() { return false; }
+    virtual void startMonitoringAirPlayRoutes() { }
+    virtual void stopMonitoringAirPlayRoutes() { }
+#endif
+
+    void addClient(MediaSessionManagerClient*);
+    void removeClient(MediaSessionManagerClient*);
 
 protected:
     friend class MediaSession;
@@ -70,14 +104,36 @@ protected:
 
     void addSession(MediaSession&);
     void removeSession(MediaSession&);
-
+    
+    void setCurrentSession(MediaSession&);
+    MediaSession* currentSession();
+    
 private:
+    friend class Internals;
+
     void updateSessionState();
+
+
+    // RemoteCommandListenerClient
+    virtual void didReceiveRemoteControlCommand(MediaSession::RemoteControlCommandType) override;
+
+    // AudioHardwareListenerClient
+    virtual void audioHardwareDidBecomeActive() override { }
+    virtual void audioHardwareDidBecomeInactive() override { }
+    virtual void audioOutputDeviceChanged() override;
+
+    // SystemSleepListener
+    virtual void systemWillSleep() override;
+    virtual void systemDidWake() override;
 
     SessionRestrictions m_restrictions[MediaSession::WebAudio + 1];
 
     Vector<MediaSession*> m_sessions;
-    int m_interruptions;
+    Vector<MediaSessionManagerClient*> m_clients;
+    std::unique_ptr<RemoteCommandListener> m_remoteCommandListener;
+    std::unique_ptr<SystemSleepListener> m_systemSleepListener;
+    RefPtr<AudioHardwareListener> m_audioHardwareListener;
+    bool m_interrupted;
 };
 
 }

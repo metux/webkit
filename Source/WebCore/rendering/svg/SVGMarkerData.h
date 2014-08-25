@@ -20,10 +20,8 @@
 #ifndef SVGMarkerData_h
 #define SVGMarkerData_h
 
-#if ENABLE(SVG)
 #include "FloatConversion.h"
 #include "Path.h"
-#include <wtf/MathExtras.h>
 
 namespace WebCore {
 
@@ -155,5 +153,4 @@ private:
 
 }
 
-#endif // ENABLE(SVG)
 #endif // SVGMarkerData_h

@@ -32,16 +32,18 @@
 #include <wtf/Assertions.h>
 #include <wtf/CheckedArithmetic.h>
 
-// Use these to declare and define a static local variable (static T;) so that
-//  it is leaked so that its destructors are not called at exit. Using this
-//  macro also allows workarounds a compiler bug present in Apple's version of GCC 4.0.1.
-#ifndef DEFINE_STATIC_LOCAL
+// This was used to declare and define a static local variable (static T;) so that
+//  it was leaked so that its destructors were not called at exit. Using this
+//  macro also allowed to workaround a compiler bug present in Apple's version of GCC 4.0.1.
+//
+// Newly written code should use static NeverDestroyed<T> instead.
+#ifndef DEPRECATED_DEFINE_STATIC_LOCAL
 #if COMPILER(GCC) && defined(__APPLE_CC__) && __GNUC__ == 4 && __GNUC_MINOR__ == 0 && __GNUC_PATCHLEVEL__ == 1
-#define DEFINE_STATIC_LOCAL(type, name, arguments) \
+#define DEPRECATED_DEFINE_STATIC_LOCAL(type, name, arguments) \
     static type* name##Ptr = new type arguments; \
     type& name = *name##Ptr
 #else
-#define DEFINE_STATIC_LOCAL(type, name, arguments) \
+#define DEPRECATED_DEFINE_STATIC_LOCAL(type, name, arguments) \
     static type& name = *new type arguments
 #endif
 #endif
@@ -49,14 +51,16 @@
 // Use this macro to declare and define a debug-only global variable that may have a
 // non-trivial constructor and destructor. When building with clang, this will suppress
 // warnings about global constructors and exit-time destructors.
-#ifndef NDEBUG
-#if COMPILER(CLANG)
-#define DEFINE_DEBUG_ONLY_GLOBAL(type, name, arguments) \
+#define DEFINE_GLOBAL_FOR_LOGGING(type, name, arguments) \
     _Pragma("clang diagnostic push") \
     _Pragma("clang diagnostic ignored \"-Wglobal-constructors\"") \
     _Pragma("clang diagnostic ignored \"-Wexit-time-destructors\"") \
     static type name arguments; \
     _Pragma("clang diagnostic pop")
+
+#ifndef NDEBUG
+#if COMPILER(CLANG)
+#define DEFINE_DEBUG_ONLY_GLOBAL(type, name, arguments) DEFINE_GLOBAL_FOR_LOGGING(type, name, arguments)
 #else
 #define DEFINE_DEBUG_ONLY_GLOBAL(type, name, arguments) \
     static type name arguments;
@@ -114,6 +118,16 @@ inline bool isPointerTypeAlignmentOkay(Type*)
 #endif
 
 namespace WTF {
+
+template<typename T>
+ALWAYS_INLINE typename std::remove_reference<T>::type&& move(T&& value)
+{
+    static_assert(std::is_lvalue_reference<T>::value, "T is not an lvalue reference; move() is unnecessary.");
+
+    using NonRefQualifiedType = typename std::remove_reference<T>::type;
+    static_assert(!std::is_const<NonRefQualifiedType>::value, "T is const qualified.");
+    return std::move(value);
+}
 
 static const size_t KB = 1024;
 static const size_t MB = 1024 * 1024;
@@ -276,6 +290,11 @@ inline void insertIntoBoundedVector(VectorType& vector, size_t size, const Eleme
     vector[index] = element;
 }
 
+// This is here instead of CompilationThread.h to prevent that header from being included
+// everywhere. The fact that this method, and that header, exist outside of JSC is a bug.
+// https://bugs.webkit.org/show_bug.cgi?id=131815
+WTF_EXPORT_PRIVATE bool isCompilationThread();
+
 } // namespace WTF
 
 #if OS(WINCE)
@@ -394,6 +413,7 @@ namespace chrono_literals {
 
 using WTF::KB;
 using WTF::MB;
+using WTF::isCompilationThread;
 using WTF::insertIntoBoundedVector;
 using WTF::isPointerAligned;
 using WTF::is8ByteAligned;

@@ -23,18 +23,15 @@
 #include "Text.h"
 
 #include "RenderCombineText.h"
+#include "RenderSVGInlineText.h"
 #include "RenderText.h"
+#include "SVGElement.h"
+#include "SVGNames.h"
 #include "ScopedEventQueue.h"
 #include "ShadowRoot.h"
-#include "TextNodeTraversal.h"
-
-#if ENABLE(SVG)
-#include "RenderSVGInlineText.h"
-#include "SVGNames.h"
-#endif
-
 #include "StyleInheritedData.h"
 #include "StyleResolver.h"
+#include "TextNodeTraversal.h"
 #include <wtf/CheckedArithmetic.h>
 #include <wtf/text/CString.h>
 #include <wtf/text/StringBuilder.h>
@@ -178,7 +175,6 @@ PassRefPtr<Node> Text::cloneNode(bool /*deep*/)
 }
 
 
-#if ENABLE(SVG)
 static bool isSVGShadowText(Text* text)
 {
     Node* parentNode = text->parentNode();
@@ -190,14 +186,12 @@ static bool isSVGText(Text* text)
     Node* parentOrShadowHostNode = text->parentOrShadowHostNode();
     return parentOrShadowHostNode->isSVGElement() && !parentOrShadowHostNode->hasTagName(SVGNames::foreignObjectTag);
 }
-#endif
 
 RenderPtr<RenderText> Text::createTextRenderer(const RenderStyle& style)
 {
-#if ENABLE(SVG)
     if (isSVGText(this) || isSVGShadowText(this))
         return createRenderer<RenderSVGInlineText>(*this, dataImpl());
-#endif
+
     if (style.hasTextCombine())
         return createRenderer<RenderCombineText>(*this, dataImpl());
 

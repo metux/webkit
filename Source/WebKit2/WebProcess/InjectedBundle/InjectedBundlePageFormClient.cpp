@@ -39,6 +39,11 @@ using namespace WebCore;
 
 namespace WebKit {
 
+InjectedBundlePageFormClient::InjectedBundlePageFormClient(const WKBundlePageFormClientBase* client)
+{
+    initialize(client);
+}
+
 void InjectedBundlePageFormClient::didFocusTextField(WebPage* page, HTMLInputElement* inputElement, WebFrame* frame)
 {
     if (!m_client.didFocusTextField)
@@ -66,9 +71,12 @@ void InjectedBundlePageFormClient::textFieldDidEndEditing(WebPage* page, HTMLInp
     m_client.textFieldDidEndEditing(toAPI(page), toAPI(nodeHandle.get()), toAPI(frame), m_client.base.clientInfo);
 }
 
-void InjectedBundlePageFormClient::textDidChangeInTextField(WebPage* page, HTMLInputElement* inputElement, WebFrame* frame)
+void InjectedBundlePageFormClient::textDidChangeInTextField(WebPage* page, HTMLInputElement* inputElement, WebFrame* frame, bool initiatedByUserTyping)
 {
     if (!m_client.textDidChangeInTextField)
+        return;
+
+    if (!initiatedByUserTyping)
         return;
 
     RefPtr<InjectedBundleNodeHandle> nodeHandle = InjectedBundleNodeHandle::getOrCreate(inputElement);
@@ -84,13 +92,36 @@ void InjectedBundlePageFormClient::textDidChangeInTextArea(WebPage* page, HTMLTe
     m_client.textDidChangeInTextArea(toAPI(page), toAPI(nodeHandle.get()), toAPI(frame), m_client.base.clientInfo);
 }
 
-bool InjectedBundlePageFormClient::shouldPerformActionInTextField(WebPage* page, HTMLInputElement* inputElement, WKInputFieldActionType actionType, WebFrame* frame)
+static WKInputFieldActionType toWKInputFieldActionType(API::InjectedBundle::FormClient::InputFieldAction action)
+{
+    switch (action) {
+    case API::InjectedBundle::FormClient::InputFieldAction::MoveUp:
+        return WKInputFieldActionTypeMoveUp;
+    case API::InjectedBundle::FormClient::InputFieldAction::MoveDown:
+        return WKInputFieldActionTypeMoveDown;
+    case API::InjectedBundle::FormClient::InputFieldAction::Cancel:
+        return WKInputFieldActionTypeCancel;
+    case API::InjectedBundle::FormClient::InputFieldAction::InsertTab:
+        return WKInputFieldActionTypeInsertTab;
+    case API::InjectedBundle::FormClient::InputFieldAction::InsertBacktab:
+        return WKInputFieldActionTypeInsertBacktab;
+    case API::InjectedBundle::FormClient::InputFieldAction::InsertNewline:
+        return WKInputFieldActionTypeInsertNewline;
+    case API::InjectedBundle::FormClient::InputFieldAction::InsertDelete:
+        return WKInputFieldActionTypeInsertDelete;
+    }
+
+    ASSERT_NOT_REACHED();
+    return WKInputFieldActionTypeCancel;
+}
+
+bool InjectedBundlePageFormClient::shouldPerformActionInTextField(WebPage* page, HTMLInputElement* inputElement, API::InjectedBundle::FormClient::InputFieldAction actionType, WebFrame* frame)
 {
     if (!m_client.shouldPerformActionInTextField)
         return false;
 
     RefPtr<InjectedBundleNodeHandle> nodeHandle = InjectedBundleNodeHandle::getOrCreate(inputElement);
-    return m_client.shouldPerformActionInTextField(toAPI(page), toAPI(nodeHandle.get()), actionType, toAPI(frame), m_client.base.clientInfo);
+    return m_client.shouldPerformActionInTextField(toAPI(page), toAPI(nodeHandle.get()), toWKInputFieldActionType(actionType), toAPI(frame), m_client.base.clientInfo);
 }
 
 void InjectedBundlePageFormClient::willSendSubmitEvent(WebPage* page, HTMLFormElement* formElement, WebFrame* frame, WebFrame* sourceFrame, const Vector<std::pair<String, String>>& values)
@@ -103,7 +134,7 @@ void InjectedBundlePageFormClient::willSendSubmitEvent(WebPage* page, HTMLFormEl
     ImmutableDictionary::MapType map;
     for (size_t i = 0; i < values.size(); ++i)
         map.set(values[i].first, API::String::create(values[i].second));
-    auto textFieldsMap = ImmutableDictionary::create(std::move(map));
+    auto textFieldsMap = ImmutableDictionary::create(WTF::move(map));
 
     m_client.willSendSubmitEvent(toAPI(page), toAPI(nodeHandle.get()), toAPI(frame), toAPI(sourceFrame), toAPI(textFieldsMap.get()), m_client.base.clientInfo);
 }
@@ -118,7 +149,7 @@ void InjectedBundlePageFormClient::willSubmitForm(WebPage* page, HTMLFormElement
     ImmutableDictionary::MapType map;
     for (size_t i = 0; i < values.size(); ++i)
         map.set(values[i].first, API::String::create(values[i].second));
-    auto textFieldsMap = ImmutableDictionary::create(std::move(map));
+    auto textFieldsMap = ImmutableDictionary::create(WTF::move(map));
 
     WKTypeRef userDataToPass = 0;
     m_client.willSubmitForm(toAPI(page), toAPI(nodeHandle.get()), toAPI(frame), toAPI(sourceFrame), toAPI(textFieldsMap.get()), &userDataToPass, m_client.base.clientInfo);
@@ -136,7 +167,7 @@ void InjectedBundlePageFormClient::didAssociateFormControls(WebPage* page, const
     for (const auto& element : elements)
         elementHandles.uncheckedAppend(InjectedBundleNodeHandle::getOrCreate(element.get()));
 
-    m_client.didAssociateFormControls(toAPI(page), toAPI(API::Array::create(std::move(elementHandles)).get()), m_client.base.clientInfo);
+    m_client.didAssociateFormControls(toAPI(page), toAPI(API::Array::create(WTF::move(elementHandles)).get()), m_client.base.clientInfo);
 }
 
 bool InjectedBundlePageFormClient::shouldNotifyOnFormChanges(WebPage* page)

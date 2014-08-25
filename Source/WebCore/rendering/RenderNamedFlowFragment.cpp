@@ -34,6 +34,7 @@
 #include "PaintInfo.h"
 #include "RenderBoxRegionInfo.h"
 #include "RenderFlowThread.h"
+#include "RenderIterator.h"
 #include "RenderNamedFlowThread.h"
 #include "RenderView.h"
 #include "StyleResolver.h"
@@ -43,7 +44,7 @@
 namespace WebCore {
 
 RenderNamedFlowFragment::RenderNamedFlowFragment(Document& document, PassRef<RenderStyle> style)
-    : RenderRegion(document, std::move(style), nullptr)
+    : RenderRegion(document, WTF::move(style), nullptr)
     , m_hasCustomRegionStyle(false)
     , m_hasAutoLogicalHeight(false)
     , m_hasComputedAutoHeight(false)
@@ -62,33 +63,33 @@ PassRef<RenderStyle> RenderNamedFlowFragment::createStyle(const RenderStyle& par
     style.get().setFlowThread(parentStyle.flowThread());
     style.get().setRegionThread(parentStyle.regionThread());
     style.get().setRegionFragment(parentStyle.regionFragment());
-    style.get().setOverflowX(parentStyle.overflowX());
-    style.get().setOverflowY(parentStyle.overflowY());
-#if ENABLE(CSS_SHAPES)
-    style.get().setShapeInside(parentStyle.shapeInside());
-#endif
 
     return style;
+}
+
+void RenderNamedFlowFragment::updateRegionFlags()
+{
+    checkRegionStyle();
+    updateRegionHasAutoLogicalHeightFlag();
 }
 
 void RenderNamedFlowFragment::styleDidChange(StyleDifference diff, const RenderStyle* oldStyle)
 {
     RenderRegion::styleDidChange(diff, oldStyle);
 
-    // If the region is not attached to any thread, there is no need to check
-    // whether the region has region styling since no content will be displayed
-    // into the region.
-    if (!m_flowThread) {
-        setHasCustomRegionStyle(false);
+    if (!isValid())
         return;
-    }
 
-    updateRegionHasAutoLogicalHeightFlag();
-
-    checkRegionStyle();
+    updateRegionFlags();
 
     if (parent() && parent()->needsLayout())
         setNeedsLayout(MarkOnlyThis);
+}
+
+void RenderNamedFlowFragment::getRanges(Vector<RefPtr<Range>>& rangeObjects) const
+{
+    const RenderNamedFlowThread& namedFlow = view().flowThreadController().ensureRenderFlowThreadWithName(style().regionThread());
+    namedFlow.getRanges(rangeObjects, this);
 }
 
 bool RenderNamedFlowFragment::shouldHaveAutoLogicalHeight() const
@@ -118,20 +119,18 @@ void RenderNamedFlowFragment::decrementAutoLogicalHeightCount()
 
 void RenderNamedFlowFragment::updateRegionHasAutoLogicalHeightFlag()
 {
-    ASSERT(m_flowThread);
-
-    if (!isValid())
-        return;
+    ASSERT(isValid());
 
     bool didHaveAutoLogicalHeight = m_hasAutoLogicalHeight;
     m_hasAutoLogicalHeight = shouldHaveAutoLogicalHeight();
-    if (m_hasAutoLogicalHeight != didHaveAutoLogicalHeight) {
-        if (m_hasAutoLogicalHeight)
-            incrementAutoLogicalHeightCount();
-        else {
-            clearComputedAutoHeight();
-            decrementAutoLogicalHeightCount();
-        }
+    if (didHaveAutoLogicalHeight == m_hasAutoLogicalHeight)
+        return;
+
+    if (m_hasAutoLogicalHeight)
+        incrementAutoLogicalHeightCount();
+    else {
+        clearComputedAutoHeight();
+        decrementAutoLogicalHeightCount();
     }
 }
 
@@ -167,7 +166,7 @@ void RenderNamedFlowFragment::updateLogicalHeight()
 
 LayoutUnit RenderNamedFlowFragment::pageLogicalHeight() const
 {
-    ASSERT(m_flowThread);
+    ASSERT(isValid());
     if (hasComputedAutoHeight() && m_flowThread->inMeasureContentLayoutPhase()) {
         ASSERT(hasAutoLogicalHeight());
         return computedAutoHeight();
@@ -179,7 +178,7 @@ LayoutUnit RenderNamedFlowFragment::pageLogicalHeight() const
 // height value for auto-height regions in the first layout phase of the parent named flow.
 LayoutUnit RenderNamedFlowFragment::maxPageLogicalHeight() const
 {
-    ASSERT(m_flowThread);
+    ASSERT(isValid());
     ASSERT(hasAutoLogicalHeight() && m_flowThread->inMeasureContentLayoutPhase());
     ASSERT(isAnonymous());
     ASSERT(parent());
@@ -188,34 +187,157 @@ LayoutUnit RenderNamedFlowFragment::maxPageLogicalHeight() const
     return styleToUse.logicalMaxHeight().isUndefined() ? RenderFlowThread::maxLogicalHeight() : toRenderBlock(parent())->computeReplacedLogicalHeightUsing(styleToUse.logicalMaxHeight());
 }
 
+LayoutRect RenderNamedFlowFragment::flowThreadPortionRectForClipping(bool isFirstRegionInRange, bool isLastRegionInRange) const
+{
+    // Elements flowed into a region should not be painted past the region's content box
+    // if they continue to flow into another region in that direction.
+    // If they do not continue into another region in that direction, they should be
+    // painted all the way to the region's border box.
+    // Regions with overflow:hidden will apply clip at the border box, not the content box.
+    
+    LayoutRect clippingRect = flowThreadPortionRect();
+    RenderBlockFlow& container = fragmentContainer();
+    if (container.style().hasPadding()) {
+        if (isFirstRegionInRange) {
+            if (flowThread()->isHorizontalWritingMode()) {
+                clippingRect.move(0, -container.paddingBefore());
+                clippingRect.expand(0, container.paddingBefore());
+            } else {
+                clippingRect.move(-container.paddingBefore(), 0);
+                clippingRect.expand(container.paddingBefore(), 0);
+            }
+        }
+        
+        if (isLastRegionInRange) {
+            if (flowThread()->isHorizontalWritingMode())
+                clippingRect.expand(0, container.paddingAfter());
+            else
+                clippingRect.expand(container.paddingAfter(), 0);
+        }
+        
+        if (flowThread()->isHorizontalWritingMode()) {
+            clippingRect.move(-container.paddingStart(), 0);
+            clippingRect.expand(container.paddingStart() + container.paddingEnd(), 0);
+        } else {
+            clippingRect.move(0, -container.paddingStart());
+            clippingRect.expand(0, container.paddingStart() + container.paddingEnd());
+        }
+    }
+    
+    return clippingRect;
+}
+
+RenderBlockFlow& RenderNamedFlowFragment::fragmentContainer() const
+{
+    ASSERT(parent());
+    ASSERT(parent()->isRenderNamedFlowFragmentContainer());
+    return *toRenderBlockFlow(parent());
+}
+
+RenderLayer& RenderNamedFlowFragment::fragmentContainerLayer() const
+{
+    ASSERT(fragmentContainer().layer());
+    return *fragmentContainer().layer();
+}
+
+bool RenderNamedFlowFragment::shouldClipFlowThreadContent() const
+{
+    if (fragmentContainer().hasOverflowClip())
+        return true;
+    
+    return isLastRegion() && (style().regionFragment() == BreakRegionFragment);
+}
+    
+LayoutSize RenderNamedFlowFragment::offsetFromContainer(RenderObject* o, const LayoutPoint&, bool*) const
+{
+    ASSERT(&fragmentContainer() == o);
+    ASSERT(container() == o);
+    UNUSED_PARAM(o);
+    return topLeftLocationOffset();
+}
+
 void RenderNamedFlowFragment::layoutBlock(bool relayoutChildren, LayoutUnit)
 {
     StackStats::LayoutCheckPoint layoutCheckPoint;
     RenderRegion::layoutBlock(relayoutChildren);
 
     if (isValid()) {
-        LayoutRect oldRegionRect(flowThreadPortionRect());
-        if (!isHorizontalWritingMode())
-            oldRegionRect = oldRegionRect.transposedRect();
-
-        if (m_flowThread->inOverflowLayoutPhase() || m_flowThread->inFinalLayoutPhase())
+        if (m_flowThread->inOverflowLayoutPhase() || m_flowThread->inFinalLayoutPhase()) {
             computeOverflowFromFlowThread();
+            updateOversetState();
+        }
 
         if (hasAutoLogicalHeight() && m_flowThread->inMeasureContentLayoutPhase()) {
             m_flowThread->invalidateRegions();
             clearComputedAutoHeight();
             return;
         }
-
-        if ((oldRegionRect.width() != pageLogicalWidth() || oldRegionRect.height() != pageLogicalHeight()) && !m_flowThread->inFinalLayoutPhase())
-            // This can happen even if we are in the inConstrainedLayoutPhase and it will trigger a pathological layout of the flow thread.
-            m_flowThread->invalidateRegions();
     }
+}
+
+void RenderNamedFlowFragment::invalidateRegionIfNeeded()
+{
+    if (!isValid())
+        return;
+
+    LayoutRect oldRegionRect(flowThreadPortionRect());
+    if (!isHorizontalWritingMode())
+        oldRegionRect = oldRegionRect.transposedRect();
+
+    if ((oldRegionRect.width() != pageLogicalWidth() || oldRegionRect.height() != pageLogicalHeight()) && !m_flowThread->inFinalLayoutPhase()) {
+        // This can happen even if we are in the inConstrainedLayoutPhase and it will trigger a pathological layout of the flow thread.
+        m_flowThread->invalidateRegions();
+    }
+}
+
+void RenderNamedFlowFragment::setRegionOversetState(RegionOversetState state)
+{
+    ASSERT(generatingElement());
+
+    generatingElement()->setRegionOversetState(state);
+}
+
+RegionOversetState RenderNamedFlowFragment::regionOversetState() const
+{
+    ASSERT(generatingElement());
+
+    if (!isValid())
+        return RegionUndefined;
+
+    return generatingElement()->regionOversetState();
+}
+
+void RenderNamedFlowFragment::updateOversetState()
+{
+    ASSERT(isValid());
+
+    RenderNamedFlowThread* flowThread = namedFlowThread();
+    ASSERT(flowThread && (flowThread->inOverflowLayoutPhase() || flowThread->inFinalLayoutPhase()));
+
+    LayoutUnit flowContentBottom = flowThread->flowContentBottom();
+    bool isHorizontalWritingMode = flowThread->isHorizontalWritingMode();
+
+    LayoutUnit flowMin = flowContentBottom - (isHorizontalWritingMode ? flowThreadPortionRect().y() : flowThreadPortionRect().x());
+    LayoutUnit flowMax = flowContentBottom - (isHorizontalWritingMode ? flowThreadPortionRect().maxY() : flowThreadPortionRect().maxX());
+
+    RegionOversetState previousState = regionOversetState();
+    RegionOversetState state = RegionFit;
+    if (flowMin <= 0)
+        state = RegionEmpty;
+    if (flowMax > 0 && isLastRegion())
+        state = RegionOverset;
+    
+    setRegionOversetState(state);
+
+    // Determine whether the NamedFlow object should dispatch a regionOversetChange event
+    if (previousState != state)
+        flowThread->setDispatchRegionOversetChangeEvent(true);
 }
 
 void RenderNamedFlowFragment::checkRegionStyle()
 {
-    ASSERT(m_flowThread);
+    ASSERT(isValid());
+
     bool customRegionStyle = false;
 
     // FIXME: Region styling doesn't work for pseudo elements.
@@ -225,24 +347,21 @@ void RenderNamedFlowFragment::checkRegionStyle()
     toRenderNamedFlowThread(m_flowThread)->checkRegionsWithStyling();
 }
 
-PassRefPtr<RenderStyle> RenderNamedFlowFragment::computeStyleInRegion(const RenderObject* object)
+PassRefPtr<RenderStyle> RenderNamedFlowFragment::computeStyleInRegion(RenderElement& renderer, RenderStyle& parentStyle)
 {
-    ASSERT(object);
-    ASSERT(!object->isAnonymous());
-    ASSERT(object->node() && object->node()->isElementNode());
+    ASSERT(!renderer.isAnonymous());
 
     // FIXME: Region styling fails for pseudo-elements because the renderers don't have a node.
-    Element* element = toElement(object->node());
-    RefPtr<RenderStyle> renderObjectRegionStyle = object->view().document().ensureStyleResolver().styleForElement(element, 0, DisallowStyleSharing, MatchAllRules, this);
+    RefPtr<RenderStyle> renderObjectRegionStyle = renderer.view().document().ensureStyleResolver().styleForElement(renderer.element(), &parentStyle, DisallowStyleSharing, MatchAllRules, this);
 
     return renderObjectRegionStyle.release();
 }
 
-void RenderNamedFlowFragment::computeChildrenStyleInRegion(const RenderElement* object)
+void RenderNamedFlowFragment::computeChildrenStyleInRegion(RenderElement& renderer)
 {
-    for (RenderObject* child = object->firstChild(); child; child = child->nextSibling()) {
+    for (auto& child : childrenOfType<RenderObject>(renderer)) {
 
-        auto it = m_renderObjectRegionStyle.find(child);
+        auto it = m_renderObjectRegionStyle.find(&child);
 
         RefPtr<RenderStyle> childStyleInRegion;
         bool objectRegionStyleCached = false;
@@ -250,17 +369,17 @@ void RenderNamedFlowFragment::computeChildrenStyleInRegion(const RenderElement* 
             childStyleInRegion = it->value.style;
             objectRegionStyleCached = true;
         } else {
-            if (child->isAnonymous() || child->isInFlowRenderFlowThread())
-                childStyleInRegion = RenderStyle::createAnonymousStyleWithDisplay(&object->style(), child->style().display());
-            else if (child->isText())
-                childStyleInRegion = RenderStyle::clone(&object->style());
+            if (child.isAnonymous() || child.isInFlowRenderFlowThread())
+                childStyleInRegion = RenderStyle::createAnonymousStyleWithDisplay(&renderer.style(), child.style().display());
+            else if (child.isText())
+                childStyleInRegion = RenderStyle::clone(&renderer.style());
             else
-                childStyleInRegion = computeStyleInRegion(child);
+                childStyleInRegion = computeStyleInRegion(toRenderElement(child), renderer.style());
         }
 
-        setObjectStyleInRegion(child, childStyleInRegion, objectRegionStyleCached);
+        setObjectStyleInRegion(&child, childStyleInRegion, objectRegionStyleCached);
 
-        if (child->isRenderElement())
+        if (child.isRenderElement())
             computeChildrenStyleInRegion(toRenderElement(child));
     }
 }
@@ -328,11 +447,11 @@ void RenderNamedFlowFragment::setRegionObjectsRegionStyle()
             ASSERT(it->value.cached);
             objectRegionStyleCached = true;
         } else
-            objectStyleInRegion = computeStyleInRegion(object);
+            objectStyleInRegion = computeStyleInRegion(*object, style());
 
         setObjectStyleInRegion(object, objectStyleInRegion, objectRegionStyleCached);
 
-        computeChildrenStyleInRegion(object);
+        computeChildrenStyleInRegion(*object);
     }
 }
 
@@ -388,27 +507,36 @@ void RenderNamedFlowFragment::attachRegion()
 {
     RenderRegion::attachRegion();
 
-    if (documentBeingDestroyed() || !m_flowThread)
+    if (documentBeingDestroyed() || !isValid())
         return;
 
-    // The region just got attached to the flow thread, lets check whether
-    // it has region styling rules associated.
-    checkRegionStyle();
-
-    if (!isValid())
-        return;
-
-    m_hasAutoLogicalHeight = shouldHaveAutoLogicalHeight();
-    if (hasAutoLogicalHeight())
-        incrementAutoLogicalHeightCount();
+    updateRegionFlags();
 }
 
 void RenderNamedFlowFragment::detachRegion()
 {
-    if (m_flowThread && hasAutoLogicalHeight())
+    if (hasAutoLogicalHeight()) {
+        ASSERT(isValid());
+        m_hasAutoLogicalHeight = false;
+        clearComputedAutoHeight();
         decrementAutoLogicalHeightCount();
+    }
     
     RenderRegion::detachRegion();
+}
+
+void RenderNamedFlowFragment::absoluteQuadsForBoxInRegion(Vector<FloatQuad>& quads, bool* wasFixed, const RenderBox* renderer, float localTop, float localBottom)
+{
+    LayoutRect layoutLocalRect(0, localTop, renderer->borderBoxRectInRegion(this).width(), localBottom - localTop);
+    LayoutRect fragmentRect = rectFlowPortionForBox(renderer, layoutLocalRect);
+
+    // We want to skip the 0px height fragments for non-empty boxes that may appear in case the bottom of the box
+    // overlaps the bottom of a region.
+    if (localBottom != localTop && !fragmentRect.height())
+        return;
+
+    CurrentRenderRegionMaintainer regionMaintainer(*this);
+    quads.append(renderer->localToAbsoluteQuad(FloatRect(fragmentRect), 0 /* mode */, wasFixed));
 }
 
 } // namespace WebCore

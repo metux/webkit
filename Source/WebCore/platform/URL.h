@@ -10,10 +10,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -39,7 +39,7 @@ typedef const struct __CFURL* CFURLRef;
 #include "GUniquePtrSoup.h"
 #endif
 
-#if PLATFORM(MAC)
+#if USE(FOUNDATION)
 OBJC_CLASS NSURL;
 #endif
 
@@ -71,6 +71,8 @@ public:
     // the same way we treate null and empty base URLs.
     URL(const URL& base, const String& relative);
     URL(const URL& base, const String& relative, const TextEncoding&);
+
+    static URL fakeURLWithRelativePart(const String&);
 
     String strippedForUseAsReferrer() const;
 
@@ -169,7 +171,7 @@ public:
     GUniquePtr<SoupURI> createSoupURI() const;
 #endif
 
-#if PLATFORM(MAC)
+#if USE(FOUNDATION)
     URL(NSURL*);
     operator NSURL*() const;
 #endif

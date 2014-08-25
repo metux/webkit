@@ -10,7 +10,7 @@
  * 2.  Redistributions in binary form must reproduce the above copyright
  *     notice, this list of conditions and the following disclaimer in the
  *     documentation and/or other materials provided with the distribution.
- * 3.  Neither the name of Apple Computer, Inc. ("Apple") nor the names of
+ * 3.  Neither the name of Apple Inc. ("Apple") nor the names of
  *     its contributors may be used to endorse or promote products derived
  *     from this software without specific prior written permission.
  *
@@ -30,28 +30,13 @@
 #include "JSHistory.h"
 
 #include "Frame.h"
-#include "History.h"
+#include "JSDOMBinding.h"
 #include "SerializedScriptValue.h"
 #include <runtime/JSFunction.h>
 
 using namespace JSC;
 
 namespace WebCore {
-
-static EncodedJSValue nonCachingStaticBackFunctionGetter(ExecState* exec, EncodedJSValue, EncodedJSValue, PropertyName propertyName)
-{
-    return JSValue::encode(JSFunction::create(exec->vm(), exec->lexicalGlobalObject(), 0, propertyName.publicName(), jsHistoryPrototypeFunctionBack));
-}
-
-static EncodedJSValue nonCachingStaticForwardFunctionGetter(ExecState* exec, EncodedJSValue, EncodedJSValue, PropertyName propertyName)
-{
-    return JSValue::encode(JSFunction::create(exec->vm(), exec->lexicalGlobalObject(), 0, propertyName.publicName(), jsHistoryPrototypeFunctionForward));
-}
-
-static EncodedJSValue nonCachingStaticGoFunctionGetter(ExecState* exec, EncodedJSValue, EncodedJSValue, PropertyName propertyName)
-{
-    return JSValue::encode(JSFunction::create(exec->vm(), exec->lexicalGlobalObject(), 1, propertyName.publicName(), jsHistoryPrototypeFunctionGo));
-}
 
 bool JSHistory::getOwnPropertySlotDelegate(ExecState* exec, PropertyName propertyName, PropertySlot& slot)
 {
@@ -66,27 +51,22 @@ bool JSHistory::getOwnPropertySlotDelegate(ExecState* exec, PropertyName propert
 
     // Check for the few functions that we allow, even when called cross-domain.
     // Make these read-only / non-configurable to prevent writes via defineProperty.
-    const HashEntry* entry = JSHistoryPrototype::info()->propHashTable(exec)->entry(exec, propertyName);
-    if (entry) {
-        // Allow access to back(), forward() and go() from any frame.
-        if (entry->attributes() & JSC::Function) {
-            if (entry->function() == jsHistoryPrototypeFunctionBack) {
-                slot.setCustom(this, ReadOnly | DontDelete | DontEnum, nonCachingStaticBackFunctionGetter);
-                return true;
-            } else if (entry->function() == jsHistoryPrototypeFunctionForward) {
-                slot.setCustom(this, ReadOnly | DontDelete | DontEnum, nonCachingStaticForwardFunctionGetter);
-                return true;
-            } else if (entry->function() == jsHistoryPrototypeFunctionGo) {
-                slot.setCustom(this, ReadOnly | DontDelete | DontEnum, nonCachingStaticGoFunctionGetter);
-                return true;
-            }
-        }
-    } else {
-        // Allow access to toString() cross-domain, but always Object.toString.
-        if (propertyName == exec->propertyNames().toString) {
-            slot.setCustom(this, ReadOnly | DontDelete | DontEnum, objectToStringFunctionGetter);
-            return true;
-        }
+    if (propertyName == exec->propertyNames().back) {
+        slot.setCustom(this, ReadOnly | DontDelete | DontEnum, nonCachingStaticFunctionGetter<jsHistoryPrototypeFunctionBack, 0>);
+        return true;
+    }
+    if (propertyName == exec->propertyNames().forward) {
+        slot.setCustom(this, ReadOnly | DontDelete | DontEnum, nonCachingStaticFunctionGetter<jsHistoryPrototypeFunctionForward, 0>);
+        return true;
+    }
+    if (propertyName == exec->propertyNames().go) {
+        slot.setCustom(this, ReadOnly | DontDelete | DontEnum, nonCachingStaticFunctionGetter<jsHistoryPrototypeFunctionGo, 1>);
+        return true;
+    }
+    // Allow access to toString() cross-domain, but always Object.toString.
+    if (propertyName == exec->propertyNames().toString) {
+        slot.setCustom(this, ReadOnly | DontDelete | DontEnum, objectToStringFunctionGetter);
+        return true;
     }
 
     printErrorMessageForFrame(impl().frame(), message);

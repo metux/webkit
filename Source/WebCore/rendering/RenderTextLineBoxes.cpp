@@ -169,6 +169,13 @@ IntRect RenderTextLineBoxes::boundingBox(const RenderText& renderer) const
     return enclosingIntRect(FloatRect(x, y, width, height));
 }
 
+IntPoint RenderTextLineBoxes::firstRunLocation() const
+{
+    if (!m_first)
+        return IntPoint();
+    return IntPoint(m_first->topLeft());
+}
+
 LayoutRect RenderTextLineBoxes::visualOverflowBoundingBox(const RenderText& renderer) const
 {
     if (!m_first)
@@ -487,6 +494,17 @@ LayoutRect RenderTextLineBoxes::selectionRectForRange(unsigned start, unsigned e
     return rect;
 }
 
+void RenderTextLineBoxes::collectSelectionRectsForRange(unsigned start, unsigned end, Vector<LayoutRect>& rects)
+{
+    for (auto box = m_first; box; box = box->nextTextBox()) {
+        LayoutRect rect;
+        rect.unite(box->localSelectionRect(start, end));
+        rect.unite(ellipsisRectForBox(*box, start, end));
+        if (!rect.size().isEmpty())
+            rects.append(rect);
+    }
+}
+
 Vector<IntRect> RenderTextLineBoxes::absoluteRects(const LayoutPoint& accumulatedOffset) const
 {
     Vector<IntRect> rects;
@@ -697,10 +715,8 @@ RenderTextLineBoxes::~RenderTextLineBoxes()
 #if !ASSERT_WITH_SECURITY_IMPLICATION_DISABLED
 void RenderTextLineBoxes::invalidateParentChildLists()
 {
-    for (auto box = m_first; box; box = box->nextTextBox()) {
-        if (auto parent = box->parent())
-            parent->setHasBadChildList();
-    }
+    for (auto box = m_first; box; box = box->nextTextBox())
+        box->invalidateParentChildList();
 }
 #endif
 

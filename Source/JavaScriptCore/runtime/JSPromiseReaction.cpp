@@ -26,6 +26,8 @@
 #include "config.h"
 #include "JSPromiseReaction.h"
 
+#if ENABLE(PROMISES)
+
 #include "Error.h"
 #include "JSCJSValueInlines.h"
 #include "JSCellInlines.h"
@@ -121,7 +123,7 @@ void ExecutePromiseReactionMicrotask::run(ExecState* exec)
 }
 
 
-const ClassInfo JSPromiseReaction::s_info = { "JSPromiseReaction", 0, 0, 0, CREATE_METHOD_TABLE(JSPromiseReaction) };
+const ClassInfo JSPromiseReaction::s_info = { "JSPromiseReaction", 0, 0, CREATE_METHOD_TABLE(JSPromiseReaction) };
 
 JSPromiseReaction* JSPromiseReaction::create(VM& vm, JSPromiseDeferred* deferred, JSValue handler)
 {
@@ -146,8 +148,6 @@ void JSPromiseReaction::visitChildren(JSCell* cell, SlotVisitor& visitor)
 {
     JSPromiseReaction* thisObject = jsCast<JSPromiseReaction*>(cell);
     ASSERT_GC_OBJECT_INHERITS(thisObject, info());
-    COMPILE_ASSERT(StructureFlags & OverridesVisitChildren, OverridesVisitChildrenWithoutSettingFlag);
-    ASSERT(thisObject->structure()->typeInfo().overridesVisitChildren());
 
     Base::visitChildren(thisObject, visitor);
 
@@ -156,3 +156,5 @@ void JSPromiseReaction::visitChildren(JSCell* cell, SlotVisitor& visitor)
 }
 
 } // namespace JSC
+
+#endif // ENABLE(PROMISES)

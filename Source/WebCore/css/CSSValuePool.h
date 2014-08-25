@@ -32,6 +32,7 @@
 #include "CSSPropertyNames.h"
 #include "CSSValueKeywords.h"
 #include <wtf/HashMap.h>
+#include <wtf/NeverDestroyed.h>
 #include <wtf/RefPtr.h>
 #include <wtf/text/AtomicStringHash.h>
 
@@ -53,7 +54,7 @@ public:
     PassRef<CSSPrimitiveValue> createValue(double value, CSSPrimitiveValue::UnitTypes);
     PassRef<CSSPrimitiveValue> createValue(const String& value, CSSPrimitiveValue::UnitTypes type) { return CSSPrimitiveValue::create(value, type); }
     PassRef<CSSPrimitiveValue> createValue(const Length& value, const RenderStyle* style) { return CSSPrimitiveValue::create(value, style); }
-    PassRef<CSSPrimitiveValue> createValue(const LengthSize& value) { return CSSPrimitiveValue::create(value); }
+    PassRef<CSSPrimitiveValue> createValue(const LengthSize& value, const RenderStyle* style) { return CSSPrimitiveValue::create(value, style); }
     template<typename T> static PassRef<CSSPrimitiveValue> createValue(T value) { return CSSPrimitiveValue::create(value); }
 
     void drain();
@@ -85,7 +86,7 @@ private:
     typedef HashMap<String, RefPtr<CSSPrimitiveValue>> FontFamilyValueCache;
     FontFamilyValueCache m_fontFamilyValueCache;
 
-    friend CSSValuePool& cssValuePool();
+    friend class WTF::NeverDestroyed<CSSValuePool>;
 };
 
 CSSValuePool& cssValuePool() PURE_FUNCTION;

@@ -26,27 +26,26 @@
 #ifndef LLIntCLoop_h
 #define LLIntCLoop_h
 
-#if ENABLE(LLINT_C_LOOP)
+#if !ENABLE(JIT)
 
 #include "CallFrame.h"
 #include "JSCJSValue.h"
 #include "Opcode.h"
+#include "ProtoCallFrame.h"
 
 namespace JSC {
 namespace LLInt {
 
-const OpcodeID llint_unused = llint_end;
-
 class CLoop {
 public:
     static void initialize();
-    static JSValue execute(CallFrame*, Opcode entryOpcode, bool isInitializationPass = false);
+    static JSValue execute(OpcodeID entryOpcodeID, void* executableAddress, VM*, ProtoCallFrame*, bool isInitializationPass = false);
 };
 
 } } // namespace JSC::LLInt
 
 using JSC::LLInt::CLoop;
 
-#endif // ENABLE(LLINT_C_LOOP)
+#endif // !ENABLE(JIT)
 
 #endif // LLIntCLoop_h

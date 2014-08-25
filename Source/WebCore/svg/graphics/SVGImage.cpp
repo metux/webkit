@@ -26,8 +26,6 @@
  */
 
 #include "config.h"
-
-#if ENABLE(SVG)
 #include "SVGImage.h"
 
 #include "Chrome.h"
@@ -57,7 +55,7 @@ SVGImage::~SVGImage()
 {
     if (m_page) {
         // Store m_page in a local variable, clearing m_page, so that SVGImageChromeClient knows we're destructed.
-        std::unique_ptr<Page> currentPage = std::move(m_page);
+        std::unique_ptr<Page> currentPage = WTF::move(m_page);
         currentPage->mainFrame().loader().frameDetached(); // Break both the loader and view references to the frame
     }
 
@@ -83,7 +81,7 @@ bool SVGImage::hasSingleSecurityOrigin() const
     return true;
 }
 
-void SVGImage::setContainerSize(const IntSize& size)
+void SVGImage::setContainerSize(const FloatSize& size)
 {
     if (!m_page || !usesContainerSize())
         return;
@@ -98,7 +96,7 @@ void SVGImage::setContainerSize(const IntSize& size)
     FrameView* view = frameView();
     view->resize(this->containerSize());
 
-    renderer->setContainerSize(size);
+    renderer->setContainerSize(IntSize(size));
 }
 
 IntSize SVGImage::containerSize() const
@@ -122,7 +120,7 @@ IntSize SVGImage::containerSize() const
     ASSERT(renderer->style().effectiveZoom() == 1);
 
     FloatSize currentSize;
-    if (rootElement->intrinsicWidth().isFixed() && rootElement->intrinsicHeight().isFixed())
+    if (rootElement->hasIntrinsicWidth() && rootElement->hasIntrinsicHeight())
         currentSize = rootElement->currentViewportSize();
     else
         currentSize = rootElement->currentViewBoxRect().size();
@@ -222,6 +220,7 @@ void SVGImage::draw(GraphicsContext* context, const FloatRect& dstRect, const Fl
         return;
 
     FrameView* view = frameView();
+    ASSERT(view);
 
     GraphicsContextStateSaver stateSaver(*context);
     context->setCompositeOperation(compositeOp, blendMode);
@@ -253,6 +252,9 @@ void SVGImage::draw(GraphicsContext* context, const FloatRect& dstRect, const Fl
         context->endTransparencyLayer();
 
     stateSaver.restore();
+
+    if (!m_url.isEmpty())
+        view->scrollToFragment(m_url);
 
     if (imageObserver())
         imageObserver()->didDraw(this);
@@ -314,7 +316,7 @@ void SVGImage::computeIntrinsicDimensions(Length& intrinsicWidth, Length& intrin
 }
 
 // FIXME: support catchUpIfNecessary.
-void SVGImage::startAnimation(bool /* catchUpIfNecessary */)
+void SVGImage::startAnimation(CatchUpAnimation)
 {
     if (!m_page)
         return;
@@ -402,5 +404,3 @@ bool isInSVGImage(const Element* element)
 }
 
 }
-
-#endif // ENABLE(SVG)

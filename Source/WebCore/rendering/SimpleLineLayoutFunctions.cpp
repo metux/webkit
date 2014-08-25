@@ -42,21 +42,20 @@
 #include "SimpleLineLayoutResolver.h"
 #include "Text.h"
 #include "TextPaintStyle.h"
-#include <wtf/unicode/Unicode.h>
 
 namespace WebCore {
 namespace SimpleLineLayout {
 
-static void paintDebugBorders(GraphicsContext& context, const LayoutRect& borderRect, const LayoutPoint& paintOffset)
+static void paintDebugBorders(GraphicsContext& context, LayoutRect borderRect, const LayoutPoint& paintOffset)
 {
-    if (borderRect.isEmpty())
+    borderRect.moveBy(paintOffset);
+    IntRect snappedRect = pixelSnappedIntRect(borderRect);
+    if (snappedRect.isEmpty())
         return;
     GraphicsContextStateSaver stateSaver(context);
     context.setStrokeColor(Color(0, 255, 0), ColorSpaceDeviceRGB);
     context.setFillColor(Color::transparent, ColorSpaceDeviceRGB);
-    LayoutRect rect(borderRect);
-    rect.moveBy(paintOffset);
-    context.drawRect(pixelSnappedIntRect(rect));
+    context.drawRect(snappedRect);
 }
 
 void paintFlow(const RenderBlockFlow& flow, const Layout& layout, PaintInfo& paintInfo, const LayoutPoint& paintOffset)
@@ -80,10 +79,8 @@ void paintFlow(const RenderBlockFlow& flow, const Layout& layout, PaintInfo& pai
     GraphicsContextStateSaver stateSaver(context, textPaintStyle.strokeWidth > 0);
 
     updateGraphicsContext(context, textPaintStyle);
-    LayoutPoint adjustedPaintOffset = roundedIntPoint(paintOffset);
-
     LayoutRect paintRect = paintInfo.rect;
-    paintRect.moveBy(-adjustedPaintOffset);
+    paintRect.moveBy(-paintOffset);
 
     auto resolver = runResolver(flow, layout);
     auto range = resolver.rangeForRect(paintRect);
@@ -93,9 +90,11 @@ void paintFlow(const RenderBlockFlow& flow, const Layout& layout, PaintInfo& pai
             continue;
         TextRun textRun(run.text());
         textRun.setTabSize(!style.collapseWhiteSpace(), style.tabSize());
-        context.drawText(font, textRun, run.baseline() + adjustedPaintOffset);
+        FloatPoint textOrigin = run.baseline() + paintOffset;
+        textOrigin.setY(roundToDevicePixel(LayoutUnit(textOrigin.y()), flow.document().deviceScaleFactor()));
+        context.drawText(font, textRun, textOrigin);
         if (debugBordersEnabled)
-            paintDebugBorders(context, run.rect(), adjustedPaintOffset);
+            paintDebugBorders(context, run.rect(), paintOffset);
     }
 }
 
@@ -161,11 +160,20 @@ IntRect computeTextBoundingBox(const RenderText& textRenderer, const Layout& lay
         if (rect.maxY() > bottom)
             bottom = rect.maxY();
     }
-    float x = firstLineRect.x();
+    float x = left;
     float y = firstLineRect.y();
     float width = right - left;
     float height = bottom - y;
     return enclosingIntRect(FloatRect(x, y, width, height));
+}
+
+IntPoint computeTextFirstRunLocation(const RenderText& textRenderer, const Layout& layout)
+{
+    auto resolver = runResolver(toRenderBlockFlow(*textRenderer.parent()), layout);
+    auto begin = resolver.begin();
+    if (begin == resolver.end())
+        return IntPoint();
+    return flooredIntPoint((*begin).rect().location());
 }
 
 Vector<IntRect> collectTextAbsoluteRects(const RenderText& textRenderer, const Layout& layout, const LayoutPoint& accumulatedOffset)

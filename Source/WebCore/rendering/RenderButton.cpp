@@ -1,5 +1,5 @@
 /**
- * Copyright (C) 2005 Apple Computer, Inc.
+ * Copyright (C) 2005 Apple Inc.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -38,7 +38,7 @@ namespace WebCore {
 using namespace HTMLNames;
 
 RenderButton::RenderButton(HTMLFormControlElement& element, PassRef<RenderStyle> style)
-    : RenderFlexibleBox(element, std::move(style))
+    : RenderFlexibleBox(element, WTF::move(style))
     , m_buttonText(0)
     , m_inner(0)
     , m_default(false)
@@ -77,17 +77,18 @@ void RenderButton::addChild(RenderObject* newChild, RenderObject* beforeChild)
     m_inner->addChild(newChild, beforeChild);
 }
 
-void RenderButton::removeChild(RenderObject& oldChild)
+RenderObject* RenderButton::removeChild(RenderObject& oldChild)
 {
     // m_inner should be the only child, but checking for direct children who
     // are not m_inner prevents security problems when that assumption is
     // violated.
     if (&oldChild == m_inner || !m_inner || oldChild.parent() == this) {
         ASSERT(&oldChild == m_inner || !m_inner);
-        RenderFlexibleBox::removeChild(oldChild);
+        RenderObject* next = RenderFlexibleBox::removeChild(oldChild);
         m_inner = nullptr;
+        return next;
     } else
-        m_inner->removeChild(oldChild);
+        return m_inner->removeChild(oldChild);
 }
 
 void RenderButton::styleWillChange(StyleDifference diff, const RenderStyle& newStyle)
@@ -112,14 +113,16 @@ void RenderButton::styleDidChange(StyleDifference diff, const RenderStyle* oldSt
     if (m_inner) // RenderBlock handled updating the anonymous block's style.
         setupInnerStyle(&m_inner->style());
 
-    if (!m_default && theme().isDefault(this)) {
-        if (!m_timer)
-            m_timer = adoptPtr(new Timer<RenderButton>(this, &RenderButton::timerFired));
-        m_timer->startRepeating(0.03);
+    if (!m_default && theme().isDefault(*this)) {
+        if (theme().defaultButtonHasAnimation()) {
+            if (!m_timer)
+                m_timer = std::make_unique<Timer<RenderButton>>(this, &RenderButton::timerFired);
+            m_timer->startRepeating(0.03);
+        }
         m_default = true;
-    } else if (m_default && !theme().isDefault(this)) {
+    } else if (m_default && !theme().isDefault(*this)) {
         m_default = false;
-        m_timer.clear();
+        m_timer = nullptr;
     }
 }
 
@@ -202,7 +205,7 @@ void RenderButton::layout()
     RenderFlexibleBox::layout();
 
     // FIXME: We should not be adjusting styles during layout. See <rdar://problem/7675493>.
-    RenderThemeIOS::adjustRoundBorderRadius(style(), this);
+    RenderThemeIOS::adjustRoundBorderRadius(style(), *this);
 }
 #endif
 

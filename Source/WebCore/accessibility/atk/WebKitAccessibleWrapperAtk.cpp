@@ -57,6 +57,7 @@
 #include "WebKitAccessibleInterfaceImage.h"
 #include "WebKitAccessibleInterfaceSelection.h"
 #include "WebKitAccessibleInterfaceTable.h"
+#include "WebKitAccessibleInterfaceTableCell.h"
 #include "WebKitAccessibleInterfaceText.h"
 #include "WebKitAccessibleInterfaceValue.h"
 #include "WebKitAccessibleUtil.h"
@@ -253,6 +254,15 @@ static void setAtkRelationSetFromCoreObject(AccessibilityObject* coreObject, Atk
         coreObject->ariaDescribedByElements(ariaDescribedByElements);
         for (const auto& accessibilityObject : ariaDescribedByElements)
             atk_relation_set_add_relation_by_type(relationSet, ATK_RELATION_DESCRIBED_BY, accessibilityObject->wrapper());
+    }
+
+    // Check whether object supports aria-controls. It provides information about elements that are controlled by the current object.
+    if (coreObject->supportsARIAControls()) {
+        removeAtkRelationByType(relationSet, ATK_RELATION_CONTROLLER_FOR);
+        AccessibilityObject::AccessibilityChildrenVector ariaControls;
+        coreObject->ariaControlsElements(ariaControls);
+        for (const auto& accessibilityObject : ariaControls)
+            atk_relation_set_add_relation_by_type(relationSet, ATK_RELATION_CONTROLLER_FOR, accessibilityObject->wrapper());
     }
 }
 
@@ -543,6 +553,12 @@ static AtkAttributeSet* webkitAccessibleGetAttributes(AtkObject* object)
         attributeSet = addToAtkAttributeSet(attributeSet, "sort", sortAttribute.string().utf8().data());
     }
 
+    if (coreObject->supportsARIAPosInSet())
+        attributeSet = addToAtkAttributeSet(attributeSet, "posinset", String::number(coreObject->ariaPosInSet()).utf8().data());
+
+    if (coreObject->supportsARIASetSize())
+        attributeSet = addToAtkAttributeSet(attributeSet, "setsize", String::number(coreObject->ariaSetSize()).utf8().data());
+
     // Landmarks will be exposed with xml-roles object attributes, with the exception
     // of LandmarkApplicationRole, which will be exposed with ATK_ROLE_EMBEDDED.
     AccessibilityRole role = coreObject->roleValue();
@@ -665,7 +681,7 @@ static AtkRole atkRole(AccessibilityObject* coreObject)
     case RowHeaderRole: // Row headers are cells after all.
     case ColumnHeaderRole: // Column headers are cells after all.
     case CellRole:
-        return ATK_ROLE_TABLE_CELL;
+        return coreObject->inheritsPresentationalRole() ? ATK_ROLE_SECTION : ATK_ROLE_TABLE_CELL;
     case LinkRole:
     case WebCoreLinkRole:
     case ImageMapLinkRole:
@@ -688,6 +704,7 @@ static AtkRole atkRole(AccessibilityObject* coreObject)
     case ListBoxRole:
         return ATK_ROLE_LIST;
     case ListItemRole:
+        return coreObject->inheritsPresentationalRole() ? ATK_ROLE_SECTION : ATK_ROLE_LIST_ITEM;
     case ListBoxOptionRole:
         return ATK_ROLE_LIST_ITEM;
     case ParagraphRole:
@@ -1044,6 +1061,9 @@ static const GInterfaceInfo AtkInterfacesInitFunctions[] = {
     {reinterpret_cast<GInterfaceInitFunc>(webkitAccessibleComponentInterfaceInit), 0, 0},
     {reinterpret_cast<GInterfaceInitFunc>(webkitAccessibleImageInterfaceInit), 0, 0},
     {reinterpret_cast<GInterfaceInitFunc>(webkitAccessibleTableInterfaceInit), 0, 0},
+#if ATK_CHECK_VERSION(2,11,90)
+    {reinterpret_cast<GInterfaceInitFunc>(webkitAccessibleTableCellInterfaceInit), 0, 0},
+#endif
     {reinterpret_cast<GInterfaceInitFunc>(webkitAccessibleHypertextInterfaceInit), 0, 0},
     {reinterpret_cast<GInterfaceInitFunc>(webkitAccessibleHyperlinkImplInterfaceInit), 0, 0},
     {reinterpret_cast<GInterfaceInitFunc>(webkitAccessibleDocumentInterfaceInit), 0, 0},
@@ -1051,43 +1071,50 @@ static const GInterfaceInfo AtkInterfacesInitFunctions[] = {
 };
 
 enum WAIType {
-    WAI_ACTION,
-    WAI_SELECTION,
-    WAI_EDITABLE_TEXT,
-    WAI_TEXT,
-    WAI_COMPONENT,
-    WAI_IMAGE,
-    WAI_TABLE,
-    WAI_HYPERTEXT,
-    WAI_HYPERLINK,
-    WAI_DOCUMENT,
-    WAI_VALUE,
+    WAIAction,
+    WAISelection,
+    WAIEditableText,
+    WAIText,
+    WAIComponent,
+    WAIImage,
+    WAITable,
+#if ATK_CHECK_VERSION(2,11,90)
+    WAITableCell,
+#endif
+    WAIHypertext,
+    WAIHyperlink,
+    WAIDocument,
+    WAIValue,
 };
 
 static GType GetAtkInterfaceTypeFromWAIType(WAIType type)
 {
     switch (type) {
-    case WAI_ACTION:
+    case WAIAction:
         return ATK_TYPE_ACTION;
-    case WAI_SELECTION:
+    case WAISelection:
         return ATK_TYPE_SELECTION;
-    case WAI_EDITABLE_TEXT:
+    case WAIEditableText:
         return ATK_TYPE_EDITABLE_TEXT;
-    case WAI_TEXT:
+    case WAIText:
         return ATK_TYPE_TEXT;
-    case WAI_COMPONENT:
+    case WAIComponent:
         return ATK_TYPE_COMPONENT;
-    case WAI_IMAGE:
+    case WAIImage:
         return ATK_TYPE_IMAGE;
-    case WAI_TABLE:
+    case WAITable:
         return ATK_TYPE_TABLE;
-    case WAI_HYPERTEXT:
+#if ATK_CHECK_VERSION(2,11,90)
+    case WAITableCell:
+        return ATK_TYPE_TABLE_CELL;
+#endif
+    case WAIHypertext:
         return ATK_TYPE_HYPERTEXT;
-    case WAI_HYPERLINK:
+    case WAIHyperlink:
         return ATK_TYPE_HYPERLINK_IMPL;
-    case WAI_DOCUMENT:
+    case WAIDocument:
         return ATK_TYPE_DOCUMENT;
-    case WAI_VALUE:
+    case WAIValue:
         return ATK_TYPE_VALUE;
     }
 
@@ -1105,7 +1132,7 @@ static guint16 getInterfaceMaskFromObject(AccessibilityObject* coreObject)
     guint16 interfaceMask = 0;
 
     // Component interface is always supported
-    interfaceMask |= 1 << WAI_COMPONENT;
+    interfaceMask |= 1 << WAIComponent;
 
     AccessibilityRole role = coreObject->roleValue();
 
@@ -1115,11 +1142,11 @@ static guint16 getInterfaceMaskFromObject(AccessibilityObject* coreObject)
     // object, and only supports having one action per object), it is
     // better just to implement this interface for every instance of
     // the WebKitAccessible class and let WebCore decide what to do.
-    interfaceMask |= 1 << WAI_ACTION;
+    interfaceMask |= 1 << WAIAction;
 
     // Selection
     if (coreObject->isListBox() || coreObject->isMenuList())
-        interfaceMask |= 1 << WAI_SELECTION;
+        interfaceMask |= 1 << WAISelection;
 
     // Get renderer if available.
     RenderObject* renderer = 0;
@@ -1128,55 +1155,58 @@ static guint16 getInterfaceMaskFromObject(AccessibilityObject* coreObject)
 
     // Hyperlink (links and embedded objects).
     if (coreObject->isLink() || (renderer && renderer->isReplaced()))
-        interfaceMask |= 1 << WAI_HYPERLINK;
+        interfaceMask |= 1 << WAIHyperlink;
 
-    // Text & Editable Text
+    // Text, Editable Text & Hypertext
     if (role == StaticTextRole || coreObject->isMenuListOption())
-        interfaceMask |= 1 << WAI_TEXT;
-    else {
-        if (coreObject->isTextControl()) {
-            interfaceMask |= 1 << WAI_TEXT;
-            if (!coreObject->isReadOnly())
-                interfaceMask |= 1 << WAI_EDITABLE_TEXT;
-        } else {
-            if (role != TableRole) {
-                interfaceMask |= 1 << WAI_HYPERTEXT;
-                if ((renderer && renderer->childrenInline()) || roleIsTextType(role))
-                    interfaceMask |= 1 << WAI_TEXT;
-            }
+        interfaceMask |= 1 << WAIText;
+    else if (coreObject->isTextControl()) {
+        interfaceMask |= 1 << WAIText;
+        if (!coreObject->isReadOnly())
+            interfaceMask |= 1 << WAIEditableText;
+    } else if (!coreObject->isWebArea()) {
+        if (role != TableRole) {
+            interfaceMask |= 1 << WAIHypertext;
+            if ((renderer && renderer->childrenInline()) || roleIsTextType(role))
+                interfaceMask |= 1 << WAIText;
+        }
 
-            // Add the TEXT interface for list items whose
-            // first accessible child has a text renderer
-            if (role == ListItemRole) {
-                const AccessibilityObject::AccessibilityChildrenVector& children = coreObject->children();
-                if (children.size()) {
-                    AccessibilityObject* axRenderChild = children.at(0).get();
-                    interfaceMask |= getInterfaceMaskFromObject(axRenderChild);
-                }
+        // Add the TEXT interface for list items whose
+        // first accessible child has a text renderer
+        if (role == ListItemRole) {
+            const AccessibilityObject::AccessibilityChildrenVector& children = coreObject->children();
+            if (children.size()) {
+                AccessibilityObject* axRenderChild = children.at(0).get();
+                interfaceMask |= getInterfaceMaskFromObject(axRenderChild);
             }
         }
     }
 
     // Image
     if (coreObject->isImage())
-        interfaceMask |= 1 << WAI_IMAGE;
+        interfaceMask |= 1 << WAIImage;
 
     // Table
     if (role == TableRole)
-        interfaceMask |= 1 << WAI_TABLE;
+        interfaceMask |= 1 << WAITable;
+
+#if ATK_CHECK_VERSION(2,11,90)
+    if (role == CellRole)
+        interfaceMask |= 1 << WAITableCell;
+#endif
 
     // Document
     if (role == WebAreaRole)
-        interfaceMask |= 1 << WAI_DOCUMENT;
+        interfaceMask |= 1 << WAIDocument;
 
     // Value
     if (role == SliderRole || role == SpinButtonRole || role == ScrollBarRole || role == ProgressIndicatorRole)
-        interfaceMask |= 1 << WAI_VALUE;
+        interfaceMask |= 1 << WAIValue;
 
 #if ENABLE(INPUT_TYPE_COLOR)
     // Color type.
     if (role == ColorWellRole)
-        interfaceMask |= 1 << WAI_TEXT;
+        interfaceMask |= 1 << WAIText;
 #endif
 
     return interfaceMask;
@@ -1257,18 +1287,6 @@ bool webkitAccessibleIsDetached(WebKitAccessible* accessible)
 {
     ASSERT(accessible->m_object);
     return accessible->m_object == fallbackObject();
-}
-
-AtkObject* webkitAccessibleGetFocusedElement(WebKitAccessible* accessible)
-{
-    if (!accessible->m_object)
-        return 0;
-
-    RefPtr<AccessibilityObject> focusedObj = accessible->m_object->focusedUIElement();
-    if (!focusedObj)
-        return 0;
-
-    return focusedObj->wrapper();
 }
 
 AccessibilityObject* objectFocusedAndCaretOffsetUnignored(AccessibilityObject* referenceObject, int& offset)

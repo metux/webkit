@@ -47,37 +47,37 @@ namespace WebCore {
 
 const AtomicString& VideoTrack::alternativeKeyword()
 {
-    DEFINE_STATIC_LOCAL(const AtomicString, alternative, ("alternative", AtomicString::ConstructFromLiteral));
+    DEPRECATED_DEFINE_STATIC_LOCAL(const AtomicString, alternative, ("alternative", AtomicString::ConstructFromLiteral));
     return alternative;
 }
 
 const AtomicString& VideoTrack::captionsKeyword()
 {
-    DEFINE_STATIC_LOCAL(const AtomicString, captions, ("captions", AtomicString::ConstructFromLiteral));
+    DEPRECATED_DEFINE_STATIC_LOCAL(const AtomicString, captions, ("captions", AtomicString::ConstructFromLiteral));
     return captions;
 }
 
 const AtomicString& VideoTrack::mainKeyword()
 {
-    DEFINE_STATIC_LOCAL(const AtomicString, captions, ("main", AtomicString::ConstructFromLiteral));
+    DEPRECATED_DEFINE_STATIC_LOCAL(const AtomicString, captions, ("main", AtomicString::ConstructFromLiteral));
     return captions;
 }
 
 const AtomicString& VideoTrack::signKeyword()
 {
-    DEFINE_STATIC_LOCAL(const AtomicString, sign, ("sign", AtomicString::ConstructFromLiteral));
+    DEPRECATED_DEFINE_STATIC_LOCAL(const AtomicString, sign, ("sign", AtomicString::ConstructFromLiteral));
     return sign;
 }
 
 const AtomicString& VideoTrack::subtitlesKeyword()
 {
-    DEFINE_STATIC_LOCAL(const AtomicString, subtitles, ("subtitles", AtomicString::ConstructFromLiteral));
+    DEPRECATED_DEFINE_STATIC_LOCAL(const AtomicString, subtitles, ("subtitles", AtomicString::ConstructFromLiteral));
     return subtitles;
 }
 
 const AtomicString& VideoTrack::commentaryKeyword()
 {
-    DEFINE_STATIC_LOCAL(const AtomicString, commentary, ("commentary", AtomicString::ConstructFromLiteral));
+    DEPRECATED_DEFINE_STATIC_LOCAL(const AtomicString, commentary, ("commentary", AtomicString::ConstructFromLiteral));
     return commentary;
 }
 
@@ -88,38 +88,28 @@ VideoTrack::VideoTrack(VideoTrackClient* client, PassRefPtr<VideoTrackPrivate> t
     , m_private(trackPrivate)
 {
     m_private->setClient(this);
-
-    switch (m_private->kind()) {
-    case VideoTrackPrivate::Alternative:
-        setKindInternal(VideoTrack::alternativeKeyword());
-        break;
-    case VideoTrackPrivate::Captions:
-        setKindInternal(VideoTrack::captionsKeyword());
-        break;
-    case VideoTrackPrivate::Main:
-        setKindInternal(VideoTrack::mainKeyword());
-        break;
-    case VideoTrackPrivate::Sign:
-        setKindInternal(VideoTrack::signKeyword());
-        break;
-    case VideoTrackPrivate::Subtitles:
-        setKindInternal(VideoTrack::subtitlesKeyword());
-        break;
-    case VideoTrackPrivate::Commentary:
-        setKindInternal(VideoTrack::commentaryKeyword());
-        break;
-    case VideoTrackPrivate::None:
-        setKindInternal(emptyString());
-        break;
-    default:
-        ASSERT_NOT_REACHED();
-        break;
-    }
+    updateKindFromPrivate();
 }
 
 VideoTrack::~VideoTrack()
 {
     m_private->setClient(0);
+}
+
+void VideoTrack::setPrivate(PassRefPtr<VideoTrackPrivate> trackPrivate)
+{
+    ASSERT(m_private);
+    ASSERT(trackPrivate);
+
+    if (m_private == trackPrivate)
+        return;
+
+    m_private->setClient(nullptr);
+    m_private = trackPrivate;
+    m_private->setClient(this);
+
+    m_private->setSelected(m_selected);
+    updateKindFromPrivate();
 }
 
 bool VideoTrack::isValidKind(const AtomicString& value) const
@@ -164,19 +154,19 @@ void VideoTrack::selectedChanged(VideoTrackPrivate* trackPrivate, bool selected)
     setSelected(selected);
 }
 
-void VideoTrack::idChanged(TrackPrivateBase* trackPrivate, const String& id)
+void VideoTrack::idChanged(TrackPrivateBase* trackPrivate, const AtomicString& id)
 {
     ASSERT_UNUSED(trackPrivate, trackPrivate == m_private);
     setId(id);
 }
 
-void VideoTrack::labelChanged(TrackPrivateBase* trackPrivate, const String& label)
+void VideoTrack::labelChanged(TrackPrivateBase* trackPrivate, const AtomicString& label)
 {
     ASSERT_UNUSED(trackPrivate, trackPrivate == m_private);
     setLabel(label);
 }
 
-void VideoTrack::languageChanged(TrackPrivateBase* trackPrivate, const String& language)
+void VideoTrack::languageChanged(TrackPrivateBase* trackPrivate, const AtomicString& language)
 {
     ASSERT_UNUSED(trackPrivate, trackPrivate == m_private);
     setLanguage(language);
@@ -230,6 +220,36 @@ void VideoTrack::setLanguage(const AtomicString& language)
     mediaElement()->videoTracks()->scheduleChangeEvent();
 }
 #endif
+
+void VideoTrack::updateKindFromPrivate()
+{
+    switch (m_private->kind()) {
+    case VideoTrackPrivate::Alternative:
+        setKindInternal(VideoTrack::alternativeKeyword());
+        break;
+    case VideoTrackPrivate::Captions:
+        setKindInternal(VideoTrack::captionsKeyword());
+        break;
+    case VideoTrackPrivate::Main:
+        setKindInternal(VideoTrack::mainKeyword());
+        break;
+    case VideoTrackPrivate::Sign:
+        setKindInternal(VideoTrack::signKeyword());
+        break;
+    case VideoTrackPrivate::Subtitles:
+        setKindInternal(VideoTrack::subtitlesKeyword());
+        break;
+    case VideoTrackPrivate::Commentary:
+        setKindInternal(VideoTrack::commentaryKeyword());
+        break;
+    case VideoTrackPrivate::None:
+        setKindInternal(emptyString());
+        break;
+    default:
+        ASSERT_NOT_REACHED();
+        break;
+    }
+}
 
 } // namespace WebCore
 

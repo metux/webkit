@@ -11,7 +11,7 @@
  * 2.  Redistributions in binary form must reproduce the above copyright
  *     notice, this list of conditions and the following disclaimer in the
  *     documentation and/or other materials provided with the distribution.
- * 3.  Neither the name of Apple Computer, Inc. ("Apple") nor the names of
+ * 3.  Neither the name of Apple Inc. ("Apple") nor the names of
  *     its contributors may be used to endorse or promote products derived
  *     from this software without specific prior written permission.
  *
@@ -30,8 +30,8 @@
 #ifndef CommandLineAPIHost_h
 #define CommandLineAPIHost_h
 
-#include "ConsoleTypes.h"
 #include "ScriptState.h"
+#include <runtime/ConsoleTypes.h>
 #include <wtf/RefCounted.h>
 #include <wtf/Vector.h>
 #include <wtf/text/WTFString.h>
@@ -42,6 +42,7 @@ class ScriptValue;
 
 namespace Inspector {
 class InspectorAgent;
+class InspectorConsoleAgent;
 class InspectorObject;
 class InspectorValue;
 }
@@ -49,7 +50,6 @@ class InspectorValue;
 namespace WebCore {
 
 class Database;
-class InspectorConsoleAgent;
 class InspectorDOMAgent;
 class InspectorDOMStorageAgent;
 class InspectorDatabaseAgent;
@@ -64,11 +64,11 @@ public:
     ~CommandLineAPIHost();
 
     void init(Inspector::InspectorAgent* inspectorAgent
-            , InspectorConsoleAgent* consoleAgent
-            , InspectorDOMAgent* domAgent
-            , InspectorDOMStorageAgent* domStorageAgent
+        , Inspector::InspectorConsoleAgent* consoleAgent
+        , InspectorDOMAgent* domAgent
+        , InspectorDOMStorageAgent* domStorageAgent
 #if ENABLE(SQL_DATABASE)
-            , InspectorDatabaseAgent* databaseAgent
+        , InspectorDatabaseAgent* databaseAgent
 #endif
         )
     {
@@ -92,7 +92,7 @@ public:
         virtual Deprecated::ScriptValue get(JSC::ExecState*);
         virtual ~InspectableObject() { }
     };
-    void addInspectedObject(PassOwnPtr<InspectableObject>);
+    void addInspectedObject(std::unique_ptr<InspectableObject>);
     void clearInspectedObjects();
     InspectableObject* inspectedObject(unsigned index);
     void inspectImpl(PassRefPtr<Inspector::InspectorValue> objectToInspect, PassRefPtr<Inspector::InspectorValue> hints);
@@ -108,15 +108,15 @@ private:
     CommandLineAPIHost();
 
     Inspector::InspectorAgent* m_inspectorAgent;
-    InspectorConsoleAgent* m_consoleAgent;
+    Inspector::InspectorConsoleAgent* m_consoleAgent;
     InspectorDOMAgent* m_domAgent;
     InspectorDOMStorageAgent* m_domStorageAgent;
 #if ENABLE(SQL_DATABASE)
     InspectorDatabaseAgent* m_databaseAgent;
 #endif
 
-    Vector<OwnPtr<InspectableObject>> m_inspectedObjects;
-    OwnPtr<InspectableObject> m_defaultInspectableObject;
+    Vector<std::unique_ptr<InspectableObject>> m_inspectedObjects;
+    std::unique_ptr<InspectableObject> m_defaultInspectableObject;
 };
 
 } // namespace WebCore

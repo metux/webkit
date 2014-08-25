@@ -26,8 +26,6 @@
 #ifndef DFGNodeType_h
 #define DFGNodeType_h
 
-#include <wtf/Platform.h>
-
 #if ENABLE(DFG_JIT)
 
 #include "DFGNodeFlags.h"
@@ -37,11 +35,11 @@ namespace JSC { namespace DFG {
 // This macro defines a set of information about all known node types, used to populate NodeId, NodeType below.
 #define FOR_EACH_DFG_OP(macro) \
     /* A constant in the CodeBlock's constant pool. */\
-    macro(JSConstant, NodeResultJS | NodeDoesNotExit) \
+    macro(JSConstant, NodeResultJS) \
     \
-    /* A constant not in the CodeBlock's constant pool. Uses get patched to jumps that exit the */\
-    /* code block. */\
-    macro(WeakJSConstant, NodeResultJS | NodeDoesNotExit) \
+    /* Constants with specific representations. */\
+    macro(DoubleConstant, NodeResultDouble) \
+    macro(Int52Constant, NodeResultInt52) \
     \
     /* Marker to indicate that an operation was optimized entirely and all that is left */\
     /* is to make one node alias another. CSE will later usually eliminate this node, */\
@@ -58,15 +56,16 @@ namespace JSC { namespace DFG {
     /* VariableAccessData, and thus will share predictions. */\
     macro(GetLocal, NodeResultJS) \
     macro(SetLocal, 0) \
-    macro(MovHint, NodeDoesNotExit) \
-    macro(ZombieHint, NodeDoesNotExit) \
+    macro(MovHint, 0) \
+    macro(ZombieHint, 0) \
     macro(GetArgument, NodeResultJS | NodeMustGenerate) \
     macro(Phantom, NodeMustGenerate) \
-    macro(Check, 0) /* Used if we want just a type check but not liveness. DCE eithers kills this or converts it to Phantom. */\
-    macro(Upsilon, NodeDoesNotExit | NodeRelevantToOSR) \
-    macro(Phi, NodeDoesNotExit | NodeRelevantToOSR) \
-    macro(Flush, NodeMustGenerate | NodeDoesNotExit) \
-    macro(PhantomLocal, NodeMustGenerate | NodeDoesNotExit) \
+    macro(HardPhantom, NodeMustGenerate) /* Like Phantom, but we never remove any of its children. */ \
+    macro(Check, NodeMustGenerate) /* Used if we want just a type check but not liveness. Non-checking uses will be removed. */\
+    macro(Upsilon, NodeRelevantToOSR) \
+    macro(Phi, NodeRelevantToOSR) \
+    macro(Flush, NodeMustGenerate) \
+    macro(PhantomLocal, NodeMustGenerate) \
     \
     /* Hint that this is where bytecode thinks is a good place to OSR. Note that this */\
     /* will exist even in inlined loops. This has no execution semantics but it must */\
@@ -89,7 +88,7 @@ namespace JSC { namespace DFG {
     macro(GetLocalUnlinked, NodeResultJS) \
     \
     /* Marker for an argument being set at the prologue of a function. */\
-    macro(SetArgument, NodeDoesNotExit) \
+    macro(SetArgument, 0) \
     \
     /* Marker of location in the IR where we may possibly perform jump replacement to */\
     /* invalidate this code block. */\
@@ -106,16 +105,19 @@ namespace JSC { namespace DFG {
     macro(ValueToInt32, NodeResultInt32) \
     /* Used to box the result of URShift nodes (result has range 0..2^32-1). */\
     macro(UInt32ToNumber, NodeResultNumber) \
+    /* Converts booleans to numbers but passes everything else through. */\
+    macro(BooleanToNumber, NodeResultJS) \
     \
-    /* Used to cast known integers to doubles, so as to separate the double form */\
-    /* of the value from the integer form. */\
-    macro(Int32ToDouble, NodeResultNumber) \
-    /* Used to speculate that a double value is actually an integer. */\
+    /* Attempt to truncate a double to int32; this will exit if it can't do it. */\
     macro(DoubleAsInt32, NodeResultInt32) \
-    /* Used to separate representation and register allocation of Int52's represented */\
-    /* as values. */\
-    macro(Int52ToValue, NodeResultJS) \
-    macro(Int52ToDouble, NodeResultNumber) \
+    \
+    /* Change the representation of a value. */\
+    macro(DoubleRep, NodeResultDouble) \
+    macro(Int52Rep, NodeResultInt52) \
+    macro(ValueRep, NodeResultJS) \
+    \
+    /* Bogus type asserting node. Useful for testing, disappears during Fixup. */\
+    macro(FiatInt52, NodeResultJS) \
     \
     /* Nodes for arithmetic operations. */\
     macro(ArithAdd, NodeResultNumber) \
@@ -128,6 +130,7 @@ namespace JSC { namespace DFG {
     macro(ArithAbs, NodeResultNumber) \
     macro(ArithMin, NodeResultNumber) \
     macro(ArithMax, NodeResultNumber) \
+    macro(ArithFRound, NodeResultNumber) \
     macro(ArithSqrt, NodeResultNumber) \
     macro(ArithSin, NodeResultNumber) \
     macro(ArithCos, NodeResultNumber) \
@@ -147,25 +150,13 @@ namespace JSC { namespace DFG {
     macro(GetById, NodeResultJS | NodeMustGenerate | NodeClobbersWorld) \
     macro(GetByIdFlush, NodeResultJS | NodeMustGenerate | NodeClobbersWorld) \
     macro(PutById, NodeMustGenerate | NodeClobbersWorld) \
+    macro(PutByIdFlush, NodeMustGenerate | NodeMustGenerate | NodeClobbersWorld) \
     macro(PutByIdDirect, NodeMustGenerate | NodeClobbersWorld) \
     macro(CheckStructure, NodeMustGenerate) \
     macro(CheckExecutable, NodeMustGenerate) \
-    /* Transition watchpoints are a contract between the party setting the watchpoint */\
-    /* and the runtime system, where the party promises that the child object once had */\
-    /* the structure being watched, and the runtime system in turn promises that the */\
-    /* watchpoint will be turned into an OSR exit if any object with that structure */\
-    /* ever transitions to a different structure. Hence, the child object must have */\
-    /* previously had a CheckStructure executed on it or we're dealing with an object */\
-    /* constant (WeakJSConstant) and the object was known to have that structure at */\
-    /* compile-time. In the latter case this means that no structure checks have to be */\
-    /* performed for this object by JITted code. In the former case this means that*/\
-    /* the object's structure does not need to be rechecked due to side-effecting */\
-    /* (clobbering) operations. */\
-    macro(StructureTransitionWatchpoint, NodeMustGenerate) \
     macro(PutStructure, NodeMustGenerate) \
-    macro(PhantomPutStructure, NodeMustGenerate | NodeDoesNotExit) \
-    macro(AllocatePropertyStorage, NodeMustGenerate | NodeDoesNotExit | NodeResultStorage) \
-    macro(ReallocatePropertyStorage, NodeMustGenerate | NodeDoesNotExit | NodeResultStorage) \
+    macro(AllocatePropertyStorage, NodeMustGenerate | NodeResultStorage) \
+    macro(ReallocatePropertyStorage, NodeMustGenerate | NodeResultStorage) \
     macro(GetButterfly, NodeResultStorage) \
     macro(CheckArray, NodeMustGenerate) \
     macro(Arrayify, NodeMustGenerate) \
@@ -173,8 +164,13 @@ namespace JSC { namespace DFG {
     macro(GetIndexedPropertyStorage, NodeResultStorage) \
     macro(ConstantStoragePointer, NodeResultStorage) \
     macro(TypedArrayWatchpoint, NodeMustGenerate) \
+    macro(GetGetter, NodeResultJS) \
+    macro(GetSetter, NodeResultJS) \
     macro(GetByOffset, NodeResultJS) \
+    macro(GetGetterSetterByOffset, NodeResultJS) \
+    macro(MultiGetByOffset, NodeResultJS) \
     macro(PutByOffset, NodeMustGenerate) \
+    macro(MultiPutByOffset, NodeMustGenerate) \
     macro(GetArrayLength, NodeResultInt32) \
     macro(GetTypedArrayByteOffset, NodeResultInt32) \
     macro(GetScope, NodeResultJS) \
@@ -215,16 +211,17 @@ namespace JSC { namespace DFG {
     macro(CompareEq, NodeResultBoolean | NodeMustGenerate | NodeClobbersWorld) \
     macro(CompareEqConstant, NodeResultBoolean) \
     macro(CompareStrictEq, NodeResultBoolean) \
-    macro(CompareStrictEqConstant, NodeResultBoolean) \
     \
     /* Calls. */\
     macro(Call, NodeResultJS | NodeMustGenerate | NodeHasVarArgs | NodeClobbersWorld) \
     macro(Construct, NodeResultJS | NodeMustGenerate | NodeHasVarArgs | NodeClobbersWorld) \
+    macro(NativeCall, NodeResultJS | NodeMustGenerate | NodeHasVarArgs | NodeClobbersWorld) \
+    macro(NativeConstruct, NodeResultJS | NodeMustGenerate | NodeHasVarArgs | NodeClobbersWorld) \
     \
     /* Allocations. */\
     macro(NewObject, NodeResultJS) \
     macro(NewArray, NodeResultJS | NodeHasVarArgs) \
-    macro(NewArrayWithSize, NodeResultJS) \
+    macro(NewArrayWithSize, NodeResultJS | NodeMustGenerate) \
     macro(NewArrayBuffer, NodeResultJS) \
     macro(NewTypedArray, NodeResultJS | NodeClobbersWorld | NodeMustGenerate) \
     macro(NewRegexp, NodeResultJS) \
@@ -258,7 +255,7 @@ namespace JSC { namespace DFG {
     /* Nodes used for arguments. Similar to activation support, only it makes even less */\
     /* sense. */\
     macro(CreateArguments, NodeResultJS) \
-    macro(PhantomArguments, NodeResultJS | NodeDoesNotExit) \
+    macro(PhantomArguments, NodeResultJS) \
     macro(TearOffArguments, NodeMustGenerate) \
     macro(GetMyArgumentsLength, NodeResultJS | NodeMustGenerate) \
     macro(GetMyArgumentByVal, NodeResultJS | NodeMustGenerate) \
@@ -295,8 +292,18 @@ namespace JSC { namespace DFG {
     macro(CheckWatchdogTimer, NodeMustGenerate) \
     /* Write barriers ! */\
     macro(StoreBarrier, NodeMustGenerate) \
-    macro(ConditionalStoreBarrier, NodeMustGenerate) \
     macro(StoreBarrierWithNullCheck, NodeMustGenerate) \
+    \
+    /* For-in enumeration opcodes */\
+    macro(GetEnumerableLength, NodeMustGenerate | NodeResultJS) \
+    macro(HasIndexedProperty, NodeResultBoolean) \
+    macro(HasStructureProperty, NodeResultBoolean) \
+    macro(HasGenericProperty, NodeResultBoolean) \
+    macro(GetDirectPname, NodeMustGenerate | NodeHasVarArgs | NodeResultJS) \
+    macro(GetStructurePropertyEnumerator, NodeMustGenerate | NodeResultJS) \
+    macro(GetGenericPropertyEnumerator, NodeMustGenerate | NodeResultJS) \
+    macro(GetEnumeratorPname, NodeMustGenerate | NodeResultJS) \
+    macro(ToIndexString, NodeResultJS)
 
 // This enum generates a monotonically increasing id for all Node types,
 // and is used by the subsequent enum to fill out the id (as accessed via the NodeIdMask).

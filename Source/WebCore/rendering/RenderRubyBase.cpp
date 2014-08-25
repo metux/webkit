@@ -37,7 +37,7 @@
 namespace WebCore {
 
 RenderRubyBase::RenderRubyBase(Document& document, PassRef<RenderStyle> style)
-    : RenderBlockFlow(document, std::move(style))
+    : RenderBlockFlow(document, WTF::move(style))
 {
     setInline(false);
 }
@@ -67,6 +67,12 @@ void RenderRubyBase::moveChildren(RenderRubyBase* toBase, RenderObject* beforeCh
 
     setNeedsLayoutAndPrefWidthsRecalc();
     toBase->setNeedsLayoutAndPrefWidthsRecalc();
+}
+
+void RenderRubyBase::mergeChildrenWithBase(RenderRubyBase* toBlock)
+{
+    moveChildren(toBlock);
+    moveFloatsTo(toBlock);
 }
 
 void RenderRubyBase::moveInlineChildren(RenderRubyBase* toBase, RenderObject* beforeChild)

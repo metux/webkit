@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2006, 2008, 2011 Apple Inc. All rights reserved.
+ * Copyright (C) 2006, 2008, 2011, 2014 Apple Inc. All rights reserved.
  * Copyright (C) 2012 Research In Motion Limited. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -11,10 +11,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -27,7 +27,9 @@
 #ifndef HistoryItem_h
 #define HistoryItem_h
 
+#include "FloatRect.h"
 #include "IntPoint.h"
+#include "IntRect.h"
 #include "SerializedScriptValue.h"
 #include <memory>
 #include <wtf/RefCounted.h>
@@ -37,7 +39,7 @@
 #include "ViewportArguments.h"
 #endif
 
-#if PLATFORM(MAC)
+#if PLATFORM(COCOA)
 #import <wtf/RetainPtr.h>
 typedef struct objc_object* id;
 #endif
@@ -49,8 +51,6 @@ class Document;
 class FormData;
 class HistoryItem;
 class Image;
-class KeyedDecoder;
-class KeyedEncoder;
 class ResourceRequest;
 class URL;
 
@@ -83,11 +83,6 @@ public:
     // Resets the HistoryItem to its initial state, as returned by create().
     void reset();
     
-    void encodeBackForwardTree(Encoder&) const;
-    void encodeBackForwardTree(KeyedEncoder&) const;
-    static PassRefPtr<HistoryItem> decodeBackForwardTree(const String& urlString, const String& title, const String& originalURLString, Decoder&);
-    static PassRefPtr<HistoryItem> decodeBackForwardTree(const String& urlString, const String& title, const String& originalURLString, KeyedDecoder&);
-
     const String& originalURLString() const;
     const String& urlString() const;
     const String& title() const;
@@ -164,7 +159,7 @@ public:
 
     bool isCurrentDocument(Document*) const;
     
-#if PLATFORM(MAC)
+#if PLATFORM(COCOA)
     id viewState() const;
     void setViewState(id);
     
@@ -180,8 +175,21 @@ public:
 #endif
 
 #if PLATFORM(IOS)
+    FloatRect exposedContentRect() const { return m_exposedContentRect; }
+    void setExposedContentRect(FloatRect exposedContentRect) { m_exposedContentRect = exposedContentRect; }
+
+    IntRect unobscuredContentRect() const { return m_unobscuredContentRect; }
+    void setUnobscuredContentRect(IntRect unobscuredContentRect) { m_unobscuredContentRect = unobscuredContentRect; }
+
+    FloatSize minimumLayoutSizeInScrollViewCoordinates() const { return m_minimumLayoutSizeInScrollViewCoordinates; }
+    void setMinimumLayoutSizeInScrollViewCoordinates(FloatSize minimumLayoutSizeInScrollViewCoordinates) { m_minimumLayoutSizeInScrollViewCoordinates = minimumLayoutSizeInScrollViewCoordinates; }
+
+    IntSize contentSize() const { return m_contentSize; }
+    void setContentSize(IntSize contentSize) { m_contentSize = contentSize; }
+
     float scale() const { return m_scale; }
     bool scaleIsInitial() const { return m_scaleIsInitial; }
+    void setScaleIsInitial(bool scaleIsInitial) { m_scaleIsInitial = scaleIsInitial; }
     void setScale(float newScale, bool isInitial)
     {
         m_scale = newScale;
@@ -208,9 +216,6 @@ private:
     bool hasSameDocumentTree(HistoryItem* otherItem) const;
 
     HistoryItem* findTargetItem();
-
-    void encodeBackForwardTreeNode(Encoder&) const;
-    void encodeBackForwardTreeNode(KeyedEncoder&) const;
 
     String m_urlString;
     String m_originalURLString;
@@ -255,6 +260,10 @@ private:
     std::unique_ptr<CachedPage> m_cachedPage;
 
 #if PLATFORM(IOS)
+    FloatRect m_exposedContentRect;
+    IntRect m_unobscuredContentRect;
+    FloatSize m_minimumLayoutSizeInScrollViewCoordinates;
+    IntSize m_contentSize;
     float m_scale;
     bool m_scaleIsInitial;
     ViewportArguments m_viewportArguments;
@@ -263,7 +272,7 @@ private:
     String m_sharedLinkUniqueIdentifier;
 #endif
 
-#if PLATFORM(MAC)
+#if PLATFORM(COCOA)
     RetainPtr<id> m_viewState;
     std::unique_ptr<HashMap<String, RetainPtr<id>>> m_transientProperties;
 #endif

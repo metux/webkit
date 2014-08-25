@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2012 Google Inc. All rights reserved.
+ * Copyright (C) 2013, 2014 Igalia S.L.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -30,6 +31,8 @@
 
 #ifndef GridPosition_h
 #define GridPosition_h
+
+#if ENABLE(CSS_GRID_LAYOUT)
 
 #include <wtf/text/WTFString.h>
 
@@ -62,6 +65,12 @@ public:
         m_type = ExplicitPosition;
         m_integerPosition = position;
         m_namedGridLine = namedGridLine;
+    }
+
+    void setAutoPosition()
+    {
+        m_type = AutoPosition;
+        m_integerPosition = 0;
     }
 
     // 'span' values cannot be negative, yet we reuse the <integer> position which can
@@ -100,7 +109,7 @@ public:
 
     bool operator==(const GridPosition& other) const
     {
-        return m_type == other.m_type && m_integerPosition == other.m_integerPosition;
+        return m_type == other.m_type && m_integerPosition == other.m_integerPosition && m_namedGridLine == other.m_namedGridLine;
     }
 
     bool shouldBeResolvedAgainstOppositePosition() const
@@ -114,5 +123,7 @@ private:
 };
 
 } // namespace WebCore
+
+#endif /* ENABLE(CSS_GRID_LAYOUT) */
 
 #endif // GridPosition_h

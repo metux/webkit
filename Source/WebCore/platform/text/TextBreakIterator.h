@@ -24,7 +24,6 @@
 
 #include <wtf/text/AtomicString.h>
 #include <wtf/text/StringView.h>
-#include <wtf/unicode/Unicode.h>
 
 namespace WebCore {
 
@@ -184,7 +183,7 @@ private:
 unsigned numGraphemeClusters(const String&);
 // Returns the number of characters which will be less than or equal to
 // the specified grapheme cluster length.
-unsigned numCharactersInGraphemeClusters(const String&, unsigned);
+unsigned numCharactersInGraphemeClusters(const StringView&, unsigned);
 
 }
 

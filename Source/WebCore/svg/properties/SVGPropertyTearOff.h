@@ -20,7 +20,6 @@
 #ifndef SVGPropertyTearOff_h
 #define SVGPropertyTearOff_h
 
-#if ENABLE(SVG)
 #include "SVGAnimatedProperty.h"
 #include "SVGElement.h"
 #include "SVGProperty.h"
@@ -169,5 +168,4 @@ protected:
 
 }
 
-#endif // ENABLE(SVG)
 #endif // SVGPropertyTearOff_h

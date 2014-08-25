@@ -10,7 +10,7 @@
  * 2.  Redistributions in binary form must reproduce the above copyright
  *     notice, this list of conditions and the following disclaimer in the
  *     documentation and/or other materials provided with the distribution.
- * 3.  Neither the name of Apple Computer, Inc. ("Apple") nor the names of
+ * 3.  Neither the name of Apple Inc. ("Apple") nor the names of
  *     its contributors may be used to endorse or promote products derived
  *     from this software without specific prior written permission.
  *
@@ -32,20 +32,18 @@
 #include "Arguments.h"
 #include "Interpreter.h"
 #include "JSFunction.h"
-#include "Operations.h"
+#include "JSCInlines.h"
 
 using namespace std;
 
 namespace JSC {
 
-const ClassInfo JSActivation::s_info = { "JSActivation", &Base::s_info, 0, 0, CREATE_METHOD_TABLE(JSActivation) };
+const ClassInfo JSActivation::s_info = { "JSActivation", &Base::s_info, 0, CREATE_METHOD_TABLE(JSActivation) };
 
 void JSActivation::visitChildren(JSCell* cell, SlotVisitor& visitor)
 {
     JSActivation* thisObject = jsCast<JSActivation*>(cell);
     ASSERT_GC_OBJECT_INHERITS(thisObject, info());
-    COMPILE_ASSERT(StructureFlags & OverridesVisitChildren, OverridesVisitChildrenWithoutSettingFlag);
-    ASSERT(thisObject->structure()->typeInfo().overridesVisitChildren());
     Base::visitChildren(thisObject, visitor);
 
     // No need to mark our registers if they're still in the JSStack.
@@ -58,7 +56,7 @@ void JSActivation::visitChildren(JSCell* cell, SlotVisitor& visitor)
 
 inline bool JSActivation::symbolTableGet(PropertyName propertyName, PropertySlot& slot)
 {
-    SymbolTableEntry entry = symbolTable()->inlineGet(propertyName.publicName());
+    SymbolTableEntry entry = symbolTable()->inlineGet(propertyName.uid());
     if (entry.isNull())
         return false;
 
@@ -72,7 +70,7 @@ inline bool JSActivation::symbolTableGet(PropertyName propertyName, PropertySlot
 
 inline bool JSActivation::symbolTableGet(PropertyName propertyName, PropertyDescriptor& descriptor)
 {
-    SymbolTableEntry entry = symbolTable()->inlineGet(propertyName.publicName());
+    SymbolTableEntry entry = symbolTable()->inlineGet(propertyName.uid());
     if (entry.isNull())
         return false;
 
@@ -89,20 +87,26 @@ inline bool JSActivation::symbolTablePut(ExecState* exec, PropertyName propertyN
     VM& vm = exec->vm();
     ASSERT(!Heap::heap(value) || Heap::heap(value) == Heap::heap(this));
     
-    SymbolTableEntry entry = symbolTable()->inlineGet(propertyName.publicName());
-    if (entry.isNull())
-        return false;
-    if (entry.isReadOnly()) {
-        if (shouldThrow)
-            throwTypeError(exec, StrictModeReadonlyPropertyWriteError);
-        return true;
+    WriteBarrierBase<Unknown>* reg;
+    {
+        GCSafeConcurrentJITLocker locker(symbolTable()->m_lock, exec->vm().heap);
+        SymbolTable::Map::iterator iter = symbolTable()->find(locker, propertyName.uid());
+        if (iter == symbolTable()->end(locker))
+            return false;
+        ASSERT(!iter->value.isNull());
+        if (iter->value.isReadOnly()) {
+            if (shouldThrow)
+                throwTypeError(exec, StrictModeReadonlyPropertyWriteError);
+            return true;
+        }
+        // Defend against the inspector asking for a var after it has been optimized out.
+        if (isTornOff() && !isValid(iter->value))
+            return false;
+        if (VariableWatchpointSet* set = iter->value.watchpointSet())
+            set->invalidate(VariableWriteFireDetail(this, propertyName)); // Don't mess around - if we had found this statically, we would have invcalidated it.
+        reg = &registerAt(iter->value.getIndex());
     }
-
-    // Defend against the inspector asking for a var after it has been optimized out.
-    if (isTornOff() && !isValid(entry))
-        return false;
-
-    registerAt(entry.getIndex()).set(vm, this, value);
+    reg->set(vm, this, value);
     return true;
 }
 
@@ -111,14 +115,14 @@ void JSActivation::getOwnNonIndexPropertyNames(JSObject* object, ExecState* exec
     JSActivation* thisObject = jsCast<JSActivation*>(object);
 
     CallFrame* callFrame = CallFrame::create(reinterpret_cast<Register*>(thisObject->m_registers));
-    if (mode == IncludeDontEnumProperties && !thisObject->isTornOff() && (callFrame->codeBlock()->usesArguments() || callFrame->codeBlock()->usesEval()))
+    if (shouldIncludeDontEnumProperties(mode) && !thisObject->isTornOff() && (callFrame->codeBlock()->usesArguments() || callFrame->codeBlock()->usesEval()))
         propertyNames.add(exec->propertyNames().arguments);
 
     {
         ConcurrentJITLocker locker(thisObject->symbolTable()->m_lock);
         SymbolTable::Map::iterator end = thisObject->symbolTable()->end(locker);
         for (SymbolTable::Map::iterator it = thisObject->symbolTable()->begin(locker); it != end; ++it) {
-            if (it->value.getAttributes() & DontEnum && mode != IncludeDontEnumProperties)
+            if (it->value.getAttributes() & DontEnum && !shouldIncludeDontEnumProperties(mode))
                 continue;
             if (!thisObject->isValid(it->value))
                 continue;
@@ -136,7 +140,7 @@ inline bool JSActivation::symbolTablePutWithAttributes(VM& vm, PropertyName prop
     WriteBarrierBase<Unknown>* reg;
     {
         ConcurrentJITLocker locker(symbolTable()->m_lock);
-        SymbolTable::Map::iterator iter = symbolTable()->find(locker, propertyName.publicName());
+        SymbolTable::Map::iterator iter = symbolTable()->find(locker, propertyName.uid());
         if (iter == symbolTable()->end(locker))
             return false;
         SymbolTableEntry& entry = iter->value;
@@ -210,9 +214,9 @@ JSValue JSActivation::toThis(JSCell*, ExecState* exec, ECMAMode ecmaMode)
     return exec->globalThisValue();
 }
 
-EncodedJSValue JSActivation::argumentsGetter(ExecState*, EncodedJSValue slotBase, EncodedJSValue, PropertyName)
+EncodedJSValue JSActivation::argumentsGetter(ExecState*, JSObject* slotBase, EncodedJSValue, PropertyName)
 {
-    JSActivation* activation = jsCast<JSActivation*>(JSValue::decode(slotBase));
+    JSActivation* activation = jsCast<JSActivation*>(slotBase);
     CallFrame* callFrame = CallFrame::create(reinterpret_cast<Register*>(activation->m_registers));
     ASSERT(!activation->isTornOff() && (callFrame->codeBlock()->usesArguments() || callFrame->codeBlock()->usesEval()));
     if (activation->isTornOff() || !(callFrame->codeBlock()->usesArguments() || callFrame->codeBlock()->usesEval()))

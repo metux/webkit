@@ -75,7 +75,13 @@ public:
         FunctionExpr, BracketExpr, DotExpr, CallExpr,
         NewExpr, PreExpr, PostExpr, UnaryExpr, BinaryExpr,
         ConditionalExpr, AssignmentExpr, TypeofExpr,
-        DeleteExpr, ArrayLiteralExpr };
+        DeleteExpr, ArrayLiteralExpr, BindingDeconstruction,
+        ArrayDeconstruction, ObjectDeconstruction, SourceElementsResult,
+        FunctionBodyResult, SpreadExpr, ArgumentsResult,
+        PropertyListResult, ArgumentsListResult, ElementsListResult,
+        StatementResult, FormalParameterListResult, ClauseResult,
+        ClauseListResult, CommaExpr, DeconstructingAssignment
+    };
     typedef int ExpressionType;
 
     typedef ExpressionType Expression;
@@ -112,8 +118,8 @@ public:
     typedef int ConstDeclList;
     typedef int BinaryOperand;
     typedef int DeconstructionPattern;
-    typedef int ArrayPattern;
-    typedef int ObjectPattern;
+    typedef DeconstructionPattern ArrayPattern;
+    typedef DeconstructionPattern ObjectPattern;
 
     static const bool CreatesAST = false;
     static const bool NeedsFreeVariableInfo = false;
@@ -121,7 +127,7 @@ public:
     static const unsigned DontBuildKeywords = LexexFlagsDontBuildKeywords;
     static const unsigned DontBuildStrings = LexerFlagsDontBuildStrings;
 
-    int createSourceElements() { return 1; }
+    int createSourceElements() { return SourceElementsResult; }
     ExpressionType makeFunctionCallNode(const JSTokenLocation&, int, int, int, int, int) { return CallExpr; }
     void appendToComma(ExpressionType& base, ExpressionType right) { base = right; }
     ExpressionType createCommaExpr(const JSTokenLocation&, ExpressionType, ExpressionType right) { return right; }
@@ -153,13 +159,13 @@ public:
     ExpressionType createConditionalExpr(const JSTokenLocation&, ExpressionType, ExpressionType, ExpressionType) { return ConditionalExpr; }
     ExpressionType createAssignResolve(const JSTokenLocation&, const Identifier&, ExpressionType, int, int, int) { return AssignmentExpr; }
     ExpressionType createFunctionExpr(const JSTokenLocation&, const Identifier*, int, int, int, int, int, int, int) { return FunctionExpr; }
-    int createFunctionBody(const JSTokenLocation&, const JSTokenLocation&, int, int, bool) { return 1; }
+    int createFunctionBody(const JSTokenLocation&, const JSTokenLocation&, int, int, bool) { return FunctionBodyResult; }
     void setFunctionNameStart(int, int) { }
-    int createArguments() { return 1; }
-    int createArguments(int) { return 1; }
-    ExpressionType createSpreadExpression(const JSTokenLocation&, ExpressionType, int, int, int) { return 1; }
-    int createArgumentsList(const JSTokenLocation&, int) { return 1; }
-    int createArgumentsList(const JSTokenLocation&, int, int) { return 1; }
+    int createArguments() { return ArgumentsResult; }
+    int createArguments(int) { return ArgumentsResult; }
+    ExpressionType createSpreadExpression(const JSTokenLocation&, ExpressionType, int, int, int) { return SpreadExpr; }
+    int createArgumentsList(const JSTokenLocation&, int) { return ArgumentsListResult; }
+    int createArgumentsList(const JSTokenLocation&, int, int) { return ArgumentsListResult; }
     Property createProperty(const Identifier* name, int, PropertyNode::Type type, bool complete)
     {
         if (!complete)
@@ -177,41 +183,41 @@ public:
     {
         return Property(type);
     }
-    int createPropertyList(const JSTokenLocation&, Property) { return 1; }
-    int createPropertyList(const JSTokenLocation&, Property, int) { return 1; }
-    int createElementList(int, int) { return 1; }
-    int createElementList(int, int, int) { return 1; }
-    int createFormalParameterList(DeconstructionPattern) { return 1; }
-    int createFormalParameterList(int, DeconstructionPattern) { return 1; }
-    int createClause(int, int) { return 1; }
-    int createClauseList(int) { return 1; }
-    int createClauseList(int, int) { return 1; }
+    int createPropertyList(const JSTokenLocation&, Property) { return PropertyListResult; }
+    int createPropertyList(const JSTokenLocation&, Property, int) { return PropertyListResult; }
+    int createElementList(int, int) { return ElementsListResult; }
+    int createElementList(int, int, int) { return ElementsListResult; }
+    int createFormalParameterList(DeconstructionPattern) { return FormalParameterListResult; }
+    int createFormalParameterList(int, DeconstructionPattern) { return FormalParameterListResult; }
+    int createClause(int, int) { return ClauseResult; }
+    int createClauseList(int) { return ClauseListResult; }
+    int createClauseList(int, int) { return ClauseListResult; }
     void setUsesArguments(int) { }
-    int createFuncDeclStatement(const JSTokenLocation&, const Identifier*, int, int, int, int, int, int, int) { return 1; }
-    int createBlockStatement(const JSTokenLocation&, int, int, int) { return 1; }
-    int createExprStatement(const JSTokenLocation&, int, int, int) { return 1; }
-    int createIfStatement(const JSTokenLocation&, int, int, int, int) { return 1; }
-    int createIfStatement(const JSTokenLocation&, int, int, int, int, int) { return 1; }
-    int createForLoop(const JSTokenLocation&, int, int, int, int, int, int) { return 1; }
-    int createForInLoop(const JSTokenLocation&, int, int, int, int, int, int, int, int) { return 1; }
-    int createForOfLoop(const JSTokenLocation&, int, int, int, int, int, int, int, int) { return 1; }
-    int createEmptyStatement(const JSTokenLocation&) { return 1; }
-    int createVarStatement(const JSTokenLocation&, int, int, int) { return 1; }
-    int createReturnStatement(const JSTokenLocation&, int, int, int) { return 1; }
-    int createBreakStatement(const JSTokenLocation&, int, int) { return 1; }
-    int createBreakStatement(const JSTokenLocation&, const Identifier*, int, int) { return 1; }
-    int createContinueStatement(const JSTokenLocation&, int, int) { return 1; }
-    int createContinueStatement(const JSTokenLocation&, const Identifier*, int, int) { return 1; }
-    int createTryStatement(const JSTokenLocation&, int, const Identifier*, int, int, int, int) { return 1; }
-    int createSwitchStatement(const JSTokenLocation&, int, int, int, int, int, int) { return 1; }
-    int createWhileStatement(const JSTokenLocation&, int, int, int, int) { return 1; }
-    int createWithStatement(const JSTokenLocation&, int, int, int, int, int, int) { return 1; }
-    int createDoWhileStatement(const JSTokenLocation&, int, int, int, int) { return 1; }
-    int createLabelStatement(const JSTokenLocation&, const Identifier*, int, int, int) { return 1; }
-    int createThrowStatement(const JSTokenLocation&, int, int, int) { return 1; }
-    int createDebugger(const JSTokenLocation&, int, int) { return 1; }
-    int createConstStatement(const JSTokenLocation&, int, int, int) { return 1; }
-    int appendConstDecl(const JSTokenLocation&, int, const Identifier*, int) { return 1; }
+    int createFuncDeclStatement(const JSTokenLocation&, const Identifier*, int, int, int, int, int, int, int) { return StatementResult; }
+    int createBlockStatement(const JSTokenLocation&, int, int, int) { return StatementResult; }
+    int createExprStatement(const JSTokenLocation&, int, int, int) { return StatementResult; }
+    int createIfStatement(const JSTokenLocation&, int, int, int, int) { return StatementResult; }
+    int createIfStatement(const JSTokenLocation&, int, int, int, int, int) { return StatementResult; }
+    int createForLoop(const JSTokenLocation&, int, int, int, int, int, int) { return StatementResult; }
+    int createForInLoop(const JSTokenLocation&, int, int, int, int, int, int, int, int) { return StatementResult; }
+    int createForOfLoop(const JSTokenLocation&, int, int, int, int, int, int, int, int) { return StatementResult; }
+    int createEmptyStatement(const JSTokenLocation&) { return StatementResult; }
+    int createVarStatement(const JSTokenLocation&, int, int, int) { return StatementResult; }
+    int createReturnStatement(const JSTokenLocation&, int, int, int) { return StatementResult; }
+    int createBreakStatement(const JSTokenLocation&, int, int) { return StatementResult; }
+    int createBreakStatement(const JSTokenLocation&, const Identifier*, int, int) { return StatementResult; }
+    int createContinueStatement(const JSTokenLocation&, int, int) { return StatementResult; }
+    int createContinueStatement(const JSTokenLocation&, const Identifier*, int, int) { return StatementResult; }
+    int createTryStatement(const JSTokenLocation&, int, const Identifier*, int, int, int, int) { return StatementResult; }
+    int createSwitchStatement(const JSTokenLocation&, int, int, int, int, int, int) { return StatementResult; }
+    int createWhileStatement(const JSTokenLocation&, int, int, int, int) { return StatementResult; }
+    int createWithStatement(const JSTokenLocation&, int, int, int, int, int, int) { return StatementResult; }
+    int createDoWhileStatement(const JSTokenLocation&, int, int, int, int) { return StatementResult; }
+    int createLabelStatement(const JSTokenLocation&, const Identifier*, int, int, int) { return StatementResult; }
+    int createThrowStatement(const JSTokenLocation&, int, int, int) { return StatementResult; }
+    int createDebugger(const JSTokenLocation&, int, int) { return StatementResult; }
+    int createConstStatement(const JSTokenLocation&, int, int, int) { return StatementResult; }
+    int appendConstDecl(const JSTokenLocation&, int, const Identifier*, int) { return StatementResult; }
     Property createGetterOrSetterProperty(const JSTokenLocation&, PropertyNode::Type type, bool strict, const Identifier* name, int, int, int, int, int, int, int)
     {
         ASSERT(name);
@@ -228,7 +234,7 @@ public:
 
     void appendStatement(int, int) { }
     void addVar(const Identifier*, bool) { }
-    int combineCommaNodes(const JSTokenLocation&, int, int) { return 1; }
+    int combineCommaNodes(const JSTokenLocation&, int, int) { return CommaExpr; }
     int evalCount() const { return 0; }
     void appendBinaryExpressionInfo(int& operandStackDepth, int expr, int, int, int, bool)
     {
@@ -254,18 +260,18 @@ public:
     void unaryTokenStackRemoveLast(int& stackDepth) { stackDepth = 0; }
     
     void assignmentStackAppend(int, int, int, int, int, Operator) { }
-    int createAssignment(const JSTokenLocation&, int, int, int, int, int) { RELEASE_ASSERT_NOT_REACHED(); return 1; }
+    int createAssignment(const JSTokenLocation&, int, int, int, int, int) { RELEASE_ASSERT_NOT_REACHED(); return AssignmentExpr; }
     const Identifier* getName(const Property& property) const { ASSERT(property.name); return property.name; }
     PropertyNode::Type getType(const Property& property) const { return property.type; }
     bool isResolve(ExpressionType expr) const { return expr == ResolveExpr || expr == ResolveEvalExpr; }
     ExpressionType createDeconstructingAssignment(const JSTokenLocation&, int, ExpressionType)
     {
-        return 1;
+        return DeconstructingAssignment;
     }
     
     ArrayPattern createArrayPattern(const JSTokenLocation&)
     {
-        return 1;
+        return ArrayDeconstruction;
     }
     void appendArrayPatternSkipEntry(ArrayPattern, const JSTokenLocation&)
     {
@@ -275,15 +281,21 @@ public:
     }
     ObjectPattern createObjectPattern(const JSTokenLocation&)
     {
-        return 1;
+        return ObjectDeconstruction;
     }
     void appendObjectPatternEntry(ArrayPattern, const JSTokenLocation&, bool, const Identifier&, DeconstructionPattern)
     {
     }
     DeconstructionPattern createBindingLocation(const JSTokenLocation&, const Identifier&, const JSTextPosition&, const JSTextPosition&)
     {
-        return 1;
+        return BindingDeconstruction;
     }
+
+    bool isBindingNode(DeconstructionPattern pattern)
+    {
+        return pattern == BindingDeconstruction;
+    }
+
 private:
     int m_topBinaryExpr;
     int m_topUnaryToken;

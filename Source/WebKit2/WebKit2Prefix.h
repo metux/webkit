@@ -24,21 +24,17 @@
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#if defined(HAVE_CONFIG_H) && HAVE_CONFIG_H
-#ifdef BUILDING_WITH_CMAKE
+#if defined(HAVE_CONFIG_H) && HAVE_CONFIG_H && defined(BUILDING_WITH_CMAKE)
 #include "cmakeconfig.h"
-#else
-#include "autotoolsconfig.h"
-#endif
 #endif
 
 #include <wtf/Platform.h>
 
-#if PLATFORM(MAC)
+#if PLATFORM(COCOA)
 
-#if !PLATFORM(IOS)
+#define ENABLE_SANDBOX_EXTENSIONS 1
+
 #define ENABLE_WEB_PROCESS_SANDBOX 1
-#endif
 
 #define ENABLE_NETWORK_PROCESS 1
 
@@ -68,8 +64,18 @@
 #define ENABLE_SHARED_WORKER_PROCESS 1
 #endif
 
-#if (defined(__MAC_OS_X_VERSION_MIN_REQUIRED) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 1090) || !PLATFORM(IOS_SIMULATOR)
+#if !(defined(__MAC_OS_X_VERSION_MIN_REQUIRED) && __MAC_OS_X_VERSION_MIN_REQUIRED == 1080)
 #define WTF_USE_XPC_SERVICES 1
+#endif
+
+#if PLATFORM(MAC) && __MAC_OS_X_VERSION_MIN_REQUIRED == 1080 && defined(__OBJC__)
+@interface NSKeyedArchiver (WKDetails)
+- (void)setRequiresSecureCoding:(BOOL)requiresSecureCoding;
+@end
+
+@interface NSKeyedUnarchiver (WKDetails)
+- (void)setRequiresSecureCoding:(BOOL)requiresSecureCoding;
+@end
 #endif
 
 #if PLATFORM(GTK)
@@ -95,3 +101,4 @@
 #define new ("if you use new/delete make sure to include config.h at the top of the file"()) 
 #define delete ("if you use new/delete make sure to include config.h at the top of the file"()) 
 #endif
+

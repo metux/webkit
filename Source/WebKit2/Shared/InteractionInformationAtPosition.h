@@ -27,6 +27,7 @@
 #define InteractionInformationAtPosition_h
 
 #include "ArgumentCoders.h"
+#include "ShareableBitmap.h"
 #include <WebCore/IntPoint.h>
 #include <wtf/text/WTFString.h>
 
@@ -40,14 +41,20 @@ namespace WebKit {
 struct InteractionInformationAtPosition {
     InteractionInformationAtPosition()
         : nodeAtPositionIsAssistedNode(false)
+        , isSelectable(false)
+        , isNearMarkedText(false)
     {
     }
 
     WebCore::IntPoint point;
     bool nodeAtPositionIsAssistedNode;
+    bool isSelectable;
+    bool isNearMarkedText;
     String clickableElementName;
     String url;
-    Vector<WebCore::SelectionRect> selectionRects;
+    String title;
+    WebCore::IntRect bounds;
+    RefPtr<ShareableBitmap> image;
 
     void encode(IPC::ArgumentEncoder&) const;
     static bool decode(IPC::ArgumentDecoder&, InteractionInformationAtPosition&);

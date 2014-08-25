@@ -30,6 +30,7 @@
 #include "DocumentStyleSheetCollection.h"
 #include "Element.h"
 #include "FloatQuad.h"
+#include "Frame.h"
 #include "LayoutRect.h"
 #include "PaintPhase.h"
 #include "RenderStyle.h"
@@ -59,12 +60,11 @@ class RenderGeometryMap;
 class RenderLayer;
 class RenderLayerModelObject;
 class RenderNamedFlowThread;
+class RenderRegion;
 class RenderTheme;
+class SelectionSubtreeRoot;
 class TransformState;
 class VisiblePosition;
-#if ENABLE(SVG)
-class RenderSVGResourceContainer;
-#endif
 #if PLATFORM(IOS)
 class SelectionRect;
 #endif
@@ -141,6 +141,7 @@ const int showTreeCharacterOffset = 39;
 
 // Base class for all rendering tree objects.
 class RenderObject : public CachedImageClient {
+    WTF_MAKE_FAST_ALLOCATED;
     friend class RenderBlock;
     friend class RenderBlockFlow;
     friend class RenderElement;
@@ -205,20 +206,26 @@ public:
     bool scrollRectToVisible(const LayoutRect&, const ScrollAlignment& alignX = ScrollAlignment::alignCenterIfNeeded, const ScrollAlignment& alignY = ScrollAlignment::alignCenterIfNeeded);
 
     // Convenience function for getting to the nearest enclosing box of a RenderObject.
-    RenderBox* enclosingBox() const;
-    RenderBoxModelObject* enclosingBoxModelObject() const;
+    RenderBox& enclosingBox() const;
+    RenderBoxModelObject& enclosingBoxModelObject() const;
 
     bool fixedPositionedWithNamedFlowContainingBlock() const;
+
+    enum ShouldUseFlowThreadCache {
+        UseFlowThreadCache,
+        SkipFlowThreadCache
+    };
+
     // Function to return our enclosing flow thread if we are contained inside one. This
     // function follows the containing block chain.
-    RenderFlowThread* flowThreadContainingBlock() const
+    RenderFlowThread* flowThreadContainingBlock(ShouldUseFlowThreadCache useCache = UseFlowThreadCache) const
     {
         if (flowThreadState() == NotInsideFlowThread)
             return 0;
-        return locateFlowThreadContainingBlock();
+        return (useCache == SkipFlowThreadCache) ? locateFlowThreadContainingBlockNoCache() : locateFlowThreadContainingBlock();
     }
 
-    RenderNamedFlowThread* renderNamedFlowThreadWrapper() const;
+    RenderNamedFlowFragment* currentRenderNamedFlowFragment() const;
 
     // FIXME: The meaning of this function is unclear.
     virtual bool isEmpty() const { return !firstChildSlow(); }
@@ -281,8 +288,9 @@ public:
     void showRenderObject() const;
     // We don't make printedCharacters an optional parameter so that
     // showRenderObject can be called from gdb easily.
-    void showRenderObject(int printedCharacters) const;
-    void showRenderTreeAndMark(const RenderObject* markedObject1 = 0, const char* markedLabel1 = 0, const RenderObject* markedObject2 = 0, const char* markedLabel2 = 0, int depth = 0) const;
+    void showRenderObject(int) const;
+    void showRenderTreeAndMark(const RenderObject* = 0, const char* = 0, const RenderObject* = 0, const char* = 0, int = 0) const;
+    void showRegionsInformation(int&) const;
 #endif
 
 public:
@@ -318,9 +326,7 @@ public:
     virtual bool isMeter() const { return false; }
 #endif
     virtual bool isSnapshottedPlugIn() const { return false; }
-#if ENABLE(PROGRESS_ELEMENT)
     virtual bool isProgress() const { return false; }
-#endif
     virtual bool isRenderSVGBlock() const { return false; };
     virtual bool isRenderButton() const { return false; }
     virtual bool isRenderIFrame() const { return false; }
@@ -353,9 +359,9 @@ public:
     virtual bool isRenderFullScreen() const { return false; }
     virtual bool isRenderFullScreenPlaceholder() const { return false; }
 #endif
-
+#if ENABLE(CSS_GRID_LAYOUT)
     virtual bool isRenderGrid() const { return false; }
-
+#endif
     virtual bool isRenderFlowThread() const { return false; }
     virtual bool isRenderNamedFlowThread() const { return false; }
     bool isInFlowRenderFlowThread() const { return isRenderFlowThread() && !isOutOfFlowPositioned(); }
@@ -363,6 +369,8 @@ public:
 
     virtual bool isMultiColumnBlockFlow() const { return false; }
     virtual bool isRenderMultiColumnSet() const { return false; }
+    virtual bool isRenderMultiColumnFlowThread() const { return false; }
+    virtual bool isRenderMultiColumnSpannerPlaceholder() const { return false; }
 
     virtual bool isRenderScrollbarPart() const { return false; }
 
@@ -388,9 +396,7 @@ public:
 
     bool childrenInline() const { return m_bitfields.childrenInline(); }
     void setChildrenInline(bool b) { m_bitfields.setChildrenInline(b); }
-    bool hasColumns() const { return m_bitfields.hasColumns(); }
-    void setHasColumns(bool b = true) { m_bitfields.setHasColumns(b); }
-
+    
     enum FlowThreadState {
         NotInsideFlowThread = 0,
         InsideOutOfFlowThread = 1,
@@ -406,20 +412,23 @@ public:
 
 #if ENABLE(MATHML)
     virtual bool isRenderMathMLBlock() const { return false; }
+    virtual bool isRenderMathMLTable() const { return false; }
     virtual bool isRenderMathMLOperator() const { return false; }
+    virtual bool isRenderMathMLRadicalOperator() const { return false; }
     virtual bool isRenderMathMLRow() const { return false; }
     virtual bool isRenderMathMLMath() const { return false; }
     virtual bool isRenderMathMLFenced() const { return false; }
     virtual bool isRenderMathMLFraction() const { return false; }
     virtual bool isRenderMathMLRoot() const { return false; }
+    virtual bool isRenderMathMLRootWrapper() const { return false; }
     virtual bool isRenderMathMLSpace() const { return false; }
     virtual bool isRenderMathMLSquareRoot() const { return false; }
     virtual bool isRenderMathMLScripts() const { return false; }
     virtual bool isRenderMathMLScriptsWrapper() const { return false; }
+    virtual bool isRenderMathMLToken() const { return false; }
     virtual bool isRenderMathMLUnderOver() const { return false; }
 #endif // ENABLE(MATHML)
 
-#if ENABLE(SVG)
     // FIXME: Until all SVG renders can be subclasses of RenderSVGModelObject we have
     // to add SVG renderer methods to RenderObject with an ASSERT_NOT_REACHED() default implementation.
     virtual bool isRenderSVGModelObject() const { return false; }
@@ -440,8 +449,6 @@ public:
     virtual bool isSVGResourceContainer() const { return false; }
     virtual bool isSVGResourceFilter() const { return false; }
     virtual bool isSVGResourceFilterPrimitive() const { return false; }
-
-    virtual RenderSVGResourceContainer* toRenderSVGResourceContainer();
 
     // FIXME: Those belong into a SVG specific base-class for all renderers (see above)
     // Unfortunately we don't have such a class yet, because it's not possible for all renderers
@@ -475,7 +482,6 @@ public:
     // coordinates instead of in repaint container coordinates.  Eventually the
     // rest of the rendering tree will move to a similar model.
     virtual bool nodeAtFloatPoint(const HitTestRequest&, HitTestResult&, const FloatPoint& pointInParent, HitTestAction);
-#endif
 
     bool hasAspectRatio() const { return isReplaced() && (isImage() || isVideo() || isCanvas()); }
     bool isAnonymous() const { return m_bitfields.isAnonymous(); }
@@ -485,7 +491,7 @@ public:
         // RenderBlock::createAnonymousBlock(). This includes creating an anonymous
         // RenderBlock having a BLOCK or BOX display. Other classes such as RenderTextFragment
         // are not RenderBlocks and will return false. See https://bugs.webkit.org/show_bug.cgi?id=56709. 
-        return isAnonymous() && (style().display() == BLOCK || style().display() == BOX) && style().styleType() == NOPSEUDO && isRenderBlock() && !isListMarker() && !isRenderFlowThread() && !isRenderView()
+        return isAnonymous() && (style().display() == BLOCK || style().display() == BOX) && style().styleType() == NOPSEUDO && isRenderBlock() && !isListMarker() && !isRenderFlowThread() && !isRenderMultiColumnSet() && !isRenderView()
 #if ENABLE(FULLSCREEN_API)
             && !isRenderFullScreen()
             && !isRenderFullScreenPlaceholder()
@@ -495,8 +501,6 @@ public:
 #endif
             ;
     }
-    bool isAnonymousColumnsBlock() const { return style().specifiesColumns() && isAnonymousBlock(); }
-    bool isAnonymousColumnSpanBlock() const { return style().columnSpan() && isAnonymousBlock(); }
     bool isElementContinuation() const { return node() && node()->renderer() != this; }
     bool isInlineElementContinuation() const { return isElementContinuation() && isInline(); }
     bool isBlockElementContinuation() const { return isElementContinuation() && !isInline(); }
@@ -518,7 +522,6 @@ public:
     bool isBox() const { return m_bitfields.isBox(); }
     bool isRenderView() const  { return m_bitfields.isBox() && m_bitfields.isTextOrRenderView(); }
     bool isInline() const { return m_bitfields.isInline(); } // inline object
-    bool isRunIn() const { return style().display() == RUN_IN; } // run-in object
     bool isDragging() const { return m_bitfields.isDragging(); }
     bool isReplaced() const { return m_bitfields.isReplaced(); } // a "replaced" element (see CSS)
     bool isHorizontalWritingMode() const { return m_bitfields.horizontalWritingMode(); }
@@ -652,7 +655,7 @@ public:
     virtual void updateHitTestResult(HitTestResult&, const LayoutPoint&);
     virtual bool nodeAtPoint(const HitTestRequest&, HitTestResult&, const HitTestLocation& locationInContainer, const LayoutPoint& accumulatedOffset, HitTestAction);
 
-    virtual VisiblePosition positionForPoint(const LayoutPoint&);
+    virtual VisiblePosition positionForPoint(const LayoutPoint&, const RenderRegion*);
     VisiblePosition createVisiblePosition(int offset, EAffinity) const;
     VisiblePosition createVisiblePosition(const Position&) const;
 
@@ -662,9 +665,7 @@ public:
     bool canContainFixedPositionObjects() const
     {
         return isRenderView() || (hasTransform() && isRenderBlock())
-#if ENABLE(SVG)
                 || isSVGForeignObject()
-#endif
                 || isOutOfFlowRenderFlowThread();
     }
 
@@ -732,14 +733,17 @@ public:
     RenderLayerModelObject* containerForRepaint() const;
     // Actually do the repaint of rect r for this object which has been computed in the coordinate space
     // of repaintContainer. If repaintContainer is 0, repaint via the view.
-    void repaintUsingContainer(const RenderLayerModelObject* repaintContainer, const IntRect&, bool immediate = false, bool shouldClipToLayer = true) const;
+    void repaintUsingContainer(const RenderLayerModelObject* repaintContainer, const LayoutRect&, bool shouldClipToLayer = true) const;
     
     // Repaint the entire object.  Called when, e.g., the color of a border changes, or when a border
     // style changes.
-    void repaint(bool immediate = false) const;
+    void repaint() const;
 
     // Repaint a specific subrectangle within a given object.  The rect |r| is in the object's coordinate space.
-    void repaintRectangle(const LayoutRect&, bool immediate = false, bool shouldClipToLayer = true) const;
+    void repaintRectangle(const LayoutRect&, bool shouldClipToLayer = true) const;
+
+    // Repaint a slow repaint object, which, at this time, means we are repainting an object with background-attachment:fixed.
+    void repaintSlowRepaintObject() const;
 
     bool checkForRepaintDuringLayout() const;
 
@@ -764,16 +768,6 @@ public:
     // that rect in the coordinate space of repaintContainer.
     virtual void computeRectForRepaint(const RenderLayerModelObject* repaintContainer, LayoutRect&, bool fixed = false) const;
     virtual void computeFloatRectForRepaint(const RenderLayerModelObject* repaintContainer, FloatRect& repaintRect, bool fixed = false) const;
-
-    // If multiple-column layout results in applying an offset to the given point, add the same
-    // offset to the given size.
-    virtual void adjustForColumns(LayoutSize&, const LayoutPoint&) const { }
-    LayoutSize offsetForColumns(const LayoutPoint& point) const
-    {
-        LayoutSize offset;
-        adjustForColumns(offset, point);
-        return offset;
-    }
 
     virtual unsigned int length() const { return 1; }
 
@@ -853,8 +847,8 @@ public:
 
     virtual void imageChanged(CachedImage*, const IntRect* = 0) override;
     virtual void imageChanged(WrappedImagePtr, const IntRect* = 0) { }
-    virtual bool willRenderImage(CachedImage*) override;
 
+    SelectionSubtreeRoot& selectionRoot() const;
     void selectionStartEnd(int& spos, int& epos) const;
     
     void removeFromParent();
@@ -882,22 +876,17 @@ public:
 
     RespectImageOrientationEnum shouldRespectImageOrientation() const;
 
-    void drawLineForBoxSide(GraphicsContext*, int x1, int y1, int x2, int y2, BoxSide,
-                            Color, EBorderStyle, int adjbw1, int adjbw2, bool antialias = false);
+    void drawLineForBoxSide(GraphicsContext*, float x1, float y1, float x2, float y2, BoxSide, Color, EBorderStyle, float adjbw1, float adjbw2, bool antialias = false) const;
 protected:
-    int columnNumberForOffset(int offset);
-
     void paintFocusRing(PaintInfo&, const LayoutPoint&, RenderStyle*);
     void paintOutline(PaintInfo&, const LayoutRect&);
-    void addPDFURLRect(GraphicsContext*, const LayoutRect&);
+    void addPDFURLRect(PaintInfo&, const LayoutPoint&);
     Node& nodeForNonAnonymous() const { ASSERT(!isAnonymous()); return m_node; }
 
     void adjustRectForOutlineAndShadow(LayoutRect&) const;
 
     void clearLayoutRootIfNeeded() const;
     virtual void willBeDestroyed();
-
-    virtual bool canBeReplacedWithInlineRunIn() const;
 
     virtual void insertedIntoTree();
     virtual void willBeRemovedFromTree();
@@ -909,10 +898,13 @@ protected:
 
 private:
     RenderFlowThread* locateFlowThreadContainingBlock() const;
+    RenderFlowThread* locateFlowThreadContainingBlockNoCache() const;
+    
     void removeFromRenderFlowThread();
     void removeFromRenderFlowThreadRecursive(RenderFlowThread*);
 
     Color selectionColor(int colorProperty) const;
+    PassRefPtr<RenderStyle> selectionPseudoStyle() const;
 
     Node* generatingPseudoHostElement() const;
 
@@ -972,7 +964,6 @@ private:
             , m_hasCounterNodeMap(false)
             , m_everHadLayout(false)
             , m_childrenInline(false)
-            , m_hasColumns(false)
             , m_positionedState(IsStaticallyPositioned)
             , m_selectionState(SelectionNone)
             , m_flowThreadState(NotInsideFlowThread)
@@ -1008,7 +999,6 @@ private:
 
         // from RenderBlock
         ADD_BOOLEAN_BITFIELD(childrenInline, ChildrenInline);
-        ADD_BOOLEAN_BITFIELD(hasColumns, HasColumns);
 
     private:
         unsigned m_positionedState : 2; // PositionedState
@@ -1049,6 +1039,16 @@ private:
 
 template <typename Type> bool isRendererOfType(const RenderObject&);
 template <> inline bool isRendererOfType<const RenderObject>(const RenderObject&) { return true; }
+
+inline Frame& RenderObject::frame() const
+{
+    return *document().frame();
+}
+
+inline AnimationController& RenderObject::animation() const
+{
+    return frame().animation();
+}
 
 inline bool RenderObject::documentBeingDestroyed() const
 {
@@ -1094,10 +1094,8 @@ inline void RenderObject::setNeedsLayout(MarkingBehavior markParents)
 
 inline bool RenderObject::preservesNewline() const
 {
-#if ENABLE(SVG)
     if (isSVGInlineText())
         return false;
-#endif
         
     return style().preserveNewline();
 }
@@ -1138,7 +1136,8 @@ inline bool RenderObject::backgroundIsKnownToBeObscured()
 }
 
 #define RENDER_OBJECT_TYPE_CASTS(ToValueTypeName, predicate) \
-    TYPE_CASTS_BASE(ToValueTypeName, RenderObject, object, object->predicate, object.predicate)
+    template <> inline bool isRendererOfType<const ToValueTypeName>(const RenderObject& renderer) { return renderer.predicate; } \
+    TYPE_CASTS_BASE(ToValueTypeName, RenderObject, renderer, isRendererOfType<const ToValueTypeName>(*renderer), isRendererOfType<const ToValueTypeName>(renderer))
 
 } // namespace WebCore
 

@@ -49,7 +49,6 @@ HTMLFrameElementBase::HTMLFrameElementBase(const QualifiedName& tagName, Documen
     , m_scrolling(ScrollbarAuto)
     , m_marginWidth(-1)
     , m_marginHeight(-1)
-    , m_viewSource(false)
 {
     setHasCustomStyleResolveCallbacks();
 }
@@ -74,7 +73,7 @@ bool HTMLFrameElementBase::isURLAllowed() const
     return true;
 }
 
-void HTMLFrameElementBase::openURL(bool lockHistory, bool lockBackForwardList)
+void HTMLFrameElementBase::openURL(LockHistory lockHistory, LockBackForwardList lockBackForwardList)
 {
     if (!isURLAllowed())
         return;
@@ -87,8 +86,6 @@ void HTMLFrameElementBase::openURL(bool lockHistory, bool lockBackForwardList)
         return;
 
     parentFrame->loader().subframeLoader().requestFrame(*this, m_URL, m_frameName, lockHistory, lockBackForwardList);
-    if (contentFrame())
-        contentFrame()->setInViewSourceMode(viewSourceMode());
 }
 
 void HTMLFrameElementBase::parseAttribute(const QualifiedName& name, const AtomicString& value)
@@ -97,8 +94,7 @@ void HTMLFrameElementBase::parseAttribute(const QualifiedName& name, const Atomi
         setLocation("about:srcdoc");
     else if (name == srcAttr && !fastHasAttribute(srcdocAttr))
         setLocation(stripLeadingAndTrailingHTMLSpaces(value));
-    else if (isIdAttributeName(name)) {
-        // Important to call through to base for the id attribute so the hasID bit gets set.
+    else if (name == HTMLNames::idAttr) {
         HTMLFrameOwnerElement::parseAttribute(name, value);
         m_frameName = value;
     } else if (name == nameAttr) {
@@ -185,7 +181,7 @@ void HTMLFrameElementBase::setLocation(const String& str)
     m_URL = AtomicString(str);
 
     if (inDocument())
-        openURL(false, false);
+        openURL(LockHistory::No, LockBackForwardList::No);
 }
 
 bool HTMLFrameElementBase::supportsFocus() const

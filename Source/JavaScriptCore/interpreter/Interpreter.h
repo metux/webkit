@@ -11,7 +11,7 @@
  * 2.  Redistributions in binary form must reproduce the above copyright
  *     notice, this list of conditions and the following disclaimer in the
  *     documentation and/or other materials provided with the distribution.
- * 3.  Neither the name of Apple Computer, Inc. ("Apple") nor the names of
+ * 3.  Neither the name of Apple Inc. ("Apple") nor the names of
  *     its contributors may be used to endorse or promote products derived
  *     from this software without specific prior written permission.
  *
@@ -180,6 +180,15 @@ namespace JSC {
             ASSERT(!callFrame->isVMEntrySentinel());
             vm->topCallFrame = callFrame;
         }
+        
+        enum VMEntrySentinelOKTag { VMEntrySentinelOK };
+        ALWAYS_INLINE NativeCallFrameTracer(VM* vm, CallFrame* callFrame, VMEntrySentinelOKTag)
+        {
+            ASSERT(vm);
+            ASSERT(callFrame);
+            if (!callFrame->isVMEntrySentinel())
+                vm->topCallFrame = callFrame;
+        }
     };
 
     class Interpreter {
@@ -190,14 +199,6 @@ namespace JSC {
         friend class VM;
 
     public:
-        class ErrorHandlingMode {
-        public:
-            JS_EXPORT_PRIVATE ErrorHandlingMode(ExecState*);
-            JS_EXPORT_PRIVATE ~ErrorHandlingMode();
-        private:
-            Interpreter& m_interpreter;
-        };
-
         Interpreter(VM &);
         ~Interpreter();
         
@@ -218,7 +219,7 @@ namespace JSC {
         OpcodeID getOpcodeID(Opcode opcode)
         {
             ASSERT(m_initialized);
-#if ENABLE(COMPUTED_GOTO_OPCODES) && ENABLE(LLINT)
+#if ENABLE(COMPUTED_GOTO_OPCODES)
             ASSERT(isOpcode(opcode));
             return m_opcodeIDTable.get(opcode);
 #else
@@ -236,8 +237,6 @@ namespace JSC {
         void getArgumentsData(CallFrame*, JSFunction*&, ptrdiff_t& firstParameterIndex, Register*& argv, int& argc);
         
         SamplingTool* sampler() { return m_sampler.get(); }
-
-        bool isInErrorHandlingMode() { return m_errorHandlingModeReentry; }
 
         NEVER_INLINE HandlerInfo* unwind(CallFrame*&, JSValue&);
         NEVER_INLINE void debug(CallFrame*, DebugHookID);
@@ -275,7 +274,7 @@ namespace JSC {
         JSStack m_stack;
         int m_errorHandlingModeReentry;
         
-#if ENABLE(COMPUTED_GOTO_OPCODES) && ENABLE(LLINT)
+#if ENABLE(COMPUTED_GOTO_OPCODES)
         Opcode* m_opcodeTable; // Maps OpcodeID => Opcode for compiling
         HashMap<Opcode, OpcodeID> m_opcodeIDTable; // Maps Opcode => OpcodeID for decompiling
 #endif
@@ -286,8 +285,8 @@ namespace JSC {
     };
 
     JSValue eval(CallFrame*);
-    CallFrame* sizeAndAllocFrameForVarargs(CallFrame*, JSStack*, JSValue, int);
-    void loadVarargs(CallFrame*, CallFrame*, JSValue, JSValue);
+    CallFrame* sizeFrameForVarargs(CallFrame*, JSStack*, JSValue, int, uint32_t firstVarArgOffset);
+    void loadVarargs(CallFrame*, CallFrame*, JSValue, JSValue, uint32_t firstVarArgOffset);
 } // namespace JSC
 
 #endif // Interpreter_h

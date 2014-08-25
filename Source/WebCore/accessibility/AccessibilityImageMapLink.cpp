@@ -10,7 +10,7 @@
  * 2.  Redistributions in binary form must reproduce the above copyright
  *     notice, this list of conditions and the following disclaimer in the
  *     documentation and/or other materials provided with the distribution.
- * 3.  Neither the name of Apple Computer, Inc. ("Apple") nor the names of
+ * 3.  Neither the name of Apple Inc. ("Apple") nor the names of
  *     its contributors may be used to endorse or promote products derived
  *     from this software without specific prior written permission.
  *
@@ -40,8 +40,8 @@ namespace WebCore {
 using namespace HTMLNames;
 
 AccessibilityImageMapLink::AccessibilityImageMapLink()
-    : m_areaElement(0)
-    , m_mapElement(0)
+    : m_areaElement(nullptr)
+    , m_mapElement(nullptr)
 {
 }
 
@@ -60,7 +60,7 @@ AccessibilityObject* AccessibilityImageMapLink::parentObject() const
         return m_parent;
     
     if (!m_mapElement.get() || !m_mapElement->renderer())
-        return 0;
+        return nullptr;
     
     return m_mapElement->document().axObjectCache()->getOrCreate(m_mapElement->renderer());
 }

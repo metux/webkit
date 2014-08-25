@@ -34,6 +34,7 @@
 #if ENABLE(INSPECTOR)
 
 #include "InspectorInstrumentationCookie.h"
+#include "InspectorOverlay.h"
 #include <inspector/InspectorAgentRegistry.h>
 #include <inspector/InspectorEnvironment.h>
 #include <wtf/Forward.h>
@@ -45,8 +46,8 @@
 namespace Inspector {
 class InspectorAgent;
 class InspectorBackendDispatcher;
-class InspectorDebuggerAgent;
 class InspectorFrontendChannel;
+class InspectorProfilerAgent;
 class InspectorObject;
 }
 
@@ -55,23 +56,18 @@ namespace WebCore {
 class DOMWrapperWorld;
 class Frame;
 class GraphicsContext;
-class InspectorApplicationCacheAgent;
 class InspectorClient;
 class InspectorDOMAgent;
 class InspectorDOMDebuggerAgent;
 class InspectorFrontendClient;
-class InspectorMemoryAgent;
-class InspectorOverlay;
 class InspectorPageAgent;
-class InspectorProfilerAgent;
 class InspectorResourceAgent;
+class InspectorTimelineAgent;
 class InstrumentingAgents;
-class IntSize;
-class Page;
-class PageInjectedScriptManager;
 class Node;
-
-struct Highlight;
+class Page;
+class PageDebuggerAgent;
+class WebInjectedScriptManager;
 
 class InspectorController final : public Inspector::InspectorEnvironment {
     WTF_MAKE_NONCOPYABLE(InspectorController);
@@ -108,7 +104,7 @@ public:
 
     void inspect(Node*);
     void drawHighlight(GraphicsContext&) const;
-    void getHighlight(Highlight*) const;
+    void getHighlight(Highlight*, InspectorOverlay::CoordinateSystem) const;
     void hideHighlight();
     Node* highlightedNode() const;
 
@@ -116,46 +112,40 @@ public:
 
     PassRefPtr<Inspector::InspectorObject> buildObjectForHighlightedNode() const;
 
-    bool isUnderTest();
-    void evaluateForTestInFrontend(long callId, const String& script);
+    bool isUnderTest() const { return m_isUnderTest; }
+    void setIsUnderTest(bool isUnderTest) { m_isUnderTest = isUnderTest; }
+    void evaluateForTestInFrontend(const String& script);
 
     bool profilerEnabled() const;
     void setProfilerEnabled(bool);
 
     void resume();
 
-    void setResourcesDataSizeLimitsFromInternals(int maximumResourcesContentSize, int maximumSingleResourceContentSize);
-
     InspectorClient* inspectorClient() const { return m_inspectorClient; }
     InspectorPageAgent* pageAgent() const { return m_pageAgent; }
-
-    void didBeginFrame();
-    void didCancelFrame();
-    void willComposite();
-    void didComposite();
 
     virtual bool developerExtrasEnabled() const override;
     virtual bool canAccessInspectedScriptState(JSC::ExecState*) const override;
     virtual Inspector::InspectorFunctionCallHandler functionCallHandler() const override;
     virtual Inspector::InspectorEvaluateHandler evaluateHandler() const override;
     virtual void willCallInjectedScriptFunction(JSC::ExecState*, const String& scriptName, int scriptLine) override;
-    virtual void didCallInjectedScriptFunction() override;
+    virtual void didCallInjectedScriptFunction(JSC::ExecState*) override;
 
 private:
     friend InstrumentingAgents* instrumentationForPage(Page*);
 
     RefPtr<InstrumentingAgents> m_instrumentingAgents;
-    std::unique_ptr<PageInjectedScriptManager> m_injectedScriptManager;
+    std::unique_ptr<WebInjectedScriptManager> m_injectedScriptManager;
     std::unique_ptr<InspectorOverlay> m_overlay;
 
     Inspector::InspectorAgent* m_inspectorAgent;
     InspectorDOMAgent* m_domAgent;
     InspectorResourceAgent* m_resourceAgent;
     InspectorPageAgent* m_pageAgent;
-    InspectorMemoryAgent* m_memoryAgent;
-    Inspector::InspectorDebuggerAgent* m_debuggerAgent;
+    PageDebuggerAgent* m_debuggerAgent;
     InspectorDOMDebuggerAgent* m_domDebuggerAgent;
-    InspectorProfilerAgent* m_profilerAgent;
+    Inspector::InspectorProfilerAgent* m_profilerAgent;
+    InspectorTimelineAgent* m_timelineAgent;
 
     RefPtr<Inspector::InspectorBackendDispatcher> m_inspectorBackendDispatcher;
     std::unique_ptr<InspectorFrontendClient> m_inspectorFrontendClient;

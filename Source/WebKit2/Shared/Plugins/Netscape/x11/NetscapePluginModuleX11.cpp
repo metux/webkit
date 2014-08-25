@@ -149,6 +149,10 @@ bool NetscapePluginModule::getPluginInfoForLoadedPlugin(RawPluginMetaData& metaD
 
     metaData.mimeDescription = mimeDescription;
 
+#if PLATFORM(GTK)
+    metaData.requiresGtk2 = module->functionPointer<void (*)()>("gtk_progress_get_type");
+#endif
+
     return true;
 }
 
@@ -163,13 +167,15 @@ bool NetscapePluginModule::getPluginInfo(const String& pluginPath, PluginModuleI
     plugin.info.name = metaData.name;
     plugin.info.desc = metaData.description;
     parseMIMEDescription(metaData.mimeDescription, plugin.info.mimes);
+#if PLATFORM(GTK)
+    plugin.requiresGtk2 = metaData.requiresGtk2;
+#endif
 
     return true;
 }
 
 void NetscapePluginModule::determineQuirks()
 {
-#if CPU(X86_64)
     RawPluginMetaData metaData;
     if (!getPluginInfoForLoadedPlugin(metaData))
         return;
@@ -178,11 +184,15 @@ void NetscapePluginModule::determineQuirks()
     parseMIMEDescription(metaData.mimeDescription, mimeTypes);
     for (size_t i = 0; i < mimeTypes.size(); ++i) {
         if (mimeTypes[i].type == "application/x-shockwave-flash") {
+#if CPU(X86_64)
             m_pluginQuirks.add(PluginQuirks::IgnoreRightClickInWindowlessMode);
+#endif
+#if PLATFORM(EFL)
+            m_pluginQuirks.add(PluginQuirks::ForceFlashWindowlessMode);
+#endif
             break;
         }
     }
-#endif
 }
 
 static void writeCharacter(char byte)
@@ -231,6 +241,10 @@ bool NetscapePluginModule::scanPlugin(const String& pluginPath)
     writeLine(metaData.name);
     writeLine(metaData.description);
     writeLine(metaData.mimeDescription);
+#if PLATFORM(GTK)
+    if (metaData.requiresGtk2)
+        writeLine("requires-gtk2");
+#endif
 
     fflush(stdout);
 

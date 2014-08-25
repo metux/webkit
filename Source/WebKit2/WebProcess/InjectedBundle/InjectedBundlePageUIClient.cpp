@@ -36,6 +36,11 @@ using namespace WebCore;
 
 namespace WebKit {
 
+InjectedBundlePageUIClient::InjectedBundlePageUIClient(const WKBundlePageUIClientBase* client)
+{
+    initialize(client);
+}
+
 void InjectedBundlePageUIClient::willAddMessageToConsole(WebPage* page, const String& message, int32_t lineNumber)
 {
     if (m_client.willAddMessageToConsole)
@@ -96,42 +101,58 @@ String InjectedBundlePageUIClient::shouldGenerateFileForUpload(WebPage* page, co
 
 String InjectedBundlePageUIClient::generateFileForUpload(WebPage* page, const String& originalFilePath)
 {
-    if (!m_client.shouldGenerateFileForUpload)
+    if (!m_client.generateFileForUpload)
         return String();
     RefPtr<API::String> generatedFilePath = adoptRef(toImpl(m_client.generateFileForUpload(toAPI(page), toAPI(originalFilePath.impl()), m_client.base.clientInfo)));
     return generatedFilePath ? generatedFilePath->string() : String();
 }
 
-WKBundlePageUIElementVisibility InjectedBundlePageUIClient::statusBarIsVisible(WebPage* page)
+static API::InjectedBundle::PageUIClient::UIElementVisibility toUIElementVisibility(WKBundlePageUIElementVisibility visibility)
+{
+    switch (visibility) {
+    case WKBundlePageUIElementVisibilityUnknown:
+        return API::InjectedBundle::PageUIClient::UIElementVisibility::Unknown;
+    case WKBundlePageUIElementVisible:
+        return API::InjectedBundle::PageUIClient::UIElementVisibility::Visible;
+    case WKBundlePageUIElementHidden:
+        return API::InjectedBundle::PageUIClient::UIElementVisibility::Hidden;
+    }
+
+    ASSERT_NOT_REACHED();
+    return API::InjectedBundle::PageUIClient::UIElementVisibility::Unknown;
+}
+
+API::InjectedBundle::PageUIClient::UIElementVisibility InjectedBundlePageUIClient::statusBarIsVisible(WebPage* page)
 {
     if (!m_client.statusBarIsVisible)
-        return WKBundlePageUIElementVisibilityUnknown;
+        return API::InjectedBundle::PageUIClient::UIElementVisibility::Unknown;
     
-    return m_client.statusBarIsVisible(toAPI(page), m_client.base.clientInfo);
+    return toUIElementVisibility(m_client.statusBarIsVisible(toAPI(page), m_client.base.clientInfo));
 }
 
-WKBundlePageUIElementVisibility InjectedBundlePageUIClient::menuBarIsVisible(WebPage* page)
+API::InjectedBundle::PageUIClient::UIElementVisibility InjectedBundlePageUIClient::menuBarIsVisible(WebPage* page)
 {
     if (!m_client.menuBarIsVisible)
-        return WKBundlePageUIElementVisibilityUnknown;
+        return API::InjectedBundle::PageUIClient::UIElementVisibility::Unknown;
     
-    return m_client.menuBarIsVisible(toAPI(page), m_client.base.clientInfo);
+    return toUIElementVisibility(m_client.menuBarIsVisible(toAPI(page), m_client.base.clientInfo));
 }
 
-WKBundlePageUIElementVisibility InjectedBundlePageUIClient::toolbarsAreVisible(WebPage* page)
+API::InjectedBundle::PageUIClient::UIElementVisibility InjectedBundlePageUIClient::toolbarsAreVisible(WebPage* page)
 {
     if (!m_client.toolbarsAreVisible)
-        return WKBundlePageUIElementVisibilityUnknown;
+        return API::InjectedBundle::PageUIClient::UIElementVisibility::Unknown;
     
-    return m_client.toolbarsAreVisible(toAPI(page), m_client.base.clientInfo);
+    return toUIElementVisibility(m_client.toolbarsAreVisible(toAPI(page), m_client.base.clientInfo));
 }
 
-void InjectedBundlePageUIClient::didReachApplicationCacheOriginQuota(WebPage* page, WebSecurityOrigin* origin, int64_t totalBytesNeeded)
+bool InjectedBundlePageUIClient::didReachApplicationCacheOriginQuota(WebPage* page, WebSecurityOrigin* origin, int64_t totalBytesNeeded)
 {
     if (!m_client.didReachApplicationCacheOriginQuota)
-        return;
+        return false;
 
     m_client.didReachApplicationCacheOriginQuota(toAPI(page), toAPI(origin), totalBytesNeeded, m_client.base.clientInfo);
+    return true;
 }
 
 uint64_t InjectedBundlePageUIClient::didExceedDatabaseQuota(WebPage* page, WebSecurityOrigin* origin, const String& databaseName, const String& databaseDisplayName, uint64_t currentQuotaBytes, uint64_t currentOriginUsageBytes, uint64_t currentDatabaseUsageBytes, uint64_t expectedUsageBytes)

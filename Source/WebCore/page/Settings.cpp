@@ -10,10 +10,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -78,12 +78,8 @@ bool Settings::gShouldPaintNativeControls = true;
 bool Settings::gAVFoundationEnabled = false;
 #endif
 
-#if PLATFORM(MAC)
+#if PLATFORM(COCOA)
 bool Settings::gQTKitEnabled = true;
-#endif
-
-#if ENABLE(PLUGIN_PROXY_FOR_VIDEO)
-bool Settings::gVideoPluginProxyEnabled = true;
 #endif
 
 bool Settings::gMockScrollbarsEnabled = false;
@@ -99,6 +95,8 @@ bool Settings::gLowPowerVideoAudioBufferSizeEnabled = false;
 #if PLATFORM(IOS)
 bool Settings::gNetworkDataUsageTrackingEnabled = false;
 bool Settings::gAVKitEnabled = false;
+bool Settings::gShouldOptOutOfNetworkStateObservation = false;
+bool Settings::gManageAudioSession = false;
 #endif
 
 // NOTEs
@@ -124,14 +122,22 @@ static EditingBehaviorType editingBehaviorTypeForPlatform()
 
 #if PLATFORM(IOS)
 static const bool defaultFixedPositionCreatesStackingContext = true;
+static const bool defaultFixedBackgroundsPaintRelativeToDocument = true;
+static const bool defaultAcceleratedCompositingForFixedPositionEnabled = true;
 static const bool defaultMediaPlaybackAllowsInline = false;
 static const bool defaultMediaPlaybackRequiresUserGesture = true;
 static const bool defaultShouldRespectImageOrientation = true;
+static const bool defaultImageSubsamplingEnabled = true;
+static const bool defaultScrollingTreeIncludesFrames = true;
 #else
 static const bool defaultFixedPositionCreatesStackingContext = false;
+static const bool defaultFixedBackgroundsPaintRelativeToDocument = false;
+static const bool defaultAcceleratedCompositingForFixedPositionEnabled = false;
 static const bool defaultMediaPlaybackAllowsInline = true;
 static const bool defaultMediaPlaybackRequiresUserGesture = false;
 static const bool defaultShouldRespectImageOrientation = false;
+static const bool defaultImageSubsamplingEnabled = false;
+static const bool defaultScrollingTreeIncludesFrames = false;
 #endif
 
 static const double defaultIncrementalRenderingSuppressionTimeoutInSeconds = 5;
@@ -154,9 +160,6 @@ Settings::Settings(Page* page)
     , m_fontGenericFamilies(std::make_unique<FontGenericFamilies>())
     , m_storageBlockingPolicy(SecurityOrigin::AllowAllStorage)
     , m_layoutInterval(layoutScheduleThreshold)
-#if PLATFORM(IOS)
-    , m_maxParseDuration(-1)
-#endif
 #if ENABLE(TEXT_AUTOSIZING)
     , m_textAutosizingFontScaleFactor(1)
 #if HACK_FORCE_TEXT_AUTOSIZING_ON_DESKTOP
@@ -171,42 +174,25 @@ Settings::Settings(Page* page)
     , m_isJavaEnabled(false)
     , m_isJavaEnabledForLocalFiles(true)
     , m_loadsImagesAutomatically(false)
-    , m_privateBrowsingEnabled(false)
     , m_areImagesEnabled(true)
     , m_arePluginsEnabled(false)
     , m_isScriptEnabled(false)
     , m_needsAdobeFrameReloadingQuirk(false)
     , m_usesPageCache(false)
     , m_fontRenderingMode(0)
-#if PLATFORM(IOS)
-    , m_standalone(false)
-    , m_telephoneNumberParsingEnabled(false)
-    , m_mediaDataLoadsAutomatically(false)
-    , m_shouldTransformsAffectOverflow(true)
-    , m_shouldDispatchJavaScriptWindowOnErrorEvents(false)
-    , m_alwaysUseBaselineOfPrimaryFont(false)
-    , m_alwaysUseAcceleratedOverflowScroll(false)
-#endif
-#if ENABLE(CSS_STICKY_POSITION)
-    , m_cssStickyPositionEnabled(true)
-#endif
     , m_showTiledScrollingIndicator(false)
-    , m_tiledBackingStoreEnabled(false)
     , m_backgroundShouldExtendBeyondPage(false)
     , m_dnsPrefetchingEnabled(false)
 #if ENABLE(TOUCH_EVENTS)
     , m_touchEventEmulationEnabled(false)
 #endif
     , m_scrollingPerformanceLoggingEnabled(false)
-    , m_aggressiveTileRetentionEnabled(false)
     , m_timeWithoutMouseMovementBeforeHidingControls(3)
     , m_setImageLoadingSettingsTimer(this, &Settings::imageLoadingSettingsTimerFired)
 #if ENABLE(HIDDEN_PAGE_DOM_TIMER_THROTTLING)
     , m_hiddenPageDOMTimerThrottlingEnabled(false)
 #endif
-#if ENABLE(PAGE_VISIBILITY_API)
     , m_hiddenPageCSSAnimationSuspensionEnabled(false)
-#endif
     , m_fontFallbackPrefersPictographs(false)
 {
     // A Frame may not have been created yet, so we initialize the AtomicString
@@ -237,14 +223,14 @@ double Settings::hiddenPageDOMTimerAlignmentInterval()
     return gHiddenPageDOMTimerAlignmentInterval;
 }
 
-#if !PLATFORM(MAC)
+#if !PLATFORM(COCOA)
 bool Settings::shouldEnableScreenFontSubstitutionByDefault()
 {
     return true;
 }
 #endif
 
-#if !PLATFORM(MAC)
+#if !PLATFORM(COCOA)
 void Settings::initializeDefaultFontFamilies()
 {
     // Other platforms can set up fonts from a client, but on Mac, we want it in WebCore to share code between WebKit1 and WebKit2.
@@ -402,10 +388,8 @@ void Settings::imageLoadingSettingsTimerFired(Timer<Settings>*)
 
 void Settings::setScriptEnabled(bool isScriptEnabled)
 {
-#if PLATFORM(IOS)
     if (m_isScriptEnabled == isScriptEnabled)
         return;
-#endif
 
     m_isScriptEnabled = isScriptEnabled;
 #if PLATFORM(IOS)
@@ -439,15 +423,6 @@ void Settings::setPluginsEnabled(bool arePluginsEnabled)
 
     m_arePluginsEnabled = arePluginsEnabled;
     Page::refreshPlugins(false);
-}
-
-void Settings::setPrivateBrowsingEnabled(bool privateBrowsingEnabled)
-{
-    if (m_privateBrowsingEnabled == privateBrowsingEnabled)
-        return;
-
-    m_privateBrowsingEnabled = privateBrowsingEnabled;
-    m_page->privateBrowsingStateChanged();
 }
 
 void Settings::setUserStyleSheetLocation(const URL& userStyleSheetLocation)
@@ -495,11 +470,6 @@ void Settings::setDefaultDOMTimerAlignmentInterval(double interval)
 double Settings::defaultDOMTimerAlignmentInterval()
 {
     return gDefaultDOMTimerAlignmentInterval;
-}
-
-void Settings::setDOMTimerAlignmentInterval(double interval)
-{
-    m_page->setTimerAlignmentInterval(interval);
 }
 
 double Settings::domTimerAlignmentInterval() const
@@ -589,14 +559,6 @@ void Settings::setStorageBlockingPolicy(SecurityOrigin::StorageBlockingPolicy en
     m_page->storageBlockingStateChanged();
 }
 
-void Settings::setTiledBackingStoreEnabled(bool enabled)
-{
-    m_tiledBackingStoreEnabled = enabled;
-#if USE(TILED_BACKING_STORE)
-    m_page->mainFrame().setTiledBackingStoreEnabled(enabled);
-#endif
-}
-
 void Settings::setBackgroundShouldExtendBeyondPage(bool shouldExtend)
 {
     if (m_backgroundShouldExtendBeyondPage == shouldExtend)
@@ -604,9 +566,7 @@ void Settings::setBackgroundShouldExtendBeyondPage(bool shouldExtend)
 
     m_backgroundShouldExtendBeyondPage = shouldExtend;
 
-#if USE(ACCELERATED_COMPOSITING)
-    m_page->mainFrame().view()->setBackgroundExtendsBeyondPage(shouldExtend);
-#endif
+    m_page->mainFrame().view()->updateExtendBackgroundIfNecessary();
 }
 
 #if USE(AVFOUNDATION)
@@ -620,7 +580,7 @@ void Settings::setAVFoundationEnabled(bool enabled)
 }
 #endif
 
-#if PLATFORM(MAC)
+#if PLATFORM(COCOA)
 void Settings::setQTKitEnabled(bool enabled)
 {
     if (gQTKitEnabled == enabled)
@@ -631,28 +591,12 @@ void Settings::setQTKitEnabled(bool enabled)
 }
 #endif
 
-#if ENABLE(PLUGIN_PROXY_FOR_VIDEO)
-void Settings::setVideoPluginProxyEnabled(bool enabled)
-{
-    if (gVideoPluginProxyEnabled == enabled)
-        return;
-
-    gVideoPluginProxyEnabled = enabled;
-    HTMLMediaElement::resetMediaEngines();
-}
-#endif
-
 void Settings::setScrollingPerformanceLoggingEnabled(bool enabled)
 {
     m_scrollingPerformanceLoggingEnabled = enabled;
 
     if (m_page->mainFrame().view())
         m_page->mainFrame().view()->setScrollingPerformanceLoggingEnabled(enabled);
-}
-    
-void Settings::setAggressiveTileRetentionEnabled(bool enabled)
-{
-    m_aggressiveTileRetentionEnabled = enabled;
 }
 
 void Settings::setMockScrollbarsEnabled(bool flag)
@@ -697,7 +641,6 @@ void Settings::setHiddenPageDOMTimerThrottlingEnabled(bool flag)
 }
 #endif
 
-#if ENABLE(PAGE_VISIBILITY_API)
 void Settings::setHiddenPageCSSAnimationSuspensionEnabled(bool flag)
 {
     if (m_hiddenPageCSSAnimationSuspensionEnabled == flag)
@@ -705,7 +648,6 @@ void Settings::setHiddenPageCSSAnimationSuspensionEnabled(bool flag)
     m_hiddenPageCSSAnimationSuspensionEnabled = flag;
     m_page->hiddenPageCSSAnimationSuspensionStateChanged();
 }
-#endif
 
 void Settings::setFontFallbackPrefersPictographs(bool preferPictographs)
 {
@@ -722,11 +664,6 @@ void Settings::setLowPowerVideoAudioBufferSizeEnabled(bool flag)
 }
 
 #if PLATFORM(IOS)
-void Settings::setStandalone(bool standalone)
-{
-    m_standalone = standalone;
-}
-
 void Settings::setAudioSessionCategoryOverride(unsigned sessionCategory)
 {
     AudioSession::sharedSession().setCategoryOverride(static_cast<AudioSession::CategoryType>(sessionCategory));

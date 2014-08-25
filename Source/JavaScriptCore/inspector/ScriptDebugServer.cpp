@@ -12,7 +12,7 @@
  * 2.  Redistributions in binary form must reproduce the above copyright
  *     notice, this list of conditions and the following disclaimer in the
  *     documentation and/or other materials provided with the distribution.
- * 3.  Neither the name of Apple Computer, Inc. ("Apple") nor the names of
+ * 3.  Neither the name of Apple Inc. ("Apple") nor the names of
  *     its contributors may be used to endorse or promote products derived
  *     from this software without specific prior written permission.
  *
@@ -31,19 +31,19 @@
 #include "config.h"
 #include "ScriptDebugServer.h"
 
+#if ENABLE(INSPECTOR)
+
 #include "DebuggerCallFrame.h"
 #include "JSJavaScriptCallFrame.h"
 #include "JSLock.h"
 #include "JavaScriptCallFrame.h"
 #include "ScriptValue.h"
 #include "SourceProvider.h"
-#include <wtf/MainThread.h>
 #include <wtf/NeverDestroyed.h>
 #include <wtf/TemporaryChange.h>
 #include <wtf/text/WTFString.h>
 
 using namespace JSC;
-using namespace Inspector;
 
 namespace Inspector {
 
@@ -70,7 +70,7 @@ JSC::BreakpointID ScriptDebugServer::setBreakpoint(JSC::SourceID sourceID, const
         BreakpointIDToActionsMap::iterator it = m_breakpointIDToActions.find(id);
         ASSERT(it == m_breakpointIDToActions.end());
 #endif
-        const Vector<ScriptBreakpointAction> &actions = scriptBreakpoint.actions;
+        const BreakpointActions& actions = scriptBreakpoint.actions;
         m_breakpointIDToActions.set(id, actions);
     }
     return id;
@@ -103,7 +103,7 @@ bool ScriptDebugServer::evaluateBreakpointAction(const ScriptBreakpointAction& b
         break;
     }
     case ScriptBreakpointActionTypeSound:
-        dispatchBreakpointActionSound(debuggerCallFrame->exec());
+        dispatchBreakpointActionSound(debuggerCallFrame->exec(), breakpointAction.identifier);
         break;
     case ScriptBreakpointActionTypeProbe: {
         JSValue exception;
@@ -113,7 +113,7 @@ bool ScriptDebugServer::evaluateBreakpointAction(const ScriptBreakpointAction& b
         
         JSC::ExecState* state = debuggerCallFrame->scope()->globalObject()->globalExec();
         Deprecated::ScriptValue wrappedResult = Deprecated::ScriptValue(state->vm(), exception ? exception : result);
-        dispatchDidSampleProbe(state, breakpointAction.identifier, wrappedResult);
+        dispatchBreakpointActionProbe(state, breakpointAction, wrappedResult);
         break;
     }
     default:
@@ -154,11 +154,11 @@ void ScriptDebugServer::dispatchBreakpointActionLog(ExecState* exec, const Strin
 
     Vector<ScriptDebugListener*> listenersCopy;
     copyToVector(*listeners, listenersCopy);
-    for (auto listener : listenersCopy)
+    for (auto* listener : listenersCopy)
         listener->breakpointActionLog(exec, message);
 }
 
-void ScriptDebugServer::dispatchBreakpointActionSound(ExecState* exec)
+void ScriptDebugServer::dispatchBreakpointActionSound(ExecState* exec, int breakpointActionIdentifier)
 {
     if (m_callingListeners)
         return;
@@ -172,11 +172,11 @@ void ScriptDebugServer::dispatchBreakpointActionSound(ExecState* exec)
 
     Vector<ScriptDebugListener*> listenersCopy;
     copyToVector(*listeners, listenersCopy);
-    for (auto listener : listenersCopy)
-        listener->breakpointActionSound();
+    for (auto* listener : listenersCopy)
+        listener->breakpointActionSound(breakpointActionIdentifier);
 }
 
-void ScriptDebugServer::dispatchDidSampleProbe(ExecState* exec, int identifier, const Deprecated::ScriptValue& sample)
+void ScriptDebugServer::dispatchBreakpointActionProbe(ExecState* exec, const ScriptBreakpointAction& action, const Deprecated::ScriptValue& sample)
 {
     if (m_callingListeners)
         return;
@@ -190,8 +190,8 @@ void ScriptDebugServer::dispatchDidSampleProbe(ExecState* exec, int identifier, 
 
     Vector<ScriptDebugListener*> listenersCopy;
     copyToVector(*listeners, listenersCopy);
-    for (auto listener : listenersCopy)
-        listener->didSampleProbe(exec, identifier, m_hitCount, sample);
+    for (auto* listener : listenersCopy)
+        listener->breakpointActionProbe(exec, action, m_hitCount, sample);
 }
 
 void ScriptDebugServer::dispatchDidContinue(ScriptDebugListener* listener)
@@ -279,8 +279,8 @@ void ScriptDebugServer::dispatchFunctionToListeners(JavaScriptExecutionCallback 
     TemporaryChange<bool> change(m_callingListeners, true);
 
     if (ListenerSet* listeners = getListenersForGlobalObject(globalObject)) {
-        ASSERT(!listeners->isEmpty());
-        dispatchFunctionToListeners(*listeners, callback);
+        if (!listeners->isEmpty())
+            dispatchFunctionToListeners(*listeners, callback);
     }
 }
 
@@ -324,15 +324,17 @@ void ScriptDebugServer::handlePause(Debugger::ReasonForPause, JSGlobalObject* vm
     dispatchFunctionToListeners(&ScriptDebugServer::dispatchDidContinue, vmEntryGlobalObject);
 }
 
-const Vector<ScriptBreakpointAction>& ScriptDebugServer::getActionsForBreakpoint(JSC::BreakpointID breakpointID)
+const BreakpointActions& ScriptDebugServer::getActionsForBreakpoint(JSC::BreakpointID breakpointID)
 {
     ASSERT(breakpointID != JSC::noBreakpointID);
 
     if (m_breakpointIDToActions.contains(breakpointID))
         return m_breakpointIDToActions.find(breakpointID)->value;
     
-    static NeverDestroyed<Vector<ScriptBreakpointAction>> emptyActionVector = Vector<ScriptBreakpointAction>();
+    static NeverDestroyed<BreakpointActions> emptyActionVector = BreakpointActions();
     return emptyActionVector;
 }
 
 } // namespace Inspector
+
+#endif // ENABLE(INSPECTOR)

@@ -59,6 +59,7 @@ struct OSREntryData {
     BitVector m_localsForcedDouble;
     BitVector m_localsForcedMachineInt;
     Vector<OSREntryReshuffling> m_reshufflings;
+    BitVector m_machineStackUsed;
 };
 
 inline unsigned getOSREntryDataBytecodeIndex(OSREntryData* osrEntryData)
@@ -66,6 +67,8 @@ inline unsigned getOSREntryDataBytecodeIndex(OSREntryData* osrEntryData)
     return osrEntryData->m_bytecodeIndex;
 }
 
+// Returns a pointer to a data buffer that the OSR entry thunk will recognize and
+// parse. If this returns null, it means 
 void* prepareOSREntry(ExecState*, CodeBlock*, unsigned bytecodeIndex);
 #else
 inline void* prepareOSREntry(ExecState*, CodeBlock*, unsigned) { return 0; }

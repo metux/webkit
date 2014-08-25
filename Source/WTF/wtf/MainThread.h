@@ -11,7 +11,7 @@
  * 2.  Redistributions in binary form must reproduce the above copyright
  *     notice, this list of conditions and the following disclaimer in the
  *     documentation and/or other materials provided with the distribution. 
- * 3.  Neither the name of Apple Computer, Inc. ("Apple") nor the names of
+ * 3.  Neither the name of Apple Inc. ("Apple") nor the names of
  *     its contributors may be used to endorse or promote products derived
  *     from this software without specific prior written permission. 
  *
@@ -69,7 +69,7 @@ void initializeGCThreads();
 #if ENABLE(PARALLEL_GC)
 void registerGCThread();
 WTF_EXPORT_PRIVATE bool isMainThreadOrGCThread();
-#elif PLATFORM(MAC) || PLATFORM(IOS)
+#elif OS(DARWIN) && !PLATFORM(EFL) && !PLATFORM(GTK)
 WTF_EXPORT_PRIVATE bool isMainThreadOrGCThread();
 #else
 inline bool isMainThreadOrGCThread() { return isMainThread(); }
@@ -80,7 +80,7 @@ void initializeMainThreadPlatform();
 void scheduleDispatchFunctionsOnMainThread();
 void dispatchFunctionsFromMainThread();
 
-#if PLATFORM(MAC)
+#if OS(DARWIN) && !PLATFORM(EFL) && !PLATFORM(GTK)
 #if !USE(WEB_THREAD)
 // This version of initializeMainThread sets up the main thread as corresponding
 // to the process's main thread, and not necessarily the thread that calls this

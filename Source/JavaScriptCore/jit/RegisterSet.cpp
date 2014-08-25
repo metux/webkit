@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013 Apple Inc. All rights reserved.
+ * Copyright (C) 2013, 2014 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -30,39 +30,81 @@
 
 #include "GPRInfo.h"
 #include "MacroAssembler.h"
+#include "JSCInlines.h"
+#include <wtf/CommaPrinter.h>
 
 namespace JSC {
 
 RegisterSet RegisterSet::stackRegisters()
 {
-    RegisterSet result;
-    result.set(MacroAssembler::stackPointerRegister);
-    result.set(MacroAssembler::framePointerRegister);
-    return result;
+    return RegisterSet(
+        MacroAssembler::stackPointerRegister,
+        MacroAssembler::framePointerRegister);
+}
+
+RegisterSet RegisterSet::reservedHardwareRegisters()
+{
+#if CPU(ARM64)
+    return RegisterSet(ARM64Registers::lr);
+#else
+    return RegisterSet();
+#endif
+}
+
+RegisterSet RegisterSet::runtimeRegisters()
+{
+#if USE(JSVALUE64)
+    return RegisterSet(GPRInfo::tagTypeNumberRegister, GPRInfo::tagMaskRegister);
+#else
+    return RegisterSet();
+#endif
 }
 
 RegisterSet RegisterSet::specialRegisters()
 {
-    RegisterSet result;
-    result.merge(stackRegisters());
-    result.set(GPRInfo::callFrameRegister);
-#if USE(JSVALUE64)
-    result.set(GPRInfo::tagTypeNumberRegister);
-    result.set(GPRInfo::tagMaskRegister);
-#endif
-    return result;
+    return RegisterSet(
+        stackRegisters(), reservedHardwareRegisters(), runtimeRegisters());
 }
 
 RegisterSet RegisterSet::calleeSaveRegisters()
 {
     RegisterSet result;
-#if CPU(X86_64)
+#if CPU(X86)
+    result.set(X86Registers::ebx);
+    result.set(X86Registers::ebp);
+    result.set(X86Registers::edi);
+    result.set(X86Registers::esi);
+#elif CPU(X86_64)
     result.set(X86Registers::ebx);
     result.set(X86Registers::ebp);
     result.set(X86Registers::r12);
     result.set(X86Registers::r13);
     result.set(X86Registers::r14);
     result.set(X86Registers::r15);
+#elif CPU(ARM_THUMB2)
+    result.set(ARMRegisters::r4);
+    result.set(ARMRegisters::r5);
+    result.set(ARMRegisters::r6);
+    result.set(ARMRegisters::r8);
+    result.set(ARMRegisters::r9);
+    result.set(ARMRegisters::r10);
+    result.set(ARMRegisters::r11);
+#elif CPU(ARM64)
+    // We don't include LR in the set of callee-save registers even though it technically belongs
+    // there. This is because we use this set to describe the set of registers that need to be saved
+    // beyond what you would save by the platform-agnostic "preserve return address" and "restore
+    // return address" operations in CCallHelpers.
+    for (
+        ARM64Registers::RegisterID reg = ARM64Registers::x19;
+        reg <= ARM64Registers::x28;
+        reg = static_cast<ARM64Registers::RegisterID>(reg + 1))
+        result.set(reg);
+    result.set(ARM64Registers::fp);
+    for (
+        ARM64Registers::FPRegisterID reg = ARM64Registers::q8;
+        reg <= ARM64Registers::q15;
+        reg = static_cast<ARM64Registers::FPRegisterID>(reg + 1))
+        result.set(reg);
 #else
     UNREACHABLE_FOR_PLATFORM();
 #endif
@@ -93,9 +135,29 @@ RegisterSet RegisterSet::allRegisters()
     return result;
 }
 
+size_t RegisterSet::numberOfSetGPRs() const
+{
+    RegisterSet temp = *this;
+    temp.filter(allGPRs());
+    return temp.numberOfSetRegisters();
+}
+
+size_t RegisterSet::numberOfSetFPRs() const
+{
+    RegisterSet temp = *this;
+    temp.filter(allFPRs());
+    return temp.numberOfSetRegisters();
+}
+
 void RegisterSet::dump(PrintStream& out) const
 {
-    m_vector.dump(out);
+    CommaPrinter comma;
+    out.print("[");
+    for (Reg reg = Reg::first(); reg <= Reg::last(); reg = reg.next()) {
+        if (get(reg))
+            out.print(comma, reg);
+    }
+    out.print("]");
 }
 
 } // namespace JSC

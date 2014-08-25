@@ -2,8 +2,6 @@
 // SVG CSS property names
 //
 
-#if defined(ENABLE_SVG) && ENABLE_SVG
-
 // SVG style props
 buffered-rendering
 clip-path
@@ -54,5 +52,6 @@ writing-mode [Inherited]
 
 -webkit-svg-shadow
 
-#endif
+x
+y
 

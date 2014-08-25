@@ -18,8 +18,6 @@
  */
 
 #include "config.h"
-
-#if ENABLE(SVG)
 #include "SVGMPathElement.h"
 
 #include "Document.h"
@@ -28,6 +26,7 @@
 #include "SVGNames.h"
 #include "SVGPathElement.h"
 #include "XLinkNames.h"
+#include <wtf/NeverDestroyed.h>
 
 namespace WebCore {
 
@@ -92,8 +91,13 @@ Node::InsertionNotificationRequest SVGMPathElement::insertedInto(ContainerNode& 
 {
     SVGElement::insertedInto(rootParent);
     if (rootParent.inDocument())
-        buildPendingResource();
+        return InsertionShouldCallDidNotifySubtreeInsertions;
     return InsertionDone;
+}
+
+void SVGMPathElement::didNotifySubtreeInsertions(ContainerNode*)
+{
+    buildPendingResource();
 }
 
 void SVGMPathElement::removedFrom(ContainerNode& rootParent)
@@ -106,12 +110,12 @@ void SVGMPathElement::removedFrom(ContainerNode& rootParent)
 
 bool SVGMPathElement::isSupportedAttribute(const QualifiedName& attrName)
 {
-    DEFINE_STATIC_LOCAL(HashSet<QualifiedName>, supportedAttributes, ());
-    if (supportedAttributes.isEmpty()) {
+    static NeverDestroyed<HashSet<QualifiedName>> supportedAttributes;
+    if (supportedAttributes.get().isEmpty()) {
         SVGURIReference::addSupportedAttributes(supportedAttributes);
         SVGExternalResourcesRequired::addSupportedAttributes(supportedAttributes);
     }
-    return supportedAttributes.contains<SVGAttributeHashTranslator>(attrName);
+    return supportedAttributes.get().contains<SVGAttributeHashTranslator>(attrName);
 }
 
 void SVGMPathElement::parseAttribute(const QualifiedName& name, const AtomicString& value)
@@ -169,5 +173,3 @@ void SVGMPathElement::notifyParentOfPathChange(ContainerNode* parent)
 }
 
 } // namespace WebCore
-
-#endif // ENABLE(SVG)

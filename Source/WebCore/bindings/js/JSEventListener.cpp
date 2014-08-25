@@ -23,7 +23,6 @@
 #include "BeforeUnloadEvent.h"
 #include "Event.h"
 #include "Frame.h"
-#include "InspectorCounters.h"
 #include "JSEvent.h"
 #include "JSEventTarget.h"
 #include "JSMainThreadExecState.h"
@@ -47,20 +46,14 @@ JSEventListener::JSEventListener(JSObject* function, JSObject* wrapper, bool isA
     , m_isolatedWorld(&isolatedWorld)
 {
     if (wrapper) {
-        JSC::Heap::writeBarrier(wrapper, function);
+        JSC::Heap::heap(wrapper)->writeBarrier(wrapper, function);
         m_jsFunction = JSC::Weak<JSC::JSObject>(function);
     } else
         ASSERT(!function);
-#if ENABLE(INSPECTOR)
-    ThreadLocalInspectorCounters::current().incrementCounter(ThreadLocalInspectorCounters::JSEventListenerCounter);
-#endif
 }
 
 JSEventListener::~JSEventListener()
 {
-#if ENABLE(INSPECTOR)
-    ThreadLocalInspectorCounters::current().decrementCounter(ThreadLocalInspectorCounters::JSEventListenerCounter);
-#endif
 }
 
 JSObject* JSEventListener::initializeJSFunction(ScriptExecutionContext*) const
@@ -129,23 +122,24 @@ void JSEventListener::handleEvent(ScriptExecutionContext* scriptExecutionContext
         InspectorInstrumentationCookie cookie = JSMainThreadExecState::instrumentFunctionCall(scriptExecutionContext, callType, callData);
 
         JSValue thisValue = handleEventFunction == jsFunction ? toJS(exec, globalObject, event->currentTarget()) : jsFunction;
+        JSValue exception;
         JSValue retval = scriptExecutionContext->isDocument()
-            ? JSMainThreadExecState::call(exec, handleEventFunction, callType, callData, thisValue, args)
-            : JSC::call(exec, handleEventFunction, callType, callData, thisValue, args);
+            ? JSMainThreadExecState::call(exec, handleEventFunction, callType, callData, thisValue, args, &exception)
+            : JSC::call(exec, handleEventFunction, callType, callData, thisValue, args, &exception);
 
-        InspectorInstrumentation::didCallFunction(cookie);
+        InspectorInstrumentation::didCallFunction(cookie, scriptExecutionContext);
 
         globalObject->setCurrentEvent(savedEvent);
 
         if (scriptExecutionContext->isWorkerGlobalScope()) {
             bool terminatorCausedException = (exec->hadException() && isTerminatedExecutionException(exec->exception()));
-            if (terminatorCausedException || vm.watchdog.didFire())
-                static_cast<WorkerGlobalScope*>(scriptExecutionContext)->script()->forbidExecution();
+            if (terminatorCausedException || (vm.watchdog && vm.watchdog->didFire()))
+                toWorkerGlobalScope(scriptExecutionContext)->script()->forbidExecution();
         }
 
-        if (exec->hadException()) {
+        if (exception) {
             event->target()->uncaughtExceptionInEventHandler();
-            reportCurrentException(exec);
+            reportException(exec, exception);
         } else {
             if (!retval.isUndefinedOrNull() && event->isBeforeUnloadEvent())
                 toBeforeUnloadEvent(event)->setReturnValue(retval.toString(exec)->value(exec));

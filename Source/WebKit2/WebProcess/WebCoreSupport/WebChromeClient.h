@@ -27,13 +27,13 @@
 #ifndef WebChromeClient_h
 #define WebChromeClient_h
 
+#include "WebFrame.h"
 #include <WebCore/ChromeClient.h>
 #include <WebCore/ViewportArguments.h>
 #include <wtf/text/WTFString.h>
 
 namespace WebKit {
 
-class WebFrame;
 class WebPage;
 
 class WebChromeClient : public WebCore::ChromeClient {
@@ -90,7 +90,7 @@ private:
     
     virtual void setResizable(bool) override;
     
-    virtual void addMessageToConsole(WebCore::MessageSource, WebCore::MessageLevel, const String& message, unsigned lineNumber, unsigned columnNumber, const String& sourceID) override;
+    virtual void addMessageToConsole(JSC::MessageSource, JSC::MessageLevel, const String& message, unsigned lineNumber, unsigned columnNumber, const String& sourceID) override;
     
     virtual bool canRunBeforeUnloadConfirmPanel() override;
     virtual bool runBeforeUnloadConfirmPanel(const String& message, WebCore::Frame*) override;
@@ -108,15 +108,19 @@ private:
     virtual WebCore::IntRect windowResizerRect() const override;
     
     // HostWindow member function overrides.
-    virtual void invalidateRootView(const WebCore::IntRect&, bool) override;
-    virtual void invalidateContentsAndRootView(const WebCore::IntRect&, bool) override;
-    virtual void invalidateContentsForSlowScroll(const WebCore::IntRect&, bool) override;
+    virtual void invalidateRootView(const WebCore::IntRect&) override;
+    virtual void invalidateContentsAndRootView(const WebCore::IntRect&) override;
+    virtual void invalidateContentsForSlowScroll(const WebCore::IntRect&) override;
     virtual void scroll(const WebCore::IntSize& scrollDelta, const WebCore::IntRect& scrollRect, const WebCore::IntRect& clipRect) override;
 #if USE(TILED_BACKING_STORE)
     virtual void delegatedScrollRequested(const WebCore::IntPoint& scrollOffset) override;
 #endif
     virtual WebCore::IntPoint screenToRootView(const WebCore::IntPoint&) const override;
     virtual WebCore::IntRect rootViewToScreen(const WebCore::IntRect&) const override;
+#if PLATFORM(IOS)
+    virtual WebCore::IntPoint accessibilityScreenToRootView(const WebCore::IntPoint&) const override;
+    virtual WebCore::IntRect rootViewToAccessibilityScreen(const WebCore::IntRect&) const override;
+#endif
     virtual PlatformPageClient platformPageClient() const override;
     virtual void contentsSizeChanged(WebCore::Frame*, const WebCore::IntSize&) const override;
     virtual void scrollRectIntoView(const WebCore::IntRect&) const override; // Currently only Mac has a non empty implementation.
@@ -144,10 +148,6 @@ private:
 
     virtual void populateVisitedLinks() override;
     
-    virtual WebCore::FloatRect customHighlightRect(WebCore::Node*, const WTF::AtomicString& type, const WebCore::FloatRect& lineRect) override;
-    virtual void paintCustomHighlight(WebCore::Node*, const AtomicString& type, const WebCore::FloatRect& boxRect, const WebCore::FloatRect& lineRect,
-        bool behindText, bool entireLine) override;
-    
     virtual bool shouldReplaceWithGeneratedFileForUpload(const String& path, String& generatedFilename) override;
     virtual String generateReplacementFile(const String& path) override;
     
@@ -160,7 +160,7 @@ private:
 #endif
 
 #if PLATFORM(IOS)
-    virtual void didReceiveMobileDocType() override;
+    virtual void didReceiveMobileDocType(bool) override;
     virtual void setNeedsScrollNotifications(WebCore::Frame*, bool) override;
     virtual void observedContentChange(WebCore::Frame*) override;
     virtual void clearContentChangeObservers(WebCore::Frame*) override;
@@ -170,6 +170,7 @@ private:
     virtual void didLayout(LayoutType = NormalLayout) override;
     virtual void didStartOverflowScroll() override;
     virtual void didEndOverflowScroll() override;
+    virtual bool hasStablePageScaleFactor() const override;
 
     // FIXME: See <rdar://problem/5975559>
     virtual void suppressFormNotifications() override;
@@ -179,6 +180,13 @@ private:
     virtual void removeScrollingLayer(WebCore::Node*, PlatformLayer* scrollingLayer, PlatformLayer* contentsLayer) override;
 
     virtual void webAppOrientationsUpdated() override;
+    virtual void showPlaybackTargetPicker(bool hasVideo) override;
+
+    virtual std::chrono::milliseconds eventThrottlingDelay() override;
+#endif
+
+#if ENABLE(ORIENTATION_EVENTS)
+    virtual int deviceOrientation() const override;
 #endif
 
     virtual void runOpenPanel(WebCore::Frame*, PassRefPtr<WebCore::FileChooser>) override;
@@ -192,10 +200,6 @@ private:
     virtual void scheduleAnimation() override;
 #endif
 
-    // Notification that the given form element has changed. This function
-    // will be called frequently, so handling should be very fast.
-    virtual void formStateDidChange(const WebCore::Node*) override;
-
     virtual void didAssociateFormControls(const Vector<RefPtr<WebCore::Element>>&) override;
     virtual bool shouldNotifyOnFormChanges() override;
 
@@ -205,11 +209,16 @@ private:
     virtual PassRefPtr<WebCore::PopupMenu> createPopupMenu(WebCore::PopupMenuClient*) const override;
     virtual PassRefPtr<WebCore::SearchPopupMenu> createSearchPopupMenu(WebCore::PopupMenuClient*) const override;
 
-#if USE(ACCELERATED_COMPOSITING)
     virtual WebCore::GraphicsLayerFactory* graphicsLayerFactory() const override;
     virtual void attachRootGraphicsLayer(WebCore::Frame*, WebCore::GraphicsLayer*) override;
     virtual void setNeedsOneShotDrawingSynchronization() override;
     virtual void scheduleCompositingLayerFlush() override;
+    virtual bool adjustLayerFlushThrottling(WebCore::LayerFlushThrottleState::Flags) override;
+    virtual WebCore::GraphicsLayer* documentOverlayLayerForFrame(WebCore::Frame&) override;
+
+#if USE(REQUEST_ANIMATION_FRAME_DISPLAY_MONITOR)
+    virtual PassRefPtr<WebCore::DisplayRefreshMonitor> createDisplayRefreshMonitor(PlatformDisplayID) const override;
+#endif
 
     virtual CompositingTriggerFlags allowedCompositingTriggers() const
     {
@@ -225,19 +234,24 @@ private:
     }
 
     virtual bool layerTreeStateIsFrozen() const override;
-#endif
 
 #if ENABLE(ASYNC_SCROLLING)
     virtual PassRefPtr<WebCore::ScrollingCoordinator> createScrollingCoordinator(WebCore::Page*) const override;
 #endif
 
 #if ENABLE(TOUCH_EVENTS)
-    virtual void needTouchEvents(bool) override;
+    virtual void needTouchEvents(bool) override { }
 #endif
 
 #if PLATFORM(IOS)
     virtual void elementDidFocus(const WebCore::Node*) override;
     virtual void elementDidBlur(const WebCore::Node*) override;
+#endif
+
+#if PLATFORM(IOS)
+    virtual bool supportsFullscreenForNode(const WebCore::Node*);
+    virtual void enterFullscreenForNode(WebCore::Node*);
+    virtual void exitFullscreenForNode(WebCore::Node*);
 #endif
 
 #if ENABLE(FULLSCREEN_API)
@@ -246,19 +260,25 @@ private:
     virtual void exitFullScreenForElement(WebCore::Element*) override;
 #endif
 
-#if PLATFORM(MAC)
+#if PLATFORM(COCOA)
     virtual void makeFirstResponder() override;
 #endif
 
     virtual void enableSuddenTermination() override;
     virtual void disableSuddenTermination() override;
-    
+
+#if PLATFORM(IOS)
+    virtual WebCore::FloatSize screenSize() const override;
+    virtual WebCore::FloatSize availableScreenSize() const override;
+#endif
     virtual void dispatchViewportPropertiesDidChange(const WebCore::ViewportArguments&) const override;
 
     virtual void notifyScrollerThumbIsVisibleInRect(const WebCore::IntRect&) override;
     virtual void recommendedScrollbarStyleDidChange(int32_t newStyle) override;
 
     virtual WebCore::Color underlayColor() const override;
+
+    virtual void pageExtendedBackgroundColorDidChange(WebCore::Color) const override;
     
     virtual void numWheelEventHandlersChanged(unsigned) override;
 
@@ -274,8 +294,10 @@ private:
 
     virtual bool shouldUseTiledBackingForFrameView(const WebCore::FrameView*) const override;
 
-    virtual void incrementActivePageCount() override;
-    virtual void decrementActivePageCount() override;
+#if ENABLE(SUBTLE_CRYPTO)
+    virtual bool wrapCryptoKey(const Vector<uint8_t>&, Vector<uint8_t>&) const override;
+    virtual bool unwrapCryptoKey(const Vector<uint8_t>&, Vector<uint8_t>&) const override;
+#endif
 
     String m_cachedToolTip;
     mutable RefPtr<WebFrame> m_cachedFrameSetLargestFrame;

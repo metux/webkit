@@ -10,7 +10,7 @@
  * 2.  Redistributions in binary form must reproduce the above copyright
  *     notice, this list of conditions and the following disclaimer in the
  *     documentation and/or other materials provided with the distribution.
- * 3.  Neither the name of Apple Computer, Inc. ("Apple") nor the names of
+ * 3.  Neither the name of Apple Inc. ("Apple") nor the names of
  *     its contributors may be used to endorse or promote products derived
  *     from this software without specific prior written permission.
  *
@@ -65,7 +65,7 @@ AudioBus::AudioBus(unsigned numberOfChannels, size_t length, bool allocate)
 
     for (unsigned i = 0; i < numberOfChannels; ++i) {
         auto channel = allocate ? std::make_unique<AudioChannel>(length) : std::make_unique<AudioChannel>(nullptr, length);
-        m_channels.append(std::move(channel));
+        m_channels.append(WTF::move(channel));
     }
 
     m_layout = LayoutCanonical; // for now this is the only layout we define

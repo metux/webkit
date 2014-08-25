@@ -1155,7 +1155,7 @@ it will not have any effect.</p>
 <pre class="programlisting"><span class="returnvalue">void</span>
 webkit_web_context_allow_tls_certificate_for_host
                                (<em class="parameter"><code><a class="link" href="WebKitWebContext.html" title="WebKitWebContext"><span class="type">WebKitWebContext</span></a> *context</code></em>,
-                                <em class="parameter"><code><a class="link" href="WebKitCertificateInfo.html" title="WebKitCertificateInfo"><span class="type">WebKitCertificateInfo</span></a> *info</code></em>,
+                                <em class="parameter"><code><a href="../gio/GTlsCertificate.html"><span class="type">GTlsCertificate</span></a> *certificate</code></em>,
                                 <em class="parameter"><code>const <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a> *host</code></em>);</pre>
 <p>Ignore further TLS errors on the <em class="parameter"><code>host</code></em>
  for the certificate present in <em class="parameter"><code>info</code></em>
@@ -1175,8 +1175,8 @@ webkit_web_context_allow_tls_certificate_for_host
 <td class="parameter_annotations"> </td>
 </tr>
 <tr>
-<td class="parameter_name"><p>info</p></td>
-<td class="parameter_description"><p>a <a class="link" href="WebKitCertificateInfo.html" title="WebKitCertificateInfo"><span class="type">WebKitCertificateInfo</span></a></p></td>
+<td class="parameter_name"><p>certificate</p></td>
+<td class="parameter_description"><p>a <a href="../gio/GTlsCertificate.html"><span class="type">GTlsCertificate</span></a></p></td>
 <td class="parameter_annotations"> </td>
 </tr>
 <tr>
@@ -1187,7 +1187,7 @@ webkit_web_context_allow_tls_certificate_for_host
 </tbody>
 </table></div>
 </div>
-<p class="since">Since 2.4</p>
+<p class="since">Since 2.6</p>
 </div>
 <hr>
 <div class="refsect2">

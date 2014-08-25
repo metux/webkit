@@ -37,6 +37,7 @@ namespace JSC {
 template<typename KeyArg, typename ValueArg, typename HashArg = typename DefaultHash<KeyArg>::Hash,
     typename KeyTraitsArg = HashTraits<KeyArg>>
 class WeakGCMap {
+    WTF_MAKE_FAST_ALLOCATED;
     typedef Weak<ValueArg> ValueType;
     typedef HashMap<KeyArg, ValueType, HashArg, KeyTraitsArg> HashMapType;
 
@@ -59,16 +60,16 @@ public:
     AddResult set(const KeyType& key, ValueType value)
     {
         gcMapIfNeeded();
-        return m_map.set(key, std::move(value));
+        return m_map.set(key, WTF::move(value));
     }
 
-    AddResult add(const KeyType& key, ValueType value)
+    ALWAYS_INLINE AddResult add(const KeyType& key, ValueType value)
     {
         gcMapIfNeeded();
-        AddResult addResult = m_map.add(key, nullptr);
+        AddResult addResult = m_map.fastAdd(key, nullptr);
         if (!addResult.iterator->value) { // New value or found a zombie value.
             addResult.isNewEntry = true;
-            addResult.iterator->value = std::move(value);
+            addResult.iterator->value = WTF::move(value);
         }
         return addResult;
     }
@@ -105,7 +106,7 @@ public:
 private:
     static const int minGCThreshold = 3;
 
-    void gcMap()
+    NEVER_INLINE void gcMap()
     {
         Vector<KeyType, 4> zombies;
 

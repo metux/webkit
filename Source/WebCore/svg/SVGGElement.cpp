@@ -19,8 +19,6 @@
  */
 
 #include "config.h"
-
-#if ENABLE(SVG)
 #include "SVGGElement.h"
 
 #include "RenderSVGHiddenContainer.h"
@@ -28,6 +26,7 @@
 #include "RenderSVGTransformableContainer.h"
 #include "SVGElementInstance.h"
 #include "SVGNames.h"
+#include <wtf/NeverDestroyed.h>
 
 namespace WebCore {
 
@@ -53,12 +52,12 @@ PassRefPtr<SVGGElement> SVGGElement::create(const QualifiedName& tagName, Docume
 
 bool SVGGElement::isSupportedAttribute(const QualifiedName& attrName)
 {
-    DEFINE_STATIC_LOCAL(HashSet<QualifiedName>, supportedAttributes, ());
-    if (supportedAttributes.isEmpty()) {
+    static NeverDestroyed<HashSet<QualifiedName>> supportedAttributes;
+    if (supportedAttributes.get().isEmpty()) {
         SVGLangSpace::addSupportedAttributes(supportedAttributes);
         SVGExternalResourcesRequired::addSupportedAttributes(supportedAttributes);
     }
-    return supportedAttributes.contains<SVGAttributeHashTranslator>(attrName);
+    return supportedAttributes.get().contains<SVGAttributeHashTranslator>(attrName);
 }
 
 void SVGGElement::parseAttribute(const QualifiedName& name, const AtomicString& value)
@@ -96,9 +95,9 @@ RenderPtr<RenderElement> SVGGElement::createElementRenderer(PassRef<RenderStyle>
     // subtree may be hidden - we only want the resource renderers to exist so they can be
     // referenced from somewhere else.
     if (style.get().display() == NONE)
-        return createRenderer<RenderSVGHiddenContainer>(*this, std::move(style));
+        return createRenderer<RenderSVGHiddenContainer>(*this, WTF::move(style));
 
-    return createRenderer<RenderSVGTransformableContainer>(*this, std::move(style));
+    return createRenderer<RenderSVGTransformableContainer>(*this, WTF::move(style));
 }
 
 bool SVGGElement::rendererIsNeeded(const RenderStyle&)
@@ -109,5 +108,3 @@ bool SVGGElement::rendererIsNeeded(const RenderStyle&)
 }
 
 }
-
-#endif // ENABLE(SVG)

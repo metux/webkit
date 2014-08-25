@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013 Apple Inc. All rights reserved.
+ * Copyright (C) 2013, 2014 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -29,8 +29,14 @@
 #if ENABLE(DFG_JIT)
 
 #include "CodeBlock.h"
+#include "JSCInlines.h"
 
 namespace JSC { namespace DFG {
+
+DesiredIdentifiers::DesiredIdentifiers()
+    : m_codeBlock(nullptr)
+{
+}
 
 DesiredIdentifiers::DesiredIdentifiers(CodeBlock* codeBlock)
     : m_codeBlock(codeBlock)

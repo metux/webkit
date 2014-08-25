@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2006 Apple Computer, Inc.
+ * Copyright (C) 2006 Apple Inc.
  * Copyright (C) 2006 Alexander Kellett <lypanov@kde.org>
  * Copyright (C) 2006 Oliver Hunt <ojh16@student.canterbury.ac.nz>
  * Copyright (C) 2007 Nikolas Zimmermann <zimmermann@kde.org>
@@ -25,8 +25,6 @@
  */
 
 #include "config.h"
-
-#if ENABLE(SVG)
 #include "RenderSVGText.h"
 
 #include "FloatQuad.h"
@@ -36,6 +34,7 @@
 #include "HitTestResult.h"
 #include "LayoutRepainter.h"
 #include "PointerEventsHitRules.h"
+#include "RenderIterator.h"
 #include "RenderSVGInlineText.h"
 #include "RenderSVGResource.h"
 #include "RenderSVGRoot.h"
@@ -54,7 +53,7 @@
 namespace WebCore {
 
 RenderSVGText::RenderSVGText(SVGTextElement& element, PassRef<RenderStyle> style)
-    : RenderSVGBlock(element, std::move(style))
+    : RenderSVGBlock(element, WTF::move(style))
     , m_needsReordering(false)
     , m_needsPositioningValuesUpdate(false)
     , m_needsTransformUpdate(true)
@@ -77,24 +76,14 @@ bool RenderSVGText::isChildAllowed(const RenderObject& child, const RenderStyle&
     return child.isInline();
 }
 
-RenderSVGText* RenderSVGText::locateRenderSVGTextAncestor(RenderObject* start)
+RenderSVGText* RenderSVGText::locateRenderSVGTextAncestor(RenderObject& start)
 {
-    ASSERT(start);
-    while (start && !start->isSVGText())
-        start = start->parent();
-    if (!start || !start->isSVGText())
-        return 0;
-    return toRenderSVGText(start);
+    return lineageOfType<RenderSVGText>(start).first();
 }
 
-const RenderSVGText* RenderSVGText::locateRenderSVGTextAncestor(const RenderObject* start)
+const RenderSVGText* RenderSVGText::locateRenderSVGTextAncestor(const RenderObject& start)
 {
-    ASSERT(start);
-    while (start && !start->isSVGText())
-        start = start->parent();
-    if (!start || !start->isSVGText())
-        return 0;
-    return toRenderSVGText(start);
+    return lineageOfType<RenderSVGText>(start).first();
 }
 
 LayoutRect RenderSVGText::clippedOverflowRectForRepaint(const RenderLayerModelObject* repaintContainer) const
@@ -409,7 +398,7 @@ void RenderSVGText::layout()
     ASSERT(!simplifiedLayout());
     ASSERT(!scrollsOverflow());
     ASSERT(!hasControlClip());
-    ASSERT(!hasColumns());
+    ASSERT(!multiColumnFlowThread());
     ASSERT(!positionedObjects());
     ASSERT(!m_overflow);
     ASSERT(!isAnonymousBlock());
@@ -422,7 +411,7 @@ void RenderSVGText::layout()
     ASSERT(childrenInline());
     LayoutUnit repaintLogicalTop = 0;
     LayoutUnit repaintLogicalBottom = 0;
-    clearFloats();
+    rebuildFloatingObjectSetFromIntrudingFloats();
     layoutInlineChildren(true, repaintLogicalTop, repaintLogicalBottom);
 
     if (m_needsReordering)
@@ -447,7 +436,7 @@ std::unique_ptr<RootInlineBox> RenderSVGText::createRootInlineBox()
 {
     auto box = std::make_unique<SVGRootInlineBox>(*this);
     box->setHasVirtualLogicalHeight();
-    return std::move(box);
+    return WTF::move(box);
 }
 
 bool RenderSVGText::nodeAtFloatPoint(const HitTestRequest& request, HitTestResult& result, const FloatPoint& pointInParent, HitTestAction hitTestAction)
@@ -476,7 +465,7 @@ bool RenderSVGText::nodeAtPoint(const HitTestRequest&, HitTestResult&, const Hit
     return false;
 }
 
-VisiblePosition RenderSVGText::positionForPoint(const LayoutPoint& pointInContents)
+VisiblePosition RenderSVGText::positionForPoint(const LayoutPoint& pointInContents, const RenderRegion* region)
 {
     RootInlineBox* rootBox = firstRootBox();
     if (!rootBox)
@@ -490,7 +479,7 @@ VisiblePosition RenderSVGText::positionForPoint(const LayoutPoint& pointInConten
     if (!closestBox)
         return createVisiblePosition(0, DOWNSTREAM);
 
-    return closestBox->renderer().positionForPoint(LayoutPoint(pointInContents.x(), closestBox->y()));
+    return closestBox->renderer().positionForPoint(LayoutPoint(pointInContents.x(), closestBox->y()), region);
 }
 
 void RenderSVGText::absoluteQuads(Vector<FloatQuad>& quads, bool* wasFixed) const
@@ -504,7 +493,6 @@ void RenderSVGText::paint(PaintInfo& paintInfo, const LayoutPoint&)
         return;
 
     if (paintInfo.phase != PaintPhaseForeground
-     && paintInfo.phase != PaintPhaseSelfOutline
      && paintInfo.phase != PaintPhaseSelection)
          return;
 
@@ -512,6 +500,12 @@ void RenderSVGText::paint(PaintInfo& paintInfo, const LayoutPoint&)
     GraphicsContextStateSaver stateSaver(*blockInfo.context);
     blockInfo.applyTransform(localToParentTransform());
     RenderBlock::paint(blockInfo, LayoutPoint());
+
+    // Paint the outlines, if any
+    if (paintInfo.phase == PaintPhaseForeground) {
+        blockInfo.phase = PaintPhaseSelfOutline;
+        RenderBlock::paint(blockInfo, LayoutPoint());
+    }
 }
 
 FloatRect RenderSVGText::strokeBoundingBox() const
@@ -545,15 +539,16 @@ void RenderSVGText::addChild(RenderObject* child, RenderObject* beforeChild)
     subtreeChildWasAdded(child);
 }
 
-void RenderSVGText::removeChild(RenderObject& child)
+RenderObject* RenderSVGText::removeChild(RenderObject& child)
 {
     SVGResourcesCache::clientWillBeRemovedFromTree(child);
 
     Vector<SVGTextLayoutAttributes*, 2> affectedAttributes;
     FontCachePurgePreventer fontCachePurgePreventer;
     subtreeChildWillBeRemoved(&child, affectedAttributes);
-    RenderSVGBlock::removeChild(child);
+    RenderObject* next = RenderSVGBlock::removeChild(child);
     subtreeChildWasRemoved(affectedAttributes);
+    return next;
 }
 
 // Fix for <rdar://problem/8048875>. We should not render :first-line CSS Style
@@ -570,5 +565,3 @@ void RenderSVGText::updateFirstLetter()
 }
 
 }
-
-#endif // ENABLE(SVG)

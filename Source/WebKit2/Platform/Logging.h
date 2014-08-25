@@ -51,6 +51,7 @@ namespace WebKit {
     M(TextInput) \
     M(View) \
     M(IDB) \
+    M(Services) \
 
 #define DECLARE_LOG_CHANNEL(name) \
     extern WTFLogChannel JOIN_LOG_CHANNEL_WITH_PREFIX(LOG_CHANNEL_PREFIX, name);
@@ -61,10 +62,6 @@ WEBKIT2_LOG_CHANNELS(DECLARE_LOG_CHANNEL)
 
 void initializeLogChannelsIfNecessary(void);
 String logLevelString();
-
-#if PLATFORM(GTK) || PLATFORM(EFL)
-WTFLogChannel* logChannelByName(const String&);
-#endif
 
 } // namespace WebKit
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012, 2013 Apple Inc. All Rights Reserved.
+ * Copyright (C) 2012, 2013, 2014 Apple Inc. All Rights Reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -30,7 +30,7 @@
 #include "JSGlobalObject.h"
 #include "JSNameScope.h"
 #include "JSWithScope.h"
-#include "Operations.h"
+#include "JSCInlines.h"
 
 namespace JSC {
 
@@ -40,9 +40,6 @@ void JSScope::visitChildren(JSCell* cell, SlotVisitor& visitor)
 {
     JSScope* thisObject = jsCast<JSScope*>(cell);
     ASSERT_GC_OBJECT_INHERITS(thisObject, info());
-    COMPILE_ASSERT(StructureFlags & OverridesVisitChildren, OverridesVisitChildrenWithoutSettingFlag);
-    ASSERT(thisObject->structure()->typeInfo().overridesVisitChildren());
-
     Base::visitChildren(thisObject, visitor);
     visitor.append(&thisObject->m_next);
 }
@@ -99,8 +96,19 @@ static inline bool abstractAccess(ExecState* exec, JSScope* scope, const Identif
             op = ResolveOp(makeType(GlobalProperty, needsVarInjectionChecks), depth, 0, 0, 0, 0);
             return true;
         }
-
-        op = ResolveOp(makeType(GlobalProperty, needsVarInjectionChecks), depth, globalObject->structure(), 0, 0, slot.cachedOffset());
+        
+        WatchpointState state = globalObject->structure()->ensurePropertyReplacementWatchpointSet(exec->vm(), slot.cachedOffset())->state();
+        if (state == IsWatched && getOrPut == Put) {
+            // The field exists, but because the replacement watchpoint is still intact. This is
+            // kind of dangerous. We have two options:
+            // 1) Invalidate the watchpoint set. That would work, but it's possible that this code
+            //    path never executes - in which case this would be unwise.
+            // 2) Have the invalidation happen at run-time. All we have to do is leave the code
+            //    uncached. The only downside is slightly more work when this does execute.
+            // We go with option (2) here because it seems less evil.
+            op = ResolveOp(makeType(GlobalProperty, needsVarInjectionChecks), depth, 0, 0, 0, 0);
+        } else
+            op = ResolveOp(makeType(GlobalProperty, needsVarInjectionChecks), depth, globalObject->structure(), 0, 0, slot.cachedOffset());
         return true;
     }
 
@@ -111,7 +119,7 @@ static inline bool abstractAccess(ExecState* exec, JSScope* scope, const Identif
 JSObject* JSScope::objectAtScope(JSScope* scope)
 {
     JSObject* object = scope;
-    if (object->structure()->typeInfo().type() == WithScopeType)
+    if (object->type() == WithScopeType)
         return jsCast<JSWithScope*>(object)->object();
 
     return object;
@@ -155,6 +163,30 @@ ResolveOp JSScope::abstractResolve(ExecState* exec, JSScope* scope, const Identi
     }
 
     return op;
+}
+
+const char* resolveModeName(ResolveMode mode)
+{
+    static const char* const names[] = {
+        "ThrowIfNotFound",
+        "DoNotThrowIfNotFound"
+    };
+    return names[mode];
+}
+
+const char* resolveTypeName(ResolveType type)
+{
+    static const char* const names[] = {
+        "GlobalProperty",
+        "GlobalVar",
+        "ClosureVar",
+        "GlobalPropertyWithVarInjectionChecks",
+        "GlobalVarWithVarInjectionChecks",
+        "ClosureVarWithVarInjectionChecks",
+        "Dynamic"
+    };
+    ASSERT(type < sizeof(names) / sizeof(names[0]));
+    return names[type];
 }
 
 } // namespace JSC

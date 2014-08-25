@@ -78,7 +78,7 @@ inline static bool hasVerticalAppearance(HTMLInputElement* input)
 // --------------------------------
 
 RenderSliderThumb::RenderSliderThumb(SliderThumbElement& element, PassRef<RenderStyle> style)
-    : RenderBlockFlow(element, std::move(style))
+    : RenderBlockFlow(element, WTF::move(style))
 {
 }
 
@@ -94,8 +94,10 @@ void RenderSliderThumb::updateAppearance(RenderStyle* parentStyle)
         style().setAppearance(MediaVolumeSliderThumbPart);
     else if (parentStyle->appearance() == MediaFullScreenVolumeSliderPart)
         style().setAppearance(MediaFullScreenVolumeSliderThumbPart);
-    if (style().hasAppearance())
-        theme().adjustSliderThumbSize(&style(), element());
+    if (style().hasAppearance()) {
+        ASSERT(element());
+        theme().adjustSliderThumbSize(style(), *element());
+    }
 }
 
 bool RenderSliderThumb::isSliderThumb() const
@@ -110,7 +112,7 @@ bool RenderSliderThumb::isSliderThumb() const
 class RenderSliderContainer : public RenderFlexibleBox {
 public:
     RenderSliderContainer(SliderContainerElement& element, PassRef<RenderStyle> style)
-        : RenderFlexibleBox(element, std::move(style))
+        : RenderFlexibleBox(element, WTF::move(style))
     {
     }
 
@@ -214,7 +216,7 @@ void SliderThumbElement::setPositionFromValue()
 
 RenderPtr<RenderElement> SliderThumbElement::createElementRenderer(PassRef<RenderStyle> style)
 {
-    return createRenderer<RenderSliderThumb>(*this, std::move(style));
+    return createRenderer<RenderSliderThumb>(*this, WTF::move(style));
 }
 
 bool SliderThumbElement::isDisabledFormControl() const
@@ -258,8 +260,6 @@ void SliderThumbElement::setPositionFromPoint(const LayoutPoint& absolutePoint)
     HTMLElement* trackElement = input->sliderTrackElement();
     if (!trackElement->renderBox())
         return;
-
-    input->setTextAsOfLastFormControlChangeEvent(input->value());
 
     // Do all the tracking math relative to the input's renderer's box.
     RenderBox& inputRenderer = *toRenderBox(input->renderer());
@@ -310,7 +310,6 @@ void SliderThumbElement::setPositionFromPoint(const LayoutPoint& absolutePoint)
     input->setValueFromRenderer(valueString);
     if (renderer())
         renderer()->setNeedsLayout();
-    input->dispatchFormControlChangeEvent();
 }
 
 void SliderThumbElement::startDragging()
@@ -331,6 +330,10 @@ void SliderThumbElement::stopDragging()
     m_inDragMode = false;
     if (renderer())
         renderer()->setNeedsLayout();
+
+    RefPtr<HTMLInputElement> input = hostInput();
+    if (input)
+        input->dispatchFormControlChangeEvent();
 }
 
 #if !PLATFORM(IOS)
@@ -350,7 +353,7 @@ void SliderThumbElement::defaultEventHandler(Event* event)
         return;
     }
 
-    MouseEvent* mouseEvent = static_cast<MouseEvent*>(event);
+    MouseEvent* mouseEvent = toMouseEvent(event);
     bool isLeftButton = mouseEvent->button() == LeftButton;
     const AtomicString& eventType = event->type();
 
@@ -564,18 +567,23 @@ HTMLInputElement* SliderThumbElement::hostInput() const
 
 static const AtomicString& sliderThumbShadowPseudoId()
 {
-    DEFINE_STATIC_LOCAL(const AtomicString, sliderThumb, ("-webkit-slider-thumb", AtomicString::ConstructFromLiteral));
+    DEPRECATED_DEFINE_STATIC_LOCAL(const AtomicString, sliderThumb, ("-webkit-slider-thumb", AtomicString::ConstructFromLiteral));
     return sliderThumb;
 }
 
 static const AtomicString& mediaSliderThumbShadowPseudoId()
 {
-    DEFINE_STATIC_LOCAL(const AtomicString, mediaSliderThumb, ("-webkit-media-slider-thumb", AtomicString::ConstructFromLiteral));
+    DEPRECATED_DEFINE_STATIC_LOCAL(const AtomicString, mediaSliderThumb, ("-webkit-media-slider-thumb", AtomicString::ConstructFromLiteral));
     return mediaSliderThumb;
 }
 
 const AtomicString& SliderThumbElement::shadowPseudoId() const
 {
+    // FIXME: this code needs to go away, it is very very wrong.
+    // The value of shadowPseudoId() is needed to resolve the style of the shadow tree. In this case,
+    // that value depends on the style, which means the style needs to be computed twice to get
+    // a correct value: once to get the Input's appearance, then a second time to style the shadow tree correctly.
+
     HTMLInputElement* input = hostInput();
     if (!input)
         return sliderThumbShadowPseudoId();
@@ -615,13 +623,18 @@ PassRefPtr<SliderContainerElement> SliderContainerElement::create(Document& docu
 
 RenderPtr<RenderElement> SliderContainerElement::createElementRenderer(PassRef<RenderStyle> style)
 {
-    return createRenderer<RenderSliderContainer>(*this, std::move(style));
+    return createRenderer<RenderSliderContainer>(*this, WTF::move(style));
 }
 
 const AtomicString& SliderContainerElement::shadowPseudoId() const
 {
-    DEFINE_STATIC_LOCAL(const AtomicString, mediaSliderContainer, ("-webkit-media-slider-container", AtomicString::ConstructFromLiteral));
-    DEFINE_STATIC_LOCAL(const AtomicString, sliderContainer, ("-webkit-slider-container", AtomicString::ConstructFromLiteral));
+    // FIXME: this code needs to go away, it is very very wrong.
+    // The value of shadowPseudoId() is needed to resolve the style of the shadow tree. In this case,
+    // that value depends on the style, which means the style needs to be computed twice to get
+    // a correct value: once to get the Input's appearance, then a second time to style the shadow tree correctly.
+
+    DEPRECATED_DEFINE_STATIC_LOCAL(const AtomicString, mediaSliderContainer, ("-webkit-media-slider-container", AtomicString::ConstructFromLiteral));
+    DEPRECATED_DEFINE_STATIC_LOCAL(const AtomicString, sliderContainer, ("-webkit-slider-container", AtomicString::ConstructFromLiteral));
 
     HTMLInputElement* input = shadowHost()->toInputElement();
     if (!input)

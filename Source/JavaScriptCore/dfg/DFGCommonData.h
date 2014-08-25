@@ -26,17 +26,15 @@
 #ifndef DFGCommonData_h
 #define DFGCommonData_h
 
-#include <wtf/Platform.h>
-
 #if ENABLE(DFG_JIT)
 
 #include "CodeBlockJettisoningWatchpoint.h"
 #include "DFGJumpReplacement.h"
 #include "InlineCallFrameSet.h"
 #include "JSCell.h"
-#include "ProfiledCodeBlockJettisoningWatchpoint.h"
 #include "ProfilerCompilation.h"
 #include "SymbolTable.h"
+#include <wtf/Bag.h>
 #include <wtf/Noncopyable.h>
 
 namespace JSC {
@@ -79,7 +77,7 @@ public:
     { }
     
     void notifyCompilingStructureTransition(Plan&, CodeBlock*, Node*);
-    unsigned addCodeOrigin(CodeOrigin codeOrigin);
+    unsigned addCodeOrigin(CodeOrigin);
     
     void shrinkToFit();
     
@@ -90,14 +88,14 @@ public:
         return std::max(frameRegisterCount, requiredRegisterCountForExit);
     }
 
-    OwnPtr<InlineCallFrameSet> inlineCallFrames;
+    RefPtr<InlineCallFrameSet> inlineCallFrames;
     Vector<CodeOrigin, 0, UnsafeVectorOverflow> codeOrigins;
     
     Vector<Identifier> dfgIdentifiers;
     Vector<WeakReferenceTransition> transitions;
     Vector<WriteBarrier<JSCell>> weakReferences;
+    Vector<WriteBarrier<Structure>> weakStructureReferences;
     SegmentedVector<CodeBlockJettisoningWatchpoint, 1, 0> watchpoints;
-    SegmentedVector<ProfiledCodeBlockJettisoningWatchpoint, 1, 0> profiledWatchpoints;
     Vector<JumpReplacement> jumpReplacements;
     
     RefPtr<Profiler::Compilation> compilation;
@@ -107,6 +105,10 @@ public:
     
     int machineCaptureStart;
     std::unique_ptr<SlowArgument[]> slowArguments;
+
+#if USE(JSVALUE32_64)
+    std::unique_ptr<Bag<double>> doubleConstants;
+#endif
     
     unsigned frameRegisterCount;
     unsigned requiredRegisterCountForExit;

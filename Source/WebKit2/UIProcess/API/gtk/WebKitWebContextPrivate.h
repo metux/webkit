@@ -29,8 +29,8 @@
 #include "DownloadProxy.h"
 #include "WebContext.h"
 #include "WebKitPrivate.h"
+#include "WebKitUserContentManager.h"
 #include "WebKitWebContext.h"
-#include "WebKitWebViewGroup.h"
 #include "WebSoupCustomProtocolRequestManager.h"
 
 WebKit::WebContext* webkitWebContextGetContext(WebKitWebContext*);
@@ -42,10 +42,9 @@ WebKit::WebSoupCustomProtocolRequestManager* webkitWebContextGetRequestManager(W
 void webkitWebContextStartLoadingCustomProtocol(WebKitWebContext*, uint64_t customProtocolID, API::URLRequest*);
 void webkitWebContextStopLoadingCustomProtocol(WebKitWebContext*, uint64_t customProtocolID);
 void webkitWebContextDidFinishLoadingCustomProtocol(WebKitWebContext*, uint64_t customProtocolID);
-void webkitWebContextCreatePageForWebView(WebKitWebContext*, WebKitWebView*, WebKitWebViewGroup*, WebKitWebView*);
+void webkitWebContextCreatePageForWebView(WebKitWebContext*, WebKitWebView*, WebKitUserContentManager*, WebKitWebView*);
 void webkitWebContextWebViewDestroyed(WebKitWebContext*, WebKitWebView*);
 WebKitWebView* webkitWebContextGetWebViewForPage(WebKitWebContext*, WebKit::WebPageProxy*);
-WebKitWebViewGroup* webkitWebContextGetDefaultWebViewGroup(WebKitWebContext*);
 GVariant* webkitWebContextInitializeWebExtensions(WebKitWebContext*);
 
 #endif // WebKitWebContextPrivate_h

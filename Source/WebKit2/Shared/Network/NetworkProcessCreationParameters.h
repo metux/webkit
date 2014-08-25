@@ -56,13 +56,23 @@ struct NetworkProcessCreationParameters {
     String diskCacheDirectory;
     SandboxExtension::Handle diskCacheDirectoryExtensionHandle;
 
+    String cookieStorageDirectory;
+
+#if PLATFORM(IOS)
+    SandboxExtension::Handle cookieStorageDirectoryExtensionHandle;
+
+    // FIXME: Remove this once <rdar://problem/17726660> is fixed.
+    SandboxExtension::Handle hstsDatabasePathExtensionHandle;
+
+    SandboxExtension::Handle parentBundleDirectoryExtensionHandle;
+#endif
     bool shouldUseTestingNetworkSession;
 
 #if ENABLE(CUSTOM_PROTOCOLS)
     Vector<String> urlSchemesRegisteredForCustomProtocols;
 #endif
 
-#if PLATFORM(MAC)
+#if PLATFORM(COCOA)
     String parentProcessName;
     String uiProcessBundleIdentifier;
     uint64_t nsURLCacheMemoryCapacity;

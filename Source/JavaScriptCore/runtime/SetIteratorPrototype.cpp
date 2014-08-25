@@ -29,10 +29,11 @@
 #include "JSCJSValueInlines.h"
 #include "JSCellInlines.h"
 #include "JSSetIterator.h"
+#include "StructureInlines.h"
 
 namespace JSC {
 
-const ClassInfo SetIteratorPrototype::s_info = { "Set Iterator", &Base::s_info, 0, 0, CREATE_METHOD_TABLE(SetIteratorPrototype) };
+const ClassInfo SetIteratorPrototype::s_info = { "Set Iterator", &Base::s_info, 0, CREATE_METHOD_TABLE(SetIteratorPrototype) };
 
 static EncodedJSValue JSC_HOST_CALL SetIteratorPrototypeFuncIterator(ExecState*);
 static EncodedJSValue JSC_HOST_CALL SetIteratorPrototypeFuncNext(ExecState*);

@@ -57,6 +57,8 @@ class JS_EXPORT_PRIVATE InspectorRuntimeAgent : public InspectorAgentBase, publi
 public:
     virtual ~InspectorRuntimeAgent();
 
+    virtual void willDestroyFrontendAndBackend(InspectorDisconnectReason) override;
+
     virtual void enable(ErrorString*) override { m_enabled = true; }
     virtual void disable(ErrorString*) override { m_enabled = false; }
     virtual void parse(ErrorString*, const String& expression, Inspector::TypeBuilder::Runtime::SyntaxErrorType::Enum* result, Inspector::TypeBuilder::OptOutput<String>* message, RefPtr<Inspector::TypeBuilder::Runtime::ErrorRange>&) override final;
@@ -66,7 +68,10 @@ public:
     virtual void getProperties(ErrorString*, const String& objectId, const bool* ownProperties, RefPtr<Inspector::TypeBuilder::Array<Inspector::TypeBuilder::Runtime::PropertyDescriptor>>& result, RefPtr<Inspector::TypeBuilder::Array<Inspector::TypeBuilder::Runtime::InternalPropertyDescriptor>>& internalProperties) override final;
     virtual void releaseObjectGroup(ErrorString*, const String& objectGroup) override final;
     virtual void run(ErrorString*) override;
-
+    virtual void getRuntimeTypesForVariablesAtOffsets(ErrorString*, const RefPtr<Inspector::InspectorArray>& locations, RefPtr<Inspector::TypeBuilder::Array<Inspector::TypeBuilder::Runtime::TypeDescription>>&) override;
+    virtual void enableHighFidelityTypeProfiling(ErrorString*) override;
+    virtual void disableHighFidelityTypeProfiling(ErrorString*) override;
+    
     void setScriptDebugServer(ScriptDebugServer* scriptDebugServer) { m_scriptDebugServer = scriptDebugServer; }
 
     bool enabled() const { return m_enabled; }
@@ -76,16 +81,19 @@ protected:
 
     InjectedScriptManager* injectedScriptManager() { return m_injectedScriptManager; }
 
-    virtual JSC::VM* globalVM() = 0;
+    virtual JSC::VM& globalVM() = 0;
     virtual InjectedScript injectedScriptForEval(ErrorString*, const int* executionContextId) = 0;
 
     virtual void muteConsole() = 0;
     virtual void unmuteConsole() = 0;
 
 private:
+    void setHighFidelityTypeProfilingEnabledState(bool);
+
     InjectedScriptManager* m_injectedScriptManager;
     ScriptDebugServer* m_scriptDebugServer;
     bool m_enabled;
+    bool m_isTypeProfilingEnabled;
 };
 
 } // namespace Inspector

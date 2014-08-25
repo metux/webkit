@@ -43,7 +43,7 @@ void WKCookieManagerSetClient(WKCookieManagerRef cookieManagerRef, const WKCooki
 
 void WKCookieManagerGetHostnamesWithCookies(WKCookieManagerRef cookieManagerRef, void* context, WKCookieManagerGetCookieHostnamesFunction callback)
 {
-    toImpl(cookieManagerRef)->getHostnamesWithCookies(ArrayCallback::create(context, callback));
+    toImpl(cookieManagerRef)->getHostnamesWithCookies(toGenericCallbackFunction(context, callback));
 }
 
 void WKCookieManagerDeleteCookiesForHostname(WKCookieManagerRef cookieManagerRef, WKStringRef hostname)
@@ -56,6 +56,11 @@ void WKCookieManagerDeleteAllCookies(WKCookieManagerRef cookieManagerRef)
     toImpl(cookieManagerRef)->deleteAllCookies();
 }
 
+void WKCookieManagerDeleteAllCookiesModifiedAfterDate(WKCookieManagerRef cookieManagerRef, double date)
+{
+    toImpl(cookieManagerRef)->deleteAllCookiesModifiedAfterDate(date);
+}
+
 void WKCookieManagerSetHTTPCookieAcceptPolicy(WKCookieManagerRef cookieManager, WKHTTPCookieAcceptPolicy policy)
 {
     toImpl(cookieManager)->setHTTPCookieAcceptPolicy(toHTTPCookieAcceptPolicy(policy));
@@ -63,7 +68,7 @@ void WKCookieManagerSetHTTPCookieAcceptPolicy(WKCookieManagerRef cookieManager, 
 
 void WKCookieManagerGetHTTPCookieAcceptPolicy(WKCookieManagerRef cookieManager, void* context, WKCookieManagerGetHTTPCookieAcceptPolicyFunction callback)
 {
-    toImpl(cookieManager)->getHTTPCookieAcceptPolicy(HTTPCookieAcceptPolicyCallback::create(context, callback));
+    toImpl(cookieManager)->getHTTPCookieAcceptPolicy(toGenericCallbackFunction<WKHTTPCookieAcceptPolicy, HTTPCookieAcceptPolicy>(context, callback));
 }
 
 void WKCookieManagerStartObservingCookieChanges(WKCookieManagerRef cookieManager)

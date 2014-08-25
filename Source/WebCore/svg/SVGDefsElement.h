@@ -21,7 +21,6 @@
 #ifndef SVGDefsElement_h
 #define SVGDefsElement_h
 
-#if ENABLE(SVG)
 #include "SVGAnimatedBoolean.h"
 #include "SVGExternalResourcesRequired.h"
 #include "SVGGraphicsElement.h"
@@ -37,6 +36,7 @@ private:
     SVGDefsElement(const QualifiedName&, Document&);
 
     virtual bool isValid() const override;
+    virtual bool supportsFocus() const override { return false; }
 
     virtual RenderPtr<RenderElement> createElementRenderer(PassRef<RenderStyle>) override;
 
@@ -47,5 +47,4 @@ private:
 
 } // namespace WebCore
 
-#endif // ENABLE(SVG)
 #endif

@@ -29,13 +29,15 @@
 #include "CacheModel.h"
 #include "ChildProcess.h"
 #include "DownloadManager.h"
+#include "DrawingArea.h"
 #include "PluginProcessConnectionManager.h"
 #include "ResourceCachesToClear.h"
 #include "SandboxExtension.h"
 #include "SharedMemory.h"
 #include "TextCheckerState.h"
+#include "ViewUpdateDispatcher.h"
 #include "VisitedLinkTable.h"
-#include <WebCore/LinkHash.h>
+#include <WebCore/SessionIDHash.h>
 #include <WebCore/Timer.h>
 #include <wtf/Forward.h>
 #include <wtf/HashMap.h>
@@ -44,7 +46,7 @@
 #include <wtf/text/AtomicString.h>
 #include <wtf/text/AtomicStringHash.h>
 
-#if PLATFORM(MAC)
+#if PLATFORM(COCOA)
 #include <dispatch/dispatch.h>
 #endif
 
@@ -98,7 +100,7 @@ public:
     template <typename T>
     void addSupplement()
     {
-        m_supplements.add(T::supplementName(), adoptPtr<WebProcessSupplement>(new T(this)));
+        m_supplements.add(T::supplementName(), std::make_unique<T>(this));
     }
 
     WebConnectionToUIProcess* webConnectionToUIProcess() const { return m_webConnection.get(); }
@@ -110,19 +112,13 @@ public:
 
     InjectedBundle* injectedBundle() const { return m_injectedBundle.get(); }
 
-#if PLATFORM(MAC)
-#if USE(ACCELERATED_COMPOSITING)
+#if PLATFORM(COCOA)
     mach_port_t compositingRenderServerPort() const { return m_compositingRenderServerPort; }
 #endif
-#endif
-    
-    void setShouldTrackVisitedLinks(bool);
-    void addVisitedLink(WebCore::LinkHash);
-    bool isLinkVisited(WebCore::LinkHash) const;
 
     bool shouldPlugInAutoStartFromOrigin(const WebPage*, const String& pageOrigin, const String& pluginOrigin, const String& mimeType);
-    void plugInDidStartFromOrigin(const String& pageOrigin, const String& pluginOrigin, const String& mimeType);
-    void plugInDidReceiveUserInteraction(const String& pageOrigin, const String& pluginOrigin, const String& mimeType);
+    void plugInDidStartFromOrigin(const String& pageOrigin, const String& pluginOrigin, const String& mimeType, WebCore::SessionID);
+    void plugInDidReceiveUserInteraction(const String& pageOrigin, const String& pluginOrigin, const String& mimeType, WebCore::SessionID);
 
     bool fullKeyboardAccessEnabled() const { return m_fullKeyboardAccessEnabled; }
 
@@ -134,7 +130,7 @@ public:
     WebPageGroupProxy* webPageGroup(uint64_t pageGroupID);
     WebPageGroupProxy* webPageGroup(const WebPageGroupData&);
 
-#if PLATFORM(MAC)
+#if PLATFORM(COCOA)
     pid_t presenterApplicationPid() const { return m_presenterApplicationPid; }
     bool shouldForceScreenFontSubstitution() const { return m_shouldForceScreenFontSubstitution; }
 #endif
@@ -165,8 +161,8 @@ public:
 
     void setCacheModel(uint32_t);
 
-    void ensurePrivateBrowsingSession(uint64_t sessionID);
-    void destroyPrivateBrowsingSession(uint64_t sessionID);
+    void ensurePrivateBrowsingSession(WebCore::SessionID);
+    void destroyPrivateBrowsingSession(WebCore::SessionID);
 
     void pageDidEnterWindow(uint64_t pageID);
     void pageWillLeaveWindow(uint64_t pageID);
@@ -179,11 +175,22 @@ public:
     void allowSpecificHTTPSCertificateForHost(const WebCore::CertificateInfo&, const String& host);
 #endif
 
+    void processWillSuspend();
+    void cancelProcessWillSuspend();
+    bool markAllLayersVolatileIfPossible();
+    void processSuspensionCleanupTimerFired(WebCore::Timer<WebProcess>*);
+
 #if PLATFORM(IOS)
     void resetAllGeolocationPermissions();
-#endif // PLATFORM(IOS)
+#endif
 
     RefPtr<API::Object> apiObjectByConvertingFromHandles(API::Object*);
+
+#if ENABLE(SERVICE_CONTROLS)
+    bool hasImageServices() const { return m_hasImageServices; }
+    bool hasSelectionServices() const { return m_hasSelectionServices; }
+    bool hasRichContentServices() const { return m_hasRichContentServices; }
+#endif
 
 private:
     WebProcess();
@@ -205,19 +212,19 @@ private:
     void registerURLSchemeAsNoAccess(const String&) const;
     void registerURLSchemeAsDisplayIsolated(const String&) const;
     void registerURLSchemeAsCORSEnabled(const String&) const;
+#if ENABLE(CACHE_PARTITIONING)
+    void registerURLSchemeAsCachePartitioned(const String&) const;
+#endif
     void setDefaultRequestTimeoutInterval(double);
     void setAlwaysUsesComplexTextCodePath(bool);
     void setShouldUseFontSmoothing(bool);
     void userPreferredLanguagesChanged(const Vector<String>&) const;
     void fullKeyboardAccessModeChanged(bool fullKeyboardAccessEnabled);
 
-    void setVisitedLinkTable(const SharedMemory::Handle&);
-    void visitedLinkStateChanged(const Vector<WebCore::LinkHash>& linkHashes);
-    void allVisitedLinkStateChanged();
-
-    bool isPlugInAutoStartOriginHash(unsigned plugInOriginHash);
-    void didAddPlugInAutoStartOriginHash(unsigned plugInOriginHash, double expirationTime);
-    void resetPlugInAutoStartOriginHashes(const HashMap<unsigned, double>& hashes);
+    bool isPlugInAutoStartOriginHash(unsigned plugInOriginHash, WebCore::SessionID);
+    void didAddPlugInAutoStartOriginHash(unsigned plugInOriginHash, double expirationTime, WebCore::SessionID);
+    void resetPlugInAutoStartOriginDefaultHashes(const HashMap<unsigned, double>& hashes);
+    void resetPlugInAutoStartOriginHashes(const HashMap<WebCore::SessionID, HashMap<unsigned, double>>& hashes);
 
     void platformSetCacheModel(CacheModel);
     void platformClearResourceCaches(ResourceCachesToClear);
@@ -245,7 +252,12 @@ private:
 
     void setMemoryCacheDisabled(bool);
 
+#if ENABLE(SERVICE_CONTROLS)
+    void setEnabledServices(bool hasImageServices, bool hasSelectionServices, bool hasRichContentServices);
+#endif
+
     void postInjectedBundleMessage(const IPC::DataReference& messageData);
+    void setInjectedBundleParameter(const String& key, const IPC::DataReference&);
 
     // ChildProcess
     virtual void initializeProcess(const ChildProcessInitializationParameters&) override;
@@ -255,7 +267,7 @@ private:
     virtual bool shouldTerminate() override;
     virtual void terminate() override;
 
-#if PLATFORM(MAC) && !PLATFORM(IOS)
+#if USE(APPKIT)
     virtual void stopRunLoop() override;
 #endif
 
@@ -278,23 +290,21 @@ private:
     RefPtr<InjectedBundle> m_injectedBundle;
 
     RefPtr<EventDispatcher> m_eventDispatcher;
+#if PLATFORM(IOS)
+    RefPtr<ViewUpdateDispatcher> m_viewUpdateDispatcher;
+#endif
+    WebCore::Timer<WebProcess> m_processSuspensionCleanupTimer;
 
     bool m_inDidClose;
 
-    // FIXME: The visited link table should not be per process.
-    VisitedLinkTable m_visitedLinkTable;
-    bool m_shouldTrackVisitedLinks;
-
-    HashMap<unsigned, double> m_plugInAutoStartOriginHashes;
+    HashMap<WebCore::SessionID, HashMap<unsigned, double>> m_plugInAutoStartOriginHashes;
     HashSet<String> m_plugInAutoStartOrigins;
 
     bool m_hasSetCacheModel;
     CacheModel m_cacheModel;
 
-#if USE(ACCELERATED_COMPOSITING) && PLATFORM(MAC)
+#if PLATFORM(COCOA)
     mach_port_t m_compositingRenderServerPort;
-#endif
-#if PLATFORM(MAC)
     pid_t m_presenterApplicationPid;
     dispatch_group_t m_clearResourceCachesDispatchGroup;
     bool m_shouldForceScreenFontSubstitution;
@@ -304,7 +314,7 @@ private:
 
     HashMap<uint64_t, WebFrame*> m_frameMap;
 
-    typedef HashMap<const char*, OwnPtr<WebProcessSupplement>, PtrHash<const char*>> WebProcessSupplementMap;
+    typedef HashMap<const char*, std::unique_ptr<WebProcessSupplement>, PtrHash<const char*>> WebProcessSupplementMap;
     WebProcessSupplementMap m_supplements;
 
     TextCheckerState m_textCheckerState;
@@ -325,6 +335,12 @@ private:
 
 #if ENABLE(NETSCAPE_PLUGIN_API)
     RefPtr<PluginProcessConnectionManager> m_pluginProcessConnectionManager;
+#endif
+
+#if ENABLE(SERVICE_CONTROLS)
+    bool m_hasImageServices;
+    bool m_hasSelectionServices;
+    bool m_hasRichContentServices;
 #endif
 
     HashSet<uint64_t> m_pagesInWindows;

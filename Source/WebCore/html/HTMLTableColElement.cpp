@@ -65,7 +65,8 @@ void HTMLTableColElement::collectStyleForPresentationAttribute(const QualifiedNa
 void HTMLTableColElement::parseAttribute(const QualifiedName& name, const AtomicString& value)
 {
     if (name == spanAttr) {
-        m_span = !value.isNull() ? value.toInt() : 1;
+        int newSpan = value.toInt();
+        m_span = newSpan ? newSpan : 1;
         if (renderer() && renderer()->isRenderTableCol())
             renderer()->updateFromElement();
     } else if (name == widthAttr) {
@@ -83,11 +84,11 @@ void HTMLTableColElement::parseAttribute(const QualifiedName& name, const Atomic
 
 const StyleProperties* HTMLTableColElement::additionalPresentationAttributeStyle()
 {
-    if (!hasLocalName(colgroupTag))
-        return 0;
+    if (!hasTagName(colgroupTag))
+        return nullptr;
     if (HTMLTableElement* table = findParentTable())
         return table->additionalGroupStyle(false);
-    return 0;
+    return nullptr;
 }
 
 void HTMLTableColElement::setSpan(int n)

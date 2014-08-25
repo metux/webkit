@@ -61,7 +61,7 @@ namespace JSC {
         const char* errorMessage() const { return m_constructionError; }
 
         JS_EXPORT_PRIVATE int match(VM&, const String&, unsigned startOffset, Vector<int, 32>& ovector);
-        MatchResult match(VM&, const String&, unsigned startOffset);
+        JS_EXPORT_PRIVATE MatchResult match(VM&, const String&, unsigned startOffset);
         unsigned numSubpatterns() const { return m_numSubpatterns; }
 
         bool hasCode()
@@ -77,7 +77,7 @@ namespace JSC {
 
         static Structure* createStructure(VM& vm, JSGlobalObject* globalObject, JSValue prototype)
         {
-            return Structure::create(vm, globalObject, prototype, TypeInfo(LeafType, 0), info());
+            return Structure::create(vm, globalObject, prototype, TypeInfo(CellType, StructureFlags), info());
         }
         
         DECLARE_INFO;
@@ -85,6 +85,8 @@ namespace JSC {
         RegExpKey key() { return RegExpKey(m_flags, m_patternString); }
 
     protected:
+        static const unsigned StructureFlags = StructureIsImmortal;
+
         void finishCreation(VM&);
 
     private:
@@ -115,6 +117,10 @@ namespace JSC {
         const char* m_constructionError;
         unsigned m_numSubpatterns;
 #if ENABLE(REGEXP_TRACING)
+        double m_rtMatchOnlyTotalSubjectStringLen;
+        double m_rtMatchTotalSubjectStringLen;
+        unsigned m_rtMatchOnlyCallCount;
+        unsigned m_rtMatchOnlyFoundCount;
         unsigned m_rtMatchCallCount;
         unsigned m_rtMatchFoundCount;
 #endif

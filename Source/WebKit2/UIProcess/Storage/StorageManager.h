@@ -40,16 +40,15 @@ class SecurityOrigin;
 
 namespace WebKit {
 
+struct LocalStorageDetails;
 struct SecurityOriginData;
 class LocalStorageDatabaseTracker;
 class WebProcessProxy;
 
 class StorageManager : public IPC::Connection::WorkQueueMessageReceiver {
 public:
-    static PassRefPtr<StorageManager> create();
+    static PassRefPtr<StorageManager> create(const String& localStorageDirectory);
     ~StorageManager();
-
-    void setLocalStorageDirectory(const String&);
 
     void createSessionStorageNamespace(uint64_t storageNamespaceID, IPC::Connection* allowedConnection, unsigned quotaInBytes);
     void destroySessionStorageNamespace(uint64_t storageNamespaceID);
@@ -58,15 +57,17 @@ public:
 
     void processWillOpenConnection(WebProcessProxy*);
     void processWillCloseConnection(WebProcessProxy*);
+    void applicationWillTerminate();
 
     // FIXME: Instead of a context + C function, this should take a WTF::Function, but we currently don't
     // support arguments in functions.
-    void getOrigins(FunctionDispatcher* callbackDispatcher, void* context, void (*callback)(const Vector<RefPtr<WebCore::SecurityOrigin>>& securityOrigins, void* context));
-    void deleteEntriesForOrigin(WebCore::SecurityOrigin*);
+    void getOrigins(FunctionDispatcher& callbackDispatcher, void* context, void (*callback)(const Vector<RefPtr<WebCore::SecurityOrigin>>&, void* context));
+    void getStorageDetailsByOrigin(FunctionDispatcher& callbackDispatcher, void* context, void (*callback)(const Vector<LocalStorageDetails>&, void* context));
+    void deleteEntriesForOrigin(const WebCore::SecurityOrigin&);
     void deleteAllEntries();
 
 private:
-    StorageManager();
+    explicit StorageManager(const String& localStorageDirectory);
 
     // IPC::Connection::WorkQueueMessageReceiver.
     virtual void didReceiveMessage(IPC::Connection*, IPC::MessageDecoder&) override;
@@ -95,7 +96,8 @@ private:
     class LocalStorageNamespace;
     LocalStorageNamespace* getOrCreateLocalStorageNamespace(uint64_t storageNamespaceID);
 
-    void getOriginsInternal(FunctionDispatcher* callbackDispatcher, void* context, void (*callback)(const Vector<RefPtr<WebCore::SecurityOrigin>>& securityOrigins, void* context));
+    void getOriginsInternal(FunctionDispatcher* callbackDispatcher, void* context, void (*callback)(const Vector<RefPtr<WebCore::SecurityOrigin>>&, void* context));
+    void getStorageDetailsByOriginInternal(FunctionDispatcher* callbackDispatcher, void* context, void (*callback)(const Vector<LocalStorageDetails>&, void* context));
     void deleteEntriesForOriginInternal(WebCore::SecurityOrigin*);
     void deleteAllEntriesInternal();
 

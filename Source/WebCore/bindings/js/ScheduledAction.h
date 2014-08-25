@@ -23,8 +23,8 @@
 #include "JSDOMBinding.h"
 #include <heap/Strong.h>
 #include <heap/StrongInlines.h>
+#include <memory>
 #include <runtime/JSCell.h>
-#include <wtf/PassOwnPtr.h>
 #include <wtf/Vector.h>
 #include <wtf/text/WTFString.h>
 
@@ -46,14 +46,14 @@ namespace WebCore {
     class ScheduledAction {
         WTF_MAKE_NONCOPYABLE(ScheduledAction); WTF_MAKE_FAST_ALLOCATED;
     public:
-        static PassOwnPtr<ScheduledAction> create(JSC::ExecState*, DOMWrapperWorld& isolatedWorld, ContentSecurityPolicy*);
+        static std::unique_ptr<ScheduledAction> create(JSC::ExecState*, DOMWrapperWorld& isolatedWorld, ContentSecurityPolicy*);
 
         void execute(ScriptExecutionContext*);
 
     private:
         ScheduledAction(JSC::ExecState*, JSC::JSValue function, DOMWrapperWorld& isolatedWorld);
         ScheduledAction(const String& code, DOMWrapperWorld& isolatedWorld)
-            : m_function(*isolatedWorld.vm())
+            : m_function(isolatedWorld.vm())
             , m_code(code)
             , m_isolatedWorld(&isolatedWorld)
         {

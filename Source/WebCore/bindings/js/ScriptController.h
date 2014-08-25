@@ -30,10 +30,10 @@
 #include <wtf/RefPtr.h>
 #include <wtf/text/TextPosition.h>
 
-#if PLATFORM(MAC)
+#if PLATFORM(COCOA)
 #include <wtf/RetainPtr.h>
-OBJC_CLASS WebScriptObject;
 OBJC_CLASS JSContext;
+OBJC_CLASS WebScriptObject;
 #endif
 
 struct NPObject;
@@ -54,8 +54,9 @@ namespace JSC {
 
 namespace WebCore {
 
-class HTMLPlugInElement;
 class Frame;
+class HTMLDocument;
+class HTMLPlugInElement;
 class ScriptSourceCode;
 class SecurityOrigin;
 class Widget;
@@ -68,7 +69,8 @@ enum ReasonForCallingCanExecuteScripts {
 };
 
 class ScriptController {
-    friend class ScriptCachedFrameData;
+    WTF_MAKE_FAST_ALLOCATED;
+
     typedef HashMap<RefPtr<DOMWrapperWorld>, JSC::Strong<JSDOMWindowShell>> ShellMap;
 
 public:
@@ -79,6 +81,8 @@ public:
 
     JSDOMWindowShell* createWindowShell(DOMWrapperWorld&);
     void destroyWindowShell(DOMWrapperWorld&);
+
+    Vector<JSC::Strong<JSDOMWindowShell>> windowShells();
 
     JSDOMWindowShell* windowShell(DOMWrapperWorld& world)
     {
@@ -148,11 +152,10 @@ public:
     PassRefPtr<JSC::Bindings::RootObject> createRootObject(void* nativeHandle);
 
 #if ENABLE(INSPECTOR)
-    static void setCaptureCallStackForUncaughtExceptions(bool);
     void collectIsolatedContexts(Vector<std::pair<JSC::ExecState*, SecurityOrigin*>>&);
 #endif
 
-#if PLATFORM(MAC)
+#if PLATFORM(COCOA)
     WebScriptObject* windowScriptObject();
     JSContext *javaScriptContext();
 #endif
@@ -188,7 +191,7 @@ private:
 #if ENABLE(NETSCAPE_PLUGIN_API)
     NPObject* m_windowScriptNPObject;
 #endif
-#if PLATFORM(MAC)
+#if PLATFORM(COCOA)
     RetainPtr<WebScriptObject> m_windowScriptObject;
 #endif
 };

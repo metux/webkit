@@ -14,7 +14,7 @@
  * 2.  Redistributions in binary form must reproduce the above copyright
  *     notice, this list of conditions and the following disclaimer in the
  *     documentation and/or other materials provided with the distribution.
- * 3.  Neither the name of Apple Computer, Inc. ("Apple") nor the names of
+ * 3.  Neither the name of Apple Inc. ("Apple") nor the names of
  *     its contributors may be used to endorse or promote products derived
  *     from this software without specific prior written permission.
  *
@@ -431,6 +431,13 @@ void EventSenderProxy::continuousMouseScrollBy(int horizontal, int vertical, boo
     event->scroll.delta_y = -vertical / pixelsPerScrollTick;
 
     sendOrQueueEvent(event);
+}
+
+void EventSenderProxy::mouseScrollByWithWheelAndMomentumPhases(int x, int y, int /*phase*/, int /*momentum*/)
+{
+    // Gtk+ does not have the concept of wheel gesture phases or momentum. Just relay to
+    // the mouse wheel handler.
+    mouseScrollBy(x, y);
 }
 
 void EventSenderProxy::leapForward(int milliseconds)

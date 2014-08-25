@@ -11,10 +11,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -43,6 +43,8 @@
 #include "FontCache.h"
 #include "Frame.h"
 #include "FrameLoader.h"
+#include "SVGFontFaceElement.h"
+#include "SVGNames.h"
 #include "Settings.h"
 #include "SimpleFontData.h"
 #include "StyleProperties.h"
@@ -51,11 +53,6 @@
 #include "WebKitFontFamilyNames.h"
 #include <wtf/Ref.h>
 #include <wtf/text/AtomicString.h>
-
-#if ENABLE(SVG)
-#include "SVGFontFaceElement.h"
-#include "SVGNames.h"
-#endif
 
 namespace WebCore {
 
@@ -73,13 +70,13 @@ CSSFontSelector::CSSFontSelector(Document* document)
     // seem to be any such guarantee.
 
     ASSERT(m_document);
-    fontCache()->addClient(this);
+    fontCache().addClient(this);
 }
 
 CSSFontSelector::~CSSFontSelector()
 {
     clearDocument();
-    fontCache()->removeClient(this);
+    fontCache().removeClient(this);
 }
 
 bool CSSFontSelector::isEmpty() const
@@ -171,8 +168,8 @@ void CSSFontSelector::addFontFaceRule(const StyleRuleFontFace* fontFaceRule)
         // font-variant descriptor can be a value list.
         if (fontVariant->isPrimitiveValue()) {
             RefPtr<CSSValueList> list = CSSValueList::createCommaSeparated();
-            list->append(fontVariant);
-            fontVariant = list;
+            list->append(fontVariant.releaseNonNull());
+            fontVariant = list.releaseNonNull();
         } else if (!fontVariant->isValueList())
             return;
 
@@ -242,7 +239,7 @@ void CSSFontSelector::addFontFaceRule(const StyleRuleFontFace* fontFaceRule)
 #if ENABLE(SVG_FONTS)
             source->setSVGFontFaceElement(item->svgFontFaceElement());
 #endif
-            fontFace->addSource(std::move(source));
+            fontFace->addSource(WTF::move(source));
         }
     }
 
@@ -303,7 +300,7 @@ void CSSFontSelector::addFontFaceRule(const StyleRuleFontFace* fontFaceRule)
             ASSERT(!m_locallyInstalledFontFaces.contains(familyName));
 
             Vector<unsigned> locallyInstalledFontsTraitsMasks;
-            fontCache()->getTraitsInFamily(familyName, locallyInstalledFontsTraitsMasks);
+            fontCache().getTraitsInFamily(familyName, locallyInstalledFontsTraitsMasks);
             if (unsigned numLocallyInstalledFaces = locallyInstalledFontsTraitsMasks.size()) {
                 auto familyLocallyInstalledFaces = std::make_unique<Vector<RefPtr<CSSFontFace>>>();
 
@@ -314,7 +311,7 @@ void CSSFontSelector::addFontFaceRule(const StyleRuleFontFace* fontFaceRule)
                     familyLocallyInstalledFaces->append(locallyInstalledFontFace);
                 }
 
-                m_locallyInstalledFontFaces.set(familyName, std::move(familyLocallyInstalledFaces));
+                m_locallyInstalledFontFaces.set(familyName, WTF::move(familyLocallyInstalledFaces));
             }
         }
 
@@ -389,7 +386,7 @@ static PassRefPtr<SimpleFontData> fontDataForGenericFamily(Document* document, c
         genericFamily = settings.standardFontFamily(script);
 
     if (!genericFamily.isEmpty())
-        return fontCache()->getCachedFontData(fontDescription, genericFamily);
+        return fontCache().getCachedFontData(fontDescription, genericFamily);
 
     return nullptr;
 }
@@ -622,7 +619,7 @@ bool CSSFontSelector::resolvesFamilyFor(const FontDescription& description) cons
             continue;
         if (m_fontFaces.contains(familyName))
             return true;
-        DEFINE_STATIC_LOCAL(String, webkitPrefix, ("-webkit-"));
+        DEPRECATED_DEFINE_STATIC_LOCAL(String, webkitPrefix, ("-webkit-"));
         if (familyName.startsWith(webkitPrefix))
             return true;
             
@@ -652,7 +649,7 @@ PassRefPtr<FontData> CSSFontSelector::getFallbackFontData(const FontDescription&
     if (!settings || !settings->fontFallbackPrefersPictographs())
         return 0;
 
-    return fontCache()->getCachedFontData(fontDescription, settings->pictographFontFamily());
+    return fontCache().getCachedFontData(fontDescription, settings->pictographFontFamily());
 }
 
 }

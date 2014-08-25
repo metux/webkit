@@ -29,10 +29,9 @@
  */
 
 #include "config.h"
+#include "InspectorPageAgent.h"
 
 #if ENABLE(INSPECTOR)
-
-#include "InspectorPageAgent.h"
 
 #include "CachedCSSStyleSheet.h"
 #include "CachedFont.h"
@@ -53,7 +52,6 @@
 #include "FrameView.h"
 #include "HTMLFrameOwnerElement.h"
 #include "HTMLNames.h"
-#include "IdentifiersFactory.h"
 #include "ImageBuffer.h"
 #include "InspectorClient.h"
 #include "InspectorDOMAgent.h"
@@ -73,6 +71,7 @@
 #include "UserGestureIndicator.h"
 #include <bindings/ScriptValue.h>
 #include <inspector/ContentSearchUtilities.h>
+#include <inspector/IdentifiersFactory.h>
 #include <inspector/InspectorValues.h>
 #include <wtf/CurrentTime.h>
 #include <wtf/ListHashSet.h>
@@ -174,10 +173,10 @@ bool InspectorPageAgent::cachedResourceContent(CachedResource* cachedResource, S
     if (cachedResource) {
         switch (cachedResource->type()) {
         case CachedResource::CSSStyleSheet:
-            *result = static_cast<CachedCSSStyleSheet*>(cachedResource)->sheetText(false);
+            *result = toCachedCSSStyleSheet(cachedResource)->sheetText(false);
             return true;
         case CachedResource::Script:
-            *result = static_cast<CachedScript*>(cachedResource)->script();
+            *result = toCachedScript(cachedResource)->script();
             return true;
         case CachedResource::RawResource: {
             ResourceBuffer* buffer = cachedResource->resourceBuffer();
@@ -187,8 +186,7 @@ bool InspectorPageAgent::cachedResourceContent(CachedResource* cachedResource, S
             // We show content for raw resources only for certain mime types (text, html and xml). Otherwise decoder will be null.
             if (!decoder)
                 return false;
-            String content = decoder->decode(buffer->data(), buffer->size());
-            *result = content + decoder->flush();
+            *result = decoder->decodeAndFlush(buffer->data(), buffer->size());
             return true;
         }
         default:
@@ -249,8 +247,8 @@ void InspectorPageAgent::resourceContent(ErrorString* errorString, Frame* frame,
 //static
 String InspectorPageAgent::sourceMapURLForResource(CachedResource* cachedResource)
 {
-    DEFINE_STATIC_LOCAL(String, sourceMapHTTPHeader, (ASCIILiteral("SourceMap")));
-    DEFINE_STATIC_LOCAL(String, sourceMapHTTPHeaderDeprecated, (ASCIILiteral("X-SourceMap")));
+    DEPRECATED_DEFINE_STATIC_LOCAL(String, sourceMapHTTPHeader, (ASCIILiteral("SourceMap")));
+    DEPRECATED_DEFINE_STATIC_LOCAL(String, sourceMapHTTPHeaderDeprecated, (ASCIILiteral("X-SourceMap")));
 
     if (!cachedResource)
         return String();
@@ -283,7 +281,7 @@ CachedResource* InspectorPageAgent::cachedResource(Frame* frame, const URL& url)
 #if ENABLE(CACHE_PARTITIONING)
         request.setCachePartition(frame->document()->topOrigin()->cachePartition());
 #endif
-        cachedResource = memoryCache()->resourceForRequest(request);
+        cachedResource = memoryCache()->resourceForRequest(request, frame->page()->sessionID());
     }
 
     return cachedResource;
@@ -431,7 +429,7 @@ void InspectorPageAgent::navigate(ErrorString*, const String& url)
 {
     UserGestureIndicator indicator(DefinitelyProcessingUserGesture);
     Frame& frame = m_page->mainFrame();
-    frame.loader().changeLocation(frame.document()->securityOrigin(), frame.document()->completeURL(url), "", false, false);
+    frame.loader().changeLocation(frame.document()->securityOrigin(), frame.document()->completeURL(url), "", LockHistory::No, LockBackForwardList::No);
 }
 
 static PassRefPtr<Inspector::TypeBuilder::Page::Cookie> buildObjectForCookie(const Cookie& cookie)
@@ -453,10 +451,8 @@ static PassRefPtr<Inspector::TypeBuilder::Array<Inspector::TypeBuilder::Page::Co
 {
     RefPtr<Inspector::TypeBuilder::Array<Inspector::TypeBuilder::Page::Cookie>> cookies = Inspector::TypeBuilder::Array<Inspector::TypeBuilder::Page::Cookie>::create();
 
-    ListHashSet<Cookie>::iterator end = cookiesList.end();
-    ListHashSet<Cookie>::iterator it = cookiesList.begin();
-    for (int i = 0; it != end; ++it, i++)
-        cookies->addItem(buildObjectForCookie(*it));
+    for (auto& cookie : cookiesList)
+        cookies->addItem(buildObjectForCookie(cookie));
 
     return cookies;
 }
@@ -465,10 +461,10 @@ static Vector<CachedResource*> cachedResourcesForFrame(Frame* frame)
 {
     Vector<CachedResource*> result;
 
-    const CachedResourceLoader::DocumentResourceMap& allResources = frame->document()->cachedResourceLoader()->allCachedResources();
-    CachedResourceLoader::DocumentResourceMap::const_iterator end = allResources.end();
-    for (CachedResourceLoader::DocumentResourceMap::const_iterator it = allResources.begin(); it != end; ++it) {
-        CachedResource* cachedResource = it->value.get();
+    for (auto& cachedResourceHandle : frame->document()->cachedResourceLoader()->allCachedResources().values()) {
+        auto* cachedResource = cachedResourceHandle.get();
+        if (cachedResource->resourceRequest().hiddenFromInspector())
+            continue;
 
         switch (cachedResource->type()) {
         case CachedResource::ImageResource:
@@ -495,9 +491,8 @@ static Vector<URL> allResourcesURLsForFrame(Frame* frame)
 
     result.append(frame->loader().documentLoader()->url());
 
-    Vector<CachedResource*> allResources = cachedResourcesForFrame(frame);
-    for (Vector<CachedResource*>::const_iterator it = allResources.begin(); it != allResources.end(); ++it)
-        result.append((*it)->url());
+    for (auto* cachedResource : cachedResourcesForFrame(frame))
+        result.append(cachedResource->url());
 
     return result;
 }
@@ -517,13 +512,13 @@ void InspectorPageAgent::getCookies(ErrorString*, RefPtr<Inspector::TypeBuilder:
 
     for (Frame* frame = mainFrame(); frame; frame = frame->tree().traverseNext(mainFrame())) {
         Document* document = frame->document();
-        Vector<URL> allURLs = allResourcesURLsForFrame(frame);
-        for (Vector<URL>::const_iterator it = allURLs.begin(); it != allURLs.end(); ++it) {
+
+        for (auto& url : allResourcesURLsForFrame(frame)) {
             Vector<Cookie> docCookiesList;
-            rawCookiesImplemented = getRawCookies(document, URL(ParsedURLString, *it), docCookiesList);
+            rawCookiesImplemented = getRawCookies(document, URL(ParsedURLString, url), docCookiesList);
+
             if (!rawCookiesImplemented) {
                 // FIXME: We need duplication checking for the String representation of cookies.
-                //
                 // Exceptions are thrown by cookie() in sandboxed frames. That won't happen here
                 // because "document" is the document of the main frame of the page.
                 stringCookiesList.append(document->cookie(ASSERT_NO_EXCEPTION));
@@ -631,15 +626,15 @@ void InspectorPageAgent::searchInResources(ErrorString*, const String& text, con
 
     for (Frame* frame = &m_page->mainFrame(); frame; frame = frame->tree().traverseNext(&m_page->mainFrame())) {
         String content;
-        Vector<CachedResource*> allResources = cachedResourcesForFrame(frame);
-        for (Vector<CachedResource*>::const_iterator it = allResources.begin(); it != allResources.end(); ++it) {
-            CachedResource* cachedResource = *it;
+
+        for (auto* cachedResource : cachedResourcesForFrame(frame)) {
             if (textContentForCachedResource(cachedResource, &content)) {
                 int matchesCount = ContentSearchUtilities::countRegularExpressionMatches(regex, content);
                 if (matchesCount)
                     searchResults->addItem(buildObjectForSearchResult(frameId(frame), cachedResource->url(), matchesCount));
             }
         }
+
         if (mainResourceContent(frame, false, &content)) {
             int matchesCount = ContentSearchUtilities::countRegularExpressionMatches(regex, content);
             if (matchesCount)
@@ -751,10 +746,9 @@ void InspectorPageAgent::didClearWindowObjectInWorld(Frame* frame, DOMWrapperWor
         return;
 
     if (m_scriptsToEvaluateOnLoad) {
-        InspectorObject::const_iterator end = m_scriptsToEvaluateOnLoad->end();
-        for (InspectorObject::const_iterator it = m_scriptsToEvaluateOnLoad->begin(); it != end; ++it) {
+        for (auto& keyValuePair : *m_scriptsToEvaluateOnLoad) {
             String scriptText;
-            if (it->value->asString(&scriptText))
+            if (keyValuePair.value->asString(&scriptText))
                 frame->script().executeScript(scriptText);
         }
     }
@@ -864,9 +858,7 @@ DocumentLoader* InspectorPageAgent::assertDocumentLoader(ErrorString* errorStrin
 
 void InspectorPageAgent::loaderDetachedFromFrame(DocumentLoader* loader)
 {
-    HashMap<DocumentLoader*, String>::iterator iterator = m_loaderToIdentifier.find(loader);
-    if (iterator != m_loaderToIdentifier.end())
-        m_loaderToIdentifier.remove(iterator);
+    m_loaderToIdentifier.remove(loader);
 }
 
 void InspectorPageAgent::frameStartedLoading(Frame& frame)
@@ -976,10 +968,7 @@ PassRefPtr<Inspector::TypeBuilder::Page::FrameResourceTree> InspectorPageAgent::
          .setFrame(frameObject)
          .setResources(subresources);
 
-    Vector<CachedResource*> allResources = cachedResourcesForFrame(frame);
-    for (Vector<CachedResource*>::const_iterator it = allResources.begin(); it != allResources.end(); ++it) {
-        CachedResource* cachedResource = *it;
-
+    for (auto* cachedResource : cachedResourcesForFrame(frame)) {
         RefPtr<Inspector::TypeBuilder::Page::FrameResourceTree::Resources> resourceObject = Inspector::TypeBuilder::Page::FrameResourceTree::Resources::create()
             .setUrl(cachedResource->url())
             .setType(cachedResourceTypeJson(*cachedResource))

@@ -25,6 +25,9 @@
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#if defined(HAVE_CONFIG_H) && HAVE_CONFIG_H && defined(BUILDING_WITH_CMAKE)
+#include "cmakeconfig.h"
+#endif
 #include "BrowserWindow.h"
 
 #include "BrowserDownloadsBar.h"
@@ -56,6 +59,7 @@ struct _BrowserWindow {
     GtkWidget *downloadsBar;
     BrowserSearchBar *searchBar;
     gboolean searchBarVisible;
+    gboolean inspectorWindowIsVisible;
     GdkPixbuf *favicon;
     GtkWidget *reloadOrStopButton;
     GtkWidget *fullScreenMessageLabel;
@@ -344,7 +348,7 @@ static gboolean webViewLeaveFullScreen(WebKitWebView *webView, BrowserWindow *wi
     return FALSE;
 }
 
-static GtkWidget *webViewCreate(WebKitWebView *webView, BrowserWindow *window)
+static GtkWidget *webViewCreate(WebKitWebView *webView, WebKitNavigationAction *navigation, BrowserWindow *window)
 {
     WebKitWebView *newWebView = WEBKIT_WEB_VIEW(webkit_web_view_new_with_related_view(webView));
     webkit_web_view_set_settings(newWebView, webkit_web_view_get_settings(webView));
@@ -366,15 +370,15 @@ static gboolean webViewDecidePolicy(WebKitWebView *webView, WebKitPolicyDecision
 {
     switch (decisionType) {
     case WEBKIT_POLICY_DECISION_TYPE_NAVIGATION_ACTION: {
-        WebKitNavigationPolicyDecision *navigationDecision = WEBKIT_NAVIGATION_POLICY_DECISION(decision);
-        if (webkit_navigation_policy_decision_get_navigation_type(navigationDecision) != WEBKIT_NAVIGATION_TYPE_LINK_CLICKED
-            || webkit_navigation_policy_decision_get_mouse_button(navigationDecision) != GDK_BUTTON_MIDDLE)
+        WebKitNavigationAction *navigationAction = webkit_navigation_policy_decision_get_navigation_action(WEBKIT_NAVIGATION_POLICY_DECISION(decision));
+        if (webkit_navigation_action_get_navigation_type(navigationAction) != WEBKIT_NAVIGATION_TYPE_LINK_CLICKED
+            || webkit_navigation_action_get_mouse_button(navigationAction) != GDK_BUTTON_MIDDLE)
             return FALSE;
 
         // Opening a new window if link clicked with the middle button.
         WebKitWebView *newWebView = WEBKIT_WEB_VIEW(webkit_web_view_new_with_context(webkit_web_view_get_context(webView)));
         GtkWidget *newWindow = browser_window_new(newWebView, GTK_WINDOW(window));
-        webkit_web_view_load_request(newWebView, webkit_navigation_policy_decision_get_request(navigationDecision));
+        webkit_web_view_load_request(newWebView, webkit_navigation_action_get_request(navigationAction));
         gtk_widget_show(newWindow);
 
         webkit_policy_decision_ignore(decision);
@@ -483,6 +487,18 @@ static void webViewIsLoadingChanged(GObject *object, GParamSpec *paramSpec, Brow
     gtk_tool_button_set_stock_id(GTK_TOOL_BUTTON(window->reloadOrStopButton), isLoading ? GTK_STOCK_STOP : GTK_STOCK_REFRESH);
 }
 
+static gboolean inspectorWasOpenedInAnotherWindow(WebKitWebInspector *inspectorWindow, BrowserWindow *window)
+{
+    window->inspectorWindowIsVisible = TRUE;
+    return FALSE;
+}
+
+static gboolean inspectorWasClosed(WebKitWebInspector *inspectorWindow, BrowserWindow *window)
+{
+    window->inspectorWindowIsVisible = FALSE;
+    return FALSE;
+}
+
 static void zoomInCallback(BrowserWindow *window)
 {
     gdouble zoomLevel = webkit_web_view_get_zoom_level(window->webView) * zoomStep;
@@ -498,6 +514,30 @@ static void zoomOutCallback(BrowserWindow *window)
 static void searchCallback(BrowserWindow *window)
 {
     browser_search_bar_open(window->searchBar);
+}
+
+static gboolean toggleWebInspector(BrowserWindow *window, gpointer user_data)
+{
+    WebKitWebInspector *inspectorWindow;
+
+    inspectorWindow = webkit_web_view_get_inspector(WEBKIT_WEB_VIEW(window->webView));
+    if (!window->inspectorWindowIsVisible) {
+        webkit_web_inspector_show(inspectorWindow);
+        window->inspectorWindowIsVisible = TRUE;
+    } else
+        webkit_web_inspector_close(inspectorWindow);
+
+    return TRUE;
+}
+
+static void reloadPage(BrowserWindow *window, gpointer user_data)
+{
+    webkit_web_view_reload(window->webView);
+}
+
+static void reloadPageIgnoringCache(BrowserWindow *window, gpointer user_data)
+{
+    webkit_web_view_reload_bypass_cache(window->webView);
 }
 
 static void browserWindowFinalize(GObject *gObject)
@@ -566,6 +606,24 @@ static void browser_window_init(BrowserWindow *window)
     /* Keyboard accelerators */
     window->accelGroup = gtk_accel_group_new();
     gtk_window_add_accel_group(GTK_WINDOW(window), window->accelGroup);
+
+    /* Global accelerators */
+    gtk_accel_group_connect(window->accelGroup, GDK_KEY_I, GDK_CONTROL_MASK | GDK_SHIFT_MASK, GTK_ACCEL_VISIBLE,
+        g_cclosure_new_swap(G_CALLBACK(toggleWebInspector), window, NULL));
+    gtk_accel_group_connect(window->accelGroup, GDK_KEY_F12, 0, GTK_ACCEL_VISIBLE,
+        g_cclosure_new_swap(G_CALLBACK(toggleWebInspector), window, NULL));
+
+    /* Reload page */ 
+    gtk_accel_group_connect(window->accelGroup, GDK_KEY_F5, 0, GTK_ACCEL_VISIBLE,
+        g_cclosure_new_swap(G_CALLBACK(reloadPage), window, NULL));
+    gtk_accel_group_connect(window->accelGroup, GDK_KEY_R, GDK_CONTROL_MASK, GTK_ACCEL_VISIBLE,
+        g_cclosure_new_swap(G_CALLBACK(reloadPage), window, NULL));
+
+    /* Reload page ignoring cache */
+    gtk_accel_group_connect(window->accelGroup, GDK_KEY_F5, GDK_CONTROL_MASK, GTK_ACCEL_VISIBLE,
+        g_cclosure_new_swap(G_CALLBACK(reloadPageIgnoringCache), window, NULL));
+    gtk_accel_group_connect(window->accelGroup, GDK_KEY_R, GDK_CONTROL_MASK | GDK_SHIFT_MASK, GTK_ACCEL_VISIBLE,
+        g_cclosure_new_swap(G_CALLBACK(reloadPageIgnoringCache), window, NULL));
 
     GtkWidget *toolbar = gtk_toolbar_new();
     window->toolbar = toolbar;
@@ -660,6 +718,10 @@ static void browserWindowConstructed(GObject *gObject)
 
     WebKitBackForwardList *backForwadlist = webkit_web_view_get_back_forward_list(window->webView);
     g_signal_connect(backForwadlist, "changed", G_CALLBACK(backForwadlistChanged), window);
+
+    WebKitWebInspector *inspectorWindow = webkit_web_view_get_inspector(WEBKIT_WEB_VIEW(window->webView));
+    g_signal_connect(inspectorWindow, "open-window", G_CALLBACK(inspectorWasOpenedInAnotherWindow), window);
+    g_signal_connect(inspectorWindow, "closed", G_CALLBACK(inspectorWasClosed), window);
 
     GtkWidget *overlay = gtk_overlay_new();
     gtk_box_pack_start(GTK_BOX(window->mainBox), overlay, TRUE, TRUE, 0);

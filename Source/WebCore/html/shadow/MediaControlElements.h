@@ -11,7 +11,7 @@
  * 2.  Redistributions in binary form must reproduce the above copyright
  *     notice, this list of conditions and the following disclaimer in the
  *     documentation and/or other materials provided with the distribution.
- * 3.  Neither the name of Apple Computer, Inc. ("Apple") nor the names of
+ * 3.  Neither the name of Apple Inc. ("Apple") nor the names of
  *     its contributors may be used to endorse or promote products derived
  *     from this software without specific prior written permission.
  *
@@ -57,7 +57,6 @@ public:
 private:
     explicit MediaControlPanelElement(Document&);
 
-    virtual const AtomicString& shadowPseudoId() const override;
     virtual void defaultEventHandler(Event*) override;
 
     void startDrag(const LayoutPoint& eventLocation);
@@ -88,7 +87,6 @@ public:
 
 private:
     explicit MediaControlPanelEnclosureElement(Document&);
-    virtual const AtomicString& shadowPseudoId() const override;
 };
 
 // ----------------------------
@@ -99,7 +97,6 @@ public:
 
 private:
     explicit MediaControlOverlayEnclosureElement(Document&);
-    virtual const AtomicString& shadowPseudoId() const override;
 };
 
 // ----------------------------
@@ -112,7 +109,6 @@ public:
 
 private:
     explicit MediaControlTimelineContainerElement(Document&);
-    virtual const AtomicString& shadowPseudoId() const override;
 
     virtual RenderPtr<RenderElement> createElementRenderer(PassRef<RenderStyle>) override;
 };
@@ -130,7 +126,6 @@ public:
 private:
     explicit MediaControlVolumeSliderContainerElement(Document&);
 
-    virtual const AtomicString& shadowPseudoId() const override;
     virtual void defaultEventHandler(Event*) override;
 
     virtual RenderPtr<RenderElement> createElementRenderer(PassRef<RenderStyle>) override;
@@ -146,7 +141,6 @@ public:
 
 private:
     explicit MediaControlStatusDisplayElement(Document&);
-    virtual const AtomicString& shadowPseudoId() const override;
 
     enum StateBeingDisplayed { Nothing, Loading, LiveBroadcast };
     StateBeingDisplayed m_stateBeingDisplayed;
@@ -165,7 +159,6 @@ public:
 private:
     explicit MediaControlPanelMuteButtonElement(Document&, MediaControls*);
 
-    virtual const AtomicString& shadowPseudoId() const override;
     virtual void defaultEventHandler(Event*) override;
 
     MediaControls* m_controls;
@@ -179,7 +172,6 @@ public:
 
 private:
     explicit MediaControlVolumeSliderMuteButtonElement(Document&);
-    virtual const AtomicString& shadowPseudoId() const override;
 };
 
 
@@ -198,7 +190,6 @@ public:
 private:
     explicit MediaControlPlayButtonElement(Document&);
 
-    virtual const AtomicString& shadowPseudoId() const override;
     virtual void defaultEventHandler(Event*) override;
 };
 
@@ -213,7 +204,6 @@ public:
 private:
     explicit MediaControlOverlayPlayButtonElement(Document&);
 
-    virtual const AtomicString& shadowPseudoId() const override;
     virtual void defaultEventHandler(Event*) override;
 };
 
@@ -225,7 +215,6 @@ public:
 
 private:
     explicit MediaControlSeekForwardButtonElement(Document&);
-    virtual const AtomicString& shadowPseudoId() const override;
 
     virtual bool isForwardButton() const override { return true; }
 };
@@ -238,7 +227,6 @@ public:
 
 private:
     explicit MediaControlSeekBackButtonElement(Document&);
-    virtual const AtomicString& shadowPseudoId() const override;
 
     virtual bool isForwardButton() const override { return false; }
 };
@@ -256,7 +244,6 @@ public:
 private:
     explicit MediaControlRewindButtonElement(Document&);
 
-    virtual const AtomicString& shadowPseudoId() const override;
     virtual void defaultEventHandler(Event*) override;
 };
 
@@ -273,7 +260,6 @@ public:
 private:
     explicit MediaControlReturnToRealtimeButtonElement(Document&);
 
-    virtual const AtomicString& shadowPseudoId() const override;
     virtual void defaultEventHandler(Event*) override;
 };
 
@@ -292,10 +278,9 @@ public:
 private:
     explicit MediaControlToggleClosedCaptionsButtonElement(Document&, MediaControls*);
 
-    virtual const AtomicString& shadowPseudoId() const override;
     virtual void defaultEventHandler(Event*) override;
 
-#if PLATFORM(MAC) || PLATFORM(WIN) || PLATFORM(GTK)
+#if PLATFORM(COCOA) || PLATFORM(WIN) || PLATFORM(GTK)
     MediaControls* m_controls;
 #endif
 };
@@ -312,7 +297,6 @@ public:
 
 private:
     MediaControlClosedCaptionsContainerElement(Document&);
-    virtual const AtomicString& shadowPseudoId() const override;
 };
 
 // ----------------------------
@@ -332,7 +316,6 @@ private:
 
     void rebuildTrackListMenu();
 
-    virtual const AtomicString& shadowPseudoId() const override;
     virtual void defaultEventHandler(Event*) override;
 
     typedef Vector<RefPtr<Element>> TrackMenuItems;
@@ -360,7 +343,6 @@ public:
 private:
     explicit MediaControlTimelineElement(Document&, MediaControls*);
 
-    virtual const AtomicString& shadowPseudoId() const override;
     virtual void defaultEventHandler(Event*) override;
 
     MediaControls* m_controls;
@@ -381,7 +363,6 @@ public:
 private:
     explicit MediaControlFullscreenButtonElement(Document&);
 
-    virtual const AtomicString& shadowPseudoId() const override;
     virtual void defaultEventHandler(Event*) override;
 };
 
@@ -393,7 +374,6 @@ public:
 
 private:
     explicit MediaControlPanelVolumeSliderElement(Document&);
-    virtual const AtomicString& shadowPseudoId() const override;
 };
 // ----------------------------
 
@@ -403,7 +383,6 @@ public:
 
 private:
     explicit MediaControlFullscreenVolumeSliderElement(Document&);
-    virtual const AtomicString& shadowPseudoId() const override;
 };
 
 // ----------------------------
@@ -418,7 +397,6 @@ public:
 
 private:
     explicit MediaControlFullscreenVolumeMinButtonElement(Document&);
-    virtual const AtomicString& shadowPseudoId() const override;
     virtual void defaultEventHandler(Event*) override;
 };
 
@@ -435,7 +413,6 @@ public:
 private:
     explicit MediaControlFullscreenVolumeMaxButtonElement(Document&);
 
-    virtual const AtomicString& shadowPseudoId() const override;
     virtual void defaultEventHandler(Event*) override;
 };
 
@@ -448,7 +425,6 @@ public:
 
 private:
     explicit MediaControlTimeRemainingDisplayElement(Document&);
-    virtual const AtomicString& shadowPseudoId() const override;
 };
 
 // ----------------------------
@@ -459,7 +435,6 @@ public:
 
 private:
     explicit MediaControlCurrentTimeDisplayElement(Document&);
-    virtual const AtomicString& shadowPseudoId() const override;
 };
 
 // ----------------------------
@@ -474,25 +449,27 @@ public:
     void updateSizes(bool forceUpdate = false);
     void enteredFullscreen();
     void exitedFullscreen();
-    static const AtomicString& textTrackContainerElementShadowPseudoId();
 
 private:
     void updateTimerFired(Timer<MediaControlTextTrackContainerElement>&);
+    void updateActiveCuesFontSize();
 
     explicit MediaControlTextTrackContainerElement(Document&);
-    virtual const AtomicString& shadowPseudoId() const override;
 
     virtual RenderPtr<RenderElement> createElementRenderer(PassRef<RenderStyle>) override;
 
     virtual PassRefPtr<Image> createTextTrackRepresentationImage() override;
     virtual void textTrackRepresentationBoundsChanged(const IntRect&) override;
+    void updateTextTrackRepresentation();
     void clearTextTrackRepresentation();
+    void updateStyleForTextTrackRepresentation();
     OwnPtr<TextTrackRepresentation> m_textTrackRepresentation;
 
     Timer<MediaControlTextTrackContainerElement> m_updateTimer;
     IntRect m_videoDisplaySize;
     int m_fontSize;
     bool m_fontSizeIsImportant;
+    bool m_updateTextTrackRepresentationStyle;
 };
 
 #endif

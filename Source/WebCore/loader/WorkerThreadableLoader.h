@@ -91,7 +91,7 @@ namespace WebCore {
         //    The ThreadableLoaderClientWrapper has the underlying client cleared, so no more calls
         //    go through it.  All tasks posted from the worker object's thread to the worker context's
         //    thread do "ThreadableLoaderClientWrapper::ref" (automatically inside of the cross thread copy
-        //    done in createCallbackTask), so the ThreadableLoaderClientWrapper instance is there until all
+        //    done in CrossThreadTask), so the ThreadableLoaderClientWrapper instance is there until all
         //    tasks are executed.
         class MainThreadBridge : public ThreadableLoaderClient {
         public:
@@ -105,11 +105,11 @@ namespace WebCore {
             void clearClientWrapper();
 
             // All executed on the main thread.
-            static void mainThreadDestroy(ScriptExecutionContext*, MainThreadBridge*);
+            static void mainThreadDestroy(ScriptExecutionContext&, MainThreadBridge*);
             ~MainThreadBridge();
 
-            static void mainThreadCreateLoader(ScriptExecutionContext*, MainThreadBridge*, PassOwnPtr<CrossThreadResourceRequestData>, ThreadableLoaderOptions, const String& outgoingReferrer);
-            static void mainThreadCancel(ScriptExecutionContext*, MainThreadBridge*);
+            static void mainThreadCreateLoader(ScriptExecutionContext&, MainThreadBridge*, PassOwnPtr<CrossThreadResourceRequestData>, ThreadableLoaderOptions, const String& outgoingReferrer);
+            static void mainThreadCancel(ScriptExecutionContext&, MainThreadBridge*);
             virtual void didSendData(unsigned long long bytesSent, unsigned long long totalBytesToBeSent) override;
             virtual void didReceiveResponse(unsigned long identifier, const ResourceResponse&) override;
             virtual void didReceiveData(const char*, int dataLength) override;

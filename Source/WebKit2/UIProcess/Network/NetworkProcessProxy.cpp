@@ -76,6 +76,8 @@ void NetworkProcessProxy::connectionWillOpen(IPC::Connection* connection)
 {
 #if ENABLE(SEC_ITEM_SHIM)
     SecItemShimProxy::shared().initializeConnection(connection);
+#else
+    UNUSED_PARAM(connection);
 #endif
 }
 
@@ -87,7 +89,7 @@ void NetworkProcessProxy::getNetworkProcessConnection(PassRefPtr<Messages::WebPr
 {
     m_pendingConnectionReplies.append(reply);
 
-    if (isLaunching()) {
+    if (state() == State::Launching) {
         m_numPendingConnectionRequests++;
         return;
     }
@@ -98,7 +100,7 @@ void NetworkProcessProxy::getNetworkProcessConnection(PassRefPtr<Messages::WebPr
 DownloadProxy* NetworkProcessProxy::createDownloadProxy()
 {
     if (!m_downloadProxyMap)
-        m_downloadProxyMap = adoptPtr(new DownloadProxyMap(this));
+        m_downloadProxyMap = std::make_unique<DownloadProxyMap>(this);
 
     return m_downloadProxyMap->createDownloadProxy(m_webContext);
 }
@@ -109,7 +111,7 @@ void NetworkProcessProxy::networkProcessCrashedOrFailedToLaunch()
     while (!m_pendingConnectionReplies.isEmpty()) {
         RefPtr<Messages::WebProcessProxy::GetNetworkProcessConnection::DelayedReply> reply = m_pendingConnectionReplies.takeFirst();
 
-#if PLATFORM(MAC)
+#if OS(DARWIN)
         reply->send(IPC::Attachment(0, MACH_MSG_TYPE_MOVE_SEND));
 #elif USE(UNIX_DOMAIN_SOCKETS)
         reply->send(IPC::Attachment());
@@ -161,7 +163,7 @@ void NetworkProcessProxy::didCreateNetworkConnectionToWebProcess(const IPC::Atta
     // Grab the first pending connection reply.
     RefPtr<Messages::WebProcessProxy::GetNetworkProcessConnection::DelayedReply> reply = m_pendingConnectionReplies.takeFirst();
 
-#if PLATFORM(MAC)
+#if OS(DARWIN)
     reply->send(IPC::Attachment(connectionIdentifier.port(), MACH_MSG_TYPE_MOVE_SEND));
 #elif USE(UNIX_DOMAIN_SOCKETS)
     reply->send(connectionIdentifier);
@@ -193,9 +195,14 @@ void NetworkProcessProxy::didFinishLaunching(ProcessLauncher* launcher, IPC::Con
     
     m_numPendingConnectionRequests = 0;
 
-#if PLATFORM(MAC)
+#if PLATFORM(COCOA)
     if (m_webContext.processSuppressionEnabled())
         setProcessSuppressionEnabled(true);
+#endif
+    
+#if PLATFORM(IOS) && USE(XPC_SERVICES)
+    if (xpc_connection_t connection = this->connection()->xpcConnection())
+        m_assertion = std::make_unique<ProcessAssertion>(xpc_connection_get_pid(connection), AssertionState::Foreground);
 #endif
 }
 

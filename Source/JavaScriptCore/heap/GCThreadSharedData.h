@@ -51,6 +51,7 @@ enum GCPhase {
 };
 
 class GCThreadSharedData {
+    WTF_MAKE_FAST_ALLOCATED;
 public:
     GCThreadSharedData(VM*);
     ~GCThreadSharedData();
@@ -92,7 +93,7 @@ private:
     unsigned m_numberOfActiveParallelMarkers;
     bool m_parallelMarkersShouldExit;
 
-    Mutex m_opaqueRootsLock;
+    std::mutex m_opaqueRootsMutex;
     HashSet<void*> m_opaqueRoots;
 
     SpinLock m_copyLock;

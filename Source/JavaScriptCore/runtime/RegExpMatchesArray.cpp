@@ -27,11 +27,11 @@
 #include "RegExpMatchesArray.h"
 
 #include "ButterflyInlines.h"
-#include "Operations.h"
+#include "JSCInlines.h"
 
 namespace JSC {
 
-const ClassInfo RegExpMatchesArray::s_info = {"Array", &JSArray::s_info, 0, 0, CREATE_METHOD_TABLE(RegExpMatchesArray)};
+const ClassInfo RegExpMatchesArray::s_info = {"Array", &JSArray::s_info, 0, CREATE_METHOD_TABLE(RegExpMatchesArray)};
 
 RegExpMatchesArray::RegExpMatchesArray(VM& vm, Butterfly* butterfly, JSGlobalObject* globalObject, JSString* input, RegExp* regExp, MatchResult result)
     : JSArray(vm, globalObject->regExpMatchesArrayStructure(), butterfly)
@@ -46,7 +46,7 @@ RegExpMatchesArray* RegExpMatchesArray::create(ExecState* exec, JSString* input,
 {
     ASSERT(result);
     VM& vm = exec->vm();
-    Butterfly* butterfly = createArrayButterfly(vm, 0, regExp->numSubpatterns() + 1);
+    Butterfly* butterfly = createArrayButterflyWithExactLength(vm, 0, regExp->numSubpatterns() + 1);
     RegExpMatchesArray* array = new (NotNull, allocateCell<RegExpMatchesArray>(vm.heap)) RegExpMatchesArray(vm, butterfly, exec->lexicalGlobalObject(), input, regExp, result);
     array->finishCreation(vm);
     return array;
@@ -61,9 +61,6 @@ void RegExpMatchesArray::visitChildren(JSCell* cell, SlotVisitor& visitor)
 {
     RegExpMatchesArray* thisObject = jsCast<RegExpMatchesArray*>(cell);
     ASSERT_GC_OBJECT_INHERITS(thisObject, info());
-    COMPILE_ASSERT(StructureFlags & OverridesVisitChildren, OverridesVisitChildrenWithoutSettingFlag);
-    ASSERT(thisObject->structure()->typeInfo().overridesVisitChildren());
-
     Base::visitChildren(thisObject, visitor);
     visitor.append(&thisObject->m_input);
     visitor.append(&thisObject->m_regExp);
@@ -74,6 +71,8 @@ void RegExpMatchesArray::reifyAllProperties(ExecState* exec)
     ASSERT(m_state != ReifiedAll);
     ASSERT(m_result);
  
+    SamplingRegion samplingRegion("Reifying substring properties");
+    
     reifyMatchPropertyIfNecessary(exec);
 
     if (unsigned numSubpatterns = m_regExp->numSubpatterns()) {

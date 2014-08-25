@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2006 Oliver Hunt <ojh16@student.canterbury.ac.nz>
- * Copyright (C) 2006 Apple Computer Inc.
+ * Copyright (C) 2006 Apple Inc.
  * Copyright (C) 2007 Nikolas Zimmermann <zimmermann@kde.org>
  * Copyright (C) Research In Motion Limited 2010. All rights reserved.
  *
@@ -23,7 +23,6 @@
 #include "config.h"
 #include "SVGInlineFlowBox.h"
 
-#if ENABLE(SVG)
 #include "DocumentMarkerController.h"
 #include "GraphicsContext.h"
 #include "RenderedDocumentMarker.h"
@@ -46,7 +45,7 @@ void SVGInlineFlowBox::paintSelectionBackground(PaintInfo& paintInfo)
     }
 }
 
-void SVGInlineFlowBox::paint(PaintInfo& paintInfo, const LayoutPoint&, LayoutUnit, LayoutUnit)
+void SVGInlineFlowBox::paint(PaintInfo& paintInfo, const LayoutPoint& paintOffset, LayoutUnit, LayoutUnit)
 {
     ASSERT(paintInfo.phase == PaintPhaseForeground || paintInfo.phase == PaintPhaseSelection);
     ASSERT(!paintInfo.context->paintingDisabled());
@@ -57,7 +56,7 @@ void SVGInlineFlowBox::paint(PaintInfo& paintInfo, const LayoutPoint&, LayoutUni
             if (child->isSVGInlineTextBox())
                 computeTextMatchMarkerRectForRenderer(&(toSVGInlineTextBox(child)->renderer()));
 
-            child->paint(paintInfo, LayoutPoint(), 0, 0);
+            child->paint(paintInfo, paintOffset, 0, 0);
         }
     }
 }
@@ -134,5 +133,3 @@ void SVGInlineFlowBox::computeTextMatchMarkerRectForRenderer(RenderSVGInlineText
 }
 
 } // namespace WebCore
-
-#endif // ENABLE(SVG)

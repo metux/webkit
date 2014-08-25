@@ -42,7 +42,7 @@ RefPtr<Scrollbar> RenderScrollbar::createCustomScrollbar(ScrollableArea* scrolla
 }
 
 RenderScrollbar::RenderScrollbar(ScrollableArea* scrollableArea, ScrollbarOrientation orientation, Element* ownerElement, Frame* owningFrame)
-    : Scrollbar(scrollableArea, orientation, RegularScrollbar, RenderScrollbarTheme::renderScrollbarTheme())
+    : Scrollbar(scrollableArea, orientation, RegularScrollbar, RenderScrollbarTheme::renderScrollbarTheme(), true)
     , m_ownerElement(ownerElement)
     , m_owningFrame(owningFrame)
 {
@@ -77,7 +77,9 @@ RenderBox* RenderScrollbar::owningRenderer() const
         return currentRenderer;
     }
     ASSERT(m_ownerElement);
-    return m_ownerElement->renderer() ? m_ownerElement->renderer()->enclosingBox() : nullptr;
+    if (m_ownerElement->renderer())
+        return &m_ownerElement->renderer()->enclosingBox();
+    return nullptr;
 }
 
 void RenderScrollbar::setParent(ScrollView* parent)
@@ -325,10 +327,10 @@ IntRect RenderScrollbar::trackPieceRectWithMargins(ScrollbarPart partType, const
     IntRect rect = oldRect;
     if (orientation() == HorizontalScrollbar) {
         rect.setX(rect.x() + partRenderer->marginLeft());
-        rect.setWidth(rect.width() - partRenderer->marginWidth());
+        rect.setWidth(rect.width() - partRenderer->horizontalMarginExtent());
     } else {
         rect.setY(rect.y() + partRenderer->marginTop());
-        rect.setHeight(rect.height() - partRenderer->marginHeight());
+        rect.setHeight(rect.height() - partRenderer->verticalMarginExtent());
     }
     return rect;
 }

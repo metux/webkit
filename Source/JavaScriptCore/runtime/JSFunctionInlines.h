@@ -51,16 +51,34 @@ inline bool JSFunction::isHostFunction() const
     return m_executable->isHostFunction();
 }
 
+inline bool JSFunction::isBuiltinFunction() const
+{
+    return !isHostFunction() && jsExecutable()->isBuiltinFunction();
+}
+
+inline bool JSFunction::isHostOrBuiltinFunction() const
+{
+    return isHostFunction() || isBuiltinFunction();
+}
+
 inline NativeFunction JSFunction::nativeFunction()
 {
-    ASSERT(isHostFunction());
+    ASSERT(isHostFunctionNonInline());
     return static_cast<NativeExecutable*>(m_executable.get())->function();
 }
 
 inline NativeFunction JSFunction::nativeConstructor()
 {
-    ASSERT(isHostFunction());
+    ASSERT(isHostFunctionNonInline());
     return static_cast<NativeExecutable*>(m_executable.get())->constructor();
+}
+
+inline bool isHostFunction(JSValue value, NativeFunction nativeFunction)
+{
+    JSFunction* function = jsCast<JSFunction*>(getJSFunction(value));
+    if (!function || !function->isHostFunction())
+        return false;
+    return function->nativeFunction() == nativeFunction;
 }
 
 } // namespace JSC

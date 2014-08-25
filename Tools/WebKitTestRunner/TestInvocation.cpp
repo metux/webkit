@@ -30,22 +30,23 @@
 #include "PlatformWebView.h"
 #include "StringFunctions.h"
 #include "TestController.h"
+#include <WebKit/WKContextPrivate.h>
+#include <WebKit/WKData.h>
+#include <WebKit/WKDictionary.h>
+#include <WebKit/WKInspector.h>
+#include <WebKit/WKPagePrivate.h>
+#include <WebKit/WKRetainPtr.h>
 #include <climits>
 #include <cstdio>
-#include <WebKit2/WKContextPrivate.h>
-#include <WebKit2/WKData.h>
-#include <WebKit2/WKDictionary.h>
-#include <WebKit2/WKInspector.h>
-#include <WebKit2/WKRetainPtr.h>
-#include <wtf/PassOwnPtr.h>
 #include <wtf/StdLibExtras.h>
 #include <wtf/text/CString.h>
 
-#if PLATFORM(MAC)
-#if !PLATFORM(IOS)
+#if PLATFORM(MAC) && !PLATFORM(IOS)
 #include <Carbon/Carbon.h>
 #endif
-#include <WebKit2/WKPagePrivateMac.h>
+
+#if PLATFORM(COCOA)
+#include <WebKit/WKPagePrivateMac.h>
 #endif
 
 #include <unistd.h> // For getcwd.
@@ -105,6 +106,11 @@ TestInvocation::~TestInvocation()
 {
 }
 
+WKURLRef TestInvocation::url() const
+{
+    return m_url.get();
+}
+
 void TestInvocation::setIsPixelTest(const std::string& expectedPixelHash)
 {
     m_dumpPixels = true;
@@ -116,87 +122,25 @@ void TestInvocation::setCustomTimeout(int timeout)
     m_timeout = timeout;
 }
 
-static void sizeWebViewForCurrentTest(const char* pathOrURL)
-{
-    bool isSVGW3CTest = strstr(pathOrURL, "svg/W3C-SVG-1.1") || strstr(pathOrURL, "svg\\W3C-SVG-1.1");
-
-    if (isSVGW3CTest)
-        TestController::shared().mainWebView()->resizeTo(TestController::w3cSVGViewWidth, TestController::w3cSVGViewHeight);
-    else
-        TestController::shared().mainWebView()->resizeTo(TestController::viewWidth, TestController::viewHeight);
-}
-
 static bool shouldLogFrameLoadDelegates(const char* pathOrURL)
 {
     return strstr(pathOrURL, "loading/");
 }
 
-#if ENABLE(INSPECTOR) && !PLATFORM(IOS)
-static bool shouldOpenWebInspector(const char* pathOrURL)
+static bool shouldLogHistoryClientCallbacks(const char* pathOrURL)
 {
-    return strstr(pathOrURL, "inspector/") || strstr(pathOrURL, "inspector\\");
-}
-#endif
-
-#if PLATFORM(MAC)
-static bool shouldUseThreadedScrolling(const char* pathOrURL)
-{
-    return strstr(pathOrURL, "tiled-drawing/") || strstr(pathOrURL, "tiled-drawing\\");
-}
-#endif
-
-static void updateThreadedScrollingForCurrentTest(const char* pathOrURL)
-{
-#if PLATFORM(MAC)
-    WKRetainPtr<WKMutableDictionaryRef> viewOptions = adoptWK(WKMutableDictionaryCreate());
-    WKRetainPtr<WKStringRef> useThreadedScrollingKey = adoptWK(WKStringCreateWithUTF8CString("ThreadedScrolling"));
-    WKRetainPtr<WKBooleanRef> useThreadedScrollingValue = adoptWK(WKBooleanCreate(shouldUseThreadedScrolling(pathOrURL)));
-    WKDictionarySetItem(viewOptions.get(), useThreadedScrollingKey.get(), useThreadedScrollingValue.get());
-
-    WKRetainPtr<WKStringRef> useRemoteLayerTreeKey = adoptWK(WKStringCreateWithUTF8CString("RemoteLayerTree"));
-    WKRetainPtr<WKBooleanRef> useRemoteLayerTreeValue = adoptWK(WKBooleanCreate(TestController::shared().shouldUseRemoteLayerTree()));
-    WKDictionarySetItem(viewOptions.get(), useRemoteLayerTreeKey.get(), useRemoteLayerTreeValue.get());
-
-    TestController::shared().ensureViewSupportsOptions(viewOptions.get());
-#else
-    UNUSED_PARAM(pathOrURL);
-#endif
-}
-
-static bool shouldUseFixedLayout(const char* pathOrURL)
-{
-#if ENABLE(CSS_DEVICE_ADAPTATION)
-    if (strstr(pathOrURL, "device-adapt/") || strstr(pathOrURL, "device-adapt\\"))
-        return true;
-#endif
-
-#if USE(TILED_BACKING_STORE) && PLATFORM(EFL)
-    if (strstr(pathOrURL, "sticky/") || strstr(pathOrURL, "sticky\\"))
-        return true;
-#endif
-    return false;
-
-    UNUSED_PARAM(pathOrURL);
-}
-
-static void updateLayoutType(const char* pathOrURL)
-{
-    WKRetainPtr<WKMutableDictionaryRef> viewOptions = adoptWK(WKMutableDictionaryCreate());
-    WKRetainPtr<WKStringRef> useFixedLayoutKey = adoptWK(WKStringCreateWithUTF8CString("UseFixedLayout"));
-    WKRetainPtr<WKBooleanRef> useFixedLayoutValue = adoptWK(WKBooleanCreate(shouldUseFixedLayout(pathOrURL)));
-    WKDictionarySetItem(viewOptions.get(), useFixedLayoutKey.get(), useFixedLayoutValue.get());
-
-    TestController::shared().ensureViewSupportsOptions(viewOptions.get());
+    return strstr(pathOrURL, "globalhistory/");
 }
 
 void TestInvocation::invoke()
 {
-    TestController::TimeoutDuration timeoutToUse = TestController::LongTimeout;
-    sizeWebViewForCurrentTest(m_pathOrURL.c_str());
-    updateLayoutType(m_pathOrURL.c_str());
-    updateThreadedScrollingForCurrentTest(m_pathOrURL.c_str());
+    TestController::shared().configureViewForTest(*this);
+
+    WKPageSetAddsVisitedLinks(TestController::shared().mainWebView()->page(), false);
 
     m_textOutput.clear();
+
+    TestController::shared().setShouldLogHistoryClientCallbacks(shouldLogHistoryClientCallbacks(m_pathOrURL.c_str()));
 
     WKRetainPtr<WKStringRef> messageName = adoptWK(WKStringCreateWithUTF8CString("BeginTest"));
     WKRetainPtr<WKMutableDictionaryRef> beginTestMessageBody = adoptWK(WKMutableDictionaryCreate());
@@ -219,6 +163,8 @@ void TestInvocation::invoke()
 
     WKContextPostMessageToInjectedBundle(TestController::shared().context(), messageName.get(), beginTestMessageBody.get());
 
+    TestController::TimeoutDuration timeoutToUse = TestController::LongTimeout;
+
     TestController::shared().runUntil(m_gotInitialResponse, TestController::ShortTimeout);
     if (!m_gotInitialResponse) {
         m_errorMessage = "Timed out waiting for initial response from web process\n";
@@ -227,11 +173,6 @@ void TestInvocation::invoke()
     }
     if (m_error)
         goto end;
-
-#if ENABLE(INSPECTOR) && !PLATFORM(IOS)
-    if (shouldOpenWebInspector(m_pathOrURL.c_str()))
-        WKInspectorShow(WKPageGetInspector(TestController::shared().mainWebView()->page()));
-#endif // ENABLE(INSPECTOR)        
 
     WKPageLoadURL(TestController::shared().mainWebView()->page(), m_url.get());
 
@@ -261,8 +202,11 @@ end:
     if (m_webProcessIsUnresponsive)
         dumpWebProcessUnresponsiveness();
     else if (!TestController::shared().resetStateToConsistentValues()) {
-        m_errorMessage = "Timed out loading about:blank before the next test";
-        dumpWebProcessUnresponsiveness();
+        // The process froze while loading about:blank, let's start a fresh one.
+        // It would be nice to report that the previous test froze after dumping results, but we have no way to do that.
+        TestController::shared().terminateWebContentProcess();
+        // Make sure that we have a process, as invoke() will need one to send bundle messages for the next test.
+        TestController::shared().reattachPageToWebProcess();
     }
 }
 
@@ -274,7 +218,7 @@ void TestInvocation::dumpWebProcessUnresponsiveness()
 void TestInvocation::dumpWebProcessUnresponsiveness(const char* errorMessage)
 {
     const char* errorMessageToStderr = 0;
-#if PLATFORM(MAC)
+#if PLATFORM(COCOA)
     char buffer[64];
     pid_t pid = WKPageGetProcessIdentifier(TestController::shared().mainWebView()->page());
     sprintf(buffer, "#PROCESS UNRESPONSIVE - WebProcess (pid %ld)\n", static_cast<long>(pid));
@@ -461,6 +405,13 @@ void TestInvocation::didReceiveMessageFromInjectedBundle(WKStringRef messageName
         return;
     }
 
+    if (WKStringIsEqualToUTF8CString(messageName, "SetAddsVisitedLinks")) {
+        ASSERT(WKGetTypeID(messageBody) == WKBooleanGetTypeID());
+        WKBooleanRef enabledWK = static_cast<WKBooleanRef>(messageBody);
+        WKPageSetAddsVisitedLinks(TestController::shared().mainWebView()->page(), WKBooleanGetValue(enabledWK));
+        return;
+    }
+
     if (WKStringIsEqualToUTF8CString(messageName, "SetGeolocationPermission")) {
         ASSERT(WKGetTypeID(messageBody) == WKBooleanGetTypeID());
         WKBooleanRef enabledWK = static_cast<WKBooleanRef>(messageBody);
@@ -543,19 +494,15 @@ void TestInvocation::didReceiveMessageFromInjectedBundle(WKStringRef messageName
         return;
     }
 
-    if (WKStringIsEqualToUTF8CString(messageName, "SetVisibilityState")) {
+    if (WKStringIsEqualToUTF8CString(messageName, "SetHidden")) {
         ASSERT(WKGetTypeID(messageBody) == WKDictionaryGetTypeID());
         WKDictionaryRef messageBodyDictionary = static_cast<WKDictionaryRef>(messageBody);
 
-        WKRetainPtr<WKStringRef> visibilityStateKeyWK(AdoptWK, WKStringCreateWithUTF8CString("visibilityState"));
-        WKUInt64Ref visibilityStateWK = static_cast<WKUInt64Ref>(WKDictionaryGetItemForKey(messageBodyDictionary, visibilityStateKeyWK.get()));
-        WKPageVisibilityState visibilityState = static_cast<WKPageVisibilityState>(WKUInt64GetValue(visibilityStateWK));
+        WKRetainPtr<WKStringRef> isInitialKeyWK(AdoptWK, WKStringCreateWithUTF8CString("hidden"));
+        WKBooleanRef hiddenWK = static_cast<WKBooleanRef>(WKDictionaryGetItemForKey(messageBodyDictionary, isInitialKeyWK.get()));
+        bool hidden = WKBooleanGetValue(hiddenWK);
 
-        WKRetainPtr<WKStringRef> isInitialKeyWK(AdoptWK, WKStringCreateWithUTF8CString("isInitialState"));
-        WKBooleanRef isInitialWK = static_cast<WKBooleanRef>(WKDictionaryGetItemForKey(messageBodyDictionary, isInitialKeyWK.get()));
-        bool isInitialState = WKBooleanGetValue(isInitialWK);
-
-        TestController::shared().setVisibilityState(visibilityState, isInitialState);
+        TestController::shared().setHidden(hidden);
         return;
     }
 

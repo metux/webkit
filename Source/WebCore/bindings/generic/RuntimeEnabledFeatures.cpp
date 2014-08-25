@@ -51,14 +51,14 @@ RuntimeEnabledFeatures::RuntimeEnabledFeatures()
     , m_isTouchEnabled(true)
     , m_isDeviceMotionEnabled(true)
     , m_isDeviceOrientationEnabled(true)
-    , m_isSpeechInputEnabled(true)
-    , m_isCSSExclusionsEnabled(true)
     , m_isCSSShapesEnabled(true)
     , m_isCSSRegionsEnabled(false)
     , m_isCSSCompositingEnabled(false)
     , m_isLangAttributeAwareFormControlUIEnabled(false)
-#if ENABLE(SCRIPTED_SPEECH)
-    , m_isScriptedSpeechEnabled(false)
+#if PLATFORM(IOS)
+    , m_isPluginReplacementEnabled(true)
+#else
+    , m_isPluginReplacementEnabled(false)
 #endif
 #if ENABLE(MEDIA_STREAM)
     , m_isMediaStreamEnabled(true)
@@ -72,10 +72,6 @@ RuntimeEnabledFeatures::RuntimeEnabledFeatures()
 #endif
 #if ENABLE(VIDEO_TRACK)
     , m_isVideoTrackEnabled(true)
-#endif
-#if ENABLE(SHADOW_DOM)
-    , m_isShadowDOMEnabled(false)
-    , m_isAuthorShadowDOMForAnyElementEnabled(false)
 #endif
 #if ENABLE(INPUT_TYPE_DATE)
     , m_isInputTypeDateEnabled(true)
@@ -98,11 +94,11 @@ RuntimeEnabledFeatures::RuntimeEnabledFeatures()
 #if ENABLE(CSP_NEXT)
     , m_areExperimentalContentSecurityPolicyFeaturesEnabled(false)
 #endif
-#if ENABLE(IFRAME_SEAMLESS)
-    , m_areSeamlessIFramesEnabled(false)
-#endif
 #if ENABLE(FONT_LOAD_EVENTS)
     , m_isFontLoadEventsEnabled(false)
+#endif
+#if ENABLE(GAMEPAD)
+    , m_areGamepadsEnabled(false)
 #endif
 {
 }

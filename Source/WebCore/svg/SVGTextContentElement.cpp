@@ -19,8 +19,6 @@
  */
 
 #include "config.h"
-
-#if ENABLE(SVG)
 #include "SVGTextContentElement.h"
 
 #include "CSSPropertyNames.h"
@@ -35,6 +33,7 @@
 #include "SVGNames.h"
 #include "SVGTextQuery.h"
 #include "XMLNames.h"
+#include <wtf/NeverDestroyed.h>
 
 namespace WebCore {
  
@@ -93,7 +92,7 @@ PassRefPtr<SVGAnimatedProperty> SVGTextContentElement::lookupOrCreateTextLengthW
 
 PassRefPtr<SVGAnimatedLength> SVGTextContentElement::textLengthAnimated()
 {
-    DEFINE_STATIC_LOCAL(SVGLength, defaultTextLength, (LengthModeOther));
+    static NeverDestroyed<SVGLength> defaultTextLength(LengthModeOther);
     if (m_specifiedTextLength == defaultTextLength)
         m_textLength.value.newValueSpecifiedUnits(LengthTypeNumber, getComputedTextLength(), ASSERT_NO_EXCEPTION);
 
@@ -211,14 +210,14 @@ void SVGTextContentElement::selectSubString(unsigned charnum, unsigned nchars, E
 
 bool SVGTextContentElement::isSupportedAttribute(const QualifiedName& attrName)
 {
-    DEFINE_STATIC_LOCAL(HashSet<QualifiedName>, supportedAttributes, ());
-    if (supportedAttributes.isEmpty()) {
+    static NeverDestroyed<HashSet<QualifiedName>> supportedAttributes;
+    if (supportedAttributes.get().isEmpty()) {
         SVGLangSpace::addSupportedAttributes(supportedAttributes);
         SVGExternalResourcesRequired::addSupportedAttributes(supportedAttributes);
-        supportedAttributes.add(SVGNames::lengthAdjustAttr);
-        supportedAttributes.add(SVGNames::textLengthAttr);
+        supportedAttributes.get().add(SVGNames::lengthAdjustAttr);
+        supportedAttributes.get().add(SVGNames::textLengthAttr);
     }
-    return supportedAttributes.contains<SVGAttributeHashTranslator>(attrName);
+    return supportedAttributes.get().contains<SVGAttributeHashTranslator>(attrName);
 }
 
 bool SVGTextContentElement::isPresentationAttribute(const QualifiedName& name) const
@@ -233,7 +232,7 @@ void SVGTextContentElement::collectStyleForPresentationAttribute(const Qualified
     if (!isSupportedAttribute(name))
         SVGGraphicsElement::collectStyleForPresentationAttribute(name, value, style);
     else if (name.matches(XMLNames::spaceAttr)) {
-        DEFINE_STATIC_LOCAL(const AtomicString, preserveString, ("preserve", AtomicString::ConstructFromLiteral));
+        DEPRECATED_DEFINE_STATIC_LOCAL(const AtomicString, preserveString, ("preserve", AtomicString::ConstructFromLiteral));
 
         if (value == preserveString)
             addPropertyToPresentationAttributeStyle(style, CSSPropertyWhiteSpace, CSSValuePre);
@@ -304,5 +303,3 @@ SVGTextContentElement* SVGTextContentElement::elementFromRenderer(RenderObject* 
 }
 
 }
-
-#endif // ENABLE(SVG)

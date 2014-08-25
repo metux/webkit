@@ -35,6 +35,7 @@
 #include "Frame.h"
 #include "FrameSelection.h"
 #include "FrameView.h"
+#include "GraphicsContext.h"
 #include "ImageBuffer.h"
 #include "Page.h"
 #include "RenderObject.h"
@@ -105,7 +106,7 @@ std::unique_ptr<ImageBuffer> snapshotSelection(Frame& frame, SnapshotOptions opt
         return nullptr;
 
     options |= SnapshotOptionsPaintSelectionOnly;
-    return snapshotFrameRect(frame, enclosingIntRect(frame.selection().bounds()), options);
+    return snapshotFrameRect(frame, enclosingIntRect(frame.selection().selectionBounds()), options);
 }
 
 std::unique_ptr<ImageBuffer> snapshotNode(Frame& frame, Node& node)

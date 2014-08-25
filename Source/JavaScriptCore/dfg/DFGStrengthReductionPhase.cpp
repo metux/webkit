@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013 Apple Inc. All rights reserved.
+ * Copyright (C) 2013, 2014 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -28,12 +28,14 @@
 
 #if ENABLE(DFG_JIT)
 
+#include "DFGAbstractHeap.h"
+#include "DFGClobberize.h"
 #include "DFGGraph.h"
 #include "DFGInsertionSet.h"
 #include "DFGPhase.h"
 #include "DFGPredictionPropagationPhase.h"
 #include "DFGVariableAccessDataDump.h"
-#include "Operations.h"
+#include "JSCInlines.h"
 
 namespace JSC { namespace DFG {
 
@@ -70,41 +72,61 @@ private:
     {
         switch (m_node->op()) {
         case BitOr:
-            if (m_node->child1()->isConstant()) {
-                JSValue op1 = m_graph.valueOfJSConstant(m_node->child1().node());
-                if (op1.isInt32() && !op1.asInt32()) {
-                    convertToIdentityOverChild2();
-                    break;
-                }
+            handleCommutativity();
+
+            if (m_node->child2()->isInt32Constant() && !m_node->child2()->asInt32()) {
+                convertToIdentityOverChild1();
+                break;
             }
-            if (m_node->child2()->isConstant()) {
-                JSValue op2 = m_graph.valueOfJSConstant(m_node->child2().node());
-                if (op2.isInt32() && !op2.asInt32()) {
-                    convertToIdentityOverChild1();
-                    break;
-                }
-            }
+            break;
+            
+        case BitXor:
+        case BitAnd:
+            handleCommutativity();
             break;
             
         case BitLShift:
         case BitRShift:
         case BitURShift:
-            if (m_node->child2()->isConstant()) {
-                JSValue op2 = m_graph.valueOfJSConstant(m_node->child2().node());
-                if (op2.isInt32() && !(op2.asInt32() & 0x1f)) {
-                    convertToIdentityOverChild1();
-                    break;
-                }
+            if (m_node->child2()->isInt32Constant() && !(m_node->child2()->asInt32() & 0x1f)) {
+                convertToIdentityOverChild1();
+                break;
             }
             break;
             
         case UInt32ToNumber:
             if (m_node->child1()->op() == BitURShift
-                && m_node->child1()->child2()->isConstant()) {
-                JSValue shiftAmount = m_graph.valueOfJSConstant(
-                    m_node->child1()->child2().node());
-                if (shiftAmount.isInt32() && (shiftAmount.asInt32() & 0x1f)) {
-                    m_node->convertToIdentity();
+                && m_node->child1()->child2()->isInt32Constant()
+                && (m_node->child1()->child2()->asInt32() & 0x1f)
+                && m_node->arithMode() != Arith::DoOverflow) {
+                m_node->convertToIdentity();
+                m_changed = true;
+                break;
+            }
+            break;
+            
+        case ArithAdd:
+            handleCommutativity();
+            
+            if (m_node->child2()->isInt32Constant() && !m_node->child2()->asInt32()) {
+                convertToIdentityOverChild1();
+                break;
+            }
+            break;
+            
+        case ArithMul:
+            handleCommutativity();
+            break;
+            
+        case ArithSub:
+            if (m_node->child2()->isInt32Constant()
+                && m_node->isBinaryUseKind(Int32Use)) {
+                int32_t value = m_node->child2()->asInt32();
+                if (-value != value) {
+                    m_node->setOp(ArithAdd);
+                    m_node->child2().setNode(
+                        m_insertionSet.insertConstant(
+                            m_nodeIndex, m_node->origin, jsNumber(-value)));
                     m_changed = true;
                     break;
                 }
@@ -138,6 +160,134 @@ private:
             }
             break;
             
+        case ValueRep:
+        case Int52Rep:
+        case DoubleRep: {
+            // This short-circuits circuitous conversions, like ValueRep(DoubleRep(value)) or
+            // even more complicated things. Like, it can handle a beast like
+            // ValueRep(DoubleRep(Int52Rep(value))).
+            
+            // The only speculation that we would do beyond validating that we have a type that
+            // can be represented a certain way is an Int32 check that would appear on Int52Rep
+            // nodes. For now, if we see this and the final type we want is an Int52, we use it
+            // as an excuse not to fold. The only thing we would need is a Int52RepInt32Use kind.
+            bool hadInt32Check = false;
+            if (m_node->op() == Int52Rep) {
+                if (m_node->child1().useKind() != Int32Use)
+                    break;
+                hadInt32Check = true;
+            }
+            for (Node* node = m_node->child1().node(); ; node = node->child1().node()) {
+                if (canonicalResultRepresentation(node->result()) ==
+                    canonicalResultRepresentation(m_node->result())) {
+                    m_insertionSet.insertNode(
+                        m_nodeIndex, SpecNone, Phantom, m_node->origin, m_node->child1());
+                    if (hadInt32Check) {
+                        // FIXME: Consider adding Int52RepInt32Use or even DoubleRepInt32Use,
+                        // which would be super weird. The latter would only arise in some
+                        // seriously circuitous conversions.
+                        if (canonicalResultRepresentation(node->result()) != NodeResultJS)
+                            break;
+                        
+                        m_insertionSet.insertNode(
+                            m_nodeIndex, SpecNone, Phantom, m_node->origin,
+                            Edge(node, Int32Use));
+                    }
+                    m_node->child1() = node->defaultEdge();
+                    m_node->convertToIdentity();
+                    m_changed = true;
+                    break;
+                }
+                
+                switch (node->op()) {
+                case Int52Rep:
+                    if (node->child1().useKind() != Int32Use)
+                        break;
+                    hadInt32Check = true;
+                    continue;
+                    
+                case DoubleRep:
+                case ValueRep:
+                    continue;
+                    
+                default:
+                    break;
+                }
+                break;
+            }
+            break;
+        }
+            
+        case Flush: {
+            ASSERT(m_graph.m_form != SSA);
+            
+            Node* setLocal = nullptr;
+            VirtualRegister local = m_node->local();
+            
+            if (m_node->variableAccessData()->isCaptured()) {
+                for (unsigned i = m_nodeIndex; i--;) {
+                    Node* node = m_block->at(i);
+                    bool done = false;
+                    switch (node->op()) {
+                    case GetLocal:
+                    case Flush:
+                        if (node->local() == local)
+                            done = true;
+                        break;
+                
+                    case GetLocalUnlinked:
+                        if (node->unlinkedLocal() == local)
+                            done = true;
+                        break;
+                
+                    case SetLocal: {
+                        if (node->local() != local)
+                            break;
+                        setLocal = node;
+                        done = true;
+                        break;
+                    }
+                
+                    case Phantom:
+                    case Check:
+                    case HardPhantom:
+                    case MovHint:
+                    case JSConstant:
+                    case DoubleConstant:
+                    case Int52Constant:
+                        break;
+                
+                    default:
+                        done = true;
+                        break;
+                    }
+                    if (done)
+                        break;
+                }
+            } else {
+                for (unsigned i = m_nodeIndex; i--;) {
+                    Node* node = m_block->at(i);
+                    if (node->op() == SetLocal && node->local() == local) {
+                        setLocal = node;
+                        break;
+                    }
+                    if (accessesOverlap(m_graph, node, AbstractHeap(Variables, local)))
+                        break;
+                }
+            }
+            
+            if (!setLocal)
+                break;
+            
+            m_node->convertToPhantom();
+            Node* dataNode = setLocal->child1().node();
+            DFG_ASSERT(m_graph, m_node, dataNode->hasResult());
+            m_node->child1() = dataNode->defaultEdge();
+            m_graph.dethread();
+            m_changed = true;
+            break;
+        }
+            
         default:
             break;
         }
@@ -146,7 +296,7 @@ private:
     void convertToIdentityOverChild(unsigned childIndex)
     {
         m_insertionSet.insertNode(
-            m_nodeIndex, SpecNone, Phantom, m_node->codeOrigin, m_node->children);
+            m_nodeIndex, SpecNone, Phantom, m_node->origin, m_node->children);
         m_node->children.removeEdge(childIndex ^ 1);
         m_node->convertToIdentity();
         m_changed = true;
@@ -172,10 +322,32 @@ private:
     void prepareToFoldTypedArray(JSArrayBufferView* view)
     {
         m_insertionSet.insertNode(
-            m_nodeIndex, SpecNone, TypedArrayWatchpoint, m_node->codeOrigin,
+            m_nodeIndex, SpecNone, TypedArrayWatchpoint, m_node->origin,
             OpInfo(view));
         m_insertionSet.insertNode(
-            m_nodeIndex, SpecNone, Phantom, m_node->codeOrigin, m_node->children);
+            m_nodeIndex, SpecNone, Phantom, m_node->origin, m_node->children);
+    }
+    
+    void handleCommutativity()
+    {
+        // If the right side is a constant then there is nothing left to do.
+        if (m_node->child2()->hasConstant())
+            return;
+        
+        // This case ensures that optimizations that look for x + const don't also have
+        // to look for const + x.
+        if (m_node->child1()->hasConstant()) {
+            std::swap(m_node->child1(), m_node->child2());
+            m_changed = true;
+            return;
+        }
+        
+        // This case ensures that CSE is commutativity-aware.
+        if (m_node->child1().node() > m_node->child2().node()) {
+            std::swap(m_node->child1(), m_node->child2());
+            m_changed = true;
+            return;
+        }
     }
     
     InsertionSet m_insertionSet;

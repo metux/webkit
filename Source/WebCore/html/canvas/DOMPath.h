@@ -28,15 +28,11 @@
 #ifndef DOMPath_h
 #define DOMPath_h
 
-#if ENABLE(CANVAS_PATH)
-
 #include "CanvasPathMethods.h"
+#include "SVGMatrix.h"
+#include "SVGPathUtilities.h"
 #include <wtf/PassRefPtr.h>
 #include <wtf/RefCounted.h>
-
-#if ENABLE(SVG)
-#include "SVGPathUtilities.h"
-#endif
 
 namespace WebCore {
 
@@ -47,12 +43,20 @@ public:
     static PassRefPtr<DOMPath> create(const Path& path) { return adoptRef(new DOMPath(path)); }
     static PassRefPtr<DOMPath> create(const DOMPath* path) { return create(path->path()); }
 
-#if ENABLE(SVG)
     static PassRefPtr<DOMPath> create(const String& pathData)
     {
         Path path;
         buildPathFromString(pathData, path);
         return create(path);
+    }
+
+#if ENABLE(CANVAS_PATH)
+    void addPath(const DOMPath* path) { addPath(path, AffineTransform()); }
+    void addPath(const DOMPath* path, const AffineTransform& transform)
+    {
+        if (!path || !transform.isInvertible())
+            return;
+        m_path.addPath(path->path(), transform);
     }
 #endif
 
@@ -64,7 +68,4 @@ private:
 };
 
 }
-
-#endif
-
 #endif

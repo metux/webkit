@@ -62,10 +62,8 @@ interface HTMLInputElement : HTMLElement {
 #else
     [TreatNullAs=NullString] attribute DOMString value;
 #endif
-#if !defined(LANGUAGE_CPP) || !LANGUAGE_CPP
     [SetterRaisesException] attribute Date valueAsDate;
-#endif
-    [SetterRaisesException] attribute double valueAsNumber;
+    [SetterRaisesException] attribute unrestricted double valueAsNumber;
 
     [RaisesException] void stepUp(optional long n);
     [RaisesException] void stepDown(optional long n);
@@ -100,12 +98,8 @@ interface HTMLInputElement : HTMLElement {
 
     // Non-standard attributes
     [Reflect] attribute DOMString align;
-    [Conditional=DIRECTORY_UPLOAD, Reflect] attribute boolean webkitdirectory;
     [Reflect] attribute DOMString useMap;
     [Reflect] attribute boolean incremental;
-    [Conditional=INPUT_SPEECH, Reflect] attribute boolean webkitSpeech;
-    [Conditional=INPUT_SPEECH, Reflect] attribute boolean webkitGrammar;
-    [Conditional=INPUT_SPEECH, NotEnumerable] attribute EventListener onwebkitspeechchange;
 
 #if defined(LANGUAGE_OBJECTIVE_C) && LANGUAGE_OBJECTIVE_C
     [Reflect] attribute DOMString accessKey;
@@ -129,5 +123,5 @@ interface HTMLInputElement : HTMLElement {
     [Conditional=IOS_AUTOCORRECT_AND_AUTOCAPITALIZE, TreatNullAs=NullString] attribute DOMString autocapitalize;
 
     // See http://www.w3.org/TR/html-media-capture/
-    [Conditional=MEDIA_CAPTURE] attribute DOMString capture;
+    [Conditional=MEDIA_CAPTURE, Reflect] attribute boolean capture;
 };

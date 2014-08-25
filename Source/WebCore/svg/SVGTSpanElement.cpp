@@ -19,8 +19,6 @@
  */
 
 #include "config.h"
-
-#if ENABLE(SVG)
 #include "SVGTSpanElement.h"
 
 #include "RenderInline.h"
@@ -42,7 +40,7 @@ PassRefPtr<SVGTSpanElement> SVGTSpanElement::create(const QualifiedName& tagName
 
 RenderPtr<RenderElement> SVGTSpanElement::createElementRenderer(PassRef<RenderStyle> style)
 {
-    return createRenderer<RenderSVGTSpan>(*this, std::move(style));
+    return createRenderer<RenderSVGTSpan>(*this, WTF::move(style));
 }
 
 bool SVGTSpanElement::childShouldCreateRenderer(const Node& child) const
@@ -75,5 +73,3 @@ bool SVGTSpanElement::rendererIsNeeded(const RenderStyle& style)
 }
 
 }
-
-#endif // ENABLE(SVG)

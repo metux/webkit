@@ -42,7 +42,7 @@ class WebContext;
 class WebProcessProxy;
 class WebSecurityOrigin;
 
-typedef GenericCallback<WKArrayRef> ArrayCallback;
+typedef GenericCallback<API::Array*> ArrayCallback;
 
 class WebResourceCacheManagerProxy : public API::ObjectImpl<API::Object::Type::CacheManager>, public WebContextSupplement, private IPC::MessageReceiver {
 public:
@@ -51,7 +51,7 @@ public:
     static PassRefPtr<WebResourceCacheManagerProxy> create(WebContext*);
     virtual ~WebResourceCacheManagerProxy();
 
-    void getCacheOrigins(PassRefPtr<ArrayCallback>);
+    void getCacheOrigins(std::function<void (API::Array*, CallbackBase::Error)>);
     void clearCacheForOrigin(WebSecurityOrigin*, ResourceCachesToClear);
     void clearCacheForAllOrigins(ResourceCachesToClear);
 

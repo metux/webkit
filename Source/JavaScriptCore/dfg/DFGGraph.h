@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011, 2012, 2013 Apple Inc. All rights reserved.
+ * Copyright (C) 2011, 2012, 2013, 2014 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -26,8 +26,6 @@
 #ifndef DFGGraph_h
 #define DFGGraph_h
 
-#include <wtf/Platform.h>
-
 #if ENABLE(DFG_JIT)
 
 #include "AssemblyHelpers.h"
@@ -35,15 +33,16 @@
 #include "DFGArgumentPosition.h"
 #include "DFGBasicBlock.h"
 #include "DFGDominators.h"
+#include "DFGFrozenValue.h"
 #include "DFGLongLivedState.h"
 #include "DFGNaturalLoops.h"
 #include "DFGNode.h"
 #include "DFGNodeAllocator.h"
 #include "DFGPlan.h"
-#include "DFGVariadicFunction.h"
-#include "InlineCallFrameSet.h"
+#include "DFGScannable.h"
 #include "JSStack.h"
 #include "MethodOfGettingAValueProfile.h"
+#include <unordered_map>
 #include <wtf/BitVector.h>
 #include <wtf/HashMap.h>
 #include <wtf/Vector.h>
@@ -78,7 +77,7 @@ enum AddSpeculationMode {
 //
 // The order may be significant for nodes with side-effects (property accesses, value conversions).
 // Nodes that are 'dead' remain in the vector with refCount 0.
-class Graph {
+class Graph : public virtual Scannable {
 public:
     Graph(VM&, Plan&, LongLivedState&);
     ~Graph();
@@ -126,7 +125,7 @@ public:
             return;
         
         // Check if there is any replacement.
-        Node* replacement = child->misc.replacement;
+        Node* replacement = child->replacement;
         if (!replacement)
             return;
         
@@ -134,55 +133,33 @@ public:
         
         // There is definitely a replacement. Assert that the replacement does not
         // have a replacement.
-        ASSERT(!child->misc.replacement);
+        ASSERT(!child->replacement);
     }
     
-#define DFG_DEFINE_ADD_NODE(templatePre, templatePost, typeParams, valueParamsComma, valueParams, valueArgs) \
-    templatePre typeParams templatePost Node* addNode(SpeculatedType type valueParamsComma valueParams) \
-    { \
-        Node* node = new (m_allocator) Node(valueArgs); \
-        node->predict(type); \
-        return node; \
+    template<typename... Params>
+    Node* addNode(SpeculatedType type, Params... params)
+    {
+        Node* node = new (m_allocator) Node(params...);
+        node->predict(type);
+        return node;
     }
-    DFG_VARIADIC_TEMPLATE_FUNCTION(DFG_DEFINE_ADD_NODE)
-#undef DFG_DEFINE_ADD_NODE
 
     void dethread();
     
-    void convertToConstant(Node* node, unsigned constantNumber)
-    {
-        if (node->op() == GetLocal)
-            dethread();
-        else
-            ASSERT(!node->hasVariableAccessData(*this));
-        node->convertToConstant(constantNumber);
-    }
+    FrozenValue* freezeFragile(JSValue value);
+    FrozenValue* freeze(JSValue value); // We use weak freezing by default. Shorthand for freezeFragile(value)->strengthenTo(WeakValue);
+    FrozenValue* freezeStrong(JSValue value); // Shorthand for freezeFragile(value)->strengthenTo(StrongValue).
     
-    unsigned constantRegisterForConstant(JSValue value)
-    {
-        unsigned constantRegister;
-        if (!m_codeBlock->findConstant(value, constantRegister)) {
-            constantRegister = m_codeBlock->addConstantLazily();
-            initializeLazyWriteBarrierForConstant(
-                m_plan.writeBarriers,
-                m_codeBlock->constants()[constantRegister],
-                m_codeBlock,
-                constantRegister,
-                m_codeBlock->ownerExecutable(),
-                value);
-        }
-        return constantRegister;
-    }
+    void convertToConstant(Node* node, FrozenValue* value);
+    void convertToConstant(Node* node, JSValue value);
+    void convertToStrongConstant(Node* node, JSValue value);
     
-    void convertToConstant(Node* node, JSValue value)
-    {
-        convertToConstant(node, constantRegisterForConstant(value));
-    }
-
+    void assertIsWatched(Structure* structure);
+    
     // CodeBlock is optional, but may allow additional information to be dumped (e.g. Identifier names).
     void dump(PrintStream& = WTF::dataFile(), DumpContext* = 0);
     enum PhiNodeDumpMode { DumpLivePhisOnly, DumpAllPhis };
-    void dumpBlockHeader(PrintStream&, const char* prefix, BasicBlock*, PhiNodeDumpMode, DumpContext* context);
+    void dumpBlockHeader(PrintStream&, const char* prefix, BasicBlock*, PhiNodeDumpMode, DumpContext*);
     void dump(PrintStream&, Edge);
     void dump(PrintStream&, const char* prefix, Node*, DumpContext* = 0);
     static int amountOfNodeWhiteSpace(Node*);
@@ -190,49 +167,54 @@ public:
 
     // Dump the code origin of the given node as a diff from the code origin of the
     // preceding node. Returns true if anything was printed.
-    bool dumpCodeOrigin(PrintStream&, const char* prefix, Node* previousNode, Node* currentNode, DumpContext* context);
+    bool dumpCodeOrigin(PrintStream&, const char* prefix, Node* previousNode, Node* currentNode, DumpContext*);
 
-    SpeculatedType getJSConstantSpeculation(Node* node)
-    {
-        return speculationFromValue(node->valueOfJSConstant(m_codeBlock));
-    }
-    
-    AddSpeculationMode addSpeculationMode(Node* add, bool leftShouldSpeculateInt32, bool rightShouldSpeculateInt32)
+    AddSpeculationMode addSpeculationMode(Node* add, bool leftShouldSpeculateInt32, bool rightShouldSpeculateInt32, PredictionPass pass)
     {
         ASSERT(add->op() == ValueAdd || add->op() == ArithAdd || add->op() == ArithSub);
+        
+        RareCaseProfilingSource source = add->sourceFor(pass);
         
         Node* left = add->child1().node();
         Node* right = add->child2().node();
         
         if (left->hasConstant())
-            return addImmediateShouldSpeculateInt32(add, rightShouldSpeculateInt32, left);
+            return addImmediateShouldSpeculateInt32(add, rightShouldSpeculateInt32, left, source);
         if (right->hasConstant())
-            return addImmediateShouldSpeculateInt32(add, leftShouldSpeculateInt32, right);
+            return addImmediateShouldSpeculateInt32(add, leftShouldSpeculateInt32, right, source);
         
-        return (leftShouldSpeculateInt32 && rightShouldSpeculateInt32 && add->canSpeculateInt32()) ? SpeculateInt32 : DontSpeculateInt32;
+        return (leftShouldSpeculateInt32 && rightShouldSpeculateInt32 && add->canSpeculateInt32(source)) ? SpeculateInt32 : DontSpeculateInt32;
     }
     
-    AddSpeculationMode valueAddSpeculationMode(Node* add)
+    AddSpeculationMode valueAddSpeculationMode(Node* add, PredictionPass pass)
     {
-        return addSpeculationMode(add, add->child1()->shouldSpeculateInt32ExpectingDefined(), add->child2()->shouldSpeculateInt32ExpectingDefined());
+        return addSpeculationMode(
+            add,
+            add->child1()->shouldSpeculateInt32OrBooleanExpectingDefined(),
+            add->child2()->shouldSpeculateInt32OrBooleanExpectingDefined(),
+            pass);
     }
     
-    AddSpeculationMode arithAddSpeculationMode(Node* add)
+    AddSpeculationMode arithAddSpeculationMode(Node* add, PredictionPass pass)
     {
-        return addSpeculationMode(add, add->child1()->shouldSpeculateInt32ForArithmetic(), add->child2()->shouldSpeculateInt32ForArithmetic());
+        return addSpeculationMode(
+            add,
+            add->child1()->shouldSpeculateInt32OrBooleanForArithmetic(),
+            add->child2()->shouldSpeculateInt32OrBooleanForArithmetic(),
+            pass);
     }
     
-    AddSpeculationMode addSpeculationMode(Node* add)
+    AddSpeculationMode addSpeculationMode(Node* add, PredictionPass pass)
     {
         if (add->op() == ValueAdd)
-            return valueAddSpeculationMode(add);
+            return valueAddSpeculationMode(add, pass);
         
-        return arithAddSpeculationMode(add);
+        return arithAddSpeculationMode(add, pass);
     }
     
-    bool addShouldSpeculateInt32(Node* add)
+    bool addShouldSpeculateInt32(Node* add, PredictionPass pass)
     {
-        return addSpeculationMode(add) != DontSpeculateInt32;
+        return addSpeculationMode(add, pass) != DontSpeculateInt32;
     }
     
     bool addShouldSpeculateMachineInt(Node* add)
@@ -252,18 +234,18 @@ public:
         return speculation && !hasExitSite(add, Int52Overflow);
     }
     
-    bool mulShouldSpeculateInt32(Node* mul)
+    bool mulShouldSpeculateInt32(Node* mul, PredictionPass pass)
     {
         ASSERT(mul->op() == ArithMul);
         
         Node* left = mul->child1().node();
         Node* right = mul->child2().node();
         
-        return Node::shouldSpeculateInt32ForArithmetic(left, right)
-            && mul->canSpeculateInt32();
+        return Node::shouldSpeculateInt32OrBooleanForArithmetic(left, right)
+            && mul->canSpeculateInt32(mul->sourceFor(pass));
     }
     
-    bool mulShouldSpeculateMachineInt(Node* mul)
+    bool mulShouldSpeculateMachineInt(Node* mul, PredictionPass pass)
     {
         ASSERT(mul->op() == ArithMul);
         
@@ -274,24 +256,25 @@ public:
         Node* right = mul->child2().node();
 
         return Node::shouldSpeculateMachineInt(left, right)
-            && mul->canSpeculateInt52()
+            && mul->canSpeculateInt52(pass)
             && !hasExitSite(mul, Int52Overflow);
     }
     
-    bool negateShouldSpeculateInt32(Node* negate)
+    bool negateShouldSpeculateInt32(Node* negate, PredictionPass pass)
     {
         ASSERT(negate->op() == ArithNegate);
-        return negate->child1()->shouldSpeculateInt32ForArithmetic() && negate->canSpeculateInt32();
+        return negate->child1()->shouldSpeculateInt32OrBooleanForArithmetic()
+            && negate->canSpeculateInt32(pass);
     }
     
-    bool negateShouldSpeculateMachineInt(Node* negate)
+    bool negateShouldSpeculateMachineInt(Node* negate, PredictionPass pass)
     {
         ASSERT(negate->op() == ArithNegate);
         if (!enableInt52())
             return false;
         return negate->child1()->shouldSpeculateMachineInt()
             && !hasExitSite(negate, Int52Overflow)
-            && negate->canSpeculateInt52();
+            && negate->canSpeculateInt52(pass);
     }
     
     VirtualRegister bytecodeRegisterForArgument(CodeOrigin codeOrigin, int argument)
@@ -301,82 +284,6 @@ public:
             baselineCodeBlockFor(codeOrigin)->argumentIndexAfterCapture(argument));
     }
     
-    // Helper methods to check nodes for constants.
-    bool isConstant(Node* node)
-    {
-        return node->hasConstant();
-    }
-    bool isJSConstant(Node* node)
-    {
-        return node->hasConstant();
-    }
-    bool isInt32Constant(Node* node)
-    {
-        return node->isInt32Constant(m_codeBlock);
-    }
-    bool isDoubleConstant(Node* node)
-    {
-        return node->isDoubleConstant(m_codeBlock);
-    }
-    bool isNumberConstant(Node* node)
-    {
-        return node->isNumberConstant(m_codeBlock);
-    }
-    bool isBooleanConstant(Node* node)
-    {
-        return node->isBooleanConstant(m_codeBlock);
-    }
-    bool isCellConstant(Node* node)
-    {
-        if (!isJSConstant(node))
-            return false;
-        JSValue value = valueOfJSConstant(node);
-        return value.isCell() && !!value;
-    }
-    bool isFunctionConstant(Node* node)
-    {
-        if (!isJSConstant(node))
-            return false;
-        if (!getJSFunction(valueOfJSConstant(node)))
-            return false;
-        return true;
-    }
-    bool isInternalFunctionConstant(Node* node)
-    {
-        if (!isJSConstant(node))
-            return false;
-        JSValue value = valueOfJSConstant(node);
-        if (!value.isCell() || !value)
-            return false;
-        JSCell* cell = value.asCell();
-        if (!cell->inherits(InternalFunction::info()))
-            return false;
-        return true;
-    }
-    // Helper methods get constant values from nodes.
-    JSValue valueOfJSConstant(Node* node)
-    {
-        return node->valueOfJSConstant(m_codeBlock);
-    }
-    int32_t valueOfInt32Constant(Node* node)
-    {
-        return valueOfJSConstant(node).asInt32();
-    }
-    double valueOfNumberConstant(Node* node)
-    {
-        return valueOfJSConstant(node).asNumber();
-    }
-    bool valueOfBooleanConstant(Node* node)
-    {
-        return valueOfJSConstant(node).asBoolean();
-    }
-    JSFunction* valueOfFunctionConstant(Node* node)
-    {
-        JSCell* function = getJSFunction(valueOfJSConstant(node));
-        ASSERT(function);
-        return jsCast<JSFunction*>(function);
-    }
-
     static const char *opName(NodeType);
     
     StructureSet* addStructureSet(const StructureSet& structureSet)
@@ -384,12 +291,6 @@ public:
         ASSERT(structureSet.size());
         m_structureSet.append(structureSet);
         return &m_structureSet.last();
-    }
-    
-    StructureTransitionData* addStructureTransitionData(const StructureTransitionData& structureTransitionData)
-    {
-        m_structureTransitionData.append(structureTransitionData);
-        return &m_structureTransitionData.last();
     }
     
     JSGlobalObject* globalObjectFor(CodeOrigin codeOrigin)
@@ -442,8 +343,7 @@ public:
     
     bool masqueradesAsUndefinedWatchpointIsStillValid(const CodeOrigin& codeOrigin)
     {
-        return m_plan.watchpoints.isStillValid(
-            globalObjectFor(codeOrigin)->masqueradesAsUndefinedWatchpoint());
+        return globalObjectFor(codeOrigin)->masqueradesAsUndefinedWatchpoint()->isStillValid();
     }
     
     bool hasGlobalExitSite(const CodeOrigin& codeOrigin, ExitKind exitKind)
@@ -458,7 +358,7 @@ public:
     
     bool hasExitSite(Node* node, ExitKind exitKind)
     {
-        return hasExitSite(node->codeOrigin, exitKind);
+        return hasExitSite(node->origin.semantic, exitKind);
     }
     
     VirtualRegister argumentsRegisterFor(InlineCallFrame* inlineCallFrame)
@@ -532,7 +432,7 @@ public:
         if (!node)
             return 0;
         
-        CodeBlock* profiledBlock = baselineCodeBlockFor(node->codeOrigin);
+        CodeBlock* profiledBlock = baselineCodeBlockFor(node->origin.semantic);
         
         if (node->op() == GetArgument)
             return profiledBlock->valueProfileForArgument(node->local().toArgument());
@@ -549,7 +449,7 @@ public:
         }
         
         if (node->hasHeapPrediction())
-            return profiledBlock->valueProfileForBytecodeOffset(node->codeOrigin.bytecodeIndex);
+            return profiledBlock->valueProfileForBytecodeOffset(node->origin.semantic.bytecodeIndex);
         
         return 0;
     }
@@ -559,21 +459,16 @@ public:
         if (!node)
             return MethodOfGettingAValueProfile();
         
-        CodeBlock* profiledBlock = baselineCodeBlockFor(node->codeOrigin);
+        CodeBlock* profiledBlock = baselineCodeBlockFor(node->origin.semantic);
         
         if (node->op() == GetLocal) {
             return MethodOfGettingAValueProfile::fromLazyOperand(
                 profiledBlock,
                 LazyOperandValueProfileKey(
-                    node->codeOrigin.bytecodeIndex, node->local()));
+                    node->origin.semantic.bytecodeIndex, node->local()));
         }
         
         return MethodOfGettingAValueProfile(valueProfileFor(node));
-    }
-    
-    bool needsActivation() const
-    {
-        return m_codeBlock->needsFullScopeChain() && m_codeBlock->codeType() != GlobalCode;
     }
     
     bool usesArguments() const
@@ -674,8 +569,6 @@ public:
     void determineReachability();
     void resetReachability();
     
-    void resetExitStates();
-    
     unsigned varArgNumChildren(Node* node)
     {
         ASSERT(node->flags() & NodeHasVarArgs);
@@ -702,7 +595,7 @@ public:
         return node->children.child(index);
     }
     
-    void voteNode(Node* node, unsigned ballot)
+    void voteNode(Node* node, unsigned ballot, float weight = 1)
     {
         switch (node->op()) {
         case ValueToInt32:
@@ -714,35 +607,35 @@ public:
         }
         
         if (node->op() == GetLocal)
-            node->variableAccessData()->vote(ballot);
+            node->variableAccessData()->vote(ballot, weight);
     }
     
-    void voteNode(Edge edge, unsigned ballot)
+    void voteNode(Edge edge, unsigned ballot, float weight = 1)
     {
-        voteNode(edge.node(), ballot);
+        voteNode(edge.node(), ballot, weight);
     }
     
-    void voteChildren(Node* node, unsigned ballot)
+    void voteChildren(Node* node, unsigned ballot, float weight = 1)
     {
         if (node->flags() & NodeHasVarArgs) {
             for (unsigned childIdx = node->firstChild();
                 childIdx < node->firstChild() + node->numChildren();
                 childIdx++) {
                 if (!!m_varArgChildren[childIdx])
-                    voteNode(m_varArgChildren[childIdx], ballot);
+                    voteNode(m_varArgChildren[childIdx], ballot, weight);
             }
             return;
         }
         
         if (!node->child1())
             return;
-        voteNode(node->child1(), ballot);
+        voteNode(node->child1(), ballot, weight);
         if (!node->child2())
             return;
-        voteNode(node->child2(), ballot);
+        voteNode(node->child2(), ballot, weight);
         if (!node->child3())
             return;
-        voteNode(node->child3(), ballot);
+        voteNode(node->child3(), ballot, weight);
     }
     
     template<typename T> // T = Node* or Edge
@@ -777,24 +670,32 @@ public:
     
     void invalidateCFG();
     
+    void clearFlagsOnAllNodes(NodeFlags);
+    
     void clearReplacements();
     void initializeNodeOwners();
     
-    void getBlocksInDepthFirstOrder(Vector<BasicBlock*>& result);
+    void getBlocksInPreOrder(Vector<BasicBlock*>& result);
+    void getBlocksInPostOrder(Vector<BasicBlock*>& result);
     
     Profiler::Compilation* compilation() { return m_plan.compilation.get(); }
     
     DesiredIdentifiers& identifiers() { return m_plan.identifiers; }
     DesiredWatchpoints& watchpoints() { return m_plan.watchpoints; }
-    DesiredStructureChains& chains() { return m_plan.chains; }
     
     FullBytecodeLiveness& livenessFor(CodeBlock*);
     FullBytecodeLiveness& livenessFor(InlineCallFrame*);
     bool isLiveInBytecode(VirtualRegister, CodeOrigin);
     
     unsigned frameRegisterCount();
+    unsigned stackPointerOffset();
     unsigned requiredRegisterCountForExit();
     unsigned requiredRegisterCountForExecutionAndExit();
+    
+    JSValue tryGetConstantProperty(JSValue base, const StructureSet&, PropertyOffset);
+    JSValue tryGetConstantProperty(JSValue base, Structure*, PropertyOffset);
+    JSValue tryGetConstantProperty(JSValue base, const StructureAbstractValue&, PropertyOffset);
+    JSValue tryGetConstantProperty(const AbstractValue&, PropertyOffset);
     
     JSActivation* tryGetActivation(Node*);
     WriteBarrierBase<Unknown>* tryGetRegisters(Node*);
@@ -803,6 +704,14 @@ public:
     JSArrayBufferView* tryGetFoldableView(Node*, ArrayMode);
     JSArrayBufferView* tryGetFoldableViewForChild1(Node*);
     
+    void registerFrozenValues();
+    
+    virtual void visitChildren(SlotVisitor&) override;
+    
+    NO_RETURN_DUE_TO_CRASH void handleAssertionFailure(
+        Node* node, const char* file, int line, const char* function,
+        const char* assertion);
+    
     VM& m_vm;
     Plan& m_plan;
     CodeBlock* m_codeBlock;
@@ -810,20 +719,26 @@ public:
     
     NodeAllocator& m_allocator;
 
-    Operands<AbstractValue> m_mustHandleAbstractValues;
+    Operands<FrozenValue*> m_mustHandleValues;
     
     Vector< RefPtr<BasicBlock> , 8> m_blocks;
     Vector<Edge, 16> m_varArgChildren;
+
+    HashMap<EncodedJSValue, FrozenValue*, EncodedJSValueHash, EncodedJSValueHashTraits> m_frozenValueMap;
+    Bag<FrozenValue> m_frozenValues;
+    
     Vector<StorageAccessData> m_storageAccessData;
     Vector<Node*, 8> m_arguments;
     SegmentedVector<VariableAccessData, 16> m_variableAccessData;
     SegmentedVector<ArgumentPosition, 8> m_argumentPositions;
     SegmentedVector<StructureSet, 16> m_structureSet;
-    SegmentedVector<StructureTransitionData, 8> m_structureTransitionData;
+    Bag<Transition> m_transitions;
     SegmentedVector<NewArrayBufferData, 4> m_newArrayBufferData;
-    SegmentedVector<SwitchData, 4> m_switchData;
+    Bag<BranchData> m_branchData;
+    Bag<SwitchData> m_switchData;
+    Bag<MultiGetByOffsetData> m_multiGetByOffsetData;
+    Bag<MultiPutByOffsetData> m_multiPutByOffsetData;
     Vector<InlineVariableData, 4> m_inlineVariableData;
-    OwnPtr<InlineCallFrameSet> m_inlineCallFrames;
     HashMap<CodeBlock*, std::unique_ptr<FullBytecodeLiveness>> m_bytecodeLiveness;
     bool m_hasArguments;
     HashSet<ExecutableBase*> m_executablesWhoseArgumentsEscaped;
@@ -835,29 +750,34 @@ public:
     unsigned m_parameterSlots;
     int m_machineCaptureStart;
     std::unique_ptr<SlowArgument[]> m_slowArguments;
+
+#if USE(JSVALUE32_64)
+    std::unordered_map<int64_t, double*> m_doubleConstantsMap;
+    std::unique_ptr<Bag<double>> m_doubleConstants;
+#endif
     
     OptimizationFixpointState m_fixpointState;
+    StructureWatchpointState m_structureWatchpointState;
     GraphForm m_form;
     UnificationState m_unificationState;
     RefCountState m_refCountState;
 private:
     
     void handleSuccessor(Vector<BasicBlock*, 16>& worklist, BasicBlock*, BasicBlock* successor);
-    void addForDepthFirstSort(Vector<BasicBlock*>& result, Vector<BasicBlock*, 16>& worklist, HashSet<BasicBlock*>& seen, BasicBlock*);
     
-    AddSpeculationMode addImmediateShouldSpeculateInt32(Node* add, bool variableShouldSpeculateInt32, Node* immediate)
+    AddSpeculationMode addImmediateShouldSpeculateInt32(Node* add, bool variableShouldSpeculateInt32, Node* immediate, RareCaseProfilingSource source)
     {
         ASSERT(immediate->hasConstant());
         
-        JSValue immediateValue = immediate->valueOfJSConstant(m_codeBlock);
-        if (!immediateValue.isNumber())
+        JSValue immediateValue = immediate->asJSValue();
+        if (!immediateValue.isNumber() && !immediateValue.isBoolean())
             return DontSpeculateInt32;
         
         if (!variableShouldSpeculateInt32)
             return DontSpeculateInt32;
         
-        if (immediateValue.isInt32())
-            return add->canSpeculateInt32() ? SpeculateInt32 : DontSpeculateInt32;
+        if (immediateValue.isInt32() || immediateValue.isBoolean())
+            return add->canSpeculateInt32(source) ? SpeculateInt32 : DontSpeculateInt32;
         
         double doubleImmediate = immediateValue.asDouble();
         const double twoToThe48 = 281474976710656.0;
@@ -865,30 +785,6 @@ private:
             return DontSpeculateInt32;
         
         return bytecodeCanTruncateInteger(add->arithNodeFlags()) ? SpeculateInt32AndTruncateConstants : DontSpeculateInt32;
-    }
-    
-    bool mulImmediateShouldSpeculateInt32(Node* mul, Node* variable, Node* immediate)
-    {
-        ASSERT(immediate->hasConstant());
-        
-        JSValue immediateValue = immediate->valueOfJSConstant(m_codeBlock);
-        if (!immediateValue.isInt32())
-            return false;
-        
-        if (!variable->shouldSpeculateInt32ForArithmetic())
-            return false;
-        
-        int32_t intImmediate = immediateValue.asInt32();
-        // Doubles have a 53 bit mantissa so we expect a multiplication of 2^31 (the highest
-        // magnitude possible int32 value) and any value less than 2^22 to not result in any
-        // rounding in a double multiplication - hence it will be equivalent to an integer
-        // multiplication, if we are doing int32 truncation afterwards (which is what
-        // canSpeculateInt32() implies).
-        const int32_t twoToThe22 = 1 << 22;
-        if (intImmediate <= -twoToThe22 || intImmediate >= twoToThe22)
-            return mul->canSpeculateInt32() && !nodeMayOverflow(mul->arithNodeFlags());
-
-        return mul->canSpeculateInt32();
     }
 };
 
@@ -921,6 +817,17 @@ private:
             thingToDo(_node, _node->child3());                          \
         }                                                               \
     } while (false)
+
+#define DFG_ASSERT(graph, node, assertion) do {                         \
+        if (!!(assertion))                                              \
+            break;                                                      \
+        (graph).handleAssertionFailure(                                 \
+            (node), __FILE__, __LINE__, WTF_PRETTY_FUNCTION, #assertion); \
+    } while (false)
+
+#define DFG_CRASH(graph, node, reason)                                  \
+    (graph).handleAssertionFailure(                                     \
+        (node), __FILE__, __LINE__, WTF_PRETTY_FUNCTION, (reason));
 
 } } // namespace JSC::DFG
 

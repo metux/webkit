@@ -12,7 +12,7 @@
  * 2.  Redistributions in binary form must reproduce the above copyright
  *     notice, this list of conditions and the following disclaimer in the
  *     documentation and/or other materials provided with the distribution.
- * 3.  Neither the name of Apple Computer, Inc. ("Apple") nor the names of
+ * 3.  Neither the name of Apple Inc. ("Apple") nor the names of
  *     its contributors may be used to endorse or promote products derived
  *     from this software without specific prior written permission.
  *
@@ -52,7 +52,7 @@ namespace JSC {
 #define PROBE_ARG1_OFFSET (1 * PTR_SIZE)
 #define PROBE_ARG2_OFFSET (2 * PTR_SIZE)
 
-#define PROBE_FIRST_GPREG_OFFSET (4 * PTR_SIZE)
+#define PROBE_FIRST_GPREG_OFFSET (3 * PTR_SIZE)
 
 #define GPREG_SIZE 4
 #define PROBE_CPU_R0_OFFSET (PROBE_FIRST_GPREG_OFFSET + (0 * GPREG_SIZE))

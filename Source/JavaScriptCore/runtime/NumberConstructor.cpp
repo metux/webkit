@@ -25,15 +25,15 @@
 #include "Lookup.h"
 #include "NumberObject.h"
 #include "NumberPrototype.h"
-#include "Operations.h"
+#include "JSCInlines.h"
 
 namespace JSC {
 
-static EncodedJSValue numberConstructorNaNValue(ExecState*, EncodedJSValue, EncodedJSValue, PropertyName);
-static EncodedJSValue numberConstructorNegInfinity(ExecState*, EncodedJSValue, EncodedJSValue, PropertyName);
-static EncodedJSValue numberConstructorPosInfinity(ExecState*, EncodedJSValue, EncodedJSValue, PropertyName);
-static EncodedJSValue numberConstructorMaxValue(ExecState*, EncodedJSValue, EncodedJSValue, PropertyName);
-static EncodedJSValue numberConstructorMinValue(ExecState*, EncodedJSValue, EncodedJSValue, PropertyName);
+static EncodedJSValue numberConstructorNaNValue(ExecState*, JSObject*, EncodedJSValue, PropertyName);
+static EncodedJSValue numberConstructorNegInfinity(ExecState*, JSObject*, EncodedJSValue, PropertyName);
+static EncodedJSValue numberConstructorPosInfinity(ExecState*, JSObject*, EncodedJSValue, PropertyName);
+static EncodedJSValue numberConstructorMaxValue(ExecState*, JSObject*, EncodedJSValue, PropertyName);
+static EncodedJSValue numberConstructorMinValue(ExecState*, JSObject*, EncodedJSValue, PropertyName);
 
 } // namespace JSC
 
@@ -43,7 +43,7 @@ namespace JSC {
 
 STATIC_ASSERT_IS_TRIVIALLY_DESTRUCTIBLE(NumberConstructor);
 
-const ClassInfo NumberConstructor::s_info = { "Function", &InternalFunction::s_info, 0, ExecState::numberConstructorTable, CREATE_METHOD_TABLE(NumberConstructor) };
+const ClassInfo NumberConstructor::s_info = { "Function", &InternalFunction::s_info, &numberConstructorTable, CREATE_METHOD_TABLE(NumberConstructor) };
 
 /* Source for NumberConstructor.lut.h
 @begin numberConstructorTable
@@ -74,30 +74,30 @@ void NumberConstructor::finishCreation(VM& vm, NumberPrototype* numberPrototype)
 
 bool NumberConstructor::getOwnPropertySlot(JSObject* object, ExecState* exec, PropertyName propertyName, PropertySlot& slot)
 {
-    return getStaticValueSlot<NumberConstructor, InternalFunction>(exec, ExecState::numberConstructorTable(exec->vm()), jsCast<NumberConstructor*>(object), propertyName, slot);
+    return getStaticValueSlot<NumberConstructor, InternalFunction>(exec, numberConstructorTable, jsCast<NumberConstructor*>(object), propertyName, slot);
 }
 
-static EncodedJSValue numberConstructorNaNValue(ExecState*, EncodedJSValue, EncodedJSValue, PropertyName)
+static EncodedJSValue numberConstructorNaNValue(ExecState*, JSObject*, EncodedJSValue, PropertyName)
 {
     return JSValue::encode(jsNaN());
 }
 
-static EncodedJSValue numberConstructorNegInfinity(ExecState*, EncodedJSValue, EncodedJSValue, PropertyName)
+static EncodedJSValue numberConstructorNegInfinity(ExecState*, JSObject*, EncodedJSValue, PropertyName)
 {
     return JSValue::encode(jsNumber(-std::numeric_limits<double>::infinity()));
 }
 
-static EncodedJSValue numberConstructorPosInfinity(ExecState*, EncodedJSValue, EncodedJSValue, PropertyName)
+static EncodedJSValue numberConstructorPosInfinity(ExecState*, JSObject*, EncodedJSValue, PropertyName)
 {
     return JSValue::encode(jsNumber(std::numeric_limits<double>::infinity()));
 }
 
-static EncodedJSValue numberConstructorMaxValue(ExecState*, EncodedJSValue, EncodedJSValue, PropertyName)
+static EncodedJSValue numberConstructorMaxValue(ExecState*, JSObject*, EncodedJSValue, PropertyName)
 {
     return JSValue::encode(jsNumber(1.7976931348623157E+308));
 }
 
-static EncodedJSValue numberConstructorMinValue(ExecState*, EncodedJSValue, EncodedJSValue, PropertyName)
+static EncodedJSValue numberConstructorMinValue(ExecState*, JSObject*, EncodedJSValue, PropertyName)
 {
     return JSValue::encode(jsNumber(5E-324));
 }

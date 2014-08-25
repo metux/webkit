@@ -10,7 +10,7 @@
  * 2.  Redistributions in binary form must reproduce the above copyright
  *     notice, this list of conditions and the following disclaimer in the
  *     documentation and/or other materials provided with the distribution.
- * 3.  Neither the name of Apple Computer, Inc. ("Apple") nor the names of
+ * 3.  Neither the name of Apple Inc. ("Apple") nor the names of
  *     its contributors may be used to endorse or promote products derived
  *     from this software without specific prior written permission.
  *
@@ -63,7 +63,7 @@ public:
         
     static JSActivation* create(VM& vm, CallFrame* callFrame, CodeBlock* codeBlock)
     {
-        return create(vm, callFrame, callFrame->registers(), codeBlock);
+        return create(vm, callFrame, callFrame->registers() + codeBlock->framePointerOffsetToGetActivationRegisters(), codeBlock);
     }
 
     static void visitChildren(JSCell*, SlotVisitor&);
@@ -91,7 +91,7 @@ public:
     static int registersOffset(SymbolTable*);
 
 protected:
-    static const unsigned StructureFlags = OverridesGetOwnPropertySlot | OverridesVisitChildren | OverridesGetPropertyNames | Base::StructureFlags;
+    static const unsigned StructureFlags = OverridesGetOwnPropertySlot | OverridesGetPropertyNames | Base::StructureFlags;
 
 private:
     bool symbolTableGet(PropertyName, PropertySlot&);
@@ -100,7 +100,7 @@ private:
     bool symbolTablePut(ExecState*, PropertyName, JSValue, bool shouldThrow);
     bool symbolTablePutWithAttributes(VM&, PropertyName, JSValue, unsigned attributes);
 
-    static EncodedJSValue argumentsGetter(ExecState*, EncodedJSValue, EncodedJSValue, PropertyName);
+    static EncodedJSValue argumentsGetter(ExecState*, JSObject*, EncodedJSValue, PropertyName);
 
     static size_t allocationSize(SymbolTable*);
     static size_t storageOffset();

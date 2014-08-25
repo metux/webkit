@@ -11,10 +11,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -132,9 +132,11 @@ void WorkerScriptController::evaluate(const ScriptSourceCode& sourceCode, Deprec
     JSLockHolder lock(exec);
 
     JSValue evaluationException;
-    JSC::evaluate(exec, sourceCode.jsSourceCode(), m_workerGlobalScopeWrapper.get(), &evaluationException);
+    JSC::evaluate(exec, sourceCode.jsSourceCode(), m_workerGlobalScopeWrapper->globalThis(), &evaluationException);
 
-    if ((evaluationException && isTerminatedExecutionException(evaluationException)) ||  m_workerGlobalScopeWrapper->vm().watchdog.didFire()) {
+    VM& vm = exec->vm();
+    if ((evaluationException && isTerminatedExecutionException(evaluationException)) 
+        || (vm.watchdog && vm.watchdog->didFire())) {
         forbidExecution();
         return;
     }
@@ -162,14 +164,17 @@ void WorkerScriptController::scheduleExecutionTermination()
     // termination is scheduled, isExecutionTerminating will
     // accurately reflect that state when called from another thread.
     MutexLocker locker(m_scheduledTerminationMutex);
-    m_vm->watchdog.fire();
+    if (m_vm->watchdog)
+        m_vm->watchdog->fire();
 }
 
 bool WorkerScriptController::isExecutionTerminating() const
 {
     // See comments in scheduleExecutionTermination regarding mutex usage.
     MutexLocker locker(m_scheduledTerminationMutex);
-    return m_vm->watchdog.didFire();
+    if (m_vm->watchdog)
+        return m_vm->watchdog->didFire();
+    return false;
 }
 
 void WorkerScriptController::forbidExecution()

@@ -31,12 +31,10 @@
 
 [
     GlobalContext=DOMWindow&WorkerGlobalScope,
-    Conditional=BLOB,
     ActiveDOMObject,
     Constructor,
     ConstructorCallWith=ScriptExecutionContext,
     EventTarget,
-    JSNoStaticTables,
 ] interface FileReader {
     // ready states
     const unsigned short EMPTY = 0;

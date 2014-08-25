@@ -74,11 +74,7 @@ MouseRelatedEvent::MouseRelatedEvent(const AtomicString& eventType, bool canBubb
     Frame* frame = view() ? view()->frame() : 0;
     if (frame && !isSimulated) {
         if (FrameView* frameView = frame->view()) {
-#if !PLATFORM(IOS)
-            scrollPosition = frameView->scrollPosition();
-#else
-            scrollPosition = frameView->actualScrollPosition();
-#endif
+            scrollPosition = frameView->contentsScrollPosition();
             adjustedPageLocation = frameView->windowToContents(windowLocation);
             float scaleFactor = 1 / (frame->pageZoomFactor() * frame->frameScaleFactor());
             if (scaleFactor != 1.0f) {
@@ -208,6 +204,8 @@ int MouseRelatedEvent::layerY()
 
 int MouseRelatedEvent::offsetX()
 {
+    if (isSimulated())
+        return 0;
     if (!m_hasCachedRelativePosition)
         computeRelativePosition();
     return roundToInt(m_offsetLocation.x());
@@ -215,6 +213,8 @@ int MouseRelatedEvent::offsetX()
 
 int MouseRelatedEvent::offsetY()
 {
+    if (isSimulated())
+        return 0;
     if (!m_hasCachedRelativePosition)
         computeRelativePosition();
     return roundToInt(m_offsetLocation.y());

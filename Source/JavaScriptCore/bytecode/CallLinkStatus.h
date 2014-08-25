@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012, 2013 Apple Inc. All rights reserved.
+ * Copyright (C) 2012, 2013, 2014 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -26,7 +26,11 @@
 #ifndef CallLinkStatus_h
 #define CallLinkStatus_h
 
+#include "CallLinkInfo.h"
+#include "CodeOrigin.h"
 #include "CodeSpecializationKind.h"
+#include "ConcurrentJITLock.h"
+#include "ExitingJITType.h"
 #include "Intrinsic.h"
 #include "JSCJSValue.h"
 
@@ -37,12 +41,12 @@ class ExecutableBase;
 class InternalFunction;
 class JSFunction;
 class Structure;
+struct CallLinkInfo;
 
 class CallLinkStatus {
 public:
     CallLinkStatus()
         : m_executable(0)
-        , m_structure(0)
         , m_couldTakeSlowPath(false)
         , m_isProved(false)
     {
@@ -57,13 +61,11 @@ public:
     
     explicit CallLinkStatus(JSValue);
     
-    CallLinkStatus(ExecutableBase* executable, Structure* structure)
+    CallLinkStatus(ExecutableBase* executable)
         : m_executable(executable)
-        , m_structure(structure)
         , m_couldTakeSlowPath(false)
         , m_isProved(false)
     {
-        ASSERT(!!executable == !!structure);
     }
     
     CallLinkStatus& setIsProved(bool isProved)
@@ -72,33 +74,38 @@ public:
         return *this;
     }
     
-    static CallLinkStatus computeFor(CodeBlock*, unsigned bytecodeIndex);
-    
-    CallLinkStatus& setHasBadFunctionExitSite(bool didHaveExitSite)
-    {
-        ASSERT(!m_isProved);
-        if (didHaveExitSite) {
-            // Turn this into a closure call.
-            m_callTarget = JSValue();
+    static CallLinkStatus computeFor(
+        CodeBlock*, unsigned bytecodeIndex, const CallLinkInfoMap&);
+
+    struct ExitSiteData {
+        ExitSiteData()
+            : m_takesSlowPath(false)
+            , m_badFunction(false)
+        {
         }
-        return *this;
-    }
+        
+        bool m_takesSlowPath;
+        bool m_badFunction;
+    };
+    static ExitSiteData computeExitSiteData(const ConcurrentJITLocker&, CodeBlock*, unsigned bytecodeIndex, ExitingJITType = ExitFromAnything);
     
-    CallLinkStatus& setHasBadCacheExitSite(bool didHaveExitSite)
-    {
-        ASSERT(!m_isProved);
-        if (didHaveExitSite)
-            *this = takesSlowPath();
-        return *this;
-    }
+#if ENABLE(JIT)
+    // Computes the status assuming that we never took slow path and never previously
+    // exited.
+    static CallLinkStatus computeFor(const ConcurrentJITLocker&, CallLinkInfo&);
+    static CallLinkStatus computeFor(const ConcurrentJITLocker&, CallLinkInfo&, ExitSiteData);
+#endif
     
-    CallLinkStatus& setHasBadExecutableExitSite(bool didHaveExitSite)
-    {
-        ASSERT(!m_isProved);
-        if (didHaveExitSite)
-            *this = takesSlowPath();
-        return *this;
-    }
+    typedef HashMap<CodeOrigin, CallLinkStatus, CodeOriginApproximateHash> ContextMap;
+    
+    // Computes all of the statuses of the DFG code block. Doesn't include statuses that had
+    // no information. Currently we use this when compiling FTL code, to enable polyvariant
+    // inlining.
+    static void computeDFGStatuses(CodeBlock* dfgCodeBlock, ContextMap&);
+    
+    // Helper that first consults the ContextMap and then does computeFor().
+    static CallLinkStatus computeFor(
+        CodeBlock*, CodeOrigin, const CallLinkInfoMap&, const ContextMap&);
     
     bool isSet() const { return m_callTarget || m_executable || m_couldTakeSlowPath; }
     
@@ -112,18 +119,23 @@ public:
     InternalFunction* internalFunction() const;
     Intrinsic intrinsicFor(CodeSpecializationKind) const;
     ExecutableBase* executable() const { return m_executable; }
-    Structure* structure() const { return m_structure; }
     bool isProved() const { return m_isProved; }
     bool canOptimize() const { return (m_callTarget || m_executable) && !m_couldTakeSlowPath; }
     
     void dump(PrintStream&) const;
     
 private:
-    static CallLinkStatus computeFromLLInt(CodeBlock*, unsigned bytecodeIndex);
+    void makeClosureCall()
+    {
+        ASSERT(!m_isProved);
+        // Turn this into a closure call.
+        m_callTarget = JSValue();
+    }
+    
+    static CallLinkStatus computeFromLLInt(const ConcurrentJITLocker&, CodeBlock*, unsigned bytecodeIndex);
     
     JSValue m_callTarget;
     ExecutableBase* m_executable;
-    Structure* m_structure;
     bool m_couldTakeSlowPath;
     bool m_isProved;
 };

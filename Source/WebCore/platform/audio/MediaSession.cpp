@@ -26,11 +26,31 @@
 #include "config.h"
 #include "MediaSession.h"
 
+#if ENABLE(VIDEO)
 #include "HTMLMediaElement.h"
 #include "Logging.h"
+#include "MediaPlayer.h"
 #include "MediaSessionManager.h"
 
 namespace WebCore {
+
+const double kClientDataBufferingTimerThrottleDelay = 0.1;
+
+#if !LOG_DISABLED
+static const char* stateName(MediaSession::State state)
+{
+#define CASE(state) case MediaSession::state: return #state
+    switch (state) {
+    CASE(Idle);
+    CASE(Playing);
+    CASE(Paused);
+    CASE(Interrupted);
+    }
+
+    ASSERT_NOT_REACHED();
+    return "";
+}
+#endif
 
 std::unique_ptr<MediaSession> MediaSession::create(MediaSessionClient& client)
 {
@@ -39,10 +59,12 @@ std::unique_ptr<MediaSession> MediaSession::create(MediaSessionClient& client)
 
 MediaSession::MediaSession(MediaSessionClient& client)
     : m_client(client)
-    , m_state(Running)
+    , m_clientDataBufferingTimer(this, &MediaSession::clientDataBufferingTimerFired)
+    , m_state(Idle)
+    , m_stateToRestore(Idle)
+    , m_notifyingClient(false)
 {
-    m_type = m_client.mediaType();
-    ASSERT(m_type >= None && m_type <= WebAudio);
+    ASSERT(m_client.mediaType() >= None && m_client.mediaType() <= WebAudio);
     MediaSessionManager::sharedManager().addSession(*this);
 }
 
@@ -51,24 +73,141 @@ MediaSession::~MediaSession()
     MediaSessionManager::sharedManager().removeSession(*this);
 }
 
-void MediaSession::beginInterruption()
+void MediaSession::setState(State state)
 {
-    LOG(Media, "MediaSession::beginInterruption");
-    m_state = Interrupted;
-    m_client.beginInterruption();
+    LOG(Media, "MediaSession::setState(%p) - %s", this, stateName(state));
+    m_state = state;
+}
+
+void MediaSession::beginInterruption(InterruptionType type)
+{
+    LOG(Media, "MediaSession::beginInterruption(%p), state = %s", this, stateName(m_state));
+
+    if (type == EnteringBackground && client().overrideBackgroundPlaybackRestriction())
+        return;
+
+    m_stateToRestore = state();
+    m_notifyingClient = true;
+    client().pausePlayback();
+    setState(Interrupted);
+    m_notifyingClient = false;
 }
 
 void MediaSession::endInterruption(EndInterruptionFlags flags)
 {
-    LOG(Media, "MediaSession::endInterruption");
-    m_state = Running;
-    m_client.endInterruption(flags);
+    LOG(Media, "MediaSession::endInterruption(%p) - flags = %i, stateToRestore = %s", this, (int)flags, stateName(m_stateToRestore));
+
+    State stateToRestore = m_stateToRestore;
+    m_stateToRestore = Idle;
+    setState(Paused);
+
+    if (flags & MayResumePlaying && stateToRestore == Playing) {
+        LOG(Media, "MediaSession::endInterruption - resuming playback");
+        client().resumePlayback();
+    }
+}
+
+bool MediaSession::clientWillBeginPlayback()
+{
+    setState(Playing);
+    MediaSessionManager::sharedManager().sessionWillBeginPlayback(*this);
+    updateClientDataBuffering();
+    return true;
+}
+
+bool MediaSession::clientWillPausePlayback()
+{
+    LOG(Media, "MediaSession::clientWillPausePlayback(%p)- state = %s", this, stateName(m_state));
+    if (state() == Interrupted) {
+        if (!m_notifyingClient) {
+            m_stateToRestore = Paused;
+            LOG(Media, "      setting stateToRestore to \"Paused\"");
+        }
+        return false;
+    }
+    
+    setState(Paused);
+    MediaSessionManager::sharedManager().sessionWillEndPlayback(*this);
+    if (!m_clientDataBufferingTimer.isActive())
+        m_clientDataBufferingTimer.startOneShot(kClientDataBufferingTimerThrottleDelay);
+    return true;
 }
 
 void MediaSession::pauseSession()
 {
-    LOG(Media, "MediaSession::pauseSession");
+    LOG(Media, "MediaSession::pauseSession(%p)", this);
     m_client.pausePlayback();
 }
 
+MediaSession::MediaType MediaSession::mediaType() const
+{
+    return m_client.mediaType();
 }
+
+MediaSession::MediaType MediaSession::presentationType() const
+{
+    return m_client.presentationType();
+}
+
+String MediaSession::title() const
+{
+    return m_client.mediaSessionTitle();
+}
+
+double MediaSession::duration() const
+{
+    return m_client.mediaSessionDuration();
+}
+
+double MediaSession::currentTime() const
+{
+    return m_client.mediaSessionCurrentTime();
+}
+    
+bool MediaSession::canReceiveRemoteControlCommands() const
+{
+    return m_client.canReceiveRemoteControlCommands();
+}
+
+void MediaSession::didReceiveRemoteControlCommand(RemoteControlCommandType command)
+{
+    m_client.didReceiveRemoteControlCommand(command);
+}
+
+void MediaSession::visibilityChanged()
+{
+    if (!m_clientDataBufferingTimer.isActive())
+        m_clientDataBufferingTimer.startOneShot(kClientDataBufferingTimerThrottleDelay);
+}
+
+void MediaSession::clientDataBufferingTimerFired(Timer<WebCore::MediaSession> &)
+{
+    updateClientDataBuffering();
+}
+
+void MediaSession::updateClientDataBuffering()
+{
+    if (m_clientDataBufferingTimer.isActive())
+        m_clientDataBufferingTimer.stop();
+
+    bool shouldBuffer = m_state == Playing || !m_client.elementIsHidden();
+    m_client.setShouldBufferData(shouldBuffer);
+}
+
+String MediaSessionClient::mediaSessionTitle() const
+{
+    return String();
+}
+
+double MediaSessionClient::mediaSessionDuration() const
+{
+    return MediaPlayer::invalidTime();
+}
+
+double MediaSessionClient::mediaSessionCurrentTime() const
+{
+    return MediaPlayer::invalidTime();
+}
+
+}
+#endif

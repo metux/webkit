@@ -26,6 +26,8 @@
 #ifndef StyleGridData_h
 #define StyleGridData_h
 
+#if ENABLE(CSS_GRID_LAYOUT)
+
 #include "GridCoordinate.h"
 #include "GridTrackSize.h"
 #include "RenderStyleConstants.h"
@@ -37,6 +39,7 @@
 namespace WebCore {
 
 typedef HashMap<String, Vector<size_t>> NamedGridLinesMap;
+typedef HashMap<size_t, Vector<String>, WTF::IntHash<size_t>, WTF::UnsignedWithZeroKeyHashTraits<size_t>> OrderedNamedGridLinesMap;
 
 class StyleGridData : public RefCounted<StyleGridData> {
 public:
@@ -46,7 +49,7 @@ public:
     bool operator==(const StyleGridData& o) const
     {
         // FIXME: comparing two hashes doesn't look great for performance. Something to keep in mind going forward.
-        return m_gridColumns == o.m_gridColumns && m_gridRows == o.m_gridRows && m_gridAutoFlow == o.m_gridAutoFlow && m_gridAutoRows == o.m_gridAutoRows && m_gridAutoColumns == o.m_gridAutoColumns && m_namedGridColumnLines == o.m_namedGridColumnLines && m_namedGridRowLines == o.m_namedGridRowLines && m_namedGridArea == o.m_namedGridArea && m_namedGridArea == o.m_namedGridArea && m_namedGridAreaRowCount == o.m_namedGridAreaRowCount && m_namedGridAreaColumnCount == o.m_namedGridAreaColumnCount;
+        return m_gridColumns == o.m_gridColumns && m_gridRows == o.m_gridRows && m_gridAutoFlow == o.m_gridAutoFlow && m_gridAutoRows == o.m_gridAutoRows && m_gridAutoColumns == o.m_gridAutoColumns && m_namedGridColumnLines == o.m_namedGridColumnLines && m_namedGridRowLines == o.m_namedGridRowLines && m_namedGridArea == o.m_namedGridArea && m_namedGridArea == o.m_namedGridArea && m_namedGridAreaRowCount == o.m_namedGridAreaRowCount && m_namedGridAreaColumnCount == o.m_namedGridAreaColumnCount && m_orderedNamedGridRowLines == o.m_orderedNamedGridRowLines && m_orderedNamedGridColumnLines == o.m_orderedNamedGridColumnLines;
     }
 
     bool operator!=(const StyleGridData& o) const
@@ -61,7 +64,10 @@ public:
     NamedGridLinesMap m_namedGridColumnLines;
     NamedGridLinesMap m_namedGridRowLines;
 
-    GridAutoFlow m_gridAutoFlow;
+    OrderedNamedGridLinesMap m_orderedNamedGridColumnLines;
+    OrderedNamedGridLinesMap m_orderedNamedGridRowLines;
+
+    unsigned m_gridAutoFlow : GridAutoFlowBits;
 
     GridTrackSize m_gridAutoRows;
     GridTrackSize m_gridAutoColumns;
@@ -78,5 +84,7 @@ private:
 };
 
 } // namespace WebCore
+
+#endif /* ENABLE(CSS_GRID_LAYOUT) */
 
 #endif // StyleGridData_h

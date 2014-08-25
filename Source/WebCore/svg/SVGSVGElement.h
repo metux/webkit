@@ -21,7 +21,6 @@
 #ifndef SVGSVGElement_h
 #define SVGSVGElement_h
 
-#if ENABLE(SVG)
 #include "SVGAnimatedBoolean.h"
 #include "SVGAnimatedLength.h"
 #include "SVGAnimatedPreserveAspectRatio.h"
@@ -51,7 +50,6 @@ public:
     using SVGGraphicsElement::deref;
 
     virtual bool isValid() const override { return SVGTests::isValid(); }
-    virtual bool supportsFocus() const override { return true; }
 
     // 'SVGSVGElement' functions
     const AtomicString& contentScriptType() const;
@@ -70,14 +68,9 @@ public:
     bool useCurrentView() const { return m_useCurrentView; }
     SVGViewSpec* currentView();
 
-    enum ConsiderCSSMode {
-        RespectCSSProperties,
-        IgnoreCSSProperties
-    };
-
     // RenderSVGRoot wants to query the intrinsic size, by only examining the width/height attributes.
-    Length intrinsicWidth(ConsiderCSSMode = RespectCSSProperties) const;
-    Length intrinsicHeight(ConsiderCSSMode = RespectCSSProperties) const;
+    Length intrinsicWidth() const;
+    Length intrinsicHeight() const;
     FloatSize currentViewportSize() const;
     FloatRect currentViewBoxRect() const;
 
@@ -90,7 +83,7 @@ public:
     // Only used from the bindings.
     void updateCurrentTranslate();
 
-    SMILTimeContainer* timeContainer() const { return m_timeContainer.get(); }
+    SMILTimeContainer* timeContainer() { return m_timeContainer.get(); }
     
     void pauseAnimations();
     void unpauseAnimations();
@@ -123,10 +116,10 @@ public:
 
     void setupInitialView(const String& fragmentIdentifier, Element* anchorNode);
 
-    Element* getElementById(const AtomicString&);
+    bool hasIntrinsicWidth() const;
+    bool hasIntrinsicHeight() const;
 
-    bool widthAttributeEstablishesViewport() const;
-    bool heightAttributeEstablishesViewport() const;
+    Element* getElementById(const String&);
 
     SVGZoomAndPanType zoomAndPan() const { return m_zoomAndPan; }
     void setZoomAndPan(unsigned short zoomAndPan) { m_zoomAndPan = SVGZoomAndPan::parseFromNumber(zoomAndPan); }
@@ -186,5 +179,4 @@ NODE_TYPE_CASTS(SVGSVGElement)
 
 } // namespace WebCore
 
-#endif // ENABLE(SVG)
 #endif

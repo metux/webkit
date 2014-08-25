@@ -10,10 +10,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -40,6 +40,9 @@ public:
 
     template<class Argument1Type> T* allocateObject(const Argument1Type& argument1)
     {
+#if defined(ADDRESS_SANITIZER)
+        return new T(argument1);
+#else
         size_t roundedSize = roundUp(sizeof(T), minAlignment<T>());
         void* ptr = allocate(roundedSize);
         if (ptr) {
@@ -47,15 +50,20 @@ public:
             new(ptr) T(argument1);
         }
         return static_cast<T*>(ptr);
+#endif
     }
 
     void freeObject(T* ptr)
     {
+#if defined(ADDRESS_SANITIZER)
+        delete ptr;
+#else
         for (typename Vector<OwnPtr<FreeListChunk>>::const_iterator it = m_chunks.begin(), end = m_chunks.end(); it != end; ++it) {
             FreeListChunk* chunk = static_cast<FreeListChunk*>(it->get());
             if (chunk->contains(ptr))
                 chunk->free(ptr);
         }
+#endif
     }
 
 private:

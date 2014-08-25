@@ -37,8 +37,8 @@
 #include "ThreadableWebSocketChannel.h"
 #include "WebSocketChannelClient.h"
 #include "WorkerThreadableWebSocketChannel.h"
+#include <memory>
 #include <wtf/Forward.h>
-#include <wtf/OwnPtr.h>
 #include <wtf/PassOwnPtr.h>
 #include <wtf/Threading.h>
 #include <wtf/Vector.h>
@@ -92,16 +92,16 @@ public:
 private:
     ThreadableWebSocketChannelClientWrapper(ScriptExecutionContext*, WebSocketChannelClient*);
 
+    static void processPendingTasksCallback(ScriptExecutionContext&, PassRefPtr<ThreadableWebSocketChannelClientWrapper>);
     void processPendingTasks();
 
-    static void didConnectCallback(ScriptExecutionContext*, PassRefPtr<ThreadableWebSocketChannelClientWrapper>);
-    static void didReceiveMessageCallback(ScriptExecutionContext*, PassRefPtr<ThreadableWebSocketChannelClientWrapper>, const String& message);
-    static void didReceiveBinaryDataCallback(ScriptExecutionContext*, PassRefPtr<ThreadableWebSocketChannelClientWrapper>, PassOwnPtr<Vector<char>>);
-    static void didUpdateBufferedAmountCallback(ScriptExecutionContext*, PassRefPtr<ThreadableWebSocketChannelClientWrapper>, unsigned long bufferedAmount);
-    static void didStartClosingHandshakeCallback(ScriptExecutionContext*, PassRefPtr<ThreadableWebSocketChannelClientWrapper>);
-    static void didCloseCallback(ScriptExecutionContext*, PassRefPtr<ThreadableWebSocketChannelClientWrapper>, unsigned long unhandledBufferedAmount, WebSocketChannelClient::ClosingHandshakeCompletionStatus, unsigned short code, const String& reason);
-    static void processPendingTasksCallback(ScriptExecutionContext*, PassRefPtr<ThreadableWebSocketChannelClientWrapper>);
-    static void didReceiveMessageErrorCallback(ScriptExecutionContext*, PassRefPtr<ThreadableWebSocketChannelClientWrapper>);
+    static void didConnectCallback(ScriptExecutionContext&, PassRefPtr<ThreadableWebSocketChannelClientWrapper>);
+    static void didReceiveMessageCallback(ScriptExecutionContext&, PassRefPtr<ThreadableWebSocketChannelClientWrapper>, const String& message);
+    static void didReceiveBinaryDataCallback(ScriptExecutionContext&, PassRefPtr<ThreadableWebSocketChannelClientWrapper>, PassOwnPtr<Vector<char>>);
+    static void didUpdateBufferedAmountCallback(ScriptExecutionContext&, PassRefPtr<ThreadableWebSocketChannelClientWrapper>, unsigned long bufferedAmount);
+    static void didStartClosingHandshakeCallback(ScriptExecutionContext&, PassRefPtr<ThreadableWebSocketChannelClientWrapper>);
+    static void didCloseCallback(ScriptExecutionContext&, PassRefPtr<ThreadableWebSocketChannelClientWrapper>, unsigned long unhandledBufferedAmount, WebSocketChannelClient::ClosingHandshakeCompletionStatus, unsigned short code, const String& reason);
+    static void didReceiveMessageErrorCallback(ScriptExecutionContext&, PassRefPtr<ThreadableWebSocketChannelClientWrapper>);
 
     ScriptExecutionContext* m_context;
     WebSocketChannelClient* m_client;
@@ -114,7 +114,7 @@ private:
     ThreadableWebSocketChannel::SendResult m_sendRequestResult;
     unsigned long m_bufferedAmount;
     bool m_suspended;
-    Vector<OwnPtr<ScriptExecutionContext::Task>> m_pendingTasks;
+    Vector<std::unique_ptr<ScriptExecutionContext::Task>> m_pendingTasks;
 };
 
 } // namespace WebCore

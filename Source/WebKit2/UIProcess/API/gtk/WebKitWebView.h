@@ -38,16 +38,17 @@
 #include <webkit2/WebKitForwardDeclarations.h>
 #include <webkit2/WebKitHitTestResult.h>
 #include <webkit2/WebKitJavascriptResult.h>
+#include <webkit2/WebKitNavigationAction.h>
 #include <webkit2/WebKitPermissionRequest.h>
 #include <webkit2/WebKitPolicyDecision.h>
 #include <webkit2/WebKitScriptDialog.h>
 #include <webkit2/WebKitSettings.h>
 #include <webkit2/WebKitURIRequest.h>
+#include <webkit2/WebKitUserContentManager.h>
 #include <webkit2/WebKitWebContext.h>
 #include <webkit2/WebKitWebInspector.h>
 #include <webkit2/WebKitWebResource.h>
 #include <webkit2/WebKitWebViewBase.h>
-#include <webkit2/WebKitWebViewGroup.h>
 #include <webkit2/WebKitWindowProperties.h>
 
 G_BEGIN_DECLS
@@ -150,19 +151,6 @@ typedef enum {
 } WebKitInsecureContentEvent;
 
 /**
- * WebKitViewMode:
- * @WEBKIT_VIEW_MODE_WEB: The normal view mode to display web contents.
- * @WEBKIT_VIEW_MODE_SOURCE: The source mode to display web source code.
- *
- * Enum values to specify the different ways in which a #WebKitWebView
- * can display a web page.
- */
-typedef enum {
-    WEBKIT_VIEW_MODE_WEB,
-    WEBKIT_VIEW_MODE_SOURCE
-} WebKitViewMode;
-
-/**
  * WebKitSnapshotOptions:
  * @WEBKIT_SNAPSHOT_OPTIONS_NONE: Do not include any special options.
  * @WEBKIT_SNAPSHOT_OPTIONS_INCLUDE_SELECTION_HIGHLIGHTING: Whether to include in the
@@ -207,7 +195,8 @@ struct _WebKitWebViewClass {
                                                 const gchar                 *failing_uri,
                                                 GError                      *error);
 
-    GtkWidget *(* create)                      (WebKitWebView               *web_view);
+    GtkWidget *(* create)                      (WebKitWebView               *web_view,
+                                                WebKitNavigationAction      *navigation_action);
     void       (* ready_to_show)               (WebKitWebView               *web_view);
     void       (* run_as_modal)                (WebKitWebView               *web_view);
     void       (* close)                       (WebKitWebView               *web_view);
@@ -246,7 +235,8 @@ struct _WebKitWebViewClass {
     gboolean   (* authenticate)                (WebKitWebView               *web_view,
                                                 WebKitAuthenticationRequest *request);
     gboolean   (* load_failed_with_tls_errors) (WebKitWebView               *web_view,
-                                                WebKitCertificateInfo       *info,
+                                                GTlsCertificate             *certificate,
+                                                GTlsCertificateFlags         errors,
                                                 const gchar                 *host);
     void (*_webkit_reserved0) (void);
     void (*_webkit_reserved1) (void);
@@ -266,16 +256,16 @@ WEBKIT_API GtkWidget *
 webkit_web_view_new_with_context                     (WebKitWebContext          *context);
 
 WEBKIT_API GtkWidget *
+webkit_web_view_new_with_settings                    (WebKitSettings            *settings);
+
+WEBKIT_API GtkWidget *
 webkit_web_view_new_with_related_view                (WebKitWebView             *web_view);
 
 WEBKIT_API GtkWidget *
-webkit_web_view_new_with_group                       (WebKitWebViewGroup        *group);
+webkit_web_view_new_with_user_content_manager        (WebKitUserContentManager  *user_content_manager);
 
 WEBKIT_API WebKitWebContext *
 webkit_web_view_get_context                          (WebKitWebView             *web_view);
-
-WEBKIT_API WebKitWebViewGroup *
-webkit_web_view_get_group                            (WebKitWebView             *web_view);
 
 WEBKIT_API void
 webkit_web_view_load_uri                             (WebKitWebView             *web_view,
@@ -293,6 +283,13 @@ webkit_web_view_load_alternate_html                  (WebKitWebView             
 WEBKIT_API void
 webkit_web_view_load_plain_text                      (WebKitWebView             *web_view,
                                                       const gchar               *plain_text);
+
+WEBKIT_API void
+webkit_web_view_load_bytes                           (WebKitWebView             *web_view,
+                                                      GBytes                    *bytes,
+                                                      const gchar               *mime_type,
+                                                      const gchar               *encoding,
+                                                      const gchar               *base_uri);
 
 WEBKIT_API void
 webkit_web_view_load_request                         (WebKitWebView             *web_view,
@@ -450,13 +447,6 @@ WEBKIT_API WebKitDownload *
 webkit_web_view_download_uri                         (WebKitWebView             *web_view,
                                                       const char                *uri);
 
-WEBKIT_API void
-webkit_web_view_set_view_mode                        (WebKitWebView             *web_view,
-                                                      WebKitViewMode             view_mode);
-
-WEBKIT_API WebKitViewMode
-webkit_web_view_get_view_mode                        (WebKitWebView             *web_view);
-
 WEBKIT_API gboolean
 webkit_web_view_get_tls_info                         (WebKitWebView             *web_view,
                                                       GTlsCertificate          **certificate,
@@ -473,6 +463,10 @@ WEBKIT_API cairo_surface_t *
 webkit_web_view_get_snapshot_finish                  (WebKitWebView             *web_view,
                                                       GAsyncResult              *result,
                                                       GError                   **error);
+
+WEBKIT_API WebKitUserContentManager *
+webkit_web_view_get_user_content_manager             (WebKitWebView             *web_view);
+
 G_END_DECLS
 
 #endif

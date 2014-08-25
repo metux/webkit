@@ -65,6 +65,7 @@ void computeUsesForBytecodeOffset(
     case op_tear_off_activation:
     case op_profile_will_call:
     case op_profile_did_call:
+    case op_profile_types_with_high_fidelity:
     case op_throw:
     case op_push_with_scope:
     case op_end:
@@ -99,13 +100,10 @@ void computeUsesForBytecodeOffset(
         return;
     }
     case op_put_by_index:
-    case op_put_by_id_replace:
-    case op_put_by_id_transition:
     case op_put_by_id_transition_direct:
     case op_put_by_id_transition_direct_out_of_line:
     case op_put_by_id_transition_normal:
     case op_put_by_id_transition_normal_out_of_line:
-    case op_put_by_id_generic:
     case op_put_by_id_out_of_line:
     case op_put_by_id:
     case op_put_to_scope: {
@@ -119,6 +117,8 @@ void computeUsesForBytecodeOffset(
         functor(codeBlock, instruction, opcodeID, instruction[4].u.operand);
         return;
     }
+    case op_get_enumerable_length:
+    case op_to_index_string:
     case op_init_global_const_nop:
     case op_init_global_const:
     case op_push_name_scope:
@@ -126,18 +126,7 @@ void computeUsesForBytecodeOffset(
     case op_to_primitive:
     case op_get_by_id:
     case op_get_by_id_out_of_line:
-    case op_get_by_id_self:
-    case op_get_by_id_proto:
-    case op_get_by_id_chain:
-    case op_get_by_id_getter_self:
-    case op_get_by_id_getter_proto:
-    case op_get_by_id_getter_chain:
-    case op_get_by_id_custom_self:
-    case op_get_by_id_custom_proto:
-    case op_get_by_id_custom_chain:
-    case op_get_by_id_generic:
     case op_get_array_length:
-    case op_get_string_length:
     case op_get_arguments_length:
     case op_typeof:
     case op_is_undefined:
@@ -155,12 +144,15 @@ void computeUsesForBytecodeOffset(
     case op_captured_mov:
     case op_new_array_with_size:
     case op_create_this:
-    case op_get_pnames:
     case op_del_by_id:
     case op_unsigned: {
         functor(codeBlock, instruction, opcodeID, instruction[2].u.operand);
         return;
     }
+    case op_has_generic_property:
+    case op_get_structure_property_enumerator:
+    case op_has_indexed_property:
+    case op_next_enumerator_pname:
     case op_get_by_val:
     case op_get_argument_by_val:
     case op_in:
@@ -190,25 +182,20 @@ void computeUsesForBytecodeOffset(
         functor(codeBlock, instruction, opcodeID, instruction[3].u.operand);
         return;
     }
+    case op_has_structure_property:
+    case op_get_generic_property_enumerator:
+    case op_construct_varargs:
     case op_call_varargs: {
         functor(codeBlock, instruction, opcodeID, instruction[2].u.operand);
         functor(codeBlock, instruction, opcodeID, instruction[3].u.operand);
         functor(codeBlock, instruction, opcodeID, instruction[4].u.operand);
         return;
     }
-    case op_next_pname: {
+    case op_get_direct_pname: {
         functor(codeBlock, instruction, opcodeID, instruction[2].u.operand);
         functor(codeBlock, instruction, opcodeID, instruction[3].u.operand);
         functor(codeBlock, instruction, opcodeID, instruction[4].u.operand);
         functor(codeBlock, instruction, opcodeID, instruction[5].u.operand);
-        return;
-    }
-    case op_get_by_pname: {
-        functor(codeBlock, instruction, opcodeID, instruction[2].u.operand);
-        functor(codeBlock, instruction, opcodeID, instruction[3].u.operand);
-        functor(codeBlock, instruction, opcodeID, instruction[4].u.operand);
-        functor(codeBlock, instruction, opcodeID, instruction[5].u.operand);
-        functor(codeBlock, instruction, opcodeID, instruction[6].u.operand);
         return;
     }
     case op_switch_string:
@@ -291,25 +278,31 @@ void computeDefsForBytecodeOffset(CodeBlock* codeBlock, unsigned bytecodeOffset,
     case op_switch_string:
     case op_put_by_id:
     case op_put_by_id_out_of_line:
-    case op_put_by_id_replace:
-    case op_put_by_id_transition:
     case op_put_by_id_transition_direct:
     case op_put_by_id_transition_direct_out_of_line:
     case op_put_by_id_transition_normal:
     case op_put_by_id_transition_normal_out_of_line:
-    case op_put_by_id_generic:
     case op_put_getter_setter:
     case op_put_by_val:
     case op_put_by_val_direct:
     case op_put_by_index:
     case op_tear_off_arguments:
+    case op_profile_types_with_high_fidelity:
     case op_touch_entry:
 #define LLINT_HELPER_OPCODES(opcode, length) case opcode:
         FOR_EACH_LLINT_OPCODE_EXTENSION(LLINT_HELPER_OPCODES);
 #undef LLINT_HELPER_OPCODES
         return;
     // These all have a single destination for the first argument.
-    case op_next_pname:
+    case op_to_index_string:
+    case op_get_generic_property_enumerator:
+    case op_get_enumerable_length:
+    case op_has_indexed_property:
+    case op_has_structure_property:
+    case op_has_generic_property:
+    case op_get_direct_pname:
+    case op_get_structure_property_enumerator:
+    case op_next_enumerator_pname:
     case op_resolve_scope:
     case op_strcat:
     case op_tear_off_activation:
@@ -324,29 +317,18 @@ void computeDefsForBytecodeOffset(CodeBlock* codeBlock, unsigned bytecodeOffset,
     case op_new_captured_func:
     case op_new_func_exp:
     case op_call_varargs:
+    case op_construct_varargs:
     case op_get_from_scope:
     case op_call:
     case op_call_eval:
     case op_construct:
     case op_get_by_id:
     case op_get_by_id_out_of_line:
-    case op_get_by_id_self:
-    case op_get_by_id_proto:
-    case op_get_by_id_chain:
-    case op_get_by_id_getter_self:
-    case op_get_by_id_getter_proto:
-    case op_get_by_id_getter_chain:
-    case op_get_by_id_custom_self:
-    case op_get_by_id_custom_proto:
-    case op_get_by_id_custom_chain:
-    case op_get_by_id_generic:
     case op_get_array_length:
-    case op_get_string_length:
     case op_check_has_instance:
     case op_instanceof:
     case op_get_by_val:
     case op_get_argument_by_val:
-    case op_get_by_pname:
     case op_get_arguments_length:
     case op_typeof:
     case op_is_undefined:
@@ -394,12 +376,6 @@ void computeDefsForBytecodeOffset(CodeBlock* codeBlock, unsigned bytecodeOffset,
     case op_del_by_val:
     case op_unsigned: {
         functor(codeBlock, instruction, opcodeID, instruction[1].u.operand);
-        return;
-    }
-    case op_get_pnames: {
-        functor(codeBlock, instruction, opcodeID, instruction[1].u.operand);
-        functor(codeBlock, instruction, opcodeID, instruction[3].u.operand);
-        functor(codeBlock, instruction, opcodeID, instruction[4].u.operand);
         return;
     }
     case op_enter: {

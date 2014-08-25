@@ -78,7 +78,7 @@ public:
 
     static Structure* createStructure(VM& vm, JSGlobalObject* globalObject, JSValue prototype)
     {
-        return Structure::create(vm, globalObject, prototype, TypeInfo(CompoundType, StructureFlags), info());
+        return Structure::create(vm, globalObject, prototype, TypeInfo(CellType, StructureFlags), info());
     }
 
     static const bool needsDestruction = true;
@@ -96,7 +96,7 @@ public:
     void clear();
 
     DECLARE_INFO;
-    static const unsigned StructureFlags = OverridesVisitChildren | Base::StructureFlags;
+    static const unsigned StructureFlags = StructureIsImmortal | Base::StructureFlags;
 
 private:
     typedef WTF::UnsignedWithZeroKeyHashTraits<int32_t> IndexTraits;
@@ -142,12 +142,13 @@ private:
 
 ALWAYS_INLINE void MapData::clear()
 {
+    m_cellKeyedTable.clear();
     m_valueKeyedTable.clear();
     m_stringKeyedTable.clear();
     m_capacity = 0;
     m_size = 0;
     m_deletedCount = 0;
-    m_entries = 0;
+    m_entries = nullptr;
 }
 
 ALWAYS_INLINE MapData::KeyType::KeyType(JSValue v)

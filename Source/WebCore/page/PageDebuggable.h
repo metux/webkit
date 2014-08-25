@@ -46,7 +46,6 @@ public:
     virtual String name() const override;
     virtual String url() const override;
     virtual bool hasLocalDebugger() const override;
-    virtual pid_t parentProcessIdentifier() const override;
 
     virtual void connect(Inspector::InspectorFrontendChannel*) override;
     virtual void disconnect() override;
@@ -55,6 +54,7 @@ public:
 
 private:
     Page& m_page;
+    bool m_forcedDeveloperExtrasEnabled;
 };
 
 } // namespace WebCore

@@ -38,7 +38,7 @@
 
 namespace JSC {
 
-const ClassInfo MapData::s_info = { "MapData", 0, 0, 0, CREATE_METHOD_TABLE(MapData) };
+const ClassInfo MapData::s_info = { "MapData", 0, 0, CREATE_METHOD_TABLE(MapData) };
 
 static const int32_t minimumMapSize = 8;
 
@@ -208,7 +208,7 @@ CheckedBoolean MapData::ensureSpaceForAppend(CallFrame* callFrame)
         replaceAndPackBackingStore(newEntries, requiredSize);
     else
         replaceBackingStore(newEntries, requiredSize);
-    Heap::writeBarrier(this);
+    callFrame->heap()->writeBarrier(this);
     return true;
 }
 

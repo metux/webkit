@@ -26,7 +26,7 @@
 #ifndef PlatformWebView_h
 #define PlatformWebView_h
 
-#include <WebKit2/WKRetainPtr.h>
+#include <WebKit/WKRetainPtr.h>
 
 #if defined(__APPLE__) && __APPLE__
 #ifdef __OBJC__
@@ -43,12 +43,6 @@ typedef struct _GtkWidget GtkWidget;
 typedef WKViewRef PlatformWKView;
 typedef GtkWidget* PlatformWindow;
 #elif PLATFORM(EFL)
-typedef struct _Ecore_Evas Ecore_Evas;
-#if USE(EO)
-typedef struct _Eo_Opaque Evas_Object;
-#else
-typedef struct _Evas_Object Evas_Object;
-#endif
 typedef Evas_Object* PlatformWKView;
 typedef Ecore_Evas* PlatformWindow;
 #endif
@@ -80,7 +74,7 @@ public:
     void setWindowIsKey(bool isKey) { m_windowIsKey = isKey; }
     bool windowIsKey() const { return m_windowIsKey; }
 
-#if PLATFORM(MAC) || PLATFORM(EFL)
+#if PLATFORM(COCOA) || PLATFORM(EFL)
     bool viewSupportsOptions(WKDictionaryRef) const;
 #else
     bool viewSupportsOptions(WKDictionaryRef) const { return true; }
@@ -89,7 +83,11 @@ public:
     WKRetainPtr<WKImageRef> windowSnapshotImage();
     WKDictionaryRef options() const { return m_options.get(); }
 
+    void changeWindowScaleIfNeeded(float newScale);
+
 private:
+    void forceWindowFramesChanged();
+
     PlatformWKView m_view;
     PlatformWindow m_window;
     bool m_windowIsKey;

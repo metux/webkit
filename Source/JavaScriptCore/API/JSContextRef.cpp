@@ -10,36 +10,40 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
  * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
  * OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
- * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
 #include "config.h"
 #include "JSContextRef.h"
-#include "JSContextRefPrivate.h"
+#include "JSContextRefInternal.h"
 
 #include "APICast.h"
 #include "CallFrame.h"
-#include "CallFrameInlines.h"
 #include "InitializeThreading.h"
 #include "JSCallbackObject.h"
 #include "JSClassRef.h"
 #include "JSGlobalObject.h"
 #include "JSObject.h"
-#include "Operations.h"
+#include "JSCInlines.h"
 #include "SourceProvider.h"
 #include "StackVisitor.h"
 #include <wtf/text/StringBuilder.h>
 #include <wtf/text/StringHash.h>
+
+#if ENABLE(REMOTE_INSPECTOR)
+#include "JSGlobalObjectDebuggable.h"
+#include "JSGlobalObjectInspectorController.h"
+#endif
 
 #if OS(DARWIN)
 #include <mach-o/dyld.h>
@@ -68,16 +72,10 @@ JSContextGroupRef JSContextGroupRetain(JSContextGroupRef group)
 
 void JSContextGroupRelease(JSContextGroupRef group)
 {
-    IdentifierTable* savedIdentifierTable;
     VM& vm = *toJS(group);
 
-    {
-        JSLockHolder lock(vm);
-        savedIdentifierTable = wtfThreadData().setCurrentIdentifierTable(vm.identifierTable);
-        vm.deref();
-    }
-
-    wtfThreadData().setCurrentIdentifierTable(savedIdentifierTable);
+    JSLockHolder locker(&vm);
+    vm.deref();
 }
 
 static bool internalScriptTimeoutCallback(ExecState* exec, void* callbackPtr, void* callbackData)
@@ -91,8 +89,10 @@ static bool internalScriptTimeoutCallback(ExecState* exec, void* callbackPtr, vo
 void JSContextGroupSetExecutionTimeLimit(JSContextGroupRef group, double limit, JSShouldTerminateCallback callback, void* callbackData)
 {
     VM& vm = *toJS(group);
-    APIEntryShim entryShim(&vm);
-    Watchdog& watchdog = vm.watchdog;
+    JSLockHolder locker(&vm);
+    if (!vm.watchdog)
+        vm.watchdog = std::make_unique<Watchdog>();
+    Watchdog& watchdog = *vm.watchdog;
     if (callback) {
         void* callbackPtr = reinterpret_cast<void*>(callback);
         watchdog.setTimeLimit(vm, limit, internalScriptTimeoutCallback, callbackPtr, callbackData);
@@ -103,8 +103,10 @@ void JSContextGroupSetExecutionTimeLimit(JSContextGroupRef group, double limit, 
 void JSContextGroupClearExecutionTimeLimit(JSContextGroupRef group)
 {
     VM& vm = *toJS(group);
-    APIEntryShim entryShim(&vm);
-    Watchdog& watchdog = vm.watchdog;
+    JSLockHolder locker(&vm);
+    if (!vm.watchdog)
+        vm.watchdog = std::make_unique<Watchdog>();
+    Watchdog& watchdog = *vm.watchdog;
     watchdog.setTimeLimit(vm, std::numeric_limits<double>::infinity());
 }
 
@@ -131,12 +133,11 @@ JSGlobalContextRef JSGlobalContextCreateInGroup(JSContextGroupRef group, JSClass
 
     RefPtr<VM> vm = group ? PassRefPtr<VM>(toJS(group)) : VM::createContextGroup();
 
-    APIEntryShim entryShim(vm.get(), false);
+    JSLockHolder locker(vm.get());
     vm->makeUsableFromMultipleThreads();
 
     if (!globalObjectClass) {
         JSGlobalObject* globalObject = JSGlobalObject::create(*vm, JSGlobalObject::createStructure(*vm, jsNull()));
-        globalObject->setGlobalThis(*vm, JSProxy::create(*vm, JSProxy::createStructure(*vm, globalObject, globalObject->prototype()), globalObject));
         return JSGlobalContextRetain(toGlobalRef(globalObject->globalExec()));
     }
 
@@ -152,7 +153,7 @@ JSGlobalContextRef JSGlobalContextCreateInGroup(JSContextGroupRef group, JSClass
 JSGlobalContextRef JSGlobalContextRetain(JSGlobalContextRef ctx)
 {
     ExecState* exec = toJS(ctx);
-    APIEntryShim entryShim(exec);
+    JSLockHolder locker(exec);
 
     VM& vm = exec->vm();
     gcProtect(exec->vmEntryGlobalObject());
@@ -162,21 +163,14 @@ JSGlobalContextRef JSGlobalContextRetain(JSGlobalContextRef ctx)
 
 void JSGlobalContextRelease(JSGlobalContextRef ctx)
 {
-    IdentifierTable* savedIdentifierTable;
     ExecState* exec = toJS(ctx);
-    {
-        JSLockHolder lock(exec);
+    JSLockHolder locker(exec);
 
-        VM& vm = exec->vm();
-        savedIdentifierTable = wtfThreadData().setCurrentIdentifierTable(vm.identifierTable);
-
-        bool protectCountIsZero = Heap::heap(exec->vmEntryGlobalObject())->unprotect(exec->vmEntryGlobalObject());
-        if (protectCountIsZero)
-            vm.heap.reportAbandonedObjectGraph();
-        vm.deref();
-    }
-
-    wtfThreadData().setCurrentIdentifierTable(savedIdentifierTable);
+    VM& vm = exec->vm();
+    bool protectCountIsZero = Heap::heap(exec->vmEntryGlobalObject())->unprotect(exec->vmEntryGlobalObject());
+    if (protectCountIsZero)
+        vm.heap.reportAbandonedObjectGraph();
+    vm.deref();
 }
 
 JSObjectRef JSContextGetGlobalObject(JSContextRef ctx)
@@ -186,7 +180,7 @@ JSObjectRef JSContextGetGlobalObject(JSContextRef ctx)
         return 0;
     }
     ExecState* exec = toJS(ctx);
-    APIEntryShim entryShim(exec);
+    JSLockHolder locker(exec);
 
     return toRef(jsCast<JSObject*>(exec->lexicalGlobalObject()->methodTable()->toThis(exec->lexicalGlobalObject(), exec, NotStrictMode)));
 }
@@ -208,7 +202,7 @@ JSGlobalContextRef JSContextGetGlobalContext(JSContextRef ctx)
         return 0;
     }
     ExecState* exec = toJS(ctx);
-    APIEntryShim entryShim(exec);
+    JSLockHolder locker(exec);
 
     return toGlobalRef(exec->lexicalGlobalObject()->globalExec());
 }
@@ -221,7 +215,7 @@ JSStringRef JSGlobalContextCopyName(JSGlobalContextRef ctx)
     }
 
     ExecState* exec = toJS(ctx);
-    APIEntryShim entryShim(exec);
+    JSLockHolder locker(exec);
 
     String name = exec->vmEntryGlobalObject()->name();
     if (name.isNull())
@@ -238,7 +232,7 @@ void JSGlobalContextSetName(JSGlobalContextRef ctx, JSStringRef name)
     }
 
     ExecState* exec = toJS(ctx);
-    APIEntryShim entryShim(exec);
+    JSLockHolder locker(exec);
 
     exec->vmEntryGlobalObject()->setName(name ? name->string() : String());
 }
@@ -310,4 +304,104 @@ JSStringRef JSContextCreateBacktrace(JSContextRef ctx, unsigned maxStackSize)
     return OpaqueJSString::create(builder.toString()).leakRef();
 }
 
+bool JSGlobalContextGetRemoteInspectionEnabled(JSGlobalContextRef ctx)
+{
+    if (!ctx) {
+        ASSERT_NOT_REACHED();
+        return false;
+    }
 
+    ExecState* exec = toJS(ctx);
+    JSLockHolder lock(exec);
+
+    return exec->vmEntryGlobalObject()->remoteDebuggingEnabled();
+}
+
+void JSGlobalContextSetRemoteInspectionEnabled(JSGlobalContextRef ctx, bool enabled)
+{
+    if (!ctx) {
+        ASSERT_NOT_REACHED();
+        return;
+    }
+
+    ExecState* exec = toJS(ctx);
+    JSLockHolder lock(exec);
+
+    exec->vmEntryGlobalObject()->setRemoteDebuggingEnabled(enabled);
+}
+
+bool JSGlobalContextGetIncludesNativeCallStackWhenReportingExceptions(JSGlobalContextRef ctx)
+{
+#if ENABLE(REMOTE_INSPECTOR)
+    if (!ctx) {
+        ASSERT_NOT_REACHED();
+        return false;
+    }
+
+    ExecState* exec = toJS(ctx);
+    JSLockHolder lock(exec);
+
+    JSGlobalObject* globalObject = exec->vmEntryGlobalObject();
+    return globalObject->inspectorController().includesNativeCallStackWhenReportingExceptions();
+#else
+    UNUSED_PARAM(ctx);
+    return false;
+#endif
+}
+
+void JSGlobalContextSetIncludesNativeCallStackWhenReportingExceptions(JSGlobalContextRef ctx, bool includesNativeCallStack)
+{
+#if ENABLE(REMOTE_INSPECTOR)
+    if (!ctx) {
+        ASSERT_NOT_REACHED();
+        return;
+    }
+
+    ExecState* exec = toJS(ctx);
+    JSLockHolder lock(exec);
+
+    JSGlobalObject* globalObject = exec->vmEntryGlobalObject();
+    globalObject->inspectorController().setIncludesNativeCallStackWhenReportingExceptions(includesNativeCallStack);
+#else
+    UNUSED_PARAM(ctx);
+    UNUSED_PARAM(includesNativeCallStack);
+#endif
+}
+
+#if USE(CF)
+CFRunLoopRef JSGlobalContextGetDebuggerRunLoop(JSGlobalContextRef ctx)
+{
+#if ENABLE(REMOTE_INSPECTOR)
+    if (!ctx) {
+        ASSERT_NOT_REACHED();
+        return nullptr;
+    }
+
+    ExecState* exec = toJS(ctx);
+    JSLockHolder lock(exec);
+
+    return exec->vmEntryGlobalObject()->inspectorDebuggable().debuggerRunLoop();
+#else
+    UNUSED_PARAM(ctx);
+    return nullptr;
+#endif
+}
+
+void JSGlobalContextSetDebuggerRunLoop(JSGlobalContextRef ctx, CFRunLoopRef runLoop)
+{
+#if ENABLE(REMOTE_INSPECTOR)
+    if (!ctx) {
+        ASSERT_NOT_REACHED();
+        return;
+    }
+
+    ExecState* exec = toJS(ctx);
+    JSLockHolder lock(exec);
+
+    exec->vmEntryGlobalObject()->inspectorDebuggable().setDebuggerRunLoop(runLoop);
+#else
+    UNUSED_PARAM(ctx);
+    UNUSED_PARAM(runLoop);
+#endif
+}
+#endif

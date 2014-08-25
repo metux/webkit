@@ -32,18 +32,14 @@
             "type": "object",
             "description": "Timing information for the request.",
             "properties": [
-                { "name": "requestTime", "type": "number", "description": "Timing's requestTime is a baseline in seconds, while the other numbers are ticks in milliseconds relatively to this requestTime." },
-                { "name": "proxyStart", "type": "number", "description": "Started resolving proxy." },
-                { "name": "proxyEnd", "type": "number", "description": "Finished resolving proxy." },
-                { "name": "dnsStart", "type": "number", "description": "Started DNS address resolve." },
-                { "name": "dnsEnd", "type": "number", "description": "Finished DNS address resolve." },
+                { "name": "navigationStart", "type": "number", "description": "Timing's navigationStart is a baseline in seconds, while the other numbers are ticks in milliseconds relatively to this navigationStart." },
+                { "name": "domainLookupStart", "type": "number", "description": "Started DNS address resolve." },
+                { "name": "domainLookupEnd", "type": "number", "description": "Finished DNS address resolve." },
                 { "name": "connectStart", "type": "number", "description": "Started connecting to the remote host." },
                 { "name": "connectEnd", "type": "number", "description": "Connected to the remote host." },
-                { "name": "sslStart", "type": "number", "description": "Started SSL handshake." },
-                { "name": "sslEnd", "type": "number", "description": "Finished SSL handshake." },
-                { "name": "sendStart", "type": "number", "description": "Started sending request." },
-                { "name": "sendEnd", "type": "number", "description": "Finished sending request." },
-                { "name": "receiveHeadersEnd", "type": "number", "description": "Finished receiving response headers." }
+                { "name": "secureConnectionStart", "type": "number", "description": "Started SSL handshake." },
+                { "name": "requestStart", "type": "number", "description": "Started sending request." },
+                { "name": "responseStart", "type": "number", "description": "Started receiving response headers." }
             ]
         },
         {
@@ -190,6 +186,20 @@
                 { "name": "cacheDisabled", "type": "boolean", "description": "Cache disabled state." }
             ],
             "description": "Toggles ignoring cache for each request. If <code>true</code>, cache will not be used."
+        },
+        {
+            "name": "loadResource",
+            "async": true,
+            "parameters": [
+                { "name": "frameId", "$ref": "FrameId", "description": "Frame to load the resource from." },
+                { "name": "url", "type": "string", "description": "URL of the resource to load." }
+            ],
+            "returns": [
+                { "name": "content", "type": "string", "description": "Resource content." },
+                { "name": "mimeType", "type": "string", "description": "Resource mimeType." },
+                { "name": "status", "type": "number", "description": "HTTP response status code." }
+            ],
+            "description": "Loads a resource in the context of a frame on the inspected page without cross origin checks."
         }
     ],
     "events": [

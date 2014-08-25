@@ -62,12 +62,10 @@ protected:
 
     float scaleEmToUnits(int x) const;
 
-    static bool hasValidAvgCharWidth(AtomicString family);
-    virtual float getAvgCharWidth(AtomicString family);
+    virtual float getAverageCharWidth();
     virtual LayoutUnit preferredContentLogicalWidth(float charWidth) const = 0;
     virtual LayoutUnit computeControlLogicalHeight(LayoutUnit lineHeight, LayoutUnit nonContentHeight) const = 0;
 
-    virtual void updateFromElement() override;
     virtual void computeLogicalHeight(LayoutUnit logicalHeight, LayoutUnit logicalTop, LogicalExtentComputedValues&) const override;
     virtual RenderObject* layoutSpecialExcludedChild(bool relayoutChildren) override;
 
@@ -81,7 +79,6 @@ private:
     virtual void removeLeftoverAnonymousBlock(RenderBlock*) override { }
     virtual bool avoidsFloats() const override { return true; }
     virtual bool canHaveGeneratedChildren() const override { return false; }
-    virtual bool canBeReplacedWithInlineRunIn() const override;
     
     virtual void addFocusRingRects(Vector<IntRect>&, const LayoutPoint& additionalOffset, const RenderLayerModelObject* paintContainer = 0) override;
 
@@ -99,7 +96,7 @@ RENDER_OBJECT_TYPE_CASTS(RenderTextControl, isTextControl())
 class RenderTextControlInnerContainer final : public RenderFlexibleBox {
 public:
     explicit RenderTextControlInnerContainer(Element& element, PassRef<RenderStyle> style)
-        : RenderFlexibleBox(element, std::move(style))
+        : RenderFlexibleBox(element, WTF::move(style))
     { }
     virtual ~RenderTextControlInnerContainer() { }
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2006, 2007, 2009, 2010, 2011, 2013 Apple Inc. All rights reserved.
+ * Copyright (C) 2006-2014 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -10,10 +10,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -37,9 +37,9 @@
 #include "TextEventInputType.h"
 #include "TextGranularity.h"
 #include "Timer.h"
-#include <wtf/Deque.h>
+#include "WheelEventDeltaTracker.h"
+#include <memory>
 #include <wtf/Forward.h>
-#include <wtf/OwnPtr.h>
 #include <wtf/RefPtr.h>
 
 #if PLATFORM(IOS)
@@ -52,7 +52,7 @@ class WebEvent;
 #endif
 #endif // PLATFORM(IOS)
 
-#if PLATFORM(MAC) && !defined(__OBJC__)
+#if PLATFORM(COCOA) && !defined(__OBJC__)
 class NSView;
 #endif
 
@@ -68,7 +68,8 @@ class NSView;
 namespace WebCore {
 
 class AutoscrollController;
-class Clipboard;
+class ContainerNode;
+class DataTransfer;
 class Document;
 class Element;
 class Event;
@@ -90,6 +91,7 @@ class RenderBox;
 class RenderElement;
 class RenderLayer;
 class RenderWidget;
+class ScrollableArea;
 class SVGElementInstance;
 class Scrollbar;
 class TextEvent;
@@ -117,6 +119,7 @@ enum CheckDragHysteresis { ShouldCheckDragHysteresis, DontCheckDragHysteresis };
 
 class EventHandler {
     WTF_MAKE_NONCOPYABLE(EventHandler);
+    WTF_MAKE_FAST_ALLOCATED;
 public:
     explicit EventHandler(Frame&);
     ~EventHandler();
@@ -127,9 +130,6 @@ public:
 #if ENABLE(DRAG_SUPPORT)
     void updateSelectionForMouseDrag();
 #endif
-
-    Node* mousePressNode() const;
-    void setMousePressNode(PassRefPtr<Node>);
 
 #if ENABLE(PAN_SCROLLING)
     void didPanScrollStart();
@@ -152,14 +152,14 @@ public:
         const LayoutSize& padding = LayoutSize());
 
     bool mousePressed() const { return m_mousePressed; }
-    void setMousePressed(bool pressed) { m_mousePressed = pressed; }
+    Node* mousePressNode() const { return m_mousePressNode.get(); }
 
     void setCapturingMouseEventsElement(PassRefPtr<Element>); // A caller is responsible for resetting capturing element to 0.
 
 #if ENABLE(DRAG_SUPPORT)
-    bool updateDragAndDrop(const PlatformMouseEvent&, Clipboard*);
-    void cancelDragAndDrop(const PlatformMouseEvent&, Clipboard*);
-    bool performDragAndDrop(const PlatformMouseEvent&, Clipboard*);
+    bool updateDragAndDrop(const PlatformMouseEvent&, DataTransfer*);
+    void cancelDragAndDrop(const PlatformMouseEvent&, DataTransfer*);
+    bool performDragAndDrop(const PlatformMouseEvent&, DataTransfer*);
     void updateDragStateAfterEditDragIfNeeded(Element* rootEditableElement);
 #endif
 
@@ -196,6 +196,11 @@ public:
     bool handleWheelEvent(const PlatformWheelEvent&);
     void defaultWheelEventHandler(Node*, WheelEvent*);
     bool handlePasteGlobalSelection(const PlatformMouseEvent&);
+
+    void platformPrepareForWheelEvents(const PlatformWheelEvent&, const HitTestResult&, RefPtr<Element>& eventTarget, RefPtr<ContainerNode>& scrollableContainer, ScrollableArea*&, bool& isOverWidget);
+    void platformRecordWheelEvent(const PlatformWheelEvent&);
+    bool platformCompleteWheelEvent(const PlatformWheelEvent&, Element* eventTarget, ContainerNode* scrollableContainer, ScrollableArea*);
+    bool platformCompletePlatformWidgetWheelEvent(const PlatformWheelEvent&, ContainerNode* scrollableContainer);
 
 #if ENABLE(IOS_TOUCH_EVENTS) || ENABLE(IOS_GESTURE_EVENTS)
     typedef Vector<RefPtr<Touch>> TouchArray;
@@ -246,7 +251,7 @@ public:
     
     void sendScrollEvent(); // Ditto
 
-#if PLATFORM(MAC) && defined(__OBJC__)
+#if PLATFORM(COCOA) && defined(__OBJC__)
 #if !PLATFORM(IOS)
     void mouseDown(NSEvent *);
     void mouseDragged(NSEvent *);
@@ -279,7 +284,7 @@ public:
 #else
     static WebEvent *currentEvent();
 #endif // !PLATFORM(IOS)
-#endif // PLATFORM(MAC) && defined(__OBJC__)
+#endif // PLATFORM(COCOA) && defined(__OBJC__)
 
 #if PLATFORM(IOS)
     void invalidateClick();
@@ -299,7 +304,7 @@ private:
     static DragState& dragState();
     static const double TextDragDelay;
     
-    PassRefPtr<Clipboard> createDraggingClipboard() const;
+    PassRefPtr<DataTransfer> createDraggingDataTransfer() const;
 #endif // ENABLE(DRAG_SUPPORT)
 
     bool eventActivatedView(const PlatformMouseEvent&) const;
@@ -329,21 +334,16 @@ private:
     bool logicalScrollOverflow(ScrollLogicalDirection, ScrollGranularity, Node* startingNode = 0);
     
     bool shouldTurnVerticalTicksIntoHorizontal(const HitTestResult&, const PlatformWheelEvent&) const;
-    void recordWheelEventDelta(const PlatformWheelEvent&);
-    enum DominantScrollGestureDirection {
-        DominantScrollDirectionNone,
-        DominantScrollDirectionVertical,
-        DominantScrollDirectionHorizontal
-    };
-    DominantScrollGestureDirection dominantScrollGestureDirection() const;
     
     bool mouseDownMayStartSelect() const { return m_mouseDownMayStartSelect; }
 
     static bool isKeyboardOptionTab(KeyboardEvent*);
     static bool eventInvertsTabsToLinksClientCallResult(KeyboardEvent*);
 
+#if !ENABLE(IOS_TOUCH_EVENTS)
     void fakeMouseMoveEventTimerFired(Timer<EventHandler>&);
     void cancelFakeMouseMoveEvent();
+#endif
 
     bool isInsideScrollbar(const IntPoint&) const;
 
@@ -364,9 +364,9 @@ private:
 
     bool dispatchMouseEvent(const AtomicString& eventType, Node* target, bool cancelable, int clickCount, const PlatformMouseEvent&, bool setUnder);
 #if ENABLE(DRAG_SUPPORT)
-    bool dispatchDragEvent(const AtomicString& eventType, Element& target, const PlatformMouseEvent&, Clipboard*);
+    bool dispatchDragEvent(const AtomicString& eventType, Element& target, const PlatformMouseEvent&, DataTransfer*);
 
-    void freeClipboard();
+    void freeDataTransfer();
 
     bool handleDrag(const MouseEventWithHitTestResults&, CheckDragHysteresis);
 #endif
@@ -379,6 +379,8 @@ private:
     bool dragHysteresisExceeded(const FloatPoint&) const;
     bool dragHysteresisExceeded(const IntPoint&) const;
 #endif // ENABLE(DRAG_SUPPORT)
+    
+    bool mouseMovementExceedsThreshold(const FloatPoint&, int pointsThreshold) const;
 
     bool passMousePressEventToSubframe(MouseEventWithHitTestResults&, Frame* subframe);
     bool passMouseMoveEventToSubframe(MouseEventWithHitTestResults&, Frame* subframe, HitTestResult* hoveredNode = 0);
@@ -420,7 +422,7 @@ private:
 
     bool capturesDragging() const { return m_capturesDragging; }
 
-#if PLATFORM(MAC) && defined(__OBJC__)
+#if PLATFORM(COCOA) && defined(__OBJC__)
     NSView *mouseDownViewIfStillGood();
 
     PlatformMouseEvent currentPlatformMouseEvent() const;
@@ -437,6 +439,15 @@ private:
     void cancelAutoHideCursorTimer();
     void autoHideCursorTimerFired(Timer<EventHandler>&);
 #endif
+
+    void beginTrackingPotentialLongMousePress();
+    void recognizeLongMousePress(Timer<EventHandler>&);
+    void cancelTrackingPotentialLongMousePress();
+    bool longMousePressHysteresisExceeded();
+    void clearLongMousePressState();
+    bool handleLongMousePressMouseMovedEvent(const PlatformMouseEvent&);
+
+    void clearLatchedState();
 
     Frame& m_frame;
 
@@ -464,17 +475,20 @@ private:
     Timer<EventHandler> m_cursorUpdateTimer;
 #endif
 
-    OwnPtr<AutoscrollController> m_autoscrollController;
+    Timer<EventHandler> m_longMousePressTimer;
+    bool m_didRecognizeLongMousePress;
+
+    std::unique_ptr<AutoscrollController> m_autoscrollController;
     bool m_mouseDownMayStartAutoscroll;
     bool m_mouseDownWasInSubframe;
 
+#if !ENABLE(IOS_TOUCH_EVENTS)
     Timer<EventHandler> m_fakeMouseMoveEventTimer;
+#endif
 
-#if ENABLE(SVG)
     bool m_svgPan;
     RefPtr<SVGElementInstance> m_instanceUnderMouse;
     RefPtr<SVGElementInstance> m_lastInstanceUnderMouse;
-#endif
 
     RenderLayer* m_resizeLayer;
 
@@ -521,16 +535,17 @@ private:
     double m_mouseDownTimestamp;
     PlatformMouseEvent m_mouseDown;
 
-    Deque<FloatSize> m_recentWheelEventDeltas;
+    std::unique_ptr<WheelEventDeltaTracker> m_recentWheelEventDeltaTracker;
     RefPtr<Element> m_latchedWheelEventElement;
-    bool m_inTrackingScrollGesturePhase;
     bool m_widgetIsLatched;
 
     RefPtr<Element> m_previousWheelScrolledElement;
 
-#if PLATFORM(MAC) || PLATFORM(IOS)
+#if PLATFORM(COCOA)
     NSView *m_mouseDownView;
+    RefPtr<ContainerNode> m_latchedScrollableContainer;
     bool m_sendingEventToSubview;
+    bool m_startedGestureAtScrollLimit;
 #if !PLATFORM(IOS)
     int m_activationEventNumber;
 #endif

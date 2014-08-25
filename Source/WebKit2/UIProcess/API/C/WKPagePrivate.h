@@ -26,8 +26,8 @@
 #ifndef WKPagePrivate_h
 #define WKPagePrivate_h
 
-#include <WebKit2/WKBase.h>
-#include <WebKit2/WKPage.h>
+#include <WebKit/WKBase.h>
+#include <WebKit/WKPage.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -87,9 +87,15 @@ WK_EXPORT WKImageRef WKPageCreateSnapshotOfVisibleContent(WKPageRef page);
 
 WK_EXPORT void WKPageSetShouldSendEventsSynchronously(WKPageRef page, bool sync);
 
+WK_EXPORT bool WKPageGetAllowsRemoteInspection(WKPageRef page);
+WK_EXPORT void WKPageSetAllowsRemoteInspection(WKPageRef page, bool allow);
+
 WK_EXPORT void WKPageSetMediaVolume(WKPageRef page, float volume);
 WK_EXPORT void WKPageSetMayStartMediaWhenInWindow(WKPageRef page, bool mayStartMedia);
 
+typedef void (*WKPageGetBytecodeProfileFunction)(WKStringRef, WKErrorRef, void*);
+WK_EXPORT void WKPageGetBytecodeProfile(WKPageRef page, void* context, WKPageGetBytecodeProfileFunction function);
+    
 WK_EXPORT WKArrayRef WKPageCopyRelatedPages(WKPageRef page);
 
 typedef void (*WKPageInvalidMessageFunction)(uint32_t messageID);
@@ -104,6 +110,9 @@ typedef uint32_t WKScrollPinningBehavior;
 
 WK_EXPORT WKScrollPinningBehavior WKPageGetScrollPinningBehavior(WKPageRef page);
 WK_EXPORT void WKPageSetScrollPinningBehavior(WKPageRef page, WKScrollPinningBehavior pinning);
+
+WK_EXPORT bool WKPageGetAddsVisitedLinks(WKPageRef page);
+WK_EXPORT void WKPageSetAddsVisitedLinks(WKPageRef page, bool visitedLinks);
 
 #ifdef __cplusplus
 }

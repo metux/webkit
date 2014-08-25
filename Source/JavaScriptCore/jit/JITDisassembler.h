@@ -26,20 +26,20 @@
 #ifndef JITDisassembler_h
 #define JITDisassembler_h
 
-#include <wtf/Platform.h>
-
 #if ENABLE(JIT)
 
-#include "LinkBuffer.h"
 #include "MacroAssembler.h"
-#include "ProfilerDatabase.h"
 #include <wtf/Vector.h>
+#include <wtf/text/CString.h>
 
 namespace JSC {
 
 class CodeBlock;
+class LinkBuffer;
 
-#if ENABLE(DISASSEMBLER)
+namespace Profiler {
+class Compilation;
+}
 
 class JITDisassembler {
     WTF_MAKE_FAST_ALLOCATED;
@@ -85,25 +85,6 @@ private:
     MacroAssembler::Label m_endOfSlowPath;
     MacroAssembler::Label m_endOfCode;
 };
-
-#else // ENABLE(DISASSEMBLER)
-
-class JITDisassembler {
-    WTF_MAKE_FAST_ALLOCATED;
-public:
-    JITDisassembler(CodeBlock*) { }
-
-    void setStartOfCode(MacroAssembler::Label) { }
-    void setForBytecodeMainPath(unsigned, MacroAssembler::Label) { }
-    void setForBytecodeSlowPath(unsigned, MacroAssembler::Label) { }
-    void setEndOfSlowPath(MacroAssembler::Label) { }
-    void setEndOfCode(MacroAssembler::Label) { }
-
-    void dump(LinkBuffer&) { }
-    void reportToProfiler(Profiler::Compilation*, LinkBuffer&) { }
-};
-
-#endif // ENABLE(DISASSEMBLER)
 
 } // namespace JSC
 

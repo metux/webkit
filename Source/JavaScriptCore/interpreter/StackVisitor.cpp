@@ -30,7 +30,7 @@
 #include "CallFrameInlines.h"
 #include "Executable.h"
 #include "Interpreter.h"
-#include "Operations.h"
+#include "JSCInlines.h"
 #include <wtf/DataLog.h>
 
 namespace JSC {
@@ -278,7 +278,7 @@ Arguments* StackVisitor::Frame::existingArguments()
         reg = codeBlock()->argumentsRegister();
     
     JSValue result = callFrame()->r(unmodifiedArgumentsRegister(reg).offset()).jsValue();
-    if (!result)
+    if (!result || !result.isCell()) // Protect against Undefined in case we throw in op_enter.
         return 0;
     return jsCast<Arguments*>(result);
 }
@@ -347,7 +347,7 @@ static void printif(int indentLevels, const char* format, ...)
     if (indentLevels)
         printIndents(indentLevels);
 
-#if COMPILER(CLANG) || (COMPILER(GCC) && GCC_VERSION_AT_LEAST(4, 6, 0))
+#if COMPILER(CLANG) || COMPILER(GCC)
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wformat-nonliteral"
 #pragma GCC diagnostic ignored "-Wmissing-format-attribute"
@@ -355,7 +355,7 @@ static void printif(int indentLevels, const char* format, ...)
 
     WTF::dataLogFV(format, argList);
 
-#if COMPILER(CLANG) || (COMPILER(GCC) && GCC_VERSION_AT_LEAST(4, 6, 0))
+#if COMPILER(CLANG) || COMPILER(GCC)
 #pragma GCC diagnostic pop
 #endif
 

@@ -36,6 +36,7 @@ class ArgumentEncoder;
 class DataReference;
 
 class ArgumentEncoder {
+    WTF_MAKE_FAST_ALLOCATED;
 public:
     ArgumentEncoder();
     virtual ~ArgumentEncoder();
@@ -66,6 +67,7 @@ public:
 
     void addAttachment(const Attachment&);
     Vector<Attachment> releaseAttachments();
+    void reserve(size_t);
 
 private:
     void encode(bool);

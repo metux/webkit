@@ -21,8 +21,8 @@
 #include "config.h"
 #include "AccessibilityObject.h"
 
+#include "HTMLElement.h"
 #include "HTMLNames.h"
-#include "RenderObject.h"
 #include "RenderText.h"
 #include <glib-object.h>
 
@@ -42,9 +42,6 @@ AccessibilityObjectInclusion AccessibilityObject::accessibilityPlatformIncludesO
         return DefaultBehavior;
 
     AccessibilityRole role = roleValue();
-    if (role == HorizontalRuleRole)
-        return IncludeObject;
-
     // We expose the slider as a whole but not its value indicator.
     if (role == SliderThumbRole)
         return IgnoreObject;

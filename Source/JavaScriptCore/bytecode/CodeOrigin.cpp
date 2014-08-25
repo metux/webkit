@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012, 2013 Apple Inc. All rights reserved.
+ * Copyright (C) 2012, 2013, 2014 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -29,7 +29,7 @@
 #include "CallFrame.h"
 #include "CodeBlock.h"
 #include "Executable.h"
-#include "Operations.h"
+#include "JSCInlines.h"
 
 namespace JSC {
 
@@ -45,7 +45,64 @@ unsigned CodeOrigin::inlineDepth() const
 {
     return inlineDepthForCallFrame(inlineCallFrame);
 }
+
+bool CodeOrigin::isApproximatelyEqualTo(const CodeOrigin& other) const
+{
+    CodeOrigin a = *this;
+    CodeOrigin b = other;
+
+    if (!a.isSet())
+        return !b.isSet();
+    if (!b.isSet())
+        return false;
     
+    if (a.isHashTableDeletedValue())
+        return b.isHashTableDeletedValue();
+    if (b.isHashTableDeletedValue())
+        return false;
+    
+    for (;;) {
+        ASSERT(a.isSet());
+        ASSERT(b.isSet());
+        
+        if (a.bytecodeIndex != b.bytecodeIndex)
+            return false;
+        
+        if ((!!a.inlineCallFrame) != (!!b.inlineCallFrame))
+            return false;
+        
+        if (!a.inlineCallFrame)
+            return true;
+        
+        if (a.inlineCallFrame->executable != b.inlineCallFrame->executable)
+            return false;
+        
+        a = a.inlineCallFrame->caller;
+        b = b.inlineCallFrame->caller;
+    }
+}
+
+unsigned CodeOrigin::approximateHash() const
+{
+    if (!isSet())
+        return 0;
+    if (isHashTableDeletedValue())
+        return 1;
+    
+    unsigned result = 2;
+    CodeOrigin codeOrigin = *this;
+    for (;;) {
+        result += codeOrigin.bytecodeIndex;
+        
+        if (!codeOrigin.inlineCallFrame)
+            return result;
+        
+        result += WTF::PtrHash<JSCell*>::hash(codeOrigin.inlineCallFrame->executable.get());
+        
+        codeOrigin = codeOrigin.inlineCallFrame->caller;
+    }
+}
+
 Vector<CodeOrigin> CodeOrigin::inlineStack() const
 {
     Vector<CodeOrigin> result(inlineDepth());
@@ -95,6 +152,12 @@ CodeBlockHash InlineCallFrame::hash() const
         specializationKind())->hash();
 }
 
+CString InlineCallFrame::hashAsStringIfPossible() const
+{
+    return jsCast<FunctionExecutable*>(executable.get())->codeBlockFor(
+        specializationKind())->hashAsStringIfPossible();
+}
+
 CString InlineCallFrame::inferredName() const
 {
     return jsCast<FunctionExecutable*>(executable.get())->inferredName().utf8();
@@ -107,7 +170,7 @@ CodeBlock* InlineCallFrame::baselineCodeBlock() const
 
 void InlineCallFrame::dumpBriefFunctionInformation(PrintStream& out) const
 {
-    out.print(inferredName(), "#", hash());
+    out.print(inferredName(), "#", hashAsStringIfPossible());
 }
 
 void InlineCallFrame::dumpInContext(PrintStream& out, DumpContext* context) const
@@ -115,7 +178,7 @@ void InlineCallFrame::dumpInContext(PrintStream& out, DumpContext* context) cons
     out.print(briefFunctionInformation(), ":<", RawPointer(executable.get()));
     if (executable->isStrictMode())
         out.print(" (StrictMode)");
-    out.print(", bc#", caller.bytecodeIndex, ", ", specializationKind());
+    out.print(", bc#", caller.bytecodeIndex, ", ", kind);
     if (isClosureCall)
         out.print(", closure call");
     else
@@ -131,4 +194,27 @@ void InlineCallFrame::dump(PrintStream& out) const
 }
 
 } // namespace JSC
+
+namespace WTF {
+
+void printInternal(PrintStream& out, JSC::InlineCallFrame::Kind kind)
+{
+    switch (kind) {
+    case JSC::InlineCallFrame::Call:
+        out.print("Call");
+        return;
+    case JSC::InlineCallFrame::Construct:
+        out.print("Construct");
+        return;
+    case JSC::InlineCallFrame::GetterCall:
+        out.print("GetterCall");
+        return;
+    case JSC::InlineCallFrame::SetterCall:
+        out.print("SetterCall");
+        return;
+    }
+    RELEASE_ASSERT_NOT_REACHED();
+}
+
+} // namespace WTF
 

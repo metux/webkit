@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011, 2013 Apple Inc. All rights reserved.
+ * Copyright (C) 2011, 2013, 2014 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -29,7 +29,6 @@
 #if ENABLE(DFG_JIT)
 
 #include "CCallHelpers.h"
-#include "CallFrameInlines.h"
 #include "CodeBlock.h"
 #include "DFGDisassembler.h"
 #include "DFGGraph.h"
@@ -187,6 +186,7 @@ public:
     // Add a call out from JIT code, with a fast exception check that tests if the return value is zero.
     void fastExceptionCheck()
     {
+        callExceptionFuzz();
         m_exceptionChecks.append(branchTestPtr(Zero, GPRInfo::returnValueGPR));
     }
     
@@ -199,12 +199,7 @@ public:
     }
 
 #if USE(JSVALUE32_64)
-    void* addressOfDoubleConstant(Node* node)
-    {
-        ASSERT(m_graph.isNumberConstant(node));
-        unsigned constantIndex = node->constantNumber();
-        return &(codeBlock()->constantRegister(FirstConstantRegisterIndex + constantIndex));
-    }
+    void* addressOfDoubleConstant(Node*);
 #endif
 
     void addGetById(const JITGetByIdGenerator& gen, SlowPathGenerator* slowPath)
@@ -221,10 +216,15 @@ public:
     {
         m_ins.append(record);
     }
-
-    void addJSCall(Call fastCall, Call slowCall, DataLabelPtr targetToCheck, CallLinkInfo::CallType callType, GPRReg callee, CodeOrigin codeOrigin)
+    
+    unsigned currentJSCallIndex() const
     {
-        m_jsCalls.append(JSCallRecord(fastCall, slowCall, targetToCheck, callType, callee, codeOrigin));
+        return m_jsCalls.size();
+    }
+
+    void addJSCall(Call fastCall, Call slowCall, DataLabelPtr targetToCheck, CallLinkInfo* info)
+    {
+        m_jsCalls.append(JSCallRecord(fastCall, slowCall, targetToCheck, info));
     }
     
     void addWeakReference(JSCell* target)
@@ -245,16 +245,38 @@ public:
         addWeakReference(weakPtr);
         return result;
     }
-    
+
+    template<typename T>
+    Jump branchWeakStructure(RelationalCondition cond, T left, Structure* weakStructure)
+    {
+#if USE(JSVALUE64)
+        Jump result = branch32(cond, left, TrustedImm32(weakStructure->id()));
+        addWeakReference(weakStructure);
+        return result;
+#else
+        return branchWeakPtr(cond, left, weakStructure);
+#endif
+    }
+
+    template<typename T>
+    Jump branchStructurePtr(RelationalCondition cond, T left, Structure* structure)
+    {
+#if USE(JSVALUE64)
+        return branch32(cond, left, TrustedImm32(structure->id()));
+#else
+        return branchPtr(cond, left, TrustedImmPtr(structure));
+#endif
+    }
+
     void noticeOSREntry(BasicBlock& basicBlock, JITCompiler::Label blockHead, LinkBuffer& linkBuffer)
     {
         // OSR entry is not allowed into blocks deemed unreachable by control flow analysis.
-        if (!basicBlock.cfaHasVisited)
+        if (!basicBlock.intersectionOfCFAHasVisited)
             return;
         
         OSREntryData* entry = m_jitCode->appendOSREntryData(basicBlock.bytecodeBegin, linkBuffer.offsetOf(blockHead));
         
-        entry->m_expectedValues = basicBlock.valuesAtHead;
+        entry->m_expectedValues = basicBlock.intersectionOfPastValuesAtHead;
         
         // Fix the expected values: in our protocol, a dead variable will have an expected
         // value of (None, []). But the old JIT may stash some values there. So we really
@@ -270,6 +292,8 @@ public:
                 entry->m_expectedValues.local(local).makeHeapTop();
             else {
                 VariableAccessData* variable = node->variableAccessData();
+                entry->m_machineStackUsed.set(variable->machineLocal().toLocal());
+                
                 switch (variable->flushFormat()) {
                 case FlushedDouble:
                     entry->m_localsForcedDouble.set(local);
@@ -325,22 +349,18 @@ private:
     Vector<Label> m_blockHeads;
 
     struct JSCallRecord {
-        JSCallRecord(Call fastCall, Call slowCall, DataLabelPtr targetToCheck, CallLinkInfo::CallType callType, GPRReg callee, CodeOrigin codeOrigin)
+        JSCallRecord(Call fastCall, Call slowCall, DataLabelPtr targetToCheck, CallLinkInfo* info)
             : m_fastCall(fastCall)
             , m_slowCall(slowCall)
             , m_targetToCheck(targetToCheck)
-            , m_callType(callType)
-            , m_callee(callee)
-            , m_codeOrigin(codeOrigin)
+            , m_info(info)
         {
         }
         
         Call m_fastCall;
         Call m_slowCall;
         DataLabelPtr m_targetToCheck;
-        CallLinkInfo::CallType m_callType;
-        GPRReg m_callee;
-        CodeOrigin m_codeOrigin;
+        CallLinkInfo* m_info;
     };
     
     Vector<InlineCacheWrapper<JITGetByIdGenerator>, 4> m_getByIds;

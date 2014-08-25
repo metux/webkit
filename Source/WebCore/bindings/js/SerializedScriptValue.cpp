@@ -10,10 +10,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -39,18 +39,18 @@
 #include "ImageData.h"
 #include "JSBlob.h"
 #include "JSCryptoKey.h"
+#include "JSDOMBinding.h"
 #include "JSDOMGlobalObject.h"
 #include "JSFile.h"
 #include "JSFileList.h"
 #include "JSImageData.h"
 #include "JSMessagePort.h"
 #include "JSNavigator.h"
-#include "NotImplemented.h"
+#include "ScriptExecutionContext.h"
 #include "SharedBuffer.h"
 #include "WebCoreJSClientData.h"
 #include <limits>
 #include <JavaScriptCore/APICast.h>
-#include <JavaScriptCore/APIShims.h>
 #include <runtime/ArrayBuffer.h>
 #include <runtime/BooleanObject.h>
 #include <runtime/DateInstance.h>
@@ -58,13 +58,13 @@
 #include <runtime/ExceptionHelpers.h>
 #include <runtime/JSArrayBuffer.h>
 #include <runtime/JSArrayBufferView.h>
+#include <runtime/JSCInlines.h>
 #include <runtime/JSDataView.h>
 #include <runtime/JSMap.h>
 #include <runtime/JSSet.h>
 #include <runtime/JSTypedArrays.h>
 #include <runtime/MapData.h>
 #include <runtime/ObjectConstructor.h>
-#include <runtime/Operations.h>
 #include <runtime/PropertyNameArray.h>
 #include <runtime/RegExp.h>
 #include <runtime/RegExpObject.h>
@@ -165,6 +165,8 @@ static unsigned typedArrayElementSize(ArrayBufferViewSubtag tag)
 }
 
 #if ENABLE(SUBTLE_CRYPTO)
+
+const uint32_t currentKeyFormatVersion = 1;
 
 enum class CryptoKeyClassSubtag {
     HMAC = 0,
@@ -293,7 +295,11 @@ static const unsigned NonIndexPropertiesTag = 0xFFFFFFFD;
  *    | ArrayBuffer
  *    | ArrayBufferViewTag ArrayBufferViewSubtag <byteOffset:uint32_t> <byteLength:uint32_t> (ArrayBuffer | ObjectReference)
  *    | ArrayBufferTransferTag <value:uint32_t>
- *    | CryptoKeyTag <extractable:int32_t> <usagesCount:uint32_t> <usages:byte{usagesCount}> CryptoKeyClassSubtag (CryptoKeyHMAC | CryptoKeyAES | CryptoKeyRSA)
+ *    | CryptoKeyTag <wrappedKeyLength:uint32_t> <factor:byte{wrappedKeyLength}>
+ *
+ * Inside wrapped crypto key, data is serialized in this format:
+ *
+ * <keyFormatVersion:uint32_t> <extractable:int32_t> <usagesCount:uint32_t> <usages:byte{usagesCount}> CryptoKeyClassSubtag (CryptoKeyHMAC | CryptoKeyAES | CryptoKeyRSA)
  *
  * String :-
  *      EmptyStringTag
@@ -311,7 +317,7 @@ static const unsigned NonIndexPropertiesTag = 0xFFFFFFFD;
  *    FileTag FileData
  *
  * FileData :-
- *    <path:StringData> <url:StringData> <type:StringData>
+ *    <path:StringData> <url:StringData> <type:StringData> <name:StringData>
  *
  * FileList :-
  *    FileListTag <length:uint32_t>(<file:FileData>){length}
@@ -374,10 +380,8 @@ protected:
         m_exec->vm().throwException(m_exec, createStackOverflowError(m_exec));
     }
 
-    NO_RETURN_DUE_TO_ASSERT
     void fail()
     {
-        ASSERT_NOT_REACHED();
         m_failed = true;
     }
 
@@ -385,6 +389,24 @@ protected:
     bool m_failed;
     MarkedArgumentBuffer m_gcBuffer;
 };
+
+#if ENABLE(SUBTLE_CRYPTO)
+static bool wrapCryptoKey(ExecState* exec, const Vector<uint8_t>& key, Vector<uint8_t>& wrappedKey)
+{
+    ScriptExecutionContext* scriptExecutionContext = scriptExecutionContextFromExecState(exec);
+    if (!scriptExecutionContext)
+        return false;
+    return scriptExecutionContext->wrapCryptoKey(key, wrappedKey);
+}
+
+static bool unwrapCryptoKey(ExecState* exec, const Vector<uint8_t>& wrappedKey, Vector<uint8_t>& key)
+{
+    ScriptExecutionContext* scriptExecutionContext = scriptExecutionContextFromExecState(exec);
+    if (!scriptExecutionContext)
+        return false;
+    return scriptExecutionContext->unwrapCryptoKey(wrappedKey, key);
+}
+#endif
 
 #if ASSUME_LITTLE_ENDIAN
 template <typename T> static void writeLittleEndian(Vector<uint8_t>& buffer, T value)
@@ -425,6 +447,19 @@ template <typename T> static bool writeLittleEndian(Vector<uint8_t>& buffer, con
     return true;
 }
 
+static bool writeLittleEndianUInt16(Vector<uint8_t>& buffer, const LChar* values, uint32_t length)
+{
+    if (length > std::numeric_limits<uint32_t>::max() / 2)
+        return false;
+
+    for (unsigned i = 0; i < length; ++i) {
+        buffer.append(values[i]);
+        buffer.append(0);
+    }
+
+    return true;
+}
+
 template <> bool writeLittleEndian<uint8_t>(Vector<uint8_t>& buffer, const uint8_t* values, uint32_t length)
 {
     buffer.append(values, length);
@@ -450,7 +485,9 @@ public:
         }
         writeLittleEndian<uint8_t>(out, StringTag);
         writeLittleEndian(out, s.length());
-        return writeLittleEndian(out, s.impl()->deprecatedCharacters(), s.length());
+        if (s.is8Bit())
+            return writeLittleEndianUInt16(out, s.characters8(), s.length());
+        return writeLittleEndian(out, s.characters16(), s.length());
     }
 
     static void serializeUndefined(Vector<uint8_t>& out)
@@ -830,7 +867,14 @@ private:
 #if ENABLE(SUBTLE_CRYPTO)
             if (CryptoKey* key = toCryptoKey(obj)) {
                 write(CryptoKeyTag);
-                write(key);
+                Vector<uint8_t> serializedKey;
+                Vector<String> dummyBlobURLs;
+                CloneSerializer rawKeySerializer(m_exec, nullptr, nullptr, dummyBlobURLs, serializedKey);
+                rawKeySerializer.write(key);
+                Vector<uint8_t> wrappedKey;
+                if (!wrapCryptoKey(m_exec, serializedKey, wrappedKey))
+                    return false;
+                write(wrappedKey);
                 return true;
             }
 #endif
@@ -940,21 +984,28 @@ private:
             return;
         }
 
+        unsigned length = str.length();
+
         // This condition is unlikely to happen as they would imply an ~8gb
         // string but we should guard against it anyway
-        if (str.length() >= StringPoolTag) {
+        if (length >= StringPoolTag) {
             fail();
             return;
         }
 
         // Guard against overflow
-        if (str.length() > (std::numeric_limits<uint32_t>::max() - sizeof(uint32_t)) / sizeof(UChar)) {
+        if (length > (std::numeric_limits<uint32_t>::max() - sizeof(uint32_t)) / sizeof(UChar)) {
             fail();
             return;
         }
 
-        writeLittleEndian<uint32_t>(m_buffer, str.length());
-        if (!writeLittleEndian<uint16_t>(m_buffer, reinterpret_cast<const uint16_t*>(str.deprecatedCharacters()), str.length()))
+        writeLittleEndian<uint32_t>(m_buffer, length);
+        if (!length || str.is8Bit()) {
+            if (!writeLittleEndianUInt16(m_buffer, str.characters8(), length))
+                fail();
+            return;
+        }
+        if (!writeLittleEndian(m_buffer, str.characters16(), length))
             fail();
     }
 
@@ -979,6 +1030,7 @@ private:
         write(file->path());
         write(file->url());
         write(file->type());
+        write(file->name());
     }
 
 #if ENABLE(SUBTLE_CRYPTO)
@@ -1095,6 +1147,8 @@ private:
 
     void write(const CryptoKey* key)
     {
+        write(currentKeyFormatVersion);
+
         write(key->extractable());
 
         CryptoKeyUsage usages = key->usagesBitmap();
@@ -1678,8 +1732,11 @@ private:
         CachedStringRef type;
         if (!readStringData(type))
             return 0;
+        CachedStringRef name;
+        if (!readStringData(name))
+            return 0;
         if (m_isDOMGlobalObject)
-            file = File::create(path->string(), URL(URL(), url->string()), type->string());
+            file = File::deserialize(path->string(), URL(URL(), url->string()), type->string(), name->string());
         return true;
     }
 
@@ -1934,7 +1991,7 @@ private:
             auto key = CryptoKeyRSA::create(algorithm, *keyData, extractable, usages);
             if (isRestrictedToHash)
                 key->restrictToHash(hash);
-            result = std::move(key);
+            result = WTF::move(key);
             return true;
         }
 
@@ -1951,7 +2008,7 @@ private:
             auto key = CryptoKeyRSA::create(algorithm, *keyData, extractable, usages);
             if (isRestrictedToHash)
                 key->restrictToHash(hash);
-            result = std::move(key);
+            result = WTF::move(key);
             return true;
         }
 
@@ -1985,12 +2042,16 @@ private:
         auto key = CryptoKeyRSA::create(algorithm, *keyData, extractable, usages);
         if (isRestrictedToHash)
             key->restrictToHash(hash);
-        result = std::move(key);
+        result = WTF::move(key);
         return true;
     }
 
     bool readCryptoKey(JSValue& cryptoKey)
     {
+        uint32_t keyFormatVersion;
+        if (!read(keyFormatVersion) || keyFormatVersion > currentKeyFormatVersion)
+            return false;
+
         int32_t extractable;
         if (!read(extractable))
             return false;
@@ -2127,17 +2188,17 @@ private:
             unsigned length = 0;
             if (!read(length))
                 return JSValue();
-            RefPtr<FileList> result = FileList::create();
+            Vector<RefPtr<File>> files;
             for (unsigned i = 0; i < length; i++) {
                 RefPtr<File> file;
                 if (!readFile(file))
                     return JSValue();
                 if (m_isDOMGlobalObject)
-                    result->append(file.get());
+                    files.append(WTF::move(file));
             }
             if (!m_isDOMGlobalObject)
                 return jsNull();
-            return getJSValue(result.get());
+            return getJSValue(FileList::create(WTF::move(files)).get());
         }
         case ImageDataTag: {
             int32_t width;
@@ -2174,7 +2235,7 @@ private:
                 return JSValue();
             if (!m_isDOMGlobalObject)
                 return jsNull();
-            return getJSValue(Blob::create(URL(URL(), url->string()), type->string(), size).get());
+            return getJSValue(Blob::deserialize(URL(URL(), url->string()), type->string(), size).get());
         }
         case StringTag: {
             CachedStringRef cachedString;
@@ -2262,8 +2323,19 @@ private:
         }
 #if ENABLE(SUBTLE_CRYPTO)
         case CryptoKeyTag: {
+            Vector<uint8_t> wrappedKey;
+            if (!read(wrappedKey)) {
+                fail();
+                return JSValue();
+            }
+            Vector<uint8_t> serializedKey;
+            if (!unwrapCryptoKey(m_exec, wrappedKey, serializedKey)) {
+                fail();
+                return JSValue();
+            }
             JSValue cryptoKey;
-            if (!readCryptoKey(cryptoKey)) {
+            CloneDeserializer rawKeyDeserializer(m_exec, m_globalObject, nullptr, nullptr, serializedKey);
+            if (!rawKeyDeserializer.readCryptoKey(cryptoKey)) {
                 fail();
                 return JSValue();
             }
@@ -2551,12 +2623,6 @@ PassRefPtr<SerializedScriptValue> SerializedScriptValue::create(ExecState* exec,
     return adoptRef(new SerializedScriptValue(buffer, blobURLs, arrayBufferContentsArray.release()));
 }
 
-PassRefPtr<SerializedScriptValue> SerializedScriptValue::create()
-{
-    Vector<uint8_t> buffer;
-    return adoptRef(new SerializedScriptValue(buffer));
-}
-
 PassRefPtr<SerializedScriptValue> SerializedScriptValue::create(const String& string)
 {
     Vector<uint8_t> buffer;
@@ -2566,11 +2632,6 @@ PassRefPtr<SerializedScriptValue> SerializedScriptValue::create(const String& st
 }
 
 #if ENABLE(INDEXED_DATABASE)
-PassRefPtr<SerializedScriptValue> SerializedScriptValue::create(JSC::ExecState* exec, JSC::JSValue value)
-{
-    return SerializedScriptValue::create(exec, value, 0, 0);
-}
-
 PassRefPtr<SerializedScriptValue> SerializedScriptValue::numberValue(double value)
 {
     Vector<uint8_t> buffer;
@@ -2578,20 +2639,20 @@ PassRefPtr<SerializedScriptValue> SerializedScriptValue::numberValue(double valu
     return adoptRef(new SerializedScriptValue(buffer));
 }
 
-JSValue SerializedScriptValue::deserialize(JSC::ExecState* exec, JSC::JSGlobalObject* globalObject)
+PassRefPtr<SerializedScriptValue> SerializedScriptValue::undefinedValue()
 {
-    return deserialize(exec, globalObject, 0);
+    Vector<uint8_t> buffer;
+    CloneSerializer::serializeUndefined(buffer);
+    return adoptRef(new SerializedScriptValue(buffer));
 }
 #endif
 
-PassRefPtr<SerializedScriptValue> SerializedScriptValue::create(JSContextRef originContext, JSValueRef apiValue, 
-                                                                MessagePortArray* messagePorts, ArrayBufferArray* arrayBuffers,
-                                                                JSValueRef* exception)
+PassRefPtr<SerializedScriptValue> SerializedScriptValue::create(JSContextRef originContext, JSValueRef apiValue, JSValueRef* exception)
 {
     ExecState* exec = toJS(originContext);
-    APIEntryShim entryShim(exec);
+    JSLockHolder locker(exec);
     JSValue value = toJS(exec, apiValue);
-    RefPtr<SerializedScriptValue> serializedValue = SerializedScriptValue::create(exec, value, messagePorts, arrayBuffers);
+    RefPtr<SerializedScriptValue> serializedValue = SerializedScriptValue::create(exec, value, nullptr, nullptr);
     if (exec->hadException()) {
         if (exception)
             *exception = toRef(exec, exec->exception());
@@ -2600,12 +2661,6 @@ PassRefPtr<SerializedScriptValue> SerializedScriptValue::create(JSContextRef ori
     }
     ASSERT(serializedValue);
     return serializedValue.release();
-}
-
-PassRefPtr<SerializedScriptValue> SerializedScriptValue::create(JSContextRef originContext, JSValueRef apiValue,
-                                                                JSValueRef* exception)
-{
-    return create(originContext, apiValue, 0, 0, exception);
 }
 
 String SerializedScriptValue::toString()
@@ -2620,72 +2675,28 @@ JSValue SerializedScriptValue::deserialize(ExecState* exec, JSGlobalObject* glob
                                                                   m_arrayBufferContentsArray.get(), m_data);
     if (throwExceptions == Throwing)
         maybeThrowExceptionIfSerializationFailed(exec, result.second);
-    return result.first;
+    return result.first ? result.first : jsNull();
 }
 
-#if ENABLE(INSPECTOR)
-Deprecated::ScriptValue SerializedScriptValue::deserializeForInspector(JSC::ExecState* scriptState)
-{
-    JSValue value = deserialize(scriptState, scriptState->lexicalGlobalObject(), 0);
-    return Deprecated::ScriptValue(scriptState->vm(), value);
-}
-#endif
-
-JSValueRef SerializedScriptValue::deserialize(JSContextRef destinationContext, JSValueRef* exception, MessagePortArray* messagePorts)
+JSValueRef SerializedScriptValue::deserialize(JSContextRef destinationContext, JSValueRef* exception)
 {
     ExecState* exec = toJS(destinationContext);
-    APIEntryShim entryShim(exec);
-    JSValue value = deserialize(exec, exec->lexicalGlobalObject(), messagePorts);
+    JSLockHolder locker(exec);
+    JSValue value = deserialize(exec, exec->lexicalGlobalObject(), nullptr);
     if (exec->hadException()) {
         if (exception)
             *exception = toRef(exec, exec->exception());
         exec->clearException();
-        return 0;
+        return nullptr;
     }
     ASSERT(value);
     return toRef(exec, value);
 }
 
-
-JSValueRef SerializedScriptValue::deserialize(JSContextRef destinationContext, JSValueRef* exception)
-{
-    return deserialize(destinationContext, exception, 0);
-}
-
 PassRefPtr<SerializedScriptValue> SerializedScriptValue::nullValue()
 {
-    return SerializedScriptValue::create();
-}
-
-PassRefPtr<SerializedScriptValue> SerializedScriptValue::undefinedValue()
-{
     Vector<uint8_t> buffer;
-    CloneSerializer::serializeUndefined(buffer);
     return adoptRef(new SerializedScriptValue(buffer));
-}
-
-PassRefPtr<SerializedScriptValue> SerializedScriptValue::booleanValue(bool value)
-{
-    Vector<uint8_t> buffer;
-    CloneSerializer::serializeBoolean(value, buffer);
-    return adoptRef(new SerializedScriptValue(buffer));
-}
-
-PassRefPtr<SerializedScriptValue> SerializedScriptValue::serialize(const Deprecated::ScriptValue& value, JSC::ExecState* scriptState, SerializationErrorMode throwExceptions)
-{
-    return SerializedScriptValue::create(scriptState, value.jsValue(), nullptr, nullptr, throwExceptions);
-}
-
-PassRefPtr<SerializedScriptValue> SerializedScriptValue::serialize(const Deprecated::ScriptValue& value, JSC::ExecState* scriptState, MessagePortArray* messagePorts, ArrayBufferArray* arrayBuffers, bool& didThrow)
-{
-    RefPtr<SerializedScriptValue> serializedValue = SerializedScriptValue::create(scriptState, value.jsValue(), messagePorts, arrayBuffers);
-    didThrow = scriptState->hadException();
-    return serializedValue.release();
-}
-
-Deprecated::ScriptValue SerializedScriptValue::deserialize(JSC::ExecState* scriptState, SerializedScriptValue* value, SerializationErrorMode throwExceptions)
-{
-    return Deprecated::ScriptValue(scriptState->vm(), value->deserialize(scriptState, scriptState->lexicalGlobalObject(), 0, throwExceptions));
 }
 
 void SerializedScriptValue::maybeThrowExceptionIfSerializationFailed(ExecState* exec, SerializationReturnCode code)

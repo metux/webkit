@@ -19,12 +19,8 @@
  *
  */
 
-#if defined(HAVE_CONFIG_H) && HAVE_CONFIG_H
-#ifdef BUILDING_WITH_CMAKE
+#if defined(HAVE_CONFIG_H) && HAVE_CONFIG_H && defined(BUILDING_WITH_CMAKE)
 #include "cmakeconfig.h"
-#else
-#include "autotoolsconfig.h"
-#endif
 #endif
 
 #include <wtf/Platform.h>
@@ -65,6 +61,11 @@
 
 #endif /* OS(WINDOWS) */
 
+// Using CMake with Unix makefiles does not use prefix headers.
+#if PLATFORM(MAC) && defined(BUILDING_WITH_CMAKE)
+#include "WebCorePrefix.h"
+#endif
+
 #ifdef __cplusplus
 
 // These undefs match up with defines in WebCorePrefix.h for Mac OS X.
@@ -100,7 +101,7 @@
 #endif
 #endif
 
-#if PLATFORM(MAC) && !PLATFORM(IOS)
+#if PLATFORM(MAC)
 #define WTF_USE_NEW_THEME 1
 #endif
 

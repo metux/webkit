@@ -28,6 +28,7 @@
 #include "FileChooser.h"
 #include "HTMLTextFormControlElement.h"
 #include "StepRange.h"
+#include <memory>
 
 #if PLATFORM(IOS)
 #include "DateComponents.h"
@@ -138,10 +139,6 @@ public:
     bool isTimeField() const;
     bool isWeekField() const;
 
-#if ENABLE(INPUT_SPEECH)
-    bool isSpeechEnabled() const;
-#endif
-
 #if PLATFORM(IOS)
     DateComponents::Type dateType() const;
 #endif
@@ -152,9 +149,6 @@ public:
     HTMLElement* innerSpinButtonElement() const;
     HTMLElement* resultsButtonElement() const;
     HTMLElement* cancelButtonElement() const;
-#if ENABLE(INPUT_SPEECH)
-    HTMLElement* speechButtonElement() const;
-#endif
     HTMLElement* sliderThumbElement() const;
     HTMLElement* sliderTrackElement() const;
     virtual HTMLElement* placeholderElement() const override;
@@ -298,8 +292,7 @@ public:
     String defaultToolTip() const;
 
 #if ENABLE(MEDIA_CAPTURE)
-    String capture() const;
-    void setCapture(const String& value);
+    bool shouldUseMediaCapture() const;
 #endif
 
     static const int maximumLength;
@@ -323,7 +316,7 @@ public:
     virtual void setRangeText(const String& replacement, ExceptionCode&) override;
     virtual void setRangeText(const String& replacement, unsigned start, unsigned end, const String& selectionMode, ExceptionCode&) override;
 
-    bool hasImageLoader() const { return m_imageLoader; }
+    bool hasImageLoader() const { return !!m_imageLoader; }
     HTMLImageLoader* imageLoader();
 
 #if ENABLE(DATE_AND_TIME_INPUT_TYPES)
@@ -337,10 +330,6 @@ protected:
 
 private:
     enum AutoCompleteSetting { Uninitialized, On, Off };
-
-    // FIXME: Author shadows should be allowed
-    // https://bugs.webkit.org/show_bug.cgi?id=92608
-    virtual bool areAuthorShadowsAllowed() const override { return false; }
 
     virtual void didAddUserAgentShadowRoot(ShadowRoot*) override;
 
@@ -459,9 +448,9 @@ private:
     // The ImageLoader must be owned by this element because the loader code assumes
     // that it lives as long as its owning element lives. If we move the loader into
     // the ImageInput object we may delete the loader while this element lives on.
-    OwnPtr<HTMLImageLoader> m_imageLoader;
+    std::unique_ptr<HTMLImageLoader> m_imageLoader;
 #if ENABLE(DATALIST_ELEMENT)
-    OwnPtr<ListAttributeTargetObserver> m_listAttributeTargetObserver;
+    std::unique_ptr<ListAttributeTargetObserver> m_listAttributeTargetObserver;
 #endif
 };
 

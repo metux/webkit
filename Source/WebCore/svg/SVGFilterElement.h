@@ -23,7 +23,7 @@
 #ifndef SVGFilterElement_h
 #define SVGFilterElement_h
 
-#if ENABLE(SVG) && ENABLE(FILTERS)
+#if ENABLE(FILTERS)
 #include "SVGAnimatedBoolean.h"
 #include "SVGAnimatedEnumeration.h"
 #include "SVGAnimatedInteger.h"
@@ -57,7 +57,7 @@ private:
     virtual RenderPtr<RenderElement> createElementRenderer(PassRef<RenderStyle>) override;
     virtual bool childShouldCreateRenderer(const Node&) const override;
 
-    virtual bool selfHasRelativeLengths() const override;
+    virtual bool selfHasRelativeLengths() const override { return true; }
 
     static const AtomicString& filterResXIdentifier();
     static const AtomicString& filterResYIdentifier();

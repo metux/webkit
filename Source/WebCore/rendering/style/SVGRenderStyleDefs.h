@@ -2,12 +2,13 @@
     Copyright (C) 2004, 2005, 2007 Nikolas Zimmermann <zimmermann@kde.org>
                   2004, 2005 Rob Buis <buis@kde.org>
     Copyright (C) Research In Motion Limited 2010. All rights reserved.
+    Copyright (C) 2014 Adobe Systems Incorporated. All rights reserved.
 
     Based on khtml code by:
     Copyright (C) 2000-2003 Lars Knoll (knoll@kde.org)
               (C) 2000 Antti Koivisto (koivisto@kde.org)
               (C) 2000-2003 Dirk Mueller (mueller@kde.org)
-              (C) 2002-2003 Apple Computer, Inc.
+              (C) 2002-2003 Apple Inc.
 
     This library is free software; you can redistribute it and/or
     modify it under the terms of the GNU Library General Public
@@ -28,12 +29,10 @@
 #ifndef SVGRenderStyleDefs_h
 #define SVGRenderStyleDefs_h
 
-#if ENABLE(SVG)
+#include "Length.h"
 #include "SVGLength.h"
 #include "SVGPaint.h"
 #include "ShadowData.h"
-#include <wtf/OwnPtr.h>
-#include <wtf/PassOwnPtr.h>
 #include <wtf/RefCounted.h>
 #include <wtf/RefPtr.h>
 
@@ -92,6 +91,23 @@ namespace WebCore {
     enum EMaskType {
         MT_LUMINANCE,
         MT_ALPHA
+    };
+
+    // These are all minimized combinations of paint-order.
+    enum PaintOrder {
+        PaintOrderNormal = 0,
+        PaintOrderFill = 1,
+        PaintOrderFillMarkers = 2,
+        PaintOrderStroke = 3,
+        PaintOrderStrokeMarkers = 4,
+        PaintOrderMarkers = 5,
+        PaintOrderMarkersStroke = 6
+    };
+
+    enum PaintType {
+        PaintTypeFill,
+        PaintTypeStroke,
+        PaintTypeMarkers
     };
 
     class CSSValue;
@@ -225,7 +241,7 @@ namespace WebCore {
             return !(*this == other);
         }
 
-        OwnPtr<ShadowData> shadow;
+        std::unique_ptr<ShadowData> shadow;
 
     private:
         StyleShadowSVGData();
@@ -274,7 +290,26 @@ namespace WebCore {
         StyleInheritedResourceData(const StyleInheritedResourceData&);
     };
 
+    // Positioning and sizing properties.
+    class StyleLayoutData : public RefCounted<StyleLayoutData> {
+    public:
+        static PassRef<StyleLayoutData> create() { return adoptRef(*new StyleLayoutData); }
+        PassRef<StyleLayoutData> copy() const;
+
+        bool operator==(const StyleLayoutData&) const;
+        bool operator!=(const StyleLayoutData& other) const
+        {
+            return !(*this == other);
+        }
+
+        Length x;
+        Length y;
+
+    private:        
+        StyleLayoutData();
+        StyleLayoutData(const StyleLayoutData&);
+    };
+
 } // namespace WebCore
 
-#endif // ENABLE(SVG)
 #endif // SVGRenderStyleDefs_h

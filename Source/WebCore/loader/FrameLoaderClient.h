@@ -11,7 +11,7 @@
  * 2.  Redistributions in binary form must reproduce the above copyright
  *     notice, this list of conditions and the following disclaimer in the
  *     documentation and/or other materials provided with the distribution. 
- * 3.  Neither the name of Apple Computer, Inc. ("Apple") nor the names of
+ * 3.  Neither the name of Apple Inc. ("Apple") nor the names of
  *     its contributors may be used to endorse or promote products derived
  *     from this software without specific prior written permission. 
  *
@@ -38,7 +38,7 @@
 #include <wtf/Forward.h>
 #include <wtf/Vector.h>
 
-#if PLATFORM(MAC)
+#if PLATFORM(COCOA)
 #ifdef __OBJC__ 
 #import <Foundation/Foundation.h>
 typedef id RemoteAXObjectRef;
@@ -49,9 +49,9 @@ typedef void* RemoteAXObjectRef;
 
 typedef class _jobject* jobject;
 
-#if PLATFORM(MAC) && !defined(__OBJC__)
-class NSCachedURLResponse;
-class NSView;
+#if PLATFORM(COCOA)
+OBJC_CLASS NSCachedURLResponse;
+OBJC_CLASS NSView;
 #endif
 
 namespace WebCore {
@@ -72,9 +72,6 @@ namespace WebCore {
     class HTMLAppletElement;
     class HTMLFormElement;
     class HTMLFrameOwnerElement;
-#if ENABLE(PLUGIN_PROXY_FOR_VIDEO)
-    class HTMLMediaElement;
-#endif
     class HTMLPlugInElement;
     class IntSize;
     class URL;
@@ -93,10 +90,17 @@ namespace WebCore {
 #endif
     class SecurityOrigin;
     class SharedBuffer;
-    class SocketStreamHandle;
     class StringWithDirection;
     class SubstituteData;
     class Widget;
+
+#if USE(QUICK_LOOK)
+    class QuickLookHandle;
+#endif
+
+#if ENABLE(CONTENT_FILTERING)
+    class ContentFilter;
+#endif
 
     typedef std::function<void (PolicyAction)> FramePolicyFunction;
 
@@ -115,9 +119,10 @@ namespace WebCore {
         virtual bool hasWebView() const = 0; // mainly for assertions
 
         virtual void makeRepresentation(DocumentLoader*) = 0;
-        virtual void forceLayout() = 0;
+        
 #if PLATFORM(IOS)
-        virtual void forceLayoutWithoutRecalculatingStyles() = 0;
+        // Returns true if the client forced the layout.
+        virtual bool forceLayoutOnRestoreFromPageCache() = 0;
 #endif
         virtual void forceLayoutForNonHTML() = 0;
 
@@ -203,6 +208,8 @@ namespace WebCore {
         virtual bool shouldGoToHistoryItem(HistoryItem*) const = 0;
         virtual void updateGlobalHistoryItemForPage() { }
 
+        virtual void willChangeCurrentHistoryItem() { }
+
         // This frame has set its opener to null, disowning it for the lifetime of the frame.
         // See http://html.spec.whatwg.org/#dom-opener.
         // FIXME: JSC should allow disowning opener. - <https://bugs.webkit.org/show_bug.cgi?id=103913>.
@@ -270,11 +277,6 @@ namespace WebCore {
         virtual PassRefPtr<Widget> createJavaAppletWidget(const IntSize&, HTMLAppletElement*, const URL& baseURL, const Vector<String>& paramNames, const Vector<String>& paramValues) = 0;
 
         virtual void dispatchDidFailToStartPlugin(const PluginView*) const { }
-#if ENABLE(PLUGIN_PROXY_FOR_VIDEO)
-        virtual PassRefPtr<Widget> createMediaPlayerProxyPlugin(const IntSize&, HTMLMediaElement*, const URL&, const Vector<String>&, const Vector<String>&, const String&) = 0;
-        virtual void hideMediaPlayerProxyPlugin(Widget*) = 0;
-        virtual void showMediaPlayerProxyPlugin(Widget*) = 0;
-#endif
 
         virtual ObjectContentType objectContentType(const URL&, const String& mimeType, bool shouldPreferPlugInsForImages) = 0;
         virtual String overrideMediaType() const = 0;
@@ -283,7 +285,7 @@ namespace WebCore {
 
         virtual void registerForIconNotification(bool listen = true) = 0;
 
-#if PLATFORM(MAC)
+#if PLATFORM(COCOA)
         // Allow an accessibility object to retrieve a Frame parent if there's no PlatformWidget.
         virtual RemoteAXObjectRef accessibilityRemoteObject() = 0;
         virtual NSCachedURLResponse* willCacheResponse(DocumentLoader*, unsigned long identifier, NSCachedURLResponse*) const = 0;
@@ -299,11 +301,6 @@ namespace WebCore {
         virtual void didChangeScrollOffset() { }
 
         virtual bool allowScript(bool enabledPerSettings) { return enabledPerSettings; }
-        virtual bool allowScriptFromSource(bool enabledPerSettings, const URL&) { return enabledPerSettings; }
-        virtual bool allowPlugins(bool enabledPerSettings) { return enabledPerSettings; }
-        virtual bool allowImage(bool enabledPerSettings, const URL&) { return enabledPerSettings; }
-        virtual bool allowDisplayingInsecureContent(bool enabledPerSettings, SecurityOrigin*, const URL&) { return enabledPerSettings; }
-        virtual bool allowRunningInsecureContent(bool enabledPerSettings, SecurityOrigin*, const URL&) { return enabledPerSettings; }
 
         // Clients that generally disallow universal access can make exceptions for particular URLs.
         virtual bool shouldForceUniversalAccessFromLocalURL(const URL&) { return false; }
@@ -311,8 +308,6 @@ namespace WebCore {
         virtual PassRefPtr<FrameNetworkingContext> createNetworkingContext() = 0;
 
         virtual bool shouldPaintBrokenImage(const URL&) const { return true; }
-
-        virtual void dispatchWillOpenSocketStream(SocketStreamHandle*) { }
 
         virtual void dispatchGlobalObjectAvailable(DOMWrapperWorld&) { }
         virtual void dispatchWillDisconnectDOMWindowExtensionFromGlobalObject(DOMWindowExtension*) { }
@@ -328,13 +323,22 @@ namespace WebCore {
         // Informs the embedder that a WebGL canvas inside this frame received a lost context
         // notification with the given GL_ARB_robustness guilt/innocence code (see Extensions3D.h).
         virtual void didLoseWebGLContext(int) { }
-        virtual WebGLLoadPolicy webGLPolicyForURL(const String&) const { return WebGLAllow; }
+        virtual WebGLLoadPolicy webGLPolicyForURL(const String&) const { return WebGLAllowCreation; }
+        virtual WebGLLoadPolicy resolveWebGLPolicyForURL(const String&) const { return WebGLAllowCreation; }
 #endif
 
         virtual void forcePageTransitionIfNeeded() { }
 
         // FIXME (bug 116233): We need to get rid of EmptyFrameLoaderClient completely, then this will no longer be needed.
         virtual bool isEmptyFrameLoaderClient() { return false; }
+
+#if USE(QUICK_LOOK)
+        virtual void didCreateQuickLookHandle(QuickLookHandle&) { }
+#endif
+
+#if ENABLE(CONTENT_FILTERING)
+        virtual void contentFilterDidBlockLoad(std::unique_ptr<ContentFilter>) { }
+#endif
     };
 
 } // namespace WebCore

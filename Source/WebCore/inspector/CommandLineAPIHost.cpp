@@ -12,7 +12,7 @@
  * 2.  Redistributions in binary form must reproduce the above copyright
  *     notice, this list of conditions and the following disclaimer in the
  *     documentation and/or other materials provided with the distribution.
- * 3.  Neither the name of Apple Computer, Inc. ("Apple") nor the names of
+ * 3.  Neither the name of Apple Inc. ("Apple") nor the names of
  *     its contributors may be used to endorse or promote products derived
  *     from this software without specific prior written permission.
  *
@@ -38,7 +38,6 @@
 #include "FrameLoader.h"
 #include "HTMLFrameOwnerElement.h"
 #include "InspectorClient.h"
-#include "InspectorConsoleAgent.h"
 #include "InspectorDOMAgent.h"
 #include "InspectorDOMStorageAgent.h"
 #include "InspectorDatabaseAgent.h"
@@ -49,6 +48,7 @@
 #include <bindings/ScriptValue.h>
 #include <inspector/InspectorValues.h>
 #include <inspector/agents/InspectorAgent.h>
+#include <inspector/agents/InspectorConsoleAgent.h>
 #include <wtf/RefPtr.h>
 #include <wtf/StdLibExtras.h>
 
@@ -74,7 +74,7 @@ CommandLineAPIHost::CommandLineAPIHost()
     , m_databaseAgent(nullptr)
 #endif
 {
-    m_defaultInspectableObject = adoptPtr(new InspectableObject);
+    m_defaultInspectableObject = std::make_unique<InspectableObject>();
 }
 
 CommandLineAPIHost::~CommandLineAPIHost()
@@ -124,9 +124,9 @@ Deprecated::ScriptValue CommandLineAPIHost::InspectableObject::get(JSC::ExecStat
     return Deprecated::ScriptValue();
 };
 
-void CommandLineAPIHost::addInspectedObject(PassOwnPtr<CommandLineAPIHost::InspectableObject> object)
+void CommandLineAPIHost::addInspectedObject(std::unique_ptr<CommandLineAPIHost::InspectableObject> object)
 {
-    m_inspectedObjects.insert(0, object);
+    m_inspectedObjects.insert(0, WTF::move(object));
     while (m_inspectedObjects.size() > 5)
         m_inspectedObjects.removeLast();
 }

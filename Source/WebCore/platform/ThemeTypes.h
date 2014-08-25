@@ -28,26 +28,10 @@
 
 namespace WebCore {
 
-enum ControlState {
-    HoverState = 1,
-    PressedState = 1 << 1,
-    FocusState = 1 << 2,
-    EnabledState = 1 << 3,
-    CheckedState = 1 << 4,
-    ReadOnlyState = 1 << 5,
-    DefaultState = 1 << 6,
-    WindowInactiveState = 1 << 7,
-    IndeterminateState = 1 << 8,
-    SpinUpState = 1 << 9, // Sub-state for HoverState and PressedState.
-    AllStates = 0xffffffff
-};
-
-typedef unsigned ControlStates;
-
 // Must follow CSSValueKeywords.in order
 enum ControlPart {
     NoControlPart, CheckboxPart, RadioPart, PushButtonPart, SquareButtonPart, ButtonPart,
-    ButtonBevelPart, DefaultButtonPart, InnerSpinButtonPart, InputSpeechButtonPart, ListboxPart, ListItemPart,
+    ButtonBevelPart, DefaultButtonPart, InnerSpinButtonPart, ListboxPart, ListItemPart,
     MediaEnterFullscreenButtonPart, MediaExitFullscreenButtonPart, MediaFullScreenVolumeSliderPart, MediaFullScreenVolumeSliderThumbPart, MediaMuteButtonPart, MediaPlayButtonPart,
     MediaOverlayPlayButtonPart, MediaSeekBackButtonPart, MediaSeekForwardButtonPart, MediaRewindButtonPart, MediaReturnToRealtimeButtonPart, MediaToggleClosedCaptionsButtonPart,
     MediaSliderPart, MediaSliderThumbPart, MediaVolumeSliderContainerPart, MediaVolumeSliderPart, MediaVolumeSliderThumbPart,
@@ -58,6 +42,9 @@ enum ControlPart {
     SearchFieldResultsDecorationPart, SearchFieldResultsButtonPart,
     SearchFieldCancelButtonPart, SnapshottedPluginOverlayPart, TextFieldPart,
     RelevancyLevelIndicatorPart, ContinuousCapacityLevelIndicatorPart, DiscreteCapacityLevelIndicatorPart, RatingLevelIndicatorPart,
+#if ENABLE(SERVICE_CONTROLS)
+    ImageControlsButtonPart,
+#endif
     TextAreaPart, CapsLockIndicatorPart
 };
 

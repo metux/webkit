@@ -43,9 +43,9 @@
 
 namespace WebCore {
 
-HashMap<const RenderLayer*, OwnPtr<RenderLayer::FilterInfo>>& RenderLayer::FilterInfo::map()
+HashMap<const RenderLayer*, std::unique_ptr<RenderLayer::FilterInfo>>& RenderLayer::FilterInfo::map()
 {
-    static NeverDestroyed<HashMap<const RenderLayer*, OwnPtr<FilterInfo>>> map;
+    static NeverDestroyed<HashMap<const RenderLayer*, std::unique_ptr<FilterInfo>>> map;
     return map;
 }
 
@@ -60,9 +60,9 @@ RenderLayer::FilterInfo& RenderLayer::FilterInfo::get(RenderLayer& layer)
 {
     ASSERT(layer.m_hasFilterInfo == map().contains(&layer));
 
-    OwnPtr<FilterInfo>& info = map().add(&layer, nullptr).iterator->value;
+    auto& info = map().add(&layer, nullptr).iterator->value;
     if (!info) {
-        info = adoptPtr(new FilterInfo(layer));
+        info = std::make_unique<FilterInfo>(layer);
         layer.m_hasFilterInfo = true;
     }
     return *info;
@@ -83,9 +83,7 @@ RenderLayer::FilterInfo::FilterInfo(RenderLayer& layer)
 
 RenderLayer::FilterInfo::~FilterInfo()
 {
-#if ENABLE(SVG)
     removeReferenceFilterClients();
-#endif
 }
 
 void RenderLayer::FilterInfo::setRenderer(PassRefPtr<FilterEffectRenderer> renderer)
@@ -93,14 +91,11 @@ void RenderLayer::FilterInfo::setRenderer(PassRefPtr<FilterEffectRenderer> rende
     m_renderer = renderer; 
 }
 
-#if ENABLE(SVG)
-
 void RenderLayer::FilterInfo::notifyFinished(CachedResource*)
 {
-    m_layer.renderer().element()->setNeedsStyleRecalc(SyntheticStyleChange);
-    m_layer.renderer().repaint();
+    m_layer.filterNeedsRepaint();
 }
-
+    
 void RenderLayer::FilterInfo::updateReferenceFilterClients(const FilterOperations& operations)
 {
     removeReferenceFilterClients();
@@ -108,7 +103,7 @@ void RenderLayer::FilterInfo::updateReferenceFilterClients(const FilterOperation
         FilterOperation* filterOperation = operations.operations()[i].get();
         if (filterOperation->type() != FilterOperation::REFERENCE)
             continue;
-        ReferenceFilterOperation* referenceFilterOperation = static_cast<ReferenceFilterOperation*>(filterOperation);
+        ReferenceFilterOperation* referenceFilterOperation = toReferenceFilterOperation(filterOperation);
         CachedSVGDocumentReference* documentReference = referenceFilterOperation->cachedSVGDocumentReference();
         CachedSVGDocument* cachedSVGDocument = documentReference ? documentReference->document() : 0;
 
@@ -119,10 +114,11 @@ void RenderLayer::FilterInfo::updateReferenceFilterClients(const FilterOperation
         } else {
             // Reference is internal; add layer as a client so we can trigger
             // filter repaint on SVG attribute change.
-            Element* filter = m_layer.renderer().element()->document().getElementById(referenceFilterOperation->fragment());
+            Element* filter = m_layer.renderer().document().getElementById(referenceFilterOperation->fragment());
+
             if (!filter || !filter->renderer() || !filter->renderer()->isSVGResourceFilter())
                 continue;
-            filter->renderer()->toRenderSVGResourceContainer()->addClientRenderLayer(&m_layer);
+            toRenderSVGResourceContainer(*filter->renderer()).addClientRenderLayer(&m_layer);
             m_internalSVGReferences.append(filter);
         }
     }
@@ -137,12 +133,10 @@ void RenderLayer::FilterInfo::removeReferenceFilterClients()
         Element* filter = m_internalSVGReferences[i].get();
         if (!filter->renderer())
             continue;
-        filter->renderer()->toRenderSVGResourceContainer()->removeClientRenderLayer(&m_layer);
+        toRenderSVGResourceContainer(*filter->renderer()).removeClientRenderLayer(&m_layer);
     }
     m_internalSVGReferences.clear();
 }
-
-#endif
 
 } // namespace WebCore
 

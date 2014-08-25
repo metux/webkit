@@ -10,7 +10,7 @@
  * 2.  Redistributions in binary form must reproduce the above copyright
  *     notice, this list of conditions and the following disclaimer in the
  *     documentation and/or other materials provided with the distribution.
- * 3.  Neither the name of Apple Computer, Inc. ("Apple") nor the names of
+ * 3.  Neither the name of Apple Inc. ("Apple") nor the names of
  *     its contributors may be used to endorse or promote products derived
  *     from this software without specific prior written permission.
  *
@@ -209,7 +209,6 @@ InjectedScript.prototype = {
         var argsArray = InjectedScriptHost.evaluate("(" + args + ")");
         var result = this[methodName].apply(this, argsArray);
         if (typeof result === "undefined") {
-            // FIXME: JS Context inspection currently does not have a global.console object.
             if (inspectedGlobalObject.console)
                 inspectedGlobalObject.console.error("Web Inspector error: InjectedScript.%s returns undefined", methodName);
             result = null;
@@ -339,6 +338,18 @@ InjectedScript.prototype = {
                     nameProcessed[name] = true;
                     var descriptor = Object.getOwnPropertyDescriptor(/** @type {!Object} */ (object), name);
                     if (!descriptor) {
+                        // Not all bindings provide proper descriptors. Fall back to the writable, configurable property.
+                        try {
+                            descriptor = { name: name, value: object[name], writable: false, configurable: false, enumerable: false};
+                            if (o === object)
+                                descriptor.isOwn = true;
+                            descriptors.push(descriptor);
+                        } catch (e) {
+                            // Silent catch.
+                        }
+                        continue;
+                    }
+                    if (descriptor.hasOwnProperty("get") && descriptor.hasOwnProperty("set") && !descriptor.get && !descriptor.set) {
                         // Not all bindings provide proper descriptors. Fall back to the writable, configurable property.
                         try {
                             descriptor = { name: name, value: object[name], writable: false, configurable: false, enumerable: false};
@@ -545,7 +556,6 @@ InjectedScript.prototype = {
         // When not evaluating on a call frame we use a 'with' statement to allow var and function statements to leak
         // into the global scope. This allow them to stick around between evaluations.
 
-        // FIXME: JS Context inspection currently does not have a global.console object.
         try {
             if (commandLineAPI) {
                 if (inspectedGlobalObject.console)
@@ -660,7 +670,6 @@ InjectedScript.prototype = {
         delete this._modules[name];
         var moduleFunction = InjectedScriptHost.evaluate("(" + source + ")");
         if (typeof moduleFunction !== "function") {
-            // FIXME: JS Context inspection currently does not have a global.console object.
             if (inspectedGlobalObject.console)
                 inspectedGlobalObject.console.error("Web Inspector error: A function was expected for module %s evaluation", name);
             return null;

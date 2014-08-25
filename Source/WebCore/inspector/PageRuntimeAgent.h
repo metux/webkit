@@ -35,7 +35,6 @@
 
 #include <inspector/InspectorJSFrontendDispatchers.h>
 #include <inspector/agents/InspectorRuntimeAgent.h>
-#include <wtf/PassOwnPtr.h>
 
 namespace JSC {
 class ExecState;
@@ -54,6 +53,7 @@ class SecurityOrigin;
 typedef String ErrorString;
 
 class PageRuntimeAgent final : public Inspector::InspectorRuntimeAgent {
+    WTF_MAKE_FAST_ALLOCATED;
 public:
     PageRuntimeAgent(Inspector::InjectedScriptManager*, Page*, InspectorPageAgent*);
     virtual ~PageRuntimeAgent() { }
@@ -67,7 +67,7 @@ public:
     void didCreateIsolatedContext(Frame*, JSC::ExecState*, SecurityOrigin*);
 
 private:
-    virtual JSC::VM* globalVM() override;
+    virtual JSC::VM& globalVM() override;
     virtual Inspector::InjectedScript injectedScriptForEval(ErrorString*, const int* executionContextId) override;
     virtual void muteConsole() override;
     virtual void unmuteConsole() override;

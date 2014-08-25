@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012, 2013 Apple Inc. All rights reserved.
+ * Copyright (C) 2012-2014 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -29,6 +29,8 @@
 #if ENABLE(DFG_JIT)
 
 #include "CodeBlockWithJITType.h"
+#include "DFGMayExit.h"
+#include "JSCInlines.h"
 #include <wtf/Assertions.h>
 #include <wtf/BitVector.h>
 
@@ -44,6 +46,7 @@ public:
     
     #define VALIDATE(context, assertion) do { \
         if (!(assertion)) { \
+            startCrashing(); \
             dataLogF("\n\n\nAt "); \
             reportValidationContext context; \
             dataLogF(": validation %s (%s:%d) failed.\n", #assertion, __FILE__, __LINE__); \
@@ -55,6 +58,7 @@ public:
     
     #define V_EQUAL(context, left, right) do { \
         if (left != right) { \
+            startCrashing(); \
             dataLogF("\n\n\nAt "); \
             reportValidationContext context; \
             dataLogF(": validation (%s = ", #left); \
@@ -113,6 +117,9 @@ public:
                         continue;
                     
                     m_myRefCounts.find(edge.node())->value++;
+                    
+                    VALIDATE((node, edge), edge->hasDoubleResult() == (edge.useKind() == DoubleRepUse || edge.useKind() == DoubleRepRealUse || edge.useKind() == DoubleRepMachineIntUse));
+                    VALIDATE((node, edge), edge->hasInt52Result() == (edge.useKind() == Int52RepUse));
                     
                     if (m_graph.m_form == SSA) {
                         // In SSA, all edges must hasResult().
@@ -181,6 +188,65 @@ public:
                     V_EQUAL((node), m_myRefCounts.get(node), node->adjustedRefCount());
                 else
                     V_EQUAL((node), node->refCount(), 1);
+            }
+            
+            for (size_t i = 0 ; i < block->size() - 1; ++i) {
+                Node* node = block->at(i);
+                VALIDATE((node), !node->isTerminal());
+            }
+            
+            for (size_t i = 0; i < block->size(); ++i) {
+                Node* node = block->at(i);
+                
+                VALIDATE((node), !mayExit(m_graph, node) || node->origin.forExit.isSet());
+                VALIDATE((node), !node->hasStructure() || !!node->structure());
+                VALIDATE((node), !node->hasFunction() || node->function()->value().isFunction());
+                 
+                if (!(node->flags() & NodeHasVarArgs)) {
+                    if (!node->child2())
+                        VALIDATE((node), !node->child3());
+                    if (!node->child1())
+                        VALIDATE((node), !node->child2());
+                }
+                 
+                switch (node->op()) {
+                case Identity:
+                    VALIDATE((node), canonicalResultRepresentation(node->result()) == canonicalResultRepresentation(node->child1()->result()));
+                    break;
+                case MakeRope:
+                case ValueAdd:
+                case ArithAdd:
+                case ArithSub:
+                case ArithMul:
+                case ArithIMul:
+                case ArithDiv:
+                case ArithMod:
+                case ArithMin:
+                case ArithMax:
+                case CompareLess:
+                case CompareLessEq:
+                case CompareGreater:
+                case CompareGreaterEq:
+                case CompareEq:
+                case CompareEqConstant:
+                case CompareStrictEq:
+                    VALIDATE((node), !!node->child1());
+                    VALIDATE((node), !!node->child2());
+                    break;
+                case PutStructure:
+                    VALIDATE((node), !node->transition()->previous->dfgShouldWatch());
+                    break;
+                case MultiPutByOffset:
+                    for (unsigned i = node->multiPutByOffsetData().variants.size(); i--;) {
+                        const PutByIdVariant& variant = node->multiPutByOffsetData().variants[i];
+                        if (variant.kind() != PutByIdVariant::Transition)
+                            continue;
+                        VALIDATE((node), !variant.oldStructureForTransition()->dfgShouldWatch());
+                    }
+                    break;
+                default:
+                    break;
+                }
             }
         }
         
@@ -401,18 +467,18 @@ private:
                 continue;
             
             unsigned nodeIndex = 0;
-            for (; nodeIndex < block->size() && !block->at(nodeIndex)->codeOrigin.isSet(); nodeIndex++) { }
+            for (; nodeIndex < block->size() && !block->at(nodeIndex)->origin.forExit.isSet(); nodeIndex++) { }
             
             VALIDATE((block), nodeIndex < block->size());
             
             for (; nodeIndex < block->size(); nodeIndex++)
-                VALIDATE((block->at(nodeIndex)), block->at(nodeIndex)->codeOrigin.isSet());
+                VALIDATE((block->at(nodeIndex)), block->at(nodeIndex)->origin.forExit.isSet());
             
             for (unsigned nodeIndex = 0; nodeIndex < block->size(); ++nodeIndex) {
                 Node* node = block->at(nodeIndex);
                 switch (node->op()) {
                 case Phi:
-                    VALIDATE((node), !node->codeOrigin.isSet());
+                    VALIDATE((node), !node->origin.forExit.isSet());
                     break;
                     
                 default:

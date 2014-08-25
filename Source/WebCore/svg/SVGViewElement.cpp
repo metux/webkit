@@ -19,8 +19,6 @@
  */
 
 #include "config.h"
-
-#if ENABLE(SVG)
 #include "SVGViewElement.h"
 
 #include "Attribute.h"
@@ -28,6 +26,7 @@
 #include "SVGNames.h"
 #include "SVGStringList.h"
 #include "SVGZoomAndPan.h"
+#include <wtf/NeverDestroyed.h>
 
 namespace WebCore {
 
@@ -59,14 +58,14 @@ PassRefPtr<SVGViewElement> SVGViewElement::create(const QualifiedName& tagName, 
 
 bool SVGViewElement::isSupportedAttribute(const QualifiedName& attrName)
 {
-    DEFINE_STATIC_LOCAL(HashSet<QualifiedName>, supportedAttributes, ());
-    if (supportedAttributes.isEmpty()) {
+    static NeverDestroyed<HashSet<QualifiedName>> supportedAttributes;
+    if (supportedAttributes.get().isEmpty()) {
         SVGExternalResourcesRequired::addSupportedAttributes(supportedAttributes);
         SVGFitToViewBox::addSupportedAttributes(supportedAttributes);
         SVGZoomAndPan::addSupportedAttributes(supportedAttributes);
-        supportedAttributes.add(SVGNames::viewTargetAttr);
+        supportedAttributes.get().add(SVGNames::viewTargetAttr);
     }
-    return supportedAttributes.contains<SVGAttributeHashTranslator>(attrName);
+    return supportedAttributes.get().contains<SVGAttributeHashTranslator>(attrName);
 }
 
 void SVGViewElement::parseAttribute(const QualifiedName& name, const AtomicString& value)
@@ -92,5 +91,3 @@ void SVGViewElement::parseAttribute(const QualifiedName& name, const AtomicStrin
 }
 
 }
-
-#endif // ENABLE(SVG)

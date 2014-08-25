@@ -18,8 +18,6 @@
  */
 
 #include "config.h"
-
-#if ENABLE(SVG)
 #include "RenderSVGResourceMasker.h"
 
 #include "Element.h"
@@ -34,7 +32,7 @@ namespace WebCore {
 RenderSVGResourceType RenderSVGResourceMasker::s_resourceType = MaskerResourceType;
 
 RenderSVGResourceMasker::RenderSVGResourceMasker(SVGMaskElement& element, PassRef<RenderStyle> style)
-    : RenderSVGResourceContainer(element, std::move(style))
+    : RenderSVGResourceContainer(element, WTF::move(style))
 {
 }
 
@@ -50,7 +48,7 @@ void RenderSVGResourceMasker::removeAllClientsFromCache(bool markForInvalidation
     markAllClientsForInvalidation(markForInvalidation ? LayoutAndBoundariesInvalidation : ParentOnlyInvalidation);
 }
 
-void RenderSVGResourceMasker::removeClientFromCache(RenderObject& client, bool markForInvalidation)
+void RenderSVGResourceMasker::removeClientFromCache(RenderElement& client, bool markForInvalidation)
 {
     m_masker.remove(&client);
 
@@ -69,7 +67,7 @@ bool RenderSVGResourceMasker::applyResource(RenderElement& renderer, const Rende
     MaskerData* maskerData = m_masker.get(&renderer);
 
     AffineTransform absoluteTransform;
-    SVGRenderingContext::calculateTransformationToOutermostCoordinateSystem(&renderer, absoluteTransform);
+    SVGRenderingContext::calculateTransformationToOutermostCoordinateSystem(renderer, absoluteTransform);
 
     FloatRect repaintRect = renderer.repaintRectInLocalCoordinates();
 
@@ -169,5 +167,3 @@ FloatRect RenderSVGResourceMasker::resourceBoundingBox(const RenderObject& objec
 }
 
 }
-
-#endif // ENABLE(SVG)

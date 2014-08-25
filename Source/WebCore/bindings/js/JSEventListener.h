@@ -20,8 +20,8 @@
 #ifndef JSEventListener_h
 #define JSEventListener_h
 
+#include "DOMWrapperWorld.h"
 #include "EventListener.h"
-#include "JSDOMWindow.h"
 #include <heap/StrongInlines.h>
 #include <heap/Weak.h>
 #include <heap/WeakInlines.h>
@@ -80,11 +80,13 @@ namespace WebCore {
         // initializeJSFunction can trigger code that deletes this event listener
         // before we're done. It should always return 0 in this case.
         Ref<JSEventListener> protect(const_cast<JSEventListener&>(*this));
-        JSC::Strong<JSC::JSObject> wrapper(*m_isolatedWorld->vm(), m_wrapper.get());
+        JSC::Strong<JSC::JSObject> wrapper(m_isolatedWorld->vm(), m_wrapper.get());
 
         if (!m_jsFunction) {
             JSC::JSObject* function = initializeJSFunction(scriptExecutionContext);
-            JSC::Heap::writeBarrier(m_wrapper.get(), function);
+            JSC::JSObject* wrapper = m_wrapper.get();
+            if (wrapper)
+                JSC::Heap::heap(wrapper)->writeBarrier(wrapper, function);
             m_jsFunction = JSC::Weak<JSC::JSObject>(function);
         }
 

@@ -20,7 +20,7 @@
 
 #include "config.h"
 
-#if ENABLE(SVG) && ENABLE(FILTERS)
+#if ENABLE(FILTERS)
 #include "SVGFEMergeNodeElement.h"
 
 #include "Attribute.h"
@@ -30,6 +30,7 @@
 #include "SVGFilterElement.h"
 #include "SVGFilterPrimitiveStandardAttributes.h"
 #include "SVGNames.h"
+#include <wtf/NeverDestroyed.h>
 
 namespace WebCore {
 
@@ -54,10 +55,10 @@ PassRefPtr<SVGFEMergeNodeElement> SVGFEMergeNodeElement::create(const QualifiedN
 
 bool SVGFEMergeNodeElement::isSupportedAttribute(const QualifiedName& attrName)
 {
-    DEFINE_STATIC_LOCAL(HashSet<QualifiedName>, supportedAttributes, ());
-    if (supportedAttributes.isEmpty())
-        supportedAttributes.add(SVGNames::inAttr);
-    return supportedAttributes.contains<SVGAttributeHashTranslator>(attrName);
+    static NeverDestroyed<HashSet<QualifiedName>> supportedAttributes;
+    if (supportedAttributes.get().isEmpty())
+        supportedAttributes.get().add(SVGNames::inAttr);
+    return supportedAttributes.get().contains<SVGAttributeHashTranslator>(attrName);
 }
 
 void SVGFEMergeNodeElement::parseAttribute(const QualifiedName& name, const AtomicString& value)
@@ -94,4 +95,4 @@ void SVGFEMergeNodeElement::svgAttributeChanged(const QualifiedName& attrName)
 
 }
 
-#endif // ENABLE(SVG)
+#endif // ENABLE(FILTERS)

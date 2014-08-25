@@ -30,7 +30,7 @@
 #include "JSString.h"
 #include "JSStringBuilder.h"
 #include "ObjectPrototype.h"
-#include "Operations.h"
+#include "JSCInlines.h"
 #include "RegExpObject.h"
 #include "RegExp.h"
 #include "RegExpCache.h"
@@ -49,7 +49,7 @@ static EncodedJSValue JSC_HOST_CALL regExpProtoFuncToString(ExecState*);
 
 namespace JSC {
 
-const ClassInfo RegExpPrototype::s_info = { "RegExp", &RegExpObject::s_info, 0, ExecState::regExpPrototypeTable, CREATE_METHOD_TABLE(RegExpPrototype) };
+const ClassInfo RegExpPrototype::s_info = { "RegExp", &RegExpObject::s_info, &regExpPrototypeTable, CREATE_METHOD_TABLE(RegExpPrototype) };
 
 /* Source for RegExpPrototype.lut.h
 @begin regExpPrototypeTable
@@ -67,14 +67,14 @@ RegExpPrototype::RegExpPrototype(VM& vm, Structure* structure, RegExp* regExp)
 
 bool RegExpPrototype::getOwnPropertySlot(JSObject* object, ExecState* exec, PropertyName propertyName, PropertySlot &slot)
 {
-    return getStaticFunctionSlot<RegExpObject>(exec, ExecState::regExpPrototypeTable(exec->vm()), jsCast<RegExpPrototype*>(object), propertyName, slot);
+    return getStaticFunctionSlot<RegExpObject>(exec, regExpPrototypeTable, jsCast<RegExpPrototype*>(object), propertyName, slot);
 }
 
 // ------------------------------ Functions ---------------------------
 
 EncodedJSValue JSC_HOST_CALL regExpProtoFuncTest(ExecState* exec)
 {
-    JSValue thisValue = exec->hostThisValue();
+    JSValue thisValue = exec->thisValue();
     if (!thisValue.inherits(RegExpObject::info()))
         return throwVMTypeError(exec);
     return JSValue::encode(jsBoolean(asRegExpObject(thisValue)->test(exec, exec->argument(0).toString(exec))));
@@ -82,7 +82,7 @@ EncodedJSValue JSC_HOST_CALL regExpProtoFuncTest(ExecState* exec)
 
 EncodedJSValue JSC_HOST_CALL regExpProtoFuncExec(ExecState* exec)
 {
-    JSValue thisValue = exec->hostThisValue();
+    JSValue thisValue = exec->thisValue();
     if (!thisValue.inherits(RegExpObject::info()))
         return throwVMTypeError(exec);
     return JSValue::encode(asRegExpObject(thisValue)->exec(exec, exec->argument(0).toString(exec)));
@@ -90,7 +90,7 @@ EncodedJSValue JSC_HOST_CALL regExpProtoFuncExec(ExecState* exec)
 
 EncodedJSValue JSC_HOST_CALL regExpProtoFuncCompile(ExecState* exec)
 {
-    JSValue thisValue = exec->hostThisValue();
+    JSValue thisValue = exec->thisValue();
     if (!thisValue.inherits(RegExpObject::info()))
         return throwVMTypeError(exec);
 
@@ -128,7 +128,7 @@ EncodedJSValue JSC_HOST_CALL regExpProtoFuncCompile(ExecState* exec)
 
 EncodedJSValue JSC_HOST_CALL regExpProtoFuncToString(ExecState* exec)
 {
-    JSValue thisValue = exec->hostThisValue();
+    JSValue thisValue = exec->thisValue();
     if (!thisValue.inherits(RegExpObject::info()))
         return throwVMTypeError(exec);
 

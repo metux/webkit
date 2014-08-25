@@ -41,7 +41,6 @@ void WebPageCreationParameters::encode(IPC::ArgumentEncoder& encoder) const
     encoder << drawsBackground;
     encoder << drawsTransparentBackground;
     encoder << underlayColor;
-    encoder << areMemoryCacheClientCallsEnabled;
     encoder << useFixedLayout;
     encoder << fixedLayoutSize;
     encoder.encodeEnum(paginationMode);
@@ -49,11 +48,15 @@ void WebPageCreationParameters::encode(IPC::ArgumentEncoder& encoder) const
     encoder << pageLength;
     encoder << gapBetweenPages;
     encoder << userAgent;
-    encoder << sessionState;
+    encoder << itemStates;
+    encoder << sessionID;
     encoder << highestUsedBackForwardItemID;
+    encoder << userContentControllerID;
+    encoder << visitedLinkTableID;
     encoder << canRunBeforeUnloadConfirmPanel;
     encoder << canRunModal;
     encoder << deviceScaleFactor;
+    encoder << topContentInset;
     encoder << mediaVolume;
     encoder << mayStartMediaWhenInWindow;
     encoder << minimumLayoutSize;
@@ -61,9 +64,18 @@ void WebPageCreationParameters::encode(IPC::ArgumentEncoder& encoder) const
     encoder.encodeEnum(scrollPinningBehavior);
     encoder << backgroundExtendsBeyondPage;
     encoder.encodeEnum(layerHostingMode);
+    encoder << mimeTypesWithCustomContentProviders;
 
+#if ENABLE(REMOTE_INSPECTOR)
+    encoder << allowsRemoteInspection;
+#endif
 #if PLATFORM(MAC)
     encoder << colorSpace;
+#endif
+#if PLATFORM(IOS)
+    encoder << screenSize;
+    encoder << availableScreenSize;
+    encoder << textAutosizingWidth;
 #endif
 }
 
@@ -85,8 +97,6 @@ bool WebPageCreationParameters::decode(IPC::ArgumentDecoder& decoder, WebPageCre
         return false;
     if (!decoder.decode(parameters.underlayColor))
         return false;
-    if (!decoder.decode(parameters.areMemoryCacheClientCallsEnabled))
-        return false;
     if (!decoder.decode(parameters.useFixedLayout))
         return false;
     if (!decoder.decode(parameters.fixedLayoutSize))
@@ -101,15 +111,23 @@ bool WebPageCreationParameters::decode(IPC::ArgumentDecoder& decoder, WebPageCre
         return false;
     if (!decoder.decode(parameters.userAgent))
         return false;
-    if (!decoder.decode(parameters.sessionState))
+    if (!decoder.decode(parameters.itemStates))
+        return false;
+    if (!decoder.decode(parameters.sessionID))
         return false;
     if (!decoder.decode(parameters.highestUsedBackForwardItemID))
+        return false;
+    if (!decoder.decode(parameters.userContentControllerID))
+        return false;
+    if (!decoder.decode(parameters.visitedLinkTableID))
         return false;
     if (!decoder.decode(parameters.canRunBeforeUnloadConfirmPanel))
         return false;
     if (!decoder.decode(parameters.canRunModal))
         return false;
     if (!decoder.decode(parameters.deviceScaleFactor))
+        return false;
+    if (!decoder.decode(parameters.topContentInset))
         return false;
     if (!decoder.decode(parameters.mediaVolume))
         return false;
@@ -125,11 +143,28 @@ bool WebPageCreationParameters::decode(IPC::ArgumentDecoder& decoder, WebPageCre
         return false;
     if (!decoder.decodeEnum(parameters.layerHostingMode))
         return false;
-    
+    if (!decoder.decode(parameters.mimeTypesWithCustomContentProviders))
+        return false;
+
+#if ENABLE(REMOTE_INSPECTOR)
+    if (!decoder.decode(parameters.allowsRemoteInspection))
+        return false;
+#endif
+
 #if PLATFORM(MAC)
     if (!decoder.decode(parameters.colorSpace))
         return false;
 #endif
+
+#if PLATFORM(IOS)
+    if (!decoder.decode(parameters.screenSize))
+        return false;
+    if (!decoder.decode(parameters.availableScreenSize))
+        return false;
+    if (!decoder.decode(parameters.textAutosizingWidth))
+        return false;
+#endif
+
 
     return true;
 }

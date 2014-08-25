@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011, 2013 Apple Inc. All rights reserved.
+ * Copyright (C) 2011, 2013, 2014 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -28,6 +28,7 @@
 
 #if ENABLE(DFG_JIT)
 
+#include "ArityCheckFailReturnThunks.h"
 #include "CodeBlock.h"
 #include "DFGFailedFinalizer.h"
 #include "DFGInlineCacheWrapperInlines.h"
@@ -40,8 +41,10 @@
 #include "DFGSpeculativeJIT.h"
 #include "DFGThunks.h"
 #include "JSCJSValueInlines.h"
-#include "VM.h"
 #include "LinkBuffer.h"
+#include "MaxFrameExtentForSlowPathCall.h"
+#include "JSCInlines.h"
+#include "VM.h"
 
 namespace JSC { namespace DFG {
 
@@ -92,15 +95,14 @@ void JITCompiler::linkOSRExits()
 void JITCompiler::compileEntry()
 {
     // This code currently matches the old JIT. In the function header we need to
-    // pop the return address (since we do not allow any recursion on the machine
-    // stack), and perform a fast stack check.
+    // save return address and call frame via the prologue and perform a fast stack check.
     // FIXME: https://bugs.webkit.org/show_bug.cgi?id=56292
     // We'll need to convert the remaining cti_ style calls (specifically the stack
     // check) which will be dependent on stack layout. (We'd need to account for this in
     // both normal return code and when jumping to an exception handler).
-    preserveReturnAddressAfterCall(GPRInfo::regT2);
-    emitPutReturnPCToCallFrameHeader(GPRInfo::regT2);
+    emitFunctionPrologue();
     emitPutImmediateToCallFrameHeader(m_codeBlock, JSStack::CodeBlock);
+    jitAssertTagsInPlace();
 }
 
 void JITCompiler::compileBody()
@@ -121,22 +123,25 @@ void JITCompiler::compileExceptionHandlers()
 
     if (!m_exceptionChecksWithCallFrameRollback.empty()) {
         m_exceptionChecksWithCallFrameRollback.link(this);
-        emitGetCallerFrameFromCallFrameHeaderPtr(GPRInfo::argumentGPR0);
+        emitGetCallerFrameFromCallFrameHeaderPtr(GPRInfo::argumentGPR1);
         doLookup = jump();
     }
 
     if (!m_exceptionChecks.empty())
         m_exceptionChecks.link(this);
 
-    // lookupExceptionHandler is passed one argument, the exec (the CallFrame*).
-    move(GPRInfo::callFrameRegister, GPRInfo::argumentGPR0);
+    // lookupExceptionHandler is passed two arguments, the VM and the exec (the CallFrame*).
+    move(GPRInfo::callFrameRegister, GPRInfo::argumentGPR1);
 
     if (doLookup.isSet())
         doLookup.link(this);
 
+    move(TrustedImmPtr(vm()), GPRInfo::argumentGPR0);
+
 #if CPU(X86)
     // FIXME: should use the call abstraction, but this is currently in the SpeculativeJIT layer!
     poke(GPRInfo::argumentGPR0);
+    poke(GPRInfo::argumentGPR1, 1);
 #endif
     m_calls.append(CallLinkRecord(call(), lookupExceptionHandler));
     jumpToExceptionHandler();
@@ -148,15 +153,21 @@ void JITCompiler::link(LinkBuffer& linkBuffer)
     m_jitCode->common.frameRegisterCount = m_graph.frameRegisterCount();
     m_jitCode->common.requiredRegisterCountForExit = m_graph.requiredRegisterCountForExit();
 
-    if (!m_graph.m_inlineCallFrames->isEmpty())
-        m_jitCode->common.inlineCallFrames = m_graph.m_inlineCallFrames.release();
+    if (!m_graph.m_plan.inlineCallFrames->isEmpty())
+        m_jitCode->common.inlineCallFrames = m_graph.m_plan.inlineCallFrames;
     
     m_jitCode->common.machineCaptureStart = m_graph.m_machineCaptureStart;
-    m_jitCode->common.slowArguments = std::move(m_graph.m_slowArguments);
+    m_jitCode->common.slowArguments = WTF::move(m_graph.m_slowArguments);
+
+#if USE(JSVALUE32_64)
+    m_jitCode->common.doubleConstants = WTF::move(m_graph.m_doubleConstants);
+#endif
+    
+    m_graph.registerFrozenValues();
 
     BitVector usedJumpTables;
-    for (unsigned i = m_graph.m_switchData.size(); i--;) {
-        SwitchData& data = m_graph.m_switchData[i];
+    for (Bag<SwitchData>::iterator iter = m_graph.m_switchData.begin(); !!iter; ++iter) {
+        SwitchData& data = **iter;
         if (!data.didUseJumpTable)
             continue;
         
@@ -167,14 +178,14 @@ void JITCompiler::link(LinkBuffer& linkBuffer)
         
         usedJumpTables.set(data.switchTableIndex);
         SimpleJumpTable& table = m_codeBlock->switchJumpTable(data.switchTableIndex);
-        table.ctiDefault = linkBuffer.locationOf(m_blockHeads[data.fallThrough->index]);
+        table.ctiDefault = linkBuffer.locationOf(m_blockHeads[data.fallThrough.block->index]);
         table.ctiOffsets.grow(table.branchOffsets.size());
         for (unsigned j = table.ctiOffsets.size(); j--;)
             table.ctiOffsets[j] = table.ctiDefault;
         for (unsigned j = data.cases.size(); j--;) {
             SwitchCase& myCase = data.cases[j];
             table.ctiOffsets[myCase.value.switchLookupValue() - table.min] =
-                linkBuffer.locationOf(m_blockHeads[myCase.target->index]);
+                linkBuffer.locationOf(m_blockHeads[myCase.target.block->index]);
         }
     }
     
@@ -188,8 +199,8 @@ void JITCompiler::link(LinkBuffer& linkBuffer)
     // NOTE: we cannot clear string switch tables because (1) we're running concurrently
     // and we cannot deref StringImpl's and (2) it would be weird to deref those
     // StringImpl's since we refer to them.
-    for (unsigned i = m_graph.m_switchData.size(); i--;) {
-        SwitchData& data = m_graph.m_switchData[i];
+    for (Bag<SwitchData>::iterator switchDataIter = m_graph.m_switchData.begin(); !!switchDataIter; ++switchDataIter) {
+        SwitchData& data = **switchDataIter;
         if (!data.didUseJumpTable)
             continue;
         
@@ -197,7 +208,7 @@ void JITCompiler::link(LinkBuffer& linkBuffer)
             continue;
         
         StringJumpTable& table = m_codeBlock->stringSwitchJumpTable(data.switchTableIndex);
-        table.ctiDefault = linkBuffer.locationOf(m_blockHeads[data.fallThrough->index]);
+        table.ctiDefault = linkBuffer.locationOf(m_blockHeads[data.fallThrough.block->index]);
         StringJumpTable::StringOffsetTable::iterator iter;
         StringJumpTable::StringOffsetTable::iterator end = table.offsetTable.end();
         for (iter = table.offsetTable.begin(); iter != end; ++iter)
@@ -206,7 +217,7 @@ void JITCompiler::link(LinkBuffer& linkBuffer)
             SwitchCase& myCase = data.cases[j];
             iter = table.offsetTable.find(myCase.value.stringImpl());
             RELEASE_ASSERT(iter != end);
-            iter->value.ctiOffset = linkBuffer.locationOf(m_blockHeads[myCase.target->index]);
+            iter->value.ctiOffset = linkBuffer.locationOf(m_blockHeads[myCase.target.block->index]);
         }
     }
 
@@ -228,17 +239,16 @@ void JITCompiler::link(LinkBuffer& linkBuffer)
         info.patch.deltaCallToSlowCase = differenceBetweenCodePtr(callReturnLocation, linkBuffer.locationOf(m_ins[i].m_slowPathGenerator->label()));
     }
     
-    m_codeBlock->setNumberOfCallLinkInfos(m_jsCalls.size());
     for (unsigned i = 0; i < m_jsCalls.size(); ++i) {
-        CallLinkInfo& info = m_codeBlock->callLinkInfo(i);
-        info.callType = m_jsCalls[i].m_callType;
-        info.isDFG = true;
-        info.codeOrigin = m_jsCalls[i].m_codeOrigin;
-        linkBuffer.link(m_jsCalls[i].m_slowCall, FunctionPtr((m_vm->getCTIStub(info.callType == CallLinkInfo::Construct ? linkConstructThunkGenerator : linkCallThunkGenerator)).code().executableAddress()));
-        info.callReturnLocation = linkBuffer.locationOfNearCall(m_jsCalls[i].m_slowCall);
-        info.hotPathBegin = linkBuffer.locationOf(m_jsCalls[i].m_targetToCheck);
-        info.hotPathOther = linkBuffer.locationOfNearCall(m_jsCalls[i].m_fastCall);
-        info.calleeGPR = static_cast<unsigned>(m_jsCalls[i].m_callee);
+        JSCallRecord& record = m_jsCalls[i];
+        CallLinkInfo& info = *record.m_info;
+        ThunkGenerator generator = linkThunkGeneratorFor(
+            info.callType == CallLinkInfo::Construct ? CodeForConstruct : CodeForCall,
+            RegisterPreservationNotRequired);
+        linkBuffer.link(record.m_slowCall, FunctionPtr(m_vm->getCTIStub(generator).code().executableAddress()));
+        info.callReturnLocation = linkBuffer.locationOfNearCall(record.m_slowCall);
+        info.hotPathBegin = linkBuffer.locationOf(record.m_targetToCheck);
+        info.hotPathOther = linkBuffer.locationOfNearCall(record.m_fastCall);
     }
     
     MacroAssemblerCodeRef osrExitThunk = vm()->getCTIStub(osrExitGenerationThunkGenerator);
@@ -278,6 +288,8 @@ void JITCompiler::compile()
     setStartOfCode();
     compileEntry();
     m_speculative = adoptPtr(new SpeculativeJIT(*this));
+    addPtr(TrustedImm32(m_graph.stackPointerOffset() * sizeof(Register)), GPRInfo::callFrameRegister, stackPointerRegister);
+    checkStackPointerAlignment();
     compileBody();
     setEndOfMainPath();
 
@@ -294,7 +306,7 @@ void JITCompiler::compile()
 
 void JITCompiler::link()
 {
-    OwnPtr<LinkBuffer> linkBuffer = adoptPtr(new LinkBuffer(*m_vm, this, m_codeBlock, JITCompilationCanFail));
+    OwnPtr<LinkBuffer> linkBuffer = adoptPtr(new LinkBuffer(*m_vm, *this, m_codeBlock, JITCompilationCanFail));
     if (linkBuffer->didFailToAllocate()) {
         m_graph.m_plan.finalizer = adoptPtr(new FailedFinalizer(m_graph.m_plan));
         return;
@@ -325,11 +337,12 @@ void JITCompiler::compileFunction()
     // so enter after this.
     Label fromArityCheck(this);
     // Plant a check that sufficient space is available in the JSStack.
-    addPtr(TrustedImm32(virtualRegisterForLocal(m_graph.requiredRegisterCountForExecutionAndExit()).offset() * sizeof(Register)), GPRInfo::callFrameRegister, GPRInfo::regT1);
-    Jump stackCheck = branchPtr(Above, AbsoluteAddress(m_vm->addressOfJSStackLimit()), GPRInfo::regT1);
-    // Return here after stack check.
-    Label fromStackCheck = label();
+    addPtr(TrustedImm32(virtualRegisterForLocal(m_graph.requiredRegisterCountForExecutionAndExit() - 1).offset() * sizeof(Register)), GPRInfo::callFrameRegister, GPRInfo::regT1);
+    Jump stackOverflow = branchPtr(Above, AbsoluteAddress(m_vm->addressOfStackLimit()), GPRInfo::regT1);
 
+    // Move the stack pointer down to accommodate locals
+    addPtr(TrustedImm32(m_graph.stackPointerOffset() * sizeof(Register)), GPRInfo::callFrameRegister, stackPointerRegister);
+    checkStackPointerAlignment();
 
     // === Function body code generation ===
     m_speculative = adoptPtr(new SpeculativeJIT(*this));
@@ -338,17 +351,19 @@ void JITCompiler::compileFunction()
 
     // === Function footer code generation ===
     //
-    // Generate code to perform the slow stack check (if the fast one in
+    // Generate code to perform the stack overflow handling (if the stack check in
     // the function header fails), and generate the entry point with arity check.
     //
-    // Generate the stack check; if the fast check in the function head fails,
-    // we need to call out to a helper function to check whether more space is available.
-    // FIXME: change this from a cti call to a DFG style operation (normal C calling conventions).
-    stackCheck.link(this);
+    // Generate the stack overflow handling; if the stack check in the function head fails,
+    // we need to call out to a helper function to throw the StackOverflowError.
+    stackOverflow.link(this);
 
     emitStoreCodeOrigin(CodeOrigin(0));
-    m_speculative->callOperationWithCallFrameRollbackOnException(operationStackCheck, m_codeBlock);
-    jump(fromStackCheck);
+
+    if (maxFrameExtentForSlowPathCall)
+        addPtr(TrustedImm32(-maxFrameExtentForSlowPathCall), stackPointerRegister);
+
+    m_speculative->callOperationWithCallFrameRollbackOnException(operationThrowStackOverflowError, m_codeBlock);
     
     // The fast entry point into a function does not check the correct number of arguments
     // have been passed to the call (we only use the fast entry point where we can statically
@@ -361,9 +376,21 @@ void JITCompiler::compileFunction()
     load32(AssemblyHelpers::payloadFor((VirtualRegister)JSStack::ArgumentCount), GPRInfo::regT1);
     branch32(AboveOrEqual, GPRInfo::regT1, TrustedImm32(m_codeBlock->numParameters())).linkTo(fromArityCheck, this);
     emitStoreCodeOrigin(CodeOrigin(0));
+    if (maxFrameExtentForSlowPathCall)
+        addPtr(TrustedImm32(-maxFrameExtentForSlowPathCall), stackPointerRegister);
     m_speculative->callOperationWithCallFrameRollbackOnException(m_codeBlock->m_isConstructor ? operationConstructArityCheck : operationCallArityCheck, GPRInfo::regT0);
+    if (maxFrameExtentForSlowPathCall)
+        addPtr(TrustedImm32(maxFrameExtentForSlowPathCall), stackPointerRegister);
     branchTest32(Zero, GPRInfo::regT0).linkTo(fromArityCheck, this);
     emitStoreCodeOrigin(CodeOrigin(0));
+    GPRReg thunkReg;
+#if USE(JSVALUE64)
+    thunkReg = GPRInfo::regT7;
+#else
+    thunkReg = GPRInfo::regT5;
+#endif
+    move(TrustedImmPtr(m_vm->arityCheckFailReturnThunks->returnPCsFor(*m_vm, m_codeBlock->numParameters())), thunkReg);
+    loadPtr(BaseIndex(thunkReg, GPRInfo::regT0, timesPtr()), thunkReg);
     m_callArityFixup = call();
     jump(fromArityCheck);
     
@@ -381,7 +408,7 @@ void JITCompiler::compileFunction()
 void JITCompiler::linkFunction()
 {
     // === Link ===
-    OwnPtr<LinkBuffer> linkBuffer = adoptPtr(new LinkBuffer(*m_vm, this, m_codeBlock, JITCompilationCanFail));
+    OwnPtr<LinkBuffer> linkBuffer = adoptPtr(new LinkBuffer(*m_vm, *this, m_codeBlock, JITCompilationCanFail));
     if (linkBuffer->didFailToAllocate()) {
         m_graph.m_plan.finalizer = adoptPtr(new FailedFinalizer(m_graph.m_plan));
         return;
@@ -392,7 +419,7 @@ void JITCompiler::linkFunction()
     m_jitCode->shrinkToFit();
     codeBlock()->shrinkToFit(CodeBlock::LateShrink);
     
-    linkBuffer->link(m_callArityFixup, FunctionPtr((m_vm->getCTIStub(arityFixup)).code().executableAddress()));
+    linkBuffer->link(m_callArityFixup, FunctionPtr((m_vm->getCTIStub(arityFixupGenerator)).code().executableAddress()));
     
     disassemble(*linkBuffer);
 
@@ -410,6 +437,25 @@ void JITCompiler::disassemble(LinkBuffer& linkBuffer)
     if (m_graph.m_plan.compilation)
         m_disassembler->reportToProfiler(m_graph.m_plan.compilation.get(), linkBuffer);
 }
+
+#if USE(JSVALUE32_64)
+void* JITCompiler::addressOfDoubleConstant(Node* node)
+{
+    double value = node->asNumber();
+    int64_t valueBits = bitwise_cast<int64_t>(value);
+    auto it = m_graph.m_doubleConstantsMap.find(valueBits);
+    if (it != m_graph.m_doubleConstantsMap.end())
+        return it->second;
+
+    if (!m_graph.m_doubleConstants)
+        m_graph.m_doubleConstants = std::make_unique<Bag<double>>();
+
+    double* addressInConstantPool = m_graph.m_doubleConstants->add();
+    *addressInConstantPool = value;
+    m_graph.m_doubleConstantsMap[valueBits] = addressInConstantPool;
+    return addressInConstantPool;
+}
+#endif
 
 } } // namespace JSC::DFG
 

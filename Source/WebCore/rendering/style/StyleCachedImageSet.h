@@ -64,15 +64,15 @@ private:
     virtual bool canRender(const RenderObject*, float multiplier) const override;
     virtual bool isLoaded() const override;
     virtual bool errorOccurred() const override;
-    virtual LayoutSize imageSize(const RenderElement*, float multiplier) const override;
+    virtual FloatSize imageSize(const RenderElement*, float multiplier) const override;
     virtual bool imageHasRelativeWidth() const override;
     virtual bool imageHasRelativeHeight() const override;
     virtual void computeIntrinsicDimensions(const RenderElement*, Length& intrinsicWidth, Length& intrinsicHeight, FloatSize& intrinsicRatio) override;
     virtual bool usesImageContainerSize() const override;
-    virtual void setContainerSizeForRenderer(const RenderElement*, const IntSize&, float) override;
+    virtual void setContainerSizeForRenderer(const RenderElement*, const FloatSize&, float) override;
     virtual void addClient(RenderElement*) override;
     virtual void removeClient(RenderElement*) override;
-    virtual PassRefPtr<Image> image(RenderElement*, const IntSize&) const override;
+    virtual PassRefPtr<Image> image(RenderElement*, const FloatSize&) const override;
     virtual float imageScaleFactor() const override { return m_imageScaleFactor; }
     virtual bool knownToBeOpaque(const RenderElement*) const override;
 
@@ -82,6 +82,8 @@ private:
     float m_imageScaleFactor;
     CSSImageSetValue* m_imageSetValue; // Not retained; it owns us.
 };
+
+STYLE_IMAGE_TYPE_CASTS(StyleCachedImageSet, StyleImage, isCachedImageSet)
 
 } // namespace WebCore
 

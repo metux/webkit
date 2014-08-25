@@ -58,11 +58,6 @@ struct ViewportArguments {
     enum Type {
         // These are ordered in increasing importance.
         Implicit,
-#if ENABLE(LEGACY_VIEWPORT_ADAPTION)
-        XHTMLMobileProfile,
-        HandheldFriendlyMeta,
-        MobileOptimizedMeta,
-#endif
 #if PLATFORM(IOS)
         PluginDocument,
         ImageDocument,
@@ -120,10 +115,6 @@ struct ViewportArguments {
     {
         // Used for figuring out whether to reset the viewport or not,
         // thus we are not taking type into account.
-#if PLATFORM(IOS)
-        // We ignore minimalUI for the same reason -- it is a higher-level
-        // property that doesn't affect the actual viewport.
-#endif
         return width == other.width
             && minWidth == other.minWidth
             && maxWidth == other.maxWidth
@@ -134,6 +125,9 @@ struct ViewportArguments {
             && minZoom == other.minZoom
             && maxZoom == other.maxZoom
             && userZoom == other.userZoom
+#if PLATFORM(IOS)
+            && minimalUI == other.minimalUI
+#endif
             && orientation == other.orientation;
     }
 
@@ -159,7 +153,7 @@ void setViewportFeature(const String& keyString, const String& valueString, Docu
 void reportViewportWarning(Document*, ViewportErrorCode, const String& replacement1, const String& replacement2);
 
 #if PLATFORM(IOS)
-void finalizeViewportArguments(ViewportArguments&);
+void finalizeViewportArguments(ViewportArguments&, const FloatSize& screenSize);
 #endif
 
 } // namespace WebCore

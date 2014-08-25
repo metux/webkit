@@ -13,7 +13,7 @@
  * THIS SOFTWARE IS PROVIDED BY GOOGLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -28,7 +28,7 @@
 
 #include "URL.h"
 #include "ScriptState.h"
-#include <wtf/PassOwnPtr.h>
+#include <memory>
 #include <wtf/RefCounted.h>
 #include <wtf/Vector.h>
 #include <wtf/text/TextPosition.h>
@@ -46,15 +46,12 @@ class ScriptExecutionContext;
 class SecurityOrigin;
 
 typedef int SandboxFlags;
-typedef Vector<OwnPtr<CSPDirectiveList>> CSPDirectiveListVector;
+typedef Vector<std::unique_ptr<CSPDirectiveList>> CSPDirectiveListVector;
 
 class ContentSecurityPolicy {
     WTF_MAKE_FAST_ALLOCATED;
 public:
-    static PassOwnPtr<ContentSecurityPolicy> create(ScriptExecutionContext* scriptExecutionContext)
-    {
-        return adoptPtr(new ContentSecurityPolicy(scriptExecutionContext));
-    }
+    explicit ContentSecurityPolicy(ScriptExecutionContext*);
     ~ContentSecurityPolicy();
 
     void copyStateFrom(const ContentSecurityPolicy*);
@@ -92,7 +89,6 @@ public:
     bool allowInlineScript(const String& contextURL, const WTF::OrdinalNumber& contextLine, ReportingStatus = SendReport) const;
     bool allowInlineStyle(const String& contextURL, const WTF::OrdinalNumber& contextLine, ReportingStatus = SendReport) const;
     bool allowEval(JSC::ExecState* = 0, ReportingStatus = SendReport) const;
-    bool allowScriptNonce(const String& nonce, const String& contextURL, const WTF::OrdinalNumber& contextLine, const URL& = URL()) const;
     bool allowPluginType(const String& type, const String& typeAttribute, const URL&, ReportingStatus = SendReport) const;
 
     bool allowScriptFromSource(const URL&, ReportingStatus = SendReport) const;
@@ -117,7 +113,6 @@ public:
     void reportDuplicateDirective(const String&) const;
     void reportInvalidDirectiveValueCharacter(const String& directiveName, const String& value) const;
     void reportInvalidPathCharacter(const String& directiveName, const String& value, const char) const;
-    void reportInvalidNonce(const String&) const;
     void reportInvalidPluginTypes(const String&) const;
     void reportInvalidSandboxFlags(const String&) const;
     void reportInvalidSourceExpression(const String& directiveName, const String& source) const;
@@ -137,8 +132,6 @@ public:
     bool experimentalFeaturesEnabled() const;
 
 private:
-    explicit ContentSecurityPolicy(ScriptExecutionContext*);
-
     void logToConsole(const String& message, const String& contextURL = String(), const WTF::OrdinalNumber& contextLine = WTF::OrdinalNumber::beforeFirst(), JSC::ExecState* = 0) const;
 
     ScriptExecutionContext* m_scriptExecutionContext;

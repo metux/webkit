@@ -46,7 +46,7 @@
 #include <wtf/TemporaryChange.h>
 #include <wtf/text/WTFString.h>
 
-#if PLATFORM(MAC)
+#if PLATFORM(COCOA)
 #include "LayerHostingContext.h"
 #endif
 
@@ -59,16 +59,14 @@ PluginControllerProxy::PluginControllerProxy(WebProcessConnection* connection, c
     , m_pluginInstanceID(creationParameters.pluginInstanceID)
     , m_userAgent(creationParameters.userAgent)
     , m_isPrivateBrowsingEnabled(creationParameters.isPrivateBrowsingEnabled)
-#if USE(ACCELERATED_COMPOSITING)
     , m_isAcceleratedCompositingEnabled(creationParameters.isAcceleratedCompositingEnabled)
-#endif
     , m_isInitializing(false)
     , m_paintTimer(RunLoop::main(), this, &PluginControllerProxy::paint)
     , m_pluginDestructionProtectCount(0)
     , m_pluginDestroyTimer(RunLoop::main(), this, &PluginControllerProxy::destroy)
     , m_waitingForDidUpdate(false)
     , m_pluginCanceledManualStreamLoad(false)
-#if PLATFORM(MAC)
+#if PLATFORM(COCOA)
     , m_isComplexTextInputEnabled(false)
 #endif
     , m_contentsScaleFactor(creationParameters.contentsScaleFactor)
@@ -102,8 +100,9 @@ PassRefPtr<Messages::WebProcessConnection::CreatePlugin::DelayedReply> PluginCon
 bool PluginControllerProxy::initialize(const PluginCreationParameters& creationParameters)
 {
     ASSERT(!m_plugin);
-    
-    TemporaryChange<bool> initializing(m_isInitializing, true);
+
+    ASSERT(!m_isInitializing);
+    m_isInitializing = true; // Cannot use TemporaryChange here, because this object can be deleted before the function returns.
 
     m_plugin = NetscapePlugin::create(PluginProcess::shared().netscapePluginModule());
     if (!m_plugin) {
@@ -131,6 +130,7 @@ bool PluginControllerProxy::initialize(const PluginCreationParameters& creationP
 
     platformInitialize(creationParameters);
 
+    m_isInitializing = false;
     return true;
 }
 
@@ -180,7 +180,7 @@ void PluginControllerProxy::paint()
     // Create a graphics context.
     auto graphicsContext = m_backingStore->createGraphicsContext();
 
-#if PLATFORM(MAC)
+#if PLATFORM(COCOA)
     // FIXME: We should really call applyDeviceScaleFactor instead of scale, but that ends up calling into WKSI
     // which we currently don't have initiated in the plug-in process.
     graphicsContext->scale(FloatSize(m_contentsScaleFactor, m_contentsScaleFactor));

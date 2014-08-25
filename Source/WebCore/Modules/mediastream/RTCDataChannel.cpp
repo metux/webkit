@@ -57,30 +57,41 @@ static const AtomicString& arraybufferKeyword()
 PassRefPtr<RTCDataChannel> RTCDataChannel::create(ScriptExecutionContext* context, RTCPeerConnectionHandler* peerConnectionHandler, const String& label, const Dictionary& options, ExceptionCode& ec)
 {
     RTCDataChannelInit initData;
+    String maxRetransmitsStr;
+    String maxRetransmitTimeStr;
     options.get("ordered", initData.ordered);
     options.get("negotiated", initData.negotiated);
     options.get("id", initData.id);
-    options.get("maxRetransmits", initData.maxRetransmits);
-    options.get("maxRetransmitTime", initData.maxRetransmitTime);
+    options.get("maxRetransmits", maxRetransmitsStr);
+    options.get("maxRetransmitTime", maxRetransmitTimeStr);
     options.get("protocol", initData.protocol);
+
+    bool maxRetransmitsConversion;
+    bool maxRetransmitTimeConversion;
+    initData.maxRetransmits = maxRetransmitsStr.toUIntStrict(&maxRetransmitsConversion);
+    initData.maxRetransmitTime = maxRetransmitTimeStr.toUIntStrict(&maxRetransmitTimeConversion);
+    if (maxRetransmitsConversion && maxRetransmitTimeConversion) {
+        ec = SYNTAX_ERR;
+        return nullptr;
+    }
 
     std::unique_ptr<RTCDataChannelHandler> handler = peerConnectionHandler->createDataChannel(label, initData);
     if (!handler) {
         ec = NOT_SUPPORTED_ERR;
         return nullptr;
     }
-    return adoptRef(new RTCDataChannel(context, std::move(handler)));
+    return adoptRef(new RTCDataChannel(context, WTF::move(handler)));
 }
 
 PassRefPtr<RTCDataChannel> RTCDataChannel::create(ScriptExecutionContext* context, std::unique_ptr<RTCDataChannelHandler> handler)
 {
     ASSERT(handler);
-    return adoptRef(new RTCDataChannel(context, std::move(handler)));
+    return adoptRef(new RTCDataChannel(context, WTF::move(handler)));
 }
 
 RTCDataChannel::RTCDataChannel(ScriptExecutionContext* context, std::unique_ptr<RTCDataChannelHandler> handler)
     : m_scriptExecutionContext(context)
-    , m_handler(std::move(handler))
+    , m_handler(WTF::move(handler))
     , m_stopped(false)
     , m_readyState(ReadyStateConnecting)
     , m_binaryType(BinaryTypeArrayBuffer)

@@ -42,7 +42,7 @@ namespace WebCore {
 MediaSourceRegistry& MediaSourceRegistry::registry()
 {
     ASSERT(isMainThread());
-    DEFINE_STATIC_LOCAL(MediaSourceRegistry, instance, ());
+    static NeverDestroyed<MediaSourceRegistry> instance;
     return instance;
 }
 
@@ -76,7 +76,7 @@ URLRegistrable* MediaSourceRegistry::lookup(const String& url) const
 
 MediaSourceRegistry::MediaSourceRegistry()
 {
-    HTMLMediaSource::setRegistry(this);
+    MediaSource::setRegistry(this);
 }
 
 } // namespace WebCore

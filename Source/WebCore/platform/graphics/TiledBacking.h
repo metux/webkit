@@ -28,10 +28,11 @@
 
 namespace WebCore {
 
+static const int defaultTileWidth = 512;
+static const int defaultTileHeight = 512;
+
 class IntRect;
-#if PLATFORM(MAC)
 class PlatformCALayer;
-#endif
 
 enum ScrollingModeIndication {
     SynchronousScrollingBecauseOfStyleIndication,
@@ -47,7 +48,8 @@ public:
     virtual FloatRect visibleRect() const = 0;
     virtual bool tilesWouldChangeForVisibleRect(const FloatRect&) const = 0;
 
-    virtual void setExposedRect(const FloatRect&) = 0;
+    virtual void setTiledScrollingIndicatorPosition(const FloatPoint&) = 0;
+    virtual void setTopContentInset(float) = 0;
 
     virtual void prepopulateRect(const FloatRect&) = 0;
 
@@ -57,7 +59,6 @@ public:
         CoverageForVisibleArea = 0,
         CoverageForVerticalScrolling = 1 << 0,
         CoverageForHorizontalScrolling = 1 << 1,
-        CoverageForSlowScrolling = 1 << 2, // Indicates that we expect to paint a lot on scrolling.
         CoverageForScrolling = CoverageForVerticalScrolling | CoverageForHorizontalScrolling
     };
     typedef unsigned TileCoverage;
@@ -73,9 +74,6 @@ public:
     virtual void setScrollingPerformanceLoggingEnabled(bool) = 0;
     virtual bool scrollingPerformanceLoggingEnabled() const = 0;
     
-    virtual void setAggressivelyRetainsTiles(bool) = 0;
-    virtual bool aggressivelyRetainsTiles() const = 0;
-    
     virtual void setUnparentsOffscreenTiles(bool) = 0;
     virtual bool unparentsOffscreenTiles() const = 0;
     
@@ -83,21 +81,27 @@ public:
 
     virtual void setTileMargins(int marginTop, int marginBottom, int marginLeft, int marginRight) = 0;
     virtual bool hasMargins() const = 0;
+    virtual bool hasHorizontalMargins() const = 0;
+    virtual bool hasVerticalMargins() const = 0;
 
     virtual int topMarginHeight() const = 0;
     virtual int bottomMarginHeight() const = 0;
     virtual int leftMarginWidth() const = 0;
     virtual int rightMarginWidth() const = 0;
 
+    virtual void setZoomedOutContentsScale(float) = 0;
+    virtual float zoomedOutContentsScale() const = 0;
+
     // Includes margins.
     virtual IntRect bounds() const = 0;
+    virtual IntRect boundsWithoutMargin() const = 0;
 
     // Exposed for testing
     virtual IntRect tileCoverageRect() const = 0;
     virtual IntRect tileGridExtent() const = 0;
     virtual void setScrollingModeIndication(ScrollingModeIndication) = 0;
 
-#if PLATFORM(MAC)
+#if USE(CA)
     virtual PlatformCALayer* tiledScrollingIndicatorLayer() = 0;
 #endif
 };

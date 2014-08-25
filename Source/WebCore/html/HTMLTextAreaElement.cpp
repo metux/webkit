@@ -111,11 +111,12 @@ PassRefPtr<HTMLTextAreaElement> HTMLTextAreaElement::create(const QualifiedName&
 void HTMLTextAreaElement::didAddUserAgentShadowRoot(ShadowRoot* root)
 {
     root->appendChild(TextControlInnerTextElement::create(document()), ASSERT_NO_EXCEPTION);
+    updateInnerTextElementEditability();
 }
 
 const AtomicString& HTMLTextAreaElement::formControlType() const
 {
-    DEFINE_STATIC_LOCAL(const AtomicString, textarea, ("textarea", AtomicString::ConstructFromLiteral));
+    DEPRECATED_DEFINE_STATIC_LOCAL(const AtomicString, textarea, ("textarea", AtomicString::ConstructFromLiteral));
     return textarea;
 }
 
@@ -211,7 +212,7 @@ void HTMLTextAreaElement::parseAttribute(const QualifiedName& name, const Atomic
 
 RenderPtr<RenderElement> HTMLTextAreaElement::createElementRenderer(PassRef<RenderStyle> style)
 {
-    return createRenderer<RenderTextControlMultiLine>(*this, std::move(style));
+    return createRenderer<RenderTextControlMultiLine>(*this, WTF::move(style));
 }
 
 bool HTMLTextAreaElement::appendFormData(FormDataList& encoding, bool)
@@ -270,7 +271,7 @@ void HTMLTextAreaElement::defaultEventHandler(Event* event)
     if (renderer() && (event->isMouseEvent() || event->isDragEvent() || event->eventInterface() == WheelEventInterfaceType || event->type() == eventNames().blurEvent))
         forwardEvent(event);
     else if (renderer() && event->isBeforeTextInsertedEvent())
-        handleBeforeTextInsertedEvent(static_cast<BeforeTextInsertedEvent*>(event));
+        handleBeforeTextInsertedEvent(toBeforeTextInsertedEvent(event));
 
     HTMLTextFormControlElement::defaultEventHandler(event);
 }
@@ -342,7 +343,6 @@ void HTMLTextAreaElement::updateValue() const
     ASSERT(renderer());
     m_value = innerTextValue();
     const_cast<HTMLTextAreaElement*>(this)->setFormControlValueMatchesRenderer(true);
-    const_cast<HTMLTextAreaElement*>(this)->notifyFormStateChanged();
     m_isDirty = true;
     m_wasModifiedByUser = true;
     const_cast<HTMLTextAreaElement*>(this)->updatePlaceholderVisibility(false);
@@ -395,7 +395,6 @@ void HTMLTextAreaElement::setValueCommon(const String& newValue)
         setSelectionRange(endOfString, endOfString);
     }
 
-    notifyFormStateChanged();
     setTextAsOfLastFormControlChangeEvent(normalizedValue);
 }
 

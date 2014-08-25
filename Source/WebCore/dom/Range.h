@@ -161,6 +161,8 @@ public:
     void formatForDebugger(char* buffer, unsigned length) const;
 #endif
 
+    bool contains(const Range&) const;
+
 private:
     explicit Range(Document&);
     Range(Document&, PassRefPtr<Node> startContainer, int startOffset, PassRefPtr<Node> endContainer, int endOffset);
@@ -171,8 +173,6 @@ private:
     void checkNodeBA(Node*, ExceptionCode&) const;
     void checkDeleteExtract(ExceptionCode&);
     bool containedByReadOnly() const;
-    int maxStartOffset() const;
-    int maxEndOffset() const;
 
     enum ActionType { Delete, Extract, Clone };
     PassRefPtr<DocumentFragment> processContents(ActionType, ExceptionCode&);
@@ -189,6 +189,7 @@ private:
 PassRefPtr<Range> rangeOfContents(Node&);
 
 bool areRangesEqual(const Range*, const Range*);
+bool rangesOverlap(const Range*, const Range*);
 
 } // namespace
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2007, 2008, 2012, 2013 Apple Inc. All rights reserved.
+ * Copyright (C) 2007, 2008, 2012-2014 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -10,7 +10,7 @@
  * 2.  Redistributions in binary form must reproduce the above copyright
  *     notice, this list of conditions and the following disclaimer in the
  *     documentation and/or other materials provided with the distribution.
- * 3.  Neither the name of Apple Computer, Inc. ("Apple") nor the names of
+ * 3.  Neither the name of Apple Inc. ("Apple") nor the names of
  *     its contributors may be used to endorse or promote products derived
  *     from this software without specific prior written permission.
  *
@@ -31,6 +31,7 @@
 
 #include "ConcurrentJITLock.h"
 #include "JSObject.h"
+#include "TypeSet.h"
 #include "VariableWatchpointSet.h"
 #include <memory>
 #include <wtf/HashTraits.h>
@@ -39,6 +40,7 @@
 namespace JSC {
 
 struct SlowArgument {
+public:
     enum Status {
         Normal = 0,
         Captured = 1,
@@ -217,7 +219,7 @@ struct SymbolTableEntry {
     
     JSValue inferredValue();
     
-    void prepareToWatch();
+    void prepareToWatch(SymbolTable*);
     
     void addWatchpoint(Watchpoint*);
     
@@ -228,11 +230,11 @@ struct SymbolTableEntry {
         return fatEntry()->m_watchpoints.get();
     }
     
-    ALWAYS_INLINE void notifyWrite(JSValue value)
+    ALWAYS_INLINE void notifyWrite(VM& vm, JSValue value, const FireDetail& detail)
     {
         if (LIKELY(!isFat()))
             return;
-        notifyWriteSlow(value);
+        notifyWriteSlow(vm, value, detail);
     }
     
 private:
@@ -256,7 +258,7 @@ private:
     };
     
     SymbolTableEntry& copySlow(const SymbolTableEntry&);
-    JS_EXPORT_PRIVATE void notifyWriteSlow(JSValue);
+    JS_EXPORT_PRIVATE void notifyWriteSlow(VM&, JSValue, const FireDetail&);
     
     bool isFat() const
     {
@@ -335,6 +337,9 @@ public:
     typedef JSCell Base;
 
     typedef HashMap<RefPtr<StringImpl>, SymbolTableEntry, IdentifierRepHash, HashTraits<RefPtr<StringImpl>>, SymbolTableIndexHashTraits> Map;
+    typedef HashMap<RefPtr<StringImpl>, GlobalVariableID> UniqueIDMap;
+    typedef HashMap<RefPtr<StringImpl>, RefPtr<TypeSet>> UniqueTypeSetMap;
+    typedef HashMap<int, RefPtr<StringImpl>, WTF::IntHash<int>, WTF::UnsignedWithZeroKeyHashTraits<int>> RegisterToVariableMap;
 
     static SymbolTable* create(VM& vm)
     {
@@ -348,7 +353,7 @@ public:
 
     static Structure* createStructure(VM& vm, JSGlobalObject* globalObject, JSValue prototype)
     {
-        return Structure::create(vm, globalObject, prototype, TypeInfo(LeafType, StructureFlags), info());
+        return Structure::create(vm, globalObject, prototype, TypeInfo(CellType, StructureFlags), info());
     }
 
     // You must hold the lock until after you're done with the iterator.
@@ -443,6 +448,11 @@ public:
         return contains(locker, key);
     }
     
+    GlobalVariableID uniqueIDForVariable(const ConcurrentJITLocker&, StringImpl* key, VM& vm);
+    GlobalVariableID uniqueIDForRegister(const ConcurrentJITLocker& locker, int registerIndex, VM& vm);
+    RefPtr<TypeSet> globalTypeSetForRegister(const ConcurrentJITLocker& locker, int registerIndex, VM& vm);
+    RefPtr<TypeSet> globalTypeSetForVariable(const ConcurrentJITLocker& locker, StringImpl* key, VM& vm);
+
     bool usesNonStrictEval() { return m_usesNonStrictEval; }
     void setUsesNonStrictEval(bool usesNonStrictEval) { m_usesNonStrictEval = usesNonStrictEval; }
 
@@ -465,13 +475,18 @@ public:
 
     // 0 if we don't capture any arguments; parameterCount() in length if we do.
     const SlowArgument* slowArguments() { return m_slowArguments.get(); }
-    void setSlowArguments(std::unique_ptr<SlowArgument[]> slowArguments) { m_slowArguments = std::move(slowArguments); }
+    void setSlowArguments(std::unique_ptr<SlowArgument[]> slowArguments) { m_slowArguments = WTF::move(slowArguments); }
     
-    SymbolTable* clone(VM&);
+    SymbolTable* cloneCapturedNames(VM&);
+
+    void prepareForHighFidelityTypeProfiling(const ConcurrentJITLocker&);
 
     static void visitChildren(JSCell*, SlotVisitor&);
 
     DECLARE_EXPORT_INFO;
+
+protected:
+    static const unsigned StructureFlags = StructureIsImmortal | Base::StructureFlags;
 
 private:
     class WatchpointCleanup : public UnconditionalFinalizer {
@@ -490,7 +505,13 @@ private:
     ~SymbolTable();
 
     Map m_map;
-    
+    struct TypeProfilingRareData {
+        UniqueIDMap m_uniqueIDMap;
+        RegisterToVariableMap m_registerToVariableMap;
+        UniqueTypeSetMap m_uniqueTypeSetMap;
+    };
+    std::unique_ptr<TypeProfilingRareData> m_typeProfilingRareData;
+
     int m_parameterCountIncludingThis;
     bool m_usesNonStrictEval;
 

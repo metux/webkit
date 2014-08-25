@@ -10,7 +10,7 @@
  * 2.  Redistributions in binary form must reproduce the above copyright
  *     notice, this list of conditions and the following disclaimer in the
  *     documentation and/or other materials provided with the distribution.
- * 3.  Neither the name of Apple Computer, Inc. ("Apple") nor the names of
+ * 3.  Neither the name of Apple Inc. ("Apple") nor the names of
  *     its contributors may be used to endorse or promote products derived
  *     from this software without specific prior written permission.
  *
@@ -31,25 +31,26 @@
 
 #include "CodeBlock.h"
 #include "CallFrame.h"
+#include "ErrorHandlingScope.h"
 #include "ErrorInstance.h"
 #include "JSGlobalObjectFunctions.h"
 #include "JSObject.h"
 #include "JSNotAnObject.h"
 #include "Interpreter.h"
 #include "Nodes.h"
-#include "Operations.h"
+#include "JSCInlines.h"
 
 namespace JSC {
 
 STATIC_ASSERT_IS_TRIVIALLY_DESTRUCTIBLE(TerminatedExecutionError);
 
-const ClassInfo TerminatedExecutionError::s_info = { "TerminatedExecutionError", &Base::s_info, 0, 0, CREATE_METHOD_TABLE(TerminatedExecutionError) };
+const ClassInfo TerminatedExecutionError::s_info = { "TerminatedExecutionError", &Base::s_info, 0, CREATE_METHOD_TABLE(TerminatedExecutionError) };
 
 JSValue TerminatedExecutionError::defaultValue(const JSObject*, ExecState* exec, PreferredPrimitiveType hint)
 {
     if (hint == PreferString)
         return jsNontrivialString(exec, String(ASCIILiteral("JavaScript execution terminated.")));
-    return JSValue(QNaN);
+    return JSValue(PNaN);
 }
 
 JSObject* createTerminatedExecutionException(VM* vm)
@@ -80,6 +81,11 @@ JSObject* createStackOverflowError(JSGlobalObject* globalObject)
 
 JSObject* createUndefinedVariableError(ExecState* exec, const Identifier& ident)
 {
+    
+    if (ident.impl()->isEmptyUnique()) {
+        String message(makeString("Can't find private variable: @", exec->propertyNames().getPublicName(ident).string()));
+        return createReferenceError(exec, message);
+    }
     String message(makeString("Can't find variable: ", ident.string()));
     return createReferenceError(exec, message);
 }
@@ -160,14 +166,16 @@ JSObject* throwOutOfMemoryError(ExecState* exec)
 
 JSObject* throwStackOverflowError(ExecState* exec)
 {
-    Interpreter::ErrorHandlingMode mode(exec);
-    return exec->vm().throwException(exec, createStackOverflowError(exec));
+    VM& vm = exec->vm();
+    ErrorHandlingScope errorScope(vm);
+    return vm.throwException(exec, createStackOverflowError(exec));
 }
 
 JSObject* throwTerminatedExecutionException(ExecState* exec)
 {
-    Interpreter::ErrorHandlingMode mode(exec);
-    return exec->vm().throwException(exec, createTerminatedExecutionException(&exec->vm()));
+    VM& vm = exec->vm();
+    ErrorHandlingScope errorScope(vm);
+    return vm.throwException(exec, createTerminatedExecutionException(&vm));
 }
 
 } // namespace JSC

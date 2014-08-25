@@ -27,23 +27,23 @@
 #ifndef WKBase_h
 #define WKBase_h
 
-#include <WebKit2/WKDeclarationSpecifiers.h>
+#include <WebKit/WKDeclarationSpecifiers.h>
 #include <stdint.h>
 
 #if defined(BUILDING_GTK__)
-#include <WebKit2/WKBaseGtk.h>
+#include <WebKit/WKBaseGtk.h>
 #endif
 
 #if defined(WTF_USE_SOUP)
-#include <WebKit2/WKBaseSoup.h>
+#include <WebKit/WKBaseSoup.h>
 #endif
 
 #if defined(BUILDING_EFL__)
-#include <WebKit2/WKBaseEfl.h>
+#include <WebKit/WKBaseEfl.h>
 #endif
 
 #if defined(__APPLE__)
-#include <WebKit2/WKBaseMac.h>
+#include <WebKit/WKBaseMac.h>
 #endif
 
 /* WebKit2 shared types */
@@ -94,6 +94,7 @@ typedef const struct OpaqueWKBatteryStatus* WKBatteryStatusRef;
 typedef const struct OpaqueWKResourceCacheManager* WKResourceCacheManagerRef;
 typedef const struct OpaqueWKColorPickerResultListener* WKColorPickerResultListenerRef;
 typedef const struct OpaqueWKContext* WKContextRef;
+typedef const struct OpaqueWKContextConfiguration* WKContextConfigurationRef;
 typedef const struct OpaqueWKCookieManager* WKCookieManagerRef;
 typedef const struct OpaqueWKCredential* WKCredentialRef;
 typedef const struct OpaqueWKDatabaseManager* WKDatabaseManagerRef;
@@ -111,8 +112,6 @@ typedef const struct OpaqueWKInspector* WKInspectorRef;
 typedef const struct OpaqueWKKeyValueStorageManager* WKKeyValueStorageManagerRef;
 typedef const struct OpaqueWKMediaCacheManager* WKMediaCacheManagerRef;
 typedef const struct OpaqueWKNavigationData* WKNavigationDataRef;
-typedef const struct OpaqueWKNetworkInfoManager* WKNetworkInfoManagerRef;
-typedef const struct OpaqueWKNetworkInfo* WKNetworkInfoRef;
 typedef const struct OpaqueWKNotification* WKNotificationRef;
 typedef const struct OpaqueWKNotificationManager* WKNotificationManagerRef;
 typedef const struct OpaqueWKNotificationPermissionRequest* WKNotificationPermissionRequestRef;
@@ -127,6 +126,7 @@ typedef const struct OpaqueWKPreferences* WKPreferencesRef;
 typedef const struct OpaqueWKProtectionSpace* WKProtectionSpaceRef;
 typedef const struct OpaqueWKTextChecker* WKTextCheckerRef;
 typedef const struct OpaqueWKSession* WKSessionRef;
+typedef const struct OpaqueWKSessionState* WKSessionStateRef;
 typedef const struct OpaqueWKVibration* WKVibrationRef;
 typedef const struct OpaqueWKViewportAttributes* WKViewportAttributesRef;
 

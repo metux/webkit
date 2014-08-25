@@ -39,7 +39,7 @@
 #include <wtf/Threading.h>
 #endif
 
-#if PLATFORM(MAC)
+#if PLATFORM(COCOA)
 #include <wtf/RetainPtr.h>
 #endif
 
@@ -48,7 +48,7 @@ namespace WebCore {
 typedef unsigned SynchronousScrollingReasons;
 typedef uint64_t ScrollingNodeID;
 
-enum ScrollingNodeType { ScrollingNode, FixedNode, StickyNode };
+enum ScrollingNodeType { FrameScrollingNode, OverflowScrollingNode, FixedNode, StickyNode };
 
 class Document;
 class Frame;
@@ -110,7 +110,7 @@ public:
     virtual bool isRemoteScrollingCoordinator() const { return false; }
 
     // Return whether this scrolling coordinator handles scrolling for the given frame view.
-    bool coordinatesScrollingForFrameView(FrameView*) const;
+    virtual bool coordinatesScrollingForFrameView(FrameView*) const;
 
     // Should be called whenever the given frame view has been laid out.
     virtual void frameViewLayoutUpdated(FrameView*) { }
@@ -125,6 +125,9 @@ public:
     // Should be called whenever the set of fixed objects changes.
     void frameViewFixedObjectsDidChange(FrameView*);
 
+    // Called whenever the non-fast scrollable region changes for reasons other than layout.
+    virtual void frameViewNonFastScrollableRegionChanged(FrameView*) { }
+
     // Should be called whenever the root layer for the given frame view changes.
     virtual void frameViewRootLayerDidChange(FrameView*);
 
@@ -132,9 +135,14 @@ public:
     // containers while scrolling.
     virtual bool supportsFixedPositionLayers() const { return false; }
 
-#if PLATFORM(MAC)
+#if PLATFORM(COCOA)
     // Dispatched by the scrolling tree during handleWheelEvent. This is required as long as scrollbars are painted on the main thread.
     void handleWheelEventPhase(PlatformWheelEventPhase);
+#endif
+
+#if ENABLE(WEB_REPLAY)
+    // Called when the page transitions between executing normally and deterministically.
+    void replaySessionStateDidChange();
 #endif
 
     // Force all scroll layer position updates to happen on the main thread.
@@ -149,7 +157,17 @@ public:
     virtual void detachFromStateTree(ScrollingNodeID) { }
     virtual void clearStateTree() { }
     virtual void updateViewportConstrainedNode(ScrollingNodeID, const ViewportConstraints&, GraphicsLayer*) { }
-    virtual void updateScrollingNode(ScrollingNodeID, GraphicsLayer* /*scrollLayer*/, GraphicsLayer* /*counterScrollingLayer*/) { }
+
+    struct ScrollingGeometry {
+        FloatSize scrollableAreaSize;
+        FloatSize contentSize;
+        FloatSize reachableContentSize; // Smaller than contentSize when overflow is hidden on one axis.
+        FloatPoint scrollPosition;
+        IntPoint scrollOrigin;
+    };
+
+    virtual void updateFrameScrollingNode(ScrollingNodeID, GraphicsLayer* /*scrollLayer*/, GraphicsLayer* /*scrolledContentsLayer*/, GraphicsLayer* /*counterScrollingLayer*/, GraphicsLayer* /*insetClipLayer*/, const ScrollingGeometry* = nullptr) { }
+    virtual void updateOverflowScrollingNode(ScrollingNodeID, GraphicsLayer* /*scrollLayer*/, GraphicsLayer* /*scrolledContentsLayer*/, const ScrollingGeometry* = nullptr) { }
     virtual void syncChildPositions(const LayoutRect&) { }
     virtual String scrollingStateTreeAsText() const;
     virtual bool isRubberBandInProgress() const { return false; }
@@ -166,13 +184,12 @@ public:
         IsImageDocument = 1 << 4
     };
 
-    SynchronousScrollingReasons synchronousScrollingReasons() const;
-    bool shouldUpdateScrollLayerPositionSynchronously() const { return synchronousScrollingReasons(); }
+    SynchronousScrollingReasons synchronousScrollingReasons(FrameView*) const;
+    bool shouldUpdateScrollLayerPositionSynchronously() const;
 
     virtual void willDestroyScrollableArea(ScrollableArea*) { }
     virtual void scrollableAreaScrollLayerDidChange(ScrollableArea*) { }
     virtual void scrollableAreaScrollbarLayerDidChange(ScrollableArea*, ScrollbarOrientation) { }
-    virtual void setLayerIsContainerForFixedPositionLayers(GraphicsLayer*, bool) { }
 
     static String synchronousScrollingReasonsAsText(SynchronousScrollingReasons);
     String synchronousScrollingReasonsAsText() const;
@@ -182,15 +199,16 @@ public:
 protected:
     explicit ScrollingCoordinator(Page*);
 
-#if USE(ACCELERATED_COMPOSITING)
     static GraphicsLayer* scrollLayerForScrollableArea(ScrollableArea*);
     static GraphicsLayer* horizontalScrollbarLayerForScrollableArea(ScrollableArea*);
     static GraphicsLayer* verticalScrollbarLayerForScrollableArea(ScrollableArea*);
-#endif
 
     unsigned computeCurrentWheelEventHandlerCount();
     GraphicsLayer* scrollLayerForFrameView(FrameView*);
     GraphicsLayer* counterScrollingLayerForFrameView(FrameView*);
+    GraphicsLayer* insetClipLayerForFrameView(FrameView*);
+    GraphicsLayer* rootContentLayerForFrameView(FrameView*);
+    GraphicsLayer* contentShadowLayerForFrameView(FrameView*);
     GraphicsLayer* headerLayerForFrameView(FrameView*);
     GraphicsLayer* footerLayerForFrameView(FrameView*);
 
@@ -201,7 +219,7 @@ private:
     virtual void setSynchronousScrollingReasons(SynchronousScrollingReasons) { }
 
     virtual bool hasVisibleSlowRepaintViewportConstrainedObjects(FrameView*) const;
-    void updateSynchronousScrollingReasons();
+    void updateSynchronousScrollingReasons(FrameView*);
     
     bool m_forceSynchronousScrollLayerPositionUpdates;
 };

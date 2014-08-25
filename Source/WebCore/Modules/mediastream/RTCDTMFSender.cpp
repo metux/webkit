@@ -38,11 +38,11 @@
 
 namespace WebCore {
 
-static const long minToneDurationMs = 70;
+static const long minToneDurationMs = 40;
 static const long defaultToneDurationMs = 100;
 static const long maxToneDurationMs = 6000;
-static const long minInterToneGapMs = 50;
-static const long defaultInterToneGapMs = 50;
+static const long minInterToneGapMs = 30;
+static const long defaultInterToneGapMs = 70;
 
 PassRefPtr<RTCDTMFSender> RTCDTMFSender::create(ScriptExecutionContext* context, RTCPeerConnectionHandler* peerConnectionHandler, PassRefPtr<MediaStreamTrack> prpTrack, ExceptionCode& ec)
 {
@@ -53,7 +53,7 @@ PassRefPtr<RTCDTMFSender> RTCDTMFSender::create(ScriptExecutionContext* context,
         return nullptr;
     }
 
-    RefPtr<RTCDTMFSender> dtmfSender = adoptRef(new RTCDTMFSender(context, track, std::move(handler)));
+    RefPtr<RTCDTMFSender> dtmfSender = adoptRef(new RTCDTMFSender(context, track, WTF::move(handler)));
     dtmfSender->suspendIfNeeded();
     return dtmfSender.release();
 }
@@ -63,7 +63,7 @@ RTCDTMFSender::RTCDTMFSender(ScriptExecutionContext* context, PassRefPtr<MediaSt
     , m_track(track)
     , m_duration(defaultToneDurationMs)
     , m_interToneGap(defaultInterToneGapMs)
-    , m_handler(std::move(handler))
+    , m_handler(WTF::move(handler))
     , m_stopped(false)
     , m_scheduledEventTimer(this, &RTCDTMFSender::scheduledEventTimerFired)
 {

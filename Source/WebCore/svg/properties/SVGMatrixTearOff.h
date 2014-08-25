@@ -20,7 +20,6 @@
 #ifndef SVGMatrixTearOff_h
 #define SVGMatrixTearOff_h
 
-#if ENABLE(SVG)
 #include "SVGPropertyTearOff.h"
 #include "SVGTransform.h"
 
@@ -58,5 +57,4 @@ private:
 
 }
 
-#endif // ENABLE(SVG)
 #endif // SVGMatrixTearOff_h

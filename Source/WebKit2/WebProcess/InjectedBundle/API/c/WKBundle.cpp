@@ -63,19 +63,9 @@ WKConnectionRef WKBundleGetApplicationConnection(WKBundleRef bundleRef)
     return toAPI(toImpl(bundleRef)->webConnectionToUIProcess());
 }
 
-void WKBundleSetShouldTrackVisitedLinks(WKBundleRef bundleRef, bool shouldTrackVisitedLinks)
-{
-    toImpl(bundleRef)->setShouldTrackVisitedLinks(shouldTrackVisitedLinks);
-}
-
 void WKBundleRemoveAllVisitedLinks(WKBundleRef bundleRef)
 {
     toImpl(bundleRef)->removeAllVisitedLinks();
-}
-
-void WKBundleActivateMacFontAscentHack(WKBundleRef bundleRef)
-{
-    toImpl(bundleRef)->activateMacFontAscentHack();
 }
 
 void WKBundleSetCacheModel(WKBundleRef bundleRef, uint32_t cacheModel)
@@ -103,7 +93,7 @@ void WKBundleSetAlwaysAcceptCookies(WKBundleRef bundleRef, bool accept)
     toImpl(bundleRef)->setAlwaysAcceptCookies(accept);
 }
 
-void WKBundleAddUserScript(WKBundleRef bundleRef, WKBundlePageGroupRef pageGroupRef, WKBundleScriptWorldRef scriptWorldRef, WKStringRef sourceRef, WKURLRef urlRef, WKArrayRef whitelistRef, WKArrayRef blacklistRef, WKUserScriptInjectionTime injectionTimeRef, WKUserContentInjectedFrames injectedFramesRef)
+void WKBundleAddUserScript(WKBundleRef bundleRef, WKBundlePageGroupRef pageGroupRef, WKBundleScriptWorldRef scriptWorldRef, WKStringRef sourceRef, WKURLRef urlRef, WKArrayRef whitelistRef, WKArrayRef blacklistRef, _WKUserScriptInjectionTime injectionTimeRef, WKUserContentInjectedFrames injectedFramesRef)
 {
     toImpl(bundleRef)->addUserScript(toImpl(pageGroupRef), toImpl(scriptWorldRef), toWTFString(sourceRef), toWTFString(urlRef), toImpl(whitelistRef), toImpl(blacklistRef), toUserScriptInjectionTime(injectionTimeRef), toUserContentInjectedFrames(injectedFramesRef));
 }
@@ -322,16 +312,6 @@ void WKBundleSetTabKeyCyclesThroughElements(WKBundleRef bundleRef, WKBundlePageR
 void WKBundleSetSerialLoadingEnabled(WKBundleRef bundleRef, bool enabled)
 {
     toImpl(bundleRef)->setSerialLoadingEnabled(enabled);
-}
-
-void WKBundleSetShadowDOMEnabled(WKBundleRef bundleRef, bool enabled)
-{
-    toImpl(bundleRef)->setShadowDOMEnabled(enabled);
-}
-
-void WKBundleSetSeamlessIFramesEnabled(WKBundleRef bundleRef, bool enabled)
-{
-    toImpl(bundleRef)->setSeamlessIFramesEnabled(enabled);
 }
 
 void WKBundleDispatchPendingLoadRequests(WKBundleRef bundleRef)

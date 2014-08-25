@@ -299,7 +299,7 @@ cairo_device_t* GLContextEGL::cairoDevice()
 }
 #endif
 
-#if ENABLE(WEBGL)
+#if USE(3D_GRAPHICS)
 PlatformGraphicsContext3D GLContextEGL::platformContext()
 {
     return m_context;

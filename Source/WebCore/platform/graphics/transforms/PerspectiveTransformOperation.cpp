@@ -13,7 +13,7 @@
  * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -31,6 +31,14 @@
 
 namespace WebCore {
 
+bool PerspectiveTransformOperation::operator==(const TransformOperation& o) const
+{
+    if (!isSameType(o))
+        return false;
+    const PerspectiveTransformOperation& p = toPerspectiveTransformOperation(o);
+    return m_p == p.m_p;
+}
+
 PassRefPtr<TransformOperation> PerspectiveTransformOperation::blend(const TransformOperation* from, double progress, bool blendToIdentity)
 {
     if (from && !from->isSameType(*this))
@@ -42,7 +50,7 @@ PassRefPtr<TransformOperation> PerspectiveTransformOperation::blend(const Transf
         return PerspectiveTransformOperation::create(Length(clampToPositiveInteger(p), Fixed));
     }
     
-    const PerspectiveTransformOperation* fromOp = static_cast<const PerspectiveTransformOperation*>(from);
+    const PerspectiveTransformOperation* fromOp = toPerspectiveTransformOperation(from);
     Length fromP = fromOp ? fromOp->m_p : Length(m_p.type());
     Length toP = m_p;
 

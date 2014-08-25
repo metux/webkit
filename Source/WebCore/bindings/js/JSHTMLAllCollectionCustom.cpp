@@ -32,6 +32,7 @@
 #include "JSNodeList.h"
 #include "Node.h"
 #include "StaticNodeList.h"
+#include <runtime/IdentifierInlines.h>
 #include <runtime/JSCJSValue.h>
 #include <wtf/Vector.h>
 #include <wtf/text/AtomicString.h>
@@ -100,9 +101,9 @@ bool JSHTMLAllCollection::canGetItemsForName(ExecState*, HTMLAllCollection* coll
     return collection->hasNamedItem(propertyNameToAtomicString(propertyName));
 }
 
-EncodedJSValue JSHTMLAllCollection::nameGetter(ExecState* exec, EncodedJSValue slotBase, EncodedJSValue, PropertyName propertyName)
+EncodedJSValue JSHTMLAllCollection::nameGetter(ExecState* exec, JSObject* slotBase, EncodedJSValue, PropertyName propertyName)
 {
-    JSHTMLAllCollection* thisObj = jsCast<JSHTMLAllCollection*>(JSValue::decode(slotBase));
+    JSHTMLAllCollection* thisObj = jsCast<JSHTMLAllCollection*>(slotBase);
     return JSValue::encode(getNamedItems(exec, thisObj, propertyName));
 }
 

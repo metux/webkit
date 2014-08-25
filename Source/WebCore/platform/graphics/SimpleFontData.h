@@ -32,6 +32,7 @@
 #include "GlyphBuffer.h"
 #include "GlyphMetricsMap.h"
 #include "GlyphPageTreeNode.h"
+#include "OpenTypeMathData.h"
 #if ENABLE(OPENTYPE_VERTICAL)
 #include "OpenTypeVerticalData.h"
 #endif
@@ -40,11 +41,8 @@
 #include <wtf/PassOwnPtr.h>
 #include <wtf/text/StringHash.h>
 
-#if PLATFORM(MAC)
+#if PLATFORM(COCOA)
 #include "WebCoreSystemInterface.h"
-#endif
-
-#if PLATFORM(MAC)
 #include <wtf/RetainPtr.h>
 #endif
 
@@ -54,6 +52,22 @@
 
 #if USE(CAIRO)
 #include <cairo.h>
+#endif
+
+#if USE(CG)
+#if defined(__has_include) && __has_include(<CoreGraphics/CGFontRendering.h>)
+#include <CoreGraphics/CGFontRendering.h>
+#else
+enum {
+    kCGFontRenderingStyleAntialiasing = (1 << 0),
+    kCGFontRenderingStyleSmoothing = (1 << 1),
+    kCGFontRenderingStyleSubpixelPositioning = (1 << 2),
+    kCGFontRenderingStyleSubpixelQuantization = (1 << 3),
+    kCGFontRenderingStylePlatformNative = (1 << 9),
+    kCGFontRenderingStyleMask = 0x20F
+};
+#endif
+typedef uint32_t CGFontRenderingStyle;
 #endif
 
 namespace WebCore {
@@ -87,7 +101,7 @@ public:
     // Used to create SVG Fonts.
     static PassRefPtr<SimpleFontData> create(std::unique_ptr<AdditionalFontData> fontData, float fontSize, bool syntheticBold, bool syntheticItalic)
     {
-        return adoptRef(new SimpleFontData(std::move(fontData), fontSize, syntheticBold, syntheticItalic));
+        return adoptRef(new SimpleFontData(WTF::move(fontData), fontSize, syntheticBold, syntheticItalic));
     }
 
     virtual ~SimpleFontData();
@@ -95,6 +109,7 @@ public:
     static const SimpleFontData* systemFallback() { return reinterpret_cast<const SimpleFontData*>(-1); }
 
     const FontPlatformData& platformData() const { return m_platformData; }
+    const OpenTypeMathData* mathData() const;
 #if ENABLE(OPENTYPE_VERTICAL)
     const OpenTypeVerticalData* verticalData() const { return m_verticalData.get(); }
 #endif
@@ -189,11 +204,11 @@ public:
     CTFontRef getCTFont() const { return m_platformData.font(); }
     bool shouldNotBeUsedForArabic() const { return m_shouldNotBeUsedForArabic; };
 #endif
-#if PLATFORM(MAC)
+#if PLATFORM(COCOA)
     CFDictionaryRef getCFStringAttributes(TypesettingFeatures, FontOrientation) const;
 #endif
 
-#if PLATFORM(MAC) || USE(HARFBUZZ)
+#if PLATFORM(COCOA) || USE(HARFBUZZ)
     bool canRenderCombiningCharacterSequence(const UChar*, size_t) const;
 #endif
 
@@ -246,6 +261,12 @@ private:
     float widthForGDIGlyph(Glyph glyph) const;
 #endif
 
+#if USE(CG)
+    bool canUseFastGlyphAdvanceGetter(Glyph glyph, CGSize& advance, bool& populatedAdvance) const;
+    CGFontRenderingStyle renderingStyle() const;
+    bool advanceForColorBitmapFont(Glyph, CGSize& result) const; // Returns true if the font is a color bitmap font
+#endif
+
     FontMetrics m_fontMetrics;
     float m_maxCharWidth;
     float m_avgCharWidth;
@@ -262,6 +283,7 @@ private:
 
     bool m_isTextOrientationFallback;
     bool m_isBrokenIdeographFallback;
+    mutable RefPtr<OpenTypeMathData> m_mathData;
 #if ENABLE(OPENTYPE_VERTICAL)
     RefPtr<OpenTypeVerticalData> m_verticalData;
 #endif
@@ -287,7 +309,7 @@ private:
         RefPtr<SimpleFontData> verticalRightOrientation;
         RefPtr<SimpleFontData> uprightOrientation;
         RefPtr<SimpleFontData> nonSyntheticItalic;
-#if PLATFORM(MAC)
+#if PLATFORM(COCOA)
         mutable RetainPtr<CFMutableDictionaryRef> compositeFontReferences;
 #endif
 
@@ -304,11 +326,11 @@ private:
     float m_syntheticBoldOffset;
 #endif
 
-#if PLATFORM(MAC)
+#if PLATFORM(COCOA)
     mutable HashMap<unsigned, RetainPtr<CFDictionaryRef>> m_CFStringAttributes;
 #endif
 
-#if PLATFORM(MAC) || USE(HARFBUZZ)
+#if PLATFORM(COCOA) || USE(HARFBUZZ)
     mutable OwnPtr<HashMap<String, bool>> m_combiningCharacterSequenceSupport;
 #endif
 

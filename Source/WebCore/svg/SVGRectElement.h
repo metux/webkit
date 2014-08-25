@@ -21,7 +21,6 @@
 #ifndef SVGRectElement_h
 #define SVGRectElement_h
 
-#if ENABLE(SVG)
 #include "SVGAnimatedBoolean.h"
 #include "SVGAnimatedLength.h"
 #include "SVGExternalResourcesRequired.h"
@@ -39,13 +38,12 @@ private:
     SVGRectElement(const QualifiedName&, Document&);
     
     virtual bool isValid() const override { return SVGTests::isValid(); }
-    virtual bool supportsFocus() const override { return true; }
 
     bool isSupportedAttribute(const QualifiedName&);
     virtual void parseAttribute(const QualifiedName&, const AtomicString&) override;
     virtual void svgAttributeChanged(const QualifiedName&) override;
 
-    virtual bool selfHasRelativeLengths() const override;
+    virtual bool selfHasRelativeLengths() const override { return true; }
 
     virtual RenderPtr<RenderElement> createElementRenderer(PassRef<RenderStyle>) override;
 
@@ -64,5 +62,4 @@ NODE_TYPE_CASTS(SVGRectElement)
 
 } // namespace WebCore
 
-#endif // ENABLE(SVG)
 #endif

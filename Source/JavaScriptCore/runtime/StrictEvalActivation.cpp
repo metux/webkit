@@ -27,13 +27,13 @@
 #include "StrictEvalActivation.h"
 
 #include "JSGlobalObject.h"
-#include "Operations.h"
+#include "JSCInlines.h"
 
 namespace JSC {
 
 STATIC_ASSERT_IS_TRIVIALLY_DESTRUCTIBLE(StrictEvalActivation);
 
-const ClassInfo StrictEvalActivation::s_info = { "Object", &Base::s_info, 0, 0, CREATE_METHOD_TABLE(StrictEvalActivation) };
+const ClassInfo StrictEvalActivation::s_info = { "Object", &Base::s_info, 0, CREATE_METHOD_TABLE(StrictEvalActivation) };
 
 StrictEvalActivation::StrictEvalActivation(ExecState* exec)
     : Base(

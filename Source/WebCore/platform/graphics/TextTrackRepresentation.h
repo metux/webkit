@@ -31,6 +31,7 @@
 #include "IntRect.h"
 #include "PlatformLayer.h"
 #include <wtf/PassOwnPtr.h>
+#include <wtf/PassRefPtr.h>
 
 namespace WebCore {
 
@@ -53,9 +54,7 @@ public:
     virtual ~TextTrackRepresentation() { }
 
     virtual void update() = 0;
-#if USE(ACCELERATED_COMPOSITING)
     virtual PlatformLayer* platformLayer() = 0;
-#endif
     virtual void setContentScale(float) = 0;
     virtual IntRect bounds() const = 0;
 };

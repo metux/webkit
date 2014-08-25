@@ -10,10 +10,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -47,18 +47,20 @@ public:
     virtual ~MockMediaPlayerMediaSource();
 
     void advanceCurrentTime();
-    void updateDuration(double);
+    void updateDuration(const MediaTime&);
 
     virtual MediaPlayer::ReadyState readyState() const override;
     void setReadyState(MediaPlayer::ReadyState);
     void setNetworkState(MediaPlayer::NetworkState);
+    void waitForSeekCompleted();
+    void seekCompleted();
 
 private:
     MockMediaPlayerMediaSource(MediaPlayer*);
 
     // MediaPlayerPrivate Overrides
     virtual void load(const String& url) override;
-    virtual void load(const String& url, PassRefPtr<HTMLMediaSource>) override;
+    virtual void load(const String& url, MediaSourcePrivateClient*) override;
     virtual void cancelLoad() override;
     virtual void play() override;
     virtual void pause() override;
@@ -70,7 +72,7 @@ private:
     virtual bool paused() const override;
     virtual MediaPlayer::NetworkState networkState() const override;
     virtual double maxTimeSeekableDouble() const override;
-    virtual PassRefPtr<TimeRanges> buffered() const override;
+    virtual std::unique_ptr<PlatformTimeRanges> buffered() const override;
     virtual bool didLoadingProgress() const override;
     virtual void setSize(const IntSize&) override;
     virtual void paint(GraphicsContext*, const IntRect&) override;
@@ -83,14 +85,14 @@ private:
     virtual double totalFrameDelay() override;
 
     MediaPlayer* m_player;
-    RefPtr<HTMLMediaSource> m_mediaSource;
     RefPtr<MockMediaSourcePrivate> m_mediaSourcePrivate;
 
     MediaTime m_currentTime;
-    double m_duration;
+    MediaTime m_duration;
     MediaPlayer::ReadyState m_readyState;
     MediaPlayer::NetworkState m_networkState;
     bool m_playing;
+    bool m_seekCompleted;
 };
 
 }

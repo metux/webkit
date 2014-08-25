@@ -448,7 +448,7 @@ public:
     {
         ASSERT(src != dst);
         static const double negativeZeroConstant = -0.0;
-        loadDouble(&negativeZeroConstant, dst);
+        loadDouble(TrustedImmPtr(&negativeZeroConstant), dst);
         m_assembler.andnpd_rr(src, dst);
     }
 
@@ -456,7 +456,7 @@ public:
     {
         ASSERT(src != dst);
         static const double negativeZeroConstant = -0.0;
-        loadDouble(&negativeZeroConstant, dst);
+        loadDouble(TrustedImmPtr(&negativeZeroConstant), dst);
         m_assembler.xorpd_rr(src, dst);
     }
 
@@ -684,13 +684,13 @@ public:
             m_assembler.movsd_rr(src, dest);
     }
 
-    void loadDouble(const void* address, FPRegisterID dest)
+    void loadDouble(TrustedImmPtr address, FPRegisterID dest)
     {
 #if CPU(X86)
         ASSERT(isSSE2Present());
-        m_assembler.movsd_mr(address, dest);
+        m_assembler.movsd_mr(address.m_value, dest);
 #else
-        move(TrustedImmPtr(address), scratchRegister);
+        move(address, scratchRegister);
         loadDouble(scratchRegister, dest);
 #endif
     }
@@ -1145,13 +1145,16 @@ public:
         return Jump(m_assembler.jCC(x86Condition(cond)));
     }
 
-    void test32(RegisterID reg, TrustedImm32 mask = TrustedImm32(-1))
+    void test32(ResultCondition, RegisterID reg, TrustedImm32 mask = TrustedImm32(-1))
     {
         if (mask.m_value == -1)
             m_assembler.testl_rr(reg, reg);
-        else if (!(mask.m_value & ~0xff) && reg < X86Registers::esp) // Using esp and greater as a byte register yields the upper half of the 16 bit registers ax, cx, dx and bx, e.g. esp, register 4, is actually ah.
-            m_assembler.testb_i8r(mask.m_value, reg);
-        else
+        else if (!(mask.m_value & ~0xff) && reg < X86Registers::esp) { // Using esp and greater as a byte register yields the upper half of the 16 bit registers ax, cx, dx and bx, e.g. esp, register 4, is actually ah.
+            if (mask.m_value == 0xff)
+                m_assembler.testb_rr(reg, reg);
+            else
+                m_assembler.testb_i8r(mask.m_value, reg);
+        } else
             m_assembler.testl_i32r(mask.m_value, reg);
     }
 
@@ -1162,7 +1165,7 @@ public:
 
     Jump branchTest32(ResultCondition cond, RegisterID reg, TrustedImm32 mask = TrustedImm32(-1))
     {
-        test32(reg, mask);
+        test32(cond, reg, mask);
         return branch(cond);
     }
 

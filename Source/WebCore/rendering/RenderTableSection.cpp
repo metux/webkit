@@ -29,6 +29,7 @@
 #include "HitTestResult.h"
 #include "HTMLNames.h"
 #include "PaintInfo.h"
+#include "RenderNamedFlowFragment.h"
 #include "RenderTableCell.h"
 #include "RenderTableCol.h"
 #include "RenderTableRow.h"
@@ -65,12 +66,11 @@ static inline void updateLogicalHeightForCell(RenderTableSection::RowStruct& row
         Length cRowLogicalHeight = row.logicalHeight;
         switch (logicalHeight.type()) {
         case Percent:
-            if (!(cRowLogicalHeight.isPercent())
-                || (cRowLogicalHeight.isPercent() && cRowLogicalHeight.percent() < logicalHeight.percent()))
+            if (!cRowLogicalHeight.isPercentNotCalculated() || cRowLogicalHeight.percent() < logicalHeight.percent())
                 row.logicalHeight = logicalHeight;
             break;
         case Fixed:
-            if (cRowLogicalHeight.type() < Percent
+            if (cRowLogicalHeight.isAuto() || cRowLogicalHeight.isRelative()
                 || (cRowLogicalHeight.isFixed() && cRowLogicalHeight.value() < logicalHeight.value()))
                 row.logicalHeight = logicalHeight;
             break;
@@ -82,7 +82,7 @@ static inline void updateLogicalHeightForCell(RenderTableSection::RowStruct& row
 }
 
 RenderTableSection::RenderTableSection(Element& element, PassRef<RenderStyle> style)
-    : RenderBox(element, std::move(style), 0)
+    : RenderBox(element, WTF::move(style), 0)
     , m_cCol(0)
     , m_cRow(0)
     , m_outerBorderStart(0)
@@ -96,7 +96,7 @@ RenderTableSection::RenderTableSection(Element& element, PassRef<RenderStyle> st
 }
 
 RenderTableSection::RenderTableSection(Document& document, PassRef<RenderStyle> style)
-    : RenderBox(document, std::move(style), 0)
+    : RenderBox(document, WTF::move(style), 0)
     , m_cCol(0)
     , m_cRow(0)
     , m_outerBorderStart(0)
@@ -435,7 +435,7 @@ void RenderTableSection::distributeExtraLogicalHeightToPercentRows(int& extraLog
     totalPercent = std::min(totalPercent, 100);
     int rowHeight = m_rowPos[1] - m_rowPos[0];
     for (unsigned r = 0; r < totalRows; ++r) {
-        if (totalPercent > 0 && m_grid[r].logicalHeight.isPercent()) {
+        if (totalPercent > 0 && m_grid[r].logicalHeight.isPercentNotCalculated()) {
             int toAdd = std::min<int>(extraLogicalHeight, (totalHeight * m_grid[r].logicalHeight.percent() / 100) - rowHeight);
             // If toAdd is negative, then we don't want to shrink the row (this bug
             // affected Outlook Web Access).
@@ -507,7 +507,7 @@ int RenderTableSection::distributeExtraLogicalHeightToRows(int extraLogicalHeigh
     for (unsigned r = 0; r < totalRows; r++) {
         if (m_grid[r].logicalHeight.isAuto())
             ++autoRowsCount;
-        else if (m_grid[r].logicalHeight.isPercent())
+        else if (m_grid[r].logicalHeight.isPercentNotCalculated())
             totalPercent += m_grid[r].logicalHeight.percent();
     }
 
@@ -1035,7 +1035,7 @@ CellSpan RenderTableSection::dirtiedRows(const LayoutRect& damageRect) const
     if (m_forceSlowPaintPathWithOverflowingCell) 
         return fullTableRowSpan();
 
-    CellSpan coveredRows = spannedRows(damageRect);
+    CellSpan coveredRows = spannedRows(damageRect, IncludeAllIntersectingCells);
 
     // To repaint the border we might need to repaint first or last row even if they are not spanned themselves.
     if (coveredRows.start() >= m_rowPos.size() - 1 && m_rowPos[m_rowPos.size() - 1] + table()->outerBorderAfter() >= damageRect.y())
@@ -1052,7 +1052,7 @@ CellSpan RenderTableSection::dirtiedColumns(const LayoutRect& damageRect) const
     if (m_forceSlowPaintPathWithOverflowingCell) 
         return fullTableColumnSpan();
 
-    CellSpan coveredColumns = spannedColumns(damageRect);
+    CellSpan coveredColumns = spannedColumns(damageRect, IncludeAllIntersectingCells);
 
     const Vector<int>& columnPos = table()->columnPositions();
     // To repaint the border we might need to repaint first or last column even if they are not spanned themselves.
@@ -1065,10 +1065,12 @@ CellSpan RenderTableSection::dirtiedColumns(const LayoutRect& damageRect) const
     return coveredColumns;
 }
 
-CellSpan RenderTableSection::spannedRows(const LayoutRect& flippedRect) const
+CellSpan RenderTableSection::spannedRows(const LayoutRect& flippedRect, ShouldIncludeAllIntersectingCells shouldIncludeAllIntersectionCells) const
 {
     // Find the first row that starts after rect top.
     unsigned nextRow = std::upper_bound(m_rowPos.begin(), m_rowPos.end(), flippedRect.y()) - m_rowPos.begin();
+    if (shouldIncludeAllIntersectionCells == IncludeAllIntersectingCells && nextRow && m_rowPos[nextRow - 1] == flippedRect.y())
+        --nextRow;
 
     if (nextRow == m_rowPos.size())
         return CellSpan(m_rowPos.size() - 1, m_rowPos.size() - 1); // After all rows.
@@ -1088,7 +1090,7 @@ CellSpan RenderTableSection::spannedRows(const LayoutRect& flippedRect) const
     return CellSpan(startRow, endRow);
 }
 
-CellSpan RenderTableSection::spannedColumns(const LayoutRect& flippedRect) const
+CellSpan RenderTableSection::spannedColumns(const LayoutRect& flippedRect, ShouldIncludeAllIntersectingCells shouldIncludeAllIntersectionCells) const
 {
     const Vector<int>& columnPos = table()->columnPositions();
 
@@ -1098,6 +1100,8 @@ CellSpan RenderTableSection::spannedColumns(const LayoutRect& flippedRect) const
     // upper_bound on the other hand properly returns the cell on the logical bottom/right, which also
     // matches the behavior of other browsers.
     unsigned nextColumn = std::upper_bound(columnPos.begin(), columnPos.end(), flippedRect.x()) - columnPos.begin();
+    if (shouldIncludeAllIntersectionCells == IncludeAllIntersectingCells && nextColumn && columnPos[nextColumn - 1] == flippedRect.x())
+        --nextColumn;
 
     if (nextColumn == columnPos.size())
         return CellSpan(columnPos.size() - 1, columnPos.size() - 1); // After all columns.
@@ -1361,9 +1365,9 @@ void RenderTableSection::imageChanged(WrappedImagePtr, const IntRect*)
 void RenderTableSection::recalcCells()
 {
     ASSERT(m_needsCellRecalc);
-    // We reset the flag here to ensure that |addCell| works. This is safe to do as
-    // fillRowsWithDefaultStartingAtPosition makes sure we match the table's columns
-    // representation.
+    // We reset the flag here to ensure that addCell() works. This is safe to do because we clear the grid
+    // and update its dimensions to be consistent with the table's column representation before we rebuild
+    // the grid using addCell().
     m_needsCellRecalc = false;
 
     m_cCol = 0;
@@ -1403,12 +1407,17 @@ void RenderTableSection::rowLogicalHeightChanged(unsigned rowIndex)
 void RenderTableSection::setNeedsCellRecalc()
 {
     m_needsCellRecalc = true;
+
+    // Clear the grid now to ensure that we don't hold onto any stale pointers (e.g. a cell renderer that is being removed).
+    m_grid.clear();
+
     if (RenderTable* t = table())
         t->setNeedsSectionRecalc();
 }
 
 unsigned RenderTableSection::numColumns() const
 {
+    ASSERT(!m_needsCellRecalc);
     unsigned result = 0;
     
     for (unsigned r = 0; r < m_grid.size(); ++r) {
@@ -1490,7 +1499,7 @@ bool RenderTableSection::nodeAtPoint(const HitTestRequest& request, HitTestResul
     // Just forward to our children always.
     LayoutPoint adjustedLocation = accumulatedOffset + location();
 
-    if (hasOverflowClip() && !locationInContainer.intersects(overflowClipRect(adjustedLocation, locationInContainer.region())))
+    if (hasOverflowClip() && !locationInContainer.intersects(overflowClipRect(adjustedLocation, currentRenderNamedFlowFragment())))
         return false;
 
     if (hasOverflowingCell()) {
@@ -1516,8 +1525,8 @@ bool RenderTableSection::nodeAtPoint(const HitTestRequest& request, HitTestResul
     hitTestRect.moveBy(-adjustedLocation);
 
     LayoutRect tableAlignedRect = logicalRectForWritingModeAndDirection(hitTestRect);
-    CellSpan rowSpan = spannedRows(tableAlignedRect);
-    CellSpan columnSpan = spannedColumns(tableAlignedRect);
+    CellSpan rowSpan = spannedRows(tableAlignedRect, DoNotIncludeAllIntersectingCells);
+    CellSpan columnSpan = spannedColumns(tableAlignedRect, DoNotIncludeAllIntersectingCells);
 
     // Now iterate over the spanned rows and columns.
     for (unsigned hitRow = rowSpan.start(); hitRow < rowSpan.end(); ++hitRow) {

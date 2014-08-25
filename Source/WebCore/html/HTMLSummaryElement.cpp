@@ -66,7 +66,7 @@ HTMLSummaryElement::HTMLSummaryElement(const QualifiedName& tagName, Document& d
 
 RenderPtr<RenderElement> HTMLSummaryElement::createElementRenderer(PassRef<RenderStyle> style)
 {
-    return createRenderer<RenderBlockFlow>(*this, std::move(style));
+    return createRenderer<RenderBlockFlow>(*this, WTF::move(style));
 }
 
 bool HTMLSummaryElement::childShouldCreateRenderer(const Node& child) const
@@ -126,13 +126,13 @@ void HTMLSummaryElement::defaultEventHandler(Event* event)
         }
 
         if (event->isKeyboardEvent()) {
-            if (event->type() == eventNames().keydownEvent && static_cast<KeyboardEvent*>(event)->keyIdentifier() == "U+0020") {
+            if (event->type() == eventNames().keydownEvent && toKeyboardEvent(event)->keyIdentifier() == "U+0020") {
                 setActive(true, true);
                 // No setDefaultHandled() - IE dispatches a keypress in this case.
                 return;
             }
             if (event->type() == eventNames().keypressEvent) {
-                switch (static_cast<KeyboardEvent*>(event)->charCode()) {
+                switch (toKeyboardEvent(event)->charCode()) {
                 case '\r':
                     dispatchSimulatedClick(event);
                     event->setDefaultHandled();
@@ -143,7 +143,7 @@ void HTMLSummaryElement::defaultEventHandler(Event* event)
                     return;
                 }
             }
-            if (event->type() == eventNames().keyupEvent && static_cast<KeyboardEvent*>(event)->keyIdentifier() == "U+0020") {
+            if (event->type() == eventNames().keyupEvent && toKeyboardEvent(event)->keyIdentifier() == "U+0020") {
                 if (active())
                     dispatchSimulatedClick(event);
                 event->setDefaultHandled();

@@ -69,7 +69,11 @@ bool WebKitNamedFlow::overset() const
 
     // The renderer may be destroyed or created after the style update.
     // Because this is called from JS, where the wrapper keeps a reference to the NamedFlow, no guard is necessary.
-    return m_parentFlowThread ? m_parentFlowThread->overset() : true;
+    if (!m_parentFlowThread || !m_parentFlowThread->hasRegions())
+        return true;
+
+    const RenderNamedFlowFragment* namedFlowFragment = toRenderNamedFlowFragment(m_parentFlowThread->lastRegion());
+    return namedFlowFragment->regionOversetState() == RegionOverset;
 }
 
 static inline bool inFlowThread(RenderObject* renderer, RenderNamedFlowThread* flowThread)
@@ -204,17 +208,6 @@ void WebKitNamedFlow::setRenderer(RenderNamedFlowThread* parentFlowThread)
     m_parentFlowThread = parentFlowThread;
 }
 
-void WebKitNamedFlow::dispatchRegionLayoutUpdateEvent()
-{
-    ASSERT(!NoEventDispatchAssertion::isEventDispatchForbidden());
-
-    // If the flow is in the "NULL" state the event should not be dispatched any more.
-    if (flowState() == FlowStateNull)
-        return;
-
-    dispatchEvent(UIEvent::create(eventNames().webkitregionlayoutupdateEvent, false, false, m_flowManager->document()->defaultView(), 0));
-}
-    
 void WebKitNamedFlow::dispatchRegionOversetChangeEvent()
 {
     ASSERT(!NoEventDispatchAssertion::isEventDispatchForbidden());

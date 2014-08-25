@@ -22,7 +22,7 @@
 
 #include "config.h"
 
-#if ENABLE(SVG) && ENABLE(FILTERS)
+#if ENABLE(FILTERS)
 #include "SVGFEImage.h"
 
 #include "AffineTransform.h"
@@ -66,13 +66,13 @@ PassRefPtr<FEImage> FEImage::createWithIRIReference(Filter* filter, Document& do
 
 void FEImage::determineAbsolutePaintRect()
 {
-    FloatRect paintRect = filter()->absoluteTransform().mapRect(filterPrimitiveSubregion());
+    FloatRect paintRect = filter().absoluteTransform().mapRect(filterPrimitiveSubregion());
     FloatRect srcRect;
     if (m_image) {
         srcRect.setSize(m_image->size());
         m_preserveAspectRatio.transformRect(paintRect, srcRect);
     } else if (RenderElement* renderer = referencedRenderer())
-        srcRect = filter()->absoluteTransform().mapRect(renderer->repaintRectInLocalCoordinates());
+        srcRect = filter().absoluteTransform().mapRect(renderer->repaintRectInLocalCoordinates());
 
     if (clipsToBounds())
         paintRect.intersect(maxEffectRect());
@@ -101,11 +101,11 @@ void FEImage::platformApplySoftware()
     if (!resultImage)
         return;
 
-    FloatRect destRect = filter()->absoluteTransform().mapRect(filterPrimitiveSubregion());
+    FloatRect destRect = filter().absoluteTransform().mapRect(filterPrimitiveSubregion());
 
     FloatRect srcRect;
     if (renderer)
-        srcRect = filter()->absoluteTransform().mapRect(renderer->repaintRectInLocalCoordinates());
+        srcRect = filter().absoluteTransform().mapRect(renderer->repaintRectInLocalCoordinates());
     else {
         srcRect = FloatRect(FloatPoint(), m_image->size());
         m_preserveAspectRatio.transformRect(destRect, srcRect);
@@ -118,7 +118,7 @@ void FEImage::platformApplySoftware()
     setResultColorSpace(ColorSpaceDeviceRGB);
 
     if (renderer) {
-        const AffineTransform& absoluteTransform = filter()->absoluteTransform();
+        const AffineTransform& absoluteTransform = filter().absoluteTransform();
         resultImage->context()->concatCTM(absoluteTransform);
 
         SVGElement* contextNode = toSVGElement(renderer->element());
@@ -146,7 +146,7 @@ void FEImage::dump()
 
 TextStream& FEImage::externalRepresentation(TextStream& ts, int indent) const
 {
-    IntSize imageSize;
+    FloatSize imageSize;
     if (m_image)
         imageSize = m_image->size();
     else if (RenderObject* renderer = referencedRenderer())
@@ -161,4 +161,4 @@ TextStream& FEImage::externalRepresentation(TextStream& ts, int indent) const
 
 } // namespace WebCore
 
-#endif // ENABLE(SVG) && ENABLE(FILTERS)
+#endif // ENABLE(FILTERS)

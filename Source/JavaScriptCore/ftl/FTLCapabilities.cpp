@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013 Apple Inc. All rights reserved.
+ * Copyright (C) 2013, 2014 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -32,6 +32,11 @@ namespace JSC { namespace FTL {
 
 using namespace DFG;
 
+static bool verboseCapabilities()
+{
+    return verboseCompilationEnabled() || Options::verboseFTLFailure();
+}
+
 inline CapabilityLevel canCompile(Node* node)
 {
     // NOTE: If we ever have phantom arguments, we can compile them but we cannot
@@ -39,12 +44,13 @@ inline CapabilityLevel canCompile(Node* node)
     
     switch (node->op()) {
     case JSConstant:
-    case WeakJSConstant:
+    case GetMyArgumentsLength:
     case GetLocal:
     case SetLocal:
     case MovHint:
     case ZombieHint:
     case Phantom:
+    case HardPhantom:
     case Flush:
     case PhantomLocal:
     case SetArgument:
@@ -56,15 +62,16 @@ inline CapabilityLevel canCompile(Node* node)
     case BitLShift:
     case BitURShift:
     case CheckStructure:
-    case StructureTransitionWatchpoint:
     case ArrayifyToStructure:
     case PutStructure:
-    case PhantomPutStructure:
     case GetButterfly:
     case NewObject:
     case NewArray:
     case NewArrayBuffer:
     case GetByOffset:
+    case GetGetterSetterByOffset:
+    case GetGetter:
+    case GetSetter:
     case PutByOffset:
     case GetGlobalVar:
     case PutGlobalVar:
@@ -77,46 +84,101 @@ inline CapabilityLevel canCompile(Node* node)
     case ArithMin:
     case ArithMax:
     case ArithAbs:
+    case ArithSin:
+    case ArithCos:
+    case ArithSqrt:
+    case ArithFRound:
     case ArithNegate:
     case UInt32ToNumber:
-    case Int32ToDouble:
     case CompareEqConstant:
-    case CompareStrictEqConstant:
     case Jump:
     case ForceOSRExit:
     case Phi:
     case Upsilon:
     case ExtractOSREntryLocal:
     case LoopHint:
-    case Call:
-    case Construct:
     case GetMyScope:
     case SkipScope:
     case GetClosureRegisters:
     case GetClosureVar:
     case PutClosureVar:
-    case Int52ToValue:
     case InvalidationPoint:
     case StringCharAt:
     case CheckFunction:
     case StringCharCodeAt:
     case AllocatePropertyStorage:
+    case ReallocatePropertyStorage:
     case FunctionReentryWatchpoint:
     case TypedArrayWatchpoint:
+    case GetTypedArrayByteOffset:
     case VariableWatchpoint:
     case NotifyWrite:
     case StoreBarrier:
-    case ConditionalStoreBarrier:
     case StoreBarrierWithNullCheck:
+    case Call:
+    case Construct:
+    case NativeCall:
+    case NativeConstruct:
     case ValueToInt32:
     case Branch:
     case LogicalNot:
     case CheckInBounds:
     case ConstantStoragePointer:
     case Check:
+    case CountExecution:
+    case CheckExecutable:
+    case GetScope:
+    case AllocationProfileWatchpoint:
+    case CheckArgumentsNotCreated:
+    case GetCallee:
+    case ToString:
+    case MakeRope:
+    case NewArrayWithSize:
+    case GetById:
+    case ToThis:
+    case MultiGetByOffset:
+    case MultiPutByOffset:
+    case ToPrimitive:
+    case PhantomArguments:
+    case Throw:
+    case ThrowReferenceError:
+    case Unreachable:
+    case GetMyArgumentByVal:
+    case IsUndefined:
+    case IsBoolean:
+    case IsNumber:
+    case IsString:
+    case IsObject:
+    case IsFunction:
+    case CheckHasInstance:
+    case InstanceOf:
+    case DoubleRep:
+    case ValueRep:
+    case Int52Rep:
+    case DoubleConstant:
+    case Int52Constant:
+    case BooleanToNumber:
+    case HasGenericProperty:
+    case HasStructureProperty:
+    case GetDirectPname:
+    case GetEnumerableLength:
+    case GetStructurePropertyEnumerator:
+    case GetGenericPropertyEnumerator:
+    case GetEnumeratorPname:
+    case ToIndexString:
         // These are OK.
         break;
-    case GetById:
+    case Identity:
+        // No backend handles this because it will be optimized out. But we may check
+        // for capabilities before optimization. It would be a deep error to remove this
+        // case because it would prevent us from catching bugs where the FTL backend
+        // pipeline failed to optimize out an Identity.
+        break;
+    case In:
+        if (node->child2().useKind() == CellUse)
+            break;
+        return CannotCompile;
+    case PutByIdDirect:
     case PutById:
         if (node->child1().useKind() == CellUse)
             break;
@@ -152,6 +214,17 @@ inline CapabilityLevel canCompile(Node* node)
             return CannotCompile;
         }
         break;
+    case HasIndexedProperty:
+        switch (node->arrayMode().type()) {
+        case Array::ForceExit:
+        case Array::Int32:
+        case Array::Double:
+        case Array::Contiguous:
+            break;
+        default:
+            return CannotCompile;
+        }
+        break;
     case GetByVal:
         switch (node->arrayMode().type()) {
         case Array::ForceExit:
@@ -183,26 +256,57 @@ inline CapabilityLevel canCompile(Node* node)
             return CannotCompile;
         }
         break;
+    case ArrayPush:
+    case ArrayPop:
+        switch (node->arrayMode().type()) {
+        case Array::Int32:
+        case Array::Contiguous:
+        case Array::Double:
+            break;
+        default:
+            return CannotCompile;
+        }
+        break;
     case CompareEq:
         if (node->isBinaryUseKind(Int32Use))
             break;
-        if (node->isBinaryUseKind(MachineIntUse))
+        if (node->isBinaryUseKind(Int52RepUse))
             break;
-        if (node->isBinaryUseKind(NumberUse))
+        if (node->isBinaryUseKind(DoubleRepUse))
+            break;
+        if (node->isBinaryUseKind(StringIdentUse))
             break;
         if (node->isBinaryUseKind(ObjectUse))
             break;
         if (node->isBinaryUseKind(UntypedUse))
             break;
+        if (node->isBinaryUseKind(BooleanUse))
+            break;
+        if (node->isBinaryUseKind(ObjectUse, ObjectOrOtherUse))
+            break;
+        if (node->isBinaryUseKind(ObjectOrOtherUse, ObjectUse))
+            break;
         return CannotCompile;
     case CompareStrictEq:
         if (node->isBinaryUseKind(Int32Use))
             break;
-        if (node->isBinaryUseKind(MachineIntUse))
+        if (node->isBinaryUseKind(Int52RepUse))
             break;
-        if (node->isBinaryUseKind(NumberUse))
+        if (node->isBinaryUseKind(DoubleRepUse))
+            break;
+        if (node->isBinaryUseKind(StringIdentUse))
             break;
         if (node->isBinaryUseKind(ObjectUse))
+            break;
+        if (node->isBinaryUseKind(BooleanUse))
+            break;
+        if (node->isBinaryUseKind(MiscUse, UntypedUse))
+            break;
+        if (node->isBinaryUseKind(UntypedUse, MiscUse))
+            break;
+        if (node->isBinaryUseKind(StringIdentUse, NotStringVarUse))
+            break;
+        if (node->isBinaryUseKind(NotStringVarUse, StringIdentUse))
             break;
         return CannotCompile;
     case CompareLess:
@@ -211,9 +315,9 @@ inline CapabilityLevel canCompile(Node* node)
     case CompareGreaterEq:
         if (node->isBinaryUseKind(Int32Use))
             break;
-        if (node->isBinaryUseKind(MachineIntUse))
+        if (node->isBinaryUseKind(Int52RepUse))
             break;
-        if (node->isBinaryUseKind(NumberUse))
+        if (node->isBinaryUseKind(DoubleRepUse))
             break;
         if (node->isBinaryUseKind(UntypedUse))
             break;
@@ -236,9 +340,26 @@ inline CapabilityLevel canCompile(Node* node)
 
 CapabilityLevel canCompile(Graph& graph)
 {
+    if (graph.m_codeBlock->instructionCount() > Options::maximumFTLCandidateInstructionCount()) {
+        if (verboseCapabilities())
+            dataLog("FTL rejecting ", *graph.m_codeBlock, " because it's too big.\n");
+        return CannotCompile;
+    }
+    
     if (graph.m_codeBlock->codeType() != FunctionCode) {
-        if (verboseCompilationEnabled())
-            dataLog("FTL rejecting code block that doesn't belong to a function.\n");
+        if (verboseCapabilities())
+            dataLog("FTL rejecting ", *graph.m_codeBlock, " because it doesn't belong to a function.\n");
+        return CannotCompile;
+    }
+    
+    if (graph.m_codeBlock->needsActivation()) {
+        // Need this because although we also don't support
+        // CreateActivation/TearOffActivation, we might not see those nodes in case of
+        // OSR entry.
+        // FIXME: Support activations.
+        // https://bugs.webkit.org/show_bug.cgi?id=129576
+        if (verboseCapabilities())
+            dataLog("FTL rejecting ", *graph.m_codeBlock, " because it uses activations.\n");
         return CannotCompile;
     }
     
@@ -264,23 +385,34 @@ CapabilityLevel canCompile(Graph& graph)
                 case UntypedUse:
                 case Int32Use:
                 case KnownInt32Use:
-                case MachineIntUse:
+                case Int52RepUse:
                 case NumberUse:
-                case KnownNumberUse:
-                case RealNumberUse:
+                case DoubleRepUse:
+                case DoubleRepRealUse:
                 case BooleanUse:
                 case CellUse:
                 case KnownCellUse:
                 case ObjectUse:
+                case FunctionUse:
                 case ObjectOrOtherUse:
                 case StringUse:
+                case KnownStringUse:
+                case StringObjectUse:
+                case StringOrStringObjectUse:
                 case FinalObjectUse:
+                case NotCellUse:
+                case OtherUse:
+                case MiscUse:
+                case StringIdentUse:
+                case NotStringVarUse:
+                case MachineIntUse:
+                case DoubleRepMachineIntUse:
                     // These are OK.
                     break;
                 default:
                     // Don't know how to handle anything else.
-                    if (verboseCompilationEnabled()) {
-                        dataLog("FTL rejecting node because of bad use kind: ", edge.useKind(), " in node:\n");
+                    if (verboseCapabilities()) {
+                        dataLog("FTL rejecting node in ", *graph.m_codeBlock, " because of bad use kind: ", edge.useKind(), " in node:\n");
                         graph.dump(WTF::dataFile(), "    ", node);
                     }
                     return CannotCompile;
@@ -289,8 +421,8 @@ CapabilityLevel canCompile(Graph& graph)
             
             switch (canCompile(node)) {
             case CannotCompile: 
-                if (verboseCompilationEnabled()) {
-                    dataLog("FTL rejecting node:\n");
+                if (verboseCapabilities()) {
+                    dataLog("FTL rejecting node in ", *graph.m_codeBlock, ":\n");
                     graph.dump(WTF::dataFile(), "    ", node);
                 }
                 return CannotCompile;

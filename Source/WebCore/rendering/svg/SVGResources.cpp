@@ -20,7 +20,6 @@
 #include "config.h"
 #include "SVGResources.h"
 
-#if ENABLE(SVG)
 #include "RenderSVGResourceClipper.h"
 #include "RenderSVGResourceFilter.h"
 #include "RenderSVGResourceMarker.h"
@@ -45,7 +44,7 @@ SVGResources::SVGResources()
 
 static HashSet<AtomicString>& clipperFilterMaskerTags()
 {
-    DEFINE_STATIC_LOCAL(HashSet<AtomicString>, s_tagList, ());
+    DEPRECATED_DEFINE_STATIC_LOCAL(HashSet<AtomicString>, s_tagList, ());
     if (s_tagList.isEmpty()) {
         // "container elements": http://www.w3.org/TR/SVG11/intro.html#TermContainerElement
         // "graphics elements" : http://www.w3.org/TR/SVG11/intro.html#TermGraphicsElement
@@ -94,7 +93,7 @@ static HashSet<AtomicString>& clipperFilterMaskerTags()
 
 static HashSet<AtomicString>& markerTags()
 {
-    DEFINE_STATIC_LOCAL(HashSet<AtomicString>, s_tagList, ());
+    DEPRECATED_DEFINE_STATIC_LOCAL(HashSet<AtomicString>, s_tagList, ());
     if (s_tagList.isEmpty()) {
         s_tagList.add(SVGNames::lineTag.localName());
         s_tagList.add(SVGNames::pathTag.localName());
@@ -107,7 +106,7 @@ static HashSet<AtomicString>& markerTags()
 
 static HashSet<AtomicString>& fillAndStrokeTags()
 {
-    DEFINE_STATIC_LOCAL(HashSet<AtomicString>, s_tagList, ());
+    DEPRECATED_DEFINE_STATIC_LOCAL(HashSet<AtomicString>, s_tagList, ());
     if (s_tagList.isEmpty()) {
         s_tagList.add(SVGNames::altGlyphTag.localName());
         s_tagList.add(SVGNames::circleTag.localName());
@@ -128,7 +127,7 @@ static HashSet<AtomicString>& fillAndStrokeTags()
 
 static HashSet<AtomicString>& chainableResourceTags()
 {
-    DEFINE_STATIC_LOCAL(HashSet<AtomicString>, s_tagList, ());
+    DEPRECATED_DEFINE_STATIC_LOCAL(HashSet<AtomicString>, s_tagList, ());
     if (s_tagList.isEmpty()) {
         s_tagList.add(SVGNames::linearGradientTag.localName());
         s_tagList.add(SVGNames::filterTag.localName());
@@ -279,7 +278,7 @@ bool SVGResources::buildCachedResources(const RenderElement& renderer, const SVG
     return foundResources;
 }
 
-void SVGResources::removeClientFromCache(RenderObject& object, bool markForInvalidation) const
+void SVGResources::removeClientFromCache(RenderElement& renderer, bool markForInvalidation) const
 {
     if (!m_clipperFilterMaskerData && !m_markerData && !m_fillStrokeData && !m_linkedResource)
         return;
@@ -288,35 +287,35 @@ void SVGResources::removeClientFromCache(RenderObject& object, bool markForInval
         ASSERT(!m_clipperFilterMaskerData);
         ASSERT(!m_markerData);
         ASSERT(!m_fillStrokeData);
-        m_linkedResource->removeClientFromCache(object, markForInvalidation);
+        m_linkedResource->removeClientFromCache(renderer, markForInvalidation);
         return;
     }
 
     if (m_clipperFilterMaskerData) {
         if (m_clipperFilterMaskerData->clipper)
-            m_clipperFilterMaskerData->clipper->removeClientFromCache(object, markForInvalidation);
+            m_clipperFilterMaskerData->clipper->removeClientFromCache(renderer, markForInvalidation);
 #if ENABLE(FILTERS)
         if (m_clipperFilterMaskerData->filter)
-            m_clipperFilterMaskerData->filter->removeClientFromCache(object, markForInvalidation);
+            m_clipperFilterMaskerData->filter->removeClientFromCache(renderer, markForInvalidation);
 #endif
         if (m_clipperFilterMaskerData->masker)
-            m_clipperFilterMaskerData->masker->removeClientFromCache(object, markForInvalidation);
+            m_clipperFilterMaskerData->masker->removeClientFromCache(renderer, markForInvalidation);
     }
 
     if (m_markerData) {
         if (m_markerData->markerStart)
-            m_markerData->markerStart->removeClientFromCache(object, markForInvalidation);
+            m_markerData->markerStart->removeClientFromCache(renderer, markForInvalidation);
         if (m_markerData->markerMid)
-            m_markerData->markerMid->removeClientFromCache(object, markForInvalidation);
+            m_markerData->markerMid->removeClientFromCache(renderer, markForInvalidation);
         if (m_markerData->markerEnd)
-            m_markerData->markerEnd->removeClientFromCache(object, markForInvalidation);
+            m_markerData->markerEnd->removeClientFromCache(renderer, markForInvalidation);
     }
 
     if (m_fillStrokeData) {
         if (m_fillStrokeData->fill)
-            m_fillStrokeData->fill->removeClientFromCache(object, markForInvalidation);
+            m_fillStrokeData->fill->removeClientFromCache(renderer, markForInvalidation);
         if (m_fillStrokeData->stroke)
-            m_fillStrokeData->stroke->removeClientFromCache(object, markForInvalidation);
+            m_fillStrokeData->stroke->removeClientFromCache(renderer, markForInvalidation);
     }
 }
 
@@ -447,7 +446,7 @@ bool SVGResources::setClipper(RenderSVGResourceClipper* clipper)
     ASSERT(clipper->resourceType() == ClipperResourceType);
 
     if (!m_clipperFilterMaskerData)
-        m_clipperFilterMaskerData = ClipperFilterMaskerData::create();
+        m_clipperFilterMaskerData = std::make_unique<ClipperFilterMaskerData>();
 
     m_clipperFilterMaskerData->clipper = clipper;
     return true;
@@ -469,7 +468,7 @@ bool SVGResources::setFilter(RenderSVGResourceFilter* filter)
     ASSERT(filter->resourceType() == FilterResourceType);
 
     if (!m_clipperFilterMaskerData)
-        m_clipperFilterMaskerData = ClipperFilterMaskerData::create();
+        m_clipperFilterMaskerData = std::make_unique<ClipperFilterMaskerData>();
 
     m_clipperFilterMaskerData->filter = filter;
     return true;
@@ -491,7 +490,7 @@ bool SVGResources::setMarkerStart(RenderSVGResourceMarker* markerStart)
     ASSERT(markerStart->resourceType() == MarkerResourceType);
 
     if (!m_markerData)
-        m_markerData = MarkerData::create();
+        m_markerData = std::make_unique<MarkerData>();
 
     m_markerData->markerStart = markerStart;
     return true;
@@ -512,7 +511,7 @@ bool SVGResources::setMarkerMid(RenderSVGResourceMarker* markerMid)
     ASSERT(markerMid->resourceType() == MarkerResourceType);
 
     if (!m_markerData)
-        m_markerData = MarkerData::create();
+        m_markerData = std::make_unique<MarkerData>();
 
     m_markerData->markerMid = markerMid;
     return true;
@@ -533,7 +532,7 @@ bool SVGResources::setMarkerEnd(RenderSVGResourceMarker* markerEnd)
     ASSERT(markerEnd->resourceType() == MarkerResourceType);
 
     if (!m_markerData)
-        m_markerData = MarkerData::create();
+        m_markerData = std::make_unique<MarkerData>();
 
     m_markerData->markerEnd = markerEnd;
     return true;
@@ -554,7 +553,7 @@ bool SVGResources::setMasker(RenderSVGResourceMasker* masker)
     ASSERT(masker->resourceType() == MaskerResourceType);
 
     if (!m_clipperFilterMaskerData)
-        m_clipperFilterMaskerData = ClipperFilterMaskerData::create();
+        m_clipperFilterMaskerData = std::make_unique<ClipperFilterMaskerData>();
 
     m_clipperFilterMaskerData->masker = masker;
     return true;
@@ -577,7 +576,7 @@ bool SVGResources::setFill(RenderSVGResourceContainer* fill)
            || fill->resourceType() == RadialGradientResourceType);
 
     if (!m_fillStrokeData)
-        m_fillStrokeData = FillStrokeData::create();
+        m_fillStrokeData = std::make_unique<FillStrokeData>();
 
     m_fillStrokeData->fill = fill;
     return true;
@@ -600,7 +599,7 @@ bool SVGResources::setStroke(RenderSVGResourceContainer* stroke)
            || stroke->resourceType() == RadialGradientResourceType);
 
     if (!m_fillStrokeData)
-        m_fillStrokeData = FillStrokeData::create();
+        m_fillStrokeData = std::make_unique<FillStrokeData>();
 
     m_fillStrokeData->stroke = stroke;
     return true;
@@ -672,5 +671,3 @@ void SVGResources::dump(const RenderObject* object)
 #endif
 
 }
-
-#endif

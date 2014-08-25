@@ -25,6 +25,7 @@
 
 #include "BooleanConstructor.h"
 #include "BooleanPrototype.h"
+#include "CustomGetterSetter.h"
 #include "Error.h"
 #include "ExceptionHelpers.h"
 #include "GetterSetter.h"
@@ -33,6 +34,7 @@
 #include "JSGlobalObject.h"
 #include "JSNotAnObject.h"
 #include "NumberObject.h"
+#include "StructureInlines.h"
 #include <wtf/MathExtras.h>
 #include <wtf/StringExtras.h>
 
@@ -61,7 +63,7 @@ double JSValue::toNumberSlowCase(ExecState* exec) const
         return asCell()->toNumber(exec);
     if (isTrue())
         return 1.0;
-    return isUndefined() ? QNaN : 0; // null and false both convert to 0.
+    return isUndefined() ? PNaN : 0; // null and false both convert to 0.
 }
 
 JSObject* JSValue::toObjectSlowCase(ExecState* exec, JSGlobalObject* globalObject) const
@@ -139,8 +141,7 @@ void JSValue::putToPrimitive(ExecState* exec, PropertyName propertyName, JSValue
 
     for (; ; obj = asObject(prototype)) {
         unsigned attributes;
-        JSCell* specificValue;
-        PropertyOffset offset = obj->structure()->get(vm, propertyName, attributes, specificValue);
+        PropertyOffset offset = obj->structure()->get(vm, propertyName, attributes);
         if (offset != invalidOffset) {
             if (attributes & ReadOnly) {
                 if (slot.isStrictMode())
@@ -151,6 +152,11 @@ void JSValue::putToPrimitive(ExecState* exec, PropertyName propertyName, JSValue
             JSValue gs = obj->getDirect(offset);
             if (gs.isGetterSetter()) {
                 callSetter(exec, *this, gs, value, slot.isStrictMode() ? StrictMode : NotStrictMode);
+                return;
+            }
+
+            if (gs.isCustomGetterSetter()) {
+                callCustomSetter(exec, gs, obj, slot.thisValue(), value);
                 return;
             }
 
@@ -191,6 +197,13 @@ void JSValue::dump(PrintStream& out) const
 
 void JSValue::dumpInContext(PrintStream& out, DumpContext* context) const
 {
+    dumpInContextAssumingStructure(
+        out, context, (!!*this && isCell()) ? asCell()->structure() : nullptr);
+}
+
+void JSValue::dumpInContextAssumingStructure(
+    PrintStream& out, DumpContext* context, Structure* structure) const
+{
     if (!*this)
         out.print("<JSValue()>");
     else if (isInt32())
@@ -207,7 +220,7 @@ void JSValue::dumpInContext(PrintStream& out, DumpContext* context) const
         out.printf("Double: %08x:%08x, %lf", u.asTwoInt32s[1], u.asTwoInt32s[0], asDouble());
 #endif
     } else if (isCell()) {
-        if (asCell()->inherits(JSString::info())) {
+        if (structure->classInfo()->isSubClassOf(JSString::info())) {
             JSString* string = jsCast<JSString*>(asCell());
             out.print("String");
             if (string->isRope())
@@ -216,18 +229,62 @@ void JSValue::dumpInContext(PrintStream& out, DumpContext* context) const
             if (impl) {
                 if (impl->isAtomic())
                     out.print(" (atomic)");
-                if (impl->isIdentifier())
+                if (impl->isAtomic())
                     out.print(" (identifier)");
                 if (impl->isEmptyUnique())
                     out.print(" (unique)");
             } else
                 out.print(" (unresolved)");
             out.print(": ", impl);
-        } else if (asCell()->inherits(Structure::info()))
+        } else if (structure->classInfo()->isSubClassOf(Structure::info()))
             out.print("Structure: ", inContext(*jsCast<Structure*>(asCell()), context));
         else {
             out.print("Cell: ", RawPointer(asCell()));
-            out.print(" (", inContext(*asCell()->structure(), context), ")");
+            out.print(" (", inContext(*structure, context), ")");
+        }
+#if USE(JSVALUE64)
+        out.print(", ID: ", asCell()->structureID());
+#endif
+    } else if (isTrue())
+        out.print("True");
+    else if (isFalse())
+        out.print("False");
+    else if (isNull())
+        out.print("Null");
+    else if (isUndefined())
+        out.print("Undefined");
+    else
+        out.print("INVALID");
+}
+
+void JSValue::dumpForBacktrace(PrintStream& out) const
+{
+    if (!*this)
+        out.print("<JSValue()>");
+    else if (isInt32())
+        out.printf("%d", asInt32());
+    else if (isDouble())
+        out.printf("%lf", asDouble());
+    else if (isCell()) {
+        if (asCell()->inherits(JSString::info())) {
+            JSString* string = jsCast<JSString*>(asCell());
+            const StringImpl* impl = string->tryGetValueImpl();
+            if (impl)
+                out.print("\"", impl, "\"");
+            else
+                out.print("(unresolved string)");
+        } else if (asCell()->inherits(Structure::info())) {
+            out.print("Structure[ ", asCell()->structure()->classInfo()->className);
+#if USE(JSVALUE64)
+            out.print(" ID: ", asCell()->structureID());
+#endif
+            out.print("]: ", RawPointer(asCell()));
+        } else {
+            out.print("Cell[", asCell()->structure()->classInfo()->className);
+#if USE(JSVALUE64)
+            out.print(" ID: ", asCell()->structureID());
+#endif
+            out.print("]: ", RawPointer(asCell()));
         }
     } else if (isTrue())
         out.print("True");

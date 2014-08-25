@@ -19,8 +19,6 @@
  */
 
 #include "config.h"
-
-#if ENABLE(SVG)
 #include "SVGTextElement.h"
 
 #include "Attribute.h"
@@ -56,7 +54,7 @@ AffineTransform SVGTextElement::animatedLocalTransform() const
         TransformationMatrix t;
         // For now, the transform-origin is not taken into account
         // Also, any percentage values will not be taken into account
-        style->applyTransform(t, IntSize(0, 0), RenderStyle::ExcludeTransformOrigin);
+        style->applyTransform(t, FloatRect(0, 0, 0, 0), RenderStyle::ExcludeTransformOrigin);
         // Flatten any 3D transform
         matrix = t.toAffineTransform();
     } else
@@ -70,7 +68,7 @@ AffineTransform SVGTextElement::animatedLocalTransform() const
 
 RenderPtr<RenderElement> SVGTextElement::createElementRenderer(PassRef<RenderStyle> style)
 {
-    return createRenderer<RenderSVGText>(*this, std::move(style));
+    return createRenderer<RenderSVGText>(*this, WTF::move(style));
 }
 
 bool SVGTextElement::childShouldCreateRenderer(const Node& child) const
@@ -89,5 +87,3 @@ bool SVGTextElement::childShouldCreateRenderer(const Node& child) const
 }
 
 }
-
-#endif // ENABLE(SVG)

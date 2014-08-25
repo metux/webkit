@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013 Apple Inc. All rights reserved.
+ * Copyright (C) 2013, 2014 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -26,13 +26,10 @@
 #ifndef DFGPlan_h
 #define DFGPlan_h
 
-#include <wtf/Platform.h>
-
 #include "CompilationResult.h"
 #include "DFGCompilationKey.h"
 #include "DFGCompilationMode.h"
 #include "DFGDesiredIdentifiers.h"
-#include "DFGDesiredStructureChains.h"
 #include "DFGDesiredTransitions.h"
 #include "DFGDesiredWatchpoints.h"
 #include "DFGDesiredWeakReferences.h"
@@ -46,53 +43,71 @@
 namespace JSC {
 
 class CodeBlock;
+class CodeBlockSet;
+class SlotVisitor;
 
 namespace DFG {
 
 class LongLivedState;
+class ThreadData;
 
 #if ENABLE(DFG_JIT)
 
 struct Plan : public ThreadSafeRefCounted<Plan> {
     Plan(
-        PassRefPtr<CodeBlock>, CompilationMode, unsigned osrEntryBytecodeIndex,
+        PassRefPtr<CodeBlock> codeBlockToCompile, CodeBlock* profiledDFGCodeBlock,
+        CompilationMode, unsigned osrEntryBytecodeIndex,
         const Operands<JSValue>& mustHandleValues);
     ~Plan();
-    
-    void compileInThread(LongLivedState&);
+
+    void compileInThread(LongLivedState&, ThreadData*);
     
     CompilationResult finalizeWithoutNotifyingCallback();
     void finalizeAndNotifyCallback();
     
+    void notifyCompiling();
+    void notifyCompiled();
     void notifyReady();
     
     CompilationKey key();
     
+    void checkLivenessAndVisitChildren(SlotVisitor&, CodeBlockSet&);
+    bool isKnownToBeLiveDuringGC();
+    void cancel();
+    
     VM& vm;
     RefPtr<CodeBlock> codeBlock;
+    RefPtr<CodeBlock> profiledDFGCodeBlock;
     CompilationMode mode;
     const unsigned osrEntryBytecodeIndex;
     Operands<JSValue> mustHandleValues;
+    
+    ThreadData* threadData;
 
     RefPtr<Profiler::Compilation> compilation;
 
     OwnPtr<Finalizer> finalizer;
     
+    RefPtr<InlineCallFrameSet> inlineCallFrames;
     DesiredWatchpoints watchpoints;
     DesiredIdentifiers identifiers;
-    DesiredStructureChains chains;
     DesiredWeakReferences weakReferences;
     DesiredWriteBarriers writeBarriers;
     DesiredTransitions transitions;
+    
+    bool willTryToTierUp;
 
     double beforeFTL;
-    
-    bool isCompiled;
+
+    enum Stage { Preparing, Compiling, Compiled, Ready, Cancelled };
+    Stage stage;
 
     RefPtr<DeferredCompilationCallback> callback;
 
 private:
-    enum CompilationPath { FailPath, DFGPath, FTLPath };
+    bool reportCompileTimes() const;
+    
+    enum CompilationPath { FailPath, DFGPath, FTLPath, CancelPath };
     CompilationPath compileInThreadImpl(LongLivedState&);
     
     bool isStillValid();

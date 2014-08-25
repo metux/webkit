@@ -71,7 +71,7 @@ namespace JSC {
 
     class MarkedBlock : public HeapBlock<MarkedBlock> {
         friend class LLIntOffsetsExtractor;
-
+        friend struct VerifyMarkedOrRetired;
     public:
         static const size_t atomSize = 16; // bytes
         static const size_t atomShiftAmount = 4; // log_2(atomSize) FIXME: Change atomSize to 16.
@@ -177,6 +177,8 @@ namespace JSC {
         void clearNewlyAllocated(const void*);
 
         bool needsSweeping();
+        void didRetireBlock(const FreeList&);
+        void willRemoveBlock();
 
         template <typename Functor> void forEachCell(Functor&);
         template <typename Functor> void forEachLiveCell(Functor&);
@@ -187,7 +189,7 @@ namespace JSC {
     private:
         static const size_t atomAlignmentMask = atomSize - 1; // atomSize must be a power of two.
 
-        enum BlockState { New, FreeListed, Allocated, Marked };
+        enum BlockState { New, FreeListed, Allocated, Marked, Retired };
         template<DestructorType> FreeList sweepHelper(SweepMode = SweepOnly);
 
         typedef char Atom[atomSize];
@@ -195,7 +197,7 @@ namespace JSC {
         MarkedBlock(Region*, MarkedAllocator*, size_t cellSize, DestructorType);
         Atom* atoms();
         size_t atomNumber(const void*);
-        void callDestructor(JSCell*);
+        template<DestructorType> void callDestructor(JSCell*);
         template<BlockState, SweepMode, DestructorType> FreeList specializedSweep();
         
         size_t m_atomsPerCell;
@@ -280,6 +282,11 @@ namespace JSC {
     inline void MarkedBlock::reapWeakSet()
     {
         m_weakSet.reap();
+    }
+
+    inline void MarkedBlock::willRemoveBlock()
+    {
+        ASSERT(m_state != Retired);
     }
 
     inline void MarkedBlock::didConsumeFreeList()
@@ -405,6 +412,7 @@ namespace JSC {
         case Allocated:
             return true;
 
+        case Retired:
         case Marked:
             return m_marks.get(atomNumber(cell)) || (m_newlyAllocated && isNewlyAllocated(cell));
 

@@ -62,7 +62,7 @@ NetscapePlugin::NetscapePlugin(PassRefPtr<NetscapePluginModule> pluginModule)
     , m_pluginModule(pluginModule)
     , m_npWindow()
     , m_isStarted(false)
-#if PLATFORM(MAC)
+#if PLATFORM(COCOA)
     , m_isWindowed(false)
 #else
     , m_isWindowed(true)
@@ -73,11 +73,11 @@ NetscapePlugin::NetscapePlugin(PassRefPtr<NetscapePluginModule> pluginModule)
     , m_hasCalledSetWindow(false)
     , m_isVisible(false)
     , m_nextTimerID(0)
-#if PLATFORM(MAC)
+#if PLATFORM(COCOA)
     , m_drawingModel(static_cast<NPDrawingModel>(-1))
     , m_eventModel(static_cast<NPEventModel>(-1))
     , m_pluginReturnsNonretainedLayer(!m_pluginModule->pluginQuirks().contains(PluginQuirks::ReturnsRetainedCoreAnimationLayer))
-    , m_layerHostingMode(LayerHostingModeDefault)
+    , m_layerHostingMode(LayerHostingMode::InProcess)
     , m_currentMouseEvent(0)
     , m_pluginHasFocus(false)
     , m_windowHasFocus(false)
@@ -288,11 +288,7 @@ void NetscapePlugin::removePluginStream(NetscapePluginStream* pluginStream)
 
 bool NetscapePlugin::isAcceleratedCompositingEnabled()
 {
-#if USE(ACCELERATED_COMPOSITING)
     return controller()->isAcceleratedCompositingEnabled();
-#else
-    return false;
-#endif
 }
 
 void NetscapePlugin::pushPopupsEnabledState(bool state)
@@ -309,15 +305,13 @@ void NetscapePlugin::popPopupsEnabledState()
 
 void NetscapePlugin::pluginThreadAsyncCall(void (*function)(void*), void* userData)
 {
-    RunLoop::main()->dispatch(WTF::bind(&NetscapePlugin::handlePluginThreadAsyncCall, this, function, userData));
-}
-    
-void NetscapePlugin::handlePluginThreadAsyncCall(void (*function)(void*), void* userData)
-{
-    if (!m_isStarted)
-        return;
+    RefPtr<NetscapePlugin> plugin(this);
+    RunLoop::main().dispatch([plugin, function, userData] {
+        if (!plugin->m_isStarted)
+            return;
 
-    function(userData);
+        function(userData);
+    });
 }
 
 NetscapePlugin::Timer::Timer(NetscapePlugin* netscapePlugin, unsigned timerID, unsigned interval, bool repeat, TimerFunc timerFunc)
@@ -369,7 +363,7 @@ uint32_t NetscapePlugin::scheduleTimer(unsigned interval, bool repeat, void (*ti
     
     // FIXME: Based on the plug-in visibility, figure out if we should throttle the timer, or if we should start it at all.
     timer->start();
-    m_timers.set(timerID, std::move(timer));
+    m_timers.set(timerID, WTF::move(timer));
 
     return timerID;
 }
@@ -604,6 +598,24 @@ bool NetscapePlugin::initialize(const Parameters& parameters)
         paramNames.append(parameterName.utf8());
         paramValues.append(parameters.values[i].utf8());
     }
+
+#if PLUGIN_ARCHITECTURE(X11)
+    if (equalIgnoringCase(parameters.mimeType, "application/x-shockwave-flash")) {
+        size_t wmodeIndex = parameters.names.find("wmode");
+        if (wmodeIndex != notFound) {
+            // Transparent window mode is not supported by X11 backend.
+            if (equalIgnoringCase(parameters.values[wmodeIndex], "transparent")
+                || (m_pluginModule->pluginQuirks().contains(PluginQuirks::ForceFlashWindowlessMode) && equalIgnoringCase(parameters.values[wmodeIndex], "window")))
+                paramValues[wmodeIndex] = "opaque";
+        } else if (m_pluginModule->pluginQuirks().contains(PluginQuirks::ForceFlashWindowlessMode)) {
+            paramNames.append("wmode");
+            paramValues.append("opaque");
+        }
+    } else if (equalIgnoringCase(parameters.mimeType, "application/x-webkit-test-netscape")) {
+        paramNames.append("windowedPlugin");
+        paramValues.append("false");
+    }
+#endif
 
     // The strings that these pointers point to are kept alive by paramNames and paramValues.
     Vector<const char*> names;
@@ -1034,7 +1046,7 @@ Scrollbar* NetscapePlugin::verticalScrollbar()
 
 bool NetscapePlugin::supportsSnapshotting() const
 {
-#if PLATFORM(MAC)
+#if PLATFORM(COCOA)
     return m_pluginModule && m_pluginModule->pluginQuirks().contains(PluginQuirks::SupportsSnapshotting);
 #endif
     return false;

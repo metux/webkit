@@ -21,6 +21,7 @@
 #include "JSDOMMimeTypeArray.h"
 
 #include "DOMMimeTypeArray.h"
+#include "JSDOMBinding.h"
 #include "JSDOMMimeType.h"
 #include <wtf/text/AtomicString.h>
 
@@ -33,9 +34,9 @@ bool JSDOMMimeTypeArray::canGetItemsForName(ExecState*, DOMMimeTypeArray* mimeTy
     return mimeTypeArray->canGetItemsForName(propertyNameToAtomicString(propertyName));
 }
 
-EncodedJSValue JSDOMMimeTypeArray::nameGetter(ExecState* exec, EncodedJSValue slotBase, EncodedJSValue, PropertyName propertyName)
+EncodedJSValue JSDOMMimeTypeArray::nameGetter(ExecState* exec, JSObject* slotBase, EncodedJSValue, PropertyName propertyName)
 {
-    JSDOMMimeTypeArray* thisObj = jsDynamicCast<JSDOMMimeTypeArray*>(JSValue::decode(slotBase));
+    JSDOMMimeTypeArray* thisObj = jsDynamicCast<JSDOMMimeTypeArray*>(slotBase);
     if (!thisObj)
         return throwVMTypeError(exec);
     return JSValue::encode(toJS(exec, thisObj->globalObject(), thisObj->impl().namedItem(propertyNameToAtomicString(propertyName))));

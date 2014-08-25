@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013 Apple Inc. All rights reserved.
+ * Copyright (C) 2013, 2014 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -32,7 +32,7 @@
 #include "DFGGraph.h"
 #include "DFGInsertionSet.h"
 #include "DFGPhase.h"
-#include "Operations.h"
+#include "JSCInlines.h"
 
 namespace JSC { namespace DFG {
 
@@ -49,12 +49,22 @@ public:
         ASSERT(m_graph.m_form == ThreadedCPS || m_graph.m_form == SSA);
         
         // First reset the counts to 0 for all nodes.
+        //
+        // Also take this opportunity to pretend that Check nodes are not NodeMustGenerate. Check
+        // nodes are MustGenerate because they are executed for effect, but they follow the same
+        // DCE rules as nodes that aren't MustGenerate: they only contribute to the ref count of
+        // their children if the edges require checks. Non-checking edges are removed. Note that
+        // for any Checks left over, this phase will turn them back into NodeMustGenerate.
         for (BlockIndex blockIndex = 0; blockIndex < m_graph.numBlocks(); ++blockIndex) {
             BasicBlock* block = m_graph.block(blockIndex);
             if (!block)
                 continue;
-            for (unsigned indexInBlock = block->size(); indexInBlock--;)
-                block->at(indexInBlock)->setRefCount(0);
+            for (unsigned indexInBlock = block->size(); indexInBlock--;) {
+                Node* node = block->at(indexInBlock);
+                if (node->op() == Check)
+                    node->clearFlags(NodeMustGenerate);
+                node->setRefCount(0);
+            }
             for (unsigned phiIndex = block->phis.size(); phiIndex--;)
                 block->phis[phiIndex]->setRefCount(0);
         }
@@ -106,11 +116,9 @@ public:
         }
         
         if (m_graph.m_form == SSA) {
-            // Need to process the graph in reverse DFS order, so that we get to the uses
-            // of a node before we get to the node itself.
             Vector<BasicBlock*> depthFirst;
-            m_graph.getBlocksInDepthFirstOrder(depthFirst);
-            for (unsigned i = depthFirst.size(); i--;)
+            m_graph.getBlocksInPreOrder(depthFirst);
+            for (unsigned i = 0; i < depthFirst.size(); ++i)
                 fixupBlock(depthFirst[i]);
         } else {
             RELEASE_ASSERT(m_graph.m_form == ThreadedCPS);
@@ -119,6 +127,30 @@ public:
                 fixupBlock(m_graph.block(blockIndex));
             
             cleanVariables(m_graph.m_arguments);
+        }
+        
+        // Just do a basic HardPhantom/Phantom/Check clean-up.
+        for (BlockIndex blockIndex = m_graph.numBlocks(); blockIndex--;) {
+            BasicBlock* block = m_graph.block(blockIndex);
+            if (!block)
+                continue;
+            unsigned sourceIndex = 0;
+            unsigned targetIndex = 0;
+            while (sourceIndex < block->size()) {
+                Node* node = block->at(sourceIndex++);
+                switch (node->op()) {
+                case Check:
+                case HardPhantom:
+                case Phantom:
+                    if (node->children.isEmpty())
+                        continue;
+                    break;
+                default:
+                    break;
+                }
+                block->at(targetIndex++) = node;
+            }
+            block->resize(targetIndex);
         }
         
         m_graph.m_refCountState = ExactRefCount;
@@ -131,7 +163,7 @@ private:
     {
         // We may have an "unproved" untyped use for code that is unreachable. The CFA
         // will just not have gotten around to it.
-        if (edge.willNotHaveCheck())
+        if (edge.isProved() || edge.willNotHaveCheck())
             return;
         if (!edge->postfixRef())
             m_worklist.append(edge.node());
@@ -147,7 +179,7 @@ private:
     void countEdge(Node*, Edge edge)
     {
         // Don't count edges that are already counted for their type checks.
-        if (edge.willHaveCheck())
+        if (!(edge.isProved() || edge.willNotHaveCheck()))
             return;
         countNode(edge.node());
     }
@@ -187,20 +219,21 @@ private:
             return;
         }
 
-        for (unsigned indexInBlock = block->size(); indexInBlock--;) {
+        // This has to be a forward loop because we are using the insertion set.
+        for (unsigned indexInBlock = 0; indexInBlock < block->size(); ++indexInBlock) {
             Node* node = block->at(indexInBlock);
             if (node->shouldGenerate())
                 continue;
                 
             switch (node->op()) {
             case MovHint: {
-                ASSERT(node->child1().useKind() == UntypedUse);
-                if (!node->child1()->shouldGenerate()) {
+                // Check if the child is dead. MovHint's child would only be a Phantom or
+                // Check if we had just killed it.
+                if (node->child1()->op() == Phantom || node->child1()->op() == Check) {
                     node->setOpAndDefaultFlags(ZombieHint);
                     node->child1() = Edge();
                     break;
                 }
-                node->setOpAndDefaultFlags(MovHint);
                 break;
             }
                 
@@ -215,37 +248,32 @@ private:
                     for (unsigned childIdx = node->firstChild(); childIdx < node->firstChild() + node->numChildren(); childIdx++) {
                         Edge edge = m_graph.m_varArgChildren[childIdx];
 
-                        if (!edge || edge.willNotHaveCheck())
+                        if (!edge || edge.isProved() || edge.willNotHaveCheck())
                             continue;
 
-                        m_insertionSet.insertNode(indexInBlock, SpecNone, Phantom, node->codeOrigin, edge);
+                        m_insertionSet.insertNode(indexInBlock, SpecNone, Check, node->origin, edge);
                     }
 
-                    node->convertToPhantomUnchecked();
+                    node->convertToPhantom();
                     node->children.reset();
                     node->setRefCount(1);
                     break;
                 }
 
-                node->convertToPhantom();
-                eliminateIrrelevantPhantomChildren(node);
+                node->convertToCheck();
+                for (unsigned i = 0; i < AdjacencyList::Size; ++i) {
+                    Edge edge = node->children.child(i);
+                    if (!edge)
+                        continue;
+                    if (edge.isProved() || edge.willNotHaveCheck())
+                        node->children.removeEdge(i--);
+                }
                 node->setRefCount(1);
                 break;
             } }
         }
 
         m_insertionSet.execute(block);
-    }
-    
-    void eliminateIrrelevantPhantomChildren(Node* node)
-    {
-        for (unsigned i = 0; i < AdjacencyList::Size; ++i) {
-            Edge edge = node->children.child(i);
-            if (!edge)
-                continue;
-            if (edge.willNotHaveCheck())
-                node->children.removeEdge(i--);
-        }
     }
     
     template<typename VariablesVectorType>
@@ -255,11 +283,43 @@ private:
             Node* node = variables[i];
             if (!node)
                 continue;
-            if (node->op() != Phantom && node->shouldGenerate())
+            if (node->op() != Phantom && node->op() != Check && node->shouldGenerate())
                 continue;
             if (node->op() == GetLocal) {
                 node = node->child1().node();
-                ASSERT(node->op() == Phi || node->op() == SetArgument);
+                
+                // FIXME: In the case that the variable is captured, we really want to be able
+                // to replace the variable-at-tail with the last use of the variable in the same
+                // way that CPS rethreading would do. The child of the GetLocal isn't necessarily
+                // the same as what CPS rethreading would do. For example, we may have:
+                //
+                // a: SetLocal(...) // live
+                // b: GetLocal(@a) // live
+                // c: GetLocal(@a) // dead
+                //
+                // When killing @c, the code below will set the variable-at-tail to @a, while CPS
+                // rethreading would have set @b. This is a benign bug, since all clients of CPS
+                // only use the variable-at-tail of captured variables to get the
+                // VariableAccessData and observe that it is in fact captured. But, this feels
+                // like it could cause bugs in the future.
+                //
+                // It's tempting to just dethread and then invoke CPS rethreading, but CPS
+                // rethreading fails to preserve exact ref-counts. So we would need a fixpoint.
+                // It's probably the case that this fixpoint will be guaranteed to converge after
+                // the second iteration (i.e. the second run of DCE will not kill anything and so
+                // will not need to dethread), but for now the safest approach is probably just to
+                // allow for this tiny bit of sloppiness.
+                //
+                // Another possible solution would be to simply say that DCE dethreads but then
+                // we never rethread before going to the backend. That feels intuitively right
+                // because it's unlikely that any of the phases after DCE in the backend rely on
+                // ThreadedCPS.
+                //
+                // https://bugs.webkit.org/show_bug.cgi?id=130115
+                ASSERT(
+                    node->op() == Phi || node->op() == SetArgument
+                    || node->variableAccessData()->isCaptured());
+                
                 if (node->shouldGenerate()) {
                     variables[i] = node;
                     continue;

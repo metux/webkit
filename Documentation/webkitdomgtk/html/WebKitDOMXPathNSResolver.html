@@ -6,8 +6,8 @@
 <meta name="generator" content="DocBook XSL Stylesheets V1.78.1">
 <link rel="home" href="index.html" title="WebKitDOMGTK+ Reference Manual">
 <link rel="up" href="ch01.html" title="Class Overview">
-<link rel="prev" href="WebKitDOMXPathExpression.html" title="WebKitDOMXPathExpression">
-<link rel="next" href="WebKitDOMXPathResult.html" title="WebKitDOMXPathResult">
+<link rel="prev" href="WebKitDOMObject.html" title="WebKitDOMObject">
+<link rel="next" href="WebKitDOMCSSRule.html" title="WebKitDOMCSSRule">
 <meta name="generator" content="GTK-Doc V1.20.1 (XML mode)">
 <link rel="stylesheet" href="style.css" type="text/css">
 </head>
@@ -16,12 +16,13 @@
 <td width="100%" align="left" class="shortcuts">
 <a href="#" class="shortcut">Top</a><span id="nav_description">  <span class="dim">|</span> 
                   <a href="#WebKitDOMXPathNSResolver.description" class="shortcut">Description</a></span><span id="nav_hierarchy">  <span class="dim">|</span> 
-                  <a href="#WebKitDOMXPathNSResolver.object-hierarchy" class="shortcut">Object Hierarchy</a></span>
+                  <a href="#WebKitDOMXPathNSResolver.object-hierarchy" class="shortcut">Object Hierarchy</a></span><span id="nav_prerequisites">  <span class="dim">|</span> 
+                  <a href="#WebKitDOMXPathNSResolver.prerequisites" class="shortcut">Prerequisites</a></span>
 </td>
 <td><a accesskey="h" href="index.html"><img src="home.png" width="16" height="16" border="0" alt="Home"></a></td>
 <td><a accesskey="u" href="ch01.html"><img src="up.png" width="16" height="16" border="0" alt="Up"></a></td>
-<td><a accesskey="p" href="WebKitDOMXPathExpression.html"><img src="left.png" width="16" height="16" border="0" alt="Prev"></a></td>
-<td><a accesskey="n" href="WebKitDOMXPathResult.html"><img src="right.png" width="16" height="16" border="0" alt="Next"></a></td>
+<td><a accesskey="p" href="WebKitDOMObject.html"><img src="left.png" width="16" height="16" border="0" alt="Prev"></a></td>
+<td><a accesskey="n" href="WebKitDOMCSSRule.html"><img src="right.png" width="16" height="16" border="0" alt="Next"></a></td>
 </tr></table>
 <div class="refentry">
 <a name="WebKitDOMXPathNSResolver"></a><div class="titlepage"></div>
@@ -64,10 +65,15 @@
 </div>
 <div class="refsect1">
 <a name="WebKitDOMXPathNSResolver.object-hierarchy"></a><h2>Object Hierarchy</h2>
-<pre class="screen">    <a href="../gobject/gobject-The-Base-Object-Type.html#GObject">GObject</a>
-    <span class="lineart">╰──</span> <a class="link" href="WebKitDOMObject.html" title="WebKitDOMObject">WebKitDOMObject</a>
-        <span class="lineart">╰──</span> WebKitDOMXPathNSResolver
+<pre class="screen">    <a href="/home/cgarcia/gnome/share/gtk-doc/html/gobject/GTypeModule.html">GInterface</a>
+    <span class="lineart">╰──</span> WebKitDOMXPathNSResolver
 </pre>
+</div>
+<div class="refsect1">
+<a name="WebKitDOMXPathNSResolver.prerequisites"></a><h2>Prerequisites</h2>
+<p>
+WebKitDOMXPathNSResolver requires
+ <a href="../gobject/gobject-The-Base-Object-Type.html#GObject">GObject</a>.</p>
 </div>
 <div class="refsect1">
 <a name="WebKitDOMXPathNSResolver.description"></a><h2>Description</h2>
@@ -80,33 +86,12 @@
 <a name="webkit-dom-xpath-ns-resolver-lookup-namespace-uri"></a><h3>webkit_dom_xpath_ns_resolver_lookup_namespace_uri ()</h3>
 <pre class="programlisting"><a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gchar</span></a> *
 webkit_dom_xpath_ns_resolver_lookup_namespace_uri
-                               (<em class="parameter"><code><a class="link" href="WebKitDOMXPathNSResolver.html" title="WebKitDOMXPathNSResolver"><span class="type">WebKitDOMXPathNSResolver</span></a> *self</code></em>,
+                               (<em class="parameter"><code><a class="link" href="WebKitDOMXPathNSResolver.html" title="WebKitDOMXPathNSResolver"><span class="type">WebKitDOMXPathNSResolver</span></a> *resolver</code></em>,
                                 <em class="parameter"><code>const <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a> *prefix</code></em>);</pre>
+<p>
+</p>
 <div class="refsect3">
-<a name="id-1.2.140.7.2.4"></a><h4>Parameters</h4>
-<div class="informaltable"><table width="100%" border="0">
-<colgroup>
-<col width="150px" class="parameters_name">
-<col class="parameters_description">
-<col width="200px" class="parameters_annotations">
-</colgroup>
-<tbody>
-<tr>
-<td class="parameter_name"><p>self</p></td>
-<td class="parameter_description"><p>A <a class="link" href="WebKitDOMXPathNSResolver.html" title="WebKitDOMXPathNSResolver"><span class="type">WebKitDOMXPathNSResolver</span></a></p></td>
-<td class="parameter_annotations"> </td>
-</tr>
-<tr>
-<td class="parameter_name"><p>prefix</p></td>
-<td class="parameter_description"><p>A <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a></p></td>
-<td class="parameter_annotations"> </td>
-</tr>
-</tbody>
-</table></div>
-</div>
-<div class="refsect3">
-<a name="id-1.2.140.7.2.5"></a><h4>Returns</h4>
-<p> A <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a></p>
+<a name="id-1.2.6.8.2.5"></a><h4>Returns</h4>
 <p></p>
 </div>
 </div>

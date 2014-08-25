@@ -74,7 +74,7 @@ void WebContextMenuClient::downloadURL(const URL&)
     ASSERT_NOT_REACHED();
 }
 
-#if !PLATFORM(MAC)
+#if !PLATFORM(COCOA)
 void WebContextMenuClient::searchWithGoogle(const Frame* frame)
 {
     String searchString = frame->editor().selectedText();
@@ -86,7 +86,7 @@ void WebContextMenuClient::searchWithGoogle(const Frame* frame)
 
     if (Page* page = frame->page()) {
         UserGestureIndicator indicator(DefinitelyProcessingUserGesture);
-        page->mainFrame().loader().urlSelected(URL(ParsedURLString, url), String(), 0, false, false, MaybeSendReferrer);
+        page->mainFrame().loader().urlSelected(URL(ParsedURLString, url), String(), 0, LockHistory::No, LockBackForwardList::No, MaybeSendReferrer);
     }
 }
 #endif

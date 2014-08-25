@@ -54,6 +54,11 @@ SharedMemory::Handle::Handle()
 
 SharedMemory::Handle::~Handle()
 {
+    clear();
+}
+
+void SharedMemory::Handle::clear()
+{
     if (!isNull())
         closeWithRetry(m_fileDescriptor);
 }
@@ -111,7 +116,7 @@ PassRefPtr<SharedMemory> SharedMemory::create(size_t size)
         } while (fileDescriptor == -1 && errno == EINTR);
     }
     if (fileDescriptor == -1) {
-        WTFLogAlways("Failed to create shared memory file %s", tempName.data());
+        WTFLogAlways("Failed to create shared memory file %s: %s", tempName.data(), strerror(errno));
         return 0;
     }
 

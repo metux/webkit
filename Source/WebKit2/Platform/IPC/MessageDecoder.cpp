@@ -31,7 +31,7 @@
 #include "MessageFlags.h"
 #include "StringReference.h"
 
-#if PLATFORM(IOS) || PLATFORM(MAC) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 1090
+#if PLATFORM(MAC) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 1090
 #include "ImportanceAssertion.h"
 #endif
 
@@ -42,7 +42,7 @@ MessageDecoder::~MessageDecoder()
 }
 
 MessageDecoder::MessageDecoder(const DataReference& buffer, Vector<Attachment> attachments)
-    : ArgumentDecoder(buffer.data(), buffer.size(), attachments)
+    : ArgumentDecoder(buffer.data(), buffer.size(), WTF::move(attachments))
 {
     if (!decode(m_messageFlags))
         return;
@@ -66,10 +66,10 @@ bool MessageDecoder::shouldDispatchMessageWhenWaitingForSyncReply() const
     return m_messageFlags & DispatchMessageWhenWaitingForSyncReply;
 }
 
-#if PLATFORM(IOS) || PLATFORM(MAC) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 1090
+#if PLATFORM(MAC) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 1090
 void MessageDecoder::setImportanceAssertion(std::unique_ptr<ImportanceAssertion> assertion)
 {
-    m_importanceAssertion = std::move(assertion);
+    m_importanceAssertion = WTF::move(assertion);
 }
 #endif
 

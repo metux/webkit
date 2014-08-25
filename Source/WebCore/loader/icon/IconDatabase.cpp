@@ -11,10 +11,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -34,16 +34,13 @@
 #include "IconDatabaseClient.h"
 #include "IconRecord.h"
 #include "Image.h"
-#include "IntSize.h"
 #include "Logging.h"
 #include "SQLiteStatement.h"
 #include "SQLiteTransaction.h"
 #include "SuddenTermination.h"
 #include <wtf/AutodrainedPool.h>
-#include <wtf/CurrentTime.h>
 #include <wtf/MainThread.h>
 #include <wtf/StdLibExtras.h>
-#include <wtf/text/CString.h>
 
 // For methods that are meant to support API from the main thread - should not be called internally
 #define ASSERT_NOT_SYNC_THREAD() ASSERT(!m_syncThreadRunning || !IS_ICON_SYNC_THREAD())
@@ -90,19 +87,19 @@ static String urlForLogging(const String& url)
 }
 #endif
 
-class DefaultIconDatabaseClient : public IconDatabaseClient {
+class DefaultIconDatabaseClient final : public IconDatabaseClient {
     WTF_MAKE_FAST_ALLOCATED;
 public:
-    virtual void didImportIconURLForPageURL(const String&) { } 
-    virtual void didImportIconDataForPageURL(const String&) { }
-    virtual void didChangeIconForPageURL(const String&) { }
-    virtual void didRemoveAllIcons() { }
-    virtual void didFinishURLImport() { }
+    virtual void didImportIconURLForPageURL(const String&) override { }
+    virtual void didImportIconDataForPageURL(const String&) override { }
+    virtual void didChangeIconForPageURL(const String&) override { }
+    virtual void didRemoveAllIcons() override { }
+    virtual void didFinishURLImport() override { }
 };
 
 static IconDatabaseClient* defaultClient() 
 {
-    static IconDatabaseClient* defaultClient = new DefaultIconDatabaseClient();
+    static IconDatabaseClient* defaultClient = new DefaultIconDatabaseClient;
     return defaultClient;
 }
 
@@ -171,7 +168,11 @@ void IconDatabase::close()
     m_removeIconsRequested = false;
 
     m_syncDB.close();
-    ASSERT(!isOpen());
+
+    // If there are still main thread callbacks in flight then the database might not actually be closed yet.
+    // But if it is closed, notify the client now.
+    if (!isOpen() && m_client)
+        m_client->didClose();
 }
 
 void IconDatabase::removeAllIcons()
@@ -796,6 +797,7 @@ IconDatabase::IconDatabase()
     , m_syncThreadHasWorkToDo(false)
     , m_retainOrReleaseIconRequested(false)
     , m_initialPruningComplete(false)
+    , m_mainThreadCallbackCount(0)
     , m_client(defaultClient())
 {
     LOG(IconDatabase, "Creating IconDatabase %p", this);
@@ -805,11 +807,6 @@ IconDatabase::IconDatabase()
 IconDatabase::~IconDatabase()
 {
     ASSERT(!isOpen());
-}
-
-void IconDatabase::notifyPendingLoadDecisionsOnMainThread(void* context)
-{
-    static_cast<IconDatabase*>(context)->notifyPendingLoadDecisions();
 }
 
 void IconDatabase::notifyPendingLoadDecisions()
@@ -841,17 +838,6 @@ void IconDatabase::wakeSyncThread()
     m_syncCondition.signal();
 }
 
-void IconDatabase::performScheduleOrDeferSyncTimer()
-{
-    m_syncTimer.startOneShot(updateTimerDelay);
-    m_scheduleOrDeferSyncTimerRequested = false;
-}
-
-void IconDatabase::performScheduleOrDeferSyncTimerOnMainThread(void* context)
-{
-    static_cast<IconDatabase*>(context)->performScheduleOrDeferSyncTimer();
-}
-
 void IconDatabase::scheduleOrDeferSyncTimer()
 {
     ASSERT_NOT_SYNC_THREAD();
@@ -863,7 +849,10 @@ void IconDatabase::scheduleOrDeferSyncTimer()
         m_disableSuddenTerminationWhileSyncTimerScheduled = std::make_unique<SuddenTerminationDisabler>();
 
     m_scheduleOrDeferSyncTimerRequested = true;
-    callOnMainThread(performScheduleOrDeferSyncTimerOnMainThread, this);
+    callOnMainThread([this] {
+        m_syncTimer.startOneShot(updateTimerDelay);
+        m_scheduleOrDeferSyncTimerRequested = false;
+    });
 }
 
 void IconDatabase::syncTimerFired(Timer<IconDatabase>&)
@@ -880,8 +869,13 @@ void IconDatabase::syncTimerFired(Timer<IconDatabase>&)
 
 bool IconDatabase::isOpen() const
 {
+    return isOpenBesidesMainThreadCallbacks() || m_mainThreadCallbackCount;
+}
+
+bool IconDatabase::isOpenBesidesMainThreadCallbacks() const
+{
     MutexLocker locker(m_syncLock);
-    return m_syncDB.isOpen();
+    return m_syncThreadRunning || m_syncDB.isOpen();
 }
 
 String IconDatabase::databasePath() const
@@ -892,7 +886,7 @@ String IconDatabase::databasePath() const
 
 String IconDatabase::defaultDatabaseFilename()
 {
-    DEFINE_STATIC_LOCAL(String, defaultDatabaseFilename, (ASCIILiteral("WebpageIcons.db")));
+    DEPRECATED_DEFINE_STATIC_LOCAL(String, defaultDatabaseFilename, (ASCIILiteral("WebpageIcons.db")));
     return defaultDatabaseFilename.isolatedCopy();
 }
 
@@ -1340,7 +1334,9 @@ void IconDatabase::performURLImport()
     dispatchDidFinishURLImportOnMainThread();
     
     // Notify all DocumentLoaders that were waiting for an icon load decision on the main thread
-    callOnMainThread(notifyPendingLoadDecisionsOnMainThread, this);
+    callOnMainThread([this] {
+        notifyPendingLoadDecisions();
+    });
 }
 
 void IconDatabase::syncThreadMainLoop()
@@ -1349,7 +1345,7 @@ void IconDatabase::syncThreadMainLoop()
 
     m_syncLock.lock();
 
-    std::unique_ptr<SuddenTerminationDisabler> disableSuddenTermination = std::move(m_disableSuddenTerminationWhileSyncThreadHasWorkToDo);
+    std::unique_ptr<SuddenTerminationDisabler> disableSuddenTermination = WTF::move(m_disableSuddenTerminationWhileSyncThreadHasWorkToDo);
 
     // We'll either do any pending work on our first pass through the loop, or we'll terminate
     // without doing any work. Either way we're dealing with any currently-pending work.
@@ -1437,7 +1433,7 @@ void IconDatabase::syncThreadMainLoop()
         m_syncThreadHasWorkToDo = false;
 
         ASSERT(m_disableSuddenTerminationWhileSyncThreadHasWorkToDo);
-        disableSuddenTermination = std::move(m_disableSuddenTerminationWhileSyncThreadHasWorkToDo);
+        disableSuddenTermination = WTF::move(m_disableSuddenTerminationWhileSyncThreadHasWorkToDo);
     }
 
     m_syncLock.unlock();
@@ -2080,132 +2076,72 @@ void IconDatabase::setWasExcludedFromBackup()
     SQLiteStatement(m_syncDB, "INSERT INTO IconDatabaseInfo (key, value) VALUES ('ExcludedFromBackup', 1)").executeCommand();
 }
 
-class ClientWorkItem {
-    WTF_MAKE_FAST_ALLOCATED;
-public:
-    ClientWorkItem(IconDatabaseClient* client)
-        : m_client(client)
-    { }
-    virtual void performWork() = 0;
-    virtual ~ClientWorkItem() { }
-
-protected:
-    IconDatabaseClient* m_client;
-};
-
-class ImportedIconURLForPageURLWorkItem : public ClientWorkItem {
-public:
-    ImportedIconURLForPageURLWorkItem(IconDatabaseClient* client, const String& pageURL)
-        : ClientWorkItem(client)
-        , m_pageURL(new String(pageURL.isolatedCopy()))
-    { }
-    
-    virtual ~ImportedIconURLForPageURLWorkItem()
-    {
-        delete m_pageURL;
-    }
-
-    virtual void performWork()
-    {
-        ASSERT(m_client);
-        m_client->didImportIconURLForPageURL(*m_pageURL);
-        m_client = 0;
-    }
-    
-private:
-    String* m_pageURL;
-};
-
-class ImportedIconDataForPageURLWorkItem : public ClientWorkItem {
-public:
-    ImportedIconDataForPageURLWorkItem(IconDatabaseClient* client, const String& pageURL)
-        : ClientWorkItem(client)
-        , m_pageURL(new String(pageURL.isolatedCopy()))
-    { }
-    
-    virtual ~ImportedIconDataForPageURLWorkItem()
-    {
-        delete m_pageURL;
-    }
-
-    virtual void performWork()
-    {
-        ASSERT(m_client);
-        m_client->didImportIconDataForPageURL(*m_pageURL);
-        m_client = 0;
-    }
-    
-private:
-    String* m_pageURL;
-};
-
-class RemovedAllIconsWorkItem : public ClientWorkItem {
-public:
-    RemovedAllIconsWorkItem(IconDatabaseClient* client)
-        : ClientWorkItem(client)
-    { }
-
-    virtual void performWork()
-    {
-        ASSERT(m_client);
-        m_client->didRemoveAllIcons();
-        m_client = 0;
-    }
-};
-
-class FinishedURLImport : public ClientWorkItem {
-public:
-    FinishedURLImport(IconDatabaseClient* client)
-        : ClientWorkItem(client)
-    { }
-
-    virtual void performWork()
-    {
-        ASSERT(m_client);
-        m_client->didFinishURLImport();
-        m_client = 0;
-    }
-};
-
-static void performWorkItem(void* context)
+void IconDatabase::checkClosedAfterMainThreadCallback()
 {
-    ClientWorkItem* item = static_cast<ClientWorkItem*>(context);
-    item->performWork();
-    delete item;
+    ASSERT_NOT_SYNC_THREAD();
+
+    // If there are still callbacks in flight from the sync thread we cannot possibly be closed.
+    if (--m_mainThreadCallbackCount)
+        return;
+
+    // Even if there's no more pending callbacks the database might otherwise still be open.
+    if (isOpenBesidesMainThreadCallbacks())
+        return;
+
+    // This database is now actually closed! But first notify the client.
+    if (m_client)
+        m_client->didClose();
 }
 
 void IconDatabase::dispatchDidImportIconURLForPageURLOnMainThread(const String& pageURL)
 {
     ASSERT_ICON_SYNC_THREAD();
+    ++m_mainThreadCallbackCount;
 
-    ImportedIconURLForPageURLWorkItem* work = new ImportedIconURLForPageURLWorkItem(m_client, pageURL);
-    callOnMainThread(performWorkItem, work);
+    String pageURLCopy = pageURL.isolatedCopy();
+    callOnMainThread([this, pageURLCopy] {
+        if (m_client)
+            m_client->didImportIconURLForPageURL(pageURLCopy);
+        checkClosedAfterMainThreadCallback();
+    });
 }
 
 void IconDatabase::dispatchDidImportIconDataForPageURLOnMainThread(const String& pageURL)
 {
     ASSERT_ICON_SYNC_THREAD();
+    ++m_mainThreadCallbackCount;
 
-    ImportedIconDataForPageURLWorkItem* work = new ImportedIconDataForPageURLWorkItem(m_client, pageURL);
-    callOnMainThread(performWorkItem, work);
+    String pageURLCopy = pageURL.isolatedCopy();
+    callOnMainThread([this, pageURLCopy] {
+        if (m_client)
+            m_client->didImportIconDataForPageURL(pageURLCopy);
+        checkClosedAfterMainThreadCallback();
+    });
 }
 
 void IconDatabase::dispatchDidRemoveAllIconsOnMainThread()
 {
     ASSERT_ICON_SYNC_THREAD();
+    ++m_mainThreadCallbackCount;
 
-    RemovedAllIconsWorkItem* work = new RemovedAllIconsWorkItem(m_client);
-    callOnMainThread(performWorkItem, work);
+    callOnMainThread([this] {
+        if (m_client)
+            m_client->didRemoveAllIcons();
+        checkClosedAfterMainThreadCallback();
+    });
 }
 
 void IconDatabase::dispatchDidFinishURLImportOnMainThread()
 {
     ASSERT_ICON_SYNC_THREAD();
+    ++m_mainThreadCallbackCount;
 
-    FinishedURLImport* work = new FinishedURLImport(m_client);
-    callOnMainThread(performWorkItem, work);
+    callOnMainThread([this] {
+        if (m_client)
+            m_client->didFinishURLImport();
+        checkClosedAfterMainThreadCallback();
+    });
 }
-
 
 } // namespace WebCore
 

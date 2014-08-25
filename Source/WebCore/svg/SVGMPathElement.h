@@ -20,7 +20,6 @@
 #ifndef SVGMPathElement_h
 #define SVGMPathElement_h
 
-#if ENABLE(SVG)
 #include "SVGAnimatedBoolean.h"
 #include "SVGAnimatedString.h"
 #include "SVGElement.h"
@@ -43,6 +42,9 @@ public:
     SVGPathElement* pathElement();
 
     void targetPathChanged();
+
+protected:
+    virtual void didNotifySubtreeInsertions(ContainerNode*) override;
 
 private:
     SVGMPathElement(const QualifiedName&, Document&);
@@ -70,5 +72,4 @@ NODE_TYPE_CASTS(SVGMPathElement)
 
 } // namespace WebCore
 
-#endif // ENABLE(SVG)
 #endif // SVGMPathElement_h

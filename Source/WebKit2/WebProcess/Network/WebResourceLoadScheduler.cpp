@@ -38,6 +38,7 @@
 #include "WebPage.h"
 #include "WebProcess.h"
 #include "WebResourceLoader.h"
+#include <WebCore/ApplicationCacheHost.h>
 #include <WebCore/CachedResource.h>
 #include <WebCore/Document.h>
 #include <WebCore/DocumentLoader.h>
@@ -47,6 +48,7 @@
 #include <WebCore/ReferrerPolicy.h>
 #include <WebCore/ResourceBuffer.h>
 #include <WebCore/ResourceLoader.h>
+#include <WebCore/SessionID.h>
 #include <WebCore/Settings.h>
 #include <WebCore/SubresourceLoader.h>
 #include <wtf/text/CString.h>
@@ -102,6 +104,20 @@ void WebResourceLoadScheduler::scheduleLoad(ResourceLoader* resourceLoader, Cach
     }
 #endif
 
+    if (resourceLoader->documentLoader()->applicationCacheHost()->maybeLoadResource(resourceLoader, resourceLoader->request(), resourceLoader->request().url())) {
+        LOG(NetworkScheduling, "(WebProcess) WebResourceLoadScheduler::scheduleLoad, url '%s' will be loaded from application cache.", resourceLoader->url().string().utf8().data());
+        m_webResourceLoaders.set(identifier, WebResourceLoader::create(resourceLoader));
+        return;
+    }
+
+#if USE(QUICK_LOOK)
+    if (maybeLoadQuickLookResource(*resourceLoader)) {
+        LOG(NetworkScheduling, "(WebProcess) WebResourceLoadScheduler::scheduleLoad, url '%s' will be handled as a QuickLook resource.", resourceLoader->url().string().utf8().data());
+        m_webResourceLoaders.set(identifier, WebResourceLoader::create(resourceLoader));
+        return;
+    }
+#endif
+
     LOG(NetworkScheduling, "(WebProcess) WebResourceLoadScheduler::scheduleLoad, url '%s' will be scheduled with the NetworkProcess with priority %i", resourceLoader->url().string().utf8().data(), priority);
 
     ContentSniffingPolicy contentSniffingPolicy = resourceLoader->shouldSniffContent() ? SniffContent : DoNotSniffContent;
@@ -118,7 +134,7 @@ void WebResourceLoadScheduler::scheduleLoad(ResourceLoader* resourceLoader, Cach
     loadParameters.identifier = identifier;
     loadParameters.webPageID = webPage ? webPage->pageID() : 0;
     loadParameters.webFrameID = webFrame ? webFrame->frameID() : 0;
-    loadParameters.sessionID = webPage ? webPage->sessionID() : SessionTracker::defaultSessionID;
+    loadParameters.sessionID = webPage ? webPage->sessionID() : SessionID::defaultSessionID();
     loadParameters.request = resourceLoader->request();
     loadParameters.priority = priority;
     loadParameters.contentSniffingPolicy = contentSniffingPolicy;
@@ -127,6 +143,8 @@ void WebResourceLoadScheduler::scheduleLoad(ResourceLoader* resourceLoader, Cach
     loadParameters.clientCredentialPolicy = (webFrame && webPage) ? resourceLoader->clientCredentialPolicy() : DoNotAskClientForAnyCredentials;
     loadParameters.shouldClearReferrerOnHTTPSToHTTPRedirect = shouldClearReferrerOnHTTPSToHTTPRedirect;
     loadParameters.isMainResource = resource && resource->type() == CachedResource::MainResource;
+    loadParameters.defersLoading = resourceLoader->defersLoading();
+    loadParameters.shouldBufferResource = resource && (resource->type() == CachedResource::CSSStyleSheet || resource->type() == CachedResource::Script);
 
     ASSERT((loadParameters.webPageID && loadParameters.webFrameID) || loadParameters.clientCredentialPolicy == DoNotAskClientForAnyCredentials);
 
@@ -183,6 +201,12 @@ void WebResourceLoadScheduler::remove(ResourceLoader* resourceLoader)
     // It's possible that this WebResourceLoader might be just about to message back to the NetworkProcess (e.g. ContinueWillSendRequest)
     // but there's no point in doing so anymore.
     loader->detachFromCoreLoader();
+}
+
+void WebResourceLoadScheduler::setDefersLoading(ResourceLoader* resourceLoader, bool defers)
+{
+    ResourceLoadIdentifier identifier = resourceLoader->identifier();
+    WebProcess::shared().networkConnection()->connection()->send(Messages::NetworkConnectionToWebProcess::SetDefersLoading(identifier, defers), 0);
 }
 
 void WebResourceLoadScheduler::crossOriginRedirectReceived(ResourceLoader*, const URL&)

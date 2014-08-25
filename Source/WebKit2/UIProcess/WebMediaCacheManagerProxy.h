@@ -39,7 +39,7 @@ namespace WebKit {
 class WebContext;
 class WebProcessProxy;
 
-typedef GenericCallback<WKArrayRef> ArrayCallback;
+typedef GenericCallback<API::Array*> ArrayCallback;
 
 class WebMediaCacheManagerProxy : public API::ObjectImpl<API::Object::Type::MediaCacheManager>, public WebContextSupplement, private IPC::MessageReceiver {
 public:
@@ -48,7 +48,7 @@ public:
     static PassRefPtr<WebMediaCacheManagerProxy> create(WebContext*);
     virtual ~WebMediaCacheManagerProxy();
     
-    void getHostnamesWithMediaCache(PassRefPtr<ArrayCallback>);
+    void getHostnamesWithMediaCache(std::function<void (API::Array*, CallbackBase::Error)>);
     void clearCacheForHostname(const String&);
     void clearCacheForAllHostnames();
 

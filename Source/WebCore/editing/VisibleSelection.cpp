@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2004, 2005, 2006 Apple Computer, Inc.  All rights reserved.
+ * Copyright (C) 2004, 2005, 2006 Apple Inc.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -10,10 +10,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -28,6 +28,7 @@
 
 #include "Document.h"
 #include "Element.h"
+#include "HTMLInputElement.h"
 #include "TextIterator.h"
 #include "VisibleUnits.h"
 #include "htmlediting.h"
@@ -233,10 +234,10 @@ void VisibleSelection::appendTrailingWhitespace()
     if (!searchRange)
         return;
 
-    CharacterIterator charIt(searchRange.get(), TextIteratorEmitsCharactersBetweenAllVisiblePositions);
+    CharacterIterator charIt(*searchRange, TextIteratorEmitsCharactersBetweenAllVisiblePositions);
 
-    for (; charIt.length(); charIt.advance(1)) {
-        UChar c = charIt.characters()[0];
+    for (; !charIt.atEnd() && charIt.text().length(); charIt.advance(1)) {
+        UChar c = charIt.text()[0];
         if ((!isSpaceOrNewline(c) && c != noBreakSpace) || c == '\n')
             break;
         m_end = charIt.range()->endPosition();
@@ -484,7 +485,7 @@ static Position adjustPositionForEnd(const Position& currentPosition, Node* star
         return positionBeforeNode(ancestor);
     }
 
-    if (Node* lastChild = treeScope.rootNode()->lastChild())
+    if (Node* lastChild = treeScope.rootNode().lastChild())
         return positionAfterNode(lastChild);
 
     return Position();
@@ -502,7 +503,7 @@ static Position adjustPositionForStart(const Position& currentPosition, Node* en
         return positionAfterNode(ancestor);
     }
 
-    if (Node* firstChild = treeScope.rootNode()->firstChild())
+    if (Node* firstChild = treeScope.rootNode().firstChild())
         return positionBeforeNode(firstChild);
 
     return Position();
@@ -664,6 +665,12 @@ Element* VisibleSelection::rootEditableElement() const
 Node* VisibleSelection::nonBoundaryShadowTreeRootNode() const
 {
     return start().deprecatedNode() ? start().deprecatedNode()->nonBoundaryShadowTreeRootNode() : 0;
+}
+
+bool VisibleSelection::isInPasswordField() const
+{
+    HTMLTextFormControlElement* textControl = enclosingTextFormControl(start());
+    return textControl && isHTMLInputElement(textControl) && toHTMLInputElement(textControl)->isPasswordField();
 }
 
 #ifndef NDEBUG

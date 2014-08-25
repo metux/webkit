@@ -26,8 +26,6 @@
 #ifndef DFGSafeToExecute_h
 #define DFGSafeToExecute_h
 
-#include <wtf/Platform.h>
-
 #if ENABLE(DFG_JIT)
 
 #include "DFGGraph.h"
@@ -48,29 +46,30 @@ public:
         switch (edge.useKind()) {
         case UntypedUse:
         case Int32Use:
-        case RealNumberUse:
+        case DoubleRepUse:
+        case DoubleRepRealUse:
+        case Int52RepUse:
         case NumberUse:
         case BooleanUse:
         case CellUse:
         case ObjectUse:
+        case FunctionUse:
         case FinalObjectUse:
         case ObjectOrOtherUse:
         case StringIdentUse:
         case StringUse:
         case StringObjectUse:
         case StringOrStringObjectUse:
+        case NotStringVarUse:
         case NotCellUse:
         case OtherUse:
+        case MiscUse:
         case MachineIntUse:
+        case DoubleRepMachineIntUse:
             return;
             
         case KnownInt32Use:
             if (m_state.forNode(edge).m_type & ~SpecInt32)
-                m_result = false;
-            return;
-            
-        case KnownNumberUse:
-            if (m_state.forNode(edge).m_type & ~SpecFullNumber)
                 m_result = false;
             return;
             
@@ -111,7 +110,8 @@ bool safeToExecute(AbstractStateType& state, Graph& graph, Node* node)
 
     switch (node->op()) {
     case JSConstant:
-    case WeakJSConstant:
+    case DoubleConstant:
+    case Int52Constant:
     case Identity:
     case ToThis:
     case CreateThis:
@@ -122,6 +122,7 @@ bool safeToExecute(AbstractStateType& state, Graph& graph, Node* node)
     case ZombieHint:
     case GetArgument:
     case Phantom:
+    case HardPhantom:
     case Upsilon:
     case Phi:
     case Flush:
@@ -136,7 +137,6 @@ bool safeToExecute(AbstractStateType& state, Graph& graph, Node* node)
     case BitURShift:
     case ValueToInt32:
     case UInt32ToNumber:
-    case Int32ToDouble:
     case DoubleAsInt32:
     case ArithAdd:
     case ArithSub:
@@ -149,12 +149,14 @@ bool safeToExecute(AbstractStateType& state, Graph& graph, Node* node)
     case ArithMin:
     case ArithMax:
     case ArithSqrt:
+    case ArithFRound:
     case ArithSin:
     case ArithCos:
     case ValueAdd:
     case GetById:
     case GetByIdFlush:
     case PutById:
+    case PutByIdFlush:
     case PutByIdDirect:
     case CheckStructure:
     case CheckExecutable:
@@ -184,7 +186,6 @@ bool safeToExecute(AbstractStateType& state, Graph& graph, Node* node)
     case CompareEq:
     case CompareEqConstant:
     case CompareStrictEq:
-    case CompareStrictEqConstant:
     case Call:
     case Construct:
     case NewObject:
@@ -240,10 +241,7 @@ bool safeToExecute(AbstractStateType& state, Graph& graph, Node* node)
     case CheckTierUpAtReturn:
     case CheckTierUpAndOSREnter:
     case LoopHint:
-    case Int52ToDouble:
-    case Int52ToValue:
     case StoreBarrier:
-    case ConditionalStoreBarrier:
     case StoreBarrierWithNullCheck:
     case InvalidationPoint:
     case NotifyWrite:
@@ -252,8 +250,30 @@ bool safeToExecute(AbstractStateType& state, Graph& graph, Node* node)
     case CheckInBounds:
     case ConstantStoragePointer:
     case Check:
+    case MultiGetByOffset:
+    case MultiPutByOffset:
+    case ValueRep:
+    case DoubleRep:
+    case Int52Rep:
+    case BooleanToNumber:
+    case FiatInt52:
+    case GetGetter:
+    case GetSetter:
+    case GetEnumerableLength:
+    case HasGenericProperty:
+    case HasStructureProperty:
+    case HasIndexedProperty:
+    case GetDirectPname:
+    case GetStructurePropertyEnumerator:
+    case GetGenericPropertyEnumerator:
+    case GetEnumeratorPname:
+    case ToIndexString:
         return true;
-        
+
+    case NativeCall:
+    case NativeConstruct:
+        return false; // TODO: add a check for already checked.  https://bugs.webkit.org/show_bug.cgi?id=133769
+
     case GetByVal:
     case GetIndexedPropertyStorage:
     case GetArrayLength:
@@ -272,21 +292,25 @@ bool safeToExecute(AbstractStateType& state, Graph& graph, Node* node)
         return node->arrayMode().modeForPut().alreadyChecked(
             graph, node, state.forNode(graph.varArgChild(node, 0)));
 
-    case StructureTransitionWatchpoint:
-        return state.forNode(node->child1()).m_futurePossibleStructure.isSubsetOf(
-            StructureSet(node->structure()));
-        
     case PutStructure:
-    case PhantomPutStructure:
     case AllocatePropertyStorage:
     case ReallocatePropertyStorage:
-        return state.forNode(node->child1()).m_currentKnownStructure.isSubsetOf(
-            StructureSet(node->structureTransitionData().previousStructure));
+        return state.forNode(node->child1()).m_structure.isSubsetOf(
+            StructureSet(node->transition()->previous));
         
     case GetByOffset:
-    case PutByOffset:
-        return state.forNode(node->child1()).m_currentKnownStructure.isValidOffset(
-            graph.m_storageAccessData[node->storageAccessDataIndex()].offset);
+    case GetGetterSetterByOffset:
+    case PutByOffset: {
+        StructureAbstractValue& value = state.forNode(node->child1()).m_structure;
+        if (value.isTop())
+            return false;
+        PropertyOffset offset = graph.m_storageAccessData[node->storageAccessDataIndex()].offset;
+        for (unsigned i = value.size(); i--;) {
+            if (!value[i]->isValidOffset(offset))
+                return false;
+        }
+        return true;
+    }
         
     case LastNodeType:
         RELEASE_ASSERT_NOT_REACHED();

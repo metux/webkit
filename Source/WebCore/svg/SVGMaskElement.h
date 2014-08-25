@@ -20,7 +20,6 @@
 #ifndef SVGMaskElement_h
 #define SVGMaskElement_h
 
-#if ENABLE(SVG)
 #include "SVGAnimatedBoolean.h"
 #include "SVGAnimatedEnumeration.h"
 #include "SVGAnimatedLength.h"
@@ -51,7 +50,7 @@ private:
 
     virtual RenderPtr<RenderElement> createElementRenderer(PassRef<RenderStyle>) override;
 
-    virtual bool selfHasRelativeLengths() const override;
+    virtual bool selfHasRelativeLengths() const override { return true; }
 
     BEGIN_DECLARE_ANIMATED_PROPERTIES(SVGMaskElement)
         DECLARE_ANIMATED_ENUMERATION(MaskUnits, maskUnits, SVGUnitTypes::SVGUnitType)
@@ -73,5 +72,4 @@ NODE_TYPE_CASTS(SVGMaskElement)
 
 }
 
-#endif
 #endif

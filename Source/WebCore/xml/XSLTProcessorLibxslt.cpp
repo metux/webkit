@@ -49,7 +49,7 @@
 #include <wtf/text/StringBuffer.h>
 #include <wtf/unicode/UTF8.h>
 
-#if PLATFORM(MAC)
+#if OS(DARWIN) && !PLATFORM(EFL) && !PLATFORM(GTK)
 #include "SoftLinking.h"
 
 SOFT_LINK_LIBRARY(libxslt);
@@ -86,20 +86,20 @@ void XSLTProcessor::parseErrorFunc(void* userData, xmlError* error)
     MessageLevel level;
     switch (error->level) {
     case XML_ERR_NONE:
-        level = DebugMessageLevel;
+        level = MessageLevel::Debug;
         break;
     case XML_ERR_WARNING:
-        level = WarningMessageLevel;
+        level = MessageLevel::Warning;
         break;
     case XML_ERR_ERROR:
     case XML_ERR_FATAL:
     default:
-        level = ErrorMessageLevel;
+        level = MessageLevel::Error;
         break;
     }
 
     // xmlError->int2 is the column number of the error or 0 if N/A.
-    console->addMessage(XMLMessageSource, level, error->message, error->file, error->line, error->int2);
+    console->addMessage(MessageSource::XML, level, error->message, error->file, error->line, error->int2);
 }
 
 // FIXME: There seems to be no way to control the ctxt pointer for loading here, thus we have globals.
@@ -128,7 +128,10 @@ static xmlDocPtr docLoaderFunc(const xmlChar* uri,
         bool requestAllowed = globalCachedResourceLoader->frame() && globalCachedResourceLoader->document()->securityOrigin()->canRequest(url);
         if (requestAllowed) {
             globalCachedResourceLoader->frame()->loader().loadResourceSynchronously(url, AllowStoredCredentials, DoNotAskClientForCrossOriginCredentials, error, response, data);
-            requestAllowed = globalCachedResourceLoader->document()->securityOrigin()->canRequest(response.url());
+            if (error.isNull())
+                requestAllowed = globalCachedResourceLoader->document()->securityOrigin()->canRequest(response.url());
+            else
+                data.clear();
         }
         if (!requestAllowed) {
             data.clear();

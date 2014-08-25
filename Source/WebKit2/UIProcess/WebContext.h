@@ -41,10 +41,9 @@
 #include "WebContextClient.h"
 #include "WebContextConnectionClient.h"
 #include "WebContextInjectedBundleClient.h"
-#include "WebDownloadClient.h"
-#include "WebHistoryClient.h"
 #include "WebProcessProxy.h"
 #include <WebCore/LinkHash.h>
+#include <WebCore/SessionID.h>
 #include <wtf/Forward.h>
 #include <wtf/HashMap.h>
 #include <wtf/HashSet.h>
@@ -61,10 +60,16 @@
 #include "NetworkProcessProxy.h"
 #endif
 
-#if PLATFORM(MAC)
+#if PLATFORM(COCOA)
+OBJC_CLASS NSMutableDictionary;
 OBJC_CLASS NSObject;
 OBJC_CLASS NSString;
 #endif
+
+namespace API {
+class DownloadClient;
+class HistoryClient;
+}
 
 namespace WebKit {
 
@@ -77,21 +82,25 @@ struct StatisticsData;
 struct WebPageConfiguration;
 struct WebProcessCreationParameters;
     
-typedef GenericCallback<WKDictionaryRef> DictionaryCallback;
+typedef GenericCallback<ImmutableDictionary*> DictionaryCallback;
 
-#if ENABLE(NETWORK_INFO)
-class WebNetworkInfoManagerProxy;
-#endif
 #if ENABLE(NETWORK_PROCESS)
 struct NetworkProcessCreationParameters;
 #endif
 
-#if PLATFORM(MAC)
+#if PLATFORM(COCOA)
 int networkProcessLatencyQOS();
 int networkProcessThroughputQOS();
 int webProcessLatencyQOS();
 int webProcessThroughputQOS();
 #endif
+
+struct WebContextConfiguration {
+    String injectedBundlePath;
+    String localStorageDirectory;
+    String webSQLDatabaseDirectory;
+    String indexedDBDatabaseDirectory;
+};
 
 class WebContext : public API::ObjectImpl<API::Object::Type::Context>, private IPC::MessageReceiver
 #if ENABLE(NETSCAPE_PLUGIN_API)
@@ -99,9 +108,11 @@ class WebContext : public API::ObjectImpl<API::Object::Type::Context>, private I
 #endif
     {
 public:
-    WebContext(const String& injectedBundlePath);
+    static void applyPlatformSpecificConfigurationDefaults(WebContextConfiguration&);
 
-    static PassRefPtr<WebContext> create(const String& injectedBundlePath);
+    WebContext(WebContextConfiguration);
+        
+    static PassRefPtr<WebContext> create(WebContextConfiguration);
     virtual ~WebContext();
 
     static const Vector<WebContext*>& allContexts();
@@ -128,14 +139,16 @@ public:
     void initializeClient(const WKContextClientBase*);
     void initializeInjectedBundleClient(const WKContextInjectedBundleClientBase*);
     void initializeConnectionClient(const WKContextConnectionClientBase*);
-    void initializeHistoryClient(const WKContextHistoryClientBase*);
-    void initializeDownloadClient(const WKContextDownloadClientBase*);
+    void setHistoryClient(std::unique_ptr<API::HistoryClient>);
+    void setDownloadClient(std::unique_ptr<API::DownloadClient>);
 
     void setProcessModel(ProcessModel); // Can only be called when there are no processes running.
     ProcessModel processModel() const { return m_processModel; }
 
     void setMaximumNumberOfProcesses(unsigned); // Can only be called when there are no processes running.
     unsigned maximumNumberOfProcesses() const { return m_webProcessCountLimit; }
+
+    const Vector<RefPtr<WebProcessProxy>>& processes() const { return m_processes; }
 
     // WebProcess or NetworkProcess as approporiate for current process model. The connection must be non-null.
     IPC::Connection* networkingProcessConnection();
@@ -148,10 +161,14 @@ public:
     template<typename T> void sendToNetworkingProcess(T&& message);
     template<typename T> void sendToNetworkingProcessRelaunchingIfNecessary(T&& message);
 
+    // Sends the message to WebProcess or DatabaseProcess as approporiate for current process model.
+    template<typename T> void sendToDatabaseProcessRelaunchingIfNecessary(T&& message);
+
     void processWillOpenConnection(WebProcessProxy*);
     void processWillCloseConnection(WebProcessProxy*);
     void processDidFinishLaunching(WebProcessProxy*);
 
+    void applicationWillTerminate();
     // Disconnect the process from the context.
     void disconnectProcess(WebProcessProxy*);
 
@@ -189,9 +206,11 @@ public:
     void registerURLSchemeAsNoAccess(const String&);
     void registerURLSchemeAsDisplayIsolated(const String&);
     void registerURLSchemeAsCORSEnabled(const String&);
+#if ENABLE(CACHE_PARTITIONING)
+    void registerURLSchemeAsCachePartitioned(const String&);
+#endif
 
-    void addVisitedLink(const String&);
-    void addVisitedLinkHash(WebCore::LinkHash);
+    VisitedLinkProvider& visitedLinkProvider() { return *m_visitedLinkProvider; }
 
     // MessageReceiver.
     virtual void didReceiveMessage(IPC::Connection*, IPC::MessageDecoder&) override;
@@ -212,9 +231,9 @@ public:
     
     // Downloads.
     DownloadProxy* createDownloadProxy();
-    WebDownloadClient& downloadClient() { return m_downloadClient; }
+    API::DownloadClient& downloadClient() { return *m_downloadClient; }
 
-    WebHistoryClient& historyClient() { return m_historyClient; }
+    API::HistoryClient& historyClient() { return *m_historyClient; }
     WebContextClient& client() { return m_client; }
 
     WebIconDatabase* iconDatabase() const { return m_iconDatabase.get(); }
@@ -230,10 +249,8 @@ public:
     static Statistics& statistics();    
 
     void setApplicationCacheDirectory(const String& dir) { m_overrideApplicationCacheDirectory = dir; }
-    void setDatabaseDirectory(const String& dir) { m_overrideDatabaseDirectory = dir; }
     void setIconDatabasePath(const String&);
     String iconDatabasePath() const;
-    void setLocalStorageDirectory(const String&);
     void setDiskCacheDirectory(const String& dir) { m_overrideDiskCacheDirectory = dir; }
     void setCookieStorageDirectory(const String& dir) { m_overrideCookieStorageDirectory = dir; }
 
@@ -254,12 +271,12 @@ public:
     void setHTTPPipeliningEnabled(bool);
     bool httpPipeliningEnabled() const;
 
-    void getStatistics(uint32_t statisticsMask, PassRefPtr<DictionaryCallback>);
+    void getStatistics(uint32_t statisticsMask, std::function<void (ImmutableDictionary*, CallbackBase::Error)>);
     
     void garbageCollectJavaScriptObjects();
     void setJavaScriptGarbageCollectorTimerEnabled(bool flag);
 
-#if PLATFORM(MAC)
+#if PLATFORM(COCOA)
     static bool omitPDFSupport();
 #endif
 
@@ -288,11 +305,13 @@ public:
 #if ENABLE(DATABASE_PROCESS)
     void ensureDatabaseProcess();
     void getDatabaseProcessConnection(PassRefPtr<Messages::WebProcessProxy::GetDatabaseProcessConnection::DelayedReply>);
+    void databaseProcessCrashed(DatabaseProcessProxy*);
 #endif
 
-#if PLATFORM(MAC)
+#if PLATFORM(COCOA)
     bool processSuppressionEnabled() const;
     static bool processSuppressionIsEnabledForAllContexts();
+    static bool processSuppressionPreferenceIsEnabledForAllContexts();
 #endif
 
     void windowServerConnectionStateChanged();
@@ -300,7 +319,7 @@ public:
     static void willStartUsingPrivateBrowsing();
     static void willStopUsingPrivateBrowsing();
 
-    static bool isEphemeralSession(uint64_t sessionID);
+    static bool isEphemeralSession(WebCore::SessionID);
 
 #if USE(SOUP)
     void setIgnoreTLSErrors(bool);
@@ -324,8 +343,11 @@ public:
     static void unregisterGlobalURLSchemeAsHavingCustomProtocolHandlers(const String&);
 #endif
 
-#if PLATFORM(MAC)
+#if PLATFORM(COCOA)
     void updateProcessSuppressionState() const;
+
+    NSMutableDictionary *ensureBundleParameters();
+    NSMutableDictionary *bundleParameters() { return m_bundleParameters.get(); }
 #endif
 
     void setMemoryCacheDisabled(bool);
@@ -345,7 +367,6 @@ private:
     void platformInitializeNetworkProcess(NetworkProcessCreationParameters&);
 #endif
 
-#if PLATFORM(MAC)
 #if PLATFORM(IOS)
     void writeWebContentToPasteboard(const WebCore::PasteboardWebContent&);
     void writeImageToPasteboard(const WebCore::PasteboardImage&);
@@ -355,6 +376,7 @@ private:
     void readBufferFromPasteboard(uint64_t index, const String& pasteboardType, SharedMemory::Handle&, uint64_t& size);
     void getPasteboardItemsCount(uint64_t& itemsCount);
 #endif
+#if PLATFORM(COCOA)
     void getPasteboardTypes(const String& pasteboardName, Vector<String>& pasteboardTypes);
     void getPasteboardPathnamesForType(const String& pasteboardName, const String& pasteboardType, Vector<String>& pathnames);
     void getPasteboardStringForType(const String& pasteboardName, const String& pasteboardType, String&);
@@ -371,14 +393,14 @@ private:
     void setPasteboardBufferForType(const String& pasteboardName, const String& pasteboardType, const SharedMemory::Handle&, uint64_t size, uint64_t& newChangeCount);
 #endif
 
-#if !PLATFORM(MAC)
+#if !PLATFORM(COCOA)
     // FIXME: This a dummy message, to avoid breaking the build for platforms that don't require
     // any synchronous messages, and should be removed when <rdar://problem/8775115> is fixed.
     void dummy(bool&);
 #endif
 
     void didGetStatistics(const StatisticsData&, uint64_t callbackID);
-        
+
     // Implemented in generated WebContextMessageReceiver.cpp
     void didReceiveWebContextMessage(IPC::Connection*, IPC::MessageDecoder&);
     void didReceiveSyncWebContextMessage(IPC::Connection*, IPC::MessageDecoder&, std::unique_ptr<IPC::MessageEncoder>&);
@@ -389,13 +411,11 @@ private:
     String applicationCacheDirectory() const;
     String platformDefaultApplicationCacheDirectory() const;
 
-    String databaseDirectory() const;
-    String platformDefaultDatabaseDirectory() const;
-
     String platformDefaultIconDatabasePath() const;
 
-    String localStorageDirectory() const;
-    String platformDefaultLocalStorageDirectory() const;
+    static String platformDefaultLocalStorageDirectory();
+    static String platformDefaultIndexedDBDatabaseDirectory();
+    static String platformDefaultWebSQLDatabaseDirectory();
 
     String diskCacheDirectory() const;
     String platformDefaultDiskCacheDirectory() const;
@@ -403,13 +423,21 @@ private:
     String cookieStorageDirectory() const;
     String platformDefaultCookieStorageDirectory() const;
 
-#if PLATFORM(MAC)
+#if PLATFORM(IOS)
+    String openGLCacheDirectory() const;
+    String parentBundleDirectory() const;
+    String networkingHSTSDatabasePath() const;
+    String webContentHSTSDatabasePath() const;
+    String containerTemporaryDirectory() const;
+#endif
+
+#if PLATFORM(COCOA)
     void registerNotificationObservers();
     void unregisterNotificationObservers();
 #endif
 
-    void addPlugInAutoStartOriginHash(const String& pageOrigin, unsigned plugInOriginHash);
-    void plugInDidReceiveUserInteraction(unsigned plugInOriginHash);
+    void addPlugInAutoStartOriginHash(const String& pageOrigin, unsigned plugInOriginHash, WebCore::SessionID);
+    void plugInDidReceiveUserInteraction(unsigned plugInOriginHash, WebCore::SessionID);
 
     void setAnyPageGroupMightHavePrivateBrowsingEnabled(bool);
 
@@ -436,13 +464,15 @@ private:
 
     WebContextClient m_client;
     WebContextConnectionClient m_connectionClient;
-    WebDownloadClient m_downloadClient;
-    WebHistoryClient m_historyClient;
+    std::unique_ptr<API::DownloadClient> m_downloadClient;
+    std::unique_ptr<API::HistoryClient> m_historyClient;
 
 #if ENABLE(NETSCAPE_PLUGIN_API)
     PluginInfoStore m_pluginInfoStore;
 #endif
-    VisitedLinkProvider m_visitedLinkProvider;
+    RefPtr<VisitedLinkProvider> m_visitedLinkProvider;
+    bool m_visitedLinksPopulated;
+
     PlugInAutoStartProvider m_plugInAutoStartProvider;
         
     HashSet<String> m_schemesToRegisterAsEmptyDocument;
@@ -452,6 +482,9 @@ private:
     HashSet<String> m_schemesToRegisterAsNoAccess;
     HashSet<String> m_schemesToRegisterAsDisplayIsolated;
     HashSet<String> m_schemesToRegisterAsCORSEnabled;
+#if ENABLE(CACHE_PARTITIONING)
+    HashSet<String> m_schemesToRegisterAsCachePartitioned;
+#endif
 
     bool m_alwaysUsesComplexTextCodePath;
     bool m_shouldUseFontSmoothing;
@@ -483,18 +516,19 @@ private:
     RetainPtr<NSObject> m_enhancedAccessibilityObserver;
     RetainPtr<NSObject> m_automaticTextReplacementNotificationObserver;
     RetainPtr<NSObject> m_automaticSpellingCorrectionNotificationObserver;
-#if !PLATFORM(IOS) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 1090
+#if __MAC_OS_X_VERSION_MIN_REQUIRED >= 1090
     RetainPtr<NSObject> m_automaticQuoteSubstitutionNotificationObserver;
     RetainPtr<NSObject> m_automaticDashSubstitutionNotificationObserver;
 #endif
 #endif
 
     String m_overrideApplicationCacheDirectory;
-    String m_overrideDatabaseDirectory;
     String m_overrideIconDatabasePath;
-    String m_overrideLocalStorageDirectory;
     String m_overrideDiskCacheDirectory;
     String m_overrideCookieStorageDirectory;
+
+    String m_webSQLDatabaseDirectory;
+    String m_indexedDBDatabaseDirectory;
 
     bool m_shouldUseTestingNetworkSession;
 
@@ -517,6 +551,10 @@ private:
 #endif
 
     bool m_memoryCacheDisabled;
+
+#if PLATFORM(COCOA)
+    RetainPtr<NSMutableDictionary> m_bundleParameters;
+#endif
 };
 
 template<typename T>
@@ -571,6 +609,17 @@ void WebContext::sendToNetworkingProcessRelaunchingIfNecessary(T&& message)
 #endif
     }
     ASSERT_NOT_REACHED();
+}
+
+template<typename T>
+void WebContext::sendToDatabaseProcessRelaunchingIfNecessary(T&& message)
+{
+#if ENABLE(DATABASE_PROCESS)
+    ensureDatabaseProcess();
+    m_databaseProcess->send(std::forward<T>(message), 0);
+#else
+    sendToAllProcessesRelaunchingThemIfNecessary(std::forward<T>(message));
+#endif
 }
 
 template<typename T>

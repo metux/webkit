@@ -2,7 +2,7 @@
  * Copyright (C) 2004, 2005, 2007 Nikolas Zimmermann <zimmermann@kde.org>
  * Copyright (C) 2004, 2005 Rob Buis <buis@kde.org>
  * Copyright (C) 2005 Eric Seidel <eric@webkit.org>
- * Copyright (C) 2006 Apple Computer, Inc
+ * Copyright (C) 2006 Apple Inc.
  * Copyright (C) 2009 Google, Inc.
  * Copyright (C) 2011 Renata Hodovan <reni@webkit.org>
  * Copyright (C) 2011 University of Szeged
@@ -26,7 +26,6 @@
 #ifndef RenderSVGPath_h
 #define RenderSVGPath_h
 
-#if ENABLE(SVG)
 #include "RenderSVGShape.h"
 
 namespace WebCore {
@@ -51,6 +50,8 @@ private:
     FloatRect zeroLengthSubpathRect(const FloatPoint&, float) const;
     void updateZeroLengthSubpaths();
 
+    virtual bool isRenderingDisabled() const override;
+
     Vector<FloatPoint> m_zeroLengthLinecapLocations;
 };
 
@@ -58,5 +59,4 @@ RENDER_OBJECT_TYPE_CASTS(RenderSVGPath, isSVGPath())
 
 }
 
-#endif // ENABLE(SVG)
 #endif

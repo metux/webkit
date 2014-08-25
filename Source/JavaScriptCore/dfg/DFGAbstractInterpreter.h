@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013 Apple Inc. All rights reserved.
+ * Copyright (C) 2013, 2014 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -26,8 +26,6 @@
 #ifndef DFGAbstractInterpreter_h
 #define DFGAbstractInterpreter_h
 
-#include <wtf/Platform.h>
-
 #if ENABLE(DFG_JIT)
 
 #include "DFGAbstractValue.h"
@@ -40,7 +38,7 @@ namespace JSC { namespace DFG {
 template<typename AbstractStateType>
 class AbstractInterpreter {
 public:
-    AbstractInterpreter(Graph&, AbstractStateType& state);
+    AbstractInterpreter(Graph&, AbstractStateType&);
     ~AbstractInterpreter();
     
     AbstractValue& forNode(Node* node)
@@ -90,12 +88,8 @@ public:
     bool execute(unsigned indexInBlock);
     bool execute(Node*);
     
-    // Indicate the start of execution of the node. It resets any state in the node,
-    // that is progressively built up by executeEdges() and executeEffects(). In
-    // particular, this resets canExit(), so if you want to "know" between calls of
-    // startExecuting() and executeEdges()/Effects() whether the last run of the
-    // analysis concluded that the node can exit, you should probably set that
-    // information aside prior to calling startExecuting().
+    // Indicate the start of execution of the node. It resets any state in the node
+    // that is progressively built up by executeEdges() and executeEffects().
     bool startExecuting(Node*);
     bool startExecuting(unsigned indexInBlock);
     
@@ -105,10 +99,14 @@ public:
     void executeEdges(Node*);
     void executeEdges(unsigned indexInBlock);
     
-    ALWAYS_INLINE void filterEdgeByUse(Node* node, Edge& edge)
+    ALWAYS_INLINE void filterEdgeByUse(Edge& edge)
     {
         ASSERT(mayHaveTypeCheck(edge.useKind()) || !needsTypeCheck(edge));
-        filterByType(node, edge, typeFilterFor(edge.useKind()));
+        filterByType(edge, typeFilterFor(edge.useKind()));
+    }
+    ALWAYS_INLINE void filterEdgeByUse(Node*, Edge& edge)
+    {
+        filterEdgeByUse(edge);
     }
     
     // Abstractly execute the effects of the given node. This changes the abstract
@@ -116,6 +114,7 @@ public:
     bool executeEffects(unsigned indexInBlock);
     bool executeEffects(unsigned clobberLimit, Node*);
     
+    void dump(PrintStream& out) const;
     void dump(PrintStream& out);
     
     template<typename T>
@@ -137,7 +136,7 @@ public:
     }
     
     template<typename T>
-    FiltrationResult filterByValue(T node, JSValue value)
+    FiltrationResult filterByValue(T node, FrozenValue value)
     {
         return filterByValue(forNode(node), value);
     }
@@ -145,12 +144,19 @@ public:
     FiltrationResult filter(AbstractValue&, const StructureSet&);
     FiltrationResult filterArrayModes(AbstractValue&, ArrayModes);
     FiltrationResult filter(AbstractValue&, SpeculatedType);
-    FiltrationResult filterByValue(AbstractValue&, JSValue);
+    FiltrationResult filterByValue(AbstractValue&, FrozenValue);
     
 private:
     void clobberWorld(const CodeOrigin&, unsigned indexInBlock);
     void clobberCapturedVars(const CodeOrigin&);
+    
+    template<typename Functor>
+    void forAllValues(unsigned indexInBlock, Functor&);
+    
     void clobberStructures(unsigned indexInBlock);
+    void observeTransition(unsigned indexInBlock, Structure* from, Structure* to);
+    void observeTransitions(unsigned indexInBlock, const TransitionVector&);
+    void setDidClobber();
     
     enum BooleanResult {
         UnknownBooleanResult,
@@ -159,19 +165,25 @@ private:
     };
     BooleanResult booleanResult(Node*, AbstractValue&);
     
-    void setConstant(Node* node, JSValue value)
+    void setBuiltInConstant(Node* node, FrozenValue value)
     {
-        forNode(node).set(m_graph, value);
+        AbstractValue& abstractValue = forNode(node);
+        abstractValue.set(m_graph, value, m_state.structureClobberState());
+        abstractValue.fixTypeForRepresentation(node);
+    }
+    
+    void setConstant(Node* node, FrozenValue value)
+    {
+        setBuiltInConstant(node, value);
         m_state.setFoundConstants(true);
     }
     
-    ALWAYS_INLINE void filterByType(Node* node, Edge& edge, SpeculatedType type)
+    ALWAYS_INLINE void filterByType(Edge& edge, SpeculatedType type)
     {
         AbstractValue& value = forNode(edge);
-        if (!value.isType(type)) {
-            node->setCanExit(true);
+        if (!value.isType(type))
             edge.setProofStatus(NeedsCheck);
-        } else
+        else
             edge.setProofStatus(IsProved);
         
         filter(value, type);

@@ -30,10 +30,11 @@
 #include "JSCellInlines.h"
 #include "JSSet.h"
 #include "SlotVisitorInlines.h"
+#include "StructureInlines.h"
 
 namespace JSC {
 
-const ClassInfo JSSetIterator::s_info = { "Set Iterator", &Base::s_info, 0, 0, CREATE_METHOD_TABLE(JSSetIterator) };
+const ClassInfo JSSetIterator::s_info = { "Set Iterator", &Base::s_info, 0, CREATE_METHOD_TABLE(JSSetIterator) };
 
 void JSSetIterator::finishCreation(VM& vm, JSSet* iteratedObject)
 {
@@ -44,10 +45,7 @@ void JSSetIterator::finishCreation(VM& vm, JSSet* iteratedObject)
 void JSSetIterator::visitChildren(JSCell* cell, SlotVisitor& visitor)
 {
     JSSetIterator* thisObject = jsCast<JSSetIterator*>(cell);
-    ASSERT_GC_OBJECT_INHERITS(thisObject, info());
-    COMPILE_ASSERT(StructureFlags & OverridesVisitChildren, OverridesVisitChildrenWithoutSettingFlag);
-    ASSERT(thisObject->structure()->typeInfo().overridesVisitChildren());
-        
+    ASSERT_GC_OBJECT_INHERITS(thisObject, info());        
     Base::visitChildren(thisObject, visitor);
     visitor.append(&thisObject->m_iteratedObjectData);
 }

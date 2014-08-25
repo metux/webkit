@@ -128,7 +128,7 @@ public:
         m_wheelTicksY = webEvent.wheelTicks().height();
         m_granularity = (webEvent.granularity() == WebWheelEvent::ScrollByPageWheelEvent) ? WebCore::ScrollByPageWheelEvent : WebCore::ScrollByPixelWheelEvent;
         m_directionInvertedFromDevice = webEvent.directionInvertedFromDevice();
-#if PLATFORM(MAC)
+#if PLATFORM(COCOA)
         m_phase = static_cast<WebCore::PlatformWheelEventPhase>(webEvent.phase());
         m_momentumPhase = static_cast<WebCore::PlatformWheelEventPhase>(webEvent.momentumPhase());
         m_hasPreciseScrollingDeltas = webEvent.hasPreciseScrollingDeltas();
@@ -185,6 +185,10 @@ public:
         m_windowsVirtualKeyCode = webEvent.windowsVirtualKeyCode();
         m_nativeVirtualKeyCode = webEvent.nativeVirtualKeyCode();
         m_macCharCode = webEvent.macCharCode();
+#if USE(APPKIT)
+        m_handledByInputMethod = webEvent.handledByInputMethod();
+        m_commands = webEvent.commands();
+#endif
         m_autoRepeat = webEvent.isAutoRepeat();
         m_isKeypad = webEvent.isKeypad();
         m_isSystemKey = webEvent.isSystemKey();
@@ -302,6 +306,7 @@ public:
 
         m_gestureScale = webEvent.gestureScale();
         m_gestureRotation = webEvent.gestureRotation();
+        m_canPreventNativeGestures = webEvent.canPreventNativeGestures();
         m_isGesture = webEvent.isGesture();
         m_position = webEvent.position();
         m_globalPosition = webEvent.position();

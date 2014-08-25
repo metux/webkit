@@ -30,10 +30,11 @@
 #include "JSCellInlines.h"
 #include "JSMap.h"
 #include "SlotVisitorInlines.h"
+#include "StructureInlines.h"
 
 namespace JSC {
 
-const ClassInfo JSMapIterator::s_info = { "Map Iterator", &Base::s_info, 0, 0, CREATE_METHOD_TABLE(JSMapIterator) };
+const ClassInfo JSMapIterator::s_info = { "Map Iterator", &Base::s_info, 0, CREATE_METHOD_TABLE(JSMapIterator) };
 
 void JSMapIterator::finishCreation(VM& vm, JSMap* iteratedObject)
 {
@@ -44,10 +45,7 @@ void JSMapIterator::finishCreation(VM& vm, JSMap* iteratedObject)
 void JSMapIterator::visitChildren(JSCell* cell, SlotVisitor& visitor)
 {
     JSMapIterator* thisObject = jsCast<JSMapIterator*>(cell);
-    ASSERT_GC_OBJECT_INHERITS(thisObject, info());
-    COMPILE_ASSERT(StructureFlags & OverridesVisitChildren, OverridesVisitChildrenWithoutSettingFlag);
-    ASSERT(thisObject->structure()->typeInfo().overridesVisitChildren());
-        
+    ASSERT_GC_OBJECT_INHERITS(thisObject, info());        
     Base::visitChildren(thisObject, visitor);
     visitor.append(&thisObject->m_iteratedObjectData);
 }

@@ -10,7 +10,7 @@
  * 2.  Redistributions in binary form must reproduce the above copyright
  *     notice, this list of conditions and the following disclaimer in the
  *     documentation and/or other materials provided with the distribution.
- * 3.  Neither the name of Apple Computer, Inc. ("Apple") nor the names of
+ * 3.  Neither the name of Apple Inc. ("Apple") nor the names of
  *     its contributors may be used to endorse or promote products derived
  *     from this software without specific prior written permission.
  *
@@ -28,8 +28,6 @@
 
 #ifndef SVGImageChromeClient_h
 #define SVGImageChromeClient_h
-
-#if ENABLE(SVG)
 
 #include "EmptyClients.h"
 
@@ -52,7 +50,7 @@ private:
         m_image = 0;
     }
     
-    virtual void invalidateContentsAndRootView(const IntRect& r, bool) override
+    virtual void invalidateContentsAndRootView(const IntRect& r) override
     {
         // If m_image->m_page is null, we're being destructed, don't fire changedInRect() in that case.
         if (m_image && m_image->imageObserver() && m_image->m_page)
@@ -70,5 +68,4 @@ inline SVGImageChromeClient* toSVGImageChromeClient(ChromeClient* client)
     
 } 
 
-#endif // ENABLE(SVG)
 #endif // SVGImageChromeClient_h

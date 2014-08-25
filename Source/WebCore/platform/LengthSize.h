@@ -21,7 +21,6 @@
 #ifndef LengthSize_h
 #define LengthSize_h
 
-#include "FloatSize.h"
 #include "Length.h"
 
 namespace WebCore {
@@ -33,8 +32,8 @@ public:
     }
     
     LengthSize(Length width, Length height)
-        : m_width(std::move(width))
-        , m_height(std::move(height))
+        : m_width(WTF::move(width))
+        , m_height(WTF::move(height))
     {
     }
 
@@ -43,20 +42,15 @@ public:
         return m_width == o.m_width && m_height == o.m_height;
     }
 
-    void setWidth(Length width) { m_width = std::move(width); }
+    void setWidth(Length width) { m_width = WTF::move(width); }
     const Length& width() const { return m_width; }
 
-    void setHeight(Length height) { m_height = std::move(height); }
+    void setHeight(Length height) { m_height = WTF::move(height); }
     const Length& height() const { return m_height; }
 
     LengthSize blend(const LengthSize& from, double progress) const
     {
         return LengthSize(m_width.blend(from.width(), progress), m_height.blend(from.height(), progress));
-    }
-
-    FloatSize floatSize() const
-    {
-        return FloatSize(m_width.value(), m_height.value());
     }
 
 private:

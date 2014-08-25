@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012 Apple Inc. All rights reserved.
+ * Copyright (C) 2012, 2014 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -29,6 +29,7 @@
 #if ENABLE(ASSEMBLER) && CPU(ARM64)
 
 #include "AssemblerBuffer.h"
+#include <limits.h>
 #include <wtf/Assertions.h>
 #include <wtf/Vector.h>
 #include <stdint.h>
@@ -40,12 +41,24 @@
 #define DATASIZE DATASIZE_OF(datasize)
 #define MEMOPSIZE MEMOPSIZE_OF(datasize)
 #define CHECK_FP_MEMOP_DATASIZE() ASSERT(datasize == 8 || datasize == 16 || datasize == 32 || datasize == 64 || datasize == 128)
+#define MEMPAIROPSIZE_INT(datasize) ((datasize == 64) ? MemPairOp_64 : MemPairOp_32)
+#define MEMPAIROPSIZE_FP(datasize) ((datasize == 128) ? MemPairOp_V128 : (datasize == 64) ? MemPairOp_V64 : MemPairOp_32)
 
 namespace JSC {
+
+ALWAYS_INLINE bool isInt7(int32_t value)
+{
+    return value == ((value << 25) >> 25);
+}
 
 ALWAYS_INLINE bool isInt9(int32_t value)
 {
     return value == ((value << 23) >> 23);
+}
+
+ALWAYS_INLINE bool isInt11(int32_t value)
+{
+    return value == ((value << 21) >> 21);
 }
 
 ALWAYS_INLINE bool isUInt5(int32_t value)
@@ -111,6 +124,34 @@ public:
         : m_value(value)
     {
         ASSERT(isInt9(value));
+    }
+
+    operator int() { return m_value; }
+
+private:
+    int m_value;
+};
+
+class PairPostIndex {
+public:
+    explicit PairPostIndex(int value)
+        : m_value(value)
+    {
+        ASSERT(isInt11(value));
+    }
+
+    operator int() { return m_value; }
+
+private:
+    int m_value;
+};
+
+class PairPreIndex {
+public:
+    explicit PairPreIndex(int value)
+        : m_value(value)
+    {
+        ASSERT(isInt11(value));
     }
 
     operator int() { return m_value; }
@@ -438,7 +479,7 @@ public:
     typedef ARM64Registers::FPRegisterID FPRegisterID;
     
     static RegisterID firstRegister() { return ARM64Registers::x0; }
-    static RegisterID lastRegister() { return ARM64Registers::x28; }
+    static RegisterID lastRegister() { return ARM64Registers::sp; }
     
     static FPRegisterID firstFPRegister() { return ARM64Registers::q0; }
     static FPRegisterID lastFPRegister() { return ARM64Registers::q31; }
@@ -583,9 +624,9 @@ public:
                 JumpType m_type : 8;
                 JumpLinkType m_linkType : 8;
                 Condition m_condition : 4;
-                bool m_is64Bit : 1;
                 unsigned m_bitNumber : 6;
-                RegisterID m_compareRegister : 5;
+                RegisterID m_compareRegister : 6;
+                bool m_is64Bit : 1;
             } realTypes;
             struct CopyTypes {
                 uint64_t content[3];
@@ -823,6 +864,16 @@ private:
         MemOp_LOAD_signed32 = 3 // size may be 0 or 1
     };
 
+    enum MemPairOpSize {
+        MemPairOp_32 = 0,
+        MemPairOp_LoadSigned_32 = 1,
+        MemPairOp_64 = 2,
+
+        MemPairOp_V32 = MemPairOp_32,
+        MemPairOp_V64 = 1,
+        MemPairOp_V128 = 2
+    };
+
     enum MoveWideOp {
         MoveWideOp_N = 0,
         MoveWideOp_Z = 2,
@@ -835,6 +886,14 @@ private:
         LdrLiteralOp_LDRSW = 2,
         LdrLiteralOp_128BIT = 2
     };
+
+    static unsigned memPairOffsetShift(bool V, MemPairOpSize size)
+    {
+        // return the log2 of the size in bytes, e.g. 64 bit size returns 3
+        if (V)
+            return size + 2;
+        return (size >> 1) + 2;
+    }
 
 public:
     // Integer Instructions:
@@ -871,8 +930,9 @@ public:
     ALWAYS_INLINE void add(RegisterID rd, RegisterID rn, RegisterID rm, ShiftType shift, int amount)
     {
         CHECK_DATASIZE();
-        if (isSp(rn)) {
+        if (isSp(rd) || isSp(rn)) {
             ASSERT(shift == LSL);
+            ASSERT(!isSp(rm));
             add<datasize, setFlags>(rd, rn, rm, UXTX, amount);
         } else
             insn(addSubtractShiftedRegister(DATASIZE, AddOp_ADD, setFlags, shift, rm, amount, rn, rd));
@@ -1213,6 +1273,20 @@ public:
     ALWAYS_INLINE void hlt(uint16_t imm)
     {
         insn(excepnGeneration(ExcepnOp_HALT, imm, 0));
+    }
+
+    template<int datasize>
+    ALWAYS_INLINE void ldp(RegisterID rt, RegisterID rt2, RegisterID rn, PairPostIndex simm)
+    {
+        CHECK_DATASIZE();
+        insn(loadStoreRegisterPairPostIndex(MEMPAIROPSIZE_INT(datasize), false, MemOp_LOAD, simm, rn, rt, rt2));
+    }
+
+    template<int datasize>
+    ALWAYS_INLINE void ldp(RegisterID rt, RegisterID rt2, RegisterID rn, PairPreIndex simm)
+    {
+        CHECK_DATASIZE();
+        insn(loadStoreRegisterPairPreIndex(MEMPAIROPSIZE_INT(datasize), false, MemOp_LOAD, simm, rn, rt, rt2));
     }
 
     template<int datasize>
@@ -1596,6 +1670,14 @@ public:
         insn(nopPseudo());
     }
     
+    static void fillNops(void* base, size_t size)
+    {
+        RELEASE_ASSERT(!(size % sizeof(int32_t)));
+        size_t n = size / sizeof(int32_t);
+        for (int32_t* ptr = static_cast<int32_t*>(base); n--;)
+            *ptr++ = nopPseudo();
+    }
+    
     ALWAYS_INLINE void dmbSY()
     {
         insn(0xd5033fbf);
@@ -1748,6 +1830,20 @@ public:
     }
 
     template<int datasize>
+    ALWAYS_INLINE void stp(RegisterID rt, RegisterID rt2, RegisterID rn, PairPostIndex simm)
+    {
+        CHECK_DATASIZE();
+        insn(loadStoreRegisterPairPostIndex(MEMPAIROPSIZE_INT(datasize), false, MemOp_STORE, simm, rn, rt, rt2));
+    }
+
+    template<int datasize>
+    ALWAYS_INLINE void stp(RegisterID rt, RegisterID rt2, RegisterID rn, PairPreIndex simm)
+    {
+        CHECK_DATASIZE();
+        insn(loadStoreRegisterPairPreIndex(MEMPAIROPSIZE_INT(datasize), false, MemOp_STORE, simm, rn, rt, rt2));
+    }
+
+    template<int datasize>
     ALWAYS_INLINE void str(RegisterID rt, RegisterID rn, RegisterID rm)
     {
         str<datasize>(rt, rn, rm, UXTX, 0);
@@ -1862,7 +1958,13 @@ public:
     template<int datasize, SetFlags setFlags = DontSetFlags>
     ALWAYS_INLINE void sub(RegisterID rd, RegisterID rn, RegisterID rm)
     {
-        sub<datasize, setFlags>(rd, rn, rm, LSL, 0);
+        ASSERT_WITH_MESSAGE(!isSp(rd) || setFlags == DontSetFlags, "SUBS with shifted register does not support SP for Xd, it uses XZR for the register 31. SUBS with extended register support SP for Xd, but only if SetFlag is not used, otherwise register 31 is Xd.");
+        ASSERT_WITH_MESSAGE(!isSp(rm), "No encoding of SUBS supports SP for the third operand.");
+
+        if (isSp(rd) || isSp(rn))
+            sub<datasize, setFlags>(rd, rn, rm, UXTX, 0);
+        else
+            sub<datasize, setFlags>(rd, rn, rm, LSL, 0);
     }
 
     template<int datasize, SetFlags setFlags = DontSetFlags>
@@ -1876,11 +1978,8 @@ public:
     ALWAYS_INLINE void sub(RegisterID rd, RegisterID rn, RegisterID rm, ShiftType shift, int amount)
     {
         CHECK_DATASIZE();
-        if (isSp(rn)) {
-            ASSERT(shift == LSL);
-            sub<datasize, setFlags>(rd, rn, rm, UXTX, amount);
-        } else
-            insn(addSubtractShiftedRegister(DATASIZE, AddOp_SUB, setFlags, shift, rm, amount, rn, rd));
+        ASSERT(!isSp(rd) && !isSp(rn) && !isSp(rm));
+        insn(addSubtractShiftedRegister(DATASIZE, AddOp_SUB, setFlags, shift, rm, amount, rn, rd));
     }
 
     template<int datasize>
@@ -2494,13 +2593,6 @@ public:
         return b.m_offset - a.m_offset;
     }
 
-    int executableOffsetFor(int location)
-    {
-        if (!location)
-            return 0;
-        return static_cast<int32_t*>(m_buffer.data())[location / sizeof(int32_t) - 1];
-    }
-
     void* unlinkedCode() { return m_buffer.data(); }
     size_t codeSize() const { return m_buffer.codeSize(); }
 
@@ -2752,10 +2844,34 @@ public:
 
     unsigned debugOffset() { return m_buffer.debugOffset(); }
 
+#if OS(LINUX) && COMPILER(GCC)
+    static inline void linuxPageFlush(uintptr_t begin, uintptr_t end)
+    {
+        __builtin___clear_cache(reinterpret_cast<void*>(begin), reinterpret_cast<void*>(end));
+    }
+#endif
+
     static void cacheFlush(void* code, size_t size)
     {
 #if OS(IOS)
         sys_cache_control(kCacheFunctionPrepareForExecution, code, size);
+#elif OS(LINUX)
+        size_t page = pageSize();
+        uintptr_t current = reinterpret_cast<uintptr_t>(code);
+        uintptr_t end = current + size;
+        uintptr_t firstPageEnd = (current & ~(page - 1)) + page;
+
+        if (end <= firstPageEnd) {
+            linuxPageFlush(current, end);
+            return;
+        }
+
+        linuxPageFlush(current, firstPageEnd);
+
+        for (current = firstPageEnd; current + page < end; current += page)
+            linuxPageFlush(current, current + page);
+
+        linuxPageFlush(current, end);
 #else
 #error "The cacheFlush support is missing on this platform."
 #endif
@@ -2763,20 +2879,20 @@ public:
 
     // Assembler admin methods:
 
-    int jumpSizeDelta(JumpType jumpType, JumpLinkType jumpLinkType) { return JUMP_ENUM_SIZE(jumpType) - JUMP_ENUM_SIZE(jumpLinkType); }
+    static int jumpSizeDelta(JumpType jumpType, JumpLinkType jumpLinkType) { return JUMP_ENUM_SIZE(jumpType) - JUMP_ENUM_SIZE(jumpLinkType); }
 
     static ALWAYS_INLINE bool linkRecordSourceComparator(const LinkRecord& a, const LinkRecord& b)
     {
         return a.from() < b.from();
     }
 
-    bool canCompact(JumpType jumpType)
+    static bool canCompact(JumpType jumpType)
     {
         // Fixed jumps cannot be compacted
         return (jumpType == JumpNoCondition) || (jumpType == JumpCondition) || (jumpType == JumpCompareAndBranch) || (jumpType == JumpTestBit);
     }
 
-    JumpLinkType computeJumpType(JumpType jumpType, const uint8_t* from, const uint8_t* to)
+    static JumpLinkType computeJumpType(JumpType jumpType, const uint8_t* from, const uint8_t* to)
     {
         switch (jumpType) {
         case JumpFixed:
@@ -2828,20 +2944,11 @@ public:
         return LinkJumpNoCondition;
     }
 
-    JumpLinkType computeJumpType(LinkRecord& record, const uint8_t* from, const uint8_t* to)
+    static JumpLinkType computeJumpType(LinkRecord& record, const uint8_t* from, const uint8_t* to)
     {
         JumpLinkType linkType = computeJumpType(record.type(), from, to);
         record.setLinkType(linkType);
         return linkType;
-    }
-
-    void recordLinkOffsets(int32_t regionStart, int32_t regionEnd, int32_t offset)
-    {
-        int32_t ptr = regionStart / sizeof(int32_t);
-        const int32_t end = regionEnd / sizeof(int32_t);
-        int32_t* offsets = static_cast<int32_t*>(m_buffer.data());
-        while (ptr < end)
-            offsets[ptr++] = offset;
     }
 
     Vector<LinkRecord, 0, UnsafeVectorOverflow>& jumpsToLink()
@@ -2850,7 +2957,7 @@ public:
         return m_jumpsToLink;
     }
 
-    void ALWAYS_INLINE link(LinkRecord& record, uint8_t* from, uint8_t* to)
+    static void ALWAYS_INLINE link(LinkRecord& record, uint8_t* from, uint8_t* to)
     {
         switch (record.linkType()) {
         case LinkJumpNoCondition:
@@ -3361,6 +3468,23 @@ private:
     }
 
     // 'V' means vector
+    ALWAYS_INLINE static int loadStoreRegisterPairPostIndex(MemPairOpSize size, bool V, MemOp opc, int immediate, RegisterID rn, FPRegisterID rt, FPRegisterID rt2)
+    {
+        ASSERT(size < 3);
+        ASSERT(opc == (opc & 1)); // Only load or store, load signed 64 is handled via size.
+        ASSERT(V || (size != MemPairOp_LoadSigned_32) || (opc == MemOp_LOAD)); // There isn't an integer store signed.
+        unsigned immedShiftAmount = memPairOffsetShift(V, size);
+        int imm7 = immediate >> immedShiftAmount;
+        ASSERT((imm7 << immedShiftAmount) == immediate && isInt7(imm7));
+        return (0x28800000 | size << 30 | V << 26 | opc << 22 | (imm7 & 0x7f) << 15 | rt2 << 10 | xOrSp(rn) << 5 | rt);
+    }
+
+    ALWAYS_INLINE static int loadStoreRegisterPairPostIndex(MemPairOpSize size, bool V, MemOp opc, int immediate, RegisterID rn, RegisterID rt, RegisterID rt2)
+    {
+        return loadStoreRegisterPairPostIndex(size, V, opc, immediate, rn, xOrZrAsFPR(rt), xOrZrAsFPR(rt2));
+    }
+
+    // 'V' means vector
     ALWAYS_INLINE static int loadStoreRegisterPreIndex(MemOpSize size, bool V, MemOp opc, int imm9, RegisterID rn, FPRegisterID rt)
     {
         ASSERT(!(size && V && (opc & 2))); // Maximum vector size is 128 bits.
@@ -3372,6 +3496,23 @@ private:
     ALWAYS_INLINE static int loadStoreRegisterPreIndex(MemOpSize size, bool V, MemOp opc, int imm9, RegisterID rn, RegisterID rt)
     {
         return loadStoreRegisterPreIndex(size, V, opc, imm9, rn, xOrZrAsFPR(rt));
+    }
+
+    // 'V' means vector
+    ALWAYS_INLINE static int loadStoreRegisterPairPreIndex(MemPairOpSize size, bool V, MemOp opc, int immediate, RegisterID rn, FPRegisterID rt, FPRegisterID rt2)
+    {
+        ASSERT(size < 3);
+        ASSERT(opc == (opc & 1)); // Only load or store, load signed 64 is handled via size.
+        ASSERT(V || (size != MemPairOp_LoadSigned_32) || (opc == MemOp_LOAD)); // There isn't an integer store signed.
+        unsigned immedShiftAmount = memPairOffsetShift(V, size);
+        int imm7 = immediate >> immedShiftAmount;
+        ASSERT((imm7 << immedShiftAmount) == immediate && isInt7(imm7));
+        return (0x29800000 | size << 30 | V << 26 | opc << 22 | (imm7 & 0x7f) << 15 | rt2 << 10 | xOrSp(rn) << 5 | rt);
+    }
+
+    ALWAYS_INLINE static int loadStoreRegisterPairPreIndex(MemPairOpSize size, bool V, MemOp opc, int immediate, RegisterID rn, RegisterID rt, RegisterID rt2)
+    {
+        return loadStoreRegisterPairPreIndex(size, V, opc, immediate, rn, xOrZrAsFPR(rt), xOrZrAsFPR(rt2));
     }
 
     // 'V' means vector

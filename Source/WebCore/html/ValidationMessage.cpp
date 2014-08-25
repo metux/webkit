@@ -46,13 +46,12 @@
 #include "StyleResolver.h"
 #include "Text.h"
 #include "ValidationMessageClient.h"
-#include <wtf/PassOwnPtr.h>
 
 namespace WebCore {
 
 using namespace HTMLNames;
 
-ALWAYS_INLINE ValidationMessage::ValidationMessage(HTMLFormControlElement* element)
+ValidationMessage::ValidationMessage(HTMLFormControlElement* element)
     : m_element(element)
 {
     ASSERT(m_element);
@@ -66,11 +65,6 @@ ValidationMessage::~ValidationMessage()
     }
 
     deleteBubbleTree();
-}
-
-OwnPtr<ValidationMessage> ValidationMessage::create(HTMLFormControlElement* element)
-{
-    return adoptPtr(new ValidationMessage(element));
 }
 
 ValidationMessageClient* ValidationMessage::validationMessageClient() const
@@ -87,10 +81,10 @@ void ValidationMessage::updateValidationMessage(const String& message)
         // HTML5 specification doesn't ask UA to show the title attribute value
         // with the validationMessage. However, this behavior is same as Opera
         // and the specification describes such behavior as an example.
-        const AtomicString& title = m_element->fastGetAttribute(titleAttr);
-        if (!updatedMessage.isEmpty() && !title.isEmpty()) {
-            updatedMessage.append('\n');
-            updatedMessage.append(title);
+        if (!updatedMessage.isEmpty()) {
+            const AtomicString& title = m_element->fastGetAttribute(titleAttr);
+            if (!title.isEmpty())
+                updatedMessage = updatedMessage + '\n' + title;
         }
     }
 
@@ -113,9 +107,9 @@ void ValidationMessage::setMessage(const String& message)
     ASSERT(!message.isEmpty());
     m_message = message;
     if (!m_bubble)
-        m_timer = adoptPtr(new Timer<ValidationMessage>(this, &ValidationMessage::buildBubbleTree));
+        m_timer = std::make_unique<Timer<ValidationMessage>>(this, &ValidationMessage::buildBubbleTree);
     else
-        m_timer = adoptPtr(new Timer<ValidationMessage>(this, &ValidationMessage::setMessageDOMAndStartTimer));
+        m_timer = std::make_unique<Timer<ValidationMessage>>(this, &ValidationMessage::setMessageDOMAndStartTimer);
     m_timer->startOneShot(0);
 }
 
@@ -140,9 +134,9 @@ void ValidationMessage::setMessageDOMAndStartTimer(Timer<ValidationMessage>*)
 
     int magnification = document.page() ? document.page()->settings().validationMessageTimerMagnification() : -1;
     if (magnification <= 0)
-        m_timer.clear();
+        m_timer = nullptr;
     else {
-        m_timer = adoptPtr(new Timer<ValidationMessage>(this, &ValidationMessage::deleteBubbleTree));
+        m_timer = std::make_unique<Timer<ValidationMessage>>(this, &ValidationMessage::deleteBubbleTree);
         m_timer->startOneShot(std::max(5.0, static_cast<double>(m_message.length()) * magnification / 1000));
     }
 }
@@ -222,7 +216,7 @@ void ValidationMessage::requestToHideMessage()
     }
 
     // We must not modify the DOM tree in this context by the same reason as setMessage().
-    m_timer = adoptPtr(new Timer<ValidationMessage>(this, &ValidationMessage::deleteBubbleTree));
+    m_timer = std::make_unique<Timer<ValidationMessage>>(this, &ValidationMessage::deleteBubbleTree);
     m_timer->startOneShot(0);
 }
 

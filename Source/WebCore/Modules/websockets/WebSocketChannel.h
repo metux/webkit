@@ -55,10 +55,7 @@ class SocketStreamHandle;
 class SocketStreamError;
 class WebSocketChannelClient;
 
-class WebSocketChannel : public RefCounted<WebSocketChannel>, public SocketStreamHandleClient, public ThreadableWebSocketChannel
-#if ENABLE(BLOB)
-                       , public FileReaderLoaderClient
-#endif
+class WebSocketChannel : public RefCounted<WebSocketChannel>, public SocketStreamHandleClient, public ThreadableWebSocketChannel, public FileReaderLoaderClient
 {
     WTF_MAKE_FAST_ALLOCATED;
 public:
@@ -73,7 +70,7 @@ public:
     virtual String extensions() override;
     virtual ThreadableWebSocketChannel::SendResult send(const String& message) override;
     virtual ThreadableWebSocketChannel::SendResult send(const JSC::ArrayBuffer&, unsigned byteOffset, unsigned byteLength) override;
-    virtual ThreadableWebSocketChannel::SendResult send(const Blob&) override;
+    virtual ThreadableWebSocketChannel::SendResult send(Blob&) override;
     virtual unsigned long bufferedAmount() const override;
     virtual void close(int code, const String& reason) override; // Start closing handshake.
     virtual void fail(const String& reason) override;
@@ -111,13 +108,11 @@ public:
         CloseEventCodeMaximumUserDefined = 4999
     };
 
-#if ENABLE(BLOB)
     // FileReaderLoaderClient functions.
     virtual void didStartLoading();
     virtual void didReceiveData();
     virtual void didFinishLoading();
     virtual void didFail(int errorCode);
-#endif
 
     using RefCounted<WebSocketChannel>::ref;
     using RefCounted<WebSocketChannel>::deref;
@@ -161,7 +156,7 @@ private:
     };
     void enqueueTextFrame(const CString&);
     void enqueueRawFrame(WebSocketFrame::OpCode, const char* data, size_t dataLength);
-    void enqueueBlobFrame(WebSocketFrame::OpCode, const Blob&);
+    void enqueueBlobFrame(WebSocketFrame::OpCode, Blob&);
 
     void processOutgoingFrameQueue();
     void abortOutgoingFrameQueue();
@@ -182,14 +177,12 @@ private:
     // instead of call sendFrame() directly.
     bool sendFrame(WebSocketFrame::OpCode, const char* data, size_t dataLength);
 
-#if ENABLE(BLOB)
     enum BlobLoaderStatus {
         BlobLoaderNotStarted,
         BlobLoaderStarted,
         BlobLoaderFinished,
         BlobLoaderFailed
     };
-#endif
 
     Document* m_document;
     WebSocketChannelClient* m_client;
@@ -218,11 +211,9 @@ private:
     Deque<OwnPtr<QueuedFrame>> m_outgoingFrameQueue;
     OutgoingFrameQueueStatus m_outgoingFrameQueueStatus;
 
-#if ENABLE(BLOB)
     // FIXME: Load two or more Blobs simultaneously for better performance.
     OwnPtr<FileReaderLoader> m_blobLoader;
     BlobLoaderStatus m_blobLoaderStatus;
-#endif
 
     WebSocketDeflateFramer m_deflateFramer;
 };

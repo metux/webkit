@@ -27,13 +27,13 @@
 #include "JSArrayBufferView.h"
 
 #include "JSArrayBuffer.h"
-#include "Operations.h"
+#include "JSCInlines.h"
 #include "Reject.h"
 
 namespace JSC {
 
 const ClassInfo JSArrayBufferView::s_info = {
-    "ArrayBufferView", &Base::s_info, 0, 0, CREATE_METHOD_TABLE(JSArrayBufferView)
+    "ArrayBufferView", &Base::s_info, 0, CREATE_METHOD_TABLE(JSArrayBufferView)
 };
 
 JSArrayBufferView::ConstructionContext::ConstructionContext(
@@ -201,7 +201,7 @@ void JSArrayBufferView::getOwnNonIndexPropertyNames(
     JSArrayBufferView* thisObject = jsCast<JSArrayBufferView*>(object);
     
     // length/byteOffset/byteLength are DontEnum, at least in Firefox.
-    if (mode == IncludeDontEnumProperties) {
+    if (shouldIncludeDontEnumProperties(mode)) {
         array.add(exec->propertyNames().byteOffset);
         array.add(exec->propertyNames().byteLength);
         array.add(exec->propertyNames().buffer);

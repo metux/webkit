@@ -65,6 +65,8 @@ class Data;
 class Point;
 class Rect;
 class Size;
+class WebArchive;
+class WebArchiveResource;
 }
 
 namespace WebKit {
@@ -72,8 +74,6 @@ namespace WebKit {
 class ImmutableDictionary;
 class MutableDictionary;
 class ObjCObjectGraph;
-class WebArchive;
-class WebArchiveResource;
 class WebCertificateInfo;
 class WebConnection;
 class WebContextMenuItem;
@@ -118,9 +118,9 @@ WK_ADD_API_MAPPING(WKSessionRef, API::Session)
 
 template<> struct APITypeInfo<WKMutableArrayRef> { typedef API::Array* ImplType; };
 
-#if PLATFORM(MAC)
-WK_ADD_API_MAPPING(WKWebArchiveRef, WebArchive)
-WK_ADD_API_MAPPING(WKWebArchiveResourceRef, WebArchiveResource)
+#if PLATFORM(COCOA)
+WK_ADD_API_MAPPING(WKWebArchiveRef, API::WebArchive)
+WK_ADD_API_MAPPING(WKWebArchiveResourceRef, API::WebArchiveResource)
 WK_ADD_API_MAPPING(WKObjCTypeWrapperRef, ObjCObjectGraph)
 #endif
 
@@ -482,7 +482,7 @@ inline WKContextMenuItemTag toAPI(WebCore::ContextMenuAction action)
         return kWKContextMenuItemTagMediaPlayPause;
     case WebCore::ContextMenuItemTagMediaMute:
         return kWKContextMenuItemTagMediaMute;
-#if PLATFORM(MAC)
+#if PLATFORM(COCOA)
     case WebCore::ContextMenuItemTagCorrectSpellingAutomatically:
         return kWKContextMenuItemTagCorrectSpellingAutomatically;
     case WebCore::ContextMenuItemTagSubstitutionsMenu:
@@ -676,7 +676,7 @@ inline WebCore::ContextMenuAction toImpl(WKContextMenuItemTag tag)
         return WebCore::ContextMenuItemTagMediaPlayPause;
     case kWKContextMenuItemTagMediaMute:
         return WebCore::ContextMenuItemTagMediaMute;
-#if PLATFORM(MAC)
+#if PLATFORM(COCOA)
     case kWKContextMenuItemTagCorrectSpellingAutomatically:
         return WebCore::ContextMenuItemTagCorrectSpellingAutomatically;
     case kWKContextMenuItemTagSubstitutionsMenu:
@@ -895,7 +895,7 @@ inline SnapshotOptions toSnapshotOptions(WKSnapshotOptions wkSnapshotOptions)
     return snapshotOptions;
 }
 
-inline WebCore::UserScriptInjectionTime toUserScriptInjectionTime(WKUserScriptInjectionTime wkInjectedTime)
+inline WebCore::UserScriptInjectionTime toUserScriptInjectionTime(_WKUserScriptInjectionTime wkInjectedTime)
 {
     switch (wkInjectedTime) {
     case kWKInjectAtDocumentStart:

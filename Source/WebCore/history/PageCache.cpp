@@ -10,10 +10,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -40,11 +40,11 @@
 #include "FrameLoaderClient.h"
 #include "FrameLoaderStateMachine.h"
 #include "FrameView.h"
-#include "HistogramSupport.h"
 #include "HistoryController.h"
 #include "HistoryItem.h"
 #include "Logging.h"
 #include "MainFrame.h"
+#include "MemoryPressureHandler.h"
 #include "Page.h"
 #include "Settings.h"
 #include "SharedWorkerRepository.h"
@@ -180,16 +180,6 @@ static unsigned logCanCacheFrameDecision(Frame* frame, int indentLevel)
         rejectReasons |= 1 << ClientDeniesCaching;
     }
 
-    HistogramSupport::histogramEnumeration("PageCache.FrameCacheable", !rejectReasons, 2);
-    int reasonCount = 0;
-    for (int i = 0; i < NumberOfReasonsFramesCannotBeInPageCache; ++i) {
-        if (rejectReasons & (1 << i)) {
-            ++reasonCount;
-            HistogramSupport::histogramEnumeration("PageCache.FrameRejectReason", i, NumberOfReasonsFramesCannotBeInPageCache);
-        }
-    }
-    HistogramSupport::histogramEnumeration("PageCache.FrameRejectReasonCount", reasonCount, 1 + NumberOfReasonsFramesCannotBeInPageCache);
-
     for (Frame* child = frame->tree().firstChild(); child; child = child->tree().nextSibling())
         rejectReasons |= logCanCacheFrameDecision(child, indentLevel + 1);
     
@@ -217,7 +207,7 @@ COMPILE_ASSERT(NumberOfReasonsPagesCannotBeInPageCache <= sizeof(unsigned)*8, Re
 static void logCanCachePageDecision(Page* page)
 {
     // Only bother logging for main frames that have actually loaded and have content.
-    if (page->mainFrame().loader().stateMachine()->creatingInitialEmptyDocument())
+    if (page->mainFrame().loader().stateMachine().creatingInitialEmptyDocument())
         return;
     URL currentURL = page->mainFrame().loader().documentLoader() ? page->mainFrame().loader().documentLoader()->url() : URL();
     if (currentURL.isEmpty())
@@ -252,45 +242,20 @@ static void logCanCachePageDecision(Page* page)
     }
 #endif
     FrameLoadType loadType = page->mainFrame().loader().loadType();
-    if (loadType == FrameLoadTypeReload) {
+    if (loadType == FrameLoadType::Reload) {
         PCLOG("   -Load type is: Reload");
         rejectReasons |= 1 << IsReload;
     }
-    if (loadType == FrameLoadTypeReloadFromOrigin) {
+    if (loadType == FrameLoadType::ReloadFromOrigin) {
         PCLOG("   -Load type is: Reload from origin");
         rejectReasons |= 1 << IsReloadFromOrigin;
     }
-    if (loadType == FrameLoadTypeSame) {
+    if (loadType == FrameLoadType::Same) {
         PCLOG("   -Load type is: Same");
         rejectReasons |= 1 << IsSameLoad;
     }
     
     PCLOG(rejectReasons ? " Page CANNOT be cached\n--------" : " Page CAN be cached\n--------");
-
-    HistogramSupport::histogramEnumeration("PageCache.PageCacheable", !rejectReasons, 2);
-    int reasonCount = 0;
-    for (int i = 0; i < NumberOfReasonsPagesCannotBeInPageCache; ++i) {
-        if (rejectReasons & (1 << i)) {
-            ++reasonCount;
-            HistogramSupport::histogramEnumeration("PageCache.PageRejectReason", i, NumberOfReasonsPagesCannotBeInPageCache);
-        }
-    }
-    HistogramSupport::histogramEnumeration("PageCache.PageRejectReasonCount", reasonCount, 1 + NumberOfReasonsPagesCannotBeInPageCache);
-    const bool settingsDisabledPageCache = rejectReasons & (1 << DisabledPageCache);
-    HistogramSupport::histogramEnumeration("PageCache.PageRejectReasonCountExcludingSettings", reasonCount - settingsDisabledPageCache, NumberOfReasonsPagesCannotBeInPageCache);
-
-    // Report also on the frame reasons by page; this is distinct from the per frame statistics since it coalesces the
-    // causes from all subframes together.
-    HistogramSupport::histogramEnumeration("PageCache.FrameCacheableByPage", !frameRejectReasons, 2);
-    int frameReasonCount = 0;
-    for (int i = 0; i <= NumberOfReasonsFramesCannotBeInPageCache; ++i) {
-        if (frameRejectReasons & (1 << i)) {
-            ++frameReasonCount;
-            HistogramSupport::histogramEnumeration("PageCache.FrameRejectReasonByPage", i, NumberOfReasonsFramesCannotBeInPageCache);
-        }
-    }
-
-    HistogramSupport::histogramEnumeration("PageCache.FrameRejectReasonCountByPage", frameReasonCount, 1 + NumberOfReasonsFramesCannotBeInPageCache);
 }
 
 #endif // !defined(NDEBUG)
@@ -306,9 +271,7 @@ PageCache::PageCache()
     , m_size(0)
     , m_head(0)
     , m_tail(0)
-#if USE(ACCELERATED_COMPOSITING)
     , m_shouldClearBackingStores(false)
-#endif
 {
 }
     
@@ -362,10 +325,8 @@ bool PageCache::canCache(Page* page) const
     logCanCachePageDecision(page);
 #endif
 
-#if PLATFORM(IOS)
-    if (memoryPressureHandler().hasReceivedMemoryPressure())
+    if (memoryPressureHandler().isUnderMemoryPressure())
         return false;
-#endif
 
     // Cache the page, if possible.
     // Don't write to the cache if in the middle of a redirect, since we will want to
@@ -384,10 +345,10 @@ bool PageCache::canCache(Page* page) const
 #if ENABLE(PROXIMITY_EVENTS)
         && !DeviceProximityController::isActiveAt(page)
 #endif
-        && (loadType == FrameLoadTypeStandard
-            || loadType == FrameLoadTypeBack
-            || loadType == FrameLoadTypeForward
-            || loadType == FrameLoadTypeIndexedBackForward);
+        && (loadType == FrameLoadType::Standard
+            || loadType == FrameLoadType::Back
+            || loadType == FrameLoadType::Forward
+            || loadType == FrameLoadType::IndexedBackForward);
 }
 
 void PageCache::pruneToCapacityNow(int capacity)
@@ -434,8 +395,6 @@ void PageCache::markPagesForFullStyleRecalc(Page* page)
     }
 }
 
-
-#if USE(ACCELERATED_COMPOSITING)
 void PageCache::markPagesForDeviceScaleChanged(Page* page)
 {
     for (HistoryItem* current = m_head; current; current = current->m_next) {
@@ -444,7 +403,6 @@ void PageCache::markPagesForDeviceScaleChanged(Page* page)
             cachedPage->markForDeviceScaleChanged();
     }
 }
-#endif
 
 #if ENABLE(VIDEO_TRACK)
 void PageCache::markPagesForCaptionPreferencesChanged()
@@ -479,7 +437,7 @@ std::unique_ptr<CachedPage> PageCache::take(HistoryItem* item)
     if (!item)
         return nullptr;
 
-    std::unique_ptr<CachedPage> cachedPage = std::move(item->m_cachedPage);
+    std::unique_ptr<CachedPage> cachedPage = WTF::move(item->m_cachedPage);
 
     removeFromLRUList(item);
     --m_size;

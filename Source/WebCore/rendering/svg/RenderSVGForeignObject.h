@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2006 Apple Computer, Inc.
+ * Copyright (C) 2006 Apple Inc.
  * Copyright (C) 2009 Google, Inc.
  *
  * This library is free software; you can redistribute it and/or
@@ -21,7 +21,6 @@
 #ifndef RenderSVGForeignObject_h
 #define RenderSVGForeignObject_h
 
-#if ENABLE(SVG)
 #include "AffineTransform.h"
 #include "FloatPoint.h"
 #include "FloatRect.h"
@@ -76,5 +75,4 @@ private:
 
 }
 
-#endif
 #endif

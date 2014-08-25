@@ -30,6 +30,8 @@
 #include "LayerTreeContext.h"
 #include <WebCore/FloatRect.h>
 #include <WebCore/IntRect.h>
+#include <WebCore/LayerFlushThrottleState.h>
+#include <WebCore/PlatformScreen.h>
 #include <WebCore/ViewState.h>
 #include <functional>
 #include <wtf/Forward.h>
@@ -41,6 +43,7 @@ class MessageDecoder;
 }
 
 namespace WebCore {
+class DisplayRefreshMonitor;
 class FrameView;
 class GraphicsLayer;
 class GraphicsLayerFactory;
@@ -50,7 +53,6 @@ namespace WebKit {
 
 struct ColorSpaceData;
 class LayerTreeHost;
-class PageOverlay;
 class WebPage;
 struct WebPageCreationParameters;
 struct WebPreferencesStore;
@@ -59,7 +61,7 @@ class DrawingArea {
     WTF_MAKE_NONCOPYABLE(DrawingArea);
 
 public:
-    static std::unique_ptr<DrawingArea> create(WebPage*, const WebPageCreationParameters&);
+    static std::unique_ptr<DrawingArea> create(WebPage&, const WebPageCreationParameters&);
     virtual ~DrawingArea();
     
     DrawingAreaType type() const { return m_type; }
@@ -78,33 +80,31 @@ public:
     virtual bool layerTreeStateIsFrozen() const { return false; }
     virtual LayerTreeHost* layerTreeHost() const { return 0; }
 
-    virtual void didInstallPageOverlay(PageOverlay*) { }
-    virtual void didUninstallPageOverlay(PageOverlay*) { }
-    virtual void setPageOverlayNeedsDisplay(PageOverlay*, const WebCore::IntRect&) { }
-    virtual void setPageOverlayOpacity(PageOverlay*, float) { }
-    virtual void clearPageOverlay(PageOverlay*) { }
-
     virtual void setPaintingEnabled(bool) { }
     virtual void updatePreferences(const WebPreferencesStore&) { }
     virtual void mainFrameContentSizeChanged(const WebCore::IntSize&) { }
 
-#if PLATFORM(MAC)
+#if PLATFORM(COCOA)
     virtual void setExposedRect(const WebCore::FloatRect&) = 0;
     virtual WebCore::FloatRect exposedRect() const = 0;
-    virtual void setCustomFixedPositionRect(const WebCore::FloatRect&) = 0;
+    virtual void acceleratedAnimationDidStart(uint64_t /*layerID*/, const String& /*key*/, double /*startTime*/) { }
+#endif
+#if PLATFORM(IOS)
+    virtual void setExposedContentRect(const WebCore::FloatRect&) = 0;
 #endif
     virtual void mainFrameScrollabilityChanged(bool) { }
 
     virtual bool supportsAsyncScrolling() { return false; }
 
-    virtual void didChangeScrollOffsetForAnyFrame() { }
-
     virtual bool shouldUseTiledBackingForFrameView(const WebCore::FrameView*) { return false; }
 
-#if USE(ACCELERATED_COMPOSITING)
-    virtual WebCore::GraphicsLayerFactory* graphicsLayerFactory() { return 0; }
+    virtual WebCore::GraphicsLayerFactory* graphicsLayerFactory() { return nullptr; }
     virtual void setRootCompositingLayer(WebCore::GraphicsLayer*) = 0;
     virtual void scheduleCompositingLayerFlush() = 0;
+    virtual void scheduleCompositingLayerFlushImmediately() = 0;
+
+#if USE(REQUEST_ANIMATION_FRAME_DISPLAY_MONITOR)
+    virtual PassRefPtr<WebCore::DisplayRefreshMonitor> createDisplayRefreshMonitor(PlatformDisplayID);
 #endif
 
 #if USE(COORDINATED_GRAPHICS)
@@ -113,14 +113,18 @@ public:
 
     virtual void dispatchAfterEnsuringUpdatedScrollPosition(std::function<void ()>);
 
-    virtual void viewStateDidChange(WebCore::ViewState::Flags) { }
+    virtual void viewStateDidChange(WebCore::ViewState::Flags, bool /*wantsDidUpdateViewState*/) { }
     virtual void setLayerHostingMode(LayerHostingMode) { }
 
+    virtual bool markLayersVolatileImmediatelyIfPossible() { return true; }
+
+    virtual bool adjustLayerFlushThrottling(WebCore::LayerFlushThrottleState::Flags) { return false; }
+
 protected:
-    DrawingArea(DrawingAreaType, WebPage*);
+    DrawingArea(DrawingAreaType, WebPage&);
 
     DrawingAreaType m_type;
-    WebPage* m_webPage;
+    WebPage& m_webPage;
 
 private:
     // Message handlers.
@@ -129,7 +133,7 @@ private:
                                          const WebCore::IntSize& /*scrollOffset*/) { }
     virtual void didUpdate() { }
 
-#if PLATFORM(MAC)
+#if PLATFORM(COCOA)
     // Used by TiledCoreAnimationDrawingArea.
     virtual void updateGeometry(const WebCore::IntSize& viewSize, const WebCore::IntSize& layerPosition) { }
     virtual void setDeviceScaleFactor(float) { }
@@ -137,6 +141,8 @@ private:
 
     virtual void adjustTransientZoom(double scale, WebCore::FloatPoint origin) { }
     virtual void commitTransientZoom(double scale, WebCore::FloatPoint origin) { }
+
+    virtual void addTransactionCallbackID(uint64_t callbackID) { ASSERT_NOT_REACHED(); }
 #endif
 };
 

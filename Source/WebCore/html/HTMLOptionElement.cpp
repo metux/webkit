@@ -88,24 +88,13 @@ PassRefPtr<HTMLOptionElement> HTMLOptionElement::createForJSConstructor(Document
     return element.release();
 }
 
-void HTMLOptionElement::didAttachRenderers()
-{
-    // If after attaching nothing called styleForRenderer() on this node we
-    // manually cache the value. This happens if our parent doesn't have a
-    // renderer like <optgroup> or if it doesn't allow children like <select>.
-    if (!m_style && parentNode()->renderStyle())
-        updateNonRenderStyle();
-}
-
-void HTMLOptionElement::willDetachRenderers()
-{
-    m_style.clear();
-}
-
 bool HTMLOptionElement::isFocusable() const
 {
-    // Option elements do not have a renderer so we check the renderStyle instead.
-    return supportsFocus() && renderStyle() && renderStyle()->display() != NONE;
+    if (!supportsFocus())
+        return false;
+    // Option elements do not have a renderer.
+    auto* style = const_cast<HTMLOptionElement&>(*this).computedStyle();
+    return style && style->display() != NONE;
 }
 
 String HTMLOptionElement::text() const
@@ -195,7 +184,7 @@ void HTMLOptionElement::parseAttribute(const QualifiedName& name, const AtomicSt
         if (oldDisabled != m_disabled) {
             didAffectSelector(AffectedSelectorDisabled | AffectedSelectorEnabled);
             if (renderer() && renderer()->style().hasAppearance())
-                renderer()->theme().stateChanged(renderer(), EnabledState);
+                renderer()->theme().stateChanged(*renderer(), ControlStates::EnabledState);
         }
     } else if (name == selectedAttr) {
         // FIXME: This doesn't match what the HTML specification says.
@@ -300,25 +289,7 @@ void HTMLOptionElement::setLabel(const String& label)
     setAttribute(labelAttr, label);
 }
 
-void HTMLOptionElement::updateNonRenderStyle()
-{
-    m_style = document().ensureStyleResolver().styleForElement(this);
-}
-
-RenderStyle* HTMLOptionElement::nonRendererStyle() const
-{
-    return m_style.get();
-}
-
-PassRefPtr<RenderStyle> HTMLOptionElement::customStyleForRenderer()
-{
-    // styleForRenderer is called whenever a new style should be associated
-    // with an Element so now is a good time to update our cached style.
-    updateNonRenderStyle();
-    return m_style;
-}
-
-void HTMLOptionElement::didRecalcStyle(Style::Change)
+void HTMLOptionElement::willResetComputedStyle()
 {
     // FIXME: This is nasty, we ask our owner select to repaint even if the new
     // style is exactly the same.

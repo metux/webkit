@@ -21,8 +21,6 @@
  */
 
 #include "config.h"
-
-#if ENABLE(SVG)
 #include "SVGStyleElement.h"
 
 #include "Attribute.h"
@@ -30,6 +28,7 @@
 #include "Document.h"
 #include "ExceptionCode.h"
 #include "SVGNames.h"
+#include <wtf/NeverDestroyed.h>
 #include <wtf/StdLibExtras.h>
 
 namespace WebCore {
@@ -65,7 +64,7 @@ void SVGStyleElement::setDisabled(bool setDisabled)
 
 const AtomicString& SVGStyleElement::type() const
 {
-    DEFINE_STATIC_LOCAL(const AtomicString, defaultValue, ("text/css", AtomicString::ConstructFromLiteral));
+    DEPRECATED_DEFINE_STATIC_LOCAL(const AtomicString, defaultValue, ("text/css", AtomicString::ConstructFromLiteral));
     const AtomicString& n = getAttribute(SVGNames::typeAttr);
     return n.isNull() ? defaultValue : n;
 }
@@ -77,7 +76,7 @@ void SVGStyleElement::setType(const AtomicString& type, ExceptionCode&)
 
 const AtomicString& SVGStyleElement::media() const
 {
-    DEFINE_STATIC_LOCAL(const AtomicString, defaultValue, ("all", AtomicString::ConstructFromLiteral));
+    DEPRECATED_DEFINE_STATIC_LOCAL(const AtomicString, defaultValue, ("all", AtomicString::ConstructFromLiteral));
     const AtomicString& n = fastGetAttribute(SVGNames::mediaAttr);
     return n.isNull() ? defaultValue : n;
 }
@@ -99,14 +98,14 @@ void SVGStyleElement::setTitle(const AtomicString& title, ExceptionCode&)
 
 bool SVGStyleElement::isSupportedAttribute(const QualifiedName& attrName)
 {
-    DEFINE_STATIC_LOCAL(HashSet<QualifiedName>, supportedAttributes, ());
-    if (supportedAttributes.isEmpty()) {
+    static NeverDestroyed<HashSet<QualifiedName>> supportedAttributes;
+    if (supportedAttributes.get().isEmpty()) {
         SVGLangSpace::addSupportedAttributes(supportedAttributes);
-        supportedAttributes.add(SVGNames::titleAttr);
-        supportedAttributes.add(SVGNames::mediaAttr);
-        supportedAttributes.add(SVGNames::typeAttr);
+        supportedAttributes.get().add(SVGNames::titleAttr);
+        supportedAttributes.get().add(SVGNames::mediaAttr);
+        supportedAttributes.get().add(SVGNames::typeAttr);
     }
-    return supportedAttributes.contains<SVGAttributeHashTranslator>(attrName);
+    return supportedAttributes.get().contains<SVGAttributeHashTranslator>(attrName);
 }
 
 void SVGStyleElement::parseAttribute(const QualifiedName& name, const AtomicString& value)
@@ -162,5 +161,3 @@ void SVGStyleElement::childrenChanged(const ChildChange& change)
 }
 
 }
-
-#endif // ENABLE(SVG)

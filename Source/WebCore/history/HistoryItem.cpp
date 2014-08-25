@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2005, 2006, 2008, 2011 Apple Inc. All rights reserved.
+ * Copyright (C) 2005, 2006, 2008, 2011, 2014 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -10,10 +10,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -37,13 +37,9 @@
 #include <stdio.h>
 #include <wtf/CurrentTime.h>
 #include <wtf/DateMath.h>
-#include <wtf/Decoder.h>
-#include <wtf/Encoder.h>
 #include <wtf/text/CString.h>
 
 namespace WebCore {
-
-const uint32_t backForwardTreeEncodingVersion = 2;
 
 static long long generateSequenceNumber()
 {
@@ -573,242 +569,7 @@ Vector<String>* HistoryItem::redirectURLs() const
 
 void HistoryItem::setRedirectURLs(std::unique_ptr<Vector<String>> redirectURLs)
 {
-    m_redirectURLs = std::move(redirectURLs);
-}
-
-void HistoryItem::encodeBackForwardTree(Encoder& encoder) const
-{
-    encoder.encodeUInt32(backForwardTreeEncodingVersion);
-
-    encodeBackForwardTreeNode(encoder);
-}
-
-void HistoryItem::encodeBackForwardTree(KeyedEncoder& encoder) const
-{
-    encoder.encodeUInt32("version", backForwardTreeEncodingVersion);
-
-    encoder.encodeObject("root", *this, [](KeyedEncoder& encoder, const HistoryItem& item) {
-        item.encodeBackForwardTreeNode(encoder);
-    });
-}
-
-void HistoryItem::encodeBackForwardTreeNode(Encoder& encoder) const
-{
-    size_t size = m_children.size();
-    encoder.encodeUInt64(size);
-    for (size_t i = 0; i < size; ++i) {
-        const HistoryItem& child = *m_children[i];
-
-        encoder.encodeString(child.m_originalURLString);
-
-        encoder.encodeString(child.m_urlString);
-
-        child.encodeBackForwardTreeNode(encoder);
-    }
-
-    encoder.encodeInt64(m_documentSequenceNumber);
-
-    size = m_documentState.size();
-    encoder.encodeUInt64(size);
-    for (size_t i = 0; i < size; ++i)
-        encoder.encodeString(m_documentState[i]);
-
-    encoder.encodeString(m_formContentType);
-
-    encoder.encodeBool(m_formData);
-    if (m_formData)
-        m_formData->encode(encoder);
-
-    encoder.encodeInt64(m_itemSequenceNumber);
-
-    encoder.encodeString(m_referrer);
-
-    encoder.encodeInt32(m_scrollPoint.x());
-    encoder.encodeInt32(m_scrollPoint.y());
-    
-    encoder.encodeFloat(m_pageScaleFactor);
-
-    encoder.encodeBool(m_stateObject);
-    if (m_stateObject)
-        encoder.encodeBytes(m_stateObject->data().data(), m_stateObject->data().size());
-
-    encoder.encodeString(m_target);
-}
-
-void HistoryItem::encodeBackForwardTreeNode(KeyedEncoder& encoder) const
-{
-    encoder.encodeObjects("children", m_children.begin(), m_children.end(), [](KeyedEncoder& encoder, const RefPtr<HistoryItem>& child) {
-        encoder.encodeString("originalURLString", child->m_originalURLString);
-        encoder.encodeString("urlString", child->m_urlString);
-
-        child->encodeBackForwardTreeNode(encoder);
-    });
-
-    encoder.encodeInt64("documentSequenceNumber", m_documentSequenceNumber);
-
-    encoder.encodeObjects("documentState", m_documentState.begin(), m_documentState.end(), [](KeyedEncoder& encoder, const String& string) {
-        encoder.encodeString("string", string);
-    });
-
-    encoder.encodeString("formContentType", m_formContentType);
-
-    encoder.encodeConditionalObject("formData", m_formData.get(), [](KeyedEncoder&, const FormData&) {
-        // FIXME: Implement.
-    });
-
-    encoder.encodeInt64("itemSequenceNumber", m_itemSequenceNumber);
-
-    encoder.encodeString("referrer", m_referrer);
-
-    encoder.encodeObject("scrollPoint", m_scrollPoint, [](KeyedEncoder& encoder, const IntPoint& scrollPoint) {
-        encoder.encodeInt32("x", scrollPoint.x());
-        encoder.encodeInt32("y", scrollPoint.y());
-    });
-
-    encoder.encodeFloat("pageScaleFactor", m_pageScaleFactor);
-
-    encoder.encodeConditionalObject("stateObject", m_stateObject.get(), [](KeyedEncoder& encoder, const SerializedScriptValue& stateObject) {
-        encoder.encodeBytes("data", stateObject.data().data(), stateObject.data().size());
-    });
-
-    encoder.encodeString("target", m_target);
-}
-
-struct DecodeRecursionStackElement {
-    RefPtr<HistoryItem> node;
-    size_t i;
-    uint64_t size;
-
-    DecodeRecursionStackElement(PassRefPtr<HistoryItem> node, size_t i, uint64_t size)
-        : node(node)
-        , i(i)
-        , size(size)
-    {
-    }
-};
-
-PassRefPtr<HistoryItem> HistoryItem::decodeBackForwardTree(const String& topURLString, const String& topTitle, const String& topOriginalURLString, Decoder& decoder)
-{
-    // Since the data stream is not trusted, the decode has to be non-recursive.
-    // We don't want bad data to cause a stack overflow.
-
-    uint32_t version;
-    if (!decoder.decodeUInt32(version))
-        return 0;
-    if (version != backForwardTreeEncodingVersion)
-        return 0;
-
-    String urlString = topURLString;
-    String title = topTitle;
-    String originalURLString = topOriginalURLString;
-
-    Vector<DecodeRecursionStackElement, 16> recursionStack;
-
-recurse:
-    RefPtr<HistoryItem> node = create(urlString, title);
-
-    node->setOriginalURLString(originalURLString);
-
-    title = String();
-
-    uint64_t size;
-    if (!decoder.decodeUInt64(size))
-        return 0;
-    size_t i;
-    RefPtr<HistoryItem> child;
-    for (i = 0; i < size; ++i) {
-        if (!decoder.decodeString(originalURLString))
-            return 0;
-
-        if (!decoder.decodeString(urlString))
-            return 0;
-
-        recursionStack.append(DecodeRecursionStackElement(node.release(), i, size));
-        goto recurse;
-
-resume:
-        node->m_children.append(child.release());
-    }
-
-    if (!decoder.decodeInt64(node->m_documentSequenceNumber))
-        return 0;
-
-    if (!decoder.decodeUInt64(size))
-        return 0;
-    for (i = 0; i < size; ++i) {
-        String state;
-        if (!decoder.decodeString(state))
-            return 0;
-        node->m_documentState.append(state);
-    }
-
-    if (!decoder.decodeString(node->m_formContentType))
-        return 0;
-
-    bool hasFormData;
-    if (!decoder.decodeBool(hasFormData))
-        return 0;
-    if (hasFormData) {
-        node->m_formData = FormData::decode(decoder);
-        if (!node->m_formData)
-            return 0;
-    }
-
-    if (!decoder.decodeInt64(node->m_itemSequenceNumber))
-        return 0;
-
-    if (!decoder.decodeString(node->m_referrer))
-        return 0;
-
-    int32_t x;
-    if (!decoder.decodeInt32(x))
-        return 0;
-    int32_t y;
-    if (!decoder.decodeInt32(y))
-        return 0;
-    node->m_scrollPoint = IntPoint(x, y);
-    
-    if (!decoder.decodeFloat(node->m_pageScaleFactor))
-        return 0;
-
-    bool hasStateObject;
-    if (!decoder.decodeBool(hasStateObject))
-        return 0;
-    if (hasStateObject) {
-        Vector<uint8_t> bytes;
-        if (!decoder.decodeBytes(bytes))
-            return 0;
-        node->m_stateObject = SerializedScriptValue::adopt(bytes);
-    }
-
-    if (!decoder.decodeString(node->m_target))
-        return 0;
-
-    // Simulate recursion with our own stack.
-    if (!recursionStack.isEmpty()) {
-        DecodeRecursionStackElement& element = recursionStack.last();
-        child = node.release();
-        node = element.node.release();
-        i = element.i;
-        size = element.size;
-        recursionStack.removeLast();
-        goto resume;
-    }
-
-    return node.release();
-}
-
-PassRefPtr<HistoryItem> HistoryItem::decodeBackForwardTree(const String&, const String&, const String&, KeyedDecoder& decoder)
-{
-    uint32_t version;
-    if (!decoder.decodeUInt32("version", version))
-        return nullptr;
-    
-    if (version != backForwardTreeEncodingVersion)
-        return nullptr;
-
-    // FIXME: Implement.
-    return nullptr;
+    m_redirectURLs = WTF::move(redirectURLs);
 }
 
 #ifndef NDEBUG

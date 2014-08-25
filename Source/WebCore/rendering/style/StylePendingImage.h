@@ -13,7 +13,7 @@
  * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -60,16 +60,16 @@ private:
 
     virtual PassRefPtr<CSSValue> cssValue() const override { return m_value; }
     
-    virtual LayoutSize imageSize(const RenderElement*, float /*multiplier*/) const override { return LayoutSize(); }
+    virtual FloatSize imageSize(const RenderElement*, float /*multiplier*/) const override { return FloatSize(); }
     virtual bool imageHasRelativeWidth() const override { return false; }
     virtual bool imageHasRelativeHeight() const override { return false; }
     virtual void computeIntrinsicDimensions(const RenderElement*, Length& /* intrinsicWidth */ , Length& /* intrinsicHeight */, FloatSize& /* intrinsicRatio */) { }
     virtual bool usesImageContainerSize() const override { return false; }
-    virtual void setContainerSizeForRenderer(const RenderElement*, const IntSize&, float) override { }
+    virtual void setContainerSizeForRenderer(const RenderElement*, const FloatSize&, float) override { }
     virtual void addClient(RenderElement*) override { }
     virtual void removeClient(RenderElement*) override { }
 
-    virtual PassRefPtr<Image> image(RenderElement*, const IntSize&) const override
+    virtual PassRefPtr<Image> image(RenderElement*, const FloatSize&) const override
     {
         ASSERT_NOT_REACHED();
         return nullptr;
@@ -85,6 +85,8 @@ private:
 
     CSSValue* m_value; // Not retained; it owns us.
 };
+
+STYLE_IMAGE_TYPE_CASTS(StylePendingImage, StyleImage, isPendingImage)
 
 }
 

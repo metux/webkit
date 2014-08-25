@@ -30,6 +30,7 @@
 #include "JSRadioNodeList.h"
 #include "Node.h"
 #include "RadioNodeList.h"
+#include <runtime/IdentifierInlines.h>
 #include <wtf/Vector.h>
 #include <wtf/text/AtomicString.h>
 
@@ -57,9 +58,9 @@ bool JSHTMLFormControlsCollection::canGetItemsForName(ExecState*, HTMLFormContro
     return collection->hasNamedItem(propertyNameToAtomicString(propertyName));
 }
 
-EncodedJSValue JSHTMLFormControlsCollection::nameGetter(ExecState* exec, EncodedJSValue slotBase, EncodedJSValue, PropertyName propertyName)
+EncodedJSValue JSHTMLFormControlsCollection::nameGetter(ExecState* exec, JSObject* slotBase, EncodedJSValue, PropertyName propertyName)
 {
-    JSHTMLFormControlsCollection* thisObj = jsCast<JSHTMLFormControlsCollection*>(JSValue::decode(slotBase));
+    JSHTMLFormControlsCollection* thisObj = jsCast<JSHTMLFormControlsCollection*>(slotBase);
     return JSValue::encode(getNamedItems(exec, thisObj, propertyName));
 }
 

@@ -33,6 +33,8 @@
 #include "APIURLRequest.h"
 #include "InjectedBundleBackForwardList.h"
 #include "InjectedBundleNodeHandle.h"
+#include "InjectedBundlePageFormClient.h"
+#include "InjectedBundlePageUIClient.h"
 #include "PageBanner.h"
 #include "WKAPICast.h"
 #include "WKArray.h"
@@ -78,7 +80,7 @@ void WKBundlePageSetEditorClient(WKBundlePageRef pageRef, WKBundlePageEditorClie
 
 void WKBundlePageSetFormClient(WKBundlePageRef pageRef, WKBundlePageFormClientBase* wkClient)
 {
-    toImpl(pageRef)->initializeInjectedBundleFormClient(wkClient);
+    toImpl(pageRef)->setInjectedBundleFormClient(std::make_unique<InjectedBundlePageFormClient>(wkClient));
 }
 
 void WKBundlePageSetPageLoaderClient(WKBundlePageRef pageRef, WKBundlePageLoaderClientBase* wkClient)
@@ -98,7 +100,7 @@ void WKBundlePageSetPolicyClient(WKBundlePageRef pageRef, WKBundlePagePolicyClie
 
 void WKBundlePageSetUIClient(WKBundlePageRef pageRef, WKBundlePageUIClientBase* wkClient)
 {
-    toImpl(pageRef)->initializeInjectedBundleUIClient(wkClient);
+    toImpl(pageRef)->setInjectedBundleUIClient(std::make_unique<InjectedBundlePageUIClient>(wkClient));
 }
 
 void WKBundlePageSetFullScreenClient(WKBundlePageRef pageRef, WKBundlePageFullScreenClientBase* wkClient)
@@ -183,7 +185,7 @@ static PassRefPtr<API::Array> contextMenuItems(const WebContextMenu& contextMenu
     for (const auto& item : items)
         menuItems.uncheckedAppend(WebContextMenuItem::create(item));
 
-    return API::Array::create(std::move(menuItems));
+    return API::Array::create(WTF::move(menuItems));
 }
 #endif
 
@@ -261,6 +263,22 @@ void* WKAccessibilityFocusedObject(WKBundlePageRef pageRef)
 #else
     UNUSED_PARAM(pageRef);
     return 0;
+#endif
+}
+
+void WKAccessibilityEnableEnhancedAccessibility(bool enable)
+{
+#if HAVE(ACCESSIBILITY)
+    WebCore::AXObjectCache::setEnhancedUserInterfaceAccessibility(enable);
+#endif
+}
+
+bool WKAccessibilityEnhancedAccessibilityEnabled()
+{
+#if HAVE(ACCESSIBILITY)
+    return WebCore::AXObjectCache::accessibilityEnhancedUserInterfaceEnabled();
+#else
+    return false;
 #endif
 }
 
@@ -346,17 +364,17 @@ void WKBundlePageUninstallPageOverlay(WKBundlePageRef pageRef, WKBundlePageOverl
 
 void WKBundlePageInstallPageOverlayWithAnimation(WKBundlePageRef pageRef, WKBundlePageOverlayRef pageOverlayRef)
 {
-    toImpl(pageRef)->installPageOverlay(toImpl(pageOverlayRef), true);
+    toImpl(pageRef)->installPageOverlay(toImpl(pageOverlayRef), PageOverlay::FadeMode::Fade);
 }
 
 void WKBundlePageUninstallPageOverlayWithAnimation(WKBundlePageRef pageRef, WKBundlePageOverlayRef pageOverlayRef)
 {
-    toImpl(pageRef)->uninstallPageOverlay(toImpl(pageOverlayRef), true);
+    toImpl(pageRef)->uninstallPageOverlay(toImpl(pageOverlayRef), PageOverlay::FadeMode::Fade);
 }
 
 void WKBundlePageSetTopOverhangImage(WKBundlePageRef pageRef, WKImageRef imageRef)
 {
-#if PLATFORM(MAC) && !PLATFORM(IOS)
+#if PLATFORM(MAC)
     toImpl(pageRef)->setTopOverhangImage(toImpl(imageRef));
 #else
     UNUSED_PARAM(pageRef);
@@ -366,7 +384,7 @@ void WKBundlePageSetTopOverhangImage(WKBundlePageRef pageRef, WKImageRef imageRe
 
 void WKBundlePageSetBottomOverhangImage(WKBundlePageRef pageRef, WKImageRef imageRef)
 {
-#if PLATFORM(MAC) && !PLATFORM(IOS)
+#if PLATFORM(MAC)
     toImpl(pageRef)->setBottomOverhangImage(toImpl(imageRef));
 #else
     UNUSED_PARAM(pageRef);
@@ -542,3 +560,15 @@ void WKBundlePageStopExtendingIncrementalRenderingSuppression(WKBundlePageRef pa
 {
     toImpl(pageRef)->stopExtendingIncrementalRenderingSuppression(token);
 }
+
+bool WKBundlePageIsUsingEphemeralSession(WKBundlePageRef pageRef)
+{
+    return toImpl(pageRef)->usesEphemeralSession();
+}
+
+#if TARGET_OS_IPHONE
+void WKBundlePageSetUseTestingViewportConfiguration(WKBundlePageRef pageRef, bool useTestingViewportConfiguration)
+{
+    toImpl(pageRef)->setUseTestingViewportConfiguration(useTestingViewportConfiguration);
+}
+#endif

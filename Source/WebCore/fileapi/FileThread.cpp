@@ -30,8 +30,6 @@
 
 #include "config.h"
 
-#if ENABLE(BLOB)
-
 #include "FileThread.h"
 
 #include "Logging.h"
@@ -64,9 +62,9 @@ void FileThread::stop()
     m_queue.kill();
 }
 
-void FileThread::postTask(std::unique_ptr<Task> task)
+void FileThread::postTask(Task task)
 {
-    m_queue.append(std::move(task));
+    m_queue.append(std::make_unique<FileThread::Task>(WTF::move(task)));
 }
 
 class SameInstancePredicate {
@@ -113,5 +111,3 @@ void FileThread::runLoop()
 }
 
 } // namespace WebCore
-
-#endif // ENABLE(BLOB)

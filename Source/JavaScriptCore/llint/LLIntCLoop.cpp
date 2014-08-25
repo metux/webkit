@@ -26,7 +26,7 @@
 #include "config.h"
 #include "LLIntCLoop.h"
 
-#if ENABLE(LLINT_C_LOOP)
+#if !ENABLE(JIT)
 
 #include "LLIntData.h"
 
@@ -35,10 +35,10 @@ namespace LLInt {
 
 void CLoop::initialize()
 {
-    execute(0, getOpcode(llint_unused), true);
+    execute(llint_entry, 0, 0, 0, true);
 }
 
 } // namespace LLInt
 } // namespace JSC
 
-#endif // ENABLE(LLINT_C_LOOP)
+#endif // !ENABLE(JIT)

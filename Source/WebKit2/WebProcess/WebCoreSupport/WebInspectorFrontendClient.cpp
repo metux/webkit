@@ -31,7 +31,6 @@
 #include "WebInspector.h"
 #include "WebPage.h"
 #include <WebCore/InspectorController.h>
-#include <WebCore/NotImplemented.h>
 #include <WebCore/Page.h>
 #include <inspector/InspectorAgentBase.h>
 #include <wtf/text/WTFString.h>
@@ -41,7 +40,7 @@ using namespace WebCore;
 namespace WebKit {
 
 WebInspectorFrontendClient::WebInspectorFrontendClient(WebPage* page, WebPage* inspectorPage)
-    : InspectorFrontendClientLocal(&page->corePage()->inspectorController(), inspectorPage->corePage(), adoptPtr(new Settings()))
+    : InspectorFrontendClientLocal(&page->corePage()->inspectorController(), inspectorPage->corePage(), std::make_unique<Settings>())
     , m_page(page)
 {
 }

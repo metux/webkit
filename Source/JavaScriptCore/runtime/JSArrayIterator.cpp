@@ -29,10 +29,11 @@
 #include "JSCJSValueInlines.h"
 #include "JSCellInlines.h"
 #include "SlotVisitorInlines.h"
+#include "StructureInlines.h"
 
 namespace JSC {
 
-const ClassInfo JSArrayIterator::s_info = { "ArrayIterator", &Base::s_info, 0, 0, CREATE_METHOD_TABLE(JSArrayIterator) };
+const ClassInfo JSArrayIterator::s_info = { "ArrayIterator", &Base::s_info, 0, CREATE_METHOD_TABLE(JSArrayIterator) };
 
 static EncodedJSValue JSC_HOST_CALL arrayIteratorNextKey(ExecState*);
 static EncodedJSValue JSC_HOST_CALL arrayIteratorNextValue(ExecState*);
@@ -63,12 +64,8 @@ void JSArrayIterator::visitChildren(JSCell* cell, SlotVisitor& visitor)
 {
     JSArrayIterator* thisObject = jsCast<JSArrayIterator*>(cell);
     ASSERT_GC_OBJECT_INHERITS(thisObject, info());
-    COMPILE_ASSERT(StructureFlags & OverridesVisitChildren, OverridesVisitChildrenWithoutSettingFlag);
-    ASSERT(thisObject->structure()->typeInfo().overridesVisitChildren());
-        
     Base::visitChildren(thisObject, visitor);
     visitor.append(&thisObject->m_iteratedObject);
-
 }
 
 static EncodedJSValue createIteratorResult(CallFrame* callFrame, ArrayIterationKind kind, size_t index, JSValue result, bool done)

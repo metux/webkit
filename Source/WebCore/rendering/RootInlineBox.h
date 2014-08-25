@@ -118,11 +118,6 @@ public:
     virtual int baselinePosition(FontBaseline baselineType) const override final;
     virtual LayoutUnit lineHeight() const override final;
 
-#if PLATFORM(MAC)
-    void addHighlightOverflow();
-    void paintCustomHighlight(PaintInfo&, const LayoutPoint&, const AtomicString& highlightType);
-#endif
-
     virtual void paint(PaintInfo&, const LayoutPoint&, LayoutUnit lineTop, LayoutUnit lineBottom) override;
     virtual bool nodeAtPoint(const HitTestRequest&, HitTestResult&, const HitTestLocation& locationInContainer, const LayoutPoint& accumulatedOffset, LayoutUnit lineTop, LayoutUnit lineBottom) override final;
 
@@ -147,7 +142,7 @@ public:
         if (m_floats)
             m_floats->append(&floatingBox);
         else
-            m_floats = adoptPtr(new Vector<RenderBox*>(1, &floatingBox));
+            m_floats = std::make_unique<Vector<RenderBox*>>(1, &floatingBox);
     }
 
     Vector<RenderBox*>* floatsPtr() { ASSERT(!isDirty()); return m_floats.get(); }
@@ -163,12 +158,8 @@ public:
 
     LayoutRect paddedLayoutOverflowRect(LayoutUnit endPadding) const;
 
-    void ascentAndDescentForBox(InlineBox*, GlyphOverflowAndFallbackFontsMap&, int& ascent, int& descent, bool& affectsAscent, bool& affectsDescent) const;
+    void ascentAndDescentForBox(InlineBox&, GlyphOverflowAndFallbackFontsMap&, int& ascent, int& descent, bool& affectsAscent, bool& affectsDescent) const;
     LayoutUnit verticalPositionForBox(InlineBox*, VerticalPositionCache&);
-    bool includeLeadingForBox(InlineBox*) const;
-    bool includeFontForBox(InlineBox*) const;
-    bool includeGlyphsForBox(InlineBox*) const;
-    bool includeMarginForBox(InlineBox*) const;
     bool fitsToGlyphs() const;
     bool includesRootLineBoxFontOrLeading() const;
     
@@ -201,6 +192,11 @@ public:
 private:
     virtual bool isRootInlineBox() const override final { return true; }
 
+    bool includeLeadingForBox(InlineBox&) const;
+    bool includeFontForBox(InlineBox&) const;
+    bool includeGlyphsForBox(InlineBox&) const;
+    bool includeMarginForBox(InlineBox&) const;
+
     LayoutUnit lineSnapAdjustment(LayoutUnit delta = 0) const;
 
     LayoutUnit beforeAnnotationsAdjustment() const;
@@ -224,7 +220,7 @@ private:
 
     // Floats hanging off the line are pushed into this vector during layout. It is only
     // good for as long as the line has not been marked dirty.
-    OwnPtr<Vector<RenderBox*>> m_floats;
+    std::unique_ptr<Vector<RenderBox*>> m_floats;
 };
 
 INLINE_BOX_OBJECT_TYPE_CASTS(RootInlineBox, isRootInlineBox())

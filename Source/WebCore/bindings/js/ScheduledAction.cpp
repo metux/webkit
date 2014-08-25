@@ -46,7 +46,7 @@ using namespace JSC;
 
 namespace WebCore {
 
-PassOwnPtr<ScheduledAction> ScheduledAction::create(ExecState* exec, DOMWrapperWorld& isolatedWorld, ContentSecurityPolicy* policy)
+std::unique_ptr<ScheduledAction> ScheduledAction::create(ExecState* exec, DOMWrapperWorld& isolatedWorld, ContentSecurityPolicy* policy)
 {
     JSValue v = exec->argument(0);
     CallData callData;
@@ -56,10 +56,10 @@ PassOwnPtr<ScheduledAction> ScheduledAction::create(ExecState* exec, DOMWrapperW
         String string = v.toString(exec)->value(exec);
         if (exec->hadException())
             return nullptr;
-        return adoptPtr(new ScheduledAction(string, isolatedWorld));
+        return std::unique_ptr<ScheduledAction>(new ScheduledAction(string, isolatedWorld));
     }
 
-    return adoptPtr(new ScheduledAction(exec, v, isolatedWorld));
+    return std::unique_ptr<ScheduledAction>(new ScheduledAction(exec, v, isolatedWorld));
 }
 
 ScheduledAction::ScheduledAction(ExecState* exec, JSValue function, DOMWrapperWorld& isolatedWorld)
@@ -76,10 +76,8 @@ void ScheduledAction::execute(ScriptExecutionContext* context)
 {
     if (context->isDocument())
         execute(toDocument(context));
-    else {
-        ASSERT_WITH_SECURITY_IMPLICATION(context->isWorkerGlobalScope());
-        execute(static_cast<WorkerGlobalScope*>(context));
-    }
+    else
+        execute(toWorkerGlobalScope(context));
 }
 
 void ScheduledAction::executeFunctionInContext(JSGlobalObject* globalObject, JSValue thisValue, ScriptExecutionContext* context)
@@ -101,15 +99,16 @@ void ScheduledAction::executeFunctionInContext(JSGlobalObject* globalObject, JSV
 
     InspectorInstrumentationCookie cookie = JSMainThreadExecState::instrumentFunctionCall(context, callType, callData);
 
+    JSValue exception;
     if (context->isDocument())
-        JSMainThreadExecState::call(exec, m_function.get(), callType, callData, thisValue, args);
+        JSMainThreadExecState::call(exec, m_function.get(), callType, callData, thisValue, args, &exception);
     else
-        JSC::call(exec, m_function.get(), callType, callData, thisValue, args);
+        JSC::call(exec, m_function.get(), callType, callData, thisValue, args, &exception);
 
-    InspectorInstrumentation::didCallFunction(cookie);
+    InspectorInstrumentation::didCallFunction(cookie, context);
 
-    if (exec->hadException())
-        reportCurrentException(exec);
+    if (exception)
+        reportException(exec, exception);
 }
 
 void ScheduledAction::execute(Document* document)
@@ -131,7 +130,7 @@ void ScheduledAction::execute(Document* document)
 void ScheduledAction::execute(WorkerGlobalScope* workerGlobalScope)
 {
     // In a Worker, the execution should always happen on a worker thread.
-    ASSERT(workerGlobalScope->thread()->threadID() == currentThread());
+    ASSERT(workerGlobalScope->thread().threadID() == currentThread());
 
     WorkerScriptController* scriptController = workerGlobalScope->script();
 

@@ -25,7 +25,10 @@
 #include <WebCore/GUniquePtrGtk.h>
 
 WebViewTest::WebViewTest()
-    : m_webView(WEBKIT_WEB_VIEW(g_object_ref_sink(webkit_web_view_new())))
+    : WebViewTest(WEBKIT_WEB_VIEW(webkit_web_view_new())) { }
+
+WebViewTest::WebViewTest(WebKitWebView* webView)
+    : m_webView(WEBKIT_WEB_VIEW(g_object_ref_sink(webView)))
     , m_mainLoop(g_main_loop_new(0, TRUE))
     , m_parentWindow(0)
     , m_javascriptResult(0)
@@ -66,6 +69,15 @@ void WebViewTest::loadPlainText(const char* plainText)
 {
     m_activeURI = "about:blank";
     webkit_web_view_load_plain_text(m_webView, plainText);
+}
+
+void WebViewTest::loadBytes(GBytes* bytes, const char* mimeType, const char* encoding, const char* baseURI)
+{
+    if (!baseURI)
+        m_activeURI = "about:blank";
+    else
+        m_activeURI = baseURI;
+    webkit_web_view_load_bytes(m_webView, bytes, mimeType, encoding, baseURI);
 }
 
 void WebViewTest::loadRequest(WebKitURIRequest* request)

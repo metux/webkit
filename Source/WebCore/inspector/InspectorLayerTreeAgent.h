@@ -10,7 +10,7 @@
  * 2.  Redistributions in binary form must reproduce the above copyright
  *     notice, this list of conditions and the following disclaimer in the
  *     documentation and/or other materials provided with the distribution.
- * 3.  Neither the name of Apple Computer, Inc. ("Apple") nor the names of
+ * 3.  Neither the name of Apple Inc. ("Apple") nor the names of
  *     its contributors may be used to endorse or promote products derived
  *     from this software without specific prior written permission.
  *
@@ -36,7 +36,6 @@
 #include "InspectorWebFrontendDispatchers.h"
 #include "InspectorWebTypeBuilders.h"
 #include "RenderLayer.h"
-#include <wtf/PassOwnPtr.h>
 #include <wtf/PassRefPtr.h>
 #include <wtf/Vector.h>
 #include <wtf/text/WTFString.h>
@@ -48,6 +47,7 @@ class InstrumentingAgents;
 typedef String ErrorString;
 
 class InspectorLayerTreeAgent : public InspectorAgentBase, public Inspector::InspectorLayerTreeBackendDispatcherHandler {
+    WTF_MAKE_FAST_ALLOCATED;
 public:
     explicit InspectorLayerTreeAgent(InstrumentingAgents*);
     ~InspectorLayerTreeAgent();

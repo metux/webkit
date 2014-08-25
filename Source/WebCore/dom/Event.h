@@ -34,7 +34,7 @@
 
 namespace WebCore {
 
-class Clipboard;
+class DataTransfer;
 class EventTarget;
 class HTMLIFrameElement;
 
@@ -125,7 +125,7 @@ public:
     bool legacyReturnValue() const { return !defaultPrevented(); }
     void setLegacyReturnValue(bool returnValue) { setDefaultPrevented(!returnValue); }
 
-    Clipboard* clipboardData() const { return isClipboardEvent() ? clipboard() : 0; }
+    DataTransfer* clipboardData() const { return isClipboardEvent() ? internalDataTransfer() : 0; }
 
     virtual EventInterface eventInterface() const;
 
@@ -144,6 +144,10 @@ public:
     virtual bool isBeforeTextInsertedEvent() const;
 
     virtual bool isBeforeUnloadEvent() const;
+
+    virtual bool isErrorEvent() const;
+    virtual bool isTextEvent() const;
+    virtual bool isWheelEvent() const;
 
     bool propagationStopped() const { return m_propagationStopped || m_immediatePropagationStopped; }
     bool immediatePropagationStopped() const { return m_immediatePropagationStopped; }
@@ -165,7 +169,7 @@ public:
     Event* underlyingEvent() const { return m_underlyingEvent.get(); }
     void setUnderlyingEvent(PassRefPtr<Event>);
 
-    virtual Clipboard* clipboard() const { return 0; }
+    virtual DataTransfer* internalDataTransfer() const { return 0; }
 
     bool isBeingDispatched() const { return eventPhase(); }
 
@@ -200,6 +204,10 @@ private:
 
     RefPtr<Event> m_underlyingEvent;
 };
+
+#define EVENT_TYPE_CASTS(ToValueTypeName) \
+    TYPE_CASTS_BASE(ToValueTypeName, Event, event, event->is##ToValueTypeName(), event.is##ToValueTypeName())
+
 
 } // namespace WebCore
 

@@ -11,7 +11,7 @@
  * 2.  Redistributions in binary form must reproduce the above copyright
  *     notice, this list of conditions and the following disclaimer in the
  *     documentation and/or other materials provided with the distribution. 
- * 3.  Neither the name of Apple Computer, Inc. ("Apple") nor the names of
+ * 3.  Neither the name of Apple Inc. ("Apple") nor the names of
  *     its contributors may be used to endorse or promote products derived
  *     from this software without specific prior written permission. 
  *
@@ -45,6 +45,7 @@ class StringWithDirection;
 
 class HistoryController {
     WTF_MAKE_NONCOPYABLE(HistoryController);
+    WTF_MAKE_FAST_ALLOCATED;
 public:
     enum HistoryUpdateType { UpdateAll, UpdateAllExceptBackForwardList };
 
@@ -79,6 +80,7 @@ public:
     void replaceCurrentItem(HistoryItem*);
 
     HistoryItem* previousItem() const { return m_previousItem.get(); }
+    void clearPreviousItem();
 
     HistoryItem* provisionalItem() const { return m_provisionalItem.get(); }
     void setProvisionalItem(HistoryItem*);
@@ -97,7 +99,7 @@ private:
     PassRefPtr<HistoryItem> createItem();
     PassRefPtr<HistoryItem> createItemTree(Frame& targetFrame, bool clipAtTarget);
 
-    void recursiveSetProvisionalItem(HistoryItem*, HistoryItem*, FrameLoadType);
+    void recursiveSetProvisionalItem(HistoryItem*, HistoryItem*);
     void recursiveGoToItem(HistoryItem*, HistoryItem*, FrameLoadType);
     bool isReplaceLoadTypeWithProvisionalItem(FrameLoadType);
     bool isReloadTypeWithProvisionalItem(FrameLoadType);

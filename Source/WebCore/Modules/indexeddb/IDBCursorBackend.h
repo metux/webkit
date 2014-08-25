@@ -31,14 +31,12 @@
 
 #include "IDBDatabaseBackend.h"
 #include "IDBTransactionBackend.h"
-#include "SharedBuffer.h"
-#include <wtf/OwnPtr.h>
-#include <wtf/PassOwnPtr.h>
 #include <wtf/RefPtr.h>
 
 namespace WebCore {
 
 class IDBKeyRange;
+class SharedBuffer;
 
 class IDBCursorBackend : public RefCounted<IDBCursorBackend> {
 public:
@@ -59,8 +57,8 @@ public:
 
     IDBKey* key() const { return m_currentKey.get(); }
     IDBKey* primaryKey() const { return m_currentPrimaryKey.get(); }
-    SharedBuffer* value() const { return (m_cursorType == IndexedDB::CursorType::KeyOnly) ? 0 : m_currentValue.get(); }
-    void updateCursorData(IDBKey*, IDBKey* primaryKey, SharedBuffer* value);
+    SharedBuffer* valueBuffer() const { return (m_cursorType == IndexedDB::CursorType::KeyOnly) ? nullptr : m_currentValueBuffer.get(); }
+    void updateCursorData(IDBKey*, IDBKey* primaryKey, SharedBuffer* valueBuffer);
 
     void close();
 
@@ -86,7 +84,7 @@ private:
 
     RefPtr<IDBKey> m_currentKey;
     RefPtr<IDBKey> m_currentPrimaryKey;
-    RefPtr<SharedBuffer> m_currentValue;
+    RefPtr<SharedBuffer> m_currentValueBuffer;
 
     bool m_closed;
 };

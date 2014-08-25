@@ -20,7 +20,7 @@
 #ifndef TextureMapperLayer_h
 #define TextureMapperLayer_h
 
-#if USE(ACCELERATED_COMPOSITING) && USE(TEXTURE_MAPPER)
+#if USE(TEXTURE_MAPPER)
 
 #include "FilterOperations.h"
 #include "FloatRect.h"
@@ -74,7 +74,7 @@ public:
     void setIsScrollable(bool isScrollable) { m_isScrollable = isScrollable; }
     bool isScrollable() const { return m_isScrollable; }
 
-    TextureMapper* textureMapper() const;
+    TextureMapper* textureMapper() const { return rootLayer().m_textureMapper; }
     void setTextureMapper(TextureMapper* texmap) { m_textureMapper = texmap; }
 
     void setChildren(const Vector<TextureMapperLayer*>&);
@@ -86,7 +86,7 @@ public:
     void setPreserves3D(bool);
     void setTransform(const TransformationMatrix&);
     void setChildrenTransform(const TransformationMatrix&);
-    void setContentsRect(const IntRect&);
+    void setContentsRect(const FloatRect&);
     void setMasksToBounds(bool);
     void setDrawsContent(bool);
     bool drawsContent() const { return m_state.drawsContent; }
@@ -99,8 +99,8 @@ public:
     void setBackfaceVisibility(bool);
     void setOpacity(float);
     void setSolidColor(const Color&);
-    void setContentsTileSize(const IntSize&);
-    void setContentsTilePhase(const IntPoint&);
+    void setContentsTileSize(const FloatSize&);
+    void setContentsTilePhase(const FloatPoint&);
 #if ENABLE(CSS_FILTERS)
     void setFilters(const FilterOperations&);
 #endif
@@ -134,7 +134,14 @@ public:
     void addChild(TextureMapperLayer*);
 
 private:
-    const TextureMapperLayer* rootLayer() const;
+    const TextureMapperLayer& rootLayer() const
+    {
+        if (m_effectTarget)
+            return m_effectTarget->rootLayer();
+        if (m_parent)
+            return m_parent->rootLayer();
+        return *this;
+    }
     void computeTransformsRecursive();
 
     static int compareGraphicsLayersZValue(const void* a, const void* b);
@@ -210,8 +217,8 @@ private:
         TransformationMatrix childrenTransform;
         float opacity;
         FloatRect contentsRect;
-        IntSize contentsTileSize;
-        IntPoint contentsTilePhase;
+        FloatSize contentsTileSize;
+        FloatPoint contentsTilePhase;
         TextureMapperLayer* maskLayer;
         TextureMapperLayer* replicaLayer;
         Color solidColor;

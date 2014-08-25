@@ -20,7 +20,6 @@
 #ifndef SVGForeignObjectElement_h
 #define SVGForeignObjectElement_h
 
-#if ENABLE(SVG)
 #include "SVGAnimatedBoolean.h"
 #include "SVGAnimatedLength.h"
 #include "SVGExternalResourcesRequired.h"
@@ -47,7 +46,7 @@ private:
     virtual bool childShouldCreateRenderer(const Node&) const override;
     virtual RenderPtr<RenderElement> createElementRenderer(PassRef<RenderStyle>) override;
 
-    virtual bool selfHasRelativeLengths() const override;
+    virtual bool selfHasRelativeLengths() const override { return true; }
 
     BEGIN_DECLARE_ANIMATED_PROPERTIES(SVGForeignObjectElement)
         DECLARE_ANIMATED_LENGTH(X, x)
@@ -63,5 +62,4 @@ NODE_TYPE_CASTS(SVGForeignObjectElement)
 
 } // namespace WebCore
 
-#endif // ENABLE(SVG)
 #endif

@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2006 Alexander Kellett <lypanov@kde.org>
- * Copyright (C) 2006 Apple Computer, Inc.
+ * Copyright (C) 2006 Apple Inc.
  * Copyright (C) 2007 Nikolas Zimmermann <zimmermann@kde.org>
  * Copyright (C) 2007, 2008, 2009 Rob Buis <buis@kde.org>
  * Copyright (C) 2009 Google, Inc.
@@ -24,8 +24,6 @@
  */
 
 #include "config.h"
-
-#if ENABLE(SVG)
 #include "RenderSVGImage.h"
 
 #include "Attr.h"
@@ -35,6 +33,7 @@
 #include "PointerEventsHitRules.h"
 #include "RenderImageResource.h"
 #include "RenderLayer.h"
+#include "RenderSVGResource.h"
 #include "RenderSVGResourceFilter.h"
 #include "SVGImageElement.h"
 #include "SVGLength.h"
@@ -46,7 +45,7 @@
 namespace WebCore {
 
 RenderSVGImage::RenderSVGImage(SVGImageElement& element, PassRef<RenderStyle> style)
-    : RenderSVGModelObject(element, std::move(style))
+    : RenderSVGModelObject(element, WTF::move(style))
     , m_needsBoundariesUpdate(true)
     , m_needsTransformUpdate(true)
     , m_imageResource(std::make_unique<RenderImageResource>())
@@ -67,16 +66,32 @@ SVGImageElement& RenderSVGImage::imageElement() const
 bool RenderSVGImage::updateImageViewport()
 {
     FloatRect oldBoundaries = m_objectBoundingBox;
+    bool updatedViewport = false;
 
     SVGLengthContext lengthContext(&imageElement());
     m_objectBoundingBox = FloatRect(imageElement().x().value(lengthContext), imageElement().y().value(lengthContext), imageElement().width().value(lengthContext), imageElement().height().value(lengthContext));
 
-    if (oldBoundaries == m_objectBoundingBox)
-        return false;
+    // Images with preserveAspectRatio=none should force non-uniform scaling. This can be achieved
+    // by setting the image's container size to its intrinsic size.
+    // See: http://www.w3.org/TR/SVG/single-page.html, 7.8 The ‘preserveAspectRatio’ attribute.
+    if (imageElement().preserveAspectRatio().align() == SVGPreserveAspectRatio::SVG_PRESERVEASPECTRATIO_NONE) {
+        if (CachedImage* cachedImage = imageResource().cachedImage()) {
+            LayoutSize intrinsicSize = cachedImage->imageSizeForRenderer(0, style().effectiveZoom());
+            if (intrinsicSize != imageResource().imageSize(style().effectiveZoom())) {
+                imageResource().setContainerSizeForRenderer(roundedIntSize(intrinsicSize));
+                updatedViewport = true;
+            }
+        }
+    }
 
-    imageResource().setContainerSizeForRenderer(enclosingIntRect(m_objectBoundingBox).size());
-    m_needsBoundariesUpdate = true;
-    return true;
+    if (oldBoundaries != m_objectBoundingBox) {
+        if (!updatedViewport)
+            imageResource().setContainerSizeForRenderer(enclosingIntRect(m_objectBoundingBox).size());
+        updatedViewport = true;
+        m_needsBoundariesUpdate = true;
+    }
+
+    return updatedViewport;
 }
 
 void RenderSVGImage::layout()
@@ -117,7 +132,8 @@ void RenderSVGImage::layout()
 
 void RenderSVGImage::paint(PaintInfo& paintInfo, const LayoutPoint&)
 {
-    if (paintInfo.context->paintingDisabled() || style().visibility() == HIDDEN || !imageResource().hasImage())
+    if (paintInfo.context->paintingDisabled() || paintInfo.phase != PaintPhaseForeground
+        || style().visibility() == HIDDEN || !imageResource().hasImage())
         return;
 
     FloatRect boundingBox = repaintRectInLocalCoordinates();
@@ -125,25 +141,22 @@ void RenderSVGImage::paint(PaintInfo& paintInfo, const LayoutPoint&)
         return;
 
     PaintInfo childPaintInfo(paintInfo);
-    bool drawsOutline = style().outlineWidth() && (childPaintInfo.phase == PaintPhaseOutline || childPaintInfo.phase == PaintPhaseSelfOutline);
-    if (drawsOutline || childPaintInfo.phase == PaintPhaseForeground) {
-        GraphicsContextStateSaver stateSaver(*childPaintInfo.context);
-        childPaintInfo.applyTransform(m_localTransform);
+    GraphicsContextStateSaver stateSaver(*childPaintInfo.context);
+    childPaintInfo.applyTransform(m_localTransform);
 
-        if (childPaintInfo.phase == PaintPhaseForeground) {
-            SVGRenderingContext renderingContext(*this, childPaintInfo);
+    if (childPaintInfo.phase == PaintPhaseForeground) {
+        SVGRenderingContext renderingContext(*this, childPaintInfo);
 
-            if (renderingContext.isRenderingPrepared()) {
-                if (style().svgStyle().bufferedRendering() == BR_STATIC  && renderingContext.bufferForeground(m_bufferedForeground))
-                    return;
+        if (renderingContext.isRenderingPrepared()) {
+            if (style().svgStyle().bufferedRendering() == BR_STATIC  && renderingContext.bufferForeground(m_bufferedForeground))
+                return;
 
-                paintForeground(childPaintInfo);
-            }
+            paintForeground(childPaintInfo);
         }
-
-        if (drawsOutline)
-            paintOutline(childPaintInfo, IntRect(boundingBox));
     }
+
+    if (style().outlineWidth())
+        paintOutline(childPaintInfo, IntRect(boundingBox));
 }
 
 void RenderSVGImage::paintForeground(PaintInfo& paintInfo)
@@ -216,5 +229,3 @@ void RenderSVGImage::addFocusRingRects(Vector<IntRect>& rects, const LayoutPoint
 }
 
 } // namespace WebCore
-
-#endif // ENABLE(SVG)

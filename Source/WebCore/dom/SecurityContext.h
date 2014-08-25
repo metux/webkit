@@ -13,7 +13,7 @@
  * THIS SOFTWARE IS PROVIDED BY GOOGLE, INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -27,6 +27,7 @@
 #ifndef SecurityContext_h
 #define SecurityContext_h
 
+#include <memory>
 #include <wtf/PassRefPtr.h>
 #include <wtf/RefPtr.h>
 #include <wtf/text/WTFString.h>
@@ -48,8 +49,7 @@ enum SandboxFlag {
     SandboxTopNavigation = 1 << 5,
     SandboxPopups = 1 << 6, // See https://www.w3.org/Bugs/Public/show_bug.cgi?id=12393
     SandboxAutomaticFeatures = 1 << 7,
-    SandboxSeamlessIframes = 1 << 8,
-    SandboxPointerLock = 1 << 9,
+    SandboxPointerLock = 1 << 8,
     SandboxAll = -1 // Mask with all bits set to 1.
 };
 
@@ -77,20 +77,16 @@ protected:
     SecurityContext();
     virtual ~SecurityContext();
 
-    void setContentSecurityPolicy(PassOwnPtr<ContentSecurityPolicy>);
+    void setContentSecurityPolicy(std::unique_ptr<ContentSecurityPolicy>);
 
     void didFailToInitializeSecurityOrigin() { m_haveInitializedSecurityOrigin = false; }
     bool haveInitializedSecurityOrigin() const { return m_haveInitializedSecurityOrigin; }
-
-    // Set in Document::initSecurityContext() at Document creation, per:
-    // http://www.whatwg.org/specs/web-apps/current-work/#attr-iframe-seamless
-    bool m_mayDisplaySeamlesslyWithParent;
 
 private:
     bool m_haveInitializedSecurityOrigin;
     SandboxFlags m_sandboxFlags;
     RefPtr<SecurityOrigin> m_securityOrigin;
-    OwnPtr<ContentSecurityPolicy> m_contentSecurityPolicy;
+    std::unique_ptr<ContentSecurityPolicy> m_contentSecurityPolicy;
 };
 
 } // namespace WebCore

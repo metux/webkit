@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013 Apple Inc. All rights reserved.
+ * Copyright (C) 2013, 2014 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -31,7 +31,7 @@
 #include "DFGBasicBlockInlines.h"
 #include "DFGGraph.h"
 #include "DFGPhase.h"
-#include "Operations.h"
+#include "JSCInlines.h"
 
 namespace JSC { namespace DFG {
 
@@ -44,6 +44,8 @@ public:
     
     bool run()
     {
+        RELEASE_ASSERT(m_graph.m_refCountState == EverythingIsLive);
+        
         if (m_graph.m_form == ThreadedCPS)
             return false;
         
@@ -53,6 +55,7 @@ public:
         canonicalizeLocalsInBlocks();
         propagatePhis<LocalOperand>();
         propagatePhis<ArgumentOperand>();
+        computeIsFlushed();
         
         m_graph.m_form = ThreadedCPS;
         return true;
@@ -126,25 +129,25 @@ private:
         }
     }
     
-    ALWAYS_INLINE Node* addPhiSilently(BasicBlock* block, const CodeOrigin& codeOrigin, VariableAccessData* variable)
+    ALWAYS_INLINE Node* addPhiSilently(BasicBlock* block, const NodeOrigin& origin, VariableAccessData* variable)
     {
-        Node* result = m_graph.addNode(SpecNone, Phi, codeOrigin, OpInfo(variable));
+        Node* result = m_graph.addNode(SpecNone, Phi, origin, OpInfo(variable));
         block->phis.append(result);
         return result;
     }
     
     template<OperandKind operandKind>
-    ALWAYS_INLINE Node* addPhi(BasicBlock* block, const CodeOrigin& codeOrigin, VariableAccessData* variable, size_t index)
+    ALWAYS_INLINE Node* addPhi(BasicBlock* block, const NodeOrigin& origin, VariableAccessData* variable, size_t index)
     {
-        Node* result = addPhiSilently(block, codeOrigin, variable);
+        Node* result = addPhiSilently(block, origin, variable);
         phiStackFor<operandKind>().append(PhiStackEntry(block, index, result));
         return result;
     }
     
     template<OperandKind operandKind>
-    ALWAYS_INLINE Node* addPhi(const CodeOrigin& codeOrigin, VariableAccessData* variable, size_t index)
+    ALWAYS_INLINE Node* addPhi(const NodeOrigin& origin, VariableAccessData* variable, size_t index)
     {
-        return addPhi<operandKind>(m_block, codeOrigin, variable, index);
+        return addPhi<operandKind>(m_block, origin, variable, index);
     }
     
     template<OperandKind operandKind>
@@ -198,17 +201,17 @@ private:
             
             if (otherNode->op() == GetLocal) {
                 // Replace all references to this GetLocal with otherNode.
-                node->misc.replacement = otherNode;
+                node->replacement = otherNode;
                 return;
             }
             
             ASSERT(otherNode->op() == SetLocal);
-            node->misc.replacement = otherNode->child1().node();
+            node->replacement = otherNode->child1().node();
             return;
         }
         
         variable->setIsLoadedFrom(true);
-        Node* phi = addPhi<operandKind>(node->codeOrigin, variable, idx);
+        Node* phi = addPhi<operandKind>(node->origin, variable, idx);
         node->children.setChild1(Edge(phi));
         m_block->variablesAtHead.atFor<operandKind>(idx) = phi;
         m_block->variablesAtTail.atFor<operandKind>(idx) = node;
@@ -276,7 +279,7 @@ private:
         }
         
         variable->setIsLoadedFrom(true);
-        node->children.setChild1(Edge(addPhi<operandKind>(node->codeOrigin, variable, idx)));
+        node->children.setChild1(Edge(addPhi<operandKind>(node->origin, variable, idx)));
         m_block->variablesAtHead.atFor<operandKind>(idx) = node;
         m_block->variablesAtTail.atFor<operandKind>(idx) = node;
     }
@@ -418,7 +421,7 @@ private:
                 
                 Node* variableInPrevious = predecessorBlock->variablesAtTail.atFor<operandKind>(index);
                 if (!variableInPrevious) {
-                    variableInPrevious = addPhi<operandKind>(predecessorBlock, currentPhi->codeOrigin, variable, index);
+                    variableInPrevious = addPhi<operandKind>(predecessorBlock, currentPhi->origin, variable, index);
                     predecessorBlock->variablesAtTail.atFor<operandKind>(index) = variableInPrevious;
                     predecessorBlock->variablesAtHead.atFor<operandKind>(index) = variableInPrevious;
                 } else {
@@ -452,7 +455,7 @@ private:
                     continue;
                 }
                 
-                Node* newPhi = addPhiSilently(block, currentPhi->codeOrigin, variable);
+                Node* newPhi = addPhiSilently(block, currentPhi->origin, variable);
                 newPhi->children = currentPhi->children;
                 currentPhi->children.initialize(newPhi, variableInPrevious, 0);
             }
@@ -480,9 +483,43 @@ private:
         return m_localPhiStack;
     }
     
+    void computeIsFlushed()
+    {
+        m_graph.clearFlagsOnAllNodes(NodeIsFlushed);
+        
+        for (BlockIndex blockIndex = m_graph.numBlocks(); blockIndex--;) {
+            BasicBlock* block = m_graph.block(blockIndex);
+            if (!block)
+                continue;
+            for (unsigned nodeIndex = block->size(); nodeIndex--;) {
+                Node* node = block->at(nodeIndex);
+                if (node->op() != Flush)
+                    continue;
+                addFlushedLocalOp(node);
+            }
+        }
+        while (!m_flushedLocalOpWorklist.isEmpty()) {
+            Node* node = m_flushedLocalOpWorklist.takeLast();
+            ASSERT(node->flags() & NodeIsFlushed);
+            DFG_NODE_DO_TO_CHILDREN(m_graph, node, addFlushedLocalEdge);
+        }
+    }
+    
+    void addFlushedLocalOp(Node* node)
+    {
+        if (node->mergeFlags(NodeIsFlushed))
+            m_flushedLocalOpWorklist.append(node);
+    }
+
+    void addFlushedLocalEdge(Node*, Edge edge)
+    {
+        addFlushedLocalOp(edge.node());
+    }
+
     BasicBlock* m_block;
     Vector<PhiStackEntry, 128> m_argumentPhiStack;
     Vector<PhiStackEntry, 128> m_localPhiStack;
+    Vector<Node*, 128> m_flushedLocalOpWorklist;
 };
 
 bool performCPSRethreading(Graph& graph)

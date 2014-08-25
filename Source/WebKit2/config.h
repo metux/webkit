@@ -24,15 +24,14 @@
  * THE POSSIBILITY OF SUCH DAMAGE.
  */ 
 
-#if defined(BUILDING_WITH_CMAKE)
+#if defined(HAVE_CONFIG_H) && HAVE_CONFIG_H && defined(BUILDING_WITH_CMAKE)
 #include "cmakeconfig.h"
-#elif defined(BUILDING_GTK__)
-#include "autotoolsconfig.h"
 #endif
+
+#include <wtf/Platform.h>
 
 #include <runtime/JSExportMacros.h>
 #include <wtf/DisallowCType.h>
-#include <wtf/Platform.h>
 #include <wtf/ExportMacros.h>
 
 #ifdef __cplusplus
@@ -70,19 +69,31 @@
 #define PLUGIN_ARCHITECTURE(ARCH) (defined PLUGIN_ARCHITECTURE_##ARCH && PLUGIN_ARCHITECTURE_##ARCH)
 
 #ifndef ENABLE_INSPECTOR_SERVER
-#if ENABLE(INSPECTOR) && (PLATFORM(GTK) || PLATFORM(EFL))
+#if ENABLE(INSPECTOR) && ENABLE(WEB_SOCKETS) && (PLATFORM(GTK) || PLATFORM(EFL))
 #define ENABLE_INSPECTOR_SERVER 1
 #endif
 #endif
 
 #ifndef ENABLE_SEC_ITEM_SHIM
-#if PLATFORM(MAC) && !PLATFORM(IOS)
+#if PLATFORM(MAC) || PLATFORM(IOS)
 #define ENABLE_SEC_ITEM_SHIM 1
 #endif
 #endif
 
 #ifndef HAVE_WINDOW_SERVER_OCCLUSION_NOTIFICATIONS
-#if PLATFORM(MAC) && !PLATFORM(IOS) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 1090
+#if PLATFORM(MAC) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 1090
 #define HAVE_WINDOW_SERVER_OCCLUSION_NOTIFICATIONS 1
+#endif
+#endif
+
+#ifndef HAVE_VOUCHERS
+#if PLATFORM(IOS) || (PLATFORM(MAC) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 101000)
+#define HAVE_VOUCHERS 1
+#endif
+#endif
+
+#ifndef HAVE_SEC_ACCESS_CONTROL
+#if PLATFORM(IOS) || (PLATFORM(MAC) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 101000)
+#define HAVE_SEC_ACCESS_CONTROL 1
 #endif
 #endif

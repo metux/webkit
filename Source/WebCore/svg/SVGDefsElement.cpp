@@ -19,8 +19,6 @@
  */
 
 #include "config.h"
-
-#if ENABLE(SVG)
 #include "SVGDefsElement.h"
 
 #include "RenderSVGHiddenContainer.h"
@@ -55,9 +53,7 @@ bool SVGDefsElement::isValid() const
 
 RenderPtr<RenderElement> SVGDefsElement::createElementRenderer(PassRef<RenderStyle> style)
 {
-    return createRenderer<RenderSVGHiddenContainer>(*this, std::move(style));
+    return createRenderer<RenderSVGHiddenContainer>(*this, WTF::move(style));
 }
 
 }
-
-#endif // ENABLE(SVG)

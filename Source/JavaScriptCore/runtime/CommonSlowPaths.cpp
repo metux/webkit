@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011, 2012, 2013 Apple Inc. All rights reserved.
+ * Copyright (C) 2011, 2012, 2013, 2014 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -25,15 +25,16 @@
 
 #include "config.h"
 #include "CommonSlowPaths.h"
-
-#if ENABLE(JIT) || ENABLE(LLINT)
-
 #include "Arguments.h"
+#include "ArityCheckFailReturnThunks.h"
 #include "ArrayConstructor.h"
 #include "CallFrame.h"
 #include "CodeProfiling.h"
 #include "CommonSlowPathsExceptions.h"
+#include "ErrorHandlingScope.h"
+#include "ExceptionFuzz.h"
 #include "GetterSetter.h"
+#include "HighFidelityLog.h"
 #include "HostCallReturnValue.h"
 #include "Interpreter.h"
 #include "JIT.h"
@@ -42,15 +43,16 @@
 #include "JSCJSValue.h"
 #include "JSGlobalObjectFunctions.h"
 #include "JSNameScope.h"
-#include "JSPropertyNameIterator.h"
+#include "JSPropertyNameEnumerator.h"
 #include "JSString.h"
 #include "JSWithScope.h"
 #include "LLIntCommon.h"
 #include "LLIntExceptions.h"
 #include "LowLevelInterpreter.h"
 #include "ObjectConstructor.h"
-#include "Operations.h"
+#include "JSCInlines.h"
 #include "StructureRareDataInlines.h"
+#include "VariableWatchpointSetInlines.h"
 #include <wtf/StringPrintStream.h>
 
 namespace JSC {
@@ -70,11 +72,7 @@ namespace JSC {
     } while (false)
 #endif
 
-#if ENABLE(LLINT)
 #define RETURN_TO_THROW(exec, pc)   pc = LLInt::returnToThrow(exec)
-#else
-#define RETURN_TO_THROW(exec, pc)
-#endif
 
 #define BEGIN()                           \
     BEGIN_NO_SET_PC();                    \
@@ -96,6 +94,7 @@ namespace JSC {
     } while (false)
 
 #define CHECK_EXCEPTION() do {                    \
+        doExceptionFuzzingIfEnabled(exec, "CommonSlowPaths", pc);   \
         if (UNLIKELY(vm.exception())) {           \
             RETURN_TO_THROW(exec, pc);               \
             END_IMPL();                           \
@@ -161,34 +160,53 @@ namespace JSC {
         CALL_END_IMPL(crExec, crCallTarget);                \
     } while (false)
 
+static CommonSlowPaths::ArityCheckData* setupArityCheckData(VM& vm, int slotsToAdd)
+{
+    CommonSlowPaths::ArityCheckData* result = vm.arityCheckData.get();
+    result->paddedStackSpace = slotsToAdd;
+#if ENABLE(JIT)
+    if (vm.canUseJIT()) {
+        result->thunkToCall = vm.getCTIStub(arityFixupGenerator).code().executableAddress();
+        result->returnPC = vm.arityCheckFailReturnThunks->returnPCFor(vm, slotsToAdd * stackAlignmentRegisters()).executableAddress();
+    } else
+#endif
+    {
+        result->thunkToCall = 0;
+        result->returnPC = 0;
+    }
+    return result;
+}
+
 SLOW_PATH_DECL(slow_path_call_arityCheck)
 {
     BEGIN();
-    int SlotsToAdd = CommonSlowPaths::arityCheckFor(exec, &vm.interpreter->stack(), CodeForCall);
-    if (SlotsToAdd < 0) {
+    int slotsToAdd = CommonSlowPaths::arityCheckFor(exec, &vm.interpreter->stack(), CodeForCall);
+    if (slotsToAdd < 0) {
         exec = exec->callerFrame();
+        ErrorHandlingScope errorScope(exec->vm());
         CommonSlowPaths::interpreterThrowInCaller(exec, createStackOverflowError(exec));
         RETURN_TWO(bitwise_cast<void*>(static_cast<uintptr_t>(1)), exec);
     }
-    RETURN_TWO(0, reinterpret_cast<ExecState*>(SlotsToAdd));
+    RETURN_TWO(0, setupArityCheckData(vm, slotsToAdd));
 }
 
 SLOW_PATH_DECL(slow_path_construct_arityCheck)
 {
     BEGIN();
-    int SlotsToAdd = CommonSlowPaths::arityCheckFor(exec, &vm.interpreter->stack(), CodeForConstruct);
-    if (SlotsToAdd < 0) {
+    int slotsToAdd = CommonSlowPaths::arityCheckFor(exec, &vm.interpreter->stack(), CodeForConstruct);
+    if (slotsToAdd < 0) {
         exec = exec->callerFrame();
+        ErrorHandlingScope errorScope(exec->vm());
         CommonSlowPaths::interpreterThrowInCaller(exec, createStackOverflowError(exec));
         RETURN_TWO(bitwise_cast<void*>(static_cast<uintptr_t>(1)), exec);
     }
-    RETURN_TWO(0, reinterpret_cast<ExecState*>(SlotsToAdd));
+    RETURN_TWO(0, setupArityCheckData(vm, slotsToAdd));
 }
 
 SLOW_PATH_DECL(slow_path_touch_entry)
 {
     BEGIN();
-    exec->codeBlock()->symbolTable()->m_functionEnteredOnce.touch();
+    exec->codeBlock()->symbolTable()->m_functionEnteredOnce.touch("Function (re)entered");
     END();
 }
 
@@ -229,10 +247,18 @@ SLOW_PATH_DECL(slow_path_to_this)
 {
     BEGIN();
     JSValue v1 = OP(1).jsValue();
-    if (v1.isCell())
-        pc[2].u.structure.set(exec->vm(), exec->codeBlock()->ownerExecutable(), v1.asCell()->structure());
-    else
+    if (v1.isCell()) {
+        Structure* myStructure = v1.asCell()->structure(vm);
+        Structure* otherStructure = pc[2].u.structure.get();
+        if (myStructure != otherStructure) {
+            if (otherStructure)
+                pc[3].u.toThisStatus = ToThisConflicted;
+            pc[2].u.structure.set(vm, exec->codeBlock()->ownerExecutable(), myStructure);
+        }
+    } else {
+        pc[3].u.toThisStatus = ToThisConflicted;
         pc[2].u.structure.clear();
+    }
     RETURN(v1.toThis(exec, exec->codeBlock()->isStrictMode() ? StrictMode : NotStrictMode));
 }
 
@@ -241,7 +267,7 @@ SLOW_PATH_DECL(slow_path_captured_mov)
     BEGIN();
     JSValue value = OP_C(2).jsValue();
     if (VariableWatchpointSet* set = pc[3].u.watchpointSet)
-        set->notifyWrite(value);
+        set->notifyWrite(vm, value, "Executed op_captured_mov");
     RETURN(value);
 }
 
@@ -249,13 +275,10 @@ SLOW_PATH_DECL(slow_path_new_captured_func)
 {
     BEGIN();
     CodeBlock* codeBlock = exec->codeBlock();
-    ASSERT(
-        codeBlock->codeType() != FunctionCode
-        || !codeBlock->needsFullScopeChain()
-        || exec->uncheckedR(codeBlock->activationRegister().offset()).jsValue());
+    ASSERT(codeBlock->codeType() != FunctionCode || !codeBlock->needsActivation() || exec->hasActivation());
     JSValue value = JSFunction::create(vm, codeBlock->functionDecl(pc[2].u.operand), exec->scope());
     if (VariableWatchpointSet* set = pc[3].u.watchpointSet)
-        set->notifyWrite(value);
+        set->notifyWrite(vm, value, "Executed op_new_captured_func");
     RETURN(value);
 }
 
@@ -515,6 +538,112 @@ SLOW_PATH_DECL(slow_path_enter)
     END();
 }
 
-} // namespace JSC
+SLOW_PATH_DECL(slow_path_get_enumerable_length)
+{
+    BEGIN();
+    JSValue baseValue = OP(2).jsValue();
+    if (baseValue.isUndefinedOrNull())
+        RETURN(jsNumber(0));
 
-#endif // ENABLE(JIT) || ENABLE(LLINT)
+    JSObject* base = baseValue.toObject(exec);
+    RETURN(jsNumber(base->methodTable(vm)->getEnumerableLength(exec, base)));
+}
+
+SLOW_PATH_DECL(slow_path_has_indexed_property)
+{
+    BEGIN();
+    JSObject* base = OP(2).jsValue().toObject(exec);
+    JSValue property = OP(3).jsValue();
+    pc[4].u.arrayProfile->observeStructure(base->structure(vm));
+    ASSERT(property.isUInt32());
+    RETURN(jsBoolean(base->hasProperty(exec, property.asUInt32())));
+}
+
+SLOW_PATH_DECL(slow_path_has_structure_property)
+{
+    BEGIN();
+    JSObject* base = OP(2).jsValue().toObject(exec);
+    JSValue property = OP(3).jsValue();
+    ASSERT(property.isString());
+    JSPropertyNameEnumerator* enumerator = jsCast<JSPropertyNameEnumerator*>(OP(4).jsValue().asCell());
+    if (base->structure(vm)->id() == enumerator->cachedStructureID())
+        RETURN(jsBoolean(true));
+    RETURN(jsBoolean(base->hasProperty(exec, asString(property.asCell())->toIdentifier(exec))));
+}
+
+SLOW_PATH_DECL(slow_path_has_generic_property)
+{
+    BEGIN();
+    JSObject* base = OP(2).jsValue().toObject(exec);
+    JSValue property = OP(3).jsValue();
+    bool result;
+    if (property.isString())
+        result = base->hasProperty(exec, asString(property.asCell())->toIdentifier(exec));
+    else {
+        ASSERT(property.isUInt32());
+        result = base->hasProperty(exec, property.asUInt32());
+    }
+    RETURN(jsBoolean(result));
+}
+
+SLOW_PATH_DECL(slow_path_get_direct_pname)
+{
+    BEGIN();
+    JSValue baseValue = OP(2).jsValue();
+    JSValue property = OP(3).jsValue();
+    ASSERT(property.isString());
+    RETURN(baseValue.get(exec, property.toString(exec)->toIdentifier(exec)));
+}
+
+SLOW_PATH_DECL(slow_path_get_structure_property_enumerator)
+{
+    BEGIN();
+    JSValue baseValue = OP(2).jsValue();
+    if (baseValue.isUndefinedOrNull())
+        RETURN(JSPropertyNameEnumerator::create(vm));
+        
+    JSObject* base = baseValue.toObject(exec);
+    uint32_t length = OP(3).jsValue().asUInt32();
+
+    RETURN(structurePropertyNameEnumerator(exec, base, length));
+}
+
+SLOW_PATH_DECL(slow_path_get_generic_property_enumerator)
+{
+    BEGIN();
+    JSValue baseValue = OP(2).jsValue();
+    if (baseValue.isUndefinedOrNull())
+        RETURN(JSPropertyNameEnumerator::create(vm));
+    
+    JSObject* base = baseValue.toObject(exec);
+    uint32_t length = OP(3).jsValue().asUInt32();
+    JSPropertyNameEnumerator* structureEnumerator = jsCast<JSPropertyNameEnumerator*>(OP(4).jsValue().asCell());
+
+    RETURN(genericPropertyNameEnumerator(exec, base, length, structureEnumerator));
+}
+
+SLOW_PATH_DECL(slow_path_next_enumerator_pname)
+{
+    BEGIN();
+    JSPropertyNameEnumerator* enumerator = jsCast<JSPropertyNameEnumerator*>(OP(2).jsValue().asCell());
+    uint32_t index = OP(3).jsValue().asUInt32();
+    JSString* propertyName = enumerator->propertyNameAtIndex(index);
+    RETURN(propertyName ? propertyName : jsNull());
+}
+
+SLOW_PATH_DECL(slow_path_to_index_string)
+{
+    BEGIN();
+    RETURN(jsString(exec, Identifier::from(exec, OP(2).jsValue().asUInt32()).string()));
+}
+
+SLOW_PATH_DECL(slow_path_profile_types_with_high_fidelity)
+{
+    BEGIN();
+    TypeLocation* location = pc[2].u.location;
+    JSValue val = OP_C(1).jsValue();
+    vm.highFidelityLog()->recordTypeInformationForLocation(val, location);
+    END();
+}
+
+} // namespace JSC

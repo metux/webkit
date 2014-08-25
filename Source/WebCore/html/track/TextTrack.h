@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2011 Google Inc. All rights reserved.
- * Copyright (C) 2011, 2012, 2013 Apple Inc.  All rights reserved.
+ * Copyright (C) 2011, 2012, 2013, 2014 Apple Inc.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -11,10 +11,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -32,7 +32,7 @@
 #include "ExceptionCode.h"
 #include "TextTrackCue.h"
 #include "TrackBase.h"
-#include <wtf/PassOwnPtr.h>
+#include "VTTCue.h"
 #include <wtf/RefCounted.h>
 #include <wtf/text/WTFString.h>
 
@@ -46,8 +46,8 @@ class ScriptExecutionContext;
 class TextTrack;
 class TextTrackCueList;
 #if ENABLE(WEBVTT_REGIONS)
-class TextTrackRegion;
-class TextTrackRegionList;
+class VTTRegion;
+class VTTRegionList;
 #endif
 
 class TextTrackClient {
@@ -94,6 +94,8 @@ public:
 
     virtual void setKind(const AtomicString&) override;
 
+    virtual AtomicString inBandMetadataTrackDispatchType() const { return emptyString(); }
+
     AtomicString mode() const { return m_mode; }
     virtual void setMode(const AtomicString&);
 
@@ -107,15 +109,15 @@ public:
     virtual void clearClient() override { m_client = 0; }
     TextTrackClient* client() { return m_client; }
 
-    void addCue(PassRefPtr<TextTrackCue>);
+    void addCue(PassRefPtr<TextTrackCue>, ExceptionCode&);
     virtual void removeCue(TextTrackCue*, ExceptionCode&);
 
     bool hasCue(TextTrackCue*, TextTrackCue::CueMatchRules = TextTrackCue::MatchAllFields);
 
 #if ENABLE(VIDEO_TRACK) && ENABLE(WEBVTT_REGIONS)
-    TextTrackRegionList* regions();
-    void addRegion(PassRefPtr<TextTrackRegion>);
-    void removeRegion(TextTrackRegion*, ExceptionCode&);
+    VTTRegionList* regions();
+    void addRegion(PassRefPtr<VTTRegion>);
+    void removeRegion(VTTRegion*, ExceptionCode&);
 #endif
 
     void cueWillChange(TextTrackCue*);
@@ -154,14 +156,15 @@ public:
     virtual void setLanguage(const AtomicString&) override;
 #endif
 
+    virtual bool isInband() const { return false; }
+
+    virtual double startTimeVariance() const { return 0; }
+
     using RefCounted<TrackBase>::ref;
     using RefCounted<TrackBase>::deref;
 
 protected:
     TextTrack(ScriptExecutionContext*, TextTrackClient*, const AtomicString& kind, const AtomicString& id, const AtomicString& label, const AtomicString& language, TextTrackType);
-#if ENABLE(VIDEO_TRACK) && ENABLE(WEBVTT_REGIONS)
-    TextTrackRegionList* regionList();
-#endif
 
     RefPtr<TextTrackCueList> m_cues;
 
@@ -174,8 +177,8 @@ private:
     virtual void derefEventTarget() override final { deref(); }
 
 #if ENABLE(VIDEO_TRACK) && ENABLE(WEBVTT_REGIONS)
-    TextTrackRegionList* ensureTextTrackRegionList();
-    RefPtr<TextTrackRegionList> m_regions;
+    VTTRegionList* ensureVTTRegionList();
+    RefPtr<VTTRegionList> m_regions;
 #endif
 
 #if USE(PLATFORM_TEXT_TRACK_MENU)

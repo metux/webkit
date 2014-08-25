@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2006 Oliver Hunt <ojh16@student.canterbury.ac.nz>
- * Copyright (C) 2006 Apple Computer Inc.
+ * Copyright (C) 2006 Apple Inc.
  * Copyright (C) 2007 Nikolas Zimmermann <zimmermann@kde.org>
  * Copyright (C) Research In Motion Limited 2010. All rights reserved.
  * Copyright (C) 2011 Torch Mobile (Beijing) CO. Ltd. All rights reserved.
@@ -24,7 +24,6 @@
 #include "config.h"
 #include "SVGRootInlineBox.h"
 
-#if ENABLE(SVG)
 #include "GraphicsContext.h"
 #include "RenderSVGText.h"
 #include "SVGInlineFlowBox.h"
@@ -46,7 +45,7 @@ RenderSVGText& SVGRootInlineBox::renderSVGText()
     return toRenderSVGText(blockFlow());
 }
 
-void SVGRootInlineBox::paint(PaintInfo& paintInfo, const LayoutPoint&, LayoutUnit, LayoutUnit)
+void SVGRootInlineBox::paint(PaintInfo& paintInfo, const LayoutPoint& paintOffset, LayoutUnit, LayoutUnit)
 {
     ASSERT(paintInfo.phase == PaintPhaseForeground || paintInfo.phase == PaintPhaseSelection);
     ASSERT(!paintInfo.context->paintingDisabled());
@@ -70,7 +69,7 @@ void SVGRootInlineBox::paint(PaintInfo& paintInfo, const LayoutPoint&, LayoutUni
             if (child->isSVGInlineTextBox())
                 SVGInlineFlowBox::computeTextMatchMarkerRectForRenderer(&toSVGInlineTextBox(child)->renderer());
 
-            child->paint(paintInfo, LayoutPoint(), 0, 0);
+            child->paint(paintInfo, paintOffset, 0, 0);
         }
     }
 }
@@ -311,5 +310,3 @@ void SVGRootInlineBox::reorderValueLists(Vector<SVGTextLayoutAttributes*>& attri
 }
 
 } // namespace WebCore
-
-#endif // ENABLE(SVG)

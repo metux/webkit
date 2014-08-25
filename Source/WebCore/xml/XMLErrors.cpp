@@ -33,12 +33,9 @@
 #include "Element.h"
 #include "Frame.h"
 #include "HTMLNames.h"
+#include "SVGNames.h"
 #include "Text.h"
 #include <wtf/text/WTFString.h>
-
-#if ENABLE(SVG)
-#include "SVGNames.h"
-#endif
 
 namespace WebCore {
 
@@ -129,20 +126,24 @@ void XMLErrors::insertErrorMessageBlock()
         m_document->parserAppendChild(rootElement);
         documentElement = body.get();
     }
-#if ENABLE(SVG)
     else if (documentElement->namespaceURI() == SVGNames::svgNamespaceURI) {
         RefPtr<Element> rootElement = m_document->createElement(htmlTag, true);
+        RefPtr<Element> head = m_document->createElement(headTag, true);
+        RefPtr<Element> style = m_document->createElement(styleTag, true);
+        head->parserAppendChild(style);
+        style->parserAppendChild(m_document->createTextNode("html, body { height: 100% } parsererror + svg { width: 100%; height: 100% }"));
+        style->finishParsingChildren();
+        rootElement->parserAppendChild(head);
         RefPtr<Element> body = m_document->createElement(bodyTag, true);
         rootElement->parserAppendChild(body);
 
-        documentElement->parentNode()->parserRemoveChild(*documentElement);
+        m_document->parserRemoveChild(*documentElement);
 
         body->parserAppendChild(documentElement);
-        m_document->parserAppendChild(rootElement.get());
+        m_document->parserAppendChild(rootElement);
 
         documentElement = body.get();
     }
-#endif
 
     String errorMessages = m_errorMessages.toString();
     RefPtr<Element> reportElement = createXHTMLParserErrorHeader(m_document, errorMessages);

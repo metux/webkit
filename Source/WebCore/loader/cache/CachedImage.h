@@ -44,26 +44,29 @@ class SecurityOrigin;
 
 struct Length;
 
-class CachedImage : public CachedResource, public ImageObserver {
+class CachedImage final : public CachedResource, public ImageObserver {
     friend class MemoryCache;
 
 public:
-    CachedImage(const ResourceRequest&);
-    CachedImage(Image*);
-    CachedImage(const URL&, Image*);
+    enum CacheBehaviorType { AutomaticallyCached, ManuallyCached };
+
+    CachedImage(const ResourceRequest&, SessionID);
+    CachedImage(Image*, SessionID);
+    CachedImage(const URL&, Image*, SessionID);
+    CachedImage(const URL&, Image*, CacheBehaviorType, SessionID);
     virtual ~CachedImage();
 
     Image* image(); // Returns the nullImage() if the image is not available yet.
     Image* imageForRenderer(const RenderObject*); // Returns the nullImage() if the image is not available yet.
     bool hasImage() const { return m_image.get(); }
-    bool currentFrameKnownToBeOpaque(const RenderElement*); // Side effect: ensures decoded image is in cache, therefore should only be called when about to draw the image.
+    bool currentFrameKnownToBeOpaque(const RenderElement*);
 
     std::pair<Image*, float> brokenImage(float deviceScaleFactor) const; // Returns an image and the image's resolution scale factor.
     bool willPaintBrokenImage() const; 
 
     bool canRender(const RenderObject* renderer, float multiplier) { return !errorOccurred() && !imageSizeForRenderer(renderer, multiplier).isEmpty(); }
 
-    void setContainerSizeForRenderer(const CachedImageClient*, const IntSize&, float);
+    void setContainerSizeForRenderer(const CachedImageClient*, const LayoutSize&, float);
     bool usesImageContainerSize() const;
     bool imageHasRelativeWidth() const;
     bool imageHasRelativeHeight() const;
@@ -79,12 +82,8 @@ public:
     LayoutSize imageSizeForRenderer(const RenderObject*, float multiplier, SizeType = UsedSize); // returns the size of the complete image.
     void computeIntrinsicDimensions(Length& intrinsicWidth, Length& intrinsicHeight, FloatSize& intrinsicRatio);
 
-#if USE(CF)
-    // FIXME: Remove the USE(CF) once we make MemoryCache::addImageToCache() platform-independent.
-    virtual bool isManual() const { return false; }
-#endif
-
-    static void resumeAnimatingImagesForLoader(CachedResourceLoader*);
+    bool isManuallyCached() const { return m_isManuallyCached; }
+    virtual bool mustRevalidateDueToCacheHeaders(CachePolicy) const;
 
 #if ENABLE(DISK_IMAGE_CACHE)
     virtual bool canUseDiskImageCache() const override;
@@ -100,7 +99,6 @@ private:
 
     void createImage();
     void clearImage();
-    bool canBeDrawn() const;
     // If not null, changeRect is the changed part of the image.
     void notifyObservers(const IntRect* changeRect = 0);
     virtual PurgePriority purgePriority() const override { return PurgeFirst; }
@@ -122,45 +120,28 @@ private:
     // For compatibility, images keep loading even if there are HTTP errors.
     virtual bool shouldIgnoreHTTPStatusCodeErrors() const override { return true; }
 
-    virtual bool isImage() const override { return true; }
     virtual bool stillNeedsLoad() const override { return !errorOccurred() && status() == Unknown && !isLoading(); }
 
     // ImageObserver
     virtual void decodedSizeChanged(const Image*, int delta) override;
     virtual void didDraw(const Image*) override;
 
-    virtual bool shouldPauseAnimation(const Image*) override;
     virtual void animationAdvanced(const Image*) override;
     virtual void changedInRect(const Image*, const IntRect&) override;
 
     void addIncrementalDataBuffer(ResourceBuffer*);
 
-    typedef std::pair<IntSize, float> SizeAndZoom;
+    typedef std::pair<LayoutSize, float> SizeAndZoom;
     typedef HashMap<const CachedImageClient*, SizeAndZoom> ContainerSizeRequests;
     ContainerSizeRequests m_pendingContainerSizeRequests;
 
     RefPtr<Image> m_image;
-#if ENABLE(SVG)
     std::unique_ptr<SVGImageCache> m_svgImageCache;
-#endif
-    bool m_shouldPaintBrokenImage;
+    unsigned char m_isManuallyCached : 1;
+    unsigned char m_shouldPaintBrokenImage : 1;
 };
 
-#if USE(CF)
-// FIXME: We should look to incorporate the functionality of CachedImageManual
-// into CachedImage or find a better place for this class.
-// FIXME: Remove the USE(CF) once we make MemoryCache::addImageToCache() platform-independent.
-class CachedImageManual : public CachedImage {
-public:
-    CachedImageManual(const URL&, Image*);
-    void addFakeClient() { addClient(m_fakeClient.get()); }
-    void removeFakeClient() { removeClient(m_fakeClient.get()); }
-    virtual bool isManual() const override { return true; }
-    virtual bool mustRevalidateDueToCacheHeaders(CachePolicy) const;
-private:
-    std::unique_ptr<CachedResourceClient> m_fakeClient;
-};
-#endif
+CACHED_RESOURCE_TYPE_CASTS(CachedImage, CachedResource, CachedResource::ImageResource)
 
 }
 

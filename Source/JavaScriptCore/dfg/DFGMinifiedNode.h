@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012 Apple Inc. All rights reserved.
+ * Copyright (C) 2012, 2014 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -26,8 +26,6 @@
 #ifndef DFGMinifiedNode_h
 #define DFGMinifiedNode_h
 
-#include <wtf/Platform.h>
-
 #if ENABLE(DFG_JIT)
 
 #include "DFGCommon.h"
@@ -42,7 +40,8 @@ inline bool belongsInMinifiedGraph(NodeType type)
 {
     switch (type) {
     case JSConstant:
-    case WeakJSConstant:
+    case Int52Constant:
+    case DoubleConstant:
     case PhantomArguments:
         return true;
     default:
@@ -59,22 +58,11 @@ public:
     MinifiedID id() const { return m_id; }
     NodeType op() const { return m_op; }
     
-    bool hasConstant() const { return hasConstantNumber() || hasWeakConstant(); }
+    bool hasConstant() const { return hasConstant(m_op); }
     
-    bool hasConstantNumber() const { return hasConstantNumber(m_op); }
-    
-    unsigned constantNumber() const
+    JSValue constant() const
     {
-        ASSERT(hasConstantNumber(m_op));
-        return m_info;
-    }
-    
-    bool hasWeakConstant() const { return hasWeakConstant(m_op); }
-    
-    JSCell* weakConstant() const
-    {
-        ASSERT(hasWeakConstant(m_op));
-        return bitwise_cast<JSCell*>(m_info);
+        return JSValue::decode(bitwise_cast<EncodedJSValue>(m_info));
     }
     
     static MinifiedID getID(MinifiedNode* node) { return node->id(); }
@@ -84,17 +72,13 @@ public:
     }
     
 private:
-    static bool hasConstantNumber(NodeType type)
+    static bool hasConstant(NodeType type)
     {
-        return type == JSConstant;
-    }
-    static bool hasWeakConstant(NodeType type)
-    {
-        return type == WeakJSConstant;
+        return type == JSConstant || type == Int52Constant || type == DoubleConstant;
     }
     
     MinifiedID m_id;
-    uintptr_t m_info;
+    uint64_t m_info;
     NodeType m_op;
 };
 

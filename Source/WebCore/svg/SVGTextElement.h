@@ -21,7 +21,6 @@
 #ifndef SVGTextElement_h
 #define SVGTextElement_h
 
-#if ENABLE(SVG)
 #include "SVGTextPositioningElement.h"
 
 namespace WebCore {
@@ -35,8 +34,6 @@ public:
 private:
     SVGTextElement(const QualifiedName&, Document&);
 
-    virtual bool supportsFocus() const override { return true; }
-
     virtual RenderPtr<RenderElement> createElementRenderer(PassRef<RenderStyle>) override;
     virtual bool childShouldCreateRenderer(const Node&) const override;
 };
@@ -45,5 +42,4 @@ NODE_TYPE_CASTS(SVGTextElement)
 
 } // namespace WebCore
 
-#endif // ENABLE(SVG)
 #endif

@@ -158,9 +158,9 @@ bool HTMLFrameSetElement::rendererIsNeeded(const RenderStyle& style)
 RenderPtr<RenderElement> HTMLFrameSetElement::createElementRenderer(PassRef<RenderStyle> style)
 {
     if (style.get().hasContent())
-        return RenderElement::createFor(*this, std::move(style));
+        return RenderElement::createFor(*this, WTF::move(style));
     
-    return createRenderer<RenderFrameSet>(*this, std::move(style));
+    return createRenderer<RenderFrameSet>(*this, WTF::move(style));
 }
 
 HTMLFrameSetElement* HTMLFrameSetElement::findContaining(Element* descendant)
@@ -190,7 +190,7 @@ void HTMLFrameSetElement::willAttachRenderers()
 void HTMLFrameSetElement::defaultEventHandler(Event* evt)
 {
     if (evt->isMouseEvent() && !m_noresize && renderer() && renderer()->isFrameSet()) {
-        if (toRenderFrameSet(renderer())->userResize(static_cast<MouseEvent*>(evt))) {
+        if (toRenderFrameSet(renderer())->userResize(toMouseEvent(evt))) {
             evt->setDefaultHandled();
             return;
         }

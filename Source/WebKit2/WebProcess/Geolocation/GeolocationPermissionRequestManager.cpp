@@ -32,6 +32,7 @@
 #include "WebFrame.h"
 #include "WebPage.h"
 #include "WebPageProxyMessages.h"
+#include <WebCore/Document.h>
 #include <WebCore/Frame.h>
 #include <WebCore/FrameLoader.h>
 #include <WebCore/Geolocation.h>
@@ -54,15 +55,20 @@ GeolocationPermissionRequestManager::GeolocationPermissionRequestManager(WebPage
 
 void GeolocationPermissionRequestManager::startRequestForGeolocation(Geolocation* geolocation)
 {
+    Frame* frame = geolocation->frame();
+
+    ASSERT_WITH_MESSAGE(frame, "It is not well understood in which cases the Geolocation is alive after its frame goes away. If you hit this assertion, please add a test covering this case.");
+    if (!frame) {
+        geolocation->setIsAllowed(false);
+        return;
+    }
+
     uint64_t geolocationID = generateGeolocationID();
 
     m_geolocationToIDMap.set(geolocation, geolocationID);
     m_idToGeolocationMap.set(geolocationID, geolocation);
 
-    Frame* frame = geolocation->frame();
-
-    WebFrameLoaderClient* webFrameLoaderClient = toWebFrameLoaderClient(frame->loader().client());
-    WebFrame* webFrame = webFrameLoaderClient ? webFrameLoaderClient->webFrame() : 0;
+    WebFrame* webFrame = WebFrame::fromCoreFrame(*frame);
     ASSERT(webFrame);
 
     SecurityOrigin* origin = frame->document()->securityOrigin();

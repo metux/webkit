@@ -33,8 +33,8 @@
 #include <WebCore/InspectorController.h>
 #include <WebCore/Page.h>
 
-#if ENABLE(REMOTE_INSPECTOR)
-#include "WebProcess.h"
+#if PLATFORM(IOS)
+#include <WebCore/InspectorOverlay.h>
 #endif
 
 using namespace WebCore;
@@ -47,9 +47,9 @@ void WebInspectorClient::inspectorDestroyed()
     delete this;
 }
 
-WebCore::InspectorFrontendChannel* WebInspectorClient::openInspectorFrontend(InspectorController*)
+WebCore::InspectorFrontendChannel* WebInspectorClient::openInspectorFrontend(InspectorController* controller)
 {
-    WebPage* inspectorPage = m_page->inspector()->createInspectorPage();
+    WebPage* inspectorPage = controller->isUnderTest() ? m_page->inspector()->createInspectorPageForTest() : m_page->inspector()->createInspectorPage();
     ASSERT_UNUSED(inspectorPage, inspectorPage);
     return this;
 }
@@ -71,31 +71,54 @@ void WebInspectorClient::didResizeMainFrame(Frame*)
         m_page->inspector()->updateDockingAvailability();
 }
 
-#if ENABLE(REMOTE_INSPECTOR)
-pid_t WebInspectorClient::parentProcessIdentifier() const
-{
-    return WebProcess::shared().presenterApplicationPid();
-}
-#endif
-
 void WebInspectorClient::highlight()
 {
+#if !PLATFORM(IOS)
     if (!m_highlightOverlay) {
         RefPtr<PageOverlay> highlightOverlay = PageOverlay::create(this);
         m_highlightOverlay = highlightOverlay.get();
-        m_page->installPageOverlay(highlightOverlay.release(), true);
+        m_page->installPageOverlay(highlightOverlay.release(), PageOverlay::FadeMode::Fade);
         m_highlightOverlay->setNeedsDisplay();
     } else {
         m_highlightOverlay->stopFadeOutAnimation();
         m_highlightOverlay->setNeedsDisplay();
     }
+#else
+    Highlight highlight;
+    m_page->corePage()->inspectorController().getHighlight(&highlight, InspectorOverlay::CoordinateSystem::Document);
+    m_page->showInspectorHighlight(highlight);
+#endif
 }
 
 void WebInspectorClient::hideHighlight()
 {
+#if !PLATFORM(IOS)
     if (m_highlightOverlay)
-        m_page->uninstallPageOverlay(m_highlightOverlay, true);
+        m_page->uninstallPageOverlay(m_highlightOverlay, PageOverlay::FadeMode::Fade);
+#else
+    m_page->hideInspectorHighlight();
+#endif
 }
+
+#if PLATFORM(IOS)
+void WebInspectorClient::showInspectorIndication()
+{
+    m_page->showInspectorIndication();
+}
+
+void WebInspectorClient::hideInspectorIndication()
+{
+    m_page->hideInspectorIndication();
+}
+
+void WebInspectorClient::didSetSearchingForNode(bool enabled)
+{
+    if (enabled)
+        m_page->enableInspectorNodeSearch();
+    else
+        m_page->disableInspectorNodeSearch();
+}
+#endif
 
 bool WebInspectorClient::sendMessageToFrontend(const String& message)
 {

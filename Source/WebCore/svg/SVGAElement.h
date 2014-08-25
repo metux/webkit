@@ -22,7 +22,6 @@
 #ifndef SVGAElement_h
 #define SVGAElement_h
 
-#if ENABLE(SVG)
 #include "SVGAnimatedBoolean.h"
 #include "SVGExternalResourcesRequired.h"
 #include "SVGGraphicsElement.h"
@@ -58,6 +57,8 @@ private:
     virtual bool isKeyboardFocusable(KeyboardEvent*) const override;
     virtual bool isFocusable() const override;
     virtual bool isURLAttribute(const Attribute&) const override;
+    virtual bool canStartSelection() const override;
+    virtual short tabIndex() const override;
 
     virtual bool willRespondToMouseClickEvents() override;
 
@@ -72,5 +73,4 @@ private:
 
 } // namespace WebCore
 
-#endif // ENABLE(SVG)
 #endif // SVGAElement_h

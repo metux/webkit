@@ -33,7 +33,6 @@
 #include <wtf/RefCounted.h>
 #include <wtf/Vector.h>
 #include <wtf/text/WTFString.h>
-#include <wtf/unicode/Unicode.h>
 
 namespace JSC { namespace Yarr {
 
@@ -313,6 +312,7 @@ struct YarrPattern {
 
         m_containsBackreferences = false;
         m_containsBOL = false;
+        m_containsUnsignedLengthPattern = false;
 
         newlineCached = 0;
         digitsCached = 0;
@@ -329,6 +329,11 @@ struct YarrPattern {
     bool containsIllegalBackReference()
     {
         return m_maxBackReference > m_numSubpatterns;
+    }
+
+    bool containsUnsignedLengthPattern()
+    {
+        return m_containsUnsignedLengthPattern;
     }
 
     CharacterClass* newlineCharacterClass()
@@ -378,6 +383,7 @@ struct YarrPattern {
     bool m_multiline : 1;
     bool m_containsBackreferences : 1;
     bool m_containsBOL : 1;
+    bool m_containsUnsignedLengthPattern : 1; 
     unsigned m_numSubpatterns;
     unsigned m_maxBackReference;
     PatternDisjunction* m_body;

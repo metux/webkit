@@ -11,10 +11,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -240,6 +240,16 @@ void GraphicsContext3D::getIntegerv(GC3Denum pname, GC3Dint* value)
         *value /= 4;
         break;
 #endif
+    case MAX_TEXTURE_SIZE:
+        ::glGetIntegerv(MAX_TEXTURE_SIZE, value);
+        if (getExtensions()->requiresRestrictedMaximumTextureSize())
+            *value = std::min(4096, *value);
+        break;
+    case MAX_CUBE_MAP_TEXTURE_SIZE:
+        ::glGetIntegerv(MAX_CUBE_MAP_TEXTURE_SIZE, value);
+        if (getExtensions()->requiresRestrictedMaximumTextureSize())
+            *value = std::min(1024, *value);
+        break;
     default:
         ::glGetIntegerv(pname, value);
     }
@@ -284,13 +294,13 @@ bool GraphicsContext3D::texImage2D(GC3Denum target, GC3Dint level, GC3Denum inte
     }
 
     GC3Denum openGLInternalFormat = internalformat;
+#if !PLATFORM(IOS)
     if (type == GL_FLOAT) {
         if (format == GL_RGBA)
             openGLInternalFormat = GL_RGBA32F_ARB;
         else if (format == GL_RGB)
             openGLInternalFormat = GL_RGB32F_ARB;
     } else if (type == HALF_FLOAT_OES) {
-#if !PLATFORM(IOS)
         if (format == GL_RGBA)
             openGLInternalFormat = GL_RGBA16F_ARB;
         else if (format == GL_RGB)
@@ -302,8 +312,8 @@ bool GraphicsContext3D::texImage2D(GC3Denum target, GC3Dint level, GC3Denum inte
         else if (format == GL_LUMINANCE_ALPHA)
             openGLInternalFormat = GL_LUMINANCE_ALPHA16F_ARB;
         type = GL_HALF_FLOAT_ARB;
-#endif
     }
+#endif
     texImage2DDirect(target, level, openGLInternalFormat, width, height, border, format, type, pixels);
     return true;
 }
@@ -350,31 +360,6 @@ void GraphicsContext3D::readPixels(GC3Dint x, GC3Dint y, GC3Dsizei width, GC3Dsi
     if (m_attrs.antialias && m_state.boundFBO == m_multisampleFBO)
         ::glBindFramebufferEXT(GraphicsContext3D::FRAMEBUFFER, m_multisampleFBO);
 }
-
-#if !PLATFORM(MAC)
-void GraphicsContext3D::drawArraysInstanced(GC3Denum mode, GC3Dint first, GC3Dsizei count, GC3Dsizei primcount)
-{
-    UNUSED_PARAM(mode);
-    UNUSED_PARAM(first);
-    UNUSED_PARAM(count);
-    UNUSED_PARAM(primcount);
-}
-
-void GraphicsContext3D::drawElementsInstanced(GC3Denum mode, GC3Dsizei count, GC3Denum type, GC3Dintptr offset, GC3Dsizei primcount)
-{
-    UNUSED_PARAM(mode);
-    UNUSED_PARAM(count);
-    UNUSED_PARAM(type);
-    UNUSED_PARAM(offset);
-    UNUSED_PARAM(primcount);
-}
-
-void GraphicsContext3D::vertexAttribDivisor(GC3Duint index, GC3Duint divisor)
-{
-    UNUSED_PARAM(index);
-    UNUSED_PARAM(divisor);
-}
-#endif
 
 }
 

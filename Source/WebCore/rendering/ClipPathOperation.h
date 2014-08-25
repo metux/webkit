@@ -33,8 +33,6 @@
 #include "BasicShapes.h"
 #include "Path.h"
 #include "RenderStyleConstants.h"
-#include <wtf/OwnPtr.h>
-#include <wtf/PassOwnPtr.h>
 #include <wtf/RefCounted.h>
 #include <wtf/text/WTFString.h>
 
@@ -112,8 +110,8 @@ public:
         return path;
     }
 
-    void setReferenceBox(LayoutBox referenceBox) { m_referenceBox = referenceBox; }
-    LayoutBox referenceBox() const { return m_referenceBox; }
+    void setReferenceBox(CSSBoxType referenceBox) { m_referenceBox = referenceBox; }
+    CSSBoxType referenceBox() const { return m_referenceBox; }
 
 private:
     virtual bool operator==(const ClipPathOperation& o) const override
@@ -132,24 +130,23 @@ private:
     }
 
     RefPtr<BasicShape> m_shape;
-    LayoutBox m_referenceBox;
+    CSSBoxType m_referenceBox;
 };
 
 class BoxClipPathOperation : public ClipPathOperation {
 public:
-    static PassRefPtr<BoxClipPathOperation> create(LayoutBox referenceBox)
+    static PassRefPtr<BoxClipPathOperation> create(CSSBoxType referenceBox)
     {
         return adoptRef(new BoxClipPathOperation(referenceBox));
     }
 
-    const Path pathForReferenceRect(const FloatRect&) const
+    const Path pathForReferenceRect(const RoundedRect& boundingRect) const
     {
         Path path;
-        // FIXME: Create clipping path from <box>.
-        // https://bugs.webkit.org/show_bug.cgi?id=126205
+        path.addRoundedRect(boundingRect);
         return path;
     }
-    LayoutBox referenceBox() const { return m_referenceBox; }
+    CSSBoxType referenceBox() const { return m_referenceBox; }
 
 private:
     virtual bool operator==(const ClipPathOperation& o) const override
@@ -160,13 +157,13 @@ private:
         return m_referenceBox == other->m_referenceBox;
     }
 
-    explicit BoxClipPathOperation(LayoutBox referenceBox)
+    explicit BoxClipPathOperation(CSSBoxType referenceBox)
         : ClipPathOperation(Box)
         , m_referenceBox(referenceBox)
     {
     }
 
-    LayoutBox m_referenceBox;
+    CSSBoxType m_referenceBox;
 };
 
 #define CLIP_PATH_OPERATION_CASTS(ToValueTypeName, predicate) \

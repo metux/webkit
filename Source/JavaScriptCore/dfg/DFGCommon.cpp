@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013 Apple Inc. All rights reserved.
+ * Copyright (C) 2013, 2014 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -29,6 +29,28 @@
 #if ENABLE(DFG_JIT)
 
 #include "DFGNode.h"
+#include "JSCInlines.h"
+
+namespace JSC { namespace DFG {
+
+static unsigned crashLock;
+
+void startCrashing()
+{
+#if ENABLE(COMPARE_AND_SWAP)
+    while (!WTF::weakCompareAndSwap(&crashLock, 0, 1))
+        std::this_thread::yield();
+#else
+    crashLock = 1;
+#endif
+}
+
+bool isCrashing()
+{
+    return !!crashLock;
+}
+
+} } // namespace JSC::DFG
 
 namespace WTF {
 

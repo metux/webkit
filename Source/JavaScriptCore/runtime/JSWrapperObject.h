@@ -58,9 +58,8 @@ namespace JSC {
 
     protected:
         explicit JSWrapperObject(VM&, Structure*);
-        static const unsigned StructureFlags = OverridesVisitChildren | Base::StructureFlags;
 
-        static void visitChildren(JSCell*, SlotVisitor&);
+        JS_EXPORT_PRIVATE static void visitChildren(JSCell*, SlotVisitor&);
 
     private:
         WriteBarrier<Unknown> m_internalValue;

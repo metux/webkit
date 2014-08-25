@@ -1,7 +1,7 @@
 /* -*- mode: c; tab-width: 8; -*- */
 /* vi: set sw=4 ts=8: */
 /* Reference version of egl.h for EGL 1.4.
- * $Revision: 9356 $ on $Date: 2009-10-21 02:52:25 -0700 (Wed, 21 Oct 2009) $
+ * $Revision: 9356 $ on $Date: 2009-10-21 05:52:25 -0400 (Wed, 21 Oct 2009) $
  */
 
 /*
@@ -246,6 +246,10 @@ typedef void *EGLClientBuffer;
 
 /* EGL Functions */
 
+#if defined(_MSC_VER) && !defined(ANGLE_WEBKIT_WIN)
+#include <EGL/eglsoftlinking.h>
+#else
+
 EGLAPI EGLint EGLAPIENTRY eglGetError(void);
 
 EGLAPI EGLDisplay EGLAPIENTRY eglGetDisplay(EGLNativeDisplayType display_id);
@@ -321,6 +325,8 @@ typedef void (*__eglMustCastToProperFunctionPointerType)(void);
 /* Now, define eglGetProcAddress using the generic function ptr. type */
 EGLAPI __eglMustCastToProperFunctionPointerType EGLAPIENTRY
        eglGetProcAddress(const char *procname);
+
+#endif
 
 #ifdef __cplusplus
 }

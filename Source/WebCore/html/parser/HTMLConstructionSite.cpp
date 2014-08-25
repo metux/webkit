@@ -42,6 +42,7 @@
 #include "HTMLScriptElement.h"
 #include "HTMLTemplateElement.h"
 #include "NotImplemented.h"
+#include "SVGElement.h"
 #include "Text.h"
 
 namespace WebCore {
@@ -63,8 +64,10 @@ static bool hasImpliedEndTag(const HTMLStackItem* item)
         || isHTMLOptionElement(item->node())
         || isHTMLOptGroupElement(item->node())
         || item->hasTagName(pTag)
+        || item->hasTagName(rbTag)
         || item->hasTagName(rpTag)
-        || item->hasTagName(rtTag);
+        || item->hasTagName(rtTag)
+        || item->hasTagName(rtcTag);
 }
 
 static bool shouldUseLengthLimit(const ContainerNode* node)
@@ -184,7 +187,7 @@ void HTMLConstructionSite::executeQueuedTasks()
 
     // Copy the task queue into a local variable in case executeTask
     // re-enters the parser.
-    TaskQueue queue = std::move(m_taskQueue);
+    TaskQueue queue = WTF::move(m_taskQueue);
 
     for (size_t i = 0; i < size; ++i)
         executeTask(queue[i]);
@@ -290,12 +293,12 @@ void HTMLConstructionSite::setDefaultCompatibilityMode()
         return;
     if (m_document->isSrcdocDocument())
         return;
-    setCompatibilityMode(Document::QuirksMode);
+    setCompatibilityMode(DocumentCompatibilityMode::QuirksMode);
 }
 
-void HTMLConstructionSite::setCompatibilityMode(Document::CompatibilityMode mode)
+void HTMLConstructionSite::setCompatibilityMode(DocumentCompatibilityMode mode)
 {
-    m_inQuirksMode = (mode == Document::QuirksMode);
+    m_inQuirksMode = (mode == DocumentCompatibilityMode::QuirksMode);
     m_document->setCompatibilityMode(mode);
 }
 
@@ -370,7 +373,7 @@ void HTMLConstructionSite::setCompatibilityModeFromDoctype(const String& name, c
         || equalIgnoringCase(systemId, "http://www.ibm.com/data/dtd/v11/ibmxhtml1-transitional.dtd")
         || (systemId.isEmpty() && publicId.startsWith("-//W3C//DTD HTML 4.01 Frameset//", false))
         || (systemId.isEmpty() && publicId.startsWith("-//W3C//DTD HTML 4.01 Transitional//", false))) {
-        setCompatibilityMode(Document::QuirksMode);
+        setCompatibilityMode(DocumentCompatibilityMode::QuirksMode);
         return;
     }
 
@@ -379,12 +382,12 @@ void HTMLConstructionSite::setCompatibilityModeFromDoctype(const String& name, c
         || publicId.startsWith("-//W3C//DTD XHTML 1.0 Transitional//", false)
         || (!systemId.isEmpty() && publicId.startsWith("-//W3C//DTD HTML 4.01 Frameset//", false))
         || (!systemId.isEmpty() && publicId.startsWith("-//W3C//DTD HTML 4.01 Transitional//", false))) {
-        setCompatibilityMode(Document::LimitedQuirksMode);
+        setCompatibilityMode(DocumentCompatibilityMode::LimitedQuirksMode);
         return;
     }
 
     // Otherwise we are No Quirks Mode.
-    setCompatibilityMode(Document::NoQuirksMode);
+    setCompatibilityMode(DocumentCompatibilityMode::NoQuirksMode);
 }
 
 void HTMLConstructionSite::finishedParsing()
@@ -411,7 +414,7 @@ void HTMLConstructionSite::insertDoctype(AtomicHTMLToken* token)
         return;
 
     if (token->forceQuirks())
-        setCompatibilityMode(Document::QuirksMode);
+        setCompatibilityMode(DocumentCompatibilityMode::QuirksMode);
     else {
         setCompatibilityModeFromDoctype(token->name(), publicId, systemId);
     }

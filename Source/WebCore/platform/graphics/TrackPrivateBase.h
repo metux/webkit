@@ -12,10 +12,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -42,9 +42,9 @@ class TrackPrivateBase;
 class TrackPrivateBaseClient {
 public:
     virtual ~TrackPrivateBaseClient() { }
-    virtual void idChanged(TrackPrivateBase*, const String&) = 0;
-    virtual void labelChanged(TrackPrivateBase*, const String&) = 0;
-    virtual void languageChanged(TrackPrivateBase*, const String&) = 0;
+    virtual void idChanged(TrackPrivateBase*, const AtomicString&) = 0;
+    virtual void labelChanged(TrackPrivateBase*, const AtomicString&) = 0;
+    virtual void languageChanged(TrackPrivateBase*, const AtomicString&) = 0;
     virtual void willRemove(TrackPrivateBase*) = 0;
 };
 
@@ -61,6 +61,8 @@ public:
 
     virtual int trackIndex() const { return 0; }
 
+    virtual double startTimeVariance() const { return 0; }
+    
     void willBeRemoved()
     {
         if (TrackPrivateBaseClient* client = this->client())

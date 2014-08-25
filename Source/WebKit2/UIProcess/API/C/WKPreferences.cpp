@@ -24,9 +24,9 @@
  */
 
 #include "config.h"
-#include "WKPreferencesPrivate.h"
-#include "WKPreferencesRef.h"
 
+#include "WKPreferencesRef.h"
+#include "WKPreferencesRefPrivate.h"
 #include "WKAPICast.h"
 #include "WebContext.h"
 #include "WebPreferences.h"
@@ -43,19 +43,19 @@ WKTypeID WKPreferencesGetTypeID()
 
 WKPreferencesRef WKPreferencesCreate()
 {
-    RefPtr<WebPreferences> preferences = WebPreferences::create();
+    RefPtr<WebPreferences> preferences = WebPreferences::createWithLegacyDefaults(String(), "WebKit2.", "WebKit2.");
     return toAPI(preferences.release().leakRef());
 }
 
 WKPreferencesRef WKPreferencesCreateWithIdentifier(WKStringRef identifierRef)
 {
-    RefPtr<WebPreferences> preferences = WebPreferences::create(toWTFString(identifierRef));
+    RefPtr<WebPreferences> preferences = WebPreferences::createWithLegacyDefaults(toWTFString(identifierRef), "WebKit2.", "WebKit2.");
     return toAPI(preferences.release().leakRef());
 }
 
 WKPreferencesRef WKPreferencesCreateCopy(WKPreferencesRef preferencesRef)
 {
-    RefPtr<WebPreferences> preferences = WebPreferences::create(*toImpl(preferencesRef));
+    RefPtr<WebPreferences> preferences = toImpl(preferencesRef)->copy();
     return toAPI(preferences.release().leakRef());
 }
 
@@ -507,26 +507,6 @@ void WKPreferencesSetCSSRegionsEnabled(WKPreferencesRef preferencesRef, bool fla
 bool WKPreferencesGetCSSRegionsEnabled(WKPreferencesRef preferencesRef)
 {
     return toImpl(preferencesRef)->cssRegionsEnabled();
-}
-
-void WKPreferencesSetCSSGridLayoutEnabled(WKPreferencesRef preferencesRef, bool flag)
-{
-    toImpl(preferencesRef)->setCSSGridLayoutEnabled(flag);
-}
-
-bool WKPreferencesGetCSSGridLayoutEnabled(WKPreferencesRef preferencesRef)
-{
-    return toImpl(preferencesRef)->cssGridLayoutEnabled();
-}
-
-void WKPreferencesSetRegionBasedColumnsEnabled(WKPreferencesRef preferencesRef, bool flag)
-{
-    toImpl(preferencesRef)->setRegionBasedColumnsEnabled(flag);
-}
-
-bool WKPreferencesGetRegionBasedColumnsEnabled(WKPreferencesRef preferencesRef)
-{
-    return toImpl(preferencesRef)->regionBasedColumnsEnabled();
 }
 
 void WKPreferencesSetNeedsSiteSpecificQuirks(WKPreferencesRef preferencesRef, bool flag)
@@ -1196,6 +1176,16 @@ bool WKPreferencesGetSimpleLineLayoutDebugBordersEnabled(WKPreferencesRef prefer
     return toImpl(preferencesRef)->simpleLineLayoutDebugBordersEnabled();
 }
 
+void WKPreferencesSetSubpixelCSSOMElementMetricsEnabled(WKPreferencesRef preferencesRef, bool flag)
+{
+    toImpl(preferencesRef)->setSubpixelCSSOMElementMetricsEnabled(flag);
+}
+
+bool WKPreferencesGetSubpixelCSSOMElementMetricsEnabled(WKPreferencesRef preferencesRef)
+{
+    return toImpl(preferencesRef)->subpixelCSSOMElementMetricsEnabled();
+}
+
 void WKPreferencesSetMediaStreamEnabled(WKPreferencesRef preferencesRef, bool enabled)
 {
     toImpl(preferencesRef)->setMediaStreamEnabled(enabled);
@@ -1204,16 +1194,6 @@ void WKPreferencesSetMediaStreamEnabled(WKPreferencesRef preferencesRef, bool en
 bool WKPreferencesGetMediaStreamEnabled(WKPreferencesRef preferencesRef)
 {
     return toImpl(preferencesRef)->mediaStreamEnabled();
-}
-
-void WKPreferencesSetVideoPluginProxyEnabled(WKPreferencesRef preferencesRef, bool enabled)
-{
-    toImpl(preferencesRef)->setVideoPluginProxyEnabled(enabled);
-}
-
-bool WKPreferencesGetVideoPluginProxyEnabled(WKPreferencesRef preferencesRef)
-{
-    return toImpl(preferencesRef)->isVideoPluginProxyEnabled();
 }
 
 void WKPreferencesSetSpatialNavigationEnabled(WKPreferencesRef preferencesRef, bool enabled)
@@ -1244,4 +1224,74 @@ void WKPreferencesSetViewGestureDebuggingEnabled(WKPreferencesRef preferencesRef
 bool WKPreferencesGetViewGestureDebuggingEnabled(WKPreferencesRef preferencesRef)
 {
     return toImpl(preferencesRef)->viewGestureDebuggingEnabled();
+}
+
+void WKPreferencesSetShouldConvertPositionStyleOnCopy(WKPreferencesRef preferencesRef, bool convert)
+{
+    toImpl(preferencesRef)->setShouldConvertPositionStyleOnCopy(convert);
+}
+
+bool WKPreferencesGetShouldConvertPositionStyleOnCopy(WKPreferencesRef preferencesRef)
+{
+    return toImpl(preferencesRef)->shouldConvertPositionStyleOnCopy();
+}
+
+void WKPreferencesSetTelephoneNumberParsingEnabled(WKPreferencesRef preferencesRef, bool enabled)
+{
+    toImpl(preferencesRef)->setTelephoneNumberParsingEnabled(enabled);
+}
+
+bool WKPreferencesGetTelephoneNumberParsingEnabled(WKPreferencesRef preferencesRef)
+{
+    return toImpl(preferencesRef)->telephoneNumberParsingEnabled();
+}
+
+void WKPreferencesSetEnableInheritURIQueryComponent(WKPreferencesRef preferencesRef, bool enabled)
+{
+    toImpl(preferencesRef)->setEnableInheritURIQueryComponent(enabled);
+}
+
+bool WKPreferencesGetEnableInheritURIQueryComponent(WKPreferencesRef preferencesRef)
+{
+    return toImpl(preferencesRef)->enableInheritURIQueryComponent();
+}
+
+void WKPreferencesSetServiceControlsEnabled(WKPreferencesRef preferencesRef, bool enabled)
+{
+    toImpl(preferencesRef)->setServiceControlsEnabled(enabled);
+}
+
+bool WKPreferencesGetServiceControlsEnabled(WKPreferencesRef preferencesRef)
+{
+    return toImpl(preferencesRef)->serviceControlsEnabled();
+}
+
+void WKPreferencesSetImageControlsEnabled(WKPreferencesRef preferencesRef, bool enabled)
+{
+    toImpl(preferencesRef)->setImageControlsEnabled(enabled);
+}
+
+bool WKPreferencesGetImageControlsEnabled(WKPreferencesRef preferencesRef)
+{
+    return toImpl(preferencesRef)->imageControlsEnabled();
+}
+
+void WKPreferencesSetGamepadsEnabled(WKPreferencesRef preferencesRef, bool enabled)
+{
+    toImpl(preferencesRef)->setGamepadsEnabled(enabled);
+}
+
+bool WKPreferencesGetGamepadsEnabled(WKPreferencesRef preferencesRef)
+{
+    return toImpl(preferencesRef)->gamepadsEnabled();
+}
+
+void WKPreferencesSetLongMousePressEnabled(WKPreferencesRef preferencesRef, bool enabled)
+{
+    toImpl(preferencesRef)->setLongMousePressEnabled(enabled);
+}
+
+bool WKPreferencesGetLongMousePressEnabled(WKPreferencesRef preferencesRef)
+{
+    return toImpl(preferencesRef)->longMousePressEnabled();
 }

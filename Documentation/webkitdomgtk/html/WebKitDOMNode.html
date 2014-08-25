@@ -7,7 +7,7 @@
 <link rel="home" href="index.html" title="WebKitDOMGTK+ Reference Manual">
 <link rel="up" href="ch01.html" title="Class Overview">
 <link rel="prev" href="WebKitDOMNamedNodeMap.html" title="WebKitDOMNamedNodeMap">
-<link rel="next" href="WebKitDOMNodeFilter.html" title="WebKitDOMNodeFilter">
+<link rel="next" href="WebKitDOMNodeIterator.html" title="WebKitDOMNodeIterator">
 <meta name="generator" content="GTK-Doc V1.20.1 (XML mode)">
 <link rel="stylesheet" href="style.css" type="text/css">
 </head>
@@ -23,7 +23,7 @@
 <td><a accesskey="h" href="index.html"><img src="home.png" width="16" height="16" border="0" alt="Home"></a></td>
 <td><a accesskey="u" href="ch01.html"><img src="up.png" width="16" height="16" border="0" alt="Up"></a></td>
 <td><a accesskey="p" href="WebKitDOMNamedNodeMap.html"><img src="left.png" width="16" height="16" border="0" alt="Prev"></a></td>
-<td><a accesskey="n" href="WebKitDOMNodeFilter.html"><img src="right.png" width="16" height="16" border="0" alt="Next"></a></td>
+<td><a accesskey="n" href="WebKitDOMNodeIterator.html"><img src="right.png" width="16" height="16" border="0" alt="Next"></a></td>
 </tr></table>
 <div class="refentry">
 <a name="WebKitDOMNode"></a><div class="titlepage"></div>
@@ -160,14 +160,6 @@
 </td>
 <td class="function_name">
 <a class="link" href="WebKitDOMNode.html#webkit-dom-node-contains" title="webkit_dom_node_contains ()">webkit_dom_node_contains</a> <span class="c_punctuation">()</span>
-</td>
-</tr>
-<tr>
-<td class="function_type">
-<a href="../glib/glib-Basic-Types.html#gboolean"><span class="returnvalue">gboolean</span></a>
-</td>
-<td class="function_name">
-<a class="link" href="WebKitDOMNode.html#webkit-dom-node-dispatch-event" title="webkit_dom_node_dispatch_event ()">webkit_dom_node_dispatch_event</a> <span class="c_punctuation">()</span>
 </td>
 </tr>
 <tr>
@@ -322,22 +314,6 @@
 <a class="link" href="WebKitDOMNode.html#webkit-dom-node-get-parent-element" title="webkit_dom_node_get_parent_element ()">webkit_dom_node_get_parent_element</a> <span class="c_punctuation">()</span>
 </td>
 </tr>
-<tr>
-<td class="function_type">
-<a class="link" href="WebKitDOMNamedNodeMap.html" title="WebKitDOMNamedNodeMap"><span class="returnvalue">WebKitDOMNamedNodeMap</span></a> *
-</td>
-<td class="function_name">
-<a class="link" href="WebKitDOMNode.html#webkit-dom-node-get-attributes" title="webkit_dom_node_get_attributes ()">webkit_dom_node_get_attributes</a> <span class="c_punctuation">()</span>
-</td>
-</tr>
-<tr>
-<td class="function_type">
-<a href="../glib/glib-Basic-Types.html#gboolean"><span class="returnvalue">gboolean</span></a>
-</td>
-<td class="function_name">
-<a class="link" href="WebKitDOMNode.html#webkit-dom-node-has-attributes" title="webkit_dom_node_has_attributes ()">webkit_dom_node_has_attributes</a> <span class="c_punctuation">()</span>
-</td>
-</tr>
 </tbody>
 </table></div>
 </div>
@@ -455,10 +431,84 @@
 <col width="150px" class="name">
 <col class="description">
 </colgroup>
-<tbody><tr>
+<tbody>
+<tr>
 <td class="datatype_keyword"> </td>
 <td class="function_name"><a class="link" href="WebKitDOMNode.html#WebKitDOMNode-struct" title="WebKitDOMNode">WebKitDOMNode</a></td>
-</tr></tbody>
+</tr>
+<tr>
+<td class="define_keyword">#define</td>
+<td class="function_name"><a class="link" href="WebKitDOMNode.html#WEBKIT-DOM-NODE-ELEMENT-NODE:CAPS" title="WEBKIT_DOM_NODE_ELEMENT_NODE">WEBKIT_DOM_NODE_ELEMENT_NODE</a></td>
+</tr>
+<tr>
+<td class="define_keyword">#define</td>
+<td class="function_name"><a class="link" href="WebKitDOMNode.html#WEBKIT-DOM-NODE-ATTRIBUTE-NODE:CAPS" title="WEBKIT_DOM_NODE_ATTRIBUTE_NODE">WEBKIT_DOM_NODE_ATTRIBUTE_NODE</a></td>
+</tr>
+<tr>
+<td class="define_keyword">#define</td>
+<td class="function_name"><a class="link" href="WebKitDOMNode.html#WEBKIT-DOM-NODE-TEXT-NODE:CAPS" title="WEBKIT_DOM_NODE_TEXT_NODE">WEBKIT_DOM_NODE_TEXT_NODE</a></td>
+</tr>
+<tr>
+<td class="define_keyword">#define</td>
+<td class="function_name"><a class="link" href="WebKitDOMNode.html#WEBKIT-DOM-NODE-CDATA-SECTION-NODE:CAPS" title="WEBKIT_DOM_NODE_CDATA_SECTION_NODE">WEBKIT_DOM_NODE_CDATA_SECTION_NODE</a></td>
+</tr>
+<tr>
+<td class="define_keyword">#define</td>
+<td class="function_name"><a class="link" href="WebKitDOMNode.html#WEBKIT-DOM-NODE-ENTITY-REFERENCE-NODE:CAPS" title="WEBKIT_DOM_NODE_ENTITY_REFERENCE_NODE">WEBKIT_DOM_NODE_ENTITY_REFERENCE_NODE</a></td>
+</tr>
+<tr>
+<td class="define_keyword">#define</td>
+<td class="function_name"><a class="link" href="WebKitDOMNode.html#WEBKIT-DOM-NODE-ENTITY-NODE:CAPS" title="WEBKIT_DOM_NODE_ENTITY_NODE">WEBKIT_DOM_NODE_ENTITY_NODE</a></td>
+</tr>
+<tr>
+<td class="define_keyword">#define</td>
+<td class="function_name"><a class="link" href="WebKitDOMNode.html#WEBKIT-DOM-NODE-PROCESSING-INSTRUCTION-NODE:CAPS" title="WEBKIT_DOM_NODE_PROCESSING_INSTRUCTION_NODE">WEBKIT_DOM_NODE_PROCESSING_INSTRUCTION_NODE</a></td>
+</tr>
+<tr>
+<td class="define_keyword">#define</td>
+<td class="function_name"><a class="link" href="WebKitDOMNode.html#WEBKIT-DOM-NODE-COMMENT-NODE:CAPS" title="WEBKIT_DOM_NODE_COMMENT_NODE">WEBKIT_DOM_NODE_COMMENT_NODE</a></td>
+</tr>
+<tr>
+<td class="define_keyword">#define</td>
+<td class="function_name"><a class="link" href="WebKitDOMNode.html#WEBKIT-DOM-NODE-DOCUMENT-NODE:CAPS" title="WEBKIT_DOM_NODE_DOCUMENT_NODE">WEBKIT_DOM_NODE_DOCUMENT_NODE</a></td>
+</tr>
+<tr>
+<td class="define_keyword">#define</td>
+<td class="function_name"><a class="link" href="WebKitDOMNode.html#WEBKIT-DOM-NODE-DOCUMENT-TYPE-NODE:CAPS" title="WEBKIT_DOM_NODE_DOCUMENT_TYPE_NODE">WEBKIT_DOM_NODE_DOCUMENT_TYPE_NODE</a></td>
+</tr>
+<tr>
+<td class="define_keyword">#define</td>
+<td class="function_name"><a class="link" href="WebKitDOMNode.html#WEBKIT-DOM-NODE-DOCUMENT-FRAGMENT-NODE:CAPS" title="WEBKIT_DOM_NODE_DOCUMENT_FRAGMENT_NODE">WEBKIT_DOM_NODE_DOCUMENT_FRAGMENT_NODE</a></td>
+</tr>
+<tr>
+<td class="define_keyword">#define</td>
+<td class="function_name"><a class="link" href="WebKitDOMNode.html#WEBKIT-DOM-NODE-NOTATION-NODE:CAPS" title="WEBKIT_DOM_NODE_NOTATION_NODE">WEBKIT_DOM_NODE_NOTATION_NODE</a></td>
+</tr>
+<tr>
+<td class="define_keyword">#define</td>
+<td class="function_name"><a class="link" href="WebKitDOMNode.html#WEBKIT-DOM-NODE-DOCUMENT-POSITION-DISCONNECTED:CAPS" title="WEBKIT_DOM_NODE_DOCUMENT_POSITION_DISCONNECTED">WEBKIT_DOM_NODE_DOCUMENT_POSITION_DISCONNECTED</a></td>
+</tr>
+<tr>
+<td class="define_keyword">#define</td>
+<td class="function_name"><a class="link" href="WebKitDOMNode.html#WEBKIT-DOM-NODE-DOCUMENT-POSITION-PRECEDING:CAPS" title="WEBKIT_DOM_NODE_DOCUMENT_POSITION_PRECEDING">WEBKIT_DOM_NODE_DOCUMENT_POSITION_PRECEDING</a></td>
+</tr>
+<tr>
+<td class="define_keyword">#define</td>
+<td class="function_name"><a class="link" href="WebKitDOMNode.html#WEBKIT-DOM-NODE-DOCUMENT-POSITION-FOLLOWING:CAPS" title="WEBKIT_DOM_NODE_DOCUMENT_POSITION_FOLLOWING">WEBKIT_DOM_NODE_DOCUMENT_POSITION_FOLLOWING</a></td>
+</tr>
+<tr>
+<td class="define_keyword">#define</td>
+<td class="function_name"><a class="link" href="WebKitDOMNode.html#WEBKIT-DOM-NODE-DOCUMENT-POSITION-CONTAINS:CAPS" title="WEBKIT_DOM_NODE_DOCUMENT_POSITION_CONTAINS">WEBKIT_DOM_NODE_DOCUMENT_POSITION_CONTAINS</a></td>
+</tr>
+<tr>
+<td class="define_keyword">#define</td>
+<td class="function_name"><a class="link" href="WebKitDOMNode.html#WEBKIT-DOM-NODE-DOCUMENT-POSITION-CONTAINED-BY:CAPS" title="WEBKIT_DOM_NODE_DOCUMENT_POSITION_CONTAINED_BY">WEBKIT_DOM_NODE_DOCUMENT_POSITION_CONTAINED_BY</a></td>
+</tr>
+<tr>
+<td class="define_keyword">#define</td>
+<td class="function_name"><a class="link" href="WebKitDOMNode.html#WEBKIT-DOM-NODE-DOCUMENT-POSITION-IMPLEMENTATION-SPECIFIC:CAPS" title="WEBKIT_DOM_NODE_DOCUMENT_POSITION_IMPLEMENTATION_SPECIFIC">WEBKIT_DOM_NODE_DOCUMENT_POSITION_IMPLEMENTATION_SPECIFIC</a></td>
+</tr>
+</tbody>
 </table></div>
 </div>
 <div class="refsect1">
@@ -496,7 +546,7 @@ webkit_dom_node_insert_before (<em class="parameter"><code><a class="link" href=
                                <em class="parameter"><code><a class="link" href="WebKitDOMNode.html" title="WebKitDOMNode"><span class="type">WebKitDOMNode</span></a> *refChild</code></em>,
                                <em class="parameter"><code><a href="../glib/glib-Error-Reporting.html#GError"><span class="type">GError</span></a> **error</code></em>);</pre>
 <div class="refsect3">
-<a name="id-1.2.35.9.2.4"></a><h4>Parameters</h4>
+<a name="id-1.2.29.9.2.4"></a><h4>Parameters</h4>
 <div class="informaltable"><table width="100%" border="0">
 <colgroup>
 <col width="150px" class="parameters_name">
@@ -528,7 +578,7 @@ webkit_dom_node_insert_before (<em class="parameter"><code><a class="link" href=
 </table></div>
 </div>
 <div class="refsect3">
-<a name="id-1.2.35.9.2.5"></a><h4>Returns</h4>
+<a name="id-1.2.29.9.2.5"></a><h4>Returns</h4>
 <p> A <a class="link" href="WebKitDOMNode.html" title="WebKitDOMNode"><span class="type">WebKitDOMNode</span></a>. </p>
 <p><span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span></p>
 </div>
@@ -542,7 +592,7 @@ webkit_dom_node_replace_child (<em class="parameter"><code><a class="link" href=
                                <em class="parameter"><code><a class="link" href="WebKitDOMNode.html" title="WebKitDOMNode"><span class="type">WebKitDOMNode</span></a> *oldChild</code></em>,
                                <em class="parameter"><code><a href="../glib/glib-Error-Reporting.html#GError"><span class="type">GError</span></a> **error</code></em>);</pre>
 <div class="refsect3">
-<a name="id-1.2.35.9.3.4"></a><h4>Parameters</h4>
+<a name="id-1.2.29.9.3.4"></a><h4>Parameters</h4>
 <div class="informaltable"><table width="100%" border="0">
 <colgroup>
 <col width="150px" class="parameters_name">
@@ -574,7 +624,7 @@ webkit_dom_node_replace_child (<em class="parameter"><code><a class="link" href=
 </table></div>
 </div>
 <div class="refsect3">
-<a name="id-1.2.35.9.3.5"></a><h4>Returns</h4>
+<a name="id-1.2.29.9.3.5"></a><h4>Returns</h4>
 <p> A <a class="link" href="WebKitDOMNode.html" title="WebKitDOMNode"><span class="type">WebKitDOMNode</span></a>. </p>
 <p><span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span></p>
 </div>
@@ -587,7 +637,7 @@ webkit_dom_node_remove_child (<em class="parameter"><code><a class="link" href="
                               <em class="parameter"><code><a class="link" href="WebKitDOMNode.html" title="WebKitDOMNode"><span class="type">WebKitDOMNode</span></a> *oldChild</code></em>,
                               <em class="parameter"><code><a href="../glib/glib-Error-Reporting.html#GError"><span class="type">GError</span></a> **error</code></em>);</pre>
 <div class="refsect3">
-<a name="id-1.2.35.9.4.4"></a><h4>Parameters</h4>
+<a name="id-1.2.29.9.4.4"></a><h4>Parameters</h4>
 <div class="informaltable"><table width="100%" border="0">
 <colgroup>
 <col width="150px" class="parameters_name">
@@ -614,7 +664,7 @@ webkit_dom_node_remove_child (<em class="parameter"><code><a class="link" href="
 </table></div>
 </div>
 <div class="refsect3">
-<a name="id-1.2.35.9.4.5"></a><h4>Returns</h4>
+<a name="id-1.2.29.9.4.5"></a><h4>Returns</h4>
 <p> A <a class="link" href="WebKitDOMNode.html" title="WebKitDOMNode"><span class="type">WebKitDOMNode</span></a>. </p>
 <p><span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span></p>
 </div>
@@ -627,7 +677,7 @@ webkit_dom_node_append_child (<em class="parameter"><code><a class="link" href="
                               <em class="parameter"><code><a class="link" href="WebKitDOMNode.html" title="WebKitDOMNode"><span class="type">WebKitDOMNode</span></a> *newChild</code></em>,
                               <em class="parameter"><code><a href="../glib/glib-Error-Reporting.html#GError"><span class="type">GError</span></a> **error</code></em>);</pre>
 <div class="refsect3">
-<a name="id-1.2.35.9.5.4"></a><h4>Parameters</h4>
+<a name="id-1.2.29.9.5.4"></a><h4>Parameters</h4>
 <div class="informaltable"><table width="100%" border="0">
 <colgroup>
 <col width="150px" class="parameters_name">
@@ -654,7 +704,7 @@ webkit_dom_node_append_child (<em class="parameter"><code><a class="link" href="
 </table></div>
 </div>
 <div class="refsect3">
-<a name="id-1.2.35.9.5.5"></a><h4>Returns</h4>
+<a name="id-1.2.29.9.5.5"></a><h4>Returns</h4>
 <p> A <a class="link" href="WebKitDOMNode.html" title="WebKitDOMNode"><span class="type">WebKitDOMNode</span></a>. </p>
 <p><span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span></p>
 </div>
@@ -665,7 +715,7 @@ webkit_dom_node_append_child (<em class="parameter"><code><a class="link" href="
 <pre class="programlisting"><a href="../glib/glib-Basic-Types.html#gboolean"><span class="returnvalue">gboolean</span></a>
 webkit_dom_node_has_child_nodes (<em class="parameter"><code><a class="link" href="WebKitDOMNode.html" title="WebKitDOMNode"><span class="type">WebKitDOMNode</span></a> *self</code></em>);</pre>
 <div class="refsect3">
-<a name="id-1.2.35.9.6.4"></a><h4>Parameters</h4>
+<a name="id-1.2.29.9.6.4"></a><h4>Parameters</h4>
 <div class="informaltable"><table width="100%" border="0">
 <colgroup>
 <col width="150px" class="parameters_name">
@@ -680,7 +730,7 @@ webkit_dom_node_has_child_nodes (<em class="parameter"><code><a class="link" hre
 </table></div>
 </div>
 <div class="refsect3">
-<a name="id-1.2.35.9.6.5"></a><h4>Returns</h4>
+<a name="id-1.2.29.9.6.5"></a><h4>Returns</h4>
 <p> A <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a></p>
 <p></p>
 </div>
@@ -692,7 +742,7 @@ webkit_dom_node_has_child_nodes (<em class="parameter"><code><a class="link" hre
 webkit_dom_node_clone_node (<em class="parameter"><code><a class="link" href="WebKitDOMNode.html" title="WebKitDOMNode"><span class="type">WebKitDOMNode</span></a> *self</code></em>,
                             <em class="parameter"><code><a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a> deep</code></em>);</pre>
 <div class="refsect3">
-<a name="id-1.2.35.9.7.4"></a><h4>Parameters</h4>
+<a name="id-1.2.29.9.7.4"></a><h4>Parameters</h4>
 <div class="informaltable"><table width="100%" border="0">
 <colgroup>
 <col width="150px" class="parameters_name">
@@ -714,7 +764,7 @@ webkit_dom_node_clone_node (<em class="parameter"><code><a class="link" href="We
 </table></div>
 </div>
 <div class="refsect3">
-<a name="id-1.2.35.9.7.5"></a><h4>Returns</h4>
+<a name="id-1.2.29.9.7.5"></a><h4>Returns</h4>
 <p> A <a class="link" href="WebKitDOMNode.html" title="WebKitDOMNode"><span class="type">WebKitDOMNode</span></a>. </p>
 <p><span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span></p>
 </div>
@@ -725,7 +775,7 @@ webkit_dom_node_clone_node (<em class="parameter"><code><a class="link" href="We
 <pre class="programlisting"><span class="returnvalue">void</span>
 webkit_dom_node_normalize (<em class="parameter"><code><a class="link" href="WebKitDOMNode.html" title="WebKitDOMNode"><span class="type">WebKitDOMNode</span></a> *self</code></em>);</pre>
 <div class="refsect3">
-<a name="id-1.2.35.9.8.4"></a><h4>Parameters</h4>
+<a name="id-1.2.29.9.8.4"></a><h4>Parameters</h4>
 <div class="informaltable"><table width="100%" border="0">
 <colgroup>
 <col width="150px" class="parameters_name">
@@ -748,7 +798,7 @@ webkit_dom_node_is_supported (<em class="parameter"><code><a class="link" href="
                               <em class="parameter"><code>const <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a> *feature</code></em>,
                               <em class="parameter"><code>const <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a> *version</code></em>);</pre>
 <div class="refsect3">
-<a name="id-1.2.35.9.9.4"></a><h4>Parameters</h4>
+<a name="id-1.2.29.9.9.4"></a><h4>Parameters</h4>
 <div class="informaltable"><table width="100%" border="0">
 <colgroup>
 <col width="150px" class="parameters_name">
@@ -775,7 +825,7 @@ webkit_dom_node_is_supported (<em class="parameter"><code><a class="link" href="
 </table></div>
 </div>
 <div class="refsect3">
-<a name="id-1.2.35.9.9.5"></a><h4>Returns</h4>
+<a name="id-1.2.29.9.9.5"></a><h4>Returns</h4>
 <p> A <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a></p>
 <p></p>
 </div>
@@ -787,7 +837,7 @@ webkit_dom_node_is_supported (<em class="parameter"><code><a class="link" href="
 webkit_dom_node_is_same_node (<em class="parameter"><code><a class="link" href="WebKitDOMNode.html" title="WebKitDOMNode"><span class="type">WebKitDOMNode</span></a> *self</code></em>,
                               <em class="parameter"><code><a class="link" href="WebKitDOMNode.html" title="WebKitDOMNode"><span class="type">WebKitDOMNode</span></a> *other</code></em>);</pre>
 <div class="refsect3">
-<a name="id-1.2.35.9.10.4"></a><h4>Parameters</h4>
+<a name="id-1.2.29.9.10.4"></a><h4>Parameters</h4>
 <div class="informaltable"><table width="100%" border="0">
 <colgroup>
 <col width="150px" class="parameters_name">
@@ -809,7 +859,7 @@ webkit_dom_node_is_same_node (<em class="parameter"><code><a class="link" href="
 </table></div>
 </div>
 <div class="refsect3">
-<a name="id-1.2.35.9.10.5"></a><h4>Returns</h4>
+<a name="id-1.2.29.9.10.5"></a><h4>Returns</h4>
 <p> A <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a></p>
 <p></p>
 </div>
@@ -821,7 +871,7 @@ webkit_dom_node_is_same_node (<em class="parameter"><code><a class="link" href="
 webkit_dom_node_is_equal_node (<em class="parameter"><code><a class="link" href="WebKitDOMNode.html" title="WebKitDOMNode"><span class="type">WebKitDOMNode</span></a> *self</code></em>,
                                <em class="parameter"><code><a class="link" href="WebKitDOMNode.html" title="WebKitDOMNode"><span class="type">WebKitDOMNode</span></a> *other</code></em>);</pre>
 <div class="refsect3">
-<a name="id-1.2.35.9.11.4"></a><h4>Parameters</h4>
+<a name="id-1.2.29.9.11.4"></a><h4>Parameters</h4>
 <div class="informaltable"><table width="100%" border="0">
 <colgroup>
 <col width="150px" class="parameters_name">
@@ -843,7 +893,7 @@ webkit_dom_node_is_equal_node (<em class="parameter"><code><a class="link" href=
 </table></div>
 </div>
 <div class="refsect3">
-<a name="id-1.2.35.9.11.5"></a><h4>Returns</h4>
+<a name="id-1.2.29.9.11.5"></a><h4>Returns</h4>
 <p> A <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a></p>
 <p></p>
 </div>
@@ -855,7 +905,7 @@ webkit_dom_node_is_equal_node (<em class="parameter"><code><a class="link" href=
 webkit_dom_node_lookup_prefix (<em class="parameter"><code><a class="link" href="WebKitDOMNode.html" title="WebKitDOMNode"><span class="type">WebKitDOMNode</span></a> *self</code></em>,
                                <em class="parameter"><code>const <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a> *namespaceURI</code></em>);</pre>
 <div class="refsect3">
-<a name="id-1.2.35.9.12.4"></a><h4>Parameters</h4>
+<a name="id-1.2.29.9.12.4"></a><h4>Parameters</h4>
 <div class="informaltable"><table width="100%" border="0">
 <colgroup>
 <col width="150px" class="parameters_name">
@@ -877,7 +927,7 @@ webkit_dom_node_lookup_prefix (<em class="parameter"><code><a class="link" href=
 </table></div>
 </div>
 <div class="refsect3">
-<a name="id-1.2.35.9.12.5"></a><h4>Returns</h4>
+<a name="id-1.2.29.9.12.5"></a><h4>Returns</h4>
 <p> A <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a></p>
 <p></p>
 </div>
@@ -889,7 +939,7 @@ webkit_dom_node_lookup_prefix (<em class="parameter"><code><a class="link" href=
 webkit_dom_node_is_default_namespace (<em class="parameter"><code><a class="link" href="WebKitDOMNode.html" title="WebKitDOMNode"><span class="type">WebKitDOMNode</span></a> *self</code></em>,
                                       <em class="parameter"><code>const <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a> *namespaceURI</code></em>);</pre>
 <div class="refsect3">
-<a name="id-1.2.35.9.13.4"></a><h4>Parameters</h4>
+<a name="id-1.2.29.9.13.4"></a><h4>Parameters</h4>
 <div class="informaltable"><table width="100%" border="0">
 <colgroup>
 <col width="150px" class="parameters_name">
@@ -911,7 +961,7 @@ webkit_dom_node_is_default_namespace (<em class="parameter"><code><a class="link
 </table></div>
 </div>
 <div class="refsect3">
-<a name="id-1.2.35.9.13.5"></a><h4>Returns</h4>
+<a name="id-1.2.29.9.13.5"></a><h4>Returns</h4>
 <p> A <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a></p>
 <p></p>
 </div>
@@ -923,7 +973,7 @@ webkit_dom_node_is_default_namespace (<em class="parameter"><code><a class="link
 webkit_dom_node_lookup_namespace_uri (<em class="parameter"><code><a class="link" href="WebKitDOMNode.html" title="WebKitDOMNode"><span class="type">WebKitDOMNode</span></a> *self</code></em>,
                                       <em class="parameter"><code>const <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a> *prefix</code></em>);</pre>
 <div class="refsect3">
-<a name="id-1.2.35.9.14.4"></a><h4>Parameters</h4>
+<a name="id-1.2.29.9.14.4"></a><h4>Parameters</h4>
 <div class="informaltable"><table width="100%" border="0">
 <colgroup>
 <col width="150px" class="parameters_name">
@@ -945,7 +995,7 @@ webkit_dom_node_lookup_namespace_uri (<em class="parameter"><code><a class="link
 </table></div>
 </div>
 <div class="refsect3">
-<a name="id-1.2.35.9.14.5"></a><h4>Returns</h4>
+<a name="id-1.2.29.9.14.5"></a><h4>Returns</h4>
 <p> A <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a></p>
 <p></p>
 </div>
@@ -958,7 +1008,7 @@ webkit_dom_node_compare_document_position
                                (<em class="parameter"><code><a class="link" href="WebKitDOMNode.html" title="WebKitDOMNode"><span class="type">WebKitDOMNode</span></a> *self</code></em>,
                                 <em class="parameter"><code><a class="link" href="WebKitDOMNode.html" title="WebKitDOMNode"><span class="type">WebKitDOMNode</span></a> *other</code></em>);</pre>
 <div class="refsect3">
-<a name="id-1.2.35.9.15.4"></a><h4>Parameters</h4>
+<a name="id-1.2.29.9.15.4"></a><h4>Parameters</h4>
 <div class="informaltable"><table width="100%" border="0">
 <colgroup>
 <col width="150px" class="parameters_name">
@@ -980,7 +1030,7 @@ webkit_dom_node_compare_document_position
 </table></div>
 </div>
 <div class="refsect3">
-<a name="id-1.2.35.9.15.5"></a><h4>Returns</h4>
+<a name="id-1.2.29.9.15.5"></a><h4>Returns</h4>
 <p> A <a href="../glib/glib-Basic-Types.html#gushort"><span class="type">gushort</span></a></p>
 <p></p>
 </div>
@@ -992,7 +1042,7 @@ webkit_dom_node_compare_document_position
 webkit_dom_node_contains (<em class="parameter"><code><a class="link" href="WebKitDOMNode.html" title="WebKitDOMNode"><span class="type">WebKitDOMNode</span></a> *self</code></em>,
                           <em class="parameter"><code><a class="link" href="WebKitDOMNode.html" title="WebKitDOMNode"><span class="type">WebKitDOMNode</span></a> *other</code></em>);</pre>
 <div class="refsect3">
-<a name="id-1.2.35.9.16.4"></a><h4>Parameters</h4>
+<a name="id-1.2.29.9.16.4"></a><h4>Parameters</h4>
 <div class="informaltable"><table width="100%" border="0">
 <colgroup>
 <col width="150px" class="parameters_name">
@@ -1014,51 +1064,7 @@ webkit_dom_node_contains (<em class="parameter"><code><a class="link" href="WebK
 </table></div>
 </div>
 <div class="refsect3">
-<a name="id-1.2.35.9.16.5"></a><h4>Returns</h4>
-<p> A <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a></p>
-<p></p>
-</div>
-</div>
-<hr>
-<div class="refsect2">
-<a name="webkit-dom-node-dispatch-event"></a><h3>webkit_dom_node_dispatch_event ()</h3>
-<pre class="programlisting"><a href="../glib/glib-Basic-Types.html#gboolean"><span class="returnvalue">gboolean</span></a>
-webkit_dom_node_dispatch_event (<em class="parameter"><code><a class="link" href="WebKitDOMNode.html" title="WebKitDOMNode"><span class="type">WebKitDOMNode</span></a> *self</code></em>,
-                                <em class="parameter"><code><a class="link" href="WebKitDOMEvent.html" title="WebKitDOMEvent"><span class="type">WebKitDOMEvent</span></a> *event</code></em>,
-                                <em class="parameter"><code><a href="../glib/glib-Error-Reporting.html#GError"><span class="type">GError</span></a> **error</code></em>);</pre>
-<div class="warning">
-<p><code class="literal">webkit_dom_node_dispatch_event</code> has been deprecated since version 2.4 and should not be used in newly-written code.</p>
-<p>Use <a class="link" href="WebKitDOMEventTarget.html#webkit-dom-event-target-dispatch-event" title="webkit_dom_event_target_dispatch_event ()"><code class="function">webkit_dom_event_target_dispatch_event()</code></a> instead.</p>
-</div>
-<div class="refsect3">
-<a name="id-1.2.35.9.17.5"></a><h4>Parameters</h4>
-<div class="informaltable"><table width="100%" border="0">
-<colgroup>
-<col width="150px" class="parameters_name">
-<col class="parameters_description">
-<col width="200px" class="parameters_annotations">
-</colgroup>
-<tbody>
-<tr>
-<td class="parameter_name"><p>self</p></td>
-<td class="parameter_description"><p>A <a class="link" href="WebKitDOMNode.html" title="WebKitDOMNode"><span class="type">WebKitDOMNode</span></a></p></td>
-<td class="parameter_annotations"> </td>
-</tr>
-<tr>
-<td class="parameter_name"><p>event</p></td>
-<td class="parameter_description"><p>A <a class="link" href="WebKitDOMEvent.html" title="WebKitDOMEvent"><span class="type">WebKitDOMEvent</span></a></p></td>
-<td class="parameter_annotations"> </td>
-</tr>
-<tr>
-<td class="parameter_name"><p>error</p></td>
-<td class="parameter_description"><p><a href="../glib/glib-Error-Reporting.html#GError"><span class="type">GError</span></a></p></td>
-<td class="parameter_annotations"> </td>
-</tr>
-</tbody>
-</table></div>
-</div>
-<div class="refsect3">
-<a name="id-1.2.35.9.17.6"></a><h4>Returns</h4>
+<a name="id-1.2.29.9.16.5"></a><h4>Returns</h4>
 <p> A <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a></p>
 <p></p>
 </div>
@@ -1068,9 +1074,8 @@ webkit_dom_node_dispatch_event (<em class="parameter"><code><a class="link" href
 <a name="webkit-dom-node-get-node-name"></a><h3>webkit_dom_node_get_node_name ()</h3>
 <pre class="programlisting"><a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gchar</span></a> *
 webkit_dom_node_get_node_name (<em class="parameter"><code><a class="link" href="WebKitDOMNode.html" title="WebKitDOMNode"><span class="type">WebKitDOMNode</span></a> *self</code></em>);</pre>
-<div class="warning"><p><code class="literal">webkit_dom_node_get_node_name</code> is deprecated and should not be used in newly-written code.</p></div>
 <div class="refsect3">
-<a name="id-1.2.35.9.18.5"></a><h4>Parameters</h4>
+<a name="id-1.2.29.9.17.4"></a><h4>Parameters</h4>
 <div class="informaltable"><table width="100%" border="0">
 <colgroup>
 <col width="150px" class="parameters_name">
@@ -1085,7 +1090,7 @@ webkit_dom_node_get_node_name (<em class="parameter"><code><a class="link" href=
 </table></div>
 </div>
 <div class="refsect3">
-<a name="id-1.2.35.9.18.6"></a><h4>Returns</h4>
+<a name="id-1.2.29.9.17.5"></a><h4>Returns</h4>
 <p> A <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a></p>
 <p></p>
 </div>
@@ -1096,7 +1101,7 @@ webkit_dom_node_get_node_name (<em class="parameter"><code><a class="link" href=
 <pre class="programlisting"><a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gchar</span></a> *
 webkit_dom_node_get_node_value (<em class="parameter"><code><a class="link" href="WebKitDOMNode.html" title="WebKitDOMNode"><span class="type">WebKitDOMNode</span></a> *self</code></em>);</pre>
 <div class="refsect3">
-<a name="id-1.2.35.9.19.4"></a><h4>Parameters</h4>
+<a name="id-1.2.29.9.18.4"></a><h4>Parameters</h4>
 <div class="informaltable"><table width="100%" border="0">
 <colgroup>
 <col width="150px" class="parameters_name">
@@ -1111,7 +1116,7 @@ webkit_dom_node_get_node_value (<em class="parameter"><code><a class="link" href
 </table></div>
 </div>
 <div class="refsect3">
-<a name="id-1.2.35.9.19.5"></a><h4>Returns</h4>
+<a name="id-1.2.29.9.18.5"></a><h4>Returns</h4>
 <p> A <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a></p>
 <p></p>
 </div>
@@ -1124,7 +1129,7 @@ webkit_dom_node_set_node_value (<em class="parameter"><code><a class="link" href
                                 <em class="parameter"><code>const <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a> *value</code></em>,
                                 <em class="parameter"><code><a href="../glib/glib-Error-Reporting.html#GError"><span class="type">GError</span></a> **error</code></em>);</pre>
 <div class="refsect3">
-<a name="id-1.2.35.9.20.4"></a><h4>Parameters</h4>
+<a name="id-1.2.29.9.19.4"></a><h4>Parameters</h4>
 <div class="informaltable"><table width="100%" border="0">
 <colgroup>
 <col width="150px" class="parameters_name">
@@ -1157,7 +1162,7 @@ webkit_dom_node_set_node_value (<em class="parameter"><code><a class="link" href
 <pre class="programlisting"><a href="../glib/glib-Basic-Types.html#gushort"><span class="returnvalue">gushort</span></a>
 webkit_dom_node_get_node_type (<em class="parameter"><code><a class="link" href="WebKitDOMNode.html" title="WebKitDOMNode"><span class="type">WebKitDOMNode</span></a> *self</code></em>);</pre>
 <div class="refsect3">
-<a name="id-1.2.35.9.21.4"></a><h4>Parameters</h4>
+<a name="id-1.2.29.9.20.4"></a><h4>Parameters</h4>
 <div class="informaltable"><table width="100%" border="0">
 <colgroup>
 <col width="150px" class="parameters_name">
@@ -1172,7 +1177,7 @@ webkit_dom_node_get_node_type (<em class="parameter"><code><a class="link" href=
 </table></div>
 </div>
 <div class="refsect3">
-<a name="id-1.2.35.9.21.5"></a><h4>Returns</h4>
+<a name="id-1.2.29.9.20.5"></a><h4>Returns</h4>
 <p> A <a href="../glib/glib-Basic-Types.html#gushort"><span class="type">gushort</span></a></p>
 <p></p>
 </div>
@@ -1183,7 +1188,7 @@ webkit_dom_node_get_node_type (<em class="parameter"><code><a class="link" href=
 <pre class="programlisting"><a class="link" href="WebKitDOMNode.html" title="WebKitDOMNode"><span class="returnvalue">WebKitDOMNode</span></a> *
 webkit_dom_node_get_parent_node (<em class="parameter"><code><a class="link" href="WebKitDOMNode.html" title="WebKitDOMNode"><span class="type">WebKitDOMNode</span></a> *self</code></em>);</pre>
 <div class="refsect3">
-<a name="id-1.2.35.9.22.4"></a><h4>Parameters</h4>
+<a name="id-1.2.29.9.21.4"></a><h4>Parameters</h4>
 <div class="informaltable"><table width="100%" border="0">
 <colgroup>
 <col width="150px" class="parameters_name">
@@ -1198,7 +1203,7 @@ webkit_dom_node_get_parent_node (<em class="parameter"><code><a class="link" hre
 </table></div>
 </div>
 <div class="refsect3">
-<a name="id-1.2.35.9.22.5"></a><h4>Returns</h4>
+<a name="id-1.2.29.9.21.5"></a><h4>Returns</h4>
 <p> A <a class="link" href="WebKitDOMNode.html" title="WebKitDOMNode"><span class="type">WebKitDOMNode</span></a>. </p>
 <p><span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span></p>
 </div>
@@ -1209,7 +1214,7 @@ webkit_dom_node_get_parent_node (<em class="parameter"><code><a class="link" hre
 <pre class="programlisting"><a class="link" href="WebKitDOMNodeList.html" title="WebKitDOMNodeList"><span class="returnvalue">WebKitDOMNodeList</span></a> *
 webkit_dom_node_get_child_nodes (<em class="parameter"><code><a class="link" href="WebKitDOMNode.html" title="WebKitDOMNode"><span class="type">WebKitDOMNode</span></a> *self</code></em>);</pre>
 <div class="refsect3">
-<a name="id-1.2.35.9.23.4"></a><h4>Parameters</h4>
+<a name="id-1.2.29.9.22.4"></a><h4>Parameters</h4>
 <div class="informaltable"><table width="100%" border="0">
 <colgroup>
 <col width="150px" class="parameters_name">
@@ -1224,7 +1229,7 @@ webkit_dom_node_get_child_nodes (<em class="parameter"><code><a class="link" hre
 </table></div>
 </div>
 <div class="refsect3">
-<a name="id-1.2.35.9.23.5"></a><h4>Returns</h4>
+<a name="id-1.2.29.9.22.5"></a><h4>Returns</h4>
 <p> A <a class="link" href="WebKitDOMNodeList.html" title="WebKitDOMNodeList"><span class="type">WebKitDOMNodeList</span></a>. </p>
 <p><span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span></p>
 </div>
@@ -1235,7 +1240,7 @@ webkit_dom_node_get_child_nodes (<em class="parameter"><code><a class="link" hre
 <pre class="programlisting"><a class="link" href="WebKitDOMNode.html" title="WebKitDOMNode"><span class="returnvalue">WebKitDOMNode</span></a> *
 webkit_dom_node_get_first_child (<em class="parameter"><code><a class="link" href="WebKitDOMNode.html" title="WebKitDOMNode"><span class="type">WebKitDOMNode</span></a> *self</code></em>);</pre>
 <div class="refsect3">
-<a name="id-1.2.35.9.24.4"></a><h4>Parameters</h4>
+<a name="id-1.2.29.9.23.4"></a><h4>Parameters</h4>
 <div class="informaltable"><table width="100%" border="0">
 <colgroup>
 <col width="150px" class="parameters_name">
@@ -1250,7 +1255,7 @@ webkit_dom_node_get_first_child (<em class="parameter"><code><a class="link" hre
 </table></div>
 </div>
 <div class="refsect3">
-<a name="id-1.2.35.9.24.5"></a><h4>Returns</h4>
+<a name="id-1.2.29.9.23.5"></a><h4>Returns</h4>
 <p> A <a class="link" href="WebKitDOMNode.html" title="WebKitDOMNode"><span class="type">WebKitDOMNode</span></a>. </p>
 <p><span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span></p>
 </div>
@@ -1261,7 +1266,7 @@ webkit_dom_node_get_first_child (<em class="parameter"><code><a class="link" hre
 <pre class="programlisting"><a class="link" href="WebKitDOMNode.html" title="WebKitDOMNode"><span class="returnvalue">WebKitDOMNode</span></a> *
 webkit_dom_node_get_last_child (<em class="parameter"><code><a class="link" href="WebKitDOMNode.html" title="WebKitDOMNode"><span class="type">WebKitDOMNode</span></a> *self</code></em>);</pre>
 <div class="refsect3">
-<a name="id-1.2.35.9.25.4"></a><h4>Parameters</h4>
+<a name="id-1.2.29.9.24.4"></a><h4>Parameters</h4>
 <div class="informaltable"><table width="100%" border="0">
 <colgroup>
 <col width="150px" class="parameters_name">
@@ -1276,7 +1281,7 @@ webkit_dom_node_get_last_child (<em class="parameter"><code><a class="link" href
 </table></div>
 </div>
 <div class="refsect3">
-<a name="id-1.2.35.9.25.5"></a><h4>Returns</h4>
+<a name="id-1.2.29.9.24.5"></a><h4>Returns</h4>
 <p> A <a class="link" href="WebKitDOMNode.html" title="WebKitDOMNode"><span class="type">WebKitDOMNode</span></a>. </p>
 <p><span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span></p>
 </div>
@@ -1287,7 +1292,7 @@ webkit_dom_node_get_last_child (<em class="parameter"><code><a class="link" href
 <pre class="programlisting"><a class="link" href="WebKitDOMNode.html" title="WebKitDOMNode"><span class="returnvalue">WebKitDOMNode</span></a> *
 webkit_dom_node_get_previous_sibling (<em class="parameter"><code><a class="link" href="WebKitDOMNode.html" title="WebKitDOMNode"><span class="type">WebKitDOMNode</span></a> *self</code></em>);</pre>
 <div class="refsect3">
-<a name="id-1.2.35.9.26.4"></a><h4>Parameters</h4>
+<a name="id-1.2.29.9.25.4"></a><h4>Parameters</h4>
 <div class="informaltable"><table width="100%" border="0">
 <colgroup>
 <col width="150px" class="parameters_name">
@@ -1302,7 +1307,7 @@ webkit_dom_node_get_previous_sibling (<em class="parameter"><code><a class="link
 </table></div>
 </div>
 <div class="refsect3">
-<a name="id-1.2.35.9.26.5"></a><h4>Returns</h4>
+<a name="id-1.2.29.9.25.5"></a><h4>Returns</h4>
 <p> A <a class="link" href="WebKitDOMNode.html" title="WebKitDOMNode"><span class="type">WebKitDOMNode</span></a>. </p>
 <p><span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span></p>
 </div>
@@ -1313,7 +1318,7 @@ webkit_dom_node_get_previous_sibling (<em class="parameter"><code><a class="link
 <pre class="programlisting"><a class="link" href="WebKitDOMNode.html" title="WebKitDOMNode"><span class="returnvalue">WebKitDOMNode</span></a> *
 webkit_dom_node_get_next_sibling (<em class="parameter"><code><a class="link" href="WebKitDOMNode.html" title="WebKitDOMNode"><span class="type">WebKitDOMNode</span></a> *self</code></em>);</pre>
 <div class="refsect3">
-<a name="id-1.2.35.9.27.4"></a><h4>Parameters</h4>
+<a name="id-1.2.29.9.26.4"></a><h4>Parameters</h4>
 <div class="informaltable"><table width="100%" border="0">
 <colgroup>
 <col width="150px" class="parameters_name">
@@ -1328,7 +1333,7 @@ webkit_dom_node_get_next_sibling (<em class="parameter"><code><a class="link" hr
 </table></div>
 </div>
 <div class="refsect3">
-<a name="id-1.2.35.9.27.5"></a><h4>Returns</h4>
+<a name="id-1.2.29.9.26.5"></a><h4>Returns</h4>
 <p> A <a class="link" href="WebKitDOMNode.html" title="WebKitDOMNode"><span class="type">WebKitDOMNode</span></a>. </p>
 <p><span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span></p>
 </div>
@@ -1339,7 +1344,7 @@ webkit_dom_node_get_next_sibling (<em class="parameter"><code><a class="link" hr
 <pre class="programlisting"><a class="link" href="WebKitDOMDocument.html" title="WebKitDOMDocument"><span class="returnvalue">WebKitDOMDocument</span></a> *
 webkit_dom_node_get_owner_document (<em class="parameter"><code><a class="link" href="WebKitDOMNode.html" title="WebKitDOMNode"><span class="type">WebKitDOMNode</span></a> *self</code></em>);</pre>
 <div class="refsect3">
-<a name="id-1.2.35.9.28.4"></a><h4>Parameters</h4>
+<a name="id-1.2.29.9.27.4"></a><h4>Parameters</h4>
 <div class="informaltable"><table width="100%" border="0">
 <colgroup>
 <col width="150px" class="parameters_name">
@@ -1354,7 +1359,7 @@ webkit_dom_node_get_owner_document (<em class="parameter"><code><a class="link" 
 </table></div>
 </div>
 <div class="refsect3">
-<a name="id-1.2.35.9.28.5"></a><h4>Returns</h4>
+<a name="id-1.2.29.9.27.5"></a><h4>Returns</h4>
 <p> A <a class="link" href="WebKitDOMDocument.html" title="WebKitDOMDocument"><span class="type">WebKitDOMDocument</span></a>. </p>
 <p><span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span></p>
 </div>
@@ -1365,7 +1370,7 @@ webkit_dom_node_get_owner_document (<em class="parameter"><code><a class="link" 
 <pre class="programlisting"><a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gchar</span></a> *
 webkit_dom_node_get_namespace_uri (<em class="parameter"><code><a class="link" href="WebKitDOMNode.html" title="WebKitDOMNode"><span class="type">WebKitDOMNode</span></a> *self</code></em>);</pre>
 <div class="refsect3">
-<a name="id-1.2.35.9.29.4"></a><h4>Parameters</h4>
+<a name="id-1.2.29.9.28.4"></a><h4>Parameters</h4>
 <div class="informaltable"><table width="100%" border="0">
 <colgroup>
 <col width="150px" class="parameters_name">
@@ -1380,7 +1385,7 @@ webkit_dom_node_get_namespace_uri (<em class="parameter"><code><a class="link" h
 </table></div>
 </div>
 <div class="refsect3">
-<a name="id-1.2.35.9.29.5"></a><h4>Returns</h4>
+<a name="id-1.2.29.9.28.5"></a><h4>Returns</h4>
 <p> A <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a></p>
 <p></p>
 </div>
@@ -1391,7 +1396,7 @@ webkit_dom_node_get_namespace_uri (<em class="parameter"><code><a class="link" h
 <pre class="programlisting"><a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gchar</span></a> *
 webkit_dom_node_get_prefix (<em class="parameter"><code><a class="link" href="WebKitDOMNode.html" title="WebKitDOMNode"><span class="type">WebKitDOMNode</span></a> *self</code></em>);</pre>
 <div class="refsect3">
-<a name="id-1.2.35.9.30.4"></a><h4>Parameters</h4>
+<a name="id-1.2.29.9.29.4"></a><h4>Parameters</h4>
 <div class="informaltable"><table width="100%" border="0">
 <colgroup>
 <col width="150px" class="parameters_name">
@@ -1406,7 +1411,7 @@ webkit_dom_node_get_prefix (<em class="parameter"><code><a class="link" href="We
 </table></div>
 </div>
 <div class="refsect3">
-<a name="id-1.2.35.9.30.5"></a><h4>Returns</h4>
+<a name="id-1.2.29.9.29.5"></a><h4>Returns</h4>
 <p> A <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a></p>
 <p></p>
 </div>
@@ -1419,7 +1424,7 @@ webkit_dom_node_set_prefix (<em class="parameter"><code><a class="link" href="We
                             <em class="parameter"><code>const <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a> *value</code></em>,
                             <em class="parameter"><code><a href="../glib/glib-Error-Reporting.html#GError"><span class="type">GError</span></a> **error</code></em>);</pre>
 <div class="refsect3">
-<a name="id-1.2.35.9.31.4"></a><h4>Parameters</h4>
+<a name="id-1.2.29.9.30.4"></a><h4>Parameters</h4>
 <div class="informaltable"><table width="100%" border="0">
 <colgroup>
 <col width="150px" class="parameters_name">
@@ -1452,7 +1457,7 @@ webkit_dom_node_set_prefix (<em class="parameter"><code><a class="link" href="We
 <pre class="programlisting"><a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gchar</span></a> *
 webkit_dom_node_get_local_name (<em class="parameter"><code><a class="link" href="WebKitDOMNode.html" title="WebKitDOMNode"><span class="type">WebKitDOMNode</span></a> *self</code></em>);</pre>
 <div class="refsect3">
-<a name="id-1.2.35.9.32.4"></a><h4>Parameters</h4>
+<a name="id-1.2.29.9.31.4"></a><h4>Parameters</h4>
 <div class="informaltable"><table width="100%" border="0">
 <colgroup>
 <col width="150px" class="parameters_name">
@@ -1467,7 +1472,7 @@ webkit_dom_node_get_local_name (<em class="parameter"><code><a class="link" href
 </table></div>
 </div>
 <div class="refsect3">
-<a name="id-1.2.35.9.32.5"></a><h4>Returns</h4>
+<a name="id-1.2.29.9.31.5"></a><h4>Returns</h4>
 <p> A <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a></p>
 <p></p>
 </div>
@@ -1478,7 +1483,7 @@ webkit_dom_node_get_local_name (<em class="parameter"><code><a class="link" href
 <pre class="programlisting"><a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gchar</span></a> *
 webkit_dom_node_get_base_uri (<em class="parameter"><code><a class="link" href="WebKitDOMNode.html" title="WebKitDOMNode"><span class="type">WebKitDOMNode</span></a> *self</code></em>);</pre>
 <div class="refsect3">
-<a name="id-1.2.35.9.33.4"></a><h4>Parameters</h4>
+<a name="id-1.2.29.9.32.4"></a><h4>Parameters</h4>
 <div class="informaltable"><table width="100%" border="0">
 <colgroup>
 <col width="150px" class="parameters_name">
@@ -1493,7 +1498,7 @@ webkit_dom_node_get_base_uri (<em class="parameter"><code><a class="link" href="
 </table></div>
 </div>
 <div class="refsect3">
-<a name="id-1.2.35.9.33.5"></a><h4>Returns</h4>
+<a name="id-1.2.29.9.32.5"></a><h4>Returns</h4>
 <p> A <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a></p>
 <p></p>
 </div>
@@ -1504,7 +1509,7 @@ webkit_dom_node_get_base_uri (<em class="parameter"><code><a class="link" href="
 <pre class="programlisting"><a href="../glib/glib-Basic-Types.html#gchar"><span class="returnvalue">gchar</span></a> *
 webkit_dom_node_get_text_content (<em class="parameter"><code><a class="link" href="WebKitDOMNode.html" title="WebKitDOMNode"><span class="type">WebKitDOMNode</span></a> *self</code></em>);</pre>
 <div class="refsect3">
-<a name="id-1.2.35.9.34.4"></a><h4>Parameters</h4>
+<a name="id-1.2.29.9.33.4"></a><h4>Parameters</h4>
 <div class="informaltable"><table width="100%" border="0">
 <colgroup>
 <col width="150px" class="parameters_name">
@@ -1519,7 +1524,7 @@ webkit_dom_node_get_text_content (<em class="parameter"><code><a class="link" hr
 </table></div>
 </div>
 <div class="refsect3">
-<a name="id-1.2.35.9.34.5"></a><h4>Returns</h4>
+<a name="id-1.2.29.9.33.5"></a><h4>Returns</h4>
 <p> A <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a></p>
 <p></p>
 </div>
@@ -1532,7 +1537,7 @@ webkit_dom_node_set_text_content (<em class="parameter"><code><a class="link" hr
                                   <em class="parameter"><code>const <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a> *value</code></em>,
                                   <em class="parameter"><code><a href="../glib/glib-Error-Reporting.html#GError"><span class="type">GError</span></a> **error</code></em>);</pre>
 <div class="refsect3">
-<a name="id-1.2.35.9.35.4"></a><h4>Parameters</h4>
+<a name="id-1.2.29.9.34.4"></a><h4>Parameters</h4>
 <div class="informaltable"><table width="100%" border="0">
 <colgroup>
 <col width="150px" class="parameters_name">
@@ -1565,7 +1570,7 @@ webkit_dom_node_set_text_content (<em class="parameter"><code><a class="link" hr
 <pre class="programlisting"><a class="link" href="WebKitDOMElement.html" title="WebKitDOMElement"><span class="returnvalue">WebKitDOMElement</span></a> *
 webkit_dom_node_get_parent_element (<em class="parameter"><code><a class="link" href="WebKitDOMNode.html" title="WebKitDOMNode"><span class="type">WebKitDOMNode</span></a> *self</code></em>);</pre>
 <div class="refsect3">
-<a name="id-1.2.35.9.36.4"></a><h4>Parameters</h4>
+<a name="id-1.2.29.9.35.4"></a><h4>Parameters</h4>
 <div class="informaltable"><table width="100%" border="0">
 <colgroup>
 <col width="150px" class="parameters_name">
@@ -1580,35 +1585,9 @@ webkit_dom_node_get_parent_element (<em class="parameter"><code><a class="link" 
 </table></div>
 </div>
 <div class="refsect3">
-<a name="id-1.2.35.9.36.5"></a><h4>Returns</h4>
+<a name="id-1.2.29.9.35.5"></a><h4>Returns</h4>
 <p> A <a class="link" href="WebKitDOMElement.html" title="WebKitDOMElement"><span class="type">WebKitDOMElement</span></a>. </p>
 <p><span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span></p>
-</div>
-</div>
-<hr>
-<div class="refsect2">
-<a name="webkit-dom-node-get-attributes"></a><h3>webkit_dom_node_get_attributes ()</h3>
-<pre class="programlisting"><a class="link" href="WebKitDOMNamedNodeMap.html" title="WebKitDOMNamedNodeMap"><span class="returnvalue">WebKitDOMNamedNodeMap</span></a> *
-webkit_dom_node_get_attributes (<em class="parameter"><code><a class="link" href="WebKitDOMNode.html" title="WebKitDOMNode"><span class="type">WebKitDOMNode</span></a> *self</code></em>);</pre>
-<div class="warning"><p><code class="literal">webkit_dom_node_get_attributes</code> is deprecated and should not be used in newly-written code.</p></div>
-<p>
-</p>
-<div class="refsect3">
-<a name="id-1.2.35.9.37.6"></a><h4>Returns</h4>
-<p></p>
-</div>
-</div>
-<hr>
-<div class="refsect2">
-<a name="webkit-dom-node-has-attributes"></a><h3>webkit_dom_node_has_attributes ()</h3>
-<pre class="programlisting"><a href="../glib/glib-Basic-Types.html#gboolean"><span class="returnvalue">gboolean</span></a>
-webkit_dom_node_has_attributes (<em class="parameter"><code><a class="link" href="WebKitDOMNode.html" title="WebKitDOMNode"><span class="type">WebKitDOMNode</span></a> *self</code></em>);</pre>
-<div class="warning"><p><code class="literal">webkit_dom_node_has_attributes</code> is deprecated and should not be used in newly-written code.</p></div>
-<p>
-</p>
-<div class="refsect3">
-<a name="id-1.2.35.9.38.6"></a><h4>Returns</h4>
-<p></p>
 </div>
 </div>
 </div>
@@ -1619,6 +1598,114 @@ webkit_dom_node_has_attributes (<em class="parameter"><code><a class="link" href
 <pre class="programlisting">typedef struct _WebKitDOMNode WebKitDOMNode;</pre>
 <p>
 </p>
+</div>
+<hr>
+<div class="refsect2">
+<a name="WEBKIT-DOM-NODE-ELEMENT-NODE:CAPS"></a><h3>WEBKIT_DOM_NODE_ELEMENT_NODE</h3>
+<pre class="programlisting">#define WEBKIT_DOM_NODE_ELEMENT_NODE 1
+</pre>
+</div>
+<hr>
+<div class="refsect2">
+<a name="WEBKIT-DOM-NODE-ATTRIBUTE-NODE:CAPS"></a><h3>WEBKIT_DOM_NODE_ATTRIBUTE_NODE</h3>
+<pre class="programlisting">#define WEBKIT_DOM_NODE_ATTRIBUTE_NODE 2
+</pre>
+</div>
+<hr>
+<div class="refsect2">
+<a name="WEBKIT-DOM-NODE-TEXT-NODE:CAPS"></a><h3>WEBKIT_DOM_NODE_TEXT_NODE</h3>
+<pre class="programlisting">#define WEBKIT_DOM_NODE_TEXT_NODE 3
+</pre>
+</div>
+<hr>
+<div class="refsect2">
+<a name="WEBKIT-DOM-NODE-CDATA-SECTION-NODE:CAPS"></a><h3>WEBKIT_DOM_NODE_CDATA_SECTION_NODE</h3>
+<pre class="programlisting">#define WEBKIT_DOM_NODE_CDATA_SECTION_NODE 4
+</pre>
+</div>
+<hr>
+<div class="refsect2">
+<a name="WEBKIT-DOM-NODE-ENTITY-REFERENCE-NODE:CAPS"></a><h3>WEBKIT_DOM_NODE_ENTITY_REFERENCE_NODE</h3>
+<pre class="programlisting">#define WEBKIT_DOM_NODE_ENTITY_REFERENCE_NODE 5
+</pre>
+</div>
+<hr>
+<div class="refsect2">
+<a name="WEBKIT-DOM-NODE-ENTITY-NODE:CAPS"></a><h3>WEBKIT_DOM_NODE_ENTITY_NODE</h3>
+<pre class="programlisting">#define WEBKIT_DOM_NODE_ENTITY_NODE 6
+</pre>
+</div>
+<hr>
+<div class="refsect2">
+<a name="WEBKIT-DOM-NODE-PROCESSING-INSTRUCTION-NODE:CAPS"></a><h3>WEBKIT_DOM_NODE_PROCESSING_INSTRUCTION_NODE</h3>
+<pre class="programlisting">#define WEBKIT_DOM_NODE_PROCESSING_INSTRUCTION_NODE 7
+</pre>
+</div>
+<hr>
+<div class="refsect2">
+<a name="WEBKIT-DOM-NODE-COMMENT-NODE:CAPS"></a><h3>WEBKIT_DOM_NODE_COMMENT_NODE</h3>
+<pre class="programlisting">#define WEBKIT_DOM_NODE_COMMENT_NODE 8
+</pre>
+</div>
+<hr>
+<div class="refsect2">
+<a name="WEBKIT-DOM-NODE-DOCUMENT-NODE:CAPS"></a><h3>WEBKIT_DOM_NODE_DOCUMENT_NODE</h3>
+<pre class="programlisting">#define WEBKIT_DOM_NODE_DOCUMENT_NODE 9
+</pre>
+</div>
+<hr>
+<div class="refsect2">
+<a name="WEBKIT-DOM-NODE-DOCUMENT-TYPE-NODE:CAPS"></a><h3>WEBKIT_DOM_NODE_DOCUMENT_TYPE_NODE</h3>
+<pre class="programlisting">#define WEBKIT_DOM_NODE_DOCUMENT_TYPE_NODE 10
+</pre>
+</div>
+<hr>
+<div class="refsect2">
+<a name="WEBKIT-DOM-NODE-DOCUMENT-FRAGMENT-NODE:CAPS"></a><h3>WEBKIT_DOM_NODE_DOCUMENT_FRAGMENT_NODE</h3>
+<pre class="programlisting">#define WEBKIT_DOM_NODE_DOCUMENT_FRAGMENT_NODE 11
+</pre>
+</div>
+<hr>
+<div class="refsect2">
+<a name="WEBKIT-DOM-NODE-NOTATION-NODE:CAPS"></a><h3>WEBKIT_DOM_NODE_NOTATION_NODE</h3>
+<pre class="programlisting">#define WEBKIT_DOM_NODE_NOTATION_NODE 12
+</pre>
+</div>
+<hr>
+<div class="refsect2">
+<a name="WEBKIT-DOM-NODE-DOCUMENT-POSITION-DISCONNECTED:CAPS"></a><h3>WEBKIT_DOM_NODE_DOCUMENT_POSITION_DISCONNECTED</h3>
+<pre class="programlisting">#define WEBKIT_DOM_NODE_DOCUMENT_POSITION_DISCONNECTED 0x01
+</pre>
+</div>
+<hr>
+<div class="refsect2">
+<a name="WEBKIT-DOM-NODE-DOCUMENT-POSITION-PRECEDING:CAPS"></a><h3>WEBKIT_DOM_NODE_DOCUMENT_POSITION_PRECEDING</h3>
+<pre class="programlisting">#define WEBKIT_DOM_NODE_DOCUMENT_POSITION_PRECEDING 0x02
+</pre>
+</div>
+<hr>
+<div class="refsect2">
+<a name="WEBKIT-DOM-NODE-DOCUMENT-POSITION-FOLLOWING:CAPS"></a><h3>WEBKIT_DOM_NODE_DOCUMENT_POSITION_FOLLOWING</h3>
+<pre class="programlisting">#define WEBKIT_DOM_NODE_DOCUMENT_POSITION_FOLLOWING 0x04
+</pre>
+</div>
+<hr>
+<div class="refsect2">
+<a name="WEBKIT-DOM-NODE-DOCUMENT-POSITION-CONTAINS:CAPS"></a><h3>WEBKIT_DOM_NODE_DOCUMENT_POSITION_CONTAINS</h3>
+<pre class="programlisting">#define WEBKIT_DOM_NODE_DOCUMENT_POSITION_CONTAINS 0x08
+</pre>
+</div>
+<hr>
+<div class="refsect2">
+<a name="WEBKIT-DOM-NODE-DOCUMENT-POSITION-CONTAINED-BY:CAPS"></a><h3>WEBKIT_DOM_NODE_DOCUMENT_POSITION_CONTAINED_BY</h3>
+<pre class="programlisting">#define WEBKIT_DOM_NODE_DOCUMENT_POSITION_CONTAINED_BY 0x10
+</pre>
+</div>
+<hr>
+<div class="refsect2">
+<a name="WEBKIT-DOM-NODE-DOCUMENT-POSITION-IMPLEMENTATION-SPECIFIC:CAPS"></a><h3>WEBKIT_DOM_NODE_DOCUMENT_POSITION_IMPLEMENTATION_SPECIFIC</h3>
+<pre class="programlisting">#define WEBKIT_DOM_NODE_DOCUMENT_POSITION_IMPLEMENTATION_SPECIFIC 0x20
+</pre>
 </div>
 </div>
 <div class="refsect1">

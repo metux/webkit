@@ -19,7 +19,6 @@
  */
 
 #include "config.h"
-#if ENABLE(PROGRESS_ELEMENT)
 #include "HTMLProgressElement.h"
 
 #include "Attribute.h"
@@ -60,10 +59,10 @@ PassRefPtr<HTMLProgressElement> HTMLProgressElement::create(const QualifiedName&
 
 RenderPtr<RenderElement> HTMLProgressElement::createElementRenderer(PassRef<RenderStyle> style)
 {
-    if (!style.get().hasAppearance() || hasAuthorShadowRoot())
-        return RenderElement::createFor(*this, std::move(style));
+    if (!style.get().hasAppearance())
+        return RenderElement::createFor(*this, WTF::move(style));
 
-    return createRenderer<RenderProgress>(*this, std::move(style));
+    return createRenderer<RenderProgress>(*this, WTF::move(style));
 }
 
 bool HTMLProgressElement::childShouldCreateRenderer(const Node& child) const
@@ -169,4 +168,3 @@ bool HTMLProgressElement::shouldAppearIndeterminate() const
 }
 
 } // namespace
-#endif

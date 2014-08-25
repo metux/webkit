@@ -26,6 +26,8 @@
 #ifndef JSPromiseReaction_h
 #define JSPromiseReaction_h
 
+#if ENABLE(PROMISES)
+
 #include "JSCell.h"
 #include "Structure.h"
 
@@ -41,7 +43,7 @@ public:
     static JSPromiseReaction* create(VM&, JSPromiseDeferred*, JSValue);
     static Structure* createStructure(VM& vm, JSGlobalObject* globalObject, JSValue prototype)
     {
-        return Structure::create(vm, globalObject, prototype, TypeInfo(CompoundType, StructureFlags), info());
+        return Structure::create(vm, globalObject, prototype, TypeInfo(CellType, StructureFlags), info());
     }
 
     static const bool hasImmortalStructure = true;
@@ -54,7 +56,6 @@ public:
 private:
     JSPromiseReaction(VM&);
     void finishCreation(VM&, JSPromiseDeferred*, JSValue);
-    static const unsigned StructureFlags = OverridesVisitChildren | Base::StructureFlags;
     static void visitChildren(JSCell*, SlotVisitor&);
 
     WriteBarrier<JSPromiseDeferred> m_deferred;
@@ -64,5 +65,7 @@ private:
 PassRefPtr<Microtask> createExecutePromiseReactionMicrotask(VM&, JSPromiseReaction*, JSValue);
 
 } // namespace JSC
+
+#endif // ENABLE(PROMISES)
 
 #endif // JSPromiseReaction_h

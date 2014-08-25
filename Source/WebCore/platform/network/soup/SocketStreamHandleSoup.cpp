@@ -32,6 +32,8 @@
 #include "config.h"
 #include "SocketStreamHandle.h"
 
+#if USE(SOUP)
+
 #include "URL.h"
 #include "Logging.h"
 #include "NotImplemented.h"
@@ -226,6 +228,16 @@ void SocketStreamHandle::receivedCancellation(const AuthenticationChallenge&)
     notImplemented();
 }
 
+void SocketStreamHandle::receivedRequestToPerformDefaultHandling(const AuthenticationChallenge&)
+{
+    notImplemented();
+}
+
+void SocketStreamHandle::receivedChallengeRejection(const AuthenticationChallenge&)
+{
+    notImplemented();
+}
+
 void SocketStreamHandle::beginWaitingForSocketWritability()
 {
     if (m_writeReadySource) // Already waiting.
@@ -286,3 +298,5 @@ static gboolean writeReadyCallback(GPollableOutputStream*, void* id)
 }
 
 } // namespace WebCore
+
+#endif

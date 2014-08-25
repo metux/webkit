@@ -29,10 +29,11 @@
 #include "JSCJSValueInlines.h"
 #include "JSCellInlines.h"
 #include "JSMapIterator.h"
+#include "StructureInlines.h"
 
 namespace JSC {
 
-const ClassInfo MapIteratorPrototype::s_info = { "Map Iterator", &Base::s_info, 0, 0, CREATE_METHOD_TABLE(MapIteratorPrototype) };
+const ClassInfo MapIteratorPrototype::s_info = { "Map Iterator", &Base::s_info, 0, CREATE_METHOD_TABLE(MapIteratorPrototype) };
 
 static EncodedJSValue JSC_HOST_CALL MapIteratorPrototypeFuncIterator(ExecState*);
 static EncodedJSValue JSC_HOST_CALL MapIteratorPrototypeFuncNext(ExecState*);

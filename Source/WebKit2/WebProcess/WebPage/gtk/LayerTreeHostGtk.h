@@ -36,6 +36,7 @@
 #include <WebCore/GraphicsLayerClient.h>
 #include <wtf/HashMap.h>
 #include <wtf/OwnPtr.h>
+#include <wtf/gobject/GMainLoopSource.h>
 
 namespace WebKit {
 
@@ -79,7 +80,7 @@ private:
     // GraphicsLayerClient
     virtual void notifyAnimationStarted(const WebCore::GraphicsLayer*, double time);
     virtual void notifyFlushRequired(const WebCore::GraphicsLayer*);
-    virtual void paintContents(const WebCore::GraphicsLayer*, WebCore::GraphicsContext&, WebCore::GraphicsLayerPaintingPhase, const WebCore::IntRect& clipRect);
+    virtual void paintContents(const WebCore::GraphicsLayer*, WebCore::GraphicsContext&, WebCore::GraphicsLayerPaintingPhase, const WebCore::FloatRect& clipRect);
     virtual void didCommitChangesForLayer(const WebCore::GraphicsLayer*) const { }
 
     void createPageOverlayLayer(PageOverlay*);
@@ -92,7 +93,6 @@ private:
     void cancelPendingLayerFlush();
 
     void layerFlushTimerFired();
-    static gboolean layerFlushTimerFiredCallback(LayerTreeHostGtk*);
 
     WebCore::GLContext* glContext();
 
@@ -103,11 +103,11 @@ private:
     std::unique_ptr<WebCore::GraphicsLayer> m_nonCompositedContentLayer;
     typedef HashMap<PageOverlay*, std::unique_ptr<WebCore::GraphicsLayer>> PageOverlayLayerMap;
     PageOverlayLayerMap m_pageOverlayLayers;
-    OwnPtr<WebCore::TextureMapper> m_textureMapper;
+    std::unique_ptr<WebCore::TextureMapper> m_textureMapper;
     OwnPtr<WebCore::GLContext> m_context;
     double m_lastFlushTime;
     bool m_layerFlushSchedulingEnabled;
-    unsigned m_layerFlushTimerCallbackId;
+    GMainLoopSource m_layerFlushTimerCallback;
 };
 
 } // namespace WebKit

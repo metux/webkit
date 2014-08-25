@@ -46,6 +46,10 @@
 #include <RuntimeApplicationChecksIOS.h>
 #endif
 
+#if USE(QUICK_LOOK)
+#include "QuickLook.h"
+#endif
+
 namespace WebCore {
 
 // Match the parallel connection count used by the networking layer.
@@ -162,8 +166,8 @@ void ResourceLoadScheduler::scheduleLoad(ResourceLoader* resourceLoader, Resourc
     bool hadRequests = host->hasRequests();
     host->schedule(resourceLoader, priority);
 
-#if PLATFORM(MAC) || USE(CFNETWORK)
-    if (!isSuspendingPendingRequests()) {
+#if PLATFORM(COCOA) || USE(CFNETWORK)
+    if (ResourceRequest::resourcePrioritiesEnabled() && !isSuspendingPendingRequests()) {
         // Serve all requests at once to keep the pipeline full at the network layer.
         // FIXME: Does this code do anything useful, given that we also set maxRequestsInFlightPerHost to effectively unlimited on these platforms?
         servePendingRequests(host, ResourceLoadPriorityVeryLow);
@@ -197,6 +201,17 @@ void ResourceLoadScheduler::notifyDidScheduleResourceRequest(ResourceLoader* loa
     InspectorInstrumentation::didScheduleResourceRequest(loader->frameLoader() ? loader->frameLoader()->frame().document() : 0, loader->url());
 }
 
+#if USE(QUICK_LOOK)
+bool ResourceLoadScheduler::maybeLoadQuickLookResource(ResourceLoader& loader)
+{
+    if (!loader.request().url().protocolIs(QLPreviewProtocol()))
+        return false;
+
+    loader.start();
+    return true;
+}
+#endif
+
 void ResourceLoadScheduler::remove(ResourceLoader* resourceLoader)
 {
     ASSERT(resourceLoader);
@@ -214,6 +229,10 @@ void ResourceLoadScheduler::remove(ResourceLoader* resourceLoader)
     }
 #endif
     scheduleServePendingRequests();
+}
+
+void ResourceLoadScheduler::setDefersLoading(ResourceLoader*, bool)
+{
 }
 
 void ResourceLoadScheduler::crossOriginRedirectReceived(ResourceLoader* resourceLoader, const URL& redirectURL)

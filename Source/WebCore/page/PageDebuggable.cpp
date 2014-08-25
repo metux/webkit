@@ -29,11 +29,11 @@
 #if ENABLE(REMOTE_INSPECTOR)
 
 #include "Document.h"
-#include "InspectorClient.h"
 #include "InspectorController.h"
 #include "InspectorForwarding.h"
 #include "MainFrame.h"
 #include "Page.h"
+#include "Settings.h"
 #include <inspector/InspectorAgentBase.h>
 
 using namespace Inspector;
@@ -42,6 +42,7 @@ namespace WebCore {
 
 PageDebuggable::PageDebuggable(Page& page)
     : m_page(page)
+    , m_forcedDeveloperExtrasEnabled(false)
 {
 }
 
@@ -67,16 +68,14 @@ bool PageDebuggable::hasLocalDebugger() const
     return m_page.inspectorController().hasLocalFrontend();
 }
 
-pid_t PageDebuggable::parentProcessIdentifier() const
-{
-    if (InspectorClient* inspectorClient = m_page.inspectorController().inspectorClient())
-        return inspectorClient->parentProcessIdentifier();
-
-    return 0;
-}
-
 void PageDebuggable::connect(Inspector::InspectorFrontendChannel* channel)
 {
+    if (!m_page.settings().developerExtrasEnabled()) {
+        m_forcedDeveloperExtrasEnabled = true;
+        m_page.settings().setDeveloperExtrasEnabled(true);
+    } else
+        m_forcedDeveloperExtrasEnabled = false;
+
     InspectorController& inspectorController = m_page.inspectorController();
     inspectorController.setHasRemoteFrontend(true);
     inspectorController.connectFrontend(reinterpret_cast<WebCore::InspectorFrontendChannel*>(channel));
@@ -87,6 +86,11 @@ void PageDebuggable::disconnect()
     InspectorController& inspectorController = m_page.inspectorController();
     inspectorController.disconnectFrontend(InspectorDisconnectReason::InspectorDestroyed);
     inspectorController.setHasRemoteFrontend(false);
+
+    if (m_forcedDeveloperExtrasEnabled) {
+        m_forcedDeveloperExtrasEnabled = false;
+        m_page.settings().setDeveloperExtrasEnabled(false);
+    }
 }
 
 void PageDebuggable::dispatchMessageFromRemoteFrontend(const String& message)

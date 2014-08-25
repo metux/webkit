@@ -139,10 +139,13 @@ namespace JSC {
             return newString;
         }
 
+        Identifier toIdentifier(ExecState*) const;
+        AtomicString toAtomicString(ExecState*) const;
+        AtomicStringImpl* toExistingAtomicString(ExecState*) const;
         const String& value(ExecState*) const;
         const String& tryGetValue() const;
         const StringImpl* tryGetValueImpl() const;
-        unsigned length() { return m_length; }
+        unsigned length() const { return m_length; }
 
         JSValue toPrimitive(ExecState*, PreferredPrimitiveType) const;
         JS_EXPORT_PRIVATE bool toBoolean() const;
@@ -159,7 +162,7 @@ namespace JSC {
 
         static Structure* createStructure(VM& vm, JSGlobalObject* globalObject, JSValue proto)
         {
-            return Structure::create(vm, globalObject, proto, TypeInfo(StringType, OverridesGetOwnPropertySlot | InterceptsGetOwnPropertySlotByIndexEvenWhenLengthIsNotZero), info());
+            return Structure::create(vm, globalObject, proto, TypeInfo(StringType, StructureFlags), info());
         }
 
         static size_t offsetOfLength() { return OBJECT_OFFSETOF(JSString, m_length); }
@@ -168,6 +171,7 @@ namespace JSC {
 
         DECLARE_EXPORT_INFO;
 
+        static void dumpToStream(const JSCell*, PrintStream&);
         static void visitChildren(JSCell*, SlotVisitor&);
 
         enum {
@@ -177,6 +181,8 @@ namespace JSC {
         };
 
     protected:
+        static const unsigned StructureFlags = OverridesGetOwnPropertySlot | InterceptsGetOwnPropertySlotByIndexEvenWhenLengthIsNotZero | StructureIsImmortal;
+
         friend class JSValue;
             
         bool isRope() const { return m_value.isNull(); }
@@ -246,7 +252,7 @@ namespace JSC {
                 return tmp;
             }
 
-            unsigned length() { return m_jsString->m_length; }
+            unsigned length() const { return m_jsString->m_length; }
 
         private:
             void expand();
@@ -267,8 +273,10 @@ namespace JSC {
             Base::finishCreation(vm);
             m_length = s1->length() + s2->length();
             setIs8Bit(s1->is8Bit() && s2->is8Bit());
-            m_fibers[0].set(vm, this, s1);
-            m_fibers[1].set(vm, this, s2);
+            setIsSubstring(false);
+            fiber(0).set(vm, this, s1);
+            fiber(1).set(vm, this, s2);
+            fiber(2).clear();
         }
             
         void finishCreation(VM& vm, JSString* s1, JSString* s2, JSString* s3)
@@ -276,19 +284,37 @@ namespace JSC {
             Base::finishCreation(vm);
             m_length = s1->length() + s2->length() + s3->length();
             setIs8Bit(s1->is8Bit() && s2->is8Bit() &&  s3->is8Bit());
-            m_fibers[0].set(vm, this, s1);
-            m_fibers[1].set(vm, this, s2);
-            m_fibers[2].set(vm, this, s3);
+            setIsSubstring(false);
+            fiber(0).set(vm, this, s1);
+            fiber(1).set(vm, this, s2);
+            fiber(2).set(vm, this, s3);
+        }
+        
+        void finishCreation(VM& vm, JSString* base, unsigned offset, unsigned length)
+        {
+            Base::finishCreation(vm);
+            ASSERT(!base->isRope());
+            ASSERT(!sumOverflows<int32_t>(offset, length));
+            ASSERT(offset + length <= base->length());
+            m_length = length;
+            setIs8Bit(base->is8Bit());
+            setIsSubstring(true);
+            substringBase().set(vm, this, base);
+            substringOffset() = offset;
         }
 
         void finishCreation(VM& vm)
         {
             JSString::finishCreation(vm);
+            setIsSubstring(false);
+            fiber(0).clear();
+            fiber(1).clear();
+            fiber(2).clear();
         }
 
         void append(VM& vm, size_t index, JSString* jsString)
         {
-            m_fibers[index].set(vm, this, jsString);
+            fiber(index).set(vm, this, jsString);
             m_length += jsString->m_length;
             RELEASE_ASSERT(static_cast<int32_t>(m_length) >= 0);
             setIs8Bit(is8Bit() && jsString->is8Bit());
@@ -314,10 +340,17 @@ namespace JSC {
             newString->finishCreation(vm, s1, s2, s3);
             return newString;
         }
+        
+        static JSString* create(VM& vm, JSString* base, unsigned offset, unsigned length)
+        {
+            JSRopeString* newString = new (NotNull, allocateCell<JSRopeString>(vm.heap)) JSRopeString(vm);
+            newString->finishCreation(vm, base, offset, length);
+            return newString;
+        }
 
         void visitFibers(SlotVisitor&);
             
-        static ptrdiff_t offsetOfFibers() { return OBJECT_OFFSETOF(JSRopeString, m_fibers); }
+        static ptrdiff_t offsetOfFibers() { return OBJECT_OFFSETOF(JSRopeString, u); }
 
         static const unsigned s_maxInternalRopeLength = 3;
             
@@ -326,13 +359,60 @@ namespace JSC {
         friend JSValue jsStringFromArguments(ExecState*, JSValue);
 
         JS_EXPORT_PRIVATE void resolveRope(ExecState*) const;
+        JS_EXPORT_PRIVATE void resolveRopeToAtomicString(ExecState*) const;
+        JS_EXPORT_PRIVATE AtomicStringImpl* resolveRopeToExistingAtomicString(ExecState*) const;
         void resolveRopeSlowCase8(LChar*) const;
         void resolveRopeSlowCase(UChar*) const;
         void outOfMemory(ExecState*) const;
+        void resolveRopeInternal8(LChar*) const;
+        void resolveRopeInternal8NoSubstring(LChar*) const;
+        void resolveRopeInternal16(UChar*) const;
+        void resolveRopeInternal16NoSubstring(UChar*) const;
+        void clearFibers() const;
             
         JS_EXPORT_PRIVATE JSString* getIndexSlowCase(ExecState*, unsigned);
+        
+        WriteBarrierBase<JSString>& fiber(unsigned i) const
+        {
+            ASSERT(!isSubstring());
+            ASSERT(i < s_maxInternalRopeLength);
+            return u[i].string;
+        }
+        
+        WriteBarrierBase<JSString>& substringBase() const
+        {
+            return u[1].string;
+        }
+        
+        uintptr_t& substringOffset() const
+        {
+            return u[2].number;
+        }
+        
+        static uintptr_t notSubstringSentinel()
+        {
+            return 0;
+        }
+        
+        static uintptr_t substringSentinel()
+        {
+            return 1;
+        }
+        
+        bool isSubstring() const
+        {
+            return u[0].number == substringSentinel();
+        }
+        
+        void setIsSubstring(bool isSubstring)
+        {
+            u[0].number = isSubstring ? substringSentinel() : notSubstringSentinel();
+        }
 
-        mutable std::array<WriteBarrier<JSString>, s_maxInternalRopeLength> m_fibers;
+        mutable union {
+            uintptr_t number;
+            WriteBarrierBase<JSString> string;
+        } u[s_maxInternalRopeLength];
     };
 
 
@@ -368,13 +448,38 @@ namespace JSC {
         UChar c = s.characterAt(offset);
         if (c <= maxSingleCharacterString)
             return vm->smallStrings.singleCharacterString(c);
-        return JSString::create(*vm, StringImpl::create(s.impl(), offset, 1));
+        return JSString::create(*vm, StringImpl::createSubstringSharingImpl(s.impl(), offset, 1));
     }
 
     inline JSString* jsNontrivialString(VM* vm, const String& s)
     {
         ASSERT(s.length() > 1);
         return JSString::create(*vm, s.impl());
+    }
+
+    ALWAYS_INLINE Identifier JSString::toIdentifier(ExecState* exec) const
+    {
+        return Identifier(exec, toAtomicString(exec));
+    }
+
+    ALWAYS_INLINE AtomicString JSString::toAtomicString(ExecState* exec) const
+    {
+        if (isRope())
+            static_cast<const JSRopeString*>(this)->resolveRopeToAtomicString(exec);
+        return AtomicString(m_value);
+    }
+
+    ALWAYS_INLINE AtomicStringImpl* JSString::toExistingAtomicString(ExecState* exec) const
+    {
+        if (isRope())
+            return static_cast<const JSRopeString*>(this)->resolveRopeToExistingAtomicString(exec);
+        if (m_value.impl()->isAtomic())
+            return static_cast<AtomicStringImpl*>(m_value.impl());
+        if (AtomicStringImpl* existingAtomicString = AtomicString::find(m_value.impl())) {
+            m_value = *existingAtomicString;
+            return existingAtomicString;
+        }
+        return nullptr;
     }
 
     inline const String& JSString::value(ExecState* exec) const
@@ -418,10 +523,11 @@ namespace JSC {
         ASSERT(offset <= static_cast<unsigned>(s->length()));
         ASSERT(length <= static_cast<unsigned>(s->length()));
         ASSERT(offset + length <= static_cast<unsigned>(s->length()));
-        VM* vm = &exec->vm();
+        VM& vm = exec->vm();
         if (!length)
-            return vm->smallStrings.emptyString();
-        return jsSubstring(vm, s->value(exec), offset, length);
+            return vm.smallStrings.emptyString();
+        s->value(exec); // For effect. We need to ensure that any string that is used as a substring base is not a rope.
+        return JSRopeString::create(vm, s, offset, length);
     }
 
     inline JSString* jsSubstring8(VM* vm, const String& s, unsigned offset, unsigned length)
@@ -436,7 +542,7 @@ namespace JSC {
             if (c <= maxSingleCharacterString)
                 return vm->smallStrings.singleCharacterString(c);
         }
-        return JSString::createHasOtherOwner(*vm, StringImpl::create8(s.impl(), offset, length));
+        return JSString::createHasOtherOwner(*vm, StringImpl::createSubstringSharingImpl8(s.impl(), offset, length));
     }
 
     inline JSString* jsSubstring(VM* vm, const String& s, unsigned offset, unsigned length)
@@ -451,7 +557,7 @@ namespace JSC {
             if (c <= maxSingleCharacterString)
                 return vm->smallStrings.singleCharacterString(c);
         }
-        return JSString::createHasOtherOwner(*vm, StringImpl::create(s.impl(), offset, length));
+        return JSString::createHasOtherOwner(*vm, StringImpl::createSubstringSharingImpl(s.impl(), offset, length));
     }
 
     inline JSString* jsOwnedString(VM* vm, const String& s)
@@ -480,6 +586,34 @@ namespace JSC {
     inline JSString* jsNontrivialString(ExecState* exec, const String& s) { return jsNontrivialString(&exec->vm(), s); }
     inline JSString* jsOwnedString(ExecState* exec, const String& s) { return jsOwnedString(&exec->vm(), s); }
 
+    JS_EXPORT_PRIVATE JSString* jsStringWithCacheSlowCase(VM&, StringImpl&);
+
+    ALWAYS_INLINE JSString* jsStringWithCache(ExecState* exec, const String& s)
+    {
+        VM& vm = exec->vm();
+        StringImpl* stringImpl = s.impl();
+        if (!stringImpl || !stringImpl->length())
+            return jsEmptyString(&vm);
+
+        if (stringImpl->length() == 1) {
+            UChar singleCharacter = (*stringImpl)[0u];
+            if (singleCharacter <= maxSingleCharacterString)
+                return vm.smallStrings.singleCharacterString(static_cast<unsigned char>(singleCharacter));
+        }
+
+        if (JSString* lastCachedString = vm.lastCachedString.get()) {
+            if (lastCachedString->tryGetValueImpl() == stringImpl)
+                return lastCachedString;
+        }
+
+        return jsStringWithCacheSlowCase(vm, *stringImpl);
+    }
+
+    ALWAYS_INLINE JSString* jsStringWithCache(ExecState* exec, const AtomicString& s)
+    {
+        return jsStringWithCache(exec, s.string());
+    }
+
     ALWAYS_INLINE bool JSString::getStringPropertySlot(ExecState* exec, PropertyName propertyName, PropertySlot& slot)
     {
         if (propertyName == exec->propertyNames().length) {
@@ -507,7 +641,7 @@ namespace JSC {
         return false;
     }
 
-    inline bool isJSString(JSValue v) { return v.isCell() && v.asCell()->classInfo() == JSString::info(); }
+    inline bool isJSString(JSValue v) { return v.isCell() && v.asCell()->type() == StringType; }
 
     // --- JSValue inlines ----------------------------
         

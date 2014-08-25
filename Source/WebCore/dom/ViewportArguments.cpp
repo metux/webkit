@@ -28,18 +28,11 @@
 #include "config.h"
 #include "ViewportArguments.h"
 
-#include "Chrome.h"
-#include "Console.h"
-#include "DOMWindow.h"
 #include "Document.h"
 #include "Frame.h"
 #include "IntSize.h"
 #include "Page.h"
 #include "ScriptableDocumentParser.h"
-
-#if PLATFORM(IOS)
-#include "WebCoreSystemInterface.h"
-#endif
 
 namespace WebCore {
 
@@ -267,13 +260,6 @@ static FloatSize convertToUserSpace(const FloatSize& deviceSize, float devicePix
 
 ViewportAttributes computeViewportAttributes(ViewportArguments args, int desktopWidth, int deviceWidth, int deviceHeight, float devicePixelRatio, IntSize visibleViewport)
 {
-#if PLATFORM(IOS)
-    // FIXME: This should probably be fixed elsewhere on iOS. iOS may only use computeViewportAttributes for tests.
-    CGSize screenSize = wkGetViewportScreenSize();
-    visibleViewport.setWidth(screenSize.width);
-    visibleViewport.setHeight(screenSize.height);
-#endif
-
     FloatSize initialViewportSize = convertToUserSpace(visibleViewport, devicePixelRatio);
     FloatSize deviceSize = convertToUserSpace(FloatSize(deviceWidth, deviceHeight), devicePixelRatio);
 
@@ -416,19 +402,17 @@ void setViewportFeature(const String& keyString, const String& valueString, Docu
 }
 
 #if PLATFORM(IOS)
-void finalizeViewportArguments(ViewportArguments& arguments)
+void finalizeViewportArguments(ViewportArguments& arguments, const FloatSize& screenSize)
 {
-    CGSize screenSize = wkGetViewportScreenSize();
-
     if (arguments.width == ViewportArguments::ValueDeviceWidth)
-        arguments.width = screenSize.width;
+        arguments.width = screenSize.width();
     else if (arguments.width == ViewportArguments::ValueDeviceHeight)
-        arguments.width = screenSize.height;
+        arguments.width = screenSize.height();
 
     if (arguments.height == ViewportArguments::ValueDeviceWidth)
-        arguments.height = screenSize.width;
+        arguments.height = screenSize.width();
     else if (arguments.height == ViewportArguments::ValueDeviceHeight)
-        arguments.height = screenSize.height;
+        arguments.height = screenSize.height();
 }
 #endif
 
@@ -448,15 +432,15 @@ static MessageLevel viewportErrorMessageLevel(ViewportErrorCode errorCode)
 {
     switch (errorCode) {
     case TruncatedViewportArgumentValueError:
-        return WarningMessageLevel;
+        return MessageLevel::Warning;
     case UnrecognizedViewportArgumentKeyError:
     case UnrecognizedViewportArgumentValueError:
     case MaximumScaleTooLargeError:
-        return ErrorMessageLevel;
+        return MessageLevel::Error;
     }
 
     ASSERT_NOT_REACHED();
-    return ErrorMessageLevel;
+    return MessageLevel::Error;
 }
 
 void reportViewportWarning(Document* document, ViewportErrorCode errorCode, const String& replacement1, const String& replacement2)
@@ -475,7 +459,7 @@ void reportViewportWarning(Document* document, ViewportErrorCode errorCode, cons
         message.append(" Note that ';' is not a separator in viewport values. The list should be comma-separated.");
 
     // FIXME: This message should be moved off the console once a solution to https://bugs.webkit.org/show_bug.cgi?id=103274 exists.
-    document->addConsoleMessage(RenderingMessageSource, viewportErrorMessageLevel(errorCode), message);
+    document->addConsoleMessage(MessageSource::Rendering, viewportErrorMessageLevel(errorCode), message);
 }
 
 } // namespace WebCore

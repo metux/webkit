@@ -84,7 +84,7 @@ Notification::Notification(ScriptExecutionContext& context, const String& title)
     : ActiveDOMObject(&context)
     , m_title(title)
     , m_state(Idle)
-    , m_taskTimer(adoptPtr(new Timer<Notification>(this, &Notification::taskTimerFired)))
+    , m_taskTimer(std::make_unique<Timer<Notification>>(this, &Notification::taskTimerFired))
 {
     m_notificationCenter = DOMWindowNotifications::webkitNotifications(toDocument(context).domWindow());
     
@@ -98,35 +98,35 @@ Notification::~Notification()
 }
 
 #if ENABLE(LEGACY_NOTIFICATIONS)
-PassRefPtr<Notification> Notification::create(const String& title, const String& body, const String& iconURI, ScriptExecutionContext* context, ExceptionCode& ec, PassRefPtr<NotificationCenter> provider) 
+PassRef<Notification> Notification::create(const String& title, const String& body, const String& iconURI, ScriptExecutionContext* context, ExceptionCode& ec, PassRefPtr<NotificationCenter> provider) 
 { 
-    RefPtr<Notification> notification(adoptRef(new Notification(title, body, iconURI, context, ec, provider)));
-    notification->suspendIfNeeded();
-    return notification.release();
+    auto notification = adoptRef(*new Notification(title, body, iconURI, context, ec, provider));
+    notification.get().suspendIfNeeded();
+    return notification;
 }
 #endif
 
 #if ENABLE(NOTIFICATIONS)
-PassRefPtr<Notification> Notification::create(ScriptExecutionContext& context, const String& title, const Dictionary& options)
+PassRef<Notification> Notification::create(ScriptExecutionContext& context, const String& title, const Dictionary& options)
 {
-    RefPtr<Notification> notification(adoptRef(new Notification(context, title)));
+    auto notification = adoptRef(*new Notification(context, title));
     String argument;
     if (options.get("body", argument))
-        notification->setBody(argument);
+        notification.get().setBody(argument);
     if (options.get("tag", argument))
-        notification->setTag(argument);
+        notification.get().setTag(argument);
     if (options.get("lang", argument))
-        notification->setLang(argument);
+        notification.get().setLang(argument);
     if (options.get("dir", argument))
-        notification->setDir(argument);
+        notification.get().setDir(argument);
     if (options.get("icon", argument)) {
         URL iconURI = argument.isEmpty() ? URL() : context.completeURL(argument);
         if (!iconURI.isEmpty() && iconURI.isValid())
-            notification->setIconURL(iconURI);
+            notification.get().setIconURL(iconURI);
     }
 
-    notification->suspendIfNeeded();
-    return notification.release();
+    notification.get().suspendIfNeeded();
+    return notification;
 }
 #endif
 

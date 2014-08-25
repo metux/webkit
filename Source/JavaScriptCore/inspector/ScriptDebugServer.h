@@ -11,7 +11,7 @@
  * 2.  Redistributions in binary form must reproduce the above copyright
  *     notice, this list of conditions and the following disclaimer in the
  *     documentation and/or other materials provided with the distribution.
- * 3.  Neither the name of Apple Computer, Inc. ("Apple") nor the names of
+ * 3.  Neither the name of Apple Inc. ("Apple") nor the names of
  *     its contributors may be used to endorse or promote products derived
  *     from this software without specific prior written permission.
  *
@@ -58,7 +58,7 @@ public:
 
     virtual void recompileAllJSFunctions() = 0;
 
-    const Vector<ScriptBreakpointAction>& getActionsForBreakpoint(JSC::BreakpointID);
+    const BreakpointActions& getActionsForBreakpoint(JSC::BreakpointID);
 
     class Task {
         WTF_MAKE_FAST_ALLOCATED;
@@ -90,13 +90,12 @@ protected:
     void dispatchDidParseSource(const ListenerSet& listeners, JSC::SourceProvider*, bool isContentScript);
     void dispatchFailedToParseSource(const ListenerSet& listeners, JSC::SourceProvider*, int errorLine, const String& errorMessage);
     void dispatchBreakpointActionLog(JSC::ExecState*, const String&);
-    void dispatchBreakpointActionSound(JSC::ExecState*);
-    void dispatchDidSampleProbe(JSC::ExecState*, int probeIdentifier, const Deprecated::ScriptValue& sample);
+    void dispatchBreakpointActionSound(JSC::ExecState*, int breakpointActionIdentifier);
+    void dispatchBreakpointActionProbe(JSC::ExecState*, const ScriptBreakpointAction&, const Deprecated::ScriptValue& sample);
 
     bool m_doneProcessingDebuggerEvents;
 
 private:
-    typedef Vector<ScriptBreakpointAction> BreakpointActions;
     typedef HashMap<JSC::BreakpointID, BreakpointActions> BreakpointIDToActionsMap;
 
     virtual void sourceParsed(JSC::ExecState*, JSC::SourceProvider*, int errorLine, const String& errorMsg) override final;

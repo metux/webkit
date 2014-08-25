@@ -11,10 +11,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -60,6 +60,7 @@
 #include "Widget.h"
 #include "htmlediting.h" // For firstPositionInOrBeforeNode
 #include <limits>
+#include <wtf/CurrentTime.h>
 #include <wtf/Ref.h>
 
 namespace WebCore {
@@ -74,7 +75,7 @@ FocusNavigationScope::FocusNavigationScope(TreeScope* treeScope)
 
 ContainerNode* FocusNavigationScope::rootNode() const
 {
-    return m_rootTreeScope->rootNode();
+    return &m_rootTreeScope->rootNode();
 }
 
 Element* FocusNavigationScope::owner() const
@@ -158,12 +159,11 @@ static inline bool shouldVisit(Element& element, KeyboardEvent& event)
     return element.isKeyboardFocusable(&event) || isNonFocusableShadowHost(element, event);
 }
 
-FocusController::FocusController(Page& page)
+FocusController::FocusController(Page& page, ViewState::Flags viewState)
     : m_page(page)
-    , m_isActive(false)
-    , m_isFocused(false)
     , m_isChangingFocusedFrame(false)
-    , m_contentIsVisible(false)
+    , m_viewState(viewState)
+    , m_focusRepaintTimer(this, &FocusController::focusRepaintTimerFired)
 {
 }
 
@@ -205,12 +205,12 @@ Frame& FocusController::focusedOrMainFrame() const
 
 void FocusController::setFocused(bool focused)
 {
-    if (isFocused() == focused)
-        return;
-    
-    m_isFocused = focused;
+    m_page.setViewState(focused ? m_viewState | ViewState::IsFocused : m_viewState & ~ViewState::IsFocused);
+}
 
-    if (!m_isFocused)
+void FocusController::setFocusedInternal(bool focused)
+{
+    if (!isFocused())
         focusedOrMainFrame().eventHandler().stopAutoscrollTimer();
 
     if (!m_focusedFrame)
@@ -281,7 +281,7 @@ bool FocusController::advanceFocusInDocumentOrder(FocusDirection direction, Keyb
     bool caretBrowsing = frame.settings().caretBrowsingEnabled();
 
     if (caretBrowsing && !currentNode)
-        currentNode = frame.selection().start().deprecatedNode();
+        currentNode = frame.selection().selection().start().deprecatedNode();
 
     document->updateLayoutIgnorePendingStylesheets();
 
@@ -553,8 +553,8 @@ static void clearSelectionIfNeeded(Frame* oldFocusedFrame, Frame* newFocusedFram
         
     if (oldFocusedFrame->document() != newFocusedFrame->document())
         return;
-    
-    FrameSelection& selection = oldFocusedFrame->selection();
+
+    const VisibleSelection& selection = oldFocusedFrame->selection().selection();
     if (selection.isNone())
         return;
 
@@ -562,7 +562,7 @@ static void clearSelectionIfNeeded(Frame* oldFocusedFrame, Frame* newFocusedFram
     if (caretBrowsing)
         return;
 
-    Node* selectionStartNode = selection.selection().start().deprecatedNode();
+    Node* selectionStartNode = selection.start().deprecatedNode();
     if (selectionStartNode == newFocusedNode || selectionStartNode->isDescendantOf(newFocusedNode) || selectionStartNode->deprecatedShadowAncestorNode() == newFocusedNode)
         return;
         
@@ -579,8 +579,8 @@ static void clearSelectionIfNeeded(Frame* oldFocusedFrame, Frame* newFocusedFram
             }
         }
     }
-    
-    selection.clear();
+
+    oldFocusedFrame->selection().clear();
 }
 
 bool FocusController::setFocusedElement(Element* element, PassRefPtr<Frame> newFocusedFrame, FocusDirection direction)
@@ -632,16 +632,32 @@ bool FocusController::setFocusedElement(Element* element, PassRefPtr<Frame> newF
     if (newDocument->focusedElement() == element)
         m_page.editorClient()->setInputMethodState(element->shouldUseInputMethod());
 
+    m_focusSetTime = monotonicallyIncreasingTime();
+    m_focusRepaintTimer.stop();
+
     return true;
+}
+
+void FocusController::setViewState(ViewState::Flags viewState)
+{
+    ViewState::Flags changed = m_viewState ^ viewState;
+    m_viewState = viewState;
+
+    if (changed & ViewState::IsFocused)
+        setFocusedInternal(viewState & ViewState::IsFocused);
+    if (changed & ViewState::WindowIsActive)
+        setActiveInternal(viewState & ViewState::WindowIsActive);
+    if (changed & ViewState::IsVisible)
+        setIsVisibleInternal(viewState & ViewState::IsVisible);
 }
 
 void FocusController::setActive(bool active)
 {
-    if (m_isActive == active)
-        return;
+    m_page.setViewState(active ? m_viewState | ViewState::WindowIsActive : m_viewState & ~ViewState::WindowIsActive);
+}
 
-    m_isActive = active;
-
+void FocusController::setActiveInternal(bool active)
+{
     if (FrameView* view = m_page.mainFrame().view()) {
         if (!view->platformWidget()) {
             view->updateLayoutAndStyleIfNeededRecursive();
@@ -663,13 +679,8 @@ static void contentAreaDidShowOrHide(ScrollableArea* scrollableArea, bool didSho
         scrollableArea->contentAreaDidHide();
 }
 
-void FocusController::setContentIsVisible(bool contentIsVisible)
+void FocusController::setIsVisibleInternal(bool contentIsVisible)
 {
-    if (m_contentIsVisible == contentIsVisible)
-        return;
-
-    m_contentIsVisible = contentIsVisible;
-
     FrameView* view = m_page.mainFrame().view();
     if (!view)
         return;
@@ -892,6 +903,30 @@ bool FocusController::advanceFocusDirectionally(FocusDirection direction, Keyboa
     } while (!consumed && container);
 
     return consumed;
+}
+
+void FocusController::setFocusedElementNeedsRepaint()
+{
+    m_focusRepaintTimer.startOneShot(0.033);
+}
+
+void FocusController::focusRepaintTimerFired(Timer<FocusController>&)
+{
+    Document* focusedDocument = focusedOrMainFrame().document();
+    if (!focusedDocument)
+        return;
+
+    Element* focusedElement = focusedDocument->focusedElement();
+    if (!focusedElement)
+        return;
+
+    if (focusedElement->renderer())
+        focusedElement->renderer()->repaint();
+}
+
+double FocusController::timeSinceFocusWasSet() const
+{
+    return monotonicallyIncreasingTime() - m_focusSetTime;
 }
 
 } // namespace WebCore

@@ -10,10 +10,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -104,7 +104,7 @@ public:
 
     void detachWrapper(AccessibilityObject*, AccessibilityDetachmentType);
     void attachWrapper(AccessibilityObject*);
-    void childrenChanged(Node*);
+    void childrenChanged(Node*, Node* newChild = nullptr);
     void childrenChanged(RenderObject*, RenderObject* newChild = nullptr);
     void childrenChanged(AccessibilityObject*);
     void checkedStateChanged(Node*);
@@ -131,7 +131,7 @@ public:
     static void disableAccessibility();
 
     // Enhanced user interface accessibility can be toggled by the assistive technology.
-    static void setEnhancedUserInterfaceAccessibility(bool flag) { gAccessibilityEnhancedUserInterfaceEnabled = flag; }
+    static void setEnhancedUserInterfaceAccessibility(bool flag);
     
     static bool accessibilityEnabled() { return gAccessibilityEnabled; }
     static bool accessibilityEnhancedUserInterfaceEnabled() { return gAccessibilityEnhancedUserInterfaceEnabled; }
@@ -169,6 +169,7 @@ public:
         AXSelectedTextChanged,
         AXValueChanged,
         AXScrolledToAnchor,
+        AXLiveRegionCreated,
         AXLiveRegionChanged,
         AXMenuListItemSelected,
         AXMenuListValueChanged,
@@ -177,6 +178,7 @@ public:
         AXRowCountChanged,
         AXRowCollapsed,
         AXRowExpanded,
+        AXExpandedChanged,
         AXInvalidStatusChanged,
         AXTextChanged,
         AXAriaAttributeChanged,
@@ -243,6 +245,7 @@ private:
     Vector<std::pair<RefPtr<AccessibilityObject>, AXNotification>> m_notificationsToPost;
     void notificationPostTimerFired(Timer<AXObjectCache>&);
     void handleMenuOpened(Node*);
+    void handleLiveRegionCreated(Node*);
     void handleMenuItemSelected(Node*);
     
     static AccessibilityObject* focusedImageMapUIElement(HTMLAreaElement*);
@@ -269,26 +272,26 @@ inline AccessibilityObjectInclusion AXComputedObjectAttributeCache::getIgnored(A
 inline void AXComputedObjectAttributeCache::setIgnored(AXID, AccessibilityObjectInclusion) { }
 inline AXObjectCache::AXObjectCache(Document& document) : m_document(document), m_notificationPostTimer(this, (Timer<AXObjectCache>::TimerFiredFunction) nullptr) { }
 inline AXObjectCache::~AXObjectCache() { }
-inline AccessibilityObject* AXObjectCache::focusedUIElementForPage(const Page*) { return 0; }
-inline AccessibilityObject* AXObjectCache::get(RenderObject*) { return 0; }
-inline AccessibilityObject* AXObjectCache::get(Node*) { return 0; }
-inline AccessibilityObject* AXObjectCache::get(Widget*) { return 0; }
-inline AccessibilityObject* AXObjectCache::getOrCreate(AccessibilityRole) { return 0; }
-inline AccessibilityObject* AXObjectCache::getOrCreate(RenderObject*) { return 0; }
-inline AccessibilityObject* AXObjectCache::getOrCreate(Node*) { return 0; }
-inline AccessibilityObject* AXObjectCache::getOrCreate(Widget*) { return 0; }
-inline AccessibilityObject* AXObjectCache::rootObject() { return 0; }
-inline AccessibilityObject* AXObjectCache::rootObjectForFrame(Frame*) { return 0; }
-inline Element* AXObjectCache::rootAXEditableElement(Node*) { return 0; }
+inline AccessibilityObject* AXObjectCache::focusedUIElementForPage(const Page*) { return nullptr; }
+inline AccessibilityObject* AXObjectCache::get(RenderObject*) { return nullptr; }
+inline AccessibilityObject* AXObjectCache::get(Node*) { return nullptr; }
+inline AccessibilityObject* AXObjectCache::get(Widget*) { return nullptr; }
+inline AccessibilityObject* AXObjectCache::getOrCreate(AccessibilityRole) { return nullptr; }
+inline AccessibilityObject* AXObjectCache::getOrCreate(RenderObject*) { return nullptr; }
+inline AccessibilityObject* AXObjectCache::getOrCreate(Node*) { return nullptr; }
+inline AccessibilityObject* AXObjectCache::getOrCreate(Widget*) { return nullptr; }
+inline AccessibilityObject* AXObjectCache::rootObject() { return nullptr; }
+inline AccessibilityObject* AXObjectCache::rootObjectForFrame(Frame*) { return nullptr; }
+inline Element* AXObjectCache::rootAXEditableElement(Node*) { return nullptr; }
 inline bool nodeHasRole(Node*, const String&) { return false; }
 inline void AXObjectCache::startCachingComputedObjectAttributesUntilTreeMutates() { }
 inline void AXObjectCache::stopCachingComputedObjectAttributes() { }
 inline bool isNodeAriaVisible(Node*) { return true; }
-inline const Element* AXObjectCache::rootAXEditableElement(const Node*) { return 0; }
+inline const Element* AXObjectCache::rootAXEditableElement(const Node*) { return nullptr; }
 inline void AXObjectCache::attachWrapper(AccessibilityObject*) { }
 inline void AXObjectCache::checkedStateChanged(Node*) { }
 inline void AXObjectCache::childrenChanged(RenderObject*, RenderObject*) { }
-inline void AXObjectCache::childrenChanged(Node*) { }
+inline void AXObjectCache::childrenChanged(Node*, Node*) { }
 inline void AXObjectCache::childrenChanged(AccessibilityObject*) { }
 inline void AXObjectCache::textChanged(RenderObject*) { }
 inline void AXObjectCache::textChanged(Node*) { }

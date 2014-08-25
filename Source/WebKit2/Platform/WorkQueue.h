@@ -36,7 +36,6 @@
 #include <wtf/Forward.h>
 #include <wtf/Functional.h>
 #include <wtf/HashMap.h>
-#include <wtf/PassOwnPtr.h>
 #include <wtf/RefCounted.h>
 #include <wtf/Threading.h>
 #include <wtf/Vector.h>
@@ -46,15 +45,23 @@
 #endif
 
 #if PLATFORM(GTK)
+#include <wtf/gobject/GMainLoopSource.h>
 #include <wtf/gobject/GRefPtr.h>
-typedef gboolean (*GSourceFunc) (gpointer data);
 #elif PLATFORM(EFL)
 #include <DispatchQueueEfl.h>
 #endif
 
 class WorkQueue : public ThreadSafeRefCounted<WorkQueue> {
 public:
-    static PassRefPtr<WorkQueue> create(const char* name);
+    enum class QOS {
+        UserInteractive,
+        UserInitiated,
+        Default,
+        Utility,
+        Background
+    };
+    
+    static PassRefPtr<WorkQueue> create(const char* name, QOS = QOS::Default);
     ~WorkQueue();
 
     void dispatch(std::function<void ()>);
@@ -71,28 +78,23 @@ public:
 #endif
 
 private:
-    explicit WorkQueue(const char* name);
+    explicit WorkQueue(const char* name, QOS);
 
-    void platformInitialize(const char* name);
+    void platformInitialize(const char* name, QOS);
     void platformInvalidate();
 
 #if OS(DARWIN)
     static void executeFunction(void*);
     dispatch_queue_t m_dispatchQueue;
 #elif PLATFORM(GTK)
-    class EventSource;
-    class SocketEventSource;
-
     static void startWorkQueueThread(WorkQueue*);
     void workQueueThreadBody();
-    void dispatchOnSource(GSource*, std::function<void ()>, GSourceFunc);
 
     ThreadIdentifier m_workQueueThread;
     GRefPtr<GMainContext> m_eventContext;
     Mutex m_eventLoopLock;
     GRefPtr<GMainLoop> m_eventLoop;
-    Mutex m_eventSourcesLock;
-    HashMap<int, Vector<SocketEventSource*>> m_eventSources;
+    GMainLoopSource m_socketEventSource;
 #elif PLATFORM(EFL)
     RefPtr<DispatchQueue> m_dispatchQueue;
 #endif

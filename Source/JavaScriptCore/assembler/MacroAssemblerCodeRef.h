@@ -36,7 +36,7 @@
 
 // ASSERT_VALID_CODE_POINTER checks that ptr is a non-null pointer, and that it is a valid
 // instruction address on the platform (for example, check any alignment requirements).
-#if CPU(ARM_THUMB2) && !ENABLE(LLINT_C_LOOP)
+#if CPU(ARM_THUMB2) && ENABLE(JIT)
 // ARM instructions must be 16-bit aligned. Thumb2 code pointers to be loaded into
 // into the processor are decorated with the bottom bit set, while traditional ARM has
 // the lower bit clear. Since we don't know what kind of pointer, we check for both
@@ -254,6 +254,11 @@ public:
     }
 
     void* value() const { return m_value; }
+    
+    void dump(PrintStream& out) const
+    {
+        out.print(RawPointer(m_value));
+    }
 
 private:
     void* m_value;
@@ -288,12 +293,10 @@ public:
         return result;
     }
 
-#if ENABLE(LLINT)
-    static MacroAssemblerCodePtr createLLIntCodePtr(LLIntCode codeId)
+    static MacroAssemblerCodePtr createLLIntCodePtr(OpcodeID codeId)
     {
         return createFromExecutableAddress(LLInt::getCodePtr(codeId));
     }
-#endif
 
     explicit MacroAssemblerCodePtr(ReturnAddressPtr ra)
         : m_value(ra.value())
@@ -309,9 +312,10 @@ public:
     void* dataLocation() const { ASSERT_VALID_CODE_POINTER(m_value); return m_value; }
 #endif
 
-    bool operator!() const
+    typedef void* (MacroAssemblerCodePtr::*UnspecifiedBoolType);
+    operator UnspecifiedBoolType*() const
     {
-        return !m_value;
+        return !!m_value ? reinterpret_cast<UnspecifiedBoolType*>(1) : 0;
     }
     
     bool operator==(const MacroAssemblerCodePtr& other) const
@@ -404,13 +408,11 @@ public:
         return MacroAssemblerCodeRef(codePtr);
     }
     
-#if ENABLE(LLINT)
     // Helper for creating self-managed code refs from LLInt.
-    static MacroAssemblerCodeRef createLLIntCodeRef(LLIntCode codeId)
+    static MacroAssemblerCodeRef createLLIntCodeRef(OpcodeID codeId)
     {
         return createSelfManagedCodeRef(MacroAssemblerCodePtr::createFromExecutableAddress(LLInt::getCodePtr(codeId)));
     }
-#endif
 
     ExecutableMemoryHandle* executableMemory() const
     {
@@ -434,7 +436,11 @@ public:
         return JSC::tryToDisassemble(m_codePtr, size(), prefix, WTF::dataFile());
     }
     
-    bool operator!() const { return !m_codePtr; }
+    typedef void* (MacroAssemblerCodeRef::*UnspecifiedBoolType);
+    operator UnspecifiedBoolType*() const
+    {
+        return !!m_codePtr ? reinterpret_cast<UnspecifiedBoolType*>(1) : 0;
+    }
     
     void dump(PrintStream& out) const
     {

@@ -29,6 +29,7 @@
 #include "CallData.h"
 #include "ExceptionHelpers.h"
 #include "Interpreter.h"
+#include "JSCJSValueInlines.h"
 #include "JSInterfaceJIT.h"
 #include "JSObject.h"
 #include "JSStackInlines.h"
@@ -41,7 +42,6 @@
 namespace JSC {
 
 #if ENABLE(JIT)
-#if ENABLE(LLINT)
 
 namespace LLInt {
 
@@ -53,99 +53,56 @@ static MacroAssemblerCodeRef generateThunkWithJumpTo(VM* vm, void (*target)(), c
     jit.move(JSInterfaceJIT::TrustedImmPtr(bitwise_cast<void*>(target)), JSInterfaceJIT::regT0);
     jit.jump(JSInterfaceJIT::regT0);
     
-    LinkBuffer patchBuffer(*vm, &jit, GLOBAL_THUNK_ID);
+    LinkBuffer patchBuffer(*vm, jit, GLOBAL_THUNK_ID);
     return FINALIZE_CODE(patchBuffer, ("LLInt %s prologue thunk", thunkKind));
 }
 
 MacroAssemblerCodeRef functionForCallEntryThunkGenerator(VM* vm)
 {
-    return generateThunkWithJumpTo(vm, llint_function_for_call_prologue, "function for call");
+    return generateThunkWithJumpTo(vm, LLInt::getCodeFunctionPtr(llint_function_for_call_prologue), "function for call");
 }
 
 MacroAssemblerCodeRef functionForConstructEntryThunkGenerator(VM* vm)
 {
-    return generateThunkWithJumpTo(vm, llint_function_for_construct_prologue, "function for construct");
+    return generateThunkWithJumpTo(vm, LLInt::getCodeFunctionPtr(llint_function_for_construct_prologue), "function for construct");
 }
 
 MacroAssemblerCodeRef functionForCallArityCheckThunkGenerator(VM* vm)
 {
-    return generateThunkWithJumpTo(vm, llint_function_for_call_arity_check, "function for call with arity check");
+    return generateThunkWithJumpTo(vm, LLInt::getCodeFunctionPtr(llint_function_for_call_arity_check), "function for call with arity check");
 }
 
 MacroAssemblerCodeRef functionForConstructArityCheckThunkGenerator(VM* vm)
 {
-    return generateThunkWithJumpTo(vm, llint_function_for_construct_arity_check, "function for construct with arity check");
+    return generateThunkWithJumpTo(vm, LLInt::getCodeFunctionPtr(llint_function_for_construct_arity_check), "function for construct with arity check");
 }
 
 MacroAssemblerCodeRef evalEntryThunkGenerator(VM* vm)
 {
-    return generateThunkWithJumpTo(vm, llint_eval_prologue, "eval");
+    return generateThunkWithJumpTo(vm, LLInt::getCodeFunctionPtr(llint_eval_prologue), "eval");
 }
 
 MacroAssemblerCodeRef programEntryThunkGenerator(VM* vm)
 {
-    return generateThunkWithJumpTo(vm, llint_program_prologue, "program");
+    return generateThunkWithJumpTo(vm, LLInt::getCodeFunctionPtr(llint_program_prologue), "program");
 }
 
 } // namespace LLInt
 
-#endif // ENABLE(LLINT)
 #else // ENABLE(JIT)
 
 // Non-JIT (i.e. C Loop LLINT) case:
 
-typedef JSValue (*ExecuteCode) (CallFrame*, void* executableAddress);
-
-template<ExecuteCode execute>
-EncodedJSValue doCallToJavaScript(void* executableAddress, ProtoCallFrame* protoCallFrame)
+EncodedJSValue callToJavaScript(void* executableAddress, VM* vm, ProtoCallFrame* protoCallFrame)
 {
-    CodeBlock* codeBlock = protoCallFrame->codeBlock();
-    JSScope* scope = protoCallFrame->scope();
-    JSObject* callee = protoCallFrame->callee();
-    int argCountIncludingThis = protoCallFrame->argumentCountIncludingThis();
-    int argCount = protoCallFrame->argumentCount();
-    JSValue thisValue = protoCallFrame->thisValue();
-    JSStack& stack = scope->vm()->interpreter->stack();
-
-    CallFrame* newCallFrame = stack.pushFrame(codeBlock, scope, argCountIncludingThis, callee);
-    if (UNLIKELY(!newCallFrame)) {
-        JSGlobalObject* globalObject = scope->globalObject();
-        ExecState* exec = globalObject->globalExec();
-        return JSValue::encode(throwStackOverflowError(exec));
-    }
-
-    // Set the arguments for the callee:
-    newCallFrame->setThisValue(thisValue);
-    for (int i = 0; i < argCount; ++i)
-        newCallFrame->setArgument(i, protoCallFrame->argument(i));
-
-    JSValue result = execute(newCallFrame, executableAddress);
-
-    stack.popFrame(newCallFrame);
-
+    JSValue result = CLoop::execute(llint_call_to_javascript, executableAddress, vm, protoCallFrame);
     return JSValue::encode(result);
 }
 
-static inline JSValue executeJS(CallFrame* newCallFrame, void* executableAddress)
+EncodedJSValue callToNativeFunction(void* executableAddress, VM* vm, ProtoCallFrame* protoCallFrame)
 {
-    Opcode entryOpcode = *reinterpret_cast<Opcode*>(&executableAddress);
-    return CLoop::execute(newCallFrame, entryOpcode);
-}
-
-EncodedJSValue callToJavaScript(void* executableAddress, ExecState**, ProtoCallFrame* protoCallFrame, Register*)
-{
-    return doCallToJavaScript<executeJS>(executableAddress, protoCallFrame);
-}
-
-static inline JSValue executeNative(CallFrame* newCallFrame, void* executableAddress)
-{
-    NativeFunction function = reinterpret_cast<NativeFunction>(executableAddress);
-    return JSValue::decode(function(newCallFrame));
-}
-
-EncodedJSValue callToNativeFunction(void* executableAddress, ExecState**, ProtoCallFrame* protoCallFrame, Register*)
-{
-    return doCallToJavaScript<executeNative>(executableAddress, protoCallFrame);
+    JSValue result = CLoop::execute(llint_call_to_native_function, executableAddress, vm, protoCallFrame);
+    return JSValue::encode(result);
 }
 
 #endif // ENABLE(JIT)

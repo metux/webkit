@@ -21,13 +21,12 @@
  */
 
 #include "config.h"
-
-#if ENABLE(SVG)
 #include "SVGAnimateTransformElement.h"
 
 #include "Attribute.h"
 #include "SVGNames.h"
 #include "SVGTransformable.h"
+#include <wtf/NeverDestroyed.h>
 
 namespace WebCore {
 
@@ -57,10 +56,10 @@ bool SVGAnimateTransformElement::hasValidAttributeType()
 
 bool SVGAnimateTransformElement::isSupportedAttribute(const QualifiedName& attrName)
 {
-    DEFINE_STATIC_LOCAL(HashSet<QualifiedName>, supportedAttributes, ());
-    if (supportedAttributes.isEmpty())
-        supportedAttributes.add(SVGNames::typeAttr);
-    return supportedAttributes.contains<SVGAttributeHashTranslator>(attrName);
+    static NeverDestroyed<HashSet<QualifiedName>> supportedAttributes;
+    if (supportedAttributes.get().isEmpty())
+        supportedAttributes.get().add(SVGNames::typeAttr);
+    return supportedAttributes.get().contains<SVGAttributeHashTranslator>(attrName);
 }
 
 void SVGAnimateTransformElement::parseAttribute(const QualifiedName& name, const AtomicString& value)
@@ -81,5 +80,3 @@ void SVGAnimateTransformElement::parseAttribute(const QualifiedName& name, const
 }
 
 }
-
-#endif // ENABLE(SVG)

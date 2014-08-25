@@ -10,7 +10,7 @@
  * 2.  Redistributions in binary form must reproduce the above copyright
  *     notice, this list of conditions and the following disclaimer in the
  *     documentation and/or other materials provided with the distribution.
- * 3.  Neither the name of Apple Computer, Inc. ("Apple") nor the names of
+ * 3.  Neither the name of Apple Inc. ("Apple") nor the names of
  *     its contributors may be used to endorse or promote products derived
  *     from this software without specific prior written permission.
  *
@@ -35,6 +35,7 @@
 #include "AccessibilityTableHeaderContainer.h"
 #include "AccessibilityTableRow.h"
 #include "RenderObject.h"
+#include "RenderTableSection.h"
 
 namespace WebCore {
 
@@ -54,7 +55,7 @@ PassRefPtr<AccessibilityARIAGrid> AccessibilityARIAGrid::create(RenderObject* re
 
 bool AccessibilityARIAGrid::addTableCellChild(AccessibilityObject* child, HashSet<AccessibilityObject*>& appendedRows, unsigned& columnCount)
 {
-    if (!child || !child->isTableRow() || child->ariaRoleAttribute() != RowRole)
+    if (!child || (!child->isTableRow() && child->ariaRoleAttribute() != RowRole))
         return false;
         
     AccessibilityTableRow* row = toAccessibilityTableRow(child);
@@ -109,11 +110,28 @@ void AccessibilityARIAGrid::addChildren()
     
     AXObjectCache* axCache = m_renderer->document().axObjectCache();
     
-    // add only rows that are labeled as aria rows
+    // Add the children rows but be mindful in case there are footer sections in this table.
     HashSet<AccessibilityObject*> appendedRows;
     unsigned columnCount = 0;
-    for (RefPtr<AccessibilityObject> child = firstChild(); child; child = child->nextSibling())
-        addRowDescendant(child.get(), appendedRows, columnCount);
+    AccessibilityChildrenVector footerSections;
+    for (RefPtr<AccessibilityObject> child = firstChild(); child; child = child->nextSibling()) {
+        bool footerSection = false;
+        if (RenderObject* childRenderer = child->renderer()) {
+            if (childRenderer->isTableSection()) {
+                if (RenderTableSection* childSection = toRenderTableSection(childRenderer)) {
+                    if (childSection == childSection->table()->footer()) {
+                        footerSections.append(child);
+                        footerSection = true;
+                    }
+                }
+            }
+        }
+        if (!footerSection)
+            addRowDescendant(child.get(), appendedRows, columnCount);
+    }
+    
+    for (const auto& footerSection : footerSections)
+        addRowDescendant(footerSection.get(), appendedRows, columnCount);
     
     // make the columns based on the number of columns in the first body
     for (unsigned i = 0; i < columnCount; ++i) {

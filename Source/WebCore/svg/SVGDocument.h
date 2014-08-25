@@ -20,7 +20,6 @@
 
 #ifndef SVGDocument_h
 #define SVGDocument_h
-#if ENABLE(SVG)
 
 #include "Document.h"
 #include "FloatPoint.h"
@@ -40,9 +39,6 @@ public:
 
     SVGSVGElement* rootElement() const;
 
-    void dispatchZoomEvent(float prevScale, float newScale);
-    void dispatchScrollEvent();
-
     bool zoomAndPanEnabled() const;
 
     void startPan(const FloatPoint& start);
@@ -50,8 +46,6 @@ public:
 
 private:
     SVGDocument(Frame*, const URL&);
-
-    virtual bool childShouldCreateRenderer(const Node&) const override;
 
     virtual PassRefPtr<Document> cloneDocumentWithoutChildren() const override;
 
@@ -65,7 +59,4 @@ DOCUMENT_TYPE_CASTS(SVGDocument)
 
 } // namespace WebCore
 
-#endif // ENABLE(SVG)
 #endif // SVGDocument_h
-
-// vim:ts=4:noet

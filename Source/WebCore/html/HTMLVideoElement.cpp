@@ -10,10 +10,10 @@
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY APPLE COMPUTER, INC. ``AS IS'' AND ANY
+ * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
@@ -69,31 +69,21 @@ bool HTMLVideoElement::rendererIsNeeded(const RenderStyle& style)
 
 RenderPtr<RenderElement> HTMLVideoElement::createElementRenderer(PassRef<RenderStyle> style)
 {
-#if ENABLE(PLUGIN_PROXY_FOR_VIDEO)
-    if (shouldUseVideoPluginProxy())
-        return HTMLMediaElement::createElementRenderer(std::move(style));
-#endif
-    return createRenderer<RenderVideo>(*this, std::move(style));
+    return createRenderer<RenderVideo>(*this, WTF::move(style));
 }
 
 void HTMLVideoElement::didAttachRenderers()
 {
     HTMLMediaElement::didAttachRenderers();
 
-#if ENABLE(PLUGIN_PROXY_FOR_VIDEO)
-    if (!shouldUseVideoPluginProxy()) {
-#endif
-        updateDisplayState();
-        if (shouldDisplayPosterImage()) {
-            if (!m_imageLoader)
-                m_imageLoader = adoptPtr(new HTMLImageLoader(this));
-            m_imageLoader->updateFromElement();
-            if (renderer())
-                toRenderImage(renderer())->imageResource().setCachedImage(m_imageLoader->image());
-        }
-#if ENABLE(PLUGIN_PROXY_FOR_VIDEO)
+    updateDisplayState();
+    if (shouldDisplayPosterImage()) {
+        if (!m_imageLoader)
+            m_imageLoader = std::make_unique<HTMLImageLoader>(*this);
+        m_imageLoader->updateFromElement();
+        if (renderer())
+            toRenderImage(renderer())->imageResource().setCachedImage(m_imageLoader->image());
     }
-#endif
 }
 
 void HTMLVideoElement::collectStyleForPresentationAttribute(const QualifiedName& name, const AtomicString& value, MutableStyleProperties& style)
@@ -119,13 +109,10 @@ void HTMLVideoElement::parseAttribute(const QualifiedName& name, const AtomicStr
         // Force a poster recalc by setting m_displayMode to Unknown directly before calling updateDisplayState.
         HTMLMediaElement::setDisplayMode(Unknown);
         updateDisplayState();
-#if ENABLE(PLUGIN_PROXY_FOR_VIDEO)
-        if (shouldUseVideoPluginProxy())
-            return;
-#endif
+
         if (shouldDisplayPosterImage()) {
             if (!m_imageLoader)
-                m_imageLoader = adoptPtr(new HTMLImageLoader(this));
+                m_imageLoader = std::make_unique<HTMLImageLoader>(*this);
             m_imageLoader->updateFromElementIgnoringPreviousError();
         } else {
             if (renderer())
@@ -133,21 +120,18 @@ void HTMLVideoElement::parseAttribute(const QualifiedName& name, const AtomicStr
         }
     }
 #if ENABLE(IOS_AIRPLAY)
-    else if (name == webkitwirelessvideoplaybackdisabledAttr) {
-        if (player())
-            player()->setWirelessVideoPlaybackDisabled(webkitWirelessVideoPlaybackDisabled());
-    } else {
-        HTMLMediaElement::parseAttribute(name, value);
-
-        if (name == webkitairplayAttr) {
-            if (player())
-                player()->setWirelessVideoPlaybackDisabled(webkitWirelessVideoPlaybackDisabled());
-        }
-    }
-#else
-    else
-        HTMLMediaElement::parseAttribute(name, value);    
+    else if (name == webkitwirelessvideoplaybackdisabledAttr)
+        mediaSession().setWirelessVideoPlaybackDisabled(*this, webkitWirelessVideoPlaybackDisabled());
 #endif
+    else {
+        HTMLMediaElement::parseAttribute(name, value);    
+
+#if PLATFORM(IOS) && ENABLE(IOS_AIRPLAY)
+        if (name == webkitairplayAttr)
+            mediaSession().setWirelessVideoPlaybackDisabled(*this, webkitWirelessVideoPlaybackDisabled());
+#endif
+    }
+
 }
 
 bool HTMLVideoElement::supportsFullscreen() const
@@ -233,10 +217,6 @@ void HTMLVideoElement::setDisplayMode(DisplayMode mode)
             player()->setPoster(poster);
     }
 
-#if ENABLE(PLUGIN_PROXY_FOR_VIDEO)
-    if (shouldUseVideoPluginProxy())
-        return;
-#endif
     if (renderer() && displayMode() != oldMode)
         renderer()->updateFromElement();
 }
@@ -277,7 +257,7 @@ bool HTMLVideoElement::hasAvailableVideoFrame() const
 PassNativeImagePtr HTMLVideoElement::nativeImageForCurrentTime()
 {
     if (!player())
-        return 0;
+        return nullptr;
 
     return player()->nativeImageForCurrentTime();
 }
@@ -316,14 +296,7 @@ bool HTMLVideoElement::webkitDisplayingFullscreen()
 #if ENABLE(IOS_AIRPLAY)
 bool HTMLVideoElement::webkitWirelessVideoPlaybackDisabled() const
 {
-    Settings* settings = document().settings();
-    if (!settings || !settings->mediaPlaybackAllowsAirPlay())
-        return true;
-
-    String legacyAirplayAttributeValue = fastGetAttribute(webkitairplayAttr);
-    if (equalIgnoringCase(legacyAirplayAttributeValue, "deny"))
-        return true;
-    return fastHasAttribute(webkitwirelessvideoplaybackdisabledAttr);
+    return mediaSession().wirelessVideoPlaybackDisabled(*this);
 }
 
 void HTMLVideoElement::setWebkitWirelessVideoPlaybackDisabled(bool disabled)

@@ -37,6 +37,7 @@
 #include "WebPageProxy.h"
 #include "WebProcessProxyMessages.h"
 #include <WebCore/LinkHash.h>
+#include <memory>
 #include <wtf/Forward.h>
 #include <wtf/HashMap.h>
 #include <wtf/PassRefPtr.h>
@@ -44,6 +45,10 @@
 
 #if ENABLE(CUSTOM_PROTOCOLS)
 #include "CustomProtocolManagerProxy.h"
+#endif
+
+#if PLATFORM(IOS)
+#include "ProcessThrottler.h"
 #endif
 
 namespace WebCore {
@@ -58,7 +63,7 @@ class WebBackForwardListItem;
 class WebContext;
 class WebPageGroup;
 struct WebNavigationDataStore;
-
+    
 class WebProcessProxy : public ChildProcessProxy, ResponsivenessTimer::Client {
 public:
     typedef HashMap<uint64_t, RefPtr<WebBackForwardListItem>> WebBackForwardListItemMap;
@@ -81,7 +86,9 @@ public:
     PassRefPtr<WebPageProxy> createWebPage(PageClient&, const WebPageConfiguration&);
     void addExistingWebPage(WebPageProxy*, uint64_t pageID);
     void removeWebPage(uint64_t pageID);
-    Vector<WebPageProxy*> pages() const;
+
+    WTF::IteratorRange<WebPageProxyMap::const_iterator::Values> pages() const { return m_pageMap.values(); }
+    unsigned pageCount() const { return m_pageMap.size(); }
 
     WebBackForwardListItem* webBackForwardItem(uint64_t itemID) const;
 
@@ -114,7 +121,7 @@ public:
     void didSaveToPageCache();
     void releasePageCache();
 
-#if PLATFORM(MAC)
+#if PLATFORM(COCOA)
     bool allPagesAreProcessSuppressible() const;
     void updateProcessSuppressionState();
 #endif
@@ -128,6 +135,13 @@ public:
 
     void windowServerConnectionStateChanged();
 
+    void sendProcessWillSuspend();
+    void processReadyToSuspend();
+    void sendCancelProcessWillSuspend();
+    void didCancelProcessSuspension();
+    
+    ProcessThrottler& throttler() { return *m_throttler; }
+    
 private:
     explicit WebProcessProxy(WebContext&);
 
@@ -142,7 +156,7 @@ private:
     void disconnect();
 
     // IPC message handlers.
-    void addBackForwardItem(uint64_t itemID, const String& originalURLString, const String& urlString, const String& title, const IPC::DataReference& backForwardData);
+    void addBackForwardItem(uint64_t itemID, uint64_t pageID, const PageState&);
     void didDestroyFrame(uint64_t);
     
     void shouldTerminate(bool& shouldTerminate);
@@ -200,20 +214,21 @@ private:
     WebFrameProxyMap m_frameMap;
     WebBackForwardListItemMap m_backForwardListItemMap;
 
-    OwnPtr<DownloadProxyMap> m_downloadProxyMap;
+    std::unique_ptr<DownloadProxyMap> m_downloadProxyMap;
 
 #if ENABLE(CUSTOM_PROTOCOLS)
     CustomProtocolManagerProxy m_customProtocolManagerProxy;
 #endif
 
-#if PLATFORM(MAC)
+#if PLATFORM(COCOA)
     HashSet<uint64_t> m_processSuppressiblePages;
     bool m_processSuppressionEnabled;
 #endif
 
     int m_numberOfTimesSuddenTerminationWasDisabled;
+    std::unique_ptr<ProcessThrottler> m_throttler;
 };
-    
+
 } // namespace WebKit
 
 #endif // WebProcessProxy_h

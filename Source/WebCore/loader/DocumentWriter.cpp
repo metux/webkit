@@ -10,7 +10,7 @@
  * 2.  Redistributions in binary form must reproduce the above copyright
  *     notice, this list of conditions and the following disclaimer in the
  *     documentation and/or other materials provided with the distribution. 
- * 3.  Neither the name of Apple Computer, Inc. ("Apple") nor the names of
+ * 3.  Neither the name of Apple Inc. ("Apple") nor the names of
  *     its contributors may be used to endorse or promote products derived
  *     from this software without specific prior written permission. 
  *
@@ -36,6 +36,8 @@
 #include "FrameLoaderClient.h"
 #include "FrameLoaderStateMachine.h"
 #include "FrameView.h"
+#include "MIMETypeRegistry.h"
+#include "MainFrame.h"
 #include "PluginDocument.h"
 #include "RawDataDocumentParser.h"
 #include "ScriptController.h"
@@ -77,7 +79,7 @@ void DocumentWriter::replaceDocument(const String& source, Document* ownerDocume
     if (!source.isNull()) {
         if (!m_hasReceivedSomeData) {
             m_hasReceivedSomeData = true;
-            m_frame->document()->setCompatibilityMode(Document::NoQuirksMode);
+            m_frame->document()->setCompatibilityMode(DocumentCompatibilityMode::NoQuirksMode);
         }
 
         // FIXME: This should call DocumentParser::appendBytes instead of append
@@ -104,15 +106,15 @@ void DocumentWriter::begin()
 
 PassRefPtr<Document> DocumentWriter::createDocument(const URL& url)
 {
-    if (!m_frame->loader().stateMachine()->isDisplayingInitialEmptyDocument() && m_frame->loader().client().shouldAlwaysUsePluginDocument(m_mimeType))
+    if (!m_frame->loader().stateMachine().isDisplayingInitialEmptyDocument() && m_frame->loader().client().shouldAlwaysUsePluginDocument(m_mimeType))
         return PluginDocument::create(m_frame, url);
 #if PLATFORM(IOS)
-    if (equalIgnoringCase(m_mimeType, "application/pdf"))
+    if (MIMETypeRegistry::isPDFMIMEType(m_mimeType) && (m_frame->isMainFrame() || !m_frame->settings().useImageDocumentForSubframePDF()))
         return PDFDocument::create(m_frame, url);
 #endif
     if (!m_frame->loader().client().hasHTMLView())
         return Document::createNonRenderedPlaceholder(m_frame, url);
-    return DOMImplementation::createDocument(m_mimeType, m_frame, url, m_frame->inViewSourceMode());
+    return DOMImplementation::createDocument(m_mimeType, m_frame, url);
 }
 
 void DocumentWriter::begin(const URL& urlReference, bool dispatch, Document* ownerDocument)
@@ -133,7 +135,7 @@ void DocumentWriter::begin(const URL& urlReference, bool dispatch, Document* own
 
     // FIXME: Do we need to consult the content security policy here about blocked plug-ins?
 
-    bool shouldReuseDefaultView = m_frame->loader().stateMachine()->isDisplayingInitialEmptyDocument() && m_frame->document()->isSecureTransitionTo(url);
+    bool shouldReuseDefaultView = m_frame->loader().stateMachine().isDisplayingInitialEmptyDocument() && m_frame->document()->isSecureTransitionTo(url);
     if (shouldReuseDefaultView)
         document->takeDOMWindowFrom(m_frame->document());
     else

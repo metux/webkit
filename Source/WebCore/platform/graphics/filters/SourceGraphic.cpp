@@ -37,26 +37,26 @@ PassRefPtr<SourceGraphic> SourceGraphic::create(Filter* filter)
 
 const AtomicString& SourceGraphic::effectName()
 {
-    DEFINE_STATIC_LOCAL(const AtomicString, s_effectName, ("SourceGraphic", AtomicString::ConstructFromLiteral));
+    DEPRECATED_DEFINE_STATIC_LOCAL(const AtomicString, s_effectName, ("SourceGraphic", AtomicString::ConstructFromLiteral));
     return s_effectName;
 }
 
 void SourceGraphic::determineAbsolutePaintRect()
 {
-    Filter* filter = this->filter();
-    FloatRect paintRect = filter->sourceImageRect();
-    paintRect.scale(filter->filterResolution().width(), filter->filterResolution().height());
+    Filter& filter = this->filter();
+    FloatRect paintRect = filter.sourceImageRect();
+    paintRect.scale(filter.filterResolution().width(), filter.filterResolution().height());
     setAbsolutePaintRect(enclosingIntRect(paintRect));
 }
 
 void SourceGraphic::platformApplySoftware()
 {
     ImageBuffer* resultImage = createImageBufferResult();
-    Filter* filter = this->filter();
-    if (!resultImage || !filter->sourceImage())
+    Filter& filter = this->filter();
+    if (!resultImage || !filter.sourceImage())
         return;
 
-    resultImage->context()->drawImageBuffer(filter->sourceImage(), ColorSpaceDeviceRGB, IntPoint());
+    resultImage->context()->drawImageBuffer(filter.sourceImage(), ColorSpaceDeviceRGB, IntPoint());
 }
 
 void SourceGraphic::dump()

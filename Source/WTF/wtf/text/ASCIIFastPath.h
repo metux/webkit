@@ -22,12 +22,14 @@
 #ifndef ASCIIFastPath_h
 #define ASCIIFastPath_h
 
+#include <stdint.h>
+#include <unicode/utypes.h>
+#include <wtf/StdLibExtras.h>
+#include <wtf/text/LChar.h>
+
 #if OS(DARWIN) && (CPU(X86) || CPU(X86_64))
 #include <emmintrin.h>
 #endif
-#include <stdint.h>
-#include <wtf/StdLibExtras.h>
-#include <wtf/unicode/Unicode.h>
 
 namespace WTF {
 
@@ -158,7 +160,7 @@ inline void copyLCharsFromUCharSource(LChar* destination, const UChar* source, s
 
     while (destination != end)
         *destination++ = static_cast<LChar>(*source++);
-#elif COMPILER(GCC) && CPU(ARM_NEON) && !(PLATFORM(BIG_ENDIAN) || PLATFORM(MIDDLE_ENDIAN)) && defined(NDEBUG)
+#elif COMPILER(GCC) && CPU(ARM_NEON) && !(CPU(BIG_ENDIAN) || CPU(MIDDLE_ENDIAN)) && defined(NDEBUG)
     const LChar* const end = destination + length;
     const uintptr_t memoryAccessSize = 8;
 

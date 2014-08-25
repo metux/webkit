@@ -11,7 +11,7 @@
  * 2.  Redistributions in binary form must reproduce the above copyright
  *     notice, this list of conditions and the following disclaimer in the
  *     documentation and/or other materials provided with the distribution. 
- * 3.  Neither the name of Apple Computer, Inc. ("Apple") nor the names of
+ * 3.  Neither the name of Apple Inc. ("Apple") nor the names of
  *     its contributors may be used to endorse or promote products derived
  *     from this software without specific prior written permission. 
  *
@@ -83,6 +83,8 @@ public:
         m_fontData.clear();
         m_glyphs.clear();
         m_advances.clear();
+        if (m_offsetsInString)
+            m_offsetsInString->clear();
 #if PLATFORM(WIN)
         m_offsets.clear();
 #endif
@@ -121,18 +123,9 @@ public:
         return FloatSize();
 #endif
     }
-
-    void add(const GlyphBuffer* glyphBuffer, int from, int len)
-    {
-        m_glyphs.append(glyphBuffer->glyphs(from), len);
-        m_advances.append(glyphBuffer->advances(from), len);
-        m_fontData.append(glyphBuffer->m_fontData.data() + from, len);
-#if PLATFORM(WIN)
-        m_offsets.append(glyphBuffer->m_offsets.data() + from, len);
-#endif
-    }
-
-    void add(Glyph glyph, const SimpleFontData* font, float width, const FloatSize* offset = 0)
+    
+    static const int kNoOffset = -1;
+    void add(Glyph glyph, const SimpleFontData* font, float width, int offsetInString = kNoOffset, const FloatSize* offset = 0)
     {
         m_fontData.append(font);
 
@@ -159,10 +152,13 @@ public:
 #else
         UNUSED_PARAM(offset);
 #endif
+        
+        if (offsetInString != kNoOffset && m_offsetsInString)
+            m_offsetsInString->append(offsetInString);
     }
     
 #if !USE(WINGDI)
-    void add(Glyph glyph, const SimpleFontData* font, GlyphBufferAdvance advance)
+    void add(Glyph glyph, const SimpleFontData* font, GlyphBufferAdvance advance, int offsetInString = kNoOffset)
     {
         m_fontData.append(font);
 #if USE(CAIRO)
@@ -174,6 +170,9 @@ public:
 #endif
 
         m_advances.append(advance);
+        
+        if (offsetInString != kNoOffset && m_offsetsInString)
+            m_offsetsInString->append(offsetInString);
     }
 #endif
 
@@ -188,6 +187,17 @@ public:
         ASSERT(!isEmpty());
         GlyphBufferAdvance& lastAdvance = m_advances.last();
         lastAdvance.setWidth(lastAdvance.width() + width);
+    }
+    
+    void saveOffsetsInString()
+    {
+        m_offsetsInString.reset(new Vector<int, 2048>());
+    }
+    
+    int offsetInString(int index) const
+    {
+        ASSERT(m_offsetsInString);
+        return (*m_offsetsInString)[index];
     }
 
 private:
@@ -216,6 +226,7 @@ private:
     Vector<GlyphBufferGlyph, 2048> m_glyphs;
     Vector<GlyphBufferAdvance, 2048> m_advances;
     GlyphBufferAdvance m_initialAdvance;
+    std::unique_ptr<Vector<int, 2048>> m_offsetsInString;
 #if PLATFORM(WIN)
     Vector<FloatSize, 2048> m_offsets;
 #endif

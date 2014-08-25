@@ -21,8 +21,6 @@
 #ifndef SVGPolyElement_h
 #define SVGPolyElement_h
 
-#if ENABLE(SVG)
-
 #include "SVGAnimatedBoolean.h"
 #include "SVGExternalResourcesRequired.h"
 #include "SVGGraphicsElement.h"
@@ -45,7 +43,6 @@ protected:
 
 private:
     virtual bool isValid() const override { return SVGTests::isValid(); }
-    virtual bool supportsFocus() const override { return true; }
 
     bool isSupportedAttribute(const QualifiedName&);
     virtual void parseAttribute(const QualifiedName&, const AtomicString&) override; 
@@ -70,7 +67,5 @@ bool isSVGPolyElement(const Node&);
 NODE_TYPE_CASTS(SVGPolyElement)
 
 } // namespace WebCore
-
-#endif // ENABLE(SVG)
 
 #endif

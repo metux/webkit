@@ -188,18 +188,23 @@ private:
     typedef enum {
         OP_ADD_EvGv                     = 0x01,
         OP_ADD_GvEv                     = 0x03,
+        OP_ADD_EAXIv                    = 0x05,
         OP_OR_EvGv                      = 0x09,
         OP_OR_GvEv                      = 0x0B,
+        OP_OR_EAXIv                     = 0x0D,
         OP_2BYTE_ESCAPE                 = 0x0F,
         OP_AND_EvGv                     = 0x21,
         OP_AND_GvEv                     = 0x23,
         OP_SUB_EvGv                     = 0x29,
         OP_SUB_GvEv                     = 0x2B,
+        OP_SUB_EAXIv                    = 0x2D,
         PRE_PREDICT_BRANCH_NOT_TAKEN    = 0x2E,
         OP_XOR_EvGv                     = 0x31,
         OP_XOR_GvEv                     = 0x33,
+        OP_XOR_EAXIv                    = 0x35,
         OP_CMP_EvGv                     = 0x39,
         OP_CMP_GvEv                     = 0x3B,
+        OP_CMP_EAXIv                    = 0x3D,
 #if CPU(X86_64)
         PRE_REX                         = 0x40,
 #endif
@@ -224,9 +229,12 @@ private:
         OP_LEA                          = 0x8D,
         OP_GROUP1A_Ev                   = 0x8F,
         OP_NOP                          = 0x90,
+        OP_XCHG_EAX                     = 0x90,
         OP_CDQ                          = 0x99,
         OP_MOV_EAXOv                    = 0xA1,
         OP_MOV_OvEAX                    = 0xA3,
+        OP_TEST_ALIb                    = 0xA8,
+        OP_TEST_EAXIv                   = 0xA9,
         OP_MOV_EAXIv                    = 0xB8,
         OP_GROUP2_EvIb                  = 0xC1,
         OP_RET                          = 0xC3,
@@ -413,7 +421,10 @@ public:
             m_formatter.oneByteOp(OP_GROUP1_EvIb, GROUP1_OP_ADD, dst);
             m_formatter.immediate8(imm);
         } else {
-            m_formatter.oneByteOp(OP_GROUP1_EvIz, GROUP1_OP_ADD, dst);
+            if (dst == X86Registers::eax)
+                m_formatter.oneByteOp(OP_ADD_EAXIv);
+            else
+                m_formatter.oneByteOp(OP_GROUP1_EvIz, GROUP1_OP_ADD, dst);
             m_formatter.immediate32(imm);
         }
     }
@@ -446,7 +457,10 @@ public:
             m_formatter.oneByteOp64(OP_GROUP1_EvIb, GROUP1_OP_ADD, dst);
             m_formatter.immediate8(imm);
         } else {
-            m_formatter.oneByteOp64(OP_GROUP1_EvIz, GROUP1_OP_ADD, dst);
+            if (dst == X86Registers::eax)
+                m_formatter.oneByteOp64(OP_ADD_EAXIv);
+            else
+                m_formatter.oneByteOp64(OP_GROUP1_EvIz, GROUP1_OP_ADD, dst);
             m_formatter.immediate32(imm);
         }
     }
@@ -612,7 +626,10 @@ public:
             m_formatter.oneByteOp(OP_GROUP1_EvIb, GROUP1_OP_OR, dst);
             m_formatter.immediate8(imm);
         } else {
-            m_formatter.oneByteOp(OP_GROUP1_EvIz, GROUP1_OP_OR, dst);
+            if (dst == X86Registers::eax)
+                m_formatter.oneByteOp(OP_OR_EAXIv);
+            else
+                m_formatter.oneByteOp(OP_GROUP1_EvIz, GROUP1_OP_OR, dst);
             m_formatter.immediate32(imm);
         }
     }
@@ -640,7 +657,10 @@ public:
             m_formatter.oneByteOp64(OP_GROUP1_EvIb, GROUP1_OP_OR, dst);
             m_formatter.immediate8(imm);
         } else {
-            m_formatter.oneByteOp64(OP_GROUP1_EvIz, GROUP1_OP_OR, dst);
+            if (dst == X86Registers::eax)
+                m_formatter.oneByteOp64(OP_OR_EAXIv);
+            else
+                m_formatter.oneByteOp64(OP_GROUP1_EvIz, GROUP1_OP_OR, dst);
             m_formatter.immediate32(imm);
         }
     }
@@ -683,7 +703,10 @@ public:
             m_formatter.oneByteOp(OP_GROUP1_EvIb, GROUP1_OP_SUB, dst);
             m_formatter.immediate8(imm);
         } else {
-            m_formatter.oneByteOp(OP_GROUP1_EvIz, GROUP1_OP_SUB, dst);
+            if (dst == X86Registers::eax)
+                m_formatter.oneByteOp(OP_SUB_EAXIv);
+            else
+                m_formatter.oneByteOp(OP_GROUP1_EvIz, GROUP1_OP_SUB, dst);
             m_formatter.immediate32(imm);
         }
     }
@@ -711,7 +734,10 @@ public:
             m_formatter.oneByteOp64(OP_GROUP1_EvIb, GROUP1_OP_SUB, dst);
             m_formatter.immediate8(imm);
         } else {
-            m_formatter.oneByteOp64(OP_GROUP1_EvIz, GROUP1_OP_SUB, dst);
+            if (dst == X86Registers::eax)
+                m_formatter.oneByteOp64(OP_SUB_EAXIv);
+            else
+                m_formatter.oneByteOp64(OP_GROUP1_EvIz, GROUP1_OP_SUB, dst);
             m_formatter.immediate32(imm);
         }
     }
@@ -760,7 +786,10 @@ public:
             m_formatter.oneByteOp(OP_GROUP1_EvIb, GROUP1_OP_XOR, dst);
             m_formatter.immediate8(imm);
         } else {
-            m_formatter.oneByteOp(OP_GROUP1_EvIz, GROUP1_OP_XOR, dst);
+            if (dst == X86Registers::eax)
+                m_formatter.oneByteOp(OP_XOR_EAXIv);
+            else
+                m_formatter.oneByteOp(OP_GROUP1_EvIz, GROUP1_OP_XOR, dst);
             m_formatter.immediate32(imm);
         }
     }
@@ -777,7 +806,10 @@ public:
             m_formatter.oneByteOp64(OP_GROUP1_EvIb, GROUP1_OP_XOR, dst);
             m_formatter.immediate8(imm);
         } else {
-            m_formatter.oneByteOp64(OP_GROUP1_EvIz, GROUP1_OP_XOR, dst);
+            if (dst == X86Registers::eax)
+                m_formatter.oneByteOp64(OP_XOR_EAXIv);
+            else
+                m_formatter.oneByteOp64(OP_GROUP1_EvIz, GROUP1_OP_XOR, dst);
             m_formatter.immediate32(imm);
         }
     }
@@ -922,7 +954,10 @@ public:
             m_formatter.oneByteOp(OP_GROUP1_EvIb, GROUP1_OP_CMP, dst);
             m_formatter.immediate8(imm);
         } else {
-            m_formatter.oneByteOp(OP_GROUP1_EvIz, GROUP1_OP_CMP, dst);
+            if (dst == X86Registers::eax)
+                m_formatter.oneByteOp(OP_CMP_EAXIv);
+            else
+                m_formatter.oneByteOp(OP_GROUP1_EvIz, GROUP1_OP_CMP, dst);
             m_formatter.immediate32(imm);
         }
     }
@@ -1008,7 +1043,10 @@ public:
             m_formatter.oneByteOp64(OP_GROUP1_EvIb, GROUP1_OP_CMP, dst);
             m_formatter.immediate8(imm);
         } else {
-            m_formatter.oneByteOp64(OP_GROUP1_EvIz, GROUP1_OP_CMP, dst);
+            if (dst == X86Registers::eax)
+                m_formatter.oneByteOp64(OP_CMP_EAXIv);
+            else
+                m_formatter.oneByteOp64(OP_GROUP1_EvIz, GROUP1_OP_CMP, dst);
             m_formatter.immediate32(imm);
         }
     }
@@ -1091,7 +1129,10 @@ public:
     
     void testl_i32r(int imm, RegisterID dst)
     {
-        m_formatter.oneByteOp(OP_GROUP3_EvIz, GROUP3_OP_TEST, dst);
+        if (dst == X86Registers::eax)
+            m_formatter.oneByteOp(OP_TEST_EAXIv);
+        else
+            m_formatter.oneByteOp(OP_GROUP3_EvIz, GROUP3_OP_TEST, dst);
         m_formatter.immediate32(imm);
     }
 
@@ -1145,7 +1186,10 @@ public:
 
     void testq_i32r(int imm, RegisterID dst)
     {
-        m_formatter.oneByteOp64(OP_GROUP3_EvIz, GROUP3_OP_TEST, dst);
+        if (dst == X86Registers::eax)
+            m_formatter.oneByteOp64(OP_TEST_EAXIv);
+        else
+            m_formatter.oneByteOp64(OP_GROUP3_EvIz, GROUP3_OP_TEST, dst);
         m_formatter.immediate32(imm);
     }
 
@@ -1170,7 +1214,10 @@ public:
     
     void testb_i8r(int imm, RegisterID dst)
     {
-        m_formatter.oneByteOp8(OP_GROUP3_EbIb, GROUP3_OP_TEST, dst);
+        if (dst == X86Registers::eax)
+            m_formatter.oneByteOp(OP_TEST_ALIb);
+        else
+            m_formatter.oneByteOp8(OP_GROUP3_EbIb, GROUP3_OP_TEST, dst);
         m_formatter.immediate8(imm);
     }
 
@@ -1213,13 +1260,23 @@ public:
 
     void xchgl_rr(RegisterID src, RegisterID dst)
     {
-        m_formatter.oneByteOp(OP_XCHG_EvGv, src, dst);
+        if (src == X86Registers::eax)
+            m_formatter.oneByteOp(OP_XCHG_EAX, dst);
+        else if (dst == X86Registers::eax)
+            m_formatter.oneByteOp(OP_XCHG_EAX, src);
+        else
+            m_formatter.oneByteOp(OP_XCHG_EvGv, src, dst);
     }
 
 #if CPU(X86_64)
     void xchgq_rr(RegisterID src, RegisterID dst)
     {
-        m_formatter.oneByteOp64(OP_XCHG_EvGv, src, dst);
+        if (src == X86Registers::eax)
+            m_formatter.oneByteOp64(OP_XCHG_EAX, dst);
+        else if (dst == X86Registers::eax)
+            m_formatter.oneByteOp64(OP_XCHG_EAX, src);
+        else
+            m_formatter.oneByteOp64(OP_XCHG_EvGv, src, dst);
     }
 #endif
 
@@ -1330,7 +1387,7 @@ public:
     {
         m_formatter.oneByteOp8(OP_MOV_EbGb, src, base, index, scale, offset);
     }
-    
+
     void movw_rm(RegisterID src, int offset, RegisterID base, RegisterID index, int scale)
     {
         m_formatter.prefix(PRE_OPERAND_SIZE);
@@ -2054,9 +2111,9 @@ public:
 #if CPU(X86_64)
     static void revertJumpTo_movq_i64r(void* instructionStart, int64_t imm, RegisterID dst)
     {
+        const unsigned instructionSize = 10; // REX.W MOV IMM64
         const int rexBytes = 1;
         const int opcodeBytes = 1;
-        ASSERT(rexBytes + opcodeBytes <= maxJumpReplacementSize());
         uint8_t* ptr = reinterpret_cast<uint8_t*>(instructionStart);
         ptr[0] = PRE_REX | (1 << 3) | (dst >> 3);
         ptr[1] = OP_MOV_EAXIv | (dst & 7);
@@ -2066,11 +2123,33 @@ public:
             uint8_t asBytes[8];
         } u;
         u.asWord = imm;
-        for (unsigned i = rexBytes + opcodeBytes; i < static_cast<unsigned>(maxJumpReplacementSize()); ++i)
+        for (unsigned i = rexBytes + opcodeBytes; i < instructionSize; ++i)
+            ptr[i] = u.asBytes[i - rexBytes - opcodeBytes];
+    }
+
+    static void revertJumpTo_movl_i32r(void* instructionStart, int32_t imm, RegisterID dst)
+    {
+        // We only revert jumps on inline caches, and inline caches always use the scratch register (r11).
+        // FIXME: If the above is ever false then we need to make this smarter with respect to emitting 
+        // the REX byte.
+        ASSERT(dst == X86Registers::r11);
+        const unsigned instructionSize = 6; // REX MOV IMM32
+        const int rexBytes = 1;
+        const int opcodeBytes = 1;
+        uint8_t* ptr = reinterpret_cast<uint8_t*>(instructionStart);
+        ptr[0] = PRE_REX | (dst >> 3);
+        ptr[1] = OP_MOV_EAXIv | (dst & 7);
+        
+        union {
+            uint32_t asWord;
+            uint8_t asBytes[4];
+        } u;
+        u.asWord = imm;
+        for (unsigned i = rexBytes + opcodeBytes; i < instructionSize; ++i)
             ptr[i] = u.asBytes[i - rexBytes - opcodeBytes];
     }
 #endif
-    
+
     static void revertJumpTo_cmpl_ir_force32(void* instructionStart, int32_t imm, RegisterID dst)
     {
         const int opcodeBytes = 1;
@@ -2165,10 +2244,49 @@ public:
     {
         m_formatter.oneByteOp(OP_NOP);
     }
-    
+
     static void fillNops(void* base, size_t size)
     {
+#if CPU(X86_64)
+        static const uint8_t nops[10][10] = {
+            // nop
+            {0x90},
+            // xchg %ax,%ax
+            {0x66, 0x90},
+            // nopl (%[re]ax)
+            {0x0f, 0x1f, 0x00},
+            // nopl 8(%[re]ax)
+            {0x0f, 0x1f, 0x40, 0x08},
+            // nopl 8(%[re]ax,%[re]ax,1)
+            {0x0f, 0x1f, 0x44, 0x00, 0x08},
+            // nopw 8(%[re]ax,%[re]ax,1)
+            {0x66, 0x0f, 0x1f, 0x44, 0x00, 0x08},
+            // nopl 512(%[re]ax)
+            {0x0f, 0x1f, 0x80, 0x00, 0x02, 0x00, 0x00},
+            // nopl 512(%[re]ax,%[re]ax,1)
+            {0x0f, 0x1f, 0x84, 0x00, 0x00, 0x02, 0x00, 0x00},
+            // nopw 512(%[re]ax,%[re]ax,1)
+            {0x66, 0x0f, 0x1f, 0x84, 0x00, 0x00, 0x02, 0x00, 0x00},
+            // nopw %cs:512(%[re]ax,%[re]ax,1)
+            {0x66, 0x2e, 0x0f, 0x1f, 0x84, 0x00, 0x00, 0x02, 0x00, 0x00}
+        };
+
+        uint8_t* where = reinterpret_cast<uint8_t*>(base);
+        while (size) {
+            unsigned nopSize = static_cast<unsigned>(std::min<size_t>(size, 15));
+            unsigned numPrefixes = nopSize <= 10 ? 0 : nopSize - 10;
+            for (unsigned i = 0; i != numPrefixes; ++i)
+                *where++ = 0x66;
+
+            unsigned nopRest = nopSize - numPrefixes;
+            for (unsigned i = 0; i != nopRest; ++i)
+                *where++ = nops[nopRest-1][i];
+
+            size -= nopSize;
+        }
+#else
         memset(base, OP_NOP, size);
+#endif
     }
 
     // This is a no-op on x86
