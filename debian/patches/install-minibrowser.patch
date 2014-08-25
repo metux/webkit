@@ -5,33 +5,29 @@ Index: webkitgtk/Tools/MiniBrowser/gtk/main.c
 ===================================================================
 --- webkitgtk.orig/Tools/MiniBrowser/gtk/main.c
 +++ webkitgtk/Tools/MiniBrowser/gtk/main.c
-@@ -265,8 +265,6 @@ int main(int argc, char *argv[])
-     }
-     g_option_context_free (context);
- 
+@@ -240,7 +240,6 @@ aboutURISchemeRequestCallback(WebKitURIS
+ int main(int argc, char *argv[])
+ {
+     gtk_init(&argc, &argv);
 -    g_setenv("WEBKIT_INJECTED_BUNDLE_PATH", WEBKIT_INJECTED_BUNDLE_PATH, FALSE);
--
-     // Enable the favicon database, by specifying the default directory.
-     webkit_web_context_set_favicon_database_directory(webkit_web_context_get_default(), NULL);
  
-Index: webkitgtk/Tools/MiniBrowser/gtk/GNUmakefile.am
+     const gchar *multiprocess = g_getenv("MINIBROWSER_MULTIPROCESS");
+     if (multiprocess && *multiprocess) {
+Index: webkitgtk/Tools/MiniBrowser/gtk/CMakeLists.txt
 ===================================================================
---- webkitgtk.orig/Tools/MiniBrowser/gtk/GNUmakefile.am
-+++ webkitgtk/Tools/MiniBrowser/gtk/GNUmakefile.am
-@@ -1,5 +1,5 @@
- if ENABLE_WEBKIT2
--noinst_PROGRAMS += \
-+libexec_PROGRAMS += \
- 	Programs/MiniBrowser
- endif
- 
-@@ -44,9 +44,6 @@ Programs_MiniBrowser_LDADD = \
- 	$(GTK_LIBS) \
- 	$(LIBSOUP_LIBS)
- 
--Programs_MiniBrowser_LDFLAGS = \
--	-no-install
--
- CLEANFILES += \
- 	$(top_builddir)/Programs/MiniBrowser \
- 	$(minibrowser_built_sources) \
+--- webkitgtk.orig/Tools/MiniBrowser/gtk/CMakeLists.txt
++++ webkitgtk/Tools/MiniBrowser/gtk/CMakeLists.txt
+@@ -52,3 +52,4 @@ include_directories(${MiniBrowser_INCLUD
+ add_executable(MiniBrowser ${MiniBrowser_SOURCES})
+ target_link_libraries(MiniBrowser ${MiniBrowser_LIBRARIES})
+ set_target_properties(MiniBrowser PROPERTIES FOLDER "Tools")
++install(TARGETS MiniBrowser DESTINATION "${LIBEXEC_INSTALL_DIR}")
+Index: webkitgtk/CMakeLists.txt
+===================================================================
+--- webkitgtk.orig/CMakeLists.txt
++++ webkitgtk/CMakeLists.txt
+@@ -181,3 +181,4 @@ add_subdirectory(Source)
+ if (ENABLE_TOOLS)
+     add_subdirectory(Tools)
+ endif ()
++add_subdirectory(Tools/MiniBrowser/gtk)

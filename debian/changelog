@@ -10,6 +10,19 @@ webkit2gtk (2.5.3+dfsg1-1) UNRELEASED; urgency=medium
     + Update upstream branch name.
   * debian/watch:
     + Add dversionmangle rule to strip +dfsg1 from the package.
+  * debian/patches/enable_llint.patch,
+    debian/patches/02_notebook_scroll.patch,
+    debian/patches/atomic_build_fix.patch,
+    debian/patches/fix-gtkdoc-error.patch,
+    debian/patches/ftbfs-armhf.patch:
+    + Remove.
+  * debian/patches/dfg-jit.patch,
+    debian/patches/local-label-string-hurd.patch,
+    debian/patches/restore_sparc_code.patch,
+    debian/patches/fix-textrel-x86.patch:
+    + Refresh.
+  * debian/patches/install-minibrowser.patch:
+    + Rewrite to make it work with cmake.
 
  -- Alberto Garcia <berto@igalia.com>  Mon, 25 Aug 2014 10:58:41 +0300
 

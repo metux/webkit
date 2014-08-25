@@ -5,7 +5,7 @@ Index: webkitgtk/Source/WTF/wtf/InlineASM.h
 ===================================================================
 --- webkitgtk.orig/Source/WTF/wtf/InlineASM.h
 +++ webkitgtk/Source/WTF/wtf/InlineASM.h
-@@ -46,6 +46,8 @@
+@@ -44,6 +44,8 @@
  #define GLOBAL_REFERENCE(name) #name "@plt"
  #elif CPU(X86) && COMPILER(MINGW)
  #define GLOBAL_REFERENCE(name) "@" #name "@4"
@@ -18,7 +18,7 @@ Index: webkitgtk/Source/JavaScriptCore/jit/ThunkGenerators.cpp
 ===================================================================
 --- webkitgtk.orig/Source/JavaScriptCore/jit/ThunkGenerators.cpp
 +++ webkitgtk/Source/JavaScriptCore/jit/ThunkGenerators.cpp
-@@ -619,6 +619,30 @@ double jsRound(double d)
+@@ -724,6 +724,30 @@ double jsRound(double d)
      } \
      static MathThunk UnaryDoubleOpWrapper(function) = &function##Thunk;
  
