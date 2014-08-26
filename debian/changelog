@@ -13,6 +13,8 @@ webkit2gtk (2.5.3+dfsg1-1) UNRELEASED; urgency=medium
   * debian/rules:
     + Rewrite completely using the debhelper sequencer and build with
       cmake instead of autotools.
+    + Disable JIT and MacroAssembler in all architectures unless we know
+      it works.
     + Add get-orig-source target.
   * debian/control:
     + Remove all packages that use the old WebKit API, as well as the
