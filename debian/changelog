@@ -1,4 +1,4 @@
-webkit2gtk (2.5.3+dfsg1-1) UNRELEASED; urgency=medium
+webkit2gtk (2.5.3+dfsg1-1) experimental; urgency=medium
 
   * New upstream release from the upcoming 2.6 branch.
     + Rename source package to webkit2gtk, since now WebKitGTK+ only
@@ -56,7 +56,7 @@ webkit2gtk (2.5.3+dfsg1-1) UNRELEASED; urgency=medium
   * debian/symbols.filter:
     + Remove.
 
- -- Alberto Garcia <berto@igalia.com>  Mon, 25 Aug 2014 10:58:41 +0300
+ -- Alberto Garcia <berto@igalia.com>  Wed, 27 Aug 2014 06:18:56 +0000
 
 webkitgtk (2.4.1-1) experimental; urgency=medium
 
