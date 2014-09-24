@@ -26,7 +26,7 @@ Index: webkitgtk/CMakeLists.txt
 ===================================================================
 --- webkitgtk.orig/CMakeLists.txt
 +++ webkitgtk/CMakeLists.txt
-@@ -181,3 +181,4 @@ add_subdirectory(Source)
+@@ -184,3 +184,4 @@ add_subdirectory(Source)
  if (ENABLE_TOOLS)
      add_subdirectory(Tools)
  endif ()

@@ -1,6 +1,13 @@
 webkit2gtk (2.6.0+dfsg1-1) UNRELEASED; urgency=medium
 
   * New upstream release.
+  * debian/patches/fix-textrel-x86.patch,
+    debian/patches/change-libexec-dir.patch:
+    + Remove.
+  * debian/patches/dfg-jit.patch,
+    debian/patches/install-minibrowser.patch,
+    debian/patches/restore_sparc_code.patch:
+    + Refresh.
 
  -- Alberto Garcia <berto@igalia.com>  Wed, 24 Sep 2014 23:59:09 +0300
 

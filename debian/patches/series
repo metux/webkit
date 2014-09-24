@@ -1,6 +1,4 @@
 dfg-jit.patch
 install-minibrowser.patch
 restore_sparc_code.patch
-fix-textrel-x86.patch
 local-label-string-hurd.patch
-change-libexec-dir.patch
