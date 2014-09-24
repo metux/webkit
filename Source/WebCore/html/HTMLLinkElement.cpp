@@ -94,7 +94,7 @@ HTMLLinkElement::~HTMLLinkElement()
     if (inDocument())
         document().styleSheetCollection().removeStyleSheetCandidateNode(*this);
 
-    linkLoadEventSender().cancelEvent(this);
+    linkLoadEventSender().cancelEvent(*this);
 }
 
 void HTMLLinkElement::setDisabledState(bool disabled)
@@ -189,7 +189,7 @@ void HTMLLinkElement::process()
     if (m_disabledState != Disabled && (m_relAttribute.m_isStyleSheet || (acceptIfTypeContainsTextCSS && type.contains("text/css")))
         && document().frame() && url.isValid()) {
         
-        String charset = getAttribute(charsetAttr);
+        AtomicString charset = fastGetAttribute(charsetAttr);
         if (charset.isEmpty() && document().frame())
             charset = document().charset();
         
@@ -380,7 +380,7 @@ void HTMLLinkElement::notifyLoadedSheetAndAllCriticalSubresources(bool errorOccu
     if (m_firedLoad)
         return;
     m_loadedSheet = !errorOccurred;
-    linkLoadEventSender().dispatchEventSoon(this);
+    linkLoadEventSender().dispatchEventSoon(*this);
     m_firedLoad = true;
 }
 
@@ -401,9 +401,9 @@ URL HTMLLinkElement::href() const
     return document().completeURL(getAttribute(hrefAttr));
 }
 
-String HTMLLinkElement::rel() const
+const AtomicString& HTMLLinkElement::rel() const
 {
-    return getAttribute(relAttr);
+    return fastGetAttribute(relAttr);
 }
 
 String HTMLLinkElement::target() const
@@ -411,7 +411,7 @@ String HTMLLinkElement::target() const
     return getAttribute(targetAttr);
 }
 
-String HTMLLinkElement::type() const
+const AtomicString& HTMLLinkElement::type() const
 {
     return getAttribute(typeAttr);
 }

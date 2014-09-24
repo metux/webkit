@@ -20,7 +20,7 @@
 # OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-messages -> DrawingArea LegacyReceiver {
+messages -> DrawingArea {
     UpdateBackingStoreState(uint64_t backingStoreStateID, bool respondImmediately, float deviceScaleFactor, WebCore::IntSize size, WebCore::IntSize scrollOffset)
     DidUpdate()
 
@@ -35,6 +35,7 @@ messages -> DrawingArea LegacyReceiver {
     CommitTransientZoom(double scale, WebCore::FloatPoint origin)
     
     AcceleratedAnimationDidStart(uint64_t layerID, String key, double startTime)
+    AcceleratedAnimationDidEnd(uint64_t layerID, String key)
     
     AddTransactionCallbackID(uint64_t callbackID)
 #endif

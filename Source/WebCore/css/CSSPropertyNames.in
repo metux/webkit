@@ -38,6 +38,9 @@ zoom
 // line height needs to be right after the above high-priority properties
 line-height [Inherited]
 
+// Keep this in between the highest priority props and the lower ones.
+-webkit-ruby-position [Inherited]
+
 // The remaining properties are listed in alphabetical order
 background
 background-attachment
@@ -289,20 +292,29 @@ z-index
 mix-blend-mode
 isolation
 #endif
-#if defined(ENABLE_CSS_FILTERS) && ENABLE_CSS_FILTERS
 -webkit-filter
-#endif
--webkit-align-content
--webkit-align-items
--webkit-align-self
--webkit-flex
--webkit-flex-basis
--webkit-flex-direction
--webkit-flex-flow
--webkit-flex-grow
--webkit-flex-shrink
--webkit-flex-wrap
--webkit-justify-content
+align-content
+-webkit-align-content = align-content
+align-items
+-webkit-align-items = align-items
+align-self
+-webkit-align-self = align-self
+flex
+-webkit-flex = flex
+flex-basis
+-webkit-flex-basis = flex-basis
+flex-direction
+-webkit-flex-direction = flex-direction
+flex-flow
+-webkit-flex-flow = flex-flow
+flex-grow
+-webkit-flex-grow = flex-grow
+flex-shrink
+-webkit-flex-shrink = flex-shrink
+flex-wrap
+-webkit-flex-wrap = flex-wrap
+justify-content
+-webkit-justify-content = justify-content
 -webkit-justify-self
 -webkit-font-size-delta
 #if defined(ENABLE_CSS_GRID_LAYOUT) && ENABLE_CSS_GRID_LAYOUT
@@ -328,6 +340,7 @@ isolation
 -webkit-hyphenate-limit-lines [Inherited]
 -webkit-hyphens [Inherited]
 -epub-hyphens = -webkit-hyphens
+-webkit-initial-letter
 -webkit-line-box-contain [Inherited]
 -webkit-line-align [Inherited]
 -webkit-line-break [Inherited]
@@ -375,7 +388,8 @@ isolation
 -webkit-min-logical-width
 -webkit-min-logical-height
 -webkit-nbsp-mode [Inherited]
--webkit-order
+order
+-webkit-order = order
 -webkit-padding-after
 -webkit-padding-before
 -webkit-padding-end
@@ -386,7 +400,6 @@ isolation
 -webkit-perspective-origin-y
 -webkit-print-color-adjust [Inherited]
 -webkit-rtl-ordering [Inherited]
--webkit-ruby-position [Inherited]
 #if defined(ENABLE_CSS_SCROLL_SNAP)
 -webkit-scroll-snap-points-x
 -webkit-scroll-snap-points-y
@@ -467,8 +480,4 @@ user-zoom
 #endif
 #if defined(WTF_PLATFORM_IOS) && WTF_PLATFORM_IOS
 -webkit-touch-callout [Inherited]
-
-// FIXME: This property shouldn't be iOS-specific. Once we fix up its usage in InlineTextBox::paintCompositionBackground()
-// we should move it outside the WTF_PLATFORM_IOS-guard.
--webkit-composition-fill-color [Inherited]
 #endif

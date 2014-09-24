@@ -30,12 +30,12 @@
 #include "WebView.h"
 
 #include "CoordinatedDrawingAreaProxy.h"
+#include "CoordinatedGraphicsScene.h"
 #include "CoordinatedLayerTreeHostProxy.h"
 #include "NotImplemented.h"
 #include "ViewState.h"
 #include "WebContextMenuProxy.h"
 #include "WebPageProxy.h"
-#include <WebCore/CoordinatedGraphicsScene.h>
 
 #if ENABLE(FULLSCREEN_API)
 #include "WebFullScreenManagerProxy.h"
@@ -152,11 +152,9 @@ void WebView::paintToCurrentGLContext()
     if (!scene)
         return;
 
-    // FIXME: We need to clean up this code as it is split over CoordGfx and Page.
-    scene->setDrawsBackground(m_page->drawsBackground());
     const FloatRect& viewport = m_userViewportTransform.mapRect(IntRect(IntPoint(), m_size));
 
-    scene->paintToCurrentGLContext(transformToScene().toTransformationMatrix(), m_opacity, viewport);
+    scene->paintToCurrentGLContext(transformToScene().toTransformationMatrix(), m_opacity, viewport, m_page->pageExtendedBackgroundColor(), m_page->drawsBackground());
 }
 
 void WebView::setDrawsBackground(bool drawsBackground)
@@ -286,7 +284,7 @@ WebCore::FloatSize WebView::visibleContentsSize() const
 
 std::unique_ptr<DrawingAreaProxy> WebView::createDrawingAreaProxy()
 {
-    return std::make_unique<CoordinatedDrawingAreaProxy>(page());
+    return std::make_unique<CoordinatedDrawingAreaProxy>(*m_page);
 }
 
 void WebView::setViewNeedsDisplay(const WebCore::IntRect& area)

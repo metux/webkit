@@ -100,9 +100,9 @@ WebKitDOMNode* wrap(Node* node)
     case Node::COMMENT_NODE:
         return WEBKIT_DOM_NODE(wrapComment(static_cast<Comment*>(node)));
     case Node::DOCUMENT_NODE:
-        if (static_cast<Document*>(node)->isHTMLDocument())
+        if (toDocument(node)->isHTMLDocument())
             return WEBKIT_DOM_NODE(wrapHTMLDocument(static_cast<HTMLDocument*>(node)));
-        return WEBKIT_DOM_NODE(wrapDocument(static_cast<Document*>(node)));
+        return WEBKIT_DOM_NODE(wrapDocument(toDocument(node)));
     case Node::DOCUMENT_TYPE_NODE:
         return WEBKIT_DOM_NODE(wrapDocumentType(static_cast<DocumentType*>(node)));
     case Node::DOCUMENT_FRAGMENT_NODE:
@@ -141,7 +141,7 @@ WebKitDOMStyleSheet* wrap(StyleSheet* styleSheet)
     ASSERT(styleSheet);
 
     if (styleSheet->isCSSStyleSheet())
-        return WEBKIT_DOM_STYLE_SHEET(wrapCSSStyleSheet(static_cast<CSSStyleSheet*>(styleSheet)));
+        return WEBKIT_DOM_STYLE_SHEET(wrapCSSStyleSheet(toCSSStyleSheet(styleSheet)));
     return wrapStyleSheet(styleSheet);
 }
 

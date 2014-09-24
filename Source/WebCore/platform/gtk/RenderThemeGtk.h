@@ -28,20 +28,26 @@
 #ifndef RenderThemeGtk_h
 #define RenderThemeGtk_h
 
-#include <wtf/gobject/GRefPtr.h>
 #include "RenderTheme.h"
-
-typedef struct _GdkColormap GdkColormap;
 
 namespace WebCore {
 
 class RenderThemeGtk final : public RenderTheme {
-private:
-    RenderThemeGtk();
-    virtual ~RenderThemeGtk();
-
 public:
     static PassRefPtr<RenderTheme> create();
+
+    // System fonts.
+    virtual void systemFont(CSSValueID, FontDescription&) const override;
+
+#if ENABLE(DATALIST_ELEMENT)
+    // Returns size of one slider tick mark for a horizontal track.
+    // For vertical tracks we rotate it and use it. i.e. Width is always length along the track.
+    virtual IntSize sliderTickSize() const override;
+    // Returns the distance of slider tick origin from the slider track center.
+    virtual int sliderTickOffsetFromTrackCenter() const override;
+#endif
+
+#ifndef GTK_API_VERSION_2
 
     // A method asking if the theme's controls actually care about redrawing when hovered.
     virtual bool supportsHover(const RenderStyle&) const override { return true; }
@@ -78,8 +84,7 @@ public:
 
     virtual void platformColorsDidChange() override;
 
-    // System fonts and colors.
-    virtual void systemFont(CSSValueID, FontDescription&) const override;
+    // System colors.
     virtual Color systemColor(CSSValueID) const override;
 
     virtual bool popsMenuBySpaceOrReturn() const override { return true; }
@@ -95,32 +100,17 @@ public:
 #endif
 #endif
 
-#if ENABLE(DATALIST_ELEMENT)
-    // Returns size of one slider tick mark for a horizontal track.
-    // For vertical tracks we rotate it and use it. i.e. Width is always length along the track.
-    virtual IntSize sliderTickSize() const override;
-    // Returns the distance of slider tick origin from the slider track center.
-    virtual int sliderTickOffsetFromTrackCenter() const override;
-#endif
-
-#ifdef GTK_API_VERSION_2
-    GtkWidget* gtkContainer() const;
-    GtkWidget* gtkEntry() const;
-    GtkWidget* gtkVScrollbar() const;
-    GtkWidget* gtkHScrollbar() const;
-    static void getIndicatorMetrics(ControlPart, int& indicatorSize, int& indicatorSpacing);
-#else
-    GtkStyleContext* gtkScrollbarStyle();
-#endif
-
 private:
+    RenderThemeGtk();
+    virtual ~RenderThemeGtk();
+
     virtual bool paintCheckbox(const RenderObject&, const PaintInfo&, const IntRect&) override;
     virtual void setCheckboxSize(RenderStyle&) const override;
 
     virtual bool paintRadio(const RenderObject&, const PaintInfo&, const IntRect&) override;
     virtual void setRadioSize(RenderStyle&) const override;
 
-    virtual void adjustButtonStyle(StyleResolver&, RenderStyle&, Element&) const override;
+    virtual void adjustButtonStyle(StyleResolver&, RenderStyle&, Element*) const override;
     virtual bool paintButton(const RenderObject&, const PaintInfo&, const IntRect&) override;
 
     virtual bool paintTextField(const RenderObject&, const PaintInfo&, const FloatRect&) override;
@@ -135,30 +125,30 @@ private:
     // The former is used when a menu list button has been styled. This is used to ensure
     // Aqua themed controls whenever possible. We always want to use GTK+ theming, so
     // we don't maintain this differentiation.
-    virtual void adjustMenuListStyle(StyleResolver&, RenderStyle&, Element&) const override;
-    virtual void adjustMenuListButtonStyle(StyleResolver&, RenderStyle&, Element&) const override;
+    virtual void adjustMenuListStyle(StyleResolver&, RenderStyle&, Element*) const override;
+    virtual void adjustMenuListButtonStyle(StyleResolver&, RenderStyle&, Element*) const override;
     virtual bool paintMenuList(const RenderObject&, const PaintInfo&, const FloatRect&) override;
     virtual bool paintMenuListButtonDecorations(const RenderObject&, const PaintInfo&, const FloatRect&) override;
 
-    virtual void adjustSearchFieldResultsDecorationPartStyle(StyleResolver&, RenderStyle&, Element&) const override;
+    virtual void adjustSearchFieldResultsDecorationPartStyle(StyleResolver&, RenderStyle&, Element*) const override;
     virtual bool paintSearchFieldResultsDecorationPart(const RenderObject&, const PaintInfo&, const IntRect&) override;
 
-    virtual void adjustSearchFieldStyle(StyleResolver&, RenderStyle&, Element&) const override;
+    virtual void adjustSearchFieldStyle(StyleResolver&, RenderStyle&, Element*) const override;
     virtual bool paintSearchField(const RenderObject&, const PaintInfo&, const IntRect&) override;
 
-    virtual void adjustSearchFieldResultsButtonStyle(StyleResolver&, RenderStyle&, Element&) const override;
+    virtual void adjustSearchFieldResultsButtonStyle(StyleResolver&, RenderStyle&, Element*) const override;
     virtual bool paintSearchFieldResultsButton(const RenderObject&, const PaintInfo&, const IntRect&);
 
-    virtual void adjustSearchFieldCancelButtonStyle(StyleResolver&, RenderStyle&, Element&) const override;
+    virtual void adjustSearchFieldCancelButtonStyle(StyleResolver&, RenderStyle&, Element*) const override;
     virtual bool paintSearchFieldCancelButton(const RenderObject&, const PaintInfo&, const IntRect&) override;
 
     virtual bool paintSliderTrack(const RenderObject&, const PaintInfo&, const IntRect&) override;
-    virtual void adjustSliderTrackStyle(StyleResolver&, RenderStyle&, Element&) const override;
+    virtual void adjustSliderTrackStyle(StyleResolver&, RenderStyle&, Element*) const override;
 
     virtual bool paintSliderThumb(const RenderObject&, const PaintInfo&, const IntRect&) override;
-    virtual void adjustSliderThumbStyle(StyleResolver&, RenderStyle&, Element&) const override;
+    virtual void adjustSliderThumbStyle(StyleResolver&, RenderStyle&, Element*) const override;
 
-    virtual void adjustSliderThumbSize(RenderStyle&, Element&) const override;
+    virtual void adjustSliderThumbSize(RenderStyle&, Element*) const override;
 
 #if ENABLE(VIDEO)
     void initMediaColors();
@@ -182,19 +172,17 @@ private:
 
     virtual double animationRepeatIntervalForProgressBar(RenderProgress&) const override;
     virtual double animationDurationForProgressBar(RenderProgress&) const override;
-    virtual void adjustProgressBarStyle(StyleResolver&, RenderStyle&, Element&) const override;
+    virtual void adjustProgressBarStyle(StyleResolver&, RenderStyle&, Element*) const override;
     virtual bool paintProgressBar(const RenderObject&, const PaintInfo&, const IntRect&) override;
 
     virtual bool paintCapsLockIndicator(const RenderObject&, const PaintInfo&, const IntRect&) override;
 
-    virtual void adjustInnerSpinButtonStyle(StyleResolver&, RenderStyle&, Element&) const override;
+    virtual void adjustInnerSpinButtonStyle(StyleResolver&, RenderStyle&, Element*) const override;
     virtual bool paintInnerSpinButton(const RenderObject&, const PaintInfo&, const IntRect&) override;
 
     virtual String fileListNameForWidth(const FileList*, const Font&, int width, bool multipleFilesAllowed) const override;
 
-    void platformInit();
     static void setTextInputBorders(RenderStyle&);
-    static double getScreenDPI();
 
 #if ENABLE(VIDEO)
     bool paintMediaButton(const RenderObject&, GraphicsContext*, const IntRect&, const char* symbolicIconName, const char* fallbackStockIconName);
@@ -207,48 +195,7 @@ private:
     mutable Color m_sliderThumbColor;
     const int m_mediaIconSize;
     const int m_mediaSliderHeight;
-
-#ifdef GTK_API_VERSION_2
-    void setupWidgetAndAddToContainer(GtkWidget*, GtkWidget*) const;
-    void refreshComboBoxChildren() const;
-    void getComboBoxPadding(RenderStyle&, int& left, int& top, int& right, int& bottom) const;
-    int getComboBoxSeparatorWidth() const;
-    int comboBoxArrowSize(RenderStyle&) const;
-
-    GtkWidget* gtkButton() const;
-    GtkWidget* gtkTreeView() const;
-    GtkWidget* gtkVScale() const;
-    GtkWidget* gtkHScale() const;
-    GtkWidget* gtkRadioButton() const;
-    GtkWidget* gtkCheckButton() const;
-    GtkWidget* gtkProgressBar() const;
-    GtkWidget* gtkComboBox() const;
-    GtkWidget* gtkComboBoxButton() const;
-    GtkWidget* gtkComboBoxArrow() const;
-    GtkWidget* gtkComboBoxSeparator() const;
-    GtkWidget* gtkSpinButton() const;
-
-    GdkColormap* m_colormap;
-    mutable GtkWidget* m_gtkWindow;
-    mutable GtkWidget* m_gtkContainer;
-    mutable GtkWidget* m_gtkButton;
-    mutable GtkWidget* m_gtkEntry;
-    mutable GtkWidget* m_gtkTreeView;
-    mutable GtkWidget* m_gtkVScale;
-    mutable GtkWidget* m_gtkHScale;
-    mutable GtkWidget* m_gtkRadioButton;
-    mutable GtkWidget* m_gtkCheckButton;
-    mutable GtkWidget* m_gtkProgressBar;
-    mutable GtkWidget* m_gtkComboBox;
-    mutable GtkWidget* m_gtkComboBoxButton;
-    mutable GtkWidget* m_gtkComboBoxArrow;
-    mutable GtkWidget* m_gtkComboBoxSeparator;
-    mutable GtkWidget* m_gtkVScrollbar;
-    mutable GtkWidget* m_gtkHScrollbar;
-    mutable GtkWidget* m_gtkSpinButton;
-    bool m_themePartsHaveRGBAColormap;
-    friend class WidgetRenderingContext;
-#endif
+#endif // GTK_API_VERSION_2
 };
 
 }

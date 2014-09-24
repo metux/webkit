@@ -251,13 +251,6 @@ template<> struct ArgumentCoder<WebCore::ResourceRequest> {
     static bool decodePlatformData(ArgumentDecoder&, WebCore::ResourceRequest&);
 };
 
-template<> struct ArgumentCoder<WebCore::ResourceResponse> {
-    static void encode(ArgumentEncoder&, const WebCore::ResourceResponse&);
-    static bool decode(ArgumentDecoder&, WebCore::ResourceResponse&);
-    static void encodePlatformData(ArgumentEncoder&, const WebCore::ResourceResponse&);
-    static bool decodePlatformData(ArgumentDecoder&, WebCore::ResourceResponse&);
-};
-
 template<> struct ArgumentCoder<WebCore::ResourceError> {
     static void encode(ArgumentEncoder&, const WebCore::ResourceError&);
     static bool decode(ArgumentDecoder&, WebCore::ResourceError&);
@@ -374,7 +367,7 @@ template<> struct ArgumentCoder<WebCore::StickyPositionViewportConstraints> {
     static bool decode(ArgumentDecoder&, WebCore::StickyPositionViewportConstraints&);
 };
 
-#if ENABLE(CSS_FILTERS) && !USE(COORDINATED_GRAPHICS)
+#if !USE(COORDINATED_GRAPHICS)
 template<> struct ArgumentCoder<WebCore::FilterOperations> {
     static void encode(ArgumentEncoder&, const WebCore::FilterOperations&);
     static bool decode(ArgumentDecoder&, WebCore::FilterOperations&);

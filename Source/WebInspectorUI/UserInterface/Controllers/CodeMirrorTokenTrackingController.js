@@ -49,8 +49,9 @@ WebInspector.CodeMirrorTokenTrackingController.Mode = {
     None: "none",
     NonSymbolTokens: "non-symbol-tokens",
     JavaScriptExpression: "javascript-expression",
+    JavaScriptTypeInformation: "javascript-type-information",
     MarkedTokens: "marked-tokens"
-}
+};
 
 WebInspector.CodeMirrorTokenTrackingController.prototype = {
     constructor: WebInspector.CodeMirrorTokenTrackingController,
@@ -148,7 +149,7 @@ WebInspector.CodeMirrorTokenTrackingController.prototype = {
     {
         return this._hoveredMarker;
     },
-    
+
     set hoveredMarker(hoveredMarker)
     {
         this._hoveredMarker = hoveredMarker;
@@ -261,7 +262,8 @@ WebInspector.CodeMirrorTokenTrackingController.prototype = {
 
     _mouseEntered: function(event)
     {
-        this._startTracking();
+        if (!this._tracking)
+            this._startTracking();
     },
 
     _mouseLeft: function(event)
@@ -389,6 +391,7 @@ WebInspector.CodeMirrorTokenTrackingController.prototype = {
             this._candidate = this._processNonSymbolToken();
             break;
         case WebInspector.CodeMirrorTokenTrackingController.Mode.JavaScriptExpression:
+        case WebInspector.CodeMirrorTokenTrackingController.Mode.JavaScriptTypeInformation:
             this._candidate = this._processJavaScriptExpression();
             break;
         case WebInspector.CodeMirrorTokenTrackingController.Mode.MarkedTokens:
@@ -437,13 +440,13 @@ WebInspector.CodeMirrorTokenTrackingController.prototype = {
                 start: this._codeMirror.getCursor("start"),
                 end: this._codeMirror.getCursor("end")
             };
-        
+
             function tokenIsInRange(token, range)
             {
                 return token.line >= range.start.line && token.ch >= range.start.ch &&
                        token.line <= range.end.line && token.ch <= range.end.ch;
             }
-        
+
             if (tokenIsInRange(startPosition, selectionRange) || tokenIsInRange(endPosition, selectionRange)) {
                 return {
                     hoveredToken: this._hoveredTokenInfo.token,
@@ -452,7 +455,7 @@ WebInspector.CodeMirrorTokenTrackingController.prototype = {
                     expressionRange: selectionRange,
                 };
             }
-        } 
+        }
 
         // We only handle vars, definitions, properties, and the keyword 'this'.
         var type = this._hoveredTokenInfo.token.type;

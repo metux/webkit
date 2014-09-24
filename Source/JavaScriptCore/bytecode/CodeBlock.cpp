@@ -40,16 +40,14 @@
 #include "DFGWorklist.h"
 #include "Debugger.h"
 #include "FunctionExecutableDump.h"
-#include "HighFidelityTypeProfiler.h"
 #include "Interpreter.h"
 #include "JIT.h"
 #include "JITStubs.h"
-#include "JSActivation.h"
 #include "JSCJSValue.h"
 #include "JSFunction.h"
+#include "JSLexicalEnvironment.h"
 #include "JSNameScope.h"
 #include "LLIntEntrypoint.h"
-#include "TypeLocationCache.h"
 #include "LowLevelInterpreter.h"
 #include "JSCInlines.h"
 #include "PolymorphicGetByIdList.h"
@@ -59,6 +57,9 @@
 #include "Repatch.h"
 #include "RepatchBuffer.h"
 #include "SlotVisitorInlines.h"
+#include "StackVisitor.h"
+#include "TypeLocationCache.h"
+#include "TypeProfiler.h"
 #include "UnlinkedInstructionStream.h"
 #include <wtf/BagToHashMap.h>
 #include <wtf/CommaPrinter.h>
@@ -278,7 +279,9 @@ void CodeBlock::printGetByIdOp(PrintStream& out, ExecState* exec, int location, 
         break;
     default:
         RELEASE_ASSERT_NOT_REACHED();
+#if COMPILER_QUIRK(CONSIDERS_UNREACHABLE_CODE)
         op = 0;
+#endif
     }
     int r0 = (++it)->u.operand;
     int r1 = (++it)->u.operand;
@@ -585,7 +588,7 @@ void CodeBlock::dumpBytecode(PrintStream& out)
             unmodifiedArgumentsRegister(argumentsRegister()).offset());
     }
     if (needsActivation() && codeType() == FunctionCode)
-        out.printf("; activation in r%d", activationRegister().offset());
+        out.printf("; lexical environment in r%d", activationRegister().offset());
     out.printf("\n");
     
     StubInfoMap stubInfos;
@@ -740,9 +743,9 @@ void CodeBlock::dumpBytecode(
             printLocationAndOp(out, exec, location, it, "touch_entry");
             break;
         }
-        case op_create_activation: {
+        case op_create_lexical_environment: {
             int r0 = (++it)->u.operand;
-            printLocationOpAndRegisterOperand(out, exec, location, it, "create_activation", r0);
+            printLocationOpAndRegisterOperand(out, exec, location, it, "create_lexical_environment", r0);
             break;
         }
         case op_create_arguments: {
@@ -838,11 +841,13 @@ void CodeBlock::dumpBytecode(
             ++it;
             break;
         }
-        case op_profile_types_with_high_fidelity: {
+        case op_profile_type: {
             int r0 = (++it)->u.operand;
             ++it;
             ++it;
-            printLocationAndOp(out, exec, location, it, "op_profile_types_with_high_fidelity");
+            ++it;
+            ++it;
+            printLocationAndOp(out, exec, location, it, "op_profile_type");
             out.printf("%s", registerName(r0).data());
             break;
         }
@@ -1312,9 +1317,9 @@ void CodeBlock::dumpBytecode(
             break;
         }
             
-        case op_tear_off_activation: {
+        case op_tear_off_lexical_environment: {
             int r0 = (++it)->u.operand;
-            printLocationOpAndRegisterOperand(out, exec, location, it, "tear_off_activation", r0);
+            printLocationOpAndRegisterOperand(out, exec, location, it, "tear_off_lexical_environment", r0);
             break;
         }
         case op_tear_off_arguments: {
@@ -1632,7 +1637,7 @@ CodeBlock::CodeBlock(CopyParsedBlockTag, CodeBlock& other)
     , m_instructions(other.m_instructions)
     , m_thisRegister(other.m_thisRegister)
     , m_argumentsRegister(other.m_argumentsRegister)
-    , m_activationRegister(other.m_activationRegister)
+    , m_lexicalEnvironmentRegister(other.m_lexicalEnvironmentRegister)
     , m_isStrictMode(other.m_isStrictMode)
     , m_needsActivation(other.m_needsActivation)
     , m_mayBeExecuting(false)
@@ -1691,7 +1696,7 @@ CodeBlock::CodeBlock(ScriptExecutable* ownerExecutable, UnlinkedCodeBlock* unlin
     , m_vm(unlinkedCodeBlock->vm())
     , m_thisRegister(unlinkedCodeBlock->thisRegister())
     , m_argumentsRegister(unlinkedCodeBlock->argumentsRegister())
-    , m_activationRegister(unlinkedCodeBlock->activationRegister())
+    , m_lexicalEnvironmentRegister(unlinkedCodeBlock->activationRegister())
     , m_isStrictMode(unlinkedCodeBlock->isStrictMode())
     , m_needsActivation(unlinkedCodeBlock->hasActivationRegister() && unlinkedCodeBlock->codeType() == FunctionCode)
     , m_mayBeExecuting(false)
@@ -1703,7 +1708,6 @@ CodeBlock::CodeBlock(ScriptExecutable* ownerExecutable, UnlinkedCodeBlock* unlin
     , m_osrExitCounter(0)
     , m_optimizationDelayCounter(0)
     , m_reoptimizationRetryCounter(0)
-    , m_returnStatementTypeSet(nullptr)
 #if ENABLE(JIT)
     , m_capabilityLevelState(DFG::CapabilityLevelNotSet)
 #endif
@@ -1713,9 +1717,9 @@ CodeBlock::CodeBlock(ScriptExecutable* ownerExecutable, UnlinkedCodeBlock* unlin
     bool didCloneSymbolTable = false;
     
     if (SymbolTable* symbolTable = unlinkedCodeBlock->symbolTable()) {
-        if (m_vm->isProfilingTypesWithHighFidelity()) {
+        if (m_vm->typeProfiler()) {
             ConcurrentJITLocker locker(symbolTable->m_lock);
-            symbolTable->prepareForHighFidelityTypeProfiling(locker);
+            symbolTable->prepareForTypeProfiling(locker);
         }
 
         if (codeType() == FunctionCode && symbolTable->captureCount()) {
@@ -1728,8 +1732,8 @@ CodeBlock::CodeBlock(ScriptExecutable* ownerExecutable, UnlinkedCodeBlock* unlin
     ASSERT(m_source);
     setNumParameters(unlinkedCodeBlock->numParameters());
 
-    if (vm()->isProfilingTypesWithHighFidelity())
-        vm()->highFidelityTypeProfiler()->functionHasExecutedCache()->removeUnexecutedRange(m_ownerExecutable->sourceID(), m_ownerExecutable->highFidelityTypeProfilingStartOffset(), m_ownerExecutable->highFidelityTypeProfilingEndOffset());
+    if (vm()->typeProfiler())
+        vm()->typeProfiler()->functionHasExecutedCache()->removeUnexecutedRange(m_ownerExecutable->sourceID(), m_ownerExecutable->typeProfilingStartOffset(), m_ownerExecutable->typeProfilingEndOffset());
 
     setConstantRegisters(unlinkedCodeBlock->constantRegisters());
     if (unlinkedCodeBlock->usesGlobalObject())
@@ -1737,8 +1741,8 @@ CodeBlock::CodeBlock(ScriptExecutable* ownerExecutable, UnlinkedCodeBlock* unlin
     m_functionDecls.resizeToFit(unlinkedCodeBlock->numberOfFunctionDecls());
     for (size_t count = unlinkedCodeBlock->numberOfFunctionDecls(), i = 0; i < count; ++i) {
         UnlinkedFunctionExecutable* unlinkedExecutable = unlinkedCodeBlock->functionDecl(i);
-        if (vm()->isProfilingTypesWithHighFidelity())
-            vm()->highFidelityTypeProfiler()->functionHasExecutedCache()->insertUnexecutedRange(m_ownerExecutable->sourceID(), unlinkedExecutable->highFidelityTypeProfilingStartOffset(), unlinkedExecutable->highFidelityTypeProfilingEndOffset());
+        if (vm()->typeProfiler())
+            vm()->typeProfiler()->functionHasExecutedCache()->insertUnexecutedRange(m_ownerExecutable->sourceID(), unlinkedExecutable->typeProfilingStartOffset(), unlinkedExecutable->typeProfilingEndOffset());
         unsigned lineCount = unlinkedExecutable->lineCount();
         unsigned firstLine = ownerExecutable->lineNo() + unlinkedExecutable->firstLineOffset();
         bool startColumnIsOnOwnerStartLine = !unlinkedExecutable->firstLineOffset();
@@ -1755,8 +1759,8 @@ CodeBlock::CodeBlock(ScriptExecutable* ownerExecutable, UnlinkedCodeBlock* unlin
     m_functionExprs.resizeToFit(unlinkedCodeBlock->numberOfFunctionExprs());
     for (size_t count = unlinkedCodeBlock->numberOfFunctionExprs(), i = 0; i < count; ++i) {
         UnlinkedFunctionExecutable* unlinkedExecutable = unlinkedCodeBlock->functionExpr(i);
-        if (vm()->isProfilingTypesWithHighFidelity())
-            vm()->highFidelityTypeProfiler()->functionHasExecutedCache()->insertUnexecutedRange(m_ownerExecutable->sourceID(), unlinkedExecutable->highFidelityTypeProfilingStartOffset(), unlinkedExecutable->highFidelityTypeProfilingEndOffset());
+        if (vm()->typeProfiler())
+            vm()->typeProfiler()->functionHasExecutedCache()->insertUnexecutedRange(m_ownerExecutable->sourceID(), unlinkedExecutable->typeProfilingStartOffset(), unlinkedExecutable->typeProfilingEndOffset());
         unsigned lineCount = unlinkedExecutable->lineCount();
         unsigned firstLine = ownerExecutable->lineNo() + unlinkedExecutable->firstLineOffset();
         bool startColumnIsOnOwnerStartLine = !unlinkedExecutable->firstLineOffset();
@@ -1943,11 +1947,11 @@ CodeBlock::CodeBlock(ScriptExecutable* ownerExecutable, UnlinkedCodeBlock* unlin
             const Identifier& ident = identifier(pc[2].u.operand);
             ResolveType type = static_cast<ResolveType>(pc[3].u.operand);
 
-            ResolveOp op = JSScope::abstractResolve(m_globalObject->globalExec(), scope, ident, Get, type);
+            ResolveOp op = JSScope::abstractResolve(m_globalObject->globalExec(), needsActivation(), scope, ident, Get, type);
             instructions[i + 3].u.operand = op.type;
             instructions[i + 4].u.operand = op.depth;
-            if (op.activation)
-                instructions[i + 5].u.activation.set(*vm(), ownerExecutable, op.activation);
+            if (op.lexicalEnvironment)
+                instructions[i + 5].u.lexicalEnvironment.set(*vm(), ownerExecutable, op.lexicalEnvironment);
             break;
         }
 
@@ -1960,7 +1964,7 @@ CodeBlock::CodeBlock(ScriptExecutable* ownerExecutable, UnlinkedCodeBlock* unlin
             // get_from_scope dst, scope, id, ResolveModeAndType, Structure, Operand
             const Identifier& ident = identifier(pc[3].u.operand);
             ResolveModeAndType modeAndType = ResolveModeAndType(pc[4].u.operand);
-            ResolveOp op = JSScope::abstractResolve(m_globalObject->globalExec(), scope, ident, Get, modeAndType.type());
+            ResolveOp op = JSScope::abstractResolve(m_globalObject->globalExec(), needsActivation(), scope, ident, Get, modeAndType.type());
 
             instructions[i + 4].u.operand = ResolveModeAndType(modeAndType.mode(), op.type).operand();
             if (op.type == GlobalVar || op.type == GlobalVarWithVarInjectionChecks)
@@ -1976,7 +1980,7 @@ CodeBlock::CodeBlock(ScriptExecutable* ownerExecutable, UnlinkedCodeBlock* unlin
             // put_to_scope scope, id, value, ResolveModeAndType, Structure, Operand
             const Identifier& ident = identifier(pc[2].u.operand);
             ResolveModeAndType modeAndType = ResolveModeAndType(pc[4].u.operand);
-            ResolveOp op = JSScope::abstractResolve(m_globalObject->globalExec(), scope, ident, Put, modeAndType.type());
+            ResolveOp op = JSScope::abstractResolve(m_globalObject->globalExec(), needsActivation(), scope, ident, Put, modeAndType.type());
 
             instructions[i + 4].u.operand = ResolveModeAndType(modeAndType.mode(), op.type).operand();
             if (op.type == GlobalVar || op.type == GlobalVarWithVarInjectionChecks)
@@ -1991,60 +1995,64 @@ CodeBlock::CodeBlock(ScriptExecutable* ownerExecutable, UnlinkedCodeBlock* unlin
             break;
         }
 
-        case op_profile_types_with_high_fidelity: {
-            // The format of this instruction is: op_profile_types_with_high_fidelity regToProfile, TypeLocation*, flag, identifier?, resolveType?
+        case op_profile_type: {
+            // The format of this instruction is: op_profile_type regToProfile, TypeLocation*, flag, identifier?, resolveType?
             size_t instructionOffset = i + opLength - 1;
             unsigned divotStart, divotEnd;
             GlobalVariableID globalVariableID;
             RefPtr<TypeSet> globalTypeSet;
-            bool shouldAnalyze = m_unlinkedCode->highFidelityTypeProfileExpressionInfoForBytecodeOffset(instructionOffset, divotStart, divotEnd);
+            bool shouldAnalyze = m_unlinkedCode->typeProfilerExpressionInfoForBytecodeOffset(instructionOffset, divotStart, divotEnd);
             VirtualRegister profileRegister(pc[1].u.operand);
-            ProfileTypesWithHighFidelityBytecodeFlag flag = static_cast<ProfileTypesWithHighFidelityBytecodeFlag>(pc[3].u.operand);
+            ProfileTypeBytecodeFlag flag = static_cast<ProfileTypeBytecodeFlag>(pc[3].u.operand);
             SymbolTable* symbolTable = nullptr;
 
             switch (flag) {
-            case ProfileTypesBytecodePutToScope:
-            case ProfileTypesBytecodeGetFromScope: {
+            case ProfileTypeBytecodePutToScope:
+            case ProfileTypeBytecodeGetFromScope: {
                 const Identifier& ident = identifier(pc[4].u.operand);
                 ResolveType type = static_cast<ResolveType>(pc[5].u.operand);
-                ResolveOp op = JSScope::abstractResolve(m_globalObject->globalExec(), scope, ident, (flag == ProfileTypesBytecodeGetFromScope ? Get : Put), type);
+                ResolveOp op = JSScope::abstractResolve(m_globalObject->globalExec(), needsActivation(), scope, ident, (flag == ProfileTypeBytecodeGetFromScope ? Get : Put), type);
 
                 // FIXME: handle other values for op.type here, and also consider what to do when we can't statically determine the globalID
                 // https://bugs.webkit.org/show_bug.cgi?id=135184
                 if (op.type == ClosureVar)
-                    symbolTable = op.activation->symbolTable();
+                    symbolTable = op.lexicalEnvironment->symbolTable();
                 else if (op.type == GlobalVar)
                     symbolTable = m_globalObject.get()->symbolTable();
                 
                 if (symbolTable) {
                     ConcurrentJITLocker locker(symbolTable->m_lock);
                     // If our parent scope was created while profiling was disabled, it will not have prepared for profiling yet.
-                    symbolTable->prepareForHighFidelityTypeProfiling(locker);
+                    symbolTable->prepareForTypeProfiling(locker);
                     globalVariableID = symbolTable->uniqueIDForVariable(locker, ident.impl(), *vm());
                     globalTypeSet = symbolTable->globalTypeSetForVariable(locker, ident.impl(), *vm());
                 } else
-                    globalVariableID = HighFidelityNoGlobalIDExists;
+                    globalVariableID = TypeProfilerNoGlobalIDExists;
 
                 break;
             }
-            case ProfileTypesBytecodeHasGlobalID: {
+            case ProfileTypeBytecodeHasGlobalID: {
                 symbolTable = m_symbolTable.get();
                 ConcurrentJITLocker locker(symbolTable->m_lock);
                 globalVariableID = symbolTable->uniqueIDForRegister(locker, profileRegister.offset(), *vm());
                 globalTypeSet = symbolTable->globalTypeSetForRegister(locker, profileRegister.offset(), *vm());
                 break;
             }
-            case ProfileTypesBytecodeDoesNotHaveGlobalID: 
-            case ProfileTypesBytecodeFunctionArgument: {
-                globalVariableID = HighFidelityNoGlobalIDExists;
+            case ProfileTypeBytecodeDoesNotHaveGlobalID: 
+            case ProfileTypeBytecodeFunctionArgument: {
+                globalVariableID = TypeProfilerNoGlobalIDExists;
                 break;
             }
-            case ProfileTypesBytecodeFunctionReturnStatement: {
-                globalTypeSet = returnStatementTypeSet();
-                globalVariableID = HighFidelityReturnStatement;
+            case ProfileTypeBytecodeFunctionReturnStatement: {
+                RELEASE_ASSERT(ownerExecutable->isFunctionExecutable());
+                globalTypeSet = jsCast<FunctionExecutable*>(ownerExecutable)->returnStatementTypeSet();
+                globalVariableID = TypeProfilerReturnStatement;
                 if (!shouldAnalyze) {
-                    // Because some return statements are added implicitly (to return undefined at the end of a function), and these nodes don't emit expression ranges, give them some range.
-                    // Currently, this divot is on the open brace of the function. 
+                    // Because a return statement can be added implicitly to return undefined at the end of a function,
+                    // and these nodes don't emit expression ranges because they aren't in the actual source text of
+                    // the user's program, give the type profiler some range to identify these return statements.
+                    // Currently, the text offset that is used as identification is on the open brace of the function 
+                    // and is stored on TypeLocation's m_divotForFunctionOffsetIfReturnStatement member variable.
                     divotStart = divotEnd = m_sourceOffset;
                     shouldAnalyze = true;
                 }
@@ -2052,16 +2060,16 @@ CodeBlock::CodeBlock(ScriptExecutable* ownerExecutable, UnlinkedCodeBlock* unlin
             }
             }
 
-            std::pair<TypeLocation*, bool> locationPair = vm()->highFidelityTypeProfiler()->typeLocationCache()->getTypeLocation(globalVariableID,
+            std::pair<TypeLocation*, bool> locationPair = vm()->typeProfiler()->typeLocationCache()->getTypeLocation(globalVariableID,
                 m_ownerExecutable->sourceID(), divotStart, divotEnd, globalTypeSet, vm());
             TypeLocation* location = locationPair.first;
             bool isNewLocation = locationPair.second;
 
-            if (ProfileTypesBytecodeFunctionReturnStatement)
+            if (flag == ProfileTypeBytecodeFunctionReturnStatement)
                 location->m_divotForFunctionOffsetIfReturnStatement = m_sourceOffset;
 
             if (shouldAnalyze && isNewLocation)
-                vm()->highFidelityTypeProfiler()->insertNewLocation(location);
+                vm()->typeProfiler()->insertNewLocation(location);
 
             instructions[i + 2].u.location = location;
             break;
@@ -2526,12 +2534,12 @@ void CodeBlock::finalizeUnconditionally()
                 curInstruction[2].u.jsCell.clear();
                 break;
             case op_resolve_scope: {
-                WriteBarrierBase<JSActivation>& activation = curInstruction[5].u.activation;
-                if (!activation || Heap::isMarked(activation.get()))
+                WriteBarrierBase<JSLexicalEnvironment>& lexicalEnvironment = curInstruction[5].u.lexicalEnvironment;
+                if (!lexicalEnvironment || Heap::isMarked(lexicalEnvironment.get()))
                     break;
                 if (Options::verboseOSR())
-                    dataLogF("Clearing dead activation %p.\n", activation.get());
-                activation.clear();
+                    dataLogF("Clearing dead lexicalEnvironment %p.\n", lexicalEnvironment.get());
+                lexicalEnvironment.clear();
                 break;
             }
             case op_get_from_scope:
@@ -2823,7 +2831,7 @@ bool CodeBlock::isCaptured(VirtualRegister operand, InlineCallFrame* inlineCallF
     if (inlineCallFrame)
         return inlineCallFrame->capturedVars.get(operand.toLocal());
 
-    // The activation object isn't in the captured region, but it's "captured"
+    // The lexical environment object isn't in the captured region, but it's "captured"
     // in the sense that stores to its location can be observed indirectly.
     if (needsActivation() && operand == activationRegister())
         return true;
@@ -3159,6 +3167,46 @@ JSGlobalObject* CodeBlock::globalObjectFor(CodeOrigin codeOrigin)
     return jsCast<FunctionExecutable*>(codeOrigin.inlineCallFrame->executable.get())->eitherCodeBlock()->globalObject();
 }
 
+class RecursionCheckFunctor {
+public:
+    RecursionCheckFunctor(CallFrame* startCallFrame, CodeBlock* codeBlock, unsigned depthToCheck)
+        : m_startCallFrame(startCallFrame)
+        , m_codeBlock(codeBlock)
+        , m_depthToCheck(depthToCheck)
+        , m_foundStartCallFrame(false)
+        , m_didRecurse(false)
+    { }
+
+    StackVisitor::Status operator()(StackVisitor& visitor)
+    {
+        CallFrame* currentCallFrame = visitor->callFrame();
+
+        if (currentCallFrame == m_startCallFrame)
+            m_foundStartCallFrame = true;
+
+        if (m_foundStartCallFrame) {
+            if (visitor->callFrame()->codeBlock() == m_codeBlock) {
+                m_didRecurse = true;
+                return StackVisitor::Done;
+            }
+
+            if (!m_depthToCheck--)
+                return StackVisitor::Done;
+        }
+
+        return StackVisitor::Continue;
+    }
+
+    bool didRecurse() const { return m_didRecurse; }
+
+private:
+    CallFrame* m_startCallFrame;
+    CodeBlock* m_codeBlock;
+    unsigned m_depthToCheck;
+    bool m_foundStartCallFrame;
+    bool m_didRecurse;
+};
+
 void CodeBlock::noticeIncomingCall(ExecState* callerFrame)
 {
     CodeBlock* callerCodeBlock = callerFrame->codeBlock();
@@ -3206,20 +3254,18 @@ void CodeBlock::noticeIncomingCall(ExecState* callerFrame)
             dataLog("    Clearing SABI because caller is not a function.\n");
         return;
     }
-    
-    ExecState* frame = callerFrame;
-    for (unsigned i = Options::maximumInliningDepth(); i--; frame = frame->callerFrame()) {
-        if (frame->isVMEntrySentinel())
-            break;
-        if (frame->codeBlock() == this) {
-            // Recursive calls won't be inlined.
-            if (Options::verboseCallLink())
-                dataLog("    Clearing SABI because recursion was detected.\n");
-            m_shouldAlwaysBeInlined = false;
-            return;
-        }
+
+    // Recursive calls won't be inlined.
+    RecursionCheckFunctor functor(callerFrame, this, Options::maximumInliningDepth());
+    vm()->topCallFrame->iterate(functor);
+
+    if (functor.didRecurse()) {
+        if (Options::verboseCallLink())
+            dataLog("    Clearing SABI because recursion was detected.\n");
+        m_shouldAlwaysBeInlined = false;
+        return;
     }
-    
+
     RELEASE_ASSERT(callerCodeBlock->m_capabilityLevelState != DFG::CapabilityLevelNotSet);
     
     if (canCompile(callerCodeBlock->m_capabilityLevelState))
@@ -3791,7 +3837,7 @@ String CodeBlock::nameForRegister(VirtualRegister virtualRegister)
         }
     }
     if (needsActivation() && virtualRegister == activationRegister())
-        return ASCIILiteral("activation");
+        return ASCIILiteral("lexical environment");
     if (virtualRegister == thisRegister())
         return ASCIILiteral("this");
     if (usesArguments()) {
@@ -3801,7 +3847,7 @@ String CodeBlock::nameForRegister(VirtualRegister virtualRegister)
             return ASCIILiteral("real arguments");
     }
     if (virtualRegister.isArgument())
-        return String::format("arguments[%3d]", virtualRegister.toArgument()).impl();
+        return String::format("arguments[%3d]", virtualRegister.toArgument());
 
     return "";
 }

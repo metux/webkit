@@ -34,8 +34,8 @@
 #include "Interpreter.h"
 #include "JITInlines.h"
 #include "JSArray.h"
+#include "JSEnvironmentRecord.h"
 #include "JSFunction.h"
-#include "JSVariableObject.h"
 #include "LinkBuffer.h"
 #include "RepatchBuffer.h"
 #include "ResultType.h"
@@ -617,10 +617,6 @@ void JIT::emitResolveClosure(int dst, bool needsVarInjectionChecks, unsigned dep
     emitVarInjectionCheck(needsVarInjectionChecks);
     move(TrustedImm32(JSValue::CellTag), regT1);
     emitLoadPayload(JSStack::ScopeChain, regT0);
-    if (m_codeBlock->needsActivation()) {
-        emitLoadPayload(m_codeBlock->activationRegister().offset(), regT2);
-        loadPtr(Address(regT2, JSScope::offsetOfNext()), regT0);
-    }
     for (unsigned i = 0; i < depth; ++i)
         loadPtr(Address(regT0, JSScope::offsetOfNext()), regT0);
     emitStore(dst, regT1, regT0);
@@ -688,7 +684,7 @@ void JIT::emitGetGlobalVar(uintptr_t operand)
 void JIT::emitGetClosureVar(int scope, uintptr_t operand)
 {
     emitLoad(scope, regT1, regT0);
-    loadPtr(Address(regT0, JSVariableObject::offsetOfRegisters()), regT0);
+    loadPtr(Address(regT0, JSEnvironmentRecord::offsetOfRegisters()), regT0);
     load32(Address(regT0, operand * sizeof(Register) + OBJECT_OFFSETOF(EncodedValueDescriptor, asBits.tag)), regT1);
     load32(Address(regT0, operand * sizeof(Register) + OBJECT_OFFSETOF(EncodedValueDescriptor, asBits.payload)), regT0);
 }
@@ -777,7 +773,7 @@ void JIT::emitPutClosureVar(int scope, uintptr_t operand, int value)
 {
     emitLoad(value, regT3, regT2);
     emitLoad(scope, regT1, regT0);
-    loadPtr(Address(regT0, JSVariableObject::offsetOfRegisters()), regT0);
+    loadPtr(Address(regT0, JSEnvironmentRecord::offsetOfRegisters()), regT0);
     store32(regT3, Address(regT0, operand * sizeof(Register) + OBJECT_OFFSETOF(EncodedValueDescriptor, asBits.tag)));
     store32(regT2, Address(regT0, operand * sizeof(Register) + OBJECT_OFFSETOF(EncodedValueDescriptor, asBits.payload)));
 }

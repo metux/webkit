@@ -70,10 +70,6 @@
 #define ENABLE_CURSOR_SUPPORT 0
 #endif
 
-#if !defined(ENABLE_DISK_IMAGE_CACHE)
-#define ENABLE_DISK_IMAGE_CACHE 1
-#endif
-
 #if !defined(ENABLE_DRAG_SUPPORT)
 #define ENABLE_DRAG_SUPPORT 0
 #endif
@@ -94,7 +90,7 @@
 #define ENABLE_IOS_AUTOCORRECT_AND_AUTOCAPITALIZE 1
 #endif
 
-#if !defined(ENABLE_IOS_GESTURE_EVENTS)
+#if !defined(ENABLE_IOS_GESTURE_EVENTS) && USE(APPLE_INTERNAL_SDK)
 #define ENABLE_IOS_GESTURE_EVENTS 1
 #endif
 
@@ -102,7 +98,7 @@
 #define ENABLE_IOS_TEXT_AUTOSIZING 1
 #endif
 
-#if !defined(ENABLE_IOS_TOUCH_EVENTS)
+#if !defined(ENABLE_IOS_TOUCH_EVENTS) && USE(APPLE_INTERNAL_SDK)
 #define ENABLE_IOS_TOUCH_EVENTS 1
 #endif
 
@@ -138,7 +134,9 @@
 #define ENABLE_TEXT_SELECTION 0
 #endif
 
-#if !defined(ENABLE_TOUCH_EVENTS)
+/* FIXME: Remove the USE(APPLE_INTERNAL_SDK) conjunct once we support touch events when building against
+the public iOS SDK. We will also need to update the FeatureDefines.xcconfig files. */
+#if !defined(ENABLE_TOUCH_EVENTS) && USE(APPLE_INTERNAL_SDK)
 #define ENABLE_TOUCH_EVENTS 1
 #endif
 
@@ -152,6 +150,12 @@
 
 #if !defined(ENABLE_WEBGL)
 #define ENABLE_WEBGL 1
+#endif
+
+/* FIXME: Remove this logic and always enable XSLT once we support XSLT when building against
+the public iOS SDK. We will also need to update the FeatureDefines.xcconfig files. */
+#if !defined(ENABLE_XSLT) && !USE(APPLE_INTERNAL_SDK)
+#define ENABLE_XSLT 0
 #endif
 
 #endif /* PLATFORM(IOS) */
@@ -188,10 +192,6 @@
 #if !defined(ENABLE_REMOTE_INSPECTOR)
 #define ENABLE_REMOTE_INSPECTOR 1
 #endif
-#endif
-
-#if !defined(ENABLE_RUBBER_BANDING)
-#define ENABLE_RUBBER_BANDING 1
 #endif
 
 #if !defined(ENABLE_SMOOTH_SCROLLING)
@@ -300,10 +300,6 @@
 #define ENABLE_PLUGIN_PACKAGE_SIMPLE_HASH 1
 #endif
 
-#if !defined(ENABLE_SUBPIXEL_LAYOUT)
-#define ENABLE_SUBPIXEL_LAYOUT 1
-#endif
-
 #endif /* PLATFORM(EFL) */
 
 /* --------- Gtk port (Unix, Windows, Mac) --------- */
@@ -313,10 +309,6 @@
 #if !defined(ENABLE_PLUGIN_PACKAGE_SIMPLE_HASH)
 #define ENABLE_PLUGIN_PACKAGE_SIMPLE_HASH 1
 #endif
-#endif
-
-#if !defined(ENABLE_SUBPIXEL_LAYOUT)
-#define ENABLE_SUBPIXEL_LAYOUT 1
 #endif
 
 #endif /* PLATFORM(GTK) */
@@ -380,10 +372,6 @@
 #define ENABLE_CSS_COMPOSITING 0
 #endif
 
-#if !defined(ENABLE_CSS_FILTERS)
-#define ENABLE_CSS_FILTERS 0
-#endif
-
 #if !defined(ENABLE_CSS_IMAGE_ORIENTATION)
 #define ENABLE_CSS_IMAGE_ORIENTATION 0
 #endif
@@ -444,10 +432,6 @@
 #define ENABLE_ENCRYPTED_MEDIA_V2 0
 #endif
 
-#if !defined(ENABLE_FILTERS)
-#define ENABLE_FILTERS 0
-#endif
-
 #if !defined(ENABLE_FONT_LOAD_EVENTS)
 #define ENABLE_FONT_LOAD_EVENTS 0
 #endif
@@ -474,10 +458,6 @@
 
 #if !defined(ENABLE_HIDDEN_PAGE_DOM_TIMER_THROTTLING)
 #define ENABLE_HIDDEN_PAGE_DOM_TIMER_THROTTLING 0
-#endif
-
-#if !defined(ENABLE_HIGH_DPI_CANVAS)
-#define ENABLE_HIGH_DPI_CANVAS 0
 #endif
 
 #if !defined(ENABLE_ICONDATABASE)
@@ -664,12 +644,16 @@
 #define ENABLE_REQUEST_ANIMATION_FRAME 0
 #endif
 
+#if !defined(ENABLE_REQUEST_AUTOCOMPLETE)
+#define ENABLE_REQUEST_AUTOCOMPLETE 0
+#endif
+
 #if !defined(ENABLE_RUBBER_BANDING)
 #define ENABLE_RUBBER_BANDING 0
 #endif
 
 #if !defined(ENABLE_SATURATED_LAYOUT_ARITHMETIC)
-#define ENABLE_SATURATED_LAYOUT_ARITHMETIC 0
+#define ENABLE_SATURATED_LAYOUT_ARITHMETIC 1
 #endif
 
 #if !defined(ENABLE_SHARED_WORKERS)
@@ -690,10 +674,6 @@
 
 #if !defined(ENABLE_SQL_DATABASE)
 #define ENABLE_SQL_DATABASE 1
-#endif
-
-#if !defined(ENABLE_SUBPIXEL_LAYOUT)
-#define ENABLE_SUBPIXEL_LAYOUT 0
 #endif
 
 #if !defined(ENABLE_SVG_FONTS)
@@ -793,10 +773,6 @@
 #endif
 
 /* Asserts, invariants for macro definitions */
-
-#if ENABLE(SATURATED_LAYOUT_ARITHMETIC) && !ENABLE(SUBPIXEL_LAYOUT)
-#error "ENABLE(SATURATED_LAYOUT_ARITHMETIC) requires ENABLE(SUBPIXEL_LAYOUT)"
-#endif
 
 #if ENABLE(VIDEO_TRACK) && !ENABLE(VIDEO)
 #error "ENABLE(VIDEO_TRACK) requires ENABLE(VIDEO)"

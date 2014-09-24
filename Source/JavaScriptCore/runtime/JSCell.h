@@ -39,6 +39,7 @@ namespace JSC {
 
 class CopyVisitor;
 class ExecState;
+class Identifier;
 class JSArrayBufferView;
 class JSDestructibleObject;
 class JSGlobalObject;
@@ -103,6 +104,8 @@ public:
 
     const char* className() const;
 
+    VM* vm() const;
+
     // Extracting the value.
     JS_EXPORT_PRIVATE bool getString(ExecState*, String&) const;
     JS_EXPORT_PRIVATE String getString(ExecState*) const; // null string if not a string
@@ -141,7 +144,7 @@ public:
     bool isZapped() const { return !*reinterpret_cast<uintptr_t* const*>(this); }
 
     static bool canUseFastGetOwnProperty(const Structure&);
-    JSValue fastGetOwnProperty(VM&, Structure&, const String&);
+    JSValue fastGetOwnProperty(VM&, Structure&, PropertyName);
 
     enum GCData : uint8_t {
         Marked = 0,

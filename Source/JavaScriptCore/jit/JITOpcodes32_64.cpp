@@ -35,9 +35,9 @@
 #include "JITInlines.h"
 #include "JSArray.h"
 #include "JSCell.h"
+#include "JSEnvironmentRecord.h"
 #include "JSFunction.h"
 #include "JSPropertyNameEnumerator.h"
-#include "JSVariableObject.h"
 #include "LinkBuffer.h"
 #include "MaxFrameExtentForSlowPathCall.h"
 #include "RepatchBuffer.h"
@@ -350,11 +350,11 @@ void JIT::emit_op_is_string(Instruction* currentInstruction)
     emitStoreBool(dst, regT0);
 }
 
-void JIT::emit_op_tear_off_activation(Instruction* currentInstruction)
+void JIT::emit_op_tear_off_lexical_environment(Instruction* currentInstruction)
 {
-    int activation = currentInstruction[1].u.operand;
-    Jump activationNotCreated = branch32(Equal, tagFor(activation), TrustedImm32(JSValue::EmptyValueTag));
-    emitLoadPayload(activation, regT0);
+    int lexicalEnvironment = currentInstruction[1].u.operand;
+    Jump activationNotCreated = branch32(Equal, tagFor(lexicalEnvironment), TrustedImm32(JSValue::EmptyValueTag));
+    emitLoadPayload(lexicalEnvironment, regT0);
     callOperation(operationTearOffActivation, regT0);
     activationNotCreated.link(this);
 }
@@ -362,11 +362,11 @@ void JIT::emit_op_tear_off_activation(Instruction* currentInstruction)
 void JIT::emit_op_tear_off_arguments(Instruction* currentInstruction)
 {
     VirtualRegister arguments = VirtualRegister(currentInstruction[1].u.operand);
-    int activation = currentInstruction[2].u.operand;
+    int lexicalEnvironment = currentInstruction[2].u.operand;
 
     Jump argsNotCreated = branch32(Equal, tagFor(unmodifiedArgumentsRegister(arguments).offset()), TrustedImm32(JSValue::EmptyValueTag));
     emitLoadPayload(unmodifiedArgumentsRegister(VirtualRegister(arguments)).offset(), regT0);
-    emitLoadPayload(activation, regT1);
+    emitLoadPayload(lexicalEnvironment, regT1);
     callOperation(operationTearOffArguments, regT0, regT1);
     argsNotCreated.link(this);
 }
@@ -813,6 +813,8 @@ void JIT::emit_op_catch(Instruction* currentInstruction)
     move(TrustedImmPtr(m_vm), regT3);
     // operationThrow returns the callFrame for the handler.
     load32(Address(regT3, VM::callFrameForThrowOffset()), callFrameRegister);
+    load32(Address(regT3, VM::vmEntryFrameForThrowOffset()), regT0);
+    store32(regT0, Address(regT3, VM::topVMEntryFrameOffset()));
 
     addPtr(TrustedImm32(stackPointerOffsetFor(codeBlock()) * sizeof(Register)), callFrameRegister, stackPointerRegister);
 
@@ -902,12 +904,12 @@ void JIT::emit_op_enter(Instruction* currentInstruction)
     slowPathCall.call();
 }
 
-void JIT::emit_op_create_activation(Instruction* currentInstruction)
+void JIT::emit_op_create_lexical_environment(Instruction* currentInstruction)
 {
-    int activation = currentInstruction[1].u.operand;
+    int lexicalEnvironment = currentInstruction[1].u.operand;
 
     callOperation(operationCreateActivation, 0);
-    emitStoreCell(activation, returnValueGPR);
+    emitStoreCell(lexicalEnvironment, returnValueGPR);
 }
 
 void JIT::emit_op_create_arguments(Instruction* currentInstruction)
@@ -1306,9 +1308,9 @@ void JIT::emit_op_to_index_string(Instruction* currentInstruction)
     slowPathCall.call();
 }
 
-void JIT::emit_op_profile_types_with_high_fidelity(Instruction* currentInstruction)
+void JIT::emit_op_profile_type(Instruction* currentInstruction)
 {
-    JITSlowPathCall slowPathCall(this, currentInstruction, slow_path_profile_types_with_high_fidelity);
+    JITSlowPathCall slowPathCall(this, currentInstruction, slow_path_profile_type);
     slowPathCall.call();
 }
 

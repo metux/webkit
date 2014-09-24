@@ -33,6 +33,7 @@
 #include "JSDestructibleObject.h"
 #include "JSObject.h"
 #include "JSString.h"
+#include "MarkedBlock.h"
 #include "Structure.h"
 #include <wtf/CompilationThread.h>
 
@@ -109,6 +110,17 @@ inline void JSCell::visitChildren(JSCell* cell, SlotVisitor& visitor)
 {
     Structure* structure = cell->structure(visitor.vm());
     visitor.appendUnbarrieredPointer(&structure);
+}
+
+inline VM* JSCell::vm() const
+{
+    return MarkedBlock::blockFor(this)->vm();
+}
+
+inline VM& ExecState::vm() const
+{
+    ASSERT(callee()->vm());
+    return *callee()->vm();
 }
 
 template<typename T>
@@ -209,16 +221,10 @@ inline bool JSCell::inherits(const ClassInfo* info) const
     return classInfo()->isSubClassOf(info);
 }
 
-// Fast call to get a property where we may not yet have converted the string to an
-// identifier. The first time we perform a property access with a given string, try
-// performing the property map lookup without forming an identifier. We detect this
-// case by checking whether the hash has yet been set for this string.
-ALWAYS_INLINE JSValue JSCell::fastGetOwnProperty(VM& vm, Structure& structure, const String& name)
+ALWAYS_INLINE JSValue JSCell::fastGetOwnProperty(VM& vm, Structure& structure, PropertyName name)
 {
     ASSERT(canUseFastGetOwnProperty(structure));
-    PropertyOffset offset = name.impl()->hasHash()
-        ? structure.get(vm, Identifier(&vm, name))
-        : structure.get(vm, name);
+    PropertyOffset offset = structure.get(vm, name);
     if (offset != invalidOffset)
         return asObject(this)->locationForOffset(offset)->get();
     return JSValue();

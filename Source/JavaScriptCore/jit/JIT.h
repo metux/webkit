@@ -44,7 +44,6 @@
 #include "JITDisassembler.h"
 #include "JITInlineCacheGenerator.h"
 #include "JSInterfaceJIT.h"
-#include "LegacyProfiler.h"
 #include "Opcode.h"
 #include "ResultType.h"
 #include "SamplingTool.h"
@@ -476,7 +475,7 @@ namespace JSC {
         void emit_op_div(Instruction*);
         void emit_op_end(Instruction*);
         void emit_op_enter(Instruction*);
-        void emit_op_create_activation(Instruction*);
+        void emit_op_create_lexical_environment(Instruction*);
         void emit_op_eq(Instruction*);
         void emit_op_eq_null(Instruction*);
         void emit_op_get_by_id(Instruction*);
@@ -527,7 +526,7 @@ namespace JSC {
         void emit_op_inc(Instruction*);
         void emit_op_profile_did_call(Instruction*);
         void emit_op_profile_will_call(Instruction*);
-        void emit_op_profile_types_with_high_fidelity(Instruction*);
+        void emit_op_profile_type(Instruction*);
         void emit_op_push_name_scope(Instruction*);
         void emit_op_push_with_scope(Instruction*);
         void emit_op_put_by_id(Instruction*);
@@ -544,7 +543,7 @@ namespace JSC {
         void emit_op_switch_char(Instruction*);
         void emit_op_switch_imm(Instruction*);
         void emit_op_switch_string(Instruction*);
-        void emit_op_tear_off_activation(Instruction*);
+        void emit_op_tear_off_lexical_environment(Instruction*);
         void emit_op_tear_off_arguments(Instruction*);
         void emit_op_throw(Instruction*);
         void emit_op_throw_static_error(Instruction*);
@@ -719,6 +718,7 @@ namespace JSC {
         MacroAssembler::Call callOperation(V_JITOperation_EC, RegisterID);
         MacroAssembler::Call callOperation(V_JITOperation_ECC, RegisterID, RegisterID);
         MacroAssembler::Call callOperation(V_JITOperation_ECICC, RegisterID, const Identifier*, RegisterID, RegisterID);
+        MacroAssembler::Call callOperation(J_JITOperation_EE, RegisterID);
         MacroAssembler::Call callOperation(V_JITOperation_EIdJZ, const Identifier*, RegisterID, int32_t);
         MacroAssembler::Call callOperation(V_JITOperation_EJ, RegisterID);
 #if USE(JSVALUE64)
@@ -739,7 +739,6 @@ namespace JSC {
         MacroAssembler::Call callOperation(V_JITOperation_EPc, Instruction*);
         MacroAssembler::Call callOperation(V_JITOperation_EZ, int32_t);
         MacroAssembler::Call callOperationWithCallFrameRollbackOnException(J_JITOperation_E);
-        MacroAssembler::Call callOperationNoExceptionCheck(J_JITOperation_EE, RegisterID);
         MacroAssembler::Call callOperationWithCallFrameRollbackOnException(V_JITOperation_ECb, CodeBlock*);
         MacroAssembler::Call callOperationWithCallFrameRollbackOnException(Z_JITOperation_E);
 #if USE(JSVALUE32_64)

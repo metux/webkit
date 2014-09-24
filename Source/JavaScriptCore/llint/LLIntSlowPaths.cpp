@@ -25,6 +25,7 @@
 
 #include "config.h"
 #include "LLIntSlowPaths.h"
+
 #include "Arguments.h"
 #include "ArrayConstructor.h"
 #include "CallFrame.h"
@@ -34,11 +35,11 @@
 #include "ExceptionFuzz.h"
 #include "GetterSetter.h"
 #include "HostCallReturnValue.h"
-#include "HighFidelityLog.h"
 #include "Interpreter.h"
 #include "JIT.h"
 #include "JITExceptions.h"
-#include "JSActivation.h"
+#include "JSLexicalEnvironment.h"
+#include "JSCInlines.h"
 #include "JSCJSValue.h"
 #include "JSGlobalObjectFunctions.h"
 #include "JSNameScope.h"
@@ -47,9 +48,9 @@
 #include "JSWithScope.h"
 #include "LLIntCommon.h"
 #include "LLIntExceptions.h"
+#include "LegacyProfiler.h"
 #include "LowLevelInterpreter.h"
 #include "ObjectConstructor.h"
-#include "JSCInlines.h"
 #include "ProtoCallFrame.h"
 #include "StructureRareDataInlines.h"
 #include <wtf/StringPrintStream.h>
@@ -469,11 +470,11 @@ LLINT_SLOW_PATH_DECL(stack_check)
 #endif
     // This stack check is done in the prologue for a function call, and the
     // CallFrame is not completely set up yet. For example, if the frame needs
-    // an activation object, the activation object will only be set up after
-    // we start executing the function. If we need to throw a StackOverflowError
-    // here, then we need to tell the prologue to start the stack unwinding from
-    // the caller frame (which is fully set up) instead. To do that, we return
-    // the caller's CallFrame in the second return value.
+    // a lexical environment object, the lexical environment object will only be
+    // set up after we start executing the function. If we need to throw a
+    // StackOverflowError here, then we need to tell the prologue to start the
+    // stack unwinding from the caller frame (which is fully set up) instead.
+    // To do that, we return the caller's CallFrame in the second return value.
     //
     // If the stack check succeeds and we don't need to throw the error, then
     // we'll return 0 instead. The prologue will check for a non-zero value
@@ -496,15 +497,15 @@ LLINT_SLOW_PATH_DECL(stack_check)
     LLINT_RETURN_TWO(pc, exec);
 }
 
-LLINT_SLOW_PATH_DECL(slow_path_create_activation)
+LLINT_SLOW_PATH_DECL(slow_path_create_lexical_environment)
 {
     LLINT_BEGIN();
 #if LLINT_SLOW_PATH_TRACING
-    dataLogF("Creating an activation, exec = %p!\n", exec);
+    dataLogF("Creating an lexicalEnvironment, exec = %p!\n", exec);
 #endif
-    JSActivation* activation = JSActivation::create(vm, exec, exec->codeBlock());
-    exec->setScope(activation);
-    LLINT_RETURN(JSValue(activation));
+    JSLexicalEnvironment* lexicalEnvironment = JSLexicalEnvironment::create(vm, exec, exec->codeBlock());
+    exec->setScope(lexicalEnvironment);
+    LLINT_RETURN(JSValue(lexicalEnvironment));
 }
 
 LLINT_SLOW_PATH_DECL(slow_path_new_object)
@@ -726,8 +727,10 @@ inline JSValue getByVal(ExecState* exec, JSValue baseValue, JSValue subscript)
         VM& vm = exec->vm();
         Structure& structure = *baseValue.asCell()->structure(vm);
         if (JSCell::canUseFastGetOwnProperty(structure)) {
-            if (JSValue result = baseValue.asCell()->fastGetOwnProperty(vm, structure, asString(subscript)->value(exec)))
-                return result;
+            if (AtomicStringImpl* existingAtomicString = asString(subscript)->toExistingAtomicString(exec)) {
+                if (JSValue result = baseValue.asCell()->fastGetOwnProperty(vm, structure, existingAtomicString))
+                    return result;
+            }
         }
     }
     
@@ -794,7 +797,7 @@ LLINT_SLOW_PATH_DECL(slow_path_put_by_val)
         LLINT_END();
     }
 
-    Identifier property(exec, subscript.toString(exec)->value(exec));
+    Identifier property = subscript.toString(exec)->toIdentifier(exec);
     LLINT_CHECK_EXCEPTION();
     PutPropertySlot slot(baseValue, exec->codeBlock()->isStrictMode());
     baseValue.put(exec, property, value, slot);
@@ -817,7 +820,7 @@ LLINT_SLOW_PATH_DECL(slow_path_put_by_val_direct)
         PutPropertySlot slot(baseObject, exec->codeBlock()->isStrictMode());
         baseObject->putDirect(exec->vm(), jsCast<NameInstance*>(subscript.asCell())->privateName(), value, slot);
     } else {
-        Identifier property(exec, subscript.toString(exec)->value(exec));
+        Identifier property = subscript.toString(exec)->toIdentifier(exec);
         if (!exec->vm().exception()) { // Don't put to an object if toString threw an exception.
             PutPropertySlot slot(baseObject, exec->codeBlock()->isStrictMode());
             baseObject->putDirect(exec->vm(), property, value, slot);
@@ -843,7 +846,7 @@ LLINT_SLOW_PATH_DECL(slow_path_del_by_val)
         couldDelete = baseObject->methodTable()->deleteProperty(baseObject, exec, jsCast<NameInstance*>(subscript.asCell())->privateName());
     else {
         LLINT_CHECK_EXCEPTION();
-        Identifier property(exec, subscript.toString(exec)->value(exec));
+        Identifier property = subscript.toString(exec)->toIdentifier(exec);
         LLINT_CHECK_EXCEPTION();
         couldDelete = baseObject->methodTable()->deleteProperty(baseObject, exec, property);
     }
@@ -1242,11 +1245,11 @@ LLINT_SLOW_PATH_DECL(slow_path_call_eval)
     LLINT_CALL_RETURN(exec, execCallee, LLInt::getCodePtr(getHostCallReturnValue));
 }
 
-LLINT_SLOW_PATH_DECL(slow_path_tear_off_activation)
+LLINT_SLOW_PATH_DECL(slow_path_tear_off_lexical_environment)
 {
     LLINT_BEGIN();
     ASSERT(exec->codeBlock()->needsActivation());
-    jsCast<JSActivation*>(LLINT_OP(1).jsValue())->tearOff(vm);
+    jsCast<JSLexicalEnvironment*>(LLINT_OP(1).jsValue())->tearOff(vm);
     LLINT_END();
 }
 
@@ -1256,7 +1259,7 @@ LLINT_SLOW_PATH_DECL(slow_path_tear_off_arguments)
     ASSERT(exec->codeBlock()->usesArguments());
     Arguments* arguments = jsCast<Arguments*>(exec->uncheckedR(unmodifiedArgumentsRegister(VirtualRegister(pc[1].u.operand)).offset()).jsValue());
     if (JSValue activationValue = LLINT_OP_C(2).jsValue())
-        arguments->didTearOffActivation(exec, jsCast<JSActivation*>(activationValue));
+        arguments->didTearOffActivation(exec, jsCast<JSLexicalEnvironment*>(activationValue));
     else
         arguments->tearOff(exec);
     LLINT_END();

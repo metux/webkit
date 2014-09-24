@@ -42,6 +42,10 @@ WebInspector.DOMTreeContentView = function(representedObject)
     this._compositingBordersButtonNavigationItem.addEventListener(WebInspector.ButtonNavigationItem.Event.Clicked, this._toggleCompositingBorders, this);
     this._compositingBordersButtonNavigationItem.enabled = !!PageAgent.getCompositingBordersVisible;
 
+    this._paintFlashingButtonNavigationItem = new WebInspector.ActivateButtonNavigationItem("paint-flashing", WebInspector.UIString("Enable paint flashing"), WebInspector.UIString("Disable paint flashing"), "Images/PaintFlashing.svg", 16, 16);
+    this._paintFlashingButtonNavigationItem.addEventListener(WebInspector.ButtonNavigationItem.Event.Clicked, this._togglePaintFlashing, this);
+    this._paintFlashingButtonNavigationItem.enabled = true;
+
     WebInspector.showShadowDOMSetting.addEventListener(WebInspector.Setting.Event.Changed, this._showShadowDOMSettingChanged, this);
     this._showsShadowDOMButtonNavigationItem = new WebInspector.ActivateButtonNavigationItem("shows-shadow-DOM", WebInspector.UIString("Show shadow DOM nodes"), WebInspector.UIString("Hide shadow DOM nodes"), shadowDOMImage.src, shadowDOMImage.width, shadowDOMImage.height);
     this._showsShadowDOMButtonNavigationItem.addEventListener(WebInspector.ButtonNavigationItem.Event.Clicked, this._toggleShowsShadowDOMSetting, this);
@@ -74,7 +78,7 @@ WebInspector.DOMTreeContentView.prototype = {
 
     get navigationItems()
     {
-        return [this._showsShadowDOMButtonNavigationItem, this._compositingBordersButtonNavigationItem];
+        return [this._showsShadowDOMButtonNavigationItem, this._compositingBordersButtonNavigationItem, this._paintFlashingButtonNavigationItem];
     },
 
     get domTreeOutline()
@@ -196,8 +200,10 @@ WebInspector.DOMTreeContentView.prototype = {
         if (this._searchQuery === query)
             return;
 
-        if (this._searchIdentifier)
+        if (this._searchIdentifier) {
             DOMAgent.discardSearchResults(this._searchIdentifier);
+            this._hideSearchHighlights();
+        }
 
         this._searchQuery = query;
         this._searchIdentifier = null;
@@ -213,6 +219,8 @@ WebInspector.DOMTreeContentView.prototype = {
             this._numberOfSearchResults = resultsCount;
 
             this.dispatchEventToListeners(WebInspector.ContentView.Event.NumberOfSearchResultsDidChange);
+
+            this._showSearchHighlights();
 
             if (this._automaticallyRevealFirstSearchResult)
                 this.revealNextSearchResult();
@@ -235,8 +243,10 @@ WebInspector.DOMTreeContentView.prototype = {
 
     searchCleared: function()
     {
-        if (this._searchIdentifier)
+        if (this._searchIdentifier) {
             DOMAgent.discardSearchResults(this._searchIdentifier);
+            this._hideSearchHighlights();
+        }
 
         this._searchQuery = null;
         this._searchIdentifier = null;
@@ -295,6 +305,10 @@ WebInspector.DOMTreeContentView.prototype = {
                 return;
 
             this._domTreeOutline.selectDOMNode(domNode, changeFocus);
+
+            var selectedTreeElement = this._domTreeOutline.selectedTreeElement;
+            if (selectedTreeElement)
+                selectedTreeElement.emphasizeSearchHighlight();
         }
 
         DOMAgent.getSearchResults(this._searchIdentifier, index, index + 1, revealResult.bind(this));
@@ -414,6 +428,15 @@ WebInspector.DOMTreeContentView.prototype = {
         PageAgent.setCompositingBordersVisible(activated);
     },
 
+    _togglePaintFlashing: function(event)
+    {
+        console.assert(PageAgent.setShowPaintRects);
+
+        var activated = !this._paintFlashingButtonNavigationItem.activated;
+        this._paintFlashingButtonNavigationItem.activated = activated;
+        PageAgent.setShowPaintRects(activated);
+    },
+
     _updateCompositingBordersButtonToMatchPageSettings: function()
     {
         if (!PageAgent.getCompositingBordersVisible)
@@ -436,5 +459,52 @@ WebInspector.DOMTreeContentView.prototype = {
     _toggleShowsShadowDOMSetting: function(event)
     {
         WebInspector.showShadowDOMSetting.value = !WebInspector.showShadowDOMSetting.value;
+    },
+
+    _showSearchHighlights: function()
+    {
+        console.assert(this._searchIdentifier);
+
+        this._searchResultNodes = [];
+
+        var searchIdentifier = this._searchIdentifier;
+
+        DOMAgent.getSearchResults(this._searchIdentifier, 0, this._numberOfSearchResults, function(error, nodeIdentifiers) {
+            if (error)
+                return;
+
+            if (this._searchIdentifier !== searchIdentifier)
+                return;
+
+            console.assert(nodeIdentifiers.length === this._numberOfSearchResults);
+
+            for (var i = 0; i < nodeIdentifiers.length; ++i) {
+                var domNode = WebInspector.domTreeManager.nodeForId(nodeIdentifiers[i]);
+                console.assert(domNode);
+                if (!domNode)
+                    continue;
+
+                this._searchResultNodes.push(domNode);
+
+                var treeElement = this._domTreeOutline.findTreeElement(domNode);
+                console.assert(treeElement);
+                if (treeElement)
+                    treeElement.highlightSearchResults(this._searchQuery);
+            }
+        }.bind(this));
+    },
+
+    _hideSearchHighlights: function()
+    {
+        if (!this._searchResultNodes)
+            return;
+
+        for (var domNode of this._searchResultNodes) {
+            var treeElement = this._domTreeOutline.findTreeElement(domNode);
+            if (treeElement)
+                treeElement.hideSearchHighlights();
+        }
+
+        delete this._searchResultNodes;
     }
 };

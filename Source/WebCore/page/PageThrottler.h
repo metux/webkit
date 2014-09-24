@@ -30,7 +30,6 @@
 
 #include "UserActivity.h"
 #include "ViewState.h"
-#include <wtf/HashSet.h>
 #include <wtf/WeakPtr.h>
 
 namespace WebCore {
@@ -43,6 +42,7 @@ class PageThrottler {
 public:
     PageThrottler(Page&, ViewState::Flags);
 
+    void createUserActivity();
     void setViewState(ViewState::Flags);
 
     void didReceiveUserInput() { m_hysteresis.impulse(); }
@@ -56,17 +56,17 @@ private:
     void incrementActivityCount();
     void decrementActivityCount();
 
-    void updateHysteresis();
+    void updateUserActivity();
 
     friend class HysteresisActivity<PageThrottler>;
-    void started();
+    WEBCORE_EXPORT void started();
     void stopped();
 
     Page& m_page;
     ViewState::Flags m_viewState;
     WeakPtrFactory<PageThrottler> m_weakPtrFactory;
     HysteresisActivity<PageThrottler> m_hysteresis;
-    UserActivity::Impl m_activity;
+    std::unique_ptr<UserActivity::Impl> m_activity;
     size_t m_activityCount;
 };
 

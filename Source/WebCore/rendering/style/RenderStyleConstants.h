@@ -64,7 +64,8 @@ enum StyleDifferenceContextSensitiveProperty {
     ContextSensitivePropertyNone = 0,
     ContextSensitivePropertyTransform = (1 << 0),
     ContextSensitivePropertyOpacity = (1 << 1),
-    ContextSensitivePropertyFilter = (1 << 2)
+    ContextSensitivePropertyFilter = (1 << 2),
+    ContextSensitivePropertyClipRect = (1 << 3)
 };
 
 // Static pseudo styles. Dynamic ones are produced on the fly.
@@ -473,7 +474,7 @@ enum EDisplay {
     TABLE_HEADER_GROUP, TABLE_FOOTER_GROUP, TABLE_ROW,
     TABLE_COLUMN_GROUP, TABLE_COLUMN, TABLE_CELL,
     TABLE_CAPTION, BOX, INLINE_BOX,
-    FLEX, INLINE_FLEX,
+    FLEX, WEBKIT_FLEX, INLINE_FLEX, WEBKIT_INLINE_FLEX,
 #if ENABLE(CSS_GRID_LAYOUT)
     GRID, INLINE_GRID,
 #endif
@@ -537,7 +538,7 @@ enum LineSnap { LineSnapNone, LineSnapBaseline, LineSnapContain };
 
 enum LineAlign { LineAlignNone, LineAlignEdges };
 
-enum RubyPosition { RubyPositionBefore, RubyPositionAfter };
+enum RubyPosition { RubyPositionBefore, RubyPositionAfter, RubyPositionInterCharacter };
 
 #if ENABLE(CSS_GRID_LAYOUT)
 static const size_t GridAutoFlowBits = 5;

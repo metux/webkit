@@ -46,45 +46,33 @@ class SelectorChecker {
     enum Match { SelectorMatches, SelectorFailsLocally, SelectorFailsAllSiblings, SelectorFailsCompletely };
 
 public:
-    enum VisitedMatchType { VisitedMatchDisabled, VisitedMatchEnabled };
     enum class Mode : unsigned char {
-        ResolvingStyle = 0, CollectingRules, QueryingRules, SharingRules, StyleInvalidation
+        ResolvingStyle = 0, CollectingRules, CollectingRulesIgnoringVirtualPseudoElements, QueryingRules
     };
 
-    SelectorChecker(Document&, Mode);
+    SelectorChecker(Document&);
 
-    struct SelectorCheckingContext {
-        // Initial selector constructor
-        SelectorCheckingContext(const CSSSelector* selector, Element* element, VisitedMatchType visitedMatchType)
-            : selector(selector)
-            , element(element)
-            , scope(nullptr)
-            , visitedMatchType(visitedMatchType)
-            , pseudoId(NOPSEUDO)
+    struct CheckingContext {
+        CheckingContext(SelectorChecker::Mode resolvingMode)
+            : resolvingMode(resolvingMode)
             , elementStyle(nullptr)
+            , pseudoId(NOPSEUDO)
             , scrollbar(nullptr)
-            , firstSelectorOfTheFragment(selector)
             , scrollbarPart(NoPart)
-            , inFunctionalPseudoClass(false)
-            , hasScrollbarPseudo(false)
-            , hasSelectionPseudo(false)
+            , scope(nullptr)
         { }
 
-        const CSSSelector* selector;
-        Element* element;
-        const ContainerNode* scope;
-        VisitedMatchType visitedMatchType;
-        PseudoId pseudoId;
+        SelectorChecker::Mode resolvingMode;
         RenderStyle* elementStyle;
+        PseudoId pseudoId;
         RenderScrollbar* scrollbar;
-        const CSSSelector* firstSelectorOfTheFragment;
         ScrollbarPart scrollbarPart;
-        bool inFunctionalPseudoClass;
-        bool hasScrollbarPseudo;
-        bool hasSelectionPseudo;
+        const ContainerNode* scope;
     };
 
-    bool match(const SelectorCheckingContext&) const;
+    struct CheckingContextWithStatus;
+
+    bool match(const CSSSelector*, Element*, const CheckingContext&) const;
 
     static bool tagMatches(const Element*, const QualifiedName&);
     static bool isCommonPseudoClassSelector(const CSSSelector*);
@@ -95,19 +83,18 @@ public:
     static unsigned determineLinkMatchType(const CSSSelector*);
 
 private:
-    Match matchRecursively(const SelectorCheckingContext&, PseudoId&) const;
-    bool checkOne(const SelectorCheckingContext&) const;
+    Match matchRecursively(const CheckingContextWithStatus&, PseudoId&) const;
+    bool checkOne(const CheckingContextWithStatus&) const;
 
-    bool checkScrollbarPseudoClass(const SelectorCheckingContext&, const CSSSelector*) const;
+    bool checkScrollbarPseudoClass(const CheckingContextWithStatus&, const CSSSelector*) const;
 
     bool m_strictParsing;
     bool m_documentIsHTML;
-    Mode m_mode;
 };
 
 inline bool SelectorChecker::isCommonPseudoClassSelector(const CSSSelector* selector)
 {
-    if (selector->m_match != CSSSelector::PseudoClass)
+    if (selector->match() != CSSSelector::PseudoClass)
         return false;
     CSSSelector::PseudoClassType pseudoType = selector->pseudoClassType();
     return pseudoType == CSSSelector::PseudoClassLink

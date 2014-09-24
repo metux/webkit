@@ -36,8 +36,6 @@
 
 #include "Completion.h"
 #include "HeapIterationScope.h"
-#include "HighFidelityLog.h"
-#include "HighFidelityTypeProfiler.h"
 #include "InjectedScript.h"
 #include "InjectedScriptManager.h"
 #include "InspectorValues.h"
@@ -45,6 +43,8 @@
 #include "ParserError.h"
 #include "ScriptDebugServer.h"
 #include "SourceCode.h"
+#include "TypeProfiler.h"
+#include "TypeProfilerLog.h"
 #include "VMEntryScope.h"
 #include <wtf/PassRefPtr.h>
 #include <wtf/CurrentTime.h>
@@ -80,15 +80,15 @@ static ScriptDebugServer::PauseOnExceptionsState setPauseOnExceptionsState(Scrip
     return presentState;
 }
 
-static PassRefPtr<Inspector::TypeBuilder::Runtime::ErrorRange> buildErrorRangeObject(const JSTokenLocation& tokenLocation)
+static PassRefPtr<Inspector::Protocol::Runtime::ErrorRange> buildErrorRangeObject(const JSTokenLocation& tokenLocation)
 {
-    RefPtr<Inspector::TypeBuilder::Runtime::ErrorRange> result = Inspector::TypeBuilder::Runtime::ErrorRange::create()
+    RefPtr<Inspector::Protocol::Runtime::ErrorRange> result = Inspector::Protocol::Runtime::ErrorRange::create()
         .setStartOffset(tokenLocation.startOffset)
         .setEndOffset(tokenLocation.endOffset);
     return result.release();
 }
 
-void InspectorRuntimeAgent::parse(ErrorString*, const String& expression, Inspector::TypeBuilder::Runtime::SyntaxErrorType::Enum* result, Inspector::TypeBuilder::OptOutput<String>* message, RefPtr<Inspector::TypeBuilder::Runtime::ErrorRange>& range)
+void InspectorRuntimeAgent::parse(ErrorString*, const String& expression, Inspector::Protocol::Runtime::SyntaxErrorType* result, Inspector::Protocol::OptOutput<String>* message, RefPtr<Inspector::Protocol::Runtime::ErrorRange>& range)
 {
     VM& vm = globalVM();
     JSLockHolder lock(vm);
@@ -98,16 +98,16 @@ void InspectorRuntimeAgent::parse(ErrorString*, const String& expression, Inspec
 
     switch (error.m_syntaxErrorType) {
     case ParserError::SyntaxErrorNone:
-        *result = Inspector::TypeBuilder::Runtime::SyntaxErrorType::None;
+        *result = Inspector::Protocol::Runtime::SyntaxErrorType::None;
         break;
     case ParserError::SyntaxErrorIrrecoverable:
-        *result = Inspector::TypeBuilder::Runtime::SyntaxErrorType::Irrecoverable;
+        *result = Inspector::Protocol::Runtime::SyntaxErrorType::Irrecoverable;
         break;
     case ParserError::SyntaxErrorUnterminatedLiteral:
-        *result = Inspector::TypeBuilder::Runtime::SyntaxErrorType::UnterminatedLiteral;
+        *result = Inspector::Protocol::Runtime::SyntaxErrorType::UnterminatedLiteral;
         break;
     case ParserError::SyntaxErrorRecoverable:
-        *result = Inspector::TypeBuilder::Runtime::SyntaxErrorType::Recoverable;
+        *result = Inspector::Protocol::Runtime::SyntaxErrorType::Recoverable;
         break;
     }
 
@@ -117,7 +117,7 @@ void InspectorRuntimeAgent::parse(ErrorString*, const String& expression, Inspec
     }
 }
 
-void InspectorRuntimeAgent::evaluate(ErrorString* errorString, const String& expression, const String* const objectGroup, const bool* const includeCommandLineAPI, const bool* const doNotPauseOnExceptionsAndMuteConsole, const int* executionContextId, const bool* const returnByValue, const bool* generatePreview, RefPtr<Inspector::TypeBuilder::Runtime::RemoteObject>& result, Inspector::TypeBuilder::OptOutput<bool>* wasThrown)
+void InspectorRuntimeAgent::evaluate(ErrorString* errorString, const String& expression, const String* const objectGroup, const bool* const includeCommandLineAPI, const bool* const doNotPauseOnExceptionsAndMuteConsole, const int* executionContextId, const bool* const returnByValue, const bool* generatePreview, RefPtr<Inspector::Protocol::Runtime::RemoteObject>& result, Inspector::Protocol::OptOutput<bool>* wasThrown)
 {
     InjectedScript injectedScript = injectedScriptForEval(errorString, executionContextId);
     if (injectedScript.hasNoValue())
@@ -137,7 +137,7 @@ void InspectorRuntimeAgent::evaluate(ErrorString* errorString, const String& exp
     }
 }
 
-void InspectorRuntimeAgent::callFunctionOn(ErrorString* errorString, const String& objectId, const String& expression, const RefPtr<InspectorArray>* const optionalArguments, const bool* const doNotPauseOnExceptionsAndMuteConsole, const bool* const returnByValue, const bool* generatePreview, RefPtr<Inspector::TypeBuilder::Runtime::RemoteObject>& result, Inspector::TypeBuilder::OptOutput<bool>* wasThrown)
+void InspectorRuntimeAgent::callFunctionOn(ErrorString* errorString, const String& objectId, const String& expression, const RefPtr<InspectorArray>* const optionalArguments, const bool* const doNotPauseOnExceptionsAndMuteConsole, const bool* const returnByValue, const bool* generatePreview, RefPtr<Inspector::Protocol::Runtime::RemoteObject>& result, Inspector::Protocol::OptOutput<bool>* wasThrown)
 {
     InjectedScript injectedScript = m_injectedScriptManager->injectedScriptForObjectId(objectId);
     if (injectedScript.hasNoValue()) {
@@ -163,7 +163,7 @@ void InspectorRuntimeAgent::callFunctionOn(ErrorString* errorString, const Strin
     }
 }
 
-void InspectorRuntimeAgent::getProperties(ErrorString* errorString, const String& objectId, const bool* const ownProperties, RefPtr<Inspector::TypeBuilder::Array<Inspector::TypeBuilder::Runtime::PropertyDescriptor>>& result, RefPtr<Inspector::TypeBuilder::Array<Inspector::TypeBuilder::Runtime::InternalPropertyDescriptor>>& internalProperties)
+void InspectorRuntimeAgent::getProperties(ErrorString* errorString, const String& objectId, const bool* const ownProperties, RefPtr<Inspector::Protocol::Array<Inspector::Protocol::Runtime::PropertyDescriptor>>& result, RefPtr<Inspector::Protocol::Array<Inspector::Protocol::Runtime::InternalPropertyDescriptor>>& internalProperties)
 {
     InjectedScript injectedScript = m_injectedScriptManager->injectedScriptForObjectId(objectId);
     if (injectedScript.hasNoValue()) {
@@ -197,18 +197,18 @@ void InspectorRuntimeAgent::run(ErrorString*)
 {
 }
 
-void InspectorRuntimeAgent::getRuntimeTypesForVariablesAtOffsets(ErrorString* errorString, const RefPtr<Inspector::InspectorArray>& locations, RefPtr<Inspector::TypeBuilder::Array<Inspector::TypeBuilder::Runtime::TypeDescription>>& typeDescriptions)
+void InspectorRuntimeAgent::getRuntimeTypesForVariablesAtOffsets(ErrorString* errorString, const RefPtr<Inspector::InspectorArray>& locations, RefPtr<Inspector::Protocol::Array<Inspector::Protocol::Runtime::TypeDescription>>& typeDescriptions)
 {
     static const bool verbose = false;
     VM& vm = globalVM();
-    typeDescriptions = Inspector::TypeBuilder::Array<Inspector::TypeBuilder::Runtime::TypeDescription>::create();
-    if (!vm.isProfilingTypesWithHighFidelity()) {
+    typeDescriptions = Inspector::Protocol::Array<Inspector::Protocol::Runtime::TypeDescription>::create();
+    if (!vm.typeProfiler()) {
         *errorString = ASCIILiteral("The VM does not currently have Type Information.");
         return;
     }
 
     double start = currentTimeMS();
-    vm.highFidelityLog()->processHighFidelityLog("User Query");
+    vm.typeProfilerLog()->processLogEntries(ASCIILiteral("User Query"));
 
     for (size_t i = 0; i < locations->length(); i++) {
         RefPtr<Inspector::InspectorValue> value = locations->get(i);
@@ -221,14 +221,29 @@ void InspectorRuntimeAgent::getRuntimeTypesForVariablesAtOffsets(ErrorString* er
         int descriptor;
         String sourceIDAsString;
         int divot;
-        location->getNumber(ASCIILiteral("typeInformationDescriptor"), &descriptor);
+        location->getInteger(ASCIILiteral("typeInformationDescriptor"), &descriptor);
         location->getString(ASCIILiteral("sourceID"), &sourceIDAsString);
-        location->getNumber(ASCIILiteral("divot"), &divot);
+        location->getInteger(ASCIILiteral("divot"), &divot);
 
-        RefPtr<Inspector::TypeBuilder::Runtime::TypeDescription> typeDescription = Inspector::TypeBuilder::Runtime::TypeDescription::create();
         bool okay;
-        vm.highFidelityTypeProfiler()->getTypesForVariableAtOffsetForInspector(static_cast<TypeProfilerSearchDescriptor>(descriptor), divot, sourceIDAsString.toIntPtrStrict(&okay), typeDescription);
-        typeDescriptions->addItem(typeDescription);
+        TypeLocation* typeLocation = vm.typeProfiler()->findLocation(divot, sourceIDAsString.toIntPtrStrict(&okay), static_cast<TypeProfilerSearchDescriptor>(descriptor));
+        RefPtr<Inspector::Protocol::Runtime::TypeDescription> description = Inspector::Protocol::Runtime::TypeDescription::create()
+            .setIsValid(!!typeLocation);
+        if (typeLocation) {
+            RefPtr<TypeSet> typeSet;
+            if (typeLocation->m_globalTypeSet && typeLocation->m_globalVariableID != TypeProfilerNoGlobalIDExists)
+                typeSet = typeLocation->m_globalTypeSet;
+            else
+                typeSet = typeLocation->m_instructionTypeSet;
+
+            description->setLeastCommonAncestor(typeSet->leastCommonAncestor());
+            description->setPrimitiveTypeNames(typeSet->allPrimitiveTypeNames());
+            description->setStructures(typeSet->allStructureRepresentations());
+            description->setTypeSet(typeSet->inspectorTypeSet());
+            description->setIsTruncated(typeSet->isOverflown());
+        }
+
+        typeDescriptions->addItem(description);
     }
 
     double end = currentTimeMS();
@@ -251,9 +266,9 @@ public:
 
 static void recompileAllJSFunctionsForTypeProfiling(VM& vm, bool shouldEnableTypeProfiling)
 {
-    vm.waitForCompilationsToComplete();
+    vm.prepareToDiscardCode();
 
-    bool needsToRecompile = (shouldEnableTypeProfiling ? vm.enableHighFidelityTypeProfiling() : vm.disableHighFidelityTypeProfiling());
+    bool needsToRecompile = (shouldEnableTypeProfiling ? vm.enableTypeProfiler() : vm.disableTypeProfiler());
     if (needsToRecompile) {
         TypeRecompiler recompiler;
         HeapIterationScope iterationScope(vm.heap);
@@ -264,20 +279,20 @@ static void recompileAllJSFunctionsForTypeProfiling(VM& vm, bool shouldEnableTyp
 void InspectorRuntimeAgent::willDestroyFrontendAndBackend(InspectorDisconnectReason reason)
 {
     if (reason != InspectorDisconnectReason::InspectedTargetDestroyed && m_isTypeProfilingEnabled)
-        setHighFidelityTypeProfilingEnabledState(false);
+        setTypeProfilerEnabledState(false);
 }
 
-void InspectorRuntimeAgent::enableHighFidelityTypeProfiling(ErrorString*)
+void InspectorRuntimeAgent::enableTypeProfiler(ErrorString*)
 {
-    setHighFidelityTypeProfilingEnabledState(true);
+    setTypeProfilerEnabledState(true);
 }
 
-void InspectorRuntimeAgent::disableHighFidelityTypeProfiling(ErrorString*)
+void InspectorRuntimeAgent::disableTypeProfiler(ErrorString*)
 {
-    setHighFidelityTypeProfilingEnabledState(false);
+    setTypeProfilerEnabledState(false);
 }
 
-void InspectorRuntimeAgent::setHighFidelityTypeProfilingEnabledState(bool shouldEnableTypeProfiling)
+void InspectorRuntimeAgent::setTypeProfilerEnabledState(bool shouldEnableTypeProfiling)
 {
     if (m_isTypeProfilingEnabled == shouldEnableTypeProfiling)
         return;

@@ -101,7 +101,6 @@ my $configurationProductDir;
 my $sourceDir;
 my $currentSVNRevision;
 my $debugger;
-my $iPhoneSimulatorVersion;
 my $didLoadIPhoneSimulatorNotification;
 my $nmPath;
 my $osXVersion;
@@ -762,61 +761,41 @@ sub safariPathFromSafariBundle
 {
     my ($safariBundle) = @_;
 
-    if (isAppleMacWebKit()) {
-        my $safariPath = "$safariBundle/Contents/MacOS/Safari";
-        return $safariPath if skipSafariExecutableEntitlementChecks();
+    die "Safari path is only relevant on Apple Mac platform\n" unless isAppleMacWebKit();
 
-        my $safariForWebKitDevelopmentPath = "$safariBundle/Contents/MacOS/SafariForWebKitDevelopment";
-        return $safariForWebKitDevelopmentPath if -f $safariForWebKitDevelopmentPath && executableHasEntitlements($safariPath);
+    my $safariPath = "$safariBundle/Contents/MacOS/Safari";
+    return $safariPath if skipSafariExecutableEntitlementChecks();
 
-        return $safariPath;
-    }
-    return $safariBundle if isAppleWinWebKit();
+    my $safariForWebKitDevelopmentPath = "$safariBundle/Contents/MacOS/SafariForWebKitDevelopment";
+    return $safariForWebKitDevelopmentPath if -f $safariForWebKitDevelopmentPath && executableHasEntitlements($safariPath);
+
+    return $safariPath;
 }
 
 sub installedSafariPath
 {
-    my $safariBundle;
-
-    if (isAppleMacWebKit()) {
-        $safariBundle = "/Applications/Safari.app";
-    } elsif (isAppleWinWebKit()) {
-        $safariBundle = readRegistryString("/HKLM/SOFTWARE/Apple Inc./Safari/InstallDir");
-        $safariBundle =~ s/[\r\n]+$//;
-        $safariBundle = `cygpath -u '$safariBundle'` if isCygwin();
-        $safariBundle =~ s/[\r\n]+$//;
-        $safariBundle .= "Safari.exe";
-    }
-
-    return safariPathFromSafariBundle($safariBundle);
+    return safariPathFromSafariBundle("/Applications/Safari.app");
 }
 
 # Locate Safari.
 sub safariPath
 {
+    die "Safari path is only relevant on Apple Mac platform\n" unless isAppleMacWebKit();
+
     # Use WEBKIT_SAFARI environment variable if present.
     my $safariBundle = $ENV{WEBKIT_SAFARI};
     if (!$safariBundle) {
         determineConfigurationProductDir();
         # Use Safari.app in product directory if present (good for Safari development team).
-        if (isAppleMacWebKit() && -d "$configurationProductDir/Safari.app") {
+        if (-d "$configurationProductDir/Safari.app") {
             $safariBundle = "$configurationProductDir/Safari.app";
-        } elsif (isAppleWinWebKit()) {
-            my $path = "$configurationProductDir/Safari.exe";
-            my $debugPath = "$configurationProductDir/Safari_debug.exe";
-
-            if (configuration() eq "Debug_All" && -x $debugPath) {
-                $safariBundle = $debugPath;
-            } elsif (-x $path) {
-                $safariBundle = $path;
-            }
         }
         if (!$safariBundle) {
             return installedSafariPath();
         }
     }
     my $safariPath = safariPathFromSafariBundle($safariBundle);
-    die "Can't find executable at $safariPath.\n" if isAppleMacWebKit() && !-x $safariPath;
+    die "Can't find executable at $safariPath.\n" if !-x $safariPath;
     return $safariPath;
 }
 
@@ -1201,48 +1180,6 @@ sub isIOSWebKit()
     return isAppleMacWebKit() && (willUseIOSDeviceSDKWhenBuilding() || willUseIOSSimulatorSDKWhenBuilding());
 }
 
-sub isPerianInstalled()
-{
-    if (!isAppleWebKit()) {
-        return 0;
-    }
-
-    if (-d "/Library/QuickTime/Perian.component") {
-        return 1;
-    }
-
-    if (-d "$ENV{HOME}/Library/QuickTime/Perian.component") {
-        return 1;
-    }
-
-    return 0;
-}
-
-sub determineIPhoneSimulatorVersion()
-{
-    return if $iPhoneSimulatorVersion;
-
-    if (!isIOSWebKit()) {
-        $iPhoneSimulatorVersion = -1;
-        return;
-    }
-
-    my $version = `/usr/local/bin/psw_vers -productVersion`;
-    my @splitVersion = split(/\./, $version);
-    @splitVersion >= 2 or die "Invalid version $version";
-    $iPhoneSimulatorVersion = {
-            "major" => $splitVersion[0],
-            "minor" => $splitVersion[1],
-            "subminor" => defined($splitVersion[2] ? $splitVersion[2] : 0),
-    };
-}
-
-sub iPhoneSimulatorVersion()
-{
-    determineIPhoneSimulatorVersion();
-    return $iPhoneSimulatorVersion;
-}
-
 sub determineNmPath()
 {
     return if $nmPath;
@@ -1283,16 +1220,6 @@ sub osXVersion()
 {
     determineOSXVersion();
     return $osXVersion;
-}
-
-sub isSnowLeopard()
-{
-    return isDarwin() && osXVersion()->{"minor"} == 6;
-}
-
-sub isLion()
-{
-    return isDarwin() && osXVersion()->{"minor"} == 7;
 }
 
 sub isWindowsNT()
@@ -1425,14 +1352,12 @@ sub launcherPath()
 
 sub launcherName()
 {
-    if (isGtk()) {
+    if (isGtk() || isEfl()) {
         return "MiniBrowser";
     } elsif (isAppleMacWebKit()) {
         return "Safari";
     } elsif (isAppleWinWebKit()) {
         return "WinLauncher";
-    } elsif (isEfl()) {
-        return "EWebLauncher/MiniBrowser";
     } elsif (isWinCE()) {
         return "WinCELauncher";
     }
@@ -1674,65 +1599,6 @@ sub dieIfWindowsPlatformSDKNotInstalled
     die;
 }
 
-sub copyInspectorFrontendFiles
-{
-    my $productDir = productDir();
-    my $sourceInspectorPath = sourceDir() . "/Source/WebCore/inspector/front-end/";
-    my $inspectorResourcesDirPath = $ENV{"WEBKITINSPECTORRESOURCESDIR"};
-
-    if (!defined($inspectorResourcesDirPath)) {
-        $inspectorResourcesDirPath = "";
-    }
-
-    if (isAppleMacWebKit()) {
-        if (isIOSWebKit()) {
-            $inspectorResourcesDirPath = $productDir . "/WebCore.framework/inspector";
-        } else {
-            $inspectorResourcesDirPath = $productDir . "/WebCore.framework/Resources/inspector";
-        }
-    } elsif (isAppleWinWebKit() || isWinCairo()) {
-        $inspectorResourcesDirPath = $productDir . "/WebKit.resources/inspector";
-    } elsif (isGtk()) {
-        my $prefix = $ENV{"WebKitInstallationPrefix"};
-        $inspectorResourcesDirPath = (defined($prefix) ? $prefix : "/usr/share") . "/webkit-1.0/webinspector";
-    } elsif (isEfl()) {
-        my $prefix = $ENV{"WebKitInstallationPrefix"};
-        $inspectorResourcesDirPath = (defined($prefix) ? $prefix : "/usr/share") . "/ewebkit/webinspector";
-    }
-
-    if (! -d $inspectorResourcesDirPath) {
-        print "*************************************************************\n";
-        print "Cannot find '$inspectorResourcesDirPath'.\n" if (defined($inspectorResourcesDirPath));
-        print "Make sure that you have built WebKit first.\n" if (! -d $productDir || defined($inspectorResourcesDirPath));
-        print "Optionally, set the environment variable 'WebKitInspectorResourcesDir'\n";
-        print "to point to the directory that contains the WebKit Inspector front-end\n";
-        print "files for the built WebCore framework.\n";
-        print "*************************************************************\n";
-        die;
-    }
-
-    if (isAppleMacWebKit()) {
-        my $sourceLocalizedStrings = sourceDir() . "/Source/WebCore/English.lproj/localizedStrings.js";
-        my $destinationLocalizedStrings;
-        if (isIOSWebKit()) {
-            $destinationLocalizedStrings = $productDir . "/WebCore.framework/English.lproj/localizedStrings.js";
-        } else {
-            $destinationLocalizedStrings = $productDir . "/WebCore.framework/Resources/English.lproj/localizedStrings.js";
-        }
-        system "ditto", $sourceLocalizedStrings, $destinationLocalizedStrings;
-    }
-
-    my $exitStatus = system "rsync", "-aut", "--exclude=/.DS_Store", "--exclude=*.re2js", "--exclude=.svn/", $sourceInspectorPath, $inspectorResourcesDirPath;
-    return $exitStatus if $exitStatus;
-
-    if (isIOSWebKit()) {
-        chdir($productDir . "/WebCore.framework");
-        return system "zip", "--quiet", "--exclude=*.qrc", "-r", "inspector-remote.zip", "inspector";
-    }
-
-    return 0; # Success; did copy files.
-}
-
 sub buildXCodeProject($$@)
 {
     my ($project, $clean, @extraOptions) = @_;
@@ -1925,7 +1791,6 @@ sub generateBuildSystemFromCMakeProject
     push @args, "-DPORT=\"$port\"";
     push @args, "-DCMAKE_INSTALL_PREFIX=\"$prefixPath\"" if $prefixPath;
     push @args, "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON" if isGtk();
-    push @args, "-DSHARED_CORE=ON" if isEfl() && $ENV{"ENABLE_DRT"};
     if ($config =~ /release/i) {
         push @args, "-DCMAKE_BUILD_TYPE=Release";
     } elsif ($config =~ /debug/i) {
@@ -1942,7 +1807,7 @@ sub generateBuildSystemFromCMakeProject
     }
 
     # GTK+ has a production mode, but build-webkit should always use developer mode.
-    push @args, "-DDEVELOPER_MODE=ON" if isGtk();
+    push @args, "-DDEVELOPER_MODE=ON" if isEfl() || isGtk();
 
     # Don't warn variables which aren't used by cmake ports.
     push @args, "--no-warn-unused-cli";
@@ -2057,11 +1922,6 @@ sub promptUser
 
 sub appleApplicationSupportPath
 {
-    if (isWin64()) {
-        # FIXME (125180): Remove the following once official 64-bit Windows support is available.
-        return $ENV{"WEBKIT_64_SUPPORT"}, "\n" if isWin64();
-    }
-
     open INSTALL_DIR, "</proc/registry/HKEY_LOCAL_MACHINE/SOFTWARE/Apple\ Inc./Apple\ Application\ Support/InstallDir";
     my $path = <INSTALL_DIR>;
     $path =~ s/[\r\n\x00].*//;
@@ -2077,7 +1937,7 @@ sub setPathForRunningWebKitApp
     my ($env) = @_;
 
     if (isAppleWinWebKit()) {
-        $env->{PATH} = join(':', productDir(), dirname(installedSafariPath()), appleApplicationSupportPath(), $env->{PATH} || "");
+        $env->{PATH} = join(':', productDir(), appleApplicationSupportPath(), $env->{PATH} || "");
     } elsif (isWinCairo()) {
         my $winCairoBin = sourceDir() . "/WebKitLibraries/win/" . (isWin64() ? "bin64/" : "bin32/");
         my $gstreamerBin = isWin64() ? $ENV{"GSTREAMER_1_0_ROOT_X86_64"} . "bin" : $ENV{"GSTREAMER_1_0_ROOT_X86"} . "bin";
@@ -2212,11 +2072,6 @@ sub openIOSSimulator()
         $date->release();
     }
     $iPhoneSimulatorNotification->stopObservingReadyNotification();
-}
-
-sub quitIOSSimulator()
-{
-    return system {"osascript"} "osascript", "-e", 'tell application "iOS Simulator" to quit';
 }
 
 sub iosSimulatorDeviceByName($)
@@ -2518,6 +2373,43 @@ sub formatBuildTime($)
         return sprintf("%dh:%02dm:%02ds", $buildHours, $buildMins, $buildSecs);
     }
     return sprintf("%02dm:%02ds", $buildMins, $buildSecs);
+}
+
+sub runSvnUpdateAndResolveChangeLogs(@)
+{
+    my @svnOptions = @_;
+    open UPDATE, "-|", "svn", "update", @svnOptions or die;
+    my @conflictedChangeLogs;
+    while (my $line = <UPDATE>) {
+        print $line;
+        $line =~ m/^C\s+(.+?)[\r\n]*$/;
+        if ($1) {
+          my $filename = normalizePath($1);
+          push @conflictedChangeLogs, $filename if basename($filename) eq "ChangeLog";
+        }
+    }
+    close UPDATE or die;
+
+    if (@conflictedChangeLogs) {
+        print "Attempting to merge conflicted ChangeLogs.\n";
+        my $resolveChangeLogsPath = File::Spec->catfile(sourceDir(), "Tools", "Scripts", "resolve-ChangeLogs");
+        (system($resolveChangeLogsPath, "--no-warnings", @conflictedChangeLogs) == 0)
+            or die "Could not open resolve-ChangeLogs script: $!.\n";
+    }
+}
+
+sub runGitUpdate()
+{
+    # Doing a git fetch first allows setups with svn-remote.svn.fetch = trunk:refs/remotes/origin/master
+    # to perform the rebase much much faster.
+    system("git", "fetch");
+    if (isGitSVN()) {
+        system("git", "svn", "rebase") == 0 or die;
+    } else {
+        # This will die if branch.$BRANCHNAME.merge isn't set, which is
+        # almost certainly what we want.
+        system("git", "pull") == 0 or die;
+    }
 }
 
 1;

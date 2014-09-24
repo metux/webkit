@@ -85,7 +85,7 @@ inline bool opIn(ExecState* exec, JSValue propName, JSValue baseVal)
     if (isName(propName))
         return baseObj->hasProperty(exec, jsCast<NameInstance*>(propName.asCell())->privateName());
 
-    Identifier property(exec, propName.toString(exec)->value(exec));
+    Identifier property = propName.toString(exec)->toIdentifier(exec);
     if (exec->vm().exception())
         return false;
     return baseObj->hasProperty(exec, property);
@@ -233,7 +233,7 @@ SLOW_PATH_HIDDEN_DECL(slow_path_get_structure_property_enumerator);
 SLOW_PATH_HIDDEN_DECL(slow_path_get_generic_property_enumerator);
 SLOW_PATH_HIDDEN_DECL(slow_path_next_enumerator_pname);
 SLOW_PATH_HIDDEN_DECL(slow_path_to_index_string);
-SLOW_PATH_HIDDEN_DECL(slow_path_profile_types_with_high_fidelity);
+SLOW_PATH_HIDDEN_DECL(slow_path_profile_type);
 
 } // namespace JSC
 

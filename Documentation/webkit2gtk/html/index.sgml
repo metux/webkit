@@ -418,10 +418,12 @@
 <ANCHOR id="webkit-uri-response-get-content-length" href="webkit2gtk/WebKitURIResponse.html#webkit-uri-response-get-content-length">
 <ANCHOR id="webkit-uri-response-get-mime-type" href="webkit2gtk/WebKitURIResponse.html#webkit-uri-response-get-mime-type">
 <ANCHOR id="webkit-uri-response-get-suggested-filename" href="webkit2gtk/WebKitURIResponse.html#webkit-uri-response-get-suggested-filename">
+<ANCHOR id="webkit-uri-response-get-http-headers" href="webkit2gtk/WebKitURIResponse.html#webkit-uri-response-get-http-headers">
 <ANCHOR id="WebKitURIResponse.other_details" href="webkit2gtk/WebKitURIResponse.html#WebKitURIResponse.other_details">
 <ANCHOR id="WebKitURIResponse-struct" href="webkit2gtk/WebKitURIResponse.html#WebKitURIResponse-struct">
 <ANCHOR id="WebKitURIResponse.property-details" href="webkit2gtk/WebKitURIResponse.html#WebKitURIResponse.property-details">
 <ANCHOR id="WebKitURIResponse--content-length" href="webkit2gtk/WebKitURIResponse.html#WebKitURIResponse--content-length">
+<ANCHOR id="WebKitURIResponse--http-headers" href="webkit2gtk/WebKitURIResponse.html#WebKitURIResponse--http-headers">
 <ANCHOR id="WebKitURIResponse--mime-type" href="webkit2gtk/WebKitURIResponse.html#WebKitURIResponse--mime-type">
 <ANCHOR id="WebKitURIResponse--status-code" href="webkit2gtk/WebKitURIResponse.html#WebKitURIResponse--status-code">
 <ANCHOR id="WebKitURIResponse--suggested-filename" href="webkit2gtk/WebKitURIResponse.html#WebKitURIResponse--suggested-filename">
@@ -470,9 +472,12 @@
 <ANCHOR id="webkit-download-get-elapsed-time" href="webkit2gtk/WebKitDownload.html#webkit-download-get-elapsed-time">
 <ANCHOR id="webkit-download-get-received-data-length" href="webkit2gtk/WebKitDownload.html#webkit-download-get-received-data-length">
 <ANCHOR id="webkit-download-get-web-view" href="webkit2gtk/WebKitDownload.html#webkit-download-get-web-view">
+<ANCHOR id="webkit-download-get-allow-overwrite" href="webkit2gtk/WebKitDownload.html#webkit-download-get-allow-overwrite">
+<ANCHOR id="webkit-download-set-allow-overwrite" href="webkit2gtk/WebKitDownload.html#webkit-download-set-allow-overwrite">
 <ANCHOR id="WebKitDownload.other_details" href="webkit2gtk/WebKitDownload.html#WebKitDownload.other_details">
 <ANCHOR id="WebKitDownload-struct" href="webkit2gtk/WebKitDownload.html#WebKitDownload-struct">
 <ANCHOR id="WebKitDownload.property-details" href="webkit2gtk/WebKitDownload.html#WebKitDownload.property-details">
+<ANCHOR id="WebKitDownload--allow-overwrite" href="webkit2gtk/WebKitDownload.html#WebKitDownload--allow-overwrite">
 <ANCHOR id="WebKitDownload--destination" href="webkit2gtk/WebKitDownload.html#WebKitDownload--destination">
 <ANCHOR id="WebKitDownload--estimated-progress" href="webkit2gtk/WebKitDownload.html#WebKitDownload--estimated-progress">
 <ANCHOR id="WebKitDownload--response" href="webkit2gtk/WebKitDownload.html#WebKitDownload--response">

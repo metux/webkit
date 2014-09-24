@@ -195,6 +195,9 @@ void SubresourceLoader::didReceiveResponse(const ResourceResponse& response)
     // anything including removing the last reference to this object; one example of this is 3266216.
     Ref<SubresourceLoader> protect(*this);
 
+    if (shouldIncludeCertificateInfo())
+        response.includeCertificateInfo();
+
     if (m_resource->resourceToRevalidate()) {
         if (response.httpStatusCode() == 304) {
             // 304 Not modified / Use local copy
@@ -299,12 +302,8 @@ void SubresourceLoader::didFinishLoading(double finishTime)
     LOG(ResourceLoading, "Received '%s'.", m_resource->url().string().latin1().data());
 
     Ref<SubresourceLoader> protect(*this);
-
-#if PLATFORM(IOS)
-    if (resourceData())
-        resourceData()->setShouldUsePurgeableMemory(true);
-#endif
     CachedResourceHandle<CachedResource> protectResource(m_resource);
+
     m_state = Finishing;
     m_resource->setLoadFinishTime(finishTime);
     m_resource->finishLoading(resourceData());

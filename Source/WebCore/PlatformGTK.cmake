@@ -14,6 +14,7 @@ list(APPEND WebCore_INCLUDE_DIRECTORIES
     "${WEBCORE_DIR}/platform/graphics/harfbuzz/ng"
     "${WEBCORE_DIR}/platform/graphics/opengl"
     "${WEBCORE_DIR}/platform/graphics/opentype"
+    "${WEBCORE_DIR}/platform/graphics/wayland"
     "${WEBCORE_DIR}/platform/linux"
     "${WEBCORE_DIR}/platform/mediastream/gstreamer"
     "${WEBCORE_DIR}/platform/mock/mediasource"
@@ -179,6 +180,7 @@ list(APPEND WebCorePlatformGTK_SOURCES
     accessibility/atk/WebKitAccessibleWrapperAtk.cpp
 
     editing/atk/FrameSelectionAtk.cpp
+    editing/gtk/EditorGtk.cpp
 
     page/gtk/DragControllerGtk.cpp
     page/gtk/EventHandlerGtk.cpp
@@ -237,24 +239,17 @@ list(APPEND WebCorePlatformGTK_SOURCES
     platform/gtk/PlatformMouseEventGtk.cpp
     platform/gtk/PlatformScreenGtk.cpp
     platform/gtk/PlatformWheelEventGtk.cpp
-    platform/gtk/PopupMenuGtk.cpp
     platform/gtk/RedirectedXCompositeWindow.cpp
-    platform/gtk/RenderThemeGtk.cpp
-    platform/gtk/RenderThemeGtk2.cpp
-    platform/gtk/RenderThemeGtk3.cpp
     platform/gtk/ScrollbarThemeGtk.cpp
-    platform/gtk/ScrollbarThemeGtk2.cpp
-    platform/gtk/ScrollbarThemeGtk3.cpp
-    platform/gtk/SearchPopupMenuGtk.cpp
     platform/gtk/SharedBufferGtk.cpp
     platform/gtk/SharedTimerGtk.cpp
     platform/gtk/SoundGtk.cpp
     platform/gtk/TemporaryLinkStubs.cpp
     platform/gtk/UserAgentGtk.cpp
-    platform/gtk/WebKitAuthenticationWidget.cpp
     platform/gtk/WidgetBackingStoreGtkX11.cpp
     platform/gtk/WidgetGtk.cpp
-    platform/gtk/WidgetRenderingContext.cpp
+
+    rendering/RenderThemeGtk.cpp
 )
 
 if (WTF_USE_GEOCLUE2)
@@ -274,7 +269,7 @@ list(APPEND WebCore_USER_AGENT_STYLE_SHEETS
 
 set(WebCore_USER_AGENT_SCRIPTS
     ${WEBCORE_DIR}/English.lproj/mediaControlsLocalizedStrings.js
-    ${WEBCORE_DIR}/Modules/mediacontrols/mediaControlsApple.js
+    ${WEBCORE_DIR}/Modules/mediacontrols/mediaControlsBase.js
     ${WEBCORE_DIR}/Modules/mediacontrols/mediaControlsGtk.js
 )
 
@@ -422,6 +417,32 @@ if (ENABLE_PLUGIN_PROCESS_GTK2)
          ${WebCore_LIBRARIES}
          ${GTK2_LIBRARIES}
          ${GDK2_LIBRARIES}
+    )
+endif ()
+
+# Wayland protocol extension.
+add_custom_command(
+    OUTPUT ${DERIVED_SOURCES_WEBCORE_DIR}/WebKitGtkWaylandClientProtocol.c
+    DEPENDS ${WEBCORE_DIR}/platform/graphics/wayland/WebKitGtkWaylandClientProtocol.xml
+    COMMAND wayland-scanner server-header < ${WEBCORE_DIR}/platform/graphics/wayland/WebKitGtkWaylandClientProtocol.xml > ${DERIVED_SOURCES_WEBCORE_DIR}/WebKitGtkWaylandServerProtocol.h
+    COMMAND wayland-scanner client-header < ${WEBCORE_DIR}/platform/graphics/wayland/WebKitGtkWaylandClientProtocol.xml > ${DERIVED_SOURCES_WEBCORE_DIR}/WebKitGtkWaylandClientProtocol.h
+    COMMAND wayland-scanner code < ${WEBCORE_DIR}/platform/graphics/wayland/WebKitGtkWaylandClientProtocol.xml > ${DERIVED_SOURCES_WEBCORE_DIR}/WebKitGtkWaylandClientProtocol.c
+)
+
+if (ENABLE_WAYLAND_TARGET)
+    list(APPEND WebCorePlatformGTK_SOURCES
+        platform/graphics/wayland/WaylandDisplay.cpp
+        platform/graphics/wayland/WaylandEventSource.cpp
+        platform/graphics/wayland/WaylandSurface.cpp
+
+        ${DERIVED_SOURCES_WEBCORE_DIR}/WebKitGtkWaylandClientProtocol.c
+    )
+
+    list(APPEND WebCore_INCLUDE_DIRECTORIES
+        ${WAYLAND_INCLUDE_DIRECTORIES}
+    )
+    list(APPEND WebCore_LIBRARIES
+        ${WAYLAND_LIBRARIES}
     )
 endif ()
 

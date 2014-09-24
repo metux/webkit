@@ -21,7 +21,6 @@
 #ifndef SVGFilterPrimitiveStandardAttributes_h
 #define SVGFilterPrimitiveStandardAttributes_h
 
-#if ENABLE(FILTERS)
 #include "RenderSVGResourceFilter.h"
 #include "RenderSVGResourceFilterPrimitive.h"
 #include "SVGAnimatedLength.h"
@@ -86,12 +85,15 @@ void invalidateFilterPrimitiveParent(SVGElement*);
 void isSVGFilterPrimitiveStandardAttributes(const SVGFilterPrimitiveStandardAttributes&); // Catch unnecessary runtime check of type known at compile time.
 inline bool isSVGFilterPrimitiveStandardAttributes(const SVGElement& element) { return element.isFilterEffect(); }
 inline bool isSVGFilterPrimitiveStandardAttributes(const Node& node) { return node.isSVGElement() && toSVGElement(node).isFilterEffect(); }
-template <> inline bool isElementOfType<const SVGFilterPrimitiveStandardAttributes>(const Element& element) { return isSVGFilterPrimitiveStandardAttributes(element); }
+
+template <typename ArgType>
+struct ElementTypeCastTraits<const SVGFilterPrimitiveStandardAttributes, ArgType> {
+    static bool is(ArgType& node) { return isSVGFilterPrimitiveStandardAttributes(node); }
+};
 
 NODE_TYPE_CASTS(SVGFilterPrimitiveStandardAttributes)
 
 
 } // namespace WebCore
 
-#endif // ENABLE(FILTERS)
 #endif

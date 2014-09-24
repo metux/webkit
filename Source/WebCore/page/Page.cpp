@@ -57,7 +57,7 @@
 #include "NetworkStateNotifier.h"
 #include "PageActivityAssertionToken.h"
 #include "PageCache.h"
-#include "PageConsole.h"
+#include "PageConsoleClient.h"
 #include "PageDebuggable.h"
 #include "PageGroup.h"
 #include "PageThrottler.h"
@@ -192,7 +192,8 @@ Page::Page(PageClients& pageClients)
 #endif
     , m_alternativeTextClient(pageClients.alternativeTextClient)
     , m_scriptedAnimationsSuspended(false)
-    , m_console(std::make_unique<PageConsole>(*this))
+    , m_pageThrottler(*this, m_viewState)
+    , m_consoleClient(std::make_unique<PageConsoleClient>(*this))
 #if ENABLE(REMOTE_INSPECTOR)
     , m_inspectorDebuggable(std::make_unique<PageDebuggable>(*this))
 #endif
@@ -1203,17 +1204,13 @@ void Page::resumeAnimatingImages()
 {
     // Drawing models which cache painted content while out-of-window (WebKit2's composited drawing areas, etc.)
     // require that we repaint animated images to kickstart the animation loop.
-
-    for (Frame* frame = m_mainFrame.get(); frame; frame = frame->tree().traverseNext()) {
-        if (auto* renderView = frame->contentRenderer())
-            renderView->resumePausedImageAnimationsIfNeeded();
-    }
+    if (FrameView* view = mainFrame().view())
+        view->resumeVisibleImageAnimationsIncludingSubframes();
 }
 
-void Page::createPageThrottler()
+void Page::enablePageThrottler()
 {
-    ASSERT(!m_pageThrottler);
-    m_pageThrottler = std::make_unique<PageThrottler>(*this, m_viewState);
+    m_pageThrottler.createUserActivity();
 }
 
 void Page::setViewState(ViewState::Flags viewState)
@@ -1226,8 +1223,7 @@ void Page::setViewState(ViewState::Flags viewState)
 
     m_viewState = viewState;
     m_focusController->setViewState(viewState);
-    if (m_pageThrottler)
-        m_pageThrottler->setViewState(viewState);
+    m_pageThrottler.setViewState(viewState);
 
     if (changed & ViewState::IsVisible)
         setIsVisibleInternal(viewState & ViewState::IsVisible);
@@ -1256,11 +1252,6 @@ void Page::setIsVisibleInternal(bool isVisible)
     if (isVisible) {
         m_isPrerender = false;
 
-        for (Frame* frame = &mainFrame(); frame; frame = frame->tree().traverseNext()) {
-            if (FrameView* frameView = frame->view())
-                frameView->didMoveOnscreen();
-        }
-
         resumeScriptedAnimations();
 
         if (FrameView* view = mainFrame().view())
@@ -1282,11 +1273,6 @@ void Page::setIsVisibleInternal(bool isVisible)
     if (!isVisible) {
         if (m_settings->hiddenPageCSSAnimationSuspensionEnabled())
             mainFrame().animation().suspendAnimations();
-
-        for (Frame* frame = &mainFrame(); frame; frame = frame->tree().traverseNext()) {
-            if (FrameView* frameView = frame->view())
-                frameView->willMoveOffscreen();
-        }
 
         suspendScriptedAnimations();
 
@@ -1439,10 +1425,10 @@ void Page::addRelevantRepaintedObject(RenderObject* object, const LayoutRect& ob
     LayoutRect relevantRect = relevantViewRect(&object->view());
 
     // The objects are only relevant if they are being painted within the viewRect().
-    if (!objectPaintRect.intersects(pixelSnappedIntRect(relevantRect)))
+    if (!objectPaintRect.intersects(snappedIntRect(relevantRect)))
         return;
 
-    IntRect snappedPaintRect = pixelSnappedIntRect(objectPaintRect);
+    IntRect snappedPaintRect = snappedIntRect(objectPaintRect);
 
     // If this object was previously counted as an unpainted object, remove it from that HashSet
     // and corresponding Region. FIXME: This doesn't do the right thing if the objects overlap.
@@ -1460,11 +1446,11 @@ void Page::addRelevantRepaintedObject(RenderObject* object, const LayoutRect& ob
     // If the rect straddles both Regions, split it appropriately.
     if (topRelevantRect.intersects(snappedPaintRect) && bottomRelevantRect.intersects(snappedPaintRect)) {
         IntRect topIntersection = snappedPaintRect;
-        topIntersection.intersect(pixelSnappedIntRect(topRelevantRect));
+        topIntersection.intersect(snappedIntRect(topRelevantRect));
         m_topRelevantPaintedRegion.unite(topIntersection);
 
         IntRect bottomIntersection = snappedPaintRect;
-        bottomIntersection.intersect(pixelSnappedIntRect(bottomRelevantRect));
+        bottomIntersection.intersect(snappedIntRect(bottomRelevantRect));
         m_bottomRelevantPaintedRegion.unite(bottomIntersection);
     } else if (topRelevantRect.intersects(snappedPaintRect))
         m_topRelevantPaintedRegion.unite(snappedPaintRect);
@@ -1494,11 +1480,11 @@ void Page::addRelevantUnpaintedObject(RenderObject* object, const LayoutRect& ob
         return;
 
     // The objects are only relevant if they are being painted within the relevantViewRect().
-    if (!objectPaintRect.intersects(pixelSnappedIntRect(relevantViewRect(&object->view()))))
+    if (!objectPaintRect.intersects(snappedIntRect(relevantViewRect(&object->view()))))
         return;
 
     m_relevantUnpaintedRenderObjects.add(object);
-    m_relevantUnpaintedRegion.unite(pixelSnappedIntRect(objectPaintRect));
+    m_relevantUnpaintedRegion.unite(snappedIntRect(objectPaintRect));
 }
 
 void Page::suspendActiveDOMObjectsAndAnimations()

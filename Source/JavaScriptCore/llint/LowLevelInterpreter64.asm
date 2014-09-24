@@ -138,7 +138,7 @@ macro cCall4(function, arg1, arg2, arg3, arg4)
     end
 end
 
-macro doCallToJavaScript(makeCall)
+macro doVMEntry(makeCall)
     if X86_64
         const entry = t4
         const vm = t5
@@ -171,46 +171,28 @@ macro doCallToJavaScript(makeCall)
         const temp3 = t6
     end
 
-    callToJavaScriptPrologue()
+    functionPrologue()
+    pushCalleeSaves()
 
-    if X86_64
-        loadp 7*8[sp], previousPC
-        move 6*8[sp], previousCFR
-    elsif X86_64_WIN
-        # Win64 pushes two more registers
-        loadp 9*8[sp], previousPC
-        move 8*8[sp], previousCFR
-    elsif ARM64
-        move cfr, previousCFR
-    end
+    vmEntryRecord(cfr, sp)
 
     checkStackPointerAlignment(temp2, 0xbad0dc01)
 
-    # The stack reserved zone ensures that we have adequate space for the
-    # VMEntrySentinelFrame. Proceed with allocating and initializing the
-    # sentinel frame.
-    move sp, cfr
-    subp CallFrameHeaderSlots * 8, cfr
-    storep 0, ArgumentCount[cfr]
-    storep vm, Callee[cfr]
+    storep vm, VMEntryRecord::m_vm[sp]
     loadp VM::topCallFrame[vm], temp2
-    storep temp2, ScopeChain[cfr]
-    storep 1, CodeBlock[cfr]
-
-    storep previousPC, ReturnPC[cfr]
-    storep previousCFR, CallerFrame[cfr]
+    storep temp2, VMEntryRecord::m_prevTopCallFrame[sp]
+    loadp VM::topVMEntryFrame[vm], temp2
+    storep temp2, VMEntryRecord::m_prevTopVMEntryFrame[sp]
 
     loadi ProtoCallFrame::paddedArgCount[protoCallFrame], temp2
     addp CallFrameHeaderSlots, temp2, temp2
     lshiftp 3, temp2
-    subp cfr, temp2, temp1
+    subp sp, temp2, temp1
 
     # Ensure that we have enough additional stack capacity for the incoming args,
     # and the frame for the JS code we're executing. We need to do this check
     # before we start copying the args from the protoCallFrame below.
     bpaeq temp1, VM::m_jsStackLimit[vm], .stackHeightOK
-
-    move cfr, sp
 
     if C_LOOP
         move entry, temp2
@@ -227,7 +209,19 @@ macro doCallToJavaScript(makeCall)
     end
 
     cCall2(_llint_throw_stack_overflow_error, vm, protoCallFrame)
-    callToJavaScriptEpilogue()
+
+    vmEntryRecord(cfr, temp2)
+
+    loadp VMEntryRecord::m_vm[temp2], vm
+    loadp VMEntryRecord::m_prevTopCallFrame[temp2], temp3
+    storep temp3, VM::topCallFrame[vm]
+    loadp VMEntryRecord::m_prevTopVMEntryFrame[temp2], temp3
+    storep temp3, VM::topVMEntryFrame[vm]
+
+    subp cfr, CalleeRegisterSaveSize, sp
+
+    popCalleeSaves()
+    functionEpilogue()
     ret
 
 .stackHeightOK:
@@ -269,6 +263,7 @@ macro doCallToJavaScript(makeCall)
     else
         storep sp, VM::topCallFrame[vm]
     end
+    storep cfr, VM::topVMEntryFrame[vm]
 
     move 0xffff000000000000, csr1
     addp 2, csr1, csr2
@@ -279,20 +274,18 @@ macro doCallToJavaScript(makeCall)
 
     checkStackPointerAlignment(temp3, 0xbad0dc03)
 
-    bpeq CodeBlock[cfr], 1, .calleeFramePopped
-    loadp CallerFrame[cfr], cfr
+    vmEntryRecord(cfr, temp2)
 
-.calleeFramePopped:
-    loadp Callee[cfr], temp2 # VM
-    loadp ScopeChain[cfr], temp3 # previous topCallFrame
-    storep temp3, VM::topCallFrame[temp2]
+    loadp VMEntryRecord::m_vm[temp2], vm
+    loadp VMEntryRecord::m_prevTopCallFrame[temp2], temp3
+    storep temp3, VM::topCallFrame[vm]
+    loadp VMEntryRecord::m_prevTopVMEntryFrame[temp2], temp3
+    storep temp3, VM::topVMEntryFrame[vm]
 
-    checkStackPointerAlignment(temp3, 0xbad0dc04)
+    subp cfr, CalleeRegisterSaveSize, sp
 
-    if X86_64 or X86_64_WIN
-        pop t5
-    end
-    callToJavaScriptEpilogue()
+    popCalleeSaves()
+    functionEpilogue()
 
     ret
 end
@@ -311,6 +304,7 @@ end
 
 macro makeHostFunctionCall(entry, temp)
     move entry, temp
+    storep cfr, [sp]
     if X86_64
         move sp, t4
     elsif X86_64_WIN
@@ -319,46 +313,38 @@ macro makeHostFunctionCall(entry, temp)
         move sp, a0
     end
     if C_LOOP
-        storep cfr, [sp]
         storep lr, 8[sp]
         cloopCallNative temp
     elsif X86_64_WIN
-        # For a host function call, JIT relies on that the CallerFrame (frame pointer) is put on the stack,
-        # On Win64 we need to manually copy the frame pointer to the stack, since MSVC may not maintain a frame pointer on 64-bit.
-        # See http://msdn.microsoft.com/en-us/library/9z1stfyw.aspx where it's stated that rbp MAY be used as a frame pointer.
-        storep cfr, [sp]
-
         # We need to allocate 32 bytes on the stack for the shadow space.
         subp 32, sp
         call temp
         addp 32, sp
     else
-        addp 16, sp
         call temp
-        subp 16, sp
     end
 end
 
 
 _handleUncaughtException:
-    loadp ScopeChain[cfr], t3
+    loadp Callee[cfr], t3
     andp MarkedBlockMask, t3
     loadp MarkedBlock::m_weakSet + WeakSet::m_vm[t3], t3
     loadp VM::callFrameForThrow[t3], cfr
 
-    # So far, we've unwound the stack to the frame just below the sentinel frame, except
-    # in the case of stack overflow in the first function called from callToJavaScript.
-    # Check if we need to pop to the sentinel frame and do the necessary clean up for
-    # returning to the caller C frame.
-    bpeq CodeBlock[cfr], 1, .handleUncaughtExceptionAlreadyIsSentinel
     loadp CallerFrame[cfr], cfr
-.handleUncaughtExceptionAlreadyIsSentinel:
+    vmEntryRecord(cfr, t2)
 
-    loadp Callee[cfr], t3 # VM
-    loadp ScopeChain[cfr], t5 # previous topCallFrame
+    loadp VMEntryRecord::m_vm[t2], t3
+    loadp VMEntryRecord::m_prevTopCallFrame[t2], t5
     storep t5, VM::topCallFrame[t3]
+    loadp VMEntryRecord::m_prevTopVMEntryFrame[t2], t5
+    storep t5, VM::topVMEntryFrame[t3]
 
-    callToJavaScriptEpilogue()
+    subp cfr, CalleeRegisterSaveSize, sp
+
+    popCalleeSaves()
+    functionEpilogue()
     ret
 
 
@@ -592,7 +578,7 @@ macro functionArityCheck(doneLabel, slowPath)
 end
 
 macro branchIfException(label)
-    loadp ScopeChain[cfr], t3
+    loadp Callee[cfr], t3
     andp MarkedBlockMask, t3
     loadp MarkedBlock::m_weakSet + WeakSet::m_vm[t3], t3
     btqz VM::m_exception[t3], .noException
@@ -621,10 +607,10 @@ _llint_op_enter:
     dispatch(1)
 
 
-_llint_op_create_activation:
+_llint_op_create_lexical_environment:
     traceExecution()
     loadisFromInstruction(1, t0)
-    callSlowPath(_llint_slow_path_create_activation)
+    callSlowPath(_llint_slow_path_create_lexical_environment)
     dispatch(2)
 
 
@@ -1842,11 +1828,11 @@ macro doCall(slowPath)
 end
 
 
-_llint_op_tear_off_activation:
+_llint_op_tear_off_lexical_environment:
     traceExecution()
     loadisFromInstruction(1, t0)
     btqz [cfr, t0, 8], .opTearOffActivationNotCreated
-    callSlowPath(_llint_slow_path_tear_off_activation)
+    callSlowPath(_llint_slow_path_tear_off_lexical_environment)
 .opTearOffActivationNotCreated:
     dispatch(2)
 
@@ -1906,10 +1892,12 @@ _llint_op_catch:
     # the interpreter's throw trampoline (see _llint_throw_trampoline).
     # The throwing code must have known that we were throwing to the interpreter,
     # and have set VM::targetInterpreterPCForThrow.
-    loadp ScopeChain[cfr], t3
+    loadp Callee[cfr], t3
     andp MarkedBlockMask, t3
     loadp MarkedBlock::m_weakSet + WeakSet::m_vm[t3], t3
     loadp VM::callFrameForThrow[t3], cfr
+    loadp VM::vmEntryFrameForThrow[t3], t0
+    storep t0, VM::topVMEntryFrame[t3]
     restoreStackPointerAfterCall()
 
     loadp CodeBlock[cfr], PB
@@ -1964,7 +1952,7 @@ macro nativeCallTrampoline(executableOffsetToFunction)
             const arg2 = t1  # t1 = rdx
             const temp = t0
         end
-        loadp ScopeChain[cfr], t0
+        loadp Callee[cfr], t0
         andp MarkedBlockMask, t0
         loadp MarkedBlock::m_weakSet + WeakSet::m_vm[t0], t0
         storep cfr, VM::topCallFrame[t0]
@@ -1982,11 +1970,11 @@ macro nativeCallTrampoline(executableOffsetToFunction)
         if X86_64_WIN
             addp 32, sp
         end
-        loadp ScopeChain[cfr], t3
+        loadp Callee[cfr], t3
         andp MarkedBlockMask, t3
         loadp MarkedBlock::m_weakSet + WeakSet::m_vm[t3], t3
     elsif ARM64 or C_LOOP
-        loadp ScopeChain[cfr], t0
+        loadp Callee[cfr], t0
         andp MarkedBlockMask, t0
         loadp MarkedBlock::m_weakSet + WeakSet::m_vm[t0], t0
         storep cfr, VM::topCallFrame[t0]
@@ -2005,7 +1993,7 @@ macro nativeCallTrampoline(executableOffsetToFunction)
             call executableOffsetToFunction[t1]
         end
         restoreReturnAddressBeforeReturn(t3)
-        loadp ScopeChain[cfr], t3
+        loadp Callee[cfr], t3
         andp MarkedBlockMask, t3
         loadp MarkedBlock::m_weakSet + WeakSet::m_vm[t3], t3
     else
@@ -2041,11 +2029,6 @@ end
 macro resolveScope()
     loadp CodeBlock[cfr], t0
     loadisFromInstruction(4, t2)
-    btbz CodeBlock::m_needsActivation[t0], .resolveScopeAfterActivationCheck
-    loadis CodeBlock::m_activationRegister[t0], t1
-    addi 1, t2
-
-.resolveScopeAfterActivationCheck:
     loadp ScopeChain[cfr], t0
     btiz t2, .resolveScopeLoopEnd
 
@@ -2127,7 +2110,7 @@ macro getGlobalVar()
 end
 
 macro getClosureVar()
-    loadp JSVariableObject::m_registers[t0], t0
+    loadp JSEnvironmentRecord::m_registers[t0], t0
     loadisFromInstruction(6, t1)
     loadq [t0, t1, 8], t0
     valueProfile(t0, 7, t1)
@@ -2201,7 +2184,7 @@ end
 macro putClosureVar()
     loadisFromInstruction(3, t1)
     loadConstantOrVariable(t1, t2)
-    loadp JSVariableObject::m_registers[t0], t0
+    loadp JSEnvironmentRecord::m_registers[t0], t0
     loadisFromInstruction(6, t1)
     storeq t2, [t0, t1, 8]
 end

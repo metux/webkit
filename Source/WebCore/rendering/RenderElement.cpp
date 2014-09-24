@@ -85,6 +85,7 @@ inline RenderElement::RenderElement(ContainerNode& elementOrDocument, PassRef<Re
     , m_renderInlineAlwaysCreatesLineBoxes(false)
     , m_renderBoxNeedsLazyRepaint(false)
     , m_hasPausedImageAnimations(false)
+    , m_hasCounterNodeMap(false)
     , m_firstChild(nullptr)
     , m_lastChild(nullptr)
     , m_style(WTF::move(style))
@@ -186,6 +187,8 @@ RenderPtr<RenderElement> RenderElement::createFor(Element& element, PassRef<Rend
         return createRenderer<RenderDeprecatedFlexibleBox>(element, WTF::move(style));
     case FLEX:
     case INLINE_FLEX:
+    case WEBKIT_FLEX:
+    case WEBKIT_INLINE_FLEX:
         return createRenderer<RenderFlexibleBox>(element, WTF::move(style));
 #if ENABLE(CSS_GRID_LAYOUT)
     case GRID:
@@ -273,8 +276,7 @@ StyleDifference RenderElement::adjustStyleDifference(StyleDifference diff, unsig
         else if (diff < StyleDifferenceRecompositeLayer)
             diff = StyleDifferenceRecompositeLayer;
     }
-    
-#if ENABLE(CSS_FILTERS)
+
     if ((contextSensitiveProperties & ContextSensitivePropertyFilter) && hasLayer()) {
         RenderLayer* layer = toRenderLayerModelObject(this)->layer();
         if (!layer->isComposited() || layer->paintsWithFilters())
@@ -282,7 +284,6 @@ StyleDifference RenderElement::adjustStyleDifference(StyleDifference diff, unsig
         else if (diff < StyleDifferenceRecompositeLayer)
             diff = StyleDifferenceRecompositeLayer;
     }
-#endif
     
     // The answer to requiresLayer() for plugins, iframes, and canvas can change without the actual
     // style changing, since it depends on whether we decide to composite these elements. When the
@@ -568,7 +569,8 @@ void RenderElement::insertChildInternal(RenderObject* newChild, RenderObject* be
     if (!documentBeingDestroyed()) {
         if (notifyChildren == NotifyChildren)
             newChild->insertedIntoTree();
-        RenderCounter::rendererSubtreeAttached(newChild);
+        if (newChild->isRenderElement())
+            RenderCounter::rendererSubtreeAttached(toRenderElement(*newChild));
     }
 
     newChild->setNeedsLayoutAndPrefWidthsRecalc();
@@ -636,8 +638,8 @@ RenderObject* RenderElement::removeChildInternal(RenderObject& oldChild, NotifyC
 
     // rendererRemovedFromTree walks the whole subtree. We can improve performance
     // by skipping this step when destroying the entire tree.
-    if (!documentBeingDestroyed())
-        RenderCounter::rendererRemovedFromTree(oldChild);
+    if (!documentBeingDestroyed() && oldChild.isRenderElement())
+        RenderCounter::rendererRemovedFromTree(toRenderElement(oldChild));
 
     if (AXObjectCache* cache = document().existingAXObjectCache())
         cache->childrenChanged(this);
@@ -920,7 +922,7 @@ void RenderElement::styleDidChange(StyleDifference diff, const RenderStyle* oldS
         return;
     
     if (diff == StyleDifferenceLayout || diff == StyleDifferenceSimplifiedLayout) {
-        RenderCounter::rendererStyleChanged(this, oldStyle, &m_style.get());
+        RenderCounter::rendererStyleChanged(*this, oldStyle, &m_style.get());
 
         // If the object already needs layout, then setNeedsLayout won't do
         // any work. But if the containing block has changed, then we may need
@@ -1007,6 +1009,9 @@ void RenderElement::willBeDestroyed()
 
     destroyLeftoverChildren();
 
+    if (hasCounterNodeMap())
+        RenderCounter::destroyCounterNodes(*this);
+
     RenderObject::willBeDestroyed();
 
 #if !ASSERT_DISABLED
@@ -1028,7 +1033,7 @@ void RenderElement::setNeedsPositionedMovementLayout(const RenderStyle* oldStyle
     setNeedsPositionedMovementLayoutBit(true);
     markContainingBlocksForLayout();
     if (hasLayer()) {
-        if (oldStyle && style().diffRequiresRepaint(oldStyle))
+        if (oldStyle && style().diffRequiresLayerRepaint(*oldStyle, toRenderLayerModelObject(this)->layer()->isComposited()))
             setLayerNeedsFullRepaint();
         else
             setLayerNeedsFullRepaintForPositionedMovementLayout();
@@ -1305,7 +1310,8 @@ static bool shouldRepaintForImageAnimation(const RenderElement& renderer, const 
 
 void RenderElement::newImageAnimationFrameAvailable(CachedImage& image)
 {
-    auto visibleRect = view().frameView().visibleContentRect();
+    auto& frameView = view().frameView();
+    auto visibleRect = frameView.windowToContents(frameView.windowClipRect());
     if (!shouldRepaintForImageAnimation(*this, visibleRect)) {
         view().addRendererWithPausedImageAnimations(*this);
         return;

@@ -45,7 +45,7 @@
 #include "Interpreter.h"
 #include "JIT.h"
 #include "JITExceptions.h"
-#include "JSActivation.h"
+#include "JSLexicalEnvironment.h"
 #include "VM.h"
 #include "JSNameScope.h"
 #include "NameInstance.h"
@@ -137,7 +137,7 @@ char* newTypedArrayWithSize(ExecState* exec, Structure* structure, int32_t size)
     VM& vm = exec->vm();
     NativeCallFrameTracer tracer(&vm, exec);
     if (size < 0) {
-        vm.throwException(exec, createRangeError(exec, "Requested length is negative"));
+        vm.throwException(exec, createRangeError(exec, ASCIILiteral("Requested length is negative")));
         return 0;
     }
     return bitwise_cast<char*>(ViewClass::create(exec, structure, size));
@@ -156,7 +156,7 @@ char* newTypedArrayWithOneArgument(
         RefPtr<ArrayBuffer> buffer = jsBuffer->impl();
         
         if (buffer->byteLength() % ViewClass::elementSize) {
-            vm.throwException(exec, createRangeError(exec, "ArrayBuffer length minus the byteOffset is not a multiple of the element size"));
+            vm.throwException(exec, createRangeError(exec, ASCIILiteral("ArrayBuffer length minus the byteOffset is not a multiple of the element size")));
             return 0;
         }
         return bitwise_cast<char*>(
@@ -183,18 +183,18 @@ char* newTypedArrayWithOneArgument(
     if (value.isInt32())
         length = value.asInt32();
     else if (!value.isNumber()) {
-        vm.throwException(exec, createTypeError(exec, "Invalid array length argument"));
+        vm.throwException(exec, createTypeError(exec, ASCIILiteral("Invalid array length argument")));
         return 0;
     } else {
         length = static_cast<int>(value.asNumber());
         if (length != value.asNumber()) {
-            vm.throwException(exec, createTypeError(exec, "Invalid array length argument (fractional lengths not allowed)"));
+            vm.throwException(exec, createTypeError(exec, ASCIILiteral("Invalid array length argument (fractional lengths not allowed)")));
             return 0;
         }
     }
     
     if (length < 0) {
-        vm.throwException(exec, createRangeError(exec, "Requested length is negative"));
+        vm.throwException(exec, createRangeError(exec, ASCIILiteral("Requested length is negative")));
         return 0;
     }
     
@@ -297,8 +297,10 @@ EncodedJSValue JIT_OPERATION operationGetByVal(ExecState* exec, EncodedJSValue e
         } else if (property.isString()) {
             Structure& structure = *base->structure(vm);
             if (JSCell::canUseFastGetOwnProperty(structure)) {
-                if (JSValue result = base->fastGetOwnProperty(vm, structure, asString(property)->value(exec)))
-                    return JSValue::encode(result);
+                if (AtomicStringImpl* existingAtomicString = asString(property)->toExistingAtomicString(exec)) {
+                    if (JSValue result = base->fastGetOwnProperty(vm, structure, existingAtomicString))
+                        return JSValue::encode(result);
+                }
             }
         }
     }
@@ -327,8 +329,10 @@ EncodedJSValue JIT_OPERATION operationGetByValCell(ExecState* exec, JSCell* base
     } else if (property.isString()) {
         Structure& structure = *base->structure(vm);
         if (JSCell::canUseFastGetOwnProperty(structure)) {
-            if (JSValue result = base->fastGetOwnProperty(vm, structure, asString(property)->value(exec)))
-                return JSValue::encode(result);
+            if (AtomicStringImpl* existingAtomicString = asString(property)->toExistingAtomicString(exec)) {
+                if (JSValue result = base->fastGetOwnProperty(vm, structure, existingAtomicString))
+                    return JSValue::encode(result);
+            }
         }
     }
 

@@ -105,7 +105,7 @@
 #include "NodeIterator.h"
 #include "NodeRareData.h"
 #include "NodeWithIndex.h"
-#include "PageConsole.h"
+#include "PageConsoleClient.h"
 #include "PageGroup.h"
 #include "PageTransitionEvent.h"
 #include "PlatformLocale.h"
@@ -158,6 +158,7 @@
 #include <wtf/CurrentTime.h>
 #include <wtf/TemporaryChange.h>
 #include <wtf/text/StringBuffer.h>
+#include <yarr/RegularExpression.h>
 
 #if ENABLE(SHARED_WORKERS)
 #include "SharedWorkerRepository.h"
@@ -403,7 +404,7 @@ HashSet<Document*>& Document::allDocuments()
 Document::Document(Frame* frame, const URL& url, unsigned documentClasses, unsigned constructionFlags)
     : ContainerNode(*this, CreateDocument)
     , TreeScope(*this)
-#if ENABLE(TOUCH_EVENTS) && PLATFORM(IOS)
+#if ENABLE(IOS_TOUCH_EVENTS)
     , m_handlingTouchEvent(false)
     , m_touchEventRegionsDirty(false)
     , m_touchEventsChangedTimer(this, &Document::touchEventsChangedTimerFired)
@@ -813,7 +814,7 @@ DOMImplementation* Document::implementation()
 
 bool Document::hasManifest() const
 {
-    return documentElement() && documentElement()->hasTagName(htmlTag) && documentElement()->hasAttribute(manifestAttr);
+    return documentElement() && documentElement()->hasTagName(htmlTag) && documentElement()->fastHasAttribute(manifestAttr);
 }
 
 DocumentType* Document::doctype() const
@@ -1395,7 +1396,7 @@ PassRefPtr<Range> Document::caretRangeFromPoint(int x, int y)
 
     Node* shadowAncestorNode = ancestorInThisScope(node);
     if (shadowAncestorNode != node) {
-        unsigned offset = shadowAncestorNode->nodeIndex();
+        unsigned offset = shadowAncestorNode->computeNodeIndex();
         ContainerNode* container = shadowAncestorNode->parentNode();
         return Range::create(*this, container, offset, container, offset);
     }
@@ -1808,8 +1809,8 @@ void Document::updateLayout()
 
     RenderView::RepaintRegionAccumulator repaintRegionAccumulator(renderView());
 
-    if (Element* oe = ownerElement())
-        oe->document().updateLayout();
+    if (HTMLFrameOwnerElement* owner = ownerElement())
+        owner->document().updateLayout();
 
     updateStyleIfNeeded();
 
@@ -1851,7 +1852,7 @@ void Document::updateLayoutIgnorePendingStylesheets(Document::RunPostLayoutTasks
 
     updateLayout();
 
-    if (runPostLayoutTasks == RunPostLayoutTasksSynchronously && view())
+    if (runPostLayoutTasks == RunPostLayoutTasks::Synchronously && view())
         view()->flushAnyPendingPostLayoutTasks();
 
     m_ignorePendingStylesheets = oldIgnore;
@@ -2051,7 +2052,7 @@ void Document::prepareForDestruction()
     if (m_hasPreparedForDestruction)
         return;
 
-#if ENABLE(TOUCH_EVENTS) && PLATFORM(IOS)
+#if ENABLE(IOS_TOUCH_EVENTS)
     clearTouchEventListeners();
 #endif
 
@@ -2102,7 +2103,7 @@ void Document::removeAllEventListeners()
 
     if (m_domWindow)
         m_domWindow->removeAllEventListeners();
-#if ENABLE(TOUCH_EVENTS) && PLATFORM(IOS)
+#if ENABLE(IOS_TOUCH_EVENTS)
     clearTouchEventListeners();
 #endif
     for (Node* node = firstChild(); node; node = NodeTraversal::next(node))
@@ -2380,14 +2381,16 @@ void Document::implicitClose()
     if (f) {
         f->loader().icon().startLoader();
         f->animation().startAnimationsIfNotSuspended(this);
+
+        // FIXME: We shouldn't be dispatching pending events globally on all Documents here.
+        // For now, only do this when there is a Frame, otherwise this could cause JS reentrancy
+        // below SVG font parsing, for example. <https://webkit.org/b/136269>
+        ImageLoader::dispatchPendingBeforeLoadEvents();
+        ImageLoader::dispatchPendingLoadEvents();
+        ImageLoader::dispatchPendingErrorEvents();
+        HTMLLinkElement::dispatchPendingLoadEvents();
+        HTMLStyleElement::dispatchPendingLoadEvents();
     }
-
-    ImageLoader::dispatchPendingBeforeLoadEvents();
-    ImageLoader::dispatchPendingLoadEvents();
-    ImageLoader::dispatchPendingErrorEvents();
-
-    HTMLLinkElement::dispatchPendingLoadEvents();
-    HTMLStyleElement::dispatchPendingLoadEvents();
 
     // To align the HTML load event and the SVGLoad event for the outermost <svg> element, fire it from
     // here, instead of doing it from SVGElement::finishedParsingChildren (if externalResourcesRequired="false",
@@ -4137,6 +4140,11 @@ void Document::documentWillSuspendForPageCache()
     // is dispatched, after the document is restored from the page cache.
     m_didDispatchViewportPropertiesChanged = false;
 #endif
+
+    if (RenderView* view = renderView()) {
+        if (view->usesCompositing())
+            view->compositor().cancelCompositingLayerUpdate();
+    }
 }
 
 void Document::documentDidResumeFromPageCache() 
@@ -4381,7 +4389,7 @@ Document& Document::topDocument() const
     }
 
     Document* document = const_cast<Document*>(this);
-    while (Element* element = document->ownerElement())
+    while (HTMLFrameOwnerElement* element = document->ownerElement())
         document = &element->document();
     return *document;
 }
@@ -5324,6 +5332,15 @@ static void unwrapFullScreenRenderer(RenderFullScreen* fullScreenRenderer, Eleme
         fullScreenElement->parentNode()->setNeedsStyleRecalc(ReconstructRenderTree);
 }
 
+static bool hostIsYouTube(const String& host)
+{
+    // Match .youtube.com, youtube.com, youtube.co.uk, and all two-letter country codes.
+    static NeverDestroyed<JSC::Yarr::RegularExpression> youtubePattern("(^|\\.)youtube.(com|co.uk|[a-z]{2})$", TextCaseInsensitive);
+    ASSERT(youtubePattern.get().isValid());
+
+    return youtubePattern.get().match(host);
+}
+
 void Document::webkitWillEnterFullScreenForElement(Element* element)
 {
     if (!hasLivingRenderTree() || inPageCache())
@@ -5361,8 +5378,11 @@ void Document::webkitWillEnterFullScreenForElement(Element* element)
         RenderFullScreen::wrapRenderer(renderer, renderer ? renderer->parent() : nullptr, *this);
 
     m_fullScreenElement->setContainsFullScreenElementOnAncestorsCrossingFrameBoundaries(true);
-    
+
     recalcStyle(Style::Force);
+
+    if (settings() && settings()->needsSiteSpecificQuirks() && hostIsYouTube(url().host()))
+        fullScreenChangeDelayTimerFired(m_fullScreenChangeDelayTimer);
 }
 
 void Document::webkitDidEnterFullScreenForElement(Element*)
@@ -5375,7 +5395,8 @@ void Document::webkitDidEnterFullScreenForElement(Element*)
 
     m_fullScreenElement->didBecomeFullscreenElement();
 
-    m_fullScreenChangeDelayTimer.startOneShot(0);
+    if (!settings() || !settings()->needsSiteSpecificQuirks() || !hostIsYouTube(url().host()))
+        m_fullScreenChangeDelayTimer.startOneShot(0);
 }
 
 void Document::webkitWillExitFullScreenForElement(Element*)
@@ -5411,9 +5432,16 @@ void Document::webkitDidExitFullScreenForElement(Element*)
     // the exiting document.
     bool eventTargetQueuesEmpty = m_fullScreenChangeEventTargetQueue.isEmpty() && m_fullScreenErrorEventTargetQueue.isEmpty();
     Document& exitingDocument = eventTargetQueuesEmpty ? topDocument() : *this;
-    exitingDocument.m_fullScreenChangeDelayTimer.startOneShot(0);
+
+    // FIXME(136605): Remove this quirk once YouTube moves to relative widths and heights for
+    // fullscreen mode.
+    if (settings() && settings()->needsSiteSpecificQuirks() && hostIsYouTube(url().host()))
+        exitingDocument.fullScreenChangeDelayTimerFired(exitingDocument.m_fullScreenChangeDelayTimer);
+    else
+        exitingDocument.m_fullScreenChangeDelayTimer.startOneShot(0);
+
 }
-    
+
 void Document::setFullScreenRenderer(RenderFullScreen* renderer)
 {
     if (renderer == m_fullScreenRenderer)
@@ -6144,9 +6172,20 @@ bool Document::unwrapCryptoKey(const Vector<uint8_t>& wrappedKey, Vector<uint8_t
 
 static inline bool nodeOrItsAncestorNeedsStyleRecalc(const Node& node)
 {
-    for (const Node* n = &node; n; n = n->parentOrShadowHostNode()) {
-        if (n->needsStyleRecalc())
+    if (node.needsStyleRecalc())
+        return true;
+
+    const Node* currentNode = &node;
+    const Element* ancestor = currentNode->parentOrShadowHostElement();
+    while (ancestor) {
+        if (ancestor->needsStyleRecalc())
             return true;
+
+        if (ancestor->directChildNeedsStyleRecalc() && currentNode->styleIsAffectedByPreviousSibling())
+            return true;
+
+        currentNode = ancestor;
+        ancestor = currentNode->parentOrShadowHostElement();
     }
     return false;
 }

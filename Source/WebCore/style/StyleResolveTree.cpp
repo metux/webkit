@@ -118,6 +118,11 @@ Change determineChange(const RenderStyle* s1, const RenderStyle* s2)
     // When the region thread has changed, we need to prepare a separate render region object.
     if (s1->regionThread() != s2->regionThread())
         return Detach;
+    // FIXME: Multicolumn regions not yet supported (http://dev.w3.org/csswg/css-regions/#multi-column-regions)
+    // When the node has region style and changed its multicol style, we have to prepare
+    // a separate render region object.
+    if (s1->hasFlowFrom() && (s1->specifiesColumns() != s2->specifiesColumns()))
+        return Detach;
 
     if (*s1 != *s2) {
         if (s1->inheritedNotEqual(s2))
@@ -552,12 +557,21 @@ static void clearBeforeOrAfterPseudoElement(Element& current, PseudoId pseudoId)
 static void resetStyleForNonRenderedDescendants(Element& current)
 {
     ASSERT(!current.renderer());
+    bool elementNeedingStyleRecalcAffectsNextSiblingElementStyle = false;
     for (auto& child : childrenOfType<Element>(current)) {
         ASSERT(!child.renderer());
+        if (elementNeedingStyleRecalcAffectsNextSiblingElementStyle) {
+            if (child.styleIsAffectedByPreviousSibling())
+                child.setNeedsStyleRecalc();
+            elementNeedingStyleRecalcAffectsNextSiblingElementStyle = child.affectsNextSiblingElementStyle();
+        }
+
         if (child.needsStyleRecalc()) {
             child.resetComputedStyle();
             child.clearNeedsStyleRecalc();
+            elementNeedingStyleRecalcAffectsNextSiblingElementStyle = child.affectsNextSiblingElementStyle();
         }
+
         if (child.childNeedsStyleRecalc()) {
             resetStyleForNonRenderedDescendants(child);
             child.clearChildNeedsStyleRecalc();
@@ -896,9 +910,6 @@ void resolveTree(Element& current, RenderStyle& inheritedStyle, RenderTreePositi
             return;
     }
 
-    bool hasDirectAdjacentRules = current.childrenAffectedByDirectAdjacentRules();
-    bool hasIndirectAdjacentRules = current.childrenAffectedByForwardPositionalRules();
-
 #if PLATFORM(IOS)
     CheckForVisibilityChangeOnRecalcStyle checkForVisibilityChange(&current, current.renderStyle());
 #endif
@@ -924,30 +935,28 @@ void resolveTree(Element& current, RenderStyle& inheritedStyle, RenderTreePositi
         RenderTreePosition childRenderTreePosition(*renderer);
         updateBeforeOrAfterPseudoElement(current, change, BEFORE, childRenderTreePosition);
 
-        // FIXME: This check is good enough for :hover + foo, but it is not good enough for :hover + foo + bar.
-        // For now we will just worry about the common case, since it's a lot trickier to get the second case right
-        // without doing way too much re-resolution.
-        bool forceCheckOfNextElementSibling = false;
-        bool forceCheckOfAnyElementSibling = false;
+        bool elementNeedingStyleRecalcAffectsNextSiblingElementStyle = false;
         for (Node* child = current.firstChild(); child; child = child->nextSibling()) {
-            if (child->renderer())
-                childRenderTreePosition.invalidateNextSibling(*child->renderer());
+            if (RenderObject* childRenderer = child->renderer())
+                childRenderTreePosition.invalidateNextSibling(*childRenderer);
             if (child->isTextNode() && child->needsStyleRecalc()) {
                 resolveTextNode(*toText(child), childRenderTreePosition);
                 continue;
             }
             if (!child->isElementNode())
                 continue;
+
             Element* childElement = toElement(child);
-            bool childRulesChanged = childElement->needsStyleRecalc() && childElement->styleChangeType() == FullStyleChange;
-            if ((forceCheckOfNextElementSibling || forceCheckOfAnyElementSibling))
-                childElement->setNeedsStyleRecalc();
+            if (elementNeedingStyleRecalcAffectsNextSiblingElementStyle) {
+                if (childElement->styleIsAffectedByPreviousSibling())
+                    childElement->setNeedsStyleRecalc();
+                elementNeedingStyleRecalcAffectsNextSiblingElementStyle = childElement->affectsNextSiblingElementStyle();
+            } else if (childElement->styleChangeType() >= FullStyleChange)
+                elementNeedingStyleRecalcAffectsNextSiblingElementStyle = childElement->affectsNextSiblingElementStyle();
             if (change >= Inherit || childElement->childNeedsStyleRecalc() || childElement->needsStyleRecalc()) {
                 parentPusher.push();
                 resolveTree(*childElement, renderer->style(), childRenderTreePosition, change);
             }
-            forceCheckOfNextElementSibling = childRulesChanged && hasDirectAdjacentRules;
-            forceCheckOfAnyElementSibling = forceCheckOfAnyElementSibling || (childRulesChanged && hasIndirectAdjacentRules);
         }
 
         updateBeforeOrAfterPseudoElement(current, change, AFTER, childRenderTreePosition);

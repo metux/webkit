@@ -550,7 +550,7 @@ bool AccessibilityRenderObject::isReadOnly() const
 bool AccessibilityRenderObject::isOffScreen() const
 {
     ASSERT(m_renderer);
-    IntRect contentRect = pixelSnappedIntRect(m_renderer->absoluteClippedOverflowRect());
+    IntRect contentRect = snappedIntRect(m_renderer->absoluteClippedOverflowRect());
     // FIXME: unclear if we need LegacyIOSDocumentVisibleRect.
     IntRect viewRect = m_renderer->view().frameView().visibleContentRect(ScrollableArea::LegacyIOSDocumentVisibleRect);
     viewRect.intersect(contentRect);
@@ -1246,9 +1246,25 @@ bool AccessibilityRenderObject::computeAccessibilityIsIgnored() const
     if (isLink())
         return false;
     
+    if (isLandmark())
+        return false;
+
     // all controls are accessible
     if (isControl())
         return false;
+
+    switch (roleValue()) {
+    case AudioRole:
+    case DescriptionListTermRole:
+    case DescriptionListDetailRole:
+    case DocumentArticleRole:
+    case DocumentRegionRole:
+    case ListItemRole:
+    case VideoRole:
+        return false;
+    default:
+        break;
+    }
     
     if (ariaRoleAttribute() != UnknownRole)
         return false;
@@ -1267,14 +1283,6 @@ bool AccessibilityRenderObject::computeAccessibilityIsIgnored() const
     if (hasContentEditableAttributeSet())
         return false;
     
-    switch (roleValue()) {
-    case AudioRole:
-    case ListItemRole:
-    case VideoRole:
-        return false;
-    default:
-        break;
-    }
     
     // if this element has aria attributes on it, it should not be ignored.
     if (supportsARIAAttributes())
@@ -1952,9 +1960,9 @@ IntRect AccessibilityRenderObject::boundsForVisiblePositionRange(const VisiblePo
     }
     
 #if PLATFORM(MAC)
-    return m_renderer->view().frameView().contentsToScreen(pixelSnappedIntRect(ourrect));
+    return m_renderer->view().frameView().contentsToScreen(snappedIntRect(ourrect));
 #else
-    return pixelSnappedIntRect(ourrect);
+    return snappedIntRect(ourrect);
 #endif
 }
     

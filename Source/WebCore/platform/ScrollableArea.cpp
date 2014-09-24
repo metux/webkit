@@ -87,6 +87,11 @@ void ScrollableArea::setScrollOrigin(const IntPoint& origin)
     }
 }
 
+float ScrollableArea::adjustScrollStepForFixedContent(float step, ScrollbarOrientation, ScrollGranularity)
+{
+    return step;
+}
+
 bool ScrollableArea::scroll(ScrollDirection direction, ScrollGranularity granularity, float multiplier)
 {
     ScrollbarOrientation orientation;
@@ -122,6 +127,7 @@ bool ScrollableArea::scroll(ScrollDirection direction, ScrollGranularity granula
     if (direction == ScrollUp || direction == ScrollLeft)
         multiplier = -multiplier;
 
+    step = adjustScrollStepForFixedContent(step, orientation, granularity);
     return scrollAnimator()->scroll(orientation, granularity, step, multiplier);
 }
 
@@ -179,6 +185,9 @@ void ScrollableArea::scrollPositionChanged(const IntPoint& position)
 
 bool ScrollableArea::handleWheelEvent(const PlatformWheelEvent& wheelEvent)
 {
+    if (!isScrollableOrRubberbandable())
+        return false;
+
     return scrollAnimator()->handleWheelEvent(wheelEvent);
 }
 

@@ -66,10 +66,10 @@ public:
     bool shouldAutocomplete() const;
 
 #if ENABLE(IOS_AUTOCORRECT_AND_AUTOCAPITALIZE)
-    bool autocorrect() const;
+    WEBCORE_EXPORT bool autocorrect() const;
     void setAutocorrect(bool);
 
-    WebAutocapitalizeType autocapitalizeType() const;
+    WEBCORE_EXPORT WebAutocapitalizeType autocapitalizeType() const;
     const AtomicString& autocapitalize() const;
     void setAutocapitalize(const AtomicString&);
 #endif
@@ -111,6 +111,21 @@ public:
     HTMLFormControlElement* defaultButton() const;
 
     bool checkValidity();
+
+#if ENABLE(REQUEST_AUTOCOMPLETE)
+    enum class AutocompleteResult {
+        Success,
+        ErrorDisabled,
+        ErrorCancel,
+        ErrorInvalid,
+    };
+
+    void requestAutocomplete();
+    void finishRequestAutocomplete(AutocompleteResult);
+
+    DEFINE_ATTRIBUTE_EVENT_LISTENER(autocomplete);
+    DEFINE_ATTRIBUTE_EVENT_LISTENER(autocompleteerror);
+#endif
 
     CheckedRadioButtons& checkedRadioButtons() { return m_checkedRadioButtons; }
 
@@ -177,6 +192,13 @@ private:
     bool m_isInResetFunction;
 
     bool m_wasDemoted;
+
+#if ENABLE(REQUEST_AUTOCOMPLETE)
+    void requestAutocompleteTimerFired(Timer<HTMLFormElement>*);
+
+    Vector<RefPtr<Event>> m_pendingAutocompleteEvents;
+    Timer<HTMLFormElement> m_requestAutocompleteTimer;
+#endif
 };
 
 NODE_TYPE_CASTS(HTMLFormElement)

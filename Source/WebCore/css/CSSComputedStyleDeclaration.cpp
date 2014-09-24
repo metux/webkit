@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2004 Zack Rusin <zack@kde.org>
- * Copyright (C) 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011, 2012 Apple Inc. All rights reserved.
+ * Copyright (C) 2004-2014 Apple Inc. All rights reserved.
  * Copyright (C) 2007 Alexey Proskuryakov <ap@webkit.org>
  * Copyright (C) 2007 Nicholas Shanks <webkit@nickshanks.com>
  * Copyright (C) 2011 Sencha, Inc. All rights reserved.
@@ -62,6 +62,7 @@
 #include "StyleProperties.h"
 #include "StylePropertyShorthand.h"
 #include "StyleResolver.h"
+#include "WebKitCSSFilterValue.h"
 #include "WebKitCSSTransformValue.h"
 #include "WebKitFontFamilyNames.h"
 #include <wtf/NeverDestroyed.h>
@@ -75,10 +76,6 @@
 
 #if ENABLE(CSS_SHAPES)
 #include "ShapeValue.h"
-#endif
-
-#if ENABLE(CSS_FILTERS)
-#include "WebKitCSSFilterValue.h"
 #endif
 
 #if ENABLE(DASHBOARD_SUPPORT)
@@ -283,19 +280,17 @@ static const CSSPropertyID computedProperties[] = {
 #if ENABLE(DASHBOARD_SUPPORT)
     CSSPropertyWebkitDashboardRegion,
 #endif
-#if ENABLE(CSS_FILTERS)
-    CSSPropertyWebkitFilter,
-#endif
-    CSSPropertyWebkitAlignContent,
-    CSSPropertyWebkitAlignItems,
-    CSSPropertyWebkitAlignSelf,
-    CSSPropertyWebkitFlexBasis,
-    CSSPropertyWebkitFlexGrow,
-    CSSPropertyWebkitFlexShrink,
-    CSSPropertyWebkitFlexDirection,
-    CSSPropertyWebkitFlexWrap,
-    CSSPropertyWebkitJustifyContent,
+    CSSPropertyAlignContent,
+    CSSPropertyAlignItems,
+    CSSPropertyAlignSelf,
+    CSSPropertyFlexBasis,
+    CSSPropertyFlexGrow,
+    CSSPropertyFlexShrink,
+    CSSPropertyFlexDirection,
+    CSSPropertyFlexWrap,
+    CSSPropertyJustifyContent,
     CSSPropertyWebkitJustifySelf,
+    CSSPropertyWebkitFilter,
     CSSPropertyWebkitFontKerning,
     CSSPropertyWebkitFontSmoothing,
     CSSPropertyWebkitFontVariantLigatures,
@@ -316,6 +311,7 @@ static const CSSPropertyID computedProperties[] = {
     CSSPropertyWebkitHyphenateLimitBefore,
     CSSPropertyWebkitHyphenateLimitLines,
     CSSPropertyWebkitHyphens,
+    CSSPropertyWebkitInitialLetter,
     CSSPropertyWebkitLineAlign,
     CSSPropertyWebkitLineBoxContain,
     CSSPropertyWebkitLineBreak,
@@ -344,7 +340,7 @@ static const CSSPropertyID computedProperties[] = {
     CSSPropertyWebkitMaskSize,
     CSSPropertyWebkitMaskSourceType,
     CSSPropertyWebkitNbspMode,
-    CSSPropertyWebkitOrder,
+    CSSPropertyOrder,
 #if ENABLE(ACCELERATED_OVERFLOW_SCROLLING)
     CSSPropertyWebkitOverflowScrolling,
 #endif
@@ -354,10 +350,6 @@ static const CSSPropertyID computedProperties[] = {
     CSSPropertyWebkitRtlOrdering,
 #if PLATFORM(IOS)
     CSSPropertyWebkitTouchCallout,
-
-    // FIXME: This property shouldn't be iOS-specific. Once we fix up its usage in InlineTextBox::paintCompositionBackground()
-    // we should move it outside the PLATFORM(IOS)-guard. See <https://bugs.webkit.org/show_bug.cgi?id=126296>.
-    CSSPropertyWebkitCompositionFillColor,
 #endif
 #if ENABLE(CSS_SHAPES)
     CSSPropertyWebkitShapeOutside,
@@ -404,6 +396,8 @@ static const CSSPropertyID computedProperties[] = {
     CSSPropertyBufferedRendering,
     CSSPropertyClipPath,
     CSSPropertyClipRule,
+    CSSPropertyCx,
+    CSSPropertyCy,
     CSSPropertyMask,
     CSSPropertyFilter,
     CSSPropertyFloodColor,
@@ -422,6 +416,9 @@ static const CSSPropertyID computedProperties[] = {
     CSSPropertyMarkerStart,
     CSSPropertyMaskType,
     CSSPropertyPaintOrder,
+    CSSPropertyR,
+    CSSPropertyRx,
+    CSSPropertyRy,
     CSSPropertyShapeRendering,
     CSSPropertyStroke,
     CSSPropertyStrokeDasharray,
@@ -673,36 +670,36 @@ static PassRefPtr<CSSValue> positionOffsetValue(RenderStyle* style, CSSPropertyI
     if (!style)
         return nullptr;
 
-    Length l;
+    Length length;
     switch (propertyID) {
         case CSSPropertyLeft:
-            l = style->left();
+            length = style->left();
             break;
         case CSSPropertyRight:
-            l = style->right();
+            length = style->right();
             break;
         case CSSPropertyTop:
-            l = style->top();
+            length = style->top();
             break;
         case CSSPropertyBottom:
-            l = style->bottom();
+            length = style->bottom();
             break;
         default:
             return nullptr;
     }
 
     if (style->hasOutOfFlowPosition()) {
-        if (l.isFixed())
-            return zoomAdjustedPixelValue(l.value(), style);
+        if (length.isFixed())
+            return zoomAdjustedPixelValue(length.value(), style);
 
-        return cssValuePool().createValue(l);
+        return cssValuePool().createValue(length);
     }
 
     if (style->hasInFlowPosition()) {
         // FIXME: It's not enough to simply return "auto" values for one offset if the other side is defined.
         // In other words if left is auto and right is not auto, then left's computed value is negative right().
         // So we should get the opposite length unit and see if it is auto.
-        return cssValuePool().createValue(l);
+        return cssValuePool().createValue(length);
     }
 
     return cssValuePool().createIdentifierValue(CSSValueAuto);
@@ -716,27 +713,27 @@ PassRefPtr<CSSPrimitiveValue> ComputedStyleExtractor::currentColorOrValidColor(R
     return cssValuePool().createColorValue(color.rgb());
 }
 
+static PassRef<CSSPrimitiveValue> percentageOrZoomAdjustedValue(Length length, const RenderStyle* style)
+{
+    if (length.isPercentNotCalculated())
+        return cssValuePool().createValue(length.percent(), CSSPrimitiveValue::CSS_PERCENTAGE);
+    
+    return zoomAdjustedPixelValue(valueForLength(length, 0), style);
+}
+
 static PassRef<CSSValueList> getBorderRadiusCornerValues(const LengthSize& radius, const RenderStyle* style)
 {
     auto list = CSSValueList::createSpaceSeparated();
-    if (radius.width().isPercentNotCalculated())
-        list.get().append(cssValuePool().createValue(radius.width().percent(), CSSPrimitiveValue::CSS_PERCENTAGE));
-    else
-        list.get().append(zoomAdjustedPixelValue(valueForLength(radius.width(), 0), style));
-    if (radius.height().isPercentNotCalculated())
-        list.get().append(cssValuePool().createValue(radius.height().percent(), CSSPrimitiveValue::CSS_PERCENTAGE));
-    else
-        list.get().append(zoomAdjustedPixelValue(valueForLength(radius.height(), 0), style));
+    list.get().append(percentageOrZoomAdjustedValue(radius.width(), style));
+    list.get().append(percentageOrZoomAdjustedValue(radius.height(), style));
     return list;
 }
 
 static PassRef<CSSValue> getBorderRadiusCornerValue(const LengthSize& radius, const RenderStyle* style)
 {
-    if (radius.width() == radius.height()) {
-        if (radius.width().isPercentNotCalculated())
-            return cssValuePool().createValue(radius.width().percent(), CSSPrimitiveValue::CSS_PERCENTAGE);
-        return zoomAdjustedPixelValue(valueForLength(radius.width(), 0), style);
-    }
+    if (radius.width() == radius.height())
+        return percentageOrZoomAdjustedValue(radius.width(), style);
+
     return getBorderRadiusCornerValues(radius, style);
 }
 
@@ -837,7 +834,7 @@ static PassRef<CSSValue> computedTransform(RenderObject* renderer, const RenderS
 
     FloatRect pixelSnappedRect;
     if (renderer->isBox())
-        pixelSnappedRect = pixelSnappedForPainting(toRenderBox(renderer)->borderBoxRect(), renderer->document().deviceScaleFactor());
+        pixelSnappedRect = snapRectToDevicePixels(toRenderBox(renderer)->borderBoxRect(), renderer->document().deviceScaleFactor());
 
     TransformationMatrix transform;
     style->applyTransform(transform, pixelSnappedRect, RenderStyle::ExcludeTransformOrigin);
@@ -877,7 +874,6 @@ PassRef<CSSValue> ComputedStyleExtractor::valueForShadow(const ShadowData* shado
     return WTF::move(list);
 }
 
-#if ENABLE(CSS_FILTERS)
 PassRef<CSSValue> ComputedStyleExtractor::valueForFilter(const RenderStyle* style, const FilterOperations& filterOperations, AdjustPixelValuesForComputedStyle adjust)
 {
     if (filterOperations.operations().isEmpty())
@@ -968,7 +964,6 @@ PassRef<CSSValue> ComputedStyleExtractor::valueForFilter(const RenderStyle* styl
 
     return WTF::move(list);
 }
-#endif
 
 #if ENABLE(CSS_GRID_LAYOUT)
 static PassRef<CSSValue> specifiedValueForGridTrackBreadth(const GridLength& trackBreadth, const RenderStyle* style)
@@ -1003,8 +998,8 @@ static void addValuesForNamedGridLinesAtIndex(const OrderedNamedGridLinesMap& or
         return;
 
     RefPtr<CSSGridLineNamesValue> lineNames = CSSGridLineNamesValue::create();
-    for (size_t i = 0; i < namedGridLines.size(); ++i)
-        lineNames->append(cssValuePool().createValue(namedGridLines[i], CSSPrimitiveValue::CSS_STRING));
+    for (auto& name : namedGridLines)
+        lineNames->append(cssValuePool().createValue(name, CSSPrimitiveValue::CSS_STRING));
     list.append(lineNames.releaseNonNull());
 }
 
@@ -1012,21 +1007,30 @@ static PassRef<CSSValue> valueForGridTrackList(GridTrackSizingDirection directio
 {
     const Vector<GridTrackSize>& trackSizes = direction == ForColumns ? style->gridColumns() : style->gridRows();
     const OrderedNamedGridLinesMap& orderedNamedGridLines = direction == ForColumns ? style->orderedNamedGridColumnLines() : style->orderedNamedGridRowLines();
+    bool isRenderGrid = renderer && renderer->isRenderGrid();
 
-    // Handle the 'none' case here.
-    if (!trackSizes.size()) {
+    // Handle the 'none' case.
+    bool trackListIsEmpty = trackSizes.isEmpty();
+    if (isRenderGrid && trackListIsEmpty) {
+        // For grids we should consider every listed track, whether implicitly or explicitly created. If we don't have
+        // any explicit track and there are no children then there are no implicit tracks. We cannot simply check the
+        // number of rows/columns in our internal grid representation because it's always at least 1x1 (see r143331).
+        trackListIsEmpty = !toRenderBlock(renderer)->firstChild();
+    }
+
+    if (trackListIsEmpty) {
         ASSERT(orderedNamedGridLines.isEmpty());
         return cssValuePool().createIdentifierValue(CSSValueNone);
     }
 
     auto list = CSSValueList::createSpaceSeparated();
-    if (renderer && renderer->isRenderGrid()) {
+    if (isRenderGrid) {
         const Vector<LayoutUnit>& trackPositions = direction == ForColumns ? toRenderGrid(renderer)->columnPositions() : toRenderGrid(renderer)->rowPositions();
         // There are at least #tracks + 1 grid lines (trackPositions). Apart from that, the grid container can generate implicit grid tracks,
         // so we'll have more trackPositions than trackSizes as the latter only contain the explicit grid.
         ASSERT(trackPositions.size() - 1 >= trackSizes.size());
 
-        for (unsigned i = 0; i < trackSizes.size(); ++i) {
+        for (unsigned i = 0; i < trackPositions.size() - 1; ++i) {
             addValuesForNamedGridLinesAtIndex(orderedNamedGridLines, i, list.get());
             list.get().append(zoomAdjustedPixelValue(trackPositions[i + 1] - trackPositions[i], style));
         }
@@ -1084,61 +1088,44 @@ static PassRef<CSSValueList> getTransitionPropertyValue(const AnimationList* ani
 }
 
 #if ENABLE(CSS_SCROLL_SNAP)
-static PassRef<CSSValueList> scrollSnapDestination(RenderStyle* style, Length x, Length y)
+
+static PassRef<CSSValueList> scrollSnapDestination(RenderStyle& style, const LengthSize& destination)
 {
-    RefPtr<CSSValueList> snapDestinationValue = CSSValueList::createSpaceSeparated();
-    if (x.isPercentNotCalculated())
-        snapDestinationValue->append(cssValuePool().createValue(x.percent(), CSSPrimitiveValue::CSS_PERCENTAGE));
-    else
-        snapDestinationValue->append(zoomAdjustedPixelValue(valueForLength(x, 0), style));
-
-    if (y.isPercentNotCalculated())
-        snapDestinationValue->append(cssValuePool().createValue(y.percent(), CSSPrimitiveValue::CSS_PERCENTAGE));
-    else
-        snapDestinationValue->append(zoomAdjustedPixelValue(valueForLength(y, 0), style));
-
-    return snapDestinationValue.releaseNonNull();
+    auto list = CSSValueList::createSpaceSeparated();
+    list.get().append(percentageOrZoomAdjustedValue(destination.width(), &style));
+    list.get().append(percentageOrZoomAdjustedValue(destination.height(), &style));
+    return list;
 }
 
-static PassRef<CSSValueList> scrollSnapPoints(RenderStyle* style, const Vector<Length>& points, Length repeatPoint, bool hasRepeat)
+static PassRef<CSSValue> scrollSnapPoints(RenderStyle& style, const ScrollSnapPoints& points)
 {
-    RefPtr<CSSValueList> snapPointsValue = CSSValueList::createSpaceSeparated();
-    for (auto& point : points) {
-        if (point.isPercentNotCalculated())
-            snapPointsValue->append(cssValuePool().createValue(point.percent(), CSSPrimitiveValue::CSS_PERCENTAGE));
-        else
-            snapPointsValue->append(zoomAdjustedPixelValue(valueForLength(point, 0), style));
-    }
-    if (hasRepeat) {
-        if (repeatPoint.isPercentNotCalculated())
-            snapPointsValue->append(cssValuePool().createValue(LengthRepeat::create(cssValuePool().createValue(repeatPoint.percent(), CSSPrimitiveValue::CSS_PERCENTAGE))));
-        else
-            snapPointsValue->append(cssValuePool().createValue(LengthRepeat::create(zoomAdjustedPixelValue(valueForLength(repeatPoint, 0), style))));
-    }
-    return snapPointsValue.releaseNonNull();
+    if (points.usesElements)
+        return cssValuePool().createIdentifierValue(CSSValueElements);
+    auto list = CSSValueList::createSpaceSeparated();
+    for (auto& point : points.offsets)
+        list.get().append(percentageOrZoomAdjustedValue(point, &style));
+    if (points.hasRepeat)
+        list.get().append(cssValuePool().createValue(LengthRepeat::create(percentageOrZoomAdjustedValue(points.repeatOffset, &style))));
+    return WTF::move(list);
 }
 
-static PassRef<CSSValueList> scrollSnapCoordinates(RenderStyle* style, const Vector<SnapCoordinate>& coordinates)
+static PassRef<CSSValue> scrollSnapCoordinates(RenderStyle& style, const Vector<LengthSize>& coordinates)
 {
-    RefPtr<CSSValueList> snapCoordinatesValue = CSSValueList::createCommaSeparated();
-    for (const auto& coordinate : coordinates) {
-        RefPtr<CSSValueList> currentCoordinate = CSSValueList::createSpaceSeparated();
-        Length point = coordinate.first;
-        if (point.isPercentNotCalculated())
-            currentCoordinate->append(cssValuePool().createValue(point.percent(), CSSPrimitiveValue::CSS_PERCENTAGE));
-        else
-            currentCoordinate->append(zoomAdjustedPixelValue(valueForLength(point, 0), style));
+    if (coordinates.isEmpty())
+        return cssValuePool().createIdentifierValue(CSSValueNone);
 
-        point = coordinate.second;
-        if (point.isPercentNotCalculated())
-            currentCoordinate->append(cssValuePool().createValue(point.percent(), CSSPrimitiveValue::CSS_PERCENTAGE));
-        else
-            currentCoordinate->append(zoomAdjustedPixelValue(valueForLength(point, 0), style));
+    auto list = CSSValueList::createCommaSeparated();
 
-        snapCoordinatesValue->append(currentCoordinate.releaseNonNull());
+    for (auto& coordinate : coordinates) {
+        auto pair = CSSValueList::createSpaceSeparated();
+        pair.get().append(percentageOrZoomAdjustedValue(coordinate.width(), &style));
+        pair.get().append(percentageOrZoomAdjustedValue(coordinate.height(), &style));
+        list.get().append(WTF::move(pair));
     }
-    return snapCoordinatesValue.releaseNonNull();
+
+    return WTF::move(list);
 }
+
 #endif
 
 static PassRef<CSSValueList> getDelayValue(const AnimationList* animList)
@@ -1264,7 +1251,7 @@ String CSSComputedStyleDeclaration::cssText() const
         if (i)
             result.append(' ');
         result.append(getPropertyName(computedProperties[i]));
-        result.append(": ", 2);
+        result.appendLiteral(": ");
         result.append(getPropertyValue(computedProperties[i]));
         result.append(';');
     }
@@ -1287,13 +1274,13 @@ static CSSValueID cssIdentifierForFontSizeKeyword(int keywordSize)
 PassRefPtr<CSSPrimitiveValue> ComputedStyleExtractor::getFontSizeCSSValuePreferringKeyword() const
 {
     if (!m_node)
-        return 0;
+        return nullptr;
 
     m_node->document().updateLayoutIgnorePendingStylesheets();
 
     RefPtr<RenderStyle> style = m_node->computedStyle(m_pseudoElementSpecifier);
     if (!style)
-        return 0;
+        return nullptr;
 
     if (int keywordSize = style->fontDescription().keywordSize())
         return cssValuePool().createIdentifierValue(cssIdentifierForFontSizeKeyword(keywordSize));
@@ -1483,7 +1470,7 @@ static PassRefPtr<CSSValue> counterToCSSValue(const RenderStyle* style, CSSPrope
 {
     const CounterDirectiveMap* map = style->counterDirectives();
     if (!map)
-        return 0;
+        return nullptr;
 
     RefPtr<CSSValueList> list = CSSValueList::createSpaceSeparated();
     for (CounterDirectiveMap::const_iterator it = map->begin(); it != map->end(); ++it) {
@@ -1603,9 +1590,7 @@ static bool isLayoutDependent(CSSPropertyID propertyID, RenderStyle* style, Rend
     case CSSPropertyWebkitPerspectiveOrigin:
     case CSSPropertyWebkitTransformOrigin:
     case CSSPropertyWebkitTransform:
-#if ENABLE(CSS_FILTERS)
     case CSSPropertyWebkitFilter:
-#endif
         return true;
     case CSSPropertyMargin: {
         if (!renderer || !renderer->isBox())
@@ -1643,7 +1628,7 @@ static bool isLayoutDependent(CSSPropertyID propertyID, RenderStyle* style, Rend
 Node* ComputedStyleExtractor::styledNode() const
 {
     if (!m_node)
-        return 0;
+        return nullptr;
     if (!m_node->isElementNode())
         return m_node.get();
     Element* element = toElement(m_node.get());
@@ -1711,10 +1696,10 @@ PassRefPtr<CSSValue> ComputedStyleExtractor::propertyValue(CSSPropertyID propert
 {
     Node* styledNode = this->styledNode();
     if (!styledNode)
-        return 0;
+        return nullptr;
 
     RefPtr<RenderStyle> style;
-    RenderObject* renderer = 0;
+    RenderObject* renderer = nullptr;
     bool forceFullLayout = false;
     if (updateLayout) {
         Document& document = styledNode->document();
@@ -1749,7 +1734,7 @@ PassRefPtr<CSSValue> ComputedStyleExtractor::propertyValue(CSSPropertyID propert
     }
 
     if (!style)
-        return 0;
+        return nullptr;
 
     propertyID = CSSProperty::resolveDirectionAwareProperty(propertyID, style->direction(), style->writingMode());
 
@@ -2047,11 +2032,11 @@ PassRefPtr<CSSValue> ComputedStyleExtractor::propertyValue(CSSPropertyID propert
             return cssValuePool().createValue(style->display());
         case CSSPropertyEmptyCells:
             return cssValuePool().createValue(style->emptyCells());
-        case CSSPropertyWebkitAlignContent:
+        case CSSPropertyAlignContent:
             return cssValuePool().createValue(style->alignContent());
-        case CSSPropertyWebkitAlignItems:
+        case CSSPropertyAlignItems:
             return cssValuePool().createValue(style->alignItems());
-        case CSSPropertyWebkitAlignSelf:
+        case CSSPropertyAlignSelf:
             if (style->alignSelf() == AlignAuto) {
                 Node* parent = styledNode->parentNode();
                 if (parent && parent->computedStyle())
@@ -2059,21 +2044,21 @@ PassRefPtr<CSSValue> ComputedStyleExtractor::propertyValue(CSSPropertyID propert
                 return cssValuePool().createValue(AlignStretch);
             }
             return cssValuePool().createValue(style->alignSelf());
-        case CSSPropertyWebkitFlex:
-            return getCSSPropertyValuesForShorthandProperties(webkitFlexShorthand());
-        case CSSPropertyWebkitFlexBasis:
+        case CSSPropertyFlex:
+            return getCSSPropertyValuesForShorthandProperties(flexShorthand());
+        case CSSPropertyFlexBasis:
             return cssValuePool().createValue(style->flexBasis());
-        case CSSPropertyWebkitFlexDirection:
+        case CSSPropertyFlexDirection:
             return cssValuePool().createValue(style->flexDirection());
-        case CSSPropertyWebkitFlexFlow:
-            return getCSSPropertyValuesForShorthandProperties(webkitFlexFlowShorthand());
-        case CSSPropertyWebkitFlexGrow:
+        case CSSPropertyFlexFlow:
+            return getCSSPropertyValuesForShorthandProperties(flexFlowShorthand());
+        case CSSPropertyFlexGrow:
             return cssValuePool().createValue(style->flexGrow());
-        case CSSPropertyWebkitFlexShrink:
+        case CSSPropertyFlexShrink:
             return cssValuePool().createValue(style->flexShrink());
-        case CSSPropertyWebkitFlexWrap:
+        case CSSPropertyFlexWrap:
             return cssValuePool().createValue(style->flexWrap());
-        case CSSPropertyWebkitJustifyContent:
+        case CSSPropertyJustifyContent:
             return cssValuePool().createValue(style->justifyContent());
         case CSSPropertyWebkitJustifySelf: {
             RefPtr<CSSValueList> result = CSSValueList::createSpaceSeparated();
@@ -2082,7 +2067,7 @@ PassRefPtr<CSSValue> ComputedStyleExtractor::propertyValue(CSSPropertyID propert
                 result->append(CSSPrimitiveValue::create(style->justifySelfOverflowAlignment()));
             return result.release();
         }
-        case CSSPropertyWebkitOrder:
+        case CSSPropertyOrder:
             return cssValuePool().createValue(style->order(), CSSPrimitiveValue::CSS_NUMBER);
         case CSSPropertyFloat:
             if (style->display() != NONE && style->hasOutOfFlowPosition())
@@ -2345,7 +2330,7 @@ PassRefPtr<CSSValue> ComputedStyleExtractor::propertyValue(CSSPropertyID propert
             EPageBreak pageBreak = style->pageBreakInside();
             ASSERT(pageBreak != PBALWAYS);
             if (pageBreak == PBALWAYS)
-                return 0;
+                return nullptr;
             return cssValuePool().createValue(style->pageBreakInside());
         }
         case CSSPropertyPosition:
@@ -2479,7 +2464,7 @@ PassRefPtr<CSSValue> ComputedStyleExtractor::propertyValue(CSSPropertyID propert
                     return cssValuePool().createValue(style->verticalAlignLength());
             }
             ASSERT_NOT_REACHED();
-            return 0;
+            return nullptr;
         case CSSPropertyVisibility:
             return cssValuePool().createValue(style->visibility());
         case CSSPropertyWhiteSpace:
@@ -2549,7 +2534,7 @@ PassRefPtr<CSSValue> ComputedStyleExtractor::propertyValue(CSSPropertyID propert
                 return cssValuePool().createIdentifierValue(CSSValueNone);
 
             RefPtr<DashboardRegion> firstRegion;
-            DashboardRegion* previousRegion = 0;
+            DashboardRegion* previousRegion = nullptr;
             for (unsigned i = 0; i < count; i++) {
                 RefPtr<DashboardRegion> region = DashboardRegion::create();
                 StyleDashboardRegion styleRegion = regions[i];
@@ -2695,6 +2680,11 @@ PassRefPtr<CSSValue> ComputedStyleExtractor::propertyValue(CSSPropertyID propert
         case CSSPropertyWebkitFontSizeDelta:
             // Not a real style property -- used by the editing engine -- so has no computed value.
             break;
+        case CSSPropertyWebkitInitialLetter: {
+            RefPtr<CSSPrimitiveValue> drop = !style->initialLetterDrop() ? cssValuePool().createIdentifierValue(CSSValueNormal) : cssValuePool().createValue(style->initialLetterDrop(), CSSPrimitiveValue::CSS_NUMBER);
+            RefPtr<CSSPrimitiveValue> size = !style->initialLetterHeight() ? cssValuePool().createIdentifierValue(CSSValueNormal) : cssValuePool().createValue(style->initialLetterHeight(), CSSPrimitiveValue::CSS_NUMBER);
+            return cssValuePool().createValue(Pair::create(drop.release(), size.release()));
+        }
         case CSSPropertyWebkitMarginBottomCollapse:
         case CSSPropertyWebkitMarginAfterCollapse:
             return cssValuePool().createValue(style->marginAfterCollapse());
@@ -2730,12 +2720,6 @@ PassRefPtr<CSSValue> ComputedStyleExtractor::propertyValue(CSSPropertyID propert
         }
         case CSSPropertyWebkitRtlOrdering:
             return cssValuePool().createIdentifierValue(style->rtlOrdering() ? CSSValueVisual : CSSValueLogical);
-#if PLATFORM(IOS)
-        // FIXME: This property shouldn't be iOS-specific. Once we fix up its usage in InlineTextBox::paintCompositionBackground()
-        // we should remove the PLATFORM(IOS)-guard. See <https://bugs.webkit.org/show_bug.cgi?id=126296>.
-        case CSSPropertyWebkitCompositionFillColor:
-            return currentColorOrValidColor(style.get(), style->compositionFillColor());
-#endif
 #if ENABLE(TOUCH_EVENTS)
         case CSSPropertyWebkitTapHighlightColor:
             return currentColorOrValidColor(style.get(), style->tapHighlightColor());
@@ -2897,10 +2881,8 @@ PassRefPtr<CSSValue> ComputedStyleExtractor::propertyValue(CSSPropertyID propert
         case CSSPropertyWebkitShapeOutside:
             return shapePropertyValue(style.get(), style->shapeOutside());
 #endif
-#if ENABLE(CSS_FILTERS)
         case CSSPropertyWebkitFilter:
             return valueForFilter(style.get(), style->filter());
-#endif
 #if ENABLE(CSS_COMPOSITING)
         case CSSPropertyMixBlendMode:
             return cssValuePool().createValue(style->blendMode());
@@ -2922,11 +2904,10 @@ PassRefPtr<CSSValue> ComputedStyleExtractor::propertyValue(CSSPropertyID propert
             return getBackgroundShorthandValue();
         case CSSPropertyBorder: {
             RefPtr<CSSValue> value = propertyValue(CSSPropertyBorderTop, DoNotUpdateLayout);
-            const CSSPropertyID properties[3] = { CSSPropertyBorderRight, CSSPropertyBorderBottom,
-                                        CSSPropertyBorderLeft };
-            for (size_t i = 0; i < WTF_ARRAY_LENGTH(properties); ++i) {
-                if (!compareCSSValuePtr<CSSValue>(value, propertyValue(properties[i], DoNotUpdateLayout)))
-                    return 0;
+            const CSSPropertyID properties[3] = { CSSPropertyBorderRight, CSSPropertyBorderBottom, CSSPropertyBorderLeft };
+            for (auto& property : properties) {
+                if (!compareCSSValuePtr<CSSValue>(value, propertyValue(property, DoNotUpdateLayout)))
+                    return nullptr;
             }
             return value.release();
         }
@@ -2960,12 +2941,40 @@ PassRefPtr<CSSValue> ComputedStyleExtractor::propertyValue(CSSPropertyID propert
             return getCSSPropertyValuesForShorthandProperties(outlineShorthand());
         case CSSPropertyPadding:
             return getCSSPropertyValuesForSidesShorthand(paddingShorthand());
+
+#if ENABLE(CSS_SCROLL_SNAP)
+        case CSSPropertyWebkitScrollSnapType:
+            return cssValuePool().createValue(style->scrollSnapType());
+        case CSSPropertyWebkitScrollSnapDestination:
+            return scrollSnapDestination(*style, style->scrollSnapDestination());
+        case CSSPropertyWebkitScrollSnapPointsX:
+            return scrollSnapPoints(*style, style->scrollSnapPointsX());
+        case CSSPropertyWebkitScrollSnapPointsY:
+            return scrollSnapPoints(*style, style->scrollSnapPointsY());
+        case CSSPropertyWebkitScrollSnapCoordinate:
+            return scrollSnapCoordinates(*style, style->scrollSnapCoordinates());
+#endif
+
         /* Individual properties not part of the spec */
         case CSSPropertyBackgroundRepeatX:
         case CSSPropertyBackgroundRepeatY:
             break;
 
-        // New positioning properties for SVG.
+        // Length properties for SVG.
+        case CSSPropertyCx:
+            return zoomAdjustedPixelValueForLength(style->svgStyle().cx(), style.get());
+        case CSSPropertyCy:
+            return zoomAdjustedPixelValueForLength(style->svgStyle().cy(), style.get());
+        case CSSPropertyR:
+            return zoomAdjustedPixelValueForLength(style->svgStyle().r(), style.get());
+        case CSSPropertyRx:
+            return zoomAdjustedPixelValueForLength(style->svgStyle().rx(), style.get());
+        case CSSPropertyRy:
+            return zoomAdjustedPixelValueForLength(style->svgStyle().ry(), style.get());
+        case CSSPropertyStrokeWidth:
+            return zoomAdjustedPixelValueForLength(style->svgStyle().strokeWidth(), style.get());
+        case CSSPropertyStrokeDashoffset:
+            return zoomAdjustedPixelValueForLength(style->svgStyle().strokeDashOffset(), style.get());
         case CSSPropertyX:
             return zoomAdjustedPixelValueForLength(style->svgStyle().x(), style.get());
         case CSSPropertyY:
@@ -3088,12 +3097,10 @@ PassRefPtr<CSSValue> ComputedStyleExtractor::propertyValue(CSSPropertyID propert
         case CSSPropertyShapeRendering:
         case CSSPropertyStroke:
         case CSSPropertyStrokeDasharray:
-        case CSSPropertyStrokeDashoffset:
         case CSSPropertyStrokeLinecap:
         case CSSPropertyStrokeLinejoin:
         case CSSPropertyStrokeMiterlimit:
         case CSSPropertyStrokeOpacity:
-        case CSSPropertyStrokeWidth:
         case CSSPropertyAlignmentBaseline:
         case CSSPropertyBaselineShift:
         case CSSPropertyDominantBaseline:
@@ -3105,38 +3112,18 @@ PassRefPtr<CSSValue> ComputedStyleExtractor::propertyValue(CSSPropertyID propert
         case CSSPropertyWritingMode:
         case CSSPropertyWebkitSvgShadow:
             return svgPropertyValue(propertyID, DoNotUpdateLayout);
-
-#if ENABLE(CSS_SCROLL_SNAP)
-        case CSSPropertyWebkitScrollSnapType:
-            return cssValuePool().createValue(style->scrollSnapType());
-        case CSSPropertyWebkitScrollSnapDestination:
-            return scrollSnapDestination(style.get(), style->scrollSnapDestinationX(), style->scrollSnapDestinationY());
-        case CSSPropertyWebkitScrollSnapPointsX:
-            if (style->scrollSnapUsesElementsX())
-                return cssValuePool().createValue("elements", CSSPrimitiveValue::CSS_STRING);
-            return scrollSnapPoints(style.get(), style->scrollSnapOffsetsX(), style->scrollSnapRepeatOffsetX(), style->scrollSnapHasRepeatX());
-        case CSSPropertyWebkitScrollSnapPointsY:
-            if (style->scrollSnapUsesElementsY())
-                return cssValuePool().createValue("elements", CSSPrimitiveValue::CSS_STRING);
-            return scrollSnapPoints(style.get(), style->scrollSnapOffsetsY(), style->scrollSnapRepeatOffsetY(), style->scrollSnapHasRepeatY());
-        case CSSPropertyWebkitScrollSnapCoordinate:
-            Vector<SnapCoordinate> coords = style->scrollSnapCoordinates();
-            if (!coords.size())
-                return cssValuePool().createValue("none", CSSPrimitiveValue::CSS_STRING);
-            return scrollSnapCoordinates(style.get(), coords);
-#endif
     }
 
     logUnimplementedPropertyID(propertyID);
-    return 0;
+    return nullptr;
 }
 
 String CSSComputedStyleDeclaration::getPropertyValue(CSSPropertyID propertyID) const
 {
     RefPtr<CSSValue> value = getPropertyCSSValue(propertyID);
-    if (value)
-        return value->cssText();
-    return "";
+    if (!value)
+        return emptyString(); // FIXME: Should this be null instead, as it is in StyleProperties::getPropertyValue?
+    return value->cssText();
 }
 
 unsigned CSSComputedStyleDeclaration::length() const
@@ -3155,7 +3142,7 @@ unsigned CSSComputedStyleDeclaration::length() const
 String CSSComputedStyleDeclaration::item(unsigned i) const
 {
     if (i >= length())
-        return "";
+        return emptyString();
 
     return getPropertyNameString(computedProperties[i]);
 }
@@ -3202,7 +3189,7 @@ PassRefPtr<CSSValueList> ComputedStyleExtractor::getCSSPropertyValuesForSidesSho
 
     // All 4 properties must be specified.
     if (!topValue || !rightValue || !bottomValue || !leftValue)
-        return 0;
+        return nullptr;
 
     bool showLeft = !compareCSSValuePtr(rightValue, leftValue);
     bool showBottom = !compareCSSValuePtr(topValue, bottomValue) || showLeft;
@@ -3243,16 +3230,16 @@ PassRef<MutableStyleProperties> ComputedStyleExtractor::copyPropertiesInSet(cons
 
 CSSRule* CSSComputedStyleDeclaration::parentRule() const
 {
-    return 0;
+    return nullptr;
 }
 
 PassRefPtr<CSSValue> CSSComputedStyleDeclaration::getPropertyCSSValue(const String& propertyName)
 {
     CSSPropertyID propertyID = cssPropertyID(propertyName);
     if (!propertyID)
-        return 0;
+        return nullptr;
     RefPtr<CSSValue> value = getPropertyCSSValue(propertyID);
-    return value ? value->cloneForCSSOM() : 0;
+    return value ? value->cloneForCSSOM() : nullptr;
 }
 
 String CSSComputedStyleDeclaration::getPropertyValue(const String &propertyName)
@@ -3266,12 +3253,12 @@ String CSSComputedStyleDeclaration::getPropertyValue(const String &propertyName)
 String CSSComputedStyleDeclaration::getPropertyPriority(const String&)
 {
     // All computed styles have a priority of not "important".
-    return "";
+    return emptyString(); // FIXME: Should this sometimes be null instead of empty, to match a normal style declaration?
 }
 
 String CSSComputedStyleDeclaration::getPropertyShorthand(const String&)
 {
-    return "";
+    return emptyString(); // FIXME: Should this sometimes be null instead of empty, to match a normal style declaration?
 }
 
 bool CSSComputedStyleDeclaration::isPropertyImplicit(const String&)

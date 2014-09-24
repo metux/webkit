@@ -42,9 +42,9 @@
 #include "EvalCodeCache.h"
 #include "ExceptionHelpers.h"
 #include "GetterSetter.h"
-#include "JSActivation.h"
 #include "JSArray.h"
 #include "JSBoundFunction.h"
+#include "JSLexicalEnvironment.h"
 #include "JSNameScope.h"
 #include "JSNotAnObject.h"
 #include "JSStackInlines.h"
@@ -443,23 +443,23 @@ static bool unwindCallFrame(StackVisitor& visitor)
 
     if (Debugger* debugger = callFrame->vmEntryGlobalObject()->debugger()) {
         ClearExceptionScope scope(&callFrame->vm());
-        if (callFrame->callee())
+        if (jsDynamicCast<JSFunction*>(callFrame->callee()))
             debugger->returnEvent(callFrame);
         else
             debugger->didExecuteProgram(callFrame);
         ASSERT(!callFrame->hadException());
     }
 
-    JSValue activation;
+    JSValue lexicalEnvironment;
     if (codeBlock->codeType() == FunctionCode && codeBlock->needsActivation()) {
 #if ENABLE(DFG_JIT)
         RELEASE_ASSERT(!visitor->isInlinedFrame());
 #endif
-        activation = callFrame->uncheckedActivation();
-        // Protect against the activation not being created, or the variable still being
+        lexicalEnvironment = callFrame->uncheckedActivation();
+        // Protect against the lexical environment not being created, or the variable still being
         // initialized to Undefined inside op_enter.
-        if (activation && activation.isCell()) {
-            JSActivation* activationObject = jsCast<JSActivation*>(activation);
+        if (lexicalEnvironment && lexicalEnvironment.isCell()) {
+            JSLexicalEnvironment* activationObject = jsCast<JSLexicalEnvironment*>(lexicalEnvironment);
             // Protect against throwing exceptions after tear-off.
             if (!activationObject->isTornOff())
                 activationObject->tearOff(*scope->vm());
@@ -468,8 +468,8 @@ static bool unwindCallFrame(StackVisitor& visitor)
 
     if (codeBlock->codeType() == FunctionCode && codeBlock->usesArguments()) {
         if (Arguments* arguments = visitor->existingArguments()) {
-            if (activation && activation.isCell())
-                arguments->didTearOffActivation(callFrame, jsCast<JSActivation*>(activation));
+            if (lexicalEnvironment && lexicalEnvironment.isCell())
+                arguments->didTearOffActivation(callFrame, jsCast<JSLexicalEnvironment*>(lexicalEnvironment));
 #if ENABLE(DFG_JIT)
             else if (visitor->isInlinedFrame())
                 arguments->tearOff(callFrame, visitor->inlineCallFrame());
@@ -479,8 +479,7 @@ static bool unwindCallFrame(StackVisitor& visitor)
         }
     }
 
-    CallFrame* callerFrame = callFrame->callerFrame();
-    return !callerFrame->isVMEntrySentinel();
+    return !visitor->callerIsVMEntryFrame();
 }
 
 static StackFrameCodeType getStackFrameCodeType(StackVisitor& visitor)
@@ -597,7 +596,6 @@ private:
 void Interpreter::getStackTrace(Vector<StackFrame>& results, size_t maxStackSize)
 {
     VM& vm = m_vm;
-    ASSERT(!vm.topCallFrame->isVMEntrySentinel());
     CallFrame* callFrame = vm.topCallFrame;
     if (!callFrame)
         return;
@@ -647,8 +645,9 @@ private:
 
 class UnwindFunctor {
 public:
-    UnwindFunctor(CallFrame*& callFrame, bool isTermination, CodeBlock*& codeBlock, HandlerInfo*& handler)
-        : m_callFrame(callFrame)
+    UnwindFunctor(VMEntryFrame*& vmEntryFrame, CallFrame*& callFrame, bool isTermination, CodeBlock*& codeBlock, HandlerInfo*& handler)
+        : m_vmEntryFrame(vmEntryFrame)
+        , m_callFrame(callFrame)
         , m_isTermination(isTermination)
         , m_codeBlock(codeBlock)
         , m_handler(handler)
@@ -658,6 +657,7 @@ public:
     StackVisitor::Status operator()(StackVisitor& visitor)
     {
         VM& vm = m_callFrame->vm();
+        m_vmEntryFrame = visitor->vmEntryFrame();
         m_callFrame = visitor->callFrame();
         m_codeBlock = visitor->codeBlock();
         unsigned bytecodeOffset = visitor->bytecodeOffset();
@@ -675,23 +675,15 @@ public:
     }
 
 private:
+    VMEntryFrame*& m_vmEntryFrame;
     CallFrame*& m_callFrame;
     bool m_isTermination;
     CodeBlock*& m_codeBlock;
     HandlerInfo*& m_handler;
 };
 
-NEVER_INLINE HandlerInfo* Interpreter::unwind(CallFrame*& callFrame, JSValue& exceptionValue)
+NEVER_INLINE HandlerInfo* Interpreter::unwind(VMEntryFrame*& vmEntryFrame, CallFrame*& callFrame, JSValue& exceptionValue)
 {
-    if (callFrame->isVMEntrySentinel()) {
-        // This happens when we throw stack overflow in a function that is called
-        // directly from callToJavaScript. Stack overflow throws the exception in the
-        // context of the caller. In that case the caller is the sentinel frame. The
-        // right thing to do is to pretend that the exception is uncaught so that we
-        // go to the uncaught exception handler, which returns through callToJavaScript.
-        return 0;
-    }
-    
     CodeBlock* codeBlock = callFrame->codeBlock();
     ASSERT(codeBlock);
     bool isTermination = false;
@@ -735,7 +727,7 @@ NEVER_INLINE HandlerInfo* Interpreter::unwind(CallFrame*& callFrame, JSValue& ex
     HandlerInfo* handler = 0;
     VM& vm = callFrame->vm();
     ASSERT(callFrame == vm.topCallFrame);
-    UnwindFunctor functor(callFrame, isTermination, codeBlock, handler);
+    UnwindFunctor functor(vmEntryFrame, callFrame, isTermination, codeBlock, handler);
     callFrame->iterate(functor);
     if (!handler)
         return 0;
@@ -922,7 +914,7 @@ failedJSONP:
     ASSERT(codeBlock->numParameters() == 1); // 1 parameter for 'this'.
 
     ProtoCallFrame protoCallFrame;
-    protoCallFrame.init(codeBlock, scope, 0, thisObj, 1);
+    protoCallFrame.init(codeBlock, scope, JSCallee::create(vm, scope->globalObject(), scope), thisObj, 1);
 
     if (LegacyProfiler* profiler = vm.enabledProfiler())
         profiler->willExecute(callFrame, program->sourceURL(), program->lineNo(), program->startColumn());
@@ -996,7 +988,7 @@ JSValue Interpreter::executeCall(CallFrame* callFrame, JSObject* function, CallT
         if (isJSCall)
             result = callData.js.functionExecutable->generatedJITCodeForCall()->execute(&vm, &protoCallFrame);
         else {
-            result = JSValue::decode(callToNativeFunction(reinterpret_cast<void*>(callData.native.function), &vm, &protoCallFrame));
+            result = JSValue::decode(vmEntryToNative(reinterpret_cast<void*>(callData.native.function), &vm, &protoCallFrame));
             if (callFrame->hadException())
                 result = jsNull();
         }
@@ -1064,7 +1056,7 @@ JSObject* Interpreter::executeConstruct(CallFrame* callFrame, JSObject* construc
         if (isJSConstruct)
             result = constructData.js.functionExecutable->generatedJITCodeForConstruct()->execute(&vm, &protoCallFrame);
         else {
-            result = JSValue::decode(callToNativeFunction(reinterpret_cast<void*>(constructData.native.function), &vm, &protoCallFrame));
+            result = JSValue::decode(vmEntryToNative(reinterpret_cast<void*>(constructData.native.function), &vm, &protoCallFrame));
 
             if (!callFrame->hadException())
                 RELEASE_ASSERT(result.isObject());
@@ -1203,7 +1195,7 @@ JSValue Interpreter::execute(EvalExecutable* eval, CallFrame* callFrame, JSValue
     ASSERT(codeBlock->numParameters() == 1); // 1 parameter for 'this'.
 
     ProtoCallFrame protoCallFrame;
-    protoCallFrame.init(codeBlock, scope, 0, thisValue, 1);
+    protoCallFrame.init(codeBlock, scope, JSCallee::create(vm, scope->globalObject(), scope), thisValue, 1);
 
     if (LegacyProfiler* profiler = vm.enabledProfiler())
         profiler->willExecute(callFrame, eval->sourceURL(), eval->lineNo(), eval->startColumn());

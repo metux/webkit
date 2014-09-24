@@ -34,15 +34,12 @@
 #include "Color.h"
 #include "MediaQuery.h"
 #include "SourceSizeList.h"
+#include "WebKitCSSFilterValue.h"
 #include <memory>
 #include <wtf/HashMap.h>
 #include <wtf/HashSet.h>
 #include <wtf/Vector.h>
 #include <wtf/text/AtomicString.h>
-
-#if ENABLE(CSS_FILTERS)
-#include "WebKitCSSFilterValue.h"
-#endif
 
 #if ENABLE(CSS_GRID_LAYOUT)
 #include "CSSGridTemplateAreasValue.h"
@@ -174,7 +171,7 @@ public:
     PassRefPtr<CSSPrimitiveValue> parseGridBreadth(CSSParserValue*);
     bool parseGridTemplateAreasRow(NamedGridAreaMap&, const unsigned, unsigned&);
     PassRefPtr<CSSValue> parseGridTemplateAreas();
-    void parseGridLineNames(CSSParserValueList&, CSSValueList&, CSSGridLineNamesValue* = nullptr);
+    bool parseGridLineNames(CSSParserValueList&, CSSValueList&, CSSGridLineNamesValue* = nullptr);
     PassRefPtr<CSSValue> parseGridAutoFlow(CSSParserValueList&);
 #endif
 
@@ -263,12 +260,10 @@ public:
     PassRefPtr<CSSValue> parseImageSet();
 #endif
 
-#if ENABLE(CSS_FILTERS)
     bool parseFilterImage(CSSParserValueList*, RefPtr<CSSValue>&);
 
     bool parseFilter(CSSParserValueList*, RefPtr<CSSValue>&);
     PassRefPtr<WebKitCSSFilterValue> parseBuiltinFilterArguments(CSSParserValueList*, WebKitCSSFilterValue::FilterOperationType);
-#endif
 
     PassRefPtr<CSSValue> parseClipPath();
 
@@ -639,9 +634,7 @@ private:
     double parsedDouble(CSSParserValue*, ReleaseParsedCalcValueCondition releaseCalc = DoNotReleaseParsedCalcValue);
     
     friend class TransformOperationInfo;
-#if ENABLE(CSS_FILTERS)
     friend class FilterOperationInfo;
-#endif
 };
 
 CSSPropertyID cssPropertyID(const CSSParserString&);

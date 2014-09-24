@@ -289,13 +289,6 @@ void StyleResolver::applySVGProperty(CSSPropertyID id, CSSValue* value)
             }
             break;
         }
-        case CSSPropertyStrokeWidth:
-        {
-            HANDLE_INHERIT_AND_INITIAL(strokeWidth, StrokeWidth)
-            if (primitiveValue)
-                svgStyle.setStrokeWidth(SVGLength::fromCSSPrimitiveValue(primitiveValue));
-            break;
-        }
         case CSSPropertyStrokeDasharray:
         {
             HANDLE_INHERIT_AND_INITIAL(strokeDashArray, StrokeDashArray)
@@ -318,13 +311,6 @@ void StyleResolver::applySVGProperty(CSSPropertyID id, CSSValue* value)
             }
 
             svgStyle.setStrokeDashArray(array);
-            break;
-        }
-        case CSSPropertyStrokeDashoffset:
-        {
-            HANDLE_INHERIT_AND_INITIAL(strokeDashOffset, StrokeDashOffset)
-            if (primitiveValue)
-                svgStyle.setStrokeDashOffset(SVGLength::fromCSSPrimitiveValue(primitiveValue));
             break;
         }
         case CSSPropertyFillOpacity:
@@ -575,6 +561,9 @@ void StyleResolver::applySVGProperty(CSSPropertyID id, CSSValue* value)
         case CSSPropertyEnableBackground:
             // Silently ignoring this property for now
             // http://bugs.webkit.org/show_bug.cgi?id=6022
+            break;
+        case CSSPropertyWebkitInitialLetter:
+            // Not Implemented
             break;
         case CSSPropertyWebkitSvgShadow: {
             if (isInherit)

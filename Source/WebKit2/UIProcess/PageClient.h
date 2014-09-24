@@ -229,6 +229,9 @@ public:
     virtual String dismissCorrectionPanelSoon(WebCore::ReasonForDismissingAlternativeText) = 0;
     virtual void recordAutocorrectionResponse(WebCore::AutocorrectionResponseType, const String& replacedString, const String& replacementString) = 0;
     virtual void recommendedScrollbarStyleDidChange(int32_t newStyle) = 0;
+    virtual void removeNavigationGestureSnapshot() = 0;
+
+    virtual CGRect boundsOfLayerInLayerBackedWindowCoordinates(CALayer *) const = 0;
 
     virtual ColorSpaceData colorSpace() = 0;
 
@@ -301,6 +304,10 @@ public:
     virtual void navigationGestureWillEnd(bool willNavigate, WebBackForwardListItem&) = 0;
     virtual void navigationGestureDidEnd(bool willNavigate, WebBackForwardListItem&) = 0;
     virtual void willRecordNavigationSnapshot(WebBackForwardListItem&) = 0;
+
+    virtual void didFirstVisuallyNonEmptyLayoutForMainFrame() = 0;
+    virtual void didFinishLoadForMainFrame() = 0;
+    virtual void didSameDocumentNavigationForMainFrame(SameDocumentNavigationType) = 0;
 };
 
 } // namespace WebKit

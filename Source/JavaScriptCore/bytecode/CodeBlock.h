@@ -64,7 +64,6 @@
 #include "ProfilerJettisonReason.h"
 #include "RegExpObject.h"
 #include "StructureStubInfo.h"
-#include "TypeSet.h"
 #include "UnconditionalFinalizer.h"
 #include "ValueProfile.h"
 #include "VirtualRegister.h"
@@ -343,25 +342,25 @@ public:
     }
     void setActivationRegister(VirtualRegister activationRegister)
     {
-        m_activationRegister = activationRegister;
+        m_lexicalEnvironmentRegister = activationRegister;
     }
 
     VirtualRegister activationRegister() const
     {
-        ASSERT(m_activationRegister.isValid());
-        return m_activationRegister;
+        ASSERT(m_lexicalEnvironmentRegister.isValid());
+        return m_lexicalEnvironmentRegister;
     }
 
     VirtualRegister uncheckedActivationRegister()
     {
-        return m_activationRegister;
+        return m_lexicalEnvironmentRegister;
     }
 
     bool usesArguments() const { return m_argumentsRegister.isValid(); }
 
     bool needsActivation() const
     {
-        ASSERT(m_activationRegister.isValid() == m_needsActivation);
+        ASSERT(m_lexicalEnvironmentRegister.isValid() == m_needsActivation);
         return m_needsActivation;
     }
     
@@ -942,13 +941,6 @@ public:
     NO_RETURN_DUE_TO_CRASH void endValidationDidFail();
 
     bool isKnownToBeLiveDuringGC(); // Will only return valid results when called during GC. Assumes that you've already established that the owner executable is live.
-    RefPtr<TypeSet> returnStatementTypeSet() 
-    {
-        if (!m_returnStatementTypeSet)
-            m_returnStatementTypeSet = TypeSet::create();
-
-        return m_returnStatementTypeSet;
-    }
 
 
 protected:
@@ -1041,7 +1033,7 @@ private:
     WriteBarrier<SymbolTable> m_symbolTable;
     VirtualRegister m_thisRegister;
     VirtualRegister m_argumentsRegister;
-    VirtualRegister m_activationRegister;
+    VirtualRegister m_lexicalEnvironmentRegister;
 
     bool m_isStrictMode;
     bool m_needsActivation;
@@ -1098,8 +1090,6 @@ private:
     mutable CodeBlockHash m_hash;
 
     std::unique_ptr<BytecodeLivenessAnalysis> m_livenessAnalysis;
-
-    RefPtr<TypeSet> m_returnStatementTypeSet;
 
     struct RareData {
         WTF_MAKE_FAST_ALLOCATED;

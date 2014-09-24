@@ -573,7 +573,7 @@ public:
     //  - assumes the object contains no own getter/setter properties.
     //  - provides no special handling for __proto__
     //  - does not walk the prototype chain (to check for accessors or non-writable properties).
-    // This is used by JSActivation.
+    // This is used by JSLexicalEnvironment.
     bool putOwnDataProperty(VM&, PropertyName, JSValue, PutPropertySlot&);
 
     // Fast access to known property offsets.
@@ -594,6 +594,7 @@ public:
     bool isNameScopeObject() const;
     bool isActivationObject() const;
     bool isErrorInstance() const;
+    bool isWithScope() const;
 
     JS_EXPORT_PRIVATE void seal(VM&);
     JS_EXPORT_PRIVATE void freeze(VM&);
@@ -1150,6 +1151,11 @@ inline bool JSObject::isErrorInstance() const
     return type() == ErrorInstanceType;
 }
 
+inline bool JSObject::isWithScope() const
+{
+    return type() == WithScopeType;
+}
+
 inline void JSObject::setStructureAndButterfly(VM& vm, Structure* structure, Butterfly* butterfly)
 {
     ASSERT(structure);
@@ -1572,24 +1578,6 @@ ALWAYS_INLINE Identifier makeIdentifier(VM&, const Identifier& name)
 // intrinsic.
 #define JSC_NATIVE_FUNCTION(jsName, cppName, attributes, length) \
     JSC_NATIVE_INTRINSIC_FUNCTION(jsName, cppName, (attributes), (length), NoIntrinsic)
-
-ALWAYS_INLINE JSValue PropertySlot::getValue(ExecState* exec, PropertyName propertyName) const
-{
-    if (m_propertyType == TypeValue)
-        return JSValue::decode(m_data.value);
-    if (m_propertyType == TypeGetter)
-        return functionGetter(exec);
-    return JSValue::decode(m_data.custom.getValue(exec, slotBase(), JSValue::encode(m_thisValue), propertyName));
-}
-
-ALWAYS_INLINE JSValue PropertySlot::getValue(ExecState* exec, unsigned propertyName) const
-{
-    if (m_propertyType == TypeValue)
-        return JSValue::decode(m_data.value);
-    if (m_propertyType == TypeGetter)
-        return functionGetter(exec);
-    return JSValue::decode(m_data.custom.getValue(exec, slotBase(), JSValue::encode(m_thisValue), Identifier::from(exec, propertyName)));
-}
 
 } // namespace JSC
 
