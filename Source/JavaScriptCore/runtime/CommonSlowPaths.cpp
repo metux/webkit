@@ -34,14 +34,13 @@
 #include "ErrorHandlingScope.h"
 #include "ExceptionFuzz.h"
 #include "GetterSetter.h"
-#include "HighFidelityLog.h"
 #include "HostCallReturnValue.h"
 #include "Interpreter.h"
 #include "JIT.h"
 #include "JITStubs.h"
-#include "JSActivation.h"
 #include "JSCJSValue.h"
 #include "JSGlobalObjectFunctions.h"
+#include "JSLexicalEnvironment.h"
 #include "JSNameScope.h"
 #include "JSPropertyNameEnumerator.h"
 #include "JSString.h"
@@ -52,6 +51,7 @@
 #include "ObjectConstructor.h"
 #include "JSCInlines.h"
 #include "StructureRareDataInlines.h"
+#include "TypeProfilerLog.h"
 #include "VariableWatchpointSetInlines.h"
 #include <wtf/StringPrintStream.h>
 
@@ -507,7 +507,7 @@ SLOW_PATH_DECL(slow_path_del_by_val)
         couldDelete = baseObject->methodTable()->deleteProperty(baseObject, exec, jsCast<NameInstance*>(subscript.asCell())->privateName());
     else {
         CHECK_EXCEPTION();
-        Identifier property(exec, subscript.toString(exec)->value(exec));
+        Identifier property = subscript.toString(exec)->toIdentifier(exec);
         CHECK_EXCEPTION();
         couldDelete = baseObject->methodTable()->deleteProperty(baseObject, exec, property);
     }
@@ -637,12 +637,12 @@ SLOW_PATH_DECL(slow_path_to_index_string)
     RETURN(jsString(exec, Identifier::from(exec, OP(2).jsValue().asUInt32()).string()));
 }
 
-SLOW_PATH_DECL(slow_path_profile_types_with_high_fidelity)
+SLOW_PATH_DECL(slow_path_profile_type)
 {
     BEGIN();
     TypeLocation* location = pc[2].u.location;
     JSValue val = OP_C(1).jsValue();
-    vm.highFidelityLog()->recordTypeInformationForLocation(val, location);
+    vm.typeProfilerLog()->recordTypeInformationForLocation(val, location);
     END();
 }
 

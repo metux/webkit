@@ -77,7 +77,7 @@ RenderTheme::RenderTheme()
 {
 }
 
-void RenderTheme::adjustStyle(StyleResolver& styleResolver, RenderStyle& style, Element& e, bool UAHasAppearance, const BorderData& border, const FillLayer& background, const Color& backgroundColor)
+void RenderTheme::adjustStyle(StyleResolver& styleResolver, RenderStyle& style, Element* e, bool UAHasAppearance, const BorderData& border, const FillLayer& background, const Color& backgroundColor)
 {
     // Force inline and table display styles to be inline-block (except for table- which is block)
     ControlPart part = style.appearance();
@@ -267,8 +267,8 @@ bool RenderTheme::paint(const RenderObject& o, ControlStates* controlStates, con
         return false;
 
     ControlPart part = o.style().appearance();
-    IntRect integralSnappedRect = pixelSnappedIntRect(r);
-    FloatRect devicePixelSnappedRect = pixelSnappedForPainting(r, o.document().deviceScaleFactor());
+    IntRect integralSnappedRect = snappedIntRect(r);
+    FloatRect devicePixelSnappedRect = snapRectToDevicePixels(r, o.document().deviceScaleFactor());
 
 #if USE(NEW_THEME)
     switch (part) {
@@ -400,7 +400,7 @@ bool RenderTheme::paintBorderOnly(const RenderObject& o, const PaintInfo& paintI
     UNUSED_PARAM(r);
     return o.style().appearance() != NoControlPart;
 #else
-    FloatRect devicePixelSnappedRect = pixelSnappedForPainting(r, o.document().deviceScaleFactor());
+    FloatRect devicePixelSnappedRect = snapRectToDevicePixels(r, o.document().deviceScaleFactor());
     // Call the appropriate paint method based off the appearance value.
     switch (o.style().appearance()) {
     case TextFieldPart:
@@ -450,8 +450,8 @@ bool RenderTheme::paintDecorations(const RenderObject& renderer, const PaintInfo
     if (paintInfo.context->paintingDisabled())
         return false;
 
-    IntRect integralSnappedRect = pixelSnappedIntRect(rect);
-    FloatRect devicePixelSnappedRect = pixelSnappedForPainting(rect, renderer.document().deviceScaleFactor());
+    IntRect integralSnappedRect = snappedIntRect(rect);
+    FloatRect devicePixelSnappedRect = snapRectToDevicePixels(rect, renderer.document().deviceScaleFactor());
 
     // Call the appropriate paint method based off the appearance value.
     switch (renderer.style().appearance()) {
@@ -752,8 +752,6 @@ ControlStates::States RenderTheme::extractControlStatesForRenderer(const RenderO
         states |= ControlStates::EnabledState;
     if (isChecked(o))
         states |= ControlStates::CheckedState;
-    if (isReadOnlyControl(o))
-        states |= ControlStates::ReadOnlyState;
     if (isDefault(o))
         states |= ControlStates::DefaultState;
     if (!isActive(o))
@@ -845,9 +843,9 @@ bool RenderTheme::isSpinUpButtonPartPressed(const RenderObject& o) const
 bool RenderTheme::isReadOnlyControl(const RenderObject& o) const
 {
     Node* node = o.node();
-    if (!node || !node->isElementNode())
+    if (!node || !node->isElementNode() || !toElement(node)->isFormControlElement())
         return false;
-    return toElement(node)->matchesReadOnlyPseudoClass();
+    return !toElement(node)->matchesReadWritePseudoClass();
 }
 
 bool RenderTheme::isHovered(const RenderObject& o) const
@@ -884,7 +882,7 @@ bool RenderTheme::isDefault(const RenderObject& o) const
 
 #if !USE(NEW_THEME)
 
-void RenderTheme::adjustCheckboxStyle(StyleResolver&, RenderStyle& style, Element&) const
+void RenderTheme::adjustCheckboxStyle(StyleResolver&, RenderStyle& style, Element*) const
 {
     // A summary of the rules for checkbox designed to match WinIE:
     // width/height - honored (WinIE actually scales its control for small widths, but lets it overflow for small heights.)
@@ -901,7 +899,7 @@ void RenderTheme::adjustCheckboxStyle(StyleResolver&, RenderStyle& style, Elemen
     style.setBoxShadow(nullptr);
 }
 
-void RenderTheme::adjustRadioStyle(StyleResolver&, RenderStyle& style, Element&) const
+void RenderTheme::adjustRadioStyle(StyleResolver&, RenderStyle& style, Element*) const
 {
     // A summary of the rules for checkbox designed to match WinIE:
     // width/height - honored (WinIE actually scales its control for small widths, but lets it overflow for small heights.)
@@ -918,7 +916,7 @@ void RenderTheme::adjustRadioStyle(StyleResolver&, RenderStyle& style, Element&)
     style.setBoxShadow(nullptr);
 }
 
-void RenderTheme::adjustButtonStyle(StyleResolver&, RenderStyle& style, Element&) const
+void RenderTheme::adjustButtonStyle(StyleResolver&, RenderStyle& style, Element*) const
 {
     // Most platforms will completely honor all CSS, and so we have no need to
     // adjust the style at all by default. We will still allow the theme a crack
@@ -926,25 +924,25 @@ void RenderTheme::adjustButtonStyle(StyleResolver&, RenderStyle& style, Element&
     setButtonSize(style);
 }
 
-void RenderTheme::adjustInnerSpinButtonStyle(StyleResolver&, RenderStyle&, Element&) const
+void RenderTheme::adjustInnerSpinButtonStyle(StyleResolver&, RenderStyle&, Element*) const
 {
 }
 #endif
 
-void RenderTheme::adjustTextFieldStyle(StyleResolver&, RenderStyle&, Element&) const
+void RenderTheme::adjustTextFieldStyle(StyleResolver&, RenderStyle&, Element*) const
 {
 }
 
-void RenderTheme::adjustTextAreaStyle(StyleResolver&, RenderStyle&, Element&) const
+void RenderTheme::adjustTextAreaStyle(StyleResolver&, RenderStyle&, Element*) const
 {
 }
 
-void RenderTheme::adjustMenuListStyle(StyleResolver&, RenderStyle&, Element&) const
+void RenderTheme::adjustMenuListStyle(StyleResolver&, RenderStyle&, Element*) const
 {
 }
 
 #if ENABLE(METER_ELEMENT)
-void RenderTheme::adjustMeterStyle(StyleResolver&, RenderStyle& style, Element&) const
+void RenderTheme::adjustMeterStyle(StyleResolver&, RenderStyle& style, Element*) const
 {
     style.setBoxShadow(nullptr);
 }
@@ -1065,7 +1063,7 @@ double RenderTheme::animationDurationForProgressBar(RenderProgress&) const
     return 0;
 }
 
-void RenderTheme::adjustProgressBarStyle(StyleResolver&, RenderStyle&, Element&) const
+void RenderTheme::adjustProgressBarStyle(StyleResolver&, RenderStyle&, Element*) const
 {
 }
 
@@ -1079,44 +1077,44 @@ bool RenderTheme::shouldHaveSpinButton(HTMLInputElement& inputElement) const
     return inputElement.isSteppable() && !inputElement.isRangeControl();
 }
 
-void RenderTheme::adjustMenuListButtonStyle(StyleResolver&, RenderStyle&, Element&) const
+void RenderTheme::adjustMenuListButtonStyle(StyleResolver&, RenderStyle&, Element*) const
 {
 }
 
-void RenderTheme::adjustMediaControlStyle(StyleResolver&, RenderStyle&, Element&) const
+void RenderTheme::adjustMediaControlStyle(StyleResolver&, RenderStyle&, Element*) const
 {
 }
 
-void RenderTheme::adjustSliderTrackStyle(StyleResolver&, RenderStyle&, Element&) const
+void RenderTheme::adjustSliderTrackStyle(StyleResolver&, RenderStyle&, Element*) const
 {
 }
 
-void RenderTheme::adjustSliderThumbStyle(StyleResolver&, RenderStyle& style, Element& element) const
+void RenderTheme::adjustSliderThumbStyle(StyleResolver&, RenderStyle& style, Element* element) const
 {
     adjustSliderThumbSize(style, element);
 }
 
-void RenderTheme::adjustSliderThumbSize(RenderStyle&, Element&) const
+void RenderTheme::adjustSliderThumbSize(RenderStyle&, Element*) const
 {
 }
 
-void RenderTheme::adjustSearchFieldStyle(StyleResolver&, RenderStyle&, Element&) const
+void RenderTheme::adjustSearchFieldStyle(StyleResolver&, RenderStyle&, Element*) const
 {
 }
 
-void RenderTheme::adjustSearchFieldCancelButtonStyle(StyleResolver&, RenderStyle&, Element&) const
+void RenderTheme::adjustSearchFieldCancelButtonStyle(StyleResolver&, RenderStyle&, Element*) const
 {
 }
 
-void RenderTheme::adjustSearchFieldDecorationPartStyle(StyleResolver&, RenderStyle&, Element&) const
+void RenderTheme::adjustSearchFieldDecorationPartStyle(StyleResolver&, RenderStyle&, Element*) const
 {
 }
 
-void RenderTheme::adjustSearchFieldResultsDecorationPartStyle(StyleResolver&, RenderStyle&, Element&) const
+void RenderTheme::adjustSearchFieldResultsDecorationPartStyle(StyleResolver&, RenderStyle&, Element*) const
 {
 }
 
-void RenderTheme::adjustSearchFieldResultsButtonStyle(StyleResolver&, RenderStyle&, Element&) const
+void RenderTheme::adjustSearchFieldResultsButtonStyle(StyleResolver&, RenderStyle&, Element*) const
 {
 }
 

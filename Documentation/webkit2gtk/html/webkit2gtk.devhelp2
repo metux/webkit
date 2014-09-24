@@ -395,8 +395,10 @@
     <keyword type="function" name="webkit_uri_response_get_content_length ()" link="WebKitURIResponse.html#webkit-uri-response-get-content-length"/>
     <keyword type="function" name="webkit_uri_response_get_mime_type ()" link="WebKitURIResponse.html#webkit-uri-response-get-mime-type"/>
     <keyword type="function" name="webkit_uri_response_get_suggested_filename ()" link="WebKitURIResponse.html#webkit-uri-response-get-suggested-filename"/>
+    <keyword type="function" name="webkit_uri_response_get_http_headers ()" link="WebKitURIResponse.html#webkit-uri-response-get-http-headers" since="2.6"/>
     <keyword type="struct" name="struct WebKitURIResponse" link="WebKitURIResponse.html#WebKitURIResponse-struct"/>
     <keyword type="property" name="The “content-length” property" link="WebKitURIResponse.html#WebKitURIResponse--content-length"/>
+    <keyword type="property" name="The “http-headers” property" link="WebKitURIResponse.html#WebKitURIResponse--http-headers"/>
     <keyword type="property" name="The “mime-type” property" link="WebKitURIResponse.html#WebKitURIResponse--mime-type"/>
     <keyword type="property" name="The “status-code” property" link="WebKitURIResponse.html#WebKitURIResponse--status-code"/>
     <keyword type="property" name="The “suggested-filename” property" link="WebKitURIResponse.html#WebKitURIResponse--suggested-filename"/>
@@ -427,7 +429,10 @@
     <keyword type="function" name="webkit_download_get_elapsed_time ()" link="WebKitDownload.html#webkit-download-get-elapsed-time"/>
     <keyword type="function" name="webkit_download_get_received_data_length ()" link="WebKitDownload.html#webkit-download-get-received-data-length"/>
     <keyword type="function" name="webkit_download_get_web_view ()" link="WebKitDownload.html#webkit-download-get-web-view"/>
+    <keyword type="function" name="webkit_download_get_allow_overwrite ()" link="WebKitDownload.html#webkit-download-get-allow-overwrite" since="2.6"/>
+    <keyword type="function" name="webkit_download_set_allow_overwrite ()" link="WebKitDownload.html#webkit-download-set-allow-overwrite" since="2.6"/>
     <keyword type="struct" name="struct WebKitDownload" link="WebKitDownload.html#WebKitDownload-struct"/>
+    <keyword type="property" name="The “allow-overwrite” property" link="WebKitDownload.html#WebKitDownload--allow-overwrite"/>
     <keyword type="property" name="The “destination” property" link="WebKitDownload.html#WebKitDownload--destination"/>
     <keyword type="property" name="The “estimated-progress” property" link="WebKitDownload.html#WebKitDownload--estimated-progress"/>
     <keyword type="property" name="The “response” property" link="WebKitDownload.html#WebKitDownload--response"/>

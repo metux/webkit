@@ -1,4 +1,5 @@
 # Copyright (C) 2011, 2012, 2014 Apple Inc. All rights reserved.
+# Copyright (C) 2014 University of Szeged. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -197,6 +198,36 @@ end
 # Actual lowering code follows.
 #
 
+def arm64LowerMalformedLoadStoreAddresses(list)
+    newList = []
+
+    def isAddressMalformed(operand)
+        operand.is_a? Address and not (-255..4095).include? operand.offset.value
+    end
+
+    list.each {
+        | node |
+        if node.is_a? Instruction
+            if node.opcode =~ /^store/ and isAddressMalformed(node.operands[1])
+                address = node.operands[1]
+                tmp = Tmp.new(codeOrigin, :gpr)
+                newList << Instruction.new(node.codeOrigin, "move", [address.offset, tmp])
+                newList << Instruction.new(node.codeOrigin, node.opcode, [node.operands[0], BaseIndex.new(node.codeOrigin, address.base, tmp, 1, Immediate.new(codeOrigin, 0))], node.annotation)
+            elsif node.opcode =~ /^load/ and isAddressMalformed(node.operands[0])
+                address = node.operands[0]
+                tmp = Tmp.new(codeOrigin, :gpr)
+                newList << Instruction.new(node.codeOrigin, "move", [address.offset, tmp])
+                newList << Instruction.new(node.codeOrigin, node.opcode, [BaseIndex.new(node.codeOrigin, address.base, tmp, 1, Immediate.new(codeOrigin, 0)), node.operands[1]], node.annotation)
+            else
+                newList << node
+            end
+        else
+            newList << node
+        end
+    }
+    newList
+end
+
 class Sequence
     def getModifiedListARM64
         result = @list
@@ -204,6 +235,7 @@ class Sequence
         result = riscLowerSimpleBranchOps(result)
         result = riscLowerHardBranchOps64(result)
         result = riscLowerShiftOps(result)
+        result = arm64LowerMalformedLoadStoreAddresses(result)
         result = riscLowerMalformedAddresses(result) {
             | node, address |
             case node.opcode
@@ -369,7 +401,7 @@ def emitARM64MoveImmediate(value, target)
     [48, 32, 16, 0].each {
         | shift |
         currentValue = (value >> shift) & 0xffff
-        next if currentValue == (isNegative ? 0xffff : 0) and shift != 0
+        next if currentValue == (isNegative ? 0xffff : 0) and (shift != 0 or !first)
         if first
             if isNegative
                 $asm.puts "movn #{target.arm64Operand(:ptr)}, \##{(~currentValue) & 0xffff}, lsl \##{shift}"

@@ -1386,7 +1386,6 @@ bool AbstractInterpreter<AbstractStateType>::executeEffects(unsigned clobberLimi
         
     case GetScope: // FIXME: We could get rid of these if we know that the JSFunction is a constant. https://bugs.webkit.org/show_bug.cgi?id=106202
     case GetMyScope:
-    case SkipTopScope:
         forNode(node).setType(SpecObjectOther);
         break;
 
@@ -1460,14 +1459,6 @@ bool AbstractInterpreter<AbstractStateType>::executeEffects(unsigned clobberLimi
         forNode(node).setType(SpecInt32);
         break;
         
-    case CheckExecutable: {
-        // FIXME: We could track executables in AbstractValue, which would allow us to get rid of these checks
-        // more thoroughly. https://bugs.webkit.org/show_bug.cgi?id=106200
-        // FIXME: We could eliminate these entirely if we know the exact value that flows into this.
-        // https://bugs.webkit.org/show_bug.cgi?id=106201
-        break;
-    }
-
     case CheckStructure: {
         // FIXME: We should be able to propagate the structure sets of constants (i.e. prototypes).
         AbstractValue& value = forNode(node->child1());
@@ -1727,16 +1718,29 @@ bool AbstractInterpreter<AbstractStateType>::executeEffects(unsigned clobberLimi
             m_state.setIsValid(false);
         break;
     }
-    
-    case CheckFunction: {
+        
+    case GetExecutable: {
         JSValue value = forNode(node->child1()).value();
-        if (value == node->function()->value()) {
+        if (value) {
+            JSFunction* function = jsDynamicCast<JSFunction*>(value);
+            if (function) {
+                setConstant(node, *m_graph.freeze(function->executable()));
+                break;
+            }
+        }
+        forNode(node).setType(SpecCellOther);
+        break;
+    }
+    
+    case CheckCell: {
+        JSValue value = forNode(node->child1()).value();
+        if (value == node->cellOperand()->value()) {
             m_state.setFoundConstants(true);
             ASSERT(value);
             break;
         }
         
-        filterByValue(node->child1(), *node->function());
+        filterByValue(node->child1(), *node->cellOperand());
         break;
     }
         
@@ -1773,7 +1777,7 @@ bool AbstractInterpreter<AbstractStateType>::executeEffects(unsigned clobberLimi
                         transitions.append(
                             Transition(
                                 variant.oldStructureForTransition(), variant.newStructure()));
-                        m_graph.watchpoints().consider(variant.newStructure());
+                        m_graph.registerStructure(variant.newStructure());
                         newSet.add(variant.newStructure());
                     } else {
                         ASSERT(variant.kind() == PutByIdVariant::Replace);
@@ -1860,8 +1864,6 @@ bool AbstractInterpreter<AbstractStateType>::executeEffects(unsigned clobberLimi
         
     case VariableWatchpoint:
     case VarInjectionWatchpoint:
-        break;
-            
     case PutGlobalVar:
     case NotifyWrite:
         break;
@@ -1901,7 +1903,16 @@ bool AbstractInterpreter<AbstractStateType>::executeEffects(unsigned clobberLimi
         forNode(node).makeHeapTop();
         break;
 
+    case ProfiledCall:
+    case ProfiledConstruct:
+        if (forNode(m_graph.varArgChild(node, 0)).m_value)
+            m_state.setFoundConstants(true);
+        clobberWorld(node->origin.semantic, clobberLimit);
+        forNode(node).makeHeapTop();
+        break;
+
     case ForceOSRExit:
+    case CheckBadCell:
         m_state.setIsValid(false);
         break;
         
@@ -1956,7 +1967,8 @@ bool AbstractInterpreter<AbstractStateType>::executeEffects(unsigned clobberLimi
     case LastNodeType:
     case ArithIMul:
     case FiatInt52:
-        RELEASE_ASSERT_NOT_REACHED();
+    case BottomValue:
+        DFG_CRASH(m_graph, node, "Unexpected node type");
         break;
     }
     

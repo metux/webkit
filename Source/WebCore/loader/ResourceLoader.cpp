@@ -404,12 +404,6 @@ void ResourceLoader::cleanupForError(const ResourceError& error)
         frameLoader()->notifier().didFailToLoad(this, error);
 }
 
-void ResourceLoader::didChangePriority(ResourceLoadPriority loadPriority)
-{
-    if (m_handle)
-        m_handle->didChangePriority(loadPriority);
-}
-
 void ResourceLoader::cancel()
 {
     cancel(ResourceError());
@@ -544,6 +538,11 @@ bool ResourceLoader::shouldUseCredentialStorage()
     return frameLoader()->client().shouldUseCredentialStorage(documentLoader(), identifier());
 }
 
+bool ResourceLoader::isAllowedToAskUserForCredentials() const
+{
+    return m_options.clientCredentialPolicy() == AskClientForAllCredentials || (m_options.clientCredentialPolicy() == DoNotAskClientForCrossOriginCredentials && m_frame->document()->securityOrigin()->canRequest(originalRequest().url()));
+}
+
 void ResourceLoader::didReceiveAuthenticationChallenge(const AuthenticationChallenge& challenge)
 {
     ASSERT(m_handle->hasAuthenticationChallenge());
@@ -553,7 +552,7 @@ void ResourceLoader::didReceiveAuthenticationChallenge(const AuthenticationChall
     Ref<ResourceLoader> protect(*this);
 
     if (m_options.allowCredentials() == AllowStoredCredentials) {
-        if (m_options.clientCredentialPolicy() == AskClientForAllCredentials || (m_options.clientCredentialPolicy() == DoNotAskClientForCrossOriginCredentials && m_frame->document()->securityOrigin()->canRequest(originalRequest().url()))) {
+        if (isAllowedToAskUserForCredentials()) {
             frameLoader()->notifier().didReceiveAuthenticationChallenge(this, challenge);
             return;
         }

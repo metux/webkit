@@ -120,7 +120,7 @@ if (length($fontNamesIn)) {
     print F StaticString::GenerateStrings(\%parameters);
 
     for my $name (sort keys %parameters) {
-        print F "DEFINE_GLOBAL(AtomicString, $name)\n";
+        print F "WEBCORE_EXPORT DEFINE_GLOBAL(AtomicString, $name)\n";
     }
 
     printInit($F, 0);
@@ -568,7 +568,7 @@ sub printInit
     my ($F, $isDefinition) = @_;
 
     if ($isDefinition) {
-        print F "\nvoid init();\n\n";
+        print F "\nWEBCORE_EXPORT void init();\n\n";
         print F "} }\n\n";
         print F "#endif\n\n";
         return;
@@ -642,40 +642,29 @@ void $checkHelper(const $class*); // Catch unnecessary runtime check of type kno
 END
         ;
 
-        if ($parameters{namespace} eq "HTML") {
-            if ($parsedTags{$name}{wrapperOnlyIfMediaIsAvailable}) {
-                # We need to check for HTMLUnknownElement if it might have been created by the factory.
-                print F <<END
+        if ($parameters{namespace} eq "HTML" && $parsedTags{$name}{wrapperOnlyIfMediaIsAvailable}) {
+            # We need to check for HTMLUnknownElement if it might have been created by the factory.
+            print F <<END
 inline bool $checkHelper(const HTMLElement& element) { return !element.isHTMLUnknownElement() && element.hasTagName($parameters{namespace}Names::${name}Tag); }
-inline bool $checkHelper(const HTMLElement* element) { ASSERT(element); return $checkHelper(*element); }
-END
-                ;
-            } else {
-                print F <<END
-inline bool $checkHelper(const HTMLElement& element) { return element.hasTagName(HTMLNames::${name}Tag); }
-inline bool $checkHelper(const HTMLElement* element) { ASSERT(element); return $checkHelper(*element); }
-END
-                ;
-            }
-
-                print F <<END
 inline bool $checkHelper(const Node& node) { return node.isHTMLElement() && $checkHelper(toHTMLElement(node)); }
-inline bool $checkHelper(const Node* node) { ASSERT(node); return $checkHelper(*node); }
-template <> inline bool isElementOfType<const $class>(const HTMLElement& element) { return $checkHelper(element); }
-template <> inline bool isElementOfType<const $class>(const Element& element) { return $checkHelper(element); }
 END
-                ;
-
+            ;
         } else {
             print F <<END
-inline bool $checkHelper(const Element& element) { return element.hasTagName($parameters{namespace}Names::${name}Tag); }
-inline bool $checkHelper(const Element* element) { ASSERT(element); return $checkHelper(*element); }
-inline bool $checkHelper(const Node& node) { return node.isElementNode() && $checkHelper(toElement(node)); }
-inline bool $checkHelper(const Node* node) { ASSERT(node); return node->isElementNode() && $checkHelper(toElement(node)); }
-template <> inline bool isElementOfType<const $class>(const Element& element) { return $checkHelper(element); }
+inline bool $checkHelper(const $parameters{namespace}Element& element) { return element.hasTagName($parameters{namespace}Names::${name}Tag); }
+inline bool $checkHelper(const Node& node) { return node.hasTagName($parameters{namespace}Names::${name}Tag); }
 END
             ;
         }
+        print F <<END
+inline bool $checkHelper(const $parameters{namespace}Element* element) { ASSERT(element); return $checkHelper(*element); }
+inline bool $checkHelper(const Node* node) { ASSERT(node); return $checkHelper(*node); }
+template <typename ArgType>
+struct ElementTypeCastTraits<const $class, ArgType> {
+    static bool is(ArgType& node) { return $checkHelper(node); }
+};
+END
+        ;
 
         print F "\n";
     }
@@ -751,14 +740,14 @@ sub printNamesCppFile
     
     my $lowercaseNamespacePrefix = lc($parameters{namespacePrefix});
 
-    print F "DEFINE_GLOBAL(AtomicString, ${lowercaseNamespacePrefix}NamespaceURI)\n\n";
+    print F "WEBCORE_EXPORT DEFINE_GLOBAL(AtomicString, ${lowercaseNamespacePrefix}NamespaceURI)\n\n";
 
     print F StaticString::GenerateStrings(\%allStrings);
 
     if (keys %allTags) {
         print F "// Tags\n";
         for my $name (sort keys %allTags) {
-            print F "DEFINE_GLOBAL($parameters{namespace}QualifiedName, ", $name, "Tag)\n";
+            print F "WEBCORE_EXPORT DEFINE_GLOBAL($parameters{namespace}QualifiedName, ", $name, "Tag)\n";
         }
         
         print F "\n\nconst WebCore::$parameters{namespace}QualifiedName* const* get$parameters{namespace}Tags()\n";
@@ -774,7 +763,7 @@ sub printNamesCppFile
     if (keys %allAttrs) {
         print F "\n// Attributes\n";
         for my $name (sort keys %allAttrs) {
-            print F "DEFINE_GLOBAL(QualifiedName, ", $name, "Attr)\n";
+            print F "WEBCORE_EXPORT DEFINE_GLOBAL(QualifiedName, ", $name, "Attr)\n";
         }
         print F "\n\nconst WebCore::QualifiedName* const* get$parameters{namespace}Attrs()\n";
         print F "{\n    static const WebCore::QualifiedName* const $parameters{namespace}Attrs[] = {\n";

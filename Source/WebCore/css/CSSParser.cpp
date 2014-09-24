@@ -1,7 +1,7 @@
 /*
  * Copyright (C) 2003 Lars Knoll (knoll@kde.org)
  * Copyright (C) 2005 Allan Sandfeld Jensen (kde@carewolf.com)
- * Copyright (C) 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2011, 2012, 2013 Apple Inc. All rights reserved.
+ * Copyright (C) 2004-2014 Apple Inc. All rights reserved.
  * Copyright (C) 2007 Nicholas Shanks <webkit@nickshanks.com>
  * Copyright (C) 2008 Eric Seidel <eric@webkit.org>
  * Copyright (C) 2009 Torch Mobile Inc. All rights reserved. (http://www.torchmobile.com/)
@@ -65,7 +65,7 @@
 #include "MediaList.h"
 #include "MediaQueryExp.h"
 #include "Page.h"
-#include "PageConsole.h"
+#include "PageConsoleClient.h"
 #include "Pair.h"
 #include "Rect.h"
 #include "RenderTheme.h"
@@ -78,6 +78,7 @@
 #include "StyleRuleImport.h"
 #include "StyleSheetContents.h"
 #include "TextEncoding.h"
+#include "WebKitCSSFilterValue.h"
 #include "WebKitCSSKeyframeRule.h"
 #include "WebKitCSSKeyframesRule.h"
 #include "WebKitCSSRegionRule.h"
@@ -98,10 +99,6 @@
 
 #if ENABLE(CSS_IMAGE_SET)
 #include "CSSImageSetValue.h"
-#endif
-
-#if ENABLE(CSS_FILTERS)
-#include "WebKitCSSFilterValue.h"
 #endif
 
 #if ENABLE(CSS_SCROLL_SNAP)
@@ -471,7 +468,9 @@ PassRefPtr<StyleKeyframe> CSSParser::parseKeyframeRule(StyleSheetContents* sheet
 bool CSSParser::parseSupportsCondition(const String& string)
 {
     m_supportsCondition = false;
-    setupParser("@-webkit-supports-condition{ ", string, "} ");
+    // can't use { because tokenizer state switches from supports to initial state when it sees { token.
+    // instead insert one " " (which is WHITESPACE in CSSGrammar.y)
+    setupParser("@-webkit-supports-condition ", string, "} ");
     cssyyparse(this);
     return m_supportsCondition;
 }
@@ -562,11 +561,16 @@ static inline bool isSimpleLengthPropertyID(CSSPropertyID propertyId, bool& acce
         return RuntimeEnabledFeatures::sharedFeatures().cssShapesEnabled();
 #endif
     case CSSPropertyBottom:
+    case CSSPropertyCx:
+    case CSSPropertyCy:
     case CSSPropertyLeft:
     case CSSPropertyMarginBottom:
     case CSSPropertyMarginLeft:
     case CSSPropertyMarginRight:
     case CSSPropertyMarginTop:
+    case CSSPropertyR:
+    case CSSPropertyRx:
+    case CSSPropertyRy:
     case CSSPropertyRight:
     case CSSPropertyTop:
     case CSSPropertyWebkitMarginAfter:
@@ -675,7 +679,7 @@ static inline bool isValidKeywordPropertyAndValue(CSSPropertyID propertyId, int 
         // inline | block | list-item | inline-block | table |
         // inline-table | table-row-group | table-header-group | table-footer-group | table-row |
         // table-column-group | table-column | table-cell | table-caption | -webkit-box | -webkit-inline-box | none | inherit
-        // -webkit-flex | -webkit-inline-flex | -webkit-grid | -webkit-inline-grid
+        // flex | -webkit-flex | inline-flex | -webkit-inline-flex | -webkit-grid | -webkit-inline-grid
         if ((valueID >= CSSValueInline && valueID <= CSSValueWebkitInlineFlex) || valueID == CSSValueNone)
             return true;
 #if ENABLE(CSS_GRID_LAYOUT)
@@ -859,30 +863,30 @@ static inline bool isValidKeywordPropertyAndValue(CSSPropertyID propertyId, int 
         if (valueID == CSSValueAuto || valueID == CSSValueBalance)
             return true;
         break;
-    case CSSPropertyWebkitAlignContent:
+    case CSSPropertyAlignContent:
         // FIXME: Per CSS alignment, this property should accept an optional <overflow-position>. We should share this parsing code with 'justify-self'.
         if (valueID == CSSValueFlexStart || valueID == CSSValueFlexEnd || valueID == CSSValueCenter || valueID == CSSValueSpaceBetween || valueID == CSSValueSpaceAround || valueID == CSSValueStretch)
             return true;
         break;
-    case CSSPropertyWebkitAlignItems:
+    case CSSPropertyAlignItems:
         // FIXME: Per CSS alignment, this property should accept the same arguments as 'justify-self' so we should share its parsing code.
         if (valueID == CSSValueFlexStart || valueID == CSSValueFlexEnd || valueID == CSSValueCenter || valueID == CSSValueBaseline || valueID == CSSValueStretch)
             return true;
         break;
-    case CSSPropertyWebkitAlignSelf:
+    case CSSPropertyAlignSelf:
         // FIXME: Per CSS alignment, this property should accept the same arguments as 'justify-self' so we should share its parsing code.
         if (valueID == CSSValueAuto || valueID == CSSValueFlexStart || valueID == CSSValueFlexEnd || valueID == CSSValueCenter || valueID == CSSValueBaseline || valueID == CSSValueStretch)
             return true;
         break;
-    case CSSPropertyWebkitFlexDirection:
+    case CSSPropertyFlexDirection:
         if (valueID == CSSValueRow || valueID == CSSValueRowReverse || valueID == CSSValueColumn || valueID == CSSValueColumnReverse)
             return true;
         break;
-    case CSSPropertyWebkitFlexWrap:
+    case CSSPropertyFlexWrap:
         if (valueID == CSSValueNowrap || valueID == CSSValueWrap || valueID == CSSValueWrapReverse)
              return true;
         break;
-    case CSSPropertyWebkitJustifyContent:
+    case CSSPropertyJustifyContent:
         // FIXME: Per CSS alignment, this property should accept an optional <overflow-position>. We should share this parsing code with 'justify-self'.
         if (valueID == CSSValueFlexStart || valueID == CSSValueFlexEnd || valueID == CSSValueCenter || valueID == CSSValueSpaceBetween || valueID == CSSValueSpaceAround)
             return true;
@@ -966,7 +970,7 @@ static inline bool isValidKeywordPropertyAndValue(CSSPropertyID propertyId, int 
         break;
 
     case CSSPropertyWebkitRubyPosition:
-        if (valueID == CSSValueBefore || valueID == CSSValueAfter)
+        if (valueID == CSSValueBefore || valueID == CSSValueAfter || valueID == CSSValueInterCharacter)
             return true;
         break;
 
@@ -1101,12 +1105,12 @@ static inline bool isKeywordPropertyID(CSSPropertyID propertyId)
     case CSSPropertyWebkitColumnBreakInside:
     case CSSPropertyWebkitColumnFill:
     case CSSPropertyWebkitColumnRuleStyle:
-    case CSSPropertyWebkitAlignContent:
-    case CSSPropertyWebkitAlignItems:
-    case CSSPropertyWebkitAlignSelf:
-    case CSSPropertyWebkitFlexDirection:
-    case CSSPropertyWebkitFlexWrap:
-    case CSSPropertyWebkitJustifyContent:
+    case CSSPropertyAlignContent:
+    case CSSPropertyAlignItems:
+    case CSSPropertyAlignSelf:
+    case CSSPropertyFlexDirection:
+    case CSSPropertyFlexWrap:
+    case CSSPropertyJustifyContent:
     case CSSPropertyWebkitFontKerning:
     case CSSPropertyWebkitFontSmoothing:
     case CSSPropertyWebkitHyphens:
@@ -2407,6 +2411,30 @@ bool CSSParser::parseValue(CSSPropertyID propId, bool important)
             return false;
         }
         break;
+    case CSSPropertyWebkitInitialLetter: {
+        if (id == CSSValueNormal)
+            validPrimitive = true;
+        else {
+            if (num != 1 && num != 2)
+                return false;
+            validPrimitive = validUnit(value, FPositiveInteger);
+            if (!validPrimitive)
+                return false;
+            RefPtr<CSSPrimitiveValue> parsedValue1 = createPrimitiveNumericValue(value);
+            RefPtr<CSSPrimitiveValue> parsedValue2;
+            if (num == 2) {
+                value = m_valueList->next();
+                validPrimitive = validUnit(value, FPositiveInteger);
+                if (!validPrimitive)
+                    return false;
+                parsedValue2 = createPrimitiveNumericValue(value);
+            } else
+                parsedValue2 = parsedValue1;
+            addProperty(propId, createPrimitiveValuePair(parsedValue1.release(), parsedValue2.release()), important);
+            return true;
+        }
+        break;
+    }
     case CSSPropertyWebkitBoxReflect:
         if (id == CSSValueNone)
             validPrimitive = true;
@@ -2425,7 +2453,6 @@ bool CSSParser::parseValue(CSSPropertyID propId, bool important)
     case CSSPropertyWebkitBoxOrdinalGroup:
         validPrimitive = validUnit(value, FInteger | FNonNeg, CSSStrictMode) && value->fValue;
         break;
-#if ENABLE(CSS_FILTERS)
     case CSSPropertyWebkitFilter:
         if (id == CSSValueNone)
             validPrimitive = true;
@@ -2437,7 +2464,6 @@ bool CSSParser::parseValue(CSSPropertyID propId, bool important)
             return true;
         }
         break;
-#endif
 #if ENABLE(CSS_COMPOSITING)
     case CSSPropertyMixBlendMode:
         if (cssCompositingEnabled())
@@ -2448,28 +2474,28 @@ bool CSSParser::parseValue(CSSPropertyID propId, bool important)
             validPrimitive = true;
         break;
 #endif
-    case CSSPropertyWebkitFlex: {
+    case CSSPropertyFlex: {
         ShorthandScope scope(this, propId);
         if (id == CSSValueNone) {
-            addProperty(CSSPropertyWebkitFlexGrow, cssValuePool().createValue(0, CSSPrimitiveValue::CSS_NUMBER), important);
-            addProperty(CSSPropertyWebkitFlexShrink, cssValuePool().createValue(0, CSSPrimitiveValue::CSS_NUMBER), important);
-            addProperty(CSSPropertyWebkitFlexBasis, cssValuePool().createIdentifierValue(CSSValueAuto), important);
+            addProperty(CSSPropertyFlexGrow, cssValuePool().createValue(0, CSSPrimitiveValue::CSS_NUMBER), important);
+            addProperty(CSSPropertyFlexShrink, cssValuePool().createValue(0, CSSPrimitiveValue::CSS_NUMBER), important);
+            addProperty(CSSPropertyFlexBasis, cssValuePool().createIdentifierValue(CSSValueAuto), important);
             return true;
         }
         return parseFlex(m_valueList.get(), important);
     }
-    case CSSPropertyWebkitFlexBasis:
+    case CSSPropertyFlexBasis:
         // FIXME: Support intrinsic dimensions too.
         if (id == CSSValueAuto)
             validPrimitive = true;
         else
             validPrimitive = (!id && validUnit(value, FLength | FPercent | FNonNeg));
         break;
-    case CSSPropertyWebkitFlexGrow:
-    case CSSPropertyWebkitFlexShrink:
+    case CSSPropertyFlexGrow:
+    case CSSPropertyFlexShrink:
         validPrimitive = validUnit(value, FNumber | FNonNeg);
         break;
-    case CSSPropertyWebkitOrder:
+    case CSSPropertyOrder:
         if (validUnit(value, FInteger, CSSStrictMode)) {
             // We restrict the smallest value to int min + 2 because we use int min and int min + 1 as special values in a hash set.
             parsedValue = cssValuePool().createValue(std::max<double>(std::numeric_limits<int>::min() + 2, value->fValue), static_cast<CSSPrimitiveValue::UnitTypes>(value->unit));
@@ -2752,19 +2778,6 @@ bool CSSParser::parseValue(CSSPropertyID propId, bool important)
 #endif
 
 #if PLATFORM(IOS)
-    // FIXME: CSSPropertyWebkitCompositionFillColor shouldn't be iOS-specific. Once we fix up its usage in
-    // InlineTextBox::paintCompositionBackground() we should move it outside the PLATFORM(IOS)-guard.
-    // See <https://bugs.webkit.org/show_bug.cgi?id=126296>.
-    case CSSPropertyWebkitCompositionFillColor:
-        if ((id >= CSSValueAqua && id <= CSSValueWindowtext) || id == CSSValueMenu
-            || (id >= CSSValueWebkitFocusRingColor && id < CSSValueWebkitText && inQuirksMode())) {
-            validPrimitive = true;
-        } else {
-            parsedValue = parseColor();
-            if (parsedValue)
-                m_valueList->next();
-        }
-        break;
     case CSSPropertyWebkitTouchCallout:
         if (id == CSSValueDefault || id == CSSValueNone)
             validPrimitive = true;
@@ -2847,8 +2860,8 @@ bool CSSParser::parseValue(CSSPropertyID propId, bool important)
     case CSSPropertyPadding:
         // <padding-width>{1,4} | inherit
         return parse4Values(propId, paddingShorthand().properties(), important);
-    case CSSPropertyWebkitFlexFlow:
-        return parseShorthand(propId, webkitFlexFlowShorthand(), important);
+    case CSSPropertyFlexFlow:
+        return parseShorthand(propId, flexFlowShorthand(), important);
     case CSSPropertyFont:
         // [ [ 'font-style' || 'font-variant' || 'font-weight' ]? 'font-size' [ / 'line-height' ]?
         // 'font-family' ] | caption | icon | menu | message-box | small-caption | status-bar | inherit
@@ -2998,12 +3011,12 @@ bool CSSParser::parseValue(CSSPropertyID propId, bool important)
     case CSSPropertyWebkitColumnBreakInside:
     case CSSPropertyWebkitColumnFill:
     case CSSPropertyWebkitColumnRuleStyle:
-    case CSSPropertyWebkitAlignContent:
-    case CSSPropertyWebkitAlignItems:
-    case CSSPropertyWebkitAlignSelf:
-    case CSSPropertyWebkitFlexDirection:
-    case CSSPropertyWebkitFlexWrap:
-    case CSSPropertyWebkitJustifyContent:
+    case CSSPropertyAlignContent:
+    case CSSPropertyAlignItems:
+    case CSSPropertyAlignSelf:
+    case CSSPropertyFlexDirection:
+    case CSSPropertyFlexWrap:
+    case CSSPropertyJustifyContent:
     case CSSPropertyWebkitFontKerning:
     case CSSPropertyWebkitFontSmoothing:
     case CSSPropertyWebkitHyphens:
@@ -4981,7 +4994,7 @@ bool CSSParser::parseGridTemplateRowsAndAreas(PassRefPtr<CSSValue> templateColum
         if (m_valueList->current()->unit == CSSParserValue::ValueList) {
             if (trailingIdentWasAdded) {
                 // A row's trailing ident must be concatenated with the next row's leading one.
-                parseGridLineNames(*m_valueList, *templateRows, static_cast<CSSGridLineNamesValue*>(templateRows->item(templateRows->length() - 1)));
+                parseGridLineNames(*m_valueList, *templateRows, toCSSGridLineNamesValue(templateRows->item(templateRows->length() - 1)));
             } else
                 parseGridLineNames(*m_valueList, *templateRows);
         }
@@ -5002,10 +5015,8 @@ bool CSSParser::parseGridTemplateRowsAndAreas(PassRefPtr<CSSValue> templateColum
 
         // This will handle the trailing/leading <custom-ident>* in the grammar.
         trailingIdentWasAdded = false;
-        if (m_valueList->current() && m_valueList->current()->unit == CSSParserValue::ValueList) {
-            parseGridLineNames(*m_valueList, *templateRows);
-            trailingIdentWasAdded = true;
-        }
+        if (m_valueList->current() && m_valueList->current()->unit == CSSParserValue::ValueList)
+            trailingIdentWasAdded = parseGridLineNames(*m_valueList, *templateRows);
     } while (m_valueList->current());
 
     // [<track-list> /]?
@@ -5181,14 +5192,14 @@ bool CSSParser::parseSingleGridAreaLonghand(RefPtr<CSSValue>& property)
     return true;
 }
 
-void CSSParser::parseGridLineNames(CSSParserValueList& inputList, CSSValueList& valueList, CSSGridLineNamesValue* previousNamedAreaTrailingLineNames)
+bool CSSParser::parseGridLineNames(CSSParserValueList& inputList, CSSValueList& valueList, CSSGridLineNamesValue* previousNamedAreaTrailingLineNames)
 {
     ASSERT(inputList.current() && inputList.current()->unit == CSSParserValue::ValueList);
 
     CSSParserValueList* identList = inputList.current()->valueList;
     if (!identList->size()) {
         inputList.next();
-        return;
+        return false;
     }
 
     // Need to ensure the identList is at the heading index, since the parserList might have been rewound.
@@ -5204,6 +5215,7 @@ void CSSParser::parseGridLineNames(CSSParserValueList& inputList, CSSValueList& 
         valueList.append(lineNames.releaseNonNull());
 
     inputList.next();
+    return true;
 }
 
 PassRefPtr<CSSValue> CSSParser::parseGridTrackList()
@@ -5268,18 +5280,24 @@ bool CSSParser::parseGridTrackRepeatFunction(CSSValueList& list)
     if (currentValue && currentValue->unit == CSSParserValue::ValueList)
         parseGridLineNames(*arguments, *repeatedValues);
 
+    bool sawTrackSize = false;
     while (arguments->current()) {
         RefPtr<CSSValue> trackSize = parseGridTrackSize(*arguments);
         if (!trackSize)
             return false;
 
         repeatedValues->append(trackSize.releaseNonNull());
+        sawTrackSize = true;
 
         // This takes care of any trailing <custom-ident>* in the grammar.
         currentValue = arguments->current();
         if (currentValue && currentValue->unit == CSSParserValue::ValueList)
             parseGridLineNames(*arguments, *repeatedValues);
     }
+
+    // We should have found at least one <track-size>, otherwise the declaration is invalid.
+    if (!sawTrackSize)
+        return false;
 
     for (size_t i = 0; i < repetitions; ++i) {
         for (size_t j = 0; j < repeatedValues->length(); ++j)
@@ -7345,9 +7363,9 @@ bool CSSParser::parseFlex(CSSParserValueList* args, bool important)
     if (!flexBasis)
         flexBasis = cssValuePool().createValue(0, CSSPrimitiveValue::CSS_PX);
 
-    addProperty(CSSPropertyWebkitFlexGrow, cssValuePool().createValue(clampToFloat(flexGrow), CSSPrimitiveValue::CSS_NUMBER), important);
-    addProperty(CSSPropertyWebkitFlexShrink, cssValuePool().createValue(clampToFloat(flexShrink), CSSPrimitiveValue::CSS_NUMBER), important);
-    addProperty(CSSPropertyWebkitFlexBasis, flexBasis, important);
+    addProperty(CSSPropertyFlexGrow, cssValuePool().createValue(clampToFloat(flexGrow), CSSPrimitiveValue::CSS_NUMBER), important);
+    addProperty(CSSPropertyFlexShrink, cssValuePool().createValue(clampToFloat(flexShrink), CSSPrimitiveValue::CSS_NUMBER), important);
+    addProperty(CSSPropertyFlexBasis, flexBasis, important);
     return true;
 }
 
@@ -8672,15 +8690,12 @@ bool CSSParser::parseGeneratedImage(CSSParserValueList* valueList, RefPtr<CSSVal
     if (equalIgnoringCase(val->function->name, "-webkit-cross-fade("))
         return parseCrossfade(valueList, value);
 
-#if ENABLE(CSS_FILTERS)
     if (equalIgnoringCase(val->function->name, "-webkit-filter("))
         return parseFilterImage(valueList, value);
-#endif
 
     return false;
 }
 
-#if ENABLE(CSS_FILTERS)
 bool CSSParser::parseFilterImage(CSSParserValueList* valueList, RefPtr<CSSValue>& filter)
 {
     RefPtr<CSSFilterImageValue> result;
@@ -8721,7 +8736,6 @@ bool CSSParser::parseFilterImage(CSSParserValueList* valueList, RefPtr<CSSValue>
 
     return true;
 }
-#endif
 
 bool CSSParser::parseCrossfade(CSSParserValueList* valueList, RefPtr<CSSValue>& crossfade)
 {
@@ -9230,8 +9244,6 @@ bool CSSParser::isCompositeOperator(CSSValueID valueID)
     return valueID >= CSSValueClear && valueID <= CSSValueXor;
 }
 
-#if ENABLE(CSS_FILTERS)
-
 static void filterInfoForName(const CSSParserString& name, WebKitCSSFilterValue::FilterOperationType& filterType, unsigned& maximumArgumentCount)
 {
     if (equalIgnoringCase(name, "grayscale("))
@@ -9393,7 +9405,6 @@ bool CSSParser::parseFilter(CSSParserValueList* valueList, RefPtr<CSSValue>& res
 
     return true;
 }
-#endif
 
 #if ENABLE(CSS_REGIONS)
 static bool validFlowName(const String& flowName)
@@ -9823,6 +9834,10 @@ bool CSSParser::parseLineBoxContain(bool important)
             if (lineBoxContain & LineBoxContainInlineBox)
                 return false;
             lineBoxContain |= LineBoxContainInlineBox;
+        } else if (value->id == CSSValueInitialLetter) {
+            if (lineBoxContain & LineBoxContainInitialLetter)
+                return false;
+            lineBoxContain |= LineBoxContainInitialLetter;
         } else
             return false;
     }
@@ -9976,7 +9991,7 @@ enum CharacterType {
     CharacterOther,
     CharacterNull,
     CharacterWhiteSpace,
-    CharacterEndMediaQuery,
+    CharacterEndConditionQuery,
     CharacterEndNthChild,
     CharacterQuote,
     CharacterExclamationMark,
@@ -10055,7 +10070,7 @@ static const CharacterType typesOfASCIICharacters[128] = {
 /*  56 - 8                  */ CharacterNumber,
 /*  57 - 9                  */ CharacterNumber,
 /*  58 - :                  */ CharacterOther,
-/*  59 - ;                  */ CharacterEndMediaQuery,
+/*  59 - ;                  */ CharacterEndConditionQuery,
 /*  60 - <                  */ CharacterLess,
 /*  61 - =                  */ CharacterOther,
 /*  62 - >                  */ CharacterOther,
@@ -10119,7 +10134,7 @@ static const CharacterType typesOfASCIICharacters[128] = {
 /* 120 - x                  */ CharacterIdentifierStart,
 /* 121 - y                  */ CharacterIdentifierStart,
 /* 122 - z                  */ CharacterIdentifierStart,
-/* 123 - {                  */ CharacterEndMediaQuery,
+/* 123 - {                  */ CharacterEndConditionQuery,
 /* 124 - |                  */ CharacterVerticalBar,
 /* 125 - }                  */ CharacterOther,
 /* 126 - ~                  */ CharacterTilde,
@@ -10656,6 +10671,7 @@ inline bool CSSParser::detectFunctionTypeToken(int length)
 
     case 9:
         if (isEqualToCSSIdentifier(name, "nth-child")) {
+            m_token = NTHCHILDFUNCTION;
             m_parsingMode = NthChildMode;
             return true;
         }
@@ -11189,6 +11205,10 @@ restartAfterComment:
                 }
             }
         }
+        if (m_parsingMode == NthChildMode && m_token == IDENT && yylval->string.length() == 2 && yylval->string.equalIgnoringCase("of")) {
+            m_parsingMode = NormalMode;
+            m_token = NTHCHILDSELECTORSEPARATOR;
+        }
         break;
 
     case CharacterDot:
@@ -11335,10 +11355,15 @@ restartAfterComment:
         } while (*currentCharacter<SrcCharacterType>() <= ' ' && (typesOfASCIICharacters[*currentCharacter<SrcCharacterType>()] == CharacterWhiteSpace));
         break;
 
-    case CharacterEndMediaQuery:
-        if (m_parsingMode == MediaQueryMode)
+    case CharacterEndConditionQuery: {
+        bool isParsingCondition = m_parsingMode == MediaQueryMode;
+#if ENABLE(CSS3_CONDITIONAL_RULES)
+        isParsingCondition = isParsingCondition || m_parsingMode == SupportsMode;
+#endif
+        if (isParsingCondition)
             m_parsingMode = NormalMode;
         break;
+    }
 
     case CharacterEndNthChild:
         if (m_parsingMode == NthChildMode)
@@ -11457,6 +11482,10 @@ restartAfterComment:
             --currentCharacter<SrcCharacterType>();
             parseIdentifier(result, yylval->string, hasEscape);
             m_token = IDENT;
+        }
+        if (m_parsingMode == NthChildMode && m_token == IDENT && yylval->string.length() == 2 && yylval->string.equalIgnoringCase("of")) {
+            m_parsingMode = NormalMode;
+            m_token = NTHCHILDSELECTORSEPARATOR;
         }
         break;
 
@@ -11643,7 +11672,7 @@ bool CSSParser::isLoggingErrors()
 void CSSParser::logError(const String& message, int lineNumber)
 {
     // FIXME: <http://webkit.org/b/114313> CSS parser console message errors should include column numbers.
-    PageConsole& console = m_styleSheet->singleOwnerDocument()->page()->console();
+    PageConsoleClient& console = m_styleSheet->singleOwnerDocument()->page()->console();
     console.addMessage(MessageSource::CSS, MessageLevel::Warning, message, m_styleSheet->baseURL().string(), lineNumber + 1, 0);
 }
 

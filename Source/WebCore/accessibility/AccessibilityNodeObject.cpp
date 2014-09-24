@@ -400,10 +400,6 @@ bool AccessibilityNodeObject::canHaveChildren() const
     case ScrollBarRole:
     case ProgressIndicatorRole:
         return false;
-    case LegendRole:
-        if (Element* element = this->element())
-            return !ancestorsOfType<HTMLFieldSetElement>(*element).first();
-        FALLTHROUGH;
     default:
         return true;
     }
@@ -1460,30 +1456,26 @@ String AccessibilityNodeObject::alternativeTextForWebArea() const
     
     // Check if the HTML element has an aria-label for the webpage.
     if (Element* documentElement = document->documentElement()) {
-        const AtomicString& ariaLabel = documentElement->getAttribute(aria_labelAttr);
+        const AtomicString& ariaLabel = documentElement->fastGetAttribute(aria_labelAttr);
         if (!ariaLabel.isEmpty())
             return ariaLabel;
     }
     
-    Node* owner = document->ownerElement();
-    if (owner) {
+    if (auto* owner = document->ownerElement()) {
         if (owner->hasTagName(frameTag) || owner->hasTagName(iframeTag)) {
-            const AtomicString& title = toElement(owner)->getAttribute(titleAttr);
+            const AtomicString& title = owner->fastGetAttribute(titleAttr);
             if (!title.isEmpty())
                 return title;
-            return toElement(owner)->getNameAttribute();
         }
-        if (owner->isHTMLElement())
-            return toHTMLElement(owner)->getNameAttribute();
+        return owner->getNameAttribute();
     }
     
     String documentTitle = document->title();
     if (!documentTitle.isEmpty())
         return documentTitle;
     
-    owner = document->body();
-    if (owner && owner->isHTMLElement())
-        return toHTMLElement(owner)->getNameAttribute();
+    if (auto* body = document->body())
+        return body->getNameAttribute();
     
     return String();
 }
@@ -1571,7 +1563,7 @@ unsigned AccessibilityNodeObject::hierarchicalLevel() const
     if (!node || !node->isElementNode())
         return 0;
     Element* element = toElement(node);
-    String ariaLevel = element->getAttribute(aria_levelAttr);
+    const AtomicString& ariaLevel = element->fastGetAttribute(aria_levelAttr);
     if (!ariaLevel.isEmpty())
         return ariaLevel.toInt();
     
@@ -1857,7 +1849,7 @@ static String accessibleNameForNode(Node* node)
     AccessibilityObject* axObject = node->document().axObjectCache()->getOrCreate(node);
     String text;
     if (axObject)
-        text = axObject->textUnderElement();
+        text = axObject->textUnderElement(AccessibilityTextUnderElementMode(AccessibilityTextUnderElementMode::TextUnderElementModeSkipIgnoredChildren, true));
     else
         text = element->innerText();
     

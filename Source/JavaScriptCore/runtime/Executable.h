@@ -40,6 +40,7 @@
 #include "RegisterPreservationMode.h"
 #include "SamplingTool.h"
 #include "SourceCode.h"
+#include "TypeSet.h"
 #include "UnlinkedCodeBlock.h"
 #include <wtf/PassOwnPtr.h>
 
@@ -365,8 +366,8 @@ public:
     int lastLine() const { return m_lastLine; }
     unsigned startColumn() const { return m_startColumn; }
     unsigned endColumn() const { return m_endColumn; }
-    unsigned highFidelityTypeProfilingStartOffset() const { return m_highFidelityTypeProfilingStartOffset; }
-    unsigned highFidelityTypeProfilingEndOffset() const { return m_highFidelityTypeProfilingEndOffset; }
+    unsigned typeProfilingStartOffset() const { return m_typeProfilingStartOffset; }
+    unsigned typeProfilingEndOffset() const { return m_typeProfilingEndOffset; }
 
     bool usesEval() const { return m_features & EvalFeature; }
     bool usesArguments() const { return m_features & ArgumentsFeature; }
@@ -437,8 +438,8 @@ protected:
     int m_lastLine;
     unsigned m_startColumn;
     unsigned m_endColumn;
-    unsigned m_highFidelityTypeProfilingStartOffset;
-    unsigned m_highFidelityTypeProfilingEndOffset;
+    unsigned m_typeProfilingStartOffset;
+    unsigned m_typeProfilingEndOffset;
 };
 
 class EvalExecutable : public ScriptExecutable {
@@ -612,6 +613,14 @@ public:
     {
         return baselineCodeBlockFor(kind);
     }
+
+    RefPtr<TypeSet> returnStatementTypeSet() 
+    {
+        if (!m_returnStatementTypeSet)
+            m_returnStatementTypeSet = TypeSet::create();
+
+        return m_returnStatementTypeSet;
+    }
         
     FunctionMode functionMode() { return m_unlinkedExecutable->functionMode(); }
     bool isBuiltinFunction() const { return m_unlinkedExecutable->isBuiltinFunction(); }
@@ -659,6 +668,7 @@ private:
     RefPtr<FunctionCodeBlock> m_codeBlockForConstruct;
     bool m_bodyIncludesBraces;
     bool m_didParseForTheFirstTime;
+    RefPtr<TypeSet> m_returnStatementTypeSet;
 };
 
 inline void ExecutableBase::clearCodeVirtual(ExecutableBase* executable)

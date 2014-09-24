@@ -70,13 +70,13 @@ public:
     void userDidClickSnapshot(PassRefPtr<MouseEvent>, bool forwardEvent);
     void checkSnapshotStatus();
     Image* snapshotImage() const { return m_snapshotImage.get(); }
-    void restartSnapshottedPlugIn();
+    WEBCORE_EXPORT void restartSnapshottedPlugIn();
 
     // Plug-in URL might not be the same as url() with overriding parameters.
     void subframeLoaderWillCreatePlugIn(const URL& plugInURL);
     void subframeLoaderDidCreatePlugIn(const Widget*);
 
-    void setIsPrimarySnapshottedPlugIn(bool);
+    WEBCORE_EXPORT void setIsPrimarySnapshottedPlugIn(bool);
     bool partOfSnapshotOverlay(Node*);
 
     bool needsCheckForSizeChange() const { return m_needsCheckForSizeChange; }
@@ -160,7 +160,12 @@ private:
 void isHTMLPlugInImageElement(const HTMLPlugInImageElement&); // Catch unnecessary runtime check of type known at compile time.
 inline bool isHTMLPlugInImageElement(const HTMLPlugInElement& element) { return element.isPlugInImageElement(); }
 inline bool isHTMLPlugInImageElement(const Node& node) { return node.isPluginElement() && toHTMLPlugInElement(node).isPlugInImageElement(); }
-template <> inline bool isElementOfType<const HTMLPlugInImageElement>(const Element& element) { return isHTMLPlugInImageElement(element); }
+
+template <typename ArgType>
+struct ElementTypeCastTraits<const HTMLPlugInImageElement, ArgType> {
+    static bool is(ArgType& node) { return isHTMLPlugInImageElement(node); }
+};
+
 NODE_TYPE_CASTS(HTMLPlugInImageElement)
 
 } // namespace WebCore

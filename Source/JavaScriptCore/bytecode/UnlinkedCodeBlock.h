@@ -125,8 +125,8 @@ public:
     unsigned unlinkedBodyEndColumn() const { return m_unlinkedBodyEndColumn; }
     unsigned startOffset() const { return m_startOffset; }
     unsigned sourceLength() { return m_sourceLength; }
-    unsigned highFidelityTypeProfilingStartOffset() const { return m_highFidelityTypeProfilingStartOffset; }
-    unsigned highFidelityTypeProfilingEndOffset() const { return m_highFidelityTypeProfilingEndOffset; }
+    unsigned typeProfilingStartOffset() const { return m_typeProfilingStartOffset; }
+    unsigned typeProfilingEndOffset() const { return m_typeProfilingEndOffset; }
 
     String paramString() const;
 
@@ -187,8 +187,8 @@ private:
     unsigned m_unlinkedBodyEndColumn;
     unsigned m_startOffset;
     unsigned m_sourceLength;
-    unsigned m_highFidelityTypeProfilingStartOffset;
-    unsigned m_highFidelityTypeProfilingEndOffset;
+    unsigned m_typeProfilingStartOffset;
+    unsigned m_typeProfilingEndOffset;
 
     CodeFeatures m_features;
 
@@ -276,13 +276,13 @@ public:
     void addExpressionInfo(unsigned instructionOffset, int divot,
         int startOffset, int endOffset, unsigned line, unsigned column);
 
-    void addHighFidelityTypeProfileExpressionInfo(unsigned instructionOffset, unsigned startDivot, unsigned endDivot);
+    void addTypeProfilerExpressionInfo(unsigned instructionOffset, unsigned startDivot, unsigned endDivot);
 
     bool hasExpressionInfo() { return m_expressionInfo.size(); }
 
     // Special registers
     void setThisRegister(VirtualRegister thisRegister) { m_thisRegister = thisRegister; }
-    void setActivationRegister(VirtualRegister activationRegister) { m_activationRegister = activationRegister; }
+    void setActivationRegister(VirtualRegister activationRegister) { m_lexicalEnvironmentRegister = activationRegister; }
 
     void setArgumentsRegister(VirtualRegister argumentsRegister) { m_argumentsRegister = argumentsRegister; }
     bool usesArguments() const { return m_argumentsRegister.isValid(); }
@@ -429,8 +429,8 @@ public:
     CodeType codeType() const { return m_codeType; }
 
     VirtualRegister thisRegister() const { return m_thisRegister; }
-    VirtualRegister activationRegister() const { return m_activationRegister; }
-    bool hasActivationRegister() const { return m_activationRegister.isValid(); }
+    VirtualRegister activationRegister() const { return m_lexicalEnvironmentRegister; }
+    bool hasActivationRegister() const { return m_lexicalEnvironmentRegister.isValid(); }
 
     void addPropertyAccessInstruction(unsigned propertyAccessInstruction)
     {
@@ -470,7 +470,7 @@ public:
     void expressionRangeForBytecodeOffset(unsigned bytecodeOffset, int& divot,
         int& startOffset, int& endOffset, unsigned& line, unsigned& column);
 
-    bool highFidelityTypeProfileExpressionInfoForBytecodeOffset(unsigned bytecodeOffset, unsigned& startDivot, unsigned& endDivot);
+    bool typeProfilerExpressionInfoForBytecodeOffset(unsigned bytecodeOffset, unsigned& startDivot, unsigned& endDivot);
 
     void recordParse(CodeFeatures features, bool hasCapturedVariables, unsigned firstLine, unsigned lineCount, unsigned endColumn)
     {
@@ -520,7 +520,7 @@ private:
 
     VirtualRegister m_thisRegister;
     VirtualRegister m_argumentsRegister;
-    VirtualRegister m_activationRegister;
+    VirtualRegister m_lexicalEnvironmentRegister;
     VirtualRegister m_globalObjectRegister;
 
     bool m_needsFullScopeChain : 1;
@@ -583,11 +583,11 @@ public:
 private:
     OwnPtr<RareData> m_rareData;
     Vector<ExpressionRangeInfo> m_expressionInfo;
-    struct HighFidelityTypeProfileExpressionRange {
+    struct TypeProfilerExpressionRange {
         unsigned m_startDivot;
         unsigned m_endDivot;
     };
-    HashMap<unsigned, HighFidelityTypeProfileExpressionRange> m_highFidelityTypeProfileInfoMap;
+    HashMap<unsigned, TypeProfilerExpressionRange> m_typeProfilerInfoMap;
 
 protected:
 

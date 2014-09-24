@@ -142,6 +142,12 @@ PassRefPtr<Element> Element::create(const QualifiedName& tagName, Document& docu
     return adoptRef(new Element(tagName, document, CreateElement));
 }
 
+Element::Element(const QualifiedName& tagName, Document& document, ConstructionType type)
+    : ContainerNode(document, type)
+    , m_tagName(tagName)
+{
+}
+
 Element::~Element()
 {
 #ifndef NDEBUG
@@ -261,9 +267,6 @@ bool Element::dispatchMouseEvent(const PlatformMouseEvent& platformEvent, const 
 
 bool Element::dispatchWheelEvent(const PlatformWheelEvent& event)
 {
-    if (!(event.deltaX() || event.deltaY()))
-        return true;
-
     RefPtr<WheelEvent> wheelEvent = WheelEvent::create(event, document().defaultView());
     return EventDispatcher::dispatchEvent(this, wheelEvent) && !wheelEvent->defaultHandled();
 }
@@ -646,14 +649,7 @@ static double adjustForLocalZoom(LayoutUnit value, const RenderElement& renderer
     zoomFactor = localZoomForRenderer(renderer);
     if (zoomFactor == 1)
         return value.toDouble();
-#if ENABLE(SUBPIXEL_LAYOUT)
     return value.toDouble() / zoomFactor;
-#else
-    // Needed because computeLengthInt truncates (rather than rounds) when scaling up.
-    if (zoomFactor > 1)
-        ++value;
-    return value.toDouble() / zoomFactor;
-#endif
 }
 
 enum LegacyCSSOMElementMetricsRoundingStrategy { Round, Floor };
@@ -696,12 +692,8 @@ double Element::offsetWidth()
 {
     document().updateLayoutIgnorePendingStylesheets();
     if (RenderBoxModelObject* renderer = renderBoxModelObject()) {
-#if ENABLE(SUBPIXEL_LAYOUT)
         LayoutUnit offsetWidth = subpixelMetricsEnabled(renderer->document()) ? renderer->offsetWidth() : LayoutUnit(renderer->pixelSnappedOffsetWidth());
         return convertToNonSubpixelValueIfNeeded(adjustLayoutUnitForAbsoluteZoom(offsetWidth, *renderer).toDouble(), renderer->document());
-#else
-        return adjustForAbsoluteZoom(renderer->offsetWidth(), *renderer);
-#endif
     }
     return 0;
 }
@@ -710,12 +702,8 @@ double Element::offsetHeight()
 {
     document().updateLayoutIgnorePendingStylesheets();
     if (RenderBoxModelObject* renderer = renderBoxModelObject()) {
-#if ENABLE(SUBPIXEL_LAYOUT)
         LayoutUnit offsetHeight = subpixelMetricsEnabled(renderer->document()) ? renderer->offsetHeight() : LayoutUnit(renderer->pixelSnappedOffsetHeight());
         return convertToNonSubpixelValueIfNeeded(adjustLayoutUnitForAbsoluteZoom(offsetHeight, *renderer).toDouble(), renderer->document());
-#else
-        return adjustForAbsoluteZoom(renderer->offsetHeight(), *renderer);
-#endif
     }
     return 0;
 }
@@ -745,12 +733,8 @@ double Element::clientLeft()
     document().updateLayoutIgnorePendingStylesheets();
 
     if (RenderBox* renderer = renderBox()) {
-#if ENABLE(SUBPIXEL_LAYOUT)
         LayoutUnit clientLeft = subpixelMetricsEnabled(renderer->document()) ? renderer->clientLeft() : LayoutUnit(roundToInt(renderer->clientLeft()));
         return convertToNonSubpixelValueIfNeeded(adjustLayoutUnitForAbsoluteZoom(clientLeft, *renderer).toDouble(), renderer->document());
-#else
-        return adjustForAbsoluteZoom(renderer->clientLeft(), *renderer);
-#endif
     }
     return 0;
 }
@@ -760,12 +744,8 @@ double Element::clientTop()
     document().updateLayoutIgnorePendingStylesheets();
 
     if (RenderBox* renderer = renderBox()) {
-#if ENABLE(SUBPIXEL_LAYOUT)
         LayoutUnit clientTop = subpixelMetricsEnabled(renderer->document()) ? renderer->clientTop() : LayoutUnit(roundToInt(renderer->clientTop()));
         return convertToNonSubpixelValueIfNeeded(adjustLayoutUnitForAbsoluteZoom(clientTop, *renderer).toDouble(), renderer->document());
-#else
-        return adjustForAbsoluteZoom(renderer->clientTop(), *renderer);
-#endif
     }
     return 0;
 }
@@ -785,12 +765,8 @@ double Element::clientWidth()
         return adjustForAbsoluteZoom(renderView.frameView().layoutWidth(), renderView);
     
     if (RenderBox* renderer = renderBox()) {
-#if ENABLE(SUBPIXEL_LAYOUT)
         LayoutUnit clientWidth = subpixelMetricsEnabled(renderer->document()) ? renderer->clientWidth() : LayoutUnit(renderer->pixelSnappedClientWidth());
         return convertToNonSubpixelValueIfNeeded(adjustLayoutUnitForAbsoluteZoom(clientWidth, *renderer).toDouble(), renderer->document());
-#else
-        return adjustForAbsoluteZoom(renderer->clientWidth(), *renderer);
-#endif
     }
     return 0;
 }
@@ -810,12 +786,8 @@ double Element::clientHeight()
         return adjustForAbsoluteZoom(renderView.frameView().layoutHeight(), renderView);
 
     if (RenderBox* renderer = renderBox()) {
-#if ENABLE(SUBPIXEL_LAYOUT)
         LayoutUnit clientHeight = subpixelMetricsEnabled(renderer->document()) ? renderer->clientHeight() : LayoutUnit(renderer->pixelSnappedClientHeight());
         return convertToNonSubpixelValueIfNeeded(adjustLayoutUnitForAbsoluteZoom(clientHeight, *renderer).toDouble(), renderer->document());
-#else
-        return adjustForAbsoluteZoom(renderer->clientHeight(), *renderer);
-#endif
     }
     return 0;
 }
@@ -1333,7 +1305,7 @@ URL Element::baseURI() const
 
 const AtomicString& Element::imageSourceURL() const
 {
-    return getAttribute(srcAttr);
+    return fastGetAttribute(srcAttr);
 }
 
 bool Element::rendererIsNeeded(const RenderStyle& style)
@@ -1574,8 +1546,8 @@ static void checkForSiblingStyleChanges(Element* parent, SiblingCheckType checkT
 {
     // :empty selector.
     checkForEmptyStyleChange(*parent);
-    
-    if (parent->needsStyleRecalc() && parent->childrenAffectedByPositionalRules())
+
+    if (parent->styleChangeType() >= FullStyleChange)
         return;
 
     // :first-child.  In the parser callback case, we don't have to check anything, since we were right the first time.
@@ -1622,20 +1594,26 @@ static void checkForSiblingStyleChanges(Element* parent, SiblingCheckType checkT
         }
     }
 
-    // The + selector.  We need to invalidate the first element following the insertion point.  It is the only possible element
-    // that could be affected by this DOM change.
-    if (parent->childrenAffectedByDirectAdjacentRules() && elementAfterChange)
-        elementAfterChange->setNeedsStyleRecalc();
+    if (elementAfterChange) {
+        if (elementAfterChange->styleIsAffectedByPreviousSibling())
+            elementAfterChange->setNeedsStyleRecalc();
+        else if (elementAfterChange->affectsNextSiblingElementStyle()) {
+            Element* elementToInvalidate = elementAfterChange;
+            do {
+                elementToInvalidate = elementToInvalidate->nextElementSibling();
+            } while (elementToInvalidate && !elementToInvalidate->styleIsAffectedByPreviousSibling());
 
-    // Forward positional selectors include the ~ selector, nth-child, nth-of-type, first-of-type and only-of-type.
+            if (elementToInvalidate)
+                elementToInvalidate->setNeedsStyleRecalc();
+        }
+    }
+
     // Backward positional selectors include nth-last-child, nth-last-of-type, last-of-type and only-of-type.
     // We have to invalidate everything following the insertion point in the forward case, and everything before the insertion point in the
     // backward case.
     // |afterChange| is 0 in the parser callback case, so we won't do any work for the forward case if we don't have to.
     // For performance reasons we just mark the parent node as changed, since we don't want to make childrenChanged O(n^2) by crawling all our kids
     // here.  recalcStyle will then force a walk of the children when it sees that this has happened.
-    if (parent->childrenAffectedByForwardPositionalRules() && elementAfterChange)
-        parent->setNeedsStyleRecalc();
     if (parent->childrenAffectedByBackwardPositionalRules() && elementBeforeChange)
         parent->setNeedsStyleRecalc();
 }
@@ -2067,7 +2045,7 @@ String Element::title() const
 
 const AtomicString& Element::pseudo() const
 {
-    return getAttribute(pseudoAttr);
+    return fastGetAttribute(pseudoAttr);
 }
 
 void Element::setPseudo(const AtomicString& value)
@@ -2142,11 +2120,6 @@ void Element::setChildrenAffectedByDrag()
     ensureElementRareData().setChildrenAffectedByDrag(true);
 }
 
-void Element::setChildrenAffectedByForwardPositionalRules(Element* element)
-{
-    element->ensureElementRareData().setChildrenAffectedByForwardPositionalRules(true);
-}
-
 void Element::setChildrenAffectedByBackwardPositionalRules()
 {
     ensureElementRareData().setChildrenAffectedByBackwardPositionalRules(true);
@@ -2162,14 +2135,13 @@ void Element::setChildIndex(unsigned index)
 
 bool Element::hasFlagsSetDuringStylingOfChildren() const
 {
-    if (childrenAffectedByHover() || childrenAffectedByFirstChildRules() || childrenAffectedByLastChildRules() || childrenAffectedByDirectAdjacentRules())
+    if (childrenAffectedByHover() || childrenAffectedByFirstChildRules() || childrenAffectedByLastChildRules())
         return true;
 
     if (!hasRareData())
         return false;
     return rareDataChildrenAffectedByActive()
         || rareDataChildrenAffectedByDrag()
-        || rareDataChildrenAffectedByForwardPositionalRules()
         || rareDataChildrenAffectedByBackwardPositionalRules();
 }
 
@@ -2189,12 +2161,6 @@ bool Element::rareDataChildrenAffectedByDrag() const
 {
     ASSERT(hasRareData());
     return elementRareData()->childrenAffectedByDrag();
-}
-
-bool Element::rareDataChildrenAffectedByForwardPositionalRules() const
-{
-    ASSERT(hasRareData());
-    return elementRareData()->childrenAffectedByForwardPositionalRules();
 }
 
 bool Element::rareDataChildrenAffectedByBackwardPositionalRules() const
@@ -2344,11 +2310,6 @@ unsigned Element::childElementCount() const
     return count;
 }
 
-bool Element::matchesReadOnlyPseudoClass() const
-{
-    return false;
-}
-
 bool Element::matchesReadWritePseudoClass() const
 {
     return false;
@@ -2494,7 +2455,7 @@ void Element::requestPointerLock()
 
 SpellcheckAttributeState Element::spellcheckAttributeState() const
 {
-    const AtomicString& value = getAttribute(HTMLNames::spellcheckAttr);
+    const AtomicString& value = fastGetAttribute(HTMLNames::spellcheckAttr);
     if (value == nullAtom)
         return SpellcheckAttributeDefault;
     if (equalIgnoringCase(value, "true") || equalIgnoringCase(value, ""))
@@ -2645,16 +2606,16 @@ void Element::updateNameForDocument(HTMLDocument& document, const AtomicString& 
 {
     ASSERT(oldName != newName);
 
-    if (WindowNameCollection::nodeMatchesIfNameAttributeMatch(this)) {
-        const AtomicString& id = WindowNameCollection::nodeMatchesIfIdAttributeMatch(this) ? getIdAttribute() : nullAtom;
+    if (WindowNameCollection::elementMatchesIfNameAttributeMatch(*this)) {
+        const AtomicString& id = WindowNameCollection::elementMatchesIfIdAttributeMatch(*this) ? getIdAttribute() : nullAtom;
         if (!oldName.isEmpty() && oldName != id)
             document.removeWindowNamedItem(*oldName.impl(), *this);
         if (!newName.isEmpty() && newName != id)
             document.addWindowNamedItem(*newName.impl(), *this);
     }
 
-    if (DocumentNameCollection::nodeMatchesIfNameAttributeMatch(this)) {
-        const AtomicString& id = DocumentNameCollection::nodeMatchesIfIdAttributeMatch(this) ? getIdAttribute() : nullAtom;
+    if (DocumentNameCollection::elementMatchesIfNameAttributeMatch(*this)) {
+        const AtomicString& id = DocumentNameCollection::elementMatchesIfIdAttributeMatch(*this) ? getIdAttribute() : nullAtom;
         if (!oldName.isEmpty() && oldName != id)
             document.removeDocumentNamedItem(*oldName.impl(), *this);
         if (!newName.isEmpty() && newName != id)
@@ -2695,16 +2656,16 @@ void Element::updateIdForDocument(HTMLDocument& document, const AtomicString& ol
     ASSERT(inDocument());
     ASSERT(oldId != newId);
 
-    if (WindowNameCollection::nodeMatchesIfIdAttributeMatch(this)) {
-        const AtomicString& name = condition == UpdateHTMLDocumentNamedItemMapsOnlyIfDiffersFromNameAttribute && WindowNameCollection::nodeMatchesIfNameAttributeMatch(this) ? getNameAttribute() : nullAtom;
+    if (WindowNameCollection::elementMatchesIfIdAttributeMatch(*this)) {
+        const AtomicString& name = condition == UpdateHTMLDocumentNamedItemMapsOnlyIfDiffersFromNameAttribute && WindowNameCollection::elementMatchesIfNameAttributeMatch(*this) ? getNameAttribute() : nullAtom;
         if (!oldId.isEmpty() && oldId != name)
             document.removeWindowNamedItem(*oldId.impl(), *this);
         if (!newId.isEmpty() && newId != name)
             document.addWindowNamedItem(*newId.impl(), *this);
     }
 
-    if (DocumentNameCollection::nodeMatchesIfIdAttributeMatch(this)) {
-        const AtomicString& name = condition == UpdateHTMLDocumentNamedItemMapsOnlyIfDiffersFromNameAttribute && DocumentNameCollection::nodeMatchesIfNameAttributeMatch(this) ? getNameAttribute() : nullAtom;
+    if (DocumentNameCollection::elementMatchesIfIdAttributeMatch(*this)) {
+        const AtomicString& name = condition == UpdateHTMLDocumentNamedItemMapsOnlyIfDiffersFromNameAttribute && DocumentNameCollection::elementMatchesIfNameAttributeMatch(*this) ? getNameAttribute() : nullAtom;
         if (!oldId.isEmpty() && oldId != name)
             document.removeDocumentNamedItem(*oldId.impl(), *this);
         if (!newId.isEmpty() && newId != name)
@@ -2741,7 +2702,7 @@ void Element::willModifyAttribute(const QualifiedName& name, const AtomicString&
 
     if (oldValue != newValue) {
         auto styleResolver = document().styleResolverIfExists();
-        if (styleResolver && styleResolver->hasSelectorForAttribute(name.localName()))
+        if (styleResolver && styleResolver->hasSelectorForAttribute(*this, name.localName()))
             setNeedsStyleRecalc();
     }
 
@@ -2972,7 +2933,7 @@ void Element::cloneAttributesFromElement(const Element& other)
     if (other.m_elementData->isUnique()
         && !other.m_elementData->presentationAttributeStyle()
         && (!other.m_elementData->inlineStyle() || !other.m_elementData->inlineStyle()->hasCSSOMWrapper()))
-        const_cast<Element&>(other).m_elementData = static_cast<const UniqueElementData*>(other.m_elementData.get())->makeShareableCopy();
+        const_cast<Element&>(other).m_elementData = toUniqueElementData(other.m_elementData)->makeShareableCopy();
 
     if (!other.m_elementData->isUnique())
         m_elementData = other.m_elementData;
@@ -2993,10 +2954,8 @@ void Element::createUniqueElementData()
 {
     if (!m_elementData)
         m_elementData = UniqueElementData::create();
-    else {
-        ASSERT(!m_elementData->isUnique());
-        m_elementData = static_cast<ShareableElementData*>(m_elementData.get())->makeUniqueCopy();
-    }
+    else
+        m_elementData = toShareableElementData(m_elementData)->makeUniqueCopy();
 }
 
 bool Element::hasPendingResources() const

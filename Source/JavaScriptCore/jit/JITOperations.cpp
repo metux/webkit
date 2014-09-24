@@ -40,20 +40,21 @@
 #include "ErrorHandlingScope.h"
 #include "ExceptionFuzz.h"
 #include "GetterSetter.h"
-#include "HighFidelityLog.h"
 #include "HostCallReturnValue.h"
 #include "JIT.h"
 #include "JITToDFGDeferredCompilationCallback.h"
+#include "JSCInlines.h"
 #include "JSGlobalObjectFunctions.h"
 #include "JSNameScope.h"
 #include "JSPropertyNameEnumerator.h"
 #include "JSStackInlines.h"
 #include "JSWithScope.h"
+#include "LegacyProfiler.h"
 #include "ObjectConstructor.h"
-#include "JSCInlines.h"
 #include "Repatch.h"
 #include "RepatchBuffer.h"
 #include "TestRunnerUtils.h"
+#include "TypeProfilerLog.h"
 #include <wtf/InlineASM.h>
 
 namespace JSC {
@@ -80,11 +81,13 @@ void JIT_OPERATION operationThrowStackOverflowError(ExecState* exec, CodeBlock* 
 {
     // We pass in our own code block, because the callframe hasn't been populated.
     VM* vm = codeBlock->vm();
-    CallFrame* callerFrame = exec->callerFrameSkippingVMEntrySentinel();
+
+    VMEntryFrame* vmEntryFrame = vm->topVMEntryFrame;
+    CallFrame* callerFrame = exec->callerFrame(vmEntryFrame);
     if (!callerFrame)
         callerFrame = exec;
 
-    NativeCallFrameTracer tracer(vm, callerFrame);
+    NativeCallFrameTracerWithRestore tracer(vm, vmEntryFrame, callerFrame);
     ErrorHandlingScope errorScope(*vm);
     vm->throwException(callerFrame, createStackOverflowError(callerFrame));
 }
@@ -92,14 +95,16 @@ void JIT_OPERATION operationThrowStackOverflowError(ExecState* exec, CodeBlock* 
 int32_t JIT_OPERATION operationCallArityCheck(ExecState* exec)
 {
     VM* vm = &exec->vm();
-    CallFrame* callerFrame = exec->callerFrameSkippingVMEntrySentinel();
-    NativeCallFrameTracer tracer(vm, callerFrame);
+    VMEntryFrame* vmEntryFrame = vm->topVMEntryFrame;
+    CallFrame* callerFrame = exec->callerFrame(vmEntryFrame);
 
     JSStack& stack = vm->interpreter->stack();
 
     int32_t missingArgCount = CommonSlowPaths::arityCheckFor(exec, &stack, CodeForCall);
-    if (missingArgCount < 0)
+    if (missingArgCount < 0) {
+        NativeCallFrameTracerWithRestore tracer(vm, vmEntryFrame, callerFrame);
         throwStackOverflowError(callerFrame);
+    }
 
     return missingArgCount;
 }
@@ -107,14 +112,16 @@ int32_t JIT_OPERATION operationCallArityCheck(ExecState* exec)
 int32_t JIT_OPERATION operationConstructArityCheck(ExecState* exec)
 {
     VM* vm = &exec->vm();
-    CallFrame* callerFrame = exec->callerFrameSkippingVMEntrySentinel();
-    NativeCallFrameTracer tracer(vm, callerFrame);
+    VMEntryFrame* vmEntryFrame = vm->topVMEntryFrame;
+    CallFrame* callerFrame = exec->callerFrame(vmEntryFrame);
 
     JSStack& stack = vm->interpreter->stack();
 
     int32_t missingArgCount = CommonSlowPaths::arityCheckFor(exec, &stack, CodeForConstruct);
-    if (missingArgCount < 0)
+    if (missingArgCount < 0) {
+        NativeCallFrameTracerWithRestore tracer(vm, vmEntryFrame, callerFrame);
         throwStackOverflowError(callerFrame);
+    }
 
     return missingArgCount;
 }
@@ -474,7 +481,7 @@ static void directPutByVal(CallFrame* callFrame, JSObject* baseObject, JSValue s
         PutPropertySlot slot(baseObject, callFrame->codeBlock()->isStrictMode());
         baseObject->putDirect(callFrame->vm(), jsCast<NameInstance*>(subscript.asCell())->privateName(), value, slot);
     } else {
-        Identifier property(callFrame, subscript.toString(callFrame)->value(callFrame));
+        Identifier property = subscript.toString(callFrame)->toIdentifier(callFrame);
         if (!callFrame->vm().exception()) { // Don't put to an object if toString threw an exception.
             PutPropertySlot slot(baseObject, callFrame->codeBlock()->isStrictMode());
             baseObject->putDirect(callFrame->vm(), property, value, slot);
@@ -913,7 +920,7 @@ size_t JIT_OPERATION operationCompareStringEq(ExecState* exec, JSCell* left, JSC
 
 size_t JIT_OPERATION operationHasProperty(ExecState* exec, JSObject* base, JSString* property)
 {
-    int result = base->hasProperty(exec, Identifier(exec, property->value(exec)));
+    int result = base->hasProperty(exec, property->toIdentifier(exec));
     return result;
 }
     
@@ -962,7 +969,7 @@ EncodedJSValue JIT_OPERATION operationNewRegexp(ExecState* exec, void* regexpPtr
     NativeCallFrameTracer tracer(&vm, exec);
     RegExp* regexp = static_cast<RegExp*>(regexpPtr);
     if (!regexp->isValid()) {
-        vm.throwException(exec, createSyntaxError(exec, "Invalid flags supplied to RegExp constructor."));
+        vm.throwException(exec, createSyntaxError(exec, ASCIILiteral("Invalid flags supplied to RegExp constructor.")));
         return JSValue::encode(jsUndefined());
     }
 
@@ -1374,9 +1381,9 @@ JSCell* JIT_OPERATION operationCreateActivation(ExecState* exec, int32_t offset)
 {
     VM& vm = exec->vm();
     NativeCallFrameTracer tracer(&vm, exec);
-    JSActivation* activation = JSActivation::create(vm, exec, exec->registers() + offset, exec->codeBlock());
-    exec->setScope(activation);
-    return activation;
+    JSLexicalEnvironment* lexicalEnvironment = JSLexicalEnvironment::create(vm, exec, exec->registers() + offset, exec->codeBlock());
+    exec->setScope(lexicalEnvironment);
+    return lexicalEnvironment;
 }
 
 JSCell* JIT_OPERATION operationCreateArguments(ExecState* exec)
@@ -1416,8 +1423,10 @@ static JSValue getByVal(ExecState* exec, JSValue baseValue, JSValue subscript, R
         VM& vm = exec->vm();
         Structure& structure = *baseValue.asCell()->structure(vm);
         if (JSCell::canUseFastGetOwnProperty(structure)) {
-            if (JSValue result = baseValue.asCell()->fastGetOwnProperty(vm, structure, asString(subscript)->value(exec)))
-                return result;
+            if (AtomicStringImpl* existingAtomicString = asString(subscript)->toExistingAtomicString(exec)) {
+                if (JSValue result = baseValue.asCell()->fastGetOwnProperty(vm, structure, existingAtomicString))
+                    return result;
+            }
         }
     }
 
@@ -1586,14 +1595,14 @@ void JIT_OPERATION operationTearOffActivation(ExecState* exec, JSCell* activatio
     NativeCallFrameTracer tracer(&vm, exec);
 
     ASSERT(exec->codeBlock()->needsActivation());
-    jsCast<JSActivation*>(activationCell)->tearOff(vm);
+    jsCast<JSLexicalEnvironment*>(activationCell)->tearOff(vm);
 }
 
 void JIT_OPERATION operationTearOffArguments(ExecState* exec, JSCell* argumentsCell, JSCell* activationCell)
 {
     ASSERT(exec->codeBlock()->usesArguments());
     if (activationCell) {
-        jsCast<Arguments*>(argumentsCell)->didTearOffActivation(exec, jsCast<JSActivation*>(activationCell));
+        jsCast<Arguments*>(argumentsCell)->didTearOffActivation(exec, jsCast<JSLexicalEnvironment*>(activationCell));
         return;
     }
     jsCast<Arguments*>(argumentsCell)->tearOff(exec);
@@ -1608,7 +1617,7 @@ EncodedJSValue JIT_OPERATION operationDeleteById(ExecState* exec, EncodedJSValue
     bool couldDelete = baseObj->methodTable(vm)->deleteProperty(baseObj, exec, *identifier);
     JSValue result = jsBoolean(couldDelete);
     if (!couldDelete && exec->codeBlock()->isStrictMode())
-        vm.throwException(exec, createTypeError(exec, "Unable to delete property."));
+        vm.throwException(exec, createTypeError(exec, ASCIILiteral("Unable to delete property.")));
     return JSValue::encode(result);
 }
 
@@ -1784,7 +1793,7 @@ void JIT_OPERATION operationThrow(ExecState* exec, EncodedJSValue encodedExcepti
     JSValue exceptionValue = JSValue::decode(encodedExceptionValue);
     vm->throwException(exec, exceptionValue);
 
-    // Results stored out-of-band in vm.targetMachinePCForThrow & vm.callFrameForThrow
+    // Results stored out-of-band in vm.targetMachinePCForThrow, vm.callFrameForThrow & vm.vmEntryFrameForThrow
     genericUnwind(vm, exec, exceptionValue);
 }
 
@@ -1823,7 +1832,7 @@ void JIT_OPERATION operationInitGlobalConst(ExecState* exec, Instruction* pc)
 
 void JIT_OPERATION lookupExceptionHandler(VM* vm, ExecState* exec)
 {
-    NativeCallFrameTracer tracer(vm, exec, NativeCallFrameTracer::VMEntrySentinelOK);
+    NativeCallFrameTracer tracer(vm, exec);
 
     JSValue exceptionValue = vm->exception();
     ASSERT(exceptionValue);
@@ -1832,12 +1841,26 @@ void JIT_OPERATION lookupExceptionHandler(VM* vm, ExecState* exec)
     ASSERT(vm->targetMachinePCForThrow);
 }
 
+void JIT_OPERATION lookupExceptionHandlerFromCallerFrame(VM* vm, ExecState* exec)
+{
+    VMEntryFrame* vmEntryFrame = vm->topVMEntryFrame;
+    CallFrame* callerFrame = exec->callerFrame(vmEntryFrame);
+    ASSERT(callerFrame);
+
+    NativeCallFrameTracerWithRestore tracer(vm, vmEntryFrame, callerFrame);
+
+    JSValue exceptionValue = vm->exception();
+    ASSERT(exceptionValue);
+    
+    genericUnwind(vm, callerFrame, exceptionValue);
+    ASSERT(vm->targetMachinePCForThrow);
+}
+
 void JIT_OPERATION operationVMHandleException(ExecState* exec)
 {
     VM* vm = &exec->vm();
     NativeCallFrameTracer tracer(vm, exec);
 
-    ASSERT(!exec->isVMEntrySentinel());
     genericUnwind(vm, exec, vm->exception());
 }
 
@@ -1924,7 +1947,7 @@ JSCell* JIT_OPERATION operationToIndexString(ExecState* exec, int32_t index)
 
 void JIT_OPERATION operationProcessTypeProfilerLog(ExecState* exec)
 {
-    exec->vm().highFidelityLog()->processHighFidelityLog(ASCIILiteral("Log Full, called from inside baseline JIT"));
+    exec->vm().typeProfilerLog()->processLogEntries(ASCIILiteral("Log Full, called from inside baseline JIT"));
 }
 
 } // extern "C"

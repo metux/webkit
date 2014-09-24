@@ -220,18 +220,13 @@ void JIT::compileLoadVarargs(Instruction* instruction)
 void JIT::compileCallEval(Instruction* instruction)
 {
     addPtr(TrustedImm32(-static_cast<ptrdiff_t>(sizeof(CallerFrameAndPC))), stackPointerRegister, regT1);
+    storePtr(callFrameRegister, Address(regT1, CallFrame::callerFrameOffset()));
 
-    callOperationNoExceptionCheck(operationCallEval, regT1);
-
-    Jump noException = emitExceptionCheck(InvertedExceptionCheck);
     addPtr(TrustedImm32(stackPointerOffsetFor(m_codeBlock) * sizeof(Register)), callFrameRegister, stackPointerRegister);
-    exceptionCheck(jump());
 
-    noException.link(this);
+    callOperation(operationCallEval, regT1);
+
     addSlowCase(branch32(Equal, regT1, TrustedImm32(JSValue::EmptyValueTag)));
-
-    addPtr(TrustedImm32(stackPointerOffsetFor(m_codeBlock) * sizeof(Register)), callFrameRegister, stackPointerRegister);
-    checkStackPointerAlignment();
 
     sampleCodeBlock(m_codeBlock);
     
@@ -241,6 +236,10 @@ void JIT::compileCallEval(Instruction* instruction)
 void JIT::compileCallEvalSlowCase(Instruction* instruction, Vector<SlowCaseEntry>::iterator& iter)
 {
     linkSlowCase(iter);
+
+    int registerOffset = -instruction[4].u.operand;
+
+    addPtr(TrustedImm32(registerOffset * sizeof(Register) + sizeof(CallerFrameAndPC)), callFrameRegister, stackPointerRegister);
 
     loadPtr(Address(stackPointerRegister, sizeof(Register) * JSStack::Callee - sizeof(CallerFrameAndPC)), regT0);
     loadPtr(Address(stackPointerRegister, sizeof(Register) * JSStack::Callee - sizeof(CallerFrameAndPC)), regT1);
@@ -300,6 +299,14 @@ void JIT::compileOpCall(OpcodeID opcodeID, Instruction* instruction, unsigned ca
     store32(regT0, Address(stackPointerRegister, JSStack::Callee * static_cast<int>(sizeof(Register)) + PayloadOffset - sizeof(CallerFrameAndPC)));
     store32(regT1, Address(stackPointerRegister, JSStack::Callee * static_cast<int>(sizeof(Register)) + TagOffset - sizeof(CallerFrameAndPC)));
 
+    CallLinkInfo* info = m_codeBlock->addCallLinkInfo();
+
+    if (CallEdgeLog::isEnabled() && shouldEmitProfiling()
+        && Options::baselineDoesCallEdgeProfiling()) {
+        m_vm->ensureCallEdgeLog().emitLogCode(
+            *this, info->callEdgeProfile, JSValueRegs(regT1, regT0));
+    }
+
     if (opcodeID == op_call_eval) {
         compileCallEval(instruction);
         return;
@@ -313,7 +320,6 @@ void JIT::compileOpCall(OpcodeID opcodeID, Instruction* instruction, unsigned ca
     addSlowCase(slowCase);
 
     ASSERT(m_callCompilationInfo.size() == callLinkInfoIndex);
-    CallLinkInfo* info = m_codeBlock->addCallLinkInfo();
     info->callType = CallLinkInfo::callTypeFor(opcodeID);
     info->codeOrigin = CodeOrigin(m_bytecodeOffset);
     info->calleeGPR = regT0;

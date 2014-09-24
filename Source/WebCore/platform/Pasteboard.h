@@ -34,6 +34,7 @@
 
 #if PLATFORM(GTK)
 typedef struct _GtkClipboard GtkClipboard;
+#include <wtf/gobject/GRefPtr.h>
 #endif
 
 #if PLATFORM(IOS)
@@ -68,8 +69,8 @@ enum ShouldSerializeSelectedTextForDataTransfer { DefaultSelectedTextType, Inclu
 
 struct PasteboardWebContent {
 #if !(PLATFORM(EFL) || PLATFORM(GTK) || PLATFORM(WIN))
-    PasteboardWebContent();
-    ~PasteboardWebContent();
+    WEBCORE_EXPORT PasteboardWebContent();
+    WEBCORE_EXPORT ~PasteboardWebContent();
     bool canSmartCopyOrDelete;
     RefPtr<SharedBuffer> dataInWebArchiveFormat;
     RefPtr<SharedBuffer> dataInRTFDFormat;
@@ -77,6 +78,12 @@ struct PasteboardWebContent {
     String dataInStringFormat;
     Vector<String> clientTypes;
     Vector<RefPtr<SharedBuffer>> clientData;
+#endif
+#if PLATFORM(GTK)
+    bool canSmartCopyOrDelete;
+    String text;
+    String markup;
+    GRefPtr<GClosure> callback;
 #endif
 };
 
@@ -86,14 +93,19 @@ struct PasteboardURL {
 #if PLATFORM(MAC)
     String userVisibleForm;
 #endif
+#if PLATFORM(GTK)
+    String markup;
+#endif
 };
 
 struct PasteboardImage {
-    PasteboardImage();
-    ~PasteboardImage();
+    WEBCORE_EXPORT PasteboardImage();
+    WEBCORE_EXPORT ~PasteboardImage();
     RefPtr<Image> image;
-#if !(PLATFORM(EFL) || PLATFORM(GTK) || PLATFORM(WIN))
+#if !(PLATFORM(EFL) || PLATFORM(WIN))
     PasteboardURL url;
+#endif
+#if !(PLATFORM(EFL) || PLATFORM(GTK) || PLATFORM(WIN))
     RefPtr<SharedBuffer> resourceData;
     String resourceMIMEType;
 #endif
@@ -129,7 +141,7 @@ class Pasteboard {
 public:
     ~Pasteboard();
 
-    static PassOwnPtr<Pasteboard> createForCopyAndPaste();
+    WEBCORE_EXPORT static PassOwnPtr<Pasteboard> createForCopyAndPaste();
     static PassOwnPtr<Pasteboard> createPrivate(); // Temporary pasteboard. Can put data on this and then write to another pasteboard with writePasteboard.
 
     bool hasData();
@@ -152,7 +164,7 @@ public:
 
     void writeMarkup(const String& markup);
     enum SmartReplaceOption { CanSmartReplace, CannotSmartReplace };
-    void writePlainText(const String&, SmartReplaceOption); // FIXME: Two separate functions would be clearer than one function with an argument.
+    WEBCORE_EXPORT void writePlainText(const String&, SmartReplaceOption); // FIXME: Two separate functions would be clearer than one function with an argument.
     void writePasteboard(const Pasteboard& sourcePasteboard);
 
 #if ENABLE(DRAG_SUPPORT)
@@ -162,7 +174,7 @@ public:
     void setDragImage(DragImageRef, const IntPoint& hotSpot);
 #endif
 
-#if PLATFORM(GTK) || PLATFORM(WIN)
+#if PLATFORM(WIN)
     PassRefPtr<DocumentFragment> documentFragment(Frame&, Range&, bool allowPlainText, bool& chosePlainText); // FIXME: Layering violation.
     void writeImage(Element&, const URL&, const String& title); // FIXME: Layering violation.
     void writeSelection(Range&, bool canSmartCopyOrDelete, Frame&, ShouldSerializeSelectedTextForDataTransfer = DefaultSelectedTextType); // FIXME: Layering violation.

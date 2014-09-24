@@ -282,7 +282,7 @@ void DocumentStyleSheetCollection::collectActiveStyleSheets(Vector<RefPtr<StyleS
 #endif
         } else if ((node->isHTMLElement() && (toHTMLElement(*node).hasTagName(linkTag) || toHTMLElement(*node).hasTagName(styleTag))) || (node->isSVGElement() && toSVGElement(*node).hasTagName(SVGNames::styleTag))) {
             Element& element = toElement(*node);
-            AtomicString title = element.getAttribute(titleAttr);
+            AtomicString title = element.fastGetAttribute(titleAttr);
             bool enabledViaScript = false;
             if (isHTMLLinkElement(element)) {
                 // <LINK> element
@@ -413,7 +413,7 @@ static void filterEnabledNonemptyCSSStyleSheets(Vector<RefPtr<CSSStyleSheet>>& r
             continue;
         if (sheets[i]->disabled())
             continue;
-        CSSStyleSheet* sheet = static_cast<CSSStyleSheet*>(sheets[i].get());
+        CSSStyleSheet* sheet = toCSSStyleSheet(sheets[i]);
         if (!sheet->length())
             continue;
         result.append(sheet);

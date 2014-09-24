@@ -41,6 +41,7 @@
 #include "FrameTree.h"
 #include "FrameView.h"
 #include "GraphicsContext.h"
+#include "HTMLBodyElement.h"
 #include "HTMLFormElement.h"
 #include "HTMLFrameElementBase.h"
 #include "HTMLInputElement.h"
@@ -615,7 +616,7 @@ void FrameSelection::willBeModified(EAlteration alter, SelectionDirection direct
 
 VisiblePosition FrameSelection::positionForPlatform(bool isGetStart) const
 {
-    if (m_frame && m_frame->settings().editingBehaviorType() == EditingMacBehavior)
+    if (m_frame && (m_frame->settings().editingBehaviorType() == EditingMacBehavior || m_frame->settings().editingBehaviorType() == EditingIOSBehavior))
         return isGetStart ? m_selection.visibleStart() : m_selection.visibleEnd();
     // Linux and Windows always extend selections from the extent endpoint.
     // FIXME: VisibleSelection should be fixed to ensure as an invariant that
@@ -700,11 +701,9 @@ VisiblePosition FrameSelection::modifyExtendingRight(TextGranularity granularity
         // FIXME: implement all of the above?
         pos = modifyExtendingForward(granularity);
         break;
-#if PLATFORM(IOS)
     case DocumentGranularity:
         ASSERT_NOT_REACHED();
         break;
-#endif
     }
 #if ENABLE(USERSELECT_ALL)
     adjustPositionForUserSelectAll(pos, directionOfEnclosingBlock() == LTR);
@@ -731,11 +730,9 @@ VisiblePosition FrameSelection::modifyExtendingForward(TextGranularity granulari
     case ParagraphGranularity:
         pos = nextParagraphPosition(pos, lineDirectionPointForBlockDirectionNavigation(EXTENT));
         break;
-#if PLATFORM(IOS)
     case DocumentGranularity:
         ASSERT_NOT_REACHED();
         break;
-#endif
     case SentenceBoundary:
         pos = endOfSentence(endForPlatform());
         break;
@@ -791,11 +788,9 @@ VisiblePosition FrameSelection::modifyMovingRight(TextGranularity granularity)
     case LineBoundary:
         pos = rightBoundaryOfLine(startForPlatform(), directionOfEnclosingBlock());
         break;
-#if PLATFORM(IOS)
     case DocumentGranularity:
         ASSERT_NOT_REACHED();
         break;
-#endif
     }
     return pos;
 }
@@ -828,11 +823,9 @@ VisiblePosition FrameSelection::modifyMovingForward(TextGranularity granularity)
     case ParagraphGranularity:
         pos = nextParagraphPosition(endForPlatform(), lineDirectionPointForBlockDirectionNavigation(START));
         break;
-#if PLATFORM(IOS)
     case DocumentGranularity:
         ASSERT_NOT_REACHED();
         break;
-#endif
     case SentenceBoundary:
         pos = endOfSentence(endForPlatform());
         break;
@@ -889,11 +882,9 @@ VisiblePosition FrameSelection::modifyExtendingLeft(TextGranularity granularity)
     case DocumentBoundary:
         pos = modifyExtendingBackward(granularity);
         break;
-#if PLATFORM(IOS)
     case DocumentGranularity:
         ASSERT_NOT_REACHED();
         break;
-#endif
     }
 #if ENABLE(USERSELECT_ALL)
     adjustPositionForUserSelectAll(pos, !(directionOfEnclosingBlock() == LTR));
@@ -941,11 +932,9 @@ VisiblePosition FrameSelection::modifyExtendingBackward(TextGranularity granular
         else
             pos = startOfDocument(pos);
         break;
-#if PLATFORM(IOS)
     case DocumentGranularity:
         ASSERT_NOT_REACHED();
         break;
-#endif
     }
 #if ENABLE(USERSELECT_ALL)
     adjustPositionForUserSelectAll(pos, !(directionOfEnclosingBlock() == LTR));
@@ -983,11 +972,9 @@ VisiblePosition FrameSelection::modifyMovingLeft(TextGranularity granularity)
     case LineBoundary:
         pos = leftBoundaryOfLine(startForPlatform(), directionOfEnclosingBlock());
         break;
-#if PLATFORM(IOS)
     case DocumentGranularity:
         ASSERT_NOT_REACHED();
         break;
-#endif
     }
     return pos;
 }
@@ -1030,11 +1017,9 @@ VisiblePosition FrameSelection::modifyMovingBackward(TextGranularity granularity
         else
             pos = startOfDocument(pos);
         break;
-#if PLATFORM(IOS)
     case DocumentGranularity:
         ASSERT_NOT_REACHED();
         break;
-#endif
     }
     return pos;
 }
@@ -1509,10 +1494,23 @@ void CaretBase::paintCaret(Node* node, GraphicsContext* context, const LayoutPoi
     Color caretColor = Color::black;
     ColorSpace colorSpace = ColorSpaceDeviceRGB;
     Element* element = node->isElementNode() ? toElement(node) : node->parentElement();
+    Element* rootEditableElement = node->rootEditableElement();
 
     if (element && element->renderer()) {
-        caretColor = element->renderer()->style().visitedDependentColor(CSSPropertyColor);
-        colorSpace = element->renderer()->style().colorSpace();
+        bool setToRootEditableElement = false;
+        if (rootEditableElement && rootEditableElement->renderer()) {
+            const auto& rootEditableStyle = rootEditableElement->renderer()->style();
+            const auto& elementStyle = element->renderer()->style();
+            if (rootEditableStyle.visitedDependentColor(CSSPropertyBackgroundColor) == elementStyle.visitedDependentColor(CSSPropertyBackgroundColor)) {
+                caretColor = rootEditableElement->renderer()->style().visitedDependentColor(CSSPropertyColor);
+                colorSpace = rootEditableElement->renderer()->style().colorSpace();
+                setToRootEditableElement = true;
+            }
+        }
+        if (!setToRootEditableElement) {
+            caretColor = element->renderer()->style().visitedDependentColor(CSSPropertyColor);
+            colorSpace = element->renderer()->style().colorSpace();
+        }
     }
 
     context->fillRect(caret, caretColor, colorSpace);
@@ -1656,7 +1654,7 @@ void FrameSelection::selectFrameElementInParentIfFullySelected()
         return;
 
     // Create compute positions before and after the element.
-    unsigned ownerElementNodeIndex = ownerElement->nodeIndex();
+    unsigned ownerElementNodeIndex = ownerElement->computeNodeIndex();
     VisiblePosition beforeOwnerElement(VisiblePosition(Position(ownerElementParent, ownerElementNodeIndex, Position::PositionIsOffsetInAnchor)));
     VisiblePosition afterOwnerElement(VisiblePosition(Position(ownerElementParent, ownerElementNodeIndex + 1, Position::PositionIsOffsetInAnchor), VP_UPSTREAM_IF_POSSIBLE));
 
@@ -2114,11 +2112,11 @@ void FrameSelection::setSelectionFromNone()
         return;
 #endif
 
-    Node* node = document->documentElement();
-    while (node && !node->hasTagName(bodyTag))
-        node = NodeTraversal::next(node);
-    if (node)
-        setSelection(VisibleSelection(firstPositionInOrBeforeNode(node), DOWNSTREAM));
+    auto* documentElement = document->documentElement();
+    if (!documentElement)
+        return;
+    if (auto body = childrenOfType<HTMLBodyElement>(*documentElement).first())
+        setSelection(VisibleSelection(firstPositionInOrBeforeNode(body), DOWNSTREAM));
 }
 
 bool FrameSelection::shouldChangeSelection(const VisibleSelection& newSelection) const
@@ -2198,7 +2196,7 @@ PassRefPtr<Range> FrameSelection::elementRangeContainingCaretSelection() const
         return nullptr;
 
     Position startPos = createLegacyEditingPosition(element, 0);
-    Position endPos = createLegacyEditingPosition(element, element->childNodeCount());
+    Position endPos = createLegacyEditingPosition(element, element->countChildNodes());
     
     VisiblePosition startVisiblePos(startPos, VP_DEFAULT_AFFINITY);
     VisiblePosition endVisiblePos(endPos, VP_DEFAULT_AFFINITY);

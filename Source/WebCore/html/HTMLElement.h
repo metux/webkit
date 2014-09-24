@@ -44,7 +44,7 @@ public:
 
     PassRefPtr<HTMLCollection> children();
 
-    virtual String title() const override final;
+    WEBCORE_EXPORT virtual String title() const override final;
 
     virtual short tabIndex() const override;
 
@@ -88,7 +88,7 @@ public:
     bool hasDirectionAuto() const;
     TextDirection directionalityIfhasDirAutoAttribute(bool& isAuto) const;
 
-    bool isHTMLUnknownElement() const { return getFlag(IsHTMLUnknownElementFlag); }
+    virtual bool isHTMLUnknownElement() const { return false; }
     virtual bool isTextControlInnerTextElement() const { return false; }
 
     virtual bool willRespondToMouseMoveEvents() override;
@@ -111,6 +111,7 @@ protected:
     void applyAlignmentAttributeToStyle(const AtomicString&, MutableStyleProperties&);
     void applyBorderAttributeToStyle(const AtomicString&, MutableStyleProperties&);
 
+    virtual bool matchesReadWritePseudoClass() const;
     virtual void parseAttribute(const QualifiedName&, const AtomicString&) override;
     virtual bool isPresentationAttribute(const QualifiedName&) const override;
     virtual void collectStyleForPresentationAttribute(const QualifiedName&, const AtomicString&, MutableStyleProperties&) override;
@@ -145,12 +146,13 @@ inline HTMLElement::HTMLElement(const QualifiedName& tagName, Document& document
     ASSERT(tagName.localName().impl());
 }
 
-template <typename Type> bool isElementOfType(const HTMLElement&);
-
 void isHTMLElement(const HTMLElement&); // Catch unnecessary runtime check of type known at compile time.
 inline bool isHTMLElement(const Node& node) { return node.isHTMLElement(); }
-template <> inline bool isElementOfType<const HTMLElement>(const HTMLElement&) { return true; }
-template <> inline bool isElementOfType<const HTMLElement>(const Element& element) { return element.isHTMLElement(); }
+
+template <typename ArgType>
+struct ElementTypeCastTraits<const HTMLElement, ArgType> {
+    static bool is(ArgType& node) { return isHTMLElement(node); }
+};
 
 NODE_TYPE_CASTS(HTMLElement)
 

@@ -766,7 +766,7 @@ IntRect AccessibilityObject::boundingBoxForQuads(RenderObject* obj, const Vector
             result.unite(r);
         }
     }
-    return pixelSnappedIntRect(LayoutRect(result));
+    return snappedIntRect(LayoutRect(result));
 }
     
 bool AccessibilityObject::press()
@@ -1139,7 +1139,7 @@ String AccessibilityObject::stringForVisiblePositionRange(const VisiblePositionR
             Node* node = it.range()->startContainer();
             ASSERT(node == it.range()->endContainer());
             int offset = it.range()->startOffset();
-            if (replacedNodeNeedsCharacter(node->childNode(offset)))
+            if (replacedNodeNeedsCharacter(node->traverseToChildAt(offset)))
                 builder.append(objectReplacementCharacter);
         }
     }
@@ -1166,7 +1166,7 @@ int AccessibilityObject::lengthForVisiblePositionRange(const VisiblePositionRang
             ASSERT(node == it.range()->endContainer(exception));
             int offset = it.range()->startOffset(exception);
 
-            if (replacedNodeNeedsCharacter(node->childNode(offset)))
+            if (replacedNodeNeedsCharacter(node->traverseToChildAt(offset)))
                 length++;
         }
     }
@@ -1378,10 +1378,10 @@ bool AccessibilityObject::contentEditableAttributeIsEnabled(Element* element)
     if (!element)
         return false;
     
-    if (!element->hasAttribute(contenteditableAttr))
+    const AtomicString& contentEditableValue = element->fastGetAttribute(contenteditableAttr);
+    if (contentEditableValue.isNull())
         return false;
     
-    const AtomicString& contentEditableValue = element->fastGetAttribute(contenteditableAttr);
     // Both "true" (case-insensitive) and the empty string count as true.
     return contentEditableValue.isEmpty() || equalIgnoringCase(contentEditableValue, "true");
 }
@@ -2218,8 +2218,8 @@ bool AccessibilityObject::isOnscreen() const
         const AccessibilityObject* outer = objects[i];
         const AccessibilityObject* inner = objects[i - 1];
         // FIXME: unclear if we need LegacyIOSDocumentVisibleRect.
-        const IntRect outerRect = i < levels ? pixelSnappedIntRect(outer->boundingBoxRect()) : outer->getScrollableAreaIfScrollable()->visibleContentRect(ScrollableArea::LegacyIOSDocumentVisibleRect);
-        const IntRect innerRect = pixelSnappedIntRect(inner->isAccessibilityScrollView() ? inner->parentObject()->boundingBoxRect() : inner->boundingBoxRect());
+        const IntRect outerRect = i < levels ? snappedIntRect(outer->boundingBoxRect()) : outer->getScrollableAreaIfScrollable()->visibleContentRect(ScrollableArea::LegacyIOSDocumentVisibleRect);
+        const IntRect innerRect = snappedIntRect(inner->isAccessibilityScrollView() ? inner->parentObject()->boundingBoxRect() : inner->boundingBoxRect());
         
         if (!outerRect.intersects(innerRect)) {
             isOnscreen = false;
@@ -2232,7 +2232,7 @@ bool AccessibilityObject::isOnscreen() const
 
 void AccessibilityObject::scrollToMakeVisible() const
 {
-    IntRect objectRect = pixelSnappedIntRect(boundingBoxRect());
+    IntRect objectRect = snappedIntRect(boundingBoxRect());
     objectRect.setLocation(IntPoint());
     scrollToMakeVisibleWithSubFocus(objectRect);
 }

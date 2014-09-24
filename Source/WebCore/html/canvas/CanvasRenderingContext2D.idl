@@ -97,6 +97,7 @@ interface CanvasRenderingContext2D : CanvasRenderingContext {
     attribute DOMString font;
     attribute DOMString textAlign;
     attribute DOMString textBaseline;
+    attribute DOMString direction;
 
     TextMetrics measureText(DOMString text);
 
@@ -180,6 +181,7 @@ interface CanvasRenderingContext2D : CanvasRenderingContext {
     
     // Focus rings
     void drawFocusIfNeeded(Element element);
+    void drawFocusIfNeeded(DOMPath path, Element element);
 
     readonly attribute float webkitBackingStorePixelRatio;
 

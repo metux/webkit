@@ -153,7 +153,7 @@ namespace JSC { namespace DFG {
     macro(PutByIdFlush, NodeMustGenerate | NodeMustGenerate | NodeClobbersWorld) \
     macro(PutByIdDirect, NodeMustGenerate | NodeClobbersWorld) \
     macro(CheckStructure, NodeMustGenerate) \
-    macro(CheckExecutable, NodeMustGenerate) \
+    macro(GetExecutable, NodeResultJS) \
     macro(PutStructure, NodeMustGenerate) \
     macro(AllocatePropertyStorage, NodeMustGenerate | NodeResultStorage) \
     macro(ReallocatePropertyStorage, NodeMustGenerate | NodeResultStorage) \
@@ -175,7 +175,6 @@ namespace JSC { namespace DFG {
     macro(GetTypedArrayByteOffset, NodeResultInt32) \
     macro(GetScope, NodeResultJS) \
     macro(GetMyScope, NodeResultJS) \
-    macro(SkipTopScope, NodeResultJS) \
     macro(SkipScope, NodeResultJS) \
     macro(GetClosureRegisters, NodeResultStorage) \
     macro(GetClosureVar, NodeResultJS) \
@@ -186,7 +185,8 @@ namespace JSC { namespace DFG {
     macro(VariableWatchpoint, NodeMustGenerate) \
     macro(VarInjectionWatchpoint, NodeMustGenerate) \
     macro(FunctionReentryWatchpoint, NodeMustGenerate) \
-    macro(CheckFunction, NodeMustGenerate) \
+    macro(CheckCell, NodeMustGenerate) \
+    macro(CheckBadCell, NodeMustGenerate) \
     macro(AllocationProfileWatchpoint, NodeMustGenerate) \
     macro(CheckInBounds, NodeMustGenerate) \
     \
@@ -215,6 +215,8 @@ namespace JSC { namespace DFG {
     /* Calls. */\
     macro(Call, NodeResultJS | NodeMustGenerate | NodeHasVarArgs | NodeClobbersWorld) \
     macro(Construct, NodeResultJS | NodeMustGenerate | NodeHasVarArgs | NodeClobbersWorld) \
+    macro(ProfiledCall, NodeResultJS | NodeMustGenerate | NodeHasVarArgs | NodeClobbersWorld) \
+    macro(ProfiledConstruct, NodeResultJS | NodeMustGenerate | NodeHasVarArgs | NodeClobbersWorld) \
     macro(NativeCall, NodeResultJS | NodeMustGenerate | NodeHasVarArgs | NodeClobbersWorld) \
     macro(NativeConstruct, NodeResultJS | NodeMustGenerate | NodeHasVarArgs | NodeClobbersWorld) \
     \
@@ -252,7 +254,7 @@ namespace JSC { namespace DFG {
     macro(CreateActivation, NodeResultJS) \
     macro(TearOffActivation, NodeMustGenerate) \
     \
-    /* Nodes used for arguments. Similar to activation support, only it makes even less */\
+    /* Nodes used for arguments. Similar to lexical environment support, only it makes even less */\
     /* sense. */\
     macro(CreateArguments, NodeResultJS) \
     macro(PhantomArguments, NodeResultJS) \
@@ -286,6 +288,11 @@ namespace JSC { namespace DFG {
     /* this point, but execution does continue in the basic block - just in a */\
     /* different compiler. */\
     macro(ForceOSRExit, NodeMustGenerate) \
+    \
+    /* Vends a bottom JS value. It is invalid to ever execute this. Useful for cases */\
+    /* where we know that we would have exited but we'd like to still track the control */\
+    /* flow. */\
+    macro(BottomValue, NodeResultJS) \
     \
     /* Checks the watchdog timer. If the timer has fired, we OSR exit to the */ \
     /* baseline JIT to redo the watchdog timer check, and service the timer. */ \

@@ -11,7 +11,7 @@ end
 WEB_INSPECTOR_PATH = File.expand_path File.join(File.dirname(__FILE__), "..")
 JAVASCRIPTCORE_PATH = File.expand_path File.join(File.dirname(__FILE__), "..", "..", "JavaScriptCore")
 
-$code_generator_path = File.join JAVASCRIPTCORE_PATH, "inspector", "scripts", "CodeGeneratorInspector.py"
+$code_generator_path = File.join JAVASCRIPTCORE_PATH, "inspector", "scripts", "generate-inspector-protocol-bindings.py"
 $versions_directory_path = File.join WEB_INSPECTOR_PATH, "Versions"
 $web_inspector_protocol_legacy_path = File.join WEB_INSPECTOR_PATH, "UserInterface", "Protocol", "Legacy"
 
@@ -25,6 +25,7 @@ class Task
 
   def run
     output_filename_prefix = {"JavaScript" => "JS", "Web" => "Web"}[@type]
+    framework = {"JavaScript" => "JavaScriptCore", "Web" => "WebCore"}[@type]
     output_filename = "Inspector#{output_filename_prefix}BackendCommands.js"
     display_input = File.basename @input_json_path
     display_output = File.join @output_directory_path.gsub(/^.*?\/UserInterface/, "UserInterface"), output_filename
@@ -32,7 +33,7 @@ class Task
 
     Dir.mktmpdir do |tmpdir|
       dependency = @dependency_json_path ? "'#{@dependency_json_path}'" : ""
-      cmd = "#{$code_generator_path} '#{@input_json_path}' #{dependency} --no_verification --output_h_dir '#{tmpdir}' --output_cpp_dir '#{tmpdir}' --output_js_dir '#{tmpdir}' --write_always --output_type '#{@type}'"
+      cmd = "#{$code_generator_path} --force --outputDir '#{tmpdir}' --framework #{framework} '#{@input_json_path}' #{dependency}"
       %x{ #{cmd} }
       if $?.exitstatus != 0
         puts "ERROR: Error Code (#{$?.exitstatus}) Evaluating: #{cmd}"
@@ -56,12 +57,22 @@ def all_tasks
 
   had_error = false
   Dir.glob(File.join($versions_directory_path, "*.json")).each do |version_path|
-    match = File.basename(version_path).match(/^Inspector(.*?)\-([^-]+?)\.json$/)
+    match = File.basename(version_path).match(/^Inspector(.*?)\-(.*?)\-([^-]+?)\.json$/)
     if match
-      output_path = File.join $web_inspector_protocol_legacy_path, match[2]
-      tasks << Task.new(version_path, nil, "Web", output_path)
+      output_path = File.join $web_inspector_protocol_legacy_path, match[3]
+      type = "Web"
+      dependency_path = nil
+      if !match[1].empty?
+        if match[1] == "JS"
+          type = "JavaScript"
+        else
+          dependency_filename = version_path.sub(/InspectorWeb/, "InspectorJS")
+          dependency_path = File.join($versions_directory_path, dependency_filename)
+        end
+      end
+      tasks << Task.new(version_path, dependency_filename, type, output_path)
     else
-      puts "ERROR: Version file (#{version_path}) did not match the template Inspector<ANYTHING>-<VERSION>.js"
+      puts "ERROR: Version file (#{version_path}) did not match the template Inspector(Web|JS)?-<ANYTHING>-<VERSION>.js"
       had_error = true
     end
   end

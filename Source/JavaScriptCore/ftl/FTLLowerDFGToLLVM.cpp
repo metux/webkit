@@ -31,6 +31,7 @@
 #include "CodeBlockWithJITType.h"
 #include "DFGAbstractInterpreterInlines.h"
 #include "DFGInPlaceAbstractState.h"
+#include "DFGOSRAvailabilityAnalysisPhase.h"
 #include "FTLAbstractHeapRepository.h"
 #include "FTLAvailableRecovery.h"
 #include "FTLForOSREntryJITCode.h"
@@ -67,7 +68,6 @@ NO_RETURN_DUE_TO_CRASH static void ftlUnreachable()
 NO_RETURN_DUE_TO_CRASH static void ftlUnreachable(
     CodeBlock* codeBlock, BlockIndex blockIndex, unsigned nodeIndex)
 {
-    
     dataLog("Crashing in thought-to-be-unreachable FTL-generated code for ", pointerDump(codeBlock), " at basic block #", blockIndex);
     if (nodeIndex != UINT_MAX)
         dataLog(", node @", nodeIndex);
@@ -94,7 +94,6 @@ public:
         , m_ftlState(state)
         , m_heaps(state.context)
         , m_out(state.context)
-        , m_availability(OperandsLike, state.graph.block(0)->variablesAtHead)
         , m_state(state.graph)
         , m_interpreter(state.graph, m_state)
         , m_stackmapIDs(0)
@@ -146,18 +145,22 @@ public:
         m_out.appendTo(m_prologue, stackOverflow);
         createPhiVariables();
 
-        Vector<BasicBlock*> depthFirst;
-        m_graph.getBlocksInPreOrder(depthFirst);
+        Vector<BasicBlock*> preOrder = m_graph.blocksInPreOrder();
 
         int maxNumberOfArguments = -1;
-        for (unsigned blockIndex = depthFirst.size(); blockIndex--; ) {
-            BasicBlock* block = depthFirst[blockIndex];
+        for (BasicBlock* block : preOrder) {
             for (unsigned nodeIndex = block->size(); nodeIndex--; ) {
-                Node* m_node = block->at(nodeIndex);
-                if (m_node->hasKnownFunction()) {
+                Node* node = block->at(nodeIndex);
+                switch (node->op()) {
+                case NativeCall:
+                case NativeConstruct: {
                     int numArgs = m_node->numChildren();
                     if (numArgs > maxNumberOfArguments)
                         maxNumberOfArguments = numArgs;
+                    break;
+                }
+                default:
+                    break;
                 }
             }
         }
@@ -206,9 +209,8 @@ public:
             m_out.constInt32(MacroAssembler::maxJumpReplacementSize()));
         m_out.unreachable();
 
-
-        for (unsigned i = 0; i < depthFirst.size(); ++i)
-            compileBlock(depthFirst[i]);
+        for (BasicBlock* block : preOrder)
+            compileBlock(block);
         
         if (Options::dumpLLVMIR())
             dumpModule(m_ftlState.module);
@@ -293,7 +295,7 @@ private:
             return;
         }
         
-        initializeOSRExitStateForBlock();
+        m_availabilityCalculator.beginBlock(m_highBlock);
         
         m_state.reset();
         m_state.beginBasicBlock(m_highBlock);
@@ -386,17 +388,11 @@ private:
         case SetLocal:
             compileSetLocal();
             break;
-        case MovHint:
-            compileMovHint();
-            break;
         case GetMyArgumentsLength:
             compileGetMyArgumentsLength();
             break;
         case GetMyArgumentByVal:
             compileGetMyArgumentByVal();
-            break;
-        case ZombieHint:
-            compileZombieHint();
             break;
         case Phantom:
         case HardPhantom:
@@ -468,11 +464,14 @@ private:
         case CheckStructure:
             compileCheckStructure();
             break;
-        case CheckFunction:
-            compileCheckFunction();
+        case CheckCell:
+            compileCheckCell();
             break;
-        case CheckExecutable:
-            compileCheckExecutable();
+        case CheckBadCell:
+            compileCheckBadCell();
+            break;
+        case GetExecutable:
+            compileGetExecutable();
             break;
         case ArrayifyToStructure:
             compileArrayifyToStructure();
@@ -734,11 +733,15 @@ private:
         case FunctionReentryWatchpoint:
         case TypedArrayWatchpoint:
         case AllocationProfileWatchpoint:
+        case MovHint:
+        case ZombieHint:
             break;
         default:
             DFG_CRASH(m_graph, m_node, "Unrecognized node in FTL backend");
             break;
         }
+        
+        m_availabilityCalculator.executeNode(m_node);
         
         if (shouldExecuteEffects)
             m_interpreter.executeEffects(nodeIndex);
@@ -1059,22 +1062,6 @@ private:
             DFG_CRASH(m_graph, m_node, "Bad flush format");
             break;
         }
-        
-        m_availability.operand(variable->local()) = Availability(variable->flushedAt());
-    }
-    
-    void compileMovHint()
-    {
-        ASSERT(m_node->containsMovHint());
-        ASSERT(m_node->op() != ZombieHint);
-        
-        VirtualRegister operand = m_node->unlinkedLocal();
-        m_availability.operand(operand) = Availability(m_node->child1().node());
-    }
-    
-    void compileZombieHint()
-    {
-        m_availability.operand(m_node->unlinkedLocal()) = Availability::unavailable();
     }
     
     void compilePhantom()
@@ -1743,26 +1730,25 @@ private:
         m_out.appendTo(continuation, lastNext);
     }
     
-    void compileCheckFunction()
+    void compileCheckCell()
     {
         LValue cell = lowCell(m_node->child1());
         
         speculate(
-            BadFunction, jsValueValue(cell), m_node->child1().node(),
-            m_out.notEqual(cell, weakPointer(m_node->function()->value().asCell())));
+            BadCell, jsValueValue(cell), m_node->child1().node(),
+            m_out.notEqual(cell, weakPointer(m_node->cellOperand()->value().asCell())));
     }
     
-    void compileCheckExecutable()
+    void compileCheckBadCell()
+    {
+        terminate(BadCell);
+    }
+    
+    void compileGetExecutable()
     {
         LValue cell = lowCell(m_node->child1());
-        
         speculateFunction(m_node->child1(), cell);
-        
-        speculate(
-            BadExecutable, jsValueValue(cell), m_node->child1().node(),
-            m_out.notEqual(
-                m_out.loadPtr(cell, m_heaps.JSFunction_executable),
-                weakPointer(m_node->executable())));
+        setJSValue(m_out.loadPtr(cell, m_heaps.JSFunction_executable));
     }
     
     void compileArrayifyToStructure()
@@ -1899,7 +1885,7 @@ private:
         // Arguments: id, bytes, target, numArgs, args...
         unsigned stackmapID = m_stackmapIDs++;
 
-        if (Options::verboseCompilation())
+        if (verboseCompilationEnabled())
             dataLog("    Emitting PutById patchpoint with stackmap #", stackmapID, "\n");
         
         LValue call = m_out.call(
@@ -3493,7 +3479,7 @@ private:
         }
         
         setStorage(m_out.loadPtr(
-            lowCell(m_node->child1()), m_heaps.JSVariableObject_registers));
+            lowCell(m_node->child1()), m_heaps.JSEnvironmentRecord_registers));
     }
     
     void compileGetClosureVar()
@@ -3673,9 +3659,7 @@ private:
         int numPassedArgs = m_node->numChildren() - 1;
         int numArgs = numPassedArgs + dummyThisArgument;
 
-        ASSERT(m_node->hasKnownFunction());
-
-        JSFunction* knownFunction = m_node->knownFunction();
+        JSFunction* knownFunction = jsCast<JSFunction*>(m_node->cellOperand()->value().asCell());
         NativeFunction function = knownFunction->nativeFunction();
 
         Dl_info info;
@@ -3715,7 +3699,7 @@ private:
             : m_out.bitCast(calleeCallFrame, typeCalleeArg);
         LValue call = vmCall(callee, argument);
 
-        if (Options::verboseCompilation())
+        if (verboseCompilationEnabled())
             dataLog("Native calling: ", info.dli_sname, "\n");
 
         setJSValue(call);
@@ -3918,10 +3902,37 @@ private:
             return;
         }
         
-        case SwitchString:
+        case SwitchString: {
             DFG_CRASH(m_graph, m_node, "Unimplemented");
-            break;
+            return;
         }
+            
+        case SwitchCell: {
+            LValue cell;
+            switch (m_node->child1().useKind()) {
+            case CellUse: {
+                cell = lowCell(m_node->child1());
+                break;
+            }
+                
+            case UntypedUse: {
+                LValue value = lowJSValue(m_node->child1());
+                LBasicBlock cellCase = FTL_NEW_BLOCK(m_out, ("Switch/SwitchCell cell case"));
+                m_out.branch(
+                    isCell(value), unsure(cellCase), unsure(lowBlock(data->fallThrough.block)));
+                m_out.appendTo(cellCase);
+                cell = value;
+                break;
+            }
+                
+            default:
+                DFG_CRASH(m_graph, m_node, "Bad use kind");
+                return;
+            }
+            
+            buildSwitch(m_node->switchData(), m_out.intPtr, cell);
+            return;
+        } }
         
         DFG_CRASH(m_graph, m_node, "Bad switch kind");
     }
@@ -3944,12 +3955,12 @@ private:
     void compileInvalidationPoint()
     {
         if (verboseCompilationEnabled())
-            dataLog("    Invalidation point with availability: ", m_availability, "\n");
+            dataLog("    Invalidation point with availability: ", availability(), "\n");
         
         m_ftlState.jitCode->osrExit.append(OSRExit(
             UncountableInvalidation, InvalidValueFormat, MethodOfGettingAValueProfile(),
             m_codeOriginForExitTarget, m_codeOriginForExitProfile,
-            m_availability.numberOfArguments(), m_availability.numberOfLocals()));
+            availability().numberOfArguments(), availability().numberOfLocals()));
         m_ftlState.finalizer->osrExit.append(OSRExitCompilationInfo());
         
         OSRExit& exit = m_ftlState.jitCode->osrExit.last();
@@ -4382,16 +4393,22 @@ private:
             isX86() ? "/Resources/Runtime/x86_64/" : "/Resources/Runtime/arm64/",
             path.data());
 
-        if (createMemoryBufferWithContentsOfFile(actualPath.data(), &memBuf, nullptr)) {
-            if (Options::verboseCompilation()) 
-                dataLog("Failed to load module at ", actualPath.data(), "\n for symbol ", symbol.data());
+        char* outMsg;
+        
+        if (createMemoryBufferWithContentsOfFile(actualPath.data(), &memBuf, &outMsg)) {
+            if (Options::verboseFTLFailure())
+                dataLog("Failed to load module at ", actualPath, "\n for symbol ", symbol, "\nERROR: ", outMsg, "\n");
+            disposeMessage(outMsg);
             return false;
         }
 
         LModule module;
 
-        if (parseBitcodeInContext(m_ftlState.context, memBuf, &module, nullptr)) {
+        if (parseBitcodeInContext(m_ftlState.context, memBuf, &module, &outMsg)) {
+            if (Options::verboseFTLFailure())
+                dataLog("Failed to parse module at ", actualPath, "\n for symbol ", symbol, "\nERROR: ", outMsg, "\n");
             disposeMemoryBuffer(memBuf);
+            disposeMessage(outMsg);
             return false;
         }
 
@@ -4424,8 +4441,12 @@ private:
             namedGlobals.append(globalName);
         }
 
-        if (linkModules(m_ftlState.module, module, LLVMLinkerDestroySource, nullptr))
+        if (linkModules(m_ftlState.module, module, LLVMLinkerDestroySource, &outMsg)) {
+            if (Options::verboseFTLFailure())
+                dataLog("Failed to link module at ", actualPath, "\n for symbol ", symbol, "\nERROR: ", outMsg, "\n");
+            disposeMessage(outMsg);
             return false;
+        }
         
         for (CString* symbol = namedFunctions.begin(); symbol != namedFunctions.end(); ++symbol) {
             LValue function = getNamedFunction(m_ftlState.module, symbol->data());
@@ -4434,6 +4455,7 @@ private:
                 setVisibility(function, LLVMHiddenVisibility);
             if (!isDeclaration(function)) {
                 setLinkage(function, LLVMPrivateLinkage);
+                setLinkage(function, LLVMAvailableExternallyLinkage);
 
                 if (ASSERT_DISABLED)
                     removeFunctionAttr(function, LLVMStackProtectAttribute);
@@ -5175,7 +5197,7 @@ private:
         Vector<SwitchCase> cases;
         for (unsigned i = 0; i < data->cases.size(); ++i) {
             cases.append(SwitchCase(
-                constInt(type, data->cases[i].value.switchLookupValue()),
+                constInt(type, data->cases[i].value.switchLookupValue(data->kind)),
                 lowBlock(data->cases[i].target.block), Weight(data->cases[i].target.count)));
         }
         
@@ -6320,16 +6342,11 @@ private:
         return m_blocks.get(block);
     }
     
-    void initializeOSRExitStateForBlock()
-    {
-        m_availability = m_highBlock->ssa->availabilityAtHead;
-    }
-    
     void appendOSRExit(
         ExitKind kind, FormattedValue lowValue, Node* highValue, LValue failCondition)
     {
         if (verboseCompilationEnabled()) {
-            dataLog("    OSR exit #", m_ftlState.jitCode->osrExit.size(), " with availability: ", m_availability, "\n");
+            dataLog("    OSR exit #", m_ftlState.jitCode->osrExit.size(), " with availability: ", availability(), "\n");
             if (!m_availableRecoveries.isEmpty())
                 dataLog("        Available recoveries: ", listDump(m_availableRecoveries), "\n");
         }
@@ -6339,7 +6356,7 @@ private:
         m_ftlState.jitCode->osrExit.append(OSRExit(
             kind, lowValue.format(), m_graph.methodOfGettingAValueProfileFor(highValue),
             m_codeOriginForExitTarget, m_codeOriginForExitProfile,
-            m_availability.numberOfArguments(), m_availability.numberOfLocals()));
+            availability().numberOfArguments(), availability().numberOfLocals()));
         m_ftlState.finalizer->osrExit.append(OSRExitCompilationInfo());
         
         OSRExit& exit = m_ftlState.jitCode->osrExit.last();
@@ -6387,7 +6404,7 @@ private:
                 continue;
             }
             
-            Availability availability = m_availability[i];
+            Availability availability = this->availability()[i];
             FlushedAt flush = availability.flushedAt();
             switch (flush.format()) {
             case DeadFlush:
@@ -6726,6 +6743,8 @@ private:
         m_out.unreachable();
     }
     
+    Operands<Availability>& availability() { return m_availabilityCalculator.m_availability; }
+    
     VM& vm() { return m_graph.m_vm; }
     CodeBlock* codeBlock() { return m_graph.m_codeBlock; }
     
@@ -6755,7 +6774,7 @@ private:
     
     HashMap<Node*, LValue> m_phis;
     
-    Operands<Availability> m_availability;
+    LocalOSRAvailabilityCalculator m_availabilityCalculator;
     
     Vector<AvailableRecovery, 3> m_availableRecoveries;
     

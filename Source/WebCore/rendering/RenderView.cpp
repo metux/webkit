@@ -110,9 +110,7 @@ RenderView::RenderView(Document& document, PassRef<RenderStyle> style)
     , m_renderQuoteHead(0)
     , m_renderCounterCount(0)
     , m_selectionWasCaret(false)
-#if ENABLE(CSS_FILTERS)
     , m_hasSoftwareFilters(false)
-#endif
 #if ENABLE(SERVICE_CONTROLS)
     , m_selectionRectGatherer(*this)
 #endif
@@ -539,9 +537,8 @@ void RenderView::paintBoxDecorations(PaintInfo& paintInfo, const LayoutPoint&)
     // layers with reflections, or transformed layers.
     // FIXME: This needs to be dynamic.  We should be able to go back to blitting if we ever stop being inside
     // a transform, transparency layer, etc.
-    Element* elt;
-    for (elt = document().ownerElement(); elt && elt->renderer(); elt = elt->document().ownerElement()) {
-        RenderLayer* layer = elt->renderer()->enclosingLayer();
+    for (HTMLFrameOwnerElement* element = document().ownerElement(); element && element->renderer(); element = element->document().ownerElement()) {
+        RenderLayer* layer = element->renderer()->enclosingLayer();
         if (layer->cannotBlitToWindow()) {
             frameView().setCannotBlitToWindow();
             break;
@@ -635,7 +632,7 @@ void RenderView::repaintViewRectangle(const LayoutRect& repaintRect) const
         return;
     }
 
-    frameView().addTrackedRepaintRect(pixelSnappedForPainting(repaintRect, document().deviceScaleFactor()));
+    frameView().addTrackedRepaintRect(snapRectToDevicePixels(repaintRect, document().deviceScaleFactor()));
 
     // FIXME: convert all repaint rect dependencies to FloatRect.
     IntRect enclosingRect = enclosingIntRect(repaintRect);
@@ -707,12 +704,20 @@ void RenderView::computeRectForRepaint(const RenderLayerModelObject* repaintCont
         
     // Apply our transform if we have one (because of full page zooming).
     if (!repaintContainer && layer() && layer()->transform())
-        rect = LayoutRect(layer()->transform()->mapRect(pixelSnappedForPainting(rect, document().deviceScaleFactor())));
+        rect = LayoutRect(layer()->transform()->mapRect(snapRectToDevicePixels(rect, document().deviceScaleFactor())));
+}
+
+bool RenderView::isScrollableOrRubberbandableBox() const
+{
+    // The main frame might be allowed to rubber-band even if there is no content to scroll to. This is unique to
+    // the main frame; subframes and overflow areas have to have content that can be scrolled to in order to rubber-band.
+    FrameView::Scrollability defineScrollable = frame().ownerElement() ? FrameView::Scrollability::Scrollable : FrameView::Scrollability::ScrollableOrRubberbandable;
+    return frameView().isScrollable(defineScrollable);
 }
 
 void RenderView::absoluteRects(Vector<IntRect>& rects, const LayoutPoint& accumulatedOffset) const
 {
-    rects.append(pixelSnappedIntRect(accumulatedOffset, layer()->size()));
+    rects.append(snappedIntRect(accumulatedOffset, layer()->size()));
 }
 
 void RenderView::absoluteQuads(Vector<FloatQuad>& quads, bool* wasFixed) const
@@ -742,7 +747,7 @@ IntRect RenderView::selectionBounds(bool clipToVisibleContent) const
         }
     }
 
-    return pixelSnappedIntRect(selRect);
+    return snappedIntRect(selRect);
 }
 
 LayoutRect RenderView::subtreeSelectionBounds(const SelectionSubtreeRoot& root, bool clipToVisibleContent) const
@@ -900,7 +905,7 @@ void RenderView::splitSelectionBetweenSubtrees(RenderObject* start, int startPos
             if (node == endNode)
                 selectionData.setSelectionEndPos(endPos);
             else
-                selectionData.setSelectionEndPos(node->offsetInCharacters() ? node->maxCharacterOffset() : node->childNodeCount());
+                selectionData.setSelectionEndPos(node->offsetInCharacters() ? node->maxCharacterOffset() : node->countChildNodes());
 
             renderSubtreesMap.set(&root, selectionData);
         }
@@ -1122,7 +1127,7 @@ IntRect RenderView::unscaledDocumentRect() const
 {
     LayoutRect overflowRect(layoutOverflowRect());
     flipForWritingMode(overflowRect);
-    return pixelSnappedIntRect(overflowRect);
+    return snappedIntRect(overflowRect);
 }
 
 bool RenderView::rootBackgroundIsEntirelyFixed() const
@@ -1361,7 +1366,7 @@ void RenderView::removeRendererWithPausedImageAnimations(RenderElement& renderer
 
 void RenderView::resumePausedImageAnimationsIfNeeded()
 {
-    auto visibleRect = frameView().visibleContentRect();
+    auto visibleRect = frameView().windowToContents(frameView().windowClipRect());
     Vector<RenderElement*, 10> toRemove;
     for (auto* renderer : m_renderersWithPausedImageAnimation) {
         if (renderer->repaintForPausedImageAnimationsIfNeeded(visibleRect))

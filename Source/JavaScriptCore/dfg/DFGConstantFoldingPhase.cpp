@@ -142,8 +142,8 @@ private:
                 break;
             }
                 
-            case CheckFunction: {
-                if (m_state.forNode(node->child1()).value() != node->function()->value())
+            case CheckCell: {
+                if (m_state.forNode(node->child1()).value() != node->cellOperand()->value())
                     break;
                 node->convertToPhantom();
                 eliminated = true;
@@ -384,6 +384,20 @@ private:
                 }
                 break;
             }
+                
+            case ProfiledCall:
+            case ProfiledConstruct: {
+                if (!m_state.forNode(m_graph.varArgChild(node, 0)).m_value)
+                    break;
+                
+                // If we were able to prove that the callee is a constant then the normal call
+                // inline cache will record this callee. This means that there is no need to do any
+                // additional profiling.
+                m_interpreter.execute(indexInBlock);
+                node->setOp(node->op() == ProfiledCall ? Call : Construct);
+                eliminated = true;
+                break;
+            }
 
             default:
                 break;
@@ -571,8 +585,10 @@ private:
 
     void addStructureTransitionCheck(NodeOrigin origin, unsigned indexInBlock, JSCell* cell, Structure* structure)
     {
-        if (m_graph.watchpoints().consider(cell->structure()))
+        if (m_graph.registerStructure(cell->structure()) == StructureRegisteredAndWatched)
             return;
+        
+        m_graph.registerStructure(structure);
 
         Node* weakConstant = m_insertionSet.insertNode(
             indexInBlock, speculationFromValue(cell), JSConstant, origin,

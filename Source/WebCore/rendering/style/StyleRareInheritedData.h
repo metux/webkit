@@ -123,7 +123,7 @@ public:
 #endif // CSS3_TEXT
     unsigned m_textDecorationSkip : 5; // TextDecorationSkip
     unsigned m_textUnderlinePosition : 3; // TextUnderlinePosition
-    unsigned m_rubyPosition : 1; // RubyPosition
+    unsigned m_rubyPosition : 2; // RubyPosition
 
 #if PLATFORM(IOS)
     unsigned touchCalloutEnabled : 1;
@@ -142,9 +142,6 @@ public:
     AtomicString m_lineGrid;
     unsigned m_tabSize;
 
-#if PLATFORM(IOS)
-    Color compositionFillColor;
-#endif
 #if ENABLE(IOS_TEXT_AUTOSIZING)
     TextSizeAdjustment textSizeAdjust;
 #endif

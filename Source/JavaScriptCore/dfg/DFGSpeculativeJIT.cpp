@@ -331,7 +331,9 @@ SilentRegisterSavePlan SpeculativeJIT::silentSavePlanForGPR(VirtualRegister spil
     } else if (registerFormat == DataFormatBoolean) {
 #if USE(JSVALUE64)
         RELEASE_ASSERT_NOT_REACHED();
+#if COMPILER_QUIRK(CONSIDERS_UNREACHABLE_CODE)
         fillAction = DoNothingForFill;
+#endif
 #elif USE(JSVALUE32_64)
         ASSERT(info.gpr() == source);
         if (node->hasConstant()) {
@@ -367,7 +369,9 @@ SilentRegisterSavePlan SpeculativeJIT::silentSavePlanForGPR(VirtualRegister spil
             fillAction = Load64;
         else {
             RELEASE_ASSERT_NOT_REACHED();
+#if COMPILER_QUIRK(CONSIDERS_UNREACHABLE_CODE)
             fillAction = Load64; // Make GCC happy.
+#endif
         }
     } else if (registerFormat == DataFormatStrictInt52) {
         if (node->hasConstant())
@@ -380,7 +384,9 @@ SilentRegisterSavePlan SpeculativeJIT::silentSavePlanForGPR(VirtualRegister spil
             fillAction = Load64;
         else {
             RELEASE_ASSERT_NOT_REACHED();
+#if COMPILER_QUIRK(CONSIDERS_UNREACHABLE_CODE)
             fillAction = Load64; // Make GCC happy.
+#endif
         }
     } else {
         ASSERT(registerFormat & DataFormatJS);
@@ -596,8 +602,10 @@ JITCompiler::Jump SpeculativeJIT::jumpSlowForUnwantedArrayMode(GPRReg tempGPR, A
     switch (arrayMode.arrayClass()) {
     case Array::OriginalArray: {
         CRASH();
+#if COMPILER_QUIRK(CONSIDERS_UNREACHABLE_CODE)
         JITCompiler::Jump result; // I already know that VC++ takes unkindly to the expression "return Jump()", so I'm doing it this way in anticipation of someone eventually using VC++ to compile the DFG.
         return result;
+#endif
     }
         
     case Array::Array:
@@ -2170,14 +2178,6 @@ void SpeculativeJIT::compileValueRep(Node* node)
         if (needsTypeCheck(node->child1(), ~SpecDoubleImpureNaN))
             m_jit.purifyNaN(valueFPR);
 
-#if CPU(X86)
-        // boxDouble() on X86 clobbers the source, so we need to copy.
-        // FIXME: Don't do that! https://bugs.webkit.org/show_bug.cgi?id=131690
-        FPRTemporary temp(this);
-        m_jit.moveDouble(valueFPR, temp.fpr());
-        valueFPR = temp.fpr();
-#endif
-        
         boxDouble(valueFPR, resultRegs);
         
         jsValueResult(resultRegs, node);
@@ -5353,6 +5353,10 @@ void SpeculativeJIT::emitSwitch(Node* node)
     }
     case SwitchString: {
         emitSwitchString(node, data);
+        return;
+    }
+    case SwitchCell: {
+        DFG_CRASH(m_jit.graph(), node, "Bad switch kind");
         return;
     } }
     RELEASE_ASSERT_NOT_REACHED();

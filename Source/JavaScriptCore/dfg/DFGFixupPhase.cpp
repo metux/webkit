@@ -736,6 +736,12 @@ private:
                 else if (node->child1()->shouldSpeculateString())
                     fixEdge<StringUse>(node->child1());
                 break;
+            case SwitchCell:
+                if (node->child1()->shouldSpeculateCell())
+                    fixEdge<CellUse>(node->child1());
+                // else it's fine for this to have UntypedUse; we will handle this by just making
+                // non-cells take the default case.
+                break;
             }
             break;
         }
@@ -853,7 +859,6 @@ private:
         }
 
         case GetClosureRegisters:
-        case SkipTopScope:
         case SkipScope:
         case GetScope:
         case GetGetter:
@@ -898,13 +903,13 @@ private:
             break;
         }
 
-        case CheckExecutable: {
+        case GetExecutable: {
             fixEdge<FunctionUse>(node->child1());
             break;
         }
             
         case CheckStructure:
-        case CheckFunction:
+        case CheckCell:
         case CheckHasInstance:
         case CreateThis:
         case GetButterfly: {
@@ -1121,6 +1126,8 @@ private:
         case AllocationProfileWatchpoint:
         case Call:
         case Construct:
+        case ProfiledCall:
+        case ProfiledConstruct:
         case NativeCall:
         case NativeConstruct:
         case NewObject:
@@ -1150,6 +1157,7 @@ private:
         case ThrowReferenceError:
         case CountExecution:
         case ForceOSRExit:
+        case CheckBadCell:
         case CheckWatchdogTimer:
         case Unreachable:
         case ExtractOSREntryLocal:
@@ -1160,6 +1168,7 @@ private:
         case TypedArrayWatchpoint:
         case MovHint:
         case ZombieHint:
+        case BottomValue:
             break;
 #else
         default:
@@ -1393,7 +1402,7 @@ private:
         
         JSObject* stringPrototypeObject = asObject(stringObjectStructure->storedPrototype());
         Structure* stringPrototypeStructure = stringPrototypeObject->structure();
-        if (!m_graph.watchpoints().consider(stringPrototypeStructure))
+        if (m_graph.registerStructure(stringPrototypeStructure) != StructureRegisteredAndWatched)
             return false;
         
         if (stringPrototypeStructure->isDictionary())

@@ -115,7 +115,7 @@ Object.defineProperty(Node.prototype, "enclosingNodeOrSelfWithNodeNameInArray",
 {
     value: function(nameArray)
     {
-        var lowerCaseNameArray = nameArray.map(function(name) { return name.toLowerCase() });
+        var lowerCaseNameArray = nameArray.map(function(name) { return name.toLowerCase(); });
         for (var node = this; node && node !== this.ownerDocument; node = node.parentNode) {
             for (var i = 0; i < nameArray.length; ++i) {
                 if (node.nodeName.toLowerCase() === lowerCaseNameArray[i])
@@ -584,7 +584,7 @@ Object.defineProperty(String, "tokenizeFormatString",
     }
 });
 
-Object.defineProperty(String.prototype, "startsWith", 
+Object.defineProperty(String.prototype, "startsWith",
 {
     value: function(string)
     {
@@ -1014,6 +1014,11 @@ Object.defineProperty(Array.prototype, "binaryIndexOf",
         return index < this.length && comparator(value, this[index]) === 0 ? index : -1;
     }
 });
+
+function clamp(min, value, max)
+{
+    return Math.min(Math.max(min, value), max);
+}
 
 function insertionIndexForObjectInListSortedByFunction(object, list, comparator, insertionIndexAfter)
 {

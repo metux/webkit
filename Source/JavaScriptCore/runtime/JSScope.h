@@ -99,11 +99,11 @@ inline bool needsVarInjectionChecks(ResolveType type)
 }
 
 struct ResolveOp {
-    ResolveOp(ResolveType type, size_t depth, Structure* structure, JSActivation* activation, VariableWatchpointSet* watchpointSet, uintptr_t operand)
+    ResolveOp(ResolveType type, size_t depth, Structure* structure, JSLexicalEnvironment* lexicalEnvironment, VariableWatchpointSet* watchpointSet, uintptr_t operand)
         : type(type)
         , depth(depth)
         , structure(structure)
-        , activation(activation)
+        , lexicalEnvironment(lexicalEnvironment)
         , watchpointSet(watchpointSet)
         , operand(operand)
     {
@@ -112,7 +112,7 @@ struct ResolveOp {
     ResolveType type;
     size_t depth;
     Structure* structure;
-    JSActivation* activation;
+    JSLexicalEnvironment* lexicalEnvironment;
     VariableWatchpointSet* watchpointSet;
     uintptr_t operand;
 };
@@ -150,10 +150,10 @@ public:
     friend class LLIntOffsetsExtractor;
     static size_t offsetOfNext();
 
-    JS_EXPORT_PRIVATE static JSObject* objectAtScope(JSScope*);
+    static JSObject* objectAtScope(JSScope*);
 
     static JSValue resolve(ExecState*, JSScope*, const Identifier&);
-    static ResolveOp abstractResolve(ExecState*, JSScope*, const Identifier&, GetOrPut, ResolveType);
+    static ResolveOp abstractResolve(ExecState*, bool hasTopActivation, JSScope*, const Identifier&, GetOrPut, ResolveType);
 
     static void visitChildren(JSCell*, SlotVisitor&);
 
@@ -234,12 +234,6 @@ inline Register& Register::operator=(JSScope* scope)
 inline JSScope* Register::scope() const
 {
     return jsCast<JSScope*>(jsValue());
-}
-
-inline VM& ExecState::vm() const
-{
-    ASSERT(scope()->vm());
-    return *scope()->vm();
 }
 
 inline JSGlobalObject* ExecState::lexicalGlobalObject() const

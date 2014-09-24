@@ -569,11 +569,7 @@ template<> unsigned CSSPrimitiveValue::computeLength(const CSSToLengthConversion
 
 template<> Length CSSPrimitiveValue::computeLength(const CSSToLengthConversionData& conversionData) const
 {
-#if ENABLE(SUBPIXEL_LAYOUT)
     return Length(clampTo<float>(computeLengthDouble(conversionData), minValueForCssLength, maxValueForCssLength), Fixed);
-#else
-    return Length(clampTo<float>(roundForImpreciseConversion<float>(computeLengthDouble(conversionData)), minValueForCssLength, maxValueForCssLength), Fixed);
-#endif
 }
 
 template<> short CSSPrimitiveValue::computeLength(const CSSToLengthConversionData& conversionData) const
@@ -977,7 +973,7 @@ ALWAYS_INLINE PassRef<StringImpl> CSSPrimitiveValue::formatNumberValue(const cha
     return formatNumberValue(characters, characterCount - 1);
 }
 
-ALWAYS_INLINE String CSSPrimitiveValue::formatNumberForcustomCSSText() const
+ALWAYS_INLINE String CSSPrimitiveValue::formatNumberForCustomCSSText() const
 {
     switch (m_primitiveUnitType) {
     case CSS_UNKNOWN:
@@ -1190,7 +1186,7 @@ String CSSPrimitiveValue::customCSSText() const
         return cssTextCache.get(this);
     }
 
-    String text = formatNumberForcustomCSSText();
+    String text = formatNumberForCustomCSSText();
 
     ASSERT(!cssTextCache.contains(this));
     m_hasCachedCSSText = true;

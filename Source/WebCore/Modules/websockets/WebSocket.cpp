@@ -97,7 +97,7 @@ static String encodeProtocolString(const String& protocol)
         if (protocol[i] < 0x20 || protocol[i] > 0x7E)
             builder.append(String::format("\\u%04X", protocol[i]));
         else if (protocol[i] == 0x5c)
-            builder.append("\\\\");
+            builder.appendLiteral("\\\\");
         else
             builder.append(protocol[i]);
     }
@@ -533,6 +533,7 @@ void WebSocket::didReceiveBinaryData(PassOwnPtr<Vector<char>> binaryData)
 void WebSocket::didReceiveMessageError()
 {
     LOG(Network, "WebSocket %p didReceiveErrorMessage()", this);
+    m_state = CLOSED;
     ASSERT(scriptExecutionContext());
     dispatchEvent(Event::create(eventNames().errorEvent, false, false));
 }

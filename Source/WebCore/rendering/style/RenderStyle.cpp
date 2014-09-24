@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 1999 Antti Koivisto (koivisto@kde.org)
- * Copyright (C) 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2014 Apple Inc. All rights reserved.
+ * Copyright (C) 2004-2014 Apple Inc. All rights reserved.
  * Copyright (C) 2011 Adobe Systems Incorporated. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
@@ -38,9 +38,7 @@
 #include "StyleImage.h"
 #include "StyleInheritedData.h"
 #include "StyleResolver.h"
-#if ENABLE(TOUCH_EVENTS)
-#include "RenderTheme.h"
-#endif
+#include "StyleScrollSnapPoints.h"
 #include <wtf/MathExtras.h>
 #include <wtf/StdLibExtras.h>
 #include <algorithm>
@@ -51,6 +49,10 @@
 
 #if ENABLE(TEXT_AUTOSIZING)
 #include "TextAutosizer.h"
+#endif
+
+#if ENABLE(TOUCH_EVENTS)
+#include "RenderTheme.h"
 #endif
 
 namespace WebCore {
@@ -434,6 +436,7 @@ bool RenderStyle::changeRequiresLayout(const RenderStyle* other, unsigned& chang
             || rareNonInheritedData->marginBeforeCollapse != other->rareNonInheritedData->marginBeforeCollapse
             || rareNonInheritedData->marginAfterCollapse != other->rareNonInheritedData->marginAfterCollapse
             || rareNonInheritedData->lineClamp != other->rareNonInheritedData->lineClamp
+            || rareNonInheritedData->m_initialLetter != other->rareNonInheritedData->m_initialLetter
             || rareNonInheritedData->textOverflow != other->rareNonInheritedData->textOverflow)
             return true;
 
@@ -631,10 +634,8 @@ bool RenderStyle::changeRequiresLayout(const RenderStyle* other, unsigned& chang
         return true;
     }
 
-#if ENABLE(CSS_FILTERS)
     if (rareNonInheritedData->hasFilters() != other->rareNonInheritedData->hasFilters())
         return true;
-#endif
 
     const QuotesData* quotesDataA = rareInheritedData->quotes.get();
     const QuotesData* quotesDataB = other->rareInheritedData->quotes.get();
@@ -679,9 +680,10 @@ bool RenderStyle::changeRequiresLayerRepaint(const RenderStyle* other, unsigned&
         return true;
 
     if (position() != StaticPosition) {
-        if (visual->clip != other->visual->clip
-            || visual->hasClip != other->visual->hasClip)
+        if (visual->clip != other->visual->clip || visual->hasClip != other->visual->hasClip) {
+            changedContextSensitiveProperties |= ContextSensitivePropertyClipRect;
             return true;
+        }
     }
 
 #if ENABLE(CSS_COMPOSITING)
@@ -694,13 +696,11 @@ bool RenderStyle::changeRequiresLayerRepaint(const RenderStyle* other, unsigned&
         // Don't return; keep looking for another change.
     }
 
-#if ENABLE(CSS_FILTERS)
     if (rareNonInheritedData->m_filter.get() != other->rareNonInheritedData->m_filter.get()
         && *rareNonInheritedData->m_filter.get() != *other->rareNonInheritedData->m_filter.get()) {
         changedContextSensitiveProperties |= ContextSensitivePropertyFilter;
         // Don't return; keep looking for another change.
     }
-#endif
 
     if (rareNonInheritedData->m_mask != other->rareNonInheritedData->m_mask
         || rareNonInheritedData->m_maskBoxImage != other->rareNonInheritedData->m_maskBoxImage)
@@ -810,10 +810,17 @@ StyleDifference RenderStyle::diff(const RenderStyle* other, unsigned& changedCon
     return StyleDifferenceEqual;
 }
 
-bool RenderStyle::diffRequiresRepaint(const RenderStyle* style) const
+bool RenderStyle::diffRequiresLayerRepaint(const RenderStyle& style, bool isComposited) const
 {
     unsigned changedContextSensitiveProperties = 0;
-    return changeRequiresRepaint(style, changedContextSensitiveProperties);
+
+    if (changeRequiresRepaint(&style, changedContextSensitiveProperties))
+        return true;
+
+    if (isComposited && changeRequiresLayerRepaint(&style, changedContextSensitiveProperties))
+        return changedContextSensitiveProperties & ContextSensitivePropertyClipRect;
+
+    return false;
 }
 
 void RenderStyle::setClip(Length top, Length right, Length bottom, Length left)
@@ -1820,5 +1827,77 @@ void RenderStyle::setColumnStylesFromPaginationMode(const Pagination::Mode& pagi
         break;
     }
 }
+
+#if ENABLE(CSS_SCROLL_SNAP)
+
+ScrollSnapPoints RenderStyle::initialScrollSnapPointsX()
+{
+    return ScrollSnapPoints();
+}
+
+ScrollSnapPoints RenderStyle::initialScrollSnapPointsY()
+{
+    return ScrollSnapPoints();
+}
+
+LengthSize RenderStyle::initialScrollSnapDestination()
+{
+    return defaultScrollSnapDestination();
+}
+
+Vector<LengthSize> RenderStyle::initialScrollSnapCoordinates()
+{
+    return Vector<LengthSize>();
+}
+
+const ScrollSnapPoints& RenderStyle::scrollSnapPointsX() const
+{
+    return rareNonInheritedData->m_scrollSnapPoints->xPoints;
+}
+
+const ScrollSnapPoints& RenderStyle::scrollSnapPointsY() const
+{
+    return rareNonInheritedData->m_scrollSnapPoints->yPoints;
+}
+
+const LengthSize& RenderStyle::scrollSnapDestination() const
+{
+    return rareNonInheritedData->m_scrollSnapPoints->destination;
+}
+
+const Vector<LengthSize>& RenderStyle::scrollSnapCoordinates() const
+{
+    return rareNonInheritedData->m_scrollSnapPoints->coordinates;
+}
+
+void RenderStyle::setScrollSnapPointsX(ScrollSnapPoints points)
+{
+    if (rareNonInheritedData->m_scrollSnapPoints->xPoints == points)
+        return;
+    rareNonInheritedData.access()->m_scrollSnapPoints.access()->xPoints = WTF::move(points);
+}
+
+void RenderStyle::setScrollSnapPointsY(ScrollSnapPoints points)
+{
+    if (rareNonInheritedData->m_scrollSnapPoints->yPoints == points)
+        return;
+    rareNonInheritedData.access()->m_scrollSnapPoints.access()->yPoints = WTF::move(points);
+}
+
+void RenderStyle::setScrollSnapDestination(LengthSize destination)
+{
+    if (rareNonInheritedData->m_scrollSnapPoints->destination == destination)
+        return;
+    rareNonInheritedData.access()->m_scrollSnapPoints.access()->destination = WTF::move(destination);
+}
+
+void RenderStyle::setScrollSnapCoordinates(Vector<LengthSize> coordinates)
+{
+    if (rareNonInheritedData->m_scrollSnapPoints->coordinates == coordinates)
+        return;
+    rareNonInheritedData.access()->m_scrollSnapPoints.access()->coordinates = WTF::move(coordinates);
+}
+
+#endif
 
 } // namespace WebCore

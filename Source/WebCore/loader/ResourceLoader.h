@@ -57,7 +57,7 @@ class ResourceLoader : public RefCounted<ResourceLoader>, protected ResourceHand
 public:
     virtual ~ResourceLoader() = 0;
 
-    void cancel();
+    WEBCORE_EXPORT void cancel();
 
     virtual bool init(const ResourceRequest&);
 
@@ -71,12 +71,12 @@ public:
     virtual const ResourceRequest& iOSOriginalRequest() const { return request(); }
 #endif
 
-    FrameLoader* frameLoader() const;
+    WEBCORE_EXPORT FrameLoader* frameLoader() const;
     DocumentLoader* documentLoader() const { return m_documentLoader.get(); }
-    const ResourceRequest& originalRequest() const { return m_originalRequest; }
+    WEBCORE_EXPORT const ResourceRequest& originalRequest() const { return m_originalRequest; }
     
-    void cancel(const ResourceError&);
-    ResourceError cancelledError();
+    WEBCORE_EXPORT void cancel(const ResourceError&);
+    WEBCORE_EXPORT ResourceError cancelledError();
     ResourceError blockedError();
     ResourceError cannotShowURLError();
     
@@ -103,11 +103,10 @@ public:
 #if USE(NETWORK_CFDATA_ARRAY_CALLBACK)
     virtual void didReceiveDataArray(CFArrayRef dataArray);
 #endif
-    void didChangePriority(ResourceLoadPriority);
 
     virtual bool shouldUseCredentialStorage();
     virtual void didReceiveAuthenticationChallenge(const AuthenticationChallenge&);
-    void didCancelAuthenticationChallenge(const AuthenticationChallenge&);
+    WEBCORE_EXPORT void didCancelAuthenticationChallenge(const AuthenticationChallenge&);
 #if USE(PROTECTION_SPACE_AUTH_CALLBACK)
     virtual bool canAuthenticateAgainstProtectionSpace(const ProtectionSpace&);
 #endif
@@ -123,9 +122,11 @@ public:
     bool shouldSendResourceLoadCallbacks() const { return m_options.sendLoadCallbacks() == SendCallbacks; }
     void setSendCallbackPolicy(SendCallbackPolicy sendLoadCallbacks) { m_options.setSendLoadCallbacks(sendLoadCallbacks); }
     bool shouldSniffContent() const { return m_options.sniffContent() == SniffContent; }
-    ClientCredentialPolicy clientCredentialPolicy() const { return m_options.clientCredentialPolicy(); }
+    WEBCORE_EXPORT bool isAllowedToAskUserForCredentials() const;
+    bool shouldIncludeCertificateInfo() const { return m_options.certificateInfoPolicy() == IncludeCertificateInfo; }
 
     bool reachedTerminalState() const { return m_reachedTerminalState; }
+
 
     const ResourceRequest& request() const { return m_request; }
 
@@ -154,6 +155,13 @@ protected:
     void didReceiveDataOrBuffer(const char*, unsigned, PassRefPtr<SharedBuffer>, long long encodedDataLength, DataPayloadType);
 
     const ResourceLoaderOptions& options() { return m_options; }
+
+#if PLATFORM(COCOA) && !USE(CFNETWORK)
+    virtual NSCachedURLResponse* willCacheResponse(ResourceHandle*, NSCachedURLResponse*) override;
+#endif
+#if PLATFORM(COCOA) && USE(CFNETWORK)
+    virtual CFCachedURLResponseRef willCacheResponse(ResourceHandle*, CFCachedURLResponseRef) override;
+#endif
 
     RefPtr<ResourceHandle> m_handle;
     RefPtr<Frame> m_frame;
@@ -186,12 +194,6 @@ private:
     virtual bool canAuthenticateAgainstProtectionSpace(ResourceHandle*, const ProtectionSpace& protectionSpace) override { return canAuthenticateAgainstProtectionSpace(protectionSpace); }
 #endif
     virtual void receivedCancellation(ResourceHandle*, const AuthenticationChallenge& challenge) override { receivedCancellation(challenge); }
-#if PLATFORM(COCOA) && !USE(CFNETWORK)
-    virtual NSCachedURLResponse* willCacheResponse(ResourceHandle*, NSCachedURLResponse*) override;
-#endif
-#if PLATFORM(COCOA) && USE(CFNETWORK)
-    virtual CFCachedURLResponseRef willCacheResponse(ResourceHandle*, CFCachedURLResponseRef) override;
-#endif
 #if PLATFORM(IOS)
     virtual RetainPtr<CFDictionaryRef> connectionProperties(ResourceHandle*) override;
 #endif

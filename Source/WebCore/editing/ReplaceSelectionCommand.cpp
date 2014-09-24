@@ -911,12 +911,10 @@ void ReplaceSelectionCommand::doApply()
     if (!selection.rootEditableElement())
         return;
 
-#if PLATFORM(IOS)
     // In plain text only regions, we create style-less fragments, so the inserted content will automatically
     // match the style of the surrounding area and so we can avoid unnecessary work below for m_matchStyle.
     if (!selection.isContentRichlyEditable())
         m_matchStyle = false;
-#endif
 
     ReplacementFragment fragment(document(), m_documentFragment.get(), selection);
     if (performTrivialReplace(fragment))
@@ -1142,7 +1140,7 @@ void ReplaceSelectionCommand::doApply()
 
     // We inserted before the insertionBlock to prevent nesting, and the content before the insertionBlock wasn't in its own block and
     // didn't have a br after it, so the inserted content ended up in the same paragraph.
-    if (insertionBlock && insertionPos.deprecatedNode() == insertionBlock->parentNode() && (unsigned)insertionPos.deprecatedEditingOffset() < insertionBlock->nodeIndex() && !isStartOfParagraph(startOfInsertedContent))
+    if (insertionBlock && insertionPos.deprecatedNode() == insertionBlock->parentNode() && (unsigned)insertionPos.deprecatedEditingOffset() < insertionBlock->computeNodeIndex() && !isStartOfParagraph(startOfInsertedContent))
         insertNodeAt(createBreakElement(document()), startOfInsertedContent.deepEquivalent());
 
     if (endBR && (plainTextFragment || shouldRemoveEndBR(endBR.get(), originalVisPosBeforeEndBR))) {
@@ -1439,7 +1437,7 @@ Node* ReplaceSelectionCommand::insertAsListItems(PassRefPtr<HTMLElement> prpList
 {
     RefPtr<HTMLElement> listElement = prpListElement;
 
-    while (listElement->hasChildNodes() && isListElement(listElement->firstChild()) && listElement->childNodeCount() == 1)
+    while (listElement->hasOneChild() && isListElement(listElement->firstChild()))
         listElement = toHTMLElement(listElement->firstChild());
 
     bool isStart = isStartOfParagraph(insertPos);
