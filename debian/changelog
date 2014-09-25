@@ -10,6 +10,9 @@ webkit2gtk (2.6.0+dfsg1-1) UNRELEASED; urgency=medium
     + Refresh.
   * debian/patches/atomic_build_fix.patch:
     + Add -latomic to fix build in some architectures.
+  * debian/rules:
+    + Disable JIT completely in mips and mipsel, it does not build at the
+      moment, see https://bugs.webkit.org/show_bug.cgi?id=136753.
 
  -- Alberto Garcia <berto@igalia.com>  Wed, 24 Sep 2014 23:59:09 +0300
 
