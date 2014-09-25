@@ -17,7 +17,6 @@ libwebkit2gtk-4.0.so.37 libwebkit2gtk-4.0-37 #MINVER#
  webkit_authentication_request_is_for_proxy@Base 2.5.3
  webkit_authentication_request_is_retry@Base 2.5.3
  webkit_authentication_scheme_get_type@Base 2.5.3
- webkit_authentication_widget_get_type@Base 2.5.3
  webkit_back_forward_list_get_back_item@Base 2.5.3
  webkit_back_forward_list_get_back_list@Base 2.5.3
  webkit_back_forward_list_get_back_list_with_limit@Base 2.5.3
@@ -813,6 +812,7 @@ libwebkit2gtk-4.0.so.37 libwebkit2gtk-4.0-37 #MINVER#
  (optional)webkit_dom_html_form_element_get_no_validate@Base 2.5.3
  webkit_dom_html_form_element_get_target@Base 2.5.3
  webkit_dom_html_form_element_get_type@Base 2.5.3
+ webkit_dom_html_form_element_request_autocomplete@Base 2.6.0
  webkit_dom_html_form_element_reset@Base 2.5.3
  webkit_dom_html_form_element_set_accept_charset@Base 2.5.3
  webkit_dom_html_form_element_set_action@Base 2.5.3
@@ -1979,6 +1979,7 @@ libwebkit2gtk-4.0.so.37 libwebkit2gtk-4.0-37 #MINVER#
  webkit_download_cancel@Base 2.5.3
  webkit_download_error_get_type@Base 2.5.3
  webkit_download_error_quark@Base 2.5.3
+ webkit_download_get_allow_overwrite@Base 2.6.0
  webkit_download_get_destination@Base 2.5.3
  webkit_download_get_elapsed_time@Base 2.5.3
  webkit_download_get_estimated_progress@Base 2.5.3
@@ -1987,6 +1988,7 @@ libwebkit2gtk-4.0.so.37 libwebkit2gtk-4.0-37 #MINVER#
  webkit_download_get_response@Base 2.5.3
  webkit_download_get_type@Base 2.5.3
  webkit_download_get_web_view@Base 2.5.3
+ webkit_download_set_allow_overwrite@Base 2.6.0
  webkit_download_set_destination@Base 2.5.3
  webkit_favicon_database_clear@Base 2.5.3
  webkit_favicon_database_error_get_type@Base 2.5.3
@@ -2256,6 +2258,7 @@ libwebkit2gtk-4.0.so.37 libwebkit2gtk-4.0-37 #MINVER#
  webkit_uri_request_new@Base 2.5.3
  webkit_uri_request_set_uri@Base 2.5.3
  webkit_uri_response_get_content_length@Base 2.5.3
+ webkit_uri_response_get_http_headers@Base 2.6.0
  webkit_uri_response_get_mime_type@Base 2.5.3
  webkit_uri_response_get_status_code@Base 2.5.3
  webkit_uri_response_get_suggested_filename@Base 2.5.3

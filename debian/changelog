@@ -16,6 +16,8 @@ webkit2gtk (2.6.0+dfsg1-1) UNRELEASED; urgency=medium
     + Enable JIT in armel and armhf.
   * debian/copyright:
     + Update with all the changes in 2.6.0 (Closes: #760477).
+  * debian/libwebkit2gtk-4.0-37.symbols:
+    + Update.
 
  -- Alberto Garcia <berto@igalia.com>  Wed, 24 Sep 2014 23:59:09 +0300
 
