@@ -28,13 +28,8 @@ ifneq (,$(filter $(DEB_BUILD_ARCH),armel armhf kfreebsd-amd64 powerpc))
 	CFLAGS += -gstabs
 endif
 
-# disable jit on some architectures (bug #651636)
-ifneq (,$(filter $(DEB_BUILD_ARCH),armel))
-	EXTRA_CMAKE_ARGUMENTS += -DENABLE_JIT=OFF
-endif
-
 # See https://bugs.webkit.org/show_bug.cgi?id=113638
-ifeq (,$(filter $(DEB_BUILD_ARCH),i386 amd64 hurd-i386 kfreebsd-i386 kfreebsd-amd64 armel))
+ifeq (,$(filter $(DEB_BUILD_ARCH),i386 amd64 hurd-i386 kfreebsd-i386 kfreebsd-amd64 armel armhf))
 	EXTRA_CMAKE_ARGUMENTS += -DENABLE_JIT=OFF
 	CPPFLAGS += -DENABLE_YARR_JIT=0 -DENABLE_ASSEMBLER=0
 endif
