@@ -2289,7 +2289,11 @@ Copyright: © 2002-2014 Apple Inc. and others
 License: MPL-1.1 or GPL-2+ or LGPL-2.1+
 
 Files: Tools/TestWebKitAPI/Tests/WTF/MD5.cpp
+Copyright: No copyright holders
 License: public-domain
+ This code was written by Colin Plumb in 1993, no copyright is
+ claimed.
+ This code is in the public domain; do with it what you wish.
 
 Files: Source/ThirdParty/qunit/qunit/qunit.css
        Source/ThirdParty/qunit/qunit/qunit.js
