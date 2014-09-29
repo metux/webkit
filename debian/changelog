@@ -1,4 +1,4 @@
-webkit2gtk (2.6.0+dfsg1-1) UNRELEASED; urgency=medium
+webkit2gtk (2.6.0+dfsg1-1) experimental; urgency=medium
 
   * New upstream release.
   * debian/patches/fix-textrel-x86.patch,
@@ -34,7 +34,7 @@ webkit2gtk (2.6.0+dfsg1-1) UNRELEASED; urgency=medium
       - Make WebKitEnumTypes.h equal in all builds by not including the
         name of the build directory.
 
- -- Alberto Garcia <berto@igalia.com>  Wed, 24 Sep 2014 23:59:09 +0300
+ -- Alberto Garcia <berto@igalia.com>  Mon, 29 Sep 2014 15:48:56 +0300
 
 webkit2gtk (2.5.3+dfsg1-1) experimental; urgency=medium
 
