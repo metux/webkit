@@ -1,0 +1,16 @@
+From: Alberto Garcia <berto@igalia.com>
+Subject: Don't include full path name in generated header
+Origin: http://trac.webkit.org/changeset/174008
+Index: webkitgtk/Source/WebKit2/UIProcess/API/gtk/WebKitEnumTypes.h.template
+===================================================================
+--- webkitgtk.orig/Source/WebKit2/UIProcess/API/gtk/WebKitEnumTypes.h.template
++++ webkitgtk/Source/WebKit2/UIProcess/API/gtk/WebKitEnumTypes.h.template
+@@ -33,7 +33,7 @@ G_BEGIN_DECLS
+ 
+ 
+ /*** BEGIN file-production ***/
+-/* Enumerations from @filename@. */
++/* Enumerations from @basename@. */
+ /*** END file-production ***/
+ 
+ 

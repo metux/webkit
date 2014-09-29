@@ -21,6 +21,18 @@ webkit2gtk (2.6.0+dfsg1-1) UNRELEASED; urgency=medium
     + Update with all the changes in 2.6.0 (Closes: #760477).
   * debian/libwebkit2gtk-4.0-37.symbols:
     + Update.
+  * Make gir1.2- and -dev packages multi-arch compliant:
+    + debian/gir1.2-javascriptcoregtk-4.0.install,
+      debian/gir1.2-webkit2-4.0.install:
+      - Put .typelib files in /usr/lib/<arch>/girepository-1.0.
+    + debian/control:
+      - Add Multi-Arch field to the affected packages.
+    + debian/gir1.2-javascriptcoregtk-4.0.links,
+      debian/libjavascriptcoregtk-4.0-dev.links:
+      - Remove old compatibility links.
+    + debian/patches/fix-header-template.patch:
+      - Make WebKitEnumTypes.h equal in all builds by not including the
+        name of the build directory.
 
  -- Alberto Garcia <berto@igalia.com>  Wed, 24 Sep 2014 23:59:09 +0300
 
