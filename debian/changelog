@@ -6,8 +6,9 @@ webkit2gtk (2.6.0+dfsg1-2) UNRELEASED; urgency=medium
 
   [ Emilio Pozuelo Monfort ]
   * debian/rules:
-    + Disable debugging symbols on powerpc. Should hopefully fix the
-      build as otherwise the linker needs too much memory and fails.
+    + Disable debugging symbols on powerpc. Should fix the build
+      as otherwise the linker needs too much memory and fails.
+    + Disable JIT on armel. Should fix the build.
 
  -- Alberto Garcia <berto@igalia.com>  Tue, 30 Sep 2014 14:18:51 +0300
 
