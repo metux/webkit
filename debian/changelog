@@ -1,4 +1,4 @@
-webkit2gtk (2.6.0+dfsg1-2) UNRELEASED; urgency=medium
+webkit2gtk (2.6.0+dfsg1-2) unstable; urgency=medium
 
   [ Alberto Garcia ]
   * debian/patches/atomic_build_fix.patch:
@@ -9,8 +9,9 @@ webkit2gtk (2.6.0+dfsg1-2) UNRELEASED; urgency=medium
     + Disable debugging symbols on powerpc. Should fix the build
       as otherwise the linker needs too much memory and fails.
     + Disable JIT on armel. Should fix the build.
+  * Upload to unstable.
 
- -- Alberto Garcia <berto@igalia.com>  Tue, 30 Sep 2014 14:18:51 +0300
+ -- Emilio Pozuelo Monfort <pochu@debian.org>  Thu, 02 Oct 2014 00:42:20 +0200
 
 webkit2gtk (2.6.0+dfsg1-1) experimental; urgency=medium
 
