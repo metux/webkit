@@ -5,6 +5,7 @@ webkit2gtk (2.6.0+dfsg1-3) UNRELEASED; urgency=medium
       764193).
   * debian/rules:
     + Don't build -dbg packages if we don't have debugging symbols.
+    + Disable debugging symbols in armhf (Closes: #764192).
 
  -- Alberto Garcia <berto@igalia.com>  Sun, 05 Oct 2014 20:59:21 +0300
 
