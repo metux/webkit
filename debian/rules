@@ -8,6 +8,8 @@ CPPFLAGS = $(shell dpkg-buildflags --get CPPFLAGS) -Wall
 CFLAGS = $(shell dpkg-buildflags --get CFLAGS)
 LDFLAGS = $(shell dpkg-buildflags --get LDFLAGS) -Wl,--as-needed
 
+EXTRA_DH_ARGUMENTS =
+
 # Sacrifice speed in order to make it more likely resource limits
 # won't be hit.
 ifeq ($(DEB_HOST_ARCH_BITS),32)
@@ -21,6 +23,7 @@ endif
 # Disable debugging symbols on these arches.
 ifneq (,$(filter $(DEB_BUILD_ARCH),hurd-i386 ia64 kfreebsd-i386 mips mipsel powerpc powerpcspe s390 s390x sparc))
 	CFLAGS := $(CFLAGS:-g=)
+	EXTRA_DH_ARGUMENTS += -Nlibwebkit2gtk-4.0-37-dbg -Nlibjavascriptcoregtk-4.0-18-dbg
 endif
 
 # Let's try to keep debugging symbols on these arches.
@@ -52,7 +55,7 @@ else
 endif
 
 %:
-	dh $@ --parallel
+	dh $@ --parallel $(EXTRA_DH_ARGUMENTS)
 
 override_dh_auto_configure:
 	slimit -m debian/jquery-1.9.1.js > \
@@ -70,20 +73,20 @@ override_dh_auto_configure:
 	   $(EXTRA_CMAKE_ARGUMENTS)
 
 override_dh_strip:
-	dh_strip -plibwebkit2gtk-4.0-37 --dbg-package=libwebkit2gtk-4.0-37-dbg
-	dh_strip -plibjavascriptcoregtk-4.0-18 --dbg-package=libjavascriptcoregtk-4.0-18-dbg
-	dh_strip
+	dh_strip -plibwebkit2gtk-4.0-37 --dbg-package=libwebkit2gtk-4.0-37-dbg $(EXTRA_DH_ARGUMENTS)
+	dh_strip -plibjavascriptcoregtk-4.0-18 --dbg-package=libjavascriptcoregtk-4.0-18-dbg $(EXTRA_DH_ARGUMENTS)
+	dh_strip $(EXTRA_DH_ARGUMENTS)
 
 override_dh_makeshlibs:
-	dh_makeshlibs -plibwebkit2gtk-4.0-37 -Xinjected-bundle
-	dh_makeshlibs -plibjavascriptcoregtk-4.0-18
+	dh_makeshlibs -plibwebkit2gtk-4.0-37 -Xinjected-bundle $(EXTRA_DH_ARGUMENTS)
+	dh_makeshlibs -plibjavascriptcoregtk-4.0-18 $(EXTRA_DH_ARGUMENTS)
 
 override_dh_shlibdeps:
-	dh_shlibdeps
-	dh_girepository
+	dh_shlibdeps $(EXTRA_DH_ARGUMENTS)
+	dh_girepository $(EXTRA_DH_ARGUMENTS)
 
 override_dh_clean:
-	dh_clean
+	dh_clean $(EXTRA_DH_ARGUMENTS)
 	rm -f Source/WebInspectorUI/Tools/PrettyPrinting/populate/jquery.min.js
 
 override_dh_auto_test:

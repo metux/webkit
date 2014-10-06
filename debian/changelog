@@ -2,6 +2,8 @@ webkit2gtk (2.6.0+dfsg1-3) UNRELEASED; urgency=medium
 
   * debian/patches/atomic_build_fix.patch:
     + Make -latomic work also when --as-needed is present.
+  * debian/rules:
+    + Don't build -dbg packages if we don't have debugging symbols.
 
  -- Alberto Garcia <berto@igalia.com>  Sun, 05 Oct 2014 20:59:21 +0300
 
