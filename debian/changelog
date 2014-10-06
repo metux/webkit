@@ -1,4 +1,4 @@
-webkit2gtk (2.6.0+dfsg1-3) UNRELEASED; urgency=medium
+webkit2gtk (2.6.0+dfsg1-3) unstable; urgency=medium
 
   * debian/patches/atomic_build_fix.patch:
     + Make -latomic work also when --as-needed is present (Closes:
@@ -7,7 +7,7 @@ webkit2gtk (2.6.0+dfsg1-3) UNRELEASED; urgency=medium
     + Don't build -dbg packages if we don't have debugging symbols.
     + Disable debugging symbols in armhf (Closes: #764192).
 
- -- Alberto Garcia <berto@igalia.com>  Sun, 05 Oct 2014 20:59:21 +0300
+ -- Alberto Garcia <berto@igalia.com>  Mon, 06 Oct 2014 15:18:03 +0300
 
 webkit2gtk (2.6.0+dfsg1-2) unstable; urgency=medium
 
