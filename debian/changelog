@@ -1,6 +1,8 @@
 webkit2gtk (2.6.1+dfsg1-1) UNRELEASED; urgency=medium
 
   * New upstream release.
+  * debian/patches/fix-header-template.patch:
+    + Remove.
 
  -- Alberto Garcia <berto@igalia.com>  Mon, 13 Oct 2014 15:18:12 +0300
 
