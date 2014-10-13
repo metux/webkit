@@ -1972,6 +1972,7 @@ set(WebCore_SOURCES
     page/animation/ImplicitAnimation.cpp
     page/animation/KeyframeAnimation.cpp
 
+    page/scrolling/ScrollLatchingState.cpp
     page/scrolling/ScrollingConstraints.cpp
     page/scrolling/ScrollingCoordinator.cpp
     page/scrolling/ScrollingStateFixedNode.cpp
@@ -2280,6 +2281,7 @@ set(WebCore_SOURCES
     rendering/InlineBox.cpp
     rendering/InlineElementBox.cpp
     rendering/InlineFlowBox.cpp
+    rendering/InlineIterator.cpp
     rendering/InlineTextBox.cpp
     rendering/LayoutRepainter.cpp
     rendering/LayoutState.cpp

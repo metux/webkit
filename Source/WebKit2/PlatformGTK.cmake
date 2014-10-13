@@ -15,13 +15,6 @@ add_definitions(-DLIBDIR="${LIB_INSTALL_DIR}")
 set(WebKit2_USE_PREFIX_HEADER ON)
 
 list(APPEND WebKit2_SOURCES
-    ${DERIVED_SOURCES_WEBKIT2GTK_DIR}/InspectorGResourceBundle.c
-    ${DERIVED_SOURCES_WEBKIT2GTK_DIR}/WebKit2InspectorGResourceBundle.c
-    ${DERIVED_SOURCES_WEBKIT2GTK_DIR}/WebKit2ResourcesGResourceBundle.c
-
-    ${DERIVED_SOURCES_WEBKIT2GTK_API_DIR}/WebKitEnumTypes.cpp
-    ${DERIVED_SOURCES_WEBKIT2GTK_API_DIR}/WebKitMarshal.cpp
-
     NetworkProcess/gtk/NetworkProcessMainGtk.cpp
 
     NetworkProcess/soup/NetworkProcessSoup.cpp
@@ -315,6 +308,15 @@ list(APPEND WebKit2_SOURCES
     WebProcess/soup/WebProcessSoup.cpp
 )
 
+list(APPEND WebKit2_DERIVED_SOURCES
+    ${DERIVED_SOURCES_WEBKIT2GTK_DIR}/InspectorGResourceBundle.c
+    ${DERIVED_SOURCES_WEBKIT2GTK_DIR}/WebKit2InspectorGResourceBundle.c
+    ${DERIVED_SOURCES_WEBKIT2GTK_DIR}/WebKit2ResourcesGResourceBundle.c
+
+    ${DERIVED_SOURCES_WEBKIT2GTK_API_DIR}/WebKitEnumTypes.cpp
+    ${DERIVED_SOURCES_WEBKIT2GTK_API_DIR}/WebKitMarshal.cpp
+)
+
 set(WebKit2GTK_INSTALLED_HEADERS
     ${DERIVED_SOURCES_WEBKIT2GTK_API_DIR}/WebKitEnumTypes.h
     ${DERIVED_SOURCES_WEBKIT2GTK_API_DIR}/WebKitVersion.h
@@ -378,6 +380,7 @@ file(GLOB InspectorFiles
     ${CMAKE_SOURCE_DIR}/Source/WebInspectorUI/UserInterface/Controllers/*.js
     ${CMAKE_SOURCE_DIR}/Source/WebInspectorUI/UserInterface/External/CodeMirror/*.css
     ${CMAKE_SOURCE_DIR}/Source/WebInspectorUI/UserInterface/External/CodeMirror/*.js
+    ${CMAKE_SOURCE_DIR}/Source/WebInspectorUI/UserInterface/External/Esprima/*.js
     ${CMAKE_SOURCE_DIR}/Source/WebInspectorUI/UserInterface/Models/*.js
     ${CMAKE_SOURCE_DIR}/Source/WebInspectorUI/UserInterface/Protocol/*.js
     ${CMAKE_SOURCE_DIR}/Source/WebInspectorUI/UserInterface/Views/*.css
@@ -555,19 +558,6 @@ add_custom_command(
     DEPENDS ${DERIVED_SOURCES_WEBKIT2GTK_DIR}/WebKit2ResourcesGResourceBundle.xml
     COMMAND glib-compile-resources --generate --sourcedir=${CMAKE_SOURCE_DIR}/Source/WebCore/Resources --sourcedir=${CMAKE_SOURCE_DIR}/Source/WebCore/platform/audio/resources --target=${DERIVED_SOURCES_WEBKIT2GTK_DIR}/WebKit2ResourcesGResourceBundle.c ${DERIVED_SOURCES_WEBKIT2GTK_DIR}/WebKit2ResourcesGResourceBundle.xml
     VERBATIM
-)
-
-add_custom_target(webkit2gtk-forwarding-headers
-    COMMAND ${PERL_EXECUTABLE} ${WEBKIT2_DIR}/Scripts/generate-forwarding-headers.pl ${WEBKIT2_DIR} ${FORWARDING_HEADERS_DIR} gtk
-    COMMAND ${PERL_EXECUTABLE} ${WEBKIT2_DIR}/Scripts/generate-forwarding-headers.pl ${WEBKIT2_DIR} ${FORWARDING_HEADERS_DIR} soup
-
-    # These symbolic link allows includes like #include <webkit2/WebkitWebView.h> which simulates installed headers.
-    COMMAND ln -n -s -f ${WEBKIT2_DIR}/UIProcess/API/gtk ${FORWARDING_HEADERS_WEBKIT2GTK_DIR}/webkit2
-    COMMAND ln -n -s -f ${WEBKIT2_DIR}/WebProcess/InjectedBundle/API/gtk ${FORWARDING_HEADERS_WEBKIT2GTK_EXTENSION_DIR}/webkit2
-)
-
-set(WEBKIT2_EXTRA_DEPENDENCIES
-     webkit2gtk-forwarding-headers
 )
 
 if (ENABLE_PLUGIN_PROCESS_GTK2)
@@ -860,4 +850,46 @@ file(WRITE ${CMAKE_BINARY_DIR}/gtkdoc-webkit2gtk.cfg
     "            ${WEBKIT2_DIR}/WebProcess/InjectedBundle/API/gtk\n"
     "            ${DERIVED_SOURCES_WEBKIT2GTK_API_DIR}\n"
     "headers=${WebKit2GTK_ENUM_GENERATION_HEADERS} ${WebKit2WebExtension_INSTALLED_HEADERS}\n"
+)
+
+file(GLOB_RECURSE WebKit2_HEADERS
+    *.h
+)
+
+add_custom_command(
+    OUTPUT ${CMAKE_BINARY_DIR}/WebKit2-forwarding-headers.stamp
+    DEPENDS ${WEBKIT2_DIR}/Scripts/generate-forwarding-headers.pl
+            ${WebKit2_SOURCES}
+            ${WebProcess_SOURCES}
+            ${NetworkProcess_SOURCES}
+            ${PluginProcessGTK2_SOURCES}
+            ${PluginProcess_SOURCES}
+            ${WebKit2_HEADERS}
+    COMMAND ${PERL_EXECUTABLE} ${WEBKIT2_DIR}/Scripts/generate-forwarding-headers.pl ${WEBKIT2_DIR} ${FORWARDING_HEADERS_DIR} gtk
+    COMMAND ${PERL_EXECUTABLE} ${WEBKIT2_DIR}/Scripts/generate-forwarding-headers.pl ${WEBKIT2_DIR} ${FORWARDING_HEADERS_DIR} soup
+    COMMAND touch ${CMAKE_BINARY_DIR}/WebKit2-forwarding-headers.stamp
+)
+add_custom_target(WebKit2-forwarding-headers
+    DEPENDS ${CMAKE_BINARY_DIR}/WebKit2-forwarding-headers.stamp
+)
+
+# These symbolic link allows includes like #include <webkit2/WebkitWebView.h> which simulates installed headers.
+add_custom_command(
+    OUTPUT ${FORWARDING_HEADERS_WEBKIT2GTK_DIR}/webkit2
+    DEPENDS ${WEBKIT2_DIR}/UIProcess/API/gtk
+    COMMAND ln -n -s -f ${WEBKIT2_DIR}/UIProcess/API/gtk ${FORWARDING_HEADERS_WEBKIT2GTK_DIR}/webkit2
+)
+add_custom_command(
+    OUTPUT ${FORWARDING_HEADERS_WEBKIT2GTK_EXTENSION_DIR}/webkit2
+    DEPENDS ${WEBKIT2_DIR}/WebProcess/InjectedBundle/API/gtk
+    COMMAND ln -n -s -f ${WEBKIT2_DIR}/WebProcess/InjectedBundle/API/gtk ${FORWARDING_HEADERS_WEBKIT2GTK_EXTENSION_DIR}/webkit2
+)
+add_custom_target(WebKit2-fake-api-headers
+    DEPENDS ${FORWARDING_HEADERS_WEBKIT2GTK_DIR}/webkit2
+            ${FORWARDING_HEADERS_WEBKIT2GTK_EXTENSION_DIR}/webkit2
+)
+
+set(WEBKIT2_EXTRA_DEPENDENCIES
+     WebKit2-forwarding-headers
+     WebKit2-fake-api-headers
 )

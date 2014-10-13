@@ -1589,17 +1589,16 @@ void FrameSelection::debugRenderer(RenderObject* r, bool selected) const
 
 bool FrameSelection::contains(const LayoutPoint& point)
 {
-    Document* document = m_frame->document();
-    
     // Treat a collapsed selection like no selection.
     if (!isRange())
         return false;
-    if (!document->renderView()) 
+    
+    RenderView* renderView = m_frame->contentRenderer();
+    if (!renderView)
         return false;
     
-    HitTestRequest request(HitTestRequest::ReadOnly | HitTestRequest::Active | HitTestRequest::DisallowShadowContent);
     HitTestResult result(point);
-    document->renderView()->hitTest(request, result);
+    renderView->hitTest(HitTestRequest(), result);
     Node* innerNode = result.innerNode();
     if (!innerNode || !innerNode->renderer())
         return false;
@@ -1809,17 +1808,13 @@ void FrameSelection::updateAppearance()
     // Paint a block cursor instead of a caret in overtype mode unless the caret is at the end of a line (in this case
     // the FrameSelection will paint a blinking caret as usual).
     VisibleSelection oldSelection = selection();
-    VisiblePosition forwardPosition;
-    if (m_shouldShowBlockCursor && oldSelection.isCaret()) {
-        forwardPosition = modifyExtendingForward(CharacterGranularity);
-        m_caretPaint = forwardPosition.isNull();
-    }
 
 #if ENABLE(TEXT_CARET)
+    bool paintBlockCursor = m_shouldShowBlockCursor && m_selection.isCaret() && !isLogicalEndOfLine(m_selection.visibleEnd());
     bool caretRectChangedOrCleared = recomputeCaretRect();
 
     bool caretBrowsing = m_frame->settings().caretBrowsingEnabled();
-    bool shouldBlink = caretIsVisible() && isCaret() && (oldSelection.isContentEditable() || caretBrowsing) && forwardPosition.isNull();
+    bool shouldBlink = !paintBlockCursor && caretIsVisible() && isCaret() && (oldSelection.isContentEditable() || caretBrowsing);
 
     // If the caret moved, stop the blink timer so we can restart with a
     // black caret in the new location.
@@ -1845,7 +1840,12 @@ void FrameSelection::updateAppearance()
 
     // Construct a new VisibleSolution, since m_selection is not necessarily valid, and the following steps
     // assume a valid selection. See <https://bugs.webkit.org/show_bug.cgi?id=69563> and <rdar://problem/10232866>.
-    VisibleSelection selection(oldSelection.visibleStart(), forwardPosition.isNotNull() ? forwardPosition : oldSelection.visibleEnd());
+#if ENABLE(TEXT_CARET)
+    VisiblePosition endVisiblePosition = paintBlockCursor ? modifyExtendingForward(CharacterGranularity) : oldSelection.visibleEnd();
+    VisibleSelection selection(oldSelection.visibleStart(), endVisiblePosition);
+#else
+    VisibleSelection selection(oldSelection.visibleStart(), oldSelection.visibleEnd());
+#endif
 
     if (!selection.isRange()) {
         view->clearSelection();

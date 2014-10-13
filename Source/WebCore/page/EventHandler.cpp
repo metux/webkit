@@ -83,6 +83,7 @@
 #include "SVGNames.h"
 #include "SVGUseElement.h"
 #include "ScrollAnimator.h"
+#include "ScrollLatchingState.h"
 #include "Scrollbar.h"
 #include "Settings.h"
 #include "ShadowRoot.h"
@@ -401,12 +402,9 @@ EventHandler::EventHandler(Frame& frame)
 #endif
     , m_mousePositionIsUnknown(true)
     , m_mouseDownTimestamp(0)
-    , m_recentWheelEventDeltaTracker(std::make_unique<WheelEventDeltaTracker>())
-    , m_widgetIsLatched(false)
 #if PLATFORM(COCOA)
     , m_mouseDownView(nil)
     , m_sendingEventToSubview(false)
-    , m_startedGestureAtScrollLimit(false)
 #if !PLATFORM(IOS)
     , m_activationEventNumber(-1)
 #endif // !PLATFORM(IOS)
@@ -490,11 +488,9 @@ void EventHandler::clear()
     m_mousePressed = false;
     m_capturesDragging = false;
     m_capturingMouseEventsElement = nullptr;
-    m_latchedWheelEventElement = nullptr;
-#if PLATFORM(COCOA)
-    m_latchedScrollableContainer = nullptr;
+#if PLATFORM(MAC)
+    m_frame.mainFrame().resetLatchingState();
 #endif
-    m_previousWheelScrolledElement = nullptr;
 #if ENABLE(TOUCH_EVENTS) && !ENABLE(IOS_TOUCH_EVENTS)
     m_originatingTouchPointTargets.clear();
     m_originatingTouchPointDocument.clear();
@@ -840,9 +836,8 @@ bool EventHandler::handleMouseDraggedEvent(const MouseEventWithHitTestResults& e
     }
 
     if (m_selectionInitiationState != ExtendedSelection) {
-        HitTestRequest request(HitTestRequest::ReadOnly | HitTestRequest::Active | HitTestRequest::DisallowShadowContent);
         HitTestResult result(m_mouseDownPos);
-        m_frame.document()->renderView()->hitTest(request, result);
+        m_frame.document()->renderView()->hitTest(HitTestRequest(), result);
 
         updateSelectionForMouseDrag(result);
     }
@@ -855,8 +850,8 @@ bool EventHandler::eventMayStartDrag(const PlatformMouseEvent& event) const
     // This is a pre-flight check of whether the event might lead to a drag being started.  Be careful
     // that its logic needs to stay in sync with handleMouseMoveEvent() and the way we setMouseDownMayStartDrag
     // in handleMousePressEvent
-    
-    if (!m_frame.contentRenderer() || !m_frame.contentRenderer()->hasLayer())
+    RenderView* renderView = m_frame.contentRenderer();
+    if (!renderView)
         return false;
 
     if (event.button() != LeftButton || event.clickCount() != 1)
@@ -876,7 +871,7 @@ bool EventHandler::eventMayStartDrag(const PlatformMouseEvent& event) const
     updateDragSourceActionsAllowed();
     HitTestRequest request(HitTestRequest::ReadOnly | HitTestRequest::DisallowShadowContent);
     HitTestResult result(view->windowToContents(event.position()));
-    m_frame.contentRenderer()->hitTest(request, result);
+    renderView->hitTest(request, result);
     DragState state;
     return result.innerElement() && page->dragController().draggableElement(&m_frame, result.innerElement(), result.roundedPointInInnerNodeFrame(), state);
 }
@@ -886,13 +881,13 @@ void EventHandler::updateSelectionForMouseDrag()
     FrameView* view = m_frame.view();
     if (!view)
         return;
-    RenderView* renderer = m_frame.contentRenderer();
-    if (!renderer)
+    RenderView* renderView = m_frame.contentRenderer();
+    if (!renderView)
         return;
 
     HitTestRequest request(HitTestRequest::ReadOnly | HitTestRequest::Active | HitTestRequest::Move | HitTestRequest::DisallowShadowContent);
     HitTestResult result(view->windowToContents(m_lastKnownMousePosition));
-    renderer->hitTest(request, result);
+    renderView->hitTest(request, result);
     updateSelectionForMouseDrag(result);
 }
 
@@ -1132,14 +1127,13 @@ HitTestResult EventHandler::hitTestResultAtPoint(const LayoutPoint& point, HitTe
 
     HitTestResult result(point, padding.height(), padding.width(), padding.height(), padding.width());
 
-    if (!m_frame.contentRenderer())
+    RenderView* renderView = m_frame.contentRenderer();
+    if (!renderView)
         return result;
-
-    m_frame.document()->updateLayout();
     
     // hitTestResultAtPoint is specifically used to hitTest into all frames, thus it always allows child frame content.
     HitTestRequest request(hitType | HitTestRequest::AllowChildFrameContent);
-    m_frame.contentRenderer()->hitTest(request, result);
+    renderView->hitTest(request, result);
     if (!request.readOnly())
         m_frame.document()->updateHoverActiveState(request, result.innerElement());
 
@@ -1343,8 +1337,6 @@ void EventHandler::updateCursor()
     bool altKey;
     bool metaKey;
     PlatformKeyboardEvent::getCurrentModifierState(shiftKey, ctrlKey, altKey, metaKey);
-
-    m_frame.document()->updateLayout();
 
     HitTestRequest request(HitTestRequest::ReadOnly);
     HitTestResult result(view->windowToContents(m_lastKnownMousePosition));
@@ -1751,8 +1743,7 @@ bool EventHandler::handleMousePressEvent(const PlatformMouseEvent& platformMouse
     // in case the scrollbar widget was destroyed when the mouse event was handled.
     if (mouseEvent.scrollbar()) {
         const bool wasLastScrollBar = mouseEvent.scrollbar() == m_lastScrollbarUnderMouse.get();
-        HitTestRequest request(HitTestRequest::ReadOnly | HitTestRequest::Active | HitTestRequest::DisallowShadowContent);
-        mouseEvent = m_frame.document()->prepareMouseEvent(request, documentPoint, platformMouseEvent);
+        mouseEvent = m_frame.document()->prepareMouseEvent(HitTestRequest(), documentPoint, platformMouseEvent);
         if (wasLastScrollBar && mouseEvent.scrollbar() != m_lastScrollbarUnderMouse.get())
             m_lastScrollbarUnderMouse = nullptr;
     }
@@ -1770,10 +1761,8 @@ bool EventHandler::handleMousePressEvent(const PlatformMouseEvent& platformMouse
         // If a mouse event handler changes the input element type to one that has a widget associated,
         // we'd like to EventHandler::handleMousePressEvent to pass the event to the widget and thus the
         // event target node can't still be the shadow node.
-        if (mouseEvent.targetNode()->isShadowRoot() && isHTMLInputElement(toShadowRoot(mouseEvent.targetNode())->hostElement())) {
-            HitTestRequest request(HitTestRequest::ReadOnly | HitTestRequest::Active | HitTestRequest::DisallowShadowContent);
-            mouseEvent = m_frame.document()->prepareMouseEvent(request, documentPoint, platformMouseEvent);
-        }
+        if (mouseEvent.targetNode()->isShadowRoot() && isHTMLInputElement(toShadowRoot(mouseEvent.targetNode())->hostElement()))
+            mouseEvent = m_frame.document()->prepareMouseEvent(HitTestRequest(), documentPoint, platformMouseEvent);
 
         FrameView* view = m_frame.view();
         Scrollbar* scrollbar = view ? view->scrollbarAtPoint(platformMouseEvent.position()) : 0;
@@ -2648,7 +2637,7 @@ void EventHandler::platformPrepareForWheelEvents(const PlatformWheelEvent&, cons
 
 void EventHandler::platformRecordWheelEvent(const PlatformWheelEvent& event)
 {
-    m_recentWheelEventDeltaTracker->recordWheelEventDelta(event);
+    m_frame.mainFrame().wheelEventDeltaTracker()->recordWheelEventDelta(event);
 }
 
 bool EventHandler::platformCompleteWheelEvent(const PlatformWheelEvent& event, Element*, ContainerNode*, ScrollableArea*)
@@ -2670,8 +2659,8 @@ bool EventHandler::platformCompletePlatformWidgetWheelEvent(const PlatformWheelE
 
 bool EventHandler::handleWheelEvent(const PlatformWheelEvent& event)
 {
-    Document* document = m_frame.document();
-    if (!document->renderView())
+    RenderView* renderView = m_frame.contentRenderer();
+    if (!renderView)
         return false;
 
     RefPtr<FrameView> protector(m_frame.view());
@@ -2685,7 +2674,7 @@ bool EventHandler::handleWheelEvent(const PlatformWheelEvent& event)
 
     HitTestRequest request(HitTestRequest::ReadOnly | HitTestRequest::DisallowShadowContent);
     HitTestResult result(view->windowToContents(event.position()));
-    document->renderView()->hitTest(request, result);
+    renderView->hitTest(request, result);
 
     RefPtr<Element> element = result.innerElement();
     RefPtr<ContainerNode> scrollableContainer;
@@ -2693,13 +2682,10 @@ bool EventHandler::handleWheelEvent(const PlatformWheelEvent& event)
     bool isOverWidget = result.isOverWidget();
     platformPrepareForWheelEvents(event, result, element, scrollableContainer, scrollableArea, isOverWidget);
 
-#if PLATFORM(COCOA)
+#if PLATFORM(MAC)
     if (event.phase() == PlatformWheelEventPhaseNone && event.momentumPhase() == PlatformWheelEventPhaseNone)
+        m_frame.mainFrame().latchingState()->clear();
 #endif
-    {
-        m_latchedWheelEventElement = nullptr;
-        m_previousWheelScrolledElement = nullptr;
-    }
 
     // FIXME: It should not be necessary to do this mutation here.
     // Instead, the handlers should know convert vertical scrolls appropriately.
@@ -2744,12 +2730,10 @@ bool EventHandler::handleWheelEvent(const PlatformWheelEvent& event)
 
 void EventHandler::clearLatchedState()
 {
-    m_latchedWheelEventElement = nullptr;
-#if PLATFORM(COCOA)
-    m_latchedScrollableContainer = nullptr;
+#if PLATFORM(MAC)
+    m_frame.mainFrame().latchingState()->clear();
 #endif
-    m_widgetIsLatched = false;
-    m_previousWheelScrolledElement = nullptr;
+    m_frame.mainFrame().wheelEventDeltaTracker()->endTrackingDeltas();
 }
 
 void EventHandler::defaultWheelEventHandler(Node* startNode, WheelEvent* wheelEvent)
@@ -2757,13 +2741,18 @@ void EventHandler::defaultWheelEventHandler(Node* startNode, WheelEvent* wheelEv
     if (!startNode || !wheelEvent)
         return;
     
-    Element* stopElement = m_previousWheelScrolledElement.get();
     DominantScrollGestureDirection dominantDirection = DominantScrollGestureDirection::None;
 
+#if PLATFORM(MAC)
+    ScrollLatchingState* latchedState = m_frame.mainFrame().latchingState();
+    ASSERT(latchedState);
+    Element* stopElement = latchedState->previousWheelScrolledElement();
+
     // Workaround for scrolling issues <rdar://problem/14758615>.
-#if PLATFORM(COCOA)
-    if (m_recentWheelEventDeltaTracker->isTrackingDeltas())
-        dominantDirection = m_recentWheelEventDeltaTracker->dominantScrollGestureDirection();
+    if (m_frame.mainFrame().wheelEventDeltaTracker()->isTrackingDeltas())
+        dominantDirection = m_frame.mainFrame().wheelEventDeltaTracker()->dominantScrollGestureDirection();
+#else
+    Element* stopElement = nullptr;
 #endif
     
     // Break up into two scrolls if we need to.  Diagonal movement on 
@@ -2774,8 +2763,10 @@ void EventHandler::defaultWheelEventHandler(Node* startNode, WheelEvent* wheelEv
     if (dominantDirection != DominantScrollGestureDirection::Horizontal && handleWheelEventInAppropriateEnclosingBoxForSingleAxis(startNode, wheelEvent, &stopElement, ScrollEventAxis::Vertical))
         wheelEvent->setDefaultHandled();
     
-    if (!m_latchedWheelEventElement)
-        m_previousWheelScrolledElement = stopElement;
+#if PLATFORM(MAC)
+    if (!latchedState->wheelEventElement())
+        latchedState->setPreviousWheelScrolledElement(stopElement);
+#endif
 }
 
 #if ENABLE(CONTEXT_MENUS)
@@ -2989,11 +2980,11 @@ void EventHandler::hoverTimerFired(Timer<EventHandler>&)
 
     ASSERT(m_frame.document());
 
-    if (RenderView* renderer = m_frame.contentRenderer()) {
+    if (RenderView* renderView = m_frame.contentRenderer()) {
         if (FrameView* view = m_frame.view()) {
             HitTestRequest request(HitTestRequest::Move | HitTestRequest::DisallowShadowContent);
             HitTestResult result(view->windowToContents(m_lastKnownMousePosition));
-            renderer->hitTest(request, result);
+            renderView->hitTest(request, result);
             m_frame.document()->updateHoverActiveState(request, result.innerElement());
         }
     }
@@ -3767,6 +3758,7 @@ static HitTestResult hitTestResultInFrame(Frame* frame, const LayoutPoint& point
 
     if (!frame || !frame->contentRenderer())
         return result;
+
     if (frame->view()) {
         IntRect rect = frame->view()->visibleContentRect();
         if (!rect.contains(roundedIntPoint(point)))

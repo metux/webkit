@@ -152,10 +152,6 @@ bool NetscapePluginModule::getPluginInfoForLoadedPlugin(RawPluginMetaData& metaD
 
     metaData.mimeDescription = mimeDescription;
 
-#if PLATFORM(GTK)
-    metaData.requiresGtk2 = module->functionPointer<void (*)()>("gtk_progress_get_type");
-#endif
-
     return true;
 }
 
@@ -193,6 +189,7 @@ void NetscapePluginModule::determineQuirks()
 #if PLATFORM(EFL)
             m_pluginQuirks.add(PluginQuirks::ForceFlashWindowlessMode);
 #endif
+            m_pluginQuirks.add(PluginQuirks::DoNotCancelSrcStreamInWindowedMode);
             break;
         }
     }
@@ -244,10 +241,6 @@ bool NetscapePluginModule::scanPlugin(const String& pluginPath)
     writeLine(metaData.name);
     writeLine(metaData.description);
     writeLine(metaData.mimeDescription);
-#if PLATFORM(GTK)
-    if (metaData.requiresGtk2)
-        writeLine("requires-gtk2");
-#endif
 
     fflush(stdout);
 
