@@ -1,6 +1,5 @@
 /*
- * Copyright (C) 2009 Holger Hans Peter Freyther
- * All rights reserved.
+ * Copyright (C) 2014 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -24,19 +23,51 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef GtkPluginWidget_h
-#define GtkPluginWidget_h
+#include "config.h"
+#include "ScrollLatchingState.h"
 
-#include "Widget.h"
+#include "Element.h"
 
 namespace WebCore {
-    class GtkPluginWidget : public Widget {
-    public:
-        GtkPluginWidget(GtkWidget*);
-        virtual ~GtkPluginWidget();
-        void invalidateRect(const IntRect&);
-        void frameRectsChanged();
-    };
+
+ScrollLatchingState::ScrollLatchingState()
+    : m_frame(nullptr)
+    , m_widgetIsLatched(false)
+    , m_startedGestureAtScrollLimit(false)
+{
+}
+    
+ScrollLatchingState::~ScrollLatchingState()
+{
 }
 
-#endif
+void ScrollLatchingState::clear()
+{
+    m_wheelEventElement = nullptr;
+    m_frame = nullptr;
+    m_scrollableContainer = nullptr;
+    m_widgetIsLatched = false;
+    m_previousWheelScrolledElement = nullptr;
+}
+
+void ScrollLatchingState::setWheelEventElement(PassRefPtr<Element> element)
+{
+    m_wheelEventElement = element;
+}
+
+void ScrollLatchingState::setWidgetIsLatched(bool isOverWidget)
+{
+    m_widgetIsLatched = isOverWidget;
+}
+
+void ScrollLatchingState::setPreviousWheelScrolledElement(PassRefPtr<Element> element)
+{
+    m_previousWheelScrolledElement = element;
+}
+
+void ScrollLatchingState::setScrollableContainer(PassRefPtr<ContainerNode> node)
+{
+    m_scrollableContainer = node;
+}
+
+}
