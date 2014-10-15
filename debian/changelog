@@ -3,6 +3,8 @@ webkit2gtk (2.6.1+dfsg1-2) UNRELEASED; urgency=medium
   * debian/rules:
     + Disable debugging symbols in armel and kfreebsd-amd64.
     + Use always -gstabs in order to reduce the size of the -dbg package.
+  * debian/control:
+    + Bump Standards-Version to 3.9.6; no changes needed.
 
  -- Alberto Garcia <berto@igalia.com>  Wed, 15 Oct 2014 12:39:06 +0300
 
