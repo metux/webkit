@@ -86,6 +86,7 @@ inline RenderElement::RenderElement(ContainerNode& elementOrDocument, PassRef<Re
     , m_renderBoxNeedsLazyRepaint(false)
     , m_hasPausedImageAnimations(false)
     , m_hasCounterNodeMap(false)
+    , m_isCSSAnimating(false)
     , m_firstChild(nullptr)
     , m_lastChild(nullptr)
     , m_style(WTF::move(style))
@@ -1005,7 +1006,7 @@ void RenderElement::willBeRemovedFromTree()
 
 void RenderElement::willBeDestroyed()
 {
-    animation().cancelAnimations(this);
+    animation().cancelAnimations(*this);
 
     destroyLeftoverChildren();
 

@@ -2838,16 +2838,22 @@ the download operation. </p>
 webkit_web_view_get_tls_info (<em class="parameter"><code><a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> *web_view</code></em>,
                               <em class="parameter"><code><a href="../gio/GTlsCertificate.html"><span class="type">GTlsCertificate</span></a> **certificate</code></em>,
                               <em class="parameter"><code><a href="../gio/gio-TLS-Overview.html#GTlsCertificateFlags"><span class="type">GTlsCertificateFlags</span></a> *errors</code></em>);</pre>
-<p>Retrieves the <a href="../gio/GTlsCertificate.html"><span class="type">GTlsCertificate</span></a> associated with the <em class="parameter"><code>web_view</code></em>
- connection,
+<p>Retrieves the <a href="../gio/GTlsCertificate.html"><span class="type">GTlsCertificate</span></a> associated with the main resource of <em class="parameter"><code>web_view</code></em>
+,
 and the <a href="../gio/gio-TLS-Overview.html#GTlsCertificateFlags"><span class="type">GTlsCertificateFlags</span></a> showing what problems, if any, have been found
 with that certificate.
 If the connection is not HTTPS, this function returns <a href="../glib/glib-Standard-Macros.html#FALSE:CAPS"><code class="literal">FALSE</code></a>.
 This function should be called after a response has been received from the
 server, so you can connect to <a class="link" href="WebKitWebView.html#WebKitWebView-load-changed" title="The “load-changed” signal"><span class="type">“load-changed”</span></a> and call this function
 when it's emitted with <a class="link" href="WebKitWebView.html#WEBKIT-LOAD-COMMITTED:CAPS"><code class="literal">WEBKIT_LOAD_COMMITTED</code></a> event.</p>
+<p>Note that this function provides no information about the security of the web
+page if the current <a class="link" href="WebKitWebContext.html#WebKitTLSErrorsPolicy" title="enum WebKitTLSErrorsPolicy"><span class="type">WebKitTLSErrorsPolicy</span></a> is <a class="link" href="WebKitWebContext.html#WEBKIT-TLS-ERRORS-POLICY-IGNORE:CAPS"><code class="literal">WEBKIT_TLS_ERRORS_POLICY_IGNORE</code></a>,
+as subresources of the page may be controlled by an attacker. This function
+may safely be used to determine the security status of the current page only
+if the current <a class="link" href="WebKitWebContext.html#WebKitTLSErrorsPolicy" title="enum WebKitTLSErrorsPolicy"><span class="type">WebKitTLSErrorsPolicy</span></a> is <a class="link" href="WebKitWebContext.html#WEBKIT-TLS-ERRORS-POLICY-FAIL:CAPS"><code class="literal">WEBKIT_TLS_ERRORS_POLICY_FAIL</code></a>, in
+which case subresources that fail certificate verification will be blocked.</p>
 <div class="refsect3">
-<a name="id-1.2.3.12.53.5"></a><h4>Parameters</h4>
+<a name="id-1.2.3.12.53.6"></a><h4>Parameters</h4>
 <div class="informaltable"><table width="100%" border="0">
 <colgroup>
 <col width="150px" class="parameters_name">
@@ -2875,7 +2881,7 @@ when it's emitted with <a class="link" href="WebKitWebView.html#WEBKIT-LOAD-COMM
 </table></div>
 </div>
 <div class="refsect3">
-<a name="id-1.2.3.12.53.6"></a><h4>Returns</h4>
+<a name="id-1.2.3.12.53.7"></a><h4>Returns</h4>
 <p> <a href="../glib/glib-Standard-Macros.html#TRUE:CAPS"><code class="literal">TRUE</code></a> if the <em class="parameter"><code>web_view</code></em>
 connection uses HTTPS and a response has been received
 from the server, or <a href="../glib/glib-Standard-Macros.html#FALSE:CAPS"><code class="literal">FALSE</code></a> otherwise.</p>
