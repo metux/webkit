@@ -867,7 +867,7 @@ TransformationMatrix RenderLayer::currentTransform(RenderStyle::ApplyTransformOr
     FloatRect pixelSnappedBorderRect = snapRectToDevicePixels(box->borderBoxRect(), box->document().deviceScaleFactor());
     if (renderer().style().isRunningAcceleratedAnimation()) {
         TransformationMatrix currTransform;
-        RefPtr<RenderStyle> style = renderer().animation().getAnimatedStyleForRenderer(&renderer());
+        RefPtr<RenderStyle> style = renderer().animation().getAnimatedStyleForRenderer(renderer());
         style->applyTransform(currTransform, pixelSnappedBorderRect, applyOrigin);
         makeMatrixRenderable(currTransform, canRender3DTransforms());
         return currTransform;
@@ -5450,7 +5450,8 @@ void RenderLayer::calculateRects(const ClipRectsContext& clipRectsContext, const
         // This layer establishes a clip of some kind.
         if (renderer().hasOverflowClip() && (this != clipRectsContext.rootLayer || clipRectsContext.respectOverflowClip == RespectOverflowClip)) {
             foregroundRect.intersect(toRenderBox(renderer()).overflowClipRect(toLayoutPoint(offsetFromRootLocal), namedFlowFragment, clipRectsContext.overlayScrollbarSizeRelevancy));
-            foregroundRect.setHasRadius(renderer().style().hasBorderRadius());
+            if (renderer().style().hasBorderRadius())
+                foregroundRect.setHasRadius(true);
         }
 
         if (renderer().hasClip()) {

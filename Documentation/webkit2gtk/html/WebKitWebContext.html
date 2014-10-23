@@ -347,6 +347,12 @@ spell checking, using <a class="link" href="WebKitWebContext.html#webkit-web-con
 <a class="link" href="WebKitWebContext.html#webkit-web-context-set-spell-checking-enabled" title="webkit_web_context_set_spell_checking_enabled ()"><code class="function">webkit_web_context_set_spell_checking_enabled()</code></a>.</p>
 <p>You can use <a class="link" href="WebKitWebContext.html#webkit-web-context-register-uri-scheme" title="webkit_web_context_register_uri_scheme ()"><code class="function">webkit_web_context_register_uri_scheme()</code></a> to register
 custom URI schemes, and manage several other settings.</p>
+<p>TLS certificate validation failure is now treated as a transport
+error by default. To handle TLS failures differently, you can
+connect to <a class="link" href="WebKitWebView.html#WebKitWebView-load-failed-with-tls-errors" title="The “load-failed-with-tls-errors” signal"><span class="type">“load-failed-with-tls-errors”</span></a>.
+Alternatively, you can use <a class="link" href="WebKitWebContext.html#webkit-web-context-set-tls-errors-policy" title="webkit_web_context_set_tls_errors_policy ()"><code class="function">webkit_web_context_set_tls_errors_policy()</code></a>
+to set the policy <a class="link" href="WebKitWebContext.html#WEBKIT-TLS-ERRORS-POLICY-IGNORE:CAPS"><code class="literal">WEBKIT_TLS_ERRORS_POLICY_IGNORE</code></a>; however, this is
+not appropriate for Internet applications.</p>
 </div>
 <div class="refsect1">
 <a name="WebKitWebContext.functions_details"></a><h2>Functions</h2>
