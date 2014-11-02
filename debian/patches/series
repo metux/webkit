@@ -4,3 +4,4 @@ restore_sparc_code.patch
 local-label-string-hurd.patch
 atomic_build_fix.patch
 css-image-set.patch
+fix-mips64-build.patch
