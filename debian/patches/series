@@ -13,3 +13,4 @@ nullptr-applystylecommand.patch
 nullptr-accessibilitymenulistoption.patch
 twitter-inserted-text.patch
 protect-document.patch
+at-spi2.patch
