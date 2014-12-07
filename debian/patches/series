@@ -11,3 +11,4 @@ render-text-control.patch
 nullptr-frameprogresstracker.patch
 nullptr-applystylecommand.patch
 nullptr-accessibilitymenulistoption.patch
+twitter-inserted-text.patch
