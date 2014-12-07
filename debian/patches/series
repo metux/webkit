@@ -12,3 +12,4 @@ nullptr-frameprogresstracker.patch
 nullptr-applystylecommand.patch
 nullptr-accessibilitymenulistoption.patch
 twitter-inserted-text.patch
+protect-document.patch

@@ -12,6 +12,9 @@ webkit2gtk (2.6.2+dfsg1-3) UNRELEASED; urgency=medium
      + Check for NULL pointer in SearchInputType.
    * debian/patches/twitter-inserted-text.patch:
      + Fix inserted text when typing in the Twitter message box.
+   * debian/patches/protect-document.patch:
+     + Protect Document in ProcessingInstruction::setXSLStyleSheet(). This
+       is a security fix, see https://codereview.chromium.org/579133004.
 
  -- Alberto Garcia <berto@igalia.com>  Sun, 07 Dec 2014 11:39:33 +0100
 
