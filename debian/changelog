@@ -1,3 +1,10 @@
+webkit2gtk (2.6.2+dfsg1-3) UNRELEASED; urgency=medium
+
+   * debian/patches/no-ssl-record-version.patch:
+     + Don't use a SSL3.0 record version in client hello.
+
+ -- Alberto Garcia <berto@igalia.com>  Sun, 07 Dec 2014 11:39:33 +0100
+
 webkit2gtk (2.6.2+dfsg1-2) unstable; urgency=medium
 
   * debian/patches/fix-mips64-build.patch:
