@@ -17,6 +17,8 @@ webkit2gtk (2.6.2+dfsg1-3) UNRELEASED; urgency=medium
        is a security fix, see https://codereview.chromium.org/579133004.
    * debian/patches/at-spi2.patch:
      + Accessible values are no longer accessible via AT-SPI2.
+   * debian/patches/ax-focus-events.patch:
+     + Fix accessible focus events in non-focused combo boxes.
 
  -- Alberto Garcia <berto@igalia.com>  Sun, 07 Dec 2014 11:39:33 +0100
 
