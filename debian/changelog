@@ -2,6 +2,14 @@ webkit2gtk (2.6.2+dfsg1-3) UNRELEASED; urgency=medium
 
    * debian/patches/no-ssl-record-version.patch:
      + Don't use a SSL3.0 record version in client hello.
+   * debian/patches/nullptr-accessibilitymenulistoption.patch:
+     + Check for NULL pointers in AccessibilityMenuListOption.
+   * debian/patches/nullptr-applystylecommand.patch:
+     + Check for NULL pointer in ApplyStyleCommand.
+   * debian/patches/nullptr-frameprogresstracker.patch:
+     + Check for NULL pointer in FrameProgressTracker.
+   * debian/patches/render-text-control.patch:
+     + Check for NULL pointer in SearchInputType.
 
  -- Alberto Garcia <berto@igalia.com>  Sun, 07 Dec 2014 11:39:33 +0100
 

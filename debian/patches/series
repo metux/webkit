@@ -7,3 +7,7 @@ css-image-set.patch
 fix-mips64-build.patch
 flash-crash.patch
 no-ssl-record-version.patch
+render-text-control.patch
+nullptr-frameprogresstracker.patch
+nullptr-applystylecommand.patch
+nullptr-accessibilitymenulistoption.patch
