@@ -15,3 +15,4 @@ twitter-inserted-text.patch
 protect-document.patch
 at-spi2.patch
 ax-focus-events.patch
+fix-ftbfs-hppa.patch
