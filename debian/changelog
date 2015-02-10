@@ -2,6 +2,9 @@ webkit2gtk (2.6.2+dfsg1-4) UNRELEASED; urgency=medium
 
   * debian/patches/fix-ftbfs-hppa.patch:
     + Fix FTBFS in HPPA (Closes: #776281).
+  * debian/libwebkit2gtk-4.0-doc.links:
+    + Add symbolic link to make the documentation appear in devhelp
+      (Closes: #777589).
 
  -- Alberto Garcia <berto@igalia.com>  Mon, 26 Jan 2015 14:47:51 +0200
 
