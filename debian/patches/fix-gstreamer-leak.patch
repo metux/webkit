@@ -1,0 +1,116 @@
+From: Carlos Garcia Campos <carlosgc@webkit.org>
+Subject: Fix memory leak in GStreamer code
+Bug: https://bugs.webkit.org/show_bug.cgi?id=46560
+Origin: http://trac.webkit.org/changeset/175945
+Index: webkitgtk/Source/WebCore/platform/graphics/MediaPlayer.cpp
+===================================================================
+--- webkitgtk.orig/Source/WebCore/platform/graphics/MediaPlayer.cpp
++++ webkitgtk/Source/WebCore/platform/graphics/MediaPlayer.cpp
+@@ -130,7 +130,7 @@ public:
+     virtual double minTimeSeekable() const { return 0; }
+     virtual std::unique_ptr<PlatformTimeRanges> buffered() const { return PlatformTimeRanges::create(); }
+ 
+-    virtual unsigned totalBytes() const { return 0; }
++    virtual unsigned long long totalBytes() const { return 0; }
+     virtual bool didLoadingProgress() const { return false; }
+ 
+     virtual void setSize(const IntSize&) { }
+Index: webkitgtk/Source/WebCore/platform/graphics/MediaPlayerPrivate.h
+===================================================================
+--- webkitgtk.orig/Source/WebCore/platform/graphics/MediaPlayerPrivate.h
++++ webkitgtk/Source/WebCore/platform/graphics/MediaPlayerPrivate.h
+@@ -130,6 +130,7 @@ public:
+     virtual MediaTime minMediaTimeSeekable() const { return MediaTime::createWithDouble(minTimeSeekable()); }
+     virtual std::unique_ptr<PlatformTimeRanges> buffered() const = 0;
+ 
++    virtual unsigned long long totalBytes() const { return 0; }
+     virtual bool didLoadingProgress() const = 0;
+ 
+     virtual void setSize(const IntSize&) = 0;
+@@ -242,8 +243,16 @@ public:
+ 
+     virtual String languageOfPrimaryAudioTrack() const { return emptyString(); }
+ 
+-    virtual size_t extraMemoryCost() const { return 0; }
+-    
++    virtual size_t extraMemoryCost() const
++    {
++        MediaTime duration = this->durationMediaTime();
++        if (!duration)
++            return 0;
++
++        unsigned long long extra = totalBytes() * buffered()->totalDuration().toDouble() / duration.toDouble();
++        return static_cast<unsigned>(extra);
++    }
++
+     virtual unsigned long long fileSize() const { return 0; }
+ 
+ #if ENABLE(MEDIA_SOURCE)
+Index: webkitgtk/Source/WebCore/platform/graphics/gstreamer/MediaPlayerPrivateGStreamer.cpp
+===================================================================
+--- webkitgtk.orig/Source/WebCore/platform/graphics/gstreamer/MediaPlayerPrivateGStreamer.cpp
++++ webkitgtk/Source/WebCore/platform/graphics/gstreamer/MediaPlayerPrivateGStreamer.cpp
+@@ -211,7 +211,7 @@ MediaPlayerPrivateGStreamer::MediaPlayer
+     , m_volumeAndMuteInitialized(false)
+     , m_hasVideo(false)
+     , m_hasAudio(false)
+-    , m_totalBytes(-1)
++    , m_totalBytes(0)
+     , m_preservesPitch(false)
+     , m_requestedState(GST_STATE_VOID_PENDING)
+     , m_missingPlugins(false)
+@@ -1228,12 +1228,12 @@ bool MediaPlayerPrivateGStreamer::didLoa
+     return didLoadingProgress;
+ }
+ 
+-unsigned MediaPlayerPrivateGStreamer::totalBytes() const
++unsigned long long MediaPlayerPrivateGStreamer::totalBytes() const
+ {
+     if (m_errorOccured)
+         return 0;
+ 
+-    if (m_totalBytes != -1)
++    if (m_totalBytes)
+         return m_totalBytes;
+ 
+     if (!m_source)
+@@ -1243,7 +1243,7 @@ unsigned MediaPlayerPrivateGStreamer::to
+     gint64 length = 0;
+     if (gst_element_query_duration(m_source.get(), fmt, &length)) {
+         INFO_MEDIA_MESSAGE("totalBytes %" G_GINT64_FORMAT, length);
+-        m_totalBytes = static_cast<unsigned>(length);
++        m_totalBytes = static_cast<unsigned long long>(length);
+         m_isStreaming = !length;
+         return m_totalBytes;
+     }
+@@ -1278,7 +1278,7 @@ unsigned MediaPlayerPrivateGStreamer::to
+     gst_iterator_free(iter);
+ 
+     INFO_MEDIA_MESSAGE("totalBytes %" G_GINT64_FORMAT, length);
+-    m_totalBytes = static_cast<unsigned>(length);
++    m_totalBytes = static_cast<unsigned long long>(length);
+     m_isStreaming = !length;
+     return m_totalBytes;
+ }
+Index: webkitgtk/Source/WebCore/platform/graphics/gstreamer/MediaPlayerPrivateGStreamer.h
+===================================================================
+--- webkitgtk.orig/Source/WebCore/platform/graphics/gstreamer/MediaPlayerPrivateGStreamer.h
++++ webkitgtk/Source/WebCore/platform/graphics/gstreamer/MediaPlayerPrivateGStreamer.h
+@@ -92,7 +92,7 @@ public:
+     std::unique_ptr<PlatformTimeRanges> buffered() const;
+     float maxTimeSeekable() const;
+     bool didLoadingProgress() const;
+-    unsigned totalBytes() const;
++    unsigned long long totalBytes() const;
+     float maxTimeLoaded() const;
+ 
+     void loadStateChanged();
+@@ -207,7 +207,7 @@ private:
+     GThreadSafeMainLoopSource m_videoTimerHandler;
+     GThreadSafeMainLoopSource m_videoCapsTimerHandler;
+     GThreadSafeMainLoopSource m_readyTimerHandler;
+-    mutable long m_totalBytes;
++    mutable unsigned long long m_totalBytes;
+     URL m_url;
+     bool m_preservesPitch;
+     GstState m_requestedState;
