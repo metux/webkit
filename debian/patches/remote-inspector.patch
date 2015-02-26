@@ -1,0 +1,17 @@
+From: Carlos Garcia Campos <carlosgc@webkit.org>
+Subject: Make the remote inspector work again
+Bug: https://bugs.webkit.org/show_bug.cgi?id=138246
+Origin: http://trac.webkit.org/changeset/176392
+Index: webkitgtk/Source/WebKit2/UIProcess/WebPageProxy.cpp
+===================================================================
+--- webkitgtk.orig/Source/WebKit2/UIProcess/WebPageProxy.cpp
++++ webkitgtk/Source/WebKit2/UIProcess/WebPageProxy.cpp
+@@ -639,7 +639,7 @@ void WebPageProxy::initializeWebPage()
+ #endif
+ 
+ #if ENABLE(INSPECTOR_SERVER)
+-    if (pageGroup().preferences().developerExtrasEnabled())
++    if (m_preferences->developerExtrasEnabled())
+         inspector()->enableRemoteInspection();
+ #endif
+ 
