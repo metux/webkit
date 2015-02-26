@@ -9,6 +9,8 @@ webkit2gtk (2.6.2+dfsg1-4) UNRELEASED; urgency=medium
     + Fix memory leak in GStreamer code.
   * debian/patches/remote-inspector.patch:
     + Make the remote inspector work again.
+  * debian/patches/render-block-cast.patch:
+    + Fix invalid cast in WebCore::RenderBlock::blockSelectionGaps.
 
  -- Alberto Garcia <berto@igalia.com>  Mon, 26 Jan 2015 14:47:51 +0200
 

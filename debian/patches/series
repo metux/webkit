@@ -18,3 +18,4 @@ ax-focus-events.patch
 fix-ftbfs-hppa.patch
 fix-gstreamer-leak.patch
 remote-inspector.patch
+render-block-cast.patch

@@ -1,0 +1,17 @@
+From: Carlos Garcia Campos <carlosgc@webkit.org>
+Subject: Fix invalid cast in WebCore::RenderBlock::blockSelectionGaps
+Bug: https://bugs.webkit.org/show_bug.cgi?id=137590
+Origin: http://trac.webkit.org/changeset/178261
+Index: webkitgtk/Source/WebCore/rendering/RenderBlock.cpp
+===================================================================
+--- webkitgtk.orig/Source/WebCore/rendering/RenderBlock.cpp
++++ webkitgtk/Source/WebCore/rendering/RenderBlock.cpp
+@@ -2040,7 +2040,7 @@ GapRects RenderBlock::blockSelectionGaps
+             lastLogicalTop = blockDirectionOffset(rootBlock, offsetFromRootBlock) + curr->logicalBottom();
+             lastLogicalLeft = logicalLeftSelectionOffset(rootBlock, curr->logicalBottom(), cache);
+             lastLogicalRight = logicalRightSelectionOffset(rootBlock, curr->logicalBottom(), cache);
+-        } else if (childState != SelectionNone) {
++        } else if (childState != SelectionNone && curr->isRenderBlock()) {
+             // We must be a block that has some selected object inside it.  Go ahead and recur.
+             result.unite(toRenderBlock(curr)->selectionGaps(rootBlock, rootBlockPhysicalPosition, LayoutSize(offsetFromRootBlock.width() + curr->x(), offsetFromRootBlock.height() + curr->y()), 
+                 lastLogicalTop, lastLogicalLeft, lastLogicalRight, childCache, paintInfo));
