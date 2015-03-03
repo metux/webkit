@@ -1,0 +1,18 @@
+From: Carlos Garcia Campos <carlosgc@webkit.org>
+Subject: NULL pointer check in HTMLPlugInImageElement
+Bug: https://bugs.webkit.org/show_bug.cgi?id=139057
+Origin: http://trac.webkit.org/changeset/178276
+Index: webkitgtk/Source/WebCore/html/HTMLPlugInImageElement.cpp
+===================================================================
+--- webkitgtk.orig/Source/WebCore/html/HTMLPlugInImageElement.cpp
++++ webkitgtk/Source/WebCore/html/HTMLPlugInImageElement.cpp
+@@ -334,6 +334,9 @@ void HTMLPlugInImageElement::updateSnaps
+ 
+     m_snapshotImage = image;
+ 
++    if (!renderer())
++        return;
++
+     if (renderer()->isSnapshottedPlugIn()) {
+         toRenderSnapshottedPlugIn(renderer())->updateSnapshot(image);
+         return;

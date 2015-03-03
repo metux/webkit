@@ -13,6 +13,8 @@ webkit2gtk (2.6.2+dfsg1-4) UNRELEASED; urgency=medium
     + Fix invalid cast in WebCore::RenderBlock::blockSelectionGaps.
   * debian/patches/fix-jit-crash.patch:
     + Fix crash in SpeculativeJIT::compile() when loading theblaze.com.
+  * debian/patches/fix-null-renderer.patch:
+    + NULL pointer check in HTMLPlugInImageElement.
 
  -- Alberto Garcia <berto@igalia.com>  Mon, 26 Jan 2015 14:47:51 +0200
 
