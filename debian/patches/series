@@ -19,3 +19,4 @@ fix-ftbfs-hppa.patch
 fix-gstreamer-leak.patch
 remote-inspector.patch
 render-block-cast.patch
+fix-jit-crash.patch

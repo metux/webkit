@@ -11,6 +11,8 @@ webkit2gtk (2.6.2+dfsg1-4) UNRELEASED; urgency=medium
     + Make the remote inspector work again.
   * debian/patches/render-block-cast.patch:
     + Fix invalid cast in WebCore::RenderBlock::blockSelectionGaps.
+  * debian/patches/fix-jit-crash.patch:
+    + Fix crash in SpeculativeJIT::compile() when loading theblaze.com.
 
  -- Alberto Garcia <berto@igalia.com>  Mon, 26 Jan 2015 14:47:51 +0200
 

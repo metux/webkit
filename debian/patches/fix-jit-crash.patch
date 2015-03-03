@@ -1,0 +1,69 @@
+From: Carlos Garcia Campos <carlosgc@webkit.org>
+Subject: Fix crash in SpeculativeJIT::compile() when loading theblaze.com
+Bug: https://bugs.webkit.org/show_bug.cgi?id=137642
+Origin: http://trac.webkit.org/changeset/178264
+Index: webkitgtk/Source/JavaScriptCore/dfg/DFGSpeculativeJIT32_64.cpp
+===================================================================
+--- webkitgtk.orig/Source/JavaScriptCore/dfg/DFGSpeculativeJIT32_64.cpp
++++ webkitgtk/Source/JavaScriptCore/dfg/DFGSpeculativeJIT32_64.cpp
+@@ -1692,7 +1692,26 @@ void SpeculativeJIT::compile(Node* node)
+         break;
+ 
+     case Identity: {
+-        RELEASE_ASSERT_NOT_REACHED();
++        speculate(node, node->child1());
++        switch (node->child1().useKind()) {
++        case DoubleRepUse:
++        case DoubleRepRealUse: {
++            SpeculateDoubleOperand op(this, node->child1());
++            doubleResult(op.fpr(), node);
++            break;
++        }
++        case Int52RepUse: 
++        case MachineIntUse:
++        case DoubleRepMachineIntUse: {
++            RELEASE_ASSERT_NOT_REACHED();   
++            break;
++        }
++        default: {
++            JSValueOperand op(this, node->child1());
++            jsValueResult(op.tagGPR(), op.payloadGPR(), node);
++            break;
++        }
++        } // switch
+         break;
+     }
+ 
+Index: webkitgtk/Source/JavaScriptCore/dfg/DFGSpeculativeJIT64.cpp
+===================================================================
+--- webkitgtk.orig/Source/JavaScriptCore/dfg/DFGSpeculativeJIT64.cpp
++++ webkitgtk/Source/JavaScriptCore/dfg/DFGSpeculativeJIT64.cpp
+@@ -1795,8 +1795,26 @@ void SpeculativeJIT::compile(Node* node)
+         break;
+ 
+     case Identity: {
+-        // CSE should always eliminate this.
+-        DFG_CRASH(m_jit.graph(), node, "Unexpected Identity node");
++        speculate(node, node->child1());
++        switch (node->child1().useKind()) {
++        case DoubleRepUse:
++        case DoubleRepRealUse:
++        case DoubleRepMachineIntUse: {
++            SpeculateDoubleOperand op(this, node->child1());
++            doubleResult(op.fpr(), node);
++            break;
++        }
++        case Int52RepUse: {
++            SpeculateInt52Operand op(this, node->child1());
++            int52Result(op.gpr(), node);
++            break;
++        }
++        default: {
++            JSValueOperand op(this, node->child1());
++            jsValueResult(op.gpr(), node);
++            break;
++        }
++        } // switch
+         break;
+     }
+ 
