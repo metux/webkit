@@ -23,3 +23,4 @@ fix-jit-crash.patch
 fix-null-renderer.patch
 fix-integer-overflow.patch
 serialized-script-value.patch
+http-latin1.patch

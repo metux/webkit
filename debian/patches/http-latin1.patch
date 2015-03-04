@@ -1,0 +1,64 @@
+From: Carlos Garcia Campos <carlosgc@webkit.org>
+Subject: HTTP header values should be treated as latin1, not UTF-8
+Bug: https://bugs.webkit.org/show_bug.cgi?id=128739
+Origin: http://trac.webkit.org/changeset/178328
+Index: webkitgtk/Source/WebCore/platform/network/soup/ResourceRequestSoup.cpp
+===================================================================
+--- webkitgtk.orig/Source/WebCore/platform/network/soup/ResourceRequestSoup.cpp
++++ webkitgtk/Source/WebCore/platform/network/soup/ResourceRequestSoup.cpp
+@@ -65,12 +65,12 @@ void ResourceRequest::updateFromSoupMess
+     const char* headerName;
+     const char* headerValue;
+     while (soup_message_headers_iter_next(&headersIter, &headerName, &headerValue))
+-        m_httpHeaderFields.set(String::fromUTF8(headerName), String::fromUTF8(headerValue));
++        m_httpHeaderFields.set(String(headerName), String(headerValue));
+ }
+ 
+ void ResourceRequest::updateSoupMessage(SoupMessage* soupMessage) const
+ {
+-    g_object_set(soupMessage, SOUP_MESSAGE_METHOD, httpMethod().utf8().data(), NULL);
++    g_object_set(soupMessage, SOUP_MESSAGE_METHOD, httpMethod().ascii().data(), NULL);
+ 
+     GUniquePtr<SoupURI> uri = createSoupURI();
+     soup_message_set_uri(soupMessage, uri.get());
+@@ -80,7 +80,7 @@ void ResourceRequest::updateSoupMessage(
+ 
+ SoupMessage* ResourceRequest::toSoupMessage() const
+ {
+-    SoupMessage* soupMessage = soup_message_new(httpMethod().utf8().data(), url().string().utf8().data());
++    SoupMessage* soupMessage = soup_message_new(httpMethod().ascii().data(), url().string().utf8().data());
+     if (!soupMessage)
+         return 0;
+ 
+@@ -102,7 +102,7 @@ void ResourceRequest::updateFromSoupMess
+     if (shouldPortBeResetToZero)
+         m_url.setPort(0);
+ 
+-    m_httpMethod = String::fromUTF8(soupMessage->method);
++    m_httpMethod = String(soupMessage->method);
+ 
+     updateFromSoupMessageHeaders(soupMessage->request_headers);
+ 
+Index: webkitgtk/Source/WebCore/platform/network/soup/ResourceResponseSoup.cpp
+===================================================================
+--- webkitgtk.orig/Source/WebCore/platform/network/soup/ResourceResponseSoup.cpp
++++ webkitgtk/Source/WebCore/platform/network/soup/ResourceResponseSoup.cpp
+@@ -87,7 +87,7 @@ void ResourceResponse::updateFromSoupMes
+ 
+     soup_message_headers_iter_init(&headersIter, headers);
+     while (soup_message_headers_iter_next(&headersIter, &headerName, &headerValue))
+-        addHTTPHeaderField(String::fromUTF8WithLatin1Fallback(headerName, strlen(headerName)), String::fromUTF8WithLatin1Fallback(headerValue, strlen(headerValue)));
++        addHTTPHeaderField(String(headerName), String(headerValue));
+ 
+     String contentType;
+     const char* officialType = soup_message_headers_get_one(headers, "Content-Type");
+@@ -108,7 +108,8 @@ CertificateInfo ResourceResponse::platfo
+ 
+ String ResourceResponse::platformSuggestedFilename() const
+ {
+-    return filenameFromHTTPContentDisposition(httpHeaderField(HTTPHeaderName::ContentDisposition));
++    String contentDisposition(httpHeaderField(HTTPHeaderName::ContentDisposition));
++    return filenameFromHTTPContentDisposition(String::fromUTF8WithLatin1Fallback(contentDisposition.characters8(), contentDisposition.length()));
+ }
+ 
+ }
