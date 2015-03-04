@@ -1,0 +1,54 @@
+From: Carlos Garcia Campos carlosgc@webkit.org>
+Subject: Prevent unsafe access to internal types
+Bug: https://bugs.webkit.org/show_bug.cgi?id=138653
+Origin: http://trac.webkit.org/changeset/178320
+Index: webkitgtk/Source/JavaScriptCore/runtime/MapData.h
+===================================================================
+--- webkitgtk.orig/Source/JavaScriptCore/runtime/MapData.h
++++ webkitgtk/Source/JavaScriptCore/runtime/MapData.h
+@@ -42,8 +42,8 @@ public:
+         const_iterator(const MapData*);
+         ~const_iterator();
+         const WTF::KeyValuePair<JSValue, JSValue> operator*() const;
+-        JSValue key() const { ASSERT(!atEnd()); return m_mapData->m_entries[m_index].key.get(); }
+-        JSValue value() const { ASSERT(!atEnd()); return m_mapData->m_entries[m_index].value.get(); }
++        JSValue key() const { RELEASE_ASSERT(!atEnd()); return m_mapData->m_entries[m_index].key.get(); }
++        JSValue value() const { RELEASE_ASSERT(!atEnd()); return m_mapData->m_entries[m_index].value.get(); }
+         void operator++() { ASSERT(!atEnd()); internalIncrement(); }
+         static const_iterator end(const MapData*);
+         bool operator!=(const const_iterator& other);
+Index: webkitgtk/Source/WebCore/bindings/js/SerializedScriptValue.cpp
+===================================================================
+--- webkitgtk.orig/Source/WebCore/bindings/js/SerializedScriptValue.cpp
++++ webkitgtk/Source/WebCore/bindings/js/SerializedScriptValue.cpp
+@@ -1218,6 +1218,7 @@ SerializationReturnCode CloneSerializer:
+     Vector<JSObject*, 32> inputObjectStack;
+     Vector<MapData*, 4> mapDataStack;
+     Vector<MapData::const_iterator, 4> iteratorStack;
++    Vector<JSValue, 4> iteratorValueStack;
+     Vector<WalkerState, 16> stateStack;
+     WalkerState state = StateUnknown;
+     JSValue inValue = in;
+@@ -1386,16 +1387,20 @@ SerializationReturnCode CloneSerializer:
+                     goto objectStartVisitMember;
+                 }
+                 inValue = ptr.key();
++                m_gcBuffer.append(ptr.value());
++                iteratorValueStack.append(ptr.value());
+                 stateStack.append(MapDataEndVisitKey);
+                 goto stateUnknown;
+             }
+             case MapDataEndVisitKey: {
+-                inValue = iteratorStack.last().value();
++                inValue = iteratorValueStack.last();
++                iteratorValueStack.removeLast();
+                 stateStack.append(MapDataEndVisitValue);
+                 goto stateUnknown;
+             }
+             case MapDataEndVisitValue: {
+-                ++iteratorStack.last();
++                if (iteratorStack.last() != mapDataStack.last()->end())
++                    ++iteratorStack.last();
+                 goto mapDataStartVisitEntry;
+             }
+ 

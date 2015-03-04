@@ -17,6 +17,8 @@ webkit2gtk (2.6.2+dfsg1-4) UNRELEASED; urgency=medium
     + NULL pointer check in HTMLPlugInImageElement.
   * debian/patches/fix-integer-overflow.patch:
     + Fix crash due to integer overflow.
+  * debian/patches/serialized-script-value.patch:
+    + Prevent unsafe access to internal types.
 
  -- Alberto Garcia <berto@igalia.com>  Mon, 26 Jan 2015 14:47:51 +0200
 
