@@ -21,6 +21,8 @@ webkit2gtk (2.6.2+dfsg1-4) UNRELEASED; urgency=medium
     + Prevent unsafe access to internal types.
   * debian/patches/http-latin1.patch:
     + HTTP header values should be treated as latin1, not UTF-8.
+  * debian/patches/fix-null-string-conversion.patch:
+    + Add NULL check to convertToUTF8String().
 
  -- Alberto Garcia <berto@igalia.com>  Mon, 26 Jan 2015 14:47:51 +0200
 
