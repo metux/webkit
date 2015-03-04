@@ -1,0 +1,26 @@
+From: Carlos Garcia Campos <carlosgc@webkit.org>
+Subject: Fix crash due to integer overflow
+Bug: https://bugs.webkit.org/show_bug.cgi?id=139165
+Origin: http://trac.webkit.org/changeset/178283
+Index: webkitgtk/Source/JavaScriptCore/dfg/DFGByteCodeParser.cpp
+===================================================================
+--- webkitgtk.orig/Source/JavaScriptCore/dfg/DFGByteCodeParser.cpp
++++ webkitgtk/Source/JavaScriptCore/dfg/DFGByteCodeParser.cpp
+@@ -2023,7 +2023,7 @@ void ByteCodeParser::handleGetById(
+ {
+     NodeType getById = getByIdStatus.makesCalls() ? GetByIdFlush : GetById;
+     
+-    if (!getByIdStatus.isSimple() || !Options::enableAccessInlining()) {
++    if (!getByIdStatus.isSimple() || !getByIdStatus.numVariants() || !Options::enableAccessInlining()) {
+         set(VirtualRegister(destinationOperand),
+             addToGraph(getById, OpInfo(identifierNumber), OpInfo(prediction), base));
+         return;
+@@ -2138,7 +2138,7 @@ void ByteCodeParser::handlePutById(
+     Node* base, unsigned identifierNumber, Node* value,
+     const PutByIdStatus& putByIdStatus, bool isDirect)
+ {
+-    if (!putByIdStatus.isSimple() || !Options::enableAccessInlining()) {
++    if (!putByIdStatus.isSimple() || !putByIdStatus.numVariants() || !Options::enableAccessInlining()) {
+         if (!putByIdStatus.isSet())
+             addToGraph(ForceOSRExit);
+         emitPutById(base, identifierNumber, value, putByIdStatus, isDirect);
