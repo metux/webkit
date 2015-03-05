@@ -1,0 +1,75 @@
+From: Carlos Garcia Campos <carlosgc@webkit.org>
+Subject: Recursive crash at WebCore::accessibleNameForNode
+Bug: https://bugs.webkit.org/show_bug.cgi?id=139616
+Origin: http://trac.webkit.org/changeset/178359
+Index: webkitgtk/Source/WebCore/accessibility/AccessibilityNodeObject.cpp
+===================================================================
+--- webkitgtk.orig/Source/WebCore/accessibility/AccessibilityNodeObject.cpp
++++ webkitgtk/Source/WebCore/accessibility/AccessibilityNodeObject.cpp
+@@ -86,7 +86,7 @@ namespace WebCore {
+ 
+ using namespace HTMLNames;
+ 
+-static String accessibleNameForNode(Node*);
++static String accessibleNameForNode(Node* node, Node* labelledbyNode = nullptr);
+ 
+ AccessibilityNodeObject::AccessibilityNodeObject(Node* node)
+     : AccessibilityObject()
+@@ -1664,6 +1664,8 @@ String AccessibilityNodeObject::textUnde
+ 
+     StringBuilder builder;
+     for (AccessibilityObject* child = firstChild(); child; child = child->nextSibling()) {
++        if (mode.ignoredChildNode && child->node() == mode.ignoredChildNode)
++            continue;
+         
+         bool shouldDeriveNameFromAuthor = (mode.childrenInclusion == AccessibilityTextUnderElementMode::TextUnderElementModeIncludeNameFromContentsChildren && !child->accessibleNameDerivesFromContent());
+         if (shouldDeriveNameFromAuthor) {
+@@ -1840,7 +1842,7 @@ void AccessibilityNodeObject::colorValue
+ 
+ // This function implements the ARIA accessible name as described by the Mozilla                                        
+ // ARIA Implementer's Guide.                                                                                            
+-static String accessibleNameForNode(Node* node)
++static String accessibleNameForNode(Node* node, Node* labelledbyNode)
+ {
+     ASSERT(node);
+     if (!node || !node->isElementNode())
+@@ -1870,7 +1872,7 @@ static String accessibleNameForNode(Node
+     String text;
+     if (axObject) {
+         if (axObject->accessibleNameDerivesFromContent())
+-            text = axObject->textUnderElement(AccessibilityTextUnderElementMode(AccessibilityTextUnderElementMode::TextUnderElementModeIncludeNameFromContentsChildren, true));
++            text = axObject->textUnderElement(AccessibilityTextUnderElementMode(AccessibilityTextUnderElementMode::TextUnderElementModeIncludeNameFromContentsChildren, true, labelledbyNode));
+     } else
+         text = element->innerText();
+ 
+@@ -1889,7 +1891,7 @@ String AccessibilityNodeObject::accessib
+     StringBuilder builder;
+     unsigned size = elements.size();
+     for (unsigned i = 0; i < size; ++i)
+-        appendNameToStringBuilder(builder, accessibleNameForNode(elements[i]));
++        appendNameToStringBuilder(builder, accessibleNameForNode(elements[i], node()));
+     return builder.toString();
+ }
+ 
+Index: webkitgtk/Source/WebCore/accessibility/AccessibilityObject.h
+===================================================================
+--- webkitgtk.orig/Source/WebCore/accessibility/AccessibilityObject.h
++++ webkitgtk/Source/WebCore/accessibility/AccessibilityObject.h
+@@ -253,11 +253,13 @@ struct AccessibilityTextUnderElementMode
+     
+     ChildrenInclusion childrenInclusion;
+     bool includeFocusableContent;
++    Node* ignoredChildNode;
+     
+-    AccessibilityTextUnderElementMode(ChildrenInclusion c = TextUnderElementModeSkipIgnoredChildren, bool i = false)
+-    : childrenInclusion(c)
+-    , includeFocusableContent(i)
+-    { }
++    AccessibilityTextUnderElementMode(ChildrenInclusion c = TextUnderElementModeSkipIgnoredChildren, bool i = false, Node* ignored = nullptr)
++        : childrenInclusion(c)
++        , includeFocusableContent(i)
++        , ignoredChildNode(ignored)
++        { }
+ };
+     
+ enum AccessibilityOrientation {

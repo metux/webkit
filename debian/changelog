@@ -25,6 +25,8 @@ webkit2gtk (2.6.2+dfsg1-4) UNRELEASED; urgency=medium
     + Add NULL check to convertToUTF8String().
   * debian/patches/fix-timers-animations.patch:
     + Timers might never be fired during animations.
+  * debian/patches/fix-ax-crash.patch:
+    + Recursive crash at WebCore::accessibleNameForNode.
 
  -- Alberto Garcia <berto@igalia.com>  Mon, 26 Jan 2015 14:47:51 +0200
 
