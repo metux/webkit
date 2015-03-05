@@ -1,0 +1,39 @@
+From: Carlos Garcia Campos <carlosgc@webkit.org>
+Subject: Fix segfault when calling clearSelection on a detached RenderObject
+Bug: https://bugs.webkit.org/show_bug.cgi?id=140275
+Origin: http://trac.webkit.org/changeset/178360
+Index: webkitgtk/Source/WebCore/rendering/RenderBox.cpp
+===================================================================
+--- webkitgtk.orig/Source/WebCore/rendering/RenderBox.cpp
++++ webkitgtk/Source/WebCore/rendering/RenderBox.cpp
+@@ -1828,6 +1828,8 @@ LayoutUnit RenderBox::containingBlockLog
+ #endif
+ 
+     RenderBlock* cb = containingBlock();
++    if (!cb)
++        return LayoutUnit();
+     return cb->availableLogicalWidth();
+ }
+ 
+@@ -1839,6 +1841,8 @@ LayoutUnit RenderBox::containingBlockLog
+ #endif
+ 
+     RenderBlock* cb = containingBlock();
++    if (!cb)
++        return LayoutUnit();
+     return cb->availableLogicalHeight(heightType);
+ }
+ 
+Index: webkitgtk/Source/WebCore/rendering/RenderView.cpp
+===================================================================
+--- webkitgtk.orig/Source/WebCore/rendering/RenderView.cpp
++++ webkitgtk/Source/WebCore/rendering/RenderView.cpp
+@@ -1105,7 +1105,7 @@ void RenderView::getSelection(RenderObje
+ void RenderView::clearSelection()
+ {
+     layer()->repaintBlockSelectionGaps();
+-    setSelection(0, -1, 0, -1, RepaintNewMinusOld);
++    setSelection(nullptr, -1, nullptr, -1, RepaintNewMinusOld);
+ }
+ 
+ bool RenderView::printing() const

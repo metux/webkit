@@ -27,6 +27,8 @@ webkit2gtk (2.6.2+dfsg1-4) UNRELEASED; urgency=medium
     + Timers might never be fired during animations.
   * debian/patches/fix-ax-crash.patch:
     + Recursive crash at WebCore::accessibleNameForNode.
+  * debian/patches/fix-clearselection-segfault.patch:
+    + Fix segfault when calling clearSelection on a detached RenderObject.
 
  -- Alberto Garcia <berto@igalia.com>  Mon, 26 Jan 2015 14:47:51 +0200
 
