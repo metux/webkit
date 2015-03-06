@@ -29,3 +29,4 @@ fix-timers-animations.patch
 fix-ax-crash.patch
 fix-clearselection-segfault.patch
 fix-date.patch
+check-tls-errors.patch
