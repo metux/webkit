@@ -1,4 +1,4 @@
-webkit2gtk (2.6.2+dfsg1-4) UNRELEASED; urgency=medium
+webkit2gtk (2.6.2+dfsg1-4) unstable; urgency=medium
 
   * debian/patches/fix-ftbfs-hppa.patch:
     + Fix FTBFS in HPPA (Closes: #776281).
@@ -34,7 +34,7 @@ webkit2gtk (2.6.2+dfsg1-4) UNRELEASED; urgency=medium
   * debian/patches/check-tls-errors.patch:
     + Check TLS errors as soon as they are set in the SoupMessage.
 
- -- Alberto Garcia <berto@igalia.com>  Mon, 26 Jan 2015 14:47:51 +0200
+ -- Alberto Garcia <berto@igalia.com>  Fri, 06 Mar 2015 09:33:11 +0200
 
 webkit2gtk (2.6.2+dfsg1-3) unstable; urgency=medium
 
