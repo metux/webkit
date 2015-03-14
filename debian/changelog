@@ -1,3 +1,10 @@
+webkit2gtk (2.6.2+dfsg1-5) UNRELEASED; urgency=medium
+
+  * debian/patches/restore_sparc_code.patch:
+    + Update patch to make it work with cmake.
+
+ -- Alberto Garcia <berto@igalia.com>  Sat, 14 Mar 2015 11:59:05 +0200
+
 webkit2gtk (2.6.2+dfsg1-4) unstable; urgency=medium
 
   * debian/patches/fix-ftbfs-hppa.patch:
