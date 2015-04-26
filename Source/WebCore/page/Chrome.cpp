@@ -95,7 +95,7 @@ void Chrome::invalidateContentsForSlowScroll(const IntRect& updateRect)
 void Chrome::scroll(const IntSize& scrollDelta, const IntRect& rectToScroll, const IntRect& clipRect)
 {
     m_client.scroll(scrollDelta, rectToScroll, clipRect);
-    InspectorInstrumentation::didScroll(&m_page);
+    InspectorInstrumentation::didScroll(m_page);
 }
 
 #if USE(TILED_BACKING_STORE)
@@ -228,8 +228,7 @@ bool Chrome::canRunModalNow() const
 {
     // If loads are blocked, we can't run modal because the contents
     // of the modal dialog will never show up!
-    return canRunModal() && !ResourceHandle::loadsBlocked()
-           && canRunModalIfDuringPageDismissal(m_page, ChromeClient::HTMLDialog, String());
+    return canRunModal() && canRunModalIfDuringPageDismissal(m_page, ChromeClient::HTMLDialog, String());
 }
 
 void Chrome::runModal() const
@@ -298,7 +297,7 @@ bool Chrome::runBeforeUnloadConfirmPanel(const String& message, Frame* frame)
     // otherwise cause the load to continue while we're in the middle of executing JavaScript.
     PageGroupLoadDeferrer deferrer(m_page, true);
 
-    InspectorInstrumentationCookie cookie = InspectorInstrumentation::willRunJavaScriptDialog(&m_page, message);
+    InspectorInstrumentationCookie cookie = InspectorInstrumentation::willRunJavaScriptDialog(m_page, message);
     bool ok = m_client.runBeforeUnloadConfirmPanel(message, frame);
     InspectorInstrumentation::didRunJavaScriptDialog(cookie);
     return ok;
@@ -322,7 +321,7 @@ void Chrome::runJavaScriptAlert(Frame* frame, const String& message)
     notifyPopupOpeningObservers();
     String displayMessage = frame->displayStringModifiedByEncoding(message);
 
-    InspectorInstrumentationCookie cookie = InspectorInstrumentation::willRunJavaScriptDialog(&m_page, displayMessage);
+    InspectorInstrumentationCookie cookie = InspectorInstrumentation::willRunJavaScriptDialog(m_page, displayMessage);
     m_client.runJavaScriptAlert(frame, displayMessage);
     InspectorInstrumentation::didRunJavaScriptDialog(cookie);
 }
@@ -340,7 +339,7 @@ bool Chrome::runJavaScriptConfirm(Frame* frame, const String& message)
     notifyPopupOpeningObservers();
     String displayMessage = frame->displayStringModifiedByEncoding(message);
 
-    InspectorInstrumentationCookie cookie = InspectorInstrumentation::willRunJavaScriptDialog(&m_page, displayMessage);
+    InspectorInstrumentationCookie cookie = InspectorInstrumentation::willRunJavaScriptDialog(m_page, displayMessage);
     bool ok = m_client.runJavaScriptConfirm(frame, displayMessage);
     InspectorInstrumentation::didRunJavaScriptDialog(cookie);
     return ok;
@@ -359,7 +358,7 @@ bool Chrome::runJavaScriptPrompt(Frame* frame, const String& prompt, const Strin
     notifyPopupOpeningObservers();
     String displayPrompt = frame->displayStringModifiedByEncoding(prompt);
 
-    InspectorInstrumentationCookie cookie = InspectorInstrumentation::willRunJavaScriptDialog(&m_page, displayPrompt);
+    InspectorInstrumentationCookie cookie = InspectorInstrumentation::willRunJavaScriptDialog(m_page, displayPrompt);
     bool ok = m_client.runJavaScriptPrompt(frame, displayPrompt, frame->displayStringModifiedByEncoding(defaultValue), result);
     InspectorInstrumentation::didRunJavaScriptDialog(cookie);
 
@@ -395,7 +394,7 @@ void Chrome::mouseDidMoveOverElement(const HitTestResult& result, unsigned modif
         prefetchDNS(result.absoluteLinkURL().host());
     m_client.mouseDidMoveOverElement(result, modifierFlags);
 
-    InspectorInstrumentation::mouseDidMoveOverElement(&m_page, result, modifierFlags);
+    InspectorInstrumentation::mouseDidMoveOverElement(m_page, result, modifierFlags);
 }
 
 void Chrome::setToolTip(const HitTestResult& result)
@@ -408,10 +407,10 @@ void Chrome::setToolTip(const HitTestResult& result)
     if (toolTip.isEmpty() && m_page.settings().showsURLsInToolTips()) {
         if (Element* element = result.innerNonSharedElement()) {
             // Get tooltip representing form action, if relevant
-            if (isHTMLInputElement(element)) {
-                HTMLInputElement* input = toHTMLInputElement(element);
-                if (input->isSubmitButton()) {
-                    if (HTMLFormElement* form = input->form()) {
+            if (is<HTMLInputElement>(*element)) {
+                HTMLInputElement& input = downcast<HTMLInputElement>(*element);
+                if (input.isSubmitButton()) {
+                    if (HTMLFormElement* form = input.form()) {
                         toolTip = form->action();
                         if (form->renderer())
                             toolTipDirection = form->renderer()->style().direction();
@@ -441,8 +440,8 @@ void Chrome::setToolTip(const HitTestResult& result)
     // Lastly, for <input type="file"> that allow multiple files, we'll consider a tooltip for the selected filenames
     if (toolTip.isEmpty()) {
         if (Element* element = result.innerNonSharedElement()) {
-            if (isHTMLInputElement(element)) {
-                toolTip = toHTMLInputElement(element)->defaultToolTip();
+            if (is<HTMLInputElement>(*element)) {
+                toolTip = downcast<HTMLInputElement>(*element).defaultToolTip();
 
                 // FIXME: We should obtain text direction of tooltip from
                 // ChromeClient or platform. As of October 2011, all client
@@ -474,7 +473,7 @@ void Chrome::disableSuddenTermination()
 }
 
 #if ENABLE(INPUT_TYPE_COLOR)
-PassOwnPtr<ColorChooser> Chrome::createColorChooser(ColorChooserClient* client, const Color& initialColor)
+std::unique_ptr<ColorChooser> Chrome::createColorChooser(ColorChooserClient* client, const Color& initialColor)
 {
     notifyPopupOpeningObservers();
     return m_client.createColorChooser(client, initialColor);
@@ -572,10 +571,6 @@ void ChromeClient::annotatedRegionsChanged()
 }
 #endif
 
-void ChromeClient::populateVisitedLinks()
-{
-}
-
 bool ChromeClient::shouldReplaceWithGeneratedFileForUpload(const String&, String&)
 {
     return false;
@@ -642,9 +637,8 @@ void Chrome::registerPopupOpeningObserver(PopupOpeningObserver* observer)
 
 void Chrome::unregisterPopupOpeningObserver(PopupOpeningObserver* observer)
 {
-    size_t index = m_popupOpeningObservers.find(observer);
-    ASSERT(index != notFound);
-    m_popupOpeningObservers.remove(index);
+    bool removed = m_popupOpeningObservers.removeFirst(observer);
+    ASSERT_UNUSED(removed, removed);
 }
 
 void Chrome::notifyPopupOpeningObservers() const

@@ -42,6 +42,7 @@ namespace WebCore {
     M(Archives) \
     M(BackForward) \
     M(Compositing) \
+    M(DOMTimers) \
     M(Editing) \
     M(Events) \
     M(FTP) \
@@ -72,6 +73,7 @@ namespace WebCore {
     M(WebAudio) \
     M(WebGL) \
     M(WebReplay) \
+    M(Services) \
 
 #define DECLARE_LOG_CHANNEL(name) \
     extern WTFLogChannel JOIN_LOG_CHANNEL_WITH_PREFIX(LOG_CHANNEL_PREFIX, name);
@@ -79,6 +81,8 @@ namespace WebCore {
 WEBCORE_LOG_CHANNELS(DECLARE_LOG_CHANNEL)
 
 #undef DECLARE_LOG_CHANNEL
+
+    WEBCORE_EXPORT extern WTFLogChannel LogNotYetImplemented;
 
     String logLevelString();
     bool isLogChannelEnabled(const String& name);

@@ -45,6 +45,9 @@ small-caption
 -apple-system-short-footnote
 -apple-system-short-caption1
 -apple-system-tall-body
+-apple-system-title1
+-apple-system-title2
+-apple-system-title3
 #endif
 
 // This has to go after the -apple-system versions.
@@ -162,6 +165,7 @@ buttonface
 buttonhighlight
 buttonshadow
 buttontext
+activebuttontext
 captiontext
 graytext
 highlight
@@ -382,8 +386,8 @@ alias
 progress
 no-drop
 not-allowed
--webkit-zoom-in
--webkit-zoom-out
+zoom-in
+zoom-out
 e-resize
 ne-resize
 nw-resize
@@ -404,6 +408,8 @@ help
 all-scroll
 -webkit-grab
 -webkit-grabbing
+-webkit-zoom-in
+-webkit-zoom-out
 // none
 //
 // CSS_PROP_CURSOR_VISIBILITY:
@@ -452,6 +458,7 @@ hand
 hide
 higher
 invert
+inverted
 -webkit-isolate
 -webkit-isolate-override
 -webkit-plaintext
@@ -1023,6 +1030,11 @@ alphabetic
 coarse
 fine
 
+// (hover:) media feature.
+// none
+hover
+on-demand
+
 // blend modes
 // normal
 multiply
@@ -1072,7 +1084,6 @@ span
 
 // -webkit-grid-auto-flow
 dense
-stack
 
 #if defined(ENABLE_CSS3_TEXT) && ENABLE_CSS3_TEXT
 // text-indent

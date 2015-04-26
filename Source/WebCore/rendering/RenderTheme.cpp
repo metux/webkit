@@ -1,7 +1,8 @@
-/**
+/*
  * This file is part of the theme implementation for form controls in WebCore.
  *
- * Copyright (C) 2005, 2006, 2007, 2008, 2009, 2010, 2012 Apple Inc.
+ * Copyright (C) 2005-2010, 2012, 2015 Apple Inc. All rights reserved.
+ * Copyright (C) 2014 Google Inc. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -45,6 +46,7 @@
 #include "SpinButtonElement.h"
 #include "StringTruncator.h"
 #include "TextControlInnerElements.h"
+#include <wtf/NeverDestroyed.h>
 
 #if ENABLE(METER_ELEMENT)
 #include "HTMLMeterElement.h"
@@ -114,7 +116,7 @@ void RenderTheme::adjustStyle(StyleResolver& styleResolver, RenderStyle& style, 
     case ButtonPart: {
         // Border
         LengthBox borderBox(style.borderTopWidth(), style.borderRightWidth(), style.borderBottomWidth(), style.borderLeftWidth());
-        borderBox = m_theme->controlBorder(part, style.font(), borderBox, style.effectiveZoom());
+        borderBox = m_theme->controlBorder(part, style.fontCascade(), borderBox, style.effectiveZoom());
         if (borderBox.top().value() != static_cast<int>(style.borderTopWidth())) {
             if (borderBox.top().value())
                 style.setBorderTopWidth(borderBox.top().value());
@@ -143,7 +145,7 @@ void RenderTheme::adjustStyle(StyleResolver& styleResolver, RenderStyle& style, 
         }
 
         // Padding
-        LengthBox paddingBox = m_theme->controlPadding(part, style.font(), style.paddingBox(), style.effectiveZoom());
+        LengthBox paddingBox = m_theme->controlPadding(part, style.fontCascade(), style.paddingBox(), style.effectiveZoom());
         if (paddingBox != style.paddingBox())
             style.setPaddingBox(paddingBox);
 
@@ -154,29 +156,29 @@ void RenderTheme::adjustStyle(StyleResolver& styleResolver, RenderStyle& style, 
         // Width / Height
         // The width and height here are affected by the zoom.
         // FIXME: Check is flawed, since it doesn't take min-width/max-width into account.
-        LengthSize controlSize = m_theme->controlSize(part, style.font(), LengthSize(style.width(), style.height()), style.effectiveZoom());
+        LengthSize controlSize = m_theme->controlSize(part, style.fontCascade(), LengthSize(style.width(), style.height()), style.effectiveZoom());
         if (controlSize.width() != style.width())
             style.setWidth(controlSize.width());
         if (controlSize.height() != style.height())
             style.setHeight(controlSize.height());
                 
         // Min-Width / Min-Height
-        LengthSize minControlSize = m_theme->minimumControlSize(part, style.font(), style.effectiveZoom());
+        LengthSize minControlSize = m_theme->minimumControlSize(part, style.fontCascade(), style.effectiveZoom());
         if (minControlSize.width() != style.minWidth())
             style.setMinWidth(minControlSize.width());
         if (minControlSize.height() != style.minHeight())
             style.setMinHeight(minControlSize.height());
                 
         // Font
-        FontDescription controlFont = m_theme->controlFont(part, style.font(), style.effectiveZoom());
-        if (controlFont != style.font().fontDescription()) {
-            // Reset our line-height
-            style.setLineHeight(RenderStyle::initialLineHeight());
-
+        FontDescription controlFont = m_theme->controlFont(part, style.fontCascade(), style.effectiveZoom());
+        if (controlFont != style.fontCascade().fontDescription()) {
             // Now update our font.
             if (style.setFontDescription(controlFont))
-                style.font().update(0);
+                style.fontCascade().update(0);
         }
+        // Reset our line-height
+        style.setLineHeight(RenderStyle::initialLineHeight());
+        style.setInsideDefaultButton(part == DefaultButtonPart);
     }
     break;
     default:
@@ -646,15 +648,15 @@ Color RenderTheme::platformInactiveListBoxSelectionForegroundColor() const
     return platformInactiveSelectionForegroundColor();
 }
 
-int RenderTheme::baselinePosition(const RenderObject& o) const
+int RenderTheme::baselinePosition(const RenderObject& renderer) const
 {
-    if (!o.isBox())
+    if (!is<RenderBox>(renderer))
         return 0;
 
-    const RenderBox& box = *toRenderBox(&o);
+    const auto& box = downcast<RenderBox>(renderer);
 
 #if USE(NEW_THEME)
-    return box.height() + box.marginTop() + m_theme->baselinePositionAdjustment(o.style().appearance()) * o.style().effectiveZoom();
+    return box.height() + box.marginTop() + m_theme->baselinePositionAdjustment(renderer.style().appearance()) * renderer.style().effectiveZoom();
 #else
     return box.height() + box.marginTop();
 #endif
@@ -802,70 +804,70 @@ bool RenderTheme::isIndeterminate(const RenderObject& o) const
     return inputElement->shouldAppearIndeterminate();
 }
 
-bool RenderTheme::isEnabled(const RenderObject& o) const
+bool RenderTheme::isEnabled(const RenderObject& renderer) const
 {
-    Node* node = o.node();
-    if (!node || !node->isElementNode())
+    Node* node = renderer.node();
+    if (!is<Element>(node))
         return true;
-    return !toElement(node)->isDisabledFormControl();
+    return !downcast<Element>(*node).isDisabledFormControl();
 }
 
-bool RenderTheme::isFocused(const RenderObject& o) const
+bool RenderTheme::isFocused(const RenderObject& renderer) const
 {
-    Node* node = o.node();
-    if (!node || !node->isElementNode())
+    Node* node = renderer.node();
+    if (!is<Element>(node))
         return false;
 
-    Element* focusDelegate = toElement(node)->focusDelegate();
+    Element* focusDelegate = downcast<Element>(*node).focusDelegate();
     Document& document = focusDelegate->document();
     Frame* frame = document.frame();
     return focusDelegate == document.focusedElement() && frame && frame->selection().isFocusedAndActive();
 }
 
-bool RenderTheme::isPressed(const RenderObject& o) const
+bool RenderTheme::isPressed(const RenderObject& renderer) const
 {
-    if (!o.node() || !o.node()->isElementNode())
+    if (!is<Element>(renderer.node()))
         return false;
-    return toElement(o.node())->active();
+    return downcast<Element>(*renderer.node()).active();
 }
 
-bool RenderTheme::isSpinUpButtonPartPressed(const RenderObject& o) const
+bool RenderTheme::isSpinUpButtonPartPressed(const RenderObject& renderer) const
 {
-    Node* node = o.node();
-    if (!node || !node->isElementNode())
+    Node* node = renderer.node();
+    if (!is<Element>(node))
         return false;
-    Element* element = toElement(node);
-    if (!element->active() || !element->isSpinButtonElement())
+    Element& element = downcast<Element>(*node);
+    if (!element.active() || !is<SpinButtonElement>(element))
         return false;
-    return static_cast<SpinButtonElement*>(element)->upDownState() == SpinButtonElement::Up;
+    return downcast<SpinButtonElement>(element).upDownState() == SpinButtonElement::Up;
 }
 
-bool RenderTheme::isReadOnlyControl(const RenderObject& o) const
+bool RenderTheme::isReadOnlyControl(const RenderObject& renderer) const
 {
-    Node* node = o.node();
-    if (!node || !node->isElementNode() || !toElement(node)->isFormControlElement())
+    Node* node = renderer.node();
+    if (!is<HTMLFormControlElement>(node))
         return false;
-    return !toElement(node)->matchesReadWritePseudoClass();
+    return !downcast<Element>(*node).matchesReadWritePseudoClass();
 }
 
-bool RenderTheme::isHovered(const RenderObject& o) const
+bool RenderTheme::isHovered(const RenderObject& renderer) const
 {
-    Node* node = o.node();
-    if (!node || !node->isElementNode())
+    Node* node = renderer.node();
+    if (!is<Element>(node))
         return false;
-    if (!toElement(node)->isSpinButtonElement())
-        return toElement(node)->hovered();
-    SpinButtonElement* element = static_cast<SpinButtonElement*>(node);
-    return element->hovered() && element->upDownState() != SpinButtonElement::Indeterminate;
+    Element& element = downcast<Element>(*node);
+    if (!is<SpinButtonElement>(element))
+        return element.hovered();
+    SpinButtonElement& spinButton = downcast<SpinButtonElement>(element);
+    return spinButton.hovered() && spinButton.upDownState() != SpinButtonElement::Indeterminate;
 }
 
-bool RenderTheme::isSpinUpButtonPartHovered(const RenderObject& o) const
+bool RenderTheme::isSpinUpButtonPartHovered(const RenderObject& renderer) const
 {
-    Node* node = o.node();
-    if (!node || !node->isElementNode() || !toElement(node)->isSpinButtonElement())
+    Node* node = renderer.node();
+    if (!is<SpinButtonElement>(node))
         return false;
-    SpinButtonElement* element = static_cast<SpinButtonElement*>(node);
-    return element->upDownState() == SpinButtonElement::Up;
+    return downcast<SpinButtonElement>(*node).upDownState() == SpinButtonElement::Up;
 }
 
 bool RenderTheme::isDefault(const RenderObject& o) const
@@ -874,9 +876,6 @@ bool RenderTheme::isDefault(const RenderObject& o) const
     if (!isActive(o))
         return false;
 
-    if (!o.frame().settings().applicationChromeMode())
-        return false;
-    
     return o.style().appearance() == DefaultButtonPart;
 }
 
@@ -980,7 +979,7 @@ void RenderTheme::paintSliderTicks(const RenderObject& o, const PaintInfo& paint
     if (!input)
         return;
 
-    HTMLDataListElement* dataList = toHTMLDataListElement(input->list());
+    HTMLDataListElement* dataList = downcast<HTMLDataListElement>(input->list());
     if (!dataList)
         return;
 
@@ -1031,13 +1030,13 @@ void RenderTheme::paintSliderTicks(const RenderObject& o, const PaintInfo& paint
         tickRegionSideMargin = trackBounds.y() + (thumbSize.width() - tickSize.width() * zoomFactor) / 2.0;
         tickRegionWidth = trackBounds.height() - thumbSize.width();
     }
-    RefPtr<HTMLCollection> options = dataList->options();
+    Ref<HTMLCollection> options = dataList->options();
     GraphicsContextStateSaver stateSaver(*paintInfo.context);
     paintInfo.context->setFillColor(o.style().visitedDependentColor(CSSPropertyColor), ColorSpaceDeviceRGB);
     for (unsigned i = 0; Node* node = options->item(i); i++) {
-        ASSERT(isHTMLOptionElement(node));
-        HTMLOptionElement* optionElement = toHTMLOptionElement(node);
-        String value = optionElement->value();
+        ASSERT(is<HTMLOptionElement>(*node));
+        HTMLOptionElement& optionElement = downcast<HTMLOptionElement>(*node);
+        String value = optionElement.value();
         if (!input->isValidValue(value))
             continue;
         double parsedValue = parseToDoubleForNumberType(input->sanitizeValue(value));
@@ -1133,6 +1132,55 @@ void RenderTheme::platformColorsDidChange()
     Page::updateStyleForAllPagesAfterGlobalChangeInEnvironment();
 }
 
+FontDescription& RenderTheme::cachedSystemFontDescription(CSSValueID systemFontID) const
+{
+    static NeverDestroyed<FontDescription> caption;
+    static NeverDestroyed<FontDescription> icon;
+    static NeverDestroyed<FontDescription> menu;
+    static NeverDestroyed<FontDescription> messageBox;
+    static NeverDestroyed<FontDescription> smallCaption;
+    static NeverDestroyed<FontDescription> statusBar;
+    static NeverDestroyed<FontDescription> webkitMiniControl;
+    static NeverDestroyed<FontDescription> webkitSmallControl;
+    static NeverDestroyed<FontDescription> webkitControl;
+    static NeverDestroyed<FontDescription> defaultDescription;
+
+    switch (systemFontID) {
+    case CSSValueCaption:
+        return caption;
+    case CSSValueIcon:
+        return icon;
+    case CSSValueMenu:
+        return menu;
+    case CSSValueMessageBox:
+        return messageBox;
+    case CSSValueSmallCaption:
+        return smallCaption;
+    case CSSValueStatusBar:
+        return statusBar;
+    case CSSValueWebkitMiniControl:
+        return webkitMiniControl;
+    case CSSValueWebkitSmallControl:
+        return webkitSmallControl;
+    case CSSValueWebkitControl:
+        return webkitControl;
+    case CSSValueNone:
+        return defaultDescription;
+    default:
+        ASSERT_NOT_REACHED();
+        return defaultDescription;
+    }
+}
+
+void RenderTheme::systemFont(CSSValueID systemFontID, FontDescription& fontDescription) const
+{
+    fontDescription = cachedSystemFontDescription(systemFontID);
+    if (fontDescription.isAbsoluteSize())
+        return;
+
+    updateCachedSystemFontDescription(systemFontID, fontDescription);
+}
+
 Color RenderTheme::systemColor(CSSValueID cssValueId) const
 {
     switch (cssValueId) {
@@ -1151,6 +1199,8 @@ Color RenderTheme::systemColor(CSSValueID cssValueId) const
     case CSSValueButtonshadow:
         return 0xFF888888;
     case CSSValueButtontext:
+        return 0xFF000000;
+    case CSSValueActivebuttontext:
         return 0xFF000000;
     case CSSValueCaptiontext:
         return 0xFF000000;
@@ -1258,7 +1308,7 @@ String RenderTheme::fileListDefaultLabel(bool multipleFilesAllowed) const
     return fileButtonNoFileSelectedLabel();
 }
 
-String RenderTheme::fileListNameForWidth(const FileList* fileList, const Font& font, int width, bool multipleFilesAllowed) const
+String RenderTheme::fileListNameForWidth(const FileList* fileList, const FontCascade& font, int width, bool multipleFilesAllowed) const
 {
     if (width <= 0)
         return String();

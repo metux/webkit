@@ -31,7 +31,6 @@
 #include "ScrollTypes.h"
 #include "ScrollingCoordinator.h"
 #include "ScrollingStateNode.h"
-#include <wtf/PassOwnPtr.h>
 
 namespace WebCore {
 
@@ -105,9 +104,9 @@ private:
     bool m_requestedScrollPositionRepresentsProgrammaticScroll;
 };
 
-SCROLLING_STATE_NODE_TYPE_CASTS(ScrollingStateScrollingNode, isScrollingNode());
-
 } // namespace WebCore
+
+SPECIALIZE_TYPE_TRAITS_SCROLLING_STATE_NODE(ScrollingStateScrollingNode, isScrollingNode())
 
 #endif // ENABLE(ASYNC_SCROLLING) || USE(COORDINATED_GRAPHICS)
 

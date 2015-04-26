@@ -22,7 +22,6 @@
 
 #include "Attribute.h"
 #include "FilterEffect.h"
-#include "SVGElementInstance.h"
 #include "SVGFilterBuilder.h"
 #include "SVGNames.h"
 #include <wtf/NeverDestroyed.h>
@@ -54,9 +53,9 @@ inline SVGFEDisplacementMapElement::SVGFEDisplacementMapElement(const QualifiedN
     registerAnimatedPropertiesForSVGFEDisplacementMapElement();
 }
 
-PassRefPtr<SVGFEDisplacementMapElement> SVGFEDisplacementMapElement::create(const QualifiedName& tagName, Document& document)
+Ref<SVGFEDisplacementMapElement> SVGFEDisplacementMapElement::create(const QualifiedName& tagName, Document& document)
 {
-    return adoptRef(new SVGFEDisplacementMapElement(tagName, document));
+    return adoptRef(*new SVGFEDisplacementMapElement(tagName, document));
 }
 
 bool SVGFEDisplacementMapElement::isSupportedAttribute(const QualifiedName& attrName)
@@ -132,7 +131,7 @@ void SVGFEDisplacementMapElement::svgAttributeChanged(const QualifiedName& attrN
         return;
     }
 
-    SVGElementInstance::InvalidationGuard invalidationGuard(this);
+    InstanceInvalidationGuard guard(*this);
     
     if (attrName == SVGNames::xChannelSelectorAttr || attrName == SVGNames::yChannelSelectorAttr || attrName == SVGNames::scaleAttr) {
         primitiveAttributeChanged(attrName);

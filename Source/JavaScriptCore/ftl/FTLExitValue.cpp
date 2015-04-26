@@ -28,9 +28,18 @@
 
 #if ENABLE(FTL_JIT)
 
+#include "FTLExitTimeObjectMaterialization.h"
 #include "JSCInlines.h"
 
 namespace JSC { namespace FTL {
+
+ExitValue ExitValue::materializeNewObject(ExitTimeObjectMaterialization* data)
+{
+    ExitValue result;
+    result.m_kind = ExitValueMaterializeNewObject;
+    result.u.newObjectMaterializationData = data;
+    return result;
+}
 
 void ExitValue::dumpInContext(PrintStream& out, DumpContext* context) const
 {
@@ -48,22 +57,25 @@ void ExitValue::dumpInContext(PrintStream& out, DumpContext* context) const
         out.print("Constant(", inContext(constant(), context), ")");
         return;
     case ExitValueInJSStack:
-        out.print("InJSStack:r", virtualRegister());
+        out.print("InJSStack:", virtualRegister());
         return;
     case ExitValueInJSStackAsInt32:
-        out.print("InJSStackAsInt32:r", virtualRegister());
+        out.print("InJSStackAsInt32:", virtualRegister());
         return;
     case ExitValueInJSStackAsInt52:
-        out.print("InJSStackAsInt52:r", virtualRegister());
+        out.print("InJSStackAsInt52:", virtualRegister());
         return;
     case ExitValueInJSStackAsDouble:
-        out.print("InJSStackAsDouble:r", virtualRegister());
+        out.print("InJSStackAsDouble:", virtualRegister());
         return;
     case ExitValueArgumentsObjectThatWasNotCreated:
         out.print("ArgumentsObjectThatWasNotCreated");
         return;
     case ExitValueRecovery:
         out.print("Recovery(", recoveryOpcode(), ", arg", leftRecoveryArgument(), ", arg", rightRecoveryArgument(), ", ", recoveryFormat(), ")");
+        return;
+    case ExitValueMaterializeNewObject:
+        out.print("Materialize(", pointerDump(objectMaterialization()), ")");
         return;
     }
     

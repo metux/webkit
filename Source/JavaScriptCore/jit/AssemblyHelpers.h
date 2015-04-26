@@ -253,10 +253,20 @@ public:
     }
 #endif
 
-    void emitGetFromCallFrameHeaderPtr(JSStack::CallFrameHeaderEntry entry, GPRReg to)
+    void emitGetFromCallFrameHeaderPtr(JSStack::CallFrameHeaderEntry entry, GPRReg to, GPRReg from = GPRInfo::callFrameRegister)
     {
-        loadPtr(Address(GPRInfo::callFrameRegister, entry * sizeof(Register)), to);
+        loadPtr(Address(from, entry * sizeof(Register)), to);
     }
+    void emitGetFromCallFrameHeader32(JSStack::CallFrameHeaderEntry entry, GPRReg to, GPRReg from = GPRInfo::callFrameRegister)
+    {
+        load32(Address(from, entry * sizeof(Register)), to);
+    }
+#if USE(JSVALUE64)
+    void emitGetFromCallFrameHeader64(JSStack::CallFrameHeaderEntry entry, GPRReg to, GPRReg from = GPRInfo::callFrameRegister)
+    {
+        load64(Address(from, entry * sizeof(Register)), to);
+    }
+#endif // USE(JSVALUE64)
     void emitPutToCallFrameHeader(GPRReg from, JSStack::CallFrameHeaderEntry entry)
     {
         storePtr(from, Address(GPRInfo::callFrameRegister, entry * sizeof(Register)));
@@ -354,6 +364,44 @@ public:
     static Address payloadFor(int operand)
     {
         return payloadFor(static_cast<VirtualRegister>(operand));
+    }
+
+    // Access to our fixed callee CallFrame.
+    Address calleeFrameSlot(int slot)
+    {
+        ASSERT(slot >= JSStack::CallerFrameAndPCSize);
+        return MacroAssembler::Address(MacroAssembler::stackPointerRegister, sizeof(Register) * (slot - JSStack::CallerFrameAndPCSize));
+    }
+
+    // Access to our fixed callee CallFrame.
+    Address calleeArgumentSlot(int argument)
+    {
+        return calleeFrameSlot(virtualRegisterForArgument(argument).offset());
+    }
+
+    Address calleeFrameTagSlot(int slot)
+    {
+        return calleeFrameSlot(slot).withOffset(TagOffset);
+    }
+
+    Address calleeFramePayloadSlot(int slot)
+    {
+        return calleeFrameSlot(slot).withOffset(PayloadOffset);
+    }
+
+    Address calleeArgumentTagSlot(int argument)
+    {
+        return calleeArgumentSlot(argument).withOffset(TagOffset);
+    }
+
+    Address calleeArgumentPayloadSlot(int argument)
+    {
+        return calleeArgumentSlot(argument).withOffset(PayloadOffset);
+    }
+
+    Address calleeFrameCallerFrame()
+    {
+        return calleeFrameSlot(0).withOffset(CallFrame::callerFrameOffset());
     }
 
     Jump branchIfCellNotObject(GPRReg cellReg)
@@ -603,22 +651,22 @@ public:
         return codeOrigin.inlineCallFrame->stackOffset * sizeof(Register);
     }
 
-    int offsetOfArgumentsIncludingThis(InlineCallFrame* inlineCallFrame)
+    int offsetOfArguments(InlineCallFrame* inlineCallFrame)
     {
         if (!inlineCallFrame)
-            return CallFrame::argumentOffsetIncludingThis(0) * sizeof(Register);
+            return CallFrame::argumentOffset(0) * sizeof(Register);
         if (inlineCallFrame->arguments.size() <= 1)
             return 0;
         ValueRecovery recovery = inlineCallFrame->arguments[1];
         RELEASE_ASSERT(recovery.technique() == DisplacedInJSStack);
-        return (recovery.virtualRegister().offset() - 1) * sizeof(Register);
+        return recovery.virtualRegister().offset() * sizeof(Register);
     }
     
-    int offsetOfArgumentsIncludingThis(const CodeOrigin& codeOrigin)
+    int offsetOfArguments(const CodeOrigin& codeOrigin)
     {
-        return offsetOfArgumentsIncludingThis(codeOrigin.inlineCallFrame);
+        return offsetOfArguments(codeOrigin.inlineCallFrame);
     }
-
+    
     void emitLoadStructure(RegisterID source, RegisterID dest, RegisterID scratch)
     {
 #if USE(JSVALUE64)
@@ -665,12 +713,12 @@ public:
 
     static void emitStoreStructureWithTypeInfo(AssemblyHelpers& jit, TrustedImmPtr structure, RegisterID dest);
 
-    Jump checkMarkByte(GPRReg cell)
+    Jump jumpIfIsRememberedOrInEden(GPRReg cell)
     {
         return branchTest8(MacroAssembler::NonZero, MacroAssembler::Address(cell, JSCell::gcDataOffset()));
     }
 
-    Jump checkMarkByte(JSCell* cell)
+    Jump jumpIfIsRememberedOrInEden(JSCell* cell)
     {
         uint8_t* address = reinterpret_cast<uint8_t*>(cell) + JSCell::gcDataOffset();
         return branchTest8(MacroAssembler::NonZero, MacroAssembler::AbsoluteAddress(address));

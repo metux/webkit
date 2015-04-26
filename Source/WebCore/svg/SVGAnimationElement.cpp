@@ -35,7 +35,6 @@
 #include "RenderObject.h"
 #include "SVGAnimateElement.h"
 #include "SVGElement.h"
-#include "SVGElementInstance.h"
 #include "SVGNames.h"
 #include "SVGParserUtilities.h"
 #include <wtf/MathExtras.h>
@@ -507,13 +506,10 @@ void SVGAnimationElement::currentValuesForValuesAnimation(float percent, float& 
     }
 
     CalcMode calcMode = this->calcMode();
-    if (hasTagName(SVGNames::animateTag) || hasTagName(SVGNames::animateColorTag)) {
-        AnimatedPropertyType attributeType = toSVGAnimateElement(this)->determineAnimatedPropertyType(targetElement());
-        // Fall back to discrete animations for Strings.
-        if (attributeType == AnimatedBoolean
-            || attributeType == AnimatedEnumeration
-            || attributeType == AnimatedPreserveAspectRatio
-            || attributeType == AnimatedString)
+    if (is<SVGAnimateElement>(*this) || is<SVGAnimateColorElement>(*this)) {
+        ASSERT(targetElement());
+        AnimatedPropertyType type = downcast<SVGAnimateElementBase>(*this).determineAnimatedPropertyType(*targetElement());
+        if (type == AnimatedBoolean || type == AnimatedEnumeration || type == AnimatedPreserveAspectRatio || type == AnimatedString)
             calcMode = CalcModeDiscrete;
     }
     if (!m_keyPoints.isEmpty() && calcMode != CalcModePaced)
@@ -663,8 +659,8 @@ void SVGAnimationElement::adjustForInheritance(SVGElement* targetElement, const 
     if (!parent || !parent->isSVGElement())
         return;
 
-    SVGElement* svgParent = toSVGElement(parent);
-    computeCSSPropertyValue(svgParent, cssPropertyID(attributeName.localName()), value);
+    SVGElement& svgParent = downcast<SVGElement>(*parent);
+    computeCSSPropertyValue(&svgParent, cssPropertyID(attributeName.localName()), value);
 }
 
 static bool inheritsFromProperty(SVGElement*, const QualifiedName& attributeName, const String& value)
@@ -692,12 +688,6 @@ void SVGAnimationElement::setTargetElement(SVGElement* target)
 {
     SVGSMILElement::setTargetElement(target);
     checkInvalidCSSAttributeType(target);
-}
-
-void SVGAnimationElement::setAttributeName(const QualifiedName& attributeName)
-{
-    SVGSMILElement::setAttributeName(attributeName);
-    checkInvalidCSSAttributeType(targetElement());
 }
 
 void SVGAnimationElement::checkInvalidCSSAttributeType(SVGElement* target)

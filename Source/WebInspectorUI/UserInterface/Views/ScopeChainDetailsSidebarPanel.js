@@ -23,7 +23,8 @@
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-WebInspector.ScopeChainDetailsSidebarPanel = function() {
+WebInspector.ScopeChainDetailsSidebarPanel = function()
+{
     WebInspector.DetailsSidebarPanel.call(this, "scope-chain", WebInspector.UIString("Scope Chain"), WebInspector.UIString("Scope Chain"), "Images/NavigationItemVariable.svg", "5");
 
     this._callFrame = null;
@@ -34,6 +35,7 @@ WebInspector.ScopeChainDetailsSidebarPanel = function() {
 
 WebInspector.ScopeChainDetailsSidebarPanel.prototype = {
     constructor: WebInspector.ScopeChainDetailsSidebarPanel,
+    __proto__: WebInspector.DetailsSidebarPanel.prototype,
 
     // Public
 
@@ -121,6 +123,12 @@ WebInspector.ScopeChainDetailsSidebarPanel.prototype = {
                     collapsedByDefault = false;
                     break;
 
+                case WebInspector.ScopeChainNode.Type.FunctionName:
+                    title = WebInspector.UIString("Function Name Variable");
+                    dontHighlightNonEnumerableProperties = true;
+                    collapsedByDefault = true;
+                    break;
+
                 case WebInspector.ScopeChainNode.Type.With:
                     title = WebInspector.UIString("With Object Properties");
                     collapsedByDefault = foundLocalScope;
@@ -154,9 +162,9 @@ WebInspector.ScopeChainDetailsSidebarPanel.prototype = {
             if (this.callFrame !== callFrame)
                 return;
 
-            this.element.removeChildren();
+            this.contentElement.removeChildren();
             for (var i = 0; i < detailsSections.length; ++i)
-                this.element.appendChild(detailsSections[i].element);
+                this.contentElement.appendChild(detailsSections[i].element);
         }
 
         // We need a timeout in place in case there are long running, pending backend dispatches. This can happen
@@ -169,5 +177,3 @@ WebInspector.ScopeChainDetailsSidebarPanel.prototype = {
         InspectorBackend.runAfterPendingDispatches(delayedWork.bind(this));
     }
 };
-
-WebInspector.ScopeChainDetailsSidebarPanel.prototype.__proto__ = WebInspector.DetailsSidebarPanel.prototype;

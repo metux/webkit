@@ -36,10 +36,10 @@ class HTMLFrameElementBase;
 // Base class for RenderFrame and RenderIFrame
 class RenderFrameBase : public RenderWidget {
 protected:
-    RenderFrameBase(HTMLFrameElementBase&, PassRef<RenderStyle>);
+    RenderFrameBase(HTMLFrameElementBase&, Ref<RenderStyle>&&);
 
 public:
-    FrameView* childView() const { return toFrameView(RenderWidget::widget()); }
+    FrameView* childView() const { return downcast<FrameView>(RenderWidget::widget()); }
 
     void layoutWithFlattening(bool fixedWidth, bool fixedHeight);
 

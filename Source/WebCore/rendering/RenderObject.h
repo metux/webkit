@@ -38,6 +38,7 @@
 #include "StyleInheritedData.h"
 #include "TextAffinity.h"
 #include <wtf/HashSet.h>
+#include <wtf/TypeCasts.h>
 
 namespace WebCore {
 
@@ -211,18 +212,14 @@ public:
 
     bool fixedPositionedWithNamedFlowContainingBlock() const;
 
-    enum ShouldUseFlowThreadCache {
-        UseFlowThreadCache,
-        SkipFlowThreadCache
-    };
-
     // Function to return our enclosing flow thread if we are contained inside one. This
     // function follows the containing block chain.
-    RenderFlowThread* flowThreadContainingBlock(ShouldUseFlowThreadCache useCache = UseFlowThreadCache) const
+    RenderFlowThread* flowThreadContainingBlock() const
     {
         if (flowThreadState() == NotInsideFlowThread)
-            return 0;
-        return (useCache == SkipFlowThreadCache) ? locateFlowThreadContainingBlockNoCache() : locateFlowThreadContainingBlock();
+            return nullptr;
+
+        return locateFlowThreadContainingBlock();
     }
 
     RenderNamedFlowFragment* currentRenderNamedFlowFragment() const;
@@ -248,12 +245,6 @@ public:
     // Obtains the nearest enclosing block (including this block) that contributes a first-line style to our inline
     // children.
     virtual RenderBlock* firstLineBlock() const;
-
-    // Called when an object that was floating or positioned becomes a normal flow object
-    // again.  We have to make sure the render tree updates as needed to accommodate the new
-    // normal flow object.
-    void handleDynamicFloatPositionChange();
-    void removeAnonymousWrappersForInlinesIfNecessary();
     
     // RenderObject tree manipulation
     //////////////////////////////////////////
@@ -332,7 +323,8 @@ public:
     virtual bool isRenderNamedFlowFragment() const { return false; }
     virtual bool isReplica() const { return false; }
 
-    virtual bool isRuby() const { return false; }
+    virtual bool isRubyInline() const { return false; }
+    virtual bool isRubyBlock() const { return false; }
     virtual bool isRubyBase() const { return false; }
     virtual bool isRubyRun() const { return false; }
     virtual bool isRubyText() const { return false; }
@@ -352,6 +344,9 @@ public:
     virtual bool isVideo() const { return false; }
     virtual bool isWidget() const { return false; }
     virtual bool isCanvas() const { return false; }
+#if ENABLE(ATTACHMENT_ELEMENT)
+    virtual bool isAttachment() const { return false; }
+#endif
 #if ENABLE(FULLSCREEN_API)
     virtual bool isRenderFullScreen() const { return false; }
     virtual bool isRenderFullScreenPlaceholder() const { return false; }
@@ -386,6 +381,8 @@ public:
     static inline bool isBeforeContent(const RenderObject* obj) { return obj && obj->isBeforeContent(); }
     static inline bool isAfterContent(const RenderObject* obj) { return obj && obj->isAfterContent(); }
     static inline bool isBeforeOrAfterContent(const RenderObject* obj) { return obj && obj->isBeforeOrAfterContent(); }
+
+    bool beingDestroyed() const { return m_bitfields.beingDestroyed(); }
 
     bool everHadLayout() const { return m_bitfields.everHadLayout(); }
 
@@ -557,15 +554,11 @@ public:
 
     bool hasOverflowClip() const { return m_bitfields.hasOverflowClip(); }
 
-    bool hasTransform() const { return m_bitfields.hasTransform(); }
+    bool hasTransformRelatedProperty() const { return m_bitfields.hasTransformRelatedProperty(); } // Transform, perspective or transform-style: preserve-3d.
+    bool hasTransform() const { return hasTransformRelatedProperty() && style().hasTransform(); }
 
     inline bool preservesNewline() const;
 
-    // The pseudo element style can be cached or uncached.  Use the cached method if the pseudo element doesn't respect
-    // any pseudo classes (and therefore has no concept of changing state).
-    RenderStyle* getCachedPseudoStyle(PseudoId, RenderStyle* parentStyle = 0) const;
-    PassRefPtr<RenderStyle> getUncachedPseudoStyle(const PseudoStyleRequest&, RenderStyle* parentStyle = 0, RenderStyle* ownStyle = 0) const;
-    
     virtual void updateDragState(bool dragOn);
 
     RenderView& view() const { return *document().renderView(); };
@@ -628,7 +621,7 @@ public:
     void setHorizontalWritingMode(bool b = true) { m_bitfields.setHorizontalWritingMode(b); }
     void setHasOverflowClip(bool b = true) { m_bitfields.setHasOverflowClip(b); }
     void setHasLayer(bool b = true) { m_bitfields.setHasLayer(b); }
-    void setHasTransform(bool b = true) { m_bitfields.setHasTransform(b); }
+    void setHasTransformRelatedProperty(bool b = true) { m_bitfields.setHasTransformRelatedProperty(b); }
     void setHasReflection(bool b = true) { m_bitfields.setHasReflection(b); }
 
     // Hook so that RenderTextControl can return the line height of its inner renderer.
@@ -657,13 +650,6 @@ public:
     // returns the containing block level element for this element.
     RenderBlock* containingBlock() const;
 
-    bool canContainFixedPositionObjects() const
-    {
-        return isRenderView() || (hasTransform() && isRenderBlock())
-                || isSVGForeignObject()
-                || isOutOfFlowRenderFlowThread();
-    }
-
     // Convert the given local point to absolute coordinates
     // FIXME: Temporary. If UseTransforms is true, take transforms into account. Eventually localToAbsolute() will always be transform-aware.
     WEBCORE_EXPORT FloatPoint localToAbsolute(const FloatPoint& localPoint = FloatPoint(), MapCoordinatesFlags = 0) const;
@@ -683,9 +669,9 @@ public:
 
     // Return the offset from the container() renderer (excluding transforms). In multi-column layout,
     // different offsets apply at different points, so return the offset that applies to the given point.
-    virtual LayoutSize offsetFromContainer(RenderObject*, const LayoutPoint&, bool* offsetDependsOnPoint = 0) const;
+    virtual LayoutSize offsetFromContainer(RenderElement&, const LayoutPoint&, bool* offsetDependsOnPoint = 0) const;
     // Return the offset from an object up the container() chain. Asserts that none of the intermediate objects have transforms.
-    LayoutSize offsetFromAncestorContainer(RenderObject*) const;
+    LayoutSize offsetFromAncestorContainer(RenderElement&) const;
 
 #if PLATFORM(IOS)
     virtual void collectSelectionRects(Vector<SelectionRect>&, unsigned startOffset = 0, unsigned endOffset = std::numeric_limits<unsigned>::max());
@@ -720,7 +706,7 @@ public:
     
     virtual CursorDirective getCursor(const LayoutPoint&, Cursor&) const;
 
-    void getTextDecorationColors(int decorations, Color& underline, Color& overline, Color& linethrough, bool quirksMode = false, bool firstlineStyle = false);
+    void getTextDecorationColors(int decorations, Color& underline, Color& overline, Color& linethrough, bool firstlineStyle = false);
 
     // Return the RenderLayerModelObject in the container chain which is responsible for painting this object, or 0
     // if painting is root-relative. This is the container that should be passed to the 'forRepaint'
@@ -796,11 +782,6 @@ public:
     virtual bool canBeSelectionLeaf() const { return false; }
     bool hasSelectedChildren() const { return selectionState() != SelectionNone; }
 
-    // Obtains the selection colors that should be used when painting a selection.
-    Color selectionBackgroundColor() const;
-    Color selectionForegroundColor() const;
-    Color selectionEmphasisMarkColor() const;
-
     // Whether or not a given block needs to paint selection gaps.
     virtual bool shouldPaintSelectionGaps() const { return false; }
 
@@ -821,7 +802,6 @@ public:
 
     // Virtual function helpers for the deprecated Flexible Box Layout (display: -webkit-box).
     virtual bool isDeprecatedFlexibleBox() const { return false; }
-    virtual bool isStretchingChildren() const { return false; }
 
     // Virtual function helper for the new FlexibleBox Layout (display: -webkit-flex).
     virtual bool isFlexibleBox() const { return false; }
@@ -891,16 +871,13 @@ protected:
     void setPosChildNeedsLayoutBit(bool b) { m_bitfields.setPosChildNeedsLayout(b); }
     void setNeedsSimplifiedNormalFlowLayoutBit(bool b) { m_bitfields.setNeedsSimplifiedNormalFlowLayout(b); }
 
+    virtual RenderFlowThread* locateFlowThreadContainingBlock() const;
+    void invalidateFlowThreadContainingBlockIncludingDescendants(RenderFlowThread* = nullptr);
+    static void calculateBorderStyleColor(const EBorderStyle&, const BoxSide&, Color&);
+
 private:
-    RenderFlowThread* locateFlowThreadContainingBlock() const;
-    RenderFlowThread* locateFlowThreadContainingBlockNoCache() const;
-    
     void removeFromRenderFlowThread();
-    void removeFromRenderFlowThreadRecursive(RenderFlowThread*);
-
-    Color selectionColor(int colorProperty) const;
-    PassRefPtr<RenderStyle> selectionPseudoStyle() const;
-
+    void removeFromRenderFlowThreadIncludingDescendants(bool);
     Node* generatingPseudoHostElement() const;
 
     virtual bool isWBR() const { ASSERT_NOT_REACHED(); return false; }
@@ -937,7 +914,8 @@ private:
 
     public:
         RenderObjectBitfields(const Node& node)
-            : m_needsLayout(false)
+            : m_beingDestroyed(false)
+            , m_needsLayout(false)
             , m_needsPositionedMovementLayout(false)
             , m_normalChildNeedsLayout(false)
             , m_posChildNeedsLayout(false)
@@ -954,7 +932,7 @@ private:
             , m_isDragging(false)
             , m_hasLayer(false)
             , m_hasOverflowClip(false)
-            , m_hasTransform(false)
+            , m_hasTransformRelatedProperty(false)
             , m_hasReflection(false)
             , m_everHadLayout(false)
             , m_childrenInline(false)
@@ -965,7 +943,7 @@ private:
         {
         }
         
-        // 31 bits have been used here. There is one bit available.
+        ADD_BOOLEAN_BITFIELD(beingDestroyed, BeingDestroyed);
         ADD_BOOLEAN_BITFIELD(needsLayout, NeedsLayout);
         ADD_BOOLEAN_BITFIELD(needsPositionedMovementLayout, NeedsPositionedMovementLayout);
         ADD_BOOLEAN_BITFIELD(normalChildNeedsLayout, NormalChildNeedsLayout);
@@ -985,7 +963,7 @@ private:
 
         ADD_BOOLEAN_BITFIELD(hasLayer, HasLayer);
         ADD_BOOLEAN_BITFIELD(hasOverflowClip, HasOverflowClip); // Set in the case of overflow:auto/scroll/hidden
-        ADD_BOOLEAN_BITFIELD(hasTransform, HasTransform);
+        ADD_BOOLEAN_BITFIELD(hasTransformRelatedProperty, HasTransformRelatedProperty);
         ADD_BOOLEAN_BITFIELD(hasReflection, HasReflection);
 
         ADD_BOOLEAN_BITFIELD(everHadLayout, EverHadLayout);
@@ -1029,9 +1007,6 @@ private:
     void setIsDragging(bool b) { m_bitfields.setIsDragging(b); }
     void setEverHadLayout(bool b) { m_bitfields.setEverHadLayout(b); }
 };
-
-template <typename Type> bool isRendererOfType(const RenderObject&);
-template <> inline bool isRendererOfType<const RenderObject>(const RenderObject&) { return true; }
 
 inline Frame& RenderObject::frame() const
 {
@@ -1128,11 +1103,12 @@ inline bool RenderObject::backgroundIsKnownToBeObscured()
     return m_bitfields.boxDecorationState() == HasBoxDecorationsAndBackgroundIsKnownToBeObscured;
 }
 
-#define RENDER_OBJECT_TYPE_CASTS(ToValueTypeName, predicate) \
-    template <> inline bool isRendererOfType<const ToValueTypeName>(const RenderObject& renderer) { return renderer.predicate; } \
-    TYPE_CASTS_BASE(ToValueTypeName, RenderObject, renderer, isRendererOfType<const ToValueTypeName>(*renderer), isRendererOfType<const ToValueTypeName>(renderer))
-
 } // namespace WebCore
+
+#define SPECIALIZE_TYPE_TRAITS_RENDER_OBJECT(ToValueTypeName, predicate) \
+SPECIALIZE_TYPE_TRAITS_BEGIN(WebCore::ToValueTypeName) \
+    static bool isType(const WebCore::RenderObject& renderer) { return renderer.predicate; } \
+SPECIALIZE_TYPE_TRAITS_END()
 
 #ifndef NDEBUG
 // Outside the WebCore namespace for ease of invocation from gdb.

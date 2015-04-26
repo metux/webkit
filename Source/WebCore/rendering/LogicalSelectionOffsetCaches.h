@@ -25,10 +25,12 @@
 
 namespace WebCore {
 
+// FIXME: share code with RenderObject::container().
 static inline bool isContainingBlockCandidateForAbsolutelyPositionedObject(RenderElement& object)
 {
+    // FIXME: hasTransformRelatedProperty() includes preserves3D() check, but this may need to change: https://www.w3.org/Bugs/Public/show_bug.cgi?id=27566
     return object.style().position() != StaticPosition
-        || (object.hasTransform() && object.isRenderBlock())
+        || (object.isRenderBlock() && object.hasTransformRelatedProperty())
         || object.isSVGForeignObject()
         || object.isRenderView();
 }
@@ -38,13 +40,14 @@ static inline bool isNonRenderBlockInline(RenderElement& object)
     return (object.isInline() && !object.isReplaced()) || !object.isRenderBlock();
 }
 
+// FIXME: share code with RenderObject::container().
 static inline RenderBlock* containingBlockForFixedPosition(RenderElement* parent)
 {
     RenderElement* object = parent;
     while (object && !object->canContainFixedPositionObjects())
         object = object->parent();
     ASSERT(!object || !object->isAnonymousBlock());
-    return toRenderBlock(object);
+    return downcast<RenderBlock>(object);
 }
 
 static inline RenderBlock* containingBlockForAbsolutePosition(RenderElement* parent)
@@ -57,13 +60,13 @@ static inline RenderBlock* containingBlockForAbsolutePosition(RenderElement* par
     // not the inline itself, to avoid having a positioned objects list in all RenderInlines
     // and use RenderBlock* as RenderElement::containingBlock's return type.
     // Use RenderBlock::container() to obtain the inline.
-    if (object && !object->isRenderBlock())
+    if (object && !is<RenderBlock>(*object))
         object = object->containingBlock();
 
     while (object && object->isAnonymousBlock())
         object = object->containingBlock();
 
-    return toRenderBlock(object);
+    return downcast<RenderBlock>(object);
 }
 
 static inline RenderBlock* containingBlockForObjectInFlow(RenderElement* parent)
@@ -71,7 +74,7 @@ static inline RenderBlock* containingBlockForObjectInFlow(RenderElement* parent)
     RenderElement* object = parent;
     while (object && isNonRenderBlockInline(*object))
         object = object->parent();
-    return toRenderBlock(object);
+    return downcast<RenderBlock>(object);
 }
 
 class LogicalSelectionOffsetCaches {

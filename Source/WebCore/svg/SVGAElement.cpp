@@ -40,15 +40,12 @@
 #include "RenderSVGText.h"
 #include "RenderSVGTransformableContainer.h"
 #include "ResourceRequest.h"
-#include "SVGElementInstance.h"
 #include "SVGNames.h"
 #include "SVGSMILElement.h"
 #include "XLinkNames.h"
 #include <wtf/NeverDestroyed.h>
 
 namespace WebCore {
-
-using namespace HTMLNames;
 
 // Animated property definitions
 DEFINE_ANIMATED_STRING(SVGAElement, SVGNames::targetAttr, SVGTarget, svgTarget)
@@ -69,9 +66,9 @@ inline SVGAElement::SVGAElement(const QualifiedName& tagName, Document& document
     registerAnimatedPropertiesForSVGAElement();
 }
 
-PassRefPtr<SVGAElement> SVGAElement::create(const QualifiedName& tagName, Document& document)
+Ref<SVGAElement> SVGAElement::create(const QualifiedName& tagName, Document& document)
 {
-    return adoptRef(new SVGAElement(tagName, document));
+    return adoptRef(*new SVGAElement(tagName, document));
 }
 
 String SVGAElement::title() const
@@ -126,7 +123,7 @@ void SVGAElement::svgAttributeChanged(const QualifiedName& attrName)
         return;
     }
 
-    SVGElementInstance::InvalidationGuard invalidationGuard(this);
+    InstanceInvalidationGuard guard(*this);
 
     // Unlike other SVG*Element classes, SVGAElement only listens to SVGURIReference changes
     // as none of the other properties changes the linking behaviour for our <a> element.
@@ -138,9 +135,9 @@ void SVGAElement::svgAttributeChanged(const QualifiedName& attrName)
     }
 }
 
-RenderPtr<RenderElement> SVGAElement::createElementRenderer(PassRef<RenderStyle> style)
+RenderPtr<RenderElement> SVGAElement::createElementRenderer(Ref<RenderStyle>&& style)
 {
-    if (parentNode() && parentNode()->isSVGElement() && toSVGElement(parentNode())->isTextContent())
+    if (parentNode() && parentNode()->isSVGElement() && downcast<SVGElement>(*parentNode()).isTextContent())
         return createRenderer<RenderSVGInline>(*this, WTF::move(style));
 
     return createRenderer<RenderSVGTransformableContainer>(*this, WTF::move(style));
@@ -155,13 +152,13 @@ void SVGAElement::defaultEventHandler(Event* event)
             return;
         }
 
-        if (isLinkClick(event)) {
+        if (MouseEvent::canTriggerActivationBehavior(*event)) {
             String url = stripLeadingAndTrailingHTMLSpaces(href());
 
             if (url[0] == '#') {
                 Element* targetElement = treeScope().getElementById(url.substringSharingImpl(1));
-                if (targetElement && isSVGSMILElement(*targetElement)) {
-                    toSVGSMILElement(*targetElement).beginByLinkActivation();
+                if (is<SVGSMILElement>(targetElement)) {
+                    downcast<SVGSMILElement>(*targetElement).beginByLinkActivation();
                     event->setDefaultHandled();
                     return;
                 }
@@ -210,7 +207,7 @@ bool SVGAElement::isFocusable() const
 
 bool SVGAElement::isURLAttribute(const Attribute& attribute) const
 {
-    return attribute.name().localName() == hrefAttr || SVGGraphicsElement::isURLAttribute(attribute);
+    return attribute.name().localName() == XLinkNames::hrefAttr || SVGGraphicsElement::isURLAttribute(attribute);
 }
 
 bool SVGAElement::isMouseFocusable() const

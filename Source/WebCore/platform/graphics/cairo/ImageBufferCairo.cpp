@@ -29,6 +29,8 @@
 #include "config.h"
 #include "ImageBuffer.h"
 
+#if USE(CAIRO)
+
 #include "BitmapImage.h"
 #include "CairoUtilities.h"
 #include "Color.h"
@@ -99,6 +101,8 @@ ImageBuffer::ImageBuffer(const FloatSize& size, float /* resolutionScale */, Col
     , m_logicalSize(size)
 {
     success = false;  // Make early return mean error.
+    if (m_size.isEmpty())
+        return;
 
 #if ENABLE(ACCELERATED_2D_CANVAS)
     if (renderingMode == Accelerated)
@@ -418,3 +422,5 @@ PlatformLayer* ImageBuffer::platformLayer() const
 }
 
 } // namespace WebCore
+
+#endif // USE(CAIRO)

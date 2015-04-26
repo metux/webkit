@@ -36,7 +36,8 @@ namespace WebCore {
 class HTMLMediaElement;
 class SourceBuffer;
 
-class HTMLMediaSession : public MediaSession {
+class HTMLMediaSession final : public MediaSession {
+    WTF_MAKE_FAST_ALLOCATED;
 public:
     static std::unique_ptr<HTMLMediaSession> create(MediaSessionClient&);
 
@@ -61,6 +62,7 @@ public:
     void setHasPlaybackTargetAvailabilityListeners(const HTMLMediaElement&, bool);
 #endif
     bool requiresFullscreenForVideoPlayback(const HTMLMediaElement&) const;
+    WEBCORE_EXPORT bool allowsAlternateFullscreen(const HTMLMediaElement&) const;
     MediaPlayer::Preload effectivePreloadForElement(const HTMLMediaElement&) const;
 
     void applyMediaPlayerRestrictions(const HTMLMediaElement&);
@@ -88,7 +90,10 @@ public:
 #endif
 
 private:
+    virtual bool requiresPlaybackTargetRouteMonitoring() const override { return m_hasPlaybackTargetAvailabilityListeners; }
+
     BehaviorRestrictions m_restrictions;
+    bool m_hasPlaybackTargetAvailabilityListeners;
 };
 
 }

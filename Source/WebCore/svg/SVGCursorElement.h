@@ -36,7 +36,7 @@ class SVGCursorElement final : public SVGElement,
                                public SVGExternalResourcesRequired,
                                public SVGURIReference {
 public:
-    static PassRefPtr<SVGCursorElement> create(const QualifiedName&, Document&);
+    static Ref<SVGCursorElement> create(const QualifiedName&, Document&);
 
     virtual ~SVGCursorElement();
 
@@ -71,8 +71,6 @@ private:
 
     HashSet<SVGElement*> m_clients;
 };
-
-NODE_TYPE_CASTS(SVGCursorElement)
 
 } // namespace WebCore
 

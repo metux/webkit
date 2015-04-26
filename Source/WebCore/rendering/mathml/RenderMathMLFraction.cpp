@@ -43,7 +43,7 @@ static const float gLineMedium = 1.f;
 static const float gLineThick = 3.f;
 static const float gFractionBarWidth = 0.05f;
 
-RenderMathMLFraction::RenderMathMLFraction(MathMLInlineContainerElement& element, PassRef<RenderStyle> style)
+RenderMathMLFraction::RenderMathMLFraction(MathMLInlineContainerElement& element, Ref<RenderStyle>&& style)
     : RenderMathMLBlock(element, WTF::move(style))
     , m_lineThickness(gLineMedium)
 {
@@ -100,9 +100,9 @@ void RenderMathMLFraction::addChild(RenderObject* child, RenderObject* /* before
     }
     
     if (firstChild()->isEmpty())
-        toRenderElement(firstChild())->addChild(child);
+        downcast<RenderElement>(*firstChild()).addChild(child);
     else
-        toRenderElement(lastChild())->addChild(child);
+        downcast<RenderElement>(*lastChild()).addChild(child);
     
     updateFromElement();
 }
@@ -120,11 +120,11 @@ RenderMathMLOperator* RenderMathMLFraction::unembellishedOperator()
 {
     RenderObject* numeratorWrapper = firstChild();
     if (!numeratorWrapper)
-        return 0;
+        return nullptr;
     RenderObject* numerator = numeratorWrapper->firstChildSlow();
-    if (!numerator || !numerator->isRenderMathMLBlock())
-        return 0;
-    return toRenderMathMLBlock(numerator)->unembellishedOperator();
+    if (!is<RenderMathMLBlock>(numerator))
+        return nullptr;
+    return downcast<RenderMathMLBlock>(*numerator).unembellishedOperator();
 }
 
 void RenderMathMLFraction::layout()

@@ -86,7 +86,7 @@ struct Plan : public ThreadSafeRefCounted<Plan> {
 
     RefPtr<Profiler::Compilation> compilation;
 
-    OwnPtr<Finalizer> finalizer;
+    std::unique_ptr<Finalizer> finalizer;
     
     RefPtr<InlineCallFrameSet> inlineCallFrames;
     DesiredWatchpoints watchpoints;
@@ -96,8 +96,6 @@ struct Plan : public ThreadSafeRefCounted<Plan> {
     DesiredTransitions transitions;
     
     bool willTryToTierUp;
-
-    double beforeFTL;
 
     enum Stage { Preparing, Compiling, Compiled, Ready, Cancelled };
     Stage stage;
@@ -112,6 +110,8 @@ private:
     
     bool isStillValid();
     void reallyAdd(CommonData*);
+
+    double m_timeBeforeFTL;
 };
 
 #else // ENABLE(DFG_JIT)

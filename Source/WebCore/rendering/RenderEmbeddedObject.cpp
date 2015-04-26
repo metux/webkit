@@ -29,7 +29,7 @@
 #include "ChromeClient.h"
 #include "Cursor.h"
 #include "EventHandler.h"
-#include "Font.h"
+#include "FontCascade.h"
 #include "FontSelector.h"
 #include "Frame.h"
 #include "FrameLoaderClient.h"
@@ -96,7 +96,7 @@ static const Color& unavailablePluginBorderColor()
     return standard;
 }
 
-RenderEmbeddedObject::RenderEmbeddedObject(HTMLFrameOwnerElement& element, PassRef<RenderStyle> style)
+RenderEmbeddedObject::RenderEmbeddedObject(HTMLFrameOwnerElement& element, Ref<RenderStyle>&& style)
     : RenderWidget(element, WTF::move(style))
     , m_isPluginUnavailable(false)
     , m_isUnavailablePluginIndicatorHidden(false)
@@ -112,7 +112,7 @@ RenderEmbeddedObject::~RenderEmbeddedObject()
     view().frameView().removeEmbeddedObjectToUpdate(*this);
 }
 
-RenderPtr<RenderEmbeddedObject> RenderEmbeddedObject::createForApplet(HTMLAppletElement& applet, PassRef<RenderStyle> style)
+RenderPtr<RenderEmbeddedObject> RenderEmbeddedObject::createForApplet(HTMLAppletElement& applet, Ref<RenderStyle>&& style)
 {
     auto renderer = createRenderer<RenderEmbeddedObject>(applet, WTF::move(style));
     renderer->setInline(true);
@@ -131,9 +131,9 @@ bool RenderEmbeddedObject::allowsAcceleratedCompositing() const
 {
 #if PLATFORM(IOS)
     // The timing of layer creation is different on the phone, since the plugin can only be manipulated from the main thread.
-    return widget() && widget()->isPluginViewBase() && toPluginViewBase(widget())->willProvidePluginLayer();
+    return is<PluginViewBase>(widget()) && downcast<PluginViewBase>(*widget()).willProvidePluginLayer();
 #else
-    return widget() && widget()->isPluginViewBase() && toPluginViewBase(widget())->platformLayer();
+    return is<PluginViewBase>(widget()) && downcast<PluginViewBase>(*widget()).platformLayer();
 #endif
 }
 
@@ -224,10 +224,10 @@ void RenderEmbeddedObject::paintSnapshotImage(PaintInfo& paintInfo, const Layout
 
 void RenderEmbeddedObject::paintContents(PaintInfo& paintInfo, const LayoutPoint& paintOffset)
 {
-    if (!frameOwnerElement().isPluginElement())
+    if (!is<HTMLPlugInElement>(frameOwnerElement()))
         return;
 
-    HTMLPlugInElement& plugInElement = toHTMLPlugInElement(frameOwnerElement());
+    HTMLPlugInElement& plugInElement = downcast<HTMLPlugInElement>(frameOwnerElement());
 
     if (plugInElement.displayState() > HTMLPlugInElement::DisplayingSnapshot) {
         RenderWidget::paintContents(paintInfo, paintOffset);
@@ -235,11 +235,10 @@ void RenderEmbeddedObject::paintContents(PaintInfo& paintInfo, const LayoutPoint
             return;
     }
 
-    if (!plugInElement.isPlugInImageElement())
+    if (!is<HTMLPlugInImageElement>(plugInElement))
         return;
 
-    Image* snapshot = toHTMLPlugInImageElement(plugInElement).snapshotImage();
-    if (snapshot)
+    if (Image* snapshot = downcast<HTMLPlugInImageElement>(plugInElement).snapshotImage())
         paintSnapshotImage(paintInfo, paintOffset, snapshot);
 }
 
@@ -299,7 +298,7 @@ void RenderEmbeddedObject::paintReplaced(PaintInfo& paintInfo, const LayoutPoint
     FloatRect indicatorRect;
     FloatRect replacementTextRect;
     FloatRect arrowRect;
-    Font font;
+    FontCascade font;
     TextRun run("");
     float textWidth;
     if (!getReplacementTextGeometry(paintOffset, contentRect, indicatorRect, replacementTextRect, arrowRect, font, run, textWidth))
@@ -343,12 +342,14 @@ void RenderEmbeddedObject::paintReplaced(PaintInfo& paintInfo, const LayoutPoint
 
 void RenderEmbeddedObject::setUnavailablePluginIndicatorIsHidden(bool hidden)
 {
-    m_isUnavailablePluginIndicatorHidden = hidden;
+    if (m_isUnavailablePluginIndicatorHidden == hidden)
+        return;
 
+    m_isUnavailablePluginIndicatorHidden = hidden;
     repaint();
 }
 
-bool RenderEmbeddedObject::getReplacementTextGeometry(const LayoutPoint& accumulatedOffset, FloatRect& contentRect, FloatRect& indicatorRect, FloatRect& replacementTextRect, FloatRect& arrowRect, Font& font, TextRun& run, float& textWidth) const
+bool RenderEmbeddedObject::getReplacementTextGeometry(const LayoutPoint& accumulatedOffset, FloatRect& contentRect, FloatRect& indicatorRect, FloatRect& replacementTextRect, FloatRect& arrowRect, FontCascade& font, TextRun& run, float& textWidth) const
 {
     bool includesArrow = shouldUnavailablePluginMessageBeButton(document(), m_pluginUnavailabilityReason);
 
@@ -360,7 +361,7 @@ bool RenderEmbeddedObject::getReplacementTextGeometry(const LayoutPoint& accumul
     fontDescription.setWeight(FontWeightBold);
     fontDescription.setRenderingMode(frame().settings().fontRenderingMode());
     fontDescription.setComputedSize(12);
-    font = Font(fontDescription, 0, 0);
+    font = FontCascade(fontDescription, 0, 0);
     font.update(0);
 
     run = TextRun(m_unavailablePluginReplacementText);
@@ -390,7 +391,7 @@ LayoutRect RenderEmbeddedObject::unavailablePluginIndicatorBounds(const LayoutPo
     FloatRect indicatorRect;
     FloatRect replacementTextRect;
     FloatRect arrowRect;
-    Font font;
+    FontCascade font;
     TextRun run("", 0);
     float textWidth;
     if (getReplacementTextGeometry(accumulatedOffset, contentRect, indicatorRect, replacementTextRect, arrowRect, font, run, textWidth))
@@ -494,8 +495,8 @@ void RenderEmbeddedObject::layout()
 
     if (!wasMissingWidget && newSize.width() >= oldSize.width() && newSize.height() >= oldSize.height()) {
         HTMLFrameOwnerElement& element = frameOwnerElement();
-        if (element.isPluginElement() && toHTMLPlugInElement(element).isPlugInImageElement()) {
-            HTMLPlugInImageElement& plugInImageElement = toHTMLPlugInImageElement(element);
+        if (is<HTMLPlugInImageElement>(element)) {
+            HTMLPlugInImageElement& plugInImageElement = downcast<HTMLPlugInImageElement>(element);
             if (plugInImageElement.displayState() > HTMLPlugInElement::DisplayingSnapshot && plugInImageElement.snapshotDecision() == HTMLPlugInImageElement::MaySnapshotWhenResized) {
                 plugInImageElement.setNeedsCheckForSizeChange();
                 view().frameView().addEmbeddedObjectToUpdate(*this);
@@ -512,12 +513,9 @@ void RenderEmbeddedObject::layout()
     if (!child)
         return;
 
-    RenderBox* childBox = toRenderBox(child);
+    auto& childBox = downcast<RenderBox>(*child);
 
-    if (!childBox)
-        return;
-
-    if (newSize == oldSize && !childBox->needsLayout())
+    if (newSize == oldSize && !childBox.needsLayout())
         return;
     
     // When calling layout() on a child node, a parent must either push a LayoutStateMaintainter, or
@@ -525,11 +523,11 @@ void RenderEmbeddedObject::layout()
     // and this method will be called many times per second during playback, use a LayoutStateMaintainer:
     LayoutStateMaintainer statePusher(view(), *this, locationOffset(), hasTransform() || hasReflection() || style().isFlippedBlocksWritingMode());
     
-    childBox->setLocation(LayoutPoint(borderLeft(), borderTop()) + LayoutSize(paddingLeft(), paddingTop()));
-    childBox->style().setHeight(Length(newSize.height(), Fixed));
-    childBox->style().setWidth(Length(newSize.width(), Fixed));
-    childBox->setNeedsLayout(MarkOnlyThis);
-    childBox->layout();
+    childBox.setLocation(LayoutPoint(borderLeft(), borderTop()) + LayoutSize(paddingLeft(), paddingTop()));
+    childBox.style().setHeight(Length(newSize.height(), Fixed));
+    childBox.style().setWidth(Length(newSize.width(), Fixed));
+    childBox.setNeedsLayout(MarkOnlyThis);
+    childBox.layout();
     clearChildNeedsLayout();
     
     statePusher.pop();
@@ -540,20 +538,20 @@ bool RenderEmbeddedObject::nodeAtPoint(const HitTestRequest& request, HitTestRes
     if (!RenderWidget::nodeAtPoint(request, result, locationInContainer, accumulatedOffset, hitTestAction))
         return false;
 
-    if (!widget() || !widget()->isPluginViewBase())
+    if (!is<PluginViewBase>(widget()))
         return true;
 
-    PluginViewBase* view = toPluginViewBase(widget());
+    PluginViewBase& view = downcast<PluginViewBase>(*widget());
     IntPoint roundedPoint = locationInContainer.roundedPoint();
 
-    if (Scrollbar* horizontalScrollbar = view->horizontalScrollbar()) {
+    if (Scrollbar* horizontalScrollbar = view.horizontalScrollbar()) {
         if (horizontalScrollbar->shouldParticipateInHitTesting() && horizontalScrollbar->frameRect().contains(roundedPoint)) {
             result.setScrollbar(horizontalScrollbar);
             return true;
         }
     }
 
-    if (Scrollbar* verticalScrollbar = view->verticalScrollbar()) {
+    if (Scrollbar* verticalScrollbar = view.verticalScrollbar()) {
         if (verticalScrollbar->shouldParticipateInHitTesting() && verticalScrollbar->frameRect().contains(roundedPoint)) {
             result.setScrollbar(verticalScrollbar);
             return true;
@@ -565,10 +563,10 @@ bool RenderEmbeddedObject::nodeAtPoint(const HitTestRequest& request, HitTestRes
 
 bool RenderEmbeddedObject::scroll(ScrollDirection direction, ScrollGranularity granularity, float, Element**, RenderBox*, const IntPoint&)
 {
-    if (!widget() || !widget()->isPluginViewBase())
+    if (!is<PluginViewBase>(widget()))
         return false;
 
-    return toPluginViewBase(widget())->scroll(direction, granularity);
+    return downcast<PluginViewBase>(*widget()).scroll(direction, granularity);
 }
 
 bool RenderEmbeddedObject::logicalScroll(ScrollLogicalDirection direction, ScrollGranularity granularity, float multiplier, Element** stopElement)
@@ -584,16 +582,16 @@ bool RenderEmbeddedObject::isInUnavailablePluginIndicator(const FloatPoint& poin
     FloatRect indicatorRect;
     FloatRect replacementTextRect;
     FloatRect arrowRect;
-    Font font;
+    FontCascade font;
     TextRun run("");
     float textWidth;
     return getReplacementTextGeometry(IntPoint(), contentRect, indicatorRect, replacementTextRect, arrowRect, font, run, textWidth)
         && indicatorRect.contains(point);
 }
 
-bool RenderEmbeddedObject::isInUnavailablePluginIndicator(MouseEvent* event) const
+bool RenderEmbeddedObject::isInUnavailablePluginIndicator(const MouseEvent& event) const
 {
-    return isInUnavailablePluginIndicator(absoluteToLocal(event->absoluteLocation(), UseTransforms));
+    return isInUnavailablePluginIndicator(absoluteToLocal(event.absoluteLocation(), UseTransforms));
 }
 
 void RenderEmbeddedObject::handleUnavailablePluginIndicatorEvent(Event* event)
@@ -601,21 +599,21 @@ void RenderEmbeddedObject::handleUnavailablePluginIndicatorEvent(Event* event)
     if (!shouldUnavailablePluginMessageBeButton(document(), m_pluginUnavailabilityReason))
         return;
 
-    if (!event->isMouseEvent())
+    if (!is<MouseEvent>(*event))
         return;
 
-    MouseEvent* mouseEvent = toMouseEvent(event);
-    HTMLPlugInElement& element = toHTMLPlugInElement(frameOwnerElement());
-    if (event->type() == eventNames().mousedownEvent && toMouseEvent(event)->button() == LeftButton) {
+    MouseEvent& mouseEvent = downcast<MouseEvent>(*event);
+    HTMLPlugInElement& element = downcast<HTMLPlugInElement>(frameOwnerElement());
+    if (mouseEvent.type() == eventNames().mousedownEvent && mouseEvent.button() == LeftButton) {
         m_mouseDownWasInUnavailablePluginIndicator = isInUnavailablePluginIndicator(mouseEvent);
         if (m_mouseDownWasInUnavailablePluginIndicator) {
             frame().eventHandler().setCapturingMouseEventsElement(&element);
             element.setIsCapturingMouseEvents(true);
             setUnavailablePluginIndicatorIsPressed(true);
         }
-        event->setDefaultHandled();
+        mouseEvent.setDefaultHandled();
     }
-    if (event->type() == eventNames().mouseupEvent && toMouseEvent(event)->button() == LeftButton) {
+    if (mouseEvent.type() == eventNames().mouseupEvent && mouseEvent.button() == LeftButton) {
         if (m_unavailablePluginIndicatorIsPressed) {
             frame().eventHandler().setCapturingMouseEventsElement(nullptr);
             element.setIsCapturingMouseEvents(false);
@@ -628,9 +626,9 @@ void RenderEmbeddedObject::handleUnavailablePluginIndicatorEvent(Event* event)
         m_mouseDownWasInUnavailablePluginIndicator = false;
         event->setDefaultHandled();
     }
-    if (event->type() == eventNames().mousemoveEvent) {
+    if (mouseEvent.type() == eventNames().mousemoveEvent) {
         setUnavailablePluginIndicatorIsPressed(m_mouseDownWasInUnavailablePluginIndicator && isInUnavailablePluginIndicator(mouseEvent));
-        event->setDefaultHandled();
+        mouseEvent.setDefaultHandled();
     }
 }
 

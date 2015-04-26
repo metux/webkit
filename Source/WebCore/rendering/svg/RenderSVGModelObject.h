@@ -64,10 +64,10 @@ public:
     bool hasSVGShadow() const { return m_hasSVGShadow; }
     void setHasSVGShadow(bool hasShadow) { m_hasSVGShadow = hasShadow; }
 
-    SVGElement& element() const { return toSVGElement(nodeForNonAnonymous()); }
+    SVGElement& element() const { return downcast<SVGElement>(nodeForNonAnonymous()); }
 
 protected:
-    RenderSVGModelObject(SVGElement&, PassRef<RenderStyle>);
+    RenderSVGModelObject(SVGElement&, Ref<RenderStyle>&&);
 
     virtual void willBeDestroyed() override;
 
@@ -80,8 +80,8 @@ private:
     bool m_hasSVGShadow;
 };
 
-RENDER_OBJECT_TYPE_CASTS(RenderSVGModelObject, isRenderSVGModelObject());
+} // namespace WebCore
 
-}
+SPECIALIZE_TYPE_TRAITS_RENDER_OBJECT(RenderSVGModelObject, isRenderSVGModelObject())
 
 #endif

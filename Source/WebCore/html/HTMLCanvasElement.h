@@ -63,8 +63,8 @@ public:
 
 class HTMLCanvasElement final : public HTMLElement {
 public:
-    static PassRefPtr<HTMLCanvasElement> create(Document&);
-    static PassRefPtr<HTMLCanvasElement> create(const QualifiedName&, Document&);
+    static Ref<HTMLCanvasElement> create(Document&);
+    static Ref<HTMLCanvasElement> create(const QualifiedName&, Document&);
     virtual ~HTMLCanvasElement();
 
     void addObserver(CanvasObserver&);
@@ -115,7 +115,7 @@ public:
     ImageBuffer* buffer() const;
     Image* copiedImage() const;
     void clearCopiedImage();
-    PassRefPtr<ImageData> getImageData();
+    RefPtr<ImageData> getImageData();
     void makePresentationCopy();
     void clearPresentationCopy();
 
@@ -135,11 +135,13 @@ public:
 
     bool shouldAccelerate(const IntSize&) const;
 
+    size_t memoryCost() const;
+
 private:
     HTMLCanvasElement(const QualifiedName&, Document&);
 
     virtual void parseAttribute(const QualifiedName&, const AtomicString&) override;
-    virtual RenderPtr<RenderElement> createElementRenderer(PassRef<RenderStyle>) override;
+    virtual RenderPtr<RenderElement> createElementRenderer(Ref<RenderStyle>&&) override;
 
     virtual bool canContainRangeEndPoint() const override;
     virtual bool canStartSelection() const override;
@@ -179,8 +181,6 @@ private:
     mutable RefPtr<Image> m_presentedImage;
     mutable RefPtr<Image> m_copiedImage; // FIXME: This is temporary for platforms that have to copy the image buffer to render (and for CSSCanvasValue).
 };
-
-NODE_TYPE_CASTS(HTMLCanvasElement)
 
 } //namespace
 

@@ -41,10 +41,12 @@
 #include "RemoteNetworkingContext.h"
 #include "SessionTracker.h"
 #include "StatisticsData.h"
-#include "WebContextMessages.h"
 #include "WebCookieManager.h"
+#include "WebProcessPoolMessages.h"
+#include "WebsiteDataTypes.h"
 #include <WebCore/Logging.h>
 #include <WebCore/MemoryPressureHandler.h>
+#include <WebCore/PlatformCookieJar.h>
 #include <WebCore/ResourceRequest.h>
 #include <WebCore/SessionID.h>
 #include <wtf/RunLoop.h>
@@ -58,7 +60,7 @@ using namespace WebCore;
 
 namespace WebKit {
 
-NetworkProcess& NetworkProcess::shared()
+NetworkProcess& NetworkProcess::singleton()
 {
     static NeverDestroyed<NetworkProcess> networkProcess;
     return networkProcess;
@@ -67,6 +69,8 @@ NetworkProcess& NetworkProcess::shared()
 NetworkProcess::NetworkProcess()
     : m_hasSetCacheModel(false)
     , m_cacheModel(CacheModelDocumentViewer)
+    , m_diskCacheIsDisabledForTesting(false)
+    , m_canHandleHTTPSServerTrustEvaluation(true)
 #if PLATFORM(COCOA)
     , m_clearCacheDispatchGroup(0)
 #endif
@@ -75,9 +79,7 @@ NetworkProcess::NetworkProcess()
 
     addSupplement<AuthenticationManager>();
     addSupplement<WebCookieManager>();
-#if ENABLE(CUSTOM_PROTOCOLS)
     addSupplement<CustomProtocolManager>();
-#endif
 }
 
 NetworkProcess::~NetworkProcess()
@@ -109,7 +111,7 @@ bool NetworkProcess::shouldTerminate()
     return false;
 }
 
-void NetworkProcess::didReceiveMessage(IPC::Connection* connection, IPC::MessageDecoder& decoder)
+void NetworkProcess::didReceiveMessage(IPC::Connection& connection, IPC::MessageDecoder& decoder)
 {
     if (messageReceiverMap().dispatchMessage(connection, decoder))
         return;
@@ -117,18 +119,18 @@ void NetworkProcess::didReceiveMessage(IPC::Connection* connection, IPC::Message
     didReceiveNetworkProcessMessage(connection, decoder);
 }
 
-void NetworkProcess::didReceiveSyncMessage(IPC::Connection* connection, IPC::MessageDecoder& decoder, std::unique_ptr<IPC::MessageEncoder>& replyEncoder)
+void NetworkProcess::didReceiveSyncMessage(IPC::Connection& connection, IPC::MessageDecoder& decoder, std::unique_ptr<IPC::MessageEncoder>& replyEncoder)
 {
     messageReceiverMap().dispatchSyncMessage(connection, decoder, replyEncoder);
 }
 
-void NetworkProcess::didClose(IPC::Connection*)
+void NetworkProcess::didClose(IPC::Connection&)
 {
     // The UIProcess just exited.
     RunLoop::current().stop();
 }
 
-void NetworkProcess::didReceiveInvalidMessage(IPC::Connection*, IPC::StringReference, IPC::StringReference)
+void NetworkProcess::didReceiveInvalidMessage(IPC::Connection&, IPC::StringReference, IPC::StringReference)
 {
     RunLoop::current().stop();
 }
@@ -162,7 +164,10 @@ void NetworkProcess::initializeNetworkProcess(const NetworkProcessCreationParame
     memoryPressureHandler().setLowMemoryHandler(lowMemoryHandler);
     memoryPressureHandler().install();
 
+    m_diskCacheIsDisabledForTesting = parameters.shouldUseTestingNetworkSession;
     setCacheModel(static_cast<uint32_t>(parameters.cacheModel));
+
+    setCanHandleHTTPSServerTrustEvaluation(parameters.canHandleHTTPSServerTrustEvaluation);
 
 #if PLATFORM(MAC) || USE(CFNETWORK)
     SessionTracker::setIdentifierBase(parameters.uiProcessBundleIdentifier);
@@ -186,7 +191,7 @@ void NetworkProcess::initializeConnection(IPC::Connection* connection)
     ChildProcess::initializeConnection(connection);
 
 #if ENABLE(SEC_ITEM_SHIM)
-    SecItemShim::shared().initializeConnection(connection);
+    SecItemShim::singleton().initializeConnection(connection);
 #endif
 
     NetworkProcessSupplementMap::const_iterator it = m_supplements.begin();
@@ -231,9 +236,33 @@ void NetworkProcess::destroyPrivateBrowsingSession(SessionID sessionID)
     SessionTracker::destroySession(sessionID);
 }
 
+void NetworkProcess::deleteWebsiteData(WebCore::SessionID sessionID, uint64_t websiteDataTypes, std::chrono::system_clock::time_point modifiedSince, uint64_t callbackID)
+{
+    if (websiteDataTypes & WebsiteDataTypeCookies) {
+        if (auto* networkStorageSession = SessionTracker::session(sessionID))
+            deleteAllCookiesModifiedSince(*networkStorageSession, modifiedSince);
+    }
+
+    auto completionHandler = [this, callbackID] {
+        parentProcessConnection()->send(Messages::NetworkProcessProxy::DidDeleteWebsiteData(callbackID), 0);
+    };
+
+    if ((websiteDataTypes & WebsiteDataTypeDiskCache) & !sessionID.isEphemeral()) {
+        clearDiskCache(modifiedSince, WTF::move(completionHandler));
+        return;
+    }
+
+    completionHandler();
+}
+
 void NetworkProcess::downloadRequest(uint64_t downloadID, const ResourceRequest& request)
 {
     downloadManager().startDownload(downloadID, request);
+}
+
+void NetworkProcess::resumeDownload(uint64_t downloadID, const IPC::DataReference& resumeData, const String& path, const WebKit::SandboxExtension::Handle& sandboxExtensionHandle)
+{
+    downloadManager().resumeDownload(downloadID, resumeData, path, sandboxExtensionHandle);
 }
 
 void NetworkProcess::cancelDownload(uint64_t downloadID)
@@ -252,18 +281,39 @@ void NetworkProcess::setCacheModel(uint32_t cm)
     }
 }
 
+void NetworkProcess::setCanHandleHTTPSServerTrustEvaluation(bool value)
+{
+    m_canHandleHTTPSServerTrustEvaluation = value;
+}
+
 void NetworkProcess::getNetworkProcessStatistics(uint64_t callbackID)
 {
-    NetworkResourceLoadScheduler& scheduler = NetworkProcess::shared().networkResourceLoadScheduler();
+    NetworkResourceLoadScheduler& scheduler = NetworkProcess::singleton().networkResourceLoadScheduler();
 
     StatisticsData data;
 
+    auto& networkProcess = NetworkProcess::singleton();
     data.statisticsNumbers.set("LoadsPendingCount", scheduler.loadsPendingCount());
     data.statisticsNumbers.set("LoadsActiveCount", scheduler.loadsActiveCount());
-    data.statisticsNumbers.set("DownloadsActiveCount", shared().downloadManager().activeDownloadCount());
-    data.statisticsNumbers.set("OutstandingAuthenticationChallengesCount", shared().authenticationManager().outstandingAuthenticationChallengeCount());
+    data.statisticsNumbers.set("DownloadsActiveCount", networkProcess.downloadManager().activeDownloadCount());
+    data.statisticsNumbers.set("OutstandingAuthenticationChallengesCount", networkProcess.authenticationManager().outstandingAuthenticationChallengeCount());
 
-    parentProcessConnection()->send(Messages::WebContext::DidGetStatistics(data, callbackID), 0);
+    parentProcessConnection()->send(Messages::WebProcessPool::DidGetStatistics(data, callbackID), 0);
+}
+
+void NetworkProcess::logDiagnosticMessage(uint64_t webPageID, const String& message, const String& description)
+{
+    parentProcessConnection()->send(Messages::NetworkProcessProxy::LogDiagnosticMessage(webPageID, message, description), 0);
+}
+
+void NetworkProcess::logDiagnosticMessageWithResult(uint64_t webPageID, const String& message, const String& description, WebCore::DiagnosticLoggingResultType result)
+{
+    parentProcessConnection()->send(Messages::NetworkProcessProxy::LogDiagnosticMessageWithResult(webPageID, message, description, result), 0);
+}
+
+void NetworkProcess::logDiagnosticMessageWithValue(uint64_t webPageID, const String& message, const String& description, const String& value)
+{
+    parentProcessConnection()->send(Messages::NetworkProcessProxy::LogDiagnosticMessageWithValue(webPageID, message, description, value), 0);
 }
 
 void NetworkProcess::terminate()

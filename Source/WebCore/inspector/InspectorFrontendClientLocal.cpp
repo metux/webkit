@@ -29,9 +29,6 @@
  */
 
 #include "config.h"
-
-#if ENABLE(INSPECTOR)
-
 #include "InspectorFrontendClientLocal.h"
 
 #include "Chrome.h"
@@ -44,7 +41,6 @@
 #include "InspectorController.h"
 #include "InspectorFrontendHost.h"
 #include "InspectorPageAgent.h"
-#include "InspectorWebBackendDispatchers.h"
 #include "MainFrame.h"
 #include "Page.h"
 #include "ScriptController.h"
@@ -55,9 +51,9 @@
 #include "UserGestureIndicator.h"
 #include "WindowFeatures.h"
 #include <bindings/ScriptValue.h>
+#include <inspector/InspectorBackendDispatchers.h>
 #include <wtf/Deque.h>
 #include <wtf/text/CString.h>
-#include <wtf/text/WTFString.h>
 
 using namespace Inspector;
 
@@ -75,7 +71,7 @@ class InspectorBackendDispatchTask {
 public:
     InspectorBackendDispatchTask(InspectorController* inspectorController)
         : m_inspectorController(inspectorController)
-        , m_timer(this, &InspectorBackendDispatchTask::timerFired)
+        , m_timer(*this, &InspectorBackendDispatchTask::timerFired)
     {
     }
 
@@ -92,7 +88,7 @@ public:
         m_timer.stop();
     }
 
-    void timerFired(Timer<InspectorBackendDispatchTask>&)
+    void timerFired()
     {
         if (!m_messages.isEmpty()) {
             // Dispatch can lead to the timer destruction -> schedule the next shot first.
@@ -103,7 +99,7 @@ public:
 
 private:
     InspectorController* m_inspectorController;
-    Timer<InspectorBackendDispatchTask> m_timer;
+    Timer m_timer;
     Deque<String> m_messages;
 };
 
@@ -124,6 +120,9 @@ InspectorFrontendClientLocal::InspectorFrontendClientLocal(InspectorController* 
     , m_dockSide(DockSide::Undocked)
 {
     m_frontendPage->settings().setAllowFileAccessFromFileURLs(true);
+    m_frontendPage->settings().setJavaScriptRuntimeFlags({
+        JSC::RuntimeFlags::SymbolEnabled
+    });
     m_dispatchTask = std::make_unique<InspectorBackendDispatchTask>(inspectorController);
 }
 
@@ -358,5 +357,3 @@ void InspectorFrontendClientLocal::evaluateOnLoad(const String& expression)
 }
 
 } // namespace WebCore
-
-#endif

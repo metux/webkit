@@ -31,6 +31,7 @@
 #include "config.h"
 #include "PageSerializer.h"
 
+#include "CSSFontFaceRule.h"
 #include "CSSImageValue.h"
 #include "CSSImportRule.h"
 #include "CSSStyleRule.h"
@@ -66,10 +67,10 @@ namespace WebCore {
 
 static bool isCharsetSpecifyingNode(const Node& node)
 {
-    if (!node.isHTMLElement())
+    if (!is<HTMLElement>(node))
         return false;
 
-    const HTMLElement& element = toHTMLElement(node);
+    const HTMLElement& element = downcast<HTMLElement>(node);
     if (!element.hasTagName(HTMLNames::metaTag))
         return false;
     HTMLMetaCharsetParser::AttributeList attributes;
@@ -91,7 +92,7 @@ static bool shouldIgnoreElement(const Element& element)
 static const QualifiedName& frameOwnerURLAttributeName(const HTMLFrameOwnerElement& frameOwner)
 {
     // FIXME: We should support all frame owners including applets.
-    return isHTMLObjectElement(frameOwner) ? HTMLNames::dataAttr : HTMLNames::srcAttr;
+    return is<HTMLObjectElement>(frameOwner) ? HTMLNames::dataAttr : HTMLNames::srcAttr;
 }
 
 class SerializerMarkupAccumulator final : public WebCore::MarkupAccumulator {
@@ -146,10 +147,10 @@ void SerializerMarkupAccumulator::appendElement(StringBuilder& out, const Elemen
 
 void SerializerMarkupAccumulator::appendCustomAttributes(StringBuilder& out, const Element& element, Namespaces* namespaces)
 {
-    if (!element.isFrameOwnerElement())
+    if (!is<HTMLFrameOwnerElement>(element))
         return;
 
-    const HTMLFrameOwnerElement& frameOwner = toHTMLFrameOwnerElement(element);
+    const HTMLFrameOwnerElement& frameOwner = downcast<HTMLFrameOwnerElement>(element);
     Frame* frame = frameOwner.contentFrame();
     if (!frame)
         return;
@@ -215,35 +216,35 @@ void PageSerializer::serializeFrame(Frame* frame)
         // FIXME: iframes used as images trigger this. We should deal with them correctly.
         return;
     }
-    String text = accumulator.serializeNodes(*document->documentElement(), 0, IncludeNode);
+    String text = accumulator.serializeNodes(*document->documentElement(), IncludeNode);
     CString frameHTML = textEncoding.encode(text, EntitiesForUnencodables);
     m_resources->append(Resource(url, document->suggestedMIMEType(), SharedBuffer::create(frameHTML.data(), frameHTML.length())));
     m_resourceURLs.add(url);
 
     for (Vector<Node*>::iterator iter = nodes.begin(); iter != nodes.end(); ++iter) {
         Node* node = *iter;
-        if (!node->isElementNode())
+        if (!is<Element>(*node))
             continue;
 
-        Element* element = toElement(node);
+        Element& element = downcast<Element>(*node);
         // We have to process in-line style as it might contain some resources (typically background images).
-        if (element->isStyledElement())
-            retrieveResourcesForProperties(toStyledElement(element)->inlineStyle(), document);
+        if (is<StyledElement>(element))
+            retrieveResourcesForProperties(downcast<StyledElement>(element).inlineStyle(), document);
 
-        if (isHTMLImageElement(element)) {
-            HTMLImageElement* imageElement = toHTMLImageElement(element);
-            URL url = document->completeURL(imageElement->fastGetAttribute(HTMLNames::srcAttr));
-            CachedImage* cachedImage = imageElement->cachedImage();
-            addImageToResources(cachedImage, imageElement->renderer(), url);
-        } else if (element->hasTagName(HTMLNames::linkTag)) {
-            HTMLLinkElement* linkElement = toHTMLLinkElement(element);
-            if (CSSStyleSheet* sheet = linkElement->sheet()) {
-                URL url = document->completeURL(linkElement->getAttribute(HTMLNames::hrefAttr));
+        if (is<HTMLImageElement>(element)) {
+            HTMLImageElement& imageElement = downcast<HTMLImageElement>(element);
+            URL url = document->completeURL(imageElement.fastGetAttribute(HTMLNames::srcAttr));
+            CachedImage* cachedImage = imageElement.cachedImage();
+            addImageToResources(cachedImage, imageElement.renderer(), url);
+        } else if (is<HTMLLinkElement>(element)) {
+            HTMLLinkElement& linkElement = downcast<HTMLLinkElement>(element);
+            if (CSSStyleSheet* sheet = linkElement.sheet()) {
+                URL url = document->completeURL(linkElement.getAttribute(HTMLNames::hrefAttr));
                 serializeCSSStyleSheet(sheet, url);
                 ASSERT(m_resourceURLs.contains(url));
             }
-        } else if (isHTMLStyleElement(element)) {
-            if (CSSStyleSheet* sheet = toHTMLStyleElement(element)->sheet())
+        } else if (is<HTMLStyleElement>(element)) {
+            if (CSSStyleSheet* sheet = downcast<HTMLStyleElement>(element).sheet())
                 serializeCSSStyleSheet(sheet, URL());
         }
     }
@@ -265,17 +266,17 @@ void PageSerializer::serializeCSSStyleSheet(CSSStyleSheet* styleSheet, const URL
         }
         Document* document = styleSheet->ownerDocument();
         // Some rules have resources associated with them that we need to retrieve.
-        if (rule->type() == CSSRule::IMPORT_RULE) {
-            CSSImportRule* importRule = toCSSImportRule(rule);
-            URL importURL = document->completeURL(importRule->href());
+        if (is<CSSImportRule>(*rule)) {
+            CSSImportRule& importRule = downcast<CSSImportRule>(*rule);
+            URL importURL = document->completeURL(importRule.href());
             if (m_resourceURLs.contains(importURL))
                 continue;
-            serializeCSSStyleSheet(importRule->styleSheet(), importURL);
-        } else if (rule->type() == CSSRule::FONT_FACE_RULE) {
+            serializeCSSStyleSheet(importRule.styleSheet(), importURL);
+        } else if (is<CSSFontFaceRule>(*rule)) {
             // FIXME: Add support for font face rule. It is not clear to me at this point if the actual otf/eot file can
             // be retrieved from the CSSFontFaceRule object.
-        } else if (rule->type() == CSSRule::STYLE_RULE)
-            retrieveResourcesForRule(toCSSStyleRule(rule)->styleRule(), document);
+        } else if (is<CSSStyleRule>(*rule))
+            retrieveResourcesForRule(downcast<CSSStyleRule>(*rule).styleRule(), document);
     }
 
     if (url.isValid() && !m_resourceURLs.contains(url)) {
@@ -311,9 +312,9 @@ void PageSerializer::addImageToResources(CachedImage* image, RenderElement* imag
     m_resourceURLs.add(url);
 }
 
-void PageSerializer::retrieveResourcesForRule(StyleRule* rule, Document* document)
+void PageSerializer::retrieveResourcesForRule(StyleRule& rule, Document* document)
 {
-    retrieveResourcesForProperties(&rule->properties(), document);
+    retrieveResourcesForProperties(&rule.properties(), document);
 }
 
 void PageSerializer::retrieveResourcesForProperties(const StyleProperties* styleDeclaration, Document* document)
@@ -327,18 +328,18 @@ void PageSerializer::retrieveResourcesForProperties(const StyleProperties* style
     unsigned propertyCount = styleDeclaration->propertyCount();
     for (unsigned i = 0; i < propertyCount; ++i) {
         RefPtr<CSSValue> cssValue = styleDeclaration->propertyAt(i).value();
-        if (!cssValue->isImageValue())
+        if (!is<CSSImageValue>(*cssValue))
             continue;
 
-        StyleImage* styleImage = toCSSImageValue(cssValue.get())->cachedOrPendingImage();
+        StyleImage* styleImage = downcast<CSSImageValue>(*cssValue).cachedOrPendingImage();
         // Non cached-images are just place-holders and do not contain data.
-        if (!styleImage || !styleImage->isCachedImage())
+        if (!is<StyleCachedImage>(styleImage))
             continue;
 
-        CachedImage* image = toStyleCachedImage(styleImage)->cachedImage();
+        CachedImage* image = downcast<StyleCachedImage>(*styleImage).cachedImage();
 
         URL url = document->completeURL(image->url());
-        addImageToResources(image, 0, url);
+        addImageToResources(image, nullptr, url);
     }
 }
 

@@ -174,11 +174,11 @@ RTCPeerConnection::RTCPeerConnection(ScriptExecutionContext& context, PassRefPtr
     , m_signalingState(SignalingStateStable)
     , m_iceGatheringState(IceGatheringStateNew)
     , m_iceConnectionState(IceConnectionStateNew)
-    , m_scheduledEventTimer(this, &RTCPeerConnection::scheduledEventTimerFired)
+    , m_scheduledEventTimer(*this, &RTCPeerConnection::scheduledEventTimerFired)
     , m_configuration(configuration)
     , m_stopped(false)
 {
-    Document& document = toDocument(context);
+    Document& document = downcast<Document>(context);
 
     if (!document.frame()) {
         ec = NOT_SUPPORTED_ERR;
@@ -724,7 +724,7 @@ void RTCPeerConnection::scheduleDispatchEvent(PassRefPtr<Event> event)
         m_scheduledEventTimer.startOneShot(0);
 }
 
-void RTCPeerConnection::scheduledEventTimerFired(Timer<RTCPeerConnection>*)
+void RTCPeerConnection::scheduledEventTimerFired()
 {
     if (m_stopped)
         return;

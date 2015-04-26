@@ -33,10 +33,13 @@
 namespace WebCore {
 
 class Element;
+class FrameLoader;
 class FrameView;
 class ImageBuffer;
 class Page;
 class RenderBox;
+class SVGSVGElement;
+class SVGFrameLoaderClient;
 class SVGImageChromeClient;
 class SVGImageForContainer;
 
@@ -54,6 +57,7 @@ public:
     virtual FloatSize size() const override { return m_intrinsicSize; }
 
     void setURL(const URL& url) { m_url = url; }
+    void setDataProtocolLoader(FrameLoader* dataProtocolLoader) { m_dataProtocolLoader = dataProtocolLoader; }
 
     virtual bool hasSingleSecurityOrigin() const override;
 
@@ -95,16 +99,20 @@ private:
     void drawPatternForContainer(GraphicsContext*, const FloatSize, float, const FloatRect&, const AffineTransform&, const FloatPoint&, ColorSpace,
         CompositeOperator, const FloatRect&, BlendMode);
 
+    SVGSVGElement* rootElement() const;
+
+    std::unique_ptr<SVGFrameLoaderClient> m_loaderClient;
     std::unique_ptr<SVGImageChromeClient> m_chromeClient;
     std::unique_ptr<Page> m_page;
     FloatSize m_intrinsicSize;
     URL m_url;
+    FrameLoader* m_dataProtocolLoader { nullptr };
 };
 
 bool isInSVGImage(const Element*);
 
-IMAGE_TYPE_CASTS(SVGImage)
+} // namespace WebCore
 
-}
+SPECIALIZE_TYPE_TRAITS_IMAGE(SVGImage)
 
 #endif // SVGImage_h

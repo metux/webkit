@@ -120,8 +120,9 @@ CapabilityLevel capabilityLevel(OpcodeID opcodeID, CodeBlock* codeBlock, Instruc
     case op_debug:
     case op_profile_will_call:
     case op_profile_did_call:
+    case op_profile_type:
+    case op_profile_control_flow:
     case op_mov:
-    case op_captured_mov:
     case op_check_has_instance:
     case op_instanceof:
     case op_is_undefined:
@@ -192,6 +193,7 @@ CapabilityLevel capabilityLevel(OpcodeID opcodeID, CodeBlock* codeBlock, Instruc
     case op_switch_imm:
     case op_switch_char:
     case op_in:
+    case op_get_scope:
     case op_get_from_scope:
     case op_get_enumerable_length:
     case op_has_generic_property:
@@ -215,7 +217,7 @@ CapabilityLevel capabilityLevel(OpcodeID opcodeID, CodeBlock* codeBlock, Instruc
 
     case op_resolve_scope: {
         // We don't compile 'catch' or 'with', so there's no point in compiling variable resolution within them.
-        ResolveType resolveType = ResolveModeAndType(pc[3].u.operand).type();
+        ResolveType resolveType = ResolveModeAndType(pc[4].u.operand).type();
         if (resolveType == Dynamic)
             return CannotCompile;
         return CanCompileAndInline;
@@ -231,9 +233,7 @@ CapabilityLevel capabilityLevel(OpcodeID opcodeID, CodeBlock* codeBlock, Instruc
 
     case op_new_regexp: 
     case op_create_lexical_environment:
-    case op_tear_off_lexical_environment:
     case op_new_func:
-    case op_new_captured_func:
     case op_new_func_exp:
     case op_switch_string: // Don't inline because we don't want to copy string tables in the concurrent JIT.
         return CanCompile;

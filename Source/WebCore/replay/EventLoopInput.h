@@ -48,9 +48,10 @@ class EventLoopInputExtent {
     WTF_MAKE_NONCOPYABLE(EventLoopInputExtent);
 public:
     EventLoopInputExtent(JSC::InputCursor&);
+    EventLoopInputExtent(JSC::InputCursor*);
     ~EventLoopInputExtent();
 private:
-    JSC::InputCursor& m_cursor;
+    JSC::InputCursor* m_cursor;
 };
 
 class EventLoopInputBase : public NondeterministicInputBase {
@@ -63,7 +64,8 @@ public:
 
 template <typename InputType>
 class EventLoopInput : public EventLoopInputBase {
-    virtual const AtomicString& type() const override final
+public:
+    virtual const String& type() const override final
     {
         return InputTraits<InputType>::type();
     }

@@ -36,6 +36,7 @@
 namespace WebCore {
 
 class CaptionUserPreferencesMediaAF : public CaptionUserPreferences {
+    WTF_MAKE_FAST_ALLOCATED;
 public:
     CaptionUserPreferencesMediaAF(PageGroup&);
     virtual ~CaptionUserPreferencesMediaAF();
@@ -68,6 +69,8 @@ public:
 
 private:
 #if HAVE(MEDIA_ACCESSIBILITY_FRAMEWORK)
+    void updateTimerFired();
+
     String captionsWindowCSS() const;
     String captionsBackgroundCSS() const;
     String captionsTextColorCSS() const;
@@ -78,6 +81,7 @@ private:
     String captionsTextEdgeCSS() const;
     String cssPropertyWithTextEdgeColor(CSSPropertyID, const String&, const Color&, bool) const;
     String colorPropertyCSS(CSSPropertyID, const Color&, bool) const;
+    Timer m_updateStyleSheetTimer;
 
     bool m_listeningForPreferenceChanges;
 #endif

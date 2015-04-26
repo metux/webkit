@@ -30,8 +30,8 @@
 #include "CodeSpecializationKind.h"
 #include "ExceptionHelpers.h"
 #include "JSStackInlines.h"
-#include "NameInstance.h"
 #include "StackAlignment.h"
+#include "Symbol.h"
 #include "VM.h"
 #include <wtf/StdLibExtras.h>
 
@@ -82,10 +82,7 @@ inline bool opIn(ExecState* exec, JSValue propName, JSValue baseVal)
     if (propName.getUInt32(i))
         return baseObj->hasProperty(exec, i);
 
-    if (isName(propName))
-        return baseObj->hasProperty(exec, jsCast<NameInstance*>(propName.asCell())->privateName());
-
-    Identifier property = propName.toString(exec)->toIdentifier(exec);
+    auto property = propName.toPropertyKey(exec);
     if (exec->vm().exception())
         return false;
     return baseObj->hasProperty(exec, property);
@@ -190,8 +187,6 @@ SLOW_PATH_HIDDEN_DECL(slow_path_create_this);
 SLOW_PATH_HIDDEN_DECL(slow_path_enter);
 SLOW_PATH_HIDDEN_DECL(slow_path_get_callee);
 SLOW_PATH_HIDDEN_DECL(slow_path_to_this);
-SLOW_PATH_HIDDEN_DECL(slow_path_captured_mov);
-SLOW_PATH_HIDDEN_DECL(slow_path_new_captured_func);
 SLOW_PATH_HIDDEN_DECL(slow_path_not);
 SLOW_PATH_HIDDEN_DECL(slow_path_eq);
 SLOW_PATH_HIDDEN_DECL(slow_path_neq);
@@ -233,7 +228,7 @@ SLOW_PATH_HIDDEN_DECL(slow_path_get_structure_property_enumerator);
 SLOW_PATH_HIDDEN_DECL(slow_path_get_generic_property_enumerator);
 SLOW_PATH_HIDDEN_DECL(slow_path_next_enumerator_pname);
 SLOW_PATH_HIDDEN_DECL(slow_path_to_index_string);
-SLOW_PATH_HIDDEN_DECL(slow_path_profile_type);
+SLOW_PATH_HIDDEN_DECL(slow_path_profile_type_clear_log);
 
 } // namespace JSC
 

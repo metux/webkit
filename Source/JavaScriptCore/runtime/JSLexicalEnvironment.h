@@ -41,12 +41,12 @@ class Register;
     
 class JSLexicalEnvironment : public JSEnvironmentRecord {
 private:
-    JSLexicalEnvironment(VM&, CallFrame*, Register*, SymbolTable*);
+    JSLexicalEnvironment(VM&, CallFrame*, Register*, JSScope*, CodeBlock*);
     
 public:
     typedef JSEnvironmentRecord Base;
 
-    static JSLexicalEnvironment* create(VM& vm, CallFrame* callFrame, Register* registers, CodeBlock* codeBlock)
+    static JSLexicalEnvironment* create(VM& vm, CallFrame* callFrame, Register* registers, JSScope* currentScope, CodeBlock* codeBlock)
     {
         SymbolTable* symbolTable = codeBlock->symbolTable();
         ASSERT(codeBlock->codeType() == FunctionCode);
@@ -56,14 +56,14 @@ public:
                 vm.heap,
                 allocationSize(symbolTable)
             )
-        ) JSLexicalEnvironment(vm, callFrame, registers, symbolTable);
+        ) JSLexicalEnvironment(vm, callFrame, registers, currentScope, codeBlock);
         lexicalEnvironment->finishCreation(vm);
         return lexicalEnvironment;
     }
         
-    static JSLexicalEnvironment* create(VM& vm, CallFrame* callFrame, CodeBlock* codeBlock)
+    static JSLexicalEnvironment* create(VM& vm, CallFrame* callFrame, JSScope* currentScope, CodeBlock* codeBlock)
     {
-        return create(vm, callFrame, callFrame->registers() + codeBlock->framePointerOffsetToGetActivationRegisters(), codeBlock);
+        return create(vm, callFrame, callFrame->registers() + codeBlock->framePointerOffsetToGetActivationRegisters(), currentScope, codeBlock);
     }
 
     static void visitChildren(JSCell*, SlotVisitor&);
@@ -77,8 +77,6 @@ public:
 
     static JSValue toThis(JSCell*, ExecState*, ECMAMode);
 
-    void tearOff(VM&);
-        
     DECLARE_INFO;
 
     static Structure* createStructure(VM& vm, JSGlobalObject* globalObject) { return Structure::create(vm, globalObject, jsNull(), TypeInfo(ActivationObjectType, StructureFlags), info()); }
@@ -86,7 +84,6 @@ public:
     WriteBarrierBase<Unknown>& registerAt(int) const;
     bool isValidIndex(int) const;
     bool isValid(const SymbolTableEntry&) const;
-    bool isTornOff();
     int registersOffset();
     static int registersOffset(SymbolTable*);
 
@@ -111,18 +108,21 @@ private:
 extern int activationCount;
 extern int allTheThingsCount;
 
-inline JSLexicalEnvironment::JSLexicalEnvironment(VM& vm, CallFrame* callFrame, Register* registers, SymbolTable* symbolTable)
+inline JSLexicalEnvironment::JSLexicalEnvironment(VM& vm, CallFrame* callFrame, Register* registers, JSScope* currentScope, CodeBlock* codeBlock)
     : Base(
         vm,
         callFrame->lexicalGlobalObject()->activationStructure(),
         registers,
-        callFrame->scope(),
-        symbolTable)
+        currentScope,
+        codeBlock->symbolTable())
 {
+    SymbolTable* symbolTable = codeBlock->symbolTable();
     WriteBarrier<Unknown>* storage = this->storage();
     size_t captureCount = symbolTable->captureCount();
     for (size_t i = 0; i < captureCount; ++i)
-        new (NotNull, &storage[i]) WriteBarrier<Unknown>;
+        new (NotNull, &storage[i]) WriteBarrier<Unknown>(UndefinedWriteBarrierTag);
+    m_registers = reinterpret_cast_ptr<WriteBarrierBase<Unknown>*>(
+        reinterpret_cast<char*>(this) + registersOffset(symbolTable));
 }
 
 JSLexicalEnvironment* asActivation(JSValue);
@@ -141,28 +141,6 @@ ALWAYS_INLINE JSLexicalEnvironment* Register::lexicalEnvironment() const
 inline int JSLexicalEnvironment::registersOffset(SymbolTable* symbolTable)
 {
     return storageOffset() + ((symbolTable->captureCount() - symbolTable->captureStart()  - 1) * sizeof(WriteBarrier<Unknown>));
-}
-
-inline void JSLexicalEnvironment::tearOff(VM& vm)
-{
-    ASSERT(!isTornOff());
-
-    WriteBarrierBase<Unknown>* dst = reinterpret_cast_ptr<WriteBarrierBase<Unknown>*>(
-        reinterpret_cast<char*>(this) + registersOffset(symbolTable()));
-    WriteBarrierBase<Unknown>* src = m_registers;
-
-    int captureEnd = symbolTable()->captureEnd();
-    for (int i = symbolTable()->captureStart(); i > captureEnd; --i)
-        dst[i].set(vm, this, src[i].get());
-
-    m_registers = dst;
-    ASSERT(isTornOff());
-}
-
-inline bool JSLexicalEnvironment::isTornOff()
-{
-    return m_registers == reinterpret_cast_ptr<WriteBarrierBase<Unknown>*>(
-        reinterpret_cast<char*>(this) + registersOffset(symbolTable()));
 }
 
 inline size_t JSLexicalEnvironment::storageOffset()

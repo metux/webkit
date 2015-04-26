@@ -46,9 +46,9 @@ class Document;
 class SVGAttributeToPropertyMap;
 class SVGCursorElement;
 class SVGDocumentExtensions;
-class SVGElementInstance;
 class SVGElementRareData;
 class SVGSVGElement;
+class SVGUseElement;
 
 void mapAttributeToCSSProperty(HashMap<AtomicStringImpl*, CSSPropertyID>* propertyNameToIdMap, const QualifiedName& attrName);
 
@@ -66,15 +66,13 @@ public:
     static bool isAnimatableCSSProperty(const QualifiedName&);
     bool isPresentationAttributeWithSVGDOM(const QualifiedName&);
     bool isKnownAttribute(const QualifiedName&);
-    PassRefPtr<CSSValue> getPresentationAttribute(const String& name);
+    RefPtr<CSSValue> getPresentationAttribute(const String& name);
     virtual bool supportsMarkers() const { return false; }
     bool hasRelativeLengths() const { return !m_elementsWithRelativeLengths.isEmpty(); }
     virtual bool needsPendingResourceHandling() const { return true; }
     bool instanceUpdatesBlocked() const;
     void setInstanceUpdatesBlocked(bool);
     virtual AffineTransform localCoordinateSpaceTransform(SVGLocatable::CTMScope) const;
-
-    SVGDocumentExtensions* accessDocumentSVGExtensions();
 
     virtual bool isSVGGraphicsElement() const { return false; }
     virtual bool isFilterEffect() const { return false; }
@@ -87,12 +85,12 @@ public:
 
     virtual void svgAttributeChanged(const QualifiedName&);
 
-    void animatedPropertyTypeForAttribute(const QualifiedName&, Vector<AnimatedPropertyType>&);
+    Vector<AnimatedPropertyType> animatedPropertyTypesForAttribute(const QualifiedName&);
 
     void sendSVGLoadEventIfPossible(bool sendParentLoadEvents = false);
     void sendSVGLoadEventIfPossibleAsynchronously();
-    void svgLoadEventTimerFired(Timer<SVGElement>*);
-    virtual Timer<SVGElement>* svgLoadEventTimer();
+    void svgLoadEventTimerFired();
+    virtual Timer* svgLoadEventTimer();
 
     virtual AffineTransform* supplementalTransform() { return 0; }
 
@@ -104,7 +102,8 @@ public:
         setNeedsStyleRecalc(InlineStyleChange);
     }
 
-    const HashSet<SVGElementInstance*>& instancesForElement() const;
+    // The instances of an element are clones made in shadow trees to implement <use>.
+    const HashSet<SVGElement*>& instances() const;
 
     bool getBoundingBox(FloatRect&, SVGLocatable::StyleUpdateStrategy = SVGLocatable::AllowStyleUpdate);
 
@@ -113,13 +112,15 @@ public:
     void setCursorImageValue(CSSCursorImageValue*);
     void cursorImageValueRemoved();
 
-    SVGElement* correspondingElement();
+    SVGElement* correspondingElement() const;
+    SVGUseElement* correspondingUseElement() const;
+
     void setCorrespondingElement(SVGElement*);
 
     void synchronizeAnimatedSVGAttribute(const QualifiedName&) const;
     static void synchronizeAllAnimatedSVGAttribute(SVGElement*);
  
-    virtual PassRefPtr<RenderStyle> customStyleForRenderer(RenderStyle& parentStyle) override;
+    virtual RefPtr<RenderStyle> customStyleForRenderer(RenderStyle& parentStyle) override;
 
     static void synchronizeRequiredFeatures(SVGElement* contextElement);
     static void synchronizeRequiredExtensions(SVGElement* contextElement);
@@ -153,6 +154,8 @@ public:
 
     void callClearTarget() { clearTarget(); }
 
+    class InstanceUpdateBlocker;
+
 protected:
     SVGElement(const QualifiedName&, Document&);
     virtual ~SVGElement();
@@ -181,9 +184,9 @@ protected:
     void updateRelativeLengthsInformation() { updateRelativeLengthsInformation(selfHasRelativeLengths(), this); }
     void updateRelativeLengthsInformation(bool hasRelativeLengths, SVGElement*);
 
-private:
-    friend class SVGElementInstance;
+    class InstanceInvalidationGuard;
 
+private:
     virtual RenderStyle* computedStyle(PseudoId = NOPSEUDO) override final;
     virtual bool willRecalcStyle(Style::Change) override;
 
@@ -191,15 +194,14 @@ private:
 
     virtual void clearTarget() { }
 
-    void mapInstanceToElement(SVGElementInstance*);
-    void removeInstanceMapping(SVGElementInstance*);
-
     void buildPendingResourcesIfNeeded();
     virtual void accessKeyAction(bool sendMouseEvents) override;
 
 #ifndef NDEBUG
     virtual bool filterOutAnimatableAttribute(const QualifiedName&) const;
 #endif
+
+    void invalidateInstances();
 
     std::unique_ptr<SVGElementRareData> m_svgRareData;
 
@@ -209,6 +211,22 @@ private:
         DECLARE_ANIMATED_STRING(ClassName, className)
     END_DECLARE_ANIMATED_PROPERTIES
 
+};
+
+class SVGElement::InstanceInvalidationGuard {
+public:
+    InstanceInvalidationGuard(SVGElement&);
+    ~InstanceInvalidationGuard();
+private:
+    SVGElement& m_element;
+};
+
+class SVGElement::InstanceUpdateBlocker {
+public:
+    InstanceUpdateBlocker(SVGElement&);
+    ~InstanceUpdateBlocker();
+private:
+    SVGElement& m_element;
 };
 
 struct SVGAttributeHashTranslator {
@@ -223,22 +241,37 @@ struct SVGAttributeHashTranslator {
     static bool equal(const QualifiedName& a, const QualifiedName& b) { return a.matches(b); }
 };
 
-void isSVGElement(const SVGElement&); // Catch unnecessary runtime check of type known at compile time.
-inline bool isSVGElement(const Node& node) { return node.isSVGElement(); }
+inline SVGElement::InstanceInvalidationGuard::InstanceInvalidationGuard(SVGElement& element)
+    : m_element(element)
+{
+}
 
-template <typename ArgType>
-struct ElementTypeCastTraits<const SVGElement, ArgType> {
-    static bool is(ArgType& node) { return isSVGElement(node); }
-};
+inline SVGElement::InstanceInvalidationGuard::~InstanceInvalidationGuard()
+{
+    m_element.invalidateInstances();
+}
 
-NODE_TYPE_CASTS(SVGElement)
+inline SVGElement::InstanceUpdateBlocker::InstanceUpdateBlocker(SVGElement& element)
+    : m_element(element)
+{
+    m_element.setInstanceUpdatesBlocked(true);
+}
+
+inline SVGElement::InstanceUpdateBlocker::~InstanceUpdateBlocker()
+{
+    m_element.setInstanceUpdatesBlocked(false);
+}
 
 inline bool Node::hasTagName(const SVGQualifiedName& name) const
 {
-    return isSVGElement() && toSVGElement(*this).hasTagName(name);
+    return isSVGElement() && downcast<SVGElement>(*this).hasTagName(name);
 }
 
 } // namespace WebCore
+
+SPECIALIZE_TYPE_TRAITS_BEGIN(WebCore::SVGElement)
+    static bool isType(const WebCore::Node& node) { return node.isSVGElement(); }
+SPECIALIZE_TYPE_TRAITS_END()
 
 #include "SVGElementTypeHelpers.h"
 

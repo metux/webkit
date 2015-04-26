@@ -43,9 +43,9 @@ inline HTMLOptGroupElement::HTMLOptGroupElement(const QualifiedName& tagName, Do
     ASSERT(hasTagName(optgroupTag));
 }
 
-PassRefPtr<HTMLOptGroupElement> HTMLOptGroupElement::create(const QualifiedName& tagName, Document& document)
+Ref<HTMLOptGroupElement> HTMLOptGroupElement::create(const QualifiedName& tagName, Document& document)
 {
-    return adoptRef(new HTMLOptGroupElement(tagName, document));
+    return adoptRef(*new HTMLOptGroupElement(tagName, document));
 }
 
 bool HTMLOptGroupElement::isDisabledFormControl() const
@@ -80,16 +80,16 @@ void HTMLOptGroupElement::parseAttribute(const QualifiedName& name, const Atomic
     recalcSelectOptions();
 
     if (name == disabledAttr)
-        didAffectSelector(AffectedSelectorDisabled | AffectedSelectorEnabled);
+        setNeedsStyleRecalc();
 }
 
 void HTMLOptGroupElement::recalcSelectOptions()
 {
     ContainerNode* select = parentNode();
-    while (select && !select->hasTagName(selectTag))
+    while (select && !is<HTMLSelectElement>(*select))
         select = select->parentNode();
     if (select)
-        toHTMLSelectElement(select)->setRecalcListItems();
+        downcast<HTMLSelectElement>(*select).setRecalcListItems();
 }
 
 String HTMLOptGroupElement::groupLabelText() const
@@ -107,13 +107,13 @@ String HTMLOptGroupElement::groupLabelText() const
 HTMLSelectElement* HTMLOptGroupElement::ownerSelectElement() const
 {
     ContainerNode* select = parentNode();
-    while (select && !select->hasTagName(selectTag))
+    while (select && !is<HTMLSelectElement>(*select))
         select = select->parentNode();
     
     if (!select)
-       return 0;
+        return nullptr;
     
-    return toHTMLSelectElement(select);
+    return downcast<HTMLSelectElement>(select);
 }
 
 void HTMLOptGroupElement::accessKeyAction(bool)

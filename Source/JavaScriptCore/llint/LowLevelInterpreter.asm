@@ -1,4 +1,4 @@
-# Copyright (C) 2011, 2012, 2013, 2014 Apple Inc. All rights reserved.
+# Copyright (C) 2011-2015 Apple Inc. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -34,10 +34,10 @@ end
 
 if JSVALUE64
     const PtrSize = 8
-    const CallFrameHeaderSlots = 6
+    const CallFrameHeaderSlots = 5
 else
     const PtrSize = 4
-    const CallFrameHeaderSlots = 5
+    const CallFrameHeaderSlots = 4
     const CallFrameAlignSlots = 1
 end
 const SlotSize = 8
@@ -50,10 +50,10 @@ const CallerFrameAndPCSize = 2 * PtrSize
 const CallerFrame = 0
 const ReturnPC = CallerFrame + PtrSize
 const CodeBlock = ReturnPC + PtrSize
-const ScopeChain = CodeBlock + SlotSize
-const Callee = ScopeChain + SlotSize
+const Callee = CodeBlock + SlotSize
 const ArgumentCount = Callee + SlotSize
 const ThisArgumentOffset = ArgumentCount + SlotSize
+const FirstArgumentOffset = ThisArgumentOffset + SlotSize
 const CallFrameHeaderSize = ThisArgumentOffset
 
 # Some value representation constants.
@@ -66,6 +66,8 @@ if JSVALUE64
     const ValueTrue       = TagBitTypeOther | TagBitBool | 1
     const ValueUndefined  = TagBitTypeOther | TagBitUndefined
     const ValueNull       = TagBitTypeOther
+    const TagTypeNumber   = 0xffff000000000000
+    const TagMask         = TagTypeNumber | TagBitTypeOther
 else
     const Int32Tag = -1
     const BooleanTag = -2
@@ -154,8 +156,8 @@ const SlowPutArrayStorageShape = 30
 
 # Type constants.
 const StringType = 6
-const ObjectType = 17
-const FinalObjectType = 18
+const ObjectType = 18
+const FinalObjectType = 19
 
 # Type flags constants.
 const MasqueradesAsUndefined = 1
@@ -183,10 +185,11 @@ const firstOutOfLineOffset = 100
 const GlobalProperty = 0
 const GlobalVar = 1
 const ClosureVar = 2
-const GlobalPropertyWithVarInjectionChecks = 3
-const GlobalVarWithVarInjectionChecks = 4
-const ClosureVarWithVarInjectionChecks = 5
-const Dynamic = 6
+const LocalClosureVar = 3
+const GlobalPropertyWithVarInjectionChecks = 4
+const GlobalVarWithVarInjectionChecks = 5
+const ClosureVarWithVarInjectionChecks = 6
+const Dynamic = 7
 
 const ResolveModeMask = 0xffff
 
@@ -444,21 +447,21 @@ macro vmEntryRecord(entryFramePointer, resultReg)
     subp entryFramePointer, VMEntryTotalFrameSize, resultReg
 end
 
-macro moveStackPointerForCodeBlock(codeBlock, scratch)
-    loadi CodeBlock::m_numCalleeRegisters[codeBlock], scratch
-    lshiftp 3, scratch
-    addp maxFrameExtentForSlowPathCall, scratch
-    if ARMv7
-        subp cfr, scratch, scratch
-        move scratch, sp
-    else
-        subp cfr, scratch, sp
-    end
+macro getFrameRegisterSizeForCodeBlock(codeBlock, size)
+    loadi CodeBlock::m_numCalleeRegisters[codeBlock], size
+    lshiftp 3, size
+    addp maxFrameExtentForSlowPathCall, size
 end
 
 macro restoreStackPointerAfterCall()
     loadp CodeBlock[cfr], t2
-    moveStackPointerForCodeBlock(t2, t4)
+    getFrameRegisterSizeForCodeBlock(t2, t4)
+    if ARMv7
+        subp cfr, t4, t4
+        move t4, sp
+    else
+        subp cfr, t4, sp
+    end
 end
 
 macro traceExecution()
@@ -508,7 +511,7 @@ macro arrayProfile(cellAndIndexingType, profile, scratch)
     loadb JSCell::m_indexingType[cell], indexingType
 end
 
-macro checkMarkByte(cell, scratch1, scratch2, continuation)
+macro skipIfIsRememberedOrInEden(cell, scratch1, scratch2, continuation)
     loadb JSCell::m_gcData[cell], scratch1
     continuation(scratch1)
 end
@@ -605,8 +608,6 @@ macro prologue(codeBlockGetter, codeBlockSetter, osrSlowPath, traceSlowPath)
     end
 
     codeBlockSetter(t1)
-    
-    moveStackPointerForCodeBlock(t1, t2)
 
     # Set up the PC.
     if JSVALUE64
@@ -615,6 +616,29 @@ macro prologue(codeBlockGetter, codeBlockSetter, osrSlowPath, traceSlowPath)
     else
         loadp CodeBlock::m_instructions[t1], PC
     end
+
+    # Get new sp in t0 and check stack height.
+    getFrameRegisterSizeForCodeBlock(t1, t0)
+    subp cfr, t0, t0
+    loadp CodeBlock::m_vm[t1], t2
+    bpbeq VM::m_jsStackLimit[t2], t0, .stackHeightOK
+
+    # Stack height check failed - need to call a slow_path.
+    subp maxFrameExtentForSlowPathCall, sp # Set up temporary stack pointer for call
+    callSlowPath(_llint_stack_check)
+    bpeq t1, 0, .stackHeightOKGetCodeBlock
+    move t1, cfr
+    dispatch(0) # Go to exception handler in PC
+
+.stackHeightOKGetCodeBlock:
+    # Stack check slow path returned that the stack was ok.
+    # Since they were clobbered, need to get CodeBlock and new sp
+    codeBlockGetter(t1)
+    getFrameRegisterSizeForCodeBlock(t1, t0)
+    subp cfr, t0, t0
+
+.stackHeightOK:
+    move t0, sp
 end
 
 # Expects that CodeBlock is in t1, which is what prologue() leaves behind.
@@ -649,20 +673,6 @@ macro functionInitialization(profileArgSkip)
     end
     baddpnz -8, t0, .argumentProfileLoop
 .argumentProfileDone:
-        
-    # Check stack height.
-    loadi CodeBlock::m_numCalleeRegisters[t1], t0
-    loadp CodeBlock::m_vm[t1], t2
-    lshiftp 3, t0
-    addi maxFrameExtentForSlowPathCall, t0
-    subp cfr, t0, t0
-    bpbeq VM::m_jsStackLimit[t2], t0, .stackHeightOK
-
-    # Stack height check failed - need to call a slow_path.
-    callSlowPath(_llint_stack_check)
-    bpeq t1, 0, .stackHeightOK
-    move t1, cfr
-.stackHeightOK:
 end
 
 macro allocateJSObject(allocator, structure, result, scratch1, slowCase)
@@ -1111,12 +1121,14 @@ _llint_op_loop_hint:
     traceExecution()
     loadp CodeBlock[cfr], t1
     loadp CodeBlock::m_vm[t1], t1
-    loadb VM::watchdog+Watchdog::m_timerDidFire[t1], t0
-    btbnz t0, .handleWatchdogTimer
+    loadp VM::watchdog[t1], t0
+    btpnz t0, .handleWatchdogTimer
 .afterWatchdogTimerCheck:
     checkSwitchToJITForLoop()
     dispatch(1)
 .handleWatchdogTimer:
+    loadb Watchdog::m_timerDidFire[t0], t0
+    btbz t0, .afterWatchdogTimerCheck
     callWatchdogTimerHandler(.throwHandler)
     jmp .afterWatchdogTimerCheck
 .throwHandler:
@@ -1131,7 +1143,7 @@ _llint_op_switch_string:
 _llint_op_new_func_exp:
     traceExecution()
     callSlowPath(_llint_slow_path_new_func_exp)
-    dispatch(3)
+    dispatch(4)
 
 
 _llint_op_call:
@@ -1234,19 +1246,19 @@ _llint_op_strcat:
 _llint_op_push_with_scope:
     traceExecution()
     callSlowPath(_llint_slow_path_push_with_scope)
-    dispatch(2)
+    dispatch(3)
 
 
 _llint_op_pop_scope:
     traceExecution()
     callSlowPath(_llint_slow_path_pop_scope)
-    dispatch(1)
+    dispatch(2)
 
 
 _llint_op_push_name_scope:
     traceExecution()
     callSlowPath(_llint_slow_path_push_name_scope)
-    dispatch(4)
+    dispatch(6)
 
 
 _llint_op_throw:
@@ -1345,6 +1357,12 @@ _llint_op_to_index_string:
     callSlowPath(_slow_path_to_index_string)
     dispatch(3)
 
+_llint_op_profile_control_flow:
+    traceExecution()
+    loadpFromInstruction(1, t0)
+    storeb 1, BasicBlockLocation::m_hasExecuted[t0]
+    dispatch(2)
+
 # Lastly, make sure that we can link even though we don't support all opcodes.
 # These opcodes should never arise when using LLInt or either JIT. We assert
 # as much.
@@ -1365,7 +1383,3 @@ end
 
 _llint_op_init_global_const_nop:
     dispatch(5)
-
-_llint_op_profile_type:
-    callSlowPath(_slow_path_profile_type)
-    dispatch(6)

@@ -32,7 +32,6 @@
 #include "ElementIterator.h"
 #include "FocusController.h"
 #include "Frame.h"
-#include "FrameView.h"
 #include "HTMLAnchorElement.h"
 #include "HTMLFrameOwnerElement.h"
 #include "HTMLLabelElement.h"
@@ -40,7 +39,6 @@
 #include "HitTestResult.h"
 #include "IdTargetObserverRegistry.h"
 #include "Page.h"
-#include "RenderView.h"
 #include "RuntimeEnabledFeatures.h"
 #include "ShadowRoot.h"
 #include "TreeScopeAdopter.h"
@@ -216,49 +214,6 @@ HTMLMapElement* TreeScope::getImageMap(const String& url) const
     return m_imageMapsByName->getElementByMapName(*AtomicString(name).impl(), *this);
 }
 
-Node* nodeFromPoint(Document* document, int x, int y, LayoutPoint* localPoint)
-{
-    Frame* frame = document->frame();
-
-    if (!frame)
-        return nullptr;
-    FrameView* frameView = frame->view();
-    if (!frameView)
-        return nullptr;
-
-    float scaleFactor = frame->pageZoomFactor() * frame->frameScaleFactor();
-
-    IntPoint scrollPosition = frameView->contentsScrollPosition();
-    IntPoint point = roundedIntPoint(FloatPoint(x * scaleFactor  + scrollPosition.x(), y * scaleFactor + scrollPosition.y()));
-
-    IntRect visibleRect;
-#if PLATFORM(IOS)
-    visibleRect = frameView->unobscuredContentRect();
-#else
-    visibleRect = frameView->visibleContentRect();
-#endif
-    if (!visibleRect.contains(point))
-        return nullptr;
-
-    HitTestResult result(point);
-    document->renderView()->hitTest(HitTestRequest(), result);
-
-    if (localPoint)
-        *localPoint = result.localPoint();
-
-    return result.innerNode();
-}
-
-Element* TreeScope::elementFromPoint(int x, int y) const
-{
-    Node* node = nodeFromPoint(&m_rootNode.document(), x, y);
-    while (node && !node->isElementNode())
-        node = node->parentNode();
-    if (node)
-        node = ancestorInThisScope(node);
-    return toElement(node);
-}
-
 void TreeScope::addLabel(const AtomicStringImpl& forAttributeValue, HTMLLabelElement& element)
 {
     ASSERT(m_labelsByForAttribute);
@@ -356,7 +311,7 @@ Element* TreeScope::focusedElement()
         return nullptr;
     TreeScope* treeScope = &element->treeScope();
     while (treeScope != this && treeScope != &document) {
-        element = toShadowRoot(treeScope->rootNode()).hostElement();
+        element = downcast<ShadowRoot>(treeScope->rootNode()).hostElement();
         treeScope = &element->treeScope();
     }
     if (this != treeScope)

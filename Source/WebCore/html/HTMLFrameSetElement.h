@@ -31,7 +31,7 @@ namespace WebCore {
 
 class HTMLFrameSetElement final : public HTMLElement {
 public:
-    static PassRefPtr<HTMLFrameSetElement> create(const QualifiedName&, Document&);
+    static Ref<HTMLFrameSetElement> create(const QualifiedName&, Document&);
 
     bool hasFrameBorder() const { return m_frameborder; }
     bool noResize() const { return m_noresize; }
@@ -75,7 +75,7 @@ private:
 
     virtual void willAttachRenderers() override;
     virtual bool rendererIsNeeded(const RenderStyle&) override;
-    virtual RenderPtr<RenderElement> createElementRenderer(PassRef<RenderStyle>) override;
+    virtual RenderPtr<RenderElement> createElementRenderer(Ref<RenderStyle>&&) override;
     
     virtual void defaultEventHandler(Event*) override;
 
@@ -99,8 +99,6 @@ private:
     bool m_frameborderSet;
     bool m_noresize;
 };
-
-NODE_TYPE_CASTS(HTMLFrameSetElement)
 
 } // namespace WebCore
 

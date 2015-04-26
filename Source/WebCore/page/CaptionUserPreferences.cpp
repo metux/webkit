@@ -24,16 +24,19 @@
  */
 
 #include "config.h"
+#include "CaptionUserPreferences.h"
 
 #if ENABLE(VIDEO_TRACK)
 
-#include "CaptionUserPreferences.h"
+#include "AudioTrackList.h"
 #include "DOMWrapperWorld.h"
 #include "Page.h"
 #include "PageGroup.h"
 #include "Settings.h"
 #include "TextTrackList.h"
 #include "UserContentController.h"
+#include "UserContentTypes.h"
+#include "UserStyleSheet.h"
 #include "UserStyleSheetTypes.h"
 
 namespace WebCore {
@@ -41,7 +44,7 @@ namespace WebCore {
 CaptionUserPreferences::CaptionUserPreferences(PageGroup& group)
     : m_pageGroup(group)
     , m_displayMode(ForcedOnly)
-    , m_timer(this, &CaptionUserPreferences::timerFired)
+    , m_timer(*this, &CaptionUserPreferences::timerFired)
     , m_testingMode(false)
     , m_havePreferences(false)
 {
@@ -51,7 +54,7 @@ CaptionUserPreferences::~CaptionUserPreferences()
 {
 }
 
-void CaptionUserPreferences::timerFired(Timer<CaptionUserPreferences>&)
+void CaptionUserPreferences::timerFired()
 {
     captionPreferencesChanged();
 }
@@ -193,6 +196,38 @@ Vector<RefPtr<TextTrack>> CaptionUserPreferences::sortedTrackListForMenu(TextTra
 
     tracksForMenu.insert(0, TextTrack::captionMenuOffItem());
     tracksForMenu.insert(1, TextTrack::captionMenuAutomaticItem());
+
+    return tracksForMenu;
+}
+
+static String trackDisplayName(AudioTrack* track)
+{
+    if (track->label().isEmpty() && track->language().isEmpty())
+        return audioTrackNoLabelText();
+    if (!track->label().isEmpty())
+        return track->label();
+    return track->language();
+}
+
+String CaptionUserPreferences::displayNameForTrack(AudioTrack* track) const
+{
+    return trackDisplayName(track);
+}
+
+Vector<RefPtr<AudioTrack>> CaptionUserPreferences::sortedTrackListForMenu(AudioTrackList* trackList)
+{
+    ASSERT(trackList);
+
+    Vector<RefPtr<AudioTrack>> tracksForMenu;
+
+    for (unsigned i = 0, length = trackList->length(); i < length; ++i) {
+        AudioTrack* track = trackList->item(i);
+        tracksForMenu.append(track);
+    }
+
+    std::sort(tracksForMenu.begin(), tracksForMenu.end(), [](const RefPtr<AudioTrack>& a, const RefPtr<AudioTrack>& b) {
+        return codePointCompare(trackDisplayName(a.get()), trackDisplayName(b.get())) < 0;
+    });
 
     return tracksForMenu;
 }

@@ -84,7 +84,7 @@ static double getScreenDPI()
     return dpi;
 }
 
-void RenderThemeGtk::systemFont(CSSValueID, FontDescription& fontDescription) const
+void RenderThemeGtk::updateCachedSystemFontDescription(CSSValueID, FontDescription& fontDescription) const
 {
     GtkSettings* settings = gtk_settings_get_default();
     if (!settings)
@@ -107,9 +107,8 @@ void RenderThemeGtk::systemFont(CSSValueID, FontDescription& fontDescription) co
 
     fontDescription.setSpecifiedSize(size);
     fontDescription.setIsAbsoluteSize(true);
-    fontDescription.setGenericFamily(FontDescription::NoFamily);
     fontDescription.setWeight(FontWeightNormal);
-    fontDescription.setItalic(false);
+    fontDescription.setItalic(FontItalicOff);
     pango_font_description_free(pangoDescription);
 }
 
@@ -258,13 +257,13 @@ static GRefPtr<GdkPixbuf> getStockSymbolicIconForWidgetType(GType widgetType, co
 static HTMLMediaElement* getMediaElementFromRenderObject(const RenderObject& o)
 {
     Node* node = o.node();
-    Node* mediaNode = node ? node->shadowHost() : 0;
+    Node* mediaNode = node ? node->shadowHost() : nullptr;
     if (!mediaNode)
         mediaNode = node;
-    if (!mediaNode || !mediaNode->isElementNode() || !toElement(mediaNode)->isMediaElement())
-        return 0;
+    if (!is<HTMLMediaElement>(mediaNode))
+        return nullptr;
 
-    return toHTMLMediaElement(mediaNode);
+    return downcast<HTMLMediaElement>(mediaNode);
 }
 
 void RenderThemeGtk::initMediaColors()
@@ -316,15 +315,15 @@ static bool nodeHasPseudo(Node* node, const char* pseudo)
 
 static bool nodeHasClass(Node* node, const char* className)
 {
-    if (!node->isElementNode())
+    if (!is<Element>(*node))
         return false;
 
-    Element* element = toElement(node);
+    Element& element = downcast<Element>(*node);
 
-    if (!element->hasClass())
+    if (!element.hasClass())
         return false;
 
-    return element->classNames().contains(className);
+    return element.classNames().contains(className);
 }
 
 RenderThemeGtk::RenderThemeGtk()
@@ -373,19 +372,18 @@ bool RenderThemeGtk::controlSupportsTints(const RenderObject& o) const
     return isEnabled(o);
 }
 
-int RenderThemeGtk::baselinePosition(const RenderObject& o) const
+int RenderThemeGtk::baselinePosition(const RenderObject& renderer) const
 {
-    if (!o.isBox())
+    if (!is<RenderBox>(renderer))
         return 0;
 
     // FIXME: This strategy is possibly incorrect for the GTK+ port.
-    if (o.style().appearance() == CheckboxPart
-        || o.style().appearance() == RadioPart) {
-        const RenderBox* box = toRenderBox(&o);
-        return box->marginTop() + box->height() - 2;
+    if (renderer.style().appearance() == CheckboxPart || renderer.style().appearance() == RadioPart) {
+        const auto& box = downcast<RenderBox>(renderer);
+        return box.marginTop() + box.height() - 2;
     }
 
-    return RenderTheme::baselinePosition(o);
+    return RenderTheme::baselinePosition(renderer);
 }
 
 static GtkTextDirection gtkTextDirection(TextDirection direction)
@@ -990,13 +988,13 @@ static IntRect centerRectVerticallyInParentInputElement(const RenderObject& rend
     Node* input = renderObject.node()->shadowHost();
     if (!input)
         input = renderObject.node();
-    if (!input->renderer()->isBox())
+    if (!is<RenderBox>(*input->renderer()))
         return IntRect();
 
     // If possible center the y-coordinate of the rect vertically in the parent input element.
     // We also add one pixel here to ensure that the y coordinate is rounded up for box heights
     // that are even, which looks in relation to the box text.
-    IntRect inputContentBox = toRenderBox(input->renderer())->absoluteContentBox();
+    IntRect inputContentBox = downcast<RenderBox>(*input->renderer()).absoluteContentBox();
 
     // Make sure the scaled decoration stays square and will fit in its parent's box.
     int iconSize = std::min(inputContentBox.width(), std::min(inputContentBox.height(), rect.height()));
@@ -1618,7 +1616,7 @@ double RenderThemeGtk::animationDurationForProgressBar(RenderProgress&) const
 IntRect RenderThemeGtk::calculateProgressRect(const RenderObject& renderObject, const IntRect& fullBarRect)
 {
     IntRect progressRect(fullBarRect);
-    const RenderProgress& renderProgress = toRenderProgress(renderObject);
+    const auto& renderProgress = downcast<RenderProgress>(renderObject);
     if (renderProgress.isDeterminate()) {
         int progressWidth = progressRect.width() * renderProgress.position();
         if (renderObject.style().direction() == RTL)
@@ -1645,7 +1643,7 @@ IntRect RenderThemeGtk::calculateProgressRect(const RenderObject& renderObject, 
     return progressRect;
 }
 
-String RenderThemeGtk::fileListNameForWidth(const FileList* fileList, const Font& font, int width, bool multipleFilesAllowed) const
+String RenderThemeGtk::fileListNameForWidth(const FileList* fileList, const FontCascade& font, int width, bool multipleFilesAllowed) const
 {
     if (width <= 0)
         return String();
@@ -1664,6 +1662,7 @@ String RenderThemeGtk::fileListNameForWidth(const FileList* fileList, const Font
     return StringTruncator::centerTruncate(string, width, font, StringTruncator::EnableRoundingHacks);
 }
 
+#if ENABLE(VIDEO)
 String RenderThemeGtk::mediaControlsScript()
 {
     StringBuilder scriptBuilder;
@@ -1672,6 +1671,7 @@ String RenderThemeGtk::mediaControlsScript()
     scriptBuilder.append(mediaControlsGtkJavaScript, sizeof(mediaControlsGtkJavaScript));
     return scriptBuilder.toString();
 }
+#endif // ENABLE(VIDEO)
 
 #endif // GTK_API_VERSION_2
 }

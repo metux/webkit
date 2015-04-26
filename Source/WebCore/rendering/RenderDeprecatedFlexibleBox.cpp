@@ -25,7 +25,7 @@
 #include "config.h"
 #include "RenderDeprecatedFlexibleBox.h"
 
-#include "Font.h"
+#include "FontCascade.h"
 #include "LayoutRepainter.h"
 #include "RenderLayer.h"
 #include "RenderView.h"
@@ -117,7 +117,7 @@ private:
     int m_ordinalIteration;
 };
 
-RenderDeprecatedFlexibleBox::RenderDeprecatedFlexibleBox(Element& element, PassRef<RenderStyle> style)
+RenderDeprecatedFlexibleBox::RenderDeprecatedFlexibleBox(Element& element, Ref<RenderStyle>&& style)
     : RenderBlock(element, WTF::move(style), 0)
 {
     setChildrenInline(false); // All of our children must be block-level
@@ -423,8 +423,7 @@ void RenderDeprecatedFlexibleBox::layoutHorizontalBox(bool relayoutChildren)
             // Compute the child's vertical margins.
             child->computeAndSetBlockDirectionMargins(this);
 
-            if (!child->needsLayout())
-                child->markForPaginationRelayoutIfNeeded();
+            child->markForPaginationRelayoutIfNeeded();
             
             // Apply the child's current layout delta.
             layoutChildIfNeededApplyingDelta(child, childLayoutDelta);
@@ -499,8 +498,7 @@ void RenderDeprecatedFlexibleBox::layoutHorizontalBox(bool relayoutChildren)
             if (oldChildHeight != child->height())
                 child->setChildNeedsLayout(MarkOnlyThis);
 
-            if (!child->needsLayout())
-                child->markForPaginationRelayoutIfNeeded();
+            child->markForPaginationRelayoutIfNeeded();
 
             layoutChildIfNeededApplyingDelta(child, childLayoutDelta);
 
@@ -744,8 +742,7 @@ void RenderDeprecatedFlexibleBox::layoutVerticalBox(bool relayoutChildren)
             // Add in the child's marginTop to our height.
             setHeight(height() + child->marginTop());
 
-            if (!child->needsLayout())
-                child->markForPaginationRelayoutIfNeeded();
+            child->markForPaginationRelayoutIfNeeded();
 
             // Now do a layout.
             layoutChildIfNeededApplyingDelta(child, childLayoutDelta);
@@ -942,18 +939,18 @@ void RenderDeprecatedFlexibleBox::applyLineClamp(FlexBoxIterator& iterator, bool
 
         child->clearOverrideSize();
         if (relayoutChildren || (child->isReplaced() && (child->style().width().isPercent() || child->style().height().isPercent()))
-            || (child->style().height().isAuto() && child->isRenderBlockFlow())) {
+            || (child->style().height().isAuto() && is<RenderBlockFlow>(*child))) {
             child->setChildNeedsLayout(MarkOnlyThis);
 
             // Dirty all the positioned objects.
-            if (child->isRenderBlockFlow()) {
-                toRenderBlockFlow(child)->markPositionedObjectsForLayout();
-                toRenderBlockFlow(child)->clearTruncation();
+            if (is<RenderBlockFlow>(*child)) {
+                downcast<RenderBlockFlow>(*child).markPositionedObjectsForLayout();
+                downcast<RenderBlockFlow>(*child).clearTruncation();
             }
         }
         child->layoutIfNeeded();
-        if (child->style().height().isAuto() && child->isRenderBlockFlow())
-            maxLineCount = std::max(maxLineCount, toRenderBlockFlow(child)->lineCount());
+        if (child->style().height().isAuto() && is<RenderBlockFlow>(*child))
+            maxLineCount = std::max(maxLineCount, downcast<RenderBlockFlow>(*child).lineCount());
     }
 
     // Get the number of lines and then alter all block flow children with auto height to use the
@@ -964,15 +961,15 @@ void RenderDeprecatedFlexibleBox::applyLineClamp(FlexBoxIterator& iterator, bool
         return;
 
     for (RenderBox* child = iterator.first(); child; child = iterator.next()) {
-        if (childDoesNotAffectWidthOrFlexing(child) || !child->style().height().isAuto() || !child->isRenderBlockFlow())
+        if (childDoesNotAffectWidthOrFlexing(child) || !child->style().height().isAuto() || !is<RenderBlockFlow>(*child))
             continue;
 
-        RenderBlockFlow* blockChild = toRenderBlockFlow(child);
-        int lineCount = blockChild->lineCount();
+        RenderBlockFlow& blockChild = downcast<RenderBlockFlow>(*child);
+        int lineCount = blockChild.lineCount();
         if (lineCount <= numVisibleLines)
             continue;
 
-        LayoutUnit newHeight = blockChild->heightForLineCount(numVisibleLines);
+        LayoutUnit newHeight = blockChild.heightForLineCount(numVisibleLines);
         if (newHeight == child->height())
             continue;
 
@@ -985,11 +982,11 @@ void RenderDeprecatedFlexibleBox::applyLineClamp(FlexBoxIterator& iterator, bool
             continue;
 
         // Get the last line
-        RootInlineBox* lastLine = blockChild->lineAtIndex(lineCount - 1);
+        RootInlineBox* lastLine = blockChild.lineAtIndex(lineCount - 1);
         if (!lastLine)
             continue;
 
-        RootInlineBox* lastVisibleLine = blockChild->lineAtIndex(numVisibleLines - 1);
+        RootInlineBox* lastVisibleLine = blockChild.lineAtIndex(numVisibleLines - 1);
         if (!lastVisibleLine)
             continue;
 
@@ -997,7 +994,7 @@ void RenderDeprecatedFlexibleBox::applyLineClamp(FlexBoxIterator& iterator, bool
         DEPRECATED_DEFINE_STATIC_LOCAL(AtomicString, ellipsisAndSpaceStr, (ellipsisAndSpace, 2));
         DEPRECATED_DEFINE_STATIC_LOCAL(AtomicString, ellipsisStr, (&horizontalEllipsis, 1));
         const RenderStyle& lineStyle = numVisibleLines == 1 ? firstLineStyle() : style();
-        const Font& font = lineStyle.font();
+        const FontCascade& font = lineStyle.fontCascade();
 
         // Get ellipsis width, and if the last child is an anchor, it will go after the ellipsis, so add in a space and the anchor width too
         LayoutUnit totalWidth;
@@ -1005,7 +1002,7 @@ void RenderDeprecatedFlexibleBox::applyLineClamp(FlexBoxIterator& iterator, bool
         if (anchorBox && anchorBox->renderer().style().isLink())
             totalWidth = anchorBox->logicalWidth() + font.width(constructTextRun(this, font, ellipsisAndSpace, 2, style()));
         else {
-            anchorBox = 0;
+            anchorBox = nullptr;
             totalWidth = font.width(constructTextRun(this, font, &horizontalEllipsis, 1, style()));
         }
 
@@ -1042,12 +1039,12 @@ void RenderDeprecatedFlexibleBox::clearLineClamp()
 
         child->clearOverrideSize();
         if ((child->isReplaced() && (child->style().width().isPercent() || child->style().height().isPercent()))
-            || (child->style().height().isAuto() && child->isRenderBlock())) {
+            || (child->style().height().isAuto() && is<RenderBlockFlow>(*child))) {
             child->setChildNeedsLayout();
 
-            if (child->isRenderBlockFlow()) {
-                toRenderBlockFlow(child)->markPositionedObjectsForLayout();
-                toRenderBlockFlow(child)->clearTruncation();
+            if (is<RenderBlockFlow>(*child)) {
+                downcast<RenderBlockFlow>(*child).markPositionedObjectsForLayout();
+                downcast<RenderBlockFlow>(*child).clearTruncation();
             }
         }
     }

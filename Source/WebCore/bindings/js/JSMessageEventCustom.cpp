@@ -95,12 +95,12 @@ static JSC::JSValue handleInitMessageEvent(JSMessageEvent* jsEvent, JSC::ExecSta
     bool cancelableArg = exec->argument(2).toBoolean(exec);
     const String originArg = exec->argument(4).toString(exec)->value(exec);
     const String lastEventIdArg = exec->argument(5).toString(exec)->value(exec);
-    DOMWindow* sourceArg = toDOMWindow(exec->argument(6));
+    DOMWindow* sourceArg = JSDOMWindow::toWrapped(exec->argument(6));
     std::unique_ptr<MessagePortArray> messagePorts;
-    OwnPtr<ArrayBufferArray> arrayBuffers;
+    std::unique_ptr<ArrayBufferArray> arrayBuffers;
     if (!exec->argument(7).isUndefinedOrNull()) {
         messagePorts = std::make_unique<MessagePortArray>();
-        arrayBuffers = adoptPtr(new ArrayBufferArray);
+        arrayBuffers = std::make_unique<ArrayBufferArray>();
         fillMessagePortArray(exec, exec->argument(7), *messagePorts, *arrayBuffers);
         if (exec->hadException())
             return jsUndefined();

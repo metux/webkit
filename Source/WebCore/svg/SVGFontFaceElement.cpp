@@ -33,7 +33,7 @@
 #include "CSSValueList.h"
 #include "Document.h"
 #include "ElementIterator.h"
-#include "Font.h"
+#include "FontCascade.h"
 #include "SVGDocumentExtensions.h"
 #include "SVGFontElement.h"
 #include "SVGFontFaceSrcElement.h"
@@ -56,9 +56,9 @@ inline SVGFontFaceElement::SVGFontFaceElement(const QualifiedName& tagName, Docu
     ASSERT(hasTagName(font_faceTag));
 }
 
-PassRefPtr<SVGFontFaceElement> SVGFontFaceElement::create(const QualifiedName& tagName, Document& document)
+Ref<SVGFontFaceElement> SVGFontFaceElement::create(const QualifiedName& tagName, Document& document)
 {
-    return adoptRef(new SVGFontFaceElement(tagName, document));
+    return adoptRef(*new SVGFontFaceElement(tagName, document));
 }
 
 void SVGFontFaceElement::parseAttribute(const QualifiedName& name, const AtomicString& value)
@@ -216,7 +216,7 @@ String SVGFontFaceElement::fontFamily() const
 SVGFontElement* SVGFontFaceElement::associatedFontElement() const
 {
     ASSERT(parentNode() == m_fontElement);
-    ASSERT(!parentNode() || isSVGFontElement(parentNode()));
+    ASSERT(!parentNode() || is<SVGFontElement>(*parentNode()));
     return m_fontElement;
 }
 
@@ -230,16 +230,16 @@ void SVGFontFaceElement::rebuildFontFace()
     // we currently ignore all but the first src element, alternatively we could concat them
     auto srcElement = childrenOfType<SVGFontFaceSrcElement>(*this).first();
 
-    bool describesParentFont = isSVGFontElement(parentNode());
+    bool describesParentFont = is<SVGFontElement>(*parentNode());
     RefPtr<CSSValueList> list;
 
     if (describesParentFont) {
-        m_fontElement = toSVGFontElement(parentNode());
+        m_fontElement = downcast<SVGFontElement>(parentNode());
 
         list = CSSValueList::createCommaSeparated();
         list->append(CSSFontFaceSrcValue::createLocal(fontFamily()));
     } else {
-        m_fontElement = 0;
+        m_fontElement = nullptr;
         if (srcElement)
             list = srcElement->srcValue();
     }
@@ -253,11 +253,11 @@ void SVGFontFaceElement::rebuildFontFace()
     if (describesParentFont) {    
         // Traverse parsed CSS values and associate CSSFontFaceSrcValue elements with ourselves.
         RefPtr<CSSValue> src = m_fontFaceRule->properties().getPropertyCSSValue(CSSPropertySrc);
-        CSSValueList* srcList = toCSSValueList(src.get());
+        CSSValueList* srcList = downcast<CSSValueList>(src.get());
 
         unsigned srcLength = srcList ? srcList->length() : 0;
-        for (unsigned i = 0; i < srcLength; i++) {
-            if (CSSFontFaceSrcValue* item = toCSSFontFaceSrcValue(srcList->itemWithoutBoundsCheck(i)))
+        for (unsigned i = 0; i < srcLength; ++i) {
+            if (CSSFontFaceSrcValue* item = downcast<CSSFontFaceSrcValue>(srcList->itemWithoutBoundsCheck(i)))
                 item->setSVGFontFaceElement(this);
         }
     }
@@ -272,7 +272,7 @@ Node::InsertionNotificationRequest SVGFontFaceElement::insertedInto(ContainerNod
         ASSERT(!m_fontElement);
         return InsertionDone;
     }
-    document().accessSVGExtensions()->registerSVGFontFaceElement(this);
+    document().accessSVGExtensions().registerSVGFontFaceElement(this);
 
     rebuildFontFace();
     return InsertionDone;
@@ -284,7 +284,7 @@ void SVGFontFaceElement::removedFrom(ContainerNode& rootParent)
 
     if (rootParent.inDocument()) {
         m_fontElement = 0;
-        document().accessSVGExtensions()->unregisterSVGFontFaceElement(this);
+        document().accessSVGExtensions().unregisterSVGFontFaceElement(this);
         m_fontFaceRule->mutableProperties().clear();
 
         document().styleResolverChanged(DeferRecalcStyle);

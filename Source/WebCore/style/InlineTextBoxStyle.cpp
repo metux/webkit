@@ -26,7 +26,7 @@
 #include "config.h"
 #include "InlineTextBoxStyle.h"
 
-#include "Font.h"
+#include "FontCascade.h"
 #include "InlineTextBox.h"
 #include "RootInlineBox.h"
 
@@ -46,7 +46,19 @@ int computeUnderlineOffset(TextUnderlinePosition underlinePosition, const FontMe
     case TextUnderlinePositionUnder: {
         ASSERT(inlineTextBox);
         // Position underline relative to the bottom edge of the lowest element's content box.
-        float offset = inlineTextBox->root().maxLogicalTop() - inlineTextBox->logicalTop();
+        const RootInlineBox& rootBox = inlineTextBox->root();
+        const RenderElement* decorationRenderer = inlineTextBox->parent()->renderer().enclosingRendererWithTextDecoration(TextDecorationUnderline, inlineTextBox->isFirstLine());
+        
+        float offset;
+        if (inlineTextBox->renderer().style().isFlippedLinesWritingMode()) {
+            offset = inlineTextBox->logicalTop();
+            rootBox.minLogicalTopForTextDecorationLine(offset, decorationRenderer, TextDecorationUnderline);
+            offset = inlineTextBox->logicalTop() - offset;
+        } else {
+            offset = inlineTextBox->logicalBottom();
+            rootBox.maxLogicalBottomForTextDecorationLine(offset, decorationRenderer, TextDecorationUnderline);
+            offset -= inlineTextBox->logicalBottom();
+        }
         return inlineTextBox->logicalHeight() + gap + std::max<float>(offset, 0);
     }
     }
@@ -89,7 +101,7 @@ GlyphOverflow visualOverflowForDecorations(const RenderStyle& lineStyle, InlineT
     float wavyOffset;
         
     TextDecorationStyle decorationStyle = lineStyle.textDecorationStyle();
-    float height = lineStyle.font().fontMetrics().floatHeight();
+    float height = lineStyle.fontCascade().fontMetrics().floatHeight();
     GlyphOverflow overflowResult;
     
     if (decorationStyle == TextDecorationStyleWavy) {

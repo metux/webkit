@@ -74,7 +74,7 @@ public:
     } while (0)
 
     #define notSet (static_cast<size_t>(-1))
-
+        
     void validate()
     {
         // NB. This code is not written for performance, since it is not intended to run
@@ -187,8 +187,6 @@ public:
                 Node* node = block->node(i);
                 if (m_graph.m_refCountState == ExactRefCount)
                     V_EQUAL((node), m_myRefCounts.get(node), node->adjustedRefCount());
-                else
-                    V_EQUAL((node), node->refCount(), 1);
             }
             
             for (size_t i = 0 ; i < block->size() - 1; ++i) {
@@ -215,6 +213,23 @@ public:
                 case Identity:
                     VALIDATE((node), canonicalResultRepresentation(node->result()) == canonicalResultRepresentation(node->child1()->result()));
                     break;
+                case SetLocal:
+                case PutLocal:
+                case Upsilon:
+                    VALIDATE((node), !!node->child1());
+                    switch (node->child1().useKind()) {
+                    case UntypedUse:
+                    case CellUse:
+                    case Int32Use:
+                    case Int52RepUse:
+                    case DoubleRepUse:
+                    case BooleanUse:
+                        break;
+                    default:
+                        VALIDATE((node), !"Bad use kind");
+                        break;
+                    }
+                    break;
                 case MakeRope:
                 case ValueAdd:
                 case ArithAdd:
@@ -225,6 +240,7 @@ public:
                 case ArithMod:
                 case ArithMin:
                 case ArithMax:
+                case ArithPow:
                 case CompareLess:
                 case CompareLessEq:
                 case CompareGreater:
@@ -527,23 +543,23 @@ private:
     void reportValidationContext(VirtualRegister local, BasicBlock* block)
     {
         if (!block) {
-            dataLog("r", local, " in null Block ");
+            dataLog(local, " in null Block ");
             return;
         }
 
-        dataLog("r", local, " in Block ", *block);
+        dataLog(local, " in Block ", *block);
     }
     
     void reportValidationContext(
         VirtualRegister local, BasicBlock* sourceBlock, BasicBlock* destinationBlock)
     {
-        dataLog("r", local, " in Block ", *sourceBlock, " -> ", *destinationBlock);
+        dataLog(local, " in Block ", *sourceBlock, " -> ", *destinationBlock);
     }
     
     void reportValidationContext(
         VirtualRegister local, BasicBlock* sourceBlock, Node* prevNode)
     {
-        dataLog(prevNode, " for r", local, " in Block ", *sourceBlock);
+        dataLog(prevNode, " for ", local, " in Block ", *sourceBlock);
     }
     
     void reportValidationContext(Node* node, BasicBlock* block)

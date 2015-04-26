@@ -124,6 +124,42 @@ private:
                 break;
             }
                 
+            case CheckStructureImmediate: {
+                AbstractValue& value = m_state.forNode(node->child1());
+                StructureSet& set = node->structureSet();
+                
+                if (value.value()) {
+                    if (Structure* structure = jsDynamicCast<Structure*>(value.value())) {
+                        if (set.contains(structure)) {
+                            m_interpreter.execute(indexInBlock);
+                            node->convertToPhantom();
+                            eliminated = true;
+                            break;
+                        }
+                    }
+                }
+                
+                if (PhiChildren* phiChildren = m_interpreter.phiChildren()) {
+                    bool allGood = true;
+                    phiChildren->forAllTransitiveIncomingValues(
+                        node,
+                        [&] (Node* incoming) {
+                            if (Structure* structure = incoming->dynamicCastConstant<Structure*>()) {
+                                if (set.contains(structure))
+                                    return;
+                            }
+                            allGood = false;
+                        });
+                    if (allGood) {
+                        m_interpreter.execute(indexInBlock);
+                        node->convertToPhantom();
+                        eliminated = true;
+                        break;
+                    }
+                }
+                break;
+            }
+                
             case CheckArray:
             case Arrayify: {
                 if (!node->arrayMode().alreadyChecked(m_graph, node, m_state.forNode(node->child1())))
@@ -251,7 +287,7 @@ private:
                     break;
                 
                 GetByIdStatus status = GetByIdStatus::computeFor(
-                    vm(), baseValue.m_structure.set(), m_graph.identifiers()[identifierNumber]);
+                    baseValue.m_structure.set(), m_graph.identifiers()[identifierNumber]);
                 if (!status.isSimple())
                     break;
                 
@@ -300,7 +336,6 @@ private:
                     break;
                 
                 PutByIdStatus status = PutByIdStatus::computeFor(
-                    vm(),
                     m_graph.globalObjectFor(origin.semantic),
                     baseValue.m_structure.set(),
                     m_graph.identifiers()[identifierNumber],
@@ -385,20 +420,6 @@ private:
                 break;
             }
                 
-            case ProfiledCall:
-            case ProfiledConstruct: {
-                if (!m_state.forNode(m_graph.varArgChild(node, 0)).m_value)
-                    break;
-                
-                // If we were able to prove that the callee is a constant then the normal call
-                // inline cache will record this callee. This means that there is no need to do any
-                // additional profiling.
-                m_interpreter.execute(indexInBlock);
-                node->setOp(node->op() == ProfiledCall ? Call : Construct);
-                eliminated = true;
-                break;
-            }
-
             default:
                 break;
             }
@@ -457,7 +478,6 @@ private:
     {
         NodeOrigin origin = node->origin;
         Edge childEdge = node->child1();
-        Node* child = childEdge.node();
 
         addBaseCheck(indexInBlock, node, baseValue, variant.structureSet());
         
@@ -472,7 +492,7 @@ private:
         }
         
         if (variant.alternateBase()) {
-            child = m_insertionSet.insertConstant(indexInBlock, origin, variant.alternateBase());
+            Node* child = m_insertionSet.insertConstant(indexInBlock, origin, variant.alternateBase());
             childEdge = Edge(child, KnownCellUse);
         } else
             childEdge.setUseKind(KnownCellUse);
@@ -486,12 +506,11 @@ private:
                 indexInBlock, SpecNone, GetButterfly, origin, childEdge));
         }
         
-        node->convertToGetByOffset(m_graph.m_storageAccessData.size(), propertyStorage);
+        StorageAccessData& data = *m_graph.m_storageAccessData.add();
+        data.offset = variant.offset();
+        data.identifierNumber = identifierNumber;
         
-        StorageAccessData storageAccessData;
-        storageAccessData.offset = variant.offset();
-        storageAccessData.identifierNumber = identifierNumber;
-        m_graph.m_storageAccessData.append(storageAccessData);
+        node->convertToGetByOffset(data, propertyStorage);
     }
 
     void emitPutByOffset(unsigned indexInBlock, Node* node, const AbstractValue& baseValue, const PutByIdVariant& variant, unsigned identifierNumber)
@@ -544,15 +563,14 @@ private:
             m_insertionSet.insert(indexInBlock, putStructure);
         }
 
-        node->convertToPutByOffset(m_graph.m_storageAccessData.size(), propertyStorage);
+        StorageAccessData& data = *m_graph.m_storageAccessData.add();
+        data.offset = variant.offset();
+        data.identifierNumber = identifierNumber;
+        
+        node->convertToPutByOffset(data, propertyStorage);
         m_insertionSet.insertNode(
             indexInBlock, SpecNone, StoreBarrier, origin, 
             Edge(node->child2().node(), KnownCellUse));
-
-        StorageAccessData storageAccessData;
-        storageAccessData.offset = variant.offset();
-        storageAccessData.identifierNumber = identifierNumber;
-        m_graph.m_storageAccessData.append(storageAccessData);
     }
     
     void addBaseCheck(

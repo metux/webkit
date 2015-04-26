@@ -26,7 +26,6 @@
 #include "FilterEffect.h"
 #include "RenderStyle.h"
 #include "SVGColor.h"
-#include "SVGElementInstance.h"
 #include "SVGFELightElement.h"
 #include "SVGFilterBuilder.h"
 #include "SVGNames.h"
@@ -63,9 +62,9 @@ inline SVGFESpecularLightingElement::SVGFESpecularLightingElement(const Qualifie
     registerAnimatedPropertiesForSVGFESpecularLightingElement();
 }
 
-PassRefPtr<SVGFESpecularLightingElement> SVGFESpecularLightingElement::create(const QualifiedName& tagName, Document& document)
+Ref<SVGFESpecularLightingElement> SVGFESpecularLightingElement::create(const QualifiedName& tagName, Document& document)
 {
-    return adoptRef(new SVGFESpecularLightingElement(tagName, document));
+    return adoptRef(*new SVGFESpecularLightingElement(tagName, document));
 }
 
 const AtomicString& SVGFESpecularLightingElement::kernelUnitLengthXIdentifier()
@@ -185,7 +184,7 @@ void SVGFESpecularLightingElement::svgAttributeChanged(const QualifiedName& attr
         return;
     }
 
-    SVGElementInstance::InvalidationGuard invalidationGuard(this);
+    InstanceInvalidationGuard guard(*this);
     
     if (attrName == SVGNames::surfaceScaleAttr
         || attrName == SVGNames::specularConstantAttr

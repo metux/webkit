@@ -56,12 +56,10 @@
 #include "JSEventListener.h"
 #include "JSHTMLElement.h"
 #include "JSHTMLElementWrapperFactory.h"
-#include "JSNotation.h"
 #include "JSProcessingInstruction.h"
 #include "JSSVGElementWrapperFactory.h"
 #include "JSText.h"
 #include "Node.h"
-#include "Notation.h"
 #include "ProcessingInstruction.h"
 #include "RegisteredEventListener.h"
 #include "SVGElement.h"
@@ -97,21 +95,21 @@ static inline bool isObservable(JSNode* jsNode, Node* node)
 static inline bool isReachableFromDOM(JSNode* jsNode, Node* node, SlotVisitor& visitor)
 {
     if (!node->inDocument()) {
-        if (node->isElementNode()) {
-            auto& element = toElement(*node);
+        if (is<Element>(*node)) {
+            auto& element = downcast<Element>(*node);
 
             // If a wrapper is the last reference to an image element
             // that is loading but not in the document, the wrapper is observable
             // because it is the only thing keeping the image element alive, and if
             // the element is destroyed, its load event will not fire.
             // FIXME: The DOM should manage this issue without the help of JavaScript wrappers.
-            if (isHTMLImageElement(element)) {
-                if (toHTMLImageElement(element).hasPendingActivity())
+            if (is<HTMLImageElement>(element)) {
+                if (downcast<HTMLImageElement>(element).hasPendingActivity())
                     return true;
             }
 #if ENABLE(VIDEO)
-            else if (isHTMLAudioElement(element)) {
-                if (!toHTMLAudioElement(element).paused())
+            else if (is<HTMLAudioElement>(element)) {
+                if (!downcast<HTMLAudioElement>(element).paused())
                     return true;
             }
 #endif
@@ -135,7 +133,7 @@ bool JSNodeOwner::isReachableFromOpaqueRoots(JSC::Handle<JSC::Unknown> handle, v
 JSValue JSNode::insertBefore(ExecState* exec)
 {
     ExceptionCode ec = 0;
-    bool ok = impl().insertBefore(toNode(exec->argument(0)), toNode(exec->argument(1)), ec);
+    bool ok = impl().insertBefore(JSNode::toWrapped(exec->argument(0)), JSNode::toWrapped(exec->argument(1)), ec);
     setDOMException(exec, ec);
     if (ok)
         return exec->argument(0);
@@ -145,7 +143,7 @@ JSValue JSNode::insertBefore(ExecState* exec)
 JSValue JSNode::replaceChild(ExecState* exec)
 {
     ExceptionCode ec = 0;
-    bool ok = impl().replaceChild(toNode(exec->argument(0)), toNode(exec->argument(1)), ec);
+    bool ok = impl().replaceChild(JSNode::toWrapped(exec->argument(0)), JSNode::toWrapped(exec->argument(1)), ec);
     setDOMException(exec, ec);
     if (ok)
         return exec->argument(1);
@@ -155,7 +153,7 @@ JSValue JSNode::replaceChild(ExecState* exec)
 JSValue JSNode::removeChild(ExecState* exec)
 {
     ExceptionCode ec = 0;
-    bool ok = impl().removeChild(toNode(exec->argument(0)), ec);
+    bool ok = impl().removeChild(JSNode::toWrapped(exec->argument(0)), ec);
     setDOMException(exec, ec);
     if (ok)
         return exec->argument(0);
@@ -165,7 +163,7 @@ JSValue JSNode::removeChild(ExecState* exec)
 JSValue JSNode::appendChild(ExecState* exec)
 {
     ExceptionCode ec = 0;
-    bool ok = impl().appendChild(toNode(exec->argument(0)), ec);
+    bool ok = impl().appendChild(JSNode::toWrapped(exec->argument(0)), ec);
     setDOMException(exec, ec);
     if (ok)
         return exec->argument(0);
@@ -192,10 +190,10 @@ static ALWAYS_INLINE JSValue createWrapperInline(ExecState* exec, JSDOMGlobalObj
     JSDOMWrapper* wrapper;    
     switch (node->nodeType()) {
         case Node::ELEMENT_NODE:
-            if (node->isHTMLElement())
-                wrapper = createJSHTMLWrapper(globalObject, toHTMLElement(node));
-            else if (node->isSVGElement())
-                wrapper = createJSSVGWrapper(globalObject, toSVGElement(node));
+            if (is<HTMLElement>(*node))
+                wrapper = createJSHTMLWrapper(globalObject, downcast<HTMLElement>(node));
+            else if (is<SVGElement>(*node))
+                wrapper = createJSSVGWrapper(globalObject, downcast<SVGElement>(node));
             else
                 wrapper = CREATE_DOM_WRAPPER(globalObject, Element, node);
             break;
@@ -219,12 +217,9 @@ static ALWAYS_INLINE JSValue createWrapperInline(ExecState* exec, JSDOMGlobalObj
             break;
         case Node::DOCUMENT_NODE:
             // we don't want to cache the document itself in the per-document dictionary
-            return toJS(exec, globalObject, toDocument(node));
+            return toJS(exec, globalObject, downcast<Document>(node));
         case Node::DOCUMENT_TYPE_NODE:
             wrapper = CREATE_DOM_WRAPPER(globalObject, DocumentType, node);
-            break;
-        case Node::NOTATION_NODE:
-            wrapper = CREATE_DOM_WRAPPER(globalObject, Notation, node);
             break;
         case Node::DOCUMENT_FRAGMENT_NODE:
             wrapper = CREATE_DOM_WRAPPER(globalObject, DocumentFragment, node);

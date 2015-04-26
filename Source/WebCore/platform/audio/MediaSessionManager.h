@@ -41,6 +41,7 @@ class MediaSession;
 class RemoteCommandListener;
 
 class MediaSessionManager : private RemoteCommandListenerClient, private SystemSleepListener::Client, private AudioHardwareListener::Client {
+    WTF_MAKE_FAST_ALLOCATED;
 public:
     WEBCORE_EXPORT static MediaSessionManager& sharedManager();
     virtual ~MediaSessionManager() { }
@@ -65,7 +66,7 @@ public:
         BackgroundPlaybackNotPermitted = 1 << 4,
     };
     typedef unsigned SessionRestrictions;
-    
+
     WEBCORE_EXPORT void addRestriction(MediaSession::MediaType, SessionRestrictions);
     WEBCORE_EXPORT void removeRestriction(MediaSession::MediaType, SessionRestrictions);
     WEBCORE_EXPORT SessionRestrictions restrictions(MediaSession::MediaType);
@@ -73,13 +74,15 @@ public:
 
     virtual void sessionWillBeginPlayback(MediaSession&);
     virtual void sessionWillEndPlayback(MediaSession&);
-    
+
     bool sessionRestrictsInlineVideoPlayback(const MediaSession&) const;
+
+    virtual bool sessionCanLoadMedia(const MediaSession&) const;
+
+    virtual void configureWireLessTargetMonitoring() { }
 
 #if ENABLE(IOS_AIRPLAY)
     virtual bool hasWirelessTargetsAvailable() { return false; }
-    virtual void startMonitoringAirPlayRoutes() { }
-    virtual void stopMonitoringAirPlayRoutes() { }
 #endif
 
 protected:
@@ -88,10 +91,12 @@ protected:
 
     void addSession(MediaSession&);
     void removeSession(MediaSession&);
-    
+
     void setCurrentSession(MediaSession&);
     MediaSession* currentSession();
-    
+
+    Vector<MediaSession*> sessions() { return m_sessions; }
+
 private:
     friend class Internals;
 

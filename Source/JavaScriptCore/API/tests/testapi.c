@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2006 Apple Inc.  All rights reserved.
+ * Copyright (C) 2006, 2015 Apple Inc.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -50,6 +50,7 @@
 #if JSC_OBJC_API_ENABLED
 void testObjectiveCAPI(void);
 #endif
+void testCompareAndSwap();
 
 bool assertTrue(bool value, const char* message);
 extern void JSSynchronousGarbageCollectForDebugging(JSContextRef);
@@ -123,7 +124,11 @@ static void assertEqualsAsCharactersPtr(JSValueRef value, const char* expectedVa
     }
     
     if (jsLength != (size_t)cfLength) {
-        fprintf(stderr, "assertEqualsAsCharactersPtr failed: jsLength(%ld) != cfLength(%ld)\n", jsLength, cfLength);
+#if OS(WINDOWS)
+        fprintf(stderr, "assertEqualsAsCharactersPtr failed: jsLength(%Iu) != cfLength(%Iu)\n", jsLength, (size_t)cfLength);
+#else
+        fprintf(stderr, "assertEqualsAsCharactersPtr failed: jsLength(%zu) != cfLength(%zu)\n", jsLength, (size_t)cfLength);
+#endif
         failed = 1;
     }
 
@@ -1173,11 +1178,22 @@ static bool extendTerminateCallback(JSContextRef ctx, void* context)
 int main(int argc, char* argv[])
 {
 #if OS(WINDOWS)
+#if defined(_M_X64) || defined(__x86_64__)
+    // The VS2013 runtime has a bug where it mis-detects AVX-capable processors
+    // if the feature has been disabled in firmware. This causes us to crash
+    // in some of the math functions. For now, we disable those optimizations
+    // because Microsoft is not going to fix the problem in VS2013.
+    // FIXME: http://webkit.org/b/141449: Remove this workaround when we switch to VS2015+.
+    _set_FMA3_enable(0);
+#endif
+
     // Cygwin calls ::SetErrorMode(SEM_FAILCRITICALERRORS), which we will inherit. This is bad for
     // testing/debugging, as it causes the post-mortem debugger not to be invoked. We reset the
     // error mode here to work around Cygwin's behavior. See <http://webkit.org/b/55222>.
     ::SetErrorMode(0);
 #endif
+
+    testCompareAndSwap();
 
 #if JSC_OBJC_API_ENABLED
     testObjectiveCAPI();
@@ -1901,7 +1917,7 @@ int main(int argc, char* argv[])
             printf("PASS: script timed out as expected.\n");
         else {
             if (!((endTime - startTime) < .150f))
-                printf("FAIL: script did not timed out as expected.\n");
+                printf("FAIL: script did not time out as expected.\n");
             if (!shouldTerminateCallbackWasCalled)
                 printf("FAIL: script timeout callback was not called.\n");
             failed = true;
@@ -1928,7 +1944,7 @@ int main(int argc, char* argv[])
 
         if (((endTime - startTime) >= .150f) || !shouldTerminateCallbackWasCalled) {
             if (!((endTime - startTime) < .150f))
-                printf("FAIL: script did not timed out as expected.\n");
+                printf("FAIL: script did not time out as expected.\n");
             if (!shouldTerminateCallbackWasCalled)
                 printf("FAIL: script timeout callback was not called.\n");
             failed = true;
@@ -1958,7 +1974,7 @@ int main(int argc, char* argv[])
             printf("PASS: script timed out as expected when no callback is specified.\n");
         else {
             if (!((endTime - startTime) < .150f))
-                printf("FAIL: script did not timed out as expected when no callback is specified.\n");
+                printf("FAIL: script did not time out as expected when no callback is specified.\n");
             failed = true;
         }
 

@@ -95,9 +95,8 @@ void SVGDocumentExtensions::startAnimations()
     // In the future we should refactor the use-element to avoid this. See https://webkit.org/b/53704
     Vector<RefPtr<SVGSVGElement>> timeContainers;
     timeContainers.appendRange(m_timeContainers.begin(), m_timeContainers.end());
-    auto end = timeContainers.end();
-    for (auto it = timeContainers.begin(); it != end; ++it)
-        (*it)->timeContainer()->begin();
+    for (auto& element : timeContainers)
+        element->timeContainer().begin();
 }
 
 void SVGDocumentExtensions::pauseAnimations()
@@ -341,13 +340,6 @@ void SVGDocumentExtensions::rebuildElements()
 
 void SVGDocumentExtensions::clearTargetDependencies(SVGElement& referencedElement)
 {
-    if (referencedElement.isInShadowTree()) {
-        // The host element (e.g. <use>) of the shadow root will rebuild the shadow tree
-        // and all its references.
-        ASSERT(referencedElement.shadowRoot());
-        ASSERT(m_rebuildElements.contains(referencedElement.shadowRoot()->hostElement()));
-        return;
-    }
     auto it = m_elementDependencies.find(&referencedElement);
     if (it == m_elementDependencies.end())
         return;
@@ -379,10 +371,7 @@ void SVGDocumentExtensions::rebuildAllElementReferencesForTarget(SVGElement& ref
 void SVGDocumentExtensions::removeAllElementReferencesForTarget(SVGElement* referencedElement)
 {
     m_elementDependencies.remove(referencedElement);
-
-    size_t position = m_rebuildElements.find(referencedElement);
-    if (position != notFound)
-        m_rebuildElements.remove(position);
+    m_rebuildElements.removeFirst(referencedElement);
 }
 
 #if ENABLE(SVG_FONTS)

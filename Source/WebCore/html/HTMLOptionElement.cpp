@@ -57,17 +57,17 @@ HTMLOptionElement::HTMLOptionElement(const QualifiedName& tagName, Document& doc
     setHasCustomStyleResolveCallbacks();
 }
 
-PassRefPtr<HTMLOptionElement> HTMLOptionElement::create(Document& document)
+Ref<HTMLOptionElement> HTMLOptionElement::create(Document& document)
 {
-    return adoptRef(new HTMLOptionElement(optionTag, document));
+    return adoptRef(*new HTMLOptionElement(optionTag, document));
 }
 
-PassRefPtr<HTMLOptionElement> HTMLOptionElement::create(const QualifiedName& tagName, Document& document)
+Ref<HTMLOptionElement> HTMLOptionElement::create(const QualifiedName& tagName, Document& document)
 {
-    return adoptRef(new HTMLOptionElement(tagName, document));
+    return adoptRef(*new HTMLOptionElement(tagName, document));
 }
 
-PassRefPtr<HTMLOptionElement> HTMLOptionElement::createForJSConstructor(Document& document, const String& data, const String& value,
+RefPtr<HTMLOptionElement> HTMLOptionElement::createForJSConstructor(Document& document, const String& data, const String& value,
         bool defaultSelected, bool selected, ExceptionCode& ec)
 {
     RefPtr<HTMLOptionElement> element = adoptRef(new HTMLOptionElement(optionTag, document));
@@ -129,8 +129,8 @@ void HTMLOptionElement::setText(const String &text, ExceptionCode& ec)
 
     // Handle the common special case where there's exactly 1 child node, and it's a text node.
     Node* child = firstChild();
-    if (child && child->isTextNode() && !child->nextSibling())
-        toText(child)->setData(text, ec);
+    if (is<Text>(child) && !child->nextSibling())
+        downcast<Text>(*child).setData(text, ec);
     else {
         removeChildren();
         appendChild(Text::create(document(), text), ec);
@@ -160,7 +160,7 @@ int HTMLOptionElement::index() const
     const Vector<HTMLElement*>& items = selectElement->listItems();
     size_t length = items.size();
     for (size_t i = 0; i < length; ++i) {
-        if (!isHTMLOptionElement(items[i]))
+        if (!is<HTMLOptionElement>(*items[i]))
             continue;
         if (items[i] == this)
             return optionIndex;
@@ -182,7 +182,7 @@ void HTMLOptionElement::parseAttribute(const QualifiedName& name, const AtomicSt
         bool oldDisabled = m_disabled;
         m_disabled = !value.isNull();
         if (oldDisabled != m_disabled) {
-            didAffectSelector(AffectedSelectorDisabled | AffectedSelectorEnabled);
+            setNeedsStyleRecalc();
             if (renderer() && renderer()->style().hasAppearance())
                 renderer()->theme().stateChanged(*renderer(), ControlStates::EnabledState);
         }
@@ -235,7 +235,7 @@ void HTMLOptionElement::setSelectedState(bool selected)
         return;
 
     m_isSelected = selected;
-    didAffectSelector(AffectedSelectorChecked);
+    setNeedsStyleRecalc();
 
     if (HTMLSelectElement* select = ownerSelectElement())
         select->invalidateSelectedItems();
@@ -257,23 +257,23 @@ void HTMLOptionElement::childrenChanged(const ChildChange& change)
 HTMLDataListElement* HTMLOptionElement::ownerDataListElement() const
 {
     for (ContainerNode* parent = parentNode(); parent ; parent = parent->parentNode()) {
-        if (parent->hasTagName(datalistTag))
-            return toHTMLDataListElement(parent);
+        if (is<HTMLDataListElement>(*parent))
+            return downcast<HTMLDataListElement>(parent);
     }
-    return 0;
+    return nullptr;
 }
 #endif
 
 HTMLSelectElement* HTMLOptionElement::ownerSelectElement() const
 {
     ContainerNode* select = parentNode();
-    while (select && !select->hasTagName(selectTag))
+    while (select && !is<HTMLSelectElement>(*select))
         select = select->parentNode();
 
     if (!select)
-        return 0;
+        return nullptr;
 
-    return toHTMLSelectElement(select);
+    return downcast<HTMLSelectElement>(select);
 }
 
 String HTMLOptionElement::label() const
@@ -302,7 +302,7 @@ void HTMLOptionElement::willResetComputedStyle()
 String HTMLOptionElement::textIndentedToRespectGroupLabel() const
 {
     ContainerNode* parent = parentNode();
-    if (parent && isHTMLOptGroupElement(parent))
+    if (is<HTMLOptGroupElement>(parent))
         return "    " + text();
     return text();
 }
@@ -312,11 +312,10 @@ bool HTMLOptionElement::isDisabledFormControl() const
     if (ownElementDisabled())
         return true;
 
-    if (!parentNode() || !parentNode()->isHTMLElement())
+    if (!is<HTMLOptGroupElement>(parentNode()))
         return false;
 
-    HTMLElement& parentElement = toHTMLElement(*parentNode());
-    return isHTMLOptGroupElement(parentElement) && parentElement.isDisabledFormControl();
+    return downcast<HTMLOptGroupElement>(*parentNode()).isDisabledFormControl();
 }
 
 Node::InsertionNotificationRequest HTMLOptionElement::insertedInto(ContainerNode& insertionPoint)
@@ -339,13 +338,13 @@ String HTMLOptionElement::collectOptionInnerText() const
 {
     StringBuilder text;
     for (Node* node = firstChild(); node; ) {
-        if (node->isTextNode())
+        if (is<Text>(*node))
             text.append(node->nodeValue());
         // Text nodes inside script elements are not part of the option text.
-        if (node->isElementNode() && toScriptElementIfPossible(toElement(node)))
-            node = NodeTraversal::nextSkippingChildren(node, this);
+        if (is<Element>(*node) && toScriptElementIfPossible(downcast<Element>(node)))
+            node = NodeTraversal::nextSkippingChildren(*node, this);
         else
-            node = NodeTraversal::next(node, this);
+            node = NodeTraversal::next(*node, this);
     }
     return text.toString();
 }

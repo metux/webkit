@@ -27,6 +27,8 @@
 #include "RenderBoxModelObject.h"
 
 #include "BorderEdge.h"
+#include "CachedImage.h"
+#include "CachedSVGDocument.h"
 #include "FloatRoundedRect.h"
 #include "Frame.h"
 #include "FrameView.h"
@@ -47,13 +49,18 @@
 #include "RenderNamedFlowFragment.h"
 #include "RenderNamedFlowThread.h"
 #include "RenderRegion.h"
+#include "RenderSVGResourceMasker.h"
 #include "RenderTable.h"
+#include "RenderTableRow.h"
 #include "RenderText.h"
 #include "RenderTextFragment.h"
 #include "RenderView.h"
+#include "SVGImageForContainer.h"
 #include "ScrollingConstraints.h"
 #include "Settings.h"
+#include "StyleCachedImage.h"
 #include "TransformState.h"
+#include <wtf/NeverDestroyed.h>
 
 namespace WebCore {
 
@@ -67,7 +74,11 @@ using namespace HTMLNames;
 // <b><i><p>Hello</p></i></b>. In this example the <i> will have a block as
 // its continuation but the <b> will just have an inline as its continuation.
 typedef HashMap<const RenderBoxModelObject*, RenderBoxModelObject*> ContinuationMap;
-static ContinuationMap* continuationMap = 0;
+static ContinuationMap& continuationMap()
+{
+    static NeverDestroyed<ContinuationMap> map;
+    return map;
+}
 
 // This HashMap is similar to the continuation map, but connects first-letter
 // renderers to their remaining text fragments.
@@ -160,12 +171,12 @@ bool RenderBoxModelObject::shouldPaintAtLowQuality(GraphicsContext* context, Ima
     return view().imageQualityController().shouldPaintAtLowQuality(context, this, image, layer, size);
 }
 
-RenderBoxModelObject::RenderBoxModelObject(Element& element, PassRef<RenderStyle> style, unsigned baseTypeFlags)
+RenderBoxModelObject::RenderBoxModelObject(Element& element, Ref<RenderStyle>&& style, unsigned baseTypeFlags)
     : RenderLayerModelObject(element, WTF::move(style), baseTypeFlags | RenderBoxModelObjectFlag)
 {
 }
 
-RenderBoxModelObject::RenderBoxModelObject(Document& document, PassRef<RenderStyle> style, unsigned baseTypeFlags)
+RenderBoxModelObject::RenderBoxModelObject(Document& document, Ref<RenderStyle>&& style, unsigned baseTypeFlags)
     : RenderLayerModelObject(document, WTF::move(style), baseTypeFlags | RenderBoxModelObjectFlag)
 {
 }
@@ -176,8 +187,10 @@ RenderBoxModelObject::~RenderBoxModelObject()
 
 void RenderBoxModelObject::willBeDestroyed()
 {
-    // A continuation of this RenderObject should be destroyed at subclasses.
-    ASSERT(!continuation());
+    if (hasContinuation()) {
+        continuation()->destroy();
+        setContinuation(nullptr);
+    }
 
     // If this is a first-letter object with a remaining text fragment then the
     // entry needs to be cleared from the map.
@@ -192,7 +205,7 @@ void RenderBoxModelObject::willBeDestroyed()
 
 bool RenderBoxModelObject::hasBoxDecorationStyle() const
 {
-    return hasBackground() || style().hasBorder() || style().hasAppearance() || style().boxShadow();
+    return hasBackground() || style().hasBorderDecoration() || style().hasAppearance() || style().boxShadow();
 }
 
 void RenderBoxModelObject::updateFromStyle()
@@ -213,13 +226,9 @@ static LayoutSize accumulateInFlowPositionOffsets(const RenderObject* child)
     if (!child->isAnonymousBlock() || !child->isInFlowPositioned())
         return LayoutSize();
     LayoutSize offset;
-    RenderElement* p = toRenderBlock(child)->inlineElementContinuation();
-    while (p && p->isRenderInline()) {
-        if (p->isInFlowPositioned()) {
-            RenderInline* renderInline = toRenderInline(p);
-            offset += renderInline->offsetForInFlowPosition();
-        }
-        p = p->parent();
+    for (RenderElement* parent = downcast<RenderBlock>(*child).inlineElementContinuation(); is<RenderInline>(parent); parent = parent->parent()) {
+        if (parent->isInFlowPositioned())
+            offset += downcast<RenderInline>(*parent).offsetForInFlowPosition();
     }
     return offset;
 }
@@ -314,8 +323,8 @@ LayoutPoint RenderBoxModelObject::adjustedPositionRelativeToOffsetParent(const L
     // return the distance between the canvas origin and the left border edge 
     // of the element and stop this algorithm.
     if (const RenderBoxModelObject* offsetParent = this->offsetParent()) {
-        if (offsetParent->isBox() && !offsetParent->isBody() && !offsetParent->isTable())
-            referencePoint.move(-toRenderBox(offsetParent)->borderLeft(), -toRenderBox(offsetParent)->borderTop());
+        if (is<RenderBox>(*offsetParent) && !offsetParent->isBody() && !is<RenderTable>(*offsetParent))
+            referencePoint.move(-downcast<RenderBox>(*offsetParent).borderLeft(), -downcast<RenderBox>(*offsetParent).borderTop());
         if (!isOutOfFlowPositioned() || flowThreadContainingBlock()) {
             if (isRelPositioned())
                 referencePoint.move(relativePositionOffset());
@@ -325,29 +334,29 @@ LayoutPoint RenderBoxModelObject::adjustedPositionRelativeToOffsetParent(const L
             // CSS regions specification says that region flows should return the body element as their offsetParent.
             // Since we will bypass the body’s renderer anyway, just end the loop if we encounter a region flow (named flow thread).
             // See http://dev.w3.org/csswg/css-regions/#cssomview-offset-attributes
-            auto curr = parent();
-            while (curr != offsetParent && !curr->isRenderNamedFlowThread()) {
+            auto* ancestor = parent();
+            while (ancestor != offsetParent && !is<RenderNamedFlowThread>(*ancestor)) {
                 // FIXME: What are we supposed to do inside SVG content?
                 
-                if (curr->isInFlowRenderFlowThread()) {
+                if (is<RenderMultiColumnFlowThread>(*ancestor)) {
                     // We need to apply a translation based off what region we are inside.
-                    RenderRegion* region = toRenderMultiColumnFlowThread(curr)->physicalTranslationFromFlowToRegion(referencePoint);
+                    RenderRegion* region = downcast<RenderMultiColumnFlowThread>(*ancestor).physicalTranslationFromFlowToRegion(referencePoint);
                     if (region)
                         referencePoint.moveBy(region->topLeftLocation());
                 } else if (!isOutOfFlowPositioned()) {
-                    if (curr->isBox() && !curr->isTableRow())
-                        referencePoint.moveBy(toRenderBox(curr)->topLeftLocation());
+                    if (is<RenderBox>(*ancestor) && !is<RenderTableRow>(*ancestor))
+                        referencePoint.moveBy(downcast<RenderBox>(*ancestor).topLeftLocation());
                 }
                 
-                curr = curr->parent();
+                ancestor = ancestor->parent();
             }
             
             // Compute the offset position for elements inside named flow threads for which the offsetParent was the body.
             // See https://bugs.webkit.org/show_bug.cgi?id=115899
-            if (curr->isRenderNamedFlowThread())
-                referencePoint = toRenderNamedFlowThread(curr)->adjustedPositionRelativeToOffsetParent(*this, referencePoint);
-            else if (offsetParent->isBox() && offsetParent->isBody() && !offsetParent->isPositioned())
-                referencePoint.moveBy(toRenderBox(offsetParent)->topLeftLocation());
+            if (is<RenderNamedFlowThread>(*ancestor))
+                referencePoint = downcast<RenderNamedFlowThread>(*ancestor).adjustedPositionRelativeToOffsetParent(*this, referencePoint);
+            else if (is<RenderBox>(*offsetParent) && offsetParent->isBody() && !offsetParent->isPositioned())
+                referencePoint.moveBy(downcast<RenderBox>(*offsetParent).topLeftLocation());
         }
     }
 
@@ -360,7 +369,7 @@ void RenderBoxModelObject::computeStickyPositionConstraints(StickyPositionViewpo
 
     RenderBlock* containingBlock = this->containingBlock();
     RenderLayer* enclosingClippingLayer = layer()->enclosingOverflowClipLayer(ExcludeSelf);
-    RenderBox& enclosingClippingBox = enclosingClippingLayer ? toRenderBox(enclosingClippingLayer->renderer()) : view();
+    RenderBox& enclosingClippingBox = enclosingClippingLayer ? downcast<RenderBox>(enclosingClippingLayer->renderer()) : view();
 
     LayoutRect containerContentRect;
     if (!enclosingClippingLayer || (containingBlock != &enclosingClippingBox))
@@ -440,7 +449,7 @@ FloatRect RenderBoxModelObject::constrainingRectForStickyPosition() const
 {
     RenderLayer* enclosingClippingLayer = layer()->enclosingOverflowClipLayer(ExcludeSelf);
     if (enclosingClippingLayer) {
-        RenderBox& enclosingClippingBox = toRenderBox(enclosingClippingLayer->renderer());
+        RenderBox& enclosingClippingBox = downcast<RenderBox>(enclosingClippingLayer->renderer());
         LayoutRect clipRect = enclosingClippingBox.overflowClipRect(LayoutPoint(), 0); // FIXME: make this work in regions.
         clipRect.contract(LayoutSize(enclosingClippingBox.paddingLeft() + enclosingClippingBox.paddingRight(),
             enclosingClippingBox.paddingTop() + enclosingClippingBox.paddingBottom()));
@@ -611,11 +620,11 @@ void RenderBoxModelObject::paintMaskForTextFillBox(ImageBuffer* maskImage, const
         const RootInlineBox& rootBox = box->root();
         box->paint(info, LayoutPoint(scrolledPaintRect.x() - box->x(), scrolledPaintRect.y() - box->y()), rootBox.lineTop(), rootBox.lineBottom());
     } else if (isRenderNamedFlowFragmentContainer()) {
-        RenderNamedFlowFragment* region = toRenderBlockFlow(this)->renderNamedFlowFragment();
-        if (region->isValid())
-            region->flowThread()->layer()->paintNamedFlowThreadInsideRegion(maskImageContext, region, maskRect, maskRect.location(), PaintBehaviorForceBlackText, RenderLayer::PaintLayerTemporaryClipRects);
+        RenderNamedFlowFragment& region = *downcast<RenderBlockFlow>(*this).renderNamedFlowFragment();
+        if (region.isValid())
+            region.flowThread()->layer()->paintNamedFlowThreadInsideRegion(maskImageContext, &region, maskRect, maskRect.location(), PaintBehaviorForceBlackText, RenderLayer::PaintLayerTemporaryClipRects);
     } else {
-        LayoutSize localOffset = isBox() ? toRenderBox(this)->locationOffset() : LayoutSize();
+        LayoutSize localOffset = is<RenderBox>(*this) ? downcast<RenderBox>(*this).locationOffset() : LayoutSize();
         paint(info, scrolledPaintRect.location() - localOffset);
     }
 }
@@ -672,7 +681,7 @@ void RenderBoxModelObject::paintFillLayerExtended(const PaintInfo& paintInfo, co
     FloatRect pixelSnappedRect = snapRectToDevicePixels(rect, deviceScaleFactor);
 
     // Fast path for drawing simple color backgrounds.
-    if (!isRoot && !clippedWithLocalScrolling && !shouldPaintBackgroundImage && isBorderFill && !bgLayer->next()) {
+    if (!isRoot && !clippedWithLocalScrolling && !shouldPaintBackgroundImage && isBorderFill && !bgLayer->hasMaskImage() && !bgLayer->next()) {
         if (!colorVisible)
             return;
 
@@ -723,11 +732,11 @@ void RenderBoxModelObject::paintFillLayerExtended(const PaintInfo& paintInfo, co
     LayoutRect scrolledPaintRect = rect;
     if (clippedWithLocalScrolling) {
         // Clip to the overflow area.
-        RenderBox* thisBox = toRenderBox(this);
-        context->clip(thisBox->overflowClipRect(rect.location(), currentRenderNamedFlowFragment()));
+        auto& thisBox = downcast<RenderBox>(*this);
+        context->clip(thisBox.overflowClipRect(rect.location(), currentRenderNamedFlowFragment()));
         
         // Adjust the paint rect to reflect a scrolled content box with borders at the ends.
-        IntSize offset = thisBox->scrolledContentOffset();
+        IntSize offset = thisBox.scrolledContentOffset();
         scrolledPaintRect.move(-offset);
         scrolledPaintRect.setWidth(bLeft + layer()->scrollWidth() + bRight);
         scrolledPaintRect.setHeight(borderTop() + layer()->scrollHeight() + borderBottom());
@@ -780,10 +789,9 @@ void RenderBoxModelObject::paintFillLayerExtended(const PaintInfo& paintInfo, co
                     // to crawl around a render tree with potential :before/:after content and
                     // anonymous blocks created by inline <body> tags etc.  We can locate the <body>
                     // render object very easily via the DOM.
-                    HTMLElement* body = document().body();
-                    if (body) {
+                    if (HTMLElement* body = document().bodyOrFrameset()) {
                         // Can't scroll a frameset document anyway.
-                        isOpaqueRoot = body->hasTagName(framesetTag);
+                        isOpaqueRoot = is<HTMLFrameSetElement>(*body);
                     } else {
                         // SVG documents and XML documents with SVG root nodes are transparent.
                         isOpaqueRoot = !document().hasSVGRootNode();
@@ -833,19 +841,26 @@ void RenderBoxModelObject::paintFillLayerExtended(const PaintInfo& paintInfo, co
     }
 
     // no progressive loading of the background image
-    if (!baseBgColorOnly && shouldPaintBackgroundImage) {
+    if (!baseBgColorOnly && (shouldPaintBackgroundImage || bgLayer->hasMaskImage())) {
         BackgroundImageGeometry geometry;
         calculateBackgroundImageGeometry(paintInfo.paintContainer, bgLayer, scrolledPaintRect, geometry, backgroundObject);
         geometry.clip(LayoutRect(pixelSnappedRect));
+
         if (!geometry.destRect().isEmpty()) {
+            bool didPaintCustomMask = false;
             CompositeOperator compositeOp = op == CompositeSourceOver ? bgLayer->composite() : op;
             auto clientForBackgroundImage = backgroundObject ? backgroundObject : this;
-            RefPtr<Image> image = bgImage->image(clientForBackgroundImage, geometry.tileSize());
-            context->setDrawLuminanceMask(bgLayer->maskSourceType() == MaskLuminance);
-            bool useLowQualityScaling = shouldPaintAtLowQuality(context, image.get(), bgLayer, geometry.tileSize());
-            if (image.get())
-                image->setSpaceSize(geometry.spaceSize());
-            context->drawTiledImage(image.get(), style().colorSpace(), geometry.destRect(), geometry.relativePhase(), geometry.tileSize(), ImagePaintingOptions(compositeOp, bgLayer->blendMode(), ImageOrientationDescription(), useLowQualityScaling));
+            RefPtr<Image> image = (bgImage ? bgImage->image(clientForBackgroundImage, geometry.tileSize()) : nullptr);
+            if (!image.get() && bgLayer->hasMaskImage())
+                didPaintCustomMask = bgLayer->maskImage()->drawMask(*this, geometry, context, compositeOp);
+
+            if (!didPaintCustomMask && shouldPaintBackgroundImage) {
+                context->setDrawLuminanceMask(bgLayer->maskSourceType() == MaskLuminance);
+                bool useLowQualityScaling = shouldPaintAtLowQuality(context, image.get(), bgLayer, geometry.tileSize());
+                if (image.get())
+                    image->setSpaceSize(geometry.spaceSize());
+                context->drawTiledImage(image.get(), style().colorSpace(), geometry.destRect(), geometry.relativePhase(), geometry.tileSize(), ImagePaintingOptions(compositeOp, bgLayer->blendMode(), ImageOrientationDescription(), useLowQualityScaling));
+            }
         }
     }
 
@@ -950,8 +965,13 @@ LayoutSize RenderBoxModelObject::calculateFillTileSize(const FillLayer* fillLaye
     StyleImage* image = fillLayer->image();
     EFillSizeType type = fillLayer->size().type;
 
-    LayoutSize imageIntrinsicSize = calculateImageIntrinsicDimensions(image, positioningAreaSize, ScaleByEffectiveZoom);
-    imageIntrinsicSize.scale(1 / image->imageScaleFactor(), 1 / image->imageScaleFactor());
+    LayoutSize imageIntrinsicSize;
+    if (image) {
+        imageIntrinsicSize = calculateImageIntrinsicDimensions(image, positioningAreaSize, ScaleByEffectiveZoom);
+        imageIntrinsicSize.scale(1 / image->imageScaleFactor(), 1 / image->imageScaleFactor());
+    } else
+        imageIntrinsicSize = positioningAreaSize;
+
     switch (type) {
         case SizeLength: {
             LayoutSize tileSize = positioningAreaSize;
@@ -1013,31 +1033,31 @@ LayoutSize RenderBoxModelObject::calculateFillTileSize(const FillLayer* fillLaye
     return LayoutSize();
 }
 
-void RenderBoxModelObject::BackgroundImageGeometry::setNoRepeatX(LayoutUnit xOffset)
+void BackgroundImageGeometry::setNoRepeatX(LayoutUnit xOffset)
 {
     m_destRect.move(std::max<LayoutUnit>(xOffset, 0), 0);
     m_phase.setX(-std::min<LayoutUnit>(xOffset, 0));
     m_destRect.setWidth(m_tileSize.width() + std::min<float>(xOffset, 0));
 }
-void RenderBoxModelObject::BackgroundImageGeometry::setNoRepeatY(LayoutUnit yOffset)
+void BackgroundImageGeometry::setNoRepeatY(LayoutUnit yOffset)
 {
     m_destRect.move(0, std::max<LayoutUnit>(yOffset, 0));
     m_phase.setY(-std::min<LayoutUnit>(yOffset, 0));
     m_destRect.setHeight(m_tileSize.height() + std::min<float>(yOffset, 0));
 }
 
-void RenderBoxModelObject::BackgroundImageGeometry::useFixedAttachment(const LayoutPoint& attachmentPoint)
+void BackgroundImageGeometry::useFixedAttachment(const LayoutPoint& attachmentPoint)
 {
     FloatPoint alignedPoint = attachmentPoint;
     m_phase.move(std::max<LayoutUnit>(alignedPoint.x() - m_destRect.x(), 0), std::max<LayoutUnit>(alignedPoint.y() - m_destRect.y(), 0));
 }
 
-void RenderBoxModelObject::BackgroundImageGeometry::clip(const LayoutRect& clipRect)
+void BackgroundImageGeometry::clip(const LayoutRect& clipRect)
 {
     m_destRect.intersect(clipRect);
 }
 
-LayoutPoint RenderBoxModelObject::BackgroundImageGeometry::relativePhase() const
+LayoutPoint BackgroundImageGeometry::relativePhase() const
 {
     LayoutPoint phase = m_phase;
     phase += m_destRect.location() - m_destOrigin;
@@ -1114,7 +1134,7 @@ void RenderBoxModelObject::calculateBackgroundImageGeometry(const RenderLayerMod
         // its margins. Since those were added in already, we have to factor them out when computing
         // the background positioning area.
         if (isRoot()) {
-            positioningAreaSize = toRenderBox(this)->size() - LayoutSize(left + right, top + bottom);
+            positioningAreaSize = downcast<RenderBox>(*this).size() - LayoutSize(left + right, top + bottom);
             if (view().frameView().hasExtendedBackgroundRectForPainting()) {
                 LayoutRect extendedBackgroundRect = view().frameView().extendedBackgroundRectForPainting();
                 left += (marginLeft() - extendedBackgroundRect.x());
@@ -1147,7 +1167,9 @@ void RenderBoxModelObject::calculateBackgroundImageGeometry(const RenderLayerMod
 
     auto clientForBackgroundImage = backgroundObject ? backgroundObject : this;
     LayoutSize fillTileSize = calculateFillTileSize(fillLayer, positioningAreaSize);
-    fillLayer->image()->setContainerSizeForRenderer(clientForBackgroundImage, fillTileSize, style().effectiveZoom());
+    if (StyleImage* layerImage = fillLayer->image())
+        layerImage->setContainerSizeForRenderer(clientForBackgroundImage, fillTileSize, style().effectiveZoom());
+    
     geometry.setTileSize(fillTileSize);
 
     EFillRepeat backgroundRepeatX = fillLayer->repeatX();
@@ -2027,12 +2049,8 @@ void RenderBoxModelObject::drawBoxSideFromPath(GraphicsContext* graphicsContext,
         return;
     }
     case INSET:
-        if (side == BSTop || side == BSLeft)
-            color = color.dark();
-        break;
     case OUTSET:
-        if (side == BSBottom || side == BSRight)
-            color = color.dark();
+        calculateBorderStyleColor(borderStyle, side, color);
         break;
     default:
         break;
@@ -2532,21 +2550,18 @@ LayoutUnit RenderBoxModelObject::containingBlockLogicalWidthForContent() const
 
 RenderBoxModelObject* RenderBoxModelObject::continuation() const
 {
-    if (!continuationMap)
-        return 0;
-    return continuationMap->get(this);
+    if (!hasContinuation())
+        return nullptr;
+    return continuationMap().get(this);
 }
 
 void RenderBoxModelObject::setContinuation(RenderBoxModelObject* continuation)
 {
-    if (continuation) {
-        if (!continuationMap)
-            continuationMap = new ContinuationMap;
-        continuationMap->set(this, continuation);
-    } else {
-        if (continuationMap)
-            continuationMap->remove(this);
-    }
+    if (continuation)
+        continuationMap().set(this, continuation);
+    else if (hasContinuation())
+        continuationMap().remove(this);
+    setHasContinuation(!!continuation);
 }
 
 RenderTextFragment* RenderBoxModelObject::firstLetterRemainingText() const
@@ -2641,8 +2656,8 @@ bool RenderBoxModelObject::shouldAntialiasLines(GraphicsContext* context)
 
 void RenderBoxModelObject::mapAbsoluteToLocalPoint(MapCoordinatesFlags mode, TransformState& transformState) const
 {
-    auto o = container();
-    if (!o)
+    RenderElement* container = this->container();
+    if (!container)
         return;
     
     // FIXME: This code is wrong for named flow threads since it only works for content in the first region.
@@ -2650,21 +2665,21 @@ void RenderBoxModelObject::mapAbsoluteToLocalPoint(MapCoordinatesFlags mode, Tra
     // geometry to actually get a better result.
     // The point inside a box that's inside a region has its coordinates relative to the region,
     // not the FlowThread that is its container in the RenderObject tree.
-    if (isBox() && o->isOutOfFlowRenderFlowThread()) {
+    if (is<RenderBox>(*this) && container->isOutOfFlowRenderFlowThread()) {
         RenderRegion* startRegion = nullptr;
         RenderRegion* endRegion = nullptr;
-        if (toRenderFlowThread(o)->getRegionRangeForBox(toRenderBox(this), startRegion, endRegion))
-            o = startRegion;
+        if (downcast<RenderFlowThread>(*container).getRegionRangeForBox(downcast<RenderBox>(this), startRegion, endRegion))
+            container = startRegion;
     }
 
-    o->mapAbsoluteToLocalPoint(mode, transformState);
+    container->mapAbsoluteToLocalPoint(mode, transformState);
 
-    LayoutSize containerOffset = offsetFromContainer(o, LayoutPoint());
+    LayoutSize containerOffset = offsetFromContainer(*container, LayoutPoint());
 
-    bool preserve3D = mode & UseTransforms && (o->style().preserves3D() || style().preserves3D());
-    if (mode & UseTransforms && shouldUseTransformFromContainer(o)) {
+    bool preserve3D = mode & UseTransforms && (container->style().preserves3D() || style().preserves3D());
+    if (mode & UseTransforms && shouldUseTransformFromContainer(container)) {
         TransformationMatrix t;
-        getTransformFromContainer(o, containerOffset, t);
+        getTransformFromContainer(container, containerOffset, t);
         transformState.applyTransform(t, preserve3D ? TransformState::AccumulateTransform : TransformState::FlattenTransform);
     } else
         transformState.move(containerOffset.width(), containerOffset.height(), preserve3D ? TransformState::AccumulateTransform : TransformState::FlattenTransform);
@@ -2674,7 +2689,7 @@ void RenderBoxModelObject::moveChildTo(RenderBoxModelObject* toBoxModelObject, R
 {
     // We assume that callers have cleared their positioned objects list for child moves (!fullRemoveInsert) so the
     // positioned renderer maps don't become stale. It would be too slow to do the map lookup on each call.
-    ASSERT(!fullRemoveInsert || !isRenderBlock() || !toRenderBlock(this)->hasPositionedObjects());
+    ASSERT(!fullRemoveInsert || !is<RenderBlock>(*this) || !downcast<RenderBlock>(*this).hasPositionedObjects());
 
     ASSERT(this == child->parent());
     ASSERT(!beforeChild || toBoxModelObject == beforeChild->parent());
@@ -2695,10 +2710,10 @@ void RenderBoxModelObject::moveChildrenTo(RenderBoxModelObject* toBoxModelObject
     // This condition is rarely hit since this function is usually called on
     // anonymous blocks which can no longer carry positioned objects (see r120761)
     // or when fullRemoveInsert is false.
-    if (fullRemoveInsert && isRenderBlock()) {
-        toRenderBlock(this)->removePositionedObjects(0);
-        if (isRenderBlockFlow())
-            toRenderBlockFlow(this)->removeFloatingObjects(); 
+    if (fullRemoveInsert && is<RenderBlock>(*this)) {
+        downcast<RenderBlock>(*this).removePositionedObjects(nullptr);
+        if (is<RenderBlockFlow>(*this))
+            downcast<RenderBlockFlow>(*this).removeFloatingObjects();
     }
 
     ASSERT(!beforeChild || toBoxModelObject == beforeChild->parent());
@@ -2709,9 +2724,9 @@ void RenderBoxModelObject::moveChildrenTo(RenderBoxModelObject* toBoxModelObject
         // Check to make sure we're not saving the firstLetter as the nextSibling.
         // When the |child| object will be moved, its firstLetter will be recreated,
         // so saving it now in nextSibling would let us with a destroyed object.
-        if (child->isText() && toRenderText(child)->isTextFragment() && nextSibling && nextSibling->isText()) {
+        if (is<RenderTextFragment>(*child) && is<RenderText>(nextSibling)) {
             RenderObject* firstLetterObj = nullptr;
-            if (RenderBlock* block = toRenderTextFragment(child)->blockForAccompanyingFirstLetter()) {
+            if (RenderBlock* block = downcast<RenderTextFragment>(*child).blockForAccompanyingFirstLetter()) {
                 RenderElement* firstLetterContainer = nullptr;
                 block->getFirstLetter(firstLetterObj, firstLetterContainer, child);
             }

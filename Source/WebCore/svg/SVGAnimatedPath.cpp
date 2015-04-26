@@ -20,7 +20,7 @@
 #include "config.h"
 #include "SVGAnimatedPath.h"
 
-#include "SVGAnimateElement.h"
+#include "SVGAnimateElementBase.h"
 #include "SVGAnimatedPathSegListPropertyTearOff.h"
 #include "SVGPathUtilities.h"
 
@@ -54,7 +54,7 @@ std::unique_ptr<SVGAnimatedType> SVGAnimatedPathAnimator::startAnimValAnimation(
     for (SVGElementAnimatedPropertyList::const_iterator it = animatedTypes.begin(); it != end; ++it)
         result.append(castAnimatedPropertyToActualType<SVGAnimatedPathSegListPropertyTearOff>(it->properties[0].get()));
 
-    SVGElementInstance::InstanceUpdateBlocker blocker(property->contextElement());
+    SVGElement::InstanceUpdateBlocker blocker(*property->contextElement());
 
     size_t resultSize = result.size();
     for (size_t i = 0; i < resultSize; ++i)

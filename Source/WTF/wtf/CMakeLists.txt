@@ -71,7 +71,6 @@ set(WTF_HEADERS
     PassRef.h
     PassRefPtr.h
     Platform.h
-    PossiblyNull.h
     PrintStream.h
     ProcessID.h
     RAMSize.h
@@ -82,8 +81,8 @@ set(WTF_HEADERS
     Ref.h
     RefCounted.h
     RefCountedLeakCounter.h
+    RefCounter.h
     RefPtr.h
-    RefPtrHashMap.h
     RetainPtr.h
     RunLoop.h
     SHA1.h
@@ -93,13 +92,13 @@ set(WTF_HEADERS
     StackStats.h
     StaticConstructors.h
     StdLibExtras.h
+    Stopwatch.h
     StringExtras.h
     StringHasher.h
     StringPrintStream.h
     TCPackedCache.h
     TCPageMap.h
     TCSpinLock.h
-    TCSystemAlloc.h
     ThreadIdentifierDataPthreads.h
     ThreadSafeRefCounted.h
     ThreadSpecific.h
@@ -175,13 +174,13 @@ set(WTF_SOURCES
     RAMSize.cpp
     RandomNumber.cpp
     RefCountedLeakCounter.cpp
+    RefCounter.cpp
     RunLoop.cpp
     SHA1.cpp
     SixCharacterHash.cpp
     StackStats.cpp
     StackBounds.cpp
     StringPrintStream.cpp
-    TCSystemAlloc.cpp
     Threading.cpp
     WTFThreadData.cpp
     dtoa.cpp
@@ -202,6 +201,7 @@ set(WTF_SOURCES
     text/StringBuilder.cpp
     text/StringImpl.cpp
     text/StringStatics.cpp
+    text/StringView.cpp
     text/WTFString.cpp
 
     threads/BinarySemaphore.cpp
@@ -210,6 +210,7 @@ set(WTF_SOURCES
 )
 
 set(WTF_INCLUDE_DIRECTORIES
+    "${BMALLOC_DIR}"
     "${WTF_DIR}"
     "${WTF_DIR}/wtf"
     "${WTF_DIR}/wtf/dtoa"
@@ -223,6 +224,7 @@ set(WTF_INCLUDE_DIRECTORIES
 
 set(WTF_LIBRARIES
     ${CMAKE_DL_LIBS}
+    bmalloc
 )
 
 list(APPEND WTF_SOURCES

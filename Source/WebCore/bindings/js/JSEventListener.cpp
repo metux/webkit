@@ -131,18 +131,18 @@ void JSEventListener::handleEvent(ScriptExecutionContext* scriptExecutionContext
 
         globalObject->setCurrentEvent(savedEvent);
 
-        if (scriptExecutionContext->isWorkerGlobalScope()) {
+        if (is<WorkerGlobalScope>(*scriptExecutionContext)) {
             bool terminatorCausedException = (exec->hadException() && isTerminatedExecutionException(exec->exception()));
             if (terminatorCausedException || (vm.watchdog && vm.watchdog->didFire()))
-                toWorkerGlobalScope(scriptExecutionContext)->script()->forbidExecution();
+                downcast<WorkerGlobalScope>(*scriptExecutionContext).script()->forbidExecution();
         }
 
         if (exception) {
             event->target()->uncaughtExceptionInEventHandler();
             reportException(exec, exception);
         } else {
-            if (!retval.isUndefinedOrNull() && event->isBeforeUnloadEvent())
-                toBeforeUnloadEvent(event)->setReturnValue(retval.toString(exec)->value(exec));
+            if (!retval.isUndefinedOrNull() && is<BeforeUnloadEvent>(*event))
+                downcast<BeforeUnloadEvent>(*event).setReturnValue(retval.toString(exec)->value(exec));
             if (m_isAttribute) {
                 if (retval.isFalse())
                     event->preventDefault();
@@ -161,6 +161,13 @@ bool JSEventListener::operator==(const EventListener& listener)
     if (const JSEventListener* jsEventListener = JSEventListener::cast(&listener))
         return m_jsFunction == jsEventListener->m_jsFunction && m_isAttribute == jsEventListener->m_isAttribute;
     return false;
+}
+
+Ref<JSEventListener> createJSEventListenerForAdd(JSC::ExecState& state, JSC::JSObject& listener, JSC::JSObject& wrapper)
+{
+    // FIXME: This abstraction is no longer needed. It was part of support for SVGElementInstance.
+    // We should remove it and simplify the bindings generation scripts.
+    return JSEventListener::create(&listener, &wrapper, false, currentWorld(&state));
 }
 
 } // namespace WebCore

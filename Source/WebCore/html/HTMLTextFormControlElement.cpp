@@ -87,20 +87,20 @@ Node::InsertionNotificationRequest HTMLTextFormControlElement::insertedInto(Cont
     return InsertionDone;
 }
 
-void HTMLTextFormControlElement::dispatchFocusEvent(PassRefPtr<Element> oldFocusedElement, FocusDirection direction)
+void HTMLTextFormControlElement::dispatchFocusEvent(RefPtr<Element>&& oldFocusedElement, FocusDirection direction)
 {
     if (supportsPlaceholder())
         updatePlaceholderVisibility();
     handleFocusEvent(oldFocusedElement.get(), direction);
-    HTMLFormControlElementWithState::dispatchFocusEvent(oldFocusedElement, direction);
+    HTMLFormControlElementWithState::dispatchFocusEvent(WTF::move(oldFocusedElement), direction);
 }
 
-void HTMLTextFormControlElement::dispatchBlurEvent(PassRefPtr<Element> newFocusedElement)
+void HTMLTextFormControlElement::dispatchBlurEvent(RefPtr<Element>&& newFocusedElement)
 {
     if (supportsPlaceholder())
         updatePlaceholderVisibility();
     handleBlurEvent();
-    HTMLFormControlElementWithState::dispatchBlurEvent(newFocusedElement);
+    HTMLFormControlElementWithState::dispatchBlurEvent(WTF::move(newFocusedElement));
 }
 
 void HTMLTextFormControlElement::didEditInnerTextValue()
@@ -431,7 +431,7 @@ static inline void setContainerAndOffsetForRange(Node* node, int offset, Node*& 
 PassRefPtr<Range> HTMLTextFormControlElement::selection() const
 {
     if (!renderer() || !isTextFormControl() || !hasCachedSelection())
-        return 0;
+        return nullptr;
 
     int start = m_cachedSelectionStart;
     int end = m_cachedSelectionEnd;
@@ -439,15 +439,15 @@ PassRefPtr<Range> HTMLTextFormControlElement::selection() const
     ASSERT(start <= end);
     TextControlInnerTextElement* innerText = innerTextElement();
     if (!innerText)
-        return 0;
+        return nullptr;
 
     if (!innerText->firstChild())
         return Range::create(document(), innerText, 0, innerText, 0);
 
     int offset = 0;
-    Node* startNode = 0;
-    Node* endNode = 0;
-    for (Node* node = innerText->firstChild(); node; node = NodeTraversal::next(node, innerText)) {
+    Node* startNode = nullptr;
+    Node* endNode = nullptr;
+    for (Node* node = innerText->firstChild(); node; node = NodeTraversal::next(*node, innerText)) {
         ASSERT(!node->firstChild());
         ASSERT(node->isTextNode() || node->hasTagName(brTag));
         int length = node->isTextNode() ? lastOffsetInNode(node) : 1;
@@ -464,7 +464,7 @@ PassRefPtr<Range> HTMLTextFormControlElement::selection() const
     }
 
     if (!startNode || !endNode)
-        return 0;
+        return nullptr;
 
     return Range::create(document(), startNode, start, endNode, end);
 }
@@ -521,66 +521,67 @@ bool HTMLTextFormControlElement::lastChangeWasUserEdit() const
     return m_lastChangeWasUserEdit;
 }
 
+static void stripTrailingNewline(StringBuilder& result)
+{
+    // Remove one trailing newline; there's always one that's collapsed out by rendering.
+    size_t size = result.length();
+    if (size && result[size - 1] == newlineCharacter)
+        result.resize(size - 1);
+}
+
+static String innerTextValueFrom(TextControlInnerTextElement& innerText)
+{
+    StringBuilder result;
+    for (Node* node = innerText.firstChild(); node; node = NodeTraversal::next(*node, &innerText)) {
+        if (is<HTMLBRElement>(*node))
+            result.append(newlineCharacter);
+        else if (is<Text>(*node))
+            result.append(downcast<Text>(*node).data());
+    }
+    stripTrailingNewline(result);
+    return result.toString();
+}
+
 void HTMLTextFormControlElement::setInnerTextValue(const String& value)
 {
-    if (!isTextFormControl())
+    TextControlInnerTextElement* innerText = innerTextElement();
+    if (!innerText)
         return;
 
-    bool textIsChanged = value != innerTextValue();
-    if (textIsChanged || !innerTextElement()->hasChildNodes()) {
+    ASSERT(isTextFormControl());
+    bool textIsChanged = value != innerTextValueFrom(*innerText);
+    if (textIsChanged || !innerText->hasChildNodes()) {
         if (textIsChanged && renderer()) {
             if (AXObjectCache* cache = document().existingAXObjectCache())
                 cache->postNotification(this, AXObjectCache::AXValueChanged, TargetObservableParent);
         }
-        innerTextElement()->setInnerText(value, ASSERT_NO_EXCEPTION);
+        innerText->setInnerText(value, ASSERT_NO_EXCEPTION);
 
         if (value.endsWith('\n') || value.endsWith('\r'))
-            innerTextElement()->appendChild(HTMLBRElement::create(document()), ASSERT_NO_EXCEPTION);
+            innerText->appendChild(HTMLBRElement::create(document()), ASSERT_NO_EXCEPTION);
     }
 
     setFormControlValueMatchesRenderer(true);
 }
 
-static String finishText(StringBuilder& result)
-{
-    // Remove one trailing newline; there's always one that's collapsed out by rendering.
-    size_t size = result.length();
-    if (size && result[size - 1] == newlineCharacter)
-        result.resize(--size);
-    return result.toString();
-}
-
 String HTMLTextFormControlElement::innerTextValue() const
 {
-    if (!isTextFormControl())
-        return emptyString();
-
     TextControlInnerTextElement* innerText = innerTextElement();
-    if (!innerText)
-        return emptyString();
-
-    StringBuilder result;
-    for (Node* node = innerText; node; node = NodeTraversal::next(node, innerText)) {
-        if (node->hasTagName(brTag))
-            result.append(newlineCharacter);
-        else if (node->isTextNode())
-            result.append(toText(node)->data());
-    }
-    return finishText(result);
+    return innerText ? innerTextValueFrom(*innerText) : emptyString();
 }
 
 static Position positionForIndex(TextControlInnerTextElement* innerText, unsigned index)
 {
     unsigned remainingCharactersToMoveForward = index;
     Node* lastBrOrText = innerText;
-    for (Node* node = innerText; node; node = NodeTraversal::next(node, innerText)) {
+    for (Node* node = innerText; node; node = NodeTraversal::next(*node, innerText)) {
         if (node->hasTagName(brTag)) {
             if (!remainingCharactersToMoveForward)
                 return positionBeforeNode(node);
             remainingCharactersToMoveForward--;
             lastBrOrText = node;
-        } else if (node->isTextNode()) {
-            Text& text = toText(*node);
+        } else if (is<Text>(*node)) {
+            Text& text = downcast<Text>(*node);
             if (remainingCharactersToMoveForward < text.length())
                 return Position(&text, remainingCharactersToMoveForward);
             remainingCharactersToMoveForward -= text.length();
@@ -606,15 +607,15 @@ unsigned HTMLTextFormControlElement::indexForPosition(const Position& passedPosi
     ASSERT(startNode);
     ASSERT(innerText->contains(startNode));
 
-    for (Node* node = startNode; node; node = NodeTraversal::previous(node, innerText)) {
-        if (node->isTextNode()) {
-            unsigned length = toText(*node).length();
+    for (Node* node = startNode; node; node = NodeTraversal::previous(*node, innerText)) {
+        if (is<Text>(*node)) {
+            unsigned length = downcast<Text>(*node).length();
             if (node == passedPosition.containerNode())
                 index += std::min<unsigned>(length, passedPosition.offsetInContainerNode());
             else
                 index += length;
-        } else if (node->hasTagName(brTag))
-            index++;
+        } else if (is<HTMLBRElement>(*node))
+            ++index;
     }
 
     unsigned length = innerTextValue().length();
@@ -684,11 +685,11 @@ String HTMLTextFormControlElement::valueWithHardLineBreaks() const
     getNextSoftBreak(line, breakNode, breakOffset);
 
     StringBuilder result;
-    for (Node* node = innerText->firstChild(); node; node = NodeTraversal::next(node, innerText)) {
-        if (node->hasTagName(brTag))
+    for (Node* node = innerText->firstChild(); node; node = NodeTraversal::next(*node, innerText)) {
+        if (is<HTMLBRElement>(*node))
             result.append(newlineCharacter);
-        else if (node->isTextNode()) {
-            String data = toText(node)->data();
+        else if (is<Text>(*node)) {
+            String data = downcast<Text>(*node).data();
             unsigned length = data.length();
             unsigned position = 0;
             while (breakNode == node && breakOffset <= length) {
@@ -704,7 +705,8 @@ String HTMLTextFormControlElement::valueWithHardLineBreaks() const
         while (breakNode == node)
             getNextSoftBreak(line, breakNode, breakOffset);
     }
-    return finishText(result);
+    stripTrailingNewline(result);
+    return result.toString();
 }
 
 HTMLTextFormControlElement* enclosingTextFormControl(const Position& position)
@@ -717,7 +719,7 @@ HTMLTextFormControlElement* enclosingTextFormControl(const Position& position)
     if (!container)
         return nullptr;
     Element* ancestor = container->shadowHost();
-    return ancestor && isHTMLTextFormControlElement(*ancestor) ? toHTMLTextFormControlElement(ancestor) : nullptr;
+    return ancestor && is<HTMLTextFormControlElement>(*ancestor) ? downcast<HTMLTextFormControlElement>(ancestor) : nullptr;
 }
 
 static const Element* parentHTMLElement(const Element* element)

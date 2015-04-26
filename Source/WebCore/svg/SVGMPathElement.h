@@ -35,7 +35,7 @@ class SVGMPathElement final : public SVGElement,
                               public SVGURIReference,
                               public SVGExternalResourcesRequired {
 public:
-    static PassRefPtr<SVGMPathElement> create(const QualifiedName&, Document&);
+    static Ref<SVGMPathElement> create(const QualifiedName&, Document&);
 
     virtual ~SVGMPathElement();
 
@@ -67,8 +67,6 @@ private:
         DECLARE_ANIMATED_BOOLEAN(ExternalResourcesRequired, externalResourcesRequired)
     END_DECLARE_ANIMATED_PROPERTIES
 };
-
-NODE_TYPE_CASTS(SVGMPathElement)
 
 } // namespace WebCore
 

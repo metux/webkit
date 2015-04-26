@@ -23,8 +23,16 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+WebInspector.DebuggableType = {
+    Web: "web",
+    JavaScript: "javascript"
+};
+
 WebInspector.loaded = function()
 {
+    this.debuggableType = WebInspector.DebuggableType.Web;
+    this.hasExtraDomains = false;
+
     // Register observers for events from the InspectorBackend.
     // The initialization order should match the same in Main.js.
     InspectorBackend.registerInspectorDispatcher(new WebInspector.InspectorObserver);
@@ -48,6 +56,9 @@ WebInspector.loaded = function()
     this.probeManager = new WebInspector.ProbeManager;
     this.replayManager = new WebInspector.ReplayManager;
 
+    // Global controllers.
+    this.quickConsole = {executionContextIdentifier: undefined};
+
     document.addEventListener("DOMContentLoaded", this.contentLoaded.bind(this));
 
     // Enable agents.
@@ -56,14 +67,18 @@ WebInspector.loaded = function()
     // Perform one-time tasks.
     WebInspector.CSSCompletions.requestCSSNameCompletions();
 
-    // Establish communication with the InspectorBackend.
-    InspectorFrontendHost.loaded();
+    // Global settings.
+    this.showShadowDOMSetting = new WebInspector.Setting("show-shadow-dom", true);
 }
 
 WebInspector.contentLoaded = function()
 {
     // Signal that the frontend is now ready to receive messages.
     InspectorFrontendAPI.loadCompleted();
+
+    // Tell the InspectorFrontendHost we loaded, which causes the window to display
+    // and pending InspectorFrontendAPI commands to be sent.
+    InspectorFrontendHost.loaded();
 }
 
 WebInspector.UIString = function(string)

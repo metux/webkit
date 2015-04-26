@@ -37,7 +37,6 @@
 #include "PseudoElement.h"
 #include "ScopedEventQueue.h"
 #include "ShadowRoot.h"
-#include "SVGElementInstance.h"
 #include "SVGNames.h"
 #include "SVGUseElement.h"
 #include "TouchEvent.h"
@@ -60,10 +59,10 @@ private:
 WindowEventContext::WindowEventContext(PassRefPtr<Node> node, const EventContext* topEventContext)
 {
     Node* topLevelContainer = topEventContext ? topEventContext->node() : node.get();
-    if (!topLevelContainer->isDocumentNode())
+    if (!is<Document>(*topLevelContainer))
         return;
 
-    m_window = toDocument(topLevelContainer)->domWindow();
+    m_window = downcast<Document>(*topLevelContainer).domWindow();
     m_target = topEventContext ? topEventContext->target() : node.get();
 }
 
@@ -143,8 +142,8 @@ public:
             return m_relatedNodeInCurrentTreeScope;
 
         if (m_currentTreeScope) {
-            ASSERT(m_currentTreeScope->rootNode().isShadowRoot());
-            ASSERT(&newTarget == toShadowRoot(m_currentTreeScope->rootNode()).hostElement());
+            ASSERT(is<ShadowRoot>(m_currentTreeScope->rootNode()));
+            ASSERT(&newTarget == downcast<ShadowRoot>(m_currentTreeScope->rootNode()).hostElement());
             ASSERT(m_currentTreeScope->parentTreeScope() == &newTreeScope);
         }
 
@@ -184,8 +183,8 @@ public:
                 ASSERT_WITH_SECURITY_IMPLICATION(&previousHost->treeScope() == &targetScope);
                 return previousHost;
             }
-            if (scope->rootNode().isShadowRoot())
-                previousHost = toShadowRoot(scope->rootNode()).hostElement();
+            if (is<ShadowRoot>(scope->rootNode()))
+                previousHost = downcast<ShadowRoot>(scope->rootNode()).hostElement();
             else
                 ASSERT_WITH_SECURITY_IMPLICATION(!scope->parentTreeScope());
         }
@@ -205,25 +204,16 @@ private:
 
 inline EventTarget& eventTargetRespectingTargetRules(Node& referenceNode)
 {
-    if (referenceNode.isPseudoElement()) {
-        EventTarget* hostElement = toPseudoElement(referenceNode).hostElement();
-        ASSERT(hostElement);
-        return *hostElement;
+    if (is<PseudoElement>(referenceNode)) {
+        ASSERT(downcast<PseudoElement>(referenceNode).hostElement());
+        return *downcast<PseudoElement>(referenceNode).hostElement();
     }
 
-    if (!referenceNode.isSVGElement() || !referenceNode.isInShadowTree())
-        return referenceNode;
-
-    // Spec: The event handling for the non-exposed tree works as if the referenced element had been textually included
-    // as a deeply cloned child of the 'use' element, except that events are dispatched to the SVGElementInstance objects
-    auto& rootNode = referenceNode.treeScope().rootNode();
-    Element* shadowHostElement = rootNode.isShadowRoot() ? toShadowRoot(rootNode).hostElement() : nullptr;
-    // At this time, SVG nodes are not supported in non-<use> shadow trees.
-    if (!shadowHostElement || !shadowHostElement->hasTagName(SVGNames::useTag))
-        return referenceNode;
-    SVGUseElement* useElement = toSVGUseElement(shadowHostElement);
-    if (SVGElementInstance* instance = useElement->instanceForShadowTreeElement(&referenceNode))
-        return *instance;
+    // Events sent to elements inside an SVG use element's shadow tree go to the use element.
+    if (is<SVGElement>(referenceNode)) {
+        if (auto* useElement = downcast<SVGElement>(referenceNode).correspondingUseElement())
+            return *useElement;
+    }
 
     return referenceNode;
 }
@@ -342,8 +332,8 @@ bool EventDispatcher::dispatchEvent(Node* origin, PassRefPtr<Event> prpEvent)
     if (EventTarget* relatedTarget = event->relatedTarget())
         eventPath.setRelatedTarget(*node, *relatedTarget);
 #if ENABLE(TOUCH_EVENTS) && !PLATFORM(IOS)
-    if (event->isTouchEvent()) {
-        if (!eventPath.updateTouchLists(*toTouchEvent(event.get())))
+    if (is<TouchEvent>(*event)) {
+        if (!eventPath.updateTouchLists(downcast<TouchEvent>(*event)))
             return true;
     }
 #endif
@@ -356,18 +346,18 @@ bool EventDispatcher::dispatchEvent(Node* origin, PassRefPtr<Event> prpEvent)
     WindowEventContext windowEventContext(node.get(), eventPath.lastContextIfExists());
 
     InputElementClickState clickHandlingState;
-    if (isHTMLInputElement(node.get()))
-        toHTMLInputElement(*node).willDispatchEvent(*event, clickHandlingState);
+    if (is<HTMLInputElement>(*node))
+        downcast<HTMLInputElement>(*node).willDispatchEvent(*event, clickHandlingState);
 
     if (!event->propagationStopped() && !eventPath.isEmpty())
         dispatchEventInDOM(*event, eventPath, windowEventContext);
 
     event->setTarget(&eventTargetRespectingTargetRules(*node));
-    event->setCurrentTarget(0);
+    event->setCurrentTarget(nullptr);
     event->setEventPhase(0);
 
     if (clickHandlingState.stateful)
-        toHTMLInputElement(*node).didDispatchClickEvent(*event, clickHandlingState);
+        downcast<HTMLInputElement>(*node).didDispatchClickEvent(*event, clickHandlingState);
 
     // Call default event handlers. While the DOM does have a concept of preventing
     // default handling, the detail of which handlers are called is an internal
@@ -418,7 +408,7 @@ static inline bool shouldEventCrossShadowBoundary(Event& event, ShadowRoot& shad
 
 static Node* nodeOrHostIfPseudoElement(Node* node)
 {
-    return node->isPseudoElement() ? toPseudoElement(node)->hostElement() : node;
+    return is<PseudoElement>(*node) ? downcast<PseudoElement>(*node).hostElement() : node;
 }
 
 EventPath::EventPath(Node& targetNode, Event& event)
@@ -447,12 +437,12 @@ EventPath::EventPath(Node& targetNode, Event& event)
                 m_path.append(std::make_unique<EventContext>(node, &currentTarget, target));
             if (!inDocument)
                 return;
-            if (node->isShadowRoot())
+            if (is<ShadowRoot>(*node))
                 break;
         }
-        if (!node || !shouldEventCrossShadowBoundary(event, *toShadowRoot(node), *target))
+        if (!node || !shouldEventCrossShadowBoundary(event, downcast<ShadowRoot>(*node), *target))
             return;
-        node = toShadowRoot(node)->hostElement();
+        node = downcast<ShadowRoot>(*node).hostElement();
     }
 }
 

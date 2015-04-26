@@ -47,6 +47,8 @@ inline CapabilityLevel canCompile(Node* node)
     case GetMyArgumentsLength:
     case GetLocal:
     case SetLocal:
+    case PutLocal:
+    case KillLocal:
     case MovHint:
     case ZombieHint:
     case Phantom:
@@ -86,6 +88,7 @@ inline CapabilityLevel canCompile(Node* node)
     case ArithAbs:
     case ArithSin:
     case ArithCos:
+    case ArithPow:
     case ArithSqrt:
     case ArithFRound:
     case ArithNegate:
@@ -97,7 +100,6 @@ inline CapabilityLevel canCompile(Node* node)
     case Upsilon:
     case ExtractOSREntryLocal:
     case LoopHint:
-    case GetMyScope:
     case SkipScope:
     case GetClosureRegisters:
     case GetClosureVar:
@@ -168,12 +170,12 @@ inline CapabilityLevel canCompile(Node* node)
     case GetEnumeratorPname:
     case ToIndexString:
     case BottomValue:
+    case PhantomNewObject:
+    case PutByOffsetHint:
+    case CheckStructureImmediate:
+    case PutStructureHint:
+    case MaterializeNewObject:
         // These are OK.
-        break;
-    case ProfiledCall:
-    case ProfiledConstruct:
-        // These are OK not because the FTL can support them, but because if the DFG sees one of
-        // these then the FTL will see a normal Call/Construct.
         break;
     case Identity:
         // No backend handles this because it will be optimized out. But we may check
@@ -362,7 +364,7 @@ CapabilityLevel canCompile(Graph& graph)
     
     if (graph.m_codeBlock->needsActivation()) {
         // Need this because although we also don't support
-        // CreateActivation/TearOffActivation, we might not see those nodes in case of
+        // CreateActivation, we might not see those nodes in case of
         // OSR entry.
         // FIXME: Support activations.
         // https://bugs.webkit.org/show_bug.cgi?id=129576

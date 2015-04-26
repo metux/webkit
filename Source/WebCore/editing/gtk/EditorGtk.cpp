@@ -82,22 +82,22 @@ void Editor::pasteWithPasteboard(Pasteboard* pasteboard, bool allowPlainText, Ma
 
 static const AtomicString& elementURL(Element& element)
 {
-    if (isHTMLImageElement(element) || isHTMLInputElement(element))
+    if (is<HTMLImageElement>(element) || is<HTMLInputElement>(element))
         return element.fastGetAttribute(HTMLNames::srcAttr);
-    if (isSVGImageElement(element))
+    if (is<SVGImageElement>(element))
         return element.fastGetAttribute(XLinkNames::hrefAttr);
-    if (isHTMLEmbedElement(element) || isHTMLObjectElement(element))
+    if (is<HTMLEmbedElement>(element) || is<HTMLObjectElement>(element))
         return element.imageSourceURL();
     return nullAtom;
 }
 
 static bool getImageForElement(Element& element, RefPtr<Image>& image)
 {
-    auto renderer = element.renderer();
-    if (!renderer || !renderer->isRenderImage())
+    auto* renderer = element.renderer();
+    if (!is<RenderImage>(renderer))
         return false;
 
-    CachedImage* cachedImage = toRenderImage(*renderer).cachedImage();
+    CachedImage* cachedImage = downcast<RenderImage>(*renderer).cachedImage();
     if (!cachedImage || cachedImage->errorOccurred())
         return false;
 
@@ -127,6 +127,11 @@ void Editor::writeSelectionToPasteboard(Pasteboard& pasteboard)
     pasteboardContent.markup = createMarkup(*selectedRange(), nullptr, AnnotateForInterchange, false, ResolveNonLocalURLs);
     pasteboardContent.callback = nullptr;
     pasteboard.write(pasteboardContent);
+}
+
+PassRefPtr<DocumentFragment> Editor::webContentFromPasteboard(Pasteboard& pasteboard, Range& context, bool allowPlainText, bool& chosePlainText)
+{
+    return createFragmentFromPasteboardData(pasteboard, m_frame, context, allowPlainText, chosePlainText);
 }
 
 } // namespace WebCore

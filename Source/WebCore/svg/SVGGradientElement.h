@@ -107,10 +107,17 @@ private:
     END_DECLARE_ANIMATED_PROPERTIES
 };
 
-void isSVGGradientElement(const SVGGradientElement&); // Catch unnecessary runtime check of type known at compile time.
-bool isSVGGradientElement(const Node&);
-NODE_TYPE_CASTS(SVGGradientElement)
-
 } // namespace WebCore
+
+SPECIALIZE_TYPE_TRAITS_BEGIN(WebCore::SVGGradientElement)
+static bool isType(const WebCore::SVGElement& element)
+{
+    return element.hasTagName(WebCore::SVGNames::radialGradientTag) || element.hasTagName(WebCore::SVGNames::linearGradientTag);
+}
+static bool isType(const WebCore::Node& node)
+{
+    return is<WebCore::SVGElement>(node) && isType(downcast<WebCore::SVGElement>(node));
+}
+SPECIALIZE_TYPE_TRAITS_END()
 
 #endif

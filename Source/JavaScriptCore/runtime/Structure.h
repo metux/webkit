@@ -48,8 +48,7 @@
 #include <wtf/PassRefPtr.h>
 #include <wtf/PrintStream.h>
 #include <wtf/RefCounted.h>
-#include <wtf/text/StringImpl.h>
-
+#include <wtf/text/AtomicStringImpl.h>
 
 namespace JSC {
 
@@ -72,6 +71,26 @@ static const unsigned initialOutOfLineCapacity = 4;
 // The factor by which to grow out-of-line storage when it is exhausted, after the
 // initial allocation.
 static const unsigned outOfLineGrowthFactor = 2;
+
+struct PropertyMapEntry {
+    AtomicStringImpl* key;
+    PropertyOffset offset;
+    unsigned attributes;
+
+    PropertyMapEntry()
+        : key(nullptr)
+        , offset(invalidOffset)
+        , attributes(0)
+    {
+    }
+    
+    PropertyMapEntry(AtomicStringImpl* key, PropertyOffset offset, unsigned attributes)
+        : key(key)
+        , offset(offset)
+        , attributes(attributes)
+    {
+    }
+};
 
 class Structure : public JSCell {
 public:
@@ -113,7 +132,7 @@ public:
     static void dumpStatistics();
 
     JS_EXPORT_PRIVATE static Structure* addPropertyTransition(VM&, Structure*, PropertyName, unsigned attributes, PropertyOffset&, PutPropertySlot::Context = PutPropertySlot::UnknownContext);
-    static Structure* addPropertyTransitionToExistingStructureConcurrently(Structure*, StringImpl* uid, unsigned attributes, PropertyOffset&);
+    static Structure* addPropertyTransitionToExistingStructureConcurrently(Structure*, AtomicStringImpl* uid, unsigned attributes, PropertyOffset&);
     JS_EXPORT_PRIVATE static Structure* addPropertyTransitionToExistingStructure(Structure*, PropertyName, unsigned attributes, PropertyOffset&);
     static Structure* removePropertyTransition(VM&, Structure*, PropertyName, PropertyOffset&);
     JS_EXPORT_PRIVATE static Structure* changePrototypeTransition(VM&, Structure*, JSValue prototype);
@@ -262,8 +281,17 @@ public:
     PropertyOffset get(VM&, PropertyName);
     PropertyOffset get(VM&, PropertyName, unsigned& attributes);
 
-    PropertyOffset getConcurrently(VM&, StringImpl* uid);
-    PropertyOffset getConcurrently(VM&, StringImpl* uid, unsigned& attributes);
+    // This is a somewhat internalish method. It will call your functor while possibly holding the
+    // Structure's lock. There is no guarantee whether the lock is held or not in any particular
+    // call. So, you have to assume the worst. Also, the functor returns true if it wishes for you
+    // to continue or false if it's done.
+    template<typename Functor>
+    void forEachPropertyConcurrently(const Functor&);
+    
+    PropertyOffset getConcurrently(AtomicStringImpl* uid);
+    PropertyOffset getConcurrently(AtomicStringImpl* uid, unsigned& attributes);
+    
+    Vector<PropertyMapEntry> getPropertiesConcurrently();
     
     void setHasGetterSetterPropertiesWithProtoCheck(bool is__proto__)
     {
@@ -404,6 +432,10 @@ public:
 
     PassRefPtr<StructureShape> toStructureShape(JSValue);
     
+    // Determines if the two structures match enough that this one could be used for allocations
+    // of the other one.
+    bool canUseForAllocationsOf(Structure*);
+    
     void dump(PrintStream&) const;
     void dumpInContext(PrintStream&, DumpContext*) const;
     void dumpBrief(PrintStream&, const CString&) const;
@@ -453,7 +485,7 @@ private:
 
     static Structure* create(VM&, Structure*);
     
-    static Structure* addPropertyTransitionToExistingStructureImpl(Structure*, StringImpl* uid, unsigned attributes, PropertyOffset&);
+    static Structure* addPropertyTransitionToExistingStructureImpl(Structure*, AtomicStringImpl* uid, unsigned attributes, PropertyOffset&);
 
     // This will return the structure that has a usable property table, that property table,
     // and the list of structures that we visited before we got to it. If it returns a
@@ -561,7 +593,7 @@ private:
 
     WriteBarrier<JSCell> m_previousOrRareData;
 
-    RefPtr<StringImpl> m_nameInPrevious;
+    RefPtr<AtomicStringImpl> m_nameInPrevious;
 
     const ClassInfo* m_classInfo;
 

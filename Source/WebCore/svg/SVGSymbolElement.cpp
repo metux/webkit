@@ -22,7 +22,6 @@
 #include "SVGSymbolElement.h"
 
 #include "RenderSVGHiddenContainer.h"
-#include "SVGElementInstance.h"
 #include "SVGFitToViewBox.h"
 #include "SVGNames.h"
 #include <wtf/NeverDestroyed.h>
@@ -48,9 +47,9 @@ inline SVGSymbolElement::SVGSymbolElement(const QualifiedName& tagName, Document
     registerAnimatedPropertiesForSVGSymbolElement();
 }
 
-PassRefPtr<SVGSymbolElement> SVGSymbolElement::create(const QualifiedName& tagName, Document& document)
+Ref<SVGSymbolElement> SVGSymbolElement::create(const QualifiedName& tagName, Document& document)
 {
-    return adoptRef(new SVGSymbolElement(tagName, document));
+    return adoptRef(*new SVGSymbolElement(tagName, document));
 }
 
 bool SVGSymbolElement::isSupportedAttribute(const QualifiedName& attrName)
@@ -88,7 +87,7 @@ void SVGSymbolElement::svgAttributeChanged(const QualifiedName& attrName)
         return;
     }
 
-    SVGElementInstance::InvalidationGuard invalidationGuard(this);
+    InstanceInvalidationGuard guard(*this);
 
     // Every other property change is ignored.
     if (attrName == SVGNames::viewBoxAttr)
@@ -100,7 +99,7 @@ bool SVGSymbolElement::selfHasRelativeLengths() const
     return hasAttribute(SVGNames::viewBoxAttr);
 }
 
-RenderPtr<RenderElement> SVGSymbolElement::createElementRenderer(PassRef<RenderStyle> style)
+RenderPtr<RenderElement> SVGSymbolElement::createElementRenderer(Ref<RenderStyle>&& style)
 {
     return createRenderer<RenderSVGHiddenContainer>(*this, WTF::move(style));
 }

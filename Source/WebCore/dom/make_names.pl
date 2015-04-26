@@ -192,9 +192,10 @@ sub defaultTagPropertyHash
         'JSInterfaceName' => defaultInterfaceName($_[0]),
         'mapToTagName' => '',
         'wrapperOnlyIfMediaIsAvailable' => 0,
+        'settingsConditional' => 0,
         'conditional' => 0,
         'runtimeConditional' => 0,
-        'generateTypeHelpers' => 0
+        'customTypeHelper' => 0,
     );
 }
 
@@ -381,7 +382,7 @@ sub printConstructorSignature
 {
     my ($F, $tagName, $constructorName, $constructorTagName) = @_;
 
-    print F "static PassRefPtr<$parameters{namespace}Element> ${constructorName}Constructor(const QualifiedName& $constructorTagName, Document& document";
+    print F "static Ref<$parameters{namespace}Element> ${constructorName}Constructor(const QualifiedName& $constructorTagName, Document& document";
     if ($parameters{namespace} eq "HTML") {
         print F ", HTMLFormElement*";
         print F " formElement" if $enabledTags{$tagName}{constructorNeedsFormElement};
@@ -407,7 +408,7 @@ sub printConstructorInterior
         print F <<END
     Settings* settings = document.settings();
     if (!MediaPlayer::isAvailable() || (settings && !settings->mediaEnabled()))
-        return 0;
+        return $parameters{fallbackInterfaceName}::create($constructorTagName, document);
     
 END
 ;
@@ -418,6 +419,16 @@ END
         print F <<END
     if (!RuntimeEnabledFeatures::sharedFeatures().${runtimeConditional}Enabled())
         return 0;
+END
+;
+    }
+
+    my $settingsConditional = $enabledTags{$tagName}{settingsConditional};
+    if ($settingsConditional) {
+        print F <<END
+    Settings* settings = document.settings();
+    if (!settings || !settings->${settingsConditional}())
+        return $parameters{fallbackInterfaceName}::create($constructorTagName, document);
 END
 ;
     }
@@ -627,46 +638,51 @@ sub printTypeHelpers
     my ($F, $namesRef) = @_;
     my %names = %$namesRef;
 
-    for my $name (sort keys %names) {
-        if (!$parsedTags{$name}{generateTypeHelpers}) {
-            next;
-        }
-
+    # Do a first pass to discard classes that map to several tags.
+    my %classToTags = ();
+    for my $name (keys %names) {
         my $class = $parsedTags{$name}{interfaceName};
-        my $checkHelper = "is$class";
+        push(@{$classToTags{$class}}, $name) if defined $class;
+    }
+
+    for my $class (sort keys %classToTags) {
+        my $name = $classToTags{$class}[0];
+        next if $parsedTags{$name}{customTypeHelper};
+        # Skip classes that map to more than 1 tag.
+        my $tagCount = scalar @{$classToTags{$class}};
+        next if $tagCount > 1;
 
         print F <<END
+namespace WebCore {
 class $class;
-void $checkHelper(const $class&); // Catch unnecessary runtime check of type known at compile time.
-void $checkHelper(const $class*); // Catch unnecessary runtime check of type known at compile time.
-END
-        ;
-
-        if ($parameters{namespace} eq "HTML" && $parsedTags{$name}{wrapperOnlyIfMediaIsAvailable}) {
-            # We need to check for HTMLUnknownElement if it might have been created by the factory.
-            print F <<END
-inline bool $checkHelper(const HTMLElement& element) { return !element.isHTMLUnknownElement() && element.hasTagName($parameters{namespace}Names::${name}Tag); }
-inline bool $checkHelper(const Node& node) { return node.isHTMLElement() && $checkHelper(toHTMLElement(node)); }
-END
-            ;
-        } else {
-            print F <<END
-inline bool $checkHelper(const $parameters{namespace}Element& element) { return element.hasTagName($parameters{namespace}Names::${name}Tag); }
-inline bool $checkHelper(const Node& node) { return node.hasTagName($parameters{namespace}Names::${name}Tag); }
-END
-            ;
-        }
-        print F <<END
-inline bool $checkHelper(const $parameters{namespace}Element* element) { ASSERT(element); return $checkHelper(*element); }
-inline bool $checkHelper(const Node* node) { ASSERT(node); return $checkHelper(*node); }
+}
+namespace WTF {
 template <typename ArgType>
-struct ElementTypeCastTraits<const $class, ArgType> {
-    static bool is(ArgType& node) { return $checkHelper(node); }
-};
+class TypeCastTraits<const WebCore::$class, ArgType, false /* isBaseType */> {
+public:
+    static bool isOfType(ArgType& node) { return checkTagName(node); }
+private:
 END
-        ;
-
-        print F "\n";
+       ;
+       if ($parameters{namespace} eq "HTML" && ($parsedTags{$name}{wrapperOnlyIfMediaIsAvailable} || $parsedTags{$name}{settingsConditional})) {
+           print F <<END
+    static bool checkTagName(const WebCore::HTMLElement& element) { return !element.isHTMLUnknownElement() && element.hasTagName(WebCore::$parameters{namespace}Names::${name}Tag); }
+    static bool checkTagName(const WebCore::Node& node) { return is<WebCore::HTMLElement>(node) && checkTagName(downcast<WebCore::HTMLElement>(node)); }
+END
+           ;
+       } else {
+           print F <<END
+    static bool checkTagName(const WebCore::$parameters{namespace}Element& element) { return element.hasTagName(WebCore::$parameters{namespace}Names::${name}Tag); }
+    static bool checkTagName(const WebCore::Node& node) { return node.hasTagName(WebCore::$parameters{namespace}Names::${name}Tag); }
+END
+           ;
+       }
+       print F <<END
+};
+}
+END
+       ;
+       print F "\n";
     }
 }
 
@@ -680,11 +696,9 @@ sub printTypeHelpersHeaderFile
     print F "#ifndef ".$parameters{namespace}."ElementTypeHelpers_h\n";
     print F "#define ".$parameters{namespace}."ElementTypeHelpers_h\n\n";
     print F "#include \"".$parameters{namespace}."Names.h\"\n\n";
-    print F "namespace WebCore {\n\n";
 
     printTypeHelpers($F, \%allTags);
 
-    print F "}\n\n";
     print F "#endif\n";
 
     close F;
@@ -952,7 +966,7 @@ namespace WebCore {
 
 using namespace $parameters{namespace}Names;
 
-typedef PassRefPtr<$parameters{namespace}Element> (*$parameters{namespace}ConstructorFunction)(const QualifiedName&, Document&$formElementArgumentForDeclaration, bool createdByParser);
+typedef Ref<$parameters{namespace}Element> (*$parameters{namespace}ConstructorFunction)(const QualifiedName&, Document&$formElementArgumentForDeclaration, bool createdByParser);
 
 END
     ;
@@ -982,42 +996,23 @@ END
         map.add(table[i].name.localName().impl(), table[i].function);
 }
 
-PassRefPtr<$parameters{namespace}Element> $parameters{namespace}ElementFactory::createElement(const QualifiedName& name, Document& document$formElementArgumentForDefinition, bool createdByParser)
+Ref<$parameters{namespace}Element> $parameters{namespace}ElementFactory::createElement(const QualifiedName& name, Document& document$formElementArgumentForDefinition, bool createdByParser)
 {
-END
-    ;
-
-    if ($parameters{namespace} ne "HTML" and $parameters{namespace} ne "SVG") {
-        print F <<END
-#if ENABLE(DASHBOARD_SUPPORT)
-    Settings* settings = document.settings();
-    if (settings && settings->usesDashboardBackwardCompatibilityMode())
-        return 0;
-#endif
-END
-        ;
-    }
-
-    print F <<END
     static NeverDestroyed<HashMap<AtomicStringImpl*, $parameters{namespace}ConstructorFunction>> functions;
     if (functions.get().isEmpty())
         populate$parameters{namespace}FactoryMap(functions);
-    if ($parameters{namespace}ConstructorFunction function = functions.get().get(name.localName().impl())) {
+    if ($parameters{namespace}ConstructorFunction function = functions.get().get(name.localName().impl()))
 END
     ;
 
     if ($parameters{namespace} eq "HTML") {
-        print F "        if (RefPtr<$parameters{namespace}Element> element = function(name, document, formElement, createdByParser))\n";
-        print F "            return element.release();\n";
+        print F "        return function(name, document, formElement, createdByParser);\n";
     } else {
-        print F "        if (RefPtr<$parameters{namespace}Element> element = function(name, document, createdByParser))\n";
-        print F "            return element.release();\n";
+        print F "        return function(name, document, createdByParser);\n";
     }
 
-    print F "   }\n";
-    print F "   return $parameters{fallbackInterfaceName}::create(name, document);\n";
-
     print F <<END
+    return $parameters{fallbackInterfaceName}::create(name, document);
 }
 
 } // namespace WebCore
@@ -1057,7 +1052,7 @@ namespace WebCore {
 END
 ;
 
-print F "        static PassRefPtr<$parameters{namespace}Element> createElement(const QualifiedName&, Document&";
+print F "        static Ref<$parameters{namespace}Element> createElement(const QualifiedName&, Document&";
 print F ", HTMLFormElement* = nullptr" if $parameters{namespace} eq "HTML";
 print F ", bool createdByParser = false);\n";
 
@@ -1091,7 +1086,7 @@ sub printWrapperFunctions
     for my $tagName (sort keys %enabledTags) {
         # Avoid defining the same wrapper method twice.
         my $JSInterfaceName = $enabledTags{$tagName}{JSInterfaceName};
-        next if defined($tagsSeen{$JSInterfaceName}) || (usesDefaultJSWrapper($tagName) && ($parameters{fallbackJSInterfaceName} eq $parameters{namespace} . "Element"));
+        next if (defined($tagsSeen{$JSInterfaceName}) || (usesDefaultJSWrapper($tagName) && ($parameters{fallbackJSInterfaceName} eq $parameters{namespace} . "Element"))) && !$enabledTags{$tagName}{settingsConditional};
         $tagsSeen{$JSInterfaceName} = 1;
 
         my $conditional = $enabledTags{$tagName}{conditional};
@@ -1104,8 +1099,19 @@ sub printWrapperFunctions
             print F <<END
 static JSDOMWrapper* create${JSInterfaceName}Wrapper(JSDOMGlobalObject* globalObject, PassRefPtr<$parameters{namespace}Element> element)
 {
-    if (element->isHTMLUnknownElement())
-        return CREATE_DOM_WRAPPER(globalObject, $parameters{namespace}Element, element.get());
+    if (element->is$parameters{fallbackInterfaceName}())
+        return CREATE_DOM_WRAPPER(globalObject, $parameters{fallbackInterfaceName}, element.get());
+    return CREATE_DOM_WRAPPER(globalObject, ${JSInterfaceName}, element.get());
+}
+
+END
+            ;
+        } elsif ($enabledTags{$tagName}{settingsConditional}) {
+            print F <<END
+static JSDOMWrapper* create$enabledTags{$tagName}{interfaceName}Wrapper(JSDOMGlobalObject* globalObject, PassRefPtr<$parameters{namespace}Element> element)
+{
+    if (element->is$parameters{fallbackInterfaceName}())
+        return CREATE_DOM_WRAPPER(globalObject, $parameters{fallbackInterfaceName}, element.get());
     return CREATE_DOM_WRAPPER(globalObject, ${JSInterfaceName}, element.get());
 }
 
@@ -1210,7 +1216,12 @@ END
             print F "#if ${conditionalString}\n";
         }
 
-        my $ucTag = $enabledTags{$tag}{JSInterfaceName};
+        my $ucTag;
+        if ($enabledTags{$tag}{settingsConditional}) {
+            $ucTag = $enabledTags{$tag}{interfaceName};
+        } else {
+            $ucTag = $enabledTags{$tag}{JSInterfaceName};
+        }
 
         # FIXME Remove unnecessary '&' from the following (print) line once we switch to a non-broken Visual Studio compiler.
         # https://bugs.webkit.org/show_bug.cgi?id=121235:

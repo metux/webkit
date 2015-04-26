@@ -32,12 +32,10 @@
 #include "PatternAttributes.h"
 #include "RenderSVGContainer.h"
 #include "RenderSVGResourcePattern.h"
-#include "SVGElementInstance.h"
 #include "SVGFitToViewBox.h"
 #include "SVGGraphicsElement.h"
 #include "SVGNames.h"
 #include "SVGRenderSupport.h"
-#include "SVGSVGElement.h"
 #include "SVGTransformable.h"
 #include "XLinkNames.h"
 #include <wtf/NeverDestroyed.h>
@@ -86,9 +84,9 @@ inline SVGPatternElement::SVGPatternElement(const QualifiedName& tagName, Docume
     registerAnimatedPropertiesForSVGPatternElement();
 }
 
-PassRefPtr<SVGPatternElement> SVGPatternElement::create(const QualifiedName& tagName, Document& document)
+Ref<SVGPatternElement> SVGPatternElement::create(const QualifiedName& tagName, Document& document)
 {
-    return adoptRef(new SVGPatternElement(tagName, document));
+    return adoptRef(*new SVGPatternElement(tagName, document));
 }
 
 bool SVGPatternElement::isSupportedAttribute(const QualifiedName& attrName)
@@ -159,7 +157,7 @@ void SVGPatternElement::svgAttributeChanged(const QualifiedName& attrName)
         return;
     }
 
-    SVGElementInstance::InvalidationGuard invalidationGuard(this);
+    InstanceInvalidationGuard guard(*this);
 
     if (attrName == SVGNames::xAttr
         || attrName == SVGNames::yAttr
@@ -184,7 +182,7 @@ void SVGPatternElement::childrenChanged(const ChildChange& change)
         object->setNeedsLayout();
 }
 
-RenderPtr<RenderElement> SVGPatternElement::createElementRenderer(PassRef<RenderStyle> style)
+RenderPtr<RenderElement> SVGPatternElement::createElementRenderer(Ref<RenderStyle>&& style)
 {
     return createRenderer<RenderSVGResourcePattern>(*this, WTF::move(style));
 }
@@ -236,8 +234,8 @@ void SVGPatternElement::collectPatternAttributes(PatternAttributes& attributes) 
 
         // Respect xlink:href, take attributes from referenced element
         Element* refElement = SVGURIReference::targetElementFromIRIString(current->href(), document());
-        if (refElement && isSVGPatternElement(refElement)) {
-            current = toSVGPatternElement(refElement);
+        if (is<SVGPatternElement>(refElement)) {
+            current = downcast<SVGPatternElement>(refElement);
 
             // Cycle detection
             if (processedPatterns.contains(current))

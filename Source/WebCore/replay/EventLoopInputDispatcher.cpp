@@ -31,8 +31,8 @@
 #if ENABLE(WEB_REPLAY)
 
 #include "Page.h"
-#include "ReplayInputTypes.h"
 #include "ReplayingInputCursor.h"
+#include "WebReplayInputs.h"
 #include <wtf/TemporaryChange.h>
 
 #if !LOG_DISABLED
@@ -48,12 +48,8 @@ EventLoopInputDispatcher::EventLoopInputDispatcher(Page& page, ReplayingInputCur
     : m_page(page)
     , m_client(client)
     , m_cursor(cursor)
-    , m_timer(this, &EventLoopInputDispatcher::timerFired)
-    , m_dispatching(false)
-    , m_running(false)
+    , m_timer(*this, &EventLoopInputDispatcher::timerFired)
     , m_speed(DispatchSpeed::FastForward)
-    , m_previousDispatchStartTime(0.0)
-    , m_previousInputTimestamp(0.0)
 {
     m_currentWork.input = nullptr;
     m_currentWork.timestamp = 0.0;
@@ -79,7 +75,7 @@ void EventLoopInputDispatcher::pause()
         m_timer.stop();
 }
 
-void EventLoopInputDispatcher::timerFired(Timer<EventLoopInputDispatcher>*)
+void EventLoopInputDispatcher::timerFired()
 {
     dispatchInput();
 }
@@ -140,7 +136,7 @@ void EventLoopInputDispatcher::dispatchInput()
     String jsonString = encodedInput.asObject()->toJSONString();
 
     LOG(WebReplay, "%-20s ----------------------------------------------", "ReplayEvents");
-    LOG(WebReplay, "%-20s >DISPATCH: %s %s\n", "ReplayEvents", m_currentWork.input->type().string().utf8().data(), jsonString.utf8().data());
+    LOG(WebReplay, "%-20s >DISPATCH: %s %s\n", "ReplayEvents", m_currentWork.input->type().utf8().data(), jsonString.utf8().data());
 #endif
 
     m_client->willDispatchInput(*m_currentWork.input);
@@ -158,7 +154,7 @@ void EventLoopInputDispatcher::dispatchInput()
 
     // Notify clients that the event was dispatched.
     m_client->didDispatchInput(*dispatchedInput);
-    if (dispatchedInput->type() == inputTypes().EndSegmentSentinel) {
+    if (dispatchedInput->type() == InputTraits<EndSegmentSentinel>::type()) {
         m_running = false;
         m_dispatching = false;
         m_client->didDispatchFinalInput();

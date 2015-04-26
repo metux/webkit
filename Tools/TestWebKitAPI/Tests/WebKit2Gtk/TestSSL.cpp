@@ -129,16 +129,21 @@ static void testInsecureContent(InsecureContentTest* test, gconstpointer)
     webkit_web_context_set_tls_errors_policy(context, originalPolicy);
 }
 
+static bool assertIfSSLRequestProcessed = false;
+
 static void testTLSErrorsPolicy(SSLTest* test, gconstpointer)
 {
     WebKitWebContext* context = webkit_web_view_get_context(test->m_webView);
     // TLS errors are treated as transport failures by default.
     g_assert(webkit_web_context_get_tls_errors_policy(context) == WEBKIT_TLS_ERRORS_POLICY_FAIL);
+
+    assertIfSSLRequestProcessed = true;
     test->loadURI(kHttpsServer->getURIForPath("/").data());
     test->waitUntilLoadFinished();
     g_assert(test->m_loadFailed);
     g_assert(test->m_loadEvents.contains(LoadTrackingTest::ProvisionalLoadFailed));
     g_assert(!test->m_loadEvents.contains(LoadTrackingTest::LoadCommitted));
+    assertIfSSLRequestProcessed = false;
 
     webkit_web_context_set_tls_errors_policy(context, WEBKIT_TLS_ERRORS_POLICY_IGNORE);
     g_assert(webkit_web_context_get_tls_errors_policy(context) == WEBKIT_TLS_ERRORS_POLICY_IGNORE);
@@ -158,11 +163,13 @@ static void testTLSErrorsRedirect(SSLTest* test, gconstpointer)
     WebKitTLSErrorsPolicy originalPolicy = webkit_web_context_get_tls_errors_policy(context);
     webkit_web_context_set_tls_errors_policy(context, WEBKIT_TLS_ERRORS_POLICY_FAIL);
 
+    assertIfSSLRequestProcessed = true;
     test->loadURI(kHttpsServer->getURIForPath("/redirect").data());
     test->waitUntilLoadFinished();
     g_assert(test->m_loadFailed);
     g_assert(test->m_loadEvents.contains(LoadTrackingTest::ProvisionalLoadFailed));
     g_assert(!test->m_loadEvents.contains(LoadTrackingTest::LoadCommitted));
+    assertIfSSLRequestProcessed = false;
 
     webkit_web_context_set_tls_errors_policy(context, originalPolicy);
 }
@@ -180,12 +187,14 @@ static void testTLSErrorsHTTPAuth(SSLTest* test, gconstpointer)
     WebKitTLSErrorsPolicy originalPolicy = webkit_web_context_get_tls_errors_policy(context);
     webkit_web_context_set_tls_errors_policy(context, WEBKIT_TLS_ERRORS_POLICY_FAIL);
 
+    assertIfSSLRequestProcessed = true;
     g_signal_connect(test->m_webView, "authenticate", G_CALLBACK(webViewAuthenticationCallback), NULL);
     test->loadURI(kHttpsServer->getURIForPath("/auth").data());
     test->waitUntilLoadFinished();
     g_assert(test->m_loadFailed);
     g_assert(test->m_loadEvents.contains(LoadTrackingTest::ProvisionalLoadFailed));
     g_assert(!test->m_loadEvents.contains(LoadTrackingTest::LoadCommitted));
+    assertIfSSLRequestProcessed = false;
 
     webkit_web_context_set_tls_errors_policy(context, originalPolicy);
 }
@@ -235,6 +244,7 @@ static void testLoadFailedWithTLSErrors(TLSErrorsTest* test, gconstpointer)
     WebKitTLSErrorsPolicy originalPolicy = webkit_web_context_get_tls_errors_policy(context);
     webkit_web_context_set_tls_errors_policy(context, WEBKIT_TLS_ERRORS_POLICY_FAIL);
 
+    assertIfSSLRequestProcessed = true;
     // The load-failed-with-tls-errors signal should be emitted when there is a TLS failure.
     test->loadURI(kHttpsServer->getURIForPath("/test-tls/").data());
     test->waitUntilLoadFinished();
@@ -244,6 +254,7 @@ static void testLoadFailedWithTLSErrors(TLSErrorsTest* test, gconstpointer)
     g_assert_cmpint(test->m_loadEvents[0], ==, LoadTrackingTest::ProvisionalLoadStarted);
     g_assert_cmpint(test->m_loadEvents[1], ==, LoadTrackingTest::LoadFailedWithTLSErrors);
     g_assert_cmpint(test->m_loadEvents[2], ==, LoadTrackingTest::LoadFinished);
+    assertIfSSLRequestProcessed = false;
 
     // Test allowing an exception for this certificate on this host.
     webkit_web_context_allow_tls_certificate_for_host(context, test->certificate(), test->host());
@@ -259,6 +270,72 @@ static void testLoadFailedWithTLSErrors(TLSErrorsTest* test, gconstpointer)
     webkit_web_context_set_tls_errors_policy(context, originalPolicy);
 }
 
+class TLSSubresourceTest : public WebViewTest {
+public:
+    MAKE_GLIB_TEST_FIXTURE(TLSSubresourceTest);
+
+    static void resourceLoadStartedCallback(WebKitWebView* webView, WebKitWebResource* resource, WebKitURIRequest* request, TLSSubresourceTest* test)
+    {
+        if (webkit_web_view_get_main_resource(test->m_webView) == resource)
+            return;
+
+        // Ignore favicons.
+        if (g_str_has_suffix(webkit_uri_request_get_uri(request), "favicon.ico"))
+            return;
+
+        test->subresourceLoadStarted(resource);
+    }
+
+    TLSSubresourceTest()
+        : m_tlsErrors(static_cast<GTlsCertificateFlags>(0))
+    {
+        g_signal_connect(m_webView, "resource-load-started", G_CALLBACK(resourceLoadStartedCallback), this);
+    }
+
+    static void subresourceFailedCallback(WebKitWebResource*, GError*)
+    {
+        g_assert_not_reached();
+    }
+
+    static void subresourceFailedWithTLSErrorsCallback(WebKitWebResource* resource, GTlsCertificate* certificate, GTlsCertificateFlags tlsErrors, TLSSubresourceTest* test)
+    {
+        test->subresourceFailedWithTLSErrors(resource, certificate, tlsErrors);
+    }
+
+    void subresourceLoadStarted(WebKitWebResource* resource)
+    {
+        g_signal_connect(resource, "failed", G_CALLBACK(subresourceFailedCallback), nullptr);
+        g_signal_connect(resource, "failed-with-tls-errors", G_CALLBACK(subresourceFailedWithTLSErrorsCallback), this);
+    }
+
+    void subresourceFailedWithTLSErrors(WebKitWebResource* resource, GTlsCertificate* certificate, GTlsCertificateFlags tlsErrors)
+    {
+        m_certificate = certificate;
+        m_tlsErrors = tlsErrors;
+        g_main_loop_quit(m_mainLoop);
+    }
+
+    void waitUntilSubresourceLoadFail()
+    {
+        g_main_loop_run(m_mainLoop);
+    }
+
+    GRefPtr<GTlsCertificate> m_certificate;
+    GTlsCertificateFlags m_tlsErrors;
+};
+
+static void testSubresourceLoadFailedWithTLSErrors(TLSSubresourceTest* test, gconstpointer)
+{
+    WebKitWebContext* context = webkit_web_view_get_context(test->m_webView);
+    webkit_web_context_set_tls_errors_policy(context, WEBKIT_TLS_ERRORS_POLICY_FAIL);
+
+    assertIfSSLRequestProcessed = true;
+    test->loadURI(kHttpServer->getURIForPath("/").data());
+    test->waitUntilSubresourceLoadFail();
+    g_assert(G_IS_TLS_CERTIFICATE(test->m_certificate.get()));
+    g_assert_cmpuint(test->m_tlsErrors, ==, G_TLS_CERTIFICATE_UNKNOWN_CA);
+    assertIfSSLRequestProcessed = false;
+}
 
 static void httpsServerCallback(SoupServer* server, SoupMessage* message, const char* path, GHashTable*, SoupClientContext*, gpointer)
 {
@@ -266,6 +343,8 @@ static void httpsServerCallback(SoupServer* server, SoupMessage* message, const 
         soup_message_set_status(message, SOUP_STATUS_NOT_IMPLEMENTED);
         return;
     }
+
+    g_assert(!assertIfSSLRequestProcessed);
 
     if (g_str_equal(path, "/")) {
         soup_message_set_status(message, SOUP_STATUS_OK);
@@ -286,6 +365,10 @@ static void httpsServerCallback(SoupServer* server, SoupMessage* message, const 
     } else if (g_str_equal(path, "/auth")) {
         soup_message_set_status(message, SOUP_STATUS_UNAUTHORIZED);
         soup_message_headers_append(message->response_headers, "WWW-Authenticate", "Basic realm=\"HTTPS auth\"");
+    } else if (g_str_equal(path, "/style.css")) {
+        soup_message_set_status(message, SOUP_STATUS_OK);
+        static const char* styleCSS = "body { color: black; }";
+        soup_message_body_append(message->response_body, SOUP_MEMORY_STATIC, styleCSS, strlen(styleCSS));
     } else
         soup_message_set_status(message, SOUP_STATUS_NOT_FOUND);
 }
@@ -315,6 +398,12 @@ static void httpServerCallback(SoupServer* server, SoupMessage* message, const c
         soup_message_body_append(message->response_body, SOUP_MEMORY_TAKE, contents, length);
         soup_message_set_status(message, SOUP_STATUS_OK);
         soup_message_body_complete(message->response_body);
+    } else if (g_str_equal(path, "/")) {
+        soup_message_set_status(message, SOUP_STATUS_OK);
+        char* responseHTML = g_strdup_printf("<html><head><link rel='stylesheet' href='%s' type='text/css'></head><body>SSL subresource test</body></html>",
+            kHttpsServer->getURIForPath("/style.css").data());
+        soup_message_body_append(message->response_body, SOUP_MEMORY_TAKE, responseHTML, strlen(responseHTML));
+        soup_message_body_complete(message->response_body);
     } else
         soup_message_set_status(message, SOUP_STATUS_NOT_FOUND);
 }
@@ -329,12 +418,10 @@ void beforeAll()
 
     SSLTest::add("WebKitWebView", "ssl", testSSL);
     InsecureContentTest::add("WebKitWebView", "insecure-content", testInsecureContent);
-    // In this case the order of the tests does matter because tls-errors-policy expects
-    // that no exception will have been added for this certificate and host pair as is
-    // done in the load-failed-with-tls-errors test.
     SSLTest::add("WebKitWebView", "tls-errors-policy", testTLSErrorsPolicy);
     SSLTest::add("WebKitWebView", "tls-errors-redirect-to-http", testTLSErrorsRedirect);
     SSLTest::add("WebKitWebView", "tls-http-auth", testTLSErrorsHTTPAuth);
+    TLSSubresourceTest::add("WebKitWebView", "tls-subresource", testSubresourceLoadFailedWithTLSErrors);
     TLSErrorsTest::add("WebKitWebView", "load-failed-with-tls-errors", testLoadFailedWithTLSErrors);
 }
 

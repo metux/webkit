@@ -35,7 +35,7 @@ class SVGImageElement final : public SVGGraphicsElement,
                               public SVGExternalResourcesRequired,
                               public SVGURIReference {
 public:
-    static PassRefPtr<SVGImageElement> create(const QualifiedName&, Document&);
+    static Ref<SVGImageElement> create(const QualifiedName&, Document&);
 
 private:
     SVGImageElement(const QualifiedName&, Document&);
@@ -49,7 +49,7 @@ private:
     virtual void didAttachRenderers() override;
     virtual InsertionNotificationRequest insertedInto(ContainerNode&) override;
 
-    virtual RenderPtr<RenderElement> createElementRenderer(PassRef<RenderStyle>) override;
+    virtual RenderPtr<RenderElement> createElementRenderer(Ref<RenderStyle>&&) override;
 
     virtual const AtomicString& imageSourceURL() const override;
     virtual void addSubresourceAttributeURLs(ListHashSet<URL>&) const override;
@@ -71,8 +71,6 @@ private:
 
     SVGImageLoader m_imageLoader;
 };
-
-NODE_TYPE_CASTS(SVGImageElement)
 
 } // namespace WebCore
 

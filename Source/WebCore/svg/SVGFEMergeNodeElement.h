@@ -28,7 +28,7 @@ namespace WebCore {
 
 class SVGFEMergeNodeElement final : public SVGElement {
 public:
-    static PassRefPtr<SVGFEMergeNodeElement> create(const QualifiedName&, Document&);
+    static Ref<SVGFEMergeNodeElement> create(const QualifiedName&, Document&);
 
 private:
     SVGFEMergeNodeElement(const QualifiedName&, Document&);
@@ -43,8 +43,6 @@ private:
         DECLARE_ANIMATED_STRING(In1, in1)
     END_DECLARE_ANIMATED_PROPERTIES
 };
-
-NODE_TYPE_CASTS(SVGFEMergeNodeElement)
 
 } // namespace WebCore
 

@@ -26,15 +26,13 @@ namespace WebCore {
 
 class SVGFEDistantLightElement final : public SVGFELightElement {
 public:
-    static PassRefPtr<SVGFEDistantLightElement> create(const QualifiedName&, Document&);
+    static Ref<SVGFEDistantLightElement> create(const QualifiedName&, Document&);
 
 private:
     SVGFEDistantLightElement(const QualifiedName&, Document&);
 
     virtual PassRefPtr<LightSource> lightSource() const override;
 };
-
-NODE_TYPE_CASTS(SVGFEDistantLightElement)
 
 } // namespace WebCore
 

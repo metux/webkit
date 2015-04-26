@@ -73,6 +73,7 @@
 #include "RenderMenuList.h"
 #include "RenderMeter.h"
 #include "RenderProgress.h"
+#include "RenderSVGRoot.h"
 #include "RenderSlider.h"
 #include "RenderTable.h"
 #include "RenderTableCell.h"
@@ -127,7 +128,7 @@ void AXObjectCache::setEnhancedUserInterfaceAccessibility(bool flag)
 
 AXObjectCache::AXObjectCache(Document& document)
     : m_document(document)
-    , m_notificationPostTimer(this, &AXObjectCache::notificationPostTimerFired)
+    , m_notificationPostTimer(*this, &AXObjectCache::notificationPostTimerFired)
 {
 }
 
@@ -158,10 +159,10 @@ AccessibilityObject* AXObjectCache::focusedImageMapUIElement(HTMLAreaElement* ar
         return nullptr;
     
     for (const auto& child : axRenderImage->children()) {
-        if (!child->isImageMapLink())
+        if (!is<AccessibilityImageMapLink>(*child))
             continue;
         
-        if (toAccessibilityImageMapLink(child.get())->areaElement() == areaElement)
+        if (downcast<AccessibilityImageMapLink>(*child).areaElement() == areaElement)
             return child.get();
     }    
     
@@ -176,8 +177,8 @@ AccessibilityObject* AXObjectCache::focusedUIElementForPage(const Page* page)
     // get the focused node in the page
     Document* focusedDocument = page->focusController().focusedOrMainFrame().document();
     Element* focusedElement = focusedDocument->focusedElement();
-    if (focusedElement && isHTMLAreaElement(focusedElement))
-        return focusedImageMapUIElement(toHTMLAreaElement(focusedElement));
+    if (is<HTMLAreaElement>(focusedElement))
+        return focusedImageMapUIElement(downcast<HTMLAreaElement>(focusedElement));
 
     AccessibilityObject* obj = focusedDocument->axObjectCache()->getOrCreate(focusedElement ? static_cast<Node*>(focusedElement) : focusedDocument);
     if (!obj)
@@ -253,10 +254,10 @@ AccessibilityObject* AXObjectCache::get(Node* node)
 // FIXME: This should take a const char*, but one caller passes nullAtom.
 bool nodeHasRole(Node* node, const String& role)
 {
-    if (!node || !node->isElementNode())
+    if (!node || !is<Element>(node))
         return false;
 
-    auto& roleValue = toElement(node)->fastGetAttribute(roleAttr);
+    auto& roleValue = downcast<Element>(*node).fastGetAttribute(roleAttr);
     if (role.isNull())
         return roleValue.isEmpty();
     if (roleValue.isEmpty())
@@ -265,7 +266,7 @@ bool nodeHasRole(Node* node, const String& role)
     return SpaceSplitString(roleValue, true).contains(role);
 }
 
-static PassRefPtr<AccessibilityObject> createFromRenderer(RenderObject* renderer)
+static Ref<AccessibilityObject> createFromRenderer(RenderObject* renderer)
 {
     // FIXME: How could renderer->node() ever not be an Element?
     Node* node = renderer->node();
@@ -290,46 +291,46 @@ static PassRefPtr<AccessibilityObject> createFromRenderer(RenderObject* renderer
         return AccessibilityMediaControl::create(renderer);
 #endif
 
-    if (renderer->isSVGRoot())
+    if (is<RenderSVGRoot>(*renderer))
         return AccessibilitySVGRoot::create(renderer);
     
     // Search field buttons
-    if (node && node->isElementNode() && toElement(node)->isSearchFieldCancelButtonElement())
+    if (is<Element>(node) && downcast<Element>(*node).isSearchFieldCancelButtonElement())
         return AccessibilitySearchFieldCancelButton::create(renderer);
     
-    if (renderer->isBoxModelObject()) {
-        RenderBoxModelObject* cssBox = toRenderBoxModelObject(renderer);
-        if (cssBox->isListBox())
-            return AccessibilityListBox::create(toRenderListBox(cssBox));
-        if (cssBox->isMenuList())
-            return AccessibilityMenuList::create(toRenderMenuList(cssBox));
+    if (is<RenderBoxModelObject>(*renderer)) {
+        RenderBoxModelObject& cssBox = downcast<RenderBoxModelObject>(*renderer);
+        if (is<RenderListBox>(cssBox))
+            return AccessibilityListBox::create(&downcast<RenderListBox>(cssBox));
+        if (is<RenderMenuList>(cssBox))
+            return AccessibilityMenuList::create(&downcast<RenderMenuList>(cssBox));
 
         // standard tables
-        if (cssBox->isTable())
-            return AccessibilityTable::create(toRenderTable(cssBox));
-        if (cssBox->isTableRow())
-            return AccessibilityTableRow::create(toRenderTableRow(cssBox));
-        if (cssBox->isTableCell())
-            return AccessibilityTableCell::create(toRenderTableCell(cssBox));
+        if (is<RenderTable>(cssBox))
+            return AccessibilityTable::create(&downcast<RenderTable>(cssBox));
+        if (is<RenderTableRow>(cssBox))
+            return AccessibilityTableRow::create(&downcast<RenderTableRow>(cssBox));
+        if (is<RenderTableCell>(cssBox))
+            return AccessibilityTableCell::create(&downcast<RenderTableCell>(cssBox));
 
         // progress bar
-        if (cssBox->isProgress())
-            return AccessibilityProgressIndicator::create(toRenderProgress(cssBox));
+        if (is<RenderProgress>(cssBox))
+            return AccessibilityProgressIndicator::create(&downcast<RenderProgress>(cssBox));
 
 #if ENABLE(METER_ELEMENT)
-        if (cssBox->isMeter())
-            return AccessibilityProgressIndicator::create(toRenderMeter(cssBox));
+        if (is<RenderMeter>(cssBox))
+            return AccessibilityProgressIndicator::create(&downcast<RenderMeter>(cssBox));
 #endif
 
         // input type=range
-        if (cssBox->isSlider())
-            return AccessibilitySlider::create(toRenderSlider(cssBox));
+        if (is<RenderSlider>(cssBox))
+            return AccessibilitySlider::create(&downcast<RenderSlider>(cssBox));
     }
 
     return AccessibilityRenderObject::create(renderer);
 }
 
-static PassRefPtr<AccessibilityObject> createFromNode(Node* node)
+static Ref<AccessibilityObject> createFromNode(Node* node)
 {
     return AccessibilityNodeObject::create(node);
 }
@@ -342,11 +343,11 @@ AccessibilityObject* AXObjectCache::getOrCreate(Widget* widget)
     if (AccessibilityObject* obj = get(widget))
         return obj;
     
-    RefPtr<AccessibilityObject> newObj = nullptr;
-    if (widget->isFrameView())
-        newObj = AccessibilityScrollView::create(toScrollView(widget));
-    else if (widget->isScrollbar())
-        newObj = AccessibilityScrollbar::create(toScrollbar(widget));
+    RefPtr<AccessibilityObject> newObj;
+    if (is<ScrollView>(*widget))
+        newObj = AccessibilityScrollView::create(downcast<ScrollView>(widget));
+    else if (is<Scrollbar>(*widget))
+        newObj = AccessibilityScrollbar::create(downcast<Scrollbar>(widget));
 
     // Will crash later if we have two objects for the same widget.
     ASSERT(!get(widget));
@@ -386,7 +387,7 @@ AccessibilityObject* AXObjectCache::getOrCreate(Node* node)
 
     bool insideMeterElement = false;
 #if ENABLE(METER_ELEMENT)
-    insideMeterElement = isHTMLMeterElement(node->parentElement());
+    insideMeterElement = is<HTMLMeterElement>(*node->parentElement());
 #endif
     
     if (!inCanvasSubtree && !isHidden && !insideMeterElement)
@@ -566,7 +567,7 @@ void AXObjectCache::remove(Widget* view)
 }
     
     
-#if !PLATFORM(WIN) || OS(WINCE)
+#if !PLATFORM(WIN)
 AXID AXObjectCache::platformGenerateAXID() const
 {
     static AXID lastUsedID = 0;
@@ -653,10 +654,10 @@ void AXObjectCache::handleMenuOpened(Node* node)
     
 void AXObjectCache::handleLiveRegionCreated(Node* node)
 {
-    if (!node || !node->renderer() || !node->isElementNode())
+    if (!is<Element>(node) || !node->renderer())
         return;
     
-    Element* element = toElement(node);
+    Element* element = downcast<Element>(node);
     String liveRegionStatus = element->fastGetAttribute(aria_liveAttr);
     if (liveRegionStatus.isEmpty()) {
         const AtomicString& ariaRole = element->fastGetAttribute(roleAttr);
@@ -699,7 +700,7 @@ void AXObjectCache::childrenChanged(AccessibilityObject* obj)
     obj->childrenChanged();
 }
     
-void AXObjectCache::notificationPostTimerFired(Timer<AXObjectCache>&)
+void AXObjectCache::notificationPostTimerFired()
 {
     Ref<Document> protectorForCacheOwner(m_document);
     m_notificationPostTimer.stop();
@@ -719,10 +720,8 @@ void AXObjectCache::notificationPostTimerFired(Timer<AXObjectCache>&)
 #ifndef NDEBUG
         // Make sure none of the render views are in the process of being layed out.
         // Notifications should only be sent after the renderer has finished
-        if (obj->isAccessibilityRenderObject()) {
-            AccessibilityRenderObject* renderObj = toAccessibilityRenderObject(obj);
-            RenderObject* renderer = renderObj->renderer();
-            if (renderer)
+        if (is<AccessibilityRenderObject>(*obj)) {
+            if (auto* renderer = downcast<AccessibilityRenderObject>(*obj).renderer())
                 ASSERT(!renderer->view().layoutState());
         }
 #endif
@@ -820,7 +819,7 @@ void AXObjectCache::handleMenuItemSelected(Node* node)
     if (!nodeHasRole(node, "menuitem") && !nodeHasRole(node, "menuitemradio") && !nodeHasRole(node, "menuitemcheckbox"))
         return;
     
-    if (!toElement(node)->focused() && !equalIgnoringCase(toElement(node)->fastGetAttribute(aria_selectedAttr), "true"))
+    if (!downcast<Element>(*node).focused() && !equalIgnoringCase(downcast<Element>(*node).fastGetAttribute(aria_selectedAttr), "true"))
         return;
     
     postNotification(getOrCreate(node), &document(), AXMenuListItemSelected);
@@ -917,7 +916,7 @@ void AXObjectCache::handleAttributeChanged(const QualifiedName& attrName, Elemen
         handleAriaRoleChanged(element);
     else if (attrName == altAttr || attrName == titleAttr)
         textChanged(element);
-    else if (attrName == forAttr && isHTMLLabelElement(element))
+    else if (attrName == forAttr && is<HTMLLabelElement>(*element))
         labelChanged(element);
 
     if (!attrName.localName().string().startsWith("aria-"))
@@ -947,8 +946,8 @@ void AXObjectCache::handleAttributeChanged(const QualifiedName& attrName, Elemen
 
 void AXObjectCache::labelChanged(Element* element)
 {
-    ASSERT(isHTMLLabelElement(element));
-    HTMLElement* correspondingControl = toHTMLLabelElement(element)->control();
+    ASSERT(is<HTMLLabelElement>(*element));
+    HTMLElement* correspondingControl = downcast<HTMLLabelElement>(*element).control();
     textChanged(correspondingControl);
 }
 
@@ -1030,7 +1029,7 @@ void AXObjectCache::textMarkerDataForVisiblePosition(TextMarkerData& textMarkerD
 const Element* AXObjectCache::rootAXEditableElement(const Node* node)
 {
     const Element* result = node->rootEditableElement();
-    const Element* element = node->isElementNode() ? toElement(node) : node->parentElement();
+    const Element* element = is<Element>(*node) ? downcast<Element>(node) : node->parentElement();
 
     for (; element; element = element->parentElement()) {
         if (nodeIsTextControl(element))
@@ -1073,8 +1072,8 @@ bool isNodeAriaVisible(Node* node)
     // To determine if a node is ARIA visible, we need to check the parent hierarchy to see if anyone specifies
     // aria-hidden explicitly.
     for (Node* testNode = node; testNode; testNode = testNode->parentNode()) {
-        if (testNode->isElementNode()) {
-            const AtomicString& ariaHiddenValue = toElement(testNode)->fastGetAttribute(aria_hiddenAttr);
+        if (is<Element>(*testNode)) {
+            const AtomicString& ariaHiddenValue = downcast<Element>(*testNode).fastGetAttribute(aria_hiddenAttr);
             if (equalIgnoringCase(ariaHiddenValue, "false"))
                 return true;
             if (equalIgnoringCase(ariaHiddenValue, "true"))

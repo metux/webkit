@@ -77,9 +77,7 @@ void SVGResourcesCache::removeResourcesFromRenderer(RenderElement& renderer)
 
 static inline SVGResourcesCache& resourcesCacheFromRenderer(const RenderElement& renderer)
 {
-    SVGDocumentExtensions* extensions = renderer.document().accessSVGExtensions();
-    ASSERT(extensions);
-    return extensions->resourcesCache();
+    return renderer.document().accessSVGExtensions().resourcesCache();
 }
 
 SVGResources* SVGResourcesCache::cachedResourcesForRenderer(const RenderElement& renderer)
@@ -137,7 +135,7 @@ void SVGResourcesCache::clientWasAddedToTree(RenderObject& renderer)
 
     if (!rendererCanHaveResources(renderer))
         return;
-    RenderElement& elementRenderer = toRenderElement(renderer);
+    RenderElement& elementRenderer = downcast<RenderElement>(renderer);
     resourcesCacheFromRenderer(elementRenderer).addResourcesFromRenderer(elementRenderer, elementRenderer.style());
 }
 
@@ -150,7 +148,7 @@ void SVGResourcesCache::clientWillBeRemovedFromTree(RenderObject& renderer)
 
     if (!rendererCanHaveResources(renderer))
         return;
-    RenderElement& elementRenderer = toRenderElement(renderer);
+    RenderElement& elementRenderer = downcast<RenderElement>(renderer);
     resourcesCacheFromRenderer(elementRenderer).removeResourcesFromRenderer(elementRenderer);
 }
 
@@ -175,9 +173,7 @@ void SVGResourcesCache::resourceDestroyed(RenderSVGResourceContainer& resource)
         // Mark users of destroyed resources as pending resolution based on the id of the old resource.
         Element& resourceElement = resource.element();
         Element* clientElement = it.key->element();
-        SVGDocumentExtensions* extensions = clientElement->document().accessSVGExtensions();
-
-        extensions->addPendingResource(resourceElement.getIdAttribute(), clientElement);
+        clientElement->document().accessSVGExtensions().addPendingResource(resourceElement.getIdAttribute(), clientElement);
     }
 }
 

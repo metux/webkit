@@ -38,6 +38,7 @@
 
 #include <inttypes.h>
 #include <stdarg.h>
+#include <stdbool.h>
 #include <stddef.h>
 
 #ifdef NDEBUG
@@ -111,7 +112,7 @@ extern "C" {
 
    Signals are ignored by the crash reporter on OS X so we must do better.
 */
-#if COMPILER(CLANG) || COMPILER(MSVC)
+#if COMPILER(CLANG) || COMPILER(GCC) || COMPILER(MSVC)
 #define NO_RETURN_DUE_TO_CRASH NO_RETURN
 #else
 #define NO_RETURN_DUE_TO_CRASH
@@ -144,6 +145,8 @@ WTF_EXPORT_PRIVATE void WTFPrintBacktrace(void** stack, int size);
 typedef void (*WTFCrashHookFunction)();
 WTF_EXPORT_PRIVATE void WTFSetCrashHook(WTFCrashHookFunction);
 WTF_EXPORT_PRIVATE void WTFInstallReportBacktraceOnCrashHook();
+
+WTF_EXPORT_PRIVATE bool WTFIsDebuggerAttached();
 
 #ifdef __cplusplus
 }
@@ -196,14 +199,6 @@ extern "C" {
   Expressions inside them are evaluated in debug builds only.
 */
 
-#if OS(WINCE)
-/* FIXME: We include this here only to avoid a conflict with the ASSERT macro. */
-#include <windows.h>
-#undef min
-#undef max
-#undef ERROR
-#endif
-
 #if OS(WINDOWS)
 /* FIXME: Change to use something other than ASSERT to avoid this conflict with the underlying platform */
 #undef ASSERT
@@ -218,7 +213,7 @@ extern "C" {
 
 #define ASSERT_UNUSED(variable, assertion) ((void)variable)
 
-#ifdef ADDRESS_SANITIZER
+#if ENABLE(SECURITY_ASSERTIONS)
 #define ASSERT_WITH_SECURITY_IMPLICATION(assertion) \
     (!(assertion) ? \
         (WTFReportAssertionFailure(__FILE__, __LINE__, WTF_PRETTY_FUNCTION, #assertion), \
@@ -386,31 +381,5 @@ static inline void UNREACHABLE_FOR_PLATFORM()
 #define RELEASE_ASSERT_WITH_MESSAGE(assertion, ...) ASSERT_WITH_MESSAGE(assertion, __VA_ARGS__)
 #define RELEASE_ASSERT_NOT_REACHED() ASSERT_NOT_REACHED()
 #endif
-
-/* TYPE CAST */
-
-#define TYPE_CASTS_BASE(ToClassName, argumentType, argumentName, pointerPredicate, referencePredicate) \
-inline ToClassName* to##ToClassName(argumentType* argumentName) \
-{ \
-    ASSERT_WITH_SECURITY_IMPLICATION(!argumentName || (pointerPredicate)); \
-    return static_cast<ToClassName*>(argumentName); \
-} \
-inline const ToClassName* to##ToClassName(const argumentType* argumentName) \
-{ \
-    ASSERT_WITH_SECURITY_IMPLICATION(!argumentName || (pointerPredicate)); \
-    return static_cast<const ToClassName*>(argumentName); \
-} \
-inline ToClassName& to##ToClassName(argumentType& argumentName) \
-{ \
-    ASSERT_WITH_SECURITY_IMPLICATION(referencePredicate); \
-    return static_cast<ToClassName&>(argumentName); \
-} \
-inline const ToClassName& to##ToClassName(const argumentType& argumentName) \
-{ \
-    ASSERT_WITH_SECURITY_IMPLICATION(referencePredicate); \
-    return static_cast<const ToClassName&>(argumentName); \
-} \
-void to##ToClassName(const ToClassName*); \
-void to##ToClassName(const ToClassName&);
 
 #endif /* WTF_Assertions_h */

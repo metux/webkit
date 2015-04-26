@@ -84,13 +84,11 @@ namespace WebCore {
 
 static PlatformMouseEvent createMouseEvent(DragData& dragData)
 {
-    bool shiftKey, ctrlKey, altKey, metaKey;
-    shiftKey = ctrlKey = altKey = metaKey = false;
     int keyState = dragData.modifierKeyState();
-    shiftKey = static_cast<bool>(keyState & PlatformEvent::ShiftKey);
-    ctrlKey = static_cast<bool>(keyState & PlatformEvent::CtrlKey);
-    altKey = static_cast<bool>(keyState & PlatformEvent::AltKey);
-    metaKey = static_cast<bool>(keyState & PlatformEvent::MetaKey);
+    bool shiftKey = static_cast<bool>(keyState & PlatformEvent::ShiftKey);
+    bool ctrlKey = static_cast<bool>(keyState & PlatformEvent::CtrlKey);
+    bool altKey = static_cast<bool>(keyState & PlatformEvent::AltKey);
+    bool metaKey = static_cast<bool>(keyState & PlatformEvent::MetaKey);
 
     return PlatformMouseEvent(dragData.clientPosition(), dragData.globalPosition(),
                               LeftButton, PlatformEvent::MouseMoved, 0, shiftKey, ctrlKey, altKey,
@@ -114,13 +112,13 @@ DragController::~DragController()
     m_client.dragControllerDestroyed();
 }
 
-PassRefPtr<DocumentFragment> DragController::documentFragmentFromDragData(DragData& dragData, Frame& frame, Range& context, bool allowPlainText, bool& chosePlainText)
+static PassRefPtr<DocumentFragment> documentFragmentFromDragData(DragData& dragData, Frame& frame, Range& context, bool allowPlainText, bool& chosePlainText)
 {
     chosePlainText = false;
 
     Document& document = context.ownerDocument();
     if (dragData.containsCompatibleContent()) {
-        if (PassRefPtr<DocumentFragment> fragment = createFragmentFromDragData(dragData, frame, context, allowPlainText, chosePlainText))
+        if (PassRefPtr<DocumentFragment> fragment = frame.editor().webContentFromPasteboard(*Pasteboard::createForDragAndDrop(dragData), context, allowPlainText, chosePlainText))
             return fragment;
 
         if (dragData.containsURL(DragData::DoNotConvertFilenames)) {
@@ -192,10 +190,10 @@ void DragController::dragExited(DragData& dragData)
         m_page.mainFrame().eventHandler().cancelDragAndDrop(createMouseEvent(dragData), dataTransfer.get());
         dataTransfer->setAccessPolicy(DataTransferAccessPolicy::Numb); // Invalidate dataTransfer here for security.
     }
-    mouseMovedIntoDocument(0);
+    mouseMovedIntoDocument(nullptr);
     if (m_fileInputElementUnderMouse)
         m_fileInputElementUnderMouse->setCanReceiveDroppedFiles(false);
-    m_fileInputElementUnderMouse = 0;
+    m_fileInputElementUnderMouse = nullptr;
 }
 
 DragOperation DragController::dragUpdated(DragData& dragData)
@@ -255,7 +253,7 @@ DragOperation DragController::dragEnteredOrUpdated(DragData& dragData)
 
     m_dragDestinationAction = m_client.actionMaskForDrag(dragData);
     if (m_dragDestinationAction == DragDestinationActionNone) {
-        cancelDrag(); // FIXME: Why not call mouseMovedIntoDocument(0)?
+        cancelDrag(); // FIXME: Why not call mouseMovedIntoDocument(nullptr)?
         return DragOperationNone;
     }
 
@@ -273,8 +271,8 @@ static HTMLInputElement* asFileInput(Node* node)
     HTMLInputElement* inputElement = node->toInputElement();
 
     // If this is a button inside of the a file input, move up to the file input.
-    if (inputElement && inputElement->isTextButton() && inputElement->treeScope().rootNode().isShadowRoot())
-        inputElement = toShadowRoot(inputElement->treeScope().rootNode()).hostElement()->toInputElement();
+    if (inputElement && inputElement->isTextButton() && is<ShadowRoot>(inputElement->treeScope().rootNode()))
+        inputElement = downcast<ShadowRoot>(inputElement->treeScope().rootNode()).hostElement()->toInputElement();
 
     return inputElement && inputElement->isFileUpload() ? inputElement : 0;
 }
@@ -289,13 +287,13 @@ static Element* elementUnderMouse(Document* documentUnderMouse, const IntPoint& 
     HitTestResult result(point);
     documentUnderMouse->renderView()->hitTest(HitTestRequest(), result);
 
-    Node* n = result.innerNode();
-    while (n && !n->isElementNode())
-        n = n->parentNode();
-    if (n)
-        n = n->deprecatedShadowAncestorNode();
+    Node* node = result.innerNode();
+    while (node && !is<Element>(*node))
+        node = node->parentNode();
+    if (node)
+        node = node->deprecatedShadowAncestorNode();
 
-    return toElement(n);
+    return downcast<Element>(node);
 }
 
 bool DragController::tryDocumentDrag(DragData& dragData, DragDestinationAction actionMask, DragOperation& dragOperation)
@@ -393,19 +391,19 @@ DragSourceAction DragController::delegateDragSourceAction(const IntPoint& rootVi
 
 DragOperation DragController::operationForLoad(DragData& dragData)
 {
-    Document* doc = m_page.mainFrame().documentAtPoint(dragData.clientPosition());
+    Document* document = m_page.mainFrame().documentAtPoint(dragData.clientPosition());
 
     bool pluginDocumentAcceptsDrags = false;
 
-    if (doc && doc->isPluginDocument()) {
-        const Widget* widget = toPluginDocument(doc)->pluginWidget();
-        const PluginViewBase* pluginView = (widget && widget->isPluginViewBase()) ? toPluginViewBase(widget) : nullptr;
+    if (is<PluginDocument>(document)) {
+        const Widget* widget = downcast<PluginDocument>(*document).pluginWidget();
+        const PluginViewBase* pluginView = is<PluginViewBase>(widget) ? downcast<PluginViewBase>(widget) : nullptr;
 
         if (pluginView)
             pluginDocumentAcceptsDrags = pluginView->shouldAllowNavigationFromDrags();
     }
 
-    if (doc && (m_didInitiateDrag || (doc->isPluginDocument() && !pluginDocumentAcceptsDrags) || doc->hasEditableStyle()))
+    if (document && (m_didInitiateDrag || (is<PluginDocument>(*document) && !pluginDocumentAcceptsDrags) || document->hasEditableStyle()))
         return DragOperationNone;
     return dragOperation(dragData);
 }
@@ -489,8 +487,7 @@ bool DragController::concludeEditDrag(DragData& dragData)
     if (!range)
         return false;
 
-    CachedResourceLoader* cachedResourceLoader = range->ownerDocument().cachedResourceLoader();
-    ResourceCacheValidationSuppressor validationSuppressor(cachedResourceLoader);
+    ResourceCacheValidationSuppressor validationSuppressor(range->ownerDocument().cachedResourceLoader());
     if (dragIsMove(innerFrame->selection(), dragData) || dragCaret.isContentRichlyEditable()) {
         bool chosePlainText = false;
         RefPtr<DocumentFragment> fragment = documentFragmentFromDragData(dragData, *innerFrame, *range, true, chosePlainText);
@@ -552,8 +549,8 @@ bool DragController::canProcessDrag(DragData& dragData)
     if (dragData.containsFiles() && asFileInput(result.innerNonSharedNode()))
         return true;
 
-    if (result.innerNonSharedNode()->isPluginElement()) {
-        if (!toHTMLPlugInElement(result.innerNonSharedNode())->canProcessDrag() && !result.innerNonSharedNode()->hasEditableStyle())
+    if (is<HTMLPlugInElement>(*result.innerNonSharedNode())) {
+        if (!downcast<HTMLPlugInElement>(result.innerNonSharedNode())->canProcessDrag() && !result.innerNonSharedNode()->hasEditableStyle())
             return false;
     } else if (!result.innerNonSharedNode()->hasEditableStyle())
         return false;
@@ -623,7 +620,7 @@ Element* DragController::draggableElement(const Frame* sourceFrame, Element* sta
 {
     state.type = (sourceFrame->selection().contains(dragOrigin)) ? DragSourceActionSelection : DragSourceActionNone;
     if (!startElement)
-        return 0;
+        return nullptr;
 
     for (auto renderer = startElement->renderer(); renderer; renderer = renderer->parent()) {
         Element* element = renderer->nonPseudoElement();
@@ -639,14 +636,14 @@ Element* DragController::draggableElement(const Frame* sourceFrame, Element* sta
         }
         if (dragMode == DRAG_AUTO) {
             if ((m_dragSourceAction & DragSourceActionImage)
-                && isHTMLImageElement(element)
+                && is<HTMLImageElement>(*element)
                 && sourceFrame->settings().loadsImagesAutomatically()) {
                 state.type = static_cast<DragSourceAction>(state.type | DragSourceActionImage);
                 return element;
             }
             if ((m_dragSourceAction & DragSourceActionLink)
-                && isHTMLAnchorElement(element)
-                && toHTMLAnchorElement(element)->isLiveLink()) {
+                && is<HTMLAnchorElement>(*element)
+                && downcast<HTMLAnchorElement>(*element).isLiveLink()) {
                 state.type = static_cast<DragSourceAction>(state.type | DragSourceActionLink);
                 return element;
             }
@@ -654,16 +651,16 @@ Element* DragController::draggableElement(const Frame* sourceFrame, Element* sta
     }
 
     // We either have nothing to drag or we have a selection and we're not over a draggable element.
-    return (state.type & DragSourceActionSelection) ? startElement : 0;
+    return (state.type & DragSourceActionSelection) ? startElement : nullptr;
 }
 
 static CachedImage* getCachedImage(Element& element)
 {
     RenderObject* renderer = element.renderer();
-    if (!renderer || !renderer->isRenderImage())
-        return 0;
-    RenderImage* image = toRenderImage(renderer);
-    return image->cachedImage();
+    if (!is<RenderImage>(renderer))
+        return nullptr;
+    auto& image = downcast<RenderImage>(*renderer);
+    return image.cachedImage();
 }
 
 static Image* getImage(Element& element)
@@ -673,7 +670,7 @@ static Image* getImage(Element& element)
     // Users of getImage() want access to the SVGImage, in order to figure out the filename extensions,
     // which would be empty when asking the cached BitmapImages.
     return (cachedImage && !cachedImage->errorOccurred()) ?
-        cachedImage->image() : 0;
+        cachedImage->image() : nullptr;
 }
 
 static void selectElement(Element& element)

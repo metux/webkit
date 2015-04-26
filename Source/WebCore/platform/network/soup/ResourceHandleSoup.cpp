@@ -75,7 +75,7 @@ namespace WebCore {
 static bool loadingSynchronousRequest = false;
 static const size_t gDefaultReadBufferSize = 8192;
 
-class WebCoreSynchronousLoader : public ResourceHandleClient {
+class WebCoreSynchronousLoader final : public ResourceHandleClient {
     WTF_MAKE_NONCOPYABLE(WebCoreSynchronousLoader);
 public:
 
@@ -86,7 +86,6 @@ public:
         , m_data(data)
         , m_finished(false)
         , m_storedCredentials(storedCredentials)
-        
     {
         // We don't want any timers to fire while we are doing our synchronous load
         // so we replace the thread default main context. The main loop iterations
@@ -96,12 +95,16 @@ public:
         g_main_context_push_thread_default(innerMainContext.get());
         m_mainLoop = adoptGRef(g_main_loop_new(innerMainContext.get(), false));
 
+#if !SOUP_CHECK_VERSION(2, 49, 91)
         adjustMaxConnections(1);
+#endif
     }
 
     ~WebCoreSynchronousLoader()
     {
+#if !SOUP_CHECK_VERSION(2, 49, 91)
         adjustMaxConnections(-1);
+#endif
 
         GMainContext* context = g_main_context_get_thread_default();
         while (g_main_context_pending(context))
@@ -111,6 +114,7 @@ public:
         loadingSynchronousRequest = false;
     }
 
+#if !SOUP_CHECK_VERSION(2, 49, 91)
     void adjustMaxConnections(int adjustment)
     {
         int maxConnections, maxConnectionsPerHost;
@@ -126,23 +130,19 @@ public:
                      NULL);
 
     }
+#endif // SOUP_CHECK_VERSION(2, 49, 91)
 
-    virtual bool isSynchronousClient()
-    {
-        return true;
-    }
-
-    virtual void didReceiveResponse(ResourceHandle*, const ResourceResponse& response)
+    virtual void didReceiveResponse(ResourceHandle*, const ResourceResponse& response) override
     {
         m_response = response;
     }
 
-    virtual void didReceiveData(ResourceHandle*, const char* /* data */, unsigned /* length */, int)
+    virtual void didReceiveData(ResourceHandle*, const char* /* data */, unsigned /* length */, int) override
     {
         ASSERT_NOT_REACHED();
     }
 
-    virtual void didReceiveBuffer(ResourceHandle*, PassRefPtr<SharedBuffer> buffer, int /* encodedLength */)
+    virtual void didReceiveBuffer(ResourceHandle*, PassRefPtr<SharedBuffer> buffer, int /* encodedLength */) override
     {
         // This pattern is suggested by SharedBuffer.h.
         const char* segment;
@@ -153,26 +153,26 @@ public:
         }
     }
 
-    virtual void didFinishLoading(ResourceHandle*, double)
+    virtual void didFinishLoading(ResourceHandle*, double) override
     {
         if (g_main_loop_is_running(m_mainLoop.get()))
             g_main_loop_quit(m_mainLoop.get());
         m_finished = true;
     }
 
-    virtual void didFail(ResourceHandle* handle, const ResourceError& error)
+    virtual void didFail(ResourceHandle* handle, const ResourceError& error) override
     {
         m_error = error;
         didFinishLoading(handle, 0);
     }
 
-    virtual void didReceiveAuthenticationChallenge(ResourceHandle*, const AuthenticationChallenge& challenge)
+    virtual void didReceiveAuthenticationChallenge(ResourceHandle*, const AuthenticationChallenge& challenge) override
     {
         // We do not handle authentication for synchronous XMLHttpRequests.
         challenge.authenticationClient()->receivedRequestToContinueWithoutCredential(challenge);
     }
 
-    virtual bool shouldUseCredentialStorage(ResourceHandle*)
+    virtual bool shouldUseCredentialStorage(ResourceHandle*) override
     {
         return m_storedCredentials == AllowStoredCredentials;
     }
@@ -231,7 +231,6 @@ static bool createSoupRequestAndMessageForHandle(ResourceHandle*, const Resource
 static void cleanupSoupRequestOperation(ResourceHandle*, bool isDestroying = false);
 static void sendRequestCallback(GObject*, GAsyncResult*, gpointer);
 static void readCallback(GObject*, GAsyncResult*, gpointer);
-static gboolean requestTimeoutCallback(void*);
 #if ENABLE(WEB_TIMING)
 static int  milisecondsSinceRequest(double requestTime);
 #endif
@@ -331,16 +330,21 @@ static bool handleUnignoredTLSErrors(ResourceHandle* handle, SoupMessage* messag
     return true;
 }
 
-static void gotHeadersCallback(SoupMessage* message, gpointer data)
+static void tlsErrorsChangedCallback(SoupMessage* message, GParamSpec*, gpointer data)
 {
     ResourceHandle* handle = static_cast<ResourceHandle*>(data);
     if (!handle || handle->cancelledOrClientless())
         return;
 
-    if (handleUnignoredTLSErrors(handle, message)) {
+    if (handleUnignoredTLSErrors(handle, message))
         handle->cancel();
+}
+
+static void gotHeadersCallback(SoupMessage* message, gpointer data)
+{
+    ResourceHandle* handle = static_cast<ResourceHandle*>(data);
+    if (!handle || handle->cancelledOrClientless())
         return;
-    }
 
     ResourceHandleInternal* d = handle->getInternal();
 
@@ -590,10 +594,7 @@ static void cleanupSoupRequestOperation(ResourceHandle* handle, bool isDestroyin
         d->m_soupMessage.clear();
     }
 
-    if (d->m_timeoutSource) {
-        g_source_destroy(d->m_timeoutSource.get());
-        d->m_timeoutSource.clear();
-    }
+    d->m_timeoutSource.cancel();
 
     if (!isDestroying)
         handle->deref();
@@ -837,6 +838,13 @@ void ResourceHandle::didStartRequest()
     getInternal()->m_response.resourceLoadTiming().requestStart = milisecondsSinceRequest(m_requestTime);
 }
 
+#if SOUP_CHECK_VERSION(2, 49, 91)
+static void startingCallback(SoupMessage*, ResourceHandle* handle)
+{
+    handle->didStartRequest();
+}
+#endif // SOUP_CHECK_VERSION(2, 49, 91)
+
 static void networkEventCallback(SoupMessage*, GSocketClientEvent event, GIOStream*, gpointer data)
 {
     ResourceHandle* handle = static_cast<ResourceHandle*>(data);
@@ -931,12 +939,23 @@ static bool createSoupMessageForHandleAndRequest(ResourceHandle* handle, const R
         && (!request.httpBody() || request.httpBody()->isEmpty()))
         soup_message_headers_set_content_length(soupMessage->request_headers, 0);
 
+    g_signal_connect(d->m_soupMessage.get(), "notify::tls-errors", G_CALLBACK(tlsErrorsChangedCallback), handle);
     g_signal_connect(d->m_soupMessage.get(), "got-headers", G_CALLBACK(gotHeadersCallback), handle);
     g_signal_connect(d->m_soupMessage.get(), "wrote-body-data", G_CALLBACK(wroteBodyDataCallback), handle);
 
-    soup_message_set_flags(d->m_soupMessage.get(), static_cast<SoupMessageFlags>(soup_message_get_flags(d->m_soupMessage.get()) | SOUP_MESSAGE_NO_REDIRECT));
+    unsigned flags = SOUP_MESSAGE_NO_REDIRECT;
+#if SOUP_CHECK_VERSION(2, 49, 91)
+    // Ignore the connection limits in synchronous loads to avoid freezing the networking process.
+    // See https://bugs.webkit.org/show_bug.cgi?id=141508.
+    if (loadingSynchronousRequest)
+        flags |= SOUP_MESSAGE_IGNORE_CONNECTION_LIMITS;
+#endif
+    soup_message_set_flags(d->m_soupMessage.get(), static_cast<SoupMessageFlags>(soup_message_get_flags(d->m_soupMessage.get()) | flags));
 
 #if ENABLE(WEB_TIMING)
+#if SOUP_CHECK_VERSION(2, 49, 91)
+    g_signal_connect(d->m_soupMessage.get(), "starting", G_CALLBACK(startingCallback), handle);
+#endif
     g_signal_connect(d->m_soupMessage.get(), "network-event", G_CALLBACK(networkEventCallback), handle);
     g_signal_connect(d->m_soupMessage.get(), "restarted", G_CALLBACK(restartedCallback), handle);
 #endif
@@ -1015,10 +1034,11 @@ void ResourceHandle::sendPendingRequest()
 #endif
 
     if (d->m_firstRequest.timeoutInterval() > 0) {
-        // soup_add_timeout returns a GSource* whose only reference is owned by
-        // the context. We need to have our own reference to it, hence not using adoptRef.
-        d->m_timeoutSource = soup_add_timeout(g_main_context_get_thread_default(),
-            d->m_firstRequest.timeoutInterval() * 1000, requestTimeoutCallback, this);
+        d->m_timeoutSource.scheduleAfterDelay("[WebKit] ResourceHandle request timeout", [this] {
+            client()->didFail(this, ResourceError::timeoutError(firstRequest().url().string()));
+            cancel();
+        }, std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::duration<double>(d->m_firstRequest.timeoutInterval())),
+        G_PRIORITY_DEFAULT, nullptr, g_main_context_get_thread_default());
     }
 
     // Balanced by a deref() in cleanupSoupRequestOperation, which should always run.
@@ -1223,10 +1243,7 @@ void ResourceHandle::platformSetDefersLoading(bool defersLoading)
 
     // Except when canceling a possible timeout timer, we only need to take action here to UN-defer loading.
     if (defersLoading) {
-        if (d->m_timeoutSource) {
-            g_source_destroy(d->m_timeoutSource.get());
-            d->m_timeoutSource.clear();
-        }
+        d->m_timeoutSource.cancel();
         return;
     }
 
@@ -1243,11 +1260,6 @@ void ResourceHandle::platformSetDefersLoading(bool defersLoading)
         else
             sendRequestCallback(G_OBJECT(d->m_soupRequest.get()), asyncResult.get(), this);
     }
-}
-
-bool ResourceHandle::loadsBlocked()
-{
-    return false;
 }
 
 void ResourceHandle::platformLoadResourceSynchronously(NetworkingContext* context, const ResourceRequest& request, StoredCredentials storedCredentials, ResourceError& error, ResourceResponse& response, Vector<char>& data)
@@ -1343,15 +1355,6 @@ void ResourceHandle::continueDidReceiveResponse()
     ASSERT(client());
     ASSERT(client()->usesAsyncCallbacks());
     continueAfterDidReceiveResponse(this);
-}
-
-static gboolean requestTimeoutCallback(gpointer data)
-{
-    RefPtr<ResourceHandle> handle = static_cast<ResourceHandle*>(data);
-    handle->client()->didFail(handle.get(), ResourceError::timeoutError(handle->getInternal()->m_firstRequest.url().string()));
-    handle->cancel();
-
-    return FALSE;
 }
 
 }

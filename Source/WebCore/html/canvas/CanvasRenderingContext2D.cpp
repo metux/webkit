@@ -42,7 +42,6 @@
 #include "DOMPath.h"
 #include "ExceptionCodePlaceholder.h"
 #include "FloatQuad.h"
-#include "FontCache.h"
 #include "GraphicsContext.h"
 #include "HTMLImageElement.h"
 #include "HTMLVideoElement.h"
@@ -1282,8 +1281,8 @@ static LayoutSize size(HTMLImageElement* image, ImageSizeType sizeType)
     if (CachedImage* cachedImage = image->cachedImage()) {
         size = cachedImage->imageSizeForRenderer(image->renderer(), 1.0f); // FIXME: Not sure about this.
 
-        if (sizeType == ImageSizeAfterDevicePixelRatio && image->renderer() && image->renderer()->isRenderImage() && cachedImage->image() && !cachedImage->image()->hasRelativeWidth())
-            size.scale(toRenderImage(image->renderer())->imageDevicePixelRatio());
+        if (sizeType == ImageSizeAfterDevicePixelRatio && is<RenderImage>(image->renderer()) && cachedImage->image() && !cachedImage->image()->hasRelativeWidth())
+            size.scale(downcast<RenderImage>(*image->renderer()).imageDevicePixelRatio());
     }
     return size;
 }
@@ -1378,8 +1377,6 @@ void CanvasRenderingContext2D::drawImage(HTMLImageElement* image, const FloatRec
     if (!cachedImage)
         return;
 
-    checkOrigin(image);
-
     if (rectContainsCanvas(normalizedDstRect)) {
         c->drawImage(cachedImage->imageForRenderer(image->renderer()), ColorSpaceDeviceRGB, normalizedDstRect, normalizedSrcRect, ImagePaintingOptions(op, blendMode));
         didDrawEntireCanvas();
@@ -1394,6 +1391,8 @@ void CanvasRenderingContext2D::drawImage(HTMLImageElement* image, const FloatRec
         c->drawImage(cachedImage->imageForRenderer(image->renderer()), ColorSpaceDeviceRGB, normalizedDstRect, normalizedSrcRect, ImagePaintingOptions(op, blendMode));
         didDraw(normalizedDstRect);
     }
+
+    checkOrigin(image);
 }
 
 void CanvasRenderingContext2D::drawImage(HTMLCanvasElement* sourceCanvas, float x, float y, ExceptionCode& ec)
@@ -1752,11 +1751,12 @@ PassRefPtr<CanvasPattern> CanvasRenderingContext2D::createPattern(HTMLImageEleme
     if (ec)
         return 0;
 
-    if (!image->complete())
-        return 0;
-
     CachedImage* cachedImage = image->cachedImage();
-    if (!cachedImage || cachedImage->status() == CachedResource::LoadError) {
+    // If the image loading hasn't started or the image is not complete, it is not fully decodable.
+    if (!cachedImage || !image->complete())
+        return nullptr;
+
+    if (cachedImage->status() == CachedResource::LoadError) {
         ec = INVALID_STATE_ERR;
         return 0;
     }
@@ -2094,7 +2094,10 @@ void CanvasRenderingContext2D::setFont(const String& newFont)
     // Map the <canvas> font into the text style. If the font uses keywords like larger/smaller, these will work
     // relative to the canvas.
     RefPtr<RenderStyle> newStyle = RenderStyle::create();
-    canvas()->document().updateStyleIfNeeded();
+
+    Document& document = canvas()->document();
+    document.updateStyleIfNeeded();
+
     if (RenderStyle* computedStyle = canvas()->computedStyle())
         newStyle->setFontDescription(computedStyle->fontDescription());
     else {
@@ -2106,7 +2109,7 @@ void CanvasRenderingContext2D::setFont(const String& newFont)
         newStyle->setFontDescription(defaultFontDescription);
     }
 
-    newStyle->font().update(newStyle->font().fontSelector());
+    newStyle->fontCascade().update(newStyle->fontCascade().fontSelector());
 
     // Now map the font property longhands into the style.
     StyleResolver& styleResolver = canvas()->document().ensureStyleResolver();
@@ -2123,10 +2126,10 @@ void CanvasRenderingContext2D::setFont(const String& newFont)
     styleResolver.updateFont();
     styleResolver.applyPropertyToCurrentStyle(CSSPropertyLineHeight, parsedStyle->getPropertyCSSValue(CSSPropertyLineHeight).get());
 
-    modifiableState().m_font = newStyle->font();
-    modifiableState().m_font.update(styleResolver.fontSelector());
+    modifiableState().m_font = newStyle->fontCascade();
+    modifiableState().m_font.update(&document.fontSelector());
     modifiableState().m_realizedFont = true;
-    styleResolver.fontSelector()->registerForInvalidationCallbacks(&modifiableState());
+    document.fontSelector().registerForInvalidationCallbacks(&modifiableState());
 }
 
 String CanvasRenderingContext2D::textAlign() const
@@ -2257,8 +2260,6 @@ static void normalizeSpaces(String& text)
 
 PassRefPtr<TextMetrics> CanvasRenderingContext2D::measureText(const String& text)
 {
-    FontCachePurgePreventer fontCachePurgePreventer;
-
     RefPtr<TextMetrics> metrics = TextMetrics::create();
 
     String normalizedText = text;
@@ -2290,9 +2291,7 @@ void CanvasRenderingContext2D::drawTextInternal(const String& text, float x, flo
     if (fill && gradient && gradient->isZeroSize())
         return;
 
-    FontCachePurgePreventer fontCachePurgePreventer;
-
-    const Font& font = accessFont();
+    const FontCascade& font = accessFont();
     const FontMetrics& fontMetrics = font.fontMetrics();
 
     String normalizedText = text;
@@ -2377,10 +2376,10 @@ void CanvasRenderingContext2D::drawTextInternal(const String& text, float x, flo
             maskImageContext->translate(location.x() - maskRect.x(), location.y() - maskRect.y());
             // We draw when fontWidth is 0 so compositing operations (eg, a "copy" op) still work.
             maskImageContext->scale(FloatSize((fontWidth > 0 ? (width / fontWidth) : 0), 1));
-            maskImageContext->drawBidiText(font, textRun, FloatPoint(0, 0), Font::UseFallbackIfFontNotReady);
+            maskImageContext->drawBidiText(font, textRun, FloatPoint(0, 0), FontCascade::UseFallbackIfFontNotReady);
         } else {
             maskImageContext->translate(-maskRect.x(), -maskRect.y());
-            maskImageContext->drawBidiText(font, textRun, location, Font::UseFallbackIfFontNotReady);
+            maskImageContext->drawBidiText(font, textRun, location, FontCascade::UseFallbackIfFontNotReady);
         }
 
         GraphicsContextStateSaver stateSaver(*c);
@@ -2403,15 +2402,15 @@ void CanvasRenderingContext2D::drawTextInternal(const String& text, float x, flo
 
     if (isFullCanvasCompositeMode(state().m_globalComposite)) {
         beginCompositeLayer();
-        c->drawBidiText(font, textRun, location, Font::UseFallbackIfFontNotReady);
+        c->drawBidiText(font, textRun, location, FontCascade::UseFallbackIfFontNotReady);
         endCompositeLayer();
         didDrawEntireCanvas();
     } else if (state().m_globalComposite == CompositeCopy) {
         clearCanvas();
-        c->drawBidiText(font, textRun, location, Font::UseFallbackIfFontNotReady);
+        c->drawBidiText(font, textRun, location, FontCascade::UseFallbackIfFontNotReady);
         didDrawEntireCanvas();
     } else {
-        c->drawBidiText(font, textRun, location, Font::UseFallbackIfFontNotReady);
+        c->drawBidiText(font, textRun, location, FontCascade::UseFallbackIfFontNotReady);
         didDraw(textRect);
     }
 }
@@ -2431,7 +2430,7 @@ void CanvasRenderingContext2D::inflateStrokeRect(FloatRect& rect) const
     rect.inflate(delta);
 }
 
-const Font& CanvasRenderingContext2D::accessFont()
+const FontCascade& CanvasRenderingContext2D::accessFont()
 {
     canvas()->document().updateStyleIfNeeded();
 

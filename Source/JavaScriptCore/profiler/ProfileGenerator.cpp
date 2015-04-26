@@ -28,7 +28,6 @@
 
 #include "CallFrame.h"
 #include "CodeBlock.h"
-#include "Debugger.h"
 #include "JSGlobalObject.h"
 #include "JSStringRef.h"
 #include "JSFunction.h"
@@ -40,20 +39,18 @@
 
 namespace JSC {
 
-PassRefPtr<ProfileGenerator> ProfileGenerator::create(ExecState* exec, const String& title, unsigned uid)
+PassRefPtr<ProfileGenerator> ProfileGenerator::create(ExecState* exec, const String& title, unsigned uid, PassRefPtr<Stopwatch> stopwatch)
 {
-    return adoptRef(new ProfileGenerator(exec, title, uid));
+    return adoptRef(new ProfileGenerator(exec, title, uid, stopwatch));
 }
 
-ProfileGenerator::ProfileGenerator(ExecState* exec, const String& title, unsigned uid)
+ProfileGenerator::ProfileGenerator(ExecState* exec, const String& title, unsigned uid, PassRefPtr<Stopwatch> stopwatch)
     : m_origin(exec ? exec->lexicalGlobalObject() : nullptr)
     , m_profileGroup(exec ? exec->lexicalGlobalObject()->profileGroup() : 0)
+    , m_stopwatch(stopwatch)
     , m_foundConsoleStartParent(false)
-    , m_debuggerPaused(false)
+    , m_suspended(false)
 {
-    if (Debugger* debugger = exec->lexicalGlobalObject()->debugger())
-        m_debuggerPaused = debugger->isPaused();
-
     m_profile = Profile::create(title, uid);
     m_currentNode = m_rootNode = m_profile->rootNode();
     if (exec)
@@ -84,7 +81,9 @@ public:
         unsigned column = 0;
         visitor->computeLineAndColumn(line, column);
         m_currentNode = ProfileNode::create(m_exec, LegacyProfiler::createCallIdentifier(m_exec, visitor->callee(), visitor->sourceURL(), line, column), m_rootNode.get());
-        m_currentNode->appendCall(ProfileNode::Call(currentTime()));
+        // Assume that profile times are relative to when the |console.profile| command is evaluated.
+        // This matches the logic in JSStartProfiling() and InspectorTimelineAgent::startFromConsole().
+        m_currentNode->appendCall(ProfileNode::Call(0.0));
         m_rootNode->spliceNode(m_currentNode.get());
 
         m_foundParent = true;
@@ -116,8 +115,9 @@ void ProfileGenerator::beginCallEntry(ProfileNode* node, double startTime)
 {
     ASSERT_ARG(node, node);
 
-    if (isnan(startTime))
-        startTime = currentTime();
+    if (std::isnan(startTime))
+        startTime = m_stopwatch->elapsedTime();
+
     node->appendCall(ProfileNode::Call(startTime));
 }
 
@@ -126,9 +126,10 @@ void ProfileGenerator::endCallEntry(ProfileNode* node)
     ASSERT_ARG(node, node);
 
     ProfileNode::Call& last = node->lastCall();
-    ASSERT(isnan(last.totalTime()));
 
-    last.setTotalTime(m_debuggerPaused ? 0.0 : currentTime() - last.startTime());
+    double previousElapsedTime = std::isnan(last.elapsedTime()) ? 0.0 : last.elapsedTime();
+    double newlyElapsedTime = m_stopwatch->elapsedTime() - last.startTime();
+    last.setElapsedTime(previousElapsedTime + newlyElapsedTime);
 }
 
 void ProfileGenerator::willExecute(ExecState* callerCallFrame, const CallIdentifier& callIdentifier)
@@ -140,6 +141,9 @@ void ProfileGenerator::willExecute(ExecState* callerCallFrame, const CallIdentif
     }
 
     if (!m_origin)
+        return;
+
+    if (m_suspended)
         return;
 
     RefPtr<ProfileNode> calleeNode = nullptr;
@@ -156,7 +160,7 @@ void ProfileGenerator::willExecute(ExecState* callerCallFrame, const CallIdentif
     }
 
     m_currentNode = calleeNode;
-    beginCallEntry(calleeNode.get());
+    beginCallEntry(calleeNode.get(), m_stopwatch->elapsedTime());
 }
 
 void ProfileGenerator::didExecute(ExecState* callerCallFrame, const CallIdentifier& callIdentifier)
@@ -168,6 +172,9 @@ void ProfileGenerator::didExecute(ExecState* callerCallFrame, const CallIdentifi
     }
 
     if (!m_origin)
+        return;
+
+    if (m_suspended)
         return;
 
     // Make a new node if the caller node has never seen this callee call frame before.

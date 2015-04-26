@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013, 2014 Apple Inc. All rights reserved.
+ * Copyright (C) 2013-2015 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -39,6 +39,7 @@ class CPSRethreadingPhase : public Phase {
 public:
     CPSRethreadingPhase(Graph& graph)
         : Phase(graph, "CPS rethreading")
+        , m_availableForOSR(OperandsLike, graph.block(0)->variablesAtHead)
     {
     }
     
@@ -53,6 +54,7 @@ public:
         freeUnnecessaryNodes();
         m_graph.clearReplacements();
         canonicalizeLocalsInBlocks();
+        specialCaseArguments();
         propagatePhis<LocalOperand>();
         propagatePhis<ArgumentOperand>();
         computeIsFlushed();
@@ -98,7 +100,7 @@ private:
                     case Phi:
                     case SetArgument:
                     case SetLocal:
-                        node->convertToPhantomLocal();
+                        node->convertPhantomToPhantomLocal();
                         break;
                     default:
                         ASSERT(node->child1()->hasResult());
@@ -119,15 +121,19 @@ private:
     }
     
     template<OperandKind operandKind>
-    void clearVariablesAtHeadAndTail()
+    void clearVariables()
     {
         ASSERT(
             m_block->variablesAtHead.sizeFor<operandKind>()
             == m_block->variablesAtTail.sizeFor<operandKind>());
+        ASSERT(
+            m_block->variablesAtHead.sizeFor<operandKind>()
+            == m_availableForOSR.sizeFor<operandKind>());
         
         for (unsigned i = m_block->variablesAtHead.sizeFor<operandKind>(); i--;) {
-            m_block->variablesAtHead.atFor<operandKind>(i) = 0;
-            m_block->variablesAtTail.atFor<operandKind>(i) = 0;
+            m_block->variablesAtHead.atFor<operandKind>(i) = nullptr;
+            m_block->variablesAtTail.atFor<operandKind>(i) = nullptr;
+            m_availableForOSR.atFor<operandKind>(i) = Edge();
         }
     }
     
@@ -228,11 +234,6 @@ private:
             canonicalizeGetLocalFor<LocalOperand>(node, variable, variable->local().toLocal());
     }
     
-    void canonicalizeSetLocal(Node* node)
-    {
-        m_block->variablesAtTail.setOperand(node->local(), node);
-    }
-    
     template<NodeType nodeType, OperandKind operandKind>
     void canonicalizeFlushOrPhantomLocalFor(Node* node, VariableAccessData* variable, size_t idx)
     {
@@ -259,13 +260,10 @@ private:
                 // for the purpose of OSR. PhantomLocal(SetLocal) means: at this point I
                 // know that I would have read the value written by that SetLocal. This is
                 // redundant and inefficient, since really it just means that we want to
-                // be keeping the operand to the SetLocal alive. The SetLocal may die, and
-                // we'll be fine because OSR tracks dead SetLocals.
+                // keep the last MovHinted value of that local alive.
                 
-                // So we turn this into a Phantom on the child of the SetLocal.
-                
+                node->children.setChild1(m_availableForOSR.atFor<operandKind>(idx));
                 node->convertToPhantom();
-                node->children.setChild1(otherNode->child1());
                 return;
             }
             
@@ -296,13 +294,9 @@ private:
             canonicalizeFlushOrPhantomLocalFor<nodeType, LocalOperand>(node, variable, variable->local().toLocal());
     }
     
-    void canonicalizeSetArgument(Node* node)
+    void canonicalizeSet(Node* node)
     {
-        VirtualRegister local = node->local();
-        ASSERT(local.isArgument());
-        int argument = local.toArgument();
-        m_block->variablesAtHead.setArgumentFirstTime(argument, node);
-        m_block->variablesAtTail.setArgumentFirstTime(argument, node);
+        m_block->variablesAtTail.setOperand(node->local(), node);
     }
     
     void canonicalizeLocalsInBlock()
@@ -311,8 +305,8 @@ private:
             return;
         ASSERT(m_block->isReachable);
         
-        clearVariablesAtHeadAndTail<ArgumentOperand>();
-        clearVariablesAtHeadAndTail<LocalOperand>();
+        clearVariables<ArgumentOperand>();
+        clearVariables<LocalOperand>();
         
         // Assumes that all phi references have been removed. Assumes that things that
         // should be live have a non-zero ref count, but doesn't assume that the ref
@@ -367,7 +361,7 @@ private:
                 break;
                 
             case SetLocal:
-                canonicalizeSetLocal(node);
+                canonicalizeSet(node);
                 break;
                 
             case Flush:
@@ -379,7 +373,11 @@ private:
                 break;
                 
             case SetArgument:
-                canonicalizeSetArgument(node);
+                canonicalizeSet(node);
+                break;
+                
+            case MovHint:
+                m_availableForOSR.operand(node->unlinkedLocal()) = node->child1();
                 break;
                 
             default:
@@ -396,6 +394,16 @@ private:
             m_block = m_graph.block(blockIndex);
             canonicalizeLocalsInBlock();
         }
+    }
+    
+    void specialCaseArguments()
+    {
+        // Normally, a SetArgument denotes the start of a live range for a local's value on the stack.
+        // But those SetArguments used for the actual arguments to the machine CodeBlock get
+        // special-cased. We could have instead used two different node types - one for the arguments
+        // at the prologue case, and another for the other uses. But this seemed like IR overkill.
+        for (unsigned i = m_graph.m_arguments.size(); i--;)
+            m_graph.block(0)->variablesAtHead.setArgumentFirstTime(i, m_graph.m_arguments[i]);
     }
     
     template<OperandKind operandKind>
@@ -522,6 +530,7 @@ private:
     Vector<PhiStackEntry, 128> m_argumentPhiStack;
     Vector<PhiStackEntry, 128> m_localPhiStack;
     Vector<Node*, 128> m_flushedLocalOpWorklist;
+    Operands<Edge> m_availableForOSR;
 };
 
 bool performCPSRethreading(Graph& graph)

@@ -45,13 +45,13 @@ class Page;
 
 class InspectorFrontendHost : public RefCounted<InspectorFrontendHost> {
 public:
-    static PassRefPtr<InspectorFrontendHost> create(InspectorFrontendClient* client, Page* frontendPage)
+    static Ref<InspectorFrontendHost> create(InspectorFrontendClient* client, Page* frontendPage)
     {
-        return adoptRef(new InspectorFrontendHost(client, frontendPage));
+        return adoptRef(*new InspectorFrontendHost(client, frontendPage));
     }
 
-    ~InspectorFrontendHost();
-    void disconnectClient();
+    WEBCORE_EXPORT ~InspectorFrontendHost();
+    WEBCORE_EXPORT void disconnectClient();
 
     void loaded();
     void requestSetDockSide(const String&);
@@ -95,7 +95,7 @@ private:
 #if ENABLE(CONTEXT_MENUS)
     friend class FrontendMenuProvider;
 #endif
-    InspectorFrontendHost(InspectorFrontendClient*, Page* frontendPage);
+    WEBCORE_EXPORT InspectorFrontendHost(InspectorFrontendClient*, Page* frontendPage);
 
     InspectorFrontendClient* m_client;
     Page* m_frontendPage;

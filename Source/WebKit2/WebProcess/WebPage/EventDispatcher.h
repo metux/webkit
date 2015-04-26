@@ -70,7 +70,7 @@ private:
     EventDispatcher();
 
     // IPC::Connection::WorkQueueMessageReceiver.
-    virtual void didReceiveMessage(IPC::Connection*, IPC::MessageDecoder&) override;
+    virtual void didReceiveMessage(IPC::Connection&, IPC::MessageDecoder&) override;
 
     // Message handlers
     void wheelEvent(uint64_t pageID, const WebWheelEvent&, bool canRubberBandAtLeft, bool canRubberBandAtRight, bool canRubberBandAtTop, bool canRubberBandAtBottom);
@@ -89,7 +89,7 @@ private:
     void sendDidReceiveEvent(uint64_t pageID, const WebEvent&, bool didHandleEvent);
 #endif
 
-    RefPtr<WorkQueue> m_queue;
+    Ref<WorkQueue> m_queue;
 
 #if ENABLE(ASYNC_SCROLLING)
     Mutex m_scrollingTreesMutex;

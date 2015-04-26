@@ -49,6 +49,7 @@
 #include "FrameLoader.h"
 #include "FrameLoaderClient.h"
 #include "FrameSelection.h"
+#include "HTMLFormControlElement.h"
 #include "HTMLFormElement.h"
 #include "HitTestRequest.h"
 #include "HitTestResult.h"
@@ -89,7 +90,7 @@ ContextMenuController::~ContextMenuController()
 
 void ContextMenuController::clearContextMenu()
 {
-    m_contextMenu.clear();
+    m_contextMenu = nullptr;
     if (m_menuProvider)
         m_menuProvider->contextMenuCleared();
     m_menuProvider = 0;
@@ -106,9 +107,9 @@ void ContextMenuController::handleContextMenuEvent(Event* event)
     showContextMenu(event);
 }
 
-static PassOwnPtr<ContextMenuItem> separatorItem()
+static std::unique_ptr<ContextMenuItem> separatorItem()
 {
-    return adoptPtr(new ContextMenuItem(SeparatorType, ContextMenuItemTagNoAction, String()));
+    return std::unique_ptr<ContextMenuItem>(new ContextMenuItem(SeparatorType, ContextMenuItemTagNoAction, String()));
 }
 
 void ContextMenuController::showContextMenu(Event* event, PassRefPtr<ContextMenuProvider> menuProvider)
@@ -133,11 +134,9 @@ void ContextMenuController::showContextMenu(Event* event, PassRefPtr<ContextMenu
 static Image* imageFromImageElementNode(Node& node)
 {
     RenderObject* renderer = node.renderer();
-    if (!renderer)
+    if (!is<RenderImage>(renderer))
         return nullptr;
-    if (!renderer->isRenderImage())
-        return nullptr;
-    CachedImage* image = toRenderImage(*renderer).cachedImage();
+    CachedImage* image = downcast<RenderImage>(*renderer).cachedImage();
     if (!image || image->errorOccurred())
         return nullptr;
 
@@ -145,14 +144,14 @@ static Image* imageFromImageElementNode(Node& node)
 }
 #endif
 
-PassOwnPtr<ContextMenu> ContextMenuController::maybeCreateContextMenu(Event* event)
+std::unique_ptr<ContextMenu> ContextMenuController::maybeCreateContextMenu(Event* event)
 {
     ASSERT(event);
     
-    if (!event->isMouseEvent())
+    if (!is<MouseEvent>(*event))
         return nullptr;
 
-    MouseEvent& mouseEvent = toMouseEvent(*event);
+    MouseEvent& mouseEvent = downcast<MouseEvent>(*event);
     HitTestResult result(mouseEvent.absoluteLocation());
 
     Node* node = event->target()->toNode();
@@ -174,18 +173,16 @@ PassOwnPtr<ContextMenu> ContextMenuController::maybeCreateContextMenu(Event* eve
     }
 #endif
 
-    return adoptPtr(new ContextMenu);
+    return std::unique_ptr<ContextMenu>(new ContextMenu);
 }
 
 void ContextMenuController::showContextMenu(Event* event)
 {
-#if ENABLE(INSPECTOR)
     if (m_page.inspectorController().enabled())
         addInspectElementItem();
-#endif
 
 #if USE(CROSS_PLATFORM_CONTEXT_MENUS)
-    m_contextMenu = m_client.customizeMenu(m_contextMenu.release());
+    m_contextMenu = m_client.customizeMenu(WTF::move(m_contextMenu));
 #else
     PlatformMenuDescription customMenu = m_client.getCustomMenuFromDefaultItems(m_contextMenu.get());
     m_contextMenu->setPlatformDescription(customMenu);
@@ -200,13 +197,12 @@ static void openNewWindow(const URL& urlToLoad, Frame* frame)
         return;
     
     FrameLoadRequest request(frame->document()->securityOrigin(), ResourceRequest(urlToLoad, frame->loader().outgoingReferrer()));
-    Page* newPage = oldPage;
 
-    newPage = oldPage->chrome().createWindow(frame, request, WindowFeatures(), NavigationAction(request.resourceRequest()));
+    Page* newPage = oldPage->chrome().createWindow(frame, request, WindowFeatures(), NavigationAction(request.resourceRequest()));
     if (!newPage)
         return;
     newPage->chrome().show();
-    newPage->mainFrame().loader().loadFrameRequest(request, LockHistory::No, LockBackForwardList::No, 0, 0, MaybeSendReferrer, AllowNavigationToInvalidURL::Yes);
+    newPage->mainFrame().loader().loadFrameRequest(request, LockHistory::No, LockBackForwardList::No, 0, 0, MaybeSendReferrer, AllowNavigationToInvalidURL::Yes, NewFrameOpenerPolicy::Suppress);
 }
 
 #if PLATFORM(GTK)
@@ -405,12 +401,12 @@ void ContextMenuController::contextMenuItemSelected(ContextMenuItem* item)
         break;
     case ContextMenuItemTagOpenLink:
         if (Frame* targetFrame = m_context.hitTestResult().targetFrame())
-            targetFrame->loader().loadFrameRequest(FrameLoadRequest(frame->document()->securityOrigin(), ResourceRequest(m_context.hitTestResult().absoluteLinkURL(), frame->loader().outgoingReferrer())), LockHistory::No, LockBackForwardList::No, 0, 0, MaybeSendReferrer, AllowNavigationToInvalidURL::Yes);
+            targetFrame->loader().loadFrameRequest(FrameLoadRequest(frame->document()->securityOrigin(), ResourceRequest(m_context.hitTestResult().absoluteLinkURL(), frame->loader().outgoingReferrer())), LockHistory::No, LockBackForwardList::No, 0, 0, MaybeSendReferrer, AllowNavigationToInvalidURL::Yes, NewFrameOpenerPolicy::Suppress);
         else
             openNewWindow(m_context.hitTestResult().absoluteLinkURL(), frame);
         break;
     case ContextMenuItemTagOpenLinkInThisWindow:
-        frame->loader().loadFrameRequest(FrameLoadRequest(frame->document()->securityOrigin(), ResourceRequest(m_context.hitTestResult().absoluteLinkURL(), frame->loader().outgoingReferrer())), LockHistory::No, LockBackForwardList::No, 0, 0, MaybeSendReferrer, AllowNavigationToInvalidURL::Yes);
+        frame->loader().loadFrameRequest(FrameLoadRequest(frame->document()->securityOrigin(), ResourceRequest(m_context.hitTestResult().absoluteLinkURL(), frame->loader().outgoingReferrer())), LockHistory::No, LockBackForwardList::No, 0, 0, MaybeSendReferrer, AllowNavigationToInvalidURL::Yes, NewFrameOpenerPolicy::Suppress);
         break;
     case ContextMenuItemTagBold:
         frame->editor().command("ToggleBold").execute();
@@ -523,12 +519,10 @@ void ContextMenuController::contextMenuItemSelected(ContextMenuItem* item)
         frame->editor().toggleAutomaticSpellingCorrection();
         break;
 #endif
-#if ENABLE(INSPECTOR)
     case ContextMenuItemTagInspectElement:
         if (Page* page = frame->page())
             page->inspectorController().inspect(m_context.hitTestResult().innerNonSharedNode());
         break;
-#endif
     case ContextMenuItemTagDictationAlternative:
         frame->editor().applyDictationAlternativelternative(item->title());
         break;
@@ -836,7 +830,7 @@ void ContextMenuController::populate()
     if (!node)
         return;
 #if PLATFORM(GTK)
-    if (!m_context.hitTestResult().isContentEditable() && (node->isElementNode() && toElement(node)->isFormControlElement()))
+    if (!m_context.hitTestResult().isContentEditable() && is<HTMLFormControlElement>(*node))
         return;
 #endif
     Frame* frame = node->document().frame();
@@ -892,7 +886,7 @@ void ContextMenuController::populate()
             appendItem(*separatorItem(), m_contextMenu.get());
             appendItem(CopyMediaLinkItem, m_contextMenu.get());
             appendItem(OpenMediaInNewWindowItem, m_contextMenu.get());
-            if (loader.client().canHandleRequest(ResourceRequest(mediaURL)))
+            if (m_context.hitTestResult().isDownloadableMedia() && loader.client().canHandleRequest(ResourceRequest(mediaURL)))
                 appendItem(DownloadMediaItem, m_contextMenu.get());
         }
 
@@ -921,9 +915,7 @@ void ContextMenuController::populate()
                 appendItem(SpeechMenuItem, m_contextMenu.get());
 #endif                
             } else {
-#if ENABLE(INSPECTOR)
                 if (!(frame->page() && (frame->page()->inspectorController().hasInspectorFrontendClient() || frame->page()->inspectorController().hasRemoteFrontend()))) {
-#endif
 
                 // In GTK+ unavailable items are not hidden but insensitive.
 #if PLATFORM(GTK)
@@ -945,9 +937,7 @@ void ContextMenuController::populate()
                 else
                     appendItem(ReloadItem, m_contextMenu.get());
 #endif
-#if ENABLE(INSPECTOR)
                 }
-#endif
 
                 if (frame->page() && !frame->isMainFrame())
                     appendItem(OpenFrameItem, m_contextMenu.get());
@@ -1115,7 +1105,6 @@ void ContextMenuController::populate()
     }
 }
 
-#if ENABLE(INSPECTOR)
 void ContextMenuController::addInspectElementItem()
 {
     Node* node = m_context.hitTestResult().innerNonSharedNode();
@@ -1139,7 +1128,6 @@ void ContextMenuController::addInspectElementItem()
         appendItem(*separatorItem(), m_contextMenu.get());
     appendItem(InspectElementItem, m_contextMenu.get());
 }
-#endif // ENABLE(INSPECTOR)
 
 void ContextMenuController::checkOrEnableIfNeeded(ContextMenuItem& item) const
 {
@@ -1406,9 +1394,7 @@ void ContextMenuController::checkOrEnableIfNeeded(ContextMenuItem& item) const
         case ContextMenuItemTagTextDirectionMenu:
         case ContextMenuItemTagPDFSinglePageScrolling:
         case ContextMenuItemTagPDFFacingPagesScrolling:
-#if ENABLE(INSPECTOR)
         case ContextMenuItemTagInspectElement:
-#endif
         case ContextMenuItemBaseCustomTag:
         case ContextMenuItemCustomTagNoAction:
         case ContextMenuItemLastCustomTag:

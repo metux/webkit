@@ -90,7 +90,7 @@ static inline bool pageIsBeingDismissed(Document& document)
 ImageLoader::ImageLoader(Element& element)
     : m_element(element)
     , m_image(0)
-    , m_derefElementTimer(this, &ImageLoader::timerFired)
+    , m_derefElementTimer(*this, &ImageLoader::timerFired)
     , m_hasPendingBeforeLoadEvent(false)
     , m_hasPendingLoadEvent(false)
     , m_hasPendingErrorEvent(false)
@@ -171,7 +171,8 @@ void ImageLoader::updateFromElement()
 
     AtomicString attr = element().imageSourceURL();
 
-    if (attr == m_failedLoadURL)
+    // Avoid loading a URL we already failed to load.
+    if (!m_failedLoadURL.isEmpty() && attr == m_failedLoadURL)
         return;
 
     // Do not load any image if the 'src' attribute is missing or if it is
@@ -188,15 +189,15 @@ void ImageLoader::updateFromElement()
         }
 
         if (m_loadManually) {
-            bool autoLoadOtherImages = document.cachedResourceLoader()->autoLoadImages();
-            document.cachedResourceLoader()->setAutoLoadImages(false);
+            bool autoLoadOtherImages = document.cachedResourceLoader().autoLoadImages();
+            document.cachedResourceLoader().setAutoLoadImages(false);
             newImage = new CachedImage(request.resourceRequest(), m_element.document().page()->sessionID());
             newImage->setLoading(true);
-            newImage->setOwningCachedResourceLoader(document.cachedResourceLoader());
-            document.cachedResourceLoader()->m_documentResources.set(newImage->url(), newImage.get());
-            document.cachedResourceLoader()->setAutoLoadImages(autoLoadOtherImages);
+            newImage->setOwningCachedResourceLoader(&document.cachedResourceLoader());
+            document.cachedResourceLoader().m_documentResources.set(newImage->url(), newImage.get());
+            document.cachedResourceLoader().setAutoLoadImages(autoLoadOtherImages);
         } else
-            newImage = document.cachedResourceLoader()->requestImage(request);
+            newImage = document.cachedResourceLoader().requestImage(request);
 
         // If we do not have an image here, it means that a cross-site
         // violation occurred, or that the image was blocked via Content
@@ -254,8 +255,10 @@ void ImageLoader::updateFromElement()
             // dispatched.
             newImage->addClient(this);
         }
-        if (oldImage)
+        if (oldImage) {
             oldImage->removeClient(this);
+            updateRenderer();
+        }
     }
 
     if (RenderImageResource* imageResource = renderImageResource())
@@ -317,21 +320,21 @@ void ImageLoader::notifyFinished(CachedResource* resource)
 
 RenderImageResource* ImageLoader::renderImageResource()
 {
-    auto renderer = element().renderer();
+    auto* renderer = element().renderer();
     if (!renderer)
         return nullptr;
 
     // We don't return style generated image because it doesn't belong to the ImageLoader.
     // See <https://bugs.webkit.org/show_bug.cgi?id=42840>
-    if (renderer->isRenderImage() && !toRenderImage(*renderer).isGeneratedContent())
-        return &toRenderImage(*renderer).imageResource();
+    if (is<RenderImage>(*renderer) && !downcast<RenderImage>(*renderer).isGeneratedContent())
+        return &downcast<RenderImage>(*renderer).imageResource();
 
-    if (renderer->isSVGImage())
-        return &toRenderSVGImage(renderer)->imageResource();
+    if (is<RenderSVGImage>(*renderer))
+        return &downcast<RenderSVGImage>(*renderer).imageResource();
 
 #if ENABLE(VIDEO)
-    if (renderer->isVideo())
-        return &toRenderVideo(*renderer).imageResource();
+    if (is<RenderVideo>(*renderer))
+        return &downcast<RenderVideo>(*renderer).imageResource();
 #endif
 
     return nullptr;
@@ -374,7 +377,7 @@ void ImageLoader::updatedHasPendingEvent()
     }   
 }
 
-void ImageLoader::timerFired(Timer<ImageLoader>&)
+void ImageLoader::timerFired()
 {
     element().deref();
 }
@@ -406,14 +409,14 @@ void ImageLoader::dispatchPendingBeforeLoadEvent()
     }
     if (m_image) {
         m_image->removeClient(this);
-        m_image = 0;
+        m_image = nullptr;
     }
 
     loadEventSender().cancelEvent(*this);
     m_hasPendingLoadEvent = false;
     
-    if (isHTMLObjectElement(element()))
-        toHTMLObjectElement(element()).renderFallbackContent();
+    if (is<HTMLObjectElement>(element()))
+        downcast<HTMLObjectElement>(element()).renderFallbackContent();
 
     // Only consider updating the protection ref-count of the Element immediately before returning
     // from this function as doing so might result in the destruction of this ImageLoader.

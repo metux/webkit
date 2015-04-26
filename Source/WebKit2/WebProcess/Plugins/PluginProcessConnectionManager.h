@@ -56,11 +56,11 @@ private:
     PluginProcessConnectionManager();
 
     // IPC::Connection::WorkQueueMessageReceiver.
-    virtual void didReceiveMessage(IPC::Connection*, IPC::MessageDecoder&) override;
+    virtual void didReceiveMessage(IPC::Connection&, IPC::MessageDecoder&) override;
 
     void pluginProcessCrashed(uint64_t pluginProcessToken);
 
-    RefPtr<WorkQueue> m_queue;
+    Ref<WorkQueue> m_queue;
 
     Vector<RefPtr<PluginProcessConnection>> m_pluginProcessConnections;
 

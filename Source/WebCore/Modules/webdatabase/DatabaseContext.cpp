@@ -28,12 +28,9 @@
 #include "config.h"
 #include "DatabaseContext.h"
 
-#if ENABLE(SQL_DATABASE)
-
 #include "Chrome.h"
 #include "ChromeClient.h"
 #include "Database.h"
-#include "DatabaseBackendContext.h"
 #include "DatabaseManager.h"
 #include "DatabaseTask.h"
 #include "DatabaseThread.h"
@@ -147,12 +144,6 @@ void DatabaseContext::stop()
     stopDatabases();
 }
 
-PassRefPtr<DatabaseBackendContext> DatabaseContext::backend()
-{
-    DatabaseBackendContext* backend = static_cast<DatabaseBackendContext*>(this);
-    return backend;
-}
-
 DatabaseThread* DatabaseContext::databaseThread()
 {
     if (!m_databaseThread && !m_hasOpenDatabases) {
@@ -218,9 +209,9 @@ bool DatabaseContext::stopDatabases(DatabaseTaskSynchronizer* synchronizer)
 
 bool DatabaseContext::allowDatabaseAccess() const
 {
-    if (m_scriptExecutionContext->isDocument()) {
-        Document* document = toDocument(m_scriptExecutionContext);
-        if (!document->page() || (document->page()->usesEphemeralSession() && !SchemeRegistry::allowsDatabaseAccessInPrivateBrowsing(document->securityOrigin()->protocol())))
+    if (is<Document>(*m_scriptExecutionContext)) {
+        Document& document = downcast<Document>(*m_scriptExecutionContext);
+        if (!document.page() || (document.page()->usesEphemeralSession() && !SchemeRegistry::allowsDatabaseAccessInPrivateBrowsing(document.securityOrigin()->protocol())))
             return false;
         return true;
     }
@@ -231,10 +222,10 @@ bool DatabaseContext::allowDatabaseAccess() const
 
 void DatabaseContext::databaseExceededQuota(const String& name, DatabaseDetails details)
 {
-    if (m_scriptExecutionContext->isDocument()) {
-        Document* document = toDocument(m_scriptExecutionContext);
-        if (Page* page = document->page())
-            page->chrome().client().exceededDatabaseQuota(document->frame(), name, details);
+    if (is<Document>(*m_scriptExecutionContext)) {
+        Document& document = downcast<Document>(*m_scriptExecutionContext);
+        if (Page* page = document.page())
+            page->chrome().client().exceededDatabaseQuota(document.frame(), name, details);
         return;
     }
     ASSERT(m_scriptExecutionContext->isWorkerGlobalScope());
@@ -243,6 +234,14 @@ void DatabaseContext::databaseExceededQuota(const String& name, DatabaseDetails 
     DatabaseManager::manager().setQuota(m_scriptExecutionContext->securityOrigin(), defaultQuota);
 }
 
-} // namespace WebCore
+SecurityOrigin* DatabaseContext::securityOrigin() const
+{
+    return m_scriptExecutionContext->securityOrigin();
+}
 
-#endif // ENABLE(SQL_DATABASE)
+bool DatabaseContext::isContextThread() const
+{
+    return m_scriptExecutionContext->isContextThread();
+}
+
+} // namespace WebCore

@@ -24,18 +24,17 @@
 #include <JavaScriptCore/JSRetainPtr.h>
 #include <WebCore/GUniquePtrGtk.h>
 
-WebViewTest::WebViewTest()
-    : WebViewTest(WEBKIT_WEB_VIEW(webkit_web_view_new())) { }
-
-WebViewTest::WebViewTest(WebKitWebView* webView)
-    : m_webView(WEBKIT_WEB_VIEW(g_object_ref_sink(webView)))
-    , m_mainLoop(g_main_loop_new(0, TRUE))
-    , m_parentWindow(0)
-    , m_javascriptResult(0)
+WebViewTest::WebViewTest(WebKitUserContentManager* userContentManager)
+    : m_webView(WEBKIT_WEB_VIEW(g_object_ref_sink(g_object_new(WEBKIT_TYPE_WEB_VIEW, "web-context", m_webContext.get(), "user-content-manager", userContentManager, nullptr))))
+    , m_mainLoop(g_main_loop_new(nullptr, TRUE))
+    , m_parentWindow(nullptr)
+    , m_javascriptResult(nullptr)
     , m_resourceDataSize(0)
-    , m_surface(0)
+    , m_surface(nullptr)
+    , m_expectedWebProcessCrash(false)
 {
     assertObjectIsDeletedWhenTestFinishes(G_OBJECT(m_webView));
+    g_signal_connect(m_webView, "web-process-crashed", G_CALLBACK(WebViewTest::webProcessCrashed), this);
 }
 
 WebViewTest::~WebViewTest()
@@ -48,6 +47,16 @@ WebViewTest::~WebViewTest()
         cairo_surface_destroy(m_surface);
     g_object_unref(m_webView);
     g_main_loop_unref(m_mainLoop);
+}
+
+gboolean WebViewTest::webProcessCrashed(WebKitWebView*, WebViewTest* test)
+{
+    if (test->m_expectedWebProcessCrash) {
+        test->m_expectedWebProcessCrash = false;
+        return FALSE;
+    }
+    g_assert_not_reached();
+    return TRUE;
 }
 
 void WebViewTest::loadURI(const char* uri)
@@ -235,10 +244,12 @@ void WebViewTest::showInWindow(GtkWindowType windowType)
     gtk_widget_show(m_parentWindow);
 }
 
-void WebViewTest::showInWindowAndWaitUntilMapped(GtkWindowType windowType)
+void WebViewTest::showInWindowAndWaitUntilMapped(GtkWindowType windowType, int width, int height)
 {
     g_assert(!m_parentWindow);
     m_parentWindow = gtk_window_new(windowType);
+    if (width && height)
+        gtk_window_resize(GTK_WINDOW(m_parentWindow), width, height);
     gtk_container_add(GTK_CONTAINER(m_parentWindow), GTK_WIDGET(m_webView));
     gtk_widget_show(GTK_WIDGET(m_webView));
 
@@ -261,6 +272,16 @@ void WebViewTest::resizeView(int width, int height)
 void WebViewTest::selectAll()
 {
     webkit_web_view_execute_editing_command(m_webView, "SelectAll");
+}
+
+bool WebViewTest::isEditable()
+{
+    webkit_web_view_is_editable(m_webView);
+}
+
+void WebViewTest::setEditable(bool editable)
+{
+    webkit_web_view_set_editable(m_webView, editable);
 }
 
 static void resourceGetDataCallback(GObject* object, GAsyncResult* result, gpointer userData)
@@ -489,4 +510,13 @@ cairo_surface_t* WebViewTest::getSnapshotAndWaitUntilReady(WebKitSnapshotRegion 
     webkit_web_view_get_snapshot(m_webView, region, options, 0, reinterpret_cast<GAsyncReadyCallback>(onSnapshotReady), this);
     g_main_loop_run(m_mainLoop);
     return m_surface;
+}
+
+bool WebViewTest::runWebProcessTest(const char* suiteName, const char* testName)
+{
+    GUniquePtr<char> script(g_strdup_printf("WebProcessTestRunner.runTest('%s/%s');", suiteName, testName));
+    GUniqueOutPtr<GError> error;
+    WebKitJavascriptResult* javascriptResult = runJavaScriptAndWaitUntilFinished(script.get(), &error.outPtr());
+    g_assert(!error);
+    return javascriptResultToBoolean(javascriptResult);
 }

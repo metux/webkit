@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012, 2013, 2014 Apple Inc. All rights reserved.
+ * Copyright (C) 2012-2015 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -34,6 +34,7 @@
 #include "DFGPredictionPropagationPhase.h"
 #include "DFGVariableAccessDataDump.h"
 #include "JSCInlines.h"
+#include "TypeLocation.h"
 
 namespace JSC { namespace DFG {
 
@@ -119,7 +120,7 @@ private:
 
         switch (op) {
         case SetLocal: {
-            // This gets handled by fixupSetLocalsInBlock().
+            // This gets handled by fixupGetAndSetLocalsInBlock().
             return;
         }
             
@@ -160,14 +161,14 @@ private:
         case ValueAdd: {
             if (attemptToMakeIntegerAdd(node)) {
                 node->setOp(ArithAdd);
-                node->clearFlags(NodeMustGenerate | NodeClobbersWorld);
+                node->clearFlags(NodeMustGenerate);
                 break;
             }
             if (Node::shouldSpeculateNumberOrBooleanExpectingDefined(node->child1().node(), node->child2().node())) {
                 fixDoubleOrBooleanEdge(node->child1());
                 fixDoubleOrBooleanEdge(node->child2());
                 node->setOp(ArithAdd);
-                node->clearFlags(NodeMustGenerate | NodeClobbersWorld);
+                node->clearFlags(NodeMustGenerate);
                 node->setResult(NodeResultDouble);
                 break;
             }
@@ -270,7 +271,7 @@ private:
         case ArithMod: {
             if (Node::shouldSpeculateInt32OrBooleanForArithmetic(node->child1().node(), node->child2().node())
                 && node->canSpeculateInt32(FixupPass)) {
-                if (optimizeForX86() || optimizeForARM64() || optimizeForARMv7s()) {
+                if (optimizeForX86() || optimizeForARM64() || optimizeForARMv7IDIVSupported()) {
                     fixIntOrBooleanEdge(node->child1());
                     fixIntOrBooleanEdge(node->child2());
                     if (bytecodeCanTruncateInteger(node->arithNodeFlags()))
@@ -336,6 +337,19 @@ private:
             node->setResult(NodeResultDouble);
             break;
         }
+
+        case ArithPow: {
+            node->setResult(NodeResultDouble);
+            if (node->child2()->shouldSpeculateInt32OrBooleanForArithmetic()) {
+                fixDoubleOrBooleanEdge(node->child1());
+                fixIntOrBooleanEdge(node->child2());
+                break;
+            }
+
+            fixDoubleOrBooleanEdge(node->child1());
+            fixDoubleOrBooleanEdge(node->child2());
+            break;
+        }
             
         case ArithSqrt:
         case ArithFRound:
@@ -381,26 +395,26 @@ private:
                 && Node::shouldSpeculateBoolean(node->child1().node(), node->child2().node())) {
                 fixEdge<BooleanUse>(node->child1());
                 fixEdge<BooleanUse>(node->child2());
-                node->clearFlags(NodeMustGenerate | NodeClobbersWorld);
+                node->clearFlags(NodeMustGenerate);
                 break;
             }
             if (Node::shouldSpeculateInt32OrBoolean(node->child1().node(), node->child2().node())) {
                 fixIntOrBooleanEdge(node->child1());
                 fixIntOrBooleanEdge(node->child2());
-                node->clearFlags(NodeMustGenerate | NodeClobbersWorld);
+                node->clearFlags(NodeMustGenerate);
                 break;
             }
             if (enableInt52()
                 && Node::shouldSpeculateMachineInt(node->child1().node(), node->child2().node())) {
                 fixEdge<Int52RepUse>(node->child1());
                 fixEdge<Int52RepUse>(node->child2());
-                node->clearFlags(NodeMustGenerate | NodeClobbersWorld);
+                node->clearFlags(NodeMustGenerate);
                 break;
             }
             if (Node::shouldSpeculateNumberOrBoolean(node->child1().node(), node->child2().node())) {
                 fixDoubleOrBooleanEdge(node->child1());
                 fixDoubleOrBooleanEdge(node->child2());
-                node->clearFlags(NodeMustGenerate | NodeClobbersWorld);
+                node->clearFlags(NodeMustGenerate);
                 break;
             }
             if (node->op() != CompareEq)
@@ -408,31 +422,31 @@ private:
             if (node->child1()->shouldSpeculateStringIdent() && node->child2()->shouldSpeculateStringIdent()) {
                 fixEdge<StringIdentUse>(node->child1());
                 fixEdge<StringIdentUse>(node->child2());
-                node->clearFlags(NodeMustGenerate | NodeClobbersWorld);
+                node->clearFlags(NodeMustGenerate);
                 break;
             }
             if (node->child1()->shouldSpeculateString() && node->child2()->shouldSpeculateString() && GPRInfo::numberOfRegisters >= 7) {
                 fixEdge<StringUse>(node->child1());
                 fixEdge<StringUse>(node->child2());
-                node->clearFlags(NodeMustGenerate | NodeClobbersWorld);
+                node->clearFlags(NodeMustGenerate);
                 break;
             }
             if (node->child1()->shouldSpeculateObject() && node->child2()->shouldSpeculateObject()) {
                 fixEdge<ObjectUse>(node->child1());
                 fixEdge<ObjectUse>(node->child2());
-                node->clearFlags(NodeMustGenerate | NodeClobbersWorld);
+                node->clearFlags(NodeMustGenerate);
                 break;
             }
             if (node->child1()->shouldSpeculateObject() && node->child2()->shouldSpeculateObjectOrOther()) {
                 fixEdge<ObjectUse>(node->child1());
                 fixEdge<ObjectOrOtherUse>(node->child2());
-                node->clearFlags(NodeMustGenerate | NodeClobbersWorld);
+                node->clearFlags(NodeMustGenerate);
                 break;
             }
             if (node->child1()->shouldSpeculateObjectOrOther() && node->child2()->shouldSpeculateObject()) {
                 fixEdge<ObjectOrOtherUse>(node->child1());
                 fixEdge<ObjectUse>(node->child2());
-                node->clearFlags(NodeMustGenerate | NodeClobbersWorld);
+                node->clearFlags(NodeMustGenerate);
                 break;
             }
             break;
@@ -465,7 +479,7 @@ private:
                 fixEdge<StringIdentUse>(node->child2());
                 break;
             }
-            if (node->child1()->shouldSpeculateString() && node->child2()->shouldSpeculateString() && (GPRInfo::numberOfRegisters >= 7 || isFTL(m_graph.m_plan.mode))) {
+            if (node->child1()->shouldSpeculateString() && node->child2()->shouldSpeculateString() && ((GPRInfo::numberOfRegisters >= 7) || isFTL(m_graph.m_plan.mode))) {
                 fixEdge<StringUse>(node->child1());
                 fixEdge<StringUse>(node->child2());
                 break;
@@ -495,11 +509,11 @@ private:
                 fixEdge<NotStringVarUse>(node->child1());
                 break;
             }
-            if (node->child1()->shouldSpeculateString() && (GPRInfo::numberOfRegisters >= 8 || isFTL(m_graph.m_plan.mode))) {
+            if (node->child1()->shouldSpeculateString() && ((GPRInfo::numberOfRegisters >= 8) || isFTL(m_graph.m_plan.mode))) {
                 fixEdge<StringUse>(node->child1());
                 break;
             }
-            if (node->child2()->shouldSpeculateString() && (GPRInfo::numberOfRegisters >= 8 || isFTL(m_graph.m_plan.mode))) {
+            if (node->child2()->shouldSpeculateString() && ((GPRInfo::numberOfRegisters >= 8) || isFTL(m_graph.m_plan.mode))) {
                 fixEdge<StringUse>(node->child2());
                 break;
             }
@@ -828,7 +842,7 @@ private:
         case NewTypedArray: {
             if (node->child1()->shouldSpeculateInt32()) {
                 fixEdge<Int32Use>(node->child1());
-                node->clearFlags(NodeMustGenerate | NodeClobbersWorld);
+                node->clearFlags(NodeMustGenerate);
                 break;
             }
             break;
@@ -1019,7 +1033,6 @@ private:
         case GetArrayLength:
         case Phi:
         case Upsilon:
-        case GetArgument:
         case GetIndexedPropertyStorage:
         case GetTypedArrayByteOffset:
         case LastNodeType:
@@ -1040,6 +1053,13 @@ private:
         case Int52Constant:
         case Identity: // This should have been cleaned up.
         case BooleanToNumber:
+        case PhantomNewObject:
+        case PutByOffsetHint:
+        case CheckStructureImmediate:
+        case PutStructureHint:
+        case MaterializeNewObject:
+        case PutLocal:
+        case KillLocal:
             // These are just nodes that we don't currently expect to see during fixup.
             // If we ever wanted to insert them prior to fixup, then we just have to create
             // fixup rules for them.
@@ -1055,14 +1075,6 @@ private:
             Node* barrierNode = m_graph.addNode(
                 SpecNone, StoreBarrier, m_currentNode->origin, 
                 Edge(globalObjectNode, KnownCellUse));
-            m_insertionSet.insert(m_indexInBlock, barrierNode);
-            break;
-        }
-
-        case TearOffActivation: {
-            Node* barrierNode = m_graph.addNode(
-                SpecNone, StoreBarrierWithNullCheck, m_currentNode->origin, 
-                Edge(node->child1().node(), UntypedUse));
             m_insertionSet.insert(m_indexInBlock, barrierNode);
             break;
         }
@@ -1134,6 +1146,56 @@ private:
             fixEdge<KnownInt32Use>(node->child1());
             break;
         }
+        case ProfileType: {
+            // We want to insert type checks based on the instructionTypeSet of the TypeLocation, not the globalTypeSet.
+            // Because the instructionTypeSet is contained in globalTypeSet, if we produce a type check for
+            // type T for the instructionTypeSet, the global type set must also have information for type T.
+            // So if it the type check succeeds for type T in the instructionTypeSet, a type check for type T 
+            // in the globalTypeSet would've also succeeded.
+            // (The other direction does not hold in general).
+
+            RefPtr<TypeSet> typeSet = node->typeLocation()->m_instructionTypeSet;
+            uint8_t seenTypes = typeSet->seenTypes();
+            if (typeSet->doesTypeConformTo(TypeMachineInt)) {
+                node->convertToCheck();
+                if (node->child1()->shouldSpeculateInt32())
+                    fixEdge<Int32Use>(node->child1());
+                else
+                    fixEdge<MachineIntUse>(node->child1());
+            } else if (typeSet->doesTypeConformTo(TypeNumber | TypeMachineInt)) {
+                node->convertToCheck();
+                fixEdge<NumberUse>(node->child1());
+            } else if (typeSet->doesTypeConformTo(TypeString)) {
+                node->convertToCheck();
+                fixEdge<StringUse>(node->child1());
+            } else if (typeSet->doesTypeConformTo(TypeBoolean)) {
+                node->convertToCheck();
+                fixEdge<BooleanUse>(node->child1());
+            } else if (typeSet->doesTypeConformTo(TypeUndefined | TypeNull) && (seenTypes & TypeUndefined) && (seenTypes & TypeNull)) {
+                node->convertToCheck();
+                fixEdge<OtherUse>(node->child1());
+            } else if (typeSet->doesTypeConformTo(TypeObject)) {
+                StructureSet set = typeSet->structureSet();
+                if (!set.isEmpty()) {
+                    node->convertToCheckStructure(m_graph.addStructureSet(set));
+                    fixEdge<CellUse>(node->child1());
+                }
+            }
+
+            break;
+        }
+
+        case CreateActivation:
+        case NewFunction: {
+            fixEdge<CellUse>(node->child2());
+            break;
+        }
+
+        case NewFunctionNoCheck:
+        case NewFunctionExpression: {
+            fixEdge<CellUse>(node->child1());
+            break;
+        }
             
 #if !ASSERT_DISABLED
         // Have these no-op cases here to ensure that nobody forgets to add handlers for new opcodes.
@@ -1144,7 +1206,6 @@ private:
         case Flush:
         case PhantomLocal:
         case GetLocalUnlinked:
-        case GetMyScope:
         case GetClosureVar:
         case GetGlobalVar:
         case NotifyWrite:
@@ -1153,8 +1214,7 @@ private:
         case AllocationProfileWatchpoint:
         case Call:
         case Construct:
-        case ProfiledCall:
-        case ProfiledConstruct:
+        case ProfileControlFlow:
         case NativeCall:
         case NativeConstruct:
         case NewObject:
@@ -1168,16 +1228,12 @@ private:
         case IsNumber:
         case IsObject:
         case IsFunction:
-        case CreateActivation:
         case CreateArguments:
         case PhantomArguments:
         case TearOffArguments:
         case GetMyArgumentsLength:
         case GetMyArgumentsLengthSafe:
         case CheckArgumentsNotCreated:
-        case NewFunction:
-        case NewFunctionNoCheck:
-        case NewFunctionExpression:
         case Jump:
         case Return:
         case Throw:
@@ -1395,11 +1451,11 @@ private:
     }
     
     bool isStringPrototypeMethodSane(
-        JSObject* stringPrototype, Structure* stringPrototypeStructure, StringImpl* uid)
+        JSObject* stringPrototype, Structure* stringPrototypeStructure, AtomicStringImpl* uid)
     {
         unsigned attributesUnused;
         PropertyOffset offset =
-            stringPrototypeStructure->getConcurrently(vm(), uid, attributesUnused);
+            stringPrototypeStructure->getConcurrently(uid, attributesUnused);
         if (!isValidOffset(offset))
             return false;
         
@@ -1903,7 +1959,7 @@ private:
         // We can use a BitLShift here because typed arrays will never have a byteLength
         // that overflows int32.
         node->setOp(BitLShift);
-        node->clearFlags(NodeMustGenerate | NodeClobbersWorld);
+        node->clearFlags(NodeMustGenerate);
         observeUseKindOnNode(length, Int32Use);
         observeUseKindOnNode(shiftAmount, Int32Use);
         node->child1() = Edge(length, Int32Use);
@@ -1914,7 +1970,7 @@ private:
     void convertToGetArrayLength(Node* node, ArrayMode arrayMode)
     {
         node->setOp(GetArrayLength);
-        node->clearFlags(NodeMustGenerate | NodeClobbersWorld);
+        node->clearFlags(NodeMustGenerate);
         fixEdge<KnownCellUse>(node->child1());
         node->setArrayMode(arrayMode);
             
@@ -1947,7 +2003,7 @@ private:
             0, neverNeedsStorage);
         
         node->setOp(GetTypedArrayByteOffset);
-        node->clearFlags(NodeMustGenerate | NodeClobbersWorld);
+        node->clearFlags(NodeMustGenerate);
         fixEdge<KnownCellUse>(node->child1());
         return true;
     }

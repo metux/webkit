@@ -111,7 +111,7 @@ FrameSelection::FrameSelection(Frame* frame)
     : m_frame(frame)
     , m_xPosForVerticalArrowNavigation(NoXPosForVerticalArrowNavigation())
     , m_granularity(CharacterGranularity)
-    , m_caretBlinkTimer(this, &FrameSelection::caretBlinkTimerFired)
+    , m_caretBlinkTimer(*this, &FrameSelection::caretBlinkTimerFired)
     , m_absCaretBoundsDirty(true)
     , m_caretPaint(true)
     , m_isCaretBlinkingSuspended(false)
@@ -390,53 +390,46 @@ void FrameSelection::updateDataDetectorsForSelection()
 #endif
 }
 
-static bool removingNodeRemovesPosition(Node* node, const Position& position)
+static bool removingNodeRemovesPosition(Node& node, const Position& position)
 {
     if (!position.anchorNode())
         return false;
 
-    if (position.anchorNode() == node)
+    if (position.anchorNode() == &node)
         return true;
 
-    if (!node->isElementNode())
+    if (!is<Element>(node))
         return false;
 
-    Element* element = toElement(node);
-    return element->containsIncludingShadowDOM(position.anchorNode());
+    return downcast<Element>(node).containsIncludingShadowDOM(position.anchorNode());
 }
 
-static void clearRenderViewSelection(Node& node)
+void DragCaretController::nodeWillBeRemoved(Node& node)
 {
-    Ref<Document> document(node.document());
-    document->updateStyleIfNeeded();
-    if (RenderView* view = document->renderView())
-        view->clearSelection();
-}
-
-void DragCaretController::nodeWillBeRemoved(Node* node)
-{
-    if (!hasCaret() || (node && !node->inDocument()))
+    if (!hasCaret() || !node.inDocument())
         return;
 
     if (!removingNodeRemovesPosition(node, m_position.deepEquivalent()))
         return;
 
-    clearRenderViewSelection(*node);
+    if (RenderView* view = node.document().renderView())
+        view->clearSelection();
+
     clear();
 }
 
-void FrameSelection::nodeWillBeRemoved(Node* node)
+void FrameSelection::nodeWillBeRemoved(Node& node)
 {
     // There can't be a selection inside a fragment, so if a fragment's node is being removed,
     // the selection in the document that created the fragment needs no adjustment.
-    if (isNone() || (node && !node->inDocument()))
+    if (isNone() || !node.inDocument())
         return;
 
     respondToNodeModification(node, removingNodeRemovesPosition(node, m_selection.base()), removingNodeRemovesPosition(node, m_selection.extent()),
         removingNodeRemovesPosition(node, m_selection.start()), removingNodeRemovesPosition(node, m_selection.end()));
 }
 
-void FrameSelection::respondToNodeModification(Node* node, bool baseRemoved, bool extentRemoved, bool startRemoved, bool endRemoved)
+void FrameSelection::respondToNodeModification(Node& node, bool baseRemoved, bool extentRemoved, bool startRemoved, bool endRemoved)
 {
     bool clearRenderTreeSelection = false;
     bool clearDOMTreeSelection = false;
@@ -469,7 +462,7 @@ void FrameSelection::respondToNodeModification(Node* node, bool baseRemoved, boo
             m_selection.setWithoutValidation(m_selection.end(), m_selection.start());
     } else if (RefPtr<Range> range = m_selection.firstRange()) {
         ExceptionCode ec = 0;
-        Range::CompareResults compareResult = range->compareNode(node, ec);
+        Range::CompareResults compareResult = range->compareNode(&node, ec);
         if (!ec && (compareResult == Range::NODE_BEFORE_AND_AFTER || compareResult == Range::NODE_INSIDE)) {
             // If we did nothing here, when this node's renderer was destroyed, the rect that it 
             // occupied would be invalidated, but, selection gaps that change as a result of 
@@ -480,10 +473,10 @@ void FrameSelection::respondToNodeModification(Node* node, bool baseRemoved, boo
     }
 
     if (clearRenderTreeSelection) {
-        clearRenderViewSelection(*node);
+        if (auto* renderView = node.document().renderView()) {
+            renderView->clearSelection();
 
-        // Trigger a selection update so the selection will be set again.
-        if (auto* renderView = node->document().renderView()) {
+            // Trigger a selection update so the selection will be set again.
             m_pendingSelectionUpdate = true;
             renderView->setNeedsLayout();
         }
@@ -770,8 +763,6 @@ VisiblePosition FrameSelection::modifyMovingRight(TextGranularity granularity)
             pos = VisiblePosition(m_selection.extent(), m_selection.affinity()).right(true);
         break;
     case WordGranularity: {
-        // Visual word movement relies on isWordTextBreak which is not implemented in WinCE and QT.
-        // https://bugs.webkit.org/show_bug.cgi?id=81136.
         bool skipsSpaceWhenMovingRight = m_frame && m_frame->editor().behavior().shouldSkipSpaceWhenMovingRight();
         pos = rightWordPosition(VisiblePosition(m_selection.extent(), m_selection.affinity()), skipsSpaceWhenMovingRight);
         break;
@@ -1336,17 +1327,17 @@ bool CaretBase::updateCaretRect(Document* document, const VisiblePosition& caret
 {
     document->updateLayoutIgnorePendingStylesheets();
     m_caretRectNeedsUpdate = false;
-    RenderObject* renderer;
+    RenderBlock* renderer;
     m_caretLocalRect = localCaretRectInRendererForCaretPainting(caretPosition, renderer);
     return !m_caretLocalRect.isEmpty();
 }
 
-RenderObject* FrameSelection::caretRendererWithoutUpdatingLayout() const
+RenderBlock* FrameSelection::caretRendererWithoutUpdatingLayout() const
 {
     return rendererForCaretPainting(m_selection.start().deprecatedNode());
 }
 
-RenderObject* DragCaretController::caretRenderer() const
+RenderBlock* DragCaretController::caretRenderer() const
 {
     return rendererForCaretPainting(m_position.deepEquivalent().deprecatedNode());
 }
@@ -1367,11 +1358,8 @@ IntRect FrameSelection::absoluteCaretBounds()
 
 static void repaintCaretForLocalRect(Node* node, const LayoutRect& rect)
 {
-    RenderObject* caretPainter = rendererForCaretPainting(node);
-    if (!caretPainter)
-        return;
-
-    caretPainter->repaintRectangle(rect);
+    if (auto* caretPainter = rendererForCaretPainting(node))
+        caretPainter->repaintRectangle(rect);
 }
 
 bool FrameSelection::recomputeCaretRect()
@@ -1476,6 +1464,13 @@ void FrameSelection::paintCaret(GraphicsContext* context, const LayoutPoint& pai
         CaretBase::paintCaret(m_selection.start().deprecatedNode(), context, paintOffset, clipRect);
 }
 
+#if ENABLE(TEXT_CARET)
+static inline bool disappearsIntoBackground(Color foreground, Color background)
+{
+    return background.blend(foreground) == background;
+}
+#endif
+
 void CaretBase::paintCaret(Node* node, GraphicsContext* context, const LayoutPoint& paintOffset, const LayoutRect& clipRect) const
 {
 #if ENABLE(TEXT_CARET)
@@ -1483,9 +1478,8 @@ void CaretBase::paintCaret(Node* node, GraphicsContext* context, const LayoutPoi
         return;
 
     LayoutRect drawingRect = localCaretRectWithoutUpdate();
-    RenderObject* renderer = rendererForCaretPainting(node);
-    if (renderer && renderer->isBox())
-        toRenderBox(renderer)->flipForWritingMode(drawingRect);
+    if (auto* renderer = rendererForCaretPainting(node))
+        renderer->flipForWritingMode(drawingRect);
     drawingRect.moveBy(roundedIntPoint(paintOffset));
     LayoutRect caret = intersection(drawingRect, clipRect);
     if (caret.isEmpty())
@@ -1493,7 +1487,7 @@ void CaretBase::paintCaret(Node* node, GraphicsContext* context, const LayoutPoi
 
     Color caretColor = Color::black;
     ColorSpace colorSpace = ColorSpaceDeviceRGB;
-    Element* element = node->isElementNode() ? toElement(node) : node->parentElement();
+    Element* element = is<Element>(*node) ? downcast<Element>(node) : node->parentElement();
     Element* rootEditableElement = node->rootEditableElement();
 
     if (element && element->renderer()) {
@@ -1501,9 +1495,11 @@ void CaretBase::paintCaret(Node* node, GraphicsContext* context, const LayoutPoi
         if (rootEditableElement && rootEditableElement->renderer()) {
             const auto& rootEditableStyle = rootEditableElement->renderer()->style();
             const auto& elementStyle = element->renderer()->style();
-            if (rootEditableStyle.visitedDependentColor(CSSPropertyBackgroundColor) == elementStyle.visitedDependentColor(CSSPropertyBackgroundColor)) {
-                caretColor = rootEditableElement->renderer()->style().visitedDependentColor(CSSPropertyColor);
-                colorSpace = rootEditableElement->renderer()->style().colorSpace();
+            auto rootEditableBGColor = rootEditableStyle.visitedDependentColor(CSSPropertyBackgroundColor);
+            auto elementBGColor = elementStyle.visitedDependentColor(CSSPropertyBackgroundColor);
+            if (disappearsIntoBackground(elementBGColor, rootEditableBGColor)) {
+                caretColor = rootEditableStyle.visitedDependentColor(CSSPropertyColor);
+                colorSpace = rootEditableStyle.colorSpace();
                 setToRootEditableElement = true;
             }
         }
@@ -1522,30 +1518,30 @@ void CaretBase::paintCaret(Node* node, GraphicsContext* context, const LayoutPoi
 #endif
 }
 
-void FrameSelection::debugRenderer(RenderObject* r, bool selected) const
+void FrameSelection::debugRenderer(RenderObject* renderer, bool selected) const
 {
-    if (r->node()->isElementNode()) {
-        Element* element = toElement(r->node());
-        fprintf(stderr, "%s%s\n", selected ? "==> " : "    ", element->localName().string().utf8().data());
-    } else if (r->isText()) {
-        RenderText* textRenderer = toRenderText(r);
-        if (!textRenderer->textLength() || !textRenderer->firstTextBox()) {
+    if (is<Element>(*renderer->node())) {
+        Element& element = downcast<Element>(*renderer->node());
+        fprintf(stderr, "%s%s\n", selected ? "==> " : "    ", element.localName().string().utf8().data());
+    } else if (is<RenderText>(*renderer)) {
+        RenderText& textRenderer = downcast<RenderText>(*renderer);
+        if (!textRenderer.textLength() || !textRenderer.firstTextBox()) {
             fprintf(stderr, "%s#text (empty)\n", selected ? "==> " : "    ");
             return;
         }
         
         static const int max = 36;
-        String text = textRenderer->text();
+        String text = textRenderer.text();
         int textLength = text.length();
         if (selected) {
             int offset = 0;
-            if (r->node() == m_selection.start().containerNode())
+            if (renderer->node() == m_selection.start().containerNode())
                 offset = m_selection.start().computeOffsetInContainerNode();
-            else if (r->node() == m_selection.end().containerNode())
+            else if (renderer->node() == m_selection.end().containerNode())
                 offset = m_selection.end().computeOffsetInContainerNode();
 
             int pos;
-            InlineTextBox* box = textRenderer->findNextInlineTextBox(offset, pos);
+            InlineTextBox* box = textRenderer.findNextInlineTextBox(offset, pos);
             text = text.substring(box->start(), box->len());
             
             String show;
@@ -1670,16 +1666,16 @@ void FrameSelection::selectAll()
     Document* document = m_frame->document();
 
     Element* focusedElement = document->focusedElement();
-    if (focusedElement && focusedElement->hasTagName(selectTag)) {
-        HTMLSelectElement* selectElement = toHTMLSelectElement(document->focusedElement());
-        if (selectElement->canSelectAll()) {
-            selectElement->selectAll();
+    if (is<HTMLSelectElement>(focusedElement)) {
+        HTMLSelectElement& selectElement = downcast<HTMLSelectElement>(*focusedElement);
+        if (selectElement.canSelectAll()) {
+            selectElement.selectAll();
             return;
         }
     }
 
-    RefPtr<Node> root = 0;
-    Node* selectStartTarget = 0;
+    RefPtr<Node> root;
+    Node* selectStartTarget = nullptr;
     if (m_selection.isContentEditable()) {
         root = highestEditableRoot(m_selection.start());
         if (Node* shadowRoot = m_selection.nonBoundaryShadowTreeRootNode())
@@ -1688,8 +1684,8 @@ void FrameSelection::selectAll()
             selectStartTarget = root.get();
     } else {
         if (m_selection.isNone() && focusedElement) {
-            if (focusedElement->isTextFormControl()) {
-                toHTMLTextFormControlElement(focusedElement)->select();
+            if (is<HTMLTextFormControlElement>(*focusedElement)) {
+                downcast<HTMLTextFormControlElement>(*focusedElement).select();
                 return;
             }
             root = focusedElement->nonBoundaryShadowTreeRootNode();
@@ -1700,7 +1696,7 @@ void FrameSelection::selectAll()
             selectStartTarget = root->shadowHost();
         else {
             root = document->documentElement();
-            selectStartTarget = document->body();
+            selectStartTarget = document->bodyOrFrameset();
         }
     }
     if (!root)
@@ -1894,7 +1890,7 @@ void FrameSelection::setCaretVisibility(CaretVisibility visibility)
     updateAppearance();
 }
 
-void FrameSelection::caretBlinkTimerFired(Timer<FrameSelection>&)
+void FrameSelection::caretBlinkTimerFired()
 {
 #if ENABLE(TEXT_CARET)
     ASSERT(caretIsVisible());
@@ -1914,9 +1910,9 @@ static bool isFrameElement(const Node* n)
     if (!n)
         return false;
     RenderObject* renderer = n->renderer();
-    if (!renderer || !renderer->isWidget())
+    if (!is<RenderWidget>(renderer))
         return false;
-    Widget* widget = toRenderWidget(renderer)->widget();
+    Widget* widget = downcast<RenderWidget>(*renderer).widget();
     return widget && widget->isFrameView();
 }
 
@@ -2024,12 +2020,12 @@ static HTMLFormElement* scanForForm(Element* start)
     auto descendants = descendantsOfType<HTMLElement>(start->document());
     for (auto it = descendants.from(*start), end = descendants.end(); it != end; ++it) {
         HTMLElement& element = *it;
-        if (isHTMLFormElement(&element))
-            return toHTMLFormElement(&element);
-        if (isHTMLFormControlElement(element))
-            return toHTMLFormControlElement(element).form();
-        if (isHTMLFrameElementBase(element)) {
-            Document* contentDocument = toHTMLFrameElementBase(element).contentDocument();
+        if (is<HTMLFormElement>(element))
+            return &downcast<HTMLFormElement>(element);
+        if (is<HTMLFormControlElement>(element))
+            return downcast<HTMLFormControlElement>(element).form();
+        if (is<HTMLFrameElementBase>(element)) {
+            Document* contentDocument = downcast<HTMLFrameElementBase>(element).contentDocument();
             if (!contentDocument)
                 continue;
             if (HTMLFormElement* frameResult = scanForForm(contentDocument->documentElement()))
@@ -2112,10 +2108,7 @@ void FrameSelection::setSelectionFromNone()
         return;
 #endif
 
-    auto* documentElement = document->documentElement();
-    if (!documentElement)
-        return;
-    if (auto body = childrenOfType<HTMLBodyElement>(*documentElement).first())
+    if (auto* body = document->body())
         setSelection(VisibleSelection(firstPositionInOrBeforeNode(body), DOWNSTREAM));
 }
 

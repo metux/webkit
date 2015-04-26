@@ -92,6 +92,7 @@
 #include "Storage.h"
 #include "StorageArea.h"
 #include "StorageNamespace.h"
+#include "StorageNamespaceProvider.h"
 #include "StyleMedia.h"
 #include "StyleResolver.h"
 #include "SuddenTermination.h"
@@ -254,8 +255,8 @@ bool DOMWindow::dispatchAllPendingBeforeUnloadEvents()
     for (auto it = set.begin(), end = set.end(); it != end; ++it)
         windows.uncheckedAppend(*it->key);
 
-    for (unsigned i = 0; i < windows.size(); ++i) {
-        DOMWindow& window = windows[i].get();
+    for (Ref<DOMWindow>& windowRef : windows) {
+        DOMWindow& window = windowRef;
         if (!set.contains(&window))
             continue;
 
@@ -291,11 +292,11 @@ void DOMWindow::dispatchAllPendingUnloadEvents()
 
     Vector<Ref<DOMWindow>> windows;
     windows.reserveInitialCapacity(set.size());
-    for (auto it = set.begin(), end = set.end(); it != end; ++it)
-        windows.uncheckedAppend(*it->key);
+    for (auto& keyValue : set)
+        windows.uncheckedAppend(*keyValue.key);
 
-    for (unsigned i = 0; i < windows.size(); ++i) {
-        DOMWindow& window = windows[i].get();
+    for (Ref<DOMWindow>& windowRef : windows) {
+        DOMWindow& window = windowRef;
         if (!set.contains(&window))
             continue;
 
@@ -452,7 +453,7 @@ DOMWindow::~DOMWindow()
 
 #if ENABLE(GAMEPAD)
     if (m_gamepadEventListenerCount)
-        GamepadManager::shared().unregisterDOMWindow(this);
+        GamepadManager::singleton().unregisterDOMWindow(this);
 #endif
 }
 
@@ -518,7 +519,7 @@ void DOMWindow::willDetachDocumentFromFrame()
 void DOMWindow::incrementGamepadEventListenerCount()
 {
     if (++m_gamepadEventListenerCount == 1)
-        GamepadManager::shared().registerDOMWindow(this);
+        GamepadManager::singleton().registerDOMWindow(this);
 }
 
 void DOMWindow::decrementGamepadEventListenerCount()
@@ -526,7 +527,7 @@ void DOMWindow::decrementGamepadEventListenerCount()
     ASSERT(m_gamepadEventListenerCount);
 
     if (!--m_gamepadEventListenerCount)
-        GamepadManager::shared().unregisterDOMWindow(this);
+        GamepadManager::singleton().unregisterDOMWindow(this);
 }
 #endif
 
@@ -855,11 +856,7 @@ Storage* DOMWindow::localStorage(ExceptionCode& ec) const
     if (!page->settings().localStorageEnabled())
         return nullptr;
 
-    RefPtr<StorageArea> storageArea;
-    if (!document->securityOrigin()->canAccessLocalStorage(document->topOrigin()))
-        storageArea = page->group().transientLocalStorage(document->topOrigin())->storageArea(document->securityOrigin());
-    else
-        storageArea = page->group().localStorage()->storageArea(document->securityOrigin());
+    RefPtr<StorageArea> storageArea = page->storageNamespaceProvider().localStorageArea(*document);
 
     if (!storageArea->canAccessStorage(m_frame)) {
         ec = SECURITY_ERR;
@@ -973,8 +970,8 @@ void DOMWindow::focus(ScriptExecutionContext* context)
     bool allowFocus = WindowFocusAllowedIndicator::windowFocusAllowed() || !m_frame->settings().windowFocusRestricted();
     if (context) {
         ASSERT(isMainThread());
-        Document* activeDocument = toDocument(context);
-        if (opener() && opener() != this && activeDocument->domWindow() == opener())
+        Document& activeDocument = downcast<Document>(*context);
+        if (opener() && opener() != this && activeDocument.domWindow() == opener())
             allowFocus = true;
     }
 
@@ -1025,11 +1022,7 @@ void DOMWindow::close(ScriptExecutionContext* context)
 
     if (context) {
         ASSERT(isMainThread());
-        Document* activeDocument = toDocument(context);
-        if (!activeDocument)
-            return;
-
-        if (!activeDocument->canNavigate(m_frame))
+        if (!downcast<Document>(*context).canNavigate(m_frame))
             return;
     }
 
@@ -1413,24 +1406,24 @@ DOMWindow* DOMWindow::top() const
 Document* DOMWindow::document() const
 {
     ScriptExecutionContext* context = ContextDestructionObserver::scriptExecutionContext();
-    return toDocument(context);
+    return downcast<Document>(context);
 }
 
 PassRefPtr<StyleMedia> DOMWindow::styleMedia() const
 {
     if (!isCurrentlyDisplayedInFrame())
-        return 0;
+        return nullptr;
     if (!m_media)
         m_media = StyleMedia::create(m_frame);
     return m_media.get();
 }
 
-PassRefPtr<CSSStyleDeclaration> DOMWindow::getComputedStyle(Element* elt, const String& pseudoElt) const
+PassRefPtr<CSSStyleDeclaration> DOMWindow::getComputedStyle(Element* element, const String& pseudoElt) const
 {
-    if (!elt)
-        return 0;
+    if (!element)
+        return nullptr;
 
-    return CSSComputedStyleDeclaration::create(elt, false, pseudoElt);
+    return CSSComputedStyleDeclaration::create(element, false, pseudoElt);
 }
 
 PassRefPtr<CSSRuleList> DOMWindow::getMatchedCSSRules(Element* element, const String& pseudoElement, bool authorOnly) const
@@ -1610,7 +1603,7 @@ int DOMWindow::setTimeout(std::unique_ptr<ScheduledAction> action, int timeout, 
         ec = INVALID_ACCESS_ERR;
         return -1;
     }
-    return DOMTimer::install(context, WTF::move(action), timeout, true);
+    return DOMTimer::install(*context, WTF::move(action), timeout, true);
 }
 
 void DOMWindow::clearTimeout(int timeoutId)
@@ -1634,7 +1627,7 @@ void DOMWindow::clearTimeout(int timeoutId)
     ScriptExecutionContext* context = scriptExecutionContext();
     if (!context)
         return;
-    DOMTimer::removeById(context, timeoutId);
+    DOMTimer::removeById(*context, timeoutId);
 }
 
 int DOMWindow::setInterval(std::unique_ptr<ScheduledAction> action, int timeout, ExceptionCode& ec)
@@ -1644,7 +1637,7 @@ int DOMWindow::setInterval(std::unique_ptr<ScheduledAction> action, int timeout,
         ec = INVALID_ACCESS_ERR;
         return -1;
     }
-    return DOMTimer::install(context, WTF::move(action), timeout, false);
+    return DOMTimer::install(*context, WTF::move(action), timeout, false);
 }
 
 void DOMWindow::clearInterval(int timeoutId)
@@ -1652,7 +1645,7 @@ void DOMWindow::clearInterval(int timeoutId)
     ScriptExecutionContext* context = scriptExecutionContext();
     if (!context)
         return;
-    DOMTimer::removeById(context, timeoutId);
+    DOMTimer::removeById(*context, timeoutId);
 }
 
 #if ENABLE(REQUEST_ANIMATION_FRAME)
@@ -1679,14 +1672,12 @@ void DOMWindow::cancelAnimationFrame(int id)
 }
 #endif
 
-#if ENABLE(CSS3_CONDITIONAL_RULES)
 DOMWindowCSS* DOMWindow::css()
 {
     if (!m_css)
         m_css = DOMWindowCSS::create();
     return m_css.get();
 }
-#endif
 
 static void didAddStorageEventListener(DOMWindow* window)
 {
@@ -1855,21 +1846,21 @@ bool DOMWindow::removeEventListener(const AtomicString& eventType, EventListener
 void DOMWindow::dispatchLoadEvent()
 {
     RefPtr<Event> loadEvent(Event::create(eventNames().loadEvent, false, false));
-    if (m_frame && m_frame->loader().documentLoader() && !m_frame->loader().documentLoader()->timing()->loadEventStart()) {
+    if (m_frame && m_frame->loader().documentLoader() && !m_frame->loader().documentLoader()->timing().loadEventStart()) {
         // The DocumentLoader (and thus its DocumentLoadTiming) might get destroyed while dispatching
         // the event, so protect it to prevent writing the end time into freed memory.
         RefPtr<DocumentLoader> documentLoader = m_frame->loader().documentLoader();
-        DocumentLoadTiming* timing = documentLoader->timing();
-        timing->markLoadEventStart();
+        DocumentLoadTiming& timing = documentLoader->timing();
+        timing.markLoadEventStart();
         dispatchEvent(loadEvent, document());
-        timing->markLoadEventEnd();
+        timing.markLoadEventEnd();
     } else
         dispatchEvent(loadEvent, document());
 
     // For load events, send a separate load event to the enclosing frame only.
     // This is a DOM extension and is independent of bubbling/capturing rules of
     // the DOM.
-    Element* ownerElement = m_frame ? m_frame->ownerElement() : 0;
+    Element* ownerElement = m_frame ? m_frame->ownerElement() : nullptr;
     if (ownerElement)
         ownerElement->dispatchEvent(Event::create(eventNames().loadEvent, false, false));
 
@@ -1901,7 +1892,7 @@ bool DOMWindow::dispatchEvent(PassRefPtr<Event> prpEvent, PassRefPtr<EventTarget
     event->setCurrentTarget(this);
     event->setEventPhase(Event::AT_TARGET);
 
-    InspectorInstrumentationCookie cookie = InspectorInstrumentation::willDispatchEventOnWindow(frame(), *event, this);
+    InspectorInstrumentationCookie cookie = InspectorInstrumentation::willDispatchEventOnWindow(frame(), *event, *this);
 
     bool result = fireEventListeners(event.get());
 
@@ -2029,7 +2020,7 @@ String DOMWindow::crossDomainAccessErrorMessage(const DOMWindow& activeWindow)
     URL activeURL = activeWindow.document()->url();
     URL targetURL = document()->url();
     if (document()->isSandboxed(SandboxOrigin) || activeWindow.document()->isSandboxed(SandboxOrigin)) {
-        message = "Blocked a frame at \"" + SecurityOrigin::create(activeURL)->toString() + "\" from accessing a frame at \"" + SecurityOrigin::create(targetURL)->toString() + "\". ";
+        message = "Blocked a frame at \"" + SecurityOrigin::create(activeURL).get().toString() + "\" from accessing a frame at \"" + SecurityOrigin::create(targetURL).get().toString() + "\". ";
         if (document()->isSandboxed(SandboxOrigin) && activeWindow.document()->isSandboxed(SandboxOrigin))
             return "Sandbox access violation: " + message + " Both frames are sandboxed and lack the \"allow-same-origin\" flag.";
         if (document()->isSandboxed(SandboxOrigin))

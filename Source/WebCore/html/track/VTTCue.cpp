@@ -234,7 +234,7 @@ const AtomicString& VTTCueBox::vttCueBoxShadowPseudoId()
     return trackDisplayBoxShadowPseudoId;
 }
 
-RenderPtr<RenderElement> VTTCueBox::createElementRenderer(PassRef<RenderStyle> style)
+RenderPtr<RenderElement> VTTCueBox::createElementRenderer(Ref<RenderStyle>&& style)
 {
     return createRenderer<RenderVTTCue>(*this, WTF::move(style));
 }
@@ -288,8 +288,8 @@ void VTTCue::initialize(ScriptExecutionContext& context)
     m_writingDirection = Horizontal;
     m_cueAlignment = Middle;
     m_webVTTNodeTree = nullptr;
-    m_cueBackdropBox = HTMLDivElement::create(toDocument(context));
-    m_cueHighlightBox = HTMLSpanElement::create(spanTag, toDocument(context));
+    m_cueBackdropBox = HTMLDivElement::create(downcast<Document>(context));
+    m_cueHighlightBox = HTMLSpanElement::create(spanTag, downcast<Document>(context));
     m_displayDirection = CSSValueLtr;
     m_displaySize = 0;
     m_snapToLines = true;
@@ -497,13 +497,13 @@ void VTTCue::copyWebVTTNodeToDOMTree(ContainerNode* webVTTNode, ContainerNode* p
 {
     for (Node* node = webVTTNode->firstChild(); node; node = node->nextSibling()) {
         RefPtr<Node> clonedNode;
-        if (node->isWebVTTElement())
-            clonedNode = toWebVTTElement(node)->createEquivalentHTMLElement(ownerDocument());
+        if (is<WebVTTElement>(*node))
+            clonedNode = downcast<WebVTTElement>(*node).createEquivalentHTMLElement(ownerDocument());
         else
             clonedNode = node->cloneNode(false);
         parent->appendChild(clonedNode, ASSERT_NO_EXCEPTION);
-        if (node->isContainerNode())
-            copyWebVTTNodeToDOMTree(toContainerNode(node), toContainerNode(clonedNode.get()));
+        if (is<ContainerNode>(*node))
+            copyWebVTTNodeToDOMTree(downcast<ContainerNode>(node), downcast<ContainerNode>(clonedNode.get()));
     }
 }
 
@@ -614,7 +614,7 @@ void VTTCue::determineTextDirection()
     // pre-order, depth-first traversal, excluding WebVTT Ruby Text Objects and
     // their descendants.
     StringBuilder paragraphBuilder;
-    for (Node* node = m_webVTTNodeTree->firstChild(); node; node = NodeTraversal::next(node, m_webVTTNodeTree.get())) {
+    for (Node* node = m_webVTTNodeTree->firstChild(); node; node = NodeTraversal::next(*node, m_webVTTNodeTree.get())) {
         // FIXME: The code does not match the comment above. This does not actually exclude Ruby Text Object descendant.
         if (!node->isTextNode() || node->localName() == rtTag)
             continue;
@@ -755,7 +755,7 @@ void VTTCue::markFutureAndPastNodes(ContainerNode* root, const MediaTime& previo
     if (currentTimestamp > movieTime)
         isPastNode = false;
     
-    for (Node* child = root->firstChild(); child; child = NodeTraversal::next(child, root)) {
+    for (Node* child = root->firstChild(); child; child = NodeTraversal::next(*child, root)) {
         if (child->nodeName() == timestampTag) {
             MediaTime currentTimestamp;
             bool check = WebVTTParser::collectTimeStamp(child->nodeValue(), currentTimestamp);
@@ -766,11 +766,11 @@ void VTTCue::markFutureAndPastNodes(ContainerNode* root, const MediaTime& previo
                 isPastNode = false;
         }
         
-        if (child->isWebVTTElement()) {
-            toWebVTTElement(child)->setIsPastNode(isPastNode);
+        if (is<WebVTTElement>(*child)) {
+            downcast<WebVTTElement>(*child).setIsPastNode(isPastNode);
             // Make an elemenet id match a cue id for style matching purposes.
             if (!id().isEmpty())
-                toElement(child)->setIdAttribute(id());
+                downcast<WebVTTElement>(*child).setIdAttribute(id());
         }
     }
 }

@@ -31,8 +31,6 @@
 #include "config.h"
 #include "ConsoleMessage.h"
 
-#if ENABLE(INSPECTOR)
-
 #include "IdentifiersFactory.h"
 #include "InjectedScript.h"
 #include "InjectedScriptManager.h"
@@ -179,12 +177,13 @@ static Inspector::Protocol::Console::ConsoleMessage::Level messageLevelValue(Mes
     return Inspector::Protocol::Console::ConsoleMessage::Level::Log;
 }
 
-void ConsoleMessage::addToFrontend(InspectorConsoleFrontendDispatcher* consoleFrontendDispatcher, Inspector::InjectedScriptManager* injectedScriptManager, bool generatePreview)
+void ConsoleMessage::addToFrontend(ConsoleFrontendDispatcher* consoleFrontendDispatcher, InjectedScriptManager* injectedScriptManager, bool generatePreview)
 {
-    RefPtr<Inspector::Protocol::Console::ConsoleMessage> jsonObj = Inspector::Protocol::Console::ConsoleMessage::create()
+    Ref<Inspector::Protocol::Console::ConsoleMessage> jsonObj = Inspector::Protocol::Console::ConsoleMessage::create()
         .setSource(messageSourceValue(m_source))
         .setLevel(messageLevelValue(m_level))
-        .setText(m_message);
+        .setText(m_message)
+        .release();
 
     // FIXME: only send out type for ConsoleAPI source messages.
     jsonObj->setType(messageTypeValue(m_type));
@@ -199,7 +198,7 @@ void ConsoleMessage::addToFrontend(InspectorConsoleFrontendDispatcher* consoleFr
     if (m_arguments && m_arguments->argumentCount()) {
         InjectedScript injectedScript = injectedScriptManager->injectedScriptFor(m_arguments->globalState());
         if (!injectedScript.hasNoValue()) {
-            RefPtr<Inspector::Protocol::Array<Inspector::Protocol::Runtime::RemoteObject>> jsonArgs = Inspector::Protocol::Array<Inspector::Protocol::Runtime::RemoteObject>::create();
+            Ref<Inspector::Protocol::Array<Inspector::Protocol::Runtime::RemoteObject>> jsonArgs = Inspector::Protocol::Array<Inspector::Protocol::Runtime::RemoteObject>::create();
             if (m_type == MessageType::Table && generatePreview && m_arguments->argumentCount()) {
                 Deprecated::ScriptValue table = m_arguments->argumentAt(0);
                 Deprecated::ScriptValue columns = m_arguments->argumentCount() > 1 ? m_arguments->argumentAt(1) : Deprecated::ScriptValue();
@@ -208,7 +207,9 @@ void ConsoleMessage::addToFrontend(InspectorConsoleFrontendDispatcher* consoleFr
                     ASSERT_NOT_REACHED();
                     return;
                 }
-                jsonArgs->addItem(inspectorValue);
+                jsonArgs->addItem(inspectorValue.copyRef());
+                if (m_arguments->argumentCount() > 1)
+                    jsonArgs->addItem(injectedScript.wrapObject(columns, ASCIILiteral("console"), true));
             } else {
                 for (unsigned i = 0; i < m_arguments->argumentCount(); ++i) {
                     RefPtr<Inspector::Protocol::Runtime::RemoteObject> inspectorValue = injectedScript.wrapObject(m_arguments->argumentAt(i), ASCIILiteral("console"), generatePreview);
@@ -216,20 +217,20 @@ void ConsoleMessage::addToFrontend(InspectorConsoleFrontendDispatcher* consoleFr
                         ASSERT_NOT_REACHED();
                         return;
                     }
-                    jsonArgs->addItem(inspectorValue);
+                    jsonArgs->addItem(inspectorValue.copyRef());
                 }
             }
-            jsonObj->setParameters(jsonArgs);
+            jsonObj->setParameters(WTF::move(jsonArgs));
         }
     }
 
     if (m_callStack)
         jsonObj->setStackTrace(m_callStack->buildInspectorArray());
 
-    consoleFrontendDispatcher->messageAdded(jsonObj);
+    consoleFrontendDispatcher->messageAdded(WTF::move(jsonObj));
 }
 
-void ConsoleMessage::updateRepeatCountInConsole(InspectorConsoleFrontendDispatcher* consoleFrontendDispatcher)
+void ConsoleMessage::updateRepeatCountInConsole(ConsoleFrontendDispatcher* consoleFrontendDispatcher)
 {
     consoleFrontendDispatcher->messageRepeatCountUpdated(m_repeatCount);
 }
@@ -290,5 +291,3 @@ unsigned ConsoleMessage::argumentCount() const
 }
 
 } // namespace Inspector
-
-#endif // ENABLE(INSPECTOR)

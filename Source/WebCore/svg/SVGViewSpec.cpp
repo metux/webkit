@@ -25,7 +25,6 @@
 #include "SVGFitToViewBox.h"
 #include "SVGNames.h"
 #include "SVGParserUtilities.h"
-#include "SVGSVGElement.h"
 #include "SVGTransformable.h"
 
 namespace WebCore {
@@ -139,11 +138,11 @@ String SVGViewSpec::preserveAspectRatioString() const
 SVGElement* SVGViewSpec::viewTarget() const
 {
     if (!m_contextElement)
-        return 0;
+        return nullptr;
     Element* element = m_contextElement->treeScope().getElementById(m_viewTargetString);
     if (!element || !element->isSVGElement())
-        return 0;
-    return toSVGElement(element);
+        return nullptr;
+    return downcast<SVGElement>(element);
 }
 
 SVGTransformListPropertyTearOff* SVGViewSpec::transform()
@@ -252,7 +251,7 @@ bool SVGViewSpec::parseViewSpec(const String& viewSpec)
             if (currViewSpec >= end || *currViewSpec != '(')
                 return false;
             currViewSpec++;
-            if (!parseZoomAndPan(currViewSpec, end, m_zoomAndPan))
+            if (!parse(currViewSpec, end, m_zoomAndPan))
                 return false;
             if (currViewSpec >= end || *currViewSpec != ')')
                 return false;

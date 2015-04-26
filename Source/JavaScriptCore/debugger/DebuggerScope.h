@@ -84,9 +84,13 @@ public:
     void invalidateChain();
     bool isValid() const { return !!m_scope; }
 
+    bool isCatchScope() const;
+    bool isFunctionNameScope() const;
     bool isWithScope() const;
     bool isGlobalScope() const;
     bool isFunctionOrEvalScope() const;
+
+    JSValue caughtValue() const;
 
 private:
     JS_EXPORT_PRIVATE DebuggerScope(VM&, JSScope*);

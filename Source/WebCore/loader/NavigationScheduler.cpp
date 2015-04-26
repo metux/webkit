@@ -74,7 +74,7 @@ public:
     virtual void fire(Frame&) = 0;
 
     virtual bool shouldStartTimer(Frame&) { return true; }
-    virtual void didStartTimer(Frame&, Timer<NavigationScheduler>&) { }
+    virtual void didStartTimer(Frame&, Timer&) { }
     virtual void didStopTimer(Frame&, bool /* newLoadInProgress */) { }
 
     double delay() const { return m_delay; }
@@ -113,7 +113,7 @@ protected:
         frame.loader().changeLocation(m_securityOrigin.get(), m_url, m_referrer, lockHistory(), lockBackForwardList(), false);
     }
 
-    virtual void didStartTimer(Frame& frame, Timer<NavigationScheduler>& timer) override
+    virtual void didStartTimer(Frame& frame, Timer& timer) override
     {
         if (m_haveToldClient)
             return;
@@ -246,10 +246,10 @@ public:
             return;
         FrameLoadRequest frameRequest(requestingDocument->securityOrigin());
         m_submission->populateFrameLoadRequest(frameRequest);
-        frame.loader().loadFrameRequest(frameRequest, lockHistory(), lockBackForwardList(), m_submission->event(), m_submission->state(), MaybeSendReferrer, AllowNavigationToInvalidURL::Yes);
+        frame.loader().loadFrameRequest(frameRequest, lockHistory(), lockBackForwardList(), m_submission->event(), m_submission->state(), MaybeSendReferrer, AllowNavigationToInvalidURL::Yes, NewFrameOpenerPolicy::Allow);
     }
     
-    virtual void didStartTimer(Frame& frame, Timer<NavigationScheduler>& timer) override
+    virtual void didStartTimer(Frame& frame, Timer& timer) override
     {
         if (m_haveToldClient)
             return;
@@ -280,7 +280,7 @@ private:
 
 NavigationScheduler::NavigationScheduler(Frame& frame)
     : m_frame(frame)
-    , m_timer(this, &NavigationScheduler::timerFired)
+    , m_timer(*this, &NavigationScheduler::timerFired)
 {
 }
 
@@ -366,8 +366,7 @@ void NavigationScheduler::scheduleLocationChange(SecurityOrigin* securityOrigin,
 
     // If the URL we're going to navigate to is the same as the current one, except for the
     // fragment part, we don't need to schedule the location change.
-    URL parsedURL(ParsedURLString, url);
-    if (parsedURL.hasFragmentIdentifier() && equalIgnoringFragmentIdentifier(m_frame.document()->url(), parsedURL)) {
+    if (url.hasFragmentIdentifier() && equalIgnoringFragmentIdentifier(m_frame.document()->url(), url)) {
         loader.changeLocation(securityOrigin, m_frame.document()->completeURL(url), referrer, lockHistory, lockBackForwardList, false, AllowNavigationToInvalidURL::No);
         return;
     }
@@ -430,7 +429,7 @@ void NavigationScheduler::scheduleHistoryNavigation(int steps)
     schedule(std::make_unique<ScheduledHistoryNavigation>(steps));
 }
 
-void NavigationScheduler::timerFired(Timer<NavigationScheduler>&)
+void NavigationScheduler::timerFired()
 {
     if (!m_frame.page())
         return;

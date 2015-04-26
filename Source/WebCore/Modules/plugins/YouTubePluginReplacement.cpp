@@ -28,6 +28,7 @@
 
 #include "HTMLIFrameElement.h"
 #include "HTMLNames.h"
+#include "HTMLParserIdioms.h"
 #include "HTMLPlugInElement.h"
 #include "Page.h"
 #include "RenderElement.h"
@@ -66,7 +67,7 @@ YouTubePluginReplacement::YouTubePluginReplacement(HTMLPlugInElement& plugin, co
         m_attributes.add(paramNames[i], paramValues[i]);
 }
 
-RenderPtr<RenderElement> YouTubePluginReplacement::createElementRenderer(HTMLPlugInElement& plugin, PassRef<RenderStyle> style)
+RenderPtr<RenderElement> YouTubePluginReplacement::createElementRenderer(HTMLPlugInElement& plugin, Ref<RenderStyle>&& style)
 {
     ASSERT_UNUSED(plugin, m_parentElement == &plugin);
 
@@ -185,7 +186,9 @@ static bool isYouTubeURL(const URL& url)
     return hostName == "m.youtube.com"
         || hostName == "youtu.be"
         || hostName == "www.youtube.com"
-        || hostName == "youtube.com";
+        || hostName == "youtube.com"
+        || hostName == "www.youtube-nocookie.com"
+        || hostName == "youtube-nocookie.com";
 }
 
 static const String& valueForKey(const YouTubePluginReplacement::KeyValueMap& dictionary, const String& key)
@@ -282,7 +285,7 @@ static URL processAndCreateYouTubeURL(const URL& url, bool& isYouTubeShortenedUR
 
 String YouTubePluginReplacement::youTubeURL(const String& srcString)
 {
-    URL srcURL(URL(), srcString);
+    URL srcURL = m_parentElement->document().completeURL(stripLeadingAndTrailingHTMLSpaces(srcString));
 
     bool isYouTubeShortenedURL = false;
     URL youTubeURL = processAndCreateYouTubeURL(srcURL, isYouTubeShortenedURL);

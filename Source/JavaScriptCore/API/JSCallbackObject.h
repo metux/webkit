@@ -30,11 +30,12 @@
 #include "JSObjectRef.h"
 #include "JSValueRef.h"
 #include "JSObject.h"
-#include <wtf/PassOwnPtr.h>
 
 namespace JSC {
 
 struct JSCallbackObjectData : WeakHandleOwner {
+    WTF_MAKE_FAST_ALLOCATED;
+public:
     JSCallbackObjectData(void* privateData, JSClassRef jsClass)
         : privateData(privateData)
         , jsClass(jsClass)
@@ -57,7 +58,7 @@ struct JSCallbackObjectData : WeakHandleOwner {
     void setPrivateProperty(VM& vm, JSCell* owner, const Identifier& propertyName, JSValue value)
     {
         if (!m_privateProperties)
-            m_privateProperties = adoptPtr(new JSPrivatePropertyMap);
+            m_privateProperties = std::make_unique<JSPrivatePropertyMap>();
         m_privateProperties->setPrivateProperty(vm, owner, propertyName, value);
     }
     
@@ -109,7 +110,7 @@ struct JSCallbackObjectData : WeakHandleOwner {
         typedef HashMap<RefPtr<StringImpl>, WriteBarrier<Unknown>, IdentifierRepHash> PrivatePropertyMap;
         PrivatePropertyMap m_propertyMap;
     };
-    OwnPtr<JSPrivatePropertyMap> m_privateProperties;
+    std::unique_ptr<JSPrivatePropertyMap> m_privateProperties;
     virtual void finalize(Handle<Unknown>, void*) override;
 };
 

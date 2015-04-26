@@ -67,7 +67,7 @@ protected:
 private:
     virtual bool isFilterEffect() const override { return true; }
 
-    virtual RenderPtr<RenderElement> createElementRenderer(PassRef<RenderStyle>) override;
+    virtual RenderPtr<RenderElement> createElementRenderer(Ref<RenderStyle>&&) override;
     virtual bool rendererIsNeeded(const RenderStyle&) override;
     virtual bool childShouldCreateRenderer(const Node&) const override { return false; }
 
@@ -82,18 +82,11 @@ private:
 
 void invalidateFilterPrimitiveParent(SVGElement*);
 
-void isSVGFilterPrimitiveStandardAttributes(const SVGFilterPrimitiveStandardAttributes&); // Catch unnecessary runtime check of type known at compile time.
-inline bool isSVGFilterPrimitiveStandardAttributes(const SVGElement& element) { return element.isFilterEffect(); }
-inline bool isSVGFilterPrimitiveStandardAttributes(const Node& node) { return node.isSVGElement() && toSVGElement(node).isFilterEffect(); }
-
-template <typename ArgType>
-struct ElementTypeCastTraits<const SVGFilterPrimitiveStandardAttributes, ArgType> {
-    static bool is(ArgType& node) { return isSVGFilterPrimitiveStandardAttributes(node); }
-};
-
-NODE_TYPE_CASTS(SVGFilterPrimitiveStandardAttributes)
-
-
 } // namespace WebCore
+
+SPECIALIZE_TYPE_TRAITS_BEGIN(WebCore::SVGFilterPrimitiveStandardAttributes)
+    static bool isType(const WebCore::SVGElement& element) { return element.isFilterEffect(); }
+    static bool isType(const WebCore::Node& node) { return is<WebCore::SVGElement>(node) && isType(downcast<WebCore::SVGElement>(node)); }
+SPECIALIZE_TYPE_TRAITS_END()
 
 #endif

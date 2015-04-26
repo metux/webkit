@@ -23,7 +23,6 @@
 
 #include "Attribute.h"
 #include "FilterEffect.h"
-#include "SVGElementInstance.h"
 #include "SVGFilterBuilder.h"
 #include "SVGNames.h"
 #include "SVGParserUtilities.h"
@@ -53,9 +52,9 @@ inline SVGFEGaussianBlurElement::SVGFEGaussianBlurElement(const QualifiedName& t
     registerAnimatedPropertiesForSVGFEGaussianBlurElement();
 }
 
-PassRefPtr<SVGFEGaussianBlurElement> SVGFEGaussianBlurElement::create(const QualifiedName& tagName, Document& document)
+Ref<SVGFEGaussianBlurElement> SVGFEGaussianBlurElement::create(const QualifiedName& tagName, Document& document)
 {
-    return adoptRef(new SVGFEGaussianBlurElement(tagName, document));
+    return adoptRef(*new SVGFEGaussianBlurElement(tagName, document));
 }
 
 const AtomicString& SVGFEGaussianBlurElement::stdDeviationXIdentifier()
@@ -114,7 +113,7 @@ void SVGFEGaussianBlurElement::parseAttribute(const QualifiedName& name, const A
         if (propertyValue > 0)
             setEdgeModeBaseValue(propertyValue);
         else
-            document().accessSVGExtensions()->reportWarning(
+            document().accessSVGExtensions().reportWarning(
                 "feGaussianBlur: problem parsing edgeMode=\"" + value
                 + "\". Filtered element will not be displayed.");
         return;
@@ -130,7 +129,7 @@ void SVGFEGaussianBlurElement::svgAttributeChanged(const QualifiedName& attrName
         return;
     }
 
-    SVGElementInstance::InvalidationGuard invalidationGuard(this);
+    InstanceInvalidationGuard guard(*this);
     
     if (attrName == SVGNames::inAttr
         || attrName == SVGNames::stdDeviationAttr

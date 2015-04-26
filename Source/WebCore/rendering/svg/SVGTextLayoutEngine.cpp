@@ -165,12 +165,12 @@ void SVGTextLayoutEngine::beginTextPathLayout(RenderObject* object, SVGTextLayou
     ASSERT(object);
 
     m_inPathLayout = true;
-    RenderSVGTextPath* textPath = toRenderSVGTextPath(object);
+    RenderSVGTextPath& textPath = downcast<RenderSVGTextPath>(*object);
 
-    m_textPath = textPath->layoutPath();
+    m_textPath = textPath.layoutPath();
     if (m_textPath.isEmpty())
         return;
-    m_textPathStartOffset = textPath->startOffset();
+    m_textPathStartOffset = textPath.startOffset();
     m_textPathLength = m_textPath.length();
     if (m_textPathStartOffset > 0 && m_textPathStartOffset <= 1)
         m_textPathStartOffset *= m_textPathLength;
@@ -202,7 +202,7 @@ void SVGTextLayoutEngine::beginTextPathLayout(RenderObject* object, SVGTextLayou
     SVGLengthAdjustType lengthAdjust = SVGLengthAdjustUnknown;
     float desiredTextLength = 0;
 
-    if (SVGTextContentElement* textContentElement = SVGTextContentElement::elementFromRenderer(textPath)) {
+    if (SVGTextContentElement* textContentElement = SVGTextContentElement::elementFromRenderer(&textPath)) {
         SVGLengthContext lengthContext(textContentElement);
         lengthAdjust = textContentElement->lengthAdjust();
         desiredTextLength = textContentElement->specifiedTextLength().value(lengthContext);
@@ -423,10 +423,11 @@ void SVGTextLayoutEngine::layoutTextOnLineOrPath(SVGInlineTextBox* textBox, Rend
     if (m_inPathLayout && m_textPath.isEmpty())
         return;
 
-    SVGElement* lengthContext = toSVGElement(text->parent()->element());
+    RenderElement* textParent = text->parent();
+    ASSERT(textParent);
+    SVGElement* lengthContext = downcast<SVGElement>(textParent->element());
     
-    RenderObject* textParent = text->parent();
-    bool definesTextLength = textParent ? parentDefinesTextLength(textParent) : false;
+    bool definesTextLength = parentDefinesTextLength(textParent);
 
     const SVGRenderStyle& svgStyle = style->svgStyle();
 
@@ -438,7 +439,7 @@ void SVGTextLayoutEngine::layoutTextOnLineOrPath(SVGInlineTextBox* textBox, Rend
 
     auto upconvertedCharacters = StringView(text->text()).upconvertedCharacters();
     const UChar* characters = upconvertedCharacters;
-    const Font& font = style->font();
+    const FontCascade& font = style->fontCascade();
 
     SVGTextLayoutEngineSpacing spacingLayout(font);
     SVGTextLayoutEngineBaseline baselineLayout(font);

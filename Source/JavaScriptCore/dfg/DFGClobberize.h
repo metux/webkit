@@ -1,5 +1,5 @@
- /*
- * Copyright (C) 2013, 2014 Apple Inc. All rights reserved.
+/*
+ * Copyright (C) 2013-2015 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -37,7 +37,7 @@
 namespace JSC { namespace DFG {
 
 template<typename ReadFunctor, typename WriteFunctor, typename DefFunctor>
-void clobberize(Graph& graph, Node* node, ReadFunctor& read, WriteFunctor& write, DefFunctor& def)
+void clobberize(Graph& graph, Node* node, const ReadFunctor& read, const WriteFunctor& write, const DefFunctor& def)
 {
     // Some notes:
     //
@@ -109,6 +109,7 @@ void clobberize(Graph& graph, Node* node, ReadFunctor& read, WriteFunctor& write
     case HardPhantom:
     case Check:
     case ExtractOSREntryLocal:
+    case CheckStructureImmediate:
         return;
         
     case BitAnd:
@@ -121,6 +122,7 @@ void clobberize(Graph& graph, Node* node, ReadFunctor& read, WriteFunctor& write
     case ArithAbs:
     case ArithMin:
     case ArithMax:
+    case ArithPow:
     case ArithSqrt:
     case ArithFRound:
     case ArithSin:
@@ -251,6 +253,7 @@ void clobberize(Graph& graph, Node* node, ReadFunctor& read, WriteFunctor& write
          
     case MovHint:
     case ZombieHint:
+    case KillLocal:
     case Upsilon:
     case Phi:
     case PhantomLocal:
@@ -271,8 +274,12 @@ void clobberize(Graph& graph, Node* node, ReadFunctor& read, WriteFunctor& write
     case Breakpoint:
     case ProfileWillCall:
     case ProfileDidCall:
+    case ProfileType:
+    case ProfileControlFlow:
     case StoreBarrier:
     case StoreBarrierWithNullCheck:
+    case PutByOffsetHint:
+    case PutStructureHint:
         write(SideState);
         return;
         
@@ -357,8 +364,6 @@ void clobberize(Graph& graph, Node* node, ReadFunctor& read, WriteFunctor& write
     case ArrayPop:
     case Call:
     case Construct:
-    case ProfiledCall:
-    case ProfiledConstruct:
     case NativeCall:
     case NativeConstruct:
     case ToPrimitive:
@@ -386,12 +391,12 @@ void clobberize(Graph& graph, Node* node, ReadFunctor& read, WriteFunctor& write
         return;
         
     case GetLocal:
-    case GetArgument:
         read(AbstractHeap(Variables, node->local()));
         def(HeapLocation(VariableLoc, AbstractHeap(Variables, node->local())), node);
         return;
         
     case SetLocal:
+    case PutLocal:
         write(AbstractHeap(Variables, node->local()));
         def(HeapLocation(VariableLoc, AbstractHeap(Variables, node->local())), node->child1().node());
         return;
@@ -673,8 +678,7 @@ void clobberize(Graph& graph, Node* node, ReadFunctor& read, WriteFunctor& write
         
     case GetByOffset:
     case GetGetterSetterByOffset: {
-        unsigned identifierNumber =
-            graph.m_storageAccessData[node->storageAccessDataIndex()].identifierNumber;
+        unsigned identifierNumber = node->storageAccessData().identifierNumber;
         AbstractHeap heap(NamedProperties, identifierNumber);
         read(heap);
         def(HeapLocation(NamedPropertyLoc, heap, node->child2()), node);
@@ -704,8 +708,7 @@ void clobberize(Graph& graph, Node* node, ReadFunctor& read, WriteFunctor& write
     }
         
     case PutByOffset: {
-        unsigned identifierNumber =
-            graph.m_storageAccessData[node->storageAccessDataIndex()].identifierNumber;
+        unsigned identifierNumber = node->storageAccessData().identifierNumber;
         AbstractHeap heap(NamedProperties, identifierNumber);
         write(heap);
         def(HeapLocation(NamedPropertyLoc, heap, node->child2()), node->child3().node());
@@ -740,14 +743,6 @@ void clobberize(Graph& graph, Node* node, ReadFunctor& read, WriteFunctor& write
             return;
         }
     }
-        
-    case GetMyScope:
-        if (graph.m_codeBlock->needsActivation()) {
-            read(AbstractHeap(Variables, JSStack::ScopeChain));
-            def(HeapLocation(VariableLoc, AbstractHeap(Variables, JSStack::ScopeChain)), node);
-        } else
-            def(PureValue(node));
-        return;
         
     case GetClosureRegisters:
         read(JSEnvironmentRecord_registers);
@@ -789,17 +784,15 @@ void clobberize(Graph& graph, Node* node, ReadFunctor& read, WriteFunctor& write
     case NewObject:
     case NewRegexp:
     case NewStringObject:
-        read(HeapObjectCount);
-        write(HeapObjectCount);
-        return;
-        
+    case PhantomNewObject:
+    case MaterializeNewObject:
     case NewFunctionNoCheck:
     case NewFunction:
     case NewFunctionExpression:
         read(HeapObjectCount);
         write(HeapObjectCount);
         return;
-
+        
     case RegExpExec:
     case RegExpTest:
         read(RegExpState);
@@ -846,11 +839,6 @@ void clobberize(Graph& graph, Node* node, ReadFunctor& read, WriteFunctor& write
             RELEASE_ASSERT_NOT_REACHED();
             return;
         }
-
-    case TearOffActivation:
-        read(Variables);
-        write(JSEnvironmentRecord_registers);
-        return;
         
     case TearOffArguments:
         read(Variables);
@@ -900,7 +888,7 @@ class NoOpClobberize {
 public:
     NoOpClobberize() { }
     template<typename... T>
-    void operator()(T...) { }
+    void operator()(T...) const { }
 };
 
 class CheckClobberize {
@@ -911,12 +899,12 @@ public:
     }
     
     template<typename... T>
-    void operator()(T...) { m_result = true; }
+    void operator()(T...) const { m_result = true; }
     
     bool result() const { return m_result; }
     
 private:
-    bool m_result;
+    mutable bool m_result;
 };
 
 bool doesWrites(Graph&, Node*);
@@ -929,7 +917,7 @@ public:
     {
     }
     
-    void operator()(AbstractHeap otherHeap)
+    void operator()(AbstractHeap otherHeap) const
     {
         if (m_result)
             return;
@@ -940,11 +928,13 @@ public:
 
 private:
     AbstractHeap m_heap;
-    bool m_result;
+    mutable bool m_result;
 };
 
 bool accessesOverlap(Graph&, Node*, AbstractHeap);
 bool writesOverlap(Graph&, Node*, AbstractHeap);
+
+bool clobbersWorld(Graph&, Node*);
 
 // We would have used bind() for these, but because of the overlaoding that we are doing,
 // it's quite a bit of clearer to just write this out the traditional way.
@@ -957,7 +947,7 @@ public:
     {
     }
     
-    void operator()(AbstractHeap heap)
+    void operator()(AbstractHeap heap) const
     {
         m_value.read(heap);
     }
@@ -973,7 +963,7 @@ public:
     {
     }
     
-    void operator()(AbstractHeap heap)
+    void operator()(AbstractHeap heap) const
     {
         m_value.write(heap);
     }
@@ -989,12 +979,12 @@ public:
     {
     }
     
-    void operator()(PureValue value)
+    void operator()(PureValue value) const
     {
         m_value.def(value);
     }
     
-    void operator()(HeapLocation location, Node* node)
+    void operator()(HeapLocation location, Node* node) const
     {
         m_value.def(location, node);
     }

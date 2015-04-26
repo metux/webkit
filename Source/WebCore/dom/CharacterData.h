@@ -30,7 +30,7 @@ namespace WebCore {
 
 class CharacterData : public Node {
 public:
-    String data() const { return m_data; }
+    const String& data() const { return m_data; }
     static ptrdiff_t dataMemoryOffset() { return OBJECT_OFFSETOF(CharacterData, m_data); }
 
     WEBCORE_EXPORT void setData(const String&, ExceptionCode&);
@@ -42,8 +42,6 @@ public:
     void replaceData(unsigned offset, unsigned count, const String&, ExceptionCode&);
 
     bool containsOnlyWhitespace() const;
-
-    StringImpl* dataImpl() { return m_data.impl(); }
 
     // Like appendData, but optimized for the parser (e.g., no mutation events).
     // Returns how much could be added before length limit was met.
@@ -76,12 +74,10 @@ private:
     String m_data;
 };
 
-inline bool isCharacterData(const Node& node) { return node.isCharacterDataNode(); }
-void isCharacterData(const CharacterData&); // Catch unnecessary runtime check of type known at compile time.
-void isCharacterData(const ContainerNode&); // Catch unnecessary runtime check of type known at compile time.
-
-NODE_TYPE_CASTS(CharacterData)
-
 } // namespace WebCore
+
+SPECIALIZE_TYPE_TRAITS_BEGIN(WebCore::CharacterData)
+    static bool isType(const WebCore::Node& node) { return node.isCharacterDataNode(); }
+SPECIALIZE_TYPE_TRAITS_END()
 
 #endif // CharacterData_h

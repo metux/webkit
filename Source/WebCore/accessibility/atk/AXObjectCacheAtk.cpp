@@ -80,6 +80,14 @@ void AXObjectCache::attachWrapper(AccessibilityObject* obj)
     if (obj->accessibilityIsIgnoredByDefault())
         return;
 
+    // Don't emit the signal if the object being added is not -- or not yet -- rendered,
+    // which can occur in nested iframes. In these instances we don't want to ignore the
+    // child. But if an assistive technology is listening, AT-SPI2 will attempt to create
+    // and cache the state set for the child upon emission of the signal. If the object
+    // has not yet been rendered, this will result in a crash.
+    if (!obj->renderer())
+        return;
+
     // Don't emit the signal for objects whose parents won't be exposed directly.
     AccessibilityObject* coreParent = obj->parentObjectUnignored();
     if (!coreParent || coreParent->accessibilityIsIgnoredByDefault())
@@ -133,17 +141,15 @@ static void notifyChildrenSelectionChange(AccessibilityObject* object)
 
     // Only support HTML select elements so far (ARIA selectors not supported).
     Node* node = object->node();
-    if (!node || !isHTMLSelectElement(node))
+    if (!is<HTMLSelectElement>(node))
         return;
 
     // Emit signal from the listbox's point of view first.
     g_signal_emit_by_name(object->wrapper(), "selection-changed");
 
     // Find the item where the selection change was triggered from.
-    HTMLSelectElement* select = toHTMLSelectElement(node);
-    if (!select)
-        return;
-    int changedItemIndex = select->activeSelectionStartListIndex();
+    HTMLSelectElement& select = downcast<HTMLSelectElement>(*node);
+    int changedItemIndex = select.activeSelectionStartListIndex();
 
     AccessibilityObject* listObject = getListObject(object);
     if (!listObject) {
@@ -175,8 +181,12 @@ static void notifyChildrenSelectionChange(AccessibilityObject* object)
     if (axItem) {
         bool isSelected = item->isSelected();
         atk_object_notify_state_change(axItem, ATK_STATE_SELECTED, isSelected);
-        g_signal_emit_by_name(axItem, "focus-event", isSelected);
-        atk_object_notify_state_change(axItem, ATK_STATE_FOCUSED, isSelected);
+        // When the selection changes in a collapsed widget such as a combo box
+        // whose child menu is not showing, that collapsed widget retains focus.
+        if (!object->isCollapsed()) {
+            g_signal_emit_by_name(axItem, "focus-event", isSelected);
+            atk_object_notify_state_change(axItem, ATK_STATE_FOCUSED, isSelected);
+        }
     }
 
     // Update pointers to the previously involved objects.
@@ -192,14 +202,15 @@ void AXObjectCache::postPlatformNotification(AccessibilityObject* coreObject, AX
 
     switch (notification) {
     case AXCheckedStateChanged:
-        if (!coreObject->isCheckboxOrRadio())
+        if (!coreObject->isCheckboxOrRadio() && !coreObject->isSwitch())
             return;
         atk_object_notify_state_change(axObject, ATK_STATE_CHECKED, coreObject->isChecked());
         break;
 
     case AXSelectedChildrenChanged:
     case AXMenuListValueChanged:
-        if (notification == AXMenuListValueChanged && coreObject->isMenuList()) {
+        // Accessible focus claims should not be made if the associated widget is not focused.
+        if (notification == AXMenuListValueChanged && coreObject->isMenuList() && coreObject->isFocused()) {
             g_signal_emit_by_name(axObject, "focus-event", true);
             atk_object_notify_state_change(axObject, ATK_STATE_FOCUSED, true);
         }

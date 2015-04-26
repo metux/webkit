@@ -34,8 +34,6 @@
 #include "TextureMapperLayer.h"
 #include <WebCore/GLContext.h>
 #include <WebCore/GraphicsLayerClient.h>
-#include <wtf/HashMap.h>
-#include <wtf/OwnPtr.h>
 #include <wtf/gobject/GMainLoopSource.h>
 
 namespace WebKit {
@@ -63,6 +61,8 @@ protected:
     virtual void deviceOrPageScaleFactorChanged() override;
     virtual void pageBackgroundTransparencyChanged() override;
 
+    virtual void setNativeSurfaceHandleForCompositing(uint64_t) override;
+
 private:
     // LayerTreeHost
     virtual const LayerTreeContext& layerTreeContext() override;
@@ -71,18 +71,12 @@ private:
     virtual void setNonCompositedContentsNeedDisplay() override;
     virtual void setNonCompositedContentsNeedDisplayInRect(const WebCore::IntRect&) override;
     virtual void scrollNonCompositedContents(const WebCore::IntRect& scrollRect) override;
-
-    virtual void didInstallPageOverlay(PageOverlay*) override;
-    virtual void didUninstallPageOverlay(PageOverlay*) override;
-    virtual void setPageOverlayNeedsDisplay(PageOverlay*, const WebCore::IntRect&) override;
+    virtual void setViewOverlayRootLayer(WebCore::GraphicsLayer*) override;
 
     // GraphicsLayerClient
     virtual void paintContents(const WebCore::GraphicsLayer*, WebCore::GraphicsContext&, WebCore::GraphicsLayerPaintingPhase, const WebCore::FloatRect& clipRect) override;
 
     bool flushPendingLayerChanges();
-
-    void createPageOverlayLayer(PageOverlay*);
-    void destroyPageOverlayLayer(PageOverlay*);
 
     enum CompositePurpose { ForResize, NotForResize };
     void compositeLayersToContext(CompositePurpose = NotForResize);
@@ -92,20 +86,19 @@ private:
 
     void layerFlushTimerFired();
 
-    WebCore::GLContext* glContext();
+    bool makeContextCurrent();
 
     LayerTreeContext m_layerTreeContext;
     bool m_isValid;
     bool m_notifyAfterScheduledLayerFlush;
     std::unique_ptr<WebCore::GraphicsLayer> m_rootLayer;
     std::unique_ptr<WebCore::GraphicsLayer> m_nonCompositedContentLayer;
-    typedef HashMap<PageOverlay*, std::unique_ptr<WebCore::GraphicsLayer>> PageOverlayLayerMap;
-    PageOverlayLayerMap m_pageOverlayLayers;
     std::unique_ptr<WebCore::TextureMapper> m_textureMapper;
-    OwnPtr<WebCore::GLContext> m_context;
-    double m_lastFlushTime;
+    std::unique_ptr<WebCore::GLContext> m_context;
+    double m_lastImmediateFlushTime;
     bool m_layerFlushSchedulingEnabled;
     GMainLoopSource m_layerFlushTimerCallback;
+    WebCore::GraphicsLayer* m_viewOverlayRootLayer;
 };
 
 } // namespace WebKit

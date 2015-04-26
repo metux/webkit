@@ -29,13 +29,20 @@ enum DeviceType {
     "tvout"
 };
 
+enum MediaUIPartID {
+    "optimized-fullscreen-button",
+    "optimized-fullscreen-placeholder"
+};
+
 [
     NoInterfaceObject,
     Conditional=MEDIA_CONTROLS_SCRIPT,
     ImplementationLacksVTable,
 ] interface MediaControlsHost {
     TextTrack[] sortedTrackListForMenu(TextTrackList trackList);
+    AudioTrack[] sortedTrackListForMenu(AudioTrackList trackList);
     DOMString displayNameForTrack(TextTrack track);
+    DOMString displayNameForTrack(AudioTrack track);
     readonly attribute TextTrack captionMenuOffItem;
     readonly attribute TextTrack captionMenuAutomaticItem;
     readonly attribute DOMString captionDisplayMode;
@@ -53,4 +60,6 @@ enum DeviceType {
     void updateTextTrackContainer();
     void enteredFullscreen();
     void exitedFullscreen();
+    void enterFullscreenOptimized();
+    DOMString mediaUIImageData(MediaUIPartID partID);
 };

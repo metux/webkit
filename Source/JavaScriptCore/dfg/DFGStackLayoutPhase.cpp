@@ -66,6 +66,7 @@ public:
                 switch (node->op()) {
                 case GetLocal:
                 case SetLocal:
+                case PutLocal:
                 case Flush:
                 case PhantomLocal: {
                     VariableAccessData* variable = node->variableAccessData();
@@ -105,7 +106,7 @@ public:
             usedLocals.set(codeBlock()->activationRegister().toLocal());
         for (InlineCallFrameSet::iterator iter = m_graph.m_plan.inlineCallFrames->begin(); !!iter; ++iter) {
             InlineCallFrame* inlineCallFrame = *iter;
-            if (!inlineCallFrame->executable->usesArguments())
+            if (!m_graph.usesArguments(inlineCallFrame))
                 continue;
             
             VirtualRegister argumentsRegister = m_graph.argumentsRegisterFor(inlineCallFrame);
@@ -167,11 +168,14 @@ public:
                 virtualRegisterForLocal(allocation[codeBlock()->activationRegister().toLocal()]));
         }
         
+        // This register is never valid for DFG code blocks.
+        codeBlock()->setScopeRegister(VirtualRegister());
+
         for (unsigned i = m_graph.m_inlineVariableData.size(); i--;) {
             InlineVariableData data = m_graph.m_inlineVariableData[i];
             InlineCallFrame* inlineCallFrame = data.inlineCallFrame;
             
-            if (inlineCallFrame->executable->usesArguments()) {
+            if (m_graph.usesArguments(inlineCallFrame)) {
                 inlineCallFrame->argumentsRegister = virtualRegisterForLocal(
                     allocation[m_graph.argumentsRegisterFor(inlineCallFrame).toLocal()]);
 

@@ -37,6 +37,7 @@
 #include <functional>
 #include <wtf/Forward.h>
 #include <wtf/Noncopyable.h>
+#include <wtf/TypeCasts.h>
 
 namespace IPC {
 class Connection;
@@ -45,6 +46,7 @@ class MessageDecoder;
 
 namespace WebCore {
 class DisplayRefreshMonitor;
+class Frame;
 class FrameView;
 class GraphicsLayer;
 class GraphicsLayerFactory;
@@ -107,18 +109,20 @@ public:
     virtual PassRefPtr<WebCore::DisplayRefreshMonitor> createDisplayRefreshMonitor(PlatformDisplayID);
 #endif
 
-#if USE(COORDINATED_GRAPHICS)
-    virtual void didReceiveCoordinatedLayerTreeHostMessage(IPC::Connection*, IPC::MessageDecoder&) = 0;
+#if USE(COORDINATED_GRAPHICS_MULTIPROCESS)
+    virtual void didReceiveCoordinatedLayerTreeHostMessage(IPC::Connection&, IPC::MessageDecoder&) = 0;
 #endif
 
     virtual void dispatchAfterEnsuringUpdatedScrollPosition(std::function<void ()>);
 
-    virtual void viewStateDidChange(WebCore::ViewState::Flags, bool /*wantsDidUpdateViewState*/) { }
+    virtual void viewStateDidChange(WebCore::ViewState::Flags, bool /* wantsDidUpdateViewState */, const Vector<uint64_t>& /* callbackIDs */) { }
     virtual void setLayerHostingMode(LayerHostingMode) { }
 
     virtual bool markLayersVolatileImmediatelyIfPossible() { return true; }
 
     virtual bool adjustLayerFlushThrottling(WebCore::LayerFlushThrottleState::Flags) { return false; }
+
+    virtual void attachViewOverlayGraphicsLayer(WebCore::Frame*, WebCore::GraphicsLayer*) { }
 
 protected:
     DrawingArea(DrawingAreaType, WebPage&);
@@ -126,9 +130,13 @@ protected:
     DrawingAreaType m_type;
     WebPage& m_webPage;
 
+#if USE(TEXTURE_MAPPER_GL) && PLATFORM(GTK)
+    uint64_t m_nativeSurfaceHandleForCompositing;
+#endif
+
 private:
     // IPC::MessageReceiver.
-    virtual void didReceiveMessage(IPC::Connection*, IPC::MessageDecoder&) override;
+    virtual void didReceiveMessage(IPC::Connection&, IPC::MessageDecoder&) override;
 
     // Message handlers.
     // FIXME: These should be pure virtual.
@@ -147,11 +155,17 @@ private:
 
     virtual void addTransactionCallbackID(uint64_t callbackID) { ASSERT_NOT_REACHED(); }
 #endif
+
+#if USE(TEXTURE_MAPPER_GL) && PLATFORM(GTK)
+    virtual void setNativeSurfaceHandleForCompositing(uint64_t) = 0;
+#endif
 };
 
-#define DRAWING_AREA_TYPE_CASTS(ToValueTypeName, predicate) \
-    TYPE_CASTS_BASE(ToValueTypeName, DrawingArea, value, value->predicate, value.predicate)
-
 } // namespace WebKit
+
+#define SPECIALIZE_TYPE_TRAITS_DRAWING_AREA(ToValueTypeName, AreaType) \
+SPECIALIZE_TYPE_TRAITS_BEGIN(WebKit::ToValueTypeName) \
+    static bool isType(const WebKit::DrawingArea& area) { return area.type() == WebKit::AreaType; } \
+SPECIALIZE_TYPE_TRAITS_END()
 
 #endif // DrawingArea_h

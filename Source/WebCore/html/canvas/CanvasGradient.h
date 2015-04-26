@@ -38,16 +38,17 @@ namespace WebCore {
 
     class CanvasGradient : public RefCounted<CanvasGradient> {
     public:
-        static PassRefPtr<CanvasGradient> create(const FloatPoint& p0, const FloatPoint& p1)
+        static Ref<CanvasGradient> create(const FloatPoint& p0, const FloatPoint& p1)
         {
-            return adoptRef(new CanvasGradient(p0, p1));
+            return adoptRef(*new CanvasGradient(p0, p1));
         }
-        static PassRefPtr<CanvasGradient> create(const FloatPoint& p0, float r0, const FloatPoint& p1, float r1)
+        static Ref<CanvasGradient> create(const FloatPoint& p0, float r0, const FloatPoint& p1, float r1)
         {
-            return adoptRef(new CanvasGradient(p0, r0, p1, r1));
+            return adoptRef(*new CanvasGradient(p0, r0, p1, r1));
         }
         
-        Gradient* gradient() const { return m_gradient.get(); }
+        Gradient& gradient() { return m_gradient; }
+        const Gradient& gradient() const { return m_gradient; }
 
         void addColorStop(float value, const String& color, ExceptionCode&);
 
@@ -59,7 +60,7 @@ namespace WebCore {
         CanvasGradient(const FloatPoint& p0, const FloatPoint& p1);
         CanvasGradient(const FloatPoint& p0, float r0, const FloatPoint& p1, float r1);
         
-        RefPtr<Gradient> m_gradient;
+        Ref<Gradient> m_gradient;
 #if ENABLE(DASHBOARD_SUPPORT)
         bool m_dashbardCompatibilityMode;
 #endif

@@ -26,6 +26,7 @@
 #include <wtf/ListHashSet.h>
 #include <wtf/RefCounted.h>
 #include <wtf/RefPtr.h>
+#include <wtf/TypeCasts.h>
 
 namespace WebCore {
 
@@ -102,6 +103,7 @@ public:
     bool isSVGColor() const { return m_classType == SVGColorClass || m_classType == SVGPaintClass; }
     bool isSVGPaint() const { return m_classType == SVGPaintClass; }
     bool isUnicodeRangeValue() const { return m_classType == UnicodeRangeClass; }
+    bool isWebKitCSSResourceValue() const { return m_classType == WebKitCSSResourceClass; }
 
     bool isCSSOMSafe() const { return m_isCSSOMSafe; }
     bool isSubtypeExposedToCSSOM() const
@@ -161,6 +163,7 @@ protected:
 #endif
         SVGColorClass,
         SVGPaintClass,
+        WebKitCSSResourceClass,
 
         // List class types must appear after ValueListClass.
         ValueListClass,
@@ -172,6 +175,7 @@ protected:
 #if ENABLE(CSS_GRID_LAYOUT)
         GridLineNamesClass,
 #endif
+
         // Do not append non-list class types here.
     };
 
@@ -246,12 +250,14 @@ inline bool compareCSSValuePtr(const RefPtr<CSSValueType>& first, const RefPtr<C
 template<typename CSSValueType>
 inline bool compareCSSValue(const Ref<CSSValueType>& first, const Ref<CSSValueType>& second)
 {
-    return first.get().equals(second.get());
+    return first.get().equals(second);
 }
 
-#define CSS_VALUE_TYPE_CASTS(ToValueTypeName, predicate) \
-    TYPE_CASTS_BASE(ToValueTypeName, CSSValue, value, value->predicate, value.predicate)
-
 } // namespace WebCore
+
+#define SPECIALIZE_TYPE_TRAITS_CSS_VALUE(ToValueTypeName, predicate) \
+SPECIALIZE_TYPE_TRAITS_BEGIN(WebCore::ToValueTypeName) \
+    static bool isType(const WebCore::CSSValue& value) { return value.predicate; } \
+SPECIALIZE_TYPE_TRAITS_END()
 
 #endif // CSSValue_h

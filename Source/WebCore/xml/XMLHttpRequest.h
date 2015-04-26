@@ -52,7 +52,7 @@ class ThreadableLoader;
 class XMLHttpRequest final : public ScriptWrappable, public RefCounted<XMLHttpRequest>, public EventTargetWithInlineData, private ThreadableLoaderClient, public ActiveDOMObject {
     WTF_MAKE_FAST_ALLOCATED;
 public:
-    static PassRefPtr<XMLHttpRequest> create(ScriptExecutionContext&);
+    static Ref<XMLHttpRequest> create(ScriptExecutionContext&);
     ~XMLHttpRequest();
 
     // These exact numeric values are important because JS expects them.
@@ -121,8 +121,6 @@ public:
     bool responseCacheIsValid() const { return m_responseCacheIsValid; }
     void didCacheResponseJSON();
 
-    void sendForInspectorXHRReplay(PassRefPtr<FormData>, ExceptionCode&);
-
     // Expose HTTP validation methods for other untrusted requests.
     static bool isAllowedHTTPMethod(const String&);
     static String uppercaseKnownHTTPMethod(const String&);
@@ -131,6 +129,8 @@ public:
     void setResponseType(const String&, ExceptionCode&);
     String responseType();
     ResponseTypeCode responseTypeCode() const { return m_responseTypeCode; }
+
+    String responseURL() const;
 
     // response attribute has custom getter.
     JSC::ArrayBuffer* responseArrayBuffer();
@@ -141,6 +141,8 @@ public:
 
     XMLHttpRequestUpload* upload();
     XMLHttpRequestUpload* optionalUpload() const { return m_upload.get(); }
+
+    const ResourceResponse& resourceResponse() const { return m_response; }
 
     DEFINE_ATTRIBUTE_EVENT_LISTENER(readystatechange);
     DEFINE_ATTRIBUTE_EVENT_LISTENER(abort);
@@ -165,6 +167,7 @@ private:
     virtual void suspend(ReasonForSuspension) override;
     virtual void resume() override;
     virtual void stop() override;
+    virtual const char* activeDOMObjectName() const override { return "XMLHttpRequest"; }
 
     virtual void refEventTarget() override { ref(); }
     virtual void derefEventTarget() override { deref(); }

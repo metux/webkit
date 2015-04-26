@@ -32,12 +32,15 @@
 #include "NativeWebKeyboardEvent.h"
 #include "NativeWebMouseEvent.h"
 #include "NotImplemented.h"
-#include "WebContext.h"
+#include "WebColorPickerGtk.h"
 #include "WebContextMenuProxyGtk.h"
 #include "WebEventFactory.h"
+#include "WebKitColorChooser.h"
+#include "WebKitWebView.h"
 #include "WebKitWebViewBasePrivate.h"
 #include "WebPageProxy.h"
 #include "WebPopupMenuProxyGtk.h"
+#include "WebProcessPool.h"
 #include <WebCore/Cursor.h>
 #include <WebCore/EventNames.h>
 #include <WebCore/GtkUtilities.h>
@@ -225,27 +228,31 @@ PassRefPtr<WebContextMenuProxy> PageClientImpl::createContextMenuProxy(WebPagePr
     return WebContextMenuProxyGtk::create(m_viewWidget, page);
 }
 
-#if ENABLE(INPUT_TYPE_COLOR)
-PassRefPtr<WebColorPicker> PageClientImpl::createColorPicker(WebPageProxy*, const WebCore::Color&, const WebCore::IntRect&)
+PassRefPtr<WebColorPicker> PageClientImpl::createColorPicker(WebPageProxy* page, const WebCore::Color& color, const WebCore::IntRect& rect)
+{
+    if (WEBKIT_IS_WEB_VIEW(m_viewWidget))
+        return WebKitColorChooser::create(*page, color, rect);
+    return WebColorPickerGtk::create(*page, color, rect);
+}
+
+void PageClientImpl::setTextIndicator(PassRefPtr<WebCore::TextIndicator>, bool /* fadeOut */)
 {
     notImplemented();
-    return 0;
 }
-#endif
 
-void PageClientImpl::setFindIndicator(PassRefPtr<FindIndicator>, bool /* fadeOut */, bool /* animate */)
+void PageClientImpl::setTextIndicatorAnimationProgress(float)
 {
     notImplemented();
 }
 
 void PageClientImpl::enterAcceleratedCompositingMode(const LayerTreeContext&)
 {
-    notImplemented();
+    webkitWebViewBaseEnterAcceleratedCompositingMode(WEBKIT_WEB_VIEW_BASE(m_viewWidget));
 }
 
 void PageClientImpl::exitAcceleratedCompositingMode()
 {
-    notImplemented();
+    webkitWebViewBaseExitAcceleratedCompositingMode(WEBKIT_WEB_VIEW_BASE(m_viewWidget));
 }
 
 void PageClientImpl::updateAcceleratedCompositingMode(const LayerTreeContext&)
@@ -339,6 +346,12 @@ void PageClientImpl::doneWithTouchEvent(const NativeWebTouchEvent& event, bool w
 {
     if (wasEventHandled)
         return;
+
+#if HAVE(GTK_GESTURES)
+    GestureController& gestureController = webkitWebViewBaseGestureController(WEBKIT_WEB_VIEW_BASE(m_viewWidget));
+    if (gestureController.handleEvent(event.nativeEvent()))
+        return;
+#endif
 
     // Emulate pointer events if unhandled.
     const GdkEvent* touchEvent = event.nativeEvent();

@@ -26,6 +26,8 @@
 #ifndef GraphicsLayerClient_h
 #define GraphicsLayerClient_h
 
+#include <wtf/Forward.h>
+
 namespace WebCore {
 
 class FloatPoint;
@@ -42,6 +44,7 @@ enum GraphicsLayerPaintingPhaseFlags {
     GraphicsLayerPaintMask = (1 << 2),
     GraphicsLayerPaintOverflowContents = (1 << 3),
     GraphicsLayerPaintCompositedScroll = (1 << 4),
+    GraphicsLayerPaintChildClippingMask = (1 << 5),
     GraphicsLayerPaintAllWithOverflowClip = (GraphicsLayerPaintBackground | GraphicsLayerPaintForeground | GraphicsLayerPaintMask)
 };
 typedef unsigned GraphicsLayerPaintingPhase;
@@ -54,11 +57,22 @@ enum AnimatedPropertyID {
     AnimatedPropertyWebkitFilter
 };
 
+enum LayerTreeAsTextBehaviorFlags {
+    LayerTreeAsTextBehaviorNormal = 0,
+    LayerTreeAsTextDebug = 1 << 0, // Dump extra debugging info like layer addresses.
+    LayerTreeAsTextIncludeVisibleRects = 1 << 1,
+    LayerTreeAsTextIncludeTileCaches = 1 << 2,
+    LayerTreeAsTextIncludeRepaintRects = 1 << 3,
+    LayerTreeAsTextIncludePaintingPhases = 1 << 4,
+    LayerTreeAsTextIncludeContentLayers = 1 << 5,
+    LayerTreeAsTextIncludePageOverlayLayers = 1 << 6,
+};
+typedef unsigned LayerTreeAsTextBehavior;
+
 class GraphicsLayerClient {
 public:
     virtual ~GraphicsLayerClient() {}
 
-    virtual bool shouldUseTiledBacking(const GraphicsLayer*) const { return false; }
     virtual void tiledBackingUsageChanged(const GraphicsLayer*, bool /*usingTiledBacking*/) { }
     
     // Callback for when hardware-accelerated animation started.
@@ -94,13 +108,15 @@ public:
 
     virtual bool isTrackingRepaints() const { return false; }
 
-    virtual bool shouldSkipLayerInDump(const GraphicsLayer*) const { return false; }
+    virtual bool shouldSkipLayerInDump(const GraphicsLayer*, LayerTreeAsTextBehavior) const { return false; }
     virtual bool shouldDumpPropertyForLayer(const GraphicsLayer*, const char*) const { return true; }
 
     virtual bool shouldAggressivelyRetainTiles(const GraphicsLayer*) const { return false; }
     virtual bool shouldTemporarilyRetainTileCohorts(const GraphicsLayer*) const { return true; }
 
     virtual bool needsPixelAligment() const { return false; }
+
+    virtual bool needsIOSDumpRenderTreeMainFrameRenderViewLayerIsAlwaysOpaqueHack(const GraphicsLayer&) const { return false; }
 
 #ifndef NDEBUG
     // RenderLayerBacking overrides this to verify that it is not

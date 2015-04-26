@@ -1,7 +1,7 @@
 /*
  *  Copyright (C) 1999-2002 Harri Porten (porten@kde.org)
  *  Copyright (C) 2001 Peter Kelly (pmk@post.com)
- *  Copyright (C) 2003, 2004, 2005, 2006, 2007, 2008, 2009 Apple Inc. All rights reserved.
+ *  Copyright (C) 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2015 Apple Inc. All rights reserved.
  *  Copyright (C) 2007 Cameron Zwarich (cwzwarich@uwaterloo.ca)
  *  Copyright (C) 2007 Maks Orlovich
  *
@@ -43,14 +43,13 @@ const ClassInfo Arguments::s_info = { "Arguments", &Base::s_info, 0, CREATE_METH
 void Arguments::visitChildren(JSCell* cell, SlotVisitor& visitor)
 {
     Arguments* thisObject = jsCast<Arguments*>(cell);
+
     ASSERT_GC_OBJECT_INHERITS(thisObject, info());
     JSObject::visitChildren(thisObject, visitor);
 
-    if (thisObject->m_registerArray) {
-        visitor.copyLater(thisObject, ArgumentsRegisterArrayCopyToken, 
-            thisObject->m_registerArray.get(), thisObject->registerArraySizeInBytes());
-        visitor.appendValues(thisObject->m_registerArray.get(), thisObject->m_numArguments);
-    }
+    if (thisObject->isTornOff())
+        visitor.appendValues(&thisObject->registerArray(), thisObject->m_numArguments);
+
     if (thisObject->m_slowArgumentData) {
         visitor.copyLater(thisObject, ArgumentsSlowArgumentDataCopyToken,
             thisObject->m_slowArgumentData.get(), SlowArgumentData::sizeForNumArguments(thisObject->m_numArguments));
@@ -66,22 +65,6 @@ void Arguments::copyBackingStore(JSCell* cell, CopyVisitor& visitor, CopyToken t
     
 
     switch (token) {
-    case ArgumentsRegisterArrayCopyToken: {
-        WriteBarrier<Unknown>* registerArray = thisObject->m_registerArray.get();
-        if (!registerArray)
-            return;
-
-        if (visitor.checkIfShouldCopy(registerArray)) {
-            size_t bytes = thisObject->registerArraySizeInBytes();
-            WriteBarrier<Unknown>* newRegisterArray = static_cast<WriteBarrier<Unknown>*>(visitor.allocateNewSpace(bytes));
-            memcpy(newRegisterArray, registerArray, bytes);
-            thisObject->m_registerArray.setWithoutWriteBarrier(newRegisterArray);
-            thisObject->m_registers = newRegisterArray - CallFrame::offsetFor(1) - 1;
-            visitor.didCopy(registerArray, bytes);
-        }
-        return;
-    }
-
     case ArgumentsSlowArgumentDataCopyToken: {
         SlowArgumentData* slowArgumentData = thisObject->m_slowArgumentData.get();
         if (!slowArgumentData)
@@ -104,22 +87,16 @@ void Arguments::copyBackingStore(JSCell* cell, CopyVisitor& visitor, CopyToken t
     
 static EncodedJSValue JSC_HOST_CALL argumentsFuncIterator(ExecState*);
 
-void Arguments::copyToArguments(ExecState* exec, CallFrame* callFrame, uint32_t copyLength, int32_t firstVarArgOffset)
+void Arguments::copyToArguments(ExecState* exec, VirtualRegister firstElementDest, unsigned offset, unsigned length)
 {
-    uint32_t length = copyLength + firstVarArgOffset;
-
-    if (UNLIKELY(m_overrodeLength)) {
-        length = min(get(exec, exec->propertyNames().length).toUInt32(exec), length);
-        for (unsigned i = firstVarArgOffset; i < length; i++)
-            callFrame->setArgument(i, get(exec, i));
-        return;
-    }
-    ASSERT(length == this->length(exec));
-    for (size_t i = firstVarArgOffset; i < length; ++i) {
-        if (JSValue value = tryGetArgument(i))
-            callFrame->setArgument(i - firstVarArgOffset, value);
-        else
-            callFrame->setArgument(i - firstVarArgOffset, get(exec, i));
+    for (unsigned i = 0; i < length; ++i) {
+        if (JSValue value = tryGetArgument(i + offset))
+            exec->r(firstElementDest + i) = value;
+        else {
+            exec->r(firstElementDest + i) = get(exec, i + offset);
+            if (UNLIKELY(exec->vm().exception()))
+                return;
+        }
     }
 }
 
@@ -361,15 +338,6 @@ bool Arguments::defineOwnProperty(JSObject* object, ExecState* exec, PropertyNam
     return Base::defineOwnProperty(object, exec, propertyName, descriptor, shouldThrow);
 }
 
-void Arguments::allocateRegisterArray(VM& vm)
-{
-    ASSERT(!m_registerArray);
-    void* backingStore;
-    if (!vm.heap.tryAllocateStorage(this, registerArraySizeInBytes(), &backingStore))
-        RELEASE_ASSERT_NOT_REACHED();
-    m_registerArray.set(vm, this, static_cast<WriteBarrier<Unknown>*>(backingStore));
-}
-
 void Arguments::tearOff(CallFrame* callFrame)
 {
     if (isTornOff())
@@ -380,49 +348,28 @@ void Arguments::tearOff(CallFrame* callFrame)
 
     // Must be called for the same call frame from which it was created.
     ASSERT(bitwise_cast<WriteBarrier<Unknown>*>(callFrame) == m_registers);
-    
-    allocateRegisterArray(callFrame->vm());
-    m_registers = m_registerArray.get() - CallFrame::offsetFor(1) - 1;
 
-    // If we have a captured argument that logically aliases lexical environment storage,
-    // but we optimize away the lexicalEnvironment, the argument needs to tear off into
-    // our storage. The simplest way to do this is to revert it to Normal status.
-    if (m_slowArgumentData && !m_lexicalEnvironment) {
-        for (size_t i = 0; i < m_numArguments; ++i) {
-            if (m_slowArgumentData->slowArguments()[i].status != SlowArgument::Captured)
-                continue;
-            m_slowArgumentData->slowArguments()[i].status = SlowArgument::Normal;
-            m_slowArgumentData->slowArguments()[i].index = CallFrame::argumentOffset(i);
+    m_registers = &registerArray() - CallFrame::offsetFor(1) - 1;
+
+    for (size_t i = 0; i < m_numArguments; ++i) {
+        if (m_slowArgumentData && m_slowArgumentData->slowArguments()[i].status == SlowArgument::Captured) {
+            m_registers[CallFrame::argumentOffset(i)].setUndefined();
+            continue;
         }
-    }
-
-    for (size_t i = 0; i < m_numArguments; ++i)
         trySetArgument(callFrame->vm(), i, callFrame->argumentAfterCapture(i));
-}
-
-void Arguments::didTearOffActivation(ExecState* exec, JSLexicalEnvironment* lexicalEnvironment)
-{
-    RELEASE_ASSERT(lexicalEnvironment);
-    if (isTornOff())
-        return;
-
-    if (!m_numArguments)
-        return;
-    
-    m_lexicalEnvironment.set(exec->vm(), this, lexicalEnvironment);
-    tearOff(exec);
+    }
 }
 
 void Arguments::tearOff(CallFrame* callFrame, InlineCallFrame* inlineCallFrame)
 {
+    RELEASE_ASSERT(!inlineCallFrame->baselineCodeBlock()->needsActivation());
     if (isTornOff())
         return;
     
     if (!m_numArguments)
         return;
-    
-    allocateRegisterArray(callFrame->vm());
-    m_registers = m_registerArray.get() - CallFrame::offsetFor(1) - 1;
+
+    m_registers = &registerArray() - CallFrame::offsetFor(1) - 1;
 
     for (size_t i = 0; i < m_numArguments; ++i) {
         ValueRecovery& recovery = inlineCallFrame->arguments[i + 1];
@@ -430,6 +377,40 @@ void Arguments::tearOff(CallFrame* callFrame, InlineCallFrame* inlineCallFrame)
     }
 }
     
+void Arguments::tearOffForCloning(CallFrame* callFrame)
+{
+    ASSERT(!isTornOff());
+    
+    if (!m_numArguments)
+        return;
+    
+    // Must be called for the same call frame from which it was created.
+    ASSERT(bitwise_cast<WriteBarrier<Unknown>*>(callFrame) == m_registers);
+    
+    m_registers = &registerArray() - CallFrame::offsetFor(1) - 1;
+    
+    ASSERT(!m_slowArgumentData);
+    for (size_t i = 0; i < m_numArguments; ++i)
+        m_registers[CallFrame::argumentOffset(i)].set(callFrame->vm(), this, callFrame->argument(i));
+}
+    
+void Arguments::tearOffForCloning(CallFrame* callFrame, InlineCallFrame* inlineCallFrame)
+{
+    RELEASE_ASSERT(!inlineCallFrame->baselineCodeBlock()->needsActivation());
+    ASSERT(!isTornOff());
+    
+    if (!m_numArguments)
+        return;
+    
+    m_registers = &registerArray() - CallFrame::offsetFor(1) - 1;
+    
+    ASSERT(!m_slowArgumentData);
+    for (size_t i = 0; i < m_numArguments; ++i) {
+        ValueRecovery& recovery = inlineCallFrame->arguments[i + 1];
+        m_registers[CallFrame::argumentOffset(i)].set(callFrame->vm(), this, recovery.recover(callFrame));
+    }
+}
+
 EncodedJSValue JSC_HOST_CALL argumentsFuncIterator(ExecState* exec)
 {
     JSObject* thisObj = exec->thisValue().toThis(exec, StrictMode).toObject(exec);

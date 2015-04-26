@@ -105,8 +105,8 @@ void SVGRenderingContext::prepareToRenderSVGContent(RenderElement& renderer, Pai
     bool isolateMaskForBlending = false;
 
 #if ENABLE(CSS_COMPOSITING)
-    if (svgStyle.hasMasker() && toSVGElement(renderer.element())->isSVGGraphicsElement()) {
-        SVGGraphicsElement& graphicsElement = *toSVGGraphicsElement(renderer.element());
+    if (svgStyle.hasMasker() && is<SVGGraphicsElement>(downcast<SVGElement>(*renderer.element()))) {
+        SVGGraphicsElement& graphicsElement = downcast<SVGGraphicsElement>(*renderer.element());
         isolateMaskForBlending = graphicsElement.shouldIsolateBlending();
     }
 #endif
@@ -136,15 +136,15 @@ void SVGRenderingContext::prepareToRenderSVGContent(RenderElement& renderer, Pai
     }
 
     ClipPathOperation* clipPathOperation = style.clipPath();
-    if (clipPathOperation && clipPathOperation->type() == ClipPathOperation::Shape) {
-        ShapeClipPathOperation& clipPath = toShapeClipPathOperation(*clipPathOperation);
+    if (is<ShapeClipPathOperation>(clipPathOperation)) {
+        auto& clipPath = downcast<ShapeClipPathOperation>(*clipPathOperation);
         FloatRect referenceBox;
         if (clipPath.referenceBox() == Stroke)
             // FIXME: strokeBoundingBox() takes dasharray into account but shouldn't.
             referenceBox = renderer.strokeBoundingBox();
         else if (clipPath.referenceBox() == ViewBox && renderer.element()) {
             FloatSize viewportSize;
-            SVGLengthContext(toSVGElement(renderer.element())).determineViewport(viewportSize);
+            SVGLengthContext(downcast<SVGElement>(renderer.element())).determineViewport(viewportSize);
             referenceBox.setWidth(viewportSize.width());
             referenceBox.setHeight(viewportSize.height());
         } else
@@ -345,7 +345,7 @@ void SVGRenderingContext::clear2DRotation(AffineTransform& transform)
 bool SVGRenderingContext::bufferForeground(std::unique_ptr<ImageBuffer>& imageBuffer)
 {
     ASSERT(m_paintInfo);
-    ASSERT(m_renderer->isSVGImage());
+    ASSERT(is<RenderSVGImage>(*m_renderer));
     FloatRect boundingBox = m_renderer->objectBoundingBox();
 
     // Invalidate an existing buffer if the scale is not correct.
@@ -364,7 +364,7 @@ bool SVGRenderingContext::bufferForeground(std::unique_ptr<ImageBuffer>& imageBu
             bufferedRenderingContext->translate(-boundingBox.x(), -boundingBox.y());
             PaintInfo bufferedInfo(*m_paintInfo);
             bufferedInfo.context = bufferedRenderingContext;
-            toRenderSVGImage(m_renderer)->paintForeground(bufferedInfo);
+            downcast<RenderSVGImage>(*m_renderer).paintForeground(bufferedInfo);
         } else
             return false;
     }

@@ -28,6 +28,7 @@
 
 #include "JSLexicalEnvironment.h"
 #include "JSCInlines.h"
+#include "JSNameScope.h"
 #include "JSWithScope.h"
 
 namespace JSC {
@@ -142,14 +143,26 @@ DebuggerScope* DebuggerScope::next()
 
 void DebuggerScope::invalidateChain()
 {
+    if (!isValid())
+        return;
+
     DebuggerScope* scope = this;
     while (scope) {
-        ASSERT(scope->isValid());
         DebuggerScope* nextScope = scope->m_next.get();
         scope->m_next.clear();
-        scope->m_scope.clear();
+        scope->m_scope.clear(); // This also marks this scope as invalid.
         scope = nextScope;
     }
+}
+
+bool DebuggerScope::isCatchScope() const
+{
+    return m_scope->isNameScopeObject() && reinterpret_cast<JSNameScope*>(m_scope.get())->isCatchScope();
+}
+
+bool DebuggerScope::isFunctionNameScope() const
+{
+    return m_scope->isNameScopeObject() && reinterpret_cast<JSNameScope*>(m_scope.get())->isFunctionNameScope();
 }
 
 bool DebuggerScope::isWithScope() const
@@ -168,6 +181,12 @@ bool DebuggerScope::isFunctionOrEvalScope() const
     // lexical environment object. Hence, a lexical environment object implies a
     // function or eval scope.
     return m_scope->isActivationObject();
+}
+
+JSValue DebuggerScope::caughtValue() const
+{
+    ASSERT(isCatchScope());
+    return reinterpret_cast<JSNameScope*>(m_scope.get())->value();
 }
 
 } // namespace JSC

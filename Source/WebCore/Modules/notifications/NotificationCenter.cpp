@@ -42,7 +42,7 @@
 
 namespace WebCore {
 
-PassRef<NotificationCenter> NotificationCenter::create(ScriptExecutionContext* context, NotificationClient* client)
+Ref<NotificationCenter> NotificationCenter::create(ScriptExecutionContext* context, NotificationClient* client)
 {
     auto notificationCenter = adoptRef(*new NotificationCenter(context, client));
     notificationCenter.get().suspendIfNeeded();
@@ -100,9 +100,16 @@ void NotificationCenter::stop()
 {
     if (!m_client)
         return;
-    m_client->cancelRequestsForPermission(scriptExecutionContext());
-    m_client->clearNotifications(scriptExecutionContext());
-    m_client = 0;
+
+    // Clear m_client now because the call to NotificationClient::clearNotifications() below potentially
+    // destroy the NotificationCenter. This is because the notifications will be destroyed and unref the
+    // NotificationCenter.
+    auto& client = *m_client;
+    m_client = nullptr;
+
+    client.cancelRequestsForPermission(scriptExecutionContext());
+    client.clearNotifications(scriptExecutionContext());
+    // Do not attempt the access |this|, the NotificationCenter may be destroyed at this point.
 }
 
 void NotificationCenter::requestTimedOut(NotificationCenter::NotificationRequestCallback* request)
@@ -119,7 +126,7 @@ PassRefPtr<NotificationCenter::NotificationRequestCallback> NotificationCenter::
 
 NotificationCenter::NotificationRequestCallback::NotificationRequestCallback(NotificationCenter* center, PassRefPtr<VoidCallback> callback)
     : m_notificationCenter(center)
-    , m_timer(this, &NotificationCenter::NotificationRequestCallback::timerFired)
+    , m_timer(*this, &NotificationCenter::NotificationRequestCallback::timerFired)
     , m_callback(callback)
 {
 }
@@ -129,7 +136,7 @@ void NotificationCenter::NotificationRequestCallback::startTimer()
     m_timer.startOneShot(0);
 }
 
-void NotificationCenter::NotificationRequestCallback::timerFired(Timer<NotificationCenter::NotificationRequestCallback>&)
+void NotificationCenter::NotificationRequestCallback::timerFired()
 {
     if (m_callback)
         m_callback->handleEvent();

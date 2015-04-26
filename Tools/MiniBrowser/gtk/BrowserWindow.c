@@ -60,6 +60,7 @@ struct _BrowserWindow {
     BrowserSearchBar *searchBar;
     gboolean searchBarVisible;
     gboolean inspectorWindowIsVisible;
+    gboolean fullScreenIsEnabled;
     GdkPixbuf *favicon;
     GtkWidget *reloadOrStopButton;
     GtkWidget *fullScreenMessageLabel;
@@ -76,6 +77,7 @@ static const char *defaultWindowTitle = "WebKitGTK+ MiniBrowser";
 static const char *miniBrowserAboutScheme = "minibrowser-about";
 static const gdouble minimumZoomLevel = 0.5;
 static const gdouble maximumZoomLevel = 3;
+static const gdouble defaultZoomLevel = 1;
 static const gdouble zoomStep = 1.2;
 static gint windowCount = 0;
 
@@ -253,7 +255,7 @@ static void backForwadlistChanged(WebKitBackForwardList *backForwadlist, WebKitB
     browserWindowUpdateNavigationActions(window, backForwadlist);
 }
 
-static void geolocationRequestDialogCallback(GtkDialog *dialog, gint response, WebKitPermissionRequest *request)
+static void permissionRequestDialogCallback(GtkDialog *dialog, gint response, WebKitPermissionRequest *request)
 {
     switch (response) {
     case GTK_RESPONSE_YES:
@@ -366,6 +368,24 @@ static gboolean webViewLoadFailed(WebKitWebView *webView, WebKitLoadEvent loadEv
     return FALSE;
 }
 
+static gboolean webViewLoadFailedWithTLSerrors(WebKitWebView *webView, const char *failingURI, GTlsCertificate *certificate, GTlsCertificateFlags errors, BrowserWindow *window)
+{
+    GtkWidget *dialog = gtk_message_dialog_new(GTK_WINDOW(window), GTK_DIALOG_MODAL | GTK_DIALOG_DESTROY_WITH_PARENT,
+        GTK_MESSAGE_QUESTION, GTK_BUTTONS_YES_NO, "%s", "Invalid TLS Certificate");
+    gtk_message_dialog_format_secondary_text(GTK_MESSAGE_DIALOG(dialog), "Failed to load %s: Do you want to continue ignoring the TLS errors?", failingURI);
+    int response = gtk_dialog_run(GTK_DIALOG(dialog));
+    gtk_widget_destroy(dialog);
+
+    if (response == GTK_RESPONSE_YES) {
+        SoupURI *uri = soup_uri_new(failingURI);
+        webkit_web_context_allow_tls_certificate_for_host(webkit_web_view_get_context(webView), certificate, uri->host);
+        soup_uri_free(uri);
+        webkit_web_view_load_uri(webView, failingURI);
+    }
+
+    return TRUE;
+}
+
 static gboolean webViewDecidePolicy(WebKitWebView *webView, WebKitPolicyDecision *decision, WebKitPolicyDecisionType decisionType, BrowserWindow *window)
 {
     switch (decisionType) {
@@ -406,19 +426,42 @@ static gboolean webViewDecidePolicy(WebKitWebView *webView, WebKitPolicyDecision
 
 static gboolean webViewDecidePermissionRequest(WebKitWebView *webView, WebKitPermissionRequest *request, BrowserWindow *window)
 {
-    if (!WEBKIT_IS_GEOLOCATION_PERMISSION_REQUEST(request))
+    const gchar *dialog_title = NULL;
+    const gchar *dialog_message = NULL;
+    const gchar *dialog_message_format = NULL;
+
+    if (WEBKIT_IS_GEOLOCATION_PERMISSION_REQUEST(request)) {
+        dialog_title = "Geolocation request";
+        dialog_message_format = "%s";
+        dialog_message = "Allow geolocation request?";
+    } else if (WEBKIT_IS_NOTIFICATION_PERMISSION_REQUEST(request)) {
+        dialog_title = "Notification request";
+        dialog_message_format = "%s";
+        dialog_message = "Allow notifications request?";
+    } else if (WEBKIT_IS_USER_MEDIA_PERMISSION_REQUEST(request)) {
+        dialog_message_format = "Allow access to %s device?";
+        gboolean is_for_audio_device = webkit_user_media_permission_is_for_audio_device(WEBKIT_USER_MEDIA_PERMISSION_REQUEST(request));
+        gboolean is_for_video_device = webkit_user_media_permission_is_for_video_device(WEBKIT_USER_MEDIA_PERMISSION_REQUEST(request));
+        dialog_title = "UserMedia request";
+        if (is_for_audio_device) {
+            if (is_for_video_device)
+                dialog_message = "audio/video";
+            else
+                dialog_message = "audio";
+        } else if (is_for_video_device)
+            dialog_message = "video";
+    } else
         return FALSE;
 
     GtkWidget *dialog = gtk_message_dialog_new(GTK_WINDOW(window),
-                                               GTK_DIALOG_MODAL | GTK_DIALOG_DESTROY_WITH_PARENT,
-                                               GTK_MESSAGE_QUESTION,
-                                               GTK_BUTTONS_YES_NO,
-                                               "Geolocation request");
+        GTK_DIALOG_MODAL | GTK_DIALOG_DESTROY_WITH_PARENT,
+        GTK_MESSAGE_QUESTION,
+        GTK_BUTTONS_YES_NO,
+        "%s", dialog_title);
 
-    gtk_message_dialog_format_secondary_text(GTK_MESSAGE_DIALOG(dialog), "Allow geolocation request?");
-    g_signal_connect(dialog, "response", G_CALLBACK(geolocationRequestDialogCallback), g_object_ref(request));
+    gtk_message_dialog_format_secondary_text(GTK_MESSAGE_DIALOG(dialog), dialog_message_format, dialog_message);
+    g_signal_connect(dialog, "response", G_CALLBACK(permissionRequestDialogCallback), g_object_ref(request));
     gtk_widget_show(dialog);
-
     return TRUE;
 }
 
@@ -442,6 +485,84 @@ static gboolean browserWindowCanZoomOut(BrowserWindow *window)
     gdouble zoomLevel = webkit_web_view_get_zoom_level(window->webView) / zoomStep;
     return zoomLevel > minimumZoomLevel;
 }
+
+static gboolean browserWindowZoomIn(BrowserWindow *window)
+{
+    if (browserWindowCanZoomIn(window)) {
+        gdouble zoomLevel = webkit_web_view_get_zoom_level(window->webView) * zoomStep;
+        webkit_web_view_set_zoom_level(window->webView, zoomLevel);
+        return TRUE;
+    }
+    return FALSE;
+}
+
+static gboolean browserWindowZoomOut(BrowserWindow *window)
+{
+    if (browserWindowCanZoomOut(window)) {
+        gdouble zoomLevel = webkit_web_view_get_zoom_level(window->webView) / zoomStep;
+        webkit_web_view_set_zoom_level(window->webView, zoomLevel);
+        return TRUE;
+    }
+    return FALSE;
+}
+
+static gboolean scrollEventCallback(WebKitWebView *webView, const GdkEventScroll *event, BrowserWindow *window)
+{
+    GdkModifierType mod = gtk_accelerator_get_default_mod_mask();
+
+    if ((event->state & mod) != GDK_CONTROL_MASK)
+        return FALSE;
+    
+    if (event->delta_y < 0)
+        return browserWindowZoomIn(window);
+    
+    return browserWindowZoomOut(window);
+}
+
+#if GTK_CHECK_VERSION(3, 12, 0)
+static void colorChooserRGBAChanged(GtkColorChooser *colorChooser, GParamSpec *paramSpec, WebKitColorChooserRequest *request)
+{
+    GdkRGBA rgba;
+    gtk_color_chooser_get_rgba(colorChooser, &rgba);
+    webkit_color_chooser_request_set_rgba(request, &rgba);
+}
+
+static void popoverColorClosed(GtkWidget *popover, WebKitColorChooserRequest *request)
+{
+    webkit_color_chooser_request_finish(request);
+}
+
+static void colorChooserRequestFinished(WebKitColorChooserRequest *request, GtkWidget *popover)
+{
+    g_object_unref(request);
+    gtk_widget_destroy(popover);
+}
+
+static gboolean runColorChooserCallback(WebKitWebView *webView, WebKitColorChooserRequest *request, BrowserWindow *window)
+{
+    GtkWidget *popover = gtk_popover_new(GTK_WIDGET(webView));
+
+    GdkRectangle rectangle;
+    webkit_color_chooser_request_get_element_rectangle(request, &rectangle);
+    gtk_popover_set_pointing_to(GTK_POPOVER(popover), &rectangle);
+
+    GtkWidget *colorChooser = gtk_color_chooser_widget_new();
+    GdkRGBA rgba;
+    webkit_color_chooser_request_get_rgba(request, &rgba);
+    gtk_color_chooser_set_rgba(GTK_COLOR_CHOOSER(colorChooser), &rgba);
+    g_signal_connect(colorChooser, "notify::rgba", G_CALLBACK(colorChooserRGBAChanged), request);
+    gtk_container_add(GTK_CONTAINER(popover), colorChooser);
+    gtk_widget_show(colorChooser);
+
+    g_object_ref(request);
+    g_signal_connect_object(popover, "hide", G_CALLBACK(popoverColorClosed), request, 0);
+    g_signal_connect_object(request, "finished", G_CALLBACK(colorChooserRequestFinished), popover, 0);
+
+    gtk_widget_show(popover);
+
+    return TRUE;
+}
+#endif /* GTK_CHECK_VERSION(3, 12, 0) */
 
 static void browserWindowUpdateZoomActions(BrowserWindow *window)
 {
@@ -501,14 +622,17 @@ static gboolean inspectorWasClosed(WebKitWebInspector *inspectorWindow, BrowserW
 
 static void zoomInCallback(BrowserWindow *window)
 {
-    gdouble zoomLevel = webkit_web_view_get_zoom_level(window->webView) * zoomStep;
-    webkit_web_view_set_zoom_level(window->webView, zoomLevel);
+    browserWindowZoomIn(window);
 }
 
 static void zoomOutCallback(BrowserWindow *window)
 {
-    gdouble zoomLevel = webkit_web_view_get_zoom_level(window->webView) / zoomStep;
-    webkit_web_view_set_zoom_level(window->webView, zoomLevel);
+    browserWindowZoomOut(window);
+}
+
+static void defaultZoomCallback(BrowserWindow *window)
+{
+    webkit_web_view_set_zoom_level(window->webView, defaultZoomLevel);
 }
 
 static void searchCallback(BrowserWindow *window)
@@ -538,6 +662,33 @@ static void reloadPage(BrowserWindow *window, gpointer user_data)
 static void reloadPageIgnoringCache(BrowserWindow *window, gpointer user_data)
 {
     webkit_web_view_reload_bypass_cache(window->webView);
+}
+
+static void stopPageLoad(BrowserWindow *window, gpointer user_data)
+{
+    if (gtk_widget_get_visible(GTK_WIDGET(window->searchBar))) 
+        browser_search_bar_close(window->searchBar);
+    else if (webkit_web_view_is_loading(window->webView))
+        webkit_web_view_stop_loading(window->webView);
+}
+
+static void loadHomePage(BrowserWindow *window, gpointer user_data)
+{
+    webkit_web_view_load_uri(window->webView, BROWSER_DEFAULT_URL);
+}
+
+static gboolean toggleFullScreen(BrowserWindow *window, gpointer user_data)
+{
+    if (!window->fullScreenIsEnabled) {
+        gtk_window_fullscreen(GTK_WINDOW(window));
+        gtk_widget_hide(window->toolbar);
+        window->fullScreenIsEnabled = TRUE;
+    } else {
+        gtk_window_unfullscreen(GTK_WINDOW(window));
+        gtk_widget_show(window->toolbar);
+        window->fullScreenIsEnabled = FALSE;
+    }
+    return TRUE;
 }
 
 static void browserWindowFinalize(GObject *gObject)
@@ -625,6 +776,40 @@ static void browser_window_init(BrowserWindow *window)
     gtk_accel_group_connect(window->accelGroup, GDK_KEY_R, GDK_CONTROL_MASK | GDK_SHIFT_MASK, GTK_ACCEL_VISIBLE,
         g_cclosure_new_swap(G_CALLBACK(reloadPageIgnoringCache), window, NULL));
 
+    /* Stop page load */ 
+    gtk_accel_group_connect(window->accelGroup, GDK_KEY_F6, 0, GTK_ACCEL_VISIBLE,
+        g_cclosure_new_swap(G_CALLBACK(stopPageLoad), window, NULL));
+    gtk_accel_group_connect(window->accelGroup, GDK_KEY_Escape, 0, GTK_ACCEL_VISIBLE,
+        g_cclosure_new_swap(G_CALLBACK(stopPageLoad), window, NULL));
+
+    /* Load home page */ 
+    gtk_accel_group_connect(window->accelGroup, GDK_KEY_Home, GDK_MOD1_MASK, GTK_ACCEL_VISIBLE,
+        g_cclosure_new_swap(G_CALLBACK(loadHomePage), window, NULL));
+
+    /* Zoom in, zoom out and default zoom*/
+    gtk_accel_group_connect(window->accelGroup, GDK_KEY_equal, GDK_CONTROL_MASK, GTK_ACCEL_VISIBLE,
+        g_cclosure_new_swap(G_CALLBACK(zoomInCallback), window, NULL));
+    gtk_accel_group_connect(window->accelGroup, GDK_KEY_KP_Add, GDK_CONTROL_MASK, GTK_ACCEL_VISIBLE,
+        g_cclosure_new_swap(G_CALLBACK(zoomInCallback), window, NULL));
+    gtk_accel_group_connect(window->accelGroup, GDK_KEY_minus, GDK_CONTROL_MASK, GTK_ACCEL_VISIBLE,
+        g_cclosure_new_swap(G_CALLBACK(zoomOutCallback), window, NULL));
+    gtk_accel_group_connect(window->accelGroup, GDK_KEY_KP_Subtract, GDK_CONTROL_MASK, GTK_ACCEL_VISIBLE,
+        g_cclosure_new_swap(G_CALLBACK(zoomOutCallback), window, NULL));
+    gtk_accel_group_connect(window->accelGroup, GDK_KEY_0, GDK_CONTROL_MASK, GTK_ACCEL_VISIBLE,
+        g_cclosure_new_swap(G_CALLBACK(defaultZoomCallback), window, NULL));
+    gtk_accel_group_connect(window->accelGroup, GDK_KEY_KP_0, GDK_CONTROL_MASK, GTK_ACCEL_VISIBLE,
+        g_cclosure_new_swap(G_CALLBACK(defaultZoomCallback), window, NULL));
+
+    /* Toggle fullscreen */ 
+    gtk_accel_group_connect(window->accelGroup, GDK_KEY_F11, 0, GTK_ACCEL_VISIBLE,
+        g_cclosure_new_swap(G_CALLBACK(toggleFullScreen), window, NULL));
+
+    /* Quit */
+    gtk_accel_group_connect(window->accelGroup, GDK_KEY_Q, GDK_CONTROL_MASK, GTK_ACCEL_VISIBLE,
+        g_cclosure_new_swap(G_CALLBACK(gtk_widget_destroy), window, NULL));
+    gtk_accel_group_connect(window->accelGroup, GDK_KEY_W, GDK_CONTROL_MASK, GTK_ACCEL_VISIBLE,
+        g_cclosure_new_swap(G_CALLBACK(gtk_widget_destroy), window, NULL));
+
     GtkWidget *toolbar = gtk_toolbar_new();
     window->toolbar = toolbar;
     gtk_orientable_set_orientation(GTK_ORIENTABLE(toolbar), GTK_ORIENTATION_HORIZONTAL);
@@ -667,6 +852,12 @@ static void browser_window_init(BrowserWindow *window)
     gtk_widget_add_accelerator(GTK_WIDGET(item), "clicked", window->accelGroup, GDK_KEY_F, GDK_CONTROL_MASK, GTK_ACCEL_VISIBLE);
     gtk_widget_show(GTK_WIDGET(item));
 
+    item = gtk_tool_button_new_from_stock(GTK_STOCK_HOME);
+    g_signal_connect_swapped(item, "clicked", G_CALLBACK(loadHomePage), window);
+    gtk_toolbar_insert(GTK_TOOLBAR(toolbar), item, -1);
+    gtk_widget_add_accelerator(GTK_WIDGET(item), "clicked", window->accelGroup, GDK_KEY_Home, GDK_MOD1_MASK, GTK_ACCEL_VISIBLE);
+    gtk_widget_show(GTK_WIDGET(item));
+
     item = gtk_tool_item_new();
     gtk_tool_item_set_expand(item, TRUE);
     gtk_container_add(GTK_CONTAINER(item), window->uriEntry);
@@ -701,6 +892,7 @@ static void browserWindowConstructed(GObject *gObject)
     g_signal_connect(window->webView, "notify::title", G_CALLBACK(webViewTitleChanged), window);
     g_signal_connect(window->webView, "create", G_CALLBACK(webViewCreate), window);
     g_signal_connect(window->webView, "load-failed", G_CALLBACK(webViewLoadFailed), window);
+    g_signal_connect(window->webView, "load-failed-with-tls-errors", G_CALLBACK(webViewLoadFailedWithTLSerrors), window);
     g_signal_connect(window->webView, "decide-policy", G_CALLBACK(webViewDecidePolicy), window);
     g_signal_connect(window->webView, "permission-request", G_CALLBACK(webViewDecidePermissionRequest), window);
     g_signal_connect(window->webView, "mouse-target-changed", G_CALLBACK(webViewMouseTargetChanged), window);
@@ -709,6 +901,10 @@ static void browserWindowConstructed(GObject *gObject)
     g_signal_connect(window->webView, "enter-fullscreen", G_CALLBACK(webViewEnterFullScreen), window);
     g_signal_connect(window->webView, "leave-fullscreen", G_CALLBACK(webViewLeaveFullScreen), window);
     g_signal_connect(window->webView, "notify::is-loading", G_CALLBACK(webViewIsLoadingChanged), window);
+    g_signal_connect(window->webView, "scroll-event", G_CALLBACK(scrollEventCallback), window);
+#if GTK_CHECK_VERSION(3, 12, 0)
+    g_signal_connect(window->webView, "run-color-chooser", G_CALLBACK(runColorChooserCallback), window);
+#endif
 
     g_signal_connect(webkit_web_view_get_context(window->webView), "download-started", G_CALLBACK(downloadStarted), window);
 
@@ -800,4 +996,26 @@ void browser_window_load_uri(BrowserWindow *window, const char *uri)
     }
 
     webkit_web_view_run_javascript(window->webView, strstr(uri, "javascript:"), NULL, NULL, NULL);
+}
+
+void browser_window_set_background_color(BrowserWindow *window, GdkRGBA *rgba)
+{
+    g_return_if_fail(BROWSER_IS_WINDOW(window));
+    g_return_if_fail(rgba);
+
+    GdkRGBA viewRGBA;
+    webkit_web_view_get_background_color(window->webView, &viewRGBA);
+    if (gdk_rgba_equal(rgba, &viewRGBA))
+        return;
+
+    if (rgba->alpha < 1) {
+        GdkVisual *rgbaVisual = gdk_screen_get_rgba_visual(gtk_window_get_screen(GTK_WINDOW(window)));
+        if (!rgbaVisual)
+            return;
+
+        gtk_widget_set_visual(GTK_WIDGET(window), rgbaVisual);
+        gtk_widget_set_app_paintable(GTK_WIDGET(window), TRUE);
+    }
+
+    webkit_web_view_set_background_color(window->webView, rgba);
 }

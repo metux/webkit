@@ -33,7 +33,7 @@ class SearchPopupMenu;
 
 class RenderSearchField final : public RenderTextControlSingleLine, private PopupMenuClient {
 public:
-    RenderSearchField(HTMLInputElement&, PassRef<RenderStyle>);
+    RenderSearchField(HTMLInputElement&, Ref<RenderStyle>&&);
     virtual ~RenderSearchField();
 
     void updateCancelButtonVisibility() const;
@@ -90,8 +90,8 @@ private:
     Vector<String> m_recentSearches;
 };
 
-RENDER_OBJECT_TYPE_CASTS(RenderSearchField, isTextField())
+} // namespace WebCore
 
-}
+SPECIALIZE_TYPE_TRAITS_RENDER_OBJECT(RenderSearchField, isTextField())
 
 #endif

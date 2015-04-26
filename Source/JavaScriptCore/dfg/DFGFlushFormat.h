@@ -93,6 +93,11 @@ inline UseKind useKindFor(FlushFormat format)
     return UntypedUse;
 }
 
+inline SpeculatedType typeFilterFor(FlushFormat format)
+{
+    return typeFilterFor(useKindFor(format));
+}
+
 inline DataFormat dataFormatFor(FlushFormat format)
 {
     switch (format) {
@@ -116,6 +121,17 @@ inline DataFormat dataFormatFor(FlushFormat format)
     }
     RELEASE_ASSERT_NOT_REACHED();
     return DataFormatDead;
+}
+
+inline FlushFormat merge(FlushFormat a, FlushFormat b)
+{
+    if (a == DeadFlush)
+        return b;
+    if (b == DeadFlush)
+        return a;
+    if (a == b)
+        return a;
+    return ConflictingFlush;
 }
 
 } } // namespace JSC::DFG
