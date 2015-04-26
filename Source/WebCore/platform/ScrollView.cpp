@@ -71,13 +71,13 @@ void ScrollView::addChild(PassRefPtr<Widget> prpChild)
         platformAddChild(child);
 }
 
-void ScrollView::removeChild(Widget* child)
+void ScrollView::removeChild(Widget& child)
 {
-    ASSERT(child->parent() == this);
-    child->setParent(0);
-    m_children.remove(child);
-    if (child->platformWidget())
-        platformRemoveChild(child);
+    ASSERT(child.parent() == this);
+    child.setParent(nullptr);
+    m_children.remove(&child);
+    if (child.platformWidget())
+        platformRemoveChild(&child);
 }
 
 bool ScrollView::setHasHorizontalScrollbar(bool hasBar, bool* contentSizeAffected)
@@ -96,8 +96,8 @@ bool ScrollView::setHasHorizontalScrollbar(bool hasBar, bool* contentSizeAffecte
     if (!hasBar && m_horizontalScrollbar) {
         bool wasOverlayScrollbar = m_horizontalScrollbar->isOverlayScrollbar();
         willRemoveScrollbar(m_horizontalScrollbar.get(), HorizontalScrollbar);
-        removeChild(m_horizontalScrollbar.get());
-        m_horizontalScrollbar = 0;
+        removeChild(*m_horizontalScrollbar);
+        m_horizontalScrollbar = nullptr;
         if (contentSizeAffected)
             *contentSizeAffected = !wasOverlayScrollbar;
         return true;
@@ -122,8 +122,8 @@ bool ScrollView::setHasVerticalScrollbar(bool hasBar, bool* contentSizeAffected)
     if (!hasBar && m_verticalScrollbar) {
         bool wasOverlayScrollbar = m_verticalScrollbar->isOverlayScrollbar();
         willRemoveScrollbar(m_verticalScrollbar.get(), VerticalScrollbar);
-        removeChild(m_verticalScrollbar.get());
-        m_verticalScrollbar = 0;
+        removeChild(*m_verticalScrollbar);
+        m_verticalScrollbar = nullptr;
         if (contentSizeAffected)
             *contentSizeAffected = !wasOverlayScrollbar;
         return true;
@@ -310,7 +310,7 @@ IntRect ScrollView::visibleContentRectInternal(VisibleContentRectIncludesScrollb
 #if PLATFORM(IOS)
     if (visibleContentRectBehavior == LegacyIOSDocumentViewRect) {
         if (platformWidget())
-            return platformVisibleContentRect(true /* include scrollbars */);
+            return platformVisibleContentRect(scrollbarInclusion == IncludeScrollbars);
     }
     
     if (platformWidget())
@@ -457,10 +457,41 @@ void ScrollView::setScrollOffset(const IntPoint& offset)
     scrollTo(newOffset);
 }
 
+void ScrollView::scrollPositionChangedViaPlatformWidget(const IntPoint& oldPosition, const IntPoint& newPosition)
+{
+    // We should not attempt to actually modify (paint) platform widgets if the layout phase
+    // is not complete. Instead, defer the scroll event until the layout finishes.
+    if (shouldDeferScrollUpdateAfterContentSizeChange()) {
+        // We only care about the most recent scroll position change request
+        m_deferredScrollPositions = std::make_unique<std::pair<IntPoint, IntPoint>>(std::make_pair(oldPosition, newPosition));
+        return;
+    }
+
+    scrollPositionChangedViaPlatformWidgetImpl(oldPosition, newPosition);
+}
+
+void ScrollView::handleDeferredScrollUpdateAfterContentSizeChange()
+{
+    ASSERT(!shouldDeferScrollUpdateAfterContentSizeChange());
+
+    if (!m_deferredScrollDelta && !m_deferredScrollPositions)
+        return;
+
+    ASSERT(static_cast<bool>(m_deferredScrollDelta) != static_cast<bool>(m_deferredScrollPositions));
+
+    if (m_deferredScrollDelta)
+        completeUpdatesAfterScrollTo(*m_deferredScrollDelta);
+    else if (m_deferredScrollPositions)
+        scrollPositionChangedViaPlatformWidgetImpl(m_deferredScrollPositions->first, m_deferredScrollPositions->second);
+    
+    m_deferredScrollDelta = nullptr;
+    m_deferredScrollPositions = nullptr;
+}
+
 void ScrollView::scrollTo(const IntSize& newOffset)
 {
     IntSize scrollDelta = newOffset - m_scrollOffset;
-    if (scrollDelta == IntSize())
+    if (scrollDelta.isZero())
         return;
     m_scrollOffset = newOffset;
 
@@ -469,10 +500,23 @@ void ScrollView::scrollTo(const IntSize& newOffset)
 
 #if USE(TILED_BACKING_STORE)
     if (delegatesScrolling()) {
-        hostWindow()->delegatedScrollRequested(IntPoint(newOffset));
+        requestScrollPositionUpdate(IntPoint(newOffset));
         return;
     }
 #endif
+    // We should not attempt to actually modify layer contents if the layout phase
+    // is not complete. Instead, defer the scroll event until the layout finishes.
+    if (shouldDeferScrollUpdateAfterContentSizeChange()) {
+        ASSERT(!m_deferredScrollDelta);
+        m_deferredScrollDelta = std::make_unique<IntSize>(scrollDelta);
+        return;
+    }
+
+    completeUpdatesAfterScrollTo(scrollDelta);
+}
+
+void ScrollView::completeUpdatesAfterScrollTo(const IntSize& scrollDelta)
+{
     updateLayerPositionsAfterScrolling();
     scrollContents(scrollDelta);
     updateCompositingLayersAfterScrolling();

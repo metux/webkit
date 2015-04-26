@@ -293,10 +293,11 @@ PluginView::PluginView(PassRefPtr<HTMLPlugInElement> pluginElement, PassRefPtr<P
     , m_npRuntimeObjectMap(this)
 #endif
     , m_manualStreamState(StreamStateInitial)
-    , m_pluginSnapshotTimer(this, &PluginView::pluginSnapshotTimerFired, pluginSnapshotTimerDelay)
+    , m_pluginSnapshotTimer(*this, &PluginView::pluginSnapshotTimerFired, pluginSnapshotTimerDelay)
     , m_countSnapshotRetries(0)
     , m_didReceiveUserInteraction(false)
     , m_pageScaleFactor(1)
+    , m_pluginIsPlayingAudio(false)
 {
     m_webPage->addPluginView(this);
 }
@@ -310,6 +311,8 @@ PluginView::~PluginView()
 
     if (m_isWaitingUntilMediaCanStart)
         m_pluginElement->document().removeMediaCanStartListener(this);
+
+    m_pluginElement->document().removeAudioProducer(this);
 
     destroyPluginAndReset();
 
@@ -464,7 +467,7 @@ void PluginView::manualLoadDidFail(const ResourceError& error)
 
 RenderBoxModelObject* PluginView::renderer() const
 {
-    return toRenderBoxModelObject(m_pluginElement->renderer());
+    return downcast<RenderBoxModelObject>(m_pluginElement->renderer());
 }
 
 void PluginView::pageScaleFactorDidChange()
@@ -480,8 +483,8 @@ void PluginView::topContentInsetDidChange()
 void PluginView::setPageScaleFactor(double scaleFactor, IntPoint)
 {
     m_pageScaleFactor = scaleFactor;
-    m_webPage->send(Messages::WebPageProxy::PageScaleFactorDidChange(scaleFactor));
-    m_webPage->send(Messages::WebPageProxy::PageZoomFactorDidChange(scaleFactor));
+    m_webPage->send(Messages::WebPageProxy::PluginScaleFactorDidChange(scaleFactor));
+    m_webPage->send(Messages::WebPageProxy::PluginZoomFactorDidChange(scaleFactor));
     pageScaleFactorDidChange();
 }
 
@@ -589,9 +592,11 @@ void PluginView::initializePlugin()
         }
     }
 
+    m_pluginElement->document().addAudioProducer(this);
+
 #if ENABLE(PRIMARY_SNAPSHOTTED_PLUGIN_HEURISTIC)
-    HTMLPlugInImageElement* plugInImageElement = toHTMLPlugInImageElement(m_pluginElement.get());
-    m_didPlugInStartOffScreen = !m_webPage->plugInIntersectsSearchRect(*plugInImageElement);
+    HTMLPlugInImageElement& plugInImageElement = downcast<HTMLPlugInImageElement>(*m_pluginElement);
+    m_didPlugInStartOffScreen = !m_webPage->plugInIntersectsSearchRect(plugInImageElement);
 #endif
     m_plugin->initialize(this, m_parameters);
     
@@ -892,8 +897,8 @@ void PluginView::handleEvent(Event* event)
 
     const WebEvent* currentEvent = WebPage::currentEvent();
     std::unique_ptr<WebEvent> simulatedWebEvent;
-    if (event->isMouseEvent() && toMouseEvent(event)->isSimulated()) {
-        simulatedWebEvent = createWebEvent(toMouseEvent(event));
+    if (is<MouseEvent>(*event) && downcast<MouseEvent>(*event).isSimulated()) {
+        simulatedWebEvent = createWebEvent(downcast<MouseEvent>(event));
         currentEvent = simulatedWebEvent.get();
     }
     if (!currentEvent)
@@ -1297,7 +1302,7 @@ void PluginView::invalidateRect(const IntRect& dirtyRect)
     if (m_pluginElement->displayState() < HTMLPlugInElement::Restarting)
         return;
 
-    RenderBoxModelObject* renderer = toRenderBoxModelObject(m_pluginElement->renderer());
+    RenderBoxModelObject* renderer = downcast<RenderBoxModelObject>(m_pluginElement->renderer());
     if (!renderer)
         return;
 
@@ -1322,6 +1327,17 @@ void PluginView::mediaCanStart()
     m_isWaitingUntilMediaCanStart = false;
     
     initializePlugin();
+}
+
+void PluginView::pageMutedStateDidChange()
+{
+#if ENABLE(NETSCAPE_PLUGIN_API)
+    // The plug-in can be null here if it failed to initialize.
+    if (!m_isInitialized || !m_plugin)
+        return;
+
+    m_plugin->mutedStateChanged(isMuted());
+#endif
 }
 
 bool PluginView::isPluginVisible()
@@ -1433,6 +1449,23 @@ bool PluginView::evaluate(NPObject* npObject, const String& scriptString, NPVari
     UserGestureIndicator gestureIndicator(allowPopups ? DefinitelyProcessingUserGesture : PossiblyProcessingUserGesture);
     return m_npRuntimeObjectMap.evaluate(npObject, scriptString, result);
 }
+
+void PluginView::setPluginIsPlayingAudio(bool pluginIsPlayingAudio)
+{
+    if (m_pluginIsPlayingAudio == pluginIsPlayingAudio)
+        return;
+
+    m_pluginIsPlayingAudio = pluginIsPlayingAudio;
+    m_pluginElement->document().updateIsPlayingAudio();
+}
+
+bool PluginView::isMuted() const
+{
+    if (!frame() || !frame()->page())
+        return false;
+
+    return frame()->page()->isMuted();
+}
 #endif
 
 void PluginView::setStatusbarText(const String& statusbarText)
@@ -1466,16 +1499,12 @@ void PluginView::pluginProcessCrashed()
 {
     m_pluginProcessHasCrashed = true;
 
-    if (!m_pluginElement->renderer())
-        return;
-
-    if (!m_pluginElement->renderer()->isEmbeddedObject())
+    if (!is<RenderEmbeddedObject>(m_pluginElement->renderer()))
         return;
 
     m_pluginElement->setNeedsStyleRecalc(SyntheticStyleChange);
 
-    RenderEmbeddedObject* renderer = toRenderEmbeddedObject(m_pluginElement->renderer());
-    renderer->setPluginUnavailabilityReason(RenderEmbeddedObject::PluginCrashed);
+    downcast<RenderEmbeddedObject>(*m_pluginElement->renderer()).setPluginUnavailabilityReason(RenderEmbeddedObject::PluginCrashed);
     
     Widget::invalidate();
 }
@@ -1501,9 +1530,9 @@ void PluginView::setComplexTextInputState(PluginComplexTextInputState pluginComp
         m_webPage->send(Messages::WebPageProxy::SetPluginComplexTextInputState(m_plugin->pluginComplexTextInputIdentifier(), pluginComplexTextInputState));
 }
 
-mach_port_t PluginView::compositingRenderServerPort()
+const MachSendRight& PluginView::compositingRenderServerPort()
 {
-    return WebProcess::shared().compositingRenderServerPort();
+    return WebProcess::singleton().compositingRenderServerPort();
 }
 
 void PluginView::openPluginPreferencePane()
@@ -1587,11 +1616,6 @@ void PluginView::protectPluginFromDestruction()
         ref();
 }
 
-static void derefPluginView(PluginView* pluginView)
-{
-    pluginView->deref();
-}
-
 void PluginView::unprotectPluginFromDestruction()
 {
     if (m_isBeingDestroyed)
@@ -1602,10 +1626,14 @@ void PluginView::unprotectPluginFromDestruction()
     // for example, may crash if the plug-in is destroyed and we return to code for
     // the destroyed object higher on the stack. To prevent this, if the plug-in has
     // only one remaining reference, call deref() asynchronously.
-    if (hasOneRef())
-        RunLoop::main().dispatch(bind(derefPluginView, this));
-    else
-        deref();
+    if (hasOneRef()) {
+        RunLoop::main().dispatch([this] {
+            deref();
+        });
+        return;
+    }
+
+    deref();
 }
 
 void PluginView::didFinishLoad(WebFrame* webFrame)
@@ -1710,16 +1738,14 @@ static bool isAlmostSolidColor(BitmapImage* bitmap)
 
 void PluginView::pluginSnapshotTimerFired()
 {
-    ASSERT(m_plugin);
-
 #if ENABLE(PRIMARY_SNAPSHOTTED_PLUGIN_HEURISTIC)
-    HTMLPlugInImageElement* plugInImageElement = toHTMLPlugInImageElement(m_pluginElement.get());
-    bool isPlugInOnScreen = m_webPage->plugInIntersectsSearchRect(*plugInImageElement);
+    HTMLPlugInImageElement& plugInImageElement = downcast<HTMLPlugInImageElement>(*m_pluginElement);
+    bool isPlugInOnScreen = m_webPage->plugInIntersectsSearchRect(plugInImageElement);
     bool plugInCameOnScreen = isPlugInOnScreen && m_didPlugInStartOffScreen;
     bool snapshotFound = false;
 #endif
 
-    if (m_plugin->supportsSnapshotting()) {
+    if (m_plugin && m_plugin->supportsSnapshotting()) {
         // Snapshot might be 0 if plugin size is 0x0.
         RefPtr<ShareableBitmap> snapshot = m_plugin->snapshot();
         RefPtr<Image> snapshotImage;
@@ -1729,7 +1755,7 @@ void PluginView::pluginSnapshotTimerFired()
 
         if (snapshotImage) {
 #if ENABLE(PRIMARY_SNAPSHOTTED_PLUGIN_HEURISTIC)
-            bool snapshotIsAlmostSolidColor = isAlmostSolidColor(toBitmapImage(snapshotImage.get()));
+            bool snapshotIsAlmostSolidColor = isAlmostSolidColor(downcast<BitmapImage>(snapshotImage.get()));
             snapshotFound = !snapshotIsAlmostSolidColor;
 #endif
 
@@ -1747,7 +1773,7 @@ void PluginView::pluginSnapshotTimerFired()
 #if ENABLE(PRIMARY_SNAPSHOTTED_PLUGIN_HEURISTIC)
     unsigned candidateArea = 0;
     bool noSnapshotFoundAfterMaxRetries = m_countSnapshotRetries == frame()->settings().maximumPlugInSnapshotAttempts() && !isPlugInOnScreen && !snapshotFound;
-    if (m_webPage->plugInIsPrimarySize(*plugInImageElement, candidateArea)
+    if (m_webPage->plugInIsPrimarySize(plugInImageElement, candidateArea)
         && (noSnapshotFoundAfterMaxRetries || plugInCameOnScreen))
         m_pluginElement->setDisplayState(HTMLPlugInElement::Playing);
     else
@@ -1781,12 +1807,12 @@ void PluginView::pluginDidReceiveUserInteraction()
 
     m_didReceiveUserInteraction = true;
 
-    WebCore::HTMLPlugInImageElement* plugInImageElement = toHTMLPlugInImageElement(m_pluginElement.get());
-    String pageOrigin = plugInImageElement->document().page()->mainFrame().document()->baseURL().host();
-    String pluginOrigin = plugInImageElement->loadedUrl().host();
-    String mimeType = plugInImageElement->loadedMimeType();
+    HTMLPlugInImageElement& plugInImageElement = downcast<HTMLPlugInImageElement>(*m_pluginElement);
+    String pageOrigin = plugInImageElement.document().page()->mainFrame().document()->baseURL().host();
+    String pluginOrigin = plugInImageElement.loadedUrl().host();
+    String mimeType = plugInImageElement.loadedMimeType();
 
-    WebProcess::shared().plugInDidReceiveUserInteraction(pageOrigin, pluginOrigin, mimeType, plugInImageElement->document().page()->sessionID());
+    WebProcess::singleton().plugInDidReceiveUserInteraction(pageOrigin, pluginOrigin, mimeType, plugInImageElement.document().page()->sessionID());
 }
 
 bool PluginView::shouldCreateTransientPaintingSnapshot() const

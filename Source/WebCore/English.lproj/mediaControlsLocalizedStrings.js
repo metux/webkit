@@ -6,10 +6,12 @@ var UIStringTable = {
     '##TVOUT_DEVICE_NAME##': 'This video is playing on the TV.',
 
     'Aborted': 'Aborted',
+    'Audio': 'Audio',
     'Audio Playback': 'Audio Playback',
     'Captions': 'Captions',
     'Choose Wireless Display': 'Choose Wireless Display',
     'Display Full Screen': 'Display Full Screen',
+    'Display Optimized Full Screen': 'Display Optimized Full Screen',
     'Duration': 'Duration',
     'Elapsed': 'Elapsed',
     'Error': 'Error',

@@ -39,12 +39,12 @@
 #define WINVER 0x0502
 #endif
 
-#if !COMPILER(MSVC7_OR_LOWER) && !OS(WINCE)
+#if !COMPILER(MSVC7_OR_LOWER)
 // We need to define this before the first #include of stdlib.h or it won't contain rand_s.
 #ifndef _CRT_RAND_S
 #define _CRT_RAND_S
 #endif
-#endif // !COMPILER(MSVC7_OR_LOWER) && !OS(WINCE)
+#endif // !COMPILER(MSVC7_OR_LOWER
 
 #endif // OS(WINDOWS)
 
@@ -63,8 +63,4 @@
 #else
 #define SKIP_STATIC_CONSTRUCTORS_ON_GCC 1
 #endif
-
-// Enable the following if you want to use the MacroAssembler::probe() facility
-// to do JIT debugging.
-#define WTF_USE_MASM_PROBE 0
 

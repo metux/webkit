@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011, 2012, 2013, 2014 Apple Inc. All rights reserved.
+ * Copyright (C) 2011-2015 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -28,6 +28,7 @@
 
 #if ENABLE(DFG_JIT)
 
+#include "BasicBlockLocation.h"
 #include "CodeBlock.h"
 #include "DFGAbstractValue.h"
 #include "DFGAdjacencyList.h"
@@ -38,6 +39,7 @@
 #include "DFGNodeFlags.h"
 #include "DFGNodeOrigin.h"
 #include "DFGNodeType.h"
+#include "DFGObjectMaterializationData.h"
 #include "DFGTransition.h"
 #include "DFGUseKind.h"
 #include "DFGVariableAccessData.h"
@@ -47,6 +49,7 @@
 #include "PutByIdVariant.h"
 #include "SpeculatedType.h"
 #include "StructureSet.h"
+#include "TypeLocation.h"
 #include "ValueProfile.h"
 #include <wtf/ListDump.h>
 
@@ -54,6 +57,11 @@ namespace JSC { namespace DFG {
 
 class Graph;
 struct BasicBlock;
+
+struct StorageAccessData {
+    PropertyOffset offset;
+    unsigned identifierNumber;
+};
 
 struct MultiGetByOffsetData {
     unsigned identifierNumber;
@@ -373,6 +381,12 @@ struct Node {
     {
         setOpAndDefaultFlags(Check);
     }
+
+    void convertToCheckStructure(StructureSet* set)
+    {
+        setOpAndDefaultFlags(CheckStructure);
+        m_opInfo = bitwise_cast<uintptr_t>(set); 
+    }
     
     void replaceWith(Node* other)
     {
@@ -434,7 +448,7 @@ struct Node {
             m_op = Int52Constant;
         else
             m_op = JSConstant;
-        m_flags &= ~(NodeMustGenerate | NodeMightClobber | NodeClobbersWorld);
+        m_flags &= ~NodeMustGenerate;
         m_opInfo = bitwise_cast<uintptr_t>(value);
         children.reset();
     }
@@ -450,21 +464,21 @@ struct Node {
     void convertToGetLocalUnlinked(VirtualRegister local)
     {
         m_op = GetLocalUnlinked;
-        m_flags &= ~(NodeMustGenerate | NodeMightClobber | NodeClobbersWorld);
+        m_flags &= ~NodeMustGenerate;
         m_opInfo = local.offset();
         m_opInfo2 = VirtualRegister().offset();
         children.reset();
     }
     
-    void convertToGetByOffset(unsigned storageAccessDataIndex, Edge storage)
+    void convertToGetByOffset(StorageAccessData& data, Edge storage)
     {
         ASSERT(m_op == GetById || m_op == GetByIdFlush || m_op == MultiGetByOffset);
-        m_opInfo = storageAccessDataIndex;
+        m_opInfo = bitwise_cast<uintptr_t>(&data);
         children.setChild2(children.child1());
         children.child2().setUseKind(KnownCellUse);
         children.setChild1(storage);
         m_op = GetByOffset;
-        m_flags &= ~NodeClobbersWorld;
+        m_flags &= ~NodeMustGenerate;
     }
     
     void convertToMultiGetByOffset(MultiGetByOffsetData* data)
@@ -473,18 +487,17 @@ struct Node {
         m_opInfo = bitwise_cast<intptr_t>(data);
         child1().setUseKind(CellUse);
         m_op = MultiGetByOffset;
-        m_flags &= ~NodeClobbersWorld;
+        ASSERT(m_flags & NodeMustGenerate);
     }
     
-    void convertToPutByOffset(unsigned storageAccessDataIndex, Edge storage)
+    void convertToPutByOffset(StorageAccessData& data, Edge storage)
     {
         ASSERT(m_op == PutById || m_op == PutByIdDirect || m_op == PutByIdFlush || m_op == MultiPutByOffset);
-        m_opInfo = storageAccessDataIndex;
+        m_opInfo = bitwise_cast<uintptr_t>(&data);
         children.setChild3(children.child2());
         children.setChild2(children.child1());
         children.setChild1(storage);
         m_op = PutByOffset;
-        m_flags &= ~NodeClobbersWorld;
     }
     
     void convertToMultiPutByOffset(MultiPutByOffsetData* data)
@@ -492,15 +505,50 @@ struct Node {
         ASSERT(m_op == PutById || m_op == PutByIdDirect || m_op == PutByIdFlush);
         m_opInfo = bitwise_cast<intptr_t>(data);
         m_op = MultiPutByOffset;
-        m_flags &= ~NodeClobbersWorld;
     }
     
-    void convertToPhantomLocal()
+    void convertToPutByOffsetHint()
+    {
+        ASSERT(m_op == PutByOffset);
+        m_opInfo = storageAccessData().identifierNumber;
+        m_op = PutByOffsetHint;
+        child1() = child2();
+        child2() = child3();
+        child3() = Edge();
+    }
+    
+    void convertToPutStructureHint(Node* structure)
+    {
+        ASSERT(m_op == PutStructure);
+        ASSERT(structure->castConstant<Structure*>() == transition()->next);
+        m_op = PutStructureHint;
+        m_opInfo = 0;
+        child2() = Edge(structure, KnownCellUse);
+    }
+    
+    void convertToPhantomNewObject()
+    {
+        ASSERT(m_op == NewObject || m_op == MaterializeNewObject);
+        m_op = PhantomNewObject;
+        m_flags &= ~NodeHasVarArgs;
+        m_opInfo = 0;
+        m_opInfo2 = 0;
+        children = AdjacencyList();
+    }
+    
+    void convertPhantomToPhantomLocal()
     {
         ASSERT(m_op == Phantom && (child1()->op() == Phi || child1()->op() == SetLocal || child1()->op() == SetArgument));
         m_op = PhantomLocal;
         m_opInfo = child1()->m_opInfo; // Copy the variableAccessData.
         children.setChild1(Edge());
+    }
+    
+    void convertFlushToPhantomLocal()
+    {
+        ASSERT(m_op == Flush);
+        m_op = PhantomLocal;
+        children = AdjacencyList();
     }
     
     void convertToGetLocal(VariableAccessData* variable, Node* phi)
@@ -516,6 +564,13 @@ struct Node {
     {
         ASSERT(m_op == ToPrimitive);
         m_op = ToString;
+    }
+
+    void convertToArithSqrt()
+    {
+        ASSERT(m_op == ArithPow);
+        child2() = Edge();
+        m_op = ArithSqrt;
     }
     
     JSValue asJSValue()
@@ -575,7 +630,7 @@ struct Node {
      
     bool isCellConstant()
     {
-        return isConstant() && constant()->value().isCell();
+        return isConstant() && constant()->value() && constant()->value().isCell();
     }
      
     JSCell* asCell()
@@ -589,6 +644,14 @@ struct Node {
         if (!isCellConstant())
             return nullptr;
         return jsDynamicCast<T>(asCell());
+    }
+    
+    template<typename T>
+    T castConstant()
+    {
+        T result = dynamicCastConstant<T>();
+        RELEASE_ASSERT(result);
+        return result;
     }
      
     bool containsMovHint()
@@ -640,6 +703,7 @@ struct Node {
         case ExtractOSREntryLocal:
         case MovHint:
         case ZombieHint:
+        case KillLocal:
             return true;
         default:
             return false;
@@ -699,6 +763,7 @@ struct Node {
         case PutById:
         case PutByIdFlush:
         case PutByIdDirect:
+        case PutByOffsetHint:
             return true;
         default:
             return false;
@@ -711,33 +776,13 @@ struct Node {
         return m_opInfo;
     }
     
-    bool hasArithNodeFlags()
-    {
-        switch (op()) {
-        case UInt32ToNumber:
-        case ArithAdd:
-        case ArithSub:
-        case ArithNegate:
-        case ArithMul:
-        case ArithAbs:
-        case ArithMin:
-        case ArithMax:
-        case ArithMod:
-        case ArithDiv:
-        case ValueAdd:
-            return true;
-        default:
-            return false;
-        }
-    }
-    
     // This corrects the arithmetic node flags, so that irrelevant bits are
     // ignored. In particular, anything other than ArithMul does not need
     // to know if it can speculate on negative zero.
     NodeFlags arithNodeFlags()
     {
         NodeFlags result = m_flags & NodeArithFlagsMask;
-        if (op() == ArithMul || op() == ArithDiv || op() == ArithMod || op() == ArithNegate || op() == DoubleAsInt32)
+        if (op() == ArithMul || op() == ArithDiv || op() == ArithMod || op() == ArithNegate || op() == ArithPow || op() == DoubleAsInt32)
             return result;
         return result & ~NodeBytecodeNeedsNegZero;
     }
@@ -1004,8 +1049,6 @@ struct Node {
         case GetMyArgumentByValSafe:
         case Call:
         case Construct:
-        case ProfiledCall:
-        case ProfiledConstruct:
         case NativeCall:
         case NativeConstruct:
         case GetByOffset:
@@ -1150,13 +1193,20 @@ struct Node {
     
     bool hasStorageAccessData()
     {
-        return op() == GetByOffset || op() == GetGetterSetterByOffset || op() == PutByOffset;
+        switch (op()) {
+        case GetByOffset:
+        case PutByOffset:
+        case GetGetterSetterByOffset:
+            return true;
+        default:
+            return false;
+        }
     }
     
-    unsigned storageAccessDataIndex()
+    StorageAccessData& storageAccessData()
     {
         ASSERT(hasStorageAccessData());
-        return m_opInfo;
+        return *bitwise_cast<StorageAccessData*>(m_opInfo);
     }
     
     bool hasMultiGetByOffsetData()
@@ -1177,6 +1227,26 @@ struct Node {
     MultiPutByOffsetData& multiPutByOffsetData()
     {
         return *reinterpret_cast<MultiPutByOffsetData*>(m_opInfo);
+    }
+    
+    bool hasObjectMaterializationData()
+    {
+        return op() == MaterializeNewObject;
+    }
+    
+    ObjectMaterializationData& objectMaterializationData()
+    {
+        return *reinterpret_cast<ObjectMaterializationData*>(m_opInfo);
+    }
+    
+    bool isPhantomObjectAllocation()
+    {
+        switch (op()) {
+        case PhantomNewObject:
+            return true;
+        default:
+            return false;
+        }
     }
     
     bool hasFunctionDeclIndex()
@@ -1319,6 +1389,8 @@ struct Node {
     {
         switch (op()) {
         case SetLocal:
+        case PutLocal:
+        case KillLocal:
         case MovHint:
         case ZombieHint:
         case PhantomArguments:
@@ -1701,6 +1773,16 @@ struct Node {
     bool canSpeculateInt52(PredictionPass pass)
     {
         return canSpeculateInt52(sourceFor(pass));
+    }
+
+    TypeLocation* typeLocation()
+    {
+        return reinterpret_cast<TypeLocation*>(m_opInfo);
+    }
+
+    BasicBlockLocation* basicBlockLocation()
+    {
+        return reinterpret_cast<BasicBlockLocation*>(m_opInfo);
     }
     
     void dumpChildren(PrintStream& out)

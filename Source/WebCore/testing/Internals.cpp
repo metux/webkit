@@ -31,6 +31,7 @@
 #include "AnimationController.h"
 #include "ApplicationCacheStorage.h"
 #include "BackForwardController.h"
+#include "CachedImage.h"
 #include "CachedResourceLoader.h"
 #include "Chrome.h"
 #include "ChromeClient.h"
@@ -52,11 +53,13 @@
 #include "FrameLoader.h"
 #include "FrameView.h"
 #include "HTMLIFrameElement.h"
+#include "HTMLImageElement.h"
 #include "HTMLInputElement.h"
 #include "HTMLNames.h"
 #include "HTMLPlugInElement.h"
 #include "HTMLSelectElement.h"
 #include "HTMLTextAreaElement.h"
+#include "HTMLVideoElement.h"
 #include "HistoryController.h"
 #include "HistoryItem.h"
 #include "InspectorClient.h"
@@ -75,7 +78,10 @@
 #include "MediaSessionManager.h"
 #include "MemoryCache.h"
 #include "MemoryInfo.h"
+#include "MockPageOverlayClient.h"
 #include "Page.h"
+#include "PageCache.h"
+#include "PageOverlay.h"
 #include "PrintContext.h"
 #include "PseudoElement.h"
 #include "Range.h"
@@ -83,6 +89,7 @@
 #include "RenderMenuList.h"
 #include "RenderTreeAsText.h"
 #include "RenderView.h"
+#include "RenderedDocumentMarker.h"
 #include "RuntimeEnabledFeatures.h"
 #include "SchemeRegistry.h"
 #include "ScrollingCoordinator.h"
@@ -99,6 +106,7 @@
 #include "ViewportArguments.h"
 #include "WebConsoleAgent.h"
 #include "WorkerThread.h"
+#include "XMLHttpRequest.h"
 #include <bytecode/CodeBlock.h>
 #include <inspector/InspectorAgentBase.h>
 #include <inspector/InspectorValues.h>
@@ -159,6 +167,10 @@
 #include "MockMediaPlayerMediaSource.h"
 #endif
 
+#if PLATFORM(MAC)
+#include "DictionaryLookup.h"
+#endif
+
 using JSC::CodeBlock;
 using JSC::FunctionExecutable;
 using JSC::JSFunction;
@@ -172,7 +184,6 @@ namespace WebCore {
 
 using namespace HTMLNames;
 
-#if ENABLE(INSPECTOR)
 class InspectorFrontendClientDummy : public InspectorFrontendClientLocal {
 public:
     InspectorFrontendClientDummy(InspectorController*, Page*);
@@ -217,7 +228,6 @@ bool InspectorFrontendChannelDummy::sendMessageToFrontend(const String& message)
 {
     return InspectorClient::doDispatchMessageOnFrontendPage(m_frontendPage, message);
 }
-#endif // ENABLE(INSPECTOR)
 
 static bool markerTypesFrom(const String& markerType, DocumentMarker::MarkerTypes& result)
 {
@@ -281,9 +291,7 @@ void Internals::resetToConsistentState(Page* page)
     TextRun::setAllowsRoundingHacks(false);
     WebCore::overrideUserPreferredLanguages(Vector<String>());
     WebCore::Settings::setUsesOverlayScrollbars(false);
-#if ENABLE(INSPECTOR)
     page->inspectorController().setProfilerEnabled(false);
-#endif
 #if ENABLE(VIDEO_TRACK)
     page->group().captionPreferences()->setCaptionsStyleSheetOverride(emptyString());
     page->group().captionPreferences()->setTestingMode(false);
@@ -300,6 +308,8 @@ void Internals::resetToConsistentState(Page* page)
     AXObjectCache::setEnhancedUserInterfaceAccessibility(false);
     AXObjectCache::disableAccessibility();
 #endif
+
+    MockPageOverlayClient::singleton().uninstallAllOverlays();
 }
 
 Internals::Internals(Document* document)
@@ -319,13 +329,13 @@ Internals::Internals(Document* document)
 
 Document* Internals::contextDocument() const
 {
-    return toDocument(scriptExecutionContext());
+    return downcast<Document>(scriptExecutionContext());
 }
 
 Frame* Internals::frame() const
 {
     if (!contextDocument())
-        return 0;
+        return nullptr;
     return contextDocument()->frame();
 }
 
@@ -368,17 +378,62 @@ String Internals::description(Deprecated::ScriptValue value)
 bool Internals::isPreloaded(const String& url)
 {
     Document* document = contextDocument();
-    return document->cachedResourceLoader()->isPreloaded(url);
+    return document->cachedResourceLoader().isPreloaded(url);
 }
 
 bool Internals::isLoadingFromMemoryCache(const String& url)
 {
     if (!contextDocument() || !contextDocument()->page())
         return false;
-    CachedResource* resource = memoryCache()->resourceForURL(contextDocument()->completeURL(url), contextDocument()->page()->sessionID());
+    CachedResource* resource = MemoryCache::singleton().resourceForURL(contextDocument()->completeURL(url), contextDocument()->page()->sessionID());
     return resource && resource->status() == CachedResource::Cached;
 }
 
+String Internals::xhrResponseSource(XMLHttpRequest* xhr)
+{
+    if (!xhr)
+        return "Null xhr";
+    if (xhr->resourceResponse().isNull())
+        return "Null response";
+    switch (xhr->resourceResponse().source()) {
+    case ResourceResponse::Source::Unknown:
+        return "Unknown";
+    case ResourceResponse::Source::Network:
+        return "Network";
+    case ResourceResponse::Source::DiskCache:
+        return "Disk cache";
+    case ResourceResponse::Source::DiskCacheAfterValidation:
+        return "Disk cache after validation";
+    }
+    ASSERT_NOT_REACHED();
+    return "Error";
+}
+
+void Internals::clearMemoryCache()
+{
+    MemoryCache::singleton().evictResources();
+}
+
+void Internals::pruneMemoryCacheToSize(unsigned size)
+{
+    MemoryCache::singleton().pruneDeadResourcesToSize(size);
+    MemoryCache::singleton().pruneLiveResourcesToSize(size, true);
+}
+
+unsigned Internals::memoryCacheSize() const
+{
+    return MemoryCache::singleton().size();
+}
+
+void Internals::clearPageCache()
+{
+    PageCache::singleton().pruneToSizeNow(0, PruningReason::None);
+}
+
+unsigned Internals::pageCacheSize() const
+{
+    return PageCache::singleton().pageCount();
+}
 
 Node* Internals::treeScopeRootNode(Node* node, ExceptionCode& ec)
 {
@@ -537,6 +592,15 @@ String Internals::elementRenderTreeAsText(Element* element, ExceptionCode& ec)
     return representation;
 }
 
+bool Internals::hasPausedImageAnimations(Element* element, ExceptionCode& ec)
+{
+    if (!element) {
+        ec = INVALID_ACCESS_ERR;
+        return false;
+    }
+    return element->renderer() && element->renderer()->hasPausedImageAnimations();
+}
+
 PassRefPtr<CSSComputedStyleDeclaration> Internals::computedStyleIncludingVisitedInfo(Node* node, ExceptionCode& ec) const
 {
     if (!node) {
@@ -574,19 +638,19 @@ Node* Internals::shadowRoot(Element* host, ExceptionCode& ec)
 {
     if (!host) {
         ec = INVALID_ACCESS_ERR;
-        return 0;
+        return nullptr;
     }
     return host->shadowRoot();
 }
 
 String Internals::shadowRootType(const Node* root, ExceptionCode& ec) const
 {
-    if (!root || !root->isShadowRoot()) {
+    if (!is<ShadowRoot>(root)) {
         ec = INVALID_ACCESS_ERR;
         return String();
     }
 
-    switch (toShadowRoot(root)->type()) {
+    switch (downcast<ShadowRoot>(*root).type()) {
     case ShadowRoot::UserAgentShadowRoot:
         return String("UserAgentShadowRoot");
     default:
@@ -598,7 +662,7 @@ String Internals::shadowRootType(const Node* root, ExceptionCode& ec) const
 Element* Internals::includerFor(Node*, ExceptionCode& ec)
 {
     ec = INVALID_ACCESS_ERR;
-    return 0;
+    return nullptr;
 }
 
 String Internals::shadowPseudoId(Element* element, ExceptionCode& ec)
@@ -621,10 +685,20 @@ void Internals::setShadowPseudoId(Element* element, const String& id, ExceptionC
     return element->setPseudo(id);
 }
 
+bool Internals::isTimerThrottled(int timeoutId, ExceptionCode& ec)
+{
+    DOMTimer* timer = scriptExecutionContext()->findTimeout(timeoutId);
+    if (!timer) {
+        ec = NOT_FOUND_ERR;
+        return false;
+    }
+    return timer->m_throttleState == DOMTimer::ShouldThrottle;
+}
+
 String Internals::visiblePlaceholder(Element* element)
 {
-    if (element && isHTMLTextFormControlElement(*element)) {
-        const HTMLTextFormControlElement& textFormControlElement = toHTMLTextFormControlElement(*element);
+    if (is<HTMLTextFormControlElement>(element)) {
+        const HTMLTextFormControlElement& textFormControlElement = downcast<HTMLTextFormControlElement>(*element);
         if (!textFormControlElement.isPlaceholderVisible())
             return String();
         if (HTMLElement* placeholderElement = textFormControlElement.placeholderElement())
@@ -637,7 +711,7 @@ String Internals::visiblePlaceholder(Element* element)
 #if ENABLE(INPUT_TYPE_COLOR)
 void Internals::selectColorInColorChooser(Element* element, const String& colorValue)
 {
-    if (!isHTMLInputElement(element))
+    if (!is<HTMLInputElement>(*element))
         return;
     HTMLInputElement* inputElement = element->toInputElement();
     if (!inputElement)
@@ -698,7 +772,7 @@ void Internals::enableMockRTCPeerConnectionHandler()
 }
 #endif
 
-PassRefPtr<ClientRect> Internals::absoluteCaretBounds(ExceptionCode& ec)
+Ref<ClientRect> Internals::absoluteCaretBounds(ExceptionCode& ec)
 {
     Document* document = contextDocument();
     if (!document || !document->frame()) {
@@ -709,7 +783,7 @@ PassRefPtr<ClientRect> Internals::absoluteCaretBounds(ExceptionCode& ec)
     return ClientRect::create(document->frame()->selection().absoluteCaretBounds());
 }
 
-PassRefPtr<ClientRect> Internals::boundingBox(Element* element, ExceptionCode& ec)
+Ref<ClientRect> Internals::boundingBox(Element* element, ExceptionCode& ec)
 {
     if (!element) {
         ec = INVALID_ACCESS_ERR;
@@ -723,9 +797,8 @@ PassRefPtr<ClientRect> Internals::boundingBox(Element* element, ExceptionCode& e
     return ClientRect::create(renderer->absoluteBoundingBoxRectIgnoringTransforms());
 }
 
-PassRefPtr<ClientRectList> Internals::inspectorHighlightRects(ExceptionCode& ec)
+Ref<ClientRectList> Internals::inspectorHighlightRects(ExceptionCode& ec)
 {
-#if ENABLE(INSPECTOR)
     Document* document = contextDocument();
     if (!document || !document->page()) {
         ec = INVALID_ACCESS_ERR;
@@ -733,28 +806,19 @@ PassRefPtr<ClientRectList> Internals::inspectorHighlightRects(ExceptionCode& ec)
     }
 
     Highlight highlight;
-    document->page()->inspectorController().getHighlight(&highlight, InspectorOverlay::CoordinateSystem::View);
+    document->page()->inspectorController().getHighlight(highlight, InspectorOverlay::CoordinateSystem::View);
     return ClientRectList::create(highlight.quads);
-#else
-    UNUSED_PARAM(ec);
-    return ClientRectList::create();
-#endif
 }
 
 String Internals::inspectorHighlightObject(ExceptionCode& ec)
 {
-#if ENABLE(INSPECTOR)
     Document* document = contextDocument();
     if (!document || !document->page()) {
         ec = INVALID_ACCESS_ERR;
         return String();
     }
-    RefPtr<InspectorObject> object = document->page()->inspectorController().buildObjectForHighlightedNode();
+    auto object = document->page()->inspectorController().buildObjectForHighlightedNode();
     return object ? object->toJSONString() : String();
-#else
-    UNUSED_PARAM(ec);
-    return String();
-#endif
 }
 
 unsigned Internals::markerCountForNode(Node* node, const String& markerType, ExceptionCode& ec)
@@ -775,39 +839,39 @@ unsigned Internals::markerCountForNode(Node* node, const String& markerType, Exc
     return node->document().markers().markersFor(node, markerTypes).size();
 }
 
-DocumentMarker* Internals::markerAt(Node* node, const String& markerType, unsigned index, ExceptionCode& ec)
+RenderedDocumentMarker* Internals::markerAt(Node* node, const String& markerType, unsigned index, ExceptionCode& ec)
 {
     node->document().updateLayoutIgnorePendingStylesheets();
     if (!node) {
         ec = INVALID_ACCESS_ERR;
-        return 0;
+        return nullptr;
     }
 
     DocumentMarker::MarkerTypes markerTypes = 0;
     if (!markerTypesFrom(markerType, markerTypes)) {
         ec = SYNTAX_ERR;
-        return 0;
+        return nullptr;
     }
 
     node->document().frame()->editor().updateEditorUINowIfScheduled();
 
-    Vector<DocumentMarker*> markers = node->document().markers().markersFor(node, markerTypes);
+    Vector<RenderedDocumentMarker*> markers = node->document().markers().markersFor(node, markerTypes);
     if (markers.size() <= index)
-        return 0;
+        return nullptr;
     return markers[index];
 }
 
 PassRefPtr<Range> Internals::markerRangeForNode(Node* node, const String& markerType, unsigned index, ExceptionCode& ec)
 {
-    DocumentMarker* marker = markerAt(node, markerType, index, ec);
+    RenderedDocumentMarker* marker = markerAt(node, markerType, index, ec);
     if (!marker)
-        return 0;
+        return nullptr;
     return Range::create(node->document(), node, marker->startOffset(), node, marker->endOffset());
 }
 
 String Internals::markerDescriptionForNode(Node* node, const String& markerType, unsigned index, ExceptionCode& ec)
 {
-    DocumentMarker* marker = markerAt(node, markerType, index, ec);
+    RenderedDocumentMarker* marker = markerAt(node, markerType, index, ec);
     if (!marker)
         return String();
     return marker->description();
@@ -912,9 +976,8 @@ bool Internals::wasLastChangeUserEdit(Element* textField, ExceptionCode& ec)
     if (HTMLInputElement* inputElement = textField->toInputElement())
         return inputElement->lastChangeWasUserEdit();
 
-    // FIXME: We should be using hasTagName instead but Windows port doesn't link QualifiedNames properly.
-    if (textField->tagName() == "TEXTAREA")
-        return toHTMLTextAreaElement(textField)->lastChangeWasUserEdit();
+    if (is<HTMLTextAreaElement>(*textField))
+        return downcast<HTMLTextAreaElement>(*textField).lastChangeWasUserEdit();
 
     ec = INVALID_NODE_TYPE_ERR;
     return false;
@@ -1026,6 +1089,38 @@ String Internals::rangeAsText(const Range* range, ExceptionCode& ec)
     }
 
     return range->text();
+}
+
+PassRefPtr<Range> Internals::subrange(Range* range, int rangeLocation, int rangeLength, ExceptionCode& ec)
+{
+    if (!range) {
+        ec = INVALID_ACCESS_ERR;
+        return 0;
+    }
+
+    return TextIterator::subrange(range, rangeLocation, rangeLength);
+}
+
+RefPtr<Range> Internals::rangeForDictionaryLookupAtLocation(int x, int y, ExceptionCode& ec)
+{
+#if PLATFORM(MAC)
+    Document* document = contextDocument();
+    if (!document || !document->frame()) {
+        ec = INVALID_ACCESS_ERR;
+        return nullptr;
+    }
+
+    document->updateLayoutIgnorePendingStylesheets();
+    
+    HitTestResult result = document->frame()->mainFrame().eventHandler().hitTestResultAtPoint(IntPoint(x, y));
+    NSDictionary *options = nullptr;
+    return rangeForDictionaryLookupAtHitTestResult(result, &options);
+#else
+    UNUSED_PARAM(x);
+    UNUSED_PARAM(y);
+    ec = INVALID_ACCESS_ERR;
+    return nullptr;
+#endif
 }
 
 void Internals::setDelegatesScrolling(bool enabled, ExceptionCode& ec)
@@ -1281,23 +1376,11 @@ void Internals::updateEditorUINowIfScheduled()
     }
 }
 
-Node* Internals::findEditingDeleteButton()
-{
-    Document* document = contextDocument();
-    if (!document || !document->frame())
-        return 0;
-
-    updateEditorUINowIfScheduled();
-
-    // FIXME: We shouldn't pollute the id namespace with this name.
-    return document->getElementById(String(ASCIILiteral("WebKit-Editing-Delete-Button")));
-}
-
 bool Internals::hasSpellingMarker(int from, int length, ExceptionCode&)
 {
     Document* document = contextDocument();
     if (!document || !document->frame())
-        return 0;
+        return false;
 
     updateEditorUINowIfScheduled();
 
@@ -1308,7 +1391,7 @@ bool Internals::hasAutocorrectedMarker(int from, int length, ExceptionCode&)
 {
     Document* document = contextDocument();
     if (!document || !document->frame())
-        return 0;
+        return false;
 
     updateEditorUINowIfScheduled();
 
@@ -1393,7 +1476,7 @@ bool Internals::isOverwriteModeEnabled(ExceptionCode&)
 {
     Document* document = contextDocument();
     if (!document || !document->frame())
-        return 0;
+        return false;
 
     return document->frame()->editor().isOverwriteModeEnabled();
 }
@@ -1435,14 +1518,13 @@ unsigned Internals::numberOfLiveDocuments() const
     return Document::allDocuments().size();
 }
 
-#if ENABLE(INSPECTOR)
 Vector<String> Internals::consoleMessageArgumentCounts() const
 {
     Document* document = contextDocument();
     if (!document || !document->page())
         return Vector<String>();
 
-    InstrumentingAgents* instrumentingAgents = instrumentationForPage(document->page());
+    InstrumentingAgents* instrumentingAgents = InspectorInstrumentation::instrumentingAgentsForPage(document->page());
     if (!instrumentingAgents)
         return Vector<String>();
 
@@ -1471,13 +1553,12 @@ PassRefPtr<DOMWindow> Internals::openDummyInspectorFrontend(const String& url)
     Page* frontendPage = m_frontendWindow->document()->page();
     ASSERT(frontendPage);
 
-    auto frontendClient = std::make_unique<InspectorFrontendClientDummy>(&page->inspectorController(), frontendPage);
+    m_frontendClient = std::make_unique<InspectorFrontendClientDummy>(&page->inspectorController(), frontendPage);
+    frontendPage->inspectorController().setInspectorFrontendClient(m_frontendClient.get());
 
-    frontendPage->inspectorController().setInspectorFrontendClient(WTF::move(frontendClient));
-
-    m_frontendChannel = adoptPtr(new InspectorFrontendChannelDummy(frontendPage));
-
-    page->inspectorController().connectFrontend(m_frontendChannel.get());
+    bool isAutomaticInspection = false;
+    m_frontendChannel = std::make_unique<InspectorFrontendChannelDummy>(frontendPage);
+    page->inspectorController().connectFrontend(m_frontendChannel.get(), isAutomaticInspection);
 
     return m_frontendWindow;
 }
@@ -1488,12 +1569,13 @@ void Internals::closeDummyInspectorFrontend()
     ASSERT(page);
     ASSERT(m_frontendWindow);
 
-    page->inspectorController().disconnectFrontend(InspectorDisconnectReason::InspectorDestroyed);
+    page->inspectorController().disconnectFrontend(Inspector::DisconnectReason::InspectorDestroyed);
 
-    m_frontendChannel.release();
+    m_frontendClient = nullptr;
+    m_frontendChannel = nullptr;
 
     m_frontendWindow->close(m_frontendWindow->scriptExecutionContext());
-    m_frontendWindow.release();
+    m_frontendWindow.clear();
 }
 
 void Internals::setJavaScriptProfilingEnabled(bool enabled, ExceptionCode& ec)
@@ -1517,13 +1599,12 @@ void Internals::setInspectorIsUnderTest(bool isUnderTest, ExceptionCode& ec)
 
     page->inspectorController().setIsUnderTest(isUnderTest);
 }
-#endif // ENABLE(INSPECTOR)
 
 bool Internals::hasGrammarMarker(int from, int length, ExceptionCode&)
 {
     Document* document = contextDocument();
     if (!document || !document->frame())
-        return 0;
+        return false;
 
     return document->frame()->editor().selectionStartHasMarkerFor(DocumentMarker::Grammar, from, length);
 }
@@ -1630,17 +1711,17 @@ String Internals::mainThreadScrollingReasons(ExceptionCode& ec) const
     return page->synchronousScrollingReasonsAsText();
 }
 
-PassRefPtr<ClientRectList> Internals::nonFastScrollableRects(ExceptionCode& ec) const
+RefPtr<ClientRectList> Internals::nonFastScrollableRects(ExceptionCode& ec) const
 {
     Document* document = contextDocument();
     if (!document || !document->frame()) {
         ec = INVALID_ACCESS_ERR;
-        return 0;
+        return nullptr;
     }
 
     Page* page = document->page();
     if (!page)
-        return 0;
+        return nullptr;
 
     return page->nonFastScrollableRects(document->frame());
 }
@@ -1652,11 +1733,7 @@ void Internals::garbageCollectDocumentResources(ExceptionCode& ec) const
         ec = INVALID_ACCESS_ERR;
         return;
     }
-
-    CachedResourceLoader* cachedResourceLoader = document->cachedResourceLoader();
-    if (!cachedResourceLoader)
-        return;
-    cachedResourceLoader->garbageCollectDocumentResources();
+    document->cachedResourceLoader().garbageCollectDocumentResources();
 }
 
 void Internals::allowRoundingHacks() const
@@ -1917,10 +1994,10 @@ void Internals::updateLayoutIgnorePendingStylesheetsAndRunPostLayoutTasks(Node* 
     Document* document;
     if (!node)
         document = contextDocument();
-    else if (node->isDocumentNode())
-        document = toDocument(node);
-    else if (node->hasTagName(HTMLNames::iframeTag))
-        document = toHTMLIFrameElement(node)->contentDocument();
+    else if (is<Document>(*node))
+        document = downcast<Document>(node);
+    else if (is<HTMLIFrameElement>(*node))
+        document = downcast<HTMLIFrameElement>(*node).contentDocument();
     else {
         ec = TypeError;
         return;
@@ -2061,6 +2138,18 @@ String Internals::markerTextForListItem(Element* element, ExceptionCode& ec)
     return WebCore::markerTextForListItem(element);
 }
 
+String Internals::toolTipFromElement(Element* element, ExceptionCode& ec) const
+{
+    if (!element) {
+        ec = INVALID_ACCESS_ERR;
+        return String();
+    }
+    HitTestResult result;
+    result.setInnerNode(element);
+    TextDirection dir;
+    return result.title(dir);
+}
+
 String Internals::getImageSourceURL(Element* element, ExceptionCode& ec)
 {
     if (!element) {
@@ -2074,28 +2163,46 @@ String Internals::getImageSourceURL(Element* element, ExceptionCode& ec)
 void Internals::simulateAudioInterruption(Node* node)
 {
 #if USE(GSTREAMER)
-    HTMLMediaElement* element = toHTMLMediaElement(node);
+    HTMLMediaElement* element = downcast<HTMLMediaElement>(node);
     element->player()->simulateAudioInterruption();
 #else
     UNUSED_PARAM(node);
 #endif
 }
+
+bool Internals::mediaElementHasCharacteristic(Node* node, const String& characteristic, ExceptionCode& ec)
+{
+    if (!is<HTMLMediaElement>(*node))
+        return false;
+
+    HTMLMediaElement* element = downcast<HTMLMediaElement>(node);
+
+    if (equalIgnoringCase(characteristic, "Audible"))
+        return element->hasAudio();
+    if (equalIgnoringCase(characteristic, "Visual"))
+        return element->hasVideo();
+    if (equalIgnoringCase(characteristic, "Legible"))
+        return element->hasClosedCaptions();
+
+    ec = SYNTAX_ERR;
+    return false;
+}
 #endif
 
 bool Internals::isSelectPopupVisible(Node* node)
 {
-    if (!isHTMLSelectElement(node))
+    if (!is<HTMLSelectElement>(*node))
         return false;
 
-    HTMLSelectElement* select = toHTMLSelectElement(node);
+    HTMLSelectElement& select = downcast<HTMLSelectElement>(*node);
 
-    auto renderer = select->renderer();
-    if (!renderer->isMenuList())
+    auto* renderer = select.renderer();
+    ASSERT(renderer);
+    if (!is<RenderMenuList>(*renderer))
         return false;
 
 #if !PLATFORM(IOS)
-    RenderMenuList* menuList = toRenderMenuList(renderer);
-    return menuList->popupIsVisible();
+    return downcast<RenderMenuList>(*renderer).popupIsVisible();
 #else
     return false;
 #endif // !PLATFORM(IOS)
@@ -2189,7 +2296,7 @@ double Internals::closestTimeToTimeRanges(double time, TimeRanges* ranges)
 }
 #endif
 
-PassRefPtr<ClientRect> Internals::selectionBounds(ExceptionCode& ec)
+Ref<ClientRect> Internals::selectionBounds(ExceptionCode& ec)
 {
     Document* document = contextDocument();
     if (!document || !document->frame()) {
@@ -2217,14 +2324,13 @@ bool Internals::isPluginUnavailabilityIndicatorObscured(Element* element, Except
         return false;
     }
 
-    auto renderer = element->renderer();
-    if (!renderer || !renderer->isEmbeddedObject()) {
+    auto* renderer = element->renderer();
+    if (!is<RenderEmbeddedObject>(renderer)) {
         ec = INVALID_ACCESS_ERR;
         return false;
     }
 
-    RenderEmbeddedObject* embed = toRenderEmbeddedObject(renderer);
-    return embed->isReplacementObscured();
+    return downcast<RenderEmbeddedObject>(*renderer).isReplacementObscured();
 }
     
 bool Internals::isPluginSnapshotted(Element* element, ExceptionCode& ec)
@@ -2233,7 +2339,7 @@ bool Internals::isPluginSnapshotted(Element* element, ExceptionCode& ec)
         ec = INVALID_ACCESS_ERR;
         return false;
     }
-    HTMLPlugInElement* pluginElement = toHTMLPlugInElement(element);
+    HTMLPlugInElement* pluginElement = downcast<HTMLPlugInElement>(element);
     return pluginElement->displayState() <= HTMLPlugInElement::DisplayingSnapshot;
 }
     
@@ -2341,6 +2447,13 @@ void Internals::postRemoteControlCommand(const String& commandString, ExceptionC
     
     MediaSessionManager::sharedManager().didReceiveRemoteControlCommand(command);
 }
+
+bool Internals::elementIsBlockingDisplaySleep(Element* element) const
+{
+    HTMLMediaElement* mediaElement = downcast<HTMLMediaElement>(element);
+    return mediaElement ? mediaElement->isDisablingSleep() : false;
+}
+
 #endif // ENABLE(VIDEO)
 
 void Internals::simulateSystemSleep() const
@@ -2355,6 +2468,50 @@ void Internals::simulateSystemWake() const
 #if ENABLE(VIDEO)
     MediaSessionManager::sharedManager().systemDidWake();
 #endif
+}
+
+
+void Internals::installMockPageOverlay(const String& overlayType, ExceptionCode& ec)
+{
+    Document* document = contextDocument();
+    if (!document || !document->frame()) {
+        ec = INVALID_ACCESS_ERR;
+        return;
+    }
+
+    MockPageOverlayClient::singleton().installOverlay(document->frame()->mainFrame(), overlayType == "view" ? PageOverlay::OverlayType::View : PageOverlay::OverlayType::Document);
+}
+
+String Internals::pageOverlayLayerTreeAsText(ExceptionCode& ec) const
+{
+    Document* document = contextDocument();
+    if (!document || !document->frame()) {
+        ec = INVALID_ACCESS_ERR;
+        return String();
+    }
+
+    document->updateLayout();
+
+    return MockPageOverlayClient::singleton().layerTreeAsText(document->frame()->mainFrame());
+}
+
+void Internals::setPageMuted(bool muted)
+{
+    Document* document = contextDocument();
+    if (!document)
+        return;
+
+    if (Page* page = document->page())
+        page->setMuted(muted);
+}
+
+bool Internals::isPagePlayingAudio()
+{
+    Document* document = contextDocument();
+    if (!document || !document->page())
+        return false;
+
+    return document->page()->isPlayingAudio();
 }
 
 }

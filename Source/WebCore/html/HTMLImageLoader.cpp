@@ -29,6 +29,7 @@
 #include "HTMLNames.h"
 #include "HTMLObjectElement.h"
 #include "HTMLParserIdioms.h"
+#include "HTMLVideoElement.h"
 #include "Settings.h"
 
 #include "JSDOMWindowBase.h"
@@ -48,13 +49,15 @@ HTMLImageLoader::~HTMLImageLoader()
 
 void HTMLImageLoader::dispatchLoadEvent()
 {
+#if ENABLE(VIDEO)
     // HTMLVideoElement uses this class to load the poster image, but it should not fire events for loading or failure.
-    if (isHTMLVideoElement(element()))
+    if (is<HTMLVideoElement>(element()))
         return;
+#endif
 
     bool errorOccurred = image()->errorOccurred();
     if (!errorOccurred && image()->response().httpStatusCode() >= 400)
-        errorOccurred = isHTMLObjectElement(element()); // An <object> considers a 404 to be an error and should fire onerror.
+        errorOccurred = is<HTMLObjectElement>(element()); // An <object> considers a 404 to be an error and should fire onerror.
     element().dispatchEvent(Event::create(errorOccurred ? eventNames().errorEvent : eventNames().loadEvent, false, false));
 }
 
@@ -81,12 +84,14 @@ void HTMLImageLoader::notifyFinished(CachedResource*)
         if (!element().inDocument()) {
             JSC::VM& vm = JSDOMWindowBase::commonVM();
             JSC::JSLockHolder lock(vm);
-            vm.heap.reportExtraMemoryCost(cachedImage->encodedSize());
+            // FIXME: Adopt reportExtraMemoryVisited, and switch to reportExtraMemoryAllocated.
+            // https://bugs.webkit.org/show_bug.cgi?id=142595
+            vm.heap.deprecatedReportExtraMemory(cachedImage->encodedSize());
         }
     }
 
-    if (loadError && isHTMLObjectElement(element()))
-        toHTMLObjectElement(element()).renderFallbackContent();
+    if (loadError && is<HTMLObjectElement>(element()))
+        downcast<HTMLObjectElement>(element()).renderFallbackContent();
 }
 
 }

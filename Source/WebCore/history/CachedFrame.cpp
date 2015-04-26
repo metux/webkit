@@ -89,7 +89,7 @@ void CachedFrameBase::restore()
     m_cachedFrameScriptData->restore(frame);
 
     if (m_document->svgExtensions())
-        m_document->accessSVGExtensions()->unpauseAnimations();
+        m_document->accessSVGExtensions().unpauseAnimations();
 
     frame.animation().resumeAnimationsForDocument(m_document.get());
     m_document->resumeActiveDOMObjects(ActiveDOMObject::DocumentWillBecomeInactive);
@@ -173,7 +173,7 @@ CachedFrame::CachedFrame(Frame& frame)
 
     frame.loader().client().savePlatformDataToCachedFrame(this);
 
-    if (m_isComposited && pageCache()->shouldClearBackingStores())
+    if (m_isComposited && PageCache::singleton().shouldClearBackingStores())
         frame.view()->clearBackingStores();
 
     // documentWillSuspendForPageCache() can set up a layout timer on the FrameView, so clear timers after that.

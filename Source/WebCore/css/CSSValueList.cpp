@@ -50,21 +50,15 @@ CSSValueList::CSSValueList(CSSParserValueList& parserValues)
     }
 }
 
-bool CSSValueList::removeAll(CSSValue* val)
+bool CSSValueList::removeAll(CSSValue* value)
 {
     // FIXME: Why even take a pointer?
-    if (!val)
+    if (!value)
         return false;
 
-    bool found = false;
-    for (unsigned i = 0; i < m_values.size(); ++i) {
-        if (m_values[i].get().equals(*val)) {
-            m_values.remove(i);
-            found = true;
-        }
-    }
-
-    return found;
+    return m_values.removeAllMatching([value] (const Ref<CSSValue>& current) {
+        return current->equals(*value);
+    }) > 0;
 }
 
 bool CSSValueList::hasValue(CSSValue* val) const
@@ -96,8 +90,8 @@ PassRefPtr<CSSValueList> CSSValueList::copy()
     default:
         ASSERT_NOT_REACHED();
     }
-    for (unsigned i = 0, size = m_values.size(); i < size; ++i)
-        newList->append(m_values[i].get());
+    for (auto& value : m_values)
+        newList->append(value.get());
     return newList.release();
 }
 
@@ -119,10 +113,10 @@ String CSSValueList::customCSSText() const
         ASSERT_NOT_REACHED();
     }
 
-    for (unsigned i = 0, size = m_values.size(); i < size; i++) {
+    for (auto& value : m_values) {
         if (!result.isEmpty())
             result.append(separator);
-        result.append(m_values[i].get().cssText());
+        result.append(value.get().cssText());
     }
 
     return result.toString();
@@ -137,7 +131,7 @@ bool CSSValueList::equals(const CSSValueList& other) const
         return false;
 
     for (unsigned i = 0, size = m_values.size(); i < size; ++i) {
-        if (!m_values[i].get().equals(other.m_values[i].get()))
+        if (!m_values[i].get().equals(other.m_values[i]))
             return false;
     }
     return true;

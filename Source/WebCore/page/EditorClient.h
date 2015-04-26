@@ -97,7 +97,11 @@ public:
     virtual void willWriteSelectionToPasteboard(Range*) = 0;
     virtual void didWriteSelectionToPasteboard() = 0;
     virtual void getClientPasteboardDataForRange(Range*, Vector<String>& pasteboardTypes, Vector<RefPtr<SharedBuffer>>& pasteboardData) = 0;
-    
+
+    // Notify an input method that a composition was voluntarily discarded by WebCore, so that it could clean up too.
+    // This function is not called when a composition is closed per a request from an input method.
+    virtual void discardedComposition(Frame*) = 0;
+
     virtual void registerUndoStep(PassRefPtr<UndoStep>) = 0;
     virtual void registerRedoStep(PassRefPtr<UndoStep>) = 0;
     virtual void clearUndoRedoOperations() = 0;
@@ -164,10 +168,6 @@ public:
     virtual void toggleAutomaticSpellingCorrection() = 0;
 #endif
     
-#if ENABLE(DELETION_UI)
-    virtual bool shouldShowDeleteInterface(HTMLElement*) = 0;
-#endif
-
 #if PLATFORM(GTK)
     virtual bool shouldShowUnicodeMenu() = 0;
 #endif
@@ -180,11 +180,6 @@ public:
     virtual bool spellingUIIsShowing() = 0;
     virtual void willSetInputMethodState() = 0;
     virtual void setInputMethodState(bool enabled) = 0;
-
-#if ENABLE(SERVICE_CONTROLS) || ENABLE(TELEPHONE_NUMBER_DETECTION)
-    virtual void selectedTelephoneNumberRangesChanged() { }
-    virtual void selectionRectsDidChange(const Vector<LayoutRect>&, const Vector<GapRects>&, bool) { }
-#endif
 
     // Support for global selections, used on platforms like the X Window System that treat
     // selection as a type of clipboard.

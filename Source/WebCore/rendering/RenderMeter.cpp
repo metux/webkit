@@ -30,7 +30,7 @@ namespace WebCore {
 
 using namespace HTMLNames;
 
-RenderMeter::RenderMeter(HTMLElement& element, PassRef<RenderStyle> style)
+RenderMeter::RenderMeter(HTMLElement& element, Ref<RenderStyle>&& style)
     : RenderBlockFlow(element, WTF::move(style))
 {
 }
@@ -43,11 +43,11 @@ HTMLMeterElement* RenderMeter::meterElement() const
 {
     ASSERT(element());
 
-    if (isHTMLMeterElement(element()))
-        return toHTMLMeterElement(element());
+    if (is<HTMLMeterElement>(*element()))
+        return downcast<HTMLMeterElement>(element());
 
     ASSERT(element()->shadowHost());
-    return toHTMLMeterElement(element()->shadowHost());
+    return downcast<HTMLMeterElement>(element()->shadowHost());
 }
 
 void RenderMeter::updateLogicalWidth()

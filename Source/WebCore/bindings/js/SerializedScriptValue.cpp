@@ -784,12 +784,12 @@ private:
                 write(obj->internalValue().asNumber());
                 return true;
             }
-            if (File* file = toFile(obj)) {
+            if (File* file = JSFile::toWrapped(obj)) {
                 write(FileTag);
                 write(file);
                 return true;
             }
-            if (FileList* list = toFileList(obj)) {
+            if (FileList* list = JSFileList::toWrapped(obj)) {
                 write(FileListTag);
                 unsigned length = list->length();
                 write(length);
@@ -797,7 +797,7 @@ private:
                     write(list->item(i));
                 return true;
             }
-            if (Blob* blob = toBlob(obj)) {
+            if (Blob* blob = JSBlob::toWrapped(obj)) {
                 write(BlobTag);
                 m_blobURLs.append(blob->url());
                 write(blob->url());
@@ -805,7 +805,7 @@ private:
                 write(blob->size());
                 return true;
             }
-            if (ImageData* data = toImageData(obj)) {
+            if (ImageData* data = JSImageData::toWrapped(obj)) {
                 write(ImageDataTag);
                 write(data->width());
                 write(data->height());
@@ -865,7 +865,7 @@ private:
                 return success;
             }
 #if ENABLE(SUBTLE_CRYPTO)
-            if (CryptoKey* key = toCryptoKey(obj)) {
+            if (CryptoKey* key = JSCryptoKey::toWrapped(obj)) {
                 write(CryptoKeyTag);
                 Vector<uint8_t> serializedKey;
                 Vector<String> dummyBlobURLs;
@@ -1173,23 +1173,23 @@ private:
         switch (key->keyClass()) {
         case CryptoKeyClass::HMAC:
             write(CryptoKeyClassSubtag::HMAC);
-            write(toCryptoKeyHMAC(key)->key());
-            write(toCryptoKeyHMAC(key)->hashAlgorithmIdentifier());
+            write(downcast<CryptoKeyHMAC>(*key).key());
+            write(downcast<CryptoKeyHMAC>(*key).hashAlgorithmIdentifier());
             break;
         case CryptoKeyClass::AES:
             write(CryptoKeyClassSubtag::AES);
             write(key->algorithmIdentifier());
-            write(toCryptoKeyAES(key)->key());
+            write(downcast<CryptoKeyAES>(*key).key());
             break;
         case CryptoKeyClass::RSA:
             write(CryptoKeyClassSubtag::RSA);
             write(key->algorithmIdentifier());
             CryptoAlgorithmIdentifier hash;
-            bool isRestrictedToHash = toCryptoKeyRSA(key)->isRestrictedToHash(hash);
+            bool isRestrictedToHash = downcast<CryptoKeyRSA>(*key).isRestrictedToHash(hash);
             write(isRestrictedToHash);
             if (isRestrictedToHash)
                 write(hash);
-            write(toCryptoKeyDataRSAComponents(*key->exportData()));
+            write(downcast<CryptoKeyDataRSAComponents>(*key->exportData()));
             break;
         }
     }
@@ -1218,6 +1218,7 @@ SerializationReturnCode CloneSerializer::serialize(JSValue in)
     Vector<JSObject*, 32> inputObjectStack;
     Vector<MapData*, 4> mapDataStack;
     Vector<MapData::const_iterator, 4> iteratorStack;
+    Vector<JSValue, 4> iteratorValueStack;
     Vector<WalkerState, 16> stateStack;
     WalkerState state = StateUnknown;
     JSValue inValue = in;
@@ -1386,16 +1387,20 @@ SerializationReturnCode CloneSerializer::serialize(JSValue in)
                     goto objectStartVisitMember;
                 }
                 inValue = ptr.key();
+                m_gcBuffer.append(ptr.value());
+                iteratorValueStack.append(ptr.value());
                 stateStack.append(MapDataEndVisitKey);
                 goto stateUnknown;
             }
             case MapDataEndVisitKey: {
-                inValue = iteratorStack.last().value();
+                inValue = iteratorValueStack.last();
+                iteratorValueStack.removeLast();
                 stateStack.append(MapDataEndVisitValue);
                 goto stateUnknown;
             }
             case MapDataEndVisitValue: {
-                ++iteratorStack.last();
+                if (iteratorStack.last() != mapDataStack.last()->end())
+                    ++iteratorStack.last();
                 goto mapDataStartVisitEntry;
             }
 
@@ -2122,6 +2127,12 @@ private:
         return toJS(m_exec, jsCast<JSDOMGlobalObject*>(m_globalObject), nativeObj);
     }
 
+    template<class T>
+    JSValue getJSValue(T& nativeObj)
+    {
+        return getJSValue(&nativeObj);
+    }
+
     JSValue readTerminal()
     {
         SerializationTag tag = readTag();
@@ -2563,15 +2574,15 @@ SerializedScriptValue::SerializedScriptValue(Vector<uint8_t>& buffer, Vector<Str
         addBlobURL(string);
 }
 
-SerializedScriptValue::SerializedScriptValue(Vector<uint8_t>& buffer, Vector<String>& blobURLs, PassOwnPtr<ArrayBufferContentsArray> arrayBufferContentsArray)
-    : m_arrayBufferContentsArray(arrayBufferContentsArray)
+SerializedScriptValue::SerializedScriptValue(Vector<uint8_t>& buffer, Vector<String>& blobURLs, std::unique_ptr<ArrayBufferContentsArray> arrayBufferContentsArray)
+    : m_arrayBufferContentsArray(WTF::move(arrayBufferContentsArray))
 {
     m_data.swap(buffer);
     for (auto& string : blobURLs)
         addBlobURL(string);
 }
 
-PassOwnPtr<SerializedScriptValue::ArrayBufferContentsArray> SerializedScriptValue::transferArrayBuffers(
+std::unique_ptr<SerializedScriptValue::ArrayBufferContentsArray> SerializedScriptValue::transferArrayBuffers(
     ExecState* exec, ArrayBufferArray& arrayBuffers, SerializationReturnCode& code)
 {
     for (size_t i = 0; i < arrayBuffers.size(); i++) {
@@ -2581,7 +2592,7 @@ PassOwnPtr<SerializedScriptValue::ArrayBufferContentsArray> SerializedScriptValu
         }
     }
 
-    OwnPtr<ArrayBufferContentsArray> contents = adoptPtr(new ArrayBufferContentsArray(arrayBuffers.size()));
+    auto contents = std::make_unique<ArrayBufferContentsArray>(arrayBuffers.size());
     Vector<Ref<DOMWrapperWorld>> worlds;
     static_cast<WebCoreJSClientData*>(exec->vm().clientData)->getAllWorlds(worlds);
 
@@ -2597,9 +2608,8 @@ PassOwnPtr<SerializedScriptValue::ArrayBufferContentsArray> SerializedScriptValu
             return nullptr;
         }
     }
-    return contents.release();
+    return contents;
 }
-
 
 PassRefPtr<SerializedScriptValue> SerializedScriptValue::create(ExecState* exec, JSValue value,
                                                                 MessagePortArray* messagePorts, ArrayBufferArray* arrayBuffers,
@@ -2609,7 +2619,7 @@ PassRefPtr<SerializedScriptValue> SerializedScriptValue::create(ExecState* exec,
     Vector<String> blobURLs;
     SerializationReturnCode code = CloneSerializer::serialize(exec, value, messagePorts, arrayBuffers, blobURLs, buffer);
 
-    OwnPtr<ArrayBufferContentsArray> arrayBufferContentsArray;
+    std::unique_ptr<ArrayBufferContentsArray> arrayBufferContentsArray;
 
     if (arrayBuffers && serializationDidCompleteSuccessfully(code))
         arrayBufferContentsArray = transferArrayBuffers(exec, *arrayBuffers, code);
@@ -2620,7 +2630,7 @@ PassRefPtr<SerializedScriptValue> SerializedScriptValue::create(ExecState* exec,
     if (!serializationDidCompleteSuccessfully(code))
         return 0;
 
-    return adoptRef(new SerializedScriptValue(buffer, blobURLs, arrayBufferContentsArray.release()));
+    return adoptRef(new SerializedScriptValue(buffer, blobURLs, WTF::move(arrayBufferContentsArray)));
 }
 
 PassRefPtr<SerializedScriptValue> SerializedScriptValue::create(const String& string)

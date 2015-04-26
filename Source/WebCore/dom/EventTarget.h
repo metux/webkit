@@ -65,10 +65,7 @@ namespace WebCore {
     class MessagePort;
     class Node;
     class Notification;
-    class SVGElementInstance;
     class ScriptExecutionContext;
-    class SharedWorker;
-    class SharedWorkerGlobalScope;
     class TextTrack;
     class TextTrackCue;
     class VideoTrackList;

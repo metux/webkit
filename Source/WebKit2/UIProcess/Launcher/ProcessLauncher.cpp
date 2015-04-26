@@ -27,13 +27,14 @@
 #include "ProcessLauncher.h"
 
 #include "WorkQueue.h"
-#include <wtf/StdLibExtras.h>
+#include <wtf/StdLibExtras.h> 
 
 namespace WebKit {
 
-static WorkQueue* processLauncherWorkQueue()
+static WorkQueue& processLauncherWorkQueue()
 {
-    static WorkQueue* processLauncherWorkQueue = WorkQueue::create("com.apple.WebKit.ProcessLauncher").leakRef();
+
+    static WorkQueue& processLauncherWorkQueue = WorkQueue::create("com.apple.WebKit.ProcessLauncher").leakRef();
     return processLauncherWorkQueue;
 }
 
@@ -42,9 +43,12 @@ ProcessLauncher::ProcessLauncher(Client* client, const LaunchOptions& launchOpti
     , m_launchOptions(launchOptions)
     , m_processIdentifier(0)
 {
-    // Launch the process.
     m_isLaunching = true;
-    processLauncherWorkQueue()->dispatch(bind(&ProcessLauncher::launchProcess, this));
+
+    RefPtr<ProcessLauncher> processLauncher(this);
+    processLauncherWorkQueue().dispatch([processLauncher] {
+        processLauncher->launchProcess();
+    });
 }
 
 void ProcessLauncher::didFinishLaunchingProcess(PlatformProcessIdentifier processIdentifier, IPC::Connection::Identifier identifier)

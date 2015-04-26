@@ -71,7 +71,6 @@
     <link rel="stylesheet" href="Views/DatabaseTableIcon.css">
     <link rel="stylesheet" href="Views/DebuggerSidebarPanel.css">
     <link rel="stylesheet" href="Views/DetailsSection.css">
-    <link rel="stylesheet" href="Views/DetailsSidebarPanel.css">
     <link rel="stylesheet" href="Views/DividerNavigationItem.css">
     <link rel="stylesheet" href="Views/Editing.css">
     <link rel="stylesheet" href="Views/EventListenerSectionGroup.css">
@@ -87,7 +86,7 @@
     <link rel="stylesheet" href="Views/ImageResourceContentView.css">
     <link rel="stylesheet" href="Views/IndeterminateProgressSpinner.css">
     <link rel="stylesheet" href="Views/IndexedDatabaseObjectStoreContentView.css">
-    <link rel="stylesheet" href="Views/LayerTreeSidebarPanel.css">
+    <link rel="stylesheet" href="Views/LayerTreeDetailsSidebarPanel.css">
     <link rel="stylesheet" href="Views/LayoutTimelineOverviewGraph.css">
     <link rel="stylesheet" href="Views/LayoutTimelineView.css">
     <link rel="stylesheet" href="Views/LogContentView.css">
@@ -117,6 +116,7 @@
     <link rel="stylesheet" href="Views/SearchIcons.css">
     <link rel="stylesheet" href="Views/Section.css">
     <link rel="stylesheet" href="Views/Sidebar.css">
+    <link rel="stylesheet" href="Views/SidebarPanel.css">
     <link rel="stylesheet" href="Views/Slider.css">
     <link rel="stylesheet" href="Views/SourceCodeTextEditor.css">
     <link rel="stylesheet" href="Views/StyleRuleIcons.css">
@@ -124,11 +124,11 @@
     <link rel="stylesheet" href="Views/TextContentView.css">
     <link rel="stylesheet" href="Views/TextEditor.css">
     <link rel="stylesheet" href="Views/TextResourceContentView.css">
-    <link rel="stylesheet" href="Views/TimelineContentView.css">
     <link rel="stylesheet" href="Views/TimelineDataGrid.css">
     <link rel="stylesheet" href="Views/TimelineIcons.css">
     <link rel="stylesheet" href="Views/TimelineOverview.css">
     <link rel="stylesheet" href="Views/TimelineRecordBar.css">
+    <link rel="stylesheet" href="Views/TimelineRecordingContentView.css">
     <link rel="stylesheet" href="Views/TimelineRuler.css">
     <link rel="stylesheet" href="Views/TimelineSidebarPanel.css">
     <link rel="stylesheet" href="Views/TimelineView.css">
@@ -160,6 +160,9 @@
     <script src="External/CodeMirror/sql.js"></script>
     <script src="External/CodeMirror/xml.js"></script>
 
+    <script src="External/Esprima/esprima.js"></script>
+    <script src="External/ESLint/eslint.js"></script>
+
     <script src="Base/WebInspector.js"></script>
     <script src="Protocol/InspectorFrontendHostStub.js"></script>
     <script src="Base/Platform.js"></script>
@@ -173,8 +176,6 @@
     <script src="Base/MIMETypeUtilities.js"></script>
     <script src="Base/URLUtilities.js"></script>
     <script src="Base/Utilities.js"></script>
-
-    <script src="External/Esprima/esprima.js"></script>
 
     <script src="Protocol/ApplicationCacheObserver.js"></script>
     <script src="Protocol/CSSObserver.js"></script>
@@ -202,6 +203,7 @@
     <script src="Models/Timeline.js"></script>
     <script src="Models/TimelineRecord.js"></script>
 
+    <script src="Models/AnalyzerMessage.js"></script>
     <script src="Models/ApplicationCacheFrame.js"></script>
     <script src="Models/ApplicationCacheManifest.js"></script>
     <script src="Models/BackForwardEntry.js"></script>
@@ -212,6 +214,7 @@
     <script src="Models/CSSMedia.js"></script>
     <script src="Models/CSSProperty.js"></script>
     <script src="Models/CSSRule.js"></script>
+    <script src="Models/CSSSelector.js"></script>
     <script src="Models/CSSStyleDeclaration.js"></script>
     <script src="Models/CSSStyleSheet.js"></script>
     <script src="Models/CallFrame.js"></script>
@@ -253,7 +256,6 @@
     <script src="Models/ReplaySessionSegment.js"></script>
     <script src="Models/Resource.js"></script>
     <script src="Models/ResourceCollection.js"></script>
-    <script src="Models/ResourceSearchMatchObject.js"></script>
     <script src="Models/ResourceTimelineRecord.js"></script>
     <script src="Models/Revision.js"></script>
     <script src="Models/ScopeChainNode.js"></script>
@@ -263,6 +265,7 @@
     <script src="Models/Setting.js"></script>
     <script src="Models/SourceCodePosition.js"></script>
     <script src="Models/SourceCodeRevision.js"></script>
+    <script src="Models/SourceCodeSearchMatchObject.js"></script>
     <script src="Models/SourceCodeTextRange.js"></script>
     <script src="Models/SourceCodeTimeline.js"></script>
     <script src="Models/SourceMap.js"></script>
@@ -300,6 +303,7 @@
     <script src="Views/TimelineDataGridNode.js"></script>
 
     <script src="Views/DOMDetailsSidebarPanel.js"></script>
+    <script src="Views/FolderizedTreeElement.js"></script>
     <script src="Views/SourceCodeTreeElement.js"></script>
     <script src="Views/StorageTreeElement.js"></script>
     <script src="Views/TimelineRecordTreeElement.js"></script>
@@ -363,6 +367,7 @@
     <script src="Views/DetailsSectionGroup.js"></script>
     <script src="Views/DetailsSectionPropertiesRow.js"></script>
     <script src="Views/DetailsSectionSimpleRow.js"></script>
+    <script src="Views/DetailsSectionTextRow.js"></script>
     <script src="Views/DividerNavigationItem.js"></script>
     <script src="Views/EditingSupport.js"></script>
     <script src="Views/EventListenerSection.js"></script>
@@ -390,7 +395,7 @@
     <script src="Views/IndexedDatabaseObjectStoreTreeElement.js"></script>
     <script src="Views/IndexedDatabaseTreeElement.js"></script>
     <script src="Views/LayerTreeDataGridNode.js"></script>
-    <script src="Views/LayerTreeSidebarPanel.js"></script>
+    <script src="Views/LayerTreeDetailsSidebarPanel.js"></script>
     <script src="Views/LayoutTimelineDataGrid.js"></script>
     <script src="Views/LayoutTimelineDataGridNode.js"></script>
     <script src="Views/LayoutTimelineOverviewGraph.js"></script>
@@ -441,9 +446,9 @@
     <script src="Views/SyntaxHighlightingSupport.js"></script>
     <script src="Views/TextContentView.js"></script>
     <script src="Views/TextResourceContentView.js"></script>
-    <script src="Views/TimelineContentView.js"></script>
     <script src="Views/TimelineOverview.js"></script>
     <script src="Views/TimelineRecordBar.js"></script>
+    <script src="Views/TimelineRecordingContentView.js"></script>
     <script src="Views/TimelineRuler.js"></script>
     <script src="Views/TimelineSidebarPanel.js"></script>
     <script src="Views/ToggleButtonNavigationItem.js"></script>
@@ -454,9 +459,12 @@
     <script src="Views/TypePropertiesSection.js"></script>
     <script src="Views/TypeTokenView.js"></script>
 
+    <script src="Controllers/Annotator.js"></script>
     <script src="Controllers/CodeMirrorEditingController.js"></script>
 
+    <script src="Controllers/AnalyzerManager.js"></script>
     <script src="Controllers/ApplicationCacheManager.js"></script>
+    <script src="Controllers/BasicBlockAnnotator.js"></script>
     <script src="Controllers/BranchManager.js"></script>
     <script src="Controllers/CSSStyleManager.js"></script>
     <script src="Controllers/CodeMirrorColorEditingController.js"></script>

@@ -47,14 +47,14 @@ HTMLBodyElement::HTMLBodyElement(const QualifiedName& tagName, Document& documen
     ASSERT(hasTagName(bodyTag));
 }
 
-PassRefPtr<HTMLBodyElement> HTMLBodyElement::create(Document& document)
+Ref<HTMLBodyElement> HTMLBodyElement::create(Document& document)
 {
-    return adoptRef(new HTMLBodyElement(bodyTag, document));
+    return adoptRef(*new HTMLBodyElement(bodyTag, document));
 }
 
-PassRefPtr<HTMLBodyElement> HTMLBodyElement::create(const QualifiedName& tagName, Document& document)
+Ref<HTMLBodyElement> HTMLBodyElement::create(const QualifiedName& tagName, Document& document)
 {
-    return adoptRef(new HTMLBodyElement(tagName, document));
+    return adoptRef(*new HTMLBodyElement(tagName, document));
 }
 
 HTMLBodyElement::~HTMLBodyElement()
@@ -175,8 +175,8 @@ Node::InsertionNotificationRequest HTMLBodyElement::insertedInto(ContainerNode& 
     // magically appear on the <body> of all documents embedded through <iframe> or <frame>.
     // FIXME: Perhaps this code should be in attach() instead of here.
     HTMLFrameOwnerElement* ownerElement = document().ownerElement();
-    if (ownerElement && isHTMLFrameElementBase(*ownerElement)) {
-        HTMLFrameElementBase& ownerFrameElement = toHTMLFrameElementBase(*ownerElement);
+    if (is<HTMLFrameElementBase>(ownerElement)) {
+        HTMLFrameElementBase& ownerFrameElement = downcast<HTMLFrameElementBase>(*ownerElement);
         int marginWidth = ownerFrameElement.marginWidth();
         if (marginWidth != -1)
             setIntegralAttribute(marginwidthAttr, marginWidth);

@@ -49,10 +49,12 @@
 #include "DFGLoopPreHeaderCreationPhase.h"
 #include "DFGOSRAvailabilityAnalysisPhase.h"
 #include "DFGOSREntrypointCreationPhase.h"
+#include "DFGObjectAllocationSinkingPhase.h"
 #include "DFGPhantomCanonicalizationPhase.h"
 #include "DFGPhantomRemovalPhase.h"
 #include "DFGPredictionInjectionPhase.h"
 #include "DFGPredictionPropagationPhase.h"
+#include "DFGPutLocalSinkingPhase.h"
 #include "DFGResurrectionForValidationPhase.h"
 #include "DFGSSAConversionPhase.h"
 #include "DFGSSALoweringPhase.h"
@@ -149,7 +151,7 @@ void Plan::compileInThread(LongLivedState& longLivedState, ThreadData* threadDat
     double before = 0;
     CString codeBlockName;
     if (reportCompileTimes()) {
-        before = currentTimeMS();
+        before = monotonicallyIncreasingTime();
         codeBlockName = toCString(*codeBlock);
     }
     
@@ -186,10 +188,10 @@ void Plan::compileInThread(LongLivedState& longLivedState, ThreadData* threadDat
 #endif
             break;
         }
-        double now = currentTimeMS();
+        double now = monotonicallyIncreasingTime();
         dataLog("Optimized ", codeBlockName, " using ", mode, " with ", pathName, " into ", finalizer ? finalizer->codeSize() : 0, " bytes in ", now - before, " ms");
         if (path == FTLPath)
-            dataLog(" (DFG: ", beforeFTL - before, ", LLVM: ", now - beforeFTL, ")");
+            dataLog(" (DFG: ", m_timeBeforeFTL - before, ", LLVM: ", now - m_timeBeforeFTL, ")");
         dataLog(".\n");
     }
 }
@@ -205,7 +207,7 @@ Plan::CompilationPath Plan::compileInThreadImpl(LongLivedState& longLivedState)
     Graph dfg(vm, *this, longLivedState);
     
     if (!parse(dfg)) {
-        finalizer = adoptPtr(new FailedFinalizer(*this));
+        finalizer = std::make_unique<FailedFinalizer>(*this);
         return FailPath;
     }
     
@@ -227,7 +229,7 @@ Plan::CompilationPath Plan::compileInThreadImpl(LongLivedState& longLivedState)
     if (mode == FTLForOSREntryMode) {
         bool result = performOSREntrypointCreation(dfg);
         if (!result) {
-            finalizer = adoptPtr(new FailedFinalizer(*this));
+            finalizer = std::make_unique<FailedFinalizer>(*this);
             return FailPath;
         }
         performCPSRethreading(dfg);
@@ -255,8 +257,9 @@ Plan::CompilationPath Plan::compileInThreadImpl(LongLivedState& longLivedState)
         
     performStrengthReduction(dfg);
     performLocalCSE(dfg);
+    performCPSRethreading(dfg); // Canonicalize PhantomLocal to Phantom
     performArgumentsSimplification(dfg);
-    performCPSRethreading(dfg);
+    performCPSRethreading(dfg); // This should do nothing, if arguments simplification did nothing.
     performCFA(dfg);
     performConstantFolding(dfg);
     bool changed = false;
@@ -277,6 +280,7 @@ Plan::CompilationPath Plan::compileInThreadImpl(LongLivedState& longLivedState)
     if (validationEnabled()) {
         dfg.m_dominators.computeIfNecessary(dfg);
         dfg.m_naturalLoops.computeIfNecessary(dfg);
+        dfg.m_prePostNumbering.computeIfNecessary(dfg);
     }
 
     switch (mode) {
@@ -310,7 +314,7 @@ Plan::CompilationPath Plan::compileInThreadImpl(LongLivedState& longLivedState)
     case FTLForOSREntryMode: {
 #if ENABLE(FTL_JIT)
         if (FTL::canCompile(dfg) == FTL::CannotCompile) {
-            finalizer = adoptPtr(new FailedFinalizer(*this));
+            finalizer = std::make_unique<FailedFinalizer>(*this);
             return FailPath;
         }
         
@@ -320,16 +324,24 @@ Plan::CompilationPath Plan::compileInThreadImpl(LongLivedState& longLivedState)
         performCPSRethreading(dfg);
         performSSAConversion(dfg);
         performSSALowering(dfg);
+        performPutLocalSinking(dfg);
         performGlobalCSE(dfg);
         performLivenessAnalysis(dfg);
         performCFA(dfg);
         performConstantFolding(dfg);
         performPhantomCanonicalization(dfg); // Reduce the graph size a lot.
-        if (performStrengthReduction(dfg)) {
+        changed = false;
+        changed |= performStrengthReduction(dfg);
+        if (Options::enableObjectAllocationSinking()) {
+            changed |= performCriticalEdgeBreaking(dfg);
+            changed |= performObjectAllocationSinking(dfg);
+        }
+        if (changed) {
             // State-at-tail and state-at-head will be invalid if we did strength reduction since
             // it might increase live ranges.
             performLivenessAnalysis(dfg);
             performCFA(dfg);
+            performConstantFolding(dfg);
         }
         performLICM(dfg);
         performPhantomCanonicalization(dfg);
@@ -346,12 +358,17 @@ Plan::CompilationPath Plan::compileInThreadImpl(LongLivedState& longLivedState)
         performCFA(dfg);
         if (Options::validateFTLOSRExitLiveness())
             performResurrectionForValidation(dfg);
-        performDCE(dfg); // We rely on this to convert dead SetLocals into the appropriate hint, and to kill dead code that won't be recognized as dead by LLVM.
+        performDCE(dfg); // We rely on this to kill dead code that won't be recognized as dead by LLVM.
         performStackLayout(dfg);
         performLivenessAnalysis(dfg);
         performOSRAvailabilityAnalysis(dfg);
         performWatchpointCollection(dfg);
         
+        if (FTL::canCompile(dfg) == FTL::CannotCompile) {
+            finalizer = std::make_unique<FailedFinalizer>(*this);
+            return FailPath;
+        }
+
         dumpAndVerifyGraph(dfg, "Graph just before FTL lowering:");
         
         bool haveLLVM;
@@ -364,15 +381,15 @@ Plan::CompilationPath Plan::compileInThreadImpl(LongLivedState& longLivedState)
             return CancelPath;
         
         if (!haveLLVM) {
-            finalizer = adoptPtr(new FailedFinalizer(*this));
+            finalizer = std::make_unique<FailedFinalizer>(*this);
             return FailPath;
         }
-            
+
         FTL::State state(dfg);
         FTL::lowerDFGToLLVM(state);
         
         if (reportCompileTimes())
-            beforeFTL = currentTimeMS();
+            m_timeBeforeFTL = monotonicallyIncreasingTime();
         
         if (Options::llvmAlwaysFailsBeforeCompile()) {
             FTL::fail(state);
@@ -513,7 +530,7 @@ void Plan::cancel()
     profiledDFGCodeBlock = nullptr;
     mustHandleValues.clear();
     compilation = nullptr;
-    finalizer.clear();
+    finalizer = nullptr;
     inlineCallFrames = nullptr;
     watchpoints = DesiredWatchpoints();
     identifiers = DesiredIdentifiers();

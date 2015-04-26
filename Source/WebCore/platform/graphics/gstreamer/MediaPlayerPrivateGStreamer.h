@@ -50,6 +50,11 @@ typedef struct _GstMpegtsSection GstMpegtsSection;
 
 namespace WebCore {
 
+#if ENABLE(WEB_AUDIO)
+class AudioSourceProvider;
+class AudioSourceProviderGStreamer;
+#endif
+
 class AudioTrackPrivateGStreamer;
 class InbandMetadataTextTrackPrivateGStreamer;
 class InbandTextTrackPrivateGStreamer;
@@ -84,15 +89,16 @@ public:
     void seek(float);
 
     void setRate(float);
+    double rate() const override;
     void setPreservesPitch(bool);
 
     void setPreload(MediaPlayer::Preload);
-    void fillTimerFired(Timer<MediaPlayerPrivateGStreamer>*);
+    void fillTimerFired();
 
     std::unique_ptr<PlatformTimeRanges> buffered() const;
     float maxTimeSeekable() const;
     bool didLoadingProgress() const;
-    unsigned totalBytes() const;
+    unsigned long long totalBytes() const;
     float maxTimeLoaded() const;
 
     void loadStateChanged();
@@ -124,6 +130,10 @@ public:
     void simulateAudioInterruption();
 
     bool changePipelineState(GstState);
+
+#if ENABLE(WEB_AUDIO)
+    AudioSourceProvider* audioSourceProvider() { return reinterpret_cast<AudioSourceProvider*>(m_audioSourceProvider.get()); }
+#endif
 
 private:
     MediaPlayerPrivateGStreamer(MediaPlayer*);
@@ -164,6 +174,15 @@ private:
     virtual String engineDescription() const { return "GStreamer"; }
     virtual bool isLiveStream() const { return m_isStreaming; }
     virtual bool didPassCORSAccessCheck() const;
+    virtual bool canSaveMediaData() const override;
+
+#if ENABLE(MEDIA_SOURCE)
+    // TODO: Implement
+    virtual unsigned long totalVideoFrames() { return 0; }
+    virtual unsigned long droppedVideoFrames() { return 0; }
+    virtual unsigned long corruptedVideoFrames() { return 0; }
+    virtual MediaTime totalFrameDelay() { return MediaTime::zeroTime(); }
+#endif
 
 private:
     GRefPtr<GstElement> m_playBin;
@@ -192,7 +211,7 @@ private:
     bool m_errorOccured;
     mutable gfloat m_mediaDuration;
     bool m_downloadFinished;
-    Timer<MediaPlayerPrivateGStreamer> m_fillTimer;
+    Timer m_fillTimer;
     float m_maxTimeLoaded;
     int m_bufferingPercentage;
     MediaPlayer::Preload m_preload;
@@ -207,9 +226,12 @@ private:
     GThreadSafeMainLoopSource m_videoTimerHandler;
     GThreadSafeMainLoopSource m_videoCapsTimerHandler;
     GThreadSafeMainLoopSource m_readyTimerHandler;
-    mutable long m_totalBytes;
+    mutable unsigned long long m_totalBytes;
     URL m_url;
     bool m_preservesPitch;
+#if ENABLE(WEB_AUDIO)
+    OwnPtr<AudioSourceProviderGStreamer> m_audioSourceProvider;
+#endif
     GstState m_requestedState;
     GRefPtr<GstElement> m_autoAudioSink;
     bool m_missingPlugins;
@@ -224,6 +246,9 @@ private:
 #endif
 #if ENABLE(MEDIA_SOURCE)
     RefPtr<MediaSourcePrivateClient> m_mediaSource;
+    bool isMediaSource() const { return m_mediaSource; }
+#else
+    bool isMediaSource() const { return false; }
 #endif
 };
 }

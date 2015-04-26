@@ -28,9 +28,9 @@ namespace WebCore {
 
 class RenderSVGInline : public RenderInline {
 public:
-    RenderSVGInline(SVGGraphicsElement&, PassRef<RenderStyle>);
+    RenderSVGInline(SVGGraphicsElement&, Ref<RenderStyle>&&);
 
-    SVGGraphicsElement& graphicsElement() const { return toSVGGraphicsElement(nodeForNonAnonymous()); }
+    SVGGraphicsElement& graphicsElement() const { return downcast<SVGGraphicsElement>(nodeForNonAnonymous()); }
 
 private:
     void element() const = delete;
@@ -62,9 +62,11 @@ private:
     virtual void styleDidChange(StyleDifference, const RenderStyle* oldStyle) override final;
 
     virtual void addChild(RenderObject* child, RenderObject* beforeChild = 0) override final;
-    virtual RenderObject* removeChild(RenderObject&) override final;
+    virtual void removeChild(RenderObject&) override final;
 };
 
-}
+} // namespace WebCore
+
+SPECIALIZE_TYPE_TRAITS_RENDER_OBJECT(RenderSVGInline, isSVGInline())
 
 #endif // !RenderSVGTSpan_H

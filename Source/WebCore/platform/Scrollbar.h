@@ -31,6 +31,7 @@
 #include "Timer.h"
 #include "Widget.h"
 #include <wtf/PassRefPtr.h>
+#include <wtf/WeakPtr.h>
 
 namespace WebCore {
 
@@ -58,7 +59,7 @@ public:
     virtual IntPoint location() const override { return Widget::location(); }
 
     virtual ScrollView* parent() const override { return Widget::parent(); }
-    virtual ScrollView* root() const override { return Widget::root(); }
+    virtual ScrollView* root() const override;
 
     virtual void setFrameRect(const IntRect&) override;
     virtual IntRect frameRect() const override { return Widget::frameRect(); }
@@ -156,7 +157,9 @@ public:
     virtual bool isAlphaLocked() const override { return m_isAlphaLocked; }
     virtual void setIsAlphaLocked(bool flag) override { m_isAlphaLocked = flag; }
 
-    virtual bool supportsUpdateOnSecondaryThread() const;
+    virtual bool supportsUpdateOnSecondaryThread() const override;
+
+    WeakPtr<Scrollbar> createWeakPtr() { return m_weakPtrFactory.createWeakPtr(); }
 
 protected:
     Scrollbar(ScrollableArea*, ScrollbarOrientation, ScrollbarControlSize, ScrollbarTheme* = 0, bool isCustomScrollbar = false);
@@ -165,7 +168,7 @@ protected:
     virtual void updateThumbPosition();
     virtual void updateThumbProportion();
 
-    void autoscrollTimerFired(Timer<Scrollbar>&);
+    void autoscrollTimerFired();
     void startTimerIfNeeded(double delay);
     void stopTimerIfNeeded();
     void autoscrollPressedPart(double delay);
@@ -194,7 +197,7 @@ protected:
 
     bool m_enabled;
 
-    Timer<Scrollbar> m_scrollTimer;
+    Timer m_scrollTimer;
     bool m_overlapsResizer;
 
     bool m_suppressInvalidation;
@@ -205,10 +208,12 @@ protected:
 
 private:
     virtual bool isScrollbar() const override { return true; }
+
+    WeakPtrFactory<Scrollbar> m_weakPtrFactory;
 };
 
-WIDGET_TYPE_CASTS(Scrollbar, isScrollbar());
-
 } // namespace WebCore
+
+SPECIALIZE_TYPE_TRAITS_WIDGET(Scrollbar, isScrollbar())
 
 #endif // Scrollbar_h

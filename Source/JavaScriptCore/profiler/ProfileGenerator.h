@@ -29,6 +29,7 @@
 #include <wtf/PassRefPtr.h>
 #include <wtf/RefCounted.h>
 #include <wtf/RefPtr.h>
+#include <wtf/Stopwatch.h>
 #include <wtf/text/WTFString.h>
 
 namespace JSC {
@@ -42,7 +43,7 @@ namespace JSC {
 
     class ProfileGenerator : public RefCounted<ProfileGenerator>  {
     public:
-        static PassRefPtr<ProfileGenerator> create(ExecState*, const WTF::String& title, unsigned uid);
+        static PassRefPtr<ProfileGenerator> create(ExecState*, const WTF::String& title, unsigned uid, PassRefPtr<Stopwatch>);
 
         // Members
         const WTF::String& title() const;
@@ -54,30 +55,28 @@ namespace JSC {
         void didExecute(ExecState* callerCallFrame, const CallIdentifier&);
         void exceptionUnwind(ExecState* handlerCallFrame, const CallIdentifier&);
 
-        void didPause(PassRefPtr<DebuggerCallFrame>, const CallIdentifier&) { m_debuggerPaused = true; }
-        void didContinue(PassRefPtr<DebuggerCallFrame>, const CallIdentifier&) { m_debuggerPaused = false; }
+        void setIsSuspended(bool suspended) { ASSERT(m_suspended != suspended); m_suspended = suspended; }
 
         void stopProfiling();
 
-        typedef void (ProfileGenerator::*ProfileFunction)(ExecState* callerOrHandlerCallFrame, const CallIdentifier& callIdentifier);
-
     private:
-        ProfileGenerator(ExecState*, const WTF::String& title, unsigned uid);
+        ProfileGenerator(ExecState*, const WTF::String& title, unsigned uid, PassRefPtr<Stopwatch>);
         void addParentForConsoleStart(ExecState*);
 
         void removeProfileStart();
         void removeProfileEnd();
 
-        void beginCallEntry(ProfileNode*, double startTime = NAN);
+        void beginCallEntry(ProfileNode*, double startTime);
         void endCallEntry(ProfileNode*);
 
         RefPtr<Profile> m_profile;
         JSGlobalObject* m_origin;
         unsigned m_profileGroup;
+        RefPtr<Stopwatch> m_stopwatch;
         RefPtr<ProfileNode> m_rootNode;
         RefPtr<ProfileNode> m_currentNode;
         bool m_foundConsoleStartParent;
-        bool m_debuggerPaused;
+        bool m_suspended;
     };
 
 } // namespace JSC

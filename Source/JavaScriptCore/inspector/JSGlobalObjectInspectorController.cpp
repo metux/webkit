@@ -26,9 +26,8 @@
 #include "config.h"
 #include "JSGlobalObjectInspectorController.h"
 
-#if ENABLE(INSPECTOR)
-
 #include "Completion.h"
+#include "ConsoleMessage.h"
 #include "ErrorHandlingScope.h"
 #include "InjectedScriptHost.h"
 #include "InjectedScriptManager.h"
@@ -43,9 +42,16 @@
 #include "ScriptArguments.h"
 #include "ScriptCallStack.h"
 #include "ScriptCallStackFactory.h"
+#include <wtf/Stopwatch.h>
+
 #include <cxxabi.h>
 #include <dlfcn.h>
 #include <execinfo.h>
+
+#if ENABLE(REMOTE_INSPECTOR)
+#include "JSGlobalObjectDebuggable.h"
+#include "RemoteInspector.h"
+#endif
 
 using namespace JSC;
 
@@ -54,22 +60,32 @@ namespace Inspector {
 JSGlobalObjectInspectorController::JSGlobalObjectInspectorController(JSGlobalObject& globalObject)
     : m_globalObject(globalObject)
     , m_injectedScriptManager(std::make_unique<InjectedScriptManager>(*this, InjectedScriptHost::create()))
-    , m_inspectorFrontendChannel(nullptr)
+    , m_frontendChannel(nullptr)
+    , m_executionStopwatch(Stopwatch::create())
     , m_includeNativeCallStackWithExceptions(true)
+    , m_isAutomaticInspection(false)
+#if ENABLE(INSPECTOR_ALTERNATE_DISPATCHERS)
+    , m_augmentingClient(nullptr)
+#endif
 {
+    auto inspectorAgent = std::make_unique<InspectorAgent>(*this);
     auto runtimeAgent = std::make_unique<JSGlobalObjectRuntimeAgent>(m_injectedScriptManager.get(), m_globalObject);
     auto consoleAgent = std::make_unique<JSGlobalObjectConsoleAgent>(m_injectedScriptManager.get());
     auto debuggerAgent = std::make_unique<JSGlobalObjectDebuggerAgent>(m_injectedScriptManager.get(), m_globalObject, consoleAgent.get());
 
+    m_inspectorAgent = inspectorAgent.get();
+    m_debuggerAgent = debuggerAgent.get();
     m_consoleAgent = consoleAgent.get();
     m_consoleClient = std::make_unique<JSGlobalObjectConsoleClient>(m_consoleAgent);
 
     runtimeAgent->setScriptDebugServer(&debuggerAgent->scriptDebugServer());
 
-    m_agents.append(std::make_unique<InspectorAgent>());
+    m_agents.append(WTF::move(inspectorAgent));
     m_agents.append(WTF::move(runtimeAgent));
     m_agents.append(WTF::move(consoleAgent));
     m_agents.append(WTF::move(debuggerAgent));
+
+    m_executionStopwatch->start();
 }
 
 JSGlobalObjectInspectorController::~JSGlobalObjectInspectorController()
@@ -79,38 +95,54 @@ JSGlobalObjectInspectorController::~JSGlobalObjectInspectorController()
 
 void JSGlobalObjectInspectorController::globalObjectDestroyed()
 {
-    disconnectFrontend(InspectorDisconnectReason::InspectedTargetDestroyed);
+    disconnectFrontend(DisconnectReason::InspectedTargetDestroyed);
 
     m_injectedScriptManager->disconnect();
 }
 
-void JSGlobalObjectInspectorController::connectFrontend(InspectorFrontendChannel* frontendChannel)
+void JSGlobalObjectInspectorController::connectFrontend(FrontendChannel* frontendChannel, bool isAutomaticInspection)
 {
-    ASSERT(!m_inspectorFrontendChannel);
-    ASSERT(!m_inspectorBackendDispatcher);
+    ASSERT(!m_frontendChannel);
+    ASSERT(!m_backendDispatcher);
 
-    m_inspectorFrontendChannel = frontendChannel;
-    m_inspectorBackendDispatcher = InspectorBackendDispatcher::create(frontendChannel);
+    m_isAutomaticInspection = isAutomaticInspection;
 
-    m_agents.didCreateFrontendAndBackend(frontendChannel, m_inspectorBackendDispatcher.get());
+    m_frontendChannel = frontendChannel;
+    m_backendDispatcher = BackendDispatcher::create(frontendChannel);
+
+    m_agents.didCreateFrontendAndBackend(frontendChannel, m_backendDispatcher.get());
+
+#if ENABLE(INSPECTOR_ALTERNATE_DISPATCHERS)
+    m_inspectorAgent->activateExtraDomains(m_agents.extraDomains());
+
+    if (m_augmentingClient)
+        m_augmentingClient->inspectorConnected();
+#endif
 }
 
-void JSGlobalObjectInspectorController::disconnectFrontend(InspectorDisconnectReason reason)
+void JSGlobalObjectInspectorController::disconnectFrontend(DisconnectReason reason)
 {
-    if (!m_inspectorFrontendChannel)
+    if (!m_frontendChannel)
         return;
 
     m_agents.willDestroyFrontendAndBackend(reason);
 
-    m_inspectorBackendDispatcher->clearFrontend();
-    m_inspectorBackendDispatcher.clear();
-    m_inspectorFrontendChannel = nullptr;
+    m_backendDispatcher->clearFrontend();
+    m_backendDispatcher.clear();
+    m_frontendChannel = nullptr;
+
+    m_isAutomaticInspection = false;
+
+#if ENABLE(INSPECTOR_ALTERNATE_DISPATCHERS)
+    if (m_augmentingClient)
+        m_augmentingClient->inspectorDisconnected();
+#endif
 }
 
 void JSGlobalObjectInspectorController::dispatchMessageFromFrontend(const String& message)
 {
-    if (m_inspectorBackendDispatcher)
-        m_inspectorBackendDispatcher->dispatch(message);
+    if (m_backendDispatcher)
+        m_backendDispatcher->dispatch(message);
 }
 
 void JSGlobalObjectInspectorController::appendAPIBacktrace(ScriptCallStack* callStack)
@@ -164,12 +196,25 @@ void JSGlobalObjectInspectorController::reportAPIException(ExecState* exec, JSVa
             ConsoleClient::printConsoleMessage(MessageSource::JS, MessageType::Log, MessageLevel::Error, errorMessage, String(), 0, 0);
     }
 
-    m_consoleAgent->addMessageToConsole(MessageSource::JS, MessageType::Log, MessageLevel::Error, errorMessage, callStack);
+    m_consoleAgent->addMessageToConsole(std::make_unique<ConsoleMessage>(MessageSource::JS, MessageType::Log, MessageLevel::Error, errorMessage, callStack));
 }
 
 ConsoleClient* JSGlobalObjectInspectorController::consoleClient() const
 {
     return m_consoleClient.get();
+}
+
+bool JSGlobalObjectInspectorController::developerExtrasEnabled() const
+{
+#if ENABLE(REMOTE_INSPECTOR)
+    if (!RemoteInspector::singleton().enabled())
+        return false;
+
+    if (!m_globalObject.inspectorDebuggable().remoteDebuggingAllowed())
+        return false;
+#endif
+
+    return true;
 }
 
 InspectorFunctionCallHandler JSGlobalObjectInspectorController::functionCallHandler() const
@@ -182,6 +227,33 @@ InspectorEvaluateHandler JSGlobalObjectInspectorController::evaluateHandler() co
     return JSC::evaluate;
 }
 
+void JSGlobalObjectInspectorController::frontendInitialized()
+{
+#if ENABLE(REMOTE_INSPECTOR)
+    if (m_isAutomaticInspection)
+        m_globalObject.inspectorDebuggable().unpauseForInitializedInspector();
+#endif
+}
+
+Ref<Stopwatch> JSGlobalObjectInspectorController::executionStopwatch()
+{
+    return m_executionStopwatch.copyRef();
+}
+
+#if ENABLE(INSPECTOR_ALTERNATE_DISPATCHERS)
+void JSGlobalObjectInspectorController::appendExtraAgent(std::unique_ptr<InspectorAgentBase> agent)
+{
+    String domainName = agent->domainName();
+
+    if (m_frontendChannel)
+        agent->didCreateFrontendAndBackend(m_frontendChannel, m_backendDispatcher.get());
+
+    m_agents.appendExtraAgent(WTF::move(agent));
+
+    if (m_frontendChannel)
+        m_inspectorAgent->activateExtraDomain(domainName);
+}
+#endif
+
 } // namespace Inspector
 
-#endif // ENABLE(INSPECTOR)

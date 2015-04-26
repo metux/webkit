@@ -45,11 +45,11 @@ namespace WebCore {
 
 static const auto progressNotificationInterval = std::chrono::milliseconds(50);
 
-PassRefPtr<FileReader> FileReader::create(ScriptExecutionContext& context)
+Ref<FileReader> FileReader::create(ScriptExecutionContext& context)
 {
-    RefPtr<FileReader> fileReader(adoptRef(new FileReader(context)));
+    Ref<FileReader> fileReader = adoptRef(*new FileReader(context));
     fileReader->suspendIfNeeded();
-    return fileReader.release();
+    return fileReader;
 }
 
 FileReader::FileReader(ScriptExecutionContext& context)
@@ -81,7 +81,7 @@ void FileReader::readAsArrayBuffer(Blob* blob, ExceptionCode& ec)
     if (!blob)
         return;
 
-    LOG(FileAPI, "FileReader: reading as array buffer: %s %s\n", blob->url().string().utf8().data(), blob->isFile() ? toFile(blob)->path().utf8().data() : "");
+    LOG(FileAPI, "FileReader: reading as array buffer: %s %s\n", blob->url().string().utf8().data(), is<File>(*blob) ? downcast<File>(*blob).path().utf8().data() : "");
 
     readInternal(blob, FileReaderLoader::ReadAsArrayBuffer, ec);
 }
@@ -91,7 +91,7 @@ void FileReader::readAsBinaryString(Blob* blob, ExceptionCode& ec)
     if (!blob)
         return;
 
-    LOG(FileAPI, "FileReader: reading as binary: %s %s\n", blob->url().string().utf8().data(), blob->isFile() ? toFile(blob)->path().utf8().data() : "");
+    LOG(FileAPI, "FileReader: reading as binary: %s %s\n", blob->url().string().utf8().data(), is<File>(*blob) ? downcast<File>(*blob).path().utf8().data() : "");
 
     readInternal(blob, FileReaderLoader::ReadAsBinaryString, ec);
 }
@@ -101,7 +101,7 @@ void FileReader::readAsText(Blob* blob, const String& encoding, ExceptionCode& e
     if (!blob)
         return;
 
-    LOG(FileAPI, "FileReader: reading as text: %s %s\n", blob->url().string().utf8().data(), blob->isFile() ? toFile(blob)->path().utf8().data() : "");
+    LOG(FileAPI, "FileReader: reading as text: %s %s\n", blob->url().string().utf8().data(), is<File>(*blob) ? downcast<File>(*blob).path().utf8().data() : "");
 
     m_encoding = encoding;
     readInternal(blob, FileReaderLoader::ReadAsText, ec);
@@ -117,7 +117,7 @@ void FileReader::readAsDataURL(Blob* blob, ExceptionCode& ec)
     if (!blob)
         return;
 
-    LOG(FileAPI, "FileReader: reading as data URL: %s %s\n", blob->url().string().utf8().data(), blob->isFile() ? toFile(blob)->path().utf8().data() : "");
+    LOG(FileAPI, "FileReader: reading as data URL: %s %s\n", blob->url().string().utf8().data(), is<File>(*blob) ? downcast<File>(*blob).path().utf8().data() : "");
 
     readInternal(blob, FileReaderLoader::ReadAsDataURL, ec);
 }
@@ -152,7 +152,7 @@ void FileReader::abort()
     m_aborting = true;
 
     // Schedule to have the abort done later since abort() might be called from the event handler and we do not want the resource loading code to be in the stack.
-    scriptExecutionContext()->postTask([=](ScriptExecutionContext&) {
+    scriptExecutionContext()->postTask([this] (ScriptExecutionContext&) {
         ASSERT(m_state != DONE);
 
         terminate();

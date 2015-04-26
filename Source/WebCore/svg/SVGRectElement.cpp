@@ -26,7 +26,6 @@
 #include "RenderSVGPath.h"
 #include "RenderSVGRect.h"
 #include "RenderSVGResource.h"
-#include "SVGElementInstance.h"
 #include "SVGLength.h"
 #include "SVGNames.h"
 #include <wtf/NeverDestroyed.h>
@@ -66,9 +65,9 @@ inline SVGRectElement::SVGRectElement(const QualifiedName& tagName, Document& do
     registerAnimatedPropertiesForSVGRectElement();
 }
 
-PassRefPtr<SVGRectElement> SVGRectElement::create(const QualifiedName& tagName, Document& document)
+Ref<SVGRectElement> SVGRectElement::create(const QualifiedName& tagName, Document& document)
 {
-    return adoptRef(new SVGRectElement(tagName, document));
+    return adoptRef(*new SVGRectElement(tagName, document));
 }
 
 bool SVGRectElement::isSupportedAttribute(const QualifiedName& attrName)
@@ -120,7 +119,7 @@ void SVGRectElement::svgAttributeChanged(const QualifiedName& attrName)
         return;
     }
 
-    SVGElementInstance::InvalidationGuard invalidationGuard(this);
+    InstanceInvalidationGuard guard(*this);
 
     if (attrName == SVGNames::xAttr
         || attrName == SVGNames::yAttr
@@ -132,7 +131,7 @@ void SVGRectElement::svgAttributeChanged(const QualifiedName& attrName)
         return;
     }
 
-    RenderSVGShape* renderer = toRenderSVGShape(this->renderer());
+    auto* renderer = downcast<RenderSVGShape>(this->renderer());
     if (!renderer)
         return;
 
@@ -144,7 +143,7 @@ void SVGRectElement::svgAttributeChanged(const QualifiedName& attrName)
     ASSERT_NOT_REACHED();
 }
 
-RenderPtr<RenderElement> SVGRectElement::createElementRenderer(PassRef<RenderStyle> style)
+RenderPtr<RenderElement> SVGRectElement::createElementRenderer(Ref<RenderStyle>&& style)
 {
     return createRenderer<RenderSVGRect>(*this, WTF::move(style));
 }

@@ -30,6 +30,7 @@
 
 #include "Attr.h"
 #include "Document.h"
+#include "HTMLDocument.h"
 #include "HTMLElement.h"
 #include "NodeTraversal.h"
 #include "XMLNSNames.h"
@@ -201,21 +202,21 @@ inline bool nodeMatchesBasicTest(Node& node, Step::Axis axis, const Step::NodeTe
 
             // For other axes, the principal node type is element.
             ASSERT(primaryNodeType(axis) == Node::ELEMENT_NODE);
-            if (!node.isElementNode())
+            if (!is<Element>(node))
                 return false;
 
             if (name == starAtom)
                 return namespaceURI.isEmpty() || namespaceURI == node.namespaceURI();
 
-            if (node.document().isHTMLDocument()) {
-                if (node.isHTMLElement()) {
+            if (is<HTMLDocument>(node.document())) {
+                if (is<HTMLElement>(node)) {
                     // Paths without namespaces should match HTML elements in HTML documents despite those having an XHTML namespace. Names are compared case-insensitively.
-                    return equalIgnoringCase(toHTMLElement(node).localName(), name) && (namespaceURI.isNull() || namespaceURI == node.namespaceURI());
+                    return equalIgnoringCase(downcast<HTMLElement>(node).localName(), name) && (namespaceURI.isNull() || namespaceURI == node.namespaceURI());
                 }
                 // An expression without any prefix shouldn't match no-namespace nodes (because HTML5 says so).
-                return toElement(node).hasLocalName(name) && namespaceURI == node.namespaceURI() && !namespaceURI.isNull();
+                return downcast<Element>(node).hasLocalName(name) && namespaceURI == node.namespaceURI() && !namespaceURI.isNull();
             }
-            return toElement(node).hasLocalName(name) && namespaceURI == node.namespaceURI();
+            return downcast<Element>(node).hasLocalName(name) && namespaceURI == node.namespaceURI();
         }
     }
     ASSERT_NOT_REACHED();
@@ -259,7 +260,7 @@ void Step::nodesInAxis(Node& context, NodeSet& nodes) const
         case DescendantAxis:
             if (context.isAttributeNode()) // In XPath model, attribute nodes do not have children.
                 return;
-            for (Node* node = context.firstChild(); node; node = NodeTraversal::next(node, &context)) {
+            for (Node* node = context.firstChild(); node; node = NodeTraversal::next(*node, &context)) {
                 if (nodeMatches(*node, DescendantAxis, m_nodeTest))
                     nodes.append(node);
             }
@@ -309,7 +310,7 @@ void Step::nodesInAxis(Node& context, NodeSet& nodes) const
         case FollowingAxis:
             if (context.isAttributeNode()) {
                 Node* node = static_cast<Attr&>(context).ownerElement();
-                while ((node = NodeTraversal::next(node))) {
+                while ((node = NodeTraversal::next(*node))) {
                     if (nodeMatches(*node, FollowingAxis, m_nodeTest))
                         nodes.append(node);
                 }
@@ -318,7 +319,7 @@ void Step::nodesInAxis(Node& context, NodeSet& nodes) const
                     for (Node* node = parent->nextSibling(); node; node = node->nextSibling()) {
                         if (nodeMatches(*node, FollowingAxis, m_nodeTest))
                             nodes.append(node);
-                        for (Node* child = node->firstChild(); child; child = NodeTraversal::next(child, node)) {
+                        for (Node* child = node->firstChild(); child; child = NodeTraversal::next(*child, node)) {
                             if (nodeMatches(*child, FollowingAxis, m_nodeTest))
                                 nodes.append(child);
                         }
@@ -333,7 +334,7 @@ void Step::nodesInAxis(Node& context, NodeSet& nodes) const
             else
                 node = &context;
             while (ContainerNode* parent = node->parentNode()) {
-                for (node = NodeTraversal::previous(node); node != parent; node = NodeTraversal::previous(node)) {
+                for (node = NodeTraversal::previous(*node); node != parent; node = NodeTraversal::previous(*node)) {
                     if (nodeMatches(*node, PrecedingAxis, m_nodeTest))
                         nodes.append(node);
                 }
@@ -343,10 +344,10 @@ void Step::nodesInAxis(Node& context, NodeSet& nodes) const
             return;
         }
         case AttributeAxis: {
-            if (!context.isElementNode())
+            if (!is<Element>(context))
                 return;
 
-            Element& contextElement = toElement(context);
+            Element& contextElement = downcast<Element>(context);
 
             // Avoid lazily creating attribute nodes for attributes that we do not need anyway.
             if (m_nodeTest.m_kind == NodeTest::NameTest && m_nodeTest.m_data != starAtom) {
@@ -380,7 +381,7 @@ void Step::nodesInAxis(Node& context, NodeSet& nodes) const
                 nodes.append(&context);
             if (context.isAttributeNode()) // In XPath model, attribute nodes do not have children.
                 return;
-            for (Node* node = context.firstChild(); node; node = NodeTraversal::next(node, &context)) {
+            for (Node* node = context.firstChild(); node; node = NodeTraversal::next(*node, &context)) {
                 if (nodeMatches(*node, DescendantOrSelfAxis, m_nodeTest))
                     nodes.append(node);
             }

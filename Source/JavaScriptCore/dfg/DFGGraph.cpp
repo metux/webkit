@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011, 2013, 2014 Apple Inc. All rights reserved.
+ * Copyright (C) 2011, 2013-2015 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -75,6 +75,11 @@ Graph::Graph(VM& vm, Plan& plan, LongLivedState& longLivedState)
     
     for (unsigned i = m_mustHandleValues.size(); i--;)
         m_mustHandleValues[i] = freezeFragile(plan.mustHandleValues[i]);
+    
+    for (unsigned i = m_codeBlock->m_numVars; i--;) {
+        if (m_codeBlock->isCaptured(virtualRegisterForLocal(i)))
+            m_outermostCapturedVars.set(i);
+    }
 }
 
 Graph::~Graph()
@@ -250,7 +255,7 @@ void Graph::dump(PrintStream& out, const char* prefix, Node* node, DumpContext* 
         out.print(comma, FunctionExecutableDump(executable));
     }
     if (node->hasStorageAccessData()) {
-        StorageAccessData& storageAccessData = m_storageAccessData[node->storageAccessDataIndex()];
+        StorageAccessData& storageAccessData = node->storageAccessData();
         out.print(comma, "id", storageAccessData.identifierNumber, "{", identifiers()[storageAccessData.identifierNumber], "}");
         out.print(", ", static_cast<ptrdiff_t>(storageAccessData.offset));
     }
@@ -271,35 +276,18 @@ void Graph::dump(PrintStream& out, const char* prefix, Node* node, DumpContext* 
         VariableAccessData* variableAccessData = node->tryGetVariableAccessData();
         if (variableAccessData) {
             VirtualRegister operand = variableAccessData->local();
-            if (operand.isArgument())
-                out.print(comma, "arg", operand.toArgument(), "(", VariableAccessDataDump(*this, variableAccessData), ")");
-            else
-                out.print(comma, "loc", operand.toLocal(), "(", VariableAccessDataDump(*this, variableAccessData), ")");
-            
+            out.print(comma, variableAccessData->local(), "(", VariableAccessDataDump(*this, variableAccessData), ")");
             operand = variableAccessData->machineLocal();
-            if (operand.isValid()) {
-                if (operand.isArgument())
-                    out.print(comma, "machine:arg", operand.toArgument());
-                else
-                    out.print(comma, "machine:loc", operand.toLocal());
-            }
+            if (operand.isValid())
+                out.print(comma, "machine:", operand);
         }
     }
-    if (node->hasUnlinkedLocal()) {
-        VirtualRegister operand = node->unlinkedLocal();
-        if (operand.isArgument())
-            out.print(comma, "arg", operand.toArgument());
-        else
-            out.print(comma, "loc", operand.toLocal());
-    }
+    if (node->hasUnlinkedLocal()) 
+        out.print(comma, node->unlinkedLocal());
     if (node->hasUnlinkedMachineLocal()) {
         VirtualRegister operand = node->unlinkedMachineLocal();
-        if (operand.isValid()) {
-            if (operand.isArgument())
-                out.print(comma, "machine:arg", operand.toArgument());
-            else
-                out.print(comma, "machine:loc", operand.toLocal());
-        }
+        if (operand.isValid())
+            out.print(comma, "machine:", operand);
     }
     if (node->hasConstantBuffer()) {
         out.print(comma);
@@ -323,6 +311,8 @@ void Graph::dump(PrintStream& out, const char* prefix, Node* node, DumpContext* 
         out.print(comma, inContext(JSValue(node->typedArray()), context));
     if (node->hasStoragePointer())
         out.print(comma, RawPointer(node->storagePointer()));
+    if (node->hasObjectMaterializationData())
+        out.print(comma, node->objectMaterializationData());
     if (node->isConstant())
         out.print(comma, pointerDumpInContext(node->constant(), context));
     if (node->isJump())
@@ -368,12 +358,21 @@ void Graph::dumpBlockHeader(PrintStream& out, const char* prefix, BasicBlock* bl
     for (size_t i = 0; i < block->predecessors.size(); ++i)
         out.print(" ", *block->predecessors[i]);
     out.print("\n");
+    out.print(prefix, "  Successors:");
+    for (BasicBlock* successor : block->successors()) {
+        out.print(" ", *successor);
+        if (m_prePostNumbering.isValid())
+            out.print(" (", m_prePostNumbering.edgeKind(block, successor), ")");
+    }
+    out.print("\n");
     if (m_dominators.isValid()) {
         out.print(prefix, "  Dominated by: ", m_dominators.dominatorsOf(block), "\n");
         out.print(prefix, "  Dominates: ", m_dominators.blocksDominatedBy(block), "\n");
         out.print(prefix, "  Dominance Frontier: ", m_dominators.dominanceFrontierOf(block), "\n");
         out.print(prefix, "  Iterated Dominance Frontier: ", m_dominators.iteratedDominanceFrontierOf(BlockList(1, block)), "\n");
     }
+    if (m_prePostNumbering.isValid())
+        out.print(prefix, "  Pre/Post Numbering: ", m_prePostNumbering.preNumber(block), "/", m_prePostNumbering.postNumber(block), "\n");
     if (m_naturalLoops.isValid()) {
         if (const NaturalLoop* loop = m_naturalLoops.headerOf(block)) {
             out.print(prefix, "  Loop header, contains:");
@@ -426,6 +425,10 @@ void Graph::dump(PrintStream& out, DumpContext* context)
     out.print("\n");
     out.print("DFG for ", CodeBlockWithJITType(m_codeBlock, JITCode::DFGJIT), ":\n");
     out.print("  Fixpoint state: ", m_fixpointState, "; Form: ", m_form, "; Unification state: ", m_unificationState, "; Ref count state: ", m_refCountState, "\n");
+    if (m_form == SSA)
+        out.print("  Argument formats: ", listDump(m_argumentFormats), "\n");
+    else
+        out.print("  Arguments: ", listDump(m_arguments), "\n");
     out.print("\n");
     
     Node* lastNode = 0;
@@ -560,6 +563,27 @@ void Graph::resetReachability()
     }
     
     determineReachability();
+}
+
+void Graph::mergeRelevantToOSR()
+{
+    for (BasicBlock* block : blocksInNaturalOrder()) {
+        for (Node* node : *block) {
+            switch (node->op()) {
+            case MovHint:
+                node->child1()->mergeFlags(NodeRelevantToOSR);
+                break;
+                
+            case PutStructureHint:
+            case PutByOffsetHint:
+                node->child2()->mergeFlags(NodeRelevantToOSR);
+                break;
+                
+            default:
+                break;
+            }
+        }
+    }
 }
 
 namespace {
@@ -707,6 +731,7 @@ void Graph::invalidateCFG()
 {
     m_dominators.invalidate();
     m_naturalLoops.invalidate();
+    m_prePostNumbering.invalidate();
 }
 
 void Graph::substituteGetLocal(BasicBlock& block, unsigned startIndexInBlock, VariableAccessData* variableAccessData, Node* newGetLocal)
@@ -849,8 +874,6 @@ bool Graph::isLiveInBytecode(VirtualRegister operand, CodeOrigin codeOrigin)
                 
                 if (reg.offset() == JSStack::Callee)
                     return true;
-                if (reg.offset() == JSStack::ScopeChain)
-                    return true;
                 
                 return false;
             }
@@ -979,8 +1002,6 @@ WriteBarrierBase<Unknown>* Graph::tryGetRegisters(Node* node)
 {
     JSLexicalEnvironment* lexicalEnvironment = tryGetActivation(node);
     if (!lexicalEnvironment)
-        return 0;
-    if (!lexicalEnvironment->isTornOff())
         return 0;
     return lexicalEnvironment->registers();
 }
@@ -1179,23 +1200,39 @@ void Graph::assertIsRegistered(Structure* structure)
     DFG_CRASH(*this, nullptr, toCString("Structure ", pointerDump(structure), " is watchable but isn't being watched.").data());
 }
 
-void Graph::handleAssertionFailure(
-    Node* node, const char* file, int line, const char* function, const char* assertion)
+NO_RETURN_DUE_TO_CRASH static void crash(
+    Graph& graph, const CString& whileText, const char* file, int line, const char* function,
+    const char* assertion)
 {
     startCrashing();
     dataLog("DFG ASSERTION FAILED: ", assertion, "\n");
     dataLog(file, "(", line, ") : ", function, "\n");
     dataLog("\n");
-    if (node) {
-        dataLog("While handling node ", node, "\n");
-        dataLog("\n");
-    }
+    dataLog(whileText);
     dataLog("Graph at time of failure:\n");
-    dump();
+    graph.dump();
     dataLog("\n");
     dataLog("DFG ASSERTION FAILED: ", assertion, "\n");
     dataLog(file, "(", line, ") : ", function, "\n");
     CRASH_WITH_SECURITY_IMPLICATION();
+}
+
+void Graph::handleAssertionFailure(
+    std::nullptr_t, const char* file, int line, const char* function, const char* assertion)
+{
+    crash(*this, "", file, line, function, assertion);
+}
+
+void Graph::handleAssertionFailure(
+    Node* node, const char* file, int line, const char* function, const char* assertion)
+{
+    crash(*this, toCString("While handling node ", node, "\n\n"), file, line, function, assertion);
+}
+
+void Graph::handleAssertionFailure(
+    BasicBlock* block, const char* file, int line, const char* function, const char* assertion)
+{
+    crash(*this, toCString("While handling block ", pointerDump(block), "\n\n"), file, line, function, assertion);
 }
 
 } } // namespace JSC::DFG

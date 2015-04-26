@@ -258,8 +258,8 @@ static void writeStyle(TextStream& ts, const RenderElement& renderer)
         writeNameValuePair(ts, "transform", renderer.localTransform());
     writeIfNotDefault(ts, "image rendering", style.imageRendering(), RenderStyle::initialImageRendering());
     writeIfNotDefault(ts, "opacity", style.opacity(), RenderStyle::initialOpacity());
-    if (renderer.isSVGShape()) {
-        const auto& shape = toRenderSVGShape(renderer);
+    if (is<RenderSVGShape>(renderer)) {
+        const auto& shape = downcast<RenderSVGShape>(renderer);
 
         Color fallbackColor;
         if (RenderSVGResource* strokePaintingResource = RenderSVGResource::strokePaintingResource(const_cast<RenderSVGShape&>(shape), shape.style(), fallbackColor)) {
@@ -320,34 +320,34 @@ static TextStream& operator<<(TextStream& ts, const RenderSVGShape& shape)
     SVGGraphicsElement& svgElement = shape.graphicsElement();
     SVGLengthContext lengthContext(&svgElement);
 
-    if (isSVGRectElement(svgElement)) {
-        const SVGRectElement& element = toSVGRectElement(svgElement);
+    if (is<SVGRectElement>(svgElement)) {
+        const SVGRectElement& element = downcast<SVGRectElement>(svgElement);
         writeNameValuePair(ts, "x", element.x().value(lengthContext));
         writeNameValuePair(ts, "y", element.y().value(lengthContext));
         writeNameValuePair(ts, "width", element.width().value(lengthContext));
         writeNameValuePair(ts, "height", element.height().value(lengthContext));
-    } else if (isSVGLineElement(svgElement)) {
-        const SVGLineElement& element = toSVGLineElement(svgElement);
+    } else if (is<SVGLineElement>(svgElement)) {
+        const SVGLineElement& element = downcast<SVGLineElement>(svgElement);
         writeNameValuePair(ts, "x1", element.x1().value(lengthContext));
         writeNameValuePair(ts, "y1", element.y1().value(lengthContext));
         writeNameValuePair(ts, "x2", element.x2().value(lengthContext));
         writeNameValuePair(ts, "y2", element.y2().value(lengthContext));
-    } else if (isSVGEllipseElement(svgElement)) {
-        const SVGEllipseElement& element = toSVGEllipseElement(svgElement);
+    } else if (is<SVGEllipseElement>(svgElement)) {
+        const SVGEllipseElement& element = downcast<SVGEllipseElement>(svgElement);
         writeNameValuePair(ts, "cx", element.cx().value(lengthContext));
         writeNameValuePair(ts, "cy", element.cy().value(lengthContext));
         writeNameValuePair(ts, "rx", element.rx().value(lengthContext));
         writeNameValuePair(ts, "ry", element.ry().value(lengthContext));
-    } else if (isSVGCircleElement(svgElement)) {
-        const SVGCircleElement& element = toSVGCircleElement(svgElement);
+    } else if (is<SVGCircleElement>(svgElement)) {
+        const SVGCircleElement& element = downcast<SVGCircleElement>(svgElement);
         writeNameValuePair(ts, "cx", element.cx().value(lengthContext));
         writeNameValuePair(ts, "cy", element.cy().value(lengthContext));
         writeNameValuePair(ts, "r", element.r().value(lengthContext));
-    } else if (svgElement.hasTagName(SVGNames::polygonTag) || svgElement.hasTagName(SVGNames::polylineTag)) {
-        const SVGPolyElement& element = toSVGPolyElement(svgElement);
+    } else if (is<SVGPolyElement>(svgElement)) {
+        const SVGPolyElement& element = downcast<SVGPolyElement>(svgElement);
         writeNameAndQuotedValue(ts, "points", element.pointList().valueAsString());
-    } else if (isSVGPathElement(svgElement)) {
-        const SVGPathElement& element = toSVGPathElement(svgElement);
+    } else if (is<SVGPathElement>(svgElement)) {
+        const SVGPathElement& element = downcast<SVGPathElement>(svgElement);
         String pathString;
         // FIXME: We should switch to UnalteredParsing here - this will affect the path dumping output of dozens of tests.
         buildStringFromByteStream(element.pathByteStream(), pathString, NormalizedParsing);
@@ -364,7 +364,7 @@ static TextStream& operator<<(TextStream& ts, const RenderSVGRoot& root)
 
 static void writeRenderSVGTextBox(TextStream& ts, const RenderSVGText& text)
 {
-    SVGRootInlineBox* box = toSVGRootInlineBox(text.firstRootBox());
+    auto* box = downcast<SVGRootInlineBox>(text.firstRootBox());
     if (!box)
         return;
 
@@ -434,10 +434,10 @@ static inline void writeSVGInlineTextBox(TextStream& ts, SVGInlineTextBox* textB
 static inline void writeSVGInlineTextBoxes(TextStream& ts, const RenderText& text, int indent)
 {
     for (InlineTextBox* box = text.firstTextBox(); box; box = box->nextTextBox()) {
-        if (!box->isSVGInlineTextBox())
+        if (!is<SVGInlineTextBox>(*box))
             continue;
 
-        writeSVGInlineTextBox(ts, toSVGInlineTextBox(box), indent);
+        writeSVGInlineTextBox(ts, downcast<SVGInlineTextBox>(box), indent);
     }
 }
 

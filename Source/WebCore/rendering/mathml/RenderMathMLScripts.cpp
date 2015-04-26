@@ -50,13 +50,12 @@ using namespace MathMLNames;
 // where BaseWrapper can now be empty and SubSupPairWrapper can now have one or two elements.
 //
 
-static bool isPrescript(RenderObject* renderObject)
+static bool isPrescript(const RenderObject& renderObject)
 {
-    ASSERT(renderObject);
-    return renderObject->node() && renderObject->node()->hasTagName(MathMLNames::mprescriptsTag);
+    return renderObject.node() && renderObject.node()->hasTagName(MathMLNames::mprescriptsTag);
 }
 
-RenderMathMLScripts::RenderMathMLScripts(Element& element, PassRef<RenderStyle> style)
+RenderMathMLScripts::RenderMathMLScripts(Element& element, Ref<RenderStyle>&& style)
     : RenderMathMLBlock(element, WTF::move(style))
     , m_baseWrapper(0)
 {
@@ -76,11 +75,11 @@ RenderMathMLScripts::RenderMathMLScripts(Element& element, PassRef<RenderStyle> 
 RenderBoxModelObject* RenderMathMLScripts::base() const
 {
     if (!m_baseWrapper)
-        return 0;
+        return nullptr;
     RenderObject* base = m_baseWrapper->firstChild();
-    if (!base || !base->isBoxModelObject())
-        return 0;
-    return toRenderBoxModelObject(base);
+    if (!is<RenderBoxModelObject>(base))
+        return nullptr;
+    return downcast<RenderBoxModelObject>(base);
 }
 
 void RenderMathMLScripts::fixAnonymousStyleForSubSupPair(RenderObject* subSupPair, bool isPostScript)
@@ -119,18 +118,18 @@ void RenderMathMLScripts::fixAnonymousStyles()
 
     // This sets the style for postscript pairs.
     RenderObject* subSupPair = m_baseWrapper;
-    for (subSupPair = subSupPair->nextSibling(); subSupPair && !isPrescript(subSupPair); subSupPair = subSupPair->nextSibling())
+    for (subSupPair = subSupPair->nextSibling(); subSupPair && !isPrescript(*subSupPair); subSupPair = subSupPair->nextSibling())
         fixAnonymousStyleForSubSupPair(subSupPair, true);
 
     if (subSupPair && m_kind == Multiscripts) {
         // This sets the style for prescript pairs.
-        for (subSupPair = subSupPair->nextSibling(); subSupPair && !isPrescript(subSupPair); subSupPair = subSupPair->nextSibling())
+        for (subSupPair = subSupPair->nextSibling(); subSupPair && !isPrescript(*subSupPair); subSupPair = subSupPair->nextSibling())
             fixAnonymousStyleForSubSupPair(subSupPair, false);
     }
 
     // This resets style for extra subSup pairs.
     for (; subSupPair; subSupPair = subSupPair->nextSibling()) {
-        if (!isPrescript(subSupPair)) {
+        if (!isPrescript(*subSupPair)) {
             ASSERT(subSupPair && subSupPair->style().refCount() == 1);
             RenderStyle& scriptsStyle = subSupPair->style();
             scriptsStyle.setFlexDirection(FlowRow);
@@ -153,10 +152,10 @@ void RenderMathMLScripts::addChildInternal(bool doNotRestructure, RenderObject* 
         // beforeChild may be a grandchild, so we call the addChild function of the corresponding wrapper instead.
         RenderObject* parent = beforeChild->parent();
         if (parent != this) {
-            RenderMathMLBlock* parentBlock = toRenderMathMLBlock(parent);
-            if (parentBlock->isRenderMathMLScriptsWrapper()) {
-                RenderMathMLScriptsWrapper* wrapper = toRenderMathMLScriptsWrapper(parentBlock);
-                wrapper->addChildInternal(false, child, beforeChild);
+            RenderMathMLBlock& parentBlock = downcast<RenderMathMLBlock>(*parent);
+            if (is<RenderMathMLScriptsWrapper>(parentBlock)) {
+                RenderMathMLScriptsWrapper& wrapper = downcast<RenderMathMLScriptsWrapper>(parentBlock);
+                wrapper.addChildInternal(false, child, beforeChild);
                 return;
             }
         }
@@ -168,20 +167,20 @@ void RenderMathMLScripts::addChildInternal(bool doNotRestructure, RenderObject* 
         return;
     }
     
-    if (isPrescript(child)) {
+    if (isPrescript(*child)) {
         // The new child becomes an <mprescripts/> separator.
         RenderMathMLBlock::addChild(child, beforeChild);
         return;
     }
 
-    if (!beforeChild || isPrescript(beforeChild)) {
+    if (!beforeChild || isPrescript(*beforeChild)) {
         // We are at the end of a sequence of subSup pairs.
-        RenderMathMLBlock* previousSibling = toRenderMathMLBlock(beforeChild ? beforeChild->previousSibling() : lastChild());
-        if (previousSibling && previousSibling->isRenderMathMLScriptsWrapper()) {
-            RenderMathMLScriptsWrapper* wrapper = toRenderMathMLScriptsWrapper(previousSibling);
-            if ((wrapper->m_kind == RenderMathMLScriptsWrapper::Base && wrapper->isEmpty()) || (wrapper->m_kind == RenderMathMLScriptsWrapper::SubSupPair && !wrapper->firstChild()->nextSibling())) {
+        RenderMathMLBlock* previousSibling = downcast<RenderMathMLBlock>(beforeChild ? beforeChild->previousSibling() : lastChild());
+        if (is<RenderMathMLScriptsWrapper>(previousSibling)) {
+            RenderMathMLScriptsWrapper& wrapper = downcast<RenderMathMLScriptsWrapper>(*previousSibling);
+            if ((wrapper.m_kind == RenderMathMLScriptsWrapper::Base && wrapper.isEmpty()) || (wrapper.m_kind == RenderMathMLScriptsWrapper::SubSupPair && !wrapper.firstChild()->nextSibling())) {
                 // The previous sibling is either an empty base or a SubSup pair with a single child so we can insert the new child into that wrapper.
-                wrapper->addChildInternal(true, child);
+                wrapper.addChildInternal(true, child);
                 return;
             }
         }
@@ -193,35 +192,37 @@ void RenderMathMLScripts::addChildInternal(bool doNotRestructure, RenderObject* 
     }
 
     // beforeChild is a subSup pair. This is like inserting the new child at the beginning of the subSup wrapper.
-    RenderMathMLScriptsWrapper* wrapper = toRenderMathMLScriptsWrapper(beforeChild);
-    ASSERT(wrapper->m_kind == RenderMathMLScriptsWrapper::SubSupPair);
+    RenderMathMLScriptsWrapper& wrapper = downcast<RenderMathMLScriptsWrapper>(*beforeChild);
+    ASSERT(wrapper.m_kind == RenderMathMLScriptsWrapper::SubSupPair);
     ASSERT(!(m_baseWrapper->isEmpty() && m_baseWrapper->nextSibling() == beforeChild));
-    wrapper->addChildInternal(false, child, wrapper->firstChild());
+    wrapper.addChildInternal(false, child, wrapper.firstChild());
 }
 
-RenderObject* RenderMathMLScripts::removeChildInternal(bool doNotRestructure, RenderObject& child)
+void RenderMathMLScripts::removeChildInternal(bool doNotRestructure, RenderObject& child)
 {
-    if (doNotRestructure)
-        return RenderMathMLBlock::removeChild(child);
+    if (doNotRestructure) {
+        RenderMathMLBlock::removeChild(child);
+        return;
+    }
 
-    ASSERT(isPrescript(&child));
+    ASSERT(isPrescript(child));
 
     RenderObject* previousSibling = child.previousSibling();
     RenderObject* nextSibling = child.nextSibling();
     ASSERT(previousSibling);
 
-    if (nextSibling && !isPrescript(previousSibling) && !isPrescript(nextSibling)) {
-        RenderMathMLScriptsWrapper* previousWrapper = toRenderMathMLScriptsWrapper(previousSibling);
-        RenderMathMLScriptsWrapper* nextWrapper = toRenderMathMLScriptsWrapper(nextSibling);
-        ASSERT(nextWrapper->m_kind == RenderMathMLScriptsWrapper::SubSupPair && !nextWrapper->isEmpty());
-        if ((previousWrapper->m_kind == RenderMathMLScriptsWrapper::Base && previousWrapper->isEmpty()) || (previousWrapper->m_kind == RenderMathMLScriptsWrapper::SubSupPair && !previousWrapper->firstChild()->nextSibling())) {
-            RenderObject* script = nextWrapper->firstChild();
-            nextWrapper->removeChildInternal(false, *script);
-            previousWrapper->addChildInternal(true, script);
+    if (nextSibling && !isPrescript(*previousSibling) && !isPrescript(*nextSibling)) {
+        RenderMathMLScriptsWrapper& previousWrapper = downcast<RenderMathMLScriptsWrapper>(*previousSibling);
+        RenderMathMLScriptsWrapper& nextWrapper = downcast<RenderMathMLScriptsWrapper>(*nextSibling);
+        ASSERT(nextWrapper.m_kind == RenderMathMLScriptsWrapper::SubSupPair && !nextWrapper.isEmpty());
+        if ((previousWrapper.m_kind == RenderMathMLScriptsWrapper::Base && previousWrapper.isEmpty()) || (previousWrapper.m_kind == RenderMathMLScriptsWrapper::SubSupPair && !previousWrapper.firstChild()->nextSibling())) {
+            RenderObject* script = nextWrapper.firstChild();
+            nextWrapper.removeChildInternal(false, *script);
+            previousWrapper.addChildInternal(true, script);
         }
     }
 
-    return RenderMathMLBlock::removeChild(child);
+    RenderMathMLBlock::removeChild(child);
 }
 
 void RenderMathMLScripts::addChild(RenderObject* child, RenderObject* beforeChild)
@@ -236,18 +237,16 @@ void RenderMathMLScripts::addChild(RenderObject* child, RenderObject* beforeChil
     fixAnonymousStyles();
 }
 
-RenderObject* RenderMathMLScripts::removeChild(RenderObject& child)
+void RenderMathMLScripts::removeChild(RenderObject& child)
 {
     if (beingDestroyed() || documentBeingDestroyed()) {
         // The renderer is being destroyed so we remove the child normally.
-        return RenderMathMLBlock::removeChild(child);
+        RenderMathMLBlock::removeChild(child);
+        return;
     }
 
-    RenderObject* next = removeChildInternal(false, child);
-    
+    removeChildInternal(false, child);
     fixAnonymousStyles();
-    
-    return next;
 }
 
 void RenderMathMLScripts::styleDidChange(StyleDifference diff, const RenderStyle* oldStyle)
@@ -261,9 +260,9 @@ void RenderMathMLScripts::styleDidChange(StyleDifference diff, const RenderStyle
 RenderMathMLOperator* RenderMathMLScripts::unembellishedOperator()
 {
     RenderBoxModelObject* base = this->base();
-    if (!base || !base->isRenderMathMLBlock())
-        return 0;
-    return toRenderMathMLBlock(base)->unembellishedOperator();
+    if (!is<RenderMathMLBlock>(base))
+        return nullptr;
+    return downcast<RenderMathMLBlock>(*base).unembellishedOperator();
 }
 
 void RenderMathMLScripts::layout()
@@ -302,11 +301,11 @@ void RenderMathMLScripts::layout()
         parseMathMLLength(scriptElement->fastGetAttribute(MathMLNames::superscriptshiftAttr), superscriptShiftValue, &style(), false);
 
     bool isPostScript = true;
-    RenderMathMLBlock* subSupPair = toRenderMathMLBlock(m_baseWrapper->nextSibling());
-    for (; subSupPair; subSupPair = toRenderMathMLBlock(subSupPair->nextSibling())) {
+    RenderMathMLBlock* subSupPair = downcast<RenderMathMLBlock>(m_baseWrapper->nextSibling());
+    for (; subSupPair; subSupPair = downcast<RenderMathMLBlock>(subSupPair->nextSibling())) {
 
         // We skip the base and <mprescripts/> elements.
-        if (isPrescript(subSupPair)) {
+        if (isPrescript(*subSupPair)) {
             if (!isPostScript)
                 break;
             isPostScript = false;
@@ -381,7 +380,7 @@ void RenderMathMLScriptsWrapper::addChildInternal(bool doNotRestructure, RenderO
         return;
     }
 
-    RenderMathMLScripts* parentNode = toRenderMathMLScripts(parent());
+    RenderMathMLScripts* parentNode = downcast<RenderMathMLScripts>(parent());
 
     if (m_kind == Base) {
         RenderObject* sibling = nextSibling();
@@ -396,7 +395,7 @@ void RenderMathMLScriptsWrapper::addChildInternal(bool doNotRestructure, RenderO
         RenderObject* oldBase = firstChild();
         if (oldBase)
             RenderMathMLBlock::removeChild(*oldBase);
-        if (isPrescript(child))
+        if (isPrescript(*child))
             parentNode->addChildInternal(true, child, sibling);
         else
             RenderMathMLBlock::addChild(child);
@@ -405,7 +404,7 @@ void RenderMathMLScriptsWrapper::addChildInternal(bool doNotRestructure, RenderO
         return;
     }
 
-    if (isPrescript(child)) {
+    if (isPrescript(*child)) {
         // We insert an <mprescripts> element.
         if (!beforeChild)
             parentNode->addChildInternal(true, child, nextSibling());
@@ -431,8 +430,8 @@ void RenderMathMLScriptsWrapper::addChildInternal(bool doNotRestructure, RenderO
 
     // We first move to the last subSup pair in the curent sequence of scripts.
     RenderMathMLScriptsWrapper* subSupPair = this;
-    while (subSupPair->nextSibling() && !isPrescript(subSupPair->nextSibling()))
-        subSupPair = toRenderMathMLScriptsWrapper(subSupPair->nextSibling());
+    while (subSupPair->nextSibling() && !isPrescript(*subSupPair->nextSibling()))
+        subSupPair = downcast<RenderMathMLScriptsWrapper>(subSupPair->nextSibling());
     if (subSupPair->firstChild()->nextSibling()) {
         // The last pair has two children so we need to create a new pair to leave room for the new child.
         RenderMathMLScriptsWrapper* newPair = createAnonymousWrapper(parentNode, RenderMathMLScriptsWrapper::SubSupPair);
@@ -442,56 +441,58 @@ void RenderMathMLScriptsWrapper::addChildInternal(bool doNotRestructure, RenderO
 
     // We shift the successors in the current sequence of scripts.
     for (RenderObject* previousSibling = subSupPair->previousSibling(); subSupPair != this; previousSibling = previousSibling->previousSibling()) {
-        RenderMathMLScriptsWrapper* previousSubSupPair = toRenderMathMLScriptsWrapper(previousSibling);
-        RenderObject* script = previousSubSupPair->lastChild();
-        previousSubSupPair->removeChildInternal(true, *script);
+        RenderMathMLScriptsWrapper& previousSubSupPair = downcast<RenderMathMLScriptsWrapper>(*previousSibling);
+        RenderObject* script = previousSubSupPair.lastChild();
+        previousSubSupPair.removeChildInternal(true, *script);
         subSupPair->addChildInternal(true, script, subSupPair->firstChild());
-        subSupPair = toRenderMathMLScriptsWrapper(previousSibling);
+        subSupPair = downcast<RenderMathMLScriptsWrapper>(previousSibling);
     }
 
     // This subSup pair now contain one element which is either beforeChild or the script that was before. Hence we can insert the new child before of after that element.
-    RenderMathMLBlock::addChild(child, firstChild() == beforeChild ? beforeChild : 0);
+    RenderMathMLBlock::addChild(child, firstChild() == beforeChild ? beforeChild : nullptr);
 }
 
 void RenderMathMLScriptsWrapper::addChild(RenderObject* child, RenderObject* beforeChild)
 {
-    RenderMathMLScripts* parentNode = toRenderMathMLScripts(parent());
+    RenderMathMLScripts* parentNode = downcast<RenderMathMLScripts>(parent());
 
     addChildInternal(false, child, beforeChild);
 
     parentNode->fixAnonymousStyles();
 }
 
-RenderObject* RenderMathMLScriptsWrapper::removeChildInternal(bool doNotRestructure, RenderObject& child)
+void RenderMathMLScriptsWrapper::removeChildInternal(bool doNotRestructure, RenderObject& child)
 {
-    if (doNotRestructure)
-        return RenderMathMLBlock::removeChild(child);
+    if (doNotRestructure) {
+        RenderMathMLBlock::removeChild(child);
+        return;
+    }
 
-    RenderMathMLScripts* parentNode = toRenderMathMLScripts(parent());
+    RenderMathMLScripts* parentNode = downcast<RenderMathMLScripts>(parent());
 
     if (m_kind == Base) {
         // We remove the child from the base wrapper.
         RenderObject* sibling = nextSibling();
         RenderMathMLBlock::removeChild(child);
-        if (sibling && !isPrescript(sibling)) {
+        if (sibling && !isPrescript(*sibling)) {
             // If there are postscripts, the first one becomes the base.
-            RenderMathMLScriptsWrapper* wrapper = toRenderMathMLScriptsWrapper(sibling);
-            RenderObject* script = wrapper->firstChild();
-            wrapper->removeChildInternal(false, *script);
+            RenderMathMLScriptsWrapper& wrapper = downcast<RenderMathMLScriptsWrapper>(*sibling);
+            RenderObject* script = wrapper.firstChild();
+            wrapper.removeChildInternal(false, *script);
             RenderMathMLBlock::addChild(script);
         }
-        return sibling;
+        return;
     }
 
     // We remove the child and shift the successors in the current sequence of scripts.
-    RenderObject* next = RenderMathMLBlock::removeChild(child);
+    RenderMathMLBlock::removeChild(child);
     RenderMathMLScriptsWrapper* subSupPair = this;
-    for (RenderObject* nextSibling = subSupPair->nextSibling(); nextSibling && !isPrescript(nextSibling); nextSibling = nextSibling->nextSibling()) {
-        RenderMathMLScriptsWrapper* nextSubSupPair = toRenderMathMLScriptsWrapper(nextSibling);
-        RenderObject* script = nextSubSupPair->firstChild();
-        nextSubSupPair->removeChildInternal(true, *script);
+    for (RenderObject* nextSibling = subSupPair->nextSibling(); nextSibling && !isPrescript(*nextSibling); nextSibling = nextSibling->nextSibling()) {
+        RenderMathMLScriptsWrapper& nextSubSupPair = downcast<RenderMathMLScriptsWrapper>(*nextSibling);
+        RenderObject* script = nextSubSupPair.firstChild();
+        nextSubSupPair.removeChildInternal(true, *script);
         subSupPair->addChildInternal(true, script);
-        subSupPair = toRenderMathMLScriptsWrapper(nextSibling);
+        subSupPair = downcast<RenderMathMLScriptsWrapper>(nextSibling);
     }
 
     // We remove the last subSup pair if it became empty.
@@ -499,21 +500,19 @@ RenderObject* RenderMathMLScriptsWrapper::removeChildInternal(bool doNotRestruct
         parentNode->removeChildInternal(true, *subSupPair);
         subSupPair->destroy();
     }
-    
-    return next;
 }
 
-RenderObject* RenderMathMLScriptsWrapper::removeChild(RenderObject& child)
+void RenderMathMLScriptsWrapper::removeChild(RenderObject& child)
 {
     if (beingDestroyed() || documentBeingDestroyed()) {
         // The renderer is being destroyed so we remove the child normally.
-        return RenderMathMLBlock::removeChild(child);
+        RenderMathMLBlock::removeChild(child);
+        return;
     }
 
-    RenderMathMLScripts* parentNode = toRenderMathMLScripts(parent());
-    RenderObject* next = removeChildInternal(false, child);
+    RenderMathMLScripts* parentNode = downcast<RenderMathMLScripts>(parent());
+    removeChildInternal(false, child);
     parentNode->fixAnonymousStyles();
-    return next;
 }
 
 }    

@@ -119,11 +119,11 @@ private:
     END_DECLARE_ANIMATED_PROPERTIES
 };
 
-void isSVGTextContentElement(const SVGTextContentElement&); // Catch unnecessary runtime check of type known at compile time.
-inline bool isSVGTextContentElement(const SVGElement& element) { return element.isTextContent(); }
-inline bool isSVGTextContentElement(const Node& node) { return node.isSVGElement() && toSVGElement(node).isTextContent(); }
-NODE_TYPE_CASTS(SVGTextContentElement)
-
 } // namespace WebCore
+
+SPECIALIZE_TYPE_TRAITS_BEGIN(WebCore::SVGTextContentElement)
+    static bool isType(const WebCore::SVGElement& element) { return element.isTextContent(); }
+    static bool isType(const WebCore::Node& node) { return is<WebCore::SVGElement>(node) && isType(downcast<WebCore::SVGElement>(node)); }
+SPECIALIZE_TYPE_TRAITS_END()
 
 #endif

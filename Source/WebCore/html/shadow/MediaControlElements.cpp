@@ -74,7 +74,7 @@ MediaControlPanelElement::MediaControlPanelElement(Document& document)
     , m_isBeingDragged(false)
     , m_isDisplayed(false)
     , m_opaque(true)
-    , m_transitionTimer(this, &MediaControlPanelElement::transitionTimerFired)
+    , m_transitionTimer(*this, &MediaControlPanelElement::transitionTimerFired)
 {
     setPseudo(AtomicString("-webkit-media-controls-panel", AtomicString::ConstructFromLiteral));
 }
@@ -149,7 +149,7 @@ void MediaControlPanelElement::stopTimer()
         m_transitionTimer.stop();
 }
 
-void MediaControlPanelElement::transitionTimerFired(Timer<MediaControlPanelElement>&)
+void MediaControlPanelElement::transitionTimerFired()
 {
     if (!m_opaque)
         hide();
@@ -169,7 +169,7 @@ void MediaControlPanelElement::setPosition(const LayoutPoint& position)
     setInlineStyleProperty(CSSPropertyMarginLeft, 0.0, CSSPrimitiveValue::CSS_PX);
     setInlineStyleProperty(CSSPropertyMarginTop, 0.0, CSSPrimitiveValue::CSS_PX);
 
-    classList()->add("dragged", IGNORE_EXCEPTION);
+    classList().add("dragged", IGNORE_EXCEPTION);
 }
 
 void MediaControlPanelElement::resetPosition()
@@ -179,7 +179,7 @@ void MediaControlPanelElement::resetPosition()
     removeInlineStyleProperty(CSSPropertyMarginLeft);
     removeInlineStyleProperty(CSSPropertyMarginTop);
 
-    classList()->remove("dragged", IGNORE_EXCEPTION);
+    classList().remove("dragged", IGNORE_EXCEPTION);
 
     m_cumulativeDragOffset.setX(0);
     m_cumulativeDragOffset.setY(0);
@@ -221,8 +221,8 @@ void MediaControlPanelElement::defaultEventHandler(Event* event)
 {
     MediaControlDivElement::defaultEventHandler(event);
 
-    if (event->isMouseEvent()) {
-        LayoutPoint location = toMouseEvent(event)->absoluteLocation();
+    if (is<MouseEvent>(*event)) {
+        LayoutPoint location = downcast<MouseEvent>(*event).absoluteLocation();
         if (event->type() == eventNames().mousedownEvent && event->target() == this) {
             startDrag(location);
             event->setDefaultHandled();
@@ -310,7 +310,7 @@ void MediaControlTimelineContainerElement::setTimeDisplaysHidden(bool hidden)
     }
 }
 
-RenderPtr<RenderElement> MediaControlTimelineContainerElement::createElementRenderer(PassRef<RenderStyle> style)
+RenderPtr<RenderElement> MediaControlTimelineContainerElement::createElementRenderer(Ref<RenderStyle>&& style)
 {
     return createRenderer<RenderMediaControlTimelineContainer>(*this, WTF::move(style));
 }
@@ -330,19 +330,19 @@ PassRefPtr<MediaControlVolumeSliderContainerElement> MediaControlVolumeSliderCon
     return element.release();
 }
 
-RenderPtr<RenderElement> MediaControlVolumeSliderContainerElement::createElementRenderer(PassRef<RenderStyle> style)
+RenderPtr<RenderElement> MediaControlVolumeSliderContainerElement::createElementRenderer(Ref<RenderStyle>&& style)
 {
     return createRenderer<RenderMediaVolumeSliderContainer>(*this, WTF::move(style));
 }
 
 void MediaControlVolumeSliderContainerElement::defaultEventHandler(Event* event)
 {
-    if (!event->isMouseEvent() || event->type() != eventNames().mouseoutEvent)
+    if (!is<MouseEvent>(*event) || event->type() != eventNames().mouseoutEvent)
         return;
 
     // Poor man's mouseleave event detection.
-    MouseEvent* mouseEvent = toMouseEvent(event);
-    EventTarget* relatedTarget = mouseEvent->relatedTarget();
+    MouseEvent& mouseEvent = downcast<MouseEvent>(*event);
+    EventTarget* relatedTarget = mouseEvent.relatedTarget();
     if (!relatedTarget || !relatedTarget->toNode())
         return;
 
@@ -689,7 +689,7 @@ void MediaControlClosedCaptionsTrackListElement::defaultEventHandler(Event* even
 #if ENABLE(VIDEO_TRACK)
     if (event->type() == eventNames().clickEvent) {
         Node* target = event->target()->toNode();
-        if (!target || !target->isElementNode())
+        if (!is<Element>(target))
             return;
 
         // When we created the elements in the track list, we gave them a custom
@@ -698,7 +698,7 @@ void MediaControlClosedCaptionsTrackListElement::defaultEventHandler(Event* even
         // tell the HTMLMediaElement to enable that track.
 
         RefPtr<TextTrack> textTrack;
-        MenuItemToTrackMap::iterator iter = m_menuToTrackMap.find(toElement(target));
+        MenuItemToTrackMap::iterator iter = m_menuToTrackMap.find(downcast<Element>(target));
         if (iter != m_menuToTrackMap.end())
             textTrack = iter->value;
         m_menuToTrackMap.clear();
@@ -764,24 +764,24 @@ void MediaControlClosedCaptionsTrackListElement::updateDisplay()
 
         if (textTrack == TextTrack::captionMenuAutomaticItem()) {
             if (displayMode == CaptionUserPreferences::Automatic)
-                trackItem->classList()->add(selectedClassValue, ASSERT_NO_EXCEPTION);
+                trackItem->classList().add(selectedClassValue, ASSERT_NO_EXCEPTION);
             else
-                trackItem->classList()->remove(selectedClassValue, ASSERT_NO_EXCEPTION);
+                trackItem->classList().remove(selectedClassValue, ASSERT_NO_EXCEPTION);
             continue;
         }
 
         if (displayMode != CaptionUserPreferences::Automatic && textTrack->mode() == TextTrack::showingKeyword()) {
             trackMenuItemSelected = true;
-            trackItem->classList()->add(selectedClassValue, ASSERT_NO_EXCEPTION);
+            trackItem->classList().add(selectedClassValue, ASSERT_NO_EXCEPTION);
         } else
-            trackItem->classList()->remove(selectedClassValue, ASSERT_NO_EXCEPTION);
+            trackItem->classList().remove(selectedClassValue, ASSERT_NO_EXCEPTION);
     }
 
     if (offMenuItem) {
         if (displayMode == CaptionUserPreferences::ForcedOnly && !trackMenuItemSelected)
-            offMenuItem->classList()->add(selectedClassValue, ASSERT_NO_EXCEPTION);
+            offMenuItem->classList().add(selectedClassValue, ASSERT_NO_EXCEPTION);
         else
-            offMenuItem->classList()->remove(selectedClassValue, ASSERT_NO_EXCEPTION);
+            offMenuItem->classList().remove(selectedClassValue, ASSERT_NO_EXCEPTION);
     }
 #endif
 }
@@ -851,7 +851,7 @@ PassRefPtr<MediaControlTimelineElement> MediaControlTimelineElement::create(Docu
 void MediaControlTimelineElement::defaultEventHandler(Event* event)
 {
     // Left button is 0. Rejects mouse events not from left button.
-    if (event->isMouseEvent() && toMouseEvent(event)->button())
+    if (is<MouseEvent>(*event) && downcast<MouseEvent>(*event).button())
         return;
 
     if (!renderer())
@@ -872,8 +872,8 @@ void MediaControlTimelineElement::defaultEventHandler(Event* event)
     if (event->type() == eventNames().inputEvent && time != mediaController()->currentTime())
         mediaController()->setCurrentTime(time);
 
-    RenderSlider* slider = toRenderSlider(renderer());
-    if (slider && slider->inDragMode())
+    RenderSlider& slider = downcast<RenderSlider>(*renderer());
+    if (slider.inDragMode())
         m_controls->updateCurrentTimeDisplay();
 }
 
@@ -1073,7 +1073,7 @@ static const AtomicString& getMediaControlCurrentTimeDisplayElementShadowPseudoI
 
 MediaControlTextTrackContainerElement::MediaControlTextTrackContainerElement(Document& document)
     : MediaControlDivElement(document, MediaTextTrackDisplayContainer)
-    , m_updateTimer(this, &MediaControlTextTrackContainerElement::updateTimerFired)
+    , m_updateTimer(*this, &MediaControlTextTrackContainerElement::updateTimerFired)
     , m_fontSize(0)
     , m_fontSizeIsImportant(false)
     , m_updateTextTrackRepresentationStyle(false)
@@ -1088,7 +1088,7 @@ PassRefPtr<MediaControlTextTrackContainerElement> MediaControlTextTrackContainer
     return element.release();
 }
 
-RenderPtr<RenderElement> MediaControlTextTrackContainerElement::createElementRenderer(PassRef<RenderStyle> style)
+RenderPtr<RenderElement> MediaControlTextTrackContainerElement::createElementRenderer(Ref<RenderStyle>&& style)
 {
     return createRenderer<RenderTextTrackContainerElement>(*this, WTF::move(style));
 }
@@ -1111,7 +1111,7 @@ void MediaControlTextTrackContainerElement::updateDisplay()
         return;
 
     // 2. Let video be the media element or other playback mechanism.
-    HTMLVideoElement* video = toHTMLVideoElement(mediaElement);
+    HTMLVideoElement& video = downcast<HTMLVideoElement>(*mediaElement);
 
     // 3. Let output be an empty list of absolutely positioned CSS block boxes.
     Vector<RefPtr<HTMLDivElement>> output;
@@ -1135,7 +1135,7 @@ void MediaControlTextTrackContainerElement::updateDisplay()
     // 7. Let cues be an empty list of text track cues.
     // 8. For each track track in tracks, append to cues all the cues from
     // track's list of cues that have their text track cue active flag set.
-    CueList activeCues = video->currentlyActiveCues();
+    CueList activeCues = video.currentlyActiveCues();
 
     // 9. If reset is false, then, for each text track cue cue in cues: if cue's
     // text track cue display state has a set of CSS boxes, then add those boxes
@@ -1243,7 +1243,7 @@ void MediaControlTextTrackContainerElement::updateActiveCuesFontSize()
 
 }
 
-void MediaControlTextTrackContainerElement::updateTimerFired(Timer<MediaControlTextTrackContainerElement>&)
+void MediaControlTextTrackContainerElement::updateTimerFired()
 {
     if (!document().page())
         return;
@@ -1337,9 +1337,9 @@ void MediaControlTextTrackContainerElement::updateSizes(bool forceUpdate)
     if (m_textTrackRepresentation)
         videoBox = m_textTrackRepresentation->bounds();
     else {
-        if (!mediaElement->renderer() || !mediaElement->renderer()->isVideo())
+        if (!is<RenderVideo>(mediaElement->renderer()))
             return;
-        videoBox = toRenderVideo(*mediaElement->renderer()).videoBox();
+        videoBox = downcast<RenderVideo>(*mediaElement->renderer()).videoBox();
     }
 
     if (!forceUpdate && m_videoDisplaySize == videoBox)
@@ -1363,14 +1363,14 @@ PassRefPtr<Image> MediaControlTextTrackContainerElement::createTextTrackRepresen
 
     document().updateLayout();
 
-    auto renderer = this->renderer();
+    auto* renderer = this->renderer();
     if (!renderer)
         return nullptr;
 
     if (!renderer->hasLayer())
         return nullptr;
 
-    RenderLayer* layer = toRenderLayerModelObject(renderer)->layer();
+    RenderLayer* layer = downcast<RenderLayerModelObject>(*renderer).layer();
 
     float deviceScaleFactor = 1;
     if (Page* page = document().page())

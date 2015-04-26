@@ -40,18 +40,14 @@ enum TranslateAttributeMode {
 
 class HTMLElement : public StyledElement {
 public:
-    static PassRefPtr<HTMLElement> create(const QualifiedName& tagName, Document&);
+    static Ref<HTMLElement> create(const QualifiedName& tagName, Document&);
 
-    PassRefPtr<HTMLCollection> children();
+    Ref<HTMLCollection> children();
 
     WEBCORE_EXPORT virtual String title() const override final;
 
     virtual short tabIndex() const override;
 
-    String innerHTML() const;
-    String outerHTML() const;
-    void setInnerHTML(const String&, ExceptionCode&);
-    void setOuterHTML(const String&, ExceptionCode&);
     void setInnerText(const String&, ExceptionCode&);
     void setOuterText(const String&, ExceptionCode&);
 
@@ -81,9 +77,12 @@ public:
     bool ieForbidsInsertHTML() const;
 
     virtual bool rendererIsNeeded(const RenderStyle&) override;
-    virtual RenderPtr<RenderElement> createElementRenderer(PassRef<RenderStyle>) override;
+    virtual RenderPtr<RenderElement> createElementRenderer(Ref<RenderStyle>&&) override;
 
     HTMLFormElement* form() const { return virtualForm(); }
+
+    const AtomicString& dir() const;
+    void setDir(const AtomicString&);
 
     bool hasDirectionAuto() const;
     TextDirection directionalityIfhasDirAutoAttribute(bool& isAuto) const;
@@ -111,7 +110,7 @@ protected:
     void applyAlignmentAttributeToStyle(const AtomicString&, MutableStyleProperties&);
     void applyBorderAttributeToStyle(const AtomicString&, MutableStyleProperties&);
 
-    virtual bool matchesReadWritePseudoClass() const;
+    virtual bool matchesReadWritePseudoClass() const override;
     virtual void parseAttribute(const QualifiedName&, const AtomicString&) override;
     virtual bool isPresentationAttribute(const QualifiedName&) const override;
     virtual void collectStyleForPresentationAttribute(const QualifiedName&, const AtomicString&, MutableStyleProperties&) override;
@@ -119,8 +118,6 @@ protected:
 
     virtual void childrenChanged(const ChildChange&) override;
     void calculateAndAdjustDirectionality();
-
-    virtual bool isURLAttribute(const Attribute&) const override;
 
 private:
     virtual String nodeName() const override final;
@@ -130,7 +127,7 @@ private:
     virtual HTMLFormElement* virtualForm() const;
 
     Node* insertAdjacent(const String& where, Node* newChild, ExceptionCode&);
-    PassRefPtr<DocumentFragment> textToFragment(const String&, ExceptionCode&);
+    RefPtr<DocumentFragment> textToFragment(const String&, ExceptionCode&);
 
     void dirAttributeChanged(const AtomicString&);
     void adjustDirectionalityIfNeededAfterChildAttributeChanged(Element* child);
@@ -146,22 +143,16 @@ inline HTMLElement::HTMLElement(const QualifiedName& tagName, Document& document
     ASSERT(tagName.localName().impl());
 }
 
-void isHTMLElement(const HTMLElement&); // Catch unnecessary runtime check of type known at compile time.
-inline bool isHTMLElement(const Node& node) { return node.isHTMLElement(); }
-
-template <typename ArgType>
-struct ElementTypeCastTraits<const HTMLElement, ArgType> {
-    static bool is(ArgType& node) { return isHTMLElement(node); }
-};
-
-NODE_TYPE_CASTS(HTMLElement)
-
 inline bool Node::hasTagName(const HTMLQualifiedName& name) const
 {
-    return isHTMLElement() && toHTMLElement(*this).hasTagName(name);
+    return is<HTMLElement>(*this) && downcast<HTMLElement>(*this).hasTagName(name);
 }
 
 } // namespace WebCore
+
+SPECIALIZE_TYPE_TRAITS_BEGIN(WebCore::HTMLElement)
+    static bool isType(const WebCore::Node& node) { return node.isHTMLElement(); }
+SPECIALIZE_TYPE_TRAITS_END()
 
 #include "HTMLElementTypeHelpers.h"
 

@@ -83,13 +83,12 @@ public:
     void fastDecrement();
     bool atEnd() const;
 
-    inline bool atTextParagraphSeparator()
+    bool atTextParagraphSeparator() const
     {
-        return m_renderer && m_renderer->preservesNewline() && m_renderer->isText() && toRenderText(m_renderer)->textLength()
-            && toRenderText(m_renderer)->characterAt(m_pos) == '\n';
+        return is<RenderText>(m_renderer) && m_renderer->preservesNewline() && downcast<RenderText>(*m_renderer).characterAt(m_pos) == '\n';
     }
     
-    inline bool atParagraphSeparator()
+    bool atParagraphSeparator() const
     {
         return (m_renderer && m_renderer->isBR()) || atTextParagraphSeparator();
     }
@@ -195,15 +194,15 @@ enum EmptyInlineBehavior {
 
 static bool isEmptyInline(const RenderInline& renderer)
 {
-    for (RenderObject* curr = renderer.firstChild(); curr; curr = curr->nextSibling()) {
-        if (curr->isFloatingOrOutOfFlowPositioned())
+    for (RenderObject* current = renderer.firstChild(); current; current = current->nextSibling()) {
+        if (current->isFloatingOrOutOfFlowPositioned())
             continue;
-        if (curr->isText()) {
-            if (!toRenderText(curr)->isAllCollapsibleWhitespace())
+        if (is<RenderText>(*current)) {
+            if (!downcast<RenderText>(*current).isAllCollapsibleWhitespace())
                 return false;
             continue;
         }
-        if (!curr->isRenderInline() || !isEmptyInline(toRenderInline(*curr)))
+        if (!is<RenderInline>(*current) || !isEmptyInline(downcast<RenderInline>(*current)))
             return false;
     }
     return true;
@@ -215,22 +214,22 @@ static bool isEmptyInline(const RenderInline& renderer)
 template <class Observer>
 static inline RenderObject* bidiNextShared(RenderElement& root, RenderObject* current, Observer* observer = 0, EmptyInlineBehavior emptyInlineBehavior = SkipEmptyInlines, bool* endOfInlinePtr = 0)
 {
-    RenderObject* next = 0;
+    RenderObject* next = nullptr;
     // oldEndOfInline denotes if when we last stopped iterating if we were at the end of an inline.
     bool oldEndOfInline = endOfInlinePtr ? *endOfInlinePtr : false;
     bool endOfInline = false;
 
     while (current) {
-        next = 0;
+        next = nullptr;
         if (!oldEndOfInline && !isIteratorTarget(current)) {
-            next = toRenderElement(current)->firstChild();
+            next = downcast<RenderElement>(*current).firstChild();
             notifyObserverEnteredObject(observer, next);
         }
 
         // We hit this when either current has no children, or when current is not a renderer we care about.
         if (!next) {
             // If it is a renderer we care about, and we're doing our inline-walk, return it.
-            if (emptyInlineBehavior == IncludeEmptyInlines && !oldEndOfInline && current->isRenderInline()) {
+            if (emptyInlineBehavior == IncludeEmptyInlines && !oldEndOfInline && is<RenderInline>(*current)) {
                 next = current;
                 endOfInline = true;
                 break;
@@ -246,7 +245,7 @@ static inline RenderObject* bidiNextShared(RenderElement& root, RenderObject* cu
                 }
 
                 current = current->parent();
-                if (emptyInlineBehavior == IncludeEmptyInlines && current && current != &root && current->isRenderInline()) {
+                if (emptyInlineBehavior == IncludeEmptyInlines && current && current != &root && is<RenderInline>(*current)) {
                     next = current;
                     endOfInline = true;
                     break;
@@ -258,7 +257,7 @@ static inline RenderObject* bidiNextShared(RenderElement& root, RenderObject* cu
             break;
 
         if (isIteratorTarget(next)
-            || (next->isRenderInline() && (emptyInlineBehavior == IncludeEmptyInlines || isEmptyInline(toRenderInline(*next)))))
+            || (is<RenderInline>(*next) && (emptyInlineBehavior == IncludeEmptyInlines || isEmptyInline(downcast<RenderInline>(*next)))))
             break;
         current = next;
     }
@@ -289,31 +288,31 @@ static inline RenderObject* bidiNextIncludingEmptyInlines(RenderElement& root, R
     return bidiNextShared(root, current, observer, IncludeEmptyInlines, endOfInlinePtr);
 }
 
-static inline RenderObject* bidiFirstSkippingEmptyInlines(RenderElement& root, InlineBidiResolver* resolver = 0)
+static inline RenderObject* bidiFirstSkippingEmptyInlines(RenderElement& root, InlineBidiResolver* resolver = nullptr)
 {
-    RenderObject* o = root.firstChild();
-    if (!o)
+    RenderObject* renderer = root.firstChild();
+    if (!renderer)
         return nullptr;
 
-    if (o->isRenderInline()) {
-        notifyObserverEnteredObject(resolver, o);
-        if (!isEmptyInline(toRenderInline(*o)))
-            o = bidiNextSkippingEmptyInlines(root, o, resolver);
+    if (is<RenderInline>(*renderer)) {
+        notifyObserverEnteredObject(resolver, renderer);
+        if (!isEmptyInline(downcast<RenderInline>(*renderer)))
+            renderer = bidiNextSkippingEmptyInlines(root, renderer, resolver);
         else {
             // Never skip empty inlines.
             if (resolver)
                 resolver->commitExplicitEmbedding();
-            return o; 
+            return renderer;
         }
     }
 
     // FIXME: Unify this with the bidiNext call above.
-    if (o && !isIteratorTarget(o))
-        o = bidiNextSkippingEmptyInlines(root, o, resolver);
+    if (renderer && !isIteratorTarget(renderer))
+        renderer = bidiNextSkippingEmptyInlines(root, renderer, resolver);
 
     if (resolver)
         resolver->commitExplicitEmbedding();
-    return o;
+    return renderer;
 }
 
 // FIXME: This method needs to be renamed when bidiNext finds a good name.
@@ -331,9 +330,8 @@ static inline RenderObject* bidiFirstIncludingEmptyInlines(RenderElement& root)
 inline void InlineIterator::fastIncrementInTextNode()
 {
     ASSERT(m_renderer);
-    ASSERT(m_renderer->isText());
-    ASSERT(m_pos <= toRenderText(m_renderer)->textLength());
-    m_pos++;
+    ASSERT(m_pos <= downcast<RenderText>(*m_renderer).textLength());
+    ++m_pos;
 }
 
 inline void InlineIterator::setOffset(unsigned position)
@@ -384,9 +382,9 @@ inline void InlineIterator::increment(InlineBidiResolver* resolver)
 {
     if (!m_renderer)
         return;
-    if (m_renderer->isText()) {
+    if (is<RenderText>(*m_renderer)) {
         fastIncrementInTextNode();
-        if (m_pos < toRenderText(m_renderer)->textLength())
+        if (m_pos < downcast<RenderText>(*m_renderer).textLength())
             return;
     }
     // bidiNext can return 0, so use moveTo instead of moveToStartOf
@@ -409,10 +407,10 @@ inline bool InlineIterator::atEnd() const
 
 inline UChar InlineIterator::characterAt(unsigned index) const
 {
-    if (!m_renderer || !m_renderer->isText())
+    if (!is<RenderText>(m_renderer))
         return 0;
 
-    return toRenderText(m_renderer)->characterAt(index);
+    return downcast<RenderText>(*m_renderer).characterAt(index);
 }
 
 inline UChar InlineIterator::current() const
@@ -430,8 +428,8 @@ ALWAYS_INLINE UCharDirection InlineIterator::direction() const
     if (UNLIKELY(!m_renderer))
         return U_OTHER_NEUTRAL;
 
-    if (LIKELY(m_renderer->isText())) {
-        UChar codeUnit = toRenderText(*m_renderer).characterAt(m_pos);
+    if (LIKELY(is<RenderText>(*m_renderer))) {
+        UChar codeUnit = downcast<RenderText>(*m_renderer).characterAt(m_pos);
         if (LIKELY(U16_IS_SINGLE(codeUnit)))
             return u_charDirection(codeUnit);
         return surrogateTextDirection(codeUnit);

@@ -56,7 +56,7 @@ PassRefPtr<TextControlInnerContainer> TextControlInnerContainer::create(Document
     return adoptRef(new TextControlInnerContainer(document));
 }
     
-RenderPtr<RenderElement> TextControlInnerContainer::createElementRenderer(PassRef<RenderStyle> style)
+RenderPtr<RenderElement> TextControlInnerContainer::createElementRenderer(Ref<RenderStyle>&& style)
 {
     return createRenderer<RenderTextControlInnerContainer>(*this, WTF::move(style));
 }
@@ -72,10 +72,10 @@ PassRefPtr<TextControlInnerElement> TextControlInnerElement::create(Document& do
     return adoptRef(new TextControlInnerElement(document));
 }
 
-PassRefPtr<RenderStyle> TextControlInnerElement::customStyleForRenderer(RenderStyle&)
+RefPtr<RenderStyle> TextControlInnerElement::customStyleForRenderer(RenderStyle&)
 {
-    RenderTextControlSingleLine* parentRenderer = toRenderTextControlSingleLine(shadowHost()->renderer());
-    return parentRenderer->createInnerBlockStyle(&parentRenderer->style());
+    RenderTextControlSingleLine& parentRenderer = downcast<RenderTextControlSingleLine>(*shadowHost()->renderer());
+    return parentRenderer.createInnerBlockStyle(&parentRenderer.style());
 }
 
 // ---------------------------
@@ -110,20 +110,20 @@ void TextControlInnerTextElement::defaultEventHandler(Event* event)
         HTMLDivElement::defaultEventHandler(event);
 }
 
-RenderPtr<RenderElement> TextControlInnerTextElement::createElementRenderer(PassRef<RenderStyle> style)
+RenderPtr<RenderElement> TextControlInnerTextElement::createElementRenderer(Ref<RenderStyle>&& style)
 {
     return createRenderer<RenderTextControlInnerBlock>(*this, WTF::move(style));
 }
 
 RenderTextControlInnerBlock* TextControlInnerTextElement::renderer() const
 {
-    return toRenderTextControlInnerBlock(HTMLDivElement::renderer());
+    return downcast<RenderTextControlInnerBlock>(HTMLDivElement::renderer());
 }
 
-PassRefPtr<RenderStyle> TextControlInnerTextElement::customStyleForRenderer(RenderStyle&)
+RefPtr<RenderStyle> TextControlInnerTextElement::customStyleForRenderer(RenderStyle&)
 {
-    RenderTextControl* parentRenderer = toRenderTextControl(shadowHost()->renderer());
-    return parentRenderer->createInnerTextStyle(&parentRenderer->style());
+    RenderTextControl& parentRenderer = downcast<RenderTextControl>(*shadowHost()->renderer());
+    return parentRenderer.createInnerTextStyle(&parentRenderer.style());
 }
 
 // ----------------------------
@@ -141,16 +141,16 @@ PassRefPtr<SearchFieldResultsButtonElement> SearchFieldResultsButtonElement::cre
 void SearchFieldResultsButtonElement::defaultEventHandler(Event* event)
 {
     // On mousedown, bring up a menu, if needed
-    HTMLInputElement* input = toHTMLInputElement(shadowHost());
-    if (input && event->type() == eventNames().mousedownEvent && event->isMouseEvent() && toMouseEvent(event)->button() == LeftButton) {
+    HTMLInputElement* input = downcast<HTMLInputElement>(shadowHost());
+    if (input && event->type() == eventNames().mousedownEvent && is<MouseEvent>(*event) && downcast<MouseEvent>(*event).button() == LeftButton) {
         input->focus();
         input->select();
 #if !PLATFORM(IOS)
-        RenderSearchField* renderer = toRenderSearchField(input->renderer());
-        if (renderer->popupIsVisible())
-            renderer->hidePopup();
+        RenderSearchField& renderer = downcast<RenderSearchField>(*input->renderer());
+        if (renderer.popupIsVisible())
+            renderer.hidePopup();
         else if (input->maxResults() > 0)
-            renderer->showPopup();
+            renderer.showPopup();
 #endif
         event->setDefaultHandled();
     }
@@ -192,14 +192,14 @@ void SearchFieldCancelButtonElement::willDetachRenderers()
 void SearchFieldCancelButtonElement::defaultEventHandler(Event* event)
 {
     // If the element is visible, on mouseup, clear the value, and set selection
-    RefPtr<HTMLInputElement> input(toHTMLInputElement(shadowHost()));
+    RefPtr<HTMLInputElement> input(downcast<HTMLInputElement>(shadowHost()));
     if (!input || input->isDisabledOrReadOnly()) {
         if (!event->defaultHandled())
             HTMLDivElement::defaultEventHandler(event);
         return;
     }
 
-    if (event->type() == eventNames().mousedownEvent && event->isMouseEvent() && toMouseEvent(event)->button() == LeftButton) {
+    if (event->type() == eventNames().mousedownEvent && is<MouseEvent>(*event) && downcast<MouseEvent>(*event).button() == LeftButton) {
         if (renderer() && renderer()->visibleToHitTesting()) {
             if (Frame* frame = document().frame()) {
                 frame->eventHandler().setCapturingMouseEventsElement(this);
@@ -210,7 +210,7 @@ void SearchFieldCancelButtonElement::defaultEventHandler(Event* event)
         input->select();
         event->setDefaultHandled();
     }
-    if (event->type() == eventNames().mouseupEvent && event->isMouseEvent() && toMouseEvent(event)->button() == LeftButton) {
+    if (event->type() == eventNames().mouseupEvent && is<MouseEvent>(*event) && downcast<MouseEvent>(*event).button() == LeftButton) {
         if (m_capturing) {
             if (Frame* frame = document().frame()) {
                 frame->eventHandler().setCapturingMouseEventsElement(nullptr);
@@ -232,7 +232,7 @@ void SearchFieldCancelButtonElement::defaultEventHandler(Event* event)
 #if !PLATFORM(IOS)
 bool SearchFieldCancelButtonElement::willRespondToMouseClickEvents()
 {
-    const HTMLInputElement* input = toHTMLInputElement(shadowHost());
+    const HTMLInputElement* input = downcast<HTMLInputElement>(shadowHost());
     if (input && !input->isDisabledOrReadOnly())
         return true;
 

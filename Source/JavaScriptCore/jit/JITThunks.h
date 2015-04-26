@@ -36,7 +36,6 @@
 #include "Weak.h"
 #include "WeakInlines.h"
 #include <wtf/HashMap.h>
-#include <wtf/OwnPtr.h>
 #include <wtf/RefPtr.h>
 #include <wtf/ThreadingPrimitives.h>
 
@@ -46,6 +45,7 @@ class VM;
 class NativeExecutable;
 
 class JITThunks {
+    WTF_MAKE_FAST_ALLOCATED;
 public:
     JITThunks();
     ~JITThunks();
@@ -69,7 +69,7 @@ private:
     typedef HashMap<ThunkGenerator, MacroAssemblerCodeRef> CTIStubMap;
     CTIStubMap m_ctiStubMap;
     typedef HashMap<std::pair<NativeFunction, NativeFunction>, Weak<NativeExecutable>> HostFunctionStubMap;
-    OwnPtr<HostFunctionStubMap> m_hostFunctionStubMap;
+    std::unique_ptr<HostFunctionStubMap> m_hostFunctionStubMap;
     Lock m_lock;
 };
 

@@ -47,6 +47,7 @@
 #include "PositionIterator.h"
 #include "RenderBlock.h"
 #include "RenderElement.h"
+#include "RenderTableCell.h"
 #include "ShadowRoot.h"
 #include "Text.h"
 #include "TextIterator.h"
@@ -146,7 +147,7 @@ bool isEditablePosition(const Position& p, EditableType editableType, EUpdateSty
     if (!node)
         return false;
     if (updateStyle == UpdateStyle)
-        node->document().updateStyleIfNeededForNode(*node);
+        node->document().updateStyleIfNeeded();
     else
         ASSERT(updateStyle == DoNotUpdateStyle);
 
@@ -194,7 +195,7 @@ Element* unsplittableElementForPosition(const Position& p)
 {
     // Since enclosingNodeOfType won't search beyond the highest root editable node,
     // this code works even if the closest table cell was outside of the root editable node.
-    Element* enclosingCell = toElement(enclosingNodeOfType(p, &isTableCell));
+    Element* enclosingCell = downcast<Element>(enclosingNodeOfType(p, &isTableCell));
     if (enclosingCell)
         return enclosingCell;
 
@@ -316,7 +317,7 @@ bool isInline(const Node* node)
 Element* enclosingBlock(Node* node, EditingBoundaryCrossingRule rule)
 {
     Node* enclosingNode = enclosingNodeOfType(firstPositionInOrBeforeNode(node), isBlock, rule);
-    return enclosingNode && enclosingNode->isElementNode() ? toElement(enclosingNode) : 0;
+    return is<Element>(enclosingNode) ? downcast<Element>(enclosingNode) : nullptr;
 }
 
 TextDirection directionOfEnclosingBlock(const Position& position)
@@ -550,10 +551,10 @@ Element* enclosingElementWithTag(const Position& position, const QualifiedName& 
     for (Node* node = position.deprecatedNode(); node; node = node->parentNode()) {
         if (root && !node->hasEditableStyle())
             continue;
-        if (!node->isElementNode())
+        if (!is<Element>(*node))
             continue;
-        if (toElement(*node).hasTagName(tagName))
-            return toElement(node);
+        if (downcast<Element>(*node).hasTagName(tagName))
+            return downcast<Element>(node);
         if (node == root)
             return nullptr;
     }
@@ -603,12 +604,12 @@ static bool hasARenderedDescendant(Node* node, Node* excludedNode)
 {
     for (Node* n = node->firstChild(); n;) {
         if (n == excludedNode) {
-            n = NodeTraversal::nextSkippingChildren(n, node);
+            n = NodeTraversal::nextSkippingChildren(*n, node);
             continue;
         }
         if (n->renderer())
             return true;
-        n = NodeTraversal::next(n, node);
+        n = NodeTraversal::next(*n, node);
     }
     return false;
 }
@@ -629,7 +630,7 @@ Node* highestNodeToRemoveInPruning(Node* node)
 
 Node* enclosingTableCell(const Position& p)
 {
-    return toElement(enclosingNodeOfType(p, isTableCell));
+    return downcast<Element>(enclosingNodeOfType(p, isTableCell));
 }
 
 Element* enclosingAnchorElement(const Position& p)
@@ -638,8 +639,8 @@ Element* enclosingAnchorElement(const Position& p)
         return nullptr;
 
     for (Node* node = p.deprecatedNode(); node; node = node->parentNode()) {
-        if (node->isElementNode() && node->isLink())
-            return toElement(node);
+        if (is<Element>(*node) && node->isLink())
+            return downcast<Element>(node);
     }
     return nullptr;
 }
@@ -647,24 +648,24 @@ Element* enclosingAnchorElement(const Position& p)
 HTMLElement* enclosingList(Node* node)
 {
     if (!node)
-        return 0;
+        return nullptr;
         
     Node* root = highestEditableRoot(firstPositionInOrBeforeNode(node));
     
-    for (ContainerNode* n = node->parentNode(); n; n = n->parentNode()) {
-        if (n->hasTagName(ulTag) || n->hasTagName(olTag))
-            return toHTMLElement(n);
-        if (n == root)
-            return 0;
+    for (ContainerNode* ancestor = node->parentNode(); ancestor; ancestor = ancestor->parentNode()) {
+        if (is<HTMLUListElement>(*ancestor) || is<HTMLOListElement>(*ancestor))
+            return downcast<HTMLElement>(ancestor);
+        if (ancestor == root)
+            return nullptr;
     }
     
-    return 0;
+    return nullptr;
 }
 
 Node* enclosingListChild(Node *node)
 {
     if (!node)
-        return 0;
+        return nullptr;
     // Check for a list item element, or for a node whose parent is a list element. Such a node
     // will appear visually as a list item (but without a list marker)
     Node* root = highestEditableRoot(firstPositionInOrBeforeNode(node));
@@ -674,10 +675,10 @@ Node* enclosingListChild(Node *node)
         if (n->hasTagName(liTag) || (isListElement(n->parentNode()) && n != root))
             return n;
         if (n == root || isTableCell(n))
-            return 0;
+            return nullptr;
     }
     
-    return 0;
+    return nullptr;
 }
 
 static HTMLElement* embeddedSublist(Node* listItem)
@@ -685,10 +686,10 @@ static HTMLElement* embeddedSublist(Node* listItem)
     // Check the DOM so that we'll find collapsed sublists without renderers.
     for (Node* n = listItem->firstChild(); n; n = n->nextSibling()) {
         if (isListElement(n))
-            return toHTMLElement(n);
+            return downcast<HTMLElement>(n);
     }
     
-    return 0;
+    return nullptr;
 }
 
 static Node* appendedSublist(Node* listItem)
@@ -696,12 +697,12 @@ static Node* appendedSublist(Node* listItem)
     // Check the DOM so that we'll find collapsed sublists without renderers.
     for (Node* n = listItem->nextSibling(); n; n = n->nextSibling()) {
         if (isListElement(n))
-            return toHTMLElement(n);
+            return downcast<HTMLElement>(n);
         if (isListItem(listItem))
-            return 0;
+            return nullptr;
     }
     
-    return 0;
+    return nullptr;
 }
 
 // FIXME: This method should not need to call isStartOfParagraph/isEndOfParagraph
@@ -849,11 +850,11 @@ bool isEmptyTableCell(const Node* node)
         if (!renderer)
             return false;
     }
-    if (!renderer->isTableCell())
+    if (!is<RenderTableCell>(*renderer))
         return false;
 
     // Check that the table cell contains no child renderers except for perhaps a single <br>.
-    RenderObject* childRenderer = toRenderElement(renderer)->firstChild();
+    RenderObject* childRenderer = downcast<RenderTableCell>(*renderer).firstChild();
     if (!childRenderer)
         return true;
     if (!childRenderer->isBR())
@@ -894,12 +895,12 @@ PassRefPtr<HTMLElement> createListItemElement(Document& document)
     return HTMLLIElement::create(document);
 }
 
-PassRefPtr<HTMLElement> createHTMLElement(Document& document, const QualifiedName& name)
+Ref<HTMLElement> createHTMLElement(Document& document, const QualifiedName& name)
 {
     return HTMLElementFactory::createElement(name, document);
 }
 
-PassRefPtr<HTMLElement> createHTMLElement(Document& document, const AtomicString& tagName)
+Ref<HTMLElement> createHTMLElement(Document& document, const AtomicString& tagName)
 {
     return createHTMLElement(document, QualifiedName(nullAtom, tagName, xhtmlNamespaceURI));
 }
@@ -983,32 +984,32 @@ unsigned numEnclosingMailBlockquotes(const Position& p)
     return num;
 }
 
-void updatePositionForNodeRemoval(Position& position, Node* node)
+void updatePositionForNodeRemoval(Position& position, Node& node)
 {
     if (position.isNull())
         return;
     switch (position.anchorType()) {
     case Position::PositionIsBeforeChildren:
-        if (node->containsIncludingShadowDOM(position.containerNode()))
-            position = positionInParentBeforeNode(node);
+        if (node.containsIncludingShadowDOM(position.containerNode()))
+            position = positionInParentBeforeNode(&node);
         break;
     case Position::PositionIsAfterChildren:
-        if (node->containsIncludingShadowDOM(position.containerNode()))
-            position = positionInParentBeforeNode(node);
+        if (node.containsIncludingShadowDOM(position.containerNode()))
+            position = positionInParentBeforeNode(&node);
         break;
     case Position::PositionIsOffsetInAnchor:
-        if (position.containerNode() == node->parentNode() && static_cast<unsigned>(position.offsetInContainerNode()) > node->computeNodeIndex())
+        if (position.containerNode() == node.parentNode() && static_cast<unsigned>(position.offsetInContainerNode()) > node.computeNodeIndex())
             position.moveToOffset(position.offsetInContainerNode() - 1);
-        else if (node->containsIncludingShadowDOM(position.containerNode()))
-            position = positionInParentBeforeNode(node);
+        else if (node.containsIncludingShadowDOM(position.containerNode()))
+            position = positionInParentBeforeNode(&node);
         break;
     case Position::PositionIsAfterAnchor:
-        if (node->containsIncludingShadowDOM(position.anchorNode()))
-            position = positionInParentAfterNode(node);
+        if (node.containsIncludingShadowDOM(position.anchorNode()))
+            position = positionInParentAfterNode(&node);
         break;
     case Position::PositionIsBeforeAnchor:
-        if (node->containsIncludingShadowDOM(position.anchorNode()))
-            position = positionInParentBeforeNode(node);
+        if (node.containsIncludingShadowDOM(position.anchorNode()))
+            position = positionInParentBeforeNode(&node);
         break;
     }
 }
@@ -1055,12 +1056,12 @@ bool lineBreakExistsAtPosition(const Position& position)
     if (!position.anchorNode()->renderer())
         return false;
     
-    if (!position.anchorNode()->isTextNode() || !position.anchorNode()->renderer()->style().preserveNewline())
+    if (!is<Text>(*position.anchorNode()) || !position.anchorNode()->renderer()->style().preserveNewline())
         return false;
     
-    Text* textNode = toText(position.anchorNode());
+    Text& textNode = downcast<Text>(*position.anchorNode());
     unsigned offset = position.offsetInContainerNode();
-    return offset < textNode->length() && textNode->data()[offset] == '\n';
+    return offset < textNode.length() && textNode.data()[offset] == '\n';
 }
 
 // Modifies selections that have an end point at the edge of a table
@@ -1184,34 +1185,30 @@ bool isRenderedAsNonInlineTableImageOrHR(const Node* node)
 
 bool areIdenticalElements(const Node* first, const Node* second)
 {
-    if (!first->isElementNode() || !second->isElementNode())
+    if (!is<Element>(*first) || !is<Element>(*second))
         return false;
 
-    const Element* firstElement = toElement(first);
-    const Element* secondElement = toElement(second);
-    if (!firstElement->hasTagName(secondElement->tagQName()))
+    const Element& firstElement = downcast<Element>(*first);
+    const Element& secondElement = downcast<Element>(*second);
+    if (!firstElement.hasTagName(secondElement.tagQName()))
         return false;
 
-    return firstElement->hasEquivalentAttributes(secondElement);
+    return firstElement.hasEquivalentAttributes(&secondElement);
 }
 
 bool isNonTableCellHTMLBlockElement(const Node* node)
 {
-    if (!node->isElementNode())
-        return false;
-
-    const Element* element = toElement(node);
-    return element->hasTagName(listingTag)
-        || element->hasTagName(olTag)
-        || element->hasTagName(preTag)
-        || isHTMLTableElement(element)
-        || element->hasTagName(ulTag)
-        || element->hasTagName(xmpTag)
-        || element->hasTagName(h1Tag)
-        || element->hasTagName(h2Tag)
-        || element->hasTagName(h3Tag)
-        || element->hasTagName(h4Tag)
-        || element->hasTagName(h5Tag);
+    return node->hasTagName(listingTag)
+        || node->hasTagName(olTag)
+        || node->hasTagName(preTag)
+        || is<HTMLTableElement>(*node)
+        || node->hasTagName(ulTag)
+        || node->hasTagName(xmpTag)
+        || node->hasTagName(h1Tag)
+        || node->hasTagName(h2Tag)
+        || node->hasTagName(h3Tag)
+        || node->hasTagName(h4Tag)
+        || node->hasTagName(h5Tag);
 }
 
 Position adjustedSelectionStartForStyleComputation(const VisibleSelection& selection)
@@ -1251,14 +1248,14 @@ bool isBlockFlowElement(const Node* node)
 Element* deprecatedEnclosingBlockFlowElement(Node* node)
 {
     if (!node)
-        return 0;
+        return nullptr;
     if (isBlockFlowElement(node))
-        return toElement(node);
+        return downcast<Element>(node);
     while ((node = node->parentNode())) {
-        if (isBlockFlowElement(node) || node->hasTagName(bodyTag))
-            return toElement(node);
+        if (isBlockFlowElement(node) || is<HTMLBodyElement>(*node))
+            return downcast<Element>(node);
     }
-    return 0;
+    return nullptr;
 }
 
 static inline bool caretRendersInsideNode(Node* node)
@@ -1266,21 +1263,21 @@ static inline bool caretRendersInsideNode(Node* node)
     return node && !isRenderedTable(node) && !editingIgnoresContent(node);
 }
 
-RenderObject* rendererForCaretPainting(Node* node)
+RenderBlock* rendererForCaretPainting(Node* node)
 {
     if (!node)
-        return 0;
+        return nullptr;
 
     RenderObject* renderer = node->renderer();
     if (!renderer)
-        return 0;
+        return nullptr;
 
     // If caretNode is a block and caret is inside it, then caret should be painted by that block.
-    bool paintedByBlock = renderer->isRenderBlockFlow() && caretRendersInsideNode(node);
-    return paintedByBlock ? renderer : renderer->containingBlock();
+    bool paintedByBlock = is<RenderBlockFlow>(*renderer) && caretRendersInsideNode(node);
+    return paintedByBlock ? downcast<RenderBlock>(renderer) : renderer->containingBlock();
 }
 
-LayoutRect localCaretRectInRendererForCaretPainting(const VisiblePosition& caretPosition, RenderObject*& caretPainter)
+LayoutRect localCaretRectInRendererForCaretPainting(const VisiblePosition& caretPosition, RenderBlock*& caretPainter)
 {
     if (caretPosition.isNull())
         return LayoutRect();
@@ -1297,24 +1294,23 @@ LayoutRect localCaretRectInRendererForCaretPainting(const VisiblePosition& caret
 
     // Compute an offset between the renderer and the caretPainter.
     while (renderer != caretPainter) {
-        RenderObject* containerObject = renderer->container();
+        RenderElement* containerObject = renderer->container();
         if (!containerObject)
             return LayoutRect();
-        localRect.move(renderer->offsetFromContainer(containerObject, localRect.location()));
+        localRect.move(renderer->offsetFromContainer(*containerObject, localRect.location()));
         renderer = containerObject;
     }
 
     return localRect;
 }
 
-IntRect absoluteBoundsForLocalCaretRect(RenderObject* rendererForCaretPainting, const LayoutRect& rect)
+IntRect absoluteBoundsForLocalCaretRect(RenderBlock* rendererForCaretPainting, const LayoutRect& rect)
 {
     if (!rendererForCaretPainting || rect.isEmpty())
         return IntRect();
 
     LayoutRect localRect(rect);
-    if (rendererForCaretPainting->isBox())
-        toRenderBox(rendererForCaretPainting)->flipForWritingMode(localRect);
+    rendererForCaretPainting->flipForWritingMode(localRect);
     return rendererForCaretPainting->localToAbsoluteQuad(FloatRect(localRect)).enclosingBoundingBox();
 }
 

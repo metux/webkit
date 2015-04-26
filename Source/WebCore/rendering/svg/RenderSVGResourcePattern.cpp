@@ -30,9 +30,7 @@
 
 namespace WebCore {
 
-RenderSVGResourceType RenderSVGResourcePattern::s_resourceType = PatternResourceType;
-
-RenderSVGResourcePattern::RenderSVGResourcePattern(SVGPatternElement& element, PassRef<RenderStyle> style)
+RenderSVGResourcePattern::RenderSVGResourcePattern(SVGPatternElement& element, Ref<RenderStyle>&& style)
     : RenderSVGResourceContainer(element, WTF::move(style))
     , m_shouldCollectPatternAttributes(true)
 {
@@ -40,7 +38,7 @@ RenderSVGResourcePattern::RenderSVGResourcePattern(SVGPatternElement& element, P
 
 SVGPatternElement& RenderSVGResourcePattern::patternElement() const
 {
-    return toSVGPatternElement(RenderSVGResourceContainer::element());
+    return downcast<SVGPatternElement>(RenderSVGResourceContainer::element());
 }
 
 void RenderSVGResourcePattern::removeAllClientsFromCache(bool markForInvalidation)
@@ -154,13 +152,13 @@ bool RenderSVGResourcePattern::applyResource(RenderElement& renderer, const Rend
 
     if (resourceMode & ApplyToFillMode) {
         context->setAlpha(svgStyle.fillOpacity());
-        context->setFillPattern(patternData->pattern);
+        context->setFillPattern(*patternData->pattern);
         context->setFillRule(svgStyle.fillRule());
     } else if (resourceMode & ApplyToStrokeMode) {
         if (svgStyle.vectorEffect() == VE_NON_SCALING_STROKE)
             patternData->pattern->setPatternSpaceTransform(transformOnNonScalingStroke(&renderer, patternData->transform));
         context->setAlpha(svgStyle.strokeOpacity());
-        context->setStrokePattern(patternData->pattern);
+        context->setStrokePattern(*patternData->pattern);
         SVGRenderSupport::applyStrokeStyleToContext(context, style, renderer);
     }
 

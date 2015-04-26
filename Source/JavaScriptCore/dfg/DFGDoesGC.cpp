@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2014 Apple Inc. All rights reserved.
+ * Copyright (C) 2014, 2015 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -28,6 +28,7 @@
 
 #if ENABLE(DFG_JIT)
 
+#include "DFGClobberize.h"
 #include "DFGGraph.h"
 #include "DFGNode.h"
 #include "Operations.h"
@@ -36,7 +37,7 @@ namespace JSC { namespace DFG {
 
 bool doesGC(Graph& graph, Node* node)
 {
-    if (graph.clobbersWorld(node))
+    if (clobbersWorld(graph, node))
         return true;
     
     // Now consider nodes that don't clobber the world but that still may GC. This includes all
@@ -52,7 +53,6 @@ bool doesGC(Graph& graph, Node* node)
     case SetLocal:
     case MovHint:
     case ZombieHint:
-    case GetArgument:
     case Phantom:
     case HardPhantom:
     case Upsilon:
@@ -80,6 +80,7 @@ bool doesGC(Graph& graph, Node* node)
     case ArithAbs:
     case ArithMin:
     case ArithMax:
+    case ArithPow:
     case ArithSqrt:
     case ArithFRound:
     case ArithSin:
@@ -95,7 +96,6 @@ bool doesGC(Graph& graph, Node* node)
     case GetButterfly:
     case CheckArray:
     case GetScope:
-    case GetMyScope:
     case SkipScope:
     case GetClosureRegisters:
     case GetClosureVar:
@@ -119,11 +119,11 @@ bool doesGC(Graph& graph, Node* node)
     case Construct:
     case NativeCall:
     case NativeConstruct:
-    case ProfiledCall:
-    case ProfiledConstruct:
     case Breakpoint:
     case ProfileWillCall:
     case ProfileDidCall:
+    case ProfileType:
+    case ProfileControlFlow:
     case CheckHasInstance:
     case InstanceOf:
     case IsUndefined:
@@ -137,7 +137,6 @@ bool doesGC(Graph& graph, Node* node)
     case ToPrimitive:
     case ToString:
     case In:
-    case TearOffActivation:
     case PhantomArguments:
     case TearOffArguments:
     case GetMyArgumentsLength:
@@ -199,6 +198,12 @@ bool doesGC(Graph& graph, Node* node)
     case BooleanToNumber:
     case CheckBadCell:
     case BottomValue:
+    case PhantomNewObject:
+    case PutByOffsetHint:
+    case CheckStructureImmediate:
+    case PutStructureHint:
+    case PutLocal:
+    case KillLocal:
         return false;
 
     case CreateActivation:
@@ -225,6 +230,7 @@ bool doesGC(Graph& graph, Node* node)
     case GetGenericPropertyEnumerator:
     case GetEnumeratorPname:
     case ToIndexString:
+    case MaterializeNewObject:
         return true;
         
     case MultiPutByOffset:

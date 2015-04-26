@@ -29,10 +29,11 @@
 
 #include "Document.h"
 #include "ExceptionCodePlaceholder.h"
-#include "Font.h"
+#include "FontCascade.h"
 #include "Frame.h"
 #include "HTMLElement.h"
 #include "HTMLNames.h"
+#include "HTMLParagraphElement.h"
 #include "HTMLTextFormControlElement.h"
 #include "InlineTextBox.h"
 #include "NodeTraversal.h"
@@ -206,9 +207,9 @@ static Node* nextInPreOrderCrossingShadowBoundaries(Node& rangeEndContainer, int
 static inline bool fullyClipsContents(Node& node)
 {
     auto* renderer = node.renderer();
-    if (!renderer || !renderer->isBox() || !renderer->hasOverflowClip())
+    if (!is<RenderBox>(renderer) || !renderer->hasOverflowClip())
         return false;
-    return toRenderBox(renderer)->size().isEmpty();
+    return downcast<RenderBox>(*renderer).size().isEmpty();
 }
 
 static inline bool ignoresContainerClip(Node& node)
@@ -254,9 +255,9 @@ bool isRendererReplacedElement(RenderObject* renderer)
     if (renderer->isImage() || renderer->isWidget() || renderer->isMedia())
         return true;
 
-    if (renderer->node() && renderer->node()->isElementNode()) {
-        Element& element = toElement(*renderer->node());
-        if (element.isFormControlElement() || element.hasTagName(legendTag) || element.hasTagName(meterTag) || element.hasTagName(progressTag))
+    if (is<Element>(renderer->node())) {
+        Element& element = downcast<Element>(*renderer->node());
+        if (is<HTMLFormControlElement>(element) || is<HTMLLegendElement>(element) || is<HTMLMeterElement>(element) || is<HTMLProgressElement>(element))
             return true;
         if (equalIgnoringCase(element.fastGetAttribute(roleAttr), "img"))
             return true;
@@ -448,7 +449,7 @@ void TextIterator::advance()
         if (!next) {
             next = m_node->nextSibling();
             if (!next) {
-                bool pastEnd = NodeTraversal::next(m_node) == m_pastEndNode;
+                bool pastEnd = NodeTraversal::next(*m_node) == m_pastEndNode;
                 Node* parentNode = m_node->parentOrShadowHostNode();
                 while (!next && parentNode) {
                     if ((pastEnd && parentNode == m_endContainer) || m_endContainer->isDescendantOf(parentNode))
@@ -489,8 +490,8 @@ static bool hasVisibleTextNode(RenderText& renderer)
 {
     if (renderer.style().visibility() == VISIBLE)
         return true;
-    if (renderer.isTextFragment()) {
-        if (auto firstLetter = toRenderTextFragment(renderer).firstLetter()) {
+    if (is<RenderTextFragment>(renderer)) {
+        if (auto firstLetter = downcast<RenderTextFragment>(renderer).firstLetter()) {
             if (firstLetter->style().visibility() == VISIBLE)
                 return true;
         }
@@ -500,7 +501,7 @@ static bool hasVisibleTextNode(RenderText& renderer)
 
 bool TextIterator::handleTextNode()
 {
-    Text& textNode = toText(*m_node);
+    Text& textNode = downcast<Text>(*m_node);
 
     if (m_fullyClippedStack.top() && !(m_behavior & TextIteratorIgnoresStyleVisibility))
         return false;
@@ -517,8 +518,8 @@ bool TextIterator::handleTextNode()
             emitCharacter(' ', textNode, nullptr, runStart, runStart);
             return false;
         }
-        if (!m_handledFirstLetter && renderer.isTextFragment() && !m_offset) {
-            handleTextNodeFirstLetter(toRenderTextFragment(renderer));
+        if (!m_handledFirstLetter && is<RenderTextFragment>(renderer) && !m_offset) {
+            handleTextNodeFirstLetter(downcast<RenderTextFragment>(renderer));
             if (m_firstLetterText) {
                 String firstLetter = m_firstLetterText->text();
                 emitText(textNode, *m_firstLetterText, m_offset, m_offset + firstLetter.length());
@@ -574,9 +575,9 @@ bool TextIterator::handleTextNode()
     if (renderer.firstTextBox())
         m_textBox = renderer.firstTextBox();
 
-    bool shouldHandleFirstLetter = !m_handledFirstLetter && renderer.isTextFragment() && !m_offset;
+    bool shouldHandleFirstLetter = !m_handledFirstLetter && is<RenderTextFragment>(renderer) && !m_offset;
     if (shouldHandleFirstLetter)
-        handleTextNodeFirstLetter(toRenderTextFragment(renderer));
+        handleTextNodeFirstLetter(downcast<RenderTextFragment>(renderer));
 
     if (!renderer.firstTextBox() && rendererText.length() && !shouldHandleFirstLetter) {
         if (renderer.style().visibility() != VISIBLE && !(m_behavior & TextIteratorIgnoresStyleVisibility))
@@ -602,7 +603,7 @@ bool TextIterator::handleTextNode()
 
 void TextIterator::handleTextBox()
 {    
-    Text& textNode = toText(*m_node);
+    Text& textNode = downcast<Text>(*m_node);
 
     auto& renderer = m_firstLetterText ? *m_firstLetterText : *textNode.renderer();
     if (renderer.style().visibility() != VISIBLE && !(m_behavior & TextIteratorIgnoresStyleVisibility)) {
@@ -727,8 +728,8 @@ bool TextIterator::handleReplacedElement()
         return false;
     }
 
-    if ((m_behavior & TextIteratorEntersTextControls) && renderer.isTextControl()) {
-        if (TextControlInnerTextElement* innerTextElement = toRenderTextControl(renderer).textFormControlElement().innerTextElement()) {
+    if ((m_behavior & TextIteratorEntersTextControls) && is<RenderTextControl>(renderer)) {
+        if (TextControlInnerTextElement* innerTextElement = downcast<RenderTextControl>(renderer).textFormControlElement().innerTextElement()) {
             m_node = innerTextElement->containingShadowRoot();
             pushFullyClippedState(m_fullyClippedStack, *m_node);
             m_offset = 0;
@@ -759,8 +760,8 @@ bool TextIterator::handleReplacedElement()
     m_positionStartOffset = 0;
     m_positionEndOffset = 1;
 
-    if ((m_behavior & TextIteratorEmitsImageAltText) && renderer.isRenderImage()) {
-        String altText = toRenderImage(renderer).altText();
+    if ((m_behavior & TextIteratorEmitsImageAltText) && is<RenderImage>(renderer)) {
+        String altText = downcast<RenderImage>(renderer).altText();
         if (unsigned length = altText.length()) {
             m_lastCharacter = altText[length - 1];
             m_copyableText.set(WTF::move(altText));
@@ -784,7 +785,7 @@ static bool shouldEmitTabBeforeNode(Node& node)
         return false;
     
     // Want a tab before every cell other than the first one.
-    RenderTableCell& cell = toRenderTableCell(*renderer);
+    RenderTableCell& cell = downcast<RenderTableCell>(*renderer);
     RenderTable* table = cell.table();
     return table && (table->cellBefore(&cell) || table->cellAbove(&cell));
 }
@@ -813,9 +814,9 @@ static bool shouldEmitNewlinesBeforeAndAfterNode(Node& node)
     // a newline both before and after the element.
     auto* renderer = node.renderer();
     if (!renderer) {
-        if (!node.isHTMLElement())
+        if (!is<HTMLElement>(node))
             return false;
-        auto& element = toHTMLElement(node);
+        auto& element = downcast<HTMLElement>(node);
         return hasHeaderTag(element)
             || element.hasTagName(blockquoteTag)
             || element.hasTagName(ddTag)
@@ -839,14 +840,14 @@ static bool shouldEmitNewlinesBeforeAndAfterNode(Node& node)
     
     // Need to make an exception for table row elements, because they are neither
     // "inline" or "RenderBlock", but we want newlines for them.
-    if (renderer->isTableRow()) {
-        RenderTable* table = toRenderTableRow(*renderer).table();
+    if (is<RenderTableRow>(*renderer)) {
+        RenderTable* table = downcast<RenderTableRow>(*renderer).table();
         if (table && !table->isInline())
             return true;
     }
     
     return !renderer->isInline()
-        && renderer->isRenderBlock()
+        && is<RenderBlock>(*renderer)
         && !renderer->isFloatingOrOutOfFlowPositioned()
         && !renderer->isBody()
         && !renderer->isRubyText();
@@ -860,7 +861,7 @@ static bool shouldEmitNewlineAfterNode(Node& node)
     // Check if this is the very last renderer in the document.
     // If so, then we should not emit a newline.
     Node* subsequentNode = &node;
-    while ((subsequentNode = NodeTraversal::nextSkippingChildren(subsequentNode))) {
+    while ((subsequentNode = NodeTraversal::nextSkippingChildren(*subsequentNode))) {
         if (subsequentNode->renderer())
             return true;
     }
@@ -880,17 +881,19 @@ static bool shouldEmitExtraNewlineForNode(Node& node)
     // will work right even if both the <div> and the <p> have bottom margins.
 
     auto* renderer = node.renderer();
-    if (!renderer || !renderer->isBox())
+    if (!is<RenderBox>(renderer))
         return false;
 
     // NOTE: We only do this for a select set of nodes, and WinIE appears not to do this at all.
-    if (!node.isHTMLElement())
-        return false;
-    if (!(hasHeaderTag(toHTMLElement(node)) || toHTMLElement(node).hasTagName(pTag)))
+    if (!is<HTMLElement>(node))
         return false;
 
-    int bottomMargin = toRenderBox(renderer)->collapsedMarginAfter();
-    int fontSize = toRenderBox(renderer)->style().fontDescription().computedPixelSize();
+    HTMLElement& element = downcast<HTMLElement>(node);
+    if (!hasHeaderTag(element) && !is<HTMLParagraphElement>(element))
+        return false;
+
+    int bottomMargin = downcast<RenderBox>(*renderer).collapsedMarginAfter();
+    int fontSize = downcast<RenderBox>(*renderer).style().fontDescription().computedPixelSize();
     return bottomMargin * 2 >= fontSize;
 }
 
@@ -909,8 +912,8 @@ static int maxOffsetIncludingCollapsedSpaces(Node& node)
 {
     int offset = caretMaxOffset(&node);
     if (auto* renderer = node.renderer()) {
-        if (renderer->isText())
-            offset += collapsedSpaceLength(toRenderText(*renderer), offset);
+        if (is<RenderText>(*renderer))
+            offset += collapsedSpaceLength(downcast<RenderText>(*renderer), offset);
     }
     return offset;
 }
@@ -960,7 +963,7 @@ bool TextIterator::shouldRepresentNodeOffsetZero()
     // Additionally, if the range we are iterating over contains huge sections of unrendered content, 
     // we would create VisiblePositions on every call to this function without this check.
     if (!m_node->renderer() || m_node->renderer()->style().visibility() != VISIBLE
-        || (m_node->renderer()->isRenderBlockFlow() && !toRenderBlock(m_node->renderer())->height() && !m_node->hasTagName(bodyTag)))
+        || (is<RenderBlockFlow>(*m_node->renderer()) && !downcast<RenderBlockFlow>(*m_node->renderer()).height() && !is<HTMLBodyElement>(*m_node)))
         return false;
 
     // The startPos.isNotNull() check is needed because the start could be before the body,
@@ -1089,7 +1092,7 @@ void TextIterator::emitText(Text& textNode, RenderText& renderer, int textStartO
     m_hasEmitted = true;
 }
 
-PassRefPtr<Range> TextIterator::range() const
+Ref<Range> TextIterator::range() const
 {
     ASSERT(!atEnd());
 
@@ -1105,7 +1108,7 @@ PassRefPtr<Range> TextIterator::range() const
     
 Node* TextIterator::node() const
 {
-    RefPtr<Range> textRange = range();
+    Ref<Range> textRange = range();
 
     Node* node = textRange->startContainer();
     if (node->offsetInCharacters())
@@ -1260,7 +1263,7 @@ void SimplifiedBackwardsTextIterator::advance()
 
 bool SimplifiedBackwardsTextIterator::handleTextNode()
 {
-    Text& textNode = toText(*m_node);
+    Text& textNode = downcast<Text>(*m_node);
 
     m_lastTextNode = &textNode;
 
@@ -1298,31 +1301,31 @@ bool SimplifiedBackwardsTextIterator::handleTextNode()
 
 RenderText* SimplifiedBackwardsTextIterator::handleFirstLetter(int& startOffset, int& offsetInNode)
 {
-    RenderText* renderer = toRenderText(m_node->renderer());
+    RenderText& renderer = downcast<RenderText>(*m_node->renderer());
     startOffset = (m_node == m_startContainer) ? m_startOffset : 0;
 
-    if (!renderer->isTextFragment()) {
+    if (!is<RenderTextFragment>(renderer)) {
         offsetInNode = 0;
-        return renderer;
+        return &renderer;
     }
 
-    RenderTextFragment* fragment = toRenderTextFragment(renderer);
-    int offsetAfterFirstLetter = fragment->start();
+    RenderTextFragment& fragment = downcast<RenderTextFragment>(renderer);
+    int offsetAfterFirstLetter = fragment.start();
     if (startOffset >= offsetAfterFirstLetter) {
         ASSERT(!m_shouldHandleFirstLetter);
         offsetInNode = offsetAfterFirstLetter;
-        return renderer;
+        return &renderer;
     }
 
     if (!m_shouldHandleFirstLetter && startOffset + offsetAfterFirstLetter < m_offset) {
         m_shouldHandleFirstLetter = true;
         offsetInNode = offsetAfterFirstLetter;
-        return renderer;
+        return &renderer;
     }
 
     m_shouldHandleFirstLetter = false;
     offsetInNode = 0;
-    return firstRenderTextInFirstLetter(fragment->firstLetter());
+    return firstRenderTextInFirstLetter(fragment.firstLetter());
 }
 
 bool SimplifiedBackwardsTextIterator::handleReplacedElement()
@@ -1379,7 +1382,7 @@ bool SimplifiedBackwardsTextIterator::advanceRespectingRange(Node* next)
     return true;
 }
 
-PassRefPtr<Range> SimplifiedBackwardsTextIterator::range() const
+Ref<Range> SimplifiedBackwardsTextIterator::range() const
 {
     ASSERT(!atEnd());
 
@@ -1398,21 +1401,21 @@ CharacterIterator::CharacterIterator(const Range& range, TextIteratorBehavior be
         m_underlyingIterator.advance();
 }
 
-PassRefPtr<Range> CharacterIterator::range() const
+Ref<Range> CharacterIterator::range() const
 {
-    RefPtr<Range> r = m_underlyingIterator.range();
+    Ref<Range> range = m_underlyingIterator.range();
     if (!m_underlyingIterator.atEnd()) {
         if (m_underlyingIterator.text().length() <= 1) {
             ASSERT(m_runOffset == 0);
         } else {
-            Node* n = r->startContainer();
-            ASSERT(n == r->endContainer());
-            int offset = r->startOffset() + m_runOffset;
-            r->setStart(n, offset);
-            r->setEnd(n, offset + 1);
+            Node* n = range->startContainer();
+            ASSERT(n == range->endContainer());
+            int offset = range->startOffset() + m_runOffset;
+            range->setStart(n, offset);
+            range->setEnd(n, offset + 1);
         }
     }
-    return r.release();
+    return range;
 }
 
 void CharacterIterator::advance(int count)
@@ -1460,16 +1463,22 @@ void CharacterIterator::advance(int count)
     m_runOffset = 0;
 }
 
-static PassRefPtr<Range> characterSubrange(CharacterIterator& it, int offset, int length)
+static Ref<Range> characterSubrange(Document& document, CharacterIterator& it, int offset, int length)
 {
     it.advance(offset);
-    RefPtr<Range> start = it.range();
+    if (it.atEnd())
+        return Range::create(document);
+
+    Ref<Range> start = it.range();
 
     if (length > 1)
         it.advance(length - 1);
-    RefPtr<Range> end = it.range();
+    if (it.atEnd())
+        return Range::create(document);
 
-    return Range::create(start->startContainer()->document(),
+    Ref<Range> end = it.range();
+
+    return Range::create(document,
         start->startContainer(), start->startOffset(), 
         end->endContainer(), end->endOffset());
 }
@@ -1484,9 +1493,9 @@ BackwardsCharacterIterator::BackwardsCharacterIterator(const Range& range)
         m_underlyingIterator.advance();
 }
 
-PassRefPtr<Range> BackwardsCharacterIterator::range() const
+Ref<Range> BackwardsCharacterIterator::range() const
 {
-    RefPtr<Range> r = m_underlyingIterator.range();
+    Ref<Range> r = m_underlyingIterator.range();
     if (!m_underlyingIterator.atEnd()) {
         if (m_underlyingIterator.text().length() <= 1)
             ASSERT(m_runOffset == 0);
@@ -1498,7 +1507,7 @@ PassRefPtr<Range> BackwardsCharacterIterator::range() const
             r->setEnd(n, offset);
         }
     }
-    return r.release();
+    return r;
 }
 
 void BackwardsCharacterIterator::advance(int count)
@@ -2176,7 +2185,7 @@ inline bool SearchBuffer::isWordStartMatch(size_t start, size_t length) const
 
     // Chinese and Japanese lack word boundary marks, and there is no clear agreement on what constitutes
     // a word, so treat the position before any CJK character as a word start.
-    if (Font::isCJKIdeographOrSymbol(firstCharacter))
+    if (FontCascade::isCJKIdeographOrSymbol(firstCharacter))
         return true;
 
     size_t wordBreakSearchStart = start + length;
@@ -2376,10 +2385,10 @@ int TextIterator::rangeLength(const Range* range, bool forSelectionPreservation)
     return length;
 }
 
-PassRefPtr<Range> TextIterator::subrange(Range* entireRange, int characterOffset, int characterCount)
+Ref<Range> TextIterator::subrange(Range* entireRange, int characterOffset, int characterCount)
 {
     CharacterIterator entireRangeIterator(*entireRange);
-    return characterSubrange(entireRangeIterator, characterOffset, characterCount);
+    return characterSubrange(entireRange->ownerDocument(), entireRangeIterator, characterOffset, characterCount);
 }
 
 static inline bool isInsideReplacedElement(TextIterator& iterator)
@@ -2390,23 +2399,23 @@ static inline bool isInsideReplacedElement(TextIterator& iterator)
     return node && isRendererReplacedElement(node->renderer());
 }
 
-PassRefPtr<Range> TextIterator::rangeFromLocationAndLength(ContainerNode* scope, int rangeLocation, int rangeLength, bool forSelectionPreservation)
+RefPtr<Range> TextIterator::rangeFromLocationAndLength(ContainerNode* scope, int rangeLocation, int rangeLength, bool forSelectionPreservation)
 {
-    RefPtr<Range> resultRange = scope->document().createRange();
+    Ref<Range> resultRange = scope->document().createRange();
 
     int docTextPosition = 0;
     int rangeEnd = rangeLocation + rangeLength;
     bool startRangeFound = false;
 
-    RefPtr<Range> textRunRange = rangeOfContents(*scope);
+    Ref<Range> textRunRange = rangeOfContents(*scope);
 
-    TextIterator it(textRunRange.get(), forSelectionPreservation ? TextIteratorEmitsCharactersBetweenAllVisiblePositions : TextIteratorDefaultBehavior);
+    TextIterator it(textRunRange.ptr(), forSelectionPreservation ? TextIteratorEmitsCharactersBetweenAllVisiblePositions : TextIteratorDefaultBehavior);
     
     // FIXME: the atEnd() check shouldn't be necessary, workaround for <http://bugs.webkit.org/show_bug.cgi?id=6289>.
     if (!rangeLocation && !rangeLength && it.atEnd()) {
         resultRange->setStart(textRunRange->startContainer(), 0);
         resultRange->setEnd(textRunRange->startContainer(), 0);
-        return resultRange.release();
+        return WTF::move(resultRange);
     }
 
     for (; !it.atEnd(); it.advance()) {
@@ -2422,7 +2431,7 @@ PassRefPtr<Range> TextIterator::rangeFromLocationAndLength(ContainerNode* scope,
             if (length == 1 && (it.text()[0] == '\n' || isInsideReplacedElement(it))) {
                 it.advance();
                 if (!it.atEnd()) {
-                    RefPtr<Range> range = it.range();
+                    Ref<Range> range = it.range();
                     textRunRange->setEnd(range->startContainer(), range->startOffset());
                 } else {
                     Position runStart = textRunRange->startPosition();
@@ -2469,7 +2478,7 @@ PassRefPtr<Range> TextIterator::rangeFromLocationAndLength(ContainerNode* scope,
     if (rangeLength && rangeEnd > docTextPosition) // rangeEnd is out of bounds
         resultRange->setEnd(textRunRange->endContainer(), textRunRange->endOffset());
     
-    return resultRange.release();
+    return WTF::move(resultRange);
 }
 
 bool TextIterator::getLocationAndLengthFromRange(Node* scope, const Range* range, size_t& location, size_t& length)
@@ -2490,13 +2499,13 @@ bool TextIterator::getLocationAndLengthFromRange(Node* scope, const Range* range
     if (range->endContainer() != scope && !range->endContainer()->isDescendantOf(scope))
         return false;
 
-    RefPtr<Range> testRange = Range::create(scope->document(), scope, 0, range->startContainer(), range->startOffset());
+    Ref<Range> testRange = Range::create(scope->document(), scope, 0, range->startContainer(), range->startOffset());
     ASSERT(testRange->startContainer() == scope);
-    location = TextIterator::rangeLength(testRange.get());
+    location = TextIterator::rangeLength(testRange.ptr());
 
     testRange->setEnd(range->endContainer(), range->endOffset(), IGNORE_EXCEPTION);
     ASSERT(testRange->startContainer() == scope);
-    length = TextIterator::rangeLength(testRange.get()) - location;
+    length = TextIterator::rangeLength(testRange.ptr()) - location;
     return true;
 }
 
@@ -2535,11 +2544,11 @@ String plainTextReplacingNoBreakSpace(const Range* range, TextIteratorBehavior d
     return plainText(range, defaultBehavior, isDisplayString).replace(noBreakSpace, ' ');
 }
 
-static PassRefPtr<Range> collapsedToBoundary(const Range& range, bool forward)
+static Ref<Range> collapsedToBoundary(const Range& range, bool forward)
 {
-    RefPtr<Range> result = range.cloneRange(ASSERT_NO_EXCEPTION);
+    Ref<Range> result = range.cloneRange(ASSERT_NO_EXCEPTION).releaseNonNull();
     result->collapse(!forward, ASSERT_NO_EXCEPTION);
-    return result.release();
+    return result;
 }
 
 static size_t findPlainText(const Range& range, const String& target, FindOptions options, size_t& matchStart)
@@ -2550,9 +2559,9 @@ static size_t findPlainText(const Range& range, const String& target, FindOption
     SearchBuffer buffer(target, options);
 
     if (buffer.needsMoreContext()) {
-        RefPtr<Range> beforeStartRange = range.ownerDocument().createRange();
+        Ref<Range> beforeStartRange = range.ownerDocument().createRange();
         beforeStartRange->setEnd(range.startContainer(), range.startOffset());
-        for (SimplifiedBackwardsTextIterator backwardsIterator(*beforeStartRange); !backwardsIterator.atEnd(); backwardsIterator.advance()) {
+        for (SimplifiedBackwardsTextIterator backwardsIterator(beforeStartRange.get()); !backwardsIterator.atEnd(); backwardsIterator.advance()) {
             buffer.prependContext(backwardsIterator.text());
             if (!buffer.needsMoreContext())
                 break;
@@ -2586,7 +2595,7 @@ tryAgain:
     return matchLength;
 }
 
-PassRefPtr<Range> findPlainText(const Range& range, const String& target, FindOptions options)
+Ref<Range> findPlainText(const Range& range, const String& target, FindOptions options)
 {
     // First, find the text.
     size_t matchStart;
@@ -2599,7 +2608,7 @@ PassRefPtr<Range> findPlainText(const Range& range, const String& target, FindOp
 
     // Then, find the document position of the start and the end of the text.
     CharacterIterator computeRangeIterator(range, TextIteratorEntersTextControls);
-    return characterSubrange(computeRangeIterator, matchStart, matchLength);
+    return characterSubrange(range.ownerDocument(), computeRangeIterator, matchStart, matchLength);
 }
 
 }

@@ -26,8 +26,7 @@
 
 #include "Document.h"
 #include "ElementIterator.h"
-#include "Font.h"
-#include "GlyphPageTreeNode.h"
+#include "FontCascade.h"
 #include "SVGGlyphElement.h"
 #include "SVGHKernElement.h"
 #include "SVGMissingGlyphElement.h"
@@ -54,9 +53,9 @@ inline SVGFontElement::SVGFontElement(const QualifiedName& tagName, Document& do
     registerAnimatedPropertiesForSVGFontElement();
 }
 
-PassRefPtr<SVGFontElement> SVGFontElement::create(const QualifiedName& tagName, Document& document)
+Ref<SVGFontElement> SVGFontElement::create(const QualifiedName& tagName, Document& document)
 {
-    return adoptRef(new SVGFontElement(tagName, document));
+    return adoptRef(*new SVGFontElement(tagName, document));
 }
 
 void SVGFontElement::invalidateGlyphCache()
@@ -119,8 +118,8 @@ void SVGFontElement::ensureGlyphCache()
     const SVGMissingGlyphElement* firstMissingGlyphElement = nullptr;
     Vector<String> ligatures;
     for (auto& child : childrenOfType<SVGElement>(*this)) {
-        if (isSVGGlyphElement(child)) {
-            SVGGlyphElement& glyph = toSVGGlyphElement(child);
+        if (is<SVGGlyphElement>(child)) {
+            SVGGlyphElement& glyph = downcast<SVGGlyphElement>(child);
             AtomicString unicode = glyph.fastGetAttribute(SVGNames::unicodeAttr);
             AtomicString glyphId = glyph.getIdAttribute();
             if (glyphId.isEmpty() && unicode.isEmpty())
@@ -131,14 +130,18 @@ void SVGFontElement::ensureGlyphCache()
             // Register ligatures, if needed, don't mix up with surrogate pairs though!
             if (unicode.length() > 1 && !U16_IS_SURROGATE(unicode[0]))
                 ligatures.append(unicode.string());
-        } else if (isSVGHKernElement(child)) {
-            SVGHKernElement& hkern = toSVGHKernElement(child);
-            hkern.buildHorizontalKerningPair(m_horizontalKerningMap);
-        } else if (isSVGVKernElement(child)) {
-            SVGVKernElement& vkern = toSVGVKernElement(child);
-            vkern.buildVerticalKerningPair(m_verticalKerningMap);
-        } else if (isSVGMissingGlyphElement(child) && !firstMissingGlyphElement)
-            firstMissingGlyphElement = &toSVGMissingGlyphElement(child);
+        } else if (is<SVGHKernElement>(child)) {
+            SVGHKernElement& hkern = downcast<SVGHKernElement>(child);
+            SVGKerningPair kerningPair;
+            if (hkern.buildHorizontalKerningPair(kerningPair))
+                m_horizontalKerningMap.insert(kerningPair);
+        } else if (is<SVGVKernElement>(child)) {
+            SVGVKernElement& vkern = downcast<SVGVKernElement>(child);
+            SVGKerningPair kerningPair;
+            if (vkern.buildVerticalKerningPair(kerningPair))
+                m_verticalKerningMap.insert(kerningPair);
+        } else if (is<SVGMissingGlyphElement>(child) && !firstMissingGlyphElement)
+            firstMissingGlyphElement = &downcast<SVGMissingGlyphElement>(child);
     }
 
     // Register each character of each ligature, if needed.

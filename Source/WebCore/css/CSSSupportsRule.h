@@ -31,35 +31,32 @@
 
 #include "CSSGroupingRule.h"
 
-#if ENABLE(CSS3_CONDITIONAL_RULES)
-
 namespace WebCore {
 
 class CSSRule;
 class StyleRuleSupports;
 
-class CSSSupportsRule : public CSSGroupingRule {
+class CSSSupportsRule final : public CSSGroupingRule {
 public:
-    static PassRefPtr<CSSSupportsRule> create(StyleRuleSupports* rule, CSSStyleSheet* sheet)
+    static PassRefPtr<CSSSupportsRule> create(StyleRuleSupports& rule, CSSStyleSheet* sheet)
     {
         return adoptRef(new CSSSupportsRule(rule, sheet));
     }
 
     virtual ~CSSSupportsRule() { }
 
-    virtual CSSRule::Type type() const override { return SUPPORTS_RULE; }
     virtual String cssText() const override;
 
     String conditionText() const;
 
 private:
-    CSSSupportsRule(StyleRuleSupports*, CSSStyleSheet*);
-};
+    CSSSupportsRule(StyleRuleSupports&, CSSStyleSheet*);
 
-CSS_RULE_TYPE_CASTS(CSSSupportsRule, CSSRule::SUPPORTS_RULE)
+    virtual CSSRule::Type type() const override { return SUPPORTS_RULE; }
+};
 
 } // namespace WebCore
 
-#endif // ENABLE(CSS3_CONDITIONAL_RULES)
+SPECIALIZE_TYPE_TRAITS_CSS_RULE(CSSSupportsRule, CSSRule::SUPPORTS_RULE)
 
 #endif // CSSSupportsRule_h

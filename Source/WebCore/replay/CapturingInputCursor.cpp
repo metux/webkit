@@ -38,9 +38,8 @@
 
 namespace WebCore {
 
-CapturingInputCursor::CapturingInputCursor(PassRefPtr<ReplaySessionSegment> segment)
-    : m_segment(segment)
-    , m_withinEventLoopInputExtent(false)
+CapturingInputCursor::CapturingInputCursor(RefPtr<ReplaySessionSegment>&& segment)
+    : m_segment(WTF::move(segment))
 {
     LOG(WebReplay, "%-30sCreated capture cursor=%p.\n", "[ReplayController]", this);
 }
@@ -50,9 +49,9 @@ CapturingInputCursor::~CapturingInputCursor()
     LOG(WebReplay, "%-30sDestroyed capture cursor=%p.\n", "[ReplayController]", this);
 }
 
-PassRefPtr<CapturingInputCursor> CapturingInputCursor::create(PassRefPtr<ReplaySessionSegment> segment)
+Ref<CapturingInputCursor> CapturingInputCursor::create(RefPtr<ReplaySessionSegment>&& segment)
 {
-    return adoptRef(new CapturingInputCursor(segment));
+    return adoptRef(*new CapturingInputCursor(WTF::move(segment)));
 }
 
 void CapturingInputCursor::storeInput(std::unique_ptr<NondeterministicInputBase> input)
@@ -68,7 +67,7 @@ void CapturingInputCursor::storeInput(std::unique_ptr<NondeterministicInputBase>
     m_segment->storage().store(WTF::move(input));
 }
 
-NondeterministicInputBase* CapturingInputCursor::loadInput(InputQueue, const AtomicString&)
+NondeterministicInputBase* CapturingInputCursor::loadInput(InputQueue, const String&)
 {
     // Can't load inputs from capturing cursor.
     ASSERT_NOT_REACHED();
@@ -80,13 +79,6 @@ NondeterministicInputBase* CapturingInputCursor::uncheckedLoadInput(InputQueue)
     // Can't load inputs from capturing cursor.
     ASSERT_NOT_REACHED();
     return nullptr;
-}
-
-void CapturingInputCursor::setWithinEventLoopInputExtent(bool withinEventLoopInputExtent)
-{
-    // We cannot enter more than one extent at a time, since they represent a single run loop.
-    ASSERT(withinEventLoopInputExtent != m_withinEventLoopInputExtent);
-    m_withinEventLoopInputExtent = withinEventLoopInputExtent;
 }
 
 }; // namespace WebCore

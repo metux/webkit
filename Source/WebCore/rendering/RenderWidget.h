@@ -60,7 +60,7 @@ class RenderWidget : public RenderReplaced, private OverlapTestRequestClient {
 public:
     virtual ~RenderWidget();
 
-    HTMLFrameOwnerElement& frameOwnerElement() const { return toHTMLFrameOwnerElement(nodeForNonAnonymous()); }
+    HTMLFrameOwnerElement& frameOwnerElement() const { return downcast<HTMLFrameOwnerElement>(nodeForNonAnonymous()); }
 
     Widget* widget() const { return m_widget.get(); }
     WEBCORE_EXPORT void setWidget(PassRefPtr<Widget>);
@@ -75,7 +75,7 @@ public:
     WeakPtr<RenderWidget> createWeakPtr() { return m_weakPtrFactory.createWeakPtr(); }
 
 protected:
-    RenderWidget(HTMLFrameOwnerElement&, PassRef<RenderStyle>);
+    RenderWidget(HTMLFrameOwnerElement&, Ref<RenderStyle>&&);
 
     virtual void styleDidChange(StyleDifference, const RenderStyle* oldStyle) override final;
     virtual void layout() override;
@@ -104,8 +104,8 @@ private:
     IntRect m_clipRect; // The rectangle needs to remain correct after scrolling, so it is stored in content view coordinates, and not clipped to window.
 };
 
-RENDER_OBJECT_TYPE_CASTS(RenderWidget, isWidget())
-
 } // namespace WebCore
+
+SPECIALIZE_TYPE_TRAITS_RENDER_OBJECT(RenderWidget, isWidget())
 
 #endif // RenderWidget_h

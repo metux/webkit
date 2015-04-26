@@ -29,7 +29,6 @@
 #include "AccessibilityMenuList.h"
 #include "CSSFontSelector.h"
 #include "Chrome.h"
-#include "FontCache.h"
 #include "Frame.h"
 #include "FrameView.h"
 #include "HTMLNames.h"
@@ -64,14 +63,14 @@ static size_t selectedOptionCount(const RenderMenuList& renderMenuList)
 
     size_t count = 0;
     for (size_t i = 0; i < numberOfItems; ++i) {
-        if (listItems[i]->hasTagName(optionTag) && toHTMLOptionElement(listItems[i])->selected())
+        if (is<HTMLOptionElement>(*listItems[i]) && downcast<HTMLOptionElement>(*listItems[i]).selected())
             ++count;
     }
     return count;
 }
 #endif
 
-RenderMenuList::RenderMenuList(HTMLSelectElement& element, PassRef<RenderStyle> style)
+RenderMenuList::RenderMenuList(HTMLSelectElement& element, Ref<RenderStyle>&& style)
     : RenderFlexibleBox(element, WTF::move(style))
     , m_buttonText(nullptr)
     , m_innerBlock(nullptr)
@@ -168,7 +167,7 @@ void RenderMenuList::adjustInnerStyle()
 
 HTMLSelectElement& RenderMenuList::selectElement() const
 {
-    return toHTMLSelectElement(nodeForNonAnonymous());
+    return downcast<HTMLSelectElement>(nodeForNonAnonymous());
 }
 
 void RenderMenuList::addChild(RenderObject* newChild, RenderObject* beforeChild)
@@ -181,14 +180,13 @@ void RenderMenuList::addChild(RenderObject* newChild, RenderObject* beforeChild)
         cache->childrenChanged(this, newChild);
 }
 
-RenderObject* RenderMenuList::removeChild(RenderObject& oldChild)
+void RenderMenuList::removeChild(RenderObject& oldChild)
 {
     if (&oldChild == m_innerBlock || !m_innerBlock) {
-        RenderObject* next = RenderFlexibleBox::removeChild(oldChild);
+        RenderFlexibleBox::removeChild(oldChild);
         m_innerBlock = 0;
-        return next;
     } else
-        return m_innerBlock->removeChild(oldChild);
+        m_innerBlock->removeChild(oldChild);
 }
 
 void RenderMenuList::styleDidChange(StyleDifference diff, const RenderStyle* oldStyle)
@@ -198,7 +196,7 @@ void RenderMenuList::styleDidChange(StyleDifference diff, const RenderStyle* old
     if (m_innerBlock) // RenderBlock handled updating the anonymous block's style.
         adjustInnerStyle();
 
-    bool fontChanged = !oldStyle || oldStyle->font() != style().font();
+    bool fontChanged = !oldStyle || oldStyle->fontCascade() != style().fontCascade();
     if (fontChanged) {
         updateOptionsWidth();
         m_needsOptionsWidthUpdate = false;
@@ -210,14 +208,13 @@ void RenderMenuList::updateOptionsWidth()
     float maxOptionWidth = 0;
     const Vector<HTMLElement*>& listItems = selectElement().listItems();
     int size = listItems.size();    
-    FontCachePurgePreventer fontCachePurgePreventer;
 
     for (int i = 0; i < size; ++i) {
         HTMLElement* element = listItems[i];
-        if (!isHTMLOptionElement(element))
+        if (!is<HTMLOptionElement>(*element))
             continue;
 
-        String text = toHTMLOptionElement(element)->textIndentedToRespectGroupLabel();
+        String text = downcast<HTMLOptionElement>(*element).textIndentedToRespectGroupLabel();
         applyTextTransform(style(), text, ' ');
         if (theme().popupOptionSupportsTextIndent()) {
             // Add in the option's text indent.  We can't calculate percentage values for now.
@@ -225,13 +222,13 @@ void RenderMenuList::updateOptionsWidth()
             if (RenderStyle* optionStyle = element->computedStyle())
                 optionWidth += minimumValueForLength(optionStyle->textIndent(), 0);
             if (!text.isEmpty()) {
-                const Font& font = style().font();
+                const FontCascade& font = style().fontCascade();
                 TextRun run = RenderBlock::constructTextRun(this, font, text, style(), TextRun::AllowTrailingExpansion | TextRun::ForbidLeadingExpansion, DefaultTextRunFlags);
                 optionWidth += font.width(run);
             }
             maxOptionWidth = std::max(maxOptionWidth, optionWidth);
         } else if (!text.isEmpty()) {
-            const Font& font = style().font();
+            const FontCascade& font = style().fontCascade();
             TextRun run = RenderBlock::constructTextRun(this, font, text, style(), TextRun::AllowTrailingExpansion | TextRun::ForbidLeadingExpansion, DefaultTextRunFlags);
             maxOptionWidth = std::max(maxOptionWidth, font.width(run));
         }
@@ -270,8 +267,8 @@ void RenderMenuList::setTextFromOption(int optionIndex)
     String text = emptyString();
     if (i >= 0 && i < size) {
         Element* element = listItems[i];
-        if (isHTMLOptionElement(element)) {
-            text = toHTMLOptionElement(element)->textIndentedToRespectGroupLabel();
+        if (is<HTMLOptionElement>(*element)) {
+            text = downcast<HTMLOptionElement>(*element).textIndentedToRespectGroupLabel();
             m_optionStyle = element->computedStyle();
         }
     }
@@ -437,7 +434,7 @@ void RenderMenuList::didUpdateActiveOption(int optionIndex)
         return;
 
     if (AXObjectCache* cache = document().existingAXObjectCache()) {
-        if (AccessibilityMenuList* menuList = toAccessibilityMenuList(cache->get(this)))
+        if (AccessibilityMenuList* menuList = downcast<AccessibilityMenuList>(cache->get(this)))
             menuList->didUpdateActiveOption(optionIndex);
     }
 }
@@ -450,10 +447,10 @@ String RenderMenuList::itemText(unsigned listIndex) const
 
     String itemString;
     Element* element = listItems[listIndex];
-    if (isHTMLOptGroupElement(element))
-        itemString = toHTMLOptGroupElement(element)->groupLabelText();
-    else if (isHTMLOptionElement(element))
-        itemString = toHTMLOptionElement(element)->textIndentedToRespectGroupLabel();
+    if (is<HTMLOptGroupElement>(*element))
+        itemString = downcast<HTMLOptGroupElement>(*element).groupLabelText();
+    else if (is<HTMLOptionElement>(*element))
+        itemString = downcast<HTMLOptionElement>(*element).textIndentedToRespectGroupLabel();
 
     applyTextTransform(style(), itemString, ' ');
     return itemString;
@@ -492,12 +489,12 @@ bool RenderMenuList::itemIsEnabled(unsigned listIndex) const
     if (listIndex >= listItems.size())
         return false;
     HTMLElement* element = listItems[listIndex];
-    if (!isHTMLOptionElement(element))
+    if (!is<HTMLOptionElement>(*element))
         return false;
 
     bool groupEnabled = true;
     if (Element* parentElement = element->parentElement()) {
-        if (isHTMLOptGroupElement(parentElement))
+        if (is<HTMLOptGroupElement>(*parentElement))
             groupEnabled = !parentElement->isDisabledFormControl();
     }
     if (!groupEnabled)
@@ -526,7 +523,7 @@ PopupMenuStyle RenderMenuList::itemStyle(unsigned listIndex) const
     getItemBackgroundColor(listIndex, itemBackgroundColor, itemHasCustomBackgroundColor);
 
     RenderStyle* style = element->renderStyle() ? element->renderStyle() : element->computedStyle();
-    return style ? PopupMenuStyle(style->visitedDependentColor(CSSPropertyColor), itemBackgroundColor, style->font(), style->visibility() == VISIBLE,
+    return style ? PopupMenuStyle(style->visitedDependentColor(CSSPropertyColor), itemBackgroundColor, style->fontCascade(), style->visibility() == VISIBLE,
         style->display() == NONE, true, style->textIndent(), style->direction(), isOverride(style->unicodeBidi()),
         itemHasCustomBackgroundColor ? PopupMenuStyle::CustomBackgroundColor : PopupMenuStyle::DefaultBackgroundColor) : menuStyle();
 }
@@ -567,7 +564,8 @@ PopupMenuStyle RenderMenuList::menuStyle() const
     const RenderStyle& styleToUse = m_innerBlock ? m_innerBlock->style() : style();
     IntRect absBounds = absoluteBoundingBoxRectIgnoringTransforms();
     return PopupMenuStyle(styleToUse.visitedDependentColor(CSSPropertyColor), styleToUse.visitedDependentColor(CSSPropertyBackgroundColor),
-        styleToUse.font(), styleToUse.visibility() == VISIBLE, styleToUse.display() == NONE, style().hasAppearance(), styleToUse.textIndent(),
+        styleToUse.fontCascade(), styleToUse.visibility() == VISIBLE, styleToUse.display() == NONE,
+        style().hasAppearance() && style().appearance() == MenulistPart, styleToUse.textIndent(),
         style().direction(), isOverride(style().unicodeBidi()), PopupMenuStyle::DefaultBackgroundColor,
         PopupMenuStyle::SelectPopup, theme().popupMenuSize(styleToUse, absBounds));
 }
@@ -645,7 +643,7 @@ bool RenderMenuList::itemIsSeparator(unsigned listIndex) const
 bool RenderMenuList::itemIsLabel(unsigned listIndex) const
 {
     const Vector<HTMLElement*>& listItems = selectElement().listItems();
-    return listIndex < listItems.size() && isHTMLOptGroupElement(listItems[listIndex]);
+    return listIndex < listItems.size() && is<HTMLOptGroupElement>(*listItems[listIndex]);
 }
 
 bool RenderMenuList::itemIsSelected(unsigned listIndex) const
@@ -654,7 +652,7 @@ bool RenderMenuList::itemIsSelected(unsigned listIndex) const
     if (listIndex >= listItems.size())
         return false;
     HTMLElement* element = listItems[listIndex];
-    return isHTMLOptionElement(element) && toHTMLOptionElement(element)->selected();
+    return is<HTMLOptionElement>(*element) && downcast<HTMLOptionElement>(*element).selected();
 }
 
 void RenderMenuList::setTextFromItem(unsigned listIndex)
@@ -664,7 +662,7 @@ void RenderMenuList::setTextFromItem(unsigned listIndex)
 
 FontSelector* RenderMenuList::fontSelector() const
 {
-    return document().ensureStyleResolver().fontSelector();
+    return &document().fontSelector();
 }
 
 }

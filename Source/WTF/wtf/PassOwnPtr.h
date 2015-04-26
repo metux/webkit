@@ -28,6 +28,7 @@
 
 #include <cstddef>
 #include <wtf/Assertions.h>
+#include <wtf/GetPtr.h>
 #include <wtf/OwnPtrCommon.h>
 #include <type_traits>
 
@@ -88,9 +89,7 @@ namespace WTF {
 
     template<typename T> inline typename PassOwnPtr<T>::PtrType PassOwnPtr<T>::leakPtr() const
     {
-        PtrType ptr = m_ptr;
-        m_ptr = 0;
-        return ptr;
+        return std::exchange(m_ptr, nullptr);
     }
 
     template<typename T, typename U> inline bool operator==(const PassOwnPtr<T>& a, const PassOwnPtr<U>& b) 
@@ -156,10 +155,9 @@ namespace WTF {
         return adoptPtr(static_cast<T*>(p.leakPtr()));
     }
 
-    template<typename T> inline T* getPtr(const PassOwnPtr<T>& p)
-    {
-        return p.get();
-    }
+    template <typename T> struct IsSmartPtr<PassOwnPtr<T>> {
+        static const bool value = true;
+    };
 
 } // namespace WTF
 

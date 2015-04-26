@@ -47,9 +47,9 @@ inline HTMLButtonElement::HTMLButtonElement(const QualifiedName& tagName, Docume
     ASSERT(hasTagName(buttonTag));
 }
 
-PassRefPtr<HTMLButtonElement> HTMLButtonElement::create(const QualifiedName& tagName, Document& document, HTMLFormElement* form)
+Ref<HTMLButtonElement> HTMLButtonElement::create(const QualifiedName& tagName, Document& document, HTMLFormElement* form)
 {
-    return adoptRef(new HTMLButtonElement(tagName, document, form));
+    return adoptRef(*new HTMLButtonElement(tagName, document, form));
 }
 
 void HTMLButtonElement::setType(const AtomicString& type)
@@ -57,7 +57,7 @@ void HTMLButtonElement::setType(const AtomicString& type)
     setAttribute(typeAttr, type);
 }
 
-RenderPtr<RenderElement> HTMLButtonElement::createElementRenderer(PassRef<RenderStyle> style)
+RenderPtr<RenderElement> HTMLButtonElement::createElementRenderer(Ref<RenderStyle>&& style)
 {
     return createRenderer<RenderButton>(*this, WTF::move(style));
 }
@@ -123,28 +123,29 @@ void HTMLButtonElement::defaultEventHandler(Event* event)
         }
     }
 
-    if (event->isKeyboardEvent()) {
-        if (event->type() == eventNames().keydownEvent && toKeyboardEvent(event)->keyIdentifier() == "U+0020") {
+    if (is<KeyboardEvent>(*event)) {
+        KeyboardEvent& keyboardEvent = downcast<KeyboardEvent>(*event);
+        if (keyboardEvent.type() == eventNames().keydownEvent && keyboardEvent.keyIdentifier() == "U+0020") {
             setActive(true, true);
             // No setDefaultHandled() - IE dispatches a keypress in this case.
             return;
         }
-        if (event->type() == eventNames().keypressEvent) {
-            switch (toKeyboardEvent(event)->charCode()) {
+        if (keyboardEvent.type() == eventNames().keypressEvent) {
+            switch (keyboardEvent.charCode()) {
                 case '\r':
-                    dispatchSimulatedClick(event);
-                    event->setDefaultHandled();
+                    dispatchSimulatedClick(&keyboardEvent);
+                    keyboardEvent.setDefaultHandled();
                     return;
                 case ' ':
                     // Prevent scrolling down the page.
-                    event->setDefaultHandled();
+                    keyboardEvent.setDefaultHandled();
                     return;
             }
         }
-        if (event->type() == eventNames().keyupEvent && toKeyboardEvent(event)->keyIdentifier() == "U+0020") {
+        if (keyboardEvent.type() == eventNames().keyupEvent && keyboardEvent.keyIdentifier() == "U+0020") {
             if (active())
-                dispatchSimulatedClick(event);
-            event->setDefaultHandled();
+                dispatchSimulatedClick(&keyboardEvent);
+            keyboardEvent.setDefaultHandled();
             return;
         }
     }
@@ -199,9 +200,9 @@ const AtomicString& HTMLButtonElement::value() const
     return fastGetAttribute(valueAttr);
 }
 
-bool HTMLButtonElement::recalcWillValidate() const
+bool HTMLButtonElement::computeWillValidate() const
 {
-    return m_type == SUBMIT && HTMLFormControlElement::recalcWillValidate();
+    return m_type == SUBMIT && HTMLFormControlElement::computeWillValidate();
 }
 
 } // namespace

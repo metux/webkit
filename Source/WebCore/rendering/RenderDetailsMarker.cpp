@@ -24,6 +24,7 @@
 
 #include "Element.h"
 #include "GraphicsContext.h"
+#include "HTMLDetailsElement.h"
 #include "HTMLInputElement.h"
 #include "HTMLNames.h"
 #include "PaintInfo.h"
@@ -32,7 +33,7 @@ namespace WebCore {
 
 using namespace HTMLNames;
 
-RenderDetailsMarker::RenderDetailsMarker(DetailsMarkerControl& element, PassRef<RenderStyle> style)
+RenderDetailsMarker::RenderDetailsMarker(DetailsMarkerControl& element, Ref<RenderStyle>&& style)
     : RenderBlockFlow(element, WTF::move(style))
 {
 }
@@ -143,9 +144,9 @@ bool RenderDetailsMarker::isOpen() const
     for (RenderObject* renderer = parent(); renderer; renderer = renderer->parent()) {
         if (!renderer->node())
             continue;
-        if (renderer->node()->hasTagName(detailsTag))
-            return !toElement(renderer->node())->getAttribute(openAttr).isNull();
-        if (isHTMLInputElement(renderer->node()))
+        if (is<HTMLDetailsElement>(*renderer->node()))
+            return !downcast<HTMLDetailsElement>(*renderer->node()).getAttribute(openAttr).isNull();
+        if (is<HTMLInputElement>(*renderer->node()))
             return true;
     }
 

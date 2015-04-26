@@ -41,6 +41,10 @@
 #include <sys/sysctl.h>
 #endif
 
+#if OS(WINDOWS)
+#include "MacroAssemblerX86.h"
+#endif
+
 namespace JSC {
 
 static bool parse(const char* string, bool& value)
@@ -105,7 +109,6 @@ static bool parse(const char* string, GCLogging::Level& value)
 template<typename T>
 bool overrideOptionWithHeuristic(T& variable, const char* name)
 {
-#if !OS(WINCE)
     const char* stringValue = getenv(name);
     if (!stringValue)
         return false;
@@ -114,7 +117,6 @@ bool overrideOptionWithHeuristic(T& variable, const char* name)
         return true;
     
     fprintf(stderr, "WARNING: failed to parse %s=%s\n", name, stringValue);
-#endif
     return false;
 }
 
@@ -229,7 +231,11 @@ static void recomputeDependentOptions()
 #if !ENABLE(FTL_JIT)
     Options::useFTLJIT() = false;
 #endif
-
+#if OS(WINDOWS) && CPU(X86) 
+    // Disable JIT on Windows if SSE2 is not present 
+    if (!MacroAssemblerX86::supportsFloatingPoint())
+        Options::useJIT() = false;
+#endif
     if (Options::showDisassembly()
         || Options::showDFGDisassembly()
         || Options::showFTLDisassembly()

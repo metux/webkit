@@ -59,7 +59,7 @@ std::unique_ptr<MediaSession> MediaSession::create(MediaSessionClient& client)
 
 MediaSession::MediaSession(MediaSessionClient& client)
     : m_client(client)
-    , m_clientDataBufferingTimer(this, &MediaSession::clientDataBufferingTimerFired)
+    , m_clientDataBufferingTimer(*this, &MediaSession::clientDataBufferingTimerFired)
     , m_state(Idle)
     , m_stateToRestore(Idle)
     , m_notifyingClient(false)
@@ -81,9 +81,9 @@ void MediaSession::setState(State state)
 
 void MediaSession::beginInterruption(InterruptionType type)
 {
-    LOG(Media, "MediaSession::beginInterruption(%p), state = %s", this, stateName(m_state));
+    LOG(Media, "MediaSession::beginInterruption(%p), state = %s, interruption count = %i", this, stateName(m_state), m_interruptionCount);
 
-    if (type == EnteringBackground && client().overrideBackgroundPlaybackRestriction())
+    if (++m_interruptionCount > 1 || (type == EnteringBackground && client().overrideBackgroundPlaybackRestriction()))
         return;
 
     m_stateToRestore = state();
@@ -95,7 +95,15 @@ void MediaSession::beginInterruption(InterruptionType type)
 
 void MediaSession::endInterruption(EndInterruptionFlags flags)
 {
-    LOG(Media, "MediaSession::endInterruption(%p) - flags = %i, stateToRestore = %s", this, (int)flags, stateName(m_stateToRestore));
+    LOG(Media, "MediaSession::endInterruption(%p) - flags = %i, stateToRestore = %s, interruption count = %i", this, (int)flags, stateName(m_stateToRestore), m_interruptionCount);
+
+    if (!m_interruptionCount) {
+        LOG(Media, "MediaSession::endInterruption(%p) - !! ignoring spurious interruption end !!", this);
+        return;
+    }
+
+    if (--m_interruptionCount)
+        return;
 
     State stateToRestore = m_stateToRestore;
     m_stateToRestore = Idle;
@@ -180,7 +188,7 @@ void MediaSession::visibilityChanged()
         m_clientDataBufferingTimer.startOneShot(kClientDataBufferingTimerThrottleDelay);
 }
 
-void MediaSession::clientDataBufferingTimerFired(Timer<WebCore::MediaSession> &)
+void MediaSession::clientDataBufferingTimerFired()
 {
     updateClientDataBuffering();
 }
@@ -190,8 +198,22 @@ void MediaSession::updateClientDataBuffering()
     if (m_clientDataBufferingTimer.isActive())
         m_clientDataBufferingTimer.stop();
 
-    bool shouldBuffer = m_state == Playing || !m_client.elementIsHidden();
-    m_client.setShouldBufferData(shouldBuffer);
+    m_client.setShouldBufferData(MediaSessionManager::sharedManager().sessionCanLoadMedia(*this));
+}
+
+bool MediaSession::isHidden() const
+{
+    return m_client.elementIsHidden();
+}
+
+MediaSession::DisplayType MediaSession::displayType() const
+{
+    return m_client.displayType();
+}
+
+void MediaSession::wirelessRoutesAvailableDidChange() const
+{
+    m_client.wirelessRoutesAvailableDidChange();
 }
 
 String MediaSessionClient::mediaSessionTitle() const

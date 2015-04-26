@@ -118,9 +118,10 @@ bool safeToExecute(AbstractStateType& state, Graph& graph, Node* node)
     case GetCallee:
     case GetLocal:
     case SetLocal:
+    case PutLocal:
+    case KillLocal:
     case MovHint:
     case ZombieHint:
-    case GetArgument:
     case Phantom:
     case HardPhantom:
     case Upsilon:
@@ -148,6 +149,7 @@ bool safeToExecute(AbstractStateType& state, Graph& graph, Node* node)
     case ArithAbs:
     case ArithMin:
     case ArithMax:
+    case ArithPow:
     case ArithSqrt:
     case ArithFRound:
     case ArithSin:
@@ -165,7 +167,6 @@ bool safeToExecute(AbstractStateType& state, Graph& graph, Node* node)
     case Arrayify:
     case ArrayifyToStructure:
     case GetScope:
-    case GetMyScope:
     case SkipScope:
     case GetClosureRegisters:
     case GetClosureVar:
@@ -188,8 +189,6 @@ bool safeToExecute(AbstractStateType& state, Graph& graph, Node* node)
     case CompareStrictEq:
     case Call:
     case Construct:
-    case ProfiledCall:
-    case ProfiledConstruct:
     case NewObject:
     case NewArray:
     case NewArrayWithSize:
@@ -198,6 +197,8 @@ bool safeToExecute(AbstractStateType& state, Graph& graph, Node* node)
     case Breakpoint:
     case ProfileWillCall:
     case ProfileDidCall:
+    case ProfileType:
+    case ProfileControlFlow:
     case CheckHasInstance:
     case InstanceOf:
     case IsUndefined:
@@ -214,7 +215,6 @@ bool safeToExecute(AbstractStateType& state, Graph& graph, Node* node)
     case MakeRope:
     case In:
     case CreateActivation:
-    case TearOffActivation:
     case CreateArguments:
     case PhantomArguments:
     case TearOffArguments:
@@ -270,6 +270,11 @@ bool safeToExecute(AbstractStateType& state, Graph& graph, Node* node)
     case GetGenericPropertyEnumerator:
     case GetEnumeratorPname:
     case ToIndexString:
+    case PhantomNewObject:
+    case PutByOffsetHint:
+    case CheckStructureImmediate:
+    case PutStructureHint:
+    case MaterializeNewObject:
         return true;
 
     case NativeCall:
@@ -311,7 +316,7 @@ bool safeToExecute(AbstractStateType& state, Graph& graph, Node* node)
         StructureAbstractValue& value = state.forNode(node->child1()).m_structure;
         if (value.isTop())
             return false;
-        PropertyOffset offset = graph.m_storageAccessData[node->storageAccessDataIndex()].offset;
+        PropertyOffset offset = node->storageAccessData().offset;
         for (unsigned i = value.size(); i--;) {
             if (!value[i]->isValidOffset(offset))
                 return false;

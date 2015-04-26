@@ -36,7 +36,6 @@
 #include "DocumentEventQueue.h"
 #include "EventHandler.h"
 #include "FocusController.h"
-#include "FontCache.h"
 #include "Frame.h"
 #include "FrameSelection.h"
 #include "FrameView.h"
@@ -81,7 +80,7 @@ const int defaultSize = 4;
 // widget, but I'm not sure this is right for the new control.
 const int baselineAdjustment = 7;
 
-RenderListBox::RenderListBox(HTMLSelectElement& element, PassRef<RenderStyle> style)
+RenderListBox::RenderListBox(HTMLSelectElement& element, Ref<RenderStyle>&& style)
     : RenderBlockFlow(element, WTF::move(style))
     , m_optionsChanged(true)
     , m_scrollToRevealSelectionAfterLayout(false)
@@ -100,13 +99,11 @@ RenderListBox::~RenderListBox()
 
 HTMLSelectElement& RenderListBox::selectElement() const
 {
-    return toHTMLSelectElement(nodeForNonAnonymous());
+    return downcast<HTMLSelectElement>(nodeForNonAnonymous());
 }
 
 void RenderListBox::updateFromElement()
 {
-    FontCachePurgePreventer fontCachePurgePreventer;
-
     if (m_optionsChanged) {
         const Vector<HTMLElement*>& listItems = selectElement().listItems();
         int size = numItems();
@@ -115,15 +112,15 @@ void RenderListBox::updateFromElement()
         for (int i = 0; i < size; ++i) {
             HTMLElement* element = listItems[i];
             String text;
-            Font itemFont = style().font();
-            if (isHTMLOptionElement(element))
-                text = toHTMLOptionElement(element)->textIndentedToRespectGroupLabel();
-            else if (isHTMLOptGroupElement(element)) {
-                text = toHTMLOptGroupElement(element)->groupLabelText();
+            FontCascade itemFont = style().fontCascade();
+            if (is<HTMLOptionElement>(*element))
+                text = downcast<HTMLOptionElement>(*element).textIndentedToRespectGroupLabel();
+            else if (is<HTMLOptGroupElement>(*element)) {
+                text = downcast<HTMLOptGroupElement>(*element).groupLabelText();
                 FontDescription d = itemFont.fontDescription();
                 d.setWeight(d.bolderWeight());
-                itemFont = Font(d, itemFont.letterSpacing(), itemFont.wordSpacing());
-                itemFont.update(document().ensureStyleResolver().fontSelector());
+                itemFont = FontCascade(d, itemFont.letterSpacing(), itemFont.wordSpacing());
+                itemFont.update(&document().fontSelector());
             }
 
             if (!text.isEmpty()) {
@@ -330,7 +327,7 @@ void RenderListBox::addFocusRingRects(Vector<IntRect>& rects, const LayoutPoint&
     const Vector<HTMLElement*>& listItems = selectElement().listItems();
     for (int i = 0; i < size; ++i) {
         HTMLElement* element = listItems[i];
-        if (isHTMLOptionElement(element) && !element->isDisabledFormControl()) {
+        if (is<HTMLOptionElement>(*element) && !element->isDisabledFormControl()) {
             selectElement().setActiveSelectionEndIndex(i);
             rects.append(snappedIntRect(itemBoundingBoxRect(additionalOffset, i)));
             return;
@@ -350,7 +347,7 @@ void RenderListBox::paintScrollbar(PaintInfo& paintInfo, const LayoutPoint& pain
     }
 }
 
-static LayoutSize itemOffsetForAlignment(TextRun textRun, RenderStyle* itemStyle, Font itemFont, LayoutRect itemBoudingBox)
+static LayoutSize itemOffsetForAlignment(TextRun textRun, RenderStyle* itemStyle, FontCascade itemFont, LayoutRect itemBoudingBox)
 {
     ETextAlign actualAlignment = itemStyle->textAlign();
     // FIXME: Firefox doesn't respect JUSTIFY. Should we?
@@ -372,8 +369,6 @@ static LayoutSize itemOffsetForAlignment(TextRun textRun, RenderStyle* itemStyle
 
 void RenderListBox::paintItemForeground(PaintInfo& paintInfo, const LayoutPoint& paintOffset, int listIndex)
 {
-    FontCachePurgePreventer fontCachePurgePreventer;
-
     const Vector<HTMLElement*>& listItems = selectElement().listItems();
     HTMLElement* listItemElement = listItems[listIndex];
 
@@ -385,15 +380,15 @@ void RenderListBox::paintItemForeground(PaintInfo& paintInfo, const LayoutPoint&
         return;
 
     String itemText;
-    bool isOptionElement = isHTMLOptionElement(listItemElement);
+    bool isOptionElement = is<HTMLOptionElement>(*listItemElement);
     if (isOptionElement)
-        itemText = toHTMLOptionElement(listItemElement)->textIndentedToRespectGroupLabel();
-    else if (isHTMLOptGroupElement(listItemElement))
-        itemText = toHTMLOptGroupElement(listItemElement)->groupLabelText();
+        itemText = downcast<HTMLOptionElement>(*listItemElement).textIndentedToRespectGroupLabel();
+    else if (is<HTMLOptGroupElement>(*listItemElement))
+        itemText = downcast<HTMLOptGroupElement>(*listItemElement).groupLabelText();
     applyTextTransform(style(), itemText, ' ');
 
     Color textColor = listItemElement->renderStyle() ? listItemElement->renderStyle()->visitedDependentColor(CSSPropertyColor) : style().visitedDependentColor(CSSPropertyColor);
-    if (isOptionElement && toHTMLOptionElement(listItemElement)->selected()) {
+    if (isOptionElement && downcast<HTMLOptionElement>(*listItemElement).selected()) {
         if (frame().selection().isFocusedAndActive() && document().focusedElement() == &selectElement())
             textColor = theme().activeListBoxSelectionForegroundColor();
         // Honor the foreground color for disabled items
@@ -405,15 +400,15 @@ void RenderListBox::paintItemForeground(PaintInfo& paintInfo, const LayoutPoint&
     paintInfo.context->setFillColor(textColor, colorSpace);
 
     TextRun textRun(itemText, 0, 0, TextRun::AllowTrailingExpansion, itemStyle->direction(), isOverride(itemStyle->unicodeBidi()), true, TextRun::NoRounding);
-    Font itemFont = style().font();
+    FontCascade itemFont = style().fontCascade();
     LayoutRect r = itemBoundingBoxRect(paintOffset, listIndex);
     r.move(itemOffsetForAlignment(textRun, itemStyle, itemFont, r));
 
-    if (isHTMLOptGroupElement(listItemElement)) {
+    if (is<HTMLOptGroupElement>(*listItemElement)) {
         FontDescription d = itemFont.fontDescription();
         d.setWeight(d.bolderWeight());
-        itemFont = Font(d, itemFont.letterSpacing(), itemFont.wordSpacing());
-        itemFont.update(document().ensureStyleResolver().fontSelector());
+        itemFont = FontCascade(d, itemFont.letterSpacing(), itemFont.wordSpacing());
+        itemFont.update(&document().fontSelector());
     }
 
     // Draw the item text
@@ -426,7 +421,7 @@ void RenderListBox::paintItemBackground(PaintInfo& paintInfo, const LayoutPoint&
     HTMLElement* listItemElement = listItems[listIndex];
 
     Color backColor;
-    if (isHTMLOptionElement(listItemElement) && toHTMLOptionElement(listItemElement)->selected()) {
+    if (is<HTMLOptionElement>(*listItemElement) && downcast<HTMLOptionElement>(*listItemElement).selected()) {
         if (frame().selection().isFocusedAndActive() && document().focusedElement() == &selectElement())
             backColor = theme().activeListBoxSelectionBackgroundColor();
         else

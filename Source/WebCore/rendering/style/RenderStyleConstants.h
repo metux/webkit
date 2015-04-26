@@ -26,6 +26,8 @@
 #ifndef RenderStyleConstants_h
 #define RenderStyleConstants_h
 
+#include <initializer_list>
+
 namespace WebCore {
 
 static const size_t PrintColorAdjustBits = 1;
@@ -78,6 +80,67 @@ enum PseudoId : unsigned char {
     FIRST_PUBLIC_PSEUDOID = FIRST_LINE,
     FIRST_INTERNAL_PSEUDOID = SCROLLBAR_THUMB,
     PUBLIC_PSEUDOID_MASK = ((1 << FIRST_INTERNAL_PSEUDOID) - 1) & ~((1 << FIRST_PUBLIC_PSEUDOID) - 1)
+};
+
+class PseudoIdSet {
+public:
+    PseudoIdSet()
+        : m_data(0)
+    {
+    }
+
+    PseudoIdSet(std::initializer_list<PseudoId> initializerList)
+        : m_data(0)
+    {
+        for (PseudoId pseudoId : initializerList)
+            add(pseudoId);
+    }
+
+    static PseudoIdSet fromMask(unsigned rawPseudoIdSet)
+    {
+        return PseudoIdSet(rawPseudoIdSet);
+    }
+
+    bool has(PseudoId pseudoId) const
+    {
+        ASSERT((sizeof(m_data) * 8) > pseudoId);
+        return m_data & (1U << pseudoId);
+    }
+
+    void add(PseudoId pseudoId)
+    {
+        ASSERT((sizeof(m_data) * 8) > pseudoId);
+        m_data |= (1U << pseudoId);
+    }
+
+    void merge(PseudoIdSet source)
+    {
+        m_data |= source.m_data;
+    }
+
+    PseudoIdSet operator &(const PseudoIdSet& pseudoIdSet) const
+    {
+        return PseudoIdSet(m_data & pseudoIdSet.m_data);
+    }
+
+    PseudoIdSet operator |(const PseudoIdSet& pseudoIdSet) const
+    {
+        return PseudoIdSet(m_data | pseudoIdSet.m_data);
+    }
+
+    explicit operator bool() const
+    {
+        return m_data;
+    }
+
+    unsigned data() const { return m_data; }
+private:
+    explicit PseudoIdSet(unsigned rawPseudoIdSet)
+        : m_data(rawPseudoIdSet)
+    {
+    }
+
+    unsigned m_data;
 };
 
 enum ColumnFill { ColumnFillBalance, ColumnFillAuto };
@@ -420,44 +483,44 @@ enum EVisibility { VISIBLE, HIDDEN, COLLAPSE };
 
 enum ECursor {
     // The following must match the order in CSSValueKeywords.in.
-    CURSOR_AUTO,
-    CURSOR_CROSS,
-    CURSOR_DEFAULT,
-    CURSOR_POINTER,
-    CURSOR_MOVE,
-    CURSOR_VERTICAL_TEXT,
-    CURSOR_CELL,
-    CURSOR_CONTEXT_MENU,
-    CURSOR_ALIAS,
-    CURSOR_PROGRESS,
-    CURSOR_NO_DROP,
-    CURSOR_NOT_ALLOWED,
-    CURSOR_WEBKIT_ZOOM_IN,
-    CURSOR_WEBKIT_ZOOM_OUT,
-    CURSOR_E_RESIZE,
-    CURSOR_NE_RESIZE,
-    CURSOR_NW_RESIZE,
-    CURSOR_N_RESIZE,
-    CURSOR_SE_RESIZE,
-    CURSOR_SW_RESIZE,
-    CURSOR_S_RESIZE,
-    CURSOR_W_RESIZE,
-    CURSOR_EW_RESIZE,
-    CURSOR_NS_RESIZE,
-    CURSOR_NESW_RESIZE,
-    CURSOR_NWSE_RESIZE,
-    CURSOR_COL_RESIZE,
-    CURSOR_ROW_RESIZE,
-    CURSOR_TEXT,
-    CURSOR_WAIT,
-    CURSOR_HELP,
-    CURSOR_ALL_SCROLL,
-    CURSOR_WEBKIT_GRAB,
-    CURSOR_WEBKIT_GRABBING,
+    CursorAuto,
+    CursorCross,
+    CursorDefault,
+    CursorPointer,
+    CursorMove,
+    CursorVerticalText,
+    CursorCell,
+    CursorContextMenu,
+    CursorAlias,
+    CursorProgress,
+    CursorNoDrop,
+    CursorNotAllowed,
+    CursorZoomIn,
+    CursorZoomOut,
+    CursorEResize,
+    CursorNeResize,
+    CursorNwResize,
+    CursorNResize,
+    CursorSeResize,
+    CursorSwResize,
+    CursorSResize,
+    CursorWResize,
+    CursorEwResize,
+    CursorNsResize,
+    CursorNeswResize,
+    CursorNwseResize,
+    CursorColResize,
+    CursorRowResize,
+    CursorText,
+    CursorWait,
+    CursorHelp,
+    CursorAllScroll,
+    CursorWebkitGrab,
+    CursorWebkitGrabbing,
 
     // The following are handled as exceptions so don't need to match.
-    CURSOR_COPY,
-    CURSOR_NONE
+    CursorCopy,
+    CursorNone
 };
 
 #if ENABLE(CURSOR_VISIBILITY)
@@ -541,25 +604,22 @@ enum LineAlign { LineAlignNone, LineAlignEdges };
 enum RubyPosition { RubyPositionBefore, RubyPositionAfter, RubyPositionInterCharacter };
 
 #if ENABLE(CSS_GRID_LAYOUT)
-static const size_t GridAutoFlowBits = 5;
+static const size_t GridAutoFlowBits = 4;
 enum InternalGridAutoFlowAlgorithm {
     InternalAutoFlowAlgorithmSparse = 0x1,
     InternalAutoFlowAlgorithmDense = 0x2,
-    InternalAutoFlowAlgorithmStack = 0x4
 };
 
 enum InternalGridAutoFlowDirection {
-    InternalAutoFlowDirectionRow = 0x8,
-    InternalAutoFlowDirectionColumn = 0x10
+    InternalAutoFlowDirectionRow = 0x4,
+    InternalAutoFlowDirectionColumn = 0x8
 };
 
 enum GridAutoFlow {
     AutoFlowRow = InternalAutoFlowAlgorithmSparse | InternalAutoFlowDirectionRow,
     AutoFlowColumn = InternalAutoFlowAlgorithmSparse | InternalAutoFlowDirectionColumn,
     AutoFlowRowDense = InternalAutoFlowAlgorithmDense | InternalAutoFlowDirectionRow,
-    AutoFlowColumnDense = InternalAutoFlowAlgorithmDense | InternalAutoFlowDirectionColumn,
-    AutoFlowStackRow = InternalAutoFlowAlgorithmStack | InternalAutoFlowDirectionRow,
-    AutoFlowStackColumn = InternalAutoFlowAlgorithmStack | InternalAutoFlowDirectionColumn
+    AutoFlowColumnDense = InternalAutoFlowAlgorithmDense | InternalAutoFlowDirectionColumn
 };
 #endif
 

@@ -34,6 +34,7 @@
 #include <chrono>
 #include <functional>
 #include <wtf/Forward.h>
+#include <wtf/FunctionDispatcher.h>
 #include <wtf/Functional.h>
 #include <wtf/HashMap.h>
 #include <wtf/RefCounted.h>
@@ -51,8 +52,12 @@
 #include <DispatchQueueEfl.h>
 #endif
 
-class WorkQueue : public ThreadSafeRefCounted<WorkQueue> {
+class WorkQueue final : public FunctionDispatcher {
 public:
+    enum class Type {
+        Serial,
+        Concurrent
+    };
     enum class QOS {
         UserInteractive,
         UserInitiated,
@@ -61,10 +66,10 @@ public:
         Background
     };
     
-    static PassRefPtr<WorkQueue> create(const char* name, QOS = QOS::Default);
-    ~WorkQueue();
+    static Ref<WorkQueue> create(const char* name, Type = Type::Serial, QOS = QOS::Default);
+    virtual ~WorkQueue();
 
-    void dispatch(std::function<void ()>);
+    virtual void dispatch(std::function<void ()>) override;
     void dispatchAfter(std::chrono::nanoseconds, std::function<void ()>);
 
 #if OS(DARWIN)
@@ -78,18 +83,15 @@ public:
 #endif
 
 private:
-    explicit WorkQueue(const char* name, QOS);
+    explicit WorkQueue(const char* name, Type, QOS);
 
-    void platformInitialize(const char* name, QOS);
+    void platformInitialize(const char* name, Type, QOS);
     void platformInvalidate();
 
 #if OS(DARWIN)
     static void executeFunction(void*);
     dispatch_queue_t m_dispatchQueue;
 #elif PLATFORM(GTK)
-    static void startWorkQueueThread(WorkQueue*);
-    void workQueueThreadBody();
-
     ThreadIdentifier m_workQueueThread;
     GRefPtr<GMainContext> m_eventContext;
     Mutex m_eventLoopLock;

@@ -89,6 +89,21 @@ bool BasicBlock::isInBlock(Node* myNode) const
     return false;
 }
 
+Node* BasicBlock::firstOriginNode()
+{
+    for (Node* node : *this) {
+        if (node->origin.isSet())
+            return node;
+    }
+    RELEASE_ASSERT_NOT_REACHED();
+    return nullptr;
+}
+
+NodeOrigin BasicBlock::firstOrigin()
+{
+    return firstOriginNode()->origin;
+}
+
 void BasicBlock::removePredecessor(BasicBlock* block)
 {
     for (unsigned i = 0; i < predecessors.size(); ++i) {
@@ -118,9 +133,9 @@ void BasicBlock::dump(PrintStream& out) const
 }
 
 BasicBlock::SSAData::SSAData(BasicBlock* block)
-    : availabilityAtHead(OperandsLike, block->variablesAtHead)
-    , availabilityAtTail(OperandsLike, block->variablesAtHead)
 {
+    availabilityAtHead.m_locals = Operands<Availability>(OperandsLike, block->variablesAtHead);
+    availabilityAtTail.m_locals = Operands<Availability>(OperandsLike, block->variablesAtHead);
 }
 
 BasicBlock::SSAData::~SSAData() { }

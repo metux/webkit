@@ -31,9 +31,6 @@
  */
 
 #include "config.h"
-
-#if ENABLE(INSPECTOR)
-
 #include "JSInspectorFrontendHost.h"
 
 #include "ContextMenuItem.h"
@@ -131,7 +128,7 @@ JSValue JSInspectorFrontendHost::showContextMenu(ExecState* exec)
 #if ENABLE(CONTEXT_MENUS)
     if (exec->argumentCount() < 2)
         return jsUndefined();
-    Event* event = toEvent(exec->argument(0));
+    Event* event = JSEvent::toWrapped(exec->argument(0));
 
     JSArray* array = asArray(exec->argument(1));
     ContextMenu menu;
@@ -150,5 +147,3 @@ JSValue JSInspectorFrontendHost::showContextMenu(ExecState* exec)
 }
 
 } // namespace WebCore
-
-#endif // ENABLE(INSPECTOR)

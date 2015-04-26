@@ -50,6 +50,7 @@ WebInspector.CSSStyleManager.ForceablePseudoClasses = ["active", "focus", "hover
 
 WebInspector.CSSStyleManager.prototype = {
     constructor: WebInspector.CSSStyleManager,
+    __proto__: WebInspector.Object.prototype,
 
     // Public
 
@@ -252,9 +253,7 @@ WebInspector.CSSStyleManager.prototype = {
                 return;
             }
 
-            for (var i = 0; i < styleSheets.length; ++i) {
-                var styleSheetInfo = styleSheets[i];
-
+            for (var styleSheetInfo of styleSheets) {
                 // COMPATIBILITY (iOS 6): The info did not have 'frameId', so make parentFrame null in that case.
                 var parentFrame = "frameId" in styleSheetInfo ? WebInspector.frameResourceManager.frameForIdentifier(styleSheetInfo.frameId) : null;
 
@@ -310,8 +309,11 @@ WebInspector.CSSStyleManager.prototype = {
     {
         console.assert(styleSheet);
 
-        function fetchedStyleSheetContent(styleSheet, content)
+        function fetchedStyleSheetContent(parameters)
         {
+            var styleSheet = parameters.sourceCode;
+            var content = parameters.content;
+
             delete styleSheet.__pendingChangeTimeout;
 
             console.assert(styleSheet.url);
@@ -347,7 +349,7 @@ WebInspector.CSSStyleManager.prototype = {
 
         function styleSheetReady()
         {
-            styleSheet.requestContent(fetchedStyleSheetContent.bind(this));
+            styleSheet.requestContent().then(fetchedStyleSheetContent.bind(this));
         }
 
         function applyStyleSheetChanges()
@@ -363,5 +365,3 @@ WebInspector.CSSStyleManager.prototype = {
         styleSheet.__pendingChangeTimeout = setTimeout(applyStyleSheetChanges.bind(this), 500);
     }
 };
-
-WebInspector.CSSStyleManager.prototype.__proto__ = WebInspector.Object.prototype;

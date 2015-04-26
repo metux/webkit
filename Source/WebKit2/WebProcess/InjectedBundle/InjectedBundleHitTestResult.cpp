@@ -108,16 +108,21 @@ bool InjectedBundleHitTestResult::mediaHasAudio() const
     return m_hitTestResult.mediaHasAudio();
 }
 
+bool InjectedBundleHitTestResult::isDownloadableMedia() const
+{
+    return m_hitTestResult.isDownloadableMedia();
+}
+
 BundleHitTestResultMediaType InjectedBundleHitTestResult::mediaType() const
 {
 #if !ENABLE(VIDEO)
     return BundleHitTestResultMediaTypeNone;
 #else
     WebCore::Node* node = m_hitTestResult.innerNonSharedNode();
-    if (!node->isElementNode())
+    if (!is<Element>(*node))
         return BundleHitTestResultMediaTypeNone;
     
-    if (!toElement(node)->isMediaElement())
+    if (!downcast<Element>(*node).isMediaElement())
         return BundleHitTestResultMediaTypeNone;
     
     return m_hitTestResult.mediaIsVideo() ? BundleHitTestResultMediaTypeVideo : BundleHitTestResultMediaTypeAudio;    

@@ -26,7 +26,7 @@
 
 WebInspector.ProbeDetailsSidebarPanel = function()
 {
-    WebInspector.DetailsSidebarPanel.call(this, "probe", WebInspector.UIString("Probes"), WebInspector.UIString("Probes"), "Images/NavigationItemProbes.pdf", "6");
+    WebInspector.DetailsSidebarPanel.call(this, "probe", WebInspector.UIString("Probes"), WebInspector.UIString("Probes"), "Images/NavigationItemProbes.svg", "6");
 
     WebInspector.probeManager.addEventListener(WebInspector.ProbeManager.Event.ProbeSetAdded, this._probeSetAdded, this);
     WebInspector.probeManager.addEventListener(WebInspector.ProbeManager.Event.ProbeSetRemoved, this._probeSetRemoved, this);
@@ -56,14 +56,14 @@ WebInspector.ProbeDetailsSidebarPanel.prototype = {
     {
         for (var probeSet of this._inspectedProbeSets) {
             var removedSection = this._probeSetSections.get(probeSet);
-            this.element.removeChild(removedSection.element);
+            this.contentElement.removeChild(removedSection.element);
         }
 
         this._inspectedProbeSets = newProbeSets;
 
         for (var probeSet of newProbeSets) {
             var shownSection = this._probeSetSections.get(probeSet);
-            this.element.appendChild(shownSection.element);
+            this.contentElement.appendChild(shownSection.element);
         }
     },
 
@@ -72,9 +72,25 @@ WebInspector.ProbeDetailsSidebarPanel.prototype = {
         if (!(objects instanceof Array))
             objects = [objects];
 
-        this.inspectedProbeSets = objects.filter(function(object) {
+        var inspectedProbeSets = objects.filter(function(object) {
             return object instanceof WebInspector.ProbeSet;
         });
+
+        inspectedProbeSets.sort(function sortBySourceLocation(aProbeSet, bProbeSet) {
+            var aLocation = aProbeSet.breakpoint.sourceCodeLocation;
+            var bLocation = bProbeSet.breakpoint.sourceCodeLocation;
+            var comparisonResult = aLocation.sourceCode.displayName.localeCompare(bLocation.sourceCode.displayName);
+            if (comparisonResult !== 0)
+                return comparisonResult;
+
+            comparisonResult = aLocation.displayLineNumber - bLocation.displayLineNumber;
+            if (comparisonResult !== 0)
+                return comparisonResult;
+
+            return aLocation.displayColumnNumber - bLocation.displayColumnNumber;
+        });
+
+        this.inspectedProbeSets = inspectedProbeSets;
 
         return !!this._inspectedProbeSets.length;
     },

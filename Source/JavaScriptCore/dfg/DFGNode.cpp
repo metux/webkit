@@ -74,11 +74,11 @@ bool Node::hasVariableAccessData(Graph& graph)
     case Phi:
         return graph.m_form != SSA;
     case GetLocal:
-    case GetArgument:
     case SetLocal:
     case SetArgument:
     case Flush:
     case PhantomLocal:
+    case PutLocal:
         return true;
     default:
         return false;

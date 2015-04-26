@@ -143,15 +143,14 @@ DebuggerScope* DebuggerCallFrame::scope()
 
     if (!m_scope) {
         VM& vm = m_callFrame->vm();
+        JSScope* scope;
         CodeBlock* codeBlock = m_callFrame->codeBlock();
-        if (codeBlock && codeBlock->needsActivation() && !m_callFrame->hasActivation()) {
-            ASSERT(!m_callFrame->scope()->isWithScope());
-            JSLexicalEnvironment* lexicalEnvironment = JSLexicalEnvironment::create(vm, m_callFrame, codeBlock);
-            m_callFrame->setActivation(lexicalEnvironment);
-            m_callFrame->setScope(lexicalEnvironment);
-        }
+        if (codeBlock && codeBlock->scopeRegister().isValid())
+            scope = m_callFrame->scope(codeBlock->scopeRegister().offset());
+        else
+            scope = jsCast<JSCallee*>(m_callFrame->callee())->scope();
 
-        m_scope.set(vm, DebuggerScope::create(vm, m_callFrame->scope()));
+        m_scope.set(vm, DebuggerScope::create(vm, scope));
     }
     return m_scope.get();
 }
@@ -208,14 +207,13 @@ JSValue DebuggerCallFrame::evaluate(const String& script, JSValue& exception)
 
 void DebuggerCallFrame::invalidate()
 {
-    m_callFrame = nullptr;
-    if (m_scope) {
-        m_scope->invalidateChain();
-        m_scope.clear();
-    }
-    RefPtr<DebuggerCallFrame> frame = m_caller.release();
+    RefPtr<DebuggerCallFrame> frame = this;
     while (frame) {
         frame->m_callFrame = nullptr;
+        if (frame->m_scope) {
+            frame->m_scope->invalidateChain();
+            frame->m_scope.clear();
+        }
         frame = frame->m_caller.release();
     }
 }

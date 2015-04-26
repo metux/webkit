@@ -41,7 +41,7 @@ typedef unsigned LineBoxContain;
 // Used for text-CSSLineBoxContain and box-CSSLineBoxContain
 class CSSLineBoxContainValue : public CSSValue {
 public:
-    static PassRef<CSSLineBoxContainValue> create(LineBoxContain value)
+    static Ref<CSSLineBoxContainValue> create(LineBoxContain value)
     {
         return adoptRef(*new CSSLineBoxContainValue(value));
     }
@@ -56,8 +56,8 @@ private:
     LineBoxContain m_value;
 };
 
-CSS_VALUE_TYPE_CASTS(CSSLineBoxContainValue, isLineBoxContainValue())
+} // namespace WebCore
 
-} // namespace
+SPECIALIZE_TYPE_TRAITS_CSS_VALUE(CSSLineBoxContainValue, isLineBoxContainValue())
 
-#endif
+#endif // CSSLineBoxContainValue_h

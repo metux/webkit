@@ -27,7 +27,6 @@
 #include "RenderSVGEllipse.h"
 #include "RenderSVGPath.h"
 #include "RenderSVGResource.h"
-#include "SVGElementInstance.h"
 #include "SVGException.h"
 #include "SVGLength.h"
 #include "SVGNames.h"
@@ -59,9 +58,9 @@ inline SVGCircleElement::SVGCircleElement(const QualifiedName& tagName, Document
     registerAnimatedPropertiesForSVGCircleElement();
 }
 
-PassRefPtr<SVGCircleElement> SVGCircleElement::create(const QualifiedName& tagName, Document& document)
+Ref<SVGCircleElement> SVGCircleElement::create(const QualifiedName& tagName, Document& document)
 {
-    return adoptRef(new SVGCircleElement(tagName, document));
+    return adoptRef(*new SVGCircleElement(tagName, document));
 }
 
 bool SVGCircleElement::isSupportedAttribute(const QualifiedName& attrName)
@@ -104,7 +103,7 @@ void SVGCircleElement::svgAttributeChanged(const QualifiedName& attrName)
         return;
     }
 
-    SVGElementInstance::InvalidationGuard invalidationGuard(this);
+    InstanceInvalidationGuard guard(*this);
 
     if (attrName == SVGNames::cxAttr
         || attrName == SVGNames::cyAttr
@@ -113,7 +112,7 @@ void SVGCircleElement::svgAttributeChanged(const QualifiedName& attrName)
         return;
     }
 
-    RenderSVGShape* renderer = toRenderSVGShape(this->renderer());
+    auto* renderer = downcast<RenderSVGShape>(this->renderer());
     if (!renderer)
         return;
 
@@ -125,7 +124,7 @@ void SVGCircleElement::svgAttributeChanged(const QualifiedName& attrName)
     ASSERT_NOT_REACHED();
 }
 
-RenderPtr<RenderElement> SVGCircleElement::createElementRenderer(PassRef<RenderStyle> style)
+RenderPtr<RenderElement> SVGCircleElement::createElementRenderer(Ref<RenderStyle>&& style)
 {
     return createRenderer<RenderSVGEllipse>(*this, WTF::move(style));
 }

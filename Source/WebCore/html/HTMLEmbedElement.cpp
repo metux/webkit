@@ -50,22 +50,23 @@ inline HTMLEmbedElement::HTMLEmbedElement(const QualifiedName& tagName, Document
     ASSERT(hasTagName(embedTag));
 }
 
-PassRefPtr<HTMLEmbedElement> HTMLEmbedElement::create(const QualifiedName& tagName, Document& document, bool createdByParser)
+Ref<HTMLEmbedElement> HTMLEmbedElement::create(const QualifiedName& tagName, Document& document, bool createdByParser)
 {
-    return adoptRef(new HTMLEmbedElement(tagName, document, createdByParser));
+    return adoptRef(*new HTMLEmbedElement(tagName, document, createdByParser));
 }
 
-static inline RenderWidget* findWidgetRenderer(const Node* n) 
+static inline RenderWidget* findWidgetRenderer(const Node* node)
 {
-    if (!n->renderer())
-        do
-            n = n->parentNode();
-        while (n && !n->hasTagName(objectTag));
+    if (!node->renderer()) {
+        do {
+            node = node->parentNode();
+        } while (node && !is<HTMLObjectElement>(*node));
+    }
 
-    if (n && n->renderer() && n->renderer()->isWidget())
-        return toRenderWidget(n->renderer());
+    if (node && is<RenderWidget>(node->renderer()))
+        return downcast<RenderWidget>(node->renderer());
 
-    return 0;
+    return nullptr;
 }
 
 RenderWidget* HTMLEmbedElement::renderWidgetLoadingPlugin() const
@@ -166,11 +167,11 @@ void HTMLEmbedElement::updateWidget(PluginCreationOption pluginCreationOption)
     Ref<HTMLEmbedElement> protect(*this); // Loading the plugin might remove us from the document.
     bool beforeLoadAllowedLoad = guardedDispatchBeforeLoadEvent(m_url);
     if (!beforeLoadAllowedLoad) {
-        if (document().isPluginDocument()) {
+        if (is<PluginDocument>(document())) {
             // Plugins inside plugin documents load differently than other plugins. By the time
             // we are here in a plugin document, the load of the plugin (which is the plugin document's
             // main resource) has already started. We need to explicitly cancel the main resource load here.
-            toPluginDocument(&document())->cancelManualPluginLoad();
+            downcast<PluginDocument>(document()).cancelManualPluginLoad();
         }
         return;
     }
@@ -188,12 +189,12 @@ bool HTMLEmbedElement::rendererIsNeeded(const RenderStyle& style)
 
     // If my parent is an <object> and is not set to use fallback content, I
     // should be ignored and not get a renderer.
-    ContainerNode* p = parentNode();
-    if (p && p->hasTagName(objectTag)) {
-        if (!p->renderer())
+    ContainerNode* parent = parentNode();
+    if (is<HTMLObjectElement>(parent)) {
+        if (!parent->renderer())
             return false;
-        if (!toHTMLObjectElement(p)->useFallbackContent()) {
-            ASSERT(!p->renderer()->isEmbeddedObject());
+        if (!downcast<HTMLObjectElement>(*parent).useFallbackContent()) {
+            ASSERT(!parent->renderer()->isEmbeddedObject());
             return false;
         }
     }

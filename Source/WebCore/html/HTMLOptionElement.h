@@ -34,12 +34,12 @@ class HTMLSelectElement;
 
 class HTMLOptionElement final : public HTMLElement {
 public:
-    static PassRefPtr<HTMLOptionElement> create(Document&);
-    static PassRefPtr<HTMLOptionElement> create(const QualifiedName&, Document&);
-    static PassRefPtr<HTMLOptionElement> createForJSConstructor(Document&, const String& data, const String& value,
+    static Ref<HTMLOptionElement> create(Document&);
+    static Ref<HTMLOptionElement> create(const QualifiedName&, Document&);
+    static RefPtr<HTMLOptionElement> createForJSConstructor(Document&, const String& data, const String& value,
        bool defaultSelected, bool selected, ExceptionCode&);
 
-    WEBCORE_EXPORT virtual String text() const;
+    WEBCORE_EXPORT String text() const;
     void setText(const String&, ExceptionCode&);
 
     int index() const;
@@ -86,8 +86,6 @@ private:
     bool m_disabled;
     bool m_isSelected;
 };
-
-NODE_TYPE_CASTS(HTMLOptionElement)
 
 } // namespace
 

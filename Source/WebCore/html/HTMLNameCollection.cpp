@@ -51,8 +51,8 @@ HTMLNameCollection::~HTMLNameCollection()
 
 bool WindowNameCollection::elementMatchesIfNameAttributeMatch(const Element& element)
 {
-    return isHTMLImageElement(element) || isHTMLFormElement(element) || element.hasTagName(appletTag)
-        || element.hasTagName(embedTag) || element.hasTagName(objectTag);
+    return is<HTMLImageElement>(element) || is<HTMLFormElement>(element) || is<HTMLAppletElement>(element)
+        || is<HTMLEmbedElement>(element) || is<HTMLObjectElement>(element);
 }
 
 bool WindowNameCollection::elementMatches(const Element& element, const AtomicStringImpl* name)
@@ -66,28 +66,28 @@ bool WindowNameCollection::elementMatches(const Element& element, const AtomicSt
 bool DocumentNameCollection::elementMatchesIfIdAttributeMatch(const Element& element)
 {
     // FIXME: we need to fix HTMLImageElement to update the hash map for us when name attribute has been removed.
-    return element.hasTagName(appletTag) || (element.hasTagName(objectTag) && toHTMLObjectElement(element).isDocNamedItem())
-        || (isHTMLImageElement(element) && element.hasName());
+    return is<HTMLAppletElement>(element) || (is<HTMLObjectElement>(element) && downcast<HTMLObjectElement>(element).isDocNamedItem())
+        || (is<HTMLImageElement>(element) && element.hasName());
 }
 
 bool DocumentNameCollection::elementMatchesIfNameAttributeMatch(const Element& element)
 {
-    return isHTMLFormElement(element) || element.hasTagName(embedTag) || element.hasTagName(iframeTag)
-        || element.hasTagName(appletTag) || (element.hasTagName(objectTag) && toHTMLObjectElement(element).isDocNamedItem())
-        || isHTMLImageElement(element);
+    return is<HTMLFormElement>(element) || is<HTMLEmbedElement>(element) || is<HTMLIFrameElement>(element)
+        || is<HTMLAppletElement>(element) || (is<HTMLObjectElement>(element) && downcast<HTMLObjectElement>(element).isDocNamedItem())
+        || is<HTMLImageElement>(element);
 }
 
 bool DocumentNameCollection::elementMatches(const Element& element, const AtomicStringImpl* name)
 {
     // Find images, forms, applets, embeds, objects and iframes by name, applets and object by id, and images by id
     // but only if they have a name attribute (this very strange rule matches IE)
-    if (isHTMLFormElement(element) || element.hasTagName(embedTag) || element.hasTagName(iframeTag))
+    if (is<HTMLFormElement>(element) || is<HTMLEmbedElement>(element) || is<HTMLIFrameElement>(element))
         return element.getNameAttribute().impl() == name;
-    if (element.hasTagName(appletTag))
+    if (is<HTMLAppletElement>(element))
         return element.getNameAttribute().impl() == name || element.getIdAttribute().impl() == name;
-    if (element.hasTagName(objectTag))
-        return (element.getNameAttribute().impl() == name || element.getIdAttribute().impl() == name) && toHTMLObjectElement(element).isDocNamedItem();
-    if (isHTMLImageElement(element))
+    if (is<HTMLObjectElement>(element))
+        return (element.getNameAttribute().impl() == name || element.getIdAttribute().impl() == name) && downcast<HTMLObjectElement>(element).isDocNamedItem();
+    if (is<HTMLImageElement>(element))
         return element.getNameAttribute().impl() == name || (element.getIdAttribute().impl() == name && element.hasName());
     return false;
 }

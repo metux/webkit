@@ -39,6 +39,7 @@
 #include "DFGNode.h"
 #include "DFGNodeAllocator.h"
 #include "DFGPlan.h"
+#include "DFGPrePostNumbering.h"
 #include "DFGScannable.h"
 #include "JSStack.h"
 #include "MethodOfGettingAValueProfile.h"
@@ -55,10 +56,46 @@ class ExecState;
 
 namespace DFG {
 
-struct StorageAccessData {
-    PropertyOffset offset;
-    unsigned identifierNumber;
-};
+#define DFG_NODE_DO_TO_CHILDREN(graph, node, thingToDo) do {            \
+        Node* _node = (node);                                           \
+        if (_node->flags() & NodeHasVarArgs) {                          \
+            for (unsigned _childIdx = _node->firstChild();              \
+                _childIdx < _node->firstChild() + _node->numChildren(); \
+                _childIdx++) {                                          \
+                if (!!(graph).m_varArgChildren[_childIdx])              \
+                    thingToDo(_node, (graph).m_varArgChildren[_childIdx]); \
+            }                                                           \
+        } else {                                                        \
+            if (!_node->child1()) {                                     \
+                ASSERT(                                                 \
+                    !_node->child2()                                    \
+                    && !_node->child3());                               \
+                break;                                                  \
+            }                                                           \
+            thingToDo(_node, _node->child1());                          \
+                                                                        \
+            if (!_node->child2()) {                                     \
+                ASSERT(!_node->child3());                               \
+                break;                                                  \
+            }                                                           \
+            thingToDo(_node, _node->child2());                          \
+                                                                        \
+            if (!_node->child3())                                       \
+                break;                                                  \
+            thingToDo(_node, _node->child3());                          \
+        }                                                               \
+    } while (false)
+
+#define DFG_ASSERT(graph, node, assertion) do {                         \
+        if (!!(assertion))                                              \
+            break;                                                      \
+        (graph).handleAssertionFailure(                                 \
+            (node), __FILE__, __LINE__, WTF_PRETTY_FUNCTION, #assertion); \
+    } while (false)
+
+#define DFG_CRASH(graph, node, reason)                                  \
+    (graph).handleAssertionFailure(                                     \
+        (node), __FILE__, __LINE__, WTF_PRETTY_FUNCTION, (reason));
 
 struct InlineVariableData {
     InlineCallFrame* inlineCallFrame;
@@ -330,6 +367,13 @@ public:
         return baselineCodeBlockForOriginAndBaselineCodeBlock(codeOrigin, m_profiledBlock);
     }
     
+    const BitVector& capturedVarsFor(InlineCallFrame* inlineCallFrame)
+    {
+        if (!inlineCallFrame)
+            return m_outermostCapturedVars;
+        return inlineCallFrame->capturedVars;
+    }
+    
     bool isStrictModeFor(CodeOrigin codeOrigin)
     {
         if (!codeOrigin.inlineCallFrame)
@@ -360,6 +404,14 @@ public:
     bool hasExitSite(Node* node, ExitKind exitKind)
     {
         return hasExitSite(node->origin.semantic, exitKind);
+    }
+    
+    bool usesArguments(InlineCallFrame* inlineCallFrame)
+    {
+        if (!inlineCallFrame)
+            return m_profiledBlock->usesArguments();
+        
+        return baselineCodeBlockForInlineCallFrame(inlineCallFrame)->usesArguments();
     }
     
     VirtualRegister argumentsRegisterFor(InlineCallFrame* inlineCallFrame)
@@ -431,21 +483,19 @@ public:
     ValueProfile* valueProfileFor(Node* node)
     {
         if (!node)
-            return 0;
+            return nullptr;
         
         CodeBlock* profiledBlock = baselineCodeBlockFor(node->origin.semantic);
         
-        if (node->op() == GetArgument)
-            return profiledBlock->valueProfileForArgument(node->local().toArgument());
-        
         if (node->hasLocal(*this)) {
-            if (m_form == SSA)
-                return 0;
             if (!node->local().isArgument())
                 return 0;
             int argument = node->local().toArgument();
-            if (node->variableAccessData() != m_arguments[argument]->variableAccessData())
-                return 0;
+            Node* argumentNode = m_arguments[argument];
+            if (!argumentNode)
+                return nullptr;
+            if (node->variableAccessData() != argumentNode->variableAccessData())
+                return nullptr;
             return profiledBlock->valueProfileForArgument(argument);
         }
         
@@ -460,16 +510,19 @@ public:
         if (!node)
             return MethodOfGettingAValueProfile();
         
-        CodeBlock* profiledBlock = baselineCodeBlockFor(node->origin.semantic);
+        if (ValueProfile* valueProfile = valueProfileFor(node))
+            return MethodOfGettingAValueProfile(valueProfile);
         
         if (node->op() == GetLocal) {
+            CodeBlock* profiledBlock = baselineCodeBlockFor(node->origin.semantic);
+        
             return MethodOfGettingAValueProfile::fromLazyOperand(
                 profiledBlock,
                 LazyOperandValueProfileKey(
                     node->origin.semantic.bytecodeIndex, node->local()));
         }
         
-        return MethodOfGettingAValueProfile(valueProfileFor(node));
+        return MethodOfGettingAValueProfile();
     }
     
     bool usesArguments() const
@@ -501,74 +554,10 @@ public:
     
     void killUnreachableBlocks();
     
-    bool isPredictedNumerical(Node* node)
-    {
-        return isNumerical(node->child1().useKind()) && isNumerical(node->child2().useKind());
-    }
-    
-    // Note that a 'true' return does not actually mean that the ByVal access clobbers nothing.
-    // It really means that it will not clobber the entire world. It's still up to you to
-    // carefully consider things like:
-    // - PutByVal definitely changes the array it stores to, and may even change its length.
-    // - PutByOffset definitely changes the object it stores to.
-    // - and so on.
-    bool byValIsPure(Node* node)
-    {
-        switch (node->arrayMode().type()) {
-        case Array::Generic:
-            return false;
-        case Array::Int32:
-        case Array::Double:
-        case Array::Contiguous:
-        case Array::ArrayStorage:
-            return !node->arrayMode().isOutOfBounds();
-        case Array::SlowPutArrayStorage:
-            return !node->arrayMode().mayStoreToHole();
-        case Array::String:
-            return node->op() == GetByVal && node->arrayMode().isInBounds();
-#if USE(JSVALUE32_64)
-        case Array::Arguments:
-            if (node->op() == GetByVal)
-                return true;
-            return false;
-#endif // USE(JSVALUE32_64)
-        default:
-            return true;
-        }
-    }
-    
-    bool clobbersWorld(Node* node)
-    {
-        if (node->flags() & NodeClobbersWorld)
-            return true;
-        if (!(node->flags() & NodeMightClobber))
-            return false;
-        switch (node->op()) {
-        case GetByVal:
-        case PutByValDirect:
-        case PutByVal:
-        case PutByValAlias:
-            return !byValIsPure(node);
-        case ToString:
-            switch (node->child1().useKind()) {
-            case StringObjectUse:
-            case StringOrStringObjectUse:
-                return false;
-            case CellUse:
-            case UntypedUse:
-                return true;
-            default:
-                RELEASE_ASSERT_NOT_REACHED();
-                return true;
-            }
-        default:
-            RELEASE_ASSERT_NOT_REACHED();
-            return true; // If by some oddity we hit this case in release build it's safer to have CSE assume the worst.
-        }
-    }
-    
     void determineReachability();
     void resetReachability();
+    
+    void mergeRelevantToOSR();
     
     void computeRefCounts();
     
@@ -681,6 +670,100 @@ public:
     BlockList blocksInPreOrder();
     BlockList blocksInPostOrder();
     
+    class NaturalBlockIterable {
+    public:
+        NaturalBlockIterable()
+            : m_graph(nullptr)
+        {
+        }
+        
+        NaturalBlockIterable(Graph& graph)
+            : m_graph(&graph)
+        {
+        }
+        
+        class iterator {
+        public:
+            iterator()
+                : m_graph(nullptr)
+                , m_index(0)
+            {
+            }
+            
+            iterator(Graph& graph, BlockIndex index)
+                : m_graph(&graph)
+                , m_index(findNext(index))
+            {
+            }
+            
+            BasicBlock *operator*()
+            {
+                return m_graph->block(m_index);
+            }
+            
+            iterator& operator++()
+            {
+                m_index = findNext(m_index + 1);
+                return *this;
+            }
+            
+            bool operator==(const iterator& other) const
+            {
+                return m_index == other.m_index;
+            }
+            
+            bool operator!=(const iterator& other) const
+            {
+                return !(*this == other);
+            }
+            
+        private:
+            BlockIndex findNext(BlockIndex index)
+            {
+                while (index < m_graph->numBlocks() && !m_graph->block(index))
+                    index++;
+                return index;
+            }
+            
+            Graph* m_graph;
+            BlockIndex m_index;
+        };
+        
+        iterator begin()
+        {
+            return iterator(*m_graph, 0);
+        }
+        
+        iterator end()
+        {
+            return iterator(*m_graph, m_graph->numBlocks());
+        }
+        
+    private:
+        Graph* m_graph;
+    };
+    
+    NaturalBlockIterable blocksInNaturalOrder()
+    {
+        return NaturalBlockIterable(*this);
+    }
+    
+    template<typename ChildFunctor>
+    void doToChildrenWithNode(Node* node, const ChildFunctor& functor)
+    {
+        DFG_NODE_DO_TO_CHILDREN(*this, node, functor);
+    }
+    
+    template<typename ChildFunctor>
+    void doToChildren(Node* node, const ChildFunctor& functor)
+    {
+        doToChildrenWithNode(
+            node,
+            [&functor] (Node*, Edge& edge) {
+                functor(edge);
+            });
+    }
+    
     Profiler::Compilation* compilation() { return m_plan.compilation.get(); }
     
     DesiredIdentifiers& identifiers() { return m_plan.identifiers; }
@@ -712,7 +795,13 @@ public:
     virtual void visitChildren(SlotVisitor&) override;
     
     NO_RETURN_DUE_TO_CRASH void handleAssertionFailure(
-        Node* node, const char* file, int line, const char* function,
+        std::nullptr_t, const char* file, int line, const char* function,
+        const char* assertion);
+    NO_RETURN_DUE_TO_CRASH void handleAssertionFailure(
+        Node*, const char* file, int line, const char* function,
+        const char* assertion);
+    NO_RETURN_DUE_TO_CRASH void handleAssertionFailure(
+        BasicBlock*, const char* file, int line, const char* function,
         const char* assertion);
     
     VM& m_vm;
@@ -730,8 +819,38 @@ public:
     HashMap<EncodedJSValue, FrozenValue*, EncodedJSValueHash, EncodedJSValueHashTraits> m_frozenValueMap;
     Bag<FrozenValue> m_frozenValues;
     
-    Vector<StorageAccessData> m_storageAccessData;
+    Bag<StorageAccessData> m_storageAccessData;
+    
+    // In CPS, this is all of the SetArgument nodes for the arguments in the machine code block
+    // that survived DCE. All of them except maybe "this" will survive DCE, because of the Flush
+    // nodes.
+    //
+    // In SSA, this is all of the GetLocal nodes for the arguments in the machine code block that
+    // may have some speculation in the prologue and survived DCE. Note that to get the speculation
+    // for an argument in SSA, you must use m_argumentFormats, since we still have to speculate
+    // even if the argument got killed. For example:
+    //
+    //     function foo(x) {
+    //        var tmp = x + 1;
+    //     }
+    //
+    // Assume that x is always int during profiling. The ArithAdd for "x + 1" will be dead and will
+    // have a proven check for the edge to "x". So, we will not insert a Check node and we will
+    // kill the GetLocal for "x". But, we must do the int check in the progolue, because that's the
+    // thing we used to allow DCE of ArithAdd. Otherwise the add could be impure:
+    //
+    //     var o = {
+    //         valueOf: function() { do side effects; }
+    //     };
+    //     foo(o);
+    //
+    // If we DCE the ArithAdd and we remove the int check on x, then this won't do the side
+    // effects.
     Vector<Node*, 8> m_arguments;
+    
+    // In CPS, this is meaningless. In SSA, this is the argument speculation that we've locked in.
+    Vector<FlushFormat> m_argumentFormats;
+    
     SegmentedVector<VariableAccessData, 16> m_variableAccessData;
     SegmentedVector<ArgumentPosition, 8> m_argumentPositions;
     SegmentedVector<StructureSet, 16> m_structureSet;
@@ -741,18 +860,21 @@ public:
     Bag<SwitchData> m_switchData;
     Bag<MultiGetByOffsetData> m_multiGetByOffsetData;
     Bag<MultiPutByOffsetData> m_multiPutByOffsetData;
+    Bag<ObjectMaterializationData> m_objectMaterializationData;
     Vector<InlineVariableData, 4> m_inlineVariableData;
     HashMap<CodeBlock*, std::unique_ptr<FullBytecodeLiveness>> m_bytecodeLiveness;
     bool m_hasArguments;
     HashSet<ExecutableBase*> m_executablesWhoseArgumentsEscaped;
     BitVector m_lazyVars;
     Dominators m_dominators;
+    PrePostNumbering m_prePostNumbering;
     NaturalLoops m_naturalLoops;
     unsigned m_localVars;
     unsigned m_nextMachineLocal;
     unsigned m_parameterSlots;
     int m_machineCaptureStart;
     std::unique_ptr<SlowArgument[]> m_slowArguments;
+    BitVector m_outermostCapturedVars;
 
 #if USE(JSVALUE32_64)
     std::unordered_map<int64_t, double*> m_doubleConstantsMap;
@@ -790,47 +912,6 @@ private:
         return bytecodeCanTruncateInteger(add->arithNodeFlags()) ? SpeculateInt32AndTruncateConstants : DontSpeculateInt32;
     }
 };
-
-#define DFG_NODE_DO_TO_CHILDREN(graph, node, thingToDo) do {            \
-        Node* _node = (node);                                           \
-        if (_node->flags() & NodeHasVarArgs) {                          \
-            for (unsigned _childIdx = _node->firstChild();              \
-                _childIdx < _node->firstChild() + _node->numChildren(); \
-                _childIdx++) {                                          \
-                if (!!(graph).m_varArgChildren[_childIdx])              \
-                    thingToDo(_node, (graph).m_varArgChildren[_childIdx]); \
-            }                                                           \
-        } else {                                                        \
-            if (!_node->child1()) {                                     \
-                ASSERT(                                                 \
-                    !_node->child2()                                    \
-                    && !_node->child3());                               \
-                break;                                                  \
-            }                                                           \
-            thingToDo(_node, _node->child1());                          \
-                                                                        \
-            if (!_node->child2()) {                                     \
-                ASSERT(!_node->child3());                               \
-                break;                                                  \
-            }                                                           \
-            thingToDo(_node, _node->child2());                          \
-                                                                        \
-            if (!_node->child3())                                       \
-                break;                                                  \
-            thingToDo(_node, _node->child3());                          \
-        }                                                               \
-    } while (false)
-
-#define DFG_ASSERT(graph, node, assertion) do {                         \
-        if (!!(assertion))                                              \
-            break;                                                      \
-        (graph).handleAssertionFailure(                                 \
-            (node), __FILE__, __LINE__, WTF_PRETTY_FUNCTION, #assertion); \
-    } while (false)
-
-#define DFG_CRASH(graph, node, reason)                                  \
-    (graph).handleAssertionFailure(                                     \
-        (node), __FILE__, __LINE__, WTF_PRETTY_FUNCTION, (reason));
 
 } } // namespace JSC::DFG
 

@@ -31,8 +31,6 @@
 #include "config.h"
 #include "PageRuntimeAgent.h"
 
-#if ENABLE(INSPECTOR)
-
 #include "Document.h"
 #include "Frame.h"
 #include "InspectorPageAgent.h"
@@ -61,24 +59,24 @@ PageRuntimeAgent::PageRuntimeAgent(InjectedScriptManager* injectedScriptManager,
 {
 }
 
-void PageRuntimeAgent::didCreateFrontendAndBackend(Inspector::InspectorFrontendChannel* frontendChannel, InspectorBackendDispatcher* backendDispatcher)
+void PageRuntimeAgent::didCreateFrontendAndBackend(Inspector::FrontendChannel* frontendChannel, Inspector::BackendDispatcher* backendDispatcher)
 {
-    m_frontendDispatcher = std::make_unique<InspectorRuntimeFrontendDispatcher>(frontendChannel);
-    m_backendDispatcher = InspectorRuntimeBackendDispatcher::create(backendDispatcher, this);
+    m_frontendDispatcher = std::make_unique<Inspector::RuntimeFrontendDispatcher>(frontendChannel);
+    m_backendDispatcher = Inspector::RuntimeBackendDispatcher::create(backendDispatcher, this);
 }
 
-void PageRuntimeAgent::willDestroyFrontendAndBackend(InspectorDisconnectReason reason)
+void PageRuntimeAgent::willDestroyFrontendAndBackend(Inspector::DisconnectReason reason)
 {
     m_frontendDispatcher = nullptr;
     m_backendDispatcher.clear();
 
-    String errorString;
-    disable(&errorString);
+    String unused;
+    disable(unused);
 
     InspectorRuntimeAgent::willDestroyFrontendAndBackend(reason);
 }
 
-void PageRuntimeAgent::enable(ErrorString* errorString)
+void PageRuntimeAgent::enable(ErrorString& errorString)
 {
     if (enabled())
         return;
@@ -92,7 +90,7 @@ void PageRuntimeAgent::enable(ErrorString* errorString)
         reportExecutionContextCreation();
 }
 
-void PageRuntimeAgent::disable(ErrorString* errorString)
+void PageRuntimeAgent::disable(ErrorString& errorString)
 {
     if (!enabled())
         return;
@@ -100,7 +98,7 @@ void PageRuntimeAgent::disable(ErrorString* errorString)
     InspectorRuntimeAgent::disable(errorString);
 }
 
-void PageRuntimeAgent::didCreateMainWorldContext(Frame* frame)
+void PageRuntimeAgent::didCreateMainWorldContext(Frame& frame)
 {
     m_mainWorldContextCreated = true;
 
@@ -108,19 +106,9 @@ void PageRuntimeAgent::didCreateMainWorldContext(Frame* frame)
         return;
 
     ASSERT(m_frontendDispatcher);
-    String frameId = m_pageAgent->frameId(frame);
-    JSC::ExecState* scriptState = mainWorldExecState(frame);
+    String frameId = m_pageAgent->frameId(&frame);
+    JSC::ExecState* scriptState = mainWorldExecState(&frame);
     notifyContextCreated(frameId, scriptState, nullptr, true);
-}
-
-void PageRuntimeAgent::didCreateIsolatedContext(Frame* frame, JSC::ExecState* scriptState, SecurityOrigin* origin)
-{
-    if (!enabled())
-        return;
-
-    ASSERT(m_frontendDispatcher);
-    String frameId = m_pageAgent->frameId(frame);
-    notifyContextCreated(frameId, scriptState, origin, false);
 }
 
 JSC::VM& PageRuntimeAgent::globalVM()
@@ -128,19 +116,19 @@ JSC::VM& PageRuntimeAgent::globalVM()
     return JSDOMWindowBase::commonVM();
 }
 
-InjectedScript PageRuntimeAgent::injectedScriptForEval(ErrorString* errorString, const int* executionContextId)
+InjectedScript PageRuntimeAgent::injectedScriptForEval(ErrorString& errorString, const int* executionContextId)
 {
     if (!executionContextId) {
         JSC::ExecState* scriptState = mainWorldExecState(&m_inspectedPage->mainFrame());
         InjectedScript result = injectedScriptManager()->injectedScriptFor(scriptState);
         if (result.hasNoValue())
-            *errorString = ASCIILiteral("Internal error: main world execution context not found.");
+            errorString = ASCIILiteral("Internal error: main world execution context not found.");
         return result;
     }
 
     InjectedScript injectedScript = injectedScriptManager()->injectedScriptForId(*executionContextId);
     if (injectedScript.hasNoValue())
-        *errorString = ASCIILiteral("Execution context with given id not found.");
+        errorString = ASCIILiteral("Execution context with given id not found.");
     return injectedScript;
 }
 
@@ -187,5 +175,3 @@ void PageRuntimeAgent::notifyContextCreated(const String& frameId, JSC::ExecStat
 }
 
 } // namespace WebCore
-
-#endif // ENABLE(INSPECTOR)

@@ -36,7 +36,7 @@ namespace WebCore {
 
 class RenderMathMLFraction final : public RenderMathMLBlock {
 public:
-    RenderMathMLFraction(MathMLInlineContainerElement&, PassRef<RenderStyle>);
+    RenderMathMLFraction(MathMLInlineContainerElement&, Ref<RenderStyle>&&);
 
     MathMLInlineContainerElement& element() { return static_cast<MathMLInlineContainerElement&>(nodeForNonAnonymous()); }
     float lineThickness() const { return m_lineThickness; }
@@ -58,9 +58,9 @@ private:
     LayoutUnit m_lineThickness;
 };
 
-RENDER_OBJECT_TYPE_CASTS(RenderMathMLFraction, isRenderMathMLFraction())
+} // namespace WebCore
 
-}
+SPECIALIZE_TYPE_TRAITS_RENDER_OBJECT(RenderMathMLFraction, isRenderMathMLFraction())
 
 #endif // ENABLE(MATHML)
 

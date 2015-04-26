@@ -40,7 +40,7 @@ WebInspector.ContentView = function(representedObject)
             return new WebInspector.ScriptContentView(representedObject);
 
         if (representedObject instanceof WebInspector.TimelineRecording)
-            return new WebInspector.TimelineContentView(representedObject);
+            return new WebInspector.TimelineRecordingContentView(representedObject);
 
         if (representedObject instanceof WebInspector.DOMStorageObject)
             return new WebInspector.DOMStorageContentView(representedObject);
@@ -68,9 +68,6 @@ WebInspector.ContentView = function(representedObject)
 
         if (representedObject instanceof WebInspector.LogObject)
             return new WebInspector.LogContentView(representedObject);
-
-        if (representedObject instanceof WebInspector.LegacyJavaScriptProfileObject)
-            return new WebInspector.LegacyJavaScriptProfileView(representedObject);
 
         if (representedObject instanceof WebInspector.ContentFlow)
             return new WebInspector.ContentFlowDOMTreeContentView(representedObject);
@@ -126,8 +123,6 @@ WebInspector.ContentView.isViewable = function(representedObject)
     if (representedObject instanceof WebInspector.DOMTree)
         return true;
     if (representedObject instanceof WebInspector.LogObject)
-        return true;
-    if (representedObject instanceof WebInspector.LegacyJavaScriptProfileObject)
         return true;
     if (representedObject instanceof WebInspector.ContentFlow)
         return true;

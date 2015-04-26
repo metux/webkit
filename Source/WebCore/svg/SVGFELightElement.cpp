@@ -26,7 +26,6 @@
 #include "ElementIterator.h"
 #include "RenderObject.h"
 #include "RenderSVGResource.h"
-#include "SVGElementInstance.h"
 #include "SVGFEDiffuseLightingElement.h"
 #include "SVGFESpecularLightingElement.h"
 #include "SVGFilterElement.h"
@@ -71,7 +70,7 @@ SVGFELightElement::SVGFELightElement(const QualifiedName& tagName, Document& doc
 SVGFELightElement* SVGFELightElement::findLightElement(const SVGElement* svgElement)
 {
     for (auto& child : childrenOfType<SVGElement>(*svgElement)) {
-        if (isSVGFEDistantLightElement(child) || isSVGFEPointLightElement(child) || isSVGFESpotLightElement(child))
+        if (is<SVGFEDistantLightElement>(child) || is<SVGFEPointLightElement>(child) || is<SVGFESpotLightElement>(child))
             return static_cast<SVGFELightElement*>(const_cast<SVGElement*>(&child));
     }
     return nullptr;
@@ -170,7 +169,7 @@ void SVGFELightElement::svgAttributeChanged(const QualifiedName& attrName)
         return;
     }
 
-    SVGElementInstance::InvalidationGuard invalidationGuard(this);
+    InstanceInvalidationGuard guard(*this);
     
     if (attrName == SVGNames::azimuthAttr
         || attrName == SVGNames::elevationAttr

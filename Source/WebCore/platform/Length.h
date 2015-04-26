@@ -52,7 +52,7 @@ public:
     Length(float value, LengthType, bool hasQuirk = false);
     Length(double value, LengthType, bool hasQuirk = false);
 
-    WEBCORE_EXPORT explicit Length(PassRef<CalculationValue>);
+    WEBCORE_EXPORT explicit Length(Ref<CalculationValue>&&);
 
     Length(const Length&);
     Length(Length&&);
@@ -179,6 +179,9 @@ inline Length::Length(Length&& other)
 
 inline Length& Length::operator=(const Length& other)
 {
+    if (this == &other)
+        return *this;
+
     if (other.isCalculated())
         other.ref();
     if (isCalculated())

@@ -34,7 +34,6 @@
 #include <wtf/FastMalloc.h>
 #include <wtf/HashMap.h>
 #include <wtf/Noncopyable.h>
-#include <wtf/OwnPtr.h>
 #include <wtf/Vector.h>
 #include <wtf/text/CString.h>
 
@@ -71,6 +70,11 @@ public:
     {
         m_parent = parent;
         m_heapName = heapName;
+    }
+    
+    void changeParent(AbstractHeap* parent)
+    {
+        m_parent = parent;
     }
 
     AbstractHeap* parent() const
@@ -178,7 +182,7 @@ private:
     };
     typedef HashMap<ptrdiff_t, std::unique_ptr<AbstractField>, WTF::IntHash<ptrdiff_t>, WithoutZeroOrOneHashTraits> MapType;
     
-    OwnPtr<MapType> m_largeIndices;
+    std::unique_ptr<MapType> m_largeIndices;
     Vector<CString, 16> m_largeIndexNames;
 };
 

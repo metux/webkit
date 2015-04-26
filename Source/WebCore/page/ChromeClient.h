@@ -24,12 +24,15 @@
 
 #include "AXObjectCache.h"
 #include "Cursor.h"
+#include "DatabaseDetails.h"
 #include "DisplayRefreshMonitor.h"
 #include "FocusDirection.h"
 #include "FrameLoader.h"
 #include "GraphicsContext.h"
+#include "HTMLMediaElement.h"
 #include "HostWindow.h"
 #include "LayerFlushThrottleState.h"
+#include "PageThrottler.h"
 #include "PopupMenu.h"
 #include "PopupMenuClient.h"
 #include "RenderEmbeddedObject.h"
@@ -39,7 +42,6 @@
 #include "WebCoreKeyboardUIMode.h"
 #include <runtime/ConsoleTypes.h>
 #include <wtf/Forward.h>
-#include <wtf/PassOwnPtr.h>
 #include <wtf/Vector.h>
 
 #if PLATFORM(IOS)
@@ -50,10 +52,6 @@ class WAKResponder;
 #else
 @class WAKResponder;
 #endif
-#endif
-
-#if ENABLE(SQL_DATABASE)
-#include "DatabaseDetails.h"
 #endif
 
 OBJC_CLASS NSResponder;
@@ -75,6 +73,7 @@ class GraphicsContext3D;
 class GraphicsLayer;
 class GraphicsLayerFactory;
 class HTMLInputElement;
+class HTMLVideoElement;
 class HitTestResult;
 class IntRect;
 class NavigationAction;
@@ -91,7 +90,7 @@ struct GraphicsDeviceAdapter;
 struct ViewportArguments;
 struct WindowFeatures;
 
-class ChromeClient {
+class WEBCORE_EXPORT ChromeClient {
 public:
     virtual void chromeDestroyed() = 0;
 
@@ -202,9 +201,7 @@ public:
 
     virtual void pageExtendedBackgroundColorDidChange(Color) const { }
 
-#if ENABLE(SQL_DATABASE)
     virtual void exceededDatabaseQuota(Frame*, const String& databaseName, DatabaseDetails) = 0;
-#endif
 
     // Callback invoked when the application cache fails to save a cache object
     // because storing it would grow the database file past its defined maximum
@@ -226,8 +223,6 @@ public:
 #if ENABLE(DASHBOARD_SUPPORT)
     virtual void annotatedRegionsChanged();
 #endif
-
-    virtual void populateVisitedLinks();
 
     virtual bool shouldReplaceWithGeneratedFileForUpload(const String& path, String& generatedFilename);
     virtual String generateReplacementFile(const String& path);
@@ -274,7 +269,7 @@ public:
 #endif
 
 #if ENABLE(INPUT_TYPE_COLOR)
-    virtual PassOwnPtr<ColorChooser> createColorChooser(ColorChooserClient*, const Color&) = 0;
+    virtual std::unique_ptr<ColorChooser> createColorChooser(ColorChooserClient*, const Color&) = 0;
 #endif
 
 #if ENABLE(DATE_AND_TIME_INPUT_TYPES) && !PLATFORM(IOS)
@@ -300,6 +295,7 @@ public:
 
     // Pass 0 as the GraphicsLayer to detatch the root layer.
     virtual void attachRootGraphicsLayer(Frame*, GraphicsLayer*) = 0;
+    virtual void attachViewOverlayGraphicsLayer(Frame*, GraphicsLayer*) = 0;
     // Sets a flag to specify that the next time content is drawn to the window,
     // the changes appear on the screen in synchrony with updates to GraphicsLayers.
     virtual void setNeedsOneShotDrawingSynchronization() = 0;
@@ -309,8 +305,6 @@ public:
     // Returns whether or not the client can render the composited layer,
     // regardless of the settings.
     virtual bool allowsAcceleratedCompositing() const { return true; }
-    // Supply a layer that will added as an overlay over other document layers (scrolling with the document).
-    virtual GraphicsLayer* documentOverlayLayerForFrame(Frame&) { return nullptr; }
 
     enum CompositingTrigger {
         ThreeDTransformTrigger = 1 << 0,
@@ -340,7 +334,9 @@ public:
 #endif
 
     virtual bool supportsVideoFullscreen() { return false; }
-    virtual void enterVideoFullscreenForVideoElement(HTMLVideoElement*) { }
+#if ENABLE(VIDEO)
+    virtual void enterVideoFullscreenForVideoElement(HTMLVideoElement*, HTMLMediaElement::VideoFullscreenMode) { }
+#endif
     virtual void exitVideoFullscreen() { }
     virtual bool requiresFullscreenForVideoPlayback() { return false; } 
 
@@ -414,8 +410,6 @@ public:
     virtual void didRecognizeLongMousePress() { }
     virtual void didCancelTrackingPotentialLongMousePress() { }
 
-    virtual void logDiagnosticMessage(const String& message, const String& description, const String& status) { UNUSED_PARAM(message); UNUSED_PARAM(description); UNUSED_PARAM(status); }
-
     virtual FloatSize minimumWindowSize() const { return FloatSize(100, 100); };
 
     virtual bool isEmptyChromeClient() const { return false; }
@@ -433,10 +427,23 @@ public:
 
     virtual bool shouldUseTiledBackingForFrameView(const FrameView*) const { return false; }
 
+    virtual void isPlayingAudioDidChange(bool) { }
+    virtual void setPageActivityState(PageActivityState::Flags) { }
+
 #if ENABLE(SUBTLE_CRYPTO)
     virtual bool wrapCryptoKey(const Vector<uint8_t>&, Vector<uint8_t>&) const { return false; }
     virtual bool unwrapCryptoKey(const Vector<uint8_t>&, Vector<uint8_t>&) const { return false; }
 #endif
+
+#if ENABLE(TELEPHONE_NUMBER_DETECTION) && PLATFORM(MAC)
+    virtual void handleTelephoneNumberClick(const String&, const WebCore::IntPoint&) { }
+#endif
+#if ENABLE(SERVICE_CONTROLS)
+    virtual void handleSelectionServiceClick(WebCore::FrameSelection&, const Vector<String>&, const WebCore::IntPoint&) { }
+    virtual bool hasRelevantSelectionServices(bool /* isTextOnly */) const { return false; }
+#endif
+
+    virtual bool shouldDispatchFakeMouseMoveEvents() const { return true; }
 
 protected:
     virtual ~ChromeClient() { }

@@ -32,12 +32,8 @@ WebInspector.TimelineRecording = function(identifier, displayName)
     this._displayName = displayName;
     this._isWritable = true;
 
-    for (var key of Object.keys(WebInspector.TimelineRecord.Type)) {
-        var type = WebInspector.TimelineRecord.Type[key];
-        var timeline = new WebInspector.Timeline(type);
-        this._timelines.set(type, timeline);
-        timeline.addEventListener(WebInspector.Timeline.Event.TimesUpdated, this._timelineTimesUpdated, this);
-    }
+    // For legacy backends, we compute the elapsed time of records relative to this timestamp.
+    this._legacyFirstRecordedTimestamp = NaN;
 
     this.reset(true);
 };
@@ -46,8 +42,12 @@ WebInspector.TimelineRecording.Event = {
     Reset: "timeline-recording-reset",
     Unloaded: "timeline-recording-unloaded",
     SourceCodeTimelineAdded: "timeline-recording-source-code-timeline-added",
+    TimelineAdded: "timeline-recording-timeline-added",
+    TimelineRemoved: "timeline-recording-timeline-removed",
     TimesUpdated: "timeline-recording-times-updated"
 };
+
+WebInspector.TimelineRecording.TimestampThresholdForLegacyRecordConversion = 28800000; // Date.parse("Jan 1, 1970")
 
 WebInspector.TimelineRecording.prototype = {
     constructor: WebInspector.TimelineRecording,
@@ -133,7 +133,30 @@ WebInspector.TimelineRecording.prototype = {
         var timelines = this._sourceCodeTimelinesMap.get(sourceCode);
         if (!timelines)
             return [];
-        return timelines.values();
+        return [...timelines.values()];
+    },
+
+    addTimeline: function(timeline)
+    {
+        console.assert(timeline instanceof WebInspector.Timeline, timeline);
+        console.assert(!this._timelines.has(timeline), this._timelines, timeline);
+
+        this._timelines.set(timeline.type, timeline);
+
+        timeline.addEventListener(WebInspector.Timeline.Event.TimesUpdated, this._timelineTimesUpdated, this);
+        this.dispatchEventToListeners(WebInspector.TimelineRecording.Event.TimelineAdded, {timeline: timeline});
+    },
+
+    removeTimeline: function(timeline)
+    {
+        console.assert(timeline instanceof WebInspector.Timeline, timeline);
+        console.assert(this._timelines.has(timeline.type), this._timelines, timeline);
+        console.assert(this._timelines.get(timeline.type) === timeline, this._timelines, timeline);
+
+        this._timelines.delete(timeline.type);
+
+        timeline.removeEventListener(WebInspector.Timeline.Event.TimesUpdated, this._timelineTimesUpdated, this);
+        this.dispatchEventToListeners(WebInspector.TimelineRecording.Event.TimelineRemoved, {timeline: timeline});
     },
 
     addEventMarker: function(eventMarker)
@@ -143,6 +166,11 @@ WebInspector.TimelineRecording.prototype = {
 
     addRecord: function(record)
     {
+        var hasCorrespondingTimeline = this._timelines.has(record.type);
+        console.assert(hasCorrespondingTimeline, record, this._timelines);
+        if (!hasCorrespondingTimeline)
+            return;
+
         // Add the record to the global timeline by type.
         this._timelines.get(record.type).addRecord(record);
 
@@ -173,6 +201,24 @@ WebInspector.TimelineRecording.prototype = {
 
         if (newTimeline)
             this.dispatchEventToListeners(WebInspector.TimelineRecording.Event.SourceCodeTimelineAdded, {sourceCodeTimeline: sourceCodeTimeline});
+    },
+
+    computeElapsedTime: function(timestamp)
+    {
+        if (!timestamp || isNaN(timestamp))
+            return NaN;
+
+        // COMPATIBILITY (iOS8): old backends send timestamps (milliseconds since the epoch), rather
+        // than seconds elapsed since timeline capturing started. We approximate the latter by
+        // subtracting the start timestamp, as old versions did not use monotonic times.
+        if (isNaN(this._legacyFirstRecordedTimestamp))
+            this._legacyFirstRecordedTimestamp = timestamp;
+
+        // If the record's start time sems unreasonably large, treat it as a legacy timestamp.
+        if (timestamp > WebInspector.TimelineRecording.TimestampThresholdForLegacyRecordConversion)
+            return (timestamp - this._legacyFirstRecordedTimestamp) / 1000.0;
+
+        return timestamp;
     },
 
     // Private

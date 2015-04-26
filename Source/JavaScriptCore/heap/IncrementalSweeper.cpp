@@ -26,7 +26,6 @@
 #include "config.h"
 #include "IncrementalSweeper.h"
 
-#include "DelayedReleaseScope.h"
 #include "Heap.h"
 #include "JSObject.h"
 #include "JSString.h"
@@ -51,11 +50,6 @@ IncrementalSweeper::IncrementalSweeper(Heap* heap, CFRunLoopRef runLoop)
 {
 }
 
-PassOwnPtr<IncrementalSweeper> IncrementalSweeper::create(Heap* heap)
-{
-    return adoptPtr(new IncrementalSweeper(heap, CFRunLoopGetCurrent()));
-}
-
 void IncrementalSweeper::scheduleTimer()
 {
     CFRunLoopTimerSetNextFireDate(m_timer.get(), CFAbsoluteTimeGetCurrent() + (sweepTimeSlice * sweepTimeMultiplier));
@@ -73,7 +67,6 @@ void IncrementalSweeper::doWork()
 
 void IncrementalSweeper::doSweep(double sweepBeginTime)
 {
-    DelayedReleaseScope scope(m_vm->heap.m_objectSpace);
     while (m_currentBlockToSweepIndex < m_blocksToSweep.size()) {
         sweepNextBlock();
 
@@ -97,6 +90,7 @@ void IncrementalSweeper::sweepNextBlock()
         if (!block->needsSweeping())
             continue;
 
+        DeferGCForAWhile deferGC(m_vm->heap);
         block->sweep();
         m_vm->heap.objectSpace().freeOrShrinkBlock(block);
         return;
@@ -127,11 +121,6 @@ IncrementalSweeper::IncrementalSweeper(VM* vm)
 
 void IncrementalSweeper::doWork()
 {
-}
-
-PassOwnPtr<IncrementalSweeper> IncrementalSweeper::create(Heap* heap)
-{
-    return adoptPtr(new IncrementalSweeper(heap->vm()));
 }
 
 void IncrementalSweeper::startSweeping(Vector<MarkedBlock*>&)

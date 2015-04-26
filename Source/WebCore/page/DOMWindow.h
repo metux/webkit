@@ -99,7 +99,7 @@ namespace WebCore {
         , public FrameDestructionObserver
         , public Supplementable<DOMWindow> {
     public:
-        static PassRefPtr<DOMWindow> create(Document* document) { return adoptRef(new DOMWindow(document)); }
+        static Ref<DOMWindow> create(Document* document) { return adoptRef(*new DOMWindow(document)); }
         virtual ~DOMWindow();
 
         // In some rare cases, we'll re-used a DOMWindow for a new Document. For example,
@@ -269,9 +269,7 @@ namespace WebCore {
         void cancelAnimationFrame(int id);
 #endif
 
-#if ENABLE(CSS3_CONDITIONAL_RULES)
         DOMWindowCSS* css();
-#endif
 
         // Events
         // EventTarget API
@@ -362,6 +360,9 @@ namespace WebCore {
         DEFINE_MAPPED_ATTRIBUTE_EVENT_LISTENER(webkitanimationstart, webkitAnimationStart);
         DEFINE_MAPPED_ATTRIBUTE_EVENT_LISTENER(webkitanimationiteration, webkitAnimationIteration);
         DEFINE_MAPPED_ATTRIBUTE_EVENT_LISTENER(webkitanimationend, webkitAnimationEnd);
+        DEFINE_MAPPED_ATTRIBUTE_EVENT_LISTENER(animationstart, animationstart);
+        DEFINE_MAPPED_ATTRIBUTE_EVENT_LISTENER(animationiteration, animationiteration);
+        DEFINE_MAPPED_ATTRIBUTE_EVENT_LISTENER(animationend, animationend);
         DEFINE_MAPPED_ATTRIBUTE_EVENT_LISTENER(webkittransitionend, webkitTransitionEnd);
         DEFINE_MAPPED_ATTRIBUTE_EVENT_LISTENER(transitionend, transitionend);
 
@@ -518,9 +519,7 @@ namespace WebCore {
         mutable RefPtr<Performance> m_performance;
 #endif
 
-#if ENABLE(CSS3_CONDITIONAL_RULES)
         mutable RefPtr<DOMWindowCSS> m_css;
-#endif
 
 #if ENABLE(USER_MESSAGE_HANDLERS)
         mutable RefPtr<WebKitNamespace> m_webkitNamespace;

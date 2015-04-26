@@ -35,7 +35,7 @@ namespace WebCore {
     
 class RenderMathMLSpace final : public RenderMathMLBlock {
 public:
-    RenderMathMLSpace(MathMLTextElement&, PassRef<RenderStyle>);
+    RenderMathMLSpace(MathMLTextElement&, Ref<RenderStyle>&&);
     MathMLTextElement& element() { return static_cast<MathMLTextElement&>(nodeForNonAnonymous()); }
 
 private:
@@ -54,9 +54,9 @@ private:
     LayoutUnit m_depth;
 };
 
-RENDER_OBJECT_TYPE_CASTS(RenderMathMLSpace, isRenderMathMLSpace())
+} // namespace WebCore
 
-}
+SPECIALIZE_TYPE_TRAITS_RENDER_OBJECT(RenderMathMLSpace, isRenderMathMLSpace())
 
 #endif // ENABLE(MATHML)
 #endif // RenderMathMLSpace_h

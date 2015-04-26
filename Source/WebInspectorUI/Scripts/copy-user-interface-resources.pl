@@ -2,7 +2,7 @@
 
 use English;
 use File::Copy qw(copy);
-use File::Path qw(make_path);
+use File::Path qw(make_path remove_tree);
 use File::Spec;
 
 my $useDirCopy = 0;
@@ -100,15 +100,23 @@ my $targetResourcePath = File::Spec->catdir($ENV{'TARGET_BUILD_DIR'}, $ENV{'UNLO
 my $protocolDir = File::Spec->catdir($targetResourcePath, 'Protocol');
 my $codeMirrorPath = File::Spec->catdir($uiRoot, 'External', 'CodeMirror');
 my $esprimaPath = File::Spec->catdir($uiRoot, 'External', 'Esprima');
+my $eslintPath = File::Spec->catdir($uiRoot, 'External', 'ESLint');
 
 my $codeMirrorLicense = readLicenseFile(File::Spec->catfile($codeMirrorPath, 'LICENSE'));
-my $esprimaMirrorLicense = readLicenseFile(File::Spec->catfile($esprimaPath, 'LICENSE'));
+my $esprimaLicense = readLicenseFile(File::Spec->catfile($esprimaPath, 'LICENSE'));
+my $eslintLicense = readLicenseFile(File::Spec->catfile($eslintPath, 'LICENSE'));
 
 make_path($protocolDir, $targetResourcePath);
 
 # Copy over dynamically loaded files from other frameworks, even if we aren't combining resources.
-copy(File::Spec->catfile($ENV{'JAVASCRIPTCORE_PRIVATE_HEADERS_DIR'}, 'InspectorJSBackendCommands.js'), File::Spec->catfile($protocolDir, 'InspectorJSBackendCommands.js')) or die "Copy of InspectorJSBackendCommands.js failed: $!";
-copy(File::Spec->catfile($ENV{'WEBCORE_PRIVATE_HEADERS_DIR'}, 'InspectorWebBackendCommands.js'), File::Spec->catfile($protocolDir, 'InspectorWebBackendCommands.js')) or die "Copy of InspectorWebBackendCommands.js failed: $!";
+copy(File::Spec->catfile($ENV{'JAVASCRIPTCORE_PRIVATE_HEADERS_DIR'}, 'InspectorBackendCommands.js'), File::Spec->catfile($protocolDir, 'InspectorBackendCommands.js')) or die "Copy of InspectorBackendCommands.js failed: $!";
+
+if (defined $ENV{'FORCE_TOOL_INSTALL'} && ($ENV{'FORCE_TOOL_INSTALL'} eq 'YES')) {
+    # Copy all files over individually to ensure we have Test.html / Test.js and files included from Test.html.
+    # We may then proceed to include combined & optimized resources which will output mostly to different paths
+    # but overwrite Main.html / Main.js with optimized versions.
+    ditto($uiRoot, $targetResourcePath);
+}
 
 if (defined $ENV{'COMBINE_INSPECTOR_RESOURCES'} && ($ENV{'COMBINE_INSPECTOR_RESOURCES'} eq 'YES')) {
     my $combineResourcesCmd = File::Spec->catfile($scriptsRoot, 'combine-resources.pl');
@@ -122,6 +130,9 @@ if (defined $ENV{'COMBINE_INSPECTOR_RESOURCES'} && ($ENV{'COMBINE_INSPECTOR_RESO
 
     # Combine the Esprima JavaScript files in Production builds into a single file (Esprima.js).
     system($combineResourcesCmd, '--input-dir', 'External/Esprima', '--input-html', $derivedSourcesMainHTML, '--input-html-dir', $uiRoot, '--derived-sources-dir', $derivedSourcesDir, '--output-dir', $derivedSourcesDir, '--output-script-name', 'Esprima.js');
+
+    # Combine the ESLint JavaScript files in Production builds into a single file (ESLint.js).
+    system($combineResourcesCmd, '--input-dir', 'External/ESLint', '--input-html', $derivedSourcesMainHTML, '--input-html-dir', $uiRoot, '--derived-sources-dir', $derivedSourcesDir, '--output-dir', $derivedSourcesDir, '--output-script-name', 'ESLint.js');
 
     # Remove console.assert calls from the Main.js file.
     my $derivedSourcesMainJS = File::Spec->catfile($derivedSourcesDir, 'Main.js');
@@ -155,7 +166,11 @@ if (defined $ENV{'COMBINE_INSPECTOR_RESOURCES'} && ($ENV{'COMBINE_INSPECTOR_RESO
 
     # Export the license into Esprima.js.
     my $targetEsprimaJS = File::Spec->catfile($targetResourcePath, 'Esprima.js');
-    seedFile($targetEsprimaJS, $esprimaMirrorLicense);
+    seedFile($targetEsprimaJS, $esprimaLicense);
+
+    # Export the license into ESLint.js.
+    my $targetESLintJS = File::Spec->catfile($targetResourcePath, 'ESLint.js');
+    seedFile($targetESLintJS, $eslintLicense);
 
     # Minify the Main.js and Main.css files, with Main.js appending to the license that was exported above.
     my $jsMinScript = File::Spec->catfile($scriptsRoot, 'jsmin.py');
@@ -173,10 +188,20 @@ if (defined $ENV{'COMBINE_INSPECTOR_RESOURCES'} && ($ENV{'COMBINE_INSPECTOR_RESO
     my $derivedSouressEsprimaJS = File::Spec->catfile($derivedSourcesDir, 'Esprima.js');
     system(qq("$python" "$jsMinScript" < "$derivedSouressEsprimaJS" >> "$targetEsprimaJS")) and die "Failed to minify $derivedSouressEsprimaJS: $!";
 
+    # Minify the ESLint.js file, appending to the license that was exported above.
+    my $derivedSouressESLintJS = File::Spec->catfile($derivedSourcesDir, 'ESLint.js');
+    system(qq("$python" "$jsMinScript" < "$derivedSouressESLintJS" >> "$targetESLintJS")) and die "Failed to minify $derivedSouressESLintJS: $!";
+
     # Copy over Main.html and the Images directory.
     copy($derivedSourcesMainHTML, File::Spec->catfile($targetResourcePath, 'Main.html'));
 
     ditto(File::Spec->catdir($uiRoot, 'Images'), File::Spec->catdir($targetResourcePath, 'Images'));
+
+    # Remove Images/Legacy on modern systems (OS X 10.10 Yosemite and greater or Windows).
+    remove_tree(File::Spec->catdir($targetResourcePath, 'Images', 'Legacy')) if (defined $ENV{'MAC_OS_X_VERSION_MAJOR'} && $ENV{'MAC_OS_X_VERSION_MAJOR'} ge 101000) or defined $ENV{'OFFICIAL_BUILD'};
+
+    # Remove Images/gtk on Mac and Windows builds.
+    remove_tree(File::Spec->catdir($targetResourcePath, 'Images', 'gtk')) if defined $ENV{'MAC_OS_X_VERSION_MAJOR'} or defined $ENV{'OFFICIAL_BUILD'};
 
     # Copy the Legacy directory.
     ditto(File::Spec->catfile($uiRoot, 'Protocol', 'Legacy'), File::Spec->catfile($protocolDir, 'Legacy'));

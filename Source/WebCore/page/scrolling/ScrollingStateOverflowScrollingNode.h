@@ -36,7 +36,7 @@ class ScrollingStateOverflowScrollingNode : public ScrollingStateScrollingNode {
 public:
     static PassRefPtr<ScrollingStateOverflowScrollingNode> create(ScrollingStateTree&, ScrollingNodeID);
 
-    virtual PassRefPtr<ScrollingStateNode> clone(ScrollingStateTree&);
+    virtual PassRefPtr<ScrollingStateNode> clone(ScrollingStateTree&) override;
 
     virtual ~ScrollingStateOverflowScrollingNode();
 
@@ -57,9 +57,9 @@ private:
     LayerRepresentation m_scrolledContentsLayer;    
 };
 
-SCROLLING_STATE_NODE_TYPE_CASTS(ScrollingStateOverflowScrollingNode, isOverflowScrollingNode());
-
 } // namespace WebCore
+
+SPECIALIZE_TYPE_TRAITS_SCROLLING_STATE_NODE(ScrollingStateOverflowScrollingNode, isOverflowScrollingNode())
 
 #endif // ENABLE(ASYNC_SCROLLING) || USE(COORDINATED_GRAPHICS)
 

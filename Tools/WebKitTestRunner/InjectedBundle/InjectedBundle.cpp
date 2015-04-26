@@ -41,7 +41,7 @@
 
 namespace WTR {
 
-InjectedBundle& InjectedBundle::shared()
+InjectedBundle& InjectedBundle::singleton()
 {
     static InjectedBundle& shared = *new InjectedBundle;
     return shared;
@@ -109,13 +109,9 @@ void InjectedBundle::didCreatePage(WKBundlePageRef page)
 
 void InjectedBundle::willDestroyPage(WKBundlePageRef page)
 {
-    size_t size = m_pages.size();
-    for (size_t i = 0; i < size; ++i) {
-        if (m_pages[i]->page() == page) {
-            m_pages.remove(i);
-            break;
-        }
-    }
+    m_pages.removeFirstMatching([page] (const std::unique_ptr<InjectedBundlePage>& current) {
+        return current->page() == page;
+    });
 }
 
 void InjectedBundle::didInitializePageGroup(WKBundlePageGroupRef pageGroup)
@@ -243,7 +239,6 @@ void InjectedBundle::beginTesting(WKDictionaryRef settings)
     m_textInputController = TextInputController::create();
     m_accessibilityController = AccessibilityController::create();
 
-    WKBundleRemoveAllVisitedLinks(m_bundle);
     WKBundleSetAllowUniversalAccessFromFileURLs(m_bundle, m_pageGroup, true);
     WKBundleSetJavaScriptCanAccessClipboard(m_bundle, m_pageGroup, true);
     WKBundleSetPrivateBrowsingEnabled(m_bundle, m_pageGroup, false);
@@ -254,9 +249,8 @@ void InjectedBundle::beginTesting(WKDictionaryRef settings)
     WKBundleSetAllowFileAccessFromFileURLs(m_bundle, m_pageGroup, true);
     WKBundleSetPluginsEnabled(m_bundle, m_pageGroup, true);
     WKBundleSetPopupBlockingEnabled(m_bundle, m_pageGroup, false);
-    WKBundleSetAlwaysAcceptCookies(m_bundle, false);
+    WKBundleSetAlwaysAcceptCookies(m_bundle, false); // FIXME: Do this from UI process, so that Networking process gets the preference, too.
     WKBundleSetSerialLoadingEnabled(m_bundle, false);
-    WKBundleSetCacheModel(m_bundle, 1 /*CacheModelDocumentBrowser*/);
 
     WKBundleRemoveAllUserContent(m_bundle, m_pageGroup);
 
@@ -267,7 +261,8 @@ void InjectedBundle::beginTesting(WKDictionaryRef settings)
     m_testRunner->setAcceptsEditing(true);
     m_testRunner->setTabKeyCyclesThroughElements(true);
 
-    m_testRunner->setCustomTimeout(m_timeout);
+    if (m_timeout > 0)
+        m_testRunner->setCustomTimeout(m_timeout);
 
     page()->prepare();
 
@@ -288,6 +283,8 @@ void InjectedBundle::done()
 
     page()->stopLoading();
     setTopLoadingFrame(0);
+
+    m_testRunner->invalidateWaitToDumpWatchdogTimer();
 
     m_accessibilityController->resetToConsistentState();
 
@@ -458,6 +455,13 @@ void InjectedBundle::setMockGeolocationPositionUnavailableError(WKStringRef erro
     WKBundlePostMessage(m_bundle, messageName.get(), errorMessage);
 }
 
+void InjectedBundle::setUserMediaPermission(bool enabled)
+{
+    auto messageName = adoptWK(WKStringCreateWithUTF8CString("SetUserMediaPermission"));
+    auto messageBody = adoptWK(WKBooleanCreate(enabled));
+    WKBundlePostMessage(m_bundle, messageName.get(), messageBody.get());
+}
+
 void InjectedBundle::setCustomPolicyDelegate(bool enabled, bool permissive)
 {
     WKRetainPtr<WKStringRef> messageName(AdoptWK, WKStringCreateWithUTF8CString("SetCustomPolicyDelegate"));
@@ -484,6 +488,13 @@ void InjectedBundle::setHidden(bool hidden)
     WKRetainPtr<WKBooleanRef> isInitialWK(AdoptWK, WKBooleanCreate(hidden));
     WKDictionarySetItem(messageBody.get(), isInitialKeyWK.get(), isInitialWK.get());
 
+    WKBundlePostMessage(m_bundle, messageName.get(), messageBody.get());
+}
+
+void InjectedBundle::setCacheModel(int model)
+{
+    WKRetainPtr<WKStringRef> messageName(AdoptWK, WKStringCreateWithUTF8CString("SetCacheModel"));
+    WKRetainPtr<WKUInt64Ref> messageBody(AdoptWK, WKUInt64Create(model));
     WKBundlePostMessage(m_bundle, messageName.get(), messageBody.get());
 }
 

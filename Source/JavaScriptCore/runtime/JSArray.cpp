@@ -1,6 +1,6 @@
 /*
  *  Copyright (C) 1999-2000 Harri Porten (porten@kde.org)
- *  Copyright (C) 2003, 2007, 2008, 2009, 2012, 2013 Apple Inc. All rights reserved.
+ *  Copyright (C) 2003, 2007, 2008, 2009, 2012, 2013, 2015 Apple Inc. All rights reserved.
  *  Copyright (C) 2003 Peter Kelly (pmk@post.com)
  *  Copyright (C) 2006 Alexey Proskuryakov (ap@nypop.com)
  *
@@ -36,7 +36,6 @@
 #include "Reject.h"
 #include <wtf/AVLTree.h>
 #include <wtf/Assertions.h>
-#include <wtf/OwnPtr.h>
 
 using namespace std;
 using namespace WTF;
@@ -676,7 +675,7 @@ bool JSArray::shiftCountWithArrayStorage(VM& vm, unsigned startIndex, unsigned c
     // If the array contains holes or is otherwise in an abnormal state,
     // use the generic algorithm in ArrayPrototype.
     if ((storage->hasHoles() && this->structure(vm)->holesMustForwardToPrototype(vm)) 
-        || inSparseIndexingMode() 
+        || hasSparseMap() 
         || shouldUseSlowPut(indexingType())) {
         return false;
     }
@@ -1092,15 +1091,16 @@ void JSArray::sortNumeric(ExecState* exec, JSValue compareFunction, CallType cal
 
     switch (indexingType()) {
     case ArrayClass:
+    case ArrayWithUndecided:
         return;
         
     case ArrayWithInt32:
         sortNumericVector<ArrayWithInt32>(exec, compareFunction, callType, callData);
-        break;
+        return;
         
     case ArrayWithDouble:
         sortNumericVector<ArrayWithDouble>(exec, compareFunction, callType, callData);
-        break;
+        return;
         
     case ArrayWithContiguous:
         sortNumericVector<ArrayWithContiguous>(exec, compareFunction, callType, callData);
@@ -1111,7 +1111,8 @@ void JSArray::sortNumeric(ExecState* exec, JSValue compareFunction, CallType cal
         return;
         
     default:
-        CRASH();
+        dataLog("Indexing type: ", indexingType(), "\n");
+        RELEASE_ASSERT_NOT_REACHED();
         return;
     }
 }
@@ -1307,7 +1308,7 @@ struct AVLTreeAbstractorForArrayCompare {
     JSValue m_compareFunction;
     CallType m_compareCallType;
     const CallData* m_compareCallData;
-    OwnPtr<CachedCall> m_cachedCall;
+    std::unique_ptr<CachedCall> m_cachedCall;
 
     handle get_less(handle h) { return m_nodes[h].lt & 0x7FFFFFFF; }
     void set_less(handle h, handle lh) { m_nodes[h].lt &= 0x80000000; m_nodes[h].lt |= lh; }
@@ -1390,10 +1391,10 @@ void JSArray::sortVector(ExecState* exec, JSValue compareFunction, CallType call
     tree.abstractor().m_compareCallType = callType;
     tree.abstractor().m_compareCallData = &callData;
     tree.abstractor().m_nodes.grow(nodeCount);
-        
+
     if (callType == CallTypeJS)
-        tree.abstractor().m_cachedCall = adoptPtr(new CachedCall(exec, jsCast<JSFunction*>(compareFunction), 2));
-        
+        tree.abstractor().m_cachedCall = std::make_unique<CachedCall>(exec, jsCast<JSFunction*>(compareFunction), 2);
+
     if (!tree.abstractor().m_nodes.begin()) {
         throwOutOfMemoryError(exec);
         return;
@@ -1571,12 +1572,12 @@ void JSArray::fillArgList(ExecState* exec, MarkedArgumentBuffer& args)
         args.append(get(exec, i));
 }
 
-void JSArray::copyToArguments(ExecState* exec, CallFrame* callFrame, uint32_t copyLength, int32_t firstVarArgOffset)
+void JSArray::copyToArguments(ExecState* exec, VirtualRegister firstElementDest, unsigned offset, unsigned length)
 {
-    unsigned i = firstVarArgOffset;
+    unsigned i = offset;
     WriteBarrier<Unknown>* vector;
     unsigned vectorEnd;
-    unsigned length = copyLength + firstVarArgOffset;
+    length += offset; // We like to think of the length as being our length, rather than the output length.
     ASSERT(length == this->length());
     switch (indexingType()) {
     case ArrayClass:
@@ -1603,7 +1604,7 @@ void JSArray::copyToArguments(ExecState* exec, CallFrame* callFrame, uint32_t co
             double v = m_butterfly->contiguousDouble()[i];
             if (v != v)
                 break;
-            callFrame->setArgument(i - firstVarArgOffset, JSValue(JSValue::EncodeAsDouble, v));
+            exec->r(firstElementDest + i - offset) = JSValue(JSValue::EncodeAsDouble, v);
         }
         break;
     }
@@ -1628,11 +1629,14 @@ void JSArray::copyToArguments(ExecState* exec, CallFrame* callFrame, uint32_t co
         WriteBarrier<Unknown>& v = vector[i];
         if (!v)
             break;
-        callFrame->setArgument(i - firstVarArgOffset, v.get());
+        exec->r(firstElementDest + i - offset) = v.get();
     }
     
-    for (; i < length; ++i)
-        callFrame->setArgument(i - firstVarArgOffset, get(exec, i));
+    for (; i < length; ++i) {
+        exec->r(firstElementDest + i - offset) = get(exec, i);
+        if (UNLIKELY(exec->vm().exception()))
+            return;
+    }
 }
 
 template<IndexingType arrayIndexingType>

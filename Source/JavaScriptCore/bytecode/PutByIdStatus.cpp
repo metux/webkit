@@ -62,7 +62,7 @@ bool PutByIdStatus::hasExitSite(const ConcurrentJITLocker& locker, CodeBlock* pr
 }
 #endif
 
-PutByIdStatus PutByIdStatus::computeFromLLInt(CodeBlock* profiledBlock, unsigned bytecodeIndex, StringImpl* uid)
+PutByIdStatus PutByIdStatus::computeFromLLInt(CodeBlock* profiledBlock, unsigned bytecodeIndex, AtomicStringImpl* uid)
 {
     UNUSED_PARAM(profiledBlock);
     UNUSED_PARAM(bytecodeIndex);
@@ -75,7 +75,7 @@ PutByIdStatus PutByIdStatus::computeFromLLInt(CodeBlock* profiledBlock, unsigned
     
     if (instruction[0].u.opcode == LLInt::getOpcode(op_put_by_id)
         || instruction[0].u.opcode == LLInt::getOpcode(op_put_by_id_out_of_line)) {
-        PropertyOffset offset = structure->getConcurrently(*profiledBlock->vm(), uid);
+        PropertyOffset offset = structure->getConcurrently(uid);
         if (!isValidOffset(offset))
             return PutByIdStatus(NoInformation);
         
@@ -94,7 +94,7 @@ PutByIdStatus PutByIdStatus::computeFromLLInt(CodeBlock* profiledBlock, unsigned
     ASSERT(newStructure);
     ASSERT(chain);
     
-    PropertyOffset offset = newStructure->getConcurrently(*profiledBlock->vm(), uid);
+    PropertyOffset offset = newStructure->getConcurrently(uid);
     if (!isValidOffset(offset))
         return PutByIdStatus(NoInformation);
     
@@ -105,7 +105,7 @@ PutByIdStatus PutByIdStatus::computeFromLLInt(CodeBlock* profiledBlock, unsigned
     return PutByIdVariant::transition(structure, newStructure, intendedChain.get(), offset);
 }
 
-PutByIdStatus PutByIdStatus::computeFor(CodeBlock* profiledBlock, StubInfoMap& map, unsigned bytecodeIndex, StringImpl* uid)
+PutByIdStatus PutByIdStatus::computeFor(CodeBlock* profiledBlock, StubInfoMap& map, unsigned bytecodeIndex, AtomicStringImpl* uid)
 {
     ConcurrentJITLocker locker(profiledBlock->m_lock);
     
@@ -134,7 +134,7 @@ PutByIdStatus PutByIdStatus::computeFor(CodeBlock* profiledBlock, StubInfoMap& m
 #if ENABLE(JIT)
 PutByIdStatus PutByIdStatus::computeForStubInfo(
     const ConcurrentJITLocker& locker, CodeBlock* profiledBlock, StructureStubInfo* stubInfo,
-    StringImpl* uid, CallLinkStatus::ExitSiteData callExitSiteData)
+    AtomicStringImpl* uid, CallLinkStatus::ExitSiteData callExitSiteData)
 {
     if (!stubInfo || !stubInfo->seen)
         return PutByIdStatus();
@@ -146,8 +146,7 @@ PutByIdStatus PutByIdStatus::computeForStubInfo(
         
     case access_put_by_id_replace: {
         PropertyOffset offset =
-            stubInfo->u.putByIdReplace.baseObjectStructure->getConcurrently(
-                *profiledBlock->vm(), uid);
+            stubInfo->u.putByIdReplace.baseObjectStructure->getConcurrently(uid);
         if (isValidOffset(offset)) {
             return PutByIdVariant::replace(
                 stubInfo->u.putByIdReplace.baseObjectStructure.get(), offset);
@@ -159,8 +158,7 @@ PutByIdStatus PutByIdStatus::computeForStubInfo(
     case access_put_by_id_transition_direct: {
         ASSERT(stubInfo->u.putByIdTransition.previousStructure->transitionWatchpointSetHasBeenInvalidated());
         PropertyOffset offset = 
-            stubInfo->u.putByIdTransition.structure->getConcurrently(
-                *profiledBlock->vm(), uid);
+            stubInfo->u.putByIdTransition.structure->getConcurrently(uid);
         if (isValidOffset(offset)) {
             RefPtr<IntendedStructureChain> chain;
             if (stubInfo->u.putByIdTransition.chain) {
@@ -204,7 +202,7 @@ PutByIdStatus PutByIdStatus::computeForStubInfo(
             switch (access.type()) {
             case PutByIdAccess::Replace: {
                 Structure* structure = access.structure();
-                PropertyOffset offset = structure->getConcurrently(*profiledBlock->vm(), uid);
+                PropertyOffset offset = structure->getConcurrently(uid);
                 if (!isValidOffset(offset))
                     return PutByIdStatus(slowPathState);
                 variant = PutByIdVariant::replace(structure, offset);
@@ -213,7 +211,7 @@ PutByIdStatus PutByIdStatus::computeForStubInfo(
                 
             case PutByIdAccess::Transition: {
                 PropertyOffset offset =
-                    access.newStructure()->getConcurrently(*profiledBlock->vm(), uid);
+                    access.newStructure()->getConcurrently(uid);
                 if (!isValidOffset(offset))
                     return PutByIdStatus(slowPathState);
                 RefPtr<IntendedStructureChain> chain;
@@ -251,7 +249,7 @@ PutByIdStatus PutByIdStatus::computeForStubInfo(
                     
                     variant = PutByIdVariant::setter(
                         structure, complexGetStatus.offset(), complexGetStatus.chain(),
-                        std::move(callLinkStatus));
+                        WTF::move(callLinkStatus));
                 } }
                 break;
             }
@@ -276,7 +274,7 @@ PutByIdStatus PutByIdStatus::computeForStubInfo(
 }
 #endif
 
-PutByIdStatus PutByIdStatus::computeFor(CodeBlock* baselineBlock, CodeBlock* dfgBlock, StubInfoMap& baselineMap, StubInfoMap& dfgMap, CodeOrigin codeOrigin, StringImpl* uid)
+PutByIdStatus PutByIdStatus::computeFor(CodeBlock* baselineBlock, CodeBlock* dfgBlock, StubInfoMap& baselineMap, StubInfoMap& dfgMap, CodeOrigin codeOrigin, AtomicStringImpl* uid)
 {
 #if ENABLE(DFG_JIT)
     if (dfgBlock) {
@@ -310,7 +308,7 @@ PutByIdStatus PutByIdStatus::computeFor(CodeBlock* baselineBlock, CodeBlock* dfg
     return computeFor(baselineBlock, baselineMap, codeOrigin.bytecodeIndex, uid);
 }
 
-PutByIdStatus PutByIdStatus::computeFor(VM& vm, JSGlobalObject* globalObject, const StructureSet& set, StringImpl* uid, bool isDirect)
+PutByIdStatus PutByIdStatus::computeFor(JSGlobalObject* globalObject, const StructureSet& set, AtomicStringImpl* uid, bool isDirect)
 {
     if (toUInt32FromStringImpl(uid) != PropertyName::NotAnIndex)
         return PutByIdStatus(TakesSlowPath);
@@ -330,7 +328,7 @@ PutByIdStatus PutByIdStatus::computeFor(VM& vm, JSGlobalObject* globalObject, co
             return PutByIdStatus(TakesSlowPath);
     
         unsigned attributes;
-        PropertyOffset offset = structure->getConcurrently(vm, uid, attributes);
+        PropertyOffset offset = structure->getConcurrently(uid, attributes);
         if (isValidOffset(offset)) {
             if (attributes & CustomAccessor)
                 return PutByIdStatus(MakesCalls);
@@ -370,7 +368,7 @@ PutByIdStatus PutByIdStatus::computeFor(VM& vm, JSGlobalObject* globalObject, co
             chain = adoptRef(new IntendedStructureChain(globalObject, structure));
         
             // If the prototype chain has setters or read-only properties, then give up.
-            if (chain->mayInterceptStoreTo(vm, uid))
+            if (chain->mayInterceptStoreTo(uid))
                 return PutByIdStatus(TakesSlowPath);
         
             // If the prototype chain hasn't been normalized (i.e. there are proxies or dictionaries)

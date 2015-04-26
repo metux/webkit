@@ -55,12 +55,6 @@
 #include <unistd.h>
 #endif
 
-#if OS(WINCE)
-// From pkfuncs.h (private header file from the Platform Builder)
-#define CACHE_SYNC_ALL 0x07F
-extern "C" __declspec(dllimport) void CacheRangeFlush(LPVOID pAddr, DWORD dwLength, DWORD dwFlags);
-#endif
-
 #define JIT_ALLOCATOR_LARGE_ALLOC_SIZE (pageSize() * 4)
 
 #if ENABLE(ASSEMBLER_WX_EXCLUSIVE)
@@ -144,7 +138,7 @@ private:
     static void reprotectRegion(void*, size_t, ProtectionSetting);
 #if ENABLE(EXECUTABLE_ALLOCATOR_DEMAND)
     // We create a MetaAllocator for each JS global object.
-    OwnPtr<DemandExecutableAllocator> m_allocator;
+    std::unique_ptr<DemandExecutableAllocator> m_allocator;
     DemandExecutableAllocator* allocator() { return m_allocator.get(); }
 #endif
 #endif

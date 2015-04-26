@@ -188,8 +188,6 @@ private:
         case GetDirectPname:
         case Call:
         case Construct:
-        case ProfiledCall:
-        case ProfiledConstruct:
         case NativeCall:
         case NativeConstruct:
         case GetGlobalVar:
@@ -251,22 +249,8 @@ private:
             }
             break;
         }
-            
-        case ArithAdd: {
-            SpeculatedType left = node->child1()->prediction();
-            SpeculatedType right = node->child2()->prediction();
-            
-            if (left && right) {
-                if (m_graph.addSpeculationMode(node, m_pass) != DontSpeculateInt32)
-                    changed |= mergePrediction(SpecInt32);
-                else if (m_graph.addShouldSpeculateMachineInt(node))
-                    changed |= mergePrediction(SpecInt52);
-                else
-                    changed |= mergePrediction(speculatedDoubleTypeForPredictions(left, right));
-            }
-            break;
-        }
-            
+
+        case ArithAdd:
         case ArithSub: {
             SpeculatedType left = node->child1()->prediction();
             SpeculatedType right = node->child2()->prediction();
@@ -322,21 +306,8 @@ private:
             }
             break;
         }
-            
-        case ArithDiv: {
-            SpeculatedType left = node->child1()->prediction();
-            SpeculatedType right = node->child2()->prediction();
-            
-            if (left && right) {
-                if (Node::shouldSpeculateInt32OrBooleanForArithmetic(node->child1().node(), node->child2().node())
-                    && node->canSpeculateInt32(m_pass))
-                    changed |= mergePrediction(SpecInt32);
-                else
-                    changed |= mergePrediction(SpecBytecodeDouble);
-            }
-            break;
-        }
-            
+
+        case ArithDiv:
         case ArithMod: {
             SpeculatedType left = node->child1()->prediction();
             SpeculatedType right = node->child2()->prediction();
@@ -350,7 +321,8 @@ private:
             }
             break;
         }
-            
+
+        case ArithPow:
         case ArithSqrt:
         case ArithFRound:
         case ArithSin:
@@ -462,7 +434,6 @@ private:
             break;
         }
             
-        case GetMyScope:
         case SkipScope: {
             changed |= setPrediction(SpecObjectOther);
             break;
@@ -560,7 +531,14 @@ private:
         case DoubleConstant:
         case Int52Constant:
         case Identity:
-        case BooleanToNumber: {
+        case BooleanToNumber:
+        case PhantomNewObject:
+        case PutByOffsetHint:
+        case CheckStructureImmediate:
+        case PutStructureHint:
+        case MaterializeNewObject:
+        case PutLocal:
+        case KillLocal: {
             // This node should never be visible at this stage of compilation. It is
             // inserted by fixup(), which follows this phase.
             RELEASE_ASSERT_NOT_REACHED();
@@ -574,7 +552,6 @@ private:
             break;
             
         case Upsilon:
-        case GetArgument:
             // These don't get inserted until we go into SSA.
             RELEASE_ASSERT_NOT_REACHED();
             break;
@@ -591,22 +568,13 @@ private:
             changed |= setPrediction(SpecInt32);
             break;
         }
-        case HasGenericProperty: {
-            changed |= setPrediction(SpecBoolean);
-            break;
-        }
-        case HasStructureProperty: {
-            changed |= setPrediction(SpecBoolean);
-            break;
-        }
+        case HasGenericProperty:
+        case HasStructureProperty:
         case HasIndexedProperty: {
             changed |= setPrediction(SpecBoolean);
             break;
         }
-        case GetStructurePropertyEnumerator: {
-            changed |= setPrediction(SpecCell);
-            break;
-        }
+        case GetStructurePropertyEnumerator:
         case GetGenericPropertyEnumerator: {
             changed |= setPrediction(SpecCell);
             break;
@@ -640,6 +608,8 @@ private:
         case Breakpoint:
         case ProfileWillCall:
         case ProfileDidCall:
+        case ProfileType:
+        case ProfileControlFlow:
         case CheckHasInstance:
         case ThrowReferenceError:
         case ForceOSRExit:
@@ -648,7 +618,6 @@ private:
         case CheckCell:
         case CheckBadCell:
         case PutStructure:
-        case TearOffActivation:
         case TearOffArguments:
         case CheckArgumentsNotCreated:
         case VariableWatchpoint:

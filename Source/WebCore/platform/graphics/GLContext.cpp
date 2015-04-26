@@ -17,8 +17,6 @@
  */
 
 #include "config.h"
-
-#if USE(OPENGL)
 #include "GLContext.h"
 
 #if USE(EGL)
@@ -68,7 +66,7 @@ inline ThreadGlobalGLContext* currentContext()
 
 GLContext* GLContext::sharingContext()
 {
-    DEPRECATED_DEFINE_STATIC_LOCAL(OwnPtr<GLContext>, sharing, (createOffscreenContext()));
+    DEPRECATED_DEFINE_STATIC_LOCAL(std::unique_ptr<GLContext>, sharing, (createOffscreenContext()));
     return sharing.get();
 }
 
@@ -142,25 +140,25 @@ void GLContext::cleanupActiveContextsAtExit()
 #endif // PLATFORM(X11)
 
 
-PassOwnPtr<GLContext> GLContext::createContextForWindow(GLNativeWindowType windowHandle, GLContext* sharingContext)
+std::unique_ptr<GLContext> GLContext::createContextForWindow(GLNativeWindowType windowHandle, GLContext* sharingContext)
 {
 #if PLATFORM(GTK) && PLATFORM(WAYLAND) && !defined(GTK_API_VERSION_2) && defined(GDK_WINDOWING_WAYLAND) && USE(EGL)
     GdkDisplay* display = gdk_display_manager_get_default_display(gdk_display_manager_get());
 
     if (GDK_IS_WAYLAND_DISPLAY(display)) {
-        if (OwnPtr<GLContext> eglContext = GLContextEGL::createContext(windowHandle, sharingContext))
-            return eglContext.release();
+        if (auto eglContext = GLContextEGL::createContext(windowHandle, sharingContext))
+            return WTF::move(eglContext);
         return nullptr;
     }
 #endif
 
 #if USE(GLX)
-    if (OwnPtr<GLContext> glxContext = GLContextGLX::createContext(windowHandle, sharingContext))
-        return glxContext.release();
+    if (auto glxContext = GLContextGLX::createContext(windowHandle, sharingContext))
+        return WTF::move(glxContext);
 #endif
 #if USE(EGL)
-    if (OwnPtr<GLContext> eglContext = GLContextEGL::createContext(windowHandle, sharingContext))
-        return eglContext.release();
+    if (auto eglContext = GLContextEGL::createContext(windowHandle, sharingContext))
+        return WTF::move(eglContext);
 #endif
     return nullptr;
 }
@@ -172,7 +170,7 @@ GLContext::GLContext()
 #endif
 }
 
-PassOwnPtr<GLContext> GLContext::createOffscreenContext(GLContext* sharingContext)
+std::unique_ptr<GLContext> GLContext::createOffscreenContext(GLContext* sharingContext)
 {
     return createContextForWindow(0, sharingContext);
 }
@@ -199,5 +197,4 @@ GLContext* GLContext::getCurrent()
 
 } // namespace WebCore
 
-#endif // USE(OPENGL)
 

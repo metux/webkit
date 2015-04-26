@@ -43,6 +43,7 @@ enum ResolveType {
     GlobalProperty,
     GlobalVar,
     ClosureVar,
+    LocalClosureVar,
 
     // Ditto, but at least one intervening scope used non-strict eval, which
     // can inject an intercepting var delcaration at runtime.
@@ -68,6 +69,7 @@ inline ResolveType makeType(ResolveType type, bool needsVarInjectionChecks)
     case GlobalVar:
         return GlobalVarWithVarInjectionChecks;
     case ClosureVar:
+    case LocalClosureVar:
         return ClosureVarWithVarInjectionChecks;
     case GlobalPropertyWithVarInjectionChecks:
     case GlobalVarWithVarInjectionChecks:
@@ -86,6 +88,7 @@ inline bool needsVarInjectionChecks(ResolveType type)
     case GlobalProperty:
     case GlobalVar:
     case ClosureVar:
+    case LocalClosureVar:
         return false;
     case GlobalPropertyWithVarInjectionChecks:
     case GlobalVarWithVarInjectionChecks:
@@ -238,12 +241,7 @@ inline JSScope* Register::scope() const
 
 inline JSGlobalObject* ExecState::lexicalGlobalObject() const
 {
-    return scope()->globalObject();
-}
-
-inline JSObject* ExecState::globalThisValue() const
-{
-    return scope()->globalThis();
+    return callee()->globalObject();
 }
 
 inline size_t JSScope::offsetOfNext()

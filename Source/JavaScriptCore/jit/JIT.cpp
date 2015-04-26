@@ -29,12 +29,6 @@
 
 #include "JIT.h"
 
-// This probably does not belong here; adding here for now as a quick Windows build fix.
-#if ENABLE(ASSEMBLER) && CPU(X86) && !OS(MAC_OS_X)
-#include "MacroAssembler.h"
-JSC::MacroAssemblerX86Common::SSE2CheckState JSC::MacroAssemblerX86Common::s_sse2CheckState = NotCheckedSSE2;
-#endif
-
 #include "ArityCheckFailReturnThunks.h"
 #include "CodeBlock.h"
 #include "DFGCapabilities.h"
@@ -81,7 +75,7 @@ JIT::JIT(VM* vm, CodeBlock* codeBlock)
     : JSInterfaceJIT(vm, codeBlock)
     , m_interpreter(vm->interpreter)
     , m_labels(codeBlock ? codeBlock->numberOfInstructions() : 0)
-    , m_bytecodeOffset((unsigned)-1)
+    , m_bytecodeOffset(std::numeric_limits<unsigned>::max())
     , m_getByIdIndex(UINT_MAX)
     , m_putByIdIndex(UINT_MAX)
     , m_byValInstructionIndex(UINT_MAX)
@@ -216,6 +210,7 @@ void JIT::privateCompileMainPass()
         DEFINE_OP(op_end)
         DEFINE_OP(op_enter)
         DEFINE_OP(op_create_lexical_environment)
+        DEFINE_OP(op_get_scope)
         DEFINE_OP(op_eq)
         DEFINE_OP(op_eq_null)
         case op_get_by_id_out_of_line:
@@ -247,7 +242,6 @@ void JIT::privateCompileMainPass()
         DEFINE_OP(op_loop_hint)
         DEFINE_OP(op_lshift)
         DEFINE_OP(op_mod)
-        DEFINE_OP(op_captured_mov)
         DEFINE_OP(op_mov)
         DEFINE_OP(op_mul)
         DEFINE_OP(op_negate)
@@ -257,7 +251,6 @@ void JIT::privateCompileMainPass()
         DEFINE_OP(op_new_array_with_size)
         DEFINE_OP(op_new_array_buffer)
         DEFINE_OP(op_new_func)
-        DEFINE_OP(op_new_captured_func)
         DEFINE_OP(op_new_func_exp)
         DEFINE_OP(op_new_object)
         DEFINE_OP(op_new_regexp)
@@ -269,6 +262,7 @@ void JIT::privateCompileMainPass()
         DEFINE_OP(op_profile_did_call)
         DEFINE_OP(op_profile_will_call)
         DEFINE_OP(op_profile_type)
+        DEFINE_OP(op_profile_control_flow)
         DEFINE_OP(op_push_name_scope)
         DEFINE_OP(op_push_with_scope)
         case op_put_by_id_out_of_line:
@@ -286,7 +280,6 @@ void JIT::privateCompileMainPass()
         DEFINE_OP(op_init_global_const)
 
         DEFINE_OP(op_ret)
-        DEFINE_OP(op_ret_object_or_this)
         DEFINE_OP(op_rshift)
         DEFINE_OP(op_unsigned)
         DEFINE_OP(op_urshift)
@@ -296,7 +289,6 @@ void JIT::privateCompileMainPass()
         DEFINE_OP(op_switch_char)
         DEFINE_OP(op_switch_imm)
         DEFINE_OP(op_switch_string)
-        DEFINE_OP(op_tear_off_lexical_environment)
         DEFINE_OP(op_tear_off_arguments)
         DEFINE_OP(op_throw)
         DEFINE_OP(op_throw_static_error)
@@ -325,7 +317,7 @@ void JIT::privateCompileMainPass()
 
 #ifndef NDEBUG
     // Reset this, in order to guard its use with ASSERTs.
-    m_bytecodeOffset = (unsigned)-1;
+    m_bytecodeOffset = std::numeric_limits<unsigned>::max();
 #endif
 }
 
@@ -384,7 +376,6 @@ void JIT::privateCompileSlowCases()
         DEFINE_SLOWCASE_OP(op_construct)
         DEFINE_SLOWCASE_OP(op_to_this)
         DEFINE_SLOWCASE_OP(op_create_this)
-        DEFINE_SLOWCASE_OP(op_captured_mov)
         DEFINE_SLOWCASE_OP(op_div)
         DEFINE_SLOWCASE_OP(op_eq)
         DEFINE_SLOWCASE_OP(op_get_callee)
@@ -460,7 +451,7 @@ void JIT::privateCompileSlowCases()
 
 #ifndef NDEBUG
     // Reset this, in order to guard its use with ASSERTs.
-    m_bytecodeOffset = (unsigned)-1;
+    m_bytecodeOffset = std::numeric_limits<unsigned>::max();
 #endif
 }
 
@@ -506,7 +497,7 @@ CompilationResult JIT::privateCompile(JITCompilationEffort effort)
         m_vm->typeProfilerLog()->processLogEntries(ASCIILiteral("Preparing for JIT compilation."));
     
     if (Options::showDisassembly() || m_vm->m_perBytecodeProfiler)
-        m_disassembler = adoptPtr(new JITDisassembler(m_codeBlock));
+        m_disassembler = std::make_unique<JITDisassembler>(m_codeBlock);
     if (m_vm->m_perBytecodeProfiler) {
         m_compilation = adoptRef(
             new Profiler::Compilation(
@@ -532,9 +523,8 @@ CompilationResult JIT::privateCompile(JITCompilationEffort effort)
     sampleInstruction(m_codeBlock->instructions().begin());
 #endif
 
-    Jump stackOverflow;
     if (m_codeBlock->codeType() == FunctionCode) {
-        ASSERT(m_bytecodeOffset == (unsigned)-1);
+        ASSERT(m_bytecodeOffset == std::numeric_limits<unsigned>::max());
         if (shouldEmitProfiling()) {
             for (int argument = 0; argument < m_codeBlock->numParameters(); ++argument) {
                 // If this is a constructor, then we want to put in a dummy profiling site (to
@@ -551,12 +541,12 @@ CompilationResult JIT::privateCompile(JITCompilationEffort effort)
                 emitValueProfilingSite(m_codeBlock->valueProfileForArgument(argument));
             }
         }
-
-        addPtr(TrustedImm32(stackPointerOffsetFor(m_codeBlock) * sizeof(Register)), callFrameRegister, regT1);
-        stackOverflow = branchPtr(Above, AbsoluteAddress(m_vm->addressOfStackLimit()), regT1);
     }
 
-    addPtr(TrustedImm32(stackPointerOffsetFor(m_codeBlock) * sizeof(Register)), callFrameRegister, stackPointerRegister);
+    addPtr(TrustedImm32(stackPointerOffsetFor(m_codeBlock) * sizeof(Register)), callFrameRegister, regT1);
+    Jump stackOverflow = branchPtr(Above, AbsoluteAddress(m_vm->addressOfStackLimit()), regT1);
+
+    move(regT1, stackPointerRegister);
     checkStackPointerAlignment();
 
     privateCompileMainPass();
@@ -566,14 +556,14 @@ CompilationResult JIT::privateCompile(JITCompilationEffort effort)
     if (m_disassembler)
         m_disassembler->setEndOfSlowPath(label());
 
+    stackOverflow.link(this);
+    m_bytecodeOffset = 0;
+    if (maxFrameExtentForSlowPathCall)
+        addPtr(TrustedImm32(-maxFrameExtentForSlowPathCall), stackPointerRegister);
+    callOperationWithCallFrameRollbackOnException(operationThrowStackOverflowError, m_codeBlock);
+
     Label arityCheck;
     if (m_codeBlock->codeType() == FunctionCode) {
-        stackOverflow.link(this);
-        m_bytecodeOffset = 0;
-        if (maxFrameExtentForSlowPathCall)
-            addPtr(TrustedImm32(-maxFrameExtentForSlowPathCall), stackPointerRegister);
-        callOperationWithCallFrameRollbackOnException(operationThrowStackOverflowError, m_codeBlock);
-
         arityCheck = label();
         store8(TrustedImm32(0), &m_codeBlock->m_shouldAlwaysBeInlined);
         emitFunctionPrologue();
@@ -603,7 +593,7 @@ CompilationResult JIT::privateCompile(JITCompilationEffort effort)
         emitNakedCall(m_vm->getCTIStub(arityFixupGenerator).code());
 
 #if !ASSERT_DISABLED
-        m_bytecodeOffset = (unsigned)-1; // Reset this, in order to guard its use with ASSERTs.
+        m_bytecodeOffset = std::numeric_limits<unsigned>::max(); // Reset this, in order to guard its use with ASSERTs.
 #endif
 
         jump(beginLabel);
@@ -735,7 +725,7 @@ void JIT::privateCompileExceptionHandlers()
         poke(GPRInfo::argumentGPR0);
         poke(GPRInfo::argumentGPR1, 1);
 #endif
-        m_calls.append(CallRecord(call(), (unsigned)-1, FunctionPtr(lookupExceptionHandlerFromCallerFrame).value()));
+        m_calls.append(CallRecord(call(), std::numeric_limits<unsigned>::max(), FunctionPtr(lookupExceptionHandlerFromCallerFrame).value()));
         jumpToExceptionHandler();
     }
 
@@ -751,7 +741,7 @@ void JIT::privateCompileExceptionHandlers()
         poke(GPRInfo::argumentGPR0);
         poke(GPRInfo::argumentGPR1, 1);
 #endif
-        m_calls.append(CallRecord(call(), (unsigned)-1, FunctionPtr(lookupExceptionHandler).value()));
+        m_calls.append(CallRecord(call(), std::numeric_limits<unsigned>::max(), FunctionPtr(lookupExceptionHandler).value()));
         jumpToExceptionHandler();
     }
 }

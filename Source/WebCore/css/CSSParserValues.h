@@ -178,6 +178,14 @@ public:
     std::unique_ptr<CSSParserValueList> args;
 };
 
+enum class CSSParserSelectorCombinator {
+    Child,
+    DescendantSpace,
+    DescendantDoubleChild,
+    DirectAdjacent,
+    IndirectAdjacent
+};
+
 class CSSParserSelector {
     WTF_MAKE_FAST_ALLOCATED;
 public:
@@ -195,12 +203,15 @@ public:
     void setValue(const AtomicString& value) { m_selector->setValue(value); }
     void setAttribute(const QualifiedName& value, bool isCaseInsensitive) { m_selector->setAttribute(value, isCaseInsensitive); }
     void setArgument(const AtomicString& value) { m_selector->setArgument(value); }
+    void setAttributeValueMatchingIsCaseInsensitive(bool isCaseInsensitive) { m_selector->setAttributeValueMatchingIsCaseInsensitive(isCaseInsensitive); }
     void setMatch(CSSSelector::Match value) { m_selector->setMatch(value); }
     void setRelation(CSSSelector::Relation value) { m_selector->setRelation(value); }
     void setForPage() { m_selector->setForPage(); }
 
-
     void adoptSelectorVector(Vector<std::unique_ptr<CSSParserSelector>>& selectorVector);
+#if ENABLE(CSS_SELECTORS_LEVEL4)
+    void setLangArgumentList(const Vector<CSSParserString>& stringVector);
+#endif
 
     void setPseudoClassValue(const CSSParserString& pseudoClassString);
     CSSSelector::PseudoClassType pseudoClassType() const { return m_selector->pseudoClassType(); }
@@ -215,7 +226,6 @@ public:
 #endif
     }
 
-    bool isSimple() const;
     bool hasShadowDescendant() const;
     bool matchesPseudoElement() const;
 
@@ -224,9 +234,12 @@ public:
     void clearTagHistory() { m_tagHistory.reset(); }
     void insertTagHistory(CSSSelector::Relation before, std::unique_ptr<CSSParserSelector>, CSSSelector::Relation after);
     void appendTagHistory(CSSSelector::Relation, std::unique_ptr<CSSParserSelector>);
+    void appendTagHistory(CSSParserSelectorCombinator, std::unique_ptr<CSSParserSelector>);
     void prependTagSelector(const QualifiedName&, bool tagIsForNamespaceRule = false);
 
 private:
+    void setDescendantUseDoubleChildSyntax() { m_selector->setDescendantUseDoubleChildSyntax(); }
+
     std::unique_ptr<CSSSelector> m_selector;
     std::unique_ptr<CSSParserSelector> m_tagHistory;
 };

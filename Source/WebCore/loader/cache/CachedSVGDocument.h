@@ -36,20 +36,25 @@ public:
     virtual ~CachedSVGDocument();
 
     SVGDocument* document() const { return m_document.get(); }
-
-protected:
-    RefPtr<SVGDocument> m_document;
-    RefPtr<TextResourceDecoder> m_decoder;
+    void setShouldCreateFrameForDocument(bool shouldCreate) { m_shouldCreateFrameForDocument = shouldCreate; }
+    virtual bool canReuse(const ResourceRequest&) const override { return m_canReuseResource; }
+    void setCanReuse(bool canReuseResource) { m_canReuseResource = canReuseResource; };
 
 private:
     virtual bool mayTryReplaceEncodedData() const override { return true; }
     virtual void setEncoding(const String&) override;
     virtual String encoding() const override;
-    virtual void finishLoading(ResourceBuffer*) override;
+    virtual void finishLoading(SharedBuffer*) override;
+
+    RefPtr<SVGDocument> m_document;
+    RefPtr<TextResourceDecoder> m_decoder;
+    std::unique_ptr<Page> m_page;
+    bool m_shouldCreateFrameForDocument;
+    bool m_canReuseResource;
 };
 
-CACHED_RESOURCE_TYPE_CASTS(CachedSVGDocument, CachedResource, CachedResource::SVGDocumentResource)
-
 } // namespace WebCore
+
+SPECIALIZE_TYPE_TRAITS_CACHED_RESOURCE(CachedSVGDocument, CachedResource::SVGDocumentResource)
 
 #endif // CachedSVGDocument_h

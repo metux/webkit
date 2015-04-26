@@ -36,9 +36,9 @@ FETile::FETile(Filter* filter)
 {
 }
 
-PassRefPtr<FETile> FETile::create(Filter* filter)
+Ref<FETile> FETile::create(Filter* filter)
 {
-    return adoptRef(new FETile(filter));
+    return adoptRef(*new FETile(filter));
 }
 
 void FETile::platformApplySoftware()
@@ -71,13 +71,13 @@ void FETile::platformApplySoftware()
     tileImageContext->translate(-inMaxEffectLocation.x(), -inMaxEffectLocation.y());
     tileImageContext->drawImageBuffer(in->asImageBuffer(), ColorSpaceDeviceRGB, in->absolutePaintRect().location());
 
-    RefPtr<Pattern> pattern = Pattern::create(tileImage->copyImage(CopyBackingStore), true, true);
+    auto pattern = Pattern::create(tileImage->copyImage(CopyBackingStore), true, true);
 
     AffineTransform patternTransform;
     patternTransform.translate(inMaxEffectLocation.x() - maxEffectLocation.x(), inMaxEffectLocation.y() - maxEffectLocation.y());
-    pattern->setPatternSpaceTransform(patternTransform);
+    pattern.get().setPatternSpaceTransform(patternTransform);
     GraphicsContext* filterContext = resultImage->context();
-    filterContext->setFillPattern(pattern);
+    filterContext->setFillPattern(WTF::move(pattern));
     filterContext->fillRect(FloatRect(FloatPoint(), absolutePaintRect().size()));
 }
 

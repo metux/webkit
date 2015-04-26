@@ -143,6 +143,15 @@ public:
     //   static translate(ValueType&, const T&, unsigned hashCode);
     template<typename HashTranslator, typename K, typename V> AddResult add(K&&, V&&);
 
+    // Overloads for smart pointer keys that take the raw pointer type as the parameter.
+    template<typename K = KeyType> typename std::enable_if<IsSmartPtr<K>::value, iterator>::type find(typename GetPtrHelper<K>::PtrType);
+    template<typename K = KeyType> typename std::enable_if<IsSmartPtr<K>::value, const_iterator>::type find(typename GetPtrHelper<K>::PtrType) const;
+    template<typename K = KeyType> typename std::enable_if<IsSmartPtr<K>::value, bool>::type contains(typename GetPtrHelper<K>::PtrType) const;
+    template<typename K = KeyType> typename std::enable_if<IsSmartPtr<K>::value, MappedPeekType>::type inlineGet(typename GetPtrHelper<K>::PtrType) const;
+    template<typename K = KeyType> typename std::enable_if<IsSmartPtr<K>::value, MappedPeekType>::type get(typename GetPtrHelper<K>::PtrType) const;
+    template<typename K = KeyType> typename std::enable_if<IsSmartPtr<K>::value, bool>::type remove(typename GetPtrHelper<K>::PtrType);
+    template<typename K = KeyType> typename std::enable_if<IsSmartPtr<K>::value, MappedType>::type take(typename GetPtrHelper<K>::PtrType);
+
     void checkConsistency() const;
 
     static bool isValidKey(const KeyType&);
@@ -386,6 +395,63 @@ auto HashMap<T, U, V, W, MappedTraits>::take(const KeyType& key) -> MappedType
 }
 
 template<typename T, typename U, typename V, typename W, typename X>
+template<typename K>
+inline auto HashMap<T, U, V, W, X>::find(typename GetPtrHelper<K>::PtrType key) -> typename std::enable_if<IsSmartPtr<K>::value, iterator>::type
+{
+    return m_impl.template find<HashMapTranslator<KeyValuePairTraits, HashFunctions>>(key);
+}
+
+template<typename T, typename U, typename V, typename W, typename X>
+template<typename K>
+inline auto HashMap<T, U, V, W, X>::find(typename GetPtrHelper<K>::PtrType key) const -> typename std::enable_if<IsSmartPtr<K>::value, const_iterator>::type
+{
+    return m_impl.template find<HashMapTranslator<KeyValuePairTraits, HashFunctions>>(key);
+}
+
+template<typename T, typename U, typename V, typename W, typename X>
+template<typename K>
+inline auto HashMap<T, U, V, W, X>::contains(typename GetPtrHelper<K>::PtrType key) const -> typename std::enable_if<IsSmartPtr<K>::value, bool>::type
+{
+    return m_impl.template contains<HashMapTranslator<KeyValuePairTraits, HashFunctions>>(key);
+}
+
+template<typename T, typename U, typename V, typename W, typename X>
+template<typename K>
+inline auto HashMap<T, U, V, W, X>::inlineGet(typename GetPtrHelper<K>::PtrType key) const -> typename std::enable_if<IsSmartPtr<K>::value, MappedPeekType>::type
+{
+    KeyValuePairType* entry = const_cast<HashTableType&>(m_impl).template lookup<HashMapTranslator<KeyValuePairTraits, HashFunctions>>(key);
+    if (!entry)
+        return MappedTraits::peek(MappedTraits::emptyValue());
+    return MappedTraits::peek(entry->value);
+}
+
+template<typename T, typename U, typename V, typename W, typename X>
+template<typename K>
+auto HashMap<T, U, V, W, X>::get(typename GetPtrHelper<K>::PtrType key) const -> typename std::enable_if<IsSmartPtr<K>::value, MappedPeekType>::type
+{
+    return inlineGet(key);
+}
+
+template<typename T, typename U, typename V, typename W, typename X>
+template<typename K>
+inline auto HashMap<T, U, V, W, X>::remove(typename GetPtrHelper<K>::PtrType key) -> typename std::enable_if<IsSmartPtr<K>::value, bool>::type
+{
+    return remove(find(key));
+}
+
+template<typename T, typename U, typename V, typename W, typename X>
+template<typename K>
+inline auto HashMap<T, U, V, W, X>::take(typename GetPtrHelper<K>::PtrType key) -> typename std::enable_if<IsSmartPtr<K>::value, MappedType>::type
+{
+    iterator it = find(key);
+    if (it == end())
+        return MappedTraits::emptyValue();
+    MappedType value = WTF::move(it->value);
+    remove(it);
+    return value;
+}
+
+template<typename T, typename U, typename V, typename W, typename X>
 inline void HashMap<T, U, V, W, X>::checkConsistency() const
 {
     m_impl.checkTableConsistency();
@@ -462,7 +528,5 @@ inline void copyValuesToVector(const HashMap<T, U, V, W, X>& collection, Y& vect
 } // namespace WTF
 
 using WTF::HashMap;
-
-#include <wtf/RefPtrHashMap.h>
 
 #endif /* WTF_HashMap_h */

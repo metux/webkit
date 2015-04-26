@@ -46,6 +46,7 @@ class VM;
 class JSGlobalObject;
 class JSObject;
 class JSString;
+class Identifier;
 class PropertyName;
 class PropertySlot;
 class PutPropertySlot;
@@ -217,6 +218,7 @@ public:
     bool isMachineInt() const;
     bool isNumber() const;
     bool isString() const;
+    bool isSymbol() const;
     bool isPrimitive() const;
     bool isGetterSetter() const;
     bool isCustomGetterSetter() const;
@@ -242,6 +244,7 @@ public:
     // been set in the ExecState already.
     double toNumber(ExecState*) const;
     JSString* toString(ExecState*) const;
+    Identifier toPropertyKey(ExecState*) const;
     WTF::String toWTFString(ExecState*) const;
     WTF::String toWTFStringInline(ExecState*) const;
     JSObject* toObject(ExecState*) const;
@@ -255,13 +258,16 @@ public:
 
     // Floating point conversions (this is a convenience method for webcore;
     // signle precision float is not a representation used in JS or JSC).
-    JS_EXPORT_PRIVATE float toFloat(ExecState* exec) const { return static_cast<float>(toNumber(exec)); }
+    float toFloat(ExecState* exec) const { return static_cast<float>(toNumber(exec)); }
 
     // Object operations, with the toObject operation included.
     JSValue get(ExecState*, PropertyName) const;
     JSValue get(ExecState*, PropertyName, PropertySlot&) const;
     JSValue get(ExecState*, unsigned propertyName) const;
     JSValue get(ExecState*, unsigned propertyName, PropertySlot&) const;
+
+    bool getPropertySlot(ExecState*, PropertyName, PropertySlot&) const;
+
     void put(ExecState*, PropertyName, JSValue, PutPropertySlot&);
     JS_EXPORT_PRIVATE void putToPrimitive(ExecState*, PropertyName, JSValue, PutPropertySlot&);
     JS_EXPORT_PRIVATE void putToPrimitiveByIndex(ExecState*, unsigned propertyName, JSValue, bool shouldThrow);

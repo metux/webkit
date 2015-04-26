@@ -83,7 +83,7 @@ VTTRegion::VTTRegion(ScriptExecutionContext& context)
     , m_regionDisplayTree(nullptr)
     , m_track(nullptr)
     , m_currentTop(0)
-    , m_scrollTimer(this, &VTTRegion::scrollTimerFired)
+    , m_scrollTimer(*this, &VTTRegion::scrollTimerFired)
 {
 }
 
@@ -368,13 +368,13 @@ void VTTRegion::displayLastTextTrackCueBox()
 
     // If it's a scrolling region, add the scrolling class.
     if (isScrollingRegion())
-        m_cueContainer->classList()->add(textTrackCueContainerScrollingClass(), IGNORE_EXCEPTION);
+        m_cueContainer->classList().add(textTrackCueContainerScrollingClass(), IGNORE_EXCEPTION);
 
     float regionBottom = m_regionDisplayTree->getBoundingClientRect()->bottom();
 
     // Find first cue that is not entirely displayed and scroll it upwards.
     for (auto& child : childrenOfType<Element>(*m_cueContainer)) {
-        RefPtr<ClientRect> rect = child.getBoundingClientRect();
+        Ref<ClientRect> rect = child.getBoundingClientRect();
         float childTop = rect->top();
         float childBottom = rect->bottom();
 
@@ -398,7 +398,7 @@ void VTTRegion::willRemoveTextTrackCueBox(VTTCueBox* box)
 
     double boxHeight = box->getBoundingClientRect()->bottom() - box->getBoundingClientRect()->top();
 
-    m_cueContainer->classList()->remove(textTrackCueContainerScrollingClass(), IGNORE_EXCEPTION);
+    m_cueContainer->classList().remove(textTrackCueContainerScrollingClass(), IGNORE_EXCEPTION);
 
     m_currentTop += boxHeight;
     m_cueContainer->setInlineStyleProperty(CSSPropertyTop, m_currentTop, CSSPrimitiveValue::CSS_PX);
@@ -478,7 +478,7 @@ void VTTRegion::stopTimer()
         m_scrollTimer.stop();
 }
 
-void VTTRegion::scrollTimerFired(Timer<VTTRegion>*)
+void VTTRegion::scrollTimerFired()
 {
     LOG(Media, "VTTRegion::scrollTimerFired");
 

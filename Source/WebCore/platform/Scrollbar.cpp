@@ -26,6 +26,7 @@
 #include "config.h"
 #include "Scrollbar.h"
 
+#include "FrameView.h"
 #include "GraphicsContext.h"
 #include "PlatformMouseEvent.h"
 #include "ScrollAnimator.h"
@@ -56,7 +57,7 @@ int Scrollbar::maxOverlapBetweenPages()
 }
 
 Scrollbar::Scrollbar(ScrollableArea* scrollableArea, ScrollbarOrientation orientation, ScrollbarControlSize controlSize,
-                     ScrollbarTheme* theme, bool isCustomScrollbar)
+    ScrollbarTheme* theme, bool isCustomScrollbar)
     : m_scrollableArea(scrollableArea)
     , m_orientation(orientation)
     , m_controlSize(controlSize)
@@ -75,11 +76,12 @@ Scrollbar::Scrollbar(ScrollableArea* scrollableArea, ScrollbarOrientation orient
     , m_draggingDocument(false)
     , m_documentDragPos(0)
     , m_enabled(true)
-    , m_scrollTimer(this, &Scrollbar::autoscrollTimerFired)
+    , m_scrollTimer(*this, &Scrollbar::autoscrollTimerFired)
     , m_overlapsResizer(false)
     , m_suppressInvalidation(false)
     , m_isAlphaLocked(false)
     , m_isCustomScrollbar(isCustomScrollbar)
+    , m_weakPtrFactory(this)
 {
     if (!m_theme)
         m_theme = ScrollbarTheme::theme();
@@ -184,7 +186,7 @@ void Scrollbar::paint(GraphicsContext* context, const IntRect& damageRect)
         Widget::paint(context, damageRect);
 }
 
-void Scrollbar::autoscrollTimerFired(Timer<Scrollbar>&)
+void Scrollbar::autoscrollTimerFired()
 {
     autoscrollPressedPart(theme()->autoscrollTimerDelay());
 }
@@ -556,6 +558,11 @@ bool Scrollbar::supportsUpdateOnSecondaryThread() const
 #else
     return false;
 #endif
+}
+
+ScrollView* Scrollbar::root() const
+{
+    return Widget::root();
 }
 
 } // namespace WebCore

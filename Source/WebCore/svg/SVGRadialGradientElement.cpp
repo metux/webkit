@@ -29,7 +29,6 @@
 #include "FloatPoint.h"
 #include "RadialGradientAttributes.h"
 #include "RenderSVGResourceRadialGradient.h"
-#include "SVGElementInstance.h"
 #include "SVGNames.h"
 #include "SVGStopElement.h"
 #include "SVGTransform.h"
@@ -71,9 +70,9 @@ inline SVGRadialGradientElement::SVGRadialGradientElement(const QualifiedName& t
     registerAnimatedPropertiesForSVGRadialGradientElement();
 }
 
-PassRefPtr<SVGRadialGradientElement> SVGRadialGradientElement::create(const QualifiedName& tagName, Document& document)
+Ref<SVGRadialGradientElement> SVGRadialGradientElement::create(const QualifiedName& tagName, Document& document)
 {
-    return adoptRef(new SVGRadialGradientElement(tagName, document));
+    return adoptRef(*new SVGRadialGradientElement(tagName, document));
 }
 
 bool SVGRadialGradientElement::isSupportedAttribute(const QualifiedName& attrName)
@@ -121,7 +120,7 @@ void SVGRadialGradientElement::svgAttributeChanged(const QualifiedName& attrName
         return;
     }
 
-    SVGElementInstance::InvalidationGuard invalidationGuard(this);
+    InstanceInvalidationGuard guard(*this);
     
     updateRelativeLengthsInformation();
         
@@ -129,7 +128,7 @@ void SVGRadialGradientElement::svgAttributeChanged(const QualifiedName& attrName
         object->setNeedsLayout();
 }
 
-RenderPtr<RenderElement> SVGRadialGradientElement::createElementRenderer(PassRef<RenderStyle> style)
+RenderPtr<RenderElement> SVGRadialGradientElement::createElementRenderer(Ref<RenderStyle>&& style)
 {
     return createRenderer<RenderSVGResourceRadialGradient>(*this, WTF::move(style));
 }
@@ -155,25 +154,25 @@ static void setGradientAttributes(SVGGradientElement& element, RadialGradientAtt
     }
 
     if (isRadial) {
-        SVGRadialGradientElement* radial = toSVGRadialGradientElement(&element);
+        SVGRadialGradientElement& radial = downcast<SVGRadialGradientElement>(element);
 
         if (!attributes.hasCx() && element.hasAttribute(SVGNames::cxAttr))
-            attributes.setCx(radial->cx());
+            attributes.setCx(radial.cx());
 
         if (!attributes.hasCy() && element.hasAttribute(SVGNames::cyAttr))
-            attributes.setCy(radial->cy());
+            attributes.setCy(radial.cy());
 
         if (!attributes.hasR() && element.hasAttribute(SVGNames::rAttr))
-            attributes.setR(radial->r());
+            attributes.setR(radial.r());
 
         if (!attributes.hasFx() && element.hasAttribute(SVGNames::fxAttr))
-            attributes.setFx(radial->fx());
+            attributes.setFx(radial.fx());
 
         if (!attributes.hasFy() && element.hasAttribute(SVGNames::fyAttr))
-            attributes.setFy(radial->fy());
+            attributes.setFy(radial.fy());
 
         if (!attributes.hasFr() && element.hasAttribute(SVGNames::frAttr))
-            attributes.setFr(radial->fr());
+            attributes.setFr(radial.fr());
     }
 }
 
@@ -191,8 +190,8 @@ bool SVGRadialGradientElement::collectGradientAttributes(RadialGradientAttribute
     while (true) {
         // Respect xlink:href, take attributes from referenced element
         Node* refNode = SVGURIReference::targetElementFromIRIString(current->href(), document());
-        if (refNode && isSVGGradientElement(*refNode)) {
-            current = toSVGGradientElement(refNode);
+        if (is<SVGGradientElement>(refNode)) {
+            current = downcast<SVGGradientElement>(refNode);
 
             // Cycle detection
             if (processedGradients.contains(current))

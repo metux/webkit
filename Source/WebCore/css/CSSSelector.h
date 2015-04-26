@@ -29,6 +29,12 @@
 namespace WebCore {
     class CSSSelectorList;
 
+    enum class SelectorSpecificityIncrement {
+        ClassA = 0x10000,
+        ClassB = 0x100,
+        ClassC = 1
+    };
+
     // this class represents a selector for a StyleRule
     class CSSSelector {
         WTF_MAKE_FAST_ALLOCATED;
@@ -47,9 +53,15 @@ namespace WebCore {
         // checks if the 2 selectors (including sub selectors) agree.
         bool operator==(const CSSSelector&) const;
 
-        // tag == -1 means apply to all elements (Selector = *)
+        static const unsigned maxValueMask = 0xffffff;
+        static const unsigned idMask = 0xff0000;
+        static const unsigned classMask = 0xff00;
+        static const unsigned elementMask = 0xff;
 
-        unsigned specificity() const;
+        unsigned staticSpecificity(bool& ok) const;
+        unsigned specificityForPage() const;
+        unsigned simpleSelectorSpecificity() const;
+        static unsigned addSpecificities(unsigned, unsigned);
 
         /* how the attribute value has to match.... Default is Exact */
         enum Match {
@@ -94,7 +106,10 @@ namespace WebCore {
             PseudoClassLink,
             PseudoClassVisited,
             PseudoClassAny,
+#if ENABLE(CSS_SELECTORS_LEVEL4)
             PseudoClassAnyLink,
+#endif
+            PseudoClassAnyLinkDeprecated,
             PseudoClassAutofill,
             PseudoClassHover,
             PseudoClassDrag,
@@ -105,10 +120,9 @@ namespace WebCore {
             PseudoClassFullPageMedia,
             PseudoClassDefault,
             PseudoClassDisabled,
+            PseudoClassMatches,
             PseudoClassOptional,
-#if ENABLE(CSS_SELECTORS_LEVEL4)
             PseudoClassPlaceholderShown,
-#endif
             PseudoClassRequired,
             PseudoClassReadOnly,
             PseudoClassReadWrite,
@@ -142,6 +156,10 @@ namespace WebCore {
 #if ENABLE(VIDEO_TRACK)
             PseudoClassFuture,
             PseudoClassPast,
+#endif
+#if ENABLE(CSS_SELECTORS_LEVEL4)
+            PseudoClassDir,
+            PseudoClassRole,
 #endif
         };
 
@@ -199,15 +217,25 @@ namespace WebCore {
         const CSSSelector* tagHistory() const { return m_isLastInTagHistory ? 0 : const_cast<CSSSelector*>(this + 1); }
 
         const QualifiedName& tagQName() const;
+        const AtomicString& tagLowercaseLocalName() const;
+
         const AtomicString& value() const;
         const QualifiedName& attribute() const;
         const AtomicString& attributeCanonicalLocalName() const;
         const AtomicString& argument() const { return m_hasRareData ? m_data.m_rareData->m_argument : nullAtom; }
+        bool attributeValueMatchingIsCaseInsensitive() const;
+#if ENABLE(CSS_SELECTORS_LEVEL4)
+        const Vector<AtomicString>* langArgumentList() const { return m_hasRareData ? m_data.m_rareData->m_langArgumentList.get() : nullptr; }
+#endif
         const CSSSelectorList* selectorList() const { return m_hasRareData ? m_data.m_rareData->m_selectorList.get() : nullptr; }
 
         void setValue(const AtomicString&);
         void setAttribute(const QualifiedName&, bool isCaseInsensitive);
         void setArgument(const AtomicString&);
+        void setAttributeValueMatchingIsCaseInsensitive(bool);
+#if ENABLE(CSS_SELECTORS_LEVEL4)
+        void setLangArgumentList(std::unique_ptr<Vector<AtomicString>>);
+#endif
         void setSelectorList(std::unique_ptr<CSSSelectorList>);
 
         bool parseNth() const;
@@ -261,6 +289,12 @@ namespace WebCore {
             ASSERT(m_relation == relation);
         }
 
+        void setDescendantUseDoubleChildSyntax()
+        {
+            ASSERT(relation() == Descendant);
+            m_descendantDoubleChildSyntax = true;
+        }
+
         Match match() const { return static_cast<Match>(m_match); }
         void setMatch(Match match)
         {
@@ -284,11 +318,13 @@ namespace WebCore {
         unsigned m_isLastInSelectorList  : 1;
         unsigned m_isLastInTagHistory    : 1;
         unsigned m_hasRareData           : 1;
+        unsigned m_hasNameWithCase       : 1;
         unsigned m_isForPage             : 1;
         unsigned m_tagIsForNamespaceRule : 1;
+        unsigned m_descendantDoubleChildSyntax : 1;
+        unsigned m_caseInsensitiveAttributeValueMatching : 1;
 
-        unsigned specificityForOneSelector() const;
-        unsigned specificityForPage() const;
+        unsigned simpleSelectorSpecificityForPage() const;
 
         // Hide.
         CSSSelector& operator=(const CSSSelector&);
@@ -305,7 +341,10 @@ namespace WebCore {
             int m_b; // Used for :nth-*
             QualifiedName m_attribute; // used for attribute selector
             AtomicString m_attributeCanonicalLocalName;
-            AtomicString m_argument; // Used for :contains, :lang and :nth-*
+            AtomicString m_argument; // Used for :contains and :nth-*
+#if ENABLE(CSS_SELECTORS_LEVEL4)
+            std::unique_ptr<Vector<AtomicString>> m_langArgumentList;
+#endif
             std::unique_ptr<CSSSelectorList> m_selectorList; // Used for :-webkit-any and :not
         
         private:
@@ -313,11 +352,24 @@ namespace WebCore {
         };
         void createRareData();
 
+        struct NameWithCase : public RefCounted<NameWithCase> {
+            NameWithCase(const QualifiedName& originalName, const AtomicString& lowercaseName)
+                : m_originalName(originalName)
+                , m_lowercaseLocalName(lowercaseName)
+            {
+                ASSERT(originalName.localName() != lowercaseName);
+            }
+
+            const QualifiedName m_originalName;
+            const AtomicString m_lowercaseLocalName;
+        };
+
         union DataUnion {
             DataUnion() : m_value(0) { }
             AtomicStringImpl* m_value;
             QualifiedName::QualifiedNameImpl* m_tagQName;
             RareData* m_rareData;
+            NameWithCase* m_nameWithCase;
         } m_data;
     };
 
@@ -408,24 +460,12 @@ inline CSSSelector::CSSSelector()
     , m_isLastInSelectorList(false)
     , m_isLastInTagHistory(true)
     , m_hasRareData(false)
+    , m_hasNameWithCase(false)
     , m_isForPage(false)
     , m_tagIsForNamespaceRule(false)
+    , m_descendantDoubleChildSyntax(false)
+    , m_caseInsensitiveAttributeValueMatching(false)
 {
-}
-
-inline CSSSelector::CSSSelector(const QualifiedName& tagQName, bool tagIsForNamespaceRule)
-    : m_relation(Descendant)
-    , m_match(Tag)
-    , m_pseudoType(0)
-    , m_parsedNth(false)
-    , m_isLastInSelectorList(false)
-    , m_isLastInTagHistory(true)
-    , m_hasRareData(false)
-    , m_isForPage(false)
-    , m_tagIsForNamespaceRule(tagIsForNamespaceRule)
-{
-    m_data.m_tagQName = tagQName.impl();
-    m_data.m_tagQName->ref();
 }
 
 inline CSSSelector::CSSSelector(const CSSSelector& o)
@@ -436,15 +476,21 @@ inline CSSSelector::CSSSelector(const CSSSelector& o)
     , m_isLastInSelectorList(o.m_isLastInSelectorList)
     , m_isLastInTagHistory(o.m_isLastInTagHistory)
     , m_hasRareData(o.m_hasRareData)
+    , m_hasNameWithCase(o.m_hasNameWithCase)
     , m_isForPage(o.m_isForPage)
     , m_tagIsForNamespaceRule(o.m_tagIsForNamespaceRule)
+    , m_descendantDoubleChildSyntax(o.m_descendantDoubleChildSyntax)
+    , m_caseInsensitiveAttributeValueMatching(o.m_caseInsensitiveAttributeValueMatching)
 {
-    if (o.match() == Tag) {
-        m_data.m_tagQName = o.m_data.m_tagQName;
-        m_data.m_tagQName->ref();
-    } else if (o.m_hasRareData) {
+    if (o.m_hasRareData) {
         m_data.m_rareData = o.m_data.m_rareData;
         m_data.m_rareData->ref();
+    } else if (o.m_hasNameWithCase) {
+        m_data.m_nameWithCase = o.m_data.m_nameWithCase;
+        m_data.m_nameWithCase->ref();
+    } if (o.match() == Tag) {
+        m_data.m_tagQName = o.m_data.m_tagQName;
+        m_data.m_tagQName->ref();
     } else if (o.m_data.m_value) {
         m_data.m_value = o.m_data.m_value;
         m_data.m_value->ref();
@@ -453,10 +499,12 @@ inline CSSSelector::CSSSelector(const CSSSelector& o)
 
 inline CSSSelector::~CSSSelector()
 {
-    if (match() == Tag)
-        m_data.m_tagQName->deref();
-    else if (m_hasRareData)
+    if (m_hasRareData)
         m_data.m_rareData->deref();
+    else if (m_hasNameWithCase)
+        m_data.m_nameWithCase->deref();
+    else if (match() == Tag)
+        m_data.m_tagQName->deref();
     else if (m_data.m_value)
         m_data.m_value->deref();
 }
@@ -464,7 +512,16 @@ inline CSSSelector::~CSSSelector()
 inline const QualifiedName& CSSSelector::tagQName() const
 {
     ASSERT(match() == Tag);
+    if (m_hasNameWithCase)
+        return m_data.m_nameWithCase->m_originalName;
     return *reinterpret_cast<const QualifiedName*>(&m_data.m_tagQName);
+}
+
+inline const AtomicString& CSSSelector::tagLowercaseLocalName() const
+{
+    if (m_hasNameWithCase)
+        return m_data.m_nameWithCase->m_lowercaseLocalName;
+    return m_data.m_tagQName->m_localName;
 }
 
 inline const AtomicString& CSSSelector::value() const
@@ -475,6 +532,16 @@ inline const AtomicString& CSSSelector::value() const
     return *reinterpret_cast<const AtomicString*>(m_hasRareData ? &m_data.m_rareData->m_value : &m_data.m_value);
 }
 
+inline void CSSSelector::setAttributeValueMatchingIsCaseInsensitive(bool isCaseInsensitive)
+{
+    ASSERT(isAttributeSelector() && match() != CSSSelector::Set);
+    m_caseInsensitiveAttributeValueMatching = isCaseInsensitive;
+}
+
+inline bool CSSSelector::attributeValueMatchingIsCaseInsensitive() const
+{
+    return m_caseInsensitiveAttributeValueMatching;
+}
 
 } // namespace WebCore
 

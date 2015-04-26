@@ -86,7 +86,7 @@ void PluginProxy::pluginProcessCrashed()
 bool PluginProxy::initialize(const Parameters& parameters)
 {
     ASSERT(!m_connection);
-    m_connection = WebProcess::shared().pluginProcessConnectionManager().getPluginProcessConnection(m_pluginProcessToken);
+    m_connection = WebProcess::singleton().pluginProcessConnectionManager().getPluginProcessConnection(m_pluginProcessToken);
     
     if (!m_connection)
         return false;
@@ -104,6 +104,7 @@ bool PluginProxy::initialize(const Parameters& parameters)
     m_pendingPluginCreationParameters->userAgent = controller()->userAgent();
     m_pendingPluginCreationParameters->contentsScaleFactor = contentsScaleFactor();
     m_pendingPluginCreationParameters->isPrivateBrowsingEnabled = controller()->isPrivateBrowsingEnabled();
+    m_pendingPluginCreationParameters->isMuted = controller()->isMuted();
     m_pendingPluginCreationParameters->artificialPluginInitializationDelayEnabled = controller()->artificialPluginInitializationDelayEnabled();
     m_pendingPluginCreationParameters->isAcceleratedCompositingEnabled = controller()->isAcceleratedCompositingEnabled();
 
@@ -526,6 +527,11 @@ void PluginProxy::privateBrowsingStateChanged(bool isPrivateBrowsingEnabled)
     m_connection->connection()->send(Messages::PluginControllerProxy::PrivateBrowsingStateChanged(isPrivateBrowsingEnabled), m_pluginInstanceID);
 }
 
+void PluginProxy::mutedStateChanged(bool isMuted)
+{
+    m_connection->connection()->send(Messages::PluginControllerProxy::MutedStateChanged(isMuted), m_pluginInstanceID);
+}
+
 bool PluginProxy::getFormValue(String& formValue)
 {
     bool returnValue;
@@ -587,18 +593,15 @@ bool PluginProxy::updateBackingStore()
 
     IntSize backingStoreSize = m_pluginSize;
     backingStoreSize.scale(contentsScaleFactor());
-    
-    if (!m_backingStore) {
-        m_backingStore = ShareableBitmap::create(backingStoreSize, ShareableBitmap::SupportsAlpha);
-        return true;
+
+    if (m_backingStore) {
+        if (m_backingStore->size() == backingStoreSize)
+            return false;
+        m_backingStore = nullptr; // Give malloc a chance to recycle our backing store.
     }
 
-    if (backingStoreSize != m_backingStore->size()) {
-        // The backing store already exists, just resize it.
-        return m_backingStore->resize(backingStoreSize);
-    }
-
-    return false;
+    m_backingStore = ShareableBitmap::create(backingStoreSize, ShareableBitmap::SupportsAlpha);
+    return !!m_backingStore;
 }
 
 uint64_t PluginProxy::windowNPObjectID()
@@ -652,6 +655,11 @@ void PluginProxy::evaluate(const NPVariantData& npObjectAsVariantData, const Str
     releaseNPVariantValue(&result);
 
     releaseNPVariantValue(&npObjectAsVariant);
+}
+
+void PluginProxy::setPluginIsPlayingAudio(bool pluginIsPlayingAudio)
+{
+    controller()->setPluginIsPlayingAudio(pluginIsPlayingAudio);
 }
 
 void PluginProxy::cancelStreamLoad(uint64_t streamID)

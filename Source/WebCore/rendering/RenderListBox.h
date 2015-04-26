@@ -40,7 +40,7 @@ class HTMLSelectElement;
 
 class RenderListBox final : public RenderBlockFlow, public ScrollableArea {
 public:
-    RenderListBox(HTMLSelectElement&, PassRef<RenderStyle>);
+    RenderListBox(HTMLSelectElement&, Ref<RenderStyle>&&);
     virtual ~RenderListBox();
 
     HTMLSelectElement& selectElement() const;
@@ -123,7 +123,7 @@ private:
     virtual IntPoint convertFromContainingViewToScrollbar(const Scrollbar*, const IntPoint&) const override;
     virtual Scrollbar* verticalScrollbar() const override { return m_vBar.get(); }
     virtual IntSize contentsSize() const override;
-    virtual IntSize visibleSize() const override { return IntSize(height(), width()); }
+    virtual IntSize visibleSize() const override { return IntSize(width(), height()); }
     virtual IntPoint lastKnownMousePosition() const override;
     virtual bool isHandlingWheelEvent() const override;
     virtual bool shouldSuspendScrollAnimations() const override;
@@ -161,8 +161,8 @@ private:
     RefPtr<Scrollbar> m_vBar;
 };
 
-RENDER_OBJECT_TYPE_CASTS(RenderListBox, isListBox())
-
 } // namepace WebCore
+
+SPECIALIZE_TYPE_TRAITS_RENDER_OBJECT(RenderListBox, isListBox())
 
 #endif // RenderListBox_h

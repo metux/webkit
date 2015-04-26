@@ -24,7 +24,6 @@
 
 #include "Attribute.h"
 #include "FilterEffect.h"
-#include "SVGElementInstance.h"
 #include "SVGFilterBuilder.h"
 #include "SVGNames.h"
 #include <wtf/NeverDestroyed.h>
@@ -51,9 +50,9 @@ inline SVGFEBlendElement::SVGFEBlendElement(const QualifiedName& tagName, Docume
     registerAnimatedPropertiesForSVGFEBlendElement();
 }
 
-PassRefPtr<SVGFEBlendElement> SVGFEBlendElement::create(const QualifiedName& tagName, Document& document)
+Ref<SVGFEBlendElement> SVGFEBlendElement::create(const QualifiedName& tagName, Document& document)
 {
-    return adoptRef(new SVGFEBlendElement(tagName, document));
+    return adoptRef(*new SVGFEBlendElement(tagName, document));
 }
 
 bool SVGFEBlendElement::isSupportedAttribute(const QualifiedName& attrName)
@@ -111,7 +110,7 @@ void SVGFEBlendElement::svgAttributeChanged(const QualifiedName& attrName)
         return;
     }
 
-    SVGElementInstance::InvalidationGuard invalidationGuard(this);
+    InstanceInvalidationGuard guard(*this);
 
     if (attrName == SVGNames::modeAttr) {
         primitiveAttributeChanged(attrName);

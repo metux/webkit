@@ -85,12 +85,12 @@ public:
     virtual HostWindow* hostWindow() const = 0;
 
     // Returns a clip rect in host window coordinates. Used to clip the blit on a scroll.
-    virtual IntRect windowClipRect(bool clipToContents = true) const = 0;
+    virtual IntRect windowClipRect() const = 0;
 
     // Functions for child manipulation and inspection.
     const HashSet<RefPtr<Widget>>& children() const { return m_children; }
     WEBCORE_EXPORT virtual void addChild(PassRefPtr<Widget>);
-    virtual void removeChild(Widget*);
+    virtual void removeChild(Widget&);
 
     // If the scroll view does not use a native widget, then it will have cross-platform Scrollbars. These functions
     // can be used to obtain those scrollbars.
@@ -180,7 +180,7 @@ public:
     // Parts of the document can be visible through transparent or blured UI widgets of the chrome. Those parts
     // contribute to painting but not to the scrollable area.
     // The unobscuredContentRect is the area that is not covered by UI elements.
-    IntRect unobscuredContentRect(VisibleContentRectIncludesScrollbars = ExcludeScrollbars) const;
+    WEBCORE_EXPORT IntRect unobscuredContentRect(VisibleContentRectIncludesScrollbars = ExcludeScrollbars) const;
 #if PLATFORM(IOS)
     IntRect unobscuredContentRectIncludingScrollbars() const { return unobscuredContentRect(IncludeScrollbars); }
 #else
@@ -379,6 +379,8 @@ public:
 
     virtual bool isScrollView() const override { return true; }
 
+    WEBCORE_EXPORT void scrollPositionChangedViaPlatformWidget(const IntPoint& oldPosition, const IntPoint& newPosition);
+
 protected:
     ScrollView();
 
@@ -417,9 +419,17 @@ protected:
     float platformTopContentInset() const;
     void platformSetTopContentInset(float);
 
+    virtual void handleDeferredScrollUpdateAfterContentSizeChange();
+
+    virtual bool shouldDeferScrollUpdateAfterContentSizeChange() { return false; }
+
+    virtual void scrollPositionChangedViaPlatformWidgetImpl(const IntPoint&, const IntPoint&) { }
+
 private:
     virtual IntRect visibleContentRectInternal(VisibleContentRectIncludesScrollbars, VisibleContentRectBehavior) const override;
     WEBCORE_EXPORT IntRect unobscuredContentRectInternal(VisibleContentRectIncludesScrollbars = ExcludeScrollbars) const;
+
+    void completeUpdatesAfterScrollTo(const IntSize& scrollDelta);
 
     RefPtr<Scrollbar> m_horizontalScrollbar;
     RefPtr<Scrollbar> m_verticalScrollbar;
@@ -449,6 +459,10 @@ private:
     IntPoint m_cachedScrollPosition;
     IntSize m_fixedLayoutSize;
     IntSize m_contentsSize;
+
+    std::unique_ptr<IntSize> m_deferredScrollDelta; // Needed for WebKit scrolling
+    std::unique_ptr<std::pair<IntPoint, IntPoint>> m_deferredScrollPositions; // Needed for platform widget scrolling
+
 
     int m_scrollbarsAvoidingResizer;
     bool m_scrollbarsSuppressed;
@@ -507,8 +521,8 @@ private:
 #endif
 }; // class ScrollView
 
-WIDGET_TYPE_CASTS(ScrollView, isScrollView());
-
 } // namespace WebCore
+
+SPECIALIZE_TYPE_TRAITS_WIDGET(ScrollView, isScrollView())
 
 #endif // ScrollView_h

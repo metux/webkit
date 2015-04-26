@@ -48,9 +48,9 @@ public:
 
 private:
     virtual void didAddClient(CachedResourceClient*) override;
-    virtual void addDataBuffer(ResourceBuffer*) override;
+    virtual void addDataBuffer(SharedBuffer&) override;
     virtual void addData(const char* data, unsigned length) override;
-    virtual void finishLoading(ResourceBuffer*) override;
+    virtual void finishLoading(SharedBuffer*) override;
 
     virtual bool shouldIgnoreHTTPStatusCodeErrors() const override { return true; }
     virtual void allClientsRemoved() override;
@@ -64,7 +64,7 @@ private:
 
     virtual bool canReuse(const ResourceRequest&) const override;
 
-    const char* calculateIncrementalDataChunk(ResourceBuffer*, unsigned& incrementalDataLength);
+    const char* calculateIncrementalDataChunk(SharedBuffer*, unsigned& incrementalDataLength);
     void notifyClientsDataWasReceived(const char* data, unsigned length);
 
 #if USE(SOUP)
@@ -89,8 +89,10 @@ private:
     Vector<RedirectPair> m_redirectChain;
 };
 
-TYPE_CASTS_BASE(CachedRawResource, CachedResource, resource, resource->isMainOrRawResource(), resource.isMainOrRawResource())
+} // namespace WebCore
 
-}
+SPECIALIZE_TYPE_TRAITS_BEGIN(WebCore::CachedRawResource)
+    static bool isType(const WebCore::CachedResource& resource) { return resource.isMainOrRawResource(); }
+SPECIALIZE_TYPE_TRAITS_END()
 
 #endif // CachedRawResource_h

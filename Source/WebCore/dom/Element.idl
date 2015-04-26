@@ -108,6 +108,9 @@
 
     // HTML 5
     NodeList getElementsByClassName([Default=Undefined] optional DOMString name);
+    [TreatNullAs=NullString, SetterRaisesException] attribute DOMString innerHTML;
+    [TreatNullAs=NullString, SetterRaisesException] attribute DOMString outerHTML;
+             
 
     [Reflect=class] attribute DOMString className;
     readonly attribute DOMTokenList classList;
@@ -120,8 +123,9 @@
     [RaisesException] Element querySelector(DOMString selectors);
     [RaisesException] NodeList querySelectorAll(DOMString selectors);
 
-    [RaisesException] boolean matches([Default=Undefined] optional DOMString selectors);
-    [ImplementedAs=matches, RaisesException] boolean webkitMatchesSelector([Default=Undefined] optional DOMString selectors);
+    [RaisesException] boolean matches(DOMString selectors);
+    [RaisesException] Element closest(DOMString selectors);    
+    [ImplementedAs=matches, RaisesException] boolean webkitMatchesSelector(DOMString selectors);
 
     // ElementTraversal API
     readonly attribute Element firstElementChild;

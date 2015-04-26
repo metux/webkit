@@ -143,7 +143,7 @@ SVGSMILElement::~SVGSMILElement()
 
 void SVGSMILElement::clearResourceReferences()
 {
-    document().accessSVGExtensions()->removeAllTargetReferencesForElement(this);
+    document().accessSVGExtensions().removeAllTargetReferencesForElement(this);
 }
 
 void SVGSMILElement::clearTarget()
@@ -157,7 +157,7 @@ void SVGSMILElement::buildPendingResource()
 
     if (!inDocument()) {
         // Reset the target element if we are no longer in the document.
-        setTargetElement(0);
+        setTargetElement(nullptr);
         return;
     }
 
@@ -165,30 +165,30 @@ void SVGSMILElement::buildPendingResource()
     String href = getAttribute(XLinkNames::hrefAttr);
     Element* target;
     if (href.isEmpty())
-        target = parentNode() && parentNode()->isElementNode() ? toElement(parentNode()) : 0;
+        target = is<Element>(parentNode()) ? downcast<Element>(parentNode()) : nullptr;
     else
         target = SVGURIReference::targetElementFromIRIString(href, document(), &id);
-    SVGElement* svgTarget = target && target->isSVGElement() ? toSVGElement(target) : 0;
+    SVGElement* svgTarget = is<SVGElement>(target) ? downcast<SVGElement>(target) : nullptr;
 
     if (svgTarget && !svgTarget->inDocument())
-        svgTarget = 0;
+        svgTarget = nullptr;
 
     if (svgTarget != targetElement())
         setTargetElement(svgTarget);
 
     if (!svgTarget) {
         // Do not register as pending if we are already pending this resource.
-        if (document().accessSVGExtensions()->isPendingResource(this, id))
+        if (document().accessSVGExtensions().isPendingResource(this, id))
             return;
 
         if (!id.isEmpty()) {
-            document().accessSVGExtensions()->addPendingResource(id, this);
+            document().accessSVGExtensions().addPendingResource(id, this);
             ASSERT(hasPendingResources());
         }
     } else {
         // Register us with the target in the dependencies map. Any change of hrefElement
         // that leads to relayout/repainting now informs us, so we can react to it.
-        document().accessSVGExtensions()->addElementReferencingTarget(this, svgTarget);
+        document().accessSVGExtensions().addElementReferencingTarget(this, svgTarget);
     }
 }
 
@@ -214,10 +214,9 @@ static inline QualifiedName constructQualifiedName(const SVGElement* svgElement,
 
 static inline void clearTimesWithDynamicOrigins(Vector<SMILTimeWithOrigin>& timeList)
 {
-    for (int i = timeList.size() - 1; i >= 0; --i) {
-        if (timeList[i].originIsScript())
-            timeList.remove(i);
-    }
+    timeList.removeAllMatching([] (const SMILTimeWithOrigin& time) {
+        return time.originIsScript();
+    });
 }
 
 void SVGSMILElement::reset()
@@ -249,8 +248,7 @@ Node::InsertionNotificationRequest SVGSMILElement::insertedInto(ContainerNode& r
     if (!owner)
         return InsertionDone;
 
-    m_timeContainer = owner->timeContainer();
-    ASSERT(m_timeContainer);
+    m_timeContainer = &owner->timeContainer();
     m_timeContainer->setDocumentOrderIndexesDirty();
 
     // "If no attribute is present, the default begin value (an offset-value of 0) must be evaluated."
@@ -499,7 +497,7 @@ void SVGSMILElement::svgAttributeChanged(const QualifiedName& attrName)
     else if (attrName == SVGNames::attributeNameAttr)
         setAttributeName(constructQualifiedName(this, fastGetAttribute(SVGNames::attributeNameAttr)));
     else if (attrName.matches(XLinkNames::hrefAttr)) {
-        SVGElementInstance::InvalidationGuard invalidationGuard(this);
+        InstanceInvalidationGuard guard(*this);
         buildPendingResource();
     } else if (inDocument()) {
         if (attrName == SVGNames::beginAttr)
@@ -536,11 +534,11 @@ void SVGSMILElement::connectConditions()
             condition.m_syncbase = treeScope().getElementById(condition.m_baseID);
             if (!condition.m_syncbase)
                 continue;
-            if (!isSVGSMILElement(*condition.m_syncbase)) {
+            if (!is<SVGSMILElement>(*condition.m_syncbase)) {
                 condition.m_syncbase = nullptr;
                 continue;
             }
-            toSVGSMILElement(*condition.m_syncbase).addTimeDependent(this);
+            downcast<SVGSMILElement>(*condition.m_syncbase).addTimeDependent(this);
         }
     }
 }
@@ -565,12 +563,12 @@ void SVGSMILElement::disconnectConditions()
             if (eventBase)
                 eventBase->removeEventListener(condition.m_name, condition.m_eventListener.get(), false);
             condition.m_eventListener->disconnectAnimation();
-            condition.m_eventListener = 0;
+            condition.m_eventListener = nullptr;
         } else if (condition.m_type == Condition::Syncbase) {
             if (condition.m_syncbase)
-                toSVGSMILElement(condition.m_syncbase.get())->removeTimeDependent(this);
+                downcast<SVGSMILElement>(condition.m_syncbase.get())->removeTimeDependent(this);
         }
-        condition.m_syncbase = 0;
+        condition.m_syncbase = nullptr;
     }
 }
 

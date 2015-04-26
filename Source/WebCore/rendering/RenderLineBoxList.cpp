@@ -149,11 +149,12 @@ void RenderLineBoxList::dirtyLineBoxes()
         curr->dirtyLineBoxes();
 }
 
+// FIXME: This should take a RenderBoxModelObject&.
 bool RenderLineBoxList::rangeIntersectsRect(RenderBoxModelObject* renderer, LayoutUnit logicalTop, LayoutUnit logicalBottom, const LayoutRect& rect, const LayoutPoint& offset) const
 {
     RenderBox* block;
-    if (renderer->isBox())
-        block = toRenderBox(renderer);
+    if (is<RenderBox>(*renderer))
+        block = downcast<RenderBox>(renderer);
     else
         block = renderer->containingBlock();
     LayoutUnit physicalStart = block->flipForWritingMode(logicalTop);
@@ -312,22 +313,22 @@ bool RenderLineBoxList::hitTest(RenderBoxModelObject* renderer, const HitTestReq
     return false;
 }
 
-void RenderLineBoxList::dirtyLinesFromChangedChild(RenderBoxModelObject* container, RenderObject* child)
+void RenderLineBoxList::dirtyLinesFromChangedChild(RenderBoxModelObject& container, RenderObject& child)
 {
-    ASSERT(container->isRenderInline() || container->isRenderBlockFlow());
-    if (!container->parent() || (container->isRenderBlockFlow() && container->selfNeedsLayout()))
+    ASSERT(is<RenderInline>(container) || is<RenderBlockFlow>(container));
+    if (!container.parent() || (is<RenderBlockFlow>(container) && container.selfNeedsLayout()))
         return;
 
-    RenderInline* inlineContainer = container->isRenderInline() ? toRenderInline(container) : 0;
+    RenderInline* inlineContainer = is<RenderInline>(container) ? &downcast<RenderInline>(container) : nullptr;
     InlineBox* firstBox = inlineContainer ? inlineContainer->firstLineBoxIncludingCulling() : firstLineBox();
 
     // If we have no first line box, then just bail early.
     if (!firstBox) {
         // For an empty inline, go ahead and propagate the check up to our parent, unless the parent
         // is already dirty.
-        if (container->isInline() && !container->ancestorLineBoxDirty()) {
-            container->parent()->dirtyLinesFromChangedChild(container);
-            container->setAncestorLineBoxDirty(); // Mark the container to avoid dirtying the same lines again across multiple destroy() calls of the same subtree.
+        if (container.isInline() && !container.ancestorLineBoxDirty()) {
+            container.parent()->dirtyLinesFromChangedChild(container);
+            container.setAncestorLineBoxDirty(); // Mark the container to avoid dirtying the same lines again across multiple destroy() calls of the same subtree.
         }
         return;
     }
@@ -335,24 +336,23 @@ void RenderLineBoxList::dirtyLinesFromChangedChild(RenderBoxModelObject* contain
     // Try to figure out which line box we belong in.  First try to find a previous
     // line box by examining our siblings.  If we didn't find a line box, then use our 
     // parent's first line box.
-    RootInlineBox* box = 0;
-    RenderObject* curr = 0;
-    for (curr = child->previousSibling(); curr; curr = curr->previousSibling()) {
-        if (curr->isFloatingOrOutOfFlowPositioned())
+    RootInlineBox* box = nullptr;
+    RenderObject* current;
+    for (current = child.previousSibling(); current; current = current->previousSibling()) {
+        if (current->isFloatingOrOutOfFlowPositioned())
             continue;
 
-        if (curr->isReplaced()) {
-            if (auto wrapper = toRenderBox(curr)->inlineBoxWrapper())
+        if (current->isReplaced()) {
+            if (auto wrapper = downcast<RenderBox>(*current).inlineBoxWrapper())
                 box = &wrapper->root();
-        } if (curr->isLineBreak()) {
-            if (auto wrapper = toRenderLineBreak(curr)->inlineBoxWrapper())
+        } if (is<RenderLineBreak>(*current)) {
+            if (auto wrapper = downcast<RenderLineBreak>(*current).inlineBoxWrapper())
                 box = &wrapper->root();
-        } else if (curr->isText()) {
-            InlineTextBox* textBox = toRenderText(curr)->lastTextBox();
-            if (textBox)
+        } else if (is<RenderText>(*current)) {
+            if (InlineTextBox* textBox = downcast<RenderText>(*current).lastTextBox())
                 box = &textBox->root();
-        } else if (curr->isRenderInline()) {
-            InlineBox* lastSiblingBox = toRenderInline(curr)->lastLineBoxIncludingCulling();
+        } else if (is<RenderInline>(*current)) {
+            InlineBox* lastSiblingBox = downcast<RenderInline>(*current).lastLineBoxIncludingCulling();
             if (lastSiblingBox)
                 box = &lastSiblingBox->root();
         }
@@ -368,7 +368,7 @@ void RenderLineBoxList::dirtyLinesFromChangedChild(RenderBoxModelObject* contain
             // This isn't good enough, since we won't locate the root line box that encloses the removed
             // <br>. We have to just over-invalidate a bit and go up to our parent.
             if (!inlineContainer->ancestorLineBoxDirty()) {
-                inlineContainer->parent()->dirtyLinesFromChangedChild(inlineContainer);
+                inlineContainer->parent()->dirtyLinesFromChangedChild(*inlineContainer);
                 inlineContainer->setAncestorLineBoxDirty(); // Mark the container to avoid dirtying the same lines again across multiple destroy() calls of the same subtree.
             }
             return;
@@ -378,7 +378,6 @@ void RenderLineBoxList::dirtyLinesFromChangedChild(RenderBoxModelObject* contain
 
     // If we found a line box, then dirty it.
     if (box) {
-        RootInlineBox* adjacentBox;
         box->markDirty();
 
         // dirty the adjacent lines that might be affected
@@ -388,17 +387,13 @@ void RenderLineBoxList::dirtyLinesFromChangedChild(RenderBoxModelObject* contain
         // calls setLineBreakInfo with the result of findNextLineBreak.  findNextLineBreak,
         // despite the name, actually returns the first RenderObject after the BR.
         // <rdar://problem/3849947> "Typing after pasting line does not appear until after window resize."
-        adjacentBox = box->prevRootBox();
-        if (adjacentBox)
-            adjacentBox->markDirty();
-        adjacentBox = box->nextRootBox();
-        // If |child| has been inserted before the first element in the linebox, but after collapsed leading
-        // space, the search for |child|'s linebox will go past the leading space to the previous linebox and select that
-        // one as |box|. If we hit that situation here, dirty the |box| actually containing the child too. 
-        bool insertedAfterLeadingSpace = box->lineBreakObj() == child->previousSibling();
-        if (adjacentBox && (adjacentBox->lineBreakObj() == child || child->isBR() || (curr && curr->isBR())
-            || insertedAfterLeadingSpace || isIsolated(container->style().unicodeBidi())))
-            adjacentBox->markDirty();
+        if (RootInlineBox* prevBox = box->prevRootBox())
+            prevBox->markDirty();
+
+        // FIXME: We shouldn't need to always dirty the next line. This is only strictly 
+        // necessary some of the time, in situations involving BRs.
+        if (RootInlineBox* nextBox = box->nextRootBox())
+            nextBox->markDirty();
     }
 }
 

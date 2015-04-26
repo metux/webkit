@@ -45,8 +45,8 @@ namespace WebCore {
 
 AsyncScrollingCoordinator::AsyncScrollingCoordinator(Page* page)
     : ScrollingCoordinator(page)
-    , m_updateNodeScrollPositionTimer(this, &AsyncScrollingCoordinator::updateScrollPositionAfterAsyncScrollTimerFired)
-    , m_scrollingStateTree(ScrollingStateTree::create(this))
+    , m_updateNodeScrollPositionTimer(*this, &AsyncScrollingCoordinator::updateScrollPositionAfterAsyncScrollTimerFired)
+    , m_scrollingStateTree(std::make_unique<ScrollingStateTree>(this))
 {
 }
 
@@ -87,13 +87,12 @@ void AsyncScrollingCoordinator::frameViewLayoutUpdated(FrameView* frameView)
     // frame view whose layout was updated is not the main frame.
     // In the future, we may want to have the ability to set non-fast scrolling regions for more than
     // just the root node. But right now, this concept only applies to the root.
-    if (frameView->frame().isMainFrame())
-        m_scrollingStateTree->rootStateNode()->setNonFastScrollableRegion(computeNonFastScrollableRegion(&frameView->frame(), IntPoint()));
+    m_scrollingStateTree->rootStateNode()->setNonFastScrollableRegion(computeNonFastScrollableRegion(&m_page->mainFrame(), IntPoint()));
 
     if (!coordinatesScrollingForFrameView(frameView))
         return;
 
-    ScrollingStateFrameScrollingNode* node = toScrollingStateFrameScrollingNode(m_scrollingStateTree->stateNodeForID(frameView->scrollLayerID()));
+    ScrollingStateFrameScrollingNode* node = downcast<ScrollingStateFrameScrollingNode>(m_scrollingStateTree->stateNodeForID(frameView->scrollLayerID()));
     if (!node)
         return;
 
@@ -114,10 +113,10 @@ void AsyncScrollingCoordinator::frameViewLayoutUpdated(FrameView* frameView)
 #if ENABLE(CSS_SCROLL_SNAP)
     frameView->updateSnapOffsets();
     if (const Vector<LayoutUnit>* horizontalSnapOffsets = frameView->horizontalSnapOffsets())
-        setStateScrollingNodeSnapOffsetsAsFloat(*node, ScrollEventAxis::Horizontal, *horizontalSnapOffsets, frameView->frame().document()->deviceScaleFactor());
+        setStateScrollingNodeSnapOffsetsAsFloat(*node, ScrollEventAxis::Horizontal, *horizontalSnapOffsets, m_page->deviceScaleFactor());
 
     if (const Vector<LayoutUnit>* verticalSnapOffsets = frameView->verticalSnapOffsets())
-        setStateScrollingNodeSnapOffsetsAsFloat(*node, ScrollEventAxis::Vertical, *verticalSnapOffsets, frameView->frame().document()->deviceScaleFactor());
+        setStateScrollingNodeSnapOffsetsAsFloat(*node, ScrollEventAxis::Vertical, *verticalSnapOffsets, m_page->deviceScaleFactor());
 #endif
 
     ScrollableAreaParameters scrollParameters;
@@ -158,7 +157,7 @@ void AsyncScrollingCoordinator::frameViewRootLayerDidChange(FrameView* frameView
 
     ScrollingCoordinator::frameViewRootLayerDidChange(frameView);
 
-    ScrollingStateFrameScrollingNode* node = toScrollingStateFrameScrollingNode(m_scrollingStateTree->stateNodeForID(frameView->scrollLayerID()));
+    ScrollingStateFrameScrollingNode* node = downcast<ScrollingStateFrameScrollingNode>(m_scrollingStateTree->stateNodeForID(frameView->scrollLayerID()));
     node->setLayer(scrollLayerForFrameView(frameView));
     node->setScrolledContentsLayer(rootContentLayerForFrameView(frameView));
     node->setCounterScrollingLayer(counterScrollingLayerForFrameView(frameView));
@@ -177,19 +176,20 @@ bool AsyncScrollingCoordinator::requestScrollPositionUpdate(FrameView* frameView
     if (!coordinatesScrollingForFrameView(frameView))
         return false;
 
-    if (frameView->inProgrammaticScroll() || frameView->frame().document()->inPageCache())
-        updateScrollPositionAfterAsyncScroll(frameView->scrollLayerID(), scrollPosition, frameView->inProgrammaticScroll(), SetScrollingLayerPosition);
+    bool isProgrammaticScroll = frameView->inProgrammaticScroll();
+    if (isProgrammaticScroll || frameView->frame().document()->inPageCache())
+        updateScrollPositionAfterAsyncScroll(frameView->scrollLayerID(), scrollPosition, isProgrammaticScroll, SetScrollingLayerPosition);
 
     // If this frame view's document is being put into the page cache, we don't want to update our
     // main frame scroll position. Just let the FrameView think that we did.
     if (frameView->frame().document()->inPageCache())
         return true;
 
-    ScrollingStateScrollingNode* stateNode = toScrollingStateScrollingNode(m_scrollingStateTree->stateNodeForID(frameView->scrollLayerID()));
+    ScrollingStateScrollingNode* stateNode = downcast<ScrollingStateScrollingNode>(m_scrollingStateTree->stateNodeForID(frameView->scrollLayerID()));
     if (!stateNode)
         return false;
 
-    stateNode->setRequestedScrollPosition(scrollPosition, frameView->inProgrammaticScroll());
+    stateNode->setRequestedScrollPosition(scrollPosition, isProgrammaticScroll);
     return true;
 }
 
@@ -197,6 +197,10 @@ void AsyncScrollingCoordinator::scheduleUpdateScrollPositionAfterAsyncScroll(Scr
 {
     ScheduledScrollUpdate scrollUpdate(nodeID, scrollPosition, programmaticScroll, scrollingLayerPositionAction);
     
+    // For programmatic scrolls, requestScrollPositionUpdate() has already called updateScrollPositionAfterAsyncScroll().
+    if (programmaticScroll)
+        return;
+
     if (m_updateNodeScrollPositionTimer.isActive()) {
         if (m_scheduledScrollUpdate.matchesUpdateType(scrollUpdate)) {
             m_scheduledScrollUpdate.scrollPosition = scrollPosition;
@@ -214,7 +218,7 @@ void AsyncScrollingCoordinator::scheduleUpdateScrollPositionAfterAsyncScroll(Scr
     m_updateNodeScrollPositionTimer.startOneShot(0);
 }
 
-void AsyncScrollingCoordinator::updateScrollPositionAfterAsyncScrollTimerFired(Timer<AsyncScrollingCoordinator>*)
+void AsyncScrollingCoordinator::updateScrollPositionAfterAsyncScrollTimerFired()
 {
     updateScrollPositionAfterAsyncScroll(m_scheduledScrollUpdate.nodeID, m_scheduledScrollUpdate.scrollPosition, m_scheduledScrollUpdate.isProgrammaticScroll, m_scheduledScrollUpdate.updateLayerPositionAction);
 }
@@ -332,7 +336,7 @@ void AsyncScrollingCoordinator::updateScrollPositionAfterAsyncScroll(ScrollingNo
         scrollableArea->scrollToOffsetWithoutAnimation(scrollPosition);
         scrollableArea->setIsUserScroll(false);
         if (scrollingLayerPositionAction == SetScrollingLayerPosition)
-            m_page->editorClient()->overflowScrollPositionChanged();
+            m_page->editorClient().overflowScrollPositionChanged();
     }
 }
 
@@ -387,7 +391,7 @@ void AsyncScrollingCoordinator::ensureRootStateNodeForFrameView(FrameView* frame
 
 void AsyncScrollingCoordinator::updateFrameScrollingNode(ScrollingNodeID nodeID, GraphicsLayer* layer, GraphicsLayer* scrolledContentsLayer, GraphicsLayer* counterScrollingLayer, GraphicsLayer* insetClipLayer, const ScrollingGeometry* scrollingGeometry)
 {
-    ScrollingStateFrameScrollingNode* node = toScrollingStateFrameScrollingNode(m_scrollingStateTree->stateNodeForID(nodeID));
+    ScrollingStateFrameScrollingNode* node = downcast<ScrollingStateFrameScrollingNode>(m_scrollingStateTree->stateNodeForID(nodeID));
     ASSERT(node);
     if (!node)
         return;
@@ -408,7 +412,7 @@ void AsyncScrollingCoordinator::updateFrameScrollingNode(ScrollingNodeID nodeID,
     
 void AsyncScrollingCoordinator::updateOverflowScrollingNode(ScrollingNodeID nodeID, GraphicsLayer* layer, GraphicsLayer* scrolledContentsLayer, const ScrollingGeometry* scrollingGeometry)
 {
-    ScrollingStateOverflowScrollingNode* node = toScrollingStateOverflowScrollingNode(m_scrollingStateTree->stateNodeForID(nodeID));
+    ScrollingStateOverflowScrollingNode* node = downcast<ScrollingStateOverflowScrollingNode>(m_scrollingStateTree->stateNodeForID(nodeID));
     ASSERT(node);
     if (!node)
         return;
@@ -423,8 +427,8 @@ void AsyncScrollingCoordinator::updateOverflowScrollingNode(ScrollingNodeID node
         node->setReachableContentsSize(scrollingGeometry->reachableContentSize);
         node->setScrollableAreaSize(scrollingGeometry->scrollableAreaSize);
 #if ENABLE(CSS_SCROLL_SNAP)
-        setStateScrollingNodeSnapOffsetsAsFloat(*node, ScrollEventAxis::Horizontal, scrollingGeometry->horizontalSnapOffsets, scrolledContentsLayer->deviceScaleFactor());
-        setStateScrollingNodeSnapOffsetsAsFloat(*node, ScrollEventAxis::Vertical, scrollingGeometry->verticalSnapOffsets, scrolledContentsLayer->deviceScaleFactor());
+        setStateScrollingNodeSnapOffsetsAsFloat(*node, ScrollEventAxis::Horizontal, scrollingGeometry->horizontalSnapOffsets, m_page->deviceScaleFactor());
+        setStateScrollingNodeSnapOffsetsAsFloat(*node, ScrollEventAxis::Vertical, scrollingGeometry->verticalSnapOffsets, m_page->deviceScaleFactor());
 #endif
     }
 }
@@ -439,15 +443,15 @@ void AsyncScrollingCoordinator::updateViewportConstrainedNode(ScrollingNodeID no
 
     switch (constraints.constraintType()) {
     case ViewportConstraints::FixedPositionConstraint: {
-        ScrollingStateFixedNode* fixedNode = toScrollingStateFixedNode(node);
-        fixedNode->setLayer(graphicsLayer);
-        fixedNode->updateConstraints((const FixedPositionViewportConstraints&)constraints);
+        ScrollingStateFixedNode& fixedNode = downcast<ScrollingStateFixedNode>(*node);
+        fixedNode.setLayer(graphicsLayer);
+        fixedNode.updateConstraints((const FixedPositionViewportConstraints&)constraints);
         break;
     }
     case ViewportConstraints::StickyPositionConstraint: {
-        ScrollingStateStickyNode* stickyNode = toScrollingStateStickyNode(node);
-        stickyNode->setLayer(graphicsLayer);
-        stickyNode->updateConstraints((const StickyPositionViewportConstraints&)constraints);
+        ScrollingStateStickyNode& stickyNode = downcast<ScrollingStateStickyNode>(*node);
+        stickyNode.setLayer(graphicsLayer);
+        stickyNode.updateConstraints((const StickyPositionViewportConstraints&)constraints);
         break;
     }
     }
@@ -483,7 +487,7 @@ void AsyncScrollingCoordinator::updateMainFrameScrollLayerPosition()
 
 void AsyncScrollingCoordinator::recomputeWheelEventHandlerCountForFrameView(FrameView* frameView)
 {
-    ScrollingStateFrameScrollingNode* node = toScrollingStateFrameScrollingNode(m_scrollingStateTree->stateNodeForID(frameView->scrollLayerID()));
+    ScrollingStateFrameScrollingNode* node = downcast<ScrollingStateFrameScrollingNode>(m_scrollingStateTree->stateNodeForID(frameView->scrollLayerID()));
     if (!node)
         return;
     node->setWheelEventHandlerCount(computeCurrentWheelEventHandlerCount());

@@ -30,6 +30,8 @@
 
 #include "CachedScript.h"
 #include "DOMTimer.h"
+#include "DatabaseContext.h"
+#include "Document.h"
 #include "ErrorEvent.h"
 #include "MessagePort.h"
 #include "PublicURLManager.h"
@@ -45,10 +47,6 @@
 
 #if PLATFORM(IOS)
 #include "Document.h"
-#endif
-
-#if ENABLE(SQL_DATABASE)
-#include "DatabaseContext.h"
 #endif
 
 using namespace Inspector;
@@ -158,16 +156,16 @@ void ScriptExecutionContext::dispatchMessagePortEvents()
 
 void ScriptExecutionContext::createdMessagePort(MessagePort& messagePort)
 {
-    ASSERT((isDocument() && isMainThread())
-        || (isWorkerGlobalScope() && currentThread() == toWorkerGlobalScope(this)->thread().threadID()));
+    ASSERT((is<Document>(*this) && isMainThread())
+        || (is<WorkerGlobalScope>(*this) && currentThread() == downcast<WorkerGlobalScope>(*this).thread().threadID()));
 
     m_messagePorts.add(&messagePort);
 }
 
 void ScriptExecutionContext::destroyedMessagePort(MessagePort& messagePort)
 {
-    ASSERT((isDocument() && isMainThread())
-        || (isWorkerGlobalScope() && currentThread() == toWorkerGlobalScope(this)->thread().threadID()));
+    ASSERT((is<Document>(*this) && isMainThread())
+        || (is<WorkerGlobalScope>(*this) && currentThread() == downcast<WorkerGlobalScope>(*this).thread().threadID()));
 
     m_messagePorts.remove(&messagePort);
 }
@@ -176,7 +174,7 @@ void ScriptExecutionContext::didLoadResourceSynchronously(const ResourceRequest&
 {
 }
 
-bool ScriptExecutionContext::canSuspendActiveDOMObjects()
+bool ScriptExecutionContext::canSuspendActiveDOMObjects(Vector<ActiveDOMObject*>* unsuspendableObjects)
 {
     checkConsistency();
 
@@ -194,7 +192,10 @@ bool ScriptExecutionContext::canSuspendActiveDOMObjects()
     for (auto* activeDOMObject : m_activeDOMObjects) {
         if (!activeDOMObject->canSuspend()) {
             canSuspend = false;
-            break;
+            if (unsuspendableObjects)
+                unsuspendableObjects->append(activeDOMObject);
+            else
+                break;
         }
     }
 
@@ -349,25 +350,25 @@ bool ScriptExecutionContext::sanitizeScriptError(String& errorMessage, int& line
     return true;
 }
 
-void ScriptExecutionContext::reportException(const String& errorMessage, int lineNumber, int columnNumber, const String& sourceURL, PassRefPtr<ScriptCallStack> callStack, CachedScript* cachedScript)
+void ScriptExecutionContext::reportException(const String& errorMessage, int lineNumber, int columnNumber, const String& sourceURL, RefPtr<ScriptCallStack>&& callStack, CachedScript* cachedScript)
 {
     if (m_inDispatchErrorEvent) {
         if (!m_pendingExceptions)
             m_pendingExceptions = std::make_unique<Vector<std::unique_ptr<PendingException>>>();
-        m_pendingExceptions->append(std::make_unique<PendingException>(errorMessage, lineNumber, columnNumber, sourceURL, callStack));
+        m_pendingExceptions->append(std::make_unique<PendingException>(errorMessage, lineNumber, columnNumber, sourceURL, callStack.copyRef()));
         return;
     }
 
     // First report the original exception and only then all the nested ones.
     if (!dispatchErrorEvent(errorMessage, lineNumber, columnNumber, sourceURL, cachedScript))
-        logExceptionToConsole(errorMessage, sourceURL, lineNumber, columnNumber, callStack);
+        logExceptionToConsole(errorMessage, sourceURL, lineNumber, columnNumber, callStack.copyRef());
 
     if (!m_pendingExceptions)
         return;
 
     std::unique_ptr<Vector<std::unique_ptr<PendingException>>> pendingExceptions = WTF::move(m_pendingExceptions);
     for (auto& exception : *pendingExceptions)
-        logExceptionToConsole(exception->m_errorMessage, exception->m_sourceURL, exception->m_lineNumber, exception->m_columnNumber, exception->m_callStack);
+        logExceptionToConsole(exception->m_errorMessage, exception->m_sourceURL, exception->m_lineNumber, exception->m_columnNumber, exception->m_callStack.copyRef());
 }
 
 void ScriptExecutionContext::addConsoleMessage(MessageSource source, MessageLevel level, const String& message, const String& sourceURL, unsigned lineNumber, unsigned columnNumber, JSC::ExecState* state, unsigned long requestIdentifier)
@@ -382,8 +383,8 @@ bool ScriptExecutionContext::dispatchErrorEvent(const String& errorMessage, int 
         return false;
 
 #if PLATFORM(IOS)
-    if (target == target->toDOMWindow() && isDocument()) {
-        Settings* settings = toDocument(this)->settings();
+    if (target == target->toDOMWindow() && is<Document>(*this)) {
+        Settings* settings = downcast<Document>(*this).settings();
         if (settings && !settings->shouldDispatchJavaScriptWindowOnErrorEvents())
             return false;
     }
@@ -449,19 +450,17 @@ double ScriptExecutionContext::timerAlignmentInterval() const
 
 JSC::VM& ScriptExecutionContext::vm()
 {
-     if (isDocument())
+    if (is<Document>(*this))
         return JSDOMWindow::commonVM();
 
-    return toWorkerGlobalScope(*this).script()->vm();
+    return downcast<WorkerGlobalScope>(*this).script()->vm();
 }
 
-#if ENABLE(SQL_DATABASE)
 void ScriptExecutionContext::setDatabaseContext(DatabaseContext* databaseContext)
 {
     ASSERT(!m_databaseContext);
     m_databaseContext = databaseContext;
 }
-#endif
 
 bool ScriptExecutionContext::hasPendingActivity() const
 {

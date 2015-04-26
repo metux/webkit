@@ -31,7 +31,7 @@ namespace WebCore {
 class SVGEllipseElement final : public SVGGraphicsElement,
                                 public SVGExternalResourcesRequired {
 public:
-    static PassRefPtr<SVGEllipseElement> create(const QualifiedName&, Document&);
+    static Ref<SVGEllipseElement> create(const QualifiedName&, Document&);
 
 private:
     SVGEllipseElement(const QualifiedName&, Document&);
@@ -44,7 +44,7 @@ private:
 
     virtual bool selfHasRelativeLengths() const override { return true; };
 
-    virtual RenderPtr<RenderElement> createElementRenderer(PassRef<RenderStyle>) override;
+    virtual RenderPtr<RenderElement> createElementRenderer(Ref<RenderStyle>&&) override;
 
     BEGIN_DECLARE_ANIMATED_PROPERTIES(SVGEllipseElement)
         DECLARE_ANIMATED_LENGTH(Cx, cx)
@@ -54,8 +54,6 @@ private:
         DECLARE_ANIMATED_BOOLEAN(ExternalResourcesRequired, externalResourcesRequired)
     END_DECLARE_ANIMATED_PROPERTIES
 };
-
-NODE_TYPE_CASTS(SVGEllipseElement)
 
 } // namespace WebCore
 

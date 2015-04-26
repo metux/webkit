@@ -31,6 +31,7 @@
 namespace WebCore {
 
 class RemoteCommandListenerClient {
+    WTF_MAKE_FAST_ALLOCATED;
 public:
     virtual ~RemoteCommandListenerClient() { }
     virtual void didReceiveRemoteControlCommand(MediaSession::RemoteControlCommandType) = 0;
@@ -38,7 +39,7 @@ public:
 
 class RemoteCommandListener {
 public:
-    static std::unique_ptr<RemoteCommandListener> create(RemoteCommandListenerClient&);
+    WEBCORE_EXPORT static std::unique_ptr<RemoteCommandListener> create(RemoteCommandListenerClient&);
     RemoteCommandListener(RemoteCommandListenerClient& client) : m_client(client) { }
     virtual ~RemoteCommandListener() { }
 

@@ -53,7 +53,7 @@
 #ifndef _WINSOCKAPI_
 #define _WINSOCKAPI_ // Prevent inclusion of winsock.h in windows.h
 #endif
-#elif !OS(WINCE)
+#else
 #define WTF_USE_CG 1
 #undef WTF_USE_CAIRO
 #undef WTF_USE_CURL
@@ -84,4 +84,8 @@
 
 #if PLATFORM(COCOA) && defined(__OBJC__)
 #import <WebKit/WebKit.h>
+#endif
+
+#if !PLATFORM(IOS)
+#define WK_HAVE_C_SPI 1
 #endif
