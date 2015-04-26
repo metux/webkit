@@ -1,33 +1,27 @@
 From: Alberto Garcia <berto@igalia.com>
 Subject: Install the MiniBrowser binary
 Forwarded: not-needed
-Index: webkitgtk/Tools/MiniBrowser/gtk/main.c
-===================================================================
---- webkitgtk.orig/Tools/MiniBrowser/gtk/main.c
-+++ webkitgtk/Tools/MiniBrowser/gtk/main.c
-@@ -240,7 +240,6 @@ aboutURISchemeRequestCallback(WebKitURIS
- int main(int argc, char *argv[])
- {
-     gtk_init(&argc, &argv);
--    g_setenv("WEBKIT_INJECTED_BUNDLE_PATH", WEBKIT_INJECTED_BUNDLE_PATH, FALSE);
- 
-     const gchar *multiprocess = g_getenv("MINIBROWSER_MULTIPROCESS");
-     if (multiprocess && *multiprocess) {
 Index: webkitgtk/Tools/MiniBrowser/gtk/CMakeLists.txt
 ===================================================================
 --- webkitgtk.orig/Tools/MiniBrowser/gtk/CMakeLists.txt
 +++ webkitgtk/Tools/MiniBrowser/gtk/CMakeLists.txt
-@@ -52,3 +52,4 @@ include_directories(${MiniBrowser_INCLUD
- add_executable(MiniBrowser ${MiniBrowser_SOURCES})
+@@ -54,4 +54,4 @@ add_executable(MiniBrowser ${MiniBrowser
  target_link_libraries(MiniBrowser ${MiniBrowser_LIBRARIES})
  set_target_properties(MiniBrowser PROPERTIES FOLDER "Tools")
+ 
+-install(TARGETS MiniBrowser DESTINATION "${EXEC_INSTALL_DIR}")
+\ No newline at end of file
 +install(TARGETS MiniBrowser DESTINATION "${LIBEXEC_INSTALL_DIR}")
-Index: webkitgtk/CMakeLists.txt
+Index: webkitgtk/Source/cmake/OptionsGTK.cmake
 ===================================================================
---- webkitgtk.orig/CMakeLists.txt
-+++ webkitgtk/CMakeLists.txt
-@@ -184,3 +184,4 @@ add_subdirectory(Source)
- if (ENABLE_TOOLS)
-     add_subdirectory(Tools)
+--- webkitgtk.orig/Source/cmake/OptionsGTK.cmake
++++ webkitgtk/Source/cmake/OptionsGTK.cmake
+@@ -141,7 +141,7 @@ if (DEVELOPER_MODE)
+     WEBKIT_OPTION_DEFAULT_PORT_VALUE(ENABLE_MINIBROWSER ON)
+     WEBKIT_OPTION_DEFAULT_PORT_VALUE(ENABLE_API_TESTS ON)
+ else ()
+-    WEBKIT_OPTION_DEFAULT_PORT_VALUE(ENABLE_MINIBROWSER OFF)
++    WEBKIT_OPTION_DEFAULT_PORT_VALUE(ENABLE_MINIBROWSER ON)
+     WEBKIT_OPTION_DEFAULT_PORT_VALUE(ENABLE_API_TESTS OFF)
+     set(WebKit2_VERSION_SCRIPT "-Wl,--version-script,${CMAKE_MODULE_PATH}/gtksymbols.filter")
  endif ()
-+add_subdirectory(Tools/MiniBrowser/gtk)
