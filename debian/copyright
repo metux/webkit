@@ -10,7 +10,7 @@ Comment:
 Files: debian/*
 Copyright: © 2007-2009 Mike Hommey <glandium@debian.org>
            © 2009 Gustavo Noronha Silva <kov@debian.org>
-           © 2014 Alberto Garcia <berto@igalia.com>
+           © 2014-2015 Alberto Garcia <berto@igalia.com>
 License: LGPL-2+
 
 Files: debian/jquery-1.9.1.js
@@ -21,7 +21,7 @@ Comment:
  http://code.jquery.com/jquery-1.9.1.js
 
 Files: *
-Copyright: © 2002-2014 Apple Inc. and others
+Copyright: © 2002-2015 Apple Inc. and others
 License: BSD-2-clause
 Comment:
  The default license of WebKit is BSD 2-clause, available in
