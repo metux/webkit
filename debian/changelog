@@ -6,6 +6,8 @@ webkit2gtk (2.8.1+dfsg1-1) UNRELEASED; urgency=medium
       - Refresh and update it to make it work with cmake.
     + debian/patches/install-minibrowser.patch:
       - Update for this release.
+  * debian/libwebkit2gtk-4.0-37.symbols:
+    + Update.
 
  -- Alberto Garcia <berto@igalia.com>  Sat, 14 Mar 2015 11:59:05 +0200
 
