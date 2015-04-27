@@ -1,4 +1,4 @@
-webkit2gtk (2.8.1+dfsg1-1) UNRELEASED; urgency=medium
+webkit2gtk (2.8.1+dfsg1-1) unstable; urgency=medium
 
   * New upstream release.
   * Drop all patches, except:
@@ -15,7 +15,7 @@ webkit2gtk (2.8.1+dfsg1-1) UNRELEASED; urgency=medium
   * debian/control:
     + Add build dependencies on libgnutls28-dev and libnotify-dev.
 
- -- Alberto Garcia <berto@igalia.com>  Sat, 14 Mar 2015 11:59:05 +0200
+ -- Alberto Garcia <berto@igalia.com>  Mon, 27 Apr 2015 21:22:35 +0300
 
 webkit2gtk (2.6.2+dfsg1-4) unstable; urgency=medium
 
