@@ -1,3 +1,11 @@
+webkit2gtk (2.8.1+dfsg1-2) UNRELEASED; urgency=medium
+
+  [ Helge Deller ]
+  * debian/rules:
+    + Disable debugging symbols in hppa (Closes: #784176).
+
+ -- Alberto Garcia <berto@igalia.com>  Thu, 07 May 2015 10:53:28 +0300
+
 webkit2gtk (2.8.1+dfsg1-1) unstable; urgency=medium
 
   * New upstream release.

@@ -21,7 +21,7 @@ ifeq ($(DEB_BUILD_ARCH),alpha)
 endif
 
 # Disable debugging symbols on these arches.
-ifneq (,$(filter $(DEB_BUILD_ARCH),hurd-i386 ia64 kfreebsd-i386 kfreebsd-amd64 mips mipsel powerpc powerpcspe s390 s390x sparc armel armhf))
+ifneq (,$(filter $(DEB_BUILD_ARCH),hurd-i386 ia64 kfreebsd-i386 kfreebsd-amd64 mips mipsel powerpc powerpcspe s390 s390x sparc armel armhf hppa))
 	CFLAGS := $(CFLAGS:-g=)
 	EXTRA_DH_ARGUMENTS += -Nlibwebkit2gtk-4.0-37-dbg -Nlibjavascriptcoregtk-4.0-18-dbg
 endif
