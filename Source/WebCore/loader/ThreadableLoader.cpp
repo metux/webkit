@@ -51,6 +51,19 @@ ThreadableLoaderOptions::~ThreadableLoaderOptions()
 {
 }
 
+std::unique_ptr<ThreadableLoaderOptions> ThreadableLoaderOptions::isolatedCopy() const
+{
+    std::unique_ptr<ThreadableLoaderOptions> copy = std::make_unique<ThreadableLoaderOptions>();
+    copy->preflightPolicy = preflightPolicy;
+    copy->crossOriginRequestPolicy = crossOriginRequestPolicy;
+    if (securityOrigin)
+        copy->securityOrigin = securityOrigin->isolatedCopy();
+#if ENABLE(RESOURCE_TIMING)
+    copy->initiator = initiator.string().isolatedCopy();
+#endif
+    return copy;
+}
+
 PassRefPtr<ThreadableLoader> ThreadableLoader::create(ScriptExecutionContext* context, ThreadableLoaderClient* client, const ResourceRequest& request, const ThreadableLoaderOptions& options)
 {
     ASSERT(client);

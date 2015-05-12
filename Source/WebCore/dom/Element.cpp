@@ -55,6 +55,7 @@
 #include "HTMLSelectElement.h"
 #include "HTMLTableRowsCollection.h"
 #include "HTMLTemplateElement.h"
+#include "IdTargetObserverRegistry.h"
 #include "InsertionPoint.h"
 #include "KeyboardEvent.h"
 #include "MutationObserverInterestGroup.h"
@@ -1073,31 +1074,40 @@ static bool checkNeedsStyleInvalidationForIdChange(const AtomicString& oldId, co
 
 void Element::attributeChanged(const QualifiedName& name, const AtomicString& oldValue, const AtomicString& newValue, AttributeModificationReason)
 {
+    bool valueIsSameAsBefore = oldValue == newValue;
+
+    StyleResolver* styleResolver = document().styleResolverIfExists();
+    bool testShouldInvalidateStyle = inRenderedDocument() && styleResolver && styleChangeType() < FullStyleChange;
+
+    bool shouldInvalidateStyle = false;
+
+    if (!valueIsSameAsBefore) {
+        if (name == HTMLNames::idAttr) {
+            if (!oldValue.isEmpty())
+                treeScope().idTargetObserverRegistry().notifyObservers(*oldValue.impl());
+            if (!newValue.isEmpty())
+                treeScope().idTargetObserverRegistry().notifyObservers(*newValue.impl());
+
+            AtomicString oldId = elementData()->idForStyleResolution();
+            AtomicString newId = makeIdForStyleResolution(newValue, document().inQuirksMode());
+            if (newId != oldId) {
+                elementData()->setIdForStyleResolution(newId);
+                shouldInvalidateStyle = testShouldInvalidateStyle && checkNeedsStyleInvalidationForIdChange(oldId, newId, styleResolver);
+            }
+        } else if (name == classAttr)
+            classAttributeChanged(newValue);
+        else if (name == HTMLNames::nameAttr)
+            elementData()->setHasNameAttribute(!newValue.isNull());
+        else if (name == HTMLNames::pseudoAttr)
+            shouldInvalidateStyle |= testShouldInvalidateStyle && isInShadowTree();
+    }
+
     parseAttribute(name, newValue);
 
     document().incDOMTreeVersion();
 
-    if (oldValue == newValue)
+    if (valueIsSameAsBefore)
         return;
-
-    StyleResolver* styleResolver = document().styleResolverIfExists();
-    bool testShouldInvalidateStyle = inRenderedDocument() && styleResolver && styleChangeType() < FullStyleChange;
-    bool shouldInvalidateStyle = false;
-
-    if (name == HTMLNames::idAttr) {
-        AtomicString oldId = elementData()->idForStyleResolution();
-        AtomicString newId = makeIdForStyleResolution(newValue, document().inQuirksMode());
-        if (newId != oldId) {
-            elementData()->setIdForStyleResolution(newId);
-            shouldInvalidateStyle = testShouldInvalidateStyle && checkNeedsStyleInvalidationForIdChange(oldId, newId, styleResolver);
-        }
-    } else if (name == classAttr)
-        classAttributeChanged(newValue);
-    else if (name == HTMLNames::nameAttr)
-        elementData()->setHasNameAttribute(!newValue.isNull());
-    else if (name == HTMLNames::pseudoAttr)
-        shouldInvalidateStyle |= testShouldInvalidateStyle && isInShadowTree();
-
 
     invalidateNodeListAndCollectionCachesInAncestors(&name, this);
 
@@ -2071,14 +2081,14 @@ void Element::blur()
 
 void Element::dispatchFocusInEvent(const AtomicString& eventType, RefPtr<Element>&& oldFocusedElement)
 {
-    ASSERT(!NoEventDispatchAssertion::isEventDispatchForbidden());
+    ASSERT_WITH_SECURITY_IMPLICATION(!NoEventDispatchAssertion::isEventDispatchForbidden());
     ASSERT(eventType == eventNames().focusinEvent || eventType == eventNames().DOMFocusInEvent);
     dispatchScopedEvent(FocusEvent::create(eventType, true, false, document().defaultView(), 0, WTF::move(oldFocusedElement)));
 }
 
 void Element::dispatchFocusOutEvent(const AtomicString& eventType, RefPtr<Element>&& newFocusedElement)
 {
-    ASSERT(!NoEventDispatchAssertion::isEventDispatchForbidden());
+    ASSERT_WITH_SECURITY_IMPLICATION(!NoEventDispatchAssertion::isEventDispatchForbidden());
     ASSERT(eventType == eventNames().focusoutEvent || eventType == eventNames().DOMFocusOutEvent);
     dispatchScopedEvent(FocusEvent::create(eventType, true, false, document().defaultView(), 0, WTF::move(newFocusedElement)));
 }
@@ -2800,7 +2810,7 @@ void Element::updateNameForDocument(HTMLDocument& document, const AtomicString& 
     }
 }
 
-inline void Element::updateId(const AtomicString& oldId, const AtomicString& newId)
+inline void Element::updateId(const AtomicString& oldId, const AtomicString& newId, NotifyObservers notifyObservers)
 {
     if (!isInTreeScope())
         return;
@@ -2808,7 +2818,7 @@ inline void Element::updateId(const AtomicString& oldId, const AtomicString& new
     if (oldId == newId)
         return;
 
-    updateIdForTreeScope(treeScope(), oldId, newId);
+    updateIdForTreeScope(treeScope(), oldId, newId, notifyObservers);
 
     if (!inDocument())
         return;
@@ -2817,15 +2827,15 @@ inline void Element::updateId(const AtomicString& oldId, const AtomicString& new
     updateIdForDocument(downcast<HTMLDocument>(document()), oldId, newId, UpdateHTMLDocumentNamedItemMapsOnlyIfDiffersFromNameAttribute);
 }
 
-void Element::updateIdForTreeScope(TreeScope& scope, const AtomicString& oldId, const AtomicString& newId)
+void Element::updateIdForTreeScope(TreeScope& scope, const AtomicString& oldId, const AtomicString& newId, NotifyObservers notifyObservers)
 {
     ASSERT(isInTreeScope());
     ASSERT(oldId != newId);
 
     if (!oldId.isEmpty())
-        scope.removeElementById(*oldId.impl(), *this);
+        scope.removeElementById(*oldId.impl(), *this, notifyObservers == NotifyObservers::Yes);
     if (!newId.isEmpty())
-        scope.addElementById(*newId.impl(), *this);
+        scope.addElementById(*newId.impl(), *this, notifyObservers == NotifyObservers::Yes);
 }
 
 void Element::updateIdForDocument(HTMLDocument& document, const AtomicString& oldId, const AtomicString& newId, HTMLDocumentNamedItemMapsUpdatingCondition condition)
@@ -2869,7 +2879,7 @@ void Element::updateLabel(TreeScope& scope, const AtomicString& oldForAttributeV
 void Element::willModifyAttribute(const QualifiedName& name, const AtomicString& oldValue, const AtomicString& newValue)
 {
     if (name == HTMLNames::idAttr)
-        updateId(oldValue, newValue);
+        updateId(oldValue, newValue, NotifyObservers::No); // Will notify observers after the attribute is actually changed.
     else if (name == HTMLNames::nameAttr)
         updateName(oldValue, newValue);
     else if (name == HTMLNames::forAttr && hasTagName(labelTag)) {
@@ -3098,7 +3108,7 @@ void Element::cloneAttributesFromElement(const Element& other)
     const AtomicString& newID = other.getIdAttribute();
 
     if (!oldID.isNull() || !newID.isNull())
-        updateId(oldID, newID);
+        updateId(oldID, newID, NotifyObservers::No); // Will notify observers after the attribute is actually changed.
 
     const AtomicString& oldName = getNameAttribute();
     const AtomicString& newName = other.getNameAttribute();

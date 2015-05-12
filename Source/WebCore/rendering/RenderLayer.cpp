@@ -971,12 +971,12 @@ TransformationMatrix RenderLayer::currentTransform(RenderStyle::ApplyTransformOr
 {
     if (!m_transform)
         return TransformationMatrix();
-
+    
     RenderBox* box = renderBox();
     ASSERT(box);
-    FloatRect pixelSnappedBorderRect = snapRectToDevicePixels(box->borderBoxRect(), box->document().deviceScaleFactor());
     if (renderer().style().isRunningAcceleratedAnimation()) {
         TransformationMatrix currTransform;
+        FloatRect pixelSnappedBorderRect = snapRectToDevicePixels(box->borderBoxRect(), box->document().deviceScaleFactor());
         RefPtr<RenderStyle> style = renderer().animation().getAnimatedStyleForRenderer(renderer());
         style->applyTransform(currTransform, pixelSnappedBorderRect, applyOrigin);
         makeMatrixRenderable(currTransform, canRender3DTransforms());
@@ -986,6 +986,7 @@ TransformationMatrix RenderLayer::currentTransform(RenderStyle::ApplyTransformOr
     // m_transform includes transform-origin, so we need to recompute the transform here.
     if (applyOrigin == RenderStyle::ExcludeTransformOrigin) {
         TransformationMatrix currTransform;
+        FloatRect pixelSnappedBorderRect = snapRectToDevicePixels(box->borderBoxRect(), box->document().deviceScaleFactor());
         box->style().applyTransform(currTransform, pixelSnappedBorderRect, RenderStyle::ExcludeTransformOrigin);
         makeMatrixRenderable(currTransform, canRender3DTransforms());
         return currTransform;
@@ -1316,7 +1317,7 @@ bool RenderLayer::updateLayerPosition()
     } else if (RenderBox* box = renderBox()) {
         // FIXME: Is snapping the size really needed here for the RenderBox case?
         setSize(box->pixelSnappedSize());
-        localPoint += box->topLeftLocationOffset();
+        box->applyTopLeftLocationOffset(localPoint);
     }
 
     RenderElement* ancestor;
@@ -5802,11 +5803,13 @@ LayoutRect RenderLayer::localBoundingBox(CalculateLayerBoundsFlags flags) const
 LayoutRect RenderLayer::boundingBox(const RenderLayer* ancestorLayer, const LayoutSize& offsetFromRoot, CalculateLayerBoundsFlags flags) const
 {    
     LayoutRect result = localBoundingBox(flags);
-    if (renderer().isBox())
-        renderBox()->flipForWritingMode(result);
-    else
-        renderer().containingBlock()->flipForWritingMode(result);
-    
+    if (renderer().view().frameView().hasFlippedBlockRenderers()) {
+        if (renderer().isBox())
+            renderBox()->flipForWritingMode(result);
+        else
+            renderer().containingBlock()->flipForWritingMode(result);
+    }
+
     PaginationInclusionMode inclusionMode = ExcludeCompositedPaginatedLayers;
     if (flags & UseFragmentBoxesIncludingCompositing)
         inclusionMode = IncludeCompositedPaginatedLayers;
@@ -5865,10 +5868,12 @@ LayoutRect RenderLayer::calculateLayerBounds(const RenderLayer* ancestorLayer, c
 
     LayoutRect boundingBoxRect = localBoundingBox(flags);
 
-    if (is<RenderBox>(renderer()))
-        downcast<RenderBox>(renderer()).flipForWritingMode(boundingBoxRect);
-    else
-        renderer().containingBlock()->flipForWritingMode(boundingBoxRect);
+    if (renderer().view().frameView().hasFlippedBlockRenderers()) {
+        if (is<RenderBox>(renderer()))
+            downcast<RenderBox>(renderer()).flipForWritingMode(boundingBoxRect);
+        else
+            renderer().containingBlock()->flipForWritingMode(boundingBoxRect);
+    }
 
     if (renderer().isRoot()) {
         // If the root layer becomes composited (e.g. because some descendant with negative z-index is composited),
