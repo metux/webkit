@@ -1,4 +1,4 @@
-webkit2gtk (2.8.2+dfsg1-1) UNRELEASED; urgency=medium
+webkit2gtk (2.8.2+dfsg1-1) unstable; urgency=medium
 
   [ Alberto Garcia ]
   * New upstream release.
@@ -11,7 +11,7 @@ webkit2gtk (2.8.2+dfsg1-1) UNRELEASED; urgency=medium
   * debian/patches/fix-ftbfs-m68k.patch:
     + Fix FTBFS in m68k.
 
- -- Alberto Garcia <berto@igalia.com>  Thu, 07 May 2015 10:53:28 +0300
+ -- Alberto Garcia <berto@igalia.com>  Tue, 12 May 2015 15:31:38 +0300
 
 webkit2gtk (2.8.1+dfsg1-1) unstable; urgency=medium
 
