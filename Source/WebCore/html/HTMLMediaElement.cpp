@@ -1142,12 +1142,17 @@ void HTMLMediaElement::loadResource(const URL& initialURL, ContentType& contentT
         return;
     }
 
+    if (!frame->page()) {
+        mediaLoadingFailed(MediaPlayer::FormatError);
+        return;
+    }
+
     URL url = initialURL;
     if (!frame->loader().willLoadMediaElementURL(url)) {
         mediaLoadingFailed(MediaPlayer::FormatError);
         return;
     }
-    
+
     // The resource fetch algorithm 
     m_networkState = NETWORK_LOADING;
 
@@ -5272,12 +5277,12 @@ void HTMLMediaElement::configureMediaControls()
         requireControls = true;
 
 #if ENABLE(MEDIA_CONTROLS_SCRIPT)
-    if (!requireControls || !inDocument())
+    if (!requireControls || !inDocument() || !inActiveDocument())
         return;
 
     ensureUserAgentShadowRoot();
 #else
-    if (!requireControls || !inDocument()) {
+    if (!requireControls || !inDocument() || !inActiveDocument()) {
         if (hasMediaControls())
             mediaControls()->hide();
         return;

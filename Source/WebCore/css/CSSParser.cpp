@@ -1649,18 +1649,12 @@ bool CSSParser::validateCalculationUnit(ValueWithCalculation& valueWithCalculati
             isValid = true;
         if (!isValid && (unitFlags & FPositiveInteger) && calculation->isInt() && calculation->isPositive())
             isValid = true;
-        if (isValid && mustBeNonNegative && calculation->isNegative())
-            isValid = false;
         break;
     case CalcLength:
         isValid = (unitFlags & FLength);
-        if (isValid && mustBeNonNegative && calculation->isNegative())
-            isValid = false;
         break;
     case CalcPercent:
         isValid = (unitFlags & FPercent);
-        if (isValid && mustBeNonNegative && calculation->isNegative())
-            isValid = false;
         break;
     case CalcPercentLength:
         isValid = (unitFlags & FPercent) && (unitFlags & FLength);
@@ -9574,15 +9568,22 @@ bool CSSParser::parseMaskImage(CSSParserValueList& valueList, RefPtr<CSSValue>& 
 {
     outValue = nullptr;
     CSSParserValue* value = valueList.current();
-    if (value->id == CSSValueNone)
+    if (value->id == CSSValueNone) {
         outValue = WebKitCSSResourceValue::create(cssValuePool().createIdentifierValue(CSSValueNone));
-    else if (value->unit == CSSPrimitiveValue::CSS_URI)
-        outValue = WebKitCSSResourceValue::create(CSSPrimitiveValue::create(completeURL(value->string), CSSPrimitiveValue::CSS_URI));
-    else {
-        RefPtr<CSSValue> fillImageValue;
-        if (parseFillImage(valueList, fillImageValue))
-            outValue = WebKitCSSResourceValue::create(fillImageValue);
+        return outValue.get();
     }
+
+    RefPtr<CSSValue> resourceValue;
+    if (value->unit == CSSPrimitiveValue::CSS_URI) {
+        if (protocolIs(value->string, "data"))
+            parseFillImage(valueList, resourceValue);
+        else
+            resourceValue = CSSPrimitiveValue::create(completeURL(value->string), CSSPrimitiveValue::CSS_URI);
+    } else
+        parseFillImage(valueList, resourceValue);
+
+    if (resourceValue)
+        outValue = WebKitCSSResourceValue::create(resourceValue);
 
     return outValue.get();
 }
