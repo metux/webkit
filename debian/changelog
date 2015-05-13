@@ -1,3 +1,10 @@
+webkit2gtk (2.8.2+dfsg1-2) UNRELEASED; urgency=medium
+
+  * debian/rules:
+    + Disable the gold linker, it's causing problems in arm64 at least.
+
+ -- Alberto Garcia <berto@igalia.com>  Wed, 13 May 2015 14:29:30 +0300
+
 webkit2gtk (2.8.2+dfsg1-1) unstable; urgency=medium
 
   [ Alberto Garcia ]
