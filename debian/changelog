@@ -5,6 +5,9 @@ webkit2gtk (2.8.3+dfsg1-1) UNRELEASED; urgency=medium
     + The default linker uses too much memory and it makes the build fail
       in i386, so let's get back to the old behavior and disable gold in
       arm64 only.
+    + The shared library is too big in i386 and this is causing problems
+      when generating the introspection bindings, so use -g1. See also
+      upstream bug #140176.
 
  -- Alberto Garcia <berto@igalia.com>  Sat, 16 May 2015 12:36:58 +0300
 

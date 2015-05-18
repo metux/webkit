@@ -31,6 +31,12 @@ ifneq (,$(filter $(DEB_BUILD_ARCH),hurd-i386 ia64 kfreebsd-i386 kfreebsd-amd64 m
 	EXTRA_DH_ARGUMENTS += -Nlibwebkit2gtk-4.0-37-dbg -Nlibjavascriptcoregtk-4.0-18-dbg
 endif
 
+# The size of the i386 shared library is causing problems, so let's use -g1
+# See https://bugs.webkit.org/show_bug.cgi?id=140176
+ifeq ($(DEB_BUILD_ARCH),i386)
+	CFLAGS := $(CFLAGS:-g=-g1)
+endif
+
 # See https://bugs.webkit.org/show_bug.cgi?id=113638
 ifeq (,$(filter $(DEB_BUILD_ARCH),i386 amd64 hurd-i386 kfreebsd-i386 kfreebsd-amd64 armhf))
 	EXTRA_CMAKE_ARGUMENTS += -DENABLE_JIT=OFF
