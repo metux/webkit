@@ -9,7 +9,7 @@ CFLAGS = $(shell dpkg-buildflags --get CFLAGS)
 LDFLAGS = $(shell dpkg-buildflags --get LDFLAGS) -Wl,--as-needed
 
 EXTRA_DH_ARGUMENTS =
-EXTRA_CMAKE_ARGUMENTS = -DUSE_LD_GOLD=OFF
+EXTRA_CMAKE_ARGUMENTS =
 
 # Sacrifice speed in order to make it more likely resource limits
 # won't be hit.
@@ -19,6 +19,10 @@ endif
 
 ifeq ($(DEB_BUILD_ARCH),alpha)
 	LDFLAGS += -Wl,--no-relax
+endif
+
+ifeq ($(DEB_BUILD_ARCH),arm64)
+	EXTRA_CMAKE_ARGUMENTS += -DUSE_LD_GOLD=OFF
 endif
 
 # Disable debugging symbols on these arches.
