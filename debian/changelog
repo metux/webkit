@@ -1,6 +1,7 @@
 webkit2gtk (2.8.4+dfsg1-1) UNRELEASED; urgency=medium
 
   * New upstream release.
+    + Uses _ABI64 instead of _MIPS_SIM_ABI64 for mips64el. Closes: #789262.
 
  -- Emilio Pozuelo Monfort <pochu@debian.org>  Thu, 09 Jul 2015 11:52:42 +0200
 
