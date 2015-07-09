@@ -1099,7 +1099,8 @@ void WebPage::loadDataImpl(uint64_t navigationID, PassRefPtr<SharedBuffer> share
     m_pendingNavigationID = navigationID;
 
     ResourceRequest request(baseURL);
-    SubstituteData substituteData(sharedBuffer, MIMEType, encodingName, unreachableURL);
+    ResourceResponse response(URL(), MIMEType, sharedBuffer->size(), encodingName);
+    SubstituteData substituteData(sharedBuffer, unreachableURL, response, SubstituteData::SessionHistoryVisibility::Hidden);
 
     // Let the InjectedBundle know we are about to start the load, passing the user data from the UIProcess
     // to all the client to set up any needed state.
@@ -1213,8 +1214,7 @@ void WebPage::goForward(uint64_t navigationID, uint64_t backForwardItemID)
         return;
 
     ASSERT(!m_pendingNavigationID);
-    if (!item->isInPageCache())
-        m_pendingNavigationID = navigationID;
+    m_pendingNavigationID = navigationID;
 
     m_page->goToItem(*item, FrameLoadType::Forward);
 }
@@ -1229,8 +1229,7 @@ void WebPage::goBack(uint64_t navigationID, uint64_t backForwardItemID)
         return;
 
     ASSERT(!m_pendingNavigationID);
-    if (!item->isInPageCache())
-        m_pendingNavigationID = navigationID;
+    m_pendingNavigationID = navigationID;
 
     m_page->goToItem(*item, FrameLoadType::Back);
 }
@@ -1245,8 +1244,7 @@ void WebPage::goToBackForwardItem(uint64_t navigationID, uint64_t backForwardIte
         return;
 
     ASSERT(!m_pendingNavigationID);
-    if (!item->isInPageCache())
-        m_pendingNavigationID = navigationID;
+    m_pendingNavigationID = navigationID;
 
     m_page->goToItem(*item, FrameLoadType::IndexedBackForward);
 }
@@ -4590,14 +4588,14 @@ void WebPage::didFinishLoad(WebFrame* frame)
 }
 
 #if ENABLE(PRIMARY_SNAPSHOTTED_PLUGIN_HEURISTIC)
-static int primarySnapshottedPlugInSearchLimit = 3000;
-static float primarySnapshottedPlugInSearchBucketSize = 1.1;
-static int primarySnapshottedPlugInMinimumWidth = 400;
-static int primarySnapshottedPlugInMinimumHeight = 300;
-static unsigned maxPrimarySnapshottedPlugInDetectionAttempts = 2;
-static int deferredPrimarySnapshottedPlugInDetectionDelay = 3;
-static float overlappingImageBoundsScale = 1.1;
-static float minimumOverlappingImageToPluginDimensionScale = .9;
+static const int primarySnapshottedPlugInSearchLimit = 3000;
+static const float primarySnapshottedPlugInSearchBucketSize = 1.1;
+static const int primarySnapshottedPlugInMinimumWidth = 400;
+static const int primarySnapshottedPlugInMinimumHeight = 300;
+static const unsigned maxPrimarySnapshottedPlugInDetectionAttempts = 2;
+static const int deferredPrimarySnapshottedPlugInDetectionDelay = 3;
+static const float overlappingImageBoundsScale = 1.1;
+static const float minimumOverlappingImageToPluginDimensionScale = .9;
 
 #if ENABLE(PRIMARY_SNAPSHOTTED_PLUGIN_HEURISTIC)
 void WebPage::determinePrimarySnapshottedPlugInTimerFired()
@@ -4822,6 +4820,14 @@ PassRefPtr<DocumentLoader> WebPage::createDocumentLoader(Frame& frame, const Res
     }
 
     return documentLoader.release();
+}
+
+void WebPage::updateCachedDocumentLoader(WebDocumentLoader& documentLoader, Frame& frame)
+{
+    if (m_pendingNavigationID && frame.isMainFrame()) {
+        documentLoader.setNavigationID(m_pendingNavigationID);
+        m_pendingNavigationID = 0;
+    }
 }
 
 void WebPage::getBytecodeProfile(uint64_t callbackID)

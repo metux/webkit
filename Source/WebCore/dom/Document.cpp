@@ -1726,6 +1726,7 @@ void Document::recalcStyle(Style::Change change)
         return;
 
     FrameView& frameView = m_renderView->frameView();
+    Ref<FrameView> protect(frameView);
     if (frameView.isPainting())
         return;
     
@@ -6284,7 +6285,7 @@ void Document::ensurePlugInsInjectedScript(DOMWrapperWorld& world)
     if (!jsString)
         jsString = String(plugInsJavaScript, sizeof(plugInsJavaScript));
 
-    m_frame->mainFrame().script().evaluateInWorld(ScriptSourceCode(jsString), world);
+    frame()->script().evaluateInWorld(ScriptSourceCode(jsString), world);
 
     m_hasInjectedPlugInsScript = true;
 }

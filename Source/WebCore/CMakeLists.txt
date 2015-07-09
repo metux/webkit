@@ -2954,18 +2954,30 @@ if (WTF_USE_3D_GRAPHICS)
     # these include directories need to be added before the ANGLE directories.
     if (OPENGL_FOUND)
         list(APPEND WebCore_INCLUDE_DIRECTORIES
-            ${OPENGL_INCLUDE_DIR}
+            ${OPENGL_INCLUDE_DIRS}
         )
         list(APPEND WebCore_LIBRARIES
-            ${OPENGL_gl_LIBRARY}
+            ${OPENGL_LIBRARIES}
         )
+        add_definitions(${OPENGL_DEFINITIONS})
     elseif (OPENGLES2_FOUND)
         list(APPEND WebCore_INCLUDE_DIRECTORIES
-            ${OPENGLES2_INCLUDE_DIR}
+            ${OPENGLES2_INCLUDE_DIRS}
         )
         list(APPEND WebCore_LIBRARIES
             ${OPENGLES2_LIBRARIES}
         )
+        add_definitions(${OPENGLES2_DEFINITIONS})
+    endif ()
+
+    if (EGL_FOUND)
+        list(APPEND WebCore_INCLUDE_DIRECTORIES
+            ${EGL_INCLUDE_DIRS}
+        )
+        list(APPEND WebCore_LIBRARIES
+            ${EGL_LIBRARIES}
+        )
+        add_definitions(${EGL_DEFINITIONS})
     endif ()
 
     list(APPEND WebCore_INCLUDE_DIRECTORIES
@@ -3478,6 +3490,14 @@ add_library(WebCore ${WebCore_LIBRARY_TYPE} ${WebCore_SOURCES})
 set_target_properties(WebCore PROPERTIES COMPILE_DEFINITIONS "BUILDING_WebCore")
 set_target_properties(WebCore PROPERTIES FOLDER "WebCore")
 
+# The -ftree-sra optimization (implicit with -O2) causes crashes when
+# allocating large chunks of memory using bmalloc on Intel 32bit.
+# See https://bugs.webkit.org/show_bug.cgi?id=146440
+string(TOLOWER ${CMAKE_HOST_SYSTEM_PROCESSOR} LOWERCASE_CMAKE_HOST_SYSTEM_PROCESSOR)
+if (CMAKE_COMPILER_IS_GNUCXX AND "${LOWERCASE_CMAKE_HOST_SYSTEM_PROCESSOR}" MATCHES "(i[3-6]86|x86)$")
+    ADD_TARGET_PROPERTIES(WebCore COMPILE_FLAGS "-fno-tree-sra")
+endif ()
+
 if (WebCore_OUTPUT_NAME)
     set_target_properties(WebCore PROPERTIES OUTPUT_NAME ${WebCore_OUTPUT_NAME})
 endif ()
@@ -3513,4 +3533,10 @@ endif ()
 if (SHARED_CORE)
     set_target_properties(WebCore PROPERTIES VERSION ${PROJECT_VERSION} SOVERSION ${PROJECT_VERSION_MAJOR})
     install(TARGETS WebCore DESTINATION "${LIB_INSTALL_DIR}")
+endif ()
+
+# [ARM] Build SVGPathElement.cpp with -O2 due to a GCC bug
+# https://bugs.webkit.org/show_bug.cgi?id=145377
+if ((CMAKE_CXX_COMPILER_ID STREQUAL "GNU") AND WTF_CPU_ARM AND (CMAKE_CXX_COMPILER_VERSION VERSION_GREATER "4.9") AND (CMAKE_CXX_COMPILER_VERSION VERSION_LESS "4.9.3"))
+    set_source_files_properties(svg/SVGPathElement.cpp PROPERTIES COMPILE_FLAGS "-O2")
 endif ()

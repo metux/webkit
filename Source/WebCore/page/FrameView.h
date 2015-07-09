@@ -43,7 +43,6 @@
 namespace WebCore {
 
 class AXObjectCache;
-class DOMTimer;
 class Element;
 class FloatSize;
 class Frame;
@@ -314,9 +313,6 @@ public:
 
     void postLayoutTimerFired();
 
-    void registerThrottledDOMTimer(DOMTimer*);
-    void unregisterThrottledDOMTimer(DOMTimer*);
-
     WEBCORE_EXPORT bool wasScrolledByUser() const;
     WEBCORE_EXPORT void setWasScrolledByUser(bool);
 
@@ -361,6 +357,10 @@ public:
     WEBCORE_EXPORT Color documentBackgroundColor() const;
 
     bool isInChildFrameWithFrameFlattening() const;
+
+    void startDisallowingLayout() { ++m_layoutDisallowed; }
+    void endDisallowingLayout() { ASSERT(m_layoutDisallowed > 0); --m_layoutDisallowed; }
+    bool layoutDisallowed() const { return m_layoutDisallowed; }
 
     static double currentPaintTimeStamp() { return sCurrentPaintTimeStamp; } // returns 0 if not painting
     
@@ -583,7 +583,6 @@ private:
     void forceLayoutParentViewIfNeeded();
     void performPostLayoutTasks();
     void autoSizeIfEnabled();
-    void updateThrottledDOMTimersState();
 
     void updateLayerFlushThrottling();
     WEBCORE_EXPORT void adjustTiledBackingCoverage();
@@ -721,6 +720,7 @@ private:
 
     unsigned m_deferSetNeedsLayouts;
     bool m_setNeedsLayoutWasDeferred;
+    int m_layoutDisallowed { 0 };
 
     RefPtr<Node> m_nodeToDraw;
     PaintBehavior m_paintBehavior;
@@ -771,8 +771,6 @@ private:
 
     std::unique_ptr<ScrollableAreaSet> m_scrollableAreas;
     std::unique_ptr<ViewportConstrainedObjectSet> m_viewportConstrainedObjects;
-
-    HashSet<DOMTimer*> m_throttledTimers;
 
     int m_headerHeight;
     int m_footerHeight;

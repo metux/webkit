@@ -385,7 +385,7 @@ struct ViewModeInfo {
     Page::ViewMode type;
 };
 static const int viewModeMapSize = 5;
-static ViewModeInfo viewModeMap[viewModeMapSize] = {
+static const ViewModeInfo viewModeMap[viewModeMapSize] = {
     {"windowed", Page::ViewModeWindowed},
     {"floating", Page::ViewModeFloating},
     {"fullscreen", Page::ViewModeFullscreen},
@@ -551,6 +551,12 @@ void Page::setCanStartMedia(bool canStartMedia)
             break;
         listener->mediaCanStart();
     }
+}
+
+bool Page::inPageCache() const
+{
+    auto* document = mainFrame().document();
+    return document && document->inPageCache();
 }
 
 static Frame* incrementFrame(Frame* curr, bool forward, bool wrapFlag)
@@ -1418,8 +1424,8 @@ Color Page::pageExtendedBackgroundColor() const
 }
 
 // These are magical constants that might be tweaked over time.
-static double gMinimumPaintedAreaRatio = 0.1;
-static double gMaximumUnpaintedAreaRatio = 0.04;
+static const double gMinimumPaintedAreaRatio = 0.1;
+static const double gMaximumUnpaintedAreaRatio = 0.04;
 
 bool Page::isCountingRelevantRepaintedObjects() const
 {

@@ -55,7 +55,7 @@ public:
     static String isExpiredKey();
     static String loadedKey();
     static String loadingKey();
-    static String loadingAPISenseKey();
+    static String isLoadingKey();
     static String mainDocumentErrorKey();
     static String mainResourceKey();
     static String mediaKey();
@@ -81,6 +81,7 @@ public:
     static String playedKey();
     static String pluginLoadedKey();
     static String pluginLoadingFailedKey();
+    static String provisionalLoadKey();
     static String prunedDueToMaxSizeReached();
     static String prunedDueToMemoryPressureKey();
     static String prunedDueToProcessSuspended();

@@ -53,6 +53,11 @@ String DiagnosticLoggingKeys::pluginLoadingFailedKey()
     return ASCIILiteral("pluginFailedLoading");
 }
 
+String DiagnosticLoggingKeys::provisionalLoadKey()
+{
+    return ASCIILiteral("provisionalLoad");
+}
+
 String DiagnosticLoggingKeys::pageContainsPluginKey()
 {
     return ASCIILiteral("pageContainsPlugin");
@@ -228,9 +233,9 @@ String DiagnosticLoggingKeys::reasonKey()
     return ASCIILiteral("reason");
 }
 
-String DiagnosticLoggingKeys::loadingAPISenseKey()
+String DiagnosticLoggingKeys::isLoadingKey()
 {
-    return ASCIILiteral("loadingAPISense");
+    return ASCIILiteral("isLoading");
 }
 
 String DiagnosticLoggingKeys::documentLoaderStoppingKey()

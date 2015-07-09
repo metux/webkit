@@ -1708,7 +1708,7 @@ void RenderBoxModelObject::paintTranslucentBorderSides(GraphicsContext* graphics
 {
     // willBeOverdrawn assumes that we draw in order: top, bottom, left, right.
     // This is different from BoxSide enum order.
-    static BoxSide paintOrder[] = { BSTop, BSBottom, BSLeft, BSRight };
+    static const BoxSide paintOrder[] = { BSTop, BSBottom, BSLeft, BSRight };
 
     while (edgesToDraw) {
         // Find undrawn edges sharing a color.
@@ -2084,10 +2084,11 @@ void RenderBoxModelObject::clipBorderSidePolygon(GraphicsContext* graphicsContex
 {
     FloatPoint quad[4];
 
-    const LayoutRect& outerRect = outerBorder.rect();
-    const LayoutRect& innerRect = innerBorder.rect();
+    float deviceScaleFactor = document().deviceScaleFactor();
+    const FloatRect& outerRect = snapRectToDevicePixels(outerBorder.rect(), deviceScaleFactor);
+    const FloatRect& innerRect = snapRectToDevicePixels(innerBorder.rect(), deviceScaleFactor);
 
-    FloatPoint centerPoint(innerRect.location().x() + static_cast<float>(innerRect.width()) / 2, innerRect.location().y() + static_cast<float>(innerRect.height()) / 2);
+    FloatPoint centerPoint(innerRect.location().x() + innerRect.width() / 2, innerRect.location().y() + innerRect.height() / 2);
 
     // For each side, create a quad that encompasses all parts of that side that may draw,
     // including areas inside the innerBorder.
