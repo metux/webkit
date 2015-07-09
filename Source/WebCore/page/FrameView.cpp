@@ -291,7 +291,6 @@ void FrameView::reset()
     m_isVisuallyNonEmpty = false;
     m_firstVisuallyNonEmptyLayoutCallbackPending = true;
     m_maintainScrollPositionAnchor = nullptr;
-    m_throttledTimers.clear();
 }
 
 void FrameView::removeFromAXObjectCache()
@@ -437,6 +436,7 @@ void FrameView::invalidateRect(const IntRect& rect)
 
 void FrameView::setFrameRect(const IntRect& newRect)
 {
+    Ref<FrameView> protect(*this);
     IntRect oldRect = frameRect();
     if (newRect == oldRect)
         return;
@@ -1123,6 +1123,9 @@ void FrameView::layout(bool allowSubtree)
     if (isInLayout())
         return;
 
+    if (layoutDisallowed())
+        return;
+
     // Protect the view from being deleted during layout (in recalcStyle).
     Ref<FrameView> protect(*this);
 
@@ -1764,7 +1767,6 @@ void FrameView::viewportContentsChanged()
     // When the viewport contents changes (scroll, resize, style recalc, layout, ...),
     // check if we should resume animated images or unthrottle DOM timers.
     resumeVisibleImageAnimationsIncludingSubframes();
-    updateThrottledDOMTimersState();
 }
 
 bool FrameView::fixedElementsLayoutRelativeToFrame() const
@@ -2909,7 +2911,8 @@ void FrameView::updateEmbeddedObject(RenderEmbeddedObject& embeddedObject)
     if (!weakRenderer)
         return;
 
-    embeddedObject.updateWidgetPosition();
+    auto ignoreWidgetState = embeddedObject.updateWidgetPosition();
+    UNUSED_PARAM(ignoreWidgetState);
 }
 
 bool FrameView::updateEmbeddedObjects()
@@ -3086,31 +3089,6 @@ void FrameView::willEndLiveResize()
 void FrameView::postLayoutTimerFired()
 {
     performPostLayoutTasks();
-}
-
-void FrameView::registerThrottledDOMTimer(DOMTimer* timer)
-{
-    m_throttledTimers.add(timer);
-}
-
-void FrameView::unregisterThrottledDOMTimer(DOMTimer* timer)
-{
-    m_throttledTimers.remove(timer);
-}
-
-void FrameView::updateThrottledDOMTimersState()
-{
-    if (m_throttledTimers.isEmpty())
-        return;
-
-    IntRect visibleRect = windowToContents(windowClipRect());
-
-    // Do not iterate over the HashSet because calling DOMTimer::updateThrottlingStateAfterViewportChange()
-    // may cause timers to remove themselves from it while we are iterating.
-    Vector<DOMTimer*> timers;
-    copyToVector(m_throttledTimers, timers);
-    for (auto* timer : timers)
-        timer->updateThrottlingStateAfterViewportChange(visibleRect);
 }
 
 void FrameView::autoSizeIfEnabled()
@@ -3713,21 +3691,25 @@ FrameView* FrameView::parentFrameView() const
 
 bool FrameView::isInChildFrameWithFrameFlattening() const
 {
-    if (!parent() || !frame().ownerElement())
+    if (!frameFlatteningEnabled())
+        return false;
+
+    if (!parent())
+        return false;
+
+    HTMLFrameOwnerElement* ownerElement = frame().ownerElement();
+    if (!ownerElement)
+        return false;
+
+    if (!ownerElement->renderWidget())
         return false;
 
     // Frame flattening applies when the owner element is either in a frameset or
     // an iframe with flattening parameters.
-    if (is<HTMLIFrameElement>(*frame().ownerElement())) {
-        RenderIFrame& iframeRenderer = downcast<RenderIFrame>(*frame().ownerElement()->renderWidget());
-        if (iframeRenderer.flattenFrame())
-            return true;
-    }
+    if (is<HTMLIFrameElement>(*ownerElement))
+        return downcast<RenderIFrame>(*ownerElement->renderWidget()).flattenFrame();
 
-    if (!frameFlatteningEnabled())
-        return false;
-
-    if (is<HTMLFrameElement>(*frame().ownerElement()))
+    if (is<HTMLFrameElement>(*ownerElement))
         return true;
 
     return false;
@@ -3754,9 +3736,6 @@ void FrameView::startLayoutAtMainFrameViewIfNeeded(bool allowSubtree)
         parentView = parentView->parentFrameView();
 
     parentView->layout(allowSubtree);
-
-    RenderElement* root = m_layoutRoot ? m_layoutRoot : frame().document()->renderView();
-    ASSERT_UNUSED(root, !root->needsLayout());
 }
 
 void FrameView::updateControlTints()
@@ -4726,11 +4705,11 @@ void FrameView::updateWidgetPositions()
     // updateWidgetPosition() can possibly cause layout to be re-entered (via plug-ins running
     // scripts in response to NPP_SetWindow, for example), so we need to keep the Widgets
     // alive during enumeration.
-    auto protectedWidgets = collectAndProtectWidgets(m_widgetsInRenderTree);
-
-    for (unsigned i = 0, size = protectedWidgets.size(); i < size; ++i) {
-        if (RenderWidget* renderWidget = RenderWidget::find(protectedWidgets[i].get()))
-            renderWidget->updateWidgetPosition();
+    for (auto& widget : collectAndProtectWidgets(m_widgetsInRenderTree)) {
+        if (RenderWidget* renderWidget = RenderWidget::find(widget.get())) {
+            auto ignoreWidgetState = renderWidget->updateWidgetPosition();
+            UNUSED_PARAM(ignoreWidgetState);
+        }
     }
 }
 

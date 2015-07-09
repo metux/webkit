@@ -87,12 +87,13 @@ enum ReasonFrameCannotBeInPageCache {
     HasSharedWorkers, // FIXME: Remove.
     NoHistoryItem,
     QuickRedirectComing,
-    IsLoadingInAPISense,
+    IsLoading,
     IsStopping,
     CannotSuspendActiveDOMObjects,
     DocumentLoaderUsesApplicationCache,
     ClientDeniesCaching,
     NumberOfReasonsFramesCannotBeInPageCache,
+    IsInProvisionalLoadStage,
 };
 COMPILE_ASSERT(NumberOfReasonsFramesCannotBeInPageCache <= sizeof(unsigned)*8, ReasonFrameCannotBeInPageCacheDoesNotFitInBitmap);
 
@@ -112,6 +113,11 @@ static inline void logPageCacheFailureDiagnosticMessage(Page* page, const String
 static unsigned logCanCacheFrameDecision(Frame& frame, DiagnosticLoggingClient& diagnosticLoggingClient, unsigned indentLevel)
 {
     PCLOG("+---");
+    if (!frame.isMainFrame() && frame.loader().state() == FrameStateProvisional) {
+        PCLOG("   -Frame is in provisional load stage");
+        logPageCacheFailureDiagnosticMessage(diagnosticLoggingClient, DiagnosticLoggingKeys::provisionalLoadKey());
+        return 1 << IsInProvisionalLoadStage;
+    }
     if (!frame.loader().documentLoader()) {
         PCLOG("   -There is no DocumentLoader object");
         logPageCacheFailureDiagnosticMessage(diagnosticLoggingClient, DiagnosticLoggingKeys::noDocumentLoaderKey());
@@ -168,10 +174,10 @@ static unsigned logCanCacheFrameDecision(Frame& frame, DiagnosticLoggingClient& 
         logPageCacheFailureDiagnosticMessage(diagnosticLoggingClient, DiagnosticLoggingKeys::quirkRedirectComingKey());
         rejectReasons |= 1 << QuickRedirectComing;
     }
-    if (frame.loader().documentLoader()->isLoadingInAPISense()) {
-        PCLOG("   -DocumentLoader is still loading in API sense");
-        logPageCacheFailureDiagnosticMessage(diagnosticLoggingClient, DiagnosticLoggingKeys::loadingAPISenseKey());
-        rejectReasons |= 1 << IsLoadingInAPISense;
+    if (frame.loader().documentLoader()->isLoading()) {
+        PCLOG("   -DocumentLoader is still loading");
+        logPageCacheFailureDiagnosticMessage(diagnosticLoggingClient, DiagnosticLoggingKeys::isLoadingKey());
+        rejectReasons |= 1 << IsLoading;
     }
     if (frame.loader().documentLoader()->isStopping()) {
         PCLOG("   -DocumentLoader is in the middle of stopping");
@@ -305,6 +311,12 @@ bool PageCache::canCachePageContainingThisFrame(Frame& frame)
     }
     
     FrameLoader& frameLoader = frame.loader();
+
+    // Prevent page caching if a subframe is still in provisional load stage.
+    // We only do this check for subframes because the main frame is reused when navigating to a new page.
+    if (!frame.isMainFrame() && frameLoader.state() == FrameStateProvisional)
+        return false;
+
     DocumentLoader* documentLoader = frameLoader.documentLoader();
     Document* document = frame.document();
     
@@ -321,7 +333,7 @@ bool PageCache::canCachePageContainingThisFrame(Frame& frame)
         && !DatabaseManager::manager().hasOpenDatabases(document)
         && frameLoader.history().currentItem()
         && !frameLoader.quickRedirectComing()
-        && !documentLoader->isLoadingInAPISense()
+        && !documentLoader->isLoading()
         && !documentLoader->isStopping()
         && document->canSuspendActiveDOMObjects()
         // FIXME: We should investigating caching frames that have an associated

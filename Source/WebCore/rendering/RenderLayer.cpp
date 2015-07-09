@@ -3382,9 +3382,9 @@ void RenderLayer::updateScrollbarsAfterLayout()
     bool hasVerticalOverflow = this->hasVerticalOverflow();
 
     // If overflow requires a scrollbar, then we just need to enable or disable.
-    if (styleRequiresScrollbar(renderer().style(), HorizontalScrollbar))
+    if (m_hBar && styleRequiresScrollbar(renderer().style(), HorizontalScrollbar))
         m_hBar->setEnabled(hasHorizontalOverflow);
-    if (styleRequiresScrollbar(renderer().style(), VerticalScrollbar))
+    if (m_vBar && styleRequiresScrollbar(renderer().style(), VerticalScrollbar))
         m_vBar->setEnabled(hasVerticalOverflow);
 
     // Scrollbars with auto behavior may need to lay out again if scrollbars got added or removed.
@@ -4777,6 +4777,8 @@ bool RenderLayer::hitTest(const HitTestRequest& request, const HitTestLocation& 
 {
     ASSERT(isSelfPaintingLayer() || hasSelfPaintingLayerDescendant());
     ASSERT(!renderer().view().needsLayout());
+    
+    updateLayerListsIfNeeded();
 
     LayoutRect hitTestArea = isOutOfFlowRenderFlowThread() ? downcast<RenderFlowThread>(renderer()).visualOverflowRect() : renderer().view().documentRect();
     if (!request.ignoreClipping())
@@ -6239,7 +6241,7 @@ void RenderLayer::collectLayers(bool includeHiddenLayers, CollectLayersBehavior 
 
 void RenderLayer::updateLayerListsIfNeeded()
 {
-    bool shouldUpdateDescendantsAreContiguousInStackingOrder = isStackingContext() && (m_zOrderListsDirty || m_normalFlowListDirty);
+    bool shouldUpdateDescendantsAreContiguousInStackingOrder = (m_zOrderListsDirty || m_normalFlowListDirty) && isStackingContext();
     updateZOrderLists();
     updateNormalFlowList();
 

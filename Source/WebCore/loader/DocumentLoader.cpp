@@ -103,7 +103,7 @@ static bool areAllLoadersPageCacheAcceptable(const ResourceLoaderMap& loaders)
         if (!handle)
             return false;
 
-        if (!loader->frameLoader())
+        if (!loader->frameLoader() || !loader->frameLoader()->frame().page())
             return false;
 
         CachedResource* cachedResource = MemoryCache::singleton().resourceForURL(handle->firstRequest().url(), loader->frameLoader()->frame().page()->sessionID());
@@ -327,14 +327,15 @@ void DocumentLoader::stopLoading()
     if (isLoadingMainResource()) {
         // Stop the main resource loader and let it send the cancelled message.
         cancelMainResourceLoad(frameLoader->cancelledError(m_request));
-    } else if (!m_subresourceLoaders.isEmpty())
-        // The main resource loader already finished loading. Set the cancelled error on the 
-        // document and let the subresourceLoaders send individual cancelled messages below.
+    } else if (!m_subresourceLoaders.isEmpty() || !m_plugInStreamLoaders.isEmpty()) {
+        // The main resource loader already finished loading. Set the cancelled error on the
+        // document and let the subresourceLoaders and pluginLoaders send individual cancelled messages below.
         setMainDocumentError(frameLoader->cancelledError(m_request));
-    else
+    } else {
         // If there are no resource loaders, we need to manufacture a cancelled message.
         // (A back/forward navigation has no resource loaders because its resources are cached.)
         mainReceivedError(frameLoader->cancelledError(m_request));
+    }
 
     // We always need to explicitly cancel the Document's parser when stopping the load.
     // Otherwise cancelling the parser while starting the next page load might result
@@ -469,10 +470,10 @@ bool DocumentLoader::isPostOrRedirectAfterPost(const ResourceRequest& newRequest
 
 void DocumentLoader::handleSubstituteDataLoadNow()
 {
-    URL url = m_substituteData.responseURL();
-    if (url.isEmpty())
-        url = m_request.url();
-    ResourceResponse response(url, m_substituteData.mimeType(), m_substituteData.content()->size(), m_substituteData.textEncoding());
+    ResourceResponse response = m_substituteData.response();
+    if (response.url().isEmpty())
+        response = ResourceResponse(m_request.url(), m_substituteData.mimeType(), m_substituteData.content()->size(), m_substituteData.textEncoding());
+
     responseReceived(0, response);
 }
 
@@ -609,7 +610,7 @@ void DocumentLoader::responseReceived(CachedResource* resource, const ResourceRe
     auto it = commonHeaders.find(HTTPHeaderName::XFrameOptions);
     if (it != commonHeaders.end()) {
         String content = it->value;
-        ASSERT(m_mainResource);
+        ASSERT(m_identifierForLoadWithoutResourceLoader || m_mainResource);
         unsigned long identifier = m_identifierForLoadWithoutResourceLoader ? m_identifierForLoadWithoutResourceLoader : m_mainResource->identifier();
         ASSERT(identifier);
         if (frameLoader()->shouldInterruptLoadForXFrameOptions(content, response.url(), identifier)) {
@@ -1269,7 +1270,7 @@ const URL& DocumentLoader::responseURL() const
 
 URL DocumentLoader::documentURL() const
 {
-    URL url = substituteData().responseURL();
+    URL url = substituteData().response().url();
 #if ENABLE(WEB_ARCHIVE)
     if (url.isEmpty() && m_archive && m_archive->type() == Archive::WebArchive)
         url = m_archive->mainResource()->url();

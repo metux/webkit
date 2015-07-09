@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 2006 Eric Seidel <eric@webkit.org>
- * Copyright (C) 2008, 2009 Apple Inc. All rights reserved.
+ * Copyright (C) 2008, 2009, 2015 Apple Inc. All rights reserved.
  * Copyright (C) Research In Motion Limited 2011. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -48,8 +48,9 @@
 
 namespace WebCore {
 
-SVGImage::SVGImage(ImageObserver* observer)
-    : Image(observer)
+SVGImage::SVGImage(ImageObserver& observer, const URL& url)
+    : Image(&observer)
+    , m_url(url)
 {
 }
 
@@ -206,6 +207,8 @@ void SVGImage::drawPatternForContainer(GraphicsContext* context, const FloatSize
         buffer->convertToLuminanceMask();
 
     RefPtr<Image> image = buffer->copyImage(DontCopyBackingStore, Unscaled);
+    if (!image)
+        return;
     image->setSpaceSize(spaceSize());
 
     // Adjust the source rect and transform due to the image buffer's scaling.
@@ -249,6 +252,9 @@ void SVGImage::draw(GraphicsContext* context, const FloatRect& dstRect, const Fl
 
     view->resize(containerSize());
 
+    if (!m_url.isEmpty())
+        view->scrollToFragment(m_url);
+    
     if (view->needsLayout())
         view->layout();
 
@@ -258,9 +264,6 @@ void SVGImage::draw(GraphicsContext* context, const FloatRect& dstRect, const Fl
         context->endTransparencyLayer();
 
     stateSaver.restore();
-
-    if (!m_url.isEmpty())
-        view->scrollToFragment(m_url);
 
     if (imageObserver())
         imageObserver()->didDraw(this);

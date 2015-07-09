@@ -53,7 +53,7 @@ namespace Sizes {
 #endif
     static const size_t vmPageMask = ~(vmPageSize - 1);
     
-    static const size_t superChunkSize = 32 * MB;
+    static const size_t superChunkSize = 8 * MB;
 
     static const size_t smallMax = 256;
     static const size_t smallLineSize = 256;
@@ -80,6 +80,7 @@ namespace Sizes {
     static const size_t largeMin = mediumMax;
     
     static const size_t xLargeAlignment = vmPageSize;
+    static const size_t xLargeMax = std::numeric_limits<size_t>::max() - xLargeAlignment; // Make sure that rounding up to xLargeAlignment does not overflow.
 
     static const size_t freeListSearchDepth = 16;
     static const size_t freeListGrowFactor = 2;
