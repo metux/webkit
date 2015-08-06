@@ -213,6 +213,10 @@
 #include "CoordinatedLayerTreeHostMessages.h"
 #endif
 
+#if ENABLE(VIDEO) && USE(GSTREAMER)
+#include <WebCore/MediaPlayerRequestInstallMissingPluginsCallback.h>
+#endif
+
 using namespace JSC;
 using namespace WebCore;
 
@@ -1013,6 +1017,13 @@ void WebPage::close()
     }
 #endif
 
+#if ENABLE(VIDEO) && USE(GSTREAMER)
+    if (m_installMediaPluginsCallback) {
+        m_installMediaPluginsCallback->invalidate();
+        m_installMediaPluginsCallback = nullptr;
+    }
+#endif
+
     m_sandboxExtensionTracker.invalidate();
 
 #if ENABLE(PRIMARY_SNAPSHOTTED_PLUGIN_HEURISTIC)
@@ -1197,7 +1208,7 @@ void WebPage::reload(uint64_t navigationID, bool reloadFromOrigin, const Sandbox
 {
     SendStopResponsivenessTimer stopper(this);
 
-    ASSERT(!m_pendingNavigationID);
+    ASSERT(!m_mainFrame->coreFrame()->loader().frameHasLoaded() || !m_pendingNavigationID);
     m_pendingNavigationID = navigationID;
 
     m_sandboxExtensionTracker.beginLoad(m_mainFrame.get(), sandboxExtensionHandle);
@@ -1725,7 +1736,8 @@ PassRefPtr<WebImage> WebPage::snapshotAtSize(const IntRect& rect, const IntSize&
 
     auto graphicsContext = snapshot->bitmap()->createGraphicsContext();
 
-    Color backgroundColor = coreFrame->settings().backgroundShouldExtendBeyondPage() ? frameView->documentBackgroundColor() : frameView->baseBackgroundColor();
+    Color documentBackgroundColor = frameView->documentBackgroundColor();
+    Color backgroundColor = (coreFrame->settings().backgroundShouldExtendBeyondPage() && documentBackgroundColor.isValid()) ? documentBackgroundColor : frameView->baseBackgroundColor();
     graphicsContext->fillRect(IntRect(IntPoint(), bitmapSize), backgroundColor, ColorSpaceDeviceRGB);
 
     if (!(options & SnapshotOptionsExcludeDeviceScaleFactor)) {

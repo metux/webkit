@@ -553,8 +553,11 @@ void DocumentLoader::willSendRequest(ResourceRequest& newRequest, const Resource
         // We checked application cache for initial URL, now we need to check it for redirected one.
         ASSERT(!m_substituteData.isValid());
         m_applicationCacheHost->maybeLoadMainResourceForRedirect(newRequest, m_substituteData);
-        if (m_substituteData.isValid())
-            m_identifierForLoadWithoutResourceLoader = mainResourceLoader()->identifier();
+        if (m_substituteData.isValid()) {
+            RELEASE_ASSERT(m_mainResource);
+            ResourceLoader* loader = m_mainResource->loader();
+            m_identifierForLoadWithoutResourceLoader = loader ? loader->identifier() : m_mainResource->identifierForLoadWithoutResourceLoader();
+        }
     }
 
     // FIXME: Ideally we'd stop the I/O until we hear back from the navigation policy delegate
@@ -584,10 +587,15 @@ void DocumentLoader::continueAfterNavigationPolicy(const ResourceRequest&, bool 
         // However, from an API perspective, this isn't a cancellation. Therefore, sever our relationship with the network load,
         // but prevent the ResourceLoader from sending ResourceLoadNotifier callbacks.
         RefPtr<ResourceLoader> resourceLoader = mainResourceLoader();
-        ASSERT(resourceLoader->shouldSendResourceLoadCallbacks());
-        resourceLoader->setSendCallbackPolicy(DoNotSendCallbacks);
+        if (resourceLoader) {
+            ASSERT(resourceLoader->shouldSendResourceLoadCallbacks());
+            resourceLoader->setSendCallbackPolicy(DoNotSendCallbacks);
+        }
+
         clearMainResource();
-        resourceLoader->setSendCallbackPolicy(SendCallbacks);
+
+        if (resourceLoader)
+            resourceLoader->setSendCallbackPolicy(SendCallbacks);
         handleSubstituteDataLoadSoon();
     }
 }
@@ -648,6 +656,7 @@ void DocumentLoader::responseReceived(CachedResource* resource, const ResourceRe
     }
 
     ASSERT(!m_waitingForContentPolicy);
+    ASSERT(frameLoader());
     m_waitingForContentPolicy = true;
 
     // Always show content with valid substitute data.
@@ -922,13 +931,14 @@ void DocumentLoader::checkLoadComplete()
     m_frame->document()->domWindow()->finishedLoading();
 }
 
-void DocumentLoader::setFrame(Frame* frame)
+void DocumentLoader::attachToFrame(Frame& frame)
 {
-    if (m_frame == frame)
+    if (m_frame == &frame)
         return;
-    ASSERT(frame && !m_frame);
-    m_frame = frame;
-    m_writer.setFrame(frame);
+
+    ASSERT(!m_frame);
+    m_frame = &frame;
+    m_writer.setFrame(&frame);
     attachToFrame();
 }
 
@@ -950,10 +960,17 @@ void DocumentLoader::detachFromFrame()
         m_mainResource->removeClient(this);
 
     m_applicationCacheHost->setDOMApplicationCache(nullptr);
-    InspectorInstrumentation::loaderDetachedFromFrame(*m_frame, *this);
+
+    cancelPolicyCheckIfNeeded();
+
+    // Even though we ASSERT at the top of this method that we have an m_frame, we're seeing crashes where m_frame is null.
+    // This means either that a DocumentLoader is detaching twice, or is detaching before ever having attached.
+    // Until we figure out how that is happening, null check m_frame before dereferencing it here.
+    // <rdar://problem/21293082> and https://bugs.webkit.org/show_bug.cgi?id=146786
+    if (m_frame)
+        InspectorInstrumentation::loaderDetachedFromFrame(*m_frame, *this);
+
     m_frame = nullptr;
-    // The call to stopLoading() above should have canceled any pending content policy check.
-    ASSERT_WITH_MESSAGE(!m_waitingForContentPolicy, "The content policy callback needs a valid frame.");
 }
 
 void DocumentLoader::clearMainResourceLoader()
@@ -1470,17 +1487,24 @@ void DocumentLoader::startLoadingMainResource()
     setRequest(request);
 }
 
+void DocumentLoader::cancelPolicyCheckIfNeeded()
+{
+    RELEASE_ASSERT(frameLoader());
+
+    if (m_waitingForContentPolicy) {
+        frameLoader()->policyChecker().cancelCheck();
+        m_waitingForContentPolicy = false;
+    }
+}
+
 void DocumentLoader::cancelMainResourceLoad(const ResourceError& resourceError)
 {
     Ref<DocumentLoader> protect(*this);
     ResourceError error = resourceError.isNull() ? frameLoader()->cancelledError(m_request) : resourceError;
 
     m_dataLoadTimer.stop();
-    if (m_waitingForContentPolicy) {
-        frameLoader()->policyChecker().cancelCheck();
-        ASSERT(m_waitingForContentPolicy);
-        m_waitingForContentPolicy = false;
-    }
+
+    cancelPolicyCheckIfNeeded();
 
     if (mainResourceLoader())
         mainResourceLoader()->cancel(error);

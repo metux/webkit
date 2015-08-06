@@ -47,6 +47,11 @@
 #include <wtf/text/CString.h>
 #include <wtf/text/WTFString.h>
 
+#if PLATFORM(X11)
+#include <gdk/gdkx.h>
+#undef KeyPress
+#endif
+
 using namespace WebCore;
 
 namespace WebKit {
@@ -93,11 +98,8 @@ void PageClientImpl::requestScroll(const WebCore::FloatPoint&, bool)
 
 WebCore::IntSize PageClientImpl::viewSize()
 {
-    if (!gtk_widget_get_realized(m_viewWidget))
-        return IntSize();
-    GtkAllocation allocation;
-    gtk_widget_get_allocation(m_viewWidget, &allocation);
-    return IntSize(allocation.width, allocation.height);
+    auto* drawingArea = static_cast<DrawingAreaProxyImpl*>(webkitWebViewBaseGetPage(WEBKIT_WEB_VIEW_BASE(m_viewWidget))->drawingArea());
+    return drawingArea ? drawingArea->size() : IntSize();
 }
 
 bool PageClientImpl::isViewWindowActive()
@@ -135,7 +137,7 @@ void PageClientImpl::toolTipChanged(const String&, const String& newToolTip)
     webkitWebViewBaseSetTooltipText(WEBKIT_WEB_VIEW_BASE(m_viewWidget), newToolTip.utf8().data());
 }
 
-void PageClientImpl::setCursor(const Cursor& cursor)
+void PageClientImpl::setCursor(const WebCore::Cursor& cursor)
 {
     if (!gtk_widget_get_realized(m_viewWidget))
         return;
@@ -429,5 +431,20 @@ void PageClientImpl::didFinishLoadForMainFrame()
 void PageClientImpl::didSameDocumentNavigationForMainFrame(SameDocumentNavigationType)
 {
 }
+
+#if ENABLE(VIDEO)
+GUniquePtr<GstInstallPluginsContext> PageClientImpl::createGstInstallPluginsContext()
+{
+#if PLATFORM(X11)
+    if (GDK_IS_X11_DISPLAY(gdk_display_manager_get_default_display(gdk_display_manager_get()))) {
+        GUniquePtr<GstInstallPluginsContext> context(gst_install_plugins_context_new());
+        gst_install_plugins_context_set_xid(context.get(), GDK_WINDOW_XID(gtk_widget_get_window(m_viewWidget)));
+        return context;
+    }
+#endif
+
+    return nullptr;
+}
+#endif
 
 } // namespace WebKit
