@@ -274,7 +274,7 @@ void FrameLoader::initForSynthesizedDocument(const URL&)
     // FrameLoader::checkCompleted() will overwrite the URL of the document to be activeDocumentLoader()->documentURL().
 
     RefPtr<DocumentLoader> loader = m_client.createDocumentLoader(ResourceRequest(URL(ParsedURLString, emptyString())), SubstituteData());
-    loader->setFrame(&m_frame);
+    loader->attachToFrame(m_frame);
     loader->setResponse(ResourceResponse(URL(), ASCIILiteral("text/html"), 0, String()));
     loader->setCommitted(true);
     setDocumentLoader(loader.get());
@@ -1685,7 +1685,7 @@ void FrameLoader::setPolicyDocumentLoader(DocumentLoader* loader)
         return;
 
     if (loader)
-        loader->setFrame(&m_frame);
+        loader->attachToFrame(m_frame);
     if (m_policyDocumentLoader
             && m_policyDocumentLoader != m_provisionalDocumentLoader
             && m_policyDocumentLoader != m_documentLoader)
@@ -1925,7 +1925,7 @@ void FrameLoader::transitionToCommitted(CachedPage* cachedPage)
             if (cachedPage) {
                 DocumentLoader* cachedDocumentLoader = cachedPage->documentLoader();
                 ASSERT(cachedDocumentLoader);
-                cachedDocumentLoader->setFrame(&m_frame);
+                cachedDocumentLoader->attachToFrame(m_frame);
                 m_client.transitionToCommittedFromCachedFrame(cachedPage->cachedMainFrame());
             } else
                 m_client.transitionToCommittedForNewPage();
@@ -3134,7 +3134,7 @@ void FrameLoader::loadSameDocumentItem(HistoryItem& item)
     if (FrameView* view = m_frame.view())
         view->setWasScrolledByUser(false);
 
-    history().setCurrentItem(item);
+    history().setCurrentItem(&item);
         
     // loadInSameDocument() actually changes the URL and notifies load delegates of a "fake" load
     loadInSameDocument(item.url(), item.stateObject(), false);

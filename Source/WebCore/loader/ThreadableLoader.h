@@ -36,10 +36,7 @@
 #include <wtf/PassRefPtr.h>
 #include <wtf/RefPtr.h>
 #include <wtf/Vector.h>
-
-#if ENABLE(RESOURCE_TIMING)
-#include <wtf/text/AtomicString.h>
-#endif
+#include <wtf/text/WTFString.h>
 
 namespace WebCore {
 
@@ -62,8 +59,9 @@ namespace WebCore {
         PreventPreflight
     };
 
-    struct ThreadableLoaderOptions : public ResourceLoaderOptions {
+    struct ThreadableLoaderOptions : ResourceLoaderOptions {
         ThreadableLoaderOptions();
+        ThreadableLoaderOptions(const ResourceLoaderOptions&, PreflightPolicy, CrossOriginRequestPolicy, RefPtr<SecurityOrigin>&&, String&& initiator);
         ~ThreadableLoaderOptions();
 
         std::unique_ptr<ThreadableLoaderOptions> isolatedCopy() const;
