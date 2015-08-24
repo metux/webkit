@@ -1,4 +1,4 @@
-webkit2gtk (2.8.5+dfsg1-2) UNRELEASED; urgency=medium
+webkit2gtk (2.8.5+dfsg1-2) unstable; urgency=medium
 
   * debian/patches/fix-ftbfs-gcc5.patch:
     + Fix FTBFS with GCC 5 in some architectures.
