@@ -95,6 +95,10 @@ override_dh_clean:
 	dh_clean $(EXTRA_DH_ARGUMENTS)
 	rm -f Source/WebInspectorUI/Tools/PrettyPrinting/populate/jquery.min.js
 
+override_dh_builddeb:
+	DEB_BUILD_OPTIONS="$(filter-out parallel=%,$(DEB_BUILD_OPTIONS))" \
+		dh_builddeb $(EXTRA_DH_ARGUMENTS)
+
 override_dh_auto_test:
 
 VERSION := $(shell dpkg-parsechangelog | sed -ne 's/^Version: \(.*\)-.*/\1/p')
