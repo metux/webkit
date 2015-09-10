@@ -1,4 +1,4 @@
-webkit2gtk (2.8.5+dfsg1-3) UNRELEASED; urgency=medium
+webkit2gtk (2.8.5+dfsg1-3) unstable; urgency=medium
 
   * debian/rules:
     + Do not run dh_builddeb in parallel, it is very I/O intensive for
