@@ -5,23 +5,22 @@ Index: webkitgtk/Tools/MiniBrowser/gtk/CMakeLists.txt
 ===================================================================
 --- webkitgtk.orig/Tools/MiniBrowser/gtk/CMakeLists.txt
 +++ webkitgtk/Tools/MiniBrowser/gtk/CMakeLists.txt
-@@ -54,4 +54,4 @@ add_executable(MiniBrowser ${MiniBrowser
+@@ -60,4 +60,4 @@ add_executable(MiniBrowser ${MiniBrowser
  target_link_libraries(MiniBrowser ${MiniBrowser_LIBRARIES})
  set_target_properties(MiniBrowser PROPERTIES FOLDER "Tools")
  
 -install(TARGETS MiniBrowser DESTINATION "${EXEC_INSTALL_DIR}")
-\ No newline at end of file
 +install(TARGETS MiniBrowser DESTINATION "${LIBEXEC_INSTALL_DIR}")
 Index: webkitgtk/Source/cmake/OptionsGTK.cmake
 ===================================================================
 --- webkitgtk.orig/Source/cmake/OptionsGTK.cmake
 +++ webkitgtk/Source/cmake/OptionsGTK.cmake
-@@ -141,7 +141,7 @@ if (DEVELOPER_MODE)
-     WEBKIT_OPTION_DEFAULT_PORT_VALUE(ENABLE_MINIBROWSER ON)
-     WEBKIT_OPTION_DEFAULT_PORT_VALUE(ENABLE_API_TESTS ON)
+@@ -101,7 +101,7 @@ if (DEVELOPER_MODE)
+     WEBKIT_OPTION_DEFAULT_PORT_VALUE(ENABLE_MINIBROWSER PUBLIC ON)
+     WEBKIT_OPTION_DEFAULT_PORT_VALUE(ENABLE_API_TESTS PRIVATE ON)
  else ()
--    WEBKIT_OPTION_DEFAULT_PORT_VALUE(ENABLE_MINIBROWSER OFF)
-+    WEBKIT_OPTION_DEFAULT_PORT_VALUE(ENABLE_MINIBROWSER ON)
-     WEBKIT_OPTION_DEFAULT_PORT_VALUE(ENABLE_API_TESTS OFF)
+-    WEBKIT_OPTION_DEFAULT_PORT_VALUE(ENABLE_MINIBROWSER PUBLIC OFF)
++    WEBKIT_OPTION_DEFAULT_PORT_VALUE(ENABLE_MINIBROWSER PUBLIC ON)
+     WEBKIT_OPTION_DEFAULT_PORT_VALUE(ENABLE_API_TESTS PRIVATE OFF)
      set(WebKit2_VERSION_SCRIPT "-Wl,--version-script,${CMAKE_MODULE_PATH}/gtksymbols.filter")
  endif ()

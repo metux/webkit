@@ -1,4 +1,2 @@
 install-minibrowser.patch
-restore_sparc_code.patch
 fix-ftbfs-m68k.patch
-fix-ftbfs-gcc5.patch

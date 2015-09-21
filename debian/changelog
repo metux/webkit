@@ -1,6 +1,13 @@
 webkit2gtk (2.10.0+dfsg1-1) UNRELEASED; urgency=medium
 
   * New upstream release.
+  * debian/patches/fix-ftbfs-gcc5.patch:
+    + Remove, this has been merged upstream.
+  * debian/patches/restore_sparc_code.patch:
+    + Remove, this is obsolete.
+  * debian/patches/install-minibrowser.patch,
+    debian/patches/fix-ftbfs-m68k.patch:
+    + Refresh.
 
  -- Alberto Garcia <berto@igalia.com>  Mon, 21 Sep 2015 15:21:03 +0300
 
