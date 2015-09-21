@@ -1,6 +1,6 @@
 /*
  *  Copyright (C) 1999-2000 Harri Porten (porten@kde.org)
- *  Copyright (C) 2004, 2005, 2006, 2007, 2008, 2012, 2013, 2015 Apple Inc. All rights reserved.
+ *  Copyright (C) 2004-2008, 2012-2013, 2015 Apple Inc. All rights reserved.
  *  Copyright (C) 2006 Bjoern Graf (bjoern.graf@gmail.com)
  *
  *  This library is free software; you can redistribute it and/or
@@ -28,6 +28,9 @@
 #include "CodeBlock.h"
 #include "Completion.h"
 #include "CopiedSpaceInlines.h"
+#include "DFGPlan.h"
+#include "Disassembler.h"
+#include "Exception.h"
 #include "ExceptionHelpers.h"
 #include "HeapStatistics.h"
 #include "InitializeThreading.h"
@@ -40,6 +43,7 @@
 #include "JSONObject.h"
 #include "JSProxy.h"
 #include "JSString.h"
+#include "JSWASMModule.h"
 #include "ProfilerDatabase.h"
 #include "SamplingTool.h"
 #include "StackVisitor.h"
@@ -47,6 +51,7 @@
 #include "StructureRareDataInlines.h"
 #include "TestRunnerUtils.h"
 #include "TypeProfilerLog.h"
+#include "WASMModuleParser.h"
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -96,14 +101,12 @@
 using namespace JSC;
 using namespace WTF;
 
-namespace JSC {
-WTF_IMPORT extern const struct HashTable globalObjectTable;
-}
-
 namespace {
 
 NO_RETURN_WITH_VALUE static void jscExit(int status)
 {
+    waitForAsynchronousDisassembly();
+    
 #if ENABLE(DFG_JIT)
     if (DFG::isCrashing()) {
         for (;;) {
@@ -126,27 +129,34 @@ class RuntimeArray;
 
 class Element : public JSNonFinalObject {
 public:
-    Element(VM& vm, Structure* structure, Root* root)
+    Element(VM& vm, Structure* structure)
         : Base(vm, structure)
-        , m_root(root)
     {
     }
 
     typedef JSNonFinalObject Base;
     static const bool needsDestruction = false;
 
-    Root* root() const { return m_root; }
-    void setRoot(Root* root) { m_root = root; }
+    Root* root() const { return m_root.get(); }
+    void setRoot(VM& vm, Root* root) { m_root.set(vm, this, root); }
 
     static Element* create(VM& vm, JSGlobalObject* globalObject, Root* root)
     {
         Structure* structure = createStructure(vm, globalObject, jsNull());
-        Element* element = new (NotNull, allocateCell<Element>(vm.heap, sizeof(Element))) Element(vm, structure, root);
-        element->finishCreation(vm);
+        Element* element = new (NotNull, allocateCell<Element>(vm.heap, sizeof(Element))) Element(vm, structure);
+        element->finishCreation(vm, root);
         return element;
     }
 
-    void finishCreation(VM&);
+    void finishCreation(VM&, Root*);
+
+    static void visitChildren(JSCell* cell, SlotVisitor& visitor)
+    {
+        Element* thisObject = jsCast<Element*>(cell);
+        ASSERT_GC_OBJECT_INHERITS(thisObject, info());
+        Base::visitChildren(thisObject, visitor);
+        visitor.append(&thisObject->m_root);
+    }
 
     static ElementHandleOwner* handleOwner();
 
@@ -158,7 +168,7 @@ public:
     DECLARE_INFO;
 
 private:
-    Root* m_root;
+    WriteBarrier<Root> m_root;
 };
 
 class ElementHandleOwner : public WeakHandleOwner {
@@ -178,6 +188,7 @@ public:
     }
 
     typedef JSNonFinalObject Base;
+    static const unsigned StructureFlags = Base::StructureFlags | JSC::MasqueradesAsUndefined;
 
     static Masquerader* create(VM& vm, JSGlobalObject* globalObject)
     {
@@ -194,9 +205,6 @@ public:
     }
 
     DECLARE_INFO;
-
-protected:
-    static const unsigned StructureFlags = JSC::MasqueradesAsUndefined | Base::StructureFlags;
 };
 
 class Root : public JSDestructibleObject {
@@ -254,6 +262,7 @@ public:
 
     DECLARE_INFO;
     typedef JSNonFinalObject Base;
+    static const unsigned StructureFlags = Base::StructureFlags | JSC::HasImpureGetOwnPropertySlot | JSC::OverridesGetOwnPropertySlot;
 
     static Structure* createStructure(VM& vm, JSGlobalObject* globalObject, JSValue prototype)
     {
@@ -273,8 +282,6 @@ public:
         if (delegate)
             m_delegate.set(vm, this, delegate);
     }
-
-    static const unsigned StructureFlags = JSC::HasImpureGetOwnPropertySlot | JSC::OverridesGetOwnPropertySlot | Base::StructureFlags;
 
     static bool getOwnPropertySlot(JSObject* object, ExecState* exec, PropertyName name, PropertySlot& slot)
     {
@@ -305,6 +312,7 @@ private:
 class RuntimeArray : public JSArray {
 public:
     typedef JSArray Base;
+    static const unsigned StructureFlags = Base::StructureFlags | OverridesGetOwnPropertySlot | InterceptsGetOwnPropertySlotByIndexEvenWhenLengthIsNotZero | OverridesGetPropertyNames;
 
     static RuntimeArray* create(ExecState* exec)
     {
@@ -334,10 +342,9 @@ public:
             return true;
         }
 
-        unsigned index = propertyName.asIndex();
-        if (index < thisObject->getLength()) {
-            ASSERT(index != PropertyName::NotAnIndex);
-            slot.setValue(thisObject, DontDelete | DontEnum, jsNumber(thisObject->m_vector[index]));
+        Optional<uint32_t> index = parseIndex(propertyName);
+        if (index && index.value() < thisObject->getLength()) {
+            slot.setValue(thisObject, DontDelete | DontEnum, jsNumber(thisObject->m_vector[index.value()]));
             return true;
         }
 
@@ -389,8 +396,6 @@ protected:
             m_vector.append(exec->argument(i).toInt32(exec));
     }
 
-    static const unsigned StructureFlags = OverridesGetOwnPropertySlot | InterceptsGetOwnPropertySlotByIndexEvenWhenLengthIsNotZero | OverridesGetPropertyNames | JSArray::StructureFlags;
-
 private:
     RuntimeArray(ExecState* exec, Structure* structure)
         : JSArray(exec->vm(), structure, 0)
@@ -422,9 +427,10 @@ ElementHandleOwner* Element::handleOwner()
     return owner;
 }
 
-void Element::finishCreation(VM& vm)
+void Element::finishCreation(VM& vm, Root* root)
 {
     Base::finishCreation(vm);
+    setRoot(vm, root);
     m_root->setElement(this);
 }
 
@@ -449,9 +455,10 @@ static EncodedJSValue JSC_HOST_CALL functionJSCStack(ExecState*);
 static EncodedJSValue JSC_HOST_CALL functionGCAndSweep(ExecState*);
 static EncodedJSValue JSC_HOST_CALL functionFullGC(ExecState*);
 static EncodedJSValue JSC_HOST_CALL functionEdenGC(ExecState*);
+static EncodedJSValue JSC_HOST_CALL functionHeapSize(ExecState*);
 static EncodedJSValue JSC_HOST_CALL functionDeleteAllCompiledCode(ExecState*);
+static EncodedJSValue JSC_HOST_CALL functionAddressOf(ExecState*);
 #ifndef NDEBUG
-static EncodedJSValue JSC_HOST_CALL functionReleaseExecutableMemory(ExecState*);
 static EncodedJSValue JSC_HOST_CALL functionDumpCallFrame(ExecState*);
 #endif
 static EncodedJSValue JSC_HOST_CALL functionVersion(ExecState*);
@@ -471,6 +478,7 @@ static EncodedJSValue JSC_HOST_CALL functionFalse1(ExecState*);
 static EncodedJSValue JSC_HOST_CALL functionFalse2(ExecState*);
 static EncodedJSValue JSC_HOST_CALL functionUndefined1(ExecState*);
 static EncodedJSValue JSC_HOST_CALL functionUndefined2(ExecState*);
+static EncodedJSValue JSC_HOST_CALL functionIsInt32(ExecState*);
 static EncodedJSValue JSC_HOST_CALL functionEffectful42(ExecState*);
 static EncodedJSValue JSC_HOST_CALL functionIdentity(ExecState*);
 static EncodedJSValue JSC_HOST_CALL functionMakeMasquerader(ExecState*);
@@ -480,6 +488,13 @@ static EncodedJSValue JSC_HOST_CALL functionFindTypeForExpression(ExecState*);
 static EncodedJSValue JSC_HOST_CALL functionReturnTypeFor(ExecState*);
 static EncodedJSValue JSC_HOST_CALL functionDumpBasicBlockExecutionRanges(ExecState*);
 static EncodedJSValue JSC_HOST_CALL functionHasBasicBlockExecuted(ExecState*);
+static EncodedJSValue JSC_HOST_CALL functionEnableExceptionFuzz(ExecState*);
+#if ENABLE(WEBASSEMBLY)
+static EncodedJSValue JSC_HOST_CALL functionLoadWebAssembly(ExecState*);
+#endif
+#if ENABLE(ES6_MODULES)
+static EncodedJSValue JSC_HOST_CALL functionCheckModuleSyntax(ExecState*);
+#endif
 
 #if ENABLE(SAMPLING_FLAGS)
 static EncodedJSValue JSC_HOST_CALL functionSetSamplingFlags(ExecState*);
@@ -587,10 +602,11 @@ protected:
         addFunction(vm, "gc", functionGCAndSweep, 0);
         addFunction(vm, "fullGC", functionFullGC, 0);
         addFunction(vm, "edenGC", functionEdenGC, 0);
+        addFunction(vm, "gcHeapSize", functionHeapSize, 0);
         addFunction(vm, "deleteAllCompiledCode", functionDeleteAllCompiledCode, 0);
+        addFunction(vm, "addressOf", functionAddressOf, 1);
 #ifndef NDEBUG
         addFunction(vm, "dumpCallFrame", functionDumpCallFrame, 0);
-        addFunction(vm, "releaseExecutableMemory", functionReleaseExecutableMemory, 0);
 #endif
         addFunction(vm, "version", functionVersion, 1);
         addFunction(vm, "run", functionRun, 1);
@@ -615,11 +631,12 @@ protected:
         addFunction(vm, "getElement", functionGetElement, 1);
         addFunction(vm, "setElementRoot", functionSetElementRoot, 2);
         
-        putDirectNativeFunction(vm, this, Identifier(&vm, "DFGTrue"), 0, functionFalse1, DFGTrueIntrinsic, DontEnum | JSC::Function);
-        putDirectNativeFunction(vm, this, Identifier(&vm, "OSRExit"), 0, functionUndefined1, OSRExitIntrinsic, DontEnum | JSC::Function);
-        putDirectNativeFunction(vm, this, Identifier(&vm, "isFinalTier"), 0, functionFalse2, IsFinalTierIntrinsic, DontEnum | JSC::Function);
-        putDirectNativeFunction(vm, this, Identifier(&vm, "predictInt32"), 0, functionUndefined2, SetInt32HeapPredictionIntrinsic, DontEnum | JSC::Function);
-        putDirectNativeFunction(vm, this, Identifier(&vm, "fiatInt52"), 0, functionIdentity, FiatInt52Intrinsic, DontEnum | JSC::Function);
+        putDirectNativeFunction(vm, this, Identifier::fromString(&vm, "DFGTrue"), 0, functionFalse1, DFGTrueIntrinsic, DontEnum | JSC::Function);
+        putDirectNativeFunction(vm, this, Identifier::fromString(&vm, "OSRExit"), 0, functionUndefined1, OSRExitIntrinsic, DontEnum | JSC::Function);
+        putDirectNativeFunction(vm, this, Identifier::fromString(&vm, "isFinalTier"), 0, functionFalse2, IsFinalTierIntrinsic, DontEnum | JSC::Function);
+        putDirectNativeFunction(vm, this, Identifier::fromString(&vm, "predictInt32"), 0, functionUndefined2, SetInt32HeapPredictionIntrinsic, DontEnum | JSC::Function);
+        putDirectNativeFunction(vm, this, Identifier::fromString(&vm, "isInt32"), 0, functionIsInt32, CheckInt32Intrinsic, DontEnum | JSC::Function);
+        putDirectNativeFunction(vm, this, Identifier::fromString(&vm, "fiatInt52"), 0, functionIdentity, FiatInt52Intrinsic, DontEnum | JSC::Function);
         
         addFunction(vm, "effectful42", functionEffectful42, 0);
         addFunction(vm, "makeMasquerader", functionMakeMasquerader, 0);
@@ -637,31 +654,39 @@ protected:
 
         addFunction(vm, "dumpBasicBlockExecutionRanges", functionDumpBasicBlockExecutionRanges , 0);
         addFunction(vm, "hasBasicBlockExecuted", functionHasBasicBlockExecuted, 2);
+
+        addFunction(vm, "enableExceptionFuzz", functionEnableExceptionFuzz, 0);
         
+#if ENABLE(WEBASSEMBLY)
+        addFunction(vm, "loadWebAssembly", functionLoadWebAssembly, 1);
+#endif
+#if ENABLE(ES6_MODULES)
+        addFunction(vm, "checkModuleSyntax", functionCheckModuleSyntax, 1);
+#endif
+
         JSArray* array = constructEmptyArray(globalExec(), 0);
         for (size_t i = 0; i < arguments.size(); ++i)
             array->putDirectIndex(globalExec(), i, jsString(globalExec(), arguments[i]));
-        putDirect(vm, Identifier(globalExec(), "arguments"), array);
+        putDirect(vm, Identifier::fromString(globalExec(), "arguments"), array);
         
-        putDirect(vm, Identifier(globalExec(), "console"), jsUndefined());
+        putDirect(vm, Identifier::fromString(globalExec(), "console"), jsUndefined());
     }
 
     void addFunction(VM& vm, const char* name, NativeFunction function, unsigned arguments)
     {
-        Identifier identifier(&vm, name);
+        Identifier identifier = Identifier::fromString(&vm, name);
         putDirect(vm, identifier, JSFunction::create(vm, this, arguments, identifier.string(), function));
     }
     
     void addConstructableFunction(VM& vm, const char* name, NativeFunction function, unsigned arguments)
     {
-        Identifier identifier(&vm, name);
+        Identifier identifier = Identifier::fromString(&vm, name);
         putDirect(vm, identifier, JSFunction::create(vm, this, arguments, identifier.string(), function, NoIntrinsic, function));
     }
 };
 
-const ClassInfo GlobalObject::s_info = { "global", &JSGlobalObject::s_info, &globalObjectTable, CREATE_METHOD_TABLE(GlobalObject) };
+const ClassInfo GlobalObject::s_info = { "global", &JSGlobalObject::s_info, nullptr, CREATE_METHOD_TABLE(GlobalObject) };
 const GlobalObjectMethodTable GlobalObject::s_globalObjectMethodTable = { &allowsAccessFrom, &supportsProfiling, &supportsRichSourceInfo, &shouldInterruptScript, &javaScriptRuntimeFlags, 0, &shouldInterruptScriptBeforeTimeout };
-
 
 GlobalObject::GlobalObject(VM& vm, Structure* structure)
     : JSGlobalObject(vm, structure, &s_globalObjectMethodTable)
@@ -685,7 +710,7 @@ EncodedJSValue JSC_HOST_CALL functionPrint(ExecState* exec)
         if (i)
             putchar(' ');
 
-        printf("%s", exec->uncheckedArgument(i).toString(exec)->value(exec).utf8().data());
+        printf("%s", exec->uncheckedArgument(i).toString(exec)->view(exec).get().utf8().data());
     }
 
     putchar('\n');
@@ -706,7 +731,7 @@ EncodedJSValue JSC_HOST_CALL functionDumpCallFrame(ExecState* exec)
 
 EncodedJSValue JSC_HOST_CALL functionDebug(ExecState* exec)
 {
-    fprintf(stderr, "--> %s\n", exec->argument(0).toString(exec)->value(exec).utf8().data());
+    fprintf(stderr, "--> %s\n", exec->argument(0).toString(exec)->view(exec).get().utf8().data());
     return JSValue::encode(jsUndefined());
 }
 
@@ -780,7 +805,7 @@ EncodedJSValue JSC_HOST_CALL functionSetElementRoot(ExecState* exec)
     JSLockHolder lock(exec);
     Element* element = jsCast<Element*>(exec->argument(0));
     Root* root = jsCast<Root*>(exec->argument(1));
-    element->setRoot(root);
+    element->setRoot(exec->vm(), root);
     return JSValue::encode(jsUndefined());
 }
 
@@ -833,21 +858,27 @@ EncodedJSValue JSC_HOST_CALL functionGCAndSweep(ExecState* exec)
 {
     JSLockHolder lock(exec);
     exec->heap()->collectAllGarbage();
-    return JSValue::encode(jsUndefined());
+    return JSValue::encode(jsNumber(exec->heap()->sizeAfterLastFullCollection()));
 }
 
 EncodedJSValue JSC_HOST_CALL functionFullGC(ExecState* exec)
 {
     JSLockHolder lock(exec);
     exec->heap()->collect(FullCollection);
-    return JSValue::encode(jsUndefined());
+    return JSValue::encode(jsNumber(exec->heap()->sizeAfterLastFullCollection()));
 }
 
 EncodedJSValue JSC_HOST_CALL functionEdenGC(ExecState* exec)
 {
     JSLockHolder lock(exec);
     exec->heap()->collect(EdenCollection);
-    return JSValue::encode(jsUndefined());
+    return JSValue::encode(jsNumber(exec->heap()->sizeAfterLastEdenCollection()));
+}
+
+EncodedJSValue JSC_HOST_CALL functionHeapSize(ExecState* exec)
+{
+    JSLockHolder lock(exec);
+    return JSValue::encode(jsNumber(exec->heap()->size()));
 }
 
 EncodedJSValue JSC_HOST_CALL functionDeleteAllCompiledCode(ExecState* exec)
@@ -857,14 +888,19 @@ EncodedJSValue JSC_HOST_CALL functionDeleteAllCompiledCode(ExecState* exec)
     return JSValue::encode(jsUndefined());
 }
 
-#ifndef NDEBUG
-EncodedJSValue JSC_HOST_CALL functionReleaseExecutableMemory(ExecState* exec)
+// This function is not generally very helpful in 64-bit code as the tag and payload
+// share a register. But in 32-bit JITed code the tag may not be checked if an
+// optimization removes type checking requirements, such as in ===.
+EncodedJSValue JSC_HOST_CALL functionAddressOf(ExecState* exec)
 {
-    JSLockHolder lock(exec);
-    exec->vm().releaseExecutableMemory();
-    return JSValue::encode(jsUndefined());
+    JSValue value = exec->argument(0);
+    if (!value.isCell())
+        return JSValue::encode(jsUndefined());
+    // Need to cast to uint64_t so bitwise_cast will play along.
+    uint64_t asNumber = reinterpret_cast<uint64_t>(value.asCell());
+    EncodedJSValue returnValue = JSValue::encode(jsNumber(bitwise_cast<double>(asNumber)));
+    return returnValue;
 }
-#endif
 
 EncodedJSValue JSC_HOST_CALL functionVersion(ExecState*)
 {
@@ -886,15 +922,15 @@ EncodedJSValue JSC_HOST_CALL functionRun(ExecState* exec)
     for (unsigned i = 1; i < exec->argumentCount(); ++i)
         array->putDirectIndex(globalObject->globalExec(), i - 1, exec->uncheckedArgument(i));
     globalObject->putDirect(
-        exec->vm(), Identifier(globalObject->globalExec(), "arguments"), array);
+        exec->vm(), Identifier::fromString(globalObject->globalExec(), "arguments"), array);
 
-    JSValue exception;
+    NakedPtr<Exception> exception;
     StopWatch stopWatch;
     stopWatch.start();
-    evaluate(globalObject->globalExec(), jscSource(script.data(), fileName), JSValue(), &exception);
+    evaluate(globalObject->globalExec(), jscSource(script.data(), fileName), JSValue(), exception);
     stopWatch.stop();
 
-    if (!!exception) {
+    if (exception) {
         exec->vm().throwException(globalObject->globalExec(), exception);
         return JSValue::encode(jsUndefined());
     }
@@ -911,8 +947,8 @@ EncodedJSValue JSC_HOST_CALL functionLoad(ExecState* exec)
 
     JSGlobalObject* globalObject = exec->lexicalGlobalObject();
     
-    JSValue evaluationException;
-    JSValue result = evaluate(globalObject->globalExec(), jscSource(script.data(), fileName), JSValue(), &evaluationException);
+    NakedPtr<Exception> evaluationException;
+    JSValue result = evaluate(globalObject->globalExec(), jscSource(script.data(), fileName), JSValue(), evaluationException);
     if (evaluationException)
         exec->vm().throwException(exec, evaluationException);
     return JSValue::encode(result);
@@ -1047,6 +1083,14 @@ EncodedJSValue JSC_HOST_CALL functionFalse2(ExecState*) { return JSValue::encode
 
 EncodedJSValue JSC_HOST_CALL functionUndefined1(ExecState*) { return JSValue::encode(jsUndefined()); }
 EncodedJSValue JSC_HOST_CALL functionUndefined2(ExecState*) { return JSValue::encode(jsUndefined()); }
+EncodedJSValue JSC_HOST_CALL functionIsInt32(ExecState* exec)
+{
+    for (size_t i = 0; i < exec->argumentCount(); ++i) {
+        if (!exec->argument(i).isInt32())
+            return JSValue::encode(jsBoolean(false));
+    }
+    return JSValue::encode(jsBoolean(true));
+}
 
 EncodedJSValue JSC_HOST_CALL functionIdentity(ExecState* exec) { return JSValue::encode(exec->argument(0)); }
 
@@ -1124,11 +1168,53 @@ EncodedJSValue JSC_HOST_CALL functionHasBasicBlockExecuted(ExecState* exec)
     RELEASE_ASSERT(exec->argument(1).isString());
     String substring = exec->argument(1).getString(exec);
     String sourceCodeText = executable->source().toString();
+    RELEASE_ASSERT(sourceCodeText.contains(substring));
     int offset = sourceCodeText.find(substring) + executable->source().startOffset();
     
     bool hasExecuted = exec->vm().controlFlowProfiler()->hasBasicBlockAtTextOffsetBeenExecuted(offset, executable->sourceID(), exec->vm());
     return JSValue::encode(jsBoolean(hasExecuted));
 }
+
+EncodedJSValue JSC_HOST_CALL functionEnableExceptionFuzz(ExecState*)
+{
+    Options::enableExceptionFuzz() = true;
+    return JSValue::encode(jsUndefined());
+}
+
+#if ENABLE(WEBASSEMBLY)
+EncodedJSValue JSC_HOST_CALL functionLoadWebAssembly(ExecState* exec)
+{
+    String fileName = exec->argument(0).toString(exec)->value(exec);
+    Vector<char> buffer;
+    if (!fillBufferWithContentsOfFile(fileName, buffer))
+        return JSValue::encode(exec->vm().throwException(exec, createError(exec, ASCIILiteral("Could not open file."))));
+    RefPtr<WebAssemblySourceProvider> sourceProvider = WebAssemblySourceProvider::create(reinterpret_cast<Vector<uint8_t>&>(buffer), fileName);
+    SourceCode source(sourceProvider);
+    String errorMessage;
+    JSWASMModule* module = parseWebAssembly(exec, source, errorMessage);
+    if (!module)
+        return JSValue::encode(exec->vm().throwException(exec, createSyntaxError(exec, errorMessage)));
+    return JSValue::encode(module);
+}
+#endif
+
+#if ENABLE(ES6_MODULES)
+EncodedJSValue JSC_HOST_CALL functionCheckModuleSyntax(ExecState* exec)
+{
+    String source = exec->argument(0).toString(exec)->value(exec);
+
+    StopWatch stopWatch;
+    stopWatch.start();
+
+    ParserError error;
+    bool validSyntax = checkModuleSyntax(exec->vm(), makeSource(source), error);
+    stopWatch.stop();
+
+    if (!validSyntax)
+        exec->vm().throwException(exec, jsNontrivialString(exec, toString("SyntaxError: ", error.message(), ":", error.line())));
+    return JSValue::encode(jsNumber(stopWatch.getElapsedMS()));
+}
+#endif
 
 // Use SEH for Release builds only to get rid of the crash report dialog
 // (luckily the same tests fail in Release and Debug builds so far). Need to
@@ -1195,11 +1281,10 @@ int main(int argc, char** argv)
     ecore_init();
 #endif
 
-    // Initialize JSC before getting VM.
-#if ENABLE(SAMPLING_REGIONS)
-    WTF::initializeMainThread();
-#endif
-    JSC::initializeThreading();
+    // Need to initialize WTF threading before we start any threads. Cannot initialize JSC
+    // threading yet, since that would do somethings that we'd like to defer until after we
+    // have a chance to parse options.
+    WTF::initializeThreading();
 
     if (char* timeoutString = getenv("JSC_timeout")) {
         if (sscanf(timeoutString, "%lf", &s_desiredTimeout) != 1) {
@@ -1259,15 +1344,15 @@ static bool runWithScripts(GlobalObject* globalObject, const Vector<Script>& scr
 
         vm.startSampling();
 
-        JSValue evaluationException;
-        JSValue returnValue = evaluate(globalObject->globalExec(), jscSource(script, fileName), JSValue(), &evaluationException);
+        NakedPtr<Exception> evaluationException;
+        JSValue returnValue = evaluate(globalObject->globalExec(), jscSource(script, fileName), JSValue(), evaluationException);
         success = success && !evaluationException;
         if (dump && !evaluationException)
             printf("End: %s\n", returnValue.toString(globalObject->globalExec())->value(globalObject->globalExec()).utf8().data());
         if (evaluationException) {
-            printf("Exception: %s\n", evaluationException.toString(globalObject->globalExec())->value(globalObject->globalExec()).utf8().data());
-            Identifier stackID(globalObject->globalExec(), "stack");
-            JSValue stackValue = evaluationException.get(globalObject->globalExec(), stackID);
+            printf("Exception: %s\n", evaluationException->value().toString(globalObject->globalExec())->value(globalObject->globalExec()).utf8().data());
+            Identifier stackID = Identifier::fromString(globalObject->globalExec(), "stack");
+            JSValue stackValue = evaluationException->value().get(globalObject->globalExec(), stackID);
             if (!stackValue.isUndefinedOrNull())
                 printf("%s\n", stackValue.toString(globalObject->globalExec())->value(globalObject->globalExec()).utf8().data());
         }
@@ -1315,16 +1400,16 @@ static void runInteractive(GlobalObject* globalObject)
             if (!line[0])
                 break;
             add_history(line);
-        } while (error.m_syntaxErrorType == ParserError::SyntaxErrorRecoverable);
+        } while (error.syntaxErrorType() == ParserError::SyntaxErrorRecoverable);
         
-        if (error.m_type != ParserError::ErrorNone) {
-            printf("%s:%d\n", error.m_message.utf8().data(), error.m_line);
+        if (error.isValid()) {
+            printf("%s:%d\n", error.message().utf8().data(), error.line());
             continue;
         }
         
         
-        JSValue evaluationException;
-        JSValue returnValue = evaluate(globalObject->globalExec(), makeSource(source, interpreterName), JSValue(), &evaluationException);
+        NakedPtr<Exception> evaluationException;
+        JSValue returnValue = evaluate(globalObject->globalExec(), makeSource(source, interpreterName), JSValue(), evaluationException);
 #else
         printf("%s", interactivePrompt);
         Vector<char, 256> line;
@@ -1339,15 +1424,16 @@ static void runInteractive(GlobalObject* globalObject)
             break;
         line.append('\0');
 
-        JSValue evaluationException;
-        JSValue returnValue = evaluate(globalObject->globalExec(), jscSource(line.data(), interpreterName), JSValue(), &evaluationException);
+        NakedPtr<Exception> evaluationException;
+        JSValue returnValue = evaluate(globalObject->globalExec(), jscSource(line.data(), interpreterName), JSValue(), evaluationException);
 #endif
         if (evaluationException)
-            printf("Exception: %s\n", evaluationException.toString(globalObject->globalExec())->value(globalObject->globalExec()).utf8().data());
+            printf("Exception: %s\n", evaluationException->value().toString(globalObject->globalExec())->value(globalObject->globalExec()).utf8().data());
         else
             printf("%s\n", returnValue.toString(globalObject->globalExec())->value(globalObject->globalExec()).utf8().data());
 
         globalObject->globalExec()->clearException();
+        globalObject->vm().drainMicrotasks();
     }
     printf("\n");
 }
@@ -1376,6 +1462,8 @@ static NO_RETURN void printUsageStatement(bool help = false)
 
 void CommandLine::parseArguments(int argc, char** argv)
 {
+    Options::initialize();
+    
     int i = 1;
     bool needToDumpOptions = false;
     bool needToExit = false;
@@ -1440,8 +1528,7 @@ void CommandLine::parseArguments(int argc, char** argv)
         }
 
         // See if the -- option is a JSC VM option.
-        // NOTE: At this point, we know that the arg starts with "--". Skip it.
-        if (JSC::Options::setOption(&arg[2])) {
+        if (strstr(arg, "--") == arg && JSC::Options::setOption(&arg[2])) {
             // The arg was recognized as a VM option and has been parsed.
             continue; // Just continue with the next arg. 
         }
@@ -1458,7 +1545,8 @@ void CommandLine::parseArguments(int argc, char** argv)
         m_arguments.append(argv[i]);
 
     if (needToDumpOptions)
-        JSC::Options::dumpAllOptions(stderr);
+        JSC::Options::dumpAllOptions(stderr, JSC::Options::DumpLevel::Verbose, "All JSC runtime options:");
+    JSC::Options::ensureOptionsAreCoherent();
     if (needToExit)
         jscExit(EXIT_SUCCESS);
 }
@@ -1468,7 +1556,14 @@ int jscmain(int argc, char** argv)
     // Note that the options parsing can affect VM creation, and thus
     // comes first.
     CommandLine options(argc, argv);
-    VM* vm = VM::create(LargeHeap).leakRef();
+
+    // Initialize JSC before getting VM.
+#if ENABLE(SAMPLING_REGIONS)
+    WTF::initializeMainThread();
+#endif
+    JSC::initializeThreading();
+
+    VM* vm = &VM::create(LargeHeap).leakRef();
     int result;
     {
         JSLockHolder locker(vm);
@@ -1494,7 +1589,22 @@ int jscmain(int argc, char** argv)
 #if ENABLE(JIT)
         if (Options::enableExceptionFuzz())
             printf("JSC EXCEPTION FUZZ: encountered %u checks.\n", numberOfExceptionFuzzChecks());
+        bool fireAtEnabled =
+            Options::fireExecutableAllocationFuzzAt() || Options::fireExecutableAllocationFuzzAtOrAfter();
+        if (Options::enableExecutableAllocationFuzz() && (!fireAtEnabled || Options::verboseExecutableAllocationFuzz()))
+            printf("JSC EXECUTABLE ALLOCATION FUZZ: encountered %u checks.\n", numberOfExecutableAllocationFuzzChecks());
+        if (Options::enableOSRExitFuzz()) {
+            printf("JSC OSR EXIT FUZZ: encountered %u static checks.\n", numberOfStaticOSRExitFuzzChecks());
+            printf("JSC OSR EXIT FUZZ: encountered %u dynamic checks.\n", numberOfOSRExitFuzzChecks());
+        }
 #endif
+        auto compileTimeStats = DFG::Plan::compileTimeStats();
+        Vector<CString> compileTimeKeys;
+        for (auto& entry : compileTimeStats)
+            compileTimeKeys.append(entry.key);
+        std::sort(compileTimeKeys.begin(), compileTimeKeys.end());
+        for (CString key : compileTimeKeys)
+            printf("%40s: %.3lf ms\n", key.data(), compileTimeStats.get(key));
     }
     
     return result;

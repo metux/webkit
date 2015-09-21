@@ -146,8 +146,7 @@ void AudioScheduledSourceNode::start(double when, ExceptionCode& ec)
 {
     ASSERT(isMainThread());
 
-    if (ScriptController::processingUserGesture())
-        context()->removeBehaviorRestriction(AudioContext::RequireUserGestureForAudioStartRestriction);
+    context()->nodeWillBeginPlayback();
 
     if (m_playbackState != UNSCHEDULED_STATE) {
         ec = INVALID_STATE_ERR;
@@ -196,12 +195,6 @@ void AudioScheduledSourceNode::noteOff(double when, ExceptionCode& ec)
 }
 #endif
 
-void AudioScheduledSourceNode::setOnended(PassRefPtr<EventListener> listener)
-{
-    m_hasEndedListener = listener;
-    setAttributeEventListener(eventNames().endedEvent, listener);
-}
-
 void AudioScheduledSourceNode::finish()
 {
     if (m_playbackState != FINISHED_STATE) {
@@ -211,24 +204,33 @@ void AudioScheduledSourceNode::finish()
         context()->decrementActiveSourceCount();
     }
 
-    if (m_hasEndedListener)
-        callOnMainThread(&AudioScheduledSourceNode::notifyEndedDispatch, this);
+    if (m_hasEndedListener) {
+        callOnMainThread([this] {
+            dispatchEvent(Event::create(eventNames().endedEvent, false, false));
+        });
+    }
 }
 
-void AudioScheduledSourceNode::notifyEndedDispatch(void* userData)
+bool AudioScheduledSourceNode::addEventListener(const AtomicString& eventType, PassRefPtr<EventListener> listener, bool useCapture)
 {
-    static_cast<AudioScheduledSourceNode*>(userData)->notifyEnded();
+    bool success = AudioNode::addEventListener(eventType, listener, useCapture);
+    if (success && eventType == eventNames().endedEvent)
+        m_hasEndedListener = hasEventListeners(eventNames().endedEvent);
+    return success;
 }
 
-void AudioScheduledSourceNode::notifyEnded()
+bool AudioScheduledSourceNode::removeEventListener(const AtomicString& eventType, EventListener* listener, bool useCapture)
 {
-    EventListener* listener = onended();
-    if (!listener)
-        return;
+    bool success = AudioNode::removeEventListener(eventType, listener, useCapture);
+    if (success && eventType == eventNames().endedEvent)
+        m_hasEndedListener = hasEventListeners(eventNames().endedEvent);
+    return success;
+}
 
-    RefPtr<Event> event = Event::create(eventNames().endedEvent, FALSE, FALSE);
-    event->setTarget(this);
-    listener->handleEvent(context()->scriptExecutionContext(), event.get());
+void AudioScheduledSourceNode::removeAllEventListeners()
+{
+    m_hasEndedListener = false;
+    AudioNode::removeAllEventListeners();
 }
 
 } // namespace WebCore

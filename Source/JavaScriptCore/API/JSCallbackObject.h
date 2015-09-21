@@ -33,7 +33,7 @@
 
 namespace JSC {
 
-struct JSCallbackObjectData : WeakHandleOwner {
+struct JSCallbackObjectData {
     WTF_MAKE_FAST_ALLOCATED;
 public:
     JSCallbackObjectData(void* privateData, JSClassRef jsClass)
@@ -43,7 +43,7 @@ public:
         JSClassRetain(jsClass);
     }
     
-    virtual ~JSCallbackObjectData()
+    ~JSCallbackObjectData()
     {
         JSClassRelease(jsClass);
     }
@@ -79,6 +79,8 @@ public:
     void* privateData;
     JSClassRef jsClass;
     struct JSPrivatePropertyMap {
+        WTF_MAKE_FAST_ALLOCATED;
+    public:
         JSValue getPrivateProperty(const Identifier& propertyName) const
         {
             PrivatePropertyMap::const_iterator location = m_propertyMap.find(propertyName.impl());
@@ -107,11 +109,10 @@ public:
         }
 
     private:
-        typedef HashMap<RefPtr<StringImpl>, WriteBarrier<Unknown>, IdentifierRepHash> PrivatePropertyMap;
+        typedef HashMap<RefPtr<UniquedStringImpl>, WriteBarrier<Unknown>, IdentifierRepHash> PrivatePropertyMap;
         PrivatePropertyMap m_propertyMap;
     };
     std::unique_ptr<JSPrivatePropertyMap> m_privateProperties;
-    virtual void finalize(Handle<Unknown>, void*) override;
 };
 
     
@@ -126,6 +127,9 @@ protected:
 
 public:
     typedef Parent Base;
+    static const unsigned StructureFlags = Base::StructureFlags | ProhibitsPropertyCaching | OverridesGetOwnPropertySlot | InterceptsGetOwnPropertySlotByIndexEvenWhenLengthIsNotZero | ImplementsHasInstance | OverridesHasInstance | OverridesGetPropertyNames | TypeOfShouldCallGetCallData;
+
+    ~JSCallbackObject();
 
     static JSCallbackObject* create(ExecState* exec, JSGlobalObject* globalObject, Structure* structure, JSClassRef classRef, void* data)
     {
@@ -169,9 +173,6 @@ public:
 
     using Parent::methodTable;
 
-protected:
-    static const unsigned StructureFlags = ProhibitsPropertyCaching | OverridesGetOwnPropertySlot | InterceptsGetOwnPropertySlotByIndexEvenWhenLengthIsNotZero | ImplementsHasInstance | OverridesHasInstance | OverridesGetPropertyNames | Parent::StructureFlags;
-
 private:
     static String className(const JSObject*);
 
@@ -213,7 +214,7 @@ private:
     static EncodedJSValue staticFunctionGetter(ExecState*, JSObject*, EncodedJSValue, PropertyName);
     static EncodedJSValue callbackGetter(ExecState*, JSObject*, EncodedJSValue, PropertyName);
 
-    OwnPtr<JSCallbackObjectData> m_callbackObjectData;
+    std::unique_ptr<JSCallbackObjectData> m_callbackObjectData;
 };
 
 } // namespace JSC

@@ -37,13 +37,8 @@
 #include <wtf/HashSet.h>
 
 #if PLATFORM(IOS)
-#ifdef __OBJC__
-@class WAKScrollView;
-@class WAKView;
-#else
-class WAKScrollView;
-class WAKView;
-#endif
+OBJC_CLASS WAKScrollView;
+OBJC_CLASS WAKView;
 
 #ifndef NSScrollView
 #define NSScrollView WAKScrollView
@@ -55,6 +50,7 @@ class WAKView;
 #endif // PLATFORM(IOS)
 
 #if PLATFORM(COCOA) && defined __OBJC__
+@class NSScrollView;
 @protocol WebCoreFrameScrollView;
 #endif
 
@@ -73,7 +69,7 @@ public:
     virtual int scrollPosition(Scrollbar*) const override;
     WEBCORE_EXPORT virtual void setScrollOffset(const IntPoint&) override;
     virtual bool isScrollCornerVisible() const override;
-    virtual void scrollbarStyleChanged(int newStyle, bool forceUpdate) override;
+    virtual void scrollbarStyleChanged(ScrollbarStyle, bool forceUpdate) override;
 
     virtual void notifyPageThatContentAreaWillPaint() const;
 
@@ -172,7 +168,7 @@ public:
     // which usually will happen when panning, pinching and rotation ends, or when scale or position are changed manually.
     virtual IntSize visibleSize() const override { return visibleContentRect(LegacyIOSDocumentVisibleRect).size(); }
 
-#if USE(TILED_BACKING_STORE)
+#if USE(COORDINATED_GRAPHICS)
     virtual void setFixedVisibleContentRect(const IntRect& visibleContentRect) { m_fixedVisibleContentRect = visibleContentRect; }
     IntRect fixedVisibleContentRect() const { return m_fixedVisibleContentRect; }
 #endif
@@ -292,6 +288,12 @@ public:
     IntRect rootViewToContents(const IntRect&) const;
     WEBCORE_EXPORT IntRect contentsToRootView(const IntRect&) const;
 
+    IntPoint viewToContents(const IntPoint&) const;
+    IntPoint contentsToView(const IntPoint&) const;
+
+    IntRect viewToContents(IntRect) const;
+    IntRect contentsToView(IntRect) const;
+
     WEBCORE_EXPORT IntPoint rootViewToTotalContents(const IntPoint&) const;
 
     // Event coordinates are assumed to be in the coordinate space of a window that contains
@@ -309,15 +311,6 @@ public:
     // The purpose of this function is to answer whether or not the scroll view is currently visible. Animations and painting updates can be suspended if
     // we know that we are either not in a window right now or if that window is not visible.
     bool isOffscreen() const;
-    
-    // These functions are used to enable scrollbars to avoid window resizer controls that overlap the scroll view. This happens on Mac
-    // for example.
-    virtual IntRect windowResizerRect() const { return IntRect(); }
-    bool containsScrollbarsAvoidingResizer() const;
-    void adjustScrollbarsAvoidingResizerCount(int overlapDelta);
-    WEBCORE_EXPORT void windowResizerRectChanged();
-
-    virtual void setParent(ScrollView*) override; // Overridden to update the overlapping scrollbar count.
 
     // Called when our frame rect changes (or the rect/scroll position of an ancestor changes).
     virtual void frameRectsChanged() override;
@@ -389,10 +382,9 @@ protected:
 
     virtual void paintOverhangAreas(GraphicsContext*, const IntRect& horizontalOverhangArea, const IntRect& verticalOverhangArea, const IntRect& dirtyRect);
 
-    virtual void visibleContentsResized() = 0;
+    virtual void availableContentSizeChanged(AvailableSizeChangeReason) override;
     virtual void addedOrRemovedScrollbar() = 0;
     virtual void delegatesScrollingDidChange() { }
-    virtual void fixedLayoutSizeChanged();
 
     // These functions are used to create/destroy scrollbars.
     // They return true if the scrollbar was added or removed.
@@ -463,8 +455,6 @@ private:
     std::unique_ptr<IntSize> m_deferredScrollDelta; // Needed for WebKit scrolling
     std::unique_ptr<std::pair<IntPoint, IntPoint>> m_deferredScrollPositions; // Needed for platform widget scrolling
 
-
-    int m_scrollbarsAvoidingResizer;
     bool m_scrollbarsSuppressed;
 
     bool m_inUpdateScrollbars;

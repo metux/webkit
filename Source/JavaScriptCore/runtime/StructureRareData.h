@@ -36,12 +36,14 @@ namespace JSC {
 class JSPropertyNameEnumerator;
 class Structure;
 
-class StructureRareData : public JSCell {
+class StructureRareData final : public JSCell {
 public:
+    typedef JSCell Base;
+    static const unsigned StructureFlags = Base::StructureFlags | StructureIsImmortal;
+
     static StructureRareData* create(VM&, Structure*);
 
     static const bool needsDestruction = true;
-    static const bool hasImmortalStructure = true;
     static void destroy(JSCell*);
 
     static void visitChildren(JSCell*, SlotVisitor&);
@@ -55,10 +57,8 @@ public:
     JSString* objectToStringValue() const;
     void setObjectToStringValue(VM&, JSString* value);
 
-    JSPropertyNameEnumerator* cachedStructurePropertyNameEnumerator() const;
-    JSPropertyNameEnumerator* cachedGenericPropertyNameEnumerator() const;
-    void setCachedStructurePropertyNameEnumerator(VM&, JSPropertyNameEnumerator*);
-    void setCachedGenericPropertyNameEnumerator(VM&, JSPropertyNameEnumerator*);
+    JSPropertyNameEnumerator* cachedPropertyNameEnumerator() const;
+    void setCachedPropertyNameEnumerator(VM&, JSPropertyNameEnumerator*);
 
     DECLARE_EXPORT_INFO;
 
@@ -67,11 +67,9 @@ private:
     
     StructureRareData(VM&, Structure*);
 
-    static const unsigned StructureFlags = JSCell::StructureFlags;
-
     WriteBarrier<Structure> m_previous;
     WriteBarrier<JSString> m_objectToStringValue;
-    WriteBarrier<JSPropertyNameEnumerator> m_cachedStructurePropertyNameEnumerator;
+    WriteBarrier<JSPropertyNameEnumerator> m_cachedPropertyNameEnumerator;
     WriteBarrier<JSPropertyNameEnumerator> m_cachedGenericPropertyNameEnumerator;
     
     typedef HashMap<PropertyOffset, RefPtr<WatchpointSet>, WTF::IntHash<PropertyOffset>, WTF::UnsignedWithZeroKeyHashTraits<PropertyOffset>> PropertyWatchpointMap;

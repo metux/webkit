@@ -39,10 +39,11 @@
 #include <WebKit/WKBundleFramePrivate.h>
 #include <WebKit/WKBundleHitTestResult.h>
 #include <WebKit/WKBundleNavigationAction.h>
+#include <WebKit/WKBundleNavigationActionPrivate.h>
 #include <WebKit/WKBundleNodeHandlePrivate.h>
 #include <WebKit/WKBundlePagePrivate.h>
 #include <WebKit/WKBundlePrivate.h>
-#include <WebKit/WKSecurityOrigin.h>
+#include <WebKit/WKSecurityOriginRef.h>
 #include <WebKit/WKURLRequest.h>
 #include <wtf/HashMap.h>
 #include <wtf/text/CString.h>
@@ -304,7 +305,7 @@ InjectedBundlePage::InjectedBundlePage(WKBundlePageRef page)
         0, // featuresUsedInPage
         0, // willLoadURLRequest
         0, // willLoadDataRequest
-        0, // willDestroyFrame
+        0, // willDestroyFrame_unavailable
         0, // userAgentForURL
     };
     WKBundlePageSetPageLoaderClient(m_page, &loaderClient.base);
@@ -685,14 +686,17 @@ void InjectedBundlePage::didReceiveServerRedirectForProvisionalLoadForFrame(WKBu
     dumpLoadEvent(frame, "didReceiveServerRedirectForProvisionalLoadForFrame");
 }
 
-void InjectedBundlePage::didFailProvisionalLoadWithErrorForFrame(WKBundleFrameRef frame, WKErrorRef)
+void InjectedBundlePage::didFailProvisionalLoadWithErrorForFrame(WKBundleFrameRef frame, WKErrorRef error)
 {
     auto& injectedBundle = InjectedBundle::singleton();
     if (!injectedBundle.isTestRunning())
         return;
 
-    if (injectedBundle.testRunner()->shouldDumpFrameLoadCallbacks())
+    if (injectedBundle.testRunner()->shouldDumpFrameLoadCallbacks()) {
         dumpLoadEvent(frame, "didFailProvisionalLoadWithError");
+        if (WKErrorGetErrorCode(error) == kWKErrorCodeCannotShowURL)
+            dumpLoadEvent(frame, "(kWKErrorCodeCannotShowURL)");
+    }
 
     frameDidChangeLocation(frame);
 }
@@ -1000,6 +1004,17 @@ void InjectedBundlePage::willPerformClientRedirectForFrame(WKBundlePageRef, WKBu
 
 void InjectedBundlePage::didSameDocumentNavigationForFrame(WKBundleFrameRef frame, WKSameDocumentNavigationType type)
 {
+    auto& injectedBundle = InjectedBundle::singleton();
+    if (!injectedBundle.isTestRunning())
+        return;
+
+    if (!injectedBundle.testRunner()->shouldDumpFrameLoadCallbacks())
+        return;
+
+    if (type != kWKSameDocumentNavigationAnchorNavigation)
+        return;
+
+    dumpLoadEvent(frame, "didChangeLocationWithinPageForFrame");
 }
 
 void InjectedBundlePage::didFinishDocumentLoadForFrame(WKBundleFrameRef frame)
@@ -1074,6 +1089,11 @@ static inline bool isHTTPOrHTTPSScheme(WKStringRef scheme)
     return WKStringIsEqualToUTF8CStringIgnoringCase(scheme, "http") || WKStringIsEqualToUTF8CStringIgnoringCase(scheme, "https");
 }
 
+static inline bool isAllowedHost(WKStringRef host)
+{
+    return InjectedBundle::singleton().isAllowedHost(host);
+}
+
 WKURLRequestRef InjectedBundlePage::willSendRequestForFrame(WKBundlePageRef page, WKBundleFrameRef frame, uint64_t identifier, WKURLRequestRef request, WKURLResponseRef response)
 {
     auto& injectedBundle = InjectedBundle::singleton();
@@ -1108,7 +1128,7 @@ WKURLRequestRef InjectedBundlePage::willSendRequestForFrame(WKBundlePageRef page
         && !isLocalHost(host.get())) {
         bool mainFrameIsExternal = false;
         if (injectedBundle.isTestRunning()) {
-            WKBundleFrameRef mainFrame = injectedBundle.topLoadingFrame();
+            WKBundleFrameRef mainFrame = WKBundlePageGetMainFrame(m_page);
             WKRetainPtr<WKURLRef> mainFrameURL = adoptWK(WKBundleFrameCopyURL(mainFrame));
             if (!mainFrameURL || WKStringIsEqualToUTF8CString(adoptWK(WKURLCopyString(mainFrameURL.get())).get(), "about:blank"))
                 mainFrameURL = adoptWK(WKBundleFrameCopyProvisionalURL(mainFrame));
@@ -1117,7 +1137,7 @@ WKURLRequestRef InjectedBundlePage::willSendRequestForFrame(WKBundlePageRef page
             WKRetainPtr<WKStringRef> mainFrameScheme = adoptWK(WKURLCopyScheme(mainFrameURL.get()));
             mainFrameIsExternal = isHTTPOrHTTPSScheme(mainFrameScheme.get()) && !isLocalHost(mainFrameHost.get());
         }
-        if (!mainFrameIsExternal) {
+        if (!mainFrameIsExternal && !isAllowedHost(host.get())) {
             StringBuilder stringBuilder;
             stringBuilder.appendLiteral("Blocked access to external URL ");
             stringBuilder.append(toWTFString(urlString));
@@ -1254,6 +1274,18 @@ WKBundlePagePolicyAction InjectedBundlePage::decidePolicyForNavigationAction(WKB
     if (!injectedBundle.isTestRunning())
         return WKBundlePagePolicyActionUse;
 
+    if (injectedBundle.testRunner()->shouldDumpPolicyCallbacks()) {
+        StringBuilder stringBuilder;
+        stringBuilder.appendLiteral(" - decidePolicyForNavigationAction \n");
+        dumpRequestDescriptionSuitableForTestResult(request, stringBuilder);
+        stringBuilder.appendLiteral(" is main frame - ");
+        stringBuilder.append(WKBundleFrameIsMainFrame(frame) ? "yes" : "no");
+        stringBuilder.appendLiteral(" should open URLs externally - ");
+        stringBuilder.append(WKBundleNavigationActionGetShouldOpenExternalURLs(navigationAction) ? "yes" : "no");
+        stringBuilder.append('\n');
+        injectedBundle.outputText(stringBuilder.toString());
+    }
+
     if (!injectedBundle.testRunner()->isPolicyDelegateEnabled())
         return WKBundlePagePolicyActionUse;
 
@@ -1294,7 +1326,7 @@ WKBundlePagePolicyAction InjectedBundlePage::decidePolicyForNewWindowAction(WKBu
 
 WKBundlePagePolicyAction InjectedBundlePage::decidePolicyForResponse(WKBundlePageRef page, WKBundleFrameRef, WKURLResponseRef response, WKURLRequestRef, WKTypeRef*)
 {
-    if (WKURLResponseIsAttachment(response)) {
+    if (InjectedBundle::singleton().testRunner()->isPolicyDelegateEnabled() && WKURLResponseIsAttachment(response)) {
         StringBuilder stringBuilder;
         WKRetainPtr<WKStringRef> filename = adoptWK(WKURLResponseCopySuggestedFilename(response));
         stringBuilder.appendLiteral("Policy delegate: resource is an attachment, suggested file name \'");

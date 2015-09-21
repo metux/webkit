@@ -101,7 +101,7 @@ void TextureMapperLayer::computePatternTransformIfNeeded()
     m_patternTransformDirty = false;
     m_patternTransform =
         TransformationMatrix::rectToRect(FloatRect(FloatPoint::zero(), m_state.contentsTileSize), FloatRect(FloatPoint::zero(), m_state.contentsRect.size()))
-        .multiply(TransformationMatrix().translate(m_state.contentsTilePhase.x() / m_state.contentsRect.width(), m_state.contentsTilePhase.y() / m_state.contentsRect.height()));
+        .multiply(TransformationMatrix().translate(m_state.contentsTilePhase.width() / m_state.contentsRect.width(), m_state.contentsTilePhase.height() / m_state.contentsRect.height()));
 }
 
 void TextureMapperLayer::paintSelf(const TextureMapperPaintOptions& options)
@@ -408,7 +408,7 @@ void TextureMapperLayer::paintWithIntermediateSurface(const TextureMapperPaintOp
 
     if (replicaSurface && options.opacity == 1) {
         commitSurface(options, replicaSurface, rect, 1);
-        replicaSurface.clear();
+        replicaSurface = nullptr;
     }
 
     mainSurface = paintIntoSurface(paintOptions, rect.size());
@@ -554,7 +554,7 @@ void TextureMapperLayer::setContentsTileSize(const FloatSize& size)
     m_patternTransformDirty = true;
 }
 
-void TextureMapperLayer::setContentsTilePhase(const FloatPoint& phase)
+void TextureMapperLayer::setContentsTilePhase(const FloatSize& phase)
 {
     if (phase == m_state.contentsTilePhase)
         return;
@@ -656,7 +656,7 @@ void TextureMapperLayer::applyAnimationsRecursively()
 void TextureMapperLayer::syncAnimations()
 {
     m_animations.apply(this);
-    if (!m_animations.hasActiveAnimationsOfType(AnimatedPropertyWebkitTransform))
+    if (!m_animations.hasActiveAnimationsOfType(AnimatedPropertyTransform))
         m_currentTransform.setLocalTransform(m_state.transform);
     if (!m_animations.hasActiveAnimationsOfType(AnimatedPropertyOpacity))
         m_currentOpacity = m_state.opacity;

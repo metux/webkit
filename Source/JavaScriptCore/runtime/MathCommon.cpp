@@ -417,7 +417,27 @@ double JIT_OPERATION operationMathPow(double x, double y)
         return PNaN;
     if (std::isinf(y) && fabs(x) == 1)
         return PNaN;
-    return mathPowInternal(x, y);
+    int32_t yAsInt = y;
+    if (static_cast<double>(yAsInt) != y || yAsInt < 0)
+        return mathPowInternal(x, y);
+
+    // If the exponent is a positive int32 integer, we do a fast exponentiation
+    double result = 1;
+    while (yAsInt) {
+        if (yAsInt & 1)
+            result *= x;
+        x *= x;
+        yAsInt >>= 1;
+    }
+    return result;
+}
+
+extern "C" {
+double jsRound(double value)
+{
+    double integer = ceil(value);
+    return integer - (integer - value > 0.5);
+}
 }
 
 } // namespace JSC

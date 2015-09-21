@@ -31,12 +31,12 @@
 #include "MediaPlayer.h"
 #include "PlatformTimeRanges.h"
 #include <wtf/Forward.h>
-#include <wtf/OwnPtr.h>
 
 namespace WebCore {
 
 class IntRect;
 class IntSize;
+class MediaPlaybackTarget;
 class PlatformTextTrack;
 
 class MediaPlayerPrivateInterface {
@@ -49,6 +49,9 @@ public:
 #if ENABLE(MEDIA_SOURCE)
     virtual void load(const String& url, MediaSourcePrivateClient*) = 0;
 #endif
+#if ENABLE(MEDIA_STREAM)
+    virtual void load(MediaStreamPrivate&) = 0;
+#endif
     virtual void cancelLoad() = 0;
     
     virtual void prepareToPlay() { }
@@ -58,6 +61,7 @@ public:
     virtual void setVideoFullscreenLayer(PlatformLayer*) { }
     virtual void setVideoFullscreenFrame(FloatRect) { }
     virtual void setVideoFullscreenGravity(MediaPlayer::VideoGravity) { }
+    virtual void setVideoFullscreenMode(MediaPlayer::VideoFullscreenMode) { }
 
     virtual NSArray *timedMetadata() const { return 0; }
     virtual String accessLog() const { return emptyString(); }
@@ -75,7 +79,7 @@ public:
 
     virtual bool canSaveMediaData() const { return false; }
 
-    virtual IntSize naturalSize() const = 0;
+    virtual FloatSize naturalSize() const = 0;
 
     virtual bool hasVideo() const = 0;
     virtual bool hasAudio() const = 0;
@@ -89,6 +93,8 @@ public:
     virtual float currentTime() const { return 0; }
     virtual double currentTimeDouble() const { return currentTime(); }
     virtual MediaTime currentMediaTime() const { return MediaTime::createWithDouble(currentTimeDouble()); }
+
+    virtual MediaTime getStartDate() const { return MediaTime::createWithDouble(std::numeric_limits<double>::quiet_NaN()); }
 
     virtual void seek(float) { }
     virtual void seekDouble(double time) { seek(time); }
@@ -126,7 +132,7 @@ public:
     virtual MediaPlayer::NetworkState networkState() const = 0;
     virtual MediaPlayer::ReadyState readyState() const = 0;
 
-    virtual std::unique_ptr<PlatformTimeRanges> seekable() const { return maxMediaTimeSeekable() == MediaTime::zeroTime() ? PlatformTimeRanges::create() : PlatformTimeRanges::create(minMediaTimeSeekable(), maxMediaTimeSeekable()); }
+    virtual std::unique_ptr<PlatformTimeRanges> seekable() const { return maxMediaTimeSeekable() == MediaTime::zeroTime() ? std::make_unique<PlatformTimeRanges>() : std::make_unique<PlatformTimeRanges>(minMediaTimeSeekable(), maxMediaTimeSeekable()); }
     virtual float maxTimeSeekable() const { return 0; }
     virtual MediaTime maxMediaTimeSeekable() const { return MediaTime::createWithDouble(maxTimeSeekable()); }
     virtual double minTimeSeekable() const { return 0; }
@@ -138,9 +144,9 @@ public:
 
     virtual void setSize(const IntSize&) = 0;
 
-    virtual void paint(GraphicsContext*, const IntRect&) = 0;
+    virtual void paint(GraphicsContext*, const FloatRect&) = 0;
 
-    virtual void paintCurrentFrameInContext(GraphicsContext* c, const IntRect& r) { paint(c, r); }
+    virtual void paintCurrentFrameInContext(GraphicsContext* c, const FloatRect& r) { paint(c, r); }
     virtual bool copyVideoTextureToPlatformTexture(GraphicsContext3D*, Platform3DObject, GC3Dint, GC3Denum, GC3Denum, bool, bool) { return false; }
     virtual PassNativeImagePtr nativeImageForCurrentTime() { return nullptr; }
 
@@ -156,18 +162,19 @@ public:
     virtual void exitFullscreen() { }
 #endif
 
-#if ENABLE(IOS_AIRPLAY)
-    virtual bool isCurrentPlaybackTargetWireless() const { return false; }
+#if ENABLE(WIRELESS_PLAYBACK_TARGET)
 
     virtual String wirelessPlaybackTargetName() const { return emptyString(); }
     virtual MediaPlayer::WirelessPlaybackTargetType wirelessPlaybackTargetType() const { return MediaPlayer::TargetTypeNone; }
 
-    virtual void showPlaybackTargetPicker() { }
-
-    virtual bool hasWirelessPlaybackTargets() const { return false; }
-
-    virtual bool wirelessVideoPlaybackDisabled() const { return false; }
+    virtual bool wirelessVideoPlaybackDisabled() const { return true; }
     virtual void setWirelessVideoPlaybackDisabled(bool) { }
+
+    virtual bool canPlayToWirelessPlaybackTarget() const { return false; }
+    virtual bool isCurrentPlaybackTargetWireless() const { return false; }
+    virtual void setWirelessPlaybackTarget(Ref<MediaPlaybackTarget>&&) { }
+
+    virtual void setShouldPlayToPlaybackTarget(bool) { }
 #endif
 
 #if USE(NATIVE_FULLSCREEN_VIDEO)
@@ -232,6 +239,7 @@ public:
     virtual bool requiresTextTrackRepresentation() const { return false; }
     virtual void setTextTrackRepresentation(TextTrackRepresentation*) { }
     virtual void syncTextTrackBounds() { };
+    virtual void tracksChanged() { };
 #endif
 
 #if USE(PLATFORM_TEXT_TRACK_MENU)

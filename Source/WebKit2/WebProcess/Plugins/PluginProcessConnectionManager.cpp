@@ -42,9 +42,9 @@
 
 namespace WebKit {
 
-PassRefPtr<PluginProcessConnectionManager> PluginProcessConnectionManager::create()
+Ref<PluginProcessConnectionManager> PluginProcessConnectionManager::create()
 {
-    return adoptRef(new PluginProcessConnectionManager);
+    return adoptRef(*new PluginProcessConnectionManager);
 }
 
 PluginProcessConnectionManager::PluginProcessConnectionManager()
@@ -76,19 +76,17 @@ PluginProcessConnection* PluginProcessConnectionManager::getPluginProcessConnect
 
 #if OS(DARWIN)
     IPC::Connection::Identifier connectionIdentifier(encodedConnectionIdentifier.port());
-    if (IPC::Connection::identifierIsNull(connectionIdentifier))
-        return 0;
 #elif USE(UNIX_DOMAIN_SOCKETS)
-    IPC::Connection::Identifier connectionIdentifier = encodedConnectionIdentifier.fileDescriptor();
-    if (connectionIdentifier == -1)
-        return 0;
+    IPC::Connection::Identifier connectionIdentifier = encodedConnectionIdentifier.releaseFileDescriptor();
 #endif
+    if (IPC::Connection::identifierIsNull(connectionIdentifier))
+        return nullptr;
 
     RefPtr<PluginProcessConnection> pluginProcessConnection = PluginProcessConnection::create(this, pluginProcessToken, connectionIdentifier, supportsAsynchronousInitialization);
     m_pluginProcessConnections.append(pluginProcessConnection);
 
     {
-        MutexLocker locker(m_tokensAndConnectionsMutex);
+        LockHolder locker(m_tokensAndConnectionsMutex);
         ASSERT(!m_tokensAndConnections.contains(pluginProcessToken));
 
         m_tokensAndConnections.set(pluginProcessToken, pluginProcessConnection->connection());
@@ -103,7 +101,7 @@ void PluginProcessConnectionManager::removePluginProcessConnection(PluginProcess
     ASSERT(vectorIndex != notFound);
 
     {
-        MutexLocker locker(m_tokensAndConnectionsMutex);
+        LockHolder locker(m_tokensAndConnectionsMutex);
         ASSERT(m_tokensAndConnections.contains(pluginProcessConnection->pluginProcessToken()));
         
         m_tokensAndConnections.remove(pluginProcessConnection->pluginProcessToken());
@@ -114,7 +112,7 @@ void PluginProcessConnectionManager::removePluginProcessConnection(PluginProcess
 
 void PluginProcessConnectionManager::pluginProcessCrashed(uint64_t pluginProcessToken)
 {
-    MutexLocker locker(m_tokensAndConnectionsMutex);
+    LockHolder locker(m_tokensAndConnectionsMutex);
     IPC::Connection* connection = m_tokensAndConnections.get(pluginProcessToken);
 
     // It's OK for connection to be null here; it will happen if this web process doesn't know

@@ -29,11 +29,12 @@ CheckSecurityForNode
 Clamp
 Conditional=*
 Constructor
-ConstructorCallWith=Document|ScriptExecutionContext
+ConstructorCallWith=Document|ScriptExecutionContext|ScriptState
 ConstructorConditional=*
 ConstructorRaisesException
 ConstructorTemplate=Event|TypedArray
 Custom
+CustomBinding
 CustomCall
 CustomConstructor
 CustomDeleteProperty
@@ -55,6 +56,7 @@ DoNotCheckConstants
 DoNotCheckSecurity
 DoNotCheckSecurityOnGetter
 DoNotCheckSecurityOnSetter
+DocumentEventHandler
 EnabledAtRuntime=*
 EnabledBySetting=*
 EnforceRange
@@ -82,7 +84,6 @@ JSCustomToNativeObject
 JSGenerateToJSObject
 JSGenerateToNativeObject
 JSLegacyParent=*
-JSWindowEventListener
 MasqueradesAsUndefined
 NamedConstructor=*
 NewImpurePropertyFiresWatchpoints
@@ -111,10 +112,12 @@ SkipVTableValidation
 StrictTypeChecking
 SuppressToJSObject
 TreatNullAs=NullString
+TreatReturnedNaNDateAs=Null|NaN
 TreatReturnedNullStringAs=Null|Undefined
 TreatUndefinedAs=NullString
 TypedArray=*
 URL
+WindowEventHandler
 
 # PLATFORM(IOS)
 AppleCopyright

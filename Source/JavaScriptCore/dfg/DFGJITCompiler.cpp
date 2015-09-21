@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011, 2013, 2014 Apple Inc. All rights reserved.
+ * Copyright (C) 2011, 2013-2015 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -122,6 +122,7 @@ void JITCompiler::compileExceptionHandlers()
         // lookupExceptionHandlerFromCallerFrame is passed two arguments, the VM and the exec (the CallFrame*).
         move(TrustedImmPtr(vm()), GPRInfo::argumentGPR0);
         move(GPRInfo::callFrameRegister, GPRInfo::argumentGPR1);
+        addPtr(TrustedImm32(m_graph.stackPointerOffset() * sizeof(Register)), GPRInfo::callFrameRegister, stackPointerRegister);
 
 #if CPU(X86)
         // FIXME: should use the call abstraction, but this is currently in the SpeculativeJIT layer!
@@ -160,9 +161,6 @@ void JITCompiler::link(LinkBuffer& linkBuffer)
     if (!m_graph.m_plan.inlineCallFrames->isEmpty())
         m_jitCode->common.inlineCallFrames = m_graph.m_plan.inlineCallFrames;
     
-    m_jitCode->common.machineCaptureStart = m_graph.m_machineCaptureStart;
-    m_jitCode->common.slowArguments = WTF::move(m_graph.m_slowArguments);
-
 #if USE(JSVALUE32_64)
     m_jitCode->common.doubleConstants = WTF::move(m_graph.m_doubleConstants);
 #endif
@@ -246,13 +244,10 @@ void JITCompiler::link(LinkBuffer& linkBuffer)
     for (unsigned i = 0; i < m_jsCalls.size(); ++i) {
         JSCallRecord& record = m_jsCalls[i];
         CallLinkInfo& info = *record.m_info;
-        ThunkGenerator generator = linkThunkGeneratorFor(
-            info.callType == CallLinkInfo::Construct ? CodeForConstruct : CodeForCall,
-            RegisterPreservationNotRequired);
-        linkBuffer.link(record.m_slowCall, FunctionPtr(m_vm->getCTIStub(generator).code().executableAddress()));
-        info.callReturnLocation = linkBuffer.locationOfNearCall(record.m_slowCall);
-        info.hotPathBegin = linkBuffer.locationOf(record.m_targetToCheck);
-        info.hotPathOther = linkBuffer.locationOfNearCall(record.m_fastCall);
+        linkBuffer.link(record.m_slowCall, FunctionPtr(m_vm->getCTIStub(linkCallThunkGenerator).code().executableAddress()));
+        info.setCallLocations(linkBuffer.locationOfNearCall(record.m_slowCall),
+            linkBuffer.locationOf(record.m_targetToCheck),
+            linkBuffer.locationOfNearCall(record.m_fastCall));
     }
     
     MacroAssemblerCodeRef osrExitThunk = vm()->getCTIStub(osrExitGenerationThunkGenerator);
@@ -324,10 +319,7 @@ void JITCompiler::compile()
     // Create OSR entry trampolines if necessary.
     m_speculative->createOSREntries();
     setEndOfCode();
-}
 
-void JITCompiler::link()
-{
     auto linkBuffer = std::make_unique<LinkBuffer>(*m_vm, *this, m_codeBlock, JITCompilationCanFail);
     if (linkBuffer->didFailToAllocate()) {
         m_graph.m_plan.finalizer = std::make_unique<FailedFinalizer>(m_graph.m_plan);
@@ -411,7 +403,9 @@ void JITCompiler::compileFunction()
 #else
     thunkReg = GPRInfo::regT5;
 #endif
-    move(TrustedImmPtr(m_vm->arityCheckFailReturnThunks->returnPCsFor(*m_vm, m_codeBlock->numParameters())), thunkReg);
+    CodeLocationLabel* arityThunkLabels =
+        m_vm->arityCheckFailReturnThunks->returnPCsFor(*m_vm, m_codeBlock->numParameters());
+    move(TrustedImmPtr(arityThunkLabels), thunkReg);
     loadPtr(BaseIndex(thunkReg, GPRInfo::regT0, timesPtr()), thunkReg);
     m_callArityFixup = call();
     jump(fromArityCheck);
@@ -425,10 +419,7 @@ void JITCompiler::compileFunction()
     // Create OSR entry trampolines if necessary.
     m_speculative->createOSREntries();
     setEndOfCode();
-}
 
-void JITCompiler::linkFunction()
-{
     // === Link ===
     auto linkBuffer = std::make_unique<LinkBuffer>(*m_vm, *this, m_codeBlock, JITCompilationCanFail);
     if (linkBuffer->didFailToAllocate()) {
@@ -453,8 +444,10 @@ void JITCompiler::linkFunction()
 
 void JITCompiler::disassemble(LinkBuffer& linkBuffer)
 {
-    if (shouldShowDisassembly())
+    if (shouldShowDisassembly()) {
         m_disassembler->dump(linkBuffer);
+        linkBuffer.didAlreadyDisassemble();
+    }
     
     if (m_graph.m_plan.compilation)
         m_disassembler->reportToProfiler(m_graph.m_plan.compilation.get(), linkBuffer);
@@ -478,6 +471,54 @@ void* JITCompiler::addressOfDoubleConstant(Node* node)
     return addressInConstantPool;
 }
 #endif
+
+void JITCompiler::noticeOSREntry(BasicBlock& basicBlock, JITCompiler::Label blockHead, LinkBuffer& linkBuffer)
+{
+    // OSR entry is not allowed into blocks deemed unreachable by control flow analysis.
+    if (!basicBlock.intersectionOfCFAHasVisited)
+        return;
+        
+    OSREntryData* entry = m_jitCode->appendOSREntryData(basicBlock.bytecodeBegin, linkBuffer.offsetOf(blockHead));
+    
+    entry->m_expectedValues = basicBlock.intersectionOfPastValuesAtHead;
+        
+    // Fix the expected values: in our protocol, a dead variable will have an expected
+    // value of (None, []). But the old JIT may stash some values there. So we really
+    // need (Top, TOP).
+    for (size_t argument = 0; argument < basicBlock.variablesAtHead.numberOfArguments(); ++argument) {
+        Node* node = basicBlock.variablesAtHead.argument(argument);
+        if (!node || !node->shouldGenerate())
+            entry->m_expectedValues.argument(argument).makeHeapTop();
+    }
+    for (size_t local = 0; local < basicBlock.variablesAtHead.numberOfLocals(); ++local) {
+        Node* node = basicBlock.variablesAtHead.local(local);
+        if (!node || !node->shouldGenerate())
+            entry->m_expectedValues.local(local).makeHeapTop();
+        else {
+            VariableAccessData* variable = node->variableAccessData();
+            entry->m_machineStackUsed.set(variable->machineLocal().toLocal());
+                
+            switch (variable->flushFormat()) {
+            case FlushedDouble:
+                entry->m_localsForcedDouble.set(local);
+                break;
+            case FlushedInt52:
+                entry->m_localsForcedMachineInt.set(local);
+                break;
+            default:
+                break;
+            }
+            
+            if (variable->local() != variable->machineLocal()) {
+                entry->m_reshufflings.append(
+                    OSREntryReshuffling(
+                        variable->local().offset(), variable->machineLocal().offset()));
+            }
+        }
+    }
+        
+    entry->m_reshufflings.shrinkToFit();
+}
 
 } } // namespace JSC::DFG
 

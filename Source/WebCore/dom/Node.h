@@ -25,7 +25,6 @@
 #ifndef Node_h
 #define Node_h
 
-#include "EditingBoundary.h"
 #include "EventTarget.h"
 #include "URLHash.h"
 #include "LayoutRect.h"
@@ -33,19 +32,10 @@
 #include "RenderStyleConstants.h"
 #include "ScriptWrappable.h"
 #include "TreeScope.h"
-#include "TreeShared.h"
 #include <wtf/Forward.h>
 #include <wtf/ListHashSet.h>
+#include <wtf/MainThread.h>
 #include <wtf/TypeCasts.h>
-
-namespace JSC {
-class VM;
-class SlotVisitor;
-}
-
-namespace WTF {
-class AtomicString;
-}
 
 // This needs to be here because Document.h also depends on it.
 #define DUMP_NODE_STATISTICS 0
@@ -68,10 +58,11 @@ class IntRect;
 class KeyboardEvent;
 class MathMLQualifiedName;
 class NSResolver;
-class NamedNodeMap;
 class NameNodeList;
+class NamedNodeMap;
 class NodeList;
 class NodeListsNodeData;
+class NodeOrString;
 class NodeRareData;
 class QualifiedName;
 class RadioNodeList;
@@ -121,7 +112,9 @@ private:
     RenderObject* m_renderer;
 };
 
-class Node : public EventTarget, public ScriptWrappable, public TreeShared<Node> {
+class Node : public EventTarget, public ScriptWrappable {
+    WTF_MAKE_FAST_ALLOCATED;
+
     friend class Document;
     friend class TreeScope;
     friend class TreeScopeAdopter;
@@ -189,7 +182,7 @@ public:
     Node* pseudoAwareFirstChild() const;
     Node* pseudoAwareLastChild() const;
 
-    virtual URL baseURI() const;
+    URL baseURI() const;
     
     void getSubresourceURLs(ListHashSet<URL>&) const;
 
@@ -201,7 +194,6 @@ public:
     WEBCORE_EXPORT bool removeChild(Node* child, ExceptionCode&);
     WEBCORE_EXPORT bool appendChild(PassRefPtr<Node> newChild, ExceptionCode&);
 
-    WEBCORE_EXPORT void remove(ExceptionCode&);
     bool hasChildNodes() const { return firstChild(); }
 
     enum class CloningOperation {
@@ -230,6 +222,16 @@ public:
     
     Node* lastDescendant() const;
     Node* firstDescendant() const;
+
+    // From the NonDocumentTypeChildNode - https://dom.spec.whatwg.org/#nondocumenttypechildnode
+    Element* previousElementSibling() const;
+    Element* nextElementSibling() const;
+
+    // From the ChildNode - https://dom.spec.whatwg.org/#childnode
+    void before(Vector<NodeOrString>&&, ExceptionCode&);
+    void after(Vector<NodeOrString>&&, ExceptionCode&);
+    void replaceWith(Vector<NodeOrString>&&, ExceptionCode&);
+    WEBCORE_EXPORT void remove(ExceptionCode&);
 
     // Other methods (not part of DOM)
 
@@ -313,7 +315,6 @@ public:
 
     bool isRootEditableElement() const;
     WEBCORE_EXPORT Element* rootEditableElement() const;
-    Element* rootEditableElement(EditableType) const;
 
     // Called by the parser when this element's close tag is reached,
     // signaling that all child tags have been parsed and added.
@@ -358,34 +359,24 @@ public:
         UserSelectAllDoesNotAffectEditability,
         UserSelectAllIsAlwaysNonEditable
     };
-    WEBCORE_EXPORT bool isContentEditable(UserSelectAllTreatment = UserSelectAllDoesNotAffectEditability);
+    WEBCORE_EXPORT bool isContentEditable();
     bool isContentRichlyEditable();
 
     WEBCORE_EXPORT void inspect();
 
-    bool hasEditableStyle(EditableType editableType = ContentIsEditable, UserSelectAllTreatment treatment = UserSelectAllIsAlwaysNonEditable) const
+    bool hasEditableStyle(UserSelectAllTreatment treatment = UserSelectAllIsAlwaysNonEditable) const
     {
-        switch (editableType) {
-        case ContentIsEditable:
-            return hasEditableStyle(Editable, treatment);
-        case HasEditableAXRole:
-            return isEditableToAccessibility(Editable);
-        }
-        ASSERT_NOT_REACHED();
-        return false;
+        return computeEditability(treatment, ShouldUpdateStyle::DoNotUpdate) != Editability::ReadOnly;
+    }
+    // FIXME: Replace every use of this function by helpers in htmlediting.h
+    bool hasRichlyEditableStyle() const
+    {
+        return computeEditability(UserSelectAllIsAlwaysNonEditable, ShouldUpdateStyle::DoNotUpdate) == Editability::CanEditRichly;
     }
 
-    bool hasRichlyEditableStyle(EditableType editableType = ContentIsEditable) const
-    {
-        switch (editableType) {
-        case ContentIsEditable:
-            return hasEditableStyle(RichlyEditable, UserSelectAllIsAlwaysNonEditable);
-        case HasEditableAXRole:
-            return isEditableToAccessibility(RichlyEditable);
-        }
-        ASSERT_NOT_REACHED();
-        return false;
-    }
+    enum class Editability { ReadOnly, CanEditPlainText, CanEditRichly };
+    enum class ShouldUpdateStyle { Update, DoNotUpdate };
+    WEBCORE_EXPORT Editability computeEditability(UserSelectAllTreatment, ShouldUpdateStyle) const;
 
     WEBCORE_EXPORT LayoutRect renderRect(bool* isReplaced);
     IntRect pixelSnappedRenderRect(bool* isReplaced) { return snappedIntRect(renderRect(isReplaced)); }
@@ -417,6 +408,7 @@ public:
     { 
         return getFlag(InDocumentFlag);
     }
+    bool isInUserAgentShadowTree() const;
     bool isInShadowTree() const { return getFlag(IsInShadowTreeFlag); }
     bool isInTreeScope() const { return getFlag(static_cast<NodeFlags>(InDocumentFlag | IsInShadowTreeFlag)); }
 
@@ -443,6 +435,8 @@ public:
     // Whether or not a selection can be started in this object
     virtual bool canStartSelection() const;
 
+    virtual bool shouldSelectOnMouseDown() { return false; }
+
     // Getting points into and out of screen space
     FloatPoint convertToPage(const FloatPoint&) const;
     FloatPoint convertFromPage(const FloatPoint&) const;
@@ -461,7 +455,7 @@ public:
     }
 
     // Use these two methods with caution.
-    RenderBox* renderBox() const;
+    WEBCORE_EXPORT RenderBox* renderBox() const;
     RenderBoxModelObject* renderBoxModelObject() const;
     
     // Wrapper for nodes that don't have a renderer, but still cache the style (like HTMLOptionElement).
@@ -481,17 +475,17 @@ public:
     // Implementation can determine the type of subtree by seeing insertionPoint->inDocument().
     // For a performance reason, notifications are delivered only to ContainerNode subclasses if the insertionPoint is out of document.
     //
-    // There are another callback named didNotifyDescendantInsertions(), which is called after all the descendant is notified.
-    // Only a few subclasses actually need this. To utilize this, the node should return InsertionShouldCallDidNotifyDescendantInsertions
+    // There is another callback named finishedInsertingSubtree(), which is called after all descendants are notified.
+    // Only a few subclasses actually need this. To utilize this, the node should return InsertionShouldCallFinishedInsertingSubtree
     // from insrtedInto().
     //
     enum InsertionNotificationRequest {
         InsertionDone,
-        InsertionShouldCallDidNotifySubtreeInsertions
+        InsertionShouldCallFinishedInsertingSubtree
     };
 
     virtual InsertionNotificationRequest insertedInto(ContainerNode& insertionPoint);
-    virtual void didNotifySubtreeInsertions() { }
+    virtual void finishedInsertingSubtree() { }
 
     // Notifies the node that it is no longer part of the tree.
     //
@@ -500,7 +494,7 @@ public:
     //
     virtual void removedFrom(ContainerNode& insertionPoint);
 
-#ifndef NDEBUG
+#if ENABLE(TREE_DEBUGGING)
     virtual void formatForDebugger(char* buffer, unsigned length) const;
 
     void showNode(const char* prefix = "") const;
@@ -508,7 +502,7 @@ public:
     void showNodePathForThis() const;
     void showTreeAndMark(const Node* markedNode1, const char* markedLabel1, const Node* markedNode2 = nullptr, const char* markedLabel2 = nullptr) const;
     void showTreeForThisAcrossFrame() const;
-#endif
+#endif // ENABLE(TREE_DEBUGGING)
 
     void invalidateNodeListAndCollectionCachesInAncestors(const QualifiedName* attrName = nullptr, Element* attributeOwnerElement = nullptr);
     NodeListsNodeData* nodeLists();
@@ -554,8 +548,16 @@ public:
     // Perform the default action for an event.
     virtual void defaultEventHandler(Event*);
 
-    using TreeShared<Node>::ref;
-    using TreeShared<Node>::deref;
+    void ref();
+    void deref();
+    bool hasOneRef() const;
+    int refCount() const;
+
+#ifndef NDEBUG
+    bool m_deletionHasBegun { false };
+    bool m_inRemovedLastRefFunction { false };
+    bool m_adoptionIsRequired { true };
+#endif
 
     virtual EventTargetData* eventTargetData() override final;
     virtual EventTargetData& ensureEventTargetData() override final;
@@ -678,8 +680,6 @@ protected:
     void updateAncestorsForStyleRecalc();
 
 private:
-    friend class TreeShared<Node>;
-
     virtual PseudoId customPseudoId() const
     {
         ASSERT(hasCustomStyleResolveCallbacks());
@@ -687,11 +687,6 @@ private:
     }
 
     WEBCORE_EXPORT void removedLastRef();
-    bool hasTreeSharedParent() const { return !!parentNode(); }
-
-    enum EditableLevel { Editable, RichlyEditable };
-    WEBCORE_EXPORT bool hasEditableStyle(EditableLevel, UserSelectAllTreatment = UserSelectAllIsAlwaysNonEditable) const;
-    WEBCORE_EXPORT bool isEditableToAccessibility(EditableLevel) const;
 
     virtual void refEventTarget() override;
     virtual void derefEventTarget() override;
@@ -704,7 +699,9 @@ private:
     Vector<std::unique_ptr<MutationObserverRegistration>>* mutationObserverRegistry();
     HashSet<MutationObserverRegistration*>* transientMutationObserverRegistry();
 
+    int m_refCount;
     mutable uint32_t m_nodeFlags;
+
     ContainerNode* m_parentNode;
     TreeScope* m_treeScope;
     Node* m_previous;
@@ -721,6 +718,53 @@ protected:
     void setIsParsingChildrenFinished() { setFlag(IsParsingChildrenFinishedFlag); }
     void clearIsParsingChildrenFinished() { clearFlag(IsParsingChildrenFinishedFlag); }
 };
+
+#ifndef NDEBUG
+inline void adopted(Node* node)
+{
+    if (!node)
+        return;
+    ASSERT(!node->m_deletionHasBegun);
+    ASSERT(!node->m_inRemovedLastRefFunction);
+    node->m_adoptionIsRequired = false;
+}
+#endif
+
+ALWAYS_INLINE void Node::ref()
+{
+    ASSERT(isMainThread());
+    ASSERT(!m_deletionHasBegun);
+    ASSERT(!m_inRemovedLastRefFunction);
+    ASSERT(!m_adoptionIsRequired);
+    ++m_refCount;
+}
+
+ALWAYS_INLINE void Node::deref()
+{
+    ASSERT(isMainThread());
+    ASSERT(m_refCount >= 0);
+    ASSERT(!m_deletionHasBegun);
+    ASSERT(!m_inRemovedLastRefFunction);
+    ASSERT(!m_adoptionIsRequired);
+    if (--m_refCount <= 0 && !parentNode()) {
+#ifndef NDEBUG
+        m_inRemovedLastRefFunction = true;
+#endif
+        removedLastRef();
+    }
+}
+
+ALWAYS_INLINE bool Node::hasOneRef() const
+{
+    ASSERT(!m_deletionHasBegun);
+    ASSERT(!m_inRemovedLastRefFunction);
+    return m_refCount == 1;
+}
+
+ALWAYS_INLINE int Node::refCount() const
+{
+    return m_refCount;
+}
 
 // Used in Node::addSubresourceAttributeURLs() and in addSubresourceStyleURLs()
 inline void addSubresourceURL(ListHashSet<URL>& urls, const URL& url)
@@ -749,7 +793,7 @@ inline ContainerNode* Node::parentNodeGuaranteedHostFree() const
 
 } // namespace WebCore
 
-#ifndef NDEBUG
+#if ENABLE(TREE_DEBUGGING)
 // Outside the WebCore namespace for ease of invocation from gdb.
 void showTree(const WebCore::Node*);
 void showNodePath(const WebCore::Node*);

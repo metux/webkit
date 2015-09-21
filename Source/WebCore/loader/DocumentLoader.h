@@ -41,6 +41,7 @@
 #include "ResourceRequest.h"
 #include "ResourceResponse.h"
 #include "StringWithDirection.h"
+#include "StyleSheetContents.h"
 #include "SubstituteData.h"
 #include "Timer.h"
 #include <wtf/HashSet.h>
@@ -63,7 +64,6 @@ namespace WebCore {
     class ArchiveResourceCollection;
     class CachedRawResource;
     class CachedResourceLoader;
-    class ContentFilter;
     class FormState;
     class Frame;
     class FrameLoader;
@@ -71,6 +71,10 @@ namespace WebCore {
     class ResourceLoader;
     class SharedBuffer;
     class SubstituteResource;
+
+#if ENABLE(CONTENT_FILTERING)
+    class ContentFilter;
+#endif
 
     typedef HashMap<unsigned long, RefPtr<ResourceLoader>> ResourceLoaderMap;
     typedef Vector<ResourceResponse> ResponseVector;
@@ -105,12 +109,10 @@ namespace WebCore {
 
         const SubstituteData& substituteData() const { return m_substituteData; }
 
-        // FIXME: This is the same as requestURL(). We should remove one of them.
         WEBCORE_EXPORT const URL& url() const;
         WEBCORE_EXPORT const URL& unreachableURL() const;
 
         const URL& originalURL() const;
-        WEBCORE_EXPORT const URL& requestURL() const;
         WEBCORE_EXPORT const URL& responseURL() const;
         WEBCORE_EXPORT const String& responseMIMEType() const;
 #if PLATFORM(IOS)
@@ -155,6 +157,7 @@ namespace WebCore {
 
         WEBCORE_EXPORT bool scheduleArchiveLoad(ResourceLoader*, const ResourceRequest&);
 #endif
+        void scheduleSubstituteResourceLoad(ResourceLoader&, SubstituteResource&);
 
         // Return the ArchiveResource for the URL only when loading an Archive
         ArchiveResource* archiveResourceForURL(const URL&) const;
@@ -175,7 +178,7 @@ namespace WebCore {
         const ResponseVector& responses() const { return m_responses; }
 
         const NavigationAction& triggeringAction() const { return m_triggeringAction; }
-        void setTriggeringAction(const NavigationAction& action) { m_triggeringAction = action; }
+        void setTriggeringAction(const NavigationAction&);
         void setOverrideEncoding(const String& encoding) { m_overrideEncoding = encoding; }
         void setLastCheckedRequest(const ResourceRequest& request) { m_lastCheckedRequest = request; }
         const ResourceRequest& lastCheckedRequest()  { return m_lastCheckedRequest; }
@@ -225,8 +228,8 @@ namespace WebCore {
 
         void addSubresourceLoader(ResourceLoader*);
         void removeSubresourceLoader(ResourceLoader*);
-        WEBCORE_EXPORT void addPlugInStreamLoader(ResourceLoader*);
-        WEBCORE_EXPORT void removePlugInStreamLoader(ResourceLoader*);
+        void addPlugInStreamLoader(ResourceLoader&);
+        void removePlugInStreamLoader(ResourceLoader&);
 
         void subresourceLoaderFinishedLoadingOnePart(ResourceLoader*);
 
@@ -266,6 +269,14 @@ namespace WebCore {
         QuickLookHandle* quickLookHandle() const { return m_quickLookHandle.get(); }
 #endif
 
+#if ENABLE(CONTENT_EXTENSIONS)
+        void addPendingContentExtensionSheet(const String& identifier, StyleSheetContents&);
+        void addPendingContentExtensionDisplayNoneSelector(const String& identifier, const String& selector, uint32_t selectorID);
+#endif
+
+        void setShouldOpenExternalURLsPolicy(ShouldOpenExternalURLsPolicy shouldOpenExternalURLsPolicy) { m_shouldOpenExternalURLsPolicy = shouldOpenExternalURLsPolicy; }
+        ShouldOpenExternalURLsPolicy shouldOpenExternalURLsPolicyToPropagate() const;
+
     protected:
         WEBCORE_EXPORT DocumentLoader(const ResourceRequest&, const SubstituteData&);
 
@@ -295,6 +306,7 @@ namespace WebCore {
         void finishedLoading(double finishTime);
         void mainReceivedError(const ResourceError&);
         WEBCORE_EXPORT virtual void redirectReceived(CachedResource*, ResourceRequest&, const ResourceResponse&) override;
+        WEBCORE_EXPORT virtual void syntheticRedirectReceived(CachedResource*, ResourceRequest&, const ResourceResponse&, bool& /* shouldContinue */) override;
         WEBCORE_EXPORT virtual void responseReceived(CachedResource*, const ResourceResponse&) override;
         WEBCORE_EXPORT virtual void dataReceived(CachedResource*, const char* data, int length) override;
         WEBCORE_EXPORT virtual void notifyFinished(CachedResource*) override;
@@ -326,6 +338,12 @@ namespace WebCore {
         void clearMainResource();
 
         void cancelPolicyCheckIfNeeded();
+
+#if ENABLE(CONTENT_FILTERING)
+        void becomeMainResourceClientIfFilterAllows();
+        void installContentFilterUnblockHandler(ContentFilter&);
+        void contentFilterDidDecide();
+#endif
 
         Frame* m_frame;
         Ref<CachedResourceLoader> m_cachedResourceLoader;
@@ -391,7 +409,7 @@ namespace WebCore {
         SubstituteResourceMap m_pendingSubstituteResources;
         Timer m_substituteResourceDeliveryTimer;
 
-        OwnPtr<ArchiveResourceCollection> m_archiveResourceCollection;
+        std::unique_ptr<ArchiveResourceCollection> m_archiveResourceCollection;
 #if ENABLE(WEB_ARCHIVE) || ENABLE(MHTML)
         RefPtr<Archive> m_archive;
         RefPtr<SharedBuffer> m_parsedArchiveData;
@@ -416,9 +434,9 @@ namespace WebCore {
         RefPtr<IconDataCallback> m_iconDataCallback;
 
         bool m_subresourceLoadersArePageCacheAcceptable;
+        ShouldOpenExternalURLsPolicy m_shouldOpenExternalURLsPolicy { ShouldOpenExternalURLsPolicy::ShouldNotAllow };
 
-        friend class ApplicationCacheHost;  // for substitute resource delivery
-        OwnPtr<ApplicationCacheHost> m_applicationCacheHost;
+        std::unique_ptr<ApplicationCacheHost> m_applicationCacheHost;
 
 #if ENABLE(CONTENT_FILTERING)
         std::unique_ptr<ContentFilter> m_contentFilter;
@@ -426,6 +444,15 @@ namespace WebCore {
 
 #if USE(QUICK_LOOK)
         std::unique_ptr<QuickLookHandle> m_quickLookHandle;
+#endif
+
+#if ENABLE(CONTENT_EXTENSIONS)
+        HashMap<String, RefPtr<StyleSheetContents>> m_pendingNamedContentExtensionStyleSheets;
+        HashMap<String, Vector<std::pair<String, uint32_t>>> m_pendingContentExtensionDisplayNoneSelectors;
+#endif
+
+#ifndef NDEBUG
+        bool m_hasEverBeenAttached { false };
 #endif
     };
 

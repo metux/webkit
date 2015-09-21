@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013 Apple Inc. All rights reserved.
+ * Copyright (C) 2013, 2015 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -57,7 +57,7 @@ WebInspector.isEditingAnyField = function()
 
 WebInspector.isEventTargetAnEditableField = function(event)
 {
-    const textInputTypes = {"text": true, "search": true, "tel": true, "url": true, "email": true, "password": true};
+    var textInputTypes = {"text": true, "search": true, "tel": true, "url": true, "email": true, "password": true};
     if (event.target instanceof HTMLInputElement)
         return event.target.type in textInputTypes;
 
@@ -74,28 +74,34 @@ WebInspector.isEventTargetAnEditableField = function(event)
     return false;
 };
 
-WebInspector.EditingConfig = function(commitHandler, cancelHandler, context)
+WebInspector.EditingConfig = class EditingConfig
 {
-    this.commitHandler = commitHandler;
-    this.cancelHandler = cancelHandler;
-    this.context = context;
-    this.spellcheck = false;
-};
+    constructor(commitHandler, cancelHandler, context)
+    {
+        this.commitHandler = commitHandler;
+        this.cancelHandler = cancelHandler;
+        this.context = context;
+        this.spellcheck = false;
+    }
 
-WebInspector.EditingConfig.prototype = {
-    setPasteHandler: function(pasteHandler)
+    setPasteHandler(pasteHandler)
     {
         this.pasteHandler = pasteHandler;
-    },
+    }
 
-    setMultiline: function(multiline)
+    setMultiline(multiline)
     {
         this.multiline = multiline;
-    },
+    }
 
-    setCustomFinishHandler: function(customFinishHandler)
+    setCustomFinishHandler(customFinishHandler)
     {
         this.customFinishHandler = customFinishHandler;
+    }
+
+    setNumberCommitHandler(numberCommitHandler)
+    {
+        this.numberCommitHandler = numberCommitHandler;
     }
 };
 
@@ -189,6 +195,12 @@ WebInspector.startEditing = function(element, config)
             return "cancel";
         else if (event.keyIdentifier === "U+0009") // Tab key
             return "move-" + (event.shiftKey ? "backward" : "forward");
+        else if (event.altKey) {
+            if (event.keyIdentifier === "Up" || event.keyIdentifier === "Down")
+                return "modify-" + (event.keyIdentifier === "Up" ? "up" : "down");
+            if (event.keyIdentifier === "PageUp" || event.keyIdentifier === "PageDown")
+                return "modify-" + (event.keyIdentifier === "PageUp" ? "up-big" : "down-big");
+        }
     }
 
     function handleEditingResult(result, event)
@@ -205,6 +217,62 @@ WebInspector.startEditing = function(element, config)
             moveDirection = result.substring(5);
             if (event.keyIdentifier !== "U+0009")
                 blurEventListener();
+        } else if (result && result.startsWith("modify-")) {
+            var direction = result.substring(7);
+            var modifyValue = direction.startsWith("up") ? 1 : -1;
+            if (direction.endsWith("big"))
+                modifyValue *= 10;
+
+            if (event.shiftKey)
+                modifyValue *= 10;
+            else if (event.ctrlKey)
+                modifyValue /= 10;
+
+            var selection = element.ownerDocument.defaultView.getSelection();
+            if (!selection.rangeCount)
+                return;
+
+            var range = selection.getRangeAt(0);
+            if (!range.commonAncestorContainer.isSelfOrDescendant(element))
+                return false;
+
+            var wordRange = range.startContainer.rangeOfWord(range.startOffset, WebInspector.EditingSupport.StyleValueDelimiters, element);
+            var word = wordRange.toString();
+            var wordPrefix = "";
+            var wordSuffix = "";
+            var nonNumberInWord = /[^\d-\.]+/.exec(word);
+            if (nonNumberInWord) {
+                var nonNumberEndOffset = nonNumberInWord.index + nonNumberInWord[0].length;
+                if (range.startOffset > wordRange.startOffset + nonNumberInWord.index && nonNumberEndOffset < word.length && range.startOffset !== wordRange.startOffset) {
+                    wordPrefix = word.substring(0, nonNumberEndOffset);
+                    word = word.substring(nonNumberEndOffset);
+                } else {
+                    wordSuffix = word.substring(nonNumberInWord.index);
+                    word = word.substring(0, nonNumberInWord.index);
+                }
+            }
+
+            var matches = WebInspector.EditingSupport.CSSNumberRegex.exec(word);
+            if (!matches || matches.length !== 4)
+                return;
+
+            var replacement = matches[1] + (Math.round((parseFloat(matches[2]) + modifyValue) * 100) / 100) + matches[3];
+
+            selection.removeAllRanges();
+            selection.addRange(wordRange);
+            document.execCommand("insertText", false, wordPrefix + replacement + wordSuffix);
+
+            var replacementSelectionRange = document.createRange();
+            replacementSelectionRange.setStart(wordRange.commonAncestorContainer, wordRange.startOffset + wordPrefix.length);
+            replacementSelectionRange.setEnd(wordRange.commonAncestorContainer, wordRange.startOffset + wordPrefix.length + replacement.length);
+
+            selection.removeAllRanges();
+            selection.addRange(replacementSelectionRange);
+
+            if (typeof config.numberCommitHandler === "function")
+                config.numberCommitHandler(element, getContent(element), oldText, context, moveDirection);
+
+            event.preventDefault();
         }
     }
 
@@ -232,4 +300,10 @@ WebInspector.startEditing = function(element, config)
         cancel: editingCancelled.bind(element),
         commit: editingCommitted.bind(element)
     };
+};
+
+WebInspector.EditingSupport = {
+    StyleValueDelimiters: " \xA0\t\n\"':;,/()",
+    CSSNumberRegex: /(.*?)(-?(?:\d+(?:\.\d+)?|\.\d+))(.*)/,
+    NumberRegex: /^(-?(?:\d+(?:\.\d+)?|\.\d+))$/
 };

@@ -34,12 +34,17 @@ class WebGLRenderingContext final : public WebGLRenderingContextBase {
 public:
     WebGLRenderingContext(HTMLCanvasElement*, GraphicsContext3D::Attributes);
     WebGLRenderingContext(HTMLCanvasElement*, PassRefPtr<GraphicsContext3D>, GraphicsContext3D::Attributes);
-    virtual bool isWebGL1() const { return true; }
+    virtual bool isWebGL1() const override { return true; }
     
     virtual WebGLExtension* getExtension(const String&) override;
     virtual WebGLGetInfo getParameter(GC3Denum pname, ExceptionCode&) override;
     virtual Vector<String> getSupportedExtensions() override;
 
+    virtual WebGLGetInfo getFramebufferAttachmentParameter(GC3Denum target, GC3Denum attachment, GC3Denum pname, ExceptionCode&) override;
+    virtual void renderbufferStorage(GC3Denum target, GC3Denum internalformat, GC3Dsizei width, GC3Dsizei height) override;
+    virtual bool validateFramebufferFuncParameters(const char* functionName, GC3Denum target, GC3Denum attachment) override;
+    virtual void hint(GC3Denum target, GC3Denum mode) override;
+    virtual void clear(GC3Dbitfield mask) override;
     virtual void copyTexImage2D(GC3Denum target, GC3Dint level, GC3Denum internalformat, GC3Dint x, GC3Dint y, GC3Dsizei width, GC3Dsizei height, GC3Dint border) override;
     virtual void texSubImage2DBase(GC3Denum target, GC3Dint level, GC3Dint xoffset, GC3Dint yoffset, GC3Dsizei width, GC3Dsizei height, GC3Denum internalformat, GC3Denum format, GC3Denum type, const void* pixels, ExceptionCode&) override;
     virtual void texSubImage2DImpl(GC3Denum target, GC3Dint level, GC3Dint xoffset, GC3Dint yoffset, GC3Denum format, GC3Denum type, Image*, GraphicsContext3D::ImageHtmlDomSource, bool flipY, bool premultiplyAlpha, ExceptionCode&) override;
@@ -58,6 +63,11 @@ public:
 #endif
 
 protected:
+    virtual GC3Dint getMaxDrawBuffers() override;
+    virtual GC3Dint getMaxColorAttachments() override;
+    virtual void initializeVertexArrayObjects() override;
+    virtual bool validateIndexArrayConservative(GC3Denum type, unsigned& numElementsRequired) override;
+    virtual bool validateBlendEquation(const char* functionName, GC3Denum mode) override;
     virtual bool validateTexFuncParameters(const char* functionName,
         TexFuncValidationFunctionType,
         GC3Denum target, GC3Dint level,

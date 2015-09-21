@@ -45,6 +45,7 @@ maximumHTMLParserDOMTreeDepth type=unsigned, initial=defaultMaximumHTMLParserDOM
 loadsSiteIconsIgnoringImageLoadingSetting initial=false
 
 caretBrowsingEnabled initial=false
+preventKeyboardDOMEventDispatch initial=false
 localStorageEnabled initial=false
 allowUniversalAccessFromFileURLs initial=true
 allowFileAccessFromFileURLs initial=true
@@ -122,11 +123,13 @@ crossOriginCheckInGetMatchedCSSRulesDisabled initial=false
 forceCompositingMode initial=false
 shouldInjectUserScriptsInInitialEmptyDocument initial=false
 fixedElementsLayoutRelativeToFrame initial=false
-allowDisplayOfInsecureContent initial=true
-allowRunningOfInsecureContent initial=true
-mediaPlaybackRequiresUserGesture initial=defaultMediaPlaybackRequiresUserGesture
-mediaPlaybackAllowsInline initial=defaultMediaPlaybackAllowsInline
-allowsAlternateFullscreen initial=defaultAllowsAlternateFullscreen
+allowDisplayOfInsecureContent initial=false
+allowRunningOfInsecureContent initial=false
+requiresUserGestureForMediaPlayback initial=defaultRequiresUserGestureForMediaPlayback
+audioPlaybackRequiresUserGesture initial=defaultAudioPlaybackRequiresUserGesture
+allowsInlineMediaPlayback initial=defaultAllowsInlineMediaPlayback
+allowsPictureInPictureMediaPlayback initial=defaultAllowsPictureInPictureMediaPlayback
+mediaControlsScaleWithPageZoom initial=defaultMediaControlsScaleWithPageZoom
 passwordEchoEnabled initial=false
 suppressesIncrementalRendering initial=false
 incrementalRenderingSuppressionTimeoutInSeconds type=double, initial=defaultIncrementalRenderingSuppressionTimeoutInSeconds
@@ -203,7 +206,7 @@ mediaSourceEnabled initial=true, conditional=MEDIA_SOURCE
 # FIXME: Rename to allowMultiElementImplicitFormSubmission once we upstream the iOS changes to WebView.mm.
 allowMultiElementImplicitSubmission initial=false
 
-mediaPlaybackAllowsAirPlay initial=true, conditional=IOS_AIRPLAY
+allowsAirPlayForMediaPlayback initial=true, conditional=WIRELESS_PLAYBACK_TARGET
 
 shouldConvertPositionStyleOnCopy initial=false
 
@@ -236,3 +239,13 @@ ignoreViewportScalingConstraints initial=false
 appleMailPaginationQuirkEnabled initial=false
 
 attachmentElementEnabled initial=true, conditional=ATTACHMENT_ELEMENT
+
+newBlockInsideInlineModelEnabled initial=false, setNeedsStyleRecalcInAllFrames=1
+
+httpEquivEnabled initial=true
+
+# Some ports (e.g. iOS) might choose to display attachments inline, regardless of whether the response includes the
+# HTTP header "Content-Disposition: attachment". This setting enables a sandbox around these attachments. The sandbox
+# enforces all frame sandbox flags (see enum SandboxFlag in SecurityContext.h), and also disables <meta http-equiv>
+# processing and subframe loading.
+contentDispositionAttachmentSandboxEnabled initial=false

@@ -115,12 +115,16 @@ function CommandLineAPI(commandLineAPIImpl, callFrame)
         this[member].toString = customToStringMethod(member);
     }
 
-    for (var i = 0; i < 5; ++i) {
+    // $0
+    this.__defineGetter__("$0", bind(commandLineAPIImpl._inspectedObject, commandLineAPIImpl));
+
+    // $1-$99
+    for (var i = 1; i <= injectedScript._savedResults.length; ++i) {
         var member = "$" + i;
         if (member in inspectedWindow || inScopeVariables(member))
             continue;
 
-        this.__defineGetter__("$" + i, bind(commandLineAPIImpl._inspectedObject, commandLineAPIImpl, i));
+        this.__defineGetter__("$" + i, bind(injectedScript._savedResult, injectedScript, i));
     }
 
     this.$_ = injectedScript._lastResult;
@@ -159,7 +163,7 @@ CommandLineAPIImpl.prototype = {
         if (selector && selector[0] !== "#") {
             result = inspectedWindow.document.getElementById(selector);
             if (result) {
-                inspectedWindow.console.warn("The console function $() has changed from $=getElementById(id) to $=querySelector(selector). You might try $(\"#%s\")", selector );
+                inspectedWindow.console.warn("The console function $() has changed from $=getElementById(id) to $=querySelector(selector). You might try $(\"#%s\")", selector);
                 return null;
             }
         }
@@ -173,8 +177,8 @@ CommandLineAPIImpl.prototype = {
     $$: function (selector, start)
     {
         if (this._canQuerySelectorOnNode(start))
-            return start.querySelectorAll(selector);
-        return inspectedWindow.document.querySelectorAll(selector);
+            return slice(start.querySelectorAll(selector));
+        return slice(inspectedWindow.document.querySelectorAll(selector));
     },
 
     /**
@@ -183,7 +187,7 @@ CommandLineAPIImpl.prototype = {
      */
     _canQuerySelectorOnNode: function(node)
     {
-        return !!node && InjectedScriptHost.type(node) === "node" && (node.nodeType === Node.ELEMENT_NODE || node.nodeType === Node.DOCUMENT_NODE || node.nodeType === Node.DOCUMENT_FRAGMENT_NODE);
+        return !!node && InjectedScriptHost.subtype(node) === "node" && (node.nodeType === Node.ELEMENT_NODE || node.nodeType === Node.DOCUMENT_NODE || node.nodeType === Node.DOCUMENT_FRAGMENT_NODE);
     },
 
     /**
@@ -305,12 +309,9 @@ CommandLineAPIImpl.prototype = {
         return CommandLineAPIHost.getEventListeners(node);
     },
 
-    /**
-     * @param {number} num
-     */
-    _inspectedObject: function(num)
+    _inspectedObject: function()
     {
-        return CommandLineAPIHost.inspectedObject(num);
+        return CommandLineAPIHost.inspectedObject();
     },
 
     /**

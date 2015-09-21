@@ -59,7 +59,7 @@ typedef int ExceptionCode;
 
 class IDBDatabaseBackend : public RefCounted<IDBDatabaseBackend> {
 public:
-    WEBCORE_EXPORT static PassRefPtr<IDBDatabaseBackend> create(const String& name, const String& uniqueIdentifier, IDBFactoryBackendInterface*, IDBServerConnection&);
+    WEBCORE_EXPORT static Ref<IDBDatabaseBackend> create(const String& name, const String& uniqueIdentifier, IDBFactoryBackendInterface*, IDBServerConnection&);
     WEBCORE_EXPORT ~IDBDatabaseBackend();
 
     IDBServerConnection& serverConnection() { return m_serverConnection.get(); }
@@ -108,8 +108,8 @@ public:
 
     void get(int64_t transactionId, int64_t objectStoreId, int64_t indexId, PassRefPtr<IDBKeyRange>, bool keyOnly, PassRefPtr<IDBCallbacks>);
     void put(int64_t transactionId, int64_t objectStoreId, PassRefPtr<SharedBuffer> value, PassRefPtr<IDBKey>, PutMode, PassRefPtr<IDBCallbacks>, const Vector<int64_t>& indexIds, const Vector<IndexKeys>&);
-    void setIndexKeys(int64_t transactionId, int64_t objectStoreId, PassRefPtr<IDBKey> prpPrimaryKey, const Vector<int64_t>& indexIds, const Vector<IndexKeys>&);
-    void setIndexesReady(int64_t transactionId, int64_t objectStoreId, const Vector<int64_t>& indexIds);
+    void setIndexKeys(int64_t transactionId, int64_t objectStoreId, PassRefPtr<IDBKey> prpPrimaryKey, const Vector<int64_t, 1>& indexIds, const Vector<IndexKeys, 1>&);
+    void setIndexesReady(int64_t transactionId, int64_t objectStoreId, const Vector<int64_t, 1>& indexIds);
     void openCursor(int64_t transactionId, int64_t objectStoreId, int64_t indexId, PassRefPtr<IDBKeyRange>, IndexedDB::CursorDirection, bool keyOnly, TaskType, PassRefPtr<IDBCallbacks>);
     void count(int64_t transactionId, int64_t objectStoreId, int64_t indexId, PassRefPtr<IDBKeyRange>, PassRefPtr<IDBCallbacks>);
     void deleteRange(int64_t transactionId, int64_t objectStoreId, PassRefPtr<IDBKeyRange>, PassRefPtr<IDBCallbacks>);

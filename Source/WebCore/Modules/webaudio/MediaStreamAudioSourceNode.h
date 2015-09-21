@@ -31,7 +31,7 @@
 #include "AudioSourceProvider.h"
 #include "AudioSourceProviderClient.h"
 #include "MediaStream.h"
-#include <mutex>
+#include <wtf/Lock.h>
 #include <wtf/PassRefPtr.h>
 
 namespace WebCore {
@@ -40,18 +40,18 @@ class AudioContext;
 
 class MediaStreamAudioSourceNode : public AudioNode, public AudioSourceProviderClient {
 public:
-    static PassRefPtr<MediaStreamAudioSourceNode> create(AudioContext*, MediaStream*, MediaStreamTrack*, AudioSourceProvider*);
+    static Ref<MediaStreamAudioSourceNode> create(AudioContext*, MediaStream*, MediaStreamTrack*, AudioSourceProvider*);
 
     virtual ~MediaStreamAudioSourceNode();
 
     MediaStream* mediaStream() { return m_mediaStream.get(); }
 
     // AudioNode
-    virtual void process(size_t framesToProcess);
-    virtual void reset();
+    virtual void process(size_t framesToProcess) override;
+    virtual void reset() override;
 
     // AudioSourceProviderClient
-    virtual void setFormat(size_t numberOfChannels, float sampleRate);
+    virtual void setFormat(size_t numberOfChannels, float sampleRate) override;
 
     AudioSourceProvider* audioSourceProvider() const { return m_audioSourceProvider; }
 
@@ -68,7 +68,7 @@ private:
     RefPtr<MediaStreamTrack> m_audioTrack;
     AudioSourceProvider* m_audioSourceProvider;
 
-    std::mutex m_processMutex;
+    Lock m_processMutex;
 
     unsigned m_sourceNumberOfChannels;
 };

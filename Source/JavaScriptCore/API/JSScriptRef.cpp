@@ -27,6 +27,7 @@
 
 #include "APICast.h"
 #include "Completion.h"
+#include "Exception.h"
 #include "JSBasePrivate.h"
 #include "VM.h"
 #include "JSScriptRefPrivate.h"
@@ -40,9 +41,9 @@ using namespace JSC;
 
 struct OpaqueJSScript : public SourceProvider {
 public:
-    static WTF::PassRefPtr<OpaqueJSScript> create(VM* vm, const String& url, int startingLineNumber, const String& source)
+    static WTF::RefPtr<OpaqueJSScript> create(VM* vm, const String& url, int startingLineNumber, const String& source)
     {
-        return WTF::adoptRef(new OpaqueJSScript(vm, url, startingLineNumber, source));
+        return WTF::adoptRef(*new OpaqueJSScript(vm, url, startingLineNumber, source));
     }
 
     virtual const String& source() const override
@@ -68,7 +69,10 @@ private:
 
 static bool parseScript(VM* vm, const SourceCode& source, ParserError& error)
 {
-    return !!JSC::parse<JSC::ProgramNode>(vm, source, 0, Identifier(), JSParseNormal, JSParseProgramCode, error);
+    return !!JSC::parse<JSC::ProgramNode>(
+        vm, source, Identifier(), JSParserBuiltinMode::NotBuiltin,
+        JSParserStrictMode::NotStrict, SourceParseMode::ProgramMode, 
+        error);
 }
 
 extern "C" {
@@ -89,10 +93,10 @@ JSScriptRef JSScriptCreateReferencingImmortalASCIIText(JSContextGroupRef context
     ParserError error;
     if (!parseScript(vm, SourceCode(result), error)) {
         if (errorMessage)
-            *errorMessage = OpaqueJSString::create(error.m_message).leakRef();
+            *errorMessage = OpaqueJSString::create(error.message()).leakRef();
         if (errorLine)
-            *errorLine = error.m_line;
-        return 0;
+            *errorLine = error.line();
+        return nullptr;
     }
 
     return result.release().leakRef();
@@ -110,10 +114,10 @@ JSScriptRef JSScriptCreateFromString(JSContextGroupRef contextGroup, JSStringRef
     ParserError error;
     if (!parseScript(vm, SourceCode(result), error)) {
         if (errorMessage)
-            *errorMessage = OpaqueJSString::create(error.m_message).leakRef();
+            *errorMessage = OpaqueJSString::create(error.message()).leakRef();
         if (errorLine)
-            *errorLine = error.m_line;
-        return 0;
+            *errorLine = error.line();
+        return nullptr;
     }
 
     return result.release().leakRef();
@@ -139,12 +143,12 @@ JSValueRef JSScriptEvaluate(JSContextRef context, JSScriptRef script, JSValueRef
         RELEASE_ASSERT_NOT_REACHED();
         return 0;
     }
-    JSValue internalException;
+    NakedPtr<Exception> internalException;
     JSValue thisValue = thisValueRef ? toJS(exec, thisValueRef) : jsUndefined();
-    JSValue result = evaluate(exec, SourceCode(script), thisValue, &internalException);
+    JSValue result = evaluate(exec, SourceCode(script), thisValue, internalException);
     if (internalException) {
         if (exception)
-            *exception = toRef(exec, internalException);
+            *exception = toRef(exec, internalException->value());
         return 0;
     }
     ASSERT(result);

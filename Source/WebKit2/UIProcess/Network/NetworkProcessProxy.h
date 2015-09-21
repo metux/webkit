@@ -31,18 +31,17 @@
 #include "ChildProcessProxy.h"
 #include "CustomProtocolManagerProxy.h"
 #include "ProcessLauncher.h"
+#include "ProcessThrottler.h"
+#include "ProcessThrottlerClient.h"
 #include "WebProcessProxyMessages.h"
 #include "WebsiteDataTypes.h"
 #include <memory>
 #include <wtf/Deque.h>
 
-#if PLATFORM(IOS)
-#include "ProcessAssertion.h"
-#endif
-
 namespace WebCore {
 class AuthenticationChallenge;
 class ResourceRequest;
+class SecurityOrigin;
 class SessionID;
 }
 
@@ -53,20 +52,28 @@ class DownloadProxyMap;
 class WebProcessPool;
 struct NetworkProcessCreationParameters;
 
-class NetworkProcessProxy : public ChildProcessProxy {
+class NetworkProcessProxy : public ChildProcessProxy, private ProcessThrottlerClient {
 public:
-    static PassRefPtr<NetworkProcessProxy> create(WebProcessPool&);
+    static Ref<NetworkProcessProxy> create(WebProcessPool&);
     ~NetworkProcessProxy();
 
     void getNetworkProcessConnection(PassRefPtr<Messages::WebProcessProxy::GetNetworkProcessConnection::DelayedReply>);
 
     DownloadProxy* createDownloadProxy(const WebCore::ResourceRequest&);
 
+    void fetchWebsiteData(WebCore::SessionID, WebsiteDataTypes, std::function<void (WebsiteData)> completionHandler);
     void deleteWebsiteData(WebCore::SessionID, WebsiteDataTypes, std::chrono::system_clock::time_point modifiedSince, std::function<void ()> completionHandler);
+    void deleteWebsiteDataForOrigins(WebCore::SessionID, WebsiteDataTypes, const Vector<RefPtr<WebCore::SecurityOrigin>>& origins, const Vector<String>& cookieHostNames, std::function<void ()> completionHandler);
 
 #if PLATFORM(COCOA)
     void setProcessSuppressionEnabled(bool);
 #endif
+
+    void processReadyToSuspend();
+
+    void setIsHoldingLockedFiles(bool);
+
+    ProcessThrottler& throttler() { return m_throttler; }
 
 private:
     NetworkProcessProxy(WebProcessPool&);
@@ -74,9 +81,17 @@ private:
     // ChildProcessProxy
     virtual void getLaunchOptions(ProcessLauncher::LaunchOptions&) override;
     virtual void connectionWillOpen(IPC::Connection&) override;
+    virtual void processWillShutDown(IPC::Connection&) override;
 
     void platformGetLaunchOptions(ProcessLauncher::LaunchOptions&);
     void networkProcessCrashedOrFailedToLaunch();
+
+    // ProcessThrottlerClient
+    void sendProcessWillSuspendImminently() override;
+    void sendPrepareToSuspend() override;
+    void sendCancelPrepareToSuspend() override;
+    void sendProcessDidResume() override;
+    void didSetAssertionState(AssertionState) override;
 
     // IPC::Connection::Client
     virtual void didReceiveMessage(IPC::Connection&, IPC::MessageDecoder&) override;
@@ -90,10 +105,12 @@ private:
     void didReceiveNetworkProcessProxyMessage(IPC::Connection&, IPC::MessageDecoder&);
     void didCreateNetworkConnectionToWebProcess(const IPC::Attachment&);
     void didReceiveAuthenticationChallenge(uint64_t pageID, uint64_t frameID, const WebCore::AuthenticationChallenge&, uint64_t challengeID);
+    void didFetchWebsiteData(uint64_t callbackID, const WebsiteData&);
     void didDeleteWebsiteData(uint64_t callbackID);
-    void logDiagnosticMessage(uint64_t pageID, const String& message, const String& description);
-    void logDiagnosticMessageWithResult(uint64_t pageID, const String& message, const String& description, uint32_t result);
-    void logDiagnosticMessageWithValue(uint64_t pageID, const String& message, const String& description, const String& value);
+    void didDeleteWebsiteDataForOrigins(uint64_t callbackID);
+    void logSampledDiagnosticMessage(uint64_t pageID, const String& message, const String& description);
+    void logSampledDiagnosticMessageWithResult(uint64_t pageID, const String& message, const String& description, uint32_t result);
+    void logSampledDiagnosticMessageWithValue(uint64_t pageID, const String& message, const String& description, const String& value);
 
     // ProcessLauncher::Client
     virtual void didFinishLaunching(ProcessLauncher*, IPC::Connection::Identifier) override;
@@ -103,13 +120,14 @@ private:
     unsigned m_numPendingConnectionRequests;
     Deque<RefPtr<Messages::WebProcessProxy::GetNetworkProcessConnection::DelayedReply>> m_pendingConnectionReplies;
 
+    HashMap<uint64_t, std::function<void (WebsiteData)>> m_pendingFetchWebsiteDataCallbacks;
     HashMap<uint64_t, std::function<void ()>> m_pendingDeleteWebsiteDataCallbacks;
+    HashMap<uint64_t, std::function<void ()>> m_pendingDeleteWebsiteDataForOriginsCallbacks;
 
     std::unique_ptr<DownloadProxyMap> m_downloadProxyMap;
     CustomProtocolManagerProxy m_customProtocolManagerProxy;
-#if PLATFORM(IOS)
-    std::unique_ptr<ProcessAssertion> m_assertion;
-#endif
+    ProcessThrottler m_throttler;
+    ProcessThrottler::BackgroundActivityToken m_tokenForHoldingLockedFiles;
 };
 
 } // namespace WebKit

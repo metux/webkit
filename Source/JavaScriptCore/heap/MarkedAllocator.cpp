@@ -175,14 +175,13 @@ void* MarkedAllocator::allocateSlowCase(size_t bytes)
 MarkedBlock* MarkedAllocator::allocateBlock(size_t bytes)
 {
     size_t minBlockSize = MarkedBlock::blockSize;
-    size_t minAllocationSize = WTF::roundUpToMultipleOf(WTF::pageSize(), sizeof(MarkedBlock) + bytes);
+    size_t minAllocationSize = WTF::roundUpToMultipleOf<MarkedBlock::atomSize>(sizeof(MarkedBlock)) + WTF::roundUpToMultipleOf<MarkedBlock::atomSize>(bytes);
+    minAllocationSize = WTF::roundUpToMultipleOf(WTF::pageSize(), minAllocationSize);
     size_t blockSize = std::max(minBlockSize, minAllocationSize);
 
     size_t cellSize = m_cellSize ? m_cellSize : WTF::roundUpToMultipleOf<MarkedBlock::atomSize>(bytes);
 
-    if (blockSize == MarkedBlock::blockSize)
-        return MarkedBlock::create(m_heap->blockAllocator().allocate<MarkedBlock>(), this, cellSize, m_destructorType);
-    return MarkedBlock::create(m_heap->blockAllocator().allocateCustomSize(blockSize, MarkedBlock::blockSize), this, cellSize, m_destructorType);
+    return MarkedBlock::create(this, blockSize, cellSize, m_needsDestruction);
 }
 
 void MarkedAllocator::addBlock(MarkedBlock* block)

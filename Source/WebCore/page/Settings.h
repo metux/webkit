@@ -28,11 +28,11 @@
 #define Settings_h
 
 #include "EditingBehaviorTypes.h"
-#include "FontRenderingMode.h"
 #include "IntSize.h"
 #include "URL.h"
 #include "SecurityOrigin.h"
 #include "SettingsMacros.h"
+#include "TextFlags.h"
 #include "Timer.h"
 #include <chrono>
 #include <runtime/RuntimeFlags.h>
@@ -71,7 +71,7 @@ typedef unsigned DebugOverlayRegions;
 class Settings : public RefCounted<Settings> {
     WTF_MAKE_NONCOPYABLE(Settings); WTF_MAKE_FAST_ALLOCATED;
 public:
-    static PassRefPtr<Settings> create(Page*);
+    static Ref<Settings> create(Page*);
     ~Settings();
 
     void pageDestroyed() { m_page = nullptr; }
@@ -108,6 +108,9 @@ public:
     void setTextAutosizingWindowSizeOverride(const IntSize&);
     const IntSize& textAutosizingWindowSizeOverride() const { return m_textAutosizingWindowSizeOverride; }
 #endif
+
+    WEBCORE_EXPORT void setAntialiasedFontDilationEnabled(bool);
+    bool antialiasedFontDilationEnabled() const { return m_antialiasedFontDilationEnabled; }
 
     // Only set by Layout Tests.
     WEBCORE_EXPORT void setMediaTypeOverride(const String&);
@@ -163,19 +166,11 @@ public:
     WEBCORE_EXPORT void setNeedsAdobeFrameReloadingQuirk(bool);
     bool needsAcrobatFrameReloadingQuirk() const { return m_needsAdobeFrameReloadingQuirk; }
 
-    WEBCORE_EXPORT static void setDefaultMinDOMTimerInterval(double); // Interval specified in seconds.
-    WEBCORE_EXPORT static double defaultMinDOMTimerInterval();
-        
-    static void setHiddenPageDOMTimerAlignmentInterval(double); // Interval specified in seconds.
-    static double hiddenPageDOMTimerAlignmentInterval();
+    WEBCORE_EXPORT void setMinimumDOMTimerInterval(double); // Initialized to DOMTimer::defaultMinimumInterval().
+    double minimumDOMTimerInterval() const { return m_minimumDOMTimerInterval; }
 
-    WEBCORE_EXPORT void setMinDOMTimerInterval(double); // Per-page; initialized to default value.
-    WEBCORE_EXPORT double minDOMTimerInterval();
-
-    static void setDefaultDOMTimerAlignmentInterval(double);
-    WEBCORE_EXPORT static double defaultDOMTimerAlignmentInterval();
-
-    double domTimerAlignmentInterval() const;
+    void setDOMTimerAlignmentInterval(double);
+    double domTimerAlignmentInterval() const { return m_domTimerAlignmentInterval; }
 
     WEBCORE_EXPORT void setLayoutInterval(std::chrono::milliseconds);
     std::chrono::milliseconds layoutInterval() const { return m_layoutInterval; }
@@ -210,15 +205,11 @@ public:
 #if PLATFORM(COCOA)
     WEBCORE_EXPORT static void setQTKitEnabled(bool flag);
     static bool isQTKitEnabled() { return gQTKitEnabled; }
+#else
+    static bool isQTKitEnabled() { return false; }
 #endif
 
     static const unsigned defaultMaximumHTMLParserDOMTreeDepth = 512;
-
-#if USE(SAFARI_THEME)
-    // Windows debugging pref (global) for switching between the Aqua look and a native windows look.
-    static void setShouldPaintNativeControls(bool);
-    static bool shouldPaintNativeControls() { return gShouldPaintNativeControls; }
-#endif
 
     WEBCORE_EXPORT static void setMockScrollbarsEnabled(bool flag);
     WEBCORE_EXPORT static bool mockScrollbarsEnabled();
@@ -262,7 +253,9 @@ public:
     WEBCORE_EXPORT static void setNetworkInterfaceName(const String&);
     static const String& networkInterfaceName();
 
+#if HAVE(AVKIT)
     static void setAVKitEnabled(bool flag) { gAVKitEnabled = flag; }
+#endif
     static bool avKitEnabled() { return gAVKitEnabled; }
 
     static void setShouldOptOutOfNetworkStateObservation(bool flag) { gShouldOptOutOfNetworkStateObservation = flag; }
@@ -276,6 +269,14 @@ public:
     void setMediaKeysStorageDirectory(const String& directory) { m_mediaKeysStorageDirectory = directory; }
     const String& mediaKeysStorageDirectory() const { return m_mediaKeysStorageDirectory; }
 #endif
+    
+#if ENABLE(MEDIA_STREAM)
+    void setMediaDeviceIdentifierStorageDirectory(const String& directory) { m_mediaDeviceIdentifierStorageDirectory = directory; }
+    const String& mediaDeviceIdentifierStorageDirectory() const { return m_mediaDeviceIdentifierStorageDirectory; }
+#endif
+
+    WEBCORE_EXPORT void setForcePendingWebGLPolicy(bool);
+    bool isForcePendingWebGLPolicy() const { return m_forcePendingWebGLPolicy; }
 
 private:
     explicit Settings(Page*);
@@ -289,6 +290,9 @@ private:
     const std::unique_ptr<FontGenericFamilies> m_fontGenericFamilies;
     SecurityOrigin::StorageBlockingPolicy m_storageBlockingPolicy;
     std::chrono::milliseconds m_layoutInterval;
+    double m_minimumDOMTimerInterval;
+    double m_domTimerAlignmentInterval;
+
 #if ENABLE(TEXT_AUTOSIZING)
     float m_textAutosizingFontScaleFactor;
     IntSize m_textAutosizingWindowSizeOverride;
@@ -306,6 +310,7 @@ private:
     bool m_needsAdobeFrameReloadingQuirk : 1;
     bool m_usesPageCache : 1;
     unsigned m_fontRenderingMode : 1;
+    bool m_antialiasedFontDilationEnabled : 1;
     bool m_showTiledScrollingIndicator : 1;
     bool m_backgroundShouldExtendBeyondPage : 1;
     bool m_dnsPrefetchingEnabled : 1;
@@ -326,8 +331,7 @@ private:
     bool m_hiddenPageCSSAnimationSuspensionEnabled : 1;
     bool m_fontFallbackPrefersPictographs : 1;
 
-    static double gDefaultMinDOMTimerInterval;
-    static double gDefaultDOMTimerAlignmentInterval;
+    bool m_forcePendingWebGLPolicy : 1;
 
 #if USE(AVFOUNDATION)
     WEBCORE_EXPORT static bool gAVFoundationEnabled;
@@ -340,9 +344,6 @@ private:
     static bool gMockScrollbarsEnabled;
     static bool gUsesOverlayScrollbars;
 
-#if USE(SAFARI_THEME)
-    static bool gShouldPaintNativeControls;
-#endif
 #if PLATFORM(WIN)
     static bool gShouldUseHighResolutionTimers;
 #endif
@@ -357,8 +358,10 @@ private:
 #if ENABLE(ENCRYPTED_MEDIA_V2)
     String m_mediaKeysStorageDirectory;
 #endif
-
-    static double gHiddenPageDOMTimerAlignmentInterval;
+    
+#if ENABLE(MEDIA_STREAM)
+    String m_mediaDeviceIdentifierStorageDirectory;
+#endif
 
     static bool gLowPowerVideoAudioBufferSizeEnabled;
 };

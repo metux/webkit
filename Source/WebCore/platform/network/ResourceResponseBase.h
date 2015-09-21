@@ -27,13 +27,11 @@
 #ifndef ResourceResponseBase_h
 #define ResourceResponseBase_h
 
+#include "CacheValidation.h"
 #include "CertificateInfo.h"
 #include "HTTPHeaderMap.h"
-#include "URL.h"
 #include "ResourceLoadTiming.h"
-
-#include <wtf/PassOwnPtr.h>
-#include <wtf/RefPtr.h>
+#include "URL.h"
 
 #if OS(SOLARIS)
 #include <sys/time.h> // For time_t structure.
@@ -57,7 +55,7 @@ public:
     WEBCORE_EXPORT bool isHTTP() const;
 
     WEBCORE_EXPORT const URL& url() const;
-    WEBCORE_EXPORT void setURL(const URL& url);
+    WEBCORE_EXPORT void setURL(const URL&);
 
     WEBCORE_EXPORT const String& mimeType() const;
     WEBCORE_EXPORT void setMimeType(const String& mimeType);
@@ -103,13 +101,14 @@ public:
     WEBCORE_EXPORT bool cacheControlContainsNoStore() const;
     WEBCORE_EXPORT bool cacheControlContainsMustRevalidate() const;
     WEBCORE_EXPORT bool hasCacheValidatorFields() const;
-    double cacheControlMaxAge() const;
-    double date() const;
-    double age() const;
-    double expires() const;
-    WEBCORE_EXPORT double lastModified() const;
+    WEBCORE_EXPORT Optional<std::chrono::microseconds> cacheControlMaxAge() const;
+    WEBCORE_EXPORT Optional<std::chrono::system_clock::time_point> date() const;
+    WEBCORE_EXPORT Optional<std::chrono::microseconds> age() const;
+    WEBCORE_EXPORT Optional<std::chrono::system_clock::time_point> expires() const;
+    WEBCORE_EXPORT Optional<std::chrono::system_clock::time_point> lastModified() const;
 
-    enum class Source { Unknown, Network, DiskCache, DiskCacheAfterValidation };
+    // This is primarily for testing support. It is not necessarily accurate in all scenarios.
+    enum class Source { Unknown, Network, DiskCache, DiskCacheAfterValidation, MemoryCache, MemoryCacheAfterValidation };
     WEBCORE_EXPORT Source source() const;
     WEBCORE_EXPORT void setSource(Source);
 
@@ -146,6 +145,13 @@ protected:
 
     static bool platformCompare(const ResourceResponse&, const ResourceResponse&) { return true; }
 
+private:
+    const ResourceResponse& asResourceResponse() const;
+    void parseCacheControlDirectives() const;
+    void updateHeaderParsedState(HTTPHeaderName);
+
+protected:
+    bool m_isNull;
     URL m_url;
     AtomicString m_mimeType;
     long long m_expectedContentLength;
@@ -160,31 +166,19 @@ protected:
     int m_httpStatusCode;
 
 private:
-    mutable double m_cacheControlMaxAge;
-    mutable double m_age;
-    mutable double m_date;
-    mutable double m_expires;
-    mutable double m_lastModified;
+    mutable Optional<std::chrono::microseconds> m_age;
+    mutable Optional<std::chrono::system_clock::time_point> m_date;
+    mutable Optional<std::chrono::system_clock::time_point> m_expires;
+    mutable Optional<std::chrono::system_clock::time_point> m_lastModified;
+    mutable CacheControlDirectives m_cacheControlDirectives;
 
-public:
-    bool m_isNull : 1;
-    
-private:
-    const ResourceResponse& asResourceResponse() const;
-    void parseCacheControlDirectives() const;
-    void updateHeaderParsedState(HTTPHeaderName);
+    mutable bool m_haveParsedCacheControlHeader { false };
+    mutable bool m_haveParsedAgeHeader { false };
+    mutable bool m_haveParsedDateHeader { false };
+    mutable bool m_haveParsedExpiresHeader { false };
+    mutable bool m_haveParsedLastModifiedHeader { false };
 
-    mutable bool m_haveParsedCacheControlHeader : 1;
-    mutable bool m_haveParsedAgeHeader : 1;
-    mutable bool m_haveParsedDateHeader : 1;
-    mutable bool m_haveParsedExpiresHeader : 1;
-    mutable bool m_haveParsedLastModifiedHeader : 1;
-
-    mutable bool m_cacheControlContainsNoCache : 1;
-    mutable bool m_cacheControlContainsNoStore : 1;
-    mutable bool m_cacheControlContainsMustRevalidate : 1;
-
-    Source m_source;
+    Source m_source { Source::Unknown };
 };
 
 inline bool operator==(const ResourceResponse& a, const ResourceResponse& b) { return ResourceResponseBase::compare(a, b); }

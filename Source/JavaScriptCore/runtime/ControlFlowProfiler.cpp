@@ -91,7 +91,7 @@ Vector<BasicBlockRange> ControlFlowProfiler::getBasicBlocksForSourceID(intptr_t 
         BasicBlockRange range;
         range.m_hasExecuted = std::get<0>(functionRange);
         range.m_startOffset = static_cast<int>(std::get<1>(functionRange));
-        range.m_endOffset = static_cast<int>(std::get<2>(functionRange) + 1);
+        range.m_endOffset = static_cast<int>(std::get<2>(functionRange));
         result.append(range);
     }
 
@@ -104,6 +104,7 @@ bool ControlFlowProfiler::hasBasicBlockAtTextOffsetBeenExecuted(int offset, intp
     int bestDistance = INT_MAX;
     BasicBlockRange bestRange;
     bestRange.m_startOffset = bestRange.m_endOffset = -1;
+    bestRange.m_hasExecuted = false; // Suppress MSVC warning.
     // Because some ranges may overlap because of function boundaries, make sure to find the smallest range enclosing the offset.
     for (BasicBlockRange range : blocks) {
         if (range.m_startOffset <= offset && offset <= range.m_endOffset && (range.m_endOffset - range.m_startOffset) < bestDistance) {

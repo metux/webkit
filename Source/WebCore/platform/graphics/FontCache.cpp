@@ -31,7 +31,6 @@
 #include "FontCache.h"
 
 #include "FontCascade.h"
-#include "FontGlyphs.h"
 #include "FontPlatformData.h"
 #include "FontSelector.h"
 #include "MemoryPressureHandler.h"
@@ -86,14 +85,14 @@ using namespace WTF;
 
 namespace WebCore {
 
-FontCache& fontCache()
+FontCache& FontCache::singleton()
 {
     static NeverDestroyed<FontCache> globalFontCache;
     return globalFontCache;
 }
 
 FontCache::FontCache()
-    : m_purgeTimer(*this, &FontCache::purgeTimerFired)
+    : m_purgeTimer(*this, &FontCache::purgeInactiveFontDataIfNeeded)
 {
 }
 
@@ -106,30 +105,25 @@ public:
         , m_family(family)
     { }
 
-    FontPlatformDataCacheKey(HashTableDeletedValueType) : m_fontDescriptionKey(hashTableDeletedSize()) { }
-    bool isHashTableDeletedValue() const { return m_fontDescriptionKey.size == hashTableDeletedSize(); }
+    explicit FontPlatformDataCacheKey(HashTableDeletedValueType t)
+        : m_fontDescriptionKey(t)
+    { }
+
+    bool isHashTableDeletedValue() const { return m_fontDescriptionKey.isHashTableDeletedValue(); }
 
     bool operator==(const FontPlatformDataCacheKey& other) const
     {
         return equalIgnoringCase(m_family, other.m_family) && m_fontDescriptionKey == other.m_fontDescriptionKey;
     }
 
-    FontDescriptionFontDataCacheKey m_fontDescriptionKey;
+    FontDescriptionKey m_fontDescriptionKey;
     AtomicString m_family;
-
-private:
-    static unsigned hashTableDeletedSize() { return 0xFFFFFFFFU; }
 };
 
-inline unsigned computeHash(const FontPlatformDataCacheKey& fontKey)
-{
-    return pairIntHash(CaseFoldingHash::hash(fontKey.m_family), fontKey.m_fontDescriptionKey.computeHash());
-}
-
 struct FontPlatformDataCacheKeyHash {
-    static unsigned hash(const FontPlatformDataCacheKey& font)
+    static unsigned hash(const FontPlatformDataCacheKey& fontKey)
     {
-        return computeHash(font);
+        return pairIntHash(CaseFoldingHash::hash(fontKey.m_family), fontKey.m_fontDescriptionKey.computeHash());
     }
          
     static bool equal(const FontPlatformDataCacheKey& a, const FontPlatformDataCacheKey& b)
@@ -140,9 +134,7 @@ struct FontPlatformDataCacheKeyHash {
     static const bool safeToCompareToEmptyOrDeleted = true;
 };
 
-struct FontPlatformDataCacheKeyTraits : WTF::SimpleClassHashTraits<FontPlatformDataCacheKey> { };
-
-typedef HashMap<FontPlatformDataCacheKey, std::unique_ptr<FontPlatformData>, FontPlatformDataCacheKeyHash, FontPlatformDataCacheKeyTraits> FontPlatformDataCache;
+typedef HashMap<FontPlatformDataCacheKey, std::unique_ptr<FontPlatformData>, FontPlatformDataCacheKeyHash, WTF::SimpleClassHashTraits<FontPlatformDataCacheKey>> FontPlatformDataCache;
 
 static FontPlatformDataCache& fontPlatformDataCache()
 {
@@ -321,7 +313,7 @@ PassRefPtr<OpenTypeVerticalData> FontCache::getVerticalData(const FontFileKey& k
 
     RefPtr<OpenTypeVerticalData> verticalData = OpenTypeVerticalData::create(platformData);
     if (!verticalData->isOpenType())
-        verticalData.clear();
+        verticalData = nullptr;
     fontVerticalDataCache.set(key, verticalData);
     return verticalData;
 }
@@ -343,7 +335,6 @@ struct FontDataCacheKeyHash {
 
 struct FontDataCacheKeyTraits : WTF::GenericHashTraits<FontPlatformData> {
     static const bool emptyValueIsZero = true;
-    static const bool needsDestruction = true;
     static const FontPlatformData& emptyValue()
     {
         static NeverDestroyed<FontPlatformData> key(0.f, false, false);
@@ -369,15 +360,15 @@ static FontDataCache& cachedFonts()
 
 
 #if PLATFORM(IOS)
-const int cMaxInactiveFontData = 120;
-const int cTargetInactiveFontData = 100;
+const unsigned cMaxInactiveFontData = 120;
+const unsigned cTargetInactiveFontData = 100;
 #else
-const int cMaxInactiveFontData = 225;
-const int cTargetInactiveFontData = 200;
+const unsigned cMaxInactiveFontData = 225;
+const unsigned cTargetInactiveFontData = 200;
 #endif
 
-const int cMaxUnderMemoryPressureInactiveFontData = 50;
-const int cTargetUnderMemoryPressureInactiveFontData = 30;
+const unsigned cMaxUnderMemoryPressureInactiveFontData = 50;
+const unsigned cTargetUnderMemoryPressureInactiveFontData = 30;
 
 RefPtr<Font> FontCache::fontForFamily(const FontDescription& fontDescription, const AtomicString& family, bool checkingAlternateName)
 {
@@ -404,29 +395,24 @@ Ref<Font> FontCache::fontForPlatformData(const FontPlatformData& platformData)
     return *addResult.iterator->value;
 }
 
-void FontCache::purgeTimerFired()
-{
-    purgeInactiveFontDataIfNeeded();
-}
-
 void FontCache::purgeInactiveFontDataIfNeeded()
 {
-    bool underMemoryPressure = memoryPressureHandler().isUnderMemoryPressure();
-    int inactiveFontDataLimit = underMemoryPressure ? cMaxUnderMemoryPressureInactiveFontData : cMaxInactiveFontData;
+    bool underMemoryPressure = MemoryPressureHandler::singleton().isUnderMemoryPressure();
+    unsigned inactiveFontDataLimit = underMemoryPressure ? cMaxUnderMemoryPressureInactiveFontData : cMaxInactiveFontData;
 
     if (cachedFonts().size() < inactiveFontDataLimit)
         return;
-    int inactiveCount = inactiveFontCount();
+    unsigned inactiveCount = inactiveFontCount();
     if (inactiveCount <= inactiveFontDataLimit)
         return;
 
-    int targetFontDataLimit = underMemoryPressure ? cTargetUnderMemoryPressureInactiveFontData : cTargetInactiveFontData;
+    unsigned targetFontDataLimit = underMemoryPressure ? cTargetUnderMemoryPressureInactiveFontData : cTargetInactiveFontData;
     purgeInactiveFontData(inactiveCount - targetFontDataLimit);
 }
 
-void FontCache::purgeInactiveFontData(int purgeCount)
+void FontCache::purgeInactiveFontData(unsigned purgeCount)
 {
-    pruneUnreferencedEntriesFromFontGlyphsCache();
+    pruneUnreferencedEntriesFromFontCascadeCache();
     pruneSystemFallbackFonts();
 
 #if PLATFORM(IOS)
@@ -481,6 +467,8 @@ void FontCache::purgeInactiveFontData(int purgeCount)
             fontVerticalDataCache.remove(key);
     }
 #endif
+
+    platformPurgeInactiveFontData();
 }
 
 size_t FontCache::fontCount()
@@ -535,7 +523,7 @@ void FontCache::invalidate()
     }
 
     fontPlatformDataCache().clear();
-    invalidateFontGlyphsCache();
+    invalidateFontCascadeCache();
 
     gGeneration++;
 

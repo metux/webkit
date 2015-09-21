@@ -35,8 +35,10 @@
 #include "FloatSize.h"
 #include "GraphicsLayerClient.h"
 #include "IntRect.h"
+#include "Path.h"
 #include "PlatformLayer.h"
 #include "TransformOperations.h"
+#include "WindRule.h"
 #include <wtf/TypeCasts.h>
 
 #if ENABLE(CSS_COMPOSITING)
@@ -73,6 +75,12 @@ protected:
     {
     }
 
+    AnimationValue(const AnimationValue& other)
+        : m_keyTime(other.m_keyTime)
+        , m_timingFunction(other.m_timingFunction ? other.m_timingFunction->clone() : nullptr)
+    {
+    }
+
 private:
     double m_keyTime;
     RefPtr<TimingFunction> m_timingFunction;
@@ -91,6 +99,12 @@ public:
     virtual std::unique_ptr<AnimationValue> clone() const override
     {
         return std::make_unique<FloatAnimationValue>(*this);
+    }
+
+    FloatAnimationValue(const FloatAnimationValue& other)
+        : AnimationValue(other)
+        , m_value(other.m_value)
+    {
     }
 
     float value() const { return m_value; }
@@ -114,6 +128,13 @@ public:
         return std::make_unique<TransformAnimationValue>(*this);
     }
 
+    TransformAnimationValue(const TransformAnimationValue& other)
+        : AnimationValue(other)
+    {
+        for (size_t i = 0; i < other.m_value.operations().size(); ++i)
+            m_value.operations().append(other.m_value.operations()[i]->clone());
+    }
+
     const TransformOperations& value() const { return m_value; }
 
 private:
@@ -133,6 +154,13 @@ public:
     virtual std::unique_ptr<AnimationValue> clone() const override
     {
         return std::make_unique<FilterAnimationValue>(*this);
+    }
+
+    FilterAnimationValue(const FilterAnimationValue& other)
+        : AnimationValue(other)
+    {
+        for (size_t i = 0; i < other.m_value.operations().size(); ++i)
+            m_value.operations().append(other.m_value.operations()[i]->clone());
     }
 
     const FilterOperations& value() const { return m_value; }
@@ -198,12 +226,15 @@ public:
     enum class Type {
         Normal,
         PageTiledBacking,
-        Scrolling
+        Scrolling,
+        Shape
     };
     
     WEBCORE_EXPORT static std::unique_ptr<GraphicsLayer> create(GraphicsLayerFactory*, GraphicsLayerClient&, Type = Type::Normal);
     
     WEBCORE_EXPORT virtual ~GraphicsLayer();
+    
+    Type type() const { return m_type; }
 
     virtual void initialize(Type) { }
 
@@ -340,6 +371,9 @@ public:
     const FilterOperations& backdropFilters() const { return m_backdropFilters; }
     virtual bool setBackdropFilters(const FilterOperations& filters) { m_backdropFilters = filters; return true; }
 
+    virtual void setBackdropFiltersRect(const FloatRect& backdropFiltersRect) { m_backdropFiltersRect = backdropFiltersRect; }
+    FloatRect backdropFiltersRect() const { return m_backdropFiltersRect; }
+
 #if ENABLE(CSS_COMPOSITING)
     BlendMode blendMode() const { return m_blendMode; }
     virtual void setBlendMode(BlendMode blendMode) { m_blendMode = blendMode; }
@@ -361,8 +395,8 @@ public:
     virtual void setContentsNeedsDisplay() { };
 
     // The tile phase is relative to the GraphicsLayer bounds.
-    virtual void setContentsTilePhase(const FloatPoint& p) { m_contentsTilePhase = p; }
-    FloatPoint contentsTilePhase() const { return m_contentsTilePhase; }
+    virtual void setContentsTilePhase(const FloatSize& p) { m_contentsTilePhase = p; }
+    FloatSize contentsTilePhase() const { return m_contentsTilePhase; }
 
     virtual void setContentsTileSize(const FloatSize& s) { m_contentsTileSize = s; }
     FloatSize contentsTileSize() const { return m_contentsTileSize; }
@@ -380,6 +414,12 @@ public:
     // Returns false if the platform can't support this rounded clip, and we should fall back to painting a mask.
     FloatRoundedRect maskToBoundsRect() const { return m_masksToBoundsRect; };
     virtual bool setMasksToBoundsRect(const FloatRoundedRect& roundedRect) { m_masksToBoundsRect = roundedRect; return false; }
+
+    Path shapeLayerPath() const;
+    virtual void setShapeLayerPath(const Path&);
+
+    WindRule shapeLayerWindRule() const;
+    virtual void setShapeLayerWindRule(WindRule);
 
     // Transitions are identified by a special animation name that cannot clash with a keyframe identifier.
     static String animationNameForTransition(AnimatedPropertyID);
@@ -432,7 +472,7 @@ public:
     virtual void setDebugBackgroundColor(const Color&) { }
     virtual void setDebugBorder(const Color&, float /*borderWidth*/) { }
 
-    enum CustomAppearance { NoCustomAppearance, ScrollingOverhang, ScrollingShadow };
+    enum CustomAppearance { NoCustomAppearance, ScrollingOverhang, ScrollingShadow, LightBackdropAppearance, DarkBackdropAppearance };
     virtual void setCustomAppearance(CustomAppearance customAppearance) { m_customAppearance = customAppearance; }
     CustomAppearance customAppearance() const { return m_customAppearance; }
 
@@ -453,6 +493,10 @@ public:
 
     float pageScaleFactor() const { return m_client.pageScaleFactor(); }
     float deviceScaleFactor() const { return m_client.deviceScaleFactor(); }
+    
+    // Whether this layer is viewport constrained, implying that it's moved around externally from GraphicsLayer (e.g. by the scrolling tree).
+    virtual void setIsViewportConstrained(bool) { }
+    virtual bool isViewportConstrained() const { return false; }
 
     virtual void deviceOrPageScaleFactorChanged() { }
     WEBCORE_EXPORT void noteDeviceOrPageScaleFactorChangedIncludingDescendants();
@@ -460,8 +504,8 @@ public:
     // Some compositing systems may do internal batching to synchronize compositing updates
     // with updates drawn into the window. These methods flush internal batched state on this layer
     // and descendant layers, and this layer only.
-    virtual void flushCompositingState(const FloatRect& /* clipRect */) { }
-    virtual void flushCompositingStateForThisLayerOnly() { }
+    virtual void flushCompositingState(const FloatRect& /* clipRect */, bool /* viewportIsStable */) { }
+    virtual void flushCompositingStateForThisLayerOnly(bool /* viewportIsStable */) { }
 
     // If the exposed rect of this layer changes, returns true if this or descendant layers need a flush,
     // for example to allocate new tiles.
@@ -480,24 +524,9 @@ public:
     void resetTrackedRepaints();
     void addRepaintRect(const FloatRect&);
 
-    static bool supportsBackgroundColorContent()
-    {
-#if USE(CA) || USE(TEXTURE_MAPPER)
-        return true;
-#else
-        return false;
-#endif
-    }
-
-#if USE(COORDINATED_GRAPHICS)
+    static bool supportsBackgroundColorContent();
+    static bool supportsLayerType(Type);
     static bool supportsContentsTiling();
-#else
-    static bool supportsContentsTiling()
-    {
-        // FIXME: Enable the feature on different ports.
-        return false;
-    }
-#endif
 
     void updateDebugIndicators();
 
@@ -506,8 +535,6 @@ public:
     virtual bool isGraphicsLayerCA() const { return false; }
     virtual bool isGraphicsLayerCARemote() const { return false; }
     virtual bool isGraphicsLayerTextureMapper() const { return false; }
-
-    virtual bool needsClippingMaskLayer() { return true; };
 
 protected:
     WEBCORE_EXPORT explicit GraphicsLayer(Type, GraphicsLayerClient&);
@@ -570,6 +597,8 @@ protected:
     BlendMode m_blendMode;
 #endif
 
+    const Type m_type;
+
     bool m_contentsOpaque : 1;
     bool m_preserves3D: 1;
     bool m_backfaceVisibility : 1;
@@ -599,11 +628,17 @@ protected:
     FloatRect m_contentsRect;
     FloatRoundedRect m_contentsClippingRect;
     FloatRoundedRect m_masksToBoundsRect;
-    FloatPoint m_contentsTilePhase;
+    FloatSize m_contentsTilePhase;
     FloatSize m_contentsTileSize;
+    FloatRect m_backdropFiltersRect;
 
     int m_repaintCount;
     CustomAppearance m_customAppearance;
+
+#if USE(CA)
+    Path m_shapeLayerPath;
+    WindRule m_shapeLayerWindRule { RULE_NONZERO };
+#endif
 };
 
 } // namespace WebCore

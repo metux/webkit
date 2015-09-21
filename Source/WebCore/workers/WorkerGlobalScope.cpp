@@ -175,21 +175,19 @@ void WorkerGlobalScope::importScripts(const Vector<String>& urls, ExceptionCode&
 {
     ASSERT(contentSecurityPolicy());
     ec = 0;
-    Vector<String>::const_iterator urlsEnd = urls.end();
     Vector<URL> completedURLs;
-    for (Vector<String>::const_iterator it = urls.begin(); it != urlsEnd; ++it) {
-        const URL& url = scriptExecutionContext()->completeURL(*it);
+    for (auto& entry : urls) {
+        URL url = scriptExecutionContext()->completeURL(entry);
         if (!url.isValid()) {
             ec = SYNTAX_ERR;
             return;
         }
-        completedURLs.append(url);
+        completedURLs.append(WTF::move(url));
     }
-    Vector<URL>::const_iterator end = completedURLs.end();
 
-    for (Vector<URL>::const_iterator it = completedURLs.begin(); it != end; ++it) {
+    for (auto& url : completedURLs) {
         Ref<WorkerScriptLoader> scriptLoader = WorkerScriptLoader::create();
-        scriptLoader->loadSynchronously(scriptExecutionContext(), *it, AllowCrossOriginRequests);
+        scriptLoader->loadSynchronously(scriptExecutionContext(), url, AllowCrossOriginRequests);
 
         // If the fetching attempt failed, throw a NETWORK_ERR exception and abort all these steps.
         if (scriptLoader->failed()) {
@@ -199,9 +197,9 @@ void WorkerGlobalScope::importScripts(const Vector<String>& urls, ExceptionCode&
 
         InspectorInstrumentation::scriptImported(scriptExecutionContext(), scriptLoader->identifier(), scriptLoader->script());
 
-        Deprecated::ScriptValue exception;
-        m_script->evaluate(ScriptSourceCode(scriptLoader->script(), scriptLoader->responseURL()), &exception);
-        if (!exception.hasNoValue()) {
+        NakedPtr<JSC::Exception> exception;
+        m_script->evaluate(ScriptSourceCode(scriptLoader->script(), scriptLoader->responseURL()), exception);
+        if (exception) {
             m_script->setException(exception);
             return;
         }

@@ -24,7 +24,6 @@
 
 #include "FcUniquePtr.h"
 #include "Font.h"
-#include "OwnPtrCairo.h"
 #include "RefPtrCairo.h"
 #include "UTF16UChar32Iterator.h"
 #include <cairo-ft.h>
@@ -42,62 +41,92 @@ void FontCache::platformInit()
         ASSERT_NOT_REACHED();
 }
 
-FcPattern* createFontConfigPatternForCharacters(const UChar* characters, int bufferLength)
+static RefPtr<FcPattern> createFontConfigPatternForCharacters(const UChar* characters, int bufferLength)
 {
-    FcPattern* pattern = FcPatternCreate();
-    FcCharSet* fontConfigCharSet = FcCharSetCreate();
+    RefPtr<FcPattern> pattern = adoptRef(FcPatternCreate());
+    FcUniquePtr<FcCharSet> fontConfigCharSet(FcCharSetCreate());
 
     UTF16UChar32Iterator iterator(characters, bufferLength);
     UChar32 character = iterator.next();
     while (character != iterator.end()) {
-        FcCharSetAddChar(fontConfigCharSet, character);
+        FcCharSetAddChar(fontConfigCharSet.get(), character);
         character = iterator.next();
     }
 
-    FcPatternAddCharSet(pattern, FC_CHARSET, fontConfigCharSet);
-    FcCharSetDestroy(fontConfigCharSet);
+    FcPatternAddCharSet(pattern.get(), FC_CHARSET, fontConfigCharSet.get());
 
-    FcPatternAddBool(pattern, FC_SCALABLE, FcTrue);
-    FcConfigSubstitute(0, pattern, FcMatchPattern);
-    FcDefaultSubstitute(pattern);
+    FcPatternAddBool(pattern.get(), FC_SCALABLE, FcTrue);
+    FcConfigSubstitute(nullptr, pattern.get(), FcMatchPattern);
+    FcDefaultSubstitute(pattern.get());
     return pattern;
 }
 
-FcPattern* findBestFontGivenFallbacks(const FontPlatformData& fontData, FcPattern* pattern)
+static RefPtr<FcPattern> findBestFontGivenFallbacks(const FontPlatformData& fontData, FcPattern* pattern)
 {
     if (!fontData.m_pattern)
-        return 0;
+        return nullptr;
 
     if (!fontData.m_fallbacks) {
         FcResult fontConfigResult;
-        fontData.m_fallbacks = FcFontSort(0, fontData.m_pattern.get(), FcTrue, 0, &fontConfigResult);
+        fontData.m_fallbacks = FcFontSort(nullptr, fontData.m_pattern.get(), FcTrue, nullptr, &fontConfigResult);
     }
 
     if (!fontData.m_fallbacks)
-        return 0;
+        return nullptr;
 
     FcFontSet* sets[] = { fontData.m_fallbacks };
     FcResult fontConfigResult;
-    return FcFontSetMatch(0, sets, 1, pattern, &fontConfigResult);
+    return FcFontSetMatch(nullptr, sets, 1, pattern, &fontConfigResult);
 }
 
-RefPtr<Font> FontCache::systemFallbackForCharacters(const FontDescription& description, const Font* originalFontData, bool, const UChar* characters, int length)
+RefPtr<Font> FontCache::systemFallbackForCharacters(const FontDescription& description, const Font* originalFontData, bool, const UChar* characters, unsigned length)
 {
-    RefPtr<FcPattern> pattern = adoptRef(createFontConfigPatternForCharacters(characters, length));
+    RefPtr<FcPattern> pattern = createFontConfigPatternForCharacters(characters, length);
     const FontPlatformData& fontData = originalFontData->platformData();
 
-    RefPtr<FcPattern> fallbackPattern = adoptRef(findBestFontGivenFallbacks(fontData, pattern.get()));
+    RefPtr<FcPattern> fallbackPattern = findBestFontGivenFallbacks(fontData, pattern.get());
     if (fallbackPattern) {
         FontPlatformData alternateFontData(fallbackPattern.get(), description);
         return fontForPlatformData(alternateFontData);
     }
 
     FcResult fontConfigResult;
-    RefPtr<FcPattern> resultPattern = adoptRef(FcFontMatch(0, pattern.get(), &fontConfigResult));
+    RefPtr<FcPattern> resultPattern = adoptRef(FcFontMatch(nullptr, pattern.get(), &fontConfigResult));
     if (!resultPattern)
-        return 0;
+        return nullptr;
     FontPlatformData alternateFontData(resultPattern.get(), description);
     return fontForPlatformData(alternateFontData);
+}
+
+static Vector<String> patternToFamilies(FcPattern& pattern)
+{
+    char* patternChars = reinterpret_cast<char*>(FcPatternFormat(&pattern, reinterpret_cast<const FcChar8*>("%{family}")));
+    String patternString = String::fromUTF8(patternChars);
+    free(patternChars);
+
+    Vector<String> results;
+    patternString.split(',', results);
+    return results;
+}
+
+Vector<String> FontCache::systemFontFamilies()
+{
+    RefPtr<FcPattern> scalablesOnlyPattern = adoptRef(FcPatternCreate());
+    FcPatternAddBool(scalablesOnlyPattern.get(), FC_SCALABLE, FcTrue);
+
+    FcUniquePtr<FcObjectSet> familiesOnly(FcObjectSetBuild(FC_FAMILY, nullptr));
+    FcUniquePtr<FcFontSet> fontSet(FcFontList(nullptr, scalablesOnlyPattern.get(), familiesOnly.get()));
+
+    Vector<String> fontFamilies;
+    for (int i = 0; i < fontSet->nfont; i++) {
+        FcPattern* pattern = fontSet->fonts[i];
+        FcChar8* family = nullptr;
+        FcPatternGetString(pattern, FC_FAMILY, 0, &family);
+        if (family)
+            fontFamilies.appendVector(patternToFamilies(*pattern));
+    }
+
+    return fontFamilies;
 }
 
 Ref<Font> FontCache::lastResortFallbackFont(const FontDescription& fontDescription)
@@ -132,7 +161,7 @@ static String getFamilyNameStringFromFamily(const AtomicString& family)
     return "";
 }
 
-int fontWeightToFontconfigWeight(FontWeight weight)
+static int fontWeightToFontconfigWeight(FontWeight weight)
 {
     switch (weight) {
     case FontWeight100:
@@ -195,17 +224,19 @@ static AliasStrength strengthOfFirstAlias(const FcPattern& original)
 
     FcUniquePtr<FcLangSet> strongLangSet(FcLangSetCreate());
     FcLangSetAdd(strongLangSet.get(), reinterpret_cast<const FcChar8*>("nomatchlang"));
-    RefPtr<FcPattern> strong = adoptRef(FcPatternDuplicate(pattern.get()));
-    FcPatternAddLangSet(strong.get(), FC_LANG, strongLangSet.get());
+    // Ownership of this FcPattern will be transferred with FcFontSetAdd.
+    FcPattern* strong = FcPatternDuplicate(pattern.get());
+    FcPatternAddLangSet(strong, FC_LANG, strongLangSet.get());
 
     FcUniquePtr<FcLangSet> weakLangSet(FcLangSetCreate());
     FcLangSetAdd(weakLangSet.get(), reinterpret_cast<const FcChar8*>("matchlang"));
-    RefPtr<FcPattern> weak(FcPatternCreate());
-    FcPatternAddString(weak.get(), FC_FAMILY, reinterpret_cast<const FcChar8*>("nomatchstring"));
-    FcPatternAddLangSet(weak.get(), FC_LANG, weakLangSet.get());
+    // Ownership of this FcPattern will be transferred via FcFontSetAdd.
+    FcPattern* weak = FcPatternCreate();
+    FcPatternAddString(weak, FC_FAMILY, reinterpret_cast<const FcChar8*>("nomatchstring"));
+    FcPatternAddLangSet(weak, FC_LANG, weakLangSet.get());
 
-    FcFontSetAdd(fontSet.get(), strong.leakRef());
-    FcFontSetAdd(fontSet.get(), weak.leakRef());
+    FcFontSetAdd(fontSet.get(), strong);
+    FcFontSetAdd(fontSet.get(), weak);
 
     // Add 'matchlang' to the copy of the pattern.
     FcPatternAddLangSet(pattern.get(), FC_LANG, weakLangSet.get());
@@ -272,16 +303,7 @@ static Vector<String> strongAliasesForFamily(const String& family)
         }
     }
 
-    // Take the resulting pattern and remove everything but the families.
-    minimal = adoptRef(FcPatternFilter(pattern.get(), familiesOnly.get()));
-    // Convert the pattern to a string, and cut out the non-family junk that gets added to the end.
-    char* patternChars = reinterpret_cast<char*>(FcPatternFormat(pattern.get(), reinterpret_cast<const FcChar8*>("%{family}")));
-    String patternString = String::fromUTF8(patternChars);
-    free(patternChars);
-
-    Vector<String> results;
-    patternString.split(',', results);
-    return results;
+    return patternToFamilies(*pattern);
 }
 
 static bool areStronglyAliased(const String& familyA, const String& familyB)
@@ -292,7 +314,6 @@ static bool areStronglyAliased(const String& familyA, const String& familyB)
     }
     return false;
 }
-
 
 std::unique_ptr<FontPlatformData> FontCache::createFontPlatformData(const FontDescription& fontDescription, const AtomicString& family)
 {
@@ -326,7 +347,7 @@ std::unique_ptr<FontPlatformData> FontCache::createFontPlatformData(const FontDe
     // Fontconfig is used in two stages: (1) configuration and (2) matching. During the
     // configuration step, before any matching occurs, we allow arbitrary family substitutions,
     // since this is an exact matter of respecting the user's font configuration.
-    FcConfigSubstitute(0, pattern.get(), FcMatchPattern);
+    FcConfigSubstitute(nullptr, pattern.get(), FcMatchPattern);
     FcDefaultSubstitute(pattern.get());
 
     FcChar8* fontConfigFamilyNameAfterConfiguration;
@@ -334,7 +355,7 @@ std::unique_ptr<FontPlatformData> FontCache::createFontPlatformData(const FontDe
     String familyNameAfterConfiguration = String::fromUTF8(reinterpret_cast<char*>(fontConfigFamilyNameAfterConfiguration));
 
     FcResult fontConfigResult;
-    RefPtr<FcPattern> resultPattern = adoptRef(FcFontMatch(0, pattern.get(), &fontConfigResult));
+    RefPtr<FcPattern> resultPattern = adoptRef(FcFontMatch(nullptr, pattern.get(), &fontConfigResult));
     if (!resultPattern) // No match.
         return nullptr;
 

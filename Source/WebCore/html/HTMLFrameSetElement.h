@@ -47,25 +47,6 @@ public:
 
     static HTMLFrameSetElement* findContaining(Element* descendant);
 
-    // Declared virtual in Element
-    DEFINE_WINDOW_ATTRIBUTE_EVENT_LISTENER(blur);
-    DEFINE_WINDOW_ATTRIBUTE_EVENT_LISTENER(error);
-    DEFINE_WINDOW_ATTRIBUTE_EVENT_LISTENER(focus);
-    DEFINE_WINDOW_ATTRIBUTE_EVENT_LISTENER(load);
-
-    DEFINE_WINDOW_ATTRIBUTE_EVENT_LISTENER(beforeunload);
-    DEFINE_WINDOW_ATTRIBUTE_EVENT_LISTENER(hashchange);
-    DEFINE_WINDOW_ATTRIBUTE_EVENT_LISTENER(message);
-    DEFINE_WINDOW_ATTRIBUTE_EVENT_LISTENER(offline);
-    DEFINE_WINDOW_ATTRIBUTE_EVENT_LISTENER(online);
-    DEFINE_WINDOW_ATTRIBUTE_EVENT_LISTENER(popstate);
-    DEFINE_WINDOW_ATTRIBUTE_EVENT_LISTENER(resize);
-    DEFINE_WINDOW_ATTRIBUTE_EVENT_LISTENER(storage);
-    DEFINE_WINDOW_ATTRIBUTE_EVENT_LISTENER(unload);
-#if ENABLE(ORIENTATION_EVENTS)
-    DEFINE_WINDOW_ATTRIBUTE_EVENT_LISTENER(orientationchange);
-#endif
-
 private:
     HTMLFrameSetElement(const QualifiedName&, Document&);
 
@@ -75,7 +56,7 @@ private:
 
     virtual void willAttachRenderers() override;
     virtual bool rendererIsNeeded(const RenderStyle&) override;
-    virtual RenderPtr<RenderElement> createElementRenderer(Ref<RenderStyle>&&) override;
+    virtual RenderPtr<RenderElement> createElementRenderer(Ref<RenderStyle>&&, const RenderTreePosition&) override;
     
     virtual void defaultEventHandler(Event*) override;
 

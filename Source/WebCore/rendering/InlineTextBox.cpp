@@ -271,8 +271,6 @@ LayoutRect InlineTextBox::localSelectionRect(int startPos, int endPos) const
     String hyphenatedStringBuffer;
     bool respectHyphen = ePos == m_len && hasHyphen();
     TextRun textRun = constructTextRun(lineStyle, font, respectHyphen ? &hyphenatedStringBuffer : 0);
-    if (respectHyphen)
-        endPos = textRun.length();
 
     LayoutRect selectionRect = LayoutRect(LayoutPoint(logicalLeft(), selectionTop), LayoutSize(m_logicalWidth, selectionHeight));
     // Avoid computing the font width when the entire line box is selected as an optimization.
@@ -389,7 +387,8 @@ bool InlineTextBox::isLineBreak() const
     return renderer().style().preserveNewline() && len() == 1 && (*renderer().text())[start()] == '\n';
 }
 
-bool InlineTextBox::nodeAtPoint(const HitTestRequest& request, HitTestResult& result, const HitTestLocation& locationInContainer, const LayoutPoint& accumulatedOffset, LayoutUnit /* lineTop */, LayoutUnit /*lineBottom*/)
+bool InlineTextBox::nodeAtPoint(const HitTestRequest& request, HitTestResult& result, const HitTestLocation& locationInContainer, const LayoutPoint& accumulatedOffset, LayoutUnit /* lineTop */, LayoutUnit /*lineBottom*/,
+    HitTestAction /*hitTestAction*/)
 {
     if (!visibleToHitTesting())
         return false;
@@ -620,7 +619,7 @@ void InlineTextBox::paint(PaintInfo& paintInfo, const LayoutPoint& paintOffset, 
         updateGraphicsContext(context, textPaintStyle);
         if (combinedText)
             context.concatCTM(rotation(boxRect, Clockwise));
-        paintDecoration(context, boxOrigin, textDecorations, lineStyle.textDecorationStyle(), textShadow, textPainter);
+        paintDecoration(context, boxOrigin, textDecorations, textShadow, textPainter);
         if (combinedText)
             context.concatCTM(rotation(boxRect, Counterclockwise));
     }
@@ -893,7 +892,7 @@ static void strokeWavyTextDecoration(GraphicsContext& context, FloatPoint& p1, F
     context.strokePath(path);
 }
 
-void InlineTextBox::paintDecoration(GraphicsContext& context, const FloatPoint& boxOrigin, TextDecoration decoration, TextDecorationStyle decorationStyle, const ShadowData* shadow, TextPainter& textPainter)
+void InlineTextBox::paintDecoration(GraphicsContext& context, const FloatPoint& boxOrigin, TextDecoration decoration, const ShadowData* shadow, TextPainter& textPainter)
 {
 #if !ENABLE(CSS3_TEXT_DECORATION_SKIP_INK)
     UNUSED_PARAM(textPainter);
@@ -912,10 +911,11 @@ void InlineTextBox::paintDecoration(GraphicsContext& context, const FloatPoint& 
     }
     
     // Get the text decoration colors.
-    Color underline, overline, linethrough;
-    renderer().getTextDecorationColors(decoration, underline, overline, linethrough);
+    Color underlineColor, overlineColor, linethroughColor;
+    TextDecorationStyle underlineStyle, overlineStyle, linethroughStyle;
+    renderer().getTextDecorationColorsAndStyles(decoration, underlineColor, overlineColor, linethroughColor, underlineStyle, overlineStyle, linethroughStyle);
     if (isFirstLine())
-        renderer().getTextDecorationColors(decoration, underline, overline, linethrough, true);
+        renderer().getTextDecorationColorsAndStyles(decoration, underlineColor, overlineColor, linethroughColor, underlineStyle, overlineStyle, linethroughStyle, true);
     
     // Use a special function for underlines to get the positioning exactly right.
     bool isPrinting = renderer().document().printing();
@@ -923,7 +923,7 @@ void InlineTextBox::paintDecoration(GraphicsContext& context, const FloatPoint& 
     float textDecorationThickness = textDecorationStrokeThickness(renderer().style().fontSize());
     context.setStrokeThickness(textDecorationThickness);
 
-    bool linesAreOpaque = !isPrinting && (!(decoration & TextDecorationUnderline) || underline.alpha() == 255) && (!(decoration & TextDecorationOverline) || overline.alpha() == 255) && (!(decoration & TextDecorationLineThrough) || linethrough.alpha() == 255);
+    bool linesAreOpaque = !isPrinting && (!(decoration & TextDecorationUnderline) || underlineColor.alpha() == 255) && (!(decoration & TextDecorationOverline) || overlineColor.alpha() == 255) && (!(decoration & TextDecorationLineThrough) || linethroughColor.alpha() == 255);
 
     const RenderStyle& lineStyle = this->lineStyle();
     int baseline = lineStyle.fontMetrics().ascent();
@@ -968,13 +968,13 @@ void InlineTextBox::paintDecoration(GraphicsContext& context, const FloatPoint& 
         
         float wavyOffset = wavyOffsetFromDecoration();
 
-        context.setStrokeStyle(textDecorationStyleToStrokeStyle(decorationStyle));
         // These decorations should match the visual overflows computed in visualOverflowForDecorations()
         if (decoration & TextDecorationUnderline) {
-            context.setStrokeColor(underline, colorSpace);
+            context.setStrokeColor(underlineColor, colorSpace);
+            context.setStrokeStyle(textDecorationStyleToStrokeStyle(underlineStyle));
             const int underlineOffset = computeUnderlineOffset(lineStyle.textUnderlinePosition(), lineStyle.fontMetrics(), this, textDecorationThickness);
 
-            switch (decorationStyle) {
+            switch (underlineStyle) {
             case TextDecorationStyleWavy: {
                 FloatPoint start(localOrigin.x(), localOrigin.y() + underlineOffset + wavyOffset);
                 FloatPoint end(localOrigin.x() + width, localOrigin.y() + underlineOffset + wavyOffset);
@@ -985,17 +985,18 @@ void InlineTextBox::paintDecoration(GraphicsContext& context, const FloatPoint& 
 #if ENABLE(CSS3_TEXT_DECORATION_SKIP_INK)
                 if ((lineStyle.textDecorationSkip() == TextDecorationSkipInk || lineStyle.textDecorationSkip() == TextDecorationSkipAuto) && isHorizontal()) {
                     if (!context.paintingDisabled()) {
-                        drawSkipInkUnderline(textPainter, context, localOrigin, underlineOffset, width, isPrinting, decorationStyle == TextDecorationStyleDouble);
+                        drawSkipInkUnderline(textPainter, context, localOrigin, underlineOffset, width, isPrinting, underlineStyle == TextDecorationStyleDouble);
                     }
                 } else
                     // FIXME: Need to support text-decoration-skip: none.
 #endif // CSS3_TEXT_DECORATION_SKIP_INK
-                    context.drawLineForText(FloatPoint(localOrigin.x(), localOrigin.y() + underlineOffset), width, isPrinting, decorationStyle == TextDecorationStyleDouble);
+                    context.drawLineForText(FloatPoint(localOrigin.x(), localOrigin.y() + underlineOffset), width, isPrinting, underlineStyle == TextDecorationStyleDouble);
             }
         }
         if (decoration & TextDecorationOverline) {
-            context.setStrokeColor(overline, colorSpace);
-            switch (decorationStyle) {
+            context.setStrokeColor(overlineColor, colorSpace);
+            context.setStrokeStyle(textDecorationStyleToStrokeStyle(overlineStyle));
+            switch (overlineStyle) {
             case TextDecorationStyleWavy: {
                 FloatPoint start(localOrigin.x(), localOrigin.y() - wavyOffset);
                 FloatPoint end(localOrigin.x() + width, localOrigin.y() - wavyOffset);
@@ -1006,16 +1007,17 @@ void InlineTextBox::paintDecoration(GraphicsContext& context, const FloatPoint& 
 #if ENABLE(CSS3_TEXT_DECORATION_SKIP_INK)
                 if ((lineStyle.textDecorationSkip() == TextDecorationSkipInk || lineStyle.textDecorationSkip() == TextDecorationSkipAuto) && isHorizontal()) {
                     if (!context.paintingDisabled())
-                        drawSkipInkUnderline(textPainter, context, localOrigin, 0, width, isPrinting, decorationStyle == TextDecorationStyleDouble);
+                        drawSkipInkUnderline(textPainter, context, localOrigin, 0, width, isPrinting, overlineStyle == TextDecorationStyleDouble);
                 } else
                     // FIXME: Need to support text-decoration-skip: none.
 #endif // CSS3_TEXT_DECORATION_SKIP_INK
-                    context.drawLineForText(localOrigin, width, isPrinting, decorationStyle == TextDecorationStyleDouble);
+                    context.drawLineForText(localOrigin, width, isPrinting, overlineStyle == TextDecorationStyleDouble);
             }
         }
         if (decoration & TextDecorationLineThrough) {
-            context.setStrokeColor(linethrough, colorSpace);
-            switch (decorationStyle) {
+            context.setStrokeColor(linethroughColor, colorSpace);
+            context.setStrokeStyle(textDecorationStyleToStrokeStyle(linethroughStyle));
+            switch (linethroughStyle) {
             case TextDecorationStyleWavy: {
                 FloatPoint start(localOrigin.x(), localOrigin.y() + 2 * baseline / 3);
                 FloatPoint end(localOrigin.x() + width, localOrigin.y() + 2 * baseline / 3);
@@ -1023,7 +1025,7 @@ void InlineTextBox::paintDecoration(GraphicsContext& context, const FloatPoint& 
                 break;
             }
             default:
-                context.drawLineForText(FloatPoint(localOrigin.x(), localOrigin.y() + 2 * baseline / 3), width, isPrinting, decorationStyle == TextDecorationStyleDouble);
+                context.drawLineForText(FloatPoint(localOrigin.x(), localOrigin.y() + 2 * baseline / 3), width, isPrinting, linethroughStyle == TextDecorationStyleDouble);
             }
         }
     } while (shadow);
@@ -1388,7 +1390,28 @@ TextRun InlineTextBox::constructTextRun(const RenderStyle& style, const FontCasc
     return run;
 }
 
-#ifndef NDEBUG
+ExpansionBehavior InlineTextBox::expansionBehavior() const
+{
+    ExpansionBehavior leadingBehavior;
+    if (forceLeadingExpansion())
+        leadingBehavior = ForceLeadingExpansion;
+    else if (canHaveLeadingExpansion())
+        leadingBehavior = AllowLeadingExpansion;
+    else
+        leadingBehavior = ForbidLeadingExpansion;
+
+    ExpansionBehavior trailingBehavior;
+    if (forceTrailingExpansion())
+        trailingBehavior = ForceTrailingExpansion;
+    else if (expansion() && nextLeafChild() && !nextLeafChild()->isLineBreak())
+        trailingBehavior = AllowTrailingExpansion;
+    else
+        trailingBehavior = ForbidTrailingExpansion;
+
+    return leadingBehavior | trailingBehavior;
+}
+
+#if ENABLE(TREE_DEBUGGING)
 
 const char* InlineTextBox::boxName() const
 {

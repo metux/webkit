@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010 Apple Inc. All rights reserved.
+ * Copyright (C) 2010, 2015 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -38,6 +38,14 @@
 #include <wtf/text/CString.h>
 #include <wtf/text/StringHash.h>
 
+#if PLATFORM(COCOA)
+#include "WebHitTestResult.h"
+#endif
+
+#if PLUGIN_ARCHITECTURE(X11)
+#include <WebCore/XUniqueResource.h>
+#endif
+
 namespace WebCore {
 class MachSendRight;
 class HTTPHeaderMap;
@@ -53,10 +61,10 @@ class NetscapePluginStream;
     
 class NetscapePlugin : public Plugin {
 public:
-    static PassRefPtr<NetscapePlugin> create(PassRefPtr<NetscapePluginModule> pluginModule);
+    static RefPtr<NetscapePlugin> create(PassRefPtr<NetscapePluginModule>);
     virtual ~NetscapePlugin();
 
-    static PassRefPtr<NetscapePlugin> fromNPP(NPP);
+    static RefPtr<NetscapePlugin> fromNPP(NPP);
 
     // In-process NetscapePlugins don't support asynchronous initialization.
     virtual bool isBeingAsynchronouslyInitialized() const override { return false; }
@@ -133,6 +141,9 @@ public:
 
     void setIsPlayingAudio(bool);
 
+    void registerRedirect(NetscapePluginStream*, const WebCore::URL& requestURL, int redirectResponseStatus, void* notificationData);
+    void urlRedirectResponse(void* notifyData, bool allow);
+
     // Member functions for calling into the plug-in.
     NPError NPP_New(NPMIMEType pluginType, uint16_t mode, int16_t argc, char* argn[], char* argv[], NPSavedData*);
     NPError NPP_Destroy(NPSavedData**);
@@ -144,6 +155,7 @@ public:
     int32_t NPP_Write(NPStream*, int32_t offset, int32_t len, void* buffer);
     int16_t NPP_HandleEvent(void* event);
     void NPP_URLNotify(const char* url, NPReason, void* notifyData);
+    bool NPP_URLRedirectNotify(const char* url, int32_t status, void* notifyData);
     NPError NPP_GetValue(NPPVariable, void *value);
     NPError NPP_SetValue(NPNVariable, void *value);
 
@@ -180,7 +192,7 @@ private:
     virtual bool initialize(const Parameters&) override;
     virtual void destroy() override;
     virtual void paint(WebCore::GraphicsContext*, const WebCore::IntRect& dirtyRect) override;
-    virtual PassRefPtr<ShareableBitmap> snapshot() override;
+    virtual RefPtr<ShareableBitmap> snapshot() override;
 #if PLATFORM(COCOA)
     virtual PlatformLayer* pluginLayer() override;
 #endif
@@ -191,7 +203,8 @@ private:
     virtual void frameDidFinishLoading(uint64_t requestID) override;
     virtual void frameDidFail(uint64_t requestID, bool wasCancelled) override;
     virtual void didEvaluateJavaScript(uint64_t requestID, const String& result) override;
-    virtual void streamDidReceiveResponse(uint64_t streamID, const WebCore::URL& responseURL, uint32_t streamLength, 
+    virtual void streamWillSendRequest(uint64_t streamID, const WebCore::URL& requestURL, const WebCore::URL& responseURL, int responseStatus) override;
+    virtual void streamDidReceiveResponse(uint64_t streamID, const WebCore::URL& responseURL, uint32_t streamLength,
                                           uint32_t lastModifiedTime, const String& mimeType, const String& headers, const String& suggestedFileName) override;
     virtual void streamDidReceiveData(uint64_t streamID, const char* bytes, int length) override;
     virtual void streamDidFinishLoading(uint64_t streamID) override;
@@ -256,11 +269,13 @@ private:
     // converted (if the transformation matrix isn't invertible).
     bool convertFromRootView(const WebCore::IntPoint& pointInRootViewCoordinates, WebCore::IntPoint& pointInPluginCoordinates);
 
-    virtual PassRefPtr<WebCore::SharedBuffer> liveResourceData() const override;
+    virtual RefPtr<WebCore::SharedBuffer> liveResourceData() const override;
 
     virtual bool performDictionaryLookupAtLocation(const WebCore::FloatPoint&) override { return false; }
 
-    virtual String getSelectionString() const override { return String(); }
+    String getSelectionString() const override { return String(); }
+    String getSelectionForWordAtPoint(const WebCore::FloatPoint&) const override { return String(); }
+    bool existingSelectionContainsPoint(const WebCore::FloatPoint&) const override { return false; }
 
     virtual void mutedStateChanged(bool) override;
 
@@ -278,6 +293,7 @@ private:
 
     typedef HashMap<uint64_t, RefPtr<NetscapePluginStream>> StreamsMap;
     StreamsMap m_streams;
+    HashMap<void*, std::pair<RefPtr<NetscapePluginStream>, String>> m_redirects;
 
     RefPtr<NetscapePluginModule> m_pluginModule;
     NPP_t m_npp;
@@ -382,7 +398,7 @@ private:
     NP_CGContext m_npCGContext;
 #endif
 #elif PLUGIN_ARCHITECTURE(X11)
-    Pixmap m_drawable;
+    WebCore::XUniquePixmap m_drawable;
     Display* m_pluginDisplay;
 #if PLATFORM(GTK)
     GtkWidget* m_platformPluginWidget;
@@ -394,6 +410,8 @@ public: // Need to call it in the NPN_GetValue browser callback.
 };
 
 } // namespace WebKit
+
+SPECIALIZE_TYPE_TRAITS_PLUGIN(NetscapePlugin, NetscapePluginType)
 
 #endif // ENABLE(NETSCAPE_PLUGIN_API)
 

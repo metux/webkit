@@ -45,6 +45,9 @@ public:
     
     Ref<ProcessPoolConfiguration> copy();
 
+    bool shouldHaveLegacyDataStore() const { return m_shouldHaveLegacyDataStore; }
+    void setShouldHaveLegacyDataStore(bool shouldHaveLegacyDataStore) { m_shouldHaveLegacyDataStore = shouldHaveLegacyDataStore; }
+
     WebKit::ProcessModel processModel() const { return m_processModel; }
     void setProcessModel(WebKit::ProcessModel processModel) { m_processModel = processModel; } 
 
@@ -55,33 +58,48 @@ public:
     void setMaximumProcessCount(unsigned maximumProcessCount) { m_maximumProcessCount = maximumProcessCount; } 
 
     WebKit::CacheModel cacheModel() const { return m_cacheModel; }
-    void setCacheModel(WebKit::CacheModel cacheModel) { m_cacheModel = cacheModel; } 
+    void setCacheModel(WebKit::CacheModel cacheModel) { m_cacheModel = cacheModel; }
 
-    WTF::String indexedDBDatabaseDirectory() const { return m_indexedDBDatabaseDirectory; }
+    int64_t diskCacheSizeOverride() const { return m_diskCacheSizeOverride; }
+    void setDiskCacheSizeOverride(int64_t size) { m_diskCacheSizeOverride = size; }
+
+    const WTF::String& applicationCacheDirectory() const { return m_applicationCacheDirectory; }
+    void setApplicationCacheDirectory(const WTF::String& applicationCacheDirectory) { m_applicationCacheDirectory = applicationCacheDirectory; }
+
+    const WTF::String& diskCacheDirectory() const { return m_diskCacheDirectory; }
+    void setDiskCacheDirectory(const WTF::String& diskCacheDirectory) { m_diskCacheDirectory = diskCacheDirectory; }
+
+    const WTF::String& indexedDBDatabaseDirectory() const { return m_indexedDBDatabaseDirectory; }
     void setIndexedDBDatabaseDirectory(const WTF::String& indexedDBDatabaseDirectory) { m_indexedDBDatabaseDirectory = indexedDBDatabaseDirectory; }
 
-    WTF::String injectedBundlePath() const { return m_injectedBundlePath; }
+    const WTF::String& injectedBundlePath() const { return m_injectedBundlePath; }
     void setInjectedBundlePath(const WTF::String& injectedBundlePath) { m_injectedBundlePath = injectedBundlePath; }
 
-    WTF::String localStorageDirectory() const { return m_localStorageDirectory; }
+    const WTF::String& localStorageDirectory() const { return m_localStorageDirectory; }
     void setLocalStorageDirectory(const WTF::String& localStorageDirectory) { m_localStorageDirectory = localStorageDirectory; }
 
-    WTF::String webSQLDatabaseDirectory() const { return m_webSQLDatabaseDirectory; }
+    const WTF::String& webSQLDatabaseDirectory() const { return m_webSQLDatabaseDirectory; }
     void setWebSQLDatabaseDirectory(const WTF::String& webSQLDatabaseDirectory) { m_webSQLDatabaseDirectory = webSQLDatabaseDirectory; }
 
-    WTF::String mediaKeysStorageDirectory() const { return m_mediaKeysStorageDirectory; }
+    const WTF::String& mediaKeysStorageDirectory() const { return m_mediaKeysStorageDirectory; }
     void setMediaKeysStorageDirectory(const WTF::String& mediaKeysStorageDirectory) { m_mediaKeysStorageDirectory = mediaKeysStorageDirectory; }
 
     const Vector<WTF::String>& cachePartitionedURLSchemes() { return m_cachePartitionedURLSchemes; }
     void setCachePartitionedURLSchemes(Vector<WTF::String>&& cachePartitionedURLSchemes) { m_cachePartitionedURLSchemes = WTF::move(cachePartitionedURLSchemes); }
 
 private:
+    bool m_shouldHaveLegacyDataStore { false };
+
     WebKit::ProcessModel m_processModel { WebKit::ProcessModelMultipleSecondaryProcesses };
     bool m_useNetworkProcess { true };
     unsigned m_maximumProcessCount { 0 };
     WebKit::CacheModel m_cacheModel { WebKit::CacheModelPrimaryWebBrowser };
-    WTF::String m_injectedBundlePath;
+    int64_t m_diskCacheSizeOverride { -1 };
+
+    WTF::String m_applicationCacheDirectory;
+    WTF::String m_diskCacheDirectory;
     WTF::String m_indexedDBDatabaseDirectory;
+    WTF::String m_injectedBundlePath;
     WTF::String m_localStorageDirectory;
     WTF::String m_webSQLDatabaseDirectory;
     WTF::String m_mediaKeysStorageDirectory;

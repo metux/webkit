@@ -27,13 +27,14 @@
 
 #include "DashArray.h"
 #include "Font.h"
+#include "FontCascadeFonts.h"
 #include "FontDescription.h"
-#include "FontGlyphs.h"
 #include "Path.h"
-#include "TextDirection.h"
+#include "TextFlags.h"
 #include "TypesettingFeatures.h"
 #include <wtf/HashMap.h>
 #include <wtf/HashSet.h>
+#include <wtf/WeakPtr.h>
 #include <wtf/unicode/CharacterNames.h>
 
 // "X11/X.h" defines Complex to 0 and conflicts
@@ -106,18 +107,17 @@ public:
 };
 GlyphToPathTranslator::GlyphUnderlineType computeUnderlineType(const TextRun&, const GlyphBuffer&, int index);
 
+class TextLayoutDeleter {
+public:
+    void operator()(TextLayout*) const;
+};
+
 class FontCascade {
 public:
     WEBCORE_EXPORT FontCascade();
     WEBCORE_EXPORT FontCascade(const FontDescription&, float letterSpacing, float wordSpacing);
     // This constructor is only used if the platform wants to start with a native font.
     WEBCORE_EXPORT FontCascade(const FontPlatformData&, FontSmoothingMode = AutoSmoothing);
-
-    // FIXME: We should make this constructor platform-independent.
-#if PLATFORM(IOS)
-    FontCascade(const FontPlatformData&, PassRefPtr<FontSelector>);
-#endif
-    ~FontCascade();
 
     FontCascade(const FontCascade&);
     WEBCORE_EXPORT FontCascade& operator=(const FontCascade&);
@@ -130,7 +130,7 @@ public:
     int pixelSize() const { return fontDescription().computedPixelSize(); }
     float size() const { return fontDescription().computedSize(); }
 
-    void update(PassRefPtr<FontSelector>) const;
+    void update(RefPtr<FontSelector>&&) const;
 
     enum CustomFontNotReadyAction { DoNotPaintIfFontNotReady, UseFallbackIfFontNotReady };
     WEBCORE_EXPORT float drawText(GraphicsContext*, const TextRun&, const FloatPoint&, int from = 0, int to = -1, CustomFontNotReadyAction = DoNotPaintIfFontNotReady) const;
@@ -142,8 +142,7 @@ public:
     WEBCORE_EXPORT float width(const TextRun&, HashSet<const Font*>* fallbackFonts = 0, GlyphOverflow* = 0) const;
     float width(const TextRun&, int& charsConsumed, String& glyphName) const;
 
-    PassOwnPtr<TextLayout> createLayout(RenderText*, float xPos, bool collapseWhiteSpace) const;
-    static void deleteLayout(TextLayout*);
+    std::unique_ptr<TextLayout, TextLayoutDeleter> createLayout(RenderText&, float xPos, bool collapseWhiteSpace) const;
     static float width(TextLayout&, unsigned from, unsigned len, HashSet<const Font*>* fallbackFonts = 0);
 
     int offsetForPosition(const TextRun&, float position, bool includePartialGlyphs) const;
@@ -169,7 +168,7 @@ public:
     FontWeight weight() const { return m_fontDescription.weight(); }
     FontWidthVariant widthVariant() const { return m_fontDescription.widthVariant(); }
 
-    bool isPlatformFont() const { return m_glyphs->isForPlatformFont(); }
+    bool isPlatformFont() const { return m_fonts->isForPlatformFont(); }
 
     const FontMetrics& fontMetrics() const { return primaryFont().fontMetrics(); }
     float spaceWidth() const { return primaryFont().spaceWidth() + m_letterSpacing; }
@@ -193,10 +192,19 @@ public:
     static bool isCJKIdeograph(UChar32);
     static bool isCJKIdeographOrSymbol(UChar32);
 
-    // BEWARE: If isAfterExpansion is true after this function call, then the returned value includes a trailing opportunity
-    // which may or may not actually be present. RenderBlockFlow::computeInlineDirectionPositionsForSegment() compensates
-    // for this by decrementing the returned value if isAfterExpansion is true at the end of a line.
-    static unsigned expansionOpportunityCount(const StringView&, TextDirection, bool& isAfterExpansion);
+    // Returns (the number of opportunities, whether the last expansion is a trailing expansion)
+    // If there are no opportunities, the bool will be true iff we are forbidding leading expansions.
+    static std::pair<unsigned, bool> expansionOpportunityCount(const StringView&, TextDirection, ExpansionBehavior);
+
+    // Whether or not there is an expansion opportunity just before the first character
+    // Note that this does not take a isAfterExpansion flag; this assumes that isAfterExpansion is false
+    // Here, "Leading" and "Trailing" are relevant after the line has been rearranged for bidi.
+    // ("Leading" means "left" and "Trailing" means "right.")
+    static bool leadingExpansionOpportunity(const StringView&, TextDirection);
+    static bool trailingExpansionOpportunity(const StringView&, TextDirection);
+
+    WEBCORE_EXPORT static void setAntialiasedFontDilationEnabled(bool);
+    WEBCORE_EXPORT static bool antialiasedFontDilationEnabled();
 
     WEBCORE_EXPORT static void setShouldUseSmoothing(bool);
     WEBCORE_EXPORT static bool shouldUseSmoothing();
@@ -207,6 +215,8 @@ public:
     static CodePath characterRangeCodePath(const UChar*, unsigned len);
 
     bool primaryFontIsSystemFont() const;
+
+    WeakPtr<FontCascade> createWeakPtr() const { return m_weakPtrFactory.createWeakPtr(); }
 
 private:
     enum ForTextEmphasisOrNot { NotForTextEmphasis, ForTextEmphasis };
@@ -234,8 +244,8 @@ private:
     int offsetForPositionForComplexText(const TextRun&, float position, bool includePartialGlyphs) const;
     void adjustSelectionRectForComplexText(const TextRun&, LayoutRect& selectionRect, int from, int to) const;
 
-    static unsigned expansionOpportunityCountInternal(const LChar*, size_t length, TextDirection, bool& isAfterExpansion);
-    static unsigned expansionOpportunityCountInternal(const UChar*, size_t length, TextDirection, bool& isAfterExpansion);
+    static std::pair<unsigned, bool> expansionOpportunityCountInternal(const LChar*, size_t length, TextDirection, ExpansionBehavior);
+    static std::pair<unsigned, bool> expansionOpportunityCountInternal(const UChar*, size_t length, TextDirection, ExpansionBehavior);
 
     friend struct WidthIterator;
     friend class SVGTextRunRenderingContext;
@@ -285,7 +295,7 @@ public:
     static String normalizeSpaces(const UChar*, unsigned length);
 
     bool useBackslashAsYenSymbol() const { return m_useBackslashAsYenSymbol; }
-    FontGlyphs* glyphs() const { return m_glyphs.get(); }
+    FontCascadeFonts* fonts() const { return m_fonts.get(); }
 
 private:
     bool isLoadingCustomFonts() const;
@@ -335,43 +345,40 @@ private:
     static TypesettingFeatures s_defaultTypesettingFeatures;
 
     FontDescription m_fontDescription;
-    mutable RefPtr<FontGlyphs> m_glyphs;
+    mutable RefPtr<FontCascadeFonts> m_fonts;
+    WeakPtrFactory<FontCascade> m_weakPtrFactory;
     float m_letterSpacing;
     float m_wordSpacing;
     mutable bool m_useBackslashAsYenSymbol;
     mutable unsigned m_typesettingFeatures : 2; // (TypesettingFeatures) Caches values computed from m_fontDescription.
 };
 
-void invalidateFontGlyphsCache();
-void pruneUnreferencedEntriesFromFontGlyphsCache();
+void invalidateFontCascadeCache();
+void pruneUnreferencedEntriesFromFontCascadeCache();
 void pruneSystemFallbackFonts();
 void clearWidthCaches();
 
-inline FontCascade::~FontCascade()
-{
-}
-
 inline const Font& FontCascade::primaryFont() const
 {
-    ASSERT(m_glyphs);
-    return m_glyphs->primaryFont(m_fontDescription);
+    ASSERT(m_fonts);
+    return m_fonts->primaryFont(m_fontDescription);
 }
 
 inline const FontRanges& FontCascade::fallbackRangesAt(unsigned index) const
 {
-    ASSERT(m_glyphs);
-    return m_glyphs->realizeFallbackRangesAt(m_fontDescription, index);
+    ASSERT(m_fonts);
+    return m_fonts->realizeFallbackRangesAt(m_fontDescription, index);
 }
 
 inline bool FontCascade::isFixedPitch() const
 {
-    ASSERT(m_glyphs);
-    return m_glyphs->isFixedPitch(m_fontDescription);
+    ASSERT(m_fonts);
+    return m_fonts->isFixedPitch(m_fontDescription);
 }
 
 inline FontSelector* FontCascade::fontSelector() const
 {
-    return m_glyphs ? m_glyphs->fontSelector() : 0;
+    return m_fonts ? m_fonts->fontSelector() : 0;
 }
 
 inline float FontCascade::tabWidth(const Font& font, unsigned tabSize, float position) const
@@ -382,12 +389,6 @@ inline float FontCascade::tabWidth(const Font& font, unsigned tabSize, float pos
     float tabDeltaWidth = tabWidth - fmodf(position, tabWidth);
     return (tabDeltaWidth < font.spaceWidth() / 2) ? tabWidth : tabDeltaWidth;
 }
-
-}
-
-namespace WTF {
-
-template <> void deleteOwnedPtr<WebCore::TextLayout>(WebCore::TextLayout*);
 
 }
 

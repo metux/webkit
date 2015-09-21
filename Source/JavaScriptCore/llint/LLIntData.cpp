@@ -153,7 +153,7 @@ void Data::performAssertions(VM& vm)
     
     ASSERT(ResolveModeAndType::mask == 0xffff);
 
-    ASSERT(MarkedBlock::blockMask == ~static_cast<decltype(MarkedBlock::blockMask)>(0xffff));
+    ASSERT(MarkedBlock::blockMask == ~static_cast<decltype(MarkedBlock::blockMask)>(0x3fff));
 
     // FIXME: make these assertions less horrible.
 #if !ASSERT_DISABLED
@@ -163,7 +163,7 @@ void Data::performAssertions(VM& vm)
     ASSERT(bitwise_cast<int**>(&testVector)[0] == testVector.begin());
 #endif
 
-    ASSERT(StringImpl::s_hashFlag8BitBuffer == 32);
+    ASSERT(StringImpl::s_hashFlag8BitBuffer == 8);
 }
 #if COMPILER(CLANG)
 #pragma clang diagnostic pop

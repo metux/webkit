@@ -28,35 +28,56 @@
 
 #include "WebProcessLifetimeObserver.h"
 #include "WebsiteDataTypes.h"
+#include <WebCore/SecurityOriginHash.h>
 #include <WebCore/SessionID.h>
 #include <functional>
 #include <wtf/HashSet.h>
 #include <wtf/RefCounted.h>
 #include <wtf/RefPtr.h>
+#include <wtf/WorkQueue.h>
 #include <wtf/text/WTFString.h>
+
+namespace WebCore {
+class SecurityOrigin;
+}
 
 namespace WebKit {
 
 class StorageManager;
 class WebPageProxy;
+class WebProcessPool;
+struct WebsiteDataRecord;
+
+#if ENABLE(NETSCAPE_PLUGIN_API)
+struct PluginModuleInfo;
+#endif
 
 class WebsiteDataStore : public RefCounted<WebsiteDataStore>, public WebProcessLifetimeObserver {
 public:
     struct Configuration {
+        String networkCacheDirectory;
+        String applicationCacheDirectory;
+
+        String webSQLDatabaseDirectory;
         String localStorageDirectory;
+        String mediaKeysStorageDirectory;
     };
-    static RefPtr<WebsiteDataStore> createNonPersistent();
-    static RefPtr<WebsiteDataStore> create(Configuration);
+    static Ref<WebsiteDataStore> createNonPersistent();
+    static Ref<WebsiteDataStore> create(Configuration);
     virtual ~WebsiteDataStore();
 
     uint64_t identifier() const { return m_identifier; }
 
-    bool isNonPersistent() const { return m_sessionID.isEphemeral(); }
+    bool isPersistent() const { return !m_sessionID.isEphemeral(); }
     WebCore::SessionID sessionID() const { return m_sessionID; }
 
     static void cloneSessionData(WebPageProxy& sourcePage, WebPageProxy& newPage);
 
+    void fetchData(WebsiteDataTypes, std::function<void (Vector<WebsiteDataRecord>)> completionHandler);
     void removeData(WebsiteDataTypes, std::chrono::system_clock::time_point modifiedSince, std::function<void ()> completionHandler);
+    void removeData(WebsiteDataTypes, const Vector<WebsiteDataRecord>&, std::function<void ()> completionHandler);
+
+    StorageManager* storageManager() { return m_storageManager.get(); }
 
 private:
     explicit WebsiteDataStore(WebCore::SessionID);
@@ -70,10 +91,30 @@ private:
     virtual void webPageDidCloseConnection(WebPageProxy&, IPC::Connection&) override;
     virtual void webProcessDidCloseConnection(WebProcessProxy&, IPC::Connection&) override;
 
+    void platformInitialize();
+    void platformDestroy();
+
+    HashSet<RefPtr<WebProcessPool>> processPools() const;
+
+#if ENABLE(NETSCAPE_PLUGIN_API)
+    Vector<PluginModuleInfo> plugins() const;
+#endif
+
+    static Vector<RefPtr<WebCore::SecurityOrigin>> mediaKeyOrigins(const String& mediaKeysStorageDirectory);
+    static void removeMediaKeys(const String& mediaKeysStorageDirectory, std::chrono::system_clock::time_point modifiedSince);
+    static void removeMediaKeys(const String& mediaKeysStorageDirectory, const HashSet<RefPtr<WebCore::SecurityOrigin>>&);
+
     const uint64_t m_identifier;
     const WebCore::SessionID m_sessionID;
 
+    const String m_networkCacheDirectory;
+    const String m_applicationCacheDirectory;
+
+    const String m_webSQLDatabaseDirectory;
+    const String m_mediaKeysStorageDirectory;
     const RefPtr<StorageManager> m_storageManager;
+
+    Ref<WorkQueue> m_queue;
 };
 
 }

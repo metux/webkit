@@ -601,7 +601,11 @@ void TestRunner::overridePreference(JSStringRef preference, JSStringRef value)
 
 void TestRunner::setAlwaysAcceptCookies(bool accept)
 {
-    WKBundleSetAlwaysAcceptCookies(InjectedBundle::singleton().bundle(), accept);
+    WKRetainPtr<WKStringRef> messageName(AdoptWK, WKStringCreateWithUTF8CString("SetAlwaysAcceptCookies"));
+
+    WKRetainPtr<WKBooleanRef> messageBody(AdoptWK, WKBooleanCreate(accept));
+
+    WKBundlePostSynchronousMessage(InjectedBundle::singleton().bundle(), messageName.get(), messageBody.get(), 0);
 }
 
 double TestRunner::preciseTime()
@@ -641,12 +645,12 @@ void TestRunner::setTabKeyCyclesThroughElements(bool enabled)
 
 void TestRunner::setSerializeHTTPLoads()
 {
-    WKBundleSetSerialLoadingEnabled(InjectedBundle::singleton().bundle(), true);
+    // WK2 doesn't reorder loads.
 }
 
 void TestRunner::dispatchPendingLoadRequests()
 {
-    WKBundleDispatchPendingLoadRequests(InjectedBundle::singleton().bundle());
+    // WK2 doesn't keep pending requests.
 }
 
 void TestRunner::setCacheModel(int model)
@@ -693,6 +697,11 @@ void TestRunner::setGeolocationPermission(bool enabled)
 {
     // FIXME: this should be done by frame.
     InjectedBundle::singleton().setGeolocationPermission(enabled);
+}
+
+bool TestRunner::isGeolocationProviderActive()
+{
+    return InjectedBundle::singleton().isGeolocationProviderActive();
 }
 
 void TestRunner::setMockGeolocationPosition(double latitude, double longitude, double accuracy, JSValueRef jsAltitude, JSValueRef jsAltitudeAccuracy, JSValueRef jsHeading, JSValueRef jsSpeed)
@@ -760,14 +769,14 @@ void TestRunner::queueForwardNavigation(unsigned howFarForward)
     InjectedBundle::singleton().queueForwardNavigation(howFarForward);
 }
 
-void TestRunner::queueLoad(JSStringRef url, JSStringRef target)
+void TestRunner::queueLoad(JSStringRef url, JSStringRef target, bool shouldOpenExternalURLs)
 {
     auto& injectedBundle = InjectedBundle::singleton();
     WKRetainPtr<WKURLRef> baseURLWK(AdoptWK, WKBundleFrameCopyURL(WKBundlePageGetMainFrame(injectedBundle.page()->page())));
     WKRetainPtr<WKURLRef> urlWK(AdoptWK, WKURLCreateWithBaseURL(baseURLWK.get(), toWTFString(toWK(url)).utf8().data()));
     WKRetainPtr<WKStringRef> urlStringWK(AdoptWK, WKURLCopyString(urlWK.get()));
 
-    injectedBundle.queueLoad(urlStringWK.get(), toWK(target).get());
+    injectedBundle.queueLoad(urlStringWK.get(), toWK(target).get(), shouldOpenExternalURLs);
 }
 
 void TestRunner::queueLoadHTMLString(JSStringRef content, JSStringRef baseURL, JSStringRef unreachableURL)
@@ -800,21 +809,21 @@ void TestRunner::setHandlesAuthenticationChallenges(bool handlesAuthenticationCh
 {
     WKRetainPtr<WKStringRef> messageName(AdoptWK, WKStringCreateWithUTF8CString("SetHandlesAuthenticationChallenge"));
     WKRetainPtr<WKBooleanRef> messageBody(AdoptWK, WKBooleanCreate(handlesAuthenticationChallenges));
-    WKBundlePostMessage(InjectedBundle::singleton().bundle(), messageName.get(), messageBody.get());
+    WKBundlePagePostMessage(InjectedBundle::singleton().page()->page(), messageName.get(), messageBody.get());
 }
 
 void TestRunner::setAuthenticationUsername(JSStringRef username)
 {
     WKRetainPtr<WKStringRef> messageName(AdoptWK, WKStringCreateWithUTF8CString("SetAuthenticationUsername"));
     WKRetainPtr<WKStringRef> messageBody(AdoptWK, WKStringCreateWithJSString(username));
-    WKBundlePostMessage(InjectedBundle::singleton().bundle(), messageName.get(), messageBody.get());
+    WKBundlePagePostMessage(InjectedBundle::singleton().page()->page(), messageName.get(), messageBody.get());
 }
 
 void TestRunner::setAuthenticationPassword(JSStringRef password)
 {
     WKRetainPtr<WKStringRef> messageName(AdoptWK, WKStringCreateWithUTF8CString("SetAuthenticationPassword"));
     WKRetainPtr<WKStringRef> messageBody(AdoptWK, WKStringCreateWithJSString(password));
-    WKBundlePostMessage(InjectedBundle::singleton().bundle(), messageName.get(), messageBody.get());
+    WKBundlePagePostMessage(InjectedBundle::singleton().page()->page(), messageName.get(), messageBody.get());
 }
 
 bool TestRunner::secureEventInputIsEnabled() const
@@ -822,7 +831,7 @@ bool TestRunner::secureEventInputIsEnabled() const
     WKRetainPtr<WKStringRef> messageName(AdoptWK, WKStringCreateWithUTF8CString("SecureEventInputIsEnabled"));
     WKTypeRef returnData = 0;
 
-    WKBundlePostSynchronousMessage(InjectedBundle::singleton().bundle(), messageName.get(), 0, &returnData);
+    WKBundlePagePostSynchronousMessage(InjectedBundle::singleton().page()->page(), messageName.get(), 0, &returnData);
     return WKBooleanGetValue(static_cast<WKBooleanRef>(returnData));
 }
 
@@ -830,7 +839,7 @@ void TestRunner::setBlockAllPlugins(bool shouldBlock)
 {
     WKRetainPtr<WKStringRef> messageName(AdoptWK, WKStringCreateWithUTF8CString("SetBlockAllPlugins"));
     WKRetainPtr<WKBooleanRef> messageBody(AdoptWK, WKBooleanCreate(shouldBlock));
-    WKBundlePostMessage(InjectedBundle::singleton().bundle(), messageName.get(), messageBody.get());
+    WKBundlePagePostMessage(InjectedBundle::singleton().page()->page(), messageName.get(), messageBody.get());
 }
 
 JSValueRef TestRunner::numberOfDFGCompiles(JSValueRef theFunction)

@@ -40,7 +40,7 @@ class WheelEventDeltaTracker;
 
 class MainFrame final : public Frame {
 public:
-    static RefPtr<MainFrame> create(Page&, PageConfiguration&);
+    static Ref<MainFrame> create(Page&, PageConfiguration&);
 
     virtual ~MainFrame();
 
@@ -76,6 +76,7 @@ private:
     std::unique_ptr<ServicesOverlayController> m_servicesOverlayController;
 #endif
 #endif
+
     std::unique_ptr<WheelEventDeltaTracker> m_recentWheelEventDeltaTracker;
     std::unique_ptr<PageOverlayController> m_pageOverlayController;
     DiagnosticLoggingClient* m_diagnosticLoggingClient;

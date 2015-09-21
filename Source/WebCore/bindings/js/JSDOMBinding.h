@@ -35,6 +35,7 @@
 #include <heap/Weak.h>
 #include <heap/WeakInlines.h>
 #include <runtime/Error.h>
+#include <runtime/IteratorOperations.h>
 #include <runtime/JSArray.h>
 #include <runtime/JSArrayBuffer.h>
 #include <runtime/JSCJSValueInlines.h>
@@ -84,15 +85,16 @@ WEBCORE_EXPORT JSC::EncodedJSValue throwThisTypeError(JSC::ExecState&, const cha
 
 // Base class for all constructor objects in the JSC bindings.
 class DOMConstructorObject : public JSDOMWrapper {
-    typedef JSDOMWrapper Base;
 public:
+    typedef JSDOMWrapper Base;
+    static const unsigned StructureFlags = Base::StructureFlags | JSC::ImplementsHasInstance;
+
     static JSC::Structure* createStructure(JSC::VM& vm, JSC::JSGlobalObject* globalObject, JSC::JSValue prototype)
     {
         return JSC::Structure::create(vm, globalObject, prototype, JSC::TypeInfo(JSC::ObjectType, StructureFlags), info());
     }
 
 protected:
-    static const unsigned StructureFlags = JSC::ImplementsHasInstance | JSDOMWrapper::StructureFlags;
     DOMConstructorObject(JSC::Structure* structure, JSDOMGlobalObject* globalObject)
         : JSDOMWrapper(structure, globalObject)
     {
@@ -210,7 +212,7 @@ template<typename WrapperClass, typename DOMClass> inline JSDOMWrapper* createWr
 {
     ASSERT(node);
     ASSERT(!getCachedWrapper(globalObject->world(), node));
-    WrapperClass* wrapper = WrapperClass::create(getDOMStructure<WrapperClass>(globalObject->vm(), globalObject), globalObject, *node);
+    WrapperClass* wrapper = WrapperClass::create(getDOMStructure<WrapperClass>(globalObject->vm(), globalObject), globalObject, Ref<DOMClass>(*node));
     cacheWrapper(globalObject->world(), node, wrapper);
     return wrapper;
 }
@@ -237,18 +239,15 @@ template<typename WrapperClass, typename DOMClass> inline JSC::JSValue createNew
     return createWrapper<WrapperClass>(globalObject, domObject);
 }
 
-inline JSC::JSValue argumentOrNull(JSC::ExecState* exec, unsigned index)
-{
-    return index >= exec->argumentCount() ? JSC::JSValue() : exec->argument(index);
-}
-
 void addImpureProperty(const AtomicString&);
 
 const JSC::HashTable& getHashTableForGlobalData(JSC::VM&, const JSC::HashTable& staticTable);
 
 WEBCORE_EXPORT void reportException(JSC::ExecState*, JSC::JSValue exception, CachedScript* = nullptr);
+WEBCORE_EXPORT void reportException(JSC::ExecState*, JSC::Exception*, CachedScript* = nullptr);
 void reportCurrentException(JSC::ExecState*);
 
+JSC::JSValue createDOMException(JSC::ExecState*, ExceptionCode);
 // Convert a DOM implementation exception code into a JavaScript exception in the execution state.
 WEBCORE_EXPORT void setDOMException(JSC::ExecState*, ExceptionCode);
 
@@ -316,6 +315,8 @@ inline uint32_t toUInt32(JSC::ExecState* exec, JSC::JSValue value, IntegerConver
 WEBCORE_EXPORT int64_t toInt64(JSC::ExecState*, JSC::JSValue, IntegerConversionConfiguration);
 WEBCORE_EXPORT uint64_t toUInt64(JSC::ExecState*, JSC::JSValue, IntegerConversionConfiguration);
 
+// Returns a Date instnace for the specified value, or NaN if the date is not a number.
+JSC::JSValue jsDateOrNaN(JSC::ExecState*, double);
 // Returns a Date instance for the specified value, or null if the value is NaN or infinity.
 JSC::JSValue jsDateOrNull(JSC::ExecState*, double);
 // NaN if the value can't be converted to a date.
@@ -396,6 +397,21 @@ inline JSC::JSValue toJS(JSC::ExecState* exec, JSDOMGlobalObject*, const String&
     return jsStringOrNull(exec, value);
 }
 
+inline JSC::JSValue toJSIterator(JSC::ExecState& state, JSDOMGlobalObject&, JSC::JSValue value)
+{
+    return createIteratorResultObject(&state, value, false);
+}
+
+template<typename T> inline JSC::JSValue toJSIterator(JSC::ExecState& state, JSDOMGlobalObject& globalObject, const T& value)
+{
+    return createIteratorResultObject(&state, toJS(&state, &globalObject, value), false);
+}
+
+inline JSC::JSValue toJSIteratorEnd(JSC::ExecState& state)
+{
+    return createIteratorResultObject(&state, JSC::jsUndefined(), true);
+}
+
 template<typename T> struct JSValueTraits {
     static JSC::JSValue arrayJSValue(JSC::ExecState* exec, JSDOMGlobalObject* globalObject, const T& value)
     {
@@ -449,15 +465,15 @@ inline PassRefPtr<JSC::ArrayBufferView> toArrayBufferView(JSC::JSValue value)
     return wrapper->impl();
 }
 
-inline PassRefPtr<JSC::Int8Array> toInt8Array(JSC::JSValue value) { return JSC::toNativeTypedView<JSC::Int8Adaptor>(value); }
-inline PassRefPtr<JSC::Int16Array> toInt16Array(JSC::JSValue value) { return JSC::toNativeTypedView<JSC::Int16Adaptor>(value); }
-inline PassRefPtr<JSC::Int32Array> toInt32Array(JSC::JSValue value) { return JSC::toNativeTypedView<JSC::Int32Adaptor>(value); }
-inline PassRefPtr<JSC::Uint8Array> toUint8Array(JSC::JSValue value) { return JSC::toNativeTypedView<JSC::Uint8Adaptor>(value); }
-inline PassRefPtr<JSC::Uint8ClampedArray> toUint8ClampedArray(JSC::JSValue value) { return JSC::toNativeTypedView<JSC::Uint8ClampedAdaptor>(value); }
-inline PassRefPtr<JSC::Uint16Array> toUint16Array(JSC::JSValue value) { return JSC::toNativeTypedView<JSC::Uint16Adaptor>(value); }
-inline PassRefPtr<JSC::Uint32Array> toUint32Array(JSC::JSValue value) { return JSC::toNativeTypedView<JSC::Uint32Adaptor>(value); }
-inline PassRefPtr<JSC::Float32Array> toFloat32Array(JSC::JSValue value) { return JSC::toNativeTypedView<JSC::Float32Adaptor>(value); }
-inline PassRefPtr<JSC::Float64Array> toFloat64Array(JSC::JSValue value) { return JSC::toNativeTypedView<JSC::Float64Adaptor>(value); }
+inline RefPtr<JSC::Int8Array> toInt8Array(JSC::JSValue value) { return JSC::toNativeTypedView<JSC::Int8Adaptor>(value); }
+inline RefPtr<JSC::Int16Array> toInt16Array(JSC::JSValue value) { return JSC::toNativeTypedView<JSC::Int16Adaptor>(value); }
+inline RefPtr<JSC::Int32Array> toInt32Array(JSC::JSValue value) { return JSC::toNativeTypedView<JSC::Int32Adaptor>(value); }
+inline RefPtr<JSC::Uint8Array> toUint8Array(JSC::JSValue value) { return JSC::toNativeTypedView<JSC::Uint8Adaptor>(value); }
+inline RefPtr<JSC::Uint8ClampedArray> toUint8ClampedArray(JSC::JSValue value) { return JSC::toNativeTypedView<JSC::Uint8ClampedAdaptor>(value); }
+inline RefPtr<JSC::Uint16Array> toUint16Array(JSC::JSValue value) { return JSC::toNativeTypedView<JSC::Uint16Adaptor>(value); }
+inline RefPtr<JSC::Uint32Array> toUint32Array(JSC::JSValue value) { return JSC::toNativeTypedView<JSC::Uint32Adaptor>(value); }
+inline RefPtr<JSC::Float32Array> toFloat32Array(JSC::JSValue value) { return JSC::toNativeTypedView<JSC::Float32Adaptor>(value); }
+inline RefPtr<JSC::Float64Array> toFloat64Array(JSC::JSValue value) { return JSC::toNativeTypedView<JSC::Float64Adaptor>(value); }
 
 template<typename T> struct NativeValueTraits;
 
@@ -487,6 +503,14 @@ template<> struct NativeValueTraits<float> {
     static inline bool nativeValue(JSC::ExecState* exec, JSC::JSValue jsValue, float& indexedValue)
     {
         indexedValue = jsValue.toFloat(exec);
+        return !exec->hadException();
+    }
+};
+
+template<> struct NativeValueTraits<double> {
+    static inline bool nativeValue(JSC::ExecState* exec, JSC::JSValue jsValue, double& indexedValue)
+    {
+        indexedValue = jsValue.toNumber(exec);
         return !exec->hadException();
     }
 };
@@ -566,12 +590,13 @@ JSC::EncodedJSValue objectToStringFunctionGetter(JSC::ExecState*, JSC::JSObject*
 
 inline String propertyNameToString(JSC::PropertyName propertyName)
 {
-    return propertyName.publicName();
+    ASSERT(!propertyName.isSymbol());
+    return propertyName.uid() ? propertyName.uid() : propertyName.publicName();
 }
 
 inline AtomicString propertyNameToAtomicString(JSC::PropertyName propertyName)
 {
-    return AtomicString(propertyName.publicName());
+    return AtomicString(propertyName.uid() ? propertyName.uid() : propertyName.publicName());
 }
 
 template<typename DOMClass> inline const JSC::HashTableValue* getStaticValueSlotEntryWithoutCaching(JSC::ExecState* exec, JSC::PropertyName propertyName)
@@ -607,6 +632,17 @@ public:
     static bool shouldAllowAccessToDOMWindow(JSC::ExecState*, DOMWindow&, SecurityReportingOption = ReportSecurityError);
     static bool shouldAllowAccessToFrame(JSC::ExecState*, Frame*, SecurityReportingOption = ReportSecurityError);
 };
+
+inline JSC::JSValue getPropertyFromObject(JSC::ExecState& exec, JSC::JSObject& object, const char* identifier)
+{
+    return object.get(&exec, JSC::Identifier::fromString(&exec, identifier));
+}
+
+inline void setPropertyToObject(JSC::ExecState& exec, JSC::JSObject& object, const char* name, JSC::JSValue value)
+{
+    JSC::PutPropertySlot propertySlot(&object);
+    JSC::JSObject::put(&object, &exec, JSC::Identifier::fromString(&exec, name), value, propertySlot);
+}
     
 } // namespace WebCore
 

@@ -28,7 +28,7 @@
 #include "config.h"
 #include "SharedTimer.h"
 
-#include <wtf/gobject/GMainLoopSource.h>
+#include <wtf/glib/GMainLoopSource.h>
 
 namespace WebCore {
 
@@ -55,6 +55,10 @@ void setSharedTimerFireInterval(double interval)
 void stopSharedTimer()
 {
     gSharedTimer.cancel();
+}
+
+void invalidateSharedTimer()
+{
 }
 
 }

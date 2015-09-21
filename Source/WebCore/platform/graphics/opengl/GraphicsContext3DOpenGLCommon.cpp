@@ -28,7 +28,7 @@
 
 #include "config.h"
 
-#if USE(3D_GRAPHICS)
+#if ENABLE(GRAPHICS_CONTEXT_3D)
 
 #include "GraphicsContext3D.h"
 #if PLATFORM(IOS)
@@ -48,6 +48,7 @@
 #include "IntSize.h"
 #include "Logging.h"
 #include "TemporaryOpenGLSetting.h"
+#include "WebGLRenderingContextBase.h"
 #include <cstring>
 #include <runtime/ArrayBuffer.h>
 #include <runtime/ArrayBufferView.h>
@@ -75,9 +76,24 @@
 #endif
 #endif
 
+
 namespace WebCore {
 
-static ShaderNameHash* currentNameHashMapForShader = nullptr;
+static ThreadSpecific<ShaderNameHash*>& getCurrentNameHashMapForShader()
+{
+    static std::once_flag onceFlag;
+    static ThreadSpecific<ShaderNameHash*>* sharedNameHash;
+    std::call_once(onceFlag, [] {
+        sharedNameHash = new ThreadSpecific<ShaderNameHash*>;
+    });
+
+    return *sharedNameHash;
+}
+
+static void setCurrentNameHashMapForShader(ShaderNameHash* shaderNameHash)
+{
+    *getCurrentNameHashMapForShader() = shaderNameHash;
+}
 
 // Hash function used by the ANGLE translator/compiler to do
 // symbol name mangling. Since this is a static method, before
@@ -92,11 +108,10 @@ static uint64_t nameHashForShader(const char* name, size_t length)
     CString nameAsCString = CString(name);
 
     // Look up name in our local map.
-    if (currentNameHashMapForShader) {
-        ShaderNameHash::iterator result = currentNameHashMapForShader->find(nameAsCString);
-        if (result != currentNameHashMapForShader->end())
-            return result->value;
-    }
+    ShaderNameHash*& currentNameHashMapForShader = *getCurrentNameHashMapForShader();
+    ShaderNameHash::iterator findResult = currentNameHashMapForShader->find(nameAsCString);
+    if (findResult != currentNameHashMapForShader->end())
+        return findResult->value;
 
     unsigned hashValue = nameAsCString.hash();
 
@@ -143,7 +158,7 @@ bool GraphicsContext3D::isResourceSafe()
     return false;
 }
 
-void GraphicsContext3D::paintRenderingResultsToCanvas(ImageBuffer* imageBuffer, DrawingBuffer*)
+void GraphicsContext3D::paintRenderingResultsToCanvas(ImageBuffer* imageBuffer)
 {
     int rowBytes = m_currentWidth * 4;
     int totalBytes = rowBytes * m_currentHeight;
@@ -182,7 +197,7 @@ bool GraphicsContext3D::paintCompositedResultsToCanvas(ImageBuffer*)
     return false;
 }
 
-PassRefPtr<ImageData> GraphicsContext3D::paintRenderingResultsToImageData(DrawingBuffer*)
+PassRefPtr<ImageData> GraphicsContext3D::paintRenderingResultsToImageData()
 {
     // Reading premultiplied alpha would involve unpremultiplying, which is
     // lossy.
@@ -357,7 +372,7 @@ bool GraphicsContext3D::checkVaryingsPacking(Platform3DObject vertexShader, Plat
         const auto& fragmentSymbol = fragmentEntry.varyingMap.find(symbolName);
         if (fragmentSymbol != fragmentEntry.varyingMap.end()) {
             ShVariableInfo symbolInfo;
-            symbolInfo.type = static_cast<ShDataType>((fragmentSymbol->value).type);
+            symbolInfo.type = (fragmentSymbol->value).type;
             // The arrays are already split up.
             symbolInfo.size = (fragmentSymbol->value).size;
             combinedVaryings.add(symbolName, symbolInfo);
@@ -395,7 +410,7 @@ bool GraphicsContext3D::precisionsMatch(Platform3DObject vertexShader, Platform3
     const auto& vertexEntry = m_shaderSourceMap.find(vertexShader)->value;
     const auto& fragmentEntry = m_shaderSourceMap.find(fragmentShader)->value;
 
-    HashMap<String, ShPrecisionType> vertexSymbolPrecisionMap;
+    HashMap<String, sh::GLenum> vertexSymbolPrecisionMap;
 
     for (const auto& entry : vertexEntry.uniformMap)
         vertexSymbolPrecisionMap.add(entry.value.mappedName, entry.value.precision);
@@ -567,14 +582,14 @@ void GraphicsContext3D::compileShader(Platform3DObject shader)
 
     if (!nameHashMapForShaders)
         nameHashMapForShaders = std::make_unique<ShaderNameHash>();
-    currentNameHashMapForShader = nameHashMapForShaders.get();
+    setCurrentNameHashMapForShader(nameHashMapForShaders.get());
     m_compiler.setResources(ANGLEResources);
 
     String translatedShaderSource = m_extensions->getTranslatedShaderSourceANGLE(shader);
 
     ANGLEResources.HashFunction = previousHashFunction;
     m_compiler.setResources(ANGLEResources);
-    currentNameHashMapForShader = nullptr;
+    setCurrentNameHashMapForShader(nullptr);
 
     if (!translatedShaderSource.length())
         return;
@@ -683,12 +698,14 @@ void GraphicsContext3D::drawArrays(GC3Denum mode, GC3Dint first, GC3Dsizei count
 {
     makeContextCurrent();
     ::glDrawArrays(mode, first, count);
+    checkGPUStatusIfNecessary();
 }
 
 void GraphicsContext3D::drawElements(GC3Denum mode, GC3Dsizei count, GC3Denum type, GC3Dintptr offset)
 {
     makeContextCurrent();
     ::glDrawElements(mode, count, type, reinterpret_cast<GLvoid*>(static_cast<intptr_t>(offset)));
+    checkGPUStatusIfNecessary();
 }
 
 void GraphicsContext3D::enable(GC3Denum cap)
@@ -847,7 +864,7 @@ static String generateHashedName(const String& name)
         return name;
     uint64_t number = nameHashForShader(name.utf8().data(), name.length());
     StringBuilder builder;
-    builder.append("webgl_");
+    builder.appendLiteral("webgl_");
     appendUnsigned64AsHex(number, builder, Lowercase);
     return builder.toString();
 }
@@ -874,11 +891,11 @@ String GraphicsContext3D::mappedSymbolName(Platform3DObject program, ANGLEShader
         // and aren't even required to be used in any shader program.
         if (!nameHashMapForShaders)
             nameHashMapForShaders = std::make_unique<ShaderNameHash>();
-        currentNameHashMapForShader = nameHashMapForShaders.get();
+        setCurrentNameHashMapForShader(nameHashMapForShaders.get());
 
         String generatedName = generateHashedName(name);
 
-        currentNameHashMapForShader = nullptr;
+        setCurrentNameHashMapForShader(nullptr);
 
         m_possiblyUnusedAttributeMap.set(generatedName, name);
 
@@ -1353,6 +1370,57 @@ void GraphicsContext3D::viewport(GC3Dint x, GC3Dint y, GC3Dsizei width, GC3Dsize
     ::glViewport(x, y, width, height);
 }
 
+Platform3DObject GraphicsContext3D::createVertexArray()
+{
+    makeContextCurrent();
+    GLuint array = 0;
+#if !USE(OPENGL_ES_2) && (PLATFORM(GTK) || PLATFORM(EFL) || PLATFORM(WIN) || PLATFORM(IOS))
+    glGenVertexArrays(1, &array);
+#elif defined(GL_APPLE_vertex_array_object) && GL_APPLE_vertex_array_object
+    glGenVertexArraysAPPLE(1, &array);
+#endif
+    return array;
+}
+
+void GraphicsContext3D::deleteVertexArray(Platform3DObject array)
+{
+    if (!array)
+        return;
+    
+    makeContextCurrent();
+#if !USE(OPENGL_ES_2) && (PLATFORM(GTK) || PLATFORM(EFL) || PLATFORM(WIN) || PLATFORM(IOS))
+    glDeleteVertexArrays(1, &array);
+#elif defined(GL_APPLE_vertex_array_object) && GL_APPLE_vertex_array_object
+    glDeleteVertexArraysAPPLE(1, &array);
+#endif
+}
+
+GC3Dboolean GraphicsContext3D::isVertexArray(Platform3DObject array)
+{
+    if (!array)
+        return GL_FALSE;
+    
+    makeContextCurrent();
+#if !USE(OPENGL_ES_2) && (PLATFORM(GTK) || PLATFORM(EFL) || PLATFORM(WIN) || PLATFORM(IOS))
+    return glIsVertexArray(array);
+#elif defined(GL_APPLE_vertex_array_object) && GL_APPLE_vertex_array_object
+    return glIsVertexArrayAPPLE(array);
+#endif
+    return GL_FALSE;
+}
+
+void GraphicsContext3D::bindVertexArray(Platform3DObject array)
+{
+    makeContextCurrent();
+#if !USE(OPENGL_ES_2) && (PLATFORM(GTK) || PLATFORM(EFL) || PLATFORM(WIN) || PLATFORM(IOS))
+    glBindVertexArray(array);
+#elif defined(GL_APPLE_vertex_array_object) && GL_APPLE_vertex_array_object
+    glBindVertexArrayAPPLE(array);
+#else
+    UNUSED_PARAM(array);
+#endif
+}
+
 void GraphicsContext3D::getBooleanv(GC3Denum pname, GC3Dboolean* value)
 {
     makeContextCurrent();
@@ -1763,6 +1831,14 @@ bool GraphicsContext3D::layerComposited() const
     return m_layerComposited;
 }
 
+void GraphicsContext3D::forceContextLost()
+{
+#if ENABLE(WEBGL)
+    if (m_webglContext)
+        m_webglContext->forceLostContext(WebGLRenderingContextBase::RealLostContext);
+#endif
+}
+
 void GraphicsContext3D::texImage2DDirect(GC3Denum target, GC3Dint level, GC3Denum internalformat, GC3Dsizei width, GC3Dsizei height, GC3Dint border, GC3Denum format, GC3Denum type, const void* pixels)
 {
     makeContextCurrent();
@@ -1786,4 +1862,4 @@ void GraphicsContext3D::vertexAttribDivisor(GC3Duint index, GC3Duint divisor)
 
 }
 
-#endif // USE(3D_GRAPHICS)
+#endif // ENABLE(GRAPHICS_CONTEXT_3D)

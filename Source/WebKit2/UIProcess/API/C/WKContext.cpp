@@ -39,22 +39,17 @@
 #include "WKRetainPtr.h"
 #include "WebCertificateInfo.h"
 #include "WebIconDatabase.h"
-#include "WebPluginSiteDataManager.h"
 #include "WebProcessPool.h"
 #include <wtf/PassRefPtr.h>
 #include <wtf/RefPtr.h>
 #include <wtf/text/WTFString.h>
 
 // Supplements
-#include "WebApplicationCacheManagerProxy.h"
 #include "WebCookieManagerProxy.h"
 #include "WebDatabaseManagerProxy.h"
 #include "WebGeolocationManagerProxy.h"
-#include "WebKeyValueStorageManager.h"
 #include "WebMediaCacheManagerProxy.h"
 #include "WebNotificationManagerProxy.h"
-#include "WebOriginDataManagerProxy.h"
-#include "WebResourceCacheManagerProxy.h"
 #if ENABLE(BATTERY_STATUS)
 #include "WebBatteryManagerProxy.h"
 #endif
@@ -203,7 +198,7 @@ void WKContextSetDownloadClient(WKContextRef contextRef, const WKContextDownload
             if (!m_client.didReceiveResponse)
                 return;
 
-            m_client.didReceiveResponse(toAPI(processPool), toAPI(downloadProxy), toAPI(API::URLResponse::create(response).get()), m_client.base.clientInfo);
+            m_client.didReceiveResponse(toAPI(processPool), toAPI(downloadProxy), toAPI(API::URLResponse::create(response).ptr()), m_client.base.clientInfo);
         }
 
         virtual void didReceiveData(WebProcessPool* processPool, DownloadProxy* downloadProxy, uint64_t length) override
@@ -319,6 +314,11 @@ void WKContextAddVisitedLink(WKContextRef contextRef, WKStringRef visitedURL)
     toImpl(contextRef)->visitedLinkProvider().addVisitedLinkHash(visitedLinkHash(visitedURLString));
 }
 
+void WKContextClearVisitedLinks(WKContextRef contextRef)
+{
+    toImpl(contextRef)->visitedLinkProvider().removeAll();
+}
+
 void WKContextSetCacheModel(WKContextRef contextRef, WKCacheModel cacheModel)
 {
     toImpl(contextRef)->setCacheModel(toCacheModel(cacheModel));
@@ -409,9 +409,14 @@ WKCookieManagerRef WKContextGetCookieManager(WKContextRef contextRef)
     return toAPI(toImpl(contextRef)->supplement<WebCookieManagerProxy>());
 }
 
-WKApplicationCacheManagerRef WKContextGetApplicationCacheManager(WKContextRef contextRef)
+WKWebsiteDataStoreRef WKContextGetWebsiteDataStore(WKContextRef context)
 {
-    return toAPI(toImpl(contextRef)->supplement<WebApplicationCacheManagerProxy>());
+    return toAPI(toImpl(context)->websiteDataStore());
+}
+
+WKApplicationCacheManagerRef WKContextGetApplicationCacheManager(WKContextRef context)
+{
+    return reinterpret_cast<WKApplicationCacheManagerRef>(WKContextGetWebsiteDataStore(context));
 }
 
 WKBatteryManagerRef WKContextGetBatteryManager(WKContextRef contextRef)
@@ -439,9 +444,9 @@ WKIconDatabaseRef WKContextGetIconDatabase(WKContextRef contextRef)
     return toAPI(toImpl(contextRef)->iconDatabase());
 }
 
-WKKeyValueStorageManagerRef WKContextGetKeyValueStorageManager(WKContextRef contextRef)
+WKKeyValueStorageManagerRef WKContextGetKeyValueStorageManager(WKContextRef context)
 {
-    return toAPI(toImpl(contextRef)->supplement<WebKeyValueStorageManager>());
+    return reinterpret_cast<WKKeyValueStorageManagerRef>(WKContextGetWebsiteDataStore(context));
 }
 
 WKMediaCacheManagerRef WKContextGetMediaCacheManager(WKContextRef contextRef)
@@ -449,29 +454,39 @@ WKMediaCacheManagerRef WKContextGetMediaCacheManager(WKContextRef contextRef)
     return toAPI(toImpl(contextRef)->supplement<WebMediaCacheManagerProxy>());
 }
 
+WKMediaSessionFocusManagerRef WKContextGetMediaSessionFocusManager(WKContextRef context)
+{
+#if ENABLE(MEDIA_SESSION)
+    return toAPI(toImpl(context)->supplement<WebMediaSessionFocusManager>());
+#else
+    UNUSED_PARAM(context);
+    return nullptr;
+#endif
+}
+
 WKNotificationManagerRef WKContextGetNotificationManager(WKContextRef contextRef)
 {
     return toAPI(toImpl(contextRef)->supplement<WebNotificationManagerProxy>());
 }
 
-WKPluginSiteDataManagerRef WKContextGetPluginSiteDataManager(WKContextRef contextRef)
+WKPluginSiteDataManagerRef WKContextGetPluginSiteDataManager(WKContextRef context)
 {
 #if ENABLE(NETSCAPE_PLUGIN_API)
-    return toAPI(toImpl(contextRef)->pluginSiteDataManager());
+    return reinterpret_cast<WKPluginSiteDataManagerRef>(WKContextGetWebsiteDataStore(context));
 #else
-    UNUSED_PARAM(contextRef);
-    return 0;
+    UNUSED_PARAM(context);
+    return nullptr;
 #endif
 }
 
-WKResourceCacheManagerRef WKContextGetResourceCacheManager(WKContextRef contextRef)
+WKResourceCacheManagerRef WKContextGetResourceCacheManager(WKContextRef context)
 {
-    return toAPI(toImpl(contextRef)->supplement<WebResourceCacheManagerProxy>());
+    return reinterpret_cast<WKResourceCacheManagerRef>(WKContextGetWebsiteDataStore(context));
 }
 
-WKOriginDataManagerRef WKContextGetOriginDataManager(WKContextRef contextRef)
+WKOriginDataManagerRef WKContextGetOriginDataManager(WKContextRef context)
 {
-    return toAPI(toImpl(contextRef)->supplement<WebOriginDataManagerProxy>());
+    return reinterpret_cast<WKOriginDataManagerRef>(toAPI(toImpl(context)->websiteDataStore()));
 }
 
 void WKContextStartMemorySampler(WKContextRef contextRef, WKDoubleRef interval)
@@ -492,16 +507,6 @@ void WKContextSetIconDatabasePath(WKContextRef contextRef, WKStringRef iconDatab
 void WKContextAllowSpecificHTTPSCertificateForHost(WKContextRef contextRef, WKCertificateInfoRef certificateRef, WKStringRef hostRef)
 {
     toImpl(contextRef)->allowSpecificHTTPSCertificateForHost(toImpl(certificateRef), toImpl(hostRef)->string());
-}
-
-WK_EXPORT void WKContextSetApplicationCacheDirectory(WKContextRef contextRef, WKStringRef applicationCacheDirectory)
-{
-    toImpl(contextRef)->setApplicationCacheDirectory(toImpl(applicationCacheDirectory)->string());
-}
-
-WK_EXPORT void WKContextSetDiskCacheDirectory(WKContextRef contextRef, WKStringRef diskCacheDirectory)
-{
-    toImpl(contextRef)->setDiskCacheDirectory(toImpl(diskCacheDirectory)->string());
 }
 
 WK_EXPORT void WKContextSetCookieStorageDirectory(WKContextRef contextRef, WKStringRef cookieStorageDirectory)
@@ -593,4 +598,9 @@ void WKContextSetInvalidMessageFunction(WKContextInvalidMessageFunction invalidM
 void WKContextSetMemoryCacheDisabled(WKContextRef contextRef, bool disabled)
 {
     toImpl(contextRef)->setMemoryCacheDisabled(disabled);
+}
+
+void WKContextSetFontWhitelist(WKContextRef contextRef, WKArrayRef arrayRef)
+{
+    toImpl(contextRef)->setFontWhitelist(toImpl(arrayRef));
 }

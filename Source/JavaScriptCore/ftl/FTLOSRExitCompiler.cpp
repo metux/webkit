@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013, 2014 Apple Inc. All rights reserved.
+ * Copyright (C) 2013-2015 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -71,10 +71,6 @@ static void compileRecovery(
     case ExitValueInJSStackAsInt52:
     case ExitValueInJSStackAsDouble:
         jit.load64(AssemblyHelpers::addressFor(value.virtualRegister()), GPRInfo::regT0);
-        break;
-            
-    case ExitValueArgumentsObjectThatWasNotCreated:
-        jit.move(MacroAssembler::TrustedImm64(JSValue::encode(JSValue())), GPRInfo::regT0);
         break;
             
     case ExitValueRecovery:
@@ -224,20 +220,24 @@ static void compileStub(
                 jit.or32(GPRInfo::regT2, MacroAssembler::AbsoluteAddress(arrayProfile->addressOfArrayModes()));
             }
         }
-        
+
         if (!!exit.m_valueProfile)
             jit.store64(GPRInfo::regT0, exit.m_valueProfile.getSpecFailBucket(0));
     }
-    
-    // Materialize all objects. Don't materialize an object until all of the objects it needs
-    // have been materialized.
+
+    // Materialize all objects. Don't materialize an object until all
+    // of the objects it needs have been materialized. We break cycles
+    // by populating objects late - we only consider an object as
+    // needing another object if the later is needed for the
+    // allocation of the former.
+
     HashSet<ExitTimeObjectMaterialization*> toMaterialize;
     for (ExitTimeObjectMaterialization* materialization : exit.m_materializations)
         toMaterialize.add(materialization);
-    
+
     while (!toMaterialize.isEmpty()) {
-        int previousToMaterializeSize = toMaterialize.size();
-        
+        unsigned previousToMaterializeSize = toMaterialize.size();
+
         Vector<ExitTimeObjectMaterialization*> worklist;
         worklist.appendRange(toMaterialize.begin(), toMaterialize.end());
         for (ExitTimeObjectMaterialization* materialization : worklist) {
@@ -246,20 +246,28 @@ static void compileStub(
             for (ExitPropertyValue value : materialization->properties()) {
                 if (!value.value().isObjectMaterialization())
                     continue;
+                if (!value.location().neededForMaterialization())
+                    continue;
                 if (toMaterialize.contains(value.value().objectMaterialization())) {
-                    // Gotta skip this one, since one of its fields points to a materialization
-                    // that hasn't been materialized.
+                    // Gotta skip this one, since it needs a
+                    // materialization that hasn't been materialized.
                     allGood = false;
                     break;
                 }
             }
             if (!allGood)
                 continue;
-            
-            // All systems go for materializing the object. First we recover the values of all of
-            // its fields and then we call a function to actually allocate the beast.
+
+            // All systems go for materializing the object. First we
+            // recover the values of all of its fields and then we
+            // call a function to actually allocate the beast.
+            // We only recover the fields that are needed for the allocation.
             for (unsigned propertyIndex = materialization->properties().size(); propertyIndex--;) {
-                const ExitValue& value = materialization->properties()[propertyIndex].value();
+                const ExitPropertyValue& property = materialization->properties()[propertyIndex];
+                const ExitValue& value = property.value();
+                if (!property.location().neededForMaterialization())
+                    continue;
+
                 compileRecovery(
                     jit, value, record, jitCode->stackmaps, registerScratch,
                     materializationToPointer);
@@ -273,7 +281,7 @@ static void compileStub(
             jit.move(CCallHelpers::TrustedImmPtr(bitwise_cast<void*>(operationMaterializeObjectInOSR)), GPRInfo::nonArgGPR0);
             jit.call(GPRInfo::nonArgGPR0);
             jit.storePtr(GPRInfo::returnValueGPR, materializationToPointer.get(materialization));
-            
+
             // Let everyone know that we're done.
             toMaterialize.remove(materialization);
         }
@@ -282,6 +290,27 @@ static void compileStub(
         // is something broken about this fixpoint. Or, this could happen if we ever violate the
         // "materializations form a DAG" rule.
         RELEASE_ASSERT(toMaterialize.size() < previousToMaterializeSize);
+    }
+
+    // Now that all the objects have been allocated, we populate them
+    // with the correct values. This time we can recover all the
+    // fields, including those that are only needed for the allocation.
+    for (ExitTimeObjectMaterialization* materialization : exit.m_materializations) {
+        for (unsigned propertyIndex = materialization->properties().size(); propertyIndex--;) {
+            const ExitValue& value = materialization->properties()[propertyIndex].value();
+            compileRecovery(
+                jit, value, record, jitCode->stackmaps, registerScratch,
+                materializationToPointer);
+            jit.storePtr(GPRInfo::regT0, materializationArguments + propertyIndex);
+        }
+
+        // This call assumes that we don't pass arguments on the stack
+        jit.setupArgumentsWithExecState(
+            CCallHelpers::TrustedImmPtr(materialization),
+            CCallHelpers::TrustedImmPtr(materializationToPointer.get(materialization)),
+            CCallHelpers::TrustedImmPtr(materializationArguments));
+        jit.move(CCallHelpers::TrustedImmPtr(bitwise_cast<void*>(operationPopulateObjectInOSR)), GPRInfo::nonArgGPR0);
+        jit.call(GPRInfo::nonArgGPR0);
     }
 
     // Save all state from wherever the exit data tells us it was, into the appropriate place in
@@ -443,15 +472,6 @@ static void compileStub(
     
     handleExitCounts(jit, exit);
     reifyInlinedCallFrames(jit, exit);
-    
-    ArgumentsRecoveryGenerator argumentsRecovery;
-    for (unsigned index = exit.m_values.size(); index--;) {
-        if (!exit.m_values[index].isArgumentsObjectThatWasNotCreated())
-            continue;
-        int operand = exit.m_values.operandForIndex(index);
-        argumentsRecovery.generateFor(operand, exit.m_codeOrigin, jit);
-    }
-    
     adjustAndJumpToTarget(jit, exit);
     
     LinkBuffer patchBuffer(*vm, jit, codeBlock);
@@ -486,6 +506,19 @@ extern "C" void* compileFTLOSRExit(ExecState* exec, unsigned exitID)
     JITCode* jitCode = codeBlock->jitCode()->ftl();
     OSRExit& exit = jitCode->osrExit[exitID];
     
+    if (shouldShowDisassembly() || Options::verboseOSR() || Options::verboseFTLOSRExit()) {
+        dataLog("    Owning block: ", pointerDump(codeBlock), "\n");
+        dataLog("    Origin: ", exit.m_codeOrigin, "\n");
+        if (exit.m_codeOriginForExitProfile != exit.m_codeOrigin)
+            dataLog("    Origin for exit profile: ", exit.m_codeOriginForExitProfile, "\n");
+        dataLog("    Exit values: ", exit.m_values, "\n");
+        if (!exit.m_materializations.isEmpty()) {
+            dataLog("    Materializations:\n");
+            for (ExitTimeObjectMaterialization* materialization : exit.m_materializations)
+                dataLog("        ", pointerDump(materialization), "\n");
+        }
+    }
+
     prepareCodeOriginForOSRExit(exec, exit.m_codeOrigin);
     
     compileStub(exitID, jitCode, exit, vm, codeBlock);

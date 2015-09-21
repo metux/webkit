@@ -185,7 +185,7 @@ By default, <em class="parameter"><code>cookie_manager</code></em>
  doesn't store the cookies persistenly, so you need to call this
 method to keep cookies saved across sessions.</p>
 <div class="refsect3">
-<a name="id-1.2.27.8.2.5"></a><h4>Parameters</h4>
+<a name="id-1.2.29.8.2.5"></a><h4>Parameters</h4>
 <div class="informaltable"><table width="100%" border="0">
 <colgroup>
 <col width="150px" class="parameters_name">
@@ -223,7 +223,7 @@ webkit_cookie_manager_set_accept_policy
  as <em class="parameter"><code>policy</code></em>
 .</p>
 <div class="refsect3">
-<a name="id-1.2.27.8.3.5"></a><h4>Parameters</h4>
+<a name="id-1.2.29.8.3.5"></a><h4>Parameters</h4>
 <div class="informaltable"><table width="100%" border="0">
 <colgroup>
 <col width="150px" class="parameters_name">
@@ -260,7 +260,7 @@ webkit_cookie_manager_get_accept_policy
  will be called. You can then call
 <a class="link" href="WebKitCookieManager.html#webkit-cookie-manager-get-accept-policy-finish" title="webkit_cookie_manager_get_accept_policy_finish ()"><code class="function">webkit_cookie_manager_get_accept_policy_finish()</code></a> to get the result of the operation.</p>
 <div class="refsect3">
-<a name="id-1.2.27.8.4.6"></a><h4>Parameters</h4>
+<a name="id-1.2.29.8.4.6"></a><h4>Parameters</h4>
 <div class="informaltable"><table width="100%" border="0">
 <colgroup>
 <col width="150px" class="parameters_name">
@@ -302,7 +302,7 @@ webkit_cookie_manager_get_accept_policy_finish
                                 <em class="parameter"><code><a href="../glib/glib-Error-Reporting.html#GError"><span class="type">GError</span></a> **error</code></em>);</pre>
 <p>Finish an asynchronous operation started with <a class="link" href="WebKitCookieManager.html#webkit-cookie-manager-get-accept-policy" title="webkit_cookie_manager_get_accept_policy ()"><code class="function">webkit_cookie_manager_get_accept_policy()</code></a>.</p>
 <div class="refsect3">
-<a name="id-1.2.27.8.5.5"></a><h4>Parameters</h4>
+<a name="id-1.2.29.8.5.5"></a><h4>Parameters</h4>
 <div class="informaltable"><table width="100%" border="0">
 <colgroup>
 <col width="150px" class="parameters_name">
@@ -329,7 +329,7 @@ webkit_cookie_manager_get_accept_policy_finish
 </table></div>
 </div>
 <div class="refsect3">
-<a name="id-1.2.27.8.5.6"></a><h4>Returns</h4>
+<a name="id-1.2.29.8.5.6"></a><h4>Returns</h4>
 <p> the cookie acceptance policy of <em class="parameter"><code>cookie_manager</code></em>
 as a <a class="link" href="WebKitCookieManager.html#WebKitCookieAcceptPolicy" title="enum WebKitCookieAcceptPolicy"><span class="type">WebKitCookieAcceptPolicy</span></a>.</p>
 </div>
@@ -349,7 +349,7 @@ webkit_cookie_manager_get_domains_with_cookies
  will be called. You can then call
 <a class="link" href="WebKitCookieManager.html#webkit-cookie-manager-get-domains-with-cookies-finish" title="webkit_cookie_manager_get_domains_with_cookies_finish ()"><code class="function">webkit_cookie_manager_get_domains_with_cookies_finish()</code></a> to get the result of the operation.</p>
 <div class="refsect3">
-<a name="id-1.2.27.8.6.6"></a><h4>Parameters</h4>
+<a name="id-1.2.29.8.6.6"></a><h4>Parameters</h4>
 <div class="informaltable"><table width="100%" border="0">
 <colgroup>
 <col width="150px" class="parameters_name">
@@ -393,7 +393,7 @@ webkit_cookie_manager_get_domains_with_cookies_finish
 The return value is a <a href="../glib/glib-Standard-Macros.html#NULL:CAPS"><code class="literal">NULL</code></a> terminated list of strings which should
 be released with <a href="../glib/glib-String-Utility-Functions.html#g-strfreev"><code class="function">g_strfreev()</code></a>.</p>
 <div class="refsect3">
-<a name="id-1.2.27.8.7.5"></a><h4>Parameters</h4>
+<a name="id-1.2.29.8.7.5"></a><h4>Parameters</h4>
 <div class="informaltable"><table width="100%" border="0">
 <colgroup>
 <col width="150px" class="parameters_name">
@@ -420,7 +420,7 @@ be released with <a href="../glib/glib-String-Utility-Functions.html#g-strfreev"
 </table></div>
 </div>
 <div class="refsect3">
-<a name="id-1.2.27.8.7.6"></a><h4>Returns</h4>
+<a name="id-1.2.29.8.7.6"></a><h4>Returns</h4>
 <p> A <a href="../glib/glib-Standard-Macros.html#NULL:CAPS"><code class="literal">NULL</code></a> terminated array of domain names
 or <a href="../glib/glib-Standard-Macros.html#NULL:CAPS"><code class="literal">NULL</code></a> in case of error. </p>
 <p><span class="annotation">[<acronym title="Free data after the code is done."><span class="acronym">transfer full</span></acronym>][<acronym title="Parameter points to an array of items."><span class="acronym">array</span></acronym> zero-terminated=1]</span></p>
@@ -437,7 +437,7 @@ webkit_cookie_manager_delete_cookies_for_domain
  for the given <em class="parameter"><code>domain</code></em>
 .</p>
 <div class="refsect3">
-<a name="id-1.2.27.8.8.5"></a><h4>Parameters</h4>
+<a name="id-1.2.29.8.8.5"></a><h4>Parameters</h4>
 <div class="informaltable"><table width="100%" border="0">
 <colgroup>
 <col width="150px" class="parameters_name">
@@ -468,7 +468,7 @@ webkit_cookie_manager_delete_all_cookies
 <p>Delete all cookies of <em class="parameter"><code>cookie_manager</code></em>
 </p>
 <div class="refsect3">
-<a name="id-1.2.27.8.9.5"></a><h4>Parameters</h4>
+<a name="id-1.2.29.8.9.5"></a><h4>Parameters</h4>
 <div class="informaltable"><table width="100%" border="0">
 <colgroup>
 <col width="150px" class="parameters_name">
@@ -495,7 +495,7 @@ webkit_cookie_manager_delete_all_cookies
 <a name="WebKitCookiePersistentStorage"></a><h3>enum WebKitCookiePersistentStorage</h3>
 <p>Enum values used to denote the cookie persistent storage types.</p>
 <div class="refsect3">
-<a name="id-1.2.27.9.3.4"></a><h4>Members</h4>
+<a name="id-1.2.29.9.3.4"></a><h4>Members</h4>
 <div class="informaltable"><table width="100%" border="0">
 <colgroup>
 <col width="300px" class="enum_members_name">
@@ -528,7 +528,7 @@ webkit_cookie_manager_delete_all_cookies
 <a name="WebKitCookieAcceptPolicy"></a><h3>enum WebKitCookieAcceptPolicy</h3>
 <p>Enum values used to denote the cookie acceptance policies.</p>
 <div class="refsect3">
-<a name="id-1.2.27.9.4.4"></a><h4>Members</h4>
+<a name="id-1.2.29.9.4.4"></a><h4>Members</h4>
 <div class="informaltable"><table width="100%" border="0">
 <colgroup>
 <col width="300px" class="enum_members_name">
@@ -571,7 +571,7 @@ user_function (<a class="link" href="WebKitCookieManager.html" title="WebKitCook
                <a href="../glib/glib-Basic-Types.html#gpointer"><span class="type">gpointer</span></a>             user_data)</pre>
 <p>This signal is emitted when cookies are added, removed or modified.</p>
 <div class="refsect3">
-<a name="id-1.2.27.10.2.5"></a><h4>Parameters</h4>
+<a name="id-1.2.29.10.2.5"></a><h4>Parameters</h4>
 <div class="informaltable"><table width="100%" border="0">
 <colgroup>
 <col width="150px" class="parameters_name">

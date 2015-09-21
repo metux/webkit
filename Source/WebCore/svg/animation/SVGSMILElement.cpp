@@ -26,7 +26,6 @@
 #include "config.h"
 #include "SVGSMILElement.h"
 
-#include "Attribute.h"
 #include "CSSPropertyNames.h"
 #include "Document.h"
 #include "Event.h"
@@ -52,23 +51,23 @@ static const double invalidCachedTime = -1.;
     
 class ConditionEventListener : public EventListener {
 public:
-    static PassRefPtr<ConditionEventListener> create(SVGSMILElement* animation, SVGSMILElement::Condition* condition)
+    static Ref<ConditionEventListener> create(SVGSMILElement* animation, SVGSMILElement::Condition* condition)
     {
-        return adoptRef(new ConditionEventListener(animation, condition));
+        return adoptRef(*new ConditionEventListener(animation, condition));
     }
 
     static const ConditionEventListener* cast(const EventListener* listener)
     {
         return listener->type() == ConditionEventListenerType
             ? static_cast<const ConditionEventListener*>(listener)
-            : 0;
+            : nullptr;
     }
 
     virtual bool operator==(const EventListener& other) override;
     
     void disconnectAnimation()
     {
-        m_animation = 0;
+        m_animation = nullptr;
     }
 
 private:
@@ -112,7 +111,7 @@ SVGSMILElement::Condition::Condition(Type type, BeginOrEnd beginOrEnd, const Str
 SVGSMILElement::SVGSMILElement(const QualifiedName& tagName, Document& doc)
     : SVGElement(tagName, doc)
     , m_attributeName(anyQName())
-    , m_targetElement(0)
+    , m_targetElement(nullptr)
     , m_conditionsConnected(false)
     , m_hasEndEventConditions(false)
     , m_isWaitingForFirstInterval(true)
@@ -261,10 +260,10 @@ Node::InsertionNotificationRequest SVGSMILElement::insertedInto(ContainerNode& r
     if (m_timeContainer)
         m_timeContainer->notifyIntervalsChanged();
 
-    return InsertionShouldCallDidNotifySubtreeInsertions;
+    return InsertionShouldCallFinishedInsertingSubtree;
 }
 
-void SVGSMILElement::didNotifySubtreeInsertions()
+void SVGSMILElement::finishedInsertingSubtree()
 {
     buildPendingResource();
 }
@@ -274,10 +273,10 @@ void SVGSMILElement::removedFrom(ContainerNode& rootParent)
     if (rootParent.inDocument()) {
         clearResourceReferences();
         disconnectConditions();
-        setTargetElement(0);
+        setTargetElement(nullptr);
         setAttributeName(anyQName());
         animationAttributeChanged();
-        m_timeContainer = 0;
+        m_timeContainer = nullptr;
     }
 
     SVGElement::removedFrom(rootParent);
@@ -422,14 +421,14 @@ void SVGSMILElement::parseBeginOrEnd(const String& parseString, BeginOrEnd begin
     if (beginOrEnd == End)
         m_hasEndEventConditions = false;
     HashSet<double> existing;
-    for (unsigned n = 0; n < timeList.size(); ++n)
-        existing.add(timeList[n].time().value());
+    for (auto& time : timeList)
+        existing.add(time.time().value());
     Vector<String> splitString;
     parseString.split(';', splitString);
-    for (unsigned n = 0; n < splitString.size(); ++n) {
-        SMILTime value = parseClockValue(splitString[n]);
+    for (auto& string : splitString) {
+        SMILTime value = parseClockValue(string);
         if (value.isUnresolved())
-            parseCondition(splitString[n], beginOrEnd);
+            parseCondition(string, beginOrEnd);
         else if (!existing.contains(value.value()))
             timeList.append(SMILTimeWithOrigin(value, SMILTimeWithOrigin::ParserOrigin));
     }
@@ -519,8 +518,7 @@ void SVGSMILElement::connectConditions()
     if (m_conditionsConnected)
         disconnectConditions();
     m_conditionsConnected = true;
-    for (unsigned n = 0; n < m_conditions.size(); ++n) {
-        Condition& condition = m_conditions[n];
+    for (auto& condition : m_conditions) {
         if (condition.m_type == Condition::EventBase) {
             ASSERT(!condition.m_syncbase);
             Element* eventBase = eventBaseFor(condition);
@@ -548,8 +546,7 @@ void SVGSMILElement::disconnectConditions()
     if (!m_conditionsConnected)
         return;
     m_conditionsConnected = false;
-    for (unsigned n = 0; n < m_conditions.size(); ++n) {
-        Condition& condition = m_conditions[n];
+    for (auto& condition : m_conditions) {
         if (condition.m_type == Condition::EventBase) {
             ASSERT(!condition.m_syncbase);
             if (!condition.m_eventListener)
@@ -1127,9 +1124,7 @@ void SVGSMILElement::notifyDependentsIntervalChanged(NewOrExistingInterval newOr
         return;
     loopBreaker.add(this);
     
-    TimeDependentSet::iterator end = m_timeDependents.end();
-    for (TimeDependentSet::iterator it = m_timeDependents.begin(); it != end; ++it) {
-        SVGSMILElement* dependent = *it;
+    for (auto& dependent : m_timeDependents) {
         dependent->createInstanceTimesFromSyncbase(this, newOrExisting);
     }
 
@@ -1140,8 +1135,7 @@ void SVGSMILElement::createInstanceTimesFromSyncbase(SVGSMILElement* syncbase, N
 {
     // FIXME: To be really correct, this should handle updating exising interval by changing 
     // the associated times instead of creating new ones.
-    for (unsigned n = 0; n < m_conditions.size(); ++n) {
-        Condition& condition = m_conditions[n];
+    for (auto& condition : m_conditions) {
         if (condition.m_type == Condition::Syncbase && condition.m_syncbase == syncbase) {
             ASSERT(condition.m_name == "begin" || condition.m_name == "end");
             // No nested time containers in SVG, no need for crazy time space conversions. Phew!

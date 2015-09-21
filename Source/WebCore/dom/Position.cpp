@@ -162,7 +162,7 @@ Node* Position::containerNode() const
         return m_anchorNode.get();
     case PositionIsBeforeAnchor:
     case PositionIsAfterAnchor:
-        return findParent(m_anchorNode.get());
+        return findParent(*m_anchorNode);
     }
     ASSERT_NOT_REACHED();
     return nullptr;
@@ -222,7 +222,7 @@ Position Position::parentAnchoredEquivalent() const
     
     // FIXME: This should only be necessary for legacy positions, but is also needed for positions before and after Tables
     if (m_offset <= 0 && (m_anchorType != PositionIsAfterAnchor && m_anchorType != PositionIsAfterChildren)) {
-        if (findParent(m_anchorNode.get()) && (editingIgnoresContent(m_anchorNode.get()) || isRenderedTable(m_anchorNode.get())))
+        if (findParent(*m_anchorNode) && (editingIgnoresContent(m_anchorNode.get()) || isRenderedTable(m_anchorNode.get())))
             return positionInParentBeforeNode(m_anchorNode.get());
         return Position(m_anchorNode.get(), 0, PositionIsOffsetInAnchor);
     }
@@ -308,6 +308,14 @@ Position Position::previous(PositionMoveType moveType) const
     // FIXME: Negative offsets shouldn't be allowed. We should catch this earlier.
     ASSERT(offset >= 0);
 
+    if (anchorType() == PositionIsBeforeAnchor) {
+        node = containerNode();
+        if (!node)
+            return *this;
+
+        offset = computeOffsetInContainerNode();
+    }
+
     if (offset > 0) {
         if (Node* child = node->traverseToChildAt(offset - 1))
             return lastPositionInOrAfterNode(child);
@@ -327,9 +335,16 @@ Position Position::previous(PositionMoveType moveType) const
         }
     }
 
-    ContainerNode* parent = findParent(node);
+    ContainerNode* parent = findParent(*node);
     if (!parent)
         return *this;
+
+    if (positionBeforeOrAfterNodeIsCandidate(node))
+        return positionBeforeNode(node);
+
+    Node* previousSibling = node->previousSibling();
+    if (previousSibling && positionBeforeOrAfterNodeIsCandidate(previousSibling))
+        return positionAfterNode(previousSibling);
 
     return createLegacyEditingPosition(parent, node->computeNodeIndex());
 }
@@ -346,6 +361,14 @@ Position Position::next(PositionMoveType moveType) const
     // FIXME: Negative offsets shouldn't be allowed. We should catch this earlier.
     ASSERT(offset >= 0);
 
+    if (anchorType() == PositionIsAfterAnchor) {
+        node = containerNode();
+        if (!node)
+            return *this;
+
+        offset = computeOffsetInContainerNode();
+    }
+
     Node* child = node->traverseToChildAt(offset);
     if (child || (!node->hasChildNodes() && offset < lastOffsetForEditing(node))) {
         if (child)
@@ -359,9 +382,16 @@ Position Position::next(PositionMoveType moveType) const
         return createLegacyEditingPosition(node, (moveType == Character) ? uncheckedNextOffset(node, offset) : offset + 1);
     }
 
-    ContainerNode* parent = findParent(node);
+    ContainerNode* parent = findParent(*node);
     if (!parent)
         return *this;
+
+    if (isRenderedTable(node) || editingIgnoresContent(node))
+        return positionAfterNode(node);
+
+    Node* nextSibling = node->nextSibling();
+    if (nextSibling && positionBeforeOrAfterNodeIsCandidate(nextSibling))
+        return positionBeforeNode(nextSibling);
 
     return createLegacyEditingPosition(parent, node->computeNodeIndex() + 1);
 }
@@ -452,14 +482,50 @@ bool Position::atStartOfTree() const
 {
     if (isNull())
         return true;
-    return !findParent(deprecatedNode()) && m_offset <= 0;
+
+    Node* container = containerNode();
+    if (container && findParent(*container))
+        return false;
+
+    switch (m_anchorType) {
+    case PositionIsOffsetInAnchor:
+        return m_offset <= 0;
+    case PositionIsBeforeAnchor:
+        return !m_anchorNode->previousSibling();
+    case PositionIsAfterAnchor:
+        return false;
+    case PositionIsBeforeChildren:
+        return true;
+    case PositionIsAfterChildren:
+        return !lastOffsetForEditing(m_anchorNode.get());
+    }
+    ASSERT_NOT_REACHED();
+    return false;
 }
 
 bool Position::atEndOfTree() const
 {
     if (isNull())
         return true;
-    return !findParent(deprecatedNode()) && m_offset >= lastOffsetForEditing(deprecatedNode());
+
+    Node* container = containerNode();
+    if (container && findParent(*container))
+        return false;
+
+    switch (m_anchorType) {
+    case PositionIsOffsetInAnchor:
+        return m_offset >= lastOffsetForEditing(m_anchorNode.get());
+    case PositionIsBeforeAnchor:
+        return false;
+    case PositionIsAfterAnchor:
+        return !m_anchorNode->nextSibling();
+    case PositionIsBeforeChildren:
+        return !lastOffsetForEditing(m_anchorNode.get());
+    case PositionIsAfterChildren:
+        return true;
+    }
+    ASSERT_NOT_REACHED();
+    return false;
 }
 
 // return first preceding DOM position rendered at a different location, or "this"
@@ -753,8 +819,8 @@ Position Position::downstream(EditingBoundaryCrossingRule rule) const
 
         // Return position before tables and nodes which have content that can be ignored.
         if (editingIgnoresContent(currentNode) || isRenderedTable(currentNode)) {
-            if (currentPos.offsetInLeafNode() <= renderer->caretMinOffset())
-                return createLegacyEditingPosition(currentNode, renderer->caretMinOffset());
+            if (currentPos.atStartOfNode())
+                return positionBeforeNode(currentNode);
             continue;
         }
 
@@ -878,9 +944,9 @@ bool Position::nodeIsUserSelectNone(Node* node)
     return node && node->renderer() && node->renderer()->style().userSelect() == SELECT_NONE;
 }
 
-ContainerNode* Position::findParent(const Node* node)
+ContainerNode* Position::findParent(const Node& node)
 {
-    return node->nonShadowBoundaryParentNode();
+    return node.nonShadowBoundaryParentNode();
 }
 
 #if ENABLE(USERSELECT_ALL)
@@ -931,8 +997,11 @@ bool Position::isCandidate() const
     if (is<RenderText>(*renderer))
         return !nodeIsUserSelectNone(deprecatedNode()) && downcast<RenderText>(*renderer).containsCaretOffset(m_offset);
 
-    if (isRenderedTable(deprecatedNode()) || editingIgnoresContent(deprecatedNode()))
-        return (atFirstEditingPositionForNode() || atLastEditingPositionForNode()) && !nodeIsUserSelectNone(deprecatedNode()->parentNode());
+    if (positionBeforeOrAfterNodeIsCandidate(deprecatedNode())) {
+        return ((atFirstEditingPositionForNode() && m_anchorType == PositionIsBeforeAnchor)
+            || (atLastEditingPositionForNode() && m_anchorType == PositionIsAfterAnchor))
+            && !nodeIsUserSelectNone(deprecatedNode()->parentNode());
+    }
 
     if (m_anchorNode->hasTagName(htmlTag))
         return false;
@@ -1319,6 +1388,7 @@ TextDirection Position::primaryDirection() const
     return LTR;
 }
 
+#if ENABLE(TREE_DEBUGGING)
 
 void Position::debugPosition(const char* msg) const
 {
@@ -1327,8 +1397,6 @@ void Position::debugPosition(const char* msg) const
     else
         fprintf(stderr, "Position [%s]: %s [%p] at %d\n", msg, deprecatedNode()->nodeName().utf8().data(), deprecatedNode(), m_offset);
 }
-
-#ifndef NDEBUG
 
 void Position::formatForDebugger(char* buffer, unsigned length) const
 {
@@ -1382,11 +1450,9 @@ void Position::showTreeForThis() const
 
 #endif
 
-
-
 } // namespace WebCore
 
-#ifndef NDEBUG
+#if ENABLE(TREE_DEBUGGING)
 
 void showTree(const WebCore::Position& pos)
 {

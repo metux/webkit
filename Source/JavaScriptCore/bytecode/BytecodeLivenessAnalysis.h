@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013 Apple Inc. All rights reserved.
+ * Copyright (C) 2013, 2015 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -33,10 +33,13 @@
 
 namespace JSC {
 
+class BytecodeKills;
 class CodeBlock;
 class FullBytecodeLiveness;
 
 class BytecodeLivenessAnalysis {
+    WTF_MAKE_FAST_ALLOCATED;
+    WTF_MAKE_NONCOPYABLE(BytecodeLivenessAnalysis);
 public:
     BytecodeLivenessAnalysis(CodeBlock*);
     
@@ -44,23 +47,22 @@ public:
     FastBitVector getLivenessInfoAtBytecodeOffset(unsigned bytecodeOffset);
     
     void computeFullLiveness(FullBytecodeLiveness& result);
+    void computeKills(BytecodeKills& result);
 
 private:
     void compute();
     void runLivenessFixpoint();
     void dumpResults();
 
-    void getLivenessInfoForNonCapturedVarsAtBytecodeOffset(unsigned bytecodeOffset, FastBitVector&);
+    void getLivenessInfoAtBytecodeOffset(unsigned bytecodeOffset, FastBitVector&);
 
     CodeBlock* m_codeBlock;
-    Vector<RefPtr<BytecodeBasicBlock> > m_basicBlocks;
+    Vector<std::unique_ptr<BytecodeBasicBlock>> m_basicBlocks;
 };
 
-inline bool operandIsAlwaysLive(CodeBlock*, int operand);
-inline bool operandThatIsNotAlwaysLiveIsLive(CodeBlock*, const FastBitVector& out, int operand);
-inline bool operandIsLive(CodeBlock*, const FastBitVector& out, int operand);
-
-FastBitVector getLivenessInfo(CodeBlock*, const FastBitVector& out);
+inline bool operandIsAlwaysLive(int operand);
+inline bool operandThatIsNotAlwaysLiveIsLive(const FastBitVector& out, int operand);
+inline bool operandIsLive(const FastBitVector& out, int operand);
 
 } // namespace JSC
 

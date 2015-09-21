@@ -122,7 +122,7 @@ public:
         return *this;
     }
 
-    template<typename U>
+    template<typename U, class = typename std::enable_if<std::is_same<typename std::remove_reference<U>::type, T>::value>::type>
     Optional& operator=(U&& u)
     {
         destroy();
@@ -132,6 +132,21 @@ public:
     }
 
     explicit operator bool() const { return m_isEngaged; }
+
+    const T* operator->() const
+    {
+        ASSERT(m_isEngaged);
+        return asPtr()->operator->();
+    }
+
+    T* operator->()
+    {
+        ASSERT(m_isEngaged);
+        return asPtr()->operator->();
+    }
+
+    const T& operator*() const { return value(); }
+    T& operator*() { return value(); }
 
     T& value()
     {
@@ -152,6 +167,15 @@ public:
             return *asPtr();
 
         return std::forward<U>(value);
+    }
+
+    template<typename U>
+    T valueOrCompute(U callback) const
+    {
+        if (m_isEngaged)
+            return *asPtr();
+
+        return callback();
     }
 
 private:

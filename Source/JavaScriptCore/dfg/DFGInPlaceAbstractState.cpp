@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013, 2014 Apple Inc. All rights reserved.
+ * Copyright (C) 2013-2015 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -118,7 +118,7 @@ void InPlaceAbstractState::initialize()
             root->valuesAtHead.argument(i).setType(SpecBoolean);
             break;
         case FlushedCell:
-            root->valuesAtHead.argument(i).setType(SpecCell);
+            root->valuesAtHead.argument(i).setType(m_graph, SpecCell);
             break;
         case FlushedJSValue:
             root->valuesAtHead.argument(i).makeHeapTop();
@@ -129,11 +129,7 @@ void InPlaceAbstractState::initialize()
         }
     }
     for (size_t i = 0; i < root->valuesAtHead.numberOfLocals(); ++i) {
-        Node* node = root->variablesAtHead.local(i);
-        if (node && node->variableAccessData()->isCaptured())
-            root->valuesAtHead.local(i).makeHeapTop();
-        else
-            root->valuesAtHead.local(i).clear();
+        root->valuesAtHead.local(i).clear();
         root->valuesAtTail.local(i).clear();
     }
     for (BlockIndex blockIndex = 1 ; blockIndex < m_graph.numBlocks(); ++blockIndex) {
@@ -154,26 +150,6 @@ void InPlaceAbstractState::initialize()
             block->valuesAtHead.local(i).clear();
             block->valuesAtTail.local(i).clear();
         }
-        if (m_graph.m_form == SSA)
-            continue;
-        if (!block->isOSRTarget)
-            continue;
-        if (block->bytecodeBegin != m_graph.m_plan.osrEntryBytecodeIndex)
-            continue;
-        for (size_t i = 0; i < m_graph.m_mustHandleValues.size(); ++i) {
-            int operand = m_graph.m_mustHandleValues.operandForIndex(i);
-            Node* node = block->variablesAtHead.operand(operand);
-            if (!node)
-                continue;
-            AbstractValue source;
-            source.setOSREntryValue(m_graph, *m_graph.m_mustHandleValues[i]);
-            AbstractValue& target = block->valuesAtHead.operand(operand);
-            VariableAccessData* variable = node->variableAccessData();
-            FlushFormat format = variable->flushFormat();
-            target.merge(source);
-            target.fixTypeForRepresentation(resultFor(format));
-        }
-        block->cfaShouldRevisit = true;
     }
     if (m_graph.m_form == SSA) {
         for (BlockIndex blockIndex = 0; blockIndex < m_graph.numBlocks(); ++blockIndex) {
@@ -263,40 +239,31 @@ bool InPlaceAbstractState::mergeStateAtTail(AbstractValue& destination, Abstract
         
     AbstractValue source;
     
-    if (node->variableAccessData()->isCaptured()) {
-        // If it's captured then we know that whatever value was stored into the variable last is the
-        // one we care about. This is true even if the variable at tail is dead, which might happen if
-        // the last thing we did to the variable was a GetLocal and then ended up not using the
-        // GetLocal's result.
-        
+    switch (node->op()) {
+    case Phi:
+    case SetArgument:
+    case PhantomLocal:
+    case Flush:
+        // The block transfers the value from head to tail.
         source = inVariable;
-    } else {
-        switch (node->op()) {
-        case Phi:
-        case SetArgument:
-        case PhantomLocal:
-        case Flush:
-            // The block transfers the value from head to tail.
-            source = inVariable;
-            break;
+        break;
             
-        case GetLocal:
-            // The block refines the value with additional speculations.
-            source = forNode(node);
-            break;
+    case GetLocal:
+        // The block refines the value with additional speculations.
+        source = forNode(node);
+        break;
             
-        case SetLocal:
-            // The block sets the variable, and potentially refines it, both
-            // before and after setting it.
-            source = forNode(node->child1());
-            if (node->variableAccessData()->flushFormat() == FlushedDouble)
-                RELEASE_ASSERT(!(source.m_type & ~SpecFullDouble));
-            break;
+    case SetLocal:
+        // The block sets the variable, and potentially refines it, both
+        // before and after setting it.
+        source = forNode(node->child1());
+        if (node->variableAccessData()->flushFormat() == FlushedDouble)
+            RELEASE_ASSERT(!(source.m_type & ~SpecFullDouble));
+        break;
         
-        default:
-            RELEASE_ASSERT_NOT_REACHED();
-            break;
-        }
+    default:
+        RELEASE_ASSERT_NOT_REACHED();
+        break;
     }
     
     if (destination == source) {
@@ -374,7 +341,7 @@ bool InPlaceAbstractState::merge(BasicBlock* from, BasicBlock* to)
 
 inline bool InPlaceAbstractState::mergeToSuccessors(BasicBlock* basicBlock)
 {
-    Node* terminal = basicBlock->last();
+    Node* terminal = basicBlock->terminal();
     
     ASSERT(terminal->isTerminal());
     

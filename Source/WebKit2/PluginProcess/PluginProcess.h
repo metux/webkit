@@ -98,9 +98,11 @@ private:
     void didReceivePluginProcessMessage(IPC::Connection&, IPC::MessageDecoder&);
     void initializePluginProcess(PluginProcessCreationParameters&&);
     void createWebProcessConnection();
+
     void getSitesWithData(uint64_t callbackID);
-    void clearSiteData(const Vector<String>& sites, uint64_t flags, uint64_t maxAgeInSeconds, uint64_t callbackID);
-    
+    void deleteWebsiteData(std::chrono::system_clock::time_point modifiedSince, uint64_t callbackID);
+    void deleteWebsiteDataForHostNames(const Vector<String>& hostNames, uint64_t callbackID);
+
     // AudioHardwareListenerClient
     virtual void audioHardwareDidBecomeActive() override;
     virtual void audioHardwareDidBecomeInactive() override;
@@ -134,7 +136,6 @@ private:
     String m_nsurlCacheDirectory;
 #endif
 
-    static void lowMemoryHandler(bool critical);
     CountedUserActivity m_connectionActivity;
 
     RefPtr<WebCore::AudioHardwareListener> m_audioHardwareListener;

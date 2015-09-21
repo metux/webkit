@@ -29,7 +29,7 @@
 #include "IndexingType.h"
 #include "WeakGCMap.h"
 #include <wtf/HashFunctions.h>
-#include <wtf/text/AtomicStringImpl.h>
+#include <wtf/text/UniquedStringImpl.h>
 
 namespace JSC {
 
@@ -93,11 +93,11 @@ class StructureTransitionTable {
 
     
     struct Hash {
-        typedef std::pair<AtomicStringImpl*, unsigned> Key;
+        typedef std::pair<UniquedStringImpl*, unsigned> Key;
         
         static unsigned hash(const Key& p)
         {
-            return PtrHash<AtomicStringImpl*>::hash(p.first) + p.second;
+            return PtrHash<UniquedStringImpl*>::hash(p.first) + p.second;
         }
 
         static bool equal(const Key& a, const Key& b)
@@ -129,11 +129,13 @@ public:
         WeakSet::deallocate(impl);
     }
 
-    inline void add(VM&, Structure*);
-    inline bool contains(AtomicStringImpl* rep, unsigned attributes) const;
-    inline Structure* get(AtomicStringImpl* rep, unsigned attributes) const;
+    void add(VM&, Structure*);
+    bool contains(UniquedStringImpl*, unsigned attributes) const;
+    Structure* get(UniquedStringImpl*, unsigned attributes) const;
 
 private:
+    friend class SingleSlotTransitionWeakOwner;
+
     bool isUsingSingleSlot() const
     {
         return m_data & UsingSingleSlotFlag;
@@ -164,24 +166,8 @@ private:
         ASSERT(!isUsingSingleSlot());
     }
 
-    Structure* singleTransition() const
-    {
-        ASSERT(isUsingSingleSlot());
-        if (WeakImpl* impl = this->weakImpl()) {
-            if (impl->state() == WeakImpl::Live)
-                return reinterpret_cast<Structure*>(impl->jsValue().asCell());
-        }
-        return 0;
-    }
-    
-    void setSingleTransition(VM&, Structure* structure)
-    {
-        ASSERT(isUsingSingleSlot());
-        if (WeakImpl* impl = this->weakImpl())
-            WeakSet::deallocate(impl);
-        WeakImpl* impl = WeakSet::allocate(reinterpret_cast<JSCell*>(structure));
-        m_data = reinterpret_cast<intptr_t>(impl) | UsingSingleSlotFlag;
-    }
+    Structure* singleTransition() const;
+    void setSingleTransition(Structure*);
 
     intptr_t m_data;
 };

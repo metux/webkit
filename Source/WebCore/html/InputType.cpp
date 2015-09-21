@@ -924,6 +924,14 @@ void InputType::requiredAttributeChanged()
 {
 }
 
+void InputType::capsLockStateMayHaveChanged()
+{
+}
+
+void InputType::updateAutoFillButton()
+{
+}
+
 void InputType::subtreeHasChanged()
 {
     ASSERT_NOT_REACHED();

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010 Apple Inc. All rights reserved.
+ * Copyright (C) 2010, 2015 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -75,9 +75,9 @@ PassRefPtr<InjectedBundleRangeHandle> InjectedBundleRangeHandle::getOrCreate(Ran
     return rangeHandle.release();
 }
 
-PassRefPtr<InjectedBundleRangeHandle> InjectedBundleRangeHandle::create(Range* range)
+Ref<InjectedBundleRangeHandle> InjectedBundleRangeHandle::create(Range* range)
 {
-    return adoptRef(new InjectedBundleRangeHandle(range));
+    return adoptRef(*new InjectedBundleRangeHandle(range));
 }
 
 InjectedBundleRangeHandle::InjectedBundleRangeHandle(Range* range)
@@ -114,7 +114,7 @@ PassRefPtr<WebImage> InjectedBundleRangeHandle::renderedImage(SnapshotOptions op
         return nullptr;
 
     VisibleSelection oldSelection = frame->selection().selection();
-    frame->selection().setSelection(VisibleSelection(m_range.get()));
+    frame->selection().setSelection(VisibleSelection(*m_range));
 
     float scaleFactor = (options & SnapshotOptionsExcludeDeviceScaleFactor) ? 1 : frame->page()->deviceScaleFactor();
     IntRect paintRect = enclosingIntRect(m_range->boundingRect());

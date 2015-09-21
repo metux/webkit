@@ -36,7 +36,7 @@
 #include <wtf/PassRefPtr.h>
 #include <wtf/RefPtr.h>
 #include <wtf/Vector.h>
-#include <wtf/text/WTFString.h>
+#include <wtf/text/AtomicString.h>
 
 namespace WebCore {
 
@@ -69,9 +69,7 @@ namespace WebCore {
         PreflightPolicy preflightPolicy; // If AccessControl is used, how to determine if a preflight is needed.
         CrossOriginRequestPolicy crossOriginRequestPolicy;
         RefPtr<SecurityOrigin> securityOrigin;
-#if ENABLE(RESOURCE_TIMING)
         String initiator; // This cannot be an AtomicString, as isolatedCopy() wouldn't create an object that's safe for passing to another thread.
-#endif
     };
 
     // Useful for doing loader operations from any thread (not threadsafe, 

@@ -52,11 +52,12 @@ public:
 
     bool start();
     void requestTermination(DatabaseTaskSynchronizer* cleanupSync);
-    bool terminationRequested(DatabaseTaskSynchronizer* taskSynchronizer = 0) const;
+    bool terminationRequested(DatabaseTaskSynchronizer* = nullptr) const;
 
     void scheduleTask(std::unique_ptr<DatabaseTask>);
     void scheduleImmediateTask(std::unique_ptr<DatabaseTask>); // This just adds the task to the front of the queue - the caller needs to be extremely careful not to create deadlocks when waiting for completion.
     void unscheduleDatabaseTasks(Database*);
+    bool hasPendingDatabaseActivity() const;
 
     void recordDatabaseOpen(Database*);
     void recordDatabaseClosed(Database*);
@@ -65,27 +66,17 @@ public:
     SQLTransactionClient* transactionClient() { return m_transactionClient.get(); }
     SQLTransactionCoordinator* transactionCoordinator() { return m_transactionCoordinator.get(); }
 
-#if PLATFORM(IOS)
-    void setPaused(bool);
-    void handlePausedQueue();
-#endif
-
 private:
     DatabaseThread();
 
     static void databaseThreadStart(void*);
     void databaseThread();
 
-    Mutex m_threadCreationMutex;
+    Lock m_threadCreationMutex;
     ThreadIdentifier m_threadID;
     RefPtr<DatabaseThread> m_selfRef;
 
     MessageQueue<DatabaseTask> m_queue;
-#if PLATFORM(IOS)
-    MessageQueue<DatabaseTask> m_pausedQueue;
-    Mutex m_pausedMutex;
-    volatile bool m_paused;
-#endif
 
     // This set keeps track of the open databases that have been used on this thread.
     typedef HashSet<RefPtr<Database>> DatabaseSet;

@@ -41,17 +41,22 @@
 
 namespace WebCore {
 
+class AudioContext;
 class ClientRect;
 class ClientRectList;
+class DOMPath;
 class DOMStringList;
 class DOMWindow;
 class Document;
 class Element;
+class File;
 class Frame;
+class HTMLMediaElement;
 class InspectorFrontendChannelDummy;
 class InspectorFrontendClientDummy;
 class InternalSettings;
 class MallocStatistics;
+class MediaSession;
 class MemoryInfo;
 class Node;
 class Page;
@@ -63,6 +68,10 @@ class SourceBuffer;
 class TimeRanges;
 class TypeConversions;
 class XMLHttpRequest;
+
+#if ENABLE(CONTENT_FILTERING)
+class MockContentFilterSettings;
+#endif
 
 typedef int ExceptionCode;
 
@@ -84,6 +93,10 @@ public:
     bool isPreloaded(const String& url);
     bool isLoadingFromMemoryCache(const String& url);
     String xhrResponseSource(XMLHttpRequest*);
+    bool isSharingStyleSheetContents(Element* linkA, Element* linkB);
+    bool isStyleSheetLoadingSubresources(Element* link);
+    void setOverrideCachePolicy(const String&);
+    void setOverrideResourceLoadPriority(const String&);
 
     void clearMemoryCache();
     void pruneMemoryCacheToSize(unsigned size);
@@ -95,6 +108,7 @@ public:
     PassRefPtr<CSSComputedStyleDeclaration> computedStyleIncludingVisitedInfo(Node*, ExceptionCode&) const;
 
     Node* ensureShadowRoot(Element* host, ExceptionCode&);
+    Node* ensureUserAgentShadowRoot(Element* host, ExceptionCode&);
     Node* createShadowRoot(Element* host, ExceptionCode&);
     Node* shadowRoot(Element* host, ExceptionCode&);
     String shadowRootType(const Node*, ExceptionCode&) const;
@@ -104,6 +118,8 @@ public:
 
     // DOMTimers throttling testing.
     bool isTimerThrottled(int timeoutId, ExceptionCode&);
+    bool isRequestAnimationFrameThrottled() const;
+    bool areTimersThrottled() const;
 
     // Spatial Navigation testing.
     unsigned lastSpatialNavigationCandidateCount(ExceptionCode&) const;
@@ -148,6 +164,8 @@ public:
     void invalidateFontCache();
 
     void setScrollViewPosition(long x, long y, ExceptionCode&);
+    void setViewBaseBackgroundColor(const String& colorValue, ExceptionCode&);
+
     void setPagination(const String& mode, int gap, ExceptionCode& ec) { setPagination(mode, gap, 0, ec); }
     void setPagination(const String& mode, int gap, int pageLength, ExceptionCode&);
     String configurationForViewport(float devicePixelRatio, int deviceWidth, int deviceHeight, int availableWidth, int availableHeight, ExceptionCode&);
@@ -156,6 +174,7 @@ public:
     bool elementShouldAutoComplete(Element* inputElement, ExceptionCode&);
     void setEditingValue(Element* inputElement, const String&, ExceptionCode&);
     void setAutofilled(Element*, bool enabled, ExceptionCode&);
+    void setShowAutoFillButton(Element*, bool enabled, ExceptionCode&);
     void scrollElementToRect(Element*, long x, long y, long w, long h, ExceptionCode&);
 
     void paintControlTints(ExceptionCode&);
@@ -174,6 +193,9 @@ public:
 
     Vector<String> userPreferredLanguages() const;
     void setUserPreferredLanguages(const Vector<String>&);
+
+    Vector<String> userPreferredAudioCharacteristics() const;
+    void setUserPreferredAudioCharacteristic(const String&);
 
     unsigned wheelEventHandlerCount(ExceptionCode&);
     unsigned touchEventHandlerCount(ExceptionCode&);
@@ -250,7 +272,6 @@ public:
 
     int pageNumber(Element*, float pageWidth = 800, float pageHeight = 600);
     Vector<String> shortcutIconURLs() const;
-    Vector<String> allIconURLs() const;
 
     int numberOfPages(float pageWidthInPixels = 800, float pageHeightInPixels = 600);
     String pageProperty(String, int, ExceptionCode& = ASSERT_NO_EXCEPTION) const;
@@ -258,6 +279,10 @@ public:
 
     void setPageScaleFactor(float scaleFactor, int x, int y, ExceptionCode&);
     void setPageZoomFactor(float zoomFactor, ExceptionCode&);
+    void setTextZoomFactor(float zoomFactor, ExceptionCode&);
+
+    void setUseFixedLayout(bool useFixedLayout, ExceptionCode&);
+    void setFixedLayoutSize(int width, int height, ExceptionCode&);
 
     void setHeaderHeight(float);
     void setFooterHeight(float);
@@ -271,7 +296,7 @@ public:
     void webkitDidExitFullScreenForElement(Element*);
 #endif
 
-    WEBCORE_EXPORT void setApplicationCacheOriginQuota(unsigned long long);
+    WEBCORE_TESTSUPPORT_EXPORT void setApplicationCacheOriginQuota(unsigned long long);
 
     void registerURLSchemeAsBypassingContentSecurityPolicy(const String& scheme);
     void removeURLSchemeRegisteredAsBypassingContentSecurityPolicy(const String& scheme);
@@ -284,12 +309,24 @@ public:
 
     void startTrackingRepaints(ExceptionCode&);
     void stopTrackingRepaints(ExceptionCode&);
+
+    void startTrackingLayerFlushes(ExceptionCode&);
+    unsigned long layerFlushCount(ExceptionCode&);
+    
+    void startTrackingStyleRecalcs(ExceptionCode&);
+    unsigned long styleRecalcCount(ExceptionCode&);
+
+    void startTrackingCompositingUpdates(ExceptionCode&);
+    unsigned long compositingUpdateCount(ExceptionCode&);
+
     void updateLayoutIgnorePendingStylesheetsAndRunPostLayoutTasks(ExceptionCode&);
     void updateLayoutIgnorePendingStylesheetsAndRunPostLayoutTasks(Node*, ExceptionCode&);
     unsigned layoutCount() const;
 
     PassRefPtr<ArrayBuffer> serializeObject(PassRefPtr<SerializedScriptValue>) const;
     PassRefPtr<SerializedScriptValue> deserializeBuffer(PassRefPtr<ArrayBuffer>) const;
+
+    bool isFromCurrentWorld(Deprecated::ScriptValue) const;
 
     void setUsesOverlayScrollbars(bool enabled);
 
@@ -342,8 +379,9 @@ public:
     bool isPluginSnapshotted(Element*, ExceptionCode&);
 
 #if ENABLE(MEDIA_SOURCE)
-    WEBCORE_EXPORT void initializeMockMediaSource();
+    WEBCORE_TESTSUPPORT_EXPORT void initializeMockMediaSource();
     Vector<String> bufferedSamplesForTrackID(SourceBuffer*, const AtomicString&);
+    void setShouldGenerateTimestamps(SourceBuffer*, bool);
 #endif
 
 #if ENABLE(VIDEO)
@@ -352,8 +390,21 @@ public:
     void applicationWillEnterForeground() const;
     void applicationWillEnterBackground() const;
     void setMediaSessionRestrictions(const String& mediaType, const String& restrictions, ExceptionCode&);
+    void setMediaElementRestrictions(HTMLMediaElement*, const String& restrictions, ExceptionCode&);
     void postRemoteControlCommand(const String&, ExceptionCode&);
     bool elementIsBlockingDisplaySleep(Element*) const;
+#endif
+
+#if ENABLE(MEDIA_SESSION)
+    void sendMediaSessionStartOfInterruptionNotification(const String&);
+    void sendMediaSessionEndOfInterruptionNotification(const String&);
+    String mediaSessionCurrentState(MediaSession*) const;
+    double mediaElementPlayerVolume(HTMLMediaElement*) const;
+    void sendMediaControlEvent(const String&);
+#endif
+
+#if ENABLE(WEB_AUDIO)
+    void setAudioContextRestrictions(AudioContext*, const String& restrictions, ExceptionCode&);
 #endif
 
     void simulateSystemSleep() const;
@@ -365,11 +416,24 @@ public:
     void setPageMuted(bool);
     bool isPagePlayingAudio();
 
+    RefPtr<File> createFile(const String&);
+    void queueMicroTask(int);
+    bool testPreloaderSettingViewport();
+
+#if ENABLE(CONTENT_FILTERING)
+    MockContentFilterSettings& mockContentFilterSettings();
+#endif
+
+#if ENABLE(CSS_SCROLL_SNAP)
+    String scrollSnapOffsets(Element*, ExceptionCode&);
+#endif
+
+    String pathStringWithShrinkWrappedRects(Vector<double> rectComponents, double radius, ExceptionCode&);
+
 private:
     explicit Internals(Document*);
     Document* contextDocument() const;
     Frame* frame() const;
-    Vector<String> iconURLs(Document*, int iconTypesMask) const;
 
     RenderedDocumentMarker* markerAt(Node*, const String& markerType, unsigned index, ExceptionCode&);
 

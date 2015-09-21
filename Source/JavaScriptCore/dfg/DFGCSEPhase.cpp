@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011, 2012, 2013, 2014 Apple Inc. All rights reserved.
+ * Copyright (C) 2011-2015 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -148,7 +148,7 @@ private:
             return nullptr;
         }
         
-        Node* findReplacement(HeapLocation location)
+        LazyNode findReplacement(HeapLocation location)
         {
             for (unsigned i = m_impureLength; i--;) {
                 if (m_impureMap[i].key == location)
@@ -157,18 +157,22 @@ private:
             return nullptr;
         }
     
-        Node* addImpure(HeapLocation location, Node* node)
+        LazyNode addImpure(HeapLocation location, LazyNode node)
         {
-            if (Node* result = findReplacement(location))
+            // FIXME: If we are using small maps, we must not def() derived values.
+            // For now the only derived values we def() are constant-based.
+            if (location.index() && !location.index().isNode())
+                return nullptr;
+            if (LazyNode result = findReplacement(location))
                 return result;
             ASSERT(m_impureLength < capacity);
-            m_impureMap[m_impureLength++] = WTF::KeyValuePair<HeapLocation, Node*>(location, node);
+            m_impureMap[m_impureLength++] = WTF::KeyValuePair<HeapLocation, LazyNode>(location, node);
             return nullptr;
         }
     
     private:
         WTF::KeyValuePair<PureValue, Node*> m_pureMap[capacity];
-        WTF::KeyValuePair<HeapLocation, Node*> m_impureMap[capacity];
+        WTF::KeyValuePair<HeapLocation, LazyNode> m_impureMap[capacity];
         unsigned m_pureLength;
         unsigned m_impureLength;
     };
@@ -198,12 +202,12 @@ private:
             return result.iterator->value;
         }
         
-        Node* findReplacement(HeapLocation location)
+        LazyNode findReplacement(HeapLocation location)
         {
             return m_impureMap.get(location);
         }
     
-        Node* addImpure(HeapLocation location, Node* node)
+        LazyNode addImpure(HeapLocation location, LazyNode node)
         {
             auto result = m_impureMap.add(location, node);
             if (result.isNewEntry)
@@ -213,7 +217,7 @@ private:
 
     private:
         HashMap<PureValue, Node*> m_pureMap;
-        HashMap<HeapLocation, Node*> m_impureMap;
+        HashMap<HeapLocation, LazyNode> m_impureMap;
     };
 
     template<typename Maps>
@@ -221,6 +225,7 @@ private:
     public:
         BlockCSE(Graph& graph)
             : m_graph(graph)
+            , m_insertionSet(graph)
         {
         }
     
@@ -228,14 +233,14 @@ private:
         {
             m_maps.clear();
             m_changed = false;
+            m_block = block;
         
             for (unsigned nodeIndex = 0; nodeIndex < block->size(); ++nodeIndex) {
                 m_node = block->at(nodeIndex);
                 m_graph.performSubstitution(m_node);
             
                 if (m_node->op() == Identity) {
-                    m_node->convertToCheck();
-                    m_node->replacement = m_node->child1().node();
+                    m_node->replaceWith(m_node->child1().node());
                     m_changed = true;
                 } else {
                     // This rule only makes sense for local CSE, since in SSA form we have already
@@ -298,6 +303,8 @@ private:
                     clobberize(m_graph, m_node, *this);
                 }
             }
+
+            m_insertionSet.execute(block);
         
             return m_changed;
         }
@@ -319,15 +326,15 @@ private:
             m_changed = true;
         }
     
-        void def(HeapLocation location, Node* value)
+        void def(HeapLocation location, LazyNode value)
         {
-            Node* match = m_maps.addImpure(location, value);
+            LazyNode match = m_maps.addImpure(location, value);
             if (!match)
                 return;
         
             if (m_node->op() == GetLocal) {
-                // For uncaptured locals, usually the CPS rethreading phase does this. But it's OK
-                // for us to mess with locals - regardless of their capturedness - so long as:
+                // Usually the CPS rethreading phase does this. But it's OK for us to mess with
+                // locals so long as:
                 // 
                 // - We dethread the graph. Any changes we make may invalidate the assumptions of
                 //   our CPS form, particularly if this GetLocal is linked to the variablesAtTail.
@@ -344,8 +351,12 @@ private:
                 m_graph.dethread();
             }
         
-            m_node->replaceWith(match);
-            m_changed = true;
+            if (value.isNode() && value.asNode() == m_node) {
+                match.ensureIsNode(m_insertionSet, m_block, 0)->owner = m_block;
+                ASSERT(match.isNode());
+                m_node->replaceWith(match.asNode());
+                m_changed = true;
+            }
         }
     
     private:
@@ -353,8 +364,11 @@ private:
         
         bool m_changed;
         Node* m_node;
+        BasicBlock* m_block;
     
         Maps m_maps;
+
+        InsertionSet m_insertionSet;
     };
 
     BlockCSE<SmallMaps> m_smallBlock;
@@ -366,6 +380,7 @@ public:
     GlobalCSEPhase(Graph& graph)
         : Phase(graph, "global common subexpression elimination")
         , m_impureDataMap(graph)
+        , m_insertionSet(graph)
     {
     }
     
@@ -394,23 +409,12 @@ public:
 
         bool changed = iterate();
         
-        // Iterating a second time should not find new CSE opportunities, unless we have a bug.
-        if (validationEnabled()) {
-            reset();
-            DFG_ASSERT(m_graph, nullptr, !iterate());
-        }
+        // FIXME: It should be possible to assert that CSE will not find any new opportunities if you
+        // run it a second time. Unfortunately, we cannot assert this right now. Note that if we did
+        // this, we'd have to first reset all of our state.
+        // https://bugs.webkit.org/show_bug.cgi?id=145853
         
         return changed;
-    }
-    
-    void reset()
-    {
-        m_pureValues.clear();
-        
-        for (BlockIndex i = m_impureDataMap.size(); i--;) {
-            m_impureDataMap[i].availableAtTail.clear();
-            m_impureDataMap[i].didVisit = false;
-        }
     }
     
     bool iterate()
@@ -430,6 +434,7 @@ public:
                 dataLog("Processing block ", *m_block, ":\n");
 
             for (unsigned nodeIndex = 0; nodeIndex < m_block->size(); ++nodeIndex) {
+                m_nodeIndex = nodeIndex;
                 m_node = m_block->at(nodeIndex);
                 if (verbose)
                     dataLog("  Looking at node ", m_node, ":\n");
@@ -437,12 +442,13 @@ public:
                 m_graph.performSubstitution(m_node);
                 
                 if (m_node->op() == Identity) {
-                    m_node->convertToCheck();
-                    m_node->replacement = m_node->child1().node();
+                    m_node->replaceWith(m_node->child1().node());
                     m_changed = true;
                 } else
                     clobberize(m_graph, m_node, *this);
             }
+
+            m_insertionSet.execute(m_block);
             
             m_impureData->didVisit = true;
         }
@@ -466,7 +472,7 @@ public:
         // clobbering the value. So, we just search for all of the like values that have been
         // computed. We pick one that is in a block that dominates ours. Note that this means that
         // a PureValue will map to a list of nodes, since there may be many places in the control
-        // flow graph that compute a value but only one of them that dominates us. we may build up
+        // flow graph that compute a value but only one of them that dominates us. We may build up
         // a large list of nodes that compute some value in the case of gnarly control flow. This
         // is probably OK.
         
@@ -488,13 +494,13 @@ public:
         result.iterator->value.append(m_node);
     }
     
-    Node* findReplacement(HeapLocation location)
+    LazyNode findReplacement(HeapLocation location)
     {
         // At this instant, our "availableAtTail" reflects the set of things that are available in
         // this block so far. We check this map to find block-local CSE opportunities before doing
         // a global search.
-        Node* match = m_impureData->availableAtTail.get(location);
-        if (match) {
+        LazyNode match = m_impureData->availableAtTail.get(location);
+        if (!!match) {
             if (verbose)
                 dataLog("      Found local match: ", match, "\n");
             return match;
@@ -577,7 +583,7 @@ public:
                 match = data.availableAtTail.get(location);
                 if (verbose)
                     dataLog("        Availability: ", match, "\n");
-                if (match) {
+                if (!!match) {
                     // Don't examine the predecessors of a match. At this point we just want to
                     // establish that other blocks on the path from here to there don't clobber
                     // the location we're interested in.
@@ -618,12 +624,12 @@ public:
         return match;
     }
     
-    void def(HeapLocation location, Node* value)
+    void def(HeapLocation location, LazyNode value)
     {
         if (verbose)
             dataLog("    Got heap location def: ", location, " -> ", value, "\n");
         
-        Node* match = findReplacement(location);
+        LazyNode match = findReplacement(location);
         
         if (verbose)
             dataLog("      Got match: ", match, "\n");
@@ -635,9 +641,33 @@ public:
             ASSERT_UNUSED(result, result.isNewEntry);
             return;
         }
-        
-        m_node->replaceWith(match);
-        m_changed = true;
+
+        if (value.isNode() && value.asNode() == m_node) {
+            if (!match.isNode()) {
+                // We need to properly record the constant in order to use an existing one if applicable.
+                // This ensures that re-running GCSE will not find new optimizations.
+                match.ensureIsNode(m_insertionSet, m_block, m_nodeIndex)->owner = m_block;
+                auto result = m_pureValues.add(PureValue(match.asNode(), match->constant()), Vector<Node*>());
+                bool replaced = false;
+                if (!result.isNewEntry) {
+                    for (unsigned i = result.iterator->value.size(); i--;) {
+                        Node* candidate = result.iterator->value[i];
+                        if (m_graph.m_dominators.dominates(candidate->owner, m_block)) {
+                            ASSERT(candidate);
+                            match->replaceWith(candidate);
+                            match.setNode(candidate);
+                            replaced = true;
+                            break;
+                        }
+                    }
+                }
+                if (!replaced)
+                    result.iterator->value.append(match.asNode());
+            }
+            ASSERT(match.asNode());
+            m_node->replaceWith(match.asNode());
+            m_changed = true;
+        }
     }
     
     struct ImpureBlockData {
@@ -658,8 +688,10 @@ public:
     
     BasicBlock* m_block;
     Node* m_node;
+    unsigned m_nodeIndex;
     ImpureBlockData* m_impureData;
     ClobberSet m_writesSoFar;
+    InsertionSet m_insertionSet;
     
     bool m_changed;
 };

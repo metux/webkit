@@ -27,6 +27,10 @@
 
 /* Things that need to be defined globally should go into "config.h". */
 
+#if defined(HAVE_CONFIG_H) && HAVE_CONFIG_H && defined(BUILDING_WITH_CMAKE)
+#include "cmakeconfig.h"
+#endif
+
 #include <wtf/Platform.h>
 
 #if defined(__APPLE__)
@@ -40,11 +44,11 @@
 #if OS(WINDOWS)
 
 #ifndef _WIN32_WINNT
-#define _WIN32_WINNT 0x0502
+#define _WIN32_WINNT 0x601
 #endif
 
 #ifndef WINVER
-#define WINVER 0x0502
+#define WINVER 0x0601
 #endif
 
 #if !USE(CURL)
@@ -52,6 +56,9 @@
 #define _WINSOCKAPI_ // Prevent inclusion of winsock.h in windows.h
 #endif
 #endif
+
+#undef WEBCORE_EXPORT
+#define WEBCORE_EXPORT WTF_EXPORT_DECLARATION
 
 #else
 
@@ -94,6 +101,32 @@
 #endif
 
 #include <CoreFoundation/CoreFoundation.h>
+
+#if OS(WINDOWS)
+#ifndef CF_IMPLICIT_BRIDGING_ENABLED
+#define CF_IMPLICIT_BRIDGING_ENABLED
+#endif
+
+#ifndef CF_IMPLICIT_BRIDGING_DISABLED
+#define CF_IMPLICIT_BRIDGING_DISABLED
+#endif
+
+#include <CoreFoundation/CFBase.h>
+
+#ifndef CF_ENUM
+#define CF_ENUM(_type, _name) _type _name; enum
+#endif
+#ifndef CF_OPTIONS
+#define CF_OPTIONS(_type, _name) _type _name; enum
+#endif
+#ifndef CF_ENUM_DEPRECATED
+#define CF_ENUM_DEPRECATED(_macIntro, _macDep, _iosIntro, _iosDep)
+#endif
+#ifndef CF_ENUM_AVAILABLE
+#define CF_ENUM_AVAILABLE(_mac, _ios)
+#endif
+#endif
+
 #if PLATFORM(WIN_CAIRO)
 #include <ConditionalMacros.h>
 #include <windows.h>

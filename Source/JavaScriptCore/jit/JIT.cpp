@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008, 2009, 2012, 2013, 2014 Apple Inc. All rights reserved.
+ * Copyright (C) 2008, 2009, 2012-2015 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -31,6 +31,7 @@
 
 #include "ArityCheckFailReturnThunks.h"
 #include "CodeBlock.h"
+#include "CodeBlockWithJITType.h"
 #include "DFGCapabilities.h"
 #include "Interpreter.h"
 #include "JITInlines.h"
@@ -103,6 +104,14 @@ void JIT::emitEnterOptimizationCheck()
     skipOptimize.link(this);
 }
 #endif
+
+void JIT::emitNotifyWrite(WatchpointSet* set)
+{
+    if (!set || set->state() == IsInvalidated)
+        return;
+    
+    addSlowCase(branch8(NotEqual, AbsoluteAddress(set->addressOfState()), TrustedImm32(IsInvalidated)));
+}
 
 void JIT::assertStackPointerOffset()
 {
@@ -185,10 +194,9 @@ void JIT::privateCompileMainPass()
         DEFINE_SLOW_OP(greater)
         DEFINE_SLOW_OP(greatereq)
         DEFINE_SLOW_OP(is_function)
-        DEFINE_SLOW_OP(is_object)
+        DEFINE_SLOW_OP(is_object_or_null)
         DEFINE_SLOW_OP(typeof)
 
-        DEFINE_OP(op_touch_entry)
         DEFINE_OP(op_add)
         DEFINE_OP(op_bitand)
         DEFINE_OP(op_bitor)
@@ -199,32 +207,31 @@ void JIT::privateCompileMainPass()
         DEFINE_OP(op_construct_varargs)
         DEFINE_OP(op_catch)
         DEFINE_OP(op_construct)
-        DEFINE_OP(op_get_callee)
         DEFINE_OP(op_create_this)
         DEFINE_OP(op_to_this)
-        DEFINE_OP(op_init_lazy_reg)
-        DEFINE_OP(op_create_arguments)
+        DEFINE_OP(op_create_direct_arguments)
+        DEFINE_OP(op_create_scoped_arguments)
+        DEFINE_OP(op_create_out_of_band_arguments)
+        DEFINE_OP(op_check_tdz)
         DEFINE_OP(op_debug)
         DEFINE_OP(op_del_by_id)
         DEFINE_OP(op_div)
         DEFINE_OP(op_end)
         DEFINE_OP(op_enter)
-        DEFINE_OP(op_create_lexical_environment)
         DEFINE_OP(op_get_scope)
         DEFINE_OP(op_eq)
         DEFINE_OP(op_eq_null)
         case op_get_by_id_out_of_line:
         case op_get_array_length:
         DEFINE_OP(op_get_by_id)
-        DEFINE_OP(op_get_arguments_length)
         DEFINE_OP(op_get_by_val)
-        DEFINE_OP(op_get_argument_by_val)
         DEFINE_OP(op_check_has_instance)
         DEFINE_OP(op_instanceof)
         DEFINE_OP(op_is_undefined)
         DEFINE_OP(op_is_boolean)
         DEFINE_OP(op_is_number)
         DEFINE_OP(op_is_string)
+        DEFINE_OP(op_is_object)
         DEFINE_OP(op_jeq_null)
         DEFINE_OP(op_jfalse)
         DEFINE_OP(op_jmp)
@@ -256,15 +263,15 @@ void JIT::privateCompileMainPass()
         DEFINE_OP(op_new_regexp)
         DEFINE_OP(op_not)
         DEFINE_OP(op_nstricteq)
-        DEFINE_OP(op_pop_scope)
         DEFINE_OP(op_dec)
         DEFINE_OP(op_inc)
         DEFINE_OP(op_profile_did_call)
         DEFINE_OP(op_profile_will_call)
         DEFINE_OP(op_profile_type)
         DEFINE_OP(op_profile_control_flow)
-        DEFINE_OP(op_push_name_scope)
         DEFINE_OP(op_push_with_scope)
+        DEFINE_OP(op_create_lexical_environment)
+        DEFINE_OP(op_get_parent_scope)
         case op_put_by_id_out_of_line:
         case op_put_by_id_transition_direct:
         case op_put_by_id_transition_normal:
@@ -274,10 +281,9 @@ void JIT::privateCompileMainPass()
         DEFINE_OP(op_put_by_index)
         case op_put_by_val_direct:
         DEFINE_OP(op_put_by_val)
+        DEFINE_OP(op_put_getter_by_id)
+        DEFINE_OP(op_put_setter_by_id)
         DEFINE_OP(op_put_getter_setter)
-        case op_init_global_const_nop:
-            NEXT_OPCODE(op_init_global_const_nop);
-        DEFINE_OP(op_init_global_const)
 
         DEFINE_OP(op_ret)
         DEFINE_OP(op_rshift)
@@ -289,24 +295,26 @@ void JIT::privateCompileMainPass()
         DEFINE_OP(op_switch_char)
         DEFINE_OP(op_switch_imm)
         DEFINE_OP(op_switch_string)
-        DEFINE_OP(op_tear_off_arguments)
         DEFINE_OP(op_throw)
         DEFINE_OP(op_throw_static_error)
         DEFINE_OP(op_to_number)
+        DEFINE_OP(op_to_string)
         DEFINE_OP(op_to_primitive)
 
         DEFINE_OP(op_resolve_scope)
         DEFINE_OP(op_get_from_scope)
         DEFINE_OP(op_put_to_scope)
+        DEFINE_OP(op_get_from_arguments)
+        DEFINE_OP(op_put_to_arguments)
 
         DEFINE_OP(op_get_enumerable_length)
         DEFINE_OP(op_has_generic_property)
         DEFINE_OP(op_has_structure_property)
         DEFINE_OP(op_has_indexed_property)
         DEFINE_OP(op_get_direct_pname)
-        DEFINE_OP(op_get_structure_property_enumerator)
-        DEFINE_OP(op_get_generic_property_enumerator)
-        DEFINE_OP(op_next_enumerator_pname)
+        DEFINE_OP(op_get_property_enumerator)
+        DEFINE_OP(op_enumerator_structure_pname)
+        DEFINE_OP(op_enumerator_generic_pname)
         DEFINE_OP(op_to_index_string)
         default:
             RELEASE_ASSERT_NOT_REACHED();
@@ -375,16 +383,14 @@ void JIT::privateCompileSlowCases()
         DEFINE_SLOWCASE_OP(op_construct_varargs)
         DEFINE_SLOWCASE_OP(op_construct)
         DEFINE_SLOWCASE_OP(op_to_this)
+        DEFINE_SLOWCASE_OP(op_check_tdz)
         DEFINE_SLOWCASE_OP(op_create_this)
         DEFINE_SLOWCASE_OP(op_div)
         DEFINE_SLOWCASE_OP(op_eq)
-        DEFINE_SLOWCASE_OP(op_get_callee)
         case op_get_by_id_out_of_line:
         case op_get_array_length:
         DEFINE_SLOWCASE_OP(op_get_by_id)
-        DEFINE_SLOWCASE_OP(op_get_arguments_length)
         DEFINE_SLOWCASE_OP(op_get_by_val)
-        DEFINE_SLOWCASE_OP(op_get_argument_by_val)
         DEFINE_SLOWCASE_OP(op_check_has_instance)
         DEFINE_SLOWCASE_OP(op_instanceof)
         DEFINE_SLOWCASE_OP(op_jfalse)
@@ -422,6 +428,7 @@ void JIT::privateCompileSlowCases()
         DEFINE_SLOWCASE_OP(op_stricteq)
         DEFINE_SLOWCASE_OP(op_sub)
         DEFINE_SLOWCASE_OP(op_to_number)
+        DEFINE_SLOWCASE_OP(op_to_string)
         DEFINE_SLOWCASE_OP(op_to_primitive)
         DEFINE_SLOWCASE_OP(op_has_indexed_property)
         DEFINE_SLOWCASE_OP(op_has_structure_property)
@@ -463,11 +470,6 @@ CompilationResult JIT::privateCompile(JITCompilationEffort effort)
         m_canBeOptimized = false;
         m_canBeOptimizedOrInlined = false;
         m_shouldEmitProfiling = false;
-        break;
-    case DFG::CanInline:
-        m_canBeOptimized = false;
-        m_canBeOptimizedOrInlined = true;
-        m_shouldEmitProfiling = true;
         break;
     case DFG::CanCompile:
     case DFG::CanCompileAndInline:
@@ -588,7 +590,9 @@ CompilationResult JIT::privateCompile(JITCompilationEffort effort)
 #else
         thunkReg = GPRInfo::regT5;
 #endif
-        move(TrustedImmPtr(m_vm->arityCheckFailReturnThunks->returnPCsFor(*m_vm, m_codeBlock->numParameters())), thunkReg);
+        CodeLocationLabel* failThunkLabels =
+            m_vm->arityCheckFailReturnThunks->returnPCsFor(*m_vm, m_codeBlock->numParameters());
+        move(TrustedImmPtr(failThunkLabels), thunkReg);
         loadPtr(BaseIndex(thunkReg, regT0, timesPtr()), thunkReg);
         emitNakedCall(m_vm->getCTIStub(arityFixupGenerator).code());
 
@@ -653,26 +657,33 @@ CompilationResult JIT::privateCompile(JITCompilationEffort effort)
     for (unsigned i = m_putByIds.size(); i--;)
         m_putByIds[i].finalize(patchBuffer);
 
-    m_codeBlock->setNumberOfByValInfos(m_byValCompilationInfo.size());
-    for (unsigned i = 0; i < m_byValCompilationInfo.size(); ++i) {
-        CodeLocationJump badTypeJump = CodeLocationJump(patchBuffer.locationOf(m_byValCompilationInfo[i].badTypeJump));
-        CodeLocationLabel doneTarget = patchBuffer.locationOf(m_byValCompilationInfo[i].doneTarget);
-        CodeLocationLabel slowPathTarget = patchBuffer.locationOf(m_byValCompilationInfo[i].slowPathTarget);
-        CodeLocationCall returnAddress = patchBuffer.locationOf(m_byValCompilationInfo[i].returnAddress);
-        
-        m_codeBlock->byValInfo(i) = ByValInfo(
-            m_byValCompilationInfo[i].bytecodeIndex,
+    for (const auto& byValCompilationInfo : m_byValCompilationInfo) {
+        PatchableJump patchableNotIndexJump = byValCompilationInfo.notIndexJump;
+        CodeLocationJump notIndexJump = CodeLocationJump();
+        if (Jump(patchableNotIndexJump).isSet())
+            notIndexJump = CodeLocationJump(patchBuffer.locationOf(patchableNotIndexJump));
+        CodeLocationJump badTypeJump = CodeLocationJump(patchBuffer.locationOf(byValCompilationInfo.badTypeJump));
+        CodeLocationLabel doneTarget = patchBuffer.locationOf(byValCompilationInfo.doneTarget);
+        CodeLocationLabel nextHotPathTarget = patchBuffer.locationOf(byValCompilationInfo.nextHotPathTarget);
+        CodeLocationLabel slowPathTarget = patchBuffer.locationOf(byValCompilationInfo.slowPathTarget);
+        CodeLocationCall returnAddress = patchBuffer.locationOf(byValCompilationInfo.returnAddress);
+
+        *byValCompilationInfo.byValInfo = ByValInfo(
+            byValCompilationInfo.bytecodeIndex,
+            notIndexJump,
             badTypeJump,
-            m_byValCompilationInfo[i].arrayMode,
+            byValCompilationInfo.arrayMode,
+            byValCompilationInfo.arrayProfile,
             differenceBetweenCodePtr(badTypeJump, doneTarget),
+            differenceBetweenCodePtr(badTypeJump, nextHotPathTarget),
             differenceBetweenCodePtr(returnAddress, slowPathTarget));
     }
     for (unsigned i = 0; i < m_callCompilationInfo.size(); ++i) {
         CallCompilationInfo& compilationInfo = m_callCompilationInfo[i];
         CallLinkInfo& info = *compilationInfo.callLinkInfo;
-        info.callReturnLocation = patchBuffer.locationOfNearCall(compilationInfo.callReturnLocation);
-        info.hotPathBegin = patchBuffer.locationOf(compilationInfo.hotPathBegin);
-        info.hotPathOther = patchBuffer.locationOfNearCall(compilationInfo.hotPathOther);
+        info.setCallLocations(patchBuffer.locationOfNearCall(compilationInfo.callReturnLocation),
+            patchBuffer.locationOf(compilationInfo.hotPathBegin),
+            patchBuffer.locationOfNearCall(compilationInfo.hotPathOther));
     }
 
     CompactJITCodeMap::Encoder jitCodeMapEncoder;
@@ -686,14 +697,18 @@ CompilationResult JIT::privateCompile(JITCompilationEffort effort)
     if (m_codeBlock->codeType() == FunctionCode)
         withArityCheck = patchBuffer.locationOf(arityCheck);
 
-    if (Options::showDisassembly())
+    if (Options::showDisassembly()) {
         m_disassembler->dump(patchBuffer);
+        patchBuffer.didAlreadyDisassemble();
+    }
     if (m_compilation) {
         m_disassembler->reportToProfiler(m_compilation.get(), patchBuffer);
         m_vm->m_perBytecodeProfiler->addCompilation(m_compilation);
     }
     
-    CodeRef result = patchBuffer.finalizeCodeWithoutDisassembly();
+    CodeRef result = FINALIZE_CODE(
+        patchBuffer,
+        ("Baseline JIT code for %s", toCString(CodeBlockWithJITType(m_codeBlock, JITCode::BaselineJIT)).data()));
     
     m_vm->machineCodeBytesPerBytecodeWordForBaselineJIT.add(
         static_cast<double>(result.size()) /

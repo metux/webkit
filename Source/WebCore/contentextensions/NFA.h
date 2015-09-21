@@ -29,6 +29,7 @@
 #if ENABLE(CONTENT_EXTENSIONS)
 
 #include "ContentExtensionsDebugging.h"
+#include "ImmutableNFANodeBuilder.h"
 #include "NFANode.h"
 #include <wtf/Vector.h>
 
@@ -36,39 +37,13 @@ namespace WebCore {
 
 namespace ContentExtensions {
 
-class NFAToDFA;
+typedef ImmutableRange<char> ImmutableCharRange;
+typedef ImmutableNFANodeBuilder<char, uint64_t> ImmutableCharNFANodeBuilder;
 
-// The NFA provides a way to build a NFA graph with characters or epsilon as transitions.
-// The nodes are accessed through an identifier.
-class NFA {
-public:
-    NFA();
-    unsigned root() const { return m_root; }
-    unsigned createNode();
-
-    void addTransition(unsigned from, unsigned to, char character);
-    void addEpsilonTransition(unsigned from, unsigned to);
-    void addTransitionsOnAnyCharacter(unsigned from, unsigned to);
-    void setFinal(unsigned node, uint64_t ruleId);
-
-    unsigned graphSize() const;
-    void restoreToGraphSize(unsigned);
-
+struct NFA : public ImmutableNFA<char, uint64_t> {
 #if CONTENT_EXTENSIONS_STATE_MACHINE_DEBUGGING
-    void addRuleId(unsigned node, uint64_t ruleId);
-
     void debugPrintDot() const;
-#else
-    void addRuleId(unsigned, uint64_t) { }
 #endif
-
-private:
-    friend class NFAToDFA;
-
-    static const unsigned epsilonTransitionCharacter = 256;
-
-    Vector<NFANode> m_nodes;
-    unsigned m_root;
 };
 
 }

@@ -107,9 +107,8 @@ private:
 
     friend class Holder;
 
-    static void appendQuotedString(StringBuilder&, const String&);
-
     JSValue toJSON(JSValue, const PropertyNameForFunctionCall&);
+    JSValue toJSONImpl(JSValue, const PropertyNameForFunctionCall&);
 
     enum StringifyResult { StringifyFailed, StringifySucceeded, StringifyFailedDueToUndefinedValue };
     StringifyResult appendStringifiedValue(StringBuilder&, JSValue, JSObject* holder, const PropertyNameForFunctionCall&);
@@ -207,7 +206,7 @@ Stringifier::Stringifier(ExecState* exec, const Local<Unknown>& replacer, const 
     : m_exec(exec)
     , m_replacer(replacer)
     , m_usingArrayReplacer(false)
-    , m_arrayReplacerPropertyNames(exec)
+    , m_arrayReplacerPropertyNames(exec, PropertyNameMode::Strings)
     , m_replacerCallType(CallTypeNone)
     , m_gap(gap(exec, space.get()))
 {
@@ -255,83 +254,16 @@ Local<Unknown> Stringifier::stringify(Handle<Unknown> value)
     return Local<Unknown>(m_exec->vm(), jsString(m_exec, result.toString()));
 }
 
-template <typename CharType>
-static void appendStringToStringBuilder(StringBuilder& builder, const CharType* data, int length)
-{
-    for (int i = 0; i < length; ++i) {
-        int start = i;
-        while (i < length && (data[i] > 0x1F && data[i] != '"' && data[i] != '\\'))
-            ++i;
-        builder.append(data + start, i - start);
-        if (i >= length)
-            break;
-        switch (data[i]) {
-        case '\t':
-            builder.append('\\');
-            builder.append('t');
-            break;
-        case '\r':
-            builder.append('\\');
-            builder.append('r');
-            break;
-        case '\n':
-            builder.append('\\');
-            builder.append('n');
-            break;
-        case '\f':
-            builder.append('\\');
-            builder.append('f');
-            break;
-        case '\b':
-            builder.append('\\');
-            builder.append('b');
-            break;
-        case '"':
-            builder.append('\\');
-            builder.append('"');
-            break;
-        case '\\':
-            builder.append('\\');
-            builder.append('\\');
-            break;
-        default:
-            static const char hexDigits[] = "0123456789abcdef";
-            UChar ch = data[i];
-            LChar hex[] = { '\\', 'u', static_cast<LChar>(hexDigits[(ch >> 12) & 0xF]), static_cast<LChar>(hexDigits[(ch >> 8) & 0xF]), static_cast<LChar>(hexDigits[(ch >> 4) & 0xF]), static_cast<LChar>(hexDigits[ch & 0xF]) };
-            builder.append(hex, WTF_ARRAY_LENGTH(hex));
-            break;
-        }
-    }
-}
-
-void escapeStringToBuilder(StringBuilder& builder, const String& message)
-{
-    if (message.is8Bit())
-        appendStringToStringBuilder(builder, message.characters8(), message.length());
-    else
-        appendStringToStringBuilder(builder, message.characters16(), message.length());
-}
-
-void Stringifier::appendQuotedString(StringBuilder& builder, const String& value)
-{
-    int length = value.length();
-
-    builder.append('"');
-
-    if (value.is8Bit())
-        appendStringToStringBuilder<LChar>(builder, value.characters8(), length);
-    else
-        appendStringToStringBuilder<UChar>(builder, value.characters16(), length);
-
-    builder.append('"');
-}
-
-inline JSValue Stringifier::toJSON(JSValue value, const PropertyNameForFunctionCall& propertyName)
+ALWAYS_INLINE JSValue Stringifier::toJSON(JSValue value, const PropertyNameForFunctionCall& propertyName)
 {
     ASSERT(!m_exec->hadException());
     if (!value.isObject() || !asObject(value)->hasProperty(m_exec, m_exec->vm().propertyNames->toJSON))
         return value;
+    return toJSONImpl(value, propertyName);
+}
 
+JSValue Stringifier::toJSONImpl(JSValue value, const PropertyNameForFunctionCall& propertyName)
+{
     JSValue toJSONFunction = asObject(value)->get(m_exec, m_exec->vm().propertyNames->toJSON);
     if (m_exec->hadException())
         return jsNull();
@@ -388,18 +320,21 @@ Stringifier::StringifyResult Stringifier::appendStringifiedValue(StringBuilder& 
         return StringifySucceeded;
     }
 
-    String stringValue;
-    if (value.getString(m_exec, stringValue)) {
-        appendQuotedString(builder, stringValue);
+    if (value.isString()) {
+        builder.appendQuotedJSONString(asString(value)->value(m_exec));
         return StringifySucceeded;
     }
 
     if (value.isNumber()) {
-        double number = value.asNumber();
-        if (!std::isfinite(number))
-            builder.appendLiteral("null");
-        else
-            builder.append(String::numberToStringECMAScript(number));
+        if (value.isInt32())
+            builder.appendNumber(value.asInt32());
+        else {
+            double number = value.asNumber();
+            if (!std::isfinite(number))
+                builder.appendLiteral("null");
+            else
+                builder.appendECMAScriptNumber(number);
+        }
         return StringifySucceeded;
     }
 
@@ -488,14 +423,17 @@ bool Stringifier::Holder::appendNextProperty(Stringifier& stringifier, StringBui
     if (!m_index) {
         if (m_isArray) {
             m_isJSArray = isJSArray(m_object.get());
-            m_size = m_object->get(exec, exec->vm().propertyNames->length).toUInt32(exec);
+            if (m_isJSArray)
+                m_size = asArray(m_object.get())->length();
+            else
+                m_size = m_object->get(exec, exec->vm().propertyNames->length).toUInt32(exec);
             builder.append('[');
         } else {
             if (stringifier.m_usingArrayReplacer)
                 m_propertyNames = stringifier.m_arrayReplacerPropertyNames.data();
             else {
-                PropertyNameArray objectPropertyNames(exec);
-                m_object->methodTable()->getOwnPropertyNames(m_object.get(), exec, objectPropertyNames, ExcludeDontEnumProperties);
+                PropertyNameArray objectPropertyNames(exec, PropertyNameMode::Strings);
+                m_object->methodTable()->getOwnPropertyNames(m_object.get(), exec, objectPropertyNames, EnumerationMode());
                 m_propertyNames = objectPropertyNames.releaseData();
             }
             m_size = m_propertyNames->propertyNameVector().size();
@@ -557,7 +495,7 @@ bool Stringifier::Holder::appendNextProperty(Stringifier& stringifier, StringBui
         stringifier.startNewLine(builder);
 
         // Append the property name.
-        appendQuotedString(builder, propertyName.string());
+        builder.appendQuotedJSONString(propertyName.string());
         builder.append(':');
         if (stringifier.willIndent())
             builder.append(' ');
@@ -711,8 +649,8 @@ NEVER_INLINE JSValue Walker::walk(JSValue unfiltered)
                 JSObject* object = asObject(inValue);
                 objectStack.push(object);
                 indexStack.append(0);
-                propertyStack.append(PropertyNameArray(m_exec));
-                object->methodTable()->getOwnPropertyNames(object, m_exec, propertyStack.last(), ExcludeDontEnumProperties);
+                propertyStack.append(PropertyNameArray(m_exec, PropertyNameMode::Strings));
+                object->methodTable()->getOwnPropertyNames(object, m_exec, propertyStack.last(), EnumerationMode());
             }
             objectStartVisitMember:
             FALLTHROUGH;
@@ -786,7 +724,7 @@ EncodedJSValue JSC_HOST_CALL JSONProtoFuncParse(ExecState* exec)
 {
     if (!exec->argumentCount())
         return throwVMError(exec, createError(exec, ASCIILiteral("JSON.parse requires at least one parameter")));
-    String source = exec->uncheckedArgument(0).toString(exec)->value(exec);
+    StringView source = exec->uncheckedArgument(0).toString(exec)->view(exec);
     if (exec->hadException())
         return JSValue::encode(jsNull());
 

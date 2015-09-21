@@ -118,6 +118,7 @@ enum AccessibilityRole {
     DescriptionListRole,
     DescriptionListTermRole,
     DescriptionListDetailRole,
+    DetailsRole,
     DirectoryRole,
     DisclosureTriangleRole,
     DivRole,
@@ -131,6 +132,7 @@ enum AccessibilityRole {
     FooterRole,
     FormRole,
     GridRole,
+    GridCellRole,
     GroupRole,
     GrowAreaRole,
     HeadingRole,
@@ -170,12 +172,18 @@ enum AccessibilityRole {
     OutlineRole,
     ParagraphRole,
     PopUpButtonRole,
+    PreRole,
     PresentationalRole,
     ProgressIndicatorRole,
     RadioButtonRole,
     RadioGroupRole,
     RowHeaderRole,
     RowRole,
+    RubyBaseRole,
+    RubyBlockRole,
+    RubyInlineRole,
+    RubyRunRole,
+    RubyTextRole,
     RulerRole,
     RulerMarkerRole,
     ScrollAreaRole,
@@ -189,6 +197,7 @@ enum AccessibilityRole {
     SplitGroupRole,
     SplitterRole,
     StaticTextRole,
+    SummaryRole,
     SwitchRole,
     SystemWideRole,
     SVGRootRole,
@@ -463,6 +472,8 @@ public:
     virtual bool isNativeImage() const { return false; }
     virtual bool isImageButton() const { return false; }
     virtual bool isPasswordField() const { return false; }
+    bool isContainedByPasswordField() const;
+    virtual AccessibilityObject* passwordFieldOrContainingPasswordField() { return nullptr; }
     virtual bool isNativeTextControl() const { return false; }
     virtual bool isSearchField() const { return false; }
     bool isWebArea() const { return roleValue() == WebAreaRole; }
@@ -502,6 +513,7 @@ public:
     virtual bool isMockObject() const { return false; }
     virtual bool isMediaControlLabel() const { return false; }
     bool isSwitch() const { return roleValue() == SwitchRole; }
+    bool isToggleButton() const { return roleValue() == ToggleButtonRole; }
     bool isTextControl() const;
     bool isARIATextControl() const;
     bool isTabList() const { return roleValue() == TabListRole; }
@@ -599,16 +611,18 @@ public:
     virtual bool supportsARIAControls() const { return false; }
     virtual void ariaControlsElements(AccessibilityChildrenVector&) const { }
     virtual bool ariaHasPopup() const { return false; }
-    virtual bool ariaPressedIsPresent() const;
+    bool ariaPressedIsPresent() const;
     bool ariaIsMultiline() const;
     String invalidStatus() const;
-    bool supportsARIAExpanded() const;
+    bool supportsARIAPressed() const;
+    bool supportsExpanded() const;
     bool supportsChecked() const;
     AccessibilitySortDirection sortDirection() const;
     virtual bool canvasHasFallbackContent() const { return false; }
     bool supportsRangeValue() const;
     String identifierAttribute() const;
     void classList(Vector<String>&) const;
+    const AtomicString& roleDescription() const;
     
     bool supportsARIASetSize() const;
     bool supportsARIAPosInSet() const;
@@ -633,6 +647,8 @@ public:
     virtual AccessibilityObject* lastChild() const { return nullptr; }
     virtual AccessibilityObject* previousSibling() const { return nullptr; }
     virtual AccessibilityObject* nextSibling() const { return nullptr; }
+    virtual AccessibilityObject* nextSiblingUnignored(int limit) const;
+    virtual AccessibilityObject* previousSiblingUnignored(int limit) const;
     virtual AccessibilityObject* parentObject() const = 0;
     virtual AccessibilityObject* parentObjectUnignored() const;
     virtual AccessibilityObject* parentObjectIfExists() const { return nullptr; }
@@ -756,6 +772,8 @@ public:
     virtual void addChildren() { }
     virtual void addChild(AccessibilityObject*) { }
     virtual void insertChild(AccessibilityObject*, unsigned) { }
+
+    virtual bool shouldIgnoreAttributeRole() const { return false; }
     
     virtual bool canHaveChildren() const { return true; }
     virtual bool hasChildren() const { return m_haveChildren; }
@@ -879,7 +897,13 @@ public:
     virtual void scrollToMakeVisibleWithSubFocus(const IntRect&) const;
     // Scroll this object to a given point in global coordinates of the top-level window.
     virtual void scrollToGlobalPoint(const IntPoint&) const;
-
+    
+    enum ScrollByPageDirection { Up, Down, Left, Right };
+    bool scrollByPage(ScrollByPageDirection) const;
+    IntPoint scrollPosition() const;
+    IntSize scrollContentsSize() const;    
+    IntRect scrollVisibleContentRect() const;
+    
     bool lastKnownIsIgnoredValue();
     void setLastKnownIsIgnoredValue(bool);
 
@@ -978,6 +1002,16 @@ public:
     // other operations update type operations
     void updateBackingStore();
     
+#if PLATFORM(COCOA)
+    bool preventKeyboardDOMEventDispatch() const;
+    void setPreventKeyboardDOMEventDispatch(bool);
+#endif
+    
+#if PLATFORM(COCOA) && !PLATFORM(IOS)
+    bool caretBrowsingEnabled() const;
+    void setCaretBrowsingEnabled(bool);
+#endif
+    
 protected:
     AXID m_id;
     AccessibilityChildrenVector m_children;
@@ -990,7 +1024,9 @@ protected:
     // If this object itself scrolls, return its ScrollableArea.
     virtual ScrollableArea* getScrollableAreaIfScrollable() const { return nullptr; }
     virtual void scrollTo(const IntPoint&) const { }
-
+    ScrollableArea* scrollableAreaAncestor() const;
+    void scrollAreaAndAncestor(std::pair<ScrollableArea*, AccessibilityObject*>&) const;
+    
     static bool isAccessibilityObjectSearchMatchAtIndex(AccessibilityObject*, AccessibilitySearchCriteria*, size_t);
     static bool isAccessibilityObjectSearchMatch(AccessibilityObject*, AccessibilitySearchCriteria*);
     static bool isAccessibilityTextSearchMatch(AccessibilityObject*, AccessibilitySearchCriteria*);

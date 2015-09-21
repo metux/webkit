@@ -30,7 +30,6 @@
 
 #include "GraphicsLayer.h"
 #include "ScrollingCoordinator.h"
-#include <wtf/OwnPtr.h>
 #include <wtf/RefCounted.h>
 #include <wtf/TypeCasts.h>
 #include <wtf/Vector.h>
@@ -198,7 +197,7 @@ public:
     bool isFrameScrollingNode() const { return m_nodeType == FrameScrollingNode; }
     bool isOverflowScrollingNode() const { return m_nodeType == OverflowScrollingNode; }
 
-    virtual PassRefPtr<ScrollingStateNode> clone(ScrollingStateTree& adoptiveTree) = 0;
+    virtual Ref<ScrollingStateNode> clone(ScrollingStateTree& adoptiveTree) = 0;
     PassRefPtr<ScrollingStateNode> cloneAndReset(ScrollingStateTree& adoptiveTree);
     void cloneAndResetChildren(ScrollingStateNode&, ScrollingStateTree& adoptiveTree);
 
@@ -250,7 +249,7 @@ private:
     ScrollingStateTree& m_scrollingStateTree;
 
     ScrollingStateNode* m_parent;
-    OwnPtr<Vector<RefPtr<ScrollingStateNode>>> m_children;
+    std::unique_ptr<Vector<RefPtr<ScrollingStateNode>>> m_children;
 
     LayerRepresentation m_layer;
 };

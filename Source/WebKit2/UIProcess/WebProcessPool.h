@@ -28,6 +28,8 @@
 
 #include "APIDictionary.h"
 #include "APIObject.h"
+#include "APIProcessPoolConfiguration.h"
+#include "APIWebsiteDataStore.h"
 #include "DownloadProxyMap.h"
 #include "GenericCallback.h"
 #include "MessageReceiver.h"
@@ -37,7 +39,6 @@
 #include "ProcessModel.h"
 #include "ProcessThrottler.h"
 #include "StatisticsRequest.h"
-#include "StorageManager.h"
 #include "VisitedLinkProvider.h"
 #include "WebContextClient.h"
 #include "WebContextConnectionClient.h"
@@ -62,6 +63,10 @@
 #include "NetworkProcessProxy.h"
 #endif
 
+#if ENABLE(MEDIA_SESSION)
+#include "WebMediaSessionFocusManager.h"
+#endif
+
 #if PLATFORM(COCOA)
 OBJC_CLASS NSMutableDictionary;
 OBJC_CLASS NSObject;
@@ -71,7 +76,7 @@ OBJC_CLASS NSString;
 namespace API {
 class DownloadClient;
 class LegacyContextHistoryClient;
-class ProcessPoolConfiguration;
+class PageConfiguration;
 }
 
 namespace WebKit {
@@ -82,7 +87,6 @@ class WebIconDatabase;
 class WebPageGroup;
 class WebPageProxy;
 struct StatisticsData;
-struct WebPageConfiguration;
 struct WebProcessCreationParameters;
     
 typedef GenericCallback<API::Dictionary*> DictionaryCallback;
@@ -139,10 +143,10 @@ public:
     void setDownloadClient(std::unique_ptr<API::DownloadClient>);
 
     void setProcessModel(ProcessModel); // Can only be called when there are no processes running.
-    ProcessModel processModel() const { return m_processModel; }
+    ProcessModel processModel() const { return m_configuration->processModel(); }
 
     void setMaximumNumberOfProcesses(unsigned); // Can only be called when there are no processes running.
-    unsigned maximumNumberOfProcesses() const { return m_webProcessCountLimit; }
+    unsigned maximumNumberOfProcesses() const { return !m_configuration->maximumProcessCount() ? UINT_MAX : m_configuration->maximumProcessCount(); }
 
     const Vector<RefPtr<WebProcessProxy>>& processes() const { return m_processes; }
 
@@ -162,15 +166,14 @@ public:
 
     void processDidFinishLaunching(WebProcessProxy*);
 
-    void applicationWillTerminate();
     // Disconnect the process from the context.
     void disconnectProcess(WebProcessProxy*);
 
-    StorageManager& storageManager() const { return *m_storageManager; }
+    API::WebsiteDataStore* websiteDataStore() const { return m_websiteDataStore.get(); }
 
-    PassRefPtr<WebPageProxy> createWebPage(PageClient&, WebPageConfiguration);
+    PassRefPtr<WebPageProxy> createWebPage(PageClient&, Ref<API::PageConfiguration>&&);
 
-    const String& injectedBundlePath() const { return m_injectedBundlePath; }
+    const String& injectedBundlePath() const { return m_configuration->injectedBundlePath(); }
 
     DownloadProxy* download(WebPageProxy* initiatingPage, const WebCore::ResourceRequest&);
     DownloadProxy* resumeDownload(const API::Data* resumeData, const String& path);
@@ -185,6 +188,9 @@ public:
     void setAdditionalPluginsDirectory(const String&);
 
     PluginInfoStore& pluginInfoStore() { return m_pluginInfoStore; }
+
+    void setPluginLoadClientPolicy(WebCore::PluginLoadClientPolicy, const String& host, const String& bundleIdentifier, const String& versionString);
+    void clearPluginClientPolicies();
 #endif
 
 #if ENABLE(NETWORK_PROCESS)
@@ -210,7 +216,7 @@ public:
     VisitedLinkProvider& visitedLinkProvider() { return m_visitedLinkProvider.get(); }
 
     void setCacheModel(CacheModel);
-    CacheModel cacheModel() const { return m_cacheModel; }
+    CacheModel cacheModel() const { return m_configuration->cacheModel(); }
 
     void setDefaultRequestTimeoutInterval(double);
 
@@ -230,9 +236,6 @@ public:
     WebContextClient& client() { return m_client; }
 
     WebIconDatabase* iconDatabase() const { return m_iconDatabase.get(); }
-#if ENABLE(NETSCAPE_PLUGIN_API)
-    WebPluginSiteDataManager* pluginSiteDataManager() const { return m_pluginSiteDataManager.get(); }
-#endif
 
     struct Statistics {
         unsigned wkViewCount;
@@ -241,13 +244,12 @@ public:
     };
     static Statistics& statistics();    
 
-    void setApplicationCacheDirectory(const String& dir) { m_overrideApplicationCacheDirectory = dir; }
     void setIconDatabasePath(const String&);
     String iconDatabasePath() const;
-    void setDiskCacheDirectory(const String& dir) { m_overrideDiskCacheDirectory = dir; }
     void setCookieStorageDirectory(const String& dir) { m_overrideCookieStorageDirectory = dir; }
 
     void useTestingNetworkSession();
+    bool isUsingTestingNetworkSession() const { return m_shouldUseTestingNetworkSession; }
 
     void allowSpecificHTTPSCertificateForHost(const WebCertificateInfo*, const String& host);
 
@@ -288,7 +290,7 @@ public:
     bool usesNetworkProcess() const;
 
 #if ENABLE(NETWORK_PROCESS)
-    void ensureNetworkProcess();
+    NetworkProcessProxy& ensureNetworkProcess();
     NetworkProcessProxy* networkProcess() { return m_networkProcess.get(); }
     void networkProcessCrashed(NetworkProcessProxy*);
 
@@ -297,6 +299,7 @@ public:
 
 #if ENABLE(DATABASE_PROCESS)
     void ensureDatabaseProcess();
+    DatabaseProcessProxy* databaseProcess() { return m_databaseProcess.get(); }
     void getDatabaseProcessConnection(PassRefPtr<Messages::WebProcessProxy::GetDatabaseProcessConnection::DelayedReply>);
     void databaseProcessCrashed(DatabaseProcessProxy*);
 #endif
@@ -324,6 +327,7 @@ public:
 
     bool isURLKnownHSTSHost(const String& urlString, bool privateBrowsingEnabled) const;
     void resetHSTSHosts();
+    void resetHSTSHostsAddedAfterDate(double startDateIntervalSince1970);
 
     void registerSchemeForCustomProtocol(const String&);
     void unregisterSchemeForCustomProtocol(const String&);
@@ -342,6 +346,7 @@ public:
 #endif
 
     void setMemoryCacheDisabled(bool);
+    void setFontWhitelist(API::Array*);
 
     UserObservablePageToken userObservablePageCount()
     {
@@ -358,6 +363,9 @@ public:
     static String legacyPlatformDefaultIndexedDBDatabaseDirectory();
     static String legacyPlatformDefaultWebSQLDatabaseDirectory();
     static String legacyPlatformDefaultMediaKeysStorageDirectory();
+    static String legacyPlatformDefaultApplicationCacheDirectory();
+    static String legacyPlatformDefaultNetworkCacheDirectory();
+    static bool isNetworkCacheEnabled();
 
 private:
     void platformInitialize();
@@ -387,22 +395,16 @@ private:
     static void languageChanged(void* context);
     void languageChanged();
 
-    String applicationCacheDirectory() const;
-    String platformDefaultApplicationCacheDirectory() const;
-
     String platformDefaultIconDatabasePath() const;
 
-    String diskCacheDirectory() const;
-    String platformDefaultDiskCacheDirectory() const;
-
+#if PLATFORM(IOS) || ENABLE(SECCOMP_FILTERS)
     String cookieStorageDirectory() const;
-    String platformDefaultCookieStorageDirectory() const;
+#endif
 
 #if PLATFORM(IOS)
-    String openGLCacheDirectory() const;
     String parentBundleDirectory() const;
-    String networkingHSTSDatabasePath() const;
-    String webContentHSTSDatabasePath() const;
+    String networkingCachesDirectory() const;
+    String webContentCachesDirectory() const;
     String containerTemporaryDirectory() const;
 #endif
 
@@ -425,9 +427,6 @@ private:
 
     IPC::MessageReceiverMap m_messageReceiverMap;
 
-    ProcessModel m_processModel;
-    unsigned m_webProcessCountLimit; // The limit has no effect when process model is ProcessModelSharedSecondaryProcess.
-    
     Vector<RefPtr<WebProcessProxy>> m_processes;
     bool m_haveInitialEmptyProcess;
 
@@ -436,7 +435,6 @@ private:
     Ref<WebPageGroup> m_defaultPageGroup;
 
     RefPtr<API::Object> m_injectedBundleInitializationUserData;
-    String m_injectedBundlePath;
     WebContextInjectedBundleClient m_injectedBundleClient;
 
     WebContextClient m_client;
@@ -467,22 +465,18 @@ private:
     bool m_alwaysUsesComplexTextCodePath;
     bool m_shouldUseFontSmoothing;
 
+    Vector<String> m_fontWhitelist;
+
     // Messages that were posted before any pages were created.
     // The client should use initialization messages instead, so that a restarted process would get the same state.
     Vector<std::pair<String, RefPtr<API::Object>>> m_messagesToInjectedBundlePostedToEmptyContext;
-
-    CacheModel m_cacheModel;
 
     bool m_memorySamplerEnabled;
     double m_memorySamplerInterval;
 
     RefPtr<WebIconDatabase> m_iconDatabase;
-#if ENABLE(NETSCAPE_PLUGIN_API)
-    RefPtr<WebPluginSiteDataManager> m_pluginSiteDataManager;
-#endif
 
-    RefPtr<WebsiteDataStore> m_websiteDataStore;
-    RefPtr<StorageManager> m_storageManager;
+    const RefPtr<API::WebsiteDataStore> m_websiteDataStore;
 
     typedef HashMap<const char*, RefPtr<WebContextSupplement>, PtrHash<const char*>> WebContextSupplementMap;
     WebContextSupplementMap m_supplements;
@@ -499,14 +493,8 @@ private:
     RetainPtr<NSObject> m_automaticDashSubstitutionNotificationObserver;
 #endif
 
-    String m_overrideApplicationCacheDirectory;
     String m_overrideIconDatabasePath;
-    String m_overrideDiskCacheDirectory;
     String m_overrideCookieStorageDirectory;
-
-    String m_webSQLDatabaseDirectory;
-    String m_indexedDBDatabaseDirectory;
-    String m_mediaKeysStorageDirectory;
 
     bool m_shouldUseTestingNetworkSession;
 
@@ -514,7 +502,7 @@ private:
 
 #if ENABLE(NETWORK_PROCESS)
     bool m_canHandleHTTPSServerTrustEvaluation;
-    bool m_usesNetworkProcess;
+    bool m_didNetworkProcessCrash;
     RefPtr<NetworkProcessProxy> m_networkProcess;
 #endif
 
@@ -542,15 +530,19 @@ private:
 #if ENABLE(CONTENT_EXTENSIONS)
     HashMap<String, String> m_encodedContentExtensions;
 #endif
+
+#if ENABLE(NETSCAPE_PLUGIN_API)
+    HashMap<String, HashMap<String, HashMap<String, uint8_t>>> m_pluginLoadClientPolicies;
+#endif
 };
 
 template<typename T>
 void WebProcessPool::sendToNetworkingProcess(T&& message)
 {
-    switch (m_processModel) {
+    switch (processModel()) {
     case ProcessModelSharedSecondaryProcess:
 #if ENABLE(NETWORK_PROCESS)
-        if (m_usesNetworkProcess) {
+        if (usesNetworkProcess()) {
             if (m_networkProcess && m_networkProcess->canSendMessage())
                 m_networkProcess->send(std::forward<T>(message), 0);
             return;
@@ -574,10 +566,10 @@ void WebProcessPool::sendToNetworkingProcess(T&& message)
 template<typename T>
 void WebProcessPool::sendToNetworkingProcessRelaunchingIfNecessary(T&& message)
 {
-    switch (m_processModel) {
+    switch (processModel()) {
     case ProcessModelSharedSecondaryProcess:
 #if ENABLE(NETWORK_PROCESS)
-        if (m_usesNetworkProcess) {
+        if (usesNetworkProcess()) {
             ensureNetworkProcess();
             m_networkProcess->send(std::forward<T>(message), 0);
             return;
@@ -624,7 +616,7 @@ template<typename T>
 void WebProcessPool::sendToAllProcessesRelaunchingThemIfNecessary(const T& message)
 {
     // FIXME (Multi-WebProcess): WebProcessPool doesn't track processes that have exited, so it cannot relaunch these. Perhaps this functionality won't be needed in this mode.
-    if (m_processModel == ProcessModelSharedSecondaryProcess)
+    if (processModel() == ProcessModelSharedSecondaryProcess)
         ensureSharedWebProcess();
     sendToAllProcesses(message);
 }
@@ -632,7 +624,7 @@ void WebProcessPool::sendToAllProcessesRelaunchingThemIfNecessary(const T& messa
 template<typename T>
 void WebProcessPool::sendToOneProcess(T&& message)
 {
-    if (m_processModel == ProcessModelSharedSecondaryProcess)
+    if (processModel() == ProcessModelSharedSecondaryProcess)
         ensureSharedWebProcess();
 
     bool messageSent = false;
@@ -646,7 +638,7 @@ void WebProcessPool::sendToOneProcess(T&& message)
         }
     }
 
-    if (!messageSent && m_processModel == ProcessModelMultipleSecondaryProcesses) {
+    if (!messageSent && processModel() == ProcessModelMultipleSecondaryProcesses) {
         warmInitialProcess();
         RefPtr<WebProcessProxy> process = m_processes.last();
         if (process->canSendMessage())

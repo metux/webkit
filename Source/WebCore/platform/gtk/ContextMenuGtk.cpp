@@ -24,8 +24,8 @@
 #include "ContextMenu.h"
 
 #include <gtk/gtk.h>
-#include <wtf/gobject/GRefPtr.h>
-#include <wtf/gobject/GUniquePtr.h>
+#include <wtf/glib/GRefPtr.h>
+#include <wtf/glib/GUniquePtr.h>
 
 namespace WebCore {
 
@@ -61,7 +61,6 @@ void ContextMenu::appendItem(ContextMenuItem& item)
 
 void ContextMenu::setPlatformDescription(PlatformMenuDescription menu)
 {
-    ASSERT(menu);
     if (m_platformDescription == menu)
         return;
     if (m_platformDescription)

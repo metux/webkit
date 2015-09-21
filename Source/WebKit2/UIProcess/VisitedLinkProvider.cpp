@@ -54,8 +54,10 @@ Ref<VisitedLinkProvider> VisitedLinkProvider::create()
 
 VisitedLinkProvider::~VisitedLinkProvider()
 {
-    for (WebProcessProxy* process : m_processes)
+    for (WebProcessProxy* process : m_processes) {
+        process->removeMessageReceiver(Messages::VisitedLinkProvider::messageReceiverName(), m_identifier);
         process->didDestroyVisitedLinkProvider(*this);
+    }
 }
 
 VisitedLinkProvider::VisitedLinkProvider()
@@ -200,7 +202,7 @@ void VisitedLinkProvider::pendingVisitedLinksTimerFired()
 
 void VisitedLinkProvider::resizeTable(unsigned newTableSize)
 {
-    RefPtr<SharedMemory> newTableMemory = SharedMemory::create(newTableSize * sizeof(LinkHash));
+    RefPtr<SharedMemory> newTableMemory = SharedMemory::allocate(newTableSize * sizeof(LinkHash));
 
     if (!newTableMemory) {
         LOG_ERROR("Could not allocate shared memory for visited link table");
@@ -248,7 +250,7 @@ void VisitedLinkProvider::sendTable(WebProcessProxy& process)
     ASSERT(process.processPool().processes().contains(&process));
 
     SharedMemory::Handle handle;
-    if (!m_table.sharedMemory()->createHandle(handle, SharedMemory::ReadOnly))
+    if (!m_table.sharedMemory()->createHandle(handle, SharedMemory::Protection::ReadOnly))
         return;
 
     process.connection()->send(Messages::VisitedLinkTableController::SetVisitedLinkTable(handle), m_identifier);

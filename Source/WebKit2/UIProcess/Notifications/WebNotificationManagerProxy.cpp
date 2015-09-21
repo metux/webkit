@@ -50,9 +50,9 @@ const char* WebNotificationManagerProxy::supplementName()
     return "WebNotificationManagerProxy";
 }
 
-PassRefPtr<WebNotificationManagerProxy> WebNotificationManagerProxy::create(WebProcessPool* processPool)
+Ref<WebNotificationManagerProxy> WebNotificationManagerProxy::create(WebProcessPool* processPool)
 {
-    return adoptRef(new WebNotificationManagerProxy(processPool));
+    return adoptRef(*new WebNotificationManagerProxy(processPool));
 }
 
 WebNotificationManagerProxy::WebNotificationManagerProxy(WebProcessPool* processPool)
@@ -91,7 +91,7 @@ void WebNotificationManagerProxy::populateCopyOfNotificationPermissions(HashMap<
         return;
 
     permissions.clear();
-    RefPtr<API::Array> knownOrigins = knownPermissions->keys();
+    Ref<API::Array> knownOrigins = knownPermissions->keys();
     for (size_t i = 0; i < knownOrigins->size(); ++i) {
         API::String* origin = knownOrigins->at<API::String>(i);
         permissions.set(origin->string(), knownPermissions->get<API::Boolean>(origin->string())->value());

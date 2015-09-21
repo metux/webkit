@@ -196,10 +196,10 @@ void HistoryItem::reset()
 
     m_itemSequenceNumber = generateSequenceNumber();
 
-    m_stateObject = 0;
+    m_stateObject = nullptr;
     m_documentSequenceNumber = generateSequenceNumber();
 
-    m_formData = 0;
+    m_formData = nullptr;
     m_formContentType = String();
 
     clearChildren();
@@ -349,6 +349,16 @@ const Vector<String>& HistoryItem::documentState() const
 void HistoryItem::clearDocumentState()
 {
     m_documentState.clear();
+}
+
+void HistoryItem::setShouldOpenExternalURLsPolicy(ShouldOpenExternalURLsPolicy policy)
+{
+    m_shouldOpenExternalURLsPolicy = policy;
+}
+
+ShouldOpenExternalURLsPolicy HistoryItem::shouldOpenExternalURLsPolicy() const
+{
+    return m_shouldOpenExternalURLsPolicy;
 }
 
 bool HistoryItem::isTargetItem() const
@@ -524,7 +534,7 @@ void HistoryItem::setFormInfoFromRequest(const ResourceRequest& request)
         m_formData = request.httpBody();
         m_formContentType = request.httpContentType();
     } else {
-        m_formData = 0;
+        m_formData = nullptr;
         m_formContentType = String();
     }
 }

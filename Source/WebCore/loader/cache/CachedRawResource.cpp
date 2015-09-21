@@ -42,7 +42,6 @@ CachedRawResource::CachedRawResource(ResourceRequest& resourceRequest, Type type
     , m_identifier(0)
     , m_allowEncodedDataReplacement(true)
 {
-    // FIXME: The wrong CachedResource::Type here may cause a bad cast elsewhere.
     ASSERT(isMainOrRawResource());
 }
 
@@ -133,14 +132,23 @@ void CachedRawResource::didAddClient(CachedResourceClient* c)
     for (size_t i = 0; i < redirectCount; i++) {
         RedirectPair redirect = m_redirectChain[i];
         ResourceRequest request(redirect.m_request);
-        client->redirectReceived(this, request, redirect.m_redirectResponse);
-        if (!hasClient(c))
+        bool shouldContinue = true;
+        client->syntheticRedirectReceived(this, request, redirect.m_redirectResponse, shouldContinue);
+        if (!hasClient(c) || !shouldContinue)
             return;
     }
     ASSERT(redirectCount == m_redirectChain.size());
 
-    if (!m_response.isNull())
-        client->responseReceived(this, m_response);
+    if (!m_response.isNull()) {
+        ResourceResponse response(m_response);
+        if (validationCompleting())
+            response.setSource(ResourceResponse::Source::MemoryCacheAfterValidation);
+        else {
+            ASSERT(!validationInProgress());
+            response.setSource(ResourceResponse::Source::MemoryCache);
+        }
+        client->responseReceived(this, response);
+    }
     if (!hasClient(c))
         return;
     if (m_data)
@@ -156,7 +164,7 @@ void CachedRawResource::allClientsRemoved()
         m_loader->cancelIfNotFinishing();
 }
 
-void CachedRawResource::willSendRequest(ResourceRequest& request, const ResourceResponse& response)
+void CachedRawResource::redirectReceived(ResourceRequest& request, const ResourceResponse& response)
 {
     CachedResourceHandle<CachedRawResource> protect(this);
     if (!response.isNull()) {
@@ -165,7 +173,7 @@ void CachedRawResource::willSendRequest(ResourceRequest& request, const Resource
             c->redirectReceived(this, request, response);
         m_redirectChain.append(RedirectPair(request, response));
     }
-    CachedResource::willSendRequest(request, response);
+    CachedResource::redirectReceived(request, response);
 }
 
 void CachedRawResource::responseReceived(const ResourceResponse& response)
@@ -269,7 +277,7 @@ bool CachedRawResource::canReuse(const ResourceRequest& newRequest) const
 
 void CachedRawResource::clear()
 {
-    m_data.clear();
+    m_data = nullptr;
     setEncodedSize(0);
     if (m_loader)
         m_loader->clearResourceData();

@@ -30,6 +30,10 @@
 
 #include "ArgumentCoders.h"
 
+#if PLATFORM(COCOA)
+#include "ArgumentCodersCF.h"
+#endif
+
 namespace WebKit {
 
 NetworkProcessCreationParameters::NetworkProcessCreationParameters()
@@ -40,6 +44,7 @@ void NetworkProcessCreationParameters::encode(IPC::ArgumentEncoder& encoder) con
 {
     encoder << privateBrowsingEnabled;
     encoder.encodeEnum(cacheModel);
+    encoder << diskCacheSizeOverride;
     encoder << canHandleHTTPSServerTrustEvaluation;
     encoder << diskCacheDirectory;
     encoder << diskCacheDirectoryExtensionHandle;
@@ -47,10 +52,15 @@ void NetworkProcessCreationParameters::encode(IPC::ArgumentEncoder& encoder) con
     encoder << shouldEnableNetworkCache;
     encoder << shouldEnableNetworkCacheEfficacyLogging;
 #endif
+#if ENABLE(SECCOMP_FILTERS)
     encoder << cookieStorageDirectory;
+#endif
+#if PLATFORM(MAC) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 101100
+    encoder << uiProcessCookieStorageIdentifier;
+#endif
 #if PLATFORM(IOS)
     encoder << cookieStorageDirectoryExtensionHandle;
-    encoder << hstsDatabasePathExtensionHandle;
+    encoder << containerCachesDirectoryExtensionHandle;
     encoder << parentBundleDirectoryExtensionHandle;
 #endif
     encoder << shouldUseTestingNetworkSession;
@@ -62,6 +72,9 @@ void NetworkProcessCreationParameters::encode(IPC::ArgumentEncoder& encoder) con
     encoder << nsURLCacheDiskCapacity;
     encoder << httpProxy;
     encoder << httpsProxy;
+#if (TARGET_OS_IPHONE && __IPHONE_OS_VERSION_MIN_REQUIRED >= 90000) || (PLATFORM(MAC) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 101100)
+    IPC::encode(encoder, networkATSContext.get());
+#endif
 #endif
 #if USE(SOUP)
     encoder << cookiePersistentStoragePath;
@@ -78,6 +91,8 @@ bool NetworkProcessCreationParameters::decode(IPC::ArgumentDecoder& decoder, Net
         return false;
     if (!decoder.decodeEnum(result.cacheModel))
         return false;
+    if (!decoder.decode(result.diskCacheSizeOverride))
+        return false;
     if (!decoder.decode(result.canHandleHTTPSServerTrustEvaluation))
         return false;
     if (!decoder.decode(result.diskCacheDirectory))
@@ -90,12 +105,18 @@ bool NetworkProcessCreationParameters::decode(IPC::ArgumentDecoder& decoder, Net
     if (!decoder.decode(result.shouldEnableNetworkCacheEfficacyLogging))
         return false;
 #endif
+#if ENABLE(SECCOMP_FILTERS)
     if (!decoder.decode(result.cookieStorageDirectory))
         return false;
+#endif
+#if PLATFORM(MAC) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 101100
+    if (!decoder.decode(result.uiProcessCookieStorageIdentifier))
+        return false;
+#endif
 #if PLATFORM(IOS)
     if (!decoder.decode(result.cookieStorageDirectoryExtensionHandle))
         return false;
-    if (!decoder.decode(result.hstsDatabasePathExtensionHandle))
+    if (!decoder.decode(result.containerCachesDirectoryExtensionHandle))
         return false;
     if (!decoder.decode(result.parentBundleDirectoryExtensionHandle))
         return false;
@@ -117,6 +138,10 @@ bool NetworkProcessCreationParameters::decode(IPC::ArgumentDecoder& decoder, Net
         return false;
     if (!decoder.decode(result.httpsProxy))
         return false;
+#if (TARGET_OS_IPHONE && __IPHONE_OS_VERSION_MIN_REQUIRED >= 90000) || (PLATFORM(MAC) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 101100)
+    if (!IPC::decode(decoder, result.networkATSContext))
+        return false;
+#endif
 #endif
 
 #if USE(SOUP)

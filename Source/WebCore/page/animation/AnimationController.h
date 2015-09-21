@@ -39,17 +39,24 @@ class AnimationControllerPrivate;
 class Document;
 class Element;
 class Frame;
+class LayoutRect;
 class RenderElement;
 class RenderStyle;
 
 class AnimationController {
+    WTF_MAKE_FAST_ALLOCATED;
 public:
     explicit AnimationController(Frame&);
     ~AnimationController();
 
     void cancelAnimations(RenderElement&);
-    Ref<RenderStyle> updateAnimations(RenderElement&, Ref<RenderStyle>&& newStyle);
+    bool updateAnimations(RenderElement&, RenderStyle& newStyle, Ref<RenderStyle>& animatedStyle);
     PassRefPtr<RenderStyle> getAnimatedStyleForRenderer(RenderElement&);
+
+    // If possible, compute the visual extent of any transform animation on the given renderer
+    // using the given rect, returning the result in the rect. Return false if there is some
+    // transform animation but we were unable to cheaply compute its affect on the extent.
+    bool computeExtentOfAnimation(RenderElement&, LayoutRect&) const;
 
     // This is called when an accelerated animation or transition has actually started to animate.
     void notifyAnimationStarted(RenderElement&, double startTime);
@@ -79,6 +86,11 @@ public:
     WEBCORE_EXPORT void setAllowsNewAnimationsWhileSuspended(bool);
     
     static bool supportsAcceleratedAnimationOfProperty(CSSPropertyID);
+
+#if ENABLE(CSS_ANIMATIONS_LEVEL_2)
+    bool wantsScrollUpdates() const;
+    void scrollWasUpdated();
+#endif
 
 private:
     const std::unique_ptr<AnimationControllerPrivate> m_data;

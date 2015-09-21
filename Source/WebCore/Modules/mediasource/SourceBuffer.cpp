@@ -151,7 +151,7 @@ SourceBuffer::~SourceBuffer()
 {
     ASSERT(isRemoved());
 
-    m_private->setClient(0);
+    m_private->setClient(nullptr);
 }
 
 PassRefPtr<TimeRanges> SourceBuffer::buffered(ExceptionCode& ec) const
@@ -447,7 +447,7 @@ void SourceBuffer::removedFromMediaSource()
     }
 
     m_private->removedFromMediaSource();
-    m_source = 0;
+    m_source = nullptr;
 }
 
 void SourceBuffer::seekToTime(const MediaTime& time)
@@ -508,6 +508,16 @@ void SourceBuffer::stop()
 {
     m_appendBufferTimer.stop();
     m_removeTimer.stop();
+}
+
+bool SourceBuffer::canSuspendForPageCache() const
+{
+    return !hasPendingActivity();
+}
+
+const char* SourceBuffer::activeDOMObjectName() const
+{
+    return "SourceBuffer";
 }
 
 bool SourceBuffer::isRemoved() const
@@ -1372,7 +1382,7 @@ void SourceBuffer::sourceBufferPrivateDidReceiveSample(SourceBufferPrivate*, Pas
         MediaTime frameDuration = sample->duration();
 
         // 1.3 If mode equals "sequence" and group start timestamp is set, then run the following steps:
-        if (m_mode == sequenceKeyword()) {
+        if (m_mode == sequenceKeyword() && m_groupStartTimestamp.isValid()) {
             // 1.3.1 Set timestampOffset equal to group start timestamp - presentation timestamp.
             m_timestampOffset = m_groupStartTimestamp;
 
@@ -1437,8 +1447,11 @@ void SourceBuffer::sourceBufferPrivateDidReceiveSample(SourceBufferPrivate*, Pas
             continue;
         }
 
-        if (m_timestampOffset) {
-            // Reflect the new timestamps back into the sample.
+        if (m_mode == sequenceKeyword()) {
+            // Use the generated timestamps instead of the sample's timestamps.
+            sample->setTimestamps(presentationTimestamp, decodeTimestamp);
+        } else if (m_timestampOffset) {
+            // Reflect the timestamp offset into the sample.
             sample->offsetTimestampsBy(m_timestampOffset);
         }
 
@@ -1783,14 +1796,18 @@ void SourceBuffer::provideMediaData(TrackBuffer& trackBuffer, AtomicString track
     unsigned enqueuedSamples = 0;
 #endif
 
-    auto sampleIt = trackBuffer.decodeQueue.begin();
-    for (auto sampleEnd = trackBuffer.decodeQueue.end(); sampleIt != sampleEnd; ++sampleIt) {
+    while (!trackBuffer.decodeQueue.empty()) {
         if (!m_private->isReadyForMoreSamples(trackID)) {
             m_private->notifyClientWhenReadyForMoreSamples(trackID);
             break;
         }
 
-        RefPtr<MediaSample> sample = sampleIt->second;
+        // FIXME(rdar://problem/20635969): Remove this re-entrancy protection when the aforementioned radar is resolved; protecting
+        // against re-entrancy introduces a small inefficency when removing appended samples from the decode queue one at a time
+        // rather than when all samples have been enqueued.
+        RefPtr<MediaSample> sample = trackBuffer.decodeQueue.begin()->second;
+        trackBuffer.decodeQueue.erase(trackBuffer.decodeQueue.begin());
+
         // Do not enqueue samples spanning a significant unbuffered gap.
         // NOTE: one second is somewhat arbitrary. MediaSource::monitorSourceBuffers() is run
         // on the playbackTimer, which is effectively every 350ms. Allowing > 350ms gap between
@@ -1808,9 +1825,7 @@ void SourceBuffer::provideMediaData(TrackBuffer& trackBuffer, AtomicString track
 #if !LOG_DISABLED
         ++enqueuedSamples;
 #endif
-
     }
-    trackBuffer.decodeQueue.erase(trackBuffer.decodeQueue.begin(), sampleIt);
 
     LOG(MediaSource, "SourceBuffer::provideMediaData(%p) - Enqueued %u samples", this, enqueuedSamples);
 }
@@ -1889,7 +1904,7 @@ void SourceBuffer::monitorBufferingRate()
 std::unique_ptr<PlatformTimeRanges> SourceBuffer::bufferedAccountingForEndOfStream() const
 {
     // FIXME: Revisit this method once the spec bug <https://www.w3.org/Bugs/Public/show_bug.cgi?id=26436> is resolved.
-    std::unique_ptr<PlatformTimeRanges> virtualRanges = PlatformTimeRanges::create(m_buffered->ranges());
+    auto virtualRanges = std::make_unique<PlatformTimeRanges>(m_buffered->ranges());
     if (m_source->isEnded()) {
         MediaTime start = virtualRanges->maximumBufferedTime();
         MediaTime end = m_source->duration();

@@ -36,8 +36,8 @@
 #include "WebContextMenuProxyGtk.h"
 #include "WebEventFactory.h"
 #include "WebKitColorChooser.h"
-#include "WebKitWebView.h"
 #include "WebKitWebViewBasePrivate.h"
+#include "WebKitWebViewPrivate.h"
 #include "WebPageProxy.h"
 #include "WebPopupMenuProxyGtk.h"
 #include "WebProcessPool.h"
@@ -47,11 +47,6 @@
 #include <wtf/text/CString.h>
 #include <wtf/text/WTFString.h>
 
-#if PLATFORM(X11)
-#include <gdk/gdkx.h>
-#undef KeyPress
-#endif
-
 using namespace WebCore;
 
 namespace WebKit {
@@ -59,15 +54,6 @@ namespace WebKit {
 PageClientImpl::PageClientImpl(GtkWidget* viewWidget)
     : m_viewWidget(viewWidget)
 {
-}
-
-void PageClientImpl::getEditorCommandsForKeyEvent(const NativeWebKeyboardEvent& event, const AtomicString& eventType, Vector<WTF::String>& commandList)
-{
-    ASSERT(eventType == eventNames().keydownEvent || eventType == eventNames().keypressEvent);
-
-    KeyBindingTranslator::EventType type = eventType == eventNames().keydownEvent ?
-        KeyBindingTranslator::KeyDown : KeyBindingTranslator::KeyPress;
-    m_keyBindingTranslator.getEditorCommandsForKeyEvent(const_cast<GdkEventKey*>(&event.nativeEvent()->key), type, commandList);
 }
 
 // PageClient's pure virtual functions
@@ -91,7 +77,7 @@ void PageClientImpl::scrollView(const WebCore::IntRect& scrollRect, const WebCor
     setViewNeedsDisplay(scrollRect);
 }
 
-void PageClientImpl::requestScroll(const WebCore::FloatPoint&, bool)
+void PageClientImpl::requestScroll(const WebCore::FloatPoint&, const WebCore::IntPoint&, bool)
 {
     notImplemented();
 }
@@ -220,24 +206,29 @@ void PageClientImpl::doneWithKeyEvent(const NativeWebKeyboardEvent& event, bool 
     gtk_main_do_event(event.nativeEvent());
 }
 
-PassRefPtr<WebPopupMenuProxy> PageClientImpl::createPopupMenuProxy(WebPageProxy* page)
+RefPtr<WebPopupMenuProxy> PageClientImpl::createPopupMenuProxy(WebPageProxy* page)
 {
     return WebPopupMenuProxyGtk::create(m_viewWidget, page);
 }
 
-PassRefPtr<WebContextMenuProxy> PageClientImpl::createContextMenuProxy(WebPageProxy* page)
+RefPtr<WebContextMenuProxy> PageClientImpl::createContextMenuProxy(WebPageProxy* page)
 {
     return WebContextMenuProxyGtk::create(m_viewWidget, page);
 }
 
-PassRefPtr<WebColorPicker> PageClientImpl::createColorPicker(WebPageProxy* page, const WebCore::Color& color, const WebCore::IntRect& rect)
+RefPtr<WebColorPicker> PageClientImpl::createColorPicker(WebPageProxy* page, const WebCore::Color& color, const WebCore::IntRect& rect)
 {
     if (WEBKIT_IS_WEB_VIEW(m_viewWidget))
         return WebKitColorChooser::create(*page, color, rect);
     return WebColorPickerGtk::create(*page, color, rect);
 }
 
-void PageClientImpl::setTextIndicator(PassRefPtr<WebCore::TextIndicator>, bool /* fadeOut */)
+void PageClientImpl::setTextIndicator(Ref<WebCore::TextIndicator>, WebCore::TextIndicatorLifetime)
+{
+    notImplemented();
+}
+
+void PageClientImpl::clearTextIndicator(WebCore::TextIndicatorDismissalAnimation)
 {
     notImplemented();
 }
@@ -272,9 +263,11 @@ void PageClientImpl::preferencesDidChange()
     notImplemented();
 }
 
-void PageClientImpl::updateTextInputState()
+void PageClientImpl::selectionDidChange()
 {
     webkitWebViewBaseUpdateTextInputState(WEBKIT_WEB_VIEW_BASE(m_viewWidget));
+    if (WEBKIT_IS_WEB_VIEW(m_viewWidget))
+        webkitWebViewSelectionDidChange(WEBKIT_WEB_VIEW(m_viewWidget));
 }
 
 #if ENABLE(DRAG_SUPPORT)
@@ -416,6 +409,10 @@ void PageClientImpl::navigationGestureDidEnd(bool, WebBackForwardListItem&)
 {
 }
 
+void PageClientImpl::navigationGestureDidEnd()
+{
+}
+
 void PageClientImpl::willRecordNavigationSnapshot(WebBackForwardListItem&)
 {
 }
@@ -432,18 +429,28 @@ void PageClientImpl::didSameDocumentNavigationForMainFrame(SameDocumentNavigatio
 {
 }
 
-#if ENABLE(VIDEO)
-GUniquePtr<GstInstallPluginsContext> PageClientImpl::createGstInstallPluginsContext()
+void PageClientImpl::didChangeBackgroundColor()
 {
-#if PLATFORM(X11)
-    if (GDK_IS_X11_DISPLAY(gdk_display_manager_get_default_display(gdk_display_manager_get()))) {
-        GUniquePtr<GstInstallPluginsContext> context(gst_install_plugins_context_new());
-        gst_install_plugins_context_set_xid(context.get(), GDK_WINDOW_XID(gtk_widget_get_window(m_viewWidget)));
-        return context;
-    }
-#endif
+}
 
-    return nullptr;
+void PageClientImpl::refView()
+{
+    g_object_ref(m_viewWidget);
+}
+
+void PageClientImpl::derefView()
+{
+    g_object_unref(m_viewWidget);
+}
+
+#if ENABLE(VIDEO)
+bool PageClientImpl::decicePolicyForInstallMissingMediaPluginsPermissionRequest(InstallMissingMediaPluginsPermissionRequest& request)
+{
+    if (!WEBKIT_IS_WEB_VIEW(m_viewWidget))
+        return false;
+
+    webkitWebViewRequestInstallMissingMediaPlugins(WEBKIT_WEB_VIEW(m_viewWidget), request);
+    return true;
 }
 #endif
 

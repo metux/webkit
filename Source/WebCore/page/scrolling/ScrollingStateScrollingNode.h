@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012 Apple Inc. All rights reserved.
+ * Copyright (C) 2012, 2014-2015 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -50,7 +50,10 @@ public:
 #if ENABLE(CSS_SCROLL_SNAP)
         HorizontalSnapOffsets,
         VerticalSnapOffsets,
+        CurrentHorizontalSnapOffsetIndex,
+        CurrentVerticalSnapOffsetIndex,
 #endif
+        ExpectsWheelEventTestTrigger,
     };
 
     const FloatSize& scrollableAreaSize() const { return m_scrollableAreaSize; }
@@ -74,6 +77,12 @@ public:
 
     const Vector<float>& verticalSnapOffsets() const { return m_verticalSnapOffsets; }
     WEBCORE_EXPORT void setVerticalSnapOffsets(const Vector<float>&);
+
+    unsigned currentHorizontalSnapPointIndex() const { return m_currentHorizontalSnapPointIndex; }
+    WEBCORE_EXPORT void setCurrentHorizontalSnapPointIndex(unsigned);
+
+    unsigned currentVerticalSnapPointIndex() const { return m_currentVerticalSnapPointIndex; }
+    WEBCORE_EXPORT void setCurrentVerticalSnapPointIndex(unsigned);
 #endif
 
     const ScrollableAreaParameters& scrollableAreaParameters() const { return m_scrollableAreaParameters; }
@@ -82,7 +91,10 @@ public:
     const FloatPoint& requestedScrollPosition() const { return m_requestedScrollPosition; }
     bool requestedScrollPositionRepresentsProgrammaticScroll() const { return m_requestedScrollPositionRepresentsProgrammaticScroll; }
     WEBCORE_EXPORT void setRequestedScrollPosition(const FloatPoint&, bool representsProgrammaticScroll);
-    
+
+    bool expectsWheelEventTestTrigger() const { return m_expectsWheelEventTestTrigger; }
+    WEBCORE_EXPORT void setExpectsWheelEventTestTrigger(bool);
+
     virtual void dumpProperties(TextStream&, int indent) const override;
     
 protected:
@@ -99,9 +111,12 @@ private:
 #if ENABLE(CSS_SCROLL_SNAP)
     Vector<float> m_horizontalSnapOffsets;
     Vector<float> m_verticalSnapOffsets;
+    unsigned m_currentHorizontalSnapPointIndex { 0 };
+    unsigned m_currentVerticalSnapPointIndex { 0 };
 #endif
     ScrollableAreaParameters m_scrollableAreaParameters;
-    bool m_requestedScrollPositionRepresentsProgrammaticScroll;
+    bool m_requestedScrollPositionRepresentsProgrammaticScroll { false };
+    bool m_expectsWheelEventTestTrigger { false };
 };
 
 } // namespace WebCore

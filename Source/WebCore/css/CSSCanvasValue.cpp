@@ -28,7 +28,6 @@
 
 #include "ImageBuffer.h"
 #include "RenderElement.h"
-#include <wtf/text/StringBuilder.h>
 
 namespace WebCore {
 
@@ -40,11 +39,7 @@ CSSCanvasValue::~CSSCanvasValue()
 
 String CSSCanvasValue::customCSSText() const
 {
-    StringBuilder result;
-    result.appendLiteral("-webkit-canvas(");
-    result.append(m_name);
-    result.append(')');
-    return result.toString();
+    return makeString("-webkit-canvas(", m_name, ')');
 }
 
 void CSSCanvasValue::canvasChanged(HTMLCanvasElement&, const FloatRect& changedRect)
@@ -84,12 +79,12 @@ HTMLCanvasElement* CSSCanvasValue::element(Document& document)
     return m_element;
 }
 
-PassRefPtr<Image> CSSCanvasValue::image(RenderElement* renderer, const FloatSize& /*size*/)
+RefPtr<Image> CSSCanvasValue::image(RenderElement* renderer, const FloatSize& /*size*/)
 {
     ASSERT(clients().contains(renderer));
     HTMLCanvasElement* element = this->element(renderer->document());
     if (!element || !element->buffer())
-        return 0;
+        return nullptr;
     return element->copiedImage();
 }
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008, 2014 Apple Inc. All Rights Reserved.
+ * Copyright (C) 2014, 2015 Apple Inc. All Rights Reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -42,37 +42,12 @@ TypeSet::TypeSet()
 {
 }
 
-RuntimeType TypeSet::getRuntimeTypeForValue(JSValue v)
-{
-    RuntimeType ret;
-    if (v.isFunction())
-        ret = TypeFunction;
-    else if (v.isUndefined())
-        ret = TypeUndefined;
-    else if (v.isNull())
-        ret = TypeNull;
-    else if (v.isBoolean())
-        ret = TypeBoolean;
-    else if (v.isMachineInt())
-        ret = TypeMachineInt;
-    else if (v.isNumber())
-        ret = TypeNumber;
-    else if (v.isString())
-        ret = TypeString;
-    else if (v.isObject())
-        ret = TypeObject;
-    else
-        ret = TypeNothing;
-
-    return ret;
-}
-
 void TypeSet::addTypeInformation(RuntimeType type, PassRefPtr<StructureShape> prpNewShape, Structure* structure) 
 {
     RefPtr<StructureShape> newShape = prpNewShape;
     m_seenTypes = m_seenTypes | type;
 
-    if (structure && newShape && type != TypeString) {
+    if (structure && newShape && !runtimeTypeIsPrimitive(type)) {
         if (!m_structureSet.contains(structure)) {
             m_structureSet.add(structure);
             // Make one more pass making sure that: 
@@ -118,21 +93,23 @@ String TypeSet::dumpTypes() const
     StringBuilder seen;
 
     if (m_seenTypes & TypeFunction)
-         seen.append("Function ");
+        seen.appendLiteral("Function ");
     if (m_seenTypes & TypeUndefined)
-         seen.append("Undefined ");
+        seen.appendLiteral("Undefined ");
     if (m_seenTypes & TypeNull)
-         seen.append("Null ");
+        seen.appendLiteral("Null ");
     if (m_seenTypes & TypeBoolean)
-         seen.append("Boolean ");
+        seen.appendLiteral("Boolean ");
     if (m_seenTypes & TypeMachineInt)
-         seen.append("MachineInt ");
+        seen.appendLiteral("MachineInt ");
     if (m_seenTypes & TypeNumber)
-         seen.append("Number ");
+        seen.appendLiteral("Number ");
     if (m_seenTypes & TypeString)
-         seen.append("String ");
+        seen.appendLiteral("String ");
     if (m_seenTypes & TypeObject)
-         seen.append("Object ");
+        seen.appendLiteral("Object ");
+    if (m_seenTypes & TypeSymbol)
+        seen.appendLiteral("Symbol ");
 
     for (size_t i = 0; i < m_structureHistory.size(); i++) {
         RefPtr<StructureShape> shape = m_structureHistory.at(i);
@@ -141,7 +118,7 @@ String TypeSet::dumpTypes() const
     }
 
     if (m_structureHistory.size()) 
-        seen.append("\nStructures:[ ");
+        seen.appendLiteral("\nStructures:[ ");
     for (size_t i = 0; i < m_structureHistory.size(); i++) {
         seen.append(m_structureHistory.at(i)->stringRepresentation());
         seen.append(' ');
@@ -150,14 +127,14 @@ String TypeSet::dumpTypes() const
         seen.append(']');
 
     if (m_structureHistory.size()) {
-        seen.append("\nLeast Common Ancestor: ");
+        seen.appendLiteral("\nLeast Common Ancestor: ");
         seen.append(leastCommonAncestor());
     }
 
     return seen.toString();
 }
 
-bool TypeSet::doesTypeConformTo(uint8_t test) const
+bool TypeSet::doesTypeConformTo(RuntimeTypeMask test) const
 {
     // This function checks if our seen types conform  to the types described by the test bitstring. (i.e we haven't seen more types than test).
     // We are <= to those types if ANDing with the bitstring doesn't zero out any of our bits.
@@ -208,6 +185,8 @@ String TypeSet::displayName() const
         return ASCIILiteral("Number");
     if (doesTypeConformTo(TypeString))
         return ASCIILiteral("String");
+    if (doesTypeConformTo(TypeSymbol))
+        return ASCIILiteral("Symbol");
 
     if (doesTypeConformTo(TypeNull | TypeUndefined))
         return ASCIILiteral("(?)");
@@ -222,6 +201,8 @@ String TypeSet::displayName() const
         return ASCIILiteral("Number?");
     if (doesTypeConformTo(TypeString | TypeNull | TypeUndefined))
         return ASCIILiteral("String?");
+    if (doesTypeConformTo(TypeSymbol | TypeNull | TypeUndefined))
+        return ASCIILiteral("Symbol?");
    
     if (doesTypeConformTo(TypeObject | TypeFunction | TypeString))
         return ASCIILiteral("Object");
@@ -257,6 +238,7 @@ Ref<Inspector::Protocol::Runtime::TypeSet> TypeSet::inspectorTypeSet() const
         .setIsNumber((m_seenTypes & TypeNumber) != TypeNothing)
         .setIsString((m_seenTypes & TypeString) != TypeNothing)
         .setIsObject((m_seenTypes & TypeObject) != TypeNothing)
+        .setIsSymbol((m_seenTypes & TypeSymbol) != TypeNothing)
         .release();
 }
 
@@ -268,67 +250,73 @@ String TypeSet::toJSONString() const
     //     structures: 'Array<JSON<StructureShape>>'
 
     StringBuilder json;
-    json.append("{");
+    json.append('{');
 
-    json.append("\"displayTypeName\":");
-    json.append("\"");
+    json.appendLiteral("\"displayTypeName\":");
+    json.append('"');
     json.append(displayName());
-    json.append("\"");
-    json.append(",");
+    json.append('"');
+    json.append(',');
 
-    json.append("\"primitiveTypeNames\":");
-    json.append("[");
+    json.appendLiteral("\"primitiveTypeNames\":");
+    json.append('[');
     bool hasAnItem = false;
     if (m_seenTypes & TypeUndefined) {
         hasAnItem = true;
-        json.append("\"Undefined\"");
+        json.appendLiteral("\"Undefined\"");
     }
     if (m_seenTypes & TypeNull) {
         if (hasAnItem)
-            json.append(",");
+            json.append(',');
         hasAnItem = true;
-        json.append("\"Null\"");
+        json.appendLiteral("\"Null\"");
     }
     if (m_seenTypes & TypeBoolean) {
         if (hasAnItem)
-            json.append(",");
+            json.append(',');
         hasAnItem = true;
-        json.append("\"Boolean\"");
+        json.appendLiteral("\"Boolean\"");
     }
     if (m_seenTypes & TypeMachineInt) {
         if (hasAnItem)
-            json.append(",");
+            json.append(',');
         hasAnItem = true;
-        json.append("\"Integer\"");
+        json.appendLiteral("\"Integer\"");
     }
     if (m_seenTypes & TypeNumber) {
         if (hasAnItem)
-            json.append(",");
+            json.append(',');
         hasAnItem = true;
-        json.append("\"Number\"");
+        json.appendLiteral("\"Number\"");
     }
     if (m_seenTypes & TypeString) {
         if (hasAnItem)
-            json.append(",");
+            json.append(',');
         hasAnItem = true;
-        json.append("\"String\"");
+        json.appendLiteral("\"String\"");
     }
-    json.append("]");
+    if (m_seenTypes & TypeSymbol) {
+        if (hasAnItem)
+            json.append(',');
+        hasAnItem = true;
+        json.appendLiteral("\"Symbol\"");
+    }
+    json.append(']');
 
-    json.append(",");
+    json.append(',');
 
-    json.append("\"structures\":");
-    json.append("[");
+    json.appendLiteral("\"structures\":");
+    json.append('[');
     hasAnItem = false;
     for (size_t i = 0; i < m_structureHistory.size(); i++) {
         if (hasAnItem)
-            json.append(",");
+            json.append(',');
         hasAnItem = true;
         json.append(m_structureHistory[i]->toJSONString());
     }
-    json.append("]");
+    json.append(']');
 
-    json.append("}");
+    json.append('}');
     return json.toString();
 }
 
@@ -346,13 +334,13 @@ void StructureShape::markAsFinal()
     m_final = true;
 }
 
-void StructureShape::addProperty(RefPtr<StringImpl> impl)
+void StructureShape::addProperty(UniquedStringImpl& uid)
 {
     ASSERT(!m_final);
-    m_fields.add(impl);
+    m_fields.add(&uid);
 }
 
-String StructureShape::propertyHash() 
+String StructureShape::propertyHash()
 {
     ASSERT(m_final);
     if (m_propertyHash)
@@ -362,16 +350,15 @@ String StructureShape::propertyHash()
     builder.append(':');
     builder.append(m_constructorName);
     builder.append(':');
-    
-    for (auto iter = m_fields.begin(), end = m_fields.end(); iter != end; ++iter) {
-        String property = String((*iter));
+    for (auto& key : m_fields) {
+        String property = key.get();
         property.replace(":", "\\:"); // Ensure that hash({"foo:", "bar"}) != hash({"foo", ":bar"}) because we're using colons as a separator and colons are legal characters in field names in JS.
         builder.append(property);
     }
 
     if (m_proto) {
         builder.append(':');
-        builder.append("__proto__");
+        builder.appendLiteral("__proto__");
         builder.append(m_proto->propertyHash());
     }
 
@@ -421,13 +408,13 @@ String StructureShape::stringRepresentation()
         for (auto it = curShape->m_fields.begin(), end = curShape->m_fields.end(); it != end; ++it) {
             String prop((*it).get());
             representation.append(prop);
-            representation.append(", ");
+            representation.appendLiteral(", ");
         }
 
         if (curShape->m_proto) {
-            String prot = makeString("__proto__ [", curShape->m_proto->m_constructorName, ']');
-            representation.append(prot);
-            representation.append(", ");
+            representation.appendLiteral("__proto__ [");
+            representation.append(curShape->m_proto->m_constructorName);
+            representation.appendLiteral("], ");
         }
 
         curShape = curShape->m_proto;
@@ -450,60 +437,60 @@ String StructureShape::toJSONString() const
     //     proto: 'JSON<StructureShape> | null'
 
     StringBuilder json;
-    json.append("{");
+    json.append('{');
 
-    json.append("\"constructorName\":");
-    json.append("\"");
+    json.appendLiteral("\"constructorName\":");
+    json.append('"');
     json.append(m_constructorName);
-    json.append("\"");
-    json.append(",");
+    json.append('"');
+    json.append(',');
 
-    json.append("\"isInDictionaryMode\":");
+    json.appendLiteral("\"isInDictionaryMode\":");
     if (m_isInDictionaryMode)
-        json.append("true");
+        json.appendLiteral("true");
     else
-        json.append("false");
-    json.append(",");
+        json.appendLiteral("false");
+    json.append(',');
 
-    json.append("\"fields\":");
-    json.append("[");
+    json.appendLiteral("\"fields\":");
+    json.append('[');
     bool hasAnItem = false;
     for (auto it = m_fields.begin(), end = m_fields.end(); it != end; ++it) {
         if (hasAnItem)
-            json.append(",");
+            json.append(',');
         hasAnItem = true;
 
         String fieldName((*it).get());
-        json.append("\"");
+        json.append('"');
         json.append(fieldName);
-        json.append("\"");
+        json.append('"');
     }
-    json.append("]");
-    json.append(",");
+    json.append(']');
+    json.append(',');
 
-    json.append("\"optionalFields\":");
-    json.append("[");
+    json.appendLiteral("\"optionalFields\":");
+    json.append('[');
     hasAnItem = false;
     for (auto it = m_optionalFields.begin(), end = m_optionalFields.end(); it != end; ++it) {
         if (hasAnItem)
-            json.append(",");
+            json.append(',');
         hasAnItem = true;
 
         String fieldName((*it).get());
-        json.append("\"");
+        json.append('"');
         json.append(fieldName);
-        json.append("\"");
+        json.append('"');
     }
-    json.append("]");
-    json.append(",");
+    json.append(']');
+    json.append(',');
 
-    json.append("\"proto\":");
+    json.appendLiteral("\"proto\":");
     if (m_proto)
         json.append(m_proto->toJSONString());
     else
-        json.append("null");
+        json.appendLiteral("null");
 
-    json.append("}");
+    json.append('}');
 
     return json.toString();
 }

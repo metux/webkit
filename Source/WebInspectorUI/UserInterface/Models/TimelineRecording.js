@@ -23,75 +23,62 @@
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-WebInspector.TimelineRecording = function(identifier, displayName)
+WebInspector.TimelineRecording = class TimelineRecording extends WebInspector.Object
 {
-    WebInspector.Object.call(this);
+    constructor(identifier, displayName)
+    {
+        super();
 
-    this._identifier = identifier;
-    this._timelines = new Map;
-    this._displayName = displayName;
-    this._isWritable = true;
+        this._identifier = identifier;
+        this._timelines = new Map;
+        this._displayName = displayName;
+        this._isWritable = true;
 
-    // For legacy backends, we compute the elapsed time of records relative to this timestamp.
-    this._legacyFirstRecordedTimestamp = NaN;
+        // For legacy backends, we compute the elapsed time of records relative to this timestamp.
+        this._legacyFirstRecordedTimestamp = NaN;
 
-    this.reset(true);
-};
-
-WebInspector.TimelineRecording.Event = {
-    Reset: "timeline-recording-reset",
-    Unloaded: "timeline-recording-unloaded",
-    SourceCodeTimelineAdded: "timeline-recording-source-code-timeline-added",
-    TimelineAdded: "timeline-recording-timeline-added",
-    TimelineRemoved: "timeline-recording-timeline-removed",
-    TimesUpdated: "timeline-recording-times-updated"
-};
-
-WebInspector.TimelineRecording.TimestampThresholdForLegacyRecordConversion = 28800000; // Date.parse("Jan 1, 1970")
-
-WebInspector.TimelineRecording.prototype = {
-    constructor: WebInspector.TimelineRecording,
-    __proto__: WebInspector.Object.prototype,
+        this.reset(true);
+    }
 
     // Public
 
     get displayName()
     {
         return this._displayName;
-    },
+    }
 
     get identifier()
     {
         return this._identifier;
-    },
+    }
 
     get timelines()
     {
         return this._timelines;
-    },
+    }
 
     get startTime()
     {
         return this._startTime;
-    },
+    }
 
     get endTime()
     {
         return this._endTime;
-    },
+    }
 
-    saveIdentityToCookie: function()
+    saveIdentityToCookie()
     {
         // Do nothing. Timeline recordings are not persisted when the inspector is
         // re-opened, so do not attempt to restore by identifier or display name.
-    },
+    }
 
-    isWritable: function()
+    isWritable()
     {
         return this._isWritable;
-    },
+    }
 
-    isEmpty: function()
+    isEmpty()
     {
         for (var timeline of this._timelines.values()) {
             if (timeline.records.length)
@@ -99,18 +86,18 @@ WebInspector.TimelineRecording.prototype = {
         }
 
         return true;
-    },
+    }
 
-    unloaded: function()
+    unloaded()
     {
         console.assert(!this.isEmpty(), "Shouldn't unload an empty recording; it should be reused instead.");
 
         this._isWritable = false;
 
         this.dispatchEventToListeners(WebInspector.TimelineRecording.Event.Unloaded);
-    },
+    }
 
-    reset: function(suppressEvents)
+    reset(suppressEvents)
     {
         console.assert(this._isWritable, "Can't reset a read-only recording.");
 
@@ -122,21 +109,23 @@ WebInspector.TimelineRecording.prototype = {
         for (var timeline of this._timelines.values())
             timeline.reset(suppressEvents);
 
+        WebInspector.RenderingFrameTimelineRecord.resetFrameIndex();
+
         if (!suppressEvents) {
             this.dispatchEventToListeners(WebInspector.TimelineRecording.Event.Reset);
             this.dispatchEventToListeners(WebInspector.TimelineRecording.Event.TimesUpdated);
         }
-    },
+    }
 
-    sourceCodeTimelinesForSourceCode: function(sourceCode)
+    sourceCodeTimelinesForSourceCode(sourceCode)
     {
         var timelines = this._sourceCodeTimelinesMap.get(sourceCode);
         if (!timelines)
             return [];
         return [...timelines.values()];
-    },
+    }
 
-    addTimeline: function(timeline)
+    addTimeline(timeline)
     {
         console.assert(timeline instanceof WebInspector.Timeline, timeline);
         console.assert(!this._timelines.has(timeline), this._timelines, timeline);
@@ -144,10 +133,10 @@ WebInspector.TimelineRecording.prototype = {
         this._timelines.set(timeline.type, timeline);
 
         timeline.addEventListener(WebInspector.Timeline.Event.TimesUpdated, this._timelineTimesUpdated, this);
-        this.dispatchEventToListeners(WebInspector.TimelineRecording.Event.TimelineAdded, {timeline: timeline});
-    },
+        this.dispatchEventToListeners(WebInspector.TimelineRecording.Event.TimelineAdded, {timeline});
+    }
 
-    removeTimeline: function(timeline)
+    removeTimeline(timeline)
     {
         console.assert(timeline instanceof WebInspector.Timeline, timeline);
         console.assert(this._timelines.has(timeline.type), this._timelines, timeline);
@@ -156,26 +145,26 @@ WebInspector.TimelineRecording.prototype = {
         this._timelines.delete(timeline.type);
 
         timeline.removeEventListener(WebInspector.Timeline.Event.TimesUpdated, this._timelineTimesUpdated, this);
-        this.dispatchEventToListeners(WebInspector.TimelineRecording.Event.TimelineRemoved, {timeline: timeline});
-    },
+        this.dispatchEventToListeners(WebInspector.TimelineRecording.Event.TimelineRemoved, {timeline});
+    }
 
-    addEventMarker: function(eventMarker)
+    addEventMarker(eventMarker)
     {
         this._eventMarkers.push(eventMarker);
-    },
+    }
 
-    addRecord: function(record)
+    addRecord(record)
     {
-        var hasCorrespondingTimeline = this._timelines.has(record.type);
-        console.assert(hasCorrespondingTimeline, record, this._timelines);
-        if (!hasCorrespondingTimeline)
+        var timeline = this._timelines.get(record.type);
+        console.assert(timeline, record, this._timelines);
+        if (!timeline)
             return;
 
         // Add the record to the global timeline by type.
-        this._timelines.get(record.type).addRecord(record);
+        timeline.addRecord(record);
 
-        // Network records don't have source code timelines.
-        if (record.type === WebInspector.TimelineRecord.Type.Network)
+        // Network and RenderingFrame records don't have source code timelines.
+        if (record.type === WebInspector.TimelineRecord.Type.Network || record.type === WebInspector.TimelineRecord.Type.RenderingFrame)
             return;
 
         // Add the record to the source code timelines.
@@ -200,30 +189,48 @@ WebInspector.TimelineRecording.prototype = {
         sourceCodeTimeline.addRecord(record);
 
         if (newTimeline)
-            this.dispatchEventToListeners(WebInspector.TimelineRecording.Event.SourceCodeTimelineAdded, {sourceCodeTimeline: sourceCodeTimeline});
-    },
+            this.dispatchEventToListeners(WebInspector.TimelineRecording.Event.SourceCodeTimelineAdded, {sourceCodeTimeline});
+    }
 
-    computeElapsedTime: function(timestamp)
+    computeElapsedTime(timestamp)
     {
         if (!timestamp || isNaN(timestamp))
             return NaN;
 
-        // COMPATIBILITY (iOS8): old backends send timestamps (milliseconds since the epoch), rather
-        // than seconds elapsed since timeline capturing started. We approximate the latter by
+        // COMPATIBILITY (iOS8): old backends send timestamps (seconds or milliseconds since the epoch),
+        // rather than seconds elapsed since timeline capturing started. We approximate the latter by
         // subtracting the start timestamp, as old versions did not use monotonic times.
+        if (WebInspector.TimelineRecording.isLegacy === undefined)
+            WebInspector.TimelineRecording.isLegacy = timestamp > WebInspector.TimelineRecording.TimestampThresholdForLegacyRecordConversion;
+
+        if (!WebInspector.TimelineRecording.isLegacy)
+            return timestamp;
+
+        // If the record's start time is large, but not really large, then it is seconds since epoch
+        // not millseconds since epoch, so convert it to milliseconds.
+        if (timestamp < WebInspector.TimelineRecording.TimestampThresholdForLegacyAssumedMilliseconds)
+            timestamp *= 1000;
+
         if (isNaN(this._legacyFirstRecordedTimestamp))
             this._legacyFirstRecordedTimestamp = timestamp;
 
-        // If the record's start time sems unreasonably large, treat it as a legacy timestamp.
-        if (timestamp > WebInspector.TimelineRecording.TimestampThresholdForLegacyRecordConversion)
-            return (timestamp - this._legacyFirstRecordedTimestamp) / 1000.0;
+        // Return seconds since the first recorded value.
+        return (timestamp - this._legacyFirstRecordedTimestamp) / 1000.0;
+    }
 
-        return timestamp;
-    },
+    setLegacyBaseTimestamp(timestamp)
+    {
+        console.assert(isNaN(this._legacyFirstRecordedTimestamp));
+
+        if (timestamp < WebInspector.TimelineRecording.TimestampThresholdForLegacyAssumedMilliseconds)
+            timestamp *= 1000;
+
+        this._legacyFirstRecordedTimestamp = timestamp;
+    }
 
     // Private
 
-    _keyForRecord: function(record)
+    _keyForRecord(record)
     {
         var key = record.type;
         if (record instanceof WebInspector.ScriptTimelineRecord || record instanceof WebInspector.LayoutTimelineRecord)
@@ -233,9 +240,9 @@ WebInspector.TimelineRecording.prototype = {
         if (record.sourceCodeLocation)
             key += ":" + record.sourceCodeLocation.lineNumber + ":" + record.sourceCodeLocation.columnNumber;
         return key;
-    },
+    }
 
-    _timelineTimesUpdated: function(event)
+    _timelineTimesUpdated(event)
     {
         var timeline = event.target;
         var changed = false;
@@ -254,3 +261,16 @@ WebInspector.TimelineRecording.prototype = {
             this.dispatchEventToListeners(WebInspector.TimelineRecording.Event.TimesUpdated);
     }
 };
+
+WebInspector.TimelineRecording.Event = {
+    Reset: "timeline-recording-reset",
+    Unloaded: "timeline-recording-unloaded",
+    SourceCodeTimelineAdded: "timeline-recording-source-code-timeline-added",
+    TimelineAdded: "timeline-recording-timeline-added",
+    TimelineRemoved: "timeline-recording-timeline-removed",
+    TimesUpdated: "timeline-recording-times-updated"
+};
+
+WebInspector.TimelineRecording.isLegacy = undefined;
+WebInspector.TimelineRecording.TimestampThresholdForLegacyRecordConversion = 10000000; // Some value not near zero.
+WebInspector.TimelineRecording.TimestampThresholdForLegacyAssumedMilliseconds = 1420099200000; // Date.parse("Jan 1, 2015"). Milliseconds since epoch.

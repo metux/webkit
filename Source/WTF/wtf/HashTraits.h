@@ -30,9 +30,6 @@ namespace WTF {
 
 class String;
 
-template<typename T> class OwnPtr;
-template<typename T> class PassOwnPtr;
-
 template<typename T> struct HashTraits;
 
 template<bool isInteger, typename T> struct GenericHashTraitsBase;
@@ -48,7 +45,7 @@ template<typename T> struct GenericHashTraitsBase<false, T> {
 
     // The starting table size. Can be overridden when we know beforehand that
     // a hash table will have at least N entries.
-    static const int minimumTableSize = 8;
+    static const unsigned minimumTableSize = 8;
 };
 
 // Default integer traits disallow both 0 and -1 as keys (max value instead of -1 for unsigned).
@@ -121,17 +118,8 @@ template<typename T, typename Deleter> struct HashTraits<std::unique_ptr<T, Dele
     static T* peek(std::nullptr_t) { return nullptr; }
 };
 
-template<typename T> struct HashTraits<OwnPtr<T>> : SimpleClassHashTraits<OwnPtr<T>> {
-    typedef std::nullptr_t EmptyValueType;
-    static EmptyValueType emptyValue() { return nullptr; }
-
-    typedef T* PeekType;
-    static T* peek(const OwnPtr<T>& value) { return value.get(); }
-    static T* peek(std::nullptr_t) { return nullptr; }
-};
-
 template<typename P> struct HashTraits<RefPtr<P>> : SimpleClassHashTraits<RefPtr<P>> {
-    static P* emptyValue() { return 0; }
+    static P* emptyValue() { return nullptr; }
 
     typedef P* PeekType;
     static PeekType peek(const RefPtr<P>& value) { return value.get(); }
@@ -167,7 +155,7 @@ struct PairHashTraits : GenericHashTraits<std::pair<typename FirstTraitsArg::Tra
     static const bool emptyValueIsZero = FirstTraits::emptyValueIsZero && SecondTraits::emptyValueIsZero;
     static EmptyValueType emptyValue() { return std::make_pair(FirstTraits::emptyValue(), SecondTraits::emptyValue()); }
 
-    static const int minimumTableSize = FirstTraits::minimumTableSize;
+    static const unsigned minimumTableSize = FirstTraits::minimumTableSize;
 
     static void constructDeletedValue(TraitType& slot) { FirstTraits::constructDeletedValue(slot.first); }
     static bool isDeletedValue(const TraitType& value) { return FirstTraits::isDeletedValue(value.first); }
@@ -212,7 +200,7 @@ struct KeyValuePairHashTraits : GenericHashTraits<KeyValuePair<typename KeyTrait
     static const bool emptyValueIsZero = KeyTraits::emptyValueIsZero && ValueTraits::emptyValueIsZero;
     static EmptyValueType emptyValue() { return KeyValuePair<typename KeyTraits::EmptyValueType, typename ValueTraits::EmptyValueType>(KeyTraits::emptyValue(), ValueTraits::emptyValue()); }
 
-    static const int minimumTableSize = KeyTraits::minimumTableSize;
+    static const unsigned minimumTableSize = KeyTraits::minimumTableSize;
 
     static void constructDeletedValue(TraitType& slot) { KeyTraits::constructDeletedValue(slot.key); }
     static bool isDeletedValue(const TraitType& value) { return KeyTraits::isDeletedValue(value.key); }

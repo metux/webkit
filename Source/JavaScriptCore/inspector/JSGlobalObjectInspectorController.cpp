@@ -29,6 +29,7 @@
 #include "Completion.h"
 #include "ConsoleMessage.h"
 #include "ErrorHandlingScope.h"
+#include "Exception.h"
 #include "InjectedScriptHost.h"
 #include "InjectedScriptManager.h"
 #include "InspectorAgent.h"
@@ -45,8 +46,10 @@
 #include <wtf/Stopwatch.h>
 
 #include <cxxabi.h>
+#if OS(DARWIN) || (OS(LINUX) && !PLATFORM(GTK))
 #include <dlfcn.h>
 #include <execinfo.h>
+#endif
 
 #if ENABLE(REMOTE_INSPECTOR)
 #include "JSGlobalObjectDebuggable.h"
@@ -128,7 +131,7 @@ void JSGlobalObjectInspectorController::disconnectFrontend(DisconnectReason reas
     m_agents.willDestroyFrontendAndBackend(reason);
 
     m_backendDispatcher->clearFrontend();
-    m_backendDispatcher.clear();
+    m_backendDispatcher = nullptr;
     m_frontendChannel = nullptr;
 
     m_isAutomaticInspection = false;
@@ -145,8 +148,19 @@ void JSGlobalObjectInspectorController::dispatchMessageFromFrontend(const String
         m_backendDispatcher->dispatch(message);
 }
 
+void JSGlobalObjectInspectorController::pause()
+{
+    if (!m_frontendChannel)
+        return;
+
+    ErrorString dummyError;
+    m_debuggerAgent->enable(dummyError);
+    m_debuggerAgent->pause(dummyError);
+}
+
 void JSGlobalObjectInspectorController::appendAPIBacktrace(ScriptCallStack* callStack)
 {
+#if OS(DARWIN) || (OS(LINUX) && !PLATFORM(GTK))
     static const int framesToShow = 31;
     static const int framesToSkip = 3; // WTFGetBacktrace, appendAPIBacktrace, reportAPIException.
 
@@ -170,9 +184,12 @@ void JSGlobalObjectInspectorController::appendAPIBacktrace(ScriptCallStack* call
             callStack->append(ScriptCallFrame(ASCIILiteral("?"), ASCIILiteral("[native code]"), 0, 0));
         free(cxaDemangled);
     }
+#else
+    UNUSED_PARAM(callStack);
+#endif
 }
 
-void JSGlobalObjectInspectorController::reportAPIException(ExecState* exec, JSValue exception)
+void JSGlobalObjectInspectorController::reportAPIException(ExecState* exec, Exception* exception)
 {
     if (isTerminatedExecutionException(exception))
         return;
@@ -185,7 +202,7 @@ void JSGlobalObjectInspectorController::reportAPIException(ExecState* exec, JSVa
 
     // FIXME: <http://webkit.org/b/115087> Web Inspector: Should not evaluate JavaScript handling exceptions
     // If this is a custom exception object, call toString on it to try and get a nice string representation for the exception.
-    String errorMessage = exception.toString(exec)->value(exec);
+    String errorMessage = exception->value().toString(exec)->value(exec);
     exec->clearException();
 
     if (JSGlobalObjectConsoleClient::logToSystemConsole()) {

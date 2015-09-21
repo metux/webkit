@@ -27,19 +27,17 @@
 #define CopiedSpace_h
 
 #include "CopiedAllocator.h"
-#include "HeapBlock.h"
 #include "HeapOperation.h"
 #include "TinyBloomFilter.h"
 #include <wtf/Assertions.h>
 #include <wtf/CheckedBoolean.h>
+#include <wtf/Condition.h>
 #include <wtf/DoublyLinkedList.h>
 #include <wtf/HashSet.h>
+#include <wtf/Lock.h>
 #include <wtf/OSAllocator.h>
-#include <wtf/PageAllocationAligned.h>
 #include <wtf/PageBlock.h>
 #include <wtf/StdLibExtras.h>
-#include <wtf/TCSpinLock.h>
-#include <wtf/ThreadingPrimitives.h>
 
 namespace JSC {
 
@@ -87,6 +85,13 @@ public:
     static CopiedBlock* blockFor(void*);
 
     Heap* heap() const { return m_heap; }
+    
+    size_t takeBytesRemovedFromOldSpaceDueToReallocation()
+    {
+        size_t result = 0;
+        std::swap(m_bytesRemovedFromOldSpaceDueToReallocation, result);
+        return result;
+    }
 
 private:
     static bool isOversize(size_t);
@@ -108,7 +113,7 @@ private:
 
     HashSet<CopiedBlock*> m_blockSet;
 
-    SpinLock m_toSpaceLock;
+    Lock m_toSpaceLock;
 
     struct CopiedGeneration {
         CopiedGeneration()
@@ -133,9 +138,11 @@ private:
     bool m_inCopyingPhase;
     bool m_shouldDoCopyPhase;
 
-    Mutex m_loanedBlocksLock; 
-    ThreadCondition m_loanedBlocksCondition;
+    Lock m_loanedBlocksLock; 
+    Condition m_loanedBlocksCondition;
     size_t m_numberOfLoanedBlocks;
+    
+    size_t m_bytesRemovedFromOldSpaceDueToReallocation;
 
     static const size_t s_maxAllocationSize = CopiedBlock::blockSize / 2;
     static const size_t s_initialBlockNum = 16;

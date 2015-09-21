@@ -33,14 +33,27 @@
 #if ENABLE(STREAMS_API)
 
 #include "ActiveDOMObject.h"
-#include "ReadableStreamSource.h"
+#include "DOMRequestState.h"
+#include "JSDOMPromise.h"
+#include "ScriptState.h"
 #include "ScriptWrappable.h"
 #include <functional>
+#include <wtf/Deque.h>
+#include <wtf/Optional.h>
 #include <wtf/Ref.h>
+#include <wtf/RefCounted.h>
+
+namespace JSC {
+class JSValue;
+}
 
 namespace WebCore {
 
+class Dictionary;
+class ReadableStreamReader;
 class ScriptExecutionContext;
+
+typedef int ExceptionCode;
 
 // ReadableStream implements the core of the streams API ReadableStream functionality.
 // It handles in particular the backpressure according the queue size.
@@ -49,30 +62,105 @@ class ScriptExecutionContext;
 class ReadableStream : public ActiveDOMObject, public ScriptWrappable, public RefCounted<ReadableStream> {
 public:
     enum class State {
-        Waiting,
-        Closed,
         Readable,
+        Closed,
         Errored
     };
 
-    static Ref<ReadableStream> create(ScriptExecutionContext&, Ref<ReadableStreamSource>&&);
+    static RefPtr<ReadableStream> create(JSC::ExecState&, JSC::JSValue, const Dictionary&);
     virtual ~ReadableStream();
 
-    virtual const char* activeDOMObjectName() const override { return "ReadableStream"; }
+    ReadableStreamReader* getReader(ExceptionCode&);
+    const ReadableStreamReader* reader() const { return m_reader.get(); }
 
-    // JS API implementation.
-    String state() const;
+    bool locked() const { return !!m_reader; }
 
-    typedef std::function<void(RefPtr<ReadableStream>)> SuccessCallback;
-    void closed(SuccessCallback);
-    void ready(SuccessCallback);
+    void releaseReader();
+    bool hasReadPendingRequests() { return !m_readRequests.isEmpty(); }
+
+    bool isErrored() const { return m_state == State::Errored; }
+    bool isReadable() const { return m_state == State::Readable; }
+    bool isCloseRequested() const { return m_closeRequested; }
+
+    virtual JSC::JSValue error() = 0;
+
+    void start();
+    void changeStateToClosed();
+    void changeStateToErrored();
+    void finishPulling();
+    void notifyCancelSucceeded();
+    void notifyCancelFailed();
+
+    typedef DOMPromise<std::nullptr_t, JSC::JSValue> CancelPromise;
+    void cancel(JSC::JSValue, CancelPromise&&, ExceptionCode&);
+    void cancelNoCheck(JSC::JSValue, CancelPromise&&);
+
+    typedef DOMPromise<std::nullptr_t, JSC::JSValue> ClosedPromise;
+    void closed(ClosedPromise&&);
+
+    typedef DOMPromiseIteratorWithCallback<JSC::JSValue, JSC::JSValue> ReadPromise;
+    void read(ReadPromise&&);
+
+protected:
+    explicit ReadableStream(ScriptExecutionContext&);
+
+    bool resolveReadCallback(JSC::JSValue);
+    void pull();
 
 private:
-    ReadableStream(ScriptExecutionContext&, Ref<ReadableStreamSource>&&);
+    // ActiveDOMObject API.
+    const char* activeDOMObjectName() const override;
+    bool canSuspendForPageCache() const override;
 
-    State m_state;
-    Ref<ReadableStreamSource> m_source;
+    void clearCallbacks();
+    void close();
+
+    virtual void clearValues() = 0;
+    virtual bool hasEnoughValues() const = 0;
+    virtual bool hasValue() const = 0;
+    virtual JSC::JSValue read() = 0;
+    virtual bool doPull() = 0;
+    virtual bool doCancel(JSC::JSValue) = 0;
+
+    std::unique_ptr<ReadableStreamReader> m_reader;
+    Vector<std::unique_ptr<ReadableStreamReader>> m_releasedReaders;
+
+    Optional<CancelPromise> m_cancelPromise;
+    Optional<ClosedPromise> m_closedPromise;
+
+    Deque<ReadPromise> m_readRequests;
+
+    bool m_isStarted { false };
+    bool m_isPulling { false };
+    bool m_shouldPullAgain { false };
+    bool m_closeRequested { false };
+    State m_state { State::Readable };
 };
+
+// This class manages the queue and knows whether there is sufficient data in it.
+//   Subclasses should implement error storage, pulling and cancelling.
+template<typename ChunkType>
+class ReadableEnqueuingStream final : public ReadableStream {
+protected:
+    explicit ReadableEnqueuingStream(ScriptExecutionContext& context) : ReadableStream(context) { }
+
+    void enqueueChunk(ChunkType&& chunk) { m_queue.append(std::forward(chunk)); }
+
+private:
+    virtual void clearValues() override { m_queue.clear(); }
+    virtual bool hasEnoughValues() const override { return m_queue.size(); }
+    virtual bool hasValue() const override { return m_queue.size(); }
+    virtual JSC::JSValue read() override;
+
+    Deque<ChunkType> m_queue;
+};
+
+template<typename ChunkType>
+inline JSC::JSValue ReadableEnqueuingStream<ChunkType>::read()
+{
+    DOMRequestState state(scriptExecutionContext());
+    return toJS(state.exec(), toJSDOMGlobalObject(scriptExecutionContext(), state.exec()), m_queue.read());
+}
 
 }
 

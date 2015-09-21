@@ -59,11 +59,13 @@ private:
     virtual bool shouldChangeSelectedRange(WebCore::Range* fromRange, WebCore::Range* toRange, WebCore::EAffinity, bool stillSelecting) override;
     
     virtual bool shouldApplyStyle(WebCore::StyleProperties*, WebCore::Range*) override;
+    virtual void didApplyStyle() override;
     virtual bool shouldMoveRangeAfterDelete(WebCore::Range*, WebCore::Range*) override;
 
     virtual void didBeginEditing() override;
     virtual void respondToChangedContents() override;
     virtual void respondToChangedSelection(WebCore::Frame*) override;
+    virtual void didChangeSelectionAndUpdateLayout() override;
     virtual void discardedComposition(WebCore::Frame*) override;
     virtual void didEndEditing() override;
     virtual void willWriteSelectionToPasteboard(WebCore::Range*) override;

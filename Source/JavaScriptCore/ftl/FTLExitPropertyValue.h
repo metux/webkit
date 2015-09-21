@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2014 Apple Inc. All rights reserved.
+ * Copyright (C) 2014, 2015 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -31,7 +31,11 @@
 #include "DFGPromotedHeapLocation.h"
 #include "FTLExitValue.h"
 
-namespace JSC { namespace FTL {
+namespace JSC {
+
+class TrackedReferences;
+
+namespace FTL {
 
 class ExitPropertyValue {
 public:
@@ -51,7 +55,11 @@ public:
     DFG::PromotedLocationDescriptor location() const { return m_location; }
     const ExitValue& value() const { return m_value; }
     
+    ExitPropertyValue withLocalsOffset(int offset) const;
+    
     void dump(PrintStream& out) const;
+    
+    void validateReferences(const TrackedReferences&) const;
 
 private:
     DFG::PromotedLocationDescriptor m_location;

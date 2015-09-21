@@ -28,12 +28,18 @@
 #ifndef DocumentStyleSheetCollection_h
 #define DocumentStyleSheetCollection_h
 
+#include "Timer.h"
 #include <memory>
 #include <wtf/FastMalloc.h>
+#include <wtf/HashMap.h>
 #include <wtf/ListHashSet.h>
 #include <wtf/RefPtr.h>
 #include <wtf/Vector.h>
 #include <wtf/text/WTFString.h>
+
+#if ENABLE(CONTENT_EXTENSIONS)
+#include "ContentExtensionStyleSheet.h"
+#endif
 
 namespace WebCore {
 
@@ -70,6 +76,11 @@ public:
     WEBCORE_EXPORT void addAuthorSheet(Ref<StyleSheetContents>&& authorSheet);
     WEBCORE_EXPORT void addUserSheet(Ref<StyleSheetContents>&& userSheet);
 
+#if ENABLE(CONTENT_EXTENSIONS)
+    void addDisplayNoneSelector(const String& identifier, const String& selector, uint32_t selectorID);
+    void maybeAddContentExtensionSheet(const String& identifier, StyleSheetContents&);
+#endif
+
     enum UpdateFlag { NoUpdate = 0, OptimizedUpdate, FullUpdate };
 
     UpdateFlag pendingUpdateType() const { return m_pendingUpdateType; }
@@ -105,6 +116,8 @@ public:
     bool usesFirstLetterRules() const { return m_usesFirstLetterRules; }
     bool usesRemUnits() const { return m_usesRemUnits; }
     void setUsesRemUnit(bool b) { m_usesRemUnits = b; }
+    bool usesStyleBasedEditability() { return m_usesStyleBasedEditability; }
+    void setUsesStyleBasedEditability(bool b) { m_usesStyleBasedEditability = b; }
 
     void combineCSSFeatureFlags();
     void resetCSSFeatureFlags();
@@ -121,6 +134,8 @@ private:
         Additive
     };
     void analyzeStyleSheetChange(UpdateFlag, const Vector<RefPtr<CSSStyleSheet>>& newStylesheets, StyleResolverUpdateType&, bool& requiresFullStyleRecalc);
+
+    void styleResolverChangedTimerFired();
 
     Document& m_document;
 
@@ -145,6 +160,11 @@ private:
     Vector<RefPtr<CSSStyleSheet>> m_userStyleSheets;
     Vector<RefPtr<CSSStyleSheet>> m_authorStyleSheets;
 
+#if ENABLE(CONTENT_EXTENSIONS)
+    HashMap<String, RefPtr<CSSStyleSheet>> m_contentExtensionSheets;
+    HashMap<String, RefPtr<ContentExtensions::ContentExtensionStyleSheet>> m_contentExtensionSelectorSheets;
+#endif
+
     bool m_hadActiveLoadingStylesheet;
     UpdateFlag m_pendingUpdateType;
 
@@ -157,6 +177,9 @@ private:
     bool m_usesFirstLineRules;
     bool m_usesFirstLetterRules;
     bool m_usesRemUnits;
+    bool m_usesStyleBasedEditability;
+
+    Timer m_styleResolverChangedTimer;
 };
 
 }

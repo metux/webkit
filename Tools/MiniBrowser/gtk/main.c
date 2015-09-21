@@ -38,6 +38,7 @@
 static const gchar **uriArguments = NULL;
 static const char *miniBrowserAboutScheme = "minibrowser-about";
 static GdkRGBA *backgroundColor;
+static gboolean editorMode;
 
 typedef enum {
     MINI_BROWSER_ERROR_INVALID_ABOUT_PATH
@@ -60,16 +61,20 @@ static gchar *argumentToURL(const char *filename)
 static void createBrowserWindow(const gchar *uri, WebKitSettings *webkitSettings)
 {
     GtkWidget *webView = webkit_web_view_new();
+    if (editorMode)
+        webkit_web_view_set_editable(WEBKIT_WEB_VIEW(webView), TRUE);
     GtkWidget *mainWindow = browser_window_new(WEBKIT_WEB_VIEW(webView), NULL);
     if (backgroundColor)
         browser_window_set_background_color(BROWSER_WINDOW(mainWindow), backgroundColor);
-    gchar *url = argumentToURL(uri);
 
     if (webkitSettings)
         webkit_web_view_set_settings(WEBKIT_WEB_VIEW(webView), webkitSettings);
 
-    browser_window_load_uri(BROWSER_WINDOW(mainWindow), url);
-    g_free(url);
+    if (!editorMode) {
+        gchar *url = argumentToURL(uri);
+        browser_window_load_uri(BROWSER_WINDOW(mainWindow), url);
+        g_free(url);
+    }
 
     gtk_widget_grab_focus(webView);
     gtk_widget_show(mainWindow);
@@ -90,6 +95,7 @@ static gboolean parseBackgroundColor(const char *optionName, const char *value, 
 static const GOptionEntry commandLineOptions[] =
 {
     { "bg-color", 0, 0, G_OPTION_ARG_CALLBACK, parseBackgroundColor, "Background color", NULL },
+    { "editor-mode", 'e', 0, G_OPTION_ARG_NONE, &editorMode, "Run in editor mode", NULL },
     { G_OPTION_REMAINING, 0, 0, G_OPTION_ARG_FILENAME_ARRAY, &uriArguments, 0, "[URL…]" },
     { 0, 0, 0, 0, 0, 0, 0 }
 };
@@ -256,15 +262,13 @@ aboutURISchemeRequestCallback(WebKitURISchemeRequest *request, gpointer userData
 int main(int argc, char *argv[])
 {
     gtk_init(&argc, &argv);
-#if defined(DEVELOPMENT_BUILD)
+#if ENABLE_DEVELOPER_MODE
     g_setenv("WEBKIT_INJECTED_BUNDLE_PATH", WEBKIT_INJECTED_BUNDLE_PATH, FALSE);
 #endif
 
-    const gchar *multiprocess = g_getenv("MINIBROWSER_MULTIPROCESS");
-    if (multiprocess && *multiprocess) {
-        webkit_web_context_set_process_model(webkit_web_context_get_default(),
-            WEBKIT_PROCESS_MODEL_MULTIPLE_SECONDARY_PROCESSES);
-    }
+    const gchar *singleprocess = g_getenv("MINIBROWSER_SINGLEPROCESS");
+    webkit_web_context_set_process_model(webkit_web_context_get_default(), (singleprocess && *singleprocess) ?
+        WEBKIT_PROCESS_MODEL_SHARED_SECONDARY_PROCESS : WEBKIT_PROCESS_MODEL_MULTIPLE_SECONDARY_PROCESSES);
 
     GOptionContext *context = g_option_context_new(NULL);
     g_option_context_add_main_entries(context, commandLineOptions, 0);

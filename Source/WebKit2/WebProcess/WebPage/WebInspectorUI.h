@@ -38,7 +38,7 @@ class WebPage;
 
 class WebInspectorUI : public API::ObjectImpl<API::Object::Type::BundleInspectorUI>, public IPC::Connection::Client, public WebCore::InspectorFrontendClient {
 public:
-    static PassRefPtr<WebInspectorUI> create(WebPage*);
+    static Ref<WebInspectorUI> create(WebPage*);
 
     WebPage* page() const { return m_page; }
 
@@ -57,7 +57,7 @@ public:
     void showConsole();
     void showResources();
 
-    void showMainResourceForFrame(String frameIdentifier);
+    void showMainResourceForFrame(const String& frameIdentifier);
 
     void startPageProfiling();
     void stopPageProfiling();
@@ -67,6 +67,7 @@ public:
     void detached() { setDockSide(DockSide::Undocked); }
 
     void setDockSide(DockSide);
+    void setDockingUnavailable(bool);
 
     void didSave(const String& url);
     void didAppend(const String& url);
@@ -77,6 +78,7 @@ public:
     void windowObjectCleared() override;
     void frontendLoaded() override;
 
+    void startWindowDrag() override;
     void moveWindowBy(float x, float y) override;
 
     String localizedStringsURL() override;

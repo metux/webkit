@@ -46,7 +46,7 @@ class TextTrackList;
 
 class MediaControlsHost : public RefCounted<MediaControlsHost> {
 public:
-    static PassRefPtr<MediaControlsHost> create(HTMLMediaElement*);
+    static Ref<MediaControlsHost> create(HTMLMediaElement*);
     ~MediaControlsHost();
 
     static const AtomicString& automaticKeyword();
@@ -63,22 +63,21 @@ public:
     void setSelectedTextTrack(TextTrack*);
     Element* textTrackContainer();
     void updateTextTrackContainer();
-    bool mediaPlaybackAllowsInline() const;
+    bool allowsInlineMediaPlayback() const;
     bool supportsFullscreen();
     bool userGestureRequired() const;
 
     void updateCaptionDisplaySizes();
     void enteredFullscreen();
     void exitedFullscreen();
-    void enterFullscreenOptimized();
-    bool optimizedFullscreenSupported();
-    String mediaUIImageData(const String&) const;
 
     String externalDeviceDisplayName() const;
     String externalDeviceType() const;
 
     bool controlsDependOnPageScaleFactor() const;
     void setControlsDependOnPageScaleFactor(bool v);
+
+    String generateUUID() const;
 
 private:
     MediaControlsHost(HTMLMediaElement*);

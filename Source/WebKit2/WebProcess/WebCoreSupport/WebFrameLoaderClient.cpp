@@ -35,6 +35,7 @@
 #include "InjectedBundleNavigationAction.h"
 #include "NavigationActionData.h"
 #include "PluginView.h"
+#include "SecurityOriginData.h"
 #include "UserData.h"
 #include "WKBundleAPICast.h"
 #include "WebBackForwardListProxy.h"
@@ -102,9 +103,6 @@ WebFrameLoaderClient::~WebFrameLoaderClient()
     
 void WebFrameLoaderClient::frameLoaderDestroyed()
 {
-    if (WebPage* webPage = m_frame->page())
-        webPage->injectedBundleLoaderClient().willDestroyFrame(webPage, m_frame);
-
     m_frame->invalidate();
 
     // Balances explicit ref() in WebFrame::create().
@@ -297,6 +295,16 @@ void WebFrameLoaderClient::dispatchDidReceiveServerRedirectForProvisionalLoad()
     webPage->send(Messages::WebPageProxy::DidReceiveServerRedirectForProvisionalLoadForFrame(m_frame->frameID(), documentLoader.navigationID(), url, UserData(WebProcess::singleton().transformObjectsToHandles(userData.get()).get())));
 }
 
+void WebFrameLoaderClient::dispatchDidChangeProvisionalURL()
+{
+    WebPage* webPage = m_frame->page();
+    if (!webPage)
+        return;
+
+    WebDocumentLoader& documentLoader = static_cast<WebDocumentLoader&>(*m_frame->coreFrame()->loader().provisionalDocumentLoader());
+    webPage->send(Messages::WebPageProxy::DidChangeProvisionalURLForFrame(m_frame->frameID(), documentLoader.navigationID(), documentLoader.url().string()));
+}
+
 void WebFrameLoaderClient::dispatchDidCancelClientRedirect()
 {
     WebPage* webPage = m_frame->page();
@@ -456,7 +464,7 @@ void WebFrameLoaderClient::dispatchDidCommitLoad()
 
     // Notify the UIProcess.
 
-    webPage->send(Messages::WebPageProxy::DidCommitLoadForFrame(m_frame->frameID(), documentLoader.navigationID(), documentLoader.response().mimeType(), m_frameHasCustomContentProvider, static_cast<uint32_t>(m_frame->coreFrame()->loader().loadType()), documentLoader.response().certificateInfo(), UserData(WebProcess::singleton().transformObjectsToHandles(userData.get()).get())));
+    webPage->send(Messages::WebPageProxy::DidCommitLoadForFrame(m_frame->frameID(), documentLoader.navigationID(), documentLoader.response().mimeType(), m_frameHasCustomContentProvider, static_cast<uint32_t>(m_frame->coreFrame()->loader().loadType()), documentLoader.response().certificateInfo(), m_frame->coreFrame()->document()->isPluginDocument(), UserData(WebProcess::singleton().transformObjectsToHandles(userData.get()).get())));
     webPage->didCommitLoad(m_frame);
 }
 
@@ -486,7 +494,7 @@ void WebFrameLoaderClient::dispatchDidFailProvisionalLoad(const ResourceError& e
         navigationID = static_cast<WebDocumentLoader*>(documentLoader)->navigationID();
 
     // Notify the UIProcess.
-    webPage->send(Messages::WebPageProxy::DidFailProvisionalLoadForFrame(m_frame->frameID(), navigationID, m_frame->coreFrame()->loader().provisionalLoadErrorBeingHandledURL(), error, UserData(WebProcess::singleton().transformObjectsToHandles(userData.get()).get())));
+    webPage->send(Messages::WebPageProxy::DidFailProvisionalLoadForFrame(m_frame->frameID(), SecurityOriginData::fromFrame(m_frame), navigationID, m_frame->coreFrame()->loader().provisionalLoadErrorBeingHandledURL(), error, UserData(WebProcess::singleton().transformObjectsToHandles(userData.get()).get())));
 
     // If we have a load listener, notify it.
     if (WebFrame::LoadListener* loadListener = m_frame->loadListener())
@@ -588,7 +596,7 @@ void WebFrameLoaderClient::dispatchDidLayout(LayoutMilestones milestones)
         }
 #endif
 
-#if USE(TILED_BACKING_STORE)
+#if USE(COORDINATED_GRAPHICS)
         // Make sure viewport properties are dispatched on the main frame by the time the first layout happens.
         ASSERT(!webPage->useFixedLayout() || m_frame != m_frame->page()->mainWebFrame() || m_frame->coreFrame()->document()->didDispatchViewportPropertiesChanged());
 #endif
@@ -643,7 +651,8 @@ Frame* WebFrameLoaderClient::dispatchCreatePage(const NavigationAction& navigati
         return 0;
 
     // Just call through to the chrome client.
-    Page* newPage = webPage->corePage()->chrome().createWindow(m_frame->coreFrame(), FrameLoadRequest(m_frame->coreFrame()->document()->securityOrigin(), navigationAction.resourceRequest()), WindowFeatures(), navigationAction);
+    FrameLoadRequest request(m_frame->coreFrame()->document()->securityOrigin(), navigationAction.resourceRequest(), LockHistory::No, LockBackForwardList::No, MaybeSendReferrer, AllowNavigationToInvalidURL::Yes, NewFrameOpenerPolicy::Allow, navigationAction.shouldOpenExternalURLsPolicy());
+    Page* newPage = webPage->corePage()->chrome().createWindow(m_frame->coreFrame(), request, WindowFeatures(), navigationAction);
     if (!newPage)
         return 0;
     
@@ -691,8 +700,8 @@ void WebFrameLoaderClient::dispatchDecidePolicyForResponse(const ResourceRespons
     unsigned syncSendFlags = IPC::InformPlatformProcessWillSuspend;
     if (WebPage::synchronousMessagesShouldSpinRunLoop())
         syncSendFlags |= IPC::SpinRunLoopWhileWaitingForReply;
-    if (!webPage->sendSync(Messages::WebPageProxy::DecidePolicyForResponseSync(m_frame->frameID(), response, request, canShowMIMEType, listenerID, UserData(WebProcess::singleton().transformObjectsToHandles(userData.get()).get())), Messages::WebPageProxy::DecidePolicyForResponseSync::Reply(receivedPolicyAction, policyAction, downloadID), std::chrono::milliseconds::max(), syncSendFlags)) {
-        function(PolicyIgnore);
+    if (!webPage->sendSync(Messages::WebPageProxy::DecidePolicyForResponseSync(m_frame->frameID(), SecurityOriginData::fromFrame(m_frame), response, request, canShowMIMEType, listenerID, UserData(WebProcess::singleton().transformObjectsToHandles(userData.get()).get())), Messages::WebPageProxy::DecidePolicyForResponseSync::Reply(receivedPolicyAction, policyAction, downloadID), std::chrono::milliseconds::max(), syncSendFlags)) {
+        m_frame->didReceivePolicyDecision(listenerID, PolicyIgnore, 0, 0);
         return;
     }
 
@@ -729,8 +738,9 @@ void WebFrameLoaderClient::dispatchDecidePolicyForNewWindowAction(const Navigati
     navigationActionData.mouseButton = action->mouseButton();
     navigationActionData.isProcessingUserGesture = navigationAction.processingUserGesture();
     navigationActionData.canHandleRequest = webPage->canHandleRequest(request);
+    navigationActionData.shouldOpenExternalURLsPolicy = navigationAction.shouldOpenExternalURLsPolicy();
 
-    webPage->send(Messages::WebPageProxy::DecidePolicyForNewWindowAction(m_frame->frameID(), navigationActionData, request, frameName, listenerID, UserData(WebProcess::singleton().transformObjectsToHandles(userData.get()).get())));
+    webPage->send(Messages::WebPageProxy::DecidePolicyForNewWindowAction(m_frame->frameID(), SecurityOriginData::fromFrame(m_frame), navigationActionData, request, frameName, listenerID, UserData(WebProcess::singleton().transformObjectsToHandles(userData.get()).get())));
 }
 
 void WebFrameLoaderClient::dispatchDecidePolicyForNavigationAction(const NavigationAction& navigationAction, const ResourceRequest& request, PassRefPtr<FormState> prpFormState, FramePolicyFunction function)
@@ -767,7 +777,7 @@ void WebFrameLoaderClient::dispatchDecidePolicyForNavigationAction(const Navigat
 
     RefPtr<WebFrame> originatingFrame;
     switch (action->navigationType()) {
-    case NavigationTypeLinkClicked:
+    case NavigationType::LinkClicked:
         if (EventTarget* target = navigationAction.event()->target()) {
             if (Node* node = target->toNode()) {
                 if (Frame* frame = node->document().frame())
@@ -775,14 +785,14 @@ void WebFrameLoaderClient::dispatchDecidePolicyForNavigationAction(const Navigat
             }
         }
         break;
-    case NavigationTypeFormSubmitted:
-    case NavigationTypeFormResubmitted:
+    case NavigationType::FormSubmitted:
+    case NavigationType::FormResubmitted:
         if (formState)
             originatingFrame = WebFrame::fromCoreFrame(*formState->sourceDocument()->frame());
         break;
-    case NavigationTypeBackForward:
-    case NavigationTypeReload:
-    case NavigationTypeOther:
+    case NavigationType::BackForward:
+    case NavigationType::Reload:
+    case NavigationType::Other:
         break;
     }
 
@@ -792,6 +802,7 @@ void WebFrameLoaderClient::dispatchDecidePolicyForNavigationAction(const Navigat
     navigationActionData.mouseButton = action->mouseButton();
     navigationActionData.isProcessingUserGesture = navigationAction.processingUserGesture();
     navigationActionData.canHandleRequest = webPage->canHandleRequest(request);
+    navigationActionData.shouldOpenExternalURLsPolicy = navigationAction.shouldOpenExternalURLsPolicy();
 
     WebCore::Frame* coreFrame = m_frame->coreFrame();
     WebDocumentLoader* documentLoader = static_cast<WebDocumentLoader*>(coreFrame->loader().policyDocumentLoader());
@@ -799,7 +810,7 @@ void WebFrameLoaderClient::dispatchDecidePolicyForNavigationAction(const Navigat
         documentLoader = static_cast<WebDocumentLoader*>(coreFrame->loader().documentLoader());
 
     // Notify the UIProcess.
-    if (!webPage->sendSync(Messages::WebPageProxy::DecidePolicyForNavigationAction(m_frame->frameID(), documentLoader->navigationID(), navigationActionData, originatingFrame ? originatingFrame->frameID() : 0, navigationAction.resourceRequest(), request, listenerID, UserData(WebProcess::singleton().transformObjectsToHandles(userData.get()).get())), Messages::WebPageProxy::DecidePolicyForNavigationAction::Reply(receivedPolicyAction, newNavigationID, policyAction, downloadID))) {
+    if (!webPage->sendSync(Messages::WebPageProxy::DecidePolicyForNavigationAction(m_frame->frameID(), SecurityOriginData::fromFrame(m_frame), documentLoader->navigationID(), navigationActionData, originatingFrame ? originatingFrame->frameID() : 0, SecurityOriginData::fromFrame(originatingFrame.get()), navigationAction.resourceRequest(), request, listenerID, UserData(WebProcess::singleton().transformObjectsToHandles(userData.get()).get())), Messages::WebPageProxy::DecidePolicyForNavigationAction::Reply(receivedPolicyAction, newNavigationID, policyAction, downloadID))) {
         function(PolicyIgnore);
         return;
     }
@@ -902,6 +913,22 @@ void WebFrameLoaderClient::willChangeTitle(DocumentLoader*)
 void WebFrameLoaderClient::didChangeTitle(DocumentLoader*)
 {
     notImplemented();
+}
+
+void WebFrameLoaderClient::willReplaceMultipartContent()
+{
+    WebPage* webPage = m_frame->page();
+    if (!webPage)
+        return;
+    webPage->willReplaceMultipartContent(*m_frame);
+}
+
+void WebFrameLoaderClient::didReplaceMultipartContent()
+{
+    WebPage* webPage = m_frame->page();
+    if (!webPage)
+        return;
+    webPage->didReplaceMultipartContent(*m_frame);
 }
 
 void WebFrameLoaderClient::committedLoad(DocumentLoader* loader, const char* data, int length)
@@ -1216,7 +1243,7 @@ void WebFrameLoaderClient::prepareForDataSourceReplacement()
     notImplemented();
 }
 
-PassRefPtr<DocumentLoader> WebFrameLoaderClient::createDocumentLoader(const ResourceRequest& request, const SubstituteData& substituteData)
+Ref<DocumentLoader> WebFrameLoaderClient::createDocumentLoader(const ResourceRequest& request, const SubstituteData& substituteData)
 {
     return m_frame->page()->createDocumentLoader(*m_frame->coreFrame(), request, substituteData);
 }
@@ -1265,12 +1292,14 @@ void WebFrameLoaderClient::transitionToCommittedForNewPage()
     bool isTransparent = !webPage->drawsBackground();
     bool shouldUseFixedLayout = isMainFrame && webPage->useFixedLayout();
     bool shouldDisableScrolling = isMainFrame && !webPage->mainFrameIsScrollable();
-    bool shouldHideScrollbars = shouldUseFixedLayout || shouldDisableScrolling;
+    bool shouldHideScrollbars = shouldDisableScrolling;
     IntRect fixedVisibleContentRect;
 
-#if USE(TILED_BACKING_STORE)
+#if USE(COORDINATED_GRAPHICS)
     if (m_frame->coreFrame()->view())
         fixedVisibleContentRect = m_frame->coreFrame()->view()->fixedVisibleContentRect();
+    if (shouldUseFixedLayout)
+        shouldHideScrollbars = true;
 #endif
 
     const ResourceResponse& response = m_frame->coreFrame()->loader().documentLoader()->response();
@@ -1280,7 +1309,7 @@ void WebFrameLoaderClient::transitionToCommittedForNewPage()
     ScrollbarMode defaultScrollbarMode = shouldHideScrollbars ? ScrollbarAlwaysOff : ScrollbarAuto;
 
     m_frame->coreFrame()->createView(webPage->size(), backgroundColor, isTransparent,
-        IntSize(), fixedVisibleContentRect, shouldUseFixedLayout,
+        webPage->fixedLayoutSize(), fixedVisibleContentRect, shouldUseFixedLayout,
         defaultScrollbarMode, /* lock */ shouldHideScrollbars, defaultScrollbarMode, /* lock */ shouldHideScrollbars);
 
     if (int minimumLayoutWidth = webPage->minimumLayoutSize().width()) {
@@ -1302,7 +1331,7 @@ void WebFrameLoaderClient::transitionToCommittedForNewPage()
     if (webPage->scrollPinningBehavior() != DoNotPin)
         m_frame->coreFrame()->view()->setScrollPinningBehavior(webPage->scrollPinningBehavior());
 
-#if USE(TILED_BACKING_STORE)
+#if USE(COORDINATED_GRAPHICS)
     if (shouldUseFixedLayout) {
         m_frame->coreFrame()->view()->setDelegatesScrolling(shouldUseFixedLayout);
         m_frame->coreFrame()->view()->setPaintsEntireContents(shouldUseFixedLayout);
@@ -1346,7 +1375,7 @@ void WebFrameLoaderClient::convertMainResourceLoadToDownload(DocumentLoader *doc
     m_frame->convertMainResourceLoadToDownload(documentLoader, request, response);
 }
 
-PassRefPtr<Frame> WebFrameLoaderClient::createFrame(const URL& url, const String& name, HTMLFrameOwnerElement* ownerElement,
+RefPtr<Frame> WebFrameLoaderClient::createFrame(const URL& url, const String& name, HTMLFrameOwnerElement* ownerElement,
                                                     const String& referrer, bool /*allowsScrolling*/, int /*marginWidth*/, int /*marginHeight*/)
 {
     WebPage* webPage = m_frame->page();
@@ -1355,25 +1384,25 @@ PassRefPtr<Frame> WebFrameLoaderClient::createFrame(const URL& url, const String
 
     Frame* coreSubframe = subframe->coreFrame();
     if (!coreSubframe)
-        return 0;
+        return nullptr;
 
     // The creation of the frame may have run arbitrary JavaScript that removed it from the page already.
     if (!coreSubframe->page())
-        return 0;
+        return nullptr;
 
     m_frame->coreFrame()->loader().loadURLIntoChildFrame(url, referrer, coreSubframe);
 
     // The frame's onload handler may have removed it from the document.
     if (!subframe->coreFrame())
-        return 0;
+        return nullptr;
     ASSERT(subframe->coreFrame() == coreSubframe);
     if (!coreSubframe->tree().parent())
-        return 0;
+        return nullptr;
 
     return coreSubframe;
 }
 
-PassRefPtr<Widget> WebFrameLoaderClient::createPlugin(const IntSize&, HTMLPlugInElement* pluginElement, const URL& url, const Vector<String>& paramNames, const Vector<String>& paramValues, const String& mimeType, bool loadManually)
+RefPtr<Widget> WebFrameLoaderClient::createPlugin(const IntSize&, HTMLPlugInElement* pluginElement, const URL& url, const Vector<String>& paramNames, const Vector<String>& paramValues, const String& mimeType, bool loadManually)
 {
     ASSERT(paramNames.size() == paramValues.size());
     ASSERT(m_frame->page());
@@ -1392,12 +1421,12 @@ PassRefPtr<Widget> WebFrameLoaderClient::createPlugin(const IntSize&, HTMLPlugIn
 #if ENABLE(NETSCAPE_PLUGIN_API)
     RefPtr<Plugin> plugin = m_frame->page()->createPlugin(m_frame, pluginElement, parameters, parameters.mimeType);
     if (!plugin)
-        return 0;
+        return nullptr;
 
     return PluginView::create(pluginElement, plugin.release(), parameters);
 #else
     UNUSED_PARAM(pluginElement);
-    return 0;
+    return nullptr;
 #endif
 }
 
@@ -1465,8 +1494,11 @@ static bool pluginSupportsExtension(const PluginData& pluginData, const String& 
 {
     ASSERT(extension.lower() == extension);
 
-    for (size_t i = 0; i < pluginData.mimes().size(); ++i) {
-        const MimeClassInfo& mimeClassInfo = pluginData.mimes()[i];
+    Vector<MimeClassInfo> mimes;
+    Vector<size_t> mimePluginIndices;
+    pluginData.getWebVisibleMimesAndPluginIndices(mimes, mimePluginIndices);
+    for (size_t i = 0; i < mimes.size(); ++i) {
+        const MimeClassInfo& mimeClassInfo = mimes[i];
 
         if (mimeClassInfo.extensions.contains(extension))
             return true;
@@ -1501,9 +1533,9 @@ ObjectContentType WebFrameLoaderClient::objectContentType(const URL& url, const 
     bool plugInSupportsMIMEType = false;
     if (WebPage* webPage = m_frame->page()) {
         const PluginData& pluginData = webPage->corePage()->pluginData();
-        if (pluginData.supportsMimeType(mimeType, PluginData::AllPlugins) && webFrame()->coreFrame()->loader().subframeLoader().allowPlugins(NotAboutToInstantiatePlugin))
+        if (pluginData.supportsWebVisibleMimeType(mimeType, PluginData::AllPlugins) && webFrame()->coreFrame()->loader().subframeLoader().allowPlugins())
             plugInSupportsMIMEType = true;
-        else if (pluginData.supportsMimeType(mimeType, PluginData::OnlyApplicationPlugins))
+        else if (pluginData.supportsWebVisibleMimeType(mimeType, PluginData::OnlyApplicationPlugins))
             plugInSupportsMIMEType = true;
     }
     
@@ -1661,10 +1693,15 @@ PassRefPtr<FrameNetworkingContext> WebFrameLoaderClient::createNetworkingContext
 }
 
 #if ENABLE(CONTENT_FILTERING)
-void WebFrameLoaderClient::contentFilterDidBlockLoad(std::unique_ptr<WebCore::ContentFilter> contentFilter)
+void WebFrameLoaderClient::contentFilterDidBlockLoad(WebCore::ContentFilterUnblockHandler unblockHandler)
 {
-    if (WebPage* webPage = m_frame->page())
-        webPage->send(Messages::WebPageProxy::ContentFilterDidBlockLoadForFrame(*contentFilter, m_frame->frameID()));
+    if (!unblockHandler.needsUIProcess()) {
+        m_frame->coreFrame()->loader().policyChecker().setContentFilterUnblockHandler(WTF::move(unblockHandler));
+        return;
+    }
+
+    if (WebPage* webPage { m_frame->page() })
+        webPage->send(Messages::WebPageProxy::ContentFilterDidBlockLoadForFrame(unblockHandler, m_frame->frameID()));
 }
 #endif
 
@@ -1673,5 +1710,10 @@ void WebFrameLoaderClient::didRequestAutocomplete(PassRefPtr<WebCore::FormState>
 {
 }
 #endif
+
+void WebFrameLoaderClient::prefetchDNS(const String& hostname)
+{
+    WebProcess::singleton().prefetchDNS(hostname);
+}
 
 } // namespace WebKit

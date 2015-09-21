@@ -25,7 +25,6 @@
 #include "CodeBlock.h"
 #include "DebuggerCallFrame.h"
 #include "Error.h"
-
 #include "HeapIterationScope.h"
 #include "Interpreter.h"
 #include "JSCJSValueInlines.h"
@@ -44,11 +43,13 @@ class Recompiler : public MarkedBlock::VoidFunctor {
 public:
     Recompiler(JSC::Debugger*);
     ~Recompiler();
-    void operator()(JSCell*);
+    IterationStatus operator()(JSCell*);
 
 private:
     typedef HashSet<FunctionExecutable*> FunctionExecutableSet;
     typedef HashMap<SourceProvider*, ExecState*> SourceProviderMap;
+    
+    void visit(JSCell*);
     
     JSC::Debugger* m_debugger;
     FunctionExecutableSet m_functionExecutables;
@@ -69,7 +70,7 @@ inline Recompiler::~Recompiler()
         m_debugger->sourceParsed(iter->value, iter->key, -1, String());
 }
 
-inline void Recompiler::operator()(JSCell* cell)
+inline void Recompiler::visit(JSCell* cell)
 {
     if (!cell->inherits(JSFunction::info()))
         return;
@@ -86,10 +87,16 @@ inline void Recompiler::operator()(JSCell* cell)
         return;
 
     ExecState* exec = function->scope()->globalObject()->JSGlobalObject::globalExec();
-    executable->clearCodeIfNotCompiling();
-    executable->clearUnlinkedCodeForRecompilationIfNotCompiling();
+    executable->clearCode();
+    executable->clearUnlinkedCodeForRecompilation();
     if (m_debugger == function->scope()->globalObject()->debugger())
         m_sourceProviders.add(executable->source().provider(), exec);
+}
+
+inline IterationStatus Recompiler::operator()(JSCell* cell)
+{
+    visit(cell);
+    return IterationStatus::Continue;
 }
 
 } // namespace
@@ -110,7 +117,7 @@ public:
     {
         if (m_debugger.m_currentDebuggerCallFrame) {
             m_debugger.m_currentDebuggerCallFrame->invalidate();
-            m_debugger.m_currentDebuggerCallFrame = 0;
+            m_debugger.m_currentDebuggerCallFrame = nullptr;
         }
     }
 
@@ -141,7 +148,7 @@ private:
 template<typename Functor>
 void Debugger::forEachCodeBlock(Functor& functor)
 {
-    m_vm->prepareToDiscardCode();
+    m_vm->prepareToDeleteCode();
     m_vm->heap.forEachCodeBlock(functor);
 }
 
@@ -241,7 +248,7 @@ void Debugger::setSteppingMode(SteppingMode mode)
     if (mode == m_steppingMode || !m_vm)
         return;
 
-    m_vm->prepareToDiscardCode();
+    m_vm->prepareToDeleteCode();
 
     m_steppingMode = mode;
     SetSteppingModeFunctor functor(this, mode);
@@ -270,7 +277,7 @@ void Debugger::toggleBreakpoint(CodeBlock* codeBlock, Breakpoint& breakpoint, Br
     unsigned line = breakpoint.line;
     unsigned column = breakpoint.column;
 
-    unsigned startLine = executable->lineNo();
+    unsigned startLine = executable->firstLine();
     unsigned startColumn = executable->startColumn();
     unsigned endLine = executable->lastLine();
     unsigned endColumn = executable->endColumn();
@@ -351,7 +358,7 @@ void Debugger::recompileAllJSFunctions(VM* vm)
         return;
     }
 
-    vm->prepareToDiscardCode();
+    vm->prepareToDeleteCode();
 
     Recompiler recompiler(this);
     HeapIterationScope iterationScope(vm->heap);
@@ -479,7 +486,7 @@ bool Debugger::hasBreakpoint(SourceID sourceID, const TextPosition& position, Br
     // so make it looks like the debugger is already paused.
     TemporaryPausedState pausedState(*this);
 
-    JSValue exception;
+    NakedPtr<Exception> exception;
     DebuggerCallFrame* debuggerCallFrame = currentDebuggerCallFrame();
     JSValue result = debuggerCallFrame->evaluate(breakpoint->condition, exception);
 
@@ -687,13 +694,13 @@ void Debugger::pauseIfNeeded(CallFrame* callFrame)
     }
 }
 
-void Debugger::exception(CallFrame* callFrame, JSValue exception, bool hasHandler)
+void Debugger::exception(CallFrame* callFrame, JSValue exception, bool hasCatchHandler)
 {
     if (m_isPaused)
         return;
 
     PauseReasonDeclaration reason(*this, PausedForException);
-    if (m_pauseOnExceptionsState == PauseOnAllExceptions || (m_pauseOnExceptionsState == PauseOnUncaughtExceptions && !hasHandler)) {
+    if (m_pauseOnExceptionsState == PauseOnAllExceptions || (m_pauseOnExceptionsState == PauseOnUncaughtExceptions && !hasCatchHandler)) {
         m_pauseOnNextStatement = true;
         setSteppingMode(SteppingModeEnabled);
     }

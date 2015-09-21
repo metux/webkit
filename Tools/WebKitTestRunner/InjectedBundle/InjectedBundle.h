@@ -91,6 +91,7 @@ public:
     void setGeolocationPermission(bool);
     void setMockGeolocationPosition(double latitude, double longitude, double accuracy, bool providesAltitude, double altitude, bool providesAltitudeAccuracy, double altitudeAccuracy, bool providesHeading, double heading, bool providesSpeed, double speed);
     void setMockGeolocationPositionUnavailableError(WKStringRef errorMessage);
+    bool isGeolocationProviderActive() const;
 
     // MediaStream.
     void setUserMediaPermission(bool);
@@ -109,11 +110,13 @@ public:
     void processWorkQueue();
     void queueBackNavigation(unsigned howFarBackward);
     void queueForwardNavigation(unsigned howFarForward);
-    void queueLoad(WKStringRef url, WKStringRef target);
+    void queueLoad(WKStringRef url, WKStringRef target, bool shouldOpenExternalURLs = false);
     void queueLoadHTMLString(WKStringRef content, WKStringRef baseURL = 0, WKStringRef unreachableURL = 0);
     void queueReload();
     void queueLoadingScript(WKStringRef script);
     void queueNonLoadingScript(WKStringRef script);
+
+    bool isAllowedHost(WKStringRef);
 
 private:
     InjectedBundle();
@@ -165,6 +168,8 @@ private:
     WKRetainPtr<WKDataRef> m_audioResult;
     WKRetainPtr<WKImageRef> m_pixelResult;
     WKRetainPtr<WKArrayRef> m_repaintRects;
+
+    Vector<String> m_allowedHosts;
 };
 
 } // namespace WTR

@@ -39,7 +39,81 @@ ContentExtensionRule::ContentExtensionRule(const Trigger& trigger, const Action&
     ASSERT(!m_trigger.urlFilter.isEmpty());
 }
 
+Action Action::deserialize(const SerializedActionByte* actions, const uint32_t actionsLength, uint32_t location)
+{
+    RELEASE_ASSERT(location < actionsLength);
+    switch (static_cast<ActionType>(actions[location])) {
+    case ActionType::BlockCookies:
+        return Action(ActionType::BlockCookies, location);
+    case ActionType::BlockLoad:
+        return Action(ActionType::BlockLoad, location);
+    case ActionType::IgnorePreviousRules:
+        return Action(ActionType::IgnorePreviousRules, location);
+    case ActionType::CSSDisplayNoneSelector: {
+        uint32_t headerLength = sizeof(ActionType) + sizeof(uint32_t) + sizeof(bool);
+        uint32_t stringStartIndex = location + headerLength;
+        RELEASE_ASSERT(actionsLength >= stringStartIndex);
+        uint32_t selectorLength = *reinterpret_cast<const unsigned*>(&actions[location + sizeof(ActionType)]);
+        bool wideCharacters = actions[location + sizeof(ActionType) + sizeof(uint32_t)];
+        
+        if (wideCharacters) {
+            RELEASE_ASSERT(actionsLength >= stringStartIndex + selectorLength * sizeof(UChar));
+            return Action(ActionType::CSSDisplayNoneSelector, String(reinterpret_cast<const UChar*>(&actions[stringStartIndex]), selectorLength), location);
+        }
+        RELEASE_ASSERT(actionsLength >= stringStartIndex + selectorLength * sizeof(LChar));
+        return Action(ActionType::CSSDisplayNoneSelector, String(reinterpret_cast<const LChar*>(&actions[stringStartIndex]), selectorLength), location);
+    }
+    case ActionType::CSSDisplayNoneStyleSheet:
+    case ActionType::InvalidAction:
+    default:
+        RELEASE_ASSERT_NOT_REACHED();
+    }
 }
+    
+ActionType Action::deserializeType(const SerializedActionByte* actions, const uint32_t actionsLength, uint32_t location)
+{
+    RELEASE_ASSERT(location < actionsLength);
+    ActionType type = static_cast<ActionType>(actions[location]);
+    switch (type) {
+    case ActionType::BlockCookies:
+    case ActionType::BlockLoad:
+    case ActionType::IgnorePreviousRules:
+    case ActionType::CSSDisplayNoneSelector:
+        return type;
+    case ActionType::CSSDisplayNoneStyleSheet:
+    case ActionType::InvalidAction:
+    default:
+        RELEASE_ASSERT_NOT_REACHED();
+    }
+}
+    
+uint32_t Action::serializedLength(const SerializedActionByte* actions, const uint32_t actionsLength, uint32_t location)
+{
+    RELEASE_ASSERT(location < actionsLength);
+    switch (static_cast<ActionType>(actions[location])) {
+    case ActionType::BlockCookies:
+    case ActionType::BlockLoad:
+    case ActionType::IgnorePreviousRules:
+        return sizeof(ActionType);
+    case ActionType::CSSDisplayNoneSelector: {
+        uint32_t headerLength = sizeof(ActionType) + sizeof(uint32_t) + sizeof(bool);
+        uint32_t stringStartIndex = location + headerLength;
+        RELEASE_ASSERT(actionsLength >= stringStartIndex);
+        uint32_t selectorLength = *reinterpret_cast<const unsigned*>(&actions[location + sizeof(ActionType)]);
+        bool wideCharacters = actions[location + sizeof(ActionType) + sizeof(uint32_t)];
+        
+        if (wideCharacters)
+            return headerLength + selectorLength * sizeof(UChar);
+        return headerLength + selectorLength * sizeof(LChar);
+    }
+    case ActionType::CSSDisplayNoneStyleSheet:
+    case ActionType::InvalidAction:
+    default:
+        RELEASE_ASSERT_NOT_REACHED();
+    }
+}
+
+} // namespace ContentExtensions
 
 } // namespace WebCore
 

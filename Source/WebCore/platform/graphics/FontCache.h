@@ -37,9 +37,10 @@
 #include <wtf/PassRefPtr.h>
 #include <wtf/RefPtr.h>
 #include <wtf/Vector.h>
+#include <wtf/text/AtomicStringHash.h>
 #include <wtf/text/WTFString.h>
 
-#if PLATFORM(IOS)
+#if PLATFORM(COCOA)
 #include <CoreText/CTFont.h>
 #endif
 
@@ -66,40 +67,75 @@ typedef IMLangFontLink IMLangFontLinkType;
 #endif
 
 // This key contains the FontDescription fields other than family that matter when fetching FontDatas (platform fonts).
-struct FontDescriptionFontDataCacheKey {
-    explicit FontDescriptionFontDataCacheKey(unsigned size = 0)
-        : size(size)
-        , weight(0)
-        , flags(0)
+struct FontDescriptionKey {
+    FontDescriptionKey() = default;
+
+    FontDescriptionKey(const FontDescription& description)
+        : m_size(description.computedPixelSize())
+        , m_weight(description.weight())
+        , m_flags(makeFlagKey(description))
+        , m_locale(description.locale())
+        , m_featureSettings(description.featureSettings())
     { }
-    FontDescriptionFontDataCacheKey(const FontDescription& description)
-        : size(description.computedPixelSize())
-        , weight(description.weight())
-        , flags(makeFlagKey(description))
+
+    explicit FontDescriptionKey(WTF::HashTableDeletedValueType)
+        : m_size(cHashTableDeletedSize)
     { }
+
+    bool operator==(const FontDescriptionKey& other) const
+    {
+        return m_size == other.m_size && m_weight == other.m_weight && m_flags == other.m_flags && m_locale == other.m_locale
+            && ((m_featureSettings == other.m_featureSettings) || (m_featureSettings && other.m_featureSettings && m_featureSettings.get() == other.m_featureSettings.get()));
+    }
+
+    bool operator!=(const FontDescriptionKey& other) const
+    {
+        return !(*this == other);
+    }
+
+    bool isHashTableDeletedValue() const { return m_size == cHashTableDeletedSize; }
+
+    inline unsigned computeHash() const
+    {
+        unsigned toHash[] = {m_size, m_weight, m_flags, m_locale.isNull() ? 0 : m_locale.impl()->existingHash(), m_featureSettings ? m_featureSettings->hash() : 0};
+        return StringHasher::hashMemory(toHash, sizeof(toHash));
+    }
+
+private:
     static unsigned makeFlagKey(const FontDescription& description)
     {
-        return static_cast<unsigned>(description.widthVariant()) << 4
+        static_assert(USCRIPT_CODE_LIMIT < 0x1000, "Script code must fit in an unsigned along with the other flags");
+        return static_cast<unsigned>(description.script()) << 9
+            | static_cast<unsigned>(description.smallCaps()) << 8
+            | static_cast<unsigned>(description.fontSynthesis()) << 6
+            | static_cast<unsigned>(description.widthVariant()) << 4
             | static_cast<unsigned>(description.nonCJKGlyphOrientation()) << 3
             | static_cast<unsigned>(description.orientation()) << 2
             | static_cast<unsigned>(description.italic()) << 1
             | static_cast<unsigned>(description.renderingMode());
     }
-    bool operator==(const FontDescriptionFontDataCacheKey& other) const
+
+    static const unsigned cHashTableDeletedSize = 0xFFFFFFFFU;
+
+    unsigned m_size { 0 };
+    unsigned m_weight { 0 };
+    unsigned m_flags { 0 };
+    AtomicString m_locale;
+    RefPtr<FontFeatureSettings> m_featureSettings;
+};
+
+struct FontDescriptionKeyHash {
+    static unsigned hash(const FontDescriptionKey& key)
     {
-        return size == other.size && weight == other.weight && flags == other.flags;
+        return key.computeHash();
     }
-    bool operator!=(const FontDescriptionFontDataCacheKey& other) const
+
+    static bool equal(const FontDescriptionKey& a, const FontDescriptionKey& b)
     {
-        return !(*this == other);
+        return a == b;
     }
-    inline unsigned computeHash() const
-    {
-        return StringHasher::hashMemory<sizeof(FontDescriptionFontDataCacheKey)>(this);
-    }
-    unsigned size;
-    unsigned weight;
-    unsigned flags;
+
+    static const bool safeToCompareToEmptyOrDeleted = true;
 };
 
 class FontCache {
@@ -107,16 +143,18 @@ class FontCache {
 
     WTF_MAKE_NONCOPYABLE(FontCache); WTF_MAKE_FAST_ALLOCATED;
 public:
-    friend FontCache& fontCache();
+    WEBCORE_EXPORT static FontCache& singleton();
 
-    // This method is implemented by the platform.
-    RefPtr<Font> systemFallbackForCharacters(const FontDescription&, const Font* originalFontData, bool isPlatformFont, const UChar* characters, int length);
-
-    // Also implemented by the platform.
+    // These methods are implemented by the platform.
+    RefPtr<Font> systemFallbackForCharacters(const FontDescription&, const Font* originalFontData, bool isPlatformFont, const UChar* characters, unsigned length);
+    Vector<String> systemFontFamilies();
     void platformInit();
 
 #if PLATFORM(IOS)
     static float weightOfCTFont(CTFontRef);
+#endif
+#if PLATFORM(MAC)
+    WEBCORE_EXPORT static void setFontWhitelist(const Vector<String>&);
 #endif
 #if PLATFORM(WIN)
     IMLangFontLinkType* getFontLinkInterface();
@@ -140,7 +178,8 @@ public:
 
     WEBCORE_EXPORT size_t fontCount();
     WEBCORE_EXPORT size_t inactiveFontCount();
-    WEBCORE_EXPORT void purgeInactiveFontData(int count = INT_MAX);
+    WEBCORE_EXPORT void purgeInactiveFontData(unsigned count = UINT_MAX);
+    void platformPurgeInactiveFontData();
 
 #if PLATFORM(WIN)
     RefPtr<Font> fontFromDescriptionAndLogFont(const FontDescription&, const LOGFONT&, AtomicString& outFontFamilyName);
@@ -151,18 +190,9 @@ public:
     PassRefPtr<OpenTypeVerticalData> getVerticalData(const FontFileKey&, const FontPlatformData&);
 #endif
 
-    struct SimpleFontFamily {
-        String name;
-        bool isBold;
-        bool isItalic;
-    };
-    static void getFontFamilyForCharacters(const UChar* characters, size_t numCharacters, const char* preferredLocale, SimpleFontFamily*);
-
 private:
     FontCache();
-    ~FontCache();
-
-    void purgeTimerFired();
+    ~FontCache() = delete;
 
     WEBCORE_EXPORT void purgeInactiveFontDataIfNeeded();
 
@@ -172,7 +202,7 @@ private:
     // These methods are implemented by each platform.
 #if PLATFORM(IOS)
     FontPlatformData* getCustomFallbackFont(const UInt32, const FontDescription&);
-    PassRefPtr<Font> getSystemFontFallbackForCharacters(const FontDescription&, const Font*, const UChar* characters, int length);
+    PassRefPtr<Font> getSystemFontFallbackForCharacters(const FontDescription&, const Font*, const UChar* characters, unsigned length);
 #endif
     std::unique_ptr<FontPlatformData> createFontPlatformData(const FontDescription&, const AtomicString& family);
 
@@ -184,8 +214,15 @@ private:
     friend class Font;
 };
 
-// Get the global fontCache.
-WEBCORE_EXPORT FontCache& fontCache();
+#if PLATFORM(COCOA)
+RetainPtr<CTFontRef> applyFontFeatureSettings(CTFontRef, const FontFeatureSettings*);
+#endif
+
+#if !PLATFORM(MAC)
+inline void FontCache::platformPurgeInactiveFontData()
+{
+}
+#endif
 
 }
 

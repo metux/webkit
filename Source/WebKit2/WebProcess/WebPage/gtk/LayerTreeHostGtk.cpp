@@ -84,7 +84,7 @@ bool LayerTreeHostGtk::makeContextCurrent()
         if (!m_layerTreeContext.contextID)
             return false;
 
-        m_context = GLContext::createContextForWindow(m_layerTreeContext.contextID, GLContext::sharingContext());
+        m_context = GLContext::createContextForWindow(reinterpret_cast<GLNativeWindowType>(m_layerTreeContext.contextID), GLContext::sharingContext());
         if (!m_context)
             return false;
     }
@@ -260,14 +260,15 @@ void LayerTreeHostGtk::layerFlushTimerFired()
 
 bool LayerTreeHostGtk::flushPendingLayerChanges()
 {
-    m_rootLayer->flushCompositingStateForThisLayerOnly();
-    m_nonCompositedContentLayer->flushCompositingStateForThisLayerOnly();
+    bool viewportIsStable = m_webPage->corePage()->mainFrame().view()->viewportIsStable();
+    m_rootLayer->flushCompositingStateForThisLayerOnly(viewportIsStable);
+    m_nonCompositedContentLayer->flushCompositingStateForThisLayerOnly(viewportIsStable);
 
     if (!m_webPage->corePage()->mainFrame().view()->flushCompositingStateIncludingSubframes())
         return false;
 
     if (m_viewOverlayRootLayer)
-        m_viewOverlayRootLayer->flushCompositingState(FloatRect(FloatPoint(), m_rootLayer->size()));
+        m_viewOverlayRootLayer->flushCompositingState(FloatRect(FloatPoint(), m_rootLayer->size()), viewportIsStable);
 
     downcast<GraphicsLayerTextureMapper>(*m_rootLayer).updateBackingStoreIncludingSubLayers();
     return true;
@@ -375,7 +376,7 @@ void LayerTreeHostGtk::setNativeSurfaceHandleForCompositing(uint64_t handle)
 
     ASSERT(m_isValid);
     ASSERT(!m_textureMapper);
-    m_textureMapper = TextureMapper::create(TextureMapper::OpenGLMode);
+    m_textureMapper = TextureMapper::create();
     static_cast<TextureMapperGL*>(m_textureMapper.get())->setEnableEdgeDistanceAntialiasing(true);
     downcast<GraphicsLayerTextureMapper>(*m_rootLayer).layer().setTextureMapper(m_textureMapper.get());
 

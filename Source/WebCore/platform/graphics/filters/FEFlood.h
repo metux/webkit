@@ -30,10 +30,10 @@ namespace WebCore {
 
 class FEFlood : public FilterEffect {
 public:
-    static Ref<FEFlood> create(Filter* filter, const Color&, float);
+    static Ref<FEFlood> create(Filter&, const Color&, float);
 
     Color floodColor() const;
-    bool setFloodColor(const Color &);
+    bool setFloodColor(const Color&);
 
     float floodOpacity() const;
     bool setFloodOpacity(float);
@@ -45,18 +45,18 @@ public:
     void setResultColorSpace(ColorSpace) override { FilterEffect::setResultColorSpace(ColorSpaceDeviceRGB); }
 #endif
 
-    virtual void platformApplySoftware();
+    virtual void platformApplySoftware() override;
 #if ENABLE(OPENCL)
-    virtual bool platformApplyOpenCL();
+    virtual bool platformApplyOpenCL() override;
 #endif
-    virtual void dump();
+    virtual void dump() override;
 
-    virtual void determineAbsolutePaintRect() { setAbsolutePaintRect(enclosingIntRect(maxEffectRect())); }
+    virtual void determineAbsolutePaintRect() override { setAbsolutePaintRect(enclosingIntRect(maxEffectRect())); }
 
-    virtual TextStream& externalRepresentation(TextStream&, int indention) const;
+    virtual TextStream& externalRepresentation(TextStream&, int indention) const override;
 
 private:
-    FEFlood(Filter*, const Color&, float);
+    FEFlood(Filter&, const Color&, float);
 
     Color m_floodColor;
     float m_floodOpacity;

@@ -71,7 +71,40 @@ void KeyframeValueList::insert(std::unique_ptr<const AnimationValue> value)
     m_values.append(WTF::move(value));
 }
 
-GraphicsLayer::GraphicsLayer(Type, GraphicsLayerClient& client)
+#if !USE(CA)
+bool GraphicsLayer::supportsLayerType(Type type)
+{
+    switch (type) {
+    case Type::Normal:
+    case Type::PageTiledBacking:
+    case Type::Scrolling:
+        return true;
+    case Type::Shape:
+        return false;
+    }
+    ASSERT_NOT_REACHED();
+    return false;
+}
+
+bool GraphicsLayer::supportsBackgroundColorContent()
+{
+#if USE(TEXTURE_MAPPER)
+    return true;
+#else
+    return false;
+#endif
+}
+#endif
+
+#if !USE(COORDINATED_GRAPHICS)
+bool GraphicsLayer::supportsContentsTiling()
+{
+    // FIXME: Enable the feature on different ports.
+    return false;
+}
+#endif
+
+GraphicsLayer::GraphicsLayer(Type type, GraphicsLayerClient& client)
     : m_client(client)
     , m_anchorPoint(0.5f, 0.5f, 0)
     , m_opacity(1)
@@ -79,6 +112,7 @@ GraphicsLayer::GraphicsLayer(Type, GraphicsLayerClient& client)
 #if ENABLE(CSS_COMPOSITING)
     , m_blendMode(BlendModeNormal)
 #endif
+    , m_type(type)
     , m_contentsOpaque(false)
     , m_preserves3D(false)
     , m_backfaceVisibility(true)
@@ -274,6 +308,42 @@ void GraphicsLayer::setMaskLayer(GraphicsLayer* layer)
     m_maskLayer = layer;
 }
 
+Path GraphicsLayer::shapeLayerPath() const
+{
+#if USE(CA)
+    return m_shapeLayerPath;
+#else
+    return Path();
+#endif
+}
+
+void GraphicsLayer::setShapeLayerPath(const Path& path)
+{
+#if USE(CA)
+    m_shapeLayerPath = path;
+#else
+    UNUSED_PARAM(path);
+#endif
+}
+
+WindRule GraphicsLayer::shapeLayerWindRule() const
+{
+#if USE(CA)
+    return m_shapeLayerWindRule;
+#else
+    return RULE_NONZERO;
+#endif
+}
+
+void GraphicsLayer::setShapeLayerWindRule(WindRule windRule)
+{
+#if USE(CA)
+    m_shapeLayerWindRule = windRule;
+#else
+    UNUSED_PARAM(windRule);
+#endif
+}
+
 void GraphicsLayer::noteDeviceOrPageScaleFactorChangedIncludingDescendants()
 {
     deviceOrPageScaleFactorChanged();
@@ -439,7 +509,11 @@ static inline const FilterOperations& filterOperationsAt(const KeyframeValueList
 
 int GraphicsLayer::validateFilterOperations(const KeyframeValueList& valueList)
 {
+#if ENABLE(FILTERS_LEVEL_2)
+    ASSERT(valueList.property() == AnimatedPropertyWebkitFilter || valueList.property() == AnimatedPropertyWebkitBackdropFilter);
+#else
     ASSERT(valueList.property() == AnimatedPropertyWebkitFilter);
+#endif
 
     if (valueList.size() < 2)
         return -1;
@@ -481,7 +555,7 @@ static inline const TransformOperations& operationsAt(const KeyframeValueList& v
 
 int GraphicsLayer::validateTransformOperations(const KeyframeValueList& valueList, bool& hasBigRotation)
 {
-    ASSERT(valueList.property() == AnimatedPropertyWebkitTransform);
+    ASSERT(valueList.property() == AnimatedPropertyTransform);
 
     hasBigRotation = false;
     
@@ -705,6 +779,15 @@ void GraphicsLayer::dumpProperties(TextStream& ts, int indent, LayerTreeAsTextBe
         ts << "[" << m_childrenTransform.m21() << " " << m_childrenTransform.m22() << " " << m_childrenTransform.m23() << " " << m_childrenTransform.m24() << "] ";
         ts << "[" << m_childrenTransform.m31() << " " << m_childrenTransform.m32() << " " << m_childrenTransform.m33() << " " << m_childrenTransform.m34() << "] ";
         ts << "[" << m_childrenTransform.m41() << " " << m_childrenTransform.m42() << " " << m_childrenTransform.m43() << " " << m_childrenTransform.m44() << "])\n";
+    }
+
+    if (m_maskLayer) {
+        writeIndent(ts, indent + 1);
+        ts << "(mask layer";
+        if (behavior & LayerTreeAsTextDebug)
+            ts << " " << m_maskLayer;
+        ts << ")\n";
+        m_maskLayer->dumpLayer(ts, indent + 2, behavior);
     }
 
     if (m_replicaLayer) {

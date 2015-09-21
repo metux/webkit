@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013, 2014 Apple Inc. All rights reserved.
+ * Copyright (C) 2013-2015 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -63,7 +63,7 @@ public:
 
         // Create a SSACalculator::Variable for every root VariableAccessData.
         for (VariableAccessData& variable : m_graph.m_variableAccessData) {
-            if (!variable.isRoot() || variable.isCaptured())
+            if (!variable.isRoot())
                 continue;
             
             SSACalculator::Variable* ssaVariable = m_calculator.newVariable();
@@ -87,8 +87,6 @@ public:
                     continue;
                 
                 VariableAccessData* variable = node->variableAccessData();
-                if (variable->isCaptured())
-                    continue;
                 
                 Node* childNode;
                 if (node->op() == SetLocal)
@@ -97,8 +95,10 @@ public:
                     ASSERT(node->op() == SetArgument);
                     childNode = m_insertionSet.insertNode(
                         nodeIndex, node->variableAccessData()->prediction(),
-                        GetLocal, node->origin, OpInfo(node->variableAccessData()));
-                    m_argumentGetters.add(childNode);
+                        GetStack, node->origin,
+                        OpInfo(m_graph.m_stackAccessData.add(variable->local(), variable->flushFormat())));
+                    if (!ASSERT_DISABLED)
+                        m_argumentGetters.add(childNode);
                     m_argumentMapping.add(node, childNode);
                 }
                 
@@ -188,26 +188,24 @@ public:
         //
         //   - MovHint has KillLocal prepended to it.
         //
-        //   - GetLocal over captured variables lose their phis.
+        //   - GetLocal die and get replaced with references to the node specified by
+        //     valueForOperand.
         //
-        //   - GetLocal over uncaptured variables die and get replaced with references to the node
-        //     specified by valueForOperand.
-        //
-        //   - SetLocal turns into PutLocal if it's flushed, or turns into a Check otherwise.
+        //   - SetLocal turns into PutStack if it's flushed, or turns into a Check otherwise.
         //
         //   - Flush loses its children and turns into a Phantom.
         //
         //   - PhantomLocal becomes Phantom, and its child is whatever is specified by
         //     valueForOperand.
         //
-        //   - SetArgument is removed. Note that GetLocal nodes have already been inserted.
+        //   - SetArgument is removed. Note that GetStack nodes have already been inserted.
         Operands<Node*> valueForOperand(OperandsLike, m_graph.block(0)->variablesAtHead);
         for (BasicBlock* block : m_graph.blocksInPreOrder()) {
             valueForOperand.clear();
             
             // CPS will claim that the root block has all arguments live. But we have already done
             // the first step of SSA conversion: argument locals are no longer live at head;
-            // instead we have GetLocal nodes for extracting the values of arguments. So, we
+            // instead we have GetStack nodes for extracting the values of arguments. So, we
             // skip the at-head available value calculation for the root block.
             if (block != m_graph.block(0)) {
                 for (size_t i = valueForOperand.size(); i--;) {
@@ -216,8 +214,6 @@ public:
                         continue;
                     
                     VariableAccessData* variable = nodeAtHead->variableAccessData();
-                    if (variable->isCaptured())
-                        continue;
                     
                     if (verbose)
                         dataLog("Considering live variable ", VariableAccessDataDump(m_graph, variable), " at head of block ", *block, "\n");
@@ -231,13 +227,13 @@ public:
                     }
                     
                     Node* node = def->value();
-                    if (node->replacement) {
+                    if (node->replacement()) {
                         // This will occur when a SetLocal had a GetLocal as its source. The
                         // GetLocal would get replaced with an actual SSA value by the time we get
                         // here. Note that the SSA value with which the GetLocal got replaced
                         // would not in turn have a replacement.
-                        node = node->replacement;
-                        ASSERT(!node->replacement);
+                        node = node->replacement();
+                        ASSERT(!node->replacement());
                     }
                     if (verbose)
                         dataLog("Mapping: ", VirtualRegister(valueForOperand.operandForIndex(i)), " -> ", node, "\n");
@@ -273,75 +269,61 @@ public:
                 switch (node->op()) {
                 case MovHint: {
                     m_insertionSet.insertNode(
-                        nodeIndex, SpecNone, KillLocal, node->origin,
+                        nodeIndex, SpecNone, KillStack, node->origin,
                         OpInfo(node->unlinkedLocal().offset()));
                     break;
                 }
                     
                 case SetLocal: {
                     VariableAccessData* variable = node->variableAccessData();
+                    Node* child = node->child1().node();
                     
-                    if (variable->isCaptured() || !!(node->flags() & NodeIsFlushed))
-                        node->setOpAndDefaultFlags(PutLocal);
-                    else
-                        node->setOpAndDefaultFlags(Check);
+                    if (!!(node->flags() & NodeIsFlushed)) {
+                        node->convertToPutStack(
+                            m_graph.m_stackAccessData.add(
+                                variable->local(), variable->flushFormat()));
+                    } else
+                        node->remove();
                     
-                    if (!variable->isCaptured()) {
-                        if (verbose)
-                            dataLog("Mapping: ", variable->local(), " -> ", node->child1().node(), "\n");
-                        valueForOperand.operand(variable->local()) = node->child1().node();
-                    }
+                    if (verbose)
+                        dataLog("Mapping: ", variable->local(), " -> ", child, "\n");
+                    valueForOperand.operand(variable->local()) = child;
+                    break;
+                }
+                    
+                case GetStack: {
+                    ASSERT(m_argumentGetters.contains(node));
+                    valueForOperand.operand(node->stackAccessData()->local) = node;
                     break;
                 }
                     
                 case GetLocal: {
                     VariableAccessData* variable = node->variableAccessData();
-                    if (m_argumentGetters.contains(node)) {
-                        if (verbose)
-                            dataLog("Mapping: ", variable->local(), " -> ", node, "\n");
-                        valueForOperand.operand(variable->local()) = node;
-                        break;
-                    }
                     node->children.reset();
                     
-                    if (variable->isCaptured())
-                        break;
-                    
-                    node->convertToPhantom();
+                    node->remove();
                     if (verbose)
                         dataLog("Replacing node ", node, " with ", valueForOperand.operand(variable->local()), "\n");
-                    node->replacement = valueForOperand.operand(variable->local());
+                    node->setReplacement(valueForOperand.operand(variable->local()));
                     break;
                 }
                     
                 case Flush: {
                     node->children.reset();
-                    node->convertToPhantom();
+                    node->remove();
                     break;
                 }
                     
                 case PhantomLocal: {
                     ASSERT(node->child1().useKind() == UntypedUse);
                     VariableAccessData* variable = node->variableAccessData();
-                    if (variable->isCaptured()) {
-                        // This is a fun case. We could have a captured variable that had some
-                        // or all of its uses strength reduced to phantoms rather than flushes.
-                        // SSA conversion will currently still treat it as flushed, in the sense
-                        // that it will just keep the SetLocal. Therefore, there is nothing that
-                        // needs to be done here: we don't need to also keep the source value
-                        // alive. And even if we did want to keep the source value alive, we
-                        // wouldn't be able to, because the variablesAtHead value for a captured
-                        // local wouldn't have been computed by the Phi reduction algorithm
-                        // above.
-                        node->children.reset();
-                    } else
-                        node->child1() = valueForOperand.operand(variable->local())->defaultEdge();
-                    node->convertToPhantom();
+                    node->child1() = valueForOperand.operand(variable->local())->defaultEdge();
+                    node->remove();
                     break;
                 }
                     
                 case SetArgument: {
-                    node->convertToPhantom();
+                    node->remove();
                     break;
                 }
                     
@@ -354,8 +336,9 @@ public:
             // seems dangerous because the Upsilon will have a checking UseKind. But, we will not
             // actually be performing the check at the point of the Upsilon; the check will
             // already have been performed at the point where the original SetLocal was.
-            size_t upsilonInsertionPoint = block->size() - 1;
-            NodeOrigin upsilonOrigin = block->last()->origin;
+            NodeAndIndex terminal = block->findTerminal();
+            size_t upsilonInsertionPoint = terminal.index;
+            NodeOrigin upsilonOrigin = terminal.node->origin;
             for (unsigned successorIndex = block->numSuccessors(); successorIndex--;) {
                 BasicBlock* successorBlock = block->successor(successorIndex);
                 for (SSACalculator::Def* phiDef : m_calculator.phisForBlock(successorBlock)) {
@@ -396,12 +379,9 @@ public:
             FlushFormat format = FlushedJSValue;
 
             Node* node = m_argumentMapping.get(m_graph.m_arguments[i]);
-
-            // m_argumentMapping.get could return null for a captured local. That's fine. We only
-            // track the argument loads of those arguments for which we speculate type. We don't
-            // speculate type for captured arguments.
-            if (node)
-                format = node->variableAccessData()->flushFormat();
+            
+            RELEASE_ASSERT(node);
+            format = node->stackAccessData()->format;
             
             m_graph.m_argumentFormats[i] = format;
             m_graph.m_arguments[i] = node; // Record the load that loads the arguments for the benefit of exit profiling.

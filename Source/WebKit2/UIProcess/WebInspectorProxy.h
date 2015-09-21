@@ -42,6 +42,7 @@
 
 OBJC_CLASS NSButton;
 OBJC_CLASS NSURL;
+OBJC_CLASS NSView;
 OBJC_CLASS NSWindow;
 OBJC_CLASS WKWebInspectorProxyObjCAdapter;
 OBJC_CLASS WKWebInspectorWKWebView;
@@ -100,12 +101,15 @@ public:
     void updateInspectorWindowTitle() const;
     void inspectedViewFrameDidChange(CGFloat = 0);
     void windowFrameDidChange();
+    void windowFullScreenDidChange();
     NSWindow* inspectorWindow() const { return m_inspectorWindow.get(); }
 
     void setInspectorWindowFrame(WKRect&);
     WKRect inspectorWindowFrame();
 
     void closeTimerFired();
+
+    void attachmentViewDidChange(NSView *oldView, NSView *newView);
 #endif
 
 #if PLATFORM(GTK)
@@ -117,6 +121,7 @@ public:
     void showResources();
     void showMainResourceForFrame(WebFrameProxy*);
 
+    AttachmentSide attachmentSide() const { return m_attachmentSide; }
     bool isAttached() const { return m_isAttached; }
     void attachRight();
     void attachBottom();
@@ -126,6 +131,8 @@ public:
     void setAttachedWindowHeight(unsigned);
     void setAttachedWindowWidth(unsigned);
     void setToolbarHeight(unsigned height) { platformSetToolbarHeight(height); }
+
+    void startWindowDrag();
 
     bool isProfilingPage() const { return m_isProfilingPage; }
     void togglePageProfiling();
@@ -172,8 +179,15 @@ private:
     void platformSetAttachedWindowHeight(unsigned);
     void platformSetAttachedWindowWidth(unsigned);
     void platformSetToolbarHeight(unsigned);
+    void platformStartWindowDrag();
     void platformSave(const String& filename, const String& content, bool base64Encoded, bool forceSaveAs);
     void platformAppend(const String& filename, const String& content);
+
+#if PLATFORM(MAC) && WK_API_ENABLED
+    bool platformCanAttach(bool webProcessCanAttach);
+#else
+    bool platformCanAttach(bool webProcessCanAttach) { return webProcessCanAttach; }
+#endif
 
     // Called by WebInspectorProxy messages
     void createInspectorPage(IPC::Attachment, bool canAttach, bool underTest);
@@ -192,6 +206,8 @@ private:
     bool canAttach() const { return m_canAttach; }
     bool shouldOpenAttached();
 
+    bool isUnderTest() const { return m_underTest; }
+
     void open();
 
     // The inspector level is used to give different preferences to each inspector
@@ -206,7 +222,6 @@ private:
 
 #if PLATFORM(GTK)
     void updateInspectorWindowTitle() const;
-    static void dockButtonClicked(GtkWidget*, WebInspectorProxy*);
 #endif
 
     static const unsigned minimumWindowWidth;
@@ -233,8 +248,6 @@ private:
 #if PLATFORM(MAC) && WK_API_ENABLED
     RetainPtr<WKWebInspectorWKWebView> m_inspectorView;
     RetainPtr<NSWindow> m_inspectorWindow;
-    RetainPtr<NSButton> m_dockBottomButton;
-    RetainPtr<NSButton> m_dockRightButton;
     RetainPtr<WKWebInspectorProxyObjCAdapter> m_inspectorProxyObjCAdapter;
     HashMap<String, RetainPtr<NSURL>> m_suggestedToActualURLMap;
     RunLoop::Timer<WebInspectorProxy> m_closeTimer;
@@ -244,8 +257,6 @@ private:
     GtkWidget* m_inspectorView {nullptr};
     GtkWidget* m_inspectorWindow {nullptr};
     GtkWidget* m_headerBar {nullptr};
-    GtkWidget* m_dockBottomButton {nullptr};
-    GtkWidget* m_dockRightButton {nullptr};
     String m_inspectedURLString;
 #elif PLATFORM(EFL)
     Evas_Object* m_inspectorView {nullptr};

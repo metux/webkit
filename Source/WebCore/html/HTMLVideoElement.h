@@ -53,7 +53,7 @@ public:
     void webkitEnterFullScreen(ExceptionCode& ec) { webkitEnterFullscreen(ec); }
     void webkitExitFullScreen() { webkitExitFullscreen(); }
 
-#if ENABLE(IOS_AIRPLAY)
+#if ENABLE(WIRELESS_PLAYBACK_TARGET)
     bool webkitWirelessVideoPlaybackDisabled() const;
     void setWebkitWirelessVideoPlaybackDisabled(bool);
 #endif
@@ -65,7 +65,7 @@ public:
 #endif
 
     // Used by canvas to gain raw pixel access
-    void paintCurrentFrameInContext(GraphicsContext*, const IntRect&);
+    void paintCurrentFrameInContext(GraphicsContext*, const FloatRect&);
 
     PassNativeImagePtr nativeImageForCurrentTime();
 
@@ -76,15 +76,13 @@ public:
     bool shouldDisplayPosterImage() const { return displayMode() == Poster || displayMode() == PosterWaitingForVideo; }
 
     URL posterImageURL() const;
-    virtual RenderPtr<RenderElement> createElementRenderer(Ref<RenderStyle>&&) override;
+    virtual RenderPtr<RenderElement> createElementRenderer(Ref<RenderStyle>&&, const RenderTreePosition&) override;
 
 #if ENABLE(VIDEO_PRESENTATION_MODE)
     bool webkitSupportsPresentationMode(const String&) const;
     void webkitSetPresentationMode(const String&);
     String webkitPresentationMode() const;
     virtual void fullscreenModeChanged(VideoFullscreenMode) override;
-
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(webkitpresentationmodechanged);
 #endif
 
 private:
@@ -106,7 +104,7 @@ private:
     virtual void didMoveToNewDocument(Document* oldDocument) override;
     virtual void setDisplayMode(DisplayMode) override;
 
-    virtual MediaSession::MediaType presentationType() const override { return MediaSession::Video; }
+    virtual PlatformMediaSession::MediaType presentationType() const override { return PlatformMediaSession::Video; }
 
     std::unique_ptr<HTMLImageLoader> m_imageLoader;
 

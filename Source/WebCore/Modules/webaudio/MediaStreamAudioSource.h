@@ -29,7 +29,8 @@
 #if ENABLE(MEDIA_STREAM)
 
 #include "AudioDestinationConsumer.h"
-#include "MediaStreamSource.h"
+#include "RealtimeMediaSource.h"
+#include <wtf/Lock.h>
 #include <wtf/RefCounted.h>
 #include <wtf/ThreadingPrimitives.h>
 #include <wtf/Vector.h>
@@ -38,18 +39,18 @@
 namespace WebCore {
 
 class AudioBus;
-class MediaStreamSourceCapabilities;
+class RealtimeMediaSourceCapabilities;
 
-class MediaStreamAudioSource : public MediaStreamSource {
+class MediaStreamAudioSource : public RealtimeMediaSource {
 public:
-    static RefPtr<MediaStreamAudioSource> create();
+    static Ref<MediaStreamAudioSource> create();
 
     ~MediaStreamAudioSource() { }
 
     virtual bool useIDForTrackID() const { return true; }
 
-    virtual RefPtr<MediaStreamSourceCapabilities> capabilities() const;
-    virtual const MediaStreamSourceStates& states();
+    virtual RefPtr<RealtimeMediaSourceCapabilities> capabilities() const;
+    virtual const RealtimeMediaSourceStates& states();
     
     const String& deviceId() const { return m_deviceId; }
     void setDeviceId(const String& deviceId) { m_deviceId = deviceId; }
@@ -65,9 +66,9 @@ private:
     MediaStreamAudioSource();
 
     String m_deviceId;
-    Mutex m_audioConsumersLock;
+    Lock m_audioConsumersLock;
     Vector<RefPtr<AudioDestinationConsumer>> m_audioConsumers;
-    MediaStreamSourceStates m_currentStates;
+    RealtimeMediaSourceStates m_currentStates;
 };
 
 } // namespace WebCore

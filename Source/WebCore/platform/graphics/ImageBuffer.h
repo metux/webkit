@@ -37,7 +37,6 @@
 #include "PlatformLayer.h"
 #include <runtime/Uint8ClampedArray.h>
 #include <wtf/Forward.h>
-#include <wtf/OwnPtr.h>
 #include <wtf/PassRefPtr.h>
 #include <wtf/Vector.h>
 
@@ -93,9 +92,11 @@ public:
     const IntSize& internalSize() const { return m_size; }
     const IntSize& logicalSize() const { return m_logicalSize; }
 
+    float resolutionScale() const { return m_resolutionScale; }
+
     WEBCORE_EXPORT GraphicsContext* context() const;
 
-    WEBCORE_EXPORT PassRefPtr<Image> copyImage(BackingStoreCopy = CopyBackingStore, ScaleBehavior = Scaled) const;
+    WEBCORE_EXPORT RefPtr<Image> copyImage(BackingStoreCopy = CopyBackingStore, ScaleBehavior = Scaled) const;
     // Give hints on the faster copyImage Mode, return DontCopyBackingStore if it supports the DontCopyBackingStore behavior
     // or return CopyBackingStore if it doesn't.  
     static BackingStoreCopy fastCopyImageMode();
@@ -115,19 +116,23 @@ public:
     void transformColorSpace(ColorSpace srcColorSpace, ColorSpace dstColorSpace);
     void platformTransformColorSpace(const Vector<int>&);
 #else
-    AffineTransform baseTransform() const { return AffineTransform(1, 0, 0, -1, 0, m_data.m_backingStoreSize.height()); }
+    AffineTransform baseTransform() const { return AffineTransform(1, 0, 0, -1, 0, m_data.backingStoreSize.height()); }
 #endif
     PlatformLayer* platformLayer() const;
 
     // FIXME: current implementations of this method have the restriction that they only work
     // with textures that are RGB or RGBA format, and UNSIGNED_BYTE type.
-    bool copyToPlatformTexture(GraphicsContext3D&, Platform3DObject, GC3Denum, bool, bool);
+    bool copyToPlatformTexture(GraphicsContext3D&, GC3Denum, Platform3DObject, GC3Denum, bool, bool);
 
     FloatSize spaceSize() const { return m_space; }
-    void setSpaceSize(const FloatSize& space)
-    {
-        m_space = space;
-    }
+    void setSpaceSize(const FloatSize& space) { m_space = space; }
+
+    // These functions are used when clamping the ImageBuffer which is created for filter, masker or clipper.
+    static bool sizeNeedsClamping(const FloatSize&);
+    static bool sizeNeedsClamping(const FloatSize&, FloatSize& scale);
+    static FloatSize clampedSize(const FloatSize&);
+    static FloatSize clampedSize(const FloatSize&, FloatSize& scale);
+    static FloatRect clampedRect(const FloatRect&);
 
 private:
 #if USE(CG)
@@ -146,6 +151,7 @@ private:
     friend class GraphicsContext;
     friend class GeneratedImage;
     friend class CrossfadeGeneratedImage;
+    friend class NamedImageGeneratedImage;
     friend class GradientImage;
 
 private:
@@ -153,7 +159,6 @@ private:
     IntSize m_size;
     IntSize m_logicalSize;
     float m_resolutionScale;
-    OwnPtr<GraphicsContext> m_context;
     FloatSize m_space;
 
     // This constructor will place its success into the given out-variable

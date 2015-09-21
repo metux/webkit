@@ -61,7 +61,6 @@ typedef void (*WKBundlePageDidLayoutCallback)(WKBundlePageRef page, WKLayoutMile
 typedef void (*WKBundlePageFeaturesUsedInPageCallback)(WKBundlePageRef page, WKArrayRef featureStrings, const void *clientInfo);
 typedef void (*WKBundlePageWillLoadURLRequestCallback)(WKBundlePageRef page, WKURLRequestRef request, WKTypeRef userData, const void *clientInfo);
 typedef void (*WKBundlePageWillLoadDataRequestCallback)(WKBundlePageRef page, WKURLRequestRef request, WKDataRef data, WKStringRef MIMEType, WKStringRef encodingName, WKURLRef unreachableURL, WKTypeRef userData, const void *clientInfo);
-typedef void (*WKBundlePageWillDestroyFrame)(WKBundlePageRef page, WKBundleFrameRef frame, const void *clientInfo);
 typedef WKStringRef (*WKBundlePageUserAgentForURLCallback)(WKBundleFrameRef frame, WKURLRef url, const void *clientInfo);
 
 typedef struct WKBundlePageLoaderClientBase {
@@ -404,7 +403,7 @@ typedef struct WKBundlePageLoaderClientV7 {
     WKBundlePageWillLoadDataRequestCallback                                 willLoadDataRequest;
 
     // Version 7
-    WKBundlePageWillDestroyFrame                                            willDestroyFrame;
+    void *                                                                  willDestroyFrame_unavailable;
 } WKBundlePageLoaderClientV7;
 
 typedef struct WKBundlePageLoaderClientV8 {
@@ -459,67 +458,10 @@ typedef struct WKBundlePageLoaderClientV8 {
     WKBundlePageWillLoadDataRequestCallback                                 willLoadDataRequest;
     
     // Version 7
-    WKBundlePageWillDestroyFrame                                            willDestroyFrame;
+    void *                                                                  willDestroyFrame_unavailable;
     
     // Version 8
     WKBundlePageUserAgentForURLCallback                                     userAgentForURL;
 } WKBundlePageLoaderClientV8;
-
-enum { kWKBundlePageLoaderClientCurrentVersion WK_ENUM_DEPRECATED("Use an explicit version number instead") = 8 };
-typedef struct WKBundlePageLoaderClient {
-    int                                                                     version;
-    const void *                                                            clientInfo;
-
-    // Version 0.
-    WKBundlePageDidStartProvisionalLoadForFrameCallback                     didStartProvisionalLoadForFrame;
-    WKBundlePageDidReceiveServerRedirectForProvisionalLoadForFrameCallback  didReceiveServerRedirectForProvisionalLoadForFrame;
-    WKBundlePageDidFailProvisionalLoadWithErrorForFrameCallback             didFailProvisionalLoadWithErrorForFrame;
-    WKBundlePageDidCommitLoadForFrameCallback                               didCommitLoadForFrame;
-    WKBundlePageDidFinishDocumentLoadForFrameCallback                       didFinishDocumentLoadForFrame;
-    WKBundlePageDidFinishLoadForFrameCallback                               didFinishLoadForFrame;
-    WKBundlePageDidFailLoadWithErrorForFrameCallback                        didFailLoadWithErrorForFrame;
-    WKBundlePageDidSameDocumentNavigationForFrameCallback                   didSameDocumentNavigationForFrame;
-    WKBundlePageDidReceiveTitleForFrameCallback                             didReceiveTitleForFrame;
-    WKBundlePageDidFirstLayoutForFrameCallback                              didFirstLayoutForFrame;
-    WKBundlePageDidFirstVisuallyNonEmptyLayoutForFrameCallback              didFirstVisuallyNonEmptyLayoutForFrame;
-    WKBundlePageDidRemoveFrameFromHierarchyCallback                         didRemoveFrameFromHierarchy;
-    WKBundlePageDidDisplayInsecureContentForFrameCallback                   didDisplayInsecureContentForFrame;
-    WKBundlePageDidRunInsecureContentForFrameCallback                       didRunInsecureContentForFrame;
-    WKBundlePageDidClearWindowObjectForFrameCallback                        didClearWindowObjectForFrame;
-    WKBundlePageDidCancelClientRedirectForFrameCallback                     didCancelClientRedirectForFrame;
-    WKBundlePageWillPerformClientRedirectForFrameCallback                   willPerformClientRedirectForFrame;
-    WKBundlePageDidHandleOnloadEventsForFrameCallback                       didHandleOnloadEventsForFrame;
-
-    // Version 1.
-    WKBundlePageDidLayoutForFrameCallback                                   didLayoutForFrame;
-    void *                                                                  didNewFirstVisuallyNonEmptyLayout_unavailable;
-    WKBundlePageDidDetectXSSForFrameCallback                                didDetectXSSForFrame;
-    WKBundlePageShouldGoToBackForwardListItemCallback                       shouldGoToBackForwardListItem;
-    WKBundlePageGlobalObjectIsAvailableForFrameCallback                     globalObjectIsAvailableForFrame;
-    WKBundlePageWillDisconnectDOMWindowExtensionFromGlobalObjectCallback    willDisconnectDOMWindowExtensionFromGlobalObject;
-    WKBundlePageDidReconnectDOMWindowExtensionToGlobalObjectCallback        didReconnectDOMWindowExtensionToGlobalObject;
-    WKBundlePageWillDestroyGlobalObjectForDOMWindowExtensionCallback        willDestroyGlobalObjectForDOMWindowExtension;
-    
-    // Version 2
-    WKBundlePageDidFinishProgressCallback                                   didFinishProgress;
-    WKBundlePageShouldForceUniversalAccessFromLocalURLCallback              shouldForceUniversalAccessFromLocalURL;
-
-    // Version 3
-    void *                                                                  didReceiveIntentForFrame_unavailable;
-    void *                                                                  registerIntentServiceForFrame_unavailable;
-
-    // Version 4
-    WKBundlePageDidLayoutCallback                                           didLayout;
-
-    // Version 5
-    WKBundlePageFeaturesUsedInPageCallback                                  featuresUsedInPage;
-    
-    // Version 6
-    WKBundlePageWillLoadURLRequestCallback                                  willLoadURLRequest;
-    WKBundlePageWillLoadDataRequestCallback                                 willLoadDataRequest;
-
-    // Version 7
-    WKBundlePageWillDestroyFrame                                            willDestroyFrame;
-} WKBundlePageLoaderClient WK_C_DEPRECATED("Use an explicit versioned struct instead");
 
 #endif // WKBundlePageLoaderClient_h

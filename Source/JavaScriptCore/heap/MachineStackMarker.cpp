@@ -72,7 +72,7 @@ namespace JSC {
 #if OS(DARWIN)
 typedef mach_port_t PlatformThread;
 #elif OS(WINDOWS)
-typedef HANDLE PlatformThread;
+typedef DWORD PlatformThread;
 #elif USE(PTHREADS)
 typedef pthread_t PlatformThread;
 static const int SigThreadSuspendResume = SIGUSR2;
@@ -103,18 +103,18 @@ public:
         }
 
     private:
-        MutexLocker m_locker;
+        LockHolder m_locker;
     };
 
     void add(MachineThreads* machineThreads)
     {
-        MutexLocker managerLock(m_lock);
+        LockHolder managerLock(m_lock);
         m_set.add(machineThreads);
     }
 
     void remove(MachineThreads* machineThreads)
     {
-        MutexLocker managerLock(m_lock);
+        LockHolder managerLock(m_lock);
         auto recordedMachineThreads = m_set.take(machineThreads);
         RELEASE_ASSERT(recordedMachineThreads = machineThreads);
     }
@@ -129,7 +129,7 @@ private:
 
     ActiveMachineThreadsManager() { }
     
-    Mutex m_lock;
+    Lock m_lock;
     MachineThreadsSet m_set;
 
     friend ActiveMachineThreadsManager& activeMachineThreadsManager();
@@ -146,10 +146,20 @@ static ActiveMachineThreadsManager& activeMachineThreadsManager()
     return *manager;
 }
     
+static inline PlatformThread getCurrentPlatformThread()
+{
+#if OS(DARWIN)
+    return pthread_mach_thread_np(pthread_self());
+#elif OS(WINDOWS)
+    return GetCurrentThreadId();
+#elif USE(PTHREADS)
+    return pthread_self();
+#endif
+}
 
 class MachineThreads::Thread {
     WTF_MAKE_FAST_ALLOCATED;
-public:
+
     Thread(const PlatformThread& platThread, void* base)
         : platformThread(platThread)
         , stackBase(base)
@@ -166,12 +176,74 @@ public:
         sigemptyset(&mask);
         sigaddset(&mask, SigThreadSuspendResume);
         pthread_sigmask(SIG_UNBLOCK, &mask, 0);
+#elif OS(WINDOWS)
+        ASSERT(platformThread == GetCurrentThreadId());
+        bool isSuccessful =
+            DuplicateHandle(GetCurrentProcess(), GetCurrentThread(), GetCurrentProcess(),
+                &platformThreadHandle, 0, FALSE, DUPLICATE_SAME_ACCESS);
+        RELEASE_ASSERT(isSuccessful);
 #endif
     }
+
+public:
+    ~Thread()
+    {
+#if OS(WINDOWS)
+        CloseHandle(platformThreadHandle);
+#endif
+    }
+
+    static Thread* createForCurrentThread()
+    {
+        return new Thread(getCurrentPlatformThread(), wtfThreadData().stack().origin());
+    }
+
+    struct Registers {
+        inline void* stackPointer() const;
+        
+#if OS(DARWIN)
+#if CPU(X86)
+        typedef i386_thread_state_t PlatformRegisters;
+#elif CPU(X86_64)
+        typedef x86_thread_state64_t PlatformRegisters;
+#elif CPU(PPC)
+        typedef ppc_thread_state_t PlatformRegisters;
+#elif CPU(PPC64)
+        typedef ppc_thread_state64_t PlatformRegisters;
+#elif CPU(ARM)
+        typedef arm_thread_state_t PlatformRegisters;
+#elif CPU(ARM64)
+        typedef arm_thread_state64_t PlatformRegisters;
+#else
+#error Unknown Architecture
+#endif
+        
+#elif OS(WINDOWS)
+        typedef CONTEXT PlatformRegisters;
+#elif USE(PTHREADS)
+        typedef pthread_attr_t PlatformRegisters;
+#else
+#error Need a thread register struct for this platform
+#endif
+        
+        PlatformRegisters regs;
+    };
+    
+    inline bool operator==(const PlatformThread& other) const;
+    inline bool operator!=(const PlatformThread& other) const { return !(*this == other); }
+
+    inline bool suspend();
+    inline void resume();
+    size_t getRegisters(Registers&);
+    void freeRegisters(Registers&);
+    std::pair<void*, size_t> captureStack(void* stackTop);
 
     Thread* next;
     PlatformThread platformThread;
     void* stackBase;
+#if OS(WINDOWS)
+    HANDLE platformThreadHandle;
+#endif
 };
 
 MachineThreads::MachineThreads(Heap* heap)
@@ -191,7 +263,7 @@ MachineThreads::~MachineThreads()
     activeMachineThreadsManager().remove(this);
     threadSpecificKeyDelete(m_threadSpecific);
 
-    MutexLocker registeredThreadsLock(m_registeredThreadsMutex);
+    LockHolder registeredThreadsLock(m_registeredThreadsMutex);
     for (Thread* t = m_registeredThreads; t;) {
         Thread* next = t->next;
         delete t;
@@ -199,23 +271,12 @@ MachineThreads::~MachineThreads()
     }
 }
 
-static inline PlatformThread getCurrentPlatformThread()
-{
-#if OS(DARWIN)
-    return pthread_mach_thread_np(pthread_self());
-#elif OS(WINDOWS)
-    return GetCurrentThread();
-#elif USE(PTHREADS)
-    return pthread_self();
-#endif
-}
-
-static inline bool equalThread(const PlatformThread& first, const PlatformThread& second)
+inline bool MachineThreads::Thread::operator==(const PlatformThread& other) const
 {
 #if OS(DARWIN) || OS(WINDOWS)
-    return first == second;
+    return platformThread == other;
 #elif USE(PTHREADS)
-    return !!pthread_equal(first, second);
+    return !!pthread_equal(platformThread, other);
 #else
 #error Need a way to compare threads on this platform
 #endif
@@ -231,9 +292,9 @@ void MachineThreads::addCurrentThread()
     }
 
     threadSpecificSet(m_threadSpecific, this);
-    Thread* thread = new Thread(getCurrentPlatformThread(), wtfThreadData().stack().origin());
+    Thread* thread = Thread::createForCurrentThread();
 
-    MutexLocker lock(m_registeredThreadsMutex);
+    LockHolder lock(m_registeredThreadsMutex);
 
     thread->next = m_registeredThreads;
     m_registeredThreads = thread;
@@ -257,16 +318,15 @@ void MachineThreads::removeThread(void* p)
 template<typename PlatformThread>
 void MachineThreads::removeThreadIfFound(PlatformThread platformThread)
 {
-    MutexLocker lock(m_registeredThreadsMutex);
-    if (equalThread(platformThread, m_registeredThreads->platformThread)) {
-        Thread* t = m_registeredThreads;
+    LockHolder lock(m_registeredThreadsMutex);
+    Thread* t = m_registeredThreads;
+    if (*t == platformThread) {
         m_registeredThreads = m_registeredThreads->next;
         delete t;
     } else {
         Thread* last = m_registeredThreads;
-        Thread* t;
         for (t = m_registeredThreads->next; t; t = t->next) {
-            if (equalThread(t->platformThread, platformThread)) {
+            if (*t == platformThread) {
                 last->next = t->next;
                 break;
             }
@@ -275,7 +335,8 @@ void MachineThreads::removeThreadIfFound(PlatformThread platformThread)
         delete t;
     }
 }
-    
+
+SUPPRESS_ASAN
 void MachineThreads::gatherFromCurrentThread(ConservativeRoots& conservativeRoots, JITStubRoutineSet& jitStubRoutines, CodeBlockSet& codeBlocks, void* stackOrigin, void* stackTop, RegisterState& calleeSavedRegisters)
 {
     void* registersBegin = &calleeSavedRegisters;
@@ -285,13 +346,13 @@ void MachineThreads::gatherFromCurrentThread(ConservativeRoots& conservativeRoot
     conservativeRoots.add(stackTop, stackOrigin, jitStubRoutines, codeBlocks);
 }
 
-static inline bool suspendThread(const PlatformThread& platformThread)
+inline bool MachineThreads::Thread::suspend()
 {
 #if OS(DARWIN)
     kern_return_t result = thread_suspend(platformThread);
     return result == KERN_SUCCESS;
 #elif OS(WINDOWS)
-    bool threadIsSuspended = (SuspendThread(platformThread) != (DWORD)-1);
+    bool threadIsSuspended = (SuspendThread(platformThreadHandle) != (DWORD)-1);
     ASSERT(threadIsSuspended);
     return threadIsSuspended;
 #elif USE(PTHREADS)
@@ -302,12 +363,12 @@ static inline bool suspendThread(const PlatformThread& platformThread)
 #endif
 }
 
-static inline void resumeThread(const PlatformThread& platformThread)
+inline void MachineThreads::Thread::resume()
 {
 #if OS(DARWIN)
     thread_resume(platformThread);
 #elif OS(WINDOWS)
-    ResumeThread(platformThread);
+    ResumeThread(platformThreadHandle);
 #elif USE(PTHREADS)
     pthread_kill(platformThread, SigThreadSuspendResume);
 #else
@@ -315,38 +376,10 @@ static inline void resumeThread(const PlatformThread& platformThread)
 #endif
 }
 
-typedef unsigned long usword_t; // word size, assumed to be either 32 or 64 bit
-
-#if OS(DARWIN)
-
-#if CPU(X86)
-typedef i386_thread_state_t PlatformThreadRegisters;
-#elif CPU(X86_64)
-typedef x86_thread_state64_t PlatformThreadRegisters;
-#elif CPU(PPC)
-typedef ppc_thread_state_t PlatformThreadRegisters;
-#elif CPU(PPC64)
-typedef ppc_thread_state64_t PlatformThreadRegisters;
-#elif CPU(ARM)
-typedef arm_thread_state_t PlatformThreadRegisters;
-#elif CPU(ARM64)
-typedef arm_thread_state64_t PlatformThreadRegisters;
-#else
-#error Unknown Architecture
-#endif
-
-#elif OS(WINDOWS)
-typedef CONTEXT PlatformThreadRegisters;
-#elif USE(PTHREADS)
-typedef pthread_attr_t PlatformThreadRegisters;
-#else
-#error Need a thread register struct for this platform
-#endif
-
-static size_t getPlatformThreadRegisters(const PlatformThread& platformThread, PlatformThreadRegisters& regs)
+size_t MachineThreads::Thread::getRegisters(MachineThreads::Thread::Registers& registers)
 {
+    Thread::Registers::PlatformRegisters& regs = registers.regs;
 #if OS(DARWIN)
-
 #if CPU(X86)
     unsigned user_count = sizeof(regs)/sizeof(int);
     thread_state_flavor_t flavor = i386_THREAD_STATE;
@@ -375,12 +408,12 @@ static size_t getPlatformThreadRegisters(const PlatformThread& platformThread, P
                             "JavaScript garbage collection failed because thread_get_state returned an error (%d). This is probably the result of running inside Rosetta, which is not supported.", result);
         CRASH();
     }
-    return user_count * sizeof(usword_t);
+    return user_count * sizeof(uintptr_t);
 // end OS(DARWIN)
 
 #elif OS(WINDOWS)
     regs.ContextFlags = CONTEXT_INTEGER | CONTEXT_CONTROL;
-    GetThreadContext(platformThread, &regs);
+    GetThreadContext(platformThreadHandle, &regs);
     return sizeof(CONTEXT);
 #elif USE(PTHREADS)
     pthread_attr_init(&regs);
@@ -399,7 +432,7 @@ static size_t getPlatformThreadRegisters(const PlatformThread& platformThread, P
 #endif
 }
 
-static inline void* otherThreadStackPointer(const PlatformThreadRegisters& regs)
+inline void* MachineThreads::Thread::Registers::stackPointer() const
 {
 #if OS(DARWIN)
 
@@ -467,8 +500,9 @@ static inline void* otherThreadStackPointer(const PlatformThreadRegisters& regs)
 #endif
 }
 
-static void freePlatformThreadRegisters(PlatformThreadRegisters& regs)
+void MachineThreads::Thread::freeRegisters(MachineThreads::Thread::Registers& registers)
 {
+    Thread::Registers::PlatformRegisters& regs = registers.regs;
 #if USE(PTHREADS) && !OS(WINDOWS) && !OS(DARWIN)
     pthread_attr_destroy(&regs);
 #else
@@ -476,21 +510,18 @@ static void freePlatformThreadRegisters(PlatformThreadRegisters& regs)
 #endif
 }
 
-static std::pair<void*, size_t> otherThreadStack(void* stackBase, const PlatformThreadRegisters& registers)
+std::pair<void*, size_t> MachineThreads::Thread::captureStack(void* stackTop)
 {
     void* begin = stackBase;
     void* end = reinterpret_cast<void*>(
-        WTF::roundUpToMultipleOf<sizeof(void*)>(
-            reinterpret_cast<uintptr_t>(
-                otherThreadStackPointer(registers))));
+        WTF::roundUpToMultipleOf<sizeof(void*)>(reinterpret_cast<uintptr_t>(stackTop)));
     if (begin > end)
         std::swap(begin, end);
     return std::make_pair(begin, static_cast<char*>(end) - static_cast<char*>(begin));
 }
 
-#if ASAN_ENABLED
-void asanUnsafeMemcpy(void* dst, const void* src, size_t);
-void asanUnsafeMemcpy(void* dst, const void* src, size_t size)
+SUPPRESS_ASAN
+static void copyMemory(void* dst, const void* src, size_t size)
 {
     size_t dstAsSize = reinterpret_cast<size_t>(dst);
     size_t srcAsSize = reinterpret_cast<size_t>(src);
@@ -505,33 +536,43 @@ void asanUnsafeMemcpy(void* dst, const void* src, size_t size)
         *dstPtr++ = *srcPtr++;
 }
     
-#define memcpy asanUnsafeMemcpy
-#endif
+
 
 // This function must not call malloc(), free(), or any other function that might
 // acquire a lock. Since 'thread' is suspended, trying to acquire a lock
 // will deadlock if 'thread' holds that lock.
+// This function, specifically the memory copying, was causing problems with Address Sanitizer in
+// apps. Since we cannot blacklist the system memcpy we must use our own naive implementation,
+// copyMemory, for ASan to work on either instrumented or non-instrumented builds. This is not a
+// significant performance loss as tryCopyOtherThreadStack is only called as part of an O(heapsize)
+// operation. As the heap is generally much larger than the stack the performance hit is minimal.
+// See: https://bugs.webkit.org/show_bug.cgi?id=146297
 void MachineThreads::tryCopyOtherThreadStack(Thread* thread, void* buffer, size_t capacity, size_t* size)
 {
-    PlatformThreadRegisters registers;
-    size_t registersSize = getPlatformThreadRegisters(thread->platformThread, registers);
-    std::pair<void*, size_t> stack = otherThreadStack(thread->stackBase, registers);
+    Thread::Registers registers;
+    size_t registersSize = thread->getRegisters(registers);
+    std::pair<void*, size_t> stack = thread->captureStack(registers.stackPointer());
 
     bool canCopy = *size + registersSize + stack.second <= capacity;
 
     if (canCopy)
-        memcpy(static_cast<char*>(buffer) + *size, &registers, registersSize);
+        copyMemory(static_cast<char*>(buffer) + *size, &registers, registersSize);
     *size += registersSize;
 
     if (canCopy)
-        memcpy(static_cast<char*>(buffer) + *size, stack.first, stack.second);
+        copyMemory(static_cast<char*>(buffer) + *size, stack.first, stack.second);
     *size += stack.second;
 
-    freePlatformThreadRegisters(registers);
+    thread->freeRegisters(registers);
 }
 
-bool MachineThreads::tryCopyOtherThreadStacks(MutexLocker&, void* buffer, size_t capacity, size_t* size)
+bool MachineThreads::tryCopyOtherThreadStacks(LockHolder&, void* buffer, size_t capacity, size_t* size)
 {
+    // Prevent two VMs from suspending each other's threads at the same time,
+    // which can cause deadlock: <rdar://problem/20300842>.
+    static StaticLock mutex;
+    std::lock_guard<StaticLock> lock(mutex);
+
     *size = 0;
 
     PlatformThread currentPlatformThread = getCurrentPlatformThread();
@@ -541,8 +582,8 @@ bool MachineThreads::tryCopyOtherThreadStacks(MutexLocker&, void* buffer, size_t
 
     Thread* previousThread = nullptr;
     for (Thread* thread = m_registeredThreads; thread; index++) {
-        if (!equalThread(thread->platformThread, currentPlatformThread)) {
-            bool success = suspendThread(thread->platformThread);
+        if (*thread != currentPlatformThread) {
+            bool success = thread->suspend();
 #if OS(DARWIN)
             if (!success) {
                 if (!numberOfThreads) {
@@ -585,13 +626,13 @@ bool MachineThreads::tryCopyOtherThreadStacks(MutexLocker&, void* buffer, size_t
     }
 
     for (Thread* thread = m_registeredThreads; thread; thread = thread->next) {
-        if (!equalThread(thread->platformThread, currentPlatformThread))
+        if (*thread != currentPlatformThread)
             tryCopyOtherThreadStack(thread, buffer, capacity, size);
     }
 
     for (Thread* thread = m_registeredThreads; thread; thread = thread->next) {
-        if (!equalThread(thread->platformThread, currentPlatformThread))
-            resumeThread(thread->platformThread);
+        if (*thread != currentPlatformThread)
+            thread->resume();
     }
 
     for (Thread* thread = threadsToBeDeleted; thread; ) {
@@ -619,7 +660,7 @@ void MachineThreads::gatherConservativeRoots(ConservativeRoots& conservativeRoot
     size_t size;
     size_t capacity = 0;
     void* buffer = nullptr;
-    MutexLocker lock(m_registeredThreadsMutex);
+    LockHolder lock(m_registeredThreadsMutex);
     while (!tryCopyOtherThreadStacks(lock, buffer, capacity, &size))
         growBuffer(size, &buffer, &capacity);
 

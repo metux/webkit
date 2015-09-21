@@ -170,6 +170,11 @@ void CachedImage::allClientsRemoved()
 
 std::pair<Image*, float> CachedImage::brokenImage(float deviceScaleFactor) const
 {
+    if (deviceScaleFactor >= 3) {
+        static NeverDestroyed<Image*> brokenImageVeryHiRes(Image::loadPlatformResource("missingImage@3x").leakRef());
+        return std::make_pair(brokenImageVeryHiRes, 3);
+    }
+
     if (deviceScaleFactor >= 2) {
         static NeverDestroyed<Image*> brokenImageHiRes(Image::loadPlatformResource("missingImage@2x").leakRef());
         return std::make_pair(brokenImageHiRes, 2);
@@ -360,8 +365,8 @@ inline void CachedImage::clearImage()
     // If our Image has an observer, it's always us so we need to clear the back pointer
     // before dropping our reference.
     if (m_image)
-        m_image->setImageObserver(0);
-    m_image.clear();
+        m_image->setImageObserver(nullptr);
+    m_image = nullptr;
 }
 
 void CachedImage::addIncrementalDataBuffer(SharedBuffer& data)
@@ -385,9 +390,8 @@ void CachedImage::addIncrementalDataBuffer(SharedBuffer& data)
         return;
     }
 
-    // Go ahead and tell our observers to try to draw.
-    // Each chunk from the network causes observers to repaint, which will
-    // force that chunk to decode.
+    // Tell our observers to try to draw.
+    // Each chunk from the network causes observers to repaint, which will force that chunk to decode.
     // It would be nice to only redraw the decoded band of the image, but with the current design
     // (decoding delayed until painting) that seems hard.
     notifyObservers();
@@ -415,11 +419,8 @@ void CachedImage::finishLoading(SharedBuffer* data)
     if (!m_image && data)
         createImage();
 
-    if (m_image) {
-        if (m_loader && m_image->isSVGImage())
-            downcast<SVGImage>(*m_image).setDataProtocolLoader(&m_loader->dataProtocolFrameLoader());
+    if (m_image)
         m_image->setData(data, true);
-    }
 
     if (!m_image || m_image->isNull()) {
         // Image decoding failed; the image data is malformed.
@@ -454,7 +455,7 @@ void CachedImage::destroyDecodedData()
 {
     bool canDeleteImage = !m_image || (m_image->hasOneRef() && m_image->isBitmapImage());
     if (canDeleteImage && !isLoading() && !hasClients()) {
-        m_image = 0;
+        m_image = nullptr;
         setDecodedSize(0);
     } else if (m_image && !errorOccurred())
         m_image->destroyDecodedData();
@@ -511,7 +512,7 @@ bool CachedImage::isOriginClean(SecurityOrigin* securityOrigin)
     return !securityOrigin->taintsCanvas(responseForSameOriginPolicyChecks().url());
 }
 
-bool CachedImage::mustRevalidateDueToCacheHeaders(const CachedResourceLoader& cachedResourceLoader, CachePolicy policy) const
+CachedResource::RevalidationDecision CachedImage::makeRevalidationDecision(CachePolicy cachePolicy) const
 {
     if (UNLIKELY(isManuallyCached())) {
         // Do not revalidate manually cached images. This mechanism is used as a
@@ -519,9 +520,9 @@ bool CachedImage::mustRevalidateDueToCacheHeaders(const CachedResourceLoader& ca
         // the URL for that image may not represent a resource that can be
         // retrieved by standard means. If the manual caching SPI is used, it is
         // incumbent on the client to only use valid resources.
-        return false;
+        return RevalidationDecision::No;
     }
-    return CachedResource::mustRevalidateDueToCacheHeaders(cachedResourceLoader, policy);
+    return CachedResource::makeRevalidationDecision(cachePolicy);
 }
 
 } // namespace WebCore

@@ -72,22 +72,23 @@ struct WebProcessCreationParameters {
     SandboxExtension::Handle applicationCacheDirectoryExtensionHandle;
     String webSQLDatabaseDirectory;
     SandboxExtension::Handle webSQLDatabaseDirectoryExtensionHandle;
-    String diskCacheDirectory;
-    SandboxExtension::Handle diskCacheDirectoryExtensionHandle;
+#if ENABLE(SECCOMP_FILTERS)
     String cookieStorageDirectory;
+#endif
+#if PLATFORM(MAC) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 101100
+    Vector<uint8_t> uiProcessCookieStorageIdentifier;
+#endif
 #if PLATFORM(IOS)
     SandboxExtension::Handle cookieStorageDirectoryExtensionHandle;
-    SandboxExtension::Handle openGLCacheDirectoryExtensionHandle;
+    SandboxExtension::Handle containerCachesDirectoryExtensionHandle;
     SandboxExtension::Handle containerTemporaryDirectoryExtensionHandle;
-    // FIXME: Remove this once <rdar://problem/17726660> is fixed.
-    SandboxExtension::Handle hstsDatabasePathExtensionHandle;
 #endif
     SandboxExtension::Handle mediaKeyStorageDirectoryExtensionHandle;
     String mediaKeyStorageDirectory;
 
     bool shouldUseTestingNetworkSession;
 
-    Vector<String> urlSchemesRegistererdAsEmptyDocument;
+    Vector<String> urlSchemesRegisteredAsEmptyDocument;
     Vector<String> urlSchemesRegisteredAsSecure;
     Vector<String> urlSchemesRegisteredAsBypassingContentSecurityPolicy;
     Vector<String> urlSchemesForWhichDomainRelaxationIsForbidden;
@@ -100,6 +101,7 @@ struct WebProcessCreationParameters {
 #endif
     Vector<String> urlSchemesRegisteredForCustomProtocols;
 #if USE(SOUP)
+    String diskCacheDirectory;
     String cookiePersistentStoragePath;
     uint32_t cookiePersistentStorageType;
     HTTPCookieAcceptPolicy cookieAcceptPolicy;
@@ -111,6 +113,8 @@ struct WebProcessCreationParameters {
     bool shouldAlwaysUseComplexTextCodePath;
     bool shouldEnableMemoryPressureReliefLogging;
     bool shouldUseFontSmoothing;
+
+    Vector<String> fontWhitelist;
 
     bool iconDatabaseEnabled;
 
@@ -132,9 +136,6 @@ struct WebProcessCreationParameters {
     pid_t presenterApplicationPid;
 
     bool accessibilityEnhancedUserInterfaceEnabled;
-
-    uint64_t nsURLCacheMemoryCapacity;
-    uint64_t nsURLCacheDiskCapacity;
 
     WebCore::MachSendRight acceleratedCompositingPort;
 
@@ -166,6 +167,14 @@ struct WebProcessCreationParameters {
     bool hasImageServices;
     bool hasSelectionServices;
     bool hasRichContentServices;
+#endif
+
+#if ENABLE(NETSCAPE_PLUGIN_API)
+    HashMap<String, HashMap<String, HashMap<String, uint8_t>>> pluginLoadClientPolicies;
+#endif
+
+#if (TARGET_OS_IPHONE && __IPHONE_OS_VERSION_MIN_REQUIRED >= 90000) || (PLATFORM(MAC) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 101100)
+    RetainPtr<CFDataRef> networkATSContext;
 #endif
 };
 

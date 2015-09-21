@@ -31,8 +31,6 @@
 
 #include "PlatformUtilities.h"
 #include "PlatformWebView.h"
-#include <wtf/OwnPtr.h>
-#include <wtf/PassOwnPtr.h>
 
 namespace TestWebKitAPI {
 
@@ -45,7 +43,7 @@ public:
     }
 
     WKRetainPtr<WKContextRef> context;
-    OwnPtr<PlatformWebView> webView;
+    std::unique_ptr<PlatformWebView> webView;
 
     WKRetainPtr<WKTypeRef> recievedBody;
 
@@ -83,7 +81,7 @@ public:
         WKPageLoaderClientV3 loaderClient;
         memset(&loaderClient, 0, sizeof(loaderClient));
 
-        loaderClient.base.version = kWKPageLoaderClientCurrentVersion;
+        loaderClient.base.version = 3;
         loaderClient.base.clientInfo = clientInfo;
         loaderClient.didFinishLoadForFrame = didFinishLoadForFrame;
 
@@ -95,7 +93,7 @@ public:
         context = adoptWK(Util::createContextForInjectedBundleTest("UserMessageTest"));
         setInjectedBundleClient(context.get(), this);
 
-        webView = adoptPtr(new PlatformWebView(context.get()));
+        webView = std::make_unique<PlatformWebView>(context.get());
         setPageLoaderClient(webView->page(), this);
 
         didFinishLoad = false;

@@ -59,10 +59,10 @@ public:
         static_cast<SVGPathSegListPropertyTearOff*>(m_baseVal.get())->removeItemFromList(itemIndex, shouldSynchronizeWrappers);
     }
 
-    static PassRefPtr<SVGAnimatedPathSegListPropertyTearOff> create(SVGElement* contextElement, const QualifiedName& attributeName, AnimatedPropertyType animatedPropertyType, SVGPathSegList& values)
+    static Ref<SVGAnimatedPathSegListPropertyTearOff> create(SVGElement* contextElement, const QualifiedName& attributeName, AnimatedPropertyType animatedPropertyType, SVGPathSegList& values)
     {
         ASSERT(contextElement);
-        return adoptRef(new SVGAnimatedPathSegListPropertyTearOff(contextElement, attributeName, animatedPropertyType, values));
+        return adoptRef(*new SVGAnimatedPathSegListPropertyTearOff(contextElement, attributeName, animatedPropertyType, values));
     }
 
     using SVGAnimatedListPropertyTearOff<SVGPathSegList>::animationStarted;
@@ -81,7 +81,7 @@ public:
     void animationEnded()
     {
         ASSERT(m_animatedPathByteStream);
-        m_animatedPathByteStream = 0;
+        m_animatedPathByteStream = nullptr;
         SVGAnimatedListPropertyTearOff<SVGPathSegList>::animationEnded();
     }
 
@@ -106,7 +106,7 @@ public:
 private:
     SVGAnimatedPathSegListPropertyTearOff(SVGElement* contextElement, const QualifiedName& attributeName, AnimatedPropertyType animatedPropertyType, SVGPathSegList& values)
         : SVGAnimatedListPropertyTearOff<SVGPathSegList>(contextElement, attributeName, animatedPropertyType, values)
-        , m_animatedPathByteStream(0)
+        , m_animatedPathByteStream(nullptr)
     {
     }
 

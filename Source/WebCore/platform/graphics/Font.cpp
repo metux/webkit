@@ -38,6 +38,7 @@
 #include "OpenTypeMathData.h"
 #include <wtf/MathExtras.h>
 #include <wtf/NeverDestroyed.h>
+#include <wtf/text/AtomicStringHash.h>
 
 #if ENABLE(OPENTYPE_VERTICAL)
 #include "OpenTypeVerticalData.h"
@@ -50,20 +51,30 @@ unsigned GlyphPage::s_count = 0;
 const float smallCapsFontSizeMultiplier = 0.7f;
 const float emphasisMarkFontSizeMultiplier = 0.5f;
 
-Font::Font(const FontPlatformData& platformData, bool isCustomFont, bool isLoading, bool isTextOrientationFallback)
+Font::Font(const FontPlatformData& platformData, std::unique_ptr<SVGData>&& svgData, bool isCustomFont, bool isLoading, bool isTextOrientationFallback)
     : m_maxCharWidth(-1)
     , m_avgCharWidth(-1)
     , m_platformData(platformData)
+    , m_svgData(WTF::move(svgData))
+    , m_mathData(nullptr)
     , m_treatAsFixedPitch(false)
     , m_isCustomFont(isCustomFont)
     , m_isLoading(isLoading)
     , m_isTextOrientationFallback(isTextOrientationFallback)
     , m_isBrokenIdeographFallback(false)
-    , m_mathData(nullptr)
-#if ENABLE(OPENTYPE_VERTICAL)
-    , m_verticalData(0)
-#endif
     , m_hasVerticalGlyphs(false)
+    , m_isUsedInSystemFallbackCache(false)
+#if PLATFORM(COCOA) || PLATFORM(WIN)
+    , m_isSystemFont(false)
+#endif
+#if PLATFORM(IOS)
+    , m_shouldNotBeUsedForArabic(false)
+#endif
+{
+}
+
+Font::Font(const FontPlatformData& platformData, bool isCustomFont, bool isLoading, bool isTextOrientationFallback)
+    : Font(platformData, std::unique_ptr<SVGData>(), isCustomFont, isLoading, isTextOrientationFallback)
 {
     platformInit();
     platformGlyphInit();
@@ -77,21 +88,7 @@ Font::Font(const FontPlatformData& platformData, bool isCustomFont, bool isLoadi
 }
 
 Font::Font(std::unique_ptr<SVGData> svgData, float fontSize, bool syntheticBold, bool syntheticItalic)
-    : m_platformData(FontPlatformData(fontSize, syntheticBold, syntheticItalic))
-    , m_svgData(WTF::move(svgData))
-    , m_treatAsFixedPitch(false)
-    , m_isCustomFont(true)
-    , m_isLoading(false)
-    , m_isTextOrientationFallback(false)
-    , m_isBrokenIdeographFallback(false)
-    , m_mathData(nullptr)
-#if ENABLE(OPENTYPE_VERTICAL)
-    , m_verticalData(0)
-#endif
-    , m_hasVerticalGlyphs(false)
-#if PLATFORM(IOS)
-    , m_shouldNotBeUsedForArabic(false)
-#endif
+    : Font(FontPlatformData(fontSize, syntheticBold, syntheticItalic), WTF::move(svgData), true, false, false)
 {
     m_svgData->initializeFont(this, fontSize);
 }
@@ -287,6 +284,7 @@ PassRefPtr<Font> Font::verticalRightOrientationFont() const
         verticalRightPlatformData.setOrientation(Horizontal);
         m_derivedFontData->verticalRightOrientation = create(verticalRightPlatformData, isCustomFont(), false, true);
     }
+    ASSERT(m_derivedFontData->verticalRightOrientation != this);
     return m_derivedFontData->verticalRightOrientation;
 }
 
@@ -296,6 +294,7 @@ PassRefPtr<Font> Font::uprightOrientationFont() const
         m_derivedFontData = std::make_unique<DerivedFontData>(isCustomFont());
     if (!m_derivedFontData->uprightOrientation)
         m_derivedFontData->uprightOrientation = create(m_platformData, isCustomFont(), false, true);
+    ASSERT(m_derivedFontData->uprightOrientation != this);
     return m_derivedFontData->uprightOrientation;
 }
 
@@ -305,7 +304,7 @@ PassRefPtr<Font> Font::smallCapsFont(const FontDescription& fontDescription) con
         m_derivedFontData = std::make_unique<DerivedFontData>(isCustomFont());
     if (!m_derivedFontData->smallCaps)
         m_derivedFontData->smallCaps = createScaledFont(fontDescription, smallCapsFontSizeMultiplier);
-
+    ASSERT(m_derivedFontData->smallCaps != this);
     return m_derivedFontData->smallCaps;
 }
 
@@ -315,7 +314,7 @@ PassRefPtr<Font> Font::emphasisMarkFont(const FontDescription& fontDescription) 
         m_derivedFontData = std::make_unique<DerivedFontData>(isCustomFont());
     if (!m_derivedFontData->emphasisMark)
         m_derivedFontData->emphasisMark = createScaledFont(fontDescription, emphasisMarkFontSizeMultiplier);
-
+    ASSERT(m_derivedFontData->emphasisMark != this);
     return m_derivedFontData->emphasisMark;
 }
 
@@ -327,6 +326,7 @@ PassRefPtr<Font> Font::brokenIdeographFont() const
         m_derivedFontData->brokenIdeograph = create(m_platformData, isCustomFont(), false);
         m_derivedFontData->brokenIdeograph->m_isBrokenIdeographFallback = true;
     }
+    ASSERT(m_derivedFontData->brokenIdeograph != this);
     return m_derivedFontData->brokenIdeograph;
 }
 
@@ -336,11 +336,12 @@ PassRefPtr<Font> Font::nonSyntheticItalicFont() const
         m_derivedFontData = std::make_unique<DerivedFontData>(isCustomFont());
     if (!m_derivedFontData->nonSyntheticItalic) {
         FontPlatformData nonSyntheticItalicFontPlatformData(m_platformData);
-#if PLATFORM(COCOA)
-        nonSyntheticItalicFontPlatformData.m_syntheticOblique = false;
+#if PLATFORM(COCOA) || USE(CAIRO)
+        nonSyntheticItalicFontPlatformData.setSyntheticOblique(false);
 #endif
         m_derivedFontData->nonSyntheticItalic = create(nonSyntheticItalicFontPlatformData, isCustomFont());
     }
+    ASSERT(m_derivedFontData->nonSyntheticItalic != this);
     return m_derivedFontData->nonSyntheticItalic;
 }
 
@@ -363,7 +364,7 @@ const OpenTypeMathData* Font::mathData() const
     if (!m_mathData) {
         m_mathData = OpenTypeMathData::create(m_platformData);
         if (!m_mathData->hasMathData())
-            m_mathData.clear();
+            m_mathData = nullptr;
     }
     return m_mathData.get();
 }
@@ -396,9 +397,58 @@ bool Font::applyTransforms(GlyphBufferGlyph* glyphs, GlyphBufferAdvance* advance
 #endif
 }
 
+class CharacterFallbackMapKey {
+public:
+    CharacterFallbackMapKey()
+    {
+    }
+
+    CharacterFallbackMapKey(const AtomicString& locale, UChar32 character, bool isForPlatformFont)
+        : locale(locale)
+        , character(character)
+        , isForPlatformFont(isForPlatformFont)
+    {
+    }
+
+    CharacterFallbackMapKey(WTF::HashTableDeletedValueType)
+        : character(-1)
+    {
+    }
+
+    bool isHashTableDeletedValue() const { return character == -1; }
+
+    bool operator==(const CharacterFallbackMapKey& other) const
+    {
+        return locale == other.locale && character == other.character && isForPlatformFont == other.isForPlatformFont;
+    }
+
+    static const bool emptyValueIsZero = true;
+
+private:
+    friend struct CharacterFallbackMapKeyHash;
+
+    AtomicString locale;
+    UChar32 character { 0 };
+    bool isForPlatformFont { false };
+};
+
+struct CharacterFallbackMapKeyHash {
+    static unsigned hash(const CharacterFallbackMapKey& key)
+    {
+        return WTF::pairIntHash(key.locale.isNull() ? 0 : WTF::AtomicStringHash::hash(key.locale), WTF::pairIntHash(key.character, key.isForPlatformFont));
+    }
+
+    static bool equal(const CharacterFallbackMapKey& a, const CharacterFallbackMapKey& b)
+    {
+        return a == b;
+    }
+
+    static const bool safeToCompareToEmptyOrDeleted = true;
+};
+
 // Fonts are not ref'd to avoid cycles.
-typedef std::pair<UChar32, bool /* isForPlatformFont */> CharacterFallbackMapKey;
-typedef HashMap<CharacterFallbackMapKey, Font*> CharacterFallbackMap;
+// FIXME: Shouldn't these be WeakPtrs?
+typedef HashMap<CharacterFallbackMapKey, Font*, CharacterFallbackMapKeyHash, WTF::SimpleClassHashTraits<CharacterFallbackMapKey>> CharacterFallbackMap;
 typedef HashMap<const Font*, CharacterFallbackMap> SystemFallbackCache;
 
 static SystemFallbackCache& systemFallbackCache()
@@ -413,17 +463,17 @@ RefPtr<Font> Font::systemFallbackFontForCharacter(UChar32 character, const FontD
 
     if (!character) {
         UChar codeUnit = 0;
-        return fontCache().systemFallbackForCharacters(description, this, isForPlatformFont, &codeUnit, 1);
+        return FontCache::singleton().systemFallbackForCharacters(description, this, isForPlatformFont, &codeUnit, 1);
     }
 
-    auto key = std::make_pair(character, isForPlatformFont);
-    auto characterAddResult = fontAddResult.iterator->value.add(key, nullptr);
+    auto key = CharacterFallbackMapKey(description.locale(), character, isForPlatformFont);
+    auto characterAddResult = fontAddResult.iterator->value.add(WTF::move(key), nullptr);
 
     Font*& fallbackFont = characterAddResult.iterator->value;
 
     if (!fallbackFont) {
         UChar codeUnits[2];
-        int codeUnitsLength;
+        unsigned codeUnitsLength;
         if (U_IS_BMP(character)) {
             codeUnits[0] = FontCascade::normalizeSpaces(character);
             codeUnitsLength = 1;
@@ -433,7 +483,7 @@ RefPtr<Font> Font::systemFallbackFontForCharacter(UChar32 character, const FontD
             codeUnitsLength = 2;
         }
 
-        fallbackFont = fontCache().systemFallbackForCharacters(description, this, isForPlatformFont, codeUnits, codeUnitsLength).get();
+        fallbackFont = FontCache::singleton().systemFallbackForCharacters(description, this, isForPlatformFont, codeUnits, codeUnitsLength).get();
         if (fallbackFont)
             fallbackFont->m_isUsedInSystemFallbackCache = true;
     }

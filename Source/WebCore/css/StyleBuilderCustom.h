@@ -40,7 +40,6 @@
 #include "ElementAncestorIterator.h"
 #include "Frame.h"
 #include "HTMLElement.h"
-#include "LocaleToScriptMapping.h"
 #include "Rect.h"
 #include "RenderTheme.h"
 #include "SVGElement.h"
@@ -120,14 +119,20 @@ public:
 #if ENABLE(DASHBOARD_SUPPORT)
     static void applyValueWebkitDashboardRegion(StyleResolver&, CSSValue&);
 #endif
-    static void applyValueWebkitJustifySelf(StyleResolver&, CSSValue&);
     static void applyValueWebkitLocale(StyleResolver&, CSSValue&);
     static void applyValueWebkitTextOrientation(StyleResolver&, CSSValue&);
 #if ENABLE(IOS_TEXT_AUTOSIZING)
     static void applyValueWebkitTextSizeAdjust(StyleResolver&, CSSValue&);
 #endif
+    static void applyValueWebkitTextZoom(StyleResolver&, CSSValue&);
     static void applyValueWebkitWritingMode(StyleResolver&, CSSValue&);
     static void applyValueAlt(StyleResolver&, CSSValue&);
+#if ENABLE(CSS_SCROLL_SNAP)
+    static void applyInitialWebkitScrollSnapPointsX(StyleResolver&);
+    static void applyInheritWebkitScrollSnapPointsX(StyleResolver&);
+    static void applyInitialWebkitScrollSnapPointsY(StyleResolver&);
+    static void applyInheritWebkitScrollSnapPointsY(StyleResolver&);
+#endif
 
 private:
     static void resetEffectiveZoom(StyleResolver&);
@@ -685,14 +690,12 @@ inline void StyleBuilderCustom::applyValueClip(StyleResolver& styleResolver, CSS
 inline void StyleBuilderCustom::applyValueWebkitLocale(StyleResolver& styleResolver, CSSValue& value)
 {
     auto& primitiveValue = downcast<CSSPrimitiveValue>(value);
-
-    if (primitiveValue.getValueID() == CSSValueAuto)
-        styleResolver.style()->setLocale(nullAtom);
-    else
-        styleResolver.style()->setLocale(primitiveValue.getStringValue());
     
     FontDescription fontDescription = styleResolver.style()->fontDescription();
-    fontDescription.setScript(localeToScriptCodeForFontSelection(styleResolver.style()->locale()));
+    if (primitiveValue.getValueID() == CSSValueAuto)
+        fontDescription.setLocale(nullAtom);
+    else
+        fontDescription.setLocale(primitiveValue.getStringValue());
     styleResolver.setFontDescription(fontDescription);
 }
 
@@ -726,15 +729,14 @@ inline void StyleBuilderCustom::applyValueWebkitTextSizeAdjust(StyleResolver& st
 }
 #endif
 
-inline void StyleBuilderCustom::applyValueWebkitJustifySelf(StyleResolver& styleResolver, CSSValue& value)
+inline void StyleBuilderCustom::applyValueWebkitTextZoom(StyleResolver& styleResolver, CSSValue& value)
 {
     auto& primitiveValue = downcast<CSSPrimitiveValue>(value);
-
-    if (Pair* pairValue = primitiveValue.getPairValue()) {
-        styleResolver.style()->setJustifySelf(*pairValue->first());
-        styleResolver.style()->setJustifySelfOverflowAlignment(*pairValue->second());
-    } else
-        styleResolver.style()->setJustifySelf(primitiveValue);
+    if (primitiveValue.getValueID() == CSSValueNormal)
+        styleResolver.style()->setTextZoom(TextZoomNormal);
+    else if (primitiveValue.getValueID() == CSSValueReset)
+        styleResolver.style()->setTextZoom(TextZoomReset);
+    styleResolver.state().setFontDirty(true);
 }
 
 template <CSSPropertyID id>
@@ -1692,6 +1694,28 @@ void StyleBuilderCustom::applyValueAlt(StyleResolver& styleResolver, CSSValue& v
     } else
         styleResolver.style()->setContentAltText(emptyAtom);
 }
+
+#if ENABLE(CSS_SCROLL_SNAP)
+inline void StyleBuilderCustom::applyInitialWebkitScrollSnapPointsX(StyleResolver& styleResolver)
+{
+    styleResolver.style()->setScrollSnapPointsX(nullptr);
+}
+
+inline void StyleBuilderCustom::applyInheritWebkitScrollSnapPointsX(StyleResolver& styleResolver)
+{
+    styleResolver.style()->setScrollSnapPointsX(styleResolver.parentStyle()->scrollSnapPointsX() ? std::make_unique<ScrollSnapPoints>(*styleResolver.parentStyle()->scrollSnapPointsX()) : nullptr);
+}
+
+inline void StyleBuilderCustom::applyInitialWebkitScrollSnapPointsY(StyleResolver& styleResolver)
+{
+    styleResolver.style()->setScrollSnapPointsY(nullptr);
+}
+
+inline void StyleBuilderCustom::applyInheritWebkitScrollSnapPointsY(StyleResolver& styleResolver)
+{
+    styleResolver.style()->setScrollSnapPointsY(styleResolver.parentStyle()->scrollSnapPointsY() ? std::make_unique<ScrollSnapPoints>(*styleResolver.parentStyle()->scrollSnapPointsY()) : nullptr);
+}
+#endif
 
 } // namespace WebCore
 

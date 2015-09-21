@@ -51,12 +51,12 @@ public:
             sleep(30);
 #endif
 
-#if USE(COORDINATED_GRAPHICS_THREADED) && PLATFORM(X11)
+#if (USE(COORDINATED_GRAPHICS_THREADED) || USE(GSTREAMER_GL)) && PLATFORM(X11)
         XInitThreads();
 #endif
         gtk_init(nullptr, nullptr);
 
-        bindtextdomain(GETTEXT_PACKAGE, PACKAGE_LOCALE_DIR);
+        bindtextdomain(GETTEXT_PACKAGE, LOCALEDIR);
         bind_textdomain_codeset(GETTEXT_PACKAGE, "UTF-8");
 
         SoupNetworkSession::defaultSession().setSSLPolicy(SoupNetworkSession::SSLUseSystemCAFile);

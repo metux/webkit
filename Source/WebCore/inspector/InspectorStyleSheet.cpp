@@ -356,7 +356,7 @@ bool InspectorStyle::populateAllProperties(Vector<InspectorStyleProperty>* resul
     Vector<CSSPropertySourceData>* sourcePropertyData = sourceData ? &(sourceData->styleSourceData->propertyData) : nullptr;
     if (sourcePropertyData) {
         String styleDeclaration;
-        bool isStyleTextKnown = styleText(&styleDeclaration);
+        bool isStyleTextKnown = getText(&styleDeclaration);
         ASSERT_UNUSED(isStyleTextKnown, isStyleTextKnown);
         for (Vector<CSSPropertySourceData>::const_iterator it = sourcePropertyData->begin(); it != sourcePropertyData->end(); ++it) {
             InspectorStyleProperty p(*it, true, false);
@@ -637,20 +637,39 @@ String InspectorStyleSheet::ruleSelector(const InspectorCSSId& id, ExceptionCode
     return rule->selectorText();
 }
 
+static bool isValidSelectorListString(const String& selector, Document* document)
+{
+    CSSSelectorList selectorList;
+    createCSSParser(document)->parseSelector(selector, selectorList);
+    return selectorList.isValid();
+}
+
 bool InspectorStyleSheet::setRuleSelector(const InspectorCSSId& id, const String& selector, ExceptionCode& ec)
 {
     if (!checkPageStyleSheet(ec))
         return false;
+
+    // If the selector is invalid, do not proceed any further.
+    if (!isValidSelectorListString(selector, m_pageStyleSheet->ownerDocument())) {
+        ec = SYNTAX_ERR;
+        return false;
+    }
+
     CSSStyleRule* rule = ruleForId(id);
     if (!rule) {
         ec = NOT_FOUND_ERR;
         return false;
     }
+
     CSSStyleSheet* styleSheet = rule->parentStyleSheet();
     if (!styleSheet || !ensureParsedDataReady()) {
         ec = NOT_FOUND_ERR;
         return false;
     }
+
+    // If the stylesheet is already mutated at this point, that must mean that our data has been modified
+    // elsewhere. This should never happen as ensureParsedDataReady would return false in that case.
+    ASSERT(!styleSheetMutated());
 
     rule->setSelectorText(selector);
     RefPtr<CSSRuleSourceData> sourceData = ruleSourceDataFor(&rule->style());
@@ -662,22 +681,16 @@ bool InspectorStyleSheet::setRuleSelector(const InspectorCSSId& id, const String
     String sheetText = m_parsedStyleSheet->text();
     sheetText.replace(sourceData->ruleHeaderRange.start, sourceData->ruleHeaderRange.length(), selector);
     m_parsedStyleSheet->setText(sheetText);
+    m_pageStyleSheet->clearHadRulesMutation();
     fireStyleSheetChanged();
     return true;
-}
-
-static bool checkStyleRuleSelector(Document* document, const String& selector)
-{
-    CSSSelectorList selectorList;
-    createCSSParser(document)->parseSelector(selector, selectorList);
-    return selectorList.isValid();
 }
 
 CSSStyleRule* InspectorStyleSheet::addRule(const String& selector, ExceptionCode& ec)
 {
     if (!checkPageStyleSheet(ec))
         return nullptr;
-    if (!checkStyleRuleSelector(m_pageStyleSheet->ownerDocument(), selector)) {
+    if (!isValidSelectorListString(selector, m_pageStyleSheet->ownerDocument())) {
         ec = SYNTAX_ERR;
         return nullptr;
     }
@@ -1077,7 +1090,8 @@ bool InspectorStyleSheet::styleSheetMutated() const
 
 bool InspectorStyleSheet::ensureParsedDataReady()
 {
-    return !styleSheetMutated() && ensureText() && ensureSourceData();
+    bool allowParsedData = m_origin == Inspector::Protocol::CSS::StyleSheetOrigin::Inspector || !styleSheetMutated();
+    return allowParsedData && ensureText() && ensureSourceData();
 }
 
 bool InspectorStyleSheet::ensureText() const
@@ -1106,7 +1120,7 @@ bool InspectorStyleSheet::ensureSourceData()
 
     RefPtr<StyleSheetContents> newStyleSheet = StyleSheetContents::create();
     auto ruleSourceDataResult = std::make_unique<RuleSourceDataList>();
-    createCSSParser(m_pageStyleSheet->ownerDocument())->parseSheet(newStyleSheet.get(), m_parsedStyleSheet->text(), 0, ruleSourceDataResult.get());
+    createCSSParser(m_pageStyleSheet->ownerDocument())->parseSheet(newStyleSheet.get(), m_parsedStyleSheet->text(), TextPosition(), ruleSourceDataResult.get(), false);
     m_parsedStyleSheet->setSourceData(WTF::move(ruleSourceDataResult));
     return m_parsedStyleSheet->hasSourceData();
 }
@@ -1260,7 +1274,7 @@ void InspectorStyleSheetForInlineStyle::didModifyElementAttribute()
     m_isStyleTextValid = false;
     if (m_element->isStyledElement() && m_element->style() != m_inspectorStyle->cssStyle())
         m_inspectorStyle = InspectorStyle::create(InspectorCSSId(id(), 0), inlineStyle(), this);
-    m_ruleSourceData.clear();
+    m_ruleSourceData = nullptr;
 }
 
 bool InspectorStyleSheetForInlineStyle::getText(String* result) const
@@ -1284,7 +1298,7 @@ bool InspectorStyleSheetForInlineStyle::setStyleText(CSSStyleDeclaration* style,
 
     m_styleText = text;
     m_isStyleTextValid = true;
-    m_ruleSourceData.clear();
+    m_ruleSourceData = nullptr;
     return !ec;
 }
 
@@ -1303,7 +1317,7 @@ bool InspectorStyleSheetForInlineStyle::ensureParsedDataReady()
     // The "style" property value can get changed indirectly, e.g. via element.style.borderWidth = "2px".
     const String& currentStyleText = elementStyleText();
     if (m_styleText != currentStyleText) {
-        m_ruleSourceData.clear();
+        m_ruleSourceData = nullptr;
         m_styleText = currentStyleText;
         m_isStyleTextValid = true;
     }

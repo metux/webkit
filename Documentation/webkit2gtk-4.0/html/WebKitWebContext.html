@@ -60,6 +60,22 @@
 </tr>
 <tr>
 <td class="function_type">
+<a class="link" href="WebKitWebContext.html" title="WebKitWebContext"><span class="returnvalue">WebKitWebContext</span></a> *
+</td>
+<td class="function_name">
+<a class="link" href="WebKitWebContext.html#webkit-web-context-new-with-website-data-manager" title="webkit_web_context_new_with_website_data_manager ()">webkit_web_context_new_with_website_data_manager</a> <span class="c_punctuation">()</span>
+</td>
+</tr>
+<tr>
+<td class="function_type">
+<a class="link" href="WebKitWebsiteDataManager.html" title="WebKitWebsiteDataManager"><span class="returnvalue">WebKitWebsiteDataManager</span></a> *
+</td>
+<td class="function_name">
+<a class="link" href="WebKitWebContext.html#webkit-web-context-get-website-data-manager" title="webkit_web_context_get_website_data_manager ()">webkit_web_context_get_website_data_manager</a> <span class="c_punctuation">()</span>
+</td>
+</tr>
+<tr>
+<td class="function_type">
 <a class="link" href="WebKitWebContext.html#WebKitCacheModel" title="enum WebKitCacheModel"><span class="returnvalue">WebKitCacheModel</span></a>
 </td>
 <td class="function_name">
@@ -72,6 +88,22 @@
 </td>
 <td class="function_name">
 <a class="link" href="WebKitWebContext.html#webkit-web-context-set-cache-model" title="webkit_web_context_set_cache_model ()">webkit_web_context_set_cache_model</a> <span class="c_punctuation">()</span>
+</td>
+</tr>
+<tr>
+<td class="function_type">
+<a href="../glib/glib-Basic-Types.html#guint"><span class="returnvalue">guint</span></a>
+</td>
+<td class="function_name">
+<a class="link" href="WebKitWebContext.html#webkit-web-context-get-web-process-count-limit" title="webkit_web_context_get_web_process_count_limit ()">webkit_web_context_get_web_process_count_limit</a> <span class="c_punctuation">()</span>
+</td>
+</tr>
+<tr>
+<td class="function_type">
+<span class="returnvalue">void</span>
+</td>
+<td class="function_name">
+<a class="link" href="WebKitWebContext.html#webkit-web-context-set-web-process-count-limit" title="webkit_web_context_set_web_process_count_limit ()">webkit_web_context_set_web_process_count_limit</a> <span class="c_punctuation">()</span>
 </td>
 </tr>
 <tr>
@@ -291,12 +323,20 @@
 <col width="300px" class="properties_name">
 <col width="200px" class="properties_flags">
 </colgroup>
-<tbody><tr>
+<tbody>
+<tr>
 <td class="property_type">
 <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a> *</td>
 <td class="property_name"><a class="link" href="WebKitWebContext.html#WebKitWebContext--local-storage-directory" title="The “local-storage-directory” property">local-storage-directory</a></td>
 <td class="property_flags">Read / Write / Construct Only</td>
-</tr></tbody>
+</tr>
+<tr>
+<td class="property_type">
+<a class="link" href="WebKitWebsiteDataManager.html" title="WebKitWebsiteDataManager"><span class="type">WebKitWebsiteDataManager</span></a> *</td>
+<td class="property_name"><a class="link" href="WebKitWebContext.html#WebKitWebContext--website-data-manager" title="The “website-data-manager” property">website-data-manager</a></td>
+<td class="property_flags">Read / Write / Construct Only</td>
+</tr>
+</tbody>
 </table></div>
 </div>
 <div class="refsect1">
@@ -407,14 +447,43 @@ webkit_web_context_new (<em class="parameter"><code><span class="type">void</spa
 </div>
 <hr>
 <div class="refsect2">
-<a name="webkit-web-context-get-cache-model"></a><h3>webkit_web_context_get_cache_model ()</h3>
-<pre class="programlisting"><a class="link" href="WebKitWebContext.html#WebKitCacheModel" title="enum WebKitCacheModel"><span class="returnvalue">WebKitCacheModel</span></a>
-webkit_web_context_get_cache_model (<em class="parameter"><code><a class="link" href="WebKitWebContext.html" title="WebKitWebContext"><span class="type">WebKitWebContext</span></a> *context</code></em>);</pre>
-<p>Returns the current cache model. For more information about this
-value check the documentation of the function
-<a class="link" href="WebKitWebContext.html#webkit-web-context-set-cache-model" title="webkit_web_context_set_cache_model ()"><code class="function">webkit_web_context_set_cache_model()</code></a>.</p>
+<a name="webkit-web-context-new-with-website-data-manager"></a><h3>webkit_web_context_new_with_website_data_manager ()</h3>
+<pre class="programlisting"><a class="link" href="WebKitWebContext.html" title="WebKitWebContext"><span class="returnvalue">WebKitWebContext</span></a> *
+webkit_web_context_new_with_website_data_manager
+                               (<em class="parameter"><code><a class="link" href="WebKitWebsiteDataManager.html" title="WebKitWebsiteDataManager"><span class="type">WebKitWebsiteDataManager</span></a> *manager</code></em>);</pre>
+<p>Create a new <a class="link" href="WebKitWebContext.html" title="WebKitWebContext"><span class="type">WebKitWebContext</span></a> with a <a class="link" href="WebKitWebsiteDataManager.html" title="WebKitWebsiteDataManager"><span class="type">WebKitWebsiteDataManager</span></a>.</p>
 <div class="refsect3">
 <a name="id-1.2.2.9.4.5"></a><h4>Parameters</h4>
+<div class="informaltable"><table width="100%" border="0">
+<colgroup>
+<col width="150px" class="parameters_name">
+<col class="parameters_description">
+<col width="200px" class="parameters_annotations">
+</colgroup>
+<tbody><tr>
+<td class="parameter_name"><p>manager</p></td>
+<td class="parameter_description"><p>a <a class="link" href="WebKitWebsiteDataManager.html" title="WebKitWebsiteDataManager"><span class="type">WebKitWebsiteDataManager</span></a></p></td>
+<td class="parameter_annotations"> </td>
+</tr></tbody>
+</table></div>
+</div>
+<div class="refsect3">
+<a name="id-1.2.2.9.4.6"></a><h4>Returns</h4>
+<p> a newly created <a class="link" href="WebKitWebContext.html" title="WebKitWebContext"><span class="type">WebKitWebContext</span></a>. </p>
+<p><span class="annotation">[<acronym title="Free data after the code is done."><span class="acronym">transfer full</span></acronym>]</span></p>
+</div>
+<p class="since">Since: <a class="link" href="api-index-2-10.html#api-index-2.10">2.10</a></p>
+</div>
+<hr>
+<div class="refsect2">
+<a name="webkit-web-context-get-website-data-manager"></a><h3>webkit_web_context_get_website_data_manager ()</h3>
+<pre class="programlisting"><a class="link" href="WebKitWebsiteDataManager.html" title="WebKitWebsiteDataManager"><span class="returnvalue">WebKitWebsiteDataManager</span></a> *
+webkit_web_context_get_website_data_manager
+                               (<em class="parameter"><code><a class="link" href="WebKitWebContext.html" title="WebKitWebContext"><span class="type">WebKitWebContext</span></a> *context</code></em>);</pre>
+<p>Get the <a class="link" href="WebKitWebsiteDataManager.html" title="WebKitWebsiteDataManager"><span class="type">WebKitWebsiteDataManager</span></a> of <em class="parameter"><code>context</code></em>
+.</p>
+<div class="refsect3">
+<a name="id-1.2.2.9.5.5"></a><h4>Parameters</h4>
 <div class="informaltable"><table width="100%" border="0">
 <colgroup>
 <col width="150px" class="parameters_name">
@@ -429,7 +498,37 @@ value check the documentation of the function
 </table></div>
 </div>
 <div class="refsect3">
-<a name="id-1.2.2.9.4.6"></a><h4>Returns</h4>
+<a name="id-1.2.2.9.5.6"></a><h4>Returns</h4>
+<p> a <a class="link" href="WebKitWebsiteDataManager.html" title="WebKitWebsiteDataManager"><span class="type">WebKitWebsiteDataManager</span></a>. </p>
+<p><span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span></p>
+</div>
+<p class="since">Since: <a class="link" href="api-index-2-10.html#api-index-2.10">2.10</a></p>
+</div>
+<hr>
+<div class="refsect2">
+<a name="webkit-web-context-get-cache-model"></a><h3>webkit_web_context_get_cache_model ()</h3>
+<pre class="programlisting"><a class="link" href="WebKitWebContext.html#WebKitCacheModel" title="enum WebKitCacheModel"><span class="returnvalue">WebKitCacheModel</span></a>
+webkit_web_context_get_cache_model (<em class="parameter"><code><a class="link" href="WebKitWebContext.html" title="WebKitWebContext"><span class="type">WebKitWebContext</span></a> *context</code></em>);</pre>
+<p>Returns the current cache model. For more information about this
+value check the documentation of the function
+<a class="link" href="WebKitWebContext.html#webkit-web-context-set-cache-model" title="webkit_web_context_set_cache_model ()"><code class="function">webkit_web_context_set_cache_model()</code></a>.</p>
+<div class="refsect3">
+<a name="id-1.2.2.9.6.5"></a><h4>Parameters</h4>
+<div class="informaltable"><table width="100%" border="0">
+<colgroup>
+<col width="150px" class="parameters_name">
+<col class="parameters_description">
+<col width="200px" class="parameters_annotations">
+</colgroup>
+<tbody><tr>
+<td class="parameter_name"><p>context</p></td>
+<td class="parameter_description"><p>the <a class="link" href="WebKitWebContext.html" title="WebKitWebContext"><span class="type">WebKitWebContext</span></a></p></td>
+<td class="parameter_annotations"> </td>
+</tr></tbody>
+</table></div>
+</div>
+<div class="refsect3">
+<a name="id-1.2.2.9.6.6"></a><h4>Returns</h4>
 <p> the current <a class="link" href="WebKitWebContext.html#WebKitCacheModel" title="enum WebKitCacheModel"><span class="type">WebKitCacheModel</span></a></p>
 </div>
 </div>
@@ -456,7 +555,7 @@ browsing interface can reduce memory usage substantially by
 specifying <a class="link" href="WebKitWebContext.html#WEBKIT-CACHE-MODEL-DOCUMENT-VIEWER:CAPS"><code class="literal">WEBKIT_CACHE_MODEL_DOCUMENT_VIEWER</code></a>. The default value is
 <a class="link" href="WebKitWebContext.html#WEBKIT-CACHE-MODEL-WEB-BROWSER:CAPS"><code class="literal">WEBKIT_CACHE_MODEL_WEB_BROWSER</code></a>.</p>
 <div class="refsect3">
-<a name="id-1.2.2.9.5.7"></a><h4>Parameters</h4>
+<a name="id-1.2.2.9.7.7"></a><h4>Parameters</h4>
 <div class="informaltable"><table width="100%" border="0">
 <colgroup>
 <col width="150px" class="parameters_name">
@@ -480,13 +579,79 @@ specifying <a class="link" href="WebKitWebContext.html#WEBKIT-CACHE-MODEL-DOCUME
 </div>
 <hr>
 <div class="refsect2">
+<a name="webkit-web-context-get-web-process-count-limit"></a><h3>webkit_web_context_get_web_process_count_limit ()</h3>
+<pre class="programlisting"><a href="../glib/glib-Basic-Types.html#guint"><span class="returnvalue">guint</span></a>
+webkit_web_context_get_web_process_count_limit
+                               (<em class="parameter"><code><a class="link" href="WebKitWebContext.html" title="WebKitWebContext"><span class="type">WebKitWebContext</span></a> *context</code></em>);</pre>
+<p>Gets the maximum number of web processes that can be created at the same time for the <em class="parameter"><code>context</code></em>
+.</p>
+<div class="refsect3">
+<a name="id-1.2.2.9.8.5"></a><h4>Parameters</h4>
+<div class="informaltable"><table width="100%" border="0">
+<colgroup>
+<col width="150px" class="parameters_name">
+<col class="parameters_description">
+<col width="200px" class="parameters_annotations">
+</colgroup>
+<tbody><tr>
+<td class="parameter_name"><p>context</p></td>
+<td class="parameter_description"><p>the <a class="link" href="WebKitWebContext.html" title="WebKitWebContext"><span class="type">WebKitWebContext</span></a></p></td>
+<td class="parameter_annotations"> </td>
+</tr></tbody>
+</table></div>
+</div>
+<div class="refsect3">
+<a name="id-1.2.2.9.8.6"></a><h4>Returns</h4>
+<p> the maximum limit of web processes, or 0 if there isn't a limit.</p>
+</div>
+<p class="since">Since: <a class="link" href="api-index-2-10.html#api-index-2.10">2.10</a></p>
+</div>
+<hr>
+<div class="refsect2">
+<a name="webkit-web-context-set-web-process-count-limit"></a><h3>webkit_web_context_set_web_process_count_limit ()</h3>
+<pre class="programlisting"><span class="returnvalue">void</span>
+webkit_web_context_set_web_process_count_limit
+                               (<em class="parameter"><code><a class="link" href="WebKitWebContext.html" title="WebKitWebContext"><span class="type">WebKitWebContext</span></a> *context</code></em>,
+                                <em class="parameter"><code><a href="../glib/glib-Basic-Types.html#guint"><span class="type">guint</span></a> limit</code></em>);</pre>
+<p>Sets the maximum number of web processes that can be created at the same time for the <em class="parameter"><code>context</code></em>
+.
+The default value is 0 and means no limit.</p>
+<p>This method **must be called before any web process has been created**,
+as early as possible in your application. Calling it later will make
+your application crash.</p>
+<div class="refsect3">
+<a name="id-1.2.2.9.9.6"></a><h4>Parameters</h4>
+<div class="informaltable"><table width="100%" border="0">
+<colgroup>
+<col width="150px" class="parameters_name">
+<col class="parameters_description">
+<col width="200px" class="parameters_annotations">
+</colgroup>
+<tbody>
+<tr>
+<td class="parameter_name"><p>context</p></td>
+<td class="parameter_description"><p>the <a class="link" href="WebKitWebContext.html" title="WebKitWebContext"><span class="type">WebKitWebContext</span></a></p></td>
+<td class="parameter_annotations"> </td>
+</tr>
+<tr>
+<td class="parameter_name"><p>limit</p></td>
+<td class="parameter_description"><p>the maximum number of web processes</p></td>
+<td class="parameter_annotations"> </td>
+</tr>
+</tbody>
+</table></div>
+</div>
+<p class="since">Since: <a class="link" href="api-index-2-10.html#api-index-2.10">2.10</a></p>
+</div>
+<hr>
+<div class="refsect2">
 <a name="webkit-web-context-clear-cache"></a><h3>webkit_web_context_clear_cache ()</h3>
 <pre class="programlisting"><span class="returnvalue">void</span>
 webkit_web_context_clear_cache (<em class="parameter"><code><a class="link" href="WebKitWebContext.html" title="WebKitWebContext"><span class="type">WebKitWebContext</span></a> *context</code></em>);</pre>
 <p>Clears all resources currently cached.
 See also <a class="link" href="WebKitWebContext.html#webkit-web-context-set-cache-model" title="webkit_web_context_set_cache_model ()"><code class="function">webkit_web_context_set_cache_model()</code></a>.</p>
 <div class="refsect3">
-<a name="id-1.2.2.9.6.5"></a><h4>Parameters</h4>
+<a name="id-1.2.2.9.10.5"></a><h4>Parameters</h4>
 <div class="informaltable"><table width="100%" border="0">
 <colgroup>
 <col width="150px" class="parameters_name">
@@ -512,7 +677,7 @@ will not be associated to any <a class="link" href="WebKitWebView.html" title="W
 starting a download from a particular <a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> use
 <a class="link" href="WebKitWebView.html#webkit-web-view-download-uri" title="webkit_web_view_download_uri ()"><code class="function">webkit_web_view_download_uri()</code></a> instead.</p>
 <div class="refsect3">
-<a name="id-1.2.2.9.7.5"></a><h4>Parameters</h4>
+<a name="id-1.2.2.9.11.5"></a><h4>Parameters</h4>
 <div class="informaltable"><table width="100%" border="0">
 <colgroup>
 <col width="150px" class="parameters_name">
@@ -534,7 +699,7 @@ starting a download from a particular <a class="link" href="WebKitWebView.html" 
 </table></div>
 </div>
 <div class="refsect3">
-<a name="id-1.2.2.9.7.6"></a><h4>Returns</h4>
+<a name="id-1.2.2.9.11.6"></a><h4>Returns</h4>
 <p> a new <a class="link" href="WebKitDownload.html" title="WebKitDownload"><span class="type">WebKitDownload</span></a> representing the
 the download operation. </p>
 <p><span class="annotation">[<acronym title="Free data after the code is done."><span class="acronym">transfer full</span></acronym>]</span></p>
@@ -548,7 +713,7 @@ webkit_web_context_get_cookie_manager (<em class="parameter"><code><a class="lin
 <p>Get the <a class="link" href="WebKitCookieManager.html" title="WebKitCookieManager"><span class="type">WebKitCookieManager</span></a> of <em class="parameter"><code>context</code></em>
 .</p>
 <div class="refsect3">
-<a name="id-1.2.2.9.8.5"></a><h4>Parameters</h4>
+<a name="id-1.2.2.9.12.5"></a><h4>Parameters</h4>
 <div class="informaltable"><table width="100%" border="0">
 <colgroup>
 <col width="150px" class="parameters_name">
@@ -563,7 +728,7 @@ webkit_web_context_get_cookie_manager (<em class="parameter"><code><a class="lin
 </table></div>
 </div>
 <div class="refsect3">
-<a name="id-1.2.2.9.8.6"></a><h4>Returns</h4>
+<a name="id-1.2.2.9.12.6"></a><h4>Returns</h4>
 <p> the <a class="link" href="WebKitCookieManager.html" title="WebKitCookieManager"><span class="type">WebKitCookieManager</span></a> of <em class="parameter"><code>context</code></em>
 . </p>
 <p><span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span></p>
@@ -580,7 +745,7 @@ webkit_web_context_get_favicon_database
 <p>To initialize the database you need to call
 <a class="link" href="WebKitWebContext.html#webkit-web-context-set-favicon-database-directory" title="webkit_web_context_set_favicon_database_directory ()"><code class="function">webkit_web_context_set_favicon_database_directory()</code></a>.</p>
 <div class="refsect3">
-<a name="id-1.2.2.9.9.6"></a><h4>Parameters</h4>
+<a name="id-1.2.2.9.13.6"></a><h4>Parameters</h4>
 <div class="informaltable"><table width="100%" border="0">
 <colgroup>
 <col width="150px" class="parameters_name">
@@ -595,7 +760,7 @@ webkit_web_context_get_favicon_database
 </table></div>
 </div>
 <div class="refsect3">
-<a name="id-1.2.2.9.9.7"></a><h4>Returns</h4>
+<a name="id-1.2.2.9.13.7"></a><h4>Returns</h4>
 <p> the <a class="link" href="WebKitFaviconDatabase.html" title="WebKitFaviconDatabase"><span class="type">WebKitFaviconDatabase</span></a> of <em class="parameter"><code>context</code></em>
 . </p>
 <p><span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span></p>
@@ -618,7 +783,7 @@ its use from the applications, so that's why it's expected to be
 called only once. Further calls for the same instance of
 <a class="link" href="WebKitWebContext.html" title="WebKitWebContext"><span class="type">WebKitWebContext</span></a> won't cause any effect.</p>
 <div class="refsect3">
-<a name="id-1.2.2.9.10.6"></a><h4>Parameters</h4>
+<a name="id-1.2.2.9.14.6"></a><h4>Parameters</h4>
 <div class="informaltable"><table width="100%" border="0">
 <colgroup>
 <col width="150px" class="parameters_name">
@@ -656,7 +821,7 @@ called yet.</p>
 <a class="link" href="WebKitWebContext.html#webkit-web-context-set-favicon-database-directory" title="webkit_web_context_set_favicon_database_directory ()"><code class="function">webkit_web_context_set_favicon_database_directory()</code></a> for the first
 time.</p>
 <div class="refsect3">
-<a name="id-1.2.2.9.11.6"></a><h4>Parameters</h4>
+<a name="id-1.2.2.9.15.6"></a><h4>Parameters</h4>
 <div class="informaltable"><table width="100%" border="0">
 <colgroup>
 <col width="150px" class="parameters_name">
@@ -671,7 +836,7 @@ time.</p>
 </table></div>
 </div>
 <div class="refsect3">
-<a name="id-1.2.2.9.11.7"></a><h4>Returns</h4>
+<a name="id-1.2.2.9.15.7"></a><h4>Returns</h4>
 <p> the path of the directory of the favicons
 database associated with <em class="parameter"><code>context</code></em>
 , or <a href="../glib/glib-Standard-Macros.html#NULL:CAPS"><code class="literal">NULL</code></a>. </p>
@@ -687,7 +852,7 @@ webkit_web_context_get_security_manager
 <p>Get the <a class="link" href="WebKitSecurityManager.html" title="WebKitSecurityManager"><span class="type">WebKitSecurityManager</span></a> of <em class="parameter"><code>context</code></em>
 .</p>
 <div class="refsect3">
-<a name="id-1.2.2.9.12.5"></a><h4>Parameters</h4>
+<a name="id-1.2.2.9.16.5"></a><h4>Parameters</h4>
 <div class="informaltable"><table width="100%" border="0">
 <colgroup>
 <col width="150px" class="parameters_name">
@@ -702,7 +867,7 @@ webkit_web_context_get_security_manager
 </table></div>
 </div>
 <div class="refsect3">
-<a name="id-1.2.2.9.12.6"></a><h4>Returns</h4>
+<a name="id-1.2.2.9.16.6"></a><h4>Returns</h4>
 <p> the <a class="link" href="WebKitSecurityManager.html" title="WebKitSecurityManager"><span class="type">WebKitSecurityManager</span></a> of <em class="parameter"><code>context</code></em>
 . </p>
 <p><span class="annotation">[<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span></p>
@@ -717,7 +882,7 @@ webkit_web_context_set_additional_plugins_directory
                                 <em class="parameter"><code>const <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a> *directory</code></em>);</pre>
 <p>Set an additional directory where WebKit will look for plugins.</p>
 <div class="refsect3">
-<a name="id-1.2.2.9.13.5"></a><h4>Parameters</h4>
+<a name="id-1.2.2.9.17.5"></a><h4>Parameters</h4>
 <div class="informaltable"><table width="100%" border="0">
 <colgroup>
 <col width="150px" class="parameters_name">
@@ -752,7 +917,7 @@ webkit_web_context_get_plugins (<em class="parameter"><code><a class="link" href
  will be called. You can then call
 <a class="link" href="WebKitWebContext.html#webkit-web-context-get-plugins-finish" title="webkit_web_context_get_plugins_finish ()"><code class="function">webkit_web_context_get_plugins_finish()</code></a> to get the result of the operation.</p>
 <div class="refsect3">
-<a name="id-1.2.2.9.14.6"></a><h4>Parameters</h4>
+<a name="id-1.2.2.9.18.6"></a><h4>Parameters</h4>
 <div class="informaltable"><table width="100%" border="0">
 <colgroup>
 <col width="150px" class="parameters_name">
@@ -793,7 +958,7 @@ webkit_web_context_get_plugins_finish (<em class="parameter"><code><a class="lin
                                        <em class="parameter"><code><a href="../glib/glib-Error-Reporting.html#GError"><span class="type">GError</span></a> **error</code></em>);</pre>
 <p>Finish an asynchronous operation started with webkit_web_context_get_plugins.</p>
 <div class="refsect3">
-<a name="id-1.2.2.9.15.5"></a><h4>Parameters</h4>
+<a name="id-1.2.2.9.19.5"></a><h4>Parameters</h4>
 <div class="informaltable"><table width="100%" border="0">
 <colgroup>
 <col width="150px" class="parameters_name">
@@ -820,7 +985,7 @@ webkit_web_context_get_plugins_finish (<em class="parameter"><code><a class="lin
 </table></div>
 </div>
 <div class="refsect3">
-<a name="id-1.2.2.9.15.6"></a><h4>Returns</h4>
+<a name="id-1.2.2.9.19.6"></a><h4>Returns</h4>
 <p> a <a href="../glib/glib-Doubly-Linked-Lists.html#GList"><span class="type">GList</span></a> of <a class="link" href="WebKitPlugin.html" title="WebKitPlugin"><span class="type">WebKitPlugin</span></a>. You must free the <a href="../glib/glib-Doubly-Linked-Lists.html#GList"><span class="type">GList</span></a> with
 <a href="../glib/glib-Doubly-Linked-Lists.html#g-list-free"><code class="function">g_list_free()</code></a> and unref the <a class="link" href="WebKitPlugin.html" title="WebKitPlugin"><span class="type">WebKitPlugin</span></a>s with <a href="../gobject/gobject-The-Base-Object-Type.html#g-object-unref"><code class="function">g_object_unref()</code></a> when you're done with them. </p>
 <p><span class="annotation">[<acronym title="Generics and defining elements of containers and arrays."><span class="acronym">element-type</span></acronym> WebKitPlugin][<acronym title="Free data after the code is done."><span class="acronym">transfer full</span></acronym>]</span></p>
@@ -834,7 +999,7 @@ webkit_web_context_get_spell_checking_enabled
                                (<em class="parameter"><code><a class="link" href="WebKitWebContext.html" title="WebKitWebContext"><span class="type">WebKitWebContext</span></a> *context</code></em>);</pre>
 <p>Get whether spell checking feature is currently enabled.</p>
 <div class="refsect3">
-<a name="id-1.2.2.9.16.5"></a><h4>Parameters</h4>
+<a name="id-1.2.2.9.20.5"></a><h4>Parameters</h4>
 <div class="informaltable"><table width="100%" border="0">
 <colgroup>
 <col width="150px" class="parameters_name">
@@ -849,7 +1014,7 @@ webkit_web_context_get_spell_checking_enabled
 </table></div>
 </div>
 <div class="refsect3">
-<a name="id-1.2.2.9.16.6"></a><h4>Returns</h4>
+<a name="id-1.2.2.9.20.6"></a><h4>Returns</h4>
 <p> <a href="../glib/glib-Standard-Macros.html#TRUE:CAPS"><code class="literal">TRUE</code></a> If spell checking is enabled, or <a href="../glib/glib-Standard-Macros.html#FALSE:CAPS"><code class="literal">FALSE</code></a> otherwise.</p>
 </div>
 </div>
@@ -862,7 +1027,7 @@ webkit_web_context_set_spell_checking_enabled
                                 <em class="parameter"><code><a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a> enabled</code></em>);</pre>
 <p>Enable or disable the spell checking feature.</p>
 <div class="refsect3">
-<a name="id-1.2.2.9.17.5"></a><h4>Parameters</h4>
+<a name="id-1.2.2.9.21.5"></a><h4>Parameters</h4>
 <div class="informaltable"><table width="100%" border="0">
 <colgroup>
 <col width="150px" class="parameters_name">
@@ -896,7 +1061,7 @@ webkit_web_context_get_spell_checking_languages
 <p>See <a class="link" href="WebKitWebContext.html#webkit-web-context-set-spell-checking-languages" title="webkit_web_context_set_spell_checking_languages ()"><code class="function">webkit_web_context_set_spell_checking_languages()</code></a> for more
 details on the format of the languages in the list.</p>
 <div class="refsect3">
-<a name="id-1.2.2.9.18.6"></a><h4>Parameters</h4>
+<a name="id-1.2.2.9.22.6"></a><h4>Parameters</h4>
 <div class="informaltable"><table width="100%" border="0">
 <colgroup>
 <col width="150px" class="parameters_name">
@@ -911,7 +1076,7 @@ details on the format of the languages in the list.</p>
 </table></div>
 </div>
 <div class="refsect3">
-<a name="id-1.2.2.9.18.7"></a><h4>Returns</h4>
+<a name="id-1.2.2.9.22.7"></a><h4>Returns</h4>
 <p> A <a href="../glib/glib-Standard-Macros.html#NULL:CAPS"><code class="literal">NULL</code></a>-terminated
 array of languages if available, or <a href="../glib/glib-Standard-Macros.html#NULL:CAPS"><code class="literal">NULL</code></a> otherwise. </p>
 <p><span class="annotation">[<acronym title="Parameter points to an array of items."><span class="acronym">array</span></acronym> zero-terminated=1][<acronym title="Generics and defining elements of containers and arrays."><span class="acronym">element-type</span></acronym> utf8][<acronym title="Don't free data after the code is done."><span class="acronym">transfer none</span></acronym>]</span></p>
@@ -934,7 +1099,7 @@ for Portuguese as written in Brazil.</p>
 least once in order to properly enable the spell checking feature
 in WebKit.</p>
 <div class="refsect3">
-<a name="id-1.2.2.9.19.7"></a><h4>Parameters</h4>
+<a name="id-1.2.2.9.23.7"></a><h4>Parameters</h4>
 <div class="informaltable"><table width="100%" border="0">
 <colgroup>
 <col width="150px" class="parameters_name">
@@ -968,7 +1133,7 @@ to least desirable. The list will be used to build the "Accept-Language"
 header that will be included in the network requests started by
 the <a class="link" href="WebKitWebContext.html" title="WebKitWebContext"><span class="type">WebKitWebContext</span></a>.</p>
 <div class="refsect3">
-<a name="id-1.2.2.9.20.5"></a><h4>Parameters</h4>
+<a name="id-1.2.2.9.24.5"></a><h4>Parameters</h4>
 <div class="informaltable"><table width="100%" border="0">
 <colgroup>
 <col width="150px" class="parameters_name">
@@ -1001,7 +1166,7 @@ webkit_web_context_set_tls_errors_policy
  as <em class="parameter"><code>policy</code></em>
 </p>
 <div class="refsect3">
-<a name="id-1.2.2.9.21.5"></a><h4>Parameters</h4>
+<a name="id-1.2.2.9.25.5"></a><h4>Parameters</h4>
 <div class="informaltable"><table width="100%" border="0">
 <colgroup>
 <col width="150px" class="parameters_name">
@@ -1032,7 +1197,7 @@ webkit_web_context_get_tls_errors_policy
 <p>Get the TLS errors policy of <em class="parameter"><code>context</code></em>
 </p>
 <div class="refsect3">
-<a name="id-1.2.2.9.22.5"></a><h4>Parameters</h4>
+<a name="id-1.2.2.9.26.5"></a><h4>Parameters</h4>
 <div class="informaltable"><table width="100%" border="0">
 <colgroup>
 <col width="150px" class="parameters_name">
@@ -1047,7 +1212,7 @@ webkit_web_context_get_tls_errors_policy
 </table></div>
 </div>
 <div class="refsect3">
-<a name="id-1.2.2.9.22.6"></a><h4>Returns</h4>
+<a name="id-1.2.2.9.26.6"></a><h4>Returns</h4>
 <p> a <a class="link" href="WebKitWebContext.html#WebKitTLSErrorsPolicy" title="enum WebKitTLSErrorsPolicy"><span class="type">WebKitTLSErrorsPolicy</span></a></p>
 </div>
 </div>
@@ -1064,7 +1229,7 @@ otherwise it will not have any effect. You can connect to
 <a class="link" href="WebKitWebContext.html#WebKitWebContext-initialize-web-extensions" title="The “initialize-web-extensions” signal"><span class="type">“initialize-web-extensions”</span></a> to call this method
 before anything is loaded.</p>
 <div class="refsect3">
-<a name="id-1.2.2.9.23.5"></a><h4>Parameters</h4>
+<a name="id-1.2.2.9.27.5"></a><h4>Parameters</h4>
 <div class="informaltable"><table width="100%" border="0">
 <colgroup>
 <col width="150px" class="parameters_name">
@@ -1101,7 +1266,7 @@ otherwise it will not have any effect. You can connect to
 <a class="link" href="WebKitWebContext.html#WebKitWebContext-initialize-web-extensions" title="The “initialize-web-extensions” signal"><span class="type">“initialize-web-extensions”</span></a> to call this method
 before anything is loaded.</p>
 <div class="refsect3">
-<a name="id-1.2.2.9.24.5"></a><h4>Parameters</h4>
+<a name="id-1.2.2.9.28.5"></a><h4>Parameters</h4>
 <div class="informaltable"><table width="100%" border="0">
 <colgroup>
 <col width="150px" class="parameters_name">
@@ -1135,7 +1300,7 @@ webkit_web_context_prefetch_dns (<em class="parameter"><code><a class="link" hre
 of <em class="parameter"><code>hostname</code></em>
  is requested the load will be performed more quickly.</p>
 <div class="refsect3">
-<a name="id-1.2.2.9.25.5"></a><h4>Parameters</h4>
+<a name="id-1.2.2.9.29.5"></a><h4>Parameters</h4>
 <div class="informaltable"><table width="100%" border="0">
 <colgroup>
 <col width="150px" class="parameters_name">
@@ -1164,11 +1329,18 @@ of <em class="parameter"><code>hostname</code></em>
 webkit_web_context_set_disk_cache_directory
                                (<em class="parameter"><code><a class="link" href="WebKitWebContext.html" title="WebKitWebContext"><span class="type">WebKitWebContext</span></a> *context</code></em>,
                                 <em class="parameter"><code>const <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a> *directory</code></em>);</pre>
+<div class="warning">
+<p><code class="literal">webkit_web_context_set_disk_cache_directory</code> has been deprecated since version 2.10. and should not be used in newly-written code.</p>
+<p>Use <a class="link" href="WebKitWebContext.html#webkit-web-context-new-with-website-data-manager" title="webkit_web_context_new_with_website_data_manager ()"><code class="function">webkit_web_context_new_with_website_data_manager()</code></a> instead.</p>
+</div>
 <p>Set the directory where disk cache files will be stored
 This method must be called before loading anything in this context, otherwise
 it will not have any effect.</p>
+<p>Note that this method overrides the directory set in the <a class="link" href="WebKitWebsiteDataManager.html" title="WebKitWebsiteDataManager"><span class="type">WebKitWebsiteDataManager</span></a>,
+but it doesn't change the value returned by <a class="link" href="WebKitWebsiteDataManager.html#webkit-website-data-manager-get-disk-cache-directory" title="webkit_website_data_manager_get_disk_cache_directory ()"><code class="function">webkit_website_data_manager_get_disk_cache_directory()</code></a>
+since the <a class="link" href="WebKitWebsiteDataManager.html" title="WebKitWebsiteDataManager"><span class="type">WebKitWebsiteDataManager</span></a> is immutable.</p>
 <div class="refsect3">
-<a name="id-1.2.2.9.26.5"></a><h4>Parameters</h4>
+<a name="id-1.2.2.9.30.7"></a><h4>Parameters</h4>
 <div class="informaltable"><table width="100%" border="0">
 <colgroup>
 <col width="150px" class="parameters_name">
@@ -1202,7 +1374,7 @@ webkit_web_context_allow_tls_certificate_for_host
  for the certificate present in <em class="parameter"><code>info</code></em>
 .</p>
 <div class="refsect3">
-<a name="id-1.2.2.9.27.5"></a><h4>Parameters</h4>
+<a name="id-1.2.2.9.31.5"></a><h4>Parameters</h4>
 <div class="informaltable"><table width="100%" border="0">
 <colgroup>
 <col width="150px" class="parameters_name">
@@ -1238,7 +1410,7 @@ webkit_web_context_get_process_model (<em class="parameter"><code><a class="link
 <p>Returns the current process model. For more information about this value
 see <a class="link" href="WebKitWebContext.html#webkit-web-context-set-process-model" title="webkit_web_context_set_process_model ()"><code class="function">webkit_web_context_set_process_model()</code></a>.</p>
 <div class="refsect3">
-<a name="id-1.2.2.9.28.5"></a><h4>Parameters</h4>
+<a name="id-1.2.2.9.32.5"></a><h4>Parameters</h4>
 <div class="informaltable"><table width="100%" border="0">
 <colgroup>
 <col width="150px" class="parameters_name">
@@ -1253,7 +1425,7 @@ see <a class="link" href="WebKitWebContext.html#webkit-web-context-set-process-m
 </table></div>
 </div>
 <div class="refsect3">
-<a name="id-1.2.2.9.28.6"></a><h4>Returns</h4>
+<a name="id-1.2.2.9.32.6"></a><h4>Returns</h4>
 <p> the current <a class="link" href="WebKitWebContext.html#WebKitProcessModel" title="enum WebKitProcessModel"><span class="type">WebKitProcessModel</span></a></p>
 </div>
 <p class="since">Since: <a class="link" href="api-index-2-4.html#api-index-2.4">2.4</a></p>
@@ -1278,11 +1450,11 @@ views interact with each other). Using this model, when a process
 hangs or crashes, only the WebViews using it stop working, while
 the rest of the WebViews in the application will still function
 normally.</p>
-<p>This method **must be called before any other functions**,
+<p>This method **must be called before any web process has been created**,
 as early as possible in your application. Calling it later will make
 your application crash.</p>
 <div class="refsect3">
-<a name="id-1.2.2.9.29.7"></a><h4>Parameters</h4>
+<a name="id-1.2.2.9.33.7"></a><h4>Parameters</h4>
 <div class="informaltable"><table width="100%" border="0">
 <colgroup>
 <col width="150px" class="parameters_name">
@@ -1314,7 +1486,7 @@ your application crash.</p>
 <p>Type definition for a function that will be called back when an URI request is
 made for a user registered URI scheme.</p>
 <div class="refsect3">
-<a name="id-1.2.2.9.30.5"></a><h4>Parameters</h4>
+<a name="id-1.2.2.9.34.5"></a><h4>Parameters</h4>
 <div class="informaltable"><table width="100%" border="0">
 <colgroup>
 <col width="150px" class="parameters_name">
@@ -1430,7 +1602,7 @@ about_uri_scheme_request_cb (WebKitURISchemeRequest *request,
 </div>
 
 <div class="refsect3">
-<a name="id-1.2.2.9.31.6"></a><h4>Parameters</h4>
+<a name="id-1.2.2.9.35.6"></a><h4>Parameters</h4>
 <div class="informaltable"><table width="100%" border="0">
 <colgroup>
 <col width="150px" class="parameters_name">
@@ -1604,9 +1776,21 @@ about_uri_scheme_request_cb (WebKitURISchemeRequest *request,
 <a name="WebKitWebContext--local-storage-directory"></a><h3>The <code class="literal">“local-storage-directory”</code> property</h3>
 <pre class="programlisting">  “local-storage-directory”  <a href="../glib/glib-Basic-Types.html#gchar"><span class="type">gchar</span></a> *</pre>
 <p>The directory where local storage data will be saved.</p>
+<div class="warning">
+<p><code class="literal">WebKitWebContext:local-storage-directory</code> has been deprecated since version 2.10. and should not be used in newly-written code.</p>
+<p>Use <a class="link" href="WebKitWebsiteDataManager.html#WebKitWebsiteDataManager--local-storage-directory" title="The “local-storage-directory” property"><span class="type">“local-storage-directory”</span></a> instead.</p>
+</div>
 <p>Flags: Read / Write / Construct Only</p>
 <p>Default value: NULL</p>
 <p class="since">Since: <a class="link" href="api-index-2-8.html#api-index-2.8">2.8</a></p>
+</div>
+<hr>
+<div class="refsect2">
+<a name="WebKitWebContext--website-data-manager"></a><h3>The <code class="literal">“website-data-manager”</code> property</h3>
+<pre class="programlisting">  “website-data-manager”     <a class="link" href="WebKitWebsiteDataManager.html" title="WebKitWebsiteDataManager"><span class="type">WebKitWebsiteDataManager</span></a> *</pre>
+<p>The <a class="link" href="WebKitWebsiteDataManager.html" title="WebKitWebsiteDataManager"><span class="type">WebKitWebsiteDataManager</span></a> associated with this context.</p>
+<p>Flags: Read / Write / Construct Only</p>
+<p class="since">Since: <a class="link" href="api-index-2-10.html#api-index-2.10">2.10</a></p>
 </div>
 </div>
 <div class="refsect1">

@@ -28,26 +28,66 @@
 
 namespace bmalloc {
 
-// The memory analysis API requires the contents of this struct to be a static
-// constant in the program binary. The leaks process will load this struct
-// out of the program binary (and not out of the running process).
-static malloc_introspection_t introspect = {
-    .enumerator = Zone::enumerator
-};
-
-template<typename T> static void remoteRead(task_t task, memory_reader_t reader, vm_address_t pointer, T& result)
+template<typename T> static void remoteRead(task_t task, memory_reader_t reader, vm_address_t remotePointer, T& result)
 {
-    void* tmp;
-    (*reader)(task, pointer, sizeof(T), &tmp);
+    void* tmp = nullptr;
+    kern_return_t error = reader(task, remotePointer, sizeof(T), &tmp);
+
+    // This read sometimes fails for unknown reasons (<rdar://problem/14093757>).
+    // Avoid a crash by skipping the memcpy when this happens.
+    if (error || !tmp) {
+        fprintf(stderr, "bmalloc: error reading remote process: 0x%x\n", error);
+        return;
+    }
+
     memcpy(&result, tmp, sizeof(T));
 }
 
-// This function runs inside the leaks process.
-kern_return_t Zone::enumerator(task_t task, void* context, unsigned type_mask, vm_address_t zone_address, memory_reader_t reader, vm_range_recorder_t recorder)
+// These function pointers are invoked unconditionally on all zones by various
+// system tools. We don't support any of these features, but we provide
+// just enough functionality not to crash.
+
+static size_t good_size(malloc_zone_t*, size_t size)
 {
-    Zone remoteZone;
-    remoteRead(task, reader, zone_address, remoteZone);
-    
+    return size;
+}
+
+static boolean_t check(malloc_zone_t*)
+{
+    return true;
+}
+
+static void print(malloc_zone_t*, boolean_t)
+{
+}
+
+static void log(malloc_zone_t*, void*)
+{
+}
+
+static void force_lock(malloc_zone_t*)
+{
+}
+
+static void force_unlock(malloc_zone_t*)
+{
+}
+
+static void statistics(malloc_zone_t*, malloc_statistics_t* statistics)
+{
+    memset(statistics, 0, sizeof(malloc_statistics_t));
+}
+
+static size_t size(malloc_zone_t*, const void*)
+{
+    // Our zone is not public API, so no pointer can belong to us.
+    return 0;
+}
+
+// This function runs inside the leaks process.
+static kern_return_t enumerator(task_t task, void* context, unsigned type_mask, vm_address_t zone_address, memory_reader_t reader, vm_range_recorder_t recorder)
+{
+    Zone remoteZone(task, reader, zone_address);
     for (auto* superChunk : remoteZone.superChunks()) {
         vm_range_t range = { reinterpret_cast<vm_address_t>(superChunk), superChunkSize };
 
@@ -61,12 +101,32 @@ kern_return_t Zone::enumerator(task_t task, void* context, unsigned type_mask, v
     return 0;
 }
 
+// The memory analysis API requires the contents of this struct to be a static
+// constant in the program binary. The leaks process will load this struct
+// out of the program binary (and not out of the running process).
+static malloc_introspection_t introspect = {
+    .enumerator = bmalloc::enumerator,
+    .good_size = bmalloc::good_size,
+    .check = bmalloc::check,
+    .print = bmalloc::print,
+    .log = bmalloc::log,
+    .force_lock = bmalloc::force_lock,
+    .force_unlock = bmalloc::force_unlock,
+    .statistics = bmalloc::statistics
+};
+
 Zone::Zone()
 {
-    version = 4;
-    zone_name = "WebKit Malloc";
-    introspect = &bmalloc::introspect;
+    malloc_zone_t::size = &bmalloc::size;
+    malloc_zone_t::zone_name = "WebKit Malloc";
+    malloc_zone_t::introspect = &bmalloc::introspect;
+    malloc_zone_t::version = 4;
     malloc_zone_register(this);
+}
+
+Zone::Zone(task_t task, memory_reader_t reader, vm_address_t remotePointer)
+{
+    remoteRead(task, reader, remotePointer, *this);
 }
 
 } // namespace bmalloc

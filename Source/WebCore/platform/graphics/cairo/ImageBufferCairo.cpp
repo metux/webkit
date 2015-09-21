@@ -68,6 +68,16 @@ ImageBufferData::ImageBufferData(const IntSize& size)
 }
 
 #if ENABLE(ACCELERATED_2D_CANVAS)
+void clearSurface(cairo_surface_t* surface)
+{
+    if (cairo_surface_status(surface) != CAIRO_STATUS_SUCCESS)
+        return;
+
+    RefPtr<cairo_t> cr = adoptRef(cairo_create(surface));
+    cairo_set_operator(cr.get(), CAIRO_OPERATOR_CLEAR);
+    cairo_paint(cr.get());
+}
+
 PassRefPtr<cairo_surface_t> createCairoGLSurface(const FloatSize& size, uint32_t& texture)
 {
     GLContext::sharingContext()->makeContextCurrent();
@@ -91,7 +101,9 @@ PassRefPtr<cairo_surface_t> createCairoGLSurface(const FloatSize& size, uint32_t
     // Thread-awareness is a huge performance hit on non-Intel drivers.
     cairo_gl_device_set_thread_aware(device, FALSE);
 
-    return adoptRef(cairo_gl_surface_create_for_texture(device, CAIRO_CONTENT_COLOR_ALPHA, texture, size.width(), size.height()));
+    auto surface = adoptRef(cairo_gl_surface_create_for_texture(device, CAIRO_CONTENT_COLOR_ALPHA, texture, size.width(), size.height()));
+    clearSurface(surface.get());
+    return surface;
 }
 #endif
 
@@ -105,9 +117,12 @@ ImageBuffer::ImageBuffer(const FloatSize& size, float /* resolutionScale */, Col
         return;
 
 #if ENABLE(ACCELERATED_2D_CANVAS)
-    if (renderingMode == Accelerated)
+    if (renderingMode == Accelerated) {
         m_data.m_surface = createCairoGLSurface(size, m_data.m_texture);
-    else
+        if (!m_data.m_surface || cairo_surface_status(m_data.m_surface.get()) != CAIRO_STATUS_SUCCESS)
+            renderingMode = Unaccelerated; // If allocation fails, fall back to non-accelerated path.
+    }
+    if (renderingMode == Unaccelerated)
 #else
     ASSERT_UNUSED(renderingMode, renderingMode != Accelerated);
 #endif
@@ -118,7 +133,7 @@ ImageBuffer::ImageBuffer(const FloatSize& size, float /* resolutionScale */, Col
 
     RefPtr<cairo_t> cr = adoptRef(cairo_create(m_data.m_surface.get()));
     m_data.m_platformContext.setCr(cr.get());
-    m_context = adoptPtr(new GraphicsContext(&m_data.m_platformContext));
+    m_data.m_context = std::make_unique<GraphicsContext>(&m_data.m_platformContext);
     success = true;
 }
 
@@ -128,10 +143,10 @@ ImageBuffer::~ImageBuffer()
 
 GraphicsContext* ImageBuffer::context() const
 {
-    return m_context.get();
+    return m_data.m_context.get();
 }
 
-PassRefPtr<Image> ImageBuffer::copyImage(BackingStoreCopy copyBehavior, ScaleBehavior) const
+RefPtr<Image> ImageBuffer::copyImage(BackingStoreCopy copyBehavior, ScaleBehavior) const
 {
     if (copyBehavior == CopyBackingStore)
         return BitmapImage::create(copyCairoImageSurface(m_data.m_surface.get()));
@@ -361,7 +376,7 @@ void ImageBuffer::putByteArray(Multiply multiplied, Uint8ClampedArray* source, c
         copyRectFromOneSurfaceToAnother(imageSurface.get(), m_data.m_surface.get(), IntSize(), IntRect(0, 0, numColumns, numRows), IntSize(destPoint.x() + sourceRect.x(), destPoint.y() + sourceRect.y()), CAIRO_OPERATOR_SOURCE);
 }
 
-#if !PLATFORM(GTK)
+#if !PLATFORM(GTK) && !PLATFORM(EFL)
 static cairo_status_t writeFunction(void* output, const unsigned char* data, unsigned int length)
 {
     if (!reinterpret_cast<Vector<unsigned char>*>(output)->tryAppend(data, length))
@@ -396,11 +411,6 @@ String ImageBuffer::toDataURL(const String& mimeType, const double*, CoordinateS
 #if ENABLE(ACCELERATED_2D_CANVAS)
 void ImageBufferData::paintToTextureMapper(TextureMapper* textureMapper, const FloatRect& targetRect, const TransformationMatrix& matrix, float opacity)
 {
-    if (textureMapper->accelerationMode() != TextureMapper::OpenGLMode) {
-        notImplemented();
-        return;
-    }
-
     ASSERT(m_texture);
 
     // Cairo may change the active context, so we make sure to change it back after flushing.
@@ -419,6 +429,57 @@ PlatformLayer* ImageBuffer::platformLayer() const
         return const_cast<ImageBufferData*>(&m_data);
 #endif
     return 0;
+}
+
+bool ImageBuffer::copyToPlatformTexture(GraphicsContext3D&, GC3Denum target, Platform3DObject destinationTexture, GC3Denum internalformat, bool premultiplyAlpha, bool flipY)
+{
+#if ENABLE(ACCELERATED_2D_CANVAS)
+    if (premultiplyAlpha || flipY)
+        return false;
+
+    if (!m_data.m_texture)
+        return false;
+
+    GC3Denum bindTextureTarget;
+    switch (target) {
+    case GL_TEXTURE_2D:
+        bindTextureTarget = GL_TEXTURE_2D;
+        break;
+    case GL_TEXTURE_CUBE_MAP_POSITIVE_X:
+    case GL_TEXTURE_CUBE_MAP_NEGATIVE_X:
+    case GL_TEXTURE_CUBE_MAP_POSITIVE_Y:
+    case GL_TEXTURE_CUBE_MAP_NEGATIVE_Y:
+    case GL_TEXTURE_CUBE_MAP_POSITIVE_Z:
+    case GL_TEXTURE_CUBE_MAP_NEGATIVE_Z:
+        bindTextureTarget = GL_TEXTURE_CUBE_MAP;
+        break;
+    default:
+        return false;
+    }
+
+    cairo_surface_flush(m_data.m_surface.get());
+
+    std::unique_ptr<GLContext> context = GLContext::createContextForWindow(0, GLContext::sharingContext());
+    context->makeContextCurrent();
+    uint32_t fbo;
+    glGenFramebuffers(1, &fbo);
+    glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, m_data.m_texture, 0);
+    glBindTexture(bindTextureTarget, destinationTexture);
+    glCopyTexImage2D(target, 0, internalformat, 0, 0, m_size.width(), m_size.height(), 0);
+    glBindTexture(bindTextureTarget, 0);
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    glFlush();
+    glDeleteFramebuffers(1, &fbo);
+    return true;
+#else
+    UNUSED_PARAM(target);
+    UNUSED_PARAM(destinationTexture);
+    UNUSED_PARAM(internalformat);
+    UNUSED_PARAM(premultiplyAlpha);
+    UNUSED_PARAM(flipY);
+    return false;
+#endif
 }
 
 } // namespace WebCore

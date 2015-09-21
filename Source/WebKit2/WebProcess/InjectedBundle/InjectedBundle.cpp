@@ -35,7 +35,6 @@
 #include "UserData.h"
 #include "WKAPICast.h"
 #include "WKBundleAPICast.h"
-#include "WebApplicationCacheManager.h"
 #include "WebConnectionToUIProcess.h"
 #include "WebCookieManager.h"
 #include "WebCoreArgumentCoders.h"
@@ -50,6 +49,7 @@
 #include "WebProcessCreationParameters.h"
 #include "WebProcessPoolMessages.h"
 #include <JavaScriptCore/APICast.h>
+#include <JavaScriptCore/Exception.h>
 #include <JavaScriptCore/JSLock.h>
 #include <WebCore/ApplicationCache.h>
 #include <WebCore/ApplicationCacheStorage.h>
@@ -136,11 +136,6 @@ WebConnection* InjectedBundle::webConnectionToUIProcess() const
     return WebProcess::singleton().webConnectionToUIProcess();
 }
 
-void InjectedBundle::setAlwaysAcceptCookies(bool accept)
-{
-    WebProcess::singleton().supplement<WebCookieManager>()->setHTTPCookieAcceptPolicy(accept ? HTTPCookieAcceptPolicyAlways : HTTPCookieAcceptPolicyOnlyFromMainDocumentDomain);
-}
-
 void InjectedBundle::overrideBoolPreferenceForTestRunner(WebPageGroupProxy* pageGroup, const String& preference, bool enabled)
 {
     const HashSet<Page*>& pages = PageGroup::pageGroup(pageGroup->identifier())->pages();
@@ -178,6 +173,11 @@ void InjectedBundle::overrideBoolPreferenceForTestRunner(WebPageGroupProxy* page
     }
 #endif
 
+#if ENABLE(CSS_ANIMATIONS_LEVEL_2)
+    if (preference == "WebKitCSSAnimationTriggersEnabled")
+        RuntimeEnabledFeatures::sharedFeatures().setAnimationTriggersEnabled(enabled);
+#endif
+
 #if ENABLE(CSS_REGIONS)
     if (preference == "WebKitCSSRegionsEnabled")
         RuntimeEnabledFeatures::sharedFeatures().setCSSRegionsEnabled(enabled);
@@ -206,7 +206,8 @@ void InjectedBundle::overrideBoolPreferenceForTestRunner(WebPageGroupProxy* page
     macro(WebKitShouldRespectImageOrientation, ShouldRespectImageOrientation, shouldRespectImageOrientation) \
     macro(WebKitEnableCaretBrowsing, CaretBrowsingEnabled, caretBrowsingEnabled) \
     macro(WebKitDisplayImagesKey, LoadsImagesAutomatically, loadsImagesAutomatically) \
-    macro(WebKitMediaStreamEnabled, MediaStreamEnabled, mediaStreamEnabled)
+    macro(WebKitMediaStreamEnabled, MediaStreamEnabled, mediaStreamEnabled) \
+    macro(WebKitHTTPEquivEnabled, HttpEquivEnabled, httpEquivEnabled)
 
 #define OVERRIDE_PREFERENCE_AND_SET_IN_EXISTING_PAGES(TestRunnerName, SettingsName, WebPreferencesName) \
     if (preference == #TestRunnerName) { \
@@ -351,42 +352,41 @@ void InjectedBundle::setDatabaseQuota(uint64_t quota)
 
 void InjectedBundle::clearApplicationCache()
 {
-    WebProcess::singleton().supplement<WebApplicationCacheManager>()->deleteAllEntries();
+    ApplicationCacheStorage::singleton().deleteAllEntries();
 }
 
 void InjectedBundle::clearApplicationCacheForOrigin(const String& originString)
 {
-    RefPtr<SecurityOrigin> origin = SecurityOrigin::createFromString(originString);
-    ApplicationCache::deleteCacheForOrigin(origin.get());
+    ApplicationCacheStorage::singleton().deleteCacheForOrigin(SecurityOrigin::createFromString(originString));
 }
 
 void InjectedBundle::setAppCacheMaximumSize(uint64_t size)
 {
-    WebProcess::singleton().supplement<WebApplicationCacheManager>()->setAppCacheMaximumSize(size);
+    ApplicationCacheStorage::singleton().setMaximumSize(size);
 }
 
 uint64_t InjectedBundle::appCacheUsageForOrigin(const String& originString)
 {
-    RefPtr<SecurityOrigin> origin = SecurityOrigin::createFromString(originString);
-    return ApplicationCache::diskUsageForOrigin(origin.get());
+    return ApplicationCacheStorage::singleton().diskUsageForOrigin(SecurityOrigin::createFromString(originString));
 }
 
 void InjectedBundle::setApplicationCacheOriginQuota(const String& originString, uint64_t bytes)
 {
-    RefPtr<SecurityOrigin> origin = SecurityOrigin::createFromString(originString);
-    cacheStorage().storeUpdatedQuotaForOrigin(origin.get(), bytes);
+    Ref<SecurityOrigin> origin = SecurityOrigin::createFromString(originString);
+    ApplicationCacheStorage::singleton().storeUpdatedQuotaForOrigin(origin.ptr(), bytes);
 }
 
 void InjectedBundle::resetApplicationCacheOriginQuota(const String& originString)
 {
-    RefPtr<SecurityOrigin> origin = SecurityOrigin::createFromString(originString);
-    cacheStorage().storeUpdatedQuotaForOrigin(origin.get(), cacheStorage().defaultOriginQuota());
+    Ref<SecurityOrigin> origin = SecurityOrigin::createFromString(originString);
+    auto& cacheStorage = ApplicationCacheStorage::singleton();
+    cacheStorage.storeUpdatedQuotaForOrigin(origin.ptr(), cacheStorage.defaultOriginQuota());
 }
 
 PassRefPtr<API::Array> InjectedBundle::originsWithApplicationCache()
 {
     HashSet<RefPtr<SecurityOrigin>> origins;
-    cacheStorage().getOriginsWithCache(origins);
+    ApplicationCacheStorage::singleton().getOriginsWithCache(origins);
 
     Vector<RefPtr<API::Object>> originIdentifiers;
     originIdentifiers.reserveInitialCapacity(origins.size());
@@ -496,12 +496,12 @@ void InjectedBundle::removeAllUserContent(WebPageGroupProxy* pageGroup)
 
 void InjectedBundle::garbageCollectJavaScriptObjects()
 {
-    gcController().garbageCollectNow();
+    GCController::singleton().garbageCollectNow();
 }
 
 void InjectedBundle::garbageCollectJavaScriptObjectsOnAlternateThreadForDebugging(bool waitUntilDone)
 {
-    gcController().garbageCollectOnAlternateThreadForDebugging(waitUntilDone);
+    GCController::singleton().garbageCollectOnAlternateThreadForDebugging(waitUntilDone);
 }
 
 size_t InjectedBundle::javaScriptObjectsCount()
@@ -604,9 +604,13 @@ void InjectedBundle::setTabKeyCyclesThroughElements(WebPage* page, bool enabled)
     page->corePage()->setTabKeyCyclesThroughElements(enabled);
 }
 
-void InjectedBundle::setSerialLoadingEnabled(bool enabled)
+void InjectedBundle::setCSSAnimationTriggersEnabled(bool enabled)
 {
-    resourceLoadScheduler()->setSerialLoadingEnabled(enabled);
+#if ENABLE(CSS_ANIMATIONS_LEVEL_2)
+    RuntimeEnabledFeatures::sharedFeatures().setAnimationTriggersEnabled(enabled);
+#else
+    UNUSED_PARAM(enabled);
+#endif
 }
 
 void InjectedBundle::setCSSRegionsEnabled(bool enabled)
@@ -625,11 +629,6 @@ void InjectedBundle::setCSSCompositingEnabled(bool enabled)
 #else
     UNUSED_PARAM(enabled);
 #endif
-}
-
-void InjectedBundle::dispatchPendingLoadRequests()
-{
-    resourceLoadScheduler()->servePendingRequests();
 }
 
 } // namespace WebKit

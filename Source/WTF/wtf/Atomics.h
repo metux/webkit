@@ -63,7 +63,7 @@
 #include <wtf/StdLibExtras.h>
 
 #if OS(WINDOWS)
-#if !COMPILER(GCC)
+#if !COMPILER(GCC_OR_CLANG)
 extern "C" void _ReadWriteBarrier(void);
 #pragma intrinsic(_ReadWriteBarrier)
 #endif
@@ -81,19 +81,31 @@ namespace WTF {
 
 template<typename T>
 struct Atomic {
+    // Don't pass a non-default value for the order parameter unless you really know
+    // what you are doing and have thought about it very hard. The cost of seq_cst
+    // is usually not high enough to justify the risk.
 
-    T load(std::memory_order order) const { return value.load(order); }
+    T load(std::memory_order order = std::memory_order_seq_cst) const { return value.load(order); }
 
-    void store(T desired, std::memory_order order) { value.store(desired, order); }
+    void store(T desired, std::memory_order order = std::memory_order_seq_cst) { value.store(desired, order); }
 
-    bool compare_exchange_weak(T expected, T desired, std::memory_order order)
+    bool compareExchangeWeak(T expected, T desired, std::memory_order order = std::memory_order_seq_cst)
     {
+#if OS(WINDOWS)
+        // Windows makes strange assertions about the argument to compare_exchange_weak, and anyway,
+        // Windows is X86 so seq_cst is cheap.
+        order = std::memory_order_seq_cst;
+#endif
         T expectedOrActual = expected;
         return value.compare_exchange_weak(expectedOrActual, desired, order);
     }
 
-    bool compare_exchange_strong(T expected, T desired, std::memory_order order)
+    bool compareExchangeStrong(T expected, T desired, std::memory_order order = std::memory_order_seq_cst)
     {
+#if OS(WINDOWS)
+        // See above.
+        order = std::memory_order_seq_cst;
+#endif
         T expectedOrActual = expected;
         return value.compare_exchange_strong(expectedOrActual, desired, order);
     }
@@ -138,7 +150,7 @@ inline bool weakCompareAndSwap(volatile unsigned* location, unsigned expected, u
         : "r"(expected), "r"(newValue)
         : "memory");
     result = !result;
-#elif CPU(ARM64) && COMPILER(GCC)
+#elif CPU(ARM64) && COMPILER(GCC_OR_CLANG)
     unsigned tmp;
     unsigned result;
     asm volatile(
@@ -192,7 +204,7 @@ inline bool weakCompareAndSwap(void*volatile* location, void* expected, void* ne
         : "memory"
         );
     return result;
-#elif CPU(ARM64) && COMPILER(GCC)
+#elif CPU(ARM64) && COMPILER(GCC_OR_CLANG)
     bool result;
     void* tmp;
     asm volatile(
@@ -248,7 +260,7 @@ inline bool weakCompareAndSwapSize(volatile size_t* location, size_t expected, s
 // to do things like register allocation and code motion over pure operations.
 inline void compilerFence()
 {
-#if OS(WINDOWS) && !COMPILER(GCC)
+#if OS(WINDOWS) && !COMPILER(GCC_OR_CLANG)
     _ReadWriteBarrier();
 #else
     asm volatile("" ::: "memory");

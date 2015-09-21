@@ -23,151 +23,171 @@
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-WebInspector.LayoutTimelineView = function(timeline)
+WebInspector.LayoutTimelineView = class LayoutTimelineView extends WebInspector.TimelineView
 {
-    WebInspector.TimelineView.call(this, timeline);
+    constructor(timeline, extraArguments)
+    {
+        super(timeline, extraArguments);
 
-    console.assert(timeline.type === WebInspector.TimelineRecord.Type.Layout);
+        console.assert(timeline.type === WebInspector.TimelineRecord.Type.Layout, timeline);
 
-    this.navigationSidebarTreeOutline.onselect = this._treeElementSelected.bind(this);
-    this.navigationSidebarTreeOutline.ondeselect = this._treeElementDeselected.bind(this);
-    this.navigationSidebarTreeOutline.element.classList.add(WebInspector.NavigationSidebarPanel.HideDisclosureButtonsStyleClassName);
-    this.navigationSidebarTreeOutline.element.classList.add(WebInspector.LayoutTimelineView.TreeOutlineStyleClassName);
+        this.navigationSidebarTreeOutline.element.classList.add("layout");
 
-    var columns = {eventType: {}, initiatorCallFrame: {}, width: {}, height: {}, startTime: {}, duration: {}};
+        var columns = {eventType: {}, location: {}, width: {}, height: {}, startTime: {}, totalTime: {}};
 
-    columns.eventType.title = WebInspector.UIString("Type");
-    columns.eventType.width = "15%";
+        columns.eventType.title = WebInspector.UIString("Type");
+        columns.eventType.width = "15%";
 
-    var typeToLabelMap = new Map;
-    for (var key in WebInspector.LayoutTimelineRecord.EventType) {
-        var value = WebInspector.LayoutTimelineRecord.EventType[key];
-        typeToLabelMap.set(value, WebInspector.LayoutTimelineRecord.displayNameForEventType(value));
+        var typeToLabelMap = new Map;
+        for (var key in WebInspector.LayoutTimelineRecord.EventType) {
+            var value = WebInspector.LayoutTimelineRecord.EventType[key];
+            typeToLabelMap.set(value, WebInspector.LayoutTimelineRecord.displayNameForEventType(value));
+        }
+
+        columns.eventType.scopeBar = WebInspector.TimelineDataGrid.createColumnScopeBar("layout", typeToLabelMap);
+        columns.eventType.hidden = true;
+        this._scopeBar = columns.eventType.scopeBar;
+
+        columns.location.title = WebInspector.UIString("Initiator");
+        columns.location.width = "25%";
+
+        columns.width.title = WebInspector.UIString("Width");
+        columns.width.width = "8%";
+
+        columns.height.title = WebInspector.UIString("Height");
+        columns.height.width = "8%";
+
+        columns.startTime.title = WebInspector.UIString("Start Time");
+        columns.startTime.width = "8%";
+        columns.startTime.aligned = "right";
+
+        columns.totalTime.title = WebInspector.UIString("Duration");
+        columns.totalTime.width = "8%";
+        columns.totalTime.aligned = "right";
+
+        for (var column in columns)
+            columns[column].sortable = true;
+
+        this._dataGrid = new WebInspector.LayoutTimelineDataGrid(this.navigationSidebarTreeOutline, columns);
+        this._dataGrid.addEventListener(WebInspector.TimelineDataGrid.Event.FiltersDidChange, this._dataGridFiltersDidChange, this);
+        this._dataGrid.addEventListener(WebInspector.DataGrid.Event.SelectedNodeChanged, this._dataGridNodeSelected, this);
+
+        this._dataGrid.sortColumnIdentifier = "startTime";
+        this._dataGrid.sortOrder = WebInspector.DataGrid.SortOrder.Ascending;
+
+        this._hoveredTreeElement = null;
+        this._hoveredDataGridNode = null;
+        this._showingHighlight = false;
+        this._showingHighlightForRecord = null;
+
+        this._dataGrid.element.addEventListener("mouseover", this._mouseOverDataGrid.bind(this));
+        this._dataGrid.element.addEventListener("mouseleave", this._mouseLeaveDataGrid.bind(this));
+        this.navigationSidebarTreeOutline.element.addEventListener("mouseover", this._mouseOverTreeOutline.bind(this));
+        this.navigationSidebarTreeOutline.element.addEventListener("mouseleave", this._mouseLeaveTreeOutline.bind(this));
+
+        this.element.classList.add("layout");
+        this.element.appendChild(this._dataGrid.element);
+
+        timeline.addEventListener(WebInspector.Timeline.Event.RecordAdded, this._layoutTimelineRecordAdded, this);
+
+        this._pendingRecords = [];
     }
-
-    columns.eventType.scopeBar = WebInspector.TimelineDataGrid.createColumnScopeBar("layout", typeToLabelMap);
-    columns.eventType.hidden = true;
-
-    columns.initiatorCallFrame.title = WebInspector.UIString("Initiator");
-    columns.initiatorCallFrame.width = "25%";
-
-    columns.width.title = WebInspector.UIString("Width");
-    columns.width.width = "8%";
-
-    columns.height.title = WebInspector.UIString("Height");
-    columns.height.width = "8%";
-
-    columns.startTime.title = WebInspector.UIString("Start Time");
-    columns.startTime.width = "8%";
-    columns.startTime.aligned = "right";
-
-    columns.duration.title = WebInspector.UIString("Duration");
-    columns.duration.width = "8%";
-    columns.duration.aligned = "right";
-
-    for (var column in columns)
-        columns[column].sortable = true;
-
-    this._dataGrid = new WebInspector.LayoutTimelineDataGrid(this.navigationSidebarTreeOutline, columns);
-    this._dataGrid.addEventListener(WebInspector.TimelineDataGrid.Event.FiltersDidChange, this._dataGridFiltersDidChange, this);
-    this._dataGrid.addEventListener(WebInspector.DataGrid.Event.SelectedNodeChanged, this._dataGridNodeSelected, this);
-
-    this._dataGrid.sortColumnIdentifier = "startTime";
-    this._dataGrid.sortOrder = WebInspector.DataGrid.SortOrder.Ascending;
-
-    this._hoveredTreeElement = null;
-    this._hoveredDataGridNode = null;
-    this._showingHighlight = false;
-    this._showingHighlightForRecord = null;
-
-    this._dataGrid.element.addEventListener("mouseover", this._mouseOverDataGrid.bind(this));
-    this._dataGrid.element.addEventListener("mouseleave", this._mouseLeaveDataGrid.bind(this));
-    this.navigationSidebarTreeOutline.element.addEventListener("mouseover", this._mouseOverTreeOutline.bind(this));
-    this.navigationSidebarTreeOutline.element.addEventListener("mouseleave", this._mouseLeaveTreeOutline.bind(this));
-
-    this.element.classList.add(WebInspector.LayoutTimelineView.StyleClassName);
-    this.element.appendChild(this._dataGrid.element);
-
-    timeline.addEventListener(WebInspector.Timeline.Event.RecordAdded, this._layoutTimelineRecordAdded, this);
-
-    this._pendingRecords = [];
-};
-
-WebInspector.LayoutTimelineView.StyleClassName = "layout";
-WebInspector.LayoutTimelineView.TreeOutlineStyleClassName = "layout";
-
-WebInspector.LayoutTimelineView.prototype = {
-    constructor: WebInspector.LayoutTimelineView,
-    __proto__: WebInspector.TimelineView.prototype,
 
     // Public
 
     get navigationSidebarTreeOutlineLabel()
     {
         return WebInspector.UIString("Records");
-    },
+    }
 
-    shown: function()
+    shown()
     {
-        WebInspector.TimelineView.prototype.shown.call(this);
+        super.shown();
 
         this._updateHighlight();
 
         this._dataGrid.shown();
-    },
+    }
 
-    hidden: function()
+    hidden()
     {
         this._hideHighlightIfNeeded();
 
         this._dataGrid.hidden();
 
-        WebInspector.TimelineView.prototype.hidden.call(this);
-    },
+        super.hidden();
+    }
 
-    filterDidChange: function()
+    closed()
     {
-        WebInspector.TimelineView.prototype.filterDidChange.call(this);
+        console.assert(this.representedObject instanceof WebInspector.Timeline);
+        this.representedObject.removeEventListener(null, null, this);
+
+        this._dataGrid.closed();
+    }
+
+    filterDidChange()
+    {
+        super.filterDidChange();
 
         this._updateHighlight();
-    },
+    }
 
-    updateLayout: function()
+    updateLayout()
     {
-        WebInspector.TimelineView.prototype.updateLayout.call(this);
+        super.updateLayout();
 
         this._dataGrid.updateLayout();
 
         this._processPendingRecords();
-    },
+    }
 
-    matchTreeElementAgainstCustomFilters: function(treeElement)
+    matchTreeElementAgainstCustomFilters(treeElement)
     {
         return this._dataGrid.treeElementMatchesActiveScopeFilters(treeElement);
-    },
+    }
 
-    reset: function()
+    reset()
     {
-        WebInspector.TimelineView.prototype.reset.call(this);
+        super.reset();
 
         this._hideHighlightIfNeeded();
 
         this._dataGrid.reset();
-    },
+
+        this._pendingRecords = [];
+    }
 
     // Protected
 
-    treeElementPathComponentSelected: function(event)
+    treeElementPathComponentSelected(event)
     {
         var dataGridNode = this._dataGrid.dataGridNodeForTreeElement(event.data.pathComponent.generalTreeElement);
         if (!dataGridNode)
             return;
         dataGridNode.revealAndSelect();
-    },
+    }
+
+    treeElementDeselected(treeElement)
+    {
+        super.treeElementDeselected(treeElement);
+
+        this._updateHighlight();
+    }
+
+    treeElementSelected(treeElement, selectedByUser)
+    {
+        if (this._dataGrid.shouldIgnoreSelectionEvent())
+            return;
+
+        super.treeElementSelected(treeElement, selectedByUser);
+
+        this._updateHighlight();
+    }
 
     // Private
 
-    _processPendingRecords: function()
+    _processPendingRecords()
     {
         if (!this._pendingRecords.length)
             return;
@@ -177,88 +197,57 @@ WebInspector.LayoutTimelineView.prototype = {
             var dataGridNode = new WebInspector.LayoutTimelineDataGridNode(layoutTimelineRecord, this.zeroTime);
 
             this._dataGrid.addRowInSortOrder(treeElement, dataGridNode);
+
+            var stack = [{children: layoutTimelineRecord.children, parentTreeElement: treeElement, index: 0}];
+            while (stack.length) {
+                var entry = stack.lastValue;
+                if (entry.index >= entry.children.length) {
+                    stack.pop();
+                    continue;
+                }
+
+                var childRecord = entry.children[entry.index];
+                console.assert(childRecord.type === WebInspector.TimelineRecord.Type.Layout, childRecord);
+
+                var childTreeElement = new WebInspector.TimelineRecordTreeElement(childRecord, WebInspector.SourceCodeLocation.NameStyle.Short);
+                var layoutDataGridNode = new WebInspector.LayoutTimelineDataGridNode(childRecord, this.zeroTime);
+                console.assert(entry.parentTreeElement, "entry without parent!");
+                this._dataGrid.addRowInSortOrder(childTreeElement, layoutDataGridNode, entry.parentTreeElement);
+
+                if (childTreeElement && childRecord.children.length)
+                    stack.push({children: childRecord.children, parentTreeElement: childTreeElement, index: 0});
+                ++entry.index;
+            }
         }
 
         this._pendingRecords = [];
-    },
+    }
 
-    _layoutTimelineRecordAdded: function(event)
+    _layoutTimelineRecordAdded(event)
     {
         var layoutTimelineRecord = event.data.record;
         console.assert(layoutTimelineRecord instanceof WebInspector.LayoutTimelineRecord);
 
+        // Only add top-level records, to avoid processing child records multiple times.
+        if (!(layoutTimelineRecord.parent instanceof WebInspector.RenderingFrameTimelineRecord))
+            return;
+
         this._pendingRecords.push(layoutTimelineRecord);
 
         this.needsLayout();
-    },
+    }
 
-    _dataGridFiltersDidChange: function(event)
+    _dataGridFiltersDidChange(event)
     {
-        WebInspector.timelineSidebarPanel.updateFilter();
-    },
+        this.timelineSidebarPanel.updateFilter();
+    }
 
-    _dataGridNodeSelected: function(event)
+    _dataGridNodeSelected(event)
     {
-        this.dispatchEventToListeners(WebInspector.TimelineView.Event.SelectionPathComponentsDidChange);
-    },
+        this.dispatchEventToListeners(WebInspector.ContentView.Event.SelectionPathComponentsDidChange);
+    }
 
-    _treeElementDeselected: function(treeElement)
-    {
-        if (treeElement.status)
-            treeElement.status = "";
-
-        this._updateHighlight();
-    },
-
-    _treeElementSelected: function(treeElement, selectedByUser)
-    {
-        if (this._dataGrid.shouldIgnoreSelectionEvent())
-            return;
-
-        if (!WebInspector.timelineSidebarPanel.canShowDifferentContentView())
-            return;
-
-        if (treeElement instanceof WebInspector.FolderTreeElement)
-            return;
-
-        if (!(treeElement instanceof WebInspector.TimelineRecordTreeElement)) {
-            console.error("Unknown tree element selected.");
-            return;
-        }
-
-        this._updateHighlight();
-
-        if (!treeElement.record.sourceCodeLocation) {
-            WebInspector.timelineSidebarPanel.showTimelineViewForTimeline(this.representedObject);
-            return;
-        }
-
-        WebInspector.resourceSidebarPanel.showOriginalOrFormattedSourceCodeLocation(treeElement.record.sourceCodeLocation);
-        this._updateTreeElementWithCloseButton(treeElement);
-    },
-
-    _updateTreeElementWithCloseButton: function(treeElement)
-    {
-        if (this._closeStatusButton) {
-            treeElement.status = this._closeStatusButton.element;
-            return;
-        }
-
-        wrappedSVGDocument(platformImagePath("Close.svg"), null, WebInspector.UIString("Close resource view"), function(element) {
-            this._closeStatusButton = new WebInspector.TreeElementStatusButton(element);
-            this._closeStatusButton.addEventListener(WebInspector.TreeElementStatusButton.Event.Clicked, this._closeStatusButtonClicked, this);
-            if (treeElement === this.navigationSidebarTreeOutline.selectedTreeElement)
-                this._updateTreeElementWithCloseButton(treeElement);
-        }.bind(this));
-    },
-
-    _closeStatusButtonClicked: function(event)
-    {
-        this.navigationSidebarTreeOutline.selectedTreeElement.deselect();
-        WebInspector.timelineSidebarPanel.showTimelineViewForTimeline(this.representedObject);
-    },
-
-    _updateHighlight: function()
+    _updateHighlight()
     {
         var record = this._hoveredOrSelectedRecord();
         if (!record) {
@@ -267,9 +256,9 @@ WebInspector.LayoutTimelineView.prototype = {
         }
 
         this._showHighlightForRecord(record);
-    },
+    }
 
-    _showHighlightForRecord: function(record)
+    _showHighlightForRecord(record)
     {
         if (this._showingHighlightForRecord === record)
             return;
@@ -299,9 +288,9 @@ WebInspector.LayoutTimelineView.prototype = {
             this._showingHighlight = false;
             DOMAgent.hideHighlight();
         }
-    },
+    }
 
-    _hideHighlightIfNeeded: function()
+    _hideHighlightIfNeeded()
     {
         this._showingHighlightForRecord = null;
 
@@ -309,9 +298,9 @@ WebInspector.LayoutTimelineView.prototype = {
             this._showingHighlight = false;
             DOMAgent.hideHighlight();
         }
-    },
+    }
 
-    _hoveredOrSelectedRecord: function()
+    _hoveredOrSelectedRecord()
     {
         if (this._hoveredDataGridNode)
             return this._hoveredDataGridNode.record;
@@ -326,9 +315,9 @@ WebInspector.LayoutTimelineView.prototype = {
         }
 
         return null;
-    },
+    }
 
-    _mouseOverDataGrid: function(event)
+    _mouseOverDataGrid(event)
     {
         var hoveredDataGridNode = this._dataGrid.dataGridNodeFromNode(event.target);
         if (!hoveredDataGridNode)
@@ -336,15 +325,15 @@ WebInspector.LayoutTimelineView.prototype = {
 
         this._hoveredDataGridNode = hoveredDataGridNode;
         this._updateHighlight();
-    },
+    }
 
-    _mouseLeaveDataGrid: function(event)
+    _mouseLeaveDataGrid(event)
     {
         this._hoveredDataGridNode = null;
         this._updateHighlight();
-    },
+    }
 
-    _mouseOverTreeOutline: function(event)
+    _mouseOverTreeOutline(event)
     {
         var hoveredTreeElement = this.navigationSidebarTreeOutline.treeElementFromNode(event.target);
         if (!hoveredTreeElement)
@@ -352,9 +341,9 @@ WebInspector.LayoutTimelineView.prototype = {
 
         this._hoveredTreeElement = hoveredTreeElement;
         this._updateHighlight();
-    },
+    }
 
-    _mouseLeaveTreeOutline: function(event)
+    _mouseLeaveTreeOutline(event)
     {
         this._hoveredTreeElement = null;
         this._updateHighlight();

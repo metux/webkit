@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010 Apple Inc. All rights reserved.
+ * Copyright (C) 2010, 2015 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -38,6 +38,7 @@
 #include <memory>
 
 #if PLATFORM(COCOA)
+#include "WebHitTestResult.h"
 #include <wtf/RetainPtr.h>
 OBJC_CLASS CALayer;
 #endif
@@ -57,7 +58,7 @@ struct PluginCreationParameters;
 
 class PluginProxy : public Plugin {
 public:
-    static PassRefPtr<PluginProxy> create(uint64_t pluginProcessToken, bool isRestartedProcess);
+    static Ref<PluginProxy> create(uint64_t pluginProcessToken, bool isRestartedProcess);
     ~PluginProxy();
 
     uint64_t pluginInstanceID() const { return m_pluginInstanceID; }
@@ -78,7 +79,7 @@ private:
     virtual void destroy() override;
     virtual void paint(WebCore::GraphicsContext*, const WebCore::IntRect& dirtyRect) override;
     virtual bool supportsSnapshotting() const override;
-    virtual PassRefPtr<ShareableBitmap> snapshot() override;
+    virtual RefPtr<ShareableBitmap> snapshot() override;
 #if PLATFORM(COCOA)
     virtual PlatformLayer* pluginLayer() override;
 #endif
@@ -89,6 +90,7 @@ private:
     virtual void frameDidFinishLoading(uint64_t requestID) override;
     virtual void frameDidFail(uint64_t requestID, bool wasCancelled) override;
     virtual void didEvaluateJavaScript(uint64_t requestID, const String& result) override;
+    virtual void streamWillSendRequest(uint64_t streamID, const WebCore::URL& requestURL, const WebCore::URL& responseURL, int responseStatus) override;
     virtual void streamDidReceiveResponse(uint64_t streamID, const WebCore::URL& responseURL, uint32_t streamLength, uint32_t lastModifiedTime, const String& mimeType, const String& headers, const String& suggestedFileName) override;
     virtual void streamDidReceiveData(uint64_t streamID, const char* bytes, int length) override;
     virtual void streamDidFinishLoading(uint64_t streamID) override;
@@ -138,10 +140,12 @@ private:
 
     virtual WebCore::IntPoint convertToRootView(const WebCore::IntPoint&) const override;
 
-    virtual PassRefPtr<WebCore::SharedBuffer> liveResourceData() const override;
+    virtual RefPtr<WebCore::SharedBuffer> liveResourceData() const override;
     virtual bool performDictionaryLookupAtLocation(const WebCore::FloatPoint&) override { return false; }
 
-    virtual String getSelectionString() const override { return String(); }
+    String getSelectionString() const override { return String(); }
+    String getSelectionForWordAtPoint(const WebCore::FloatPoint&) const override { return String(); }
+    bool existingSelectionContainsPoint(const WebCore::FloatPoint&) const override { return false; }
 
 #if PLATFORM(COCOA)
     virtual WebCore::AudioHardwareActivityType audioHardwareActivity() const override;
@@ -165,6 +169,7 @@ private:
     void getPluginElementNPObject(uint64_t& pluginElementNPObjectID);
     void evaluate(const NPVariantData& npObjectAsVariantData, const String& scriptString, bool allowPopups, bool& returnValue, NPVariantData& resultData);
     void setPluginIsPlayingAudio(bool);
+    void continueStreamLoad(uint64_t streamID);
     void cancelStreamLoad(uint64_t streamID);
     void cancelManualStreamLoad();
     void setStatusbarText(const String& statusbarText);
@@ -232,6 +237,8 @@ private:
 };
 
 } // namespace WebKit
+
+SPECIALIZE_TYPE_TRAITS_PLUGIN(PluginProxy, PluginProxyType)
 
 #endif // ENABLE(NETSCAPE_PLUGIN_API)
 

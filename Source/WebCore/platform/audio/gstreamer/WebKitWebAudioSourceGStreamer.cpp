@@ -30,7 +30,7 @@
 #include <gst/app/gstappsrc.h>
 #include <gst/audio/audio-info.h>
 #include <gst/pbutils/missing-plugins.h>
-#include <wtf/gobject/GUniquePtr.h>
+#include <wtf/glib/GUniquePtr.h>
 
 using namespace WebCore;
 
@@ -370,6 +370,9 @@ static void webKitWebAudioSrcLoop(WebKitWebAudioSrc* src)
         // Unmap before passing on the buffer.
         gst_buffer_unmap(channelBuffer, &buffer->info);
         g_free(buffer);
+
+        if (priv->bus->channel(i)->isSilent())
+            GST_BUFFER_FLAG_SET(channelBuffer, GST_BUFFER_FLAG_GAP);
 
         if (ret == GST_FLOW_OK) {
             ret = gst_app_src_push_buffer(GST_APP_SRC(appsrc), channelBuffer);

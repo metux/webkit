@@ -26,7 +26,7 @@
 #include <EGL/egl.h>
 
 #if PLATFORM(X11)
-typedef unsigned long Pixmap;
+#include "XUniqueResource.h"
 #endif
 
 namespace WebCore {
@@ -40,7 +40,7 @@ public:
 
     GLContextEGL(EGLContext, EGLSurface, EGLSurfaceType);
 #if PLATFORM(X11)
-    GLContextEGL(EGLContext, EGLSurface, Pixmap);
+    GLContextEGL(EGLContext, EGLSurface, XUniquePixmap&&);
 #endif
     virtual ~GLContextEGL();
     virtual bool makeContextCurrent();
@@ -51,8 +51,9 @@ public:
 #if USE(CAIRO)
     virtual cairo_device_t* cairoDevice();
 #endif
+    virtual bool isEGLContext() const { return true; }
 
-#if USE(3D_GRAPHICS)
+#if ENABLE(GRAPHICS_CONTEXT_3D)
     virtual PlatformGraphicsContext3D platformContext();
 #endif
 
@@ -69,7 +70,7 @@ private:
     EGLSurface m_surface;
     EGLSurfaceType m_type;
 #if PLATFORM(X11)
-    Pixmap m_pixmap;
+    XUniquePixmap m_pixmap;
 #endif
 #if USE(CAIRO)
     cairo_device_t* m_cairoDevice { nullptr };

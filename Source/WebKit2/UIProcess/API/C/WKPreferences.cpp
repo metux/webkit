@@ -479,6 +479,16 @@ bool WKPreferencesGetAccelerated2DCanvasEnabled(WKPreferencesRef preferencesRef)
     return toImpl(preferencesRef)->accelerated2dCanvasEnabled();
 }
 
+void WKPreferencesSetCSSAnimationTriggersEnabled(WKPreferencesRef preferencesRef, bool flag)
+{
+    toImpl(preferencesRef)->setCSSAnimationTriggersEnabled(flag);
+}
+
+bool WKPreferencesGetCSSAnimationTriggersEnabled(WKPreferencesRef preferencesRef)
+{
+    return toImpl(preferencesRef)->cssAnimationTriggersEnabled();
+}
+
 void WKPreferencesSetCSSRegionsEnabled(WKPreferencesRef preferencesRef, bool flag)
 {
     toImpl(preferencesRef)->setCSSRegionsEnabled(flag);
@@ -720,32 +730,32 @@ bool WKPreferencesGetHixie76WebSocketProtocolEnabled(WKPreferencesRef)
 
 void WKPreferencesSetMediaPlaybackRequiresUserGesture(WKPreferencesRef preferencesRef, bool flag)
 {
-    toImpl(preferencesRef)->setMediaPlaybackRequiresUserGesture(flag);
+    toImpl(preferencesRef)->setRequiresUserGestureForMediaPlayback(flag);
 }
 
 bool WKPreferencesGetMediaPlaybackRequiresUserGesture(WKPreferencesRef preferencesRef)
 {
-    return toImpl(preferencesRef)->mediaPlaybackRequiresUserGesture();
+    return toImpl(preferencesRef)->requiresUserGestureForMediaPlayback();
 }
 
 void WKPreferencesSetMediaPlaybackAllowsInline(WKPreferencesRef preferencesRef, bool flag)
 {
-    toImpl(preferencesRef)->setMediaPlaybackAllowsInline(flag);
+    toImpl(preferencesRef)->setAllowsInlineMediaPlayback(flag);
 }
 
 bool WKPreferencesGetMediaPlaybackAllowsInline(WKPreferencesRef preferencesRef)
 {
-    return toImpl(preferencesRef)->mediaPlaybackAllowsInline();
+    return toImpl(preferencesRef)->allowsInlineMediaPlayback();
 }
 
-void WKPreferencesSetAllowsAlternateFullscreen(WKPreferencesRef preferencesRef, bool flag)
+void WKPreferencesSetMediaControlsScaleWithPageZoom(WKPreferencesRef preferencesRef, bool flag)
 {
-    toImpl(preferencesRef)->setAllowsAlternateFullscreen(flag);
+    toImpl(preferencesRef)->setMediaControlsScaleWithPageZoom(flag);
 }
 
-bool WKPreferencesGetAllowsAlternateFullscreen(WKPreferencesRef preferencesRef)
+bool WKPreferencesGetMediaControlsScaleWithPageZoom(WKPreferencesRef preferencesRef)
 {
-    return toImpl(preferencesRef)->allowsAlternateFullscreen();
+    return toImpl(preferencesRef)->mediaControlsScaleWithPageZoom();
 }
 
 void WKPreferencesSetShowsToolTipOverTruncatedText(WKPreferencesRef preferencesRef, bool flag)
@@ -1177,6 +1187,16 @@ bool WKPreferencesGetSimpleLineLayoutDebugBordersEnabled(WKPreferencesRef prefer
     return toImpl(preferencesRef)->simpleLineLayoutDebugBordersEnabled();
 }
 
+void WKPreferencesSetNewBlockInsideInlineModelEnabled(WKPreferencesRef preferencesRef, bool flag)
+{
+    toImpl(preferencesRef)->setNewBlockInsideInlineModelEnabled(flag);
+}
+
+bool WKPreferencesGetNewBlockInsideInlineModelEnabled(WKPreferencesRef preferencesRef)
+{
+    return toImpl(preferencesRef)->newBlockInsideInlineModelEnabled();
+}
+
 void WKPreferencesSetSubpixelCSSOMElementMetricsEnabled(WKPreferencesRef preferencesRef, bool flag)
 {
     toImpl(preferencesRef)->setSubpixelCSSOMElementMetricsEnabled(flag);
@@ -1307,6 +1327,16 @@ double WKPreferencesGetMinimumZoomFontSize(WKPreferencesRef preferencesRef)
     return toImpl(preferencesRef)->minimumZoomFontSize();
 }
 
+void WKPreferencesSetAntialiasedFontDilationEnabled(WKPreferencesRef preferencesRef, bool enabled)
+{
+    toImpl(preferencesRef)->setAntialiasedFontDilationEnabled(enabled);
+}
+
+bool WKPreferencesGetAntialiasedFontDilationEnabled(WKPreferencesRef preferencesRef)
+{
+    return toImpl(preferencesRef)->antialiasedFontDilationEnabled();
+}
+
 void WKPreferencesSetVisibleDebugOverlayRegions(WKPreferencesRef preferencesRef, WKDebugOverlayRegions visibleRegions)
 {
     toImpl(preferencesRef)->setVisibleDebugOverlayRegions(visibleRegions);
@@ -1325,4 +1355,34 @@ void WKPreferencesSetIgnoreViewportScalingConstraints(WKPreferencesRef preferenc
 bool WKPreferencesGetIgnoreViewportScalingConstraints(WKPreferencesRef preferencesRef)
 {
     return toImpl(preferencesRef)->ignoreViewportScalingConstraints();
+}
+
+void WKPreferencesSetMetaRefreshEnabled(WKPreferencesRef preferencesRef, bool enabled)
+{
+    toImpl(preferencesRef)->setHTTPEquivEnabled(enabled);
+}
+
+bool WKPreferencesGetMetaRefreshEnabled(WKPreferencesRef preferencesRef)
+{
+    return toImpl(preferencesRef)->httpEquivEnabled();
+}
+
+void WKPreferencesSetHTTPEquivEnabled(WKPreferencesRef preferencesRef, bool enabled)
+{
+    toImpl(preferencesRef)->setHTTPEquivEnabled(enabled);
+}
+
+bool WKPreferencesGetHTTPEquivEnabled(WKPreferencesRef preferencesRef)
+{
+    return toImpl(preferencesRef)->httpEquivEnabled();
+}
+
+void WKPreferencesSetAllowsAirPlayForMediaPlayback(WKPreferencesRef preferencesRef, bool enabled)
+{
+    toImpl(preferencesRef)->setAllowsAirPlayForMediaPlayback(enabled);
+}
+
+bool WKPreferencesGetAllowsAirPlayForMediaPlayback(WKPreferencesRef preferencesRef)
+{
+    return toImpl(preferencesRef)->allowsAirPlayForMediaPlayback();
 }

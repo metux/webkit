@@ -41,6 +41,9 @@
 #include "JSCanvasPattern.cpp"
 #include "JSCanvasRenderingContext.cpp"
 #include "JSCanvasRenderingContext2D.cpp"
+#if ENABLE(STREAMS_API)
+#include "JSCountQueuingStrategy.cpp"
+#endif
 #if ENABLE(WEBGL)
 #include "JSEXTBlendMinMax.cpp"
 #include "JSEXTFragDepth.cpp"
@@ -171,6 +174,9 @@
 #include "JSHTMLAnchorElement.cpp"
 #include "JSHTMLAppletElement.cpp"
 #include "JSHTMLAreaElement.cpp"
+#if ENABLE(ATTACHMENT_ELEMENT)
+#include "JSHTMLAttachmentElement.cpp"
+#endif
 #include "JSHTMLAudioElement.cpp"
 #include "JSHTMLBaseElement.cpp"
 #include "JSHTMLBaseFontElement.cpp"
@@ -302,6 +308,8 @@
 #include "JSRangeException.cpp"
 #if ENABLE(STREAMS_API)
 #include "JSReadableStream.cpp"
+#include "JSReadableStreamController.cpp"
+#include "JSReadableStreamReader.cpp"
 #endif
 #include "JSRect.cpp"
 #include "JSRequestAnimationFrameCallback.cpp"
@@ -309,6 +317,9 @@
 #include "JSScreen.cpp"
 #include "JSScriptProfile.cpp"
 #include "JSScriptProfileNode.cpp"
+#if ENABLE(CSP_NEXT)
+#include "JSSecurityPolicyViolationEvent.cpp"
+#endif
 #include "JSSQLError.cpp"
 #include "JSSQLException.cpp"
 #include "JSSQLResultSet.cpp"

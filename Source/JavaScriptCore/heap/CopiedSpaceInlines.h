@@ -29,7 +29,6 @@
 #include "CopiedBlock.h"
 #include "CopiedSpace.h"
 #include "Heap.h"
-#include "HeapBlock.h"
 #include "VM.h"
 #include <wtf/CheckedBoolean.h>
 
@@ -99,37 +98,37 @@ inline void CopiedSpace::recycleEvacuatedBlock(CopiedBlock* block, HeapOperation
     ASSERT(block->canBeRecycled());
     ASSERT(!block->m_isPinned);
     {
-        SpinLockHolder locker(&m_toSpaceLock);
+        LockHolder locker(&m_toSpaceLock);
         m_blockSet.remove(block);
         if (collectionType == EdenCollection)
             m_newGen.fromSpace->remove(block);
         else
             m_oldGen.fromSpace->remove(block);
     }
-    m_heap->blockAllocator().deallocate(CopiedBlock::destroy(block));
+    CopiedBlock::destroy(block);
 }
 
 inline void CopiedSpace::recycleBorrowedBlock(CopiedBlock* block)
 {
-    m_heap->blockAllocator().deallocate(CopiedBlock::destroy(block));
+    CopiedBlock::destroy(block);
 
     {
-        MutexLocker locker(m_loanedBlocksLock);
+        LockHolder locker(m_loanedBlocksLock);
         ASSERT(m_numberOfLoanedBlocks > 0);
         ASSERT(m_inCopyingPhase);
         m_numberOfLoanedBlocks--;
         if (!m_numberOfLoanedBlocks)
-            m_loanedBlocksCondition.signal();
+            m_loanedBlocksCondition.notifyOne();
     }
 }
 
 inline CopiedBlock* CopiedSpace::allocateBlockForCopyingPhase()
 {
     ASSERT(m_inCopyingPhase);
-    CopiedBlock* block = CopiedBlock::createNoZeroFill(m_heap->blockAllocator().allocate<CopiedBlock>());
+    CopiedBlock* block = CopiedBlock::createNoZeroFill();
 
     {
-        MutexLocker locker(m_loanedBlocksLock);
+        LockHolder locker(m_loanedBlocksLock);
         m_numberOfLoanedBlocks++;
     }
 
@@ -143,7 +142,7 @@ inline void CopiedSpace::allocateBlock()
 
     m_allocator.resetCurrentBlock();
     
-    CopiedBlock* block = CopiedBlock::create(m_heap->blockAllocator().allocate<CopiedBlock>());
+    CopiedBlock* block = CopiedBlock::create();
         
     m_newGen.toSpace->push(block);
     m_newGen.blockFilter.add(reinterpret_cast<Bits>(block));
@@ -235,7 +234,7 @@ inline void CopiedSpace::startedCopying()
         } else {
             oversizeBlocks->remove(block);
             m_blockSet.remove(block);
-            m_heap->blockAllocator().deallocateCustomSize(CopiedBlock::destroy(block));
+            CopiedBlock::destroy(block);
         } 
         block = next;
     }

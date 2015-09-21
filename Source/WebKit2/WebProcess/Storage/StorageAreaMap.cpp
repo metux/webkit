@@ -53,17 +53,18 @@ static uint64_t generateStorageMapID()
     return ++storageMapID;
 }
 
-PassRefPtr<StorageAreaMap> StorageAreaMap::create(StorageNamespaceImpl* storageNamespace, PassRefPtr<WebCore::SecurityOrigin> securityOrigin)
+Ref<StorageAreaMap> StorageAreaMap::create(StorageNamespaceImpl* storageNamespace, Ref<WebCore::SecurityOrigin>&& securityOrigin)
 {
-    return adoptRef(new StorageAreaMap(storageNamespace, securityOrigin));
+    return adoptRef(*new StorageAreaMap(storageNamespace, WTF::move(securityOrigin)));
 }
 
-StorageAreaMap::StorageAreaMap(StorageNamespaceImpl* storageNamespace, PassRefPtr<WebCore::SecurityOrigin> securityOrigin)
-    : m_storageMapID(generateStorageMapID())
+StorageAreaMap::StorageAreaMap(StorageNamespaceImpl* storageNamespace, Ref<WebCore::SecurityOrigin>&& securityOrigin)
+    : m_storageNamespace(*storageNamespace)
+    , m_storageMapID(generateStorageMapID())
     , m_storageType(storageNamespace->storageType())
     , m_storageNamespaceID(storageNamespace->storageNamespaceID())
     , m_quotaInBytes(storageNamespace->quotaInBytes())
-    , m_securityOrigin(securityOrigin)
+    , m_securityOrigin(WTF::move(securityOrigin))
     , m_currentSeed(0)
     , m_hasPendingClear(false)
     , m_hasPendingGetValues(false)
@@ -71,14 +72,14 @@ StorageAreaMap::StorageAreaMap(StorageNamespaceImpl* storageNamespace, PassRefPt
     switch (m_storageType) {
     case WebCore::LocalStorage:
         if (SecurityOrigin* topLevelOrigin = storageNamespace->topLevelOrigin())
-            WebProcess::singleton().parentProcessConnection()->send(Messages::StorageManager::CreateTransientLocalStorageMap(m_storageMapID, storageNamespace->storageNamespaceID(), SecurityOriginData::fromSecurityOrigin(topLevelOrigin), SecurityOriginData::fromSecurityOrigin(m_securityOrigin.get())), 0);
+            WebProcess::singleton().parentProcessConnection()->send(Messages::StorageManager::CreateTransientLocalStorageMap(m_storageMapID, storageNamespace->storageNamespaceID(), SecurityOriginData::fromSecurityOrigin(*topLevelOrigin), SecurityOriginData::fromSecurityOrigin(m_securityOrigin)), 0);
         else
-            WebProcess::singleton().parentProcessConnection()->send(Messages::StorageManager::CreateLocalStorageMap(m_storageMapID, storageNamespace->storageNamespaceID(), SecurityOriginData::fromSecurityOrigin(m_securityOrigin.get())), 0);
+            WebProcess::singleton().parentProcessConnection()->send(Messages::StorageManager::CreateLocalStorageMap(m_storageMapID, storageNamespace->storageNamespaceID(), SecurityOriginData::fromSecurityOrigin(m_securityOrigin)), 0);
 
         break;
 
     case WebCore::SessionStorage:
-        WebProcess::singleton().parentProcessConnection()->send(Messages::StorageManager::CreateSessionStorageMap(m_storageMapID, storageNamespace->storageNamespaceID(), SecurityOriginData::fromSecurityOrigin(m_securityOrigin.get())), 0);
+        WebProcess::singleton().parentProcessConnection()->send(Messages::StorageManager::CreateSessionStorageMap(m_storageMapID, storageNamespace->storageNamespaceID(), SecurityOriginData::fromSecurityOrigin(m_securityOrigin)), 0);
         break;
     }
 
@@ -89,6 +90,8 @@ StorageAreaMap::~StorageAreaMap()
 {
     WebProcess::singleton().parentProcessConnection()->send(Messages::StorageManager::DestroyStorageMap(m_storageMapID), 0);
     WebProcess::singleton().removeMessageReceiver(Messages::StorageAreaMap::messageReceiverName(), m_storageMapID);
+
+    m_storageNamespace->didDestroyStorageAreaMap(*this);
 }
 
 unsigned StorageAreaMap::length()
@@ -325,7 +328,7 @@ void StorageAreaMap::dispatchSessionStorageEvent(uint64_t sourceStorageAreaID, c
     Page* page = webPage->corePage();
     for (Frame* frame = &page->mainFrame(); frame; frame = frame->tree().traverseNext()) {
         Document* document = frame->document();
-        if (!document->securityOrigin()->equal(m_securityOrigin.get()))
+        if (!document->securityOrigin()->equal(m_securityOrigin.ptr()))
             continue;
 
         Storage* storage = document->domWindow()->optionalSessionStorage();
@@ -341,7 +344,7 @@ void StorageAreaMap::dispatchSessionStorageEvent(uint64_t sourceStorageAreaID, c
         frames.append(frame);
     }
 
-    StorageEventDispatcher::dispatchLocalStorageEventsToFrames(page->group(), frames, key, oldValue, newValue, urlString, m_securityOrigin.get());
+    StorageEventDispatcher::dispatchLocalStorageEventsToFrames(page->group(), frames, key, oldValue, newValue, urlString, m_securityOrigin.ptr());
 }
 
 void StorageAreaMap::dispatchLocalStorageEvent(uint64_t sourceStorageAreaID, const String& key, const String& oldValue, const String& newValue, const String& urlString)
@@ -355,7 +358,7 @@ void StorageAreaMap::dispatchLocalStorageEvent(uint64_t sourceStorageAreaID, con
     for (HashSet<Page*>::const_iterator it = pages.begin(), end = pages.end(); it != end; ++it) {
         for (Frame* frame = &(*it)->mainFrame(); frame; frame = frame->tree().traverseNext()) {
             Document* document = frame->document();
-            if (!document->securityOrigin()->equal(m_securityOrigin.get()))
+            if (!document->securityOrigin()->equal(m_securityOrigin.ptr()))
                 continue;
 
             Storage* storage = document->domWindow()->optionalLocalStorage();
@@ -372,7 +375,7 @@ void StorageAreaMap::dispatchLocalStorageEvent(uint64_t sourceStorageAreaID, con
         }
     }
 
-    StorageEventDispatcher::dispatchLocalStorageEventsToFrames(pageGroup, frames, key, oldValue, newValue, urlString, m_securityOrigin.get());
+    StorageEventDispatcher::dispatchLocalStorageEventsToFrames(pageGroup, frames, key, oldValue, newValue, urlString, m_securityOrigin.ptr());
 }
 
 } // namespace WebKit

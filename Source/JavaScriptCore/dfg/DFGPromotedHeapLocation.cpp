@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2014 Apple Inc. All rights reserved.
+ * Copyright (C) 2014, 2015 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -40,23 +40,9 @@ void PromotedLocationDescriptor::dump(PrintStream& out) const
 
 Node* PromotedHeapLocation::createHint(Graph& graph, NodeOrigin origin, Node* value)
 {
-    switch (kind()) {
-    case StructurePLoc:
-        return graph.addNode(
-            SpecNone, PutStructureHint, origin,
-            Edge(base(), KnownCellUse), Edge(value, KnownCellUse));
-        
-    case NamedPropertyPLoc:
-        return graph.addNode(
-            SpecNone, PutByOffsetHint, origin,
-            OpInfo(info()), Edge(base(), KnownCellUse), Edge(value, UntypedUse));
-        
-    case InvalidPromotedLocationKind:
-        return nullptr;
-    }
-    
-    RELEASE_ASSERT_NOT_REACHED();
-    return nullptr;
+    return graph.addNode(
+        SpecNone, PutHint, origin, OpInfo(descriptor().imm1()), OpInfo(descriptor().imm2()),
+        base()->defaultEdge(), value->defaultEdge());
 }
 
 void PromotedHeapLocation::dump(PrintStream& out) const
@@ -80,9 +66,41 @@ void printInternal(PrintStream& out, PromotedLocationKind kind)
     case StructurePLoc:
         out.print("StructurePLoc");
         return;
+
+    case ActivationSymbolTablePLoc:
+        out.print("ActivationSymbolTablePLoc");
+        return;
         
     case NamedPropertyPLoc:
         out.print("NamedPropertyPLoc");
+        return;
+        
+    case ArgumentPLoc:
+        out.print("ArgumentPLoc");
+        return;
+        
+    case ArgumentCountPLoc:
+        out.print("ArgumentCountPLoc");
+        return;
+        
+    case ArgumentsCalleePLoc:
+        out.print("ArgumentsCalleePLoc");
+        return;
+
+    case FunctionExecutablePLoc:
+        out.print("FunctionExecutablePLoc");
+        return;
+
+    case FunctionActivationPLoc:
+        out.print("FunctionActivationPLoc");
+        return;
+
+    case ActivationScopePLoc:
+        out.print("ActivationScopePLoc");
+        return;
+
+    case ClosureVarPLoc:
+        out.print("ClosureVarPLoc");
         return;
     }
     

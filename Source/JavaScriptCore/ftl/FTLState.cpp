@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013 Apple Inc. All rights reserved.
+ * Copyright (C) 2013, 2015 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -35,10 +35,6 @@
 #include <llvm/InitializeLLVM.h>
 #include <stdio.h>
 
-#if ENABLE(FTL_NATIVE_CALL_INLINING)
-#include "InlineRuntimeSymbolTable.h"
-#endif
-
 namespace JSC { namespace FTL {
 
 using namespace DFG;
@@ -49,17 +45,13 @@ State::State(Graph& graph)
     , module(0)
     , function(0)
     , generatedFunction(0)
+    , handleStackOverflowExceptionStackmapID(UINT_MAX)
+    , handleExceptionStackmapID(UINT_MAX)
+    , capturedStackmapID(UINT_MAX)
+    , varargsSpillSlotsStackmapID(UINT_MAX)
     , unwindDataSection(0)
     , unwindDataSectionSize(0)
 {
-
-#if ENABLE(FTL_NATIVE_CALL_INLINING)
-#define SYMBOL_TABLE_ADD(symbol, file) \
-    symbolTable.fastAdd(symbol, file);
-    FOR_EACH_LIBRARY_SYMBOL(SYMBOL_TABLE_ADD)
-#undef SYMBOL_TABLE_ADD
-#endif
-    
     switch (graph.m_plan.mode) {
     case FTLMode: {
         jitCode = adoptRef(new JITCode());
@@ -87,6 +79,11 @@ State::~State()
 }
 
 void State::dumpState(const char* when)
+{
+    dumpState(module, when);
+}
+
+void State::dumpState(LModule module, const char* when)
 {
     dataLog("LLVM IR for ", CodeBlockWithJITType(graph.m_codeBlock, FTL::JITCode::FTLJIT), " ", when, ":\n");
     dumpModule(module);

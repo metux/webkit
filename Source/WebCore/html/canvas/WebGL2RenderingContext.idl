@@ -41,7 +41,7 @@ typedef unrestricted float GLfloat;
 typedef unrestricted float GLclampf;
 
 [
-    Conditional=WEBGL,
+    Conditional=WEBGL2,
     JSCustomMarkFunction,
     DoNotCheckConstants,
 ] interface WebGL2RenderingContext : WebGLRenderingContextBase {
@@ -326,6 +326,7 @@ typedef unrestricted float GLclampf;
     const GLenum MAX_ELEMENT_INDEX                             = 0x8D6B;
     const GLenum NUM_SAMPLE_COUNTS                             = 0x9380;
     const GLenum TEXTURE_IMMUTABLE_LEVELS                      = 0x82DF;
+    const GLenum VERTEX_ATTRIB_ARRAY_DIVISOR_ANGLE             = 0x88FE;
 
     const GLuint64 TIMEOUT_IGNORED                             = 0xFFFFFFFFFFFFFFFF;
 
@@ -338,7 +339,6 @@ typedef unrestricted float GLclampf;
     [StrictTypeChecking] void getBufferSubData(GLenum target, GLintptr offset, ArrayBuffer returnedData);
 
     /* Framebuffer objects */
-    [StrictTypeChecking, Custom] any getFramebufferAttachmentParameter(GLenum target, GLenum attachment, GLenum pname);
     [StrictTypeChecking] void blitFramebuffer(GLint srcX0, GLint srcY0, GLint srcX1, GLint srcY1, GLint dstX0, GLint dstY0, GLint dstX1, GLint dstY1, GLbitfield mask, GLenum filter);
     [StrictTypeChecking] void framebufferTextureLayer(GLenum target, GLenum attachment, GLuint texture, GLint level, GLint layer);
     [StrictTypeChecking, Custom] any getInternalformatParameter(GLenum target, GLenum internalformat, GLenum pname);

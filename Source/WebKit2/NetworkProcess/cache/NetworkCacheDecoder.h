@@ -29,20 +29,19 @@
 #if ENABLE(NETWORK_CACHE)
 
 #include "NetworkCacheCoder.h"
+#include <wtf/SHA1.h>
 
 namespace WebKit {
+namespace NetworkCache {
 
-class NetworkCacheDecoder {
+class Decoder {
     WTF_MAKE_FAST_ALLOCATED;
 public:
-    NetworkCacheDecoder(const uint8_t* buffer, size_t bufferSize);
-    virtual ~NetworkCacheDecoder();
+    Decoder(const uint8_t* buffer, size_t bufferSize);
+    virtual ~Decoder();
 
     size_t length() const { return m_bufferEnd - m_buffer; }
     size_t currentOffset() const { return m_bufferPosition - m_buffer; }
-
-    bool isInvalid() const { return m_bufferPosition > m_bufferEnd; }
-    void markInvalid() { m_bufferPosition = m_bufferEnd + 1; }
 
     bool verifyChecksum();
 
@@ -72,7 +71,7 @@ public:
 
     template<typename T> bool decode(T& t)
     {
-        return NetworkCacheCoder<T>::decode(*this, t);
+        return Coder<T>::decode(*this, t);
     }
 
     template<typename T>
@@ -94,10 +93,11 @@ private:
     const uint8_t* m_bufferPosition;
     const uint8_t* m_bufferEnd;
 
-    unsigned m_checksum;
+    SHA1 m_sha1;
 };
 
 } 
+}
 
 #endif
 #endif

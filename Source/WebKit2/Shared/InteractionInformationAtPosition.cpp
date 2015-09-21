@@ -39,14 +39,17 @@ void InteractionInformationAtPosition::encode(IPC::ArgumentEncoder& encoder) con
     encoder << isSelectable;
     encoder << isNearMarkedText;
     encoder << touchCalloutEnabled;
+    encoder << isAnimatedImage;
     encoder << clickableElementName;
     encoder << url;
+    encoder << imageURL;
     encoder << title;
     encoder << bounds;
+    encoder << linkIndicator;
 
     ShareableBitmap::Handle handle;
     if (image)
-        image->createHandle(handle, SharedMemory::ReadOnly);
+        image->createHandle(handle, SharedMemory::Protection::ReadOnly);
     encoder << handle;
 }
 
@@ -66,11 +69,17 @@ bool InteractionInformationAtPosition::decode(IPC::ArgumentDecoder& decoder, Int
 
     if (!decoder.decode(result.touchCalloutEnabled))
         return false;
+
+    if (!decoder.decode(result.isAnimatedImage))
+        return false;
     
     if (!decoder.decode(result.clickableElementName))
         return false;
 
     if (!decoder.decode(result.url))
+        return false;
+
+    if (!decoder.decode(result.imageURL))
         return false;
 
     if (!decoder.decode(result.title))
@@ -79,12 +88,15 @@ bool InteractionInformationAtPosition::decode(IPC::ArgumentDecoder& decoder, Int
     if (!decoder.decode(result.bounds))
         return false;
 
+    if (!decoder.decode(result.linkIndicator))
+        return false;
+
     ShareableBitmap::Handle handle;
     if (!decoder.decode(handle))
         return false;
 
     if (!handle.isNull())
-        result.image = ShareableBitmap::create(handle, SharedMemory::ReadOnly);
+        result.image = ShareableBitmap::create(handle, SharedMemory::Protection::ReadOnly);
 
     return true;
 }

@@ -86,9 +86,9 @@ public:
     PublicURLManager& publicURLManager();
 
     // Active objects are not garbage collected even if inaccessible, e.g. because their activity may result in callbacks being invoked.
-    WEBCORE_EXPORT bool canSuspendActiveDOMObjects(Vector<ActiveDOMObject*>* unsuspendableObjects = nullptr);
+    WEBCORE_EXPORT bool canSuspendActiveDOMObjectsForPageCache(Vector<ActiveDOMObject*>* unsuspendableObjects = nullptr);
 
-    // Active objects can be asked to suspend even if canSuspendActiveDOMObjects() returns 'false' -
+    // Active objects can be asked to suspend even if canSuspendActiveDOMObjectsForPageCache() returns 'false' -
     // step-by-step JS debugging is one example.
     virtual void suspendActiveDOMObjects(ActiveDOMObject::ReasonForSuspension);
     virtual void resumeActiveDOMObjects(ActiveDOMObject::ReasonForSuspension);
@@ -130,6 +130,12 @@ public:
         {
         }
 
+        Task(std::function<void()> task)
+            : m_task([task](ScriptExecutionContext&) { task(); })
+            , m_isCleanupTask(false)
+        {
+        }
+
         template<typename T, typename = typename std::enable_if<std::is_convertible<T, std::function<void (ScriptExecutionContext&)>>::value>::type>
         Task(CleanupTaskTag, T task)
             : m_task(WTF::move(task))
@@ -167,7 +173,7 @@ public:
     virtual double minimumTimerInterval() const;
 
     void didChangeTimerAlignmentInterval();
-    virtual double timerAlignmentInterval() const;
+    virtual double timerAlignmentInterval(bool hasReachedMaxNestingLevel) const;
 
     virtual EventQueue& eventQueue() const = 0;
 
@@ -231,6 +237,8 @@ private:
 
 #if !ASSERT_DISABLED
     bool m_inScriptExecutionContextDestructor;
+#endif
+#if !ASSERT_DISABLED || ENABLE(SECURITY_ASSERTIONS)
     bool m_activeDOMObjectRemovalForbidden;
 #endif
 };

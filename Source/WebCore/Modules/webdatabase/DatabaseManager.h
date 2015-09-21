@@ -29,10 +29,10 @@
 #include "DatabaseBasicTypes.h"
 #include "DatabaseDetails.h"
 #include "DatabaseError.h"
-#include <mutex>
 #include <wtf/Assertions.h>
 #include <wtf/HashMap.h>
 #include <wtf/HashSet.h>
+#include <wtf/Lock.h>
 #include <wtf/PassRefPtr.h>
 #include <wtf/Threading.h>
 
@@ -40,7 +40,6 @@ namespace WebCore {
 
 class AbstractDatabaseServer;
 class Database;
-class DatabaseBackendBase;
 class DatabaseCallback;
 class DatabaseContext;
 class DatabaseManagerClient;
@@ -51,8 +50,9 @@ class ScriptExecutionContext;
 
 class DatabaseManager {
     WTF_MAKE_NONCOPYABLE(DatabaseManager); WTF_MAKE_FAST_ALLOCATED;
+    friend class WTF::NeverDestroyed<DatabaseManager>;
 public:
-    WEBCORE_EXPORT static DatabaseManager& manager();
+    WEBCORE_EXPORT static DatabaseManager& singleton();
 
     WEBCORE_EXPORT void initialize(const String& databasePath);
     WEBCORE_EXPORT void setClient(DatabaseManagerClient*);
@@ -64,7 +64,7 @@ public:
 
     // This gets a DatabaseContext for the specified ScriptExecutionContext.
     // If one doesn't already exist, it will create a new one.
-    PassRefPtr<DatabaseContext> databaseContextFor(ScriptExecutionContext*);
+    RefPtr<DatabaseContext> databaseContextFor(ScriptExecutionContext*);
 
     // These 2 methods are for DatabaseContext (un)registration, and should only
     // be called by the DatabaseContext constructor and destructor.
@@ -81,9 +81,12 @@ public:
 
     static ExceptionCode exceptionCodeForDatabaseError(DatabaseError);
 
-    PassRefPtr<Database> openDatabase(ScriptExecutionContext*, const String& name, const String& expectedVersion, const String& displayName, unsigned long estimatedSize, PassRefPtr<DatabaseCallback>, DatabaseError&);
+    RefPtr<Database> openDatabase(ScriptExecutionContext*, const String& name, const String& expectedVersion, const String& displayName, unsigned long estimatedSize, PassRefPtr<DatabaseCallback>, DatabaseError&);
 
     WEBCORE_EXPORT bool hasOpenDatabases(ScriptExecutionContext*);
+
+    WEBCORE_EXPORT void closeAllDatabases();
+
     void stopDatabases(ScriptExecutionContext*, DatabaseTaskSynchronizer*);
 
     String fullPathForDatabase(SecurityOrigin*, const String& name, bool createIfDoesNotExist = true);
@@ -102,8 +105,6 @@ public:
     WEBCORE_EXPORT bool deleteOrigin(SecurityOrigin*);
     WEBCORE_EXPORT bool deleteDatabase(SecurityOrigin*, const String& name);
 
-    void interruptAllDatabasesForContext(ScriptExecutionContext*);
-
 private:
     class ProposedDatabase {
     public:
@@ -121,13 +122,13 @@ private:
     };
 
     DatabaseManager();
-    ~DatabaseManager() { }
+    ~DatabaseManager() = delete;
 
     // This gets a DatabaseContext for the specified ScriptExecutionContext if
     // it already exist previously. Otherwise, it returns 0.
-    PassRefPtr<DatabaseContext> existingDatabaseContextFor(ScriptExecutionContext*);
+    RefPtr<DatabaseContext> existingDatabaseContextFor(ScriptExecutionContext*);
 
-    PassRefPtr<DatabaseBackendBase> openDatabaseBackend(ScriptExecutionContext*, const String& name, const String& expectedVersion, const String& displayName, unsigned long estimatedSize, bool setVersionInNewDatabase, DatabaseError&, String& errorMessage);
+    PassRefPtr<Database> openDatabaseBackend(ScriptExecutionContext*, const String& name, const String& expectedVersion, const String& displayName, unsigned long estimatedSize, bool setVersionInNewDatabase, DatabaseError&, String& errorMessage);
 
     void addProposedDatabase(ProposedDatabase*);
     void removeProposedDatabase(ProposedDatabase*);
@@ -148,7 +149,7 @@ private:
     HashSet<ProposedDatabase*> m_proposedDatabases;
 
     // This mutex protects m_contextMap, and m_proposedDatabases.
-    std::mutex m_mutex;
+    Lock m_mutex;
 };
 
 } // namespace WebCore

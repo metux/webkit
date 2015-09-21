@@ -120,8 +120,9 @@ inline VM* JSCell::vm() const
 
 inline VM& ExecState::vm() const
 {
+    ASSERT(callee());
     ASSERT(callee()->vm());
-    return *callee()->vm();
+    return *calleeAsValue().asCell()->vm();
 }
 
 template<typename T>
@@ -129,13 +130,7 @@ void* allocateCell(Heap& heap, size_t size)
 {
     ASSERT(!DisallowGC::isGCDisallowedOnCurrentThread());
     ASSERT(size >= sizeof(T));
-    JSCell* result = 0;
-    if (T::needsDestruction && T::hasImmortalStructure)
-        result = static_cast<JSCell*>(heap.allocateWithImmortalStructureDestructor(size));
-    else if (T::needsDestruction)
-        result = static_cast<JSCell*>(heap.allocateWithNormalDestructor(size));
-    else 
-        result = static_cast<JSCell*>(heap.allocateWithoutDestructor(size));
+    JSCell* result = static_cast<JSCell*>(heap.allocateObjectOfType<T>(size));
 #if ENABLE(GC_VALIDATION)
     ASSERT(!heap.vm()->isInitializingObject());
     heap.vm()->setInitializingObjectClass(T::info());
@@ -246,7 +241,7 @@ inline bool JSCell::canUseFastGetOwnProperty(const Structure& structure)
 inline const ClassInfo* JSCell::classInfo() const
 {
     MarkedBlock* block = MarkedBlock::blockFor(this);
-    if (block->destructorType() == MarkedBlock::Normal)
+    if (block->needsDestruction() && !(inlineTypeFlags() & StructureIsImmortal))
         return static_cast<const JSDestructibleObject*>(this)->classInfo();
     return structure(*block->vm())->classInfo();
 }
@@ -255,8 +250,6 @@ inline bool JSCell::toBoolean(ExecState* exec) const
 {
     if (isString())
         return static_cast<const JSString*>(this)->toBoolean();
-    if (isSymbol())
-        return static_cast<const Symbol*>(this)->toBoolean();
     return !structure()->masqueradesAsUndefined(exec->lexicalGlobalObject());
 }
 
@@ -265,7 +258,7 @@ inline TriState JSCell::pureToBoolean() const
     if (isString())
         return static_cast<const JSString*>(this)->toBoolean() ? TrueTriState : FalseTriState;
     if (isSymbol())
-        return static_cast<const Symbol*>(this)->toBoolean() ? TrueTriState : FalseTriState;
+        return TrueTriState;
     return MixedTriState;
 }
 

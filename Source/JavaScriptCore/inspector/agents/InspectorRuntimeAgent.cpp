@@ -93,7 +93,7 @@ void InspectorRuntimeAgent::parse(ErrorString&, const String& expression, Inspec
     ParserError error;
     checkSyntax(vm, JSC::makeSource(expression), error);
 
-    switch (error.m_syntaxErrorType) {
+    switch (error.syntaxErrorType()) {
     case ParserError::SyntaxErrorNone:
         *result = Inspector::Protocol::Runtime::SyntaxErrorType::None;
         break;
@@ -108,13 +108,13 @@ void InspectorRuntimeAgent::parse(ErrorString&, const String& expression, Inspec
         break;
     }
 
-    if (error.m_syntaxErrorType != ParserError::SyntaxErrorNone) {
-        *message = error.m_message;
-        range = buildErrorRangeObject(error.m_token.m_location);
+    if (error.syntaxErrorType() != ParserError::SyntaxErrorNone) {
+        *message = error.message();
+        range = buildErrorRangeObject(error.token().m_location);
     }
 }
 
-void InspectorRuntimeAgent::evaluate(ErrorString& errorString, const String& expression, const String* const objectGroup, const bool* const includeCommandLineAPI, const bool* const doNotPauseOnExceptionsAndMuteConsole, const int* executionContextId, const bool* const returnByValue, const bool* generatePreview, RefPtr<Inspector::Protocol::Runtime::RemoteObject>& result, Inspector::Protocol::OptOutput<bool>* wasThrown)
+void InspectorRuntimeAgent::evaluate(ErrorString& errorString, const String& expression, const String* const objectGroup, const bool* const includeCommandLineAPI, const bool* const doNotPauseOnExceptionsAndMuteConsole, const int* executionContextId, const bool* const returnByValue, const bool* generatePreview, const bool* saveResult, RefPtr<Inspector::Protocol::Runtime::RemoteObject>& result, Inspector::Protocol::OptOutput<bool>* wasThrown, Inspector::Protocol::OptOutput<int>* savedResultIndex)
 {
     InjectedScript injectedScript = injectedScriptForEval(errorString, executionContextId);
     if (injectedScript.hasNoValue())
@@ -126,7 +126,7 @@ void InspectorRuntimeAgent::evaluate(ErrorString& errorString, const String& exp
     if (asBool(doNotPauseOnExceptionsAndMuteConsole))
         muteConsole();
 
-    injectedScript.evaluate(errorString, expression, objectGroup ? *objectGroup : String(), asBool(includeCommandLineAPI), asBool(returnByValue), asBool(generatePreview), &result, wasThrown);
+    injectedScript.evaluate(errorString, expression, objectGroup ? *objectGroup : String(), asBool(includeCommandLineAPI), asBool(returnByValue), asBool(generatePreview), asBool(saveResult), &result, wasThrown, savedResultIndex);
 
     if (asBool(doNotPauseOnExceptionsAndMuteConsole)) {
         unmuteConsole();
@@ -134,7 +134,7 @@ void InspectorRuntimeAgent::evaluate(ErrorString& errorString, const String& exp
     }
 }
 
-void InspectorRuntimeAgent::callFunctionOn(ErrorString& errorString, const String& objectId, const String& expression, const RefPtr<InspectorArray>&& optionalArguments, const bool* const doNotPauseOnExceptionsAndMuteConsole, const bool* const returnByValue, const bool* generatePreview, RefPtr<Inspector::Protocol::Runtime::RemoteObject>& result, Inspector::Protocol::OptOutput<bool>* wasThrown)
+void InspectorRuntimeAgent::callFunctionOn(ErrorString& errorString, const String& objectId, const String& expression, const InspectorArray* optionalArguments, const bool* const doNotPauseOnExceptionsAndMuteConsole, const bool* const returnByValue, const bool* generatePreview, RefPtr<Inspector::Protocol::Runtime::RemoteObject>& result, Inspector::Protocol::OptOutput<bool>* wasThrown)
 {
     InjectedScript injectedScript = m_injectedScriptManager->injectedScriptForObjectId(objectId);
     if (injectedScript.hasNoValue()) {
@@ -160,7 +160,7 @@ void InspectorRuntimeAgent::callFunctionOn(ErrorString& errorString, const Strin
     }
 }
 
-void InspectorRuntimeAgent::getProperties(ErrorString& errorString, const String& objectId, const bool* const ownProperties, const bool* const ownAndGetterProperties, RefPtr<Inspector::Protocol::Array<Inspector::Protocol::Runtime::PropertyDescriptor>>& result, RefPtr<Inspector::Protocol::Array<Inspector::Protocol::Runtime::InternalPropertyDescriptor>>& internalProperties)
+void InspectorRuntimeAgent::getProperties(ErrorString& errorString, const String& objectId, const bool* const ownProperties, const bool* const generatePreview, RefPtr<Inspector::Protocol::Array<Inspector::Protocol::Runtime::PropertyDescriptor>>& result, RefPtr<Inspector::Protocol::Array<Inspector::Protocol::Runtime::InternalPropertyDescriptor>>& internalProperties)
 {
     InjectedScript injectedScript = m_injectedScriptManager->injectedScriptForObjectId(objectId);
     if (injectedScript.hasNoValue()) {
@@ -171,8 +171,26 @@ void InspectorRuntimeAgent::getProperties(ErrorString& errorString, const String
     ScriptDebugServer::PauseOnExceptionsState previousPauseOnExceptionsState = setPauseOnExceptionsState(m_scriptDebugServer, ScriptDebugServer::DontPauseOnExceptions);
     muteConsole();
 
-    injectedScript.getProperties(errorString, objectId, asBool(ownProperties), asBool(ownAndGetterProperties), &result);
-    injectedScript.getInternalProperties(errorString, objectId, &internalProperties);
+    injectedScript.getProperties(errorString, objectId, asBool(ownProperties), asBool(generatePreview), &result);
+    injectedScript.getInternalProperties(errorString, objectId, asBool(generatePreview), &internalProperties);
+
+    unmuteConsole();
+    setPauseOnExceptionsState(m_scriptDebugServer, previousPauseOnExceptionsState);
+}
+
+void InspectorRuntimeAgent::getDisplayableProperties(ErrorString& errorString, const String& objectId, const bool* const generatePreview, RefPtr<Inspector::Protocol::Array<Inspector::Protocol::Runtime::PropertyDescriptor>>& result, RefPtr<Inspector::Protocol::Array<Inspector::Protocol::Runtime::InternalPropertyDescriptor>>& internalProperties)
+{
+    InjectedScript injectedScript = m_injectedScriptManager->injectedScriptForObjectId(objectId);
+    if (injectedScript.hasNoValue()) {
+        errorString = ASCIILiteral("Inspected frame has gone");
+        return;
+    }
+
+    ScriptDebugServer::PauseOnExceptionsState previousPauseOnExceptionsState = setPauseOnExceptionsState(m_scriptDebugServer, ScriptDebugServer::DontPauseOnExceptions);
+    muteConsole();
+
+    injectedScript.getDisplayableProperties(errorString, objectId, asBool(generatePreview), &result);
+    injectedScript.getInternalProperties(errorString, objectId, asBool(generatePreview), &internalProperties);
 
     unmuteConsole();
     setPauseOnExceptionsState(m_scriptDebugServer, previousPauseOnExceptionsState);
@@ -192,6 +210,26 @@ void InspectorRuntimeAgent::getCollectionEntries(ErrorString& errorString, const
     injectedScript.getCollectionEntries(errorString, objectId, objectGroup ? *objectGroup : String(), start, fetch, &entries);
 }
 
+void InspectorRuntimeAgent::saveResult(ErrorString& errorString, const Inspector::InspectorObject& callArgument, const int* executionContextId, Inspector::Protocol::OptOutput<int>* savedResultIndex)
+{
+    InjectedScript injectedScript;
+
+    String objectId;
+    if (callArgument.getString(ASCIILiteral("objectId"), objectId)) {
+        injectedScript = m_injectedScriptManager->injectedScriptForObjectId(objectId);
+        if (injectedScript.hasNoValue()) {
+            errorString = ASCIILiteral("Inspected frame has gone");
+            return;
+        }
+    } else {
+        injectedScript = injectedScriptForEval(errorString, executionContextId);
+        if (injectedScript.hasNoValue())
+            return;
+    }
+
+    injectedScript.saveResult(errorString, callArgument.toJSONString(), savedResultIndex);
+}
+
 void InspectorRuntimeAgent::releaseObject(ErrorString&, const String& objectId)
 {
     InjectedScript injectedScript = m_injectedScriptManager->injectedScriptForObjectId(objectId);
@@ -209,7 +247,7 @@ void InspectorRuntimeAgent::run(ErrorString&)
     // FIXME: <https://webkit.org/b/127634> Web Inspector: support debugging web workers
 }
 
-void InspectorRuntimeAgent::getRuntimeTypesForVariablesAtOffsets(ErrorString& errorString, const RefPtr<Inspector::InspectorArray>&& locations, RefPtr<Inspector::Protocol::Array<Inspector::Protocol::Runtime::TypeDescription>>& typeDescriptions)
+void InspectorRuntimeAgent::getRuntimeTypesForVariablesAtOffsets(ErrorString& errorString, const Inspector::InspectorArray& locations, RefPtr<Inspector::Protocol::Array<Inspector::Protocol::Runtime::TypeDescription>>& typeDescriptions)
 {
     static const bool verbose = false;
     VM& vm = globalVM();
@@ -222,8 +260,8 @@ void InspectorRuntimeAgent::getRuntimeTypesForVariablesAtOffsets(ErrorString& er
     double start = currentTimeMS();
     vm.typeProfilerLog()->processLogEntries(ASCIILiteral("User Query"));
 
-    for (size_t i = 0; i < locations->length(); i++) {
-        RefPtr<Inspector::InspectorValue> value = locations->get(i);
+    for (size_t i = 0; i < locations.length(); i++) {
+        RefPtr<Inspector::InspectorValue> value = locations.get(i);
         RefPtr<InspectorObject> location;
         if (!value->asObject(location)) {
             errorString = ASCIILiteral("Array of TypeLocation objects has an object that does not have type of TypeLocation.");
@@ -271,14 +309,19 @@ void InspectorRuntimeAgent::getRuntimeTypesForVariablesAtOffsets(ErrorString& er
 
 class TypeRecompiler : public MarkedBlock::VoidFunctor {
 public:
-    inline void operator()(JSCell* cell)
+    inline void visit(JSCell* cell)
     {
         if (!cell->inherits(FunctionExecutable::info()))
             return;
 
         FunctionExecutable* executable = jsCast<FunctionExecutable*>(cell);
-        executable->clearCodeIfNotCompiling();
-        executable->clearUnlinkedCodeForRecompilationIfNotCompiling();
+        executable->clearCode();
+        executable->clearUnlinkedCodeForRecompilation();
+    }
+    inline IterationStatus operator()(JSCell* cell)
+    {
+        visit(cell);
+        return IterationStatus::Continue;
     }
 };
 
@@ -289,7 +332,7 @@ static void recompileAllJSFunctionsForTypeProfiling(VM& vm, bool shouldEnableTyp
     bool needsToRecompile = shouldRecompileFromTypeProfiler || shouldRecompileFromControlFlowProfiler;
 
     if (needsToRecompile) {
-        vm.prepareToDiscardCode();
+        vm.prepareToDeleteCode();
         TypeRecompiler recompiler;
         HeapIterationScope iterationScope(vm.heap);
         vm.heap.objectSpace().forEachLiveCell(iterationScope, recompiler);

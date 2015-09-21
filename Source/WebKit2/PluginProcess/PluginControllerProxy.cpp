@@ -97,9 +97,9 @@ void PluginControllerProxy::setInitializationReply(PassRefPtr<Messages::WebProce
     m_initializationReply = reply;
 }
 
-PassRefPtr<Messages::WebProcessConnection::CreatePlugin::DelayedReply> PluginControllerProxy::takeInitializationReply()
+RefPtr<Messages::WebProcessConnection::CreatePlugin::DelayedReply> PluginControllerProxy::takeInitializationReply()
 {
-    return m_initializationReply.release();
+    return m_initializationReply;
 }
 
 bool PluginControllerProxy::initialize(const PluginCreationParameters& creationParameters)
@@ -126,7 +126,7 @@ bool PluginControllerProxy::initialize(const PluginCreationParameters& creationP
         // used as an identifier so it's OK to just get a weak reference.
         Plugin* plugin = m_plugin.get();
         
-        m_plugin = 0;
+        m_plugin = nullptr;
 
         // This will delete the plug-in controller proxy object.
         m_connection->removePluginControllerProxy(this, plugin);
@@ -156,7 +156,7 @@ void PluginControllerProxy::destroy()
     Plugin* plugin = m_plugin.get();
 
     m_plugin->destroyPlugin();
-    m_plugin = 0;
+    m_plugin = nullptr;
 
     platformDestroy();
 
@@ -220,13 +220,6 @@ void PluginControllerProxy::startPaintTimer()
     m_waitingForDidUpdate = true;
 }
 
-bool PluginControllerProxy::isPluginVisible()
-{
-    // FIXME: Implement this.
-    notImplemented();
-    return false;
-}
-
 void PluginControllerProxy::invalidate(const IntRect& rect)
 {
     IntRect dirtyRect = rect;
@@ -246,6 +239,11 @@ String PluginControllerProxy::userAgent()
 void PluginControllerProxy::loadURL(uint64_t requestID, const String& method, const String& urlString, const String& target, const HTTPHeaderMap& headerFields, const Vector<uint8_t>& httpBody, bool allowPopups)
 {
     m_connection->connection()->send(Messages::PluginProxy::LoadURL(requestID, method, urlString, target, headerFields, httpBody, allowPopups), m_pluginInstanceID);
+}
+
+void PluginControllerProxy::continueStreamLoad(uint64_t streamID)
+{
+    m_connection->connection()->send(Messages::PluginProxy::ContinueStreamLoad(streamID), m_pluginInstanceID);
 }
 
 void PluginControllerProxy::cancelStreamLoad(uint64_t streamID)
@@ -329,12 +327,6 @@ bool PluginControllerProxy::isAcceleratedCompositingEnabled()
 void PluginControllerProxy::pluginProcessCrashed()
 {
     // This should never be called from here.
-    ASSERT_NOT_REACHED();
-}
-
-void PluginControllerProxy::willSendEventToPlugin()
-{
-    // This is only used when running plugins in the web process.
     ASSERT_NOT_REACHED();
 }
 
@@ -474,6 +466,11 @@ void PluginControllerProxy::updateVisibilityActivity()
 void PluginControllerProxy::didEvaluateJavaScript(uint64_t requestID, const String& result)
 {
     m_plugin->didEvaluateJavaScript(requestID, result);
+}
+
+void PluginControllerProxy::streamWillSendRequest(uint64_t streamID, const String& requestURLString, const String& redirectResponseURLString, uint32_t redirectResponseStatusCode)
+{
+    m_plugin->streamWillSendRequest(streamID, URL(ParsedURLString, requestURLString), URL(ParsedURLString, redirectResponseURLString), redirectResponseStatusCode);
 }
 
 void PluginControllerProxy::streamDidReceiveResponse(uint64_t streamID, const String& responseURLString, uint32_t streamLength, uint32_t lastModifiedTime, const String& mimeType, const String& headers)

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2014 Apple Inc. All rights reserved.
+ * Copyright (C) 2014-2015 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -47,9 +47,9 @@ class RemoteScrollingCoordinatorTransaction;
 
 class RemoteScrollingCoordinator : public WebCore::AsyncScrollingCoordinator, public IPC::MessageReceiver {
 public:
-    static PassRefPtr<RemoteScrollingCoordinator> create(WebPage* page)
+    static Ref<RemoteScrollingCoordinator> create(WebPage* page)
     {
-        return adoptRef(new RemoteScrollingCoordinator(page));
+        return adoptRef(*new RemoteScrollingCoordinator(page));
     }
 
     void buildTransaction(RemoteScrollingCoordinatorTransaction&);
@@ -61,17 +61,19 @@ private:
     virtual bool isRemoteScrollingCoordinator() const override { return true; }
     
     // ScrollingCoordinator
-    virtual bool coordinatesScrollingForFrameView(WebCore::FrameView*) const override;
+    virtual bool coordinatesScrollingForFrameView(const WebCore::FrameView&) const override;
     virtual void scheduleTreeStateCommit() override;
 
     virtual bool isRubberBandInProgress() const override;
     virtual void setScrollPinningBehavior(WebCore::ScrollPinningBehavior) override;
+    bool isScrollSnapInProgress() const override;
 
     // IPC::MessageReceiver
     virtual void didReceiveMessage(IPC::Connection&, IPC::MessageDecoder&) override;
     
     // Respond to UI process changes.
     void scrollPositionChangedForNode(WebCore::ScrollingNodeID, const WebCore::FloatPoint& scrollPosition, bool syncLayerPosition);
+    void currentSnapPointIndicesChangedForNode(WebCore::ScrollingNodeID, unsigned horizontal, unsigned vertical);
 
     WebPage* m_webPage;
 };

@@ -50,6 +50,10 @@
 #include <RuntimeApplicationChecksIOS.h>
 #endif
 
+#if ENABLE(CONTENT_EXTENSIONS)
+#include "ResourceLoadInfo.h"
+#endif
+
 namespace WebCore {
 
 DEFINE_DEBUG_ONLY_GLOBAL(WTF::RefCountedLeakCounter, subresourceLoaderCounter, ("SubresourceLoader"));
@@ -76,6 +80,9 @@ SubresourceLoader::SubresourceLoader(Frame* frame, CachedResource* resource, con
 #ifndef NDEBUG
     subresourceLoaderCounter.increment();
 #endif
+#if ENABLE(CONTENT_EXTENSIONS)
+    m_resourceType = toResourceType(resource->type());
+#endif
 }
 
 SubresourceLoader::~SubresourceLoader()
@@ -87,7 +94,7 @@ SubresourceLoader::~SubresourceLoader()
 #endif
 }
 
-PassRefPtr<SubresourceLoader> SubresourceLoader::create(Frame* frame, CachedResource* resource, const ResourceRequest& request, const ResourceLoaderOptions& options)
+RefPtr<SubresourceLoader> SubresourceLoader::create(Frame* frame, CachedResource* resource, const ResourceRequest& request, const ResourceLoaderOptions& options)
 {
     RefPtr<SubresourceLoader> subloader(adoptRef(new SubresourceLoader(frame, resource, options)));
 #if PLATFORM(IOS)
@@ -101,7 +108,7 @@ PassRefPtr<SubresourceLoader> SubresourceLoader::create(Frame* frame, CachedReso
 #endif
     if (!subloader->init(request))
         return nullptr;
-    return subloader.release();
+    return subloader;
 }
     
 #if PLATFORM(IOS)
@@ -145,7 +152,7 @@ bool SubresourceLoader::isSubresourceLoader()
     return true;
 }
 
-void SubresourceLoader::willSendRequest(ResourceRequest& newRequest, const ResourceResponse& redirectResponse)
+void SubresourceLoader::willSendRequestInternal(ResourceRequest& newRequest, const ResourceResponse& redirectResponse)
 {
     // Store the previous URL because the call to ResourceLoader::willSendRequest will modify it.
     URL previousURL = request().url();
@@ -161,7 +168,7 @@ void SubresourceLoader::willSendRequest(ResourceRequest& newRequest, const Resou
             newRequest.makeUnconditional();
             MemoryCache::singleton().revalidationFailed(*m_resource);
             if (m_frame)
-                m_frame->mainFrame().diagnosticLoggingClient().logDiagnosticMessageWithResult(DiagnosticLoggingKeys::cachedResourceRevalidationKey(), emptyString(), DiagnosticLoggingResultFail);
+                m_frame->mainFrame().diagnosticLoggingClient().logDiagnosticMessageWithResult(DiagnosticLoggingKeys::cachedResourceRevalidationKey(), emptyString(), DiagnosticLoggingResultFail, ShouldSample::Yes);
         }
         
         if (!m_documentLoader->cachedResourceLoader().canRequest(m_resource->type(), newRequest.url(), options())) {
@@ -172,13 +179,13 @@ void SubresourceLoader::willSendRequest(ResourceRequest& newRequest, const Resou
             cancel();
             return;
         }
-        m_resource->willSendRequest(newRequest, redirectResponse);
+        m_resource->redirectReceived(newRequest, redirectResponse);
     }
 
     if (newRequest.isNull() || reachedTerminalState())
         return;
 
-    ResourceLoader::willSendRequest(newRequest, redirectResponse);
+    ResourceLoader::willSendRequestInternal(newRequest, redirectResponse);
     if (newRequest.isNull())
         cancel();
 }
@@ -209,7 +216,7 @@ void SubresourceLoader::didReceiveResponse(const ResourceResponse& response)
             m_resource->setResponse(response);
             MemoryCache::singleton().revalidationSucceeded(*m_resource, response);
             if (m_frame)
-                m_frame->mainFrame().diagnosticLoggingClient().logDiagnosticMessageWithResult(DiagnosticLoggingKeys::cachedResourceRevalidationKey(), emptyString(), DiagnosticLoggingResultPass);
+                m_frame->mainFrame().diagnosticLoggingClient().logDiagnosticMessageWithResult(DiagnosticLoggingKeys::cachedResourceRevalidationKey(), emptyString(), DiagnosticLoggingResultPass, ShouldSample::Yes);
             if (!reachedTerminalState())
                 ResourceLoader::didReceiveResponse(response);
             return;
@@ -217,7 +224,7 @@ void SubresourceLoader::didReceiveResponse(const ResourceResponse& response)
         // Did not get 304 response, continue as a regular resource load.
         MemoryCache::singleton().revalidationFailed(*m_resource);
         if (m_frame)
-            m_frame->mainFrame().diagnosticLoggingClient().logDiagnosticMessageWithResult(DiagnosticLoggingKeys::cachedResourceRevalidationKey(), emptyString(), DiagnosticLoggingResultFail);
+            m_frame->mainFrame().diagnosticLoggingClient().logDiagnosticMessageWithResult(DiagnosticLoggingKeys::cachedResourceRevalidationKey(), emptyString(), DiagnosticLoggingResultFail, ShouldSample::Yes);
     }
 
     m_resource->responseReceived(response);
@@ -244,7 +251,7 @@ void SubresourceLoader::didReceiveResponse(const ResourceResponse& response)
     auto* buffer = resourceData();
     if (m_loadingMultipartContent && buffer && buffer->size()) {
         // The resource data will change as the next part is loaded, so we need to make a copy.
-        m_resource->finishLoading(buffer->copy().get());
+        m_resource->finishLoading(buffer->copy().ptr());
         clearResourceData();
         // Since a subresource loader does not load multipart sections progressively, data was delivered to the loader all at once.        
         // After the first multipart section is complete, signal to delegates that this load is "finished" 
@@ -342,7 +349,7 @@ static void logResourceLoaded(Frame* frame, CachedResource::Type type)
         resourceType = DiagnosticLoggingKeys::otherKey();
         break;
     }
-    frame->mainFrame().diagnosticLoggingClient().logDiagnosticMessageWithValue(DiagnosticLoggingKeys::resourceKey(), DiagnosticLoggingKeys::loadedKey(), resourceType);
+    frame->mainFrame().diagnosticLoggingClient().logDiagnosticMessageWithValue(DiagnosticLoggingKeys::resourceKey(), DiagnosticLoggingKeys::loadedKey(), resourceType, ShouldSample::Yes);
 }
 
 void SubresourceLoader::didFinishLoading(double finishTime)

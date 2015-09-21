@@ -28,10 +28,10 @@
 #if ENABLE(JIT)
 #include "JIT.h"
 
-#include "Arguments.h"
 #include "BasicBlockLocation.h"
 #include "CopiedSpaceInlines.h"
 #include "Debugger.h"
+#include "Exception.h"
 #include "Heap.h"
 #include "JITInlines.h"
 #include "JSArray.h"
@@ -45,6 +45,7 @@
 #include "TypeLocation.h"
 #include "TypeProfilerLog.h"
 #include "VirtualRegister.h"
+#include "Watchdog.h"
 
 namespace JSC {
 
@@ -225,16 +226,23 @@ void JIT::emit_op_is_string(Instruction* currentInstruction)
     emitPutVirtualRegister(dst);
 }
 
-void JIT::emit_op_tear_off_arguments(Instruction* currentInstruction)
+void JIT::emit_op_is_object(Instruction* currentInstruction)
 {
-    int arguments = currentInstruction[1].u.operand;
-    int lexicalEnvironment = currentInstruction[2].u.operand;
+    int dst = currentInstruction[1].u.operand;
+    int value = currentInstruction[2].u.operand;
 
-    Jump argsNotCreated = branchTest64(Zero, Address(callFrameRegister, sizeof(Register) * (VirtualRegister(arguments).offset())));
-    emitGetVirtualRegister(VirtualRegister(arguments).offset(), regT0);
-    emitGetVirtualRegister(lexicalEnvironment, regT1);
-    callOperation(operationTearOffArguments, regT0, regT1);
-    argsNotCreated.link(this);
+    emitGetVirtualRegister(value, regT0);
+    Jump isNotCell = emitJumpIfNotJSCell(regT0);
+
+    compare8(AboveOrEqual, Address(regT0, JSCell::typeInfoTypeOffset()), TrustedImm32(ObjectType), regT0);
+    emitTagAsBoolImmediate(regT0);
+    Jump done = jump();
+
+    isNotCell.link(this);
+    move(TrustedImm32(ValueFalse), regT0);
+
+    done.link(this);
+    emitPutVirtualRegister(dst);
 }
 
 void JIT::emit_op_ret(Instruction* currentInstruction)
@@ -259,9 +267,7 @@ void JIT::emit_op_to_primitive(Instruction* currentInstruction)
     emitGetVirtualRegister(src, regT0);
     
     Jump isImm = emitJumpIfNotJSCell(regT0);
-    addSlowCase(branchStructure(NotEqual, 
-        Address(regT0, JSCell::structureIDOffset()), 
-        m_vm->stringStructure.get()));
+    addSlowCase(emitJumpIfCellObject(regT0));
     isImm.link(this);
 
     if (dst != src)
@@ -420,16 +426,8 @@ void JIT::emit_op_throw(Instruction* currentInstruction)
 
 void JIT::emit_op_push_with_scope(Instruction* currentInstruction)
 {
-    int dst = currentInstruction[1].u.operand;
-    emitGetVirtualRegister(currentInstruction[2].u.operand, regT0);
-    callOperation(operationPushWithScope, dst, regT0);
-}
-
-void JIT::emit_op_pop_scope(Instruction* currentInstruction)
-{
-    int scope = currentInstruction[1].u.operand;
-
-    callOperation(operationPopScope, scope);
+    JITSlowPathCall slowPathCall(this, currentInstruction, slow_path_push_with_scope);
+    slowPathCall.call();
 }
 
 void JIT::compileOpStrictEq(Instruction* currentInstruction, CompileOpStrictEqType type)
@@ -483,11 +481,15 @@ void JIT::emit_op_to_number(Instruction* currentInstruction)
     emitPutVirtualRegister(currentInstruction[1].u.operand);
 }
 
-void JIT::emit_op_push_name_scope(Instruction* currentInstruction)
+void JIT::emit_op_to_string(Instruction* currentInstruction)
 {
-    int dst = currentInstruction[1].u.operand;
-    emitGetVirtualRegister(currentInstruction[3].u.operand, regT0);
-    callOperation(operationPushNameScope, dst, &m_codeBlock->identifier(currentInstruction[2].u.operand), regT0, currentInstruction[4].u.operand, currentInstruction[5].u.operand);
+    int srcVReg = currentInstruction[2].u.operand;
+    emitGetVirtualRegister(srcVReg, regT0);
+
+    addSlowCase(emitJumpIfNotJSCell(regT0));
+    addSlowCase(branch8(NotEqual, Address(regT0, JSCell::typeInfoTypeOffset()), TrustedImm32(StringType)));
+
+    emitPutVirtualRegister(currentInstruction[1].u.operand);
 }
 
 void JIT::emit_op_catch(Instruction* currentInstruction)
@@ -507,6 +509,23 @@ void JIT::emit_op_catch(Instruction* currentInstruction)
     load64(Address(regT3, VM::exceptionOffset()), regT0);
     store64(TrustedImm64(JSValue::encode(JSValue())), Address(regT3, VM::exceptionOffset()));
     emitPutVirtualRegister(currentInstruction[1].u.operand);
+
+    load64(Address(regT0, Exception::valueOffset()), regT0);
+    emitPutVirtualRegister(currentInstruction[2].u.operand);
+}
+
+void JIT::emit_op_create_lexical_environment(Instruction* currentInstruction)
+{
+    JITSlowPathCall slowPathCall(this, currentInstruction, slow_path_create_lexical_environment);
+    slowPathCall.call();
+}
+
+void JIT::emit_op_get_parent_scope(Instruction* currentInstruction)
+{
+    int currentScope = currentInstruction[2].u.operand;
+    emitGetVirtualRegister(currentScope, regT0);
+    loadPtr(Address(regT0, JSScope::offsetOfNext()), regT0);
+    emitStoreCell(currentInstruction[1].u.operand, regT0);
 }
 
 void JIT::emit_op_switch_imm(Instruction* currentInstruction)
@@ -647,48 +666,12 @@ void JIT::emit_op_enter(Instruction*)
     emitEnterOptimizationCheck();
 }
 
-void JIT::emit_op_create_lexical_environment(Instruction* currentInstruction)
-{
-    int dst = currentInstruction[1].u.operand;
-    int scope = currentInstruction[2].u.operand;
-
-    emitGetVirtualRegister(scope, regT0);
-    callOperation(operationCreateActivation, regT0, 0);
-    emitStoreCell(dst, returnValueGPR);
-    emitStoreCell(scope, returnValueGPR);
-}
-
 void JIT::emit_op_get_scope(Instruction* currentInstruction)
 {
     int dst = currentInstruction[1].u.operand;
     emitGetFromCallFrameHeaderPtr(JSStack::Callee, regT0);
     loadPtr(Address(regT0, JSFunction::offsetOfScopeChain()), regT0);
     emitStoreCell(dst, regT0);
-}
-
-void JIT::emit_op_create_arguments(Instruction* currentInstruction)
-{
-    int dst = currentInstruction[1].u.operand;
-    int lexicalEnvironment = currentInstruction[2].u.operand;
-
-    Jump argsCreated = branchTest64(NonZero, Address(callFrameRegister, sizeof(Register) * dst));
-
-    if (VirtualRegister(lexicalEnvironment).isValid()) {
-        emitGetVirtualRegister(lexicalEnvironment, regT0);
-        callOperation(operationCreateArguments, regT0);
-    } else
-        callOperation(operationCreateArguments, TrustedImmPtr(nullptr));
-    emitStoreCell(dst, returnValueGPR);
-    emitStoreCell(unmodifiedArgumentsRegister(VirtualRegister(dst)), returnValueGPR);
-
-    argsCreated.link(this);
-}
-
-void JIT::emit_op_init_lazy_reg(Instruction* currentInstruction)
-{
-    int dst = currentInstruction[1].u.operand;
-
-    store64(TrustedImm64((int64_t)0), Address(callFrameRegister, sizeof(Register) * dst));
 }
 
 void JIT::emit_op_to_this(Instruction* currentInstruction)
@@ -705,39 +688,29 @@ void JIT::emit_op_to_this(Instruction* currentInstruction)
     addSlowCase(branch32(NotEqual, Address(regT1, JSCell::structureIDOffset()), regT2));
 }
 
-void JIT::emit_op_get_callee(Instruction* currentInstruction)
-{
-    int result = currentInstruction[1].u.operand;
-    WriteBarrierBase<JSCell>* cachedFunction = &currentInstruction[2].u.jsCell;
-    emitGetFromCallFrameHeaderPtr(JSStack::Callee, regT0);
-
-    loadPtr(cachedFunction, regT2);
-    addSlowCase(branchPtr(NotEqual, regT0, regT2));
-
-    emitPutVirtualRegister(result);
-}
-
-void JIT::emitSlow_op_get_callee(Instruction* currentInstruction, Vector<SlowCaseEntry>::iterator& iter)
-{
-    linkSlowCase(iter);
-
-    JITSlowPathCall slowPathCall(this, currentInstruction, slow_path_get_callee);
-    slowPathCall.call();
-}
-
 void JIT::emit_op_create_this(Instruction* currentInstruction)
 {
     int callee = currentInstruction[2].u.operand;
+    WriteBarrierBase<JSCell>* cachedFunction = &currentInstruction[4].u.jsCell;
     RegisterID calleeReg = regT0;
+    RegisterID rareDataReg = regT4;
     RegisterID resultReg = regT0;
     RegisterID allocatorReg = regT1;
     RegisterID structureReg = regT2;
+    RegisterID cachedFunctionReg = regT4;
     RegisterID scratchReg = regT3;
 
     emitGetVirtualRegister(callee, calleeReg);
-    loadPtr(Address(calleeReg, JSFunction::offsetOfAllocationProfile() + ObjectAllocationProfile::offsetOfAllocator()), allocatorReg);
-    loadPtr(Address(calleeReg, JSFunction::offsetOfAllocationProfile() + ObjectAllocationProfile::offsetOfStructure()), structureReg);
+    loadPtr(Address(calleeReg, JSFunction::offsetOfRareData()), rareDataReg);
+    addSlowCase(branchTestPtr(Zero, rareDataReg));
+    loadPtr(Address(rareDataReg, FunctionRareData::offsetOfAllocationProfile() + ObjectAllocationProfile::offsetOfAllocator()), allocatorReg);
+    loadPtr(Address(rareDataReg, FunctionRareData::offsetOfAllocationProfile() + ObjectAllocationProfile::offsetOfStructure()), structureReg);
     addSlowCase(branchTestPtr(Zero, allocatorReg));
+
+    loadPtr(cachedFunction, cachedFunctionReg);
+    Jump hasSeenMultipleCallees = branchPtr(Equal, cachedFunctionReg, TrustedImmPtr(JSCell::seenMultipleCalleeObjects()));
+    addSlowCase(branchPtr(NotEqual, calleeReg, cachedFunctionReg));
+    hasSeenMultipleCallees.link(this);
 
     emitAllocateJSObject(allocatorReg, structureReg, resultReg, scratchReg);
     emitPutVirtualRegister(currentInstruction[1].u.operand);
@@ -745,10 +718,25 @@ void JIT::emit_op_create_this(Instruction* currentInstruction)
 
 void JIT::emitSlow_op_create_this(Instruction* currentInstruction, Vector<SlowCaseEntry>::iterator& iter)
 {
+    linkSlowCase(iter); // doesn't have rare data
     linkSlowCase(iter); // doesn't have an allocation profile
     linkSlowCase(iter); // allocation failed
+    linkSlowCase(iter); // cached function didn't match
 
     JITSlowPathCall slowPathCall(this, currentInstruction, slow_path_create_this);
+    slowPathCall.call();
+}
+
+void JIT::emit_op_check_tdz(Instruction* currentInstruction)
+{
+    emitGetVirtualRegister(currentInstruction[1].u.operand, regT0);
+    addSlowCase(branchTest64(Zero, regT0));
+}
+
+void JIT::emitSlow_op_check_tdz(Instruction* currentInstruction, Vector<SlowCaseEntry>::iterator& iter)
+{
+    linkSlowCase(iter);
+    JITSlowPathCall slowPathCall(this, currentInstruction, slow_path_throw_tdz_error);
     slowPathCall.call();
 }
 
@@ -898,79 +886,16 @@ void JIT::emitSlow_op_to_number(Instruction* currentInstruction, Vector<SlowCase
     slowPathCall.call();
 }
 
-void JIT::emit_op_get_arguments_length(Instruction* currentInstruction)
+void JIT::emitSlow_op_to_string(Instruction* currentInstruction, Vector<SlowCaseEntry>::iterator& iter)
 {
-    int dst = currentInstruction[1].u.operand;
-    int argumentsRegister = currentInstruction[2].u.operand;
-    addSlowCase(branchTest64(NonZero, addressFor(argumentsRegister)));
-    emitGetFromCallFrameHeader32(JSStack::ArgumentCount, regT0);
-    sub32(TrustedImm32(1), regT0);
-    emitFastArithReTagImmediate(regT0, regT0);
-    emitPutVirtualRegister(dst, regT0);
-}
+    linkSlowCase(iter); // Not JSCell.
+    linkSlowCase(iter); // Not JSString.
 
-void JIT::emitSlow_op_get_arguments_length(Instruction* currentInstruction, Vector<SlowCaseEntry>::iterator& iter)
-{
-    linkSlowCase(iter);
-    int dst = currentInstruction[1].u.operand;
-    int base = currentInstruction[2].u.operand;
-    callOperation(operationGetArgumentsLength, dst, base);
-}
-
-void JIT::emit_op_get_argument_by_val(Instruction* currentInstruction)
-{
-    int dst = currentInstruction[1].u.operand;
-    int argumentsRegister = currentInstruction[2].u.operand;
-    int property = currentInstruction[3].u.operand;
-    addSlowCase(branchTest64(NonZero, addressFor(argumentsRegister)));
-    emitGetVirtualRegister(property, regT1);
-    addSlowCase(emitJumpIfNotImmediateInteger(regT1));
-    emitGetFromCallFrameHeader32(JSStack::ArgumentCount, regT2);
-    sub32(TrustedImm32(1), regT2);
-    addSlowCase(branch32(AboveOrEqual, regT1, regT2));
-
-    signExtend32ToPtr(regT1, regT1);
-    load64(BaseIndex(callFrameRegister, regT1, TimesEight, CallFrame::argumentOffset(0) * static_cast<int>(sizeof(Register))), regT0);
-    emitValueProfilingSite();
-    emitPutVirtualRegister(dst, regT0);
-}
-
-void JIT::emitSlow_op_get_argument_by_val(Instruction* currentInstruction, Vector<SlowCaseEntry>::iterator& iter)
-{
-    int dst = currentInstruction[1].u.operand;
-    int arguments = currentInstruction[2].u.operand;
-    int property = currentInstruction[3].u.operand;
-    int lexicalEnvironment = currentInstruction[4].u.operand;
-    
-    linkSlowCase(iter);
-    Jump skipArgumentsCreation = jump();
-    
-    linkSlowCase(iter);
-    linkSlowCase(iter);
-    if (VirtualRegister(lexicalEnvironment).isValid()) {
-        emitGetVirtualRegister(lexicalEnvironment, regT0);
-        callOperation(operationCreateArguments, regT0);
-    } else
-        callOperation(operationCreateArguments, TrustedImmPtr(nullptr));
-    emitStoreCell(arguments, returnValueGPR);
-    emitStoreCell(unmodifiedArgumentsRegister(VirtualRegister(arguments)), returnValueGPR);
-    
-    skipArgumentsCreation.link(this);
-    emitGetVirtualRegister(arguments, regT0);
-    emitGetVirtualRegister(property, regT1);
-    callOperation(WithProfile, operationGetByValGeneric, dst, regT0, regT1);
+    JITSlowPathCall slowPathCall(this, currentInstruction, slow_path_to_string);
+    slowPathCall.call();
 }
 
 #endif // USE(JSVALUE64)
-
-void JIT::emit_op_touch_entry(Instruction* currentInstruction)
-{
-    if (m_codeBlock->symbolTable()->m_functionEnteredOnce.hasBeenInvalidated())
-        return;
-    
-    JITSlowPathCall slowPathCall(this, currentInstruction, slow_path_touch_entry);
-    slowPathCall.call();
-}
 
 void JIT::emit_op_loop_hint(Instruction*)
 {
@@ -981,7 +906,7 @@ void JIT::emit_op_loop_hint(Instruction*)
     }
 
     // Emit the watchdog timer check:
-    if (m_vm->watchdog && m_vm->watchdog->isEnabled())
+    if (m_vm->watchdog)
         addSlowCase(branchTest8(NonZero, AbsoluteAddress(m_vm->watchdog->timerDidFireAddress())));
 }
 
@@ -1007,7 +932,7 @@ void JIT::emitSlow_op_loop_hint(Instruction*, Vector<SlowCaseEntry>::iterator& i
 #endif
 
     // Emit the slow path of the watchdog timer check:
-    if (m_vm->watchdog && m_vm->watchdog->isEnabled()) {
+    if (m_vm->watchdog) {
         linkSlowCase(iter);
         callOperation(operationHandleWatchdogTimer);
 
@@ -1025,13 +950,6 @@ void JIT::emit_op_new_func(Instruction* currentInstruction)
 {
     Jump lazyJump;
     int dst = currentInstruction[1].u.operand;
-    if (currentInstruction[4].u.operand) {
-#if USE(JSVALUE32_64)
-        lazyJump = branch32(NotEqual, tagFor(dst), TrustedImm32(JSValue::EmptyValueTag));
-#else
-        lazyJump = branchTest64(NonZero, addressFor(dst));
-#endif
-    }
 
 #if USE(JSVALUE64)
     emitGetVirtualRegister(currentInstruction[2].u.operand, regT0);
@@ -1040,9 +958,6 @@ void JIT::emit_op_new_func(Instruction* currentInstruction)
 #endif
     FunctionExecutable* funcExec = m_codeBlock->functionDecl(currentInstruction[3].u.operand);
     callOperation(operationNewFunction, dst, regT0, funcExec);
-
-    if (currentInstruction[4].u.operand)
-        lazyJump.link(this);
 }
 
 void JIT::emit_op_new_func_exp(Instruction* currentInstruction)
@@ -1102,12 +1017,6 @@ void JIT::emit_op_new_array_buffer(Instruction* currentInstruction)
 }
 
 #if USE(JSVALUE64)
-void JIT::emit_op_get_enumerable_length(Instruction* currentInstruction)
-{
-    JITSlowPathCall slowPathCall(this, currentInstruction, slow_path_get_enumerable_length);
-    slowPathCall.call();
-}
-
 void JIT::emit_op_has_structure_property(Instruction* currentInstruction)
 {
     int dst = currentInstruction[1].u.operand;
@@ -1123,21 +1032,6 @@ void JIT::emit_op_has_structure_property(Instruction* currentInstruction)
     
     move(TrustedImm64(JSValue::encode(jsBoolean(true))), regT0);
     emitPutVirtualRegister(dst);
-}
-
-void JIT::emitSlow_op_has_structure_property(Instruction* currentInstruction, Vector<SlowCaseEntry>::iterator& iter)
-{
-    linkSlowCase(iter);
-    linkSlowCase(iter);
-
-    JITSlowPathCall slowPathCall(this, currentInstruction, slow_path_has_structure_property);
-    slowPathCall.call();
-}
-
-void JIT::emit_op_has_generic_property(Instruction* currentInstruction)
-{
-    JITSlowPathCall slowPathCall(this, currentInstruction, slow_path_has_generic_property);
-    slowPathCall.call();
 }
 
 void JIT::privateCompileHasIndexedProperty(ByValInfo* byValInfo, ReturnAddressPtr returnAddress, JITArrayMode arrayMode)
@@ -1174,6 +1068,7 @@ void JIT::emit_op_has_indexed_property(Instruction* currentInstruction)
     int base = currentInstruction[2].u.operand;
     int property = currentInstruction[3].u.operand;
     ArrayProfile* profile = currentInstruction[4].u.arrayProfile;
+    ByValInfo* byValInfo = m_codeBlock->addByValInfo();
     
     emitGetVirtualRegisters(base, regT0, property, regT1);
 
@@ -1204,8 +1099,10 @@ void JIT::emit_op_has_indexed_property(Instruction* currentInstruction)
     Label done = label();
     
     emitPutVirtualRegister(dst);
+
+    Label nextHotPath = label();
     
-    m_byValCompilationInfo.append(ByValCompilationInfo(m_bytecodeOffset, badType, mode, done));
+    m_byValCompilationInfo.append(ByValCompilationInfo(byValInfo, m_bytecodeOffset, PatchableJump(), badType, mode, profile, done, nextHotPath));
 }
 
 void JIT::emitSlow_op_has_indexed_property(Instruction* currentInstruction, Vector<SlowCaseEntry>::iterator& iter)
@@ -1213,25 +1110,18 @@ void JIT::emitSlow_op_has_indexed_property(Instruction* currentInstruction, Vect
     int dst = currentInstruction[1].u.operand;
     int base = currentInstruction[2].u.operand;
     int property = currentInstruction[3].u.operand;
-    ArrayProfile* profile = currentInstruction[4].u.arrayProfile;
+    ByValInfo* byValInfo = m_byValCompilationInfo[m_byValInstructionIndex].byValInfo;
     
     linkSlowCaseIfNotJSCell(iter, base); // base cell check
     linkSlowCase(iter); // base array check
-    
-    Jump skipProfiling = jump();
-    
     linkSlowCase(iter); // vector length check
     linkSlowCase(iter); // empty value
-    
-    emitArrayProfileOutOfBoundsSpecialCase(profile);
-    
-    skipProfiling.link(this);
     
     Label slowPath = label();
     
     emitGetVirtualRegister(base, regT0);
     emitGetVirtualRegister(property, regT1);
-    Call call = callOperation(operationHasIndexedPropertyDefault, dst, regT0, regT1);
+    Call call = callOperation(operationHasIndexedPropertyDefault, dst, regT0, regT1, byValInfo);
 
     m_byValCompilationInfo[m_byValInstructionIndex].slowPathTarget = slowPath;
     m_byValCompilationInfo[m_byValInstructionIndex].returnAddress = call;
@@ -1288,19 +1178,7 @@ void JIT::emitSlow_op_get_direct_pname(Instruction* currentInstruction, Vector<S
     slowPathCall.call();
 }
 
-void JIT::emit_op_get_structure_property_enumerator(Instruction* currentInstruction)
-{
-    JITSlowPathCall slowPathCall(this, currentInstruction, slow_path_get_structure_property_enumerator);
-    slowPathCall.call();
-}
-
-void JIT::emit_op_get_generic_property_enumerator(Instruction* currentInstruction)
-{
-    JITSlowPathCall slowPathCall(this, currentInstruction, slow_path_get_generic_property_enumerator);
-    slowPathCall.call();
-}
-
-void JIT::emit_op_next_enumerator_pname(Instruction* currentInstruction)
+void JIT::emit_op_enumerator_structure_pname(Instruction* currentInstruction)
 {
     int dst = currentInstruction[1].u.operand;
     int enumerator = currentInstruction[2].u.operand;
@@ -1308,7 +1186,7 @@ void JIT::emit_op_next_enumerator_pname(Instruction* currentInstruction)
 
     emitGetVirtualRegister(index, regT0);
     emitGetVirtualRegister(enumerator, regT1);
-    Jump inBounds = branch32(Below, regT0, Address(regT1, JSPropertyNameEnumerator::cachedPropertyNamesLengthOffset()));
+    Jump inBounds = branch32(Below, regT0, Address(regT1, JSPropertyNameEnumerator::endStructurePropertyIndexOffset()));
 
     move(TrustedImm64(JSValue::encode(jsNull())), regT0);
 
@@ -1323,10 +1201,27 @@ void JIT::emit_op_next_enumerator_pname(Instruction* currentInstruction)
     emitPutVirtualRegister(dst);
 }
 
-void JIT::emit_op_to_index_string(Instruction* currentInstruction)
+void JIT::emit_op_enumerator_generic_pname(Instruction* currentInstruction)
 {
-    JITSlowPathCall slowPathCall(this, currentInstruction, slow_path_to_index_string);
-    slowPathCall.call();
+    int dst = currentInstruction[1].u.operand;
+    int enumerator = currentInstruction[2].u.operand;
+    int index = currentInstruction[3].u.operand;
+
+    emitGetVirtualRegister(index, regT0);
+    emitGetVirtualRegister(enumerator, regT1);
+    Jump inBounds = branch32(Below, regT0, Address(regT1, JSPropertyNameEnumerator::endGenericPropertyIndexOffset()));
+
+    move(TrustedImm64(JSValue::encode(jsNull())), regT0);
+
+    Jump done = jump();
+    inBounds.link(this);
+
+    loadPtr(Address(regT1, JSPropertyNameEnumerator::cachedPropertyNamesVectorOffset()), regT1);
+    signExtend32ToPtr(regT0, regT0);
+    load64(BaseIndex(regT1, regT0, TimesEight), regT0);
+    
+    done.link(this);
+    emitPutVirtualRegister(dst);
 }
 
 void JIT::emit_op_profile_type(Instruction* currentInstruction)
@@ -1337,6 +1232,8 @@ void JIT::emit_op_profile_type(Instruction* currentInstruction)
     emitGetVirtualRegister(valueToProfile, regT0);
 
     JumpList jumpToEnd;
+
+    jumpToEnd.append(branchTest64(Zero, regT0));
 
     // Compile in a predictive type check, if possible, to see if we can skip writing to the log.
     // These typechecks are inlined to match those of the 64-bit JSValue type checks.
@@ -1391,6 +1288,41 @@ void JIT::emit_op_profile_type(Instruction* currentInstruction)
     jumpToEnd.link(this);
 }
 
+#endif // USE(JSVALUE64)
+
+void JIT::emit_op_get_enumerable_length(Instruction* currentInstruction)
+{
+    JITSlowPathCall slowPathCall(this, currentInstruction, slow_path_get_enumerable_length);
+    slowPathCall.call();
+}
+
+void JIT::emitSlow_op_has_structure_property(Instruction* currentInstruction, Vector<SlowCaseEntry>::iterator& iter)
+{
+    linkSlowCase(iter);
+    linkSlowCase(iter);
+
+    JITSlowPathCall slowPathCall(this, currentInstruction, slow_path_has_structure_property);
+    slowPathCall.call();
+}
+
+void JIT::emit_op_has_generic_property(Instruction* currentInstruction)
+{
+    JITSlowPathCall slowPathCall(this, currentInstruction, slow_path_has_generic_property);
+    slowPathCall.call();
+}
+
+void JIT::emit_op_get_property_enumerator(Instruction* currentInstruction)
+{
+    JITSlowPathCall slowPathCall(this, currentInstruction, slow_path_get_property_enumerator);
+    slowPathCall.call();
+}
+
+void JIT::emit_op_to_index_string(Instruction* currentInstruction)
+{
+    JITSlowPathCall slowPathCall(this, currentInstruction, slow_path_to_index_string);
+    slowPathCall.call();
+}
+
 void JIT::emit_op_profile_control_flow(Instruction* currentInstruction)
 {
     BasicBlockLocation* basicBlockLocation = currentInstruction[1].u.basicBlockLocation;
@@ -1398,7 +1330,23 @@ void JIT::emit_op_profile_control_flow(Instruction* currentInstruction)
         basicBlockLocation->emitExecuteCode(*this, regT1);
 }
 
-#endif // USE(JSVALUE64)
+void JIT::emit_op_create_direct_arguments(Instruction* currentInstruction)
+{
+    JITSlowPathCall slowPathCall(this, currentInstruction, slow_path_create_direct_arguments);
+    slowPathCall.call();
+}
+
+void JIT::emit_op_create_scoped_arguments(Instruction* currentInstruction)
+{
+    JITSlowPathCall slowPathCall(this, currentInstruction, slow_path_create_scoped_arguments);
+    slowPathCall.call();
+}
+
+void JIT::emit_op_create_out_of_band_arguments(Instruction* currentInstruction)
+{
+    JITSlowPathCall slowPathCall(this, currentInstruction, slow_path_create_out_of_band_arguments);
+    slowPathCall.call();
+}
 
 } // namespace JSC
 

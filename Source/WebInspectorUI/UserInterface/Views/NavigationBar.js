@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013 Apple Inc. All rights reserved.
+ * Copyright (C) 2013, 2015 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -23,57 +23,48 @@
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-WebInspector.NavigationBar = function(element, navigationItems, role, label) {
-    WebInspector.Object.call(this);
+WebInspector.NavigationBar = class NavigationBar extends WebInspector.Object
+{
+    constructor(element, navigationItems, role, label)
+    {
+        super();
 
-    this._element = element || document.createElement("div");
-    this._element.classList.add(this.constructor.StyleClassName || WebInspector.NavigationBar.StyleClassName);
-    this._element.tabIndex = 0;
+        this._element = element || document.createElement("div");
+        this._element.classList.add(this.constructor.StyleClassName || "navigation-bar");
+        this._element.tabIndex = 0;
 
-    if (role)
-        this._element.setAttribute("role", role);
-    if (label)
-        this._element.setAttribute("aria-label", label);
+        if (role)
+            this._element.setAttribute("role", role);
+        if (label)
+            this._element.setAttribute("aria-label", label);
 
-    this._element.addEventListener("focus", this._focus.bind(this), false);
-    this._element.addEventListener("blur", this._blur.bind(this), false);
-    this._element.addEventListener("keydown", this._keyDown.bind(this), false);
-    this._element.addEventListener("mousedown", this._mouseDown.bind(this), false);
+        this._element.addEventListener("focus", this._focus.bind(this), false);
+        this._element.addEventListener("blur", this._blur.bind(this), false);
+        this._element.addEventListener("keydown", this._keyDown.bind(this), false);
+        this._element.addEventListener("mousedown", this._mouseDown.bind(this), false);
 
-    document.addEventListener("load", this.updateLayout.bind(this), false);
+        document.addEventListener("load", this.updateLayout.bind(this), false);
 
-    this._styleElement = document.createElement("style");
+        this._styleElement = document.createElement("style");
 
-    this._navigationItems = [];
+        this._navigationItems = [];
 
-    if (navigationItems) {
-        for (var i = 0; i < navigationItems.length; ++i)
-            this.addNavigationItem(navigationItems[i]);
+        if (navigationItems) {
+            for (var i = 0; i < navigationItems.length; ++i)
+                this.addNavigationItem(navigationItems[i]);
+        }
+
+        document.head.appendChild(this._styleElement);
     }
-
-    document.head.appendChild(this._styleElement);
-};
-
-WebInspector.Object.addConstructorFunctions(WebInspector.NavigationBar);
-
-WebInspector.NavigationBar.StyleClassName = "navigation-bar";
-WebInspector.NavigationBar.CollapsedStyleClassName = "collapsed";
-
-WebInspector.NavigationBar.Event = {
-    NavigationItemSelected: "navigation-bar-navigation-item-selected"
-};
-
-WebInspector.NavigationBar.prototype = {
-    constructor: WebInspector.NavigationBar,
 
     // Public
 
-    addNavigationItem: function(navigationItem, parentElement)
+    addNavigationItem(navigationItem, parentElement)
     {
         return this.insertNavigationItem(navigationItem, this._navigationItems.length, parentElement);
-    },
+    }
 
-    insertNavigationItem: function(navigationItem, index, parentElement)
+    insertNavigationItem(navigationItem, index, parentElement)
     {
         console.assert(navigationItem instanceof WebInspector.NavigationItem);
         if (!(navigationItem instanceof WebInspector.NavigationItem))
@@ -105,9 +96,9 @@ WebInspector.NavigationBar.prototype = {
         this.updateLayoutSoon();
 
         return navigationItem;
-    },
+    }
 
-    removeNavigationItem: function(navigationItemOrIdentifierOrIndex, index)
+    removeNavigationItem(navigationItemOrIdentifierOrIndex)
     {
         var navigationItem = this._findNavigationItem(navigationItemOrIdentifierOrIndex);
         if (!navigationItem)
@@ -127,9 +118,9 @@ WebInspector.NavigationBar.prototype = {
         this.updateLayoutSoon();
 
         return navigationItem;
-    },
+    }
 
-    updateLayoutSoon: function()
+    updateLayoutSoon()
     {
         if (this._updateLayoutTimeout)
             return;
@@ -145,9 +136,9 @@ WebInspector.NavigationBar.prototype = {
         }
 
         this._updateLayoutTimeout = setTimeout(update.bind(this), 0);
-    },
+    }
 
-    updateLayout: function()
+    updateLayout()
     {
         if (this._updateLayoutTimeout) {
             clearTimeout(this._updateLayoutTimeout);
@@ -177,10 +168,10 @@ WebInspector.NavigationBar.prototype = {
             if (this._navigationItems[i] instanceof WebInspector.FlexibleSpaceNavigationItem)
                 continue;
 
-            totalItemWidth += this._navigationItems[i].element.offsetWidth;
+            totalItemWidth += this._navigationItems[i].element.realOffsetWidth;
         }
 
-        var barWidth = this._element.offsetWidth;
+        var barWidth = this._element.realOffsetWidth;
 
         // Add the collapsed class back if the items are wider than the bar.
         if (totalItemWidth > barWidth)
@@ -189,12 +180,12 @@ WebInspector.NavigationBar.prototype = {
         // Give each navigation item the opportunity to collapse further.
         for (var i = 0; i < this._navigationItems.length; ++i)
             this._navigationItems[i].updateLayout();
-    },
+    }
 
     get selectedNavigationItem()
     {
         return this._selectedNavigationItem || null;
-    },
+    }
 
     set selectedNavigationItem(navigationItemOrIdentifierOrIndex)
     {
@@ -219,17 +210,17 @@ WebInspector.NavigationBar.prototype = {
         // This prevents sending the event while the user is scrubbing the bar.
         if (!this._mouseIsDown)
             this.dispatchEventToListeners(WebInspector.NavigationBar.Event.NavigationItemSelected);
-    },
+    }
 
     get navigationItems()
     {
         return this._navigationItems;
-    },
+    }
 
     get element()
     {
         return this._element;
-    },
+    }
 
     get minimumWidth()
     {
@@ -239,22 +230,22 @@ WebInspector.NavigationBar.prototype = {
         }
 
         return this._minimumWidth;
-    },
+    }
 
     get sizesToFit()
     {
         // Can be overriden by subclasses.
         return false;
-    },
+    }
 
     // Private
 
-    _findNavigationItem: function(navigationItemOrIdentifierOrIndex)
+    _findNavigationItem(navigationItemOrIdentifierOrIndex)
     {
         var navigationItem = null;
 
         if (navigationItemOrIdentifierOrIndex instanceof WebInspector.NavigationItem) {
-            if (this._navigationItems.contains(navigationItemOrIdentifierOrIndex))
+            if (this._navigationItems.includes(navigationItemOrIdentifierOrIndex))
                 navigationItem = navigationItemOrIdentifierOrIndex;
         } else if (typeof navigationItemOrIdentifierOrIndex === "number") {
             navigationItem = this._navigationItems[navigationItemOrIdentifierOrIndex];
@@ -268,9 +259,9 @@ WebInspector.NavigationBar.prototype = {
         }
 
         return navigationItem;
-    },
+    }
 
-    _mouseDown: function(event)
+    _mouseDown(event)
     {
         // Only handle left mouse clicks.
         if (event.button !== 0)
@@ -293,15 +284,20 @@ WebInspector.NavigationBar.prototype = {
         this._mouseMovedEventListener = this._mouseMoved.bind(this);
         this._mouseUpEventListener = this._mouseUp.bind(this);
 
-        // Register these listeners on the document so we can track the mouse if it leaves the resizer.
+        if (typeof this.selectedNavigationItem.dontPreventDefaultOnNavigationBarMouseDown === "function"
+            && this.selectedNavigationItem.dontPreventDefaultOnNavigationBarMouseDown()
+            && this._previousSelectedNavigationItem === this.selectedNavigationItem)
+            return;
+
+        // Register these listeners on the document so we can track the mouse if it leaves the navigation bar.
         document.addEventListener("mousemove", this._mouseMovedEventListener, false);
         document.addEventListener("mouseup", this._mouseUpEventListener, false);
 
         event.preventDefault();
         event.stopPropagation();
-    },
+    }
 
-    _mouseMoved: function(event)
+    _mouseMoved(event)
     {
         console.assert(event.button === 0);
         console.assert(this._mouseIsDown);
@@ -312,15 +308,15 @@ WebInspector.NavigationBar.prototype = {
         event.stopPropagation();
 
         var itemElement = event.target.enclosingNodeOrSelfWithClass(WebInspector.RadioButtonNavigationItem.StyleClassName);
-        if (!itemElement || !itemElement.navigationItem) {
+        if (!itemElement || !itemElement.navigationItem || !this._element.contains(itemElement)) {
             // Find the element that is at the X position of the mouse, even when the mouse is no longer
             // vertically in the navigation bar.
-            var element = document.elementFromPoint(event.pageX, this._element.totalOffsetTop);
+            var element = document.elementFromPoint(event.pageX, this._element.totalOffsetTop + (this._element.offsetHeight / 2));
             if (!element)
                 return;
 
             itemElement = element.enclosingNodeOrSelfWithClass(WebInspector.RadioButtonNavigationItem.StyleClassName);
-            if (!itemElement || !itemElement.navigationItem)
+            if (!itemElement || !itemElement.navigationItem || !this._element.contains(itemElement))
                 return;
         }
 
@@ -330,9 +326,9 @@ WebInspector.NavigationBar.prototype = {
         this.selectedNavigationItem = itemElement.navigationItem;
 
         this.selectedNavigationItem.active = true;
-    },
+    }
 
-    _mouseUp: function(event)
+    _mouseUp(event)
     {
         console.assert(event.button === 0);
         console.assert(this._mouseIsDown);
@@ -362,9 +358,9 @@ WebInspector.NavigationBar.prototype = {
 
         event.preventDefault();
         event.stopPropagation();
-    },
+    }
 
-    _keyDown: function(event)
+    _keyDown(event)
     {
         if (!this._focused)
             return;
@@ -394,23 +390,23 @@ WebInspector.NavigationBar.prototype = {
             return;
 
         this.selectedNavigationItem = this._navigationItems[selectedNavigationItemIndex];
-    },
+    }
 
-    _focus: function(event)
+    _focus(event)
     {
         this._focused = true;
-    },
+    }
 
-    _blur: function(event)
+    _blur(event)
     {
         this._focused = false;
-    },
+    }
 
-    _updateStyle: function()
+    _updateStyle()
     {
         this._needsStyleUpdated = false;
 
-        var parentSelector = "." + (this.constructor.StyleClassName || WebInspector.NavigationBar.StyleClassName);
+        var parentSelector = "." + (this.constructor.StyleClassName || "navigation-bar");
 
         var styleText = "";
         for (var i = 0; i < this._navigationItems.length; ++i) {
@@ -422,9 +418,9 @@ WebInspector.NavigationBar.prototype = {
         }
 
         this._styleElement.textContent = styleText;
-    },
+    }
 
-    _calculateMinimumWidth: function()
+    _calculateMinimumWidth()
     {
         var wasCollapsed = this._element.classList.contains(WebInspector.NavigationBar.CollapsedStyleClassName);
 
@@ -437,7 +433,7 @@ WebInspector.NavigationBar.prototype = {
             // Skip flexible space items since they can take up no space at the minimum width.
             if (this._navigationItems[i] instanceof WebInspector.FlexibleSpaceNavigationItem)
                 continue;
-            totalItemWidth += this._navigationItems[i].element.offsetWidth;
+            totalItemWidth += this._navigationItems[i].element.realOffsetWidth;
         }
 
         // Remove the collapsed style class if we were not collapsed before.
@@ -448,4 +444,8 @@ WebInspector.NavigationBar.prototype = {
     }
 };
 
-WebInspector.NavigationBar.prototype.__proto__ = WebInspector.Object.prototype;
+WebInspector.NavigationBar.CollapsedStyleClassName = "collapsed";
+
+WebInspector.NavigationBar.Event = {
+    NavigationItemSelected: "navigation-bar-navigation-item-selected"
+};

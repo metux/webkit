@@ -87,7 +87,7 @@ DebuggerCallFrame::DebuggerCallFrame(CallFrame* callFrame)
     m_position = positionForCallFrame(m_callFrame);
 }
 
-PassRefPtr<DebuggerCallFrame> DebuggerCallFrame::callerFrame()
+RefPtr<DebuggerCallFrame> DebuggerCallFrame::callerFrame()
 {
     ASSERT(isValid());
     if (!isValid())
@@ -101,7 +101,7 @@ PassRefPtr<DebuggerCallFrame> DebuggerCallFrame::callerFrame()
 
     CallFrame* callerFrame = functor.getCallerFrame();
     if (!callerFrame)
-        return 0;
+        return nullptr;
 
     m_caller = DebuggerCallFrame::create(callerFrame);
     return m_caller;
@@ -147,8 +147,10 @@ DebuggerScope* DebuggerCallFrame::scope()
         CodeBlock* codeBlock = m_callFrame->codeBlock();
         if (codeBlock && codeBlock->scopeRegister().isValid())
             scope = m_callFrame->scope(codeBlock->scopeRegister().offset());
+        else if (JSCallee* callee = jsDynamicCast<JSCallee*>(m_callFrame->callee()))
+            scope = callee->scope();
         else
-            scope = jsCast<JSCallee*>(m_callFrame->callee())->scope();
+            scope = m_callFrame->lexicalGlobalObject();
 
         m_scope.set(vm, DebuggerScope::create(vm, scope));
     }
@@ -174,7 +176,7 @@ JSValue DebuggerCallFrame::thisValue() const
 }
 
 // Evaluate some JavaScript code in the scope of this frame.
-JSValue DebuggerCallFrame::evaluate(const String& script, JSValue& exception)
+JSValue DebuggerCallFrame::evaluate(const String& script, NakedPtr<Exception>& exception)
 {
     ASSERT(isValid());
     CallFrame* callFrame = m_callFrame;
@@ -188,7 +190,13 @@ JSValue DebuggerCallFrame::evaluate(const String& script, JSValue& exception)
     
     DebuggerEvalEnabler evalEnabler(callFrame);
     VM& vm = callFrame->vm();
-    EvalExecutable* eval = EvalExecutable::create(callFrame, makeSource(script), callFrame->codeBlock()->isStrictMode());
+    auto& codeBlock = *callFrame->codeBlock();
+    ThisTDZMode thisTDZMode = codeBlock.unlinkedCodeBlock()->constructorKind() == ConstructorKind::Derived ? ThisTDZMode::AlwaysCheck : ThisTDZMode::CheckIfNeeded;
+
+    VariableEnvironment variablesUnderTDZ;
+    JSScope::collectVariablesUnderTDZ(scope()->jsScope(), variablesUnderTDZ);
+
+    EvalExecutable* eval = EvalExecutable::create(callFrame, makeSource(script), codeBlock.isStrictMode(), thisTDZMode, &variablesUnderTDZ);
     if (vm.exception()) {
         exception = vm.exception();
         vm.clearException();

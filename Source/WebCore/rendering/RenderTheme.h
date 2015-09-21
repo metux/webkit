@@ -43,6 +43,7 @@ class FileList;
 class HTMLInputElement;
 class Icon;
 class PopupMenu;
+class RenderAttachment;
 class RenderMenuList;
 #if ENABLE(METER_ELEMENT)
 class RenderMeter;
@@ -78,9 +79,9 @@ public:
     // This method is called to paint the widget as a background of the RenderObject.  A widget's foreground, e.g., the
     // text of a button, is always rendered by the engine itself.  The boolean return value indicates
     // whether the CSS border/background should also be painted.
-    bool paint(const RenderObject&, ControlStates*, const PaintInfo&, const LayoutRect&);
-    bool paintBorderOnly(const RenderObject&, const PaintInfo&, const LayoutRect&);
-    bool paintDecorations(const RenderObject&, const PaintInfo&, const LayoutRect&);
+    bool paint(const RenderBox&, ControlStates&, const PaintInfo&, const LayoutRect&);
+    bool paintBorderOnly(const RenderBox&, const PaintInfo&, const LayoutRect&);
+    bool paintDecorations(const RenderBox&, const PaintInfo&, const LayoutRect&);
 
     // The remaining methods should be implemented by the platform-specific portion of the theme, e.g.,
     // RenderThemeMac.cpp for Mac OS X.
@@ -105,7 +106,7 @@ public:
     // A method to obtain the baseline position for a "leaf" control.  This will only be used if a baseline
     // position cannot be determined by examining child content. Checkboxes and radio buttons are examples of
     // controls that need to do this.
-    virtual int baselinePosition(const RenderObject&) const;
+    virtual int baselinePosition(const RenderBox&) const;
 
     // A method for asking if a control is a container or not.  Leaf controls have to have some special behavior (like
     // the baseline position API above).
@@ -188,9 +189,6 @@ public:
 
     virtual ScrollbarControlSize scrollbarControlSizeForPart(ControlPart) { return RegularScrollbar; }
 
-    // Method for painting the caps lock indicator
-    virtual bool paintCapsLockIndicator(const RenderObject&, const PaintInfo&, const IntRect&) { return 0; };
-
     // Returns the repeat interval of the animation for the progress bar.
     virtual double animationRepeatIntervalForProgressBar(RenderProgress&) const;
     // Returns the duration of the animation for the progress bar.
@@ -211,7 +209,7 @@ public:
     virtual String formatMediaControlsRemainingTime(float currentTime, float duration) const;
     
     // Returns the media volume slider container's offset from the mute button.
-    virtual IntPoint volumeSliderOffsetFromMuteButton(RenderBox*, const IntSize&) const;
+    virtual IntPoint volumeSliderOffsetFromMuteButton(const RenderBox&, const IntSize&) const;
 #endif
 
 #if ENABLE(METER_ELEMENT)
@@ -230,8 +228,8 @@ public:
     void paintSliderTicks(const RenderObject&, const PaintInfo&, const IntRect&);
 #endif
 
-    virtual bool shouldShowPlaceholderWhenFocused() const { return false; }
     virtual bool shouldHaveSpinButton(HTMLInputElement&) const;
+    virtual bool shouldHaveCapsLockIndicator(HTMLInputElement&) const;
 
     // Functions for <select> elements.
     virtual bool delegatesMenuListRendering() const { return false; }
@@ -250,6 +248,11 @@ public:
 #endif
 
     virtual bool defaultButtonHasAnimation() const { return false; }
+
+#if ENABLE(ATTACHMENT_ELEMENT)
+    virtual LayoutSize attachmentIntrinsicSize(const RenderAttachment&) const { return LayoutSize(); }
+    virtual int attachmentBaseline(const RenderAttachment&) const { return -1; }
+#endif
 
 protected:
     virtual FontDescription& cachedSystemFontDescription(CSSValueID systemFontID) const;
@@ -304,7 +307,7 @@ protected:
     virtual bool paintMenuListDecorations(const RenderObject&, const PaintInfo&, const IntRect&) { return true; }
 
     virtual void adjustMenuListButtonStyle(StyleResolver&, RenderStyle&, Element*) const;
-    virtual bool paintMenuListButtonDecorations(const RenderObject&, const PaintInfo&, const FloatRect&) { return true; }
+    virtual bool paintMenuListButtonDecorations(const RenderBox&, const PaintInfo&, const FloatRect&) { return true; }
 
     virtual bool paintPushButtonDecorations(const RenderObject&, const PaintInfo&, const IntRect&) { return true; }
     virtual bool paintSquareButtonDecorations(const RenderObject&, const PaintInfo&, const IntRect&) { return true; }
@@ -312,6 +315,14 @@ protected:
 #if ENABLE(METER_ELEMENT)
     virtual void adjustMeterStyle(StyleResolver&, RenderStyle&, Element*) const;
     virtual bool paintMeter(const RenderObject&, const PaintInfo&, const IntRect&);
+#endif
+
+    virtual void adjustCapsLockIndicatorStyle(StyleResolver&, RenderStyle&, Element*) const;
+    virtual bool paintCapsLockIndicator(const RenderObject&, const PaintInfo&, const IntRect&);
+
+#if ENABLE(ATTACHMENT_ELEMENT)
+    virtual void adjustAttachmentStyle(StyleResolver&, RenderStyle&, Element*) const;
+    virtual bool paintAttachment(const RenderObject&, const PaintInfo&, const IntRect&);
 #endif
 
     virtual void adjustProgressBarStyle(StyleResolver&, RenderStyle&, Element*) const;
@@ -368,7 +379,7 @@ protected:
 #endif
 
 public:
-    void updateControlStatesForRenderer(const RenderObject&, ControlStates*) const;
+    void updateControlStatesForRenderer(const RenderBox&, ControlStates&) const;
     ControlStates::States extractControlStatesForRenderer(const RenderObject&) const;
     bool isActive(const RenderObject&) const;
     bool isChecked(const RenderObject&) const;

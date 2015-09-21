@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2014 Apple Inc. All rights reserved.
+ * Copyright (C) 2014, 2015 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -28,12 +28,14 @@
 
 #if ENABLE(DFG_JIT)
 
+#include "DFGGraph.h"
+#include "JSCInlines.h"
 #include "OperandsInlines.h"
 #include <wtf/ListDump.h>
 
 namespace JSC { namespace DFG {
 
-void AvailabilityMap::prune()
+void AvailabilityMap::pruneHeap()
 {
     if (m_heap.isEmpty())
         return;
@@ -45,14 +47,13 @@ void AvailabilityMap::prune()
             possibleNodes.add(m_locals[i].node());
     }
 
-    int oldPossibleNodesSize;
-    do {
-        oldPossibleNodesSize = possibleNodes.size();
-        for (auto pair : m_heap) {
-            if (pair.value.hasNode() && possibleNodes.contains(pair.key.base()))
-                possibleNodes.add(pair.value.node());
-        }
-    } while (oldPossibleNodesSize != possibleNodes.size());
+    closeOverNodes(
+        [&] (Node* node) -> bool {
+            return possibleNodes.contains(node);
+        },
+        [&] (Node* node) -> bool {
+            return possibleNodes.add(node).isNewEntry;
+        });
     
     HashMap<PromotedHeapLocation, Availability> newHeap;
     for (auto pair : m_heap) {
@@ -60,6 +61,18 @@ void AvailabilityMap::prune()
             newHeap.add(pair.key, pair.value);
     }
     m_heap = newHeap;
+}
+
+void AvailabilityMap::pruneByLiveness(Graph& graph, CodeOrigin where)
+{
+    Operands<Availability> localsCopy(OperandsLike, m_locals);
+    graph.forAllLiveInBytecode(
+        where,
+        [&] (VirtualRegister reg) {
+            localsCopy.operand(reg) = m_locals.operand(reg);
+        });
+    m_locals = localsCopy;
+    pruneHeap();
 }
 
 void AvailabilityMap::clear()

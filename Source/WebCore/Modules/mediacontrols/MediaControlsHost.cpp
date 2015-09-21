@@ -38,6 +38,7 @@
 #include "PageGroup.h"
 #include "TextTrack.h"
 #include "TextTrackList.h"
+#include "UUID.h"
 #include <runtime/JSCJSValueInlines.h>
 
 namespace WebCore {
@@ -60,9 +61,9 @@ const AtomicString& MediaControlsHost::alwaysOnKeyword()
     return alwaysOn;
 }
 
-PassRefPtr<MediaControlsHost> MediaControlsHost::create(HTMLMediaElement* mediaElement)
+Ref<MediaControlsHost> MediaControlsHost::create(HTMLMediaElement* mediaElement)
 {
-    return adoptRef(new MediaControlsHost(mediaElement));
+    return adoptRef(*new MediaControlsHost(mediaElement));
 }
 
 MediaControlsHost::MediaControlsHost(HTMLMediaElement* mediaElement)
@@ -187,21 +188,14 @@ void MediaControlsHost::exitedFullscreen()
     if (m_textTrackContainer)
         m_textTrackContainer->exitedFullscreen();
 }
-    
-void MediaControlsHost::enterFullscreenOptimized()
-{
-#if PLATFORM(IOS)
-    m_mediaElement->enterFullscreenOptimized();
-#endif
-}
-    
+
 void MediaControlsHost::updateCaptionDisplaySizes()
 {
     if (m_textTrackContainer)
         m_textTrackContainer->updateSizes(true);
 }
     
-bool MediaControlsHost::mediaPlaybackAllowsInline() const
+bool MediaControlsHost::allowsInlineMediaPlayback() const
 {
     return !m_mediaElement->mediaSession().requiresFullscreenForVideoPlayback(*m_mediaElement);
 }
@@ -218,7 +212,7 @@ bool MediaControlsHost::userGestureRequired() const
 
 String MediaControlsHost::externalDeviceDisplayName() const
 {
-#if ENABLE(IOS_AIRPLAY)
+#if ENABLE(WIRELESS_PLAYBACK_TARGET)
     MediaPlayer* player = m_mediaElement->player();
     if (!player) {
         LOG(Media, "MediaControlsHost::externalDeviceDisplayName - returning \"\" because player is NULL");
@@ -239,7 +233,7 @@ String MediaControlsHost::externalDeviceType() const
     DEPRECATED_DEFINE_STATIC_LOCAL(String, none, (ASCIILiteral("none")));
     String type = none;
     
-#if ENABLE(IOS_AIRPLAY)
+#if ENABLE(WIRELESS_PLAYBACK_TARGET)
     DEPRECATED_DEFINE_STATIC_LOCAL(String, airplay, (ASCIILiteral("airplay")));
     DEPRECATED_DEFINE_STATIC_LOCAL(String, tvout, (ASCIILiteral("tvout")));
     
@@ -277,19 +271,9 @@ void MediaControlsHost::setControlsDependOnPageScaleFactor(bool value)
     m_mediaElement->setMediaControlsDependOnPageScaleFactor(value);
 }
 
-String MediaControlsHost::mediaUIImageData(const String& partID) const
+String MediaControlsHost::generateUUID() const
 {
-#if PLATFORM(IOS)
-    if (partID == "optimized-fullscreen-button")
-        return wkGetMediaUIImageData(wkMediaUIPartOptimizedFullscreenButton);
-
-    if (partID == "optimized-fullscreen-placeholder")
-        return wkGetMediaUIImageData(wkMediaUIPartOptimizedFullscreenPlaceholder);
-#else
-    UNUSED_PARAM(partID);
-#endif
-
-    return emptyString();
+    return createCanonicalUUIDString();
 }
 
 }

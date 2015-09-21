@@ -32,14 +32,27 @@
 
 namespace WebCore {
 
+class File;
+
 class HTMLAttachmentElement final : public HTMLElement {
 public:
     static Ref<HTMLAttachmentElement> create(const QualifiedName&, Document&);
-    
+    File* file() const;
+    void setFile(File*);
+
+    String attachmentTitle() const;
+
 private:
     HTMLAttachmentElement(const QualifiedName&, Document&);
+    virtual ~HTMLAttachmentElement();
 
-    virtual RenderPtr<RenderElement> createElementRenderer(Ref<RenderStyle>&&) override;
+    virtual RenderPtr<RenderElement> createElementRenderer(Ref<RenderStyle>&&, const RenderTreePosition&) override;
+
+    virtual bool shouldSelectOnMouseDown() override { return true; }
+    virtual bool canContainRangeEndPoint() const override { return false; }
+    virtual void parseAttribute(const QualifiedName&, const AtomicString&) override;
+    
+    RefPtr<File> m_file;
 };
 
 } // namespace WebCore

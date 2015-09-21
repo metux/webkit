@@ -59,7 +59,6 @@ public:
     CompositeOperator compositeOperator() const { return m_compositeOperator; }
 
     CachedImage* cachedImage() const { return m_imageLoader.image(); }
-    void setCachedImage(CachedImage* i) { m_imageLoader.setImage(i); };
 
     void setLoadManually(bool loadManually) { m_imageLoader.setLoadManually(loadManually); }
 
@@ -102,7 +101,7 @@ private:
     virtual void collectStyleForPresentationAttribute(const QualifiedName&, const AtomicString&, MutableStyleProperties&) override;
 
     virtual void didAttachRenderers() override;
-    virtual RenderPtr<RenderElement> createElementRenderer(Ref<RenderStyle>&&) override;
+    virtual RenderPtr<RenderElement> createElementRenderer(Ref<RenderStyle>&&, const RenderTreePosition&) override;
     void setBestFitURLAndDPRFromImageCandidate(const ImageCandidate&);
 
     virtual bool canStartSelection() const override;

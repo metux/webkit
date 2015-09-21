@@ -27,15 +27,16 @@
 #ifndef SharedBuffer_h
 #define SharedBuffer_h
 
+#include "FileSystem.h"
 #include <runtime/ArrayBuffer.h>
 #include <wtf/Forward.h>
-#include <wtf/OwnPtr.h>
 #include <wtf/RefCounted.h>
 #include <wtf/ThreadSafeRefCounted.h>
 #include <wtf/Vector.h>
 #include <wtf/text/WTFString.h>
 
 #if USE(CF)
+#include "VNodeTracker.h"
 #include <wtf/RetainPtr.h>
 #endif
 
@@ -56,7 +57,7 @@ public:
     static PassRefPtr<SharedBuffer> create(const char* c, unsigned i) { return adoptRef(new SharedBuffer(c, i)); }
     static PassRefPtr<SharedBuffer> create(const unsigned char* c, unsigned i) { return adoptRef(new SharedBuffer(c, i)); }
 
-    WEBCORE_EXPORT static PassRefPtr<SharedBuffer> createWithContentsOfFile(const String& filePath);
+    WEBCORE_EXPORT static RefPtr<SharedBuffer> createWithContentsOfFile(const String& filePath);
 
     WEBCORE_EXPORT static PassRefPtr<SharedBuffer> adoptVector(Vector<char>& vector);
     
@@ -93,7 +94,7 @@ public:
     WEBCORE_EXPORT void append(const char*, unsigned);
     void append(const Vector<char>&);
 
-    void clear();
+    WEBCORE_EXPORT void clear();
     const char* platformData() const;
     unsigned platformDataSize() const;
 
@@ -102,7 +103,7 @@ public:
     void append(CFDataRef);
 #endif
 
-    PassRefPtr<SharedBuffer> copy() const;
+    WEBCORE_EXPORT Ref<SharedBuffer> copy() const;
     
     // Return the number of consecutive bytes after "position". "data"
     // points to the first byte.
@@ -130,7 +131,10 @@ private:
     explicit SharedBuffer(unsigned);
     WEBCORE_EXPORT SharedBuffer(const char*, unsigned);
     WEBCORE_EXPORT SharedBuffer(const unsigned char*, unsigned);
-    
+    explicit SharedBuffer(MappedFileData&&);
+
+    static RefPtr<SharedBuffer> createFromReadingFile(const String& filePath);
+
     // Calling this function will force internal segmented buffers
     // to be merged into a flat buffer. Use getSomeData() whenever possible
     // for better performance.
@@ -140,13 +144,15 @@ private:
     void maybeTransferPlatformData();
     bool maybeAppendPlatformData(SharedBuffer*);
 
+    void maybeTransferMappedFileData();
+
     void copyBufferAndClear(char* destination, unsigned bytesToCopy) const;
 
     void appendToDataBuffer(const char *, unsigned) const;
     void duplicateDataBufferIfNecessary() const;
     void clearDataBuffer();
 
-    unsigned m_size;
+    unsigned m_size { 0 };
     mutable RefPtr<DataBuffer> m_buffer;
 
 #if USE(NETWORK_CFDATA_ARRAY_CALLBACK)
@@ -162,12 +168,15 @@ private:
 #if USE(CF)
     explicit SharedBuffer(CFDataRef);
     RetainPtr<CFDataRef> m_cfData;
+    VNodeTracker::Token m_vnodeToken;
 #endif
 
 #if USE(SOUP)
     explicit SharedBuffer(SoupBuffer*);
     GUniquePtr<SoupBuffer> m_soupBuffer;
 #endif
+
+    MappedFileData m_fileData;
 };
 
 PassRefPtr<SharedBuffer> utf8Buffer(const String&);

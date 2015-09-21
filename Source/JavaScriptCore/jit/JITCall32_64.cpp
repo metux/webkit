@@ -29,7 +29,6 @@
 #if USE(JSVALUE32_64)
 #include "JIT.h"
 
-#include "Arguments.h"
 #include "CodeBlock.h"
 #include "Interpreter.h"
 #include "JITInlines.h"
@@ -115,28 +114,12 @@ void JIT::emit_op_construct(Instruction* currentInstruction)
     compileOpCall(op_construct, currentInstruction, m_callLinkInfoIndex++);
 }
 
-void JIT::compileSetupVarargsFrame(Instruction* instruction)
+void JIT::compileSetupVarargsFrame(Instruction* instruction, CallLinkInfo* info)
 {
     int thisValue = instruction[3].u.operand;
     int arguments = instruction[4].u.operand;
     int firstFreeRegister = instruction[5].u.operand;
     int firstVarArgOffset = instruction[6].u.operand;
-
-    JumpList slowCase;
-    JumpList end;
-    bool canOptimize = m_codeBlock->usesArguments()
-        && VirtualRegister(arguments) == m_codeBlock->argumentsRegister()
-        && !m_codeBlock->symbolTable()->slowArguments();
-
-    if (canOptimize) {
-        emitLoadTag(arguments, regT1);
-        slowCase.append(branch32(NotEqual, regT1, TrustedImm32(JSValue::EmptyValueTag)));
-        
-        move(TrustedImm32(-firstFreeRegister), regT1);
-        emitSetupVarargsFrameFastCase(*this, regT1, regT0, regT1, regT2, firstVarArgOffset, slowCase);
-        end.append(jump());
-        slowCase.link(this);
-    }
 
     emitLoad(arguments, regT1, regT0);
     callOperation(operationSizeFrameForVarargs, regT1, regT0, -firstFreeRegister, firstVarArgOffset);
@@ -147,9 +130,16 @@ void JIT::compileSetupVarargsFrame(Instruction* instruction)
     callOperation(operationSetupVarargsFrame, regT1, regT2, regT4, firstVarArgOffset, regT0);
     move(returnValueGPR, regT1);
 
-    if (canOptimize)
-        end.link(this);
-
+    // Profile the argument count.
+    load32(Address(regT1, JSStack::ArgumentCount * static_cast<int>(sizeof(Register)) + PayloadOffset), regT2);
+    load8(info->addressOfMaxNumArguments(), regT0);
+    Jump notBiggest = branch32(Above, regT0, regT2);
+    Jump notSaturated = branch32(BelowOrEqual, regT2, TrustedImm32(255));
+    move(TrustedImm32(255), regT2);
+    notSaturated.link(this);
+    store8(regT2, info->addressOfMaxNumArguments());
+    notBiggest.link(this);
+    
     // Initialize 'this'.
     emitLoad(thisValue, regT2, regT0);
     store32(regT0, Address(regT1, PayloadOffset + (CallFrame::thisArgumentOffset() * static_cast<int>(sizeof(Register)))));
@@ -176,6 +166,9 @@ void JIT::compileCallEval(Instruction* instruction)
 
 void JIT::compileCallEvalSlowCase(Instruction* instruction, Vector<SlowCaseEntry>::iterator& iter)
 {
+    CallLinkInfo* info = m_codeBlock->addCallLinkInfo();
+    info->setUpCall(CallLinkInfo::Call, CodeOrigin(m_bytecodeOffset), regT0);
+
     linkSlowCase(iter);
 
     int registerOffset = -instruction[4].u.operand;
@@ -184,10 +177,12 @@ void JIT::compileCallEvalSlowCase(Instruction* instruction, Vector<SlowCaseEntry
 
     loadPtr(Address(stackPointerRegister, sizeof(Register) * JSStack::Callee - sizeof(CallerFrameAndPC)), regT0);
     loadPtr(Address(stackPointerRegister, sizeof(Register) * JSStack::Callee - sizeof(CallerFrameAndPC)), regT1);
-    move(TrustedImmPtr(&CallLinkInfo::dummy()), regT2);
+    move(TrustedImmPtr(info), regT2);
 
     emitLoad(JSStack::Callee, regT1, regT0);
-    emitNakedCall(m_vm->getCTIStub(virtualCallThunkGenerator).code());
+    MacroAssemblerCodeRef virtualThunk = virtualThunkFor(m_vm, *info);
+    info->setSlowStub(createJITStubRoutine(virtualThunk, *m_vm, nullptr, true));
+    emitNakedCall(virtualThunk.code());
     addPtr(TrustedImm32(stackPointerOffsetFor(m_codeBlock) * sizeof(Register)), callFrameRegister, stackPointerRegister);
     checkStackPointerAlignment();
 
@@ -212,9 +207,11 @@ void JIT::compileOpCall(OpcodeID opcodeID, Instruction* instruction, unsigned ca
         - Caller initializes ReturnPC; CodeBlock.
         - Caller restores callFrameRegister after return.
     */
-    
+    CallLinkInfo* info;
+    if (opcodeID != op_call_eval)
+        info = m_codeBlock->addCallLinkInfo();
     if (opcodeID == op_call_varargs || opcodeID == op_construct_varargs)
-        compileSetupVarargsFrame(instruction);
+        compileSetupVarargsFrame(instruction, info);
     else {
         int argCount = instruction[3].u.operand;
         int registerOffset = -instruction[4].u.operand;
@@ -239,8 +236,6 @@ void JIT::compileOpCall(OpcodeID opcodeID, Instruction* instruction, unsigned ca
     store32(regT0, Address(stackPointerRegister, JSStack::Callee * static_cast<int>(sizeof(Register)) + PayloadOffset - sizeof(CallerFrameAndPC)));
     store32(regT1, Address(stackPointerRegister, JSStack::Callee * static_cast<int>(sizeof(Register)) + TagOffset - sizeof(CallerFrameAndPC)));
 
-    CallLinkInfo* info = m_codeBlock->addCallLinkInfo();
-
     if (opcodeID == op_call_eval) {
         compileCallEval(instruction);
         return;
@@ -254,9 +249,7 @@ void JIT::compileOpCall(OpcodeID opcodeID, Instruction* instruction, unsigned ca
     addSlowCase(slowCase);
 
     ASSERT(m_callCompilationInfo.size() == callLinkInfoIndex);
-    info->callType = CallLinkInfo::callTypeFor(opcodeID);
-    info->codeOrigin = CodeOrigin(m_bytecodeOffset);
-    info->calleeGPR = regT0;
+    info->setUpCall(CallLinkInfo::callTypeFor(opcodeID), CodeOrigin(m_bytecodeOffset), regT0);
     m_callCompilationInfo.append(CallCompilationInfo());
     m_callCompilationInfo[callLinkInfoIndex].hotPathBegin = addressOfLinkedFunctionCheck;
     m_callCompilationInfo[callLinkInfoIndex].callLinkInfo = info;
@@ -281,12 +274,8 @@ void JIT::compileOpCallSlowCase(OpcodeID opcodeID, Instruction* instruction, Vec
     linkSlowCase(iter);
     linkSlowCase(iter);
 
-    ThunkGenerator generator = linkThunkGeneratorFor(
-        (opcodeID == op_construct || opcodeID == op_construct_varargs) ? CodeForConstruct : CodeForCall,
-        RegisterPreservationNotRequired);
-    
     move(TrustedImmPtr(m_callCompilationInfo[callLinkInfoIndex].callLinkInfo), regT2);
-    m_callCompilationInfo[callLinkInfoIndex].callReturnLocation = emitNakedCall(m_vm->getCTIStub(generator).code());
+    m_callCompilationInfo[callLinkInfoIndex].callReturnLocation = emitNakedCall(m_vm->getCTIStub(linkCallThunkGenerator).code());
 
     addPtr(TrustedImm32(stackPointerOffsetFor(m_codeBlock) * sizeof(Register)), callFrameRegister, stackPointerRegister);
     checkStackPointerAlignment();

@@ -95,12 +95,17 @@ void RenderMathMLScripts::fixAnonymousStyleForSubSupPair(RenderObject* subSupPai
     // (respectively superscript) with the bottom (respectively top) edge of
     // the flex container. Note that for valid <msub> and <msup> elements, the
     // subSupPair should actually have only one script.
-    scriptsStyle.setJustifyContent(m_kind == Sub ? JustifyFlexStart : m_kind == Super ? JustifyFlexEnd : JustifySpaceBetween);
+    if (m_kind == Sub)
+        scriptsStyle.setJustifyContentPosition(ContentPositionFlexStart);
+    else if (m_kind == Super)
+        scriptsStyle.setJustifyContentPosition(ContentPositionFlexEnd);
+    else
+        scriptsStyle.setJustifyContentDistribution(ContentDistributionSpaceBetween);
 
     // The MathML specification does not specify vertical alignment of scripts.
     // Let's right align prescripts and left align postscripts.
     // See http://lists.w3.org/Archives/Public/www-math/2012Aug/0006.html
-    scriptsStyle.setAlignItems(isPostScript ? AlignFlexStart : AlignFlexEnd);
+    scriptsStyle.setAlignItemsPosition(isPostScript ? ItemPositionFlexStart : ItemPositionFlexEnd);
 
     // We set the order property so that the prescripts are drawn before the base.
     scriptsStyle.setOrder(isPostScript ? 0 : -1);
@@ -114,7 +119,7 @@ void RenderMathMLScripts::fixAnonymousStyles()
 {
     // We set the base wrapper's style so that baseHeight in layout() will be an unstretched height.
     ASSERT(m_baseWrapper && m_baseWrapper->style().hasOneRef());
-    m_baseWrapper->style().setAlignSelf(AlignFlexStart);
+    m_baseWrapper->style().setAlignSelfPosition(ItemPositionFlexStart);
 
     // This sets the style for postscript pairs.
     RenderObject* subSupPair = m_baseWrapper;
@@ -133,8 +138,8 @@ void RenderMathMLScripts::fixAnonymousStyles()
             ASSERT(subSupPair && subSupPair->style().refCount() == 1);
             RenderStyle& scriptsStyle = subSupPair->style();
             scriptsStyle.setFlexDirection(FlowRow);
-            scriptsStyle.setJustifyContent(JustifyFlexStart);
-            scriptsStyle.setAlignItems(AlignCenter);
+            scriptsStyle.setJustifyContentPosition(ContentPositionFlexStart);
+            scriptsStyle.setAlignItemsPosition(ItemPositionCenter);
             scriptsStyle.setOrder(0);
             scriptsStyle.setFontSize(style().fontSize());
         }
@@ -280,9 +285,7 @@ void RenderMathMLScripts::layout()
     // below the base's top edge, or the subscript's bottom edge above the base's bottom edge.
 
     LayoutUnit baseHeight = base->logicalHeight();
-    LayoutUnit baseBaseline = base->firstLineBaseline();
-    if (baseBaseline == -1)
-        baseBaseline = baseHeight;
+    LayoutUnit baseBaseline = base->firstLineBaseline().valueOr(baseHeight);
     LayoutUnit axis = style().fontMetrics().xHeight() / 2;
     int fontSize = style().fontSize();
 
@@ -314,9 +317,7 @@ void RenderMathMLScripts::layout()
 
         if (RenderBox* superscript = m_kind == Sub ? 0 : subSupPair->lastChildBox()) {
             LayoutUnit superscriptHeight = superscript->logicalHeight();
-            LayoutUnit superscriptBaseline = superscript->firstLineBaseline();
-            if (superscriptBaseline == -1)
-                superscriptBaseline = superscriptHeight;
+            LayoutUnit superscriptBaseline = superscript->firstLineBaseline().valueOr(superscriptHeight);
             LayoutUnit minBaseline = std::max<LayoutUnit>(fontSize / 3 + 1 + superscriptBaseline, superscriptHeight + axis + superscriptShiftValue);
 
             topPadding = std::max<LayoutUnit>(topPadding, minBaseline - baseBaseline);
@@ -324,9 +325,7 @@ void RenderMathMLScripts::layout()
 
         if (RenderBox* subscript = m_kind == Super ? 0 : subSupPair->firstChildBox()) {
             LayoutUnit subscriptHeight = subscript->logicalHeight();
-            LayoutUnit subscriptBaseline = subscript->firstLineBaseline();
-            if (subscriptBaseline == -1)
-                subscriptBaseline = subscriptHeight;
+            LayoutUnit subscriptBaseline = subscript->firstLineBaseline().valueOr(subscriptHeight);
             LayoutUnit baseExtendUnderBaseline = baseHeight - baseBaseline;
             LayoutUnit subscriptUnderItsBaseline = subscriptHeight - subscriptBaseline;
             LayoutUnit minExtendUnderBaseline = std::max<LayoutUnit>(fontSize / 5 + 1 + subscriptUnderItsBaseline, subscriptHeight + subscriptShiftValue - axis);
@@ -356,11 +355,10 @@ void RenderMathMLScripts::layout()
     RenderMathMLBlock::layout();
 }
 
-int RenderMathMLScripts::firstLineBaseline() const
+Optional<int> RenderMathMLScripts::firstLineBaseline() const
 {
     if (m_baseWrapper) {
-        LayoutUnit baseline = m_baseWrapper->firstLineBaseline();
-        if (baseline != -1)
+        if (Optional<int> baseline = m_baseWrapper->firstLineBaseline())
             return baseline;
     }
     return RenderMathMLBlock::firstLineBaseline();

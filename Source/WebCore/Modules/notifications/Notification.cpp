@@ -54,7 +54,7 @@
 namespace WebCore {
 
 Notification::Notification()
-    : ActiveDOMObject(0)
+    : ActiveDOMObject(nullptr)
 {
 }
 
@@ -168,6 +168,17 @@ void Notification::contextDestroyed()
     ActiveDOMObject::contextDestroyed();
     if (m_notificationCenter->client())
         m_notificationCenter->client()->notificationObjectDestroyed(this);
+}
+
+const char* Notification::activeDOMObjectName() const
+{
+    return "Notification";
+}
+
+bool Notification::canSuspendForPageCache() const
+{
+    // We can suspend if the Notification is not shown yet or after it is closed.
+    return m_state == Idle || m_state == Closed;
 }
 
 void Notification::finalize()

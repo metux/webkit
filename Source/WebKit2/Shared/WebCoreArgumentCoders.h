@@ -54,6 +54,7 @@ class IntSize;
 class KeyframeValueList;
 class LinearTimingFunction;
 class Notification;
+class Path;
 class ProtectionSpace;
 class Region;
 class ResourceError;
@@ -110,7 +111,19 @@ struct ViewportArguments;
 
 #if ENABLE(CONTENT_FILTERING)
 namespace WebCore {
-class ContentFilter;
+class ContentFilterUnblockHandler;
+}
+#endif
+
+#if ENABLE(WIRELESS_PLAYBACK_TARGET)
+namespace WebCore {
+struct MediaPlaybackTargetContext;
+}
+#endif
+
+#if ENABLE(MEDIA_SESSION)
+namespace WebCore {
+struct MediaSessionMetadata;
 }
 #endif
 
@@ -196,6 +209,11 @@ template<> struct ArgumentCoder<WebCore::IntRect> {
 template<> struct ArgumentCoder<WebCore::IntSize> {
     static void encode(ArgumentEncoder&, const WebCore::IntSize&);
     static bool decode(ArgumentDecoder&, WebCore::IntSize&);
+};
+
+template<> struct ArgumentCoder<WebCore::Path> {
+    static void encode(ArgumentEncoder&, const WebCore::Path&);
+    static bool decode(ArgumentDecoder&, WebCore::Path&);
 };
 
 template<> struct ArgumentCoder<WebCore::Region> {
@@ -437,9 +455,16 @@ template<> struct ArgumentCoder<WebCore::BlobPart> {
 };
 
 #if ENABLE(CONTENT_FILTERING)
-template<> struct ArgumentCoder<WebCore::ContentFilter> {
-    static void encode(ArgumentEncoder&, const WebCore::ContentFilter&);
-    static bool decode(ArgumentDecoder&, WebCore::ContentFilter&);
+template<> struct ArgumentCoder<WebCore::ContentFilterUnblockHandler> {
+    static void encode(ArgumentEncoder&, const WebCore::ContentFilterUnblockHandler&);
+    static bool decode(ArgumentDecoder&, WebCore::ContentFilterUnblockHandler&);
+};
+#endif
+
+#if ENABLE(MEDIA_SESSION)
+template<> struct ArgumentCoder<WebCore::MediaSessionMetadata> {
+    static void encode(ArgumentEncoder&, const WebCore::MediaSessionMetadata&);
+    static bool decode(ArgumentDecoder&, WebCore::MediaSessionMetadata&);
 };
 #endif
 
@@ -447,6 +472,15 @@ template<> struct ArgumentCoder<WebCore::TextIndicatorData> {
     static void encode(ArgumentEncoder&, const WebCore::TextIndicatorData&);
     static bool decode(ArgumentDecoder&, WebCore::TextIndicatorData&);
 };
+
+#if ENABLE(WIRELESS_PLAYBACK_TARGET)
+template<> struct ArgumentCoder<WebCore::MediaPlaybackTargetContext> {
+    static void encode(ArgumentEncoder&, const WebCore::MediaPlaybackTargetContext&);
+    static bool decode(ArgumentDecoder&, WebCore::MediaPlaybackTargetContext&);
+    static void encodePlatformData(ArgumentEncoder&, const WebCore::MediaPlaybackTargetContext&);
+    static bool decodePlatformData(ArgumentDecoder&, WebCore::MediaPlaybackTargetContext&);
+};
+#endif
 
 } // namespace IPC
 

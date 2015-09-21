@@ -126,7 +126,7 @@ void WorkerThreadableWebSocketChannel::fail(const String& reason)
 void WorkerThreadableWebSocketChannel::disconnect()
 {
     m_bridge->disconnect();
-    m_bridge.clear();
+    m_bridge = nullptr;
 }
 
 void WorkerThreadableWebSocketChannel::suspend()
@@ -242,7 +242,7 @@ void WorkerThreadableWebSocketChannel::Peer::disconnect()
     if (!m_mainWebSocketChannel)
         return;
     m_mainWebSocketChannel->disconnect();
-    m_mainWebSocketChannel = 0;
+    m_mainWebSocketChannel = nullptr;
 }
 
 void WorkerThreadableWebSocketChannel::Peer::suspend()
@@ -288,14 +288,16 @@ void WorkerThreadableWebSocketChannel::Peer::didReceiveMessage(const String& mes
     }, m_taskMode);
 }
 
-void WorkerThreadableWebSocketChannel::Peer::didReceiveBinaryData(PassOwnPtr<Vector<char>> binaryData)
+void WorkerThreadableWebSocketChannel::Peer::didReceiveBinaryData(Vector<char>&& binaryData)
 {
     ASSERT(isMainThread());
 
     RefPtr<ThreadableWebSocketChannelClientWrapper> workerClientWrapper = m_workerClientWrapper;
-    m_loaderProxy.postTaskForModeToWorkerGlobalScope([workerClientWrapper, binaryData] (ScriptExecutionContext& context) {
+    Vector<char>* capturedData = new Vector<char>(WTF::move(binaryData));
+    m_loaderProxy.postTaskForModeToWorkerGlobalScope([workerClientWrapper, capturedData] (ScriptExecutionContext& context) {
         ASSERT_UNUSED(context, context.isWorkerGlobalScope());
-        workerClientWrapper->didReceiveBinaryData(binaryData);
+        workerClientWrapper->didReceiveBinaryData(WTF::move(*capturedData));
+        delete capturedData;
     }, m_taskMode);
 }
 
@@ -324,7 +326,7 @@ void WorkerThreadableWebSocketChannel::Peer::didStartClosingHandshake()
 void WorkerThreadableWebSocketChannel::Peer::didClose(unsigned long unhandledBufferedAmount, ClosingHandshakeCompletionStatus closingHandshakeCompletion, unsigned short code, const String& reason)
 {
     ASSERT(isMainThread());
-    m_mainWebSocketChannel = 0;
+    m_mainWebSocketChannel = nullptr;
 
     RefPtr<ThreadableWebSocketChannelClientWrapper> workerClientWrapper = m_workerClientWrapper;
     StringCapture capturedReason(reason);
@@ -351,7 +353,7 @@ WorkerThreadableWebSocketChannel::Bridge::Bridge(PassRefPtr<ThreadableWebSocketC
     , m_workerGlobalScope(workerGlobalScope)
     , m_loaderProxy(m_workerGlobalScope->thread().workerLoaderProxy())
     , m_taskMode(taskMode)
-    , m_peer(0)
+    , m_peer(nullptr)
 {
     ASSERT(m_workerClientWrapper.get());
 }

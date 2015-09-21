@@ -28,6 +28,7 @@
 
 #if ENABLE(INDEXED_DATABASE) && ENABLE(DATABASE_PROCESS)
 
+#include "AsyncRequest.h"
 #include "IDBIdentifier.h"
 #include "UniqueIDBDatabaseIdentifier.h"
 #include <WebCore/IDBDatabaseBackend.h>
@@ -39,16 +40,21 @@
 #include <wtf/RefCounted.h>
 #include <wtf/text/WTFString.h>
 
+namespace IPC {
+class DataReference;
+}
+
 namespace WebCore {
 class SharedBuffer;
 
 struct IDBDatabaseMetadata;
+struct IDBGetResult;
 struct IDBKeyData;
+struct IDBKeyRangeData;
 }
 
 namespace WebKit {
 
-class AsyncRequest;
 class AsyncTask;
 class DatabaseProcessIDBConnection;
 class UniqueIDBDatabaseBackingStore;
@@ -62,9 +68,9 @@ enum class UniqueIDBDatabaseShutdownType {
 
 class UniqueIDBDatabase : public ThreadSafeRefCounted<UniqueIDBDatabase> {
 public:
-    static PassRefPtr<UniqueIDBDatabase> create(const UniqueIDBDatabaseIdentifier& identifier)
+    static Ref<UniqueIDBDatabase> create(const UniqueIDBDatabaseIdentifier& identifier)
     {
-        return adoptRef(new UniqueIDBDatabase(identifier));
+        return adoptRef(*new UniqueIDBDatabase(identifier));
     }
 
     ~UniqueIDBDatabase();
@@ -195,7 +201,7 @@ private:
     Deque<RefPtr<AsyncRequest>> m_pendingMetadataRequests;
     HashMap<IDBIdentifier, RefPtr<AsyncRequest>> m_pendingTransactionRequests;
     HashSet<IDBIdentifier> m_pendingTransactionRollbacks;
-    HashMap<uint64_t, RefPtr<AsyncRequest>> m_pendingDatabaseTasks;
+    AsyncRequestMap m_pendingDatabaseTasks;
     RefPtr<AsyncRequest> m_pendingShutdownTask;
 
     std::unique_ptr<WebCore::IDBDatabaseMetadata> m_metadata;
@@ -204,10 +210,10 @@ private:
     RefPtr<UniqueIDBDatabaseBackingStore> m_backingStore;
 
     Deque<std::unique_ptr<AsyncTask>> m_databaseTasks;
-    Mutex m_databaseTaskMutex;
+    Lock m_databaseTaskMutex;
 
     Deque<std::unique_ptr<AsyncTask>> m_mainThreadTasks;
-    Mutex m_mainThreadTaskMutex;
+    Lock m_mainThreadTaskMutex;
 };
 
 } // namespace WebKit

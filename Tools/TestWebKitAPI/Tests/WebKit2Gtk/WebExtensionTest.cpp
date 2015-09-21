@@ -22,15 +22,14 @@
 #include <JavaScriptCore/JSContextRef.h>
 #include <JavaScriptCore/JSRetainPtr.h>
 #include <gio/gio.h>
+#include <gst/gst.h>
 #include <stdlib.h>
 #include <string.h>
 #include <webkit2/webkit-web-extension.h>
 #include <wtf/Deque.h>
-#include <wtf/OwnPtr.h>
-#include <wtf/PassOwnPtr.h>
 #include <wtf/ProcessID.h>
-#include <wtf/gobject/GRefPtr.h>
-#include <wtf/gobject/GUniquePtr.h>
+#include <wtf/glib/GRefPtr.h>
+#include <wtf/glib/GUniquePtr.h>
 #include <wtf/text/CString.h>
 
 #define WEBKIT_DOM_USE_UNSTABLE_API
@@ -53,6 +52,8 @@ static const char introspectionXML[] =
     "  </method>"
     "  <method name='GetProcessIdentifier'>"
     "   <arg type='u' name='identifier' direction='out'/>"
+    "  </method>"
+    "  <method name='RemoveAVPluginsFromGSTRegistry'>"
     "  </method>"
     "  <signal name='DocumentLoaded'/>"
     "  <signal name='URIChanged'>"
@@ -83,7 +84,7 @@ struct DelayedSignal {
     CString uri;
 };
 
-Deque<OwnPtr<DelayedSignal>> delayedSignalsQueue;
+Deque<DelayedSignal> delayedSignalsQueue;
 
 static void emitDocumentLoaded(GDBusConnection* connection)
 {
@@ -115,7 +116,7 @@ static void documentLoadedCallback(WebKitWebPage* webPage, WebKitWebExtension* e
     if (data)
         emitDocumentLoaded(G_DBUS_CONNECTION(data));
     else
-        delayedSignalsQueue.append(adoptPtr(new DelayedSignal(DocumentLoadedSignal)));
+        delayedSignalsQueue.append(DelayedSignal(DocumentLoadedSignal));
 }
 
 static void emitURIChanged(GDBusConnection* connection, const char* uri)
@@ -137,7 +138,7 @@ static void uriChangedCallback(WebKitWebPage* webPage, GParamSpec* pspec, WebKit
     if (data)
         emitURIChanged(G_DBUS_CONNECTION(data), webkit_web_page_get_uri(webPage));
     else
-        delayedSignalsQueue.append(adoptPtr(new DelayedSignal(URIChangedSignal, webkit_web_page_get_uri(webPage))));
+        delayedSignalsQueue.append(DelayedSignal(URIChangedSignal, webkit_web_page_get_uri(webPage)));
 }
 
 static gboolean sendRequestCallback(WebKitWebPage*, WebKitURIRequest* request, WebKitURIResponse* redirectResponse, gpointer)
@@ -303,6 +304,17 @@ static void methodCallCallback(GDBusConnection* connection, const char* sender, 
     } else if (!g_strcmp0(methodName, "GetProcessIdentifier")) {
         g_dbus_method_invocation_return_value(invocation,
             g_variant_new("(u)", static_cast<guint32>(getCurrentProcessID())));
+    } else if (!g_strcmp0(methodName, "RemoveAVPluginsFromGSTRegistry")) {
+        gst_init(nullptr, nullptr);
+        static const char* avPlugins[] = { "libav", "omx", "vaapi", nullptr };
+        GstRegistry* registry = gst_registry_get();
+        for (unsigned i = 0; avPlugins[i]; ++i) {
+            if (GstPlugin* plugin = gst_registry_find_plugin(registry, avPlugins[i])) {
+                gst_registry_remove_plugin(registry, plugin);
+                gst_object_unref(plugin);
+            }
+        }
+        g_dbus_method_invocation_return_value(invocation, nullptr);
     }
 }
 
@@ -330,13 +342,13 @@ static void busAcquiredCallback(GDBusConnection* connection, const char* name, g
 
     g_object_set_data(G_OBJECT(userData), "dbus-connection", connection);
     while (delayedSignalsQueue.size()) {
-        OwnPtr<DelayedSignal> delayedSignal = delayedSignalsQueue.takeFirst();
-        switch (delayedSignal->type) {
+        DelayedSignal delayedSignal = delayedSignalsQueue.takeFirst();
+        switch (delayedSignal.type) {
         case DocumentLoadedSignal:
             emitDocumentLoaded(connection);
             break;
         case URIChangedSignal:
-            emitURIChanged(connection, delayedSignal->uri.data());
+            emitURIChanged(connection, delayedSignal.uri.data());
             break;
         }
     }

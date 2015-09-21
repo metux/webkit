@@ -14,12 +14,14 @@
       <sub name="WebKitDownload" link="WebKitDownload.html"/>
       <sub name="WebKitPermissionRequest" link="WebKitPermissionRequest.html"/>
       <sub name="WebKitGeolocationPermissionRequest" link="WebKitGeolocationPermissionRequest.html"/>
+      <sub name="WebKitInstallMissingMediaPluginsPermissionRequest" link="WebKitInstallMissingMediaPluginsPermissionRequest.html"/>
       <sub name="WebKitNavigationAction" link="WebKitNavigationAction.html"/>
       <sub name="WebKitUserMediaPermissionRequest" link="WebKitUserMediaPermissionRequest.html"/>
       <sub name="WebKitPolicyDecision" link="WebKitPolicyDecision.html"/>
       <sub name="WebKitNavigationPolicyDecision" link="WebKitNavigationPolicyDecision.html"/>
       <sub name="WebKitResponsePolicyDecision" link="WebKitResponsePolicyDecision.html"/>
       <sub name="WebKitHitTestResult" link="WebKitHitTestResult.html"/>
+      <sub name="WebKitEditorState" link="WebKitEditorState.html"/>
       <sub name="WebKitPrintOperation" link="WebKitPrintOperation.html"/>
       <sub name="WebKitWebResource" link="WebKitWebResource.html"/>
       <sub name="WebKitError" link="webkit2gtk-4.0-WebKitError.html"/>
@@ -40,6 +42,7 @@
       <sub name="User content" link="webkit2gtk-4.0-WebKitUserContent.html"/>
       <sub name="WebKitNotification" link="WebKitNotification.html"/>
       <sub name="WebKitNotificationPermissionRequest" link="WebKitNotificationPermissionRequest.html"/>
+      <sub name="WebKitWebsiteDataManager" link="WebKitWebsiteDataManager.html"/>
     </sub>
     <sub name="Web Extensions" link="ch02.html">
       <sub name="WebKitWebExtension" link="WebKitWebExtension.html"/>
@@ -47,6 +50,7 @@
       <sub name="WebKitFrame" link="WebKitFrame.html"/>
       <sub name="WebKitScriptWorld" link="WebKitScriptWorld.html"/>
       <sub name="WebKitWebHitTestResult" link="WebKitWebHitTestResult.html"/>
+      <sub name="WebKitWebEditor" link="WebKitWebEditor.html"/>
     </sub>
     <sub name="Index" link="index-all.html"/>
     <sub name="Index of deprecated symbols" link="api-index-deprecated.html"/>
@@ -54,13 +58,18 @@
     <sub name="Index of new symbols in 2.4" link="api-index-2-4.html"/>
     <sub name="Index of new symbols in 2.6" link="api-index-2-6.html"/>
     <sub name="Index of new symbols in 2.8" link="api-index-2-8.html"/>
+    <sub name="Index of new symbols in 2.10" link="api-index-2-10.html"/>
     <sub name="Annotation Glossary" link="annotation-glossary.html"/>
   </chapters>
   <functions>
     <keyword type="function" name="webkit_web_context_get_default ()" link="WebKitWebContext.html#webkit-web-context-get-default"/>
     <keyword type="function" name="webkit_web_context_new ()" link="WebKitWebContext.html#webkit-web-context-new" since="2.8"/>
+    <keyword type="function" name="webkit_web_context_new_with_website_data_manager ()" link="WebKitWebContext.html#webkit-web-context-new-with-website-data-manager" since="2.10"/>
+    <keyword type="function" name="webkit_web_context_get_website_data_manager ()" link="WebKitWebContext.html#webkit-web-context-get-website-data-manager" since="2.10"/>
     <keyword type="function" name="webkit_web_context_get_cache_model ()" link="WebKitWebContext.html#webkit-web-context-get-cache-model"/>
     <keyword type="function" name="webkit_web_context_set_cache_model ()" link="WebKitWebContext.html#webkit-web-context-set-cache-model"/>
+    <keyword type="function" name="webkit_web_context_get_web_process_count_limit ()" link="WebKitWebContext.html#webkit-web-context-get-web-process-count-limit" since="2.10"/>
+    <keyword type="function" name="webkit_web_context_set_web_process_count_limit ()" link="WebKitWebContext.html#webkit-web-context-set-web-process-count-limit" since="2.10"/>
     <keyword type="function" name="webkit_web_context_clear_cache ()" link="WebKitWebContext.html#webkit-web-context-clear-cache"/>
     <keyword type="function" name="webkit_web_context_download_uri ()" link="WebKitWebContext.html#webkit-web-context-download-uri"/>
     <keyword type="function" name="webkit_web_context_get_cookie_manager ()" link="WebKitWebContext.html#webkit-web-context-get-cookie-manager"/>
@@ -81,7 +90,7 @@
     <keyword type="function" name="webkit_web_context_set_web_extensions_directory ()" link="WebKitWebContext.html#webkit-web-context-set-web-extensions-directory"/>
     <keyword type="function" name="webkit_web_context_set_web_extensions_initialization_user_data ()" link="WebKitWebContext.html#webkit-web-context-set-web-extensions-initialization-user-data" since="2.4"/>
     <keyword type="function" name="webkit_web_context_prefetch_dns ()" link="WebKitWebContext.html#webkit-web-context-prefetch-dns"/>
-    <keyword type="function" name="webkit_web_context_set_disk_cache_directory ()" link="WebKitWebContext.html#webkit-web-context-set-disk-cache-directory"/>
+    <keyword type="function" name="webkit_web_context_set_disk_cache_directory ()" link="WebKitWebContext.html#webkit-web-context-set-disk-cache-directory" deprecated="2.10. Use webkit_web_context_new_with_website_data_manager() instead."/>
     <keyword type="function" name="webkit_web_context_allow_tls_certificate_for_host ()" link="WebKitWebContext.html#webkit-web-context-allow-tls-certificate-for-host" since="2.6"/>
     <keyword type="function" name="webkit_web_context_get_process_model ()" link="WebKitWebContext.html#webkit-web-context-get-process-model" since="2.4"/>
     <keyword type="function" name="webkit_web_context_set_process_model ()" link="WebKitWebContext.html#webkit-web-context-set-process-model" since="2.4"/>
@@ -92,6 +101,7 @@
     <keyword type="enum" name="enum WebKitProcessModel" link="WebKitWebContext.html#WebKitProcessModel" since="2.4"/>
     <keyword type="enum" name="enum WebKitTLSErrorsPolicy" link="WebKitWebContext.html#WebKitTLSErrorsPolicy"/>
     <keyword type="property" name="The “local-storage-directory” property" link="WebKitWebContext.html#WebKitWebContext--local-storage-directory"/>
+    <keyword type="property" name="The “website-data-manager” property" link="WebKitWebContext.html#WebKitWebContext--website-data-manager"/>
     <keyword type="signal" name="The “download-started” signal" link="WebKitWebContext.html#WebKitWebContext-download-started"/>
     <keyword type="signal" name="The “initialize-web-extensions” signal" link="WebKitWebContext.html#WebKitWebContext-initialize-web-extensions"/>
     <keyword type="function" name="webkit_web_view_new ()" link="WebKitWebView.html#webkit-web-view-new"/>
@@ -133,6 +143,7 @@
     <keyword type="function" name="webkit_web_view_can_execute_editing_command ()" link="WebKitWebView.html#webkit-web-view-can-execute-editing-command"/>
     <keyword type="function" name="webkit_web_view_can_execute_editing_command_finish ()" link="WebKitWebView.html#webkit-web-view-can-execute-editing-command-finish"/>
     <keyword type="function" name="webkit_web_view_execute_editing_command ()" link="WebKitWebView.html#webkit-web-view-execute-editing-command"/>
+    <keyword type="function" name="webkit_web_view_execute_editing_command_with_argument ()" link="WebKitWebView.html#webkit-web-view-execute-editing-command-with-argument" since="2.10"/>
     <keyword type="function" name="webkit_web_view_get_find_controller ()" link="WebKitWebView.html#webkit-web-view-get-find-controller"/>
     <keyword type="function" name="webkit_web_view_get_inspector ()" link="WebKitWebView.html#webkit-web-view-get-inspector"/>
     <keyword type="function" name="webkit_web_view_get_javascript_global_context ()" link="WebKitWebView.html#webkit-web-view-get-javascript-global-context"/>
@@ -153,6 +164,7 @@
     <keyword type="function" name="webkit_web_view_get_background_color ()" link="WebKitWebView.html#webkit-web-view-get-background-color" since="2.8"/>
     <keyword type="function" name="webkit_web_view_set_editable ()" link="WebKitWebView.html#webkit-web-view-set-editable" since="2.8"/>
     <keyword type="function" name="webkit_web_view_is_editable ()" link="WebKitWebView.html#webkit-web-view-is-editable"/>
+    <keyword type="function" name="webkit_web_view_get_editor_state ()" link="WebKitWebView.html#webkit-web-view-get-editor-state" since="2.10"/>
     <keyword type="function" name="webkit_javascript_result_ref ()" link="WebKitWebView.html#webkit-javascript-result-ref"/>
     <keyword type="function" name="webkit_javascript_result_unref ()" link="WebKitWebView.html#webkit-javascript-result-unref"/>
     <keyword type="function" name="webkit_javascript_result_get_global_context ()" link="WebKitWebView.html#webkit-javascript-result-get-global-context"/>
@@ -176,6 +188,8 @@
     <keyword type="macro" name="WEBKIT_EDITING_COMMAND_SELECT_ALL" link="WebKitWebView.html#WEBKIT-EDITING-COMMAND-SELECT-ALL:CAPS"/>
     <keyword type="macro" name="WEBKIT_EDITING_COMMAND_UNDO" link="WebKitWebView.html#WEBKIT-EDITING-COMMAND-UNDO:CAPS"/>
     <keyword type="macro" name="WEBKIT_EDITING_COMMAND_REDO" link="WebKitWebView.html#WEBKIT-EDITING-COMMAND-REDO:CAPS"/>
+    <keyword type="macro" name="WEBKIT_EDITING_COMMAND_INSERT_IMAGE" link="WebKitWebView.html#WEBKIT-EDITING-COMMAND-INSERT-IMAGE:CAPS" since="2.10"/>
+    <keyword type="macro" name="WEBKIT_EDITING_COMMAND_CREATE_LINK" link="WebKitWebView.html#WEBKIT-EDITING-COMMAND-CREATE-LINK:CAPS" since="2.10"/>
     <keyword type="struct" name="WebKitJavascriptResult" link="WebKitWebView.html#WebKitJavascriptResult-struct"/>
     <keyword type="struct" name="WebKitScriptDialog" link="WebKitWebView.html#WebKitScriptDialog-struct"/>
     <keyword type="enum" name="enum WebKitScriptDialogType" link="WebKitWebView.html#WebKitScriptDialogType"/>
@@ -351,7 +365,10 @@
     <keyword type="function" name="webkit_settings_set_enable_spatial_navigation ()" link="WebKitSettings.html#webkit-settings-set-enable-spatial-navigation" since="2.2"/>
     <keyword type="function" name="webkit_settings_get_enable_mediasource ()" link="WebKitSettings.html#webkit-settings-get-enable-mediasource" since="2.4"/>
     <keyword type="function" name="webkit_settings_set_enable_mediasource ()" link="WebKitSettings.html#webkit-settings-set-enable-mediasource" since="2.4"/>
+    <keyword type="function" name="webkit_settings_get_allow_file_access_from_file_urls ()" link="WebKitSettings.html#webkit-settings-get-allow-file-access-from-file-urls" since="2.10"/>
+    <keyword type="function" name="webkit_settings_set_allow_file_access_from_file_urls ()" link="WebKitSettings.html#webkit-settings-set-allow-file-access-from-file-urls" since="2.10"/>
     <keyword type="struct" name="struct WebKitSettings" link="WebKitSettings.html#WebKitSettings-struct"/>
+    <keyword type="property" name="The “allow-file-access-from-file-urls” property" link="WebKitSettings.html#WebKitSettings--allow-file-access-from-file-urls"/>
     <keyword type="property" name="The “allow-modal-dialogs” property" link="WebKitSettings.html#WebKitSettings--allow-modal-dialogs"/>
     <keyword type="property" name="The “auto-load-images” property" link="WebKitSettings.html#WebKitSettings--auto-load-images"/>
     <keyword type="property" name="The “cursive-font-family” property" link="WebKitSettings.html#WebKitSettings--cursive-font-family"/>
@@ -461,6 +478,8 @@
     <keyword type="function" name="webkit_permission_request_deny ()" link="WebKitPermissionRequest.html#webkit-permission-request-deny"/>
     <keyword type="struct" name="WebKitPermissionRequest" link="WebKitPermissionRequest.html#WebKitPermissionRequest-struct"/>
     <keyword type="struct" name="struct WebKitGeolocationPermissionRequest" link="WebKitGeolocationPermissionRequest.html#WebKitGeolocationPermissionRequest-struct"/>
+    <keyword type="function" name="webkit_install_missing_media_plugins_permission_request_get_description ()" link="WebKitInstallMissingMediaPluginsPermissionRequest.html#webkit-install-missing-media-plugins-permission-request-get-description" since="2.10"/>
+    <keyword type="struct" name="struct WebKitInstallMissingMediaPluginsPermissionRequest" link="WebKitInstallMissingMediaPluginsPermissionRequest.html#WebKitInstallMissingMediaPluginsPermissionRequest-struct"/>
     <keyword type="function" name="webkit_navigation_action_copy ()" link="WebKitNavigationAction.html#webkit-navigation-action-copy" since="2.6"/>
     <keyword type="function" name="webkit_navigation_action_free ()" link="WebKitNavigationAction.html#webkit-navigation-action-free" since="2.6"/>
     <keyword type="function" name="webkit_navigation_action_get_navigation_type ()" link="WebKitNavigationAction.html#webkit-navigation-action-get-navigation-type" since="2.6"/>
@@ -518,6 +537,10 @@
     <keyword type="property" name="The “link-title” property" link="WebKitHitTestResult.html#WebKitHitTestResult--link-title"/>
     <keyword type="property" name="The “link-uri” property" link="WebKitHitTestResult.html#WebKitHitTestResult--link-uri"/>
     <keyword type="property" name="The “media-uri” property" link="WebKitHitTestResult.html#WebKitHitTestResult--media-uri"/>
+    <keyword type="function" name="webkit_editor_state_get_typing_attributes ()" link="WebKitEditorState.html#webkit-editor-state-get-typing-attributes" since="2.10"/>
+    <keyword type="struct" name="struct WebKitEditorState" link="WebKitEditorState.html#WebKitEditorState-struct"/>
+    <keyword type="enum" name="enum WebKitEditorTypingAttributes" link="WebKitEditorState.html#WebKitEditorTypingAttributes" since="2.10"/>
+    <keyword type="property" name="The “typing-attributes” property" link="WebKitEditorState.html#WebKitEditorState--typing-attributes"/>
     <keyword type="function" name="webkit_print_operation_new ()" link="WebKitPrintOperation.html#webkit-print-operation-new"/>
     <keyword type="function" name="webkit_print_operation_get_print_settings ()" link="WebKitPrintOperation.html#webkit-print-operation-get-print-settings"/>
     <keyword type="function" name="webkit_print_operation_set_print_settings ()" link="WebKitPrintOperation.html#webkit-print-operation-set-print-settings"/>
@@ -739,6 +762,22 @@
     <keyword type="property" name="The “title” property" link="WebKitNotification.html#WebKitNotification--title"/>
     <keyword type="signal" name="The “closed” signal" link="WebKitNotification.html#WebKitNotification-closed"/>
     <keyword type="struct" name="struct WebKitNotificationPermissionRequest" link="WebKitNotificationPermissionRequest.html#WebKitNotificationPermissionRequest-struct"/>
+    <keyword type="function" name="webkit_website_data_manager_new ()" link="WebKitWebsiteDataManager.html#webkit-website-data-manager-new" since="2.10"/>
+    <keyword type="function" name="webkit_website_data_manager_get_base_data_directory ()" link="WebKitWebsiteDataManager.html#webkit-website-data-manager-get-base-data-directory" since="2.10"/>
+    <keyword type="function" name="webkit_website_data_manager_get_base_cache_directory ()" link="WebKitWebsiteDataManager.html#webkit-website-data-manager-get-base-cache-directory" since="2.10"/>
+    <keyword type="function" name="webkit_website_data_manager_get_local_storage_directory ()" link="WebKitWebsiteDataManager.html#webkit-website-data-manager-get-local-storage-directory" since="2.10"/>
+    <keyword type="function" name="webkit_website_data_manager_get_disk_cache_directory ()" link="WebKitWebsiteDataManager.html#webkit-website-data-manager-get-disk-cache-directory" since="2.10"/>
+    <keyword type="function" name="webkit_website_data_manager_get_offline_application_cache_directory ()" link="WebKitWebsiteDataManager.html#webkit-website-data-manager-get-offline-application-cache-directory" since="2.10"/>
+    <keyword type="function" name="webkit_website_data_manager_get_indexeddb_directory ()" link="WebKitWebsiteDataManager.html#webkit-website-data-manager-get-indexeddb-directory" since="2.10"/>
+    <keyword type="function" name="webkit_website_data_manager_get_websql_directory ()" link="WebKitWebsiteDataManager.html#webkit-website-data-manager-get-websql-directory" since="2.10"/>
+    <keyword type="struct" name="struct WebKitWebsiteDataManager" link="WebKitWebsiteDataManager.html#WebKitWebsiteDataManager-struct"/>
+    <keyword type="property" name="The “base-cache-directory” property" link="WebKitWebsiteDataManager.html#WebKitWebsiteDataManager--base-cache-directory"/>
+    <keyword type="property" name="The “base-data-directory” property" link="WebKitWebsiteDataManager.html#WebKitWebsiteDataManager--base-data-directory"/>
+    <keyword type="property" name="The “disk-cache-directory” property" link="WebKitWebsiteDataManager.html#WebKitWebsiteDataManager--disk-cache-directory"/>
+    <keyword type="property" name="The “indexeddb-directory” property" link="WebKitWebsiteDataManager.html#WebKitWebsiteDataManager--indexeddb-directory"/>
+    <keyword type="property" name="The “local-storage-directory” property" link="WebKitWebsiteDataManager.html#WebKitWebsiteDataManager--local-storage-directory"/>
+    <keyword type="property" name="The “offline-application-cache-directory” property" link="WebKitWebsiteDataManager.html#WebKitWebsiteDataManager--offline-application-cache-directory"/>
+    <keyword type="property" name="The “websql-directory” property" link="WebKitWebsiteDataManager.html#WebKitWebsiteDataManager--websql-directory"/>
     <keyword type="function" name="WebKitWebExtensionInitializeFunction ()" link="WebKitWebExtension.html#WebKitWebExtensionInitializeFunction"/>
     <keyword type="function" name="WebKitWebExtensionInitializeWithUserDataFunction ()" link="WebKitWebExtension.html#WebKitWebExtensionInitializeWithUserDataFunction" since="2.4"/>
     <keyword type="function" name="webkit_web_extension_get_page ()" link="WebKitWebExtension.html#webkit-web-extension-get-page"/>
@@ -748,7 +787,8 @@
     <keyword type="function" name="webkit_web_page_get_id ()" link="WebKitWebPage.html#webkit-web-page-get-id"/>
     <keyword type="function" name="webkit_web_page_get_uri ()" link="WebKitWebPage.html#webkit-web-page-get-uri"/>
     <keyword type="function" name="webkit_web_page_get_main_frame ()" link="WebKitWebPage.html#webkit-web-page-get-main-frame" since="2.2"/>
-    <keyword type="struct" name="struct WebKitWebPage" link="WebKitWebPage.html#WebKitWebPage-struct"/>
+    <keyword type="function" name="webkit_web_page_get_editor ()" link="WebKitWebPage.html#webkit-web-page-get-editor" since="2.10"/>
+    <keyword type="struct" name="WebKitWebPage" link="WebKitWebPage.html#WebKitWebPage-struct"/>
     <keyword type="property" name="The “uri” property" link="WebKitWebPage.html#WebKitWebPage--uri"/>
     <keyword type="signal" name="The “context-menu” signal" link="WebKitWebPage.html#WebKitWebPage-context-menu"/>
     <keyword type="signal" name="The “document-loaded” signal" link="WebKitWebPage.html#WebKitWebPage-document-loaded"/>
@@ -765,6 +805,9 @@
     <keyword type="function" name="webkit_web_hit_test_result_get_node ()" link="WebKitWebHitTestResult.html#webkit-web-hit-test-result-get-node" since="2.8"/>
     <keyword type="struct" name="struct WebKitWebHitTestResult" link="WebKitWebHitTestResult.html#WebKitWebHitTestResult-struct"/>
     <keyword type="property" name="The “node” property" link="WebKitWebHitTestResult.html#WebKitWebHitTestResult--node"/>
+    <keyword type="function" name="webkit_web_editor_get_page ()" link="WebKitWebEditor.html#webkit-web-editor-get-page" since="2.10"/>
+    <keyword type="struct" name="WebKitWebEditor" link="WebKitWebEditor.html#WebKitWebEditor-struct"/>
+    <keyword type="signal" name="The “selection-changed” signal" link="WebKitWebEditor.html#WebKitWebEditor-selection-changed"/>
     <keyword type="constant" name="WEBKIT_CACHE_MODEL_DOCUMENT_VIEWER" link="WebKitWebContext.html#WEBKIT-CACHE-MODEL-DOCUMENT-VIEWER:CAPS"/>
     <keyword type="constant" name="WEBKIT_CACHE_MODEL_WEB_BROWSER" link="WebKitWebContext.html#WEBKIT-CACHE-MODEL-WEB-BROWSER:CAPS"/>
     <keyword type="constant" name="WEBKIT_CACHE_MODEL_DOCUMENT_BROWSER" link="WebKitWebContext.html#WEBKIT-CACHE-MODEL-DOCUMENT-BROWSER:CAPS"/>
@@ -815,6 +858,11 @@
     <keyword type="constant" name="WEBKIT_HIT_TEST_RESULT_CONTEXT_EDITABLE" link="WebKitHitTestResult.html#WEBKIT-HIT-TEST-RESULT-CONTEXT-EDITABLE:CAPS"/>
     <keyword type="constant" name="WEBKIT_HIT_TEST_RESULT_CONTEXT_SCROLLBAR" link="WebKitHitTestResult.html#WEBKIT-HIT-TEST-RESULT-CONTEXT-SCROLLBAR:CAPS"/>
     <keyword type="constant" name="WEBKIT_HIT_TEST_RESULT_CONTEXT_SELECTION" link="WebKitHitTestResult.html#WEBKIT-HIT-TEST-RESULT-CONTEXT-SELECTION:CAPS"/>
+    <keyword type="constant" name="WEBKIT_EDITOR_TYPING_ATTRIBUTE_NONE" link="WebKitEditorState.html#WEBKIT-EDITOR-TYPING-ATTRIBUTE-NONE:CAPS"/>
+    <keyword type="constant" name="WEBKIT_EDITOR_TYPING_ATTRIBUTE_BOLD" link="WebKitEditorState.html#WEBKIT-EDITOR-TYPING-ATTRIBUTE-BOLD:CAPS"/>
+    <keyword type="constant" name="WEBKIT_EDITOR_TYPING_ATTRIBUTE_ITALIC" link="WebKitEditorState.html#WEBKIT-EDITOR-TYPING-ATTRIBUTE-ITALIC:CAPS"/>
+    <keyword type="constant" name="WEBKIT_EDITOR_TYPING_ATTRIBUTE_UNDERLINE" link="WebKitEditorState.html#WEBKIT-EDITOR-TYPING-ATTRIBUTE-UNDERLINE:CAPS"/>
+    <keyword type="constant" name="WEBKIT_EDITOR_TYPING_ATTRIBUTE_STRIKETHROUGH" link="WebKitEditorState.html#WEBKIT-EDITOR-TYPING-ATTRIBUTE-STRIKETHROUGH:CAPS"/>
     <keyword type="constant" name="WEBKIT_PRINT_OPERATION_RESPONSE_PRINT" link="WebKitPrintOperation.html#WEBKIT-PRINT-OPERATION-RESPONSE-PRINT:CAPS"/>
     <keyword type="constant" name="WEBKIT_PRINT_OPERATION_RESPONSE_CANCEL" link="WebKitPrintOperation.html#WEBKIT-PRINT-OPERATION-RESPONSE-CANCEL:CAPS"/>
     <keyword type="constant" name="WEBKIT_NETWORK_ERROR_FAILED" link="webkit2gtk-4.0-WebKitError.html#WEBKIT-NETWORK-ERROR-FAILED:CAPS"/>

@@ -21,7 +21,6 @@
 #include "config.h"
 #include "SVGTextPathElement.h"
 
-#include "Attribute.h"
 #include "RenderSVGResource.h"
 #include "RenderSVGTextPath.h"
 #include "SVGNames.h"
@@ -85,9 +84,7 @@ void SVGTextPathElement::parseAttribute(const QualifiedName& name, const AtomicS
 {
     SVGParsingError parseError = NoError;
 
-    if (!isSupportedAttribute(name))
-        SVGTextContentElement::parseAttribute(name, value);
-    else if (name == SVGNames::startOffsetAttr)
+    if (name == SVGNames::startOffsetAttr)
         setStartOffsetBaseValue(SVGLength::construct(LengthModeOther, value, parseError));
     else if (name == SVGNames::methodAttr) {
         SVGTextPathMethodType propertyValue = SVGPropertyTraits<SVGTextPathMethodType>::fromString(value);
@@ -97,11 +94,12 @@ void SVGTextPathElement::parseAttribute(const QualifiedName& name, const AtomicS
         SVGTextPathSpacingType propertyValue = SVGPropertyTraits<SVGTextPathSpacingType>::fromString(value);
         if (propertyValue > 0)
             setSpacingBaseValue(propertyValue);
-    } else if (SVGURIReference::parseAttribute(name, value)) {
-    } else
-        ASSERT_NOT_REACHED();
+    }
 
     reportAttributeParsingError(parseError, name, value);
+
+    SVGTextContentElement::parseAttribute(name, value);
+    SVGURIReference::parseAttribute(name, value);
 }
 
 void SVGTextPathElement::svgAttributeChanged(const QualifiedName& attrName)
@@ -125,7 +123,7 @@ void SVGTextPathElement::svgAttributeChanged(const QualifiedName& attrName)
         RenderSVGResource::markForLayoutAndParentResourceInvalidation(*renderer);
 }
 
-RenderPtr<RenderElement> SVGTextPathElement::createElementRenderer(Ref<RenderStyle>&& style)
+RenderPtr<RenderElement> SVGTextPathElement::createElementRenderer(Ref<RenderStyle>&& style, const RenderTreePosition&)
 {
     return createRenderer<RenderSVGTextPath>(*this, WTF::move(style));
 }
@@ -178,10 +176,10 @@ void SVGTextPathElement::buildPendingResource()
 Node::InsertionNotificationRequest SVGTextPathElement::insertedInto(ContainerNode& rootParent)
 {
     SVGTextContentElement::insertedInto(rootParent);
-    return InsertionShouldCallDidNotifySubtreeInsertions;
+    return InsertionShouldCallFinishedInsertingSubtree;
 }
 
-void SVGTextPathElement::didNotifySubtreeInsertions()
+void SVGTextPathElement::finishedInsertingSubtree()
 {
     buildPendingResource();
 }

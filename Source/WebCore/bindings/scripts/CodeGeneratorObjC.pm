@@ -109,7 +109,7 @@ my $nullableInit = "bool isNull = false;";
 my $exceptionInit = "WebCore::ExceptionCode ec = 0;";
 my $jsContextSetter = "WebCore::JSMainThreadNullState state;";
 my $exceptionRaiseOnError = "WebCore::raiseOnDOMError(ec);";
-my $assertMainThread = "{ DOM_ASSERT_MAIN_THREAD(); WebCoreThreadViolationCheckRoundOne(); }";
+my $threadViolationCheck = "WebCoreThreadViolationCheckRoundOne();";
 
 my %conflictMethod = (
     # FIXME: Add C language keywords?
@@ -217,6 +217,8 @@ my $implementationLicenseTemplate = << "EOF";
  */
 EOF
 
+my $TBDAvailabilityVersion = "9876_5";
+
 # Default constructor
 sub new
 {
@@ -224,8 +226,6 @@ sub new
     my $reference = { };
 
     $codeGenerator = shift;
-    shift; # $useLayerOnTop
-    shift; # $preprocessor
     $writeDependencies = shift;
 
     bless($reference, $object);
@@ -299,7 +299,7 @@ sub ReadPublicInterfaces
 
     # If this class was not found in PublicDOMInterfaces.h then it should be considered as an entirely new public class.
     $newPublicClass = !$found;
-    $interfaceAvailabilityVersion = "TBD" if $newPublicClass;
+    $interfaceAvailabilityVersion = $TBDAvailabilityVersion if $newPublicClass;
 }
 
 sub AddMethodsConstantsAndAttributesFromParentInterfaces
@@ -537,6 +537,9 @@ sub SkipFunction
     return 1 if $codeGenerator->GetSequenceType($function->signature->type);
     return 1 if $codeGenerator->GetArrayType($function->signature->type);
 
+    return 1 if $function->signature->type eq "Promise";
+    return 1 if $function->signature->extendedAttributes->{"CustomBinding"};
+
     foreach my $param (@{$function->parameters}) {
         return 1 if $codeGenerator->GetSequenceType($param->type);
         return 1 if $codeGenerator->GetArrayType($param->type);
@@ -555,12 +558,12 @@ sub SkipAttribute
     return 1 if $codeGenerator->GetArrayType($type);
     return 1 if $codeGenerator->IsTypedArrayType($type);
     return 1 if $codeGenerator->IsEnumType($type);
+    return 1 if $type eq "EventHandler";
     return 1 if $attribute->isStatic;
 
-    # This is for DynamicsCompressorNode.idl
-    if ($attribute->signature->name eq "release") {
-        return 1;
-    }
+    # This is for DynamicsCompressorNode.idl.
+    # FIXME: Normally we would rename rather than just skipping for a case like this.
+    return 1 if $attribute->signature->name eq "release";
 
     return 0;
 }
@@ -1676,7 +1679,7 @@ sub GenerateImplementation
     if ($parentImplClassName eq "Object") {        
         push(@implContent, "$className *kit($implType* value)\n");
         push(@implContent, "{\n");
-        push(@implContent, "    $assertMainThread;\n");
+        push(@implContent, "    $threadViolationCheck\n");
         push(@implContent, "    if (!value)\n");
         push(@implContent, "        return nil;\n");
         push(@implContent, "    if ($className *wrapper = getDOMWrapper(value))\n");
@@ -1696,7 +1699,7 @@ sub GenerateImplementation
     } else {
         push(@implContent, "$className *kit($implType* value)\n");
         push(@implContent, "{\n");
-        push(@implContent, "    $assertMainThread;\n");
+        push(@implContent, "    $threadViolationCheck\n");
         push(@implContent, "    return static_cast<$className*>(kit(static_cast<WebCore::$baseClass*>(value)));\n");
         push(@implContent, "}\n");
     }

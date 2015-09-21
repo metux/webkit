@@ -34,14 +34,14 @@
 
 namespace JSC {
 
-class Symbol : public JSCell {
+class Symbol final : public JSCell {
 public:
     typedef JSCell Base;
+    static const unsigned StructureFlags = Base::StructureFlags | OverridesGetOwnPropertySlot | InterceptsGetOwnPropertySlotByIndexEvenWhenLengthIsNotZero | StructureIsImmortal;
 
     DECLARE_EXPORT_INFO;
 
     static const bool needsDestruction = true;
-    static const bool hasImmortalStructure = true;
 
     static Structure* createStructure(VM& vm, JSGlobalObject* globalObject, JSValue prototype)
     {
@@ -64,7 +64,7 @@ public:
         return symbol;
     }
 
-    static Symbol* create(VM& vm, AtomicStringImpl* uid)
+    static Symbol* create(VM& vm, SymbolImpl& uid)
     {
         Symbol* symbol = new (NotNull, allocateCell<Symbol>(vm.heap)) Symbol(vm, uid);
         symbol->finishCreation(vm);
@@ -75,19 +75,18 @@ public:
     String descriptiveString() const;
 
     JSValue toPrimitive(ExecState*, PreferredPrimitiveType) const;
-    JS_EXPORT_PRIVATE bool toBoolean() const;
     bool getPrimitiveNumber(ExecState*, double& number, JSValue&) const;
     JSObject* toObject(ExecState*, JSGlobalObject*) const;
     double toNumber(ExecState*) const;
 
-protected:
-    static const unsigned StructureFlags = OverridesGetOwnPropertySlot | InterceptsGetOwnPropertySlotByIndexEvenWhenLengthIsNotZero | StructureIsImmortal;
+    static size_t offsetOfPrivateName() { return OBJECT_OFFSETOF(Symbol, m_privateName); }
 
+protected:
     static void destroy(JSCell*);
 
     Symbol(VM&);
     Symbol(VM&, const String&);
-    Symbol(VM&, AtomicStringImpl* uid);
+    Symbol(VM&, SymbolImpl& uid);
 
     void finishCreation(VM& vm)
     {

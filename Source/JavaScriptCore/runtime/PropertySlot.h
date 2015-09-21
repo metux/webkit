@@ -1,5 +1,5 @@
 /*
- *  Copyright (C) 2005, 2007, 2008 Apple Inc. All rights reserved.
+ *  Copyright (C) 2005, 2007, 2008, 2015 Apple Inc. All rights reserved.
  *
  *  This library is free software; you can redistribute it and/or
  *  modify it under the terms of the GNU Library General Public
@@ -46,7 +46,8 @@ enum Attribute {
     Builtin           = 1 << 7, // property is a builtin function - only used by static hashtables
     ConstantInteger   = 1 << 8, // property is a constant integer - only used by static hashtables
     BuiltinOrFunction = Builtin | Function, // helper only used by static hashtables
-    BuiltinOrFunctionOrConstant = Builtin | Function | ConstantInteger, // helper only used by static hashtables
+    BuiltinOrFunctionOrAccessor = Builtin | Function | Accessor, // helper only used by static hashtables
+    BuiltinOrFunctionOrAccessorOrConstant = Builtin | Function | Accessor | ConstantInteger, // helper only used by static hashtables
 };
 
 class PropertySlot {
@@ -67,6 +68,7 @@ public:
         : m_propertyType(TypeUnset)
         , m_offset(invalidOffset)
         , m_thisValue(thisValue)
+        , m_slotBase(nullptr)
         , m_watchpointSet(nullptr)
         , m_cacheability(CachingAllowed)
     {
@@ -113,7 +115,6 @@ public:
 
     JSObject* slotBase() const
     {
-        ASSERT(m_propertyType != TypeUnset);
         return m_slotBase;
     }
 
@@ -124,7 +125,6 @@ public:
 
     void setValue(JSObject* slotBase, unsigned attributes, JSValue value)
     {
-        ASSERT(value);
         m_data.value = JSValue::encode(value);
         m_attributes = attributes;
 

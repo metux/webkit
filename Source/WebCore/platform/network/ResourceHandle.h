@@ -30,7 +30,6 @@
 #include "HTTPHeaderMap.h"
 #include "ResourceHandleTypes.h"
 #include "ResourceLoadPriority.h"
-#include <wtf/OwnPtr.h>
 #include <wtf/RefCounted.h>
 
 #if PLATFORM(COCOA) || USE(CFNETWORK)
@@ -119,6 +118,10 @@ public:
     virtual void receivedChallengeRejection(const AuthenticationChallenge&) override;
 #endif
 
+#if PLATFORM(COCOA) || USE(CFNETWORK)
+    bool tryHandlePasswordBasedAuthentication(const AuthenticationChallenge&);
+#endif
+
 #if PLATFORM(COCOA) && USE(PROTECTION_SPACE_AUTH_CALLBACK)
     bool canAuthenticateAgainstProtectionSpace(const ProtectionSpace&);
 #endif
@@ -178,6 +181,7 @@ public:
 #endif
 
 #if USE(SOUP)
+    RefPtr<ResourceHandle> releaseForDownload(ResourceHandleClient*);
     void continueDidReceiveAuthenticationChallenge(const Credential& credentialFromPersistentStorage);
     void sendPendingRequest();
     bool cancelledOrClientless();
@@ -196,7 +200,7 @@ public:
 
     // The client may be 0, in which case no callbacks will be made.
     ResourceHandleClient* client() const;
-    WEBCORE_EXPORT void setClient(ResourceHandleClient*);
+    WEBCORE_EXPORT void clearClient();
 
     // Called in response to ResourceHandleClient::willSendRequestAsync().
     WEBCORE_EXPORT void continueWillSendRequest(const ResourceRequest&);
@@ -246,6 +250,8 @@ public:
 protected:
     ResourceHandle(NetworkingContext*, const ResourceRequest&, ResourceHandleClient*, bool defersLoading, bool shouldContentSniff);
 
+    bool usesAsyncCallbacks() const;
+
 private:
     enum FailureType {
         NoFailure,
@@ -284,7 +290,7 @@ static void getConnectionTimingData(NSDictionary *timingData, ResourceLoadTiming
 #endif
 
     friend class ResourceHandleInternal;
-    OwnPtr<ResourceHandleInternal> d;
+    std::unique_ptr<ResourceHandleInternal> d;
 
 #if USE(QUICK_LOOK)
     std::unique_ptr<QuickLookHandle> m_quickLook;

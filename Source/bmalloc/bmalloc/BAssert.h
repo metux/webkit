@@ -45,7 +45,7 @@
 
 #define BASSERT(x)
 
-#define IF_DEBUG(x...)
+#define IF_DEBUG(x)
 
 #endif // defined(NDEBUG)
 
@@ -56,7 +56,7 @@
 
 #define BASSERT(x) BASSERT_IMPL(x)
 
-#define IF_DEBUG(x...) x
+#define IF_DEBUG(x) x
 
 #endif // !defined(NDEBUG)
 

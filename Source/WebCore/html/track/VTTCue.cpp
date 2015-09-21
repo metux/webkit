@@ -221,7 +221,7 @@ void VTTCueBox::applyCSSProperties(const IntSize& videoSize)
         // of the way across the height of the video's rendering area, while
         // maintaining the relative positions of the boxes in boxes to each
         // other.
-        setInlineStyleProperty(CSSPropertyWebkitTransform,
+        setInlineStyleProperty(CSSPropertyTransform,
             String::format("translate(-%.2f%%, -%.2f%%)", position.first, position.second));
 
         setInlineStyleProperty(CSSPropertyWhiteSpace, CSSValuePre);
@@ -234,7 +234,7 @@ const AtomicString& VTTCueBox::vttCueBoxShadowPseudoId()
     return trackDisplayBoxShadowPseudoId;
 }
 
-RenderPtr<RenderElement> VTTCueBox::createElementRenderer(Ref<RenderStyle>&& style)
+RenderPtr<RenderElement> VTTCueBox::createElementRenderer(Ref<RenderStyle>&& style, const RenderTreePosition&)
 {
     return createRenderer<RenderVTTCue>(*this, WTF::move(style));
 }
@@ -247,9 +247,9 @@ const AtomicString& VTTCue::cueBackdropShadowPseudoId()
     return cueBackdropShadowPseudoId;
 }
 
-PassRefPtr<VTTCue> VTTCue::create(ScriptExecutionContext& context, const WebVTTCueData& data)
+Ref<VTTCue> VTTCue::create(ScriptExecutionContext& context, const WebVTTCueData& data)
 {
-    return adoptRef(new VTTCue(context, data));
+    return adoptRef(*new VTTCue(context, data));
 }
 
 VTTCue::VTTCue(ScriptExecutionContext& context, const MediaTime& start, const MediaTime& end, const String& content)
@@ -482,7 +482,7 @@ void VTTCue::setText(const String& text)
     willChange();
     // Clear the document fragment but don't bother to create it again just yet as we can do that
     // when it is requested.
-    m_webVTTNodeTree = 0;
+    m_webVTTNodeTree = nullptr;
     m_content = text;
     didChange();
 }

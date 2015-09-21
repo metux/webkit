@@ -38,10 +38,11 @@ namespace WebCore {
 
 class RenderProgress;
 class RenderStyle;
+struct AttachmentLayout;
 
 class RenderThemeMac final : public RenderTheme {
 public:
-    static PassRefPtr<RenderTheme> create();
+    static Ref<RenderTheme> create();
 
     // A method asking if the control changes its tint when the window has focus or not.
     virtual bool controlSupportsTints(const RenderObject&) const override;
@@ -81,8 +82,6 @@ public:
     virtual int popupInternalPaddingBottom(RenderStyle&) const override;
     virtual PopupMenuStyle::PopupMenuSize popupMenuSize(const RenderStyle&, IntRect&) const override;
 
-    virtual bool paintCapsLockIndicator(const RenderObject&, const PaintInfo&, const IntRect&) override;
-
     virtual bool popsMenuByArrowKeys() const override { return true; }
 
 #if ENABLE(METER_ELEMENT)
@@ -97,7 +96,6 @@ public:
     virtual double animationDurationForProgressBar(RenderProgress&) const override;
     virtual IntRect progressBarRectForBounds(const RenderObject&, const IntRect&) const override;
 
-    virtual Color systemColor(CSSValueID) const override;
     // Controls color values returned from platformFocusRingColor(). systemColor() will be used when false.
     bool usesTestModeFocusRingColor() const;
     // A view associated to the contained document.
@@ -133,7 +131,7 @@ protected:
     virtual bool paintMenuList(const RenderObject&, const PaintInfo&, const FloatRect&) override;
     virtual void adjustMenuListStyle(StyleResolver&, RenderStyle&, Element*) const override;
 
-    virtual bool paintMenuListButtonDecorations(const RenderObject&, const PaintInfo&, const FloatRect&) override;
+    virtual bool paintMenuListButtonDecorations(const RenderBox&, const PaintInfo&, const FloatRect&) override;
     virtual void adjustMenuListButtonStyle(StyleResolver&, RenderStyle&, Element*) const override;
 
     virtual void adjustProgressBarStyle(StyleResolver&, RenderStyle&, Element*) const override;
@@ -164,14 +162,22 @@ protected:
     virtual bool supportsClosedCaptioning() const override { return true; }
 #endif
 
-    virtual bool shouldShowPlaceholderWhenFocused() const override;
+    virtual bool shouldHaveCapsLockIndicator(HTMLInputElement&) const override;
 
     virtual bool paintSnapshottedPluginOverlay(const RenderObject&, const PaintInfo&, const IntRect&) override;
+
+#if ENABLE(ATTACHMENT_ELEMENT)
+    virtual LayoutSize attachmentIntrinsicSize(const RenderAttachment&) const override;
+    virtual int attachmentBaseline(const RenderAttachment&) const override;
+    virtual bool paintAttachment(const RenderObject&, const PaintInfo&, const IntRect&) override;
+#endif
 
 private:
     virtual String fileListNameForWidth(const FileList*, const FontCascade&, int width, bool multipleFilesAllowed) const override;
 
     FloatRect convertToPaintingRect(const RenderObject& inputRenderer, const RenderObject& partRenderer, const FloatRect& inputRect, const IntRect&) const;
+
+    virtual Color systemColor(CSSValueID) const override;
 
     // Get the control size based off the font. Used by some of the controls (like buttons).
     NSControlSize controlSizeForFont(RenderStyle&) const;
@@ -241,7 +247,7 @@ private:
     bool m_isSliderThumbHorizontalPressed;
     bool m_isSliderThumbVerticalPressed;
 
-    mutable HashMap<int, RGBA32> m_systemColorCache;
+    mutable HashMap<int, Color> m_systemColorCache;
 
     RetainPtr<WebCoreRenderThemeNotificationObserver> m_notificationObserver;
 

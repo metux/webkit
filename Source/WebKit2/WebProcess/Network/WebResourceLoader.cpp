@@ -45,9 +45,9 @@ using namespace WebCore;
 
 namespace WebKit {
 
-PassRefPtr<WebResourceLoader> WebResourceLoader::create(PassRefPtr<ResourceLoader> coreLoader)
+Ref<WebResourceLoader> WebResourceLoader::create(PassRefPtr<ResourceLoader> coreLoader)
 {
-    return adoptRef(new WebResourceLoader(coreLoader));
+    return adoptRef(*new WebResourceLoader(coreLoader));
 }
 
 WebResourceLoader::WebResourceLoader(PassRefPtr<WebCore::ResourceLoader> coreLoader)
@@ -76,7 +76,7 @@ void WebResourceLoader::cancelResourceLoader()
 
 void WebResourceLoader::detachFromCoreLoader()
 {
-    m_coreLoader = 0;
+    m_coreLoader = nullptr;
 }
 
 void WebResourceLoader::willSendRequest(const ResourceRequest& proposedRequest, const ResourceResponse& redirectResponse)
@@ -89,14 +89,11 @@ void WebResourceLoader::willSendRequest(const ResourceRequest& proposedRequest, 
     if (m_coreLoader->documentLoader()->applicationCacheHost()->maybeLoadFallbackForRedirect(m_coreLoader.get(), newRequest, redirectResponse))
         return;
     // FIXME: Do we need to update NetworkResourceLoader clientCredentialPolicy in case loader policy is DoNotAskClientForCrossOriginCredentials?
-    m_coreLoader->willSendRequest(WTF::move(newRequest), redirectResponse, [protect](ResourceRequest& request) {
+    m_coreLoader->willSendRequest(WTF::move(newRequest), redirectResponse, [protect](ResourceRequest&& request) {
         if (!protect->m_coreLoader)
             return;
 
-        if (!request.isNull())
-            protect->send(Messages::NetworkResourceLoader::ContinueWillSendRequest(request));
-        else
-            protect->m_coreLoader->cancel();
+        protect->send(Messages::NetworkResourceLoader::ContinueWillSendRequest(request));
     });
 }
 
@@ -180,11 +177,12 @@ void WebResourceLoader::didReceiveResource(const ShareableResource::Handle& hand
 {
     LOG(Network, "(WebProcess) WebResourceLoader::didReceiveResource for '%s'", m_coreLoader->url().string().utf8().data());
 
+    RefPtr<SharedBuffer> buffer = handle.tryWrapInSharedBuffer();
+
 #if USE(QUICK_LOOK)
     if (QuickLookHandle* quickLookHandle = m_coreLoader->documentLoader()->quickLookHandle()) {
-        RetainPtr<CFDataRef> cfBuffer = handle.tryWrapInCFData();
-        if (cfBuffer) {
-            if (quickLookHandle->didReceiveData(cfBuffer.get())) {
+        if (buffer) {
+            if (quickLookHandle->didReceiveData(buffer->existingCFData())) {
                 quickLookHandle->didFinishLoading();
                 return;
             }
@@ -193,7 +191,6 @@ void WebResourceLoader::didReceiveResource(const ShareableResource::Handle& hand
     }
 #endif
 
-    RefPtr<SharedBuffer> buffer = handle.tryWrapInSharedBuffer();
     if (!buffer) {
         LOG_ERROR("Unable to create buffer from ShareableResource sent from the network process.");
         m_coreLoader->didFail(internalError(m_coreLoader->request().url()));

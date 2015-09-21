@@ -28,6 +28,7 @@
 
 #if ENABLE(ATTACHMENT_ELEMENT)
 
+#include "File.h"
 #include "HTMLNames.h"
 #include "RenderAttachment.h"
 
@@ -41,14 +42,52 @@ HTMLAttachmentElement::HTMLAttachmentElement(const QualifiedName& tagName, Docum
     ASSERT(hasTagName(attachmentTag));
 }
 
+HTMLAttachmentElement::~HTMLAttachmentElement()
+{
+}
+
 Ref<HTMLAttachmentElement> HTMLAttachmentElement::create(const QualifiedName& tagName, Document& document)
 {
     return adoptRef(*new HTMLAttachmentElement(tagName, document));
 }
 
-RenderPtr<RenderElement> HTMLAttachmentElement::createElementRenderer(Ref<RenderStyle>&& style)
+RenderPtr<RenderElement> HTMLAttachmentElement::createElementRenderer(Ref<RenderStyle>&& style, const RenderTreePosition&)
 {
     return createRenderer<RenderAttachment>(*this, WTF::move(style));
+}
+
+File* HTMLAttachmentElement::file() const
+{
+    return m_file.get();
+}
+
+void HTMLAttachmentElement::setFile(File* file)
+{
+    m_file = file;
+
+    auto* renderer = this->renderer();
+    if (!is<RenderAttachment>(renderer))
+        return;
+
+    downcast<RenderAttachment>(*renderer).invalidate();
+}
+
+void HTMLAttachmentElement::parseAttribute(const QualifiedName& name, const AtomicString& value)
+{
+    if ((name == progressAttr || name == titleAttr || name == subtitleAttr) && is<RenderAttachment>(renderer())) {
+        downcast<RenderAttachment>(*renderer()).invalidate();
+        return;
+    }
+
+    HTMLElement::parseAttribute(name, value);
+}
+
+String HTMLAttachmentElement::attachmentTitle() const
+{
+    String title = fastGetAttribute(titleAttr);
+    if (!title.isEmpty())
+        return title;
+    return m_file ? m_file->name() : String();
 }
 
 } // namespace WebCore

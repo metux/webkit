@@ -80,6 +80,7 @@ private:
     
     virtual void dispatchDidHandleOnloadEvents() override;
     virtual void dispatchDidReceiveServerRedirectForProvisionalLoad() override;
+    virtual void dispatchDidChangeProvisionalURL() override;
     virtual void dispatchDidCancelClientRedirect() override;
     virtual void dispatchWillPerformClientRedirect(const WebCore::URL&, double interval, double fireDate) override;
     virtual void dispatchDidChangeLocationWithinPage() override;
@@ -122,7 +123,10 @@ private:
     
     virtual void willChangeTitle(WebCore::DocumentLoader*) override;
     virtual void didChangeTitle(WebCore::DocumentLoader*) override;
-    
+
+    virtual void willReplaceMultipartContent() override;
+    virtual void didReplaceMultipartContent() override;
+
     virtual void committedLoad(WebCore::DocumentLoader*, const char*, int) override;
     virtual void finishedLoading(WebCore::DocumentLoader*) override;
     
@@ -159,7 +163,7 @@ private:
     virtual void didFinishLoad() override;
     virtual void prepareForDataSourceReplacement() override;
     
-    virtual PassRefPtr<WebCore::DocumentLoader> createDocumentLoader(const WebCore::ResourceRequest&, const WebCore::SubstituteData&) override;
+    virtual Ref<WebCore::DocumentLoader> createDocumentLoader(const WebCore::ResourceRequest&, const WebCore::SubstituteData&) override;
     virtual void updateCachedDocumentLoader(WebCore::DocumentLoader&) override;
 
     virtual void setTitle(const WebCore::StringWithDirection&, const WebCore::URL&) override;
@@ -181,10 +185,10 @@ private:
     virtual bool canCachePage() const override;
     virtual void convertMainResourceLoadToDownload(WebCore::DocumentLoader*, const WebCore::ResourceRequest&, const WebCore::ResourceResponse&) override;
 
-    virtual PassRefPtr<WebCore::Frame> createFrame(const WebCore::URL& url, const String& name, WebCore::HTMLFrameOwnerElement* ownerElement,
+    virtual RefPtr<WebCore::Frame> createFrame(const WebCore::URL&, const String& name, WebCore::HTMLFrameOwnerElement*,
                                           const String& referrer, bool allowsScrolling, int marginWidth, int marginHeight) override;
     
-    virtual PassRefPtr<WebCore::Widget> createPlugin(const WebCore::IntSize&, WebCore::HTMLPlugInElement*, const WebCore::URL&, const Vector<String>&, const Vector<String>&, const String&, bool loadManually) override;
+    virtual RefPtr<WebCore::Widget> createPlugin(const WebCore::IntSize&, WebCore::HTMLPlugInElement*, const WebCore::URL&, const Vector<String>&, const Vector<String>&, const String&, bool loadManually) override;
     virtual void recreatePlugin(WebCore::Widget*) override;
     virtual void redirectDataToPlugin(WebCore::Widget* pluginWidget) override;
     
@@ -234,8 +238,10 @@ private:
 #endif
 
 #if ENABLE(CONTENT_FILTERING)
-    virtual void contentFilterDidBlockLoad(std::unique_ptr<WebCore::ContentFilter>) override;
+    void contentFilterDidBlockLoad(WebCore::ContentFilterUnblockHandler) override;
 #endif
+
+    void prefetchDNS(const String&) override;
 
     WebFrame* m_frame;
     RefPtr<PluginView> m_pluginView;

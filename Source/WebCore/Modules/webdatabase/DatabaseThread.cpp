@@ -40,12 +40,9 @@ namespace WebCore {
 
 DatabaseThread::DatabaseThread()
     : m_threadID(0)
-#if PLATFORM(IOS)
-    , m_paused(false)
-#endif
     , m_transactionClient(std::make_unique<SQLTransactionClient>())
     , m_transactionCoordinator(std::make_unique<SQLTransactionCoordinator>())
-    , m_cleanupSync(0)
+    , m_cleanupSync(nullptr)
 {
     m_selfRef = this;
 }
@@ -64,7 +61,7 @@ DatabaseThread::~DatabaseThread()
 
 bool DatabaseThread::start()
 {
-    MutexLocker lock(m_threadCreationMutex);
+    LockHolder lock(m_threadCreationMutex);
 
     if (m_threadID)
         return true;
@@ -78,9 +75,6 @@ void DatabaseThread::requestTermination(DatabaseTaskSynchronizer *cleanupSync)
 {
     m_cleanupSync = cleanupSync;
     LOG(StorageAPI, "DatabaseThread %p was asked to terminate\n", this);
-#if PLATFORM(IOS)
-    m_pausedQueue.kill();
-#endif
     m_queue.kill();
 }
 
@@ -102,99 +96,18 @@ void DatabaseThread::databaseThreadStart(void* vDatabaseThread)
     dbThread->databaseThread();
 }
 
-#if PLATFORM(IOS)
-class DatabaseUnpauseTask : public DatabaseTask {
-public:
-    static std::unique_ptr<DatabaseUnpauseTask> create(DatabaseThread* thread)
-    {
-        return std::unique_ptr<DatabaseUnpauseTask>(new DatabaseUnpauseTask(thread));
-    }
-    
-    virtual bool shouldPerformWhilePaused() const 
-    {
-        // Since we're not locking the DatabaseThread::m_paused in the main database thread loop, it's possible that
-        // a DatabaseUnpauseTask might be added to the m_pausedQueue and performed from within ::handlePausedQueue.
-        // To protect against this, we allow it to be performed even if the database is paused.
-        // If the thread is paused when it is being performed, the tasks from the paused queue will simply be
-        // requeued instead of performed.
-        return true;
-    }
-
-private:
-    DatabaseUnpauseTask(DatabaseThread* thread)
-        : DatabaseTask(0, 0)
-        , m_thread(thread)
-    {}
-
-    virtual void doPerformTask()
-    {
-        m_thread->handlePausedQueue();
-    }
-#if !LOG_DISABLED
-    virtual const char* debugTaskName() const { return "DatabaseUnpauseTask"; }
-#endif
-
-    DatabaseThread* m_thread;
-};
-
-
-void DatabaseThread::setPaused(bool paused)
-{
-    if (m_paused == paused)
-        return;
-
-    MutexLocker pausedLocker(m_pausedMutex);
-    m_paused = paused;
-    if (!m_paused)
-        scheduleTask(DatabaseUnpauseTask::create(this));
-}
-
-void DatabaseThread::handlePausedQueue()
-{
-    Vector<std::unique_ptr<DatabaseTask> > pausedTasks;
-    while (auto task = m_pausedQueue.tryGetMessage())
-        pausedTasks.append(WTF::move(task));
-
-    for (unsigned i = 0; i < pausedTasks.size(); ++i) {
-        AutodrainedPool pool;
-
-        std::unique_ptr<DatabaseTask> task(pausedTasks[i].release());
-        {
-            MutexLocker pausedLocker(m_pausedMutex);
-            if (m_paused) {
-                m_pausedQueue.append(WTF::move(task));
-                continue;
-            }
-        }
-            
-        if (terminationRequested())
-            break;
-    
-        task->performTask();
-    }
-}
-#endif //PLATFORM(IOS)
-
-
 void DatabaseThread::databaseThread()
 {
     {
         // Wait for DatabaseThread::start() to complete.
-        MutexLocker lock(m_threadCreationMutex);
+        LockHolder lock(m_threadCreationMutex);
         LOG(StorageAPI, "Started DatabaseThread %p", this);
     }
 
     while (auto task = m_queue.waitForMessage()) {
         AutodrainedPool pool;
 
-#if PLATFORM(IOS)
-        if (!m_paused || task->shouldPerformWhilePaused())
-            task->performTask();
-        else
-            m_pausedQueue.append(WTF::move(task));
-#else
         task->performTask();
-#endif
     }
 
     // Clean up the list of all pending transactions on this database thread
@@ -208,9 +121,8 @@ void DatabaseThread::databaseThread()
         // As the call to close will modify the original set, we must take a copy to iterate over.
         DatabaseSet openSetCopy;
         openSetCopy.swap(m_openDatabaseSet);
-        DatabaseSet::iterator end = openSetCopy.end();
-        for (DatabaseSet::iterator it = openSetCopy.begin(); it != end; ++it)
-            (*it).get()->close();
+        for (auto& openDatabase : openSetCopy)
+            openDatabase->close();
     }
 
     // Detach the thread so its resources are no longer of any concern to anyone else
@@ -219,7 +131,7 @@ void DatabaseThread::databaseThread()
     DatabaseTaskSynchronizer* cleanupSync = m_cleanupSync;
 
     // Clear the self refptr, possibly resulting in deletion
-    m_selfRef = 0;
+    m_selfRef = nullptr;
 
     if (cleanupSync) // Someone wanted to know when we were done cleaning up.
         cleanupSync->taskCompleted();
@@ -256,7 +168,7 @@ void DatabaseThread::scheduleImmediateTask(std::unique_ptr<DatabaseTask> task)
 class SameDatabasePredicate {
 public:
     SameDatabasePredicate(const Database* database) : m_database(database) { }
-    bool operator()(const DatabaseTask& task) const { return task.database() == m_database; }
+    bool operator()(const DatabaseTask& task) const { return &task.database() == m_database; }
 private:
     const Database* m_database;
 };
@@ -268,4 +180,14 @@ void DatabaseThread::unscheduleDatabaseTasks(Database* database)
     SameDatabasePredicate predicate(database);
     m_queue.removeIf(predicate);
 }
+
+bool DatabaseThread::hasPendingDatabaseActivity() const
+{
+    for (auto& database : m_openDatabaseSet) {
+        if (database->hasPendingCreationEvent() || database->hasPendingTransaction())
+            return true;
+    }
+    return false;
+}
+
 } // namespace WebCore

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2014 Apple Inc. All rights reserved.
+ * Copyright (C) 2014, 2015 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -33,8 +33,6 @@
 
 namespace JSC { namespace DFG {
 
-// Note that the write functor is really the useful thing here. The read functor is only useful
-// for the object allocation sinking phase.
 template<typename WriteFunctor, typename ReadFunctor>
 void promoteHeapAccess(Node* node, const WriteFunctor& write, const ReadFunctor& read)
 {
@@ -62,17 +60,30 @@ void promoteHeapAccess(Node* node, const WriteFunctor& write, const ReadFunctor&
         break;
     }
 
-    case PutStructureHint: {
-        ASSERT(node->child1()->isPhantomObjectAllocation());
-        write(PromotedHeapLocation(StructurePLoc, node->child1()), node->child2());
+    case GetClosureVar:
+        if (node->child1()->isPhantomActivationAllocation())
+            read(PromotedHeapLocation(ClosureVarPLoc, node->child1(), node->scopeOffset().offset()));
         break;
-    }
 
-    case PutByOffsetHint: {
-        ASSERT(node->child1()->isPhantomObjectAllocation());
-        unsigned identifierNumber = node->identifierNumber();
+    case SkipScope:
+        if (node->child1()->isPhantomActivationAllocation())
+            read(PromotedHeapLocation(ActivationScopePLoc, node->child1()));
+        break;
+
+    case GetScope:
+        if (node->child1()->isPhantomFunctionAllocation())
+            read(PromotedHeapLocation(FunctionActivationPLoc, node->child1()));
+        break;
+
+    case GetExecutable:
+        if (node->child1()->isPhantomFunctionAllocation())
+            read(PromotedHeapLocation(FunctionExecutablePLoc, node->child1()));
+        break;
+
+    case PutHint: {
+        ASSERT(node->child1()->isPhantomAllocation());
         write(
-            PromotedHeapLocation(NamedPropertyPLoc, node->child1(), identifierNumber),
+            PromotedHeapLocation(node->child1().node(), node->promotedLocationDescriptor()),
             node->child2());
         break;
     }

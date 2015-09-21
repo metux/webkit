@@ -28,10 +28,12 @@
 #include "config.h"
 #include "CSSValue.h"
 
+#include "CSSAnimationTriggerScrollValue.h"
 #include "CSSAspectRatioValue.h"
 #include "CSSBorderImageSliceValue.h"
 #include "CSSCalculationValue.h"
 #include "CSSCanvasValue.h"
+#include "CSSContentDistributionValue.h"
 #include "CSSCrossfadeValue.h"
 #include "CSSCursorImageValue.h"
 #include "CSSFilterImageValue.h"
@@ -45,6 +47,7 @@
 #include "CSSInheritedValue.h"
 #include "CSSInitialValue.h"
 #include "CSSLineBoxContainValue.h"
+#include "CSSNamedImageValue.h"
 #include "CSSPrimitiveValue.h"
 #include "CSSReflectValue.h"
 #include "CSSShadowValue.h"
@@ -54,7 +57,6 @@
 #include "SVGColor.h"
 #include "SVGPaint.h"
 #include "WebKitCSSFilterValue.h"
-#include "WebKitCSSResourceValue.h"
 #include "WebKitCSSTransformValue.h"
 
 #if ENABLE(CSS_GRID_LAYOUT)
@@ -123,24 +125,24 @@ void CSSValue::addSubresourceStyleURLs(ListHashSet<URL>& urls, const StyleSheetC
         downcast<CSSReflectValue>(*this).addSubresourceStyleURLs(urls, styleSheet);
 }
 
-bool CSSValue::hasFailedOrCanceledSubresources() const
+bool CSSValue::traverseSubresources(const std::function<bool (const CachedResource&)>& handler) const
 {
     // This should get called for internal instances only.
     ASSERT(!isCSSOMSafe());
 
     if (is<CSSValueList>(*this))
-        return downcast<CSSValueList>(*this).hasFailedOrCanceledSubresources();
+        return downcast<CSSValueList>(*this).traverseSubresources(handler);
     if (is<CSSFontFaceSrcValue>(*this))
-        return downcast<CSSFontFaceSrcValue>(*this).hasFailedOrCanceledSubresources();
+        return downcast<CSSFontFaceSrcValue>(*this).traverseSubresources(handler);
     if (is<CSSImageValue>(*this))
-        return downcast<CSSImageValue>(*this).hasFailedOrCanceledSubresources();
+        return downcast<CSSImageValue>(*this).traverseSubresources(handler);
     if (is<CSSCrossfadeValue>(*this))
-        return downcast<CSSCrossfadeValue>(*this).hasFailedOrCanceledSubresources();
+        return downcast<CSSCrossfadeValue>(*this).traverseSubresources(handler);
     if (is<CSSFilterImageValue>(*this))
-        return downcast<CSSFilterImageValue>(*this).hasFailedOrCanceledSubresources();
+        return downcast<CSSFilterImageValue>(*this).traverseSubresources(handler);
 #if ENABLE(CSS_IMAGE_SET)
     if (is<CSSImageSetValue>(*this))
-        return downcast<CSSImageSetValue>(*this).hasFailedOrCanceledSubresources();
+        return downcast<CSSImageSetValue>(*this).traverseSubresources(handler);
 #endif
     return false;
 }
@@ -166,6 +168,8 @@ bool CSSValue::equals(const CSSValue& other) const
             return compareCSSValues<CSSBorderImageSliceValue>(*this, other);
         case CanvasClass:
             return compareCSSValues<CSSCanvasValue>(*this, other);
+        case NamedImageClass:
+            return compareCSSValues<CSSNamedImageValue>(*this, other);
         case CursorImageClass:
             return compareCSSValues<CSSCursorImageValue>(*this, other);
         case FilterImageClass:
@@ -226,6 +230,12 @@ bool CSSValue::equals(const CSSValue& other) const
             return compareCSSValues<SVGColor>(*this, other);
         case SVGPaintClass:
             return compareCSSValues<SVGPaint>(*this, other);
+#if ENABLE(CSS_ANIMATIONS_LEVEL_2)
+        case AnimationTriggerScrollClass:
+            return compareCSSValues<CSSAnimationTriggerScrollValue>(*this, other);
+#endif
+        case CSSContentDistributionClass:
+            return compareCSSValues<CSSContentDistributionValue>(*this, other);
         default:
             ASSERT_NOT_REACHED();
             return false;
@@ -252,6 +262,8 @@ String CSSValue::cssText() const
         return downcast<CSSBorderImageSliceValue>(*this).customCSSText();
     case CanvasClass:
         return downcast<CSSCanvasValue>(*this).customCSSText();
+    case NamedImageClass:
+        return downcast<CSSNamedImageValue>(*this).customCSSText();
     case CursorImageClass:
         return downcast<CSSCursorImageValue>(*this).customCSSText();
     case FilterImageClass:
@@ -312,8 +324,12 @@ String CSSValue::cssText() const
         return downcast<SVGColor>(*this).customCSSText();
     case SVGPaintClass:
         return downcast<SVGPaint>(*this).customCSSText();
-    case WebKitCSSResourceClass:
-        return downcast<WebKitCSSResourceValue>(*this).customCSSText();
+#if ENABLE(CSS_ANIMATIONS_LEVEL_2)
+    case AnimationTriggerScrollClass:
+        return downcast<CSSAnimationTriggerScrollValue>(*this).customCSSText();
+#endif
+    case CSSContentDistributionClass:
+        return downcast<CSSContentDistributionValue>(*this).customCSSText();
     }
     ASSERT_NOT_REACHED();
     return String();
@@ -337,6 +353,9 @@ void CSSValue::destroy()
         return;
     case CanvasClass:
         delete downcast<CSSCanvasValue>(this);
+        return;
+    case NamedImageClass:
+        delete downcast<CSSNamedImageValue>(this);
         return;
     case CursorImageClass:
         delete downcast<CSSCursorImageValue>(this);
@@ -426,14 +445,19 @@ void CSSValue::destroy()
     case SVGPaintClass:
         delete downcast<SVGPaint>(this);
         return;
-    case WebKitCSSResourceClass:
-        delete downcast<WebKitCSSResourceValue>(this);
+#if ENABLE(CSS_ANIMATIONS_LEVEL_2)
+    case AnimationTriggerScrollClass:
+        delete downcast<CSSAnimationTriggerScrollValue>(this);
+        return;
+#endif
+    case CSSContentDistributionClass:
+        delete downcast<CSSContentDistributionValue>(this);
         return;
     }
     ASSERT_NOT_REACHED();
 }
 
-PassRefPtr<CSSValue> CSSValue::cloneForCSSOM() const
+RefPtr<CSSValue> CSSValue::cloneForCSSOM() const
 {
     switch (classType()) {
     case PrimitiveClass:

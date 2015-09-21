@@ -73,24 +73,24 @@ enum {
     leftPadding
 };
 
-PassRefPtr<RenderTheme> RenderThemeSafari::create()
+Ref<RenderTheme> RenderThemeSafari::create()
 {
-    return adoptRef(new RenderThemeSafari);
+    return adoptRef(*new RenderThemeSafari);
 }
 
 PassRefPtr<RenderTheme> RenderTheme::themeForPage(Page* page)
 {
-    static RenderTheme* safariTheme = RenderThemeSafari::create().leakRef();
-    static RenderTheme* windowsTheme = RenderThemeWin::create().leakRef();
+    static RenderTheme& safariTheme = RenderThemeSafari::create().leakRef();
+    static RenderTheme& windowsTheme = RenderThemeWin::create().leakRef();
 
     // FIXME: This is called before Settings has been initialized by WebKit, so will return a
     // potentially wrong answer the very first time it's called (see
     // <https://bugs.webkit.org/show_bug.cgi?id=26493>).
     if (Settings::shouldPaintNativeControls()) {
         RenderTheme::setCustomFocusRingColor(safariTheme->platformFocusRingColor());
-        return windowsTheme; // keep the reference of one.
+        return &windowsTheme;
     }
-    return safariTheme; // keep the reference of one.
+    return &safariTheme;
 }
 
 #ifdef DEBUG_ALL
@@ -293,17 +293,11 @@ IntRect RenderThemeSafari::inflateRect(const IntRect& r, const IntSize& size, co
     return result;
 }
 
-int RenderThemeSafari::baselinePosition(const RenderObject& renderer) const
+int RenderThemeSafari::baselinePosition(const RenderBox& box) const
 {
-    if (!is<RenderBox>(renderer))
-        return 0;
-
-    if (renderer.style().appearance() == CheckboxPart || renderer.style().appearance() == RadioPart) {
-        const auto& box = downcast<RenderBox>(renderer);
+    if (box.style().appearance() == CheckboxPart || box.style().appearance() == RadioPart)
         return box.marginTop() + box.height() - 2; // The baseline is 2px up from the bottom of the checkbox/radio in AppKit.
-    }
-
-    return RenderTheme::baselinePosition(renderer);
+    return RenderTheme::baselinePosition(box);
 }
 
 bool RenderThemeSafari::controlSupportsTints(const RenderObject& o) const

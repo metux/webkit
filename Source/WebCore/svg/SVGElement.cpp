@@ -26,7 +26,6 @@
 #include "config.h"
 #include "SVGElement.h"
 
-#include "Attr.h"
 #include "CSSCursorImageValue.h"
 #include "CSSParser.h"
 #include "DOMImplementation.h"
@@ -151,14 +150,14 @@ static NEVER_INLINE void populateAttributeNameToCSSPropertyIDMap(HashMap<AtomicS
         &yAttr,
     };
 
-    for (unsigned i = 0; i < WTF_ARRAY_LENGTH(attributeNames); ++i) {
-        const AtomicString& localName = attributeNames[i]->localName();
+    for (auto& name : attributeNames) {
+        const AtomicString& localName = name->localName();
         map.add(localName.impl(), cssPropertyID(localName));
     }
 
     // FIXME: When CSS supports "transform-origin" this special case can be removed,
     // and we can add transform_originAttr to the table above instead.
-    map.add(transform_originAttr.localName().impl(), CSSPropertyWebkitTransformOrigin);
+    map.add(transform_originAttr.localName().impl(), CSSPropertyTransformOrigin);
 }
 
 static NEVER_INLINE void populateAttributeNameToAnimatedPropertyTypeMap(HashMap<QualifiedName::QualifiedNameImpl*, AnimatedPropertyType>& map)
@@ -230,8 +229,8 @@ static NEVER_INLINE void populateAttributeNameToAnimatedPropertyTypeMap(HashMap<
         { word_spacingAttr, AnimatedLength },
     };
 
-    for (unsigned i = 0; i < WTF_ARRAY_LENGTH(table); ++i)
-        map.add(table[i].attributeName.impl(), table[i].type);
+    for (auto& entry : table)
+        map.add(entry.attributeName.impl(), entry.type);
 }
 
 static inline HashMap<QualifiedName::QualifiedNameImpl*, AnimatedPropertyType>& attributeNameToAnimatedPropertyTypeMap()
@@ -264,8 +263,8 @@ static NEVER_INLINE void populateCSSPropertyWithSVGDOMNameToAnimatedPropertyType
         { yAttr, AnimatedLength },
     };
 
-    for (unsigned i = 0; i < WTF_ARRAY_LENGTH(table); ++i)
-        map.add(table[i].attributeName.impl(), table[i].type);
+    for (auto& entry : table)
+        map.add(entry.attributeName.impl(), entry.type);
 }
 
 static inline HashMap<QualifiedName::QualifiedNameImpl*, AnimatedPropertyType>& cssPropertyWithSVGDOMNameToAnimatedPropertyTypeMap()
@@ -459,7 +458,7 @@ void SVGElement::setCursorElement(SVGCursorElement* cursorElement)
 void SVGElement::cursorElementRemoved() 
 {
     ASSERT(m_svgRareData);
-    m_svgRareData->setCursorElement(0);
+    m_svgRareData->setCursorElement(nullptr);
 }
 
 void SVGElement::setCursorImageValue(CSSCursorImageValue* cursorImageValue)
@@ -476,7 +475,7 @@ void SVGElement::setCursorImageValue(CSSCursorImageValue* cursorImageValue)
 void SVGElement::cursorImageValueRemoved()
 {
     ASSERT(m_svgRareData);
-    m_svgRareData->setCursorImageValue(0);
+    m_svgRareData->setCursorImageValue(nullptr);
 }
 
 SVGElement* SVGElement::correspondingElement() const
@@ -511,9 +510,12 @@ void SVGElement::setCorrespondingElement(SVGElement* correspondingElement)
 
 void SVGElement::parseAttribute(const QualifiedName& name, const AtomicString& value)
 {
-    if (name == HTMLNames::classAttr)
+    if (name == HTMLNames::classAttr) {
         setClassNameBaseValue(value);
-    else if (name == HTMLNames::tabindexAttr) {
+        return;
+    }
+
+    if (name == HTMLNames::tabindexAttr) {
         int tabindex = 0;
         if (value.isEmpty())
             clearTabIndexExplicitlyIfNeeded();
@@ -521,21 +523,16 @@ void SVGElement::parseAttribute(const QualifiedName& name, const AtomicString& v
             // Clamp tabindex to the range of 'short' to match Firefox's behavior.
             setTabIndexExplicitly(std::max(static_cast<int>(std::numeric_limits<short>::min()), std::min(tabindex, static_cast<int>(std::numeric_limits<short>::max()))));
         }
-    } else if (SVGLangSpace::parseAttribute(name, value))
         return;
-    else {
-        // FIXME: Can we do this even faster by checking the local name "on" prefix before we do anything with the map?
-        // See HTMLElement::parseAttribute().
-        static NeverDestroyed<HashMap<AtomicStringImpl*, AtomicString>> eventNamesGlobal;
-        auto& eventNames = eventNamesGlobal.get();
-        if (eventNames.isEmpty())
-            HTMLElement::populateEventNameForAttributeLocalNameMap(eventNames);
-        const AtomicString& eventName = eventNames.get(name.localName().impl());
-        if (!eventName.isNull())
-            setAttributeEventListener(eventName, name, value);
-        else
-            StyledElement::parseAttribute(name, value);
     }
+
+    auto& eventName = HTMLElement::eventNameForEventHandlerAttribute(name);
+    if (!eventName.isNull()) {
+        setAttributeEventListener(eventName, name, value);
+        return;
+    }
+
+    SVGLangSpace::parseAttribute(name, value);
 }
 
 Vector<AnimatedPropertyType> SVGElement::animatedPropertyTypesForAttribute(const QualifiedName& attributeName)
@@ -643,8 +640,8 @@ static bool hasLoadListener(Element* element)
 
     for (element = element->parentOrShadowHostElement(); element; element = element->parentOrShadowHostElement()) {
         const EventListenerVector& entry = element->getEventListeners(eventNames().loadEvent);
-        for (size_t i = 0; i < entry.size(); ++i) {
-            if (entry[i].useCapture)
+        for (auto& listener : entry) {
+            if (listener.useCapture)
                 return true;
         }
     }
@@ -1104,7 +1101,7 @@ RefPtr<CSSValue> SVGElement::getPresentationAttribute(const String& name)
     CSSPropertyID propertyID = cssPropertyIdForSVGAttributeName(attribute->name());
     style->setProperty(propertyID, attribute->value());
     RefPtr<CSSValue> cssValue = style->getPropertyCSSValue(propertyID);
-    return cssValue ? cssValue->cloneForCSSOM() : 0;
+    return cssValue ? cssValue->cloneForCSSOM() : nullptr;
 }
 
 bool SVGElement::instanceUpdatesBlocked() const

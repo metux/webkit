@@ -35,15 +35,15 @@ namespace JSC {
 
 class Identifier;
 
-class JSPropertyNameEnumerator : public JSCell {
+class JSPropertyNameEnumerator final : public JSCell {
 public:
     typedef JSCell Base;
+    static const unsigned StructureFlags = Base::StructureFlags | StructureIsImmortal;
 
     static JSPropertyNameEnumerator* create(VM&);
-    static JSPropertyNameEnumerator* create(VM&, Structure*, PropertyNameArray&);
+    static JSPropertyNameEnumerator* create(VM&, Structure*, uint32_t, uint32_t, PropertyNameArray&);
 
     static const bool needsDestruction = true;
-    static const bool hasImmortalStructure = true;
     static void destroy(JSCell*);
 
     static Structure* createStructure(VM& vm, JSGlobalObject* globalObject, JSValue prototype)
@@ -60,11 +60,6 @@ public:
         return m_propertyNames[index].get();
     }
 
-    RefCountedIdentifierSet* identifierSet() const
-    {
-        return m_identifierSet.get();
-    }
-
     StructureChain* cachedPrototypeChain() const { return m_prototypeChain.get(); }
     void setCachedPrototypeChain(VM& vm, StructureChain* prototypeChain) { return m_prototypeChain.set(vm, this, prototypeChain); }
 
@@ -75,13 +70,15 @@ public:
         return vm.heap.structureIDTable().get(m_cachedStructureID);
     }
     StructureID cachedStructureID() const { return m_cachedStructureID; }
+    uint32_t indexedLength() const { return m_indexedLength; }
+    uint32_t endStructurePropertyIndex() const { return m_endStructurePropertyIndex; }
+    uint32_t endGenericPropertyIndex() const { return m_endGenericPropertyIndex; }
     uint32_t cachedInlineCapacity() const { return m_cachedInlineCapacity; }
     static ptrdiff_t cachedStructureIDOffset() { return OBJECT_OFFSETOF(JSPropertyNameEnumerator, m_cachedStructureID); }
+    static ptrdiff_t indexedLengthOffset() { return OBJECT_OFFSETOF(JSPropertyNameEnumerator, m_indexedLength); }
+    static ptrdiff_t endStructurePropertyIndexOffset() { return OBJECT_OFFSETOF(JSPropertyNameEnumerator, m_endStructurePropertyIndex); }
+    static ptrdiff_t endGenericPropertyIndexOffset() { return OBJECT_OFFSETOF(JSPropertyNameEnumerator, m_endGenericPropertyIndex); }
     static ptrdiff_t cachedInlineCapacityOffset() { return OBJECT_OFFSETOF(JSPropertyNameEnumerator, m_cachedInlineCapacity); }
-    static ptrdiff_t cachedPropertyNamesLengthOffset()
-    {
-        return OBJECT_OFFSETOF(JSPropertyNameEnumerator, m_propertyNames) + Vector<WriteBarrier<JSString>>::sizeMemoryOffset();
-    }
     static ptrdiff_t cachedPropertyNamesVectorOffset()
     {
         return OBJECT_OFFSETOF(JSPropertyNameEnumerator, m_propertyNames) + Vector<WriteBarrier<JSString>>::dataMemoryOffset();
@@ -90,68 +87,53 @@ public:
     static void visitChildren(JSCell*, SlotVisitor&);
 
 private:
-    static const unsigned StructureFlags = Base::StructureFlags | StructureIsImmortal;
-
-    JSPropertyNameEnumerator(VM&, StructureID, uint32_t, RefCountedIdentifierSet*);
-    void finishCreation(VM&, PassRefPtr<PropertyNameArrayData>);
+    JSPropertyNameEnumerator(VM&, StructureID, uint32_t);
+    void finishCreation(VM&, uint32_t, uint32_t, PassRefPtr<PropertyNameArrayData>);
 
     Vector<WriteBarrier<JSString>> m_propertyNames;
-    RefPtr<RefCountedIdentifierSet> m_identifierSet;
     StructureID m_cachedStructureID;
     WriteBarrier<StructureChain> m_prototypeChain;
+    uint32_t m_indexedLength;
+    uint32_t m_endStructurePropertyIndex;
+    uint32_t m_endGenericPropertyIndex;
     uint32_t m_cachedInlineCapacity;
 };
 
-inline JSPropertyNameEnumerator* structurePropertyNameEnumerator(ExecState* exec, JSObject* base, uint32_t length)
+inline JSPropertyNameEnumerator* propertyNameEnumerator(ExecState* exec, JSObject* base)
 {
     VM& vm = exec->vm();
+
+    uint32_t indexedLength = base->methodTable(vm)->getEnumerableLength(exec, base);
+
+    JSPropertyNameEnumerator* enumerator = nullptr;
+
     Structure* structure = base->structure(vm);
-    if (JSPropertyNameEnumerator* enumerator = structure->cachedStructurePropertyNameEnumerator())
+    if (!indexedLength
+        && (enumerator = structure->cachedPropertyNameEnumerator())
+        && enumerator->cachedPrototypeChain() == structure->prototypeChain(exec))
         return enumerator;
 
-    if (!structure->canAccessPropertiesQuickly() || length != base->getArrayLength())
-        return JSPropertyNameEnumerator::create(vm);
+    uint32_t numberStructureProperties = 0;
 
-    PropertyNameArray propertyNames(exec);
-    base->methodTable(vm)->getStructurePropertyNames(base, exec, propertyNames, ExcludeDontEnumProperties);
+    PropertyNameArray propertyNames(exec, PropertyNameMode::Strings);
 
-    JSPropertyNameEnumerator* enumerator = JSPropertyNameEnumerator::create(vm, structure, propertyNames);
-    if (structure->canCacheStructurePropertyNameEnumerator())
-        structure->setCachedStructurePropertyNameEnumerator(vm, enumerator);
-    return enumerator;
-}
+    if (structure->canAccessPropertiesQuickly() && indexedLength == base->getArrayLength()) {
+        base->methodTable(vm)->getStructurePropertyNames(base, exec, propertyNames, EnumerationMode());
 
-inline JSPropertyNameEnumerator* genericPropertyNameEnumerator(ExecState* exec, JSObject* base, uint32_t length, JSPropertyNameEnumerator* structureEnumerator)
-{
-    VM& vm = exec->vm();
-    Structure* structure = base->structure(vm);
-    if (JSPropertyNameEnumerator* enumerator = structure->cachedGenericPropertyNameEnumerator()) {
-        if (!length && enumerator->cachedPrototypeChain() == structure->prototypeChain(exec))
-            return enumerator;
-    }
+        numberStructureProperties = propertyNames.size();
 
-    PropertyNameArray propertyNames(exec);
-    propertyNames.setPreviouslyEnumeratedLength(length);
-    propertyNames.setPreviouslyEnumeratedProperties(structureEnumerator);
+        base->methodTable(vm)->getGenericPropertyNames(base, exec, propertyNames, EnumerationMode());
+    } else
+        base->methodTable(vm)->getPropertyNames(base, exec, propertyNames, EnumerationMode());
 
-    // If we still have the same Structure that we started with, our Structure allows us to access its properties 
-    // quickly (i.e. the Structure property loop was able to do things), and we iterated the full length of the 
-    // object (i.e. there are no more own indexed properties that need to be enumerated), then the generic property 
-    // iteration can skip any properties it would get from the JSObject base class. This turns out to be important 
-    // for hot loops because most of our time is then dominated by trying to add the own Structure properties to 
-    // the new generic PropertyNameArray and failing because we've already visited them.
-    Structure* cachedStructure = structureEnumerator->cachedStructure(vm);
-    if (structure == cachedStructure && structure->canAccessPropertiesQuickly() && static_cast<uint32_t>(length) == base->getArrayLength())
-        base->methodTable(vm)->getGenericPropertyNames(base, exec, propertyNames, ExcludeDontEnumProperties);
-    else
-        base->methodTable(vm)->getPropertyNames(base, exec, propertyNames, ExcludeDontEnumProperties);
-    
+    ASSERT(propertyNames.size() < UINT32_MAX);
+
     normalizePrototypeChain(exec, structure);
 
-    JSPropertyNameEnumerator* enumerator = JSPropertyNameEnumerator::create(vm, base->structure(vm), propertyNames);
+    enumerator = JSPropertyNameEnumerator::create(vm, structure, indexedLength, numberStructureProperties, propertyNames);
     enumerator->setCachedPrototypeChain(vm, structure->prototypeChain(exec));
-    if (!length && structure->canCacheGenericPropertyNameEnumerator())
-        structure->setCachedGenericPropertyNameEnumerator(vm, enumerator);
+    if (!indexedLength && structure->canCachePropertyNameEnumerator())
+        structure->setCachedPropertyNameEnumerator(vm, enumerator);
     return enumerator;
 }
 

@@ -98,7 +98,6 @@ void SVGUseElement::parseAttribute(const QualifiedName& name, const AtomicString
 
     SVGExternalResourcesRequired::parseAttribute(name, value);
     SVGGraphicsElement::parseAttribute(name, value);
-    SVGLangSpace::parseAttribute(name, value);
     SVGURIReference::parseAttribute(name, value);
 }
 
@@ -262,7 +261,7 @@ SVGElement* SVGUseElement::targetClone() const
     return downcast<SVGElement>(root->firstChild());
 }
 
-RenderPtr<RenderElement> SVGUseElement::createElementRenderer(Ref<RenderStyle>&& style)
+RenderPtr<RenderElement> SVGUseElement::createElementRenderer(Ref<RenderStyle>&& style, const RenderTreePosition&)
 {
     return createRenderer<RenderSVGTransformableContainer>(*this, WTF::move(style));
 }
@@ -547,14 +546,14 @@ void SVGUseElement::updateExternalDocument()
     if (externalDocumentURL.isNull())
         m_externalDocument = nullptr;
     else {
-        CachedResourceRequest request { ResourceRequest { externalDocumentURL } };
+        ResourceLoaderOptions options = CachedResourceLoader::defaultCachedResourceOptions();
+        options.setContentSecurityPolicyImposition(isInUserAgentShadowTree() ? ContentSecurityPolicyImposition::SkipPolicyCheck : ContentSecurityPolicyImposition::DoPolicyCheck);
+
+        CachedResourceRequest request { ResourceRequest { externalDocumentURL }, options };
         request.setInitiator(this);
         m_externalDocument = document().cachedResourceLoader().requestSVGDocument(request);
-        if (m_externalDocument) {
-            // FIXME: Is it really OK for us to set this to false for a document that might be shared by another client?
-            m_externalDocument->setShouldCreateFrameForDocument(false); // No frame needed, we just want the elements.
+        if (m_externalDocument)
             m_externalDocument->addClient(this);
-        }
     }
 
     invalidateShadowTree();

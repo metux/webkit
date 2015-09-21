@@ -28,6 +28,7 @@
 
 #include "CachedScript.h"
 #include "Element.h"
+#include "MicroTask.h"
 #include "PendingScript.h"
 #include "ScriptElement.h"
 
@@ -45,7 +46,7 @@ ScriptRunner::~ScriptRunner()
         m_document.decrementLoadEventDelayCount();
     for (size_t i = 0; i < m_scriptsToExecuteInOrder.size(); ++i)
         m_document.decrementLoadEventDelayCount();
-    for (int i = 0; i < m_pendingAsyncScripts.size(); ++i)
+    for (unsigned i = 0; i < m_pendingAsyncScripts.size(); ++i)
         m_document.decrementLoadEventDelayCount();
 }
 
@@ -120,6 +121,7 @@ void ScriptRunner::timerFired()
         toScriptElementIfPossible(element.get())->execute(cachedScript);
         m_document.decrementLoadEventDelayCount();
     }
+    MicroTaskQueue::singleton().runMicroTasks();
 }
 
 }

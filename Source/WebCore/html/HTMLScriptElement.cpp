@@ -23,7 +23,6 @@
 #include "config.h"
 #include "HTMLScriptElement.h"
 
-#include "Attribute.h"
 #include "Document.h"
 #include "Event.h"
 #include "EventNames.h"
@@ -64,8 +63,6 @@ void HTMLScriptElement::parseAttribute(const QualifiedName& name, const AtomicSt
         handleSourceAttribute(value);
     else if (name == asyncAttr)
         handleAsyncAttribute();
-    else if (name == onbeforeloadAttr)
-        setAttributeEventListener(eventNames().beforeloadEvent, name, value);
     else
         HTMLElement::parseAttribute(name, value);
 }
@@ -73,12 +70,12 @@ void HTMLScriptElement::parseAttribute(const QualifiedName& name, const AtomicSt
 Node::InsertionNotificationRequest HTMLScriptElement::insertedInto(ContainerNode& insertionPoint)
 {
     HTMLElement::insertedInto(insertionPoint);
-    return shouldNotifySubtreeInsertions(insertionPoint) ? InsertionShouldCallDidNotifySubtreeInsertions : InsertionDone;
+    return shouldCallFinishedInsertingSubtree(insertionPoint) ? InsertionShouldCallFinishedInsertingSubtree : InsertionDone;
 }
 
-void HTMLScriptElement::didNotifySubtreeInsertions()
+void HTMLScriptElement::finishedInsertingSubtree()
 {
-    ScriptElement::didNotifySubtreeInsertions();
+    ScriptElement::finishedInsertingSubtree();
 }
 
 void HTMLScriptElement::setText(const String &value)

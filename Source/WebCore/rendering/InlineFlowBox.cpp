@@ -69,6 +69,11 @@ void InlineFlowBox::setHasBadChildList()
 
 #endif
 
+RenderBlockFlow* InlineFlowBox::anonymousInlineBlock() const
+{
+    return m_hasAnonymousInlineBlock ? &downcast<RenderBlockFlow>(firstChild()->renderer()) : nullptr;
+}
+
 LayoutUnit InlineFlowBox::getFlowSpacingLogicalWidth()
 {
     LayoutUnit totalWidth = marginBorderPaddingLogicalLeft() + marginBorderPaddingLogicalRight();
@@ -179,14 +184,6 @@ void InlineFlowBox::removeChild(InlineBox* child)
     if (!isDirty())
         dirtyLineBoxes();
 
-    if (child->prevLeafChild() && is<InlineTextBox>(child->prevLeafChild())) {
-        if (is<InlineTextBox>(child))
-            downcast<InlineTextBox>(child->prevLeafChild())->renderer().setContentIsKnownToFollow(downcast<InlineTextBox>(child)->renderer().contentIsKnownToFollow());
-        // FIXME: Handle the case where we remove the last inline box, and it's not a text box. If we're trying to share
-        // expansion opportunites both inside and outside a replaced element (such as for ruby bases), we need to search
-        // outside the current inline box tree to determine if there is content that follows the new last inline item.
-    }
-
     root().childRemoved(child);
 
     if (child == m_firstChild)
@@ -198,7 +195,7 @@ void InlineFlowBox::removeChild(InlineBox* child)
     if (child->prevOnLine())
         child->prevOnLine()->setNextOnLine(child->nextOnLine());
     
-    child->setParent(0);
+    child->setParent(nullptr);
 
     checkConsistency();
 }
@@ -206,19 +203,19 @@ void InlineFlowBox::removeChild(InlineBox* child)
 void InlineFlowBox::deleteLine()
 {
     InlineBox* child = firstChild();
-    InlineBox* next = 0;
+    InlineBox* next = nullptr;
     while (child) {
         ASSERT(this == child->parent());
         next = child->nextOnLine();
 #ifndef NDEBUG
-        child->setParent(0);
+        child->setParent(nullptr);
 #endif
         child->deleteLine();
         child = next;
     }
 #ifndef NDEBUG
-    m_firstChild = 0;
-    m_lastChild = 0;
+    m_firstChild = nullptr;
+    m_lastChild = nullptr;
 #endif
 
     removeLineBoxFromRenderObject();
@@ -372,7 +369,7 @@ float InlineFlowBox::placeBoxesInInlineDirection(float logicalLeft, bool& needsW
     float minLogicalLeft = startLogicalLeft;
     float maxLogicalRight = logicalLeft;
 
-    placeBoxRangeInInlineDirection(firstChild(), 0, logicalLeft, minLogicalLeft, maxLogicalRight, needsWordSpacing);
+    placeBoxRangeInInlineDirection(firstChild(), nullptr, logicalLeft, minLogicalLeft, maxLogicalRight, needsWordSpacing);
 
     logicalLeft += borderLogicalRight() + paddingLogicalRight();
     endPlacingBoxRangesInInlineDirection(startLogicalLeft, logicalLeft, minLogicalLeft, maxLogicalRight);
@@ -671,7 +668,7 @@ void InlineFlowBox::placeBoxesInBlockDirection(LayoutUnit top, LayoutUnit maxHei
                     : boxObject.borderRight() + boxObject.paddingRight();
             }
             newLogicalTopIncludingMargins = newLogicalTop;
-        } else if (!child->renderer().isBR()) {
+        } else if (!child->renderer().isBR() && !child->renderer().isAnonymousInlineBlock()) {
             const auto& box = downcast<RenderBox>(child->renderer());
             newLogicalTopIncludingMargins = newLogicalTop;
             LayoutUnit overSideMargin = child->isHorizontal() ? box.marginTop() : box.marginRight();
@@ -851,10 +848,10 @@ inline void InlineFlowBox::addBorderOutsetVisualOverflow(LayoutRect& logicalVisu
 
     LayoutBoxExtent borderOutsets = lineStyle.borderImageOutsets();
 
-    LayoutUnit borderOutsetLogicalTop = borderOutsets.logicalTop(lineStyle.writingMode());
-    LayoutUnit borderOutsetLogicalBottom = borderOutsets.logicalBottom(lineStyle.writingMode());
-    LayoutUnit borderOutsetLogicalLeft = borderOutsets.logicalLeft(lineStyle.writingMode());
-    LayoutUnit borderOutsetLogicalRight = borderOutsets.logicalRight(lineStyle.writingMode());
+    LayoutUnit borderOutsetLogicalTop = borderOutsets.before(lineStyle.writingMode());
+    LayoutUnit borderOutsetLogicalBottom = borderOutsets.after(lineStyle.writingMode());
+    LayoutUnit borderOutsetLogicalLeft = borderOutsets.start(lineStyle.writingMode());
+    LayoutUnit borderOutsetLogicalRight = borderOutsets.end(lineStyle.writingMode());
 
     // Similar to how glyph overflow works, if our lines are flipped, then it's actually the opposite border that applies, since
     // the line is "upside down" in terms of block coordinates. vertical-rl and horizontal-bt are the flipped line modes.
@@ -882,7 +879,7 @@ inline void InlineFlowBox::addTextBoxVisualOverflow(InlineTextBox& textBox, Glyp
     const RenderStyle& lineStyle = this->lineStyle();
     
     GlyphOverflowAndFallbackFontsMap::iterator it = textBoxDataMap.find(&textBox);
-    GlyphOverflow* glyphOverflow = it == textBoxDataMap.end() ? 0 : &it->value.second;
+    GlyphOverflow* glyphOverflow = it == textBoxDataMap.end() ? nullptr : &it->value.second;
     bool isFlippedLine = lineStyle.isFlippedLinesWritingMode();
 
     int topGlyphEdge = glyphOverflow ? (isFlippedLine ? glyphOverflow->bottom : glyphOverflow->top) : 0;
@@ -962,7 +959,7 @@ void InlineFlowBox::computeOverflow(LayoutUnit lineTop, LayoutUnit lineBottom, G
         return;
 
     if (m_overflow)
-        m_overflow.clear();
+        m_overflow = nullptr;
 
     // Visual overflow just includes overflow for stuff we need to repaint ourselves.  Self-painting layers are ignored.
     // Layout overflow is used to determine scrolling extent, so it still includes child layers and also factors in
@@ -1032,8 +1029,12 @@ void InlineFlowBox::setOverflowFromLogicalRects(const LayoutRect& logicalLayoutO
     setVisualOverflow(visualOverflow, lineTop, lineBottom);
 }
 
-bool InlineFlowBox::nodeAtPoint(const HitTestRequest& request, HitTestResult& result, const HitTestLocation& locationInContainer, const LayoutPoint& accumulatedOffset, LayoutUnit lineTop, LayoutUnit lineBottom)
+bool InlineFlowBox::nodeAtPoint(const HitTestRequest& request, HitTestResult& result, const HitTestLocation& locationInContainer, const LayoutPoint& accumulatedOffset, LayoutUnit lineTop, LayoutUnit lineBottom, HitTestAction hitTestAction)
 {
+    // As long as we don't have an anonymous inline block on our line, we restrict our hit testing only to the foreground phase.
+    if (!hasAnonymousInlineBlock() && hitTestAction != HitTestForeground)
+        return false;
+
     LayoutRect overflowRect(visualOverflowRect(lineTop, lineBottom));
     flipForWritingMode(overflowRect);
     overflowRect.moveBy(accumulatedOffset);
@@ -1064,7 +1065,7 @@ bool InlineFlowBox::nodeAtPoint(const HitTestRequest& request, HitTestResult& re
                 }
                 culledParent = newParent;
             }
-            if (child->nodeAtPoint(request, result, locationInContainer, accumulatedOffset, lineTop, lineBottom)) {
+            if (child->nodeAtPoint(request, result, locationInContainer, accumulatedOffset, lineTop, lineBottom, hitTestAction)) {
                 renderer().updateHitTestResult(result, locationInContainer.point() - toLayoutSize(accumulatedOffset));
                 return true;
             }
@@ -1125,6 +1126,10 @@ bool InlineFlowBox::nodeAtPoint(const HitTestRequest& request, HitTestResult& re
 
 void InlineFlowBox::paint(PaintInfo& paintInfo, const LayoutPoint& paintOffset, LayoutUnit lineTop, LayoutUnit lineBottom)
 {
+    // As long as we don't have an anonymous inline block on our line, we restrict our painting only to a few phases.
+    if (!hasAnonymousInlineBlock() && (paintInfo.phase != PaintPhaseForeground && paintInfo.phase != PaintPhaseSelection && paintInfo.phase != PaintPhaseOutline && paintInfo.phase != PaintPhaseSelfOutline && paintInfo.phase != PaintPhaseChildOutlines && paintInfo.phase != PaintPhaseTextClip && paintInfo.phase != PaintPhaseMask))
+        return;
+
     LayoutRect overflowRect(visualOverflowRect(lineTop, lineBottom));
     overflowRect.inflate(renderer().maximalOutlineSize(paintInfo.phase));
     flipForWritingMode(overflowRect);
@@ -1168,11 +1173,13 @@ void InlineFlowBox::paint(PaintInfo& paintInfo, const LayoutPoint& paintOffset, 
                     paintInfo.outlineObjects->add(&inlineFlow);
             }
         } else if (paintInfo.phase == PaintPhaseMask) {
-            paintMask(paintInfo, paintOffset);
+            if (!hasAnonymousInlineBlock())
+                paintMask(paintInfo, paintOffset);
             return;
         } else {
             // Paint our background, border and box-shadow.
-            paintBoxDecorations(paintInfo, paintOffset);
+            if (!hasAnonymousInlineBlock())
+                paintBoxDecorations(paintInfo, paintOffset);
         }
     }
 
@@ -1338,7 +1345,7 @@ void InlineFlowBox::paintBoxDecorations(PaintInfo& paintInfo, const LayoutPoint&
     GraphicsContext* context = paintInfo.context;
     LayoutRect paintRect = LayoutRect(adjustedPaintoffset, frameRect.size());
     // Shadow comes first and is behind the background and border.
-    if (!renderer().boxShadowShouldBeAppliedToBackground(BackgroundBleedNone, this))
+    if (!renderer().boxShadowShouldBeAppliedToBackground(adjustedPaintoffset, BackgroundBleedNone, this))
         paintBoxShadow(paintInfo, lineStyle, Normal, paintRect);
 
     Color c = lineStyle.visitedDependentColor(CSSPropertyBackgroundColor);
@@ -1687,7 +1694,7 @@ void InlineFlowBox::computeReplacedAndTextLineTopAndBottom(LayoutUnit& lineTop, 
     }
 }
 
-#ifndef NDEBUG
+#if ENABLE(TREE_DEBUGGING)
 
 const char* InlineFlowBox::boxName() const
 {
@@ -1700,6 +1707,10 @@ void InlineFlowBox::showLineTreeAndMark(const InlineBox* markedBox, int depth) c
     for (const InlineBox* box = firstChild(); box; box = box->nextOnLine())
         box->showLineTreeAndMark(markedBox, depth + 1);
 }
+
+#endif
+
+#ifndef NDEBUG
 
 void InlineFlowBox::checkConsistency() const
 {

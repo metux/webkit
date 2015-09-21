@@ -68,14 +68,19 @@ JSValue jsTypeStringForValue(VM& vm, JSGlobalObject* globalObject, JSValue v)
     if (v.isSymbol())
         return vm.smallStrings.symbolString();
     if (v.isObject()) {
+        JSObject* object = asObject(v);
         // Return "undefined" for objects that should be treated
         // as null when doing comparisons.
-        if (asObject(v)->structure(vm)->masqueradesAsUndefined(globalObject))
+        if (object->structure(vm)->masqueradesAsUndefined(globalObject))
             return vm.smallStrings.undefinedString();
-        CallData callData;
-        JSObject* object = asObject(v);
-        if (object->methodTable(vm)->getCallData(object, callData) != CallTypeNone)
+        if (object->type() == JSFunctionType)
             return vm.smallStrings.functionString();
+        if (object->inlineTypeFlags() & TypeOfShouldCallGetCallData) {
+            CallData callData;
+            JSObject* object = asObject(v);
+            if (object->methodTable(vm)->getCallData(object, callData) != CallTypeNone)
+                return vm.smallStrings.functionString();
+        }
     }
     return vm.smallStrings.objectString();
 }
@@ -85,7 +90,7 @@ JSValue jsTypeStringForValue(CallFrame* callFrame, JSValue v)
     return jsTypeStringForValue(callFrame->vm(), callFrame->lexicalGlobalObject(), v);
 }
 
-bool jsIsObjectType(CallFrame* callFrame, JSValue v)
+bool jsIsObjectTypeOrNull(CallFrame* callFrame, JSValue v)
 {
     if (!v.isCell())
         return v.isNull();

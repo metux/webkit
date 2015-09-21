@@ -56,7 +56,7 @@
 #include "StyleResolver.h"
 #include <wtf/HashMap.h>
 
-#if ENABLE(3D_RENDERING)
+#if ENABLE(3D_TRANSFORMS)
 #include "RenderLayerCompositor.h"
 #endif
 
@@ -576,7 +576,7 @@ static bool transform_3dMediaFeatureEval(CSSValue* value, const CSSToLengthConve
     bool returnValueIfNoParameter;
     int have3dRendering;
 
-#if ENABLE(3D_RENDERING)
+#if ENABLE(3D_TRANSFORMS)
     bool threeDEnabled = false;
     if (RenderView* view = frame->contentRenderer())
         threeDEnabled = view->compositor().canRender3DTransforms();
@@ -644,7 +644,7 @@ static inline bool isRunningOnIPhoneOrIPod()
 
 static bool video_playable_inlineMediaFeatureEval(CSSValue*, const CSSToLengthConversionData&, Frame* frame, MediaFeaturePrefix)
 {
-    return !isRunningOnIPhoneOrIPod() || frame->settings().mediaPlaybackAllowsInline();
+    return !isRunningOnIPhoneOrIPod() || frame->settings().allowsInlineMediaPlayback();
 }
 
 static bool hoverMediaFeatureEval(CSSValue* value, const CSSToLengthConversionData&, Frame*, MediaFeaturePrefix)

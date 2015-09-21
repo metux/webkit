@@ -248,6 +248,8 @@
     <keyword type="struct" name="WebKitDOMCharacterData" link="WebKitDOMCharacterData.html#WebKitDOMCharacterData-struct"/>
     <keyword type="property" name="The “data” property" link="WebKitDOMCharacterData.html#WebKitDOMCharacterData--data"/>
     <keyword type="property" name="The “length” property" link="WebKitDOMCharacterData.html#WebKitDOMCharacterData--length"/>
+    <keyword type="property" name="The “next-element-sibling” property" link="WebKitDOMCharacterData.html#WebKitDOMCharacterData--next-element-sibling"/>
+    <keyword type="property" name="The “previous-element-sibling” property" link="WebKitDOMCharacterData.html#WebKitDOMCharacterData--previous-element-sibling"/>
     <keyword type="struct" name="WebKitDOMComment" link="WebKitDOMComment.html#WebKitDOMComment-struct"/>
     <keyword type="function" name="webkit_dom_dom_implementation_has_feature ()" link="WebKitDOMDOMImplementation.html#webkit-dom-dom-implementation-has-feature"/>
     <keyword type="function" name="webkit_dom_dom_implementation_create_document_type ()" link="WebKitDOMDOMImplementation.html#webkit-dom-dom-implementation-create-document-type"/>
@@ -268,7 +270,6 @@
     <keyword type="function" name="webkit_dom_document_create_element_ns ()" link="WebKitDOMDocument.html#webkit-dom-document-create-element-ns"/>
     <keyword type="function" name="webkit_dom_document_create_attribute_ns ()" link="WebKitDOMDocument.html#webkit-dom-document-create-attribute-ns"/>
     <keyword type="function" name="webkit_dom_document_get_elements_by_tag_name_ns ()" link="WebKitDOMDocument.html#webkit-dom-document-get-elements-by-tag-name-ns"/>
-    <keyword type="function" name="webkit_dom_document_get_element_by_id ()" link="WebKitDOMDocument.html#webkit-dom-document-get-element-by-id"/>
     <keyword type="function" name="webkit_dom_document_adopt_node ()" link="WebKitDOMDocument.html#webkit-dom-document-adopt-node"/>
     <keyword type="function" name="webkit_dom_document_create_event ()" link="WebKitDOMDocument.html#webkit-dom-document-create-event"/>
     <keyword type="function" name="webkit_dom_document_create_range ()" link="WebKitDOMDocument.html#webkit-dom-document-create-range"/>
@@ -289,6 +290,7 @@
     <keyword type="function" name="webkit_dom_document_create_css_style_declaration ()" link="WebKitDOMDocument.html#webkit-dom-document-create-css-style-declaration"/>
     <keyword type="function" name="webkit_dom_document_get_elements_by_class_name ()" link="WebKitDOMDocument.html#webkit-dom-document-get-elements-by-class-name"/>
     <keyword type="function" name="webkit_dom_document_has_focus ()" link="WebKitDOMDocument.html#webkit-dom-document-has-focus"/>
+    <keyword type="function" name="webkit_dom_document_get_element_by_id ()" link="WebKitDOMDocument.html#webkit-dom-document-get-element-by-id"/>
     <keyword type="function" name="webkit_dom_document_query_selector ()" link="WebKitDOMDocument.html#webkit-dom-document-query-selector"/>
     <keyword type="function" name="webkit_dom_document_query_selector_all ()" link="WebKitDOMDocument.html#webkit-dom-document-query-selector-all"/>
     <keyword type="function" name="webkit_dom_document_get_doctype ()" link="WebKitDOMDocument.html#webkit-dom-document-get-doctype"/>
@@ -336,6 +338,8 @@
     <keyword type="property" name="The “body” property" link="WebKitDOMDocument.html#WebKitDOMDocument--body"/>
     <keyword type="property" name="The “character-set” property" link="WebKitDOMDocument.html#WebKitDOMDocument--character-set"/>
     <keyword type="property" name="The “charset” property" link="WebKitDOMDocument.html#WebKitDOMDocument--charset"/>
+    <keyword type="property" name="The “child-element-count” property" link="WebKitDOMDocument.html#WebKitDOMDocument--child-element-count"/>
+    <keyword type="property" name="The “children” property" link="WebKitDOMDocument.html#WebKitDOMDocument--children"/>
     <keyword type="property" name="The “compat-mode” property" link="WebKitDOMDocument.html#WebKitDOMDocument--compat-mode"/>
     <keyword type="property" name="The “content-type” property" link="WebKitDOMDocument.html#WebKitDOMDocument--content-type"/>
     <keyword type="property" name="The “cookie” property" link="WebKitDOMDocument.html#WebKitDOMDocument--cookie"/>
@@ -346,12 +350,14 @@
     <keyword type="property" name="The “document-element” property" link="WebKitDOMDocument.html#WebKitDOMDocument--document-element"/>
     <keyword type="property" name="The “document-uri” property" link="WebKitDOMDocument.html#WebKitDOMDocument--document-uri"/>
     <keyword type="property" name="The “domain” property" link="WebKitDOMDocument.html#WebKitDOMDocument--domain"/>
+    <keyword type="property" name="The “first-element-child” property" link="WebKitDOMDocument.html#WebKitDOMDocument--first-element-child"/>
     <keyword type="property" name="The “forms” property" link="WebKitDOMDocument.html#WebKitDOMDocument--forms"/>
     <keyword type="property" name="The “head” property" link="WebKitDOMDocument.html#WebKitDOMDocument--head"/>
     <keyword type="property" name="The “hidden” property" link="WebKitDOMDocument.html#WebKitDOMDocument--hidden"/>
     <keyword type="property" name="The “images” property" link="WebKitDOMDocument.html#WebKitDOMDocument--images"/>
     <keyword type="property" name="The “implementation” property" link="WebKitDOMDocument.html#WebKitDOMDocument--implementation"/>
     <keyword type="property" name="The “input-encoding” property" link="WebKitDOMDocument.html#WebKitDOMDocument--input-encoding"/>
+    <keyword type="property" name="The “last-element-child” property" link="WebKitDOMDocument.html#WebKitDOMDocument--last-element-child"/>
     <keyword type="property" name="The “last-modified” property" link="WebKitDOMDocument.html#WebKitDOMDocument--last-modified"/>
     <keyword type="property" name="The “links” property" link="WebKitDOMDocument.html#WebKitDOMDocument--links"/>
     <keyword type="property" name="The “origin” property" link="WebKitDOMDocument.html#WebKitDOMDocument--origin"/>
@@ -359,6 +365,7 @@
     <keyword type="property" name="The “preferred-stylesheet-set” property" link="WebKitDOMDocument.html#WebKitDOMDocument--preferred-stylesheet-set"/>
     <keyword type="property" name="The “ready-state” property" link="WebKitDOMDocument.html#WebKitDOMDocument--ready-state"/>
     <keyword type="property" name="The “referrer” property" link="WebKitDOMDocument.html#WebKitDOMDocument--referrer"/>
+    <keyword type="property" name="The “scrolling-element” property" link="WebKitDOMDocument.html#WebKitDOMDocument--scrolling-element"/>
     <keyword type="property" name="The “security-policy” property" link="WebKitDOMDocument.html#WebKitDOMDocument--security-policy"/>
     <keyword type="property" name="The “selected-stylesheet-set” property" link="WebKitDOMDocument.html#WebKitDOMDocument--selected-stylesheet-set"/>
     <keyword type="property" name="The “style-sheets” property" link="WebKitDOMDocument.html#WebKitDOMDocument--style-sheets"/>
@@ -374,6 +381,10 @@
     <keyword type="property" name="The “xml-standalone” property" link="WebKitDOMDocument.html#WebKitDOMDocument--xml-standalone"/>
     <keyword type="property" name="The “xml-version” property" link="WebKitDOMDocument.html#WebKitDOMDocument--xml-version"/>
     <keyword type="struct" name="WebKitDOMDocumentFragment" link="WebKitDOMDocumentFragment.html#WebKitDOMDocumentFragment-struct"/>
+    <keyword type="property" name="The “child-element-count” property" link="WebKitDOMDocumentFragment.html#WebKitDOMDocumentFragment--child-element-count"/>
+    <keyword type="property" name="The “children” property" link="WebKitDOMDocumentFragment.html#WebKitDOMDocumentFragment--children"/>
+    <keyword type="property" name="The “first-element-child” property" link="WebKitDOMDocumentFragment.html#WebKitDOMDocumentFragment--first-element-child"/>
+    <keyword type="property" name="The “last-element-child” property" link="WebKitDOMDocumentFragment.html#WebKitDOMDocumentFragment--last-element-child"/>
     <keyword type="function" name="webkit_dom_document_type_get_name ()" link="WebKitDOMDocumentType.html#webkit-dom-document-type-get-name"/>
     <keyword type="function" name="webkit_dom_document_type_get_entities ()" link="WebKitDOMDocumentType.html#webkit-dom-document-type-get-entities"/>
     <keyword type="function" name="webkit_dom_document_type_get_notations ()" link="WebKitDOMDocumentType.html#webkit-dom-document-type-get-notations"/>
@@ -438,14 +449,16 @@
     <keyword type="function" name="webkit_dom_element_set_outer_html ()" link="WebKitDOMElement.html#webkit-dom-element-set-outer-html" since="2.8"/>
     <keyword type="function" name="webkit_dom_element_get_class_name ()" link="WebKitDOMElement.html#webkit-dom-element-get-class-name"/>
     <keyword type="function" name="webkit_dom_element_set_class_name ()" link="WebKitDOMElement.html#webkit-dom-element-set-class-name"/>
-    <keyword type="function" name="webkit_dom_element_get_first_element_child ()" link="WebKitDOMElement.html#webkit-dom-element-get-first-element-child"/>
-    <keyword type="function" name="webkit_dom_element_get_last_element_child ()" link="WebKitDOMElement.html#webkit-dom-element-get-last-element-child"/>
     <keyword type="function" name="webkit_dom_element_get_previous_element_sibling ()" link="WebKitDOMElement.html#webkit-dom-element-get-previous-element-sibling"/>
     <keyword type="function" name="webkit_dom_element_get_next_element_sibling ()" link="WebKitDOMElement.html#webkit-dom-element-get-next-element-sibling"/>
+    <keyword type="function" name="webkit_dom_element_get_children ()" link="WebKitDOMElement.html#webkit-dom-element-get-children" since="2.10"/>
+    <keyword type="function" name="webkit_dom_element_get_first_element_child ()" link="WebKitDOMElement.html#webkit-dom-element-get-first-element-child"/>
+    <keyword type="function" name="webkit_dom_element_get_last_element_child ()" link="WebKitDOMElement.html#webkit-dom-element-get-last-element-child"/>
     <keyword type="function" name="webkit_dom_element_get_child_element_count ()" link="WebKitDOMElement.html#webkit-dom-element-get-child-element-count"/>
     <keyword type="struct" name="WebKitDOMElement" link="WebKitDOMElement.html#WebKitDOMElement-struct"/>
     <keyword type="property" name="The “attributes” property" link="WebKitDOMElement.html#WebKitDOMElement--attributes"/>
     <keyword type="property" name="The “child-element-count” property" link="WebKitDOMElement.html#WebKitDOMElement--child-element-count"/>
+    <keyword type="property" name="The “children” property" link="WebKitDOMElement.html#WebKitDOMElement--children"/>
     <keyword type="property" name="The “class-list” property" link="WebKitDOMElement.html#WebKitDOMElement--class-list"/>
     <keyword type="property" name="The “class-name” property" link="WebKitDOMElement.html#WebKitDOMElement--class-name"/>
     <keyword type="property" name="The “client-height” property" link="WebKitDOMElement.html#WebKitDOMElement--client-height"/>
@@ -1065,7 +1078,6 @@
     <keyword type="function" name="webkit_dom_html_element_set_inner_text ()" link="WebKitDOMHTMLElement.html#webkit-dom-html-element-set-inner-text"/>
     <keyword type="function" name="webkit_dom_html_element_get_outer_text ()" link="WebKitDOMHTMLElement.html#webkit-dom-html-element-get-outer-text"/>
     <keyword type="function" name="webkit_dom_html_element_set_outer_text ()" link="WebKitDOMHTMLElement.html#webkit-dom-html-element-set-outer-text"/>
-    <keyword type="function" name="webkit_dom_html_element_get_children ()" link="WebKitDOMHTMLElement.html#webkit-dom-html-element-get-children"/>
     <keyword type="function" name="webkit_dom_html_element_get_content_editable ()" link="WebKitDOMHTMLElement.html#webkit-dom-html-element-get-content-editable"/>
     <keyword type="function" name="webkit_dom_html_element_set_content_editable ()" link="WebKitDOMHTMLElement.html#webkit-dom-html-element-set-content-editable"/>
     <keyword type="function" name="webkit_dom_html_element_get_is_content_editable ()" link="WebKitDOMHTMLElement.html#webkit-dom-html-element-get-is-content-editable"/>
@@ -1073,9 +1085,9 @@
     <keyword type="function" name="webkit_dom_html_element_get_outer_html ()" link="WebKitDOMHTMLElement.html#webkit-dom-html-element-get-outer-html" deprecated=""/>
     <keyword type="function" name="webkit_dom_html_element_get_inner_html ()" link="WebKitDOMHTMLElement.html#webkit-dom-html-element-get-inner-html" deprecated=""/>
     <keyword type="function" name="webkit_dom_html_element_set_outer_html ()" link="WebKitDOMHTMLElement.html#webkit-dom-html-element-set-outer-html" deprecated=""/>
+    <keyword type="function" name="webkit_dom_html_element_get_children ()" link="WebKitDOMHTMLElement.html#webkit-dom-html-element-get-children" deprecated=""/>
     <keyword type="struct" name="WebKitDOMHTMLElement" link="WebKitDOMHTMLElement.html#WebKitDOMHTMLElement-struct"/>
     <keyword type="property" name="The “access-key” property" link="WebKitDOMHTMLElement.html#WebKitDOMHTMLElement--access-key"/>
-    <keyword type="property" name="The “children” property" link="WebKitDOMHTMLElement.html#WebKitDOMHTMLElement--children"/>
     <keyword type="property" name="The “content-editable” property" link="WebKitDOMHTMLElement.html#WebKitDOMHTMLElement--content-editable"/>
     <keyword type="property" name="The “dir” property" link="WebKitDOMHTMLElement.html#WebKitDOMHTMLElement--dir"/>
     <keyword type="property" name="The “draggable” property" link="WebKitDOMHTMLElement.html#WebKitDOMHTMLElement--draggable"/>
@@ -1951,6 +1963,7 @@
     <keyword type="property" name="The “navigator” property" link="WebKitDOMDOMWindow.html#WebKitDOMDOMWindow--navigator"/>
     <keyword type="property" name="The “offscreen-buffering” property" link="WebKitDOMDOMWindow.html#WebKitDOMDOMWindow--offscreen-buffering"/>
     <keyword type="property" name="The “opener” property" link="WebKitDOMDOMWindow.html#WebKitDOMDOMWindow--opener"/>
+    <keyword type="property" name="The “orientation” property" link="WebKitDOMDOMWindow.html#WebKitDOMDOMWindow--orientation"/>
     <keyword type="property" name="The “outer-height” property" link="WebKitDOMDOMWindow.html#WebKitDOMDOMWindow--outer-height"/>
     <keyword type="property" name="The “outer-width” property" link="WebKitDOMDOMWindow.html#WebKitDOMDOMWindow--outer-width"/>
     <keyword type="property" name="The “page-x-offset” property" link="WebKitDOMDOMWindow.html#WebKitDOMDOMWindow--page-x-offset"/>

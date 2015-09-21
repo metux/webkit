@@ -29,6 +29,7 @@
 
 #include "WebView.h"
 
+#include "APIPageConfiguration.h"
 #include "CoordinatedDrawingAreaProxy.h"
 #include "CoordinatedGraphicsScene.h"
 #include "CoordinatedLayerTreeHostProxy.h"
@@ -52,11 +53,11 @@ WebView::WebView(WebProcessPool* context, WebPageGroup* pageGroup)
     , m_visible(false)
     , m_opacity(1.0)
 {
-    WebPageConfiguration webPageConfiguration;
-    webPageConfiguration.pageGroup = pageGroup;
+    auto pageConfiguration = API::PageConfiguration::create();
+    pageConfiguration->setPageGroup(pageGroup);
 
     // Need to call createWebPage after other data members, specifically m_visible, are initialized.
-    m_page = context->createWebPage(*this, WTF::move(webPageConfiguration));
+    m_page = context->createWebPage(*this, WTF::move(pageConfiguration));
 
     m_page->pageGroup().preferences().setAcceleratedCompositingEnabled(true);
     m_page->pageGroup().preferences().setForceCompositingMode(true);
@@ -304,7 +305,7 @@ void WebView::scrollView(const WebCore::IntRect& scrollRect, const WebCore::IntS
     setViewNeedsDisplay(scrollRect);
 }
 
-void WebView::requestScroll(const WebCore::FloatPoint&, bool)
+void WebView::requestScroll(const WebCore::FloatPoint&, const WebCore::IntPoint&, bool)
 {
     notImplemented();
 }
@@ -430,27 +431,32 @@ void WebView::doneWithTouchEvent(const NativeWebTouchEvent& event, bool wasEvent
 }
 #endif
 
-PassRefPtr<WebPopupMenuProxy> WebView::createPopupMenuProxy(WebPageProxy*)
+RefPtr<WebPopupMenuProxy> WebView::createPopupMenuProxy(WebPageProxy*)
 {
     notImplemented();
-    return 0;
+    return nullptr;
 }
 
-PassRefPtr<WebContextMenuProxy> WebView::createContextMenuProxy(WebPageProxy*)
+RefPtr<WebContextMenuProxy> WebView::createContextMenuProxy(WebPageProxy*)
 {
     notImplemented();
-    return 0;
+    return nullptr;
 }
 
 #if ENABLE(INPUT_TYPE_COLOR)
-PassRefPtr<WebColorPicker> WebView::createColorPicker(WebPageProxy*, const WebCore::Color&, const WebCore::IntRect&)
+RefPtr<WebColorPicker> WebView::createColorPicker(WebPageProxy*, const WebCore::Color&, const WebCore::IntRect&)
 {
     notImplemented();
-    return 0;
+    return nullptr;
 }
 #endif
 
-void WebView::setTextIndicator(PassRefPtr<WebCore::TextIndicator>, bool)
+void WebView::setTextIndicator(Ref<WebCore::TextIndicator>, WebCore::TextIndicatorLifetime)
+{
+    notImplemented();
+}
+
+void WebView::clearTextIndicator(WebCore::TextIndicatorDismissalAnimation)
 {
     notImplemented();
 }
@@ -514,6 +520,7 @@ void WebView::didChangeViewportProperties(const WebCore::ViewportAttributes& att
     m_client.didChangeViewportAttributes(this, attr);
 }
 
+#if USE(COORDINATED_GRAPHICS_MULTIPROCESS)
 void WebView::pageDidRequestScroll(const IntPoint& position)
 {
     FloatPoint uiPosition(position);
@@ -536,6 +543,7 @@ void WebView::findZoomableAreaForPoint(const IntPoint& point, const IntSize& siz
 {
     m_page->findZoomableAreaForPoint(transformFromScene().mapPoint(point), transformFromScene().mapSize(size));
 }
+#endif
 
 } // namespace WebKit
 

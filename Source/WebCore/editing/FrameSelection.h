@@ -26,6 +26,7 @@
 #ifndef FrameSelection_h
 #define FrameSelection_h
 
+#include "AXTextStateChangeIntent.h"
 #include "EditingStyle.h"
 #include "IntRect.h"
 #include "LayoutRect.h"
@@ -141,16 +142,16 @@ public:
     WEBCORE_EXPORT void moveTo(const VisiblePosition&, const VisiblePosition&, EUserTriggered = NotUserTriggered);
     void moveTo(const Position&, EAffinity, EUserTriggered = NotUserTriggered);
     void moveTo(const Position&, const Position&, EAffinity, EUserTriggered = NotUserTriggered);
-    void moveWithoutValidationTo(const Position&, const Position&, bool selectionHasDirection, bool shouldSetFocus);
+    void moveWithoutValidationTo(const Position&, const Position&, bool selectionHasDirection, bool shouldSetFocus, const AXTextStateChangeIntent& = AXTextStateChangeIntent());
 
     const VisibleSelection& selection() const { return m_selection; }
-    WEBCORE_EXPORT void setSelection(const VisibleSelection&, SetSelectionOptions = defaultSetSelectionOptions(), CursorAlignOnScroll = AlignCursorOnScrollIfNeeded, TextGranularity = CharacterGranularity);
+    WEBCORE_EXPORT void setSelection(const VisibleSelection&, SetSelectionOptions = defaultSetSelectionOptions(), AXTextStateChangeIntent = AXTextStateChangeIntent(), CursorAlignOnScroll = AlignCursorOnScrollIfNeeded, TextGranularity = CharacterGranularity);
     WEBCORE_EXPORT bool setSelectedRange(Range*, EAffinity, bool closeTyping);
     WEBCORE_EXPORT void selectAll();
     WEBCORE_EXPORT void clear();
     void prepareForDestruction();
 
-    void didLayout();
+    void updateAppearanceAfterLayout();
     void setNeedsSelectionUpdate();
 
     bool contains(const LayoutPoint&);
@@ -199,7 +200,7 @@ public:
     bool isCaretBlinkingSuspended() const { return m_isCaretBlinkingSuspended; }
 
     // Focus
-    WEBCORE_EXPORT void setFocused(bool);
+    void setFocused(bool);
     bool isFocused() const { return m_focused; }
     WEBCORE_EXPORT bool isFocusedAndActive() const;
     void pageActivationChanged();
@@ -207,7 +208,7 @@ public:
     // Painting.
     WEBCORE_EXPORT void updateAppearance();
 
-#ifndef NDEBUG
+#if ENABLE(TREE_DEBUGGING)
     void formatForDebugger(char* buffer, unsigned length) const;
     void showTreeForThis() const;
 #endif
@@ -259,7 +260,8 @@ public:
 
     WEBCORE_EXPORT FloatRect selectionBounds(bool clipToVisibleContent = true) const;
 
-    WEBCORE_EXPORT void getClippedVisibleTextRectangles(Vector<FloatRect>&) const;
+    enum class TextRectangleHeight { TextHeight, SelectionHeight };
+    WEBCORE_EXPORT void getClippedVisibleTextRectangles(Vector<FloatRect>&, TextRectangleHeight = TextRectangleHeight::SelectionHeight) const;
 
     WEBCORE_EXPORT HTMLFormElement* currentForm() const;
 
@@ -272,7 +274,7 @@ public:
 private:
     enum EPositionType { START, END, BASE, EXTENT };
 
-    void updateAndRevealSelection();
+    void updateAndRevealSelection(const AXTextStateChangeIntent&);
     void updateDataDetectorsForSelection();
 
     bool setSelectionWithoutUpdatingAppearance(const VisibleSelection&, SetSelectionOptions, CursorAlignOnScroll, TextGranularity);
@@ -297,10 +299,11 @@ private:
 
     LayoutUnit lineDirectionPointForBlockDirectionNavigation(EPositionType);
 
+    AXTextStateChangeIntent textSelectionIntent(EAlteration, SelectionDirection, TextGranularity);
 #if HAVE(ACCESSIBILITY)
-    void notifyAccessibilityForSelectionChange();
+    void notifyAccessibilityForSelectionChange(const AXTextStateChangeIntent&);
 #else
-    void notifyAccessibilityForSelectionChange() { }
+    void notifyAccessibilityForSelectionChange(const AXTextStateChangeIntent&) { }
 #endif
 
     void updateSelectionCachesIfSelectionIsInsideTextFormControl(EUserTriggered);
@@ -357,7 +360,7 @@ inline EditingStyle* FrameSelection::typingStyle() const
 
 inline void FrameSelection::clearTypingStyle()
 {
-    m_typingStyle.clear();
+    m_typingStyle = nullptr;
 }
 
 inline void FrameSelection::setTypingStyle(PassRefPtr<EditingStyle> style)
@@ -367,7 +370,7 @@ inline void FrameSelection::setTypingStyle(PassRefPtr<EditingStyle> style)
 
 #if !(PLATFORM(COCOA) || PLATFORM(GTK) || PLATFORM(EFL))
 #if HAVE(ACCESSIBILITY)
-inline void FrameSelection::notifyAccessibilityForSelectionChange()
+inline void FrameSelection::notifyAccessibilityForSelectionChange(const AXTextStateChangeIntent&)
 {
 }
 #endif
@@ -375,7 +378,7 @@ inline void FrameSelection::notifyAccessibilityForSelectionChange()
 
 } // namespace WebCore
 
-#ifndef NDEBUG
+#if ENABLE(TREE_DEBUGGING)
 // Outside the WebCore namespace for ease of invocation from gdb.
 void showTree(const WebCore::FrameSelection&);
 void showTree(const WebCore::FrameSelection*);

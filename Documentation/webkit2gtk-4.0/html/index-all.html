@@ -6,7 +6,7 @@
 <meta name="generator" content="DocBook XSL Stylesheets V1.78.1">
 <link rel="home" href="index.html" title="WebKit2GTK+ Reference Manual">
 <link rel="up" href="index.html" title="WebKit2GTK+ Reference Manual">
-<link rel="prev" href="WebKitWebHitTestResult.html" title="WebKitWebHitTestResult">
+<link rel="prev" href="WebKitWebEditor.html" title="WebKitWebEditor">
 <link rel="next" href="api-index-deprecated.html" title="Index of deprecated symbols">
 <meta name="generator" content="GTK-Doc V1.23.1 (XML mode)">
 <link rel="stylesheet" href="style.css" type="text/css">
@@ -16,7 +16,7 @@
 <td width="100%" align="left" class="shortcuts"></td>
 <td><a accesskey="h" href="index.html"><img src="home.png" width="16" height="16" border="0" alt="Home"></a></td>
 <td><img src="up-insensitive.png" width="16" height="16" border="0"></td>
-<td><a accesskey="p" href="WebKitWebHitTestResult.html"><img src="left.png" width="16" height="16" border="0" alt="Prev"></a></td>
+<td><a accesskey="p" href="WebKitWebEditor.html"><img src="left.png" width="16" height="16" border="0" alt="Prev"></a></td>
 <td><a accesskey="n" href="api-index-deprecated.html"><img src="right.png" width="16" height="16" border="0" alt="Next"></a></td>
 </tr></table>
 <div class="index">
@@ -270,7 +270,11 @@
 <dl>
 <dt>WEBKIT_EDITING_COMMAND_COPY, <a class="indexterm" href="WebKitWebView.html#WEBKIT-EDITING-COMMAND-COPY:CAPS">WEBKIT_EDITING_COMMAND_COPY</a>
 </dt>
+<dt>WEBKIT_EDITING_COMMAND_CREATE_LINK, <a class="indexterm" href="WebKitWebView.html#WEBKIT-EDITING-COMMAND-CREATE-LINK:CAPS">WEBKIT_EDITING_COMMAND_CREATE_LINK</a>
+</dt>
 <dt>WEBKIT_EDITING_COMMAND_CUT, <a class="indexterm" href="WebKitWebView.html#WEBKIT-EDITING-COMMAND-CUT:CAPS">WEBKIT_EDITING_COMMAND_CUT</a>
+</dt>
+<dt>WEBKIT_EDITING_COMMAND_INSERT_IMAGE, <a class="indexterm" href="WebKitWebView.html#WEBKIT-EDITING-COMMAND-INSERT-IMAGE:CAPS">WEBKIT_EDITING_COMMAND_INSERT_IMAGE</a>
 </dt>
 <dt>WEBKIT_EDITING_COMMAND_PASTE, <a class="indexterm" href="WebKitWebView.html#WEBKIT-EDITING-COMMAND-PASTE:CAPS">WEBKIT_EDITING_COMMAND_PASTE</a>
 </dt>
@@ -279,6 +283,14 @@
 <dt>WEBKIT_EDITING_COMMAND_SELECT_ALL, <a class="indexterm" href="WebKitWebView.html#WEBKIT-EDITING-COMMAND-SELECT-ALL:CAPS">WEBKIT_EDITING_COMMAND_SELECT_ALL</a>
 </dt>
 <dt>WEBKIT_EDITING_COMMAND_UNDO, <a class="indexterm" href="WebKitWebView.html#WEBKIT-EDITING-COMMAND-UNDO:CAPS">WEBKIT_EDITING_COMMAND_UNDO</a>
+</dt>
+<dt>WebKitEditorState, <a class="indexterm" href="WebKitEditorState.html#WebKitEditorState-struct">struct WebKitEditorState</a>
+</dt>
+<dt>WebKitEditorState:typing-attributes, <a class="indexterm" href="WebKitEditorState.html#WebKitEditorState--typing-attributes">The “typing-attributes” property</a>
+</dt>
+<dt>WebKitEditorTypingAttributes, <a class="indexterm" href="WebKitEditorState.html#WebKitEditorTypingAttributes">enum WebKitEditorTypingAttributes</a>
+</dt>
+<dt>webkit_editor_state_get_typing_attributes, <a class="indexterm" href="WebKitEditorState.html#webkit-editor-state-get-typing-attributes">webkit_editor_state_get_typing_attributes ()</a>
 </dt>
 </dl>
 </div>
@@ -437,8 +449,14 @@
 </div>
 <div class="indexdiv">
 <h3>I</h3>
-<dl><dt>WebKitInsecureContentEvent, <a class="indexterm" href="WebKitWebView.html#WebKitInsecureContentEvent">enum WebKitInsecureContentEvent</a>
-</dt></dl>
+<dl>
+<dt>WebKitInsecureContentEvent, <a class="indexterm" href="WebKitWebView.html#WebKitInsecureContentEvent">enum WebKitInsecureContentEvent</a>
+</dt>
+<dt>WebKitInstallMissingMediaPluginsPermissionRequest, <a class="indexterm" href="WebKitInstallMissingMediaPluginsPermissionRequest.html#WebKitInstallMissingMediaPluginsPermissionRequest-struct">struct WebKitInstallMissingMediaPluginsPermissionRequest</a>
+</dt>
+<dt>webkit_install_missing_media_plugins_permission_request_get_description, <a class="indexterm" href="WebKitInstallMissingMediaPluginsPermissionRequest.html#webkit-install-missing-media-plugins-permission-request-get-description">webkit_install_missing_media_plugins_permission_request_get_description ()</a>
+</dt>
+</dl>
 </div>
 <div class="indexdiv">
 <h3>J</h3>
@@ -715,6 +733,8 @@
 </dt>
 <dt>WebKitSettings, <a class="indexterm" href="WebKitSettings.html#WebKitSettings-struct">struct WebKitSettings</a>
 </dt>
+<dt>WebKitSettings:allow-file-access-from-file-urls, <a class="indexterm" href="WebKitSettings.html#WebKitSettings--allow-file-access-from-file-urls">The “allow-file-access-from-file-urls” property</a>
+</dt>
 <dt>WebKitSettings:allow-modal-dialogs, <a class="indexterm" href="WebKitSettings.html#WebKitSettings--allow-modal-dialogs">The “allow-modal-dialogs” property</a>
 </dt>
 <dt>WebKitSettings:auto-load-images, <a class="indexterm" href="WebKitSettings.html#WebKitSettings--auto-load-images">The “auto-load-images” property</a>
@@ -810,6 +830,8 @@
 <dt>WebKitSettings:user-agent, <a class="indexterm" href="WebKitSettings.html#WebKitSettings--user-agent">The “user-agent” property</a>
 </dt>
 <dt>WebKitSettings:zoom-text-only, <a class="indexterm" href="WebKitSettings.html#WebKitSettings--zoom-text-only">The “zoom-text-only” property</a>
+</dt>
+<dt>webkit_settings_get_allow_file_access_from_file_urls, <a class="indexterm" href="WebKitSettings.html#webkit-settings-get-allow-file-access-from-file-urls">webkit_settings_get_allow_file_access_from_file_urls ()</a>
 </dt>
 <dt>webkit_settings_get_allow_modal_dialogs, <a class="indexterm" href="WebKitSettings.html#webkit-settings-get-allow-modal-dialogs">webkit_settings_get_allow_modal_dialogs ()</a>
 </dt>
@@ -910,6 +932,8 @@
 <dt>webkit_settings_new, <a class="indexterm" href="WebKitSettings.html#webkit-settings-new">webkit_settings_new ()</a>
 </dt>
 <dt>webkit_settings_new_with_settings, <a class="indexterm" href="WebKitSettings.html#webkit-settings-new-with-settings">webkit_settings_new_with_settings ()</a>
+</dt>
+<dt>webkit_settings_set_allow_file_access_from_file_urls, <a class="indexterm" href="WebKitSettings.html#webkit-settings-set-allow-file-access-from-file-urls">webkit_settings_set_allow_file_access_from_file_urls ()</a>
 </dt>
 <dt>webkit_settings_set_allow_modal_dialogs, <a class="indexterm" href="WebKitSettings.html#webkit-settings-set-allow-modal-dialogs">webkit_settings_set_allow_modal_dialogs ()</a>
 </dt>
@@ -1144,7 +1168,13 @@
 </dt>
 <dt>WebKitWebContext::initialize-web-extensions, <a class="indexterm" href="WebKitWebContext.html#WebKitWebContext-initialize-web-extensions">The “initialize-web-extensions” signal</a>
 </dt>
-<dt>WebKitWebContext:local-storage-directory, <a class="indexterm" href="WebKitWebContext.html#WebKitWebContext--local-storage-directory">The “local-storage-directory” property</a>
+<dt>WebKitWebContext:local-storage-directory, <a class="indexterm" href="WebKitWebContext.html#WebKitWebContext--local-storage-directory">The “local-storage-directory” property</a>, <a class="indexterm" href="WebKitWebContext.html#WebKitWebContext--local-storage-directory">The “local-storage-directory” property</a>
+</dt>
+<dt>WebKitWebContext:website-data-manager, <a class="indexterm" href="WebKitWebContext.html#WebKitWebContext--website-data-manager">The “website-data-manager” property</a>
+</dt>
+<dt>WebKitWebEditor, <a class="indexterm" href="WebKitWebEditor.html#WebKitWebEditor-struct">WebKitWebEditor</a>
+</dt>
+<dt>WebKitWebEditor::selection-changed, <a class="indexterm" href="WebKitWebEditor.html#WebKitWebEditor-selection-changed">The “selection-changed” signal</a>
 </dt>
 <dt>WebKitWebExtension, <a class="indexterm" href="WebKitWebExtension.html#WebKitWebExtension-struct">struct WebKitWebExtension</a>
 </dt>
@@ -1176,7 +1206,7 @@
 </dt>
 <dt>WebKitWebInspector:inspected-uri, <a class="indexterm" href="WebKitWebInspector.html#WebKitWebInspector--inspected-uri">The “inspected-uri” property</a>
 </dt>
-<dt>WebKitWebPage, <a class="indexterm" href="WebKitWebPage.html#WebKitWebPage-struct">struct WebKitWebPage</a>
+<dt>WebKitWebPage, <a class="indexterm" href="WebKitWebPage.html#WebKitWebPage-struct">WebKitWebPage</a>
 </dt>
 <dt>WebKitWebPage::context-menu, <a class="indexterm" href="WebKitWebPage.html#WebKitWebPage-context-menu">The “context-menu” signal</a>
 </dt>
@@ -1201,6 +1231,38 @@
 <dt>WebKitWebResource:response, <a class="indexterm" href="WebKitWebResource.html#WebKitWebResource--response">The “response” property</a>
 </dt>
 <dt>WebKitWebResource:uri, <a class="indexterm" href="WebKitWebResource.html#WebKitWebResource--uri">The “uri” property</a>
+</dt>
+<dt>WebKitWebsiteDataManager, <a class="indexterm" href="WebKitWebsiteDataManager.html#WebKitWebsiteDataManager-struct">struct WebKitWebsiteDataManager</a>
+</dt>
+<dt>WebKitWebsiteDataManager:base-cache-directory, <a class="indexterm" href="WebKitWebsiteDataManager.html#WebKitWebsiteDataManager--base-cache-directory">The “base-cache-directory” property</a>
+</dt>
+<dt>WebKitWebsiteDataManager:base-data-directory, <a class="indexterm" href="WebKitWebsiteDataManager.html#WebKitWebsiteDataManager--base-data-directory">The “base-data-directory” property</a>
+</dt>
+<dt>WebKitWebsiteDataManager:disk-cache-directory, <a class="indexterm" href="WebKitWebsiteDataManager.html#WebKitWebsiteDataManager--disk-cache-directory">The “disk-cache-directory” property</a>
+</dt>
+<dt>WebKitWebsiteDataManager:indexeddb-directory, <a class="indexterm" href="WebKitWebsiteDataManager.html#WebKitWebsiteDataManager--indexeddb-directory">The “indexeddb-directory” property</a>
+</dt>
+<dt>WebKitWebsiteDataManager:local-storage-directory, <a class="indexterm" href="WebKitWebsiteDataManager.html#WebKitWebsiteDataManager--local-storage-directory">The “local-storage-directory” property</a>
+</dt>
+<dt>WebKitWebsiteDataManager:offline-application-cache-directory, <a class="indexterm" href="WebKitWebsiteDataManager.html#WebKitWebsiteDataManager--offline-application-cache-directory">The “offline-application-cache-directory” property</a>
+</dt>
+<dt>WebKitWebsiteDataManager:websql-directory, <a class="indexterm" href="WebKitWebsiteDataManager.html#WebKitWebsiteDataManager--websql-directory">The “websql-directory” property</a>
+</dt>
+<dt>webkit_website_data_manager_get_base_cache_directory, <a class="indexterm" href="WebKitWebsiteDataManager.html#webkit-website-data-manager-get-base-cache-directory">webkit_website_data_manager_get_base_cache_directory ()</a>
+</dt>
+<dt>webkit_website_data_manager_get_base_data_directory, <a class="indexterm" href="WebKitWebsiteDataManager.html#webkit-website-data-manager-get-base-data-directory">webkit_website_data_manager_get_base_data_directory ()</a>
+</dt>
+<dt>webkit_website_data_manager_get_disk_cache_directory, <a class="indexterm" href="WebKitWebsiteDataManager.html#webkit-website-data-manager-get-disk-cache-directory">webkit_website_data_manager_get_disk_cache_directory ()</a>
+</dt>
+<dt>webkit_website_data_manager_get_indexeddb_directory, <a class="indexterm" href="WebKitWebsiteDataManager.html#webkit-website-data-manager-get-indexeddb-directory">webkit_website_data_manager_get_indexeddb_directory ()</a>
+</dt>
+<dt>webkit_website_data_manager_get_local_storage_directory, <a class="indexterm" href="WebKitWebsiteDataManager.html#webkit-website-data-manager-get-local-storage-directory">webkit_website_data_manager_get_local_storage_directory ()</a>
+</dt>
+<dt>webkit_website_data_manager_get_offline_application_cache_directory, <a class="indexterm" href="WebKitWebsiteDataManager.html#webkit-website-data-manager-get-offline-application-cache-directory">webkit_website_data_manager_get_offline_application_cache_directory ()</a>
+</dt>
+<dt>webkit_website_data_manager_get_websql_directory, <a class="indexterm" href="WebKitWebsiteDataManager.html#webkit-website-data-manager-get-websql-directory">webkit_website_data_manager_get_websql_directory ()</a>
+</dt>
+<dt>webkit_website_data_manager_new, <a class="indexterm" href="WebKitWebsiteDataManager.html#webkit-website-data-manager-new">webkit_website_data_manager_new ()</a>
 </dt>
 <dt>WebKitWebView, <a class="indexterm" href="WebKitWebView.html#WebKitWebView-struct">WebKitWebView</a>
 </dt>
@@ -1306,7 +1368,13 @@
 </dt>
 <dt>webkit_web_context_get_tls_errors_policy, <a class="indexterm" href="WebKitWebContext.html#webkit-web-context-get-tls-errors-policy">webkit_web_context_get_tls_errors_policy ()</a>
 </dt>
+<dt>webkit_web_context_get_website_data_manager, <a class="indexterm" href="WebKitWebContext.html#webkit-web-context-get-website-data-manager">webkit_web_context_get_website_data_manager ()</a>
+</dt>
+<dt>webkit_web_context_get_web_process_count_limit, <a class="indexterm" href="WebKitWebContext.html#webkit-web-context-get-web-process-count-limit">webkit_web_context_get_web_process_count_limit ()</a>
+</dt>
 <dt>webkit_web_context_new, <a class="indexterm" href="WebKitWebContext.html#webkit-web-context-new">webkit_web_context_new ()</a>
+</dt>
+<dt>webkit_web_context_new_with_website_data_manager, <a class="indexterm" href="WebKitWebContext.html#webkit-web-context-new-with-website-data-manager">webkit_web_context_new_with_website_data_manager ()</a>
 </dt>
 <dt>webkit_web_context_prefetch_dns, <a class="indexterm" href="WebKitWebContext.html#webkit-web-context-prefetch-dns">webkit_web_context_prefetch_dns ()</a>
 </dt>
@@ -1334,6 +1402,10 @@
 </dt>
 <dt>webkit_web_context_set_web_extensions_initialization_user_data, <a class="indexterm" href="WebKitWebContext.html#webkit-web-context-set-web-extensions-initialization-user-data">webkit_web_context_set_web_extensions_initialization_user_data ()</a>
 </dt>
+<dt>webkit_web_context_set_web_process_count_limit, <a class="indexterm" href="WebKitWebContext.html#webkit-web-context-set-web-process-count-limit">webkit_web_context_set_web_process_count_limit ()</a>
+</dt>
+<dt>webkit_web_editor_get_page, <a class="indexterm" href="WebKitWebEditor.html#webkit-web-editor-get-page">webkit_web_editor_get_page ()</a>
+</dt>
 <dt>webkit_web_extension_get_page, <a class="indexterm" href="WebKitWebExtension.html#webkit-web-extension-get-page">webkit_web_extension_get_page ()</a>
 </dt>
 <dt>webkit_web_hit_test_result_get_node, <a class="indexterm" href="WebKitWebHitTestResult.html#webkit-web-hit-test-result-get-node">webkit_web_hit_test_result_get_node ()</a>
@@ -1357,6 +1429,8 @@
 <dt>webkit_web_inspector_show, <a class="indexterm" href="WebKitWebInspector.html#webkit-web-inspector-show">webkit_web_inspector_show ()</a>
 </dt>
 <dt>webkit_web_page_get_dom_document, <a class="indexterm" href="WebKitWebPage.html#webkit-web-page-get-dom-document">webkit_web_page_get_dom_document ()</a>
+</dt>
+<dt>webkit_web_page_get_editor, <a class="indexterm" href="WebKitWebPage.html#webkit-web-page-get-editor">webkit_web_page_get_editor ()</a>
 </dt>
 <dt>webkit_web_page_get_id, <a class="indexterm" href="WebKitWebPage.html#webkit-web-page-get-id">webkit_web_page_get_id ()</a>
 </dt>
@@ -1386,6 +1460,8 @@
 </dt>
 <dt>webkit_web_view_execute_editing_command, <a class="indexterm" href="WebKitWebView.html#webkit-web-view-execute-editing-command">webkit_web_view_execute_editing_command ()</a>
 </dt>
+<dt>webkit_web_view_execute_editing_command_with_argument, <a class="indexterm" href="WebKitWebView.html#webkit-web-view-execute-editing-command-with-argument">webkit_web_view_execute_editing_command_with_argument ()</a>
+</dt>
 <dt>webkit_web_view_get_background_color, <a class="indexterm" href="WebKitWebView.html#webkit-web-view-get-background-color">webkit_web_view_get_background_color ()</a>
 </dt>
 <dt>webkit_web_view_get_back_forward_list, <a class="indexterm" href="WebKitWebView.html#webkit-web-view-get-back-forward-list">webkit_web_view_get_back_forward_list ()</a>
@@ -1393,6 +1469,8 @@
 <dt>webkit_web_view_get_context, <a class="indexterm" href="WebKitWebView.html#webkit-web-view-get-context">webkit_web_view_get_context ()</a>
 </dt>
 <dt>webkit_web_view_get_custom_charset, <a class="indexterm" href="WebKitWebView.html#webkit-web-view-get-custom-charset">webkit_web_view_get_custom_charset ()</a>
+</dt>
+<dt>webkit_web_view_get_editor_state, <a class="indexterm" href="WebKitWebView.html#webkit-web-view-get-editor-state">webkit_web_view_get_editor_state ()</a>
 </dt>
 <dt>webkit_web_view_get_estimated_load_progress, <a class="indexterm" href="WebKitWebView.html#webkit-web-view-get-estimated-load-progress">webkit_web_view_get_estimated_load_progress ()</a>
 </dt>

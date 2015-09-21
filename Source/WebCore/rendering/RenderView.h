@@ -1,6 +1,6 @@
 /*
  * Copyright (C) 1999 Lars Knoll (knoll@kde.org)
- * Copyright (C) 2006 Apple Inc.
+ * Copyright (C) 2006, 2015 Apple Inc.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -30,7 +30,6 @@
 #include "SelectionSubtreeRoot.h"
 #include <memory>
 #include <wtf/HashSet.h>
-#include <wtf/OwnPtr.h>
 
 #if ENABLE(SERVICE_CONTROLS)
 #include "SelectionRectGatherer.h"
@@ -189,8 +188,8 @@ public:
     WEBCORE_EXPORT bool usesCompositing() const;
 
     WEBCORE_EXPORT IntRect unscaledDocumentRect() const;
-    LayoutRect unextendedBackgroundRect(RenderBox* backgroundRenderer) const;
-    LayoutRect backgroundRect(RenderBox* backgroundRenderer) const;
+    LayoutRect unextendedBackgroundRect() const;
+    LayoutRect backgroundRect() const;
 
     WEBCORE_EXPORT IntRect documentRect() const;
 
@@ -246,8 +245,14 @@ public:
     void protectRenderWidgetUntilLayoutIsDone(RenderWidget& widget) { m_protectedRenderWidgets.append(&widget); }
     void releaseProtectedRenderWidgets() { m_protectedRenderWidgets.clear(); }
 
+#if ENABLE(CSS_SCROLL_SNAP)
+    void registerBoxWithScrollSnapCoordinates(const RenderBox&);
+    void unregisterBoxWithScrollSnapCoordinates(const RenderBox&);
+    const HashSet<const RenderBox*>& boxesWithScrollSnapCoordinates() { return m_boxesWithScrollSnapCoordinates; }
+#endif
+
 protected:
-    virtual void mapLocalToContainer(const RenderLayerModelObject* repaintContainer, TransformState&, MapCoordinatesFlags = ApplyContainerFlip, bool* wasFixed = 0) const override;
+    virtual void mapLocalToContainer(const RenderLayerModelObject* repaintContainer, TransformState&, MapCoordinatesFlags, bool* wasFixed) const override;
     virtual const RenderObject* pushMappingToContainer(const RenderLayerModelObject* ancestorToStopAt, RenderGeometryMap&) const override;
     virtual void mapAbsoluteToLocalPoint(MapCoordinatesFlags, TransformState&) const override;
     virtual bool requiresColumns(int desiredColumnCount) const override;
@@ -299,6 +304,7 @@ private:
 
     friend class LayoutStateMaintainer;
     friend class LayoutStateDisabler;
+    friend class SubtreeLayoutStateMaintainer;
 
     virtual bool isScrollableOrRubberbandableBox() const override;
 
@@ -317,7 +323,8 @@ private:
     int m_selectionUnsplitStartPos;
     int m_selectionUnsplitEndPos;
 
-    uint64_t m_rendererCount;
+    // Include this RenderView.
+    uint64_t m_rendererCount { 1 };
 
     mutable std::unique_ptr<Region> m_accumulatedRepaintRegion;
 
@@ -367,6 +374,9 @@ private:
 
 #if ENABLE(SERVICE_CONTROLS)
     SelectionRectGatherer m_selectionRectGatherer;
+#endif
+#if ENABLE(CSS_SCROLL_SNAP)
+    HashSet<const RenderBox*> m_boxesWithScrollSnapCoordinates;
 #endif
 };
 
@@ -437,20 +447,19 @@ private:
 class LayoutStateDisabler {
     WTF_MAKE_NONCOPYABLE(LayoutStateDisabler);
 public:
-    LayoutStateDisabler(RenderView* view)
+    LayoutStateDisabler(RenderView& view)
         : m_view(view)
     {
-        if (m_view)
-            m_view->disableLayoutState();
+        m_view.disableLayoutState();
     }
 
     ~LayoutStateDisabler()
     {
-        if (m_view)
-            m_view->enableLayoutState();
+        m_view.enableLayoutState();
     }
+
 private:
-    RenderView* m_view;
+    RenderView& m_view;
 };
 
 } // namespace WebCore

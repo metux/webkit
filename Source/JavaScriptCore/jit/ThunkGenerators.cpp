@@ -32,6 +32,7 @@
 #include "JSArray.h"
 #include "JSArrayIterator.h"
 #include "JSStack.h"
+#include "MathCommon.h"
 #include "MaxFrameExtentForSlowPathCall.h"
 #include "JSCInlines.h"
 #include "SpecializedThunkJIT.h"
@@ -98,8 +99,7 @@ static void slowPathFor(
     jit.jump(GPRInfo::returnValueGPR);
 }
 
-static MacroAssemblerCodeRef linkForThunkGenerator(
-    VM* vm, CodeSpecializationKind kind, RegisterPreservationMode registers)
+MacroAssemblerCodeRef linkCallThunkGenerator(VM* vm)
 {
     // The return address is on the stack or in the link register. We will hence
     // save the return address to the call frame while we make a C++ function call
@@ -109,59 +109,25 @@ static MacroAssemblerCodeRef linkForThunkGenerator(
     
     CCallHelpers jit(vm);
     
-    slowPathFor(jit, vm, operationLinkFor(kind, registers));
+    slowPathFor(jit, vm, operationLinkCall);
     
     LinkBuffer patchBuffer(*vm, jit, GLOBAL_THUNK_ID);
-    return FINALIZE_CODE(
-        patchBuffer,
-        ("Link %s%s slow path thunk", kind == CodeForCall ? "call" : "construct", registers == MustPreserveRegisters ? " that preserves registers" : ""));
-}
-
-MacroAssemblerCodeRef linkCallThunkGenerator(VM* vm)
-{
-    return linkForThunkGenerator(vm, CodeForCall, RegisterPreservationNotRequired);
-}
-
-MacroAssemblerCodeRef linkConstructThunkGenerator(VM* vm)
-{
-    return linkForThunkGenerator(vm, CodeForConstruct, RegisterPreservationNotRequired);
-}
-
-MacroAssemblerCodeRef linkCallThatPreservesRegsThunkGenerator(VM* vm)
-{
-    return linkForThunkGenerator(vm, CodeForCall, MustPreserveRegisters);
-}
-
-MacroAssemblerCodeRef linkConstructThatPreservesRegsThunkGenerator(VM* vm)
-{
-    return linkForThunkGenerator(vm, CodeForConstruct, MustPreserveRegisters);
-}
-
-static MacroAssemblerCodeRef linkPolymorphicCallForThunkGenerator(
-    VM* vm, RegisterPreservationMode registers)
-{
-    CCallHelpers jit(vm);
-    
-    slowPathFor(jit, vm, operationLinkPolymorphicCallFor(registers));
-    
-    LinkBuffer patchBuffer(*vm, jit, GLOBAL_THUNK_ID);
-    return FINALIZE_CODE(patchBuffer, ("Link polymorphic call %s slow path thunk", registers == MustPreserveRegisters ? " that preserves registers" : ""));
+    return FINALIZE_CODE(patchBuffer, ("Link call slow path thunk"));
 }
 
 // For closure optimizations, we only include calls, since if you're using closures for
 // object construction then you're going to lose big time anyway.
 MacroAssemblerCodeRef linkPolymorphicCallThunkGenerator(VM* vm)
 {
-    return linkPolymorphicCallForThunkGenerator(vm, RegisterPreservationNotRequired);
+    CCallHelpers jit(vm);
+    
+    slowPathFor(jit, vm, operationLinkPolymorphicCall);
+    
+    LinkBuffer patchBuffer(*vm, jit, GLOBAL_THUNK_ID);
+    return FINALIZE_CODE(patchBuffer, ("Link polymorphic call slow path thunk"));
 }
 
-MacroAssemblerCodeRef linkPolymorphicCallThatPreservesRegsThunkGenerator(VM* vm)
-{
-    return linkPolymorphicCallForThunkGenerator(vm, MustPreserveRegisters);
-}
-
-static MacroAssemblerCodeRef virtualForThunkGenerator(
-    VM* vm, CodeSpecializationKind kind, RegisterPreservationMode registers)
+MacroAssemblerCodeRef virtualThunkFor(VM* vm, CallLinkInfo& callLinkInfo)
 {
     // The callee is in regT0 (for JSVALUE32_64, the tag is in regT1).
     // The return address is on the stack, or in the link register. We will hence
@@ -176,7 +142,7 @@ static MacroAssemblerCodeRef virtualForThunkGenerator(
     // slow path execution for the profiler.
     jit.add32(
         CCallHelpers::TrustedImm32(1),
-        CCallHelpers::Address(GPRInfo::regT2, OBJECT_OFFSETOF(CallLinkInfo, slowPathCount)));
+        CCallHelpers::Address(GPRInfo::regT2, CallLinkInfo::offsetOfSlowPathCount()));
 
     // FIXME: we should have a story for eliminating these checks. In many cases,
     // the DFG knows that the value is definitely a cell, or definitely a function.
@@ -207,7 +173,8 @@ static MacroAssemblerCodeRef virtualForThunkGenerator(
         GPRInfo::regT4);
     jit.loadPtr(
         CCallHelpers::Address(
-            GPRInfo::regT4, ExecutableBase::offsetOfJITCodeWithArityCheckFor(kind, registers)),
+            GPRInfo::regT4, ExecutableBase::offsetOfJITCodeWithArityCheckFor(
+                callLinkInfo.specializationKind(), callLinkInfo.registerPreservationMode())),
         GPRInfo::regT4);
     slowCase.append(jit.branchTestPtr(CCallHelpers::Zero, GPRInfo::regT4));
     
@@ -222,32 +189,15 @@ static MacroAssemblerCodeRef virtualForThunkGenerator(
     
     // Here we don't know anything, so revert to the full slow path.
     
-    slowPathFor(jit, vm, operationVirtualFor(kind, registers));
+    slowPathFor(jit, vm, operationVirtualCall);
     
     LinkBuffer patchBuffer(*vm, jit, GLOBAL_THUNK_ID);
     return FINALIZE_CODE(
         patchBuffer,
-        ("Virtual %s%s slow path thunk", kind == CodeForCall ? "call" : "construct", registers == MustPreserveRegisters ? " that preserves registers" : ""));
-}
-
-MacroAssemblerCodeRef virtualCallThunkGenerator(VM* vm)
-{
-    return virtualForThunkGenerator(vm, CodeForCall, RegisterPreservationNotRequired);
-}
-
-MacroAssemblerCodeRef virtualConstructThunkGenerator(VM* vm)
-{
-    return virtualForThunkGenerator(vm, CodeForConstruct, RegisterPreservationNotRequired);
-}
-
-MacroAssemblerCodeRef virtualCallThatPreservesRegsThunkGenerator(VM* vm)
-{
-    return virtualForThunkGenerator(vm, CodeForCall, MustPreserveRegisters);
-}
-
-MacroAssemblerCodeRef virtualConstructThatPreservesRegsThunkGenerator(VM* vm)
-{
-    return virtualForThunkGenerator(vm, CodeForConstruct, MustPreserveRegisters);
+        ("Virtual %s%s slow path thunk at CodePtr(%p)",
+        callLinkInfo.specializationKind() == CodeForCall ? "call" : "construct",
+        callLinkInfo.registerPreservationMode() == MustPreserveRegisters ? " that preserves registers" : "",
+        callLinkInfo.callReturnLocation().dataLocation()));
 }
 
 enum ThunkEntryType { EnterViaCall, EnterViaJump };
@@ -348,8 +298,8 @@ static MacroAssemblerCodeRef nativeForGenerator(VM* vm, CodeSpecializationKind k
 #else
     JSInterfaceJIT::Jump exceptionHandler = jit.branch32(
         JSInterfaceJIT::NotEqual,
-        JSInterfaceJIT::AbsoluteAddress(reinterpret_cast<char*>(vm->addressOfException()) + OBJECT_OFFSETOF(EncodedValueDescriptor, asBits.tag)),
-        JSInterfaceJIT::TrustedImm32(JSValue::EmptyValueTag));
+        JSInterfaceJIT::AbsoluteAddress(vm->addressOfException()),
+        JSInterfaceJIT::TrustedImm32(0));
 #endif
 
     jit.emitFunctionEpilogue();
@@ -646,6 +596,27 @@ MacroAssemblerCodeRef fromCharCodeThunkGenerator(VM* vm)
     return jit.finalize(vm->jitStubs->ctiNativeTailCall(vm), "fromCharCode");
 }
 
+MacroAssemblerCodeRef clz32ThunkGenerator(VM* vm)
+{
+    SpecializedThunkJIT jit(vm, 1);
+    MacroAssembler::Jump nonIntArgJump;
+    jit.loadInt32Argument(0, SpecializedThunkJIT::regT0, nonIntArgJump);
+
+    SpecializedThunkJIT::Label convertedArgumentReentry(&jit);
+    jit.countLeadingZeros32(SpecializedThunkJIT::regT0, SpecializedThunkJIT::regT1);
+    jit.returnInt32(SpecializedThunkJIT::regT1);
+
+    if (jit.supportsFloatingPointTruncate()) {
+        nonIntArgJump.link(&jit);
+        jit.loadDoubleArgument(0, SpecializedThunkJIT::fpRegT0, SpecializedThunkJIT::regT0);
+        jit.branchTruncateDoubleToInt32(SpecializedThunkJIT::fpRegT0, SpecializedThunkJIT::regT0, SpecializedThunkJIT::BranchIfTruncateSuccessful).linkTo(convertedArgumentReentry, &jit);
+        jit.appendFailure(jit.jump());
+    } else
+        jit.appendFailure(nonIntArgJump);
+
+    return jit.finalize(vm->jitStubs->ctiNativeTailCall(vm), "clz32");
+}
+
 MacroAssemblerCodeRef sqrtThunkGenerator(VM* vm)
 {
     SpecializedThunkJIT jit(vm, 1);
@@ -662,18 +633,8 @@ MacroAssemblerCodeRef sqrtThunkGenerator(VM* vm)
 #define UnaryDoubleOpWrapper(function) function##Wrapper
 enum MathThunkCallingConvention { };
 typedef MathThunkCallingConvention(*MathThunk)(MathThunkCallingConvention);
-extern "C" {
 
-double jsRound(double) REFERENCED_FROM_ASM;
-double jsRound(double d)
-{
-    double integer = ceil(d);
-    return integer - (integer - d > 0.5);
-}
-
-}
-
-#if CPU(X86_64) && COMPILER(GCC) && (OS(DARWIN) || OS(LINUX))
+#if CPU(X86_64) && COMPILER(GCC_OR_CLANG) && (OS(DARWIN) || OS(LINUX))
 
 #define defineUnaryDoubleOpWrapper(function) \
     asm( \
@@ -691,7 +652,7 @@ double jsRound(double d)
     } \
     static MathThunk UnaryDoubleOpWrapper(function) = &function##Thunk;
 
-#elif CPU(X86) && COMPILER(GCC) && OS(LINUX) && defined(__PIC__)
+#elif CPU(X86) && COMPILER(GCC_OR_CLANG) && OS(LINUX) && defined(__PIC__)
 #define defineUnaryDoubleOpWrapper(function) \
     asm( \
         ".text\n" \
@@ -715,7 +676,7 @@ double jsRound(double d)
     } \
     static MathThunk UnaryDoubleOpWrapper(function) = &function##Thunk;
 
-#elif CPU(X86) && COMPILER(GCC) && (OS(DARWIN) || OS(LINUX))
+#elif CPU(X86) && COMPILER(GCC_OR_CLANG) && (OS(DARWIN) || OS(LINUX))
 #define defineUnaryDoubleOpWrapper(function) \
     asm( \
         ".text\n" \
@@ -735,7 +696,7 @@ double jsRound(double d)
     } \
     static MathThunk UnaryDoubleOpWrapper(function) = &function##Thunk;
 
-#elif CPU(ARM_THUMB2) && COMPILER(GCC) && PLATFORM(IOS)
+#elif CPU(ARM_THUMB2) && COMPILER(GCC_OR_CLANG) && PLATFORM(IOS)
 
 #define defineUnaryDoubleOpWrapper(function) \
     asm( \
@@ -1044,107 +1005,6 @@ MacroAssemblerCodeRef imulThunkGenerator(VM* vm)
     return jit.finalize(vm->jitStubs->ctiNativeTailCall(vm), "imul");
 }
 
-static MacroAssemblerCodeRef arrayIteratorNextThunkGenerator(VM* vm, ArrayIterationKind kind)
-{
-    typedef SpecializedThunkJIT::TrustedImm32 TrustedImm32;
-    typedef SpecializedThunkJIT::TrustedImmPtr TrustedImmPtr;
-    typedef SpecializedThunkJIT::Address Address;
-    typedef SpecializedThunkJIT::BaseIndex BaseIndex;
-    typedef SpecializedThunkJIT::Jump Jump;
-    
-    SpecializedThunkJIT jit(vm);
-    // Make sure we're being called on an array iterator, and load m_iteratedObject, and m_nextIndex into regT0 and regT1 respectively
-    jit.loadArgumentWithSpecificClass(JSArrayIterator::info(), SpecializedThunkJIT::ThisArgument, SpecializedThunkJIT::regT4, SpecializedThunkJIT::regT1);
-
-    // Early exit if we don't have a thunk for this form of iteration
-    jit.appendFailure(jit.branch32(SpecializedThunkJIT::AboveOrEqual, Address(SpecializedThunkJIT::regT4, JSArrayIterator::offsetOfIterationKind()), TrustedImm32(ArrayIterateKeyValue)));
-    
-    jit.loadPtr(Address(SpecializedThunkJIT::regT4, JSArrayIterator::offsetOfIteratedObject()), SpecializedThunkJIT::regT0);
-    
-    jit.load32(Address(SpecializedThunkJIT::regT4, JSArrayIterator::offsetOfNextIndex()), SpecializedThunkJIT::regT1);
-    
-    // Pull out the butterfly from iteratedObject
-    jit.load8(Address(SpecializedThunkJIT::regT0, JSCell::indexingTypeOffset()), SpecializedThunkJIT::regT3);
-    jit.loadPtr(Address(SpecializedThunkJIT::regT0, JSObject::butterflyOffset()), SpecializedThunkJIT::regT2);
-    Jump nullButterfly = jit.branchTestPtr(SpecializedThunkJIT::Zero, SpecializedThunkJIT::regT2);
-    
-    Jump notDone = jit.branch32(SpecializedThunkJIT::Below, SpecializedThunkJIT::regT1, Address(SpecializedThunkJIT::regT2, Butterfly::offsetOfPublicLength()));
-
-    nullButterfly.link(&jit);
-
-    // Return the termination signal to indicate that we've finished
-    jit.move(TrustedImmPtr(vm->iterationTerminator.get()), SpecializedThunkJIT::regT0);
-    jit.returnJSCell(SpecializedThunkJIT::regT0);
-    
-    notDone.link(&jit);
-    
-    if (kind == ArrayIterateKey) {
-        jit.add32(TrustedImm32(1), Address(SpecializedThunkJIT::regT4, JSArrayIterator::offsetOfNextIndex()));
-        jit.returnInt32(SpecializedThunkJIT::regT1);
-        return jit.finalize(vm->jitStubs->ctiNativeTailCall(vm), "array-iterator-next-key");
-        
-    }
-    ASSERT(kind == ArrayIterateValue);
-    
-    // Okay, now we're returning a value so make sure we're inside the vector size
-    jit.appendFailure(jit.branch32(SpecializedThunkJIT::AboveOrEqual, SpecializedThunkJIT::regT1, Address(SpecializedThunkJIT::regT2, Butterfly::offsetOfVectorLength())));
-    
-    // So now we perform inline loads for int32, value/undecided, and double storage
-    Jump undecidedStorage = jit.branch32(SpecializedThunkJIT::Equal, SpecializedThunkJIT::regT3, TrustedImm32(ArrayWithUndecided));
-    Jump notContiguousStorage = jit.branch32(SpecializedThunkJIT::NotEqual, SpecializedThunkJIT::regT3, TrustedImm32(ArrayWithContiguous));
-    
-    undecidedStorage.link(&jit);
-    
-    jit.loadPtr(Address(SpecializedThunkJIT::regT0, JSObject::butterflyOffset()), SpecializedThunkJIT::regT2);
-    
-#if USE(JSVALUE64)
-    jit.load64(BaseIndex(SpecializedThunkJIT::regT2, SpecializedThunkJIT::regT1, SpecializedThunkJIT::TimesEight), SpecializedThunkJIT::regT0);
-    Jump notHole = jit.branchTest64(SpecializedThunkJIT::NonZero, SpecializedThunkJIT::regT0);
-    jit.move(JSInterfaceJIT::TrustedImm64(ValueUndefined), JSInterfaceJIT::regT0);
-    notHole.link(&jit);
-    jit.addPtr(TrustedImm32(1), Address(SpecializedThunkJIT::regT4, JSArrayIterator::offsetOfNextIndex()));
-    jit.returnJSValue(SpecializedThunkJIT::regT0);
-#else
-    jit.load32(BaseIndex(SpecializedThunkJIT::regT2, SpecializedThunkJIT::regT1, SpecializedThunkJIT::TimesEight, JSValue::offsetOfTag()), SpecializedThunkJIT::regT3);
-    Jump notHole = jit.branch32(SpecializedThunkJIT::NotEqual, SpecializedThunkJIT::regT3, TrustedImm32(JSValue::EmptyValueTag));
-    jit.move(JSInterfaceJIT::TrustedImm32(JSValue::UndefinedTag), JSInterfaceJIT::regT1);
-    jit.move(JSInterfaceJIT::TrustedImm32(0), JSInterfaceJIT::regT0);
-    jit.add32(TrustedImm32(1), Address(SpecializedThunkJIT::regT4, JSArrayIterator::offsetOfNextIndex()));
-    jit.returnJSValue(SpecializedThunkJIT::regT0, JSInterfaceJIT::regT1);
-    notHole.link(&jit);
-    jit.load32(BaseIndex(SpecializedThunkJIT::regT2, SpecializedThunkJIT::regT1, SpecializedThunkJIT::TimesEight, JSValue::offsetOfPayload()), SpecializedThunkJIT::regT0);
-    jit.add32(TrustedImm32(1), Address(SpecializedThunkJIT::regT4, JSArrayIterator::offsetOfNextIndex()));
-    jit.move(SpecializedThunkJIT::regT3, SpecializedThunkJIT::regT1);
-    jit.returnJSValue(SpecializedThunkJIT::regT0, SpecializedThunkJIT::regT1);
-#endif
-    notContiguousStorage.link(&jit);
-    
-    Jump notInt32Storage = jit.branch32(SpecializedThunkJIT::NotEqual, SpecializedThunkJIT::regT3, TrustedImm32(ArrayWithInt32));
-    jit.loadPtr(Address(SpecializedThunkJIT::regT0, JSObject::butterflyOffset()), SpecializedThunkJIT::regT2);
-    jit.load32(BaseIndex(SpecializedThunkJIT::regT2, SpecializedThunkJIT::regT1, SpecializedThunkJIT::TimesEight, JSValue::offsetOfPayload()), SpecializedThunkJIT::regT0);
-    jit.add32(TrustedImm32(1), Address(SpecializedThunkJIT::regT4, JSArrayIterator::offsetOfNextIndex()));
-    jit.returnInt32(SpecializedThunkJIT::regT0);
-    notInt32Storage.link(&jit);
-    
-    jit.appendFailure(jit.branch32(SpecializedThunkJIT::NotEqual, SpecializedThunkJIT::regT3, TrustedImm32(ArrayWithDouble)));
-    jit.loadPtr(Address(SpecializedThunkJIT::regT0, JSObject::butterflyOffset()), SpecializedThunkJIT::regT2);
-    jit.loadDouble(BaseIndex(SpecializedThunkJIT::regT2, SpecializedThunkJIT::regT1, SpecializedThunkJIT::TimesEight), SpecializedThunkJIT::fpRegT0);
-    jit.add32(TrustedImm32(1), Address(SpecializedThunkJIT::regT4, JSArrayIterator::offsetOfNextIndex()));
-    jit.returnDouble(SpecializedThunkJIT::fpRegT0);
-    
-    return jit.finalize(vm->jitStubs->ctiNativeTailCall(vm), "array-iterator-next-value");
-}
-
-MacroAssemblerCodeRef arrayIteratorNextKeyThunkGenerator(VM* vm)
-{
-    return arrayIteratorNextThunkGenerator(vm, ArrayIterateKey);
-}
-
-MacroAssemblerCodeRef arrayIteratorNextValueThunkGenerator(VM* vm)
-{
-    return arrayIteratorNextThunkGenerator(vm, ArrayIterateValue);
-}
-    
 }
 
 #endif // ENABLE(JIT)

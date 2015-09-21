@@ -55,7 +55,8 @@ enum StyleDifference {
     StyleDifferenceLayoutPositionedMovementOnly,
     StyleDifferenceSimplifiedLayout,
     StyleDifferenceSimplifiedLayoutAndPositionedMovement,
-    StyleDifferenceLayout
+    StyleDifferenceLayout,
+    StyleDifferenceNewStyle
 };
 
 // When some style properties change, different amounts of work have to be done depending on
@@ -63,11 +64,12 @@ enum StyleDifference {
 // A simple StyleDifference does not provide enough information so we return a bit mask of
 // StyleDifferenceContextSensitiveProperties from RenderStyle::diff() too.
 enum StyleDifferenceContextSensitiveProperty {
-    ContextSensitivePropertyNone = 0,
-    ContextSensitivePropertyTransform = (1 << 0),
-    ContextSensitivePropertyOpacity = (1 << 1),
-    ContextSensitivePropertyFilter = (1 << 2),
-    ContextSensitivePropertyClipRect = (1 << 3)
+    ContextSensitivePropertyNone        = 0,
+    ContextSensitivePropertyTransform   = 1 << 0,
+    ContextSensitivePropertyOpacity     = 1 << 1,
+    ContextSensitivePropertyFilter      = 1 << 2,
+    ContextSensitivePropertyClipRect    = 1 << 3,
+    ContextSensitivePropertyClipPath    = 1 << 4
 };
 
 // Static pseudo styles. Dynamic ones are produced on the fly.
@@ -244,13 +246,13 @@ enum EBoxDirection { BNORMAL, BREVERSE };
 // CSS3 Flexbox Properties
 
 enum EAlignContent { AlignContentFlexStart, AlignContentFlexEnd, AlignContentCenter, AlignContentSpaceBetween, AlignContentSpaceAround, AlignContentStretch };
-enum EAlignItems { AlignAuto, AlignFlexStart, AlignFlexEnd, AlignCenter, AlignStretch, AlignBaseline };
 enum EFlexDirection { FlowRow, FlowRowReverse, FlowColumn, FlowColumnReverse };
 enum EFlexWrap { FlexNoWrap, FlexWrap, FlexWrapReverse };
-enum EJustifyContent { JustifyFlexStart, JustifyFlexEnd, JustifyCenter, JustifySpaceBetween, JustifySpaceAround };
-enum EJustifySelf {JustifySelfAuto, JustifySelfStretch, JustifySelfBaseline, JustifySelfCenter, JustifySelfStart, JustifySelfEnd, JustifySelfSelfStart, JustifySelfSelfEnd, JustifySelfFlexStart, JustifySelfFlexEnd, JustifySelfLeft, JustifySelfRight};
-enum EJustifySelfOverflowAlignment {JustifySelfOverflowAlignmentDefault, JustifySelfOverflowAlignmentTrue, JustifySelfOverflowAlignmentSafe};
-
+enum ItemPosition {ItemPositionAuto, ItemPositionStretch, ItemPositionBaseline, ItemPositionLastBaseline, ItemPositionCenter, ItemPositionStart, ItemPositionEnd, ItemPositionSelfStart, ItemPositionSelfEnd, ItemPositionFlexStart, ItemPositionFlexEnd, ItemPositionLeft, ItemPositionRight};
+enum OverflowAlignment {OverflowAlignmentDefault, OverflowAlignmentTrue, OverflowAlignmentSafe};
+enum ItemPositionType {NonLegacyPosition, LegacyPosition};
+enum ContentPosition {ContentPositionAuto, ContentPositionBaseline, ContentPositionLastBaseline, ContentPositionCenter, ContentPositionStart, ContentPositionEnd, ContentPositionFlexStart, ContentPositionFlexEnd, ContentPositionLeft, ContentPositionRight};
+enum ContentDistributionType {ContentDistributionDefault, ContentDistributionSpaceBetween, ContentDistributionSpaceAround, ContentDistributionSpaceEvenly, ContentDistributionStretch};
 
 enum ETextSecurity {
     TSNONE, TSDISC, TSCIRCLE, TSSQUARE
@@ -283,10 +285,8 @@ enum AspectRatioType {
     AspectRatioAuto, AspectRatioFromIntrinsic, AspectRatioFromDimensions, AspectRatioSpecified
 };
 
-// Word Break Values. Matches WinIE, rather than CSS3
-
 enum EWordBreak {
-    NormalWordBreak, BreakAllWordBreak, BreakWordBreak
+    NormalWordBreak, BreakAllWordBreak, KeepAllWordBreak, BreakWordBreak
 };
 
 enum EOverflowWrap {
@@ -465,6 +465,10 @@ enum TextUnderlinePosition {
     TextUnderlinePositionAuto = 0x1, TextUnderlinePositionAlphabetic = 0x2, TextUnderlinePositionUnder = 0x4
 };
 
+enum TextZoom {
+    TextZoomNormal, TextZoomReset
+};
+
 enum EPageBreak {
     PBAUTO, PBALWAYS, PBAVOID
 };
@@ -641,6 +645,13 @@ enum class ScrollSnapType {
     None,
     Proximity,
     Mandatory
+};
+#endif
+
+#if ENABLE(CSS_TRAILING_WORD)
+enum class TrailingWord {
+    Auto,
+    PartiallyBalanced
 };
 #endif
 

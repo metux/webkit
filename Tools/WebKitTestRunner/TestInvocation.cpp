@@ -31,6 +31,7 @@
 #include "StringFunctions.h"
 #include "TestController.h"
 #include <WebKit/WKContextPrivate.h>
+#include <WebKit/WKCookieManager.h>
 #include <WebKit/WKData.h>
 #include <WebKit/WKDictionary.h>
 #include <WebKit/WKInspector.h>
@@ -91,7 +92,6 @@ static WKURLRef createWKURL(const char* pathOrURL)
 
 TestInvocation::TestInvocation(const std::string& pathOrURL)
     : m_url(AdoptWK, createWKURL(pathOrURL.c_str()))
-    , m_pathOrURL(pathOrURL)
     , m_dumpPixels(false)
     , m_timeout(0)
     , m_gotInitialResponse(false)
@@ -100,6 +100,16 @@ TestInvocation::TestInvocation(const std::string& pathOrURL)
     , m_error(false)
     , m_webProcessIsUnresponsive(false)
 {
+    WKRetainPtr<WKStringRef> urlString = adoptWK(WKURLCopyString(m_url.get()));
+
+    size_t stringLength = WKStringGetLength(urlString.get());
+
+    Vector<char> urlVector;
+    urlVector.resize(stringLength + 1);
+
+    WKStringGetUTF8CString(urlString.get(), urlVector.data(), stringLength + 1);
+
+    m_urlString = String(urlVector.data(), stringLength);
 }
 
 TestInvocation::~TestInvocation()
@@ -111,20 +121,25 @@ WKURLRef TestInvocation::url() const
     return m_url.get();
 }
 
+bool TestInvocation::urlContains(const char* searchString) const
+{
+    return m_urlString.contains(searchString, false);
+}
+
 void TestInvocation::setIsPixelTest(const std::string& expectedPixelHash)
 {
     m_dumpPixels = true;
     m_expectedPixelHash = expectedPixelHash;
 }
 
-static bool shouldLogFrameLoadDelegates(const char* pathOrURL)
+bool TestInvocation::shouldLogFrameLoadDelegates()
 {
-    return strstr(pathOrURL, "loading/");
+    return urlContains("loading/");
 }
 
-static bool shouldLogHistoryClientCallbacks(const char* pathOrURL)
+bool TestInvocation::shouldLogHistoryClientCallbacks()
 {
-    return strstr(pathOrURL, "globalhistory/");
+    return urlContains("globalhistory/");
 }
 
 void TestInvocation::invoke()
@@ -135,7 +150,9 @@ void TestInvocation::invoke()
 
     m_textOutput.clear();
 
-    TestController::singleton().setShouldLogHistoryClientCallbacks(shouldLogHistoryClientCallbacks(m_pathOrURL.c_str()));
+    TestController::singleton().setShouldLogHistoryClientCallbacks(shouldLogHistoryClientCallbacks());
+
+    WKCookieManagerSetHTTPCookieAcceptPolicy(WKContextGetCookieManager(TestController::singleton().context()), kWKHTTPCookieAcceptPolicyOnlyFromMainDocumentDomain);
 
     // FIXME: We should clear out visited links here.
 
@@ -143,7 +160,7 @@ void TestInvocation::invoke()
     WKRetainPtr<WKMutableDictionaryRef> beginTestMessageBody = adoptWK(WKMutableDictionaryCreate());
 
     WKRetainPtr<WKStringRef> dumpFrameLoadDelegatesKey = adoptWK(WKStringCreateWithUTF8CString("DumpFrameLoadDelegates"));
-    WKRetainPtr<WKBooleanRef> dumpFrameLoadDelegatesValue = adoptWK(WKBooleanCreate(shouldLogFrameLoadDelegates(m_pathOrURL.c_str())));
+    WKRetainPtr<WKBooleanRef> dumpFrameLoadDelegatesValue = adoptWK(WKBooleanCreate(shouldLogFrameLoadDelegates()));
     WKDictionarySetItem(beginTestMessageBody.get(), dumpFrameLoadDelegatesKey.get(), dumpFrameLoadDelegatesValue.get());
 
     WKRetainPtr<WKStringRef> dumpPixelsKey = adoptWK(WKStringCreateWithUTF8CString("DumpPixels"));
@@ -158,7 +175,9 @@ void TestInvocation::invoke()
     WKRetainPtr<WKUInt64Ref> timeoutValue = adoptWK(WKUInt64Create(m_timeout));
     WKDictionarySetItem(beginTestMessageBody.get(), timeoutKey.get(), timeoutValue.get());
 
-    WKContextPostMessageToInjectedBundle(TestController::singleton().context(), messageName.get(), beginTestMessageBody.get());
+    WKPagePostMessageToInjectedBundle(TestController::singleton().mainWebView()->page(), messageName.get(), beginTestMessageBody.get());
+
+    bool shouldOpenExternalURLs = false;
 
     TestController::singleton().runUntil(m_gotInitialResponse, TestController::shortTimeout);
     if (!m_gotInitialResponse) {
@@ -169,7 +188,7 @@ void TestInvocation::invoke()
     if (m_error)
         goto end;
 
-    WKPageLoadURL(TestController::singleton().mainWebView()->page(), m_url.get());
+    WKPageLoadURLWithShouldOpenExternalURLsPolicy(TestController::singleton().mainWebView()->page(), m_url.get(), shouldOpenExternalURLs);
 
     TestController::singleton().runUntil(m_gotFinalMessage, TestController::noTimeout);
     if (m_error)
@@ -228,9 +247,15 @@ void TestInvocation::dump(const char* textToStdout, const char* textToStderr, bo
     fflush(stderr);
 }
 
-void TestInvocation::forceRepaintDoneCallback(WKErrorRef, void* context)
+void TestInvocation::forceRepaintDoneCallback(WKErrorRef error, void* context)
 {
+    // The context may not be valid any more, e.g. if WebKit is invalidating callbacks at process exit.
+    if (error)
+        return;
+
     TestInvocation* testInvocation = static_cast<TestInvocation*>(context);
+    RELEASE_ASSERT(TestController::singleton().isCurrentInvocation(testInvocation));
+
     testInvocation->m_gotRepaint = true;
     TestController::singleton().notifyDone();
 }
@@ -352,21 +377,21 @@ void TestInvocation::didReceiveMessageFromInjectedBundle(WKStringRef messageName
     if (WKStringIsEqualToUTF8CString(messageName, "AddChromeInputField")) {
         TestController::singleton().mainWebView()->addChromeInputField();
         WKRetainPtr<WKStringRef> messageName = adoptWK(WKStringCreateWithUTF8CString("CallAddChromeInputFieldCallback"));
-        WKContextPostMessageToInjectedBundle(TestController::singleton().context(), messageName.get(), 0);
+        WKPagePostMessageToInjectedBundle(TestController::singleton().mainWebView()->page(), messageName.get(), 0);
         return;
     }
 
     if (WKStringIsEqualToUTF8CString(messageName, "RemoveChromeInputField")) {
         TestController::singleton().mainWebView()->removeChromeInputField();
         WKRetainPtr<WKStringRef> messageName = adoptWK(WKStringCreateWithUTF8CString("CallRemoveChromeInputFieldCallback"));
-        WKContextPostMessageToInjectedBundle(TestController::singleton().context(), messageName.get(), 0);
+        WKPagePostMessageToInjectedBundle(TestController::singleton().mainWebView()->page(), messageName.get(), 0);
         return;
     }
     
     if (WKStringIsEqualToUTF8CString(messageName, "FocusWebView")) {
         TestController::singleton().mainWebView()->makeWebViewFirstResponder();
         WKRetainPtr<WKStringRef> messageName = adoptWK(WKStringCreateWithUTF8CString("CallFocusWebViewCallback"));
-        WKContextPostMessageToInjectedBundle(TestController::singleton().context(), messageName.get(), 0);
+        WKPagePostMessageToInjectedBundle(TestController::singleton().mainWebView()->page(), messageName.get(), 0);
         return;
     }
 
@@ -376,7 +401,7 @@ void TestInvocation::didReceiveMessageFromInjectedBundle(WKStringRef messageName
         WKPageSetCustomBackingScaleFactor(TestController::singleton().mainWebView()->page(), backingScaleFactor);
 
         WKRetainPtr<WKStringRef> messageName = adoptWK(WKStringCreateWithUTF8CString("CallSetBackingScaleFactorCallback"));
-        WKContextPostMessageToInjectedBundle(TestController::singleton().context(), messageName.get(), 0);
+        WKPagePostMessageToInjectedBundle(TestController::singleton().mainWebView()->page(), messageName.get(), 0);
         return;
     }
 
@@ -505,7 +530,7 @@ void TestInvocation::didReceiveMessageFromInjectedBundle(WKStringRef messageName
     if (WKStringIsEqualToUTF8CString(messageName, "ProcessWorkQueue")) {
         if (TestController::singleton().workQueueManager().processWorkQueue()) {
             WKRetainPtr<WKStringRef> messageName = adoptWK(WKStringCreateWithUTF8CString("WorkQueueProcessedCallback"));
-            WKContextPostMessageToInjectedBundle(TestController::singleton().context(), messageName.get(), 0);
+            WKPagePostMessageToInjectedBundle(TestController::singleton().mainWebView()->page(), messageName.get(), 0);
         }
         return;
     }
@@ -534,7 +559,10 @@ void TestInvocation::didReceiveMessageFromInjectedBundle(WKStringRef messageName
         WKRetainPtr<WKStringRef> targetKey(AdoptWK, WKStringCreateWithUTF8CString("target"));
         WKStringRef targetWK = static_cast<WKStringRef>(WKDictionaryGetItemForKey(loadDataDictionary, targetKey.get()));
 
-        TestController::singleton().workQueueManager().queueLoad(toWTFString(urlWK), toWTFString(targetWK));
+        WKRetainPtr<WKStringRef> shouldOpenExternalURLsKey(AdoptWK, WKStringCreateWithUTF8CString("shouldOpenExternalURLs"));
+        WKBooleanRef shouldOpenExternalURLsValueWK = static_cast<WKBooleanRef>(WKDictionaryGetItemForKey(loadDataDictionary, shouldOpenExternalURLsKey.get()));
+
+        TestController::singleton().workQueueManager().queueLoad(toWTFString(urlWK), toWTFString(targetWK), WKBooleanGetValue(shouldOpenExternalURLsValueWK));
         return;
     }
 
@@ -614,6 +642,12 @@ WKRetainPtr<WKTypeRef> TestInvocation::didReceiveSynchronousMessageFromInjectedB
         return 0;
     }
 
+    if (WKStringIsEqualToUTF8CString(messageName, "IsGeolocationClientActive")) {
+        bool isActive = TestController::singleton().isGeolocationProviderActive();
+        WKRetainPtr<WKTypeRef> result(AdoptWK, WKBooleanCreate(isActive));
+        return result;
+    }
+
     if (WKStringIsEqualToUTF8CString(messageName, "IsWorkQueueEmpty")) {
         bool isEmpty = TestController::singleton().workQueueManager().isWorkQueueEmpty();
         WKRetainPtr<WKTypeRef> result(AdoptWK, WKBooleanCreate(isEmpty));
@@ -628,6 +662,15 @@ WKRetainPtr<WKTypeRef> TestInvocation::didReceiveSynchronousMessageFromInjectedB
 #endif
         return result;
     }
+
+    if (WKStringIsEqualToUTF8CString(messageName, "SetAlwaysAcceptCookies")) {
+        WKBooleanRef accept = static_cast<WKBooleanRef>(messageBody);
+        WKHTTPCookieAcceptPolicy policy = WKBooleanGetValue(accept) ? kWKHTTPCookieAcceptPolicyAlways : kWKHTTPCookieAcceptPolicyOnlyFromMainDocumentDomain;
+        // FIXME: This updates the policy in WebProcess and in NetworkProcess asynchronously, which might break some tests' expectations.
+        WKCookieManagerSetHTTPCookieAcceptPolicy(WKContextGetCookieManager(TestController::singleton().context()), policy);
+        return 0;
+    }
+
     ASSERT_NOT_REACHED();
     return 0;
 }

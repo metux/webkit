@@ -24,7 +24,6 @@
 #if ENABLE(SVG_FONTS)
 #include "SVGFontFaceElement.h"
 
-#include "Attribute.h"
 #include "CSSFontFaceSrcValue.h"
 #include "CSSParser.h"
 #include "CSSPropertyNames.h"
@@ -51,7 +50,7 @@ using namespace SVGNames;
 inline SVGFontFaceElement::SVGFontFaceElement(const QualifiedName& tagName, Document& document)
     : SVGElement(tagName, document)
     , m_fontFaceRule(StyleRuleFontFace::create(MutableStyleProperties::create(CSSStrictMode)))
-    , m_fontElement(0)
+    , m_fontElement(nullptr)
 {
     ASSERT(hasTagName(font_faceTag));
 }
@@ -85,6 +84,11 @@ unsigned SVGFontFaceElement::unitsPerEm() const
 int SVGFontFaceElement::xHeight() const
 {
     return static_cast<int>(ceilf(fastGetAttribute(x_heightAttr).toFloat()));
+}
+
+int SVGFontFaceElement::capHeight() const
+{
+    return static_cast<int>(ceilf(fastGetAttribute(cap_heightAttr).toFloat()));
 }
 
 float SVGFontFaceElement::horizontalOriginX() const
@@ -283,7 +287,7 @@ void SVGFontFaceElement::removedFrom(ContainerNode& rootParent)
     SVGElement::removedFrom(rootParent);
 
     if (rootParent.inDocument()) {
-        m_fontElement = 0;
+        m_fontElement = nullptr;
         document().accessSVGExtensions().unregisterSVGFontFaceElement(this);
         m_fontFaceRule->mutableProperties().clear();
 

@@ -48,7 +48,7 @@ namespace WebCore {
 
     class MessagePort final : public RefCounted<MessagePort>, public EventTargetWithInlineData {
     public:
-        static PassRefPtr<MessagePort> create(ScriptExecutionContext& scriptExecutionContext) { return adoptRef(new MessagePort(scriptExecutionContext)); }
+        static Ref<MessagePort> create(ScriptExecutionContext& scriptExecutionContext) { return adoptRef(*new MessagePort(scriptExecutionContext)); }
         virtual ~MessagePort();
 
         void postMessage(PassRefPtr<SerializedScriptValue> message, const MessagePortArray*, ExceptionCode&);
@@ -82,13 +82,6 @@ namespace WebCore {
 
         bool hasPendingActivity();
 
-        void setOnmessage(PassRefPtr<EventListener> listener)
-        {
-            setAttributeEventListener(eventNames().messageEvent, listener);
-            start();
-        }
-        EventListener* onmessage() { return getAttributeEventListener(eventNames().messageEvent); }
-
         // Returns null if there is no entangled port, or if the entangled port is run by a different thread.
         // This is used solely to enable a GC optimization. Some platforms may not be able to determine ownership
         // of the remote port (since it may live cross-process) - those platforms may always return null.
@@ -99,6 +92,8 @@ namespace WebCore {
 
         // A port gets neutered when it is transferred to a new owner via postMessage().
         bool isNeutered() { return !m_entangledChannel; }
+
+        bool addEventListener(const AtomicString& eventType, PassRefPtr<EventListener>, bool useCapture) override;
 
     private:
         explicit MessagePort(ScriptExecutionContext&);

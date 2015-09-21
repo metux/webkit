@@ -26,6 +26,8 @@
 #ifndef AudioSession_h
 #define AudioSession_h
 
+#include "PlatformExportMacros.h"
+
 #if USE(AUDIO_SESSION)
 
 #include <memory>
@@ -59,7 +61,7 @@ public:
     float sampleRate() const;
     size_t numberOfOutputChannels() const;
 
-    void setActive(bool);
+    bool tryToSetActive(bool);
 
     size_t preferredBufferSize() const;
     void setPreferredBufferSize(size_t);

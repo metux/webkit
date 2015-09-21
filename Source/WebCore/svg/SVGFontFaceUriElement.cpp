@@ -23,7 +23,6 @@
 #if ENABLE(SVG_FONTS)
 #include "SVGFontFaceUriElement.h"
 
-#include "Attribute.h"
 #include "CSSFontFaceSrcValue.h"
 #include "CachedFont.h"
 #include "CachedResourceLoader.h"
@@ -101,8 +100,11 @@ void SVGFontFaceUriElement::loadFont()
 
     const AtomicString& href = getAttribute(XLinkNames::hrefAttr);
     if (!href.isNull()) {
+        ResourceLoaderOptions options = CachedResourceLoader::defaultCachedResourceOptions();
+        options.setContentSecurityPolicyImposition(isInUserAgentShadowTree() ? ContentSecurityPolicyImposition::SkipPolicyCheck : ContentSecurityPolicyImposition::DoPolicyCheck);
+
         CachedResourceLoader& cachedResourceLoader = document().cachedResourceLoader();
-        CachedResourceRequest request(ResourceRequest(document().completeURL(href)));
+        CachedResourceRequest request(ResourceRequest(document().completeURL(href)), options);
         request.setInitiator(this);
         m_cachedFont = cachedResourceLoader.requestFont(request, isSVGFontTarget(*this));
         if (m_cachedFont) {
@@ -110,7 +112,7 @@ void SVGFontFaceUriElement::loadFont()
             m_cachedFont->beginLoadIfNeeded(cachedResourceLoader);
         }
     } else
-        m_cachedFont = 0;
+        m_cachedFont = nullptr;
 }
 
 }

@@ -40,9 +40,11 @@
 #include <heap/StrongInlines.h>
 #include <interpreter/Interpreter.h>
 #include <runtime/Completion.h>
+#include <runtime/Exception.h>
 #include <runtime/ExceptionHelpers.h>
 #include <runtime/Error.h>
 #include <runtime/JSLock.h>
+#include <runtime/Watchdog.h>
 
 using namespace JSC;
 
@@ -54,6 +56,7 @@ WorkerScriptController::WorkerScriptController(WorkerGlobalScope* workerGlobalSc
     , m_workerGlobalScopeWrapper(*m_vm)
     , m_executionForbidden(false)
 {
+    m_vm->ensureWatchdog();
     initNormalWorldClientData(m_vm.get());
 }
 
@@ -61,7 +64,7 @@ WorkerScriptController::~WorkerScriptController()
 {
     JSLockHolder lock(vm());
     m_workerGlobalScopeWrapper.clear();
-    m_vm.clear();
+    m_vm = nullptr;
 }
 
 void WorkerScriptController::initScript()
@@ -98,15 +101,15 @@ void WorkerScriptController::evaluate(const ScriptSourceCode& sourceCode)
     if (isExecutionForbidden())
         return;
 
-    Deprecated::ScriptValue exception;
-    evaluate(sourceCode, &exception);
-    if (exception.jsValue()) {
+    NakedPtr<Exception> exception;
+    evaluate(sourceCode, exception);
+    if (exception) {
         JSLockHolder lock(vm());
-        reportException(m_workerGlobalScopeWrapper->globalExec(), exception.jsValue());
+        reportException(m_workerGlobalScopeWrapper->globalExec(), exception);
     }
 }
 
-void WorkerScriptController::evaluate(const ScriptSourceCode& sourceCode, Deprecated::ScriptValue* exception)
+void WorkerScriptController::evaluate(const ScriptSourceCode& sourceCode, NakedPtr<JSC::Exception>& returnedException)
 {
     if (isExecutionForbidden())
         return;
@@ -116,50 +119,50 @@ void WorkerScriptController::evaluate(const ScriptSourceCode& sourceCode, Deprec
     ExecState* exec = m_workerGlobalScopeWrapper->globalExec();
     JSLockHolder lock(exec);
 
-    JSValue evaluationException;
-    JSC::evaluate(exec, sourceCode.jsSourceCode(), m_workerGlobalScopeWrapper->globalThis(), &evaluationException);
+    JSC::evaluate(exec, sourceCode.jsSourceCode(), m_workerGlobalScopeWrapper->globalThis(), returnedException);
 
     VM& vm = exec->vm();
-    if ((evaluationException && isTerminatedExecutionException(evaluationException)) 
-        || (vm.watchdog && vm.watchdog->didFire())) {
+    if ((returnedException && isTerminatedExecutionException(returnedException)) || isTerminatingExecution()) {
         forbidExecution();
         return;
     }
 
-    if (evaluationException) {
+    if (returnedException) {
         String errorMessage;
         int lineNumber = 0;
         int columnNumber = 0;
         String sourceURL = sourceCode.url().string();
-        if (m_workerGlobalScope->sanitizeScriptError(errorMessage, lineNumber, columnNumber, sourceURL, sourceCode.cachedScript()))
-            *exception = Deprecated::ScriptValue(*m_vm, exec->vm().throwException(exec, createError(exec, errorMessage.impl())));
-        else
-            *exception = Deprecated::ScriptValue(*m_vm, evaluationException);
+        if (m_workerGlobalScope->sanitizeScriptError(errorMessage, lineNumber, columnNumber, sourceURL, sourceCode.cachedScript())) {
+            vm.throwException(exec, createError(exec, errorMessage.impl()));
+            returnedException = vm.exception();
+            vm.clearException();
+        }
     }
 }
 
-void WorkerScriptController::setException(const Deprecated::ScriptValue& exception)
+void WorkerScriptController::setException(JSC::Exception* exception)
 {
-    m_workerGlobalScopeWrapper->globalExec()->vm().throwException(m_workerGlobalScopeWrapper->globalExec(), exception.jsValue());
+    JSC::ExecState* exec = m_workerGlobalScopeWrapper->globalExec();
+    exec->vm().throwException(exec, exception);
 }
 
 void WorkerScriptController::scheduleExecutionTermination()
 {
     // The mutex provides a memory barrier to ensure that once
-    // termination is scheduled, isExecutionTerminating will
+    // termination is scheduled, isTerminatingExecution() will
     // accurately reflect that state when called from another thread.
-    MutexLocker locker(m_scheduledTerminationMutex);
-    if (m_vm->watchdog)
-        m_vm->watchdog->fire();
+    LockHolder locker(m_scheduledTerminationMutex);
+    m_isTerminatingExecution = true;
+
+    ASSERT(m_vm->watchdog);
+    m_vm->watchdog->terminateSoon();
 }
 
-bool WorkerScriptController::isExecutionTerminating() const
+bool WorkerScriptController::isTerminatingExecution() const
 {
     // See comments in scheduleExecutionTermination regarding mutex usage.
-    MutexLocker locker(m_scheduledTerminationMutex);
-    if (m_vm->watchdog)
-        return m_vm->watchdog->didFire();
-    return false;
+    LockHolder locker(m_scheduledTerminationMutex);
+    return m_isTerminatingExecution;
 }
 
 void WorkerScriptController::forbidExecution()

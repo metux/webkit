@@ -57,6 +57,7 @@ enum JSTokenType {
     FOR,
     NEW,
     VAR,
+    LET,
     CONSTTOKEN,
     CONTINUE,
     FUNCTION,
@@ -75,15 +76,15 @@ enum JSTokenType {
     FINALLY,
     DEBUGGER,
     ELSE,
+    IMPORT,
+    EXPORT,
 #if ENABLE(ES6_CLASS_SYNTAX)
     CLASSTOKEN,
     EXTENDS,
-    STATICTOKEN,
     SUPER,
 #else
     CLASSTOKEN = RESERVED,
     EXTENDS = RESERVED,
-    STATICTOKEN = RESERVED_IF_STRICT,
     SUPER = RESERVED,
 #endif
     OPENBRACE = 0,
@@ -94,9 +95,11 @@ enum JSTokenType {
     CLOSEBRACKET,
     COMMA,
     QUESTION,
-    NUMBER,
+    INTEGER,
+    DOUBLE,
     IDENT,
     STRING,
+    TEMPLATE,
     SEMICOLON,
     COLON,
     DOT,
@@ -114,6 +117,9 @@ enum JSTokenType {
     XOREQUAL,
     OREQUAL,
     DOTDOTDOT,
+#if ENABLE(ES6_ARROWFUNCTION_SYNTAX)
+    ARROWFUNCTION,
+#endif
     LastUntaggedToken,
 
     // Begin tagged tokens
@@ -161,7 +167,10 @@ enum JSTokenType {
     UNTERMINATED_STRING_LITERAL_ERRORTOK = 8 | ErrorTokenFlag | UnterminatedErrorTokenFlag,
     INVALID_STRING_LITERAL_ERRORTOK = 9 | ErrorTokenFlag,
     INVALID_PRIVATE_NAME_ERRORTOK = 10 | ErrorTokenFlag,
-    INVALID_HEX_NUMBER_ERRORTOK = 11 | ErrorTokenFlag
+    INVALID_HEX_NUMBER_ERRORTOK = 11 | ErrorTokenFlag,
+    INVALID_BINARY_NUMBER_ERRORTOK = 12 | ErrorTokenFlag,
+    UNTERMINATED_TEMPLATE_LITERAL_ERRORTOK = 13 | ErrorTokenFlag | UnterminatedErrorTokenFlag,
+    INVALID_TEMPLATE_LITERAL_ERRORTOK = 14 | ErrorTokenFlag,
 };
 
 struct JSTextPosition {
@@ -189,6 +198,11 @@ union JSTokenData {
     };
     double doubleValue;
     const Identifier* ident;
+    struct {
+        const Identifier* cooked;
+        const Identifier* raw;
+        bool isTail;
+    };
 };
 
 struct JSTokenLocation {

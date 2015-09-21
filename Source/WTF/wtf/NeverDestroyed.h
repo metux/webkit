@@ -94,6 +94,8 @@ public:
     operator T&() { return *asPtr(); }
     T& get() { return *asPtr(); }
 
+    T* operator->() { return asPtr(); }
+
 private:
     typedef typename std::remove_const<T>::type* PointerType;
 
@@ -116,7 +118,9 @@ private:
     };
 
 #if !ASSERT_DISABLED
-    bool m_isConstructed = false;
+    // LazyNeverDestroyed objects are always static, so this variable is initialized to false.
+    // It must not be initialized dynamically, because that would not be thread safe.
+    bool m_isConstructed;
 #endif
 };
 

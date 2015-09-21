@@ -275,6 +275,8 @@
 <ANCHOR id="WebKitDOMCharacterData.property-details" href="webkitdomgtk-4.0/WebKitDOMCharacterData.html#WebKitDOMCharacterData.property-details">
 <ANCHOR id="WebKitDOMCharacterData--data" href="webkitdomgtk-4.0/WebKitDOMCharacterData.html#WebKitDOMCharacterData--data">
 <ANCHOR id="WebKitDOMCharacterData--length" href="webkitdomgtk-4.0/WebKitDOMCharacterData.html#WebKitDOMCharacterData--length">
+<ANCHOR id="WebKitDOMCharacterData--next-element-sibling" href="webkitdomgtk-4.0/WebKitDOMCharacterData.html#WebKitDOMCharacterData--next-element-sibling">
+<ANCHOR id="WebKitDOMCharacterData--previous-element-sibling" href="webkitdomgtk-4.0/WebKitDOMCharacterData.html#WebKitDOMCharacterData--previous-element-sibling">
 <ANCHOR id="WebKitDOMComment" href="webkitdomgtk-4.0/WebKitDOMComment.html">
 <ANCHOR id="WebKitDOMComment.other" href="webkitdomgtk-4.0/WebKitDOMComment.html#WebKitDOMComment.other">
 <ANCHOR id="WebKitDOMComment.object-hierarchy" href="webkitdomgtk-4.0/WebKitDOMComment.html#WebKitDOMComment.object-hierarchy">
@@ -317,7 +319,6 @@
 <ANCHOR id="webkit-dom-document-create-element-ns" href="webkitdomgtk-4.0/WebKitDOMDocument.html#webkit-dom-document-create-element-ns">
 <ANCHOR id="webkit-dom-document-create-attribute-ns" href="webkitdomgtk-4.0/WebKitDOMDocument.html#webkit-dom-document-create-attribute-ns">
 <ANCHOR id="webkit-dom-document-get-elements-by-tag-name-ns" href="webkitdomgtk-4.0/WebKitDOMDocument.html#webkit-dom-document-get-elements-by-tag-name-ns">
-<ANCHOR id="webkit-dom-document-get-element-by-id" href="webkitdomgtk-4.0/WebKitDOMDocument.html#webkit-dom-document-get-element-by-id">
 <ANCHOR id="webkit-dom-document-adopt-node" href="webkitdomgtk-4.0/WebKitDOMDocument.html#webkit-dom-document-adopt-node">
 <ANCHOR id="webkit-dom-document-create-event" href="webkitdomgtk-4.0/WebKitDOMDocument.html#webkit-dom-document-create-event">
 <ANCHOR id="webkit-dom-document-create-range" href="webkitdomgtk-4.0/WebKitDOMDocument.html#webkit-dom-document-create-range">
@@ -338,6 +339,7 @@
 <ANCHOR id="webkit-dom-document-create-css-style-declaration" href="webkitdomgtk-4.0/WebKitDOMDocument.html#webkit-dom-document-create-css-style-declaration">
 <ANCHOR id="webkit-dom-document-get-elements-by-class-name" href="webkitdomgtk-4.0/WebKitDOMDocument.html#webkit-dom-document-get-elements-by-class-name">
 <ANCHOR id="webkit-dom-document-has-focus" href="webkitdomgtk-4.0/WebKitDOMDocument.html#webkit-dom-document-has-focus">
+<ANCHOR id="webkit-dom-document-get-element-by-id" href="webkitdomgtk-4.0/WebKitDOMDocument.html#webkit-dom-document-get-element-by-id">
 <ANCHOR id="webkit-dom-document-query-selector" href="webkitdomgtk-4.0/WebKitDOMDocument.html#webkit-dom-document-query-selector">
 <ANCHOR id="webkit-dom-document-query-selector-all" href="webkitdomgtk-4.0/WebKitDOMDocument.html#webkit-dom-document-query-selector-all">
 <ANCHOR id="webkit-dom-document-get-doctype" href="webkitdomgtk-4.0/WebKitDOMDocument.html#webkit-dom-document-get-doctype">
@@ -387,6 +389,8 @@
 <ANCHOR id="WebKitDOMDocument--body" href="webkitdomgtk-4.0/WebKitDOMDocument.html#WebKitDOMDocument--body">
 <ANCHOR id="WebKitDOMDocument--character-set" href="webkitdomgtk-4.0/WebKitDOMDocument.html#WebKitDOMDocument--character-set">
 <ANCHOR id="WebKitDOMDocument--charset" href="webkitdomgtk-4.0/WebKitDOMDocument.html#WebKitDOMDocument--charset">
+<ANCHOR id="WebKitDOMDocument--child-element-count" href="webkitdomgtk-4.0/WebKitDOMDocument.html#WebKitDOMDocument--child-element-count">
+<ANCHOR id="WebKitDOMDocument--children" href="webkitdomgtk-4.0/WebKitDOMDocument.html#WebKitDOMDocument--children">
 <ANCHOR id="WebKitDOMDocument--compat-mode" href="webkitdomgtk-4.0/WebKitDOMDocument.html#WebKitDOMDocument--compat-mode">
 <ANCHOR id="WebKitDOMDocument--content-type" href="webkitdomgtk-4.0/WebKitDOMDocument.html#WebKitDOMDocument--content-type">
 <ANCHOR id="WebKitDOMDocument--cookie" href="webkitdomgtk-4.0/WebKitDOMDocument.html#WebKitDOMDocument--cookie">
@@ -397,12 +401,14 @@
 <ANCHOR id="WebKitDOMDocument--document-element" href="webkitdomgtk-4.0/WebKitDOMDocument.html#WebKitDOMDocument--document-element">
 <ANCHOR id="WebKitDOMDocument--document-uri" href="webkitdomgtk-4.0/WebKitDOMDocument.html#WebKitDOMDocument--document-uri">
 <ANCHOR id="WebKitDOMDocument--domain" href="webkitdomgtk-4.0/WebKitDOMDocument.html#WebKitDOMDocument--domain">
+<ANCHOR id="WebKitDOMDocument--first-element-child" href="webkitdomgtk-4.0/WebKitDOMDocument.html#WebKitDOMDocument--first-element-child">
 <ANCHOR id="WebKitDOMDocument--forms" href="webkitdomgtk-4.0/WebKitDOMDocument.html#WebKitDOMDocument--forms">
 <ANCHOR id="WebKitDOMDocument--head" href="webkitdomgtk-4.0/WebKitDOMDocument.html#WebKitDOMDocument--head">
 <ANCHOR id="WebKitDOMDocument--hidden" href="webkitdomgtk-4.0/WebKitDOMDocument.html#WebKitDOMDocument--hidden">
 <ANCHOR id="WebKitDOMDocument--images" href="webkitdomgtk-4.0/WebKitDOMDocument.html#WebKitDOMDocument--images">
 <ANCHOR id="WebKitDOMDocument--implementation" href="webkitdomgtk-4.0/WebKitDOMDocument.html#WebKitDOMDocument--implementation">
 <ANCHOR id="WebKitDOMDocument--input-encoding" href="webkitdomgtk-4.0/WebKitDOMDocument.html#WebKitDOMDocument--input-encoding">
+<ANCHOR id="WebKitDOMDocument--last-element-child" href="webkitdomgtk-4.0/WebKitDOMDocument.html#WebKitDOMDocument--last-element-child">
 <ANCHOR id="WebKitDOMDocument--last-modified" href="webkitdomgtk-4.0/WebKitDOMDocument.html#WebKitDOMDocument--last-modified">
 <ANCHOR id="WebKitDOMDocument--links" href="webkitdomgtk-4.0/WebKitDOMDocument.html#WebKitDOMDocument--links">
 <ANCHOR id="WebKitDOMDocument--origin" href="webkitdomgtk-4.0/WebKitDOMDocument.html#WebKitDOMDocument--origin">
@@ -410,6 +416,7 @@
 <ANCHOR id="WebKitDOMDocument--preferred-stylesheet-set" href="webkitdomgtk-4.0/WebKitDOMDocument.html#WebKitDOMDocument--preferred-stylesheet-set">
 <ANCHOR id="WebKitDOMDocument--ready-state" href="webkitdomgtk-4.0/WebKitDOMDocument.html#WebKitDOMDocument--ready-state">
 <ANCHOR id="WebKitDOMDocument--referrer" href="webkitdomgtk-4.0/WebKitDOMDocument.html#WebKitDOMDocument--referrer">
+<ANCHOR id="WebKitDOMDocument--scrolling-element" href="webkitdomgtk-4.0/WebKitDOMDocument.html#WebKitDOMDocument--scrolling-element">
 <ANCHOR id="WebKitDOMDocument--security-policy" href="webkitdomgtk-4.0/WebKitDOMDocument.html#WebKitDOMDocument--security-policy">
 <ANCHOR id="WebKitDOMDocument--selected-stylesheet-set" href="webkitdomgtk-4.0/WebKitDOMDocument.html#WebKitDOMDocument--selected-stylesheet-set">
 <ANCHOR id="WebKitDOMDocument--style-sheets" href="webkitdomgtk-4.0/WebKitDOMDocument.html#WebKitDOMDocument--style-sheets">
@@ -425,6 +432,7 @@
 <ANCHOR id="WebKitDOMDocument--xml-standalone" href="webkitdomgtk-4.0/WebKitDOMDocument.html#WebKitDOMDocument--xml-standalone">
 <ANCHOR id="WebKitDOMDocument--xml-version" href="webkitdomgtk-4.0/WebKitDOMDocument.html#WebKitDOMDocument--xml-version">
 <ANCHOR id="WebKitDOMDocumentFragment" href="webkitdomgtk-4.0/WebKitDOMDocumentFragment.html">
+<ANCHOR id="WebKitDOMDocumentFragment.properties" href="webkitdomgtk-4.0/WebKitDOMDocumentFragment.html#WebKitDOMDocumentFragment.properties">
 <ANCHOR id="WebKitDOMDocumentFragment.other" href="webkitdomgtk-4.0/WebKitDOMDocumentFragment.html#WebKitDOMDocumentFragment.other">
 <ANCHOR id="WebKitDOMDocumentFragment.object-hierarchy" href="webkitdomgtk-4.0/WebKitDOMDocumentFragment.html#WebKitDOMDocumentFragment.object-hierarchy">
 <ANCHOR id="WebKitDOMDocumentFragment.implemented-interfaces" href="webkitdomgtk-4.0/WebKitDOMDocumentFragment.html#WebKitDOMDocumentFragment.implemented-interfaces">
@@ -432,6 +440,11 @@
 <ANCHOR id="WebKitDOMDocumentFragment.functions_details" href="webkitdomgtk-4.0/WebKitDOMDocumentFragment.html#WebKitDOMDocumentFragment.functions_details">
 <ANCHOR id="WebKitDOMDocumentFragment.other_details" href="webkitdomgtk-4.0/WebKitDOMDocumentFragment.html#WebKitDOMDocumentFragment.other_details">
 <ANCHOR id="WebKitDOMDocumentFragment-struct" href="webkitdomgtk-4.0/WebKitDOMDocumentFragment.html#WebKitDOMDocumentFragment-struct">
+<ANCHOR id="WebKitDOMDocumentFragment.property-details" href="webkitdomgtk-4.0/WebKitDOMDocumentFragment.html#WebKitDOMDocumentFragment.property-details">
+<ANCHOR id="WebKitDOMDocumentFragment--child-element-count" href="webkitdomgtk-4.0/WebKitDOMDocumentFragment.html#WebKitDOMDocumentFragment--child-element-count">
+<ANCHOR id="WebKitDOMDocumentFragment--children" href="webkitdomgtk-4.0/WebKitDOMDocumentFragment.html#WebKitDOMDocumentFragment--children">
+<ANCHOR id="WebKitDOMDocumentFragment--first-element-child" href="webkitdomgtk-4.0/WebKitDOMDocumentFragment.html#WebKitDOMDocumentFragment--first-element-child">
+<ANCHOR id="WebKitDOMDocumentFragment--last-element-child" href="webkitdomgtk-4.0/WebKitDOMDocumentFragment.html#WebKitDOMDocumentFragment--last-element-child">
 <ANCHOR id="WebKitDOMDocumentType" href="webkitdomgtk-4.0/WebKitDOMDocumentType.html">
 <ANCHOR id="WebKitDOMDocumentType.functions" href="webkitdomgtk-4.0/WebKitDOMDocumentType.html#WebKitDOMDocumentType.functions">
 <ANCHOR id="WebKitDOMDocumentType.properties" href="webkitdomgtk-4.0/WebKitDOMDocumentType.html#WebKitDOMDocumentType.properties">
@@ -514,16 +527,18 @@
 <ANCHOR id="webkit-dom-element-set-outer-html" href="webkitdomgtk-4.0/WebKitDOMElement.html#webkit-dom-element-set-outer-html">
 <ANCHOR id="webkit-dom-element-get-class-name" href="webkitdomgtk-4.0/WebKitDOMElement.html#webkit-dom-element-get-class-name">
 <ANCHOR id="webkit-dom-element-set-class-name" href="webkitdomgtk-4.0/WebKitDOMElement.html#webkit-dom-element-set-class-name">
-<ANCHOR id="webkit-dom-element-get-first-element-child" href="webkitdomgtk-4.0/WebKitDOMElement.html#webkit-dom-element-get-first-element-child">
-<ANCHOR id="webkit-dom-element-get-last-element-child" href="webkitdomgtk-4.0/WebKitDOMElement.html#webkit-dom-element-get-last-element-child">
 <ANCHOR id="webkit-dom-element-get-previous-element-sibling" href="webkitdomgtk-4.0/WebKitDOMElement.html#webkit-dom-element-get-previous-element-sibling">
 <ANCHOR id="webkit-dom-element-get-next-element-sibling" href="webkitdomgtk-4.0/WebKitDOMElement.html#webkit-dom-element-get-next-element-sibling">
+<ANCHOR id="webkit-dom-element-get-children" href="webkitdomgtk-4.0/WebKitDOMElement.html#webkit-dom-element-get-children">
+<ANCHOR id="webkit-dom-element-get-first-element-child" href="webkitdomgtk-4.0/WebKitDOMElement.html#webkit-dom-element-get-first-element-child">
+<ANCHOR id="webkit-dom-element-get-last-element-child" href="webkitdomgtk-4.0/WebKitDOMElement.html#webkit-dom-element-get-last-element-child">
 <ANCHOR id="webkit-dom-element-get-child-element-count" href="webkitdomgtk-4.0/WebKitDOMElement.html#webkit-dom-element-get-child-element-count">
 <ANCHOR id="WebKitDOMElement.other_details" href="webkitdomgtk-4.0/WebKitDOMElement.html#WebKitDOMElement.other_details">
 <ANCHOR id="WebKitDOMElement-struct" href="webkitdomgtk-4.0/WebKitDOMElement.html#WebKitDOMElement-struct">
 <ANCHOR id="WebKitDOMElement.property-details" href="webkitdomgtk-4.0/WebKitDOMElement.html#WebKitDOMElement.property-details">
 <ANCHOR id="WebKitDOMElement--attributes" href="webkitdomgtk-4.0/WebKitDOMElement.html#WebKitDOMElement--attributes">
 <ANCHOR id="WebKitDOMElement--child-element-count" href="webkitdomgtk-4.0/WebKitDOMElement.html#WebKitDOMElement--child-element-count">
+<ANCHOR id="WebKitDOMElement--children" href="webkitdomgtk-4.0/WebKitDOMElement.html#WebKitDOMElement--children">
 <ANCHOR id="WebKitDOMElement--class-list" href="webkitdomgtk-4.0/WebKitDOMElement.html#WebKitDOMElement--class-list">
 <ANCHOR id="WebKitDOMElement--class-name" href="webkitdomgtk-4.0/WebKitDOMElement.html#WebKitDOMElement--class-name">
 <ANCHOR id="WebKitDOMElement--client-height" href="webkitdomgtk-4.0/WebKitDOMElement.html#WebKitDOMElement--client-height">
@@ -1444,7 +1459,6 @@
 <ANCHOR id="webkit-dom-html-element-set-inner-text" href="webkitdomgtk-4.0/WebKitDOMHTMLElement.html#webkit-dom-html-element-set-inner-text">
 <ANCHOR id="webkit-dom-html-element-get-outer-text" href="webkitdomgtk-4.0/WebKitDOMHTMLElement.html#webkit-dom-html-element-get-outer-text">
 <ANCHOR id="webkit-dom-html-element-set-outer-text" href="webkitdomgtk-4.0/WebKitDOMHTMLElement.html#webkit-dom-html-element-set-outer-text">
-<ANCHOR id="webkit-dom-html-element-get-children" href="webkitdomgtk-4.0/WebKitDOMHTMLElement.html#webkit-dom-html-element-get-children">
 <ANCHOR id="webkit-dom-html-element-get-content-editable" href="webkitdomgtk-4.0/WebKitDOMHTMLElement.html#webkit-dom-html-element-get-content-editable">
 <ANCHOR id="webkit-dom-html-element-set-content-editable" href="webkitdomgtk-4.0/WebKitDOMHTMLElement.html#webkit-dom-html-element-set-content-editable">
 <ANCHOR id="webkit-dom-html-element-get-is-content-editable" href="webkitdomgtk-4.0/WebKitDOMHTMLElement.html#webkit-dom-html-element-get-is-content-editable">
@@ -1452,11 +1466,11 @@
 <ANCHOR id="webkit-dom-html-element-get-outer-html" href="webkitdomgtk-4.0/WebKitDOMHTMLElement.html#webkit-dom-html-element-get-outer-html">
 <ANCHOR id="webkit-dom-html-element-get-inner-html" href="webkitdomgtk-4.0/WebKitDOMHTMLElement.html#webkit-dom-html-element-get-inner-html">
 <ANCHOR id="webkit-dom-html-element-set-outer-html" href="webkitdomgtk-4.0/WebKitDOMHTMLElement.html#webkit-dom-html-element-set-outer-html">
+<ANCHOR id="webkit-dom-html-element-get-children" href="webkitdomgtk-4.0/WebKitDOMHTMLElement.html#webkit-dom-html-element-get-children">
 <ANCHOR id="WebKitDOMHTMLElement.other_details" href="webkitdomgtk-4.0/WebKitDOMHTMLElement.html#WebKitDOMHTMLElement.other_details">
 <ANCHOR id="WebKitDOMHTMLElement-struct" href="webkitdomgtk-4.0/WebKitDOMHTMLElement.html#WebKitDOMHTMLElement-struct">
 <ANCHOR id="WebKitDOMHTMLElement.property-details" href="webkitdomgtk-4.0/WebKitDOMHTMLElement.html#WebKitDOMHTMLElement.property-details">
 <ANCHOR id="WebKitDOMHTMLElement--access-key" href="webkitdomgtk-4.0/WebKitDOMHTMLElement.html#WebKitDOMHTMLElement--access-key">
-<ANCHOR id="WebKitDOMHTMLElement--children" href="webkitdomgtk-4.0/WebKitDOMHTMLElement.html#WebKitDOMHTMLElement--children">
 <ANCHOR id="WebKitDOMHTMLElement--content-editable" href="webkitdomgtk-4.0/WebKitDOMHTMLElement.html#WebKitDOMHTMLElement--content-editable">
 <ANCHOR id="WebKitDOMHTMLElement--dir" href="webkitdomgtk-4.0/WebKitDOMHTMLElement.html#WebKitDOMHTMLElement--dir">
 <ANCHOR id="WebKitDOMHTMLElement--draggable" href="webkitdomgtk-4.0/WebKitDOMHTMLElement.html#WebKitDOMHTMLElement--draggable">
@@ -2770,6 +2784,7 @@
 <ANCHOR id="WebKitDOMDOMWindow--navigator" href="webkitdomgtk-4.0/WebKitDOMDOMWindow.html#WebKitDOMDOMWindow--navigator">
 <ANCHOR id="WebKitDOMDOMWindow--offscreen-buffering" href="webkitdomgtk-4.0/WebKitDOMDOMWindow.html#WebKitDOMDOMWindow--offscreen-buffering">
 <ANCHOR id="WebKitDOMDOMWindow--opener" href="webkitdomgtk-4.0/WebKitDOMDOMWindow.html#WebKitDOMDOMWindow--opener">
+<ANCHOR id="WebKitDOMDOMWindow--orientation" href="webkitdomgtk-4.0/WebKitDOMDOMWindow.html#WebKitDOMDOMWindow--orientation">
 <ANCHOR id="WebKitDOMDOMWindow--outer-height" href="webkitdomgtk-4.0/WebKitDOMDOMWindow.html#WebKitDOMDOMWindow--outer-height">
 <ANCHOR id="WebKitDOMDOMWindow--outer-width" href="webkitdomgtk-4.0/WebKitDOMDOMWindow.html#WebKitDOMDOMWindow--outer-width">
 <ANCHOR id="WebKitDOMDOMWindow--page-x-offset" href="webkitdomgtk-4.0/WebKitDOMDOMWindow.html#WebKitDOMDOMWindow--page-x-offset">

@@ -28,7 +28,6 @@
 #include "config.h"
 #include "HTMLCanvasElement.h"
 
-#include "Attribute.h"
 #include "CanvasGradient.h"
 #include "CanvasPattern.h"
 #include "CanvasRenderingContext2D.h"
@@ -61,17 +60,19 @@ namespace WebCore {
 
 using namespace HTMLNames;
 
-// These values come from the WhatWG spec.
+// These values come from the WhatWG/W3C HTML spec.
 static const int DefaultWidth = 300;
 static const int DefaultHeight = 150;
 
 // Firefox limits width/height to 32767 pixels, but slows down dramatically before it
 // reaches that limit. We limit by area instead, giving us larger maximum dimensions,
-// in exchange for a smaller maximum canvas size. The maximum canvas size is in CSS pixels.
+// in exchange for a smaller maximum canvas size. The maximum canvas size is in device pixels.
 #if PLATFORM(IOS)
-static const float MaxCanvasArea = 4580 * 1145; // 20 MB assuming 4 bytes per pixel
+static const unsigned MaxCanvasArea = 4096 * 4096;
+#elif PLATFORM(MAC) && __MAC_OS_X_VERSION_MIN_REQUIRED < 101100
+static const unsigned MaxCanvasArea = 8192 * 8192;
 #else
-static const float MaxCanvasArea = 32768 * 8192;
+static const unsigned MaxCanvasArea = 16384 * 16384;
 #endif
 
 HTMLCanvasElement::HTMLCanvasElement(const QualifiedName& tagName, Document& document)
@@ -111,7 +112,7 @@ void HTMLCanvasElement::parseAttribute(const QualifiedName& name, const AtomicSt
     HTMLElement::parseAttribute(name, value);
 }
 
-RenderPtr<RenderElement> HTMLCanvasElement::createElementRenderer(Ref<RenderStyle>&& style)
+RenderPtr<RenderElement> HTMLCanvasElement::createElementRenderer(Ref<RenderStyle>&& style, const RenderTreePosition& insertionPosition)
 {
     Frame* frame = document().frame();
     if (frame && frame->script().canExecuteScripts(NotAboutToExecuteScript)) {
@@ -120,7 +121,7 @@ RenderPtr<RenderElement> HTMLCanvasElement::createElementRenderer(Ref<RenderStyl
     }
 
     m_rendererIsCanvas = false;
-    return HTMLElement::createElementRenderer(WTF::move(style));
+    return HTMLElement::createElementRenderer(WTF::move(style), insertionPosition);
 }
 
 bool HTMLCanvasElement::canContainRangeEndPoint() const
@@ -255,7 +256,11 @@ bool HTMLCanvasElement::is2dType(const String& type)
 bool HTMLCanvasElement::is3dType(const String& type)
 {
     // Retain support for the legacy "webkit-3d" name.
-    return type == "webgl" || type == "experimental-webgl" || type == "webkit-3d" || type == "experimental-webgl2";
+    return type == "webgl" || type == "experimental-webgl"
+#if ENABLE(WEBGL2)
+        || type == "experimental-webgl2"
+#endif
+        || type == "webkit-3d";
 }
 #endif
 
@@ -418,7 +423,7 @@ void HTMLCanvasElement::makePresentationCopy()
 
 void HTMLCanvasElement::clearPresentationCopy()
 {
-    m_presentedImage.clear();
+    m_presentedImage = nullptr;
 }
 
 void HTMLCanvasElement::setSurfaceSize(const IntSize& size)
@@ -560,9 +565,9 @@ void HTMLCanvasElement::createImageBuffer() const
 
     if (deviceSize.width() * deviceSize.height() > MaxCanvasArea) {
         StringBuilder stringBuilder;
-        stringBuilder.append("Canvas area exceeds the maximum limit (width * height > ");
+        stringBuilder.appendLiteral("Canvas area exceeds the maximum limit (width * height > ");
         stringBuilder.appendNumber(MaxCanvasArea);
-        stringBuilder.append(").");
+        stringBuilder.appendLiteral(").");
         document().addConsoleMessage(MessageSource::JS, MessageLevel::Warning, stringBuilder.toString());
         return;
     }
@@ -639,7 +644,7 @@ void HTMLCanvasElement::clearImageBuffer() const
 
 void HTMLCanvasElement::clearCopiedImage()
 {
-    m_copiedImage.clear();
+    m_copiedImage = nullptr;
     m_didClearImageBuffer = false;
 }
 

@@ -105,7 +105,7 @@ RefPtr<Font> CSSFontFaceSource::font(const FontDescription& fontDescription, boo
 {
     // If the font hasn't loaded or an error occurred, then we've got nothing.
     if (!isValid())
-        return 0;
+        return nullptr;
 
     if (!m_font
 #if ENABLE(SVG_FONTS)
@@ -114,7 +114,7 @@ RefPtr<Font> CSSFontFaceSource::font(const FontDescription& fontDescription, boo
     ) {
         // We're local. Just return a Font from the normal cache.
         // We don't want to check alternate font family names here, so pass true as the checkingAlternateName parameter.
-        return fontCache().fontForFamily(fontDescription, m_string, true);
+        return FontCache::singleton().fontForFamily(fontDescription, m_string, true);
     }
 
     unsigned hashKey = (fontDescription.computedPixelSize() + 1) << 5 | fontDescription.widthVariant() << 3
@@ -151,7 +151,7 @@ RefPtr<Font> CSSFontFaceSource::font(const FontDescription& fontDescription, boo
                 if (!m_generatedOTFBuffer)
                     return nullptr;
                 std::unique_ptr<FontCustomPlatformData> customPlatformData = createFontCustomPlatformData(*m_generatedOTFBuffer);
-                font = Font::create(customPlatformData->fontPlatformData(static_cast<int>(fontDescription.computedPixelSize()), syntheticBold, syntheticItalic, fontDescription.orientation(), fontDescription.widthVariant(), fontDescription.renderingMode()), true, false);
+                font = Font::create(customPlatformData->fontPlatformData(fontDescription, syntheticBold, syntheticItalic), true, false);
 #else
                 font = Font::create(std::make_unique<SVGFontData>(m_svgFontFaceElement.get()), fontDescription.computedPixelSize(), syntheticBold, syntheticItalic);
 #endif
@@ -163,7 +163,7 @@ RefPtr<Font> CSSFontFaceSource::font(const FontDescription& fontDescription, boo
         // and the loader may invoke arbitrary delegate or event handler code.
         fontSelector->beginLoadingFontSoon(m_font.get());
 
-        Ref<Font> placeholderFont = fontCache().lastResortFallbackFont(fontDescription);
+        Ref<Font> placeholderFont = FontCache::singleton().lastResortFallbackFont(fontDescription);
         Ref<Font> placeholderFontCopyInLoadingState = Font::create(placeholderFont->platformData(), true, true);
         return WTF::move(placeholderFontCopyInLoadingState);
     }

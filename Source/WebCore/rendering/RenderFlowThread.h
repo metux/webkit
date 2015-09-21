@@ -235,8 +235,6 @@ public:
     virtual bool shouldCheckColumnBreaks() const { return false; }
 
 private:
-    virtual bool isRenderFlowThread() const override final { return true; }
-
     // Always create a RenderLayer for the RenderFlowThread so that we
     // can easily avoid drawing the children directly.
     virtual bool requiresLayer() const override final { return true; }
@@ -246,7 +244,7 @@ protected:
 
     virtual RenderFlowThread* locateFlowThreadContainingBlock() const override { return const_cast<RenderFlowThread*>(this); }
 
-    virtual const char* renderName() const = 0;
+    virtual const char* renderName() const override = 0;
 
     // Overridden by columns/pages to set up an initial logical width of the page width even when
     // no regions have been generated yet.
@@ -255,9 +253,9 @@ protected:
     void clearLinesToRegionMap();
     virtual void willBeDestroyed() override;
 
-    virtual void mapLocalToContainer(const RenderLayerModelObject* repaintContainer, TransformState&, MapCoordinatesFlags = ApplyContainerFlip, bool* wasFixed = 0) const override;
+    virtual void mapLocalToContainer(const RenderLayerModelObject* repaintContainer, TransformState&, MapCoordinatesFlags, bool* wasFixed) const override;
 
-    void updateRegionsFlowThreadPortionRect(const RenderRegion* = 0);
+    void updateRegionsFlowThreadPortionRect(const RenderRegion* = nullptr);
     bool shouldRepaint(const LayoutRect&) const;
 
     bool updateAllLayerToRegionMappings();
@@ -266,7 +264,7 @@ protected:
     void updateLayerToRegionMappings(RenderLayer&, LayerToRegionMap&, RegionToLayerListMap&, bool& needsLayerUpdate);
     void updateRegionForRenderLayer(RenderLayer*, LayerToRegionMap&, RegionToLayerListMap&, bool& needsLayerUpdate);
 
-    void initializeRegionsComputedAutoHeight(RenderRegion* = 0);
+    void initializeRegionsComputedAutoHeight(RenderRegion* = nullptr);
 
     inline bool hasCachedOffsetFromLogicalTopOfFirstRegion(const RenderBox*) const;
     inline LayoutUnit cachedOffsetFromLogicalTopOfFirstRegion(const RenderBox*) const;
@@ -287,7 +285,7 @@ protected:
     public:
         RenderRegionRange()
         {
-            setRange(0, 0);
+            setRange(nullptr, nullptr);
         }
 
         RenderRegionRange(RenderRegion* start, RenderRegion* end)
@@ -320,7 +318,7 @@ protected:
     public:
         RegionSearchAdapter(LayoutUnit offset)
             : m_offset(offset)
-            , m_result(0)
+            , m_result(nullptr)
         {
         }
         

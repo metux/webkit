@@ -31,6 +31,7 @@
 #ifndef TextFieldInputType_h
 #define TextFieldInputType_h
 
+#include "AutoFillButtonElement.h"
 #include "InputType.h"
 #include "SpinButtonElement.h"
 
@@ -41,7 +42,7 @@ class TextControlInnerTextElement;
 
 // The class represents types of which UI contain text fields.
 // It supports not only the types for BaseTextInputType but also type=number.
-class TextFieldInputType : public InputType, protected SpinButtonElement::SpinButtonOwner {
+class TextFieldInputType : public InputType, protected SpinButtonElement::SpinButtonOwner, protected AutoFillButtonElement::AutoFillButtonOwner {
 protected:
     explicit TextFieldInputType(HTMLInputElement&);
     virtual ~TextFieldInputType();
@@ -52,16 +53,18 @@ protected:
     virtual HTMLElement* innerBlockElement() const override final;
     virtual TextControlInnerTextElement* innerTextElement() const override final;
     virtual HTMLElement* innerSpinButtonElement() const override final;
+    virtual HTMLElement* capsLockIndicatorElement() const override final;
+    virtual HTMLElement* autoFillButtonElement() const override final;
 
 protected:
     virtual bool needsContainer() const;
-    virtual bool shouldHaveSpinButton() const final;
     virtual void createShadowSubtree() override;
     virtual void destroyShadowSubtree() override;
     virtual void attributeChanged() override final;
     virtual void disabledAttributeChanged() override final;
     virtual void readonlyAttributeChanged() override final;
     virtual bool supportsReadOnly() const override final;
+    void handleFocusEvent(Node* oldFocusedNode, FocusDirection) override final;
     virtual void handleBlurEvent() override final;
     virtual void setValue(const String&, bool valueChanged, TextFieldEventBehavior) override;
     virtual void updateInnerTextValue() override final;
@@ -70,11 +73,7 @@ protected:
 #endif
 
     virtual String convertFromVisibleValue(const String&) const;
-    enum ValueChangeState {
-        ValueChangeStateNone,
-        ValueChangeStateChanged
-    };
-    virtual void didSetValueByUserEdit(ValueChangeState);
+    virtual void didSetValueByUserEdit();
 
 private:
     virtual bool isKeyboardFocusable(KeyboardEvent*) const override final;
@@ -95,6 +94,8 @@ private:
     virtual void updatePlaceholderText() override final;
     virtual bool appendFormData(FormDataList&, bool multipart) const override final;
     virtual void subtreeHasChanged() override final;
+    virtual void capsLockStateMayHaveChanged() override final;
+    virtual void updateAutoFillButton() override final;
 
     // SpinButtonElement::SpinButtonOwner functions.
     virtual void focusAndSelectSpinButtonOwner() override final;
@@ -103,11 +104,24 @@ private:
     virtual void spinButtonStepDown() override final;
     virtual void spinButtonStepUp() override final;
 
+    // AutoFillButtonElement::AutoFillButtonOwner
+    virtual void autoFillButtonElementWasClicked() override final;
+
+    bool shouldHaveSpinButton() const;
+    bool shouldHaveCapsLockIndicator() const;
+    bool shouldDrawCapsLockIndicator() const;
+    bool shouldDrawAutoFillButton() const;
+
+    void createContainer();
+    void createAutoFillButton();
+
     RefPtr<HTMLElement> m_container;
     RefPtr<HTMLElement> m_innerBlock;
     RefPtr<TextControlInnerTextElement> m_innerText;
     RefPtr<HTMLElement> m_placeholder;
     RefPtr<SpinButtonElement> m_innerSpinButton;
+    RefPtr<HTMLElement> m_capsLockIndicator;
+    RefPtr<HTMLElement> m_autoFillButton;
 };
 
 } // namespace WebCore

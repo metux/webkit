@@ -47,7 +47,7 @@ class MediaKeys;
 
 class MediaKeySession final : public RefCounted<MediaKeySession>, public EventTargetWithInlineData, public ActiveDOMObject, public CDMSessionClient {
 public:
-    static PassRefPtr<MediaKeySession> create(ScriptExecutionContext*, MediaKeys*, const String& keySystem);
+    static Ref<MediaKeySession> create(ScriptExecutionContext*, MediaKeys*, const String& keySystem);
     ~MediaKeySession();
 
     const String& keySystem() const { return m_keySystem; }
@@ -73,16 +73,11 @@ public:
 
     void enqueueEvent(PassRefPtr<Event>);
 
-    // ActiveDOMObject
-    virtual bool hasPendingActivity() const override { return (m_keys && !isClosed()) || m_asyncEventQueue.hasPendingEvents(); }
-    virtual void stop() override { close(); }
-
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(webkitkeyadded);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(webkitkeyerror);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(webkitkeymessage);
-
     virtual EventTargetInterface eventTargetInterface() const override { return MediaKeySessionEventTargetInterfaceType; }
     virtual ScriptExecutionContext* scriptExecutionContext() const override { return ActiveDOMObject::scriptExecutionContext(); }
+
+    // ActiveDOMObject API.
+    bool hasPendingActivity() const override;
 
 protected:
     MediaKeySession(ScriptExecutionContext*, MediaKeys*, const String& keySystem);
@@ -90,9 +85,9 @@ protected:
     void addKeyTimerFired();
 
     // CDMSessionClient
-    virtual void sendMessage(Uint8Array*, String destinationURL);
-    virtual void sendError(MediaKeyErrorCode, unsigned long systemCode);
-    virtual String mediaKeysStorageDirectory() const;
+    virtual void sendMessage(Uint8Array*, String destinationURL) override;
+    virtual void sendError(MediaKeyErrorCode, unsigned long systemCode) override;
+    virtual String mediaKeysStorageDirectory() const override;
 
     MediaKeys* m_keys;
     String m_keySystem;
@@ -116,7 +111,10 @@ private:
     virtual void refEventTarget() override { ref(); }
     virtual void derefEventTarget() override { deref(); }
 
-    virtual const char* activeDOMObjectName() const override { return "MediaKeySession"; }
+    // ActiveDOMObject API.
+    void stop() override;
+    bool canSuspendForPageCache() const override;
+    const char* activeDOMObjectName() const override;
 };
 
 }

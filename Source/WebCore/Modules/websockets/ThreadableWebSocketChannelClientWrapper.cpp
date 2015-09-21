@@ -43,7 +43,7 @@ namespace WebCore {
 ThreadableWebSocketChannelClientWrapper::ThreadableWebSocketChannelClientWrapper(ScriptExecutionContext* context, WebSocketChannelClient* client)
     : m_context(context)
     , m_client(client)
-    , m_peer(0)
+    , m_peer(nullptr)
     , m_failedWebSocketChannelCreation(false)
     , m_syncMethodDone(true)
     , m_sendRequestResult(ThreadableWebSocketChannel::SendFail)
@@ -52,9 +52,9 @@ ThreadableWebSocketChannelClientWrapper::ThreadableWebSocketChannelClientWrapper
 {
 }
 
-PassRefPtr<ThreadableWebSocketChannelClientWrapper> ThreadableWebSocketChannelClientWrapper::create(ScriptExecutionContext* context, WebSocketChannelClient* client)
+Ref<ThreadableWebSocketChannelClientWrapper> ThreadableWebSocketChannelClientWrapper::create(ScriptExecutionContext* context, WebSocketChannelClient* client)
 {
-    return adoptRef(new ThreadableWebSocketChannelClientWrapper(context, client));
+    return adoptRef(*new ThreadableWebSocketChannelClientWrapper(context, client));
 }
 
 void ThreadableWebSocketChannelClientWrapper::clearSyncMethodDone()
@@ -85,7 +85,7 @@ void ThreadableWebSocketChannelClientWrapper::didCreateWebSocketChannel(WorkerTh
 
 void ThreadableWebSocketChannelClientWrapper::clearPeer()
 {
-    m_peer = 0;
+    m_peer = nullptr;
 }
 
 bool ThreadableWebSocketChannelClientWrapper::failedWebSocketChannelCreation() const
@@ -150,7 +150,7 @@ void ThreadableWebSocketChannelClientWrapper::setBufferedAmount(unsigned long bu
 
 void ThreadableWebSocketChannelClientWrapper::clearClient()
 {
-    m_client = 0;
+    m_client = nullptr;
 }
 
 void ThreadableWebSocketChannelClientWrapper::didConnect()
@@ -180,12 +180,14 @@ void ThreadableWebSocketChannelClientWrapper::didReceiveMessage(const String& me
         processPendingTasks();
 }
 
-void ThreadableWebSocketChannelClientWrapper::didReceiveBinaryData(PassOwnPtr<Vector<char>> binaryData)
+void ThreadableWebSocketChannelClientWrapper::didReceiveBinaryData(Vector<char>&& binaryData)
 {
     ref();
-    m_pendingTasks.append(std::make_unique<ScriptExecutionContext::Task>([this, binaryData] (ScriptExecutionContext&) {
+    Vector<char>* capturedData = new Vector<char>(WTF::move(binaryData));
+    m_pendingTasks.append(std::make_unique<ScriptExecutionContext::Task>([this, capturedData] (ScriptExecutionContext&) {
         if (m_client)
-            m_client->didReceiveBinaryData(binaryData);
+            m_client->didReceiveBinaryData(WTF::move(*capturedData));
+        delete capturedData;
         deref();
     }));
 

@@ -41,6 +41,7 @@
 #include <WebCore/IDBGetResult.h>
 #include <WebCore/IDBKeyData.h>
 #include <WebCore/IDBKeyRangeData.h>
+#include <WebCore/SecurityOrigin.h>
 #include <wtf/MainThread.h>
 #include <wtf/text/WTFString.h>
 
@@ -135,7 +136,7 @@ void UniqueIDBDatabase::shutdown(UniqueIDBDatabaseShutdownType type)
     ref();
 
     {
-        MutexLocker locker(m_databaseTaskMutex);
+        LockHolder locker(m_databaseTaskMutex);
         m_databaseTasks.clear();
     }
 
@@ -146,7 +147,7 @@ void UniqueIDBDatabase::shutdownBackingStore(UniqueIDBDatabaseShutdownType type,
 {
     ASSERT(!RunLoop::isMain());
 
-    m_backingStore.clear();
+    m_backingStore = nullptr;
 
     if (type == UniqueIDBDatabaseShutdownType::DeleteShutdown) {
         String dbFilename = UniqueIDBDatabase::calculateAbsoluteDatabaseFilename(databaseDirectory);
@@ -405,10 +406,7 @@ void UniqueIDBDatabase::didDeleteIndex(uint64_t requestID, bool success)
 
 void UniqueIDBDatabase::didCompleteBoolRequest(uint64_t requestID, bool success)
 {
-    RefPtr<AsyncRequest> request = m_pendingDatabaseTasks.take(requestID);
-    ASSERT(request);
-
-    request->completeRequest(success);
+    m_pendingDatabaseTasks.take(requestID).get().completeRequest(success);
 }
 
 void UniqueIDBDatabase::createObjectStore(const IDBIdentifier& transactionIdentifier, const IDBObjectStoreMetadata& metadata, std::function<void (bool)> successCallback)
@@ -889,10 +887,7 @@ void UniqueIDBDatabase::putRecordInBackingStore(uint64_t requestID, const IDBIde
 
 void UniqueIDBDatabase::didPutRecordInBackingStore(uint64_t requestID, const IDBKeyData& keyData, uint32_t errorCode, const String& errorMessage)
 {
-    RefPtr<AsyncRequest> request = m_pendingDatabaseTasks.take(requestID);
-    ASSERT(request);
-
-    request->completeRequest(keyData, errorCode, errorMessage);
+    m_pendingDatabaseTasks.take(requestID).get().completeRequest(keyData, errorCode, errorMessage);
 }
 
 void UniqueIDBDatabase::getRecordFromBackingStore(uint64_t requestID, const IDBIdentifier& transaction, const IDBObjectStoreMetadata& objectStoreMetadata, int64_t indexID, const IDBKeyRangeData& keyRangeData, IndexedDB::CursorType cursorType)
@@ -950,10 +945,7 @@ void UniqueIDBDatabase::getRecordFromBackingStore(uint64_t requestID, const IDBI
 
 void UniqueIDBDatabase::didGetRecordFromBackingStore(uint64_t requestID, const IDBGetResult& result, uint32_t errorCode, const String& errorMessage)
 {
-    RefPtr<AsyncRequest> request = m_pendingDatabaseTasks.take(requestID);
-    ASSERT(request);
-
-    request->completeRequest(result, errorCode, errorMessage);
+    m_pendingDatabaseTasks.take(requestID).get().completeRequest(result, errorCode, errorMessage);
 }
 
 void UniqueIDBDatabase::openCursorInBackingStore(uint64_t requestID, const IDBIdentifier& transactionIdentifier, int64_t objectStoreID, int64_t indexID, IndexedDB::CursorDirection cursorDirection, IndexedDB::CursorType cursorType, IDBDatabaseBackend::TaskType taskType, const IDBKeyRangeData& keyRange)
@@ -979,10 +971,7 @@ void UniqueIDBDatabase::openCursorInBackingStore(uint64_t requestID, const IDBId
 
 void UniqueIDBDatabase::didOpenCursorInBackingStore(uint64_t requestID, int64_t cursorID, const IDBKeyData& key, const IDBKeyData& primaryKey, const Vector<uint8_t>& valueBuffer, uint32_t errorCode, const String& errorMessage)
 {
-    RefPtr<AsyncRequest> request = m_pendingDatabaseTasks.take(requestID);
-    ASSERT(request);
-
-    request->completeRequest(cursorID, key, primaryKey, SharedBuffer::create(valueBuffer.data(), valueBuffer.size()), errorCode, errorMessage);
+    m_pendingDatabaseTasks.take(requestID).get().completeRequest(cursorID, key, primaryKey, SharedBuffer::create(valueBuffer.data(), valueBuffer.size()), errorCode, errorMessage);
 }
 
 void UniqueIDBDatabase::advanceCursorInBackingStore(uint64_t requestID, const IDBIdentifier& cursorIdentifier, uint64_t count)
@@ -1004,10 +993,7 @@ void UniqueIDBDatabase::advanceCursorInBackingStore(uint64_t requestID, const ID
 
 void UniqueIDBDatabase::didAdvanceCursorInBackingStore(uint64_t requestID, const IDBKeyData& key, const IDBKeyData& primaryKey, const Vector<uint8_t>& valueBuffer, uint32_t errorCode, const String& errorMessage)
 {
-    RefPtr<AsyncRequest> request = m_pendingDatabaseTasks.take(requestID);
-    ASSERT(request);
-
-    request->completeRequest(key, primaryKey, SharedBuffer::create(valueBuffer.data(), valueBuffer.size()), errorCode, errorMessage);
+    m_pendingDatabaseTasks.take(requestID).get().completeRequest(key, primaryKey, SharedBuffer::create(valueBuffer.data(), valueBuffer.size()), errorCode, errorMessage);
 }
 
 void UniqueIDBDatabase::iterateCursorInBackingStore(uint64_t requestID, const IDBIdentifier& cursorIdentifier, const IDBKeyData& iterateKey)
@@ -1029,10 +1015,7 @@ void UniqueIDBDatabase::iterateCursorInBackingStore(uint64_t requestID, const ID
 
 void UniqueIDBDatabase::didIterateCursorInBackingStore(uint64_t requestID, const IDBKeyData& key, const IDBKeyData& primaryKey, const Vector<uint8_t>& valueBuffer, uint32_t errorCode, const String& errorMessage)
 {
-    RefPtr<AsyncRequest> request = m_pendingDatabaseTasks.take(requestID);
-    ASSERT(request);
-
-    request->completeRequest(key, primaryKey, SharedBuffer::create(valueBuffer.data(), valueBuffer.size()), errorCode, errorMessage);
+    m_pendingDatabaseTasks.take(requestID).get().completeRequest(key, primaryKey, SharedBuffer::create(valueBuffer.data(), valueBuffer.size()), errorCode, errorMessage);
 }
 
 void UniqueIDBDatabase::countInBackingStore(uint64_t requestID, const IDBIdentifier& transactionIdentifier, int64_t objectStoreID, int64_t indexID, const IDBKeyRangeData& keyRangeData)
@@ -1042,6 +1025,8 @@ void UniqueIDBDatabase::countInBackingStore(uint64_t requestID, const IDBIdentif
     if (!m_backingStore->count(transactionIdentifier, objectStoreID, indexID, keyRangeData, count)) {
         LOG_ERROR("Failed to get count from backing store.");
         postMainThreadTask(createAsyncTask(*this, &UniqueIDBDatabase::didCountInBackingStore, requestID, 0, IDBDatabaseException::UnknownError, ASCIILiteral("Failed to get count from backing store")));
+
+        return;
     }
 
     postMainThreadTask(createAsyncTask(*this, &UniqueIDBDatabase::didCountInBackingStore, requestID, count, 0, String(StringImpl::empty())));
@@ -1049,10 +1034,7 @@ void UniqueIDBDatabase::countInBackingStore(uint64_t requestID, const IDBIdentif
 
 void UniqueIDBDatabase::didCountInBackingStore(uint64_t requestID, int64_t count, uint32_t errorCode, const String& errorMessage)
 {
-    RefPtr<AsyncRequest> request = m_pendingDatabaseTasks.take(requestID);
-    ASSERT(request);
-
-    request->completeRequest(count, errorCode, errorMessage);
+    m_pendingDatabaseTasks.take(requestID).get().completeRequest(count, errorCode, errorMessage);
 }
 
 void UniqueIDBDatabase::deleteRangeInBackingStore(uint64_t requestID, const IDBIdentifier& transactionIdentifier, int64_t objectStoreID, const IDBKeyRangeData& keyRangeData)
@@ -1060,6 +1042,8 @@ void UniqueIDBDatabase::deleteRangeInBackingStore(uint64_t requestID, const IDBI
     if (!m_backingStore->deleteRange(transactionIdentifier, objectStoreID, keyRangeData)) {
         LOG_ERROR("Failed to delete range from backing store.");
         postMainThreadTask(createAsyncTask(*this, &UniqueIDBDatabase::didDeleteRangeInBackingStore, requestID, IDBDatabaseException::UnknownError, ASCIILiteral("Failed to get count from backing store")));
+
+        return;
     }
 
     m_backingStore->notifyCursorsOfChanges(transactionIdentifier, objectStoreID);
@@ -1069,10 +1053,7 @@ void UniqueIDBDatabase::deleteRangeInBackingStore(uint64_t requestID, const IDBI
 
 void UniqueIDBDatabase::didDeleteRangeInBackingStore(uint64_t requestID, uint32_t errorCode, const String& errorMessage)
 {
-    RefPtr<AsyncRequest> request = m_pendingDatabaseTasks.take(requestID);
-    ASSERT(request);
-
-    request->completeRequest(errorCode, errorMessage);
+    m_pendingDatabaseTasks.take(requestID).get().completeRequest(errorCode, errorMessage);
 }
 
 void UniqueIDBDatabase::didEstablishTransaction(const IDBIdentifier& transactionIdentifier, bool success)
@@ -1144,7 +1125,7 @@ void UniqueIDBDatabase::postMainThreadTask(std::unique_ptr<AsyncTask> task, Data
     if (!m_acceptingNewRequests && taskType == DatabaseTaskType::Normal)
         return;
 
-    MutexLocker locker(m_mainThreadTaskMutex);
+    LockHolder locker(m_mainThreadTaskMutex);
 
     m_mainThreadTasks.append(WTF::move(task));
 
@@ -1162,7 +1143,7 @@ bool UniqueIDBDatabase::performNextMainThreadTask()
 
     std::unique_ptr<AsyncTask> task;
     {
-        MutexLocker locker(m_mainThreadTaskMutex);
+        LockHolder locker(m_mainThreadTaskMutex);
 
         // This database might be shutting down, in which case the task queue might be empty.
         if (m_mainThreadTasks.isEmpty())
@@ -1184,7 +1165,7 @@ void UniqueIDBDatabase::postDatabaseTask(std::unique_ptr<AsyncTask> task, Databa
     if (!m_acceptingNewRequests && taskType == DatabaseTaskType::Normal)
         return;
 
-    MutexLocker locker(m_databaseTaskMutex);
+    LockHolder locker(m_databaseTaskMutex);
 
     m_databaseTasks.append(WTF::move(task));
 
@@ -1205,7 +1186,7 @@ void UniqueIDBDatabase::performNextDatabaseTask()
 
     std::unique_ptr<AsyncTask> task;
     {
-        MutexLocker locker(m_databaseTaskMutex);
+        LockHolder locker(m_databaseTaskMutex);
 
         // This database might be shutting down on the main thread, in which case the task queue might be empty.
         if (m_databaseTasks.isEmpty())

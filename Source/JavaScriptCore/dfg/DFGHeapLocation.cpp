@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2014 Apple Inc. All rights reserved.
+ * Copyright (C) 2014, 2015 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -60,16 +60,12 @@ void printInternal(PrintStream& out, LocationKind kind)
         out.print("InvalidationPointLoc");
         return;
         
-    case IsObjectLoc:
-        out.print("IsObjectLoc");
+    case IsObjectOrNullLoc:
+        out.print("IsObjectOrNullLoc");
         return;
-        
+
     case IsFunctionLoc:
         out.print("IsFunctionLoc");
-        return;
-        
-    case TypeOfLoc:
-        out.print("TypeOfLoc");
         return;
         
     case GetterLoc:
@@ -80,8 +76,12 @@ void printInternal(PrintStream& out, LocationKind kind)
         out.print("SetterLoc");
         return;
         
-    case VariableLoc:
-        out.print("VariableLoc");
+    case StackLoc:
+        out.print("StackLoc");
+        return;
+        
+    case StackPayloadLoc:
+        out.print("StackPayloadLoc");
         return;
         
     case ArrayLengthLoc:
@@ -96,12 +96,12 @@ void printInternal(PrintStream& out, LocationKind kind)
         out.print("CheckHasInstanceLoc");
         return;
         
-    case ClosureRegistersLoc:
-        out.print("ClosureRegistersLoc");
-        return;
-        
     case ClosureVariableLoc:
         out.print("ClosureVariableLoc");
+        return;
+        
+    case DirectArgumentsLoc:
+        out.print("DirectArgumentsLoc");
         return;
         
     case GlobalVariableLoc:
@@ -124,14 +124,6 @@ void printInternal(PrintStream& out, LocationKind kind)
         out.print("InstanceOfLoc");
         return;
         
-    case MyArgumentByValLoc:
-        out.print("MyArgumentByValLoc");
-        return;
-        
-    case MyArgumentsLengthLoc:
-        out.print("MyArgumentsLengthLoc");
-        return;
-        
     case NamedPropertyLoc:
         out.print("NamedPropertyLoc");
         return;
@@ -142,10 +134,6 @@ void printInternal(PrintStream& out, LocationKind kind)
         
     case VarInjectionWatchpointLoc:
         out.print("VarInjectionWatchpointLoc");
-        return;
-        
-    case AllocationProfileWatchpointLoc:
-        out.print("AllocationProfileWatchpointLoc");
         return;
         
     case StructureLoc:

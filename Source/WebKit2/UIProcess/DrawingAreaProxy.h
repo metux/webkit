@@ -89,7 +89,15 @@ public:
     
     virtual void dispatchAfterEnsuringDrawing(std::function<void (CallbackBase::Error)>) { ASSERT_NOT_REACHED(); }
 
-    virtual void hideContentUntilNextUpdate() { ASSERT_NOT_REACHED(); }
+    // Hide the content until the currently pending update arrives.
+    virtual void hideContentUntilPendingUpdate() { ASSERT_NOT_REACHED(); }
+
+    // Hide the content until any update arrives.
+    virtual void hideContentUntilAnyUpdate() { ASSERT_NOT_REACHED(); }
+
+    virtual bool hasVisibleContent() const { return true; }
+
+    virtual void willSendUpdateGeometry() { }
 
 protected:
     explicit DrawingAreaProxy(DrawingAreaType, WebPageProxy&);
@@ -116,7 +124,7 @@ private:
     virtual void updateAcceleratedCompositingMode(uint64_t /* backingStoreStateID */, const LayerTreeContext&) { }
 #if PLATFORM(COCOA)
     virtual void didUpdateGeometry() { }
-    virtual void intrinsicContentSizeDidChange(const WebCore::IntSize& newIntrinsicContentSize) { }
+    virtual void intrinsicContentSizeDidChange(const WebCore::IntSize&) { }
 
 #if PLATFORM(MAC)
     RunLoop::Timer<DrawingAreaProxy> m_exposedRectChangedTimer;

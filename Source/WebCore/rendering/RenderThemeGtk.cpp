@@ -53,22 +53,22 @@
 #include <glib.h>
 #include <gtk/gtk.h>
 #include <wtf/NeverDestroyed.h>
-#include <wtf/gobject/GRefPtr.h>
-#include <wtf/gobject/GUniquePtr.h>
+#include <wtf/glib/GRefPtr.h>
+#include <wtf/glib/GUniquePtr.h>
 #include <wtf/text/CString.h>
 #include <wtf/text/StringBuilder.h>
 
 namespace WebCore {
 
-PassRefPtr<RenderTheme> RenderThemeGtk::create()
+Ref<RenderTheme> RenderThemeGtk::create()
 {
-    return adoptRef(new RenderThemeGtk());
+    return adoptRef(*new RenderThemeGtk());
 }
 
 PassRefPtr<RenderTheme> RenderTheme::themeForPage(Page*)
 {
-    static RenderTheme* rt = RenderThemeGtk::create().leakRef();
-    return rt;
+    static RenderTheme& rt = RenderThemeGtk::create().leakRef();
+    return &rt;
 }
 
 static double getScreenDPI()
@@ -374,18 +374,12 @@ bool RenderThemeGtk::controlSupportsTints(const RenderObject& o) const
     return isEnabled(o);
 }
 
-int RenderThemeGtk::baselinePosition(const RenderObject& renderer) const
+int RenderThemeGtk::baselinePosition(const RenderBox& box) const
 {
-    if (!is<RenderBox>(renderer))
-        return 0;
-
     // FIXME: This strategy is possibly incorrect for the GTK+ port.
-    if (renderer.style().appearance() == CheckboxPart || renderer.style().appearance() == RadioPart) {
-        const auto& box = downcast<RenderBox>(renderer);
+    if (box.style().appearance() == CheckboxPart || box.style().appearance() == RadioPart)
         return box.marginTop() + box.height() - 2;
-    }
-
-    return RenderTheme::baselinePosition(renderer);
+    return RenderTheme::baselinePosition(box);
 }
 
 static GtkTextDirection gtkTextDirection(TextDirection direction)
@@ -866,7 +860,7 @@ bool RenderThemeGtk::paintMenuList(const RenderObject& renderObject, const Paint
     return false;
 }
 
-bool RenderThemeGtk::paintMenuListButtonDecorations(const RenderObject& object, const PaintInfo& info, const FloatRect& rect)
+bool RenderThemeGtk::paintMenuListButtonDecorations(const RenderBox& object, const PaintInfo& info, const FloatRect& rect)
 {
     return paintMenuList(object, info, rect);
 }

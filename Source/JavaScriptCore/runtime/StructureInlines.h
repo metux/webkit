@@ -49,10 +49,10 @@ inline Structure* Structure::createStructure(VM& vm)
     return structure;
 }
 
-inline Structure* Structure::create(VM& vm, Structure* structure)
+inline Structure* Structure::create(VM& vm, Structure* structure, DeferredStructureTransitionWatchpointFire* deferred)
 {
     ASSERT(vm.structureStructure);
-    Structure* newStructure = new (NotNull, allocateCell<Structure>(vm.heap)) Structure(vm, structure);
+    Structure* newStructure = new (NotNull, allocateCell<Structure>(vm.heap)) Structure(vm, structure, deferred);
     newStructure->finishCreation(vm);
     return newStructure;
 }
@@ -133,7 +133,7 @@ void Structure::forEachPropertyConcurrently(const Functor& functor)
     }
 }
 
-inline PropertyOffset Structure::getConcurrently(AtomicStringImpl* uid)
+inline PropertyOffset Structure::getConcurrently(UniquedStringImpl* uid)
 {
     unsigned attributesIgnored;
     return getConcurrently(uid, attributesIgnored);

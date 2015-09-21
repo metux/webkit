@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013 Apple Inc. All rights reserved.
+ * Copyright (C) 2013, 2015 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -23,143 +23,163 @@
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-WebInspector.ConsolePrompt = function(delegate, mimeType, element)
+WebInspector.ConsolePrompt = class ConsolePrompt extends WebInspector.Object
 {
-    WebInspector.Object.call(this);
+    constructor(delegate, mimeType, element)
+    {
+        super();
 
-    mimeType = parseMIMEType(mimeType).type;
+        mimeType = parseMIMEType(mimeType).type;
 
-    this._element = element || document.createElement("div");
-    this._element.classList.add(WebInspector.ConsolePrompt.StyleClassName);
-    this._element.classList.add(WebInspector.SyntaxHighlightedStyleClassName);
+        this._element = element || document.createElement("div");
+        this._element.classList.add("console-prompt", WebInspector.SyntaxHighlightedStyleClassName);
 
-    this._delegate = delegate || null;
+        this._delegate = delegate || null;
 
-    this._codeMirror = CodeMirror(this.element, {
-        lineWrapping: true,
-        mode: mimeType,
-        indentWithTabs: true,
-        indentUnit: 4,
-        matchBrackets: true
-    });
+        this._codeMirror = CodeMirror(this.element, {
+            lineWrapping: true,
+            mode: mimeType,
+            indentWithTabs: true,
+            indentUnit: 4,
+            matchBrackets: true
+        });
 
-    var keyMap = {
-        "Up": this._handlePreviousKey.bind(this),
-        "Down": this._handleNextKey.bind(this),
-        "Ctrl-P": this._handlePreviousKey.bind(this),
-        "Ctrl-N": this._handleNextKey.bind(this),
-        "Enter": this._handleEnterKey.bind(this),
-        "Cmd-Enter": this._handleCommandEnterKey.bind(this),
-        "Esc": this._handleEscapeKey.bind(this)
-    };
+        var keyMap = {
+            "Up": this._handlePreviousKey.bind(this),
+            "Down": this._handleNextKey.bind(this),
+            "Ctrl-P": this._handlePreviousKey.bind(this),
+            "Ctrl-N": this._handleNextKey.bind(this),
+            "Enter": this._handleEnterKey.bind(this),
+            "Cmd-Enter": this._handleCommandEnterKey.bind(this),
+            "Tab": this._handleTabKey.bind(this),
+            "Esc": this._handleEscapeKey.bind(this)
+        };
 
-    this._codeMirror.addKeyMap(keyMap);
+        this._codeMirror.addKeyMap(keyMap);
 
-    this._completionController = new WebInspector.CodeMirrorCompletionController(this._codeMirror, this);
-    this._completionController.addExtendedCompletionProvider("javascript", WebInspector.javaScriptRuntimeCompletionProvider);
+        this._completionController = new WebInspector.CodeMirrorCompletionController(this._codeMirror, this);
+        this._completionController.addExtendedCompletionProvider("javascript", WebInspector.javaScriptRuntimeCompletionProvider);
 
-    this._history = [{}];
-    this._historyIndex = 0;
-};
-
-WebInspector.ConsolePrompt.StyleClassName = "console-prompt";
-WebInspector.ConsolePrompt.MaximumHistorySize = 30;
-
-WebInspector.ConsolePrompt.prototype = {
-    constructor: WebInspector.ConsolePrompt,
+        this._history = [{}];
+        this._historyIndex = 0;
+    }
 
     // Public
 
     get element()
     {
         return this._element;
-    },
+    }
 
     get delegate()
     {
         return this._delegate;
-    },
+    }
 
     set delegate(delegate)
     {
         this._delegate = delegate || null;
-    },
+    }
 
     set escapeKeyHandlerWhenEmpty(handler)
     {
         this._escapeKeyHandlerWhenEmpty = handler;
-    },
+    }
 
     get text()
     {
         return this._codeMirror.getValue();
-    },
+    }
 
     set text(text)
     {
         this._codeMirror.setValue(text || "");
         this._codeMirror.clearHistory();
         this._codeMirror.markClean();
-    },
+    }
 
     get history()
     {
         this._history[this._historyIndex] = this._historyEntryForCurrentText();
         return this._history;
-    },
+    }
 
     set history(history)
     {
         this._history = history instanceof Array ? history.slice(0, WebInspector.ConsolePrompt.MaximumHistorySize) : [{}];
         this._historyIndex = 0;
         this._restoreHistoryEntry(0);
-    },
+    }
 
     get focused()
     {
         return this._codeMirror.getWrapperElement().classList.contains("CodeMirror-focused");
-    },
+    }
 
-    focus: function()
+    focus()
     {
         this._codeMirror.focus();
-    },
+    }
 
-    shown: function()
+    shown()
     {
         this._codeMirror.refresh();
-    },
+    }
 
-    updateLayout: function()
+    updateLayout()
     {
         this._codeMirror.refresh();
-    },
+    }
 
-    updateCompletions: function(completions, implicitSuffix)
+    updateCompletions(completions, implicitSuffix)
     {
         this._completionController.updateCompletions(completions, implicitSuffix);
-    },
+    }
+
+    pushHistoryItem(text)
+    {
+        this._commitHistoryEntry({text});
+    }
 
     // Protected
 
-    completionControllerCompletionsNeeded: function(completionController, prefix, defaultCompletions, base, suffix, forced)
+    completionControllerCompletionsNeeded(completionController, prefix, defaultCompletions, base, suffix, forced)
     {
         if (this.delegate && typeof this.delegate.consolePromptCompletionsNeeded === "function")
             this.delegate.consolePromptCompletionsNeeded(this, defaultCompletions, base, prefix, suffix, forced);
         else
             this._completionController.updateCompletions(defaultCompletions);
-    },
+    }
 
-    completionControllerShouldAllowEscapeCompletion: function(completionController)
+    completionControllerShouldAllowEscapeCompletion(completionController)
     {
         // Only allow escape to complete if there is text in the prompt. Otherwise allow it to pass through
         // so escape to toggle the quick console still works.
         return !!this.text;
-    },
+    }
 
     // Private
 
-    _handleEscapeKey: function(codeMirror)
+    _handleTabKey(codeMirror)
+    {
+        var cursor = codeMirror.getCursor();
+        var line = codeMirror.getLine(cursor.line);
+
+        if (!line.trim().length)
+            return CodeMirror.Pass;
+
+        var firstNonSpace = line.search(/[^\s]/);
+
+        if (cursor.ch <= firstNonSpace)
+            return CodeMirror.Pass;
+
+        this._completionController.completeAtCurrentPositionIfNeeded().then(function(result) {
+            if (result === WebInspector.CodeMirrorCompletionController.UpdatePromise.NoCompletionsFound)
+                InspectorFrontendHost.beep();
+        });
+    }
+
+    _handleEscapeKey(codeMirror)
     {
         if (this.text)
             return CodeMirror.Pass;
@@ -168,9 +188,9 @@ WebInspector.ConsolePrompt.prototype = {
             return CodeMirror.Pass;
 
         this._escapeKeyHandlerWhenEmpty();
-    },
+    }
 
-    _handlePreviousKey: function(codeMirror)
+    _handlePreviousKey(codeMirror)
     {
         if (this._codeMirror.somethingSelected())
             return CodeMirror.Pass;
@@ -188,9 +208,9 @@ WebInspector.ConsolePrompt.prototype = {
         ++this._historyIndex;
 
         this._restoreHistoryEntry(this._historyIndex);
-    },
+    }
 
-    _handleNextKey: function(codeMirror)
+    _handleNextKey(codeMirror)
     {
         if (this._codeMirror.somethingSelected())
             return CodeMirror.Pass;
@@ -208,9 +228,9 @@ WebInspector.ConsolePrompt.prototype = {
         --this._historyIndex;
 
         this._restoreHistoryEntry(this._historyIndex);
-    },
+    }
 
-    _handleEnterKey: function(codeMirror, forceCommit)
+    _handleEnterKey(codeMirror, forceCommit)
     {
         var currentText = this.text;
 
@@ -239,23 +259,7 @@ WebInspector.ConsolePrompt.prototype = {
                 return;
             }
 
-            var historyEntry = this._historyEntryForCurrentText();
-
-            // Replace the previous entry if it does not have text or if the text is the same.
-            if (this._history[1] && (!this._history[1].text || this._history[1].text === historyEntry.text)) {
-                this._history[1] = historyEntry;
-                this._history[0] = {};
-            } else {
-                // Replace the first history entry and push a new empty one.
-                this._history[0] = historyEntry;
-                this._history.unshift({});
-
-                // Trim the history length if needed.
-                if (this._history.length > WebInspector.ConsolePrompt.MaximumHistorySize)
-                    this._history = this._history.slice(0, WebInspector.ConsolePrompt.MaximumHistorySize);
-            }
-
-            this._historyIndex = 0;
+            this._commitHistoryEntry(this._historyEntryForCurrentText());
 
             this._codeMirror.setValue("");
             this._codeMirror.clearHistory();
@@ -273,14 +277,33 @@ WebInspector.ConsolePrompt.prototype = {
         }
 
         commitTextOrInsertNewLine.call(this, true);
-    },
+    }
 
-    _handleCommandEnterKey: function(codeMirror)
+    _commitHistoryEntry(historyEntry)
+    {
+        // Replace the previous entry if it does not have text or if the text is the same.
+        if (this._history[1] && (!this._history[1].text || this._history[1].text === historyEntry.text)) {
+            this._history[1] = historyEntry;
+            this._history[0] = {};
+        } else {
+            // Replace the first history entry and push a new empty one.
+            this._history[0] = historyEntry;
+            this._history.unshift({});
+
+            // Trim the history length if needed.
+            if (this._history.length > WebInspector.ConsolePrompt.MaximumHistorySize)
+                this._history = this._history.slice(0, WebInspector.ConsolePrompt.MaximumHistorySize);
+        }
+
+        this._historyIndex = 0;
+    }
+
+    _handleCommandEnterKey(codeMirror)
     {
         this._handleEnterKey(codeMirror, true);
-    },
+    }
 
-    _restoreHistoryEntry: function(index)
+    _restoreHistoryEntry(index)
     {
         var historyEntry = this._history[index];
 
@@ -292,14 +315,14 @@ WebInspector.ConsolePrompt.prototype = {
             this._codeMirror.clearHistory();
 
         this._codeMirror.setCursor(historyEntry.cursor || {line: 0});
-    },
+    }
 
-    _historyEntryForCurrentText: function()
+    _historyEntryForCurrentText()
     {
         return {text: this.text, undoHistory: this._codeMirror.getHistory(), cursor: this._codeMirror.getCursor()};
-    },
+    }
 
-    _rememberCurrentTextInHistory: function()
+    _rememberCurrentTextInHistory()
     {
         this._history[this._historyIndex] = this._historyEntryForCurrentText();
 
@@ -308,4 +331,4 @@ WebInspector.ConsolePrompt.prototype = {
     }
 };
 
-WebInspector.ConsolePrompt.prototype.__proto__ = WebInspector.Object.prototype;
+WebInspector.ConsolePrompt.MaximumHistorySize = 30;

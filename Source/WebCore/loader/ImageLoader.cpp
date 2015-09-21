@@ -118,21 +118,21 @@ ImageLoader::~ImageLoader()
         errorEventSender().cancelEvent(*this);
 }
 
-void ImageLoader::setImage(CachedImage* newImage)
+void ImageLoader::clearImage()
 {
-    setImageWithoutConsideringPendingLoadEvent(newImage);
+    clearImageWithoutConsideringPendingLoadEvent();
 
     // Only consider updating the protection ref-count of the Element immediately before returning
     // from this function as doing so might result in the destruction of this ImageLoader.
     updatedHasPendingEvent();
 }
 
-void ImageLoader::setImageWithoutConsideringPendingLoadEvent(CachedImage* newImage)
+void ImageLoader::clearImageWithoutConsideringPendingLoadEvent()
 {
     ASSERT(m_failedLoadURL.isEmpty());
     CachedImage* oldImage = m_image.get();
-    if (newImage != oldImage) {
-        m_image = newImage;
+    if (oldImage) {
+        m_image = nullptr;
         if (m_hasPendingBeforeLoadEvent) {
             beforeLoadEventSender().cancelEvent(*this);
             m_hasPendingBeforeLoadEvent = false;
@@ -146,8 +146,6 @@ void ImageLoader::setImageWithoutConsideringPendingLoadEvent(CachedImage* newIma
             m_hasPendingErrorEvent = false;
         }
         m_imageComplete = true;
-        if (newImage)
-            newImage->addClient(this);
         if (oldImage)
             oldImage->removeClient(this);
     }
@@ -174,7 +172,10 @@ void ImageLoader::updateFromElement()
     // an empty string.
     CachedResourceHandle<CachedImage> newImage = 0;
     if (!attr.isNull() && !stripLeadingAndTrailingHTMLSpaces(attr).isEmpty()) {
-        CachedResourceRequest request(ResourceRequest(document.completeURL(sourceURI(attr))));
+        ResourceLoaderOptions options = CachedResourceLoader::defaultCachedResourceOptions();
+        options.setContentSecurityPolicyImposition(element().isInUserAgentShadowTree() ? ContentSecurityPolicyImposition::SkipPolicyCheck : ContentSecurityPolicyImposition::DoPolicyCheck);
+
+        CachedResourceRequest request(ResourceRequest(document.completeURL(sourceURI(attr))), options);
         request.setInitiator(&element());
 
         String crossOriginMode = element().fastGetAttribute(HTMLNames::crossoriginAttr);
@@ -283,7 +284,7 @@ void ImageLoader::notifyFinished(CachedResource* resource)
         return;
 
     if (element().fastHasAttribute(HTMLNames::crossoriginAttr) && !resource->passesSameOriginPolicyCheck(*element().document().securityOrigin())) {
-        setImageWithoutConsideringPendingLoadEvent(0);
+        clearImageWithoutConsideringPendingLoadEvent();
 
         m_hasPendingErrorEvent = true;
         errorEventSender().dispatchEventSoon(*this);
@@ -461,7 +462,7 @@ void ImageLoader::dispatchPendingErrorEvents()
 void ImageLoader::elementDidMoveToNewDocument()
 {
     clearFailedLoadURL();
-    setImage(0);
+    clearImage();
 }
 
 inline void ImageLoader::clearFailedLoadURL()

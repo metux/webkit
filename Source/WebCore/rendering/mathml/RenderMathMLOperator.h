@@ -74,7 +74,7 @@ public:
 
     virtual void updateStyle() override final;
 
-    virtual void paint(PaintInfo&, const LayoutPoint&);
+    virtual void paint(PaintInfo&, const LayoutPoint&) override;
 
     void updateTokenContent(const String& operatorString);
     virtual void updateTokenContent() override final;
@@ -154,7 +154,7 @@ private:
     bool isInvisibleOperator() const { return 0x2061 <= m_textContent && m_textContent <= 0x2064; }
     virtual bool isChildAllowed(const RenderObject&, const RenderStyle&) const override;
 
-    virtual int firstLineBaseline() const override;
+    virtual Optional<int> firstLineBaseline() const override;
     virtual RenderMathMLOperator* unembellishedOperator() override { return this; }
     void rebuildTokenContent(const String& operatorString);
     virtual void updateFromElement() override;

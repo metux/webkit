@@ -186,6 +186,16 @@ threedshadow
 window
 windowframe
 windowtext
+-apple-wireless-playback-target-active
+-apple-system-blue
+-apple-system-brown
+-apple-system-gray
+-apple-system-green
+-apple-system-orange
+-apple-system-pink
+-apple-system-purple
+-apple-system-red
+-apple-system-yellow
 -webkit-focus-ring-color
 currentcolor
 //
@@ -536,6 +546,7 @@ flex-end
 // center
 space-between
 space-around
+space-evenly
 // stretch
 
 // CSS_PROP_ALIGN_ITEMS / CSS_PROP_ALIGN_SELF
@@ -543,19 +554,25 @@ space-around
 // flex-end
 // center
 // baseline
+last-baseline
 // stretch
 
 // CSS_PROP_JUSTIFY_CONTENT
+// start
+// end
 // flex-start
 // flex-end
 // center
 // space-between
 // space-around
+// space-evenly
+// stretch
 
-// CSS_PROP_JUSTIFY_SELF
+// CSS_PROP_JUSTIFY_ITEMS / CSS_PROP_JUSTIFY_SELF
 // auto
 // stretch
 // baseline
+// last-baseline
 // center
 // start
 // end
@@ -567,6 +584,7 @@ self-end
 // right
 true
 safe
+legacy
 
 // CSS_PROP_FLEX_FLOW
 row
@@ -663,6 +681,7 @@ skip-white-space
 // CSS_PROP_WORD_BREAK
 //
 break-all
+keep-all
 
 //
 // CSS_PROP_WORD_WRAP
@@ -696,28 +715,30 @@ default-button
 inner-spin-button
 listbox
 listitem
+media-controls-background
+media-controls-dark-bar-background
+media-controls-fullscreen-background
+media-controls-light-bar-background
+media-current-time-display
 media-enter-fullscreen-button
 media-exit-fullscreen-button
 media-fullscreen-volume-slider
 media-fullscreen-volume-slider-thumb
 media-mute-button
-media-play-button
 media-overlay-play-button
+media-play-button
+media-return-to-realtime-button
+media-rewind-button
 media-seek-back-button
 media-seek-forward-button
-media-rewind-button
-media-return-to-realtime-button
-media-toggle-closed-captions-button
 media-slider
 media-sliderthumb
-media-volume-slider-container
-media-volume-slider
-media-volume-sliderthumb
-media-volume-slider-mute-button
-media-controls-background
-media-controls-fullscreen-background
-media-current-time-display
 media-time-remaining-display
+media-toggle-closed-captions-button
+media-volume-slider
+media-volume-slider-container
+media-volume-slider-mute-button
+media-volume-sliderthumb
 menulist
 menulist-button
 menulist-text
@@ -745,7 +766,9 @@ rating-level-indicator
 image-controls-button
 #endif
 textarea
-// An appearance value that should not be accepted by the parser:
+#if defined(ENABLE_ATTACHMENT_ELEMENT) && ENABLE_ATTACHMENT_ELEMENT
+attachment
+#endif
 caps-lock-indicator
 
 //
@@ -896,10 +919,6 @@ geometricPrecision
 // -webkit-color-adjust
 economy
 exact
-
-// -webkit-color-correction
-//default
-sRGB
 
 #if defined(ENABLE_VIEW_MODE_CSS_MEDIA) && ENABLE_VIEW_MODE_CSS_MEDIA
 // (-webkit-view-mode:) media feature:
@@ -1052,6 +1071,8 @@ hue
 saturation
 color
 luminosity
+// plus-darker
+// plus-lighter
 
 // isolation
 // auto
@@ -1097,3 +1118,12 @@ balance
 // -webkit-aspect-ratio
 from-dimensions
 from-intrinsic
+
+#if defined(ENABLE_CSS_TRAILING_WORD) && ENABLE_CSS_TRAILING_WORD
+// -apple-trailing-word
+-webkit-partially-balanced
+#endif
+
+// font-synthesis
+weight
+style

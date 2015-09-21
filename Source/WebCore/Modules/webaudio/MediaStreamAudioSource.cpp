@@ -34,17 +34,17 @@
 
 namespace WebCore {
 
-RefPtr<MediaStreamAudioSource> MediaStreamAudioSource::create()
+Ref<MediaStreamAudioSource> MediaStreamAudioSource::create()
 {
-    return adoptRef(new MediaStreamAudioSource());
+    return adoptRef(*new MediaStreamAudioSource());
 }
 
 MediaStreamAudioSource::MediaStreamAudioSource()
-    : MediaStreamSource(ASCIILiteral("WebAudio-") + createCanonicalUUIDString(), MediaStreamSource::Audio, "MediaStreamAudioDestinationNode")
+    : RealtimeMediaSource(ASCIILiteral("WebAudio-") + createCanonicalUUIDString(), RealtimeMediaSource::Audio, "MediaStreamAudioDestinationNode")
 {
 }
 
-RefPtr<MediaStreamSourceCapabilities> MediaStreamAudioSource::capabilities() const
+RefPtr<RealtimeMediaSourceCapabilities> MediaStreamAudioSource::capabilities() const
 {
     // FIXME: implement this.
     // https://bugs.webkit.org/show_bug.cgi?id=122430
@@ -52,7 +52,7 @@ RefPtr<MediaStreamSourceCapabilities> MediaStreamAudioSource::capabilities() con
     return nullptr;
 }
 
-const MediaStreamSourceStates& MediaStreamAudioSource::states()
+const RealtimeMediaSourceStates& MediaStreamAudioSource::states()
 {
     // FIXME: implement this.
     // https://bugs.webkit.org/show_bug.cgi?id=122430
@@ -63,13 +63,13 @@ const MediaStreamSourceStates& MediaStreamAudioSource::states()
 
 void MediaStreamAudioSource::addAudioConsumer(PassRefPtr<AudioDestinationConsumer> consumer)
 {
-    MutexLocker locker(m_audioConsumersLock);
+    LockHolder locker(m_audioConsumersLock);
     m_audioConsumers.append(consumer);
 }
 
 bool MediaStreamAudioSource::removeAudioConsumer(AudioDestinationConsumer* consumer)
 {
-    MutexLocker locker(m_audioConsumersLock);
+    LockHolder locker(m_audioConsumersLock);
     size_t pos = m_audioConsumers.find(consumer);
     if (pos != notFound) {
         m_audioConsumers.remove(pos);
@@ -80,16 +80,16 @@ bool MediaStreamAudioSource::removeAudioConsumer(AudioDestinationConsumer* consu
 
 void MediaStreamAudioSource::setAudioFormat(size_t numberOfChannels, float sampleRate)
 {
-    MutexLocker locker(m_audioConsumersLock);
-    for (Vector<RefPtr<AudioDestinationConsumer>>::iterator it = m_audioConsumers.begin(); it != m_audioConsumers.end(); ++it)
-        (*it)->setFormat(numberOfChannels, sampleRate);
+    LockHolder locker(m_audioConsumersLock);
+    for (auto& consumer : m_audioConsumers)
+        consumer->setFormat(numberOfChannels, sampleRate);
 }
 
 void MediaStreamAudioSource::consumeAudio(AudioBus* bus, size_t numberOfFrames)
 {
-    MutexLocker locker(m_audioConsumersLock);
-    for (Vector<RefPtr<AudioDestinationConsumer>>::iterator it = m_audioConsumers.begin(); it != m_audioConsumers.end(); ++it)
-        (*it)->consumeAudio(bus, numberOfFrames);
+    LockHolder locker(m_audioConsumersLock);
+    for (auto& consumer : m_audioConsumers)
+        consumer->consumeAudio(bus, numberOfFrames);
 }
 
 } // namespace WebCore

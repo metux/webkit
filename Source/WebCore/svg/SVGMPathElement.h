@@ -31,9 +31,7 @@ namespace WebCore {
     
 class SVGPathElement;
 
-class SVGMPathElement final : public SVGElement,
-                              public SVGURIReference,
-                              public SVGExternalResourcesRequired {
+class SVGMPathElement final : public SVGElement, public SVGURIReference, public SVGExternalResourcesRequired {
 public:
     static Ref<SVGMPathElement> create(const QualifiedName&, Document&);
 
@@ -43,9 +41,6 @@ public:
 
     void targetPathChanged();
 
-protected:
-    virtual void didNotifySubtreeInsertions() override;
-
 private:
     SVGMPathElement(const QualifiedName&, Document&);
 
@@ -54,17 +49,17 @@ private:
     virtual InsertionNotificationRequest insertedInto(ContainerNode&) override;
     virtual void removedFrom(ContainerNode&) override;
 
-    bool isSupportedAttribute(const QualifiedName&);
     virtual void parseAttribute(const QualifiedName&, const AtomicString&) override;
     virtual void svgAttributeChanged(const QualifiedName&) override;
 
     virtual bool rendererIsNeeded(const RenderStyle&) override { return false; }
+    virtual void finishedInsertingSubtree() override;
 
     void notifyParentOfPathChange(ContainerNode*);
 
     BEGIN_DECLARE_ANIMATED_PROPERTIES(SVGMPathElement)
-        DECLARE_ANIMATED_STRING(Href, href)
-        DECLARE_ANIMATED_BOOLEAN(ExternalResourcesRequired, externalResourcesRequired)
+        DECLARE_ANIMATED_STRING_OVERRIDE(Href, href)
+        DECLARE_ANIMATED_BOOLEAN_OVERRIDE(ExternalResourcesRequired, externalResourcesRequired)
     END_DECLARE_ANIMATED_PROPERTIES
 };
 

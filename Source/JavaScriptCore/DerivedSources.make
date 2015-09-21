@@ -1,4 +1,4 @@
-# Copyright (C) 2006, 2007, 2008, 2009, 2011, 2013 Apple Inc. All rights reserved.
+# Copyright (C) 2006, 2007, 2008, 2009, 2011, 2013, 2015 Apple Inc. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -36,11 +36,17 @@ VPATH = \
 .PHONY : all
 all : \
     ArrayConstructor.lut.h \
-    ArrayPrototype.lut.h \
+    ArrayIteratorPrototype.lut.h \
     BooleanPrototype.lut.h \
     DateConstructor.lut.h \
     DatePrototype.lut.h \
     ErrorPrototype.lut.h \
+    IntlCollatorConstructor.lut.h \
+    IntlCollatorPrototype.lut.h \
+    IntlDateTimeFormatConstructor.lut.h \
+    IntlDateTimeFormatPrototype.lut.h \
+    IntlNumberFormatConstructor.lut.h \
+    IntlNumberFormatPrototype.lut.h \
     JSDataViewPrototype.lut.h \
     JSONObject.lut.h \
     JSGlobalObject.lut.h \
@@ -51,11 +57,13 @@ all : \
     NumberConstructor.lut.h \
     NumberPrototype.lut.h \
     ObjectConstructor.lut.h \
+    ReflectObject.lut.h \
     RegExpConstructor.lut.h \
     RegExpPrototype.lut.h \
     RegExpJitTables.h \
-    RegExpObject.lut.h \
     StringConstructor.lut.h \
+    StringIteratorPrototype.lut.h \
+    SymbolConstructor.lut.h \
     SymbolPrototype.lut.h \
     udis86_itab.h \
     Bytecodes.h \
@@ -66,28 +74,28 @@ all : \
 # builtin functions
 .PHONY: JSCBuiltins
 
-# Windows has specific needs for specifying the path to its interpreters
+PYTHON = python
+PERL = perl
+
 ifeq ($(OS),Windows_NT)
-    PYTHON = /usr/bin/python
-    PERL = /usr/bin/perl
+    DELETE = cmd //C del
 else
-    PYTHON = python
-    PERL = perl
+    DELETE = rm -f
 endif
 # --------
 
 JSCBuiltins: $(JavaScriptCore)/generate-js-builtins JSCBuiltins.h JSCBuiltins.cpp
-JSCBuiltins.h: $(JavaScriptCore)/generate-js-builtins $(JavaScriptCore)/builtins/*.js
-	$(PYTHON) $^ $@
+JSCBuiltins.h: $(JavaScriptCore)/generate-js-builtins $(JavaScriptCore)/builtins
+	$(PYTHON) $(JavaScriptCore)/generate-js-builtins --input-directory $(JavaScriptCore)/builtins --output $@
 																				 
 JSCBuiltins.cpp: JSCBuiltins.h
 
 # lookup tables for classes
 
 %.lut.h: create_hash_table %.cpp
-	$^ -i > $@
+	$(PERL) $^ -i > $@
 Lexer.lut.h: create_hash_table Keywords.table
-	$^ > $@
+	$(PERL) $^ > $@
 
 # character tables for Yarr
 
@@ -100,7 +108,7 @@ KeywordLookup.h: KeywordLookupGenerator.py Keywords.table
 # udis86 instruction tables
 
 udis86_itab.h: $(JavaScriptCore)/disassembler/udis86/itab.py $(JavaScriptCore)/disassembler/udis86/optable.xml
-	(PYTHONPATH=$(JavaScriptCore)/disassembler/udis86 $(PYTHON) $(JavaScriptCore)/disassembler/udis86/itab.py $(JavaScriptCore)/disassembler/udis86/optable.xml || exit 1)
+	$(PYTHON) $(JavaScriptCore)/disassembler/udis86/itab.py $(JavaScriptCore)/disassembler/udis86/optable.xml
 
 # Bytecode files
 
@@ -168,8 +176,8 @@ all : \
 # adding, modifying, or removing domains will trigger regeneration of inspector files.
 
 .PHONY: force
-EnabledInspectorDomains : force
-	echo '$(INSPECTOR_DOMAINS)' | cmp -s - $@ || echo '$(INSPECTOR_DOMAINS)' > $@
+EnabledInspectorDomains : $(JavaScriptCore)/UpdateContents.py force
+	$(PYTHON) $(JavaScriptCore)/UpdateContents.py '$(INSPECTOR_DOMAINS)' $@
 
 CombinedDomains.json : inspector/scripts/generate-combined-inspector-json.py $(INSPECTOR_DOMAINS) EnabledInspectorDomains
 	$(PYTHON) $(JavaScriptCore)/inspector/scripts/generate-combined-inspector-json.py $(INSPECTOR_DOMAINS) > ./CombinedDomains.json
@@ -182,7 +190,7 @@ InjectedScriptSource.h : inspector/InjectedScriptSource.js $(JavaScriptCore)/ins
 	echo "//# sourceURL=__WebInspectorInjectedScript__" > ./InjectedScriptSource.min.js
 	$(PYTHON) $(JavaScriptCore)/inspector/scripts/jsmin.py < $(JavaScriptCore)/inspector/InjectedScriptSource.js >> ./InjectedScriptSource.min.js
 	$(PERL) $(JavaScriptCore)/inspector/scripts/xxd.pl InjectedScriptSource_js ./InjectedScriptSource.min.js InjectedScriptSource.h
-	rm -f ./InjectedScriptSource.min.js
+	$(DELETE) InjectedScriptSource.min.js
 
 # Web Replay inputs generator
 

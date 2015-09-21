@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013, 2014 Apple Inc. All rights reserved.
+ * Copyright (C) 2013-2015 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -148,7 +148,6 @@ public:
     
 private:
     void clobberWorld(const CodeOrigin&, unsigned indexInBlock);
-    void clobberCapturedVars(const CodeOrigin&);
     
     template<typename Functor>
     void forAllValues(unsigned indexInBlock, Functor&);
@@ -169,7 +168,7 @@ private:
     {
         AbstractValue& abstractValue = forNode(node);
         abstractValue.set(m_graph, value, m_state.structureClobberState());
-        abstractValue.fixTypeForRepresentation(node);
+        abstractValue.fixTypeForRepresentation(m_graph, node);
     }
     
     void setConstant(Node* node, FrozenValue value)

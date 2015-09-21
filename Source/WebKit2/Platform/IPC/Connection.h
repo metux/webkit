@@ -33,11 +33,13 @@
 #include "MessageEncoder.h"
 #include "MessageReceiver.h"
 #include "ProcessType.h"
-#include "WorkQueue.h"
 #include <atomic>
-#include <condition_variable>
+#include <wtf/Condition.h>
 #include <wtf/Deque.h>
 #include <wtf/Forward.h>
+#include <wtf/HashMap.h>
+#include <wtf/Lock.h>
+#include <wtf/WorkQueue.h>
 #include <wtf/text/CString.h>
 
 #if OS(DARWIN)
@@ -49,10 +51,6 @@
 #if PLATFORM(GTK) || PLATFORM(EFL)
 #include "PlatformProcessIdentifier.h"
 #endif
-
-namespace WTF {
-class RunLoop;
-}
 
 namespace IPC {
 
@@ -128,7 +126,7 @@ public:
     pid_t remoteProcessID() const;
 #elif USE(UNIX_DOMAIN_SOCKETS)
     typedef int Identifier;
-    static bool identifierIsNull(Identifier identifier) { return !identifier; }
+    static bool identifierIsNull(Identifier identifier) { return identifier == -1; }
 
     struct SocketPair {
         int client;
@@ -143,13 +141,13 @@ public:
     static Connection::SocketPair createPlatformConnection(unsigned options = SetCloexecOnClient | SetCloexecOnServer);
 #endif
 
-    static Ref<Connection> createServerConnection(Identifier, Client&, WTF::RunLoop& clientRunLoop);
-    static Ref<Connection> createClientConnection(Identifier, Client&, WTF::RunLoop& clientRunLoop);
+    static Ref<Connection> createServerConnection(Identifier, Client&);
+    static Ref<Connection> createClientConnection(Identifier, Client&);
     ~Connection();
 
     Client* client() const { return m_client; }
 
-#if PLATFORM(MAC)
+#if PLATFORM(MAC) && __MAC_OS_X_VERSION_MIN_REQUIRED <= 101000
     void setShouldCloseConnectionOnMachExceptions();
 #endif
 
@@ -199,8 +197,16 @@ public:
 
     bool isValid() const { return m_client; }
 
+#if HAVE(QOS_CLASSES)
+    void setShouldBoostMainThreadOnSyncMessage(bool b) { m_shouldBoostMainThreadOnSyncMessage = b; }
+#endif
+
+    uint64_t installIncomingSyncMessageCallback(std::function<void ()>);
+    void uninstallIncomingSyncMessageCallback(uint64_t);
+    bool hasIncomingSyncMessage();
+
 private:
-    Connection(Identifier, bool isServer, Client&, WTF::RunLoop& clientRunLoop);
+    Connection(Identifier, bool isServer, Client&);
     void platformInitialize(Identifier);
     void platformInvalidate();
     
@@ -212,7 +218,7 @@ private:
     void processIncomingMessage(std::unique_ptr<MessageDecoder>);
     void processIncomingSyncReply(std::unique_ptr<MessageDecoder>);
 
-    void dispatchWorkQueueMessageReceiverMessage(WorkQueueMessageReceiver*, MessageDecoder*);
+    void dispatchWorkQueueMessageReceiverMessage(WorkQueueMessageReceiver&, MessageDecoder&);
 
     bool canSendOutgoingMessages() const;
     bool platformCanSendOutgoingMessages() const;
@@ -244,7 +250,6 @@ private:
 
     bool m_isConnected;
     Ref<WorkQueue> m_connectionQueue;
-    WTF::RunLoop& m_clientRunLoop;
 
     HashMap<StringReference, std::pair<RefPtr<WorkQueue>, RefPtr<WorkQueueMessageReceiver>>> m_workQueueMessageReceivers;
 
@@ -254,15 +259,15 @@ private:
     bool m_didReceiveInvalidMessage;
 
     // Incoming messages.
-    std::mutex m_incomingMessagesMutex;
+    Lock m_incomingMessagesMutex;
     Deque<std::unique_ptr<MessageDecoder>> m_incomingMessages;
 
     // Outgoing messages.
-    std::mutex m_outgoingMessagesMutex;
+    Lock m_outgoingMessagesMutex;
     Deque<std::unique_ptr<MessageEncoder>> m_outgoingMessages;
     
-    std::condition_variable m_waitForMessageCondition;
-    std::mutex m_waitForMessageMutex;
+    Condition m_waitForMessageCondition;
+    Lock m_waitForMessageMutex;
 
     WaitForMessageState* m_waitingForMessage;
 
@@ -293,15 +298,24 @@ private:
 
     class SyncMessageState;
     friend class SyncMessageState;
-    RefPtr<SyncMessageState> m_syncMessageState;
 
-    Mutex m_syncReplyStateMutex;
+    Lock m_syncReplyStateMutex;
     bool m_shouldWaitForSyncReplies;
     Vector<PendingSyncReply> m_pendingSyncReplies;
 
     class SecondaryThreadPendingSyncReply;
     typedef HashMap<uint64_t, SecondaryThreadPendingSyncReply*> SecondaryThreadPendingSyncReplyMap;
     SecondaryThreadPendingSyncReplyMap m_secondaryThreadPendingSyncReplyMap;
+
+    Lock m_incomingSyncMessageCallbackMutex;
+    HashMap<uint64_t, std::function<void ()>> m_incomingSyncMessageCallbacks;
+    RefPtr<WorkQueue> m_incomingSyncMessageCallbackQueue;
+    uint64_t m_nextIncomingSyncMessageCallbackID { 0 };
+
+#if HAVE(QOS_CLASSES)
+    pthread_t m_mainThread { 0 };
+    bool m_shouldBoostMainThreadOnSyncMessage { false };
+#endif
 
 #if OS(DARWIN)
     // Called on the connection queue.
@@ -314,7 +328,7 @@ private:
     mach_port_t m_receivePort;
     dispatch_source_t m_receivePortDataAvailableSource;
 
-#if !PLATFORM(IOS)
+#if PLATFORM(MAC) && __MAC_OS_X_VERSION_MIN_REQUIRED <= 101000
     void exceptionSourceEventHandler();
 
     // If setShouldCloseConnectionOnMachExceptions has been called, this has

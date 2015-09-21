@@ -49,6 +49,7 @@
 
 namespace WebCore {
 
+using namespace ContentExtensions;
 using namespace HTMLNames;
 
 DocumentStyleSheetCollection::DocumentStyleSheetCollection(Document& document)
@@ -60,6 +61,8 @@ DocumentStyleSheetCollection::DocumentStyleSheetCollection(Document& document)
     , m_usesFirstLineRules(false)
     , m_usesFirstLetterRules(false)
     , m_usesRemUnits(false)
+    , m_usesStyleBasedEditability(false)
+    , m_styleResolverChangedTimer(*this, &DocumentStyleSheetCollection::styleResolverChangedTimerFired)
 {
 }
 
@@ -101,7 +104,7 @@ CSSStyleSheet* DocumentStyleSheetCollection::pageUserSheet()
 void DocumentStyleSheetCollection::clearPageUserSheet()
 {
     if (m_pageUserSheet) {
-        m_pageUserSheet = 0;
+        m_pageUserSheet = nullptr;
         m_document.styleResolverChanged(DeferRecalcStyle);
     }
 }
@@ -187,6 +190,38 @@ void DocumentStyleSheetCollection::addUserSheet(Ref<StyleSheetContents>&& userSh
 {
     ASSERT(userSheet.get().isUserStyleSheet());
     m_userStyleSheets.append(CSSStyleSheet::create(WTF::move(userSheet), &m_document));
+    m_document.styleResolverChanged(RecalcStyleImmediately);
+}
+
+#if ENABLE(CONTENT_EXTENSIONS)
+void DocumentStyleSheetCollection::addDisplayNoneSelector(const String& identifier, const String& selector, uint32_t selectorID)
+{
+    auto result = m_contentExtensionSelectorSheets.add(identifier, nullptr);
+    if (result.isNewEntry) {
+        result.iterator->value = ContentExtensionStyleSheet::create(m_document);
+        m_userStyleSheets.append(&result.iterator->value->styleSheet());
+    }
+
+    result.iterator->value->addDisplayNoneSelector(selector, selectorID);
+    m_styleResolverChangedTimer.startOneShot(0);
+}
+
+void DocumentStyleSheetCollection::maybeAddContentExtensionSheet(const String& identifier, StyleSheetContents& sheet)
+{
+    ASSERT(sheet.isUserStyleSheet());
+
+    if (m_contentExtensionSheets.contains(identifier))
+        return;
+
+    Ref<CSSStyleSheet> cssSheet = CSSStyleSheet::create(sheet, &m_document);
+    m_contentExtensionSheets.set(identifier, &cssSheet.get());
+    m_userStyleSheets.append(adoptRef(cssSheet.leakRef()));
+    m_styleResolverChangedTimer.startOneShot(0);
+}
+#endif // ENABLE(CONTENT_EXTENSIONS)
+
+void DocumentStyleSheetCollection::styleResolverChangedTimerFired()
+{
     m_document.styleResolverChanged(RecalcStyleImmediately);
 }
 
@@ -390,15 +425,6 @@ void DocumentStyleSheetCollection::analyzeStyleSheetChange(UpdateFlag updateFlag
     requiresFullStyleRecalc = false;
 }
 
-static bool styleSheetsUseRemUnits(const Vector<RefPtr<CSSStyleSheet>>& sheets)
-{
-    for (unsigned i = 0; i < sheets.size(); ++i) {
-        if (sheets[i]->contents().usesRemUnits())
-            return true;
-    }
-    return false;
-}
-
 static void filterEnabledNonemptyCSSStyleSheets(Vector<RefPtr<CSSStyleSheet>>& result, const Vector<RefPtr<StyleSheet>>& sheets)
 {
     for (unsigned i = 0; i < sheets.size(); ++i) {
@@ -457,7 +483,12 @@ bool DocumentStyleSheetCollection::updateActiveStyleSheets(UpdateFlag updateFlag
     m_activeAuthorStyleSheets.swap(activeCSSStyleSheets);
     m_styleSheetsForStyleSheetList.swap(activeStyleSheets);
 
-    m_usesRemUnits = styleSheetsUseRemUnits(m_activeAuthorStyleSheets);
+    for (const auto& sheet : m_activeAuthorStyleSheets) {
+        if (sheet->contents().usesRemUnits())
+            m_usesRemUnits = true;
+        if (sheet->contents().usesStyleBasedEditability())
+            m_usesStyleBasedEditability = true;
+    }
     m_pendingUpdateType = NoUpdate;
 
     return requiresFullStyleRecalc;

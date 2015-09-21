@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012, 2013, 2014 Apple Inc. All rights reserved.
+ * Copyright (C) 2012-2015 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -53,6 +53,7 @@ enum Action {
 
 enum Type {
     SelectUsingPredictions, // Implies that we need predictions to decide. We will never get to the backend in this mode.
+    SelectUsingArguments, // Implies that we use the Node's arguments to decide. We will never get to the backend in this mode.
     Unprofiled, // Implies that array profiling didn't see anything. But that could be because the operands didn't comply with basic type assumptions (base is cell, property is int). This either becomes Generic or ForceExit depending on value profiling.
     ForceExit, // Implies that we have no idea how to execute this operation, so we should just give up.
     Generic,
@@ -65,7 +66,9 @@ enum Type {
     ArrayStorage,
     SlowPutArrayStorage,
     
-    Arguments,
+    DirectArguments,
+    ScopedArguments,
+    
     Int8Array,
     Int16Array,
     Int32Array,
@@ -87,14 +90,14 @@ enum Class {
 
 enum Speculation {
     SaneChain, // In bounds and the array prototype chain is still intact, i.e. loading a hole doesn't require special treatment.
+    
     InBounds, // In bounds and not loading a hole.
     ToHole, // Potentially storing to a hole.
     OutOfBounds // Out-of-bounds access and anything can happen.
 };
 enum Conversion {
     AsIs,
-    Convert,
-    RageConvert
+    Convert
 };
 } // namespace Array
 
@@ -193,7 +196,7 @@ public:
     ArrayMode withProfile(const ConcurrentJITLocker& locker, ArrayProfile* profile, bool makeSafe) const
     {
         Array::Class myArrayClass;
-        
+
         if (isJSArray()) {
             if (profile->usesOriginalArrayStructures(locker) && benefitsFromOriginalArray())
                 myArrayClass = Array::OriginalArray;
@@ -220,9 +223,9 @@ public:
         return ArrayMode(type, arrayClass(), speculation(), conversion);
     }
     
-    ArrayMode refine(Graph&, Node*, SpeculatedType base, SpeculatedType index, SpeculatedType value = SpecNone, NodeFlags = 0) const;
+    ArrayMode refine(Graph&, Node*, SpeculatedType base, SpeculatedType index, SpeculatedType value = SpecNone) const;
     
-    bool alreadyChecked(Graph&, Node*, AbstractValue&) const;
+    bool alreadyChecked(Graph&, Node*, const AbstractValue&) const;
     
     void dump(PrintStream&) const;
     
@@ -291,10 +294,13 @@ public:
     {
         switch (type()) {
         case Array::SelectUsingPredictions:
+        case Array::SelectUsingArguments:
         case Array::Unprofiled:
+        case Array::Undecided:
         case Array::ForceExit:
         case Array::Generic:
-        case Array::Arguments:
+        case Array::DirectArguments:
+        case Array::ScopedArguments:
             return false;
         default:
             return true;
@@ -304,7 +310,6 @@ public:
     bool lengthNeedsStorage() const
     {
         switch (type()) {
-        case Array::Undecided:
         case Array::Int32:
         case Array::Double:
         case Array::Contiguous:
@@ -320,11 +325,9 @@ public:
     {
         switch (type()) {
         case Array::String:
+        case Array::DirectArguments:
+        case Array::ScopedArguments:
             return ArrayMode(Array::Generic);
-#if USE(JSVALUE32_64)
-        case Array::Arguments:
-            return ArrayMode(Array::Generic);
-#endif
         default:
             return *this;
         }
@@ -334,10 +337,10 @@ public:
     {
         switch (type()) {
         case Array::SelectUsingPredictions:
+        case Array::SelectUsingArguments:
         case Array::Unprofiled:
         case Array::ForceExit:
         case Array::Generic:
-        case Array::Undecided:
             return false;
         default:
             return true;
@@ -371,6 +374,7 @@ public:
         case Array::Int32:
         case Array::Double:
         case Array::Contiguous:
+        case Array::Undecided:
         case Array::ArrayStorage:
             return true;
         default:
@@ -469,7 +473,7 @@ private:
         return arrayMode1 | arrayMode2;
     }
 
-    bool alreadyChecked(Graph&, Node*, AbstractValue&, IndexingType shape) const;
+    bool alreadyChecked(Graph&, Node*, const AbstractValue&, IndexingType shape) const;
     
     union {
         struct {

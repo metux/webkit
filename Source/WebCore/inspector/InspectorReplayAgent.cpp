@@ -93,6 +93,9 @@ static Inspector::Protocol::Replay::SessionState buildInspectorObjectForSessionS
     case WebCore::SessionState::Inactive: return Inspector::Protocol::Replay::SessionState::Inactive;
     case WebCore::SessionState::Replaying: return Inspector::Protocol::Replay::SessionState::Replaying;
     }
+
+    RELEASE_ASSERT_NOT_REACHED();
+    return Inspector::Protocol::Replay::SessionState::Inactive;
 }
 
 static Inspector::Protocol::Replay::SegmentState buildInspectorObjectForSegmentState(WebCore::SegmentState segmentState)
@@ -103,6 +106,9 @@ static Inspector::Protocol::Replay::SegmentState buildInspectorObjectForSegmentS
     case WebCore::SegmentState::Loaded: return Inspector::Protocol::Replay::SegmentState::Loaded;
     case WebCore::SegmentState::Dispatching: return Inspector::Protocol::Replay::SegmentState::Dispatching;
     }
+
+    RELEASE_ASSERT_NOT_REACHED();
+    return Inspector::Protocol::Replay::SegmentState::Unloaded;
 }
 
 class SerializeInputToJSONFunctor {
@@ -187,7 +193,7 @@ void InspectorReplayAgent::didCreateFrontendAndBackend(Inspector::FrontendChanne
 void InspectorReplayAgent::willDestroyFrontendAndBackend(Inspector::DisconnectReason)
 {
     m_frontendDispatcher = nullptr;
-    m_backendDispatcher.clear();
+    m_backendDispatcher = nullptr;
 
     m_instrumentingAgents->setInspectorReplayAgent(nullptr);
 
@@ -323,15 +329,15 @@ void InspectorReplayAgent::stopCapturing(ErrorString& errorString)
     m_page.replayController().stopCapturing();
 }
 
-void InspectorReplayAgent::replayToPosition(ErrorString& errorString, const RefPtr<InspectorObject>&& positionObject, bool fastReplay)
+void InspectorReplayAgent::replayToPosition(ErrorString& errorString, const InspectorObject& positionObject, bool fastReplay)
 {
     ReplayPosition position;
-    if (!positionObject->getInteger(ASCIILiteral("segmentOffset"), position.segmentOffset)) {
+    if (!positionObject.getInteger(ASCIILiteral("segmentOffset"), position.segmentOffset)) {
         errorString = ASCIILiteral("Couldn't decode ReplayPosition segment offset provided to ReplayAgent.replayToPosition.");
         return;
     }
 
-    if (!positionObject->getInteger(ASCIILiteral("inputOffset"), position.inputOffset)) {
+    if (!positionObject.getInteger(ASCIILiteral("inputOffset"), position.inputOffset)) {
         errorString = ASCIILiteral("Couldn't decode ReplayPosition input offset provided to ReplayAgent.replayToPosition.");
         return;
     }

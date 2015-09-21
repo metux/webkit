@@ -68,6 +68,9 @@ typedef void (*WKPageDidLayoutCallback)(WKPageRef page, WKLayoutMilestones miles
 typedef WKPluginLoadPolicy (*WKPagePluginLoadPolicyCallback)(WKPageRef page, WKPluginLoadPolicy currentPluginLoadPolicy, WKDictionaryRef pluginInfoDictionary, WKStringRef* unavailabilityDescription, const void* clientInfo);
 typedef void (*WKPagePluginDidFailCallback)(WKPageRef page, uint32_t errorCode, WKDictionaryRef pluginInfoDictionary, const void* clientInfo);
 typedef WKWebGLLoadPolicy (*WKPageWebGLLoadPolicyCallback)(WKPageRef page, WKStringRef url, const void* clientInfo);
+typedef void (*WKPageNavigationGestureDidBeginCallback)(WKPageRef page, const void* clientInfo);
+typedef void (*WKPageNavigationGestureWillEndCallback)(WKPageRef page, bool willNavigate, WKBackForwardListItemRef item, const void* clientInfo);
+typedef void (*WKPageNavigationGestureDidEndCallback)(WKPageRef page, bool willNavigate, WKBackForwardListItemRef item, const void* clientInfo);
 
 // Deprecated
 typedef void (*WKPageDidFailToInitializePluginCallback_deprecatedForUseWithV0)(WKPageRef page, WKStringRef mimeType, const void* clientInfo);
@@ -391,11 +394,8 @@ typedef struct WKPageLoaderClientV5 {
     WKPageShouldKeepCurrentBackForwardListItemInListCallback            shouldKeepCurrentBackForwardListItemInList;
 } WKPageLoaderClientV5;
 
-// FIXME: These should be deprecated.
-enum { kWKPageLoaderClientCurrentVersion WK_ENUM_DEPRECATED("Use an explicit version number instead") = 3 };
-typedef struct WKPageLoaderClient {
-    int                                                                 version;
-    const void *                                                        clientInfo;
+typedef struct WKPageLoaderClientV6 {
+    WKPageLoaderClientBase                                              base;
 
     // Version 0.
     WKPageDidStartProvisionalLoadForFrameCallback                       didStartProvisionalLoadForFrame;
@@ -448,7 +448,19 @@ typedef struct WKPageLoaderClient {
 
     // Version 3.
     WKPagePluginLoadPolicyCallback                                      pluginLoadPolicy;
-} WKPageLoaderClient;
+
+    // Version 4.
+    WKPageWebGLLoadPolicyCallback                                       webGLLoadPolicy;
+    WKPageWebGLLoadPolicyCallback                                       resolveWebGLLoadPolicy;
+    
+    // Version 5.
+    WKPageShouldKeepCurrentBackForwardListItemInListCallback            shouldKeepCurrentBackForwardListItemInList;
+
+    // Version 6.
+    WKPageNavigationGestureDidBeginCallback                             navigationGestureDidBegin;
+    WKPageNavigationGestureWillEndCallback                              navigationGestureWillEnd;
+    WKPageNavigationGestureDidEndCallback                               navigationGestureDidEnd;
+} WKPageLoaderClientV6;
 
 #ifdef __cplusplus
 }

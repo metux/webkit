@@ -26,6 +26,7 @@
 #include "RenderText.h"
 
 #include "AXObjectCache.h"
+#include "BreakingContext.h"
 #include "CharacterProperties.h"
 #include "EllipsisBox.h"
 #include "FloatQuad.h"
@@ -180,7 +181,6 @@ inline RenderText::RenderText(Node& node, const String& text)
     , m_knownToHaveNoOverflowAndNoFallbackFonts(false)
     , m_useBackslashAsYenSymbol(false)
     , m_originalTextDiffersFromRendered(false)
-    , m_contentIsKnownToFollow(false)
 #if ENABLE(IOS_TEXT_AUTOSIZING)
     , m_candidateComputedTextSize(0)
 #endif
@@ -299,8 +299,8 @@ String RenderText::originalText() const
 
 void RenderText::absoluteRects(Vector<IntRect>& rects, const LayoutPoint& accumulatedOffset) const
 {
-    if (auto layout = simpleLineLayout()) {
-        rects.appendVector(collectTextAbsoluteRects(*this, *layout, accumulatedOffset));
+    if (auto* layout = simpleLineLayout()) {
+        rects.appendVector(SimpleLineLayout::collectAbsoluteRects(*this, *layout, accumulatedOffset));
         return;
     }
     rects.appendVector(m_lineBoxes.absoluteRects(accumulatedOffset));
@@ -383,7 +383,7 @@ void RenderText::collectSelectionRects(Vector<SelectionRect>& rects, unsigned st
         bool containsEnd = box->start() <= end && box->end() + 1 >= end;
 
         bool isFixed = false;
-        IntRect absRect = localToAbsoluteQuad(FloatRect(rect), false, &isFixed).enclosingBoundingBox();
+        IntRect absRect = localToAbsoluteQuad(FloatRect(rect), UseTransforms, &isFixed).enclosingBoundingBox();
         bool boxIsHorizontal = !box->isSVGInlineTextBox() ? box->isHorizontal() : !style().svgStyle().isVerticalWritingMode();
         // If the containing block is an inline element, we want to check the inlineBoxWrapper orientation
         // to determine the orientation of the block. In this case we also use the inlineBoxWrapper to
@@ -402,17 +402,17 @@ void RenderText::collectSelectionRects(Vector<SelectionRect>& rects, unsigned st
 
 Vector<FloatQuad> RenderText::absoluteQuadsClippedToEllipsis() const
 {
-    if (auto layout = simpleLineLayout()) {
+    if (auto* layout = simpleLineLayout()) {
         ASSERT(style().textOverflow() != TextOverflowEllipsis);
-        return collectTextAbsoluteQuads(*this, *layout, nullptr);
+        return SimpleLineLayout::collectAbsoluteQuads(*this, *layout, nullptr);
     }
     return m_lineBoxes.absoluteQuads(*this, nullptr, RenderTextLineBoxes::ClipToEllipsis);
 }
 
 void RenderText::absoluteQuads(Vector<FloatQuad>& quads, bool* wasFixed) const
 {
-    if (auto layout = simpleLineLayout()) {
-        quads.appendVector(collectTextAbsoluteQuads(*this, *layout, wasFixed));
+    if (auto* layout = simpleLineLayout()) {
+        quads.appendVector(SimpleLineLayout::collectAbsoluteQuads(*this, *layout, wasFixed));
         return;
     }
     quads.appendVector(m_lineBoxes.absoluteQuads(*this, wasFixed, RenderTextLineBoxes::NoClipping));
@@ -693,7 +693,6 @@ void RenderText::computePreferredLogicalWidths(float leadWidth, HashSet<const Fo
     m_endMinWidth = 0;
     m_maxWidth = 0;
 
-    float currMinWidth = 0;
     float currMaxWidth = 0;
     m_hasBreakableChar = false;
     m_hasBreak = false;
@@ -716,8 +715,7 @@ void RenderText::computePreferredLogicalWidths(float leadWidth, HashSet<const Fo
 
     // Non-zero only when kerning is enabled, in which case we measure words with their trailing
     // space, then subtract its width.
-    float wordTrailingSpaceWidth = font.typesettingFeatures() & Kerning ? font.width(RenderBlock::constructTextRun(this, font, &space, 1, style), &fallbackFonts) + wordSpacing : 0;
-
+    WordTrailingSpace wordTrailingSpace(*this, style);
     // If automatic hyphenation is allowed, we keep track of the width of the widest word (or word
     // fragment) encountered so far, and only try hyphenating words that are wider.
     float maxWordWidth = std::numeric_limits<float>::max();
@@ -736,10 +734,11 @@ void RenderText::computePreferredLogicalWidths(float leadWidth, HashSet<const Fo
             minimumSuffixLength = 2;
     }
 
-    int firstGlyphLeftOverflow = -1;
+    Optional<int> firstGlyphLeftOverflow;
 
     bool breakNBSP = style.autoWrap() && style.nbspMode() == SPACE;
     bool breakAll = (style.wordBreak() == BreakAllWordBreak || style.wordBreak() == BreakWordBreak) && style.autoWrap();
+    bool keepAllWords = style.wordBreak() == KeepAllWordBreak;
     bool isLooseCJKMode = breakIterator.isLooseCJKMode();
 
     for (int i = 0; i < len; i++) {
@@ -769,11 +768,8 @@ void RenderText::computePreferredLogicalWidths(float leadWidth, HashSet<const Fo
         if ((isSpace || isNewline) && i == len - 1)
             m_hasEndWS = true;
 
-        if (!ignoringSpaces && style.collapseWhiteSpace() && previousCharacterIsSpace && isSpace)
-            ignoringSpaces = true;
-
-        if (ignoringSpaces && !isSpace)
-            ignoringSpaces = false;
+        ignoringSpaces |= style.collapseWhiteSpace() && previousCharacterIsSpace && isSpace;
+        ignoringSpaces &= isSpace;
 
         // Ignore spaces and soft hyphens
         if (ignoringSpaces) {
@@ -782,13 +778,13 @@ void RenderText::computePreferredLogicalWidths(float leadWidth, HashSet<const Fo
             continue;
         } else if (c == softHyphen && style.hyphens() != HyphensNone) {
             currMaxWidth += widthFromCache(font, lastWordBoundary, i - lastWordBoundary, leadWidth + currMaxWidth, &fallbackFonts, &glyphOverflow, style);
-            if (firstGlyphLeftOverflow < 0)
+            if (!firstGlyphLeftOverflow)
                 firstGlyphLeftOverflow = glyphOverflow.left;
             lastWordBoundary = i + 1;
             continue;
         }
 
-        bool hasBreak = breakAll || isBreakable(breakIterator, i, nextBreakable, breakNBSP, isLooseCJKMode);
+        bool hasBreak = breakAll || isBreakable(breakIterator, i, nextBreakable, breakNBSP, isLooseCJKMode, keepAllWords);
         bool betweenWords = true;
         int j = i;
         while (c != '\n' && !isSpaceAccordingToStyle(c, style) && c != '\t' && (c != softHyphen || style.hyphens() == HyphensNone)) {
@@ -796,7 +792,7 @@ void RenderText::computePreferredLogicalWidths(float leadWidth, HashSet<const Fo
             if (j == len)
                 break;
             c = uncheckedCharacterAt(j);
-            if (isBreakable(breakIterator, j, nextBreakable, breakNBSP, isLooseCJKMode) && characterAt(j - 1) != softHyphen)
+            if (isBreakable(breakIterator, j, nextBreakable, breakNBSP, isLooseCJKMode, keepAllWords) && characterAt(j - 1) != softHyphen)
                 break;
             if (breakAll) {
                 betweenWords = false;
@@ -806,14 +802,18 @@ void RenderText::computePreferredLogicalWidths(float leadWidth, HashSet<const Fo
 
         int wordLen = j - i;
         if (wordLen) {
+            float currMinWidth = 0;
             bool isSpace = (j < len) && isSpaceAccordingToStyle(c, style);
             float w;
-            if (wordTrailingSpaceWidth && isSpace)
-                w = widthFromCache(font, i, wordLen + 1, leadWidth + currMaxWidth, &fallbackFonts, &glyphOverflow, style) - wordTrailingSpaceWidth;
+            Optional<float> wordTrailingSpaceWidth;
+            if (isSpace)
+                wordTrailingSpaceWidth = wordTrailingSpace.width(fallbackFonts);
+            if (wordTrailingSpaceWidth)
+                w = widthFromCache(font, i, wordLen + 1, leadWidth + currMaxWidth, &fallbackFonts, &glyphOverflow, style) - wordTrailingSpaceWidth.value();
             else {
                 w = widthFromCache(font, i, wordLen, leadWidth + currMaxWidth, &fallbackFonts, &glyphOverflow, style);
                 if (c == softHyphen && style.hyphens() != HyphensNone)
-                    currMinWidth += hyphenWidth(this, font);
+                    currMinWidth = hyphenWidth(this, font);
             }
 
             if (w > maxWordWidth) {
@@ -822,8 +822,11 @@ void RenderText::computePreferredLogicalWidths(float leadWidth, HashSet<const Fo
 
                 if (suffixStart) {
                     float suffixWidth;
-                    if (wordTrailingSpaceWidth && isSpace)
-                        suffixWidth = widthFromCache(font, i + suffixStart, wordLen - suffixStart + 1, leadWidth + currMaxWidth, 0, 0, style) - wordTrailingSpaceWidth;
+                    Optional<float> wordTrailingSpaceWidth;
+                    if (isSpace)
+                        wordTrailingSpaceWidth = wordTrailingSpace.width(fallbackFonts);
+                    if (wordTrailingSpaceWidth)
+                        suffixWidth = widthFromCache(font, i + suffixStart, wordLen - suffixStart + 1, leadWidth + currMaxWidth, 0, 0, style) - wordTrailingSpaceWidth.value();
                     else
                         suffixWidth = widthFromCache(font, i + suffixStart, wordLen - suffixStart, leadWidth + currMaxWidth, 0, 0, style);
 
@@ -835,7 +838,7 @@ void RenderText::computePreferredLogicalWidths(float leadWidth, HashSet<const Fo
                     maxWordWidth = w;
             }
 
-            if (firstGlyphLeftOverflow < 0)
+            if (!firstGlyphLeftOverflow)
                 firstGlyphLeftOverflow = glyphOverflow.left;
             currMinWidth += w;
             if (betweenWords) {
@@ -852,7 +855,7 @@ void RenderText::computePreferredLogicalWidths(float leadWidth, HashSet<const Fo
 
             // Add in wordSpacing to our currMaxWidth, but not if this is the last word on a line or the
             // last word in the run.
-            if (wordSpacing && (isSpace || isCollapsibleWhiteSpace) && !containsOnlyWhitespace(j, len-j))
+            if ((isSpace || isCollapsibleWhiteSpace) && !containsOnlyWhitespace(j, len-j))
                 currMaxWidth += wordSpacing;
 
             if (firstWord) {
@@ -866,9 +869,7 @@ void RenderText::computePreferredLogicalWidths(float leadWidth, HashSet<const Fo
             }
             m_endMinWidth = currMinWidth;
 
-            if (currMinWidth > m_minWidth)
-                m_minWidth = currMinWidth;
-            currMinWidth = 0;
+            m_minWidth = std::max(currMinWidth, m_minWidth);
 
             i += wordLen - 1;
         } else {
@@ -876,10 +877,6 @@ void RenderText::computePreferredLogicalWidths(float leadWidth, HashSet<const Fo
             // breakable character boolean. Pre can only be broken if we encounter a newline.
             if (style.autoWrap() || isNewline)
                 m_hasBreakableChar = true;
-
-            if (currMinWidth > m_minWidth)
-                m_minWidth = currMinWidth;
-            currMinWidth = 0;
 
             if (isNewline) { // Only set if preserveNewline was true and we saw a newline.
                 if (firstLine) {
@@ -908,13 +905,11 @@ void RenderText::computePreferredLogicalWidths(float leadWidth, HashSet<const Fo
         }
     }
 
-    if (firstGlyphLeftOverflow > 0)
-        glyphOverflow.left = firstGlyphLeftOverflow;
+    glyphOverflow.left = firstGlyphLeftOverflow.valueOr(glyphOverflow.left);
 
     if ((needsWordSpacing && len > 1) || (ignoringSpaces && !firstWord))
         currMaxWidth += wordSpacing;
 
-    m_minWidth = std::max(currMinWidth, m_minWidth);
     m_maxWidth = std::max(currMaxWidth, m_maxWidth);
 
     if (!style.autoWrap())
@@ -961,7 +956,7 @@ bool RenderText::containsOnlyWhitespace(unsigned from, unsigned len) const
 IntPoint RenderText::firstRunLocation() const
 {
     if (auto* layout = simpleLineLayout())
-        return SimpleLineLayout::computeTextFirstRunLocation(*this, *layout);
+        return SimpleLineLayout::computeFirstRunLocation(*this, *layout);
 
     return m_lineBoxes.firstRunLocation();
 }
@@ -1257,8 +1252,8 @@ float RenderText::width(unsigned from, unsigned len, const FontCascade& f, float
 
 IntRect RenderText::linesBoundingBox() const
 {
-    if (auto layout = simpleLineLayout())
-        return SimpleLineLayout::computeTextBoundingBox(*this, *layout);
+    if (auto* layout = simpleLineLayout())
+        return SimpleLineLayout::computeBoundingBox(*this, *layout);
 
     return m_lineBoxes.boundingBox(*this);
 }
@@ -1345,15 +1340,15 @@ LayoutRect RenderText::selectionRectForRepaint(const RenderLayerModelObject* rep
 
 int RenderText::caretMinOffset() const
 {
-    if (auto layout = simpleLineLayout())
-        return SimpleLineLayout::findTextCaretMinimumOffset(*this, *layout);
+    if (auto* layout = simpleLineLayout())
+        return SimpleLineLayout::findCaretMinimumOffset(*this, *layout);
     return m_lineBoxes.caretMinOffset();
 }
 
 int RenderText::caretMaxOffset() const
 {
-    if (auto layout = simpleLineLayout())
-        return SimpleLineLayout::findTextCaretMaximumOffset(*this, *layout);
+    if (auto* layout = simpleLineLayout())
+        return SimpleLineLayout::findCaretMaximumOffset(*this, *layout);
     return m_lineBoxes.caretMaxOffset(*this);
 }
 
@@ -1371,14 +1366,14 @@ bool RenderText::containsRenderedCharacterOffset(unsigned offset) const
 
 bool RenderText::containsCaretOffset(unsigned offset) const
 {
-    if (auto layout = simpleLineLayout())
-        return SimpleLineLayout::containsTextCaretOffset(*this, *layout, offset);
+    if (auto* layout = simpleLineLayout())
+        return SimpleLineLayout::containsCaretOffset(*this, *layout, offset);
     return m_lineBoxes.containsOffset(*this, offset, RenderTextLineBoxes::CaretOffset);
 }
 
 bool RenderText::hasRenderedText() const
 {
-    if (auto layout = simpleLineLayout())
+    if (auto* layout = simpleLineLayout())
         return SimpleLineLayout::isTextRendered(*this, *layout);
     return m_lineBoxes.hasRenderedText();
 }
@@ -1401,36 +1396,28 @@ int RenderText::previousOffset(int current) const
     return result;
 }
 
-#if PLATFORM(COCOA) || PLATFORM(EFL)
+#if PLATFORM(COCOA) || PLATFORM(EFL) || PLATFORM(GTK)
 
-#define HANGUL_CHOSEONG_START (0x1100)
-#define HANGUL_CHOSEONG_END (0x115F)
-#define HANGUL_JUNGSEONG_START (0x1160)
-#define HANGUL_JUNGSEONG_END (0x11A2)
-#define HANGUL_JONGSEONG_START (0x11A8)
-#define HANGUL_JONGSEONG_END (0x11F9)
-#define HANGUL_SYLLABLE_START (0xAC00)
-#define HANGUL_SYLLABLE_END (0xD7AF)
-#define HANGUL_JONGSEONG_COUNT (28)
+const UChar hangulChoseongStart = 0x1100;
+const UChar hangulChoseongEnd = 0x115F;
+const UChar hangulJungseongStart = 0x1160;
+const UChar hangulJungseongEnd = 0x11A2;
+const UChar hangulJongseongStart = 0x11A8;
+const UChar hangulJongseongEnd = 0x11F9;
+const UChar hangulSyllableStart = 0xAC00;
+const UChar hangulSyllableEnd = 0xD7AF;
+const UChar hangulJongseongCount = 28;
 
-enum HangulState {
-    HangulStateL,
-    HangulStateV,
-    HangulStateT,
-    HangulStateLV,
-    HangulStateLVT,
-    HangulStateBreak
-};
+enum class HangulState { L, V, T, LV, LVT, Break };
 
-static inline bool isHangulLVT(UChar32 character)
+static inline bool isHangulLVT(UChar character)
 {
-    return (character - HANGUL_SYLLABLE_START) % HANGUL_JONGSEONG_COUNT;
+    return (character - hangulSyllableStart) % hangulJongseongCount;
 }
 
 static inline bool isMark(UChar32 character)
 {
-    int8_t charType = u_charType(character);
-    return charType == U_NON_SPACING_MARK || charType == U_ENCLOSING_MARK || charType == U_COMBINING_SPACING_MARK;
+    return U_GET_GC_MASK(character) & U_GC_M_MASK;
 }
 
 static inline bool isRegionalIndicator(UChar32 character)
@@ -1439,25 +1426,31 @@ static inline bool isRegionalIndicator(UChar32 character)
     return 0x1F1E6 <= character && character <= 0x1F1FF;
 }
 
+static inline bool isInArmenianToLimbuRange(UChar32 character)
+{
+    return character >= 0x0530 && character < 0x1950;
+}
+
 #endif
 
 int RenderText::previousOffsetForBackwardDeletion(int current) const
 {
-#if PLATFORM(COCOA) || PLATFORM(EFL)
-    ASSERT(m_text);
+    ASSERT(!m_text.isNull());
     StringImpl& text = *m_text.impl();
-    UChar32 character;
+
+    // FIXME: Unclear why this has so much handrolled code rather than using TextBreakIterator.
+    // Also unclear why this is so different from advanceByCombiningCharacterSequence.
+
+    // FIXME: Seems like this fancier case could be used on all platforms now, no
+    // need for the #else case below.
+#if PLATFORM(COCOA) || PLATFORM(EFL) || PLATFORM(GTK)
     bool sawRegionalIndicator = false;
     bool sawEmojiGroupCandidate = false;
     bool sawEmojiModifier = false;
     
     while (current > 0) {
-        if (U16_IS_TRAIL(text[--current]))
-            --current;
-        if (current < 0)
-            break;
-
-        UChar32 character = text.characterStartingAt(current);
+        UChar32 character;
+        U16_PREV(text, 0, current, character);
 
         if (sawEmojiGroupCandidate) {
             sawEmojiGroupCandidate = false;
@@ -1470,9 +1463,13 @@ int RenderText::previousOffsetForBackwardDeletion(int current) const
         }
 
         if (sawEmojiModifier) {
-            if (isEmojiModifier(character))
+            if (isEmojiModifier(character)) {
+                // Don't treat two emoji modifiers in a row as a group.
                 U16_FWD_1_UNSAFE(text, current);
-            break;
+                break;
+            }
+            if (!isVariationSelector(character))
+                break;
         }
 
         if (sawRegionalIndicator) {
@@ -1486,7 +1483,7 @@ int RenderText::previousOffsetForBackwardDeletion(int current) const
         }
 
         // We don't combine characters in Armenian ... Limbu range for backward deletion.
-        if ((character >= 0x0530) && (character < 0x1950))
+        if (isInArmenianToLimbuRange(character))
             break;
 
         if (isRegionalIndicator(character)) {
@@ -1504,7 +1501,8 @@ int RenderText::previousOffsetForBackwardDeletion(int current) const
             continue;
         }
 
-        if (!isMark(character) && (character != 0xFF9E) && (character != 0xFF9F))
+        // FIXME: Why are FF9E and FF9F special cased here?
+        if (!isMark(character) && character != 0xFF9E && character != 0xFF9F)
             break;
     }
 
@@ -1512,55 +1510,50 @@ int RenderText::previousOffsetForBackwardDeletion(int current) const
         return current;
 
     // Hangul
-    character = text.characterStartingAt(current);
-    if (((character >= HANGUL_CHOSEONG_START) && (character <= HANGUL_JONGSEONG_END)) || ((character >= HANGUL_SYLLABLE_START) && (character <= HANGUL_SYLLABLE_END))) {
+    UChar character = text[current];
+    if ((character >= hangulChoseongStart && character <= hangulJongseongEnd) || (character >= hangulSyllableStart && character <= hangulSyllableEnd)) {
         HangulState state;
 
-        if (character < HANGUL_JUNGSEONG_START)
-            state = HangulStateL;
-        else if (character < HANGUL_JONGSEONG_START)
-            state = HangulStateV;
-        else if (character < HANGUL_SYLLABLE_START)
-            state = HangulStateT;
+        if (character < hangulJungseongStart)
+            state = HangulState::L;
+        else if (character < hangulJongseongStart)
+            state = HangulState::V;
+        else if (character < hangulSyllableStart)
+            state = HangulState::T;
         else
-            state = isHangulLVT(character) ? HangulStateLVT : HangulStateLV;
+            state = isHangulLVT(character) ? HangulState::LVT : HangulState::LV;
 
-        while (current > 0 && ((character = text.characterStartingAt(current - 1)) >= HANGUL_CHOSEONG_START) && (character <= HANGUL_SYLLABLE_END) && ((character <= HANGUL_JONGSEONG_END) || (character >= HANGUL_SYLLABLE_START))) {
+        while (current > 0 && (character = text[current - 1]) >= hangulChoseongStart && character <= hangulSyllableEnd && (character <= hangulJongseongEnd || character >= hangulSyllableStart)) {
             switch (state) {
-            case HangulStateV:
-                if (character <= HANGUL_CHOSEONG_END)
-                    state = HangulStateL;
-                else if ((character >= HANGUL_SYLLABLE_START) && (character <= HANGUL_SYLLABLE_END) && !isHangulLVT(character))
-                    state = HangulStateLV;
-                else if (character > HANGUL_JUNGSEONG_END)
-                    state = HangulStateBreak;
+            case HangulState::V:
+                if (character <= hangulChoseongEnd)
+                    state = HangulState::L;
+                else if (character >= hangulSyllableStart && character <= hangulSyllableEnd && !isHangulLVT(character))
+                    state = HangulState::LV;
+                else if (character > hangulJungseongEnd)
+                    state = HangulState::Break;
                 break;
-            case HangulStateT:
-                if ((character >= HANGUL_JUNGSEONG_START) && (character <= HANGUL_JUNGSEONG_END))
-                    state = HangulStateV;
-                else if ((character >= HANGUL_SYLLABLE_START) && (character <= HANGUL_SYLLABLE_END))
-                    state = (isHangulLVT(character) ? HangulStateLVT : HangulStateLV);
-                else if (character < HANGUL_JUNGSEONG_START)
-                    state = HangulStateBreak;
+            case HangulState::T:
+                if (character >= hangulJungseongStart && character <= hangulJungseongEnd)
+                    state = HangulState::V;
+                else if (character >= hangulSyllableStart && character <= hangulSyllableEnd)
+                    state = isHangulLVT(character) ? HangulState::LVT : HangulState::LV;
+                else if (character < hangulJungseongStart)
+                    state = HangulState::Break;
                 break;
             default:
-                state = (character < HANGUL_JUNGSEONG_START) ? HangulStateL : HangulStateBreak;
+                state = (character < hangulJungseongStart) ? HangulState::L : HangulState::Break;
                 break;
             }
-            if (state == HangulStateBreak)
+            if (state == HangulState::Break)
                 break;
-
             --current;
         }
     }
 
     return current;
 #else
-    // Platforms other than Mac delete by one code point.
-    if (U16_IS_TRAIL(m_text[--current]))
-        --current;
-    if (current < 0)
-        current = 0;
+    U16_BACK_1(text, 0, current);
     return current;
 #endif
 }

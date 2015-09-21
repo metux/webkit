@@ -28,6 +28,9 @@
 
 #include "APIPageConfiguration.h"
 #include "WKAPICast.h"
+#include "WebPageGroup.h"
+#include "WebProcessPool.h"
+#include "WebUserContentControllerProxy.h"
 
 using namespace WebKit;
 
@@ -89,4 +92,14 @@ WKPageRef WKPageConfigurationGetRelatedPage(WKPageConfigurationRef configuration
 void WKPageConfigurationSetRelatedPage(WKPageConfigurationRef configuration, WKPageRef relatedPage)
 {
     toImpl(configuration)->setRelatedPage(toImpl(relatedPage));
+}
+
+WKWebsiteDataStoreRef WKPageConfigurationGetWebsiteDataStore(WKPageConfigurationRef configuration)
+{
+    return toAPI(toImpl(configuration)->websiteDataStore());
+}
+
+void WKPageConfigurationSetWebsiteDataStore(WKPageConfigurationRef configuration, WKWebsiteDataStoreRef websiteDataStore)
+{
+    toImpl(configuration)->setWebsiteDataStore(toImpl(websiteDataStore));
 }

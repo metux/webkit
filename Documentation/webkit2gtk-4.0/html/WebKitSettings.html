@@ -824,6 +824,22 @@
 <a class="link" href="WebKitSettings.html#webkit-settings-set-enable-mediasource" title="webkit_settings_set_enable_mediasource ()">webkit_settings_set_enable_mediasource</a> <span class="c_punctuation">()</span>
 </td>
 </tr>
+<tr>
+<td class="function_type">
+<a href="../glib/glib-Basic-Types.html#gboolean"><span class="returnvalue">gboolean</span></a>
+</td>
+<td class="function_name">
+<a class="link" href="WebKitSettings.html#webkit-settings-get-allow-file-access-from-file-urls" title="webkit_settings_get_allow_file_access_from_file_urls ()">webkit_settings_get_allow_file_access_from_file_urls</a> <span class="c_punctuation">()</span>
+</td>
+</tr>
+<tr>
+<td class="function_type">
+<span class="returnvalue">void</span>
+</td>
+<td class="function_name">
+<a class="link" href="WebKitSettings.html#webkit-settings-set-allow-file-access-from-file-urls" title="webkit_settings_set_allow_file_access_from_file_urls ()">webkit_settings_set_allow_file_access_from_file_urls</a> <span class="c_punctuation">()</span>
+</td>
+</tr>
 </tbody>
 </table></div>
 </div>
@@ -836,6 +852,11 @@
 <col width="200px" class="properties_flags">
 </colgroup>
 <tbody>
+<tr>
+<td class="property_type"><a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a></td>
+<td class="property_name"><a class="link" href="WebKitSettings.html#WebKitSettings--allow-file-access-from-file-urls" title="The “allow-file-access-from-file-urls” property">allow-file-access-from-file-urls</a></td>
+<td class="property_flags">Read / Write / Construct</td>
+</tr>
 <tr>
 <td class="property_type"><a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a></td>
 <td class="property_name"><a class="link" href="WebKitSettings.html#WebKitSettings--allow-modal-dialogs" title="The “allow-modal-dialogs” property">allow-modal-dialogs</a></td>
@@ -3943,6 +3964,66 @@ webkit_settings_set_enable_mediasource
 </div>
 <p class="since">Since: <a class="link" href="api-index-2-4.html#api-index-2.4">2.4</a></p>
 </div>
+<hr>
+<div class="refsect2">
+<a name="webkit-settings-get-allow-file-access-from-file-urls"></a><h3>webkit_settings_get_allow_file_access_from_file_urls ()</h3>
+<pre class="programlisting"><a href="../glib/glib-Basic-Types.html#gboolean"><span class="returnvalue">gboolean</span></a>
+webkit_settings_get_allow_file_access_from_file_urls
+                               (<em class="parameter"><code><a class="link" href="WebKitSettings.html" title="WebKitSettings"><span class="type">WebKitSettings</span></a> *settings</code></em>);</pre>
+<p>Get the <a class="link" href="WebKitSettings.html#WebKitSettings--allow-file-access-from-file-urls" title="The “allow-file-access-from-file-urls” property"><span class="type">“allow-file-access-from-file-urls”</span></a> property.</p>
+<div class="refsect3">
+<a name="id-1.2.7.8.101.5"></a><h4>Parameters</h4>
+<div class="informaltable"><table width="100%" border="0">
+<colgroup>
+<col width="150px" class="parameters_name">
+<col class="parameters_description">
+<col width="200px" class="parameters_annotations">
+</colgroup>
+<tbody><tr>
+<td class="parameter_name"><p>settings</p></td>
+<td class="parameter_description"><p>a <a class="link" href="WebKitSettings.html" title="WebKitSettings"><span class="type">WebKitSettings</span></a></p></td>
+<td class="parameter_annotations"> </td>
+</tr></tbody>
+</table></div>
+</div>
+<div class="refsect3">
+<a name="id-1.2.7.8.101.6"></a><h4>Returns</h4>
+<p> <a href="../glib/glib-Standard-Macros.html#TRUE:CAPS"><code class="literal">TRUE</code></a> If file access from file URLs is allowed or <a href="../glib/glib-Standard-Macros.html#FALSE:CAPS"><code class="literal">FALSE</code></a> otherwise.</p>
+</div>
+<p class="since">Since: <a class="link" href="api-index-2-10.html#api-index-2.10">2.10</a></p>
+</div>
+<hr>
+<div class="refsect2">
+<a name="webkit-settings-set-allow-file-access-from-file-urls"></a><h3>webkit_settings_set_allow_file_access_from_file_urls ()</h3>
+<pre class="programlisting"><span class="returnvalue">void</span>
+webkit_settings_set_allow_file_access_from_file_urls
+                               (<em class="parameter"><code><a class="link" href="WebKitSettings.html" title="WebKitSettings"><span class="type">WebKitSettings</span></a> *settings</code></em>,
+                                <em class="parameter"><code><a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a> allowed</code></em>);</pre>
+<p>Set the <a class="link" href="WebKitSettings.html#WebKitSettings--allow-file-access-from-file-urls" title="The “allow-file-access-from-file-urls” property"><span class="type">“allow-file-access-from-file-urls”</span></a> property.</p>
+<div class="refsect3">
+<a name="id-1.2.7.8.102.5"></a><h4>Parameters</h4>
+<div class="informaltable"><table width="100%" border="0">
+<colgroup>
+<col width="150px" class="parameters_name">
+<col class="parameters_description">
+<col width="200px" class="parameters_annotations">
+</colgroup>
+<tbody>
+<tr>
+<td class="parameter_name"><p>settings</p></td>
+<td class="parameter_description"><p>a <a class="link" href="WebKitSettings.html" title="WebKitSettings"><span class="type">WebKitSettings</span></a></p></td>
+<td class="parameter_annotations"> </td>
+</tr>
+<tr>
+<td class="parameter_name"><p>allowed</p></td>
+<td class="parameter_description"><p>Value to be set</p></td>
+<td class="parameter_annotations"> </td>
+</tr>
+</tbody>
+</table></div>
+</div>
+<p class="since">Since: <a class="link" href="api-index-2-10.html#api-index-2.10">2.10</a></p>
+</div>
 </div>
 <div class="refsect1">
 <a name="WebKitSettings.other_details"></a><h2>Types and Values</h2>
@@ -3953,6 +4034,19 @@ webkit_settings_set_enable_mediasource
 </div>
 <div class="refsect1">
 <a name="WebKitSettings.property-details"></a><h2>Property Details</h2>
+<div class="refsect2">
+<a name="WebKitSettings--allow-file-access-from-file-urls"></a><h3>The <code class="literal">“allow-file-access-from-file-urls”</code> property</h3>
+<pre class="programlisting">  “allow-file-access-from-file-urls” <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a></pre>
+<p>Whether file access is allowed from file URLs. By default, when
+something is loaded in a <a class="link" href="WebKitWebView.html" title="WebKitWebView"><span class="type">WebKitWebView</span></a> using a file URI, cross
+origin requests to other file resources are not allowed. This
+setting allows you to change that behaviour, so that it would be
+possible to do a XMLHttpRequest of a local file, for example.</p>
+<p>Flags: Read / Write / Construct</p>
+<p>Default value: FALSE</p>
+<p class="since">Since: <a class="link" href="api-index-2-10.html#api-index-2.10">2.10</a></p>
+</div>
+<hr>
 <div class="refsect2">
 <a name="WebKitSettings--allow-modal-dialogs"></a><h3>The <code class="literal">“allow-modal-dialogs”</code> property</h3>
 <pre class="programlisting">  “allow-modal-dialogs”      <a href="../glib/glib-Basic-Types.html#gboolean"><span class="type">gboolean</span></a></pre>

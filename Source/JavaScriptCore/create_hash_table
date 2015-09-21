@@ -94,6 +94,11 @@ while (<IN>) {
         if ($att =~ m/Function/) {
             push(@values, { "type" => "Function", "function" => $val, "params" => (length($param) ? $param : "") });
             #printf STDERR "WARNING: Number of arguments missing for $key/$val\n" if (length($param) == 0);
+        } elsif ($att =~ m/Accessor/) {
+            my $get = $val;
+            my $put = "nullptr";
+            $hasSetter = "true";
+            push(@values, { "type" => "Accessor", "get" => $get, "put" => $put });
         } elsif (length($att)) {
             my $get = $val;
             my $put = "0";
@@ -285,6 +290,11 @@ sub output() {
             $firstCastStr = "static_cast<NativeFunction>";
             $firstValue = $values[$i]{"function"};
             $secondValue = $values[$i]{"params"};
+        } elsif ($values[$i]{"type"} eq "Accessor") {
+            $firstCastStr = "static_cast<NativeFunction>";
+            $secondCastStr = "static_cast<NativeFunction>";
+            $firstValue = $values[$i]{"get"};
+            $secondValue = $values[$i]{"put"};
         } elsif ($values[$i]{"type"} eq "Property") {
             $firstCastStr = "static_cast<PropertySlot::GetValueFunc>";
             $secondCastStr = "static_cast<PutPropertySlot::PutValueFunc>";
@@ -310,17 +320,17 @@ sub output() {
             my $tableHead = $name;
             $tableHead =~ s/Table$//;
             print " #if JSC_BUILTIN_EXISTS(" . uc($tableHead . $key) .")\n";
-            print "   { \"$key\", (($attrs[$i]) & ~Function) | Builtin, $intrinsic, (intptr_t)static_cast<BuiltinGenerator>(" . $tableHead . ucfirst($key) . "CodeGenerator), (intptr_t)$secondValue },\n";
+            print "   { \"$key\", (($attrs[$i]) & ~Function) | Builtin, $intrinsic, { (intptr_t)static_cast<BuiltinGenerator>(" . $tableHead . ucfirst($key) . "CodeGenerator), (intptr_t)$secondValue } },\n";
             print " #else\n"
         }
-        print "   { \"$key\", $attrs[$i], $intrinsic, (intptr_t)" . $firstCastStr . "($firstValue), (intptr_t)" . $secondCastStr . "($secondValue) },\n";
+        print "   { \"$key\", $attrs[$i], $intrinsic, { (intptr_t)" . $firstCastStr . "($firstValue), (intptr_t)" . $secondCastStr . "($secondValue) } },\n";
         if ($values[$i]{"type"} eq "Function")  {
             print " #endif\n"
         }
         $i++;
     }
     print "};\n\n";
-    print "JS_EXPORT_PRIVATE extern const struct HashTable $name =\n";
-    print "    \{ $packedSize, $compactHashSizeMask, $hasSetter, $nameEntries, 0, $nameIndex \};\n";
+    print "static const struct HashTable $name =\n";
+    print "    \{ $packedSize, $compactHashSizeMask, $hasSetter, $nameEntries, $nameIndex \};\n";
     print "} // namespace\n";
 }

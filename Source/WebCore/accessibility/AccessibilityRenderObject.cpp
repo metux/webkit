@@ -1111,7 +1111,10 @@ bool AccessibilityRenderObject::isAllowedChildOfTree() const
     // Determine if this is in a tree. If so, we apply special behavior to make it work like an AXOutline.
     AccessibilityObject* axObj = parentObject();
     bool isInTree = false;
+    bool isTreeItemDescendant = false;
     while (axObj) {
+        if (axObj->roleValue() == TreeItemRole)
+            isTreeItemDescendant = true;
         if (axObj->isTree()) {
             isInTree = true;
             break;
@@ -1122,7 +1125,7 @@ bool AccessibilityRenderObject::isAllowedChildOfTree() const
     // If the object is in a tree, only tree items should be exposed (and the children of tree items).
     if (isInTree) {
         AccessibilityRole role = roleValue();
-        if (role != TreeItemRole && role != StaticTextRole)
+        if (role != TreeItemRole && role != StaticTextRole && !isTreeItemDescendant)
             return false;
     }
     return true;
@@ -1253,6 +1256,7 @@ bool AccessibilityRenderObject::computeAccessibilityIsIgnored() const
     case AudioRole:
     case DescriptionListTermRole:
     case DescriptionListDetailRole:
+    case DetailsRole:
     case DocumentArticleRole:
     case DocumentRegionRole:
     case ListItemRole:
@@ -1348,7 +1352,12 @@ bool AccessibilityRenderObject::computeAccessibilityIsIgnored() const
         // Otherwise fall through; use presence of help text, title, or description to decide.
     }
 
-    if (isWebArea() || m_renderer->isListMarker())
+    if (m_renderer->isListMarker()) {
+        AccessibilityObject* parent = parentObjectUnignored();
+        return parent && !parent->isListItem();
+    }
+
+    if (isWebArea())
         return false;
     
     // Using the presence of an accessible name to decide an element's visibility is not
@@ -1374,7 +1383,11 @@ bool AccessibilityRenderObject::computeAccessibilityIsIgnored() const
     if (node && node->hasTagName(dfnTag))
         return false;
     
-    // By default, objects should be ignored so that the AX hierarchy is not 
+    // Make sure that ruby containers are not ignored.
+    if (m_renderer->isRubyRun() || m_renderer->isRubyBlock() || m_renderer->isRubyInline())
+        return false;
+
+    // By default, objects should be ignored so that the AX hierarchy is not
     // filled with unnecessary items.
     return true;
 }
@@ -1485,17 +1498,38 @@ PlainTextRange AccessibilityRenderObject::selectedTextRange() const
     return documentBasedSelectedTextRange();
 }
 
+static void setTextSelectionIntent(AXObjectCache* cache, AXTextStateChangeType type)
+{
+    if (!cache)
+        return;
+    AXTextStateChangeIntent intent(type, AXTextSelection { AXTextSelectionDirectionDiscontiguous, AXTextSelectionGranularityUnknown, false });
+    cache->setTextSelectionIntent(intent);
+    cache->setIsSynchronizingSelection(true);
+}
+
+static void clearTextSelectionIntent(AXObjectCache* cache)
+{
+    if (!cache)
+        return;
+    cache->setTextSelectionIntent(AXTextStateChangeIntent());
+    cache->setIsSynchronizingSelection(false);
+}
+
 void AccessibilityRenderObject::setSelectedTextRange(const PlainTextRange& range)
 {
     if (isNativeTextControl()) {
+        setTextSelectionIntent(axObjectCache(), range.length ? AXTextStateChangeTypeSelectionExtend : AXTextStateChangeTypeSelectionMove);
         HTMLTextFormControlElement& textControl = downcast<RenderTextControl>(*m_renderer).textFormControlElement();
         textControl.setSelectionRange(range.start, range.start + range.length);
+        clearTextSelectionIntent(axObjectCache());
         return;
     }
 
     Node* node = m_renderer->node();
-    m_renderer->frame().selection().setSelection(VisibleSelection(Position(node, range.start, Position::PositionIsOffsetInAnchor),
-        Position(node, range.start + range.length, Position::PositionIsOffsetInAnchor), DOWNSTREAM));
+    VisibleSelection newSelection(Position(node, range.start, Position::PositionIsOffsetInAnchor), Position(node, range.start + range.length, Position::PositionIsOffsetInAnchor), DOWNSTREAM);
+    setTextSelectionIntent(axObjectCache(), range.length ? AXTextStateChangeTypeSelectionExtend : AXTextStateChangeTypeSelectionMove);
+    m_renderer->frame().selection().setSelection(newSelection, FrameSelection::defaultSetSelectionOptions());
+    clearTextSelectionIntent(axObjectCache());
 }
 
 URL AccessibilityRenderObject::url() const
@@ -1643,20 +1677,30 @@ void AccessibilityRenderObject::setFocused(bool on)
         return;
     }
 
+    // When a node is told to set focus, that can cause it to be deallocated, which means that doing
+    // anything else inside this object will crash. To fix this, we added a RefPtr to protect this object
+    // long enough for duration.
+    RefPtr<AccessibilityObject> protect(this);
+    
     // If this node is already the currently focused node, then calling focus() won't do anything.
     // That is a problem when focus is removed from the webpage to chrome, and then returns.
     // In these cases, we need to do what keyboard and mouse focus do, which is reset focus first.
     if (document->focusedElement() == node)
         document->setFocusedElement(nullptr);
 
-    downcast<Element>(*node).focus();
+    // If we return from setFocusedElement and our element has been removed from a tree, axObjectCache() may be null.
+    if (AXObjectCache* cache = axObjectCache()) {
+        cache->setIsSynchronizingSelection(true);
+        downcast<Element>(*node).focus();
+        cache->setIsSynchronizingSelection(false);
+    }
 }
 
 void AccessibilityRenderObject::setSelectedRows(AccessibilityChildrenVector& selectedRows)
 {
     // Setting selected only makes sense in trees and tables (and tree-tables).
     AccessibilityRole role = roleValue();
-    if (role != TreeRole && role != TreeGridRole && role != TableRole)
+    if (role != TreeRole && role != TreeGridRole && role != TableRole && role != GridRole)
         return;
     
     bool isMulti = isMultiSelectable();
@@ -1960,13 +2004,18 @@ void AccessibilityRenderObject::setSelectedVisiblePositionRange(const VisiblePos
 {
     if (range.start.isNull() || range.end.isNull())
         return;
-    
+
     // make selection and tell the document to use it. if it's zero length, then move to that position
-    if (range.start == range.end)
+    if (range.start == range.end) {
+        setTextSelectionIntent(axObjectCache(), AXTextStateChangeTypeSelectionMove);
         m_renderer->frame().selection().moveTo(range.start, UserTriggered);
+        clearTextSelectionIntent(axObjectCache());
+    }
     else {
+        setTextSelectionIntent(axObjectCache(), AXTextStateChangeTypeSelectionExtend);
         VisibleSelection newSelection = VisibleSelection(range.start, range.end);
-        m_renderer->frame().selection().setSelection(newSelection);
+        m_renderer->frame().selection().setSelection(newSelection, FrameSelection::defaultSetSelectionOptions());
+        clearTextSelectionIntent(axObjectCache());
     }
 }
 
@@ -2450,7 +2499,9 @@ AccessibilityRole AccessibilityRenderObject::determineAccessibilityRole()
     if (!m_renderer)
         return UnknownRole;
 
-    if ((m_ariaRole = determineAriaRoleAttribute()) != UnknownRole)
+    // Sometimes we need to ignore the attribute role. Like if a tree is malformed,
+    // we want to ignore the treeitem's attribute role.
+    if ((m_ariaRole = determineAriaRoleAttribute()) != UnknownRole && !shouldIgnoreAttributeRole())
         return m_ariaRole;
     
     Node* node = m_renderer->node();
@@ -2551,31 +2602,27 @@ AccessibilityRole AccessibilityRenderObject::determineAccessibilityRole()
     if (node && node->hasTagName(dlTag))
         return DescriptionListRole;
 
-    if (node && (node->hasTagName(rpTag) || node->hasTagName(rtTag)))
-        return AnnotationRole;
-
+    // Check for Ruby elements
+    if (m_renderer->isRubyText())
+        return RubyTextRole;
+    if (m_renderer->isRubyBase())
+        return RubyBaseRole;
+    if (m_renderer->isRubyRun())
+        return RubyRunRole;
+    if (m_renderer->isRubyBlock())
+        return RubyBlockRole;
+    if (m_renderer->isRubyInline())
+        return RubyInlineRole;
+    
+    // This return value is what will be used if AccessibilityTableCell determines
+    // the cell should not be treated as a cell (e.g. because it is a layout table.
+    // In ATK, there is a distinction between generic text block elements and other
+    // generic containers; AX API does not make this distinction.
+    if (node && (node->hasTagName(tdTag) || node->hasTagName(thTag)))
 #if PLATFORM(GTK) || PLATFORM(EFL)
-    // Gtk ATs expect all tables, data and layout, to be exposed as tables.
-    if (node && (node->hasTagName(tdTag)))
-        return CellRole;
-
-    if (node && (node->hasTagName(thTag))) {
-        for (Node* parentNode = node->parentNode(); parentNode; parentNode = parentNode->parentNode()) {
-            if (parentNode->hasTagName(theadTag))
-                return ColumnHeaderRole;
-            if (parentNode->hasTagName(tbodyTag) || parentNode->hasTagName(tfootTag))
-                return RowHeaderRole;
-            if (parentNode->hasTagName(tableTag))
-                return CellRole;
-        }
-        return CellRole;
-    }
-
-    if (node && node->hasTagName(trTag))
-        return RowRole;
-
-    if (is<HTMLTableElement>(node))
-        return TableRole;
+        return DivRole;
+#else
+        return GroupRole;
 #endif
 
     // Table sections should be ignored.
@@ -2623,6 +2670,14 @@ AccessibilityRole AccessibilityRenderObject::determineAccessibilityRole()
 
     if (node && node->hasTagName(captionTag))
         return CaptionRole;
+
+    if (node && node->hasTagName(preTag))
+        return PreRole;
+
+    if (is<HTMLDetailsElement>(node))
+        return DetailsRole;
+    if (is<HTMLSummaryElement>(node))
+        return SummaryRole;
 
 #if ENABLE(VIDEO)
     if (is<HTMLVideoElement>(node))
@@ -2698,6 +2753,7 @@ bool AccessibilityRenderObject::inheritsPresentationalRole() const
         }
         possibleParentTagNames = &listItemParents.get();
         break;
+    case GridCellRole:
     case CellRole:
         if (tableCellParents.get().isEmpty())
             tableCellParents.get().add(tableTag);
@@ -2755,6 +2811,9 @@ bool AccessibilityRenderObject::ariaRoleHasPresentationalChildren() const
 
 bool AccessibilityRenderObject::canSetExpandedAttribute() const
 {
+    if (roleValue() == DetailsRole)
+        return true;
+    
     // An object can be expanded if it aria-expanded is true or false.
     const AtomicString& ariaExpanded = getAttribute(aria_expandedAttr);
     return equalIgnoringCase(ariaExpanded, "true") || equalIgnoringCase(ariaExpanded, "false");
@@ -3190,7 +3249,7 @@ void AccessibilityRenderObject::selectedChildren(AccessibilityChildrenVector& re
     AccessibilityRole role = roleValue();
     if (role == ListBoxRole) // native list boxes would be AccessibilityListBoxes, so only check for aria list boxes
         ariaListboxSelectedChildren(result);
-    else if (role == TreeRole || role == TreeGridRole || role == TableRole)
+    else if (role == TreeRole || role == TreeGridRole || role == TableRole || role == GridRole)
         ariaSelectedRows(result);
 }
 
@@ -3838,8 +3897,8 @@ void AccessibilityRenderObject::mathPrescripts(AccessibilityMathMultiscriptPairs
                 else {
                     prescriptPair.second = axChild;
                     prescripts.append(prescriptPair);
-                    prescriptPair.first = 0;
-                    prescriptPair.second = 0;
+                    prescriptPair.first = nullptr;
+                    prescriptPair.second = nullptr;
                 }
             }
         } else if (child->hasTagName(MathMLNames::mprescriptsTag))
@@ -3873,8 +3932,8 @@ void AccessibilityRenderObject::mathPostscripts(AccessibilityMathMultiscriptPair
             else {
                 postscriptPair.second = axChild;
                 postscripts.append(postscriptPair);
-                postscriptPair.first = 0;
-                postscriptPair.second = 0;
+                postscriptPair.first = nullptr;
+                postscriptPair.second = nullptr;
             }
         }
     }

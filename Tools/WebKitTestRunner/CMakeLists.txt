@@ -49,6 +49,9 @@ set(WebKitTestRunner_INCLUDE_DIRECTORIES
     ${DERIVED_SOURCES_DIR}/InjectedBundle
     ${CMAKE_BINARY_DIR}
     ${CMAKE_SOURCE_DIR}/Source
+)
+
+set(WebKitTestRunner_SYSTEM_INCLUDE_DIRECTORIES
     ${LIBSOUP_INCLUDE_DIRS}
 )
 
@@ -91,9 +94,10 @@ GENERATE_BINDINGS(WebKitTestRunnerInjectedBundle_SOURCES
     ${DERIVED_SOURCES_DIR}/InjectedBundle JS TestRunner cpp
     ${WEBCORE_DIR}/bindings/scripts/IDLAttributes.txt)
 
-INCLUDE_IF_EXISTS(${WEBKIT_TESTRUNNER_DIR}/Platform${PORT}.cmake)
+WEBKIT_INCLUDE_CONFIG_FILES_IF_EXISTS()
 
 include_directories(${WebKitTestRunner_INCLUDE_DIRECTORIES})
+include_directories(SYSTEM ${WebKitTestRunner_SYSTEM_INCLUDE_DIRECTORIES})
 
 add_library(TestRunnerInjectedBundle SHARED ${WebKitTestRunnerInjectedBundle_SOURCES})
 target_link_libraries(TestRunnerInjectedBundle ${WebKitTestRunnerInjectedBundle_LIBRARIES})

@@ -41,6 +41,7 @@
 #include "Frame.h"
 #include "FrameLoader.h"
 #include "FrameSelection.h"
+#include "HTMLDetailsElement.h"
 #include "HTMLInputElement.h"
 #include "HTMLNames.h"
 #include "HTMLParserIdioms.h"
@@ -456,6 +457,30 @@ AccessibilityObject* AccessibilityObject::parentObjectUnignored() const
     return parent;
 }
 
+AccessibilityObject* AccessibilityObject::previousSiblingUnignored(int limit) const
+{
+    AccessibilityObject* previous;
+    ASSERT(limit >= 0);
+    for (previous = previousSibling(); previous && previous->accessibilityIsIgnored(); previous = previous->previousSibling()) {
+        limit--;
+        if (limit <= 0)
+            break;
+    }
+    return previous;
+}
+
+AccessibilityObject* AccessibilityObject::nextSiblingUnignored(int limit) const
+{
+    AccessibilityObject* next;
+    ASSERT(limit >= 0);
+    for (next = nextSibling(); next && next->accessibilityIsIgnored(); next = next->nextSibling()) {
+        limit--;
+        if (limit <= 0)
+            break;
+    }
+    return next;
+}
+
 AccessibilityObject* AccessibilityObject::firstAccessibleObjectFromNode(const Node* node)
 {
     if (!node)
@@ -610,7 +635,15 @@ void AccessibilityObject::findMatchingObjects(AccessibilitySearchCriteria* crite
 static PassRefPtr<Range> rangeClosestToRange(Range* referenceRange, PassRefPtr<Range> afterRange, PassRefPtr<Range> beforeRange)
 {
     ASSERT(referenceRange);
+    
+    // The treeScope for shadow nodes may not be the same scope as another element in a document.
+    // Comparisons may fail in that case, which are expected behavior and should not assert.
+    if (afterRange && ((afterRange->startPosition().anchorNode()->compareDocumentPosition(referenceRange->endPosition().anchorNode()) & Node::DOCUMENT_POSITION_DISCONNECTED) == Node::DOCUMENT_POSITION_DISCONNECTED))
+        return nullptr;
     ASSERT(!afterRange || afterRange->startPosition() >= referenceRange->endPosition());
+    
+    if (beforeRange && ((beforeRange->endPosition().anchorNode()->compareDocumentPosition(referenceRange->startPosition().anchorNode()) & Node::DOCUMENT_POSITION_DISCONNECTED) == Node::DOCUMENT_POSITION_DISCONNECTED))
+        return nullptr;
     ASSERT(!beforeRange || beforeRange->endPosition() <= referenceRange->startPosition());
     
     if (!referenceRange || (!afterRange && !beforeRange))
@@ -710,6 +743,12 @@ String AccessibilityObject::selectText(AccessibilitySelectTextCriteria* criteria
     
     // Determine which candidate is closest to the selection and perform the activity.
     if (RefPtr<Range> closestStringRange = rangeClosestToRange(selectedStringRange.get(), closestAfterStringRange, closestBeforeStringRange)) {
+        // If the search started within a text control, ensure that the result is inside that element.
+        if (element() && element()->isTextFormControl()) {
+            if (!closestStringRange->startContainer()->isDescendantOrShadowDescendantOf(element()) || !closestStringRange->endContainer()->isDescendantOrShadowDescendantOf(element()))
+                return String();
+        }
+        
         String closestString = closestStringRange->text();
         bool replaceSelection = false;
         if (frame->selection().setSelectedRange(closestStringRange.get(), DOWNSTREAM, true)) {
@@ -1875,8 +1914,10 @@ static void initializeRoleMap()
         { "contentinfo", LandmarkContentInfoRole },
         { "dialog", ApplicationDialogRole },
         { "directory", DirectoryRole },
-        { "grid", TableRole },
-        { "gridcell", CellRole },
+        { "grid", GridRole },
+        { "gridcell", GridCellRole },
+        { "table", TableRole },
+        { "cell", CellRole },
         { "columnheader", ColumnHeaderRole },
         { "combobox", ComboBoxRole },
         { "definition", DefinitionRole },
@@ -1988,6 +2029,11 @@ bool AccessibilityObject::hasHighlighting() const
     return false;
 }
 
+const AtomicString& AccessibilityObject::roleDescription() const
+{
+    return getAttribute(aria_roledescriptionAttr);
+}
+    
 static bool nodeHasPresentationRole(Node* node)
 {
     return nodeHasRole(node, "presentation") || nodeHasRole(node, "none");
@@ -1997,10 +2043,27 @@ bool AccessibilityObject::supportsPressAction() const
 {
     if (isButton())
         return true;
+    if (roleValue() == DetailsRole)
+        return true;
     
     Element* actionElement = this->actionElement();
     if (!actionElement)
         return false;
+    
+    // [Bug: 136247] Heuristic: element handlers that have more than one accessible descendant should not be exposed as supporting press.
+    if (actionElement != element()) {
+        if (AccessibilityObject* axObj = axObjectCache()->getOrCreate(actionElement)) {
+            AccessibilityChildrenVector results;
+            // Search within for immediate descendants that are static text. If we find more than one
+            // then this is an event delegator actionElement and we should expose the press action.
+            Vector<AccessibilitySearchKey> keys({ StaticTextSearchKey, ControlSearchKey, GraphicSearchKey, HeadingSearchKey, LinkSearchKey });
+            AccessibilitySearchCriteria criteria(axObj, SearchDirectionNext, "", 2, false, false);
+            criteria.searchKeys = keys;
+            axObj->findMatchingObjects(&criteria, results);
+            if (results.size() > 1)
+                return false;
+        }
+    }
     
     // [Bug: 133613] Heuristic: If the action element is presentational, we shouldn't expose press as a supported action.
     return !nodeHasPresentationRole(actionElement);
@@ -2028,7 +2091,7 @@ bool AccessibilityObject::isValueAutofilled() const
     if (!node || !is<HTMLInputElement>(*node))
         return false;
     
-    return downcast<HTMLInputElement>(*node).isAutofilled();
+    return downcast<HTMLInputElement>(*node).isAutoFilled();
 }
 
 const AtomicString& AccessibilityObject::placeholderValue() const
@@ -2184,8 +2247,13 @@ void AccessibilityObject::classList(Vector<String>& classList) const
         classList.append(list.item(k).string());
 }
 
+bool AccessibilityObject::supportsARIAPressed() const
+{
+    const AtomicString& expanded = getAttribute(aria_pressedAttr);
+    return equalIgnoringCase(expanded, "true") || equalIgnoringCase(expanded, "false");
+}
     
-bool AccessibilityObject::supportsARIAExpanded() const
+bool AccessibilityObject::supportsExpanded() const
 {
     // Undefined values should not result in this attribute being exposed to ATs according to ARIA.
     const AtomicString& expanded = getAttribute(aria_expandedAttr);
@@ -2194,6 +2262,7 @@ bool AccessibilityObject::supportsARIAExpanded() const
     switch (roleValue()) {
     case ComboBoxRole:
     case DisclosureTriangleRole:
+    case DetailsRole:
         return true;
     default:
         return false;
@@ -2204,6 +2273,9 @@ bool AccessibilityObject::isExpanded() const
 {
     if (equalIgnoringCase(getAttribute(aria_expandedAttr), "true"))
         return true;
+    
+    if (is<HTMLDetailsElement>(node()))
+        return downcast<HTMLDetailsElement>(node())->isOpen();
     
     return false;  
 }
@@ -2226,7 +2298,17 @@ AccessibilityButtonState AccessibilityObject::checkboxOrRadioValue() const
 {
     // If this is a real checkbox or radio button, AccessibilityRenderObject will handle.
     // If it's an ARIA checkbox, radio, or switch the aria-checked attribute should be used.
+    // If it's a toggle button, the aria-pressed attribute is consulted.
 
+    if (isToggleButton()) {
+        const AtomicString& ariaPressed = getAttribute(aria_pressedAttr);
+        if (equalIgnoringCase(ariaPressed, "true"))
+            return ButtonStateOn;
+        if (equalIgnoringCase(ariaPressed, "mixed"))
+            return ButtonStateMixed;
+        return ButtonStateOff;
+    }
+    
     const AtomicString& result = getAttribute(aria_checkedAttr);
     if (equalIgnoringCase(result, "true"))
         return ButtonStateOn;
@@ -2272,10 +2354,8 @@ AccessibilityButtonState AccessibilityObject::checkboxOrRadioValue() const
 // Note that the return value represents the ideal new scroll offset.
 // This may be out of range - the calling function should clip this
 // to the available range.
-static int computeBestScrollOffset(int currentScrollOffset,
-                                   int subfocusMin, int subfocusMax,
-                                   int objectMin, int objectMax,
-                                   int viewportMin, int viewportMax) {
+static int computeBestScrollOffset(int currentScrollOffset, int subfocusMin, int objectMin, int objectMax, int viewportMin, int viewportMax)
+{
     int viewportSize = viewportMax - viewportMin;
 
     // If the focus size is larger than the viewport size, shrink it in the
@@ -2283,12 +2363,8 @@ static int computeBestScrollOffset(int currentScrollOffset,
     if (objectMax - objectMin > viewportSize) {
         // Subfocus must be within focus:
         subfocusMin = std::max(subfocusMin, objectMin);
-        subfocusMax = std::min(subfocusMax, objectMax);
 
         // Subfocus must be no larger than the viewport size; favor top/left.
-        if (subfocusMax - subfocusMin > viewportSize)
-            subfocusMax = subfocusMin + viewportSize;
-
         if (subfocusMin + viewportSize > objectMax)
             objectMin = objectMax - viewportSize;
         else {
@@ -2375,12 +2451,12 @@ void AccessibilityObject::scrollToMakeVisibleWithSubFocus(const IntRect& subfocu
 
     int desiredX = computeBestScrollOffset(
         scrollPosition.x(),
-        objectRect.x() + subfocus.x(), objectRect.x() + subfocus.maxX(),
+        objectRect.x() + subfocus.x(),
         objectRect.x(), objectRect.maxX(),
         0, scrollVisibleRect.width());
     int desiredY = computeBestScrollOffset(
         scrollPosition.y(),
-        objectRect.y() + subfocus.y(), objectRect.y() + subfocus.maxY(),
+        objectRect.y() + subfocus.y(),
         objectRect.y(), objectRect.maxY(),
         0, scrollVisibleRect.height());
 
@@ -2427,12 +2503,12 @@ void AccessibilityObject::scrollToGlobalPoint(const IntPoint& globalPoint) const
 
         int desiredX = computeBestScrollOffset(
             0,
-            objectRect.x(), objectRect.maxX(),
+            objectRect.x(),
             objectRect.x(), objectRect.maxX(),
             point.x(), point.x());
         int desiredY = computeBestScrollOffset(
             0,
-            objectRect.y(), objectRect.maxY(),
+            objectRect.y(),
             objectRect.y(), objectRect.maxY(),
             point.y(), point.y());
         outer->scrollTo(IntPoint(desiredX, desiredY));
@@ -2453,6 +2529,102 @@ void AccessibilityObject::scrollToGlobalPoint(const IntPoint& globalPoint) const
         }
     }
 }
+    
+void AccessibilityObject::scrollAreaAndAncestor(std::pair<ScrollableArea*, AccessibilityObject*>& scrollers) const
+{
+    // Search up the parent chain until we find the first one that's scrollable.
+    scrollers.first = nullptr;
+    for (scrollers.second = parentObject(); scrollers.second; scrollers.second = scrollers.second->parentObject()) {
+        if ((scrollers.first = scrollers.second->getScrollableAreaIfScrollable()))
+            break;
+    }
+}
+    
+ScrollableArea* AccessibilityObject::scrollableAreaAncestor() const
+{
+    std::pair<ScrollableArea*, AccessibilityObject*> scrollers;
+    scrollAreaAndAncestor(scrollers);
+    return scrollers.first;
+}
+    
+IntPoint AccessibilityObject::scrollPosition() const
+{
+    if (auto scroller = scrollableAreaAncestor())
+        return scroller->scrollPosition();
+
+    return IntPoint();
+}
+
+IntRect AccessibilityObject::scrollVisibleContentRect() const
+{
+    if (auto scroller = scrollableAreaAncestor())
+        return scroller->visibleContentRect(ScrollableArea::LegacyIOSDocumentVisibleRect);
+    
+    return IntRect();
+}
+    
+IntSize AccessibilityObject::scrollContentsSize() const
+{
+    if (auto scroller = scrollableAreaAncestor())
+        return scroller->contentsSize();
+
+    return IntSize();
+}
+    
+bool AccessibilityObject::scrollByPage(ScrollByPageDirection direction) const
+{
+    std::pair<ScrollableArea*, AccessibilityObject*> scrollers;
+    scrollAreaAndAncestor(scrollers);
+    ScrollableArea* scrollableArea = scrollers.first;
+    AccessibilityObject* scrollParent = scrollers.second;
+    
+    if (!scrollableArea)
+        return false;
+    
+    IntPoint scrollPosition = scrollableArea->scrollPosition();
+    IntPoint newScrollPosition = scrollPosition;
+    IntSize scrollSize = scrollableArea->contentsSize();
+    IntRect scrollVisibleRect = scrollableArea->visibleContentRect(ScrollableArea::LegacyIOSDocumentVisibleRect);
+    switch (direction) {
+    case Right: {
+        int scrollAmount = scrollVisibleRect.size().width();
+        int newX = scrollPosition.x() - scrollAmount;
+        newScrollPosition.setX(std::max(newX, 0));
+        break;
+    }
+    case Left: {
+        int scrollAmount = scrollVisibleRect.size().width();
+        int newX = scrollAmount + scrollPosition.x();
+        int maxX = scrollSize.width() - scrollAmount;
+        newScrollPosition.setX(std::min(newX, maxX));
+        break;
+    }
+    case Up: {
+        int scrollAmount = scrollVisibleRect.size().height();
+        int newY = scrollPosition.y() - scrollAmount;
+        newScrollPosition.setY(std::max(newY, 0));
+        break;
+    }
+    case Down: {
+        int scrollAmount = scrollVisibleRect.size().height();
+        int newY = scrollAmount + scrollPosition.y();
+        int maxY = scrollSize.height() - scrollAmount;
+        newScrollPosition.setY(std::min(newY, maxY));
+        break;
+    }
+    default:
+        break;
+    }
+    
+    if (newScrollPosition != scrollPosition) {
+        scrollParent->scrollTo(newScrollPosition);
+        document()->updateLayoutIgnorePendingStylesheets();
+        return true;
+    }
+    
+    return false;
+}
+
 
 bool AccessibilityObject::lastKnownIsIgnoredValue()
 {
@@ -2603,6 +2775,35 @@ void AccessibilityObject::elementsFromAttribute(Vector<Element*>& elements, cons
         if (Element* idElement = treeScope.getElementById(idName))
             elements.append(idElement);
     }
+}
+
+#if PLATFORM(COCOA)
+bool AccessibilityObject::preventKeyboardDOMEventDispatch() const
+{
+    Frame* frame = this->frame();
+    return frame && frame->settings().preventKeyboardDOMEventDispatch();
+}
+
+void AccessibilityObject::setPreventKeyboardDOMEventDispatch(bool on)
+{
+    Frame* frame = this->frame();
+    if (!frame)
+        return;
+    frame->settings().setPreventKeyboardDOMEventDispatch(on);
+}
+#endif
+
+bool AccessibilityObject::isContainedByPasswordField() const
+{
+    Node* node = this->node();
+    if (!node)
+        return false;
+    
+    if (ariaRoleAttribute() != UnknownRole)
+        return false;
+
+    Element* element = node->shadowHost();
+    return is<HTMLInputElement>(element) && downcast<HTMLInputElement>(*element).isPasswordField();
 }
 
 } // namespace WebCore

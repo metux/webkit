@@ -40,8 +40,8 @@ class InlineTextBox : public InlineBox {
 public:
     explicit InlineTextBox(RenderText& renderer)
         : InlineBox(renderer)
-        , m_prevTextBox(0)
-        , m_nextTextBox(0)
+        , m_prevTextBox(nullptr)
+        , m_nextTextBox(nullptr)
         , m_start(0)
         , m_len(0)
         , m_truncation(cNoTruncation)
@@ -77,6 +77,12 @@ public:
     using InlineBox::setHasHyphen;
     using InlineBox::canHaveLeadingExpansion;
     using InlineBox::setCanHaveLeadingExpansion;
+    using InlineBox::canHaveTrailingExpansion;
+    using InlineBox::setCanHaveTrailingExpansion;
+    using InlineBox::forceTrailingExpansion;
+    using InlineBox::setForceTrailingExpansion;
+    using InlineBox::forceLeadingExpansion;
+    using InlineBox::setForceLeadingExpansion;
 
     static inline bool compareByStart(const InlineTextBox* first, const InlineTextBox* second) { return first->start() < second->start(); }
 
@@ -94,7 +100,7 @@ public:
 
     virtual void dirtyOwnLineBoxes() { dirtyLineBoxes(); }
 
-#ifndef NDEBUG
+#if ENABLE(TREE_DEBUGGING)
     virtual void showLineBox(bool mark, int depth) const override final;
     virtual const char* boxName() const override final;
 #endif
@@ -108,15 +114,15 @@ private:
     TextRun constructTextRun(const RenderStyle&, const FontCascade&, String, unsigned maximumLength, String* hyphenatedStringBuffer = nullptr) const;
 
 public:
-    virtual FloatRect calculateBoundaries() const { return FloatRect(x(), y(), width(), height()); }
+    virtual FloatRect calculateBoundaries() const override { return FloatRect(x(), y(), width(), height()); }
 
     virtual LayoutRect localSelectionRect(int startPos, int endPos) const;
     bool isSelected(int startPos, int endPos) const;
     void selectionStartEnd(int& sPos, int& ePos);
 
 protected:
-    virtual void paint(PaintInfo&, const LayoutPoint&, LayoutUnit lineTop, LayoutUnit lineBottom);
-    virtual bool nodeAtPoint(const HitTestRequest&, HitTestResult&, const HitTestLocation& locationInContainer, const LayoutPoint& accumulatedOffset, LayoutUnit lineTop, LayoutUnit lineBottom) override;
+    virtual void paint(PaintInfo&, const LayoutPoint&, LayoutUnit lineTop, LayoutUnit lineBottom) override;
+    virtual bool nodeAtPoint(const HitTestRequest&, HitTestResult&, const HitTestLocation& locationInContainer, const LayoutPoint& accumulatedOffset, LayoutUnit lineTop, LayoutUnit lineBottom, HitTestAction) override;
 
 private:
     virtual void deleteLine() override final;
@@ -153,18 +159,14 @@ protected:
     void paintCompositionUnderline(GraphicsContext&, const FloatPoint& boxOrigin, const CompositionUnderline&);
 
 private:
-    void paintDecoration(GraphicsContext&, const FloatPoint& boxOrigin, TextDecoration, TextDecorationStyle, const ShadowData*, TextPainter&);
+    void paintDecoration(GraphicsContext&, const FloatPoint& boxOrigin, TextDecoration, const ShadowData*, TextPainter&);
     void paintSelection(GraphicsContext&, const FloatPoint& boxOrigin, const RenderStyle&, const FontCascade&, Color textColor);
     void paintDocumentMarker(GraphicsContext&, const FloatPoint& boxOrigin, RenderedDocumentMarker&, const RenderStyle&, const FontCascade&, bool grammar);
     void paintTextMatchMarker(GraphicsContext&, const FloatPoint& boxOrigin, RenderedDocumentMarker&, const RenderStyle&, const FontCascade&);
 
     void computeRectForReplacementMarker(RenderedDocumentMarker&, const RenderStyle&, const FontCascade&);
 
-    TextRun::ExpansionBehavior expansionBehavior() const
-    {
-        return (canHaveLeadingExpansion() ? TextRun::AllowLeadingExpansion : TextRun::ForbidLeadingExpansion)
-            | (renderer().contentIsKnownToFollow() || (expansion() && nextLeafChild() && !nextLeafChild()->isLineBreak()) ? TextRun::AllowTrailingExpansion : TextRun::ForbidTrailingExpansion);
-    }
+    ExpansionBehavior expansionBehavior() const;
 
     void behavesLikeText() const = delete;
 

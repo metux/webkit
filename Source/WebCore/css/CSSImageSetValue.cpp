@@ -130,11 +130,6 @@ StyleCachedImageSet* CSSImageSetValue::cachedImageSet(CachedResourceLoader& load
     return is<StyleCachedImageSet>(m_imageSet.get()) ? downcast<StyleCachedImageSet>(m_imageSet.get()) : nullptr;
 }
 
-StyleCachedImageSet* CSSImageSetValue::cachedImageSet(CachedResourceLoader& loader)
-{
-    return cachedImageSet(loader, CachedResourceLoader::defaultCachedResourceOptions());
-}
-
 StyleImage* CSSImageSetValue::cachedOrPendingImageSet(Document& document)
 {
     if (!m_imageSet)
@@ -184,14 +179,13 @@ String CSSImageSetValue::customCSSText() const
     return result.toString();
 }
 
-bool CSSImageSetValue::hasFailedOrCanceledSubresources() const
+bool CSSImageSetValue::traverseSubresources(const std::function<bool (const CachedResource&)>& handler) const
 {
     if (!is<StyleCachedImageSet>(m_imageSet.get()))
         return false;
     CachedImage* cachedResource = downcast<StyleCachedImageSet>(*m_imageSet).cachedImage();
-    if (!cachedResource)
-        return true;
-    return cachedResource->loadFailedOrCanceled();
+    ASSERT(cachedResource);
+    return handler(*cachedResource);
 }
 
 CSSImageSetValue::CSSImageSetValue(const CSSImageSetValue& cloneFrom)
@@ -202,9 +196,9 @@ CSSImageSetValue::CSSImageSetValue(const CSSImageSetValue& cloneFrom)
     // Non-CSSValueList data is not accessible through CSS OM, no need to clone.
 }
 
-PassRefPtr<CSSImageSetValue> CSSImageSetValue::cloneForCSSOM() const
+Ref<CSSImageSetValue> CSSImageSetValue::cloneForCSSOM() const
 {
-    return adoptRef(new CSSImageSetValue(*this));
+    return adoptRef(*new CSSImageSetValue(*this));
 }
 
 } // namespace WebCore

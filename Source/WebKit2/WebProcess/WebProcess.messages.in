@@ -56,6 +56,8 @@ messages -> WebProcess LegacyReceiver {
     DidAddPlugInAutoStartOriginHash(uint32_t hash, double expirationTime, WebCore::SessionID sessionID)
     ResetPlugInAutoStartOriginDefaultHashes(HashMap<uint32_t,double> hashes)
     ResetPlugInAutoStartOriginHashes(HashMap<WebCore::SessionID, HashMap<uint32_t,double>> hashes)
+    SetPluginLoadClientPolicy(uint8_t policy, String host, String bundleIdentifier, String versionString)
+    ClearPluginClientPolicies()
 
     void StartMemorySampler(WebKit::SandboxExtension::Handle sampleLogFileHandle, String sampleLogFilePath, double interval);
     void StopMemorySampler();
@@ -79,6 +81,10 @@ messages -> WebProcess LegacyReceiver {
 
     ReleasePageCache()
 
+    FetchWebsiteData(WebCore::SessionID sessionID, uint64_t websiteDataTypes, uint64_t callbackID)
+    DeleteWebsiteData(WebCore::SessionID sessionID, uint64_t websiteDataTypes, std::chrono::system_clock::time_point modifiedSince, uint64_t callbackID)
+    DeleteWebsiteDataForOrigins(WebCore::SessionID sessionID, uint64_t websiteDataTypes, Vector<WebKit::SecurityOriginData> origins, uint64_t callbackID)
+
     SetProcessSuppressionEnabled(bool flag)
 #if PLATFORM(COCOA)
     SetQOS(int latencyQOS, int throughputQOS)
@@ -94,7 +100,8 @@ messages -> WebProcess LegacyReceiver {
     SetEnabledServices(bool hasImageServices, bool hasSelectionServices, bool hasRichContentServices)
 #endif
 
-    ProcessWillSuspend()
-    CancelProcessWillSuspend()
+    ProcessWillSuspendImminently() -> (bool handled)
+    PrepareToSuspend()
+    CancelPrepareToSuspend()
     ProcessDidResume()
 }

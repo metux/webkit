@@ -34,6 +34,7 @@
 #include "Page.h"
 #include "PageConsoleClient.h"
 #include "SecurityOrigin.h"
+#include <profiler/Profile.h>
 #include <runtime/JSLock.h>
 #include <wtf/Ref.h>
 
@@ -41,18 +42,18 @@ namespace WebCore {
 
 using namespace JSC;
 
-PassRefPtr<JSCustomXPathNSResolver> JSCustomXPathNSResolver::create(ExecState* exec, JSValue value)
+RefPtr<JSCustomXPathNSResolver> JSCustomXPathNSResolver::create(ExecState* exec, JSValue value)
 {
     if (value.isUndefinedOrNull())
-        return 0;
+        return nullptr;
 
     JSObject* resolverObject = value.getObject();
     if (!resolverObject) {
         setDOMException(exec, TYPE_MISMATCH_ERR);
-        return 0;
+        return nullptr;
     }
 
-    return adoptRef(new JSCustomXPathNSResolver(exec, resolverObject, asJSDOMWindow(exec->vmEntryGlobalObject())));
+    return adoptRef(*new JSCustomXPathNSResolver(exec, resolverObject, asJSDOMWindow(exec->vmEntryGlobalObject())));
 }
 
 JSCustomXPathNSResolver::JSCustomXPathNSResolver(ExecState* exec, JSObject* customResolver, JSDOMWindow* globalObject)
@@ -73,7 +74,7 @@ String JSCustomXPathNSResolver::lookupNamespaceURI(const String& prefix)
 
     ExecState* exec = m_globalObject->globalExec();
         
-    JSValue function = m_customResolver->get(exec, Identifier(exec, "lookupNamespaceURI"));
+    JSValue function = m_customResolver->get(exec, Identifier::fromString(exec, "lookupNamespaceURI"));
     CallData callData;
     CallType callType = getCallData(function, callData);
     if (callType == CallTypeNone) {
@@ -92,8 +93,8 @@ String JSCustomXPathNSResolver::lookupNamespaceURI(const String& prefix)
     MarkedArgumentBuffer args;
     args.append(jsStringWithCache(exec, prefix));
 
-    JSValue exception;
-    JSValue retval = JSMainThreadExecState::call(exec, function, callType, callData, m_customResolver.get(), args, &exception);
+    NakedPtr<Exception> exception;
+    JSValue retval = JSMainThreadExecState::call(exec, function, callType, callData, m_customResolver.get(), args, exception);
 
     String result;
     if (exception)

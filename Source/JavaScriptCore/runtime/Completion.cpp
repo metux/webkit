@@ -26,10 +26,13 @@
 #include "CallFrame.h"
 #include "CodeProfiling.h"
 #include "Debugger.h"
+#include "Exception.h"
 #include "Interpreter.h"
 #include "JSGlobalObject.h"
 #include "JSLock.h"
 #include "JSCInlines.h"
+#include "ModuleAnalyzer.h"
+#include "ModuleRecord.h"
 #include "Parser.h"
 #include <wtf/WTFThreadData.h>
 
@@ -55,10 +58,27 @@ bool checkSyntax(VM& vm, const SourceCode& source, ParserError& error)
 {
     JSLockHolder lock(vm);
     RELEASE_ASSERT(vm.atomicStringTable() == wtfThreadData().atomicStringTable());
-    return !!parse<ProgramNode>(&vm, source, 0, Identifier(), JSParseNormal, JSParseProgramCode, error);
+    return !!parse<ProgramNode>(
+        &vm, source, Identifier(), JSParserBuiltinMode::NotBuiltin,
+        JSParserStrictMode::NotStrict, SourceParseMode::ProgramMode, error);
 }
 
-JSValue evaluate(ExecState* exec, const SourceCode& source, JSValue thisValue, JSValue* returnedException)
+bool checkModuleSyntax(VM& vm, const SourceCode& source, ParserError& error)
+{
+    JSLockHolder lock(vm);
+    RELEASE_ASSERT(vm.atomicStringTable() == wtfThreadData().atomicStringTable());
+    std::unique_ptr<ModuleProgramNode> moduleProgramNode = parse<ModuleProgramNode>(
+        &vm, source, Identifier(), JSParserBuiltinMode::NotBuiltin,
+        JSParserStrictMode::Strict, SourceParseMode::ModuleAnalyzeMode, error);
+    if (!moduleProgramNode)
+        return false;
+
+    ModuleAnalyzer moduleAnalyzer(vm, moduleProgramNode->varDeclarations(), moduleProgramNode->lexicalVariables());
+    moduleAnalyzer.analyze(*moduleProgramNode);
+    return true;
+}
+
+JSValue evaluate(ExecState* exec, const SourceCode& source, JSValue thisValue, NakedPtr<Exception>& returnedException)
 {
     JSLockHolder lock(exec);
     RELEASE_ASSERT(exec->vm().atomicStringTable() == wtfThreadData().atomicStringTable());
@@ -68,9 +88,7 @@ JSValue evaluate(ExecState* exec, const SourceCode& source, JSValue thisValue, J
 
     ProgramExecutable* program = ProgramExecutable::create(exec, source);
     if (!program) {
-        if (returnedException)
-            *returnedException = exec->vm().exception();
-
+        returnedException = exec->vm().exception();
         exec->vm().clearException();
         return jsUndefined();
     }
@@ -81,9 +99,7 @@ JSValue evaluate(ExecState* exec, const SourceCode& source, JSValue thisValue, J
     JSValue result = exec->interpreter()->execute(program, exec, thisObj);
 
     if (exec->hadException()) {
-        if (returnedException)
-            *returnedException = exec->exception();
-
+        returnedException = exec->exception();
         exec->clearException();
         return jsUndefined();
     }

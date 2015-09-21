@@ -49,6 +49,9 @@ class SecurityOrigin;
 class DatabaseTracker {
     WTF_MAKE_NONCOPYABLE(DatabaseTracker); WTF_MAKE_FAST_ALLOCATED;
 public:
+    // FIXME: This is a hack so we can easily delete databases from the UI process in WebKit2.
+    WEBCORE_EXPORT static std::unique_ptr<DatabaseTracker> trackerWithDatabasePath(const String& databasePath);
+
     static void initializeTracker(const String& databasePath);
 
     WEBCORE_EXPORT static DatabaseTracker& tracker();
@@ -71,7 +74,7 @@ public:
 
     unsigned long long getMaxSizeForDatabase(const Database*);
 
-    void interruptAllDatabasesForContext(const DatabaseContext*);
+    WEBCORE_EXPORT void closeAllDatabases();
 
 private:
     explicit DatabaseTracker(const String& databasePath);
@@ -82,7 +85,7 @@ public:
     void setDatabaseDirectoryPath(const String&);
     String databaseDirectoryPath() const;
 
-    void origins(Vector<RefPtr<SecurityOrigin>>& result);
+    WEBCORE_EXPORT void origins(Vector<RefPtr<SecurityOrigin>>& result);
     bool databaseNamesForOrigin(SecurityOrigin*, Vector<String>& result);
 
     DatabaseDetails detailsForNameAndOrigin(const String&, SecurityOrigin*);
@@ -90,10 +93,11 @@ public:
     unsigned long long usageForOrigin(SecurityOrigin*);
     unsigned long long quotaForOrigin(SecurityOrigin*);
     void setQuota(SecurityOrigin*, unsigned long long);
-    PassRefPtr<OriginLock> originLockFor(SecurityOrigin*);
+    RefPtr<OriginLock> originLockFor(SecurityOrigin*);
 
     void deleteAllDatabases();
-    bool deleteOrigin(SecurityOrigin*);
+    WEBCORE_EXPORT void deleteDatabasesModifiedSince(std::chrono::system_clock::time_point);
+    WEBCORE_EXPORT bool deleteOrigin(SecurityOrigin*);
     bool deleteDatabase(SecurityOrigin*, const String& name);
 
 #if PLATFORM(IOS)
@@ -103,12 +107,10 @@ public:
     // MobileSafari will grab this mutex on the main thread before dispatching the task to 
     // clean up zero byte database files.  Any operations to open new database will have to
     // wait for that task to finish by waiting on this mutex.
-    static Mutex& openDatabaseMutex();
+    static Lock& openDatabaseMutex();
     
     WEBCORE_EXPORT static void emptyDatabaseFilesRemovalTaskWillBeScheduled();
     WEBCORE_EXPORT static void emptyDatabaseFilesRemovalTaskDidFinish();
-    
-    WEBCORE_EXPORT void setDatabasesPaused(bool);
 #endif
     
     void setClient(DatabaseManagerClient*);
@@ -148,11 +150,11 @@ private:
     typedef HashMap<String, DatabaseSet*> DatabaseNameMap;
     typedef HashMap<RefPtr<SecurityOrigin>, DatabaseNameMap*> DatabaseOriginMap;
 
-    Mutex m_openDatabaseMapGuard;
+    Lock m_openDatabaseMapGuard;
     mutable std::unique_ptr<DatabaseOriginMap> m_openDatabaseMap;
 
     // This lock protects m_database, m_originLockMap, m_databaseDirectoryPath, m_originsBeingDeleted, m_beingCreated, and m_beingDeleted.
-    Mutex m_databaseGuard;
+    Lock m_databaseGuard;
     SQLiteDatabase m_database;
 
     typedef HashMap<String, RefPtr<OriginLock>> OriginLockMap;

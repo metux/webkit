@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012, 2013, 2014 Apple Inc. All rights reserved.
+ * Copyright (C) 2012-2015 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -31,10 +31,9 @@
 #include "PlatformWheelEvent.h"
 #include "Region.h"
 #include "ScrollingCoordinator.h"
-#include <wtf/Functional.h>
+#include "WheelEventTestTrigger.h"
 #include <wtf/HashMap.h>
-#include <wtf/OwnPtr.h>
-#include <wtf/PassOwnPtr.h>
+#include <wtf/Lock.h>
 #include <wtf/ThreadSafeRefCounted.h>
 #include <wtf/TypeCasts.h>
 
@@ -66,6 +65,8 @@ public:
     
     void setMainFrameIsRubberBanding(bool);
     bool isRubberBandInProgress();
+    void setMainFrameIsScrollSnapping(bool);
+    bool isScrollSnapInProgress();
 
     virtual void invalidate() { }
     WEBCORE_EXPORT virtual void commitNewTreeState(std::unique_ptr<ScrollingStateTree>);
@@ -89,6 +90,8 @@ public:
     // and call scrollingTreeNodeDidScroll().
     WEBCORE_EXPORT virtual void scrollPositionChangedViaDelegatedScrolling(ScrollingNodeID, const WebCore::FloatPoint& scrollPosition, bool inUserInteration);
 
+    WEBCORE_EXPORT virtual void currentSnapPointIndicesDidChange(ScrollingNodeID, unsigned horizontal, unsigned vertical) = 0;
+
     FloatPoint mainFrameScrollPosition();
     
 #if PLATFORM(IOS)
@@ -102,6 +105,9 @@ public:
     
 #if PLATFORM(MAC)
     virtual void handleWheelEventPhase(PlatformWheelEventPhase) = 0;
+    virtual void setActiveScrollSnapIndices(ScrollingNodeID, unsigned /*horizontalIndex*/, unsigned /*verticalIndex*/) { }
+    virtual void deferTestsForReason(WheelEventTestTrigger::ScrollableAreaIdentifier, WheelEventTestTrigger::DeferTestTriggerReason) { }
+    virtual void removeTestDeferralForReason(WheelEventTestTrigger::ScrollableAreaIdentifier, WheelEventTestTrigger::DeferTestTriggerReason) { }
 #endif
 
     // Can be called from any thread. Will update what edges allow rubber-banding.
@@ -155,30 +161,30 @@ private:
     typedef HashMap<ScrollingNodeID, ScrollingTreeNode*> ScrollingTreeNodeMap;
     ScrollingTreeNodeMap m_nodeMap;
 
-    Mutex m_mutex;
+    Lock m_mutex;
     Region m_nonFastScrollableRegion;
     FloatPoint m_mainFrameScrollPosition;
-    bool m_hasWheelEventHandlers;
 
-    Mutex m_swipeStateMutex;
-    bool m_rubberBandsAtLeft;
-    bool m_rubberBandsAtRight;
-    bool m_rubberBandsAtTop;
-    bool m_rubberBandsAtBottom;
-    bool m_mainFramePinnedToTheLeft;
-    bool m_mainFramePinnedToTheRight;
-    bool m_mainFramePinnedToTheTop;
-    bool m_mainFramePinnedToTheBottom;
-    bool m_mainFrameIsRubberBanding;
-    ScrollPinningBehavior m_scrollPinningBehavior;
-    ScrollingNodeID m_latchedNode;
+    Lock m_swipeStateMutex;
+    ScrollPinningBehavior m_scrollPinningBehavior { DoNotPin };
+    ScrollingNodeID m_latchedNode { 0 };
 
-    bool m_scrollingPerformanceLoggingEnabled;
-    
-    bool m_isHandlingProgrammaticScroll;
-    unsigned m_fixedOrStickyNodeCount;
+    unsigned m_fixedOrStickyNodeCount { 0 };
+
+    bool m_rubberBandsAtLeft { true };
+    bool m_rubberBandsAtRight { true };
+    bool m_rubberBandsAtTop { true };
+    bool m_rubberBandsAtBottom { true };
+    bool m_mainFramePinnedToTheLeft { true };
+    bool m_mainFramePinnedToTheRight { true };
+    bool m_mainFramePinnedToTheTop { true };
+    bool m_mainFramePinnedToTheBottom { true };
+    bool m_mainFrameIsRubberBanding { false };
+    bool m_mainFrameIsScrollSnapping { false };
+    bool m_scrollingPerformanceLoggingEnabled { false };
+    bool m_isHandlingProgrammaticScroll { false };
 };
-
+    
 } // namespace WebCore
 
 #define SPECIALIZE_TYPE_TRAITS_SCROLLING_TREE(ToValueTypeName, predicate) \

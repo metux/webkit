@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008, 2012, 2013, 2014 Apple Inc. All rights reserved.
+ * Copyright (C) 2008, 2012-2015 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -32,6 +32,7 @@
 #include "BasicBlockLocation.h"
 #include "MacroAssembler.h"
 #include "Opcode.h"
+#include "SymbolTable.h"
 #include "TypeLocation.h"
 #include "PropertySlot.h"
 #include "SpecialPointer.h"
@@ -46,7 +47,7 @@ namespace JSC {
 class ArrayAllocationProfile;
 class ArrayProfile;
 class ObjectAllocationProfile;
-class VariableWatchpointSet;
+class WatchpointSet;
 struct LLIntCallLinkInfo;
 struct ValueProfile;
 
@@ -97,28 +98,28 @@ struct Instruction {
     Instruction(ArrayProfile* profile) { u.arrayProfile = profile; }
     Instruction(ArrayAllocationProfile* profile) { u.arrayAllocationProfile = profile; }
     Instruction(ObjectAllocationProfile* profile) { u.objectAllocationProfile = profile; }
-    Instruction(WriteBarrier<Unknown>* registerPointer) { u.registerPointer = registerPointer; }
+    Instruction(WriteBarrier<Unknown>* variablePointer) { u.variablePointer = variablePointer; }
     Instruction(Special::Pointer pointer) { u.specialPointer = pointer; }
-    Instruction(StringImpl* uid) { u.uid = uid; }
+    Instruction(UniquedStringImpl* uid) { u.uid = uid; }
     Instruction(bool* predicatePointer) { u.predicatePointer = predicatePointer; }
 
     union {
         Opcode opcode;
         int operand;
         WriteBarrierBase<Structure> structure;
+        WriteBarrierBase<SymbolTable> symbolTable;
         WriteBarrierBase<StructureChain> structureChain;
         WriteBarrierBase<JSCell> jsCell;
-        WriteBarrier<Unknown>* registerPointer;
+        WriteBarrier<Unknown>* variablePointer;
         Special::Pointer specialPointer;
         PropertySlot::GetValueFunc getterFunc;
         LLIntCallLinkInfo* callLinkInfo;
-        StringImpl* uid;
+        UniquedStringImpl* uid;
         ValueProfile* profile;
         ArrayProfile* arrayProfile;
         ArrayAllocationProfile* arrayAllocationProfile;
         ObjectAllocationProfile* objectAllocationProfile;
-        VariableWatchpointSet* watchpointSet;
-        WriteBarrierBase<JSLexicalEnvironment> lexicalEnvironment;
+        WatchpointSet* watchpointSet;
         void* pointer;
         bool* predicatePointer;
         ToThisStatus toThisStatus;

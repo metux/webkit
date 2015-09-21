@@ -35,10 +35,10 @@
 #include "ActiveDOMObject.h"
 #include "EventNames.h"
 #include "EventTarget.h"
-#include "URL.h"
 #include "NotificationClient.h"
-#include "TextDirection.h"
 #include "ThreadableLoaderClient.h"
+#include "URL.h"
+#include "WritingMode.h"
 #include <wtf/PassRefPtr.h>
 #include <wtf/RefCounted.h>
 #include <wtf/RefPtr.h>
@@ -102,15 +102,6 @@ public:
 
     TextDirection direction() const { return dir() == "rtl" ? RTL : LTR; }
 
-#if ENABLE(LEGACY_NOTIFICATIONS)
-    EventListener* ondisplay() { return getAttributeEventListener(eventNames().showEvent); }
-    void setOndisplay(PassRefPtr<EventListener> listener) { setAttributeEventListener(eventNames().showEvent, listener); }
-#endif
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(show);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(error);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(close);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(click);
-    
     WEBCORE_EXPORT void dispatchClickEvent();
     WEBCORE_EXPORT void dispatchCloseEvent();
     WEBCORE_EXPORT void dispatchErrorEvent();
@@ -133,7 +124,7 @@ public:
 #if ENABLE(NOTIFICATIONS)
     static const String permission(ScriptExecutionContext*);
     WEBCORE_EXPORT static const String permissionString(NotificationClient::Permission);
-    static void requestPermission(ScriptExecutionContext*, PassRefPtr<NotificationPermissionCallback> = 0);
+    static void requestPermission(ScriptExecutionContext*, PassRefPtr<NotificationPermissionCallback> = nullptr);
 #endif
 
 private:
@@ -146,14 +137,14 @@ private:
 
     void setBody(const String& body) { m_body = body; }
 
-    // ActiveDOMObject interface
-    virtual void contextDestroyed() override;
+    // ActiveDOMObject API.
+    void contextDestroyed() override;
+    const char* activeDOMObjectName() const override;
+    bool canSuspendForPageCache() const override;
 
-    // EventTarget interface
+    // EventTarget API.
     virtual void refEventTarget() override { ref(); }
     virtual void derefEventTarget() override { deref(); }
-
-    virtual const char* activeDOMObjectName() const override { return "Notification"; }
 
     void startLoadingIcon();
     void finishLoadingIcon();

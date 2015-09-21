@@ -24,9 +24,7 @@
 
 #if USE(CAIRO)
 
-#include "FontOrientation.h"
-#include "FontRenderingMode.h"
-#include "FontWidthVariant.h"
+#include "TextFlags.h"
 #include <wtf/Forward.h>
 #include <wtf/Noncopyable.h>
 
@@ -35,6 +33,7 @@ typedef struct _cairo_font_face cairo_font_face_t;
 
 namespace WebCore {
 
+class FontDescription;
 class FontPlatformData;
 class SharedBuffer;
 
@@ -43,7 +42,7 @@ struct FontCustomPlatformData {
 public:
     FontCustomPlatformData(FT_Face, SharedBuffer&);
     ~FontCustomPlatformData();
-    FontPlatformData fontPlatformData(int size, bool bold, bool italic, FontOrientation = Horizontal, FontWidthVariant = RegularWidth, FontRenderingMode = NormalRenderingMode);
+    FontPlatformData fontPlatformData(const FontDescription&, bool bold, bool italic);
     static bool supportsFormat(const String&);
 
 private:

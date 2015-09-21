@@ -1,6 +1,7 @@
 /*
  * Copyright (C) 2007, 2008, 2011 Apple Inc. All rights reserved.
  * Copyright (C) 2008 Collabora, Ltd. All rights reserved.
+ * Copyright (C) 2015 Canon Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -137,7 +138,9 @@ struct FileMetadata;
 WEBCORE_EXPORT bool fileExists(const String&);
 WEBCORE_EXPORT bool deleteFile(const String&);
 WEBCORE_EXPORT bool deleteEmptyDirectory(const String&);
+WEBCORE_EXPORT bool moveFile(const String& oldPath, const String& newPath);
 WEBCORE_EXPORT bool getFileSize(const String&, long long& result);
+WEBCORE_EXPORT bool getFileSize(PlatformFileHandle, long long& result);
 WEBCORE_EXPORT bool getFileModificationTime(const String&, time_t& result);
 WEBCORE_EXPORT bool getFileCreationTime(const String&, time_t& result); // Not all platforms store file creation time.
 bool getFileMetadata(const String&, FileMetadata&);
@@ -166,7 +169,7 @@ WEBCORE_EXPORT String openTemporaryFile(const String& prefix, PlatformFileHandle
 WEBCORE_EXPORT PlatformFileHandle openFile(const String& path, FileOpenMode);
 WEBCORE_EXPORT void closeFile(PlatformFileHandle&);
 // Returns the resulting offset from the beginning of the file if successful, -1 otherwise.
-long long seekFile(PlatformFileHandle, long long offset, FileSeekOrigin);
+WEBCORE_EXPORT long long seekFile(PlatformFileHandle, long long offset, FileSeekOrigin);
 bool truncateFile(PlatformFileHandle, long long offset);
 // Returns number of bytes actually read if successful, -1 otherwise.
 WEBCORE_EXPORT int writeToFile(PlatformFileHandle, const char* data, int length);
@@ -198,9 +201,39 @@ uint64_t getVolumeFreeSizeForPath(const char*);
 #endif
 
 #if PLATFORM(WIN)
-String localUserSpecificStorageDirectory();
+WEBCORE_EXPORT String localUserSpecificStorageDirectory();
 String roamingUserSpecificStorageDirectory();
 #endif
+
+class MappedFileData {
+public:
+    MappedFileData() { }
+    MappedFileData(MappedFileData&&);
+    WEBCORE_EXPORT MappedFileData(const String& filePath, bool& success);
+    WEBCORE_EXPORT ~MappedFileData();
+    MappedFileData& operator=(MappedFileData&&);
+
+    explicit operator bool() const { return !!m_fileData; }
+    const void* data() const { return m_fileData; }
+    unsigned size() const { return m_fileSize; }
+
+private:
+    void* m_fileData { nullptr };
+    unsigned m_fileSize { 0 };
+};
+
+inline MappedFileData::MappedFileData(MappedFileData&& other)
+    : m_fileData(std::exchange(other.m_fileData, nullptr))
+    , m_fileSize(std::exchange(other.m_fileSize, 0))
+{
+}
+
+inline MappedFileData& MappedFileData::operator=(MappedFileData&& other)
+{
+    m_fileData = std::exchange(other.m_fileData, nullptr);
+    m_fileSize = std::exchange(other.m_fileSize, 0);
+    return *this;
+}
 
 } // namespace WebCore
 

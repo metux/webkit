@@ -45,7 +45,8 @@ ContextMenuContextData::ContextMenuContextData()
 }
 
 ContextMenuContextData::ContextMenuContextData(const ContextMenuContext& context)
-    : m_webHitTestResultData(WebHitTestResult::Data(context.hitTestResult()))
+    : m_webHitTestResultData(context.hitTestResult(), true)
+    , m_selectedText(context.selectedText())
 #if ENABLE(SERVICE_CONTROLS)
     , m_selectionIsEditable(false)
 #endif
@@ -64,11 +65,12 @@ ContextMenuContextData::ContextMenuContextData(const ContextMenuContext& context
 void ContextMenuContextData::encode(IPC::ArgumentEncoder& encoder) const
 {
     encoder << m_webHitTestResultData;
+    encoder << m_selectedText;
 
 #if ENABLE(SERVICE_CONTROLS)
     ShareableBitmap::Handle handle;
     if (m_controlledImage)
-        m_controlledImage->createHandle(handle, SharedMemory::ReadOnly);
+        m_controlledImage->createHandle(handle, SharedMemory::Protection::ReadOnly);
     encoder << handle;
 #endif
 }
@@ -78,13 +80,16 @@ bool ContextMenuContextData::decode(IPC::ArgumentDecoder& decoder, ContextMenuCo
     if (!decoder.decode(contextMenuContextData.m_webHitTestResultData))
         return false;
 
+    if (!decoder.decode(contextMenuContextData.m_selectedText))
+        return false;
+
 #if ENABLE(SERVICE_CONTROLS)
     ShareableBitmap::Handle handle;
     if (!decoder.decode(handle))
         return false;
 
     if (!handle.isNull())
-        contextMenuContextData.m_controlledImage = ShareableBitmap::create(handle, SharedMemory::ReadOnly);
+        contextMenuContextData.m_controlledImage = ShareableBitmap::create(handle, SharedMemory::Protection::ReadOnly);
 #endif
 
     return true;

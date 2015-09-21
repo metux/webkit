@@ -44,6 +44,8 @@
 #include "RenderTableCell.h"
 #include "RenderTableSection.h"
 
+#include <wtf/Deque.h>
+
 namespace WebCore {
 
 using namespace HTMLNames;
@@ -149,6 +151,10 @@ bool AccessibilityTable::isDataTable() const
                 return true;
         }
     }
+    
+    // The following checks should only apply if this is a real <table> element.
+    if (!hasTagName(tableTag))
+        return false;
     
     RenderTable& table = downcast<RenderTable>(*m_renderer);
     // go through the cell's and check for tell-tale signs of "data" table status
@@ -324,13 +330,20 @@ bool AccessibilityTable::computeIsTableExposableThroughAccessibility() const
     if (hasARIARole())
         return false;
 
-    // Gtk+ ATs expect all tables to be exposed as tables.
-#if PLATFORM(GTK) || PLATFORM(EFL)
+    if (isDataTable())
+        return true;
+
+    // Gtk+ ATs used to expect all tables to be exposed as tables.
+    // N.B. Efl may wish to follow suit and also defer to WebCore. In the meantime, the following
+    // check fails for data tables with display:table-row-group. By checking for data tables first,
+    // we can handle that edge case without introducing regressions prior to switching to WebCore's
+    // default behavior for table exposure.
+#if PLATFORM(EFL)
     Element* tableNode = downcast<RenderTable>(*m_renderer).element();
     return is<HTMLTableElement>(tableNode);
 #endif
 
-    return isDataTable();
+    return false;
 }
 
 void AccessibilityTable::clearChildren()
@@ -398,6 +411,39 @@ void AccessibilityTable::addChildren()
     AccessibilityObject* headerContainerObject = headerContainer();
     if (headerContainerObject && !headerContainerObject->accessibilityIsIgnored())
         m_children.append(headerContainerObject);
+
+    // Sometimes the cell gets the wrong role initially because it is created before the parent
+    // determines whether it is an accessibility table. Iterate all the cells and allow them to
+    // update their roles now that the table knows its status.
+    // see bug: https://bugs.webkit.org/show_bug.cgi?id=147001
+    for (const auto& row : m_rows) {
+        for (const auto& cell : row->children())
+            cell->updateAccessibilityRole();
+    }
+
+}
+
+void AccessibilityTable::addTableCellChild(AccessibilityObject* rowObject, HashSet<AccessibilityObject*>& appendedRows, unsigned& columnCount)
+{
+    if (!rowObject || !is<AccessibilityTableRow>(*rowObject))
+        return;
+
+    auto& row = downcast<AccessibilityTableRow>(*rowObject);
+    // We need to check every cell for a new row, because cell spans
+    // can cause us to miss rows if we just check the first column.
+    if (appendedRows.contains(&row))
+        return;
+    
+    row.setRowIndex(static_cast<int>(m_rows.size()));
+    m_rows.append(&row);
+    if (!row.accessibilityIsIgnored())
+        m_children.append(&row);
+    appendedRows.add(&row);
+        
+    // store the maximum number of columns
+    unsigned rowCellCount = row.children().size();
+    if (rowCellCount > columnCount)
+        columnCount = rowCellCount;
 }
 
 void AccessibilityTable::addChildrenFromSection(RenderTableSection* tableSection, unsigned& maxColumnCount)
@@ -416,24 +462,23 @@ void AccessibilityTable::addChildrenFromSection(RenderTableSection* tableSection
             continue;
         
         AccessibilityObject& rowObject = *axCache->getOrCreate(renderRow);
-        if (!is<AccessibilityTableRow>(rowObject))
-            continue;
         
-        auto& row = downcast<AccessibilityTableRow>(rowObject);
-        // We need to check every cell for a new row, because cell spans
-        // can cause us to miss rows if we just check the first column.
-        if (appendedRows.contains(&row))
-            continue;
-        
-        row.setRowIndex(static_cast<int>(m_rows.size()));
-        m_rows.append(&row);
-        if (!row.accessibilityIsIgnored())
-            m_children.append(&row);
-#if PLATFORM(GTK) || PLATFORM(EFL)
-        else
-            m_children.appendVector(row.children());
-#endif
-        appendedRows.add(&row);
+        // If the row is anonymous, we should dive deeper into the descendants to try to find a valid row.
+        if (renderRow->isAnonymous()) {
+            Deque<AccessibilityObject*> queue;
+            queue.append(&rowObject);
+            
+            while (!queue.isEmpty()) {
+                AccessibilityObject* obj = queue.takeFirst();
+                if (obj->node() && is<AccessibilityTableRow>(*obj)) {
+                    addTableCellChild(obj, appendedRows, maxColumnCount);
+                    continue;
+                }
+                for (auto child = obj->firstChild(); child; child = child->nextSibling())
+                    queue.append(child);
+            }
+        } else
+            addTableCellChild(&rowObject, appendedRows, maxColumnCount);
     }
     
     maxColumnCount = std::max(tableSection->numColumns(), maxColumnCount);
@@ -578,6 +623,10 @@ AccessibilityRole AccessibilityTable::roleValue() const
 {
     if (!isExposableThroughAccessibility())
         return AccessibilityRenderObject::roleValue();
+    
+    AccessibilityRole ariaRole = ariaRoleAttribute();
+    if (ariaRole == GridRole || ariaRole == TreeGridRole)
+        return GridRole;
 
     return TableRole;
 }

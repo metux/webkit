@@ -33,6 +33,8 @@
 #include <wtf/WTFThreadData.h>
 #include <wtf/text/CString.h>
 #include <wtf/text/StringView.h>
+#include <wtf/text/SymbolImpl.h>
+#include <wtf/text/SymbolRegistry.h>
 #include <wtf/unicode/CharacterNames.h>
 #include <wtf/unicode/UTF8.h>
 
@@ -109,8 +111,11 @@ StringImpl::~StringImpl()
 
     STRING_STATS_REMOVE_STRING(*this);
 
-    if (isAtomic() && length() && !isUnique())
-        AtomicString::remove(this);
+    if (isAtomic() && length() && !isSymbol())
+        AtomicStringImpl::remove(static_cast<AtomicStringImpl*>(this));
+
+    if (isSymbol() && symbolRegistry())
+        symbolRegistry()->remove(static_cast<SymbolImpl&>(*this));
 
     BufferOwnership ownership = bufferOwnership();
 
@@ -286,14 +291,24 @@ Ref<StringImpl> StringImpl::create(const LChar* string)
     return create(string, length);
 }
 
-Ref<StringImpl> StringImpl::createUnique(PassRefPtr<StringImpl> rep)
+Ref<SymbolImpl> StringImpl::createSymbol(PassRefPtr<StringImpl> rep)
 {
-    unsigned length = rep->length();
-    if (!length)
-        return createUniqueEmpty();
-    Ref<StringImpl> string = createSubstringSharingImpl(rep, 0, length);
-    string->m_hashAndFlags = hashAndFlagsForUnique(string->m_hashAndFlags);
-    return string;
+    StringImpl* ownerRep = (rep->bufferOwnership() == BufferSubstring) ? rep->substringBuffer() : rep.get();
+
+    // We allocate a buffer that contains
+    // 1. the StringImpl struct
+    // 2. the pointer to the owner string
+    // 3. the pointer to the symbol registry
+    // 4. the placeholder for symbol aware hash value (allocated size is pointer size, but only 4 bytes are used)
+    StringImpl* stringImpl = static_cast<StringImpl*>(fastMalloc(allocationSize<StringImpl*>(3)));
+    if (rep->is8Bit())
+        return adoptRef(static_cast<SymbolImpl&>(*new (NotNull, stringImpl) StringImpl(CreateSymbol, rep->m_data8, rep->length(), ownerRep)));
+    return adoptRef(static_cast<SymbolImpl&>(*new (NotNull, stringImpl) StringImpl(CreateSymbol, rep->m_data16, rep->length(), ownerRep)));
+}
+
+Ref<SymbolImpl> StringImpl::createSymbolEmpty()
+{
+    return createSymbol(empty());
 }
 
 bool StringImpl::containsOnlyWhitespace()
@@ -1077,35 +1092,6 @@ size_t StringImpl::findIgnoringCase(const LChar* matchString, unsigned index)
     return index + i;
 }
 
-template <typename SearchCharacterType, typename MatchCharacterType>
-ALWAYS_INLINE static size_t findInner(const SearchCharacterType* searchCharacters, const MatchCharacterType* matchCharacters, unsigned index, unsigned searchLength, unsigned matchLength)
-{
-    // Optimization: keep a running hash of the strings,
-    // only call equal() if the hashes match.
-
-    // delta is the number of additional times to test; delta == 0 means test only once.
-    unsigned delta = searchLength - matchLength;
-
-    unsigned searchHash = 0;
-    unsigned matchHash = 0;
-
-    for (unsigned i = 0; i < matchLength; ++i) {
-        searchHash += searchCharacters[i];
-        matchHash += matchCharacters[i];
-    }
-
-    unsigned i = 0;
-    // keep looping until we match
-    while (searchHash != matchHash || !equal(searchCharacters + i, matchCharacters, matchLength)) {
-        if (i == delta)
-            return notFound;
-        searchHash += searchCharacters[i + matchLength];
-        searchHash -= searchCharacters[i];
-        ++i;
-    }
-    return index + i;        
-}
-
 size_t StringImpl::find(StringImpl* matchString)
 {
     // Check for null string to match against
@@ -1151,35 +1137,7 @@ size_t StringImpl::find(StringImpl* matchString, unsigned index)
     if (UNLIKELY(!matchString))
         return notFound;
 
-    unsigned matchLength = matchString->length();
-
-    // Optimization 1: fast case for strings of length 1.
-    if (matchLength == 1) {
-        if (is8Bit())
-            return WTF::find(characters8(), length(), (*matchString)[0], index);
-        return WTF::find(characters16(), length(), (*matchString)[0], index);
-    }
-
-    if (UNLIKELY(!matchLength))
-        return std::min(index, length());
-
-    // Check index & matchLength are in range.
-    if (index > length())
-        return notFound;
-    unsigned searchLength = length() - index;
-    if (matchLength > searchLength)
-        return notFound;
-
-    if (is8Bit()) {
-        if (matchString->is8Bit())
-            return findInner(characters8() + index, matchString->characters8(), index, searchLength, matchLength);
-        return findInner(characters8() + index, matchString->characters16(), index, searchLength, matchLength);
-    }
-
-    if (matchString->is8Bit())
-        return findInner(characters16() + index, matchString->characters8(), index, searchLength, matchLength);
-
-    return findInner(characters16() + index, matchString->characters16(), index, searchLength, matchLength);
+    return findCommon(*this, *matchString, index);
 }
 
 template <typename SearchCharacterType, typename MatchCharacterType>
@@ -1224,6 +1182,30 @@ size_t StringImpl::findIgnoringCase(StringImpl* matchString, unsigned index)
         return findIgnoringCaseInner(characters16() + index, matchString->characters8(), index, searchLength, matchLength);
 
     return findIgnoringCaseInner(characters16() + index, matchString->characters16(), index, searchLength, matchLength);
+}
+
+size_t StringImpl::findIgnoringASCIICase(const StringImpl& matchString) const
+{
+    return ::WTF::findIgnoringASCIICase(*this, matchString, 0);
+}
+
+size_t StringImpl::findIgnoringASCIICase(const StringImpl& matchString, unsigned startOffset) const
+{
+    return ::WTF::findIgnoringASCIICase(*this, matchString, startOffset);
+}
+
+size_t StringImpl::findIgnoringASCIICase(const StringImpl* matchString) const
+{
+    if (!matchString)
+        return notFound;
+    return ::WTF::findIgnoringASCIICase(*this, *matchString, 0);
+}
+
+size_t StringImpl::findIgnoringASCIICase(const StringImpl* matchString, unsigned startOffset) const
+{
+    if (!matchString)
+        return notFound;
+    return ::WTF::findIgnoringASCIICase(*this, *matchString, startOffset);
 }
 
 size_t StringImpl::findNextLineStart(unsigned index)
@@ -1380,18 +1362,25 @@ bool StringImpl::startsWith(const StringImpl* str) const
 {
     if (!str)
         return false;
+    return ::WTF::startsWith(*this, *str);
+}
 
-    if (str->length() > length())
+bool StringImpl::startsWith(const StringImpl& str) const
+{
+    return ::WTF::startsWith(*this, str);
+}
+
+bool StringImpl::startsWithIgnoringASCIICase(const StringImpl* prefix) const
+{
+    if (!prefix)
         return false;
 
-    if (is8Bit()) {
-        if (str->is8Bit())
-            return equal(characters8(), str->characters8(), str->length());
-        return equal(characters8(), str->characters16(), str->length());
-    }
-    if (str->is8Bit())
-        return equal(characters16(), str->characters8(), str->length());
-    return equal(characters16(), str->characters16(), str->length());
+    return ::WTF::startsWithIgnoringASCIICase(*this, *prefix);
+}
+
+bool StringImpl::startsWithIgnoringASCIICase(const StringImpl& prefix) const
+{
+    return ::WTF::startsWithIgnoringASCIICase(*this, prefix);
 }
 
 bool StringImpl::startsWith(UChar character) const
@@ -1412,6 +1401,19 @@ bool StringImpl::hasInfixStartingAt(const StringImpl& matchString, unsigned star
     return equalInner(*this, startOffset, matchString);
 }
 
+bool StringImpl::endsWith(StringImpl* suffix)
+{
+    if (!suffix)
+        return false;
+
+    return ::WTF::endsWith(*this, *suffix);
+}
+
+bool StringImpl::endsWith(StringImpl& suffix)
+{
+    return ::WTF::endsWith(*this, suffix);
+}
+
 bool StringImpl::endsWith(StringImpl* matchString, bool caseSensitive)
 {
     ASSERT(matchString);
@@ -1420,6 +1422,19 @@ bool StringImpl::endsWith(StringImpl* matchString, bool caseSensitive)
         return (caseSensitive ? find(matchString, start) : findIgnoringCase(matchString, start)) == start;
     }
     return false;
+}
+
+bool StringImpl::endsWithIgnoringASCIICase(const StringImpl* suffix) const
+{
+    if (!suffix)
+        return false;
+
+    return ::WTF::endsWithIgnoringASCIICase(*this, *suffix);
+}
+
+bool StringImpl::endsWithIgnoringASCIICase(const StringImpl& suffix) const
+{
+    return ::WTF::endsWithIgnoringASCIICase(*this, suffix);
 }
 
 bool StringImpl::endsWith(UChar character) const
@@ -1824,34 +1839,9 @@ Ref<StringImpl> StringImpl::replace(StringImpl* pattern, StringImpl* replacement
     return newImpl;
 }
 
-static ALWAYS_INLINE bool stringImplContentEqual(const StringImpl& a, const StringImpl& b)
-{
-    unsigned aLength = a.length();
-    unsigned bLength = b.length();
-    if (aLength != bLength)
-        return false;
-
-    if (a.is8Bit()) {
-        if (b.is8Bit())
-            return equal(a.characters8(), b.characters8(), aLength);
-
-        return equal(a.characters8(), b.characters16(), aLength);
-    }
-
-    if (b.is8Bit())
-        return equal(a.characters16(), b.characters8(), aLength);
-
-    return equal(a.characters16(), b.characters16(), aLength);
-}
-
 bool equal(const StringImpl* a, const StringImpl* b)
 {
-    if (a == b)
-        return true;
-    if (!a || !b)
-        return false;
-
-    return stringImplContentEqual(*a, *b);
+    return equalCommon(a, b);
 }
 
 template <typename CharType>
@@ -1916,10 +1906,7 @@ bool equal(const StringImpl* a, const LChar* b)
 
 bool equal(const StringImpl& a, const StringImpl& b)
 {
-    if (&a == &b)
-        return true;
-
-    return stringImplContentEqual(a, b);
+    return equalCommon(a, b);
 }
 
 bool equalIgnoringCase(const StringImpl* a, const StringImpl* b)
@@ -2016,6 +2003,38 @@ bool equalIgnoringNullity(StringImpl* a, StringImpl* b)
     if (!b && a && !a->length())
         return true;
     return equal(a, b);
+}
+
+bool equalIgnoringASCIICase(const StringImpl& a, const StringImpl& b)
+{
+    return equalIgnoringASCIICaseCommon(a, b);
+}
+
+bool equalIgnoringASCIICase(const StringImpl* a, const StringImpl*b)
+{
+    if (a == b)
+        return true;
+    if (!a || !b)
+        return false;
+    return equalIgnoringASCIICaseCommon(*a, *b);
+}
+
+bool equalIgnoringASCIICase(const StringImpl& a, const char* b, unsigned bLength)
+{
+    if (bLength != a.length())
+        return false;
+
+    if (a.is8Bit())
+        return equalIgnoringASCIICase(a.characters8(), b, bLength);
+
+    return equalIgnoringASCIICase(a.characters16(), b, bLength);
+}
+
+bool equalIgnoringASCIICaseNonNull(const StringImpl* a, const StringImpl* b)
+{
+    ASSERT(a);
+    ASSERT(b);
+    return equalIgnoringASCIICaseCommon(*a, *b);
 }
 
 UCharDirection StringImpl::defaultWritingDirection(bool* hasStrongDirectionality)
@@ -2121,6 +2140,20 @@ bool StringImpl::utf8Impl(const UChar* characters, unsigned length, char*& buffe
     }
     
     return true;
+}
+
+CString StringImpl::utf8ForCharacters(const LChar* characters, unsigned length)
+{
+    if (!length)
+        return CString("", 0);
+    if (length > std::numeric_limits<unsigned>::max() / 3)
+        return CString();
+    Vector<char, 1024> bufferVector(length * 3);
+    char* buffer = bufferVector.data();
+    const LChar* source = characters;
+    ConversionResult result = convertLatin1ToUTF8(&source, source + length, &buffer, buffer + bufferVector.size());
+    ASSERT_UNUSED(result, result != targetExhausted); // (length * 3) should be sufficient for any conversion
+    return CString(bufferVector.data(), buffer - bufferVector.data());
 }
 
 CString StringImpl::utf8ForCharacters(const UChar* characters, unsigned length, ConversionMode mode)

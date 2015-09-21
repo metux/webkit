@@ -24,6 +24,7 @@
 #include "Frame.h"
 #include "JSNode.h"
 #include "ScriptController.h"
+#include <runtime/Executable.h>
 #include <runtime/FunctionConstructor.h>
 #include <runtime/IdentifierInlines.h>
 #include <wtf/NeverDestroyed.h>
@@ -103,7 +104,14 @@ JSObject* JSLazyEventListener::initializeJSFunction(ScriptExecutionContext* exec
     args.append(jsNontrivialString(exec, m_eventParameterName));
     args.append(jsStringWithCache(exec, m_code));
 
-    JSObject* jsFunction = constructFunctionSkippingEvalEnabledCheck(exec, exec->lexicalGlobalObject(), args, Identifier(exec, m_functionName), m_sourceURL, m_position); // FIXME: is globalExec ok?
+    // We want all errors to refer back to the line on which our attribute was
+    // declared, regardless of any newlines in our JavaScript source text.
+    int overrideLineNumber = m_position.m_line.oneBasedInt();
+
+    JSObject* jsFunction = constructFunctionSkippingEvalEnabledCheck(
+        exec, exec->lexicalGlobalObject(), args, Identifier::fromString(exec, m_functionName),
+        m_sourceURL, m_position, overrideLineNumber);
+
     if (exec->hadException()) {
         reportCurrentException(exec);
         exec->clearException();
@@ -111,6 +119,7 @@ JSObject* JSLazyEventListener::initializeJSFunction(ScriptExecutionContext* exec
     }
 
     JSFunction* listenerAsFunction = jsCast<JSFunction*>(jsFunction);
+
     if (m_originalNode) {
         if (!wrapper()) {
             // Ensure that 'node' has a JavaScript wrapper to mark the event listener we're creating.
@@ -133,7 +142,7 @@ static const String& eventParameterName(bool isSVGEvent)
     return isSVGEvent ? evtString : eventString;
 }
 
-PassRefPtr<JSLazyEventListener> JSLazyEventListener::createForNode(ContainerNode& node, const QualifiedName& attributeName, const AtomicString& attributeValue)
+RefPtr<JSLazyEventListener> JSLazyEventListener::createForNode(ContainerNode& node, const QualifiedName& attributeName, const AtomicString& attributeValue)
 {
     if (attributeValue.isNull())
         return nullptr;
@@ -150,12 +159,12 @@ PassRefPtr<JSLazyEventListener> JSLazyEventListener::createForNode(ContainerNode
         sourceURL = node.document().url().string();
     }
 
-    return adoptRef(new JSLazyEventListener(attributeName.localName().string(),
+    return adoptRef(*new JSLazyEventListener(attributeName.localName().string(),
         eventParameterName(node.isSVGElement()), attributeValue,
         &node, sourceURL, position, nullptr, mainThreadNormalWorld()));
 }
 
-PassRefPtr<JSLazyEventListener> JSLazyEventListener::createForDOMWindow(Frame& frame, const QualifiedName& attributeName, const AtomicString& attributeValue)
+RefPtr<JSLazyEventListener> JSLazyEventListener::createForDOMWindow(Frame& frame, const QualifiedName& attributeName, const AtomicString& attributeValue)
 {
     if (attributeValue.isNull())
         return nullptr;
@@ -163,7 +172,7 @@ PassRefPtr<JSLazyEventListener> JSLazyEventListener::createForDOMWindow(Frame& f
     if (!frame.script().canExecuteScripts(AboutToExecuteScript))
         return nullptr;
 
-    return adoptRef(new JSLazyEventListener(attributeName.localName().string(),
+    return adoptRef(*new JSLazyEventListener(attributeName.localName().string(),
         eventParameterName(frame.document()->isSVGDocument()), attributeValue,
         nullptr, frame.document()->url().string(), frame.script().eventHandlerPosition(),
         toJSDOMWindow(&frame, mainThreadNormalWorld()), mainThreadNormalWorld()));

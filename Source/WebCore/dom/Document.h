@@ -36,11 +36,13 @@
 #include "DocumentTiming.h"
 #include "FocusDirection.h"
 #include "FontSelector.h"
-#include "IconURL.h"
+#include "MediaProducer.h"
 #include "MutationObserver.h"
 #include "PageVisibilityState.h"
+#include "PlatformEvent.h"
 #include "PlatformScreen.h"
 #include "ReferrerPolicy.h"
+#include "Region.h"
 #include "RenderPtr.h"
 #include "ScriptExecutionContext.h"
 #include "StringWithDirection.h"
@@ -53,7 +55,6 @@
 #include <memory>
 #include <wtf/Deque.h>
 #include <wtf/HashSet.h>
-#include <wtf/OwnPtr.h>
 #include <wtf/PassRefPtr.h>
 #include <wtf/WeakPtr.h>
 
@@ -68,7 +69,6 @@ namespace WebCore {
 
 class AXObjectCache;
 class Attr;
-class AudioProducer;
 class CDATASection;
 class CSSFontSelector;
 class CSSStyleDeclaration;
@@ -124,6 +124,8 @@ class LiveNodeList;
 class JSNode;
 class Locale;
 class MediaCanStartListener;
+class MediaPlaybackTarget;
+class MediaPlaybackTargetClient;
 class MediaQueryList;
 class MediaQueryMatcher;
 class MouseEventWithHitTestResults;
@@ -162,6 +164,8 @@ class XPathEvaluator;
 class XPathExpression;
 class XPathNSResolver;
 class XPathResult;
+
+enum class ShouldOpenExternalURLsPolicy;
 
 #if ENABLE(XSLT)
 class TransformSource;
@@ -218,6 +222,12 @@ struct TextAutoSizingTraits : WTF::GenericHashTraits<TextAutoSizingKey> {
 };
 #endif
 
+#if ENABLE(MEDIA_SESSION)
+class MediaSession;
+#endif
+
+const uint64_t HTMLMediaElementInvalidID = 0;
+
 enum PageshowEventPersistence {
     PageshowEventNotPersisted = 0,
     PageshowEventPersisted = 1
@@ -237,7 +247,8 @@ enum NodeListInvalidationType {
 };
 const int numNodeListInvalidationTypes = InvalidateOnAnyAttrChange + 1;
 
-typedef HashCountedSet<Node*> TouchEventTargetSet;
+enum class EventHandlerRemoval { One, All };
+typedef HashCountedSet<Node*> EventTargetSet;
 
 enum DocumentClass {
     DefaultDocumentClass = 0,
@@ -256,6 +267,14 @@ enum class DocumentCompatibilityMode : unsigned char {
     NoQuirksMode = 1,
     QuirksMode = 1 << 1,
     LimitedQuirksMode = 1 << 2
+};
+
+enum DimensionsCheck { WidthDimensionsCheck = 1 << 0, HeightDimensionsCheck = 1 << 1, AllDimensionsCheck = 1 << 2 };
+
+enum class HttpEquivPolicy {
+    Enabled,
+    DisabledBySettings,
+    DisabledByContentDispositionAttachmentSandbox
 };
 
 class Document : public ContainerNode, public TreeScope, public ScriptExecutionContext, public FontSelectorClient {
@@ -324,82 +343,6 @@ public:
 
     // DOM methods & attributes for Document
 
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(abort);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(change);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(click);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(contextmenu);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(dblclick);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(dragenter);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(dragover);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(dragleave);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(drop);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(dragstart);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(drag);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(dragend);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(input);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(invalid);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(keydown);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(keypress);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(keyup);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(mousedown);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(mouseenter);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(mouseleave);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(mousemove);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(mouseout);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(mouseover);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(mouseup);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(mousewheel);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(scroll);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(select);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(submit);
-#if ENABLE(WILL_REVEAL_EDGE_EVENTS)
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(webkitwillrevealbottom);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(webkitwillrevealleft);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(webkitwillrevealright);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(webkitwillrevealtop);
-#endif
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(wheel);
-
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(blur);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(error);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(focus);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(load);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(readystatechange);
-
-    // WebKit extensions
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(beforecut);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(cut);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(beforecopy);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(copy);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(beforepaste);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(paste);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(reset);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(search);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(selectstart);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(selectionchange);
-#if ENABLE(TOUCH_EVENTS)
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(touchstart);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(touchmove);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(touchend);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(touchcancel);
-#endif
-#if ENABLE(IOS_GESTURE_EVENTS)
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(gesturestart);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(gesturechange);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(gestureend);
-#endif
-#if ENABLE(FULLSCREEN_API)
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(webkitfullscreenchange);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(webkitfullscreenerror);
-#endif
-#if ENABLE(POINTER_LOCK)
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(pointerlockchange);
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(pointerlockerror);
-#endif
-#if ENABLE(CSP_NEXT)
-    DEFINE_ATTRIBUTE_EVENT_LISTENER(securitypolicyviolation);
-#endif
-
     void setViewportArguments(const ViewportArguments& viewportArguments) { m_viewportArguments = viewportArguments; }
     ViewportArguments viewportArguments() const { return m_viewportArguments; }
 #ifndef NDEBUG
@@ -433,7 +376,7 @@ public:
     RefPtr<Attr> createAttribute(const String& name, ExceptionCode&);
     RefPtr<Attr> createAttributeNS(const String& namespaceURI, const String& qualifiedName, ExceptionCode&, bool shouldIgnoreNamespaceChecks = false);
     RefPtr<EntityReference> createEntityReference(const String& name, ExceptionCode&);
-    RefPtr<Node> importNode(Node* importedNode, ExceptionCode& ec) { return importNode(importedNode, true, ec); }
+    RefPtr<Node> importNode(Node* importedNode, ExceptionCode& ec) { return importNode(importedNode, false, ec); }
     RefPtr<Node> importNode(Node* importedNode, bool deep, ExceptionCode&);
     WEBCORE_EXPORT RefPtr<Element> createElementNS(const String& namespaceURI, const String& qualifiedName, ExceptionCode&);
     WEBCORE_EXPORT Ref<Element> createElement(const QualifiedName&, bool createdByParser);
@@ -451,6 +394,8 @@ public:
 
     RefPtr<Range> caretRangeFromPoint(int x, int y);
     RefPtr<Range> caretRangeFromPoint(const LayoutPoint& clientPoint);
+
+    Element* scrollingElement();
 
     String readyState() const;
 
@@ -489,8 +434,6 @@ public:
     String documentURI() const { return m_documentURI; }
     void setDocumentURI(const String&);
 
-    virtual URL baseURI() const override final;
-
 #if ENABLE(WEB_REPLAY)
     JSC::InputCursor& inputCursor() const { return *m_inputCursor; }
     void setInputCursor(PassRefPtr<JSC::InputCursor>);
@@ -499,6 +442,9 @@ public:
     void visibilityStateChanged();
     String visibilityState() const;
     bool hidden() const;
+
+    void setTimerThrottlingEnabled(bool);
+    bool isTimerThrottlingEnabled() const { return m_isTimerThrottlingEnabled; }
 
 #if ENABLE(CSP_NEXT)
     DOMSecurityPolicy& securityPolicy();
@@ -601,6 +547,7 @@ public:
 
     void recalcStyle(Style::Change = Style::NoChange);
     WEBCORE_EXPORT void updateStyleIfNeeded();
+    bool needsStyleRecalc() const { return !inPageCache() && (m_pendingStyleRecalcShouldForce || childNeedsStyleRecalc() || m_optimizedStyleSheetUpdateTimer.isActive()); }
 
     WEBCORE_EXPORT void updateLayout();
     
@@ -639,7 +586,9 @@ public:
 
     bool renderTreeBeingDestroyed() const { return m_renderTreeBeingDestroyed; }
     bool hasLivingRenderTree() const { return renderView() && !renderTreeBeingDestroyed(); }
-
+    
+    bool updateLayoutIfDimensionsOutOfDate(Element&, DimensionsCheck = AllDimensionsCheck);
+    
     AXObjectCache* existingAXObjectCache() const;
     WEBCORE_EXPORT AXObjectCache* axObjectCache() const;
     void clearAXObjectCache();
@@ -693,6 +642,7 @@ public:
     Frame* findUnsafeParentScrollPropagationBoundary();
 
     CSSStyleSheet& elementSheet();
+    bool usesStyleBasedEditability() const;
     
     virtual Ref<DocumentParser> createParser();
     DocumentParser* parser() const { return m_parser.get(); }
@@ -775,7 +725,6 @@ public:
     void unscheduleStyleRecalc();
     bool hasPendingStyleRecalc() const;
     bool hasPendingForcedStyleRecalc() const;
-    void styleRecalcTimerFired();
     void optimizedStyleSheetUpdateTimerFired();
 
     void registerNodeListForInvalidation(LiveNodeList&);
@@ -837,11 +786,15 @@ public:
         ANIMATIONITERATION_LISTENER          = 1 << 9,
         TRANSITIONEND_LISTENER               = 1 << 10,
         BEFORELOAD_LISTENER                  = 1 << 11,
-        SCROLL_LISTENER                      = 1 << 12
-        // 3 bits remaining
+        SCROLL_LISTENER                      = 1 << 12,
+        FORCEWILLBEGIN_LISTENER              = 1 << 13,
+        FORCECHANGED_LISTENER                = 1 << 14,
+        FORCEDOWN_LISTENER                   = 1 << 15,
+        FORCEUP_LISTENER                     = 1 << 16
     };
 
     bool hasListenerType(ListenerType listenerType) const { return (m_listenerTypes & listenerType); }
+    bool hasListenerTypeForEventType(PlatformEvent::Type) const;
     void addListenerTypeIfNeeded(const AtomicString& eventType);
 
     bool hasMutationObserversOfType(MutationObserver::MutationType type) const
@@ -883,8 +836,9 @@ public:
     String title() const { return m_title.string(); }
     void setTitle(const String&);
 
-    void setTitleElement(const StringWithDirection&, Element* titleElement);
-    void removeTitle(Element* titleElement);
+    void titleElementAdded(Element& titleElement);
+    void titleElementRemoved(Element& titleElement);
+    void titleElementTextChanged(Element& titleElement);
 
     String cookie(ExceptionCode&);
     void setCookie(const String&, ExceptionCode&);
@@ -997,10 +951,6 @@ public:
     bool hasNodesWithPlaceholderStyle() const { return m_hasNodesWithPlaceholderStyle; }
     void setHasNodesWithPlaceholderStyle() { m_hasNodesWithPlaceholderStyle = true; }
 
-    WEBCORE_EXPORT const Vector<IconURL>& shortcutIconURLs();
-    WEBCORE_EXPORT const Vector<IconURL>& iconURLs(int iconTypesMask);
-    void addIconURL(const String& url, const String& mimeType, const String& size, IconType);
-
     void updateFocusAppearanceSoon(bool restorePreviousSelection);
     void cancelFocusAppearanceUpdate();
 
@@ -1013,6 +963,9 @@ public:
 
     virtual void postTask(Task) override final; // Executes the task on context's thread asynchronously.
 
+#if ENABLE(REQUEST_ANIMATION_FRAME)
+    ScriptedAnimationController* scriptedAnimationController() { return m_scriptedAnimationController.get(); }
+#endif
     void suspendScriptedAnimationControllerCallbacks();
     void resumeScriptedAnimationControllerCallbacks();
     void scriptedAnimationControllerSetThrottled(bool);
@@ -1037,6 +990,10 @@ public:
     void unregisterForMediaVolumeCallbacks(Element*);
     void mediaVolumeDidChange();
 
+#if ENABLE(MEDIA_SESSION)
+    MediaSession& defaultMediaSession();
+#endif
+
     void registerForPrivateBrowsingStateChangedCallbacks(Element*);
     void unregisterForPrivateBrowsingStateChangedCallbacks(Element*);
     void storageBlockingStateDidChange();
@@ -1056,6 +1013,12 @@ public:
 
     void registerForVisibilityStateChangedCallbacks(Element*);
     void unregisterForVisibilityStateChangedCallbacks(Element*);
+
+#if ENABLE(VIDEO)
+    void registerForAllowsMediaDocumentInlinePlaybackChangedCallbacks(HTMLMediaElement&);
+    void unregisterForAllowsMediaDocumentInlinePlaybackChangedCallbacks(HTMLMediaElement&);
+    void allowsMediaDocumentInlinePlaybackChanged();
+#endif
 
     WEBCORE_EXPORT void setShouldCreateRenderers(bool);
     bool shouldCreateRenderers();
@@ -1189,9 +1152,8 @@ public:
 
     void initDNSPrefetch();
 
-    unsigned wheelEventHandlerCount() const { return m_wheelEventHandlerCount; }
-    WEBCORE_EXPORT void didAddWheelEventHandler();
-    WEBCORE_EXPORT void didRemoveWheelEventHandler();
+    void didAddWheelEventHandler(Node&);
+    void didRemoveWheelEventHandler(Node&, EventHandlerRemoval = EventHandlerRemoval::One);
 
     double lastHandledUserGestureTimestamp() const { return m_lastHandledUserGestureTimestamp; }
     void updateLastHandledUserGestureTimestamp();
@@ -1202,18 +1164,33 @@ public:
     bool hasTouchEventHandlers() const { return false; }
 #endif
 
-    void didAddTouchEventHandler(Node*);
-    void didRemoveTouchEventHandler(Node*);
+    // Used for testing. Count handlers in the main document, and one per frame which contains handlers.
+    WEBCORE_EXPORT unsigned wheelEventHandlerCount() const;
+    WEBCORE_EXPORT unsigned touchEventHandlerCount() const;
 
-#if ENABLE(TOUCH_EVENTS)
-    void didRemoveEventTargetNode(Node*);
-#endif
+    WEBCORE_EXPORT void startTrackingStyleRecalcs();
+    WEBCORE_EXPORT unsigned styleRecalcCount() const;
 
+    void didAddTouchEventHandler(Node&);
+    void didRemoveTouchEventHandler(Node&, EventHandlerRemoval = EventHandlerRemoval::One);
+
+    void didRemoveEventTargetNode(Node&);
+
+    const EventTargetSet* touchEventTargets() const
+    {
 #if ENABLE(TOUCH_EVENTS)
-    const TouchEventTargetSet* touchEventTargets() const { return m_touchEventTargets.get(); }
+        return m_touchEventTargets.get();
 #else
-    const TouchEventTargetSet* touchEventTargets() const { return 0; }
+        return nullptr;
 #endif
+    }
+
+    const EventTargetSet* wheelEventTargets() const { return m_wheelEventTargets.get(); }
+
+    typedef std::pair<Region, bool> RegionFixedPair;
+    RegionFixedPair absoluteRegionForEventTargets(const EventTargetSet*);
+
+    LayoutRect absoluteEventHandlerBounds(bool&) override final;
 
     bool visualUpdatesAllowed() const { return m_visualUpdatesAllowed; }
 
@@ -1260,7 +1237,7 @@ public:
     void addDisabledFieldsetElement() { m_disabledFieldsetElementsCount++; }
     void removeDisabledFieldsetElement() { ASSERT(m_disabledFieldsetElementsCount); m_disabledFieldsetElementsCount--; }
 
-    virtual void addConsoleMessage(MessageSource, MessageLevel, const String& message, unsigned long requestIdentifier = 0) override final;
+    WEBCORE_EXPORT virtual void addConsoleMessage(MessageSource, MessageLevel, const String& message, unsigned long requestIdentifier = 0) override final;
 
     WEBCORE_EXPORT virtual SecurityOrigin* topOrigin() const override final;
 
@@ -1281,11 +1258,27 @@ public:
     bool hasStyleWithViewportUnits() const { return m_hasStyleWithViewportUnits; }
     void updateViewportUnitsOnResize();
 
-    WEBCORE_EXPORT void addAudioProducer(AudioProducer*);
-    WEBCORE_EXPORT void removeAudioProducer(AudioProducer*);
-    bool isPlayingAudio() const { return m_isPlayingAudio; }
-    WEBCORE_EXPORT void updateIsPlayingAudio();
+    WEBCORE_EXPORT void addAudioProducer(MediaProducer*);
+    WEBCORE_EXPORT void removeAudioProducer(MediaProducer*);
+    MediaProducer::MediaStateFlags mediaState() const { return m_mediaState; }
+    WEBCORE_EXPORT void updateIsPlayingMedia(uint64_t = HTMLMediaElementInvalidID);
     void pageMutedStateDidChange();
+    WeakPtr<Document> createWeakPtr() { return m_weakFactory.createWeakPtr(); }
+
+#if ENABLE(WIRELESS_PLAYBACK_TARGET)
+    void addPlaybackTargetPickerClient(MediaPlaybackTargetClient&);
+    void removePlaybackTargetPickerClient(MediaPlaybackTargetClient&);
+    void showPlaybackTargetPicker(MediaPlaybackTargetClient&, bool);
+    void playbackTargetPickerClientStateDidChange(MediaPlaybackTargetClient&, MediaProducer::MediaStateFlags);
+
+    void setPlaybackTarget(uint64_t, Ref<MediaPlaybackTarget>&&);
+    void playbackTargetAvailabilityDidChange(uint64_t, bool);
+    void setShouldPlayToPlaybackTarget(uint64_t, bool);
+#endif
+
+    ShouldOpenExternalURLsPolicy shouldOpenExternalURLsPolicyToPropagate() const;
+    bool shouldEnforceContentDispositionAttachmentSandbox() const;
+    void applyContentDispositionAttachmentSandbox();
 
 protected:
     enum ConstructionFlags { Synthesized = 1, NonRenderedPlaceholder = 1 << 1 };
@@ -1299,6 +1292,8 @@ private:
     friend class Node;
     friend class IgnoreDestructiveWriteCountIncrementer;
 
+    void updateTitleElement(Element* newTitleElement);
+
     void commonTeardown();
 
     RenderObject* renderer() const = delete;
@@ -1311,7 +1306,7 @@ private:
     void processArguments(const String& features, void* data, ArgumentsCallback);
 
     // FontSelectorClient
-    virtual void fontsNeedUpdate(FontSelector*) override final;
+    virtual void fontsNeedUpdate(FontSelector&) override final;
 
     virtual bool isDocument() const override final { return true; }
 
@@ -1330,8 +1325,9 @@ private:
 
     virtual double minimumTimerInterval() const override final;
 
-    virtual double timerAlignmentInterval() const override final;
+    virtual double timerAlignmentInterval(bool hasReachedMaxNestingLevel) const override final;
 
+    void updateTitleFromTitleElement();
     void updateTitle(const StringWithDirection&);
     void updateFocusAppearanceTimerFired();
     void updateBaseURL();
@@ -1369,12 +1365,15 @@ private:
 
     void didAssociateFormControlsTimerFired();
 
+    void wheelEventHandlersChanged();
+
+    HttpEquivPolicy httpEquivPolicy() const;
+
     // DOM Cookies caching.
     const String& cachedDOMCookies() const { return m_cachedDOMCookies; }
     void setCachedDOMCookies(const String&);
     bool isDOMCookieCacheValid() const { return m_cookieCacheExpiryTimer.isActive(); }
     void invalidateDOMCookieCache();
-    void domCookieCacheExpiryTimerFired();
     virtual void didLoadResourceSynchronously(const ResourceRequest&) override final;
 
     unsigned m_referencingNodeCount;
@@ -1447,7 +1446,7 @@ private:
     HashSet<NodeIterator*> m_nodeIterators;
     HashSet<Range*> m_ranges;
 
-    unsigned short m_listenerTypes;
+    unsigned m_listenerTypes;
 
     MutationObserverOptions m_mutationObserverTypes;
 
@@ -1480,9 +1479,10 @@ private:
     // http://www.whatwg.org/specs/web-apps/current-work/#ignore-destructive-writes-counter
     unsigned m_ignoreDestructiveWriteCount;
 
+    unsigned m_styleRecalcCount { 0 };
+
     StringWithDirection m_title;
     StringWithDirection m_rawTitle;
-    bool m_titleSetExplicitly;
     RefPtr<Element> m_titleElement;
 
     std::unique_ptr<AXObjectCache> m_axObjectCache;
@@ -1545,7 +1545,6 @@ private:
 
     bool m_createRenderers;
     bool m_inPageCache;
-    Vector<IconURL> m_iconURLs;
 
     HashSet<Element*> m_documentSuspensionCallbackElements;
     HashSet<Element*> m_mediaVolumeCallbackElements;
@@ -1559,6 +1558,9 @@ private:
 #endif
 
     HashSet<Element*> m_visibilityStateCallbackElements;
+#if ENABLE(VIDEO)
+    HashSet<HTMLMediaElement*> m_allowsMediaDocumentInlinePlaybackElements;
+#endif
 
     HashMap<StringImpl*, Element*, CaseFoldingHash> m_elementsByAccessKey;
     bool m_accessKeyMapValid;
@@ -1613,10 +1615,10 @@ private:
     bool m_writeRecursionIsTooDeep;
     unsigned m_writeRecursionDepth;
     
-    unsigned m_wheelEventHandlerCount;
 #if ENABLE(TOUCH_EVENTS)
-    std::unique_ptr<TouchEventTargetSet> m_touchEventTargets;
+    std::unique_ptr<EventTargetSet> m_touchEventTargets;
 #endif
+    std::unique_ptr<EventTargetSet> m_wheelEventTargets;
 
     double m_lastHandledUserGestureTimestamp;
 
@@ -1721,9 +1723,21 @@ private:
     bool m_hasPreparedForDestruction;
 
     bool m_hasStyleWithViewportUnits;
+    bool m_isTimerThrottlingEnabled { false };
 
-    HashSet<AudioProducer*> m_audioProducers;
-    bool m_isPlayingAudio;
+    HashSet<MediaProducer*> m_audioProducers;
+    MediaProducer::MediaStateFlags m_mediaState { MediaProducer::IsNotPlaying };
+
+#if ENABLE(WIRELESS_PLAYBACK_TARGET)
+    typedef HashMap<uint64_t, WebCore::MediaPlaybackTargetClient*> TargetIdToClientMap;
+    TargetIdToClientMap m_idToClientMap;
+    typedef HashMap<WebCore::MediaPlaybackTargetClient*, uint64_t> TargetClientToIdMap;
+    TargetClientToIdMap m_clientToIDMap;
+#endif
+
+#if ENABLE(MEDIA_SESSION)
+    RefPtr<MediaSession> m_defaultMediaSession;
+#endif
 };
 
 inline void Document::notifyRemovePendingSheetIfNeeded()

@@ -88,6 +88,7 @@ public:
     virtual bool isNativeImage() const override;
     virtual bool isNativeTextControl() const override;
     virtual bool isPasswordField() const override;
+    virtual AccessibilityObject* passwordFieldOrContainingPasswordField() override;
     virtual bool isProgressIndicator() const override;
     virtual bool isSearchField() const override;
     virtual bool isSlider() const override;
@@ -129,6 +130,7 @@ public:
     virtual void colorValue(int& r, int& g, int& b) const override;
     virtual String ariaLabeledByAttribute() const override;
     virtual bool hasAttributesRequiredForInclusion() const override final;
+    virtual void setIsExpanded(bool) override;
 
     virtual Element* actionElement() const override;
     Element* mouseButtonListener(MouseButtonListenerResultFilter = ExcludeBodyElement) const;

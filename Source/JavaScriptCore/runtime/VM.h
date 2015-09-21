@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008, 2009, 2013, 2014 Apple Inc. All rights reserved.
+ * Copyright (C) 2008, 2009, 2013-2015 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -40,6 +40,7 @@
 #include "JSLock.h"
 #include "LLIntData.h"
 #include "MacroAssemblerCodeRef.h"
+#include "Microtask.h"
 #include "NumericStrings.h"
 #include "PrivateName.h"
 #include "PrototypeMap.h"
@@ -49,21 +50,21 @@
 #include "ThunkGenerators.h"
 #include "TypedArrayController.h"
 #include "VMEntryRecord.h"
-#include "Watchdog.h"
 #include "Watchpoint.h"
 #include "WeakRandom.h"
 #include <wtf/Bag.h>
 #include <wtf/BumpPointerAllocator.h>
 #include <wtf/DateMath.h>
+#include <wtf/Deque.h>
 #include <wtf/Forward.h>
 #include <wtf/HashMap.h>
 #include <wtf/HashSet.h>
-#include <wtf/RefCountedArray.h>
 #include <wtf/SimpleStats.h>
 #include <wtf/StackBounds.h>
 #include <wtf/ThreadSafeRefCounted.h>
 #include <wtf/ThreadSpecific.h>
 #include <wtf/WTFThreadData.h>
+#include <wtf/text/SymbolRegistry.h>
 #include <wtf/text/WTFString.h>
 #if ENABLE(REGEXP_TRACING)
 #include <wtf/ListHashSet.h>
@@ -77,6 +78,7 @@ class CodeBlock;
 class CodeCache;
 class CommonIdentifiers;
 class ExecState;
+class Exception;
 class HandleStack;
 class TypeProfiler;
 class TypeProfilerLog;
@@ -84,7 +86,6 @@ class Identifier;
 class Interpreter;
 class JSGlobalObject;
 class JSObject;
-class Keywords;
 class LLIntOffsetsExtractor;
 class LegacyProfiler;
 class NativeExecutable;
@@ -104,6 +105,7 @@ class UnlinkedFunctionExecutable;
 class UnlinkedProgramCodeBlock;
 class VirtualRegister;
 class VMEntryScope;
+class Watchdog;
 class Watchpoint;
 class WatchpointSet;
 
@@ -150,6 +152,23 @@ struct LocalTimeOffsetCache {
     double end;
     double increment;
     WTF::TimeType timeType;
+};
+
+class QueuedTask {
+    WTF_MAKE_NONCOPYABLE(QueuedTask);
+    WTF_MAKE_FAST_ALLOCATED;
+public:
+    void run();
+
+    QueuedTask(VM& vm, JSGlobalObject* globalObject, PassRefPtr<Microtask> microtask)
+        : m_globalObject(vm, globalObject)
+        , m_microtask(microtask)
+    {
+    }
+
+private:
+    Strong<JSGlobalObject> m_globalObject;
+    RefPtr<Microtask> m_microtask;
 };
 
 class ConservativeRoots;
@@ -212,10 +231,12 @@ public:
     JS_EXPORT_PRIVATE static bool sharedInstanceExists();
     JS_EXPORT_PRIVATE static VM& sharedInstance();
 
-    JS_EXPORT_PRIVATE static PassRefPtr<VM> create(HeapType = SmallHeap);
-    JS_EXPORT_PRIVATE static PassRefPtr<VM> createLeaked(HeapType = SmallHeap);
-    static PassRefPtr<VM> createContextGroup(HeapType = SmallHeap);
+    JS_EXPORT_PRIVATE static Ref<VM> create(HeapType = SmallHeap);
+    JS_EXPORT_PRIVATE static Ref<VM> createLeaked(HeapType = SmallHeap);
+    static Ref<VM> createContextGroup(HeapType = SmallHeap);
     JS_EXPORT_PRIVATE ~VM();
+
+    JS_EXPORT_PRIVATE Watchdog& ensureWatchdog();
 
 private:
     RefPtr<JSLock> m_apiLock;
@@ -239,7 +260,7 @@ public:
     ClientData* clientData;
     VMEntryFrame* topVMEntryFrame;
     ExecState* topCallFrame;
-    std::unique_ptr<Watchdog> watchdog;
+    RefPtr<Watchdog> watchdog;
 
     Strong<Structure> structureStructure;
     Strong<Structure> structureRareDataStructure;
@@ -250,6 +271,7 @@ public:
     Strong<Structure> propertyNameEnumeratorStructure;
     Strong<Structure> getterSetterStructure;
     Strong<Structure> customGetterSetterStructure;
+    Strong<Structure> scopedArgumentsTableStructure;
     Strong<Structure> apiWrapperStructure;
     Strong<Structure> JSScopeStructure;
     Strong<Structure> executableStructure;
@@ -262,22 +284,23 @@ public:
     Strong<Structure> symbolTableStructure;
     Strong<Structure> structureChainStructure;
     Strong<Structure> sparseArrayValueMapStructure;
+    Strong<Structure> templateRegistryKeyStructure;
     Strong<Structure> arrayBufferNeuteringWatchpointStructure;
     Strong<Structure> unlinkedFunctionExecutableStructure;
     Strong<Structure> unlinkedProgramCodeBlockStructure;
     Strong<Structure> unlinkedEvalCodeBlockStructure;
     Strong<Structure> unlinkedFunctionCodeBlockStructure;
     Strong<Structure> propertyTableStructure;
-    Strong<Structure> mapDataStructure;
     Strong<Structure> weakMapDataStructure;
-#if ENABLE(PROMISES)
+    Strong<Structure> inferredValueStructure;
+    Strong<Structure> functionRareDataStructure;
+    Strong<Structure> exceptionStructure;
     Strong<Structure> promiseDeferredStructure;
-    Strong<Structure> promiseReactionStructure;
-#endif
     Strong<JSCell> iterationTerminator;
     Strong<JSCell> emptyPropertyNameEnumerator;
 
     AtomicStringTable* m_atomicStringTable;
+    WTF::SymbolRegistry m_symbolRegistry;
     CommonIdentifiers* propertyNames;
     const MarkedArgumentBuffer* emptyList; // Lists are supposed to be allocated on the stack to have their elements properly marked, which is not the case here - but this list has nothing to mark.
     SmallStrings smallStrings;
@@ -288,6 +311,7 @@ public:
     Strong<JSString> lastCachedString;
 
     AtomicStringTable* atomicStringTable() const { return m_atomicStringTable; }
+    WTF::SymbolRegistry& symbolRegistry() { return m_symbolRegistry; }
 
     void setInDefineOwnProperty(bool inDefineOwnProperty)
     {
@@ -323,7 +347,6 @@ public:
 
     typedef HashMap<RefPtr<SourceProvider>, RefPtr<SourceProviderCache>> SourceProviderCacheMap;
     SourceProviderCacheMap sourceProviderCacheMap;
-    std::unique_ptr<Keywords> keywords;
     Interpreter* interpreter;
 #if ENABLE(JIT)
     std::unique_ptr<JITThunks> jitStubs;
@@ -366,14 +389,22 @@ public:
         return OBJECT_OFFSETOF(VM, targetMachinePCForThrow);
     }
 
-    JS_EXPORT_PRIVATE void clearException();
-    JS_EXPORT_PRIVATE void clearExceptionStack();
-    void getExceptionInfo(JSValue& exception, RefCountedArray<StackFrame>& exceptionStack);
-    void setExceptionInfo(JSValue& exception, RefCountedArray<StackFrame>& exceptionStack);
-    JSValue exception() const { return m_exception; }
-    JSValue* addressOfException() { return &m_exception; }
-    const RefCountedArray<StackFrame>& exceptionStack() const { return m_exceptionStack; }
+    void clearException() { m_exception = nullptr; }
+    void clearLastException() { m_lastException = nullptr; }
 
+    void setException(Exception* exception)
+    {
+        m_exception = exception;
+        m_lastException = exception;
+    }
+
+    Exception* exception() const { return m_exception; }
+    JSCell** addressOfException() { return reinterpret_cast<JSCell**>(&m_exception); }
+
+    Exception* lastException() const { return m_lastException; }
+    JSCell** addressOfLastException() { return reinterpret_cast<JSCell**>(&m_lastException); }
+
+    JS_EXPORT_PRIVATE void throwException(ExecState*, Exception*);
     JS_EXPORT_PRIVATE JSValue throwException(ExecState*, JSValue);
     JS_EXPORT_PRIVATE JSObject* throwException(ExecState*, JSObject*);
 
@@ -447,6 +478,7 @@ public:
 
     VMEntryScope* entryScope;
 
+    JSObject* stringRecursionCheckFirstObject { nullptr };
     HashSet<JSObject*> stringRecursionCheckVisitedObjects;
 
     LocalTimeOffsetCache localTimeOffsetCache;
@@ -480,7 +512,6 @@ public:
     JS_EXPORT_PRIVATE void dumpRegExpTrace();
 
     bool isCollectorBusy() { return heap.isBusy(); }
-    JS_EXPORT_PRIVATE void releaseExecutableMemory();
 
 #if ENABLE(GC_VALIDATION)
     bool isInitializingObject() const; 
@@ -499,11 +530,12 @@ public:
     JSLock& apiLock() { return *m_apiLock; }
     CodeCache* codeCache() { return m_codeCache.get(); }
 
-    void prepareToDiscardCode();
+    void prepareToDeleteCode();
         
-    JS_EXPORT_PRIVATE void discardAllCode();
+    JS_EXPORT_PRIVATE void deleteAllCode();
 
     void registerWatchpointForImpureProperty(const Identifier&, Watchpoint*);
+    
     // FIXME: Use AtomicString once it got merged with Identifier.
     JS_EXPORT_PRIVATE void addImpureProperty(const String&);
 
@@ -520,6 +552,11 @@ public:
     ControlFlowProfiler* controlFlowProfiler() { return m_controlFlowProfiler.get(); }
     bool enableControlFlowProfiler();
     bool disableControlFlowProfiler();
+
+    JS_EXPORT_PRIVATE void queueMicrotask(JSGlobalObject*, PassRefPtr<Microtask>);
+    JS_EXPORT_PRIVATE void drainMicrotasks();
+
+    inline bool shouldTriggerTermination(ExecState*);
 
 private:
     friend class LLIntOffsetsExtractor;
@@ -562,12 +599,12 @@ private:
 #endif
 #endif
     void* m_lastStackTop;
-    JSValue m_exception;
+    Exception* m_exception { nullptr };
+    Exception* m_lastException { nullptr };
     bool m_inDefineOwnProperty;
     std::unique_ptr<CodeCache> m_codeCache;
     LegacyProfiler* m_enabledProfiler;
     std::unique_ptr<BuiltinExecutables> m_builtinExecutables;
-    RefCountedArray<StackFrame> m_exceptionStack;
     HashMap<String, RefPtr<WatchpointSet>> m_impurePropertyWatchpointSets;
     std::unique_ptr<TypeProfiler> m_typeProfiler;
     std::unique_ptr<TypeProfilerLog> m_typeProfilerLog;
@@ -575,6 +612,7 @@ private:
     FunctionHasExecutedCache m_functionHasExecutedCache;
     std::unique_ptr<ControlFlowProfiler> m_controlFlowProfiler;
     unsigned m_controlFlowProfilerEnabledCount;
+    Deque<std::unique_ptr<QueuedTask>> m_microtaskQueue;
 };
 
 #if ENABLE(GC_VALIDATION)
